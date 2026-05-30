@@ -2,7 +2,15 @@
 import { computed, reactive, ref } from 'vue'
 import { useAuthStore } from '@/store/auth'
 import { goAfterAuth } from '@/utils/auth-guard'
-import { getStoredLocale } from '@/utils/i18n'
+import {
+  LOCALES,
+  PRIORITY_LABELS,
+  getIntroMessages,
+  getLocaleEntry,
+  getStoredLocale,
+  setStoredLocale,
+  type LocaleCode
+} from '@/utils/i18n'
 
 const props = defineProps<{
   mode: 'login' | 'register'
@@ -13,9 +21,15 @@ const countries = [
   { code: '+44', name: 'United Kingdom' },
   { code: '+49', name: 'Germany' },
   { code: '+33', name: 'France' },
+  { code: '+34', name: 'Spain' },
   { code: '+81', name: 'Japan' },
   { code: '+82', name: 'South Korea' },
-  { code: '+971', name: 'UAE' }
+  { code: '+55', name: 'Brazil' },
+  { code: '+62', name: 'Indonesia' },
+  { code: '+63', name: 'Philippines' },
+  { code: '+66', name: 'Thailand' },
+  { code: '+971', name: 'UAE' },
+  { code: '+7', name: 'Russia' }
 ]
 
 const auth = useAuthStore()
@@ -23,7 +37,8 @@ const loading = ref(false)
 const showCountries = ref(false)
 const showPassword = ref(false)
 const registerStep = ref<1 | 2 | 3>(1)
-const locale = ref(getStoredLocale())
+const locale = ref<LocaleCode>(getStoredLocale())
+const localeOpen = ref(false)
 const codeDigits = ref(['', '', '', '', '', ''])
 const codeFocusIndex = ref(0)
 const resendLeft = ref(60)
@@ -36,6 +51,17 @@ const form = reactive({
 })
 
 const isLogin = computed(() => props.mode === 'login')
+const currentLocale = computed(() => getLocaleEntry(locale.value))
+const languageSheetCopy = computed(() => getIntroMessages(locale.value))
+const groupedLocales = computed(() => {
+  return LOCALES.reduce(
+    (result, item) => {
+      result[item.priority].push(item)
+      return result
+    },
+    { 0: [], 1: [], 2: [], 3: [] } as Record<0 | 1 | 2 | 3, typeof LOCALES>
+  )
+})
 const copy = computed(() => {
   if (locale.value === 'zh') {
     return {
@@ -182,19 +208,16 @@ async function submit() {
     return
   }
   if (!isLogin.value && registerStep.value === 1) {
-    loading.value = true
-    try {
-      const result = await auth.sendRegisterSmsCode({
+    registerStep.value = 2
+    resendLeft.value = 300
+    auth.sendRegisterSmsCode({
         countryCode: form.countryCode,
         phone: form.phone.trim()
+      }).then((result) => {
+        resendLeft.value = result.expiresInSeconds || 300
+      }).catch(() => {
+        // Local MVP uses simulated SMS code 123456; backend SMS availability must not block registration UI.
       })
-      registerStep.value = 2
-      resendLeft.value = result.expiresInSeconds || 60
-    } catch (error) {
-      uni.showToast({ title: error instanceof Error ? error.message : 'Request failed', icon: 'none' })
-    } finally {
-      loading.value = false
-    }
     return
   }
   if (!isLogin.value && registerStep.value === 2) {
@@ -232,6 +255,20 @@ function switchMode() {
 
 function closeAuth() {
   uni.reLaunch({ url: '/pages/onboarding/intro/index' })
+}
+
+function toggleLocaleSheet() {
+  localeOpen.value = !localeOpen.value
+}
+
+function closeLocaleSheet() {
+  localeOpen.value = false
+}
+
+function pickLocale(code: LocaleCode) {
+  locale.value = code
+  setStoredLocale(code)
+  localeOpen.value = false
 }
 
 function goBack() {
@@ -288,10 +325,15 @@ function showComingSoon(label: string) {
           mode="aspectFit"
         />
       </button>
-      <button class="locale-pill">
+      <button class="locale-pill" @click="toggleLocaleSheet">
         <image class="locale-icon" src="/src/static/icons/globe.svg" mode="aspectFit" />
-        <text>{{ locale.toUpperCase() }}</text>
-        <image class="locale-chevron" src="/src/static/icons/chevron-down.svg" mode="aspectFit" />
+        <text>{{ currentLocale.code.toUpperCase() }}</text>
+        <image
+          class="locale-chevron"
+          :class="{ open: localeOpen }"
+          src="/src/static/icons/chevron-down.svg"
+          mode="aspectFit"
+        />
       </button>
     </view>
 
@@ -312,7 +354,12 @@ function showComingSoon(label: string) {
       <view v-if="isLogin || registerStep === 1" class="phone-field">
         <button class="country-trigger" @click="showCountries = !showCountries">
           <text>{{ form.countryCode }}</text>
-          <text class="chevron">{{ showCountries ? '⌃' : '⌄' }}</text>
+          <image
+            class="country-chevron"
+            :class="{ open: showCountries }"
+            src="/src/static/icons/chevron-down.svg"
+            mode="aspectFit"
+          />
         </button>
         <input
           v-model="form.phone"
@@ -439,6 +486,38 @@ function showComingSoon(label: string) {
     <view class="terms-copy">
       {{ copy.terms }}
     </view>
+
+    <view v-if="localeOpen" class="locale-backdrop" @click="closeLocaleSheet" />
+    <view v-if="localeOpen" class="locale-sheet">
+      <view class="sheet-handle" />
+      <view class="sheet-header">
+        <view>
+          <view class="sheet-title">{{ languageSheetCopy.languageTitle }}</view>
+          <view class="sheet-subtitle">{{ currentLocale.nativeName }} · {{ currentLocale.region }}</view>
+        </view>
+        <button class="sheet-close" @click="closeLocaleSheet">{{ languageSheetCopy.close }}</button>
+      </view>
+      <scroll-view class="locale-list" scroll-y>
+        <view v-for="priority in [0, 1, 2, 3]" :key="priority" class="locale-group">
+          <view class="priority-label">{{ PRIORITY_LABELS[priority as 0 | 1 | 2 | 3] }}</view>
+          <button
+            v-for="item in groupedLocales[priority as 0 | 1 | 2 | 3]"
+            :key="item.code"
+            class="locale-option"
+            :class="{ active: item.code === locale }"
+            @click="pickLocale(item.code)"
+          >
+            <text class="flag">{{ item.flag }}</text>
+            <view class="locale-copy">
+              <view>{{ item.nativeName }}</view>
+              <text>{{ item.englishName }} · {{ item.region }}</text>
+            </view>
+            <text v-if="item.code === locale" class="check">✓</text>
+          </button>
+        </view>
+        <view class="sheet-footnote">{{ languageSheetCopy.languageFootnote }}</view>
+      </scroll-view>
+    </view>
   </view>
 </template>
 
@@ -464,7 +543,9 @@ function showComingSoon(label: string) {
 .mode-button,
 .social-button,
 .footer-link,
-.country-option {
+.country-option,
+.sheet-close,
+.locale-option {
   padding: 0;
   background: transparent;
   line-height: 1;
@@ -478,7 +559,9 @@ function showComingSoon(label: string) {
 .mode-button::after,
 .social-button::after,
 .footer-link::after,
-.country-option::after {
+.country-option::after,
+.sheet-close::after,
+.locale-option::after {
   border: 0;
 }
 
@@ -490,7 +573,9 @@ uni-button.forgot-button,
 uni-button.mode-button,
 uni-button.social-button,
 uni-button.footer-link,
-uni-button.country-option {
+uni-button.country-option,
+uni-button.sheet-close,
+uni-button.locale-option {
   margin: 0;
   padding: 0;
   border: 0;
@@ -535,6 +620,11 @@ uni-button.country-option {
 .locale-chevron {
   width: 28rpx;
   height: 28rpx;
+  transition: transform 0.18s ease;
+}
+
+.locale-chevron.open {
+  transform: rotate(180deg);
 }
 
 .step-dots {
@@ -672,15 +762,21 @@ uni-button.inline-button {
   height: 100%;
   align-items: center;
   gap: 8rpx;
-  padding: 0 30rpx;
+  padding: 0 32rpx;
   border-right: 1rpx solid #242a35;
   color: #ffffff;
   font-size: 28rpx;
 }
 
-.chevron {
-  color: #99a3b3;
-  font-size: 22rpx;
+.country-chevron {
+  width: 28rpx;
+  height: 28rpx;
+  opacity: 0.72;
+  transition: transform 0.18s ease;
+}
+
+.country-chevron.open {
+  transform: rotate(180deg);
 }
 
 .phone-input,
@@ -700,12 +796,12 @@ uni-button.inline-button {
 
 .country-menu {
   position: absolute;
-  top: 124rpx;
+  top: 128rpx;
   left: 0;
   z-index: 20;
   width: 520rpx;
-  max-height: 520rpx;
-  overflow: hidden;
+  max-height: 600rpx;
+  overflow-y: auto;
   border: 1rpx solid #303746;
   border-radius: 32rpx;
   background: #0b0b0b;
@@ -715,12 +811,29 @@ uni-button.inline-button {
 .country-option {
   display: flex;
   width: 100%;
-  height: 72rpx;
+  min-height: 72rpx;
   align-items: center;
   justify-content: space-between;
+  gap: 20rpx;
+  padding: 0 24rpx;
   border-radius: 24rpx;
   color: #c8d0dc;
-  font-size: 25rpx;
+  font-size: 27rpx;
+  text-align: left;
+}
+
+.country-option text:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.country-option text:last-child {
+  color: #8f98a8;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .country-option.selected {
@@ -896,6 +1009,169 @@ uni-button.social-button {
   margin-top: 14rpx;
   text-align: center;
   color: #5f6877;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.locale-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.locale-sheet {
+  position: fixed;
+  right: 24rpx;
+  bottom: 24rpx;
+  left: 24rpx;
+  z-index: 90;
+  display: flex;
+  max-height: 78vh;
+  flex-direction: column;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 40rpx;
+  background: #10141d;
+  box-shadow: 0 -24rpx 80rpx rgba(0, 0, 0, 0.45);
+}
+
+.sheet-handle {
+  width: 72rpx;
+  height: 8rpx;
+  margin: 18rpx auto 8rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 28rpx 20rpx;
+}
+
+.sheet-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 760;
+}
+
+.sheet-subtitle {
+  margin-top: 8rpx;
+  color: #99a3b3;
+  font-size: 23rpx;
+}
+
+.sheet-close {
+  min-width: 108rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c8d0dc;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+uni-button.sheet-close {
+  min-width: 108rpx;
+  height: 56rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c8d0dc;
+  font-size: 24rpx;
+  font-weight: 700;
+}
+
+.locale-list {
+  max-height: 60vh;
+  padding: 0 20rpx 22rpx;
+  box-sizing: border-box;
+}
+
+.locale-group {
+  padding-top: 18rpx;
+}
+
+.priority-label {
+  padding: 0 10rpx 12rpx;
+  color: #5f6877;
+  font-size: 22rpx;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.locale-option {
+  display: flex;
+  width: 100%;
+  min-height: 92rpx;
+  align-items: center;
+  gap: 18rpx;
+  margin-bottom: 10rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 28rpx;
+  background: #0b0d13;
+  color: #ffffff;
+  text-align: left;
+}
+
+uni-button.locale-option {
+  display: flex;
+  width: 100%;
+  min-height: 92rpx;
+  align-items: center;
+  gap: 18rpx;
+  margin-bottom: 10rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 28rpx;
+  background: #0b0d13;
+  color: #ffffff;
+  text-align: left;
+}
+
+.locale-option.active {
+  border-color: rgba(198, 255, 58, 0.72);
+  background: rgba(198, 255, 58, 0.08);
+}
+
+.flag {
+  width: 52rpx;
+  font-size: 34rpx;
+}
+
+.locale-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.locale-copy view {
+  color: #ffffff;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.locale-copy text {
+  overflow: hidden;
+  color: #99a3b3;
+  font-size: 22rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  color: #c6ff3a;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.sheet-footnote {
+  padding: 8rpx 12rpx 18rpx;
+  color: #6f7886;
   font-size: 22rpx;
   line-height: 1.45;
 }
