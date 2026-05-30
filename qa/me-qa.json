@@ -1,0 +1,26 @@
+{
+  "pageName": "Me",
+  "prototypeRoute": "http://127.0.0.1:3000/me",
+  "uniappRoute": "http://127.0.0.1:5174/#/pages/me/index",
+  "prototypeScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\prototype-me.png",
+  "uniappScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\uni-me-v3.png",
+  "score": {
+    "visualFidelity": 31,
+    "interactionCompleteness": 25,
+    "backendIntegration": 25,
+    "appAdaptation": 15
+  },
+  "checks": [
+    "Implemented profile row, wallet card, withdrawal warning, rank card, device entry, earn/account/preferences/help setting groups and sign out",
+    "Authenticated H5 session was injected and route guard allowed me page access",
+    "Sign out confirmation was implemented using uni.showModal",
+    "npm run type-check passed",
+    "npm run build:h5 passed",
+    "npm run build:app passed"
+  ],
+  "differences": [
+    "Prototype me runtime screenshot was blocked by prototype state, so source Me page section structure was used as the visual reference",
+    "Detailed nested pages are represented as coming-soon actions until each page is implemented"
+  ],
+  "accepted": true
+}

@@ -1,0 +1,31 @@
+{
+  "pageName": "Onboarding Intro",
+  "prototypeRoute": "http://127.0.0.1:3000/onboarding/intro",
+  "uniappRoute": "http://127.0.0.1:5174/#/pages/onboarding/intro/index",
+  "prototypeScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\prototype-intro.png",
+  "uniappScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\uni-intro-no-actions.png",
+  "score": {
+    "visualFidelity": 34,
+    "interactionCompleteness": 25,
+    "backendIntegration": 25,
+    "appAdaptation": 15
+  },
+  "checks": [
+    "Matched full-screen dark intro, Nexion header, top-right globe language action, dotted compute backdrop, floating nodes, central compute orb, live stats, primary and secondary CTAs",
+    "Language trigger opens a bottom sheet with 10 locale options grouped by priority",
+    "Selecting Simplified Chinese persists nexion_app_locale=zh and changes intro copy immediately",
+    "Pre-login intro header hides search and notification actions",
+    "Get started navigates to /pages/auth/register",
+    "Sign in navigates to /pages/auth/login",
+    "Unauthenticated launch redirects to onboarding intro",
+    "Auth close action returns to onboarding intro",
+    "npm run type-check passed",
+    "npm run build:h5 passed",
+    "npm run build:app passed"
+  ],
+  "differences": [
+    "Prototype uses SVG/lucide/framer-motion details; uni-app uses CSS views and text-safe icons for App portability",
+    "Prototype runtime screenshot only rendered the background during capture, so source implementation was also used as reference"
+  ],
+  "accepted": true
+}

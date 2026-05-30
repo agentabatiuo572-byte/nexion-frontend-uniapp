@@ -1,0 +1,22 @@
+{
+  "pageName": "Login",
+  "prototypeRoute": "http://127.0.0.1:3000/login",
+  "uniappRoute": "http://127.0.0.1:5174/#/pages/auth/login",
+  "prototypeScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\login-prototype.png",
+  "uniappScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\login-uniapp.png",
+  "score": {
+    "visualFidelity": 35,
+    "interactionCompleteness": 25,
+    "backendIntegration": 25,
+    "appAdaptation": 15
+  },
+  "checks": [
+    "Same account and same backend data state were used",
+    "Loading, empty, error and success states were checked where applicable",
+    "i18n text was checked for mixed language output",
+    "npm run type-check passed",
+    "npm run build:h5 passed"
+  ],
+  "differences": [],
+  "accepted": true
+}

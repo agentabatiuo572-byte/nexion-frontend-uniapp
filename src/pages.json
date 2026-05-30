@@ -1,0 +1,62 @@
+{
+  "pages": [
+    {
+      "path": "pages/launch/index",
+      "style": {
+        "navigationBarTitleText": "Nexion"
+      }
+    },
+    {
+      "path": "pages/onboarding/intro/index",
+      "style": {
+        "navigationBarTitleText": "Nexion"
+      }
+    },
+    {
+      "path": "pages/auth/login",
+      "style": {
+        "navigationBarTitleText": "Sign in"
+      }
+    },
+    {
+      "path": "pages/auth/register",
+      "style": {
+        "navigationBarTitleText": "Sign up"
+      }
+    },
+    {
+      "path": "pages/home/index",
+      "style": {
+        "navigationBarTitleText": "Nexion"
+      }
+    },
+    {
+      "path": "pages/me/index",
+      "style": {
+        "navigationBarTitleText": "Me"
+      }
+    }
+  ],
+  "globalStyle": {
+    "backgroundColor": "#07080a",
+    "navigationBarBackgroundColor": "#07080a",
+    "navigationBarTextStyle": "white",
+    "navigationStyle": "custom"
+  },
+  "tabBar": {
+    "color": "#7b8494",
+    "selectedColor": "#c6ff3a",
+    "backgroundColor": "#07080a",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "Home"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "Me"
+      }
+    ]
+  }
+}

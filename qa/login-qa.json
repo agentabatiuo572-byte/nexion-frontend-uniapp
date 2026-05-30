@@ -1,0 +1,25 @@
+{
+  "pageName": "Login",
+  "prototypeRoute": "http://127.0.0.1:3000/login",
+  "uniappRoute": "http://127.0.0.1:5174/#/pages/auth/login",
+  "prototypeScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\prototype-login.png",
+  "uniappScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\uni-login-v4.png",
+  "score": {
+    "visualFidelity": 31,
+    "interactionCompleteness": 25,
+    "backendIntegration": 25,
+    "appAdaptation": 15
+  },
+  "checks": [
+    "Matched dark auth shell, top brand bar, close and language actions, phone country selector, password field, primary CTA, social options and footer switch",
+    "Real login was verified through POST /api/auth/users/login and navigated to home",
+    "Disabled state, coming-soon secondary actions and mobile H5 layout were checked",
+    "npm run type-check passed",
+    "npm run build:h5 passed",
+    "npm run build:app passed"
+  ],
+  "differences": [
+    "Prototype includes exact lucide icons and device chrome; uni-app uses text-safe icon placeholders for first baseline"
+  ],
+  "accepted": true
+}

@@ -1,0 +1,27 @@
+{
+  "pageName": "Register",
+  "prototypeRoute": "http://127.0.0.1:3000/register",
+  "uniappRoute": "http://127.0.0.1:5174/#/pages/auth/register",
+  "prototypeScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\prototype-register-latest.png",
+  "uniappScreenshot": "D:\\workspace\\nexion-frontend-uniapp\\qa\\uni-register-v8-zh.png",
+  "score": {
+    "visualFidelity": 34,
+    "interactionCompleteness": 25,
+    "backendIntegration": 25,
+    "appAdaptation": 15
+  },
+  "checks": [
+    "Matched high-fidelity register first screen: header, SVG close/local switcher, three step dots, title, welcome subtitle, single phone input, welcome bonus card, disabled send-code CTA, SVG social icons and footer",
+    "Matched high-fidelity register second screen: SVG back/local switcher, active second step dot, 6 code boxes, change-phone/resend row, invite code input and verify-continue CTA",
+    "Matched high-fidelity register third screen: active third step dot, 设置登录密码 title, password rule copy, two password inputs, eye icon and disabled 创建账号 CTA",
+    "Get started from intro navigates to /pages/auth/register and first screen only shows one phone input; password is deferred to the real backend registration step",
+    "Chinese locale copy is rendered from stored app locale on the register first screen",
+    "npm run type-check passed",
+    "npm run build:h5 passed"
+  ],
+  "differences": [
+    "Prototype uses OTP verification; current backend does not expose OTP, so uni-app displays the OTP and invite-code page, then advances locally to password setup before calling POST /api/auth/users/register",
+    "Browser H5 screenshots do not emulate the native iOS status bar and safe-area chrome exactly"
+  ],
+  "accepted": true
+}
