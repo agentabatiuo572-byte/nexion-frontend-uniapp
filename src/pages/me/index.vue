@@ -145,17 +145,17 @@ function comingSoon(label: string) {
               <view class="quick-label">{{ quickActionsLabel }}</view>
               <view class="wallet-actions">
                 <button class="primary" @click="comingSoon(m.topUp)">
-                  <text class="action-icon">↓</text>
+                  <view class="action-icon"><text class="action-glyph icon-topup" /></view>
                   <text>{{ m.topUp }}</text>
                   <text>USDT</text>
                 </button>
                 <button @click="comingSoon(m.withdraw)">
-                  <text class="action-icon">↑</text>
+                  <view class="action-icon"><text class="action-glyph icon-withdraw" /></view>
                   <text>{{ m.withdraw }}</text>
                   <text>USDT</text>
                 </button>
                 <button @click="comingSoon(m.exchange)">
-                  <text class="action-icon">✦</text>
+                  <view class="action-icon"><text class="action-glyph icon-exchange" /></view>
                   <text>{{ m.exchange }}</text>
                   <text>USDT ⇄ NEX</text>
                 </button>
@@ -646,6 +646,28 @@ function comingSoon(label: string) {
   color: #c6ff3a;
   font-size: 34rpx;
   font-weight: 800;
+}
+
+.action-glyph {
+  display: block;
+  width: 34rpx;
+  height: 34rpx;
+  background: currentColor;
+}
+
+.icon-topup {
+  -webkit-mask: url("/static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
+  mask: url("/static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
+}
+
+.icon-withdraw {
+  -webkit-mask: url("/static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
+  mask: url("/static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
+}
+
+.icon-exchange {
+  -webkit-mask: url("/static/icons/wallet-sparkles.svg") center / contain no-repeat;
+  mask: url("/static/icons/wallet-sparkles.svg") center / contain no-repeat;
 }
 
 .wallet-actions button.primary .action-icon {
