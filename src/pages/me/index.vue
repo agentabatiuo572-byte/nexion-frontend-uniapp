@@ -32,6 +32,17 @@ const currentLocale = computed(() => getLocaleEntry(locale.value))
 const languageSheetCopy = computed(() => getIntroMessages(locale.value))
 const m = computed(() => getMeMessages(locale.value))
 const priorityLabels = computed(() => getPriorityLabels(locale.value))
+const walletTitle = computed(() => (locale.value === 'zh' ? m.value.walletTitle : 'My Wallet'))
+const quickActionsLabel = computed(() => (locale.value === 'zh' ? '快捷操作' : 'Quick actions'))
+const usdtBalanceLabel = computed(() => (locale.value === 'zh' ? 'USDT 余额' : 'USDT balance'))
+const nexBalanceLabel = computed(() => (locale.value === 'zh' ? 'NEX 余额' : 'NEX balance'))
+const billsShortLabel = computed(() => (locale.value === 'zh' ? m.value.bills : 'Bills'))
+const billsMonthLabel = computed(() => (locale.value === 'zh' ? '本月' : 'this month'))
+const slotLiveLabel = computed(() => (locale.value === 'zh' ? '在线' : 'live'))
+const slotOpenLabel = computed(() => (locale.value === 'zh' ? '可用槽位' : 'slots open'))
+const unlockLabel = computed(() => (locale.value === 'zh' ? '解锁' : 'Unlock'))
+const moreLabel = computed(() => (locale.value === 'zh' ? '更多' : 'more'))
+const addDeviceLabel = computed(() => (locale.value === 'zh' ? '添加设备 →' : 'Add device →'))
 const groupedLocales = computed(() => {
   return LOCALES.reduce(
     (result, item) => {
@@ -95,31 +106,73 @@ function comingSoon(label: string) {
         </view>
       </view>
 
-      <view class="wallet-card">
-        <view class="wallet-head">
-          <view>
-            <view class="card-label">{{ m.walletTitle }}</view>
-            <view class="wallet-balance">$0.00</view>
-          </view>
-          <view class="pending">{{ m.pending }} $0.00</view>
+      <view class="wallet-section">
+        <view class="wallet-section-head">
+          <text>{{ walletTitle }}</text>
+          <button @click="comingSoon(m.bills)">{{ billsShortLabel }}</button>
         </view>
-        <view class="wallet-actions">
-          <button @click="comingSoon(m.topUp)">{{ m.topUp }}</button>
-          <button @click="comingSoon(m.withdraw)">{{ m.withdraw }}</button>
-          <button @click="comingSoon(m.exchange)">{{ m.exchange }}</button>
-        </view>
-        <view class="wallet-strip">
-          <view>
-            <text>{{ m.slotsOpen }}</text>
-            <b>6</b>
+        <view class="wallet-card">
+          <view class="wallet-grid" />
+          <view class="wallet-aurora" />
+          <view class="wallet-dots">
+            <text v-for="i in 5" :key="i" />
           </view>
-          <view>
-            <text>NEX</text>
-            <b>0</b>
-          </view>
-          <view>
-            <text>{{ m.bills }}</text>
-            <b>0</b>
+
+          <view class="wallet-content">
+            <view class="balance-label">{{ usdtBalanceLabel }}</view>
+            <view class="usdt-row">
+              <text class="currency-mark">$</text>
+              <text class="wallet-balance">0<text>.00</text></text>
+            </view>
+            <view class="pending-line">+$0.00 {{ m.pending }} · auto-settles every 24h</view>
+
+            <view class="nex-block">
+              <view class="nex-head">
+                <text>{{ nexBalanceLabel }}</text>
+                <text>+20.4%</text>
+              </view>
+              <view class="nex-row">
+                <text>0</text>
+                <text>NEX</text>
+              </view>
+              <view class="nex-meta">
+                <text>≈ $0.00 · 1 NEX = $0.171</text>
+                <button @click="comingSoon(m.bills)">0 {{ billsMonthLabel }} ›</button>
+              </view>
+            </view>
+
+            <view class="quick-block">
+              <view class="quick-label">{{ quickActionsLabel }}</view>
+              <view class="wallet-actions">
+                <button class="primary" @click="comingSoon(m.topUp)">
+                  <text class="action-icon">↓</text>
+                  <text>{{ m.topUp }}</text>
+                  <text>USDT</text>
+                </button>
+                <button @click="comingSoon(m.withdraw)">
+                  <text class="action-icon">↑</text>
+                  <text>{{ m.withdraw }}</text>
+                  <text>USDT</text>
+                </button>
+                <button @click="comingSoon(m.exchange)">
+                  <text class="action-icon">✦</text>
+                  <text>{{ m.exchange }}</text>
+                  <text>USDT ⇄ NEX</text>
+                </button>
+              </view>
+            </view>
+
+            <view class="slot-unlock">
+              <view class="slot-copy">
+                <view class="slot-live"><text />0 {{ slotLiveLabel }} · 6 {{ slotOpenLabel }}</view>
+                <view class="slot-potential">
+                  <text>{{ unlockLabel }}</text>
+                  <b>+$0/d</b>
+                  <text>{{ moreLabel }}</text>
+                </view>
+              </view>
+              <button @click="comingSoon(addDeviceLabel)">{{ addDeviceLabel }}</button>
+            </view>
           </view>
         </view>
       </view>
@@ -321,7 +374,6 @@ function comingSoon(label: string) {
   color: #12c979;
 }
 
-.wallet-card,
 .network-card,
 .device-entry,
 .settings-card,
@@ -331,67 +383,268 @@ function comingSoon(label: string) {
   background: #10141d;
 }
 
+.wallet-section {
+  margin-top: 2rpx;
+}
+
+.wallet-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 4rpx 16rpx;
+}
+
+.wallet-section-head text {
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 760;
+}
+
+.wallet-section-head button {
+  min-width: 92rpx;
+  height: 52rpx;
+  margin: 0;
+  padding: 0 18rpx;
+  border-radius: 999rpx;
+  background: #151a23;
+  color: #9ba6b8;
+  font-size: 23rpx;
+  font-weight: 700;
+  line-height: 52rpx;
+}
+
 .wallet-card {
   position: relative;
   overflow: hidden;
-  padding: 34rpx;
+  border: 1rpx solid #303746;
+  border-radius: 32rpx;
+  background: radial-gradient(80% 60% at 50% 0%, rgba(198, 255, 58, 0.08), transparent 55%), #151a23;
+  box-shadow: 0 18rpx 60rpx rgba(0, 0, 0, 0.34);
 }
 
-.wallet-card::before {
+.wallet-grid {
   position: absolute;
-  right: -80rpx;
-  bottom: -100rpx;
-  width: 280rpx;
-  height: 280rpx;
+  inset: 0;
+  opacity: 0.36;
+  background-image:
+    linear-gradient(to right, rgba(80, 91, 112, 0.16) 1rpx, transparent 1rpx),
+    linear-gradient(to bottom, rgba(80, 91, 112, 0.16) 1rpx, transparent 1rpx);
+  background-size: 48rpx 48rpx;
+}
+
+.wallet-aurora {
+  position: absolute;
+  inset: -24%;
+  opacity: 0.82;
+  background:
+    radial-gradient(40% 50% at 80% 20%, rgba(61, 214, 255, 0.16), transparent 60%),
+    radial-gradient(40% 50% at 10% 80%, rgba(198, 255, 58, 0.18), transparent 60%),
+    radial-gradient(35% 45% at 72% 92%, rgba(255, 184, 77, 0.16), transparent 60%);
+  filter: blur(14rpx);
+}
+
+.wallet-dots {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.wallet-dots text {
+  position: absolute;
+  bottom: 22rpx;
+  width: 6rpx;
+  height: 6rpx;
   border-radius: 50%;
-  background: rgba(198, 255, 58, 0.1);
-  content: "";
+  background: #46e6ff;
+  opacity: 0.75;
 }
 
-.wallet-head {
+.wallet-dots text:nth-child(1) { left: 8%; background: #46e6ff; }
+.wallet-dots text:nth-child(2) { left: 28%; background: #c6ff3a; }
+.wallet-dots text:nth-child(3) { left: 52%; background: #46e6ff; }
+.wallet-dots text:nth-child(4) { left: 72%; background: #12c979; }
+.wallet-dots text:nth-child(5) { left: 90%; background: #ff8d4a; }
+
+.wallet-content {
   position: relative;
-  display: flex;
-  justify-content: space-between;
-  gap: 24rpx;
+  z-index: 1;
+  padding: 36rpx;
 }
 
-.card-label {
+.balance-label,
+.quick-label,
+.nex-head text:first-child {
+  color: #747f91;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22rpx;
+}
+
+.usdt-row,
+.nex-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10rpx;
+}
+
+.currency-mark {
   color: #8f98a8;
-  font-size: 24rpx;
+  font-size: 40rpx;
+  font-weight: 600;
 }
 
 .wallet-balance {
   margin-top: 8rpx;
   color: #ffffff;
-  font-size: 64rpx;
-  font-weight: 780;
-  letter-spacing: -2rpx;
+  font-size: 88rpx;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
 }
 
-.pending {
-  color: #99a3b3;
+.wallet-balance text {
+  color: #8f98a8;
+  font-size: 58rpx;
+}
+
+.pending-line {
+  margin-top: 8rpx;
+  color: #12c979;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 23rpx;
 }
 
+.nex-block,
+.quick-block,
+.slot-unlock {
+  margin-top: 28rpx;
+  padding-top: 28rpx;
+  border-top: 1rpx dashed #3a4251;
+}
+
+.nex-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14rpx;
+}
+
+.nex-head text:last-child {
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  background: rgba(198, 255, 58, 0.13);
+  color: #c6ff3a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 21rpx;
+  font-weight: 700;
+}
+
+.nex-row text:first-child {
+  color: #ffffff;
+  font-size: 64rpx;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.nex-row text:last-child {
+  color: #c6ff3a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 25rpx;
+  font-weight: 700;
+  letter-spacing: 1rpx;
+}
+
+.nex-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin-top: 10rpx;
+}
+
+.nex-meta text,
+.nex-meta button {
+  color: #8f98a8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22rpx;
+}
+
+.nex-meta text {
+  min-width: 0;
+  flex: 1;
+}
+
+.nex-meta button {
+  min-width: 136rpx;
+  height: 44rpx;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  line-height: 44rpx;
+  text-align: right;
+}
+
 .wallet-actions {
-  position: relative;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14rpx;
-  margin-top: 28rpx;
+  gap: 16rpx;
+  margin-top: 14rpx;
 }
 
 .wallet-actions button {
-  height: 76rpx;
-  border-radius: 999rpx;
-  background: #c6ff3a;
-  color: #10140a;
+  display: flex;
+  min-width: 0;
+  min-height: 138rpx;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8rpx;
+  margin: 0;
+  padding: 0 4rpx;
+  background: transparent;
+  color: #ffffff;
   font-size: 24rpx;
-  font-weight: 700;
+  font-weight: 650;
+  line-height: 1.1;
+}
+
+.wallet-actions button text:nth-child(3) {
+  color: #747f91;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 19rpx;
+  font-weight: 600;
+  letter-spacing: 0.6rpx;
+}
+
+.action-icon {
+  display: grid;
+  width: 88rpx;
+  height: 88rpx;
+  place-items: center;
+  border: 1rpx solid #303746;
+  border-radius: 50%;
+  background: #151a23;
+  color: #c6ff3a;
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.wallet-actions button.primary .action-icon {
+  border-color: transparent;
+  background: #c6ff3a;
+  color: #0b0d13;
+  box-shadow: 0 8rpx 28rpx rgba(198, 255, 58, 0.28);
 }
 
 .wallet-actions button::after,
 .wallet-actions uni-button::after,
+.wallet-section-head button::after,
+.wallet-section-head uni-button::after,
+.nex-meta button::after,
+.nex-meta uni-button::after,
+.slot-unlock button::after,
+.slot-unlock uni-button::after,
 .logout-button::after,
 uni-button.logout-button::after,
 .sheet-close::after,
@@ -403,31 +656,64 @@ uni-button.locale-option::after,
   border: 0;
 }
 
-.wallet-strip {
-  position: relative;
+.slot-unlock {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14rpx;
-  margin-top: 24rpx;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16rpx;
 }
 
-.wallet-strip view {
-  padding: 18rpx;
-  border-radius: 20rpx;
-  background: #161b25;
+.slot-copy {
+  min-width: 0;
 }
 
-.wallet-strip text {
-  display: block;
+.slot-live {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   color: #8f98a8;
-  font-size: 21rpx;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22rpx;
 }
 
-.wallet-strip b {
-  display: block;
+.slot-live text {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #46e6ff;
+  box-shadow: 0 0 18rpx rgba(70, 230, 255, 0.5);
+}
+
+.slot-potential {
+  display: flex;
+  align-items: baseline;
+  gap: 8rpx;
   margin-top: 8rpx;
-  color: #c6ff3a;
-  font-size: 30rpx;
+}
+
+.slot-potential text {
+  color: #c8d0dc;
+  font-size: 25rpx;
+}
+
+.slot-potential b {
+  color: #ff8d4a;
+  font-size: 36rpx;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.slot-unlock button {
+  height: 74rpx;
+  margin: 0;
+  padding: 0 22rpx;
+  border-radius: 999rpx;
+  background: #ff8d4a;
+  color: #1c0d04;
+  font-size: 24rpx;
+  font-weight: 750;
+  line-height: 74rpx;
+  white-space: nowrap;
 }
 
 .warning-card {
