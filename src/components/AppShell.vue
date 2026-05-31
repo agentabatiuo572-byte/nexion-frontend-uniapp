@@ -91,12 +91,16 @@ onShow(hideNativeTabBarStable)
   height: 100vh;
   max-height: 100vh !important;
   padding-top: 0;
-  padding-bottom: 132rpx;
+  padding-bottom: 0;
   box-sizing: border-box;
 }
 
 .app-content :deep(.page .uni-scroll-view-content > *:first-child) {
   margin-top: 116rpx;
+}
+
+.app-content :deep(.page .uni-scroll-view-content > *:last-child) {
+  margin-bottom: 132rpx;
 }
 
 .brand-side {
