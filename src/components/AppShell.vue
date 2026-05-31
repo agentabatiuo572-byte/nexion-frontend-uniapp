@@ -44,15 +44,19 @@ onShow(hideNativeTabBarStable)
         <image class="header-icon" src="/src/static/icons/bell.svg" mode="aspectFit" />
       </view>
     </view>
-    <slot />
+    <view class="app-content">
+      <slot />
+    </view>
     <AppTabBar v-if="activeTab" :active="activeTab" />
   </view>
 </template>
 
 <style scoped>
 .app-shell {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
-  padding: 28rpx 32rpx 170rpx;
+  padding: 0;
   box-sizing: border-box;
   background:
     radial-gradient(circle at 18% -6%, rgba(198, 255, 58, 0.12), transparent 28%),
@@ -62,11 +66,36 @@ onShow(hideNativeTabBarStable)
 }
 
 .app-header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 116rpx;
-  margin-bottom: 16rpx;
+  padding: 28rpx 32rpx 16rpx;
+  box-sizing: border-box;
+  border-bottom: 1rpx solid transparent;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(48rpx) saturate(180%);
+  -webkit-backdrop-filter: blur(48rpx) saturate(180%);
+  box-shadow: inset 0 -1rpx 0 rgba(255, 255, 255, 0.04);
+}
+
+.app-content {
+  min-height: 100vh;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+}
+
+.app-content :deep(.page) {
+  height: 100vh;
+  max-height: 100vh !important;
+  padding-top: 152rpx;
+  padding-bottom: 198rpx;
+  box-sizing: border-box;
 }
 
 .brand-side {

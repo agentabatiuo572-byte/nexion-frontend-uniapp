@@ -63,13 +63,14 @@ function go(path: string) {
   border-radius: 44rpx;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
-    rgba(12, 12, 14, 0.72);
+    rgba(12, 12, 14, 0.22);
   box-shadow:
     inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
     inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
-    0 20rpx 72rpx rgba(0, 0, 0, 0.46),
+    0 20rpx 64rpx rgba(0, 0, 0, 0.55),
     0 0 0 1rpx rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(40rpx) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(40rpx) saturate(180%) brightness(1.05);
   pointer-events: auto;
 }
 
@@ -116,6 +117,7 @@ function go(path: string) {
   width: 44rpx;
   height: 44rpx;
   background: currentColor;
+  transform: translateY(-1rpx);
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
