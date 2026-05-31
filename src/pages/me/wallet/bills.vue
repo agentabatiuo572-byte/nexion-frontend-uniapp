@@ -224,7 +224,8 @@ function demoRow(
       </button>
     </view>
 
-    <view class="tabs" role="tablist">
+    <view class="tabs" :class="`active-${tab}`" role="tablist">
+      <view class="tab-indicator" />
       <button :class="{ active: tab === 'all' }" @click="setTab('all')">{{ copy.tabAll }}</button>
       <button :class="{ active: tab === 'in' }" @click="setTab('in')">{{ copy.tabIn }}</button>
       <button :class="{ active: tab === 'out' }" @click="setTab('out')">{{ copy.tabOut }}</button>
@@ -297,7 +298,8 @@ function demoRow(
 
 .back-button,
 .bell-button,
-.tabs button {
+.tabs button,
+.tabs uni-button {
   margin: 0;
   padding: 0;
 }
@@ -360,34 +362,67 @@ function demoRow(
 }
 
 .tabs {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4rpx;
+  min-height: 82rpx;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
   margin: 8rpx 0 24rpx;
-  padding: 6rpx;
+  padding: 8rpx;
   border: 1rpx solid #232936;
-  border-radius: 24rpx;
-  background: #10141d;
+  border-radius: 28rpx;
+  background: rgba(16, 20, 29, 0.95);
+  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.02);
 }
 
-.tabs button {
-  height: 62rpx;
-  border-radius: 18rpx;
+.tab-indicator {
+  position: absolute;
+  top: 8rpx;
+  bottom: 8rpx;
+  left: 8rpx;
+  z-index: 0;
+  width: calc((100% - 16rpx) / 3);
+  border: 1rpx solid rgba(255, 255, 255, 0.05);
+  border-radius: 20rpx;
+  background: #1b212c;
+  box-shadow:
+    inset 0 0 0 1rpx rgba(255, 255, 255, 0.04),
+    0 8rpx 24rpx rgba(0, 0, 0, 0.28);
+  transform: translate3d(0, 0, 0);
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tabs.active-in .tab-indicator {
+  transform: translate3d(100%, 0, 0);
+}
+
+.tabs.active-out .tab-indicator {
+  transform: translate3d(200%, 0, 0);
+}
+
+.tabs button,
+.tabs uni-button {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 66rpx;
+  border-radius: 20rpx;
   background: transparent;
   color: #8f98a8;
   font-size: 25rpx;
   font-weight: 700;
-  line-height: 62rpx;
+  line-height: 66rpx;
+  transition: color 180ms ease, transform 180ms ease;
 }
 
-.tabs button.active {
-  background: #1b212c;
+.tabs button.active,
+.tabs uni-button.active {
   color: #ffffff;
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.06);
+  transform: translateY(-1rpx);
 }
 
 .bill-scroll {
-  max-height: calc(100vh - 196rpx);
+  max-height: calc(100vh - 216rpx);
 }
 
 .month-list {
