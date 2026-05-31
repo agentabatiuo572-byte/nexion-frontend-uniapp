@@ -1,0 +1,134 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { getTabMessages, useActiveLocale } from '@/utils/i18n'
+
+type TabKey = 'home' | 'earn' | 'store' | 'team' | 'me'
+
+defineProps<{
+  active: TabKey
+}>()
+
+const locale = useActiveLocale()
+const labels = computed(() => getTabMessages(locale.value))
+const tabs = computed<Array<{ key: TabKey; label: string; path: string; icon: string }>>(() => [
+  { key: 'home', label: labels.value.home, path: '/pages/home/index', icon: '/src/static/icons/tab-home.svg' },
+  { key: 'earn', label: labels.value.earn, path: '/pages/earn/index', icon: '/src/static/icons/tab-zap.svg' },
+  { key: 'store', label: labels.value.store, path: '/pages/store/index', icon: '/src/static/icons/tab-bag.svg' },
+  { key: 'team', label: labels.value.team, path: '/pages/team/index', icon: '/src/static/icons/tab-users.svg' },
+  { key: 'me', label: labels.value.me, path: '/pages/me/index', icon: '/src/static/icons/tab-user.svg' }
+])
+
+function go(path: string) {
+  uni.reLaunch({ url: path })
+}
+</script>
+
+<template>
+  <view class="tab-host">
+    <view class="tab-pill">
+      <view class="specular" />
+      <view
+        v-for="tab in tabs"
+        :key="tab.key"
+        class="tab-item"
+        :class="{ active: tab.key === active }"
+        @click="go(tab.path)"
+      >
+        <view class="icon-mask" :style="{ '-webkit-mask-image': `url(${tab.icon})`, maskImage: `url(${tab.icon})` }" />
+        <text>{{ tab.label }}</text>
+      </view>
+    </view>
+    <view class="home-indicator" />
+  </view>
+</template>
+
+<style scoped>
+.tab-host {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  padding: 0 24rpx 12rpx;
+  pointer-events: none;
+}
+
+.tab-pill {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  padding: 8rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 44rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
+    rgba(12, 12, 14, 0.72);
+  box-shadow:
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
+    0 20rpx 72rpx rgba(0, 0, 0, 0.46),
+    0 0 0 1rpx rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(40rpx) saturate(180%) brightness(1.05);
+  pointer-events: auto;
+}
+
+.specular {
+  position: absolute;
+  top: 0;
+  right: 12%;
+  left: 12%;
+  height: 1rpx;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.tab-item {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  height: 112rpx;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  padding: 0;
+  border-radius: 32rpx;
+  background: transparent;
+  color: #8f98a8;
+  font-size: 24rpx;
+  font-weight: 560;
+  line-height: 1;
+}
+
+.tab-item.active {
+  background: linear-gradient(180deg, rgba(198, 255, 58, 0.22) 0%, rgba(198, 255, 58, 0.08) 100%);
+  box-shadow:
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 32rpx rgba(198, 255, 58, 0.14),
+    0 0 0 1rpx rgba(198, 255, 58, 0.28);
+  color: #c6ff3a;
+}
+
+.icon-mask {
+  width: 44rpx;
+  height: 44rpx;
+  background: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.home-indicator {
+  width: 268rpx;
+  height: 10rpx;
+  margin: 18rpx auto 0;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.86);
+}
+</style>

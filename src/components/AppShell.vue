@@ -1,13 +1,34 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+import { nextTick, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
+import AppTabBar from '@/components/AppTabBar.vue'
+
+const props = withDefaults(defineProps<{
   title?: string
   version?: string
   showActions?: boolean
+  activeTab?: 'home' | 'earn' | 'store' | 'team' | 'me'
 }>(), {
   title: 'Nexion',
   version: 'v3.2',
-  showActions: true
+  showActions: true,
+  activeTab: undefined
 })
+
+function hideNativeTabBar() {
+  if (!props.activeTab) return
+  uni.hideTabBar({ animation: false, fail: () => undefined })
+}
+
+function hideNativeTabBarStable() {
+  hideNativeTabBar()
+  nextTick(hideNativeTabBar)
+  setTimeout(hideNativeTabBar, 80)
+  setTimeout(hideNativeTabBar, 240)
+}
+
+onMounted(hideNativeTabBarStable)
+onShow(hideNativeTabBarStable)
 </script>
 
 <template>
@@ -24,13 +45,14 @@ withDefaults(defineProps<{
       </view>
     </view>
     <slot />
+    <AppTabBar v-if="activeTab" :active="activeTab" />
   </view>
 </template>
 
 <style scoped>
 .app-shell {
   min-height: 100vh;
-  padding: 28rpx 32rpx 48rpx;
+  padding: 28rpx 32rpx 170rpx;
   box-sizing: border-box;
   background:
     radial-gradient(circle at 18% -6%, rgba(198, 255, 58, 0.12), transparent 28%),

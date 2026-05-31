@@ -4,8 +4,10 @@ import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/store/auth'
 import { requireAuth } from '@/utils/auth-guard'
+import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 const auth = useAuthStore()
+const locale = useActiveLocale()
 
 onShow(() => {
   requireAuth()
@@ -15,33 +17,36 @@ const firstName = computed(() => (auth.displayName || 'Stellar').split(/\s+/)[0]
 const level = computed(() => auth.session?.userLevel || 'L0')
 const vRank = computed(() => auth.session?.vRank || 'V0')
 const referralCode = computed(() => auth.session?.referralCode || 'NXN-READY')
+const copy = computed(() => getMainPageMessages(locale.value))
+const t = computed(() => copy.value.home)
+const common = computed(() => copy.value.common)
 
 function comingSoon(label: string) {
-  uni.showToast({ title: `${label} will be connected next`, icon: 'none' })
+  uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
 }
 </script>
 
 <template>
-  <AppShell>
+  <AppShell active-tab="home">
     <scroll-view class="page" scroll-y>
       <view class="greeting">
-        <view class="hello">Good day, {{ firstName }}</view>
+        <view class="hello">{{ t.goodDay }}, {{ firstName }}</view>
         <view class="headline">
-          Your node earned <text>$0.06</text> today.
+          {{ t.headlinePrefix }} <text>$0.06</text>{{ t.headlineSuffix }}
         </view>
       </view>
 
       <view class="money-card">
         <view class="card-top">
           <view>
-            <view class="kicker">Earnings</view>
+            <view class="kicker">{{ t.earnings }}</view>
             <view class="balance">$0.000300</view>
           </view>
-          <view class="live-chip"><text /> live</view>
+          <view class="live-chip"><text /> {{ t.live }}</view>
         </view>
         <view class="mini-grid">
           <view>
-            <text class="mini-label">Pending</text>
+            <text class="mini-label">{{ t.pending }}</text>
             <text class="mini-value">$0.00</text>
           </view>
           <view>
@@ -49,20 +54,20 @@ function comingSoon(label: string) {
             <text class="mini-value">0</text>
           </view>
           <view>
-            <text class="mini-label">Rank</text>
+            <text class="mini-label">{{ t.rank }}</text>
             <text class="mini-value">{{ vRank }}</text>
           </view>
         </view>
       </view>
 
-      <view class="trial-card" @click="comingSoon('Free trial')">
+      <view class="trial-card" @click="comingSoon(t.freeTrial)">
         <view class="trial-left">
-          <view class="ticket-badge">FREE TRIAL</view>
-          <view class="trial-title">Nexion Cloud Share</view>
-          <view class="trial-desc">Try a managed node before you buy hardware.</view>
+          <view class="ticket-badge">{{ t.freeTrial }}</view>
+          <view class="trial-title">{{ t.cloudShare }}</view>
+          <view class="trial-desc">{{ t.trialDesc }}</view>
         </view>
         <view class="trial-right">
-          <view class="trial-small">Earn up to</view>
+          <view class="trial-small">{{ t.earnUpTo }}</view>
           <view class="trial-money">$38</view>
         </view>
       </view>
@@ -70,50 +75,50 @@ function comingSoon(label: string) {
       <view class="day-card">
         <view class="day-row">
           <view>
-            <view class="kicker">First day reward</view>
+            <view class="kicker">{{ t.firstDayReward }}</view>
             <view class="reward">+500 <text>NEX</text></view>
           </view>
           <view class="countdown">
-            <view class="kicker">Ends in</view>
+            <view class="kicker">{{ t.endsIn }}</view>
             <view>18:24:00</view>
           </view>
         </view>
         <view class="progress-track"><view class="progress-bar" /></view>
         <view class="task-list">
-          <view class="task done"><text>✓</text> Connect wallet <b>+50</b></view>
-          <view class="task done"><text>✓</text> Visit earn <b>+30</b></view>
-          <view class="task"><text>3</text> See product ROI <b>+100</b></view>
+          <view class="task done"><text>✓</text> {{ t.connectWallet }} <b>+50</b></view>
+          <view class="task done"><text>✓</text> {{ t.visitEarn }} <b>+30</b></view>
+          <view class="task"><text>3</text> {{ t.seeProductRoi }} <b>+100</b></view>
         </view>
       </view>
 
       <view class="quick-grid">
-        <button @click="comingSoon('Store')">
+        <button @click="comingSoon(t.store)">
           <text class="q-icon">□</text>
-          <text>Store</text>
+          <text>{{ t.store }}</text>
         </button>
-        <button @click="comingSoon('Devices')">
+        <button @click="comingSoon(t.devices)">
           <text class="q-icon">▣</text>
-          <text>Devices</text>
+          <text>{{ t.devices }}</text>
         </button>
-        <button @click="comingSoon('Wallet')">
+        <button @click="comingSoon(t.wallet)">
           <text class="q-icon">↧</text>
-          <text>Wallet</text>
+          <text>{{ t.wallet }}</text>
         </button>
-        <button @click="comingSoon('Team')">
+        <button @click="comingSoon(t.team)">
           <text class="q-icon">◇</text>
-          <text>Team</text>
+          <text>{{ t.team }}</text>
         </button>
       </view>
 
       <view class="section-title">
-        <text>My fleet</text>
-        <text class="section-count">0 / 6 active</text>
+        <text>{{ t.myFleet }}</text>
+        <text class="section-count">{{ t.activeSlots }}</text>
       </view>
       <view class="fleet-card">
         <view class="device-icon">▯</view>
         <view class="fleet-main">
-          <view>Nexion grid slots</view>
-          <text>6 open slots · add hardware or cloud share</text>
+          <view>{{ t.gridSlots }}</view>
+          <text>{{ t.gridSlotsDesc }}</text>
         </view>
         <view class="slots">
           <text v-for="i in 6" :key="i" />
@@ -121,19 +126,19 @@ function comingSoon(label: string) {
       </view>
 
       <view class="section-title">
-        <text>Your rank</text>
+        <text>{{ t.yourRank }}</text>
         <text class="section-count">{{ level }} · {{ vRank }}</text>
       </view>
       <view class="rank-card">
         <view class="rank-circle">{{ vRank }}</view>
         <view class="rank-main">
-          <view class="rank-name">Cadet</view>
-          <text>Referral {{ referralCode }} · build volume to unlock higher rewards.</text>
+          <view class="rank-name">{{ common.rankCadet }}</view>
+          <text>{{ t.rankDesc.replace('{code}', referralCode) }}</text>
         </view>
       </view>
 
       <view class="trust-card">
-        <view class="trust-title">Independently audited</view>
+        <view class="trust-title">{{ t.audited }}</view>
         <view class="trust-tags">
           <text>NVIDIA</text>
           <text>Intel</text>
@@ -147,7 +152,7 @@ function comingSoon(label: string) {
 
 <style scoped>
 .page {
-  max-height: calc(100vh - 76rpx);
+  max-height: calc(100vh - 260rpx);
 }
 
 .greeting {

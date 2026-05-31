@@ -8,7 +8,7 @@ export interface ApiResult<T> {
 
 export interface RequestOptions<T = unknown> {
   url: string
-  method?: UniApp.RequestOptions['method']
+  method?: UniApp.RequestOptions['method'] | 'PATCH'
   data?: T
   auth?: boolean
 }
@@ -17,7 +17,7 @@ const configuredBaseUrl = import.meta.env.VITE_NEXION_API_BASE_URL as string | u
 
 export const API_BASE_URL = configuredBaseUrl || '/api'
 
-function joinUrl(path: string) {
+export function joinUrl(path: string) {
   const base = API_BASE_URL.replace(/\/$/, '')
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
   return `${base}${normalizedPath}`
@@ -37,7 +37,7 @@ export function request<T, B = unknown>(options: RequestOptions<B>): Promise<T> 
 
     uni.request({
       url: joinUrl(options.url),
-      method: options.method || 'GET',
+      method: (options.method || 'GET') as UniApp.RequestOptions['method'],
       data: options.data as UniApp.RequestOptions['data'],
       header,
       success(response) {

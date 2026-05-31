@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/store/auth'
 import { requireAuth } from '@/utils/auth-guard'
+import {
+  LOCALES,
+  getIntroMessages,
+  getLocaleEntry,
+  getMeMessages,
+  getPriorityLabels,
+  setStoredLocale,
+  useActiveLocale,
+  type LocaleCode
+} from '@/utils/i18n'
 
 const auth = useAuthStore()
+const locale = useActiveLocale()
+const localeOpen = ref(false)
 
 onShow(() => {
   requireAuth()
@@ -16,12 +28,43 @@ const userId = computed(() => auth.session?.userId || '-')
 const referralCode = computed(() => auth.session?.referralCode || '-')
 const level = computed(() => auth.session?.userLevel || 'L0')
 const vRank = computed(() => auth.session?.vRank || 'V0')
+const currentLocale = computed(() => getLocaleEntry(locale.value))
+const languageSheetCopy = computed(() => getIntroMessages(locale.value))
+const m = computed(() => getMeMessages(locale.value))
+const priorityLabels = computed(() => getPriorityLabels(locale.value))
+const groupedLocales = computed(() => {
+  return LOCALES.reduce(
+    (result, item) => {
+      result[item.priority].push(item)
+      return result
+    },
+    { 0: [], 1: [], 2: [], 3: [] } as Record<0 | 1 | 2 | 3, typeof LOCALES>
+  )
+})
+
+function openLocaleSheet() {
+  localeOpen.value = true
+}
+
+function openProfile() {
+  uni.navigateTo({ url: '/pages/me/profile' })
+}
+
+function closeLocaleSheet() {
+  localeOpen.value = false
+}
+
+function pickLocale(code: LocaleCode) {
+  locale.value = code
+  setStoredLocale(code)
+  localeOpen.value = false
+}
 
 function logout() {
   uni.showModal({
-    title: 'Sign out',
-    content: 'Sign out of this device?',
-    confirmText: 'Sign out',
+    title: m.value.signOutTitle,
+    content: m.value.signOutContent,
+    confirmText: m.value.signOut,
     confirmColor: '#ff7b8a',
     success(result) {
       if (!result.confirm) return
@@ -32,21 +75,22 @@ function logout() {
 }
 
 function comingSoon(label: string) {
-  uni.showToast({ title: `${label} will be connected next`, icon: 'none' })
+  uni.showToast({ title: m.value.comingSoon(label), icon: 'none' })
 }
 </script>
 
 <template>
-  <AppShell title="Me" version="">
+  <AppShell :title="m.title" version="" active-tab="me">
     <scroll-view class="page" scroll-y>
-      <view class="profile-row" @click="comingSoon('Profile')">
-        <view class="avatar">{{ initial }}</view>
+      <view class="profile-row" @click="openProfile">
+        <image v-if="auth.session?.avatarPreviewUrl" class="avatar avatar-image" :src="auth.session.avatarPreviewUrl" mode="aspectFill" />
+        <view v-else class="avatar">{{ initial }}</view>
         <view class="profile-main">
           <view class="name">{{ auth.displayName }}</view>
           <view class="meta">ID {{ userId }} · {{ referralCode }}</view>
           <view class="chips">
-            <text class="chip success">KYC pending</text>
-            <text class="chip">Joined 1d</text>
+            <text class="chip success">{{ m.kycPending }}</text>
+            <text class="chip">{{ m.joinedOneDay }}</text>
           </view>
         </view>
       </view>
@@ -54,19 +98,19 @@ function comingSoon(label: string) {
       <view class="wallet-card">
         <view class="wallet-head">
           <view>
-            <view class="card-label">My wallet</view>
+            <view class="card-label">{{ m.walletTitle }}</view>
             <view class="wallet-balance">$0.00</view>
           </view>
-          <view class="pending">pending $0.00</view>
+          <view class="pending">{{ m.pending }} $0.00</view>
         </view>
         <view class="wallet-actions">
-          <button @click="comingSoon('Top up')">Top up</button>
-          <button @click="comingSoon('Withdraw')">Withdraw</button>
-          <button @click="comingSoon('Exchange')">Exchange</button>
+          <button @click="comingSoon(m.topUp)">{{ m.topUp }}</button>
+          <button @click="comingSoon(m.withdraw)">{{ m.withdraw }}</button>
+          <button @click="comingSoon(m.exchange)">{{ m.exchange }}</button>
         </view>
         <view class="wallet-strip">
           <view>
-            <text>Slots open</text>
+            <text>{{ m.slotsOpen }}</text>
             <b>6</b>
           </view>
           <view>
@@ -74,7 +118,7 @@ function comingSoon(label: string) {
             <b>0</b>
           </view>
           <view>
-            <text>Bills</text>
+            <text>{{ m.bills }}</text>
             <b>0</b>
           </view>
         </view>
@@ -83,100 +127,132 @@ function comingSoon(label: string) {
       <view class="warning-card">
         <view class="warning-icon">!</view>
         <view>
-          <view>Withdrawal locked</view>
-          <text>Reach the minimum balance and complete verification first.</text>
+          <view>{{ m.withdrawalLocked }}</view>
+          <text>{{ m.withdrawalLockedDesc }}</text>
         </view>
       </view>
 
       <view class="network-card">
         <view class="rank-badge">{{ vRank }}</view>
         <view class="network-main">
-          <view>Your rank</view>
-          <text>{{ level }} · Cadet · invite users to grow team volume.</text>
+          <view>{{ m.yourRank }}</view>
+          <text>{{ level }} · {{ m.rankDesc }}</text>
         </view>
       </view>
 
       <view class="section-title">
-        <text>My devices</text>
+        <text>{{ m.myDevices }}</text>
         <text>0 / 6</text>
       </view>
-      <view class="device-entry" @click="comingSoon('Devices')">
+      <view class="device-entry" @click="comingSoon(m.myDevices)">
         <view class="device-icon">▯</view>
         <view class="device-main">
-          <view>Fleet status</view>
-          <text>0 online · 6 slots open</text>
+          <view>{{ m.fleetStatus }}</view>
+          <text>{{ m.fleetStatusDesc }}</text>
         </view>
         <view class="slot-bars">
           <text v-for="i in 6" :key="i" />
         </view>
       </view>
 
-      <view class="section-title"><text>Earn extras</text></view>
+      <view class="section-title"><text>{{ m.earnExtras }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon('Missions')">
-          <text class="si green">★</text><text class="label">Missions</text><text class="value">Daily</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.missions)">
+          <text class="si green">★</text><text class="label">{{ m.missions }}</text><text class="value">{{ m.daily }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row" @click="comingSoon('Events')">
-          <text class="si orange">◆</text><text class="label">Events center</text><text class="value">9 live</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.eventsCenter)">
+          <text class="si orange">◆</text><text class="label">{{ m.eventsCenter }}</text><text class="value">{{ m.liveCount }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon('Achievements')">
-          <text class="si">🏆</text><text class="label">Achievements</text><text class="value">0 / 24</text><text class="chev">›</text>
+        <view class="setting-row last" @click="comingSoon(m.achievements)">
+          <text class="si">🏆</text><text class="label">{{ m.achievements }}</text><text class="value">0 / 24</text><text class="chev">›</text>
         </view>
       </view>
 
-      <view class="section-title"><text>Account</text></view>
+      <view class="section-title"><text>{{ m.account }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon('Profile')">
-          <text class="si">◎</text><text class="label">Profile</text><text class="value">{{ auth.displayName }}</text><text class="chev">›</text>
+        <view class="setting-row" @click="openProfile">
+          <text class="si">◎</text><text class="label">{{ m.profile }}</text><text class="value">{{ auth.displayName }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row" @click="comingSoon('Security')">
-          <text class="si">◇</text><text class="label">Identity & security</text><text class="value danger">No 2FA</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.identitySecurity)">
+          <text class="si">◇</text><text class="label">{{ m.identitySecurity }}</text><text class="value danger">{{ m.no2fa }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon('Notifications')">
-          <text class="si">◌</text><text class="label">Notifications</text><text class="value">0</text><text class="chev">›</text>
+        <view class="setting-row last" @click="comingSoon(m.notifications)">
+          <text class="si">◌</text><text class="label">{{ m.notifications }}</text><text class="value">0</text><text class="chev">›</text>
         </view>
       </view>
 
-      <view class="section-title"><text>Preferences</text></view>
+      <view class="section-title"><text>{{ m.preferences }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon('Preferences')">
-          <text class="si">◐</text><text class="label">Preferences</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.preferences)">
+          <text class="si">◐</text><text class="label">{{ m.preferences }}</text><text class="chev">›</text>
         </view>
         <view class="theme-row">
           <text class="si">☼</text>
-          <text class="label">Appearance</text>
+          <text class="label">{{ m.appearance }}</text>
           <view class="theme-toggle">
-            <button class="active">Light</button>
-            <button>Dark</button>
+            <button class="active">{{ m.light }}</button>
+            <button>{{ m.dark }}</button>
           </view>
         </view>
-        <view class="setting-row last" @click="comingSoon('Language')">
-          <text class="si">◎</text><text class="label">Language</text><text class="value">EN</text><text class="chev">›</text>
+        <view class="setting-row last" @click="openLocaleSheet">
+          <text class="si">◎</text><text class="label">{{ m.language }}</text><text class="value">{{ currentLocale.code.toUpperCase() }}</text><text class="chev">›</text>
         </view>
       </view>
 
-      <view class="section-title"><text>Help</text></view>
+      <view class="section-title"><text>{{ m.help }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon('Replay tour')">
-          <text class="si">↻</text><text class="label">Replay tour</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.replayTour)">
+          <text class="si">↻</text><text class="label">{{ m.replayTour }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row" @click="comingSoon('Help')">
-          <text class="si">?</text><text class="label">Help & FAQ</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(m.helpFaq)">
+          <text class="si">?</text><text class="label">{{ m.helpFaq }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon('Support')">
-          <text class="si green">●</text><text class="label">Live support</text><text class="value green">online</text><text class="chev">›</text>
+        <view class="setting-row last" @click="comingSoon(m.liveSupport)">
+          <text class="si green">●</text><text class="label">{{ m.liveSupport }}</text><text class="value green">{{ m.online }}</text><text class="chev">›</text>
         </view>
       </view>
 
-      <button class="logout-button" @click="logout">Sign out</button>
+      <button class="logout-button" @click="logout">{{ m.signOut }}</button>
       <view class="version">Nexion · v0.1.0 · uni-app</view>
     </scroll-view>
+
+    <view v-if="localeOpen" class="locale-backdrop" @click="closeLocaleSheet" />
+    <view v-if="localeOpen" class="locale-sheet">
+      <view class="sheet-handle" />
+      <view class="sheet-header">
+        <view>
+          <view class="sheet-title">{{ languageSheetCopy.languageTitle }}</view>
+          <view class="sheet-subtitle">{{ currentLocale.nativeName }} · {{ currentLocale.region }}</view>
+        </view>
+        <button class="sheet-close" @click="closeLocaleSheet">{{ languageSheetCopy.close }}</button>
+      </view>
+      <scroll-view class="locale-list" scroll-y>
+        <view v-for="priority in [0, 1, 2, 3]" :key="priority" class="locale-group">
+          <view class="priority-label">{{ priorityLabels[priority as 0 | 1 | 2 | 3] }}</view>
+          <button
+            v-for="item in groupedLocales[priority as 0 | 1 | 2 | 3]"
+            :key="item.code"
+            class="locale-option"
+            :class="{ active: item.code === locale }"
+            @click="pickLocale(item.code)"
+          >
+            <text class="flag">{{ item.flag }}</text>
+            <view class="locale-copy">
+              <view>{{ item.nativeName }}</view>
+              <text>{{ item.englishName }} · {{ item.region }}</text>
+            </view>
+            <text v-if="item.code === locale" class="check">✓</text>
+          </button>
+        </view>
+        <view class="sheet-footnote">{{ languageSheetCopy.languageFootnote }}</view>
+      </scroll-view>
+    </view>
   </AppShell>
 </template>
 
 <style scoped>
 .page {
-  max-height: calc(100vh - 76rpx);
+  max-height: calc(100vh - 260rpx);
 }
 
 .profile-row {
@@ -196,6 +272,11 @@ function comingSoon(label: string) {
   color: #10140a;
   font-size: 44rpx;
   font-weight: 760;
+}
+
+.avatar-image {
+  display: block;
+  background: #10141d;
 }
 
 .profile-main {
@@ -313,6 +394,10 @@ function comingSoon(label: string) {
 .wallet-actions uni-button::after,
 .logout-button::after,
 uni-button.logout-button::after,
+.sheet-close::after,
+uni-button.sheet-close::after,
+.locale-option::after,
+uni-button.locale-option::after,
 .theme-toggle button::after,
 .theme-toggle uni-button::after {
   border: 0;
@@ -569,5 +654,148 @@ uni-button.logout-button::after,
   color: #5f6877;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 22rpx;
+}
+
+.locale-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.locale-sheet {
+  position: fixed;
+  right: 24rpx;
+  bottom: 24rpx;
+  left: 24rpx;
+  z-index: 90;
+  display: flex;
+  max-height: 78vh;
+  flex-direction: column;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 40rpx;
+  background: #10141d;
+  box-shadow: 0 -24rpx 80rpx rgba(0, 0, 0, 0.45);
+}
+
+.sheet-handle {
+  width: 72rpx;
+  height: 8rpx;
+  margin: 18rpx auto 8rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+  padding: 18rpx 28rpx 20rpx;
+}
+
+.sheet-title {
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 760;
+}
+
+.sheet-subtitle {
+  margin-top: 8rpx;
+  color: #99a3b3;
+  font-size: 23rpx;
+}
+
+.sheet-close {
+  min-width: 108rpx;
+  height: 56rpx;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c8d0dc;
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 56rpx;
+}
+
+.locale-list {
+  max-height: 60vh;
+  padding: 0 20rpx 22rpx;
+  box-sizing: border-box;
+}
+
+.locale-group {
+  padding-top: 18rpx;
+}
+
+.priority-label {
+  padding: 0 10rpx 12rpx;
+  color: #5f6877;
+  font-size: 22rpx;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.locale-option {
+  display: flex;
+  width: 100%;
+  min-height: 92rpx;
+  align-items: center;
+  gap: 18rpx;
+  margin: 0 0 10rpx;
+  padding: 0 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 28rpx;
+  background: #0b0d13;
+  color: #ffffff;
+  line-height: 1;
+  text-align: left;
+}
+
+.locale-option.active {
+  border-color: rgba(198, 255, 58, 0.72);
+  background: rgba(198, 255, 58, 0.08);
+}
+
+.flag {
+  width: 52rpx;
+  font-size: 34rpx;
+}
+
+.locale-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.locale-copy view {
+  color: #ffffff;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.locale-copy text {
+  overflow: hidden;
+  color: #99a3b3;
+  font-size: 22rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check {
+  color: #c6ff3a;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.sheet-footnote {
+  padding: 8rpx 12rpx 18rpx;
+  color: #6f7886;
+  font-size: 22rpx;
+  line-height: 1.45;
 }
 </style>

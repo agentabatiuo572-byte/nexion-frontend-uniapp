@@ -8,7 +8,7 @@ onMounted(() => {
   auth.restore()
   setTimeout(() => {
     if (auth.isAuthenticated) {
-      uni.switchTab({ url: '/pages/home/index' })
+      uni.reLaunch({ url: '/pages/home/index' })
     } else {
       uni.reLaunch({ url: '/pages/onboarding/intro/index' })
     }

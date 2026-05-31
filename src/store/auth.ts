@@ -1,7 +1,19 @@
 import { defineStore } from 'pinia'
-import { login as loginApi, register as registerApi, sendRegisterSmsCode as sendRegisterSmsCodeApi } from '@/api/auth'
+import {
+  getCurrentUserProfile,
+  login as loginApi,
+  register as registerApi,
+  sendRegisterSmsCode as sendRegisterSmsCodeApi,
+  updateCurrentUserProfile
+} from '@/api/auth'
 import { SESSION_KEY, TOKEN_KEY } from '@/utils/storage'
-import type { RegisterSmsCodeRequest, UserLoginRequest, UserRegisterRequest, UserSession } from '@/types/auth'
+import type {
+  RegisterSmsCodeRequest,
+  UserLoginRequest,
+  UserProfileUpdateRequest,
+  UserRegisterRequest,
+  UserSession
+} from '@/types/auth'
 
 interface AuthState {
   token: string
@@ -47,6 +59,36 @@ export const useAuthStore = defineStore('auth', {
     },
     sendRegisterSmsCode(data: RegisterSmsCodeRequest) {
       return sendRegisterSmsCodeApi(data)
+    },
+    async refreshProfile() {
+      const profile = await getCurrentUserProfile()
+      if (this.session) {
+        this.session = {
+          ...this.session,
+          nickname: profile.nickname || this.session.nickname,
+          avatarUrl: profile.avatarUrl || '',
+          referralCode: profile.referralCode || this.session.referralCode,
+          userLevel: profile.userLevel || this.session.userLevel,
+          vRank: profile.vRank || this.session.vRank
+        }
+        uni.setStorageSync(SESSION_KEY, JSON.stringify(this.session))
+      }
+      return profile
+    },
+    async updateProfile(data: UserProfileUpdateRequest) {
+      const profile = await updateCurrentUserProfile(data)
+      if (this.session) {
+        this.session = {
+          ...this.session,
+          nickname: profile.nickname || this.session.nickname,
+          avatarUrl: profile.avatarUrl || '',
+          referralCode: profile.referralCode || this.session.referralCode,
+          userLevel: profile.userLevel || this.session.userLevel,
+          vRank: profile.vRank || this.session.vRank
+        }
+        uni.setStorageSync(SESSION_KEY, JSON.stringify(this.session))
+      }
+      return profile
     },
     logout() {
       this.token = ''

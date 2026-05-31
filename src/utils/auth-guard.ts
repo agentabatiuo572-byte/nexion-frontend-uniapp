@@ -11,5 +11,5 @@ export function requireAuth() {
 }
 
 export function goAfterAuth() {
-  uni.switchTab({ url: '/pages/home/index' })
+  uni.reLaunch({ url: '/pages/home/index' })
 }
