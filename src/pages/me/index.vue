@@ -223,14 +223,6 @@ function comingSoon(label: string) {
         </view>
       </view>
 
-      <view class="warning-card">
-        <view class="warning-icon">!</view>
-        <view>
-          <view>{{ m.withdrawalLocked }}</view>
-          <text>{{ m.withdrawalLockedDesc }}</text>
-        </view>
-      </view>
-
       <view class="trial-ticket" @click="comingSoon(mePortCopy.claimNow)">
         <view class="trial-wash" />
         <view class="trial-grid">
