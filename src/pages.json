@@ -59,6 +59,12 @@
       "style": {
         "navigationBarTitleText": "Profile"
       }
+    },
+    {
+      "path": "pages/me/wallet/bills",
+      "style": {
+        "navigationBarTitleText": "Bills"
+      }
     }
   ],
   "globalStyle": {

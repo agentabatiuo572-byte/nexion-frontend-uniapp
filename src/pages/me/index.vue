@@ -61,6 +61,10 @@ function openProfile() {
   uni.navigateTo({ url: '/pages/me/profile' })
 }
 
+function openBills() {
+  uni.navigateTo({ url: '/pages/me/wallet/bills' })
+}
+
 function closeLocaleSheet() {
   localeOpen.value = false
 }
@@ -109,7 +113,7 @@ function comingSoon(label: string) {
       <view class="wallet-section">
         <view class="wallet-section-head">
           <text>{{ walletTitle }}</text>
-          <button class="wallet-bills-link" @click="comingSoon(m.bills)">
+          <button class="wallet-bills-link" @click="openBills">
             <text>{{ billsShortLabel }}</text>
             <text class="wallet-bills-chevron" />
           </button>
@@ -140,7 +144,7 @@ function comingSoon(label: string) {
               </view>
               <view class="nex-meta">
                 <text>≈ $0.00 · 1 NEX = $0.171</text>
-                <button @click="comingSoon(m.bills)">0 {{ billsMonthLabel }} ›</button>
+                <button @click="openBills">0 {{ billsMonthLabel }} ›</button>
               </view>
             </view>
 
