@@ -104,6 +104,28 @@ export interface ProfileMessages {
   tierLabels: Record<string, string>
 }
 
+export interface StellaMessages {
+  name: string
+  role: string
+  liveAgent: string
+  agentRole: string
+  backToAi: string
+  emptyHint: string
+  inputPlaceholder: string
+  agentInputPlaceholder: string
+  send: string
+  qExplainToday: string
+  qHowToBoost: string
+  qWhatsHot: string
+  qShowTopJobs: string
+  sysConnectedHuman: string
+  sysBackToAi: string
+  demoReply: string
+  agentReply: string
+  intro1: string
+  intro2: string
+}
+
 export interface TabMessages {
   home: string
   earn: string
@@ -958,6 +980,55 @@ const profileMessages: Partial<Record<LocaleCode, ProfileMessages>> = {
   zh: profileZh
 }
 
+const stellaEn: StellaMessages = {
+  name: 'Stella',
+  role: 'AI advisor · online',
+  liveAgent: 'Human support',
+  agentRole: 'Tier 2 Compliance Support · online',
+  backToAi: 'Back to AI',
+  emptyHint: 'Ask about earnings, devices, task routing, or account status.',
+  inputPlaceholder: 'Ask Stella...',
+  agentInputPlaceholder: 'Message support...',
+  send: 'Send',
+  qExplainToday: 'Explain today',
+  qHowToBoost: 'How to boost',
+  qWhatsHot: "What's hot",
+  qShowTopJobs: 'Show top jobs',
+  sysConnectedHuman: 'Connected to human support',
+  sysBackToAi: 'Back with Stella AI',
+  demoReply: 'Got it. I am checking your current node, wallet and task context. Try a quick prompt above for the demo flow.',
+  agentReply: 'Support has received it. A specialist will follow up after checking your account status.',
+  intro1: 'Your phone node is active. I can explain today\'s earnings or show the fastest boost path.',
+  intro2: 'New premium jobs are routing through the Singapore edge cluster.'
+}
+
+const stellaZh: StellaMessages = {
+  name: 'Stella',
+  role: 'AI 顾问 · 在线',
+  liveAgent: '人工客服',
+  agentRole: '二级合规客服 · 在线',
+  backToAi: '返回 AI',
+  emptyHint: '可以询问收益、设备、任务派发或账户状态。',
+  inputPlaceholder: '问问 Stella...',
+  agentInputPlaceholder: '发送给客服...',
+  send: '发送',
+  qExplainToday: '解释今日收益',
+  qHowToBoost: '如何提升',
+  qWhatsHot: '现在热门',
+  qShowTopJobs: '查看高价任务',
+  sysConnectedHuman: '已接入人工客服',
+  sysBackToAi: '已返回 Stella AI',
+  demoReply: '收到。我正在结合你的节点、钱包和任务上下文查看。演示流程里也可以点上面的快捷问题。',
+  agentReply: '客服已收到，会在核对账户状态后继续跟进。',
+  intro1: '你的手机节点已在线。我可以解释今日收益，或给你最快的提升路径。',
+  intro2: '新的高价任务正在通过新加坡边缘集群派发。'
+}
+
+const stellaMessages: Partial<Record<LocaleCode, StellaMessages>> = {
+  en: stellaEn,
+  zh: stellaZh
+}
+
 export function normalizeLocale(value: unknown): LocaleCode {
   if (typeof value !== 'string') return 'en'
   const code = value.toLowerCase().split(/[-_]/)[0] as LocaleCode
@@ -993,6 +1064,10 @@ export function getMeMessages(code: LocaleCode) {
 
 export function getProfileMessages(code: LocaleCode) {
   return profileMessages[code] ?? profileEn
+}
+
+export function getStellaMessages(code: LocaleCode) {
+  return stellaMessages[code] ?? stellaEn
 }
 
 export function getTabMessages(code: LocaleCode) {

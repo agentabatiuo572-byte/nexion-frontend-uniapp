@@ -2,6 +2,7 @@
 import { nextTick, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppTabBar from '@/components/AppTabBar.vue'
+import StellaSupport from '@/components/StellaSupport.vue'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -47,6 +48,7 @@ onShow(hideNativeTabBarStable)
     <view class="app-content">
       <slot />
     </view>
+    <StellaSupport v-if="activeTab" />
     <AppTabBar v-if="activeTab" :active="activeTab" />
   </view>
 </template>
