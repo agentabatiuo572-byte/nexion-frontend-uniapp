@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import { getMediaPreviewUrl, uploadUserAvatar } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import { requireAuth } from '@/utils/auth-guard'
 import { getProfileMessages, setStoredLocale, useActiveLocale } from '@/utils/i18n'
@@ -17,13 +16,18 @@ const TIMEZONES = [
   'America/New_York (UTC-5)'
 ]
 const TIERS = ['L0', 'L1', 'L2', 'L3', 'L4', 'L5']
+const AVATAR_LIBRARY = [
+  { key: 'mech:lime', accent: '#c6ff3a', glow: 'rgba(198, 255, 58, 0.22)' },
+  { key: 'mech:cyan', accent: '#46e6ff', glow: 'rgba(70, 230, 255, 0.2)' },
+  { key: 'mech:violet', accent: '#b89cff', glow: 'rgba(184, 156, 255, 0.22)' },
+  { key: 'mech:amber', accent: '#ffb84d', glow: 'rgba(255, 184, 77, 0.22)' },
+  { key: 'mech:rose', accent: '#ff7896', glow: 'rgba(255, 120, 150, 0.2)' }
+]
 
 const auth = useAuthStore()
 const locale = useActiveLocale()
 const t = computed(() => getProfileMessages(locale.value))
-const uploading = ref(false)
 const saving = ref(false)
-const avatarPreview = ref('')
 const joinedDate = ref('2026年5月1日')
 const form = reactive({
   nickname: '',
@@ -50,6 +54,11 @@ const dirty = computed(() =>
 )
 const displayName = computed(() => form.nickname || auth.displayName || 'Alex T.')
 const emailOrCode = computed(() => auth.session?.referralCode || 'alex@nexion.app')
+const selectedAvatar = computed(() => AVATAR_LIBRARY.find((item) => item.key === form.avatarUrl) || defaultAvatar())
+const avatarStyle = computed(() => ({
+  '--avatar-accent': selectedAvatar.value.accent,
+  '--avatar-glow': selectedAvatar.value.glow
+}))
 
 onShow(async () => {
   if (!requireAuth()) return
@@ -60,11 +69,10 @@ onShow(async () => {
 
 function applySession() {
   form.nickname = auth.session?.nickname || 'Alex T.'
-  form.avatarUrl = auth.session?.avatarUrl || ''
+  form.avatarUrl = normalizeAvatarKey(auth.session?.avatarUrl)
   form.bio = 'Running an AI-friendly node from my phone. Always up for swapping notes on yield strategies.'
   form.region = REGIONS[0]
   form.timezone = TIMEZONES[0]
-  avatarPreview.value = auth.session?.avatarPreviewUrl || ''
   snapshotOriginal()
 }
 
@@ -80,10 +88,11 @@ async function loadProfileSilently() {
   try {
     const profile = await auth.refreshProfile()
     form.nickname = profile.nickname || form.nickname
-    form.avatarUrl = profile.avatarUrl || ''
+    form.avatarUrl = normalizeAvatarKey(profile.avatarUrl)
     form.region = profile.region || form.region
+    form.bio = profile.bio || form.bio
+    form.timezone = profile.timezone || form.timezone
     if (profile.createdAt) joinedDate.value = formatDate(profile.createdAt)
-    if (form.avatarUrl) await loadAvatarPreview(form.avatarUrl)
     snapshotOriginal()
   } catch {
     // Keep the high-fidelity page usable before the running backend includes /auth/users/me.
@@ -98,37 +107,25 @@ function formatDate(value: string) {
   return value.slice(0, 10)
 }
 
-async function loadAvatarPreview(objectKey: string) {
-  if (!objectKey) return
-  if (/^https?:\/\//i.test(objectKey)) {
-    avatarPreview.value = objectKey
-    return
-  }
-  const response = await getMediaPreviewUrl(objectKey)
-  avatarPreview.value = response.downloadUrl || ''
+function defaultAvatar() {
+  const seed = Number(auth.session?.userId || 0)
+  return AVATAR_LIBRARY[Math.abs(seed) % AVATAR_LIBRARY.length]
 }
 
-async function chooseAvatar() {
-  try {
-    const result = await uni.chooseImage({ count: 1, sizeType: ['compressed'], sourceType: ['album', 'camera'] })
-    const filePath = result.tempFilePaths[0]
-    if (!filePath) return
-    uploading.value = true
-    const response = await uploadUserAvatar(filePath)
-    form.avatarUrl = response.objectKey
-    avatarPreview.value = response.downloadUrl || filePath
-  } catch (error) {
-    const message = error instanceof Error ? error.message : t.value.uploadFailed
-    if (!String(message).toLowerCase().includes('cancel')) {
-      uni.showToast({ title: message || t.value.uploadFailed, icon: 'none' })
-    }
-  } finally {
-    uploading.value = false
-  }
+function normalizeAvatarKey(value?: string) {
+  if (value && AVATAR_LIBRARY.some((item) => item.key === value)) return value
+  return defaultAvatar().key
+}
+
+function chooseAvatar() {
+  const currentIndex = AVATAR_LIBRARY.findIndex((item) => item.key === form.avatarUrl)
+  const offset = Math.floor(Math.random() * (AVATAR_LIBRARY.length - 1)) + 1
+  const nextIndex = currentIndex < 0 ? 0 : (currentIndex + offset) % AVATAR_LIBRARY.length
+  form.avatarUrl = AVATAR_LIBRARY[nextIndex].key
 }
 
 async function saveProfile() {
-  if (!dirty.value || saving.value || uploading.value) return
+  if (!dirty.value || saving.value) return
   if (!form.nickname.trim()) {
     uni.showToast({ title: t.value.namePlaceholder, icon: 'none' })
     return
@@ -140,9 +137,10 @@ async function saveProfile() {
       nickname: form.nickname.trim(),
       avatarUrl: form.avatarUrl,
       language: locale.value,
-      region: form.region
+      region: form.region,
+      bio: form.bio.trim(),
+      timezone: form.timezone
     })
-    if (auth.session) auth.session.avatarPreviewUrl = avatarPreview.value
     setStoredLocale(locale.value)
     snapshotOriginal()
     uni.showToast({ title: t.value.saved, icon: 'success' })
@@ -166,28 +164,52 @@ function back() {
 
 <template>
   <view class="profile-shell">
-    <view class="status-row">
-      <text>18:30</text>
-      <view class="status-icons"><text class="bars">▮▮▮</text><text>⌁</text><text class="battery" /></view>
-    </view>
-
     <view class="nav-row">
-      <button class="nav-button" @click="back">‹</button>
+      <button class="nav-hit" @click="back">
+        <view class="nav-glass">
+          <image class="chevron-image" src="/src/static/icons/profile-chevron-left.svg" mode="aspectFit" />
+        </view>
+      </button>
       <view class="page-title">{{ t.title }}</view>
-      <button class="nav-button bell-button">♧<text /></button>
+      <button class="nav-hit bell-button">
+        <view class="nav-glass">
+          <image class="bell-image" src="/src/static/icons/profile-bell.svg" mode="aspectFit" />
+        </view>
+        <text />
+      </button>
     </view>
 
     <scroll-view class="content" scroll-y>
       <view class="summary-card">
         <view class="avatar-wrap" @click="chooseAvatar">
-          <image v-if="avatarPreview" class="avatar-image" :src="avatarPreview" mode="aspectFill" />
-          <view v-else class="mech-avatar">
+          <view class="mech-avatar" :style="avatarStyle">
+            <view class="rim-light" />
+            <view class="shoulder left" />
+            <view class="shoulder right" />
+            <view class="neck">
+              <view />
+              <view />
+              <view />
+            </view>
+            <view class="jaw">
+              <view class="grille" />
+              <view class="chin-led" />
+            </view>
             <view class="antenna" />
-            <view class="helmet" />
-            <view class="visor" />
-            <view class="body" />
+            <view class="helmet">
+              <view class="crest" />
+              <view class="ridge" />
+              <view class="bolt left top" />
+              <view class="bolt right top" />
+              <view class="bolt left bottom" />
+              <view class="bolt right bottom" />
+            </view>
+            <view class="visor-glow" />
+            <view class="visor"><view /></view>
           </view>
-          <button class="avatar-action" @click.stop="chooseAvatar">↻</button>
+          <button class="avatar-action" @click.stop="chooseAvatar">
+            <image src="/src/static/icons/profile-refresh-cw.svg" mode="aspectFit" />
+          </button>
         </view>
         <view class="summary-copy">
           <view class="summary-name">{{ displayName }}</view>
@@ -200,7 +222,10 @@ function back() {
         <view class="section-kicker">{{ t.sectionPublic }}</view>
 
         <view class="field-block">
-          <view class="field-label">♢ {{ t.displayName }}</view>
+          <view class="field-label">
+            <image class="pencil-icon" src="/src/static/icons/profile-pencil.svg" mode="aspectFit" />
+            {{ t.displayName }}
+          </view>
           <input v-model="form.nickname" class="field-input" :placeholder="t.namePlaceholder" :maxlength="32" />
           <view class="field-hint">{{ t.displayNameHint }}</view>
         </view>
@@ -250,7 +275,7 @@ function back() {
     </scroll-view>
 
     <view class="save-dock">
-      <button class="save-button" :class="{ dirty }" :disabled="!dirty || saving || uploading" @click="saveProfile">
+      <button class="save-button" :class="{ dirty }" :disabled="!dirty || saving" @click="saveProfile">
         {{ t.saveChanges }}
       </button>
       <view class="home-indicator" />
@@ -261,79 +286,68 @@ function back() {
 <style scoped>
 .profile-shell {
   min-height: 100vh;
-  padding: 32rpx 32rpx 148rpx;
+  padding: calc(24rpx + env(safe-area-inset-top)) 32rpx 148rpx;
   box-sizing: border-box;
   background: #000000;
   color: #f7f8fb;
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 54rpx;
-  padding: 0 18rpx;
-  color: #ffffff;
-  font-size: 28rpx;
-  font-weight: 800;
-}
-
-.status-icons {
-  display: flex;
-  align-items: center;
-  gap: 18rpx;
-  font-size: 22rpx;
-}
-
-.bars {
-  color: #ffffff;
-  font-size: 18rpx;
-  letter-spacing: 2rpx;
-}
-
-.battery {
-  display: block;
-  width: 42rpx;
-  height: 22rpx;
-  border: 3rpx solid #ffffff;
-  border-radius: 7rpx;
-  box-shadow: inset -8rpx 0 0 rgba(255, 255, 255, 0.72);
-}
-
 .nav-row {
   display: grid;
-  grid-template-columns: 72rpx 1fr 72rpx;
+  grid-template-columns: 88rpx 1fr 88rpx;
   align-items: center;
-  gap: 18rpx;
-  margin-top: 36rpx;
+  gap: 10rpx;
 }
 
-.nav-button {
+.nav-hit {
+  position: relative;
+  display: grid;
+  width: 88rpx;
+  height: 88rpx;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+.nav-glass {
   display: grid;
   width: 72rpx;
   height: 72rpx;
   place-items: center;
-  border: 1rpx solid #2a2d34;
+  border: 1rpx solid rgba(255, 255, 255, 0.12);
   border-radius: 20rpx;
-  background: #161719;
-  color: #d7dce6;
-  font-size: 45rpx;
-  line-height: 72rpx;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20rpx) saturate(140%);
 }
 
 .bell-button {
   position: relative;
-  font-size: 31rpx;
 }
 
 .bell-button text {
   position: absolute;
-  top: 18rpx;
-  right: 18rpx;
-  width: 11rpx;
-  height: 11rpx;
+  top: 16rpx;
+  right: 16rpx;
+  width: 12rpx;
+  height: 12rpx;
   border-radius: 50%;
   background: #ff7f46;
+}
+
+.bell-image {
+  display: block;
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.chevron-image {
+  display: block;
+  width: 36rpx;
+  height: 36rpx;
 }
 
 .page-title {
@@ -344,7 +358,7 @@ function back() {
 }
 
 .content {
-  max-height: calc(100vh - 260rpx);
+  max-height: calc(100vh - 204rpx - env(safe-area-inset-top));
   margin-top: 32rpx;
 }
 
@@ -371,67 +385,220 @@ function back() {
   flex: 0 0 128rpx;
 }
 
-.avatar-image,
 .mech-avatar {
   width: 128rpx;
   height: 128rpx;
   border-radius: 26rpx;
 }
 
-.avatar-image {
-  display: block;
-  object-fit: cover;
-}
-
 .mech-avatar {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 20% 12%, rgba(134, 232, 31, 0.2), transparent 42%),
-    linear-gradient(145deg, #202630, #07090d);
+    radial-gradient(circle at 28% 18%, var(--avatar-glow), transparent 58%),
+    linear-gradient(145deg, #1a1f2b 0%, #06080c 100%);
+}
+
+.rim-light {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 30% 20%, var(--avatar-glow), transparent 66%);
+}
+
+.shoulder {
+  position: absolute;
+  bottom: -2rpx;
+  width: 38rpx;
+  height: 30rpx;
+  border: 1rpx solid #0a0c10;
+  background: linear-gradient(#3d424e, #0f1217);
+}
+
+.shoulder.left {
+  left: 4rpx;
+  border-radius: 22rpx 18rpx 0 0;
+  transform: skewY(-12deg);
+}
+
+.shoulder.right {
+  right: 4rpx;
+  border-radius: 18rpx 22rpx 0 0;
+  transform: skewY(12deg);
+}
+
+.neck {
+  position: absolute;
+  bottom: 22rpx;
+  left: 48rpx;
+  z-index: 2;
+  width: 32rpx;
+  height: 18rpx;
+  border: 1rpx solid #3a3f4a;
+  border-radius: 3rpx;
+  background: #1f232c;
+}
+
+.neck view {
+  height: 2rpx;
+  margin: 4rpx 6rpx 0;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.neck view:first-child {
+  background: var(--avatar-accent);
+  opacity: 0.55;
+}
+
+.jaw {
+  position: absolute;
+  bottom: 36rpx;
+  left: 40rpx;
+  z-index: 4;
+  width: 48rpx;
+  height: 28rpx;
+  border: 1rpx solid #0a0c10;
+  border-radius: 0 0 17rpx 17rpx;
+  background: linear-gradient(#373c46, #15181e);
+}
+
+.grille {
+  position: absolute;
+  top: 13rpx;
+  left: 13rpx;
+  width: 22rpx;
+  height: 8rpx;
+  border-radius: 2rpx;
+  background:
+    repeating-linear-gradient(180deg, #2a2f38 0 1rpx, transparent 1rpx 3rpx),
+    #0a0c10;
+}
+
+.chin-led {
+  position: absolute;
+  bottom: 2rpx;
+  left: 50%;
+  width: 4rpx;
+  height: 4rpx;
+  border-radius: 50%;
+  background: var(--avatar-accent);
+  box-shadow: 0 0 8rpx var(--avatar-accent);
+  transform: translateX(-50%);
 }
 
 .antenna {
   position: absolute;
-  top: 18rpx;
+  top: 16rpx;
   left: 62rpx;
+  z-index: 5;
   width: 4rpx;
-  height: 28rpx;
+  height: 12rpx;
   border-radius: 4rpx;
-  background: #89ef20;
+  background: #3a3f4a;
+}
+
+.antenna::before {
+  content: '';
+  position: absolute;
+  top: -6rpx;
+  left: 50%;
+  width: 7rpx;
+  height: 7rpx;
+  border-radius: 50%;
+  background: var(--avatar-accent);
+  box-shadow: 0 0 14rpx var(--avatar-accent);
+  transform: translateX(-50%);
 }
 
 .helmet {
   position: absolute;
-  top: 34rpx;
-  left: 33rpx;
-  width: 62rpx;
-  height: 58rpx;
-  border-radius: 26rpx 26rpx 12rpx 12rpx;
-  background: linear-gradient(#525766, #151922);
-  box-shadow: inset 0 0 0 2rpx #06080c;
+  top: 28rpx;
+  left: 35rpx;
+  z-index: 3;
+  width: 58rpx;
+  height: 52rpx;
+  border: 1rpx solid #0a0c10;
+  border-radius: 30rpx 30rpx 8rpx 8rpx;
+  background: linear-gradient(#525766 0%, #2b3038 55%, #13171f 100%);
+}
+
+.crest {
+  position: absolute;
+  top: 10rpx;
+  left: 12rpx;
+  width: 34rpx;
+  height: 12rpx;
+  border-top: 2rpx solid var(--avatar-accent);
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.ridge {
+  position: absolute;
+  top: 2rpx;
+  bottom: 15rpx;
+  left: 50%;
+  width: 1rpx;
+  background: linear-gradient(#0a0c10, rgba(10, 12, 16, 0.35));
+}
+
+.bolt {
+  position: absolute;
+  width: 6rpx;
+  height: 6rpx;
+  border: 2rpx solid #0a0c10;
+  border-radius: 50%;
+  background: #3a3f4a;
+}
+
+.bolt.left {
+  left: 7rpx;
+}
+
+.bolt.right {
+  right: 7rpx;
+}
+
+.bolt.top {
+  top: 17rpx;
+}
+
+.bolt.bottom {
+  bottom: 7rpx;
+}
+
+.visor-glow {
+  position: absolute;
+  top: 52rpx;
+  left: 34rpx;
+  z-index: 5;
+  width: 60rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: var(--avatar-accent);
+  filter: blur(8rpx);
+  opacity: 0.4;
 }
 
 .visor {
   position: absolute;
-  top: 61rpx;
-  left: 41rpx;
-  z-index: 2;
-  width: 46rpx;
+  top: 53rpx;
+  left: 39rpx;
+  z-index: 6;
+  width: 50rpx;
   height: 11rpx;
-  border-radius: 8rpx;
-  background: #9bf31e;
-  box-shadow: 0 0 16rpx rgba(155, 243, 30, 0.6);
+  border: 1rpx solid #0a0c10;
+  border-radius: 3rpx;
+  background: #06080c;
 }
 
-.body {
-  position: absolute;
-  right: 15rpx;
-  bottom: 5rpx;
-  left: 15rpx;
-  height: 38rpx;
-  border-radius: 22rpx 22rpx 0 0;
-  background: linear-gradient(90deg, #20242e, #06080c);
+.visor view {
+  width: 42rpx;
+  height: 5rpx;
+  margin: 3rpx auto 0;
+  border-radius: 3rpx;
+  background: var(--avatar-accent);
+  box-shadow: 0 0 13rpx var(--avatar-accent);
 }
 
 .avatar-action {
@@ -442,12 +609,20 @@ function back() {
   width: 56rpx;
   height: 56rpx;
   place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
-  background: #9bf31e;
+  background: #c6ff3a !important;
   color: #000000;
-  font-size: 32rpx;
-  font-weight: 900;
-  line-height: 56rpx;
+  box-shadow: none;
+  line-height: 1;
+}
+
+.avatar-action image {
+  width: 28rpx;
+  height: 28rpx;
+  display: block;
 }
 
 .summary-copy {
@@ -491,9 +666,18 @@ function back() {
 }
 
 .field-label {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
   color: #a7afbf;
   font-size: 24rpx;
   font-weight: 520;
+}
+
+.pencil-icon {
+  width: 24rpx;
+  height: 24rpx;
+  flex: 0 0 24rpx;
 }
 
 .field-input,
@@ -516,9 +700,10 @@ function back() {
 }
 
 .field-textarea {
-  height: 138rpx;
+  height: 162rpx;
   padding: 18rpx 24rpx;
   line-height: 1.45;
+  overflow: hidden;
 }
 
 .field-hint,
@@ -665,6 +850,12 @@ function back() {
   color: #777f8d;
   font-size: 27rpx;
   font-weight: 820;
+}
+
+.save-button[disabled] {
+  background: #2a2a2a !important;
+  color: #777f8d !important;
+  opacity: 1;
 }
 
 .save-button.dirty {

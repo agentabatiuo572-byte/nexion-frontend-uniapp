@@ -45,6 +45,8 @@ export interface UserProfile {
   status?: string
   language?: string
   region?: string
+  bio?: string
+  timezone?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -54,6 +56,8 @@ export interface UserProfileUpdateRequest {
   avatarUrl?: string
   language?: string
   region?: string
+  bio?: string
+  timezone?: string
 }
 
 export interface MediaUploadResponse {
