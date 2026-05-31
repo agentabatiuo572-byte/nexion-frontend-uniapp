@@ -59,19 +59,17 @@ function go(path: string) {
   align-items: stretch;
   overflow: hidden;
   padding: 8rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
   border-radius: 34rpx;
   background:
-    radial-gradient(86% 130% at 88% 36%, rgba(158, 220, 29, 0.54), rgba(158, 220, 29, 0.18) 34%, transparent 66%),
-    radial-gradient(78% 135% at 14% 42%, rgba(124, 92, 255, 0.54), rgba(124, 92, 255, 0.16) 38%, transparent 68%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 46%, rgba(0, 0, 0, 0.08) 100%),
-    rgba(12, 12, 14, 0.18);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 42%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(255, 255, 255, 0.03);
   box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.16),
-    0 18rpx 54rpx rgba(0, 0, 0, 0.48);
-  backdrop-filter: blur(54rpx) saturate(230%) brightness(1.14);
-  -webkit-backdrop-filter: blur(54rpx) saturate(230%) brightness(1.14);
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.10),
+    0 18rpx 54rpx rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(58rpx) saturate(230%) brightness(1.16);
+  -webkit-backdrop-filter: blur(58rpx) saturate(230%) brightness(1.16);
   pointer-events: auto;
 }
 
@@ -107,11 +105,14 @@ function go(path: string) {
 
 .tab-item.active {
   background:
-    linear-gradient(90deg, rgba(124, 92, 255, 0.74) 0%, rgba(158, 220, 29, 0.82) 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.08) 100%),
+    rgba(255, 255, 255, 0.05);
   box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.18),
-    0 10rpx 28rpx rgba(96, 180, 36, 0.28);
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.30),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
+    0 8rpx 24rpx rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(34rpx) saturate(220%) brightness(1.18);
+  -webkit-backdrop-filter: blur(34rpx) saturate(220%) brightness(1.18);
   color: #c6ff3a;
 }
 
