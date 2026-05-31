@@ -21,6 +21,9 @@ export interface RegisterSmsCodeResponse {
 export interface UserSession {
   token: string
   userId: number
+  countryCode?: string
+  phone?: string
+  phoneMasked?: string
   nickname: string
   avatarUrl?: string
   avatarPreviewUrl?: string

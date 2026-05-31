@@ -53,7 +53,11 @@ const dirty = computed(() =>
   form.timezone !== original.timezone
 )
 const displayName = computed(() => form.nickname || auth.displayName || 'Alex T.')
-const emailOrCode = computed(() => auth.session?.referralCode || 'alex@nexion.app')
+const phoneLine = computed(() => {
+  const session = auth.session
+  if (!session) return ''
+  return maskPhone(session.countryCode, session.phone) || normalizeMaskedPhone(session.countryCode, session.phoneMasked)
+})
 const selectedAvatar = computed(() => AVATAR_LIBRARY.find((item) => item.key === form.avatarUrl) || defaultAvatar())
 const avatarStyle = computed(() => ({
   '--avatar-accent': selectedAvatar.value.accent,
@@ -115,6 +119,31 @@ function defaultAvatar() {
 function normalizeAvatarKey(value?: string) {
   if (value && AVATAR_LIBRARY.some((item) => item.key === value)) return value
   return defaultAvatar().key
+}
+
+function normalizeMaskedPhone(countryCode?: string, value?: string) {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (trimmed.startsWith('+')) return trimmed
+  const normalizedCode = normalizeCountryCode(countryCode)
+  return normalizedCode ? `${normalizedCode} ${trimmed}` : trimmed
+}
+
+function normalizeCountryCode(value?: string) {
+  if (!value) return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return trimmed.startsWith('+') ? trimmed : `+${trimmed}`
+}
+
+function maskPhone(countryCode?: string, phone?: string) {
+  const digits = (phone || '').replace(/\D/g, '')
+  if (!digits) return ''
+  const prefix = digits.length <= 7 ? digits.slice(0, 1) : digits.slice(0, 3)
+  const suffix = digits.length <= 4 ? digits : digits.slice(-4)
+  const stars = '*'.repeat(Math.max(4, digits.length - prefix.length - suffix.length))
+  const normalizedCode = normalizeCountryCode(countryCode)
+  return `${normalizedCode ? `${normalizedCode} ` : ''}${prefix}${stars}${suffix}`
 }
 
 function chooseAvatar() {
@@ -213,7 +242,7 @@ function back() {
         </view>
         <view class="summary-copy">
           <view class="summary-name">{{ displayName }}</view>
-          <view class="summary-email">{{ emailOrCode }}</view>
+          <view v-if="phoneLine" class="summary-email">{{ phoneLine }}</view>
           <view class="joined-line">◷ {{ t.joinedOn }} {{ joinedDate }}</view>
         </view>
       </view>

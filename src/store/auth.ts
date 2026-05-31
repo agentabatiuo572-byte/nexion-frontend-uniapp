@@ -49,12 +49,20 @@ export const useAuthStore = defineStore('auth', {
     },
     async login(data: UserLoginRequest) {
       const session = await loginApi(data)
-      this.setSession(session)
+      this.setSession({
+        ...session,
+        countryCode: session.countryCode || data.countryCode,
+        phone: session.phone || data.phone
+      })
       return session
     },
     async register(data: UserRegisterRequest) {
       const session = await registerApi(data)
-      this.setSession(session)
+      this.setSession({
+        ...session,
+        countryCode: session.countryCode || data.countryCode,
+        phone: session.phone || data.phone
+      })
       return session
     },
     sendRegisterSmsCode(data: RegisterSmsCodeRequest) {
@@ -65,6 +73,9 @@ export const useAuthStore = defineStore('auth', {
       if (this.session) {
         this.session = {
           ...this.session,
+          countryCode: profile.countryCode || this.session.countryCode,
+          phone: profile.phone || this.session.phone,
+          phoneMasked: profile.phoneMasked || this.session.phoneMasked,
           nickname: profile.nickname || this.session.nickname,
           avatarUrl: profile.avatarUrl || '',
           referralCode: profile.referralCode || this.session.referralCode,
@@ -80,6 +91,9 @@ export const useAuthStore = defineStore('auth', {
       if (this.session) {
         this.session = {
           ...this.session,
+          countryCode: profile.countryCode || this.session.countryCode,
+          phone: profile.phone || this.session.phone,
+          phoneMasked: profile.phoneMasked || this.session.phoneMasked,
           nickname: profile.nickname || this.session.nickname,
           avatarUrl: profile.avatarUrl || '',
           referralCode: profile.referralCode || this.session.referralCode,
