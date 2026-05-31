@@ -78,12 +78,10 @@ onShow(hideNativeTabBarStable)
   padding: 18rpx 32rpx 14rpx;
   box-sizing: border-box;
   border-bottom: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.035) 54%, rgba(255, 255, 255, 0.00) 100%),
-    rgba(255, 255, 255, 0.02);
-  backdrop-filter: blur(60rpx) saturate(230%) brightness(1.16);
-  -webkit-backdrop-filter: blur(60rpx) saturate(230%) brightness(1.16);
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.006);
+  backdrop-filter: blur(68rpx) saturate(240%) brightness(1.18);
+  -webkit-backdrop-filter: blur(68rpx) saturate(240%) brightness(1.18);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
 }
 
 .app-content {
@@ -95,9 +93,13 @@ onShow(hideNativeTabBarStable)
 .app-content :deep(.page) {
   height: 100vh;
   max-height: 100vh !important;
-  padding-top: 116rpx;
+  padding-top: 0;
   padding-bottom: 132rpx;
   box-sizing: border-box;
+}
+
+.app-content :deep(.page .uni-scroll-view-content > *:first-child) {
+  margin-top: 116rpx;
 }
 
 .brand-side {
