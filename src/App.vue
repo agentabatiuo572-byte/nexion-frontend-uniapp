@@ -34,4 +34,25 @@ uni-button::after {
 input {
   color: inherit;
 }
+
+/* H5 only: keep scrolling but hide desktop scrollbars inside uni scroll-view. */
+::-webkit-scrollbar,
+page::-webkit-scrollbar,
+body::-webkit-scrollbar,
+uni-page-body::-webkit-scrollbar,
+uni-scroll-view::-webkit-scrollbar,
+.uni-scroll-view::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+page,
+body,
+uni-page-body,
+uni-scroll-view,
+.uni-scroll-view {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>
