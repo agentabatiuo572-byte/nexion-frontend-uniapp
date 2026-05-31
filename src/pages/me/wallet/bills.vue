@@ -364,15 +364,12 @@ function demoRow(
 .tabs {
   position: relative;
   display: grid;
-  min-height: 82rpx;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
+  gap: 1rpx;
   margin: 8rpx 0 24rpx;
   padding: 8rpx;
-  border: 1rpx solid #232936;
-  border-radius: 28rpx;
-  background: rgba(16, 20, 29, 0.95);
-  box-shadow: inset 0 0 0 1rpx rgba(255, 255, 255, 0.02);
+  border-radius: 32rpx;
+  background: #161b25;
 }
 
 .tab-indicator {
@@ -382,14 +379,11 @@ function demoRow(
   left: 8rpx;
   z-index: 0;
   width: calc((100% - 16rpx) / 3);
-  border: 1rpx solid rgba(255, 255, 255, 0.05);
   border-radius: 20rpx;
-  background: #1b212c;
-  box-shadow:
-    inset 0 0 0 1rpx rgba(255, 255, 255, 0.04),
-    0 8rpx 24rpx rgba(0, 0, 0, 0.28);
+  background: #c6ff3a;
+  box-shadow: 0 8rpx 22rpx rgba(198, 255, 58, 0.2);
   transform: translate3d(0, 0, 0);
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .tabs.active-in .tab-indicator {
@@ -404,25 +398,30 @@ function demoRow(
 .tabs uni-button {
   position: relative;
   z-index: 1;
-  display: block;
-  height: 66rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 88rpx;
   border-radius: 20rpx;
   background: transparent;
-  color: #8f98a8;
+  color: #747f91;
   font-size: 25rpx;
-  font-weight: 700;
-  line-height: 66rpx;
+  font-weight: 560;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
   transition: color 180ms ease, transform 180ms ease;
 }
 
 .tabs button.active,
 .tabs uni-button.active {
-  color: #ffffff;
+  color: #0b0d13;
+  font-weight: 720;
   transform: translateY(-1rpx);
 }
 
 .bill-scroll {
-  max-height: calc(100vh - 216rpx);
+  max-height: calc(100vh - 238rpx);
 }
 
 .month-list {
