@@ -59,17 +59,18 @@ function go(path: string) {
   align-items: stretch;
   overflow: hidden;
   padding: 8rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.14);
-  border-radius: 34rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.10);
+  border-radius: 42rpx;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.045) 42%, rgba(255, 255, 255, 0.015) 100%),
-    rgba(255, 255, 255, 0.022);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
+    rgba(12, 12, 14, 0.22);
   box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.10),
-    0 18rpx 54rpx rgba(0, 0, 0, 0.30);
-  backdrop-filter: blur(44rpx) saturate(180%) brightness(1.06);
-  -webkit-backdrop-filter: blur(44rpx) saturate(180%) brightness(1.06);
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
+    0 20rpx 70rpx rgba(0, 0, 0, 0.40),
+    0 0 0 1rpx rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(77rpx) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(77rpx) saturate(180%) brightness(1.05);
   pointer-events: auto;
 }
 
@@ -105,14 +106,11 @@ function go(path: string) {
 
 .tab-item.active {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%),
-    rgba(255, 255, 255, 0.035);
+    linear-gradient(180deg, rgba(198, 255, 58, 0.22) 0%, rgba(198, 255, 58, 0.08) 100%);
   box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
-    0 8rpx 22rpx rgba(0, 0, 0, 0.16);
-  backdrop-filter: blur(28rpx) saturate(175%) brightness(1.08);
-  -webkit-backdrop-filter: blur(28rpx) saturate(175%) brightness(1.08);
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 32rpx rgba(198, 255, 58, 0.14),
+    0 0 0 1rpx rgba(198, 255, 58, 0.28);
   color: #c6ff3a;
 }
 
