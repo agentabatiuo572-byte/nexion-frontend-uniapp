@@ -73,7 +73,7 @@ watch(locale, () => {
           <image class="avatar" src="/src/static/stella-avatar.png" mode="aspectFill" />
           <view class="avatar-halo" />
         </view>
-        <text v-if="unread" class="badge">{{ unread > 9 ? '9+' : unread }}</text>
+        <text v-if="unread" class="badge" />
       </button>
     </view>
 
@@ -206,20 +206,16 @@ watch(locale, () => {
 
 .badge {
   position: absolute;
-  top: -6rpx;
-  right: -6rpx;
-  display: grid;
-  min-width: 36rpx;
-  height: 36rpx;
-  padding: 0 8rpx;
-  place-items: center;
-  border: 2rpx solid #000;
-  border-radius: 999rpx;
-  background: #7c5cff;
-  color: #fff;
-  font-size: 20rpx;
-  font-weight: 720;
-  line-height: 1;
+  top: 6rpx;
+  right: 4rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border: 3rpx solid #000;
+  border-radius: 50%;
+  background: #ff3b30;
+  box-shadow:
+    0 0 0 1rpx rgba(255, 255, 255, 0.18),
+    0 0 16rpx rgba(255, 59, 48, 0.58);
 }
 
 .drawer-layer {
