@@ -75,7 +75,7 @@ onShow(hideNativeTabBarStable)
   padding: 18rpx 32rpx 14rpx;
   box-sizing: border-box;
   border-bottom: 0;
-  background: rgba(255, 255, 255, 0.003);
+  background: rgba(255, 255, 255, 0.018);
   backdrop-filter: blur(22rpx) saturate(138%) brightness(1.03);
   -webkit-backdrop-filter: blur(22rpx) saturate(138%) brightness(1.03);
   box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.018);
