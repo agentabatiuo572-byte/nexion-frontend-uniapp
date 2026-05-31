@@ -49,7 +49,7 @@ function go(path: string) {
   bottom: 0;
   left: 0;
   z-index: 60;
-  padding: 0 24rpx 12rpx;
+  padding: 0 24rpx 10rpx;
   pointer-events: none;
 }
 
@@ -59,18 +59,19 @@ function go(path: string) {
   align-items: stretch;
   overflow: hidden;
   padding: 8rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.1);
-  border-radius: 44rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 34rpx;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
-    rgba(12, 12, 14, 0.22);
+    radial-gradient(86% 130% at 88% 36%, rgba(158, 220, 29, 0.54), rgba(158, 220, 29, 0.18) 34%, transparent 66%),
+    radial-gradient(78% 135% at 14% 42%, rgba(124, 92, 255, 0.54), rgba(124, 92, 255, 0.16) 38%, transparent 68%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0.05) 46%, rgba(0, 0, 0, 0.08) 100%),
+    rgba(12, 12, 14, 0.18);
   box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
-    0 20rpx 64rpx rgba(0, 0, 0, 0.55),
-    0 0 0 1rpx rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(40rpx) saturate(180%) brightness(1.05);
-  -webkit-backdrop-filter: blur(40rpx) saturate(180%) brightness(1.05);
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.16),
+    0 18rpx 54rpx rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(54rpx) saturate(230%) brightness(1.14);
+  -webkit-backdrop-filter: blur(54rpx) saturate(230%) brightness(1.14);
   pointer-events: auto;
 }
 
@@ -89,27 +90,28 @@ function go(path: string) {
   position: relative;
   display: flex;
   min-width: 0;
-  height: 112rpx;
+  height: 96rpx;
   flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4rpx;
   padding: 0;
-  border-radius: 32rpx;
+  border-radius: 24rpx;
   background: transparent;
-  color: #8f98a8;
+  color: rgba(222, 229, 240, 0.72);
   font-size: 24rpx;
   font-weight: 560;
   line-height: 1;
 }
 
 .tab-item.active {
-  background: linear-gradient(180deg, rgba(198, 255, 58, 0.22) 0%, rgba(198, 255, 58, 0.08) 100%);
+  background:
+    linear-gradient(90deg, rgba(124, 92, 255, 0.74) 0%, rgba(158, 220, 29, 0.82) 100%);
   box-shadow:
     inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
-    inset 0 0 32rpx rgba(198, 255, 58, 0.14),
-    0 0 0 1rpx rgba(198, 255, 58, 0.28);
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.18),
+    0 10rpx 28rpx rgba(96, 180, 36, 0.28);
   color: #c6ff3a;
 }
 
@@ -129,7 +131,7 @@ function go(path: string) {
 .home-indicator {
   width: 268rpx;
   height: 10rpx;
-  margin: 18rpx auto 0;
+  margin: 10rpx auto 0;
   border-radius: 999rpx;
   background: rgba(255, 255, 255, 0.86);
 }

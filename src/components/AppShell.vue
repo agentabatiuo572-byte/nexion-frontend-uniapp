@@ -77,11 +77,14 @@ onShow(hideNativeTabBarStable)
   min-height: 116rpx;
   padding: 28rpx 32rpx 16rpx;
   box-sizing: border-box;
-  border-bottom: 1rpx solid transparent;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(48rpx) saturate(180%);
-  -webkit-backdrop-filter: blur(48rpx) saturate(180%);
-  box-shadow: inset 0 -1rpx 0 rgba(255, 255, 255, 0.04);
+  border-bottom: 0;
+  background:
+    radial-gradient(56% 120% at 82% 42%, rgba(255, 122, 61, 0.10), transparent 62%),
+    radial-gradient(50% 110% at 16% 45%, rgba(158, 220, 29, 0.08), transparent 64%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.58) 68%, rgba(0, 0, 0, 0.20) 100%);
+  backdrop-filter: blur(64rpx) saturate(210%) brightness(1.06);
+  -webkit-backdrop-filter: blur(64rpx) saturate(210%) brightness(1.06);
+  box-shadow: none;
 }
 
 .app-content {
