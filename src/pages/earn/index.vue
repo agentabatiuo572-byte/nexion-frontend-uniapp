@@ -3,10 +3,23 @@ import { computed, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { requireAuth } from '@/utils/auth-guard'
+import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 type Range = 'Today' | 'Week' | 'Month' | 'All'
 
 const range = ref<Range>('Today')
+const locale = useActiveLocale()
+const copy = computed(() => getMainPageMessages(locale.value))
+const t = computed(() => copy.value.earn)
+const v = computed(() => t.value.v5)
+const common = computed(() => copy.value.common)
+const rangeTabs: Range[] = ['Today', 'Week', 'Month', 'All']
+const rangeLabels = computed<Record<Range, string>>(() => ({
+  Today: v.value.today,
+  Week: v.value.week,
+  Month: v.value.month,
+  All: v.value.all
+}))
 
 onShow(() => {
   requireAuth()
@@ -24,41 +37,42 @@ const intPart = computed(() => Math.floor(total.value).toLocaleString())
 const centsPart = computed(() => String(Math.floor(total.value * 100) % 100).padStart(2, '0'))
 
 const rangeMeta = computed(() => {
-  if (range.value === 'Today') return '+5.2% · 14 jobs · 7d streak'
-  if (range.value === 'Week') return '+8.1% · 98 jobs · 7d streak'
-  if (range.value === 'Month') return '+12.4% · 412 jobs · 7d streak'
-  return '+47.3% · 1,247 jobs'
+  const sevenDays = locale.value === 'zh' ? '7 天' : '7d'
+  if (range.value === 'Today') return `+5.2% · 14 ${v.value.jobs} · ${sevenDays} ${v.value.streak}`
+  if (range.value === 'Week') return `+8.1% · 98 ${v.value.jobs} · ${sevenDays} ${v.value.streak}`
+  if (range.value === 'Month') return `+12.4% · 412 ${v.value.jobs} · ${sevenDays} ${v.value.streak}`
+  return `+47.3% · 1,247 ${v.value.jobs}`
 })
 
-const devices = [
-  { name: 'Phone node', sub: 'Mobile NPU · active', earned: '$0.06', uptime: '98%', pct: 42, icon: '▯' },
-  { name: 'Cloud Share trial', sub: 'Managed slice · ready', earned: '$0.00', uptime: 'idle', pct: 0, icon: '◇' }
-]
+const devices = computed(() => [
+  { name: v.value.phoneNode, sub: v.value.phoneNodeDesc, earned: '$0.06', uptime: '98%', pct: 42, icon: '▯' },
+  { name: v.value.cloudShareTrial, sub: v.value.cloudShareTrialDesc, earned: '$0.00', uptime: v.value.idle, pct: 0, icon: '◇' }
+])
 
-const marketRows = [
-  { label: 'Image gen', demand: 'High', pay: '$0.00048/job', color: '#c6ff3a' },
-  { label: 'LLM routing', demand: 'Live', pay: '$0.00021/job', color: '#58e7ff' },
-  { label: 'Speech', demand: 'Stable', pay: '$0.00005/job', color: '#9b89e0' }
-]
+const marketRows = computed(() => [
+  { label: v.value.imageGen, demand: v.value.high, pay: '$0.00048/job', color: '#c6ff3a' },
+  { label: v.value.llmRouting, demand: v.value.live, pay: '$0.00021/job', color: '#58e7ff' },
+  { label: v.value.speech, demand: v.value.stable, pay: '$0.00005/job', color: '#9b89e0' }
+])
 
-const tasks = [
-  { title: 'Keep phone online for 30 min', reward: '+30 NEX', status: 'Ready' },
-  { title: 'Review S1 ROI card', reward: '+100 NEX', status: 'Ready' },
-  { title: 'Invite one qualified operator', reward: '+200 NEX + $1', status: 'Ready' }
-]
+const tasks = computed(() => [
+  { title: v.value.keepOnline, reward: '+30 NEX', status: v.value.ready },
+  { title: v.value.reviewRoi, reward: '+100 NEX', status: v.value.ready },
+  { title: v.value.inviteOperator, reward: '+200 NEX + $1', status: v.value.ready }
+])
 
 function showSoon(label: string) {
-  uni.showToast({ title: `${label} coming soon`, icon: 'none' })
+  uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
 }
 </script>
 
 <template>
-  <AppShell title="Earn" version="" active-tab="earn">
+  <AppShell :title="t.title" version="" active-tab="earn">
     <scroll-view class="page" scroll-y>
       <view class="earn-stack">
         <view class="pill-tabs">
-          <view v-for="item in ['Today', 'Week', 'Month', 'All']" :key="item" class="tab-pill" :class="{ on: range === item }" @click="range = item as Range">
-            {{ item }}
+          <view v-for="item in rangeTabs" :key="item" class="tab-pill" :class="{ on: range === item }" @click="range = item">
+            {{ rangeLabels[item] }}
           </view>
         </view>
 
@@ -69,7 +83,7 @@ function showSoon(label: string) {
           </view>
           <view class="card-content">
             <view class="total-top">
-              <text>Compute earned · {{ range.toLowerCase() }}</text>
+              <text>{{ v.computeEarned }} · {{ rangeLabels[range].toLowerCase() }}</text>
               <b>USDT</b>
             </view>
             <view class="total-money"><text>$</text>{{ intPart }}<i>.{{ centsPart }}</i></view>
@@ -77,14 +91,14 @@ function showSoon(label: string) {
             <view class="split-track"><view class="production" /><view class="premium" /></view>
             <view class="split-grid">
               <view>
-                <text><i class="green" /> Production</text>
+                <text><i class="green" /> {{ v.production }}</text>
                 <b>${{ (total * 0.76).toFixed(2) }}</b>
-                <em>phone + box jobs</em>
+                <em>{{ v.productionSub }}</em>
               </view>
               <view>
-                <text><i class="brand" /> AI Premium</text>
+                <text><i class="brand" /> {{ v.aiPremium }}</text>
                 <b>${{ (total * 0.24).toFixed(2) }}</b>
-                <em>+NEX bonus</em>
+                <em>{{ v.aiPremiumSub }}</em>
               </view>
             </view>
           </view>
@@ -92,34 +106,34 @@ function showSoon(label: string) {
 
         <view class="missed-card card">
           <view>
-            <text class="mono muted">Missed income</text>
-            <view class="card-title">$38.44 left on the table today.</view>
-            <p>A dedicated NexionBox S1 can unlock the hardware pool while your phone stays in the mobile lane.</p>
+            <text class="mono muted">{{ v.missedIncome }}</text>
+            <view class="card-title">{{ v.missedTitle }}</view>
+            <p>{{ v.missedBody }}</p>
           </view>
-          <button @click="showSoon('Store')">Compare <text>›</text></button>
+          <button @click="showSoon(copy.store.title)">{{ v.compare }} <text>›</text></button>
         </view>
 
         <view class="trial-card card">
-          <view class="ticket">FREE TRIAL</view>
-          <view class="card-title">Activate a managed Cloud Share slot.</view>
-          <p>Start a 24h trial before buying hardware. Earnings and task history stay visible here.</p>
+          <view class="ticket">{{ copy.home.freeTrial }}</view>
+          <view class="card-title">{{ v.freeTrialTitle }}</view>
+          <p>{{ v.freeTrialBody }}</p>
           <view class="trial-actions">
-            <button @click="showSoon('Trial')">Start trial</button>
-            <text>Instant activation</text>
+            <button @click="showSoon(copy.home.freeTrial)">{{ v.startTrial }}</button>
+            <text>{{ v.instantActivation }}</text>
           </view>
         </view>
 
         <view class="ghost-slot">
           <view class="ghost-icon">+</view>
           <view>
-            <b>Trial ghost slot</b>
-            <text>Reserved for your first cloud-share activation.</text>
+            <b>{{ v.ghostSlot }}</b>
+            <text>{{ v.ghostSlotDesc }}</text>
           </view>
           <i>0 / 1</i>
         </view>
 
         <view class="section-title">
-          <b>My devices</b>
+          <b>{{ v.myDevices }}</b>
           <text>0 / 6</text>
         </view>
         <view v-for="device in devices" :key="device.name" class="device-card card">
@@ -139,25 +153,25 @@ function showSoon(label: string) {
 
         <view class="empty-card card">
           <view>
-            <text class="mono muted">Empty slots</text>
-            <view class="card-title">5 hardware slots open.</view>
+            <text class="mono muted">{{ v.emptySlots }}</text>
+            <view class="card-title">{{ v.emptySlotsTitle }}</view>
           </view>
-          <button @click="showSoon('Add device')">Add device</button>
+          <button @click="showSoon(v.addDevice)">{{ v.addDevice }}</button>
         </view>
 
         <view class="lifecycle-card card">
-          <view class="mono muted">Fleet lifecycle</view>
-          <view class="card-title">Keep active devices above 95% uptime to avoid yield decay.</view>
+          <view class="mono muted">{{ v.fleetLifecycle }}</view>
+          <view class="card-title">{{ v.lifecycleBody }}</view>
           <view class="lifecycle-grid">
-            <view><b>Grace</b><text>24h</text></view>
-            <view><b>Decay</b><text>-12%</text></view>
-            <view><b>Recover</b><text>instant</text></view>
+            <view><b>{{ v.grace }}</b><text>24h</text></view>
+            <view><b>{{ v.decay }}</b><text>-12%</text></view>
+            <view><b>{{ v.recover }}</b><text>{{ v.instantActivation }}</text></view>
           </view>
         </view>
 
         <view class="section-title">
-          <b>Market Overview</b>
-          <text>live demand</text>
+          <b>{{ v.marketOverview }}</b>
+          <text>{{ v.liveDemand }}</text>
         </view>
         <view class="market-card card">
           <view v-for="row in marketRows" :key="row.label" class="market-row">
@@ -169,19 +183,19 @@ function showSoon(label: string) {
 
         <view class="lock-card card">
           <view>
-            <text class="mono muted">Premium tasks above your tier</text>
-            <view class="card-title">Hardware owners unlock AI Premium, fine-tune, and 405B inference queues.</view>
+            <text class="mono muted">{{ v.premiumLocked }}</text>
+            <view class="card-title">{{ v.premiumLockedBody }}</view>
           </view>
           <view class="lock-grid">
-            <text>Fine-tune</text>
-            <text>Video gen</text>
-            <text>405B LLM</text>
+            <text>{{ v.fineTune }}</text>
+            <text>{{ v.videoGen }}</text>
+            <text>{{ v.llm405b }}</text>
           </view>
         </view>
 
         <view class="section-title">
-          <b>Task Center</b>
-          <text>3 ready</text>
+          <b>{{ v.taskCenter }}</b>
+          <text>{{ v.readyCount }}</text>
         </view>
         <view class="task-center card">
           <view v-for="task in tasks" :key="task.title" class="task-row">

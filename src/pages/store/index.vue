@@ -1,22 +1,28 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { requireAuth } from '@/utils/auth-guard'
+import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 onShow(() => {
   requireAuth()
 })
 
 const tickerIndex = ref(0)
+const locale = useActiveLocale()
+const copy = computed(() => getMainPageMessages(locale.value))
+const t = computed(() => copy.value.store)
+const v = computed(() => t.value.v5)
+const common = computed(() => copy.value.common)
 
-const tiers = [
+const tiers = computed(() => [
   { label: 'Rack P1', y: '$142.60', width: 100, hot: true },
   { label: 'Box Pro', y: '$76.00', width: 53 },
   { label: 'Box S1', y: '$38.50', width: 27 },
   { label: 'Share', y: '$0.07', width: 2 },
-  { label: 'Phone', y: '$0.06', width: 1, you: true }
-]
+  { label: v.value.phone, y: '$0.06', width: 1, you: true }
+])
 
 const purchases = [
   { who: 'Maya', co: 'ID', prod: 'NexionBox S1', t: '3m', color: '#c68316' },
@@ -24,13 +30,13 @@ const purchases = [
   { who: 'Hideo', co: 'JP', prod: 'NexionBox Pro', t: '12m', color: '#0e8e4a' }
 ]
 
-const products = [
+const products = computed(() => [
   {
     id: 'stellarbox-s1',
     name: 'NexionBox S1',
-    tier: 'Entry',
-    badge: 'Best Seller',
-    tagline: 'Personal AI inference box · fully managed',
+    tier: v.value.tierEntry,
+    badge: v.value.bestSeller,
+    tagline: v.value.personalBox,
     photo: '/src/static/products/nexionbox-s1-v4.png',
     daily: '$38.50',
     nex: '+65 NEX/d',
@@ -45,9 +51,9 @@ const products = [
   {
     id: 'stellarbox-pro',
     name: 'NexionBox Pro',
-    tier: 'Pro',
-    badge: 'Trending',
-    tagline: 'Double the GPUs, double the earning power.',
+    tier: v.value.tierPro,
+    badge: v.value.trending,
+    tagline: v.value.proBox,
     photo: '/src/static/products/nexionbox-pro-v2.png',
     daily: '$76.00',
     nex: '+215 NEX/d',
@@ -61,9 +67,9 @@ const products = [
   {
     id: 'stellarrack-p1',
     name: 'NexionRack P1',
-    tier: 'Flagship',
-    badge: 'Flagship',
-    tagline: 'Datacenter-grade A100 rack for serious operators.',
+    tier: v.value.tierFlagship,
+    badge: v.value.flagship,
+    tagline: v.value.rackBox,
     photo: '/src/static/products/nexionrack-p1-v2.png',
     daily: '$142.60',
     nex: '+950 NEX/d',
@@ -77,9 +83,9 @@ const products = [
   {
     id: 'cloud-share',
     name: 'Cloud Share',
-    tier: 'Share',
-    badge: 'Low Barrier',
-    tagline: 'No hardware needed — buy a slice of the network.',
+    tier: v.value.tierShare,
+    badge: v.value.lowBarrier,
+    tagline: v.value.cloudShareLine,
     photo: '',
     daily: '$0.073',
     nex: '+30 NEX/d',
@@ -88,14 +94,18 @@ const products = [
     payback: 'stake',
     sold: '12,483',
     stock: null,
-    specs: ['Instant activation', 'Distributed', '8-15% yield', 'Redeem 30d']
+    specs: [v.value.cloudInstant, v.value.cloudDistributed, v.value.cloudYield, v.value.cloudRedeem],
+    isShare: true
   }
-]
+])
 
-const lockedProducts = [
-  { name: 'NexionBox Pro v2', phase: 'P3', line: '8x RTX 5090 · new silicon generation' },
-  { name: 'NexionRack P2', phase: 'P5', line: '8x H100 · training pool unlock' }
-]
+const featuredProducts = computed(() => products.value.filter((p) => p.featured))
+const restProducts = computed(() => products.value.filter((p) => !p.featured))
+
+const lockedProducts = computed(() => [
+  { name: 'NexionBox Pro v2', phase: 'P3', line: v.value.newSilicon },
+  { name: 'NexionRack P2', phase: 'P5', line: v.value.trainingUnlock }
+])
 
 let tickerTimer: ReturnType<typeof setInterval> | undefined
 
@@ -110,20 +120,20 @@ onUnmounted(() => {
 })
 
 function showSoon(label: string) {
-  uni.showToast({ title: `${label} coming soon`, icon: 'none' })
+  uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
 }
 </script>
 
 <template>
-  <AppShell title="Store" version="" active-tab="store">
+  <AppShell :title="t.title" version="" active-tab="store">
     <scroll-view class="page" scroll-y>
       <view class="store-stack">
         <view class="store-hero card">
           <view class="hero-bg" />
           <view class="hero-copy">
-            <text>Your place in the network</text>
-            <view>Climb to <b>640x</b> daily yield.</view>
-            <p>Unlocks Llama 70B inference + image-gen at 1080p.</p>
+            <text>{{ v.heroKicker }}</text>
+            <view>{{ v.heroTitlePrefix }} <b>{{ v.heroTitleHighlight }}</b> {{ v.heroTitleSuffix }}</view>
+            <p>{{ v.heroSub }}</p>
           </view>
           <view class="hero-art">
             <view class="bar phone" />
@@ -134,12 +144,12 @@ function showSoon(label: string) {
         </view>
 
         <view class="section-title">
-          <b>Network ladder</b>
-          <text>5 tiers</text>
+          <b>{{ v.networkLadder }}</b>
+          <text>{{ v.fiveTiers }}</text>
         </view>
         <view class="ladder card">
           <view v-for="tier in tiers" :key="tier.label" class="tier-row" :class="{ you: tier.you }">
-            <text>{{ tier.label }}<i v-if="tier.you">←you</i></text>
+            <text>{{ tier.label }}<i v-if="tier.you">←{{ v.you }}</i></text>
             <view class="tier-track"><view :style="{ width: `${tier.width}%` }" /></view>
             <b>{{ tier.y }}<i>/d</i></b>
           </view>
@@ -147,13 +157,13 @@ function showSoon(label: string) {
 
         <view class="vs-card card">
           <view>
-            <text>your phone</text>
+            <text>{{ v.yourPhone }}</text>
             <b>$0.06<i>/d</i></b>
             <em>+12 NEX/d</em>
           </view>
           <view class="vs-mid">
             <span>→</span>
-            <i>640x more</i>
+            <i>{{ v.more640 }}</i>
           </view>
           <view class="right">
             <text>NexionBox S1</text>
@@ -165,17 +175,17 @@ function showSoon(label: string) {
         <view class="trade-card card">
           <view class="trade-icon">↻</view>
           <view>
-            <b>Trade-in window</b>
-            <text>Legacy owners can retire old hardware into next-gen credit when phases unlock.</text>
+            <b>{{ v.tradeWindow }}</b>
+            <text>{{ v.tradeWindowBody }}</text>
           </view>
-          <i>phase live</i>
+          <i>{{ v.phaseLive }}</i>
         </view>
 
         <view class="section-title">
-          <b>Recommended for you</b>
-          <text class="chip">popular</text>
+          <b>{{ v.recommended }}</b>
+          <text class="chip">{{ t.popular }}</text>
         </view>
-        <view v-for="product in products.filter((p) => p.featured)" :key="product.id" class="product-card card featured" @click="showSoon(product.name)">
+        <view v-for="product in featuredProducts" :key="product.id" class="product-card card featured" @click="showSoon(product.name)">
           <view class="product-photo">
             <image v-if="product.photo" :src="product.photo" mode="aspectFill" />
             <view v-else class="cloud-art">CPU</view>
@@ -191,8 +201,8 @@ function showSoon(label: string) {
               <view class="daily">{{ product.daily }}<text>/d</text></view>
             </view>
             <view class="roi-grid">
-              <view><text>You earn</text><b>{{ product.daily }}</b><i>{{ product.nex }}</i></view>
-              <view><text>Year 1 ROI</text><b>{{ product.annual }}</b><i>payback ~{{ product.payback }}</i></view>
+              <view><text>{{ v.youEarn }}</text><b>{{ product.daily }}</b><i>{{ product.nex }}</i></view>
+              <view><text>{{ v.yearRoi }}</text><b>{{ product.annual }}</b><i>{{ v.annualPayback.replace('{annual}', product.annual).replace('{payback}', product.payback) }}</i></view>
             </view>
             <view class="spec-row">
               <text v-for="spec in product.specs" :key="spec">{{ spec }}</text>
@@ -200,18 +210,18 @@ function showSoon(label: string) {
             <view v-if="product.stock" class="stock-strip">
               <i>🔥</i>
               <view>
-                <b>Only {{ product.stock }} units left this week</b>
+                <b>{{ v.unitsLeft.replace('{n}', String(product.stock)) }}</b>
                 <view><span :style="{ width: `${Math.min(100, product.stock * 2)}%` }" /></view>
               </view>
             </view>
           </view>
           <view class="product-footer">
             <view>
-              <text>Price</text>
+              <text>{{ v.price }}</text>
               <b>{{ product.price }}</b>
-              <i>~{{ product.annual }} annual · payback ~{{ product.payback }}</i>
+              <i>{{ v.annualPayback.replace('{annual}', product.annual).replace('{payback}', product.payback) }}</i>
             </view>
-            <button @click.stop="showSoon('Checkout')">Buy now <text>›</text></button>
+            <button @click.stop="showSoon('Checkout')">{{ v.buyNow }} <text>›</text></button>
           </view>
         </view>
 
@@ -219,15 +229,15 @@ function showSoon(label: string) {
           <view class="avatar" :style="{ background: purchases[tickerIndex].color }">{{ purchases[tickerIndex].who[0] }}</view>
           <view>
             <b>{{ purchases[tickerIndex].who }} · {{ purchases[tickerIndex].co }}</b>
-            <text>bought {{ purchases[tickerIndex].prod }}</text>
+            <text>{{ v.bought }} {{ purchases[tickerIndex].prod }}</text>
           </view>
-          <i>{{ purchases[tickerIndex].t }} ago</i>
+          <i>{{ purchases[tickerIndex].t }} {{ v.ago }}</i>
         </view>
 
         <view class="section-title">
-          <b>More tiers</b>
+          <b>{{ v.moreTiers }}</b>
         </view>
-        <view v-for="product in products.filter((p) => !p.featured)" :key="product.id" class="product-card card" @click="showSoon(product.name)">
+        <view v-for="product in restProducts" :key="product.id" class="product-card card" @click="showSoon(product.name)">
           <view class="product-photo">
             <image v-if="product.photo" :src="product.photo" mode="aspectFill" />
             <view v-else class="cloud-art">CPU</view>
@@ -243,8 +253,8 @@ function showSoon(label: string) {
               <view class="daily">{{ product.daily }}<text>/d</text></view>
             </view>
             <view class="roi-grid">
-              <view><text>You earn</text><b>{{ product.daily }}</b><i>{{ product.nex }}</i></view>
-              <view><text>Live count</text><b>{{ product.sold }}</b><i>operators</i></view>
+              <view><text>{{ v.youEarn }}</text><b>{{ product.daily }}</b><i>{{ product.nex }}</i></view>
+              <view><text>{{ v.liveCount }}</text><b>{{ product.sold }}</b><i>{{ v.operators }}</i></view>
             </view>
             <view class="spec-row">
               <text v-for="spec in product.specs" :key="spec">{{ spec }}</text>
@@ -252,24 +262,24 @@ function showSoon(label: string) {
             <view v-if="product.stock" class="stock-strip">
               <i>🔥</i>
               <view>
-                <b>Only {{ product.stock }} units left this week</b>
+                <b>{{ v.unitsLeft.replace('{n}', String(product.stock)) }}</b>
                 <view><span :style="{ width: `${Math.min(100, product.stock * 2)}%` }" /></view>
               </view>
             </view>
           </view>
           <view class="product-footer">
             <view>
-              <text>{{ product.tier === 'Share' ? 'From' : 'Price' }}</text>
+              <text>{{ product.isShare ? v.from : v.price }}</text>
               <b>{{ product.price }}</b>
-              <i>{{ product.tier === 'Share' ? 'one-time stake' : `~${product.annual} annual · payback ~${product.payback}` }}</i>
+              <i>{{ product.isShare ? v.oneTimeStake : v.annualPayback.replace('{annual}', product.annual).replace('{payback}', product.payback) }}</i>
             </view>
-            <button @click.stop="showSoon('Checkout')">{{ product.tier === 'Share' ? 'Stake' : 'Buy now' }} <text>›</text></button>
+            <button @click.stop="showSoon('Checkout')">{{ product.isShare ? v.stake : v.buyNow }} <text>›</text></button>
           </view>
         </view>
 
         <view class="section-title">
-          <b>Coming soon</b>
-          <text>next platform phases</text>
+          <b>{{ v.comingSoon }}</b>
+          <text>{{ v.nextPhases }}</text>
         </view>
         <view class="locked-list">
           <view v-for="item in lockedProducts" :key="item.name" class="locked-card card">
@@ -282,8 +292,8 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <button class="orders-entry" @click="showSoon('Orders')">▣ Orders</button>
-        <view class="footer-note">Fully managed · zero shipping · 99.9% uptime SLA</view>
+        <button class="orders-entry" @click="showSoon(v.orders)">▣ {{ v.orders }}</button>
+        <view class="footer-note">{{ v.footerNote }}</view>
       </view>
     </scroll-view>
   </AppShell>

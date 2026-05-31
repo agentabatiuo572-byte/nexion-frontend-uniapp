@@ -4,9 +4,15 @@ import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/store/auth'
 import { requireAuth } from '@/utils/auth-guard'
+import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 const auth = useAuthStore()
 const liveTab = ref<'activity' | 'earnings'>('activity')
+const locale = useActiveLocale()
+const copy = computed(() => getMainPageMessages(locale.value))
+const t = computed(() => copy.value.home)
+const v = computed(() => t.value.v5)
+const common = computed(() => copy.value.common)
 
 onShow(() => {
   requireAuth()
@@ -16,21 +22,23 @@ const firstName = computed(() => (auth.displayName || 'Stellar').split(/\s+/)[0]
 const level = computed(() => auth.session?.userLevel || 'L0')
 const vRank = computed(() => auth.session?.vRank || 'V0')
 
-const dayTasks = [
-  { label: 'Connect wallet', cat: 'Wallet', reward: '+50', done: true, color: '#9b89e0' },
-  { label: 'Visit Earn tab', cat: 'Explore', reward: '+30', done: true, color: '#ff6b35' },
-  { label: 'Visit Store', cat: 'Explore', reward: '+50', done: true, color: '#ff6b35' },
-  { label: 'See product ROI', cat: 'Convert', reward: '+100', done: false, color: '#c6ff3a' },
-  { label: 'Set up profile', cat: 'Identity', reward: '+80', done: false, color: '#9b89e0' },
-  { label: 'Invite a friend', cat: 'Social', reward: '+200', done: false, color: '#ff6b35' }
-]
+const headline = computed(() => v.value.headline.split('{amount}'))
 
-const activityRows = [
-  { ts: '+0:00', who: 'You', msg: 'phone node completed SDXL batch', val: '+$0.00032', level: 'ok' },
-  { ts: '+0:08', who: 'Grid', msg: 'new inference job routed', val: 'live', level: 'live' },
-  { ts: '+0:32', who: 'S1', msg: 'rack slot opened in Singapore', val: 'open', level: 'warn' },
-  { ts: '+1:30', who: 'Team', msg: 'Sarah K. bought NexionBox S1', val: '+$29.90', level: 'ok' }
-]
+const dayTasks = computed(() => [
+  { label: v.value.connectWallet, cat: v.value.walletCat, reward: '+50', done: true, color: '#9b89e0' },
+  { label: v.value.visitEarnTab, cat: v.value.exploreCat, reward: '+30', done: true, color: '#ff6b35' },
+  { label: v.value.visitStore, cat: v.value.exploreCat, reward: '+50', done: true, color: '#ff6b35' },
+  { label: v.value.seeProductRoi, cat: v.value.convertCat, reward: '+100', done: false, color: '#c6ff3a' },
+  { label: v.value.setupProfile, cat: v.value.identityCat, reward: '+80', done: false, color: '#9b89e0' },
+  { label: v.value.inviteFriend, cat: v.value.socialCat, reward: '+200', done: false, color: '#ff6b35' }
+])
+
+const activityRows = computed(() => [
+  { ts: '+0:00', who: v.value.youLabel, msg: v.value.phoneNodeCompleted, val: '+$0.00032', level: 'ok' },
+  { ts: '+0:08', who: v.value.gridLabel, msg: v.value.newInferenceJob, val: t.value.live, level: 'live' },
+  { ts: '+0:32', who: 'S1', msg: v.value.rackSlotOpened, val: v.value.openLabel, level: 'warn' },
+  { ts: '+1:30', who: copy.value.team.title, msg: v.value.boughtS1, val: '+$29.90', level: 'ok' }
+])
 
 const earningRows = [
   { name: 'Sarah K.', product: 'NexionBox S1', amount: '+$29.90' },
@@ -49,7 +57,7 @@ const ledgerRows = [
 const trustChips = ['NVIDIA', 'Intel', 'AMD', 'CertiK ✓', 'SOC 2', 'GDPR', 'ISO 27001']
 
 function showSoon(label: string) {
-  uni.showToast({ title: `${label} coming soon`, icon: 'none' })
+  uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
 }
 </script>
 
@@ -58,62 +66,62 @@ function showSoon(label: string) {
     <scroll-view class="page" scroll-y>
       <view class="home-stack">
         <view class="greeting">
-          <text class="hello">Good day, {{ firstName }}</text>
-          <view class="headline">Your node earned <text>$0.06</text> today.</view>
+          <text class="hello">{{ t.goodDay }}, {{ firstName }}</text>
+          <view class="headline">{{ headline[0] }}<text>$0.06</text>{{ headline[1] }}</view>
         </view>
 
         <view class="money-card card">
           <view class="aurora" />
           <view class="card-top">
             <view>
-              <view class="mono muted">Earnings</view>
+              <view class="mono muted">{{ t.earnings }}</view>
               <view class="money"><text>$</text>247<text>.83</text></view>
-              <view class="success-line">+5.2% today · 14 jobs · 7d streak</view>
+              <view class="success-line">{{ v.todayJobsStreak }}</view>
             </view>
-            <view class="live-chip"><i /> live</view>
+            <view class="live-chip"><i /> {{ t.live }}</view>
           </view>
           <view class="mini-grid">
-            <view><text>Pending</text><b>$12.40</b></view>
+            <view><text>{{ t.pending }}</text><b>$12.40</b></view>
             <view><text>NEX</text><b>1,842</b></view>
-            <view><text>Rank</text><b>{{ vRank }}</b></view>
+            <view><text>{{ t.rank }}</text><b>{{ vRank }}</b></view>
           </view>
         </view>
 
-        <view class="trial-card card" @click="showSoon('Free trial')">
+        <view class="trial-card card" @click="showSoon(t.freeTrial)">
           <view>
-            <view class="ticket">FREE TRIAL</view>
-            <view class="card-title">Try Cloud Share for 24h.</view>
-            <view class="body">No hardware, no shipping. Start earning from a managed slice of the grid.</view>
+            <view class="ticket">{{ t.freeTrial }}</view>
+            <view class="card-title">{{ t.cloudShare }}</view>
+            <view class="body">{{ v.noHardwareTrial }}</view>
           </view>
           <view class="trial-side">
-            <text>earn up to</text>
+            <text>{{ t.earnUpTo }}</text>
             <b>$38</b>
           </view>
         </view>
 
         <view class="conversion-card card">
           <view>
-            <view class="mono muted">Upgrade signal</view>
-            <view class="card-title">Your phone is earning. Hardware makes the curve obvious.</view>
+            <view class="mono muted">{{ v.upgradeSignal }}</view>
+            <view class="card-title">{{ v.upgradeSignalBody }}</view>
           </view>
-          <button @click="showSoon('Store')">See ROI <text>›</text></button>
+          <button @click="showSoon(t.store)">{{ v.seeRoi }} <text>›</text></button>
         </view>
 
         <view class="day-card card">
           <view class="day-head">
             <view>
-              <view class="mono muted">First day reward</view>
+              <view class="mono muted">{{ t.firstDayReward }}</view>
               <view class="reward"><text>+</text>500 <i>NEX</i></view>
             </view>
             <view class="timer">
-              <text>Ends in</text>
+              <text>{{ t.endsIn }}</text>
               <b>18:24:00</b>
             </view>
           </view>
           <view class="progress"><view /></view>
           <view class="day-foot">
-            <text><b>3</b>/6 done</text>
-            <text>+130 NEX earned</text>
+            <text><b>3</b>/6 {{ v.doneSuffix }}</text>
+            <text>+130 {{ v.earnedSuffix }}</text>
           </view>
           <view class="task-list">
             <view v-for="task in dayTasks" :key="task.label" class="task-row">
@@ -130,10 +138,10 @@ function showSoon(label: string) {
         <view class="live-card card">
           <view class="live-tabs">
             <view class="segmented">
-              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">Activity</button>
-              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">Earnings</button>
+              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">{{ v.activity }}</button>
+              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">{{ v.earningsTab }}</button>
             </view>
-            <view class="live-chip small"><i /> live</view>
+            <view class="live-chip small"><i /> {{ t.live }}</view>
           </view>
           <view v-if="liveTab === 'activity'" class="feed">
             <view v-for="row in activityRows" :key="row.ts" class="feed-row">
@@ -147,43 +155,43 @@ function showSoon(label: string) {
             <view v-for="row in earningRows" :key="row.name" class="earn-row">
               <i />
               <b>{{ row.name }}</b>
-              <view>bought {{ row.product }}</view>
+              <view>{{ v.bought }} {{ row.product }}</view>
               <text>{{ row.amount }}</text>
             </view>
-            <view class="see-all">See all ›</view>
+            <view class="see-all">{{ v.seeAll }} ›</view>
           </view>
         </view>
 
         <view class="quick-grid">
-          <button @click="showSoon('Store')"><text>▣</text><b>Store</b></button>
-          <button @click="showSoon('Devices')"><text>▤</text><b>Devices</b></button>
-          <button @click="showSoon('Wallet')"><text>⇩</text><b>Wallet</b></button>
-          <button @click="showSoon('Team')"><text>◇</text><b>Team</b></button>
+          <button @click="showSoon(t.store)"><text>▣</text><b>{{ t.store }}</b></button>
+          <button @click="showSoon(t.devices)"><text>▤</text><b>{{ t.devices }}</b></button>
+          <button @click="showSoon(t.wallet)"><text>⇩</text><b>{{ t.wallet }}</b></button>
+          <button @click="showSoon(t.team)"><text>◇</text><b>{{ t.team }}</b></button>
         </view>
 
-        <view class="section-title"><b>My fleet</b><text>0 / 6 active</text></view>
+        <view class="section-title"><b>{{ t.myFleet }}</b><text>{{ t.activeSlots }}</text></view>
         <view class="fleet-card card">
           <view class="device-icon">▯</view>
           <view class="fleet-main">
-            <b>Phone node</b>
-            <text>On Nexion grid · mobile NPU earning</text>
+            <b>{{ v.phoneNode }}</b>
+            <text>{{ v.phoneNodeDesc }}</text>
           </view>
           <view class="slot-bars"><i v-for="n in 6" :key="n" :class="{ on: n === 1 }" /></view>
         </view>
 
         <view class="grid-card card">
-          <view class="mono muted">On Nexion grid</view>
+          <view class="mono muted">{{ v.onGrid }}</view>
           <view class="grid-stats">
-            <view><b>4,821</b><text>live boxes</text></view>
-            <view><b>102ms</b><text>median route</text></view>
-            <view><b>99.9%</b><text>uptime SLA</text></view>
+            <view><b>4,821</b><text>{{ v.liveBoxes }}</text></view>
+            <view><b>102ms</b><text>{{ v.medianRoute }}</text></view>
+            <view><b>99.9%</b><text>{{ v.uptimeSla }}</text></view>
           </view>
         </view>
 
         <view class="pulse-card card">
           <view>
-            <view class="mono muted">Network pulse</view>
-            <view class="card-title">Demand is above baseline in 3 regions.</view>
+            <view class="mono muted">{{ v.networkPulse }}</view>
+            <view class="card-title">{{ v.networkPulseBody }}</view>
           </view>
           <view class="spark">
             <i v-for="n in 12" :key="n" :style="{ height: `${18 + (n % 5) * 10}rpx` }" />
@@ -193,43 +201,43 @@ function showSoon(label: string) {
         <view class="stella-card">
           <view class="stella-avatar">S</view>
           <view class="stella-bubble">
-            <view><b>Stella</b><text> · AI advisor</text></view>
-            <p>Your yield is in the top <b>0.16%</b> for phone-only nodes. Want a faster path?</p>
-            <i>Open chat →</i>
+            <view><b>Stella</b><text> · {{ v.stellaRole }}</text></view>
+            <p>{{ v.stellaBody.split('{pct}')[0] }}<b>0.16</b>{{ v.stellaBody.split('{pct}')[1] }}</p>
+            <i>{{ v.openChat }} →</i>
           </view>
         </view>
 
         <view class="rank-card card">
           <view class="rank-orb">{{ vRank }}</view>
           <view>
-            <view class="card-title">Your rank</view>
-            <text>{{ level }} · next rank progress</text>
+            <view class="card-title">{{ t.yourRank }}</view>
+            <text>{{ level }} · {{ v.nextRankProgress }}</text>
             <view class="rank-progress"><view /></view>
           </view>
         </view>
 
         <view class="pool-card card">
-          <view class="mono muted">Leadership pool</view>
+          <view class="mono muted">{{ v.leadershipPool }}</view>
           <view class="pool-row">
             <b>$42,680</b>
-            <text>current monthly pool</text>
+            <text>{{ v.currentMonthlyPool }}</text>
           </view>
           <view class="pool-row">
             <b>V2</b>
-            <text>required to unlock</text>
+            <text>{{ v.requiredToUnlock }}</text>
           </view>
         </view>
 
         <view class="math-card card">
-          <view class="mono muted">Do the math</view>
+          <view class="mono muted">{{ v.doTheMath }}</view>
           <view class="math-grid">
-            <view><text>Phone</text><b>$0.06/d</b></view>
+            <view><text>{{ v.phone }}</text><b>$0.06/d</b></view>
             <view><text>NexionBox S1</text><b>$38.50/d</b></view>
-            <view><text>Multiplier</text><b>640x</b></view>
+            <view><text>{{ v.multiplier }}</text><b>640x</b></view>
           </view>
         </view>
 
-        <view class="section-title"><b>Earnings ledger</b><text>5 of 247</text></view>
+        <view class="section-title"><b>{{ v.earningsLedger }}</b><text>5 of 247</text></view>
         <view class="ledger-card card">
           <view v-for="row in ledgerRows" :key="row.model" class="ledger-row">
             <view><b>{{ row.model }}</b><text> · {{ row.who }}</text></view>
@@ -241,7 +249,7 @@ function showSoon(label: string) {
         <view class="market-card card">
           <view class="market-top">
             <view>
-              <view class="mono muted">NEX price</view>
+              <view class="mono muted">{{ v.nexPrice }}</view>
               <view class="price-line">$0.0842</view>
             </view>
             <view class="success-line">+12.4% 24h</view>
@@ -250,11 +258,11 @@ function showSoon(label: string) {
         </view>
 
         <view class="trust-card card">
-          <view class="trust-title">Independently audited</view>
+          <view class="trust-title">{{ t.audited }}</view>
           <view class="trust-tags">
             <text v-for="chip in trustChips" :key="chip">{{ chip }}</text>
           </view>
-          <view class="trust-note">Reserve proof on-chain · 102.4% backed · Trust Center →</view>
+          <view class="trust-note">{{ v.reserveProof }} →</view>
         </view>
       </view>
     </scroll-view>
