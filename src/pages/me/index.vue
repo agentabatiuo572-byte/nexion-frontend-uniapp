@@ -115,7 +115,7 @@ function comingSoon(label: string) {
           <view class="wallet-grid" />
           <view class="wallet-aurora" />
           <view class="wallet-dots">
-            <text v-for="i in 5" :key="i" />
+            <text v-for="i in 5" :key="i" class="wallet-dot" />
           </view>
 
           <view class="wallet-content">
@@ -450,21 +450,39 @@ function comingSoon(label: string) {
   pointer-events: none;
 }
 
-.wallet-dots text {
+.wallet-dot {
   position: absolute;
   bottom: 22rpx;
   width: 6rpx;
   height: 6rpx;
   border-radius: 50%;
   background: #46e6ff;
-  opacity: 0.75;
+  opacity: 0;
+  animation: wallet-dot-rise 8s linear infinite;
 }
 
-.wallet-dots text:nth-child(1) { left: 8%; background: #46e6ff; }
-.wallet-dots text:nth-child(2) { left: 28%; background: #c6ff3a; }
-.wallet-dots text:nth-child(3) { left: 52%; background: #46e6ff; }
-.wallet-dots text:nth-child(4) { left: 72%; background: #12c979; }
-.wallet-dots text:nth-child(5) { left: 90%; background: #ff8d4a; }
+.wallet-dot:nth-child(1) { left: 8%; background: #46e6ff; animation-delay: 0s; }
+.wallet-dot:nth-child(2) { left: 28%; background: #c6ff3a; animation-delay: 1.4s; }
+.wallet-dot:nth-child(3) { left: 52%; background: #46e6ff; animation-delay: 3.2s; }
+.wallet-dot:nth-child(4) { left: 72%; background: #12c979; animation-delay: 5s; }
+.wallet-dot:nth-child(5) { left: 90%; background: #ff8d4a; animation-delay: 6.6s; }
+
+@keyframes wallet-dot-rise {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.72);
+  }
+  12% {
+    opacity: 0.75;
+  }
+  70% {
+    opacity: 0.65;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -300rpx, 0) scale(1.12);
+  }
+}
 
 .wallet-content {
   position: relative;
