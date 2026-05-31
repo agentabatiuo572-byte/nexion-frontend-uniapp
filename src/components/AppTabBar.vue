@@ -57,19 +57,31 @@ function go(path: string) {
   position: relative;
   display: flex;
   align-items: stretch;
-  overflow: visible;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  overflow: hidden;
+  padding: 8rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 34rpx;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 42%, rgba(255, 255, 255, 0.02) 100%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 1rpx 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.10),
+    0 18rpx 54rpx rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(58rpx) saturate(230%) brightness(1.16);
+  -webkit-backdrop-filter: blur(58rpx) saturate(230%) brightness(1.16);
   pointer-events: auto;
 }
 
 .specular {
-  display: none;
+  position: absolute;
+  top: 0;
+  right: 12%;
+  left: 12%;
+  height: 1rpx;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .tab-item {
@@ -93,14 +105,14 @@ function go(path: string) {
 
 .tab-item.active {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.08) 100%),
-    rgba(255, 255, 255, 0.04);
-  border: 1rpx solid rgba(255, 255, 255, 0.16);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.08) 100%),
+    rgba(255, 255, 255, 0.05);
   box-shadow:
     inset 0 1rpx 0 rgba(255, 255, 255, 0.30),
-    0 8rpx 24rpx rgba(0, 0, 0, 0.16);
-  backdrop-filter: blur(42rpx) saturate(230%) brightness(1.2);
-  -webkit-backdrop-filter: blur(42rpx) saturate(230%) brightness(1.2);
+    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
+    0 8rpx 24rpx rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(34rpx) saturate(220%) brightness(1.18);
+  -webkit-backdrop-filter: blur(34rpx) saturate(220%) brightness(1.18);
   color: #c6ff3a;
 }
 
