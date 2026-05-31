@@ -109,7 +109,10 @@ function comingSoon(label: string) {
       <view class="wallet-section">
         <view class="wallet-section-head">
           <text>{{ walletTitle }}</text>
-          <button @click="comingSoon(m.bills)">{{ billsShortLabel }}</button>
+          <button class="wallet-bills-link" @click="comingSoon(m.bills)">
+            <text>{{ billsShortLabel }}</text>
+            <text class="wallet-bills-chevron" />
+          </button>
         </view>
         <view class="wallet-card">
           <view class="wallet-grid" />
@@ -400,17 +403,33 @@ function comingSoon(label: string) {
   font-weight: 760;
 }
 
-.wallet-section-head button {
-  min-width: 92rpx;
-  height: 52rpx;
+.wallet-bills-link {
+  display: flex;
+  min-width: 0;
+  height: 48rpx;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2rpx;
   margin: 0;
-  padding: 0 18rpx;
-  border-radius: 999rpx;
-  background: #151a23;
+  padding: 0;
+  background: transparent;
   color: #9ba6b8;
-  font-size: 23rpx;
-  font-weight: 700;
-  line-height: 52rpx;
+  line-height: 1;
+}
+
+.wallet-bills-link text:first-child {
+  color: #9ba6b8;
+  font-size: 26rpx;
+  font-weight: 560;
+}
+
+.wallet-bills-chevron {
+  display: block;
+  width: 24rpx;
+  height: 24rpx;
+  background: #747f91;
+  -webkit-mask: url("/static/icons/wallet-chevron-right.svg") center / contain no-repeat;
+  mask: url("/static/icons/wallet-chevron-right.svg") center / contain no-repeat;
 }
 
 .wallet-card {
