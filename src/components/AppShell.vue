@@ -74,17 +74,16 @@ onShow(hideNativeTabBarStable)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 116rpx;
-  padding: 28rpx 32rpx 16rpx;
+  min-height: 88rpx;
+  padding: 18rpx 32rpx 14rpx;
   box-sizing: border-box;
   border-bottom: 0;
   background:
-    radial-gradient(56% 120% at 82% 42%, rgba(255, 122, 61, 0.10), transparent 62%),
-    radial-gradient(50% 110% at 16% 45%, rgba(158, 220, 29, 0.08), transparent 64%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.58) 68%, rgba(0, 0, 0, 0.20) 100%);
-  backdrop-filter: blur(64rpx) saturate(210%) brightness(1.06);
-  -webkit-backdrop-filter: blur(64rpx) saturate(210%) brightness(1.06);
-  box-shadow: none;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.035) 54%, rgba(255, 255, 255, 0.00) 100%),
+    rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(60rpx) saturate(230%) brightness(1.16);
+  -webkit-backdrop-filter: blur(60rpx) saturate(230%) brightness(1.16);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.06);
 }
 
 .app-content {
@@ -96,7 +95,7 @@ onShow(hideNativeTabBarStable)
 .app-content :deep(.page) {
   height: 100vh;
   max-height: 100vh !important;
-  padding-top: 152rpx;
+  padding-top: 116rpx;
   padding-bottom: 132rpx;
   box-sizing: border-box;
 }
@@ -122,8 +121,8 @@ onShow(hideNativeTabBarStable)
 
 .brand-title {
   color: #ffffff;
-  font-size: 36rpx;
-  font-weight: 780;
+  font-size: 34rpx;
+  font-weight: 760;
   letter-spacing: 0;
 }
 
@@ -140,11 +139,11 @@ onShow(hideNativeTabBarStable)
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 28rpx;
+  gap: 24rpx;
 }
 
 .header-icon {
-  width: 56rpx;
-  height: 56rpx;
+  width: 52rpx;
+  height: 52rpx;
 }
 </style>
