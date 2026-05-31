@@ -97,7 +97,7 @@ onShow(hideNativeTabBarStable)
   height: 100vh;
   max-height: 100vh !important;
   padding-top: 152rpx;
-  padding-bottom: 198rpx;
+  padding-bottom: 132rpx;
   box-sizing: border-box;
 }
 
