@@ -43,6 +43,45 @@ const slotOpenLabel = computed(() => (locale.value === 'zh' ? '可用槽位' : '
 const unlockLabel = computed(() => (locale.value === 'zh' ? '解锁' : 'Unlock'))
 const moreLabel = computed(() => (locale.value === 'zh' ? '更多' : 'more'))
 const addDeviceLabel = computed(() => (locale.value === 'zh' ? '添加设备 →' : 'Add device →'))
+const mePortCopy = computed(() => {
+  const zh = locale.value === 'zh'
+  return {
+    limitedFree: zh ? '限时免费' : 'Free trial',
+    trialDevice: 'NexionBox S1',
+    trialDesc: zh ? '免费试用 3 天 · 随时取消' : 'Try free for 3 days · cancel anytime',
+    trialEarn: zh ? '3 天到手' : 'Earn in 3d',
+    trialLeft: zh ? '今日仅剩 47 张' : '47 trials left today',
+    claimNow: zh ? '立即领取 →' : 'Claim trial →',
+    myOrders: zh ? '我的订单' : 'My Orders',
+    orderProduct: 'NexionBox Pro',
+    orderMeta: '$2399 · Singapore DC',
+    orderStatus: zh ? '已激活' : 'activated',
+    viewAllOrders: zh ? '全部订单' : 'All orders',
+    manage: zh ? '管理' : 'Manage',
+    onlineLabel: zh ? '0 在线' : '0 online',
+    emptySlots: zh ? '6 空闲槽位' : '6 slots open',
+    earnExtras: zh ? '增值玩法' : 'Earn extras',
+    missionCenter: zh ? '任务中心' : 'Mission Center',
+    dailyCheckin: zh ? '每日签到' : 'Daily check-in',
+    pts: zh ? '128 积分' : '128 pts',
+    learn: zh ? '学习中心' : 'Learn',
+    earnNex: zh ? '赚 NEX' : 'Earn NEX',
+    stakingVault: zh ? '质押金库' : 'Staking vault',
+    upTo180: zh ? '最高 180%' : 'Up to 180%',
+    goals: zh ? '收益目标' : 'Goals',
+    setTarget: zh ? '设置目标' : 'Set target',
+    wrapped: zh ? '年度回顾' : 'Wrapped',
+    receipts: zh ? '推理收据' : 'Receipts',
+    security: zh ? '安全' : 'Security',
+    passkeyMissing: zh ? '未开启 2FA' : 'No 2FA',
+    risk: zh ? '风险提示书' : 'Risk disclosure',
+    trust: zh ? '信任中心' : 'Trust Center',
+    audits: zh ? '审计与伙伴' : 'Audits',
+    preferencesRow: zh ? '声音与触感' : 'Sound & haptics',
+    developer: zh ? '开发者' : 'Developer',
+    helpSupport: zh ? '帮助与支持' : 'Help & support'
+  }
+})
 const groupedLocales = computed(() => {
   return LOCALES.reduce(
     (result, item) => {
@@ -192,6 +231,26 @@ function comingSoon(label: string) {
         </view>
       </view>
 
+      <view class="trial-ticket" @click="comingSoon(mePortCopy.claimNow)">
+        <view class="trial-wash" />
+        <view class="trial-grid">
+          <view class="trial-left">
+            <view class="trial-badge">★ {{ mePortCopy.limitedFree }}</view>
+            <view class="trial-title">{{ mePortCopy.trialDevice }}</view>
+            <view class="trial-desc">{{ mePortCopy.trialDesc }}</view>
+          </view>
+          <view class="trial-divider" />
+          <view class="trial-right">
+            <view class="trial-label">{{ mePortCopy.trialEarn }}</view>
+            <view class="trial-money"><text>$</text>116</view>
+          </view>
+        </view>
+        <view class="trial-foot">
+          <text>{{ mePortCopy.trialLeft }}</text>
+          <text>{{ mePortCopy.claimNow }}</text>
+        </view>
+      </view>
+
       <view class="network-card">
         <view class="rank-badge">{{ vRank }}</view>
         <view class="network-main">
@@ -201,30 +260,69 @@ function comingSoon(label: string) {
       </view>
 
       <view class="section-title">
-        <text>{{ m.myDevices }}</text>
-        <text>0 / 6</text>
+        <view class="section-title-main">
+          <text>{{ m.myDevices }}</text>
+          <text class="section-count">0 / 6</text>
+        </view>
+        <button class="section-link" @click="comingSoon(m.myDevices)">{{ mePortCopy.manage }} ›</button>
       </view>
       <view class="device-entry" @click="comingSoon(m.myDevices)">
-        <view class="device-icon">▯</view>
+        <view class="device-icon">
+          <text />
+        </view>
         <view class="device-main">
           <view>{{ m.fleetStatus }}</view>
-          <text>{{ m.fleetStatusDesc }}</text>
+          <view class="device-sub">
+            <text class="device-online">{{ mePortCopy.onlineLabel }}</text>
+            <text class="device-dot">·</text>
+            <text>{{ mePortCopy.emptySlots }}</text>
+          </view>
         </view>
         <view class="slot-bars">
           <text v-for="i in 6" :key="i" />
         </view>
+        <text class="device-chevron">›</text>
       </view>
 
-      <view class="section-title"><text>{{ m.earnExtras }}</text></view>
+      <view class="section-title"><text>{{ mePortCopy.myOrders }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon(m.missions)">
-          <text class="si green">★</text><text class="label">{{ m.missions }}</text><text class="value">{{ m.daily }}</text><text class="chev">›</text>
+        <view class="order-card-row">
+          <view>
+            <view>{{ mePortCopy.orderProduct }}</view>
+            <text>{{ mePortCopy.orderMeta }}</text>
+          </view>
+          <text class="status-pill">{{ mePortCopy.orderStatus }}</text>
+        </view>
+        <view class="setting-row last order-link" @click="comingSoon(mePortCopy.viewAllOrders)">
+          <text class="label">{{ mePortCopy.viewAllOrders }}</text><text class="value">1</text><text class="chev">›</text>
+        </view>
+      </view>
+
+      <view class="section-title"><text>{{ mePortCopy.earnExtras }}</text></view>
+      <view class="settings-card">
+        <view class="setting-row" @click="comingSoon(mePortCopy.missionCenter)">
+          <text class="si green">🏆</text><text class="label">{{ mePortCopy.missionCenter }}</text><text class="value green">{{ m.daily }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(mePortCopy.dailyCheckin)">
+          <text class="si orange">🔥</text><text class="label">{{ mePortCopy.dailyCheckin }}</text><text class="value orange">{{ mePortCopy.pts }}</text><text class="chev">›</text>
         </view>
         <view class="setting-row" @click="comingSoon(m.eventsCenter)">
-          <text class="si orange">◆</text><text class="label">{{ m.eventsCenter }}</text><text class="value">{{ m.liveCount }}</text><text class="chev">›</text>
+          <text class="si orange">🏆</text><text class="label">{{ m.eventsCenter }}</text><text class="value orange">{{ m.liveCount }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon(m.achievements)">
-          <text class="si">🏆</text><text class="label">{{ m.achievements }}</text><text class="value">0 / 24</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(mePortCopy.learn)">
+          <text class="si">📖</text><text class="label">{{ mePortCopy.learn }}</text><text class="value green">{{ mePortCopy.earnNex }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(mePortCopy.stakingVault)">
+          <text class="si green">🔒</text><text class="label">{{ mePortCopy.stakingVault }}</text><text class="value">{{ mePortCopy.upTo180 }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(m.achievements)">
+          <text class="si green">🏅</text><text class="label">{{ m.achievements }}</text><text class="value green">0 / 24</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(mePortCopy.goals)">
+          <text class="si orange">◎</text><text class="label">{{ mePortCopy.goals }}</text><text class="value orange">{{ mePortCopy.setTarget }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row last" @click="comingSoon(mePortCopy.wrapped)">
+          <text class="si green">✦</text><text class="label">{{ mePortCopy.wrapped }}</text><text class="value green">2026</text><text class="chev">›</text>
         </view>
       </view>
 
@@ -236,15 +334,27 @@ function comingSoon(label: string) {
         <view class="setting-row" @click="comingSoon(m.identitySecurity)">
           <text class="si">◇</text><text class="label">{{ m.identitySecurity }}</text><text class="value danger">{{ m.no2fa }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon(m.notifications)">
+        <view class="setting-row" @click="comingSoon(mePortCopy.security)">
+          <text class="si orange">⚠</text><text class="label">{{ mePortCopy.security }}</text><text class="value danger">{{ mePortCopy.passkeyMissing }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(m.notifications)">
           <text class="si">◌</text><text class="label">{{ m.notifications }}</text><text class="value">0</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(mePortCopy.receipts)">
+          <text class="si">▤</text><text class="label">{{ mePortCopy.receipts }}</text><text class="value">0</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row" @click="comingSoon(mePortCopy.risk)">
+          <text class="si orange">△</text><text class="label">{{ mePortCopy.risk }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row last" @click="comingSoon(mePortCopy.trust)">
+          <text class="si">✓</text><text class="label">{{ mePortCopy.trust }}</text><text class="value">{{ mePortCopy.audits }}</text><text class="chev">›</text>
         </view>
       </view>
 
       <view class="section-title"><text>{{ m.preferences }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon(m.preferences)">
-          <text class="si">◐</text><text class="label">{{ m.preferences }}</text><text class="chev">›</text>
+        <view class="setting-row" @click="comingSoon(mePortCopy.preferencesRow)">
+          <text class="si">◐</text><text class="label">{{ mePortCopy.preferencesRow }}</text><text class="chev">›</text>
         </view>
         <view class="theme-row">
           <text class="si">☼</text>
@@ -259,7 +369,7 @@ function comingSoon(label: string) {
         </view>
       </view>
 
-      <view class="section-title"><text>{{ m.help }}</text></view>
+      <view class="section-title"><text>{{ mePortCopy.helpSupport }}</text></view>
       <view class="settings-card">
         <view class="setting-row" @click="comingSoon(m.replayTour)">
           <text class="si">↻</text><text class="label">{{ m.replayTour }}</text><text class="chev">›</text>
@@ -267,8 +377,11 @@ function comingSoon(label: string) {
         <view class="setting-row" @click="comingSoon(m.helpFaq)">
           <text class="si">?</text><text class="label">{{ m.helpFaq }}</text><text class="chev">›</text>
         </view>
-        <view class="setting-row last" @click="comingSoon(m.liveSupport)">
+        <view class="setting-row" @click="comingSoon(m.liveSupport)">
           <text class="si green">●</text><text class="label">{{ m.liveSupport }}</text><text class="value green">{{ m.online }}</text><text class="chev">›</text>
+        </view>
+        <view class="setting-row last" @click="comingSoon(mePortCopy.developer)">
+          <text class="si">⌘</text><text class="label">{{ mePortCopy.developer }}</text><text class="chev">›</text>
         </view>
       </view>
 
@@ -813,6 +926,130 @@ uni-button.locale-option::after,
   font-size: 22rpx;
 }
 
+.trial-ticket {
+  position: relative;
+  overflow: hidden;
+  margin-top: 20rpx;
+  padding: 32rpx 36rpx;
+  border-radius: 32rpx;
+  background: #10141d;
+  color: #ffffff;
+  filter: drop-shadow(0 0 1rpx #232936);
+  -webkit-mask-image:
+    radial-gradient(circle 18rpx at 0 50%, transparent 99%, #000 100%),
+    radial-gradient(circle 18rpx at 100% 50%, transparent 99%, #000 100%);
+  mask-image:
+    radial-gradient(circle 18rpx at 0 50%, transparent 99%, #000 100%),
+    radial-gradient(circle 18rpx at 100% 50%, transparent 99%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.trial-wash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 100% at 0% 100%, rgba(18, 201, 121, 0.13), transparent 60%);
+}
+
+.trial-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1rpx minmax(0, 0.82fr);
+  gap: 32rpx;
+  align-items: center;
+}
+
+.trial-badge {
+  display: inline-flex;
+  padding: 6rpx 16rpx;
+  border: 1rpx dashed rgba(18, 201, 121, 0.45);
+  border-radius: 8rpx;
+  background: rgba(18, 201, 121, 0.1);
+  color: #12c979;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 19rpx;
+  font-weight: 650;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+.trial-title {
+  margin-top: 20rpx;
+  color: #ffffff;
+  font-size: 34rpx;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.trial-desc {
+  margin-top: 10rpx;
+  color: #99a3b3;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.trial-divider {
+  width: 1rpx;
+  height: 128rpx;
+  background-image: linear-gradient(to bottom, #3a4251 50%, transparent 50%);
+  background-size: 1rpx 12rpx;
+}
+
+.trial-right {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.trial-label {
+  color: #6f7886;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 19rpx;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+.trial-money {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2rpx;
+  margin-top: 14rpx;
+  color: #12c979;
+  font-size: 60rpx;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.trial-money text {
+  font-size: 32rpx;
+  opacity: 0.72;
+}
+
+.trial-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 28rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx dashed #303746;
+}
+
+.trial-foot text:first-child {
+  color: #ff8d4a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 21rpx;
+  font-weight: 650;
+  letter-spacing: 0.6rpx;
+}
+
+.trial-foot text:last-child {
+  color: #12c979;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
 .network-card,
 .device-entry {
   display: flex;
@@ -849,12 +1086,23 @@ uni-button.locale-option::after,
 }
 
 .network-main text,
-.device-main text {
+.device-main > text {
   display: block;
   margin-top: 8rpx;
   color: #8f98a8;
   font-size: 22rpx;
   line-height: 1.4;
+}
+
+.device-sub {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 8rpx;
+  color: #8f98a8;
+  font-size: 22rpx;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 
 .section-title {
@@ -867,6 +1115,38 @@ uni-button.locale-option::after,
   font-weight: 700;
 }
 
+.section-title-main {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 16rpx;
+  min-width: 0;
+}
+
+.section-count {
+  color: #8f98a8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 23rpx;
+  font-weight: 400;
+}
+
+.section-link {
+  display: flex;
+  height: 44rpx;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: #8f98a8;
+  font-size: 25rpx;
+  font-weight: 560;
+  line-height: 44rpx;
+}
+
+.section-link::after,
+uni-button.section-link::after {
+  border: 0;
+}
+
 .section-title text:last-child {
   color: #8f98a8;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -876,8 +1156,46 @@ uni-button.locale-option::after,
 
 .device-icon {
   border-radius: 22rpx;
+  border: 1rpx solid rgba(18, 201, 121, 0.26);
   background: rgba(18, 201, 121, 0.12);
   color: #12c979;
+  position: relative;
+}
+
+.device-icon::before {
+  content: '';
+  width: 22rpx;
+  height: 34rpx;
+  border: 4rpx solid currentColor;
+  border-radius: 5rpx;
+}
+
+.device-icon text {
+  position: absolute;
+  top: -6rpx;
+  right: -6rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border: 4rpx solid #10141d;
+  border-radius: 50%;
+  background: #12c979;
+  box-shadow: 0 0 10rpx rgba(18, 201, 121, 0.7);
+  animation: device-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes device-pulse {
+  0%, 100% { transform: scale(0.9); opacity: 0.75; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.device-online {
+  color: #12c979;
+  font-weight: 650;
+}
+
+.device-dot {
+  margin: 0 10rpx;
+  color: #5f6877;
 }
 
 .slot-bars {
@@ -892,9 +1210,53 @@ uni-button.locale-option::after,
   background: #303746;
 }
 
+.device-chevron {
+  color: #5f6877;
+  font-size: 34rpx;
+}
+
 .settings-card {
   overflow: hidden;
   padding: 0 28rpx;
+}
+
+.order-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24rpx;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #232936;
+}
+
+.order-card-row view view {
+  color: #ffffff;
+  font-size: 27rpx;
+  font-weight: 650;
+}
+
+.order-card-row view text {
+  display: block;
+  margin-top: 8rpx;
+  color: #99a3b3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 23rpx;
+}
+
+.status-pill {
+  flex-shrink: 0;
+  padding: 6rpx 18rpx;
+  border: 1rpx solid rgba(18, 201, 121, 0.3);
+  border-radius: 999rpx;
+  background: rgba(18, 201, 121, 0.1);
+  color: #9bf31e;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22rpx;
+  font-weight: 650;
+}
+
+.order-link {
+  min-height: 86rpx;
 }
 
 .setting-row,
@@ -929,6 +1291,10 @@ uni-button.locale-option::after,
 }
 
 .si.orange {
+  color: #ff8d4a;
+}
+
+.value.orange {
   color: #ff8d4a;
 }
 
