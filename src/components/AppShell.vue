@@ -58,10 +58,7 @@ onShow(hideNativeTabBarStable)
   min-height: 100vh;
   padding: 0;
   box-sizing: border-box;
-  background:
-    radial-gradient(circle at 18% -6%, rgba(198, 255, 58, 0.12), transparent 28%),
-    radial-gradient(circle at 92% 8%, rgba(88, 231, 255, 0.08), transparent 28%),
-    #000000;
+  background: #000000;
   color: #f8fafc;
 }
 
@@ -78,10 +75,10 @@ onShow(hideNativeTabBarStable)
   padding: 18rpx 32rpx 14rpx;
   box-sizing: border-box;
   border-bottom: 0;
-  background: rgba(255, 255, 255, 0.006);
-  backdrop-filter: blur(68rpx) saturate(240%) brightness(1.18);
-  -webkit-backdrop-filter: blur(68rpx) saturate(240%) brightness(1.18);
-  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.035);
+  background: rgba(255, 255, 255, 0.004);
+  backdrop-filter: blur(34rpx) saturate(175%) brightness(1.08);
+  -webkit-backdrop-filter: blur(34rpx) saturate(175%) brightness(1.08);
+  box-shadow: inset 0 1rpx 0 rgba(255, 255, 255, 0.025);
 }
 
 .app-content {
