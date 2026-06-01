@@ -181,24 +181,28 @@ function showSoon(label: string) {
           <view class="device-head">
             <view class="device-id">
               <view class="device-icon"><i class="ui-icon phone" /></view>
-              <view><b>{{ v.phoneNode }}</b><text>{{ v.phoneNpuSpec || 'Mobile NPU · 28 TOPS' }}</text></view>
+              <view><b>{{ v.yourPhoneDevice || 'Your phone' }}</b><text>{{ v.phoneNpuSpec || 'Mobile NPU · ~28 TOPS' }}</text></view>
             </view>
             <view class="online"><i />{{ v.online || 'online' }}</view>
           </view>
           <view class="current-task">
             <text>{{ v.currentTask || 'Current Task' }}</text>
-            <b>SDXL Turbo · Image Gen</b>
-            <em>#NX-8421 · Pocket Studios · Berlin</em>
+            <b>Whisper-base <span>·</span> Speech</b>
+            <em><strong>#SP-A78237</strong> <span>·</span> VoxLane <span>·</span> Tokyo, JP</em>
             <view class="task-progress"><view /></view>
-            <view class="task-meta"><text>~0m 28s {{ v.remaining || 'remaining' }}</text><text>+ $0.000</text></view>
+            <view class="task-meta"><text>~2m 12s {{ v.remaining || 'remaining' }}</text><text>{{ v.reward || 'Reward' }}: +$0.015</text></view>
+          </view>
+          <view class="background-mode">
+            <view class="mode-title">{{ v.phoneSettingsTitle || 'Background mode' }}</view>
           </view>
           <view class="runtime-row">
-            <text><i class="ui-icon battery" />82%</text>
+            <text><i class="ui-icon battery" />78%</text>
             <text><i class="ui-icon wifi" />{{ v.phoneNetOnline || 'online' }}</text>
           </view>
+          <view class="runtime-hint">{{ v.phoneRequirementsHint || 'Charging + network must both stay available before accepting tasks. The scheduler ping-checks before every job.' }}</view>
           <view class="locked-row">
-            <text><i class="ui-icon lock" />{{ v.lockedTasksTitle || 'Locked AI tasks' }}</text>
-            <b>−$157 <i>/d</i></b>
+            <text><i class="ui-icon lock" />{{ v.lockedTasksBlocked || 'Tasks your phone cannot accept' }}</text>
+            <b>−$157 <i>{{ v.lockedMissedDaily || 'lost daily' }}</i></b>
             <view class="locked-task-list">
               <view v-for="task in lockedTaskRows" :key="task.model">
                 <span><i class="ui-icon lock small-lock" />{{ task.model }}</span>
@@ -206,10 +210,6 @@ function showSoon(label: string) {
               </view>
             </view>
             <button class="unlock-more">{{ (v.unlockNMoreTasks || 'Unlock 142 more tasks').replace('{n}', '142') }}</button>
-          </view>
-          <view class="device-earnings">
-            <view><text>{{ v.todayEarnings || 'Today earnings' }}</text><b>$0.060</b><i>+12.0 NEX</i></view>
-            <view><text>{{ v.estThisHour || 'Est. this hour' }}</text><b>+$0.00</b><i>+0.5 NEX</i></view>
           </view>
         </view>
 
@@ -433,31 +433,41 @@ button::after { border: 0; }
 .section-title text { display: flex; align-items: center; gap: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; }
 .section-title text i { width: 10rpx; height: 10rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 10rpx rgba(158,220,29,.45); }
 .device-card { padding: 0; }
-.device-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 32rpx 40rpx 24rpx; }
+.device-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 32rpx 40rpx 28rpx; }
 .device-id { display: flex; align-items: center; gap: 24rpx; }
 .device-icon { display: grid; width: 72rpx; height: 72rpx; place-items: center; border-radius: 18rpx; background: #1f1f1f; color: #9edc1d; font-size: 34rpx; }
-.online { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-height: 36rpx; color: #9edc1d; font-size: 23rpx; line-height: 1; }
-.online i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 10rpx rgba(158,220,29,.6); }
-.current-task { padding: 0 40rpx 28rpx; }
+.device-id b { font-size: 30rpx; font-weight: 680; }
+.device-id text { margin-top: 8rpx; font-size: 25rpx; color: #9ba3b5; }
+.online { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-height: 36rpx; color: #9edc1d; font-size: 24rpx; font-weight: 640; line-height: 1; }
+.online i { position: relative; width: 18rpx; height: 18rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 12rpx rgba(158,220,29,.85); }
+.online i::after { content: ""; position: absolute; inset: -10rpx; border-radius: 50%; border: 2rpx solid rgba(158,220,29,.45); animation: onlinePulse 1.7s ease-out infinite; }
+.current-task { padding: 0 40rpx 30rpx; }
 .current-task > text, .task-heading, .market-heading { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; letter-spacing: 2rpx; text-transform: uppercase; }
-.current-task b { display: block; margin-top: 12rpx; color: #f5f7fa; font-size: 27rpx; font-weight: 560; }
-.current-task em { display: block; margin-top: 6rpx; color: #8f98a8; font-size: 23rpx; font-style: normal; }
-.task-progress { height: 8rpx; margin-top: 20rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
-.task-progress view { width: 42%; height: 100%; border-radius: inherit; background: rgba(158,220,29,.45); }
-.task-meta { display: flex; justify-content: space-between; margin-top: 12rpx; color: #8f98a8; font-size: 23rpx; }
+.current-task b { display: block; margin-top: 18rpx; color: #f5f7fa; font-size: 28rpx; font-weight: 680; }
+.current-task b span, .current-task em span { color: #8f98a8; margin: 0 10rpx; }
+.current-task em { display: block; margin-top: 10rpx; color: #9ba3b5; font-size: 24rpx; font-style: normal; }
+.current-task em strong { color: #9edc1d; font-weight: 560; }
+.task-progress { height: 8rpx; margin-top: 34rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
+.task-progress view { width: 30%; height: 100%; border-radius: inherit; background: rgba(158,220,29,.48); }
+.task-progress::after { content: "30%"; float: right; margin-top: -12rpx; color: #cfd5e1; font-size: 24rpx; }
+.task-meta { display: flex; justify-content: space-between; margin-top: 28rpx; color: #9ba3b5; font-size: 24rpx; }
 .task-meta text:last-child { color: #9edc1d; }
-.runtime-row { display: flex; gap: 12rpx; padding: 0 40rpx 24rpx; }
-.runtime-row text { display: inline-flex; align-items: center; justify-content: center; gap: 8rpx; min-height: 54rpx; padding: 0 20rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: rgba(158,220,29,.12); color: #9edc1d; font-size: 22rpx; line-height: 1; }
-.locked-row { padding: 24rpx 40rpx; border-top: 1rpx solid rgba(255,255,255,.07); }
-.locked-row text { display: inline-flex; align-items: center; gap: 10rpx; color: #8f98a8; font-size: 23rpx; }
-.locked-row b { display: block; margin-top: 10rpx; color: #ff7a3d; font-size: 40rpx; }
-.locked-row i { color: #8f98a8; font-size: 22rpx; font-style: normal; }
+.background-mode { padding: 0 40rpx 18rpx; }
+.mode-title { color: #8f98a8; font-size: 27rpx; font-weight: 560; }
+.runtime-row { display: flex; gap: 18rpx; padding: 0 40rpx 22rpx; }
+.runtime-row text { display: inline-flex; align-items: center; justify-content: center; gap: 8rpx; min-height: 64rpx; padding: 0 26rpx; border: 1rpx solid rgba(158,220,29,.10); border-radius: 999rpx; background: rgba(158,220,29,.20); color: #9edc1d; font-size: 23rpx; font-weight: 640; line-height: 1; }
+.runtime-hint { padding: 0 40rpx 34rpx; color: #7f8799; font-size: 23rpx; line-height: 1.45; }
+.locked-row { padding: 28rpx 40rpx 34rpx; border-top: 0; }
+.locked-row text { display: inline-flex; align-items: center; gap: 10rpx; color: #8f98a8; font-size: 24rpx; }
+.locked-row > b { display: flex; align-items: baseline; gap: 14rpx; margin-top: 16rpx; color: #ff7a3d; font-size: 48rpx; line-height: 1; }
+.locked-row > b i { color: #9ba3b5; font-size: 25rpx; font-style: normal; font-weight: 500; }
 .locked-task-list { margin-top: 18rpx; }
-.locked-task-list view { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-top: 10rpx; color: rgba(245,247,250,.82); font-size: 23rpx; }
+.locked-task-list view { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-top: 14rpx; color: rgba(245,247,250,.86); font-size: 24rpx; }
 .locked-task-list span { display: flex; min-width: 0; align-items: center; gap: 10rpx; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.locked-task-list strong { display: flex; flex: none; align-items: center; gap: 12rpx; color: #9edc1d; font-size: 27rpx; font-weight: 650; }
-.locked-task-list em { color: #8f98a8; font-size: 21rpx; font-style: normal; font-weight: 400; }
-.unlock-more { width: 100%; height: 88rpx; margin-top: 24rpx; border-radius: 999rpx; background: linear-gradient(90deg, #58e7ff, #9edc1d); color: #090d08; font-size: 27rpx; font-weight: 650; }
+.locked-task-list .small-lock { color: #9b89e0; }
+.locked-task-list strong { display: flex; flex: none; align-items: baseline; gap: 22rpx; color: #9edc1d; font-size: 29rpx; font-weight: 760; }
+.locked-task-list em { min-width: 54rpx; color: #6b7385; font-size: 23rpx; font-style: normal; font-weight: 400; text-align: right; }
+.unlock-more { width: 100%; height: 96rpx; margin-top: 28rpx; border-radius: 999rpx; background: linear-gradient(90deg, #8e72ff, #9edc1d); color: #090d08; font-size: 28rpx; font-weight: 760; }
 .device-earnings { display: flex; justify-content: space-between; gap: 24rpx; padding: 28rpx 40rpx 36rpx; border-top: 1rpx solid rgba(255,255,255,.07); }
 .device-earnings text { display: block; color: #8f98a8; font-size: 22rpx; letter-spacing: 2rpx; text-transform: uppercase; }
 .device-earnings b { display: block; margin-top: 10rpx; color: #9edc1d; font-size: 54rpx; line-height: 1; }
@@ -553,6 +563,7 @@ button::after { border: 0; }
 @keyframes dot { 0%{opacity:0;transform:translateY(0)} 20%{opacity:.7} 100%{opacity:0;transform:translateY(-360rpx)} }
 @keyframes dotTall { 0%{opacity:0;transform:translateY(0)} 18%{opacity:.45} 100%{opacity:0;transform:translateY(-520rpx)} }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.85)} 50%{opacity:1;transform:scale(1.15)} }
+@keyframes onlinePulse { 0%{opacity:.85;transform:scale(.35)} 70%,100%{opacity:0;transform:scale(1.75)} }
 @keyframes ticketEnter { from{opacity:0;transform:perspective(900rpx) rotateY(-92deg)} 70%{opacity:1;transform:perspective(900rpx) rotateY(8deg)} to{opacity:1;transform:perspective(900rpx) rotateY(0)} }
 @keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 35%{opacity:.55} 100%{opacity:0;transform:translateX(120%)} }
 </style>
