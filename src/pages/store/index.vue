@@ -540,7 +540,10 @@ function notifyLocked(product: Product) {
                 <span><i :style="{ width: `${phaseMeta[item.unlocksAtPhase].pct}%` }" /></span>
               </view>
               <view class="locked-actions">
-                <button @click.stop="notifyLocked(item)"><text class="ui-symbol icon-bell" />{{ notifyMeLabel }}</button>
+                <button @click.stop="notifyLocked(item)">
+                  <text class="ui-symbol icon-bell" />
+                  <text class="notify-copy">{{ notifyMeLabel }}</text>
+                </button>
                 <text v-if="item.unlocksAtPhase"><b>{{ fmtInt(phaseMeta[item.unlocksAtPhase].queue) }}</b> {{ inQueueLabel }}</text>
               </view>
             </view>
@@ -697,8 +700,10 @@ function notifyLocked(product: Product) {
 .locked-progress > span { display: block; height: 10rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
 .locked-progress > span i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff9b62,#58e7ff); }
 .locked-actions { display: flex; align-items: center; gap: 20rpx; margin-top: 24rpx; }
-.locked-actions button { flex: 1; gap: 10rpx; height: 84rpx; border-radius: 999rpx; background: #ff9b62; color: #0a0a0a; font-size: 26rpx; font-weight: 760; box-shadow: 0 12rpx 28rpx -16rpx rgba(255,90,31,.45); }
-.locked-actions button text { display: inline-block; margin: 0; color: currentColor; }
+.locked-actions button, .locked-actions uni-button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 10rpx; height: 84rpx; padding: 0 24rpx; border-radius: 999rpx; background: #ff9b62; color: #0a0a0a; font-size: 26rpx; font-weight: 760; line-height: 1; text-align: center; box-shadow: 0 12rpx 28rpx -16rpx rgba(255,90,31,.45); }
+.locked-actions button span, .locked-actions uni-button span { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.locked-actions button text { display: inline-flex; align-items: center; justify-content: center; margin: 0; color: currentColor; line-height: 1; }
+.locked-actions .notify-copy { color: currentColor; font-size: 26rpx; font-weight: 760; line-height: 1; text-align: center; }
 .locked-actions text { margin: 0; color: #8f98a8; font-size: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .locked-actions text b { display: block; color: #ff9b62; font-size: 23rpx; }
 .orders-entry { display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 84rpx; margin-top: 28rpx; border: 1rpx solid rgba(255,255,255,.12); border-radius: 999rpx; background: #10141d; color: #d7dce6; font-size: 25rpx; }
