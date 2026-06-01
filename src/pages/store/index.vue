@@ -520,7 +520,7 @@ function notifyLocked(product: Product) {
             <view class="locked-aurora" />
             <view class="locked-grid-bg" />
             <view class="locked-top">
-              <view class="lock-icon"><text class="ui-symbol icon-lock" /><span /></view>
+              <view class="lock-icon"><text class="ui-symbol icon-lock" /><view class="lock-pulse-dot" /></view>
               <view class="locked-main">
                 <view class="locked-kicker">
                   <em>{{ v.comingSoon }}</em>
@@ -598,11 +598,11 @@ function notifyLocked(product: Product) {
 .vs-mid i { padding: 8rpx 18rpx; border-radius: 999rpx; background: #ff9b62; color: #180b05; font-style: normal; font-size: 23rpx; font-weight: 700; white-space: nowrap; }
 .right { text-align: right; }
 .purchase-ticker { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18rpx; margin-top: 24rpx; padding: 24rpx 28rpx; }
-.lock-icon { position: relative; display: grid; flex: 0 0 88rpx; width: 88rpx; height: 88rpx; place-items: center; border-radius: 24rpx; background: linear-gradient(135deg, rgba(255,90,31,.10), rgba(12,196,214,.08)); color: #ff9b62; }
+.lock-icon { position: relative; display: grid; flex: 0 0 88rpx; width: 88rpx; height: 88rpx; place-items: center; border-radius: 24rpx; background: linear-gradient(135deg, rgba(255,90,31,.10), rgba(142,114,255,.08)); color: #ff7a3d; }
 .locked-card b { display: block; color: #fff; font-size: 26rpx; }
 .locked-card text { display: block; margin-top: 6rpx; color: #99a3b3; font-size: 22rpx; line-height: 1.35; }
-.locked-card i { color: #ff9b62; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-.locked-card em { display: block; margin-bottom: 6rpx; color: #ff9b62; font-style: normal; font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; text-transform: uppercase; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.locked-card i { color: #ff7a3d; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.locked-card em { display: block; margin-bottom: 6rpx; color: #ff7a3d; font-style: normal; font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .product-card { position: relative; overflow: hidden; margin-top: 20rpx; }
 .product-card.featured { box-shadow: 0 30rpx 90rpx rgba(0,0,0,.28); }
 .featured-glow { position: absolute; inset: -20%; z-index: 0; pointer-events: none; background: radial-gradient(40% 50% at 80% 0%, rgba(88,231,255,.18), transparent 60%); filter: blur(24rpx); opacity: .6; }
@@ -682,13 +682,13 @@ function notifyLocked(product: Product) {
 .locked-list .locked-card:first-child { margin-top: 0; }
 .locked-card { position: relative; overflow: hidden; margin-top: 20rpx; padding: 32rpx; border-color: rgba(255,255,255,.08); background: #10141d; }
 .locked-card > view:not(.locked-aurora):not(.locked-grid-bg) { position: relative; z-index: 1; }
-.locked-aurora { position: absolute; inset: -20%; background: radial-gradient(40% 50% at 85% 15%, rgba(255,122,61,.18), transparent 60%), radial-gradient(35% 45% at 15% 85%, rgba(88,231,255,.14), transparent 60%); filter: blur(20rpx); opacity: .7; animation: drift 14s ease-in-out infinite alternate; }
+.locked-aurora { position: absolute; inset: -20%; background: radial-gradient(40% 50% at 85% 15%, rgba(255,122,61,.20), transparent 60%), radial-gradient(35% 45% at 15% 85%, rgba(142,114,255,.20), transparent 60%); filter: blur(20rpx); opacity: .7; animation: drift 14s ease-in-out infinite alternate; }
 .locked-grid-bg { position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(to right, rgba(255,255,255,.06) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(255,255,255,.06) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; }
 .locked-top { display: flex; align-items: flex-start; gap: 24rpx; }
 .locked-main { flex: 1; min-width: 0; }
 .locked-kicker { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
-.locked-kicker i { flex: none; padding: 4rpx 14rpx; border-radius: 8rpx; background: rgba(255,122,61,.12); color: #ff9b62; font-size: 22rpx; font-weight: 700; }
-.lock-icon span { position: absolute; right: -4rpx; bottom: -4rpx; width: 16rpx; height: 16rpx; border: 4rpx solid #10141d; border-radius: 50%; background: #58e7ff; animation: pulse 2.4s ease-in-out infinite; }
+.locked-kicker i { flex: none; padding: 4rpx 14rpx; border-radius: 8rpx; background: rgba(255,122,61,.20); color: #ff7a3d; font-size: 22rpx; font-weight: 700; }
+.lock-pulse-dot { position: absolute; right: -4rpx; bottom: -4rpx; width: 16rpx; height: 16rpx; border: 4rpx solid #141414; border-radius: 50%; background: #8e72ff; box-shadow: 0 0 0 0 rgba(142,114,255,.55); animation: hb-pulse 2.4s ease-in-out infinite; }
 .locked-specs { display: flex; align-items: center; flex-wrap: wrap; gap: 10rpx; margin-top: 12rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .locked-specs text { display: inline; margin: 0; color: #d7dce6; font-size: 21rpx; }
 .locked-specs i { color: #6b7385; font-style: normal; font-size: 20rpx; }
@@ -696,18 +696,23 @@ function notifyLocked(product: Product) {
 .locked-progress { padding-top: 24rpx; border-top: 1rpx dashed rgba(255,255,255,.14); }
 .locked-progress view { display: flex; justify-content: space-between; align-items: center; gap: 12rpx; }
 .locked-progress view text { margin: 0; color: #99a3b3; font-size: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.locked-progress view b { color: #ff9b62; font-size: 22rpx; }
+.locked-progress view b { color: #ff7a3d; font-size: 22rpx; }
 .locked-progress > span { display: block; height: 10rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
-.locked-progress > span i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff9b62,#58e7ff); }
+.locked-progress > span i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff7a3d,#8e72ff); }
 .locked-actions { display: flex; align-items: center; gap: 20rpx; margin-top: 24rpx; }
-.locked-actions button, .locked-actions uni-button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 10rpx; height: 84rpx; padding: 0 24rpx; border-radius: 999rpx; background: #ff9b62; color: #0a0a0a; font-size: 26rpx; font-weight: 760; line-height: 1; text-align: center; box-shadow: 0 12rpx 28rpx -16rpx rgba(255,90,31,.45); }
+.locked-actions button, .locked-actions uni-button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 10rpx; height: 84rpx; padding: 0 24rpx; border-radius: 999rpx; background: #ff7a3d; color: #0a0a0a; font-size: 26rpx; font-weight: 760; line-height: 1; text-align: center; box-shadow: 0 12rpx 28rpx -16rpx rgba(255,90,31,.45); }
 .locked-actions button span, .locked-actions uni-button span { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 .locked-actions button text { display: inline-flex; align-items: center; justify-content: center; margin: 0; color: currentColor; line-height: 1; }
 .locked-actions .notify-copy { color: currentColor; font-size: 26rpx; font-weight: 760; line-height: 1; text-align: center; }
 .locked-actions text { margin: 0; color: #8f98a8; font-size: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-.locked-actions text b { display: block; color: #ff9b62; font-size: 23rpx; }
+.locked-actions text b { display: block; color: #ff7a3d; font-size: 23rpx; }
 .orders-entry { display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 84rpx; margin-top: 28rpx; border: 1rpx solid rgba(255,255,255,.12); border-radius: 999rpx; background: #10141d; color: #d7dce6; font-size: 25rpx; }
 .footer-note { margin-top: 18rpx; padding-bottom: 8rpx; text-align: center; color: #8f98a8; font-size: 23rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 @keyframes drift { from{transform:translateX(-16rpx)} to{transform:translate(20rpx,10rpx) scale(1.05)} }
 @keyframes pulse { 0%,100%{opacity:.5} 50%{opacity:1} }
+@keyframes hb-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(142,114,255,.55); }
+  70% { box-shadow: 0 0 0 16rpx rgba(142,114,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(142,114,255,0); }
+}
 </style>
