@@ -399,9 +399,13 @@ function toggleQuickPause() {
           <view class="lock-foot"><view><text>{{ v.taskLockCumulative || 'cumulative missed' }}</text><b>−$420</b></view><button>{{ v.taskLockCtaUpgrade || v.addDevice }} <i class="ui-icon arrow-right" /></button></view>
         </view>
 
-        <view class="section-title">
+        <view class="section-title task-center-title">
           <b>{{ v.taskCenter }}</b>
-          <text><i />8,432 {{ v.jobsLive || 'jobs live' }}</text>
+          <view class="task-live-label">
+            <i class="ui-icon activity" />
+            <strong>8,432</strong>
+            <text>{{ v.jobsLive || 'jobs live globally' }}</text>
+          </view>
         </view>
         <view class="task-tabs">
           <button :class="{ on: taskTab === 'current' }" @click="taskTab = 'current'">{{ v.tabCurrent || 'Current' }}</button>
@@ -583,6 +587,11 @@ button::after { border: 0; }
 .section-title b { color: #f5f7fa; font-size: 30rpx; font-weight: 640; }
 .section-title text { display: flex; align-items: center; gap: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; }
 .section-title text i { width: 10rpx; height: 10rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 10rpx rgba(158,220,29,.45); }
+.task-center-title { margin-top: 42rpx; }
+.task-live-label { display: flex; align-items: center; justify-content: flex-end; gap: 4rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; line-height: 1; }
+.task-live-label .ui-icon { width: 28rpx; height: 28rpx; color: #9edc1d; font-size: 28rpx; }
+.task-live-label strong { color: #9edc1d; font-size: 23rpx; font-weight: 500; line-height: 1; }
+.task-live-label text { display: block; color: #8f98a8; font-size: 23rpx; line-height: 1; }
 .device-card { padding: 0; }
 .quick-menu-mask { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; background: rgba(0,0,0,.55); backdrop-filter: blur(10rpx); }
 .quick-menu { width: 100%; padding: 16rpx 24rpx 24rpx; border-top: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx 32rpx 0 0; background: #101010; box-sizing: border-box; }
