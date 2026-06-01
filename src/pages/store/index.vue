@@ -84,7 +84,7 @@ const tradeCreditLabel = (credit: number) => tx(`换购 · $${credit} 抵扣`, `
 const dataCenterLabel = computed(() => tx('新加坡机房', 'Singapore DC'))
 const redemptionLabel = computed(() => tx('30 天赎回', '30d redemption'))
 const phaseProgressLabel = (current: number, total: number) => tx(`阶段 ${current}/${total} · 解锁进度`, `Phase ${current}/${total} · unlock progress`)
-const notifyMeLabel = computed(() => tx('提醒我', 'Notify me'))
+const notifyMeLabel = computed(() => tx('上线时通知我', 'Notify me when live'))
 const inQueueLabel = computed(() => tx('排队中', 'in queue'))
 
 const tiers = computed(() => [
