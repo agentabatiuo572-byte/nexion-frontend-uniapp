@@ -81,7 +81,7 @@ const pageCopy = computed(() => {
     direct: zh ? '直推' : 'Direct',
     extended: zh ? '扩展' : 'Extended',
     todayMatch: zh ? '今日对碰' : 'Today match',
-    weeklyPool: zh ? '周领导池' : 'Weekly pool',
+    weeklyPool: zh ? '本周领导池' : 'Weekly pool',
     votes: zh ? '票' : 'votes',
     thisMonth: zh ? '本月' : 'This month',
     viewDetails: zh ? '查看明细' : 'View details',
@@ -242,21 +242,21 @@ async function shareInvite() {
 
       <view class="quick-grid">
         <view class="quick-card" @click="openPage('/pages/team/unilevel')">
-          <view class="quick-top"><i class="team-icon icon-users green" /><i class="team-icon icon-arrow-up" /></view>
+          <view class="quick-top"><i class="team-icon icon-users brand" /><i class="team-icon icon-arrow-up" /></view>
           <view class="quick-num">{{ teamSeed.totalMembers }}</view>
           <view class="quick-title">{{ pageCopy.sevenLayer }}</view>
           <view class="quick-meta">{{ pageCopy.direct }} · {{ teamSeed.directMembers }}</view>
           <view class="quick-meta">{{ pageCopy.extended }} · {{ teamSeed.extendedMembers }}</view>
         </view>
         <view class="quick-card" @click="openPage('/pages/team/binary')">
-          <view class="quick-top"><i class="team-icon icon-zap orange" /><i class="team-icon icon-arrow-up" /></view>
+          <view class="quick-top"><i class="team-icon icon-zap warning" /><i class="team-icon icon-arrow-up" /></view>
           <view class="quick-num orange">+${{ teamSeed.binaryMatch.toFixed(2) }}</view>
           <view class="quick-title">{{ pageCopy.todayMatch }}</view>
           <view class="quick-meta">A · ${{ teamSeed.leftVolume.toLocaleString() }}</view>
           <view class="quick-meta">B · ${{ teamSeed.rightVolume.toLocaleString() }}</view>
         </view>
         <view class="quick-card" @click="openPage('/pages/team/commissions')">
-          <view class="quick-top"><i class="team-icon icon-crown cyan" /><i class="team-icon icon-arrow-up" /></view>
+          <view class="quick-top"><i class="team-icon icon-crown tech" /><i class="team-icon icon-arrow-up" /></view>
           <view class="quick-num">$0.00</view>
           <view class="quick-title">{{ pageCopy.weeklyPool }}</view>
           <view class="quick-meta">0 {{ pageCopy.votes }}</view>
@@ -581,6 +581,8 @@ async function shareInvite() {
 .green { color: #12c979; }
 .orange { color: #ff8d4a; }
 .warning { color: #ffb84d; }
+.brand { color: #9edc1d; }
+.tech { color: #8e72ff; }
 .team-icon {
   display: inline-block;
   width: 28rpx;
@@ -592,8 +594,8 @@ async function shareInvite() {
 .icon-chevron { width: 30rpx; height: 30rpx; color: #5f6877; -webkit-mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; }
 .icon-arrow-up { color: #687284; -webkit-mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; }
 .icon-coins { color: #c6ff3a; -webkit-mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; }
-.icon-crown,
 .icon-spark { -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; }
+.icon-crown { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a2 2 0 0 1-1.927 1.467H6.78a2 2 0 0 1-1.927-1.467L2.019 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z'/%3E%3Cpath d='M5 21h14'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a2 2 0 0 1-1.927 1.467H6.78a2 2 0 0 1-1.927-1.467L2.019 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z'/%3E%3Cpath d='M5 21h14'/%3E%3C/svg%3E") center / contain no-repeat; }
 .icon-flame { width: 24rpx; height: 24rpx; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; }
 .icon-trophy { -webkit-mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; }
 .icon-users { -webkit-mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; }
