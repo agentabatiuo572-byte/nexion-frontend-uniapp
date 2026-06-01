@@ -63,20 +63,20 @@ const rangeMeta = computed(() => {
 })
 
 const priceRows = computed(() => [
-  { icon: 'image', label: v.value.priceImageGen || 'Image Gen', unit: v.value.pricePerImage || 'per image', price: '$0.0030', delta: '↑ 4.2%', up: true, spark: sparkline([0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72]) },
-  { icon: 'message', label: v.value.priceLlmInference || 'LLM Inference', unit: v.value.pricePerTokens || 'per 1k tok', price: '$0.0024', delta: '↑ 18.7%', up: true, premium: '405B premium ↑32.1%', spark: sparkline([0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88]) },
-  { icon: 'film', label: v.value.priceVideoGen || 'Video Gen', unit: v.value.pricePerSecond || 'per sec', price: '$0.180', delta: '↓ 1.2%', up: false, spark: sparkline([0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62]) },
-  { icon: 'wrench', label: v.value.fineTune || 'Fine-tune', unit: v.value.pricePerJob || 'per job', price: '$0.060', delta: '→ 0.0%', neutral: true, spark: sparkline([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) },
-  { icon: 'database', label: v.value.priceEmbedding || 'Embedding', unit: v.value.pricePerChunks || 'per 1k chunks', price: '$0.0008', delta: '↑ 2.1%', up: true, spark: sparkline([0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57]) },
-  { icon: 'mic', label: v.value.speech || 'Speech', unit: v.value.pricePerAudioSecond || 'per audio sec', price: '$0.0003', delta: '↑ 0.3%', up: true, spark: sparkline([0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52]) }
+  { icon: '🖼', label: v.value.priceImageGen || 'Image Gen', unit: v.value.pricePerImage || 'per image', price: '$0.0030', delta: '↑ 4.2%', up: true, spark: sparkline([0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72]) },
+  { icon: '💬', label: v.value.priceLlmInference || 'LLM Inference', unit: v.value.pricePerTokens || 'per 1k tok', price: '$0.0024', delta: '↑ 18.7%', up: true, premium: '405B premium ↑32.1%', spark: sparkline([0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88]) },
+  { icon: '🎬', label: v.value.priceVideoGen || 'Video Gen', unit: v.value.pricePerSecond || 'per sec', price: '$0.180', delta: '↓ 1.2%', up: false, spark: sparkline([0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62]) },
+  { icon: '🔧', label: v.value.fineTune || 'Fine-tune', unit: v.value.pricePerJob || 'per job', price: '$0.060', delta: '→ 0.0%', neutral: true, spark: sparkline([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) },
+  { icon: '📐', label: v.value.priceEmbedding || 'Embedding', unit: v.value.pricePerChunks || 'per 1k chunks', price: '$0.0008', delta: '↑ 2.1%', up: true, spark: sparkline([0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57]) },
+  { icon: '🎙', label: v.value.speech || 'Speech', unit: v.value.pricePerAudioSecond || 'per audio sec', price: '$0.0003', delta: '↑ 0.3%', up: true, spark: sparkline([0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52]) }
 ])
 
 const deviceRankRows = computed(() => [
-  { rank: 1, icon: 'server', name: 'NexionRack P1', best: 'Training + 405B LLM', daily: '$142.60/d', top: true },
-  { rank: 2, icon: 'box', name: 'NexionBox Pro', best: 'AI Premium pool', daily: '$76.00/d' },
-  { rank: 3, icon: 'box', name: 'NexionBox S1', best: 'LLM 70B', daily: '$38.50/d' },
-  { rank: 4, icon: 'cloud', name: 'Inference Share', best: 'Low barrier entry', daily: '$0.07/d' },
-  { rank: 5, icon: 'phone', name: v.value.yourPhone, best: locale.value === 'zh' ? '移动端 NPU 档位' : 'Mobile NPU tier', daily: '$0.06/d', phone: true }
+  { rank: 1, icon: '🗄', name: 'NexionRack P1', best: 'Training + 405B LLM', daily: '$142.60/d', top: true },
+  { rank: 2, icon: '📦', name: 'NexionBox Pro', best: 'AI Premium pool', daily: '$76.00/d' },
+  { rank: 3, icon: '📦', name: 'NexionBox S1', best: 'LLM 70B', daily: '$38.50/d' },
+  { rank: 4, icon: '☁', name: 'Inference Share', best: 'Low barrier entry', daily: '$0.07/d' },
+  { rank: 5, icon: '📱', name: v.value.yourPhone, best: locale.value === 'zh' ? '移动端 NPU 档位' : 'Mobile NPU tier', daily: '$0.06/d', phone: true }
 ])
 
 const lockedTaskRows = computed(() => [
@@ -354,12 +354,12 @@ function toggleQuickPause() {
         <view class="market-shell">
           <view class="market-title-row">
             <b>{{ v.marketOverview }}</b>
-            <text><i />{{ v.liveDemand }}</text>
+            <text><i class="market-live-dot" />{{ v.liveDemand }}</text>
           </view>
           <view class="market-board">
             <view class="market-heading">{{ v.priceIndex || 'AI Workload Price Index' }}</view>
             <view v-for="row in priceRows" :key="row.label" class="price-row">
-              <text><i class="ui-icon" :class="row.icon" /></text>
+              <text class="market-emoji">{{ row.icon }}</text>
               <view><b>{{ row.label }}</b><text>{{ row.unit }}</text><em v-if="row.premium">↳ {{ row.premium }}</em></view>
               <i>{{ row.price }}</i>
               <strong :class="{ down: row.up === false, neutral: row.neutral }">{{ row.delta }}</strong>
@@ -373,7 +373,7 @@ function toggleQuickPause() {
             <view class="market-heading">{{ v.deviceRanking || 'Device earnings ranking' }}</view>
             <view v-for="row in deviceRankRows" :key="row.rank" class="rank-row" :class="{ phone: row.phone }">
               <text>{{ row.rank }}</text>
-              <i><span class="ui-icon" :class="row.icon" /></i>
+              <i class="rank-emoji">{{ row.icon }}</i>
               <view><b>{{ row.name }} <em v-if="row.top">Best</em></b><text>{{ row.best }}</text></view>
               <strong>{{ row.daily }}</strong>
               <span v-if="!row.phone"><i class="ui-icon arrow-right" /></span>
@@ -676,12 +676,14 @@ button::after { border: 0; }
 .market-title-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin: 0 8rpx 20rpx; }
 .market-title-row b { color: var(--v5-ink-3); font-size: 27rpx; font-weight: 650; letter-spacing: 0; }
 .market-title-row text { display: flex; align-items: center; gap: 10rpx; color: var(--v5-ink-3); font-size: 23rpx; }
-.market-title-row text i { width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 12rpx rgba(158,220,29,.5); }
+.market-live-dot { position: relative; width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 12rpx rgba(158,220,29,.5); }
+.market-live-dot::after { position: absolute; inset: -7rpx; border: 1rpx solid rgba(158,220,29,.48); border-radius: 50%; content: ""; animation: marketDotPulse 1.6s ease-out infinite; }
 .market-board { margin-top: 24rpx; padding-bottom: 10rpx; background: var(--v5-surface); border-color: var(--v5-border); border-radius: 32rpx; }
 .market-shell .market-board:first-of-type { margin-top: 0; }
 .market-heading { padding: 24rpx 32rpx 12rpx; color: var(--v5-ink-3); font-size: 22rpx; letter-spacing: 3rpx; }
 .price-row { display: grid; grid-template-columns: 38rpx 1fr 120rpx 90rpx 96rpx; align-items: center; gap: 14rpx; padding: 18rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }
 .price-row > text { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; font-size: 28rpx; line-height: 1; text-align: center; color: #d1d5db; }
+.market-emoji { font-size: 28rpx; filter: saturate(.95); }
 .price-row b, .rank-row b { display: block; overflow: hidden; color: #f5f7fa; font-size: 25rpx; font-weight: 520; white-space: nowrap; text-overflow: ellipsis; }
 .price-row view text, .rank-row view text { color: #6b7385; font-size: 21rpx; }
 .price-row view em { display: block; margin-top: 4rpx; color: #ffbe3d; font-size: 21rpx; font-style: normal; }
@@ -694,6 +696,7 @@ button::after { border: 0; }
 .rank-row { display: grid; grid-template-columns: 32rpx 38rpx 1fr auto 28rpx; align-items: center; gap: 16rpx; padding: 20rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }
 .rank-row > text { display: flex; align-items: center; justify-content: center; width: 32rpx; height: 32rpx; color: #6b7385; font-size: 22rpx; line-height: 1; text-align: center; }
 .rank-row > i { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; color: #d1d5db; font-style: normal; font-size: 28rpx; line-height: 1; text-align: center; }
+.rank-emoji { filter: saturate(.95); }
 .rank-row em { color: #ffbe3d; font-size: 21rpx; font-style: normal; }
 .rank-row strong { display: flex; align-items: center; justify-content: flex-end; min-height: 34rpx; color: #9edc1d; font-size: 25rpx; line-height: 1; }
 .rank-row span { display: flex; align-items: center; justify-content: center; width: 28rpx; height: 28rpx; color: #6b7385; line-height: 1; }
@@ -736,6 +739,7 @@ button::after { border: 0; }
 @keyframes dotTall { 0%{opacity:0;transform:translateY(0)} 18%{opacity:.45} 100%{opacity:0;transform:translateY(-520rpx)} }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.85)} 50%{opacity:1;transform:scale(1.15)} }
 @keyframes onlinePulse { 0%{opacity:.85;transform:scale(.35)} 70%,100%{opacity:0;transform:scale(1.75)} }
+@keyframes marketDotPulse { 0%{opacity:.72;transform:scale(.45)} 70%,100%{opacity:0;transform:scale(1.9)} }
 @keyframes scan { 0%{background-position:-100% 0} 100%{background-position:200% 0} }
 @keyframes ticketEnter { from{opacity:0;transform:perspective(900rpx) rotateY(-92deg)} 70%{opacity:1;transform:perspective(900rpx) rotateY(8deg)} to{opacity:1;transform:perspective(900rpx) rotateY(0)} }
 @keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 35%{opacity:.55} 100%{opacity:0;transform:translateX(120%)} }
