@@ -19,6 +19,7 @@ const t = computed(() => copy.value.earn)
 const v = computed(() => t.value.v5)
 const common = computed(() => copy.value.common)
 const rangeTabs: Range[] = ['Today', 'Week', 'Month', 'All']
+const tx = (zh: string, en: string) => (locale.value === 'zh' ? zh : en)
 
 onShow(() => {
   requireAuth()
@@ -211,20 +212,20 @@ function toggleQuickPause() {
           <view class="ticket-shine" />
           <view class="ticket-body">
             <view class="ticket-left">
-              <text class="ticket-badge"><i class="ui-icon star" /> {{ copy.home.freeTrial }}</text>
-              <b>NexionBox S1 Trial</b>
-              <text>{{ v.trialTagline || 'Try hardware yield for 3 days' }}</text>
+              <text class="ticket-badge"><i class="ui-icon star" /> {{ tx('限时免费', 'FREE TRIAL') }}</text>
+              <b>NexionBox S1</b>
+              <text>{{ tx('免费试用 3 天,随时取消。', 'Try free for 3 days, cancel anytime.') }}</text>
             </view>
             <view class="ticket-cut" />
             <view class="ticket-value">
-              <text>{{ v.trialEarnLabel || 'EST. 3D' }}</text>
+              <text>{{ tx('3 天预计收益', 'EST. 3D EARN') }}</text>
               <b><text>$</text>116</b>
               <i>$38.50/d × 3</i>
             </view>
           </view>
           <view class="ticket-bottom">
-            <text><i />{{ v.trialsLeft || '47 trials left' }}</text>
-            <b>{{ v.startTrial }} <i class="ui-icon arrow-right" /></b>
+            <text><i />{{ tx('今日仅剩 47 张', '47 trials left today') }}</text>
+            <b>{{ tx('立即领取', 'Claim trial') }} <i class="ui-icon arrow-right" /></b>
           </view>
         </view>
         <view
