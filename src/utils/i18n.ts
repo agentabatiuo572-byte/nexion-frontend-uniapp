@@ -906,7 +906,7 @@ const mainZh: MainPageMessages = {
       decay: '衰减',
       recover: '恢复',
       marketOverview: '行情看板',
-      liveDemand: '2 分钟前更新',
+      liveDemand: '2分钟前更新',
       priceIndex: 'AI 工作负载价格指数',
       priceImageGen: '图像生成',
       priceLlmInference: 'LLM 推理',
