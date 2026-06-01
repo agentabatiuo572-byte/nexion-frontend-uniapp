@@ -391,7 +391,10 @@ function toggleQuickPause() {
 
         <view class="task-lock">
           <view class="lock-label"><i class="ui-icon layers" /> {{ v.premiumLocked }}</view>
-          <view class="lock-money">−$140 <text>{{ v.taskLockThisMonth || 'this month' }} · Llama 70B · Flux.1</text></view>
+          <view class="lock-money">
+            <view><text>−</text><i>$</i><b>140</b></view>
+            <text>{{ v.taskLockThisMonth || 'this month' }} · Llama 70B · Flux.1</text>
+          </view>
           <view class="lock-progress"><view /></view>
           <view class="lock-foot"><view><text>{{ v.taskLockCumulative || 'cumulative missed' }}</text><b>−$420</b></view><button>{{ v.taskLockCtaUpgrade || v.addDevice }} <i class="ui-icon arrow-right" /></button></view>
         </view>
@@ -707,13 +710,17 @@ button::after { border: 0; }
 .network-state view:not(.market-heading) { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 8rpx 0; color: #8f98a8; font-size: 23rpx; }
 .network-state b { color: #f5f7fa; font-weight: 500; }
 .network-state i { color: #9edc1d; font-style: normal; font-size: 21rpx; }
-.task-lock { background: linear-gradient(160deg, rgba(255,190,61,.12), #101010 70%); }
-.lock-label { color: #ffbe3d; }
-.lock-money { display: flex; align-items: baseline; gap: 16rpx; margin-top: 16rpx; color: #ffbe3d; font-size: 60rpx; font-weight: 640; }
-.lock-money text { color: #8f98a8; font-size: 22rpx; font-weight: 400; }
+.task-lock { background: radial-gradient(60% 80% at 95% 50%, rgba(255,190,61,.18), transparent 70%), linear-gradient(160deg, rgba(255,190,61,.12), #101010 70%); }
+.lock-label { color: #ffbe3d; font-size: 22rpx; gap: 12rpx; }
+.lock-money { display: flex; align-items: baseline; flex-wrap: wrap; gap: 16rpx; margin-top: 16rpx; color: #ffbe3d; }
+.lock-money view { display: flex; align-items: baseline; color: #ffbe3d; line-height: 1; }
+.lock-money view text { color: #ffbe3d; font-size: 60rpx; font-weight: 600; line-height: 1; letter-spacing: 0; }
+.lock-money view i { color: rgba(255,190,61,.75); font-size: 30rpx; font-style: normal; font-weight: 500; line-height: 1; }
+.lock-money view b { color: #ffbe3d; font-size: 60rpx; font-weight: 600; line-height: 1; letter-spacing: 0; }
+.lock-money > text { color: #8f98a8; font-size: 22rpx; font-weight: 400; line-height: 1.2; }
 .lock-progress view { width: 60%; height: 100%; background: rgba(255,190,61,.55); }
 .lock-foot b { color: #ffbe3d; }
-.lock-foot button { background: #ffbe3d; }
+.lock-foot button { background: #ffbe3d; color: #090d08; }
 .task-tabs { display: flex; gap: 12rpx; margin: 0 4rpx 16rpx; }
 .task-tabs button { height: 88rpx; padding: 0 32rpx; border: 1rpx solid transparent; border-radius: 999rpx; background: #1f1f1f; color: #8f98a8; font-size: 25rpx; line-height: 1; }
 .task-tabs .on { border-color: rgba(158,220,29,.35); background: rgba(158,220,29,.15); color: #9edc1d; }
