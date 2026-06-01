@@ -56,6 +56,28 @@ const gridClients = computed(() => [
   { id: 'E', name: 'Echo Earbuds', model: 'Whisper tiny', city: 'Tokyo', color: '#8E72FF', gpus: '84 GPUs' }
 ])
 
+function sparkline(data: number[]) {
+  const width = 100
+  const height = 32
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const points = data.map((value, index) => {
+    const x = index * (width / (data.length - 1))
+    const y = height - 2 - ((value - min) / range) * (height - 4)
+    return { x: Number(x.toFixed(2)), y: Number(y.toFixed(2)) }
+  })
+  const line = points.map((point) => `${point.x},${point.y}`).join(' ')
+  return { line, area: `0,${height} ${line} ${width},${height}`, last: points[points.length - 1] }
+}
+
+const pulseMetrics = computed(() => [
+  { key: v.value.pulsePhones, value: '1.42M', sub: v.value.pulsePhonesSub, tone: 'ink', color: '#9EDC1D', spark: sparkline([1.38, 1.39, 1.4, 1.4, 1.41, 1.41, 1.42, 1.42]) },
+  { key: v.value.pulsePaidToday, value: '$1.24M', sub: v.value.pulsePaidTodaySub, tone: 'success', color: '#9EDC1D', spark: sparkline([0.92, 0.98, 1.04, 1.1, 1.14, 1.18, 1.22, 1.24]) },
+  { key: v.value.pulseHubs, value: '28,432', sub: v.value.pulseHubsSub, tone: 'ink', color: '#8E72FF', spark: sparkline([27.8, 27.9, 28, 28.1, 28.1, 28.2, 28.3, 28.4]) },
+  { key: v.value.pulseRank, value: '#18,742', sub: v.value.pulseRankSub, tone: 'brand', color: '#9EDC1D', spark: sparkline([-19, -19, -19, -18.9, -18.9, -18.85, -18.8, -18.74]) }
+])
+
 const earningRows = [
   { name: 'Sarah K.', product: 'NexionBox S1', amount: '+$29.90' },
   { name: 'Tom Wang', product: 'NexionBox Pro', amount: '+$89.90' },
@@ -280,13 +302,32 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="pulse-card card">
-          <view>
-            <view class="mono muted">{{ v.networkPulse }}</view>
-            <view class="card-title">{{ v.networkPulseBody }}</view>
+        <view class="network-pulse-section">
+          <view class="network-pulse-title">
+            <text>{{ v.networkPulse }}</text>
+            <text>{{ v.liveFeed }}</text>
           </view>
-          <view class="spark">
-            <i v-for="n in 12" :key="n" :style="{ height: `${18 + (n % 5) * 10}rpx` }" />
+          <view class="network-pulse-card">
+            <view class="pulse-topline">
+              <view><i />{{ v.globalGridLive }}</view>
+              <text>+$215/sec</text>
+            </view>
+            <view class="pulse-metrics">
+              <view v-for="(metric, index) in pulseMetrics" :key="metric.key" class="pulse-metric" :class="[`cell-${index}`, metric.tone]">
+                <view class="pulse-copy">
+                  <text>{{ metric.key }}</text>
+                  <b>{{ metric.value }}</b>
+                  <em>{{ metric.sub }}</em>
+                </view>
+                <view class="pulse-sparkline">
+                  <svg class="pulse-svg" viewBox="0 0 100 32" preserveAspectRatio="none">
+                    <polygon :points="metric.spark.area" :fill="metric.color" opacity="0.1" />
+                    <polyline :points="metric.spark.line" fill="none" :stroke="metric.color" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" />
+                    <circle :cx="metric.spark.last.x" :cy="metric.spark.last.y" r="1.6" :fill="metric.color" />
+                  </svg>
+                </view>
+              </view>
+            </view>
           </view>
         </view>
 
@@ -432,7 +473,7 @@ function showSoon(label: string) {
 .task-row i { color: #c6ff3a; font-style: normal; font-weight: 700; }
 .task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
 .task-toggle text { font-size: 25rpx; transform: translateY(-1rpx); }
-.live-card, .fleet-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
+.live-card, .fleet-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
 .live-card { overflow: hidden; padding-bottom: 12rpx; border-radius: 32rpx; background: #101010; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
 .segmented { display: flex; align-items: center; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }
@@ -523,9 +564,28 @@ function showSoon(label: string) {
 .on-grid-footer { display: flex; align-items: center; justify-content: space-between; min-height: 66rpx; padding: 0 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); background: rgba(255,255,255,.035); color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .on-grid-footer b { color: #f4f6fb; font-weight: 560; }
 .on-grid-footer text:last-child { color: #9edc1d; font-weight: 500; }
-.pulse-card { display: grid; grid-template-columns: 1fr 170rpx; gap: 20rpx; align-items: end; }
-.spark, .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
-.spark i, .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
+.network-pulse-section { margin-top: 24rpx; }
+.network-pulse-title { display: flex; align-items: center; justify-content: space-between; margin: 16rpx 4rpx 20rpx; }
+.network-pulse-title text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
+.network-pulse-title text:last-child { color: #8e72ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 420; }
+.network-pulse-card { overflow: hidden; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; }
+.pulse-topline { display: flex; align-items: center; justify-content: space-between; min-height: 74rpx; padding: 0 28rpx; border-bottom: 1rpx solid rgba(255,255,255,.07); background: rgba(255,255,255,.035); color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.pulse-topline view { display: flex; align-items: center; gap: 12rpx; }
+.pulse-topline i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #8e72ff; animation: pulse 1.6s ease-in-out infinite; }
+.pulse-topline text { color: #9edc1d; font-weight: 500; }
+.pulse-metrics { display: grid; grid-template-columns: repeat(2, 1fr); }
+.pulse-metric { display: grid; grid-template-columns: 1fr 112rpx; align-items: center; gap: 16rpx; min-height: 136rpx; padding: 22rpx 28rpx; box-sizing: border-box; }
+.pulse-metric.cell-0, .pulse-metric.cell-2 { border-right: 1rpx solid rgba(255,255,255,.07); }
+.pulse-metric.cell-0, .pulse-metric.cell-1 { border-bottom: 1rpx solid rgba(255,255,255,.07); }
+.pulse-copy { min-width: 0; }
+.pulse-copy text { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; line-height: 1.2; }
+.pulse-copy b { display: block; margin-top: 6rpx; color: #f5f7fa; font-size: 36rpx; font-weight: 600; line-height: 1.05; letter-spacing: 0; white-space: nowrap; }
+.pulse-metric.success .pulse-copy b, .pulse-metric.brand .pulse-copy b { color: #9edc1d; }
+.pulse-copy em { display: block; overflow: hidden; margin-top: 8rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-style: normal; line-height: 1.15; white-space: nowrap; text-overflow: ellipsis; }
+.pulse-sparkline { width: 112rpx; height: 64rpx; }
+.pulse-svg { display: block; width: 100%; height: 64rpx; overflow: visible; }
+.market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
+.market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
 .stella-card { display: flex; align-items: flex-end; gap: 20rpx; margin-top: 26rpx; padding: 4rpx; }
 .stella-avatar { display: grid; width: 88rpx; height: 88rpx; place-items: center; border-radius: 50%; background: #c6ff3a; color: #10140a; font-size: 36rpx; font-weight: 800; box-shadow: 0 0 36rpx rgba(198,255,58,.36); }
 .stella-bubble { position: relative; flex: 1; min-width: 0; padding: 22rpx 26rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 34rpx 34rpx 34rpx 8rpx; background: radial-gradient(circle at 5% 20%, rgba(198,255,58,.16), transparent 50%), radial-gradient(circle at 86% 80%, rgba(155,137,224,.18), transparent 56%), #10141d; overflow: hidden; }
