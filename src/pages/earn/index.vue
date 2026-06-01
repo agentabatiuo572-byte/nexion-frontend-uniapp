@@ -86,9 +86,15 @@ const lockedTaskRows = computed(() => [
 ])
 
 const completedRows = computed(() => [
-  { icon: 'image', model: 'SDXL Turbo', type: v.value.priceImageGen || 'Image Gen', reward: '+$0.000', time: '2m ago', receipt: true },
-  { icon: 'mic', model: 'Whisper tiny', type: v.value.speech || 'Speech', reward: '+$0.000', time: '8m ago' },
-  { icon: 'database', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.000', time: '19m ago' }
+  { icon: 'check', model: 'SDXL Turbo 512²', type: v.value.priceImageGen || 'Image Gen', reward: '+$0.003', time: locale.value === 'zh' ? '2分钟前' : '2m ago', receipt: true },
+  { icon: 'check', model: 'Whisper-tiny', type: v.value.speech || 'Speech', reward: '+$0.001', time: locale.value === 'zh' ? '8分钟前' : '8m ago' },
+  { icon: 'check', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.001', time: locale.value === 'zh' ? '19分钟前' : '19m ago', receipt: true }
+])
+
+const taskTeaserRows = computed(() => [
+  { icon: 'database', model: 'jina-embeddings-v3', type: v.value.priceEmbedding || 'Embedding', daily: '+$5/d', vram: '8GB VRAM', tier: 'RTX 4090 PC (24GB)' },
+  { icon: 'mic', model: 'Bark TTS', type: v.value.speech || 'Speech', daily: '+$14/d', vram: '12GB VRAM', tier: 'RTX 4090 PC (24GB)' },
+  { icon: 'image', model: 'Flux.1 [dev]', type: v.value.priceImageGen || 'Image Gen', daily: '+$38/d', vram: '16GB VRAM', tier: 'RTX 4090 PC (24GB)' }
 ])
 
 const trialGhost = computed(() => {
@@ -413,20 +419,48 @@ function toggleQuickPause() {
         </view>
         <view class="task-center">
           <template v-if="taskTab === 'current'">
-            <view class="task-heading">{{ v.currentlyProcessing || 'Currently processing' }}</view>
-            <view class="empty-current">{{ v.noActive || 'No active task right now.' }}</view>
-            <view class="task-heading lock-title"><i class="ui-icon lock" /> {{ v.upgradeUnlocks || 'Upgrade unlocks' }}</view>
-            <view class="unlock-hint">{{ v.upgradeUnlocksHint || 'Higher VRAM devices can accept premium AI queues.' }}</view>
-            <view class="teaser-row"><text><i class="ui-icon message" /></text><view><b>Llama 70B inference</b><i>{{ v.requires || 'requires' }} <strong>16GB VRAM</strong> · S1 tier</i></view><em>+$110/d <small>{{ v.upgradeNow || 'Upgrade now' }}</small></em></view>
-            <view class="teaser-row"><text><i class="ui-icon image" /></text><view><b>Flux.1 dev HD</b><i>{{ v.requires || 'requires' }} <strong>12GB VRAM</strong> · S1 tier</i></view><em>+$38/d <small>{{ v.upgradeNow || 'Upgrade now' }}</small></em></view>
-            <view class="task-heading done-title">{{ v.completedToday || 'Completed today' }}</view>
-            <view v-for="row in completedRows" :key="row.model" class="completed-row">
-              <text><i class="ui-icon check" /></text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em><span><i v-if="row.receipt" class="ui-icon receipt" /></span>
+            <view class="task-section">
+              <view class="task-heading">{{ v.currentlyProcessing || 'Currently processing' }}</view>
+              <view class="empty-current">{{ v.noActive || 'No active task right now.' }}</view>
+            </view>
+
+            <view class="task-section lock-title">
+              <view class="task-heading"><i class="ui-icon lock" /> {{ v.upgradeUnlocks || 'Upgrade unlocks' }}</view>
+              <view class="unlock-hint">{{ v.upgradeUnlocksHint || 'Higher-paying jobs above your current VRAM cap' }}</view>
+              <view class="teaser-list">
+                <view v-for="row in taskTeaserRows" :key="row.model" class="teaser-row">
+                  <text><i class="ui-icon" :class="row.icon" /></text>
+                  <view>
+                    <b>{{ row.model }} <i>· {{ row.type }}</i></b>
+                    <em>{{ v.requires || 'requires' }} <strong>{{ row.vram }}</strong><span>·</span>{{ row.tier }}</em>
+                  </view>
+                  <view class="teaser-earn"><b>{{ row.daily }}</b><small>{{ v.upgradeNow || 'Upgrade now' }} <i class="ui-icon arrow-up-right" /></small></view>
+                </view>
+              </view>
+            </view>
+
+            <view class="task-section done-title">
+              <view class="task-heading">{{ v.completedToday || 'Completed today' }}</view>
+              <view v-for="row in completedRows" :key="row.model" class="completed-row">
+                <text><i class="ui-icon check" /></text>
+                <view>{{ row.model }} <i>· {{ row.type }}</i></view>
+                <b>{{ row.reward }}</b>
+                <em>{{ row.time }}</em>
+                <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
+              </view>
             </view>
           </template>
           <template v-else>
+            <view class="task-section history-head">
+              <view class="task-heading">{{ v.completedToday || 'Completed today' }}</view>
+              <view class="unlock-hint">{{ (v.historyHint || 'Last {n} jobs · Tap any row to open its Proof-of-Compute receipt.').replace('{n}', String(completedRows.length)) }}</view>
+            </view>
             <view v-for="row in completedRows" :key="`h-${row.model}`" class="completed-row">
-              <text><i class="ui-icon check" /></text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em><span><i v-if="row.receipt" class="ui-icon receipt" /></span>
+              <text><i class="ui-icon check" /></text>
+              <view>{{ row.model }} <i>· {{ row.type }}</i></view>
+              <b>{{ row.reward }}</b>
+              <em>{{ row.time }}</em>
+              <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
             </view>
           </template>
         </view>
@@ -444,6 +478,8 @@ button::after { border: 0; }
 .ui-icon::before, .ui-icon::after { content: ""; position: absolute; box-sizing: border-box; }
 .arrow-right::before { width: .72em; height: .72em; border-top: .12em solid currentColor; border-right: .12em solid currentColor; transform: rotate(45deg); }
 .arrow-right::after { width: .86em; height: .12em; background: currentColor; }
+.arrow-up-right::before { width: .7em; height: .7em; border-top: .12em solid currentColor; border-right: .12em solid currentColor; transform: translate(-.05em,.05em); }
+.arrow-up-right::after { width: .82em; height: .12em; background: currentColor; transform: rotate(-45deg); }
 .trend-down::before { width: .86em; height: .12em; background: currentColor; transform: rotate(35deg); transform-origin: left center; }
 .trend-down::after { right: .04em; bottom: .14em; width: .38em; height: .38em; border-right: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(0deg); }
 .trending-up::before { width: .86em; height: .12em; background: currentColor; transform: rotate(-35deg); transform-origin: left center; }
@@ -731,27 +767,37 @@ button::after { border: 0; }
 .lock-foot b { color: #ffbe3d; }
 .lock-foot button { background: #ffbe3d; color: #090d08; }
 .task-tabs { display: flex; gap: 12rpx; margin: 0 4rpx 16rpx; }
-.task-tabs button { height: 88rpx; padding: 0 32rpx; border: 1rpx solid transparent; border-radius: 999rpx; background: #1f1f1f; color: #8f98a8; font-size: 25rpx; line-height: 1; }
+.task-tabs button, .task-tabs uni-button { height: 88rpx; padding: 0 32rpx; border: 1rpx solid transparent; border-radius: 999rpx; background: var(--v5-surface-2); color: var(--v5-ink-3); font-size: 25rpx; font-weight: 500; line-height: 1; }
 .task-tabs .on { border-color: rgba(158,220,29,.35); background: rgba(158,220,29,.15); color: #9edc1d; }
-.task-center { padding-bottom: 24rpx; }
-.task-heading { display: flex; align-items: center; gap: 10rpx; padding: 24rpx 32rpx 12rpx; }
-.empty-current { padding: 0 32rpx 24rpx; color: #8f98a8; font-size: 24rpx; }
-.unlock-hint { padding: 0 32rpx 12rpx; color: #6b7385; font-size: 22rpx; }
-.lock-title, .done-title { border-top: 1rpx solid rgba(255,255,255,.07); }
-.teaser-row { display: grid; grid-template-columns: 64rpx 1fr auto; align-items: center; gap: 18rpx; padding: 16rpx 32rpx; }
-.teaser-row > text { display: grid; width: 64rpx; height: 64rpx; place-items: center; border-radius: 16rpx; background: rgba(142,114,255,.12); font-size: 28rpx; }
-.teaser-row b { color: #f5f7fa; font-size: 25rpx; }
-.teaser-row i { display: block; margin-top: 4rpx; color: #6b7385; font-size: 21rpx; font-style: normal; }
-.teaser-row i strong { color: #58e7ff; font-weight: 600; }
-.teaser-row em { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-height: 42rpx; color: #9edc1d; font-size: 30rpx; font-style: normal; font-weight: 640; line-height: 1; }
-.teaser-row small { margin-top: 8rpx; color: #8f98a8; font-size: 21rpx; font-weight: 400; }
-.completed-row { display: grid; grid-template-columns: 30rpx 1fr auto 90rpx 48rpx; align-items: center; gap: 12rpx; padding: 10rpx 32rpx; color: #8f98a8; font-size: 23rpx; }
+.task-center { overflow: hidden; padding-bottom: 16rpx; background: var(--v5-surface); border-color: var(--v5-border); border-radius: 32rpx; }
+.task-section { padding-top: 24rpx; }
+.task-heading { display: flex; align-items: center; gap: 10rpx; padding: 0 32rpx 16rpx; color: var(--v5-ink-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 500; letter-spacing: 3rpx; line-height: 1; text-transform: uppercase; }
+.empty-current { padding: 0 32rpx 24rpx; color: var(--v5-ink-3); font-size: 24rpx; }
+.unlock-hint { padding: 0 32rpx 10rpx; color: #6b7385; font-size: 22rpx; line-height: 1.35; }
+.lock-title, .done-title, .history-head { border-top: 1rpx solid rgba(255,255,255,.07); }
+.lock-title .task-heading { color: var(--v5-ink-3); }
+.lock-title .task-heading .ui-icon { color: var(--v5-tech-cyan); }
+.teaser-list { padding: 6rpx 24rpx 16rpx; }
+.teaser-row { display: grid; grid-template-columns: 64rpx minmax(0,1fr) auto; align-items: center; gap: 24rpx; padding: 16rpx; border-radius: 18rpx; }
+.teaser-row:active { background: var(--v5-surface-2); transform: scale(.98); }
+.teaser-row > text { display: grid; width: 64rpx; height: 64rpx; place-items: center; border-radius: 16rpx; background: rgba(88,231,255,.12); color: var(--v5-tech-cyan); font-size: 30rpx; }
+.teaser-row b { display: block; overflow: hidden; color: rgba(245,247,250,.86); font-size: 25rpx; font-weight: 520; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.teaser-row b i { color: var(--v5-ink-3); font-style: normal; font-weight: 400; }
+.teaser-row em { display: block; overflow: hidden; margin-top: 6rpx; color: #6b7385; font-size: 22rpx; font-style: normal; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.teaser-row em strong { color: var(--v5-tech-cyan); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
+.teaser-row em span { margin: 0 8rpx; color: #6b7385; }
+.teaser-earn { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 112rpx; }
+.teaser-earn b { color: #9edc1d; font-size: 30rpx; font-weight: 650; line-height: 1; }
+.teaser-earn small { display: flex; align-items: center; justify-content: flex-end; gap: 2rpx; margin-top: 10rpx; color: #8f98a8; font-size: 21rpx; font-weight: 400; white-space: nowrap; }
+.teaser-earn .ui-icon { width: 20rpx; height: 20rpx; }
+.completed-row { display: grid; grid-template-columns: 30rpx minmax(0,1fr) auto 88rpx 48rpx; align-items: center; gap: 12rpx; padding: 10rpx 32rpx; color: #8f98a8; font-size: 23rpx; }
 .completed-row > text { display: flex; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; color: #9edc1d; line-height: 1; }
-.completed-row view { overflow: hidden; color: #d1d5db; white-space: nowrap; text-overflow: ellipsis; }
+.completed-row view { overflow: hidden; color: rgba(245,247,250,.86); white-space: nowrap; text-overflow: ellipsis; }
 .completed-row i { color: #8f98a8; font-style: normal; }
-.completed-row b { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #9edc1d; font-weight: 500; line-height: 1; }
+.completed-row b { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; line-height: 1; }
 .completed-row em { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #8f98a8; font-style: normal; line-height: 1; text-align: right; }
-.completed-row span { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; color: #8f98a8; }
+.completed-row button, .completed-row uni-button { display: grid; width: 48rpx; height: 48rpx; place-items: center; border-radius: 12rpx; background: transparent; color: #8f98a8; }
+.completed-row button.hidden, .completed-row uni-button.hidden { visibility: hidden; }
 @keyframes drift { from{transform:translateX(-14rpx)} to{transform:translate(18rpx,10rpx) scale(1.04)} }
 @keyframes dot { 0%{opacity:0;transform:translateY(0)} 20%{opacity:.7} 100%{opacity:0;transform:translateY(-360rpx)} }
 @keyframes dotTall { 0%{opacity:0;transform:translateY(0)} 18%{opacity:.45} 100%{opacity:0;transform:translateY(-520rpx)} }
