@@ -35,10 +35,19 @@ const dayTasks = computed(() => [
 ])
 
 const activityRows = computed(() => [
-  { ts: '+0:00', who: v.value.youLabel, msg: v.value.phoneNodeCompleted, val: '+$0.00032', level: 'ok' },
-  { ts: '+0:08', who: v.value.gridLabel, msg: v.value.newInferenceJob, val: t.value.live, level: 'live' },
-  { ts: '+0:32', who: 'S1', msg: v.value.rackSlotOpened, val: v.value.openLabel, level: 'warn' },
-  { ts: '+1:30', who: copy.value.team.title, msg: v.value.boughtS1, val: '+$29.90', level: 'ok' }
+  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
+  { ts: '+0:00', who: 'Peer', msg: 'Maya · ID — Llama 70B @ Helix Labs', val: '+$0.247', level: 'live' },
+  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
+  { ts: '+0:00', who: 'Peer', msg: 'cypher.eth — Sora 8s @ Atrium AI', val: '+$0.612', level: 'live' },
+  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
+  { ts: '+0:00', who: 'You', msg: 'MobileBERT @ Vector Foundry', val: '+$0.00007', level: 'ok' }
+])
+
+const quickActions = computed(() => [
+  { icon: '💎', label: 'Stake', sub: '180% APY', tone: 'brand' },
+  { icon: '👑', label: 'Genesis', sub: '144 left', tone: 'warm' },
+  { icon: '🎯', label: 'Missions', sub: '5 active', tone: 'brand' },
+  { icon: '🔥', label: 'Daily', sub: '8 pts', tone: 'warm' }
 ])
 
 const earningRows = [
@@ -170,13 +179,13 @@ function showSoon(label: string) {
         <view class="live-card card">
           <view class="live-tabs">
             <view class="segmented">
-              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">{{ v.activity }}</button>
-              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">{{ v.earningsTab }}</button>
+              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">Activity</button>
+              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">Earnings</button>
             </view>
-            <view class="live-chip small"><i /> {{ t.live }}</view>
+            <view class="live-chip small"><i /> live</view>
           </view>
           <view v-if="liveTab === 'activity'" class="feed">
-            <view v-for="row in activityRows" :key="row.ts" class="feed-row">
+            <view v-for="row in activityRows" :key="`${row.ts}-${row.who}-${row.msg}`" class="feed-row">
               <text>{{ row.ts }}</text>
               <b :class="row.level">{{ row.who }}</b>
               <view>{{ row.msg }}</view>
@@ -195,20 +204,50 @@ function showSoon(label: string) {
         </view>
 
         <view class="quick-grid">
-          <button @click="showSoon(t.store)"><text>▣</text><b>{{ t.store }}</b></button>
-          <button @click="showSoon(t.devices)"><text>▤</text><b>{{ t.devices }}</b></button>
-          <button @click="showSoon(t.wallet)"><text>⇩</text><b>{{ t.wallet }}</b></button>
-          <button @click="showSoon(t.team)"><text>◇</text><b>{{ t.team }}</b></button>
+          <button
+            v-for="item in quickActions"
+            :key="item.label"
+            :class="item.tone"
+            @click="showSoon(item.label)"
+          >
+            <text>{{ item.icon }}</text>
+            <b>{{ item.label }}</b>
+            <i>{{ item.sub }}</i>
+          </button>
         </view>
 
-        <view class="section-title"><b>{{ t.myFleet }}</b><text>{{ t.activeSlots }}</text></view>
+        <view class="fleet-title-row">
+          <view><b>My fleet</b><text>1 of 6</text></view>
+          <button @click="showSoon('Manage')">Manage <text>→</text></button>
+        </view>
         <view class="fleet-card card">
-          <view class="device-icon">▯</view>
-          <view class="fleet-main">
-            <b>{{ v.phoneNode }}</b>
-            <text>{{ v.phoneNodeDesc }}</text>
+          <view class="fleet-row">
+            <view class="device-icon">
+              <text>▯</text>
+              <i />
+            </view>
+            <view class="fleet-main">
+              <view><b>Your phone</b><em>earning</em></view>
+              <text>Mobile NPU · 28 TOPS</text>
+            </view>
+            <view class="fleet-earn"><b>$0.040</b><text>today</text></view>
           </view>
-          <view class="slot-bars"><i v-for="n in 6" :key="n" :class="{ on: n === 1 }" /></view>
+          <view class="phone-task">
+            <view class="phone-task-top">
+              <view>
+                <b><i />SDXL Turbo</b>
+                <text><strong>Pocket Studios</strong> · Berlin</text>
+              </view>
+              <em>+$0.00032</em>
+            </view>
+            <view class="task-progress"><view><i /></view></view>
+            <view class="task-meta"><text><b>28%</b> · 28s left</text><text>7d streak</text></view>
+          </view>
+          <view class="add-device">
+            <view class="add-icon">＋</view>
+            <view><b>Add a NexionBox</b><text>Pays back in ~34 days</text></view>
+            <em>$38.50<text>est. /d</text></em>
+          </view>
         </view>
 
         <view class="grid-card card">
@@ -373,37 +412,74 @@ function showSoon(label: string) {
 .task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
 .task-toggle text { font-size: 25rpx; transform: translateY(-1rpx); }
 .live-card, .fleet-card, .grid-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
+.live-card { overflow: hidden; padding-bottom: 12rpx; border-radius: 32rpx; background: #101010; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
 .segmented { display: flex; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }
-.segmented button { height: 48rpx; padding: 0 22rpx; border-radius: 12rpx; color: #8f98a8; font-size: 23rpx; }
+.segmented button { height: 48rpx; margin: 0; padding: 0 24rpx; border: 0; border-radius: 12rpx; background: transparent; color: #8f98a8; font-size: 24rpx; font-weight: 560; line-height: 1; }
+.segmented button::after { border: 0; }
 .segmented .on { background: #10141d; color: #fff; box-shadow: 0 1rpx 6rpx rgba(0,0,0,.3); }
 .feed { margin-top: 10rpx; }
-.feed-row { display: grid; grid-template-columns: 72rpx 60rpx 1fr auto; gap: 12rpx; align-items: center; padding: 15rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); font-size: 22rpx; }
+.feed-row { display: grid; grid-template-columns: 82rpx 68rpx 1fr auto; gap: 14rpx; align-items: center; padding: 17rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .feed-row text, .feed-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.feed-row b { text-align: center; border-radius: 6rpx; font-size: 20rpx; }
+.feed-row view { color: #c8cdd6; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 25rpx; }
+.feed-row b { padding: 3rpx 8rpx; text-align: center; border-radius: 6rpx; font-size: 20rpx; letter-spacing: .7rpx; }
 .feed-row b.ok { color: #12c979; background: rgba(18,201,121,.12); }
-.feed-row b.live { color: #58e7ff; background: rgba(88,231,255,.12); }
-.feed-row b.warn { color: #ffcb4d; background: rgba(255,203,77,.12); }
-.feed-row i, .earn-row text, .ledger-row i { color: #12c979; font-style: normal; font-weight: 700; }
+.feed-row b.live { color: #9b89e0; background: rgba(155,137,224,.18); }
+.feed-row b.warn { color: #ffcb4d; background: rgba(255,203,77,.18); }
+.feed-row i, .earn-row text, .ledger-row i { color: #9df20f; font-style: normal; font-weight: 700; }
+.feed-row i { color: #8790a2; }
+.feed-row b.live + view + i { color: #9df20f; }
 .earn-row { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 12rpx; padding: 15rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); font-size: 23rpx; }
 .earn-row i { width: 9rpx; height: 9rpx; border-radius: 50%; background: #12c979; }
 .earn-row b { color: #fff; }
 .earn-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .see-all { padding-top: 16rpx; text-align: right; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 16rpx; margin-top: 24rpx; }
-.quick-grid button { display: flex; height: 128rpx; flex-direction: column; align-items: center; justify-content: center; gap: 12rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 28rpx; background: #10141d; }
-.quick-grid text { color: #c6ff3a; font-size: 33rpx; }
-.quick-grid b { color: #d7dce6; font-size: 23rpx; }
+.quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14rpx; margin-top: 24rpx; }
+.quick-grid button { display: flex; height: 118rpx; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; border: 1rpx solid rgba(198,255,58,.36); border-radius: 24rpx; background: #101010; }
+.quick-grid button.warm { border-color: rgba(255,107,53,.46); }
+.quick-grid text { font-size: 31rpx; line-height: 1; }
+.quick-grid b { color: #f3f5f9; font-size: 25rpx; font-weight: 720; line-height: 1.05; }
+.quick-grid i { color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-style: normal; font-weight: 650; }
+.quick-grid .warm i { color: #ff7b3d; }
 .section-title { display: flex; justify-content: space-between; align-items: center; margin: 42rpx 4rpx 18rpx; }
 .section-title b { color: #fff; font-size: 30rpx; }
 .section-title text { color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.fleet-card, .rank-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22rpx; }
-.device-icon, .rank-orb { display: grid; width: 82rpx; height: 82rpx; place-items: center; border-radius: 22rpx; background: rgba(18,201,121,.12); color: #12c979; font-size: 34rpx; font-weight: 760; }
-.fleet-main b { display: block; color: #fff; font-size: 27rpx; }
-.fleet-main text, .rank-card text { display: block; margin-top: 8rpx; color: #8f98a8; font-size: 22rpx; }
-.slot-bars { display: flex; gap: 8rpx; }
-.slot-bars i { width: 10rpx; height: 36rpx; border-radius: 4rpx; background: #303746; }
-.slot-bars .on { background: #12c979; }
+.fleet-title-row { display: flex; align-items: center; justify-content: space-between; margin: 24rpx 4rpx 12rpx; }
+.fleet-title-row b { color: #fff; font-size: 34rpx; font-weight: 760; letter-spacing: -1rpx; }
+.fleet-title-row view text { margin-left: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.fleet-title-row button { display: flex; align-items: center; gap: 10rpx; margin: 0; padding: 0; border: 0; background: transparent; color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 26rpx; font-weight: 650; line-height: 1; }
+.fleet-title-row button::after { border: 0; }
+.fleet-card { overflow: hidden; padding: 28rpx 32rpx 0; border-radius: 32rpx; background: #101010; }
+.fleet-row { display: grid; grid-template-columns: 92rpx 1fr auto; align-items: center; gap: 22rpx; }
+.device-icon, .rank-orb { display: grid; width: 74rpx; height: 74rpx; place-items: center; border-radius: 20rpx; background: rgba(157,242,15,.18); color: #9df20f; font-size: 34rpx; font-weight: 760; }
+.device-icon { position: relative; }
+.device-icon text { transform: rotate(90deg); font-size: 32rpx; }
+.device-icon i { position: absolute; right: -4rpx; bottom: -4rpx; width: 18rpx; height: 18rpx; border: 4rpx solid #101010; border-radius: 50%; background: #9df20f; box-shadow: 0 0 12rpx rgba(157,242,15,.45); }
+.fleet-main view { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
+.fleet-main b { color: #fff; font-size: 30rpx; font-weight: 740; }
+.fleet-main em { padding: 3rpx 10rpx; border-radius: 6rpx; background: rgba(157,242,15,.22); color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-style: normal; font-weight: 650; }
+.fleet-main text, .rank-card text { display: block; margin-top: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.fleet-earn { text-align: right; }
+.fleet-earn b { display: block; color: #9df20f; font-size: 32rpx; font-weight: 760; }
+.fleet-earn text { color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 650; }
+.phone-task { margin-top: 24rpx; padding: 20rpx 24rpx; border-radius: 20rpx; background: rgba(255,255,255,.035); }
+.phone-task-top { display: flex; justify-content: space-between; gap: 16rpx; }
+.phone-task-top b { display: flex; align-items: center; gap: 12rpx; color: #f4f6fb; font-size: 28rpx; font-weight: 720; }
+.phone-task-top b i { width: 13rpx; height: 13rpx; border-radius: 50%; background: #9df20f; box-shadow: 0 0 12rpx rgba(157,242,15,.55); }
+.phone-task-top text { display: block; margin-top: 8rpx; color: #697386; font-size: 24rpx; }
+.phone-task-top strong { color: #cdd3dd; font-weight: 560; }
+.phone-task-top em { color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; }
+.task-progress { height: 10rpx; margin-top: 18rpx; overflow: hidden; border-radius: 999rpx; background: #252b36; }
+.task-progress view { position: relative; width: 28%; height: 100%; overflow: hidden; border-radius: inherit; background: linear-gradient(90deg,#12c979,#58e7ff); }
+.task-progress view i { position: absolute; inset: 0; background: linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); animation: shimmer 1.8s ease-in-out infinite; }
+.task-meta { display: flex; justify-content: space-between; margin-top: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.task-meta b, .task-meta text:last-child { color: #12c979; font-weight: 650; }
+.add-device { display: grid; grid-template-columns: 74rpx 1fr auto; align-items: center; gap: 22rpx; margin-top: 8rpx; padding: 24rpx 0; border-top: 1rpx solid rgba(255,255,255,.06); }
+.add-icon { display: grid; width: 74rpx; height: 74rpx; place-items: center; border: 2rpx dashed rgba(157,242,15,.45); border-radius: 20rpx; color: #9df20f; font-size: 34rpx; }
+.add-device b { color: #fff; font-size: 28rpx; font-weight: 720; }
+.add-device view text { display: block; margin-top: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.add-device em { color: #9df20f; text-align: right; font-size: 30rpx; font-style: normal; font-weight: 760; }
+.add-device em text { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 560; }
 .pulse-card { display: grid; grid-template-columns: 1fr 170rpx; gap: 20rpx; align-items: end; }
 .spark, .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .spark i, .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
@@ -433,4 +509,5 @@ function showSoon(label: string) {
 .trust-note { margin-top: 18rpx; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
 @keyframes aurora { from{transform:translate3d(-10rpx,0,0) scale(1)} to{transform:translate3d(18rpx,10rpx,0) scale(1.05)} }
+@keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
 </style>
