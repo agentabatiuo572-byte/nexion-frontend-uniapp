@@ -66,7 +66,9 @@ const pageCopy = computed(() => {
     missing: zh ? '$14,760 团队业绩' : '$14,760 more team volume',
     inviteEarn: zh ? '每邀请 1 位朋友赚' : 'Earn for each friend',
     earnedToday: zh ? '今日 247 人已领取' : '247 earned today',
-    promo: zh ? '限时 · 本周邀请奖励 2×' : 'Limited time bonus 2x',
+    promoPrefix: zh ? '限时 · 本周邀请奖励' : 'Limited time ·',
+    promoMultiplier: '2×',
+    promoSuffix: zh ? '' : 'bonus this week',
     perFriend: zh ? '每位注册好友 · 30 天冷却' : 'per friend who signs up · 30-day cooldown',
     poster: zh ? '海报' : 'Poster',
     posterValue: zh ? '二维码 + 图' : 'QR + image',
@@ -204,7 +206,12 @@ async function shareInvite() {
           <text><i class="money-emoji">💰</i> {{ pageCopy.inviteEarn }}</text>
           <view><i class="live-dot" />{{ pageCopy.earnedToday }}</view>
         </view>
-        <view class="promo-pill"><i class="team-icon icon-flame" /> {{ pageCopy.promo }}</view>
+        <view class="promo-pill">
+          <i class="team-icon icon-flame" />
+          <text>{{ pageCopy.promoPrefix }}</text>
+          <b>{{ pageCopy.promoMultiplier }}</b>
+          <text v-if="pageCopy.promoSuffix">{{ pageCopy.promoSuffix }}</text>
+        </view>
         <view class="invite-body">
           <view class="invite-stats">
             <view class="reward-main"><text>$</text>400</view>
@@ -589,9 +596,9 @@ async function shareInvite() {
 .icon-chevron { width: 30rpx; height: 30rpx; color: #5f6877; -webkit-mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; }
 .icon-arrow-up { color: #687284; -webkit-mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; }
 .icon-coins { color: #c6ff3a; -webkit-mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; }
-.icon-flame,
 .icon-crown,
 .icon-spark { -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; }
+.icon-flame { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; }
 .icon-trophy { -webkit-mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; }
 .icon-users { -webkit-mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; }
 .icon-zap { -webkit-mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; }
@@ -792,6 +799,22 @@ async function shareInvite() {
   background: rgba(255, 141, 74, 0.13);
   color: #ff8d4a;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.promo-pill text,
+.promo-pill b {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.promo-pill b {
+  color: currentColor;
+  font-size: 22rpx;
+  font-weight: 780;
+  line-height: 1;
+  letter-spacing: 0;
 }
 
 .invite-body {
