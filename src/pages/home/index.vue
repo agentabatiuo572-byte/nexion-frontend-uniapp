@@ -509,7 +509,7 @@ function showSoon(label: string) {
 .on-grid-title view { display: flex; align-items: baseline; gap: 10rpx; min-width: 0; }
 .on-grid-title view > text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
 .grid-now { color: #7f8898; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 420; }
-.on-grid-title button { display: flex; align-items: center; gap: 8rpx; margin: 0; padding: 0; border: 0; background: transparent; color: #9b89e0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 26rpx; font-weight: 560; line-height: 1; }
+.on-grid-title button { display: flex; align-items: center; gap: 8rpx; margin: 0; padding: 0; border: 0; background: transparent; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 26rpx; font-weight: 500; line-height: 1; }
 .on-grid-title button::after { border: 0; }
 .on-grid-title button text { transform: translateY(-1rpx); }
 .on-grid-card { overflow: hidden; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; }
