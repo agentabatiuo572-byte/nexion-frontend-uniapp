@@ -367,7 +367,7 @@ function notifyLocked(product: Product) {
           <view class="featured-glow" />
           <view class="product-photo">
             <image v-if="featuredProduct.photo" :src="featuredProduct.photo" mode="aspectFill" />
-            <view v-else class="cloud-art">CPU</view>
+            <view v-else class="cloud-art"><text class="cloud-cpu-icon" /></view>
             <view class="ribbon">{{ featuredProduct.badge }}</view>
             <view class="tier-stack">
               <view class="tier-chip">{{ featuredProduct.tierCode }}</view>
@@ -445,7 +445,7 @@ function notifyLocked(product: Product) {
         <view v-for="product in restProducts" :key="product.id" class="product-card card" @click="openProduct(product)">
           <view class="product-photo">
             <image v-if="product.photo" :src="product.photo" mode="aspectFill" />
-            <view v-else class="cloud-art">CPU</view>
+            <view v-else class="cloud-art"><text class="cloud-cpu-icon" /></view>
             <view class="ribbon">{{ product.badge }}</view>
             <view class="tier-stack">
               <view class="tier-chip">{{ product.tierCode }}</view>
@@ -609,7 +609,8 @@ function notifyLocked(product: Product) {
 .product-card > view:not(.featured-glow) { position: relative; z-index: 1; }
 .product-photo { position: relative; height: 360rpx; overflow: hidden; background: linear-gradient(135deg,#101216,#050608); }
 .product-photo image { width: 100%; height: 100%; }
-.cloud-art { display: grid; height: 100%; place-items: center; color: #58e7ff; font-size: 54rpx; background: repeating-linear-gradient(135deg, rgba(88,231,255,.08) 0 16rpx, transparent 16rpx 36rpx), linear-gradient(135deg, rgba(88,231,255,.18), #10141d); }
+.cloud-art { display: grid; height: 100%; place-items: center; color: #8e72ff; background: repeating-linear-gradient(135deg, rgba(142,114,255,.08) 0 16rpx, transparent 16rpx 36rpx), linear-gradient(135deg, rgba(142,114,255,.20), #1f1f1f); }
+.cloud-cpu-icon { display: block; width: 128rpx; height: 128rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='16' height='16' x='4' y='4' rx='2'/%3E%3Crect width='6' height='6' x='9' y='9' rx='1'/%3E%3Cpath d='M15 2v2'/%3E%3Cpath d='M15 20v2'/%3E%3Cpath d='M2 15h2'/%3E%3Cpath d='M2 9h2'/%3E%3Cpath d='M20 15h2'/%3E%3Cpath d='M20 9h2'/%3E%3Cpath d='M9 2v2'/%3E%3Cpath d='M9 20v2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='16' height='16' x='4' y='4' rx='2'/%3E%3Crect width='6' height='6' x='9' y='9' rx='1'/%3E%3Cpath d='M15 2v2'/%3E%3Cpath d='M15 20v2'/%3E%3Cpath d='M2 15h2'/%3E%3Cpath d='M2 9h2'/%3E%3Cpath d='M20 15h2'/%3E%3Cpath d='M20 9h2'/%3E%3Cpath d='M9 2v2'/%3E%3Cpath d='M9 20v2'/%3E%3C/svg%3E") center / contain no-repeat; }
 .product-photo::after { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 76%, #10141d 100%); content: ""; }
 .ribbon { position: absolute; top: 0; left: 32rpx; z-index: 2; padding: 6rpx 20rpx 8rpx; border-radius: 0 0 12rpx 12rpx; background: #c6ff3a; color: #10140a; font-size: 21rpx; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .tier-stack { position: absolute; left: 28rpx; bottom: 24rpx; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 10rpx; }
