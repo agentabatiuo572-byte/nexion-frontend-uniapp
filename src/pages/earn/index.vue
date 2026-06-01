@@ -196,8 +196,8 @@ function showSoon(label: string) {
             <view class="mode-title">{{ v.phoneSettingsTitle || 'Background mode' }}</view>
           </view>
           <view class="runtime-row">
-            <text><i class="ui-icon battery" />78%</text>
-            <text><i class="ui-icon wifi" />{{ v.phoneNetOnline || 'online' }}</text>
+            <button class="runtime-pill"><i class="ui-icon battery-charging" />78%</button>
+            <button class="runtime-pill"><i class="ui-icon wifi-lucide" />{{ v.phoneNetOnline || 'online' }}</button>
           </view>
           <view class="runtime-hint">{{ v.phoneRequirementsHint || 'Charging + network must both stay available before accepting tasks. The scheduler ping-checks before every job.' }}</view>
           <view class="locked-row">
@@ -344,8 +344,12 @@ button::after { border: 0; }
 .mic::after { width: .72em; height: .42em; border: .12em solid currentColor; border-top: 0; border-radius: 0 0 .38em .38em; bottom: .08em; }
 .battery::before { width: .78em; height: .46em; border: .12em solid currentColor; border-radius: .08em; }
 .battery::after { right: 0; width: .12em; height: .22em; background: currentColor; border-radius: .04em; }
+.battery-charging { background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1'/%3E%3Cpath d='m11 7-3 5h4l-3 5'/%3E%3Cline x1='22' x2='22' y1='11' y2='13'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2'/%3E%3Cpath d='M6 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h1'/%3E%3Cpath d='m11 7-3 5h4l-3 5'/%3E%3Cline x1='22' x2='22' y1='11' y2='13'/%3E%3C/svg%3E") center / contain no-repeat; }
+.battery-charging::before, .battery-charging::after { display: none; }
 .wifi::before { width: .86em; height: .86em; border: .12em solid currentColor; border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(-45deg); top: .18em; }
 .wifi::after { bottom: .1em; width: .16em; height: .16em; border-radius: 50%; background: currentColor; }
+.wifi-lucide { background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h.01'/%3E%3Cpath d='M2 8.82a15 15 0 0 1 20 0'/%3E%3Cpath d='M5 12.86a10 10 0 0 1 14 0'/%3E%3Cpath d='M8.5 16.43a5 5 0 0 1 7 0'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h.01'/%3E%3Cpath d='M2 8.82a15 15 0 0 1 20 0'/%3E%3Cpath d='M5 12.86a10 10 0 0 1 14 0'/%3E%3Cpath d='M8.5 16.43a5 5 0 0 1 7 0'/%3E%3C/svg%3E") center / contain no-repeat; }
+.wifi-lucide::before, .wifi-lucide::after { display: none; }
 .lock::before { width: .76em; height: .52em; border: .12em solid currentColor; border-radius: .1em; bottom: .08em; }
 .lock::after { width: .48em; height: .42em; border: .12em solid currentColor; border-bottom: 0; border-radius: .32em .32em 0 0; top: .04em; }
 .small-lock { width: .9em; height: .9em; }
@@ -452,10 +456,11 @@ button::after { border: 0; }
 .task-progress::after { content: "30%"; float: right; margin-top: -12rpx; color: #cfd5e1; font-size: 24rpx; }
 .task-meta { display: flex; justify-content: space-between; margin-top: 28rpx; color: #9ba3b5; font-size: 24rpx; }
 .task-meta text:last-child { color: #9edc1d; }
-.background-mode { padding: 0 40rpx 18rpx; }
-.mode-title { color: #8f98a8; font-size: 27rpx; font-weight: 560; }
-.runtime-row { display: flex; gap: 18rpx; padding: 0 40rpx 22rpx; }
-.runtime-row text { display: inline-flex; align-items: center; justify-content: center; gap: 8rpx; min-height: 64rpx; padding: 0 26rpx; border: 1rpx solid rgba(158,220,29,.10); border-radius: 999rpx; background: rgba(158,220,29,.20); color: #9edc1d; font-size: 23rpx; font-weight: 640; line-height: 1; }
+.background-mode { padding: 0 40rpx 16rpx; }
+.mode-title { color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 500; letter-spacing: 2rpx; line-height: 1; text-transform: uppercase; }
+.runtime-row { display: flex; align-items: center; gap: 12rpx; padding: 0 40rpx 22rpx; }
+.runtime-pill { gap: 8rpx; height: 56rpx; padding: 0 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: rgba(158,220,29,.14); color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 520; line-height: 1; }
+.runtime-pill .ui-icon { width: 24rpx; height: 24rpx; }
 .runtime-hint { padding: 0 40rpx 34rpx; color: #7f8799; font-size: 23rpx; line-height: 1.45; }
 .locked-row { padding: 28rpx 40rpx 34rpx; border-top: 0; }
 .locked-row text { display: inline-flex; align-items: center; gap: 10rpx; color: #8f98a8; font-size: 24rpx; }
