@@ -23,12 +23,6 @@ const t = computed(() => copy.value.home)
 const v = computed(() => t.value.v5)
 const common = computed(() => copy.value.common)
 const tx = (zh: string, en: string) => (locale.value === 'zh' ? zh : en)
-const stellaInsight = computed(() =>
-  tx(
-    '你的收益位于移动节点前 0.16%。我找到了一条更快的 S1 回本路径。',
-    'Your yield sits in the top 0.16% of mobile nodes. I found a faster S1 payback path.'
-  )
-)
 
 onShow(() => {
   requireAuth()
@@ -439,22 +433,6 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <button class="stella-card" @click="showSoon('Stella')">
-          <view class="stella-avatar">
-            <i class="ui-mask icon-spark" />
-          </view>
-          <view class="stella-bubble">
-            <i class="stella-blob one" />
-            <i class="stella-blob two" />
-            <i class="stella-blob three" />
-            <view class="stella-content">
-              <view class="stella-name"><b>Stella</b><text>AI advisor</text></view>
-              <view class="stella-message">{{ stellaInsight }}</view>
-              <view class="stella-link">{{ v.seeRoi }} <i class="ui-mask icon-arrow" /></view>
-            </view>
-          </view>
-        </button>
-
         <view class="rank-card v5-card">
           <view class="rank-top">
             <text>{{ t.yourRank }}</text>
@@ -840,21 +818,6 @@ function showSoon(label: string) {
 .pulse-svg { display: block; width: 100%; height: 64rpx; overflow: visible; }
 .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
-.stella-card { display: flex; align-items: flex-end; gap: 18rpx; width: 100%; margin: 24rpx 0 0; padding: 4rpx; border: 0; background: transparent; text-align: left; }
-.stella-card::after { border: 0; }
-.stella-avatar { position: relative; display: grid; flex: 0 0 88rpx; width: 88rpx; height: 88rpx; place-items: center; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #f8fafc 0 18%, #9b89e0 19% 54%, #1f1f1f 55% 100%); color: #c6ff3a; box-shadow: 0 0 0 10rpx rgba(155,137,224,.12); animation: stellaHalo 2.4s ease-in-out infinite; }
-.stella-avatar i { font-size: 36rpx; }
-.stella-bubble { position: relative; flex: 1; min-width: 0; overflow: hidden; padding: 24rpx 28rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 34rpx 34rpx 34rpx 8rpx; background: #101010; }
-.stella-blob { position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; filter: blur(28rpx); }
-.stella-blob.one { width: 240rpx; height: 240rpx; background: rgba(155,137,224,.25); animation: stellaBlob1 9s ease-in-out infinite; }
-.stella-blob.two { width: 210rpx; height: 210rpx; background: rgba(255,122,61,.16); animation: stellaBlob2 12s ease-in-out -3s infinite; }
-.stella-blob.three { width: 180rpx; height: 180rpx; background: rgba(88,231,255,.16); animation: stellaBlob3 14s ease-in-out -6s infinite; }
-.stella-content { position: relative; z-index: 1; }
-.stella-name { display: flex; align-items: center; gap: 10rpx; color: #7f8898; font-size: 23rpx; }
-.stella-name b { color: #9edc1d; font-size: 24rpx; font-weight: 650; }
-.stella-message { margin-top: 10rpx; color: #f5f7fa; font-size: 28rpx; font-weight: 520; line-height: 1.45; }
-.stella-message text { color: #9edc1d; font-weight: 650; }
-.stella-link { display: flex; align-items: center; gap: 8rpx; margin-top: 14rpx; color: #9edc1d; font-size: 25rpx; font-weight: 650; }
 .v5-card { margin-top: 24rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; box-sizing: border-box; overflow: hidden; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin: 24rpx 4rpx 20rpx; }
 .section-head > text:first-child, .section-head view > text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
@@ -970,8 +933,4 @@ function showSoon(label: string) {
 @keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 18%{opacity:.8} 100%{opacity:0;transform:translateX(120%)} }
 @keyframes slowSpin { to{ transform: rotate(360deg) } }
 @keyframes feedFade { from{ opacity: 0; transform: translateY(-10rpx) } to{ opacity: 1; transform: translateY(0) } }
-@keyframes stellaHalo { 0%,100%{ box-shadow: 0 0 0 8rpx rgba(155,137,224,.10) } 50%{ box-shadow: 0 0 0 16rpx rgba(155,137,224,.18) } }
-@keyframes stellaBlob1 { 0%,100%{ transform: translate3d(-35%, -30%, 0) } 50%{ transform: translate3d(42%, -12%, 0) } }
-@keyframes stellaBlob2 { 0%,100%{ transform: translate3d(55%, -34%, 0) } 50%{ transform: translate3d(8%, 18%, 0) } }
-@keyframes stellaBlob3 { 0%,100%{ transform: translate3d(22%, 34%, 0) } 50%{ transform: translate3d(62%, 6%, 0) } }
 </style>
