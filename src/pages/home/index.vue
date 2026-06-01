@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/store/auth'
@@ -9,6 +9,8 @@ import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 const auth = useAuthStore()
 const liveTab = ref<'activity' | 'earnings'>('activity')
 const dayTasksExpanded = ref(false)
+const moneyDisplay = ref(0.06)
+let moneyTimer: ReturnType<typeof setInterval> | undefined
 const locale = useActiveLocale()
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.home)
@@ -24,6 +26,25 @@ const level = computed(() => auth.session?.userLevel || 'L0')
 const vRank = computed(() => auth.session?.vRank || 'V0')
 
 const headline = computed(() => v.value.headline.split('{amount}'))
+const moneyInt = computed(() => Math.floor(moneyDisplay.value))
+const moneyCents = computed(() => String(Math.floor(moneyDisplay.value * 100) % 100).padStart(2, '0'))
+const moneyParticles = [
+  { left: '12%', delay: '0s', color: '#8E72FF' },
+  { left: '32%', delay: '1.6s', color: '#9EDC1D' },
+  { left: '54%', delay: '3.2s', color: '#FF7A3D' },
+  { left: '72%', delay: '4.8s', color: '#8E72FF' },
+  { left: '88%', delay: '6.4s', color: '#9EDC1D' }
+]
+
+onMounted(() => {
+  moneyTimer = setInterval(() => {
+    moneyDisplay.value += 0.0009 * (0.6 + Math.random() * 0.9)
+  }, 1100)
+})
+
+onUnmounted(() => {
+  if (moneyTimer) clearInterval(moneyTimer)
+})
 
 const dayTasks = computed(() => [
   { label: v.value.connectWallet, cat: v.value.walletCat, reward: '+50', done: true, color: '#9b89e0' },
@@ -119,19 +140,24 @@ function showSoon(label: string) {
         </view>
 
         <view class="money-card card">
-          <view class="aurora" />
-          <view class="card-top">
-            <view>
-              <view class="mono muted">{{ t.earnings }}</view>
-              <view class="money"><text>$</text>247<text>.83</text></view>
-              <view class="success-line">{{ v.todayJobsStreak }}</view>
-            </view>
-            <view class="live-chip"><i /> {{ t.live }}</view>
+          <view class="money-aurora" />
+          <view class="money-grid" />
+          <view class="money-particles">
+            <i v-for="dot in moneyParticles" :key="dot.left" :style="{ left: dot.left, animationDelay: dot.delay, background: dot.color }" />
           </view>
-          <view class="mini-grid">
-            <view><text>{{ t.pending }}</text><b>$12.40</b></view>
-            <view><text>NEX</text><b>1,842</b></view>
-            <view><text>{{ t.rank }}</text><b>{{ vRank }}</b></view>
+          <view class="money-inner">
+          <view class="money-head">
+            <view>
+              <view class="money-label">{{ v.todayEarningsLabel || t.earnings }}</view>
+              <view class="money"><text>$</text>{{ moneyInt }}<text>.{{ moneyCents }}</text></view>
+              <view class="success-line">↑ {{ v.todayJobsStreak }}</view>
+            </view>
+            <view class="stream-chip">{{ v.streaming || t.live }}</view>
+          </view>
+          <view class="money-metrics">
+            <view><text>{{ v.peerAvgS1 || 'Peer avg (S1 owner)' }}</text><b>$38.52/d</b></view>
+            <view><text>{{ v.paybackToBox || 'Payback to box' }}</text><b>360 {{ v.mathDays || 'days' }}</b></view>
+          </view>
           </view>
         </view>
 
@@ -475,19 +501,31 @@ function showSoon(label: string) {
 .greeting { padding: 8rpx 4rpx 4rpx; }
 .hello { color: #99a3b3; font-size: 27rpx; }
 .headline { margin-top: 8rpx; color: #fff; font-size: 52rpx; font-weight: 760; line-height: 1.12; }
-.headline text, .success-line { color: #12c979; }
-.money-card { position: relative; overflow: hidden; margin-top: 24rpx; padding: 34rpx; box-shadow: 0 24rpx 80rpx rgba(0,0,0,.24); }
-.aurora { position: absolute; inset: -35% -10% auto -10%; height: 220%; background: radial-gradient(circle at 18% 72%, rgba(18,201,121,.2), transparent 42%), radial-gradient(circle at 86% 8%, rgba(198,255,58,.15), transparent 36%), radial-gradient(circle at 70% 92%, rgba(88,231,255,.14), transparent 40%); filter: blur(18rpx); animation: aurora 13s ease-in-out infinite alternate; }
-.card-top, .day-head, .market-top { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 24rpx; }
-.money { margin-top: 12rpx; color: #fff; font-size: 88rpx; font-weight: 760; line-height: 1; letter-spacing: -2rpx; }
-.money text { color: #99a3b3; font-size: 40rpx; font-weight: 600; }
+.headline text { color: #9edc1d; }
+.success-line { margin-top: 16rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; line-height: 1.2; }
+.money-card { position: relative; isolation: isolate; overflow: hidden; margin-top: 24rpx; padding: 36rpx 36rpx 40rpx; border-color: rgba(255,255,255,.12); border-radius: 32rpx; background: #1f1f1f; box-shadow: inset 0 1rpx 0 rgba(255,255,255,.06), 0 24rpx 64rpx rgba(0,0,0,.70); }
+.money-aurora { position: absolute; inset: -30% -10% auto -10%; z-index: 0; height: 220%; background: radial-gradient(45% 35% at 22% 30%, rgba(142,114,255,.22), transparent 60%), radial-gradient(40% 30% at 78% 20%, rgba(198,255,58,.18), transparent 60%), radial-gradient(50% 40% at 55% 80%, rgba(255,122,61,.24), transparent 65%); filter: blur(28rpx); pointer-events: none; animation: v5AuroraDrift 14s ease-in-out infinite alternate; }
+.money-grid { position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(to right, rgba(158,220,29,.09) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(158,220,29,.09) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); }
+.money-particles { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.money-particles i { position: absolute; bottom: -12rpx; width: 8rpx; height: 8rpx; border-radius: 50%; opacity: 0; animation: v5DotDrift 8s linear infinite; }
+.money-inner { position: relative; z-index: 1; }
+.money-head, .day-head, .market-top { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 24rpx; }
+.money-label { color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; letter-spacing: .8rpx; }
+.money { display: flex; align-items: baseline; gap: 3rpx; margin-top: 20rpx; color: #f5f7fa; font-size: 96rpx; font-weight: 600; line-height: 1; letter-spacing: -2rpx; }
+.money text { color: #9ba3b5; font-size: 44rpx; font-weight: 500; }
+.stream-chip { display: inline-flex; align-items: center; justify-content: center; height: 40rpx; padding: 0 14rpx; border-radius: 8rpx; background: rgba(142,114,255,.20); color: #8e72ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 500; letter-spacing: .8rpx; white-space: nowrap; }
 .live-chip { display: inline-flex; align-items: center; gap: 10rpx; height: 40rpx; padding: 0 16rpx; border-radius: 999rpx; background: rgba(88,231,255,.12); color: #58e7ff; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .live-chip i { width: 9rpx; height: 9rpx; border-radius: 50%; background: #58e7ff; animation: pulse 1.6s infinite; }
 .live-chip.small { height: 32rpx; font-size: 20rpx; }
-.mini-grid, .math-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 30rpx; }
-.mini-grid view, .math-grid view { min-height: 102rpx; padding: 18rpx; border-radius: 22rpx; background: rgba(255,255,255,.05); }
-.mini-grid text, .math-grid text { display: block; color: #8f98a8; font-size: 21rpx; }
-.mini-grid b, .math-grid b { display: block; margin-top: 8rpx; color: #c6ff3a; font-size: 30rpx; }
+.money-metrics { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 28rpx; margin-top: 32rpx; padding-top: 28rpx; border-top: 2rpx solid rgba(255,255,255,.12); box-shadow: inset 0 1rpx 0 rgba(0,0,0,.45); }
+.money-metrics text { display: block; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; line-height: 1.2; }
+.money-metrics b { display: block; margin-top: 8rpx; font-size: 28rpx; font-weight: 500; line-height: 1; }
+.money-metrics view:first-child b { color: #8e72ff; }
+.money-metrics view:last-child b { color: #ff7a3d; }
+.math-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 30rpx; }
+.math-grid view { min-height: 102rpx; padding: 18rpx; border-radius: 22rpx; background: rgba(255,255,255,.05); }
+.math-grid text { display: block; color: #8f98a8; font-size: 21rpx; }
+.math-grid b { display: block; margin-top: 8rpx; color: #c6ff3a; font-size: 30rpx; }
 .trial-card, .conversion-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24rpx; margin-top: 24rpx; padding: 30rpx 34rpx; background: radial-gradient(circle at 0 100%, rgba(18,201,121,.14), transparent 56%), #10141d; }
 .ticket { display: inline-flex; padding: 6rpx 14rpx; border: 1rpx dashed rgba(18,201,121,.46); border-radius: 8rpx; color: #12c979; font-size: 19rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2rpx; }
 .card-title { margin-top: 10rpx; color: #fff; font-size: 32rpx; font-weight: 720; line-height: 1.25; }
@@ -758,5 +796,7 @@ function showSoon(label: string) {
 .trust-card-v5 .trust-note { margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
 @keyframes aurora { from{transform:translate3d(-10rpx,0,0) scale(1)} to{transform:translate3d(18rpx,10rpx,0) scale(1.05)} }
+@keyframes v5AuroraDrift { 0%{transform:translate3d(0,0,0) rotate(0deg)} 50%{transform:translate3d(-6%,3%,0) rotate(2deg)} 100%{transform:translate3d(4%,-2%,0) rotate(-1deg)} }
+@keyframes v5DotDrift { 0%{transform:translateY(0);opacity:0} 10%{opacity:.7} 90%{opacity:.7} 100%{transform:translateY(-440rpx);opacity:0} }
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
 </style>
