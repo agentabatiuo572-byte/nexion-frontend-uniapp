@@ -65,10 +65,9 @@ const pageCopy = computed(() => {
     nextRank: 'V3 Captain',
     missing: zh ? '$14,760 团队业绩' : '$14,760 more team volume',
     inviteEarn: zh ? '每邀请 1 位朋友赚' : 'Earn for each friend',
-    earnedToday: zh ? '今日 6 笔收益' : '6 earned today',
+    earnedToday: zh ? '今日 247 人已领取' : '247 earned today',
     promo: zh ? '限时 · 本周邀请奖励 2×' : 'Limited time bonus 2x',
     perFriend: zh ? '每位注册好友 · 30 天冷却' : 'per friend who signs up · 30-day cooldown',
-    beFirst: zh ? '成为第一个收益用户' : 'Be the first',
     poster: zh ? '海报' : 'Poster',
     posterValue: zh ? '二维码 + 图' : 'QR + image',
     code: zh ? '邀请码' : 'Code',
@@ -202,7 +201,7 @@ async function shareInvite() {
       <view class="invite-card">
         <view class="grid-overlay" />
         <view class="invite-head">
-          <text><i class="team-icon icon-coins" /> {{ pageCopy.inviteEarn }}</text>
+          <text><i class="money-emoji">💰</i> {{ pageCopy.inviteEarn }}</text>
           <view><i class="live-dot" />{{ pageCopy.earnedToday }}</view>
         </view>
         <view class="promo-pill"><i class="team-icon icon-flame" /> {{ pageCopy.promo }}</view>
@@ -212,7 +211,6 @@ async function shareInvite() {
             <view class="reward-strike">$200</view>
             <view class="nex-reward">+ 400 NEX</view>
             <view class="muted">{{ pageCopy.perFriend }}</view>
-            <view class="earned-pill"><i class="team-icon icon-spark" /> {{ pageCopy.beFirst }}</view>
           </view>
           <view class="share-stack">
             <button @click.stop="copyText(referralUrl, pageCopy.poster)"><i class="team-icon icon-qr" /><b>{{ pageCopy.poster }}</b><i>{{ pageCopy.posterValue }}</i></button>
@@ -745,6 +743,17 @@ async function shareInvite() {
   font-weight: 650;
 }
 
+.money-emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28rpx;
+  height: 28rpx;
+  font-size: 23rpx;
+  font-style: normal;
+  line-height: 1;
+}
+
 .invite-head view {
   display: flex;
   align-items: center;
@@ -756,17 +765,27 @@ async function shareInvite() {
 
 .invite-head .live-dot {
   position: relative;
+  display: inline-block;
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
   background: #12c979;
   box-shadow: 0 0 16rpx rgba(18, 201, 121, 0.7);
-  animation: live-pulse 1.6s ease-in-out infinite;
 }
 
-@keyframes live-pulse {
-  0%, 100% { opacity: 0.76; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.65); }
+.invite-head .live-dot::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #12c979;
+  opacity: 0.7;
+  animation: live-ping 1.6s ease-out infinite;
+  content: "";
+}
+
+@keyframes live-ping {
+  0% { opacity: 0.7; transform: scale(1); }
+  78%, 100% { opacity: 0; transform: scale(2.55); }
 }
 
 .promo-pill {
