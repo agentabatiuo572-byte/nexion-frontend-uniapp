@@ -341,15 +341,6 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="stella-card">
-          <view class="stella-avatar">S</view>
-          <view class="stella-bubble">
-            <view><b>Stella</b><text> · {{ v.stellaRole }}</text></view>
-            <p>{{ v.stellaBody.split('{pct}')[0] }}<b>0.16</b>{{ v.stellaBody.split('{pct}')[1] }}</p>
-            <i>{{ v.openChat }} →</i>
-          </view>
-        </view>
-
         <view class="rank-card v5-card">
           <view class="rank-top">
             <text>{{ t.yourRank }}</text>
@@ -737,13 +728,6 @@ function showSoon(label: string) {
 .trust-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
 .trust-tags text { padding: 6rpx 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: #1f1f1f; color: #d1d5db; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; }
 .trust-note { margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
-.stella-card { display: flex; align-items: flex-end; gap: 20rpx; margin-top: 26rpx; padding: 4rpx; }
-.stella-avatar { display: grid; width: 88rpx; height: 88rpx; place-items: center; border-radius: 50%; background: #c6ff3a; color: #10140a; font-size: 36rpx; font-weight: 800; box-shadow: 0 0 36rpx rgba(198,255,58,.36); }
-.stella-bubble { position: relative; flex: 1; min-width: 0; padding: 22rpx 26rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 34rpx 34rpx 34rpx 8rpx; background: radial-gradient(circle at 5% 20%, rgba(198,255,58,.16), transparent 50%), radial-gradient(circle at 86% 80%, rgba(155,137,224,.18), transparent 56%), #10141d; overflow: hidden; }
-.stella-bubble b { color: #c6ff3a; }
-.stella-bubble text, .stella-bubble p { color: #d7dce6; font-size: 25rpx; line-height: 1.45; }
-.stella-bubble p { margin: 10rpx 0 0; }
-.stella-bubble i { display: block; margin-top: 12rpx; color: #c6ff3a; font-style: normal; font-size: 23rpx; }
 .rank-card { grid-template-columns: auto 1fr; }
 .rank-orb { border-radius: 50%; background: #c6ff3a; color: #10140a; }
 .rank-progress { height: 9rpx; margin-top: 16rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
