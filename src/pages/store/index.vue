@@ -361,6 +361,7 @@ function notifyLocked(product: Product) {
           <text class="chip">{{ t.popular }}</text>
         </view>
         <view v-if="featuredProduct" class="product-card card featured" @click="openProduct(featuredProduct)">
+          <view class="featured-glow" />
           <view class="product-photo">
             <image v-if="featuredProduct.photo" :src="featuredProduct.photo" mode="aspectFill" />
             <view v-else class="cloud-art">CPU</view>
@@ -389,7 +390,7 @@ function notifyLocked(product: Product) {
               <text>{{ dataCenterLabel }}</text>
             </view>
             <view class="roi-hero">
-              <view class="roi-eyebrow">↗ {{ v.youEarn }}</view>
+              <view class="roi-eyebrow"><i class="ui-symbol icon-trending-up" />{{ v.youEarn }}</view>
               <view class="earn-line">
                 <b>{{ fmtMoney(featuredProduct.dailyEarn) }}<i>/day</i></b>
                 <text>+{{ featuredProduct.dailyEarnNEX }} NEX/d</text>
@@ -422,7 +423,7 @@ function notifyLocked(product: Product) {
               <b><text class="price-dollar">$</text>{{ fmtInt(featuredProduct.price) }}</b>
               <i>{{ annualPaybackLabel(featuredProduct) }}</i>
             </view>
-            <button @click.stop="buyProduct(featuredProduct)">{{ v.buyNow }} <text>›</text></button>
+            <button @click.stop="buyProduct(featuredProduct)">{{ v.buyNow }} <text class="ui-symbol icon-arrow-right" /></button>
           </view>
         </view>
 
@@ -467,7 +468,7 @@ function notifyLocked(product: Product) {
               <text>{{ isShareProduct(product) ? redemptionLabel : dataCenterLabel }}</text>
             </view>
             <view class="roi-hero">
-              <view class="roi-eyebrow">↗ {{ isShareProduct(product) ? annualYieldLabel : v.youEarn }}</view>
+              <view class="roi-eyebrow"><i class="ui-symbol icon-trending-up" />{{ isShareProduct(product) ? annualYieldLabel : v.youEarn }}</view>
               <view class="earn-line">
                 <b v-if="isShareProduct(product)">{{ product.shareYieldMin }}-{{ product.shareYieldMax }}%<i></i></b>
                 <b v-else>{{ fmtMoney(product.dailyEarn) }}<i>/day</i></b>
@@ -503,7 +504,7 @@ function notifyLocked(product: Product) {
               <b><text class="price-dollar">$</text>{{ fmtInt(product.price) }}</b>
               <i>{{ isShareProduct(product) ? v.oneTimeStake : annualPaybackLabel(product) }}</i>
             </view>
-            <button @click.stop="buyProduct(product)">{{ isShareProduct(product) ? v.stake : v.buyNow }} <text>›</text></button>
+            <button @click.stop="buyProduct(product)">{{ isShareProduct(product) ? v.stake : v.buyNow }} <text class="ui-symbol icon-arrow-right" /></button>
           </view>
         </view>
 
@@ -589,8 +590,10 @@ function notifyLocked(product: Product) {
 .locked-card text { display: block; margin-top: 6rpx; color: #99a3b3; font-size: 22rpx; line-height: 1.35; }
 .locked-card i { color: #ff9b62; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .locked-card em { display: block; margin-bottom: 6rpx; color: #ff9b62; font-style: normal; font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; text-transform: uppercase; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.product-card { overflow: hidden; margin-top: 20rpx; }
+.product-card { position: relative; overflow: hidden; margin-top: 20rpx; }
 .product-card.featured { box-shadow: 0 30rpx 90rpx rgba(0,0,0,.28); }
+.featured-glow { position: absolute; inset: -20%; z-index: 0; pointer-events: none; background: radial-gradient(40% 50% at 80% 0%, rgba(88,231,255,.18), transparent 60%); filter: blur(24rpx); opacity: .6; }
+.product-card > view:not(.featured-glow) { position: relative; z-index: 1; }
 .product-photo { position: relative; height: 360rpx; overflow: hidden; background: linear-gradient(135deg,#101216,#050608); }
 .product-photo image { width: 100%; height: 100%; }
 .cloud-art { display: grid; height: 100%; place-items: center; color: #58e7ff; font-size: 54rpx; background: repeating-linear-gradient(135deg, rgba(88,231,255,.08) 0 16rpx, transparent 16rpx 36rpx), linear-gradient(135deg, rgba(88,231,255,.18), #10141d); }
@@ -605,7 +608,7 @@ function notifyLocked(product: Product) {
 .product-head b { display: block; color: #fff; font-size: 32rpx; }
 .product-head text { display: block; margin-top: 8rpx; color: #99a3b3; font-size: 23rpx; line-height: 1.35; }
 .rating-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8rpx; margin-top: 10rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.rating-star { display: inline-block; width: 22rpx; height: 22rpx; margin: 0; background: #ff9b62; -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; }
+.rating-star { display: inline-block; width: 22rpx; height: 22rpx; margin: 0; background: #ff9b62; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E") center / contain no-repeat; }
 .rating-row b { display: inline; color: #fff; font-size: 22rpx; font-weight: 600; }
 .rating-row i { color: #8f98a8; font-style: normal; font-size: 21rpx; }
 .daily { color: #12c979; font-size: 38rpx; font-weight: 760; text-align: right; white-space: nowrap; }
@@ -623,7 +626,7 @@ function notifyLocked(product: Product) {
 .spec-row.compact { margin-top: 22rpx; gap: 10rpx; }
 .spec-row.compact text { border-radius: 12rpx; background: #171c25; color: #d7dce6; }
 .roi-hero { margin-top: 24rpx; padding-top: 22rpx; border-top: 1rpx dashed rgba(255,255,255,.14); }
-.roi-eyebrow { color: #12c979; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 700; letter-spacing: 2rpx; text-transform: uppercase; }
+.roi-eyebrow { display: inline-flex; align-items: center; gap: 8rpx; color: #12c979; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 700; letter-spacing: 2rpx; text-transform: uppercase; }
 .earn-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16rpx; margin-top: 8rpx; }
 .earn-line b { color: #12c979; font-size: 52rpx; font-weight: 720; letter-spacing: 0; line-height: 1; }
 .earn-line b i { color: #8f98a8; font-size: 26rpx; font-style: normal; font-weight: 500; }
@@ -635,9 +638,11 @@ function notifyLocked(product: Product) {
 .ai-row text { background: rgba(88,231,255,.13); color: #58e7ff; }
 .stock-strip { display: grid; grid-template-columns: auto 1fr; gap: 18rpx; align-items: center; margin-top: 22rpx; padding: 20rpx 22rpx; border-radius: 20rpx; background: rgba(255,155,98,.12); }
 .stock-icon { display: grid; width: 44rpx; height: 44rpx; place-items: center; border-radius: 12rpx; background: #ff9b62; font-style: normal; }
-.stock-icon::before { display: block; width: 24rpx; height: 24rpx; background: #120804; -webkit-mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; content: ""; }
+.stock-icon::before { display: block; width: 24rpx; height: 24rpx; background: #120804; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1.5 3-3.5 0-2-1-3.5-3-5.5-.8 1.4-2 2.5-3.5 3.5C6 12.5 5 14 5 16a7 7 0 0 0 14 0c0-3-1.5-5.5-4-7.5.2 1.5-.2 2.8-1.1 3.8'/%3E%3C/svg%3E") center / contain no-repeat; content: ""; }
 .ui-symbol { display: inline-block; flex-shrink: 0; width: 26rpx; height: 26rpx; background: currentColor; vertical-align: -4rpx; }
 .icon-zap { margin-right: 6rpx; color: inherit; -webkit-mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; }
+.icon-trending-up { width: 24rpx; height: 24rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 7h6v6'/%3E%3Cpath d='m22 7-8.5 8.5-5-5L2 17'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 7h6v6'/%3E%3Cpath d='m22 7-8.5 8.5-5-5L2 17'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-arrow-right { width: 28rpx; height: 28rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat; }
 .icon-refresh { color: inherit; -webkit-mask: url("../../static/icons/profile-refresh-cw.svg") center / contain no-repeat; mask: url("../../static/icons/profile-refresh-cw.svg") center / contain no-repeat; }
 .icon-orders { color: inherit; -webkit-mask: url("../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; mask: url("../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; }
 .stock-strip b { color: #ff9b62; font-size: 23rpx; }
@@ -653,7 +658,7 @@ function notifyLocked(product: Product) {
 .product-footer b .price-dollar { display: inline; margin-right: 2rpx; color: #8f98a8; font-size: 24rpx; }
 .product-footer i { display: block; margin-top: 8rpx; color: #12c979; font-style: normal; font-size: 22rpx; }
 .product-footer button { display: flex; align-items: center; justify-content: center; gap: 8rpx; height: 88rpx; padding: 0 38rpx; border-radius: 999rpx; background: #c6ff3a; color: #10140a; font-size: 27rpx; font-weight: 760; white-space: nowrap; }
-.product-footer button text { display: inline; color: #10140a; font-size: 32rpx; }
+.product-footer button text { display: inline-block; color: #10140a; font-size: 32rpx; }
 .purchase-ticker { grid-template-columns: auto 1fr auto; margin-top: 24rpx; }
 .avatar { display: grid; width: 56rpx; height: 56rpx; place-items: center; border-radius: 50%; color: #fff; font-size: 25rpx; font-weight: 760; }
 .purchase-ticker b { color: #fff; font-size: 24rpx; }
