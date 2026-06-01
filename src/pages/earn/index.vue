@@ -351,54 +351,42 @@ function toggleQuickPause() {
           <view class="fleet-note">{{ (v.currentFleet || 'Current fleet {amount} / day').replace('{amount}', '$0.06') }}</view>
         </view>
 
-        <view class="lifecycle-card">
-          <view class="lifecycle-glow" />
-          <view class="life-label"><i class="ui-icon activity" /> {{ v.fleetLifecycle || 'Fleet lifecycle' }}</view>
-          <view class="life-number"><b>98.4%</b><text>{{ (locale === 'zh' ? '1 台可衰减设备' : '1 degradable device') }}</text></view>
-          <view class="life-bar"><view /></view>
-          <view class="life-foot">
-            <view>
-              <text>{{ v.lifecycleMonthlyLoss || 'monthly loss' }}</text>
-              <b>−$0.61 <i>· {{ locale === 'zh' ? '12 天' : '12d' }}</i></b>
+        <view class="market-shell">
+          <view class="market-title-row">
+            <b>{{ v.marketOverview }}</b>
+            <text><i />{{ v.liveDemand }}</text>
+          </view>
+          <view class="market-board">
+            <view class="market-heading">{{ v.priceIndex || 'AI Workload Price Index' }}</view>
+            <view v-for="row in priceRows" :key="row.label" class="price-row">
+              <text><i class="ui-icon" :class="row.icon" /></text>
+              <view><b>{{ row.label }}</b><text>{{ row.unit }}</text><em v-if="row.premium">↳ {{ row.premium }}</em></view>
+              <i>{{ row.price }}</i>
+              <strong :class="{ down: row.up === false, neutral: row.neutral }">{{ row.delta }}</strong>
+              <svg viewBox="0 0 100 18" preserveAspectRatio="none">
+                <polyline :points="row.spark" fill="none" :stroke="row.up === false ? '#ff7a3d' : '#9EDC1D'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
             </view>
-            <button @click="showSoon(v.lifecycleCta || 'Review')">{{ v.lifecycleCta || 'Review' }} <i class="ui-icon arrow-right" /></button>
           </view>
-        </view>
 
-        <view class="section-title">
-          <b>{{ v.marketOverview }}</b>
-          <text><i />{{ v.liveDemand }}</text>
-        </view>
-        <view class="market-board">
-          <view class="market-heading">{{ v.priceIndex || 'AI Workload Price Index' }}</view>
-          <view v-for="row in priceRows" :key="row.label" class="price-row">
-            <text><i class="ui-icon" :class="row.icon" /></text>
-            <view><b>{{ row.label }}</b><text>{{ row.unit }}</text><em v-if="row.premium">↳ {{ row.premium }}</em></view>
-            <i>{{ row.price }}</i>
-            <strong :class="{ down: row.up === false, neutral: row.neutral }">{{ row.delta }}</strong>
-            <svg viewBox="0 0 100 18" preserveAspectRatio="none">
-              <polyline :points="row.spark" fill="none" :stroke="row.up === false ? '#ff7a3d' : '#9EDC1D'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
+          <view class="market-board rank-board">
+            <view class="market-heading">{{ v.deviceRanking || 'Device earnings ranking' }}</view>
+            <view v-for="row in deviceRankRows" :key="row.rank" class="rank-row" :class="{ phone: row.phone }">
+              <text>{{ row.rank }}</text>
+              <i><span class="ui-icon" :class="row.icon" /></i>
+              <view><b>{{ row.name }} <em v-if="row.top">Best</em></b><text>{{ row.best }}</text></view>
+              <strong>{{ row.daily }}</strong>
+              <span v-if="!row.phone"><i class="ui-icon arrow-right" /></span>
+            </view>
           </view>
-        </view>
 
-        <view class="market-board rank-board">
-          <view class="market-heading">{{ v.deviceRanking || 'Device earnings ranking' }}</view>
-          <view v-for="row in deviceRankRows" :key="row.rank" class="rank-row" :class="{ phone: row.phone }">
-            <text>{{ row.rank }}</text>
-            <i><span class="ui-icon" :class="row.icon" /></i>
-            <view><b>{{ row.name }} <em v-if="row.top">⭐ Best</em></b><text>{{ row.best }}</text></view>
-            <strong>{{ row.daily }}</strong>
-            <span v-if="!row.phone"><i class="ui-icon arrow-right" /></span>
+          <view class="network-state">
+            <view class="market-heading">{{ v.networkState || 'Network state' }}</view>
+            <view><text>{{ v.activeJobs || 'Active jobs' }}</text><b>{{ locale === 'zh' ? '8,432 全球' : '8,432 globally' }}</b></view>
+            <view><text>{{ v.llmQueue || 'LLM queue' }}</text><b>1,247 <i>{{ locale === 'zh' ? '高 · 高级定价' : 'high — premium pricing' }}</i></b></view>
+            <view><text>{{ v.peakHours || 'Peak hours' }}</text><b>14:00-22:00 UTC</b></view>
+            <view><text>{{ v.nextDrop || 'Next drop' }}</text><b>{{ locale === 'zh' ? '约 18h' : 'Open model release' }} <i>+30% LLM est.</i></b></view>
           </view>
-        </view>
-
-        <view class="network-state">
-          <view class="market-heading">{{ v.networkState || 'Network state' }}</view>
-          <view><text>{{ v.activeJobs || 'Active jobs' }}</text><b>8,432 globally</b></view>
-          <view><text>{{ v.llmQueue || 'LLM queue' }}</text><b>1,247 <i>high — premium pricing</i></b></view>
-          <view><text>{{ v.peakHours || 'Peak hours' }}</text><b>14:00-22:00 UTC</b></view>
-          <view><text>{{ v.nextDrop || 'Next drop' }}</text><b>Open model release <i>+30% LLM est.</i></b></view>
         </view>
 
         <view class="task-lock">
@@ -507,7 +495,7 @@ button::after { border: 0; }
 .pill-tabs { display: flex; gap: 4rpx; margin-top: 24rpx; padding: 6rpx; border-radius: 24rpx; background: #1f1f1f; }
 .pill-tabs button { flex: 1; height: 64rpx; border-radius: 18rpx; background: transparent; color: #9ba3b5; font-size: 26rpx; font-weight: 500; }
 .pill-tabs .on { background: rgba(158,220,29,.20); color: #9edc1d; font-weight: 600; }
-.total-card, .missed-card, .device-card, .market-board, .network-state, .task-lock, .task-center, .lifecycle-card { position: relative; overflow: hidden; margin-top: 24rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; box-sizing: border-box; }
+.total-card, .missed-card, .device-card, .market-board, .network-state, .task-lock, .task-center { position: relative; overflow: hidden; margin-top: 24rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; box-sizing: border-box; }
 .total-card { padding: 36rpx; box-shadow: 0 24rpx 80rpx rgba(0,0,0,.36); }
 .earn-aurora { position: absolute; inset: -30% -10% auto -10%; height: 220%; background: radial-gradient(circle at 20% 0%, rgba(142,114,255,.18), transparent 40%), radial-gradient(circle at 86% 86%, rgba(255,122,61,.17), transparent 42%); filter: blur(28rpx); animation: drift 14s ease-in-out infinite alternate; }
 .dot-field { position: absolute; inset: 0; overflow: hidden; }
@@ -682,23 +670,16 @@ button::after { border: 0; }
 .capacity-stats text { display: flex; align-items: center; justify-content: center; min-height: 24rpx; margin-top: 8rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 20rpx; line-height: 1; text-align: center; }
 .empty-slots-card button { position: relative; display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 96rpx; margin-top: 28rpx; border-radius: 999rpx; background: #9edc1d; color: #090d08; font-size: 28rpx; font-weight: 650; }
 .fleet-note { position: relative; margin-top: 16rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; text-align: center; }
-.lifecycle-card, .task-lock { padding: 32rpx; }
-.lifecycle-card { background: linear-gradient(160deg, rgba(88,231,255,.12), #101010 70%); border-color: rgba(88,231,255,.22); }
-.lifecycle-glow { position: absolute; inset: 0; background: radial-gradient(60% 80% at 95% 50%, rgba(88,231,255,.18), transparent 70%); pointer-events: none; }
-.life-label { color: #8e72ff; }
-.lifecycle-card .life-label { position: relative; color: #58e7ff; }
-.life-number { display: flex; align-items: baseline; gap: 16rpx; margin-top: 16rpx; color: #f5f7fa; font-size: 60rpx; font-weight: 640; }
-.life-number b { position: relative; font-size: 60rpx; font-weight: 640; line-height: 1; }
-.life-number text { color: #8f98a8; font-size: 22rpx; font-weight: 400; }
-.life-bar, .lock-progress { height: 8rpx; margin-top: 24rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
-.life-bar view { width: 98%; height: 100%; background: rgba(88,231,255,.55); }
-.lifecycle-card .life-foot { position: relative; }
-.life-foot b { color: #58e7ff; }
-.life-foot b i { color: #6b7385; font-size: 21rpx; font-style: normal; font-weight: 400; }
-.life-foot button { background: #8e72ff; color: #090d08; }
-.lifecycle-card .life-foot button { background: #58e7ff; }
-.market-board { padding-bottom: 10rpx; }
-.market-heading { padding: 24rpx 32rpx 12rpx; color: #8f98a8; }
+.task-lock { padding: 32rpx; }
+.lock-progress { height: 8rpx; margin-top: 24rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
+.market-shell { margin-top: 40rpx; }
+.market-title-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin: 0 8rpx 20rpx; }
+.market-title-row b { color: var(--v5-ink-3); font-size: 27rpx; font-weight: 650; letter-spacing: 0; }
+.market-title-row text { display: flex; align-items: center; gap: 10rpx; color: var(--v5-ink-3); font-size: 23rpx; }
+.market-title-row text i { width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 12rpx rgba(158,220,29,.5); }
+.market-board { margin-top: 24rpx; padding-bottom: 10rpx; background: var(--v5-surface); border-color: var(--v5-border); border-radius: 32rpx; }
+.market-shell .market-board:first-of-type { margin-top: 0; }
+.market-heading { padding: 24rpx 32rpx 12rpx; color: var(--v5-ink-3); font-size: 22rpx; letter-spacing: 3rpx; }
 .price-row { display: grid; grid-template-columns: 38rpx 1fr 120rpx 90rpx 96rpx; align-items: center; gap: 14rpx; padding: 18rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }
 .price-row > text { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; font-size: 28rpx; line-height: 1; text-align: center; color: #d1d5db; }
 .price-row b, .rank-row b { display: block; overflow: hidden; color: #f5f7fa; font-size: 25rpx; font-weight: 520; white-space: nowrap; text-overflow: ellipsis; }
