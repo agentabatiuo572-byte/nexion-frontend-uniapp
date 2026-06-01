@@ -57,28 +57,34 @@ const rangeMeta = computed(() => {
   return `+47.3% · 1,247 ${v.value.jobs}`
 })
 
-const priceRows = [
-  { emoji: '🖼', label: 'Image Gen', unit: 'per image', price: '$0.0030', delta: '↑ 4.2%', up: true, spark: sparkline([0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72]) },
-  { emoji: '💬', label: 'LLM Inference', unit: 'per 1k tok', price: '$0.0024', delta: '↑ 18.7%', up: true, premium: '405B premium ↑32.1%', spark: sparkline([0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88]) },
-  { emoji: '🎬', label: 'Video Gen', unit: 'per sec', price: '$0.180', delta: '↓ 1.2%', up: false, spark: sparkline([0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62]) },
-  { emoji: '🔧', label: 'Fine-tune', unit: 'per job', price: '$0.060', delta: '→ 0.0%', neutral: true, spark: sparkline([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) },
-  { emoji: '📐', label: 'Embedding', unit: 'per 1k chunks', price: '$0.0008', delta: '↑ 2.1%', up: true, spark: sparkline([0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57]) },
-  { emoji: '🎙', label: 'Speech', unit: 'per audio sec', price: '$0.0003', delta: '↑ 0.3%', up: true, spark: sparkline([0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52]) }
-]
-
-const deviceRankRows = computed(() => [
-  { rank: 1, emoji: '🗄', name: 'NexionRack P1', best: 'Training + 405B LLM', daily: '$142.60/d', top: true },
-  { rank: 2, emoji: '📦', name: 'NexionBox Pro', best: 'AI Premium pool', daily: '$76.00/d' },
-  { rank: 3, emoji: '📦', name: 'NexionBox S1', best: 'LLM 70B', daily: '$38.50/d' },
-  { rank: 4, emoji: '☁', name: 'Inference Share', best: 'Low barrier entry', daily: '$0.07/d' },
-  { rank: 5, emoji: '📱', name: v.value.yourPhone, best: 'Mobile NPU tier', daily: '$0.06/d', phone: true }
+const priceRows = computed(() => [
+  { icon: 'image', label: v.value.priceImageGen || 'Image Gen', unit: v.value.pricePerImage || 'per image', price: '$0.0030', delta: '↑ 4.2%', up: true, spark: sparkline([0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72]) },
+  { icon: 'message', label: v.value.priceLlmInference || 'LLM Inference', unit: v.value.pricePerTokens || 'per 1k tok', price: '$0.0024', delta: '↑ 18.7%', up: true, premium: '405B premium ↑32.1%', spark: sparkline([0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88]) },
+  { icon: 'film', label: v.value.priceVideoGen || 'Video Gen', unit: v.value.pricePerSecond || 'per sec', price: '$0.180', delta: '↓ 1.2%', up: false, spark: sparkline([0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62]) },
+  { icon: 'wrench', label: v.value.fineTune || 'Fine-tune', unit: v.value.pricePerJob || 'per job', price: '$0.060', delta: '→ 0.0%', neutral: true, spark: sparkline([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]) },
+  { icon: 'database', label: v.value.priceEmbedding || 'Embedding', unit: v.value.pricePerChunks || 'per 1k chunks', price: '$0.0008', delta: '↑ 2.1%', up: true, spark: sparkline([0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57]) },
+  { icon: 'mic', label: v.value.speech || 'Speech', unit: v.value.pricePerAudioSecond || 'per audio sec', price: '$0.0003', delta: '↑ 0.3%', up: true, spark: sparkline([0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52]) }
 ])
 
-const completedRows = [
-  { model: 'SDXL Turbo', type: 'Image Gen', reward: '+$0.000', time: '2m ago' },
-  { model: 'Whisper tiny', type: 'Speech', reward: '+$0.000', time: '8m ago' },
-  { model: 'MobileBERT', type: 'Embedding', reward: '+$0.000', time: '19m ago' }
-]
+const deviceRankRows = computed(() => [
+  { rank: 1, icon: 'server', name: 'NexionRack P1', best: 'Training + 405B LLM', daily: '$142.60/d', top: true },
+  { rank: 2, icon: 'box', name: 'NexionBox Pro', best: 'AI Premium pool', daily: '$76.00/d' },
+  { rank: 3, icon: 'box', name: 'NexionBox S1', best: 'LLM 70B', daily: '$38.50/d' },
+  { rank: 4, icon: 'cloud', name: 'Inference Share', best: 'Low barrier entry', daily: '$0.07/d' },
+  { rank: 5, icon: 'phone', name: v.value.yourPhone, best: 'Mobile NPU tier', daily: '$0.06/d', phone: true }
+])
+
+const lockedTaskRows = computed(() => [
+  { icon: 'message', model: 'Llama 70B inference', daily: '+$110/d', vram: '16 GB' },
+  { icon: 'image', model: 'Flux.1 [dev] HD', daily: '+$38/d', vram: '12 GB' },
+  { icon: 'image', model: 'SDXL Turbo bulk', daily: '+$9/d', vram: '8 GB' }
+])
+
+const completedRows = computed(() => [
+  { icon: 'image', model: 'SDXL Turbo', type: v.value.priceImageGen || 'Image Gen', reward: '+$0.000', time: '2m ago', receipt: true },
+  { icon: 'mic', model: 'Whisper tiny', type: v.value.speech || 'Speech', reward: '+$0.000', time: '8m ago' },
+  { icon: 'database', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.000', time: '19m ago' }
+])
 
 function showSoon(label: string) {
   uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
@@ -131,7 +137,7 @@ function showSoon(label: string) {
         </view>
 
         <view class="missed-card">
-          <view class="missed-label">↘ {{ v.missedIncome }}</view>
+          <view class="missed-label"><i class="ui-icon trend-down" /> {{ v.missedIncome }}</view>
           <view class="missed-amount"><text>−$</text><b>38.44</b><i>{{ v.vsS1Ceiling }}</i></view>
           <view class="loss-bars">
             <view><text>{{ v.yourPhone }}</text><text>$0.06/d</text></view>
@@ -146,22 +152,23 @@ function showSoon(label: string) {
         </view>
 
         <view class="trial-ticket" @click="showSoon(copy.home.freeTrial)">
+          <view class="ticket-shine" />
           <view class="ticket-body">
             <view class="ticket-left">
-              <text class="ticket-badge">★ {{ copy.home.freeTrial }}</text>
+              <text class="ticket-badge"><i class="ui-icon star" /> {{ copy.home.freeTrial }}</text>
               <b>NexionBox S1 Trial</b>
-              <text>Try hardware yield for 3 days</text>
+              <text>{{ v.trialTagline || 'Try hardware yield for 3 days' }}</text>
             </view>
             <view class="ticket-cut" />
             <view class="ticket-value">
-              <text>EST. 3D</text>
+              <text>{{ v.trialEarnLabel || 'EST. 3D' }}</text>
               <b><text>$</text>116</b>
               <i>$38.50/d × 3</i>
             </view>
           </view>
           <view class="ticket-bottom">
-            <text><i />47 trials left</text>
-            <b>{{ v.startTrial }} →</b>
+            <text><i />{{ v.trialsLeft || '47 trials left' }}</text>
+            <b>{{ v.startTrial }} <i class="ui-icon arrow-right" /></b>
           </view>
         </view>
 
@@ -182,8 +189,8 @@ function showSoon(label: string) {
         <view class="device-card">
           <view class="device-head">
             <view class="device-id">
-              <view class="device-icon">▯</view>
-              <view><b>{{ v.phoneNode }}</b><text>Mobile NPU · 28 TOPS</text></view>
+              <view class="device-icon"><i class="ui-icon phone" /></view>
+              <view><b>{{ v.phoneNode }}</b><text>{{ v.phoneNpuSpec || 'Mobile NPU · 28 TOPS' }}</text></view>
             </view>
             <view class="online"><i />{{ v.online || 'online' }}</view>
           </view>
@@ -195,12 +202,19 @@ function showSoon(label: string) {
             <view class="task-meta"><text>~0m 28s {{ v.remaining || 'remaining' }}</text><text>+ $0.000</text></view>
           </view>
           <view class="runtime-row">
-            <text>🔋 82%</text>
-            <text>⌁ {{ v.phoneNetOnline || 'online' }}</text>
+            <text><i class="ui-icon battery" />82%</text>
+            <text><i class="ui-icon wifi" />{{ v.phoneNetOnline || 'online' }}</text>
           </view>
           <view class="locked-row">
-            <text>🔒 {{ v.lockedTasksTitle || 'Locked AI tasks' }}</text>
+            <text><i class="ui-icon lock" />{{ v.lockedTasksTitle || 'Locked AI tasks' }}</text>
             <b>−$157 <i>/d</i></b>
+            <view class="locked-task-list">
+              <view v-for="task in lockedTaskRows" :key="task.model">
+                <span><i class="ui-icon lock small-lock" />{{ task.model }}</span>
+                <strong>{{ task.daily }} <em>{{ task.vram }}</em></strong>
+              </view>
+            </view>
+            <button class="unlock-more">{{ (v.unlockNMoreTasks || 'Unlock 142 more tasks').replace('{n}', '142') }}</button>
           </view>
           <view class="device-earnings">
             <view><text>{{ v.todayEarnings || 'Today earnings' }}</text><b>$0.060</b><i>+12.0 NEX</i></view>
@@ -210,26 +224,31 @@ function showSoon(label: string) {
 
         <view class="empty-slots-card" @click="showSoon(v.fillSlots || v.addDevice)">
           <view class="capacity-bg" />
-          <view class="capacity-label">↗ {{ v.slotsPotential || 'Potential daily' }}</view>
+          <view class="capacity-grid-bg" />
+          <view class="capacity-particles">
+            <i v-for="n in 10" :key="n" :style="{ left: `${7 + ((n * 17) % 88)}%`, animationDelay: `${n * .9}s`, animationDuration: `${9 + (n % 4)}s` }" />
+          </view>
+          <view class="capacity-label"><i class="ui-icon trending-up" /> {{ v.slotsPotential || 'Potential daily' }}</view>
           <view class="capacity-money"><text>+$</text><b>192</b><i>/day</i><em>{{ v.slotsUntapped || 'untapped' }}</em></view>
           <view class="capacity-sub"><b>5</b> × NexionBox S1 @ $38.50/d</view>
           <view class="slot-grid">
-            <view class="filled">▯</view>
-            <view v-for="n in 5" :key="n" class="empty">＋</view>
+            <view class="filled"><i class="ui-icon phone" /><em /></view>
+            <view v-for="n in 5" :key="n" class="empty"><i class="ui-icon plus" /></view>
           </view>
           <view class="capacity-stats">
             <view><b>1/6</b><text>{{ v.slotsFilled || 'filled' }}</text></view>
             <view><b>$143</b><text>{{ v.networkAvg || 'network avg' }}</text></view>
             <view><b>Top 6%</b><text>{{ v.rankIfFilled || 'if filled' }}</text></view>
           </view>
-          <button>⚡ {{ v.fillSlots || 'Fill slots' }} <text>→</text></button>
+          <button><i class="ui-icon zap" /> {{ v.fillSlots || 'Fill slots' }} <i class="ui-icon arrow-right" /></button>
+          <view class="fleet-note">{{ (v.currentFleet || 'Current fleet {amount} / day').replace('{amount}', '$0.06') }}</view>
         </view>
 
         <view class="lifecycle-card">
-          <view class="life-label">⌁ {{ v.fleetLifecycle }}</view>
+          <view class="life-label"><i class="ui-icon activity" /> {{ v.fleetLifecycle }}</view>
           <view class="life-number">98.2% <text>{{ v.lifecycleBody }}</text></view>
           <view class="life-bar"><view /></view>
-          <view class="life-foot"><text>{{ v.lifecycleMonthlyLoss || 'monthly loss' }}</text><b>−$0.00 · 0d</b><button>{{ v.lifecycleCta || 'Review' }} →</button></view>
+          <view class="life-foot"><text>{{ v.lifecycleMonthlyLoss || 'monthly loss' }}</text><b>−$0.00 · 0d</b><button>{{ v.lifecycleCta || 'Review' }} <i class="ui-icon arrow-right" /></button></view>
         </view>
 
         <view class="section-title">
@@ -239,7 +258,7 @@ function showSoon(label: string) {
         <view class="market-board">
           <view class="market-heading">{{ v.priceIndex || 'AI Workload Price Index' }}</view>
           <view v-for="row in priceRows" :key="row.label" class="price-row">
-            <text>{{ row.emoji }}</text>
+            <text><i class="ui-icon" :class="row.icon" /></text>
             <view><b>{{ row.label }}</b><text>{{ row.unit }}</text><em v-if="row.premium">↳ {{ row.premium }}</em></view>
             <i>{{ row.price }}</i>
             <strong :class="{ down: row.up === false, neutral: row.neutral }">{{ row.delta }}</strong>
@@ -253,10 +272,10 @@ function showSoon(label: string) {
           <view class="market-heading">{{ v.deviceRanking || 'Device earnings ranking' }}</view>
           <view v-for="row in deviceRankRows" :key="row.rank" class="rank-row" :class="{ phone: row.phone }">
             <text>{{ row.rank }}</text>
-            <i>{{ row.emoji }}</i>
+            <i><span class="ui-icon" :class="row.icon" /></i>
             <view><b>{{ row.name }} <em v-if="row.top">⭐ Best</em></b><text>{{ row.best }}</text></view>
             <strong>{{ row.daily }}</strong>
-            <span v-if="!row.phone">→</span>
+            <span v-if="!row.phone"><i class="ui-icon arrow-right" /></span>
           </view>
         </view>
 
@@ -269,10 +288,10 @@ function showSoon(label: string) {
         </view>
 
         <view class="task-lock">
-          <view class="lock-label">▣ {{ v.premiumLocked }}</view>
+          <view class="lock-label"><i class="ui-icon layers" /> {{ v.premiumLocked }}</view>
           <view class="lock-money">−$140 <text>{{ v.taskLockThisMonth || 'this month' }} · Llama 70B · Flux.1</text></view>
           <view class="lock-progress"><view /></view>
-          <view class="lock-foot"><view><text>{{ v.taskLockCumulative || 'cumulative missed' }}</text><b>−$420</b></view><button>{{ v.taskLockCtaUpgrade || v.addDevice }} →</button></view>
+          <view class="lock-foot"><view><text>{{ v.taskLockCumulative || 'cumulative missed' }}</text><b>−$420</b></view><button>{{ v.taskLockCtaUpgrade || v.addDevice }} <i class="ui-icon arrow-right" /></button></view>
         </view>
 
         <view class="section-title">
@@ -287,17 +306,18 @@ function showSoon(label: string) {
           <template v-if="taskTab === 'current'">
             <view class="task-heading">{{ v.currentlyProcessing || 'Currently processing' }}</view>
             <view class="empty-current">{{ v.noActive || 'No active task right now.' }}</view>
-            <view class="task-heading lock-title">🔒 {{ v.upgradeUnlocks || 'Upgrade unlocks' }}</view>
-            <view class="teaser-row"><text>💬</text><view><b>Llama 70B inference</b><i>{{ v.requires || 'requires' }} 16GB VRAM · S1 tier</i></view><em>+$110/d</em></view>
-            <view class="teaser-row"><text>🖼</text><view><b>Flux.1 dev HD</b><i>{{ v.requires || 'requires' }} 12GB VRAM · S1 tier</i></view><em>+$38/d</em></view>
+            <view class="task-heading lock-title"><i class="ui-icon lock" /> {{ v.upgradeUnlocks || 'Upgrade unlocks' }}</view>
+            <view class="unlock-hint">{{ v.upgradeUnlocksHint || 'Higher VRAM devices can accept premium AI queues.' }}</view>
+            <view class="teaser-row"><text><i class="ui-icon message" /></text><view><b>Llama 70B inference</b><i>{{ v.requires || 'requires' }} <strong>16GB VRAM</strong> · S1 tier</i></view><em>+$110/d <small>{{ v.upgradeNow || 'Upgrade now' }}</small></em></view>
+            <view class="teaser-row"><text><i class="ui-icon image" /></text><view><b>Flux.1 dev HD</b><i>{{ v.requires || 'requires' }} <strong>12GB VRAM</strong> · S1 tier</i></view><em>+$38/d <small>{{ v.upgradeNow || 'Upgrade now' }}</small></em></view>
             <view class="task-heading done-title">{{ v.completedToday || 'Completed today' }}</view>
             <view v-for="row in completedRows" :key="row.model" class="completed-row">
-              <text>✓</text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em>
+              <text><i class="ui-icon check" /></text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em><span><i v-if="row.receipt" class="ui-icon receipt" /></span>
             </view>
           </template>
           <template v-else>
             <view v-for="row in completedRows" :key="`h-${row.model}`" class="completed-row">
-              <text>✓</text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em>
+              <text><i class="ui-icon check" /></text><view>{{ row.model }} <i>· {{ row.type }}</i></view><b>{{ row.reward }}</b><em>{{ row.time }}</em><span><i v-if="row.receipt" class="ui-icon receipt" /></span>
             </view>
           </template>
         </view>
@@ -311,6 +331,50 @@ function showSoon(label: string) {
 .earn-stack { padding-bottom: 180rpx; color: #f7f9fc; }
 button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; margin: 0; padding: 0; border: 0; line-height: normal; }
 button::after { border: 0; }
+.ui-icon { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 1em; height: 1em; color: currentColor; line-height: 1; flex: none; }
+.ui-icon::before, .ui-icon::after { content: ""; position: absolute; box-sizing: border-box; }
+.arrow-right::before { width: .72em; height: .72em; border-top: .12em solid currentColor; border-right: .12em solid currentColor; transform: rotate(45deg); }
+.arrow-right::after { width: .86em; height: .12em; background: currentColor; }
+.trend-down::before { width: .86em; height: .12em; background: currentColor; transform: rotate(35deg); transform-origin: left center; }
+.trend-down::after { right: .04em; bottom: .14em; width: .38em; height: .38em; border-right: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(0deg); }
+.trending-up::before { width: .86em; height: .12em; background: currentColor; transform: rotate(-35deg); transform-origin: left center; }
+.trending-up::after { right: .02em; top: .12em; width: .38em; height: .38em; border-top: .12em solid currentColor; border-right: .12em solid currentColor; }
+.star::before { width: .9em; height: .9em; background: currentColor; clip-path: polygon(50% 0,61% 35%,98% 35%,68% 56%,79% 92%,50% 70%,21% 92%,32% 56%,2% 35%,39% 35%); }
+.phone::before { width: .62em; height: .95em; border: .12em solid currentColor; border-radius: .16em; }
+.phone::after { bottom: .1em; width: .16em; height: .16em; border-radius: 50%; background: currentColor; }
+.server::before { width: .92em; height: .82em; border: .12em solid currentColor; border-radius: .12em; box-shadow: inset 0 .28em 0 transparent, inset 0 .34em 0 currentColor; }
+.server::after { right: .16em; bottom: .18em; width: .16em; height: .16em; border-radius: 50%; background: currentColor; }
+.box::before { width: .84em; height: .74em; border: .12em solid currentColor; border-radius: .1em; transform: skewY(-8deg); }
+.cloud::before { width: .9em; height: .45em; border: .12em solid currentColor; border-top: 0; border-radius: 0 0 .3em .3em; bottom: .2em; }
+.cloud::after { width: .62em; height: .48em; border: .12em solid currentColor; border-bottom: 0; border-radius: .5em .5em 0 0; top: .18em; }
+.image::before { width: .9em; height: .72em; border: .12em solid currentColor; border-radius: .1em; }
+.image::after { width: .58em; height: .34em; border-left: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(-45deg); bottom: .18em; }
+.message::before { width: .92em; height: .68em; border: .12em solid currentColor; border-radius: .18em; }
+.message::after { left: .22em; bottom: .08em; width: .28em; height: .28em; border-left: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(-20deg); }
+.film::before { width: .9em; height: .7em; border: .12em solid currentColor; border-radius: .08em; box-shadow: inset .2em 0 0 transparent, inset .28em 0 0 currentColor, inset -.28em 0 0 currentColor; }
+.wrench::before { width: .75em; height: .18em; background: currentColor; border-radius: .1em; transform: rotate(-45deg); }
+.wrench::after { right: .08em; top: .04em; width: .38em; height: .38em; border: .12em solid currentColor; border-left-color: transparent; border-radius: 50%; transform: rotate(-45deg); }
+.database::before { width: .84em; height: .7em; border: .12em solid currentColor; border-radius: 50% / 24%; }
+.database::after { width: .84em; height: .22em; border: .12em solid currentColor; border-bottom: 0; border-radius: 50% 50% 0 0 / 100% 100% 0 0; top: .12em; }
+.mic::before { width: .46em; height: .72em; border: .12em solid currentColor; border-radius: .28em; top: .04em; }
+.mic::after { width: .72em; height: .42em; border: .12em solid currentColor; border-top: 0; border-radius: 0 0 .38em .38em; bottom: .08em; }
+.battery::before { width: .78em; height: .46em; border: .12em solid currentColor; border-radius: .08em; }
+.battery::after { right: 0; width: .12em; height: .22em; background: currentColor; border-radius: .04em; }
+.wifi::before { width: .86em; height: .86em; border: .12em solid currentColor; border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(-45deg); top: .18em; }
+.wifi::after { bottom: .1em; width: .16em; height: .16em; border-radius: 50%; background: currentColor; }
+.lock::before { width: .76em; height: .52em; border: .12em solid currentColor; border-radius: .1em; bottom: .08em; }
+.lock::after { width: .48em; height: .42em; border: .12em solid currentColor; border-bottom: 0; border-radius: .32em .32em 0 0; top: .04em; }
+.small-lock { width: .9em; height: .9em; }
+.zap::before { width: .72em; height: .96em; background: currentColor; clip-path: polygon(48% 0,92% 0,62% 42%,96% 42%,36% 100%,50% 55%,12% 55%); }
+.activity::before { width: .92em; height: .92em; border: .12em solid currentColor; border-radius: 50%; }
+.activity::after { width: .54em; height: .22em; border-left: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(-18deg); }
+.layers::before { width: .78em; height: .48em; border: .12em solid currentColor; transform: rotate(25deg) skew(-18deg); border-radius: .08em; }
+.layers::after { width: .78em; height: .48em; border: .12em solid currentColor; transform: translateY(.22em) rotate(25deg) skew(-18deg); border-radius: .08em; opacity: .65; }
+.plus::before { width: .72em; height: .12em; background: currentColor; }
+.plus::after { width: .12em; height: .72em; background: currentColor; }
+.check::before { width: .68em; height: .36em; border-left: .14em solid currentColor; border-bottom: .14em solid currentColor; transform: rotate(-45deg) translate(.05em,-.05em); }
+.receipt::before { width: .72em; height: .9em; border: .12em solid currentColor; border-radius: .08em; }
+.receipt::after { width: .38em; height: .12em; background: currentColor; box-shadow: 0 .22em 0 currentColor; }
 .pill-tabs { display: flex; gap: 4rpx; margin-top: 24rpx; padding: 6rpx; border-radius: 24rpx; background: #1f1f1f; }
 .pill-tabs button { flex: 1; height: 64rpx; border-radius: 18rpx; background: transparent; color: #9ba3b5; font-size: 26rpx; font-weight: 500; }
 .pill-tabs .on { background: rgba(158,220,29,.20); color: #9edc1d; font-weight: 600; }
@@ -339,7 +403,7 @@ button::after { border: 0; }
 .break-grid view:last-child b { color: #9edc1d; }
 .break-grid em { display: block; margin-top: 4rpx; color: #6b7385; font-size: 23rpx; font-style: normal; }
 .missed-card { padding: 32rpx; background: radial-gradient(60% 80% at 92% 50%, rgba(255,122,61,.18), transparent 70%), linear-gradient(140deg, rgba(255,122,61,.12), #101010 58%); }
-.missed-label, .life-label, .lock-label { color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; text-transform: uppercase; }
+.missed-label, .life-label, .lock-label { display: flex; align-items: center; gap: 10rpx; color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 600; letter-spacing: 2rpx; text-transform: uppercase; }
 .missed-amount { display: flex; align-items: baseline; gap: 8rpx; margin-top: 16rpx; }
 .missed-amount text, .missed-amount b { color: #ff7a3d; font-size: 60rpx; font-weight: 640; line-height: 1; }
 .missed-amount text { font-size: 32rpx; opacity: .78; }
@@ -356,7 +420,10 @@ button::after { border: 0; }
 .missed-foot b, .life-foot b, .lock-foot b { display: block; margin-top: 4rpx; color: #ff7a3d; font-size: 30rpx; }
 .missed-foot b i { color: #6b7385; font-size: 21rpx; font-style: normal; font-weight: 400; }
 .missed-foot button, .life-foot button, .lock-foot button { gap: 8rpx; min-width: 0; height: 72rpx; padding: 0 28rpx; border-radius: 999rpx; background: #ff7a3d; color: #090d08; font-size: 25rpx; font-weight: 650; white-space: nowrap; }
-.trial-ticket { position: relative; margin-top: 24rpx; overflow: hidden; border-radius: 32rpx; background: radial-gradient(70% 60% at 0 0, rgba(155,137,224,.18), transparent 60%), radial-gradient(80% 100% at 100% 100%, rgba(155,137,224,.12), transparent 65%), #101010; border: 1rpx solid rgba(255,255,255,.08); }
+.trial-ticket { position: relative; margin-top: 24rpx; overflow: hidden; border-radius: 32rpx; background: radial-gradient(70% 60% at 0 0, rgba(155,137,224,.18), transparent 60%), radial-gradient(80% 100% at 100% 100%, rgba(155,137,224,.12), transparent 65%), #101010; border: 1rpx solid rgba(255,255,255,.08); -webkit-mask-image: radial-gradient(circle at 62% 0, transparent 14rpx, #000 15rpx), radial-gradient(circle at 62% 100%, transparent 14rpx, #000 15rpx); -webkit-mask-composite: source-in; mask-image: radial-gradient(circle at 62% 0, transparent 14rpx, #000 15rpx), radial-gradient(circle at 62% 100%, transparent 14rpx, #000 15rpx); mask-composite: intersect; animation: ticketEnter .9s cubic-bezier(.22,1.2,.36,1) both; }
+.trial-ticket::before { content: ""; position: absolute; left: 32rpx; right: 32rpx; top: 0; height: 2rpx; background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); z-index: 3; }
+.trial-ticket::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2rpx; background: linear-gradient(90deg, transparent, #9b89e0, transparent); opacity: .6; z-index: 3; }
+.ticket-shine { position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(100deg, transparent 25%, rgba(198,255,58,.55) 50%, transparent 75%); mix-blend-mode: screen; opacity: 0; animation: ticketShimmer 1.1s ease-out .85s 1 forwards; }
 .ticket-body { display: grid; grid-template-columns: 1fr 28rpx auto; align-items: stretch; }
 .ticket-left { min-width: 0; padding: 32rpx 8rpx 28rpx 32rpx; }
 .ticket-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 38rpx; padding: 0 18rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; background: rgba(155,137,224,.12); color: #9b89e0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 600; line-height: 1; text-transform: uppercase; }
@@ -384,7 +451,7 @@ button::after { border: 0; }
 .device-card { padding: 0; }
 .device-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 32rpx 40rpx 24rpx; }
 .device-id { display: flex; align-items: center; gap: 24rpx; }
-.device-icon { display: grid; width: 72rpx; height: 72rpx; place-items: center; border-radius: 18rpx; background: #1f1f1f; color: #9edc1d; font-size: 32rpx; transform: rotate(90deg); }
+.device-icon { display: grid; width: 72rpx; height: 72rpx; place-items: center; border-radius: 18rpx; background: #1f1f1f; color: #9edc1d; font-size: 34rpx; }
 .online { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-height: 36rpx; color: #9edc1d; font-size: 23rpx; line-height: 1; }
 .online i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 10rpx rgba(158,220,29,.6); }
 .current-task { padding: 0 40rpx 28rpx; }
@@ -396,11 +463,17 @@ button::after { border: 0; }
 .task-meta { display: flex; justify-content: space-between; margin-top: 12rpx; color: #8f98a8; font-size: 23rpx; }
 .task-meta text:last-child { color: #9edc1d; }
 .runtime-row { display: flex; gap: 12rpx; padding: 0 40rpx 24rpx; }
-.runtime-row text { display: inline-flex; align-items: center; justify-content: center; min-height: 54rpx; padding: 0 20rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: rgba(158,220,29,.12); color: #9edc1d; font-size: 22rpx; line-height: 1; }
+.runtime-row text { display: inline-flex; align-items: center; justify-content: center; gap: 8rpx; min-height: 54rpx; padding: 0 20rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: rgba(158,220,29,.12); color: #9edc1d; font-size: 22rpx; line-height: 1; }
 .locked-row { padding: 24rpx 40rpx; border-top: 1rpx solid rgba(255,255,255,.07); }
-.locked-row text { color: #8f98a8; font-size: 23rpx; }
+.locked-row text { display: inline-flex; align-items: center; gap: 10rpx; color: #8f98a8; font-size: 23rpx; }
 .locked-row b { display: block; margin-top: 10rpx; color: #ff7a3d; font-size: 40rpx; }
 .locked-row i { color: #8f98a8; font-size: 22rpx; font-style: normal; }
+.locked-task-list { margin-top: 18rpx; }
+.locked-task-list view { display: flex; align-items: center; justify-content: space-between; gap: 18rpx; margin-top: 10rpx; color: rgba(245,247,250,.82); font-size: 23rpx; }
+.locked-task-list span { display: flex; min-width: 0; align-items: center; gap: 10rpx; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.locked-task-list strong { display: flex; flex: none; align-items: center; gap: 12rpx; color: #9edc1d; font-size: 27rpx; font-weight: 650; }
+.locked-task-list em { color: #8f98a8; font-size: 21rpx; font-style: normal; font-weight: 400; }
+.unlock-more { width: 100%; height: 88rpx; margin-top: 24rpx; border-radius: 999rpx; background: linear-gradient(90deg, #58e7ff, #9edc1d); color: #090d08; font-size: 27rpx; font-weight: 650; }
 .device-earnings { display: flex; justify-content: space-between; gap: 24rpx; padding: 28rpx 40rpx 36rpx; border-top: 1rpx solid rgba(255,255,255,.07); }
 .device-earnings text { display: block; color: #8f98a8; font-size: 22rpx; letter-spacing: 2rpx; text-transform: uppercase; }
 .device-earnings b { display: block; margin-top: 10rpx; color: #9edc1d; font-size: 54rpx; line-height: 1; }
@@ -408,8 +481,12 @@ button::after { border: 0; }
 .device-earnings view:last-child b { color: #f5f7fa; font-size: 36rpx; }
 .device-earnings i { display: block; margin-top: 8rpx; color: #8e72ff; font-size: 23rpx; font-style: normal; }
 .empty-slots-card { position: relative; overflow: hidden; margin-top: 24rpx; padding: 32rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; }
-.capacity-bg { position: absolute; inset: 0; background: radial-gradient(50% 60% at 12% 18%, rgba(158,220,29,.20), transparent 65%), radial-gradient(45% 55% at 88% 82%, rgba(142,114,255,.20), transparent 65%); filter: blur(20rpx); opacity: .85; }
+.capacity-bg { position: absolute; inset: 0; background: radial-gradient(50% 60% at 12% 18%, rgba(158,220,29,.20), transparent 65%), radial-gradient(45% 55% at 88% 82%, rgba(88,231,255,.16), transparent 65%); filter: blur(24rpx); opacity: .85; animation: drift 14s ease-in-out infinite alternate; }
+.capacity-grid-bg { position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(255,255,255,.04) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(255,255,255,.04) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%); mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%); }
+.capacity-particles { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.capacity-particles i { position: absolute; bottom: -8rpx; width: 7rpx; height: 7rpx; border-radius: 50%; background: #58e7ff; opacity: 0; box-shadow: 0 0 8rpx currentColor; animation: dotTall 10s linear infinite; }
 .capacity-label, .market-heading { position: relative; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 500; letter-spacing: 2rpx; text-transform: uppercase; }
+.capacity-label { display: flex; align-items: center; gap: 10rpx; }
 .capacity-money { position: relative; display: flex; align-items: baseline; gap: 10rpx; margin-top: 18rpx; color: #9edc1d; }
 .capacity-money text { font-size: 52rpx; opacity: .78; }
 .capacity-money b { font-size: 96rpx; line-height: 1; }
@@ -419,13 +496,15 @@ button::after { border: 0; }
 .capacity-sub b { color: #f5f7fa; }
 .slot-grid { position: relative; display: grid; grid-template-columns: repeat(6,1fr); gap: 12rpx; margin-top: 28rpx; }
 .slot-grid view { display: grid; height: 88rpx; place-items: center; border-radius: 24rpx; line-height: 1; }
-.slot-grid .filled { background: rgba(158,220,29,.16); color: #9edc1d; transform: rotate(90deg); }
+.slot-grid .filled { position: relative; background: rgba(158,220,29,.16); color: #9edc1d; }
+.slot-grid .filled em { position: absolute; top: 8rpx; right: 8rpx; width: 10rpx; height: 10rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 12rpx #9edc1d; animation: pulse 2.4s ease-in-out infinite; }
 .slot-grid .empty { border: 1rpx dashed rgba(142,114,255,.45); background: rgba(142,114,255,.08); color: #8e72ff; }
 .capacity-stats { position: relative; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 28rpx; padding-top: 24rpx; border-top: 1rpx dashed rgba(255,255,255,.1); text-align: center; }
 .capacity-stats view { display: flex; min-width: 0; flex-direction: column; align-items: center; justify-content: center; }
 .capacity-stats b { display: flex; align-items: center; justify-content: center; min-height: 34rpx; color: #9edc1d; font-size: 30rpx; line-height: 1; }
 .capacity-stats text { display: flex; align-items: center; justify-content: center; min-height: 24rpx; margin-top: 8rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 20rpx; line-height: 1; text-align: center; }
 .empty-slots-card button { position: relative; display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 96rpx; margin-top: 28rpx; border-radius: 999rpx; background: #9edc1d; color: #090d08; font-size: 28rpx; font-weight: 650; }
+.fleet-note { position: relative; margin-top: 16rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; text-align: center; }
 .lifecycle-card, .task-lock { padding: 32rpx; }
 .life-label { color: #8e72ff; }
 .life-number { display: flex; align-items: baseline; gap: 16rpx; margin-top: 16rpx; color: #f5f7fa; font-size: 60rpx; font-weight: 640; }
@@ -436,7 +515,7 @@ button::after { border: 0; }
 .market-board { padding-bottom: 10rpx; }
 .market-heading { padding: 24rpx 32rpx 12rpx; color: #8f98a8; }
 .price-row { display: grid; grid-template-columns: 38rpx 1fr 120rpx 90rpx 96rpx; align-items: center; gap: 14rpx; padding: 18rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }
-.price-row > text { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; font-size: 28rpx; line-height: 1; text-align: center; }
+.price-row > text { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; font-size: 28rpx; line-height: 1; text-align: center; color: #d1d5db; }
 .price-row b, .rank-row b { display: block; overflow: hidden; color: #f5f7fa; font-size: 25rpx; font-weight: 520; white-space: nowrap; text-overflow: ellipsis; }
 .price-row view text, .rank-row view text { color: #6b7385; font-size: 21rpx; }
 .price-row view em { display: block; margin-top: 4rpx; color: #ffbe3d; font-size: 21rpx; font-style: normal; }
@@ -448,7 +527,7 @@ button::after { border: 0; }
 .rank-board { padding-bottom: 0; }
 .rank-row { display: grid; grid-template-columns: 32rpx 38rpx 1fr auto 28rpx; align-items: center; gap: 16rpx; padding: 20rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }
 .rank-row > text { display: flex; align-items: center; justify-content: center; width: 32rpx; height: 32rpx; color: #6b7385; font-size: 22rpx; line-height: 1; text-align: center; }
-.rank-row > i { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; font-style: normal; font-size: 28rpx; line-height: 1; text-align: center; }
+.rank-row > i { display: flex; align-items: center; justify-content: center; width: 38rpx; height: 38rpx; color: #d1d5db; font-style: normal; font-size: 28rpx; line-height: 1; text-align: center; }
 .rank-row em { color: #ffbe3d; font-size: 21rpx; font-style: normal; }
 .rank-row strong { display: flex; align-items: center; justify-content: flex-end; min-height: 34rpx; color: #9edc1d; font-size: 25rpx; line-height: 1; }
 .rank-row span { display: flex; align-items: center; justify-content: center; width: 28rpx; height: 28rpx; color: #6b7385; line-height: 1; }
@@ -468,20 +547,28 @@ button::after { border: 0; }
 .task-tabs button { height: 88rpx; padding: 0 32rpx; border: 1rpx solid transparent; border-radius: 999rpx; background: #1f1f1f; color: #8f98a8; font-size: 25rpx; line-height: 1; }
 .task-tabs .on { border-color: rgba(158,220,29,.35); background: rgba(158,220,29,.15); color: #9edc1d; }
 .task-center { padding-bottom: 24rpx; }
-.task-heading { padding: 24rpx 32rpx 12rpx; }
+.task-heading { display: flex; align-items: center; gap: 10rpx; padding: 24rpx 32rpx 12rpx; }
 .empty-current { padding: 0 32rpx 24rpx; color: #8f98a8; font-size: 24rpx; }
+.unlock-hint { padding: 0 32rpx 12rpx; color: #6b7385; font-size: 22rpx; }
 .lock-title, .done-title { border-top: 1rpx solid rgba(255,255,255,.07); }
 .teaser-row { display: grid; grid-template-columns: 64rpx 1fr auto; align-items: center; gap: 18rpx; padding: 16rpx 32rpx; }
 .teaser-row > text { display: grid; width: 64rpx; height: 64rpx; place-items: center; border-radius: 16rpx; background: rgba(142,114,255,.12); font-size: 28rpx; }
 .teaser-row b { color: #f5f7fa; font-size: 25rpx; }
 .teaser-row i { display: block; margin-top: 4rpx; color: #6b7385; font-size: 21rpx; font-style: normal; }
-.teaser-row em { display: flex; align-items: center; justify-content: flex-end; min-height: 42rpx; color: #9edc1d; font-size: 30rpx; font-style: normal; font-weight: 640; line-height: 1; }
-.completed-row { display: grid; grid-template-columns: 30rpx 1fr auto 90rpx; align-items: center; gap: 12rpx; padding: 10rpx 32rpx; color: #8f98a8; font-size: 23rpx; }
+.teaser-row i strong { color: #58e7ff; font-weight: 600; }
+.teaser-row em { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-height: 42rpx; color: #9edc1d; font-size: 30rpx; font-style: normal; font-weight: 640; line-height: 1; }
+.teaser-row small { margin-top: 8rpx; color: #8f98a8; font-size: 21rpx; font-weight: 400; }
+.completed-row { display: grid; grid-template-columns: 30rpx 1fr auto 90rpx 48rpx; align-items: center; gap: 12rpx; padding: 10rpx 32rpx; color: #8f98a8; font-size: 23rpx; }
 .completed-row > text { display: flex; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; color: #9edc1d; line-height: 1; }
 .completed-row view { overflow: hidden; color: #d1d5db; white-space: nowrap; text-overflow: ellipsis; }
 .completed-row i { color: #8f98a8; font-style: normal; }
 .completed-row b { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #9edc1d; font-weight: 500; line-height: 1; }
 .completed-row em { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #8f98a8; font-style: normal; line-height: 1; text-align: right; }
+.completed-row span { display: flex; align-items: center; justify-content: center; width: 48rpx; height: 48rpx; color: #8f98a8; }
 @keyframes drift { from{transform:translateX(-14rpx)} to{transform:translate(18rpx,10rpx) scale(1.04)} }
 @keyframes dot { 0%{opacity:0;transform:translateY(0)} 20%{opacity:.7} 100%{opacity:0;transform:translateY(-360rpx)} }
+@keyframes dotTall { 0%{opacity:0;transform:translateY(0)} 18%{opacity:.45} 100%{opacity:0;transform:translateY(-520rpx)} }
+@keyframes pulse { 0%,100%{opacity:.45;transform:scale(.85)} 50%{opacity:1;transform:scale(1.15)} }
+@keyframes ticketEnter { from{opacity:0;transform:perspective(900rpx) rotateY(-92deg)} 70%{opacity:1;transform:perspective(900rpx) rotateY(8deg)} to{opacity:1;transform:perspective(900rpx) rotateY(0)} }
+@keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 35%{opacity:.55} 100%{opacity:0;transform:translateX(120%)} }
 </style>
