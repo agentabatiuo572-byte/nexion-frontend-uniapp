@@ -442,8 +442,8 @@ async function shareInvite() {
 }
 
 .orb-outer::before {
-  width: 264rpx;
-  height: 264rpx;
+  width: 322rpx;
+  height: 322rpx;
   border: 1rpx dashed rgba(142, 114, 255, 0.24);
   transform: translate(-50%, -50%);
 }
@@ -453,8 +453,8 @@ async function shareInvite() {
 }
 
 .orb-inner::before {
-  width: 116rpx;
-  height: 116rpx;
+  width: 142rpx;
+  height: 142rpx;
   border: 1rpx solid rgba(158, 220, 29, 0.22);
   transform: translate(-50%, -50%);
 }
@@ -485,26 +485,26 @@ async function shareInvite() {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 58rpx;
+  width: 71rpx;
   height: 1rpx;
   background: linear-gradient(90deg, rgba(158, 220, 29, 0.2), rgba(158, 220, 29, 0));
   transform-origin: left center;
 }
 
-.orb-outer .orb-dot:nth-child(1) { transform: rotate(10deg) translateX(242rpx); }
-.orb-outer .orb-dot:nth-child(2) { transform: rotate(36deg) translateX(266rpx); }
-.orb-outer .orb-dot:nth-child(3) { transform: rotate(62deg) translateX(250rpx); }
-.orb-outer .orb-dot:nth-child(4) { transform: rotate(88deg) translateX(276rpx); }
-.orb-outer .orb-dot:nth-child(5) { transform: rotate(114deg) translateX(258rpx); }
-.orb-outer .orb-dot:nth-child(6) { transform: rotate(140deg) translateX(240rpx); }
-.orb-outer .orb-dot:nth-child(7) { transform: rotate(166deg) translateX(268rpx); }
-.orb-outer .orb-dot:nth-child(8) { transform: rotate(192deg) translateX(252rpx); }
-.orb-outer .orb-dot:nth-child(9) { transform: rotate(218deg) translateX(274rpx); }
-.orb-outer .orb-dot:nth-child(10) { transform: rotate(244deg) translateX(246rpx); }
-.orb-outer .orb-dot:nth-child(11) { transform: rotate(270deg) translateX(262rpx); }
-.orb-outer .orb-dot:nth-child(12) { transform: rotate(296deg) translateX(238rpx); }
-.orb-outer .orb-dot:nth-child(13) { transform: rotate(322deg) translateX(272rpx); }
-.orb-outer .orb-dot:nth-child(14) { transform: rotate(348deg) translateX(254rpx); }
+.orb-outer .orb-dot:nth-child(1) { transform: rotate(10deg) translateX(148rpx); }
+.orb-outer .orb-dot:nth-child(2) { transform: rotate(36deg) translateX(164rpx); }
+.orb-outer .orb-dot:nth-child(3) { transform: rotate(62deg) translateX(154rpx); }
+.orb-outer .orb-dot:nth-child(4) { transform: rotate(88deg) translateX(170rpx); }
+.orb-outer .orb-dot:nth-child(5) { transform: rotate(114deg) translateX(159rpx); }
+.orb-outer .orb-dot:nth-child(6) { transform: rotate(140deg) translateX(147rpx); }
+.orb-outer .orb-dot:nth-child(7) { transform: rotate(166deg) translateX(165rpx); }
+.orb-outer .orb-dot:nth-child(8) { transform: rotate(192deg) translateX(155rpx); }
+.orb-outer .orb-dot:nth-child(9) { transform: rotate(218deg) translateX(169rpx); }
+.orb-outer .orb-dot:nth-child(10) { transform: rotate(244deg) translateX(151rpx); }
+.orb-outer .orb-dot:nth-child(11) { transform: rotate(270deg) translateX(161rpx); }
+.orb-outer .orb-dot:nth-child(12) { transform: rotate(296deg) translateX(146rpx); }
+.orb-outer .orb-dot:nth-child(13) { transform: rotate(322deg) translateX(167rpx); }
+.orb-outer .orb-dot:nth-child(14) { transform: rotate(348deg) translateX(156rpx); }
 
 .orb-inner .orb-spoke:nth-child(1) { transform: rotate(-90deg); }
 .orb-inner .orb-spoke:nth-child(2) { transform: rotate(-30deg); }
@@ -512,12 +512,12 @@ async function shareInvite() {
 .orb-inner .orb-spoke:nth-child(4) { transform: rotate(90deg); }
 .orb-inner .orb-spoke:nth-child(5) { transform: rotate(150deg); }
 .orb-inner .orb-spoke:nth-child(6) { transform: rotate(210deg); }
-.orb-inner .orb-dot:nth-child(7) { transform: rotate(-90deg) translateX(116rpx); animation: node-pulse 2.2s ease-in-out infinite; }
-.orb-inner .orb-dot:nth-child(8) { transform: rotate(-30deg) translateX(116rpx); }
-.orb-inner .orb-dot:nth-child(9) { transform: rotate(30deg) translateX(116rpx); }
-.orb-inner .orb-dot:nth-child(10) { transform: rotate(90deg) translateX(116rpx); animation: node-pulse 2.6s ease-in-out infinite 0.6s; }
-.orb-inner .orb-dot:nth-child(11) { transform: rotate(150deg) translateX(116rpx); }
-.orb-inner .orb-dot:nth-child(12) { transform: rotate(210deg) translateX(116rpx); }
+.orb-inner .orb-dot:nth-child(7) { transform: rotate(-90deg) translateX(71rpx); animation: node-pulse 2.2s ease-in-out infinite; }
+.orb-inner .orb-dot:nth-child(8) { transform: rotate(-30deg) translateX(71rpx); }
+.orb-inner .orb-dot:nth-child(9) { transform: rotate(30deg) translateX(71rpx); }
+.orb-inner .orb-dot:nth-child(10) { transform: rotate(90deg) translateX(71rpx); animation: node-pulse 2.6s ease-in-out infinite 0.6s; }
+.orb-inner .orb-dot:nth-child(11) { transform: rotate(150deg) translateX(71rpx); }
+.orb-inner .orb-dot:nth-child(12) { transform: rotate(210deg) translateX(71rpx); }
 
 @keyframes orb-spin {
   from { transform: rotate(0deg); }
