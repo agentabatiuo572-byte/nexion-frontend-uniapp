@@ -86,6 +86,7 @@ const redemptionLabel = computed(() => tx('30 天赎回', '30d redemption'))
 const phaseProgressLabel = (current: number, total: number) => tx(`阶段 ${current}/${total} · 解锁进度`, `Phase ${current}/${total} · unlock progress`)
 const notifyMeLabel = computed(() => tx('上线时通知我', 'Notify me when live'))
 const inQueueLabel = computed(() => tx('排队中', 'in queue'))
+const cloudTierLabel = computed(() => `${v.value.cloudTier} · ${v.value.cloudDistributed}`)
 
 const tiers = computed(() => [
   { label: 'Rack P1', y: '$142.60', width: 100, hot: true },
@@ -370,7 +371,8 @@ function notifyLocked(product: Product) {
             <view v-else class="cloud-art"><text class="cloud-cpu-icon" /></view>
             <view class="ribbon">{{ featuredProduct.badge }}</view>
             <view class="tier-stack">
-              <view class="tier-chip">{{ featuredProduct.tierCode }}</view>
+              <view v-if="isShareProduct(featuredProduct)" class="share-tier-chip">{{ cloudTierLabel }}</view>
+              <view v-else class="tier-chip">{{ featuredProduct.tierCode }}</view>
               <view v-if="featuredProduct.status === 'legacy'" class="legacy-chip">{{ legacyLabel(featuredProduct.generation) }}</view>
             </view>
           </view>
@@ -448,7 +450,8 @@ function notifyLocked(product: Product) {
             <view v-else class="cloud-art"><text class="cloud-cpu-icon" /></view>
             <view class="ribbon">{{ product.badge }}</view>
             <view class="tier-stack">
-              <view class="tier-chip">{{ product.tierCode }}</view>
+              <view v-if="isShareProduct(product)" class="share-tier-chip">{{ cloudTierLabel }}</view>
+              <view v-else class="tier-chip">{{ product.tierCode }}</view>
               <view v-if="product.status === 'legacy'" class="legacy-chip">{{ legacyLabel(product.generation) }}</view>
             </view>
           </view>
@@ -615,6 +618,7 @@ function notifyLocked(product: Product) {
 .ribbon { position: absolute; top: 0; left: 32rpx; z-index: 2; padding: 6rpx 20rpx 8rpx; border-radius: 0 0 12rpx 12rpx; background: #c6ff3a; color: #10140a; font-size: 21rpx; font-weight: 700; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .tier-stack { position: absolute; left: 28rpx; bottom: 24rpx; z-index: 2; display: flex; flex-direction: column; align-items: flex-start; gap: 10rpx; }
 .tier-chip { padding: 10rpx 18rpx; border: 1rpx solid rgba(198,255,58,.32); border-radius: 8rpx; background: rgba(0,0,0,.55); color: rgba(255,255,255,.88); font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 3rpx; }
+.share-tier-chip { padding: 10rpx 18rpx; border: 1rpx solid rgba(142,114,255,.45); border-radius: 8rpx; background: rgba(255,255,255,.85); color: #8e72ff; font-size: 21rpx; font-weight: 700; line-height: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 1.5rpx; }
 .legacy-chip { padding: 7rpx 16rpx; border: 1rpx solid rgba(255,203,77,.42); border-radius: 8rpx; background: rgba(0,0,0,.55); color: #ffcb4d; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .product-body { padding: 28rpx 32rpx; }
 .product-head { display: flex; justify-content: space-between; gap: 20rpx; }
