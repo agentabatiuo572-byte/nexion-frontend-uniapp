@@ -989,7 +989,7 @@ const mainZh: MainPageMessages = {
       heroTitleSuffix: '日收益。',
       heroSub: '解锁 Llama 70B 推理池和 1080p 图像生成。',
       networkLadder: '网络阶梯',
-      fiveTiers: '5 档',
+      fiveTiers: '5 tiers',
       you: '你',
       yourPhone: '你的手机',
       phone: '手机',

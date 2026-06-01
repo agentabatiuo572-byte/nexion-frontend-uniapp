@@ -48,7 +48,6 @@ onShow(() => {
 })
 
 const tickerIndex = ref(0)
-const tradeStep = ref(0)
 const locale = useActiveLocale()
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.store)
@@ -257,29 +256,16 @@ const phaseMeta: Record<'P3' | 'P5', { eta: string; current: number; total: numb
   P5: { eta: 'Q1 next year', current: 1, total: 5, pct: 20, queue: 614 }
 }
 
-const tradeVariants = computed(() => [
-  { label: tx('换购窗口', 'Trade-in window'), title: tx('Box 升级窗口开放', 'Box upgrade window live'), body: tx('旧款 NexionBox 退役后，可抵扣 $300 升级 Pro v2。', '$300 credit when retiring a legacy NexionBox for Pro v2.'), phase: 'P3', credit: '$300', pct: 62 },
-  { label: tx('最终窗口预告', 'Final window preview'), title: tx('Rack P2 终极档升级', 'Rack P2 final-tier upgrade'), body: tx('P5 窗口为 Rack P1 运营者开放 $800 抵扣。', '$800 credit opens for Rack P1 operators in the P5 window.'), phase: 'P5', credit: '$800', pct: 28 },
-  { label: tx('组合持有者', 'Combined owners'), title: tx('旧款 Box + Rack 优先通道', 'Legacy box + rack priority'), body: tx('合并持有资格，提前锁定下一代设备通道。', 'Stack eligibility across owned devices and reserve the next-gen lane.'), phase: 'P3-P5', credit: '$300/$800', pct: 46 }
-])
-
-const activeTrade = computed(() => tradeVariants.value[tradeStep.value])
-
 let tickerTimer: ReturnType<typeof setInterval> | undefined
-let tradeTimer: ReturnType<typeof setInterval> | undefined
 
 onMounted(() => {
   tickerTimer = setInterval(() => {
     tickerIndex.value = (tickerIndex.value + 1) % purchases.length
   }, 3400)
-  tradeTimer = setInterval(() => {
-    tradeStep.value = (tradeStep.value + 1) % tradeVariants.value.length
-  }, 4200)
 })
 
 onUnmounted(() => {
   if (tickerTimer) clearInterval(tickerTimer)
-  if (tradeTimer) clearInterval(tradeTimer)
 })
 
 function showSoon(label: string) {
@@ -343,8 +329,7 @@ function notifyLocked(product: Product) {
         </view>
 
         <view class="section-title">
-          <b>{{ v.networkLadder }}</b>
-          <text>{{ v.fiveTiers }}</text>
+          <b>{{ v.networkLadder }} <text class="count">{{ v.fiveTiers }}</text></b>
         </view>
         <view class="ladder card">
           <view v-for="tier in tiers" :key="tier.label" class="tier-row" :class="{ you: tier.you }">
@@ -369,19 +354,6 @@ function notifyLocked(product: Product) {
             <b>$38.50<i>/d</i></b>
             <em>+65 NEX/d</em>
           </view>
-        </view>
-
-        <view class="trade-card card trade-window" @click="openTradeIn">
-          <view class="trade-aurora" />
-          <view class="trade-grid" />
-            <view class="trade-icon"><text class="ui-symbol icon-refresh" /></view>
-          <view>
-            <em>{{ activeTrade.label }} · {{ activeTrade.phase }}</em>
-            <b>{{ activeTrade.title }}</b>
-            <text>{{ activeTrade.body }}</text>
-            <view class="trade-meter"><span :style="{ width: `${activeTrade.pct}%` }" /></view>
-          </view>
-          <i>{{ activeTrade.credit }}</i>
         </view>
 
         <view class="section-title">
@@ -590,6 +562,7 @@ function notifyLocked(product: Product) {
 .hero-spark { position: absolute; right: 12rpx; top: 26rpx; width: 32rpx; height: 32rpx; background: #ff9b62; -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; animation: pulse 2.2s ease-in-out infinite; }
 .section-title { display: flex; justify-content: space-between; align-items: center; margin: 42rpx 4rpx 18rpx; }
 .section-title b { color: #fff; font-size: 30rpx; }
+.section-title b .count { margin-left: 8rpx; color: #8f98a8; font-size: 23rpx; font-weight: 400; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .section-title text { color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .section-title .chip { padding: 4rpx 14rpx; border: 1rpx solid rgba(255,155,98,.36); border-radius: 8rpx; background: rgba(255,155,98,.12); color: #ff9b62; }
 .ladder { padding: 24rpx 28rpx; }
@@ -610,18 +583,12 @@ function notifyLocked(product: Product) {
 .vs-mid span { color: #ff9b62; font-size: 30rpx; }
 .vs-mid i { padding: 8rpx 18rpx; border-radius: 999rpx; background: #ff9b62; color: #180b05; font-style: normal; font-size: 23rpx; font-weight: 700; white-space: nowrap; }
 .right { text-align: right; }
-.trade-card, .purchase-ticker, .locked-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18rpx; margin-top: 24rpx; padding: 24rpx 28rpx; }
-.trade-window { position: relative; overflow: hidden; border-color: rgba(255,122,61,.28); background: linear-gradient(160deg, rgba(255,122,61,.13), rgba(16,20,29,.96) 62%); }
-.trade-window > view:not(.trade-aurora):not(.trade-grid), .trade-window > i { position: relative; z-index: 1; }
-.trade-aurora { position: absolute; inset: -35%; background: radial-gradient(42% 44% at 88% 10%, rgba(255,122,61,.26), transparent 64%), radial-gradient(34% 42% at 16% 88%, rgba(88,231,255,.14), transparent 62%); filter: blur(18rpx); animation: drift 11s ease-in-out infinite alternate; }
-.trade-grid { position: absolute; inset: 0; opacity: .2; background-image: linear-gradient(to right, rgba(255,255,255,.08) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(255,255,255,.08) 1rpx, transparent 1rpx); background-size: 44rpx 44rpx; }
-.trade-icon, .lock-icon { display: grid; width: 58rpx; height: 58rpx; place-items: center; border-radius: 18rpx; background: rgba(198,255,58,.12); color: #c6ff3a; font-size: 30rpx; }
-.trade-card b, .locked-card b { display: block; color: #fff; font-size: 26rpx; }
-.trade-card text, .locked-card text { display: block; margin-top: 6rpx; color: #99a3b3; font-size: 22rpx; line-height: 1.35; }
-.trade-card i, .locked-card i { color: #ff9b62; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-.trade-card em, .locked-card em { display: block; margin-bottom: 6rpx; color: #ff9b62; font-style: normal; font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; text-transform: uppercase; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.trade-meter { height: 6rpx; margin-top: 14rpx; overflow: hidden; border-radius: 999rpx; background: rgba(255,122,61,.14); }
-.trade-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff9b62,#58e7ff); transition: width .45s ease; }
+.purchase-ticker, .locked-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18rpx; margin-top: 24rpx; padding: 24rpx 28rpx; }
+.lock-icon { display: grid; width: 58rpx; height: 58rpx; place-items: center; border-radius: 18rpx; background: rgba(198,255,58,.12); color: #c6ff3a; font-size: 30rpx; }
+.locked-card b { display: block; color: #fff; font-size: 26rpx; }
+.locked-card text { display: block; margin-top: 6rpx; color: #99a3b3; font-size: 22rpx; line-height: 1.35; }
+.locked-card i { color: #ff9b62; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.locked-card em { display: block; margin-bottom: 6rpx; color: #ff9b62; font-style: normal; font-size: 20rpx; font-weight: 700; letter-spacing: 1rpx; text-transform: uppercase; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .product-card { overflow: hidden; margin-top: 20rpx; }
 .product-card.featured { box-shadow: 0 30rpx 90rpx rgba(0,0,0,.28); }
 .product-photo { position: relative; height: 360rpx; overflow: hidden; background: linear-gradient(135deg,#101216,#050608); }
