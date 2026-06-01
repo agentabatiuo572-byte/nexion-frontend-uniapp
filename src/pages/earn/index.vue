@@ -771,7 +771,9 @@ button::after { border: 0; }
 .task-tabs .on { border-color: rgba(158,220,29,.35); background: rgba(158,220,29,.15); color: #9edc1d; }
 .task-center { overflow: hidden; padding-bottom: 16rpx; background: var(--v5-surface); border-color: var(--v5-border); border-radius: 32rpx; }
 .task-section { padding-top: 24rpx; }
+.done-title, .history-head { padding-top: 16rpx; }
 .task-heading { display: flex; align-items: center; gap: 10rpx; padding: 0 32rpx 16rpx; color: var(--v5-ink-3); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 500; letter-spacing: 3rpx; line-height: 1; text-transform: uppercase; }
+.done-title .task-heading, .history-head .task-heading { padding-bottom: 16rpx; }
 .empty-current { padding: 0 32rpx 24rpx; color: var(--v5-ink-3); font-size: 24rpx; }
 .unlock-hint { padding: 0 32rpx 10rpx; color: #6b7385; font-size: 22rpx; line-height: 1.35; }
 .lock-title, .done-title, .history-head { border-top: 1rpx solid rgba(255,255,255,.07); }
