@@ -172,15 +172,6 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="ghost-slot">
-          <view class="ghost-icon">✦</view>
-          <view>
-            <b>{{ v.ghostSlot }}</b>
-            <text>{{ v.ghostSlotDesc }}</text>
-          </view>
-          <i>0 / 1</i>
-        </view>
-
         <view class="section-title">
           <b>{{ v.myDevices }}</b>
           <text>1 / 6</text>
@@ -242,13 +233,6 @@ function showSoon(label: string) {
           </view>
           <button><i class="ui-icon zap" /> {{ v.fillSlots || 'Fill slots' }} <i class="ui-icon arrow-right" /></button>
           <view class="fleet-note">{{ (v.currentFleet || 'Current fleet {amount} / day').replace('{amount}', '$0.06') }}</view>
-        </view>
-
-        <view class="lifecycle-card">
-          <view class="life-label"><i class="ui-icon activity" /> {{ v.fleetLifecycle }}</view>
-          <view class="life-number">98.2% <text>{{ v.lifecycleBody }}</text></view>
-          <view class="life-bar"><view /></view>
-          <view class="life-foot"><text>{{ v.lifecycleMonthlyLoss || 'monthly loss' }}</text><b>−$0.00 · 0d</b><button>{{ v.lifecycleCta || 'Review' }} <i class="ui-icon arrow-right" /></button></view>
         </view>
 
         <view class="section-title">
