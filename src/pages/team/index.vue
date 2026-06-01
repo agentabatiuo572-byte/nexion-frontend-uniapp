@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import AppShell from '@/components/AppShell.vue'
 import { useAuthStore } from '@/store/auth'
@@ -13,12 +13,44 @@ onShow(() => {
   requireAuth()
 })
 
-const vRank = computed(() => auth.session?.vRank || 'V0')
+const vRank = computed(() => auth.session?.vRank || 'V2')
 const referralCode = computed(() => auth.session?.referralCode || 'NX279740')
+const referralUrl = computed(() => `https://nexion.ai/ref/${referralCode.value}`)
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.team)
-const common = computed(() => copy.value.common)
 const isZh = computed(() => locale.value === 'zh')
+
+const teamSeed = {
+  totalMembers: 50,
+  directMembers: 8,
+  extendedMembers: 42,
+  leftVolume: 2695,
+  rightVolume: 2456,
+  binaryMatch: 8.19,
+  monthUSDT: 312.8,
+  monthNEX: 1840,
+  lifetimeUSDT: 2948.2,
+  directUSDT: 118.86,
+  extendedUSDT: 193.94,
+  settledUSDT: 186.3,
+  coolingUSDT: 126.5,
+  directPct: 38,
+  extendedPct: 62,
+  vProgressPct: 63
+}
+
+const tickerIndex = ref(0)
+let tickerTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  tickerTimer = setInterval(() => {
+    tickerIndex.value = (tickerIndex.value + 1) % tickerItems.value.length
+  }, 4200)
+})
+
+onUnmounted(() => {
+  if (tickerTimer) clearInterval(tickerTimer)
+})
 
 const pageCopy = computed(() => {
   const zh = isZh.value
@@ -26,25 +58,26 @@ const pageCopy = computed(() => {
     yourRank: zh ? '你的等级' : 'Your rank',
     directBonus: zh ? '直推奖' : 'Direct bonus',
     extendedRoyalty: zh ? '扩展网络版税' : 'Extended royalty',
-    next: zh ? '下一阶' : 'Next',
-    need: zh ? '还差' : 'Need',
-    prize: zh ? '奖品' : 'Prize',
-    nextRank: zh ? 'V1 Pilot' : 'V1 Pilot',
-    missing: zh ? '$299 自购 · 1 个直推' : '$299 self-buy · 1 direct',
-    inviteEarn: zh ? '邀请好友赚钱' : 'Earn for each friend',
+    next: zh ? '下一阶:' : 'Next:',
+    need: zh ? '仍需:' : 'Need:',
+    prize: zh ? '奖品:' : 'Prize:',
+    rankTitle: zh ? 'Operator 操作员' : 'Operator',
+    nextRank: 'V3 Captain',
+    missing: zh ? '$14,760 团队业绩' : '$14,760 more team volume',
+    inviteEarn: zh ? '每邀请 1 位朋友赚' : 'Earn for each friend',
     earnedToday: zh ? '今日 6 笔收益' : '6 earned today',
     promo: zh ? '限时 · 本周邀请奖励 2×' : 'Limited time bonus 2x',
-    perFriend: zh ? '每位合格好友最高价值' : 'Per qualified friend',
+    perFriend: zh ? '每位注册好友 · 30 天冷却' : 'per friend who signs up · 30-day cooldown',
     beFirst: zh ? '成为第一个收益用户' : 'Be the first',
     poster: zh ? '海报' : 'Poster',
     posterValue: zh ? '二维码 + 图' : 'QR + image',
     code: zh ? '邀请码' : 'Code',
     link: zh ? '链接' : 'Link',
     share: zh ? '分享赚' : 'Share & earn',
-    tickerName: 'Sarah K.',
-    tickerAction: zh ? '刚加入你的网络' : 'just joined your network',
-    leaderboardTitle: zh ? '全球邀请榜' : 'Global leaderboard',
-    leaderboardSubtitle: zh ? '你排第 248 名 · 再升 5 名解锁钻石等级' : 'Rank #248 · climb 5 spots to unlock Diamond',
+    copied: zh ? '已复制' : 'Copied',
+    shared: zh ? '已打开分享' : 'Share opened',
+    leaderboardTitle: zh ? '邀请榜' : 'Top Inviters',
+    leaderboardSubtitle: zh ? '实时排名 · $50K 周奖池' : 'Live ranking · $50K weekly pool',
     sevenLayer: zh ? '版税网络' : 'Royalty network',
     direct: zh ? '直推' : 'Direct',
     extended: zh ? '扩展' : 'Extended',
@@ -58,10 +91,10 @@ const pageCopy = computed(() => {
     coolingDown: zh ? '冷却中' : 'Cooling down',
     contributors: zh ? '贡献者' : 'contributors',
     composition: zh ? '影响力网络构成' : 'Influence network composition',
-    genesisLabel: 'Genesis',
-    genesisHeadline: zh ? '永久版税 · V5 直通' : 'Lifetime royalty · V5 fast-track',
-    genesisPrice: zh ? '$999 起 · 0.1% 平台分红' : 'From $999 · 0.1% platform dividend',
-    genesisLeft: zh ? '仅剩 148 席' : '148 left',
+    genesisLabel: zh ? '创世节点 · 限量' : 'Genesis Node · limited',
+    genesisHeadline: zh ? '永久分享网络成交额' : 'Permanent share of network volume',
+    genesisPrice: zh ? '$9,999 · ~$1.5K/月收益' : '$9,999 · ~$1.5K/mo yield',
+    genesisLeft: zh ? '1,000 张剩约 150' : '~150 left of 1,000',
     hardwareQuota: zh ? '硬件配额' : 'Hardware quota',
     quotaSubtitle: zh ? 'Pro / Rack 凭邀请解锁' : 'Pro / Rack unlocked by invites',
     ambassador: zh ? '区域大使' : 'Regional ambassador',
@@ -73,39 +106,94 @@ const pageCopy = computed(() => {
   }
 })
 
-function comingSoon(label: string) {
-  uni.showToast({ title: isZh.value ? `${label} 后续接入` : `${label} will be connected next`, icon: 'none' })
+const tickerItems = computed(() => {
+  const zh = isZh.value
+  return [
+    { name: 'Sarah K.', action: zh ? '刚加入你的网络' : 'just joined your network', amount: '+$45.20' },
+    { name: 'Tom W.', action: zh ? '购买了 NexionBox S1' : 'bought NexionBox S1', amount: '+$130.00' },
+    { name: 'Carlos R.', action: zh ? '升级到 V3 Captain' : 'upgraded to V3 Captain', amount: '+$28.40' },
+    { name: 'Mei L.', action: zh ? '新增第二台设备' : 'added a second device', amount: '+$76.00' }
+  ]
+})
+
+const activeTicker = computed(() => tickerItems.value[tickerIndex.value])
+
+function notify(title: string) {
+  uni.showToast({ title, icon: 'none' })
+}
+
+function copyText(value: string, label: string) {
+  uni.setClipboardData({
+    data: value,
+    success: () => notify(`${label} ${pageCopy.value.copied}`)
+  })
+}
+
+function openTab(url: string) {
+  uni.switchTab({ url })
+}
+
+function openPage(url: string) {
+  uni.navigateTo({ url })
+}
+
+function openBills() {
+  openPage('/pages/team/commissions')
+}
+
+async function shareInvite() {
+  const title = 'Nexion'
+  const text = isZh.value ? `加入我的 Nexion 网络: ${referralUrl.value}` : `Join my Nexion network: ${referralUrl.value}`
+  const nav = typeof navigator === 'undefined'
+    ? undefined
+    : (navigator as Navigator & { share?: (data: { title?: string; text?: string; url?: string }) => Promise<void> })
+
+  if (nav?.share) {
+    try {
+      await nav.share({ title, text, url: referralUrl.value })
+      notify(pageCopy.value.shared)
+      return
+    } catch {
+      return
+    }
+  }
+
+  copyText(referralUrl.value, pageCopy.value.link)
 }
 </script>
 
 <template>
   <AppShell :title="t.title" version="" active-tab="team">
     <scroll-view class="page" scroll-y>
-      <view class="rank-card" @click="comingSoon(pageCopy.yourRank)">
+      <view class="rank-card" @click="openPage('/pages/team/rank')">
         <view class="orb-layer">
+          <view class="orb-core" />
           <view class="orb-ring one" />
           <view class="orb-ring two" />
+          <view class="orb-ring three" />
           <view class="orb-node n1" />
           <view class="orb-node n2" />
           <view class="orb-node n3" />
+          <view class="orb-node n4" />
+          <view class="orb-node n5" />
         </view>
         <view class="rank-top">
           <view>
             <view class="mono cyan">{{ pageCopy.yourRank }}</view>
             <view class="v-line">
               <view class="v-badge">{{ vRank }}</view>
-              <view class="v-title">{{ common.rankCadet }}</view>
+              <view class="v-title">{{ pageCopy.rankTitle }}</view>
             </view>
-            <view class="muted">{{ pageCopy.directBonus }} 5% · {{ pageCopy.extendedRoyalty }}</view>
+            <view class="muted">{{ pageCopy.directBonus }} 10% · {{ pageCopy.extendedRoyalty }}</view>
           </view>
-          <text class="chevron">›</text>
+          <i class="team-icon icon-chevron" />
         </view>
         <view class="progress-block">
           <view class="progress-head">
             <text>{{ pageCopy.next }} <b>{{ pageCopy.nextRank }}</b></text>
-            <text>18%</text>
+            <text>{{ teamSeed.vProgressPct }}%</text>
           </view>
-          <view class="progress-track"><view /></view>
+          <view class="progress-track"><view class="grow-bar rank-grow" /></view>
           <view class="need-line">{{ pageCopy.need }} {{ pageCopy.missing }}</view>
           <view class="prize-pill">{{ pageCopy.prize }} · Apple Watch SE</view>
         </view>
@@ -114,59 +202,60 @@ function comingSoon(label: string) {
       <view class="invite-card">
         <view class="grid-overlay" />
         <view class="invite-head">
-          <text>💰 {{ pageCopy.inviteEarn }}</text>
-          <view><i />{{ pageCopy.earnedToday }}</view>
+          <text><i class="team-icon icon-coins" /> {{ pageCopy.inviteEarn }}</text>
+          <view><i class="live-dot" />{{ pageCopy.earnedToday }}</view>
         </view>
-        <view class="promo-pill">🔥 {{ pageCopy.promo }}</view>
+        <view class="promo-pill"><i class="team-icon icon-flame" /> {{ pageCopy.promo }}</view>
         <view class="invite-body">
           <view class="invite-stats">
             <view class="reward-main"><text>$</text>400</view>
             <view class="reward-strike">$200</view>
             <view class="nex-reward">+ 400 NEX</view>
             <view class="muted">{{ pageCopy.perFriend }}</view>
-            <view class="earned-pill">◆ {{ pageCopy.beFirst }}</view>
+            <view class="earned-pill"><i class="team-icon icon-spark" /> {{ pageCopy.beFirst }}</view>
           </view>
           <view class="share-stack">
-            <button @click="comingSoon(pageCopy.poster)"><text>▦</text><b>{{ pageCopy.poster }}</b><i>{{ pageCopy.posterValue }}</i></button>
-            <button @click="comingSoon(pageCopy.code)"><text>#</text><b>{{ pageCopy.code }}</b><i>{{ referralCode }}</i></button>
-            <button @click="comingSoon(pageCopy.link)"><text>↗</text><b>{{ pageCopy.link }}</b><i>nexion.ai/ref/…</i></button>
-            <button class="share-primary" @click="comingSoon(pageCopy.share)">↗ {{ pageCopy.share }} <b>$400</b></button>
+            <button @click.stop="copyText(referralUrl, pageCopy.poster)"><i class="team-icon icon-qr" /><b>{{ pageCopy.poster }}</b><i>{{ pageCopy.posterValue }}</i></button>
+            <button @click.stop="copyText(referralCode, pageCopy.code)"><i class="team-icon icon-hash" /><b>{{ pageCopy.code }}</b><i>{{ referralCode }}</i></button>
+            <button @click.stop="copyText(referralUrl, pageCopy.link)"><i class="team-icon icon-link" /><b>{{ pageCopy.link }}</b><i>nexion.ai/ref/...</i></button>
+            <button class="share-primary" @click.stop="shareInvite"><i class="team-icon icon-send" /> {{ pageCopy.share }} <b>$400</b></button>
           </view>
         </view>
-        <view class="ticker">
-          <text>⚡</text>
-          <b>{{ pageCopy.tickerName }}</b>
-          <text>{{ pageCopy.tickerAction }}</text>
-          <i>+$45.20</i>
+        <view class="ticker" :key="tickerIndex">
+          <i class="team-icon icon-zap" />
+          <b>{{ activeTicker.name }}</b>
+          <text>{{ activeTicker.action }}</text>
+          <i>{{ activeTicker.amount }}</i>
+          <i class="team-icon icon-arrow-up" />
         </view>
       </view>
 
-      <view class="leader-card" @click="comingSoon(pageCopy.leaderboardTitle)">
-        <view class="leader-icon">🏆</view>
+      <view class="leader-card" @click="openPage('/pages/team/leaderboard')">
+        <view class="leader-icon"><i class="team-icon icon-trophy" /></view>
         <view>
           <view class="mono warning">{{ pageCopy.leaderboardTitle }}</view>
           <text>{{ pageCopy.leaderboardSubtitle }}</text>
         </view>
-        <text class="chevron">›</text>
+        <i class="team-icon icon-chevron" />
       </view>
 
       <view class="quick-grid">
-        <view class="quick-card" @click="comingSoon(pageCopy.sevenLayer)">
-          <view class="quick-top"><text class="green">◉</text><text>↗</text></view>
-          <view class="quick-num">47</view>
+        <view class="quick-card" @click="openPage('/pages/team/unilevel')">
+          <view class="quick-top"><i class="team-icon icon-users green" /><i class="team-icon icon-arrow-up" /></view>
+          <view class="quick-num">{{ teamSeed.totalMembers }}</view>
           <view class="quick-title">{{ pageCopy.sevenLayer }}</view>
-          <view class="quick-meta">{{ pageCopy.direct }} · 12</view>
-          <view class="quick-meta">{{ pageCopy.extended }} · 35</view>
+          <view class="quick-meta">{{ pageCopy.direct }} · {{ teamSeed.directMembers }}</view>
+          <view class="quick-meta">{{ pageCopy.extended }} · {{ teamSeed.extendedMembers }}</view>
         </view>
-        <view class="quick-card" @click="comingSoon(pageCopy.todayMatch)">
-          <view class="quick-top"><text class="orange">ϟ</text><text>↗</text></view>
-          <view class="quick-num orange">+$128.40</view>
+        <view class="quick-card" @click="openPage('/pages/team/binary')">
+          <view class="quick-top"><i class="team-icon icon-zap orange" /><i class="team-icon icon-arrow-up" /></view>
+          <view class="quick-num orange">+${{ teamSeed.binaryMatch.toFixed(2) }}</view>
           <view class="quick-title">{{ pageCopy.todayMatch }}</view>
-          <view class="quick-meta">A · $18,420</view>
-          <view class="quick-meta">B · $12,880</view>
+          <view class="quick-meta">A · ${{ teamSeed.leftVolume.toLocaleString() }}</view>
+          <view class="quick-meta">B · ${{ teamSeed.rightVolume.toLocaleString() }}</view>
         </view>
-        <view class="quick-card" @click="comingSoon(pageCopy.weeklyPool)">
-          <view class="quick-top"><text class="cyan">♛</text><text>↗</text></view>
+        <view class="quick-card" @click="openPage('/pages/team/commissions')">
+          <view class="quick-top"><i class="team-icon icon-crown cyan" /><i class="team-icon icon-arrow-up" /></view>
           <view class="quick-num">$0.00</view>
           <view class="quick-title">{{ pageCopy.weeklyPool }}</view>
           <view class="quick-meta">0 {{ pageCopy.votes }}</view>
@@ -174,7 +263,7 @@ function comingSoon(label: string) {
         </view>
       </view>
 
-      <view class="ledger-card" @click="comingSoon(pageCopy.viewDetails)">
+      <view class="ledger-card" @click="openBills">
         <view class="grid-overlay" />
         <view class="aurora" />
         <view class="float-dots">
@@ -183,53 +272,53 @@ function comingSoon(label: string) {
         <view class="ledger-content">
           <view class="ledger-head">
             <text>{{ pageCopy.thisMonth }}</text>
-            <button>{{ pageCopy.viewDetails }} ›</button>
+            <button @click.stop="openBills">{{ pageCopy.viewDetails }} <i class="team-icon icon-chevron" /></button>
           </view>
-          <view class="ledger-money"><text>$</text>312<text>.80</text><i>+ 1,840 NEX</i></view>
-          <view class="ledger-sub">{{ pageCopy.lifetime }} $2,948.20 · 47 {{ pageCopy.contributors }} · <b>↑ +12.4%</b></view>
+          <view class="ledger-money"><text>$</text>{{ Math.floor(teamSeed.monthUSDT) }}<text>.{{ teamSeed.monthUSDT.toFixed(2).slice(3) }}</text><i>+ {{ teamSeed.monthNEX.toLocaleString() }} NEX</i></view>
+          <view class="ledger-sub">{{ pageCopy.lifetime }} ${{ teamSeed.lifetimeUSDT.toFixed(2) }} · {{ teamSeed.totalMembers }} {{ pageCopy.contributors }} · <b>+12.4%</b></view>
           <view class="split-bar"><view class="direct" /><view class="extended" /></view>
           <view class="split-grid">
             <view>
-              <text class="green">{{ pageCopy.direct }} · 38%</text>
-              <b>$118.86</b>
+              <text class="green">{{ pageCopy.direct }} · {{ teamSeed.directPct }}%</text>
+              <b>${{ teamSeed.directUSDT.toFixed(2) }}</b>
             </view>
             <view>
-              <text class="orange">{{ pageCopy.extended }} · 62%</text>
-              <b>$193.94</b>
+              <text class="orange">{{ pageCopy.extended }} · {{ teamSeed.extendedPct }}%</text>
+              <b>${{ teamSeed.extendedUSDT.toFixed(2) }}</b>
             </view>
           </view>
           <view class="settle-grid">
-            <view><text>{{ pageCopy.settled }}</text><b>$186.30</b></view>
-            <view><text>{{ pageCopy.coolingDown }}</text><b>$126.50</b></view>
+            <view><text>{{ pageCopy.settled }}</text><b>${{ teamSeed.settledUSDT.toFixed(2) }}</b></view>
+            <view><text>{{ pageCopy.coolingDown }}</text><b>${{ teamSeed.coolingUSDT.toFixed(2) }}</b></view>
           </view>
         </view>
       </view>
 
-      <view class="composition-card" @click="comingSoon(pageCopy.composition)">
+      <view class="composition-card" @click="openPage('/pages/team/unilevel')">
         <view class="card-head">
           <text>{{ pageCopy.composition }}</text>
-          <text>›</text>
+          <i class="team-icon icon-chevron" />
         </view>
         <view class="comp-row">
           <text class="green">{{ pageCopy.direct }}</text>
-          <view><i style="width: 26%" /></view>
-          <b>12</b>
+          <view><i style="width: 16%" /></view>
+          <b>{{ teamSeed.directMembers }}</b>
         </view>
         <view class="comp-row">
           <text class="cyan">{{ pageCopy.extended }}</text>
-          <view><i style="width: 74%" /></view>
-          <b>35</b>
+          <view><i style="width: 84%" /></view>
+          <b>{{ teamSeed.extendedMembers }}</b>
         </view>
       </view>
 
-      <view class="genesis-card" @click="comingSoon(pageCopy.genesisLabel)">
+      <view class="genesis-card" @click="openPage('/pages/genesis/index')">
         <view class="genesis-head">
-          <view class="genesis-icon">♛</view>
+          <view class="genesis-icon"><i class="team-icon icon-crown" /></view>
           <view>
             <view class="mono orange">{{ pageCopy.genesisLabel }}</view>
             <text>{{ pageCopy.genesisHeadline }}</text>
           </view>
-          <text class="chevron">›</text>
+          <i class="team-icon icon-chevron" />
         </view>
         <view class="genesis-meta">
           <text>{{ pageCopy.genesisPrice }}</text>
@@ -239,26 +328,26 @@ function comingSoon(label: string) {
       </view>
 
       <view class="two-grid">
-        <view class="small-card" @click="comingSoon(pageCopy.hardwareQuota)">
-          <view class="quick-top"><text class="orange">ϟ</text><text>↗</text></view>
+        <view class="small-card" @click="openTab('/pages/store/index')">
+          <view class="quick-top"><i class="team-icon icon-zap orange" /><i class="team-icon icon-arrow-up" /></view>
           <b>{{ pageCopy.hardwareQuota }}</b>
           <text>{{ pageCopy.quotaSubtitle }}</text>
         </view>
-        <view class="small-card" @click="comingSoon(pageCopy.ambassador)">
-          <view class="quick-top"><text class="warning">♛</text><text>↗</text></view>
+        <view class="small-card" @click="openPage('/pages/team/rank')">
+          <view class="quick-top"><i class="team-icon icon-crown warning" /><i class="team-icon icon-arrow-up" /></view>
           <b>{{ pageCopy.ambassador }}</b>
           <text>{{ pageCopy.ambassadorSubtitle }}</text>
         </view>
       </view>
 
       <view class="two-grid">
-        <view class="small-card" @click="comingSoon(pageCopy.influenceNetwork)">
+        <view class="small-card" @click="openPage('/pages/team/unilevel')">
           <view class="orbit-dot" />
           <b>{{ pageCopy.influenceNetwork }}</b>
           <text>{{ pageCopy.orbitLiveMap }}</text>
         </view>
-        <view class="small-card" @click="comingSoon(pageCopy.genealogy)">
-          <view class="quick-top"><text class="green">☷</text><text>↗</text></view>
+        <view class="small-card" @click="openPage('/pages/team/unilevel')">
+          <view class="quick-top"><i class="team-icon icon-users green" /><i class="team-icon icon-arrow-up" /></view>
           <b>{{ pageCopy.genealogy }}</b>
           <text>{{ pageCopy.genealogySubtitle }}</text>
         </view>
@@ -307,10 +396,22 @@ function comingSoon(label: string) {
   pointer-events: none;
 }
 
+.orb-core {
+  position: absolute;
+  top: 88rpx;
+  right: 104rpx;
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(198, 255, 58, 0.28), rgba(70, 230, 255, 0.08) 58%, transparent 72%);
+  animation: orb-breathe 4.4s ease-in-out infinite;
+}
+
 .orb-ring {
   position: absolute;
   border: 1rpx solid rgba(70, 230, 255, 0.35);
   border-radius: 50%;
+  transform-origin: center;
 }
 
 .orb-ring.one {
@@ -318,6 +419,7 @@ function comingSoon(label: string) {
   right: 42rpx;
   width: 170rpx;
   height: 170rpx;
+  animation: orb-spin 28s linear infinite reverse;
 }
 
 .orb-ring.two {
@@ -326,6 +428,17 @@ function comingSoon(label: string) {
   width: 110rpx;
   height: 110rpx;
   border-color: rgba(198, 255, 58, 0.26);
+  animation: orb-spin 22s linear infinite;
+}
+
+.orb-ring.three {
+  top: 0;
+  right: -4rpx;
+  width: 228rpx;
+  height: 228rpx;
+  border-color: rgba(70, 230, 255, 0.2);
+  border-style: dashed;
+  animation: orb-spin 42s linear infinite;
 }
 
 .orb-node {
@@ -340,6 +453,23 @@ function comingSoon(label: string) {
 .orb-node.n1 { top: 52rpx; right: 168rpx; }
 .orb-node.n2 { top: 132rpx; right: 76rpx; background: #46e6ff; }
 .orb-node.n3 { top: 178rpx; right: 188rpx; }
+.orb-node.n4 { top: 24rpx; right: 96rpx; background: #46e6ff; animation: node-pulse 2.2s ease-in-out infinite; }
+.orb-node.n5 { top: 102rpx; right: 212rpx; animation: node-pulse 2.6s ease-in-out infinite 0.6s; }
+
+@keyframes orb-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { opacity: 0.72; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes node-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 18rpx rgba(198, 255, 58, 0.62); }
+  50% { transform: scale(1.7); box-shadow: 0 0 28rpx rgba(198, 255, 58, 0.9); }
+}
 
 .rank-top,
 .invite-head,
@@ -362,6 +492,27 @@ function comingSoon(label: string) {
 .green { color: #12c979; }
 .orange { color: #ff8d4a; }
 .warning { color: #ffb84d; }
+.team-icon {
+  display: inline-block;
+  width: 28rpx;
+  height: 28rpx;
+  flex-shrink: 0;
+  background: currentColor;
+  vertical-align: middle;
+}
+.icon-chevron { width: 30rpx; height: 30rpx; color: #5f6877; -webkit-mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat; }
+.icon-arrow-up { color: #687284; -webkit-mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; mask: url("../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; }
+.icon-coins { color: #c6ff3a; -webkit-mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; mask: url("../../static/icons/bill-coins.svg") center / contain no-repeat; }
+.icon-flame,
+.icon-crown,
+.icon-spark { -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat; }
+.icon-trophy { -webkit-mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; mask: url("../../static/icons/bill-award.svg") center / contain no-repeat; }
+.icon-users { -webkit-mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; mask: url("../../static/icons/tab-users.svg") center / contain no-repeat; }
+.icon-zap { -webkit-mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; }
+.icon-send { color: #10140a; -webkit-mask: url("../../static/icons/support-send.svg") center / contain no-repeat; mask: url("../../static/icons/support-send.svg") center / contain no-repeat; }
+.icon-link { color: #46e6ff; -webkit-mask: url("../../static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat; mask: url("../../static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat; }
+.icon-qr { color: #ffb84d; -webkit-mask: url("../../static/icons/search.svg") center / contain no-repeat; mask: url("../../static/icons/search.svg") center / contain no-repeat; }
+.icon-hash { color: #c6ff3a; -webkit-mask: url("../../static/icons/key.svg") center / contain no-repeat; mask: url("../../static/icons/key.svg") center / contain no-repeat; }
 .muted {
   color: #8f98a8;
   font-size: 24rpx;
@@ -427,11 +578,26 @@ function comingSoon(label: string) {
   background: #242a35;
 }
 
-.progress-track view {
-  width: 18%;
+.progress-track view,
+.genesis-progress view {
   height: 100%;
   border-radius: inherit;
+}
+
+.progress-track view {
+  width: 63%;
   background: linear-gradient(90deg, #46e6ff, #c6ff3a);
+}
+
+.grow-bar,
+.genesis-progress view {
+  transform-origin: left center;
+  animation: progress-grow 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes progress-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .need-line {
@@ -444,6 +610,8 @@ function comingSoon(label: string) {
 .promo-pill,
 .earned-pill {
   display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
   margin-top: 18rpx;
   padding: 8rpx 16rpx;
   border-radius: 10rpx;
@@ -481,6 +649,9 @@ function comingSoon(label: string) {
 }
 
 .invite-head > text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
   color: #c6ff3a;
   font-size: 23rpx;
   font-weight: 650;
@@ -495,13 +666,19 @@ function comingSoon(label: string) {
   font-size: 22rpx;
 }
 
-.invite-head i {
+.invite-head .live-dot {
   position: relative;
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
   background: #12c979;
   box-shadow: 0 0 16rpx rgba(18, 201, 121, 0.7);
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 0.76; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.65); }
 }
 
 .promo-pill {
@@ -577,17 +754,12 @@ uni-button::after {
   border: 0;
 }
 
-.share-stack button text {
-  color: #c6ff3a;
-  font-size: 25rpx;
-}
-
 .share-stack button b {
   flex-shrink: 0;
   font-size: 23rpx;
 }
 
-.share-stack button i {
+.share-stack button i:not(.team-icon) {
   min-width: 0;
   flex: 1;
   overflow: hidden;
@@ -609,6 +781,10 @@ uni-button::after {
   font-weight: 720;
 }
 
+.share-stack .share-primary .team-icon {
+  color: #10140a;
+}
+
 .ticker {
   display: flex;
   align-items: center;
@@ -619,18 +795,32 @@ uni-button::after {
   border-top: 1rpx solid #232936;
   color: #8f98a8;
   font-size: 22rpx;
+  animation: ticker-rise 280ms ease both;
 }
 
 .ticker b {
   color: #ffffff;
 }
 
-.ticker i {
+.ticker i:not(.team-icon) {
   margin-left: auto;
   color: #c6ff3a;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-style: normal;
   font-weight: 700;
+}
+
+.ticker .team-icon:first-child {
+  color: #ffb84d;
+}
+
+.ticker .team-icon:last-child {
+  margin-left: 4rpx;
+}
+
+@keyframes ticker-rise {
+  from { opacity: 0; transform: translateY(10rpx); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .leader-card {
@@ -652,6 +842,12 @@ uni-button::after {
   background: rgba(255, 184, 77, 0.15);
   color: #ffb84d;
   font-size: 36rpx;
+}
+
+.leader-icon .team-icon,
+.genesis-icon .team-icon {
+  width: 38rpx;
+  height: 38rpx;
 }
 
 .leader-card view text,
@@ -915,8 +1111,6 @@ uni-button::after {
 
 .genesis-progress view {
   width: 85%;
-  height: 100%;
-  border-radius: inherit;
   background: linear-gradient(90deg, #ff8d4a, #ffb84d);
 }
 

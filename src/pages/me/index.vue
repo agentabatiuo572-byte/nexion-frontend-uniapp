@@ -43,18 +43,68 @@ const slotOpenLabel = computed(() => (locale.value === 'zh' ? '可用槽位' : '
 const unlockLabel = computed(() => (locale.value === 'zh' ? '解锁' : 'Unlock'))
 const moreLabel = computed(() => (locale.value === 'zh' ? '更多' : 'more'))
 const addDeviceLabel = computed(() => (locale.value === 'zh' ? '添加设备 →' : 'Add device →'))
+const t = (zh: string, en: string) => (locale.value === 'zh' ? zh : en)
+const walletState = computed(() => {
+  const usdt = 0
+  const minWithdraw = 20
+  return {
+    usdt,
+    pending: 0,
+    nex: 0,
+    nexUsd: '0.00',
+    nexRate: '0.171',
+    withdrawLocked: usdt < minWithdraw,
+    withdrawShort: (minWithdraw - usdt).toFixed(2),
+    minWithdraw
+  }
+})
+const deviceState = computed(() => {
+  const active = 0
+  const total = 6
+  return {
+    active,
+    online: 0,
+    total,
+    empty: Math.max(0, total - active),
+    slotPotential: Math.max(0, total - active) * 38
+  }
+})
+const levelProgress = computed(() => {
+  const rawLevel = Number(String(level.value).replace(/\D/g, '')) || 0
+  const rawRank = Number(String(vRank.value).replace(/\D/g, '')) || 0
+  const pct = Math.min(100, Math.max(16, rawLevel * 12 + rawRank * 8 + 18))
+  return {
+    pct,
+    next: `V${Math.min(rawRank + 1, 9)}`,
+    title: t(`冲刺 ${Math.min(rawRank + 1, 9)} 星节点`, `Toward V${Math.min(rawRank + 1, 9)} Node`),
+    gap: t('还差 1 台设备激活', '1 active device to go'),
+    perk: t('解锁团队加速与更高提现额度', 'Unlock team boost and higher withdrawal limits')
+  }
+})
+const trialCopy = computed(() => ({
+  badge: t('限时免费', 'Free trial'),
+  device: 'NexionBox S1',
+  desc: t('免费试用 3 天 · 随时取消', 'Try free for 3 days · cancel anytime'),
+  earn: t('3 天到手', 'Earn in 3d'),
+  left: t('今日仅剩 47 张', '47 trials left today'),
+  claim: t('立即领取 →', 'Claim trial →')
+}))
+const genesisCopy = computed(() => ({
+  cap: t('永久版税 · 限量 1000 张', 'Permanent royalty · 1,000 max'),
+  title: t('Genesis 节点卡', 'Genesis Node Card'),
+  subtitle: t('持有节点参与平台分润，售完不再发行。', 'Hold a node to share platform royalties. No re-issue after sellout.'),
+  remainingLabel: t('剩席', 'left'),
+  monthlyLabel: t('月均', 'monthly'),
+  floorLabel: t('地板价', 'floor'),
+  proof: t('847 位持有者已在分润 · 售完不再发行', '847 holders already sharing royalties · no re-issue'),
+  cta: t('查看 Genesis', 'View Genesis')
+}))
 const mePortCopy = computed(() => {
   const zh = locale.value === 'zh'
   return {
-    limitedFree: zh ? '限时免费' : 'Free trial',
-    trialDevice: 'NexionBox S1',
-    trialDesc: zh ? '免费试用 3 天 · 随时取消' : 'Try free for 3 days · cancel anytime',
-    trialEarn: zh ? '3 天到手' : 'Earn in 3d',
-    trialLeft: zh ? '今日仅剩 47 张' : '47 trials left today',
-    claimNow: zh ? '立即领取 →' : 'Claim trial →',
     myOrders: zh ? '我的订单' : 'My Orders',
     orderProduct: 'NexionBox Pro',
-    orderMeta: '$2399 · Singapore DC',
+    orderMeta: zh ? '$2399 · 新加坡机房' : '$2399 · Singapore DC',
     orderStatus: zh ? '已激活' : 'activated',
     viewAllOrders: zh ? '全部订单' : 'All orders',
     manage: zh ? '管理' : 'Manage',
@@ -82,6 +132,31 @@ const mePortCopy = computed(() => {
     helpSupport: zh ? '帮助与支持' : 'Help & support'
   }
 })
+const earnRows = computed(() => [
+  { key: 'missions', icon: 'icon-trophy', tone: 'green', label: mePortCopy.value.missionCenter, value: m.value.daily, valueTone: 'green' },
+  { key: 'daily', icon: 'icon-flame', tone: 'orange', label: mePortCopy.value.dailyCheckin, value: mePortCopy.value.pts, valueTone: 'orange' },
+  { key: 'events', icon: 'icon-trophy', tone: 'orange', label: m.value.eventsCenter, value: m.value.liveCount, valueTone: 'orange' },
+  { key: 'learn', icon: 'icon-book-open', label: mePortCopy.value.learn, value: mePortCopy.value.earnNex, valueTone: 'green' },
+  { key: 'staking', icon: 'icon-lock', tone: 'green', label: mePortCopy.value.stakingVault, value: mePortCopy.value.upTo180 },
+  { key: 'achievements', icon: 'icon-award', tone: 'green', label: m.value.achievements, value: '0 / 24', valueTone: 'green' },
+  { key: 'goals', icon: 'icon-target', tone: 'orange', label: mePortCopy.value.goals, value: mePortCopy.value.setTarget, valueTone: 'orange' },
+  { key: 'wrapped', icon: 'icon-sparkles', tone: 'green', label: mePortCopy.value.wrapped, value: '2026', valueTone: 'green' }
+])
+const accountRows = computed(() => [
+  { key: 'profile', icon: 'icon-user', label: m.value.profile, value: auth.displayName, action: openProfile },
+  { key: 'identity', icon: 'icon-shield-check', label: m.value.identitySecurity, value: m.value.no2fa, valueTone: 'danger' },
+  { key: 'security', icon: 'icon-shield-alert', tone: 'orange', label: mePortCopy.value.security, value: mePortCopy.value.passkeyMissing, valueTone: 'danger' },
+  { key: 'notifications', icon: 'icon-bell', label: m.value.notifications, value: '0' },
+  { key: 'receipts', icon: 'icon-receipt', label: mePortCopy.value.receipts, value: '0' },
+  { key: 'risk', icon: 'icon-alert-triangle', tone: 'orange', label: mePortCopy.value.risk },
+  { key: 'trust', icon: 'icon-shield-check', label: mePortCopy.value.trust, value: mePortCopy.value.audits }
+])
+const supportRows = computed(() => [
+  { key: 'tour', icon: 'icon-rotate-ccw', label: m.value.replayTour },
+  { key: 'faq', icon: 'icon-help-circle', label: m.value.helpFaq },
+  { key: 'support', icon: 'icon-message-circle', tone: 'green', label: m.value.liveSupport, value: m.value.online, valueTone: 'green' },
+  { key: 'dev', icon: 'icon-code', label: mePortCopy.value.developer }
+])
 const groupedLocales = computed(() => {
   return LOCALES.reduce(
     (result, item) => {
@@ -164,13 +239,13 @@ function comingSoon(label: string) {
             <text v-for="i in 5" :key="i" class="wallet-dot" />
           </view>
 
-          <view class="wallet-content">
-            <view class="balance-label">{{ usdtBalanceLabel }}</view>
-            <view class="usdt-row">
-              <text class="currency-mark">$</text>
-              <text class="wallet-balance">0<text>.00</text></text>
+            <view class="wallet-content">
+              <view class="balance-label">{{ usdtBalanceLabel }}</view>
+              <view class="usdt-row">
+                <text class="currency-mark">$</text>
+              <text class="wallet-balance">{{ walletState.usdt }}<text>.00</text></text>
             </view>
-            <view class="pending-line">+$0.00 {{ m.pending }} · auto-settles every 24h</view>
+            <view class="pending-line">+${{ walletState.pending.toFixed(2) }} {{ m.pending }} · {{ t('每 24 小时自动结算', 'auto-settles every 24h') }}</view>
 
             <view class="nex-block">
               <view class="nex-head">
@@ -178,11 +253,11 @@ function comingSoon(label: string) {
                 <text>+20.4%</text>
               </view>
               <view class="nex-row">
-                <text>0</text>
+                <text>{{ walletState.nex }}</text>
                 <text>NEX</text>
               </view>
               <view class="nex-meta">
-                <text>≈ $0.00 · 1 NEX = $0.171</text>
+                <text>≈ ${{ walletState.nexUsd }} · 1 NEX = ${{ walletState.nexRate }}</text>
                 <button @click="openBills">0 {{ billsMonthLabel }} ›</button>
               </view>
             </view>
@@ -210,10 +285,10 @@ function comingSoon(label: string) {
 
             <view class="slot-unlock">
               <view class="slot-copy">
-                <view class="slot-live"><text />0 {{ slotLiveLabel }} · 6 {{ slotOpenLabel }}</view>
+                <view class="slot-live"><text />{{ deviceState.online }} {{ slotLiveLabel }} · {{ deviceState.empty }} {{ slotOpenLabel }}</view>
                 <view class="slot-potential">
                   <text>{{ unlockLabel }}</text>
-                  <b>+$0/d</b>
+                  <b>+${{ deviceState.slotPotential }}/d</b>
                   <text>{{ moreLabel }}</text>
                 </view>
               </view>
@@ -223,31 +298,36 @@ function comingSoon(label: string) {
         </view>
       </view>
 
-      <view class="trial-ticket" @click="comingSoon(mePortCopy.claimNow)">
+      <view class="trial-ticket" @click="comingSoon(trialCopy.claim)">
         <view class="trial-wash" />
+        <view class="trial-shimmer" />
         <view class="trial-grid">
           <view class="trial-left">
-            <view class="trial-badge">★ {{ mePortCopy.limitedFree }}</view>
-            <view class="trial-title">{{ mePortCopy.trialDevice }}</view>
-            <view class="trial-desc">{{ mePortCopy.trialDesc }}</view>
+            <view class="trial-badge"><text class="trial-badge-icon" /> {{ trialCopy.badge }}</view>
+            <view class="trial-title">{{ trialCopy.device }}</view>
+            <view class="trial-desc">{{ trialCopy.desc }}</view>
           </view>
           <view class="trial-divider" />
           <view class="trial-right">
-            <view class="trial-label">{{ mePortCopy.trialEarn }}</view>
+            <view class="trial-label">{{ trialCopy.earn }}</view>
             <view class="trial-money"><text>$</text>116</view>
           </view>
         </view>
         <view class="trial-foot">
-          <text>{{ mePortCopy.trialLeft }}</text>
-          <text>{{ mePortCopy.claimNow }}</text>
+          <text>{{ trialCopy.left }}</text>
+          <text>{{ trialCopy.claim }}</text>
         </view>
       </view>
 
       <view class="network-card">
         <view class="rank-badge">{{ vRank }}</view>
         <view class="network-main">
-          <view>{{ m.yourRank }}</view>
-          <text>{{ level }} · {{ m.rankDesc }}</text>
+          <view>{{ levelProgress.title }} <text>{{ levelProgress.gap }}</text></view>
+          <text>{{ level }} · {{ levelProgress.perk }}</text>
+          <view class="level-progress">
+            <view><text :style="{ width: `${levelProgress.pct}%` }" /></view>
+            <text>{{ levelProgress.pct }}%</text>
+          </view>
         </view>
       </view>
 
@@ -260,7 +340,7 @@ function comingSoon(label: string) {
       </view>
       <view class="device-entry" @click="comingSoon(m.myDevices)">
         <view class="device-icon">
-          <text />
+          <text v-if="deviceState.active > 0" />
         </view>
         <view class="device-main">
           <view>{{ m.fleetStatus }}</view>
@@ -271,9 +351,28 @@ function comingSoon(label: string) {
           </view>
         </view>
         <view class="slot-bars">
-          <text v-for="i in 6" :key="i" />
+          <text v-for="i in deviceState.total" :key="i" :class="{ filled: i <= deviceState.active }" />
         </view>
         <text class="device-chevron">›</text>
+      </view>
+
+      <view class="genesis-card" @click="comingSoon(genesisCopy.cta)">
+        <view class="genesis-hairline" />
+        <view class="genesis-head">
+          <view class="genesis-cap"><text class="si-mask icon-crown" />{{ genesisCopy.cap }}</view>
+          <view class="genesis-crown"><text class="icon-crown-mask" /></view>
+        </view>
+        <view class="genesis-title">{{ genesisCopy.title }}</view>
+        <view class="genesis-subtitle">{{ genesisCopy.subtitle }}</view>
+        <view class="genesis-stats">
+          <view class="genesis-stat big"><b>153</b><text>{{ genesisCopy.remainingLabel }}</text></view>
+          <view class="genesis-stat"><b>$37</b><text>{{ genesisCopy.monthlyLabel }}</text></view>
+          <view class="genesis-stat"><b>$25K</b><text>{{ genesisCopy.floorLabel }}</text></view>
+        </view>
+        <view class="genesis-proof">{{ genesisCopy.proof }}</view>
+        <button class="genesis-cta" @click.stop="comingSoon(genesisCopy.cta)">
+          <text class="si-mask icon-crown" />{{ genesisCopy.cta }}<text class="wallet-bills-chevron" />
+        </button>
       </view>
 
       <view class="section-title"><text>{{ mePortCopy.myOrders }}</text></view>
@@ -292,64 +391,25 @@ function comingSoon(label: string) {
 
       <view class="section-title"><text>{{ mePortCopy.earnExtras }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon(mePortCopy.missionCenter)">
-          <text class="si green">🏆</text><text class="label">{{ mePortCopy.missionCenter }}</text><text class="value green">{{ m.daily }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.dailyCheckin)">
-          <text class="si orange">🔥</text><text class="label">{{ mePortCopy.dailyCheckin }}</text><text class="value orange">{{ mePortCopy.pts }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.eventsCenter)">
-          <text class="si orange">🏆</text><text class="label">{{ m.eventsCenter }}</text><text class="value orange">{{ m.liveCount }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.learn)">
-          <text class="si">📖</text><text class="label">{{ mePortCopy.learn }}</text><text class="value green">{{ mePortCopy.earnNex }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.stakingVault)">
-          <text class="si green">🔒</text><text class="label">{{ mePortCopy.stakingVault }}</text><text class="value">{{ mePortCopy.upTo180 }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.achievements)">
-          <text class="si green">🏅</text><text class="label">{{ m.achievements }}</text><text class="value green">0 / 24</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.goals)">
-          <text class="si orange">◎</text><text class="label">{{ mePortCopy.goals }}</text><text class="value orange">{{ mePortCopy.setTarget }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row last" @click="comingSoon(mePortCopy.wrapped)">
-          <text class="si green">✦</text><text class="label">{{ mePortCopy.wrapped }}</text><text class="value green">2026</text><text class="chev">›</text>
+        <view v-for="(row, index) in earnRows" :key="row.key" class="setting-row" :class="{ last: index === earnRows.length - 1 }" @click="comingSoon(row.label)">
+          <text class="si" :class="row.tone"><text class="si-mask" :class="row.icon" /></text><text class="label">{{ row.label }}</text><text class="value" :class="row.valueTone">{{ row.value }}</text><text class="chev">›</text>
         </view>
       </view>
 
       <view class="section-title"><text>{{ m.account }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="openProfile">
-          <text class="si">◎</text><text class="label">{{ m.profile }}</text><text class="value">{{ auth.displayName }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.identitySecurity)">
-          <text class="si">◇</text><text class="label">{{ m.identitySecurity }}</text><text class="value danger">{{ m.no2fa }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.security)">
-          <text class="si orange">⚠</text><text class="label">{{ mePortCopy.security }}</text><text class="value danger">{{ mePortCopy.passkeyMissing }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.notifications)">
-          <text class="si">◌</text><text class="label">{{ m.notifications }}</text><text class="value">0</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.receipts)">
-          <text class="si">▤</text><text class="label">{{ mePortCopy.receipts }}</text><text class="value">0</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(mePortCopy.risk)">
-          <text class="si orange">△</text><text class="label">{{ mePortCopy.risk }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row last" @click="comingSoon(mePortCopy.trust)">
-          <text class="si">✓</text><text class="label">{{ mePortCopy.trust }}</text><text class="value">{{ mePortCopy.audits }}</text><text class="chev">›</text>
+        <view v-for="(row, index) in accountRows" :key="row.key" class="setting-row" :class="{ last: index === accountRows.length - 1 }" @click="row.action ? row.action() : comingSoon(row.label)">
+          <text class="si" :class="row.tone"><text class="si-mask" :class="row.icon" /></text><text class="label">{{ row.label }}</text><text v-if="row.value" class="value" :class="row.valueTone">{{ row.value }}</text><text class="chev">›</text>
         </view>
       </view>
 
       <view class="section-title"><text>{{ m.preferences }}</text></view>
       <view class="settings-card">
         <view class="setting-row" @click="comingSoon(mePortCopy.preferencesRow)">
-          <text class="si">◐</text><text class="label">{{ mePortCopy.preferencesRow }}</text><text class="chev">›</text>
+          <text class="si"><text class="si-mask icon-volume-2" /></text><text class="label">{{ mePortCopy.preferencesRow }}</text><text class="chev">›</text>
         </view>
         <view class="theme-row">
-          <text class="si">☼</text>
+          <text class="si"><text class="si-mask icon-sun" /></text>
           <text class="label">{{ m.appearance }}</text>
           <view class="theme-toggle">
             <button class="active">{{ m.light }}</button>
@@ -357,23 +417,14 @@ function comingSoon(label: string) {
           </view>
         </view>
         <view class="setting-row last" @click="openLocaleSheet">
-          <text class="si">◎</text><text class="label">{{ m.language }}</text><text class="value">{{ currentLocale.code.toUpperCase() }}</text><text class="chev">›</text>
+          <text class="si"><text class="si-mask icon-globe-2" /></text><text class="label">{{ m.language }}</text><text class="value">{{ currentLocale.code.toUpperCase() }}</text><text class="chev">›</text>
         </view>
       </view>
 
       <view class="section-title"><text>{{ mePortCopy.helpSupport }}</text></view>
       <view class="settings-card">
-        <view class="setting-row" @click="comingSoon(m.replayTour)">
-          <text class="si">↻</text><text class="label">{{ m.replayTour }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.helpFaq)">
-          <text class="si">?</text><text class="label">{{ m.helpFaq }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row" @click="comingSoon(m.liveSupport)">
-          <text class="si green">●</text><text class="label">{{ m.liveSupport }}</text><text class="value green">{{ m.online }}</text><text class="chev">›</text>
-        </view>
-        <view class="setting-row last" @click="comingSoon(mePortCopy.developer)">
-          <text class="si">⌘</text><text class="label">{{ mePortCopy.developer }}</text><text class="chev">›</text>
+        <view v-for="(row, index) in supportRows" :key="row.key" class="setting-row" :class="{ last: index === supportRows.length - 1 }" @click="comingSoon(row.label)">
+          <text class="si" :class="row.tone"><text class="si-mask" :class="row.icon" /></text><text class="label">{{ row.label }}</text><text v-if="row.value" class="value" :class="row.valueTone">{{ row.value }}</text><text class="chev">›</text>
         </view>
       </view>
 
@@ -537,8 +588,8 @@ function comingSoon(label: string) {
   width: 24rpx;
   height: 24rpx;
   background: #747f91;
-  -webkit-mask: url("/static/icons/wallet-chevron-right.svg") center / contain no-repeat;
-  mask: url("/static/icons/wallet-chevron-right.svg") center / contain no-repeat;
+  -webkit-mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat;
+  mask: url("../../static/icons/wallet-chevron-right.svg") center / contain no-repeat;
 }
 
 .wallet-card {
@@ -569,6 +620,7 @@ function comingSoon(label: string) {
     radial-gradient(40% 50% at 10% 80%, rgba(198, 255, 58, 0.18), transparent 60%),
     radial-gradient(35% 45% at 72% 92%, rgba(255, 184, 77, 0.16), transparent 60%);
   filter: blur(14rpx);
+  animation: wallet-aurora-drift 14s ease-in-out infinite alternate;
 }
 
 .wallet-dots {
@@ -610,6 +662,25 @@ function comingSoon(label: string) {
     opacity: 0;
     transform: translate3d(0, -300rpx, 0) scale(1.12);
   }
+}
+
+@keyframes wallet-aurora-drift {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(-6%, 3%, 0) rotate(2deg); }
+  100% { transform: translate3d(4%, -2%, 0) rotate(-1deg); }
+}
+
+@keyframes trial-ticket-enter {
+  0% { opacity: 0; transform: perspective(1100rpx) rotateY(-92deg) scale(0.96); }
+  55% { opacity: 1; transform: perspective(1100rpx) rotateY(8deg) scale(1.01); }
+  78% { transform: perspective(1100rpx) rotateY(-2.5deg) scale(0.998); }
+  100% { opacity: 1; transform: perspective(1100rpx) rotateY(0deg) scale(1); }
+}
+
+@keyframes trial-ticket-shimmer {
+  0% { opacity: 0; transform: translateX(-110%) skewX(-14deg); }
+  35% { opacity: 0.55; }
+  100% { opacity: 0; transform: translateX(230%) skewX(-14deg); }
 }
 
 .wallet-content {
@@ -784,18 +855,18 @@ function comingSoon(label: string) {
 }
 
 .icon-topup {
-  -webkit-mask: url("/static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
-  mask: url("/static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
+  -webkit-mask: url("../../static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
+  mask: url("../../static/icons/wallet-arrow-down-to-line.svg") center / contain no-repeat;
 }
 
 .icon-withdraw {
-  -webkit-mask: url("/static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
-  mask: url("/static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
+  -webkit-mask: url("../../static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
+  mask: url("../../static/icons/wallet-arrow-up-from-line.svg") center / contain no-repeat;
 }
 
 .icon-exchange {
-  -webkit-mask: url("/static/icons/wallet-sparkles.svg") center / contain no-repeat;
-  mask: url("/static/icons/wallet-sparkles.svg") center / contain no-repeat;
+  -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat;
+  mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat;
 }
 
 .wallet-actions button.primary .action-icon {
@@ -813,6 +884,8 @@ function comingSoon(label: string) {
 .nex-meta uni-button::after,
 .slot-unlock button::after,
 .slot-unlock uni-button::after,
+.genesis-cta::after,
+uni-button.genesis-cta::after,
 .logout-button::after,
 uni-button.logout-button::after,
 .sheet-close::after,
@@ -850,6 +923,7 @@ uni-button.locale-option::after,
   border-radius: 50%;
   background: #46e6ff;
   box-shadow: 0 0 18rpx rgba(70, 230, 255, 0.5);
+  animation: hb-pulse-cyan 1.8s ease-in-out infinite;
 }
 
 .slot-potential {
@@ -918,6 +992,44 @@ uni-button.locale-option::after,
   font-size: 22rpx;
 }
 
+.withdrawal-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  margin-top: 20rpx;
+  padding: 26rpx 28rpx;
+  border: 1rpx solid rgba(198, 131, 22, 0.22);
+  border-radius: 24rpx;
+  background: rgba(198, 131, 22, 0.13);
+}
+
+.withdrawal-icon {
+  display: grid;
+  width: 56rpx;
+  height: 56rpx;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 16rpx;
+  background: #c68316;
+  color: #16120a;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.withdrawal-warning view view {
+  color: #ffc266;
+  font-size: 28rpx;
+  font-weight: 720;
+}
+
+.withdrawal-warning text {
+  display: block;
+  margin-top: 8rpx;
+  color: #d7b985;
+  font-size: 23rpx;
+  line-height: 1.45;
+}
+
 .trial-ticket {
   position: relative;
   overflow: hidden;
@@ -935,12 +1047,26 @@ uni-button.locale-option::after,
     radial-gradient(circle 18rpx at 100% 50%, transparent 99%, #000 100%);
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
+  transform-origin: center;
+  animation: trial-ticket-enter 0.76s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .trial-wash {
   position: absolute;
   inset: 0;
   background: radial-gradient(60% 100% at 0% 100%, rgba(18, 201, 121, 0.13), transparent 60%);
+}
+
+.trial-shimmer {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: 0;
+  width: 38%;
+  opacity: 0;
+  background: linear-gradient(90deg, transparent, rgba(198, 255, 58, 0.22), transparent);
+  transform: translateX(-110%) skewX(-14deg);
+  animation: trial-ticket-shimmer 1.4s ease-out 0.58s both;
 }
 
 .trial-grid {
@@ -953,6 +1079,8 @@ uni-button.locale-option::after,
 
 .trial-badge {
   display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
   padding: 6rpx 16rpx;
   border: 1rpx dashed rgba(18, 201, 121, 0.45);
   border-radius: 8rpx;
@@ -963,6 +1091,15 @@ uni-button.locale-option::after,
   font-weight: 650;
   letter-spacing: 2rpx;
   text-transform: uppercase;
+}
+
+.trial-badge-icon {
+  display: inline-block;
+  width: 20rpx;
+  height: 20rpx;
+  background: currentColor;
+  -webkit-mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat;
+  mask: url("../../static/icons/wallet-sparkles.svg") center / contain no-repeat;
 }
 
 .trial-title {
@@ -1086,6 +1223,43 @@ uni-button.locale-option::after,
   line-height: 1.4;
 }
 
+.network-main view text {
+  color: #ff8d4a;
+  font-size: 25rpx;
+  font-weight: 650;
+}
+
+.level-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 54rpx;
+  align-items: center;
+  gap: 14rpx;
+  margin-top: 16rpx;
+}
+
+.level-progress view {
+  overflow: hidden;
+  height: 12rpx;
+  border-radius: 999rpx;
+  background: #232936;
+}
+
+.level-progress view text {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c6ff3a, #46e6ff);
+  box-shadow: 0 0 14rpx rgba(70, 230, 255, 0.28);
+}
+
+.level-progress > text {
+  margin: 0;
+  color: #c6ff3a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22rpx;
+  text-align: right;
+}
+
 .device-sub {
   display: flex;
   align-items: center;
@@ -1172,12 +1346,19 @@ uni-button.section-link::after {
   border-radius: 50%;
   background: #12c979;
   box-shadow: 0 0 10rpx rgba(18, 201, 121, 0.7);
-  animation: device-pulse 1.6s ease-in-out infinite;
+  animation: hb-pulse-success 1.6s ease-in-out infinite;
 }
 
-@keyframes device-pulse {
-  0%, 100% { transform: scale(0.9); opacity: 0.75; }
-  50% { transform: scale(1.08); opacity: 1; }
+@keyframes hb-pulse-success {
+  0% { box-shadow: 0 0 0 0 rgba(18, 201, 121, 0.5); }
+  70% { box-shadow: 0 0 0 16rpx rgba(18, 201, 121, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(18, 201, 121, 0); }
+}
+
+@keyframes hb-pulse-cyan {
+  0% { box-shadow: 0 0 0 0 rgba(70, 230, 255, 0.5); }
+  70% { box-shadow: 0 0 0 16rpx rgba(70, 230, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(70, 230, 255, 0); }
 }
 
 .device-online {
@@ -1202,9 +1383,157 @@ uni-button.section-link::after {
   background: #303746;
 }
 
+.slot-bars text.filled {
+  background: #12c979;
+  box-shadow: 0 0 8rpx rgba(18, 201, 121, 0.4);
+}
+
 .device-chevron {
   color: #5f6877;
   font-size: 34rpx;
+}
+
+.genesis-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 22rpx;
+  padding: 34rpx 36rpx;
+  border: 1rpx solid #303746;
+  border-radius: 32rpx;
+  background:
+    radial-gradient(80% 100% at 100% 0%, rgba(255, 184, 77, 0.2), transparent 60%),
+    radial-gradient(60% 70% at 0% 100%, rgba(255, 184, 77, 0.09), transparent 70%),
+    #10141d;
+  box-shadow: 0 18rpx 60rpx rgba(0, 0, 0, 0.32);
+}
+
+.genesis-hairline {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1rpx;
+  background: linear-gradient(90deg, transparent, #ffb84d, transparent);
+  opacity: 0.8;
+}
+
+.genesis-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.genesis-cap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10rpx;
+  color: #ffb84d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 20rpx;
+  font-weight: 650;
+  letter-spacing: 2rpx;
+  text-transform: uppercase;
+}
+
+.genesis-crown {
+  display: flex;
+  justify-content: center;
+  color: #ffcf7a;
+  font-size: 54rpx;
+  line-height: 1;
+  text-shadow: 0 8rpx 28rpx rgba(255, 184, 77, 0.48);
+}
+
+.icon-crown-mask {
+  display: block;
+  width: 60rpx;
+  height: 60rpx;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z'/%3E%3Cpath d='M5 20h14'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z'/%3E%3Cpath d='M5 20h14'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.genesis-title {
+  margin-top: 18rpx;
+  color: #ffffff;
+  font-size: 38rpx;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.genesis-subtitle {
+  max-width: 560rpx;
+  margin-top: 8rpx;
+  color: #a8b1c0;
+  font-size: 24rpx;
+  line-height: 1.45;
+}
+
+.genesis-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+  margin-top: 28rpx;
+  padding: 18rpx 12rpx;
+  border: 1rpx solid rgba(255, 184, 77, 0.2);
+  border-radius: 24rpx;
+  background: rgba(255, 184, 77, 0.07);
+}
+
+.genesis-stat {
+  min-width: 0;
+  text-align: center;
+}
+
+.genesis-stat b {
+  display: block;
+  color: #ffb84d;
+  font-size: 38rpx;
+  font-weight: 780;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.genesis-stat.big b {
+  font-size: 48rpx;
+}
+
+.genesis-stat text {
+  display: block;
+  margin-top: 8rpx;
+  color: #a8b1c0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 19rpx;
+  letter-spacing: 1rpx;
+}
+
+.genesis-proof {
+  margin-top: 20rpx;
+  color: #a8b1c0;
+  font-size: 22rpx;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.genesis-cta {
+  display: flex;
+  height: 88rpx;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  margin: 28rpx 0 0;
+  border-radius: 999rpx;
+  background: #ffb84d;
+  color: #1b1205;
+  font-size: 27rpx;
+  font-weight: 760;
+  line-height: 88rpx;
+}
+
+.genesis-cta .wallet-bills-chevron {
+  background: currentColor;
 }
 
 .settings-card {
@@ -1277,6 +1606,13 @@ uni-button.section-link::after {
   font-size: 25rpx;
 }
 
+.si-mask {
+  display: block;
+  width: 30rpx;
+  height: 30rpx;
+  background: currentColor;
+}
+
 .si.green,
 .value.green {
   color: #12c979;
@@ -1289,6 +1625,28 @@ uni-button.section-link::after {
 .value.orange {
   color: #ff8d4a;
 }
+
+.icon-trophy { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4.5a2.5 2.5 0 0 1 0-5H6'/%3E%3Cpath d='M18 9h1.5a2.5 2.5 0 0 0 0-5H18'/%3E%3Cpath d='M4 22h16'/%3E%3Cpath d='M10 14.7V17c0 .6-.4 1-1 1h6c-.6 0-1-.4-1-1v-2.3'/%3E%3Cpath d='M18 2H6v7a6 6 0 0 0 12 0V2Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4.5a2.5 2.5 0 0 1 0-5H6'/%3E%3Cpath d='M18 9h1.5a2.5 2.5 0 0 0 0-5H18'/%3E%3Cpath d='M4 22h16'/%3E%3Cpath d='M10 14.7V17c0 .6-.4 1-1 1h6c-.6 0-1-.4-1-1v-2.3'/%3E%3Cpath d='M18 2H6v7a6 6 0 0 0 12 0V2Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-flame { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.29-2.23.8-3.17.4 1.2 1.2 2.25 2.7 2.67Z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.29-2.23.8-3.17.4 1.2 1.2 2.25 2.7 2.67Z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-book-open { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v14'/%3E%3Cpath d='M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-lock { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-award { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15.5 7.5 2 2'/%3E%3Cpath d='M9 11 7 9'/%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='M8.21 13.89 7 23l5-3 5 3-1.21-9.12'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m15.5 7.5 2 2'/%3E%3Cpath d='M9 11 7 9'/%3E%3Ccircle cx='12' cy='8' r='6'/%3E%3Cpath d='M8.21 13.89 7 23l5-3 5 3-1.21-9.12'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-target { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Ccircle cx='12' cy='12' r='6'/%3E%3Ccircle cx='12' cy='12' r='2'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-sparkles { -webkit-mask: url('../../static/icons/wallet-sparkles.svg') center / contain no-repeat; mask: url('../../static/icons/wallet-sparkles.svg') center / contain no-repeat; }
+.icon-user { -webkit-mask: url('../../static/icons/tab-user.svg') center / contain no-repeat; mask: url('../../static/icons/tab-user.svg') center / contain no-repeat; }
+.icon-shield-check { -webkit-mask: url('../../static/icons/bill-shield-check.svg') center / contain no-repeat; mask: url('../../static/icons/bill-shield-check.svg') center / contain no-repeat; }
+.icon-shield-alert { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.2 1.2 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.2 1.2 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/%3E%3Cpath d='M12 8v4'/%3E%3Cpath d='M12 16h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-bell { -webkit-mask: url('../../static/icons/bell.svg') center / contain no-repeat; mask: url('../../static/icons/bell.svg') center / contain no-repeat; }
+.icon-receipt { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z'/%3E%3Cpath d='M16 8h-6'/%3E%3Cpath d='M16 12H8'/%3E%3Cpath d='M13 16H8'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z'/%3E%3Cpath d='M16 8h-6'/%3E%3Cpath d='M16 12H8'/%3E%3Cpath d='M13 16H8'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-alert-triangle { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-volume-2 { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 5 6 9H2v6h4l5 4z'/%3E%3Cpath d='M19.07 4.93a10 10 0 0 1 0 14.14'/%3E%3Cpath d='M15.54 8.46a5 5 0 0 1 0 7.07'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 5 6 9H2v6h4l5 4z'/%3E%3Cpath d='M19.07 4.93a10 10 0 0 1 0 14.14'/%3E%3Cpath d='M15.54 8.46a5 5 0 0 1 0 7.07'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-sun { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m4.93 4.93 1.41 1.41'/%3E%3Cpath d='m17.66 17.66 1.41 1.41'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='m6.34 17.66-1.41 1.41'/%3E%3Cpath d='m19.07 4.93-1.41 1.41'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m4.93 4.93 1.41 1.41'/%3E%3Cpath d='m17.66 17.66 1.41 1.41'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='m6.34 17.66-1.41 1.41'/%3E%3Cpath d='m19.07 4.93-1.41 1.41'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-globe-2 { -webkit-mask: url('../../static/icons/globe.svg') center / contain no-repeat; mask: url('../../static/icons/globe.svg') center / contain no-repeat; }
+.icon-rotate-ccw { -webkit-mask: url('../../static/icons/profile-refresh-cw.svg') center / contain no-repeat; mask: url('../../static/icons/profile-refresh-cw.svg') center / contain no-repeat; }
+.icon-help-circle { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M9.09 9a3 3 0 0 1 5.82 1c0 2-3 3-3 3'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-message-circle { -webkit-mask: url('../../static/icons/support-headphones.svg') center / contain no-repeat; mask: url('../../static/icons/support-headphones.svg') center / contain no-repeat; }
+.icon-code { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m16 18 6-6-6-6'/%3E%3Cpath d='m8 6-6 6 6 6'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-crown { -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z'/%3E%3Cpath d='M5 20h14'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z'/%3E%3Cpath d='M5 20h14'/%3E%3C/svg%3E") center / contain no-repeat; }
 
 .label {
   min-width: 0;

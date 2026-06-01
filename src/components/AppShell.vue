@@ -60,8 +60,8 @@ onShow(hideNativeTabBarStable)
   min-height: 100vh;
   padding: 0;
   box-sizing: border-box;
-  background: #000000;
-  color: #f8fafc;
+  background: var(--v5-bg, #000000);
+  color: var(--v5-ink, #f8fafc);
 }
 
 .app-header {
@@ -77,7 +77,7 @@ onShow(hideNativeTabBarStable)
   padding: 18rpx 32rpx 14rpx;
   box-sizing: border-box;
   border-bottom: 1rpx solid transparent;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--v5-chrome-bg, rgba(0, 0, 0, 0.55));
   backdrop-filter: blur(46rpx) saturate(180%);
   -webkit-backdrop-filter: blur(46rpx) saturate(180%);
   box-shadow: none;
@@ -119,13 +119,13 @@ onShow(hideNativeTabBarStable)
   place-items: center;
   border-radius: 14rpx;
   background: #f4f6fb;
-  color: #10141d;
+  color: var(--v5-surface, #141414);
   font-size: 25rpx;
   font-weight: 800;
 }
 
 .brand-title {
-  color: #ffffff;
+  color: var(--v5-ink, #ffffff);
   font-size: 34rpx;
   font-weight: 760;
   letter-spacing: 0;
@@ -133,7 +133,7 @@ onShow(hideNativeTabBarStable)
 
 .brand-version {
   margin-left: 4rpx;
-  color: #6f7788;
+  color: var(--v5-ink-4, #6f7788);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 23rpx;
   font-weight: 560;

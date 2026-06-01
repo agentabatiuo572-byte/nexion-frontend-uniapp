@@ -368,13 +368,13 @@ watch(locale, () => {
 }
 
 .support-icon.headphones {
-  -webkit-mask-image: url('/static/icons/support-headphones.svg');
-  mask-image: url('/static/icons/support-headphones.svg');
+  -webkit-mask-image: url('../static/icons/support-headphones.svg');
+  mask-image: url('../static/icons/support-headphones.svg');
 }
 
 .support-icon.arrow-left {
-  -webkit-mask-image: url('/static/icons/support-arrow-left.svg');
-  mask-image: url('/static/icons/support-arrow-left.svg');
+  -webkit-mask-image: url('../static/icons/support-arrow-left.svg');
+  mask-image: url('../static/icons/support-arrow-left.svg');
 }
 
 .close-btn {
@@ -512,8 +512,8 @@ watch(locale, () => {
 .send-icon {
   width: 32rpx;
   height: 32rpx;
-  -webkit-mask-image: url('/static/icons/support-send.svg');
-  mask-image: url('/static/icons/support-send.svg');
+  -webkit-mask-image: url('../static/icons/support-send.svg');
+  mask-image: url('../static/icons/support-send.svg');
 }
 
 @keyframes stella-float {

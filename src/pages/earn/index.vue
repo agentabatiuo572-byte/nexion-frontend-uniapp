@@ -9,6 +9,10 @@ type Range = 'Today' | 'Week' | 'Month' | 'All'
 
 const range = ref<Range>('Today')
 const taskTab = ref<'current' | 'history'>('current')
+const trialState = ref<'idle' | 'active' | 'grace' | 'extended'>('idle')
+const quickMenuOpen = ref(false)
+const phoneCharging = ref(true)
+const phoneOnline = ref(true)
 const locale = useActiveLocale()
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.earn)
@@ -71,7 +75,7 @@ const deviceRankRows = computed(() => [
   { rank: 2, icon: 'box', name: 'NexionBox Pro', best: 'AI Premium pool', daily: '$76.00/d' },
   { rank: 3, icon: 'box', name: 'NexionBox S1', best: 'LLM 70B', daily: '$38.50/d' },
   { rank: 4, icon: 'cloud', name: 'Inference Share', best: 'Low barrier entry', daily: '$0.07/d' },
-  { rank: 5, icon: 'phone', name: v.value.yourPhone, best: 'Mobile NPU tier', daily: '$0.06/d', phone: true }
+  { rank: 5, icon: 'phone', name: v.value.yourPhone, best: locale.value === 'zh' ? '移动端 NPU 档位' : 'Mobile NPU tier', daily: '$0.06/d', phone: true }
 ])
 
 const lockedTaskRows = computed(() => [
@@ -86,8 +90,60 @@ const completedRows = computed(() => [
   { icon: 'database', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.000', time: '19m ago' }
 ])
 
+const trialGhost = computed(() => {
+  const map = {
+    active: {
+      ribbon: locale.value === 'zh' ? '免费体验中' : 'Trial active',
+      tint: '#9edc1d',
+      eta: locale.value === 'zh' ? '剩余 2d 18h' : '2d 18h left',
+      shadow: '38.72',
+      nex: '1,240'
+    },
+    grace: {
+      ribbon: locale.value === 'zh' ? '保留期' : 'Grace period',
+      tint: '#ffbe3d',
+      eta: locale.value === 'zh' ? '剩余 6h 20m' : '6h 20m left',
+      shadow: '101.44',
+      nex: '3,248'
+    },
+    extended: {
+      ribbon: locale.value === 'zh' ? '高质量延长' : 'Quality extension',
+      tint: '#58e7ff',
+      eta: locale.value === 'zh' ? '剩余 1d 04h' : '1d 04h left',
+      shadow: '129.08',
+      nex: '4,130'
+    }
+  } as const
+  return trialState.value === 'idle' ? null : map[trialState.value]
+})
+
+const pausedReason = computed<'charger' | 'network' | ''>(() => {
+  if (!phoneCharging.value) return 'charger'
+  if (!phoneOnline.value) return 'network'
+  return ''
+})
+
 function showSoon(label: string) {
   uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
+}
+
+function claimTrial() {
+  trialState.value = 'active'
+}
+
+function cycleTrialState() {
+  trialState.value = trialState.value === 'active'
+    ? 'grace'
+    : trialState.value === 'grace'
+      ? 'extended'
+      : trialState.value === 'extended'
+        ? 'idle'
+        : 'active'
+}
+
+function toggleQuickPause() {
+  phoneOnline.value = !phoneOnline.value
+  quickMenuOpen.value = false
 }
 </script>
 
@@ -151,7 +207,7 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="trial-ticket" @click="showSoon(copy.home.freeTrial)">
+        <view v-if="trialState === 'idle'" class="trial-ticket" @click="claimTrial">
           <view class="ticket-shine" />
           <view class="ticket-body">
             <view class="ticket-left">
@@ -171,21 +227,65 @@ function showSoon(label: string) {
             <b>{{ v.startTrial }} <i class="ui-icon arrow-right" /></b>
           </view>
         </view>
+        <view
+          v-else-if="trialGhost"
+          class="trial-ghost-card"
+          :style="{ '--trial-tint': trialGhost.tint }"
+          @click="cycleTrialState"
+        >
+          <view class="ghost-icon"><i class="ui-icon star" /></view>
+          <view class="ghost-body">
+            <view class="ghost-ribbon">
+              <text>{{ trialGhost.ribbon }}</text>
+              <i>· {{ trialGhost.eta }}</i>
+            </view>
+            <view class="ghost-money"><text>$</text><b>{{ trialGhost.shadow }}</b><i>+ {{ trialGhost.nex }} NEX</i></view>
+            <view class="ghost-desc">NexionBox S1 {{ v.cloudShareTrial || 'trial yield' }}</view>
+          </view>
+          <i class="ui-icon arrow-right ghost-arrow" />
+        </view>
 
         <view class="section-title">
           <b>{{ v.myDevices }}</b>
           <text>1 / 6</text>
         </view>
 
-        <view class="device-card">
+        <view class="device-card" @longpress="quickMenuOpen = true">
+          <view v-if="quickMenuOpen" class="quick-menu-mask" @click.stop="quickMenuOpen = false">
+            <view class="quick-menu" @click.stop>
+              <view class="quick-handle" />
+              <view class="quick-device">{{ v.yourPhoneDevice || 'Your phone' }}</view>
+              <button @click="toggleQuickPause">
+                <i class="ui-icon" :class="phoneOnline ? 'pause' : 'play'" />
+                {{ phoneOnline ? (locale === 'zh' ? '暂停接单' : 'Pause') : (locale === 'zh' ? '恢复接单' : 'Resume') }}
+              </button>
+              <button @click="quickMenuOpen = false">
+                <i class="ui-icon bar-chart" />
+                {{ locale === 'zh' ? '查看统计' : 'Stats' }}
+              </button>
+              <button @click="quickMenuOpen = false">
+                <i class="ui-icon trash" />
+                {{ locale === 'zh' ? '折旧换购' : 'Trade-in' }}
+              </button>
+              <button class="quick-cancel" @click="quickMenuOpen = false">{{ locale === 'zh' ? '取消' : 'Cancel' }}</button>
+            </view>
+          </view>
           <view class="device-head">
             <view class="device-id">
               <view class="device-icon"><i class="ui-icon phone" /></view>
               <view><b>{{ v.yourPhoneDevice || 'Your phone' }}</b><text>{{ v.phoneNpuSpec || 'Mobile NPU · ~28 TOPS' }}</text></view>
             </view>
-            <view class="online"><i />{{ v.online || 'online' }}</view>
+            <view class="online" :class="{ paused: pausedReason || !phoneOnline }"><i />{{ pausedReason || !phoneOnline ? (locale === 'zh' ? '暂停' : 'paused') : (v.online || 'online') }}</view>
           </view>
-          <view class="current-task">
+          <view v-if="pausedReason" class="paused-block">
+            <text>{{ v.currentTask || 'Current Task' }}</text>
+            <view>
+              <i class="ui-icon" :class="pausedReason === 'charger' ? 'plug' : 'wifi-off'" />
+              <b>{{ pausedReason === 'charger' ? (locale === 'zh' ? '等待接入充电器' : 'Waiting for charger') : (locale === 'zh' ? '网络连接已断开' : 'Network disconnected') }}</b>
+              <em>{{ pausedReason === 'charger' ? (locale === 'zh' ? '接入电源后才会重新接收后台任务。' : 'Plug in to resume background task intake.') : (locale === 'zh' ? '恢复网络后，调度器会在下一次 ping 后派发任务。' : 'Reconnect before the scheduler assigns the next job.') }}</em>
+            </view>
+          </view>
+          <view v-else class="current-task">
             <text>{{ v.currentTask || 'Current Task' }}</text>
             <b>Whisper-base <span>·</span> Speech</b>
             <em><strong>#SP-A78237</strong> <span>·</span> VoxLane <span>·</span> Tokyo, JP</em>
@@ -199,8 +299,8 @@ function showSoon(label: string) {
             <view class="mode-title">{{ v.phoneSettingsTitle || 'Background mode' }}</view>
           </view>
           <view class="runtime-row">
-            <button class="runtime-pill"><i class="ui-icon battery-charging" />78%</button>
-            <button class="runtime-pill"><i class="ui-icon wifi-lucide" />{{ v.phoneNetOnline || 'online' }}</button>
+            <button class="runtime-pill" :class="{ off: !phoneCharging }" @click="phoneCharging = !phoneCharging"><i class="ui-icon" :class="phoneCharging ? 'battery-charging' : 'battery'" />78%</button>
+            <button class="runtime-pill" :class="{ off: !phoneOnline }" @click="phoneOnline = !phoneOnline"><i class="ui-icon" :class="phoneOnline ? 'wifi-lucide' : 'wifi-off'" />{{ phoneOnline ? (v.phoneNetOnline || 'online') : (locale === 'zh' ? '离线' : 'offline') }}</button>
           </view>
           <view class="runtime-hint">{{ v.phoneRequirementsHint || 'Charging + network must both stay available before accepting tasks. The scheduler ping-checks before every job.' }}</view>
           <view class="locked-row">
@@ -213,6 +313,18 @@ function showSoon(label: string) {
               </view>
             </view>
             <button class="unlock-more">{{ (v.unlockNMoreTasks || 'Unlock 142 more tasks').replace('{n}', '142') }}</button>
+          </view>
+          <view class="device-earnings">
+            <view>
+              <text>{{ v.todayEarnings || 'Today earnings' }}</text>
+              <b>$0.062</b>
+              <i>+1.9 NEX</i>
+            </view>
+            <view>
+              <text>{{ v.estThisHour || 'Est. this hour' }}</text>
+              <b>+$0.00</b>
+              <i>+0.1 NEX</i>
+            </view>
           </view>
         </view>
 
@@ -236,6 +348,20 @@ function showSoon(label: string) {
           </view>
           <button><i class="ui-icon zap" /> {{ v.fillSlots || 'Fill slots' }} <i class="ui-icon arrow-right" /></button>
           <view class="fleet-note">{{ (v.currentFleet || 'Current fleet {amount} / day').replace('{amount}', '$0.06') }}</view>
+        </view>
+
+        <view class="lifecycle-card">
+          <view class="lifecycle-glow" />
+          <view class="life-label"><i class="ui-icon activity" /> {{ v.fleetLifecycle || 'Fleet lifecycle' }}</view>
+          <view class="life-number"><b>98.4%</b><text>{{ (locale === 'zh' ? '1 台可衰减设备' : '1 degradable device') }}</text></view>
+          <view class="life-bar"><view /></view>
+          <view class="life-foot">
+            <view>
+              <text>{{ v.lifecycleMonthlyLoss || 'monthly loss' }}</text>
+              <b>−$0.61 <i>· {{ locale === 'zh' ? '12 天' : '12d' }}</i></b>
+            </view>
+            <button @click="showSoon(v.lifecycleCta || 'Review')">{{ v.lifecycleCta || 'Review' }} <i class="ui-icon arrow-right" /></button>
+          </view>
         </view>
 
         <view class="section-title">
@@ -353,6 +479,17 @@ button::after { border: 0; }
 .wifi::after { bottom: .1em; width: .16em; height: .16em; border-radius: 50%; background: currentColor; }
 .wifi-lucide { background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h.01'/%3E%3Cpath d='M2 8.82a15 15 0 0 1 20 0'/%3E%3Cpath d='M5 12.86a10 10 0 0 1 14 0'/%3E%3Cpath d='M8.5 16.43a5 5 0 0 1 7 0'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20h.01'/%3E%3Cpath d='M2 8.82a15 15 0 0 1 20 0'/%3E%3Cpath d='M5 12.86a10 10 0 0 1 14 0'/%3E%3Cpath d='M8.5 16.43a5 5 0 0 1 7 0'/%3E%3C/svg%3E") center / contain no-repeat; }
 .wifi-lucide::before, .wifi-lucide::after { display: none; }
+.wifi-off::before { width: .88em; height: .88em; border: .12em solid currentColor; border-left-color: transparent; border-bottom-color: transparent; border-radius: 50%; transform: rotate(-45deg); opacity: .75; }
+.wifi-off::after { width: 1em; height: .12em; background: currentColor; transform: rotate(45deg); border-radius: .1em; }
+.plug::before { width: .36em; height: .52em; border: .12em solid currentColor; border-top: 0; border-radius: 0 0 .12em .12em; top: .28em; }
+.plug::after { top: .08em; width: .48em; height: .28em; border-left: .12em solid currentColor; border-right: .12em solid currentColor; }
+.pause::before { width: .16em; height: .72em; background: currentColor; transform: translateX(-.16em); }
+.pause::after { width: .16em; height: .72em; background: currentColor; transform: translateX(.16em); }
+.play::before { width: .78em; height: .78em; background: currentColor; clip-path: polygon(20% 8%, 84% 50%, 20% 92%); }
+.bar-chart::before { bottom: .12em; left: .18em; width: .14em; height: .42em; background: currentColor; box-shadow: .24em -.18em 0 currentColor, .48em -.3em 0 currentColor; }
+.bar-chart::after { bottom: .08em; width: .82em; height: .12em; background: currentColor; opacity: .45; }
+.trash::before { width: .62em; height: .62em; border: .12em solid currentColor; border-top: 0; border-radius: 0 0 .08em .08em; bottom: .08em; }
+.trash::after { top: .16em; width: .78em; height: .12em; background: currentColor; box-shadow: 0 -.14em 0 -.03em currentColor; }
 .lock::before { width: .76em; height: .52em; border: .12em solid currentColor; border-radius: .1em; bottom: .08em; }
 .lock::after { width: .48em; height: .42em; border: .12em solid currentColor; border-bottom: 0; border-radius: .32em .32em 0 0; top: .04em; }
 .small-lock { width: .9em; height: .9em; }
@@ -430,6 +567,18 @@ button::after { border: 0; }
 .ticket-bottom text { display: flex; align-items: center; gap: 12rpx; color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 500; line-height: 1; }
 .ticket-bottom text i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff7a3d; box-shadow: 0 0 12rpx rgba(255,122,61,.7); }
 .ticket-bottom b { display: inline-flex; align-items: center; justify-content: center; min-height: 62rpx; padding: 0 28rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; color: #9b89e0; font-size: 27rpx; line-height: 1; white-space: nowrap; }
+.trial-ghost-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22rpx; margin-top: 24rpx; padding: 30rpx 32rpx; border: 1rpx dashed var(--trial-tint); border-radius: 32rpx; background: radial-gradient(60% 80% at 96% 50%, rgba(158,220,29,.14), transparent 68%), #101010; box-sizing: border-box; }
+.trial-ghost-card .ghost-icon { background: rgba(158,220,29,.16); color: var(--trial-tint); }
+.ghost-body { min-width: 0; }
+.ghost-ribbon { display: flex; align-items: center; gap: 8rpx; min-width: 0; }
+.ghost-ribbon text { color: var(--trial-tint); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 650; letter-spacing: 1rpx; text-transform: uppercase; }
+.ghost-ribbon i { overflow: hidden; color: #6b7385; font-size: 21rpx; font-style: normal; white-space: nowrap; text-overflow: ellipsis; }
+.ghost-money { display: flex; align-items: baseline; gap: 8rpx; margin-top: 8rpx; color: #f5f7fa; }
+.ghost-money text { color: #9ba3b5; font-size: 26rpx; opacity: .75; }
+.ghost-money b { font-size: 44rpx; font-weight: 660; line-height: 1; }
+.ghost-money i { color: #58e7ff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-style: normal; }
+.ghost-desc { margin-top: 4rpx; color: #8f98a8; font-size: 22rpx; }
+.ghost-arrow { color: #6b7385; font-size: 26rpx; }
 .ghost-slot { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 22rpx; margin-top: 24rpx; padding: 30rpx 32rpx; border: 1rpx dashed rgba(158,220,29,.45); border-radius: 32rpx; background: #101010; }
 .ghost-icon { display: grid; width: 80rpx; height: 80rpx; place-items: center; border-radius: 20rpx; background: rgba(158,220,29,.16); color: #9edc1d; font-size: 34rpx; }
 .ghost-slot b, .device-id b { display: block; color: #f5f7fa; font-size: 28rpx; }
@@ -440,6 +589,15 @@ button::after { border: 0; }
 .section-title text { display: flex; align-items: center; gap: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; }
 .section-title text i { width: 10rpx; height: 10rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 10rpx rgba(158,220,29,.45); }
 .device-card { padding: 0; }
+.quick-menu-mask { position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; background: rgba(0,0,0,.55); backdrop-filter: blur(10rpx); }
+.quick-menu { width: 100%; padding: 16rpx 24rpx 24rpx; border-top: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx 32rpx 0 0; background: #101010; box-sizing: border-box; }
+.quick-handle { width: 80rpx; height: 8rpx; margin: 0 auto 12rpx; border-radius: 999rpx; background: rgba(255,255,255,.15); }
+.quick-device { overflow: hidden; padding: 10rpx 8rpx 14rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; white-space: nowrap; text-overflow: ellipsis; }
+.quick-menu button { justify-content: flex-start; gap: 20rpx; width: 100%; height: 78rpx; padding: 0 20rpx; border-radius: 18rpx; background: transparent; color: #f5f7fa; font-size: 27rpx; }
+.quick-menu button .ui-icon { color: #9edc1d; font-size: 30rpx; }
+.quick-menu button:nth-of-type(2) .ui-icon { color: #58e7ff; }
+.quick-menu button:nth-of-type(3) .ui-icon { color: #ff7a3d; }
+.quick-menu .quick-cancel { justify-content: center; height: 80rpx; margin-top: 12rpx; border-radius: 999rpx; background: #1f1f1f; color: #d1d5db; font-size: 25rpx; }
 .device-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; padding: 32rpx 40rpx 28rpx; }
 .device-id { display: flex; align-items: center; gap: 24rpx; }
 .device-icon { display: grid; width: 72rpx; height: 72rpx; place-items: center; border-radius: 18rpx; background: #1f1f1f; color: #9edc1d; font-size: 34rpx; }
@@ -448,6 +606,15 @@ button::after { border: 0; }
 .online { display: flex; align-items: center; justify-content: center; gap: 10rpx; min-height: 36rpx; color: #9edc1d; font-size: 24rpx; font-weight: 640; line-height: 1; }
 .online i { position: relative; width: 18rpx; height: 18rpx; border-radius: 50%; background: #9edc1d; box-shadow: 0 0 12rpx rgba(158,220,29,.85); }
 .online i::after { content: ""; position: absolute; inset: -10rpx; border-radius: 50%; border: 2rpx solid rgba(158,220,29,.45); animation: onlinePulse 1.7s ease-out infinite; }
+.online.paused { color: #ffbe3d; }
+.online.paused i { background: #ffbe3d; box-shadow: 0 0 12rpx rgba(255,190,61,.55); }
+.online.paused i::after { border-color: rgba(255,190,61,.35); }
+.paused-block { padding: 0 40rpx 30rpx; }
+.paused-block > text { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; letter-spacing: 2rpx; text-transform: uppercase; }
+.paused-block > view { display: flex; gap: 20rpx; margin-top: 18rpx; padding: 24rpx; border: 1rpx solid rgba(255,190,61,.24); border-radius: 24rpx; background: rgba(255,190,61,.08); }
+.paused-block .ui-icon { flex: none; width: 56rpx; height: 56rpx; border-radius: 16rpx; background: rgba(255,190,61,.16); color: #ffbe3d; font-size: 30rpx; }
+.paused-block b { display: block; color: #f5f7fa; font-size: 26rpx; line-height: 1.2; }
+.paused-block em { display: block; margin-top: 8rpx; color: #9ba3b5; font-size: 22rpx; font-style: normal; line-height: 1.35; }
 .current-task { padding: 0 40rpx 30rpx; }
 .current-task > text, .task-heading, .market-heading { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; letter-spacing: 2rpx; text-transform: uppercase; }
 .current-task b { display: block; margin-top: 18rpx; color: #f5f7fa; font-size: 28rpx; font-weight: 680; }
@@ -466,6 +633,7 @@ button::after { border: 0; }
 .runtime-row { display: flex; align-items: center; gap: 12rpx; padding: 0 40rpx 22rpx; }
 .runtime-pill { gap: 8rpx; height: 56rpx; padding: 0 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: rgba(158,220,29,.14); color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 520; line-height: 1; }
 .runtime-pill .ui-icon { width: 24rpx; height: 24rpx; }
+.runtime-pill.off { background: #1f1f1f; color: #8f98a8; }
 .runtime-hint { padding: 0 40rpx 34rpx; color: #7f8799; font-size: 23rpx; line-height: 1.45; }
 .locked-row { padding: 28rpx 40rpx 34rpx; border-top: 0; }
 .locked-row text { display: inline-flex; align-items: center; gap: 10rpx; color: #8f98a8; font-size: 24rpx; }
@@ -510,12 +678,20 @@ button::after { border: 0; }
 .empty-slots-card button { position: relative; display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 96rpx; margin-top: 28rpx; border-radius: 999rpx; background: #9edc1d; color: #090d08; font-size: 28rpx; font-weight: 650; }
 .fleet-note { position: relative; margin-top: 16rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; text-align: center; }
 .lifecycle-card, .task-lock { padding: 32rpx; }
+.lifecycle-card { background: linear-gradient(160deg, rgba(88,231,255,.12), #101010 70%); border-color: rgba(88,231,255,.22); }
+.lifecycle-glow { position: absolute; inset: 0; background: radial-gradient(60% 80% at 95% 50%, rgba(88,231,255,.18), transparent 70%); pointer-events: none; }
 .life-label { color: #8e72ff; }
+.lifecycle-card .life-label { position: relative; color: #58e7ff; }
 .life-number { display: flex; align-items: baseline; gap: 16rpx; margin-top: 16rpx; color: #f5f7fa; font-size: 60rpx; font-weight: 640; }
+.life-number b { position: relative; font-size: 60rpx; font-weight: 640; line-height: 1; }
 .life-number text { color: #8f98a8; font-size: 22rpx; font-weight: 400; }
 .life-bar, .lock-progress { height: 8rpx; margin-top: 24rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
-.life-bar view { width: 98%; height: 100%; background: rgba(142,114,255,.55); }
+.life-bar view { width: 98%; height: 100%; background: rgba(88,231,255,.55); }
+.lifecycle-card .life-foot { position: relative; }
+.life-foot b { color: #58e7ff; }
+.life-foot b i { color: #6b7385; font-size: 21rpx; font-style: normal; font-weight: 400; }
 .life-foot button { background: #8e72ff; color: #090d08; }
+.lifecycle-card .life-foot button { background: #58e7ff; }
 .market-board { padding-bottom: 10rpx; }
 .market-heading { padding: 24rpx 32rpx 12rpx; color: #8f98a8; }
 .price-row { display: grid; grid-template-columns: 38rpx 1fr 120rpx 90rpx 96rpx; align-items: center; gap: 14rpx; padding: 18rpx 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); }

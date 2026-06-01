@@ -65,6 +65,60 @@
       "style": {
         "navigationBarTitleText": "Bills"
       }
+    },
+    {
+      "path": "pages/store/orders",
+      "style": {
+        "navigationBarTitleText": "Orders"
+      }
+    },
+    {
+      "path": "pages/store/product",
+      "style": {
+        "navigationBarTitleText": "Product"
+      }
+    },
+    {
+      "path": "pages/store/checkout",
+      "style": {
+        "navigationBarTitleText": "Checkout"
+      }
+    },
+    {
+      "path": "pages/team/rank",
+      "style": {
+        "navigationBarTitleText": "Rank"
+      }
+    },
+    {
+      "path": "pages/team/leaderboard",
+      "style": {
+        "navigationBarTitleText": "Leaderboard"
+      }
+    },
+    {
+      "path": "pages/team/unilevel",
+      "style": {
+        "navigationBarTitleText": "Unilevel"
+      }
+    },
+    {
+      "path": "pages/team/binary",
+      "style": {
+        "navigationBarTitleText": "Binary"
+      }
+    },
+    {
+      "path": "pages/team/commissions",
+      "style": {
+        "navigationBarTitleText": "Commissions"
+      }
+    },
+    {
+      "path": "pages/genesis/index",
+      "style": {
+        "navigationBarTitleText": "Genesis"
+      }
     }
   ],
   "globalStyle": {

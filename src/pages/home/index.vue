@@ -10,12 +10,25 @@ const auth = useAuthStore()
 const liveTab = ref<'activity' | 'earnings'>('activity')
 const dayTasksExpanded = ref(false)
 const moneyDisplay = ref(0.06)
+const nowTick = ref(0)
+const dayProgressVisible = ref(false)
+const rankProgressVisible = ref(false)
 let moneyTimer: ReturnType<typeof setInterval> | undefined
+let clockTimer: ReturnType<typeof setInterval> | undefined
+let activityTimer: ReturnType<typeof setInterval> | undefined
+let earningsTimer: ReturnType<typeof setInterval> | undefined
 const locale = useActiveLocale()
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.home)
 const v = computed(() => t.value.v5)
 const common = computed(() => copy.value.common)
+const tx = (zh: string, en: string) => (locale.value === 'zh' ? zh : en)
+const stellaInsight = computed(() =>
+  tx(
+    '你的收益位于移动节点前 0.16%。我找到了一条更快的 S1 回本路径。',
+    'Your yield sits in the top 0.16% of mobile nodes. I found a faster S1 payback path.'
+  )
+)
 
 onShow(() => {
   requireAuth()
@@ -36,14 +49,48 @@ const moneyParticles = [
   { left: '88%', delay: '6.4s', color: '#9EDC1D' }
 ]
 
+type ActivityRow = { id: number; ts: string; who: string; msg: string; val: string; level: 'warn' | 'live' | 'ok' }
+type EarningRow = { id: number; name: string; product: string; amount: string }
+let activityId = 100
+let earningId = 100
+
 onMounted(() => {
   moneyTimer = setInterval(() => {
     moneyDisplay.value += 0.0009 * (0.6 + Math.random() * 0.9)
   }, 1100)
+  clockTimer = setInterval(() => {
+    nowTick.value += 1
+  }, 1000)
+  setTimeout(() => {
+    dayProgressVisible.value = true
+    rankProgressVisible.value = true
+  }, 180)
+  activityTimer = setInterval(() => {
+    const next = activityPool[Math.floor(Math.random() * activityPool.length)]
+    activityId += 1
+    activityRows.value = [{ ...next, id: activityId, ts: '+0:00' }, ...activityRows.value.slice(0, 5)]
+  }, 3200)
+  earningsTimer = setInterval(() => {
+    const names = ['Sarah K.', 'Tom Wang', 'Lisa Park', 'Diego P.', 'Yuki H.', 'Mehmet A.', 'Mila V.']
+    const products = [
+      { product: 'NexionBox S1', amount: '+$29.90' },
+      { product: 'NexionBox Pro', amount: '+$89.90' },
+      { product: 'NexionRack P1', amount: '+$349.90' }
+    ]
+    const product = products[Math.floor(Math.random() * products.length)]
+    earningId += 1
+    earningRows.value = [
+      { id: earningId, name: names[Math.floor(Math.random() * names.length)], ...product },
+      ...earningRows.value.slice(0, 2)
+    ]
+  }, 6500)
 })
 
 onUnmounted(() => {
   if (moneyTimer) clearInterval(moneyTimer)
+  if (clockTimer) clearInterval(clockTimer)
+  if (activityTimer) clearInterval(activityTimer)
+  if (earningsTimer) clearInterval(earningsTimer)
 })
 
 const dayTasks = computed(() => [
@@ -54,21 +101,38 @@ const dayTasks = computed(() => [
   { label: v.value.setupProfile, cat: v.value.identityCat, reward: '+80', done: false, color: '#9b89e0' },
   { label: v.value.inviteFriend, cat: v.value.socialCat, reward: '+200', done: false, color: '#ff6b35' }
 ])
+const completedTasks = computed(() => dayTasks.value.filter((task) => task.done).length)
+const nexEarned = computed(() => dayTasks.value.filter((task) => task.done).reduce((sum, task) => sum + Number(task.reward.slice(1)), 0))
+const dayProgressPct = computed(() => `${dayProgressVisible.value ? (completedTasks.value / dayTasks.value.length) * 100 : 0}%`)
+const dayCountdown = computed(() => {
+  const remainingMs = 18 * 3600_000 + 24 * 60_000 - (nowTick.value * 1000) % 60_000
+  const h = Math.floor(remainingMs / 3600_000)
+  const m = Math.floor((remainingMs % 3600_000) / 60_000)
+  const s = Math.floor((remainingMs % 60_000) / 1000)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+})
 
-const activityRows = computed(() => [
-  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
-  { ts: '+0:00', who: v.value.feedPeer, msg: 'Maya · ID — Llama 70B @ Helix Labs', val: '+$0.247', level: 'live' },
-  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
-  { ts: '+0:00', who: v.value.feedPeer, msg: 'cypher.eth — Sora 8s @ Atrium AI', val: '+$0.612', level: 'live' },
-  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
-  { ts: '+0:00', who: v.value.feedYou, msg: 'MobileBERT @ Vector Foundry', val: '+$0.00007', level: 'ok' }
-])
+const activityPool = [
+  { who: 'You', msg: 'SDXL Turbo @ Pocket Studios', val: '+$0.00032', level: 'ok' },
+  { who: 'Peer', msg: 'Maya · ID - Llama 70B @ Helix Labs', val: '+$0.247', level: 'live' },
+  { who: 'Peer', msg: 'cypher.eth - Sora 8s @ Atrium AI', val: '+$0.612', level: 'live' },
+  { who: 'You', msg: 'Whisper tiny @ Echo Earbuds', val: '+$0.00009', level: 'ok' },
+  { who: 'Peer', msg: 'Hideo · JP - Flux dev @ Mosaic', val: '+$0.182', level: 'live' },
+  { who: 'Peer', msg: 'Layla · AE - Llama 405B @ Conduit AI', val: '+$1.204', level: 'live' },
+  { who: 'Lock', msg: 'Llama 70B LoRA @ Vector - needs 192GB', val: 'locked', level: 'warn' },
+  { who: 'You', msg: 'MobileBERT @ Vector Foundry', val: '+$0.00007', level: 'ok' }
+] satisfies Omit<ActivityRow, 'id' | 'ts'>[]
+const activityRows = ref<ActivityRow[]>(activityPool.slice(0, 6).map((row, index) => ({
+  ...row,
+  id: index + 1,
+  ts: `+${Math.floor((index * 4) / 60)}:${String((index * 4) % 60).padStart(2, '0')}`
+})))
 
 const quickActions = computed(() => [
-  { icon: '💎', label: v.value.quickStake, sub: '180% APY', tone: 'brand' },
-  { icon: '👑', label: v.value.quickGenesis, sub: v.value.quickGenesisSub, tone: 'warm' },
-  { icon: '🎯', label: v.value.quickMissions, sub: v.value.quickMissionsSub, tone: 'brand' },
-  { icon: '🔥', label: v.value.quickDaily, sub: v.value.quickDailySub, tone: 'warm' }
+  { icon: 'gem', label: v.value.quickStake, sub: '180% APY', tone: 'brand' },
+  { icon: 'crown', label: v.value.quickGenesis, sub: v.value.quickGenesisSub, tone: 'warm' },
+  { icon: 'target', label: v.value.quickMissions, sub: v.value.quickMissionsSub, tone: 'brand' },
+  { icon: 'flame', label: v.value.quickDaily, sub: v.value.quickDailySub, tone: 'warm' }
 ])
 
 const gridClients = computed(() => [
@@ -99,11 +163,11 @@ const pulseMetrics = computed(() => [
   { key: v.value.pulseRank, value: '#18,742', sub: v.value.pulseRankSub, tone: 'brand', color: '#9EDC1D', spark: sparkline([-19, -19, -19, -18.9, -18.9, -18.85, -18.8, -18.74]) }
 ])
 
-const earningRows = [
-  { name: 'Sarah K.', product: 'NexionBox S1', amount: '+$29.90' },
-  { name: 'Tom Wang', product: 'NexionBox Pro', amount: '+$89.90' },
-  { name: 'Lisa Park', product: 'NexionRack P1', amount: '+$349.90' }
-]
+const earningRows = ref<EarningRow[]>([
+  { id: 1, name: 'Sarah K.', product: 'NexionBox S1', amount: '+$29.90' },
+  { id: 2, name: 'Tom Wang', product: 'NexionBox Pro', amount: '+$89.90' },
+  { id: 3, name: 'Lisa Park', product: 'NexionRack P1', amount: '+$349.90' }
+])
 
 const ledgerRows = [
   { model: 'SDXL Turbo', who: 'Pocket Studios', amt: '+$0.00032', t: '2s' },
@@ -123,7 +187,8 @@ const marketRows = [
 ]
 
 const nexSpark = sparkline([7.4, 7.7, 7.5, 8.0, 8.2, 8.1, 8.4, 8.42])
-const trustChips = ['NVIDIA', 'Intel', 'AMD', 'CertiK ✓', 'SOC 2', 'GDPR', 'ISO 27001']
+const trustChips = ['NVIDIA', 'Intel', 'AMD', 'CertiK verified', 'SOC 2', 'GDPR', 'ISO 27001']
+const rankProgressPct = computed(() => (rankProgressVisible.value ? '42%' : '0%'))
 
 function showSoon(label: string) {
   uni.showToast({ title: common.value.comingSoon(label), icon: 'none' })
@@ -150,7 +215,7 @@ function showSoon(label: string) {
             <view>
               <view class="money-label">{{ v.todayEarningsLabel || t.earnings }}</view>
               <view class="money"><text>$</text>{{ moneyInt }}<text>.{{ moneyCents }}</text></view>
-              <view class="success-line">↑ {{ v.todayJobsStreak }}</view>
+              <view class="success-line"><i class="ui-mask icon-trend" /> {{ v.todayJobsStreak }}</view>
             </view>
             <view class="stream-chip">{{ v.streaming || t.live }}</view>
           </view>
@@ -161,11 +226,12 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="trial-card card" @click="showSoon(t.freeTrial)">
+        <view class="trial-card trial-hero-card card" @click="showSoon(t.freeTrial)">
+          <view class="trial-orbit" />
           <view>
             <view class="ticket">{{ t.freeTrial }}</view>
-            <view class="card-title">{{ t.cloudShare }}</view>
-            <view class="body">{{ v.noHardwareTrial }}</view>
+            <view class="card-title">{{ v.freeTrialTitle || t.cloudShare }}</view>
+            <view class="body">{{ v.freeTrialBody || v.noHardwareTrial }}</view>
           </view>
           <view class="trial-side">
             <text>{{ t.earnUpTo }}</text>
@@ -173,12 +239,24 @@ function showSoon(label: string) {
           </view>
         </view>
 
+        <view class="trial-ghost-card card" @click="showSoon(v.startTrial || t.freeTrial)">
+          <view class="ghost-device">
+            <i class="ui-mask icon-server" />
+          </view>
+          <view class="ghost-copy">
+            <view class="mono muted">{{ v.ghostSlot || tx('试用预留槽', 'Trial ghost slot') }}</view>
+            <b>{{ v.cloudShareTrial || t.cloudShare }}</b>
+            <text>{{ v.cloudShareTrialDesc || tx('托管切片 · 可用', 'Managed slice · ready') }}</text>
+          </view>
+          <button>{{ v.startTrial || t.freeTrial }} <i class="ui-mask icon-arrow" /></button>
+        </view>
+
         <view class="conversion-card card">
           <view>
             <view class="mono muted">{{ v.upgradeSignal }}</view>
             <view class="card-title">{{ v.upgradeSignalBody }}</view>
           </view>
-          <button @click="showSoon(t.store)">{{ v.seeRoi }} <text>›</text></button>
+          <button @click="showSoon(t.store)">{{ v.seeRoi }} <i class="ui-mask icon-chevron" /></button>
         </view>
 
         <view class="weekly-quest-card card" @click="showSoon(v.weeklyQuestCta)">
@@ -186,7 +264,7 @@ function showSoon(label: string) {
           <view class="weekly-content">
             <view class="weekly-meta">
               <view class="weekly-label">
-                <text class="quest-icon">⌘</text>
+                <text class="quest-icon"><i class="ui-mask icon-spark" /></text>
                 <text>{{ v.weeklyQuestEyebrow }}</text>
                 <text class="mult-chip">1.5×</text>
               </view>
@@ -204,7 +282,7 @@ function showSoon(label: string) {
               <i>·</i>
               <text>{{ v.weeklyQuestPayback }} <em>~34d</em></text>
             </view>
-            <button class="weekly-cta">{{ v.weeklyQuestCta }} <text>→</text></button>
+            <button class="weekly-cta">{{ v.weeklyQuestCta }} <i class="ui-mask icon-arrow" /></button>
           </view>
         </view>
 
@@ -216,17 +294,19 @@ function showSoon(label: string) {
             </view>
             <view class="timer">
               <text>{{ t.endsIn }}</text>
-              <b>18:24:00</b>
+              <b>{{ dayCountdown }}</b>
             </view>
           </view>
-          <view class="progress"><view /></view>
+          <view class="progress"><view :style="{ width: dayProgressPct }" /></view>
           <view class="day-foot">
-            <text><b>3</b>/6 {{ v.doneSuffix }}</text>
-            <text>+130 {{ v.earnedSuffix }}</text>
+            <text><b>{{ completedTasks }}</b>/{{ dayTasks.length }} {{ v.doneSuffix }}</text>
+            <text>+{{ nexEarned }} {{ v.earnedSuffix }}</text>
           </view>
           <view v-if="dayTasksExpanded" class="task-list">
             <view v-for="task in dayTasks" :key="task.label" class="task-row">
-              <text class="task-dot" :class="{ done: task.done }" :style="{ borderColor: task.color, background: task.done ? task.color : 'transparent' }">{{ task.done ? '✓' : '' }}</text>
+              <text class="task-dot" :class="{ done: task.done }" :style="{ borderColor: task.color, background: task.done ? task.color : 'transparent' }">
+                <i v-if="task.done" class="ui-mask icon-check" />
+              </text>
               <view>
                 <b>{{ task.label }}</b>
                 <text :style="{ color: task.color }">{{ task.cat }}</text>
@@ -236,7 +316,7 @@ function showSoon(label: string) {
           </view>
           <button class="task-toggle" @click="dayTasksExpanded = !dayTasksExpanded">
             {{ dayTasksExpanded ? v.hideTasks : v.viewTasks.replace('{n}', '6') }}
-            <text>{{ dayTasksExpanded ? '⌃' : '⌄' }}</text>
+            <i class="ui-mask icon-chevron" :class="{ up: dayTasksExpanded }" />
           </button>
         </view>
 
@@ -249,7 +329,7 @@ function showSoon(label: string) {
             <view class="live-chip small live-feed-chip"><i /> {{ v.liveFeed }}</view>
           </view>
           <view v-if="liveTab === 'activity'" class="feed">
-            <view v-for="row in activityRows" :key="`${row.ts}-${row.who}-${row.msg}`" class="feed-row">
+            <view v-for="(row, index) in activityRows" :key="row.id" class="feed-row" :class="{ fresh: index === 0 }">
               <text>{{ row.ts }}</text>
               <b :class="row.level">{{ row.who }}</b>
               <view>{{ row.msg }}</view>
@@ -257,13 +337,13 @@ function showSoon(label: string) {
             </view>
           </view>
           <view v-else class="feed">
-            <view v-for="row in earningRows" :key="row.name" class="earn-row">
+            <view v-for="(row, index) in earningRows" :key="row.id" class="earn-row" :class="{ fresh: index === 0 }">
               <i />
               <b>{{ row.name }}</b>
               <view>{{ v.bought }} {{ row.product }}</view>
               <text>{{ row.amount }}</text>
             </view>
-            <view class="see-all">{{ v.seeAll }} ›</view>
+            <view class="see-all">{{ v.seeAll }} <i class="ui-mask icon-chevron" /></view>
           </view>
         </view>
 
@@ -274,7 +354,7 @@ function showSoon(label: string) {
             :class="item.tone"
             @click="showSoon(item.label)"
           >
-            <text>{{ item.icon }}</text>
+            <text><i class="ui-mask" :class="`icon-${item.icon}`" /></text>
             <b>{{ item.label }}</b>
             <i>{{ item.sub }}</i>
           </button>
@@ -282,17 +362,17 @@ function showSoon(label: string) {
 
         <view class="fleet-title-row">
           <view><b>{{ v.myFleetTitle }}</b><text>1 of 6</text></view>
-          <button @click="showSoon(v.manage)">{{ v.manage }} <text>→</text></button>
+          <button @click="showSoon(v.manage)">{{ v.manage }} <i class="ui-mask icon-arrow" /></button>
         </view>
         <view class="fleet-card card">
           <view class="fleet-row">
             <view class="device-icon">
-              <text>▯</text>
+              <text><i class="ui-mask icon-phone" /></text>
               <i />
             </view>
             <view class="fleet-main">
               <view><b>{{ v.yourPhoneDevice }}</b><em>{{ v.earning }}</em></view>
-              <text>Mobile NPU · 28 TOPS</text>
+              <text>{{ tx('移动端 NPU · 28 TOPS', 'Mobile NPU · 28 TOPS') }}</text>
             </view>
             <view class="fleet-earn"><b>$0.040</b><text>{{ v.today }}</text></view>
           </view>
@@ -308,7 +388,7 @@ function showSoon(label: string) {
             <view class="task-meta"><text><b>28%</b> · 28s {{ v.left }}</text><text>7d {{ v.streak }}</text></view>
           </view>
           <view class="add-device">
-            <view class="add-icon">＋</view>
+            <view class="add-icon"><i class="ui-mask icon-plus" /></view>
             <view><b>{{ v.addNexionBox }}</b><text>{{ v.paysBack34 }}</text></view>
             <em>$38.50<text>{{ v.estPerDay }}</text></em>
           </view>
@@ -320,7 +400,7 @@ function showSoon(label: string) {
               <text>{{ v.onGrid }}</text>
               <text class="grid-now">{{ v.gridNow }}</text>
             </view>
-            <button @click="showSoon(v.gridMap)">{{ v.gridMap }} <text>→</text></button>
+            <button @click="showSoon(v.gridMap)">{{ v.gridMap }} <i class="ui-mask icon-arrow" /></button>
           </view>
           <view class="on-grid-card">
             <view v-for="client in gridClients" :key="client.id" class="on-grid-row">
@@ -367,6 +447,22 @@ function showSoon(label: string) {
           </view>
         </view>
 
+        <button class="stella-card" @click="showSoon('Stella')">
+          <view class="stella-avatar">
+            <i class="ui-mask icon-spark" />
+          </view>
+          <view class="stella-bubble">
+            <i class="stella-blob one" />
+            <i class="stella-blob two" />
+            <i class="stella-blob three" />
+            <view class="stella-content">
+              <view class="stella-name"><b>Stella</b><text>AI advisor</text></view>
+              <view class="stella-message">{{ stellaInsight }}</view>
+              <view class="stella-link">{{ v.seeRoi }} <i class="ui-mask icon-arrow" /></view>
+            </view>
+          </view>
+        </button>
+
         <view class="rank-card v5-card">
           <view class="rank-top">
             <text>{{ t.yourRank }}</text>
@@ -380,14 +476,14 @@ function showSoon(label: string) {
             <text>{{ v.rankNext }} · <b>V1 Operator</b></text>
             <text>42%</text>
           </view>
-          <view class="rank-progress"><view /></view>
+          <view class="rank-progress"><view :style="{ width: rankProgressPct }" /></view>
           <view class="rank-missing">{{ v.rankMissing }}</view>
-          <view class="rank-prize">🎁 {{ v.rankPrize }}</view>
+          <view class="rank-prize"><i class="ui-mask icon-gift" /> {{ v.rankPrize }}</view>
         </view>
 
         <view class="pool-card v5-card">
           <view class="pool-head">
-            <text>♛ {{ v.leadershipPool }}</text>
+            <text><i class="ui-mask icon-crown" /> {{ v.leadershipPool }}</text>
             <text>{{ v.poolEndsIn }} <b>5d</b></text>
           </view>
           <view class="pool-main">
@@ -426,7 +522,7 @@ function showSoon(label: string) {
               <view><text>{{ v.mathPayback }}</text><b>34 d</b></view>
               <view><text>{{ v.mathVsPhone }}</text><b>642×</b></view>
             </view>
-            <button class="math-cta" @click="showSoon(v.mathSee)">{{ v.mathSee }} <text>→</text></button>
+            <button class="math-cta" @click="showSoon(v.mathSee)">{{ v.mathSee }} <i class="ui-mask icon-arrow" /></button>
           </view>
         </view>
 
@@ -446,7 +542,7 @@ function showSoon(label: string) {
               <text>NEX / USDT</text>
             </view>
             <view><b>$0.084</b><i>+12.4%</i></view>
-            <em>✓ Binance T1 cleared</em>
+            <em><i class="ui-mask icon-check" /> Binance T1 cleared</em>
           </view>
           <view class="nex-spark">
             <svg viewBox="0 0 100 32" preserveAspectRatio="none">
@@ -460,7 +556,7 @@ function showSoon(label: string) {
         <view class="market-board-section">
           <view class="section-head">
             <view><text>{{ v.computeMarket }}</text><text>{{ v.marketPrices }}</text></view>
-            <button @click="showSoon(v.marketOpen)">{{ v.marketOpen }} <text>→</text></button>
+            <button @click="showSoon(v.marketOpen)">{{ v.marketOpen }} <i class="ui-mask icon-arrow" /></button>
           </view>
           <view class="market-board v5-card">
             <view class="market-header">
@@ -481,11 +577,11 @@ function showSoon(label: string) {
         </view>
 
         <view class="trust-card-v5 v5-card">
-          <view class="trust-title">✓ {{ t.audited }}</view>
+          <view class="trust-title"><i class="ui-mask icon-check" /> {{ t.audited }}</view>
           <view class="trust-tags">
             <text v-for="chip in trustChips" :key="chip">{{ chip }}</text>
           </view>
-          <view class="trust-note">{{ v.reserveProof }} →</view>
+          <view class="trust-note">{{ v.reserveProof }} <i class="ui-mask icon-arrow" /></view>
         </view>
       </view>
     </scroll-view>
@@ -496,13 +592,28 @@ function showSoon(label: string) {
 .page { height: 100vh; }
 .home-stack { padding-bottom: 180rpx; color: #f7f9fc; }
 .card { border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #10141d; box-sizing: border-box; }
+.ui-mask { display: inline-block; width: 1em; height: 1em; background: currentColor; vertical-align: -.12em; -webkit-mask: var(--icon) center / contain no-repeat; mask: var(--icon) center / contain no-repeat; }
+.icon-arrow { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M13.2 4.4 21 12l-7.8 7.6-1.4-1.45L17.1 13H3v-2h14.1l-5.3-5.15z'/%3E%3C/svg%3E"); }
+.icon-chevron { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='m9.3 5.6 6.4 6.4-6.4 6.4-1.4-1.4 5-5-5-5z'/%3E%3C/svg%3E"); }
+.icon-chevron.up { transform: rotate(-90deg); }
+.icon-check { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M9.2 16.6 4.8 12.2l-1.4 1.4 5.8 5.8L21 7.6l-1.4-1.4z'/%3E%3C/svg%3E"); }
+.icon-gem { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M6.2 3h11.6L22 8l-10 13L2 8zm1 2-2.4 3h4.5l1.4-3zm5.9 0-1.2 3h7.3l-2.4-3zm-1.8 5H5.1l5.2 6.8zm2.1 0-1.7 7 5.4-7z'/%3E%3C/svg%3E"); }
+.icon-crown { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M3 7.2 8.2 11 12 4l3.8 7L21 7.2 19.3 19H4.7zm3.4 9.8h11.2l.8-5.4-3.2 2.3L12 8l-3.2 5.9-3.2-2.3z'/%3E%3C/svg%3E"); }
+.icon-target { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M11 2h2v3.1a7 7 0 0 1 5.9 5.9H22v2h-3.1a7 7 0 0 1-5.9 5.9V22h-2v-3.1A7 7 0 0 1 5.1 13H2v-2h3.1A7 7 0 0 1 11 5.1zm1 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10m0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4'/%3E%3C/svg%3E"); }
+.icon-flame { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M13.3 2.4c.7 3.7-.8 5.4-2.2 7.1-.8 1-1.6 1.9-1.7 3.2 1.1-.5 1.8-1.4 2.3-2.7 2.8 1.7 4.3 3.8 4.3 6.2A4 4 0 0 1 12 20a4.1 4.1 0 0 1-4.1-4.1c0-1.5.7-2.9 1.7-4.2 1.3-1.8 2.9-3.9 2.3-7.2zM12 22a6 6 0 0 0 6-5.8c0-3.2-2-6.1-6-8.4-.4 1.3-1 2.1-1.9 2.7.6-1.5 1.7-3.1 2.4-4.9.5-1.2.7-2.4.4-3.6C9.1 5.3 6 10.1 6 15.9A6 6 0 0 0 12 22'/%3E%3C/svg%3E"); }
+.icon-server { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M4 4h16v6H4zm2 2v2h12V6zm-2 8h16v6H4zm2 2v2h12v-2z'/%3E%3C/svg%3E"); }
+.icon-spark { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='m12 2 2.1 6.1L20 10l-5.9 1.9L12 18l-2.1-6.1L4 10l5.9-1.9zM19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z'/%3E%3C/svg%3E"); }
+.icon-phone { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2m0 3v13h8V5zm3 14v1h2v-1z'/%3E%3C/svg%3E"); }
+.icon-plus { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z'/%3E%3C/svg%3E"); }
+.icon-gift { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M7.5 3A3.5 3.5 0 0 1 12 6.4 3.5 3.5 0 1 1 16.5 10H21v5h-2v6H5v-6H3v-5h4.5A3.5 3.5 0 0 1 7.5 3M9 8h2V6.5A1.5 1.5 0 1 0 9 8m4 0h2a1.5 1.5 0 1 0-2-1.5zM5 12v1h6v-1zm8 0v1h6v-1zm-6 3v4h4v-4zm6 0v4h4v-4z'/%3E%3C/svg%3E"); }
+.icon-trend { --icon: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='black' d='M4 17.6 10.4 11l3.2 3.2L20 7.8V13h2V4h-9v2h5.6l-5 5-3.2-3.2L2.6 16.2z'/%3E%3C/svg%3E"); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .6rpx; }
 .muted { color: #8f98a8; font-size: 23rpx; }
 .greeting { padding: 8rpx 4rpx 4rpx; }
 .hello { color: #99a3b3; font-size: 27rpx; }
 .headline { margin-top: 8rpx; color: #fff; font-size: 52rpx; font-weight: 760; line-height: 1.12; }
 .headline text { color: #9edc1d; }
-.success-line { margin-top: 16rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; line-height: 1.2; }
+.success-line { display: flex; align-items: center; gap: 8rpx; margin-top: 16rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; line-height: 1.2; }
 .money-card { position: relative; isolation: isolate; overflow: hidden; margin-top: 24rpx; padding: 36rpx 36rpx 40rpx; border-color: rgba(255,255,255,.12); border-radius: 32rpx; background: #1f1f1f; box-shadow: inset 0 1rpx 0 rgba(255,255,255,.06), 0 24rpx 64rpx rgba(0,0,0,.70); }
 .money-aurora { position: absolute; inset: -30% -10% auto -10%; z-index: 0; height: 220%; background: radial-gradient(45% 35% at 22% 30%, rgba(142,114,255,.22), transparent 60%), radial-gradient(40% 30% at 78% 20%, rgba(198,255,58,.18), transparent 60%), radial-gradient(50% 40% at 55% 80%, rgba(255,122,61,.24), transparent 65%); filter: blur(28rpx); pointer-events: none; animation: v5AuroraDrift 14s ease-in-out infinite alternate; }
 .money-grid { position: absolute; inset: 0; z-index: 0; pointer-events: none; background-image: linear-gradient(to right, rgba(158,220,29,.09) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(158,220,29,.09) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); }
@@ -527,6 +638,19 @@ function showSoon(label: string) {
 .math-grid text { display: block; color: #8f98a8; font-size: 21rpx; }
 .math-grid b { display: block; margin-top: 8rpx; color: #c6ff3a; font-size: 30rpx; }
 .trial-card, .conversion-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24rpx; margin-top: 24rpx; padding: 30rpx 34rpx; background: radial-gradient(circle at 0 100%, rgba(18,201,121,.14), transparent 56%), #10141d; }
+.trial-hero-card { position: relative; overflow: hidden; border-color: rgba(88,231,255,.18); background: radial-gradient(circle at 18% 0, rgba(88,231,255,.18), transparent 48%), radial-gradient(circle at 100% 80%, rgba(157,242,15,.12), transparent 52%), #101010; }
+.trial-orbit { position: absolute; right: -66rpx; top: -80rpx; width: 260rpx; height: 260rpx; border: 1rpx solid rgba(88,231,255,.24); border-radius: 50%; animation: slowSpin 18s linear infinite; }
+.trial-orbit::before, .trial-orbit::after { content: ""; position: absolute; border-radius: 50%; }
+.trial-orbit::before { inset: 54rpx; border: 1rpx dashed rgba(157,242,15,.26); }
+.trial-orbit::after { right: 42rpx; top: 28rpx; width: 18rpx; height: 18rpx; background: #58e7ff; box-shadow: 0 0 22rpx rgba(88,231,255,.55); }
+.trial-ghost-card { position: relative; display: grid; grid-template-columns: 84rpx 1fr auto; align-items: center; gap: 22rpx; margin-top: 16rpx; padding: 22rpx 26rpx; border-style: dashed; border-color: rgba(255,255,255,.14); background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.025)); }
+.ghost-device { display: grid; width: 84rpx; height: 84rpx; place-items: center; border-radius: 24rpx; background: rgba(88,231,255,.12); color: #58e7ff; }
+.ghost-device i { font-size: 42rpx; }
+.ghost-copy { min-width: 0; }
+.ghost-copy b { display: block; overflow: hidden; margin-top: 4rpx; color: #f6f8fb; font-size: 28rpx; font-weight: 640; white-space: nowrap; text-overflow: ellipsis; }
+.ghost-copy text { display: block; overflow: hidden; margin-top: 6rpx; color: #8f98a8; font-size: 22rpx; white-space: nowrap; text-overflow: ellipsis; }
+.trial-ghost-card button { display: flex; align-items: center; gap: 8rpx; height: 58rpx; margin: 0; padding: 0 20rpx; border: 1rpx solid rgba(88,231,255,.26); border-radius: 999rpx; background: rgba(88,231,255,.12); color: #58e7ff; font-size: 23rpx; font-weight: 650; white-space: nowrap; }
+.trial-ghost-card button::after { border: 0; }
 .ticket { display: inline-flex; padding: 6rpx 14rpx; border: 1rpx dashed rgba(18,201,121,.46); border-radius: 8rpx; color: #12c979; font-size: 19rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2rpx; }
 .card-title { margin-top: 10rpx; color: #fff; font-size: 32rpx; font-weight: 720; line-height: 1.25; }
 .body { margin-top: 8rpx; color: #99a3b3; font-size: 24rpx; line-height: 1.45; }
@@ -540,7 +664,7 @@ function showSoon(label: string) {
 .weekly-content { position: relative; z-index: 1; padding: 28rpx 48rpx 32rpx; }
 .weekly-meta { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; }
 .weekly-label { display: inline-flex; align-items: center; min-width: 0; gap: 12rpx; color: #c6ff3a; font-weight: 560; }
-.quest-icon { font-size: 25rpx; transform: translateY(-1rpx); }
+.quest-icon { display: inline-flex; font-size: 25rpx; transform: translateY(-1rpx); }
 .mult-chip { padding: 4rpx 12rpx; border: 1rpx solid rgba(198,255,58,.38); border-radius: 8rpx; background: rgba(198,255,58,.14); color: #c6ff3a; line-height: 1; }
 .weekly-countdown { display: flex; align-items: center; gap: 10rpx; color: #687181; white-space: nowrap; }
 .weekly-countdown b { color: #9b89e0; font-weight: 560; }
@@ -564,17 +688,19 @@ function showSoon(label: string) {
 .timer text { display: block; color: #8f98a8; font-size: 22rpx; }
 .timer b { display: block; margin-top: 8rpx; color: #9b89e0; font-size: 31rpx; }
 .progress { height: 16rpx; margin-top: 28rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
-.progress view { width: 50%; height: 100%; background: linear-gradient(90deg,#c6ff3a,#58e7ff); border-radius: inherit; }
+.progress view { width: 0; height: 100%; background: linear-gradient(90deg,#c6ff3a,#58e7ff); border-radius: inherit; transition: width .9s cubic-bezier(.22,1,.36,1); }
 .day-foot { display: flex; justify-content: space-between; margin-top: 12rpx; color: #8f98a8; font-size: 23rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .day-foot b, .day-foot text:last-child { color: #c6ff3a; }
 .task-list { margin-top: 22rpx; padding-top: 20rpx; border-top: 1rpx dashed #303746; }
 .task-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16rpx; padding: 10rpx 0; }
 .task-dot { display: grid; width: 36rpx; height: 36rpx; place-items: center; border: 1rpx solid; border-radius: 50%; color: #10140a; font-size: 20rpx; font-weight: 800; }
+.task-dot i { font-size: 22rpx; }
 .task-row b { display: block; color: #fff; font-size: 25rpx; }
 .task-row view text { display: block; margin-top: 3rpx; font-size: 20rpx; }
 .task-row i { color: #c6ff3a; font-style: normal; font-weight: 700; }
 .task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
-.task-toggle text { font-size: 25rpx; transform: translateY(-1rpx); }
+.task-toggle i { font-size: 25rpx; transform: rotate(90deg); }
+.task-toggle i.up { transform: rotate(-90deg); }
 .live-card, .fleet-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
 .live-card { overflow: hidden; padding-bottom: 12rpx; border-radius: 32rpx; background: #101010; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
@@ -586,6 +712,7 @@ function showSoon(label: string) {
 .live-feed-chip i { width: 9rpx; height: 9rpx; background: #9b89e0; box-shadow: 0 0 10rpx rgba(155,137,224,.5); }
 .feed { margin-top: 10rpx; }
 .feed-row { display: grid; grid-template-columns: 82rpx 68rpx 1fr auto; gap: 14rpx; align-items: center; padding: 17rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.feed-row.fresh, .earn-row.fresh { animation: feedFade .48s ease both; }
 .feed-row text, .feed-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .feed-row view { color: #c8cdd6; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 25rpx; }
 .feed-row b { padding: 3rpx 8rpx; text-align: center; border-radius: 6rpx; font-size: 20rpx; letter-spacing: .7rpx; }
@@ -599,12 +726,13 @@ function showSoon(label: string) {
 .earn-row i { width: 9rpx; height: 9rpx; border-radius: 50%; background: #12c979; }
 .earn-row b { color: #fff; }
 .earn-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.see-all { padding-top: 16rpx; text-align: right; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.see-all { display: flex; align-items: center; justify-content: flex-end; gap: 4rpx; padding-top: 16rpx; text-align: right; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14rpx; margin-top: 24rpx; }
 .quick-grid button { display: flex; height: 118rpx; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; margin: 0; padding: 0; border: 1rpx solid rgba(198,255,58,.36); border-radius: 24rpx; background: #101010; text-align: center; line-height: 1; }
 .quick-grid button::after { border: 0; }
 .quick-grid button.warm { border-color: rgba(255,107,53,.46); }
-.quick-grid text { display: block; width: 100%; font-size: 31rpx; line-height: 1; text-align: center; }
+.quick-grid text { display: block; width: 100%; color: #9df20f; font-size: 31rpx; line-height: 1; text-align: center; }
+.quick-grid .warm text { color: #ff7b3d; }
 .quick-grid b { display: block; width: 100%; color: #f3f5f9; font-size: 25rpx; font-weight: 720; line-height: 1.05; text-align: center; }
 .quick-grid i { display: block; width: 100%; color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-style: normal; font-weight: 650; line-height: 1.1; text-align: center; }
 .quick-grid .warm i { color: #ff7b3d; }
@@ -620,7 +748,7 @@ function showSoon(label: string) {
 .fleet-row { display: grid; grid-template-columns: 92rpx 1fr auto; align-items: center; gap: 22rpx; }
 .device-icon, .rank-orb { display: grid; width: 74rpx; height: 74rpx; place-items: center; border-radius: 20rpx; background: rgba(157,242,15,.18); color: #9df20f; font-size: 34rpx; font-weight: 760; }
 .device-icon { position: relative; }
-.device-icon text { transform: rotate(90deg); font-size: 32rpx; }
+.device-icon text { font-size: 32rpx; }
 .device-icon i { position: absolute; right: -4rpx; bottom: -4rpx; width: 18rpx; height: 18rpx; border: 4rpx solid #101010; border-radius: 50%; background: #9df20f; box-shadow: 0 0 12rpx rgba(157,242,15,.45); }
 .fleet-main view { display: flex; align-items: center; gap: 10rpx; min-width: 0; }
 .fleet-main b { color: #fff; font-size: 30rpx; font-weight: 740; }
@@ -688,6 +816,21 @@ function showSoon(label: string) {
 .pulse-svg { display: block; width: 100%; height: 64rpx; overflow: visible; }
 .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
+.stella-card { display: flex; align-items: flex-end; gap: 18rpx; width: 100%; margin: 24rpx 0 0; padding: 4rpx; border: 0; background: transparent; text-align: left; }
+.stella-card::after { border: 0; }
+.stella-avatar { position: relative; display: grid; flex: 0 0 88rpx; width: 88rpx; height: 88rpx; place-items: center; border-radius: 50%; background: radial-gradient(circle at 30% 25%, #f8fafc 0 18%, #9b89e0 19% 54%, #1f1f1f 55% 100%); color: #c6ff3a; box-shadow: 0 0 0 10rpx rgba(155,137,224,.12); animation: stellaHalo 2.4s ease-in-out infinite; }
+.stella-avatar i { font-size: 36rpx; }
+.stella-bubble { position: relative; flex: 1; min-width: 0; overflow: hidden; padding: 24rpx 28rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 34rpx 34rpx 34rpx 8rpx; background: #101010; }
+.stella-blob { position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; filter: blur(28rpx); }
+.stella-blob.one { width: 240rpx; height: 240rpx; background: rgba(155,137,224,.25); animation: stellaBlob1 9s ease-in-out infinite; }
+.stella-blob.two { width: 210rpx; height: 210rpx; background: rgba(255,122,61,.16); animation: stellaBlob2 12s ease-in-out -3s infinite; }
+.stella-blob.three { width: 180rpx; height: 180rpx; background: rgba(88,231,255,.16); animation: stellaBlob3 14s ease-in-out -6s infinite; }
+.stella-content { position: relative; z-index: 1; }
+.stella-name { display: flex; align-items: center; gap: 10rpx; color: #7f8898; font-size: 23rpx; }
+.stella-name b { color: #9edc1d; font-size: 24rpx; font-weight: 650; }
+.stella-message { margin-top: 10rpx; color: #f5f7fa; font-size: 28rpx; font-weight: 520; line-height: 1.45; }
+.stella-message text { color: #9edc1d; font-weight: 650; }
+.stella-link { display: flex; align-items: center; gap: 8rpx; margin-top: 14rpx; color: #9edc1d; font-size: 25rpx; font-weight: 650; }
 .v5-card { margin-top: 24rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; box-sizing: border-box; overflow: hidden; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin: 24rpx 4rpx 20rpx; }
 .section-head > text:first-child, .section-head view > text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
@@ -703,9 +846,9 @@ function showSoon(label: string) {
 .rank-next { margin-top: 24rpx; }
 .rank-next b, .rank-next text:last-child { color: #9edc1d; font-weight: 500; }
 .rank-progress { height: 12rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #2a2a2a; }
-.rank-progress view { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#9edc1d); }
+.rank-progress view { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#58e7ff); transition: width .9s cubic-bezier(.22,1,.36,1); }
 .rank-missing { overflow: hidden; margin-top: 12rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; white-space: nowrap; text-overflow: ellipsis; }
-.rank-prize { display: inline-flex; align-items: center; margin-top: 24rpx; padding: 8rpx 20rpx; border-radius: 999rpx; background: rgba(255,122,61,.2); color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
+.rank-prize { display: inline-flex; align-items: center; gap: 8rpx; margin-top: 24rpx; padding: 8rpx 20rpx; border-radius: 999rpx; background: rgba(255,122,61,.2); color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
 .pool-card { padding: 28rpx 32rpx; }
 .pool-head text:first-child { display: flex; align-items: center; gap: 10rpx; }
 .pool-main { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24rpx; margin-top: 12rpx; }
@@ -745,7 +888,7 @@ function showSoon(label: string) {
 .nex-copy > view:nth-child(2) { display: flex; align-items: baseline; gap: 12rpx; margin-top: 8rpx; }
 .nex-copy b { color: #f5f7fa; font-size: 44rpx; font-weight: 640; line-height: 1; }
 .nex-copy i { color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-style: normal; font-weight: 500; }
-.nex-copy em { display: inline-flex; margin-top: 12rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; }
+.nex-copy em { display: inline-flex; align-items: center; gap: 8rpx; margin-top: 12rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; }
 .nex-spark, .nex-spark svg { width: 152rpx; height: 72rpx; }
 .market-board { margin-top: 0; }
 .market-header, .market-row { display: grid; grid-template-columns: 72rpx 1fr 120rpx 138rpx 86rpx; align-items: center; gap: 16rpx; }
@@ -765,11 +908,11 @@ function showSoon(label: string) {
 .trust-title { display: flex; align-items: center; gap: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
 .trust-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
 .trust-tags text { padding: 6rpx 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: #1f1f1f; color: #d1d5db; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; }
-.trust-note { margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.trust-note { display: flex; align-items: center; gap: 8rpx; margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .rank-card { grid-template-columns: auto 1fr; }
 .rank-orb { border-radius: 50%; background: #c6ff3a; color: #10140a; }
 .rank-progress { height: 9rpx; margin-top: 16rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
-.rank-progress view { width: 42%; height: 100%; background: #c6ff3a; }
+.rank-progress view { width: 0; height: 100%; background: linear-gradient(90deg,#9edc1d,#58e7ff); }
 .pool-row { display: flex; justify-content: space-between; padding: 18rpx 0; border-top: 1rpx solid rgba(255,255,255,.06); }
 .pool-row b { color: #fff; font-size: 34rpx; }
 .pool-row text { color: #8f98a8; font-size: 23rpx; }
@@ -785,7 +928,7 @@ function showSoon(label: string) {
 .trust-note { margin-top: 18rpx; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .rank-card { display: block; padding: 28rpx 32rpx; }
 .rank-progress { height: 12rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #2a2a2a; }
-.rank-progress view { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#9edc1d); }
+.rank-progress view { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#58e7ff); transition: width .9s cubic-bezier(.22,1,.36,1); }
 .ledger-card-v5 .ledger-row { display: grid; grid-template-columns: 1fr auto 50rpx; gap: 16rpx; align-items: center; padding: 20rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.07); }
 .ledger-card-v5 .ledger-row:last-child { border-bottom: 0; }
 .ledger-card-v5 .ledger-row b { color: #f5f7fa; font-size: 26rpx; font-weight: 520; }
@@ -799,4 +942,10 @@ function showSoon(label: string) {
 @keyframes v5AuroraDrift { 0%{transform:translate3d(0,0,0) rotate(0deg)} 50%{transform:translate3d(-6%,3%,0) rotate(2deg)} 100%{transform:translate3d(4%,-2%,0) rotate(-1deg)} }
 @keyframes v5DotDrift { 0%{transform:translateY(0);opacity:0} 10%{opacity:.7} 90%{opacity:.7} 100%{transform:translateY(-440rpx);opacity:0} }
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+@keyframes slowSpin { to{ transform: rotate(360deg) } }
+@keyframes feedFade { from{ opacity: 0; transform: translateY(-10rpx) } to{ opacity: 1; transform: translateY(0) } }
+@keyframes stellaHalo { 0%,100%{ box-shadow: 0 0 0 8rpx rgba(155,137,224,.10) } 50%{ box-shadow: 0 0 0 16rpx rgba(155,137,224,.18) } }
+@keyframes stellaBlob1 { 0%,100%{ transform: translate3d(-35%, -30%, 0) } 50%{ transform: translate3d(42%, -12%, 0) } }
+@keyframes stellaBlob2 { 0%,100%{ transform: translate3d(55%, -34%, 0) } 50%{ transform: translate3d(8%, 18%, 0) } }
+@keyframes stellaBlob3 { 0%,100%{ transform: translate3d(22%, 34%, 0) } 50%{ transform: translate3d(62%, 6%, 0) } }
 </style>

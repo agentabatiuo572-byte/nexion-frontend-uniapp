@@ -329,16 +329,16 @@ function demoRow(
 }
 
 .back-button text {
-  -webkit-mask: url("/static/icons/profile-chevron-left.svg") center / contain no-repeat;
-  mask: url("/static/icons/profile-chevron-left.svg") center / contain no-repeat;
+  -webkit-mask: url("../../../static/icons/profile-chevron-left.svg") center / contain no-repeat;
+  mask: url("../../../static/icons/profile-chevron-left.svg") center / contain no-repeat;
 }
 
 .bell-button text {
   width: 34rpx;
   height: 34rpx;
   background: #c8d0dc;
-  -webkit-mask: url("/static/icons/profile-bell.svg") center / contain no-repeat;
-  mask: url("/static/icons/profile-bell.svg") center / contain no-repeat;
+  -webkit-mask: url("../../../static/icons/profile-bell.svg") center / contain no-repeat;
+  mask: url("../../../static/icons/profile-bell.svg") center / contain no-repeat;
 }
 
 .bell-button i {
@@ -488,17 +488,17 @@ function demoRow(
   background: currentColor;
 }
 
-.icon-earn { -webkit-mask: url("/static/icons/bill-coins.svg") center / contain no-repeat; mask: url("/static/icons/bill-coins.svg") center / contain no-repeat; }
-.icon-refer { -webkit-mask: url("/static/icons/bill-sparkles.svg") center / contain no-repeat; mask: url("/static/icons/bill-sparkles.svg") center / contain no-repeat; }
+.icon-earn { -webkit-mask: url("../../../static/icons/bill-coins.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-coins.svg") center / contain no-repeat; }
+.icon-refer { -webkit-mask: url("../../../static/icons/bill-sparkles.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-sparkles.svg") center / contain no-repeat; }
 .icon-bonus,
-.icon-achievement { -webkit-mask: url("/static/icons/bill-award.svg") center / contain no-repeat; mask: url("/static/icons/bill-award.svg") center / contain no-repeat; }
-.icon-topup { -webkit-mask: url("/static/icons/bill-arrow-down-left.svg") center / contain no-repeat; mask: url("/static/icons/bill-arrow-down-left.svg") center / contain no-repeat; }
-.icon-withdraw { -webkit-mask: url("/static/icons/bill-arrow-up-right.svg") center / contain no-repeat; mask: url("/static/icons/bill-arrow-up-right.svg") center / contain no-repeat; }
-.icon-purchase { -webkit-mask: url("/static/icons/bill-shopping-bag.svg") center / contain no-repeat; mask: url("/static/icons/bill-shopping-bag.svg") center / contain no-repeat; }
-.icon-swap { -webkit-mask: url("/static/icons/bill-arrow-down-up.svg") center / contain no-repeat; mask: url("/static/icons/bill-arrow-down-up.svg") center / contain no-repeat; }
-.icon-kyc { -webkit-mask: url("/static/icons/bill-shield-check.svg") center / contain no-repeat; mask: url("/static/icons/bill-shield-check.svg") center / contain no-repeat; }
-.icon-stake { -webkit-mask: url("/static/icons/bill-wallet.svg") center / contain no-repeat; mask: url("/static/icons/bill-wallet.svg") center / contain no-repeat; }
-.icon-unstake { -webkit-mask: url("/static/icons/bill-wrench.svg") center / contain no-repeat; mask: url("/static/icons/bill-wrench.svg") center / contain no-repeat; }
+.icon-achievement { -webkit-mask: url("../../../static/icons/bill-award.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-award.svg") center / contain no-repeat; }
+.icon-topup { -webkit-mask: url("../../../static/icons/bill-arrow-down-left.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-arrow-down-left.svg") center / contain no-repeat; }
+.icon-withdraw { -webkit-mask: url("../../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-arrow-up-right.svg") center / contain no-repeat; }
+.icon-purchase { -webkit-mask: url("../../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; }
+.icon-swap { -webkit-mask: url("../../../static/icons/bill-arrow-down-up.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-arrow-down-up.svg") center / contain no-repeat; }
+.icon-kyc { -webkit-mask: url("../../../static/icons/bill-shield-check.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-shield-check.svg") center / contain no-repeat; }
+.icon-stake { -webkit-mask: url("../../../static/icons/bill-wallet.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-wallet.svg") center / contain no-repeat; }
+.icon-unstake { -webkit-mask: url("../../../static/icons/bill-wrench.svg") center / contain no-repeat; mask: url("../../../static/icons/bill-wrench.svg") center / contain no-repeat; }
 
 .tone-earn,
 .tone-swap {

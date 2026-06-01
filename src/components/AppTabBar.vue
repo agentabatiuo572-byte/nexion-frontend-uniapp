@@ -59,16 +59,12 @@ function go(path: string) {
   align-items: stretch;
   overflow: hidden;
   padding: 8rpx;
-  border: 1rpx solid rgba(255, 255, 255, 0.10);
+  border: 1rpx solid var(--v5-tabbar-border, rgba(255, 255, 255, 0.10));
   border-radius: 42rpx;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
-    rgba(12, 12, 14, 0.22);
-  box-shadow:
-    inset 0 1rpx 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1rpx 0 rgba(0, 0, 0, 0.12),
-    0 20rpx 70rpx rgba(0, 0, 0, 0.40),
-    0 0 0 1rpx rgba(255, 255, 255, 0.04);
+    var(--v5-tabbar-bg, rgba(12, 12, 14, 0.22));
+  box-shadow: var(--v5-tabbar-shadow, 0 12px 32px rgba(0,0,0,0.55));
   backdrop-filter: blur(77rpx) saturate(180%) brightness(1.05);
   -webkit-backdrop-filter: blur(77rpx) saturate(180%) brightness(1.05);
   pointer-events: auto;
@@ -98,7 +94,7 @@ function go(path: string) {
   padding: 0;
   border-radius: 24rpx;
   background: transparent;
-  color: rgba(222, 229, 240, 0.72);
+  color: rgba(245, 247, 250, 0.72);
   font-size: 24rpx;
   font-weight: 560;
   line-height: 1;
@@ -111,7 +107,7 @@ function go(path: string) {
     inset 0 1rpx 0 rgba(255, 255, 255, 0.22),
     inset 0 0 32rpx rgba(198, 255, 58, 0.14),
     0 0 0 1rpx rgba(198, 255, 58, 0.28);
-  color: #c6ff3a;
+  color: var(--v5-brand, #9edc1d);
 }
 
 .icon-mask {
