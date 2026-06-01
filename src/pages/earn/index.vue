@@ -189,7 +189,10 @@ function showSoon(label: string) {
             <text>{{ v.currentTask || 'Current Task' }}</text>
             <b>Whisper-base <span>·</span> Speech</b>
             <em><strong>#SP-A78237</strong> <span>·</span> VoxLane <span>·</span> Tokyo, JP</em>
-            <view class="task-progress"><view /></view>
+            <view class="task-progress-row">
+              <view class="task-progress"><view><i /></view></view>
+              <text>30%</text>
+            </view>
             <view class="task-meta"><text>~2m 12s {{ v.remaining || 'remaining' }}</text><text>{{ v.reward || 'Reward' }}: +$0.015</text></view>
           </view>
           <view class="background-mode">
@@ -451,10 +454,12 @@ button::after { border: 0; }
 .current-task b span, .current-task em span { color: #8f98a8; margin: 0 10rpx; }
 .current-task em { display: block; margin-top: 10rpx; color: #9ba3b5; font-size: 24rpx; font-style: normal; }
 .current-task em strong { color: #9edc1d; font-weight: 560; }
-.task-progress { height: 8rpx; margin-top: 34rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
-.task-progress view { width: 30%; height: 100%; border-radius: inherit; background: rgba(158,220,29,.48); }
-.task-progress::after { content: "30%"; float: right; margin-top: -12rpx; color: #cfd5e1; font-size: 24rpx; }
-.task-meta { display: flex; justify-content: space-between; margin-top: 28rpx; color: #9ba3b5; font-size: 24rpx; }
+.task-progress-row { display: flex; align-items: center; gap: 24rpx; margin-top: 28rpx; }
+.task-progress-row > text { width: 96rpx; color: rgba(245,247,250,.80); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; line-height: 1; text-align: right; }
+.task-progress { flex: 1; height: 8rpx; overflow: hidden; border-radius: 999rpx; background: #1f1f1f; }
+.task-progress view { position: relative; width: 30%; height: 100%; overflow: hidden; border-radius: inherit; background: rgba(158,220,29,.42); }
+.task-progress view i { position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,.18) 50%, transparent 100%); background-size: 60% 100%; animation: scan 2.4s linear infinite; }
+.task-meta { display: flex; justify-content: space-between; margin-top: 14rpx; color: #9ba3b5; font-size: 24rpx; }
 .task-meta text:last-child { color: #9edc1d; }
 .background-mode { padding: 0 40rpx 16rpx; }
 .mode-title { color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 500; letter-spacing: 2rpx; line-height: 1; text-transform: uppercase; }
@@ -569,6 +574,7 @@ button::after { border: 0; }
 @keyframes dotTall { 0%{opacity:0;transform:translateY(0)} 18%{opacity:.45} 100%{opacity:0;transform:translateY(-520rpx)} }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.85)} 50%{opacity:1;transform:scale(1.15)} }
 @keyframes onlinePulse { 0%{opacity:.85;transform:scale(.35)} 70%,100%{opacity:0;transform:scale(1.75)} }
+@keyframes scan { 0%{background-position:-100% 0} 100%{background-position:200% 0} }
 @keyframes ticketEnter { from{opacity:0;transform:perspective(900rpx) rotateY(-92deg)} 70%{opacity:1;transform:perspective(900rpx) rotateY(8deg)} to{opacity:1;transform:perspective(900rpx) rotateY(0)} }
 @keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 35%{opacity:.55} 100%{opacity:0;transform:translateX(120%)} }
 </style>
