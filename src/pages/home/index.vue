@@ -8,7 +8,7 @@ import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 const auth = useAuthStore()
 const liveTab = ref<'activity' | 'earnings'>('activity')
-const dayTasksExpanded = ref(false)
+const dayTasksExpanded = ref(true)
 const moneyDisplay = ref(0.06)
 const nowTick = ref(0)
 const dayProgressVisible = ref(false)
@@ -94,15 +94,15 @@ onUnmounted(() => {
 })
 
 const dayTasks = computed(() => [
-  { label: v.value.connectWallet, cat: v.value.walletCat, reward: '+50', done: true, color: '#9b89e0' },
-  { label: v.value.visitEarnTab, cat: v.value.exploreCat, reward: '+30', done: true, color: '#ff6b35' },
-  { label: v.value.visitStore, cat: v.value.exploreCat, reward: '+50', done: true, color: '#ff6b35' },
-  { label: v.value.seeProductRoi, cat: v.value.convertCat, reward: '+100', done: false, color: '#c6ff3a' },
-  { label: v.value.setupProfile, cat: v.value.identityCat, reward: '+80', done: false, color: '#9b89e0' },
-  { label: v.value.inviteFriend, cat: v.value.socialCat, reward: '+200', done: false, color: '#ff6b35' }
+  { order: 1, label: v.value.connectWallet, cat: v.value.walletCat, nex: 50, done: true, color: '#9b89e0' },
+  { order: 2, label: v.value.visitEarnTab, cat: v.value.exploreCat, nex: 30, done: true, color: '#ff6b35' },
+  { order: 3, label: v.value.visitStore, cat: v.value.exploreCat, nex: 50, done: true, color: '#ff6b35' },
+  { order: 4, label: v.value.seeProductRoi, cat: v.value.convertCat, nex: 100, done: false, color: '#c6ff3a' },
+  { order: 5, label: v.value.setupProfile, cat: v.value.identityCat, nex: 80, done: false, color: '#9b89e0' },
+  { order: 6, label: v.value.inviteFriend, cat: v.value.socialCat, nex: 200, usdt: 1, done: false, color: '#ff6b35' }
 ])
 const completedTasks = computed(() => dayTasks.value.filter((task) => task.done).length)
-const nexEarned = computed(() => dayTasks.value.filter((task) => task.done).reduce((sum, task) => sum + Number(task.reward.slice(1)), 0))
+const nexEarned = computed(() => dayTasks.value.filter((task) => task.done).reduce((sum, task) => sum + task.nex, 0))
 const dayProgressPct = computed(() => `${dayProgressVisible.value ? (completedTasks.value / dayTasks.value.length) * 100 : 0}%`)
 const dayCountdown = computed(() => {
   const remainingMs = 18 * 3600_000 + 24 * 60_000 - (nowTick.value * 1000) % 60_000
@@ -292,15 +292,18 @@ function showSoon(label: string) {
             <text>+{{ nexEarned }} {{ v.earnedSuffix }}</text>
           </view>
           <view v-if="dayTasksExpanded" class="task-list">
-            <view v-for="task in dayTasks" :key="task.label" class="task-row">
-              <text class="task-dot" :class="{ done: task.done }" :style="{ borderColor: task.color, background: task.done ? task.color : 'transparent' }">
+            <view v-for="task in dayTasks" :key="task.label" class="task-row" :class="{ done: task.done }">
+              <text class="task-dot" :class="{ done: task.done }" :style="{ borderColor: task.done ? 'transparent' : `${task.color}55`, background: task.done ? task.color : 'transparent', color: task.color }">
                 <i v-if="task.done" class="ui-mask icon-check" />
+                <span v-else>{{ task.order }}</span>
               </text>
-              <view>
+              <view class="task-copy">
                 <b>{{ task.label }}</b>
-                <text :style="{ color: task.color }">{{ task.cat }}</text>
+                <text :style="{ color: task.done ? 'var(--v5-ink-4)' : task.color }">{{ task.cat }}</text>
               </view>
-              <i>{{ task.reward }}</i>
+              <i class="task-reward" :style="{ color: task.done ? 'var(--v5-ink-4)' : task.color }">+{{ task.nex }} NEX<text v-if="task.usdt" :style="{ color: task.done ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)' }"> +${{ task.usdt }}</text></i>
+              <i v-if="!task.done" class="ui-mask icon-chevron task-chevron" />
+              <span v-else class="task-chevron-spacer" />
             </view>
           </view>
           <button class="task-toggle" @click="dayTasksExpanded = !dayTasksExpanded">
@@ -704,14 +707,22 @@ function showSoon(label: string) {
 .progress view { width: 0; height: 100%; background: linear-gradient(90deg,#c6ff3a,#58e7ff); border-radius: inherit; transition: width .9s cubic-bezier(.22,1,.36,1); }
 .day-foot { display: flex; justify-content: space-between; margin-top: 12rpx; color: #8f98a8; font-size: 23rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .day-foot b, .day-foot text:last-child { color: #c6ff3a; }
-.task-list { margin-top: 22rpx; padding-top: 20rpx; border-top: 1rpx dashed #303746; }
-.task-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16rpx; padding: 10rpx 0; }
-.task-dot { display: grid; width: 36rpx; height: 36rpx; place-items: center; border: 1rpx solid; border-radius: 50%; color: #10140a; font-size: 20rpx; font-weight: 800; }
-.task-dot i { font-size: 22rpx; }
-.task-row b { display: block; color: #fff; font-size: 25rpx; }
-.task-row view text { display: block; margin-top: 3rpx; font-size: 20rpx; }
-.task-row i { color: #c6ff3a; font-style: normal; font-weight: 700; }
-.task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
+.task-list { display: flex; flex-direction: column; gap: 8rpx; margin-top: 24rpx; padding-top: 24rpx; border-top: 1rpx dashed var(--v5-border); }
+.task-row { display: grid; grid-template-columns: 40rpx minmax(0, 1fr) auto 28rpx; align-items: center; gap: 20rpx; min-height: 52rpx; padding: 8rpx 0; }
+.task-dot { display: grid; width: 36rpx; height: 36rpx; place-items: center; border: 1rpx solid; border-radius: 50%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; box-sizing: border-box; }
+.task-dot.done { color: #0f0f0f; }
+.task-dot i { width: 20rpx; height: 20rpx; background: #0f0f0f; }
+.task-dot span { line-height: 1; }
+.task-copy { display: flex; align-items: baseline; gap: 12rpx; min-width: 0; }
+.task-row b { overflow: hidden; color: var(--v5-ink); font-size: 26rpx; font-weight: 500; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.task-row.done b { color: var(--v5-ink-4); text-decoration: line-through; }
+.task-copy text { flex-shrink: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; letter-spacing: 1rpx; opacity: .8; }
+.task-row.done .task-copy text { opacity: .5; }
+.task-reward { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.task-reward text { margin-left: 8rpx; }
+.task-chevron { width: 22rpx; height: 22rpx; color: var(--v5-ink-4); opacity: .7; }
+.task-chevron-spacer { display: block; width: 22rpx; height: 22rpx; }
+.task-toggle { display: flex; align-items: center; justify-content: center; gap: 10rpx; width: calc(100% + 68rpx); height: 80rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: var(--v5-brand-soft); border-top: 1rpx solid var(--v5-border); color: var(--v5-brand); font-size: 26rpx; font-weight: 500; }
 .task-toggle i { font-size: 25rpx; transform: rotate(90deg); }
 .task-toggle i.up { transform: rotate(-90deg); }
 .live-card, .fleet-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
