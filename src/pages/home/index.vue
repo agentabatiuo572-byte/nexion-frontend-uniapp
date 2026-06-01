@@ -92,6 +92,16 @@ const ledgerRows = [
   { model: 'MobileBERT', who: 'Vector Foundry', amt: '+$0.00009', t: '1m' }
 ]
 
+const marketRows = [
+  { tag: 'IMG', name: 'SDXL Turbo', unit: 'image', price: '$0.00032', delta: '+3.2%', vol: '142k', up: true, spark: sparkline([3.0, 3.1, 3.0, 3.15, 3.2, 3.18, 3.22, 3.2]) },
+  { tag: 'LLM', name: 'Llama 70B', unit: 'job', price: '$0.247', delta: '-1.1%', vol: '8.2k', up: false, spark: sparkline([25.0, 25.4, 25.1, 24.7, 24.6, 24.8, 24.7, 24.7]) },
+  { tag: 'STT', name: 'Whisper', unit: '60s', price: '$0.00009', delta: '-0.4%', vol: '3.1M', up: false, spark: sparkline([9.1, 9.0, 9.05, 9.0, 9.05, 9.0, 9.0, 9.0]) },
+  { tag: 'EMB', name: 'Embedding', unit: 'chunk', price: '$0.00007', delta: '+0.8%', vol: '912k', up: true, spark: sparkline([6.9, 7.0, 7.0, 7.0, 7.05, 7.0, 7.0, 7.0]) },
+  { tag: 'IMG', name: 'Flux Schnell', unit: 'image', price: '$0.00048', delta: '+2.4%', vol: '21k', up: true, spark: sparkline([4.6, 4.7, 4.7, 4.75, 4.8, 4.78, 4.8, 4.8]) },
+  { tag: 'LLM', name: 'Phi-3 mini', unit: '500 tok', price: '$0.00021', delta: '+0.5%', vol: '512k', up: true, spark: sparkline([2.05, 2.08, 2.1, 2.09, 2.1, 2.1, 2.1, 2.1]) }
+]
+
+const nexSpark = sparkline([7.4, 7.7, 7.5, 8.0, 8.2, 8.1, 8.4, 8.42])
 const trustChips = ['NVIDIA', 'Intel', 'AMD', 'CertiK ✓', 'SOC 2', 'GDPR', 'ISO 27001']
 
 function showSoon(label: string) {
@@ -340,38 +350,71 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="rank-card card">
-          <view class="rank-orb">{{ vRank }}</view>
-          <view>
-            <view class="card-title">{{ t.yourRank }}</view>
-            <text>{{ level }} · {{ v.nextRankProgress }}</text>
-            <view class="rank-progress"><view /></view>
+        <view class="rank-card v5-card">
+          <view class="rank-top">
+            <text>{{ t.yourRank }}</text>
+            <text>{{ v.rankStep }} <b>1</b>/12</text>
+          </view>
+          <view class="rank-title">
+            <b>{{ vRank }}</b>
+            <text>{{ common.rankCadet }}</text>
+          </view>
+          <view class="rank-next">
+            <text>{{ v.rankNext }} · <b>V1 Operator</b></text>
+            <text>42%</text>
+          </view>
+          <view class="rank-progress"><view /></view>
+          <view class="rank-missing">{{ v.rankMissing }}</view>
+          <view class="rank-prize">🎁 {{ v.rankPrize }}</view>
+        </view>
+
+        <view class="pool-card v5-card">
+          <view class="pool-head">
+            <text>♛ {{ v.leadershipPool }}</text>
+            <text>{{ v.poolEndsIn }} <b>5d</b></text>
+          </view>
+          <view class="pool-main">
+            <view>
+              <b>$42.7K</b>
+              <text>{{ v.poolVolume }}</text>
+            </view>
+            <em>{{ v.poolUnlock }}</em>
           </view>
         </view>
 
-        <view class="pool-card card">
-          <view class="mono muted">{{ v.leadershipPool }}</view>
-          <view class="pool-row">
-            <b>$42,680</b>
-            <text>{{ v.currentMonthlyPool }}</text>
+        <view class="math-section">
+          <view class="section-head">
+            <text>{{ v.doTheMath }}</text>
+            <text>{{ v.mathInteractive }}</text>
           </view>
-          <view class="pool-row">
-            <b>V2</b>
-            <text>{{ v.requiredToUnlock }}</text>
+          <view class="math-card-v5 v5-card">
+            <view class="math-grid-bg" />
+            <view class="math-copy">
+              {{ v.mathPhoneNeeds }} <text class="warm">27 {{ v.mathDays }}</text> {{ v.mathToEarn }} <text>$1.62</text>.
+              <br />
+              NexionBox S1 {{ v.mathEarnsIt }} <text class="green">90 sec</text>.
+            </view>
+            <view class="math-bars">
+              <view>
+                <view><text>{{ v.phone }}</text><text>$0.06 /d</text></view>
+                <i><b class="phone" /></i>
+              </view>
+              <view>
+                <view><text>NexionBox S1</text><text>$38.50 /d</text></view>
+                <i><b class="box" /></i>
+              </view>
+            </view>
+            <view class="math-stats-v5">
+              <view><text>{{ v.mathDaily }}</text><b>$38.50</b></view>
+              <view><text>{{ v.mathPayback }}</text><b>34 d</b></view>
+              <view><text>{{ v.mathVsPhone }}</text><b>642×</b></view>
+            </view>
+            <button class="math-cta" @click="showSoon(v.mathSee)">{{ v.mathSee }} <text>→</text></button>
           </view>
         </view>
 
-        <view class="math-card card">
-          <view class="mono muted">{{ v.doTheMath }}</view>
-          <view class="math-grid">
-            <view><text>{{ v.phone }}</text><b>$0.06/d</b></view>
-            <view><text>NexionBox S1</text><b>$38.50/d</b></view>
-            <view><text>{{ v.multiplier }}</text><b>640x</b></view>
-          </view>
-        </view>
-
-        <view class="section-title"><b>{{ v.earningsLedger }}</b><text>5 of 247</text></view>
-        <view class="ledger-card card">
+        <view class="section-head"><text>{{ v.earningsLedger }}</text><text>5 of 247</text></view>
+        <view class="ledger-card-v5 v5-card">
           <view v-for="row in ledgerRows" :key="row.model" class="ledger-row">
             <view><b>{{ row.model }}</b><text> · {{ row.who }}</text></view>
             <i>{{ row.amt }}</i>
@@ -379,19 +422,49 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="market-card card">
-          <view class="market-top">
+        <view class="nex-price-card v5-card">
+          <view class="nex-copy">
             <view>
-              <view class="mono muted">{{ v.nexPrice }}</view>
-              <view class="price-line">$0.0842</view>
+              <text class="nex-symbol">$NEX</text>
+              <text>NEX / USDT</text>
             </view>
-            <view class="success-line">+12.4% 24h</view>
+            <view><b>$0.084</b><i>+12.4%</i></view>
+            <em>✓ Binance T1 cleared</em>
           </view>
-          <view class="market-bars"><i v-for="n in 18" :key="n" :style="{ height: `${12 + (n % 6) * 9}rpx` }" /></view>
+          <view class="nex-spark">
+            <svg viewBox="0 0 100 32" preserveAspectRatio="none">
+              <polygon :points="nexSpark.area" fill="#9EDC1D" opacity="0.1" />
+              <polyline :points="nexSpark.line" fill="none" stroke="#9EDC1D" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" />
+              <circle :cx="nexSpark.last.x" :cy="nexSpark.last.y" r="1.6" fill="#9EDC1D" />
+            </svg>
+          </view>
         </view>
 
-        <view class="trust-card card">
-          <view class="trust-title">{{ t.audited }}</view>
+        <view class="market-board-section">
+          <view class="section-head">
+            <view><text>{{ v.computeMarket }}</text><text>{{ v.marketPrices }}</text></view>
+            <button @click="showSoon(v.marketOpen)">{{ v.marketOpen }} <text>→</text></button>
+          </view>
+          <view class="market-board v5-card">
+            <view class="market-header">
+              <text>tag</text><text>model</text><text>1h</text><text>price</text><text>24h</text>
+            </view>
+            <view v-for="row in marketRows" :key="row.name" class="market-row">
+              <text class="tag">{{ row.tag }}</text>
+              <view><b>{{ row.name }}</b><text>vol {{ row.vol }}/h</text></view>
+              <view class="row-spark">
+                <svg viewBox="0 0 100 18" preserveAspectRatio="none">
+                  <polyline :points="row.spark.line" fill="none" :stroke="row.up ? '#9EDC1D' : '#C26658'" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" />
+                </svg>
+              </view>
+              <view class="row-price"><b>{{ row.price }}</b><text>/{{ row.unit }}</text></view>
+              <em :class="{ down: !row.up }">{{ row.delta }}</em>
+            </view>
+          </view>
+        </view>
+
+        <view class="trust-card-v5 v5-card">
+          <view class="trust-title">✓ {{ t.audited }}</view>
           <view class="trust-tags">
             <text v-for="chip in trustChips" :key="chip">{{ chip }}</text>
           </view>
@@ -586,6 +659,84 @@ function showSoon(label: string) {
 .pulse-svg { display: block; width: 100%; height: 64rpx; overflow: visible; }
 .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
+.v5-card { margin-top: 24rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; box-sizing: border-box; overflow: hidden; }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin: 24rpx 4rpx 20rpx; }
+.section-head > text:first-child, .section-head view > text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
+.section-head > text:last-child, .section-head view > text:last-child { margin-left: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 420; }
+.section-head button { display: flex; align-items: center; gap: 8rpx; margin: 0; padding: 0; border: 0; background: transparent; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 26rpx; font-weight: 500; line-height: 1; }
+.section-head button::after { border: 0; }
+.rank-card { display: block; padding: 28rpx 32rpx; }
+.rank-top, .rank-next, .pool-head { display: flex; align-items: center; justify-content: space-between; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.rank-top b, .pool-head b { color: #f5f7fa; font-weight: 500; }
+.rank-title { display: flex; align-items: baseline; gap: 16rpx; margin-top: 12rpx; }
+.rank-title b { color: #f5f7fa; font-size: 52rpx; font-weight: 640; line-height: 1; }
+.rank-title text { color: #d1d5db; font-size: 30rpx; font-weight: 520; }
+.rank-next { margin-top: 24rpx; }
+.rank-next b, .rank-next text:last-child { color: #9edc1d; font-weight: 500; }
+.rank-progress { height: 12rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #2a2a2a; }
+.rank-progress view { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#9edc1d); }
+.rank-missing { overflow: hidden; margin-top: 12rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; white-space: nowrap; text-overflow: ellipsis; }
+.rank-prize { display: inline-flex; align-items: center; margin-top: 24rpx; padding: 8rpx 20rpx; border-radius: 999rpx; background: rgba(255,122,61,.2); color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
+.pool-card { padding: 28rpx 32rpx; }
+.pool-head text:first-child { display: flex; align-items: center; gap: 10rpx; }
+.pool-main { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 24rpx; margin-top: 12rpx; }
+.pool-main b { display: block; color: #f5f7fa; font-size: 52rpx; font-weight: 640; line-height: 1; }
+.pool-main text { display: block; margin-top: 12rpx; color: #8f98a8; font-size: 24rpx; }
+.pool-main em { padding: 10rpx 20rpx; border-radius: 999rpx; background: rgba(255,122,61,.2); color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; white-space: nowrap; }
+.math-section { margin-top: 24rpx; }
+.math-card-v5 { position: relative; padding: 32rpx; }
+.math-grid-bg { position: absolute; inset: 0; opacity: .6; background-image: linear-gradient(to right, rgba(14,72,230,.08) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(14,72,230,.08) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; pointer-events: none; }
+.math-copy { position: relative; z-index: 1; color: #f5f7fa; font-size: 36rpx; font-weight: 640; line-height: 1.35; letter-spacing: 0; }
+.math-copy text { color: #f5f7fa; }
+.math-copy .warm { color: #ff7a3d; }
+.math-copy .green { color: #9edc1d; }
+.math-bars { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 20rpx; margin-top: 32rpx; }
+.math-bars view view { display: flex; justify-content: space-between; margin-bottom: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.math-bars view view text:last-child { color: #f5f7fa; font-weight: 500; }
+.math-bars i { display: block; height: 6rpx; overflow: hidden; border-radius: 999rpx; background: #2a2a2a; }
+.math-bars b { display: block; height: 100%; border-radius: inherit; opacity: .72; }
+.math-bars .phone { width: 4%; background: #6b7385; }
+.math-bars .box { width: 100%; background: linear-gradient(90deg,#9edc1d,#9edc1d); }
+.math-stats-v5 { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 28rpx; padding-top: 24rpx; border-top: 1rpx dashed rgba(255,255,255,.14); }
+.math-stats-v5 text { display: block; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.math-stats-v5 b { display: block; margin-top: 6rpx; color: #9edc1d; font-size: 36rpx; font-weight: 640; }
+.math-stats-v5 view:first-child b { color: #f5f7fa; }
+.math-cta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 10rpx; height: 88rpx; margin: 28rpx 0 0; padding: 0; border: 1rpx solid rgba(158,220,29,.45); border-radius: 999rpx; background: rgba(158,220,29,.20); color: #9edc1d; font-size: 27rpx; font-weight: 640; }
+.math-cta::after { border: 0; }
+.ledger-card-v5 { padding: 8rpx 28rpx; }
+.ledger-row { display: grid; grid-template-columns: 1fr auto 50rpx; gap: 16rpx; align-items: center; padding: 20rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.07); }
+.ledger-row:last-child { border-bottom: 0; }
+.ledger-row b { color: #f5f7fa; font-size: 26rpx; font-weight: 520; }
+.ledger-row view { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ledger-row view text, .ledger-row > text { color: #8f98a8; font-size: 22rpx; }
+.ledger-row i { color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; }
+.nex-price-card { display: grid; grid-template-columns: 1fr 152rpx; align-items: center; gap: 24rpx; padding: 24rpx 28rpx; }
+.nex-copy > view:first-child { display: flex; align-items: baseline; gap: 12rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; }
+.nex-symbol { color: #9edc1d; font-weight: 640; }
+.nex-copy > view:nth-child(2) { display: flex; align-items: baseline; gap: 12rpx; margin-top: 8rpx; }
+.nex-copy b { color: #f5f7fa; font-size: 44rpx; font-weight: 640; line-height: 1; }
+.nex-copy i { color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-style: normal; font-weight: 500; }
+.nex-copy em { display: inline-flex; margin-top: 12rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; }
+.nex-spark, .nex-spark svg { width: 152rpx; height: 72rpx; }
+.market-board { margin-top: 0; }
+.market-header, .market-row { display: grid; grid-template-columns: 72rpx 1fr 120rpx 138rpx 86rpx; align-items: center; gap: 16rpx; }
+.market-header { min-height: 64rpx; padding: 0 28rpx; border-bottom: 1rpx solid rgba(255,255,255,.07); background: rgba(255,255,255,.035); color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.market-header text:nth-child(n+3) { text-align: right; }
+.market-row { min-height: 86rpx; padding: 0 28rpx; border-bottom: 1rpx solid rgba(255,255,255,.07); }
+.market-row:last-child { border-bottom: 0; }
+.market-row .tag { justify-self: start; padding: 4rpx 8rpx; border-radius: 8rpx; background: rgba(158,220,29,.20); color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; }
+.market-row view b { display: block; overflow: hidden; color: #f5f7fa; font-size: 27rpx; font-weight: 520; white-space: nowrap; text-overflow: ellipsis; }
+.market-row view text, .row-price text { display: block; margin-top: 4rpx; color: #6b7385; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; }
+.row-spark svg { display: block; width: 120rpx; height: 36rpx; }
+.row-price { text-align: right; }
+.row-price b { color: #f5f7fa; font-size: 26rpx; font-weight: 520; }
+.market-row em { color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-style: normal; font-weight: 500; text-align: right; }
+.market-row em.down { color: #c26658; }
+.trust-card-v5 { padding: 28rpx 32rpx; }
+.trust-title { display: flex; align-items: center; gap: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
+.trust-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.trust-tags text { padding: 6rpx 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: #1f1f1f; color: #d1d5db; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; }
+.trust-note { margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .stella-card { display: flex; align-items: flex-end; gap: 20rpx; margin-top: 26rpx; padding: 4rpx; }
 .stella-avatar { display: grid; width: 88rpx; height: 88rpx; place-items: center; border-radius: 50%; background: #c6ff3a; color: #10140a; font-size: 36rpx; font-weight: 800; box-shadow: 0 0 36rpx rgba(198,255,58,.36); }
 .stella-bubble { position: relative; flex: 1; min-width: 0; padding: 22rpx 26rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 34rpx 34rpx 34rpx 8rpx; background: radial-gradient(circle at 5% 20%, rgba(198,255,58,.16), transparent 50%), radial-gradient(circle at 86% 80%, rgba(155,137,224,.18), transparent 56%), #10141d; overflow: hidden; }
@@ -610,6 +761,17 @@ function showSoon(label: string) {
 .trust-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 18rpx; }
 .trust-tags text { padding: 8rpx 16rpx; border: 1rpx solid #303746; border-radius: 999rpx; background: #161b25; color: #c8d0dc; font-size: 22rpx; }
 .trust-note { margin-top: 18rpx; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rank-card { display: block; padding: 28rpx 32rpx; }
+.rank-progress { height: 12rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #2a2a2a; }
+.rank-progress view { width: 42%; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#9edc1d,#9edc1d); }
+.ledger-card-v5 .ledger-row { display: grid; grid-template-columns: 1fr auto 50rpx; gap: 16rpx; align-items: center; padding: 20rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.07); }
+.ledger-card-v5 .ledger-row:last-child { border-bottom: 0; }
+.ledger-card-v5 .ledger-row b { color: #f5f7fa; font-size: 26rpx; font-weight: 520; }
+.ledger-card-v5 .ledger-row view text, .ledger-card-v5 .ledger-row > text { color: #8f98a8; font-size: 22rpx; }
+.trust-card-v5 .trust-title { display: flex; align-items: center; gap: 10rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-weight: 500; }
+.trust-card-v5 .trust-tags { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 20rpx; }
+.trust-card-v5 .trust-tags text { padding: 6rpx 18rpx; border: 1rpx solid rgba(255,255,255,.08); border-radius: 999rpx; background: #1f1f1f; color: #d1d5db; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 500; }
+.trust-card-v5 .trust-note { margin-top: 20rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 @keyframes pulse { 0%,100%{opacity:.45;transform:scale(.8)} 50%{opacity:1;transform:scale(1.1)} }
 @keyframes aurora { from{transform:translate3d(-10rpx,0,0) scale(1)} to{transform:translate3d(18rpx,10rpx,0) scale(1.05)} }
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
