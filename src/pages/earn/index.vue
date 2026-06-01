@@ -530,8 +530,8 @@ button::after { border: 0; }
 .lock::after { width: .48em; height: .42em; border: .12em solid currentColor; border-bottom: 0; border-radius: .32em .32em 0 0; top: .04em; }
 .small-lock { width: .9em; height: .9em; }
 .zap::before { width: .72em; height: .96em; background: currentColor; clip-path: polygon(48% 0,92% 0,62% 42%,96% 42%,36% 100%,50% 55%,12% 55%); }
-.activity::before { width: .92em; height: .92em; border: .12em solid currentColor; border-radius: 50%; }
-.activity::after { width: .54em; height: .22em; border-left: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(-18deg); }
+.activity { background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat; }
+.activity::before, .activity::after { display: none; }
 .layers::before { width: .78em; height: .48em; border: .12em solid currentColor; transform: rotate(25deg) skew(-18deg); border-radius: .08em; }
 .layers::after { width: .78em; height: .48em; border: .12em solid currentColor; transform: translateY(.22em) rotate(25deg) skew(-18deg); border-radius: .08em; opacity: .65; }
 .plus::before { width: .72em; height: .12em; background: currentColor; }
