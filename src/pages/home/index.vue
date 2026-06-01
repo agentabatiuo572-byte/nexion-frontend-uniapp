@@ -8,6 +8,7 @@ import { getMainPageMessages, useActiveLocale } from '@/utils/i18n'
 
 const auth = useAuthStore()
 const liveTab = ref<'activity' | 'earnings'>('activity')
+const dayTasksExpanded = ref(false)
 const locale = useActiveLocale()
 const copy = computed(() => getMainPageMessages(locale.value))
 const t = computed(() => copy.value.home)
@@ -107,7 +108,34 @@ function showSoon(label: string) {
           <button @click="showSoon(t.store)">{{ v.seeRoi }} <text>›</text></button>
         </view>
 
-        <view class="day-card card">
+        <view class="weekly-quest-card card" @click="showSoon(v.weeklyQuestCta)">
+          <image class="weekly-device" src="/src/static/products/nexionrack-p1-v2.png" mode="aspectFit" />
+          <view class="weekly-content">
+            <view class="weekly-meta">
+              <view class="weekly-label">
+                <text class="quest-icon">⌘</text>
+                <text>{{ v.weeklyQuestEyebrow }}</text>
+                <text class="mult-chip">1.5×</text>
+              </view>
+              <view class="weekly-countdown">
+                <text>{{ v.weeklyQuestEndsIn }}</text>
+                <b>4d 11h</b>
+              </view>
+            </view>
+            <view class="weekly-reward"><text>+</text>1,200 <i>NEX</i></view>
+            <view class="weekly-title">{{ v.weeklyQuestActivate }}</view>
+            <view class="weekly-stats">
+              <text><b>$38.50</b>/d</text>
+              <i>·</i>
+              <text><em>642×</em> {{ v.weeklyQuestYourPhone }}</text>
+              <i>·</i>
+              <text>{{ v.weeklyQuestPayback }} <em>~34d</em></text>
+            </view>
+            <button class="weekly-cta">{{ v.weeklyQuestCta }} <text>→</text></button>
+          </view>
+        </view>
+
+        <view class="day-card card" :class="{ collapsed: !dayTasksExpanded }">
           <view class="day-head">
             <view>
               <view class="mono muted">{{ t.firstDayReward }}</view>
@@ -123,7 +151,7 @@ function showSoon(label: string) {
             <text><b>3</b>/6 {{ v.doneSuffix }}</text>
             <text>+130 {{ v.earnedSuffix }}</text>
           </view>
-          <view class="task-list">
+          <view v-if="dayTasksExpanded" class="task-list">
             <view v-for="task in dayTasks" :key="task.label" class="task-row">
               <text class="task-dot" :class="{ done: task.done }" :style="{ borderColor: task.color, background: task.done ? task.color : 'transparent' }">{{ task.done ? '✓' : '' }}</text>
               <view>
@@ -133,6 +161,10 @@ function showSoon(label: string) {
               <i>{{ task.reward }}</i>
             </view>
           </view>
+          <button class="task-toggle" @click="dayTasksExpanded = !dayTasksExpanded">
+            {{ dayTasksExpanded ? v.hideTasks : v.viewTasks.replace('{n}', '6') }}
+            <text>{{ dayTasksExpanded ? '⌃' : '⌄' }}</text>
+          </button>
         </view>
 
         <view class="live-card card">
@@ -299,7 +331,29 @@ function showSoon(label: string) {
 .trial-side text { color: #8f98a8; font-size: 20rpx; }
 .trial-side b { display: block; margin-top: 8rpx; color: #12c979; font-size: 54rpx; }
 .conversion-card button { display: flex; align-items: center; gap: 8rpx; height: 72rpx; padding: 0 26rpx; border-radius: 999rpx; background: #c6ff3a; color: #10140a; font-size: 25rpx; font-weight: 700; }
-.day-card { margin-top: 24rpx; padding: 32rpx 34rpx; background: radial-gradient(circle at 0 0, rgba(198,255,58,.12), transparent 55%), #10141d; }
+.weekly-quest-card { position: relative; min-height: 404rpx; margin-top: 24rpx; overflow: hidden; border-color: rgba(198,255,58,.18); background: radial-gradient(circle at 84% 10%, rgba(155,137,224,.20), transparent 42%), radial-gradient(circle at 12% 88%, rgba(198,255,58,.12), transparent 54%), #101010; box-shadow: 0 22rpx 72rpx rgba(0,0,0,.34); }
+.weekly-quest-card::after { content: ""; position: absolute; right: -10rpx; bottom: 0; left: -10rpx; height: 1rpx; background: linear-gradient(90deg, transparent, rgba(198,255,58,.55), transparent); }
+.weekly-device { position: absolute; top: -64rpx; right: -116rpx; z-index: 0; width: 440rpx; height: 440rpx; opacity: .44; transform: rotate(-3deg); -webkit-mask-image: radial-gradient(ellipse 360rpx 450rpx at 90% 48%, #000 24%, rgba(0,0,0,.72) 45%, rgba(0,0,0,.34) 66%, transparent 100%); mask-image: radial-gradient(ellipse 360rpx 450rpx at 90% 48%, #000 24%, rgba(0,0,0,.72) 45%, rgba(0,0,0,.34) 66%, transparent 100%); }
+.weekly-content { position: relative; z-index: 1; padding: 28rpx 48rpx 32rpx; }
+.weekly-meta { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; }
+.weekly-label { display: inline-flex; align-items: center; min-width: 0; gap: 12rpx; color: #c6ff3a; font-weight: 560; }
+.quest-icon { font-size: 25rpx; transform: translateY(-1rpx); }
+.mult-chip { padding: 4rpx 12rpx; border: 1rpx solid rgba(198,255,58,.38); border-radius: 8rpx; background: rgba(198,255,58,.14); color: #c6ff3a; line-height: 1; }
+.weekly-countdown { display: flex; align-items: center; gap: 10rpx; color: #687181; white-space: nowrap; }
+.weekly-countdown b { color: #9b89e0; font-weight: 560; }
+.weekly-reward { display: flex; align-items: baseline; gap: 8rpx; margin-top: 54rpx; color: #f8fafc; font-size: 70rpx; font-weight: 780; line-height: 1; letter-spacing: -2rpx; }
+.weekly-reward text { color: #f8fafc; font-size: 56rpx; font-weight: 760; }
+.weekly-reward i { color: #c6ff3a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 28rpx; font-style: normal; font-weight: 560; letter-spacing: 0; }
+.weekly-title { margin-top: 18rpx; max-width: 500rpx; color: #99a3b3; font-size: 28rpx; font-weight: 620; line-height: 1.25; }
+.weekly-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 20rpx; margin-top: 26rpx; color: #7f8898; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; }
+.weekly-stats b { color: #c6ff3a; font-weight: 650; }
+.weekly-stats em { color: #ff7b3d; font-style: normal; font-weight: 650; }
+.weekly-stats text:last-child em { color: #9b89e0; }
+.weekly-stats i { color: rgba(127,136,152,.55); font-style: normal; }
+.weekly-cta { display: flex; align-items: center; justify-content: center; gap: 18rpx; width: 100%; height: 96rpx; margin-top: 32rpx; border-radius: 999rpx; background: #9df20f; color: #090d08; font-size: 30rpx; font-weight: 780; letter-spacing: 0; box-shadow: 0 18rpx 50rpx rgba(157,242,15,.18); }
+.weekly-cta text { font-size: 35rpx; transform: translateY(-1rpx); }
+.day-card { position: relative; overflow: hidden; margin-top: 24rpx; padding: 32rpx 34rpx 0; background: radial-gradient(circle at 0 0, rgba(198,255,58,.12), transparent 55%), #10141d; }
+.day-card.collapsed { padding-bottom: 0; border-color: rgba(198,255,58,.15); }
 .reward { margin-top: 8rpx; color: #fff; font-size: 58rpx; font-weight: 760; }
 .reward text { color: #8f98a8; font-size: 28rpx; }
 .reward i { color: #c6ff3a; font-size: 25rpx; font-style: normal; }
@@ -316,6 +370,8 @@ function showSoon(label: string) {
 .task-row b { display: block; color: #fff; font-size: 25rpx; }
 .task-row view text { display: block; margin-top: 3rpx; font-size: 20rpx; }
 .task-row i { color: #c6ff3a; font-style: normal; font-weight: 700; }
+.task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
+.task-toggle text { font-size: 25rpx; transform: translateY(-1rpx); }
 .live-card, .fleet-card, .grid-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
 .segmented { display: flex; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }

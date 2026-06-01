@@ -366,7 +366,15 @@ const mainEn: MainPageMessages = {
       multiplier: 'Multiplier',
       earningsLedger: 'Earnings ledger',
       nexPrice: 'NEX price',
-      reserveProof: 'Reserve proof on-chain · 102.4% backed · Trust Center'
+      reserveProof: 'Reserve proof on-chain · 102.4% backed · Trust Center',
+      weeklyQuestEyebrow: 'This week\'s quest',
+      weeklyQuestEndsIn: 'Ends in',
+      weeklyQuestActivate: 'Activate NexionBox S1 to claim',
+      weeklyQuestYourPhone: 'your phone',
+      weeklyQuestPayback: 'payback',
+      weeklyQuestCta: 'Claim NexionBox',
+      viewTasks: 'View {n} tasks',
+      hideTasks: 'Hide tasks'
     },
     goodDay: 'Good day',
     headlinePrefix: 'Your node earned',
@@ -613,7 +621,15 @@ const mainZh: MainPageMessages = {
       multiplier: '倍数',
       earningsLedger: '收益账本',
       nexPrice: 'NEX 价格',
-      reserveProof: '链上储备证明 · 102.4% 足额支持 · 信任中心'
+      reserveProof: '链上储备证明 · 102.4% 足额支持 · 信任中心',
+      weeklyQuestEyebrow: '本周任务',
+      weeklyQuestEndsIn: '倒计时',
+      weeklyQuestActivate: '激活 NexionBox S1 即可领取',
+      weeklyQuestYourPhone: 'your phone',
+      weeklyQuestPayback: 'payback',
+      weeklyQuestCta: '获取 NexionBox',
+      viewTasks: '查看 {n} 个任务',
+      hideTasks: '收起任务'
     },
     goodDay: '你好',
     headlinePrefix: '你的节点今天已赚取',
