@@ -237,7 +237,7 @@ function showSoon(label: string) {
           </view>
           <view class="ticket-separator" />
           <view class="ticket-foot">
-            <view class="ticket-left-count"><i />{{ tx('今日仅剩 47 张', '47 trials left today') }}</view>
+            <view class="ticket-left-count"><i class="ticket-scarcity-dot" />{{ tx('今日仅剩 47 张', '47 trials left today') }}</view>
             <button>{{ tx('立即领取', 'Claim trial') }} <text>→</text></button>
           </view>
         </view>
@@ -648,7 +648,8 @@ function showSoon(label: string) {
 .ticket-separator { position: relative; z-index: 1; height: 1rpx; margin: 0 20rpx; background: repeating-linear-gradient(90deg, var(--v5-border-strong) 0 8rpx, transparent 8rpx 16rpx); }
 .ticket-foot { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 32rpx; }
 .ticket-left-count { display: inline-flex; align-items: center; gap: 12rpx; color: #ff6b35; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 520; }
-.ticket-left-count i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff6b35; box-shadow: 0 0 12rpx rgba(255,107,53,.7); animation: pulse 1.6s ease-in-out infinite; }
+.ticket-scarcity-dot { position: relative; display: inline-block; flex-shrink: 0; width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff6b35; box-shadow: 0 0 12rpx rgba(255,107,53,.7); }
+.ticket-scarcity-dot::after { position: absolute; inset: -7rpx; border: 1rpx solid rgba(255,107,53,.62); border-radius: 50%; content: ""; animation: ticketDotPulse 1.6s ease-out infinite; }
 .ticket-foot button { display: inline-flex; align-items: center; justify-content: center; gap: 10rpx; height: 68rpx; margin: 0; padding: 0 28rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; background: transparent; color: #9b89e0; font-size: 27rpx; font-weight: 650; white-space: nowrap; }
 .ticket-foot button::after { border: 0; }
 .ticket-foot button text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; opacity: .85; }
@@ -931,6 +932,7 @@ function showSoon(label: string) {
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
 @keyframes ticketEnter { 0%{opacity:0;transform:perspective(900rpx) rotateY(-92deg) scale(.98)} 68%{opacity:1;transform:perspective(900rpx) rotateY(5deg) scale(1.01)} 100%{opacity:1;transform:perspective(900rpx) rotateY(0) scale(1)} }
 @keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 18%{opacity:.8} 100%{opacity:0;transform:translateX(120%)} }
+@keyframes ticketDotPulse { 0%{opacity:.8;transform:scale(.45)} 70%,100%{opacity:0;transform:scale(1.9)} }
 @keyframes slowSpin { to{ transform: rotate(360deg) } }
 @keyframes feedFade { from{ opacity: 0; transform: translateY(-10rpx) } to{ opacity: 1; transform: translateY(0) } }
 </style>
