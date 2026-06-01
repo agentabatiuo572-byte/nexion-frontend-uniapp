@@ -224,7 +224,7 @@ function toggleQuickPause() {
             </view>
           </view>
           <view class="ticket-bottom">
-            <text><i class="ticket-scarcity-dot" />{{ tx('今日仅剩 47 张', '47 trials left today') }}</text>
+            <text class="ticket-scarcity-label"><i class="ticket-scarcity-dot" />{{ tx('今日仅剩 47 张', '47 trials left today') }}</text>
             <b>{{ tx('立即领取', 'Claim trial') }} <i class="ui-icon arrow-right" /></b>
           </view>
         </view>
@@ -565,7 +565,9 @@ button::after { border: 0; }
 .ticket-value b text { color: #9b89e0; font-size: 40rpx; }
 .ticket-value i { display: block; margin-top: 10rpx; color: #6b7385; font-size: 22rpx; font-style: normal; }
 .ticket-bottom { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 32rpx; border-top: 1rpx dashed rgba(255,255,255,.16); }
-.ticket-bottom text { display: flex; align-items: center; gap: 12rpx; color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 500; line-height: 1; }
+.ticket-bottom text,
+.ticket-scarcity-label,
+.ticket-scarcity-label :deep(span) { display: flex; align-items: center; gap: 18rpx; color: #ff7a3d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 500; line-height: 1; }
 .ticket-scarcity-dot { position: relative; display: inline-block; flex-shrink: 0; width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff7a3d; box-shadow: 0 0 12rpx rgba(255,122,61,.7); }
 .ticket-scarcity-dot::after { position: absolute; inset: -7rpx; border: 1rpx solid rgba(255,122,61,.62); border-radius: 50%; content: ""; animation: ticketDotPulse 1.6s ease-out infinite; }
 .ticket-bottom b { display: inline-flex; align-items: center; justify-content: center; min-height: 62rpx; padding: 0 28rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; color: #9b89e0; font-size: 27rpx; line-height: 1; white-space: nowrap; }

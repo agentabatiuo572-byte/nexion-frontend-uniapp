@@ -647,7 +647,7 @@ function showSoon(label: string) {
 .ticket-rate { margin-top: 10rpx; color: var(--v5-ink-4); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .ticket-separator { position: relative; z-index: 1; height: 1rpx; margin: 0 20rpx; background: repeating-linear-gradient(90deg, var(--v5-border-strong) 0 8rpx, transparent 8rpx 16rpx); }
 .ticket-foot { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 32rpx; }
-.ticket-left-count { display: inline-flex; align-items: center; gap: 12rpx; color: #ff6b35; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 520; }
+.ticket-left-count { display: inline-flex; align-items: center; gap: 18rpx; color: #ff6b35; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 520; }
 .ticket-scarcity-dot { position: relative; display: inline-block; flex-shrink: 0; width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff6b35; box-shadow: 0 0 12rpx rgba(255,107,53,.7); }
 .ticket-scarcity-dot::after { position: absolute; inset: -7rpx; border: 1rpx solid rgba(255,107,53,.62); border-radius: 50%; content: ""; animation: ticketDotPulse 1.6s ease-out infinite; }
 .ticket-foot button { display: inline-flex; align-items: center; justify-content: center; gap: 10rpx; height: 68rpx; margin: 0; padding: 0 28rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; background: transparent; color: #9b89e0; font-size: 27rpx; font-weight: 650; white-space: nowrap; }
