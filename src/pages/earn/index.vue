@@ -86,9 +86,9 @@ const lockedTaskRows = computed(() => [
 ])
 
 const completedRows = computed(() => [
-  { icon: 'check', model: 'SDXL Turbo 512²', type: v.value.priceImageGen || 'Image Gen', reward: '+$0.003', time: locale.value === 'zh' ? '2分钟前' : '2m ago', receipt: true },
-  { icon: 'check', model: 'Whisper-tiny', type: v.value.speech || 'Speech', reward: '+$0.001', time: locale.value === 'zh' ? '8分钟前' : '8m ago' },
-  { icon: 'check', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.001', time: locale.value === 'zh' ? '19分钟前' : '19m ago', receipt: true }
+  { icon: 'check', model: 'SDXL Turbo 512²', type: v.value.priceImageGen || 'Image Gen', reward: '+$0.003', time: '2m ago', receipt: true },
+  { icon: 'check', model: 'Whisper-tiny', type: v.value.speech || 'Speech', reward: '+$0.001', time: '8m ago' },
+  { icon: 'check', model: 'MobileBERT', type: v.value.priceEmbedding || 'Embedding', reward: '+$0.001', time: '19m ago', receipt: true }
 ])
 
 const taskTeaserRows = computed(() => [
@@ -441,12 +441,14 @@ function toggleQuickPause() {
 
             <view class="task-section done-title">
               <view class="task-heading">{{ v.completedToday || 'Completed today' }}</view>
-              <view v-for="row in completedRows" :key="row.model" class="completed-row">
-                <text><i class="ui-icon check" /></text>
-                <view>{{ row.model }} <i>· {{ row.type }}</i></view>
-                <b>{{ row.reward }}</b>
-                <em>{{ row.time }}</em>
-                <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
+              <view class="completed-list">
+                <view v-for="row in completedRows" :key="row.model" class="completed-row">
+                  <text><i class="ui-icon check" /></text>
+                  <view><span>{{ row.model }}</span><i>·</i><em>{{ row.type }}</em></view>
+                  <b>{{ row.reward }}</b>
+                  <strong>{{ row.time }}</strong>
+                  <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
+                </view>
               </view>
             </view>
           </template>
@@ -455,12 +457,14 @@ function toggleQuickPause() {
               <view class="task-heading">{{ v.completedToday || 'Completed today' }}</view>
               <view class="unlock-hint">{{ (v.historyHint || 'Last {n} jobs · Tap any row to open its Proof-of-Compute receipt.').replace('{n}', String(completedRows.length)) }}</view>
             </view>
-            <view v-for="row in completedRows" :key="`h-${row.model}`" class="completed-row">
-              <text><i class="ui-icon check" /></text>
-              <view>{{ row.model }} <i>· {{ row.type }}</i></view>
-              <b>{{ row.reward }}</b>
-              <em>{{ row.time }}</em>
-              <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
+            <view class="completed-list history-list">
+              <view v-for="row in completedRows" :key="`h-${row.model}`" class="completed-row">
+                <text><i class="ui-icon check" /></text>
+                <view><span>{{ row.model }}</span><i>·</i><em>{{ row.type }}</em></view>
+                <b>{{ row.reward }}</b>
+                <strong>{{ row.time }}</strong>
+                <button :class="{ hidden: !row.receipt }"><i class="ui-icon receipt" /></button>
+              </view>
             </view>
           </template>
         </view>
@@ -792,13 +796,16 @@ button::after { border: 0; }
 .teaser-earn b { color: #9edc1d; font-size: 30rpx; font-weight: 650; line-height: 1; }
 .teaser-earn small { display: flex; align-items: center; justify-content: flex-end; gap: 2rpx; margin-top: 10rpx; color: #8f98a8; font-size: 21rpx; font-weight: 400; white-space: nowrap; }
 .teaser-earn .ui-icon { width: 20rpx; height: 20rpx; }
-.completed-row { display: grid; grid-template-columns: 30rpx minmax(0,1fr) auto 88rpx 48rpx; align-items: center; gap: 12rpx; padding: 10rpx 32rpx; color: #8f98a8; font-size: 23rpx; }
-.completed-row > text { display: flex; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; color: #9edc1d; line-height: 1; }
-.completed-row view { overflow: hidden; color: rgba(245,247,250,.86); white-space: nowrap; text-overflow: ellipsis; }
-.completed-row i { color: #8f98a8; font-style: normal; }
-.completed-row b { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; line-height: 1; }
-.completed-row em { display: flex; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #8f98a8; font-style: normal; line-height: 1; text-align: right; }
-.completed-row button, .completed-row uni-button { display: grid; width: 48rpx; height: 48rpx; place-items: center; border-radius: 12rpx; background: transparent; color: #8f98a8; }
+.completed-list { display: flex; flex-direction: column; gap: 12rpx; padding: 0 32rpx 24rpx; }
+.completed-row { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; min-height: 48rpx; color: #8f98a8; font-size: 23rpx; }
+.completed-row > text { display: flex; flex: 0 0 30rpx; align-items: center; justify-content: center; width: 30rpx; height: 30rpx; color: #9edc1d; line-height: 1; }
+.completed-row > view { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 8rpx; overflow: hidden; color: rgba(245,247,250,.86); white-space: nowrap; }
+.completed-row view span { overflow: hidden; min-width: 0; text-overflow: ellipsis; }
+.completed-row view i { flex: none; color: #6b7385; font-style: normal; }
+.completed-row view em { flex: none; color: var(--v5-ink-3); font-style: normal; }
+.completed-row b { display: flex; flex: none; align-items: center; justify-content: flex-end; min-height: 30rpx; color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; line-height: 1; }
+.completed-row strong { display: flex; flex: 0 0 96rpx; align-items: center; justify-content: flex-end; min-height: 30rpx; color: var(--v5-ink-3); font-size: 22rpx; font-style: normal; font-weight: 400; line-height: 1; text-align: right; }
+.completed-row button, .completed-row uni-button { display: grid; flex: 0 0 48rpx; width: 48rpx; height: 48rpx; place-items: center; border-radius: 12rpx; background: transparent; color: #8f98a8; }
 .completed-row button.hidden, .completed-row uni-button.hidden { visibility: hidden; }
 @keyframes drift { from{transform:translateX(-14rpx)} to{transform:translate(18rpx,10rpx) scale(1.04)} }
 @keyframes dot { 0%{opacity:0;transform:translateY(0)} 20%{opacity:.7} 100%{opacity:0;transform:translateY(-360rpx)} }
