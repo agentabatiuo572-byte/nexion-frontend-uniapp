@@ -35,19 +35,19 @@ const dayTasks = computed(() => [
 ])
 
 const activityRows = computed(() => [
-  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
-  { ts: '+0:00', who: 'Peer', msg: 'Maya · ID — Llama 70B @ Helix Labs', val: '+$0.247', level: 'live' },
-  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
-  { ts: '+0:00', who: 'Peer', msg: 'cypher.eth — Sora 8s @ Atrium AI', val: '+$0.612', level: 'live' },
-  { ts: '+0:00', who: 'Lock', msg: 'Llama 70B LoRA @ Vector — needs 192GB', val: 'locked', level: 'warn' },
-  { ts: '+0:00', who: 'You', msg: 'MobileBERT @ Vector Foundry', val: '+$0.00007', level: 'ok' }
+  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
+  { ts: '+0:00', who: v.value.feedPeer, msg: 'Maya · ID — Llama 70B @ Helix Labs', val: '+$0.247', level: 'live' },
+  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
+  { ts: '+0:00', who: v.value.feedPeer, msg: 'cypher.eth — Sora 8s @ Atrium AI', val: '+$0.612', level: 'live' },
+  { ts: '+0:00', who: v.value.feedLock, msg: v.value.feedLockedJob, val: v.value.feedLocked, level: 'warn' },
+  { ts: '+0:00', who: v.value.feedYou, msg: 'MobileBERT @ Vector Foundry', val: '+$0.00007', level: 'ok' }
 ])
 
 const quickActions = computed(() => [
-  { icon: '💎', label: 'Stake', sub: '180% APY', tone: 'brand' },
-  { icon: '👑', label: 'Genesis', sub: '144 left', tone: 'warm' },
-  { icon: '🎯', label: 'Missions', sub: '5 active', tone: 'brand' },
-  { icon: '🔥', label: 'Daily', sub: '8 pts', tone: 'warm' }
+  { icon: '💎', label: v.value.quickStake, sub: '180% APY', tone: 'brand' },
+  { icon: '👑', label: v.value.quickGenesis, sub: v.value.quickGenesisSub, tone: 'warm' },
+  { icon: '🎯', label: v.value.quickMissions, sub: v.value.quickMissionsSub, tone: 'brand' },
+  { icon: '🔥', label: v.value.quickDaily, sub: v.value.quickDailySub, tone: 'warm' }
 ])
 
 const earningRows = [
@@ -179,10 +179,10 @@ function showSoon(label: string) {
         <view class="live-card card">
           <view class="live-tabs">
             <view class="segmented">
-              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">Activity</button>
-              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">Earnings</button>
+              <button :class="{ on: liveTab === 'activity' }" @click="liveTab = 'activity'">{{ v.liveActivity }}</button>
+              <button :class="{ on: liveTab === 'earnings' }" @click="liveTab = 'earnings'">{{ v.liveEarnings }}</button>
             </view>
-            <view class="live-chip small"><i /> live</view>
+            <view class="live-chip small live-feed-chip"><i /> {{ v.liveFeed }}</view>
           </view>
           <view v-if="liveTab === 'activity'" class="feed">
             <view v-for="row in activityRows" :key="`${row.ts}-${row.who}-${row.msg}`" class="feed-row">
@@ -217,8 +217,8 @@ function showSoon(label: string) {
         </view>
 
         <view class="fleet-title-row">
-          <view><b>My fleet</b><text>1 of 6</text></view>
-          <button @click="showSoon('Manage')">Manage <text>→</text></button>
+          <view><b>{{ v.myFleetTitle }}</b><text>1 of 6</text></view>
+          <button @click="showSoon(v.manage)">{{ v.manage }} <text>→</text></button>
         </view>
         <view class="fleet-card card">
           <view class="fleet-row">
@@ -227,10 +227,10 @@ function showSoon(label: string) {
               <i />
             </view>
             <view class="fleet-main">
-              <view><b>Your phone</b><em>earning</em></view>
+              <view><b>{{ v.yourPhoneDevice }}</b><em>{{ v.earning }}</em></view>
               <text>Mobile NPU · 28 TOPS</text>
             </view>
-            <view class="fleet-earn"><b>$0.040</b><text>today</text></view>
+            <view class="fleet-earn"><b>$0.040</b><text>{{ v.today }}</text></view>
           </view>
           <view class="phone-task">
             <view class="phone-task-top">
@@ -241,12 +241,12 @@ function showSoon(label: string) {
               <em>+$0.00032</em>
             </view>
             <view class="task-progress"><view><i /></view></view>
-            <view class="task-meta"><text><b>28%</b> · 28s left</text><text>7d streak</text></view>
+            <view class="task-meta"><text><b>28%</b> · 28s {{ v.left }}</text><text>7d {{ v.streak }}</text></view>
           </view>
           <view class="add-device">
             <view class="add-icon">＋</view>
-            <view><b>Add a NexionBox</b><text>Pays back in ~34 days</text></view>
-            <em>$38.50<text>est. /d</text></em>
+            <view><b>{{ v.addNexionBox }}</b><text>{{ v.paysBack34 }}</text></view>
+            <em>$38.50<text>{{ v.estPerDay }}</text></em>
           </view>
         </view>
 
@@ -414,10 +414,12 @@ function showSoon(label: string) {
 .live-card, .fleet-card, .grid-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
 .live-card { overflow: hidden; padding-bottom: 12rpx; border-radius: 32rpx; background: #101010; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
-.segmented { display: flex; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }
-.segmented button { height: 48rpx; margin: 0; padding: 0 24rpx; border: 0; border-radius: 12rpx; background: transparent; color: #8f98a8; font-size: 24rpx; font-weight: 560; line-height: 1; }
+.segmented { display: flex; align-items: center; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }
+.segmented button { display: flex; align-items: center; justify-content: center; min-width: 100rpx; height: 48rpx; margin: 0; padding: 0 24rpx; border: 0; border-radius: 12rpx; background: transparent; color: #8f98a8; font-size: 24rpx; font-weight: 560; line-height: 48rpx; text-align: center; }
 .segmented button::after { border: 0; }
 .segmented .on { background: #10141d; color: #fff; box-shadow: 0 1rpx 6rpx rgba(0,0,0,.3); }
+.live-feed-chip { height: 36rpx; padding: 0 14rpx; border-radius: 8rpx; background: rgba(124,92,255,.24); color: #9b89e0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 650; }
+.live-feed-chip i { width: 9rpx; height: 9rpx; background: #9b89e0; box-shadow: 0 0 10rpx rgba(155,137,224,.5); }
 .feed { margin-top: 10rpx; }
 .feed-row { display: grid; grid-template-columns: 82rpx 68rpx 1fr auto; gap: 14rpx; align-items: center; padding: 17rpx 0; border-bottom: 1rpx solid rgba(255,255,255,.06); font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .feed-row text, .feed-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -435,11 +437,12 @@ function showSoon(label: string) {
 .earn-row view { color: #8f98a8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .see-all { padding-top: 16rpx; text-align: right; color: #8f98a8; font-size: 22rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .quick-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 14rpx; margin-top: 24rpx; }
-.quick-grid button { display: flex; height: 118rpx; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; border: 1rpx solid rgba(198,255,58,.36); border-radius: 24rpx; background: #101010; }
+.quick-grid button { display: flex; height: 118rpx; flex-direction: column; align-items: center; justify-content: center; gap: 6rpx; margin: 0; padding: 0; border: 1rpx solid rgba(198,255,58,.36); border-radius: 24rpx; background: #101010; text-align: center; line-height: 1; }
+.quick-grid button::after { border: 0; }
 .quick-grid button.warm { border-color: rgba(255,107,53,.46); }
-.quick-grid text { font-size: 31rpx; line-height: 1; }
-.quick-grid b { color: #f3f5f9; font-size: 25rpx; font-weight: 720; line-height: 1.05; }
-.quick-grid i { color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-style: normal; font-weight: 650; }
+.quick-grid text { display: block; width: 100%; font-size: 31rpx; line-height: 1; text-align: center; }
+.quick-grid b { display: block; width: 100%; color: #f3f5f9; font-size: 25rpx; font-weight: 720; line-height: 1.05; text-align: center; }
+.quick-grid i { display: block; width: 100%; color: #9df20f; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-style: normal; font-weight: 650; line-height: 1.1; text-align: center; }
 .quick-grid .warm i { color: #ff7b3d; }
 .section-title { display: flex; justify-content: space-between; align-items: center; margin: 42rpx 4rpx 18rpx; }
 .section-title b { color: #fff; font-size: 30rpx; }
