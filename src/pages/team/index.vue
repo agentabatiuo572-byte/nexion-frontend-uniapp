@@ -990,38 +990,48 @@ uni-button::after {
 
 .quick-card,
 .small-card {
-  padding: 26rpx;
+  padding: 28rpx;
 }
 
 .quick-top {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   color: #687284;
-  font-size: 27rpx;
+}
+
+.quick-top .team-icon:first-child {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.quick-top .icon-arrow-up {
+  width: 28rpx;
+  height: 28rpx;
 }
 
 .quick-num {
-  margin-top: 24rpx;
+  margin-top: 20rpx;
   color: #ffffff;
-  font-size: 34rpx;
-  font-weight: 760;
+  font-size: 36rpx;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1;
 }
 
 .quick-title {
   margin-top: 10rpx;
-  color: #aeb7c8;
-  font-size: 22rpx;
+  color: #9ba3b5;
+  font-size: 23rpx;
   line-height: 1.25;
 }
 
 .quick-meta {
-  margin-top: 9rpx;
+  margin-top: 12rpx;
   color: #9ba3b5;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 21rpx;
-  line-height: 1.28;
+  font-size: 22rpx;
+  line-height: 1.35;
 }
 
 .aurora {
