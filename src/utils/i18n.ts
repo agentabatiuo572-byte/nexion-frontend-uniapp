@@ -921,7 +921,7 @@ const mainZh: MainPageMessages = {
       deviceRanking: '设备日收益排行',
       networkState: '网络状态',
       activeJobs: '活跃任务',
-      llmQueue: 'LLM 队列',
+      llmQueue: 'LLM 队列深度',
       peakHours: '高峰时段',
       nextDrop: '下一次发布',
       imageGen: '图像生成',

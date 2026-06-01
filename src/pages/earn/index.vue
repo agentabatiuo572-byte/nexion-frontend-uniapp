@@ -703,6 +703,7 @@ button::after { border: 0; }
 .rank-row span { display: flex; align-items: center; justify-content: center; width: 28rpx; height: 28rpx; color: #6b7385; line-height: 1; }
 .rank-row.phone b, .rank-row.phone strong { color: #8f98a8; }
 .network-state { padding: 0 32rpx 24rpx; }
+.network-state .market-heading { padding: 24rpx 0 12rpx; text-align: left; }
 .network-state view:not(.market-heading) { display: flex; align-items: center; justify-content: space-between; gap: 24rpx; padding: 8rpx 0; color: #8f98a8; font-size: 23rpx; }
 .network-state b { color: #f5f7fa; font-weight: 500; }
 .network-state i { color: #9edc1d; font-style: normal; font-size: 21rpx; }
