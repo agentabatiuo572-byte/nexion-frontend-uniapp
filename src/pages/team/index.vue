@@ -1018,9 +1018,10 @@ uni-button::after {
 
 .quick-meta {
   margin-top: 9rpx;
-  color: #7f8797;
+  color: #9ba3b5;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 21rpx;
+  line-height: 1.28;
 }
 
 .aurora {
