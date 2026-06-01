@@ -336,8 +336,8 @@ function toggleQuickPause() {
             <i v-for="n in 10" :key="n" :style="{ left: `${7 + ((n * 17) % 88)}%`, animationDelay: `${n * .9}s`, animationDuration: `${9 + (n % 4)}s` }" />
           </view>
           <view class="capacity-label"><i class="ui-icon trending-up" /> {{ v.slotsPotential || 'Potential daily' }}</view>
-          <view class="capacity-money"><text>+$</text><b>192</b><i>/day</i><em>{{ v.slotsUntapped || 'untapped' }}</em></view>
-          <view class="capacity-sub"><b>5</b> × NexionBox S1 @ $38.50/d</view>
+          <view class="capacity-money"><text>+$</text><b>193</b><i>/day</i><em>{{ v.slotsUntapped || 'untapped' }}</em></view>
+          <view class="capacity-sub"><b>5</b> × NexionBox S1 @ $38.50/d · <strong>{{ locale === 'zh' ? '3208× 你的手机' : '3208× your phone' }}</strong></view>
           <view class="slot-grid">
             <view class="filled"><i class="ui-icon phone" /><em /></view>
             <view v-for="n in 5" :key="n" class="empty"><i class="ui-icon plus" /></view>
@@ -345,7 +345,7 @@ function toggleQuickPause() {
           <view class="capacity-stats">
             <view><b>1/6</b><text>{{ v.slotsFilled || 'filled' }}</text></view>
             <view><b>$143</b><text>{{ v.networkAvg || 'network avg' }}</text></view>
-            <view><b>Top 6%</b><text>{{ v.rankIfFilled || 'if filled' }}</text></view>
+            <view><b>{{ locale === 'zh' ? '前 6%' : 'top 6%' }}</b><text>{{ v.rankIfFilled || 'if filled' }}</text></view>
           </view>
           <button><i class="ui-icon zap" /> {{ v.fillSlots || 'Fill slots' }} <i class="ui-icon arrow-right" /></button>
           <view class="fleet-note">{{ (v.currentFleet || 'Current fleet {amount} / day').replace('{amount}', '$0.06') }}</view>
@@ -670,6 +670,7 @@ button::after { border: 0; }
 .capacity-money em { padding: 6rpx 16rpx; border-radius: 999rpx; background: rgba(158,220,29,.2); color: #9edc1d; font-size: 21rpx; font-style: normal; text-transform: uppercase; }
 .capacity-sub { position: relative; margin-top: 16rpx; color: #8f98a8; font-size: 25rpx; }
 .capacity-sub b { color: #f5f7fa; }
+.capacity-sub strong { color: #58e7ff; font-weight: 650; }
 .slot-grid { position: relative; display: grid; grid-template-columns: repeat(6,1fr); gap: 12rpx; margin-top: 28rpx; }
 .slot-grid view { display: grid; height: 88rpx; place-items: center; border-radius: 24rpx; line-height: 1; }
 .slot-grid .filled { position: relative; background: rgba(158,220,29,.16); color: #9edc1d; }
