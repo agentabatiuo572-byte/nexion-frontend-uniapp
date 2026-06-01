@@ -443,7 +443,7 @@ function toggleQuickPause() {
               <view class="task-heading">{{ v.completedToday || 'Completed today' }}</view>
               <view class="completed-list">
                 <view v-for="row in completedRows" :key="row.model" class="completed-row">
-                  <text><i class="ui-icon check" /></text>
+                  <text><i class="ui-icon check-circle" /></text>
                   <view><span>{{ row.model }}</span><i>·</i><em>{{ row.type }}</em></view>
                   <b>{{ row.reward }}</b>
                   <strong>{{ row.time }}</strong>
@@ -459,7 +459,7 @@ function toggleQuickPause() {
             </view>
             <view class="completed-list history-list">
               <view v-for="row in completedRows" :key="`h-${row.model}`" class="completed-row">
-                <text><i class="ui-icon check" /></text>
+                <text><i class="ui-icon check-circle" /></text>
                 <view><span>{{ row.model }}</span><i>·</i><em>{{ row.type }}</em></view>
                 <b>{{ row.reward }}</b>
                 <strong>{{ row.time }}</strong>
@@ -537,6 +537,8 @@ button::after { border: 0; }
 .plus::before { width: .72em; height: .12em; background: currentColor; }
 .plus::after { width: .12em; height: .72em; background: currentColor; }
 .check::before { width: .68em; height: .36em; border-left: .14em solid currentColor; border-bottom: .14em solid currentColor; transform: rotate(-45deg) translate(.05em,-.05em); }
+.check-circle::before { width: .92em; height: .92em; border: .12em solid currentColor; border-radius: 50%; }
+.check-circle::after { width: .44em; height: .24em; border-left: .12em solid currentColor; border-bottom: .12em solid currentColor; transform: rotate(-45deg) translate(.02em,-.02em); }
 .receipt::before { width: .72em; height: .9em; border: .12em solid currentColor; border-radius: .08em; }
 .receipt::after { width: .38em; height: .12em; background: currentColor; box-shadow: 0 .22em 0 currentColor; }
 .pill-tabs { display: flex; gap: 4rpx; margin-top: 24rpx; padding: 6rpx; border-radius: 24rpx; background: #1f1f1f; }
