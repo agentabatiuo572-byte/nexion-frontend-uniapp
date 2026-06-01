@@ -51,9 +51,9 @@ const quickActions = computed(() => [
 ])
 
 const gridClients = computed(() => [
-  { id: 'P', name: 'Pocket Studios', model: 'SDXL Turbo', city: 'Berlin', color: '#9b89e0', gpus: '30 GPUs' },
-  { id: 'H', name: 'Helix Labs', model: 'Llama 3.2 3B', city: 'SF', color: '#12c979', gpus: '57 GPUs' },
-  { id: 'E', name: 'Echo Earbuds', model: 'Whisper tiny', city: 'Tokyo', color: '#58e7ff', gpus: '84 GPUs' }
+  { id: 'P', name: 'Pocket Studios', model: 'SDXL Turbo', city: 'Berlin', color: '#9EDC1D', gpus: '30 GPUs' },
+  { id: 'H', name: 'Helix Labs', model: 'Llama 3.2 3B', city: 'SF', color: '#9EDC1D', gpus: '57 GPUs' },
+  { id: 'E', name: 'Echo Earbuds', model: 'Whisper tiny', city: 'Tokyo', color: '#8E72FF', gpus: '84 GPUs' }
 ])
 
 const earningRows = [
@@ -514,15 +514,15 @@ function showSoon(label: string) {
 .on-grid-title button text { transform: translateY(-1rpx); }
 .on-grid-card { overflow: hidden; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; }
 .on-grid-row { display: grid; grid-template-columns: 60rpx 1fr auto; align-items: center; gap: 24rpx; min-height: 92rpx; padding: 15rpx 32rpx; border-bottom: 1rpx solid rgba(255,255,255,.07); }
-.client-mark { display: grid; width: 60rpx; height: 60rpx; place-items: center; border-radius: 16rpx; background: rgba(155,137,224,.14); font-size: 24rpx; font-weight: 680; }
+.client-mark { display: grid; width: 60rpx; height: 60rpx; place-items: center; border-radius: 16rpx; background: rgba(158,220,29,.20); font-size: 24rpx; font-weight: 600; }
 .client-main { min-width: 0; }
 .client-main b { display: block; overflow: hidden; color: #f4f6fa; font-size: 27rpx; font-weight: 560; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
 .client-main text { display: block; overflow: hidden; margin-top: 6rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
 .client-main i { color: #5e6674; font-style: normal; }
-.on-grid-row em { color: #12c979; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 560; white-space: nowrap; }
+.on-grid-row em { color: #9edc1d; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 500; white-space: nowrap; }
 .on-grid-footer { display: flex; align-items: center; justify-content: space-between; min-height: 66rpx; padding: 0 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); background: rgba(255,255,255,.035); color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .on-grid-footer b { color: #f4f6fb; font-weight: 560; }
-.on-grid-footer text:last-child { color: #12c979; font-weight: 560; }
+.on-grid-footer text:last-child { color: #9edc1d; font-weight: 500; }
 .pulse-card { display: grid; grid-template-columns: 1fr 170rpx; gap: 20rpx; align-items: end; }
 .spark, .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .spark i, .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
