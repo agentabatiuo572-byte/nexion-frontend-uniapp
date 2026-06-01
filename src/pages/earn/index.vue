@@ -354,7 +354,7 @@ function toggleQuickPause() {
         <view class="market-shell">
           <view class="market-title-row">
             <b>{{ v.marketOverview }}</b>
-            <text><i class="market-live-dot" />{{ v.liveDemand }}</text>
+            <view class="market-live-label"><i class="market-live-dot" /><text>{{ v.liveDemand }}</text></view>
           </view>
           <view class="market-board">
             <view class="market-heading">{{ v.priceIndex || 'AI Workload Price Index' }}</view>
@@ -675,7 +675,8 @@ button::after { border: 0; }
 .market-shell { margin-top: 40rpx; }
 .market-title-row { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin: 0 8rpx 20rpx; }
 .market-title-row b { color: var(--v5-ink-3); font-size: 27rpx; font-weight: 650; letter-spacing: 0; }
-.market-title-row text { display: flex; align-items: center; gap: 10rpx; color: var(--v5-ink-3); font-size: 23rpx; }
+.market-live-label { display: flex; align-items: center; justify-content: flex-end; gap: 8rpx; min-height: 28rpx; color: var(--v5-ink-3); font-size: 23rpx; line-height: 1; }
+.market-live-label text { display: block; color: var(--v5-ink-3); font-size: 23rpx; line-height: 1; }
 .market-live-dot { position: relative; display: block; flex: 0 0 12rpx; width: 12rpx; height: 12rpx; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 12rpx rgba(158,220,29,.5); }
 .market-live-dot::after { position: absolute; inset: -7rpx; border: 1rpx solid rgba(158,220,29,.48); border-radius: 50%; content: ""; animation: marketDotPulse 1.6s ease-out infinite; }
 .market-board { margin-top: 24rpx; padding-bottom: 10rpx; background: var(--v5-surface); border-color: var(--v5-border); border-radius: 32rpx; }
