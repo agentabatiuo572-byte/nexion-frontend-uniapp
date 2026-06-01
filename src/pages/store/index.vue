@@ -255,6 +255,9 @@ const phaseMeta: Record<'P3' | 'P5', { eta: string; current: number; total: numb
   P3: { eta: 'Q3', current: 1, total: 3, pct: 33, queue: 1842 },
   P5: { eta: 'Q1 next year', current: 1, total: 5, pct: 20, queue: 614 }
 }
+const phaseEta = (phase: 'P3' | 'P5') => locale.value === 'zh'
+  ? (phase === 'P3' ? '下季度' : '明年 Q1')
+  : phaseMeta[phase].eta
 
 let tickerTimer: ReturnType<typeof setInterval> | undefined
 
@@ -515,12 +518,20 @@ function notifyLocked(product: Product) {
         <view class="locked-list">
           <view v-for="item in lockedProducts" :key="item.name" class="locked-card card">
             <view class="locked-aurora" />
-            <view class="lock-icon">⌁<span /></view>
-            <view>
-              <em>{{ v.comingSoon }}</em>
-              <b>{{ item.name }}</b>
-              <text>{{ item.tagline }}</text>
-              <view class="locked-specs"><text>{{ item.gpu }}</text><i>·</i><text>{{ item.vram }}</text></view>
+            <view class="locked-grid-bg" />
+            <view class="locked-top">
+              <view class="lock-icon"><text class="ui-symbol icon-lock" /><span /></view>
+              <view class="locked-main">
+                <view class="locked-kicker">
+                  <em>{{ v.comingSoon }}</em>
+                  <i v-if="item.unlocksAtPhase">{{ phaseEta(item.unlocksAtPhase) }}</i>
+                </view>
+                <b>{{ item.name }}</b>
+                <text>{{ item.tagline }}</text>
+                <view class="locked-specs"><text>{{ item.gpu }}</text><i>·</i><text>{{ item.vram }}</text></view>
+              </view>
+            </view>
+            <view class="locked-body">
               <view v-if="item.unlocksAtPhase" class="locked-progress">
                 <view>
                   <text>{{ phaseProgressLabel(phaseMeta[item.unlocksAtPhase].current, phaseMeta[item.unlocksAtPhase].total) }}</text>
@@ -529,11 +540,10 @@ function notifyLocked(product: Product) {
                 <span><i :style="{ width: `${phaseMeta[item.unlocksAtPhase].pct}%` }" /></span>
               </view>
               <view class="locked-actions">
-                <button @click.stop="notifyLocked(item)">{{ notifyMeLabel }}</button>
+                <button @click.stop="notifyLocked(item)"><text class="ui-symbol icon-bell" />{{ notifyMeLabel }}</button>
                 <text v-if="item.unlocksAtPhase"><b>{{ fmtInt(phaseMeta[item.unlocksAtPhase].queue) }}</b> {{ inQueueLabel }}</text>
               </view>
             </view>
-            <i v-if="item.unlocksAtPhase">{{ phaseMeta[item.unlocksAtPhase].eta }}</i>
           </view>
         </view>
 
@@ -584,8 +594,8 @@ function notifyLocked(product: Product) {
 .vs-mid span { color: #ff9b62; font-size: 30rpx; }
 .vs-mid i { padding: 8rpx 18rpx; border-radius: 999rpx; background: #ff9b62; color: #180b05; font-style: normal; font-size: 23rpx; font-weight: 700; white-space: nowrap; }
 .right { text-align: right; }
-.purchase-ticker, .locked-card { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18rpx; margin-top: 24rpx; padding: 24rpx 28rpx; }
-.lock-icon { display: grid; width: 58rpx; height: 58rpx; place-items: center; border-radius: 18rpx; background: rgba(198,255,58,.12); color: #c6ff3a; font-size: 30rpx; }
+.purchase-ticker { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 18rpx; margin-top: 24rpx; padding: 24rpx 28rpx; }
+.lock-icon { position: relative; display: grid; flex: 0 0 88rpx; width: 88rpx; height: 88rpx; place-items: center; border-radius: 24rpx; background: linear-gradient(135deg, rgba(255,90,31,.10), rgba(12,196,214,.08)); color: #ff9b62; }
 .locked-card b { display: block; color: #fff; font-size: 26rpx; }
 .locked-card text { display: block; margin-top: 6rpx; color: #99a3b3; font-size: 22rpx; line-height: 1.35; }
 .locked-card i { color: #ff9b62; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
@@ -643,6 +653,8 @@ function notifyLocked(product: Product) {
 .icon-zap { margin-right: 6rpx; color: inherit; -webkit-mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; mask: url("../../static/icons/tab-zap.svg") center / contain no-repeat; }
 .icon-trending-up { width: 24rpx; height: 24rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 7h6v6'/%3E%3Cpath d='m22 7-8.5 8.5-5-5L2 17'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 7h6v6'/%3E%3Cpath d='m22 7-8.5 8.5-5-5L2 17'/%3E%3C/svg%3E") center / contain no-repeat; }
 .icon-arrow-right { width: 28rpx; height: 28rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-lock { width: 36rpx; height: 36rpx; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E") center / contain no-repeat; }
+.icon-bell { width: 28rpx; height: 28rpx; background: currentColor; -webkit-mask: url("../../static/icons/bell.svg") center / contain no-repeat; mask: url("../../static/icons/bell.svg") center / contain no-repeat; }
 .icon-refresh { color: inherit; -webkit-mask: url("../../static/icons/profile-refresh-cw.svg") center / contain no-repeat; mask: url("../../static/icons/profile-refresh-cw.svg") center / contain no-repeat; }
 .icon-orders { color: inherit; -webkit-mask: url("../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; mask: url("../../static/icons/bill-shopping-bag.svg") center / contain no-repeat; }
 .stock-strip b { color: #ff9b62; font-size: 23rpx; }
@@ -665,22 +677,28 @@ function notifyLocked(product: Product) {
 .purchase-ticker text { display: block; margin-top: 4rpx; color: #99a3b3; font-size: 22rpx; }
 .purchase-ticker i { color: #8f98a8; font-style: normal; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .locked-list .locked-card:first-child { margin-top: 0; }
-.locked-card { position: relative; overflow: hidden; align-items: flex-start; padding: 30rpx; }
-.locked-card > view:not(.locked-aurora), .locked-card > i { position: relative; z-index: 1; }
-.locked-aurora { position: absolute; inset: -24%; background: radial-gradient(40% 48% at 86% 12%, rgba(255,122,61,.16), transparent 64%), radial-gradient(36% 44% at 12% 86%, rgba(88,231,255,.12), transparent 62%); filter: blur(18rpx); animation: drift 14s ease-in-out infinite alternate; }
-.lock-icon { position: relative; background: linear-gradient(135deg, rgba(255,122,61,.14), rgba(88,231,255,.11)); color: #ff9b62; }
-.lock-icon span { position: absolute; right: -3rpx; bottom: -3rpx; width: 14rpx; height: 14rpx; border: 4rpx solid #10141d; border-radius: 50%; background: #58e7ff; animation: pulse 2.4s ease-in-out infinite; }
+.locked-card { position: relative; overflow: hidden; margin-top: 20rpx; padding: 32rpx; border-color: rgba(255,255,255,.08); background: #10141d; }
+.locked-card > view:not(.locked-aurora):not(.locked-grid-bg) { position: relative; z-index: 1; }
+.locked-aurora { position: absolute; inset: -20%; background: radial-gradient(40% 50% at 85% 15%, rgba(255,122,61,.18), transparent 60%), radial-gradient(35% 45% at 15% 85%, rgba(88,231,255,.14), transparent 60%); filter: blur(20rpx); opacity: .7; animation: drift 14s ease-in-out infinite alternate; }
+.locked-grid-bg { position: absolute; inset: 0; pointer-events: none; opacity: .18; background-image: linear-gradient(to right, rgba(255,255,255,.06) 1rpx, transparent 1rpx), linear-gradient(to bottom, rgba(255,255,255,.06) 1rpx, transparent 1rpx); background-size: 48rpx 48rpx; }
+.locked-top { display: flex; align-items: flex-start; gap: 24rpx; }
+.locked-main { flex: 1; min-width: 0; }
+.locked-kicker { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; }
+.locked-kicker i { flex: none; padding: 4rpx 14rpx; border-radius: 8rpx; background: rgba(255,122,61,.12); color: #ff9b62; font-size: 22rpx; font-weight: 700; }
+.lock-icon span { position: absolute; right: -4rpx; bottom: -4rpx; width: 16rpx; height: 16rpx; border: 4rpx solid #10141d; border-radius: 50%; background: #58e7ff; animation: pulse 2.4s ease-in-out infinite; }
 .locked-specs { display: flex; align-items: center; flex-wrap: wrap; gap: 10rpx; margin-top: 12rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .locked-specs text { display: inline; margin: 0; color: #d7dce6; font-size: 21rpx; }
 .locked-specs i { color: #6b7385; font-style: normal; font-size: 20rpx; }
-.locked-progress { margin-top: 22rpx; padding-top: 20rpx; border-top: 1rpx dashed rgba(255,255,255,.14); }
+.locked-body { margin-top: 28rpx; }
+.locked-progress { padding-top: 24rpx; border-top: 1rpx dashed rgba(255,255,255,.14); }
 .locked-progress view { display: flex; justify-content: space-between; align-items: center; gap: 12rpx; }
 .locked-progress view text { margin: 0; color: #99a3b3; font-size: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .locked-progress view b { color: #ff9b62; font-size: 22rpx; }
-.locked-progress > span { display: block; height: 8rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
+.locked-progress > span { display: block; height: 10rpx; margin-top: 12rpx; overflow: hidden; border-radius: 999rpx; background: #242a35; }
 .locked-progress > span i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#ff9b62,#58e7ff); }
-.locked-actions { display: flex; align-items: center; gap: 18rpx; margin-top: 22rpx; }
-.locked-actions button { flex: 1; height: 76rpx; border-radius: 999rpx; background: #ff9b62; color: #120804; font-size: 25rpx; font-weight: 760; }
+.locked-actions { display: flex; align-items: center; gap: 20rpx; margin-top: 24rpx; }
+.locked-actions button { flex: 1; gap: 10rpx; height: 84rpx; border-radius: 999rpx; background: #ff9b62; color: #0a0a0a; font-size: 26rpx; font-weight: 760; box-shadow: 0 12rpx 28rpx -16rpx rgba(255,90,31,.45); }
+.locked-actions button text { display: inline-block; margin: 0; color: currentColor; }
 .locked-actions text { margin: 0; color: #8f98a8; font-size: 20rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .locked-actions text b { display: block; color: #ff9b62; font-size: 23rpx; }
 .orders-entry { display: flex; align-items: center; justify-content: center; gap: 10rpx; width: 100%; height: 84rpx; margin-top: 28rpx; border: 1rpx solid rgba(255,255,255,.12); border-radius: 999rpx; background: #10141d; color: #d7dce6; font-size: 25rpx; }
