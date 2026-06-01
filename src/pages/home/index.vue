@@ -50,6 +50,12 @@ const quickActions = computed(() => [
   { icon: '🔥', label: v.value.quickDaily, sub: v.value.quickDailySub, tone: 'warm' }
 ])
 
+const gridClients = computed(() => [
+  { id: 'P', name: 'Pocket Studios', model: 'SDXL Turbo', city: 'Berlin', color: '#9b89e0', gpus: '30 GPUs' },
+  { id: 'H', name: 'Helix Labs', model: 'Llama 3.2 3B', city: 'SF', color: '#12c979', gpus: '57 GPUs' },
+  { id: 'E', name: 'Echo Earbuds', model: 'Whisper tiny', city: 'Tokyo', color: '#58e7ff', gpus: '84 GPUs' }
+])
+
 const earningRows = [
   { name: 'Sarah K.', product: 'NexionBox S1', amount: '+$29.90' },
   { name: 'Tom Wang', product: 'NexionBox Pro', amount: '+$89.90' },
@@ -250,12 +256,27 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="grid-card card">
-          <view class="mono muted">{{ v.onGrid }}</view>
-          <view class="grid-stats">
-            <view><b>4,821</b><text>{{ v.liveBoxes }}</text></view>
-            <view><b>102ms</b><text>{{ v.medianRoute }}</text></view>
-            <view><b>99.9%</b><text>{{ v.uptimeSla }}</text></view>
+        <view class="on-grid-section">
+          <view class="on-grid-title">
+            <view>
+              <text>{{ v.onGrid }}</text>
+              <text class="grid-now">{{ v.gridNow }}</text>
+            </view>
+            <button @click="showSoon(v.gridMap)">{{ v.gridMap }} <text>→</text></button>
+          </view>
+          <view class="on-grid-card">
+            <view v-for="client in gridClients" :key="client.id" class="on-grid-row">
+              <view class="client-mark" :style="{ color: client.color }">{{ client.id }}</view>
+              <view class="client-main">
+                <b>{{ client.model }}</b>
+                <text>{{ client.name }} <i>· {{ client.city }}</i></text>
+              </view>
+              <em>{{ client.gpus }}</em>
+            </view>
+            <view class="on-grid-footer">
+              <text><b>28,432</b> {{ v.gridOnline }}</text>
+              <text>+$215/sec</text>
+            </view>
           </view>
         </view>
 
@@ -358,10 +379,10 @@ function showSoon(label: string) {
 .live-chip { display: inline-flex; align-items: center; gap: 10rpx; height: 40rpx; padding: 0 16rpx; border-radius: 999rpx; background: rgba(88,231,255,.12); color: #58e7ff; font-size: 21rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .live-chip i { width: 9rpx; height: 9rpx; border-radius: 50%; background: #58e7ff; animation: pulse 1.6s infinite; }
 .live-chip.small { height: 32rpx; font-size: 20rpx; }
-.mini-grid, .grid-stats, .math-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 30rpx; }
-.mini-grid view, .grid-stats view, .math-grid view { min-height: 102rpx; padding: 18rpx; border-radius: 22rpx; background: rgba(255,255,255,.05); }
-.mini-grid text, .grid-stats text, .math-grid text { display: block; color: #8f98a8; font-size: 21rpx; }
-.mini-grid b, .grid-stats b, .math-grid b { display: block; margin-top: 8rpx; color: #c6ff3a; font-size: 30rpx; }
+.mini-grid, .math-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3,1fr); gap: 16rpx; margin-top: 30rpx; }
+.mini-grid view, .math-grid view { min-height: 102rpx; padding: 18rpx; border-radius: 22rpx; background: rgba(255,255,255,.05); }
+.mini-grid text, .math-grid text { display: block; color: #8f98a8; font-size: 21rpx; }
+.mini-grid b, .math-grid b { display: block; margin-top: 8rpx; color: #c6ff3a; font-size: 30rpx; }
 .trial-card, .conversion-card { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 24rpx; margin-top: 24rpx; padding: 30rpx 34rpx; background: radial-gradient(circle at 0 100%, rgba(18,201,121,.14), transparent 56%), #10141d; }
 .ticket { display: inline-flex; padding: 6rpx 14rpx; border: 1rpx dashed rgba(18,201,121,.46); border-radius: 8rpx; color: #12c979; font-size: 19rpx; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 2rpx; }
 .card-title { margin-top: 10rpx; color: #fff; font-size: 32rpx; font-weight: 720; line-height: 1.25; }
@@ -411,7 +432,7 @@ function showSoon(label: string) {
 .task-row i { color: #c6ff3a; font-style: normal; font-weight: 700; }
 .task-toggle { display: flex; align-items: center; justify-content: center; gap: 8rpx; width: calc(100% + 68rpx); height: 62rpx; margin: 28rpx -34rpx 0; border-radius: 0 0 32rpx 32rpx; background: rgba(198,255,58,.18); border-top: 1rpx solid rgba(198,255,58,.13); color: #c6ff3a; font-size: 27rpx; font-weight: 650; }
 .task-toggle text { font-size: 25rpx; transform: translateY(-1rpx); }
-.live-card, .fleet-card, .grid-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
+.live-card, .fleet-card, .pulse-card, .rank-card, .pool-card, .math-card, .ledger-card, .market-card, .trust-card { margin-top: 24rpx; padding: 24rpx 28rpx; }
 .live-card { overflow: hidden; padding-bottom: 12rpx; border-radius: 32rpx; background: #101010; }
 .live-tabs { display: flex; justify-content: space-between; align-items: center; }
 .segmented { display: flex; align-items: center; gap: 4rpx; padding: 6rpx; border-radius: 18rpx; background: #161b25; }
@@ -483,6 +504,25 @@ function showSoon(label: string) {
 .add-device view text { display: block; margin-top: 8rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
 .add-device em { color: #9df20f; text-align: right; font-size: 30rpx; font-style: normal; font-weight: 760; }
 .add-device em text { display: block; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; font-weight: 560; }
+.on-grid-section { margin-top: 24rpx; }
+.on-grid-title { display: flex; align-items: center; justify-content: space-between; margin: 16rpx 4rpx 20rpx; }
+.on-grid-title view { display: flex; align-items: baseline; gap: 10rpx; min-width: 0; }
+.on-grid-title view > text:first-child { color: #f6f8fb; font-size: 30rpx; font-weight: 640; letter-spacing: 0; }
+.grid-now { color: #7f8898; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; font-weight: 420; }
+.on-grid-title button { display: flex; align-items: center; gap: 8rpx; margin: 0; padding: 0; border: 0; background: transparent; color: #9b89e0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 26rpx; font-weight: 560; line-height: 1; }
+.on-grid-title button::after { border: 0; }
+.on-grid-title button text { transform: translateY(-1rpx); }
+.on-grid-card { overflow: hidden; border: 1rpx solid rgba(255,255,255,.08); border-radius: 32rpx; background: #101010; }
+.on-grid-row { display: grid; grid-template-columns: 60rpx 1fr auto; align-items: center; gap: 24rpx; min-height: 92rpx; padding: 15rpx 32rpx; border-bottom: 1rpx solid rgba(255,255,255,.07); }
+.client-mark { display: grid; width: 60rpx; height: 60rpx; place-items: center; border-radius: 16rpx; background: rgba(155,137,224,.14); font-size: 24rpx; font-weight: 680; }
+.client-main { min-width: 0; }
+.client-main b { display: block; overflow: hidden; color: #f4f6fa; font-size: 27rpx; font-weight: 560; line-height: 1.25; white-space: nowrap; text-overflow: ellipsis; }
+.client-main text { display: block; overflow: hidden; margin-top: 6rpx; color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 23rpx; line-height: 1.2; white-space: nowrap; text-overflow: ellipsis; }
+.client-main i { color: #5e6674; font-style: normal; }
+.on-grid-row em { color: #12c979; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; font-style: normal; font-weight: 560; white-space: nowrap; }
+.on-grid-footer { display: flex; align-items: center; justify-content: space-between; min-height: 66rpx; padding: 0 32rpx; border-top: 1rpx solid rgba(255,255,255,.06); background: rgba(255,255,255,.035); color: #8f98a8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.on-grid-footer b { color: #f4f6fb; font-weight: 560; }
+.on-grid-footer text:last-child { color: #12c979; font-weight: 560; }
 .pulse-card { display: grid; grid-template-columns: 1fr 170rpx; gap: 20rpx; align-items: end; }
 .spark, .market-bars { display: flex; align-items: flex-end; gap: 6rpx; height: 70rpx; }
 .spark i, .market-bars i { flex: 1; border-radius: 999rpx; background: linear-gradient(180deg,#58e7ff,#9b89e0); }
