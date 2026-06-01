@@ -174,7 +174,7 @@ async function shareInvite() {
           </view>
           <view class="orb-group orb-inner">
             <view v-for="i in 6" :key="`inner-${i}`" class="orb-spoke" />
-            <view v-for="i in 6" :key="`direct-${i}`" class="orb-dot direct" />
+            <view v-for="i in 6" :key="`direct-${i}`" class="orb-dot direct"><view /></view>
           </view>
         </view>
         <view class="rank-top">
@@ -477,8 +477,18 @@ async function shareInvite() {
 .orb-dot.direct {
   width: 8rpx;
   height: 8rpx;
+}
+
+.orb-dot.direct view {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
   background: rgba(158, 220, 29, 0.92);
   box-shadow: 0 0 18rpx rgba(158, 220, 29, 0.62);
+  transform: translate(-50%, -50%);
 }
 
 .orb-spoke {
@@ -512,12 +522,14 @@ async function shareInvite() {
 .orb-inner .orb-spoke:nth-child(4) { transform: rotate(90deg); }
 .orb-inner .orb-spoke:nth-child(5) { transform: rotate(150deg); }
 .orb-inner .orb-spoke:nth-child(6) { transform: rotate(210deg); }
-.orb-inner .orb-dot:nth-child(7) { transform: rotate(-90deg) translateX(71rpx); animation: node-pulse 2.2s ease-in-out infinite; }
+.orb-inner .orb-dot:nth-child(7) { transform: rotate(-90deg) translateX(71rpx); }
 .orb-inner .orb-dot:nth-child(8) { transform: rotate(-30deg) translateX(71rpx); }
 .orb-inner .orb-dot:nth-child(9) { transform: rotate(30deg) translateX(71rpx); }
-.orb-inner .orb-dot:nth-child(10) { transform: rotate(90deg) translateX(71rpx); animation: node-pulse 2.6s ease-in-out infinite 0.6s; }
+.orb-inner .orb-dot:nth-child(10) { transform: rotate(90deg) translateX(71rpx); }
 .orb-inner .orb-dot:nth-child(11) { transform: rotate(150deg) translateX(71rpx); }
 .orb-inner .orb-dot:nth-child(12) { transform: rotate(210deg) translateX(71rpx); }
+.orb-inner .orb-dot:nth-child(7) view { animation: node-grow 2.2s ease-in-out infinite; }
+.orb-inner .orb-dot:nth-child(10) view { animation: node-grow 2.6s ease-in-out infinite 0.6s; }
 
 @keyframes orb-spin {
   from { transform: rotate(0deg); }
@@ -534,9 +546,17 @@ async function shareInvite() {
   50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
 }
 
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.88; box-shadow: 0 0 18rpx rgba(158, 220, 29, 0.62); }
-  50% { opacity: 1; box-shadow: 0 0 34rpx rgba(158, 220, 29, 0.95); }
+@keyframes node-grow {
+  0%, 100% {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 18rpx rgba(158, 220, 29, 0.62);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.62);
+    box-shadow: 0 0 34rpx rgba(158, 220, 29, 0.95);
+  }
 }
 
 .rank-top,
