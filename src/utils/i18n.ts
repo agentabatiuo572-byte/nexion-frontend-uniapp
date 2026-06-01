@@ -692,7 +692,7 @@ const mainZh: MainPageMessages = {
   },
   home: {
     v5: {
-      headline: '你的节点今天已赚取 {amount}。',
+      headline: '今日节点已赚取 {amount}。',
       upgradeSignal: '升级信号',
       upgradeSignalBody: '你的手机正在产生收益，硬件会让收益曲线更明显。',
       seeRoi: '查看 ROI',

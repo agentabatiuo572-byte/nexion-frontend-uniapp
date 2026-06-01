@@ -226,37 +226,26 @@ function showSoon(label: string) {
           </view>
         </view>
 
-        <view class="trial-card trial-hero-card card" @click="showSoon(t.freeTrial)">
-          <view class="trial-orbit" />
-          <view>
-            <view class="ticket">{{ t.freeTrial }}</view>
-            <view class="card-title">{{ v.freeTrialTitle || t.cloudShare }}</view>
-            <view class="body">{{ v.freeTrialBody || v.noHardwareTrial }}</view>
+        <view class="trial-ticket-card" @click="showSoon(tx('立即领取', 'Claim trial'))">
+          <view class="ticket-shimmer" />
+          <view class="ticket-main">
+            <view class="ticket-left">
+              <view class="ticket-badge"><i class="ui-mask icon-spark" />{{ tx('限时免费', 'FREE TRIAL') }}</view>
+              <view class="ticket-title">NexionBox S1</view>
+              <view class="ticket-desc">{{ tx('免费试用 3 天,随时取消。', 'Try free for 3 days, cancel anytime.') }}</view>
+            </view>
+            <view class="ticket-perf" />
+            <view class="ticket-right">
+              <view class="ticket-earn-label">{{ tx('3 天预计收益', 'EST. 3D EARN') }}</view>
+              <view class="ticket-money"><text>$</text>116</view>
+              <view class="ticket-rate">$38.50/d × 3</view>
+            </view>
           </view>
-          <view class="trial-side">
-            <text>{{ t.earnUpTo }}</text>
-            <b>$38</b>
+          <view class="ticket-separator" />
+          <view class="ticket-foot">
+            <view class="ticket-left-count"><i />{{ tx('今日仅剩 47 张', '47 trials left today') }}</view>
+            <button>{{ tx('立即领取', 'Claim trial') }} <text>→</text></button>
           </view>
-        </view>
-
-        <view class="trial-ghost-card card" @click="showSoon(v.startTrial || t.freeTrial)">
-          <view class="ghost-device">
-            <i class="ui-mask icon-server" />
-          </view>
-          <view class="ghost-copy">
-            <view class="mono muted">{{ v.ghostSlot || tx('试用预留槽', 'Trial ghost slot') }}</view>
-            <b>{{ v.cloudShareTrial || t.cloudShare }}</b>
-            <text>{{ v.cloudShareTrialDesc || tx('托管切片 · 可用', 'Managed slice · ready') }}</text>
-          </view>
-          <button>{{ v.startTrial || t.freeTrial }} <i class="ui-mask icon-arrow" /></button>
-        </view>
-
-        <view class="conversion-card card">
-          <view>
-            <view class="mono muted">{{ v.upgradeSignal }}</view>
-            <view class="card-title">{{ v.upgradeSignalBody }}</view>
-          </view>
-          <button @click="showSoon(t.store)">{{ v.seeRoi }} <i class="ui-mask icon-chevron" /></button>
         </view>
 
         <view class="weekly-quest-card card" @click="showSoon(v.weeklyQuestCta)">
@@ -658,6 +647,30 @@ function showSoon(label: string) {
 .trial-side text { color: #8f98a8; font-size: 20rpx; }
 .trial-side b { display: block; margin-top: 8rpx; color: #12c979; font-size: 54rpx; }
 .conversion-card button { display: flex; align-items: center; gap: 8rpx; height: 72rpx; padding: 0 26rpx; border-radius: 999rpx; background: #c6ff3a; color: #10140a; font-size: 25rpx; font-weight: 700; }
+.trial-ticket-card { position: relative; overflow: hidden; margin-top: 24rpx; border: 1rpx solid var(--v5-border); border-radius: 32rpx; background: radial-gradient(70% 60% at 0% 0%, rgba(155,137,224,.18), transparent 60%), radial-gradient(80% 100% at 100% 100%, rgba(155,137,224,.12), transparent 65%), var(--v5-surface); box-shadow: var(--v5-card-shadow-lift); color: var(--v5-ink); transform-origin: 50% 50%; animation: ticketEnter .9s cubic-bezier(.22,1.2,.36,1) both; }
+.trial-ticket-card::before { position: absolute; left: 62%; top: -14rpx; z-index: 2; width: 28rpx; height: 28rpx; border-radius: 50%; background: var(--v5-bg); content: ""; transform: translateX(-50%); }
+.trial-ticket-card::after { position: absolute; left: 62%; bottom: -14rpx; z-index: 2; width: 28rpx; height: 28rpx; border-radius: 50%; background: var(--v5-bg); content: ""; transform: translateX(-50%); }
+.ticket-shimmer { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 25%, rgba(198,255,58,.55) 50%, transparent 75%); opacity: 0; mix-blend-mode: screen; animation: ticketShimmer 1.1s ease-out .85s 1 forwards; pointer-events: none; }
+.ticket-main { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 28rpx auto; align-items: stretch; min-height: 158rpx; }
+.ticket-left { min-width: 0; padding: 32rpx 8rpx 28rpx 32rpx; }
+.ticket-badge { display: inline-flex; align-items: center; gap: 10rpx; padding: 6rpx 18rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; background: rgba(155,137,224,.12); color: #9b89e0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; font-weight: 650; letter-spacing: 1rpx; text-transform: uppercase; }
+.ticket-badge .ui-mask { width: 20rpx; height: 20rpx; }
+.ticket-title { margin-top: 18rpx; color: var(--v5-ink); font-size: 38rpx; font-weight: 650; line-height: 1.15; letter-spacing: 0; }
+.ticket-desc { margin-top: 8rpx; color: var(--v5-ink-3); font-size: 26rpx; font-weight: 500; line-height: 1.4; letter-spacing: 0; }
+.ticket-perf { display: flex; justify-content: center; }
+.ticket-perf::before { width: 1rpx; margin: 24rpx 0; background: repeating-linear-gradient(180deg, var(--v5-border-strong) 0 8rpx, transparent 8rpx 16rpx); content: ""; }
+.ticket-right { display: flex; min-width: 232rpx; flex-direction: column; align-items: flex-end; justify-content: center; padding: 32rpx 32rpx 28rpx 8rpx; }
+.ticket-earn-label { color: var(--v5-ink-4); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 21rpx; letter-spacing: 1rpx; }
+.ticket-money { display: inline-flex; align-items: baseline; gap: 2rpx; margin-top: 12rpx; color: var(--v5-ink); font-size: 72rpx; font-weight: 650; line-height: 1; letter-spacing: 0; }
+.ticket-money text { color: #9b89e0; font-size: 40rpx; font-weight: 500; }
+.ticket-rate { margin-top: 10rpx; color: var(--v5-ink-4); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 22rpx; }
+.ticket-separator { position: relative; z-index: 1; height: 1rpx; margin: 0 20rpx; background: repeating-linear-gradient(90deg, var(--v5-border-strong) 0 8rpx, transparent 8rpx 16rpx); }
+.ticket-foot { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 20rpx; padding: 24rpx 32rpx; }
+.ticket-left-count { display: inline-flex; align-items: center; gap: 12rpx; color: #ff6b35; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 25rpx; font-weight: 520; }
+.ticket-left-count i { width: 12rpx; height: 12rpx; border-radius: 50%; background: #ff6b35; box-shadow: 0 0 12rpx rgba(255,107,53,.7); animation: pulse 1.6s ease-in-out infinite; }
+.ticket-foot button { display: inline-flex; align-items: center; justify-content: center; gap: 10rpx; height: 68rpx; margin: 0; padding: 0 28rpx; border: 1rpx solid rgba(155,137,224,.45); border-radius: 999rpx; background: transparent; color: #9b89e0; font-size: 27rpx; font-weight: 650; white-space: nowrap; }
+.ticket-foot button::after { border: 0; }
+.ticket-foot button text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 24rpx; opacity: .85; }
 .weekly-quest-card { position: relative; min-height: 404rpx; margin-top: 24rpx; overflow: hidden; border-color: rgba(198,255,58,.18); background: radial-gradient(circle at 84% 10%, rgba(155,137,224,.20), transparent 42%), radial-gradient(circle at 12% 88%, rgba(198,255,58,.12), transparent 54%), #101010; box-shadow: 0 22rpx 72rpx rgba(0,0,0,.34); }
 .weekly-quest-card::after { content: ""; position: absolute; right: -10rpx; bottom: 0; left: -10rpx; height: 1rpx; background: linear-gradient(90deg, transparent, rgba(198,255,58,.55), transparent); }
 .weekly-device { position: absolute; top: -64rpx; right: -116rpx; z-index: 0; width: 440rpx; height: 440rpx; opacity: .44; transform: rotate(-3deg); -webkit-mask-image: radial-gradient(ellipse 360rpx 450rpx at 90% 48%, #000 24%, rgba(0,0,0,.72) 45%, rgba(0,0,0,.34) 66%, transparent 100%); mask-image: radial-gradient(ellipse 360rpx 450rpx at 90% 48%, #000 24%, rgba(0,0,0,.72) 45%, rgba(0,0,0,.34) 66%, transparent 100%); }
@@ -942,6 +955,8 @@ function showSoon(label: string) {
 @keyframes v5AuroraDrift { 0%{transform:translate3d(0,0,0) rotate(0deg)} 50%{transform:translate3d(-6%,3%,0) rotate(2deg)} 100%{transform:translate3d(4%,-2%,0) rotate(-1deg)} }
 @keyframes v5DotDrift { 0%{transform:translateY(0);opacity:0} 10%{opacity:.7} 90%{opacity:.7} 100%{transform:translateY(-440rpx);opacity:0} }
 @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+@keyframes ticketEnter { 0%{opacity:0;transform:perspective(900rpx) rotateY(-92deg) scale(.98)} 68%{opacity:1;transform:perspective(900rpx) rotateY(5deg) scale(1.01)} 100%{opacity:1;transform:perspective(900rpx) rotateY(0) scale(1)} }
+@keyframes ticketShimmer { 0%{opacity:0;transform:translateX(-120%)} 18%{opacity:.8} 100%{opacity:0;transform:translateX(120%)} }
 @keyframes slowSpin { to{ transform: rotate(360deg) } }
 @keyframes feedFade { from{ opacity: 0; transform: translateY(-10rpx) } to{ opacity: 1; transform: translateY(0) } }
 @keyframes stellaHalo { 0%,100%{ box-shadow: 0 0 0 8rpx rgba(155,137,224,.10) } 50%{ box-shadow: 0 0 0 16rpx rgba(155,137,224,.18) } }
