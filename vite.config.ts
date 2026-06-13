@@ -1,26 +1,13 @@
-import { fileURLToPath, URL } from 'node:url'
+import { defineConfig } from "vite";
+import uniPlugin from "@dcloudio/vite-plugin-uni";
+import UnoCSS from "unocss/vite";
 
-import { defineConfig } from 'vite'
-import Uni from '@uni-helper/plugin-uni'
+// @dcloudio/vite-plugin-uni ships as CJS. With "type":"module" in package.json
+// (required so the ESM-only unocss/vite plugin can be imported), Vite loads
+// this config as ESM, where the callable is exposed on `.default`. Normalize
+// so uni() works regardless of interop mode.
+const uni = (uniPlugin as unknown as { default?: typeof uniPlugin }).default ?? uniPlugin;
 
 export default defineConfig({
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8090',
-        changeOrigin: true
-      }
-    }
-  },
-  plugins: [
-    // https://uni-helper.js.org/plugin-uni
-    Uni(),
-  ],
-  
-})
-
+  plugins: [uni(), UnoCSS()],
+});

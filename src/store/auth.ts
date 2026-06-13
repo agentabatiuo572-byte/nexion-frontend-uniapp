@@ -1,114 +1,77 @@
-import { defineStore } from 'pinia'
-import {
-  getCurrentUserProfile,
-  login as loginApi,
-  register as registerApi,
-  sendRegisterSmsCode as sendRegisterSmsCodeApi,
-  updateCurrentUserProfile
-} from '@/api/auth'
-import { SESSION_KEY, TOKEN_KEY } from '@/utils/storage'
-import type {
-  RegisterSmsCodeRequest,
-  UserLoginRequest,
-  UserProfileUpdateRequest,
-  UserRegisterRequest,
-  UserSession
-} from '@/types/auth'
+import { defineStore } from "pinia";
+import { ref } from "vue";
 
-interface AuthState {
-  token: string
-  session: UserSession | null
+// Ported from Nexion-prototype/lib/store/auth.ts (zustand → Pinia).
+// Gates main-app access: new sign-ups must finish onboarding
+// (intro → estimator → connect) before onboardingComplete flips true.
+const STORAGE_KEY = "nexion-auth-v1";
+
+interface Persisted {
+  isAuthenticated: boolean;
+  email: string;
+  onboardingComplete: boolean;
 }
 
-export const useAuthStore = defineStore('auth', {
-  state: (): AuthState => ({
-    token: '',
-    session: null
-  }),
-  getters: {
-    isAuthenticated: (state) => !!state.token,
-    displayName: (state) => state.session?.nickname || 'Nexion User'
-  },
-  actions: {
-    restore() {
-      this.token = uni.getStorageSync(TOKEN_KEY) || ''
-      const raw = uni.getStorageSync(SESSION_KEY)
-      if (raw) {
-        try {
-          this.session = typeof raw === 'string' ? JSON.parse(raw) : raw
-        } catch {
-          this.session = null
-        }
-      }
-    },
-    setSession(session: UserSession) {
-      this.token = session.token
-      this.session = session
-      uni.setStorageSync(TOKEN_KEY, session.token)
-      uni.setStorageSync(SESSION_KEY, JSON.stringify(session))
-    },
-    async login(data: UserLoginRequest) {
-      const session = await loginApi(data)
-      this.setSession({
-        ...session,
-        countryCode: session.countryCode || data.countryCode,
-        phone: session.phone || data.phone
-      })
-      return session
-    },
-    async register(data: UserRegisterRequest) {
-      const session = await registerApi(data)
-      this.setSession({
-        ...session,
-        countryCode: session.countryCode || data.countryCode,
-        phone: session.phone || data.phone
-      })
-      return session
-    },
-    sendRegisterSmsCode(data: RegisterSmsCodeRequest) {
-      return sendRegisterSmsCodeApi(data)
-    },
-    async refreshProfile() {
-      const profile = await getCurrentUserProfile()
-      if (this.session) {
-        this.session = {
-          ...this.session,
-          countryCode: profile.countryCode || this.session.countryCode,
-          phone: profile.phone || this.session.phone,
-          phoneMasked: profile.phoneMasked || this.session.phoneMasked,
-          nickname: profile.nickname || this.session.nickname,
-          avatarUrl: profile.avatarUrl || '',
-          referralCode: profile.referralCode || this.session.referralCode,
-          userLevel: profile.userLevel || this.session.userLevel,
-          vRank: profile.vRank || this.session.vRank
-        }
-        uni.setStorageSync(SESSION_KEY, JSON.stringify(this.session))
-      }
-      return profile
-    },
-    async updateProfile(data: UserProfileUpdateRequest) {
-      const profile = await updateCurrentUserProfile(data)
-      if (this.session) {
-        this.session = {
-          ...this.session,
-          countryCode: profile.countryCode || this.session.countryCode,
-          phone: profile.phone || this.session.phone,
-          phoneMasked: profile.phoneMasked || this.session.phoneMasked,
-          nickname: profile.nickname || this.session.nickname,
-          avatarUrl: profile.avatarUrl || '',
-          referralCode: profile.referralCode || this.session.referralCode,
-          userLevel: profile.userLevel || this.session.userLevel,
-          vRank: profile.vRank || this.session.vRank
-        }
-        uni.setStorageSync(SESSION_KEY, JSON.stringify(this.session))
-      }
-      return profile
-    },
-    logout() {
-      this.token = ''
-      this.session = null
-      uni.removeStorageSync(TOKEN_KEY)
-      uni.removeStorageSync(SESSION_KEY)
+function hydrate(): Persisted {
+  try {
+    const s = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
+    if (s && typeof s === "object") {
+      return {
+        isAuthenticated: !!s.isAuthenticated,
+        email: s.email || "",
+        // v1 persisted users predate the onboarding gate — treat as onboarded.
+        onboardingComplete: s.onboardingComplete === undefined ? true : !!s.onboardingComplete,
+      };
+    }
+  } catch {
+    // first run
+  }
+  return { isAuthenticated: false, email: "", onboardingComplete: false };
+}
+
+export const useAuth = defineStore("auth", () => {
+  const init = hydrate();
+  const isAuthenticated = ref(init.isAuthenticated);
+  const email = ref(init.email);
+  const onboardingComplete = ref(init.onboardingComplete);
+
+  function persist() {
+    try {
+      uni.setStorageSync(STORAGE_KEY, {
+        isAuthenticated: isAuthenticated.value,
+        email: email.value,
+        onboardingComplete: onboardingComplete.value,
+      });
+    } catch {
+      // storage unavailable
     }
   }
-})
+
+  // Returning users have already onboarded — don't re-run onboarding for them.
+  function signIn(e: string) {
+    isAuthenticated.value = true;
+    email.value = e;
+    onboardingComplete.value = true;
+    persist();
+  }
+  // New sign-ups must complete onboarding before the main app unlocks.
+  function signUp(e: string) {
+    isAuthenticated.value = true;
+    email.value = e;
+    onboardingComplete.value = false;
+    persist();
+  }
+  // Final onboarding step (connect "Activate phone compute") calls this.
+  function completeOnboarding() {
+    onboardingComplete.value = true;
+    persist();
+  }
+  function signOut() {
+    isAuthenticated.value = false;
+    email.value = "";
+    onboardingComplete.value = false;
+    persist();
+  }
+
+  return { isAuthenticated, email, onboardingComplete, signIn, signUp, completeOnboarding, signOut };
+});

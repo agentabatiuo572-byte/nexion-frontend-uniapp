@@ -1,0 +1,370 @@
+/**
+ * Token market data — mock prices for NEX + comparable AI/DePIN tokens.
+ * Ported from Nexion-prototype/lib/mock/tokens.ts.
+ *
+ * 真实平台对标:Binance / OKX / Bybit 的 Markets tab。
+ * NEX 与同类 AI compute / DePIN tokens 并列,锚定 NEX 在"主流赛道"。
+ * ⚠️ MOCK-ONLY. Production: GET /api/market/tokens (server-authoritative prices).
+ */
+
+export type TokenCategory = "ai" | "depin" | "infra" | "ecosystem" | "self";
+
+export interface Token {
+  symbol: string;
+  name: string;
+  category: TokenCategory;
+  /** Color used for sparkline / icon background */
+  color: string;
+  priceUSD: number;
+  change24h: number; // percentage
+  change7d: number;
+  volume24hUSD: number;
+  marketCapUSD: number;
+  fdvUSD: number;
+  circulating: number;
+  totalSupply: number;
+  /** 24-point hourly sparkline (relative 0..1) */
+  spark24h: number[];
+  /** 30-point daily sparkline (relative 0..1) */
+  spark30d: number[];
+  ath: number;
+  athDate: string;
+  rank: number;
+  /** Whether this token is in user's watchlist by default */
+  starred?: boolean;
+}
+
+function s(seed: number, length: number, vol: number): number[] {
+  const out: number[] = [];
+  let v = 0.5;
+  let r = seed;
+  for (let i = 0; i < length; i++) {
+    r = (r * 9301 + 49297) % 233280;
+    const noise = (r / 233280 - 0.5) * vol;
+    v = Math.max(0.05, Math.min(0.95, v + noise));
+    out.push(v);
+  }
+  return out;
+}
+
+export const TOKENS: Token[] = [
+  {
+    symbol: "NEX",
+    name: "Nexion",
+    category: "self",
+    color: "#C6FF3A",
+    priceUSD: 0.171,
+    change24h: 20.4,
+    change7d: 47.8,
+    volume24hUSD: 4_247_891,
+    marketCapUSD: 0.171 * 2_850_000_000,
+    fdvUSD: 0.171 * 10_000_000_000,
+    circulating: 2_850_000_000,
+    totalSupply: 10_000_000_000,
+    spark24h: [0.2, 0.22, 0.24, 0.28, 0.3, 0.35, 0.4, 0.42, 0.48, 0.52, 0.55, 0.6, 0.62, 0.65, 0.68, 0.72, 0.75, 0.78, 0.8, 0.85, 0.82, 0.88, 0.92, 0.95],
+    spark30d: [0.1, 0.12, 0.15, 0.18, 0.16, 0.2, 0.22, 0.25, 0.28, 0.3, 0.32, 0.35, 0.38, 0.4, 0.45, 0.48, 0.52, 0.55, 0.58, 0.62, 0.65, 0.68, 0.72, 0.75, 0.78, 0.82, 0.85, 0.88, 0.92, 0.95],
+    ath: 0.184,
+    athDate: "2026-05-12",
+    rank: 247,
+    starred: true,
+  },
+  {
+    symbol: "RNDR",
+    name: "Render",
+    category: "ai",
+    color: "#CF1E4D",
+    priceUSD: 7.84,
+    change24h: 3.2,
+    change7d: 12.4,
+    volume24hUSD: 184_500_000,
+    marketCapUSD: 4_080_000_000,
+    fdvUSD: 4_500_000_000,
+    circulating: 520_400_000,
+    totalSupply: 574_000_000,
+    spark24h: s(11, 24, 0.08),
+    spark30d: s(21, 30, 0.1),
+    ath: 13.6,
+    athDate: "2024-03-17",
+    rank: 38,
+  },
+  {
+    symbol: "TAO",
+    name: "Bittensor",
+    category: "ai",
+    color: "#FFD23F",
+    priceUSD: 412.5,
+    change24h: -2.1,
+    change7d: 8.7,
+    volume24hUSD: 92_300_000,
+    marketCapUSD: 3_240_000_000,
+    fdvUSD: 8_700_000_000,
+    circulating: 7_850_000,
+    totalSupply: 21_000_000,
+    spark24h: s(33, 24, 0.07),
+    spark30d: s(44, 30, 0.09),
+    ath: 757.9,
+    athDate: "2024-03-29",
+    rank: 41,
+    starred: true,
+  },
+  {
+    symbol: "FET",
+    name: "Fetch.ai",
+    category: "ai",
+    color: "#3A8DFF",
+    priceUSD: 1.42,
+    change24h: 5.6,
+    change7d: 15.2,
+    volume24hUSD: 211_400_000,
+    marketCapUSD: 3_650_000_000,
+    fdvUSD: 4_120_000_000,
+    circulating: 2_570_000_000,
+    totalSupply: 2_900_000_000,
+    spark24h: s(55, 24, 0.09),
+    spark30d: s(66, 30, 0.12),
+    ath: 3.47,
+    athDate: "2024-03-29",
+    rank: 44,
+  },
+  {
+    symbol: "AKT",
+    name: "Akash Network",
+    category: "depin",
+    color: "#FF414C",
+    priceUSD: 3.24,
+    change24h: 8.1,
+    change7d: 22.4,
+    volume24hUSD: 48_700_000,
+    marketCapUSD: 814_000_000,
+    fdvUSD: 1_080_000_000,
+    circulating: 251_200_000,
+    totalSupply: 388_500_000,
+    spark24h: s(77, 24, 0.1),
+    spark30d: s(88, 30, 0.13),
+    ath: 8.07,
+    athDate: "2024-03-13",
+    rank: 87,
+    starred: true,
+  },
+  {
+    symbol: "IO",
+    name: "io.net",
+    category: "depin",
+    color: "#7C5CFF",
+    priceUSD: 2.18,
+    change24h: 12.4,
+    change7d: 31.7,
+    volume24hUSD: 67_200_000,
+    marketCapUSD: 322_000_000,
+    fdvUSD: 1_745_000_000,
+    circulating: 148_000_000,
+    totalSupply: 800_000_000,
+    spark24h: s(99, 24, 0.11),
+    spark30d: s(110, 30, 0.14),
+    ath: 8.96,
+    athDate: "2024-06-12",
+    rank: 142,
+    starred: true,
+  },
+  {
+    symbol: "OCEAN",
+    name: "Ocean Protocol",
+    category: "ai",
+    color: "#1AB2FF",
+    priceUSD: 0.587,
+    change24h: 1.4,
+    change7d: -2.1,
+    volume24hUSD: 32_400_000,
+    marketCapUSD: 372_000_000,
+    fdvUSD: 826_000_000,
+    circulating: 633_000_000,
+    totalSupply: 1_410_000_000,
+    spark24h: s(121, 24, 0.07),
+    spark30d: s(132, 30, 0.09),
+    ath: 1.93,
+    athDate: "2021-04-09",
+    rank: 138,
+  },
+  {
+    symbol: "AR",
+    name: "Arweave",
+    category: "depin",
+    color: "#222326",
+    priceUSD: 18.42,
+    change24h: -0.8,
+    change7d: 6.3,
+    volume24hUSD: 41_800_000,
+    marketCapUSD: 1_210_000_000,
+    fdvUSD: 1_211_000_000,
+    circulating: 65_700_000,
+    totalSupply: 66_000_000,
+    spark24h: s(143, 24, 0.06),
+    spark30d: s(154, 30, 0.08),
+    ath: 89.2,
+    athDate: "2021-11-08",
+    rank: 75,
+  },
+  {
+    symbol: "FIL",
+    name: "Filecoin",
+    category: "depin",
+    color: "#0090FF",
+    priceUSD: 5.18,
+    change24h: 2.7,
+    change7d: 9.4,
+    volume24hUSD: 187_500_000,
+    marketCapUSD: 2_980_000_000,
+    fdvUSD: 9_900_000_000,
+    circulating: 575_400_000,
+    totalSupply: 1_910_000_000,
+    spark24h: s(165, 24, 0.07),
+    spark30d: s(176, 30, 0.1),
+    ath: 237,
+    athDate: "2021-04-01",
+    rank: 47,
+  },
+  {
+    symbol: "GRT",
+    name: "The Graph",
+    category: "infra",
+    color: "#6F4CFF",
+    priceUSD: 0.243,
+    change24h: 1.1,
+    change7d: 3.2,
+    volume24hUSD: 28_300_000,
+    marketCapUSD: 2_320_000_000,
+    fdvUSD: 2_530_000_000,
+    circulating: 9_550_000_000,
+    totalSupply: 10_400_000_000,
+    spark24h: s(187, 24, 0.06),
+    spark30d: s(198, 30, 0.08),
+    ath: 2.88,
+    athDate: "2021-02-12",
+    rank: 51,
+  },
+  {
+    symbol: "AGIX",
+    name: "SingularityNET",
+    category: "ai",
+    color: "#5A4FFF",
+    priceUSD: 0.834,
+    change24h: 4.2,
+    change7d: 17.8,
+    volume24hUSD: 76_500_000,
+    marketCapUSD: 1_120_000_000,
+    fdvUSD: 1_670_000_000,
+    circulating: 1_340_000_000,
+    totalSupply: 2_000_000_000,
+    spark24h: s(209, 24, 0.1),
+    spark30d: s(220, 30, 0.13),
+    ath: 3.48,
+    athDate: "2024-03-29",
+    rank: 81,
+  },
+  {
+    symbol: "GLM",
+    name: "Golem",
+    category: "depin",
+    color: "#181EA9",
+    priceUSD: 0.413,
+    change24h: -1.7,
+    change7d: 4.8,
+    volume24hUSD: 14_700_000,
+    marketCapUSD: 412_000_000,
+    fdvUSD: 412_000_000,
+    circulating: 998_000_000,
+    totalSupply: 1_000_000_000,
+    spark24h: s(231, 24, 0.06),
+    spark30d: s(242, 30, 0.08),
+    ath: 1.27,
+    athDate: "2024-03-13",
+    rank: 131,
+  },
+  {
+    symbol: "NMR",
+    name: "Numeraire",
+    category: "ai",
+    color: "#000000",
+    priceUSD: 14.27,
+    change24h: 0.8,
+    change7d: 5.4,
+    volume24hUSD: 8_400_000,
+    marketCapUSD: 96_000_000,
+    fdvUSD: 153_000_000,
+    circulating: 6_720_000,
+    totalSupply: 10_750_000,
+    spark24h: s(253, 24, 0.07),
+    spark30d: s(264, 30, 0.1),
+    ath: 168,
+    athDate: "2017-12-31",
+    rank: 246,
+  },
+  {
+    symbol: "POND",
+    name: "Marlin Protocol",
+    category: "infra",
+    color: "#19C2D2",
+    priceUSD: 0.0184,
+    change24h: 6.4,
+    change7d: 14.2,
+    volume24hUSD: 4_200_000,
+    marketCapUSD: 24_500_000,
+    fdvUSD: 184_000_000,
+    circulating: 1_330_000_000,
+    totalSupply: 10_000_000_000,
+    spark24h: s(275, 24, 0.11),
+    spark30d: s(286, 30, 0.14),
+    ath: 0.085,
+    athDate: "2021-04-09",
+    rank: 451,
+  },
+  {
+    symbol: "RLC",
+    name: "iExec RLC",
+    category: "depin",
+    color: "#FFC72C",
+    priceUSD: 2.41,
+    change24h: 3.7,
+    change7d: 11.3,
+    volume24hUSD: 18_400_000,
+    marketCapUSD: 192_500_000,
+    fdvUSD: 207_300_000,
+    circulating: 80_000_000,
+    totalSupply: 86_100_000,
+    spark24h: s(297, 24, 0.08),
+    spark30d: s(308, 30, 0.1),
+    ath: 13.78,
+    athDate: "2021-04-09",
+    rank: 196,
+  },
+  {
+    symbol: "ROSE",
+    name: "Oasis",
+    category: "infra",
+    color: "#0092F6",
+    priceUSD: 0.058,
+    change24h: -0.4,
+    change7d: 2.7,
+    volume24hUSD: 11_800_000,
+    marketCapUSD: 391_000_000,
+    fdvUSD: 580_000_000,
+    circulating: 6_740_000_000,
+    totalSupply: 10_000_000_000,
+    spark24h: s(319, 24, 0.06),
+    spark30d: s(330, 30, 0.08),
+    ath: 0.595,
+    athDate: "2022-01-15",
+    rank: 132,
+  },
+];
+
+export const CATEGORIES: Array<{ id: TokenCategory | "all" | "watchlist"; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "watchlist", label: "Watchlist" },
+  { id: "ai", label: "AI" },
+  { id: "depin", label: "DePIN" },
+  { id: "infra", label: "Infra" },
+];
+
+export const TIMEFRAMES = ["1H", "24H", "7D", "1M", "ALL"] as const;
+export type Timeframe = typeof TIMEFRAMES[number];

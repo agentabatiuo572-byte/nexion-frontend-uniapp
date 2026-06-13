@@ -2,15 +2,26 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" href="static/logo.svg">
     <script>
-      const coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)')
-  || CSS.supports('top: constant(a)'))
+      var coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)') ||
+        CSS.supports('top: constant(a)'))
       document.write(
-        `<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0${
-  coverSupport ? ', viewport-fit=cover' : ''}" />`)
+        '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
+        (coverSupport ? ', viewport-fit=cover' : '') + '" />')
     </script>
     <title></title>
+    <link rel="icon" href="data:," />
+    <!-- v5 brand fonts — General Sans (Fontshare) + Manrope + JetBrains Mono
+         (Google). The prototype loads these via next/font + a Fontshare <link>
+         in app/layout.tsx; uni-app has no layout.tsx, so they are loaded here.
+         Without them every text node renders in the system fallback (or, when
+         the var(--font-*) chain is broken, Times New Roman). display=swap →
+         no FOIT. (PITFALLS P-038) -->
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
     <!--preload-links-->
     <!--app-context-->
   </head>

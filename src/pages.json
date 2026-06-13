@@ -1,159 +1,333 @@
 {
   "pages": [
     {
-      "path": "pages/launch/index",
-      "style": {
-        "navigationBarTitleText": "Nexion"
-      }
+      "path": "pages/index/index",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/onboarding/intro/index",
-      "style": {
-        "navigationBarTitleText": "Nexion"
-      }
+      "path": "pages/onboarding/intro",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/auth/login",
-      "style": {
-        "navigationBarTitleText": "Sign in"
-      }
+      "path": "pages/onboarding/estimator",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/auth/register",
-      "style": {
-        "navigationBarTitleText": "Sign up"
-      }
+      "path": "pages/onboarding/connect",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/home/index",
-      "style": {
-        "navigationBarTitleText": "Nexion"
-      }
+      "path": "pages/onboarding/terms",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/earn/index",
-      "style": {
-        "navigationBarTitleText": "Earn"
-      }
+      "path": "pages/register/register",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/store/index",
-      "style": {
-        "navigationBarTitleText": "Store"
-      }
+      "path": "pages/login/login",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/team/index",
-      "style": {
-        "navigationBarTitleText": "Team"
-      }
+      "path": "pages/store/store",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/index",
-      "style": {
-        "navigationBarTitleText": "Me"
-      }
-    },
-    {
-      "path": "pages/me/profile",
-      "style": {
-        "navigationBarTitleText": "Profile"
-      }
-    },
-    {
-      "path": "pages/me/wallet/bills",
-      "style": {
-        "navigationBarTitleText": "Bills"
-      }
-    },
-    {
-      "path": "pages/store/orders",
-      "style": {
-        "navigationBarTitleText": "Orders"
-      }
-    },
-    {
-      "path": "pages/store/product",
-      "style": {
-        "navigationBarTitleText": "Product"
-      }
+      "path": "pages/store/detail",
+      "style": { "navigationStyle": "custom" }
     },
     {
       "path": "pages/store/checkout",
-      "style": {
-        "navigationBarTitleText": "Checkout"
-      }
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/team/rank",
-      "style": {
-        "navigationBarTitleText": "Rank"
-      }
+      "path": "pages/store/orders",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/team/leaderboard",
-      "style": {
-        "navigationBarTitleText": "Leaderboard"
-      }
+      "path": "pages/store/order-detail",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/team/unilevel",
-      "style": {
-        "navigationBarTitleText": "Unilevel"
-      }
+      "path": "pages/store/bundle",
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/team/binary",
-      "style": {
-        "navigationBarTitleText": "Binary"
-      }
+      "path": "pages/earn/earn",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/me",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-topup",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-withdraw",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/devices",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/profile",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/security",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/kyc",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/goals",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-bills",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-exchange",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-nex",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-cards",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-cards-new",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/receipts",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/proof",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wrapped",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/market/market",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/team",
+      "style": { "navigationStyle": "custom" }
     },
     {
       "path": "pages/team/commissions",
-      "style": {
-        "navigationBarTitleText": "Commissions"
-      }
+      "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/genesis/index",
-      "style": {
-        "navigationBarTitleText": "Genesis"
-      }
+      "path": "pages/team/binary",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/agent",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/rank",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/rank-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/leaderboard",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/leadership-pool",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/leadership-pool-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/network",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/quota",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/tree",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/unilevel",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/unilevel-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/binary-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/team/commissions-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/genesis/genesis",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/genesis/holder",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/genesis/marketplace",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/genesis/how-it-works",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/staking/staking",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/staking/how-it-works",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/daily/daily",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/missions/missions",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/events/events",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/learn/learn",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/globe/globe",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/developer/developer",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/search/search",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/achievements",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/help",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/support",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/support-tickets",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/language",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/notifications",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/preferences",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/replay-tour",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/risk-disclosure",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/trial",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-premium",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-nex-v2-lock",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-repurchase",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-repurchase-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-exchange-how",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/wallet-withdraw-tracking",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/trust/trust",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/trust/nex",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/ref/code",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/tx/hash",
+      "style": { "navigationStyle": "custom" }
     }
   ],
   "globalStyle": {
-    "backgroundColor": "#07080a",
-    "navigationBarBackgroundColor": "#07080a",
-    "navigationBarTextStyle": "white",
-    "navigationStyle": "custom"
-  },
-  "tabBar": {
-    "custom": true,
-    "color": "#7b8494",
-    "selectedColor": "#c6ff3a",
-    "backgroundColor": "#07080a",
-    "borderStyle": "black",
-    "list": [
-      {
-        "pagePath": "pages/home/index",
-        "text": "Home"
-      },
-      {
-        "pagePath": "pages/earn/index",
-        "text": "Earn"
-      },
-      {
-        "pagePath": "pages/store/index",
-        "text": "Store"
-      },
-      {
-        "pagePath": "pages/team/index",
-        "text": "Team"
-      },
-      {
-        "pagePath": "pages/me/index",
-        "text": "Me"
-      }
-    ]
+    "navigationStyle": "custom",
+    "backgroundColor": "#000000",
+    "backgroundColorContent": "#000000"
   }
 }
