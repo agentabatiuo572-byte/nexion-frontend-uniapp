@@ -54,9 +54,10 @@
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import QuotaTierCard, { type QuotaTier } from "@/components/team/quota-tier-card.vue";
+import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { getProduct, annualRoiPct } from "@/mock/products";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 
@@ -68,43 +69,44 @@ const members = computed(() => network.members);
 const directInvites = computed(() => members.value.filter((m) => m.layer === 1).length);
 const activeDirect = computed(() => members.value.filter((m) => m.layer === 1 && m.status === "active").length);
 
-const tiers = computed<QuotaTier[]>(() => [
-  {
-    productId: "stellarbox-pro",
-    name: "NexionBox Pro",
-    price: 899,
-    monthlyStock: 1000,
-    soldThisMonth: 873,
-    unlockKind: "all",
-    conditions: [
-      { label: t.value.quota.condActivatedDirect, current: activeDirect.value, required: 5, kind: "invites" },
-    ],
+// Single source: tiers derive from the catalog products that carry a
+// purchaseGate (name/price/锁额/解锁条件/perks all from getProduct + gate config,
+// with live progress from network/v-rank). No hardcoded device economics here —
+// the page mirrors §4 PurchaseGate + the store catalog (fixes stale $899/$3,499/
+// "800-1,100 NEX/day" that drifted out of sync with the recalibrated catalog).
+function buildTier(productId: string, tint: string): QuotaTier | null {
+  const p = getProduct(productId);
+  const g = p?.purchaseGate;
+  if (!p || !g) return null;
+  const conditions: QuotaCondition[] = [];
+  if (g.rankMin != null)
+    conditions.push({ label: fmt(t.value.quota.condRank, { v: g.rankMin }), current: vRank.myRank, required: g.rankMin, kind: "invites" });
+  if (g.activeDirectMin != null)
+    conditions.push({ label: t.value.quota.condActivatedDirect, current: activeDirect.value, required: g.activeDirectMin, kind: "invites" });
+  if (g.teamVolumeMin != null)
+    conditions.push({ label: t.value.quota.condTeamVol, current: vRank.teamVolumeUSD, required: g.teamVolumeMin, kind: "volume" });
+  return {
+    productId,
+    name: p.name,
+    price: p.price,
+    monthlyStock: g.quotaCap ?? 0,
+    soldThisMonth: g.quotaSold ?? 0,
+    unlockKind: g.mode,
+    conditions,
     perks: [
-      "180-250 NEX/day generation",
-      "12 GB VRAM · NVIDIA Hopper class",
-      "Eligible for V2 ranking immediately",
+      fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
+      `${p.gpu} · ${p.vram}`,
+      fmt(t.value.quota.perkRoi, { roi: annualRoiPct(p) }),
     ],
-    tint: "var(--v5-brand)",
-  },
-  {
-    productId: "stellarrack-p1",
-    name: "NexionRack P1",
-    price: 3499,
-    monthlyStock: 100,
-    soldThisMonth: 76,
-    unlockKind: "either",
-    conditions: [
-      { label: t.value.quota.condActivatedDirect, current: activeDirect.value, required: 15, kind: "invites" },
-      { label: t.value.quota.condTeamVol, current: vRank.teamVolumeUSD, required: 20_000, kind: "volume" },
-    ],
-    perks: [
-      "800-1,100 NEX/day generation",
-      "4× H200 · 320 GB VRAM",
-      "Direct V3 Captain promotion on first stake",
-    ],
-    tint: "var(--v5-warning)",
-  },
-]);
+    tint,
+  };
+}
+
+const tiers = computed<QuotaTier[]>(() =>
+  [buildTier("stellarbox-pro", "var(--v5-brand)"), buildTier("stellarrack-p1", "var(--v5-warning)")].filter(
+    (x): x is QuotaTier => x !== null,
+  ),
+);
 
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });

@@ -13,13 +13,13 @@ const DEVICE_SPECS: Record<
     location?: string;
   }
 > = {
-  phone: { name: "Your phone", gpu: "Mobile NPU · ~28 TOPS", vramTotal: 8, basePower: 0, baseRate: 0.06, baseRateNEX: 2 },
+  phone: { name: "Your phone", gpu: "Mobile NPU · ~28 TOPS", vramTotal: 8, basePower: 0, baseRate: 0.06, baseRateNEX: 10 },
   "stellarbox-s1": { name: "NexionBox S1", gpu: "4× RTX 4090", vramTotal: 96, basePower: 1200, baseRate: 7, baseRateNEX: 40, hashRate: 1240, location: "Singapore Data Center" },
   "stellarbox-pro": { name: "NexionBox Pro", gpu: "8× RTX 4090", vramTotal: 192, basePower: 2400, baseRate: 13, baseRateNEX: 80, hashRate: 2480, location: "Singapore Data Center" },
-  "stellarbox-pro-v2": { name: "NexionBox Pro v2", gpu: "8× RTX 5090", vramTotal: 256, basePower: 2200, baseRate: 14.5, baseRateNEX: 100, hashRate: 5120, location: "Singapore Data Center" },
+  "stellarbox-pro-v2": { name: "NexionBox Pro v2", gpu: "8× RTX 5090", vramTotal: 256, basePower: 2200, baseRate: 14, baseRateNEX: 90, hashRate: 5120, location: "Singapore Data Center" },
   "stellarrack-p1": { name: "NexionRack P1", gpu: "8× NVIDIA A100", vramTotal: 640, basePower: 3200, baseRate: 45, baseRateNEX: 300, hashRate: 3840, location: "Frankfurt Data Center" },
   "stellarrack-p2": { name: "NexionRack P2", gpu: "8× NVIDIA H100", vramTotal: 1024, basePower: 4000, baseRate: 75, baseRateNEX: 500, hashRate: 9600, location: "Frankfurt Data Center" },
-  "cloud-share": { name: "Cloud Share", gpu: "Distributed", vramTotal: 0, basePower: 0, baseRate: 0.19, baseRateNEX: 1 },
+  "cloud-share": { name: "Cloud Share", gpu: "Distributed", vramTotal: 0, basePower: 0, baseRate: 0.19, baseRateNEX: 3 },
 };
 
 // Device retail price (USDT) — used by salvage calc. MOCK-ONLY (prod: GET /api/store/catalog).

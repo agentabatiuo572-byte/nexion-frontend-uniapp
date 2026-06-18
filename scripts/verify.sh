@@ -277,6 +277,23 @@ subpage_header_sticky() {
   else bad "SubPageHeader not sticky (吸顶/磨砂 broken for ~55 pages)"; fi
 }
 subpage_header_sticky
+# Device daily-yield single-source parity (2026-06-18 drift incident): the same
+# per-SKU USDT+NEX daily yield is hand-duplicated across FOUR sources with nothing
+# deriving one from another — device-types.ts (DEVICE_SPECS → what the user is
+# DELIVERED), products.ts (PRODUCTS → what the store card/detail ADVERTISES), the
+# i18n VsPhoneHero sublines (phone + S1) and trial-config.ts (shadowDaily* → what
+# the free trial advertises, must equal its trialProductId baseline). They
+# silently drifted (phone 2≠10, Cloud 1≠3, Pro v2 14.5/100≠14/90) → advertised ≠
+# delivered, a trust bug NONE of the sentinels above caught. This asserts the four
+# agree; authoritative values = PRD §7.1/§13.3.
+device_yield_parity() {
+  if "$NODE_BIN" scripts/check-device-yield-parity.mjs >/tmp/uni-yield-parity.log 2>&1; then
+    ok "$(cat /tmp/uni-yield-parity.log)"
+  else
+    bad "device-yield parity (advertised ≠ delivered drift)"; sed 's/^/        /' /tmp/uni-yield-parity.log
+  fi
+}
+device_yield_parity
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

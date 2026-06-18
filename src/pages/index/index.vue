@@ -9,14 +9,14 @@
 -->
 <template>
   <AppChassis active="home">
-    <CardStagger class="px-4 pt-3 pb-4 space-y-4" style="color: var(--v5-ink)">
+    <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
       <!-- ZONE 1: hook — earned anchor + conversion stack + social proof -->
       <GreetingHeader />
       <TechMoneyCard />
       <TrialPromoBanner />
       <TrialGhostSlot />
-      <ConversionBanner />
       <DayOneQuestCard />
+      <ConversionBanner />
       <LiveFeedCard />
 
       <!-- ZONE 2: status — your fleet, the grid, network pulse -->

@@ -15,6 +15,22 @@ export interface AIPerformance {
   bestForCategory?: ("IG" | "VG" | "LL" | "FT" | "EM" | "SP")[];
 }
 
+// Per-user purchase gate (rank/condition + quota lock). Backend-configurable:
+// operator picks a gate shape at SKU 上架 (单活跃直推 / 单 V 级 / 组合) and the
+// thresholds; server-canonical (mirrors GET /api/store/catalog). All fields
+// optional — undefined gate = freely purchasable. rankMin is a plain VRank
+// ordinal (0-12) to avoid a circular import on the v-rank store.
+export interface PurchaseGate {
+  rankMin?: number;           // 最低 V 级 (0-12);eligible 需 myRank >= rankMin
+  activeDirectMin?: number;   // 最少活跃直推数
+  teamVolumeMin?: number;     // 最低团队业绩 USD
+  mode: "all" | "either";     // 多条件 AND / OR
+  quotaCap?: number;          // 锁额:本期可售上限
+  quotaSold?: number;         // 已售 (server 维护;remaining = cap - sold)
+  quotaPeriod?: "month" | "lifetime";
+  enforce: boolean;           // true=硬拦截售罄 / false=仅 FOMO 展示
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -49,6 +65,9 @@ export interface Product {
   // platform reaches P3 (~month 5); Rack P2 ships at P5 (~month 10). Listings
   // and direct-URL hits before that surface a "coming soon" lock card.
   unlocksAtPhase?: PhaseId;
+  // Per-user purchase gate (等级门 + 锁额). Operator-configured at 上架,
+  // server-canonical. undefined = 无门,自由购买. See evaluatePurchaseGate().
+  purchaseGate?: PurchaseGate;
 }
 
 export const PRODUCTS: Product[] = [
@@ -106,6 +125,8 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 1842,
     stock: 23,
+    // 购买门(后台可改):单活跃直推 ≥5 + 硬锁额(remaining = cap−sold = 23,对齐 stock)。
+    purchaseGate: { activeDirectMin: 5, mode: "all", quotaCap: 1000, quotaSold: 977, quotaPeriod: "month", enforce: true },
     rating: 4.9,
     reviews: 1124,
     features: [
@@ -136,8 +157,8 @@ export const PRODUCTS: Product[] = [
     vram: "256GB VRAM",
     hashRate: "5,120 MH/s",
     power: "2,200W TDP",
-    dailyEarn: 14.5,
-    dailyEarnNEX: 100,
+    dailyEarn: 14,
+    dailyEarnNEX: 90,
     price: 1319,
     monthlyPrice: 120,
     installMonths: 12,
@@ -181,6 +202,8 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 287,
     stock: 8,
+    // 购买门(后台可改):组合 either —— V≥3 或 ≥15 活跃直推 或 ≥$20K 团队业绩 + 硬锁额(remaining=8)。
+    purchaseGate: { rankMin: 3, activeDirectMin: 15, teamVolumeMin: 20000, mode: "either", quotaCap: 100, quotaSold: 92, quotaPeriod: "month", enforce: true },
     rating: 4.9,
     reviews: 154,
     features: [
@@ -248,7 +271,7 @@ export const PRODUCTS: Product[] = [
     gpu: "Distributed",
     vram: "—",
     dailyEarn: 0.19,
-    dailyEarnNEX: 1,
+    dailyEarnNEX: 3,
     price: 19.9,
     sold: 12483,
     rating: 4.6,
@@ -286,4 +309,56 @@ export function getProduct(id: string): Product | undefined {
  */
 export function annualRoiPct(p: Pick<Product, "dailyEarn" | "price">): number {
   return Math.round(((p.dailyEarn * 365) / p.price) * 100);
+}
+
+// ───── Purchase gate evaluation (单源 · store/detail/checkout/quota 共用) ─────
+// Pure helper: given a product's gate config + the user's eligibility context,
+// returns whether checkout must be blocked + the unmet conditions for display.
+// server-canonical in prod (server re-checks on POST /api/orders); client uses
+// this only for UI gating + progress copy.
+export interface GateContext {
+  rank: number; // myRank 0-12
+  activeDirect: number; // active direct-invite count
+  teamVolumeUSD: number;
+}
+export interface GateCondition {
+  kind: "rank" | "activeDirect" | "teamVolume";
+  need: number;
+  have: number;
+  met: boolean;
+}
+export interface GateResult {
+  gated: boolean; // product carries a purchaseGate
+  eligible: boolean; // rank/condition satisfied
+  soldOut: boolean; // enforce && remaining <= 0
+  blocked: boolean; // !eligible || soldOut → checkout must refuse
+  remaining: number | null; // cap - sold (null if no quota)
+  conditions: GateCondition[];
+  unmet: GateCondition[];
+  progressPct: number; // 0..1 average condition progress
+}
+
+export function evaluatePurchaseGate(
+  p: Pick<Product, "purchaseGate">,
+  ctx: GateContext,
+): GateResult {
+  const g = p.purchaseGate;
+  if (!g) {
+    return { gated: false, eligible: true, soldOut: false, blocked: false, remaining: null, conditions: [], unmet: [], progressPct: 1 };
+  }
+  const conditions: GateCondition[] = [];
+  if (g.rankMin != null) conditions.push({ kind: "rank", need: g.rankMin, have: ctx.rank, met: ctx.rank >= g.rankMin });
+  if (g.activeDirectMin != null) conditions.push({ kind: "activeDirect", need: g.activeDirectMin, have: ctx.activeDirect, met: ctx.activeDirect >= g.activeDirectMin });
+  if (g.teamVolumeMin != null) conditions.push({ kind: "teamVolume", need: g.teamVolumeMin, have: ctx.teamVolumeUSD, met: ctx.teamVolumeUSD >= g.teamVolumeMin });
+
+  const eligible =
+    conditions.length === 0 ? true : g.mode === "all" ? conditions.every((c) => c.met) : conditions.some((c) => c.met);
+  const remaining = g.quotaCap != null ? Math.max(0, g.quotaCap - (g.quotaSold ?? 0)) : null;
+  const soldOut = !!g.enforce && remaining != null && remaining <= 0;
+  const blocked = !eligible || soldOut;
+  const unmet = conditions.filter((c) => !c.met);
+  const progressPct =
+    conditions.length === 0 ? 1 : conditions.reduce((s, c) => s + Math.min(1, c.need > 0 ? c.have / c.need : 1), 0) / conditions.length;
+
+  return { gated: true, eligible, soldOut, blocked, remaining, conditions, unmet, progressPct };
 }

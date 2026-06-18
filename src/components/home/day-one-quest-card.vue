@@ -6,8 +6,6 @@
 -->
 <template>
   <view :style="rootStyle">
-    <view :style="accentStyle" />
-
     <view style="padding: 16px 18px 4px">
       <!-- Reward + countdown -->
       <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
@@ -200,7 +198,6 @@ function rewardStyle(task: QuestTask): CSSProperties {
 }
 
 const rootStyle: CSSProperties = {
-  marginTop: "12px",
   position: "relative",
   borderRadius: "16px",
   background:
@@ -208,15 +205,6 @@ const rootStyle: CSSProperties = {
   overflow: "hidden",
   color: "var(--v5-ink)",
   boxShadow: "var(--v5-card-shadow-lift)",
-};
-const accentStyle: CSSProperties = {
-  position: "absolute",
-  left: "0",
-  right: "0",
-  top: "0",
-  height: "1px",
-  background: "linear-gradient(90deg, transparent, var(--v5-brand), transparent)",
-  opacity: 0.45,
 };
 const toggleStyle: CSSProperties = {
   marginTop: "14px",

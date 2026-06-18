@@ -12,6 +12,17 @@ node_modules
 dist
 *.local
 
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# tooling / temp artifacts
+.trash/
+.playwright-mcp/
+.claude/
+.vscode/*
+
 # Editor directories and files
 .idea
 *.suo

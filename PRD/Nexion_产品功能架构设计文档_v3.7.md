@@ -1349,6 +1349,51 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 - 未发布产品 → 过滤出主列表,聚合到底部 **"Next generation" coming-soon section**,每张以 `<LockedProductCard inline>` 渲染(横向卡 + lock icon + 名称 + tagline + ETA + "Notify me when live" pill)
 - SSR 阶段(mounted=false)默认把 `unlocksAtPhase` 产品视为锁定,与 first paint hydration 对齐(参 §16.5);client mount 后按真实 phase 重算
 
+**购买门(等级门 + 锁额门)**(`Product.purchaseGate`):
+
+代际发布门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
+
+数据结构 `PurchaseGate`(全字段可选,任一条件省略=不校验该项;`purchaseGate` 整体未设=自由购买无门):
+
+| 字段 | 含义 |
+|---|---|
+| `rankMin?` | 最低 V 级(0-12),需 `myRank ≥ rankMin` |
+| `activeDirectMin?` | 最少活跃直推数 |
+| `teamVolumeMin?` | 最低团队业绩(USD) |
+| `mode` | 多条件判定:`all`(全满足 AND)/ `either`(任一满足 OR)|
+| `quotaCap?` | 锁额:本期可售上限(未设=不限量)|
+| `quotaSold?` | 已售(服务端维护;余量 `remaining = max(0, quotaCap − quotaSold)`)|
+| `quotaPeriod?` | 锁额周期:`month` / `lifetime` |
+| `enforce` | `true`=硬拦截(售罄即禁购)/ `false`=仅展示 FOMO 不拦 |
+
+**单源判定** `evaluatePurchaseGate(product, { rank, activeDirect, teamVolumeUSD })` → `{ eligible, soldOut, blocked, remaining, conditions, unmet, progressPct }`,商品列表 / 详情 / 结账 / 配额页(§8.9)**共用此纯函数**,杜绝口径分叉:
+
+- `eligible` = 无条件→true;`mode=all`→所有条件满足;`mode=either`→任一满足
+- `soldOut` = `enforce && remaining ≤ 0`
+- `blocked` = `!eligible || soldOut`(结账据此拦截)
+
+```mermaid
+flowchart TD
+  A[进入商品卡 / 详情 / 结账] --> B{product.purchaseGate 是否设置?}
+  B -- 否 --> P[自由购买 · 放行]
+  B -- 是 --> C{资格条件满足?<br/>rankMin / activeDirectMin / teamVolumeMin<br/>按 mode = all / either 判定}
+  C -- 否 --> L[锁定态:列出未达成条件 + 进度<br/>CTA 跳 /team/quota 引导拉新]
+  C -- 是 --> D{锁额 enforce 且 remaining ≤ 0?}
+  D -- 是 --> S[售罄态:禁止购买]
+  D -- 否 --> P
+  L --> X[结账硬拦截 blocked = true]
+  S --> X
+```
+
+**Pro / Rack P1 上线默认**(后台可改):
+
+| 产品 | 门类型 | 条件 | mode | 锁额 cap / sold | enforce |
+|---|---|---|---|---|---|
+| NexionBox Pro | 单活跃直推 | ≥ 5 活跃直推 | all | 1,000 / 977(余 23)| 硬拦 |
+| NexionRack P1 | 组合 | V≥3 **或** ≥15 活跃直推 **或** 团队业绩 ≥ $20,000 | either | 100 / 92(余 8)| 硬拦 |
+
+> 锁额 `remaining` 是该 SKU"还剩 N 件"的**单一来源**(收编原 `stock` 展示,消除双口径)。其余 SKU 默认无购买门;Pro v2 / Rack P2 维持阶段门(`unlocksAtPhase`)。
+
 **列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexionBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
 **Promo strip 互斥**:VsPhoneHero 之下若 `<TradeinWindowBanner>`(§7.6)正在显示,则 S1 promo `$200 off NexionBox S1` strip **隐藏**(S1 是 legacy,window 开放时推销 S1 与"换到新一代"叙事冲突)。其它情况(无 legacy fleet / 未到 P3)S1 promo 正常显示。
@@ -1581,8 +1626,9 @@ credit          = price × rate(ageMonths)                          // floor 触
 
 #### 7.5.2 Checkout intercept 触发条件
 
-`app/(main)/store/checkout/page.tsx` 在 mount 时执行 `useEffect`:
+结账页 mount 时按序评估:
 
+0. **购买门硬拦截**(置于 trade-in / MAX_DEVICES intercept 之前):对挂 `purchaseGate` 的商品跑 `evaluatePurchaseGate`(§7.1),若 `blocked`(资格未达成或锁额售罄)→ 阻断支付 + 中性提示 + CTA 跳 `/team/quota`。服务端在下单时二次校验为权威(`POST /api/orders` 对未达成资格 reject),前端拦截仅为体验前置。
 1. 若 `useDeviceEligibility(productKind).canTradeIn === true` → 显示 `<TradeInOrFullChoiceSheet>`(分叉:trade-in 哪台旧设备 / 全价购买)
 2. 否则若 `activeCount >= MAX_DEVICES` → 显示 `<ReplaceLowestSheet>`(让出最低产出设备)
 3. 否则正常 checkout 流程(支付方式选择 → 确认 → 扣款)
@@ -2233,12 +2279,14 @@ Direct / Extended 二分类可折叠列表:
 
 | 设备 | 解锁条件 | 月度库存 |
 |---|---|---|
-| NexionBox Pro | 5+ 已激活直推 | 1,000 台 |
-| NexionRack P1 | 15+ 直推 **或** 团队月业绩 ≥ $20,000 | 100 台 |
+| NexionBox Pro | 5+ 已激活直推 | 1,000 台(余 23)|
+| NexionRack P1 | 15+ 直推 **或** 团队月业绩 ≥ $20,000 | 100 台(余 8)|
+
+> 解锁条件 / 阈值 / 库存 / 进度**单源自商品目录的 `purchaseGate` 配置**(§7.1)与 `evaluatePurchaseGate`,本页不自带硬编码数值;运营在后台调门槛 / 锁额,本页与商城卡 / 详情 / 结账同步变化。tier 的名称 / 价格 / perks 同源自 catalog,杜绝口径分叉。
 
 UI:
 - 用户当前邀请数 hero
-- 每个 tier 卡片显示:解锁条件进度条 + 月度库存进度 + perks + Buy/Invite CTA
+- 每个 tier 卡片显示:解锁条件进度条(`progressPct`)+ 月度库存进度(`remaining / quotaCap`)+ perks + Buy/Invite CTA
 - 满足条件 → 直跳 store 完成销售
 - 不满足 → "Invite to unlock" 跳 team
 

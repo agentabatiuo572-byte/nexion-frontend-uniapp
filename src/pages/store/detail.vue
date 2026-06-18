@@ -244,6 +244,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { isPhaseReached } from "@/store/product-phase";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
+import { usePurchaseGate } from "@/composables/use-purchase-gate";
 
 const t = useT();
 const phase = useProductPhase();
@@ -263,6 +264,9 @@ const isLocked = computed(() => {
   if (!p || !p.unlocksAtPhase) return false;
   return !isPhaseReached(phase.value, p.unlocksAtPhase);
 });
+
+// Per-user purchase gate (等级门 + 锁额) — drives the sticky Buy CTA below.
+const { gate: purchaseGate } = usePurchaseGate(product);
 
 // Sticky chassis nav header (back + centered title/tier) — replaces the old
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
@@ -390,10 +394,25 @@ function toggleFaq(i: number) {
 // product/qty resolve; cleared on hide/unmount so it never bleeds to the next page.
 const sticky = useStickyCTA();
 watch(
-  [product, isShare, isLocked, priceText, dailyEarnText, paybackLabel],
+  [product, isShare, isLocked, priceText, dailyEarnText, paybackLabel, purchaseGate],
   () => {
     if (!product.value || isLocked.value) {
       sticky.hide();
+      return;
+    }
+    // Purchase gate blocks → CTA routes to /team/quota with locked label, not checkout.
+    if (purchaseGate.value.blocked) {
+      sticky.show({
+        href: "/pages/team/quota",
+        amount: `$${priceText.value}`,
+        amountSubtext: purchaseGate.value.soldOut
+          ? t.value.store.gateSoldOut
+          : fmt(t.value.store.gateProgress, { pct: Math.round(purchaseGate.value.progressPct * 100) }),
+        buttonLabel: purchaseGate.value.soldOut
+          ? t.value.store.gateSoldOut
+          : t.value.store.gateLockedCta,
+        showTabBar: false,
+      });
       return;
     }
     sticky.show({

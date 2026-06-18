@@ -399,4 +399,12 @@
 - **已转**：`verify.sh` 哨兵「no raw uni.navigateBack」（除 route.ts 外 grep `uni.navigateBack(` 必 0，防回归）+ 本台账。实景验冷开 detail/binary-how/terms 返回 + in-app pop 无回归 + console 0。
 - **元教训**：H5 平台 API 的「失败」语义未必走 fail 回调（navigateBack 把「无法后退」当 success）——任何「赌 fail 兜底」的逻辑必须改为**前置条件判断**（查真栈深 `getCurrentPages()`），不能依赖 SDK 在边界情况报错。
 
+## P-055 · `v-else` 非相邻 → 组件编译失败、整页动态导入挂掉(vue-tsc 漏 + verify 只 curl 首页漏)
+
+- **现象**：购买门 Buy 按钮里写 `<svg v-if="gateLockedView"/> <text>{{buyLabel}}</text> <svg v-else/>`——`v-else` 与 `v-if` 之间夹了 `<text>`。vite vue-plugin 报 `v-else/v-else-if has no adjacent v-if`，product-card.vue 编译失败 → 引用它的 `store.vue` 动态导入 `Failed to fetch dynamically imported module` → 商城整页不渲染。
+- **双重盲区**：① `vue-tsc --noEmit` = 0(它只查**类型**,不查模板语义 `v-if/v-else` 相邻性)→ 机器门「假绿」；② `verify.sh` 只 `curl /`(首页 shell HTTP200,P-008 SPA 空壳),**不编译/不渲染 store 路由**,漏掉路由级编译错。两道门都过、实际整页崩——只有浏览器实景(preview console + 渲染断言)抓到。
+- **对策**：`v-else` 必**紧邻** `v-if` 元素;中间隔了别的元素时,改用两个独立条件 `v-if="cond"` / `v-if="!cond"`。
+- **元教训**：**vue-tsc 0 ≠ vite 编译过 ≠ 页面渲染**。模板语义错(v-else 相邻/未注册组件/指令误用)只在 vite vue-plugin transform 时报,且只在该路由被**实际加载**时触发——必须浏览器 navigate 到改动路由实景验,不能只信 tsc+verify。
+- **待转哨兵(建议)**：`verify.sh` 增「关键非首页路由编译探针」——对 store/team/me 等改动密集路由 curl `/src/pages/<route>.vue` 模块(非 200 / 含 transform error 即 fail),把路由级编译错从「实景才发现」提前到机器门。
+
 <!-- 后续每批新坑追加于下，转哨兵/规则后标注「已转」 -->

@@ -201,6 +201,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useBills } from "@/store/bills";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
+import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
@@ -249,6 +250,19 @@ onLoad((options) => {
   // accept ?product= (canonical) or ?id= (per task spec)
   if (o.product) productId.value = o.product;
   else if (o.id) productId.value = o.id;
+  // Hard purchase gate (等级门/锁额): refuse checkout for ineligible / sold-out
+  // SKUs — deep-link defense (store cards & detail already redirect blocked users
+  // to /team/quota). Server re-checks on POST /api/orders (server-canonical).
+  if (purchaseGate.value.blocked) {
+    uni.showToast({
+      title: purchaseGate.value.soldOut
+        ? t.value.store.gateSoldOutToast
+        : t.value.store.gateBlockedToast,
+      icon: "none",
+    });
+    navTo("/pages/team/quota");
+    return;
+  }
   // Trade-in intercept must run AFTER productId resolves (so the eligibility
   // composable gets the real device kind). onLoad fires before onMounted in
   // uni pages, so this is the single earliest point the kind is known.
@@ -256,6 +270,8 @@ onLoad((options) => {
 });
 
 const product = computed<Product | undefined>(() => getProduct(productId.value));
+// Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
+const { gate: purchaseGate } = usePurchaseGate(product);
 
 // ─── Batch C trade-in intercept (one-shot) ───────────────────────────────
 // Product ids that map to a real DeviceKind (mirrors source KNOWN_KINDS). The

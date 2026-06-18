@@ -7,9 +7,6 @@
 -->
 <template>
   <view class="block" :style="rootStyle" @click="goStore">
-    <!-- Top edge brand accent -->
-    <view :style="accentStyle" />
-
     <!-- Product render — sibling of content (z-index wins clean), masked fade -->
     <image
       src="/static/img/marketing/trial-hero.png"
@@ -87,7 +84,6 @@ const subtitleText = computed(() =>
 );
 
 const rootStyle: CSSProperties = {
-  marginTop: "12px",
   position: "relative",
   borderRadius: "16px",
   background:
@@ -95,16 +91,6 @@ const rootStyle: CSSProperties = {
   overflow: "hidden",
   color: "var(--v5-ink)",
   boxShadow: "var(--v5-card-shadow-lift)",
-};
-
-const accentStyle: CSSProperties = {
-  position: "absolute",
-  left: "0",
-  right: "0",
-  top: "0",
-  height: "1px",
-  background: "linear-gradient(90deg, transparent, var(--v5-brand), transparent)",
-  opacity: 0.45,
 };
 
 const PRODUCT_MASK =

@@ -93,6 +93,18 @@
           <SpecPill v-if="product.ai.videoMinPerHour" ai>{{ videoText }}</SpecPill>
         </view>
 
+        <!-- Purchase gate — locked state (等级门/锁额) -->
+        <view v-if="gateLockedView" class="mt-2.5" :style="gateBoxStyle">
+          <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+            <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
+          </view>
+          <view v-if="!gate.soldOut" class="mt-1.5 flex flex-wrap" style="gap: 6px">
+            <text v-for="(c, i) in gateCondTexts" :key="i" :style="gateCondStyle">{{ c }}</text>
+          </view>
+          <text v-if="!gate.soldOut" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
+        </view>
+
         <!-- Stock urgency -->
         <view v-if="stockLow" class="mt-2.5 grid items-center" :style="stockBoxStyle">
           <view class="flex items-center justify-center shrink-0" :style="stockIconStyle">
@@ -123,9 +135,10 @@
           <text style="font-size: 26px; font-weight: 600">{{ priceText }}</text>
         </view>
       </view>
-      <view class="inline-flex items-center justify-center whitespace-nowrap" :style="buyBtnStyle" @tap.stop="goCheckout" @click.stop="goCheckout">
-        <text @tap.stop="goCheckout" @click.stop="goCheckout">{{ t.store.cardBuyNow }}</text>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      <view class="inline-flex items-center justify-center whitespace-nowrap" :style="buyBtnDynStyle" @tap.stop="onBuy" @click.stop="onBuy">
+        <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+        <text @tap.stop="onBuy" @click.stop="onBuy">{{ buyLabel }}</text>
+        <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
   </view>
@@ -138,6 +151,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import SpecPill from "./spec-pill.vue";
 import { navTo } from "@/lib/route";
+import { usePurchaseGate } from "@/composables/use-purchase-gate";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>(), {
   featured: false,
@@ -167,6 +181,41 @@ const showTradein = computed(
     !!props.product.supersededBy &&
     !!props.product.tradeinDiscount,
 );
+
+// ── Purchase gate (等级门 + 锁额) — locked state + Buy redirect ──
+const { gate } = usePurchaseGate(() => props.product);
+const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
+const gateCondTexts = computed(() =>
+  gate.value.conditions.map((c) => {
+    if (c.kind === "rank") return fmt(t.value.store.gateCondRank, { n: c.need });
+    if (c.kind === "activeDirect") return fmt(t.value.store.gateCondDirect, { n: c.need });
+    return fmt(t.value.store.gateCondVolume, { n: c.need.toLocaleString() });
+  }),
+);
+const gateModeText = computed(() =>
+  gate.value.conditions.length > 1
+    ? props.product.purchaseGate?.mode === "all"
+      ? t.value.store.gateModeAll
+      : t.value.store.gateModeAny
+    : "",
+);
+const gateProgressText = computed(() =>
+  fmt(t.value.store.gateProgress, { pct: Math.round(gate.value.progressPct * 100) }),
+);
+const buyLabel = computed(() =>
+  gate.value.soldOut
+    ? t.value.store.gateSoldOut
+    : gate.value.blocked
+      ? t.value.store.gateLockedEyebrow
+      : t.value.store.cardBuyNow,
+);
+function onBuy() {
+  if (gate.value.blocked) {
+    navTo("/pages/team/quota");
+    return;
+  }
+  goCheckout();
+}
 
 // Text helpers (toLocaleString / fmt) — kept out of template for clarity
 const reviewsText = computed(() => props.product.reviews.toLocaleString());
@@ -372,5 +421,35 @@ const buyBtnStyle: CSSProperties = {
   fontWeight: 600,
   fontSize: "13.5px",
   letterSpacing: "-0.005em",
+};
+// Locked Buy CTA = muted (soft surface, no brand) when gate blocks purchase.
+const buyBtnDynStyle = computed<CSSProperties>(() =>
+  gate.value.blocked
+    ? { ...buyBtnStyle, background: "var(--v5-surface-2)", color: "var(--v5-ink-3)" }
+    : buyBtnStyle,
+);
+const gateBoxStyle: CSSProperties = {
+  padding: "8px 10px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+  borderRadius: "10px",
+};
+const gateEyebrowStyle: CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 600,
+  color: "var(--v5-warning)",
+  letterSpacing: "0.02em",
+};
+const gateCondStyle: CSSProperties = {
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "11px",
+  color: "var(--v5-ink-3)",
+  background: "var(--v5-surface-2)",
+  padding: "2px 8px",
+  borderRadius: "6px",
+};
+const gateMetaStyle: CSSProperties = {
+  marginTop: "6px",
+  fontSize: "10.5px",
+  color: "var(--v5-ink-4)",
 };
 </script>
