@@ -408,3 +408,11 @@
 - **待转哨兵(建议)**：`verify.sh` 增「关键非首页路由编译探针」——对 store/team/me 等改动密集路由 curl `/src/pages/<route>.vue` 模块(非 200 / 含 transform error 即 fail),把路由级编译错从「实景才发现」提前到机器门。
 
 <!-- 后续每批新坑追加于下，转哨兵/规则后标注「已转」 -->
+
+## P-056 · meta-words 哨兵排除 /i18n/messages → 用户可见文案的 funnel-meta 泄漏处在盲区
+
+- **现象**：首日任务分类标签 `转化/convert`(运营漏斗黑话)印在用户端 chip 上;全站排查同类又揪出 2 条用户可见文案——`转化路径/conversion paths`(签到 footer)、`转化门槛/conversion gate`(充值档位 body)。3 处都绕过了现有「no meta/ponzi words」哨兵。
+- **根因**：`sentinel_absent`(verify.sh:50)对所有哨兵统一 `grep -vE '/i18n/messages/'`——为容忍货币 "conversion"(NEX↔USDT 兑换)+ `upsell:` 命名空间 key 的合法出现而排除了 i18n 文案文件。但**用户可见文案恰恰全在 i18n/messages**,于是 meta 哨兵对「文案级 meta」完全失明(标签当初正因此漏过门)。
+- **对策**：① 修 3 处(标签 `转化`→`推荐`、key `dayOneCatConvert`→`dayOneCatRecommend`;footer/body 去 meta 改 benefit 框架),双语同步。② 加**专扫 i18n/messages 的独立门**(不走排除 i18n 的 sentinel_absent):`转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate`——复合词 + 带引号裸 `"转化"` 是无歧义 meta(货币在文案里写「兑换/exchange」),零误报。
+- **已转**：`verify.sh` 哨兵「no funnel-meta in i18n copy」+ 本台账。**负向探针验真**:5 个 meta 串全 CAUGHT、5 个合法串(货币 conversion / 兑换 / 推荐 / 注释裸转化)全放行;verify 24/0;5175 实景验 chip=推荐、控制台 0。
+- **元教训**：哨兵的**排除范围**本身可能制造盲区——「为避免误报而 `grep -v` 某目录」时必问「该目录里有没有正该被这条哨兵守的东西」。文案 meta 的权威位置是 i18n/messages,守它的门必须扫它(用精准 pattern 规避误报,而非整目录排除)。

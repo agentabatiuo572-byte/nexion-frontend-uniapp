@@ -1,5 +1,7 @@
 import type { Device, DeviceKind } from "./types";
 import { pickRandomTask } from "@/mock/tasks";
+import { getCachedCapability, fallbackCapability } from "@/lib/device-capability";
+import { getDeviceId } from "@/lib/device-id";
 
 // Ported from Nexion-prototype/lib/store/index.ts (device specs + factory).
 export const ONE_DAY_MS = 86400000;
@@ -38,15 +40,19 @@ export function createDevice(kind: DeviceKind, id: string): Device {
   const spec = DEVICE_SPECS[kind];
   const isPhone = kind === "phone";
   const isCloud = kind === "cloud-share";
+  // Phone yield + displayed NPU spec come from this device's calibrated
+  // capability baseline (deterministic per login device). Uncalibrated demo
+  // phone → fallbackCapability() = legacy Tier-3 / 28.3 TOPS / $0.06.
+  const cap = isPhone ? (getCachedCapability(getDeviceId()) ?? fallbackCapability()) : null;
   return {
     id,
     kind,
     name: spec.name,
-    gpu: spec.gpu,
+    gpu: cap ? `Mobile NPU · ~${cap.tops} TOPS` : spec.gpu,
     vramTotal: spec.vramTotal,
     basePower: spec.basePower,
-    baseRate: spec.baseRate,
-    baseRateNEX: spec.baseRateNEX,
+    baseRate: cap ? cap.baseRateUsdt : spec.baseRate,
+    baseRateNEX: cap ? cap.baseRateNex : spec.baseRateNEX,
     purchasedAt: Date.now(),
     // New devices land in inventory inactive (activatedAt=null); opt-in via /me/devices.
     activatedAt: null,
@@ -68,6 +74,11 @@ export function createDevice(kind: DeviceKind, id: string): Device {
       isCharging: true,
       isWifiConnected: true,
       thermalState: "nominal" as const,
+      capabilityScore: cap?.score,
+      capabilityTops: cap?.tops,
+      capabilityTier: cap?.tier,
+      // Fresh page load = a fresh continuous mining run → continuity ramps up.
+      miningSince: Date.now(),
     }),
   };
 }

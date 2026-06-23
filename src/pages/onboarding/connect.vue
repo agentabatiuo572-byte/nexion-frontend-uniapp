@@ -8,9 +8,9 @@
     </view>
 
     <view>
-      <text class="cn-step">{{ t.onboarding.step3of3 }}</text>
-      <text class="cn-title">{{ t.onboarding.calibrationTitle }}</text>
-      <text class="cn-sub">{{ t.onboarding.calibrationSubtitle }}</text>
+      <text class="cn-step">{{ stepText }}</text>
+      <text class="cn-title">{{ titleText }}</text>
+      <text class="cn-sub">{{ subText }}</text>
     </view>
 
     <transition name="cn-fade" mode="out-in">
@@ -101,7 +101,7 @@
 
     <view class="cn-cta">
       <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" @click="activate">
-        <text class="cn-go__t cn-go__t--on">{{ t.onboarding.activatePhone }}</text>
+        <text class="cn-go__t cn-go__t--on">{{ activateText }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
@@ -114,20 +114,40 @@ import { onLoad } from "@dcloudio/uni-app";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useAuth } from "@/store/auth";
+import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
+import { measureDeviceCapability } from "@/lib/device-capability";
+import { getDeviceId } from "@/lib/device-id";
 
 const t = useT();
 const auth = useAuth();
+
+// Recalibrate mode (?mode=recalibrate) = new-device re-measure; otherwise the
+// first-time onboarding calibration. Set in onLoad.
+const isRecal = ref(false);
 
 type Phase = "intro" | "calibrating" | "result";
 const phase = ref<Phase>("intro");
 
 const CALIBRATION_MS = 12_000;
-const FINAL_TOPS = 28.3;
+// Capability finals are DETERMINISTICALLY derived from this device's real
+// signals (not hardcoded) — so the displayed TOPS/score/tier/yield are
+// plausible, reproducible, and monotonic with real device class.
+const cap = measureDeviceCapability(getDeviceId());
+const FINAL_TOPS = cap.tops;
+const FINAL_SCORE = cap.score;
+const FINAL_TIER = cap.tier;
+const FINAL_YIELD = cap.baseRateUsdt;
+// Network + battery rows stay cosmetic ritual theater (not part of the
+// hardware-class capability score).
 const FINAL_PING = { sg: 38, tk: 42, us: 156 };
 const FINAL_BATTERY = 78;
-const FINAL_SCORE = 87;
-const FINAL_TIER = 2;
-const FINAL_YIELD = 0.06;
+
+// Copy swaps: recalibrate vs first-time onboarding.
+const stepText = computed(() => (isRecal.value ? t.value.onboarding.recalStep : t.value.onboarding.step3of3));
+const titleText = computed(() => (isRecal.value ? t.value.onboarding.recalTitle : t.value.onboarding.calibrationTitle));
+const subText = computed(() => (isRecal.value ? t.value.onboarding.recalSubtitle : t.value.onboarding.calibrationSubtitle));
+const activateText = computed(() => (isRecal.value ? t.value.onboarding.recalActivate : t.value.onboarding.activatePhone));
 
 // lucide paths
 const ICON = {
@@ -232,11 +252,24 @@ watch(phase, (p) => {
 });
 
 function activate() {
-  auth.completeOnboarding();
+  const app = useApp();
+  // Apply the freshly-measured baseline to the live phone device + record this
+  // device as the account's calibrated device (so future logins on it skip
+  // recalibration, while a different device triggers it).
+  app.applyPhoneCalibration(cap);
+  useSession().markCalibrated(auth.email || "default");
+  if (isRecal.value) {
+    app.resumeMining();
+  } else {
+    auth.completeOnboarding();
+  }
   uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
 }
 
-onLoad(() => {});
+onLoad((options) => {
+  const o = (options || {}) as Record<string, string>;
+  if (o.mode === "recalibrate") isRecal.value = true;
+});
 onUnmounted(() => {
   if (calInterval) clearInterval(calInterval);
   if (calTimeout) clearTimeout(calTimeout);

@@ -72,6 +72,10 @@
           <template #icon><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg></template>
           <template #value><text class="font-mono-tabular tabular-nums" style="color: var(--v5-brand)">{{ achievementsValue }}</text></template>
         </SettingRow>
+        <SettingRow href="/pages/me/rewards" :label="t.rewards.entry">
+          <template #icon><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg></template>
+          <template #value><text class="font-mono-tabular" style="color: var(--v5-brand)">{{ t.rewards.entryValue }}</text></template>
+        </SettingRow>
         <SettingRow href="/pages/me/goals" :label="t.me.goalsRow">
           <template #icon><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg></template>
           <template #value><text class="font-mono-tabular" style="color: var(--v5-brand-2)">{{ t.me.setTarget }}</text></template>
@@ -175,6 +179,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
+import { useSession } from "@/store/session";
 import { useProfile } from "@/store/profile";
 import { useReceipts } from "@/store/receipts";
 import { useOrders } from "@/store/orders";
@@ -194,6 +199,7 @@ const MIN_WITHDRAWAL_USD = 20;
 const t = useT();
 const app = useApp();
 const auth = useAuth();
+const session = useSession();
 const profile = useProfile();
 const receipts = useReceipts();
 const orders = useOrders();
@@ -257,6 +263,10 @@ async function handleSignOut() {
     confirmLabel: t.value.me.signOutConfirmLabel,
   });
   if (ok) {
+    // Self sign-out: void in-flight tasks (rollback) + release the shared
+    // session record (other tabs see "logged-out") before clearing auth.
+    app.interruptAllTasks("logged-out");
+    session.signOutSession();
     auth.signOut();
     uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
   }

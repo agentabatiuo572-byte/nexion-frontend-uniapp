@@ -123,12 +123,16 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useSecurity, type Session } from "@/store/security";
 import { useAuth } from "@/store/auth";
+import { useApp } from "@/store/app";
+import { useSession } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 
 const t = useT();
 const security = useSecurity();
 const auth = useAuth();
+const app = useApp();
+const session = useSession();
 
 const twoFactorEnabled = computed(() => security.twoFactorEnabled);
 const sessions = computed(() => security.sessions);
@@ -257,6 +261,8 @@ async function handleDeleteAccount() {
   });
   if (ok) {
     toast.success(t.value.security.deleteAccountToast);
+    app.interruptAllTasks("logged-out");
+    session.signOutSession();
     auth.signOut();
     uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
   }

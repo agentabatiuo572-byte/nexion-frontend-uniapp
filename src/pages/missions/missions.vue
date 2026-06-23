@@ -7,14 +7,12 @@
   Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
   backHref="/" → SubPageHeader back="/pages/index/index".
 
-  Scope note: the source embeds live <WeeklyQuestHero>/<WeeklyQuestList>/
-  <MonthlyChallengeCard> components and computes a day-one quest phase. Those
-  quest subsystems are not yet ported to uni, so — to keep this hub
-  self-contained — "This Week" / "Day-One" surface as RouteRows pointing at
-  their destinations, and "This Month" shows the i18n "launches soon" copy
-  (matching monthSoonTitle/Body). The Events row stat IS live: ongoing /
-  joined / claimable counts derive from the ported EVENTS mock + event-quest
-  store, so the badge + stat line are real.
+  Scope note: "This Week" now embeds the live <WeeklyQuestHero> +
+  <WeeklyQuestList> (ported — Tier 1 priority quest + Tier 2 engagement list +
+  champion bonus, matching the source missions page). "This Month" still shows
+  the i18n "launches soon" copy (Monthly Challenge is Q-2, not yet ported). The
+  Events row stat IS live: ongoing / joined / claimable counts derive from the
+  ported EVENTS mock + event-quest store, so the badge + stat line are real.
 -->
 <template>
   <AppChassis active="home">
@@ -53,22 +51,14 @@
         </view>
       </view>
 
-      <!-- This Week -->
+      <!-- This Week — embed live Weekly Quest hero + list (ported, source parity) -->
       <view :style="sectionStyle">
         <view class="mx-4 flex items-center" :style="sectionHeadStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /><path d="M8 14h.01" /><path d="M12 14h.01" /><path d="M16 14h.01" /></svg>
           <text :style="sectionTitleStyle">{{ t.missions.weekHeading }}</text>
         </view>
-        <view class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/daily/daily')">
-          <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-brand)')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
-          </view>
-          <view class="flex-1 min-w-0">
-            <text class="block" :style="rowLabelStyle">{{ t.missions.weekLabel }}</text>
-            <text class="block truncate" :style="rowValueStyle">{{ t.missions.weekValue }}</text>
-          </view>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
+        <view class="mx-4"><WeeklyQuestHero /></view>
+        <WeeklyQuestList />
       </view>
 
       <!-- This Month -->
@@ -137,6 +127,8 @@ import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
+import WeeklyQuestHero from "@/components/home/weekly-quest-hero.vue";
+import WeeklyQuestList from "@/components/home/weekly-quest-list.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useEventQuest } from "@/store/event-quest";

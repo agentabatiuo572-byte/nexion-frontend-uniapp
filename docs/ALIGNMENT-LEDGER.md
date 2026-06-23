@@ -12,6 +12,8 @@
 - 这些页引用的私有组件（home/* 等）凡仅服务一级页的，一并禁改。
 - 触发逻辑触及这些页 → 一律全局/chassis 落点（`isHome`/route guard），只加行为不改本体；5 页基线守卫证零回退。
 
+> **⚠ 2026-06-22 · 代金券功能(chassis 注入,主人授权)**：代金券 banner 经 chassis 内容层顶部注入,展示在 home/store/me/earn（零改 5 页本体,符合上条「chassis 落点」约定）；并新增首页领券 auto-popup（1300ms,优先于 trial）。**这两项是授权的功能新增,会改变 5 页观感** → `scripts/.baseline/baseline/` 金线现已陈旧(不含 banner),`diff baseline current` 会把 banner 报为差异(**预期,非回退**)。`chrome-baseline.mjs` 已补 voucher-claim-sheet cooldown seed（基线中抑制 popup、保留 banner）。**重拍金线**：先把旧 `scripts/.baseline` Move 到 `.trash`(备份铁律),dev 在 5173 → `node scripts/chrome-baseline.mjs capture baseline`。由本对齐任务择机重拍。
+
 ## 端口锁（共享层同时只一批持锁，防并发踩同文件）
 | 锁定文件 | 批次 | 时间戳 | 状态 |
 |---|---|---|---|

@@ -98,6 +98,14 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
 # reverse-ed / meta language must never leak into the product
 sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|跑路|ponzi|scam|反向教育|揭穿|conversion quest|funnel'
+# Funnel-meta vocabulary must not leak into user-facing i18n copy. The sentinel
+# above EXCLUDES /i18n/messages/ (to tolerate currency "conversion" + the upsell
+# namespace key), so copy-level funnel jargon was blind-spotted there. This gate
+# scans the message files directly for unambiguous funnel compounds + a bare
+# "转化" value (currency reads 兑换/exchange in copy) → zero false positives.
+# (added 2026-06-22: 转化→推荐 task surfaced 3 user-facing leaks past the gate.)
+i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate' src/i18n/messages 2>/dev/null | head -5)
+if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`

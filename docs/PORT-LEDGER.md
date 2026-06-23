@@ -310,4 +310,13 @@ me 子页（**devices/goals/profile/security/kyc ✅** · wallet-bills/wallet-ex
 - **新坑**：P-051（enter 置 flag/timer 必 onUnload 对称复位）· P-052（page.goto 同路径换 query 不重 onLoad，验证假象）。
 - **待办**：App 端真机验证（主人侧门）；PRD/H5 回填待主人决定（uniapp-first 新功能）。
 
+### Weekly Quest 系统 port ✅ verified（2026-06-23 · 阶段4 / QUEST-FE-BE-MAP G2）
+- **缘起**：missions「本周」是占位 RouteRow（跳 daily），真 Weekly Quest（一档转化 + 二档参与 + 周冠军）整套未 port，后台 H3 的 weekly 配置悬空无消费者。**回源纠正**：源原型 weekly 嵌 `missions/page.tsx`（非独立页，plan 误判已纠）。
+- **新建**：`src/mock/weekly-quests.ts`（`dispatchTier1` 9 优先级 / `dispatchTier2` 8 池取 4 FNV-1a+mulberry32 确定性 / `getPhaseRewardMultiplier` 1.0→1.5 / `currentWeekKey` ISO）· `src/store/weekly-quest.ts`（Pinia 持久 `nexion-weekly-quest-v1`，周回滚 + markComplete + claim，照 `event-quest.ts` 范式 hydrate/persist）· `src/components/home/weekly-quest-{hero,list}.vue`（一档单卡 + 二档 4 行三态 + 周冠军 bonus 行）。
+- **改**：`missions.vue`「本周」占位 RouteRow → 嵌入 `<WeeklyQuestHero>` + `<WeeklyQuestList>`（对齐源）。store-product href 用 `/store/detail?id=`（uni 无文件动态段）。
+- **completion 触发决策**（关键）：源 `markTier1/2Complete` **零调用**（待接行为归因，demo 中 claim 走不到）。按 PRD §11.13.5 + plan「CTA 跳转后手工领」**加 CTA tap 触发 completion**，让 claim/champion-bonus 流程可达——backend-replaceable（真后台以行为归因为准，CTA tap 为占位），对齐 daily/event quest 的点击触发模式。
+- **门**：vue-tsc 0 · verify 24/24 · 5173 实景（一档 +1,000 NEX/二档 4 行/CTA→detail 跳转/claim 翻转/领取 hero 隐藏让位二档，console 0）· 3-agent audit（跨端兼容 / 视觉业务对齐源 / 文案 i18n token）**0 CRITICAL/HIGH，字段级 1:1 对齐源**。
+- **PRD**：前端 §11.13.5 补 completion 触发；QUEST-FE-BE-MAP G2 标闭环。
+- **新坑**：无（audit 0 CRITICAL，所有已知 pitfall 已避开）。**经验**：源原型「待接归因」未完成态（mark* 无调用）port 时，按 PRD 意图补触发让功能可达，胜过照抄不可达的半成品。meta 哨兵 case-sensitive 抓小写 `conversion`（注释命中）——port 源术语时注释也走中性词。
+
 <!-- 每页迁移后：改状态 + 跑 verify.sh + 更新此表 -->

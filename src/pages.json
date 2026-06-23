@@ -29,6 +29,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/session/kicked",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/store/store",
       "style": { "navigationStyle": "custom" }
     },
@@ -114,6 +118,10 @@
     },
     {
       "path": "pages/me/receipts",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/rewards",
       "style": { "navigationStyle": "custom" }
     },
     {

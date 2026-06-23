@@ -62,6 +62,35 @@
       </view>
     </view>
 
+    <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
+    <view v-if="phoneRunning" style="padding: 0 20px 12px">
+      <view class="flex items-center justify-between" style="margin-bottom: 8px">
+        <text :style="sectionLabelStyle">{{ t.earn.hashLabel }}</text>
+        <view class="flex items-center gap-1" :style="capChipStyle">
+          <text style="color: var(--v5-ink-3)">{{ t.earn.hashCapability }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-ink-2); font-weight: 600">{{ baselineTops.toFixed(1) }} TOPS</text>
+          <text style="color: var(--v5-ink-4)">·</text>
+          <text style="color: var(--v5-brand)">{{ fmt(t.earn.hashTier, { n: capTier }) }}</text>
+        </view>
+      </view>
+      <view class="flex items-end justify-between">
+        <view class="flex items-baseline" style="gap: 4px">
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ live.effectiveTops.toFixed(1) }}</text>
+          <text style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink-3)">TOPS</text>
+        </view>
+        <svg width="110" height="28" viewBox="0 0 110 28" preserveAspectRatio="none" fill="none">
+          <polyline :points="sparkPoints" fill="none" stroke="var(--v5-brand)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </view>
+      <view class="flex items-center justify-between" style="margin-top: 6px">
+        <view class="flex items-center gap-1.5">
+          <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 6px var(--v5-brand)" />
+          <text style="font-size: 11.5px; color: var(--v5-ink-2)">{{ factorLabel }}</text>
+        </view>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashOutput, { n: live.effectivePct }) }}</text>
+      </view>
+    </view>
+
     <!-- Phone: reconnecting -->
     <view v-if="reconnecting && device.kind === 'phone'" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
@@ -196,12 +225,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind } from "@/store/types";
 import { getLifecycleSummary, isDegradable } from "@/store/device-lifecycle";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
+import { computeLiveHashpower } from "@/lib/hashpower";
+import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
@@ -299,6 +330,74 @@ function toggleNetwork() {
   app.setPhoneRuntime(props.device.id, { isWifiConnected: !isOnline.value });
 }
 
+// ── Phone live hashpower (effective = calibrated capability × condition factors) ──
+// The stable capability (TOPS·Tier) is the comparable identity number; the live
+// effective value oscillates beneath that ceiling with the phone's current
+// condition (continuous-online stability bonus, thermal, jitter). Only shown
+// while running (charging + online + no interrupt) — paused/reconnect states use
+// their own blocks. Toggling charger/network visibly moves the number.
+const phoneRunning = computed(
+  () => props.device.kind === "phone" && !reconnecting.value && !props.device.pausedReason,
+);
+// Phones always carry capability fields (createDevice seeds them); fall back to
+// the lib's single-source default rather than duplicating the literal here.
+const FALLBACK_CAP = fallbackCapability();
+const baselineTops = computed(() => props.device.capabilityTops ?? FALLBACK_CAP.tops);
+const capTier = computed(() => props.device.capabilityTier ?? FALLBACK_CAP.tier);
+const live = computed(() =>
+  computeLiveHashpower({
+    baselineTops: baselineTops.value,
+    isCharging: isCharging.value,
+    isOnline: isOnline.value,
+    thermalState: props.device.thermalState,
+    continuityMs: props.device.miningSince ? Math.max(0, now.value - props.device.miningSince) : 0,
+    nowSeed: now.value,
+  }),
+);
+const factorLabel = computed(() => {
+  switch (live.value.dominant) {
+    case "continuity":
+      return t.value.earn.hashFactorContinuity;
+    case "thermal":
+      return t.value.earn.hashFactorThermal;
+    case "battery":
+      return t.value.earn.hashFactorBattery;
+    case "offline":
+      return t.value.earn.hashFactorOffline;
+    default:
+      return t.value.earn.hashFactorPeak;
+  }
+});
+
+// Rolling sparkline buffer — one sample per 1s `now` tick (≈28s window).
+const SPARK_LEN = 28;
+const sparkBuf = ref<number[]>([]);
+watch(
+  now,
+  () => {
+    if (!phoneRunning.value) return;
+    const next = [...sparkBuf.value, live.value.effectiveTops];
+    sparkBuf.value = next.length > SPARK_LEN ? next.slice(-SPARK_LEN) : next;
+  },
+  { immediate: true },
+);
+const sparkPoints = computed(() => {
+  const buf = sparkBuf.value;
+  if (buf.length < 2) return "";
+  const W = 110;
+  const H = 28;
+  const base = baselineTops.value || 1;
+  const n = buf.length;
+  return buf
+    .map((v, i) => {
+      const x = (i / (n - 1)) * W;
+      const ratio = Math.max(0, Math.min(1, v / base));
+      const y = H - (0.12 + ratio * 0.82) * H;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+});
+
 // Phone locked-tasks loss-ad
 const promo = computed(() => derivePromoUpgrade(app.devices));
 const phoneLockedVisible = computed(() => promo.value.baseKind === "phone");
@@ -369,6 +468,12 @@ const sectionLabelStyle: CSSProperties = {
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-ink-3)",
+};
+const capChipStyle: CSSProperties = {
+  padding: "3px 8px",
+  borderRadius: "9999px",
+  fontSize: "10.5px",
+  background: "var(--v5-surface-2)",
 };
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in oklab, var(--v5-warning) 8%, transparent)",

@@ -96,6 +96,10 @@
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
         <view class="nx-page-enter" :style="{ paddingTop: contentTop + 'px', paddingBottom: contentBottom + 'px' }">
+          <!-- Voucher fallback banner — chassis-injected at content top so the
+               5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
+               hides unless a claimable voucher targets the current surface. -->
+          <VoucherBanner v-if="bannerSurface" :surface="bannerSurface" />
           <slot />
         </view>
       </view>
@@ -131,6 +135,7 @@
     <!-- Chassis-level overlays (each self-gates on its own store's open state,
          mirroring the prototype IOSFrame). Ported P-043. -->
     <TrialClaimSheet />
+    <VoucherClaimSheet />
     <SlotActionSheet />
     <TradeinSheets />
     <LuckySpinSheet />
@@ -158,6 +163,8 @@ import TrialExtensionSheet from "@/components/trial-extension-sheet.vue";
 import TrialUnbindRetentionSheet from "@/components/trial-unbind-retention-sheet.vue";
 import GenesisDockHost from "@/components/genesis-dock-host.vue";
 import MessageDrawer from "@/components/message-drawer.vue";
+import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
+import VoucherBanner from "@/components/voucher-banner.vue";
 import { useT } from "@/i18n/use-t";
 import { useNotifications } from "@/store/notifications";
 import { useMessageDrawer } from "@/store/message-drawer";
@@ -166,6 +173,9 @@ import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { usePageHeader } from "@/store/page-header";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
+import { useVoucher } from "@/store/voucher";
+import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
 
 const props = defineProps<{ active?: "home" | "earn" | "store" | "team" | "me" }>();
@@ -178,7 +188,10 @@ const trialClaimSheet = useTrialClaimSheet();
 const pageHeader = usePageHeader();
 const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
+const voucher = useVoucher();
+const voucherClaimSheet = useVoucherClaimSheet();
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
+let voucherPushTimer: ReturnType<typeof setTimeout> | null = null;
 
 // ── Pull-to-refresh — touch gesture ported from the prototype's PullToRefresh
 // (lib/store/refresh + ui/pull-to-refresh.tsx). The plain overflow:auto view
@@ -270,6 +283,7 @@ onMounted(() => {
   const closeTransient = (trialClaimSheet as { closeTransient?: () => void }).closeTransient;
   if (typeof closeTransient === "function") closeTransient();
   else trialClaimSheet.open = false;
+  voucherClaimSheet.closeTransient();
 
   // Home auto-push trial sheet — ported from the prototype mission-control.tsx
   // mount effect (the missing trigger: store + config were ported, the auto-push
@@ -279,7 +293,9 @@ onMounted(() => {
   // route at fire time so it never pops over a page navigated-to during the delay.
   if (isHome.value && trialConfig.config.autoPushEnabled && freeTrial.canStart()) {
     autoPushTimer = setTimeout(() => {
-      if (readRoute() === "pages/index/index") {
+      // Defer to the voucher sheet (fires 1300ms < this 1500ms) — only one
+      // auto-popup per Home visit; the trial fills in when no voucher opened.
+      if (readRoute() === "pages/index/index" && !voucherClaimSheet.open) {
         trialClaimSheet.tryAutoPush({
           cooldownHours: trialConfig.config.autoPushCooldownHours,
           maxPerSession: trialConfig.config.autoPushMaxPerSession,
@@ -287,11 +303,32 @@ onMounted(() => {
       }
     }, trialConfig.config.autoPushDelayMs);
   }
+
+  // Home auto-push voucher sheet — fires FIRST (VOUCHER_POPUP.autoPushDelayMs
+  // 1300ms < trial 1500ms) so the voucher takes PRIORITY; the trial sheet defers
+  // via its own !voucherClaimSheet.open guard (and fills in when no voucher is
+  // claimable). The !trialClaimSheet.open check here is belt-and-suspenders
+  // (trial can't be open yet at 1300ms unless manually shown). Cooldown +
+  // session-cap gated in the store; re-checks route at fire time.
+  if (isHome.value && voucher.claimableVouchers.some((v) => v.popupEnabled)) {
+    voucherPushTimer = setTimeout(() => {
+      if (readRoute() === "pages/index/index" && !trialClaimSheet.open) {
+        voucherClaimSheet.tryAutoPush({
+          cooldownHours: VOUCHER_POPUP.cooldownHours,
+          maxPerSession: VOUCHER_POPUP.maxPerSession,
+        });
+      }
+    }, VOUCHER_POPUP.autoPushDelayMs);
+  }
 });
 onUnmounted(() => {
   if (autoPushTimer) {
     clearTimeout(autoPushTimer);
     autoPushTimer = null;
+  }
+  if (voucherPushTimer) {
+    clearTimeout(voucherPushTimer);
+    voucherPushTimer = null;
   }
 });
 
@@ -303,6 +340,17 @@ const routeTab = computed(() => TAB_ROUTE_KEY[route.value]);
 const isTabRoute = computed(() => routeTab.value !== undefined || (route.value === "" && !!props.active));
 const activeTab = computed(() => routeTab.value ?? props.active ?? "home");
 const isHome = computed(() => activeTab.value === "home");
+
+// Voucher fallback banner surface = current tab route (home/store/me/earn). team
+// is not a configured claim surface. The VoucherBanner self-hides unless a
+// claimable voucher targets the surface, so this only maps the route → surface.
+const bannerSurface = computed<"home" | "store" | "me" | "earn" | null>(() => {
+  // Tab pages only — sub-pages (checkout/detail/…) pass active="store" etc. but
+  // must NOT carry the banner (it's scoped to the 4 first-level surfaces).
+  if (!isTabRoute.value) return null;
+  const tab = activeTab.value;
+  return tab === "home" || tab === "store" || tab === "me" || tab === "earn" ? tab : null;
+});
 
 // Sub-page nav header (registered via useSetPageHeader). Null on tab routes → brand
 // row. navHeaderH drives both the row height and the content-top inset, so only

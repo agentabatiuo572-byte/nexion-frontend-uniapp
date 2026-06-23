@@ -33,7 +33,7 @@ node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 3. Browser self-check（Playwright）：每个改动路由 navigate + console error=0 + 截图。**verify 绿 ≠ 渲染 OK**（只有浏览器抓 hydration / 遮挡 / 字色回归）。
 4. 清理 `.playwright-mcp/` 和临时 `*.png`。
 5. PRD sync：报一句 diff，问主人，确认后走 `nexion-prd-sync`（标准 PRD 风格，不加 changelog）。
-6. 产品更新日志：每个功能任务收尾追一条 `docs/产品更新日志.md`（🆕/✏️/🗑️ 分类）。
+6. 产品更新日志：每个功能任务收尾追一条 `docs/前端产品更新日志.md`（🆕/✏️/🗑️ 分类）。
 
 ## 架构 big-picture
 
@@ -56,6 +56,6 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 
 - 迁移台账：`docs/PORT-LEDGER.md`（源坐标 + 版本锁 + 页面矩阵 + 进度）
 - 踩坑登记：`docs/PORT-PITFALLS.md`（P-001~，每条已转脚本哨兵或硬规则）
-- 产品日志：`docs/产品更新日志.md`
+- 产品日志：`docs/前端产品更新日志.md`
 - 源原型：`D:\WORKS\PLAN\Nexion-prototype`（迁移源 / 历史参考）
 - 前端 PRD：`D:\WORKS\PLAN\PRD\Nexion_产品功能架构设计文档_v3.7.md`（`nexion-prd-sync` 同步对象）

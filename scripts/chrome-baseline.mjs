@@ -66,6 +66,11 @@ async function capture(label) {
     // trial-check. uni H5 wraps storage as {type:"object",data:...}; a far-future
     // lastClosedAt keeps tryAutoPush in-cooldown regardless of mockServerNow's base.
     try { localStorage.setItem("nexion-trial-claim-sheet-v1", JSON.stringify({ type: "object", data: { lastClosedAt: 9999999999999 } })); } catch (e) { void e; }
+    // Same for the voucher claim sheet auto-push (Home, 1300ms): pre-seed its
+    // cooldown so the popup overlay stays closed in the static baseline. The
+    // voucher BANNER still renders (it keys off claimable vouchers, not the
+    // popup) — that banner is the intended new state on home/store/me/earn.
+    try { localStorage.setItem("nexion-voucher-claim-sheet-v1", JSON.stringify({ type: "object", data: { lastClosedAt: 9999999999999 } })); } catch (e) { void e; }
     const FIXED = 1781700000000;
     const RealDate = Date;
     class FakeDate extends RealDate {

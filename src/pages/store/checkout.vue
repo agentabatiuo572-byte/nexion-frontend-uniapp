@@ -52,9 +52,17 @@
           <view class="border-b" :style="payHeadStyle">
             <view class="flex items-center justify-between">
               <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
-              <text class="tabular-nums" :style="payTotalStyle">${{ priceText }}</text>
+              <text class="tabular-nums" :style="payTotalStyle">${{ netPriceText }}</text>
             </view>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ paybackLine }}</text>
+            <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
+              <text style="font-size: 11.5px; color: var(--v5-brand)">{{ t.voucher.checkoutRowLabel }} −${{ voucherDiscountText }}</text>
+            </view>
+            <view v-else-if="expiredVoucherForSku" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
+              <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
+            </view>
           </view>
           <view style="padding: 12px">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); padding: 0 8px 8px">{{ t.store.coPaymentMethod }}</text>
@@ -97,10 +105,11 @@
             <CheckoutRow :label="t.store.coRowQuantity" value="1" />
             <CheckoutRow :label="t.store.coRowPayment" :value="paymentLabel" />
             <CheckoutRow :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
-            <template v-if="isCard">
-              <CheckoutRow :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
-              <CheckoutRow :label="t.store.coRowCardFee" :value="`$${cardFeeText}`" />
-            </template>
+            <!-- Subtotal revealed when a voucher applies (to show the discount) or
+                 when a card fee applies; voucher row sits between subtotal & fee. -->
+            <CheckoutRow v-if="hasVoucher || isCard" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
+            <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
+            <CheckoutRow v-if="isCard" :label="t.store.coRowCardFee" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
             <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
@@ -115,8 +124,8 @@
 
         <!-- === pay-instructions === -->
         <view v-else-if="step === 'pay-instructions'" class="mx-4 nx-step-in">
-          <CardPayment v-if="isCard" :amount="product.price" @complete="goAwaiting" @cancel="goConfirm" />
-          <ChainPayment v-else :method="(payment as 'usdt-trc20' | 'usdt-erc20' | 'btc')" :amount="product.price" @complete="goAwaiting" @cancel="goConfirm" />
+          <CardPayment v-if="isCard" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
+          <ChainPayment v-else :method="(payment as 'usdt-trc20' | 'usdt-erc20' | 'btc')" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
         </view>
 
         <!-- === awaiting === -->
@@ -196,9 +205,11 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
+import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useBills } from "@/store/bills";
+import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
@@ -231,6 +242,7 @@ const t = useT();
 const app = useApp();
 const orders = useOrders();
 const bills = useBills();
+const voucher = useVoucher();
 
 // wallet icon path (lucide Wallet), bitcoin path, credit-card path
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
@@ -272,6 +284,37 @@ onLoad((options) => {
 const product = computed<Product | undefined>(() => getProduct(productId.value));
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
+
+// ─── Voucher redemption ──────────────────────────────────────────────────
+// Best claimed-unused voucher applicable to this SKU at its base price. The
+// discount applies to the device subtotal; the 3.5% card fee (if any) is then
+// computed on the discounted subtotal. The voucher is marked used once the
+// order persists (single-use). bestVoucherFor returns null when none applies.
+// Stacking/性质 policy (后台可配,见 OpsVoucher): voucher is the SOLE discount in
+// this checkout flow (trial-offset lives in the trial redeem flow; bundle
+// discount in the bundle page), so stackWithTrial/stackWithOthers are honored
+// trivially here. 不可提现 is inherent — the discount only reduces price, never
+// credits the balance; 不可拆分 is inherent — one voucher applied whole, then markUsed.
+// Real backend: redemption is server-side & atomic — the checkout sends `voucherId`
+// in the POST /api/orders body; the server re-validates (claimed/unused/applicable/
+// stacking) + marks it redeemed in the same transaction as order creation. The
+// markUsed() below is the mock's optimistic mirror of that server effect.
+const voucherMatch = computed(() => {
+  const p = product.value;
+  return p ? voucher.bestVoucherFor(p.id, p.price) : null;
+});
+const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
+const hasVoucher = computed(() => voucherDiscount.value > 0);
+const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString());
+const netPrice = computed(() => +(((product.value?.price ?? 0) - voucherDiscount.value).toFixed(2)));
+// P2-1: if the user CLAIMED a voucher that applies to this SKU but it has expired
+// (so bestVoucherFor skipped it), surface a muted "已过期" note instead of silently
+// showing no discount. Only when no active voucher applies.
+const expiredVoucherForSku = computed(() => {
+  const p = product.value;
+  if (!p || hasVoucher.value) return null;
+  return voucher.expiredVouchers.some((def) => voucherAppliesToSku(def, p.id));
+});
 
 // ─── Batch C trade-in intercept (one-shot) ───────────────────────────────
 // Product ids that map to a real DeviceKind (mirrors source KNOWN_KINDS). The
@@ -333,9 +376,12 @@ const capped = computed(() => app.devices.filter((d) => d.activatedAt !== null).
 
 // ── derived text ──
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
-const cardFee = computed(() => (isCard.value && product.value ? +(product.value.price * 0.035).toFixed(2) : 0));
+// Header "Total" = device price after voucher (still excludes card fee, matching
+// the pre-voucher convention). Card fee is computed on the discounted subtotal.
+const netPriceText = computed(() => netPrice.value.toLocaleString());
+const cardFee = computed(() => (isCard.value ? +(netPrice.value * 0.035).toFixed(2) : 0));
 const cardFeeText = computed(() => cardFee.value.toLocaleString());
-const confirmTotalText = computed(() => ((product.value?.price ?? 0) + cardFee.value).toLocaleString());
+const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
 const paybackLine = computed(() => {
   const p = product.value;
@@ -413,11 +459,17 @@ watch(step, (s) => {
     if (!p) return;
     // Persist order + spend bill — only ONCE per checkout (orderId guard).
     if (!orderId.value) {
+      // Capture the voucher discount BEFORE markUsed mutates the wallet (which
+      // would recompute voucherMatch → null). Discount applies to the device
+      // subtotal; card fee (if any) is computed on the discounted subtotal.
+      const discount = voucherDiscount.value;
+      const usedVoucherId = voucherMatch.value?.def.id ?? null;
+      const net = +(p.price - discount).toFixed(2);
       // Card payment charges the displayed total INCLUDING the 3.5% fee
       // (chain payments have no fee). Mock approximation of server-side PSP
       // debit — production: POST /api/orders does authorize+capture atomically.
-      const fee = isCard.value ? +(p.price * 0.035).toFixed(2) : 0;
-      const chargeTotal = +(p.price + fee).toFixed(2);
+      const fee = isCard.value ? +(net * 0.035).toFixed(2) : 0;
+      const chargeTotal = +(net + fee).toFixed(2);
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402).
@@ -429,17 +481,20 @@ watch(step, (s) => {
         productName: p.name,
         unitPrice: p.price,
         paymentMethod: payment.value,
+        discount,
       });
       orderId.value = ord.id;
+      // Consume the voucher (single-use) once the order is persisted.
+      if (discount > 0 && usedVoucherId) voucher.markUsed(usedVoucherId);
+      const memoParts: string[] = [];
+      if (discount > 0) memoParts.push(`voucher -$${discount}`);
+      if (fee > 0) memoParts.push(`incl. 3.5% card fee $${fee}`);
       bills.add({
         type: "purchase",
         symbol: "USDT",
         amount: -chargeTotal,
         status: "posted",
-        memo:
-          fee > 0
-            ? `Purchase · ${p.name} (incl. 3.5% card fee $${fee})`
-            : `Purchase · ${p.name}`,
+        memo: memoParts.length ? `Purchase · ${p.name} (${memoParts.join(", ")})` : `Purchase · ${p.name}`,
         ref: ord.id,
       });
       if (wasEmptyBefore.value) firstOrderCelebrating.value = true;

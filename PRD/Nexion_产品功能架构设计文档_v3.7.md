@@ -214,6 +214,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/trial                        免费试用(绑卡式 3 天 + 7 grace + 3 extension)
 /me/wallet/nex                   NEX 资产详情页(持仓 / P&L / 用途 / 活动)
 /me/receipts                     推理收据
+/me/rewards                      我的奖励(代金券 + 系统奖励聚合)
 /me/risk-disclosure              平台风险提示书(scroll-to-bottom + 强制确认)
 /me/achievements                 成就墙
 /me/goals                        收益目标设置(target + deadline + 推荐路径)
@@ -247,8 +248,9 @@ TabBar:active tab 显示背景 chip 高亮。
 /register                        注册(支持 ?ref=CODE)
 /onboarding/intro                启动语
 /onboarding/estimator            收益估算
-/onboarding/connect              算力校准 + 接单规则告知
+/onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
 /onboarding/terms                服务条款(从 intro 脚注 / register 注册脚注进入)
+/session/kicked                  登录失效阻断屏(账号在他端登录 / 退出 / 被吊销 → 在途任务回退 + 重新登录)
 ```
 
 ---
@@ -811,6 +813,44 @@ sequenceDiagram
 
 **真后台对接**:把本地 `useAuth` 替换为真实会话(`GET /api/auth/session` 提供 `isAuthenticated` / `onboardingComplete`),守卫判定逻辑完全不变。`signUp` / `signIn` → `POST /api/auth/{register,login}` 返回 token + canonical user;`completeOnboarding` → `POST /api/onboarding/complete`。
 
+### 4.7 单设备登录、会话与新设备校准
+
+**目的**:账号在同一时间只能在一台设备运行挖矿,使算力与收益绑定到当前实测的本机(参 §6.10),并防止多端薅取免费算力。包含三项强相关能力:① 单设备登录(单点会话);② 会话失效时在途任务中断回退;③ 新设备登录触发算力重新校准。
+
+**设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexion-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
+
+**会话模型**:一条共享「活跃会话」记录(`nexion-active-session-v1` = `{sessionId, deviceId, deviceName, loginAt, killedAt?}`)代表服务端记录的「账号当前归属会话」。每次登录铸新 `sessionId` 并**覆盖**该记录 → 新登录使旧会话主张失效(单设备)。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)对比内存与共享记录:
+
+- **本机自我接管**(记录 `deviceId` 与本机相同、仅 `sessionId` 不同)→ 良性,采纳新 sessionId 保持在线(同一物理设备多标签 / 重启不互踢);
+- **他端接管**(记录 `deviceId` 不同)/ **退出**(记录被清)/ **吊销**(记录置 `killedAt`)→ 判定为踢出。
+
+**踢出处置(任务中断回退)**:判定踢出 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[他端登录 / 已退出]+ 任务已回退提示 +「重新登录」)。重新登录铸新会话认领本账号 → 守卫恢复挖矿(`resumeMining`)。
+
+**新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexion-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
+
+**会话状态机**:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active: 登录铸 sessionId + 认领记录
+    Active --> Active: 本机重认领(同 deviceId,采纳新 sessionId)
+    Active --> Kicked: 他端登录 / 吊销(killedAt)
+    Active --> LoggedOut: 退出(清记录)
+    Kicked --> Active: 重新登录(认领 + resumeMining)
+    LoggedOut --> Active: 重新登录
+    note right of Kicked: 在途任务无宽限作废 + 冻结挖矿 + /session/kicked
+```
+
+**真后台对接**(mock-first,可零重写):
+
+| Endpoint | Method | 返回 / 作用 |
+|---|---|---|
+| `/api/auth/signin` | POST | `{token, sessionId, deviceId, requiresRecalibration}`;服务端发新 sessionId 即作废旧会话(单设备)|
+| `/api/auth/session` | GET | `{sessionId, status, killedAt}`,客户端轮询 / 心跳镜像 |
+| `/api/auth/logout` | POST | 清服务端会话 |
+
+运营后台「强制登出 / 吊销会话」置 `killedAt`(后台会话域)→ 前端轮询检测踢出。
+
 ---
 
 ## 5. Home Dashboard
@@ -1311,6 +1351,30 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 - `empty ≤ 0` → 渲染 Capped 状态
 - 6-col slot grid 显示 **active devices**(非 inventory)
 
+### 6.10 手机算力显示规则与校准
+
+**目的**:手机的「算力」是平台呈现的能力指标(产品仿真,不真在手机跑 AI 推理)。显示规则核心要求:数值让用户觉得**合理可信**、**排序永不翻车**(低配机不可能显示出比高配机更高的算力)、可复现,并支撑单设备登录与换机重校准的叙事(参 §4.7)。
+
+**能力基线确定性派生**(`lib/device-capability.ts` · `measureDeviceCapability`):基线**不是随机数**,而是从真实、可廉价读取、与机型档位强相关的设备信号确定性派生 —— `uni.getSystemInfo`(机型 / 品牌 / 平台)+ `navigator.deviceMemory`(RAM)/ `hardwareConcurrency`(核数)+ WebGL renderer(GPU)+ `devicePixelRatio`×分辨率。三条保证:
+
+1. **构造即单调**:评分 S = 各「越好越高」子分的正权重加权和,且 score→TOPS 映射严格递增 → 严格更弱的设备数学上不可能超过更强的设备。
+2. **失败取低**:任一信号读不到 → 按低值兜底,绝不取高 → 未知机 / 模拟器 / 批量廉价端落在真旗舰之下(亦为防多端薅羊毛的护城河)。
+3. **确定性 + 按 deviceId 缓存**(`nexion-device-baseline-v1`):同机永远同分,重新校准复现同值(建立信任而非随机);新设备(新 deviceId)按自身信号重算,自然不同 → 支撑换机重校准。
+
+**呈现量级**:S → 评分 0–100(典型机 ≈ 87)+ TOPS(真实手机 NPU ~8–58 区间,典型机 28.3)+ 档位 Tier 1–5。
+
+**手机卡片三层显示**(`/earn` 手机设备卡):
+
+1. **算力上限**(稳定 · 可比身份数):`NPU 28.3 TOPS · Tier 3`,校准时定,确定性派生,是唯一的对比数,永远排序正确;
+2. **实时有效算力**(动态):`实时 X TOPS · Y% 输出` + 迷你曲线 + 当前主导因子的**正向**标签。实时有效算力 = 上限 × 状态因子 × 抖动,状态因子均 ≤ 1,故实时值**永不超过本机上限**;曲线随时间轻微起伏(像真实测量);
+3. **产出收益**($/d + NEX):作为算力的结果呈现(沿用双币块)。
+
+**状态因子**(`lib/hashpower.ts` · `computeLiveHashpower`,均 ≤ 1,正向措辞):充电(满速)/ 网络(满 · 降 · 离线)/ 散热(温度)/ **连续在线稳定加成**(`ContinuityFactor`,连续在线越久越接近 1,约 2 小时封顶;会话踢出 / 换机重校准时清零 → 正向激励留在一端)/ 抖动。手机收益按这些因子做**有界**调制(充电 / 网络为硬门,非充电或离线时整机暂停接单,见 §12.2)。
+
+**档位收益**:手机日产按校准 Tier 派生(单调,见 §13.3)—— Tier 1 $0.04 → Tier 5 $0.095,典型机 Tier 3 = $0.06(锚定营销);NEX 同步 6 → 16。各档值**运营后台可配**(后台 E2「手机算力档位收益」),前端读 backend-replaceable config `mock/phone-tiers.ts`(真后台 `GET /api/config/phone-tiers`),前后台同口径。
+
+**校准仪式**(`/onboarding/connect`,首次 onboarding + 新设备 `?mode=recalibrate` 复用):12 秒三测(NPU 基准 / 网络延迟 / 供电散热)动画,结果(评分 / TOPS / Tier / 预估日产)由 `measureDeviceCapability` 真实派生(非写死),完成后写回手机设备(`applyPhoneCalibration`:更新 baseRate / NPU 文案 / 能力字段 + 重置连续在线加成)。
+
 ---
 
 ## 7. Store(设备商城)
@@ -1729,6 +1793,69 @@ CTA 行为:`router.push(/store/{nextTierKind})` → 用户在目标商品页 Buy
 - `cta`(`Open trade-in`)
 
 **铁律**:文案永不暴露 `phase id / "P3" / "final phase" / "deposit lock-in"` 等 PM 术语;只用"trade-in open / final upgrade window / new silicon now available"等真实平台话术。
+
+### 7.7 代金券(Voucher · 领券促销)
+
+平台促销代金券:运营在后台(运营控制台 H7)创建 / 配置,用户领取后在结算对应设备时自动抵扣。两类:**满减(fixed)**= 订单满 `minPurchaseUSD` 减 `amountUSD`;**折扣(percent)**= 按 `percent`% 抵扣、封顶 `maxDiscountUSD`。
+
+**目的**:以可控的获客 / 活动促销降低首购门槛,定向(新人 / 全部受众)+ 定 SKU(指定设备或全设备)+ 限时(有效期),全部参数后台可配、随时可投放 / 暂停。
+
+#### 7.7.1 领取入口与弹窗
+
+- **首页自动弹窗**:用户进首页(`/`)后延迟自动弹出领券弹窗,展示当前可领代金券(名称 / 面值 / 门槛 / 适用范围 / 有效期)。弹窗有节流(冷却 + 单会话上限),且**优先于免费试用弹窗**(同一次进站只弹一个;无可领代金券时让位给试用弹窗)。
+- **回退 banner**:用户关闭弹窗后,在后台为该券配置的页面(`home / store / me / earn` 子集)顶部显示领券 banner 入口;点击重新打开领券弹窗。banner 仅在一级 tab 页出现,子页不出。
+- **领取**:点击「领取」即领入个人钱包(claim);同一券每用户限领一次。
+
+#### 7.7.2 领取后跳转(马上去使用)
+
+领取后同一按钮文案变为「马上去使用」,点击按券的适用范围跳转:
+- **指定单一 SKU 券** → 跳该设备购买详情页 `/store/[productId]`。
+- **多设备 / 全设备券**(`applicableSkus` 为空 = 全设备)→ 跳商城 `/store`。
+
+#### 7.7.3 结算抵扣
+
+进入某设备结账(`/store/checkout`)时:
+- 系统在用户**已领、未使用、在有效期、适用本 SKU** 的代金券中,自动选取**抵扣额最大**的一张(`bestVoucherFor`)。
+- 价格摘要新增「代金券 −$X」行;**满减**按门槛判定(订单额 ≥ 门槛才抵),**折扣**按百分比并受封顶约束;抵扣额不超过设备价。
+- 卡支付的 3.5% 手续费按**抵扣后**小计计算;`Order.discount` 记抵扣额、`Order.total = 单价 − 抵扣`;账单(useBills)备注带券。
+- 下单成功后该券置为已使用(单次核销,`markUsed`)。
+- 若用户已领、适用本 SKU 的券**已过期**(被自动选取跳过),价格摘要显示一行「代金券已过期」提示,而非静默无折扣。
+
+#### 7.7.4 性质与叠加规则(后台可配)
+
+- **不可提现**(固有性质):代金券只在结算抵扣价格,**永不计入可提现余额**、不会转化为现金。
+- **不可拆分**(`splittable`,默认否):一张券整张一次性用于一笔订单,不跨单拆分。
+- **叠加策略**:`stackWithTrial`(可否与试用收益抵扣叠加)/ `stackWithOthers`(可否与其它优惠叠加),默认均为否(二选一取最优);当前结算流中代金券为唯一折扣来源。
+- 领取资格、有效期、核销均以服务端为权威(claim / 下单核销服务端二次校验);客户端为乐观镜像。
+
+#### 7.7.5 个人中心入口
+
+「我的奖励」页(`/me/rewards`,见 §11.5a)聚合展示用户的可用券、已过期券与系统奖励;个人中心(`/me`)「赚取」分组提供入口行。
+
+#### 7.7.6 业务流程
+
+```mermaid
+flowchart TD
+  A[进首页] --> B{有可领代金券?}
+  B -- 否 --> T[让位试用弹窗]
+  B -- 是 --> C[自动弹出领券弹窗·优先于试用]
+  C --> D{用户操作}
+  D -- 关闭 --> E[配置页面顶部显示领券 banner]
+  E --> C
+  D -- 领取 --> F[领入钱包·按钮变「马上去使用」]
+  F --> G{适用范围}
+  G -- 单一 SKU --> H[跳该设备购买详情页]
+  G -- 多/全设备 --> I[跳商城]
+  H --> J[进入结账]
+  I --> J
+  J --> K{已领适用券状态}
+  K -- 有效 --> L[自动选最优券抵扣·满减/折扣封顶]
+  K -- 已过期 --> M[显示「代金券已过期」·不抵扣]
+  L --> N[下单:order 记 discount·卡费按抵扣后算·账单带券]
+  N --> O[券置为已使用·单次核销]
+```
+
+**铁律**:代金券是真实促销折扣,文案与展示不暴露任何运营 / 漏斗术语。
 
 ---
 
@@ -3894,6 +4021,16 @@ sequenceDiagram
 
 i18n keys 在 `proof.*` namespace,~50 keys。
 
+### 11.5a 我的奖励 `/me/rewards`
+
+个人中心的奖励聚合页,把用户的代金券与系统奖励集中在一处。三类分区:
+
+1. **可用优惠券** — 用户已领、未使用、在有效期的代金券(名称 / 面值 / 适用范围 / 有效期);每张提供「去使用」操作,按券的适用范围跳转(单一 SKU → 该设备详情页,多 / 全设备 → 商城,见 §7.7.2)。
+2. **已过期优惠券** — 已领未用但已过有效期的券,置灰并标「已过期」;不可再使用。
+3. **系统奖励** — 来自活动 / 推荐 / 成就 / 客服补偿的 USDT·NEX 入账(由账单流水中奖励类条目派生),按类型分类展示金额与时间。
+
+**入口**:`/me`「赚取」分组中的「我的奖励」行。**数据源**:代金券钱包(useVoucher,§12.20)+ 账单流水(useBills,奖励类型条目)。
+
 ### 11.6 全球节点地图 `/globe`
 
 SVG 抽象世界地图 + 28K 节点 dot + 顶部国家活跃排行 + 实时 pulse 任务派发动画。
@@ -4359,6 +4496,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 - **Tier 1 + 全部 Tier 2 都 claim** → 触发 Weekly Champion bonus 行:`+500 NEX × phase mult`(P1=500 / P6=750)+ 解锁 `weekly_champion` achievement
 - 每张 Tier 2 row 完成后变 `Sparkles + Claim +N NEX` 按钮态;claim 后变 `Check + line-through` 灰显态
+- **完成触发**:点任务 CTA(Tier 1 hero 主按钮 / Tier 2 行)即标记该任务完成(`markTier1Complete` / `markTier2Complete` 写入 `useWeeklyQuest`),用户从目标页返回 Mission Center 后该任务翻转为可领(Claim)态;`tier1Claimed` 后 hero 整卡 hidden 让位 Tier 2 列表。完成态 server-canonical:真后台以行为归因为准(用户实际达成目标动作后服务端标完成),前端 CTA tap 为其占位;claim 走 `POST /api/quests/weekly/{tier1 | tier2/:id | bonus}` 原子入账(§9.11e),写 `creditNex` + bill row(`tier1` 含可选 `+$N USDT` + badge)
 
 #### 11.13.6 周次锚定(`weekKey`)
 
@@ -4453,6 +4591,11 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   thermalState?: "nominal" | "fair" | "serious" | "critical";
   pausedReason?: "no-charger" | "no-network" | null;  // tick 计算,UI 渲染中断态
   interruptedAt?: number | null;  // 掉电/掉网时任务进入重连宽限的起始 epoch;null=未中断。驱动 30s/5 次重连窗口(见下)
+  // phone 校准能力基线(见 §6.10):由真实设备信号确定性派生,单调、按 deviceId 缓存
+  capabilityScore?: number;       // 0-100 呈现评分(典型机 ≈ 87)
+  capabilityTops?: number;        // 稳定呈现算力上限(TOPS),可比身份数
+  capabilityTier?: number;        // 1-5 能力档(派生 baseRate / baseRateNEX)
+  miningSince?: number | null;    // 本次连续在线挖矿起始 epoch;null=暂停。驱动连续在线稳定加成(§6.10),会话踢出 / 换机重校准清零
 }
 ```
 
@@ -4470,6 +4613,8 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 - **窗口超时**(>30s / 5 次重试均失败)→ **取消当前任务**(`currentTask = null`,放弃进度与奖励,无收据),清 `interruptedAt`;条件恢复后由调度器**派发新任务**,不续跑被取消的任务。
 
 宽限期内任务**挂起**:不计 earnings、不轮换新任务、设备卡显示「重连中 · 第 n/5 次重连 · Xs 后超时取消」。阈值常量集中于 `lib/store/interrupt.ts`(见 §13.3),tick 取消判定与 UI 倒计时共用同一纯函数 `interruptInfo()`。
+
+**会话失效中断(单设备登录)**:区别于掉电 / 掉网的宽限窗口 —— 当账号被他端登录接管、用户退出、或运营吊销会话时(见 §4.7),设备已非授权节点 → 在途任务**无宽限立即作废**(`interruptAllTasks`:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」),并冻结挖矿(`miningPaused=true`)直至重新登录建立新会话(`resumeMining`)。
 
 **真后台对接**(endpoint TBD,候选名):
 
@@ -4904,6 +5049,33 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 - 派奖经 UI handler compose 多 store:NEX → `useApp.creditNex` + `useBills.add(bonus)`、USDT → `useApp.creditBalance` + `useBills.add(bonus)`、$50 券仅记录(不入余额);store 不跨 import 其他 store。
 - 每日免费次数按 `lastFreeSpinDate`(UTC 日桶)计;接真后台后由服务端按 `eventId × userId × spinDate` 计票,超额返 409。
 
+### 12.20 Voucher(代金券)
+
+**代金券目录**(运营配置,后台运营控制台 H7 域维护,前端只读;真后台 `GET /api/vouchers`):
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| id | string | 唯一 id |
+| name | string | 代金券名称(运营配,普通字符串非 i18n key) |
+| type | "fixed" \| "percent" | 满减 / 折扣 |
+| amountUSD | number? | 满减面值 USD(type=fixed) |
+| percent | number? | 折扣率,整数百分点 e.g. 8=8%(type=percent) |
+| minPurchaseUSD | number? | 满减门槛 USD(0 / 缺省 = 无门槛) |
+| maxDiscountUSD | number? | 折扣封顶 USD(0 / 缺省 = 不封顶) |
+| applicableSkus | string[] | 适用设备 product id 列表(空 = 全设备 → 领取 CTA 跳商城) |
+| audience | "new" \| "all" | 受众:新人礼 / 全部活动 |
+| startAt / endAt | number | 有效期起止(epoch ms;endAt=0 → 长期无到期) |
+| claimSurfaces | ("home"\|"store"\|"me"\|"earn")[] | 关闭弹窗后展示领券 banner 的页面 |
+| popupEnabled | boolean | 是否参与首页自动弹窗 |
+| stackWithTrial / stackWithOthers / splittable | boolean | 叠加试用收益 / 叠加其它优惠 / 可拆分(默认均 false) |
+| status | "active" \| "paused" | 投放中 / 暂停 |
+
+**用户钱包**(useVoucher,persist key `nexion-voucher-v1`;真后台 `GET /api/me/vouchers`):`claimed[]`,每条 `{ id, claimedAt, usedAt? }`。
+
+派生:`claimableVouchers`(可领:active + 有效期内 + 受众匹配 + 未领)/ `claimedUnused`(已领未用且有效)/ `expiredVouchers`(已领未用但过期);`bestVoucherFor(skuId, price)` 在已领适用券中选抵扣最大者;纯函数 `computeVoucherDiscount(def, subtotal)` 为单源折扣算法(满减按门槛、折扣按封顶、抵扣不超小计)。
+
+**写操作**:领取 `claim`(`POST /api/vouchers/:id/claim`,每券每用户限领一次)、核销 `markUsed`(下单成功后置 usedAt,单次)。代金券折扣只在结算抵扣价格、**永不计入可提现余额**(不可提现由设计保证)。后台对端为运营控制台 H7 代金券域,其 `OpsVoucher` 是本结构的结构化超集(字段级镜像门),两端映射同一后端资源。
+
 ---
 
 ## 13. 业务规则与计算公式
@@ -5010,10 +5182,13 @@ progressPct = avg(checks);
 | `MAX_DEVICES` | 6 | **激活槽位上限**(不限购,激活进槽时 `activateDevice()` 守卫,Sprint #146-1)|
 | `INTERRUPT_GRACE_MS` | 30,000(30s) | phone 掉电/掉网后任务重连宽限窗口;窗口内恢复则续跑原任务,超时则取消(`lib/store/interrupt.ts`)|
 | `INTERRUPT_MAX_RETRIES` | 5 | 宽限窗口内调度器重试次数(每 6s 一次);全部失败即取消当前任务,恢复后接新任务 |
-| 设备 baseRate(USDT/d) | phone 0.06 / S1 7 / Pro 13 / Pro v2 14 / Rack P1 45 / Rack P2 75 / Cloud 0.19 | 各设备 USDT 日产基线(`DEVICE_SPECS.baseRate`),全线 ~365–396% 年化、Cloud ~348% |
-| 设备 baseRateNEX | phone 10 / S1 40 / Pro 80 / Pro v2 90 / Rack P1 300 / Rack P2 500 / Cloud 3 | 各设备 NEX 日产(`DEVICE_SPECS.baseRateNEX`) |
+| 设备 baseRate(USDT/d) | phone 按 Tier 0.04–0.095(典型 T3 0.06)/ S1 7 / Pro 13 / Pro v2 14 / Rack P1 45 / Rack P2 75 / Cloud 0.19 | 各设备 USDT 日产基线;phone 按校准档派生(§6.10 + 下「手机算力档位收益」行),余为 `DEVICE_SPECS.baseRate`,~365–396% 年化、Cloud ~348% |
+| 设备 baseRateNEX | phone 按 Tier 6–16(典型 T3 10)/ S1 40 / Pro 80 / Pro v2 90 / Rack P1 300 / Rack P2 500 / Cloud 3 | 各设备 NEX 日产;phone 按校准档派生,余为 `DEVICE_SPECS.baseRateNEX` |
 | 设备零售价(USDT) | S1 649 / Pro 1,199 / Pro v2 1,319 / Rack P1 4,499 / Rack P2 7,499 / Cloud 19.9 | `DEVICE_PRICE_USDT`,商品卡 / 详情 / 结账单一定价源 |
 | phone→S1 倍数 | 117× | round(7 / 0.06);营销文案与计算徽章统一此单一派生值(§7.1 / §13.2a),不另行圆整 |
+| 手机算力档位收益 | T1 $0.04 / 6 NEX · T2 $0.05 / 8 · T3 $0.06 / 10 · T4 $0.08 / 13 · T5 $0.095 / 16 | 手机按校准能力 Tier 的日产(USDT / NEX),单调;运营可配(`mock/phone-tiers.ts` → `GET /api/config/phone-tiers`,后台 E2),见 §6.10 |
+| 手机算力典型锚点 | 评分 87 · 28.3 TOPS · Tier 3 · $0.06 | 未校准 / 典型机的呈现锚点(`fallbackCapability`,§6.10)|
+| `CONTINUITY_FULL_MS` | 7,200,000(2h) | 连续在线稳定加成达满所需时长(`lib/hashpower.ts`,§6.10);会话踢出 / 换机重校准清零 |
 | 提现冷却 | 30 天 | unilevel + binary 佣金 |
 | Direct Royalty 费率 | 固定 10% | 单一来源 `UNILEVEL_USDT[1]`,不随 Partner Status 变动 |
 | Partner Status Standard | $0+ | 基础权益(月度网络活跃度起步档)|
@@ -5059,6 +5234,8 @@ progressPct = avg(checks);
 | 首日路由监听节奏 | 每 1s 一拍 | 读当前页映射任务 id,页面变化才判定 |
 | 订单自动履约节奏 | 每 6s 一拍(全局)/ 每 3s(详情页) | `paid → provisioning → activated` 逐段推进,到 activated 自动生成并激活设备(§7.4)|
 | Initial USDT balance | $24,856.56 | mock user 启动余额(够买 1 张二级 Genesis 留出余量)|
+| 代金券弹窗节流 | 延迟 1,300ms / 冷却 24h / 单会话 1 次 | `VOUCHER_POPUP`;首页 voucher 弹窗延迟早于试用(1,500ms)→ 优先弹券,无可领券时让位试用(§7.7.1)|
+| 代金券默认投放档 | 新人满减 $50(满 $600、限 S1)/ 活动 8% 折扣(封顶 $200、全设备) | `VOUCHERS` 种子(后台 H7 可改);取可信促销档,不自曝 |
 
 #### 13.3.0 核心数字口径锁定
 

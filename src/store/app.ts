@@ -6,6 +6,8 @@ import { ONE_DAY_MS, makeInitialDevices, createDevice, MAX_DEVICES } from "./dev
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
+import { continuityFactor, thermalFactor } from "@/lib/hashpower";
+import type { DeviceCapability } from "@/lib/device-capability";
 import { useReceipts } from "./receipts";
 import { generateReceipt } from "@/mock/receipt";
 
@@ -63,11 +65,18 @@ export const useApp = defineStore("app", () => {
     todayIncrement: 1247,
   });
   const latestWithdrawal = ref<Withdrawal | null>(null);
+  // When the session is invalidated (logged in elsewhere / logged out / admin
+  // revoked), mining freezes: tick() early-returns so no earnings accrue while
+  // the account is not owned by this device. Cleared by resumeMining() once a
+  // fresh session is established. App.vue also gates tick on session state, so
+  // this is belt-and-suspenders.
+  const miningPaused = ref(false);
 
   // seed per-device timers
   devices.value.forEach((d) => deviceTimers.set(d.id, { vital: 0, earnings: 0 }));
 
   function tick(deltaMs: number) {
+    if (miningPaused.value) return;
     // ── Global platform stats jitter ──
     globalTimer += deltaMs;
     const globalUpdate: Partial<GlobalStats> = {
@@ -106,6 +115,7 @@ export const useApp = defineStore("app", () => {
             next.interruptedAt = null;
           }
           next.gpuUsage = 0;
+          next.miningSince = null; // paused → continuous-online run ends, stability bonus resets
           return next;
         }
         if (next.interruptedAt != null) {
@@ -115,6 +125,8 @@ export const useApp = defineStore("app", () => {
           }
           next.interruptedAt = null;
         }
+        // Running (charging + online): start a fresh continuity run if none.
+        if (next.miningSince == null) next.miningSince = Date.now();
       } else {
         next.pausedReason = null;
       }
@@ -134,8 +146,17 @@ export const useApp = defineStore("app", () => {
         const marketMult = 0.95 + Math.random() * 0.1;
         const variation = 0.85 + Math.random() * 0.3;
         const lifeEff = isDegradable(d.kind) ? getEfficiency(getMonthsOwned(d.purchasedAt)) : 1;
-        const inc = (d.baseRate * lifeEff * marketMult * variation * 1800) / ONE_DAY;
-        const incNEX = (d.baseRateNEX * lifeEff * marketMult * variation * 1800) / ONE_DAY;
+        // Phone yield is modulated (bounded) by the same condition factors the
+        // live hashpower shows — continuous-online stability bonus + thermal —
+        // so good behaviour (stay charged/online on ONE device) earns slightly
+        // more, within the tiny safe band. Charge/network are hard gates above
+        // (a paused phone never reaches here). Non-phone devices: factor = 1.
+        const phoneFactor =
+          d.kind === "phone"
+            ? continuityFactor(Date.now() - (next.miningSince ?? Date.now())) * thermalFactor(next.thermalState)
+            : 1;
+        const inc = (d.baseRate * lifeEff * phoneFactor * marketMult * variation * 1800) / ONE_DAY;
+        const incNEX = (d.baseRateNEX * lifeEff * phoneFactor * marketMult * variation * 1800) / ONE_DAY;
         next.todayEarnings = +(d.todayEarnings + inc).toFixed(3);
         next.todayEarningsNEX = +(d.todayEarningsNEX + incNEX).toFixed(2);
       }
@@ -210,6 +231,48 @@ export const useApp = defineStore("app", () => {
     devices.value = devices.value.map((d) =>
       d.id === id && d.kind === "phone" ? { ...d, ...patch } : d,
     );
+  }
+
+  // Apply a calibration result to the phone device: refreshes its yield baseline
+  // + displayed NPU spec from the (deterministic, per-device) capability, and
+  // starts a fresh continuity run. Called by the onboarding/recalibration ritual
+  // after measureDeviceCapability(). PROD: server returns the device's tier on
+  // POST /api/auth/signin; client applies the same shape.
+  function applyPhoneCalibration(cap: DeviceCapability) {
+    devices.value = devices.value.map((d) =>
+      d.kind === "phone"
+        ? {
+            ...d,
+            baseRate: cap.baseRateUsdt,
+            baseRateNEX: cap.baseRateNex,
+            gpu: `Mobile NPU · ~${cap.tops} TOPS`,
+            capabilityScore: cap.score,
+            capabilityTops: cap.tops,
+            capabilityTier: cap.tier,
+            miningSince: Date.now(),
+          }
+        : d,
+    );
+  }
+
+  // Session invalidated (logged in on another device / logged out / admin
+  // revoked): immediately cancel every in-flight task across the fleet WITHOUT
+  // a grace window and WITHOUT issuing a receipt — the in-progress job's reward
+  // is forfeited (the "回退"/rollback), mirroring interrupt.ts cancel semantics
+  // but triggered by auth, not connectivity. Freezes mining until resumeMining().
+  function interruptAllTasks(_reason: "kicked" | "logged-out") {
+    miningPaused.value = true;
+    devices.value = devices.value.map((d) =>
+      d.activatedAt !== null
+        ? { ...d, currentTask: null, interruptedAt: null, miningSince: null }
+        : d,
+    );
+  }
+
+  // Re-arm the simulation after a fresh session is established (re-login /
+  // recalibration complete). tick() resumes assigning tasks + accruing.
+  function resumeMining() {
+    miningPaused.value = false;
   }
 
   // ── Device lifecycle (slot CRUD) — ported from index.ts addDevice /
@@ -376,8 +439,9 @@ export const useApp = defineStore("app", () => {
   }
 
   return {
-    user, devices, earnings, global, latestWithdrawal,
-    tick, setPhoneRuntime, creditBalance, debitBalance, creditNex, debitNex, recordDeposit,
+    user, devices, earnings, global, latestWithdrawal, miningPaused,
+    tick, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
+    creditBalance, debitBalance, creditNex, debitNex, recordDeposit,
     submitWithdrawal, advanceWithdrawal,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation,
   };

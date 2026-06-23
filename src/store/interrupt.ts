@@ -15,6 +15,14 @@
  * The user cannot manually pause a task/device — a node is either running or
  * (involuntarily) interrupted. There is no opt-in pause control.
  *
+ * SESSION EVICTION is a DIFFERENT, harder cancel that does NOT use this grace
+ * window: when the account is claimed by another device, logged out, or revoked
+ * by ops, the node is no longer authorized, so its in-flight job is voided
+ * IMMEDIATELY (no retries, progress forfeit, no receipt — the "回退"/rollback)
+ * and mining freezes until a fresh session is established. That path lives in
+ * useApp().interruptAllTasks() / resumeMining(); this connectivity-grace policy
+ * applies only to power/network blips.
+ *
  * ⚠️ MOCK-ONLY: production runs this clock server-side — the device agent's
  * heartbeat drives it (PRD §9.11d candidate `POST /api/device/:id/heartbeat`);
  * the client store only mirrors the `interruptedAt` the server reports.

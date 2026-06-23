@@ -113,6 +113,20 @@ export interface Device {
    *  elapses (task cancelled → fresh task on recovery). Server-canonical in
    *  production; client mirrors only. */
   interruptedAt?: number | null;
+  // ── Phone capability (calibration baseline) ──
+  // Set by the calibration ritual via measureDeviceCapability() (or the legacy
+  // fallback for an uncalibrated demo phone). Deterministic per login device →
+  // displayed "算力" is monotonic with real device class and reproducible.
+  /** Presented capability score 0–100 (typical phone ≈ 87). */
+  capabilityScore?: number;
+  /** Stable presented NPU throughput (TOPS) — the comparable "ceiling" number. */
+  capabilityTops?: number;
+  /** 1–5 capability tier. */
+  capabilityTier?: number;
+  /** Epoch ms when the phone began its CURRENT continuous mining run; null when
+   *  paused/interrupted. Drives the live ContinuityFactor (stability bonus);
+   *  reset by interruptAllTasks (session kick) and by new-device recalibration. */
+  miningSince?: number | null;
 }
 
 // NOTE: WalletPairingState (v3.2 KYC-Express §5.4.3.2.1) lives in its own

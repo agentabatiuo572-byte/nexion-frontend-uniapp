@@ -129,6 +129,7 @@ import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
+import { useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -136,6 +137,7 @@ import { safeReturnTo } from "@/routing/safe-return-to";
 
 const t = useT();
 const auth = useAuth();
+const session = useSession();
 const sponsorship = useSponsorship();
 
 const COUNTRIES = [
@@ -233,6 +235,24 @@ function clearSignIn() {
   loading.value = false;
 }
 
+// Sign-in completion (shared by password + OTP). Claims this device's session
+// (a new login supersedes any prior one = single device); if this device differs
+// from the account's previously-calibrated device, route into the recalibration
+// ritual instead of straight home.
+function finishSignIn() {
+  if (!mounted) return;
+  const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
+  auth.signIn(identity);
+  const { requiresRecalibration } = session.claim(identity);
+  if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
+  if (requiresRecalibration) {
+    uni.reLaunch({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+    return;
+  }
+  const dest = safeReturnTo(returnParam.value, "/pages/index/index");
+  uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+}
+
 function startResend() {
   resendLeft.value = RESEND_SECONDS;
   if (resendTimer) clearInterval(resendTimer);
@@ -261,12 +281,7 @@ function signInWithPassword() {
   if (!phoneOk.value || !pwdOk.value) { error.value = t.value.login.errorInvalidPassword; return; }
   loading.value = true;
   signInTimer = setTimeout(() => {
-    if (!mounted) return;
-    const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
-    auth.signIn(identity);
-    if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
-    const dest = safeReturnTo(returnParam.value, "/pages/index/index");
-    uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+    finishSignIn();
   }, 700);
 }
 function verifyCode() {
@@ -276,12 +291,7 @@ function verifyCode() {
   if (mode.value === "reset") { step.value = 3; return; }
   loading.value = true;
   signInTimer = setTimeout(() => {
-    if (!mounted) return;
-    const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
-    auth.signIn(identity);
-    if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
-    const dest = safeReturnTo(returnParam.value, "/pages/index/index");
-    uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+    finishSignIn();
   }, 700);
 }
 function finishReset() {

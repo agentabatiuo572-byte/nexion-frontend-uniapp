@@ -18,6 +18,7 @@ import { useGenesis, GENESIS_ROYALTY_RATE } from "@/store/genesis";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
 import { useAuth } from "@/store/auth";
+import { useSession } from "@/store/session";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -328,6 +329,7 @@ const AUTH_WHITELIST_PREFIXES = [
   "pages/register/",
   "pages/ref/",
   "pages/tx/",
+  "pages/session/", // kicked screen — never auth/session-redirect away from it
 ];
 function isAuthWhitelisted(route: string): boolean {
   return AUTH_WHITELIST_PREFIXES.some((p) => route.startsWith(p));
@@ -347,6 +349,63 @@ function checkAuthGuard(): boolean {
     return true;
   }
   return false;
+}
+
+// ── Single-device session guard + new-device recalibration redirect ──
+// Mirrors GET /api/auth/session: each 1s tick (and instantly via the cross-tab
+// storage event) this compares THIS tab's sessionId to the shared "active
+// session" record. If another device/tab claimed the account, the account was
+// logged out, or ops revoked it (killedAt) → evict: void all in-flight tasks
+// (rollback) + freeze mining + reLaunch to the blocking kicked screen. If a new
+// device needs recalibration (different deviceId from the account's calibrated
+// device) → reLaunch to the calibration ritual in recalibrate mode.
+// Returns true if it redirected (caller bails). Production: identical logic
+// against the server session endpoint; the storage event becomes an SSE/push.
+function checkSession(): boolean {
+  const route = readCurrentRoute();
+  if (!route || isAuthWhitelisted(route)) return false; // flow pages exempt
+  const auth = useAuth();
+  if (!auth.isAuthenticated) return false; // auth guard handles unauth
+  const session = useSession();
+  const st = session.validate();
+  if (st === "kicked" || st === "logged-out") {
+    const reason = st === "kicked" ? "kicked" : "logged-out";
+    useApp().interruptAllTasks(reason);
+    session.kick(reason);
+    uni.reLaunch({ url: "/pages/session/kicked" });
+    return true;
+  }
+  // Active + we own the session → ensure mining is running (resumes after a
+  // fresh re-login that follows an eviction).
+  const app = useApp();
+  if (app.miningPaused) app.resumeMining();
+  if (session.requiresRecalibration && auth.onboardingComplete) {
+    uni.reLaunch({ url: "/pages/onboarding/connect?mode=recalibrate" });
+    return true;
+  }
+  return false;
+}
+
+// Cross-tab instant eviction: when another tab overwrites the shared session
+// record, the browser fires a 'storage' event here so the losing tab is kicked
+// immediately (not just on the next 1s poll). H5 only (uni storage = localStorage).
+let storageHandler: ((e: StorageEvent) => void) | undefined;
+function attachSessionWatch() {
+  // #ifdef H5
+  if (storageHandler) return;
+  storageHandler = (e: StorageEvent) => {
+    if (e.key && e.key.indexOf("nexion-active-session") >= 0) checkSession();
+  };
+  window.addEventListener("storage", storageHandler);
+  // #endif
+}
+function detachSessionWatch() {
+  // #ifdef H5
+  if (storageHandler) {
+    window.removeEventListener("storage", storageHandler);
+    storageHandler = undefined;
+  }
+  // #endif
 }
 
 // ── Quest route watcher (ports quest-route-watcher.tsx) ──
@@ -382,6 +441,7 @@ function questIdForRoute(route: string): QuestTaskId | null {
 
 function checkQuestRoute() {
   if (checkAuthGuard()) return; // unauth → redirected; don't credit quests
+  if (checkSession()) return; // evicted / needs recalibration → redirected
   const route = readCurrentRoute();
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
@@ -414,9 +474,19 @@ onLaunch(() => {
   // #ifdef H5
   document.documentElement.setAttribute("data-theme", "dark");
   // #endif
+  // Claim this device's session for an already-authenticated user so
+  // single-device enforcement is live from launch (a new login elsewhere then
+  // supersedes it). requiresRecalibration is resolved by checkSession() once
+  // routes are ready.
+  const auth = useAuth();
+  if (auth.isAuthenticated) {
+    useSession().claim(auth.email || "default");
+  }
 });
 onShow(() => {
   checkAuthGuard(); // immediate gate on app foreground (before the 1s tick)
+  checkSession(); // immediate single-device / recalibration check
+  attachSessionWatch();
   startTick();
   startTrialPoll();
   startOrderPoll();
@@ -424,6 +494,7 @@ onShow(() => {
   startQuestWatch();
 });
 onHide(() => {
+  detachSessionWatch();
   stopTick();
   stopTrialPoll();
   stopOrderPoll();

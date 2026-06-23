@@ -135,6 +135,7 @@ import { onLoad } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
+import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useSponsorship, WELCOME_GIFT_USDT, WELCOME_GIFT_NEX } from "@/store/sponsorship";
@@ -144,6 +145,7 @@ import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 
 const t = useT();
 const auth = useAuth();
+const session = useSession();
 const app = useApp();
 const bills = useBills();
 const sponsorship = useSponsorship();
@@ -256,6 +258,9 @@ function finish() {
   if (!pwdMatch.value) { error.value = t.value.register.passwordMismatch; return; }
   const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
   auth.signUp(identity);
+  // New account claims this device's session; first-time calibration runs as
+  // part of onboarding (connect.vue) which then marks this device calibrated.
+  session.claim(identity);
   const sponsorCode = refFromUrl.value?.trim() || invite.value.trim();
   if (sponsorCode) {
     sponsorship.bind(sponsorCode);
