@@ -54,8 +54,8 @@
             <text v-if="rankInfo.missing.length > 0" class="block" :style="missingStyle">
               {{ t.teamV3.need }} {{ rankInfo.missing.join(" · ") }}
             </text>
-            <view class="inline-flex items-center" :style="prizeChipStyle">
-              <text>{{ t.teamV3.prize }} {{ rankInfo.next.prizeIcon }} {{ rankInfo.next.prizeName }}</text>
+            <view v-if="rankInfo.next.cultivationBonus > 0" class="inline-flex items-center" :style="prizeChipStyle">
+              <text>{{ t.teamV3.prize }} 🎁 {{ rankInfo.next.cultivationBonus.toLocaleString() }} NEX</text>
             </view>
           </view>
         </view>

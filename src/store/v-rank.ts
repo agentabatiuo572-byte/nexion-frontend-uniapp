@@ -8,8 +8,9 @@ import { ref } from "vue";
  * Promotion judging (nextRankProgress / nextRankGap) is preview-only; server is
  * the sole canonical authority for V-rank promotion (PRD §13.2).
  *
- * V0→V12 13 阶,每升一阶解锁 unilevel 深度 +1 / 平级奖(V3+) / 领导池权重 / 实物奖品。
+ * V0→V12 13 阶,每升一阶解锁 unilevel 深度 +1 / 平级奖(V3+) / 领导池权重 / 培育奖 NEX。
  * 心理设计:V0→V3 易("上钩"),V3→V6 拼命,V7+ 画大饼,V12 永远没人到。
+ * 奖励为可配 NEX(cultivationBonus);实物奖品已删(与运营后台 F1 同步,2026-06)。
  */
 
 export type VRank = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
@@ -32,8 +33,6 @@ export interface VRankDef {
   leadershipVotes: number;    // 领导池票数
   leadershipShareApprox: number; // 占池子约比 (用于展示)
   cultivationBonus: number;   // 培育至此 V,上线拿 NEX
-  prizeName: string;          // 实物奖品名
-  prizeIcon: string;          // emoji
 }
 
 export const V_RANKS: VRankDef[] = [
@@ -41,91 +40,91 @@ export const V_RANKS: VRankDef[] = [
     v: 0, title: "Cadet", cnTitle: "学员",
     conditions: {}, directBonus: 0.05, unilevelDepth: 1,
     peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
-    cultivationBonus: 0, prizeName: "—", prizeIcon: "",
+    cultivationBonus: 0,
   },
   {
     v: 1, title: "Pilot", cnTitle: "飞行员",
     conditions: { selfBuyUSD: 299, directRefs: 3 },
     directBonus: 0.10, unilevelDepth: 2,
     peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
-    cultivationBonus: 500, prizeName: "Pilot 徽章", prizeIcon: "🎖",
+    cultivationBonus: 500,
   },
   {
     v: 2, title: "Operator", cnTitle: "操作员",
     conditions: { teamVolumeUSD: 5000 },
     directBonus: 0.10, unilevelDepth: 3,
     peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
-    cultivationBonus: 2000, prizeName: "操作员勋章", prizeIcon: "🏅",
+    cultivationBonus: 2000,
   },
   {
     v: 3, title: "Captain", cnTitle: "舰长",
     conditions: { teamVolumeUSD: 20_000, vDownlines: { 1: 2 } },
     directBonus: 0.10, unilevelDepth: 4,
     peerBonus: 0.05, leadershipVotes: 1, leadershipShareApprox: 0.01,
-    cultivationBonus: 10_000, prizeName: "Apple Watch SE", prizeIcon: "⌚",
+    cultivationBonus: 10_000,
   },
   {
     v: 4, title: "Commander", cnTitle: "指挥官",
     conditions: { teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
     directBonus: 0.10, unilevelDepth: 5,
     peerBonus: 0.05, leadershipVotes: 2, leadershipShareApprox: 0.015,
-    cultivationBonus: 50_000, prizeName: "iPhone 16 Pro", prizeIcon: "📱",
+    cultivationBonus: 50_000,
   },
   {
     v: 5, title: "Wing Leader", cnTitle: "翼领",
     conditions: { teamVolumeUSD: 150_000, vDownlines: { 3: 4 } },
     directBonus: 0.10, unilevelDepth: 6,
     peerBonus: 0.05, leadershipVotes: 4, leadershipShareApprox: 0.02,
-    cultivationBonus: 200_000, prizeName: "Apple Vision Pro", prizeIcon: "🥽",
+    cultivationBonus: 200_000,
   },
   {
     v: 6, title: "Squadron", cnTitle: "中队长",
     conditions: { teamVolumeUSD: 500_000, vDownlines: { 4: 5 } },
     directBonus: 0.10, unilevelDepth: 7,
     peerBonus: 0.05, leadershipVotes: 8, leadershipShareApprox: 0.025,
-    cultivationBonus: 800_000, prizeName: "Rolex Submariner", prizeIcon: "⌚",
+    cultivationBonus: 800_000,
   },
   {
     v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
     conditions: { teamVolumeUSD: 1_000_000, vDownlines: { 5: 6 } },
     directBonus: 0.10, unilevelDepth: 8,
     peerBonus: 0.05, leadershipVotes: 16, leadershipShareApprox: 0.03,
-    cultivationBonus: 3_200_000, prizeName: "Tesla Model Y", prizeIcon: "🚗",
+    cultivationBonus: 3_200_000,
   },
   {
     v: 8, title: "Star Admiral", cnTitle: "星上将",
     conditions: { teamVolumeUSD: 3_000_000, vDownlines: { 6: 7 } },
     directBonus: 0.10, unilevelDepth: 9,
     peerBonus: 0.05, leadershipVotes: 32, leadershipShareApprox: 0.035,
-    cultivationBonus: 10_000_000, prizeName: "Porsche 911", prizeIcon: "🏎",
+    cultivationBonus: 10_000_000,
   },
   {
     v: 9, title: "Galaxy Lord", cnTitle: "星河领主",
     conditions: { teamVolumeUSD: 10_000_000 },
     directBonus: 0.10, unilevelDepth: 10,
     peerBonus: 0.05, leadershipVotes: 64, leadershipShareApprox: 0.04,
-    cultivationBonus: 0, prizeName: "Lamborghini Urus", prizeIcon: "🏎",
+    cultivationBonus: 0,
   },
   {
     v: 10, title: "Nexion Founder", cnTitle: "联合创始",
     conditions: { teamVolumeUSD: 30_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 128, leadershipShareApprox: 0.05,
-    cultivationBonus: 0, prizeName: "私人飞机包月", prizeIcon: "✈",
+    cultivationBonus: 0,
   },
   {
     v: 11, title: "Cosmic Sovereign", cnTitle: "宇宙至尊",
     conditions: { teamVolumeUSD: 100_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 256, leadershipShareApprox: 0.06,
-    cultivationBonus: 0, prizeName: "加勒比游艇度假", prizeIcon: "🛥",
+    cultivationBonus: 0,
   },
   {
     v: 12, title: "Singularity", cnTitle: "奇点",
     conditions: { teamVolumeUSD: 500_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 512, leadershipShareApprox: 0.10,
-    cultivationBonus: 0, prizeName: "上市公司股权", prizeIcon: "💎",
+    cultivationBonus: 0,
   },
 ];
 
@@ -272,7 +271,6 @@ export interface NextRankGapInfo {
   primaryGap: PrimaryGap | null;
   unmetCount: number;
   topUnlocks: PerkUnlock[];
-  newPrize: { name: string; icon: string } | null;
 }
 
 // Emotional weight per perk kind. Higher = surfaced sooner in the UI.
@@ -296,7 +294,6 @@ export function nextRankGap(state: VRankData): NextRankGapInfo {
       primaryGap: null,
       unmetCount: 0,
       topUnlocks: [],
-      newPrize: null,
     };
   }
 
@@ -369,10 +366,5 @@ export function nextRankGap(state: VRankData): NextRankGapInfo {
     .sort((a, b) => PERK_WEIGHT[b.kind] - PERK_WEIGHT[a.kind])
     .slice(0, TOP_UNLOCKS_CAP);
 
-  const newPrize =
-    next.prizeName && next.prizeName !== "—" && next.prizeName !== current.prizeName
-      ? { name: next.prizeName, icon: next.prizeIcon }
-      : null;
-
-  return { next, progressPct, primaryGap, unmetCount: gaps.length, topUnlocks, newPrize };
+  return { next, progressPct, primaryGap, unmetCount: gaps.length, topUnlocks };
 }

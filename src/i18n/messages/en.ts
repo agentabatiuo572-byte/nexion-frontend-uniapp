@@ -268,6 +268,7 @@ export const en = {
     rankStep: "step",
     rankNext: "Next",
     rankUnlockAt: "unlock at V{n}",
+    rankReward: "+{n} NEX",
     rankTopTier: "You've reached the top tier.",
     poolTitle: "Leadership pool",
     poolThisWeek: "this week's pool · 5% of platform volume",
@@ -2694,7 +2695,7 @@ export const en = {
     extendedLabel: "Extended",
     next: "Next:",
     need: "Need:",
-    prize: "Prize:",
+    prize: "Reward:",
     upgradePath: "Upgrade path (buy device + invite)",
     sevenLayerNetwork: "Royalty network",
     todayMatch: "Today match",
@@ -3110,12 +3111,12 @@ export const en = {
     heroLabel: "RANK PROGRESSION SYSTEM",
     heroTitle: "Climb the ranks. Unlock bigger rewards every step.",
     heroSub:
-      "Every rank you reach permanently unlocks new earning channels, deeper team rewards, and exclusive physical prizes.",
+      "Every rank you reach permanently unlocks new earning channels, deeper team rewards, and increasingly large NEX cultivation bonuses.",
     s1Title: "What is the Rank System?",
     s1Para1:
       "Your account starts at V0 Cadet. As you invest in devices, invite friends, and grow your team, you advance through 13 ranks all the way up to V12 Singularity.",
     s1Para2:
-      "Each higher rank permanently expands what you earn from the network — wider extended royalty reach, a slice of the global leadership pool, and a tangible prize you can keep.",
+      "Each higher rank permanently expands what you earn from the network — wider extended royalty reach, a slice of the global leadership pool, and higher NEX cultivation bonuses.",
     s2Title: "13 ranks at a glance",
     s2Caption:
       "From Cadet to Singularity. Each step has its own requirements and rewards.",
@@ -3136,10 +3137,10 @@ export const en = {
       "Higher ranks require a minimum number of your direct invitees to have reached a target rank themselves. Counts anyone at the target rank or above.",
     s3RuleATitle: "No skipping ranks",
     s3RuleABody:
-      "You always advance one rank at a time. Even if you meet the requirements for V5 today, the system promotes you to V3 first, then to V4 on the next qualifying event, then V5 — so every rank's prize and unlocks are released in order.",
+      "You always advance one rank at a time. Even if you meet the requirements for V5 today, the system promotes you to V3 first, then to V4 on the next qualifying event, then V5 — so every rank's reward and unlocks are released in order.",
     s3RuleBTitle: "Once earned, always yours",
     s3RuleBBody:
-      "Your rank is permanent. If team volume later shrinks or a teammate's rank drops, you keep everything you've already unlocked — wider extended royalty, peer bonus, leadership pool seat, prizes.",
+      "Your rank is permanent. If team volume later shrinks or a teammate's rank drops, you keep everything you've already unlocked — wider extended royalty, peer bonus, leadership pool seat, cultivation bonus.",
     s4Title: "What each rank unlocks",
     s4Intro:
       "Every rank permanently expands your earning surface. Higher ranks layer on more channels — not as replacements, but as additions.",
@@ -3152,9 +3153,6 @@ export const en = {
     unlock3Label: "Leadership Pool seat (from V3)",
     unlock3Body:
       "A weekly share of 5% of total platform volume. Your vote count doubles every rank — V3 = 1 vote, V12 = 512 votes.",
-    unlock4Label: "Physical prize",
-    unlock4Body:
-      "From V1 Pilot badge to V12 long-term equity, each rank releases a real-world prize. Claim from your rank page after KYC address confirmation.",
     unlock5Label: "Cultivation bonus to your sponsor",
     unlock5Body:
       "When you reach a new rank, your direct sponsor receives a one-time NEX reward — the system rewards mentorship.",
@@ -3182,22 +3180,19 @@ export const en = {
     s5Unlock2:
       "Leadership Pool seat goes from 1 vote to 2 votes (effective at the next weekly settlement)",
     s5Unlock3:
-      "iPhone 16 Pro prize lands in her Claim queue — confirm shipping address after KYC, delivered within 14 days",
+      "Extended-network royalty depth widens by one more layer — she now earns royalty on orders from her 5th downstream layer",
     s5Unlock4:
       "Alice's own sponsor (Sarah) receives a +50,000 NEX cultivation bonus for her advancement",
     faqTitle: "Common questions",
     faqQ1: "Can I skip ranks to V5 or higher in one go?",
     faqA1:
-      "No — promotions are always one step at a time. This ensures every rank's prize and unlocks are released in order. If you meet several ranks' conditions simultaneously, you'll move up one rank per qualifying event.",
+      "No — promotions are always one step at a time. This ensures every rank's reward and unlocks are released in order. If you meet several ranks' conditions simultaneously, you'll move up one rank per qualifying event.",
     faqQ2: "What if my team shrinks after I reach a rank?",
     faqA2:
       "Nothing happens to your rank. Once promoted, your rank is permanent — every unlock you've earned stays with you regardless of future team activity.",
     faqQ3: "How do I see how close I am to the next rank?",
     faqA3:
       "The /team/rank page shows your current rank, a percentage progress bar to the next rank, and a checklist of what you still need.",
-    faqQ4: "When does my physical prize ship?",
-    faqA4:
-      "Right after promotion, the prize enters your Claim queue. Tap Claim, confirm your shipping address through KYC, and the item ships within 14 days.",
     ctaBack: "Got it · see my rank progress",
   },
 

@@ -1,7 +1,8 @@
 <!--
   VRankCard — ZONE 4 V-rank progress (ported from mission-control.tsx VRankCard).
   Current rank + next-rank progress bar (scroll-grow) + missing conditions + next
-  prize chip. `missing[]` strings come from nextRankProgress (English, faithful).
+  NEX-reward chip (cultivationBonus; 实物奖已删,与后台 F1 同步). `missing[]` strings
+  come from nextRankProgress (English, faithful).
 -->
 <template>
   <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 14px 16px; position: relative; overflow: hidden" @click="goRank">
@@ -24,9 +25,9 @@
         <view class="h-full rounded-full" :style="barStyle" />
       </view>
       <text v-if="missing.length > 0" class="block mt-1.5 font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ missingText }}</text>
-      <view class="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style="background: var(--v5-brand-2-soft); font-size: 12px; color: var(--v5-brand-2); font-weight: 500">
-        <text>{{ next.prizeIcon }}</text>
-        <text style="color: var(--v5-brand-2)">{{ next.prizeName }} · {{ unlockAtText }}</text>
+      <view v-if="rewardNex > 0" class="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full" style="background: var(--v5-brand-2-soft); font-size: 12px; color: var(--v5-brand-2); font-weight: 500">
+        <text>🎁</text>
+        <text style="color: var(--v5-brand-2)">{{ rewardText }} · {{ unlockAtText }}</text>
       </view>
     </template>
     <text v-else class="block mt-3" style="font-size: 12px; color: var(--v5-ink-3); font-family: var(--font-v5)">{{ t.home.rankTopTier }}</text>
@@ -53,6 +54,9 @@ const pct = computed(() => Math.round(rankInfo.value.progressPct * 100));
 const missing = computed(() => rankInfo.value.missing);
 const missingText = computed(() => missing.value.join(" · "));
 const unlockAtText = computed(() => (next.value ? fmt(t.value.home.rankUnlockAt, { n: next.value.v }) : ""));
+// 实物奖已删 → 改展示下一阶的 NEX 培育奖(cultivationBonus);为 0 时不显示 chip
+const rewardNex = computed(() => next.value?.cultivationBonus ?? 0);
+const rewardText = computed(() => fmt(t.value.home.rankReward, { n: rewardNex.value.toLocaleString() }));
 
 const barStyle = computed<CSSProperties>(() => ({
   width: `${inView.value ? pct.value : 0}%`,

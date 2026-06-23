@@ -1,6 +1,6 @@
 <!--
   NetworkCard — ported from me/page.tsx NetworkCard.
-  V-rank ladder progress toward the next rank: prize emoji anchor + "Toward V{n}
+  V-rank ladder progress toward the next rank: aspiration star anchor + "Toward V{n}
   {title} · {gap}" line + perk-unlock line + scroll-grow progress bar (≥80% =
   warning "hot" state). Max-rank reached → collapses to a single dignity row.
   Reads useVRank + nextRankGap; locale fallback shows cnTitle only for `zh`.
@@ -12,7 +12,7 @@
 
     <!-- Max-rank end state -->
     <view v-if="!gap.next" class="block active:opacity-90" :style="maxCardStyle" @click="goTeam">
-      <view :style="maxIconStyle" :aria-label="maxPrizeName">
+      <view :style="maxIconStyle" :aria-label="maxRankLine">
         <text style="font-size: 22px">{{ maxPrizeIcon }}</text>
       </view>
       <view style="flex: 1; min-width: 0">
@@ -23,8 +23,8 @@
 
     <!-- In-progress state -->
     <view v-else class="block active:opacity-90" :style="cardStyle" @click="goTeam">
-      <!-- Prize hero -->
-      <view :style="prizeHeroStyle" :aria-label="prizeHeroName">
+      <!-- Aspiration hero anchor(实物奖已删) -->
+      <view :style="prizeHeroStyle" :aria-label="towardLine">
         <text style="font-size: 28px">{{ prizeHeroIcon }}</text>
       </view>
 
@@ -82,9 +82,8 @@ const gap = computed(() => nextRankGap(vrank));
 
 const titleOf = (v: number): string => (isZh.value ? V_RANKS[v].cnTitle : V_RANKS[v].title);
 
-// ── Max-rank end state ──
-const maxPrizeIcon = computed(() => V_RANKS[myRank.value].prizeIcon || "✓");
-const maxPrizeName = computed(() => V_RANKS[myRank.value].prizeName);
+// ── Max-rank end state ──(实物奖已删 → 用通用「已达成」图标作 dignity 锚点)
+const maxPrizeIcon = "✓";
 const maxRankLine = computed(() => fmt(t.value.me.networkCardMaxRank, { title: titleOf(myRank.value) }));
 
 // ── In-progress derived values ──
@@ -93,8 +92,8 @@ const progressPct = computed(() => gap.value.progressPct);
 const pctInt = computed(() => Math.round(progressPct.value * 100));
 const isHot = computed(() => progressPct.value >= 0.8);
 
-const prizeHeroIcon = computed(() => gap.value.newPrize?.icon || "★");
-const prizeHeroName = computed(() => gap.value.newPrize?.name ?? gap.value.next?.prizeName ?? "");
+// 实物奖已删 → hero 用通用「冲刺」星标锚点(语义由 toward 行 + perk 行承载)
+const prizeHeroIcon = "★";
 
 const towardLine = computed(() =>
   fmt(t.value.me.networkCardToward, { v: nextV.value, title: titleOf(nextV.value) }),

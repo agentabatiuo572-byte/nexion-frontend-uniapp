@@ -47,7 +47,6 @@
               <text class="font-display tabular-nums" :style="ladderVStyle">V{{ r.v }}</text>
               <text :style="ladderTitleStyle">{{ r.title }}</text>
               <text class="truncate" :style="ladderCnStyle">· {{ r.cnTitle }}</text>
-              <text v-if="r.prizeName !== '—'" :style="ladderPrizeStyle">{{ r.prizeIcon }}</text>
             </view>
           </view>
         </view>
@@ -180,7 +179,6 @@ const unlocks = computed(() => [
   { emoji: "📈", label: w.value.unlock1Label, body: w.value.unlock1Body },
   { emoji: "🤝", label: w.value.unlock2Label, body: w.value.unlock2Body },
   { emoji: "🏆", label: w.value.unlock3Label, body: w.value.unlock3Body },
-  { emoji: "🎁", label: w.value.unlock4Label, body: w.value.unlock4Body },
   { emoji: "🌱", label: w.value.unlock5Label, body: w.value.unlock5Body },
 ]);
 const phases = computed(() => [
@@ -192,7 +190,6 @@ const faqs = computed(() => [
   { q: w.value.faqQ1, a: w.value.faqA1 },
   { q: w.value.faqQ2, a: w.value.faqA2 },
   { q: w.value.faqQ3, a: w.value.faqA3 },
-  { q: w.value.faqQ4, a: w.value.faqA4 },
 ]);
 
 function goBack() {
@@ -227,7 +224,6 @@ const ladderCardStyle: CSSProperties = { background: "var(--v5-surface)", border
 const ladderVStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", width: "28px" };
 const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
 const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
-const ladderPrizeStyle: CSSProperties = { marginLeft: "auto", fontSize: "10.5px", color: "var(--v5-warning)" };
 
 const reqCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
 const reqLabelStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-brand)" };

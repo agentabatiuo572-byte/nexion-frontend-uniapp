@@ -85,7 +85,7 @@
                 <text v-if="r.unilevelDepth > 1" :style="chipStyle('default')">{{ r.unilevelDepth >= 99 ? "Unlimited extended" : "Extended royalty" }}</text>
                 <text v-if="r.peerBonus > 0" :style="chipStyle('default')">Peer {{ Math.round(r.peerBonus * 100) }}%</text>
                 <text v-if="r.leadershipVotes > 0" :style="chipStyle('purple')">Pool {{ r.leadershipVotes }} votes</text>
-                <text v-if="r.prizeName !== '—'" :style="chipStyle('lemon')">{{ r.prizeIcon }} {{ r.prizeName }}</text>
+                <text v-if="r.cultivationBonus > 0" :style="chipStyle('lemon')">🎁 {{ r.cultivationBonus.toLocaleString() }} NEX</text>
               </view>
             </view>
           </view>
