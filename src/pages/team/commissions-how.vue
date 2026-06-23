@@ -29,7 +29,7 @@
         <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
         <view style="display: flex; flex-direction: column; gap: 8px">
           <HowIconRow emoji="👥" :label="w.k1Label" :body="w.k1Body" />
-          <HowIconRow emoji="⚖️" :label="w.k2Label" :body="w.k2Body" />
+          <HowIconRow emoji="⚖️" :label="w.k2Label" :body="k2BodyText" />
           <HowIconRow emoji="🤝" :label="w.k3Label" :body="w.k3Body" />
           <HowIconRow emoji="🌱" :label="w.k4Label" :body="w.k4Body" />
           <HowIconRow emoji="👑" :label="w.k5Label" :body="w.k5Body" />
@@ -136,10 +136,16 @@ import HowIconRow from "@/components/how/how-icon-row.vue";
 import HowCalloutBox from "@/components/how/how-callout-box.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { navBack } from "@/lib/route";
+import { BINARY_SETTLE_PERIOD } from "@/lib/binary-settlement";
 
 const t = useT();
 const w = computed(() => t.value.commissionsHowItWorks);
+// 平衡匹配渠道结算周期文案据后台同源配置派生(默认每月),与 /team/binary 口径一致。
+const k2BodyText = computed(() =>
+  fmt(w.value.k2Body, { freq: t.value.binary.settlePeriodLabel[BINARY_SETTLE_PERIOD] }),
+);
 
 function goBack() {
   navBack("/pages/team/commissions");

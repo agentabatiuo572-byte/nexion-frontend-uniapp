@@ -24,8 +24,8 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- match hero -->
         <view class="rounded-2xl text-center" :style="heroStyle">
-          <text class="block font-mono-tabular" :style="heroCapStyle">{{ t.binary.estimate }}</text>
-          <text class="block font-display tabular-nums" :style="heroAmtStyle">+${{ match.toFixed(2) }}</text>
+          <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
+          <text class="block font-display tabular-nums" :style="heroAmtStyle">+${{ periodMatch.toFixed(2) }}</text>
           <text class="block" :style="heroFormulaStyle">{{ formulaText }}</text>
         </view>
 
@@ -86,7 +86,7 @@
                 <view class="h-full rounded-full" :style="{ width: strongVol > 0 ? `${(weakVol / strongVol) * 100}%` : '0%', background: 'var(--v5-warning)' }" />
               </view>
             </view>
-            <text class="block" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '8px', lineHeight: 1.375 }">{{ t.binary.gapHint }}</text>
+            <text class="block" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '8px', lineHeight: 1.375 }">{{ gapHintText }}</text>
           </view>
         </view>
 
@@ -135,6 +135,7 @@ import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
+import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
 
 const t = useT();
 const network = useNetwork();
@@ -148,14 +149,15 @@ const DAILY_CAP = computed(() => phase.value.binaryDailyCapUSD);
 const sides = computed(() => network.byBinary());
 const leftMonthVol = computed(() => network.leftVolumeMonth());
 const rightMonthVol = computed(() => network.rightVolumeMonth());
-const leftDailyAvg = computed(() => leftMonthVol.value / 30);
-const rightDailyAvg = computed(() => rightMonthVol.value / 30);
 const weakSide = computed(() => (leftMonthVol.value <= rightMonthVol.value ? "left" : "right"));
 const weakVol = computed(() => Math.min(leftMonthVol.value, rightMonthVol.value));
 const strongVol = computed(() => Math.max(leftMonthVol.value, rightMonthVol.value));
-const match = computed(() =>
-  Math.min(Math.min(leftDailyAvg.value, rightDailyAvg.value) * MATCH_RATE, DAILY_CAP.value),
-);
+// 预计奖金随结算周期联动:较小轨「该周期业绩」(月业绩 × 周期天数/30) × 10%,封顶 = 日封顶 × 周期天数。
+// 默认每月 → min(月两轨)×10%,与可见的两轨月业绩 + 「{period}…估算」标签 + 「{freq}结算」节奏全自洽。
+const periodMatch = computed(() => {
+  const factor = SETTLE_PERIOD_DAYS[BINARY_SETTLE_PERIOD] / 30;
+  return Math.min(weakVol.value * factor * MATCH_RATE, DAILY_CAP.value * SETTLE_PERIOD_DAYS[BINARY_SETTLE_PERIOD]);
+});
 const blocked = computed(() => leftMonthVol.value < MIN_THRESHOLD || rightMonthVol.value < MIN_THRESHOLD);
 
 const recentBinaries = computed(() =>
@@ -197,8 +199,18 @@ const wings = computed<Wing[]>(() => [
   },
 ]);
 
+// 结算周期文案 + 数字据后台同源配置派生(默认每月),消除「页面暗示日结」与「每月结算」矛盾,
+// 并让 hero 预计金额随结算周期联动(数字 periodMatch + 标签 {period} + 节奏 {freq} 三者一致)。
+const periodFreqLabel = computed(() => t.value.binary.settlePeriodLabel[BINARY_SETTLE_PERIOD]);
+const estimateText = computed(() =>
+  fmt(t.value.binary.estimate, { period: t.value.binary.periodEstimateLabel[BINARY_SETTLE_PERIOD] }),
+);
+const gapHintText = computed(() => fmt(t.value.binary.gapHint, { freq: periodFreqLabel.value }));
 const formulaText = computed(() =>
-  fmt(t.value.binary.formula, { l: leftDailyAvg.value.toFixed(0), r: rightDailyAvg.value.toFixed(0) }),
+  fmt(t.value.binary.formula, {
+    cap: DAILY_CAP.value.toLocaleString(),
+    freq: periodFreqLabel.value,
+  }),
 );
 const blockedDetailText = computed(() =>
   fmt(t.value.binary.blockedDetail, {

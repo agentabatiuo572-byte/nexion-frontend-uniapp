@@ -3329,8 +3329,11 @@ export const en = {
 
   binary: {
     pageTitle: "Balance Match",
-    estimate: "Today Balance Match estimate",
-    formula: "min({l}, {r}) × 10% · daily cap $5,000",
+    settlePeriodLabel: { daily: "daily", weekly: "weekly", monthly: "monthly" },
+    periodEstimateLabel: { daily: "Today's", weekly: "This week's", monthly: "This month's" },
+    periodUnitLabel: { daily: "day", weekly: "week", monthly: "month" },
+    estimate: "{period} Balance Match estimate",
+    formula: "min(Track A, Track B) × 10% · daily cap ${cap} · {freq} settlement",
     blocked: "Balance Match paused",
     blockedDetail:
       "Track {side} month ${vol} < $1,000 threshold → all match earnings zeroed.",
@@ -3344,7 +3347,7 @@ export const en = {
     strong: "Larger",
     weak: "Smaller",
     gapHint:
-      "Balance Match is calculated on the smaller track. Grow the smaller track to lift daily payout.",
+      "Balance Match is calculated on the smaller track. Grow the smaller track to lift your {freq} payout.",
     spilloverTitle: "Auto-placement: {n} members assigned to Track B",
     spilloverHint: "from network partner V5 Sarah K. — volume auto-merged into your tracks",
     recentMatches: "Recent matches",
@@ -3363,7 +3366,7 @@ export const en = {
     s1Para1:
       "Your referral network is split into two independent tracks: Track A and Track B. Every person you invite joins one of the two.",
     s1Para2:
-      "The system rewards you based on the smaller of the two tracks each month. This encourages you to keep both tracks active and growing, instead of stacking everyone on one side.",
+      "The system rewards you {freq} based on the smaller of the two tracks. This encourages you to keep both tracks active and growing, instead of stacking everyone on one side.",
     s2Title: "Picture it like this",
     s2Caption:
       "A simple snapshot of your network — you at the top, your two tracks branching out below.",
@@ -3382,7 +3385,7 @@ export const en = {
       "When your network partner's direct slots fill up, new members they invite are auto-placed into your tracks — extra help to grow your sides even when you're not actively recruiting.",
     s4Title: "How your reward is calculated",
     s4Intro:
-      "Each month, the system looks at the total activity in both your tracks and uses the smaller number to calculate your Balance Match Bonus.",
+      "Each {unit}, the system looks at the total activity in both your tracks and uses the smaller number to calculate your Balance Match Bonus.",
     s4SmallerLabel: "Smaller track",
     s4Qualify: "Both tracks need at least $1,000/month to qualify",
     s4PlainTalk:
@@ -3410,10 +3413,16 @@ export const en = {
       "Keep inviting on that track, or wait for auto-placement from your network partner. Until both tracks reach $1,000/month, no Balance Match Bonus is paid.",
     faqQ3: "How often is the bonus settled?",
     faqA3:
-      "Monthly. The system totals each track's activity over the calendar month and pays out at the start of the next month.",
+      "Settled {freq}. The system totals each track's activity per {unit} and pays out at the start of the next {unit}.",
     faqQ4: "Do I still earn if I don't invite anyone?",
     faqA4:
       "Yes. The Balance Match Bonus is one of several earning channels. You still earn from your own device output, direct referral rewards, and other programs — no recruiting required.",
+    faqQ5: "Does unmatched volume carry over?",
+    residualFaq: {
+      monthlyClear: "After each monthly settlement, unmatched volume on the larger track resets at the start of the month — it does not carry over.",
+      perPairClear: "After each match settlement, unmatched volume on the larger track resets immediately — it does not carry over.",
+      carryForward: "Unmatched volume on the larger track carries forward to the next period and keeps accumulating — it is not reset.",
+    },
     ctaBack: "Got it · see my Dual-Track",
   },
 
@@ -3548,7 +3557,7 @@ export const en = {
       "Paid when anyone in your influence network places a qualifying order. Direct invites pay your current rate; the extended network pays via the algorithmic Network Yield Bonus. Most frequent channel.",
     k2Label: "Balance Match Bonus",
     k2Body:
-      "Paid monthly based on the smaller of your two tracks × 10%. Requires both tracks ≥ $1,000/month. See `/team/binary` for details.",
+      "Paid {freq} based on the smaller of your two tracks × 10%. Requires both tracks ≥ $1,000/month. See `/team/binary` for details.",
     k3Label: "Peer · same-rank bonus",
     k3Body:
       "Unlocks at V3. When teammates at your rank or higher make qualifying purchases, you receive 5% — a reward for leaders who develop other leaders.",

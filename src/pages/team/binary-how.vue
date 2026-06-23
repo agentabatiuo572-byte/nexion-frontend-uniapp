@@ -30,7 +30,7 @@
           <text>{{ w.s1Title }}</text>
         </view>
         <text class="block" :style="bodyStyle">{{ w.s1Para1 }}</text>
-        <text class="block" :style="{ ...bodyStyle, marginTop: '8px' }">{{ w.s1Para2 }}</text>
+        <text class="block" :style="{ ...bodyStyle, marginTop: '8px' }">{{ s1Para2Text }}</text>
       </view>
 
       <!-- Visual diagram -->
@@ -112,7 +112,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><line x1="8" x2="16" y1="6" y2="6" /><line x1="16" x2="16" y1="14" y2="18" /><path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" /><path d="M12 14h.01" /><path d="M8 14h.01" /><path d="M12 18h.01" /><path d="M8 18h.01" /></svg>
           <text>{{ w.s4Title }}</text>
         </view>
-        <text class="block" :style="{ fontSize: '12.5px', color: 'color-mix(in srgb, var(--v5-ink) 80%, transparent)', lineHeight: 1.625 }">{{ w.s4Intro }}</text>
+        <text class="block" :style="{ fontSize: '12.5px', color: 'color-mix(in srgb, var(--v5-ink) 80%, transparent)', lineHeight: 1.625 }">{{ s4IntroText }}</text>
         <view :style="mathCardStyle">
           <view class="grid grid-cols-2" style="gap: 12px">
             <view>
@@ -197,10 +197,19 @@ import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { navBack } from "@/lib/route";
+import { BINARY_SETTLE_PERIOD, BINARY_RESIDUAL_POLICY } from "@/lib/binary-settlement";
 
 const t = useT();
 const w = computed(() => t.value.binaryHowItWorks);
+
+// 结算周期 / 沉淀处置 文案据后台同源配置派生(默认每月 / 每月清零),全页口径一致。
+const freqLabel = computed(() => t.value.binary.settlePeriodLabel[BINARY_SETTLE_PERIOD]);
+const unitLabel = computed(() => t.value.binary.periodUnitLabel[BINARY_SETTLE_PERIOD]);
+const s1Para2Text = computed(() => fmt(w.value.s1Para2, { freq: freqLabel.value }));
+// s4Intro:zh 用 {freq}(每月…)、en 用 {unit}(Each month…),两者都传,fmt 忽略未用占位符。
+const s4IntroText = computed(() => fmt(w.value.s4Intro, { freq: freqLabel.value, unit: unitLabel.value }));
 
 const steps = computed(() => [
   { n: 1, title: w.value.step1Title, body: w.value.step1Body },
@@ -215,8 +224,9 @@ const timeline = computed(() => [
 const faqs = computed(() => [
   { q: w.value.faqQ1, a: w.value.faqA1 },
   { q: w.value.faqQ2, a: w.value.faqA2 },
-  { q: w.value.faqQ3, a: w.value.faqA3 },
+  { q: w.value.faqQ3, a: fmt(w.value.faqA3, { freq: freqLabel.value, unit: unitLabel.value }) },
   { q: w.value.faqQ4, a: w.value.faqA4 },
+  { q: w.value.faqQ5, a: w.value.residualFaq[BINARY_RESIDUAL_POLICY] },
 ]);
 
 function goBack() {

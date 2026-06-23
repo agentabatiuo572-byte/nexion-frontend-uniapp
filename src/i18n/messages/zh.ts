@@ -3250,8 +3250,11 @@ export const zh: Messages = {
 
   binary: {
     pageTitle: "平衡匹配",
-    estimate: "今日平衡匹配奖估算",
-    formula: "min({l}, {r}) × 10% · 日上限 $5,000",
+    settlePeriodLabel: { daily: "每日", weekly: "每周", monthly: "每月" },
+    periodEstimateLabel: { daily: "今日", weekly: "本周", monthly: "本月" },
+    periodUnitLabel: { daily: "日", weekly: "周", monthly: "月" },
+    estimate: "{period}平衡匹配奖估算",
+    formula: "min(A 轨, B 轨) × 10% · 日上限 ${cap} · {freq}结算",
     blocked: "平衡匹配暂停",
     blockedDetail: "{side} 轨道月业绩 ${vol} < $1,000 门槛 → 本月匹配归零。",
     blockedAction: "邀请较小一轨补齐业绩,本月奖励即可恢复。",
@@ -3263,7 +3266,7 @@ export const zh: Messages = {
     strongWeakGap: "轨道差距(较大 vs 较小)",
     strong: "较大",
     weak: "较小",
-    gapHint: "平衡匹配按较小一轨计算。继续邀请较小一轨提升每日发放。",
+    gapHint: "平衡匹配按较小一轨计算。继续邀请较小一轨提升{freq}发放。",
     spilloverTitle: "自动分配:{n} 位成员被分到 B 轨道",
     spilloverHint: "来自网络伙伴 V5 Sarah K. — 业绩自动并入你的双轨",
     recentMatches: "最近匹配",
@@ -3282,7 +3285,7 @@ export const zh: Messages = {
     s1Para1:
       "你的推荐网络分为两条独立的轨道:A 轨道(Track A)和 B 轨道(Track B)。你邀请的每个人都会加入其中一条。",
     s1Para2:
-      "系统每个月按你两条轨道中较小的那一条计算奖励。这样设计是为了鼓励你两边都保持活跃增长,而不是把人全部堆到一边。",
+      "系统{freq}按你两条轨道中较小的那一条计算奖励。这样设计是为了鼓励你两边都保持活跃增长,而不是把人全部堆到一边。",
     s2Title: "想象一下是这样的",
     s2Caption:
       "你的网络快照——你在顶端,两条轨道像树枝一样向下延伸。",
@@ -3301,7 +3304,7 @@ export const zh: Messages = {
       "当你的网络伙伴推荐位填满后,他新邀请的人会自动分配到你的两条轨道——即使你这段时间没主动邀请,轨道依然在长。",
     s4Title: "奖励是怎么算的",
     s4Intro:
-      "每个月,系统统计你两条轨道的总活跃业绩,用较小的那个数字 × 10% = 你的平衡匹配奖励(Balance Match Bonus)。",
+      "{freq},系统统计你两条轨道的总活跃业绩,用较小的那个数字 × 10% = 你的平衡匹配奖励(Balance Match Bonus)。",
     s4SmallerLabel: "较小一轨",
     s4Qualify: "两条轨道月业绩各 ≥ $1,000 才有资格",
     s4PlainTalk:
@@ -3329,10 +3332,16 @@ export const zh: Messages = {
       "继续邀请那一条,或等待网络伙伴自动分配协助。两条轨道都达到 $1,000/月之前,平衡匹配奖励为 $0。",
     faqQ3: "多久结算一次?",
     faqA3:
-      "每月结算一次。系统按自然月统计两条轨道的累计业绩,在下月月初支付。",
+      "按{freq}结算。系统按{unit}统计两条轨道的累计业绩,于下一{unit}初支付。",
     faqQ4: "如果我不邀请任何人,还能赚钱吗?",
     faqA4:
       "可以。平衡匹配奖励只是众多收益来源之一。你的设备产出、直推奖、其他奖励计划都不受影响——完全不邀请也能赚。",
+    faqQ5: "未匹配的业绩会保留吗?",
+    residualFaq: {
+      monthlyClear: "每月结算后,较大轨未匹配的业绩会在月初清零,不结转下月。",
+      perPairClear: "每次对碰结算后,较大轨未匹配的业绩即清零,不结转。",
+      carryForward: "较大轨未匹配的业绩会转结到下一周期继续累计,不清零。",
+    },
     ctaBack: "明白了 · 查看我的双轨",
   },
 
@@ -3465,7 +3474,7 @@ export const zh: Messages = {
       "你的影响力网络中任何人下合格订单都给你版税。直推朋友按当前费率结算;扩展网络通过算法 Network Yield Bonus 结算。最常见的渠道。",
     k2Label: "Binary · 平衡匹配奖",
     k2Body:
-      "按月结算,基于较小一侧月业绩 × 10%。需双侧 ≥ $1,000/月。详见 `/team/binary`。",
+      "按{freq}结算,基于较小一侧月业绩 × 10%。需双侧 ≥ $1,000/月。详见 `/team/binary`。",
     k3Label: "Peer · 平级奖",
     k3Body:
       "V3 解锁。当你**同等级或更高等级**的队友下合格订单时,你额外拿 5%——奖励带出 leader 的 leader。",

@@ -2165,7 +2165,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 
 | # | 机制 | 业务效果 |
 |---|---|---|
-| 1 | 较小轨匹配公式 | Balance Match = `min(A, B) × 10%`,日上限 $5,000。仅按较小一轨体量发放,鼓励两轨均衡发展;较大一轨未匹配的体量累积到下个结算周期或作为平台运营备付金。 |
+| 1 | 较小轨匹配公式 | Balance Match = `min(A, B) × 10%`,日上限随平台 Phase 收紧(P1–P3 $5,000 / P4+ $2,000,详见 §11 Phase 参数表)。仅按较小一轨体量发放,鼓励两轨均衡发展。**结算周期**(每日 / 每周 / 每月)与**沉淀处置策略**(较大一轨未匹配体量如何处理:每月清零 / 每次对碰清零 / 转结)均由运营后台配置(默认每月结算 + 每月清零),详见 §8.4.1.2。 |
 | 2 | 最低业绩门槛 | 强制两轨各 ≥ $1,000 才进入结算队列。未达门槛的业绩计为 pending,达标后批量结算 → 自然形成业绩沉淀缓冲池,稳定平台日结资金流。 |
 | 3 | 自动分配机制(内部 spillover) | 网络伙伴在某轨业绩饱和时,新邀请自动分配到下游轨道,形成"网络伙伴主动帮你扩展轨道"的体验。增强网络绑定关系,降低用户主动退出意愿。 |
 | 4 | LTV 延长 | 两轨无封顶 + 强制平衡,提供"持续投入还能再增长"的长期激励路径,把用户活跃生命周期从单一网络版税的 ~6 个月延长到 ~18-24 个月(基于行业基准数据)。 |
@@ -2182,7 +2182,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 
 每个用户开两条独立轨道 Track A + Track B(内部存储 `binary: "left" | "right"`)。
 
-**Balance Match** = `min(A, B) × 10%`,日上限 $5,000
+**Balance Match** = `min(A, B) × 10%`,日上限随平台 Phase(P1–P3 $5,000 / P4+ $2,000,详见 §11)
 
 **强制平衡**:必须 Track A ≥ $1,000 且 Track B ≥ $1,000 才能领奖,否则当月归零
 
@@ -2212,13 +2212,36 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 - `useNetwork.leftVolumeMonth()` / `rightVolumeMonth()` — 遍历 `members[]` 按 `binary === "left" | "right"` 筛选,累加 `monthVolumeUSD` 字段
 - `monthVolumeUSD` 字段在每笔合格交易完成时增量更新
 
+##### 8.4.1.2 结算周期与沉淀处置(运营可配置)
+
+平衡匹配的**结算周期**与**沉淀处置策略**为平台级可配置参数,由运营后台 F3 双轨结算引擎设定(server-canonical),前端读取后联动渲染。
+
+**结算周期 `settlePeriod`**:对碰奖金的派发节奏,枚举 `每日 | 每周 | 每月`,默认 `每月`。
+
+- 每条轨道的活跃业绩(GV)始终按自然月累计(§8.4.1.1);结算周期决定按何种节奏计算并派发 Balance Match Bonus。
+- **预计金额口径**:hero 显示的预计奖金随结算周期联动 = 较小轨「该周期业绩」× 10%,封顶 = 日封顶 × 周期天数。其中「周期业绩」= 月业绩 ×(周期天数 / 30),周期天数 `每日=1 / 每周=7 / 每月=30`。
+  - 默认每月:hero 显示「本月平衡匹配奖估算」= `min(月 Track A, 月 Track B) × 10%`,与双轨卡可见的月业绩、玩法说明页 `$2,000 × 10% = $200` 示例同口径,用户可自行验算。
+  - 每周 / 每日:hero 标签与金额随之切换为「本周 / 今日 …估算」并按周期天数折算。
+
+**沉淀处置策略 `residualPolicy`**:较大一轨未被匹配的剩余业绩(沉淀池)在周期边界如何处理,枚举三档,默认 `每月清零`:
+
+| 策略 | 语义 | 平台资金影响 |
+|---|---|---|
+| 每月清零 | 每自然月边界,较大轨未匹配体量重置归零 | 沉淀不累积,负债口径最紧 |
+| 每次对碰清零 | 每次结算事件后较大轨未匹配体量即清零(清零频率 = 结算周期) | 与每月清零在周期=每月时重合,但概念为「结算事件驱动」而非「日历驱动」 |
+| 转结 | 较大轨未匹配体量结转到下一周期继续累计,不清零 | 沉淀持续累积、最终可被匹配派发 → 拉大利息负债(科目 #3)与佣金应付,改前须过 B1 兑付覆盖率核验 |
+
+**最低业绩门槛**(独立于结算周期):必须 Track A ≥ $1,000/月 且 Track B ≥ $1,000/月 才进入结算队列,未达门槛该周期匹配归零;此门槛恒按月口径,与结算周期正交。
+
+**前后端联动**:运营在后台改 `settlePeriod` / `residualPolicy` → server-canonical 配置经平台配置接口下发 → 前端读取并联动:① 预计金额数字与「本周期…估算」标签;② 公式行「{周期}结算」节奏文案;③ 玩法说明页结算频率 FAQ 与沉淀处置 FAQ。前端以 backend-replaceable 单源(`lib/binary-settlement.ts`,枚举 `settlePeriod` / `residualPolicy` + i18n label map)承接,接真后台时把常量换成配置接口拉取即可,渲染层零重写。
+
 #### 8.4.2 自动分配机制
 
 当网络伙伴某节点已满后,新发展的成员自动分配到下游用户的轨道下面(内部 `isSpillover: true` 标记)。系统推送:`↳ Network partner V5 Sarah K. auto-placed 3 new members into your Track B`。
 
 #### 8.4.3 UI 规格
 
-- 今日 Balance Match 估算 hero(大字)+ 公式(min(A,B) × 10%)
+- 本周期(默认本月)Balance Match 预计 hero(大字,金额随结算周期联动,见 §8.4.1.2)+ 公式(min(Track A, Track B) × 10% · 日上限 · {周期}结算)
 - 阻塞警告(若任一轨 < $1,000)
 - Track A / Track B 双轨卡(月业绩 + 成员数 + Top member)
 - 较大 vs 较小差距比较条
@@ -2280,18 +2303,19 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
    - Month 3(高亮卡):A $4,500 / B $2,400 → bonus $240(按较小一轨)
    - 💡 takeaway 卡:`The slower track sets your reward. Invest in both.`
 
-8. **§6 Common questions**(4 FAQ 行,纯展开列表)
+8. **§6 Common questions**(5 FAQ 行,纯展开列表)
    - Q1 能否选 track?A1 可以,首次签约时选,placement 之后锁定
    - Q2 一轨没人怎么办?A2 继续邀请该轨或等网络伙伴自动分配;两轨 < $1,000 无 bonus
-   - Q3 多久结算?A3 每月,自然月末统计、月初支付
+   - Q3 多久结算?A3 按平台配置的结算周期(默认每月),按周期统计两轨累计业绩、于下一周期初支付(§8.4.1.2)
    - Q4 不邀请也赚吗?A4 可以,Balance Match Bonus 只是 channel 之一,设备产出 / 直推奖照常
+   - Q5 未匹配的业绩会保留吗?A5 取决于沉淀处置策略(§8.4.1.2):每月清零 / 每次对碰清零 → 不结转;转结 → 累积到下一周期
 
 9. **底部 footer**:全宽 CTA `Got it · see my Dual-Track →` 链 `/team/binary`
 
 **实现约束**:
 - "use client" + useT(),完全静态展示,无 store 订阅(零状态)
 - SVG 树状图:程序生成,viewBox 自适应,不依赖外部图片
-- i18n keys:`binaryHowItWorks.*` namespace(en + zh 双语镜像),~30 keys
+- i18n keys:`binaryHowItWorks.*` namespace(en + zh 双语镜像),含结算频率 FAQ 与沉淀处置 FAQ(`residualFaq` 按策略派生);结算周期 / 周期标签 label map 在 `binary.*` namespace(`settlePeriodLabel` / `periodEstimateLabel` / `periodUnitLabel`)
 
 ### 8.5 全球领导奖池 `/team/leadership-pool`
 
