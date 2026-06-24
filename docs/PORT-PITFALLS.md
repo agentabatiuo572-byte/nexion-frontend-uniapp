@@ -416,3 +416,11 @@
 - **对策**：① 修 3 处(标签 `转化`→`推荐`、key `dayOneCatConvert`→`dayOneCatRecommend`;footer/body 去 meta 改 benefit 框架),双语同步。② 加**专扫 i18n/messages 的独立门**(不走排除 i18n 的 sentinel_absent):`转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate`——复合词 + 带引号裸 `"转化"` 是无歧义 meta(货币在文案里写「兑换/exchange」),零误报。
 - **已转**：`verify.sh` 哨兵「no funnel-meta in i18n copy」+ 本台账。**负向探针验真**:5 个 meta 串全 CAUGHT、5 个合法串(货币 conversion / 兑换 / 推荐 / 注释裸转化)全放行;verify 24/0;5175 实景验 chip=推荐、控制台 0。
 - **元教训**：哨兵的**排除范围**本身可能制造盲区——「为避免误报而 `grep -v` 某目录」时必问「该目录里有没有正该被这条哨兵守的东西」。文案 meta 的权威位置是 i18n/messages,守它的门必须扫它(用精准 pattern 规避误报,而非整目录排除)。
+
+## P-057 · `now % ONE_WEEK` 周界错对齐到周四(纪元是周四)→ 结算倒计时偏差数天
+
+- **现象**：领导奖池 `store/leadership-pool.ts` 用 `weekStart = now - (now % ONE_WEEK)` 算周界。JS 纪元 1970-01-01 是**周四**,故 `now % ONE_WEEK == 0` 落在**周四 00:00 UTC**——weekStart 与派生的 `nextPayoutTs = weekStart + ONE_WEEK` 都对齐到周四,而非周一。页面 hero「N 天后结算」实测显示 ~1 天,实际到下周一应 ~5 天。
+- **口径矛盾**：权威口径(PRD §8.5.3 + 玩法说明页 i18n「周一 00:00 UTC 开新池 → 周日 23:59 UTC 快照」)明写周一周界——代码却算周四,**声明(文案)≠实现(代码)**,且 vue-tsc/verify 全绿(纯逻辑值错,无类型/渲染症状),只有实景核对倒计时数字才暴露。
+- **对策**：新增 `weekStartMondayUTC()` 助手——`getUTCDay`(周一→0…周日→6)+ `Date.UTC` 取本周一 00:00 UTC,替换 epoch-modulo 式;`nextPayoutTs`(下周一)/ history(往周一)随之正确。
+- **已转**：`verify.sh` 哨兵「no epoch-modulo week boundary」grep `% ONE_WEEK`(排除 JSDoc/`//` 注释行,容忍文档引用反例)。**负向探针验真**:真代码行 `now % ONE_WEEK` CAUGHT、注释行 EXCLUDED;verify 25/0;5173 双语实景「5天 / settles in 5d」与玩法页周一/周日 UTC 口径自洽、console 0。
+- **元教训**：**纪元锚点不是周一**——任何「时间戳 `% 周期`」做日历对齐都隐含「从周四起算」的偏差。日历周界(周/月)必须走 `getUTCDay`/`Date.UTC` 显式派生,绝不用 epoch-modulo。纯逻辑值 bug 无机器症状,必**回源核权威口径(PRD/文案)+ 实景核派生数字**,不能只信 tsc+verify 绿。

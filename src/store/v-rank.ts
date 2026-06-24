@@ -30,8 +30,7 @@ export interface VRankDef {
   directBonus: number;        // L1 直推奖比例
   unilevelDepth: number;      // unilevel 覆盖深度 (1=只有L1, 7=L1-L7)
   peerBonus: number;          // 平级奖比例
-  leadershipVotes: number;    // 领导池票数
-  leadershipShareApprox: number; // 占池子约比 (用于展示)
+  leadershipVotes: number;    // 领导池票数(单源,与 leadership-pool.ts V_VOTES 一致)
   cultivationBonus: number;   // 培育至此 V,上线拿 NEX
 }
 
@@ -39,91 +38,91 @@ export const V_RANKS: VRankDef[] = [
   {
     v: 0, title: "Cadet", cnTitle: "学员",
     conditions: {}, directBonus: 0.05, unilevelDepth: 1,
-    peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
+    peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 0,
   },
   {
     v: 1, title: "Pilot", cnTitle: "飞行员",
     conditions: { selfBuyUSD: 299, directRefs: 3 },
     directBonus: 0.10, unilevelDepth: 2,
-    peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
+    peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 500,
   },
   {
     v: 2, title: "Operator", cnTitle: "操作员",
     conditions: { teamVolumeUSD: 5000 },
     directBonus: 0.10, unilevelDepth: 3,
-    peerBonus: 0, leadershipVotes: 0, leadershipShareApprox: 0,
+    peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 2000,
   },
   {
     v: 3, title: "Captain", cnTitle: "舰长",
     conditions: { teamVolumeUSD: 20_000, vDownlines: { 1: 2 } },
     directBonus: 0.10, unilevelDepth: 4,
-    peerBonus: 0.05, leadershipVotes: 1, leadershipShareApprox: 0.01,
+    peerBonus: 0.05, leadershipVotes: 1,
     cultivationBonus: 10_000,
   },
   {
     v: 4, title: "Commander", cnTitle: "指挥官",
     conditions: { teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
     directBonus: 0.10, unilevelDepth: 5,
-    peerBonus: 0.05, leadershipVotes: 2, leadershipShareApprox: 0.015,
+    peerBonus: 0.05, leadershipVotes: 2,
     cultivationBonus: 50_000,
   },
   {
     v: 5, title: "Wing Leader", cnTitle: "翼领",
     conditions: { teamVolumeUSD: 150_000, vDownlines: { 3: 4 } },
     directBonus: 0.10, unilevelDepth: 6,
-    peerBonus: 0.05, leadershipVotes: 4, leadershipShareApprox: 0.02,
+    peerBonus: 0.05, leadershipVotes: 4,
     cultivationBonus: 200_000,
   },
   {
     v: 6, title: "Squadron", cnTitle: "中队长",
     conditions: { teamVolumeUSD: 500_000, vDownlines: { 4: 5 } },
     directBonus: 0.10, unilevelDepth: 7,
-    peerBonus: 0.05, leadershipVotes: 8, leadershipShareApprox: 0.025,
+    peerBonus: 0.05, leadershipVotes: 8,
     cultivationBonus: 800_000,
   },
   {
     v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
     conditions: { teamVolumeUSD: 1_000_000, vDownlines: { 5: 6 } },
     directBonus: 0.10, unilevelDepth: 8,
-    peerBonus: 0.05, leadershipVotes: 16, leadershipShareApprox: 0.03,
+    peerBonus: 0.05, leadershipVotes: 16,
     cultivationBonus: 3_200_000,
   },
   {
     v: 8, title: "Star Admiral", cnTitle: "星上将",
     conditions: { teamVolumeUSD: 3_000_000, vDownlines: { 6: 7 } },
     directBonus: 0.10, unilevelDepth: 9,
-    peerBonus: 0.05, leadershipVotes: 32, leadershipShareApprox: 0.035,
+    peerBonus: 0.05, leadershipVotes: 32,
     cultivationBonus: 10_000_000,
   },
   {
     v: 9, title: "Galaxy Lord", cnTitle: "星河领主",
     conditions: { teamVolumeUSD: 10_000_000 },
     directBonus: 0.10, unilevelDepth: 10,
-    peerBonus: 0.05, leadershipVotes: 64, leadershipShareApprox: 0.04,
+    peerBonus: 0.05, leadershipVotes: 64,
     cultivationBonus: 0,
   },
   {
     v: 10, title: "Nexion Founder", cnTitle: "联合创始",
     conditions: { teamVolumeUSD: 30_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 128, leadershipShareApprox: 0.05,
+    peerBonus: 0.05, leadershipVotes: 128,
     cultivationBonus: 0,
   },
   {
     v: 11, title: "Cosmic Sovereign", cnTitle: "宇宙至尊",
     conditions: { teamVolumeUSD: 100_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 256, leadershipShareApprox: 0.06,
+    peerBonus: 0.05, leadershipVotes: 256,
     cultivationBonus: 0,
   },
   {
     v: 12, title: "Singularity", cnTitle: "奇点",
     conditions: { teamVolumeUSD: 500_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
-    peerBonus: 0.05, leadershipVotes: 512, leadershipShareApprox: 0.10,
+    peerBonus: 0.05, leadershipVotes: 512,
     cultivationBonus: 0,
   },
 ];

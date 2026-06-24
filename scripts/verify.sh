@@ -145,6 +145,20 @@ no_raw_navigateback() {
   else bad "raw uni.navigateBack — cold-open no-op; use navBack() helper (P-054)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_raw_navigateback
+# Week-boundary epoch-modulo guard (leadership-pool fix 2026-06-24): the JS epoch
+# (1970-01-01) is a THURSDAY, so `now % ONE_WEEK == 0` lands on Thursday 00:00 UTC,
+# not Monday. The v3 leadership-pool cycle runs Mon 00:00 → Sun 23:59 UTC (PRD
+# §8.5.3). Any week-start MUST derive Monday via getUTCDay/Date.UTC — never
+# `x % ONE_WEEK` (no legit use exists; it always mis-aligns to Thursday).
+no_epoch_week_modulo() {
+  local hits
+  # exclude JSDoc/line-comment lines (` * …` / `// …`) — they may quote the
+  # anti-pattern for documentation (as the leadership-pool warning does).
+  hits=$(grep -rnE '%[[:space:]]*ONE_WEEK' src 2>/dev/null | grep -vE ':[0-9]+:[[:space:]]*(\*|//)' | head -5)
+  if [ -z "$hits" ]; then ok "no epoch-modulo week boundary (% ONE_WEEK → Thu, not Mon) (0 hits)";
+  else bad "epoch-modulo week boundary aligns to Thursday — use Monday-UTC helper (PRD §8.5.3)"; echo "$hits" | sed 's/^/        /'; fi
+}
+no_epoch_week_modulo
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A

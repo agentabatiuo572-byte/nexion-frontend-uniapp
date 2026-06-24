@@ -3449,6 +3449,7 @@ export const en = {
     poolTotalShort: "Pool ${k}K · {n} votes",
     youTag: "YOU",
     howItWorksEntry: "New here? Learn how the Leadership Pool works",
+    concentrationHint: "Top {n} leaders take ~{pct}% of the pool · the higher you climb, the more you take",
   },
 
   poolHowItWorks: {
@@ -3469,7 +3470,7 @@ export const en = {
     colVotes: "Votes",
     colShare: "Approx weekly share",
     s2Footnote:
-      "Shares assume current totals (~$10M weekly pool · ~200K total votes outstanding). Actual share scales with both pool size and competing vote count.",
+      "Shares are estimated live from the current network of leaders — high V ranks take the lion's share via exponential vote weight; actual share scales with pool size and competing votes.",
     s3Title: "Settlement timeline",
     s3Intro: "Weekly cycle — predictable and transparent.",
     s3Step1Title: "Monday 00:00 UTC · Pool starts",

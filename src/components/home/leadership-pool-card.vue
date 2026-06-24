@@ -48,7 +48,7 @@ const unlocked = computed(() => myRank.value >= 3);
 
 const poolKText = computed(() => (poolUSDT.value / 1000).toFixed(1));
 const payoutText = computed(() => myPayout.value.toFixed(2));
-const shareText = computed(() => fmt(t.value.home.poolShare, { n: (myShare.value * 100).toFixed(3) }));
+const shareText = computed(() => fmt(t.value.home.poolShare, { n: (myShare.value * 100).toFixed(2) }));
 
 function goPool() {
   uni.navigateTo({ url: "/pages/team/leadership-pool", fail: () => {} });

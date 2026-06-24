@@ -3368,6 +3368,7 @@ export const zh: Messages = {
     poolTotalShort: "池 ${k}K · {n} 票",
     youTag: "你",
     howItWorksEntry: "新手?了解领导池玩法",
+    concentrationHint: "顶部 {n} 名领袖分走约 {pct}% 池子 · 升得越高,吃得越多",
   },
 
   poolHowItWorks: {
@@ -3388,7 +3389,7 @@ export const zh: Messages = {
     colVotes: "票数",
     colShare: "周分红占比",
     s2Footnote:
-      "占比按当前数据(约 $10M 周池 / 约 20 万总票)估算,实际占比受池子规模和竞争票数影响。",
+      "占比按当前全网领袖分布实时估算——高 V 级凭指数票权分走大头;实际受池子规模与竞争票数影响。",
     s3Title: "结算时间表",
     s3Intro: "周度循环——可预期、透明。",
     s3Step1Title: "周一 00:00 UTC · 新池开始",

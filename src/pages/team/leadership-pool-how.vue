@@ -104,20 +104,23 @@ import HowCalloutBox from "@/components/how/how-callout-box.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
+import { useLeadershipPool, V_VOTES } from "@/store/leadership-pool";
+import type { VRank } from "@/store/v-rank";
 
 const t = useT();
 const w = computed(() => t.value.poolHowItWorks);
+const pool = useLeadershipPool();
 
-const voteRows = [
-  { r: "V3", v: 1, s: "≈ 0.005%" },
-  { r: "V4", v: 2, s: "≈ 0.01%" },
-  { r: "V5", v: 4, s: "≈ 0.02%" },
-  { r: "V6", v: 8, s: "≈ 0.04%" },
-  { r: "V7", v: 16, s: "≈ 0.08%" },
-  { r: "V8", v: 32, s: "≈ 0.16%" },
-  { r: "V9", v: 64, s: "≈ 0.32%" },
-  { r: "V10", v: 128, s: "≈ 0.64%" },
-];
+// 周分红占比 = 单人份额(votes / 全网总票),从 store 派生,不再硬编码。高阶单人份额指数递增。
+const voteRows = computed(() => {
+  const total = pool.totalVotes();
+  const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  return ranks.map((v) => {
+    const votes = V_VOTES[v];
+    const share = total > 0 ? votes / total : 0;
+    return { r: `V${v}`, v: votes, s: `≈ ${(share * 100).toFixed(2)}%` };
+  });
+});
 
 function goBack() {
   navBack("/pages/team/leadership-pool");

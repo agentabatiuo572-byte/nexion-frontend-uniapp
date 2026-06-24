@@ -52,7 +52,7 @@
               </view>
               <view>
                 <text class="block" :style="statLabelStyle">{{ t.pool.yourShare }}</text>
-                <text class="block font-display tabular-nums" :style="statValueStyle">{{ (myShare * 100).toFixed(3) }}%</text>
+                <text class="block font-display tabular-nums" :style="statValueStyle">{{ (myShare * 100).toFixed(2) }}%</text>
               </view>
             </view>
           </template>
@@ -69,6 +69,11 @@
               <text>{{ t.pool.seePathV3 }}</text>
             </view>
           </template>
+        </view>
+
+        <!-- Top-concentration caption (derived, true) -->
+        <view :style="concentrationStripStyle">
+          <text :style="concentrationTextStyle">{{ concentrationText }}</text>
         </view>
 
         <!-- V-rank vote-weight table -->
@@ -127,7 +132,7 @@ import VBadge from "@/components/team/v-badge.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useLeadershipPool, V_VOTES, type LeadershipPayout } from "@/store/leadership-pool";
+import { useLeadershipPool, V_VOTES, POOL_TOP_N, type LeadershipPayout } from "@/store/leadership-pool";
 import { useVRank, V_RANKS, type VRank } from "@/store/v-rank";
 
 const t = useT();
@@ -157,6 +162,9 @@ const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: vState.m
 const totalPeopleText = computed(() =>
   fmt(t.value.pool.totalPeople, { n: Object.values(dist.value).reduce((a, b) => a + b, 0).toLocaleString() }),
 );
+// 头部集中度:派生真值(顶部 N 名领袖占池比),随 seed/票权变,非硬编码。
+const topPct = computed(() => Math.round(pool.topConcentrationPct() * 100));
+const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n: POOL_TOP_N, pct: topPct.value }));
 
 const voteRows = computed(() => {
   const ranks: VRank[] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -230,6 +238,13 @@ const pathCtaStyle: CSSProperties = {
   fontSize: "12.5px",
   fontWeight: 600,
 };
+
+const concentrationStripStyle: CSSProperties = {
+  padding: "10px 14px",
+  borderRadius: "12px",
+  background: "color-mix(in srgb, var(--v5-brand-2) 9%, transparent)",
+};
+const concentrationTextStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.45 };
 
 const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
 const tableHeadStyle: CSSProperties = { padding: "14px 16px 8px" };
