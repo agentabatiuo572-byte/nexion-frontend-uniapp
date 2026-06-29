@@ -285,10 +285,6 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/wallet-premium",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/me/wallet-nex-v2-lock",
       "style": { "navigationStyle": "custom" }
     },

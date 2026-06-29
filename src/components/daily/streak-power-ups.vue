@@ -1,11 +1,11 @@
 <!--
   StreakPowerUps — high-value conversion perks unlocked at streak milestones
-  7 / 14 / 30 / 60 (ported from
+  7 / 30 / 60 (ported from
   Nexion-prototype/app/components/daily/streak-power-ups.tsx).
 
   Unlock state derives from current streak vs threshold; the "activated"
   decision is durable in the daily-powerup store. Claim routes the user into a
-  deeper conversion touchpoint (staking / genesis / premium / unilevel). Source
+  deeper conversion touchpoint (staking / genesis / unilevel). Source
   tints (#C6FF3A / #7C5CFF / #FFBE3D / #FFFFFF) → v5 tokens for token discipline.
   Achievement-badge side-effect from the source is omitted (no achievements
   store in this sample).
@@ -29,8 +29,6 @@
             <svg v-else-if="streak < p.threshold" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <!-- royalty_boost (Zap) -->
             <svg v-else-if="p.id === 'royalty_boost'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>
-            <!-- premium_trial (Crown) -->
-            <svg v-else-if="p.id === 'premium_trial'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
             <!-- staking_boost (ShieldCheck) -->
             <svg v-else-if="p.id === 'staking_boost'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <!-- genesis_whitelist (Gem) -->
@@ -84,7 +82,7 @@ interface PowerUp {
   id: StreakPowerUpId;
   threshold: number;
   tint: string;
-  key: "royalty_boost" | "premium_trial" | "staking_boost" | "genesis_whitelist";
+  key: "royalty_boost" | "staking_boost" | "genesis_whitelist";
   href: string;
 }
 
@@ -96,7 +94,6 @@ const powerUp = useDailyPowerUp();
 
 const POWERUPS: PowerUp[] = [
   { id: "royalty_boost", threshold: 7, tint: "var(--v5-success)", key: "royalty_boost", href: "/pages/team/team" },
-  { id: "premium_trial", threshold: 14, tint: "var(--v5-brand)", key: "premium_trial", href: "/pages/me/wallet" },
   { id: "staking_boost", threshold: 30, tint: "var(--v5-warning)", key: "staking_boost", href: "/pages/staking/staking" },
   { id: "genesis_whitelist", threshold: 60, tint: "var(--v5-ink)", key: "genesis_whitelist", href: "/pages/genesis/genesis" },
 ];

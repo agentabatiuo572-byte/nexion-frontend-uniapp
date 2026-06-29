@@ -30,7 +30,6 @@ export interface PhaseParams {
   withdrawalCooldownDays: number;      // 30 P1-P4, 45 P5+
   binaryDailyCapUSD: number;           // 5000 P1-P3, 2000 P4+
   // Feature gates (unlock incrementally as phases advance)
-  premiumSubscriptionAvailable: boolean;
   nexV2LockAvailable: boolean;
   complianceHoldEnabled: boolean;      // P5+ adds an extra compliance-review step to withdrawal
 }
@@ -45,7 +44,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 10,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
-    premiumSubscriptionAvailable: false,
     nexV2LockAvailable: false,
     complianceHoldEnabled: false,
   },
@@ -58,7 +56,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 10,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
-    premiumSubscriptionAvailable: false,
     nexV2LockAvailable: false,
     complianceHoldEnabled: false,
   },
@@ -71,7 +68,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 10,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
-    premiumSubscriptionAvailable: false,
     nexV2LockAvailable: false,
     complianceHoldEnabled: false,
   },
@@ -84,7 +80,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 10,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 2_000,
-    premiumSubscriptionAvailable: true,
     nexV2LockAvailable: false,
     complianceHoldEnabled: false,
   },
@@ -97,7 +92,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 20,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,
-    premiumSubscriptionAvailable: true,
     nexV2LockAvailable: false,
     complianceHoldEnabled: true,
   },
@@ -110,7 +104,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     withdrawalPointsPer100: 20,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,
-    premiumSubscriptionAvailable: true,
     nexV2LockAvailable: true,
     complianceHoldEnabled: true,
   },

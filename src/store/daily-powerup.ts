@@ -11,7 +11,6 @@ import { ref } from "vue";
 
 export type StreakPowerUpId =
   | "royalty_boost"
-  | "premium_trial"
   | "staking_boost"
   | "genesis_whitelist";
 
@@ -21,13 +20,18 @@ interface DailyPowerUpData {
 }
 
 const STORAGE_KEY = "nexion-daily-powerup-v1";
+const VALID_POWER_UP_IDS = new Set<StreakPowerUpId>([
+  "royalty_boost",
+  "staking_boost",
+  "genesis_whitelist",
+]);
 
 function hydrate(): DailyPowerUpData {
   try {
     const s = uni.getStorageSync(STORAGE_KEY) as Partial<DailyPowerUpData> | "";
     if (s && typeof s === "object" && Array.isArray(s.claimed)) {
       return {
-        claimed: s.claimed,
+        claimed: s.claimed.filter((id): id is StreakPowerUpId => VALID_POWER_UP_IDS.has(id as StreakPowerUpId)),
         claimedAt: s.claimedAt && typeof s.claimedAt === "object" ? s.claimedAt : {},
       };
     }
