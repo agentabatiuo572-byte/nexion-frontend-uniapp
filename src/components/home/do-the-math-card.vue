@@ -68,7 +68,7 @@ import { derivePromoUpgrade } from "@/store/device-types";
 const t = useT();
 const app = useApp();
 
-const promo = computed(() => derivePromoUpgrade(app.devices));
+const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const baseShort = computed(() => (promo.value.baseKind === "phone" ? "phone" : promo.value.baseName));
 const baseWidthPct = computed(() => Math.max(0.4, (promo.value.baseDaily / promo.value.targetDaily) * 100));
 const baseRate = computed(() => `$${promo.value.baseDaily.toFixed(2)} /d`);

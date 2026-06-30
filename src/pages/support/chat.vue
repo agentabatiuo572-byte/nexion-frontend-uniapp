@@ -191,10 +191,10 @@ function onSend(text: string) {
 
 function onChip(key: string) {
   const k = key as QuickPromptKey;
-  const onlineCount = app.devices.filter((d) => d.status === "online" && d.activatedAt !== null).length;
+  const onlineCount = app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length;
   nova.sendUser(quickLabel(k), "user-quick");
   schedule(() => {
-    nova.push(replyToQuickPrompt(k, { earningsToday: app.earnings.today, devices: app.devices, onlineCount }));
+    nova.push(replyToQuickPrompt(k, { earningsToday: app.earnings.today, devices: app.visibleDevices, onlineCount }));
   }, 600);
 }
 

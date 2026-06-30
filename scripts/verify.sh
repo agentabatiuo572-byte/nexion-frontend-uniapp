@@ -51,6 +51,12 @@ sentinel_absent() {
   if [ -z "$hits" ]; then ok "$label (0 hits)"; else bad "$label"; echo "$hits" | sed 's/^/        /'; fi
 }
 
+# grep sentinel: FAIL if pattern is ABSENT from a specific file (presence assertion)
+sentinel_present() {
+  local label="$1" file="$2" pattern="$3"
+  if grep -qE "$pattern" "$file" 2>/dev/null; then ok "$label"; else bad "$label (missing /$pattern/ in $file)"; fi
+}
+
 echo -e "${C}━━ Nexion uni-app verify · module=$MODULE ━━${N}"
 
 # ── (1) type-check ──
@@ -108,6 +114,319 @@ i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化
 if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
+# ── SPEC-1 载体分层 + 服务端结算解耦 sentinels ──
+# carrier-tiering: hashpower MUST keep the H5 base-hosting branch (防回退到 App/H5 同口径)
+sentinel_present "SPEC-1 carrier-tiering: H5 base-hosting branch" src/lib/hashpower.ts 'carrier === "h5"'
+sentinel_present "SPEC-1 carrier-tiering: H5_BASE_FACTOR present" src/lib/hashpower.ts 'H5_BASE_FACTOR'
+sentinel_present "SPEC-1 carrier single-source: #ifdef APP-PLUS" src/lib/carrier.ts '#ifdef APP-PLUS'
+# settle-single-source: earnings accrue by WALL-CLOCK Δ via settleDevice (not tick-time / fixed window)
+sentinel_present "SPEC-1 settle: settleDevice exists" src/store/app.ts 'function settleDevice'
+sentinel_present "SPEC-1 settle: wall-clock lastSettledAt anchor" src/store/app.ts 'now - d\.lastSettledAt'
+sentinel_present "SPEC-1 settle: Device.lastSettledAt typed" src/store/types.ts 'lastSettledAt'
+# single accrual source: the baseRate accrual must appear EXACTLY once (no 2nd bypass)
+SPEC1_ACC=$(grep -cE 'd\.baseRate \* lifeEff \* phoneFactor' src/store/app.ts 2>/dev/null)
+if [ "$SPEC1_ACC" = "1" ]; then ok "SPEC-1 settle single-source: 1 accrual site"; else bad "SPEC-1 settle: expected 1 accrual site, found $SPEC1_ACC"; fi
+# ── SPEC-7 risk-cluster config + earning buckets sentinels ──
+sentinel_present "SPEC-7 risk cluster config typed" src/store/config-types.ts 'interface RiskClusterConfig'
+sentinel_present "SPEC-7 risk cluster seeded in platform config" src/mock/platform-config.ts 'riskCluster:'
+sentinel_present "SPEC-7 risk cluster cloned into config store" src/store/config.ts 'riskCluster: \{ \.\.\.DEFAULT_PLATFORM_CONFIG\.riskCluster \}'
+sentinel_present "SPEC-7 earning buckets typed" src/store/types.ts 'interface EarningBuckets'
+sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earningBuckets: EarningBuckets'
+sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
+sentinel_present "SPEC-7 registration risk store exists" src/store/risk-cluster.ts 'evaluateRegistration'
+sentinel_present "SPEC-7 register evaluates before password step" src/pages/register/register.vue 'registrationRisk\.value = riskCluster\.evaluateRegistration'
+sentinel_present "SPEC-7 register commits cluster route" src/pages/register/register.vue 'riskCluster\.commitRegistration'
+sentinel_present "SPEC-7 welcome gift routes through buckets" src/pages/register/register.vue 'creditRewardBucket\(registrationRoute\.bucketRoute'
+sentinel_present "SPEC-7 welcome gift claimed per account" src/pages/register/register.vue 'claimGift\(identity\)'
+sentinel_present "SPEC-7 sponsorship tracks claimed accounts" src/store/sponsorship.ts 'giftClaimedByAccount'
+sentinel_present "SPEC-7 settlement route evaluator exists" src/store/risk-cluster.ts 'function evaluateSettlement'
+sentinel_present "SPEC-7 settle reads account risk route" src/store/app.ts 'evaluateSettlement\(accountKey\.value\)'
+sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
+sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
+sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
+sentinel_present "SPEC-7 withdraw rules config typed" src/store/config-types.ts 'interface WithdrawRulesConfig'
+sentinel_present "SPEC-7 withdraw rules seeded in platform config" src/mock/platform-config.ts 'withdrawRules:'
+sentinel_present "SPEC-7 withdrawal risk store exists" src/store/withdrawal-risk.ts 'evaluateWithdrawal'
+sentinel_present "SPEC-7 withdraw page uses withdrawable bucket" src/pages/me/wallet-withdraw.vue 'app\.user\.earningBuckets\.withdrawableUsdt'
+sentinel_present "SPEC-7 withdraw submit carries risk route" src/pages/me/wallet-withdraw.vue 'eligibility\.value\.route'
+sentinel_present "SPEC-7 withdrawal debits withdrawable bucket" src/store/app.ts 'withdrawableUsdt: \+\(currentUser\.earningBuckets\.withdrawableUsdt - amount\)'
+if grep -q 'app\.advanceWithdrawal' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null; then
+  bad "SPEC-7 tracking page must not auto-advance withdrawals"
+else
+  ok "SPEC-7 tracking page is display-only"
+fi
+if grep -q 'app\.creditBalance(gift\.usdt)' src/pages/register/register.vue 2>/dev/null; then
+  bad "SPEC-7 register gift must not credit USDT balance directly"
+else
+  ok "SPEC-7 register gift not directly credited to balance"
+fi
+if grep -q 'const usdtBalance = computed(() => app\.user\.usdtBalance)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
+  bad "SPEC-7 withdraw page must not use total USDT balance as available"
+else
+  ok "SPEC-7 withdraw page uses withdrawable amount, not total balance"
+fi
+if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/app.ts 2>/dev/null; then
+  bad "SPEC-7 settle must not credit NEX balance outside buckets"
+else
+  ok "SPEC-7 settle NEX route goes through buckets"
+fi
+# ── SPEC-2 电脑算力 sentinels ──
+spec2_pc_gpu_kind_coverage() {
+  local miss=""
+  grep -q '"pc-gpu"' src/store/types.ts || miss="${miss}DeviceKind "
+  grep -q '"pc-gpu"' src/store/device-types.ts || miss="${miss}device-types "
+  grep -q '"pc-gpu"' src/components/earn/device-card-pc.vue || miss="${miss}device-card-icon "
+  grep -q '"pc-gpu"' src/components/earn/empty-slots-hint.vue || miss="${miss}slot-grid-icon "
+  if [ -z "$miss" ]; then ok "SPEC-2 pc-gpu kind coverage (types/specs/icons)";
+  else bad "SPEC-2 pc-gpu kind coverage missing: $miss"; fi
+}
+spec2_pc_gpu_kind_coverage
+sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/earn/compute-share-entry.vue 'isEnabled\("computeShareEnabled"\)'
+sentinel_present "SPEC-2 dev config mutation production guarded" src/store/config.ts 'if \(IS_PRODUCTION\) return'
+sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
+sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
+sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-if="enabled" class="pb-8"'
+sentinel_present "SPEC-2 copy handler re-checks disabled flag" src/pages/compute-share/download.vue 'function copyDownloadUrl\(\)'
+sentinel_present "SPEC-2 connect handler re-checks disabled flag" src/pages/compute-share/download.vue 'function connectDemoComputer\(\)'
+sentinel_present "SPEC-2 download title reads config content" src/pages/compute-share/download.vue 'cfg\.config\.computeShare\.content'
+sentinel_present "SPEC-2 download guide falls back to i18n" src/pages/compute-share/download.vue 'configured \|\| t\.value\.computeShare\.downloadBody'
+sentinel_present "SPEC-2 computeShare content typed" src/store/config-types.ts 'interface ComputeShareContent'
+sentinel_present "SPEC-2 computeShare zhTitle seeded" src/mock/platform-config.ts 'zhTitle:'
+sentinel_present "SPEC-2 computeShare zhGuide seeded" src/mock/platform-config.ts 'zhGuide:'
+sentinel_present "SPEC-2 computeShare enTitle seeded" src/mock/platform-config.ts 'enTitle:'
+sentinel_present "SPEC-2 computeShare enGuide seeded" src/mock/platform-config.ts 'enGuide:'
+sentinel_present "SPEC-2 gpu tiers single source exists" src/lib/gpu-tiers.ts 'export const GPU_TIERS'
+sentinel_present "SPEC-2 device factory accepts matched tier" src/store/device-types.ts 'options\.gpuTier \?\? matchGpuTier'
+sentinel_present "SPEC-2 connect uses configured GPU tiers" src/store/app.ts 'cfg\.config\.computeShare\.gpuTiers'
+sentinel_present "SPEC-2 pc-gpu freezes when flag disabled" src/store/app.ts 'freezeComputeShareDevice'
+sentinel_present "SPEC-2 slot cap counts hidden active pc-gpu" src/store/app.ts 'activeSlotCount = computed\(\(\) => devices\.value\.filter'
+sentinel_present "SPEC-2 device page slot meter uses authoritative active count" src/pages/me/devices.vue 'app\.activeSlotCount \+ trialReserved\.value'
+sentinel_present "SPEC-2 default feature flag is off" src/mock/platform-config.ts 'computeShareEnabled:\s*false'
+sentinel_present "SPEC-2 checkout counts trial reserved slot" src/pages/store/checkout.vue 'activeSlotCount \+ reservedSlots\.value'
+sentinel_present "SPEC-2 eligibility counts trial reserved slot" src/composables/use-device-eligibility.ts 'activeSlotCount \+ reservedSlots\.value'
+sentinel_present "SPEC-2 trade-in choice counts trial reserved slot" src/components/tradein-sheets.vue 'activeSlotCount \+ reservedSlots\.value'
+sentinel_present "SPEC-2 trade-in activation receives reserved slots" src/components/tradein-sheets.vue 'activateDevice\(newId, reservedSlots\.value\)'
+sentinel_present "SPEC-2 order activation receives reserved slots" src/App.vue 'tickOrders\(trialReservesSlotNow\(\) \? 1 : 0\)'
+sentinel_present "SPEC-2 order detail passes trial reserved slot" src/pages/store/order-detail.vue 'advanceOrder\(id\.value, reservedSlots\.value\)'
+sentinel_present "SPEC-2 refresh passes trial reserved slot" src/store/refresh.ts 'tickOrders\(trialReservesSlotNow\(\) \? 1 : 0\)'
+sentinel_present "SPEC-2 slot sheet counts trial reserved slot" src/components/slot-action-sheet.vue 'slotsUsed\.value >= MAX_DEVICES'
+sentinel_present "SPEC-2 slot sheet activation receives reserved slot" src/components/slot-action-sheet.vue 'activateDevice\(d\.id, reservedSlots\.value\)'
+sentinel_present "SPEC-2 replace candidate uses slot devices" src/store/tradein-sheet.ts 'useApp\(\)\.slotDevices'
+sentinel_present "SPEC-2 purchased hardware helper exists" src/store/device-types.ts 'isPurchasedHardwareKind'
+sentinel_present "SPEC-2 download URL defaults to empty" src/mock/platform-config.ts 'downloadUrl:\s*""'
+spec2_gpu_tier_monotonic() {
+  if "$NODE_BIN" -e '
+    const fs=require("fs");
+    const s=fs.readFileSync("src/lib/gpu-tiers.ts","utf8");
+    const rows=[...s.matchAll(/id:\s*"(G[1-6])"[\s\S]*?tops:\s*(\d+)/g)].map(m=>({id:m[1],tops:+m[2]}));
+    const order=["G1","G2","G3","G4","G5","G6"];
+    if(rows.length!==6) throw new Error(`expected 6 tiers, got ${rows.length}`);
+    const by=new Map(rows.map(r=>[r.id,r.tops]));
+    for(let i=1;i<order.length;i++){ if(!(by.get(order[i])>by.get(order[i-1]))) throw new Error(`${order[i]} not > ${order[i-1]}`); }
+  ' >/tmp/uni-spec2-gpu.log 2>&1; then
+    ok "SPEC-2 gpu-tier monotonic TOPS (G1<...<G6)"
+  else
+    bad "SPEC-2 gpu-tier monotonic TOPS"; sed 's/^/        /' /tmp/uni-spec2-gpu.log
+  fi
+}
+spec2_gpu_tier_monotonic
+spec2_guard_semantics() {
+  if "$NODE_BIN" -e '
+    const fs=require("fs");
+    const download=fs.readFileSync("src/pages/compute-share/download.vue","utf8");
+    const app=fs.readFileSync("src/store/app.ts","utf8");
+    const deviceTypes=fs.readFileSync("src/store/device-types.ts","utf8");
+    const gpu=fs.readFileSync("src/lib/gpu-tiers.ts","utf8");
+    if(!/function copyDownloadUrl\(\)[\s\S]*?if \(!enabled\.value\)/.test(download)) throw new Error("copy handler lacks enabled gate");
+    if(!/function connectDemoComputer\(\)[\s\S]*?if \(!enabled\.value\)/.test(download)) throw new Error("connect handler lacks enabled gate");
+    if(!/addDevice\("pc-gpu", \{ gpuModel: normalizedModel, gpuTier \}\)/.test(app)) throw new Error("pc-gpu creation does not pass matched tier");
+    if(!/device\.kind === "pc-gpu" && !computeShareEnabled\.value/.test(app)) throw new Error("pc-gpu activation is not feature-gated");
+    if(!/const IS_PRODUCTION = import\.meta\.env\.PROD/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("dev config mutation lacks production guard constant");
+    if(!/function _devSetFlag[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetFlag is not production guarded");
+    if(!/function _devSetComputeShareContent[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetComputeShareContent is not production guarded");
+    if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(\(d\) => d\.activatedAt !== null\)\.length\)/.test(app)) throw new Error("slot cap must count hidden active pc-gpu devices");
+    const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
+    if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
+    const demoKinds = [...demoKindsMatch[1].matchAll(/"([^"]+)"/g)].map((m)=>m[1]);
+    if(demoKinds.includes("pc-gpu")) throw new Error("default demo seed must not include active pc-gpu");
+    if(demoKinds.length !== 4) throw new Error(`default demo seed must leave one free slot for pc connect, got ${demoKinds.length} demo kinds`);
+    if(/createDevice\("pc-gpu",\s*"pc-gpu-seed"/.test(app)) throw new Error("app store must not append an active pc-gpu seed");
+    if(!/const slotDevices = computed\(\(\) =>[\s\S]*computeShareEnabled\.value[\s\S]*devices\.value\.filter\(\(d\) => d\.kind !== "pc-gpu"\)/.test(app)) throw new Error("slotDevices must hide pc-gpu while compute-share is disabled");
+    if(!/const slotsUsed = computed\(\(\) => app\.activeSlotCount \+ trialReserved\.value\)/.test(fs.readFileSync("src/pages/me/devices.vue","utf8"))) throw new Error("device page slot meter must use authoritative activeSlotCount");
+    if(!/name:\s*"Shared computer"/.test(deviceTypes)) throw new Error("pc-gpu device name still uses tier label");
+    if(/PURCHASED_HARDWARE_KINDS[\s\S]*"pc-gpu"/.test(deviceTypes)) throw new Error("pc-gpu must not be a purchased hardware kind");
+    const frontText=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
+    if(/原型演示|Prototype path only|运营后台|内部开关|工程字段名|ENV_FILTERED|MANUAL_HOLD/.test(frontText)) throw new Error("front copy leaks internal or engineering language");
+    const slotSheet=fs.readFileSync("src/components/slot-action-sheet.vue","utf8");
+    const orderDetail=fs.readFileSync("src/pages/store/order-detail.vue","utf8");
+    const refresh=fs.readFileSync("src/store/refresh.ts","utf8");
+    if(/activateDevice\(d\.id\)/.test(slotSheet)) throw new Error("slot sheet activates without reserved slots");
+    if(/advanceOrder\(id\.value\)/.test(orderDetail)) throw new Error("order detail advances without reserved slots");
+    if(/tickOrders\(\)/.test(refresh)) throw new Error("refresh advances orders without reserved slots");
+    const rows=[...gpu.matchAll(/id:\s*"(G[1-6])"[\s\S]*?keywords:\s*\[([^\]]+)\][\s\S]*?tops:\s*(\d+)/g)];
+    const tierFor4070=rows.find(([,id,kw])=>id==="G4" && /rtx 4070/.test(kw));
+    const fallbackG2=rows.find(([,id])=>id==="G2");
+    if(!tierFor4070) throw new Error("RTX 4070 must map to G4");
+    if(!fallbackG2) throw new Error("G2 fallback tier missing");
+  ' >/tmp/uni-spec2-guard.log 2>&1; then
+    ok "SPEC-2 guard semantics (disabled gate/config tier/hardware naming)"
+  else
+    bad "SPEC-2 guard semantics"; sed 's/^/        /' /tmp/uni-spec2-guard.log
+  fi
+}
+spec2_guard_semantics
+# ── SPEC-3 prototype homes withdrawn ──
+spec3_prototype_homes_withdrawn() {
+  if "$NODE_BIN" -e '
+    const fs=require("fs");
+    const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
+    const paths=new Set((pj.pages||[]).map(p=>p.path));
+    const removedRoutes=["pages/home-signed/home-signed","pages/home-h5/home-h5","pages/home-cloak/home-cloak"];
+    for(const p of removedRoutes){ if(paths.has(p)) throw new Error(`removed route still registered: ${p}`); }
+    const removedFiles=[
+      "src/pages/home-signed/home-signed.vue",
+      "src/pages/home-h5/home-h5.vue",
+      "src/pages/home-cloak/home-cloak.vue",
+      "src/components/home/prototype-home.vue",
+    ];
+    for(const file of removedFiles){
+      if(fs.existsSync(file)) throw new Error(`removed prototype file still exists: ${file}`);
+    }
+    const chassis=fs.readFileSync("src/components/app-chassis.vue","utf8");
+    if(/prototypeHome/.test(chassis)) throw new Error("prototypeHome prop branch should be removed");
+    const types=fs.readFileSync("src/store/config-types.ts","utf8");
+    if(/HomePrototype|homePrototypes/.test(types)) throw new Error("prototype home config types should be removed");
+    const cfg=fs.readFileSync("src/mock/platform-config.ts","utf8");
+    if(/homePrototypes|signedApp|h5Mobile|cloakApp/.test(cfg)) throw new Error("prototype home mock seed should be removed");
+  ' >/tmp/uni-spec3-prototype-withdrawn.log 2>&1; then
+    ok "SPEC-3 prototype home routes removed"
+  else
+    bad "SPEC-3 prototype home withdrawal"; sed 's/^/        /' /tmp/uni-spec3-prototype-withdrawn.log
+  fi
+}
+spec3_prototype_homes_withdrawn
+# ── SPEC-6 new entry-surface homes ──
+spec6_entry_surface_homes_present() {
+  if "$NODE_BIN" -e '
+    const fs=require("fs");
+    const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
+    const paths=new Set((pj.pages||[]).map(p=>p.path));
+    const requiredRoutes=[
+      "pages/entry-surfaces/index",
+      "pages/entry-surfaces/signed",
+      "pages/entry-surfaces/h5",
+      "pages/entry-surfaces/white",
+    ];
+    for(const p of requiredRoutes){ if(!paths.has(p)) throw new Error(`SPEC-6 route missing: ${p}`); }
+    const requiredFiles=[
+      "src/pages/entry-surfaces/index.vue",
+      "src/pages/entry-surfaces/signed.vue",
+      "src/pages/entry-surfaces/h5.vue",
+      "src/pages/entry-surfaces/white.vue",
+      "src/components/entry-surfaces/entry-surface-home.vue",
+    ];
+    for(const file of requiredFiles){ if(!fs.existsSync(file)) throw new Error(`SPEC-6 file missing: ${file}`); }
+    const index=fs.readFileSync("src/pages/entry-surfaces/index.vue","utf8");
+    const fullLinks=[
+      "http://localhost:5173/#/pages/entry-surfaces/signed",
+      "http://localhost:5173/#/pages/entry-surfaces/h5",
+      "http://localhost:5173/#/pages/entry-surfaces/white?entry=white-app",
+    ];
+    for(const link of fullLinks){ if(!index.includes(link)) throw new Error(`SPEC-6 full clickable link missing: ${link}`); }
+    if(!/@(tap|click)="open\(item\.route\)"/.test(index)) throw new Error("SPEC-6 full links are not clickable rows");
+    const signed=fs.readFileSync("src/pages/entry-surfaces/signed.vue","utf8");
+    const h5=fs.readFileSync("src/pages/entry-surfaces/h5.vue","utf8");
+    const white=fs.readFileSync("src/pages/entry-surfaces/white.vue","utf8");
+    if(!/surface="signed"/.test(signed)) throw new Error("signed entry page does not render signed surface");
+    if(!/surface="h5"/.test(h5)) throw new Error("h5 entry page does not render h5 surface");
+    if(!/surface="white"/.test(white)) throw new Error("white entry page does not render white surface");
+    const body=fs.readFileSync("src/components/entry-surfaces/entry-surface-home.vue","utf8")+index;
+    for(const token of ["在线增强","基础托管","体检融合"]){ if(!body.includes(token)) throw new Error(`SPEC-6 surface semantic token missing: ${token}`); }
+    if(/secondary:\s*\{\s*label:\s*"PC sharing path",\s*href:\s*"\/pages\/compute-share\/download"/.test(body)) throw new Error("H5 entry must not advertise a disabled-by-default PC download path as direct CTA");
+    if(/ENV_FILTERED|MANUAL_HOLD|keyword\d+|computeShareEnabled|H5_BASE_FACTOR|home-signed|home-h5|home-cloak|原型演示|工程字段名/.test(body)) throw new Error("SPEC-6 entry UI leaks withdrawn or engineering copy");
+  ' >/tmp/uni-spec6-entry-surfaces.log 2>&1; then
+    ok "SPEC-6 entry-surface homes present (3 independent routes + full links)"
+  else
+    bad "SPEC-6 entry-surface homes"; sed 's/^/        /' /tmp/uni-spec6-entry-surfaces.log
+  fi
+}
+spec6_entry_surface_homes_present
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs >/tmp/uni-spec6-entry-runtime.log 2>&1; then
+    ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
+  else
+    bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
+  fi
+else
+  printf "  ${Y}SKIP${N}  SPEC-6 entry-surface runtime isolation (dev server not running at %s)\n" "$BASE_URL"
+fi
+# ── SPEC-4 account-cloud + multi-carrier session sentinels ──
+sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexion-account-cloud-v1'
+sentinel_present "SPEC-4 app binds account snapshot" src/store/app.ts 'function bindAccount'
+sentinel_present "SPEC-4 app persists account snapshot" src/store/app.ts 'function persistAccountSnapshot'
+sentinel_present "SPEC-4 login binds account before session claim" src/pages/login/login.vue 'app\.bindAccount\(identity\)'
+sentinel_present "SPEC-4 register binds account before rewards" src/pages/register/register.vue 'app\.bindAccount\(identity\)'
+sentinel_present "SPEC-4 entry surface supports white-app carrier" src/lib/entry-surface.ts '"white-app"'
+sentinel_present "SPEC-4 session registry storage exists" src/store/session.ts 'nexion-account-sessions-v1'
+sentinel_present "SPEC-4 security page uses live session registry" src/pages/me/security.vue 'session\.activeSessions'
+spec4_account_session_semantics() {
+  if "$NODE_BIN" -e '
+    const fs=require("fs");
+    const session=fs.readFileSync("src/store/session.ts","utf8");
+    const app=fs.readFileSync("src/store/app.ts","utf8");
+    const appVue=fs.readFileSync("src/App.vue","utf8");
+    const login=fs.readFileSync("src/pages/login/login.vue","utf8");
+    const register=fs.readFileSync("src/pages/register/register.vue","utf8");
+    const entry=fs.readFileSync("src/lib/entry-surface.ts","utf8");
+    const wallet=fs.readFileSync("src/pages/me/wallet.vue","utf8");
+    const withdrawalTracking=fs.readFileSync("src/pages/me/wallet-withdraw-tracking.vue","utf8");
+    if(/function writeActiveRecord|function readActiveRecord|const ACTIVE_KEY/.test(session)) throw new Error("legacy single active-session writer returned");
+    if(/rec\.deviceId !== deviceId\.value[\s\S]*return "kicked"/.test(session)) throw new Error("different device login still kicks current session");
+    if(!/readAccountSessionRecords/.test(session)) throw new Error("account session list is not exposed");
+    if(!/function resumeOrClaim/.test(session)) throw new Error("startup session restore/revoke guard missing");
+    if(!/\.resumeOrClaim\(key\)/.test(appVue)) throw new Error("app startup must resume existing session instead of blindly claiming a new one");
+    if(!/restored\.status === "kicked"[\s\S]*uni\.reLaunch\(\{ url: "\/pages\/session\/kicked" \}\)/.test(appVue)) throw new Error("app startup must route restored revoked sessions to kicked page");
+    if(/useSession\(\)\.claim\(key\)/.test(appVue)) throw new Error("app startup still blindly claims a new session");
+    if(!/revokeAllOtherSessions/.test(session)) throw new Error("session revoke-all action missing");
+    if(!/mergeAndWriteAccountSnapshot\(lastCloudSnapshot, snapshot\)/.test(app)) throw new Error("account snapshot is not merged through app store");
+    if(!/adoptAccountSnapshot\(merged\)/.test(app)) throw new Error("merged account snapshot is not adopted back into app state");
+    if(!/accountKey,\s*entrySurface,\s*accountCloudUpdatedAt/.test(app)) throw new Error("account cloud state is not returned to consumers");
+    if(!/auth\.signIn\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(login)) throw new Error("login must bind account before session claim");
+    if(!/auth\.signUp\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(register)) throw new Error("register must bind account before rewards/session flow");
+    if(!/entry === "white-app" \|\| entry === "white" \|\| entry === "cloak" \|\| entry === "janus"/.test(entry)) throw new Error("white-app entry aliases missing");
+    const messages=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
+    if(/同一时间只能有一台设备运行挖矿|only one device runs mining at a time/.test(messages)) throw new Error("old strong single-device copy leaked");
+    const walletUi=wallet+withdrawalTracking;
+    if(/replace\(\s*\/-\/g/.test(walletUi)) throw new Error("wallet status enum is still transformed into UI copy");
+    if(/return "just now"|`\\$\\{m\\}m ago`|`\\$\\{h\\}h ago`|`\\$\\{Math\.floor\(h \/ 24\)\}d ago`/.test(walletUi)) throw new Error("wallet relative time still hardcodes English copy");
+    if(/label="My bank cards"|USDT Balance|NEX Boost Active|cards bound|Reused at checkout/.test(wallet)) throw new Error("wallet page still has hardcoded English UI copy");
+  ' >/tmp/uni-spec4-session.log 2>&1; then
+    ok "SPEC-4 account/session semantics (account cloud + multi-carrier)"
+  else
+    bad "SPEC-4 account/session semantics"; sed 's/^/        /' /tmp/uni-spec4-session.log
+  fi
+}
+spec4_account_session_semantics
+if "$NODE_BIN" scripts/spec4-account-cloud-merge-check.mjs >/tmp/uni-spec4-merge.log 2>&1; then
+  ok "$(cat /tmp/uni-spec4-merge.log)"
+else
+  bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
+fi
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs >/tmp/uni-spec4-app-sync.log 2>&1; then
+    ok "$(cat /tmp/uni-spec4-app-sync.log)"
+  else
+    bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' /tmp/uni-spec4-app-sync.log
+  fi
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs >/tmp/uni-spec4-runtime-guard.log 2>&1; then
+    ok "$(cat /tmp/uni-spec4-runtime-guard.log)"
+  else
+    bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
+  fi
+else
+  printf "  ${Y}SKIP${N}  SPEC-4 account-cloud app sync (dev server not running at %s)\n" "$BASE_URL"
+  printf "  ${Y}SKIP${N}  SPEC-4 runtime session guard (dev server not running at %s)\n" "$BASE_URL"
+fi
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`
 # close tag compiles fine under vue-tsc/volar (lenient: script extends to EOF)
 # but THROWS in vite:vue / uni's @vue/compiler-sfc → "Element is missing end tag"

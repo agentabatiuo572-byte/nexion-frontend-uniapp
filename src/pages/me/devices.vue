@@ -42,6 +42,8 @@
           </view>
         </view>
 
+        <ComputeShareEntry context="devices" />
+
         <!-- Trial device — NexionBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
@@ -142,6 +144,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
+import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -159,12 +162,12 @@ const trialConfig = useTrialConfig();
 const trialActive = computed(() =>
   ["active", "grace", "extended"].includes(trial.status),
 );
-const activeDevices = computed(() => app.devices.filter((d) => d.activatedAt !== null));
-const inactiveDevices = computed(() => app.devices.filter((d) => d.activatedAt === null));
+const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
+const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
-const slotsUsed = computed(() => activeDevices.value.length + trialReserved.value);
+const slotsUsed = computed(() => app.activeSlotCount + trialReserved.value);
 const slotsFull = computed(() => slotsUsed.value >= MAX_DEVICES);
 
 const slotMeterLabel = computed(() =>
@@ -184,6 +187,8 @@ async function handleActivate(d: Device) {
   const ok = app.activateDevice(d.id, trialReserved.value);
   if (ok) {
     toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: d.name }));
+  } else {
+    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
   }
 }
 

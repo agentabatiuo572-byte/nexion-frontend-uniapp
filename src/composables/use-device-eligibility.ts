@@ -5,6 +5,7 @@ import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useWalletPairing } from "@/store/wallet-pairing";
 import { MAX_DEVICES } from "@/store/device-types";
+import { trialReservesSlotNow } from "@/store/free-trial";
 import {
   checkEligibility,
   eligibleTradeInSources,
@@ -50,7 +51,7 @@ export function useDeviceEligibility(
 
   // EligibilityContext rebuilt reactively from the store refs.
   const ctx = computed<EligibilityContext>(() => ({
-    devices: app.devices,
+    devices: app.visibleDevices,
     vRank: vRank.myRank,
     cumulativeDepositUsdt: app.user.cumulativeDepositUsdt,
     // ⚠️ MOCK-ONLY kycTier inference (mirrors source): walletPaired → "basic"
@@ -72,9 +73,8 @@ export function useDeviceEligibility(
     eligibleTradeInSources(kind, DEFAULT_TRADEIN_CONFIG, ctx.value),
   );
   const canTradeIn = computed(() => tradeInSources.value.length > 0);
-  const capped = computed(
-    () => app.devices.filter((d) => d.activatedAt !== null).length >= MAX_DEVICES,
-  );
+  const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
+  const capped = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
 
   return { result, canTradeIn, tradeInSources, capped };
 }

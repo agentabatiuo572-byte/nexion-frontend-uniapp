@@ -1,6 +1,6 @@
-# ALIGNMENT-LEDGER —— uniapp ↔ H5 原版 对齐台账（SoT）
+# ALIGNMENT-LEDGER —— UniApp 当前实现面对齐台账（SoT）
 
-> 长线任务唯一事实源。换 window / 续作时**第一件事读它**。基准 = `Nexion-prototype`(:3001) 真相源；
+> 长线任务唯一事实源。换 window / 续作时**第一件事读它**。基准 = `Nexion-uniapp` 当前实现面；
 > 例外：**主人已决产品决策优先于原版**（见 plan「真相源校正层」：NOVA 改名、5 一级页优化）。
 > 计划全文：`C:\Users\jason\.claude\plans\uniapp-uniapp-delegated-hejlsberg.md`
 
@@ -173,7 +173,7 @@
 ---
 
 ## BEHAVIOR-PARITY · 29 自动触发行为（Pass B-行为）
-> 校验法：源码级触发 diff + **运行时模拟双端实测**（清 localStorage/改时间戳/带 query/置业务态）。3001 触发而 5173 不触发 = P0。
+> 校验法：源码级触发回源 + **5173 运行时模拟实测**（清 localStorage/改时间戳/带 query/置业务态）。旧 H5 只保留历史样本，不再作为 P0 对位判据。
 > 状态：未审 / 已记 / 已修 / 已验。落点遵红线（触及 5 页 → 全局/chassis）。
 
 | # | 行为 | 触发源 | 条件 | 原版位置 | uni 状态 | 落点 |

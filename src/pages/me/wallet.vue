@@ -20,7 +20,7 @@
 
       <!-- Balance hero -->
       <view class="relative overflow-hidden" :style="heroStyle">
-        <text class="block" :style="heroLabelStyle">USDT Balance</text>
+        <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
         <view class="inline-flex items-center" style="margin-top: 8px; gap: 6px" @click="goNex">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
@@ -57,9 +57,13 @@
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
           <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
         </WalletListRow>
-        <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.pending">
+        <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.reviewingEarnings" :sublabel="t.wallet.reviewingEarningsSub">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ pending.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ pendingReview.toFixed(2) }}</text></template>
+        </WalletListRow>
+        <WalletListRow icon-bg="var(--v5-brand-2-soft)" :label="t.wallet.lockedRewards" :sublabel="t.wallet.lockedRewardsSub">
+          <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ lockedRewards.toFixed(2) }}</text></template>
         </WalletListRow>
         <WalletListRow icon-bg="var(--v5-tech-cyan-soft)" :label="t.wallet.allTimeEarnings" :sublabel="allTimeSublabel">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z" /><path d="M3 10h18" /></svg></template>
@@ -76,7 +80,7 @@
         <WalletListRow icon-bg="color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent)" :label="t.wallet.transactionHistory" :sublabel="t.wallet.allCreditsDebits" chevron href="/pages/me/wallet-bills">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8" /><path d="M12 17.5v-11" /></svg></template>
         </WalletListRow>
-        <WalletListRow icon-bg="var(--v5-warning-soft)" label="My bank cards" :sublabel="cardsSub" chevron href="/pages/me/wallet-cards">
+        <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.cards.listTitle" :sublabel="cardsSub" chevron href="/pages/me/wallet-cards">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg></template>
         </WalletListRow>
         <WalletListRow v-if="showWithdrawal" icon-bg="color-mix(in srgb, var(--v5-warning) 22%, transparent)" :label="withdrawalRowLabel" :sublabel="withdrawalRowSub" chevron href="/pages/me/wallet-withdraw-tracking">
@@ -87,11 +91,11 @@
 
       <!-- NEX boost footer callout -->
       <view :style="nexCalloutStyle">
-        <text class="block" :style="nexCalloutLabelStyle">NEX Boost Active</text>
+        <text class="block" :style="nexCalloutLabelStyle">{{ t.wallet.nexBoostActive }}</text>
         <view :style="nexCalloutBodyStyle">
-          <text>Your {{ nexLabel }} NEX unlocks </text>
-          <text style="color: var(--v5-brand); font-weight: 600">+10% earnings</text>
-          <text>. Reach 5,000 NEX for fee discount.</text>
+          <text>{{ fmt(t.wallet.nexBoostPrefix, { nex: nexLabel }) }}</text>
+          <text style="color: var(--v5-brand); font-weight: 600">{{ t.wallet.nexBoostHighlight }}</text>
+          <text>{{ t.wallet.nexBoostSuffix }}</text>
         </view>
       </view>
     </view>
@@ -108,15 +112,19 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useCards } from "@/store/cards";
+import type { WithdrawalStatus } from "@/store/types";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
 const cards = useCards();
 
-const usdt = computed(() => app.user.usdtBalance);
+const buckets = computed(() => app.user.earningBuckets);
+const usdt = computed(() => buckets.value.withdrawableUsdt);
 const nexLabel = computed(() => app.user.nexBalance.toLocaleString());
 const pending = computed(() => app.user.pendingEarnings);
+const pendingReview = computed(() => buckets.value.pendingReviewUsdt);
+const lockedRewards = computed(() => buckets.value.bonusLockedUsdt);
 const teamLifetimeUSD = computed(() => commission.totalUSDTLifetime());
 const allTimeEarned = computed(() => app.earnings.total + teamLifetimeUSD.value);
 const allTimeSublabel = computed(() =>
@@ -131,8 +139,8 @@ const allTimeSublabel = computed(() =>
 const cardsCount = computed(() => cards.cards.length);
 const cardsSub = computed(() =>
   cardsCount.value > 0
-    ? `${cardsCount.value} cards bound`
-    : "Reused at checkout, no re-entry",
+    ? fmt(t.value.wallet.cardsBound, { n: cardsCount.value })
+    : t.value.wallet.cardsReuseHint,
 );
 
 const latestWithdrawal = computed(() => app.latestWithdrawal);
@@ -148,17 +156,24 @@ const withdrawalRowSub = computed(() => {
   return `${statusLabel(w.status)} · ${fmtTime(w.submittedAt)}`;
 });
 
-function statusLabel(s: string): string {
-  return s.replace(/-/g, " ");
+function statusLabel(s: WithdrawalStatus): string {
+  const labels: Record<WithdrawalStatus, string> = {
+    submitted: t.value.wallet.submitted,
+    "review-passed": t.value.wallet.reviewPassed,
+    processing: t.value.wallet.processing,
+    sent: t.value.wallet.sent,
+    confirmed: t.value.wallet.confirmed,
+  };
+  return labels[s];
 }
 function fmtTime(ts: number): string {
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t.value.wallet.timeJustNow;
+  if (m < 60) return fmt(t.value.wallet.timeMinutesAgo, { n: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  if (h < 24) return fmt(t.value.wallet.timeHoursAgo, { n: h });
+  return fmt(t.value.wallet.timeDaysAgo, { n: Math.floor(h / 24) });
 }
 
 function goNex() {

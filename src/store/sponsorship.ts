@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
+import { normalizeAccountKey } from "@/store/account-cloud";
 
 // Ported from Nexion-prototype/lib/v3/sponsorship.ts (zustand → Pinia).
 // Records the referral chain; claimGift() mints the one-time welcome reward.
@@ -13,6 +14,7 @@ interface Persisted {
   sponsorCode: string | null;
   sponsor: SponsorMeta | null;
   giftClaimed: boolean;
+  giftClaimedByAccount?: Record<string, boolean>;
   boundAt: number | null;
 }
 
@@ -24,13 +26,14 @@ function hydrate(): Persisted {
         sponsorCode: s.sponsorCode ?? null,
         sponsor: s.sponsor ?? null,
         giftClaimed: !!s.giftClaimed,
+        giftClaimedByAccount: s.giftClaimedByAccount ?? {},
         boundAt: s.boundAt ?? null,
       };
     }
   } catch {
     // first run
   }
-  return { sponsorCode: null, sponsor: null, giftClaimed: false, boundAt: null };
+  return { sponsorCode: null, sponsor: null, giftClaimed: false, giftClaimedByAccount: {}, boundAt: null };
 }
 
 export const useSponsorship = defineStore("sponsorship", () => {
@@ -38,6 +41,7 @@ export const useSponsorship = defineStore("sponsorship", () => {
   const sponsorCode = ref<string | null>(init.sponsorCode);
   const sponsor = ref<SponsorMeta | null>(init.sponsor);
   const giftClaimed = ref<boolean>(init.giftClaimed);
+  const giftClaimedByAccount = ref<Record<string, boolean>>(init.giftClaimedByAccount ?? {});
   const boundAt = ref<number | null>(init.boundAt);
 
   function persist() {
@@ -46,6 +50,7 @@ export const useSponsorship = defineStore("sponsorship", () => {
         sponsorCode: sponsorCode.value,
         sponsor: sponsor.value,
         giftClaimed: giftClaimed.value,
+        giftClaimedByAccount: giftClaimedByAccount.value,
         boundAt: boundAt.value,
       });
     } catch {
@@ -64,9 +69,12 @@ export const useSponsorship = defineStore("sponsorship", () => {
     persist();
   }
 
-  function claimGift(): { usdt: number; nex: number } | null {
-    if (giftClaimed.value) return null;
+  function claimGift(accountKey?: string): { usdt: number; nex: number } | null {
+    const key = accountKey ? normalizeAccountKey(accountKey) : null;
+    if (key && giftClaimedByAccount.value[key]) return null;
+    if (!key && giftClaimed.value) return null;
     if (!sponsorCode.value) return null;
+    if (key) giftClaimedByAccount.value = { ...giftClaimedByAccount.value, [key]: true };
     giftClaimed.value = true;
     persist();
     return { usdt: WELCOME_GIFT_USDT, nex: WELCOME_GIFT_NEX };
@@ -76,6 +84,7 @@ export const useSponsorship = defineStore("sponsorship", () => {
     sponsorCode.value = null;
     sponsor.value = null;
     giftClaimed.value = false;
+    giftClaimedByAccount.value = {};
     boundAt.value = null;
     persist();
   }

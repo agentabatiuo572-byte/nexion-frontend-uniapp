@@ -41,7 +41,7 @@ import { ONE_MONTH_MS, mockServerNow } from "./server-time";
 const MIN_EFFICIENCY = 0.22; // floor at month 12+
 
 export function isDegradable(kind: DeviceKind): boolean {
-  return kind !== "phone" && kind !== "cloud-share";
+  return kind !== "phone" && kind !== "cloud-share" && kind !== "pc-gpu";
 }
 
 /**

@@ -49,8 +49,8 @@
         </view>
       </view>
 
-      <!-- Loss-aversion pair -->
-      <MissedIncomeBanner />
+      <!-- Potential daily yield — conversion hook right under the hero total -->
+      <EmptySlotsHint />
 
       <!-- Trial entries -->
       <view class="mx-4">
@@ -63,10 +63,15 @@
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.myDevices }}</text>
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ devices.length + trialSlot }} / {{ MAX_DEVICES }}</text>
       </view>
-      <DeviceCardPC v-for="d in devices" :key="d.id" :device="d" />
+      <!-- Device pool — one card, accordion rows (one detail open at a time) -->
+      <view class="mx-4 rounded-2xl overflow-hidden" style="background: var(--v5-surface)">
+        <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
+      </view>
 
-      <EmptySlotsHint />
+      <ComputeShareEntry />
       <DeviceLifecycleBanner />
+      <!-- Loss-aversion — moved directly above the market board -->
+      <MissedIncomeBanner />
       <MarketBoard />
       <TaskCenter />
     </CardStagger>
@@ -81,6 +86,7 @@ import TrialHeroBanner from "@/components/trial-hero-banner.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
+import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
 import DeviceLifecycleBanner from "@/components/earn/device-lifecycle-banner.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
@@ -97,8 +103,14 @@ const app = useApp();
 const t = useT();
 const range = ref<Range>("Today");
 
+// Accordion: only one device detail open at a time (null = all collapsed).
+const expandedId = ref<string | null>(null);
+function toggleDevice(id: string) {
+  expandedId.value = expandedId.value === id ? null : id;
+}
+
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
-const devices = computed(() => app.devices.filter((d) => d.activatedAt !== null));
+const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 
 // ── HERO total earned ──

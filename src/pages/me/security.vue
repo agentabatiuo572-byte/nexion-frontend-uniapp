@@ -79,15 +79,15 @@
         <view v-for="(s, i) in sessions" :key="s.id" class="flex items-center" :style="i === 0 ? rowStyle : rowBorderedStyle">
           <view class="grid place-items-center shrink-0" :style="iconBox(s.current ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
             <!-- Smartphone -->
-            <svg v-if="deviceIconKind(s.device) === 'phone'" width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
+            <svg v-if="deviceIconKind(s.deviceName) === 'phone'" width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <!-- Tablet -->
-            <svg v-else-if="deviceIconKind(s.device) === 'tablet'" width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><line x1="12" x2="12.01" y1="18" y2="18" /></svg>
+            <svg v-else-if="deviceIconKind(s.deviceName) === 'tablet'" width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" ry="2" /><line x1="12" x2="12.01" y1="18" y2="18" /></svg>
             <!-- Monitor -->
             <svg v-else width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="s.current ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></svg>
           </view>
           <view class="flex-1 min-w-0">
-            <text class="block truncate" :style="rowLabelStyle">{{ s.device }}</text>
-            <text class="block truncate" :style="rowSubStyle">{{ s.location }} · {{ lastActiveLabel(s.lastActiveMs) }}</text>
+            <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
+            <text class="block truncate" :style="rowSubStyle">{{ t.security.sessionLocation }} · {{ lastActiveLabel(s.lastActiveMs) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
           <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" @click="handleRevoke(s)">
@@ -121,10 +121,11 @@ import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { useSecurity, type Session } from "@/store/security";
+import { fmt } from "@/i18n/format";
+import { useSecurity } from "@/store/security";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
-import { useSession } from "@/store/session";
+import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 
@@ -135,7 +136,7 @@ const app = useApp();
 const session = useSession();
 
 const twoFactorEnabled = computed(() => security.twoFactorEnabled);
-const sessions = computed(() => security.sessions);
+const sessions = computed(() => session.activeSessions);
 const hasOtherSessions = computed(() => sessions.value.some((s) => !s.current));
 
 const editingPwd = ref(false);
@@ -167,20 +168,30 @@ function deviceIconKind(label: string): "phone" | "tablet" | "monitor" {
   return "monitor";
 }
 
+function surfaceLabel(s: SessionListItem): string {
+  if (s.entrySurface === "signed-app") return t.value.security.sessionSurfaceSigned;
+  if (s.entrySurface === "white-app") return t.value.security.sessionSurfaceWhite;
+  return t.value.security.sessionSurfaceH5;
+}
+
+function sessionDeviceLabel(s: SessionListItem): string {
+  return `${s.deviceName} · ${surfaceLabel(s)}`;
+}
+
 function lastActiveLabel(ms: number): string {
   const diff = Date.now() - ms;
-  if (diff < 5 * 60 * 1000) return "just now";
-  if (diff < 3600 * 1000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 24 * 3600 * 1000) return `${Math.floor(diff / 3600000)}h ago`;
-  return `${Math.floor(diff / (24 * 3600 * 1000))}d ago`;
+  if (diff < 5 * 60 * 1000) return t.value.security.timeJustNow;
+  if (diff < 3600 * 1000) return fmt(t.value.security.timeMinutesAgo, { n: Math.floor(diff / 60000) });
+  if (diff < 24 * 3600 * 1000) return fmt(t.value.security.timeHoursAgo, { n: Math.floor(diff / 3600000) });
+  return fmt(t.value.security.timeDaysAgo, { n: Math.floor(diff / (24 * 3600 * 1000)) });
 }
 
 function relativeWhen(ms: number): string {
   const days = Math.floor((Date.now() - ms) / (24 * 3600 * 1000));
-  if (days < 1) return "today";
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
+  if (days < 1) return t.value.security.timeToday;
+  if (days < 30) return fmt(t.value.security.timeDaysAgo, { n: days });
+  if (days < 365) return fmt(t.value.security.timeMonthsAgo, { n: Math.floor(days / 30) });
+  return fmt(t.value.security.timeYearsAgo, { n: Math.floor(days / 365) });
 }
 
 function cancelPwd() {
@@ -227,14 +238,14 @@ async function toggleTwoFactor(value: boolean) {
   }
 }
 
-async function handleRevoke(s: Session) {
+async function handleRevoke(s: SessionListItem) {
   const ok = await uiConfirm({
     title: t.value.security.sessionRevoke,
-    message: `${t.value.security.sessionRevokeConfirm}\n\n${s.device} · ${s.location}`,
+    message: `${t.value.security.sessionRevokeConfirm}\n\n${sessionDeviceLabel(s)} · ${t.value.security.sessionLocation}`,
     danger: true,
   });
   if (ok) {
-    security.revokeSession(s.id);
+    session.revokeSession(s.id);
     toast.success(t.value.security.sessionRevoked);
   }
 }
@@ -247,7 +258,7 @@ async function handleRevokeAll() {
     danger: true,
   });
   if (ok) {
-    security.revokeAllOthers();
+    session.revokeAllOtherSessions();
     toast.success(t.value.security.revokeAllDone);
   }
 }

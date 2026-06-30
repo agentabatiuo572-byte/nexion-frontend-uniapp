@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useApp } from "./app";
+import { trialReservesSlotNow } from "./free-trial";
 import { tickOrders } from "./orders";
 import { useExchange } from "./exchange";
 
@@ -29,7 +30,7 @@ export const useRefresh = defineStore("refresh", () => {
     try {
       await new Promise<void>((r) => setTimeout(r, REFRESH_LATENCY_MS));
       useApp().tick(3500);
-      tickOrders();
+      tickOrders(trialReservesSlotNow() ? 1 : 0);
       useExchange().refreshRate();
     } finally {
       isRefreshing.value = false;

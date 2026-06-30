@@ -208,7 +208,7 @@ const variant = ref<Variant>("earnings");
 
 const earningsTotal = computed(() => app.earnings.total);
 const onlineDevices = computed(
-  () => app.devices.filter((d) => d.status === "online" && d.activatedAt !== null).length,
+  () => app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length,
 );
 const profileName = computed(() => profile.displayName);
 const myRank = computed(() => vRank.myRank);

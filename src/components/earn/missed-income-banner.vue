@@ -97,7 +97,7 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-const promo = computed(() => derivePromoUpgrade(app.devices));
+const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const trialActive = computed(() => trialReservesSlotNow());
 
 // Trial active → TrialGhostSlot already carries device + earnings + buy CTA.

@@ -8,6 +8,7 @@ import {
   remainingMs,
   isHighQualityEligible,
   computeTrialOffset,
+  trialReservesSlotNow,
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useTrialExtensionSheet } from "@/store/trial-extension-sheet";
@@ -22,11 +23,13 @@ import { useSession } from "@/store/session";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { isStaticReviewRoute } from "@/lib/static-review-routes";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 let lastTick = Date.now();
+let accountSessionBootstrapped = false;
 
 function startTick() {
   stopTick();
@@ -58,6 +61,7 @@ const urgencyFired = { active24h: false, grace1h: false };
 let trialTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollTrial() {
+  if (!ensureBusinessLoopsAllowed()) return;
   const freeTrial = useFreeTrial();
   const before = freeTrial.status;
   const nowMs = Date.now();
@@ -175,11 +179,10 @@ function handleAutoRedeem(shadowUSDBeforeRedeem: number, shadowNEXBeforeRedeem: 
     });
   }
   const beforeDevices = app.devices.length;
-  const activeCount = app.devices.filter((d) => d.activatedAt !== null).length;
   app.addDevice(cfg.trialProductId);
   const deviceAdded = app.devices.length > beforeDevices;
   const newId = deviceAdded ? app.devices[app.devices.length - 1]?.id : null;
-  if (newId && activeCount < MAX_DEVICES) {
+  if (newId && app.activeSlotCount < MAX_DEVICES) {
     app.activateDevice(newId);
   }
   const note =
@@ -220,8 +223,9 @@ const GENESIS_SALE_CHANCE = 0.18;
 let orderTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollOrders() {
+  if (!ensureBusinessLoopsAllowed()) return;
   // (a) Advance every in-flight order one stage (gated internally per-order).
-  tickOrders();
+  tickOrders(trialReservesSlotNow() ? 1 : 0);
 
   // (b) Genesis resale — if the user has a live listing, it occasionally fills.
   const genesis = useGenesis();
@@ -276,6 +280,7 @@ const MILESTONE_TICK_MS = 4000;
 let milestoneTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollMilestones() {
+  if (!ensureBusinessLoopsAllowed()) return;
   const app = useApp();
   const m = useMilestones();
   // Life-to-date = banked total + the still-accruing today bucket (matches the
@@ -332,7 +337,7 @@ const AUTH_WHITELIST_PREFIXES = [
   "pages/session/", // kicked screen — never auth/session-redirect away from it
 ];
 function isAuthWhitelisted(route: string): boolean {
-  return AUTH_WHITELIST_PREFIXES.some((p) => route.startsWith(p));
+  return isStaticReviewRoute(route) || AUTH_WHITELIST_PREFIXES.some((p) => route.startsWith(p));
 }
 // Returns true if it redirected (callers bail so they don't act on a route the
 // user is being kicked off of).
@@ -351,14 +356,13 @@ function checkAuthGuard(): boolean {
   return false;
 }
 
-// ── Single-device session guard + new-device recalibration redirect ──
+// ── Account session guard + new-device recalibration redirect ──
 // Mirrors GET /api/auth/session: each 1s tick (and instantly via the cross-tab
-// storage event) this compares THIS tab's sessionId to the shared "active
-// session" record. If another device/tab claimed the account, the account was
-// logged out, or ops revoked it (killedAt) → evict: void all in-flight tasks
-// (rollback) + freeze mining + reLaunch to the blocking kicked screen. If a new
-// device needs recalibration (different deviceId from the account's calibrated
-// device) → reLaunch to the calibration ritual in recalibrate mode.
+// storage event) checks THIS session record. SPEC-4 allows the same account to
+// stay active across signed App / H5 / white-app carriers; only self sign-out,
+// deleted session, or ops revoke (killedAt) evicts this carrier. If a new device
+// needs recalibration (different deviceId from the account's calibrated device)
+// → reLaunch to the calibration ritual in recalibrate mode.
 // Returns true if it redirected (caller bails). Production: identical logic
 // against the server session endpoint; the storage event becomes an SSE/push.
 function checkSession(): boolean {
@@ -370,13 +374,14 @@ function checkSession(): boolean {
   const st = session.validate();
   if (st === "kicked" || st === "logged-out") {
     const reason = st === "kicked" ? "kicked" : "logged-out";
+    stopBusinessLoops();
     useApp().interruptAllTasks(reason);
     session.kick(reason);
     uni.reLaunch({ url: "/pages/session/kicked" });
     return true;
   }
-  // Active + we own the session → ensure mining is running (resumes after a
-  // fresh re-login that follows an eviction).
+  // Active session → ensure mining is running (resumes after a fresh re-login
+  // that follows an eviction).
   const app = useApp();
   if (app.miningPaused) app.resumeMining();
   if (session.requiresRecalibration && auth.onboardingComplete) {
@@ -386,15 +391,17 @@ function checkSession(): boolean {
   return false;
 }
 
-// Cross-tab instant eviction: when another tab overwrites the shared session
-// record, the browser fires a 'storage' event here so the losing tab is kicked
-// immediately (not just on the next 1s poll). H5 only (uni storage = localStorage).
+// Cross-tab instant session refresh: registry writes from another tab/device
+// trigger a storage event so revokes/logouts are picked up immediately. H5 only
+// (uni storage = localStorage).
 let storageHandler: ((e: StorageEvent) => void) | undefined;
 function attachSessionWatch() {
   // #ifdef H5
   if (storageHandler) return;
   storageHandler = (e: StorageEvent) => {
-    if (e.key && e.key.indexOf("nexion-active-session") >= 0) checkSession();
+    if (e.key && (e.key.indexOf("nexion-account-sessions") >= 0 || e.key.indexOf("nexion-active-session") >= 0)) {
+      checkSession();
+    }
   };
   window.addEventListener("storage", storageHandler);
   // #endif
@@ -431,6 +438,55 @@ function readCurrentRoute(): string {
   }
 }
 
+function readCurrentRouteOrHash(): string {
+  const route = readCurrentRoute();
+  if (route) return route;
+  // #ifdef H5
+  try {
+    return window.location.hash || "";
+  } catch {
+    return "";
+  }
+  // #endif
+  return "";
+}
+
+function bootstrapAccountSession() {
+  if (accountSessionBootstrapped) return;
+  accountSessionBootstrapped = true;
+  // Bind the account-cloud snapshot and claim this carrier's session for an
+  // already-authenticated account. Multi-carrier sessions coexist; forced
+  // revokes are resolved by checkSession() once routes are ready.
+  const auth = useAuth();
+  if (auth.isAuthenticated) {
+    const key = auth.email || auth.accountId || "default";
+    const app = useApp();
+    const session = useSession();
+    app.bindAccount(key);
+    const restored = session.resumeOrClaim(key);
+    if (restored.status === "kicked" || restored.status === "logged-out") {
+      const reason = restored.status === "kicked" ? "kicked" : "logged-out";
+      stopBusinessLoops();
+      app.interruptAllTasks(reason);
+      session.kick(reason);
+      uni.reLaunch({ url: "/pages/session/kicked" });
+    }
+  }
+}
+
+function scheduleAccountSessionBootstrap(attempt = 0) {
+  const route = readCurrentRouteOrHash();
+  if (isStaticReviewRoute(route)) {
+    stopBusinessLoops();
+    return;
+  }
+  if (!route) {
+    if (attempt < 10) setTimeout(() => scheduleAccountSessionBootstrap(attempt + 1), 50);
+    return;
+  }
+  bootstrapAccountSession();
+}
+
 function questIdForRoute(route: string): QuestTaskId | null {
   if (route === "pages/earn/earn") return "visit_earn";
   if (route === "pages/store/store") return "visit_store";
@@ -440,9 +496,14 @@ function questIdForRoute(route: string): QuestTaskId | null {
 }
 
 function checkQuestRoute() {
+  const route = readCurrentRoute();
+  if (isStaticReviewRoute(route)) {
+    lastQuestRoute = route;
+    stopBusinessLoops();
+    return;
+  }
   if (checkAuthGuard()) return; // unauth → redirected; don't credit quests
   if (checkSession()) return; // evicted / needs recalibration → redirected
-  const route = readCurrentRoute();
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
   const id = questIdForRoute(route);
@@ -468,25 +529,54 @@ function stopQuestWatch() {
   }
 }
 
+function stopBusinessLoops() {
+  stopTick();
+  stopTrialPoll();
+  stopOrderPoll();
+  stopMilestonePoll();
+  stopQuestWatch();
+}
+
+function canRunBusinessLoops(): boolean {
+  const route = readCurrentRouteOrHash();
+  if (!route || isAuthWhitelisted(route)) return false;
+  const auth = useAuth();
+  if (!auth.isAuthenticated || !auth.onboardingComplete) return false;
+  return useSession().validate() === "active";
+}
+
+function ensureBusinessLoopsAllowed(): boolean {
+  if (checkAuthGuard()) {
+    stopBusinessLoops();
+    return false;
+  }
+  if (checkSession()) {
+    stopBusinessLoops();
+    return false;
+  }
+  if (!canRunBusinessLoops()) {
+    stopBusinessLoops();
+    return false;
+  }
+  return true;
+}
+
 onLaunch(() => {
   // Nexion is a dark-default design system (matches prototype theme-provider:
   // SSR renders <html data-theme="dark">). Apply on H5; App theming at packaging.
   // #ifdef H5
   document.documentElement.setAttribute("data-theme", "dark");
   // #endif
-  // Claim this device's session for an already-authenticated user so
-  // single-device enforcement is live from launch (a new login elsewhere then
-  // supersedes it). requiresRecalibration is resolved by checkSession() once
-  // routes are ready.
-  const auth = useAuth();
-  if (auth.isAuthenticated) {
-    useSession().claim(auth.email || "default");
+  if (isStaticReviewRoute(readCurrentRouteOrHash())) {
+    stopBusinessLoops();
+    return;
   }
+  scheduleAccountSessionBootstrap();
 });
 onShow(() => {
-  checkAuthGuard(); // immediate gate on app foreground (before the 1s tick)
-  checkSession(); // immediate single-device / recalibration check
   attachSessionWatch();
+  if (!ensureBusinessLoopsAllowed()) return; // no business writes on auth/session flow pages
+  useApp().settle(); // SPEC-1 §4.2: settle the backgrounded gap in one shot on foreground
   startTick();
   startTrialPoll();
   startOrderPoll();
@@ -495,11 +585,7 @@ onShow(() => {
 });
 onHide(() => {
   detachSessionWatch();
-  stopTick();
-  stopTrialPoll();
-  stopOrderPoll();
-  stopMilestonePoll();
-  stopQuestWatch();
+  stopBusinessLoops();
 });
 </script>
 

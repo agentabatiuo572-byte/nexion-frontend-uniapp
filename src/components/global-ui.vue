@@ -1,6 +1,6 @@
 <template>
   <!-- Toast host -->
-  <view class="nx-toast-host">
+  <view v-if="showBusinessOverlays" class="nx-toast-host">
     <view
       v-for="t in ui.toasts"
       :key="t.id"
@@ -59,17 +59,51 @@
 
   <!-- Earnings milestone celebration (driven by useMilestones().active; App.vue
        polls + fires via store.show()) -->
-  <MilestoneCelebration />
+  <MilestoneCelebration v-if="showBusinessOverlays" />
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useUI } from "@/store/ui";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
+import { isStaticReviewRoute } from "@/lib/static-review-routes";
 
 const ui = useUI();
 // Last enqueued confirm renders on top (LIFO), matching the original.
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
+const route = ref(readRoute());
+let routeTimer: ReturnType<typeof setInterval> | undefined;
+const showBusinessOverlays = computed(() => !!route.value && !isStaticReviewRoute(route.value));
+
+function readRoute(): string {
+  try {
+    const ps = getCurrentPages();
+    const route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    if (route) return route;
+  } catch {
+    // fall through to H5 hash fallback
+  }
+  // #ifdef H5
+  try {
+    return window.location.hash.replace(/^#\/?/, "").replace(/^\//, "");
+  } catch {
+    return "";
+  }
+  // #endif
+  return "";
+}
+
+onMounted(() => {
+  routeTimer = setInterval(() => {
+    route.value = readRoute();
+  }, 250);
+});
+onUnmounted(() => {
+  if (routeTimer) {
+    clearInterval(routeTimer);
+    routeTimer = undefined;
+  }
+});
 
 function onRetry() {
   const cb = ui.netError.onRetry;

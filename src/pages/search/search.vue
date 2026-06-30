@@ -90,7 +90,7 @@ const network = useNetwork();
 
 const q = ref("");
 
-const devices = computed(() => app.devices);
+const devices = computed(() => app.visibleDevices);
 const members = computed(() => network.members);
 
 // Static route catalog. href = uni page path when the page is ported,

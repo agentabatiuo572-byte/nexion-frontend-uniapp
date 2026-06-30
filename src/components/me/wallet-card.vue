@@ -107,23 +107,28 @@ const t = useT();
 const app = useApp();
 const bills = useBills();
 
-const usdt = computed(() => app.user.usdtBalance);
+const buckets = computed(() => app.user.earningBuckets);
+const usdt = computed(() => buckets.value.withdrawableUsdt);
 const intPart = computed(() => Math.floor(usdt.value).toLocaleString());
 const fracPart = computed(() => (usdt.value - Math.floor(usdt.value)).toFixed(2).slice(2));
-const pending = computed(() => app.user.pendingEarnings);
-const pendingLine = computed(() => fmt(t.value.me.pendingHint, { n: pending.value.toFixed(2) }));
+const pendingLine = computed(() =>
+  fmt(t.value.me.walletBucketsHint, {
+    review: buckets.value.pendingReviewUsdt.toFixed(2),
+    locked: buckets.value.bonusLockedUsdt.toFixed(2),
+  }),
+);
 
 const nex = computed(() => app.user.nexBalance);
 const nexLabel = computed(() => nex.value.toLocaleString());
 const nexUsd = computed(() => (nex.value * 0.171).toFixed(2));
 
-const activeCount = computed(() => app.devices.filter((d) => d.activatedAt !== null).length);
+const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const emptySlots = computed(() => Math.max(0, MAX_DEVICES - activeCount.value - trialSlot.value));
 const onlineCount = computed(
-  () => app.devices.filter((d) => d.status === "online" && d.activatedAt !== null).length + trialSlot.value,
+  () => app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length + trialSlot.value,
 );
-const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUpgrade(app.devices).targetDaily));
+const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUpgrade(app.visibleDevices).targetDaily));
 
 const billsThisMonth = computed(() => {
   const now = new Date();

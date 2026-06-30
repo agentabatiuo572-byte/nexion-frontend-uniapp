@@ -68,7 +68,7 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-const degradableDevices = computed(() => app.devices.filter((d) => isDegradable(d.kind)));
+const degradableDevices = computed(() => app.visibleDevices.filter((d) => isDegradable(d.kind)));
 
 const summaries = computed(() => degradableDevices.value.map((d) => getLifecycleSummary(d, now.value)));
 const avgEfficiency = computed(() => {
@@ -76,7 +76,7 @@ const avgEfficiency = computed(() => {
   if (list.length === 0) return 1;
   return list.reduce((s, x) => s + x.efficiency, 0) / list.length;
 });
-const totalMonthlyLossUSD = computed(() => getNetworkMonthlyLoss(app.devices, now.value).totalMonthlyLossUSD);
+const totalMonthlyLossUSD = computed(() => getNetworkMonthlyLoss(app.visibleDevices, now.value).totalMonthlyLossUSD);
 const oldest = computed(() => {
   const list = summaries.value;
   if (list.length === 0) return null;

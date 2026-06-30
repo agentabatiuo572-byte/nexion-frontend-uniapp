@@ -167,6 +167,7 @@ import { computed, ref } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
+import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct } from "@/mock/products";
 import { getLifecycleSummary } from "@/store/device-lifecycle";
@@ -187,6 +188,7 @@ const bills = useBills();
 const t = useT();
 
 const state = computed(() => sheet.state);
+const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 
 // Double-tap guard shared across composers — handlers run synchronously; flips
 // at entry and resets on early returns / before navigation. Without this, two
@@ -215,7 +217,7 @@ function previewSalvage(oldDevice: Device): number {
  *  owned of the same kind, pick the one with most-decayed salvage (oldest,
  *  lowest credit) so the user trades the device closest to EOL. */
 function chooseOldDevice(fromKind: DeviceKind): Device | null {
-  const candidates = app.devices.filter(
+  const candidates = app.slotDevices.filter(
     (d) => d.kind === fromKind && d.activatedAt !== null,
   );
   if (candidates.length === 0) return null;
@@ -274,8 +276,7 @@ function onChooseFullPrice() {
   if (s.kind !== "choice") return;
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
   // checkout flow proceeds normally to payment).
-  const activeCount = app.devices.filter((d) => d.activatedAt !== null).length;
-  if (activeCount >= MAX_DEVICES) {
+  if (app.activeSlotCount + reservedSlots.value >= MAX_DEVICES) {
     sheet.showReplace(s.targetKind, s.newPrice);
   } else {
     hide();
@@ -319,7 +320,7 @@ function onConfirmTradein() {
   // Slot-cap defense-in-depth: replace is same-slot, but refuse if the result
   // would exceed MAX_DEVICES (the store keeps this authority for direct calls).
   const postActiveCount =
-    app.devices.filter((d) => d.id !== oldDevice.id && d.activatedAt !== null).length + 1;
+    app.slotDevices.filter((d) => d.id !== oldDevice.id && d.activatedAt !== null).length + 1;
   if (postActiveCount > MAX_DEVICES) {
     toast.warn(t.value.tradein.errReplaceUnavailable);
     return;
@@ -412,10 +413,10 @@ function onReplace() {
   }
   app.deactivateDevice(lowest.id); // move old → inventory (frees slot)
   const newId = app.addDevice(s.newKind);
-  const activated = app.activateDevice(newId);
+  const activated = app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
     app.devices = app.devices.filter((d) => d.id !== newId);
-    app.activateDevice(lowest.id);
+    app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;
@@ -423,7 +424,7 @@ function onReplace() {
   const debited = app.debitBalance(s.newPrice);
   if (!debited) {
     app.devices = app.devices.filter((d) => d.id !== newId);
-    app.activateDevice(lowest.id);
+    app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;
     return;
@@ -509,13 +510,13 @@ function onForce() {
   const taskSnapshot = lowest.currentTask;
   const newId = app.addDevice(s.newKind);
   app.deactivateDevice(lowest.id); // frees slot + wipes currentTask
-  const activated = app.activateDevice(newId);
+  const activated = app.activateDevice(newId, reservedSlots.value);
   if (!activated) {
     // Rollback: remove new, restore the snapshotted task, re-activate old.
     app.devices = app.devices
       .filter((d) => d.id !== newId)
       .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
-    app.activateDevice(lowest.id);
+    app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(t.value.tradein.errReplaceSlotConflict);
     confirming.value = false;
     return;
@@ -525,7 +526,7 @@ function onForce() {
     app.devices = app.devices
       .filter((d) => d.id !== newId)
       .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
-    app.activateDevice(lowest.id);
+    app.activateDevice(lowest.id, reservedSlots.value);
     toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
     confirming.value = false;
     return;

@@ -211,6 +211,7 @@ import { useOrders, type Order } from "@/store/orders";
 import { useBills } from "@/store/bills";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
+import { trialReservesSlotNow } from "@/store/free-trial";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
@@ -372,7 +373,8 @@ const wasEmptyBefore = ref(orders.orders.length === 0);
 const firstOrderCelebrating = ref(false);
 
 const isCard = computed(() => payment.value === "card");
-const capped = computed(() => app.devices.filter((d) => d.activatedAt !== null).length >= MAX_DEVICES);
+const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
+const capped = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
 
 // ── derived text ──
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());

@@ -134,16 +134,18 @@
 
     <!-- Chassis-level overlays (each self-gates on its own store's open state,
          mirroring the prototype IOSFrame). Ported P-043. -->
-    <TrialClaimSheet />
-    <VoucherClaimSheet />
-    <SlotActionSheet />
-    <TradeinSheets />
-    <LuckySpinSheet />
-    <TrialExtensionSheet />
-    <TrialUnbindRetentionSheet />
-    <StickyCtaBar />
-    <GenesisDockHost />
-    <MessageDrawer />
+    <template v-if="showBusinessOverlays">
+      <TrialClaimSheet />
+      <VoucherClaimSheet />
+      <SlotActionSheet />
+      <TradeinSheets />
+      <LuckySpinSheet />
+      <TrialExtensionSheet />
+      <TrialUnbindRetentionSheet />
+      <StickyCtaBar />
+      <GenesisDockHost />
+      <MessageDrawer />
+    </template>
 
     <!-- Global overlay host (toast / confirm / netError) -->
     <GlobalUi />
@@ -177,8 +179,11 @@ import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
+import { isStaticReviewRoute } from "@/lib/static-review-routes";
 
-const props = defineProps<{ active?: "home" | "earn" | "store" | "team" | "me" }>();
+const props = defineProps<{
+  active?: "home" | "earn" | "store" | "team" | "me";
+}>();
 
 const t = useT();
 const notifications = useNotifications();
@@ -272,10 +277,19 @@ const TAB_ROUTE_KEY: Record<string, "home" | "earn" | "store" | "team" | "me"> =
 function readRoute(): string {
   try {
     const ps = getCurrentPages();
-    return ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    const route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    if (route) return route;
+  } catch {
+    // fall through to H5 hash fallback
+  }
+  // #ifdef H5
+  try {
+    return window.location.hash.replace(/^#\/?/, "").replace(/^\//, "");
   } catch {
     return "";
   }
+  // #endif
+  return "";
 }
 const route = ref(readRoute());
 onMounted(() => {
@@ -333,6 +347,7 @@ onUnmounted(() => {
 });
 
 const routeTab = computed(() => TAB_ROUTE_KEY[route.value]);
+const showBusinessOverlays = computed(() => !!route.value && !isStaticReviewRoute(route.value));
 // Tab route when the current route is one of the 5 mains. First-frame fallback:
 // if the route isn't resolved yet but the page passed a tab `active` prop AND no
 // route string, treat as tab (the 5 tab pages always pass it; sub-pages resolve

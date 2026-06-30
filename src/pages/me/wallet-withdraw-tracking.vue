@@ -1,7 +1,7 @@
 <!--
   Withdrawal tracking (ported from Nexion-prototype/app/(main)/me/wallet/withdraw/tracking/page.tsx).
-  5-step status stepper auto-advancing on a 3.5s page-level interval (cleared via
-  onUnmounted per P-021). Reads app.latestWithdrawal; empty state when none.
+  5-step status stepper. Reads app.latestWithdrawal; empty state when none.
+  Status is display-only here; backend/admin simulation owns progression.
   Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -60,8 +60,8 @@
         <view class="mx-4 flex items-center" :style="etaCardStyle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <view style="flex: 1">
-            <text class="block" :style="etaTitleStyle">{{ wd.status === "confirmed" ? t.wallet.trackEtaDone : t.wallet.trackEtaPending }}</text>
-            <text class="block" :style="etaSubStyle">{{ t.wallet.trackReviewNote }}</text>
+            <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
+            <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
           </view>
         </view>
 
@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -100,40 +100,26 @@ const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>
 ]);
 
 const currentIdx = computed(() => steps.value.findIndex((s) => s.key === wd.value?.status));
+const routeHeld = computed(() => !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.toFixed(2) }) : "",
 );
-
-let timer: ReturnType<typeof setTimeout> | null = null;
-function scheduleAdvance() {
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
-  }
-  const cur = wd.value;
-  if (!cur || cur.status === "confirmed") return;
-  timer = setTimeout(() => {
-    app.advanceWithdrawal();
-  }, STEP_DELAY_MS);
-}
-// Re-arm whenever the withdrawal status changes (mirrors the source status watcher).
-watch(
-  () => wd.value?.status,
-  () => scheduleAdvance(),
-  { immediate: true },
+const etaTitle = computed(() =>
+  wd.value?.status === "confirmed"
+    ? t.value.wallet.trackEtaDone
+    : routeHeld.value
+      ? t.value.wallet.withdrawRouteHeldTitle
+      : t.value.wallet.trackEtaPending,
 );
-onUnmounted(() => {
-  if (timer) clearTimeout(timer);
-  timer = null;
-});
+const etaSub = computed(() => (routeHeld.value ? t.value.wallet.withdrawRouteHeldSub : t.value.wallet.trackReviewNote));
 
 function relTime(ts: number): string {
-  if (ts > Date.now()) return "—";
+  if (ts > Date.now()) return t.value.wallet.timePending;
   const diff = Date.now() - ts;
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ago`;
+  if (m < 1) return t.value.wallet.timeJustNow;
+  if (m < 60) return fmt(t.value.wallet.timeMinutesAgo, { n: m });
+  return fmt(t.value.wallet.timeHoursAgo, { n: Math.floor(m / 60) });
 }
 
 function goWithdraw() {

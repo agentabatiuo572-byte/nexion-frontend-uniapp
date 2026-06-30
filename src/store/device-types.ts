@@ -1,7 +1,9 @@
+import type { GpuTier } from "./config-types";
 import type { Device, DeviceKind } from "./types";
 import { pickRandomTask } from "@/mock/tasks";
 import { getCachedCapability, fallbackCapability } from "@/lib/device-capability";
 import { getDeviceId } from "@/lib/device-id";
+import { gpuTierDailyNex, gpuTierDailyRate, gpuTierVram, matchGpuTier } from "@/lib/gpu-tiers";
 
 // Ported from Nexion-prototype/lib/store/index.ts (device specs + factory).
 export const ONE_DAY_MS = 86400000;
@@ -16,6 +18,7 @@ const DEVICE_SPECS: Record<
   }
 > = {
   phone: { name: "Your phone", gpu: "Mobile NPU · ~28 TOPS", vramTotal: 8, basePower: 0, baseRate: 0.06, baseRateNEX: 10 },
+  "pc-gpu": { name: "Computer GPU", gpu: "Computer GPU · shared", vramTotal: 12, basePower: 320, baseRate: 0.34, baseRateNEX: 56.7, hashRate: 620, location: "Linked computer" },
   "stellarbox-s1": { name: "NexionBox S1", gpu: "4× RTX 4090", vramTotal: 96, basePower: 1200, baseRate: 7, baseRateNEX: 40, hashRate: 1240, location: "Singapore Data Center" },
   "stellarbox-pro": { name: "NexionBox Pro", gpu: "8× RTX 4090", vramTotal: 192, basePower: 2400, baseRate: 13, baseRateNEX: 80, hashRate: 2480, location: "Singapore Data Center" },
   "stellarbox-pro-v2": { name: "NexionBox Pro v2", gpu: "8× RTX 5090", vramTotal: 256, basePower: 2200, baseRate: 14, baseRateNEX: 90, hashRate: 5120, location: "Singapore Data Center" },
@@ -27,6 +30,7 @@ const DEVICE_SPECS: Record<
 // Device retail price (USDT) — used by salvage calc. MOCK-ONLY (prod: GET /api/store/catalog).
 export const DEVICE_PRICE_USDT: Record<DeviceKind, number> = {
   phone: 0,
+  "pc-gpu": 0,
   "stellarbox-s1": 649,
   "stellarbox-pro": 1199,
   "stellarbox-pro-v2": 1319,
@@ -35,9 +39,32 @@ export const DEVICE_PRICE_USDT: Record<DeviceKind, number> = {
   "cloud-share": 19.9,
 };
 
+export interface CreateDeviceOptions {
+  gpuModel?: string;
+  gpuTier?: GpuTier;
+  gpuTiers?: GpuTier[];
+}
+
 // ───── Default device factory ─────
-export function createDevice(kind: DeviceKind, id: string): Device {
-  const spec = DEVICE_SPECS[kind];
+export function createDevice(kind: DeviceKind, id: string, options: CreateDeviceOptions = {}): Device {
+  const pcGpuModel = options.gpuModel?.trim() || "NVIDIA GeForce RTX 4070";
+  const pcGpuTier = kind === "pc-gpu"
+    ? options.gpuTier ?? matchGpuTier(pcGpuModel, options.gpuTiers)
+    : null;
+  const baseSpec = DEVICE_SPECS[kind];
+  const spec = pcGpuTier
+    ? {
+        ...baseSpec,
+        name: "Shared computer",
+        gpu: `${pcGpuModel} · ${pcGpuTier.tops} TOPS`,
+        vramTotal: gpuTierVram(pcGpuTier),
+        basePower: Math.round(pcGpuTier.tops * 1.25),
+        baseRate: gpuTierDailyRate(pcGpuTier),
+        baseRateNEX: gpuTierDailyNex(pcGpuTier),
+        hashRate: Math.round(pcGpuTier.tops * 5.6),
+        location: "Linked computer",
+      }
+    : baseSpec;
   const isPhone = kind === "phone";
   const isCloud = kind === "cloud-share";
   // Phone yield + displayed NPU spec come from this device's calibrated
@@ -48,6 +75,7 @@ export function createDevice(kind: DeviceKind, id: string): Device {
     id,
     kind,
     name: spec.name,
+    ...(pcGpuTier && { gpuTier: pcGpuTier.id, gpuModel: pcGpuModel }),
     gpu: cap ? `Mobile NPU · ~${cap.tops} TOPS` : spec.gpu,
     vramTotal: spec.vramTotal,
     basePower: spec.basePower,
@@ -83,15 +111,27 @@ export function createDevice(kind: DeviceKind, id: string): Device {
   };
 }
 
-// Initial fleet: phone seeded by onboarding, active with tiny seed earnings.
+// Initial fleet (demo): purchased hardware/cloud devices are pre-activated so
+// the hashpower slots render an active fleet. pc-gpu is intentionally not seeded:
+// with compute-share default OFF it would be hidden yet still reserve a slot, and
+// after enabling the flag it would bypass the download/connection flow.
 export function makeInitialDevices(): Device[] {
-  const devices: Device[] = [createDevice("phone", "phone-1")];
-  devices[0].todayEarnings = 0.04; // v3.2: phone tier shows tiny seed earnings
-  devices[0].todayEarningsNEX = 6.2;
+  const now = Date.now();
+  const phone = createDevice("phone", "phone-1");
+  phone.todayEarnings = 0.04; // v3.2: phone tier shows tiny seed earnings
+  phone.todayEarningsNEX = 6.2;
   // Phone is the onboarding device — purchased on signup (30d ago = user.joinedAt).
-  devices[0].purchasedAt = Date.now() - 30 * ONE_DAY_MS;
-  devices[0].activatedAt = devices[0].purchasedAt; // onboarding-seeded phone enters active fleet
-  return devices;
+  phone.purchasedAt = now - 30 * ONE_DAY_MS;
+  phone.activatedAt = phone.purchasedAt; // onboarding-seeded phone enters active fleet
+
+  // Demo seed leaves one free slot for the computer-connect flow.
+  const demoKinds: DeviceKind[] = ["cloud-share", "stellarbox-s1", "stellarbox-pro", "stellarrack-p1"];
+  const rest = demoKinds.map((kind) => {
+    const d = createDevice(kind, `${kind}-seed`);
+    d.activatedAt = now;
+    return d;
+  });
+  return [phone, ...rest];
 }
 
 // Re-export specs so derivePromoUpgrade (below) + future pages can read base rates.
@@ -112,6 +152,18 @@ export { DEVICE_SPECS };
  * Ported from Nexion-prototype/lib/store/index.ts derivePromoUpgrade.
  */
 const UPGRADE_LADDER: DeviceKind[] = ["phone", "stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"];
+
+export const PURCHASED_HARDWARE_KINDS: DeviceKind[] = [
+  "stellarbox-s1",
+  "stellarbox-pro",
+  "stellarbox-pro-v2",
+  "stellarrack-p1",
+  "stellarrack-p2",
+];
+
+export function isPurchasedHardwareKind(kind: DeviceKind): boolean {
+  return PURCHASED_HARDWARE_KINDS.includes(kind);
+}
 
 /** The user's phone device (kind === "phone"), or undefined if deactivated/removed.
  *  Ported from Nexion-prototype/lib/store/index.ts selectPhoneDevice (zustand

@@ -105,13 +105,13 @@ function receiptFor(id: string): Receipt | undefined {
 
 // History list: completed tasks across all devices, most-recent first (last 20).
 const allRecent = computed(() =>
-  app.devices
+  app.visibleDevices
     .flatMap((d) => d.recentTasks)
     .sort((a, b) => b.completedAt - a.completedAt)
     .slice(0, 20),
 );
 
-const maxVram = computed(() => app.devices.reduce((m, d) => Math.max(m, d.vramTotal), 0));
+const maxVram = computed(() => app.visibleDevices.reduce((m, d) => Math.max(m, d.vramTotal), 0));
 const lockedTeasers = computed(() => getLockedTeasers(maxVram.value, 3));
 
 const historyHintText = computed(() =>

@@ -129,6 +129,7 @@ import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
 import { useAuth } from "@/store/auth";
+import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { useSponsorship } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
@@ -137,6 +138,7 @@ import { safeReturnTo } from "@/routing/safe-return-to";
 
 const t = useT();
 const auth = useAuth();
+const app = useApp();
 const session = useSession();
 const sponsorship = useSponsorship();
 
@@ -235,14 +237,14 @@ function clearSignIn() {
   loading.value = false;
 }
 
-// Sign-in completion (shared by password + OTP). Claims this device's session
-// (a new login supersedes any prior one = single device); if this device differs
-// from the account's previously-calibrated device, route into the recalibration
-// ritual instead of straight home.
+// Sign-in completion (shared by password + OTP). Binds the account-cloud
+// snapshot, claims this carrier's session, and routes a changed physical device
+// through recalibration before the main app.
 function finishSignIn() {
   if (!mounted) return;
   const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
   auth.signIn(identity);
+  app.bindAccount(identity);
   const { requiresRecalibration } = session.claim(identity);
   if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
   if (requiresRecalibration) {

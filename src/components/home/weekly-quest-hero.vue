@@ -75,6 +75,7 @@ import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useAchievements } from "@/store/achievements";
 import { dispatchTier1, getPhaseRewardMultiplier, type Tier1QuestDef } from "@/mock/weekly-quests";
+import { isPurchasedHardwareKind } from "@/store/device-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
@@ -96,8 +97,8 @@ onMounted(() => {
 
 const quest = computed<Tier1QuestDef | null>(() => {
   if (!mounted.value) return null;
-  const devices = app.devices;
-  const hasHardware = devices.some((d) => d.kind !== "phone" && d.kind !== "cloud-share");
+  const devices = app.visibleDevices;
+  const hasHardware = devices.some((d) => isPurchasedHardwareKind(d.kind));
   const hasS1Only =
     devices.some((d) => d.kind === "stellarbox-s1") &&
     !devices.some((d) => d.kind === "stellarbox-pro" || d.kind === "stellarrack-p1");

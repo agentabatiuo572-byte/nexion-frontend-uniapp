@@ -3,10 +3,10 @@
   Top→bottom: KYC-Express gate (banner until wallet paired / verified pill after,
   with a dev-only ?dev=1 reset) → compliance-hold banner (P5+) → amount input
   (Use Max) → network select → address input → fee/receive summary → warnings →
-  StakeAlternativeCard (≥$20) → NEX burn gate (progress + daily-check-in /
+  StakeAlternativeCard (configured minimum) → NEX burn gate (progress + daily-check-in /
   earn-NEX CTAs) → sticky submit.
 
-  Gates: wallet-pairing (must be paired), amount ∈ [$20, balance], address.len
+  Gates: wallet-pairing (must be paired), amount within configured withdrawable limits, address.len
   > 10. NO hard NEX gate — NEX optionally OFFSETS the fee. Fee model:
   grossFee = amount × penaltyFeeRate (the no-NEX fee); burning NEX waives
   nexFeeOffsetRate USDT per NEX (favorable vs market). requiredNex fully waives;
@@ -35,11 +35,11 @@
         </view>
         <view class="mt-3 w-full grid place-items-center active:opacity-85" :style="kycGateCtaStyle" @click="goKyc">
           <view class="inline-flex items-center" style="gap: 6px">
-            <text>Complete KYC-Express ($1)</text>
+            <text>{{ t.walletV3.kycCta }}</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </view>
         </view>
-        <text class="block text-center" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">🛡 Powered by Chainalysis KYT · SOC 2 Type II audited</text>
+        <text class="block text-center" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">{{ t.walletV3.kycPowered }}</text>
       </view>
 
       <!-- KYC verified pill -->
@@ -48,12 +48,12 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
-          <text class="block" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">KYC-Express verified</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.walletV3.kycVerified }}</text>
           <text class="block truncate font-mono" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ pairedAddressShort }}{{ pairedNetwork ? ' · ' + pairedNetwork : '' }}</text>
         </view>
         <view v-if="devMode" class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetKyc">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
-          <text style="margin-left: 4px">Reset KYC</text>
+          <text style="margin-left: 4px">{{ t.walletV3.resetKycLabel }}</text>
         </view>
       </view>
 
@@ -71,9 +71,9 @@
       <!-- Amount input -->
       <view class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
         <view class="flex items-center justify-between">
-          <text class="font-mono-tabular" :style="metaLabelStyle">Amount</text>
+          <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
           <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" @click="useMax">
-            <text style="font-size: 12px; color: var(--v5-brand)">Use Max</text>
+            <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
         <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
@@ -82,14 +82,24 @@
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
-          <text>Available: <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ usdtBalance.toFixed(2) }}</text></text>
-          <text>Min: $20</text>
+          <text>{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ maxWithdrawable.toFixed(2) }}</text></text>
+          <text>{{ minAmountLine }}</text>
+        </view>
+      </view>
+
+      <view v-if="withdrawalRiskNotice" class="mx-4 mt-3 flex items-start" :style="holdBannerStyle">
+        <view class="grid place-items-center shrink-0" :style="holdIconStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4" /><path d="M12 17h.01" /><circle cx="12" cy="12" r="10" /></svg>
+        </view>
+        <view class="flex-1 min-w-0" style="margin-left: 10px">
+          <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.wallet.withdrawRouteReviewTitle }}</text>
+          <text class="block" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ t.wallet.withdrawRouteReviewBody }}</text>
         </view>
       </view>
 
       <!-- Network select -->
       <view class="mx-4 mt-3 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-        <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">Network</text>
+        <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">{{ t.wallet.networkLabel }}</text>
         <view
           v-for="(n, i) in NETWORKS"
           :key="n.id"
@@ -103,16 +113,16 @@
           <view class="flex-1" style="margin-left: 12px">
             <view class="flex items-center" style="gap: 8px">
               <text style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ n.label }}</text>
-              <text v-if="n.recommended" :style="recommendedChipStyle">Recommended</text>
+              <text v-if="n.recommended" :style="recommendedChipStyle">{{ t.wallet.networkRecommended }}</text>
             </view>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ n.hint }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ networkHint(n.id) }}</text>
           </view>
         </view>
       </view>
 
       <!-- Address input -->
       <view class="mx-4 mt-3 rounded-2xl border" :style="surfaceCardStyle">
-        <text class="block font-mono-tabular" :style="metaLabelStyle">Withdrawal Address</text>
+        <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.withdrawAddressLabel }}</text>
         <input class="nx-withdraw-address-input mt-2 w-full font-mono" :style="addressInputStyle" type="text" :value="address" :placeholder="addressPlaceholder" @input="onAddress" />
       </view>
 
@@ -149,7 +159,7 @@
       </view>
 
       <!-- Reverse-talk staking alternative -->
-      <StakeAlternativeCard v-if="amountNum >= 20" :amount-num="amountNum" />
+      <StakeAlternativeCard v-if="amountNum >= minWithdrawable" :amount-num="amountNum" />
 
       <!-- NEX fee-offset panel (NEX optionally waives the fee; no hard gate) -->
       <view v-if="amountNum > 0" class="mx-4 mt-3 rounded-2xl border" :style="nexGateStyle">
@@ -199,7 +209,10 @@
               <text>{{ t.walletV3.submitCtaPaired }}</text>
             </template>
             <template v-else>
-              <text>{{ t.walletV3.submitCtaDisabled }}</text>
+              <view class="grid place-items-center" style="gap: 2px">
+                <text>{{ t.walletV3.submitCtaDisabled }}</text>
+                <text v-if="submitDisabledReason" style="font-size: 10.5px; font-weight: 400; color: var(--v5-ink-3)">{{ submitDisabledReason }}</text>
+              </view>
             </template>
           </view>
         </view>
@@ -219,27 +232,33 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useWalletPairing } from "@/store/wallet-pairing";
+import { useWithdrawalRisk } from "@/store/withdrawal-risk";
 import { computeWithdrawFee } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
+import { useConfig } from "@/store/config";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal } from "@/store/types";
 
-const NETWORKS: { id: Withdrawal["network"]; label: string; hint: string; recommended?: boolean }[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", hint: "Lowest fee · 5 min", recommended: true },
-  { id: "USDT-ERC20", label: "USDT (ERC20)", hint: "15 min · for large amounts" },
-  { id: "BTC", label: "Bitcoin", hint: "30 min" },
-  { id: "ETH", label: "Ethereum", hint: "15 min" },
+const NETWORKS: { id: Withdrawal["network"]; label: string; recommended?: boolean }[] = [
+  { id: "USDT-TRC20", label: "USDT (TRC20)", recommended: true },
+  { id: "USDT-ERC20", label: "USDT (ERC20)" },
+  { id: "BTC", label: "Bitcoin" },
+  { id: "ETH", label: "Ethereum" },
 ];
 
 const t = useT();
 const app = useApp();
 const bills = useBills();
 const pairing = useWalletPairing();
+const withdrawalRisk = useWithdrawalRisk();
 const risk = useRiskDisclosure();
 const phase = useProductPhase();
+const cfg = useConfig();
 
-const usdtBalance = computed(() => app.user.usdtBalance);
+const maxWithdrawable = computed(() => app.user.earningBuckets.withdrawableUsdt);
+const minWithdrawable = computed(() => cfg.config.withdrawRules.minWithdrawableUsdt);
+const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: minWithdrawable.value.toFixed(0) }));
 const walletPaired = computed(() => pairing.walletPaired);
 const pairedAddressShort = computed(() => {
   const a = pairing.pairedWalletAddress;
@@ -281,6 +300,25 @@ const feeWaived = computed(() => feeCalc.value.feeWaived);
 const fee = computed(() => feeCalc.value.actualFee);
 const receive = computed(() => feeCalc.value.netReceive);
 const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
+const eligibility = computed(() =>
+  withdrawalRisk.evaluateWithdrawal(app.accountKey, network.value, address.value, maxWithdrawable.value),
+);
+const withdrawalRiskNotice = computed(() =>
+  address.value.length > 10 && eligibility.value.route !== "pass" && eligibility.value.route !== "reject",
+);
+const submitDisabledReason = computed(() => {
+  if (!walletPaired.value) return t.value.walletV3.submitReasonUnpaired;
+  if (amountNum.value <= 0) return t.value.walletV3.submitReasonAmountRequired;
+  if (amountNum.value < minWithdrawable.value) {
+    return fmt(t.value.walletV3.submitReasonMinAmount, { n: minWithdrawable.value.toFixed(0) });
+  }
+  if (amountNum.value > eligibility.value.maxWithdrawableUsdt) {
+    return fmt(t.value.walletV3.submitReasonMaxAmount, { n: eligibility.value.maxWithdrawableUsdt.toFixed(2) });
+  }
+  if (address.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
+  if (!eligibility.value.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
+  return "";
+});
 const penaltyPctText = computed(() => `${(penaltyFeeRate.value * 100).toFixed(0)}%`);
 const feeGrossLabel = computed(() => fmt(t.value.walletV3.feeGross, { rate: penaltyPctText.value }));
 const fullyWaivedText = computed(() => fmt(t.value.walletV3.feeFullyWaived, { nex: fmtNex(nexBurned.value) }));
@@ -298,13 +336,21 @@ function fmtNex(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-const canSubmit = computed(
-  () =>
-    walletPaired.value &&
-    amountNum.value >= 20 &&
-    amountNum.value <= usdtBalance.value &&
-    address.value.length > 10,
-);
+const canSubmit = computed(() => submitDisabledReason.value === "");
+
+function networkHint(id: Withdrawal["network"]): string {
+  switch (id) {
+    case "USDT-TRC20":
+      return t.value.wallet.networkHintTrc20;
+    case "USDT-ERC20":
+      return t.value.wallet.networkHintErc20;
+    case "BTC":
+      return t.value.wallet.networkHintBtc;
+    case "ETH":
+      return t.value.wallet.networkHintEth;
+  }
+  return "";
+}
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -316,7 +362,7 @@ function onAddress(e: Event) {
   address.value = detailVal(e);
 }
 function useMax() {
-  amount.value = usdtBalance.value.toFixed(2);
+  amount.value = maxWithdrawable.value.toFixed(2);
 }
 
 function goDailyCheckIn() {
@@ -330,20 +376,23 @@ function goEarnNex() {
 
 async function handleResetKyc() {
   const ok = await uiConfirm({
-    title: "Reset KYC-Express pairing?",
-    message: "Reset your KYC-Express pairing? Withdrawals will be blocked until you complete KYC-Express again.",
+    title: t.value.walletV3.resetKycTitle,
+    message: t.value.walletV3.resetKycMessage,
     danger: true,
     icon: "warn",
-    confirmLabel: "Reset",
+    confirmLabel: t.value.walletV3.resetKycConfirm,
   });
   if (ok) {
     pairing.reset();
-    toast.info("KYC pairing reset", "Complete KYC-Express again to withdraw.");
+    toast.info(t.value.walletV3.resetKycToastTitle, t.value.walletV3.resetKycToastBody);
   }
 }
 
 function handleSubmit() {
-  if (!canSubmit.value) return;
+  if (!canSubmit.value) {
+    toast.info(submitDisabledReason.value || t.value.walletV3.submitCtaDisabled);
+    return;
+  }
   if (!risk.accepted) {
     // Source pushes to the risk-disclosure page (not yet ported) and returns.
     uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
@@ -360,28 +409,45 @@ function handleSubmit() {
     toast.error(t.value.walletV3.needMoreNexToast);
     return;
   }
-  const withdrawalId = app.submitWithdrawal(amountNum.value, network.value, address.value, fee.value);
+  const withdrawalId = app.submitWithdrawal(
+    amountNum.value,
+    network.value,
+    address.value,
+    fee.value,
+    eligibility.value.route,
+    eligibility.value.riskReasons,
+  );
   if (!withdrawalId) {
     if (toBurn > 0) app.creditNex(toBurn); // rollback the burned NEX
     toast.error(t.value.wallet.withdrawInsufficient);
     return;
   }
+  withdrawalRisk.commitWithdrawal(app.accountKey, network.value, address.value);
   const charged = fee.value;
+  const memo = eligibility.value.route === "pass"
+    ? fmt(t.value.wallet.withdrawBillMemoPass, { network: network.value, fee: charged.toFixed(2) })
+    : t.value.wallet.withdrawBillMemoReview;
   bills.add({
     type: "withdraw",
     symbol: "USDT",
     amount: -amountNum.value,
     status: "pending",
-    memo: `Withdraw to ${network.value} · fee $${charged.toFixed(2)}`,
+    memo,
     ref: withdrawalId,
   });
+  if (eligibility.value.route !== "pass") {
+    toast.info(t.value.wallet.withdrawRouteReviewTitle, t.value.wallet.withdrawRouteReviewBody);
+  }
   if (toBurn > 0) {
     bills.add({
       type: "withdraw",
       symbol: "NEX",
       amount: -toBurn,
       status: "posted",
-      memo: `Fee offset · ${fmtNex(toBurn)} NEX burned (−$${feeWaived.value.toFixed(2)} fee)`,
+      memo: fmt(t.value.wallet.withdrawNexFeeMemo, {
+        nex: fmtNex(toBurn),
+        fee: feeWaived.value.toFixed(2),
+      }),
       ref: withdrawalId,
     });
   }

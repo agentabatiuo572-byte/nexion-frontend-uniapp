@@ -84,6 +84,7 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useAchievements } from "@/store/achievements";
+import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
 
 const t = useT();
@@ -115,7 +116,7 @@ function iconSvg(id: string, color: string): string {
 
 // Auto-evaluate unlock conditions (mirrors source useMemo on mount).
 function evaluate() {
-  const onlineDevices = app.devices.filter((d) => d.kind !== "phone" && d.kind !== "cloud-share").length;
+  const onlineDevices = app.visibleDevices.filter((d) => isPurchasedHardwareKind(d.kind)).length;
   const earningsTotal = app.earnings.total;
   if (onlineDevices > 0) ach.unlock("hardware_owner");
   if (earningsTotal >= 1) ach.unlock("first_dollar");

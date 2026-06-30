@@ -6,8 +6,8 @@
 
 ## 工程坐标
 
-- 源：`D:\WORKS\PLAN\Nexion-prototype`（Next.js 16 + React 19 + Tailwind v4，80 页）
-- 标的：`D:\WORKS\PLAN\Nexion-uniapp`（uni-app Vue3 + Vite + TS）
+- 当前真源 / 标的：`D:\WORKS\PLAN\Nexion-uniapp`（uni-app Vue3 + Vite + TS）
+- 历史迁移源：旧 H5 Next/React 工程已于 2026-06-26 退役删除；不再作为新功能、审计或 verify 对位源
 - 目标端：App(iOS+Android) + H5；全用 `.vue`（webview 渲染，不用 .nvue）
 - H5 dev：`npm run dev:h5` → http://localhost:5173
 

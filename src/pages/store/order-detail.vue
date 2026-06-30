@@ -121,6 +121,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
 import { useOrders, type OrderStatus, timelineFor } from "@/store/orders";
+import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
@@ -150,10 +151,11 @@ useSetPageHeader(() => ({
 // visibly. The global ORDER_TICK loop (App.vue, 6s) also advances orders; this
 // faster local tick just gives the detail view a tighter feel.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
+const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 function startTick() {
   if (tickTimer) clearInterval(tickTimer);
   tickTimer = setInterval(() => {
-    if (id.value) orders.advanceOrder(id.value);
+    if (id.value) orders.advanceOrder(id.value, reservedSlots.value);
   }, 3000);
 }
 startTick();

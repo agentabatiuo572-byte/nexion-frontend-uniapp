@@ -250,7 +250,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /onboarding/estimator            收益估算
 /onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
 /onboarding/terms                服务条款(从 intro 脚注 / register 注册脚注进入)
-/session/kicked                  登录失效阻断屏(账号在他端登录 / 退出 / 被吊销 → 在途任务回退 + 重新登录)
+/session/kicked                  登录失效阻断屏(退出 / 指定会话下线 / 被吊销 → 在途任务回退 + 重新登录)
 ```
 
 ---
@@ -813,18 +813,18 @@ sequenceDiagram
 
 **真后台对接**:把本地 `useAuth` 替换为真实会话(`GET /api/auth/session` 提供 `isAuthenticated` / `onboardingComplete`),守卫判定逻辑完全不变。`signUp` / `signIn` → `POST /api/auth/{register,login}` 返回 token + canonical user;`completeOnboarding` → `POST /api/onboarding/complete`。
 
-### 4.7 单设备登录、会话与新设备校准
+### 4.7 多载体会话、会话下线与新设备校准
 
-**目的**:账号在同一时间只能在一台设备运行挖矿,使算力与收益绑定到当前实测的本机(参 §6.10),并防止多端薅取免费算力。包含三项强相关能力:① 单设备登录(单点会话);② 会话失效时在途任务中断回退;③ 新设备登录触发算力重新校准。
+**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项强相关能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 新物理设备登录触发算力重新校准。
 
 **设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexion-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
 
-**会话模型**:一条共享「活跃会话」记录(`nexion-active-session-v1` = `{sessionId, deviceId, deviceName, loginAt, killedAt?}`)代表服务端记录的「账号当前归属会话」。每次登录铸新 `sessionId` 并**覆盖**该记录 → 新登录使旧会话主张失效(单设备)。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)对比内存与共享记录:
+**会话模型**:账户级 session registry (`nexion-account-sessions-v1` = `{schema, sessions:{[sessionId]:{accountKey, deviceId, deviceName, entrySurface, loginAt, lastSeenAt, killedAt?, endedAt?}}}`)代表服务端会话表的 mock。每次登录新增一条会话,不覆盖其他设备 / 载体。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)读取自己的会话记录:
 
-- **本机自我接管**(记录 `deviceId` 与本机相同、仅 `sessionId` 不同)→ 良性,采纳新 sessionId 保持在线(同一物理设备多标签 / 重启不互踢);
-- **他端接管**(记录 `deviceId` 不同)/ **退出**(记录被清)/ **吊销**(记录置 `killedAt`)→ 判定为踢出。
+- **同账号其他会话**(不同 `deviceId` / `entrySurface`)→ 并存,不触发强踢;
+- **当前会话退出**(`endedAt`) / **记录被删** / **吊销**(`killedAt`)→ 当前端判定为登录失效。
 
-**踢出处置(任务中断回退)**:判定踢出 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[他端登录 / 已退出]+ 任务已回退提示 +「重新登录」)。重新登录铸新会话认领本账号 → 守卫恢复挖矿(`resumeMining`)。
+**失效处置(任务中断回退)**:当前会话失效 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[已退出 / 会话已停用]+ 任务已回退提示 +「重新登录」)。重新登录新增当前载体会话 → 守卫恢复挖矿(`resumeMining`)。
 
 **新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexion-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
 
@@ -832,24 +832,26 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active: 登录铸 sessionId + 认领记录
-    Active --> Active: 本机重认领(同 deviceId,采纳新 sessionId)
-    Active --> Kicked: 他端登录 / 吊销(killedAt)
-    Active --> LoggedOut: 退出(清记录)
-    Kicked --> Active: 重新登录(认领 + resumeMining)
+    [*] --> Active: 登录新增 sessionId
+    Active --> Active: 同账号其他载体登录(并存)
+    Active --> Kicked: 指定会话下线 / 吊销(killedAt)
+    Active --> LoggedOut: 当前会话退出(endedAt)
+    Kicked --> Active: 重新登录(新增会话 + resumeMining)
     LoggedOut --> Active: 重新登录
-    note right of Kicked: 在途任务无宽限作废 + 冻结挖矿 + /session/kicked
+    note right of Kicked: 当前会话在途任务无宽限作废 + 冻结挖矿 + /session/kicked
 ```
 
 **真后台对接**(mock-first,可零重写):
 
 | Endpoint | Method | 返回 / 作用 |
 |---|---|---|
-| `/api/auth/signin` | POST | `{token, sessionId, deviceId, requiresRecalibration}`;服务端发新 sessionId 即作废旧会话(单设备)|
-| `/api/auth/session` | GET | `{sessionId, status, killedAt}`,客户端轮询 / 心跳镜像 |
-| `/api/auth/logout` | POST | 清服务端会话 |
+| `/api/auth/signin` | POST | `{token, sessionId, deviceId, entrySurface, requiresRecalibration}`;服务端新增当前载体会话 |
+| `/api/auth/session` | GET | `{sessionId, status, killedAt, endedAt, entrySurface}`,客户端轮询 / 心跳镜像 |
+| `/api/auth/logout` | POST | 标记当前会话 `endedAt` |
+| `/api/account/sessions` | GET | 当前账号多载体会话列表 |
+| `/api/account/sessions/:id/revoke` | POST | 指定会话置 `killedAt` |
 
-运营后台「强制登出 / 吊销会话」置 `killedAt`(后台会话域)→ 前端轮询检测踢出。
+运营后台「指定会话下线 / 吊销会话」置 `killedAt`(后台 C5 会话域)→ 对应端轮询检测登录失效。不得因另一个 deviceId 登录而自动覆盖当前会话。
 
 ---
 
@@ -1353,7 +1355,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 ### 6.10 手机算力显示规则与校准
 
-**目的**:手机的「算力」是平台呈现的能力指标(产品仿真,不真在手机跑 AI 推理)。显示规则核心要求:数值让用户觉得**合理可信**、**排序永不翻车**(低配机不可能显示出比高配机更高的算力)、可复现,并支撑单设备登录与换机重校准的叙事(参 §4.7)。
+**目的**:手机的「算力」是平台呈现的能力指标(产品仿真,不真在手机跑 AI 推理)。显示规则核心要求:数值让使用者觉得**合理可信**、**排序永不翻车**(低配机不可能显示出比高配机更高的算力)、可复现,并支撑多载体会话下的新设备校准叙事(参 §4.7)。
 
 **能力基线确定性派生**(`lib/device-capability.ts` · `measureDeviceCapability`):基线**不是随机数**,而是从真实、可廉价读取、与机型档位强相关的设备信号确定性派生 —— `uni.getSystemInfo`(机型 / 品牌 / 平台)+ `navigator.deviceMemory`(RAM)/ `hardwareConcurrency`(核数)+ WebGL renderer(GPU)+ `devicePixelRatio`×分辨率。三条保证:
 
@@ -4649,7 +4651,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 宽限期内任务**挂起**:不计 earnings、不轮换新任务、设备卡显示「重连中 · 第 n/5 次重连 · Xs 后超时取消」。阈值常量集中于 `lib/store/interrupt.ts`(见 §13.3),tick 取消判定与 UI 倒计时共用同一纯函数 `interruptInfo()`。
 
-**会话失效中断(单设备登录)**:区别于掉电 / 掉网的宽限窗口 —— 当账号被他端登录接管、用户退出、或运营吊销会话时(见 §4.7),设备已非授权节点 → 在途任务**无宽限立即作废**(`interruptAllTasks`:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」),并冻结挖矿(`miningPaused=true`)直至重新登录建立新会话(`resumeMining`)。
+**会话失效中断(多载体 session registry)**:区别于掉电 / 掉网的宽限窗口 —— 当当前会话主动退出、被指定下线、或运营吊销时(见 §4.7),本端已非授权节点 → 在途任务**无宽限立即作废**(`interruptAllTasks`:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」),并冻结挖矿(`miningPaused=true`)直至重新登录建立新会话(`resumeMining`)。
 
 **真后台对接**(endpoint TBD,候选名):
 

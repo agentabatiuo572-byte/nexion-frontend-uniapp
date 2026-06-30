@@ -128,12 +128,12 @@ const NETWORK_AVG_DAILY = 45; // mock network top tier daily (Rack P1)
 const app = useApp();
 const t = useT();
 
-const activeDevices = computed(() => app.devices.filter((d) => d.activatedAt !== null));
+const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const realCount = computed(() => activeDevices.value.length);
 const count = computed(() => realCount.value + trialSlot.value);
 const empty = computed(() => MAX_DEVICES - count.value);
-const promo = computed(() => derivePromoUpgrade(app.devices));
+const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 
 const potentialDaily = computed(() => empty.value * promo.value.targetDaily);
 const fleetCurrentDaily = computed(() => activeDevices.value.reduce((sum, d) => sum + d.baseRate, 0));
@@ -171,6 +171,7 @@ const slotCells = computed<SlotCell[]>(() =>
 
 const DEVICE_ICON_PATHS: Record<DeviceKind, string> = {
   phone: "M5 2h14a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z",
+  "pc-gpu": "M4 5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6l1 3H9l1-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM8 21h8",
   "stellarbox-s1": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
   "stellarbox-pro": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
   "stellarbox-pro-v2": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",

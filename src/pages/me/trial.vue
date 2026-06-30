@@ -244,10 +244,9 @@ async function handleRedeem() {
     bills.add({ type: "bonus", symbol: "NEX", amount: shadowNEXBeforeRedeem, status: "posted", memo: "Trial earnings → balance · NEX", ref: `${purchaseRef}-EARN-NEX` });
   }
   // Provision device (mirrors simulation-provider auto-redeem path).
-  const activeCount = app.devices.filter((d) => d.activatedAt !== null).length;
   app.addDevice(cfg.value.trialProductId);
   const newId = app.devices[app.devices.length - 1]?.id;
-  if (newId && activeCount < MAX_DEVICES) {
+  if (newId && app.activeSlotCount < MAX_DEVICES) {
     app.activateDevice(newId);
   }
   const amountStr = chargeAmount.toLocaleString();

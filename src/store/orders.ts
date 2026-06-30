@@ -107,8 +107,8 @@ function hydrate(): Order[] {
 // order still advances to "activated", just without spawning a Device.
 type DeviceSpawnApp = {
   addDevice?: (kind: DeviceKind) => string;
-  activateDevice?: (id: string) => void;
-  devices: { id: string }[];
+  activateDevice?: (id: string, reservedSlots?: number) => boolean;
+  devices: { id: string; activatedAt?: number | null }[];
 };
 
 export const useOrders = defineStore("orders", () => {
@@ -150,7 +150,7 @@ export const useOrders = defineStore("orders", () => {
     return order;
   }
 
-  function advanceOrder(id: string) {
+  function advanceOrder(id: string, reservedSlots = 0) {
     const cur = orders.value.find((o) => o.id === id);
     if (!cur || cur.status === "activated" || cur.status === "cancelled") return;
     const idx = TIMELINE.indexOf(cur.status);
@@ -160,29 +160,35 @@ export const useOrders = defineStore("orders", () => {
     // When advancing INTO "activated", spawn the device synchronously so the
     // deviceId can land in the same update — every caller converges on the same
     // wire-into-Earn behaviour. (No-ops cleanly until device CRUD is on useApp.)
-    let spawnedDeviceId: string | undefined;
+    let spawnedDeviceId: string | undefined = cur.deviceId;
+    let activationBlocked = false;
     if (next === "activated") {
       const app = useApp() as unknown as DeviceSpawnApp;
-      if (typeof app.addDevice === "function") {
+      if (!spawnedDeviceId && typeof app.addDevice === "function") {
         spawnedDeviceId = app.addDevice(cur.productId);
         spawnedDeviceId = spawnedDeviceId ?? app.devices.slice(-1)[0]?.id;
-        if (spawnedDeviceId && typeof app.activateDevice === "function") {
-          app.activateDevice(spawnedDeviceId);
-        }
+      }
+      if (spawnedDeviceId && typeof app.activateDevice === "function") {
+        const alreadyActive = app.devices.some((d) => d.id === spawnedDeviceId && d.activatedAt !== null);
+        activationBlocked = alreadyActive ? false : !app.activateDevice(spawnedDeviceId, reservedSlots);
       }
     }
+    const targetStatus = next === "activated" && activationBlocked ? cur.status : next;
+    const targetNote = activationBlocked
+      ? "Waiting for an empty device slot"
+      : statusNote(next, cur.dataCenter);
 
     orders.value = orders.value.map((o) =>
       o.id !== id
         ? o
         : {
             ...o,
-            status: next,
+            status: targetStatus,
             deviceId: spawnedDeviceId ?? o.deviceId,
-            activatedAt: next === "activated" ? Date.now() : o.activatedAt,
+            activatedAt: targetStatus === "activated" ? Date.now() : o.activatedAt,
             timeline: [
               ...o.timeline,
-              { status: next, ts: Date.now(), note: statusNote(next, o.dataCenter) },
+              { status: targetStatus, ts: Date.now(), note: targetNote },
             ],
           },
     );
@@ -245,12 +251,12 @@ export const useOrders = defineStore("orders", () => {
 // a Math.random()<0.45 gate. PRODUCTION: server pushes order status changes;
 // client only reflects server state. `advanceOrder` spawns the device when it
 // reaches "activated", so callers don't handle device wiring separately.
-export function tickOrders() {
+export function tickOrders(reservedSlots = 0) {
   const store = useOrders();
   store.orders.forEach((o) => {
     if (o.status === "cancelled" || o.status === "activated") return;
     if (Math.random() < 0.45) {
-      store.advanceOrder(o.id);
+      store.advanceOrder(o.id, reservedSlots);
     }
   });
 }

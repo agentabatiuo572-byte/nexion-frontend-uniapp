@@ -52,7 +52,7 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 const t = useT();
 const app = useApp();
 
-const activeCount = computed(() => app.devices.filter((d) => d.activatedAt !== null).length);
+const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);

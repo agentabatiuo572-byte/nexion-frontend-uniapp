@@ -90,6 +90,11 @@
         </view>
       </view>
 
+      <view v-if="reviewNotice" class="rg-review">
+        <text class="rg-review__title">{{ t.register.rewardReviewTitle }}</text>
+        <text class="rg-review__body">{{ t.register.rewardReviewBody }}</text>
+      </view>
+
       <!-- Welcome bonus chip (step 1) -->
       <view v-if="step === 1" class="rg-bonus">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
@@ -139,6 +144,7 @@ import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useSponsorship, WELCOME_GIFT_USDT, WELCOME_GIFT_NEX } from "@/store/sponsorship";
+import { useRiskCluster, type RegistrationRiskSummary } from "@/store/risk-cluster";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -149,6 +155,7 @@ const session = useSession();
 const app = useApp();
 const bills = useBills();
 const sponsorship = useSponsorship();
+const riskCluster = useRiskCluster();
 
 const COUNTRIES = [
   { code: "+1", name: "US / Canada" }, { code: "+44", name: "United Kingdom" }, { code: "+49", name: "Germany" },
@@ -177,6 +184,7 @@ const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
 const error = ref<string | null>(null);
+const registrationRisk = ref<RegistrationRiskSummary | null>(null);
 const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -199,14 +207,15 @@ const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.va
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const ctaEnabled = computed(() => (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
+const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.status !== "clear");
 
 // uni <input> delivers the value on e.detail.value at runtime; vue-tsc types
 // the payload as a DOM Event, so we read detail through a narrow cast helper.
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
-function onPhone(e: Event) { phone.value = inputVal(e); error.value = null; }
-function onInvite(e: Event) { invite.value = inputVal(e); }
+function onPhone(e: Event) { phone.value = inputVal(e); error.value = null; registrationRisk.value = null; }
+function onInvite(e: Event) { invite.value = inputVal(e); registrationRisk.value = null; }
 function onCode(i: number, e: Event) {
   const digits = inputVal(e).replace(/\D/g, "");
   const next = [...code.value];
@@ -214,7 +223,7 @@ function onCode(i: number, e: Event) {
   code.value = next;
   error.value = null;
   if (next[i] && i < 5) focusIdx.value = i + 1;
-  if (next.every(Boolean)) { step.value = 3; }
+  if (next.every(Boolean)) verifyCode();
 }
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
@@ -250,34 +259,47 @@ function resend() {
 function verifyCode() {
   error.value = null;
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
+  registrationRisk.value = riskCluster.evaluateRegistration(prospectiveIdentity());
   step.value = 3;
 }
 function finish() {
   error.value = null;
   if (!pwdOk.value) { error.value = t.value.register.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.register.passwordMismatch; return; }
-  const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
+  const identity = prospectiveIdentity();
+  const registrationRoute = registrationRisk.value ?? riskCluster.evaluateRegistration(identity);
   auth.signUp(identity);
-  // New account claims this device's session; first-time calibration runs as
+  app.bindAccount(identity);
+  riskCluster.commitRegistration(registrationRoute);
+  // New account claims this carrier's session; first-time calibration runs as
   // part of onboarding (connect.vue) which then marks this device calibrated.
   session.claim(identity);
   const sponsorCode = refFromUrl.value?.trim() || invite.value.trim();
   if (sponsorCode) {
     sponsorship.bind(sponsorCode);
-    const gift = sponsorship.claimGift();
+    const gift = sponsorship.claimGift(identity);
     if (gift) {
-      app.creditBalance(gift.usdt);
-      app.creditNex(gift.nex);
+      const posted = app.creditRewardBucket(registrationRoute.bucketRoute, gift.usdt, gift.nex);
       const giftRef = `GIFT-${Date.now().toString(36).toUpperCase()}`;
-      bills.add({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: "posted", memo: "Welcome gift · referral bonus", ref: giftRef });
-      bills.add({ type: "bonus", symbol: "NEX", amount: gift.nex, status: "posted", memo: "Welcome gift · referral bonus", ref: giftRef });
-      toast.success(`+$${gift.usdt} + ${gift.nex} NEX`, sponsorPreview.value ? `Sponsored by ${sponsorPreview.value.name}` : "Credited to wallet");
+      const giftPosted = registrationRoute.bucketRoute === "withdrawable";
+      const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
+      bills.add({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
+      bills.add({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
+      if (posted && giftPosted) {
+        toast.success(`+$${gift.usdt} + ${gift.nex} NEX`, sponsorPreview.value ? `Sponsored by ${sponsorPreview.value.name}` : t.value.register.giftCreditedToastSub);
+      } else {
+        toast.info(t.value.register.giftPendingToast, t.value.register.giftPendingToastSub);
+      }
     }
   }
   uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} });
 }
+function prospectiveIdentity() {
+  return `${country.value}${phoneClean.value}@demo.nexion.ai`;
+}
 function back() {
   error.value = null;
+  registrationRisk.value = null;
   code.value = ["", "", "", "", "", ""];
   focusIdx.value = 0;
   if (resendTimer) clearInterval(resendTimer);
@@ -345,6 +367,9 @@ function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () =
 .rg-bonus { margin-top: 24px; background: color-mix(in srgb, var(--v5-brand) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
 .rg-bonus__t { flex: 1; font-size: 12.5px; }
 .rg-bonus__b { color: var(--v5-brand); font-weight: 600; }
+.rg-review { margin-top: 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent); background: color-mix(in srgb, var(--v5-warning) 10%, transparent); padding: 10px 12px; }
+.rg-review__title { display: block; font-size: 12.5px; font-weight: 600; color: var(--v5-warning); }
+.rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
 .rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent); border-radius: 8px; padding: 8px 12px; }
 .rg-error__t { flex: 1; }
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }

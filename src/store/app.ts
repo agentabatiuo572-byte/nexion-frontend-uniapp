@@ -1,26 +1,39 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
-import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal } from "./types";
+import { computed, ref } from "vue";
+import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
-import { ONE_DAY_MS, makeInitialDevices, createDevice, MAX_DEVICES } from "./device-types";
+import { ONE_DAY_MS, makeInitialDevices, createDevice, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor } from "@/lib/hashpower";
+import { getCarrier, type Carrier } from "@/lib/carrier";
+import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
+import { matchGpuTier } from "@/lib/gpu-tiers";
+import { useConfig } from "@/store/config";
+import { useRiskCluster } from "@/store/risk-cluster";
+import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
 import type { DeviceCapability } from "@/lib/device-capability";
 import { useReceipts } from "./receipts";
 import { generateReceipt } from "@/mock/receipt";
+import {
+  normalizeAccountKey,
+  mergeAndWriteAccountSnapshot,
+  readAccountSnapshot,
+  type AccountCloudSnapshot,
+} from "./account-cloud";
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
 // tick() with an SSE/WebSocket subscription to server-pushed per-device yield.
-// Intentionally NOT persisted (resets on refresh by design).
+// SPEC-4: user/devices/earnings now persist through the account-cloud mock, so
+// the same accountKey can be rebound by H5 / signed app / white-app carriers.
 
 const ONE_DAY = ONE_DAY_MS;
 
 // ── module-level tick state (mirrors original module scope) ──
 let globalTimer = 0;
-const deviceTimers = new Map<string, { vital: number; earnings: number }>();
+const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
 
 function normalRandom(mean: number, std: number, min: number, max: number) {
@@ -31,49 +44,274 @@ function normalRandom(mean: number, std: number, min: number, max: number) {
   return Math.max(min, Math.min(max, mean + z * std));
 }
 
-export const useApp = defineStore("app", () => {
-  const user = ref<UserState>({
-    email: "alex@nexion.ai",
+/** ms granularity floor for one settlement — throttles accrual to ≥1800ms windows
+ *  and batches the market/variation jitter (as the old tick-time batch did).
+ *  NOTE (pre-existing mock characteristic, predates SPEC-1, NOT fixed here): for a
+ *  low daily-rate device (≲ $24/day USDT or ≲ 240/day NEX) one window's increment
+ *  falls below the todayEarnings toFixed(3)/(2) rounding floor, so its steady-state
+ *  per-device counter barely moves — only higher-rate devices and large reopen-Δ
+ *  catch-ups register. A display-layer sub-cent carry would smooth this (product
+ *  改进, out of SPEC-1 scope). A reopen produces one large Δ → settled in one shot
+ *  (uncapped: PROD's server settle + daily reset bound it; mock leaves it raw). */
+const SETTLE_MIN_MS = 1800;
+
+function createEarningBuckets(withdrawableUsdt: number, now = Date.now()): UserState["earningBuckets"] {
+  return {
+    withdrawableUsdt,
+    pendingReviewUsdt: 0,
+    bonusLockedUsdt: 0,
+    lockedNex: 0,
+    policyVersion: "mock-seed-v1",
+    lastBucketedAt: now,
+  };
+}
+
+function withDefaultEarningBuckets(user: UserState): UserState {
+  return {
+    ...user,
+    earningBuckets: {
+      ...createEarningBuckets(user.usdtBalance, user.joinedAt),
+      ...(user.earningBuckets ?? {}),
+    },
+  };
+}
+
+function bucketUserEarnings(
+  current: UserState,
+  route: EarningBucketRoute,
+  usdt: number,
+  nex: number,
+  policyVersion: string,
+  now = Date.now(),
+): UserState {
+  const buckets = withDefaultEarningBuckets(current).earningBuckets;
+  const nextBuckets = { ...buckets, policyVersion, lastBucketedAt: now };
+  const nextUser: UserState = { ...current, earningBuckets: nextBuckets };
+  if (usdt <= 0 && nex <= 0) return nextUser;
+  if (route === "withdrawable") {
+    nextBuckets.withdrawableUsdt = +(nextBuckets.withdrawableUsdt + usdt).toFixed(2);
+    nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
+    nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
+  } else if (route === "pending_review") {
+    nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
+    nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
+  } else if (route === "bonus_locked") {
+    nextBuckets.bonusLockedUsdt = +(nextBuckets.bonusLockedUsdt + usdt).toFixed(2);
+    nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
+  }
+  return nextUser;
+}
+
+function createInitialUser(email = "alex@nexion.ai"): UserState {
+  const usdtBalance = 24856.56;
+  return {
+    email,
     tier: "L2",
     joinedAt: Date.now() - 30 * ONE_DAY,
     cumulativeDepositUsdt: 0,
     referralCode: "NEXION-8K9X",
-    usdtBalance: 24856.56,
+    usdtBalance,
     nexBalance: 1240,
     pendingEarnings: 2.31,
-  });
-  const devices = ref<Device[]>(makeInitialDevices());
-  const earnings = ref<EarningsState>({
+    earningBuckets: createEarningBuckets(usdtBalance),
+  };
+}
+
+function createInitialEarnings(): EarningsState {
+  const now = Date.now();
+  return {
     today: 247.83,
     todayNEX: 612.4,
     thisWeek: 1247.65,
     thisMonth: 5184.62,
     total: 28452.18,
     history: [
-      { ts: Date.now() - 1 * 3600 * 1000, amount: 0.23 },
-      { ts: Date.now() - 2 * 3600 * 1000, amount: 0.19 },
-      { ts: Date.now() - 3 * 3600 * 1000, amount: 0.21 },
-      { ts: Date.now() - 4 * 3600 * 1000, amount: 0.18 },
+      { ts: now - 1 * 3600 * 1000, amount: 0.23 },
+      { ts: now - 2 * 3600 * 1000, amount: 0.19 },
+      { ts: now - 3 * 3600 * 1000, amount: 0.21 },
+      { ts: now - 4 * 3600 * 1000, amount: 0.18 },
     ],
-  });
-  const global = ref<GlobalStats>({
+  };
+}
+
+function createInitialGlobal(): GlobalStats {
+  return {
     activeDevices: 28432,
     paidToday: 1247893,
     nodes: 156,
     countries: 47,
     uptime: 99.7,
     todayIncrement: 1247,
-  });
-  const latestWithdrawal = ref<Withdrawal | null>(null);
+  };
+}
+
+function createSeedSnapshot(accountKey: string, email: string, entrySurface: EntrySurface): AccountCloudSnapshot {
+  return {
+    schema: 1,
+    accountKey: normalizeAccountKey(accountKey),
+    entrySurface,
+    updatedAt: Date.now(),
+    user: createInitialUser(email || accountKey || "alex@nexion.ai"),
+    devices: makeInitialDevices(),
+    earnings: createInitialEarnings(),
+    latestWithdrawal: null,
+  };
+}
+
+/** SPEC-1 §4.2 — the single earnings-accrual path (settle-single-source).
+ *  Accrues a device by the WALL-CLOCK Δ since its `lastSettledAt` anchor (NOT by
+ *  accumulated tick time), then re-anchors to `now`. Driving accrual off the
+ *  registration anchor is what decouples earnings from the page being open: a
+ *  BACKGROUNDED gap (the in-memory anchor survives onHide→onShow) is settled in one
+ *  shot on the next settle(). The mock store is NOT persisted, so a full page reload
+ *  resets state — true closed-tab catch-up is the PROD server's job (it holds
+ *  lastSettledAt and settles on the foreground call).
+ *  载体分层: phone App accrues continuity×thermal (online 加成); phone H5 = flat
+ *  基础托管 (h5BaseFactor); non-phone = 1 — same carrier 口径 as lib/hashpower.ts
+ *  (display uses the full live factor set; accrual uses this bounded subset). */
+function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: OnlineBonus): Device {
+  // Not earning right now (idle / offline / cloud-share / phone gated) → drop a
+  // stale anchor so the idle gap is never back-paid when the device resumes.
+  if (
+    d.activatedAt === null ||
+    d.status !== "online" ||
+    d.kind === "cloud-share" ||
+    d.pausedReason != null
+  ) {
+    return d.lastSettledAt == null ? d : { ...d, lastSettledAt: null };
+  }
+  // First sight after (re)activation: anchor without paying (登记 moment).
+  if (d.lastSettledAt == null) return { ...d, lastSettledAt: now };
+
+  const deltaMs = now - d.lastSettledAt;
+  if (deltaMs < SETTLE_MIN_MS) return d;
+
+  const marketMult = 0.95 + Math.random() * 0.1;
+  const variation = 0.85 + Math.random() * 0.3;
+  const lifeEff = isDegradable(d.kind) ? getEfficiency(getMonthsOwned(d.purchasedAt)) : 1;
+  const phoneFactor =
+    d.kind === "phone"
+      ? carrier === "h5"
+        ? onlineBonus.h5BaseFactor
+        : continuityFactor(now - (d.miningSince ?? now), onlineBonus.continuityFullHours * 60 * 60 * 1000) * thermalFactor(d.thermalState)
+      : 1;
+  const inc = (d.baseRate * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
+  const incNEX = (d.baseRateNEX * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
+  return {
+    ...d,
+    todayEarnings: +(d.todayEarnings + inc).toFixed(3),
+    todayEarningsNEX: +(d.todayEarningsNEX + incNEX).toFixed(2),
+    lastSettledAt: now,
+  };
+}
+
+function freezeComputeShareDevice(d: Device): Device {
+  if (d.kind !== "pc-gpu") return d;
+  return {
+    ...d,
+    lastSettledAt: null,
+    currentTask: null,
+    gpuUsage: 0,
+    gpuTemp: 0,
+    gpuPower: 0,
+    vramUsed: 0,
+  };
+}
+
+export const useApp = defineStore("app", () => {
+  const bootSurface = getEntrySurface();
+  const bootSnapshot = readAccountSnapshot("default") ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface);
+  const accountKey = ref(bootSnapshot.accountKey);
+  const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
+  const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
+  const user = ref<UserState>(bootSnapshot.user);
+  const devices = ref<Device[]>(bootSnapshot.devices);
+  const earnings = ref<EarningsState>(bootSnapshot.earnings);
+  const global = ref<GlobalStats>(createInitialGlobal());
+  const latestWithdrawal = ref<Withdrawal | null>(bootSnapshot.latestWithdrawal);
+  let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
+  const cfg = useConfig();
+  const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
+  const slotDevices = computed(() =>
+    computeShareEnabled.value ? devices.value : devices.value.filter((d) => d.kind !== "pc-gpu"),
+  );
+  const visibleDevices = slotDevices;
+  // Slot authority must count hidden active pc-gpu devices too. When the PC
+  // share flag is off, UI hides those devices, but they still reserve backend
+  // capacity; otherwise closing/reopening the flag can push the account past 6.
+  const activeSlotCount = computed(() => devices.value.filter((d) => d.activatedAt !== null).length);
   // When the session is invalidated (logged in elsewhere / logged out / admin
   // revoked), mining freezes: tick() early-returns so no earnings accrue while
-  // the account is not owned by this device. Cleared by resumeMining() once a
-  // fresh session is established. App.vue also gates tick on session state, so
-  // this is belt-and-suspenders.
+  // this carrier has no valid session. Cleared by resumeMining() once a fresh
+  // session is established. App.vue also gates tick on session state, so this is
+  // belt-and-suspenders.
   const miningPaused = ref(false);
 
+  function syncDeviceRuntime(nextDevices: Device[], resetTimers = false) {
+    const nextIds = new Set(nextDevices.map((d) => d.id));
+    if (resetTimers) {
+      deviceTimers.clear();
+    } else {
+      Array.from(deviceTimers.keys()).forEach((id) => {
+        if (!nextIds.has(id)) deviceTimers.delete(id);
+      });
+    }
+    nextDevices.forEach((d) => {
+      if (!deviceTimers.has(d.id)) deviceTimers.set(d.id, { vital: 0 });
+    });
+    // Seed the aggregate baseline to the devices' pre-earned today totals so the
+    // next settle() doesn't treat stored/cloud counters as new local earnings.
+    lastTickAggregate.usd = nextDevices.reduce((s, d) => s + d.todayEarnings, 0);
+    lastTickAggregate.nex = nextDevices.reduce((s, d) => s + d.todayEarningsNEX, 0);
+  }
+
   // seed per-device timers
-  devices.value.forEach((d) => deviceTimers.set(d.id, { vital: 0, earnings: 0 }));
+  function reseedDeviceRuntime(nextDevices: Device[]) {
+    syncDeviceRuntime(nextDevices, true);
+  }
+
+  function adoptAccountSnapshot(snapshot: AccountCloudSnapshot, resetRuntime = false) {
+    const normalizedSnapshot = { ...snapshot, user: withDefaultEarningBuckets(snapshot.user) };
+    user.value = normalizedSnapshot.user;
+    devices.value = snapshot.devices;
+    earnings.value = snapshot.earnings;
+    latestWithdrawal.value = snapshot.latestWithdrawal;
+    syncDeviceRuntime(snapshot.devices, resetRuntime);
+    lastCloudSnapshot = normalizedSnapshot;
+    accountCloudUpdatedAt.value = normalizedSnapshot.updatedAt;
+  }
+
+  reseedDeviceRuntime(devices.value);
+
+  function persistAccountSnapshot() {
+    const snapshot: AccountCloudSnapshot = {
+      schema: 1,
+      accountKey: accountKey.value,
+      entrySurface: entrySurface.value,
+      updatedAt: Date.now(),
+      user: user.value,
+      devices: devices.value,
+      earnings: earnings.value,
+      latestWithdrawal: latestWithdrawal.value,
+    };
+    const merged = mergeAndWriteAccountSnapshot(lastCloudSnapshot, snapshot);
+    adoptAccountSnapshot(merged);
+  }
+
+  function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
+    const key = normalizeAccountKey(rawAccountKey);
+    const snapshot = readAccountSnapshot(key) ?? createSeedSnapshot(key, rawAccountKey, surface);
+    accountKey.value = snapshot.accountKey;
+    entrySurface.value = surface;
+    const boundSnapshot: AccountCloudSnapshot = {
+      ...snapshot,
+      entrySurface: surface,
+      user: { ...snapshot.user, email: snapshot.user.email || rawAccountKey || "alex@nexion.ai" },
+    };
+    miningPaused.value = false;
+    adoptAccountSnapshot(boundSnapshot, true);
+    persistAccountSnapshot();
+  }
 
   function tick(deltaMs: number) {
     if (miningPaused.value) return;
@@ -87,11 +325,11 @@ export const useApp = defineStore("app", () => {
 
     // ── Per-device updates ──
     const newDevices = devices.value.map((d) => {
+      if (d.kind === "pc-gpu" && !computeShareEnabled.value) return freezeComputeShareDevice(d);
       if (d.activatedAt === null) return d;
       if (d.status !== "online" || d.kind === "cloud-share") return d;
-      const timer = deviceTimers.get(d.id) ?? { vital: 0, earnings: 0 };
+      const timer = deviceTimers.get(d.id) ?? { vital: 0 };
       timer.vital += deltaMs;
-      timer.earnings += deltaMs;
       deviceTimers.set(d.id, timer);
 
       const next: Device = { ...d };
@@ -140,26 +378,10 @@ export const useApp = defineStore("app", () => {
         next.vramUsed = +(d.vramTotal * (0.7 + Math.random() * 0.2)).toFixed(1);
       }
 
-      // Earnings ~2s (USDT + NEX with lifecycle decay)
-      if (timer.earnings >= 1800) {
-        timer.earnings = 0;
-        const marketMult = 0.95 + Math.random() * 0.1;
-        const variation = 0.85 + Math.random() * 0.3;
-        const lifeEff = isDegradable(d.kind) ? getEfficiency(getMonthsOwned(d.purchasedAt)) : 1;
-        // Phone yield is modulated (bounded) by the same condition factors the
-        // live hashpower shows — continuous-online stability bonus + thermal —
-        // so good behaviour (stay charged/online on ONE device) earns slightly
-        // more, within the tiny safe band. Charge/network are hard gates above
-        // (a paused phone never reaches here). Non-phone devices: factor = 1.
-        const phoneFactor =
-          d.kind === "phone"
-            ? continuityFactor(Date.now() - (next.miningSince ?? Date.now())) * thermalFactor(next.thermalState)
-            : 1;
-        const inc = (d.baseRate * lifeEff * phoneFactor * marketMult * variation * 1800) / ONE_DAY;
-        const incNEX = (d.baseRateNEX * lifeEff * phoneFactor * marketMult * variation * 1800) / ONE_DAY;
-        next.todayEarnings = +(d.todayEarnings + inc).toFixed(3);
-        next.todayEarningsNEX = +(d.todayEarningsNEX + incNEX).toFixed(2);
-      }
+      // Earnings accrual moved to settle() (SPEC-1 §4.2): yield is settled by
+      // wall-clock Δ since lastSettledAt — not accumulated tick time — so a
+      // closed/backgrounded gap catches up on reopen. Telemetry stays per-tick
+      // here; settle() runs once below after this telemetry pass commits.
 
       // Task progress / rotation
       if (next.currentTask) {
@@ -189,21 +411,41 @@ export const useApp = defineStore("app", () => {
       return next;
     });
 
-    // ── Aggregate today's earnings + delta-add ──
-    const aggregateToday = newDevices.reduce((sum, d) => sum + d.todayEarnings, 0);
-    const aggregateTodayNEX = newDevices.reduce((sum, d) => sum + d.todayEarningsNEX, 0);
-    const usdDelta = aggregateToday - lastTickAggregate.usd;
-    const nexDelta = aggregateTodayNEX - lastTickAggregate.nex;
+    // Telemetry committed; earnings settled separately via the single source.
+    devices.value = newDevices;
+    global.value = { ...global.value, ...globalUpdate };
+    settle();
+  }
+
+  /** SPEC-1 §4.2 — settle every device by wall-clock Δ (settleDevice), then roll
+   *  the aggregate today/week/month/total + NEX balance forward by the positive
+   *  delta. Called by tick() (steady state) and on app foreground (App.vue onShow)
+   *  so a backgrounded / reopened session catches its offline gap up in one shot.
+   *  The SINGLE earnings-accrual path — PROD swaps it for the server's settle
+   *  endpoint (same lastSettledAt anchor), zero shape change. */
+  function settle() {
+    if (miningPaused.value) return;
+    const now = Date.now();
+    const carrier = getCarrier();
+    const onlineBonus = useConfig().config.onlineBonus;
+    const settlement = useRiskCluster().evaluateSettlement(accountKey.value);
+    const settled = devices.value.map((d) =>
+      d.kind === "pc-gpu" && !computeShareEnabled.value
+        ? freezeComputeShareDevice(d)
+        : settleDevice(d, carrier, now, onlineBonus),
+    );
+
+    const aggregateToday = settled.reduce((sum, d) => sum + d.todayEarnings, 0);
+    const aggregateTodayNEX = settled.reduce((sum, d) => sum + d.todayEarningsNEX, 0);
+    const positiveUsdDelta = Math.max(0, aggregateToday - lastTickAggregate.usd);
+    const positiveNexDelta = Math.max(0, aggregateTodayNEX - lastTickAggregate.nex);
     lastTickAggregate.usd = aggregateToday;
     lastTickAggregate.nex = aggregateTodayNEX;
-    const positiveUsdDelta = Math.max(0, usdDelta);
-    const positiveNexDelta = Math.max(0, nexDelta);
 
     const nextTodayUSD = +(earnings.value.today + positiveUsdDelta).toFixed(2);
     const nextTodayNEX = +(earnings.value.todayNEX + positiveNexDelta).toFixed(2);
 
-    devices.value = newDevices;
-    global.value = { ...global.value, ...globalUpdate };
+    devices.value = settled;
     earnings.value = {
       ...earnings.value,
       today: nextTodayUSD,
@@ -213,10 +455,17 @@ export const useApp = defineStore("app", () => {
       total: +(earnings.value.total + positiveUsdDelta).toFixed(2),
     };
     user.value = {
-      ...user.value,
+      ...bucketUserEarnings(
+        user.value,
+        settlement.bucketRoute,
+        +positiveUsdDelta.toFixed(2),
+        +positiveNexDelta.toFixed(2),
+        settlement.configVersion,
+        now,
+      ),
       pendingEarnings: nextTodayUSD,
-      nexBalance: +(user.value.nexBalance + positiveNexDelta).toFixed(2),
     };
+    persistAccountSnapshot();
   }
 
   // ⚠️ MOCK-ONLY demo helper (ported from index.ts setPhoneRuntime). Lets the
@@ -231,6 +480,7 @@ export const useApp = defineStore("app", () => {
     devices.value = devices.value.map((d) =>
       d.id === id && d.kind === "phone" ? { ...d, ...patch } : d,
     );
+    persistAccountSnapshot();
   }
 
   // Apply a calibration result to the phone device: refreshes its yield baseline
@@ -253,26 +503,29 @@ export const useApp = defineStore("app", () => {
           }
         : d,
     );
+    persistAccountSnapshot();
   }
 
-  // Session invalidated (logged in on another device / logged out / admin
-  // revoked): immediately cancel every in-flight task across the fleet WITHOUT
-  // a grace window and WITHOUT issuing a receipt — the in-progress job's reward
-  // is forfeited (the "回退"/rollback), mirroring interrupt.ts cancel semantics
-  // but triggered by auth, not connectivity. Freezes mining until resumeMining().
+  // Session invalidated (self logged-out / admin revoked): immediately cancel
+  // every in-flight task across the fleet WITHOUT a grace window and WITHOUT
+  // issuing a receipt — the in-progress job's reward is forfeited (the
+  // "回退"/rollback), mirroring interrupt.ts cancel semantics but triggered by
+  // auth, not connectivity. Freezes mining until resumeMining().
   function interruptAllTasks(_reason: "kicked" | "logged-out") {
     miningPaused.value = true;
     devices.value = devices.value.map((d) =>
       d.activatedAt !== null
-        ? { ...d, currentTask: null, interruptedAt: null, miningSince: null }
+        ? { ...d, currentTask: null, interruptedAt: null, miningSince: null, lastSettledAt: null }
         : d,
     );
+    persistAccountSnapshot();
   }
 
   // Re-arm the simulation after a fresh session is established (re-login /
   // recalibration complete). tick() resumes assigning tasks + accruing.
   function resumeMining() {
     miningPaused.value = false;
+    persistAccountSnapshot();
   }
 
   // ── Device lifecycle (slot CRUD) — ported from index.ts addDevice /
@@ -284,12 +537,35 @@ export const useApp = defineStore("app", () => {
   // Returns the new device id so callers that chain activate/debit/bill use
   // the returned id, NOT `.filter(kind).pop()` (Batch C Round 1 P0 #4: pop()
   // picked the wrong same-kind device when inventory already held one).
-  function addDevice(kind: DeviceKind): string {
+  function addDevice(kind: DeviceKind, options: CreateDeviceOptions = {}): string {
     const id = `${kind}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
-    const newDevice = createDevice(kind, id);
-    deviceTimers.set(id, { vital: 0, earnings: 0 });
+    const newDevice = createDevice(kind, id, options);
+    deviceTimers.set(id, { vital: 0 });
     devices.value = [...devices.value, newDevice];
+    persistAccountSnapshot();
     return id;
+  }
+
+  function connectComputeShareDevice(gpuModel = "NVIDIA GeForce RTX 4070", reservedSlots = 0): {
+    ok: boolean;
+    deviceId?: string;
+    reason?: "disabled" | "slots-full" | "activation-failed";
+  } {
+    if (!computeShareEnabled.value) return { ok: false, reason: "disabled" };
+    if (activeSlotCount.value + reservedSlots >= MAX_DEVICES) return { ok: false, reason: "slots-full" };
+
+    const normalizedModel = gpuModel.trim() || "NVIDIA GeForce RTX 4070";
+    const gpuTier = matchGpuTier(normalizedModel, cfg.config.computeShare.gpuTiers);
+    const deviceId = addDevice("pc-gpu", { gpuModel: normalizedModel, gpuTier });
+    const ok = activateDevice(deviceId, reservedSlots);
+    if (!ok) {
+      devices.value = devices.value.filter((d) => d.id !== deviceId);
+      deviceTimers.delete(deviceId);
+      persistAccountSnapshot();
+      return { ok: false, reason: "activation-failed" };
+    }
+    settle();
+    return { ok: true, deviceId };
   }
 
   // Sprint #146-1 — activation toggle. Slot cap (MAX_DEVICES) applies to ACTIVE
@@ -301,11 +577,12 @@ export const useApp = defineStore("app", () => {
   function activateDevice(id: string, reservedSlots = 0): boolean {
     const device = devices.value.find((d) => d.id === id);
     if (!device || device.activatedAt !== null) return false;
-    const activeCount = devices.value.filter((d) => d.activatedAt !== null).length;
-    if (activeCount + reservedSlots >= MAX_DEVICES) return false;
+    if (device.kind === "pc-gpu" && !computeShareEnabled.value) return false;
+    if (activeSlotCount.value + reservedSlots >= MAX_DEVICES) return false;
     devices.value = devices.value.map((d) =>
-      d.id === id ? { ...d, activatedAt: Date.now(), pendingDeactivate: false } : d,
+      d.id === id ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), pendingDeactivate: false } : d,
     );
+    persistAccountSnapshot();
     return true;
   }
 
@@ -329,6 +606,7 @@ export const useApp = defineStore("app", () => {
           }
         : d,
     );
+    persistAccountSnapshot();
   }
 
   // Sprint #146-1 supplement: graceful deactivation. Marks the device for
@@ -353,23 +631,28 @@ export const useApp = defineStore("app", () => {
           : { ...d, pendingDeactivate: true }
         : d,
     );
+    persistAccountSnapshot();
   }
 
   // ── Balance primitives (register/login/wallet use these) ──
   function creditBalance(amount: number) {
     user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(2) };
+    persistAccountSnapshot();
   }
   function debitBalance(amount: number): boolean {
     if (user.value.usdtBalance < amount) return false;
     user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance - amount).toFixed(2) };
+    persistAccountSnapshot();
     return true;
   }
   function creditNex(amount: number) {
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance + amount).toFixed(2) };
+    persistAccountSnapshot();
   }
   function debitNex(amount: number): boolean {
     if (user.value.nexBalance < amount) return false;
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance - amount).toFixed(2) };
+    persistAccountSnapshot();
     return true;
   }
   function recordDeposit(amount: number): boolean {
@@ -380,6 +663,28 @@ export const useApp = defineStore("app", () => {
       usdtBalance: +(user.value.usdtBalance + amount).toFixed(2),
       cumulativeDepositUsdt: +(user.value.cumulativeDepositUsdt + amount).toFixed(2),
     };
+    persistAccountSnapshot();
+    return true;
+  }
+  function creditRewardBucket(route: EarningBucketRoute, usdt: number, nex = 0): boolean {
+    if (!Number.isFinite(usdt) || !Number.isFinite(nex) || usdt < 0 || nex < 0) return false;
+    if (route === "no_issue") return true;
+    const buckets = withDefaultEarningBuckets(user.value).earningBuckets;
+    const nextBuckets = { ...buckets, lastBucketedAt: Date.now() };
+    const nextUser: UserState = { ...user.value, earningBuckets: nextBuckets };
+    if (route === "withdrawable") {
+      nextBuckets.withdrawableUsdt = +(nextBuckets.withdrawableUsdt + usdt).toFixed(2);
+      nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
+      nextUser.nexBalance = +(nextUser.nexBalance + nex).toFixed(2);
+    } else if (route === "pending_review") {
+      nextBuckets.pendingReviewUsdt = +(nextBuckets.pendingReviewUsdt + usdt).toFixed(2);
+      nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
+    } else {
+      nextBuckets.bonusLockedUsdt = +(nextBuckets.bonusLockedUsdt + usdt).toFixed(2);
+      nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
+    }
+    user.value = nextUser;
+    persistAccountSnapshot();
     return true;
   }
 
@@ -396,8 +701,11 @@ export const useApp = defineStore("app", () => {
     network: Withdrawal["network"],
     address: string,
     fee: number,
+    riskRoute: WithdrawalRiskRoute = "pass",
+    riskReasons: string[] = [],
   ): string | null {
-    if (user.value.usdtBalance < amount) return null;
+    const currentUser = withDefaultEarningBuckets(user.value);
+    if (currentUser.earningBuckets.withdrawableUsdt < amount) return null;
     const now = Date.now();
     const yyyymmdd = new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
     const seq = Math.floor(1000 + Math.random() * 9000);
@@ -411,11 +719,22 @@ export const useApp = defineStore("app", () => {
       address,
       fee,
       status: "submitted",
+      riskRoute,
+      riskReasons,
       submittedAt: now,
       estimatedCompletion: now + 24 * 3600 * 1000,
     };
     latestWithdrawal.value = wd;
-    user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance - amount).toFixed(2) };
+    user.value = {
+      ...currentUser,
+      usdtBalance: +(currentUser.usdtBalance - amount).toFixed(2),
+      earningBuckets: {
+        ...currentUser.earningBuckets,
+        withdrawableUsdt: +(currentUser.earningBuckets.withdrawableUsdt - amount).toFixed(2),
+        lastBucketedAt: now,
+      },
+    };
+    persistAccountSnapshot();
     return id;
   }
 
@@ -426,6 +745,7 @@ export const useApp = defineStore("app", () => {
   function advanceWithdrawal() {
     const wd = latestWithdrawal.value;
     if (!wd) return;
+    if (wd.riskRoute && wd.riskRoute !== "pass") return;
     const order: Withdrawal["status"][] = [
       "submitted",
       "review-passed",
@@ -436,13 +756,16 @@ export const useApp = defineStore("app", () => {
     const idx = order.indexOf(wd.status);
     if (idx >= order.length - 1) return;
     latestWithdrawal.value = { ...wd, status: order[idx + 1] };
+    persistAccountSnapshot();
   }
 
   return {
-    user, devices, earnings, global, latestWithdrawal, miningPaused,
-    tick, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
-    creditBalance, debitBalance, creditNex, debitNex, recordDeposit,
+    accountKey, entrySurface, accountCloudUpdatedAt,
+    user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global, latestWithdrawal, miningPaused,
+    bindAccount, persistAccountSnapshot,
+    tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
+    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, creditRewardBucket,
     submitWithdrawal, advanceWithdrawal,
-    addDevice, activateDevice, deactivateDevice, scheduleDeactivation,
+    addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });

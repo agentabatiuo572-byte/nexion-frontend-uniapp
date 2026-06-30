@@ -1,9 +1,9 @@
 /**
  * Stable per-install device identity — single source for "which device am I".
  *
- * The login device's id is what makes single-device login + new-device
- * recalibration possible: the server records which device currently owns the
- * account session, and a different deviceId on sign-in is "a new device".
+ * The login device's id is what makes new-device recalibration possible: the
+ * server can tell whether this physical device differs from the calibrated
+ * device even while multiple account sessions coexist.
  *
  * ⚠️ MOCK-ONLY: here we mint + persist the id client-side. PRODUCTION: the
  * server issues/confirms a device id during `POST /api/auth/signin`

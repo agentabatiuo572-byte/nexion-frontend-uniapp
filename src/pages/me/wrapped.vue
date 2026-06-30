@@ -126,7 +126,7 @@ const commission = useCommission();
 
 const idx = ref(0);
 
-const deviceCount = computed(() => app.devices.length);
+const deviceCount = computed(() => app.visibleDevices.length);
 const totalEarnings = computed(() => app.earnings.total);
 const myRank = computed(() => vRank.myRank);
 const totalMembers = computed(() => network.totalMembers);

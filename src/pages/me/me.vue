@@ -191,6 +191,7 @@ import { useSecurity } from "@/store/security";
 import { useNotifications } from "@/store/notifications";
 import { useGenesis } from "@/store/genesis";
 import { useAchievements } from "@/store/achievements";
+import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS } from "@/mock/achievements";
 import { confirm as uiConfirm } from "@/store/ui";
 
@@ -233,7 +234,7 @@ const trialIsHero = computed(() => !trialIsActive.value && trial.canStart());
 // Genesis promo card only surfaces to users with a purchased box (phone +
 // cloud-share don't count).
 const hasPurchasedBox = computed(() =>
-  app.devices.some((d) => d.kind !== "phone" && d.kind !== "cloud-share"),
+  app.visibleDevices.some((d) => isPurchasedHardwareKind(d.kind)),
 );
 // "我的创世节点" row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.

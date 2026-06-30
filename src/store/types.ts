@@ -1,5 +1,9 @@
+import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
+import type { EntrySurface } from "@/lib/entry-surface";
+
 export type DeviceKind =
   | "phone"
+  | "pc-gpu"
   | "stellarbox-s1"
   | "stellarbox-pro"
   | "stellarbox-pro-v2"
@@ -59,6 +63,8 @@ export interface Device {
   kind: DeviceKind;
   name: string;
   gpu: string;
+  gpuTier?: GpuTierId;
+  gpuModel?: string;
   vramTotal: number; // GB
   basePower: number; // W
   baseRate: number; // daily USDT (full-efficiency baseline; see lib/store/device-lifecycle.ts for current effective rate)
@@ -72,6 +78,13 @@ export interface Device {
   // number = epoch ms when user activated this device into one of the 6 slots.
   // Phone is auto-activated on signup; other devices start inactive and require user opt-in.
   activatedAt: number | null;
+  // SPEC-1 §4.2 登记锚点: epoch ms of the last earnings settlement. Set on
+  // activation (= registration), advanced by app.ts settle() on each accrual.
+  // Earnings accrue by wall-clock (now - lastSettledAt), NOT by accumulated tick
+  // time — so a closed/backgrounded gap is settled in one shot on reopen (mock;
+  // PROD: the server holds this anchor and settles on the foreground call).
+  // null = not currently earning (inactive / frozen); re-anchored on resume.
+  lastSettledAt?: number | null;
   // Sprint #146-1 supplement: when user requests "deactivate after current task
   // completes" (instead of forfeit-and-deactivate-now), this flag stays true
   // until tick() sees currentTask transition complete → triggers deactivation.
@@ -135,6 +148,17 @@ export interface Device {
 
 export type UserTier = "L0" | "L1" | "L2" | "L3" | "L4" | "L5";
 
+export interface EarningBuckets {
+  withdrawableUsdt: number;
+  pendingReviewUsdt: number;
+  bonusLockedUsdt: number;
+  lockedNex: number;
+  policyVersion: string;
+  lastBucketedAt: number;
+}
+
+export type EarningBucketRoute = "withdrawable" | "pending_review" | "bonus_locked" | "no_issue";
+
 export interface UserState {
   email: string;
   tier: UserTier;
@@ -143,6 +167,7 @@ export interface UserState {
   usdtBalance: number;
   nexBalance: number;
   pendingEarnings: number;
+  earningBuckets: EarningBuckets;
   /** Lifetime sum of completed USDT deposits/topups. Used by tradein eligibility
    *  `cumulative-deposit-usdt` rule. Seeded 0; incremented ONLY by recordDeposit
    *  action (NOT earnings, NOT exchange, NOT salvage refund, NOT KYC bonus,
@@ -195,29 +220,44 @@ export interface Withdrawal {
   address: string;
   fee: number;
   status: WithdrawalStatus;
+  riskRoute?: WithdrawalRiskRoute;
+  riskReasons?: string[];
   submittedAt: number;
   estimatedCompletion: number;
 }
 
 export interface AppState {
+  accountKey: string;
+  entrySurface: EntrySurface;
+  accountCloudUpdatedAt: number;
   user: UserState;
   devices: Device[];
+  visibleDevices: Device[];
+  slotDevices: Device[];
+  activeSlotCount: number;
   earnings: EarningsState;
   global: GlobalStats;
   latestWithdrawal: Withdrawal | null;
   // Actions
+  bindAccount: (accountKey: string, entrySurface?: EntrySurface) => void;
+  persistAccountSnapshot: () => void;
   tick: (deltaMs: number) => void;
   /** Adds a new inventory (inactive) device. Returns the new device id so
    *  callers can sequentially activate / debit / bill without guessing
    *  which device is "the new one" via `.filter(kind).pop()` heuristics
    *  (Batch C Round 1 P0 #4 — pop() picked wrong device when inventory
    *  already had a same-kind device at higher array index). */
-  addDevice: (kind: DeviceKind) => string;
+  addDevice: (kind: DeviceKind, options?: { gpuModel?: string; gpuTier?: GpuTier; gpuTiers?: GpuTier[] }) => string;
   // Sprint #146-1 — slot lifecycle. activateDevice sets activatedAt=now and
   // refuses if active count already at MAX_DEVICES. deactivateDevice clears
   // activatedAt + zeroes runtime telemetry so the device exits earnings/quest
   // contribution while remaining in inventory.
-  activateDevice: (id: string) => boolean;  // returns false on cap hit / not found / already active
+  activateDevice: (id: string, reservedSlots?: number) => boolean;  // returns false on cap hit / not found / already active
+  connectComputeShareDevice: (gpuModel?: string, reservedSlots?: number) => {
+    ok: boolean;
+    deviceId?: string;
+    reason?: "disabled" | "slots-full" | "activation-failed";
+  };
   deactivateDevice: (id: string) => void;
   /** Marks device for deactivation after current task completes; tick() picks it up. */
   scheduleDeactivation: (id: string) => void;
@@ -273,11 +313,14 @@ export interface AppState {
   debitBalance: (amount: number) => boolean; // returns false if insufficient
   creditNex: (amount: number) => void;
   debitNex: (amount: number) => boolean;
+  creditRewardBucket: (route: EarningBucketRoute, usdt: number, nex?: number) => boolean;
   submitWithdrawal: (
     amount: number,
     network: Withdrawal["network"],
     address: string,
-    fee: number
+    fee: number,
+    riskRoute?: WithdrawalRiskRoute,
+    riskReasons?: string[],
   ) => string | null; // fee = new-model actualFee (grossFee − NEX offset); null when insufficient balance
   advanceWithdrawal: () => void;
 }

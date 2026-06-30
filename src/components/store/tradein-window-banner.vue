@@ -51,8 +51,8 @@ const state = computed(() => {
   const rackWindowOpen = isPhaseReached(phase.value, "P5");
   const isFinal = isPhaseReached(phase.value, "P5");
 
-  const hasLegacyBox = app.devices.some((d) => LEGACY_BOX_KINDS.has(d.kind));
-  const hasLegacyRack = app.devices.some((d) => LEGACY_RACK_KINDS.has(d.kind));
+  const hasLegacyBox = app.visibleDevices.some((d) => LEGACY_BOX_KINDS.has(d.kind));
+  const hasLegacyRack = app.visibleDevices.some((d) => LEGACY_RACK_KINDS.has(d.kind));
 
   const showBox = boxWindowOpen && hasLegacyBox;
   const showRack = rackWindowOpen && hasLegacyRack;

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** compare-detail.mjs — side-by-side detail-page section spacing: uni(5173) vs proto(3001). */
+/** compare-detail.mjs — current UniApp detail-page section spacing probe. */
 import { chromium } from "playwright";
 import path from "node:path"; import fs from "node:fs"; import { fileURLToPath } from "node:url";
 const OUT = path.join(path.dirname(fileURLToPath(import.meta.url)), ".baseline", "_check");
@@ -7,7 +7,6 @@ fs.mkdirSync(OUT, { recursive: true });
 const PROD = process.argv[2] || "stellarrack-p1";
 const apps = [
   { name: "uni", url: `http://localhost:5173/#/pages/store/detail?id=${PROD}`, scrollSel: ".nx-content" },
-  { name: "proto", url: `http://localhost:3001/store/${PROD}`, scrollSel: null },
 ];
 const browser = await chromium.launch();
 for (const a of apps) {

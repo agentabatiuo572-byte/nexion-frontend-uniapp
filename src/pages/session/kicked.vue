@@ -1,9 +1,8 @@
 <!--
-  Session-ended (kicked) screen. Shown when single-device enforcement evicts
-  this device: the account signed in elsewhere, was logged out, or ops revoked
-  the session. Blocking full-screen — the only way forward is to sign in again
-  (which re-claims the session for this device). In-flight tasks were already
-  voided + rolled back by App.vue's checkSession() before routing here.
+  Session-ended screen. Shown when this carrier's session was signed out,
+  deleted, or ops-revoked. SPEC-4 multi-carrier login does not kick just because
+  another device signs in. In-flight tasks were already voided + rolled back by
+  App.vue's checkSession() before routing here.
 -->
 <template>
   <view class="ks-root">
@@ -49,7 +48,7 @@ const bodyText = computed(() =>
 );
 
 function reLogin() {
-  // Route to login; a successful sign-in re-claims the session for this device
+  // Route to login; a successful sign-in creates a fresh session for this carrier
   // (and resumes mining via App.vue's checkSession).
   uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
 }

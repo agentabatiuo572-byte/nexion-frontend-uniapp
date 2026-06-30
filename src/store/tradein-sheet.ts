@@ -75,7 +75,7 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     // "lowest drifts mid-sheet" Batch C R1 P1 #10 attack — even if tick()
     // re-orders earnings between open + tap, the sheet keeps targeting the
     // device the user expected.
-    const devices = useApp().devices;
+    const devices = useApp().slotDevices;
     const active = devices.filter((d) => d.activatedAt !== null);
     if (active.length === 0) {
       // No active device to replace — caller's slot-full assumption is wrong

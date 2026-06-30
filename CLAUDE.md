@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-**这是 Nexion 前端的唯一实现面**（主人 2026-06-14 拍板：前端新功能/改动都在这里做，不回 H5 `Nexion-prototype`）。任意 Nexion 任务先加载 `nexion-workflow` skill 判工作线；本工程（④ uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
+**这是 Nexion 前端的唯一实现面**（主人 2026-06-14 拍板：前端新功能/改动都在这里做。H5 `Nexion-prototype` 已于 2026-06-26 退役删除）。任意 Nexion 任务先读 `D:\WORKS\PLAN\WORKFLOW.md` 判工作线 + 加载 `nexion-workflow` skill；本工程（uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
 
 ## Heads-up: uni-app (Vue3)，不是 React/Next
 
-本工程是 **uni-app + Vue 3.4.21 + Vite 5 + UnoCSS + TypeScript 4.9 + vue-i18n 9**，目标端 App(iOS/Android webview) + H5，全用 `.vue`（无 .nvue）。源原型 `Nexion-prototype` 是 Next.js/React——迁移时把 React 心智**映射**到 Vue/uni，别照搬 JSX 习惯。
+本工程是 **uni-app + Vue 3.4.21 + Vite 5 + UnoCSS + TypeScript 4.9 + vue-i18n 9**，目标端 App(iOS/Android webview) + H5，全用 `.vue`（无 .nvue）。原 H5 源原型已退役;后续无迁移源,功能直接在本工程从 PRD 出发实现。
 
 **依赖版本锁（踩坑后锁定，勿升级）**：
 - Vue `3.4.21`（勿升 3.5，uni 生态锁定）

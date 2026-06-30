@@ -257,7 +257,7 @@ function activate() {
   // device as the account's calibrated device (so future logins on it skip
   // recalibration, while a different device triggers it).
   app.applyPhoneCalibration(cap);
-  useSession().markCalibrated(auth.email || "default");
+  useSession().markCalibrated(auth.email || auth.accountId || "default");
   if (isRecal.value) {
     app.resumeMining();
   } else {

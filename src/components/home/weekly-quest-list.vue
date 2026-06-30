@@ -81,6 +81,7 @@ import {
   WEEKLY_CHAMPION_BADGE_ID,
   type Tier2QuestDef,
 } from "@/mock/weekly-quests";
+import { isPurchasedHardwareKind } from "@/store/device-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
@@ -101,7 +102,7 @@ onMounted(() => {
 
 const tier2Quests = computed<Tier2QuestDef[]>(() => {
   if (!mounted.value) return [];
-  const hasHardware = app.devices.some((d) => d.kind !== "phone" && d.kind !== "cloud-share");
+  const hasHardware = app.visibleDevices.some((d) => isPurchasedHardwareKind(d.kind));
   return dispatchTier2({
     balanceUSDT: app.user.usdtBalance,
     nexBalance: app.user.nexBalance,

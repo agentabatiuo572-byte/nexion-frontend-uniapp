@@ -172,7 +172,7 @@ const isUp = computed(() => change24h.value >= 0);
 
 // Only active devices contribute today's NEX.
 const todayNEX = computed(() =>
-  app.devices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
+  app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
 );
 
 // Mock cost basis (avg buy price) — fixed 0.085 day-0 baseline for P&L visual.

@@ -74,7 +74,7 @@ const remainingLabel = computed(() => {
   return `${days}d ${String(hours).padStart(2, "0")}h`;
 });
 
-const promo = computed(() => derivePromoUpgrade(app.devices));
+const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => promo.value.targetDaily.toFixed(2));
 
 const subtitleText = computed(() =>

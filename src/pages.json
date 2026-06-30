@@ -5,6 +5,22 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/entry-surfaces/index",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/entry-surfaces/signed",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/entry-surfaces/h5",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/entry-surfaces/white",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/onboarding/intro",
       "style": { "navigationStyle": "custom" }
     },
@@ -58,6 +74,10 @@
     },
     {
       "path": "pages/earn/earn",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/compute-share/download",
       "style": { "navigationStyle": "custom" }
     },
     {

@@ -15,9 +15,9 @@
   pointer events). onPressStart/End also clear on touchcancel.
 -->
 <template>
-  <view class="mx-4 rounded-2xl overflow-hidden select-none" :style="cardStyle" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
-    <!-- Long-press quick menu -->
-    <view v-if="menuOpen" class="absolute inset-0 flex items-end" style="z-index: 70; background: rgba(0,0,0,0.55)" @click="menuOpen = false">
+  <view class="select-none" :style="rowStyle" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
+    <!-- Long-press quick menu (full-viewport bottom sheet) -->
+    <view v-if="menuOpen" class="flex items-end" style="position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55)" @click="menuOpen = false">
       <view class="w-full rounded-t-2xl p-3" style="background: var(--v5-surface); border-top: 1px solid var(--v5-border)" @click.stop>
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
         <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.name }}</text>
@@ -37,30 +37,42 @@
       </view>
     </view>
 
-    <!-- Header -->
-    <view class="flex items-start justify-between" style="padding: 16px 20px 12px">
-      <view class="flex items-center gap-3">
-        <view class="rounded-lg grid place-items-center" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
+    <!-- Collapsed row header (always visible; tap toggles detail) -->
+    <view class="flex items-center justify-between" style="padding: 14px 20px; min-height: 58px" @click="onRowTap">
+      <view class="flex items-center gap-2.5 min-w-0" style="flex: 1">
+        <view class="rounded-lg grid place-items-center shrink-0" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
         </view>
-        <view>
-          <text class="block" style="font-size: 14px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
-          <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
+        <view class="min-w-0" style="flex: 1">
+          <text class="block truncate" style="font-size: 14px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
+          <view class="flex items-center gap-1.5" style="margin-top: 3px">
+            <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
+            <text style="font-size: 11.5px" :style="{ color: statusColor }">{{ statusLabel }}</text>
+          </view>
         </view>
       </view>
-      <view class="flex flex-col items-end gap-1">
-        <view class="flex items-center gap-1.5">
-          <view :style="{ position: 'relative', display: 'inline-flex', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
-          <text style="font-size: 11.5px" :style="{ color: statusColor }">{{ statusLabel }}</text>
+      <view class="flex items-center gap-2.5 shrink-0">
+        <view class="text-right">
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 18px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
+          <text class="block" style="font-size: 10px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
         </view>
-        <!-- Lifecycle chip -->
-        <view v-if="degradable && lifecycle" class="inline-flex items-center gap-1 active:opacity-70" :style="chipStyle" @click="goDevices">
+        <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }"><path d="m6 9 6 6 6-6" /></svg>
+        </view>
+      </view>
+    </view>
+
+    <!-- Detail body (expanded; accordion) -->
+    <view v-if="expanded">
+      <!-- device identity: gpu · location + lifecycle chip -->
+      <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
+        <text class="min-w-0 truncate" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
+        <view v-if="degradable && lifecycle" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" @click.stop="goDevices">
           <text>{{ (lifecycle.efficiency * 100).toFixed(0) }}%</text>
           <text style="opacity: 0.65">·</text>
           <text style="opacity: 0.9">{{ monthsLabel }}</text>
         </view>
       </view>
-    </view>
 
     <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
     <view v-if="phoneRunning" style="padding: 0 20px 12px">
@@ -88,6 +100,11 @@
           <text style="font-size: 11.5px; color: var(--v5-ink-2)">{{ factorLabel }}</text>
         </view>
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashOutput, { n: live.effectivePct }) }}</text>
+      </view>
+      <!-- SPEC-1 §4.3 载体分层叙事: H5 非常驻 → 基础托管档,弱引导升级 App 拿在线加成(转化钩子,信息态非死按钮) -->
+      <view v-if="isH5" class="flex items-center" style="gap: 6px; margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
+        <text style="font-size: 11px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
       </view>
     </view>
 
@@ -203,23 +220,17 @@
       </view>
     </view>
 
-    <!-- Earnings — dual currency -->
+    <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
     <view style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
-      <view class="flex items-end justify-between">
-        <view>
-          <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); margin-top: 4px; font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
-          <view class="font-mono-tabular mt-1 flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-tech-cyan); font-weight: 600">
-            <text style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-tech-cyan) 75%, transparent)">+</text>
-            <text>{{ device.todayEarningsNEX.toFixed(1) }} NEX</text>
-          </view>
-        </view>
-        <view class="text-right">
-          <text class="block" :style="sectionLabelStyle">{{ t.earn.estThisHour }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); margin-top: 4px; font-size: 18px; line-height: 1; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">+${{ (device.baseRate / 24).toFixed(2) }}</text>
-          <text class="block font-mono-tabular tabular-nums" style="margin-top: 4px; font-size: 11px; color: color-mix(in srgb, var(--v5-tech-cyan) 85%, transparent)">+{{ (device.baseRateNEX / 24).toFixed(1) }} NEX</text>
+      <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
+      <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
+        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-tech-cyan); font-weight: 600">
+          <text style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-tech-cyan) 75%, transparent)">+</text>
+          <text>{{ device.todayEarningsNEX.toFixed(1) }} NEX</text>
         </view>
       </view>
+    </view>
     </view>
   </view>
 </template>
@@ -227,16 +238,19 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind } from "@/store/types";
 import { getLifecycleSummary, isDegradable } from "@/store/device-lifecycle";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { computeLiveHashpower } from "@/lib/hashpower";
+import { getCarrier } from "@/lib/carrier";
 import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
-const props = defineProps<{ device: Device }>();
+const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean }>();
+const emit = defineEmits<{ toggle: [] }>();
 const app = useApp();
 const t = useT();
 
@@ -254,6 +268,7 @@ onUnmounted(() => {
 
 const KIND_ICON_PATHS: Record<DeviceKind, string> = {
   phone: "M5 2h14a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 18h.01",
+  "pc-gpu": "M4 5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-6l1 3H9l1-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM8 21h8",
   "stellarbox-s1": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
   "stellarbox-pro": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
   "stellarbox-pro-v2": "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z",
@@ -343,18 +358,26 @@ const phoneRunning = computed(
 // the lib's single-source default rather than duplicating the literal here.
 const FALLBACK_CAP = fallbackCapability();
 const baselineTops = computed(() => props.device.capabilityTops ?? FALLBACK_CAP.tops);
+const cfg = useConfig();
 const capTier = computed(() => props.device.capabilityTier ?? FALLBACK_CAP.tier);
 const live = computed(() =>
   computeLiveHashpower({
     baselineTops: baselineTops.value,
+    carrier: getCarrier(),
     isCharging: isCharging.value,
     isOnline: isOnline.value,
     thermalState: props.device.thermalState,
     continuityMs: props.device.miningSince ? Math.max(0, now.value - props.device.miningSince) : 0,
     nowSeed: now.value,
+    onlineBonus: cfg.config.onlineBonus,
   }),
 );
+// SPEC-1 载体分层: build-time fixed (H5 browser tab vs signed App). H5 = 非常驻
+// 基础托管档; App = 全因子在线加成. Mirrors lib/carrier.ts + lib/hashpower.ts.
+const isH5 = getCarrier() === "h5";
 const factorLabel = computed(() => {
+  // SPEC-1 §4.3: H5 走基础托管档 → 标「基础托管模式」而非在线因子标签.
+  if (isH5) return t.value.earn.hashCarrierH5Mode;
   switch (live.value.dominant) {
     case "continuity":
       return t.value.earn.hashFactorContinuity;
@@ -399,7 +422,7 @@ const sparkPoints = computed(() => {
 });
 
 // Phone locked-tasks loss-ad
-const promo = computed(() => derivePromoUpgrade(app.devices));
+const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const phoneLockedVisible = computed(() => promo.value.baseKind === "phone");
 const LOCKED_ITEMS: { model: string; daily: number; vram: string }[] = [
   { model: "Llama 70B inference", daily: 110, vram: "16 GB" },
@@ -432,11 +455,14 @@ const monthsLabel = computed(() => {
 
 // Long-press quick menu
 const menuOpen = ref(false);
+const pressFiredMenu = ref(false);
 let longPress: ReturnType<typeof setTimeout> | null = null;
 function onPressStart() {
   if (longPress) clearTimeout(longPress);
+  pressFiredMenu.value = false;
   longPress = setTimeout(() => {
     menuOpen.value = true;
+    pressFiredMenu.value = true;
   }, 480);
 }
 function onPressEnd() {
@@ -444,6 +470,15 @@ function onPressEnd() {
     clearTimeout(longPress);
     longPress = null;
   }
+}
+// Tap the row header → toggle detail (accordion). Skip if a long-press just
+// fired the quick menu (touchend → click would otherwise also toggle).
+function onRowTap() {
+  if (pressFiredMenu.value) {
+    pressFiredMenu.value = false;
+    return;
+  }
+  emit("toggle");
 }
 function goStatsMenu() {
   menuOpen.value = false;
@@ -459,9 +494,15 @@ function goDevices() {
 }
 
 // ── styles ──
-const cardStyle: CSSProperties = {
+const rowStyle = computed<CSSProperties>(() => ({
   position: "relative",
-  background: "var(--v5-surface)",
+  borderTop: props.divider ? "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)" : "none",
+}));
+const chevronBtnStyle: CSSProperties = {
+  width: "30px",
+  height: "30px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
 };
 const sectionLabelStyle: CSSProperties = {
   fontSize: "11.5px",

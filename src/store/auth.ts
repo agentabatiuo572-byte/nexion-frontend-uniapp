@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "@/store/account-cloud";
 
 // Ported from Nexion-prototype/lib/store/auth.ts (zustand → Pinia).
 // Gates main-app access: new sign-ups must finish onboarding
@@ -9,6 +10,7 @@ const STORAGE_KEY = "nexion-auth-v1";
 interface Persisted {
   isAuthenticated: boolean;
   email: string;
+  accountId?: string;
   onboardingComplete: boolean;
 }
 
@@ -19,6 +21,7 @@ function hydrate(): Persisted {
       return {
         isAuthenticated: !!s.isAuthenticated,
         email: s.email || "",
+        accountId: s.accountId || normalizeAccountKey(s.email || "default"),
         // v1 persisted users predate the onboarding gate — treat as onboarded.
         onboardingComplete: s.onboardingComplete === undefined ? true : !!s.onboardingComplete,
       };
@@ -31,13 +34,14 @@ function hydrate(): Persisted {
   // (the route guard in App.vue stays dormant). Only an explicit signOut()
   // flips this to a gated state, after which the guard routes to onboarding.
   // Production seeds this from the real session (GET /api/auth/session).
-  return { isAuthenticated: true, email: "", onboardingComplete: true };
+  return { isAuthenticated: true, email: "", accountId: "default", onboardingComplete: true };
 }
 
 export const useAuth = defineStore("auth", () => {
   const init = hydrate();
   const isAuthenticated = ref(init.isAuthenticated);
   const email = ref(init.email);
+  const accountId = ref(init.accountId || normalizeAccountKey(init.email || "default"));
   const onboardingComplete = ref(init.onboardingComplete);
 
   function persist() {
@@ -45,6 +49,7 @@ export const useAuth = defineStore("auth", () => {
       uni.setStorageSync(STORAGE_KEY, {
         isAuthenticated: isAuthenticated.value,
         email: email.value,
+        accountId: accountId.value,
         onboardingComplete: onboardingComplete.value,
       });
     } catch {
@@ -56,6 +61,7 @@ export const useAuth = defineStore("auth", () => {
   function signIn(e: string) {
     isAuthenticated.value = true;
     email.value = e;
+    accountId.value = normalizeAccountKey(e);
     onboardingComplete.value = true;
     persist();
   }
@@ -63,6 +69,7 @@ export const useAuth = defineStore("auth", () => {
   function signUp(e: string) {
     isAuthenticated.value = true;
     email.value = e;
+    accountId.value = normalizeAccountKey(e);
     onboardingComplete.value = false;
     persist();
   }
@@ -74,9 +81,10 @@ export const useAuth = defineStore("auth", () => {
   function signOut() {
     isAuthenticated.value = false;
     email.value = "";
+    accountId.value = "default";
     onboardingComplete.value = false;
     persist();
   }
 
-  return { isAuthenticated, email, onboardingComplete, signIn, signUp, completeOnboarding, signOut };
+  return { isAuthenticated, email, accountId, onboardingComplete, signIn, signUp, completeOnboarding, signOut };
 });
