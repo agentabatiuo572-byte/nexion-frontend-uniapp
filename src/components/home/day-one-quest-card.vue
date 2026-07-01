@@ -1,0 +1,311 @@
+<!--
+  DayOneQuestCard — ZONE 1 first-day onboarding quest ("100% faithful v5 design
+  draft", exact per-task hex). Ported from mission-control.tsx DayOneQuestCard.
+  Reward + countdown header · scroll-grow progress bar · collapsible 6-task list
+  (each task taps to its route) · expand/collapse toggle.
+-->
+<template>
+  <view class="day-one-card" :style="rootStyle">
+    <view style="padding: 16px 18px 4px">
+      <!-- Reward + countdown -->
+      <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+        <view>
+          <text style="display: block; width: fit-content; font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.dayOneFirstDayReward }}</text>
+          <view style="margin-top: 4px; display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; white-space: nowrap">
+            <text style="font-family: var(--font-amount); font-weight: 600; color: var(--v5-ink); letter-spacing: -0.024em; line-height: 1; font-size: 34px">+{{ reward }}</text>
+            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; color: var(--v5-brand); font-size: 13px; font-weight: 500">NEX</text>
+          </view>
+        </view>
+        <view style="text-align: right">
+          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 12px; color: #9B89E0; letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
+          <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 16px; color: #9B89E0; font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
+        </view>
+      </view>
+
+      <!-- Progress -->
+      <view style="margin-top: 16px">
+        <view ref="elRef" style="height: 8px; border-radius: 4px; overflow: hidden; background: var(--v5-surface-2); position: relative">
+          <view class="day-one-progress-bar" :style="barStyle" />
+        </view>
+        <view style="margin-top: 6px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
+          <text style="color: var(--v5-ink)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
+          <text style="color: var(--v5-brand); font-variant-numeric: tabular-nums">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
+        </view>
+      </view>
+
+      <!-- Tasks list (collapsible) -->
+      <view v-if="expanded" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px dashed var(--v5-border)">
+        <view
+          v-for="task in tasks"
+          :key="task.id"
+          :class="isDone(task) ? '' : 'active:scale-[0.98] active:opacity-80 transition-transform'"
+          :style="rowStyle(task)"
+          @click="onRowTap(task)"
+        >
+          <view :style="circleStyle(task)">
+            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0F0F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12l5 5L20 7" />
+            </svg>
+            <text v-else class="day-one-quest-index" :style="{ color: task.color }">{{ task.order }}</text>
+          </view>
+          <view class="day-one-task-main">
+            <text class="day-one-task-label truncate" :style="labelStyle(task)">{{ task.label }}</text>
+            <text class="day-one-task-cat" :style="catStyle(task)">{{ task.cat }}</text>
+          </view>
+          <text :style="rewardStyle(task)">+{{ task.nex }} NEX<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ task.usdt }}</text></text>
+          <view>
+            <svg v-if="!isDone(task)" style="color: var(--v5-ink-4); opacity: 0.7" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- Expand toggle -->
+    <view :style="toggleStyle" @click="expanded = !expanded">
+      <text style="font-family: var(--font-v5); font-size: 11.5px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path :d="expanded ? 'M19 15l-7-7-7 7' : 'M5 9l7 7 7-7'" />
+      </svg>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { computed, ref, type CSSProperties } from "vue";
+import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { useNow } from "@/composables/use-now";
+import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
+import { useQuest, type QuestTaskId } from "@/store/quest";
+import { useTheme } from "@/store/theme";
+
+interface QuestTask {
+  id: QuestTaskId;
+  order: number;
+  label: string;
+  nex: number;
+  usdt?: number;
+  href: string;
+  cat: string;
+  color: string;
+}
+
+const t = useT();
+const nowTick = useNow();
+const { elRef, inView } = useScrollGrowProgress();
+const quest = useQuest();
+const theme = useTheme();
+
+const expanded = ref(true);
+const reward = 500;
+
+const tasks = computed<QuestTask[]>(() => [
+  { id: "connect_wallet", order: 1, label: t.value.home.dayOneTaskConnectWallet, nex: 50, href: "/pages/me/wallet-topup", cat: t.value.home.dayOneCatWallet, color: "#9B89E0" },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "#C6FF3A" },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "#9B89E0" },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "#FF6B35" },
+]);
+
+const total = computed(() => tasks.value.length);
+// Real completion state from the quest store. App.vue's route watcher marks
+// visit_earn/visit_store/view_product_roi on navigation; action tasks complete
+// at their own action points. Reactive — the card fills in as quests complete.
+const completedCount = computed(() => tasks.value.filter((x) => quest.isComplete(x.id)).length);
+const progressPct = computed(() => (completedCount.value / total.value) * 100);
+const nexEarned = computed(() => tasks.value.filter((x) => quest.isComplete(x.id)).reduce((a, x) => a + x.nex, 0));
+const viewTasksText = computed(() => fmt(t.value.home.dayOneViewTasks, { n: total.value }));
+
+const remainingLabel = computed(() => {
+  const remainingMs = 18 * 3600_000 + 24 * 60_000 - ((nowTick.value * 1000) % 60_000);
+  const h = Math.floor(remainingMs / 3600_000);
+  const m = Math.floor((remainingMs % 3600_000) / 60_000);
+  const s = Math.floor((remainingMs % 60_000) / 1000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+});
+
+function isDone(task: QuestTask) {
+  return quest.isComplete(task.id);
+}
+function onRowTap(task: QuestTask) {
+  if (isDone(task)) return;
+  uni.navigateTo({ url: task.href, fail: () => {} });
+}
+
+const barStyle = computed<CSSProperties>(() => ({
+  height: "100%",
+  width: `${inView.value ? progressPct.value : 0}%`,
+  transition: inView.value ? PROGRESS_GROW_TRANSITION : "none",
+  willChange: "width",
+  background: "linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
+  borderRadius: "4px",
+  boxShadow: "0 0 8px rgba(198,255,58,0.55)",
+}));
+
+function rowStyle(task: QuestTask): CSSProperties {
+  const d = isDone(task);
+  return {
+    display: "grid",
+    gridTemplateColumns: "20px minmax(0, 1fr) max-content 14px",
+    gap: "10px",
+    alignItems: "center",
+    minHeight: "44px",
+    padding: "7px 8px",
+    margin: "0 -8px",
+    borderRadius: "12px",
+    background: d ? "transparent" : `color-mix(in srgb, ${task.color} 10%, transparent)`,
+    transition: "transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease",
+    cursor: d ? "default" : "pointer",
+  };
+}
+function circleStyle(task: QuestTask): CSSProperties {
+  const d = isDone(task);
+  return {
+    width: "18px",
+    height: "18px",
+    borderRadius: "50%",
+    background: d ? task.color : "transparent",
+    border: d ? "none" : `1px solid ${task.color}55`,
+    display: "grid",
+    placeItems: "center",
+  };
+}
+function labelStyle(task: QuestTask): CSSProperties {
+  const d = isDone(task);
+  return {
+    fontFamily: "var(--font-v5)",
+    fontSize: "13px",
+    lineHeight: "18px",
+    color: d ? "var(--v5-ink-4)" : "var(--v5-ink)",
+    fontWeight: 500,
+    textDecoration: d ? "line-through" : "none",
+    display: "block",
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
+function catStyle(task: QuestTask): CSSProperties {
+  const d = isDone(task);
+  return {
+    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontSize: "10.5px",
+    lineHeight: "14px",
+    color: d ? "var(--v5-ink-4)" : task.color,
+    opacity: d ? 0.5 : 0.8,
+    letterSpacing: "0.04em",
+    display: "block",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+}
+function rewardStyle(task: QuestTask): CSSProperties {
+  const d = isDone(task);
+  return {
+    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontSize: "12px",
+    lineHeight: "16px",
+    color: d ? "var(--v5-ink-4)" : task.color,
+    fontVariantNumeric: "tabular-nums",
+    fontWeight: 500,
+    textAlign: "right",
+    whiteSpace: "nowrap",
+  };
+}
+
+const rootStyle = computed<CSSProperties>(() => ({
+  position: "relative",
+  borderRadius: "16px",
+  background:
+    theme.mode === "dark"
+      ? "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), linear-gradient(180deg, #111317 0%, #15181C 100%)"
+      : "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface-bg)",
+  overflow: "hidden",
+  color: "var(--v5-ink)",
+  boxShadow: "var(--v5-card-shadow-lift)",
+}));
+const toggleStyle: CSSProperties = {
+  marginTop: "14px",
+  width: "100%",
+  height: "32px",
+  borderTop: "1px solid var(--v5-border)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "5px",
+};
+</script>
+
+<style scoped>
+.day-one-card {
+  --day-one-card-bg: var(--v5-surface-bg);
+  --day-one-card-glow: var(--v5-brand-soft);
+}
+
+:global(html[data-theme="dark"]) .day-one-card {
+  --day-one-card-bg: linear-gradient(180deg, #111317 0%, #15181C 100%);
+}
+
+.day-one-progress-bar {
+  background: linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%);
+  box-shadow: 0 0 8px rgba(198, 255, 58, 0.55);
+}
+
+:global(html:not([data-theme="dark"])) .day-one-progress-bar {
+  background: linear-gradient(90deg, #2F35FF 0%, #126BFF 46%, #18C8FF 100%) !important;
+  box-shadow: 0 0 8px rgba(18, 107, 255, 0.42) !important;
+}
+
+.day-one-quest-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.day-one-task-main {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.day-one-task-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.day-one-task-cat {
+  flex: 0 0 auto;
+  max-width: 42px;
+}
+
+@media (max-width: 390px) {
+  .day-one-task-main {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1px;
+  }
+
+  .day-one-task-cat {
+    max-width: 100%;
+  }
+
+  .day-one-task-label {
+    width: 100%;
+  }
+}
+</style>

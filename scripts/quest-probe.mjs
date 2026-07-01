@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+/** quest-probe.mjs — observe the home day-one-quest-card real (store-driven) state. */
+import { chromium } from "playwright";
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
+const p = await ctx.newPage();
+await p.goto("http://localhost:5173/#/pages/index/index", { waitUntil: "networkidle", timeout: 30000 });
+await new Promise((r) => setTimeout(r, 2500));
+const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexion-quest-v1"));
+const completedCounterText = await p.evaluate(() => {
+  const el = [...document.querySelectorAll("text,view,span")].find((e) => /\/6/.test(e.textContent || "") && (e.textContent || "").length < 12);
+  return el ? el.textContent.trim() : "(not found)";
+});
+const checkmarkCount = await p.evaluate(() => document.querySelectorAll("path[d='M5 12l5 5L20 7']").length);
+console.log(JSON.stringify({ questLocalStorage, completedCounterText, checkmarkCount }, null, 2));
+await b.close();

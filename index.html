@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      var coverSupport = 'CSS' in window && typeof CSS.supports === 'function' && (CSS.supports('top: env(a)') ||
+        CSS.supports('top: constant(a)'))
+      document.write(
+        '<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0' +
+        (coverSupport ? ', viewport-fit=cover' : '') + '" />')
+    </script>
+    <title></title>
+    <link rel="icon" href="data:," />
+    <!-- v5 typography — Space Grotesk / Inter / Rajdhani + JetBrains Mono / Noto
+         multilingual fallbacks. Inter is loaded as the web fallback for the
+         requested Inter0 family name. display=swap → no FOIT. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;600&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&family=Rajdhani:wght@500;600&family=Space+Grotesk:wght@400;500;600&display=swap" />
+    <script>
+      ;(function () {
+        if (!location.hash.startsWith('#figmacapture')) return
+        var style = document.createElement('style')
+        style.textContent = [
+          '.nx-chassis{width:414px!important;height:874px!important;margin:16px auto!important;}',
+          'html,body,#app{min-width:446px!important;min-height:906px!important;}',
+          '#nx-figma-capture-root{position:absolute!important;left:16px!important;top:16px!important;width:414px!important;margin:0!important;overflow:visible!important;z-index:2147483000!important;background:var(--v5-bg)!important;}',
+          '#nx-figma-capture-root .nx-content{overflow:visible!important;height:auto!important;bottom:auto!important;}',
+          '#nx-figma-capture-root .nx-page-enter{animation:none!important;}',
+          '#nx-figma-capture-root *{animation:none!important;transition:none!important;}'
+        ].join('')
+        document.head.appendChild(style)
+        var started = Date.now()
+        function forceLight() {
+          try {
+            localStorage.setItem('nexion-theme-v1', JSON.stringify({ mode: 'light' }))
+            document.documentElement.setAttribute('data-theme', 'light')
+          } catch (e) {}
+          if (Date.now() - started < 120000) requestAnimationFrame(forceLight)
+        }
+        function createCaptureClone() {
+          try {
+            if (document.querySelector('#nx-figma-capture-root')) return
+            var root = document.querySelector('.nx-chassis')
+            if (!root) return
+            var page = root.querySelector('.nx-page-enter')
+            var content = root.querySelector('.nx-content')
+            var fullHeight = Math.max(
+              874,
+              page ? page.scrollHeight : 0,
+              content ? content.scrollHeight : 0,
+              root.scrollHeight
+            )
+            var clone = root.cloneNode(true)
+            clone.id = 'nx-figma-capture-root'
+            clone.style.height = fullHeight + 'px'
+            var cloneContent = clone.querySelector('.nx-content')
+            if (cloneContent) {
+              cloneContent.style.height = fullHeight + 'px'
+              cloneContent.style.overflow = 'visible'
+              cloneContent.scrollTop = 0
+            }
+            var clonePage = clone.querySelector('.nx-page-enter')
+            if (clonePage) {
+              clonePage.style.transform = 'none'
+            }
+            document.body.appendChild(clone)
+          } catch (e) {}
+        }
+        var cloneTimer = setInterval(createCaptureClone, 300)
+        setTimeout(function () { clearInterval(cloneTimer); createCaptureClone() }, 3800)
+        forceLight()
+      })()
+    </script>
+    <script>
+      ;(function () {
+        if (!location.hash.startsWith('#figmacapture')) return
+        var captureScript = document.createElement('script')
+        captureScript.src = 'http://127.0.0.1:8123/capture.js'
+        document.head.appendChild(captureScript)
+      })()
+    </script>
+    <script>
+      ;(function () {
+        if (location.hash.startsWith('#figmacapture')) {
+          history.replaceState(null, '', location.pathname + location.search + '#/')
+        }
+      })()
+    </script>
+    <!--preload-links-->
+    <!--app-context-->
+  </head>
+  <body>
+    <div id="app"><!--app-html--></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

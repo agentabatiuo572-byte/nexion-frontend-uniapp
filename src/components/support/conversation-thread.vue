@@ -1,0 +1,292 @@
+<!--
+  ConversationThread — presentational chat body shared by the conversation center's
+  chat page across all categories (Nova AI / advisor / support). Ported from the
+  body of nova/nova-drawer.vue (message bubbles + **bold**/\n segments + CTA row
+  + quick chips + input), minus the header (the chat page owns its own header).
+
+  Pure/presentational: pages normalise their store into ThreadMsg[] and wire actions
+  via @send / @chip / @cta. Bare text lives in <text> (P-026); the <input> reads
+  e.detail.value (P-033) and pins its inner native height (P-048). Stable nx-conv-*
+  class names give automation real click/fill targets (P-048).
+-->
+<template>
+  <view class="nx-conv-thread">
+    <!-- Message list -->
+    <scroll-view scroll-y class="nx-conv-list" :scroll-into-view="bottomAnchor" :scroll-with-animation="true">
+      <view v-if="messages.length === 0 && emptyHint" class="nx-conv-empty">
+        <text class="nx-conv-empty-t">{{ emptyHint }}</text>
+      </view>
+
+      <view v-for="m in messages" :key="m.id" class="nx-conv-msg-row">
+        <!-- system notice -->
+        <view v-if="m.tone === 'system'" class="nx-conv-sys">
+          <text class="nx-conv-sys-t">{{ m.text }}</text>
+        </view>
+        <!-- chat bubble -->
+        <view v-else class="nx-conv-bubble-row" :class="m.side === 'right' ? 'nx-conv-right' : 'nx-conv-left'">
+          <view class="nx-conv-bubble" :style="bubbleStyle(m)">
+            <view class="nx-conv-bubble-body">
+              <view v-for="(line, li) in formatLines(m.text)" :key="li" class="nx-conv-line">
+                <text
+                  v-for="(seg, si) in line"
+                  :key="si"
+                  class="nx-conv-seg"
+                  :class="{ 'nx-conv-seg--b': seg.bold }"
+                  :style="{ color: segColor(m) }"
+                >{{ seg.text }}</text>
+                <text v-if="line.length === 0" class="nx-conv-seg">{{ " " }}</text>
+              </view>
+            </view>
+            <view v-if="m.ctaLabel && m.ctaHref" class="nx-conv-cta-row" @click="onCta(m)">
+              <text class="nx-conv-cta-t">{{ m.ctaLabel }}</text>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
+            </view>
+          </view>
+        </view>
+      </view>
+      <view :id="bottomAnchor" class="nx-conv-bottom-anchor" />
+    </scroll-view>
+
+    <!-- Quick reply chips (AI only) -->
+    <scroll-view v-if="quickChips && quickChips.length" scroll-x class="nx-conv-chips">
+      <view class="nx-conv-chips-inner">
+        <view v-for="q in quickChips" :key="q.key" class="nx-conv-chip" @click="emit('chip', q.key)">
+          <text class="nx-conv-chip-emoji">{{ q.emoji }}</text>
+          <text class="nx-conv-chip-t">{{ q.label }}</text>
+        </view>
+      </view>
+    </scroll-view>
+
+    <!-- Input row -->
+    <view class="nx-conv-input-row">
+      <input
+        class="nx-conv-input"
+        :value="draft"
+        :placeholder="inputPlaceholder"
+        placeholder-class="nx-conv-input-ph"
+        confirm-type="send"
+        @input="onDraft"
+        @confirm="onSend"
+      />
+      <view class="nx-conv-send" :style="sendStyle" @click="onSend">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="draft.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></svg>
+      </view>
+    </view>
+  </view>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch, type CSSProperties } from "vue";
+import type { ThreadMsg, QuickChip } from "./thread-types";
+
+const props = defineProps<{
+  messages: ThreadMsg[];
+  inputPlaceholder: string;
+  quickChips?: QuickChip[];
+  emptyHint?: string;
+}>();
+
+const emit = defineEmits<{
+  (e: "send", text: string): void;
+  (e: "chip", key: string): void;
+  (e: "cta", href: string, label: string): void;
+}>();
+
+const draft = ref("");
+
+function onDraft(e: Event) {
+  draft.value = (e as unknown as { detail: { value: string } }).detail.value;
+}
+
+function onSend() {
+  const text = draft.value.trim();
+  if (!text) return;
+  emit("send", text);
+  draft.value = "";
+}
+
+function onCta(m: ThreadMsg) {
+  if (m.ctaHref) emit("cta", m.ctaHref, m.ctaLabel ?? "");
+}
+
+// ── auto-scroll: bump a bottom-anchor id whenever the list grows ──
+const bottomAnchor = ref("nx-conv-end-0");
+watch(
+  () => props.messages.length,
+  (len) => {
+    bottomAnchor.value = `nx-conv-end-${len}`;
+  },
+  { immediate: true },
+);
+
+// ── bubble styling ──
+function bubbleStyle(m: ThreadMsg): CSSProperties {
+  if (m.tone === "user") return { background: "var(--v5-brand)" };
+  return { background: "var(--v5-surface-2)" };
+}
+function segColor(m: ThreadMsg): string {
+  return m.tone === "user" ? "var(--v5-on-brand)" : "var(--v5-ink)";
+}
+
+// ── **bold** + \n → render segments. Bare text must live in <text> (P-026). ──
+function formatLines(text: string): { text: string; bold: boolean }[][] {
+  return text.split("\n").map((line) =>
+    line
+      .split(/(\*\*[^*]+\*\*)/g)
+      .filter((p) => p.length > 0)
+      .map((p) =>
+        p.startsWith("**") && p.endsWith("**")
+          ? { text: p.slice(2, -2), bold: true }
+          : { text: p, bold: false },
+      ),
+  );
+}
+
+const sendStyle = computed<CSSProperties>(() => ({
+  background: draft.value.trim() ? "var(--v5-brand)" : "var(--v5-surface-2)",
+}));
+</script>
+
+<style scoped>
+.nx-conv-thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.nx-conv-list {
+  flex: 1;
+  min-height: 0; /* allow the scroll area to shrink so the input row stays visible */
+  padding: 16px;
+}
+.nx-conv-empty {
+  text-align: center;
+  padding: 32px 16px;
+}
+.nx-conv-empty-t {
+  font-size: 12.5px;
+  color: var(--v5-ink-3);
+  line-height: 1.55;
+}
+.nx-conv-msg-row {
+  margin-bottom: 12px;
+}
+.nx-conv-sys {
+  text-align: center;
+  padding: 4px 0;
+}
+.nx-conv-sys-t {
+  font-size: 11px;
+  color: var(--v5-ink-4);
+}
+.nx-conv-bubble-row {
+  display: flex;
+}
+.nx-conv-left {
+  justify-content: flex-start;
+}
+.nx-conv-right {
+  justify-content: flex-end;
+}
+.nx-conv-bubble {
+  max-width: 82%;
+  border-radius: 18px;
+  overflow: hidden;
+}
+.nx-conv-bubble-body {
+  padding: 10px 14px;
+}
+.nx-conv-line {
+  display: block;
+  min-height: 1.55em;
+}
+.nx-conv-seg {
+  font-family: var(--font-v5);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.nx-conv-seg--b {
+  font-weight: 600;
+}
+.nx-conv-cta-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 0 14px 10px;
+}
+.nx-conv-cta-t {
+  color: var(--v5-brand);
+  font-family: var(--font-v5);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: -0.005em;
+}
+.nx-conv-bottom-anchor {
+  height: 1px;
+}
+.nx-conv-chips {
+  border-top: 1px solid var(--v5-border);
+  white-space: nowrap;
+}
+.nx-conv-chips-inner {
+  display: inline-flex;
+  gap: 6px;
+  padding: 8px 12px;
+}
+.nx-conv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--v5-surface-2);
+}
+.nx-conv-chip-emoji {
+  font-size: 12px;
+}
+.nx-conv-chip-t {
+  color: var(--v5-ink-2);
+  font-family: var(--font-v5);
+  font-weight: 500;
+  font-size: 12px;
+}
+.nx-conv-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  /* lift the input clear of the iOS home indicator (P-040 nova pattern) */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 22px);
+  border-top: 1px solid var(--v5-border);
+}
+.nx-conv-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--v5-surface-2);
+  border: 1px solid var(--v5-border);
+  color: var(--v5-ink);
+  font-family: var(--font-v5);
+  font-size: 13px;
+}
+/* P-048: pin the inner native input height so the visible host == the real target. */
+.nx-conv-input :deep(.uni-input-input) {
+  height: 100%;
+  min-height: 24px;
+}
+.nx-conv-input-ph {
+  color: var(--v5-ink-4);
+}
+.nx-conv-send {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+</style>

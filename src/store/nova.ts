@@ -1,0 +1,102 @@
+import { defineStore } from "pinia";
+import { ref } from "vue";
+
+/**
+ * Ported from Nexion-prototype/lib/store/nova.ts (zustand → Pinia).
+ * Nova · in-app AI compute advisor (design doc §6.8). All replies are
+ * template-driven — no real LLM. The store holds the chat transcript, an unread
+ * counter, and the open flag. Auto-push triggers (driven from the app layer) call
+ * `push()` to enqueue proactive Nova messages tied to mock simulator events.
+ * Non-persisted (session transcript).
+ *
+ * Live human-agent handoff USED to morph this store in-place (mode/agentName). That
+ * is now superseded by the conversation center's dedicated "support" category
+ * (store/conversations.ts) — Nova's "Human support" pill routes to a real support
+ * conversation instead of mutating Nova. This store is AI-only again.
+ */
+
+export type NovaSender = "nova" | "user";
+
+export type NovaMessageKind =
+  | "welcome"
+  | "market-peak"
+  | "idle-compute"
+  | "market-event"
+  | "upgrade-nudge"
+  | "risk-alert"
+  | "daily-summary"
+  | "user-quick"
+  | "nova-reply"
+  | "user-text";
+
+export interface NovaMessage {
+  id: string;
+  sender: NovaSender;
+  kind: NovaMessageKind;
+  text: string;        // Pre-formatted (placeholders already substituted)
+  ts: number;          // epoch ms
+  ctaLabel?: string;
+  ctaHref?: string;
+}
+
+let counter = 1;
+function nextId(): string {
+  counter += 1;
+  return `m${counter}-${Date.now().toString(36)}`;
+}
+
+export const useNova = defineStore("nova", () => {
+  const messages = ref<NovaMessage[]>([]);   // chronological (oldest first)
+  const unread = ref(0);
+  const isOpen = ref(false);
+  // throttle keys → last fire timestamp (prevents same auto-push firing too often).
+  const cooldowns = ref<Record<string, number>>({});
+
+  function open() {
+    isOpen.value = true;
+    unread.value = 0;
+  }
+  function close() {
+    isOpen.value = false;
+  }
+
+  function push(
+    msg: Omit<NovaMessage, "id" | "ts" | "sender">,
+    opts?: { cooldownKey?: string; cooldownMs?: number },
+  ): boolean {
+    const t = Date.now();
+    if (opts?.cooldownKey) {
+      const last = cooldowns.value[opts.cooldownKey] ?? 0;
+      const cooldown = opts.cooldownMs ?? 60_000;
+      if (t - last < cooldown) return false;
+    }
+    messages.value = [
+      ...messages.value,
+      { ...msg, id: nextId(), ts: t, sender: "nova" },
+    ];
+    unread.value = isOpen.value ? 0 : unread.value + 1;
+    if (opts?.cooldownKey) {
+      cooldowns.value = { ...cooldowns.value, [opts.cooldownKey]: t };
+    }
+    return true;
+  }
+
+  function sendUser(text: string, kind: NovaMessageKind = "user-text") {
+    const t = Date.now();
+    messages.value = [
+      ...messages.value,
+      { id: nextId(), sender: "user", kind, text, ts: t },
+    ];
+  }
+
+  function reset() {
+    messages.value = [];
+    unread.value = 0;
+    cooldowns.value = {};
+  }
+
+  return {
+    messages, unread, isOpen, cooldowns,
+    open, close, push, sendUser, reset,
+  };
+});
