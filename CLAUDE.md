@@ -57,5 +57,4 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 - 迁移台账：`docs/PORT-LEDGER.md`（源坐标 + 版本锁 + 页面矩阵 + 进度）
 - 踩坑登记：`docs/PORT-PITFALLS.md`（P-001~，每条已转脚本哨兵或硬规则）
 - 产品日志：`docs/前端产品更新日志.md`
-- 源原型：`D:\WORKS\PLAN\Nexion-prototype`（迁移源 / 历史参考）
 - 前端 PRD：`D:\WORKS\PLAN\PRD\Nexion_产品功能架构设计文档_v3.7.md`（`nexion-prd-sync` 同步对象）
