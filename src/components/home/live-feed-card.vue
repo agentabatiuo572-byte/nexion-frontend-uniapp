@@ -154,11 +154,16 @@ const pulseBg = computed(() => (theme.mode === "dark" ? "rgba(142, 114, 255, 0.2
 
 function tabStyle(id: "activity" | "earnings"): CSSProperties {
   const on = tab.value === id;
+  const darkOn = on && theme.mode === "dark";
   return {
     padding: "3px 11px",
     borderRadius: "6px",
-    background: on ? "var(--v5-surface-bg)" : "transparent",
-    boxShadow: on ? "0 1px 2px rgba(0,0,0,0.10), 0 0 0 0.5px var(--v5-border)" : "none",
+    background: darkOn ? "rgba(30, 50, 16, 0.88)" : on ? "var(--v5-surface-bg)" : "transparent",
+    boxShadow: darkOn
+      ? "none"
+      : on
+        ? "0 1px 2px rgba(0,0,0,0.10), 0 0 0 0.5px var(--v5-border)"
+        : "none",
   };
 }
 function whoBadgeStyle(r: FeedRow): CSSProperties {

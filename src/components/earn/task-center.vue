@@ -11,7 +11,7 @@
   store/app.ts (generateReceipt sets receipt.id = task.id).
 -->
 <template>
-  <view class="mx-4" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--v5-border)">
+  <view class="mx-4" style="margin-top: 0; padding-top: 32px; border-top: 1px solid var(--v5-border)">
     <view class="flex items-center justify-between mb-2.5 px-0">
       <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.taskCenter }}</text>
       <view class="flex items-center gap-1" style="font-size: 11.5px; color: var(--v5-ink-3)">
