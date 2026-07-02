@@ -1,10 +1,8 @@
 <!--
   LockedProductCard (inline variant) — "Coming soon" gen-2 phase-locked card
   (ported from store/page.tsx via locked-product-card.tsx inline branch).
-  Anticipation surface: brand-2 aurora drift + 24px grid texture + Lock badge +
-  phase progress bar (grows on scroll-in via useScrollGrowProgress, P-019-safe) +
-  queue-position social proof + Notify CTA. The full-page variant lives at the
-  detail page; this list only renders the inline one.
+  Anticipation surface: brand-2 aurora drift + 24px grid texture + Lock badge.
+  Detailed specs, progress, queue proof and Notify CTA stay collapsed by default.
 -->
 <template>
   <view class="relative overflow-hidden" :style="rootStyle">
@@ -21,22 +19,29 @@
           <view aria-hidden :style="lockDotStyle" />
         </view>
         <view class="flex-1 min-w-0">
-          <view class="flex items-center justify-between" style="gap: 8px">
+          <view class="flex items-center justify-between" style="gap: 8px" role="button" tabindex="0" @tap.stop="toggleDetails" @click.stop="toggleDetails">
             <text class="font-mono-tabular" style="font-size: 10.5px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
-            <text class="font-mono-tabular tabular-nums shrink-0" :style="etaChipStyle">{{ eta }}</text>
+            <view class="flex items-center shrink-0" style="gap: 6px">
+              <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ stageText }}</text>
+              <view class="grid place-items-center" :style="toggleStyle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+              </view>
+            </view>
           </view>
           <text class="block mt-1" :style="titleStyle">{{ product.name }}</text>
-          <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ product.tagline }}</text>
-          <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 11.5px; color: var(--v5-ink-3)">
-            <text style="color: var(--v5-ink-2)">{{ product.gpu }}</text>
-            <text style="color: var(--v5-ink-4)">·</text>
-            <text style="color: var(--v5-ink-2)">{{ product.vram }}</text>
+          <view v-if="detailsOpen">
+            <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ product.tagline }}</text>
+            <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 11.5px; color: var(--v5-ink-3)">
+              <text style="color: var(--v5-ink-2)">{{ product.gpu }}</text>
+              <text style="color: var(--v5-ink-4)">·</text>
+              <text style="color: var(--v5-ink-2)">{{ product.vram }}</text>
+            </view>
           </view>
         </view>
       </view>
 
       <!-- Phase progress bar -->
-      <view v-if="progress" class="mt-3.5 pt-3.5" style="border-top: 1px dashed var(--v5-border-strong)">
+      <view v-if="detailsOpen && progress" class="mt-3.5 pt-3.5" style="border-top: 1px dashed var(--v5-border-strong)">
         <view class="flex items-center justify-between font-mono-tabular" style="font-size: 11px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3)">{{ t.store.lockedPhase }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-weight: 600">{{ progress.current }}/{{ progress.total }}</text> · {{ t.store.lockedUnlockProgress }}</text>
           <text class="tabular-nums" style="color: var(--v5-brand-2); font-weight: 600">{{ progress.pct }}%</text>
@@ -47,7 +52,7 @@
       </view>
 
       <!-- Bottom row — Notify + queue social proof -->
-      <view class="mt-3 flex items-center" style="gap: 10px">
+      <view v-if="detailsOpen" class="mt-3 flex items-center" style="gap: 10px">
         <view class="flex-1 inline-flex items-center justify-center" :style="notifyBtnStyle" role="button" tabindex="0" :aria-label="t.store.lockedNotifyMe" @tap.stop="handleNotify" @click.stop="handleNotify">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ t.store.lockedNotifyMe }}</text>
@@ -62,7 +67,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -75,16 +80,14 @@ import {
 const props = defineProps<{ product: Product }>();
 const t = useT();
 
-const PHASE_TO_ETA: Record<string, string> = { P3: "Q3", P5: "Q1 next year" };
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },
   P5: { current: 1, total: 5, pct: 20 },
 };
 const PHASE_TO_QUEUE: Record<string, number> = { P3: 1842, P5: 614 };
 
-const eta = computed(() =>
-  props.product.unlocksAtPhase ? PHASE_TO_ETA[props.product.unlocksAtPhase] ?? "" : "",
-);
+const detailsOpen = ref(false);
+let lastToggleAt = 0;
 const progress = computed(() =>
   props.product.unlocksAtPhase ? PHASE_TO_PROGRESS[props.product.unlocksAtPhase] ?? null : null,
 );
@@ -92,11 +95,25 @@ const queue = computed(() =>
   props.product.unlocksAtPhase ? PHASE_TO_QUEUE[props.product.unlocksAtPhase] ?? null : null,
 );
 const queueText = computed(() => (queue.value ?? 0).toLocaleString());
+const stageText = computed(() =>
+  progress.value
+    ? fmt(t.value.store.lockedStageCompact, {
+        current: progress.value.current,
+        total: progress.value.total,
+      })
+    : t.value.store.comingSoonHeading,
+);
 
 const { elRef: barRef, inView: barInView } = useScrollGrowProgress();
 
 function handleNotify() {
   toast.success(fmt(t.value.store.notifyToast, { name: props.product.name }));
+}
+function toggleDetails() {
+  const now = Date.now();
+  if (now - lastToggleAt < 120) return;
+  lastToggleAt = now;
+  detailsOpen.value = !detailsOpen.value;
 }
 
 const rootStyle: CSSProperties = {
@@ -145,7 +162,7 @@ const lockDotStyle: CSSProperties = {
   animation: "v5-hb-pulse 2.4s ease-in-out infinite",
 };
 
-const etaChipStyle: CSSProperties = {
+const stageChipStyle: CSSProperties = {
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
@@ -153,6 +170,18 @@ const etaChipStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 600,
 };
+const toggleBaseStyle: CSSProperties = {
+  width: "28px",
+  height: "28px",
+  borderRadius: "999px",
+  color: "var(--v5-brand-2)",
+  background: "var(--v5-brand-2-soft)",
+  transition: "transform 160ms ease",
+};
+const toggleStyle = computed<CSSProperties>(() => ({
+  ...toggleBaseStyle,
+  transform: detailsOpen.value ? "rotate(180deg)" : "rotate(0deg)",
+}));
 
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

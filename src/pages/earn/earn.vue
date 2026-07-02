@@ -5,8 +5,8 @@
   → market context → tier-locked tasks → footer):
     PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
     → MissedIncomeBanner → TrialHeroBanner / TrialGhostSlot
-    → "My Devices" header + DeviceCardPC × N (active fleet only)
-    → EmptySlotsHint → DeviceLifecycleBanner → MarketBoard
+    → "My Devices" header + slot rail + DeviceCardPC × N + add-device CTA
+    → DeviceLifecycleBanner → MarketBoard
     → TaskCenter.
 
   PillTabs + TotalEarnedCard inlined here (page-specific). Wrapped in
@@ -49,9 +49,6 @@
         </view>
       </view>
 
-      <!-- Potential daily yield — conversion hook right under the hero total -->
-      <EmptySlotsHint />
-
       <!-- Trial entries -->
       <view class="mx-4">
         <TrialHeroBanner class="w-full" />
@@ -64,9 +61,9 @@
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ devices.length + trialSlot }} / {{ MAX_DEVICES }}</text>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
-      <view class="mx-4 rounded-2xl overflow-hidden" style="background: var(--v5-surface)">
+      <EmptySlotsHint>
         <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
-      </view>
+      </EmptySlotsHint>
 
       <ComputeShareEntry />
       <DeviceLifecycleBanner />

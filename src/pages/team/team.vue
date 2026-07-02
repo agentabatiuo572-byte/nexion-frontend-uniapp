@@ -1,9 +1,8 @@
 <!--
-  Team — ported from Nexion-prototype/app/(main)/team/page.tsx.
-  v3 反向 Ponzi hub: royalty hero (V3+) → V-rank + upgrade progress → InviteEarnCard
+  Team — invitation network hub: royalty hero (V3+) → V-rank + upgrade progress → InviteEarnCard
   → leaderboard entry → 3-up quick-nav (influence / binary / leadership pool) →
-  TeamLedgerCard → network composition → Genesis FOMO → quota+ambassador →
-  visualizations. Tab page → <AppChassis active="team">.
+  TeamLedgerCard → network composition → Genesis node → tool grid.
+  Tab page → <AppChassis active="team">.
   Reuses v-rank / network / commission / leadership-pool stores (all ported).
   zustand selectors → computed off Pinia store; mount-effect unlockMatured @60s →
   onMounted/onUnmounted interval. framer scroll-grow bar → CSS width transition.
@@ -158,7 +157,7 @@
           </view>
         </view>
 
-        <!-- Genesis FOMO -->
+        <!-- Genesis node -->
         <view class="relative overflow-hidden rounded-2xl active:opacity-95" :style="genesisCardStyle" @click="go('/pages/genesis/genesis')">
           <view class="flex items-start justify-between">
             <view class="flex items-center" style="gap: 8px">
@@ -176,48 +175,49 @@
             <text :style="{ color: 'var(--v5-ink-2)' }">{{ t.teamV3.genesis.priceLine }}</text>
             <text :style="{ color: 'var(--v5-warning)' }">{{ t.teamV3.genesis.remaining }}</text>
           </view>
-          <view class="rounded-full overflow-hidden" :style="genesisBarTrackStyle">
-            <view class="h-full rounded-full" :style="{ width: '85%', background: 'linear-gradient(to right, var(--v5-brand-2), var(--v5-warning))' }" />
-          </view>
         </view>
 
-        <!-- Quota + ambassador -->
-        <view class="grid grid-cols-2" style="gap: 10px">
-          <view class="rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/quota')">
+        <!-- Team tools -->
+        <view class="grid" :style="toolGridStyle">
+          <view class="active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
+              <view :style="toolIconStyle('var(--v5-warning-soft)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
+              </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
-            <text class="block" :style="dualTitleStyle">{{ t.teamV3.hardwareQuota }}</text>
-            <text class="block" :style="dualSubStyle">{{ t.teamV3.quotaSubtitle }}</text>
+            <text class="block" :style="toolTitleStyle">{{ t.teamV3.hardwareQuota }}</text>
+            <text class="block" :style="toolSubStyle">{{ t.teamV3.quotaSubtitle }}</text>
           </view>
-          <view class="rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/agent')">
+          <view class="active:opacity-95" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
             <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+              <view :style="toolIconStyle('var(--v5-brand-2-soft)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+              </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
-            <text class="block" :style="dualTitleStyle">{{ t.teamV3.ambassador }}</text>
-            <text class="block" :style="dualSubStyle">{{ t.teamV3.ambassadorSubtitle }}</text>
+            <text class="block" :style="toolTitleStyle">{{ t.teamV3.ambassador }}</text>
+            <text class="block" :style="toolSubStyle">{{ t.teamV3.ambassadorSubtitle }}</text>
           </view>
-        </view>
-
-        <!-- Visualizations -->
-        <view class="grid grid-cols-2" style="gap: 10px">
-          <view class="rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/network')">
+          <view class="active:opacity-95" :style="toolCellStyle(2)" @click="go('/pages/team/network')">
             <view class="flex items-start justify-between">
-              <view class="rounded-full" :style="orbDotStyle" />
+              <view :style="toolIconStyle('var(--v5-tech-cyan-soft)')">
+                <view class="rounded-full" :style="orbDotStyle" />
+              </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
-            <text class="block" :style="dualTitleStyle">{{ t.teamV3.visualizations.influenceNetwork }}</text>
-            <text class="block" :style="dualSubStyle">{{ t.teamV3.visualizations.orbitLiveMap }}</text>
+            <text class="block" :style="toolTitleStyle">{{ t.teamV3.visualizations.influenceNetwork }}</text>
+            <text class="block" :style="toolSubStyle">{{ t.teamV3.visualizations.orbitLiveMap }}</text>
           </view>
-          <view class="rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/tree')">
+          <view class="active:opacity-95" :style="toolCellStyle(3)" @click="go('/pages/team/tree')">
             <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              <view :style="toolIconStyle('var(--v5-brand-soft)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
-            <text class="block" :style="dualTitleStyle">{{ t.teamV3.visualizations.genealogy }}</text>
-            <text class="block" :style="dualSubStyle">{{ t.teamV3.visualizations.genealogySubtitle }}</text>
+            <text class="block" :style="toolTitleStyle">{{ t.teamV3.visualizations.genealogy }}</text>
+            <text class="block" :style="toolSubStyle">{{ t.teamV3.visualizations.genealogySubtitle }}</text>
           </view>
         </view>
       </view>
@@ -370,7 +370,7 @@ const prizeChipStyle: CSSProperties = {
 
 const leaderboardCardStyle: CSSProperties = {
   padding: "16px",
-  background: "radial-gradient(80% 60% at 80% 0%, var(--v5-warning-soft) 0%, transparent 65%), var(--v5-surface)",
+  background: "var(--v5-surface)",
 };
 const trophyIconStyle: CSSProperties = {
   width: "40px",
@@ -396,20 +396,44 @@ const compBarTrackStyle: CSSProperties = { height: "8px", background: "var(--v5-
 
 const genesisCardStyle: CSSProperties = {
   padding: "16px",
-  background: "radial-gradient(80% 60% at 80% 0%, var(--v5-brand-2-soft) 0%, transparent 65%), var(--v5-surface)",
+  background: "var(--v5-surface)",
 };
 const genesisIconStyle: CSSProperties = {
   width: "36px",
   height: "36px",
   background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
 };
-const genesisBarTrackStyle: CSSProperties = { marginTop: "8px", height: "6px", background: "var(--v5-surface-3)" };
 
-const dualTitleStyle: CSSProperties = { marginTop: "10px", fontSize: "13.5px", fontWeight: 600, lineHeight: 1.2 };
-const dualSubStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px" };
+const toolGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  background: "var(--v5-surface)",
+  borderRadius: "16px",
+  overflow: "hidden",
+};
+function toolCellStyle(index: number): CSSProperties {
+  return {
+    minHeight: "118px",
+    padding: "14px",
+    borderRight: index % 2 === 0 ? "1px solid var(--v5-border)" : "none",
+    borderBottom: index < 2 ? "1px solid var(--v5-border)" : "none",
+  };
+}
+function toolIconStyle(bg: string): CSSProperties {
+  return {
+    width: "34px",
+    height: "34px",
+    borderRadius: "12px",
+    display: "grid",
+    placeItems: "center",
+    background: `color-mix(in srgb, ${bg} 58%, transparent)`,
+  };
+}
+const toolTitleStyle: CSSProperties = { marginTop: "10px", fontSize: "13.5px", fontWeight: 600, lineHeight: 1.2 };
+const toolSubStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.35 };
 const orbDotStyle: CSSProperties = {
-  width: "28px",
-  height: "28px",
+  width: "18px",
+  height: "18px",
   background: "radial-gradient(circle at 30% 30%, var(--v5-brand) 0%, var(--v5-tech-cyan) 70%, transparent 100%)",
 };
 </script>

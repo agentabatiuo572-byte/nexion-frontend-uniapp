@@ -6,8 +6,8 @@
   Top→bottom:
     · ProductRender hero photo (S1/Pro/Rack) or cyan Cloud-Share schematic,
       with folded-corner badge ribbon + tier-code chip + Legacy chip overlay.
-    · Body: name + rating row + ×vs-phone, spec pills, ROI 4-line hero
-      (daily earn / conversion chips / AI pills / stock urgency / trade-in).
+    · Body: name, ROI hero (daily earn / trade-in). Specs, ratings, and
+      AI throughput stay on the detail page.
     · Footer: price + frosted Buy CTA.
 -->
 <template>
@@ -49,27 +49,10 @@
 
     <!-- ───── Body ───── -->
     <view class="relative" style="padding: 14px 16px">
-      <view class="grid items-start gap-3" style="grid-template-columns: 1fr auto">
+      <view>
         <view class="min-w-0">
           <text class="block" :style="nameStyle">{{ product.name }}</text>
-          <view class="mt-1.5 flex items-center gap-1.5 font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--v5-brand-2)" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5 14 8l6 .5-4.5 4 1.4 6L11.5 15l-5.4 3.5L7.5 12.5 3 8.5l6-.5z" /></svg>
-            <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ product.rating.toFixed(1) }}</text>
-            <text style="color: var(--v5-ink-4)">· {{ reviewsText }} {{ t.store.cardReviews }}</text>
-            <text style="color: var(--v5-ink-4)">· {{ soldText }} {{ t.store.cardSold }}</text>
-          </view>
         </view>
-        <view v-if="multBase" class="text-right whitespace-nowrap">
-          <text class="block tabular-nums" :style="multStyle">{{ multBaseText }}×</text>
-          <text class="block font-mono-tabular" style="margin-top: 3px; font-size: 11px; color: var(--v5-ink-4)">{{ t.store.cardVsPhone }}</text>
-        </view>
-      </view>
-
-      <!-- Spec pills -->
-      <view class="mt-3 flex flex-wrap" style="gap: 6px">
-        <SpecPill>{{ product.gpu }}</SpecPill>
-        <SpecPill>{{ product.vram }}</SpecPill>
-        <SpecPill>{{ t.store.cardSpecDc }}</SpecPill>
       </view>
 
       <!-- ROI 4-line hero -->
@@ -84,38 +67,24 @@
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
           <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
           <text class="font-mono-tabular tabular-nums" style="font-size: 13.5px; color: var(--v5-brand); font-weight: 500">{{ nexPerDayText }}</text>
-        </view>
-
-        <!-- Line 3: AI perf pills -->
-        <view v-if="product.ai" class="mt-2.5 flex flex-wrap" style="gap: 6px">
-          <SpecPill v-if="product.ai.imageGenPerMin" ai>{{ imagePerMinText }}</SpecPill>
-          <SpecPill v-if="product.ai.llmTokensPerSec" ai>{{ llmTokText }}</SpecPill>
-          <SpecPill v-if="product.ai.videoMinPerHour" ai>{{ videoText }}</SpecPill>
+          <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
 
         <!-- Purchase gate — locked state (等级门/锁额) -->
         <view v-if="gateLockedView" class="mt-2.5" :style="gateBoxStyle">
-          <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-            <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
-          </view>
-          <view v-if="!gate.soldOut" class="mt-1.5 flex flex-wrap" style="gap: 6px">
-            <text v-for="(c, i) in gateCondTexts" :key="i" :style="gateCondStyle">{{ c }}</text>
-          </view>
-          <text v-if="!gate.soldOut" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
-        </view>
-
-        <!-- Stock urgency -->
-        <view v-if="stockLow" class="mt-2.5 grid items-center" :style="stockBoxStyle">
-          <view class="flex items-center justify-center shrink-0" :style="stockIconStyle">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
-          </view>
-          <view>
-            <text class="block" :style="stockTextStyle">{{ t.store.cardOnly }} <text class="tabular-nums" style="font-weight: 600">{{ product.stock }}</text> {{ t.store.cardUnitsLeft }}</text>
-            <view class="overflow-hidden" style="margin-top: 6px; height: 3px; border-radius: 2px; background: var(--v5-brand-2-soft)">
-              <view :style="stockBarStyle" />
+          <view class="flex items-center justify-between" role="button" tabindex="0" @tap.stop="toggleGateDetails" @click.stop="toggleGateDetails">
+            <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
+            </view>
+            <view v-if="!gate.soldOut" class="grid place-items-center" :style="gateToggleStyle">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
             </view>
           </view>
+          <view v-if="!gate.soldOut && gateDetailsOpen" class="mt-1.5 flex flex-wrap" style="gap: 6px">
+            <text v-for="(c, i) in gateCondTexts" :key="i" :style="gateCondStyle">{{ c }}</text>
+          </view>
+          <text v-if="!gate.soldOut && gateDetailsOpen" class="block" :style="gateMetaStyle">{{ gateModeText ? gateModeText + " · " : "" }}{{ gateProgressText }}</text>
         </view>
 
         <!-- Trade-in callout (legacy) -->
@@ -145,11 +114,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import SpecPill from "./spec-pill.vue";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 
@@ -172,9 +140,6 @@ const photo = computed(() => (isShare.value ? null : PRODUCT_PHOTO[props.product
 const stockLow = computed(
   () => !isShare.value && props.product.stock != null && props.product.stock < 50,
 );
-const multBase = computed(() =>
-  props.product.dailyEarn > 0 ? Math.round(props.product.dailyEarn / 0.06) : null,
-);
 const showTradein = computed(
   () =>
     props.product.status === "legacy" &&
@@ -184,6 +149,8 @@ const showTradein = computed(
 
 // ── Purchase gate (等级门 + 锁额) — locked state + Buy redirect ──
 const { gate } = usePurchaseGate(() => props.product);
+const gateDetailsOpen = ref(false);
+let lastGateToggleAt = 0;
 const gateLockedView = computed(() => gate.value.gated && gate.value.blocked);
 const gateCondTexts = computed(() =>
   gate.value.conditions.map((c) => {
@@ -216,29 +183,23 @@ function onBuy() {
   }
   goCheckout();
 }
+function toggleGateDetails() {
+  const now = Date.now();
+  if (now - lastGateToggleAt < 120) return;
+  lastGateToggleAt = now;
+  if (!gate.value.soldOut) gateDetailsOpen.value = !gateDetailsOpen.value;
+}
 
-// Text helpers (toLocaleString / fmt) — kept out of template for clarity
-const reviewsText = computed(() => props.product.reviews.toLocaleString());
-const soldText = computed(() => props.product.sold.toLocaleString());
-const multBaseText = computed(() => (multBase.value ?? 0).toLocaleString());
+// Text helpers (toFixed / toLocaleString / fmt) — kept out of template for clarity
 const dailyEarnText = computed(() => props.product.dailyEarn.toFixed(2));
 const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: props.product.dailyEarnNEX }));
-const imagePerMinText = computed(() =>
-  fmt(t.value.store.cardImagePerMin, { n: props.product.ai?.imageGenPerMin ?? 0 }),
-);
-const llmTokText = computed(() =>
-  fmt(t.value.store.cardLlmTokens, { n: ((props.product.ai?.llmTokensPerSec ?? 0) / 1000).toFixed(1) }),
-);
-const videoText = computed(() =>
-  fmt(t.value.store.cardVideoPerMin, { n: props.product.ai?.videoMinPerHour ?? 0 }),
-);
 const tradeCreditText = computed(() =>
   fmt(t.value.store.cardTradeCredit, { n: props.product.tradeinDiscount ?? 0 }),
 );
 const priceText = computed(() =>
   isShare.value ? String(props.product.price) : props.product.price.toLocaleString(),
 );
-const stockPct = computed(() => Math.min(100, ((props.product.stock ?? 0) / 50) * 100));
+const stockHintText = computed(() => fmt(t.value.store.cardStockCompact, { n: props.product.stock ?? 0 }));
 
 function goDetail() {
   navTo(`/pages/store/detail?id=${props.product.id}`);
@@ -337,20 +298,11 @@ const nameStyle: CSSProperties = {
   letterSpacing: "-0.022em",
   lineHeight: 1.15,
 };
-const multStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "19px",
-  color: "var(--v5-brand-2)",
-  letterSpacing: "-0.018em",
-  lineHeight: 1,
-};
 const earnEyebrowStyle: CSSProperties = {
   fontSize: "10.5px",
   fontWeight: 500,
   letterSpacing: "0.08em",
   color: "var(--v5-success)",
-  textTransform: "uppercase",
 };
 const bigEarnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -360,28 +312,16 @@ const bigEarnStyle: CSSProperties = {
   letterSpacing: "-0.022em",
   lineHeight: 1,
 };
-const stockBoxStyle: CSSProperties = {
-  gridTemplateColumns: "auto 1fr",
-  gap: "10px",
-};
-const stockIconStyle: CSSProperties = {
-  width: "22px",
-  height: "22px",
-  color: "var(--v5-brand-2)",
-};
-const stockTextStyle: CSSProperties = {
+const stockHintStyle: CSSProperties = {
+  marginLeft: "auto",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
+  fontSize: "10.5px",
   fontWeight: 500,
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-ink-4)",
   letterSpacing: "-0.005em",
+  lineHeight: 1,
+  whiteSpace: "nowrap",
 };
-const stockBarStyle = computed<CSSProperties>(() => ({
-  height: "100%",
-  borderRadius: "2px",
-  background: "var(--v5-brand-2)",
-  width: `${stockPct.value}%`,
-}));
 const tradeinBoxStyle: CSSProperties = {
   padding: "7px 10px",
   background: "var(--v5-brand-soft)",
@@ -400,7 +340,6 @@ const priceEyebrowStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.08em",
   color: "var(--v5-ink-3)",
-  textTransform: "uppercase",
   lineHeight: 1,
 };
 const priceRowStyle: CSSProperties = {
@@ -433,6 +372,18 @@ const gateBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   borderRadius: "10px",
 };
+const gateToggleBaseStyle: CSSProperties = {
+  width: "28px",
+  height: "28px",
+  borderRadius: "999px",
+  color: "var(--v5-warning)",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+  transition: "transform 160ms ease",
+};
+const gateToggleStyle = computed<CSSProperties>(() => ({
+  ...gateToggleBaseStyle,
+  transform: gateDetailsOpen.value ? "rotate(180deg)" : "rotate(0deg)",
+}));
 const gateEyebrowStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 600,

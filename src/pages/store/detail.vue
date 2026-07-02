@@ -112,23 +112,23 @@
             </view>
 
             <!-- 4-cell roi-grid -->
-            <view class="grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr; gap: 12px">
-              <view :style="roiCellStyle">
+            <view class="grid" style="margin-top: 16px; grid-template-columns: 1fr 1fr">
+              <view :style="roiCellStyle(0)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detDaily }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ dailyYieldText }}</text>
                 <text class="block" :style="roiSubStyle">{{ t.store.detVsPhone }}</text>
               </view>
-              <view :style="roiCellStyle">
+              <view :style="roiCellStyle(1)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detMonthly }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('success')">${{ monthlyYieldText }}</text>
                 <text class="block" :style="roiSubStyle">{{ monthlyPctText }}{{ t.store.detPerMoSuffix }}</text>
               </view>
-              <view :style="roiCellStyle">
+              <view :style="roiCellStyle(2)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detAnnual }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('ink')">${{ annualYieldText }}</text>
                 <text class="block" :style="roiSubStyle">{{ annualPctText }}{{ t.store.detRoiSuffix }}</text>
               </view>
-              <view :style="roiCellStyle">
+              <view :style="roiCellStyle(3)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detPayback }}</text>
                 <text class="block tabular-nums" :style="roiValStyle('brand')">{{ paybackDays }}<text style="font-size: 13px; color: var(--v5-ink-3); font-weight: 500; margin-left: 1px">{{ t.store.detDaySuffix }}</text></text>
                 <text class="block" :style="roiSubStyle">{{ t.store.detToBreakEven }}</text>
@@ -543,11 +543,13 @@ const qtyNumStyle: CSSProperties = {
   color: "var(--v5-ink)",
   letterSpacing: "-0.014em",
 };
-const roiCellStyle: CSSProperties = {
-  padding: "12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-};
+function roiCellStyle(index: number): CSSProperties {
+  return {
+    padding: "14px 16px",
+    borderRight: index % 2 === 0 ? "1px solid color-mix(in srgb, var(--v5-border) 50%, transparent)" : "none",
+    borderBottom: index < 2 ? "1px solid color-mix(in srgb, var(--v5-border) 50%, transparent)" : "none",
+  };
+}
 const roiLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)" };
 function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
