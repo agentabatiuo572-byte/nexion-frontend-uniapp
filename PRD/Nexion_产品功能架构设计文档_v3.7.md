@@ -361,8 +361,9 @@ TabBar:active tab 显示背景 chip 高亮。
 
 **业务规则**:
 - 注册完成时:`sponsorship.bind(code)` 写入 sponsorCode + sponsor 信息
-- 立即 `claimGift()` → 钱包 +$5 USDT + 20 NEX
-- 显示庆祝 toast:`+$5 + 20 NEX welcome gift · Sponsored by Sarah K.`
+- 立即 `claimGift()` → 礼包按账户注册风险评估**分桶入账**:风险簇 clear 直入可提余额;命中多账户风险簇(watch/frozen)则进「审核中 / 锁定」桶,不直入可提(详见 §4.3.5)
+- 直入可提时显示庆祝 toast(`+$5 + 20 NEX welcome gift · Sponsored by …`);进审核桶时显示「新人奖励待审核」提示
+- 礼包金额由平台配置 `rewards.welcomeGift.{usdtAmount,nexAmount}` 决定(默认 $5 + 20 NEX,后台可调),前端展示与入账同源派生
 - **首次绑定生效,后续 URL ?ref 不可覆盖**
 - 每个账号 welcome gift **仅一次**
 
@@ -373,6 +374,38 @@ TabBar:active tab 显示背景 chip 高亮。
 #### 4.3.4 推荐人收益
 
 被推荐人完成订单时,推荐人按固定 10% 费率获得直接版税(Direct Royalty),其上线网络按 Network Yield Bonus 算法分得扩展版税(详见 §8.3)。
+
+#### 4.3.5 新人礼与 H5 收益的风险分桶
+
+H5 手机算力用「登记 + 服务端结算」解耦页面运行(关掉 H5 也按 `lastSettledAt` 补算收益),由此带来多手机号 / 多设备重复注册套利面。为堵套利,新人礼与 H5 托管收益不再直入可提余额,而是按账户实时风险评估分入**收益三桶**:
+
+| 桶 | 字段 | 入桶条件 | 可提现 |
+|---|---|---|---|
+| 可提现 | `withdrawableUsdt` | 风险簇 clear | 是 |
+| 审核中 | `pendingReviewUsdt` | 命中多账户风险簇(同设备 / 同 IP / 同收款 / 同推荐链聚簇) | 否,待释放 |
+| 锁定奖励 | `bonusLockedUsdt` | 冻结簇收益 / 熔断升格 | 否,待释放 |
+
+**释放规则**:审核中 / 锁定收益**不随观察窗口到达自动释放**,释放来源只有两个——① App 在线证明累计达标(`appAttestationReleaseHours`);② 运营人工放行。同一风险簇在观察窗口内批量释放有熔断:超出免费槽位数的待审收益自动升为锁定。
+
+**提现前置路由**:提现只认可提现桶;新账户首笔提现无条件人工审核;新绑定收款地址延迟放行;同收款地址被多账号复用按配置进人工 / 冻结。
+
+所有阈值 / 天数 / 权重为平台配置(后台可调),完整参数表、聚簇维度表与状态机见 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md`。
+
+```mermaid
+flowchart TD
+  R[注册完成 claimGift / H5 结算] --> E{账户实时风险评估}
+  E -->|clear| W[可提现桶 withdrawableUsdt]
+  E -->|watch 多账户聚簇| P[审核中桶 pendingReviewUsdt]
+  E -->|frozen 冻结簇| L[锁定奖励桶 bonusLockedUsdt]
+  P --> Rel{释放来源}
+  L --> Rel
+  Rel -->|App 在线证明达标| W
+  Rel -->|运营人工放行| W
+  Rel -.观察窗到达.-x|不自动释放| P
+  W --> WD{提现前置路由}
+  WD -->|首提 / 新地址 / 同地址多号| M[人工审核 / 延迟 / 冻结]
+  WD -->|通过| OUT[提现放行]
+```
 
 ### 4.4 KYC-Express 验证
 
@@ -1334,7 +1367,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
    - `${networkAvg}`(网络平均日产)
    - `top {N}%`(填满后排名估算 = potentialDaily / NETWORK_AVG_DAILY × 70%)
 
-6. **CTA**:brand pill + Zap icon + Fill slots + ArrowRight。无 halo(per user feedback)。
+6. **CTA**:brand pill + Zap icon + Fill slots + ArrowRight。无 halo(per user feedback)。点击 CTA(或点任一空 slot)触发**槽位操作弹窗**(见本节末「槽位操作弹窗」)。
 
 7. **Footer note**:`current fleet ${current}/d · upgrade to multiply`(对比当前 baseline,放大转化诱因)。
 
@@ -1352,6 +1385,13 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 - `fleetRankPctIfFilled = max(8, min(94, round(potentialDaily / NETWORK_AVG_DAILY × 70)))`
 - `empty ≤ 0` → 渲染 Capped 状态
 - 6-col slot grid 显示 **active devices**(非 inventory)
+
+**槽位操作弹窗(Slot Action Sheet)** — 点击 Fill slots CTA(或任一空 slot)触发,两个并存入口引导填满空槽位:
+
+1. **购买新设备**(主入口):跳转 `/store`。**始终呈现**。
+2. **激活已有设备**(次入口):仅当存在未激活设备(`activatedAt === null` 的库存设备)时出现,**默认折叠**;展开后列出全部未激活设备,点选即调 `activateDevice` 激活进槽。激活受 `MAX_DEVICES`(6)上限约束 —— 槽位已满(`activeCount + trial 预留槽 ≥ MAX_DEVICES`)则提示槽位已满、不激活。
+
+仓库无未激活设备时,弹窗仅呈现「购买新设备」入口;每次打开弹窗,次入口默认折叠。
 
 ### 6.10 手机算力显示规则与校准
 
@@ -1376,6 +1416,44 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 **档位收益**:手机日产按校准 Tier 派生(单调,见 §13.3)—— Tier 1 $0.04 → Tier 5 $0.095,典型机 Tier 3 = $0.06(锚定营销);NEX 同步 6 → 16。各档值**运营后台可配**(后台 E2「手机算力档位收益」),前端读 backend-replaceable config `mock/phone-tiers.ts`(真后台 `GET /api/config/phone-tiers`),前后台同口径。
 
 **校准仪式**(`/onboarding/connect`,首次 onboarding + 新设备 `?mode=recalibrate` 复用):12 秒三测(NPU 基准 / 网络延迟 / 供电散热)动画,结果(评分 / TOPS / Tier / 预估日产)由 `measureDeviceCapability` 真实派生(非写死),完成后写回手机设备(`applyPhoneCalibration`:更新 baseRate / NPU 文案 / 能力字段 + 重置连续在线加成)。
+
+### 6.11 载体分层与收益服务端结算
+
+**目的**:让手机算力收益与「页面是否开着」解耦——收益按账户登记的算力档位 + 真实在线时长结算,关页面 / 切后台的时段在重开 / 回前台时一次补算;同时按客户端载体(签名 App / H5 网页)分层计产,App 常驻获得完整在线加成,H5 非常驻只走基础托管基线,形成「升级 App 拿在线加成」的真实差。
+
+**登记 + 服务端结算**:
+- **激活 = 登记**:设备激活(进槽位)即记结算锚点 `lastSettledAt = now`,作为收益的起算点。
+- **结算口径(单一来源)**:`settle()` 按墙钟增量 Δ = now − lastSettledAt 累计「收益 += 登记档位 baseRate × 载体因子 × 实时状态因子 × (Δ / 一天)」,并把锚点前移到 now;所有收益累积只走此一处,无第二条旁路。
+- **触发**:进前台 / 客户端 tick 调 `settle()`;关页面或切后台期间的 Δ 在重开 / 回前台时一次补算(原型为客户端 mock 服务端 tick,正式环境由服务端按同一 `lastSettledAt` 结算下推)。
+- **冻结不回溯**:设备未激活 / 会话失效冻结时锚点清空,恢复时按当前时刻重锚,冻结期不计产、不补发。
+
+**载体分层(算力显示与收益同口径)**:
+
+| 载体 | 判定 | 计产口径 |
+|---|---|---|
+| 签名 App(常驻)| 客户端构建为 App | 基线 × 充电 × 散热 × 连续在线 × 抖动(完整在线加成;连续在线达满额时长后稳定加成至 1.0)|
+| H5 网页(非常驻)| 客户端构建为 H5 / 浏览器标签 | 基线 × `h5BaseFactor`(基础托管,默认 0.6)× 在线 × 抖动(不可测充电 / 散热、不可累计连续在线,故走基础托管基线)|
+
+非手机设备(S1 / Pro / Rack / Cloud)载体因子恒为 1,不受 App / H5 影响。
+
+**叙事**:H5 载体的手机算力卡标「基础托管模式 · 登记算力网络」,并给「升级 App 拿在线加成」弱引导;不出现「模拟 / 网页挖矿」等字眼(真平台口径)。
+
+**运营可配**:载体因子由在线加成系数配置驱动(`onlineBonus`:`h5BaseFactor` / `continuityFullHours`),运营在后台「算力与设备配置」调整,与后台 compute-config 同 key;改后对全网生效、不回溯已结算收益、以服务端为准。
+
+```mermaid
+flowchart TD
+  A[激活设备] -->|登记| B[记锚点 lastSettledAt = now]
+  B --> C{触发结算}
+  C -->|tick / 回前台 onShow| D["settle:Δ = now − lastSettledAt"]
+  D --> E{客户端载体}
+  E -->|App 常驻| F["收益 += 档位baseRate × 充电×散热×连续在线×抖动 × Δ/天"]
+  E -->|H5 非常驻| G["收益 += 档位baseRate × 基础托管0.6 × 在线×抖动 × Δ/天"]
+  F --> H[重锚 lastSettledAt = now]
+  G --> H
+  H -. 关页面期间累积 .-> C
+```
+
+**数据**:Device 新增 `lastSettledAt`(登记 / 结算锚点,§12.2);在线加成系数读自平台配置 `onlineBonus`(§13.3)。
 
 ---
 
@@ -3314,7 +3392,7 @@ interface TrialConfig {
 | Task pricing 表(6 类 min/maxReward + QUEUE_SATURATION)| `lib/mock/tasks.ts:31-193` | `GET /api/config/task-pricing` | 每周市场行情 |
 | Device specs(baseRate / baseRateNEX / price 全表) | `lib/store/index.ts:33-86` | `GET /api/products/specs` | 产品上下架 / 定价 |
 | Device degradation 曲线(-4% / -6% / -23.7% + MIN_EFFICIENCY) | `lib/store/device-lifecycle.ts:31-39` | `GET /api/config/lifecycle` | 衰减曲线决定终身收益 |
-| Sponsorship welcome gift(USDT + NEX)| `lib/v3/sponsorship.ts:34-35` | `GET /api/config/sponsorship` | 周季节性礼包变化 |
+| Sponsorship welcome gift(金额 + 发放模式)| `platform-config.rewards.welcomeGift` | `GET /api/config/platform` | 后台调额度 / 发放模式 |
 | Earnings milestones(5 档阈值 + NEX 奖励) | `lib/store/milestones.ts:28-34` | `GET /api/config/milestones` | 阶段调整 |
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x / 7d streak,作用于签到 NEX 发放)| `lib/v3/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier | A/B 实验值 |
 | Trade-in 全配置(`salvage.rate=0.30` / `monthlyDecay=0.025` / `minHoldingMonths=1` + `eligibility[kind].rules[]` + `promo.{enabled,cooldownHours,maxPerSession,delayMs,routes,triggerWhen}` + `inventory.softMax`)| `lib/v3/_config/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 折旧定价 + 资格门槛 + promo 节奏 |
@@ -4610,6 +4688,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   baseRateNEX: number;          // daily NEX 基准(平台代币,spec §8.1 静态收益 80%)
   purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 衰减曲线
   activatedAt: number | null;   // epoch ms 激活进槽位的时刻;null = 已购未激活(库存中)
+  lastSettledAt?: number | null; // epoch ms 收益结算锚点(= 登记时刻);收益按 now−lastSettledAt 墙钟结算(§6.11);null = 当前不计产(未激活 / 冻结),恢复时重锚不回溯
   pendingDeactivate?: boolean;  // true = 等当前任务完成后自动取消激活(graceful deactivation)
   generation: number;           // 1 = 原型规格;2 = trade-in 升级(Pro v2 / Rack P2)
   status: "online" | "offline";   // 无 "paused":用户无手动暂停;被动中断由 pausedReason + interruptedAt 表达
@@ -5211,8 +5290,9 @@ progressPct = avg(checks);
 | `USER_DAILY_CAP_USD` | 50 | 每用户日 NEX 兑 USDT 上限 |
 | `PLATFORM_DAILY_CAP_USD` | 20,000 | 全平台日兑换池 |
 | `KYC_LIFETIME_THRESHOLD_USD` | 100 | 累计兑换触发 KYC 线 |
-| `WELCOME_GIFT_USDT` | 5 | 注册礼包 USDT |
-| `WELCOME_GIFT_NEX` | 20 | 注册礼包 NEX(零散白嫖收缩,主 NEX 产出归设备挖矿)|
+| `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
+| `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
+| 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
 | `Notification CAP` | 200 | 通知中心最多 |
 | `MAX_DEVICES` | 6 | **激活槽位上限**(不限购,激活进槽时 `activateDevice()` 守卫,Sprint #146-1)|
 | `INTERRUPT_GRACE_MS` | 30,000(30s) | phone 掉电/掉网后任务重连宽限窗口;窗口内恢复则续跑原任务,超时则取消(`lib/store/interrupt.ts`)|
@@ -5223,7 +5303,8 @@ progressPct = avg(checks);
 | phone→S1 倍数 | 117× | round(7 / 0.06);营销文案与计算徽章统一此单一派生值(§7.1 / §13.2a),不另行圆整 |
 | 手机算力档位收益 | T1 $0.04 / 6 NEX · T2 $0.05 / 8 · T3 $0.06 / 10 · T4 $0.08 / 13 · T5 $0.095 / 16 | 手机按校准能力 Tier 的日产(USDT / NEX),单调;运营可配(`mock/phone-tiers.ts` → `GET /api/config/phone-tiers`,后台 E2),见 §6.10 |
 | 手机算力典型锚点 | 评分 87 · 28.3 TOPS · Tier 3 · $0.06 | 未校准 / 典型机的呈现锚点(`fallbackCapability`,§6.10)|
-| `CONTINUITY_FULL_MS` | 7,200,000(2h) | 连续在线稳定加成达满所需时长(`lib/hashpower.ts`,§6.10);会话踢出 / 换机重校准清零 |
+| 在线加成系数 · `h5BaseFactor` | 0.6 | H5 非常驻载体基础托管系数:H5 手机算力 = 基线 × 此值 × 在线 × 抖动,不叠充电 / 散热 / 连续在线(§6.11);运营可配(`onlineBonus`,后台「算力与设备配置」),与后台 compute-config 同 key |
+| 在线加成系数 · `continuityFullHours`(`CONTINUITY_FULL_MS`)| 2h(7,200,000ms) | App 连续在线稳定加成达满所需时长(0.85→1.0 线性,`lib/hashpower.ts`,§6.10 / §6.11);会话踢出 / 换机重校准清零;运营可配(`onlineBonus`) |
 | 提现冷却 | 30 天 | unilevel + binary 佣金 |
 | Direct Royalty 费率 | 固定 10% | 单一来源 `UNILEVEL_USDT[1]`,不随 Partner Status 变动 |
 | Partner Status Standard | $0+ | 基础权益(月度网络活跃度起步档)|

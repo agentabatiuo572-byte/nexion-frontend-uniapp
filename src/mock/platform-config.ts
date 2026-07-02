@@ -3,8 +3,8 @@ import { GPU_TIERS } from "@/lib/gpu-tiers";
 
 // MOCK-ONLY seed for platform config / feature flags (backend-replaceable).
 // PROD: `GET /api/config/platform` returns this exact shape; the admin console
-// (E 域「算力与设备配置」) is the single authoring surface. Client treats the
-// fetched config as read-only.
+// (E 域「算力与设备配置」+ K 域风控参数) is the single authoring surface. Client
+// treats the fetched config as read-only.
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   featureFlags: {
     // DR-1: 电脑算力默认 OFF。
@@ -28,10 +28,31 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     maxAccountsPerDevice: 2,
     maxAccountsPerPaymentInstrument: 1,
     clusterFreezeSuggestThreshold: 0.82,
+    releaseMode: "attest_or_manual",
+    freeSlotRequiresBinding: true,
   },
   withdrawRules: {
     minWithdrawableUsdt: 20,
     sameAddressRoute: "manual",
+    firstWithdrawalManual: true,
+    newAddressHoldHours: 24,
+  },
+  rewards: {
+    // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。
+    welcomeGift: { lockMode: "risk_bucket", usdtAmount: 5, nexAmount: 20 },
+  },
+  // SPEC-7 §5b 七维权重 mock seed(K4 权威可配)。强维 0.8+,中维 0.4-0.5,弱维 ≤0.3。
+  riskScore: {
+    dimensionWeights: {
+      serverDeviceId: 0.9,
+      ipBucket: 0.8,
+      withdrawAddress: 0.9,
+      paymentInstrument: 0.5,
+      sponsor: 0.4,
+      uaFingerprint: 0.2,
+      signupTiming: 0.3,
+    },
+    weakSignalClusterThreshold: 0.6,
   },
   // SPEC-2 M5/M6: structure mirrors admin E6 compute config. DR-7: mock-only,
   // not wired to the admin console yet; PROD server makes this authoritative.

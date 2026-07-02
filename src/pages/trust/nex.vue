@@ -39,7 +39,7 @@
           <IconRow emoji="⚙️" :label="w.src1Label" :body="w.src1Body" />
           <IconRow emoji="🤝" :label="w.src2Label" :body="w.src2Body" />
           <IconRow emoji="📈" :label="w.src3Label" :body="w.src3Body" />
-          <IconRow emoji="🎁" :label="w.src4Label" :body="w.src4Body" />
+          <IconRow emoji="🎁" :label="w.src4Label" :body="src4Body" />
         </view>
       </HowSection>
 
@@ -109,9 +109,14 @@ import HowFaqRow from "@/components/how/how-faq-row.vue";
 import IconRow from "@/components/how/how-icon-row.vue";
 import CalloutBox from "@/components/how/how-callout-box.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { useConfig } from "@/store/config";
 
 const t = useT();
 const w = computed(() => t.value.nexHowItWorks);
+const cfg = useConfig();
+// 礼包 NEX 数量单源派生自 platform config。
+const src4Body = computed(() => fmt(w.value.src4Body, { nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const tableRows = computed(() => [
   { k: w.value.rowType, usdt: w.value.usdtType, nex: w.value.nexType },

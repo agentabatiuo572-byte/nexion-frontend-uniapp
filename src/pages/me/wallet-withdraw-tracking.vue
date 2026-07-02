@@ -56,12 +56,15 @@
           </view>
         </view>
 
-        <!-- Estimated completion -->
-        <view class="mx-4 flex items-center" :style="etaCardStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+        <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结) -->
+        <view class="mx-4 flex items-start" :style="isFrozenHold ? etaFrozenCardStyle : etaCardStyle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="isFrozenHold ? 'var(--v5-danger)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <view style="flex: 1">
             <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
             <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
+            <view v-if="heldReasonLines.length" style="margin-top: 6px">
+              <text v-for="line in heldReasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
+            </view>
           </view>
         </view>
 
@@ -101,17 +104,33 @@ const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>
 
 const currentIdx = computed(() => steps.value.findIndex((s) => s.key === wd.value?.status));
 const routeHeld = computed(() => !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
+// SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
+const isFrozenHold = computed(() => wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen");
+// 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
+const heldReasonLines = computed(() => {
+  if (!routeHeld.value) return [] as string[];
+  const dict = t.value.wallet.riskReasons as Record<string, string>;
+  return (wd.value?.riskReasons ?? []).map((code) => dict[code]).filter(Boolean);
+});
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.toFixed(2) }) : "",
 );
 const etaTitle = computed(() =>
   wd.value?.status === "confirmed"
     ? t.value.wallet.trackEtaDone
-    : routeHeld.value
-      ? t.value.wallet.withdrawRouteHeldTitle
-      : t.value.wallet.trackEtaPending,
+    : isFrozenHold.value
+      ? t.value.wallet.routeHeldFrozenTitle
+      : routeHeld.value
+        ? t.value.wallet.withdrawRouteHeldTitle
+        : t.value.wallet.trackEtaPending,
 );
-const etaSub = computed(() => (routeHeld.value ? t.value.wallet.withdrawRouteHeldSub : t.value.wallet.trackReviewNote));
+const etaSub = computed(() =>
+  isFrozenHold.value
+    ? t.value.wallet.routeHeldFrozenBody
+    : routeHeld.value
+      ? t.value.wallet.withdrawRouteHeldSub
+      : t.value.wallet.trackReviewNote,
+);
 
 function relTime(ts: number): string {
   if (ts > Date.now()) return t.value.wallet.timePending;
@@ -189,8 +208,14 @@ const etaCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
 };
+const etaFrozenCardStyle: CSSProperties = {
+  ...etaCardStyle,
+  background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
+  border: "1px solid color-mix(in srgb, var(--v5-danger) 30%, transparent)",
+};
 const etaTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const reasonLineStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const backBtnStyle: CSSProperties = {
   width: "100%",
   height: "44px",

@@ -50,6 +50,12 @@
         </view>
       </view>
 
+      <!-- SPEC-7 FEAT-RISK02 异常3: 配置同步失败 → 结算暂停提示(不回退写死默认) -->
+      <view v-if="configSyncFailed" :style="syncFailBoxStyle">
+        <text class="block" :style="syncFailTitleStyle">{{ t.wallet.syncFailedTitle }}</text>
+        <text class="block" :style="syncFailBodyStyle">{{ t.wallet.syncFailedBody }}</text>
+      </view>
+
       <!-- Earnings list -->
       <text class="block" :style="listTitleStyle">{{ t.wallet.earningsSection }}</text>
       <view :style="listCardStyle">
@@ -57,11 +63,11 @@
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
           <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
         </WalletListRow>
-        <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.reviewingEarnings" :sublabel="t.wallet.reviewingEarningsSub">
+        <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.reviewingEarnings" :sublabel="t.wallet.reviewingEarningsSub" @click="showPendingSheet">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg></template>
           <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ pendingReview.toFixed(2) }}</text></template>
         </WalletListRow>
-        <WalletListRow icon-bg="var(--v5-brand-2-soft)" :label="t.wallet.lockedRewards" :sublabel="t.wallet.lockedRewardsSub">
+        <WalletListRow icon-bg="var(--v5-brand-2-soft)" :label="t.wallet.lockedRewards" :sublabel="t.wallet.lockedRewardsSub" @click="showLockedSheet">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></template>
           <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ lockedRewards.toFixed(2) }}</text></template>
         </WalletListRow>
@@ -112,12 +118,47 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useCards } from "@/store/cards";
+import { useConfig } from "@/store/config";
+import { confirm as uiConfirm } from "@/store/ui";
+import { evaluateAccountCluster } from "@/store/risk-cluster";
 import type { WithdrawalStatus } from "@/store/types";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
 const cards = useCards();
+const cfg = useConfig();
+
+const configSyncFailed = computed(() => cfg.syncFailed);
+
+// SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要
+// (reason code → i18n 业务话术,工程码不直出;R5: 原因现算不读缓存)。
+function riskReasonLines(): string {
+  const dict = t.value.wallet.riskReasons as Record<string, string>;
+  const reasons = evaluateAccountCluster(app.accountKey).reasons;
+  const lines = reasons.map((code) => dict[code]).filter(Boolean);
+  return lines.length ? `\n· ${lines.join("\n· ")}` : "";
+}
+function showPendingSheet() {
+  const hours = cfg.config.riskCluster.appAttestationReleaseHours;
+  uiConfirm({
+    title: t.value.wallet.pendingSheetTitle,
+    message: fmt(t.value.wallet.pendingSheetBody, { hours }) + riskReasonLines(),
+    confirmLabel: t.value.wallet.sheetOk,
+    hideCancel: true,
+    icon: "info",
+  });
+}
+function showLockedSheet() {
+  const hours = cfg.config.riskCluster.appAttestationReleaseHours;
+  uiConfirm({
+    title: t.value.wallet.lockedSheetTitle,
+    message: fmt(t.value.wallet.lockedSheetBody, { hours }) + riskReasonLines(),
+    confirmLabel: t.value.wallet.sheetOk,
+    hideCancel: true,
+    icon: "info",
+  });
+}
 
 const buckets = computed(() => app.user.earningBuckets);
 const usdt = computed(() => buckets.value.withdrawableUsdt);
@@ -159,10 +200,16 @@ const withdrawalRowSub = computed(() => {
 function statusLabel(s: WithdrawalStatus): string {
   const labels: Record<WithdrawalStatus, string> = {
     submitted: t.value.wallet.submitted,
+    "review-pending": t.value.wallet.reviewPending,
     "review-passed": t.value.wallet.reviewPassed,
     processing: t.value.wallet.processing,
     sent: t.value.wallet.sent,
     confirmed: t.value.wallet.confirmed,
+    "review-rejected": t.value.wallet.reviewRejected,
+    frozen: t.value.wallet.statusFrozen,
+    "address-invalid": t.value.wallet.statusAddressInvalid,
+    "tx-failed": t.value.wallet.statusTxFailed,
+    refunded: t.value.wallet.statusRefunded,
   };
   return labels[s];
 }
@@ -258,6 +305,23 @@ const nexCalloutBodyStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "13.5px",
   color: "var(--v5-ink-2)",
+  lineHeight: 1.45,
+};
+const syncFailBoxStyle: CSSProperties = {
+  margin: "8px 16px 0",
+  padding: "10px 12px",
+  borderRadius: "12px",
+  background: "var(--v5-warning-soft)",
+};
+const syncFailTitleStyle: CSSProperties = {
+  fontSize: "12.5px",
+  fontWeight: 600,
+  color: "var(--v5-warning)",
+};
+const syncFailBodyStyle: CSSProperties = {
+  marginTop: "2px",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
   lineHeight: 1.45,
 };
 </script>

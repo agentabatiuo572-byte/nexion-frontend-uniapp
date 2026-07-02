@@ -196,22 +196,23 @@ export interface GlobalStats {
   todayIncrement: number;
 }
 
-// ⚠️ MOCK STATE MACHINE — INCOMPLETE FOR PRODUCTION
-// Missing terminal/recoverable states a real on-chain withdrawal needs:
-//   - "review-rejected"  // KYC mismatch / risk flag → user must contact support
-//   - "address-invalid"  // bad checksum / wrong network → re-submit
-//   - "tx-failed"        // on-chain tx broadcast but reverted → re-attempt
-//   - "tx-orphaned"      // tx mined then re-orgged out → re-attempt
-//   - "refunded"         // ops manual reverse → balance credited back
-//   - "frozen"           // compliance hold (sanctions / OFAC) → indefinite
+// SPEC-7 FEAT-RISK03 提现单状态机。主链 submitted → (review-pending →)
+// review-passed → processing → sent → confirmed;异常态由风控路由/人工处置进入。
+// "address-invalid" / "tx-failed" / "refunded" 为结构补全(mock 不驱动,PROD 服务端驱动)。
 // Production: server is canonical; client polls `GET /api/withdrawals/:id`
 // or subscribes to a websocket. Client never advances state.
 export type WithdrawalStatus =
   | "submitted"
+  | "review-pending" // K3 route manual/delay → D2 人工/延迟队列
   | "review-passed"
   | "processing"
   | "sent"
-  | "confirmed";
+  | "confirmed"
+  | "review-rejected" // 异常终态: 人工审核拒绝
+  | "frozen" // 异常态: 风控/合规冻结(K3 route freeze 或 D2 处置)
+  | "address-invalid"
+  | "tx-failed"
+  | "refunded";
 
 export interface Withdrawal {
   id: string;
@@ -321,6 +322,9 @@ export interface AppState {
     fee: number,
     riskRoute?: WithdrawalRiskRoute,
     riskReasons?: string[],
-  ) => string | null; // fee = new-model actualFee (grossFee − NEX offset); null when insufficient balance
-  advanceWithdrawal: () => void;
+  ) => string | null; // fee = new-model actualFee (grossFee − NEX offset); null when insufficient balance or reject route
+  /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
+  _devAdvanceWithdrawal: () => void;
+  /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */
+  _devGrantManualRelease: () => void;
 }

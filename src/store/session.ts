@@ -331,6 +331,7 @@ export const useSession = defineStore("session", () => {
   }
 
   function _devSimulateOtherDeviceLogin(): void {
+    if (import.meta.env.PROD) return; // 异地登录模拟入口,store 层二层 guard(硬规则5)
     const sid = mockServerUuid();
     writeSession({
       sessionId: sid,
@@ -346,10 +347,12 @@ export const useSession = defineStore("session", () => {
   }
 
   function _devRevokeCurrentSession(): void {
+    if (import.meta.env.PROD) return; // 会话撤销入口,store 层二层 guard(硬规则5)
     if (sessionId.value) revokeSession(sessionId.value);
   }
 
   function _devForgetDevice(): void {
+    if (import.meta.env.PROD) return; // 设备身份重置入口,store 层二层 guard(硬规则5)
     _devResetDeviceIdentity();
   }
 

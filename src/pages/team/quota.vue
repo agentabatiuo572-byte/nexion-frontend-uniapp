@@ -40,7 +40,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <text class="block" :style="inviteTitleStyle">{{ t.quota.inviteFriendsTitle }}</text>
-              <text class="block" :style="inviteHintStyle">{{ t.quota.inviteFriendsHint }}</text>
+              <text class="block" :style="inviteHintStyle">{{ inviteHint }}</text>
             </view>
             <text class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-brand)' }">{{ t.quota.shareTag }}</text>
           </view>
@@ -60,10 +60,14 @@ import { fmt } from "@/i18n/format";
 import { getProduct, annualRoiPct } from "@/mock/products";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
+import { useConfig } from "@/store/config";
 
 const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
+const cfg = useConfig();
+// 礼包 NEX 数量单源派生自 platform config。
+const inviteHint = computed(() => fmt(t.value.quota.inviteFriendsHint, { nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const members = computed(() => network.members);
 const directInvites = computed(() => members.value.filter((m) => m.layer === 1).length);

@@ -2,12 +2,11 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { normalizeAccountKey } from "@/store/account-cloud";
+import { useConfig } from "@/store/config";
 
 // Ported from Nexion-prototype/lib/v3/sponsorship.ts (zustand → Pinia).
 // Records the referral chain; claimGift() mints the one-time welcome reward.
-export const WELCOME_GIFT_USDT = 5;
-// NEX 接管提现摩擦闸后,注册礼包 NEX 收紧(原 200 = 免费 $2000 提现额度,过松)。
-export const WELCOME_GIFT_NEX = 20;
+// 礼包金额从 platform config 读取(rewards.welcomeGift,运营可调),不再是本地常量。
 const STORAGE_KEY = "nexion-sponsorship-v1";
 
 interface Persisted {
@@ -77,7 +76,8 @@ export const useSponsorship = defineStore("sponsorship", () => {
     if (key) giftClaimedByAccount.value = { ...giftClaimedByAccount.value, [key]: true };
     giftClaimed.value = true;
     persist();
-    return { usdt: WELCOME_GIFT_USDT, nex: WELCOME_GIFT_NEX };
+    const gift = useConfig().config.rewards.welcomeGift;
+    return { usdt: gift.usdtAmount, nex: gift.nexAmount };
   }
 
   function reset() {

@@ -214,6 +214,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useWalletPairing, mockExternalAddress } from "@/store/wallet-pairing";
+import { recordPaymentInstrument } from "@/store/risk-identity";
 import type { Withdrawal } from "@/store/types";
 
 interface Channel {
@@ -363,6 +364,8 @@ function startVerifying() {
   step2Timer = setTimeout(() => (step2Done.value = true), KYC_PHASE_1_MS + KYC_PHASE_2_MS);
   verifyTimer = setTimeout(() => {
     pairing.complete({ address: senderAddress.value, network: network.value });
+    // SPEC-7 §6: 绑定支付工具时登记风险身份维度(K1 聚簇的中维输入)。
+    recordPaymentInstrument(app.accountKey, `${network.value}:${senderAddress.value}`);
     app.creditBalance(1);
     // ⚠️ Round 12 P0 fix: write the KYC-Express $1 compliance-bonus bill.
     bills.add({

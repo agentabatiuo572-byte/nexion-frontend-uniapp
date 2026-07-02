@@ -11,7 +11,15 @@ import { getCarrier, type Carrier } from "@/lib/carrier";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { useConfig } from "@/store/config";
-import { useRiskCluster } from "@/store/risk-cluster";
+import { evaluateAccountCluster } from "@/store/risk-cluster";
+import {
+  appendLedgerEntry,
+  evaluateAttestRelease,
+  hasReleaseEffect,
+  _devGrantManualRelease as _devGrantManualReleaseLedger,
+  type ReleaseOutcome,
+} from "@/store/earning-release";
+import { recordAttestation } from "@/store/risk-identity";
 import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
 import type { DeviceCapability } from "@/lib/device-capability";
 import { useReceipts } from "./receipts";
@@ -425,15 +433,37 @@ export const useApp = defineStore("app", () => {
    *  endpoint (same lastSettledAt anchor), zero shape change. */
   function settle() {
     if (miningPaused.value) return;
+    const cfgStore = useConfig();
+    // FEAT-RISK02 异常3: 配置同步失败 → 暂停结算并由钱包显示失败态;
+    // 禁止回退到前端写死默认值继续结算。
+    if (cfgStore.syncFailed) return;
     const now = Date.now();
     const carrier = getCarrier();
-    const onlineBonus = useConfig().config.onlineBonus;
-    const settlement = useRiskCluster().evaluateSettlement(accountKey.value);
+    const onlineBonus = cfgStore.config.onlineBonus;
+    // R5 簇状态实时性: 每轮结算现算当前簇,禁用注册时缓存的状态。
+    const clusterEval = evaluateAccountCluster(accountKey.value);
+    // 结算前锚点快照(用于下方 attest 累计的墙钟差,避免复用会跳跃重锚的锚点重复计)。
+    const anchorBefore = new Map(devices.value.map((d) => [d.id, d.lastSettledAt ?? null]));
     const settled = devices.value.map((d) =>
       d.kind === "pc-gpu" && !computeShareEnabled.value
         ? freezeComputeShareDevice(d)
         : settleDevice(d, carrier, now, onlineBonus),
     );
+    // App 载体 + 手机设备真在跑 → 累计「App 在线证明」(R1 attest 释放源)。
+    // 用 settleDevice 实际推进的锚点差(after > before 才是真结算的墙钟那一拍),
+    // 与收益累计同源;首次登记(before=null)/未达结算间隔(锚点未动)都不计,
+    // 修 audit U1「复用外层旧锚点每 tick 重算全量差 → 系统性多计 ~1.5x」。
+    // R7 落地后此处信号源换成设备真在线心跳。
+    if (carrier === "app") {
+      for (const d of settled) {
+        if (d.kind !== "phone" || d.pausedReason != null) continue;
+        const before = anchorBefore.get(d.id) ?? null;
+        const after = d.lastSettledAt ?? null;
+        if (before != null && after != null && after > before) {
+          recordAttestation(accountKey.value, after - before);
+        }
+      }
+    }
 
     const aggregateToday = settled.reduce((sum, d) => sum + d.todayEarnings, 0);
     const aggregateTodayNEX = settled.reduce((sum, d) => sum + d.todayEarningsNEX, 0);
@@ -454,17 +484,59 @@ export const useApp = defineStore("app", () => {
       thisMonth: +(earnings.value.thisMonth + positiveUsdDelta).toFixed(2),
       total: +(earnings.value.total + positiveUsdDelta).toFixed(2),
     };
+    const routedUsd = +positiveUsdDelta.toFixed(2);
+    const routedNex = +positiveNexDelta.toFixed(2);
     user.value = {
       ...bucketUserEarnings(
         user.value,
-        settlement.bucketRoute,
-        +positiveUsdDelta.toFixed(2),
-        +positiveNexDelta.toFixed(2),
-        settlement.configVersion,
+        clusterEval.bucketRoute,
+        routedUsd,
+        routedNex,
+        clusterEval.configVersion,
         now,
       ),
       pendingEarnings: nextTodayUSD,
     };
+    // R1: 非可提路线的入账记分录 —— 释放引擎只认 attest/manual,不认时间。
+    if (clusterEval.bucketRoute === "pending_review" || clusterEval.bucketRoute === "bonus_locked") {
+      appendLedgerEntry(accountKey.value, clusterEval.clusterId, clusterEval.bucketRoute, routedUsd, routedNex);
+    }
+    // R1 释放判定: attest 达标 → 释放待审/锁定;熔断命中 → 待审升锁定。
+    user.value = applyReleaseOutcome(user.value, evaluateAttestRelease(accountKey.value, clusterEval), now);
+    persistAccountSnapshot();
+  }
+
+  /** 把释放引擎的结果落到资金桶(台账为辅助账,金额 clamp 到桶余额,漂移容忍)。 */
+  function applyReleaseOutcome(current: UserState, outcome: ReleaseOutcome, now: number): UserState {
+    if (!hasReleaseEffect(outcome)) return current;
+    const buckets = { ...withDefaultEarningBuckets(current).earningBuckets, lastBucketedAt: now };
+    // 待审 → 可提
+    const relPendUsd = Math.min(outcome.releasedPendingUsdt, buckets.pendingReviewUsdt);
+    buckets.pendingReviewUsdt = +(buckets.pendingReviewUsdt - relPendUsd).toFixed(2);
+    // 锁定 → 可提
+    const relLockUsd = Math.min(outcome.releasedLockedUsdt, buckets.bonusLockedUsdt);
+    buckets.bonusLockedUsdt = +(buckets.bonusLockedUsdt - relLockUsd).toFixed(2);
+    // 熔断: 待审 → 锁定(在释放之后应用,操作的是未释放余量)
+    const escUsd = Math.min(outcome.escalatedUsdt, buckets.pendingReviewUsdt);
+    buckets.pendingReviewUsdt = +(buckets.pendingReviewUsdt - escUsd).toFixed(2);
+    buckets.bonusLockedUsdt = +(buckets.bonusLockedUsdt + escUsd).toFixed(2);
+    // NEX 锁定 → 余额
+    const relNex = Math.min(outcome.releasedPendingNex + outcome.releasedLockedNex, buckets.lockedNex);
+    buckets.lockedNex = +(buckets.lockedNex - relNex).toFixed(2);
+    const relUsd = +(relPendUsd + relLockUsd).toFixed(2);
+    buckets.withdrawableUsdt = +(buckets.withdrawableUsdt + relUsd).toFixed(2);
+    return {
+      ...current,
+      earningBuckets: buckets,
+      usdtBalance: +(current.usdtBalance + relUsd).toFixed(2),
+      nexBalance: +(current.nexBalance + relNex).toFixed(2),
+    };
+  }
+
+  /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行本账户全部待审收益(mock 双端不打通,DR-7)。 */
+  function _devGrantManualRelease() {
+    if (import.meta.env.PROD) return; // 资金释放入口,store 层二层 guard(硬规则5)
+    user.value = applyReleaseOutcome(user.value, _devGrantManualReleaseLedger(accountKey.value), Date.now());
     persistAccountSnapshot();
   }
 
@@ -683,6 +755,10 @@ export const useApp = defineStore("app", () => {
       nextBuckets.bonusLockedUsdt = +(nextBuckets.bonusLockedUsdt + usdt).toFixed(2);
       nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
     }
+    // R1: 非可提的赠金也必须记台账分录,否则释放引擎(attest/manual)永远放不出它。
+    if (route === "pending_review" || route === "bonus_locked") {
+      appendLedgerEntry(accountKey.value, evaluateAccountCluster(accountKey.value).clusterId, route, usdt, nex);
+    }
     user.value = nextUser;
     persistAccountSnapshot();
     return true;
@@ -704,12 +780,17 @@ export const useApp = defineStore("app", () => {
     riskRoute: WithdrawalRiskRoute = "pass",
     riskReasons: string[] = [],
   ): string | null {
+    // SPEC-7 FEAT-RISK03: reject 路由禁止扣款建单;freeze/manual/delay 建单进
+    // 对应队列(资金占用),状态由服务端/人工推进,client 不推进。
+    if (riskRoute === "reject") return null;
     const currentUser = withDefaultEarningBuckets(user.value);
     if (currentUser.earningBuckets.withdrawableUsdt < amount) return null;
     const now = Date.now();
     const yyyymmdd = new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
     const seq = Math.floor(1000 + Math.random() * 9000);
     const id = `WD-${yyyymmdd}-${seq}`;
+    const initialStatus: Withdrawal["status"] =
+      riskRoute === "freeze" ? "frozen" : riskRoute === "manual" || riskRoute === "delay" ? "review-pending" : "submitted";
     // fee = authoritative new-model withdrawal fee (grossFee − NEX offset), passed
     // by the caller from computeWithdrawFee. PROD: server computes + returns it.
     const wd: Withdrawal = {
@@ -718,7 +799,7 @@ export const useApp = defineStore("app", () => {
       network,
       address,
       fee,
-      status: "submitted",
+      status: initialStatus,
       riskRoute,
       riskReasons,
       submittedAt: now,
@@ -738,11 +819,11 @@ export const useApp = defineStore("app", () => {
     return id;
   }
 
-  // ⚠️ MOCK-ONLY: client unilaterally advances status through the queue.
-  // PRODUCTION: status comes from server webhook/SSE/polling only; client never
-  // mutates status. Ported from index.ts advanceWithdrawal (drives the
-  // /me/wallet/withdraw/tracking stepper demo).
-  function advanceWithdrawal() {
+  // ⚠️ DEV/DEMO-ONLY(SPEC-7 收编): 仅 pass 路由的提现可由 demo 驱动推进主链
+  // 状态;manual/delay/freeze 的状态推进属于服务端/人工处置,client 永不推进。
+  // PRODUCTION: status comes from server webhook/SSE/polling only.
+  function _devAdvanceWithdrawal() {
+    if (import.meta.env.PROD) return; // demo-only 状态推进,store 层二层 guard(硬规则5)
     const wd = latestWithdrawal.value;
     if (!wd) return;
     if (wd.riskRoute && wd.riskRoute !== "pass") return;
@@ -754,7 +835,7 @@ export const useApp = defineStore("app", () => {
       "confirmed",
     ];
     const idx = order.indexOf(wd.status);
-    if (idx >= order.length - 1) return;
+    if (idx === -1 || idx >= order.length - 1) return;
     latestWithdrawal.value = { ...wd, status: order[idx + 1] };
     persistAccountSnapshot();
   }
@@ -765,7 +846,7 @@ export const useApp = defineStore("app", () => {
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, recordDeposit, creditRewardBucket,
-    submitWithdrawal, advanceWithdrawal,
+    submitWithdrawal, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });

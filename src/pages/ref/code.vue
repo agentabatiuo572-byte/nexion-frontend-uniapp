@@ -43,8 +43,8 @@
       <view class="text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
-          <text :style="giftAmountStyle">$5</text>
-          <text :style="giftNexStyle">+ 20 NEX</text>
+          <text :style="giftAmountStyle">${{ giftUsdt }}</text>
+          <text :style="giftNexStyle">+ {{ giftNex }} NEX</text>
         </view>
         <text class="block" :style="giftSubStyle">{{ t.ref.welcomeGiftSub }}</text>
       </view>
@@ -63,7 +63,7 @@
       <!-- CTA -->
       <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="goRegister">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
-        <text style="margin: 0 8px">{{ t.ref.claimCta }}</text>
+        <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
 
@@ -122,11 +122,16 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
+import { useConfig } from "@/store/config";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
 
 const t = useT();
 const code = ref("");
+const cfg = useConfig();
+// 礼包金额单源派生自 platform config(禁写死镜像)。
+const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
 onLoad((options) => {
   code.value = options?.code ?? "";
 });
@@ -149,7 +154,8 @@ const perks: { key: PerkKey; icon: string; tint: string }[] = [
   { key: "sponsor", icon: USERS_SVG, tint: "var(--v5-tech-cyan)" },
 ];
 function perkLabel(k: PerkKey): string {
-  return t.value.ref.perks[k];
+  const s = t.value.ref.perks[k];
+  return k === "gift" ? fmt(s, { usd: giftUsdt.value, nex: giftNex.value }) : s;
 }
 
 function goRegister() {

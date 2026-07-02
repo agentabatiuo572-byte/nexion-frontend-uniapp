@@ -38,18 +38,29 @@ export interface OnlineBonus {
   continuityFullHours: number;
 }
 
-// SPEC-7 风险簇释放参数 — server/admin canonical. Client reads this as
-// config, never as business constants. Defaults live only in mock/platform-config.
+// ── SPEC-7 §5 风险簇释放参数(推倒重写版)──────────────────────────────
+// server/admin canonical. Client reads these as config, never as business
+// constants. Defaults live only in mock/platform-config (mock seed).
+// K1 是风险簇权威;K4 是评分权威;K3 是提现路由权威。
+
+// R1(整改): pending 释放模式。没有 "auto" —— 观察窗口到达永不自动释放,
+// 释放源只有 App 在线证明或 D2 人工放行。
+export type PendingReleaseMode = "attest_or_manual" | "manual_only";
+
 export interface RiskClusterConfig {
   freePhoneSlotsPerCluster: number;
   duplicateAccountPendingFrom: number;
   duplicateAccountFreezeFrom: number;
+  // R1: 观察窗口只作运营/熔断统计口径 —— 到达不触发任何释放。
   pendingReleaseHours: number;
   appAttestationReleaseHours: number;
   maxSignupPerIp24h: number;
   maxAccountsPerDevice: number;
   maxAccountsPerPaymentInstrument: number;
   clusterFreezeSuggestThreshold: number;
+  releaseMode: PendingReleaseMode;
+  // R4: 首号免费槽收益进可提前,需至少一次有效绑定(支付/推荐/App 在线证明)。
+  freeSlotRequiresBinding: boolean;
 }
 
 export type WithdrawalRiskRoute = "pass" | "delay" | "manual" | "freeze" | "reject";
@@ -57,6 +68,38 @@ export type WithdrawalRiskRoute = "pass" | "delay" | "manual" | "freeze" | "reje
 export interface WithdrawRulesConfig {
   minWithdrawableUsdt: number;
   sameAddressRoute: WithdrawalRiskRoute;
+  // R2 冷启动保守: 新账户首次提现无条件人工,兜「每号换指纹+换地址」的分散薅。
+  firstWithdrawalManual: boolean;
+  // R2: 提现地址首次绑定后 N 小时内提现走 delay/manual。
+  newAddressHoldHours: number;
+}
+
+// 新人礼发放模式: risk_bucket = 按当前风险簇分桶(默认);direct = 直入可提(运营可关闸)。
+export type WelcomeGiftLockMode = "risk_bucket" | "direct";
+
+export interface RewardsConfig {
+  welcomeGift: {
+    lockMode: WelcomeGiftLockMode;
+    // 注册礼包金额(运营可调;admin K.rewards.welcomeGift.* 同键,CGM-F-020)。
+    usdtAmount: number;
+    nexAmount: number;
+  };
+}
+
+// ── SPEC-7 §5b K1 聚簇维度权重(K4 可配)──────────────────────────────
+// mock K4 分数 = 命中维度的权重和(cap 1);强维命中直接入簇(OR),
+// 中/弱维叠加权重 ≥ weakSignalClusterThreshold 才入簇。空维度不计分(空值降权)。
+export interface RiskScoreConfig {
+  dimensionWeights: {
+    serverDeviceId: number;
+    ipBucket: number;
+    withdrawAddress: number;
+    paymentInstrument: number;
+    sponsor: number;
+    uaFingerprint: number;
+    signupTiming: number;
+  };
+  weakSignalClusterThreshold: number;
 }
 
 export interface PlatformConfig {
@@ -64,6 +107,8 @@ export interface PlatformConfig {
   onlineBonus: OnlineBonus;
   riskCluster: RiskClusterConfig;
   withdrawRules: WithdrawRulesConfig;
+  rewards: RewardsConfig;
+  riskScore: RiskScoreConfig;
   computeShare: {
     downloadUrl: string;
     content: ComputeShareContent;

@@ -85,6 +85,8 @@
           <text>{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ maxWithdrawable.toFixed(2) }}</text></text>
           <text>{{ minAmountLine }}</text>
         </view>
+        <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
+        <text v-if="heldLine" class="block tabular-nums" style="margin-top: 4px; font-size: 11px; color: var(--v5-ink-4)">{{ heldLine }}</text>
       </view>
 
       <view v-if="withdrawalRiskNotice" class="mx-4 mt-3 flex items-start" :style="holdBannerStyle">
@@ -93,7 +95,7 @@
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.wallet.withdrawRouteReviewTitle }}</text>
-          <text class="block" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ t.wallet.withdrawRouteReviewBody }}</text>
+          <text class="block" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ riskNoticeBody }}</text>
         </view>
       </view>
 
@@ -204,6 +206,10 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
               <text>{{ t.walletV3.submitCtaUnpaired }}</text>
             </template>
+            <template v-else-if="submitting">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+              <text>{{ t.wallet.submitChecking }}</text>
+            </template>
             <template v-else-if="canSubmit">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               <text>{{ t.walletV3.submitCtaPaired }}</text>
@@ -232,7 +238,12 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useWalletPairing } from "@/store/wallet-pairing";
-import { useWithdrawalRisk } from "@/store/withdrawal-risk";
+import {
+  evaluateWithdrawal,
+  commitWithdrawal,
+  requestWithdrawalEligibility,
+  type WithdrawalEligibility,
+} from "@/store/withdrawal-eligibility";
 import { computeWithdrawFee } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -251,7 +262,6 @@ const t = useT();
 const app = useApp();
 const bills = useBills();
 const pairing = useWalletPairing();
-const withdrawalRisk = useWithdrawalRisk();
 const risk = useRiskDisclosure();
 const phase = useProductPhase();
 const cfg = useConfig();
@@ -301,11 +311,28 @@ const fee = computed(() => feeCalc.value.actualFee);
 const receive = computed(() => feeCalc.value.netReceive);
 const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
 const eligibility = computed(() =>
-  withdrawalRisk.evaluateWithdrawal(app.accountKey, network.value, address.value, maxWithdrawable.value),
+  evaluateWithdrawal(app.accountKey, network.value, address.value, maxWithdrawable.value),
 );
 const withdrawalRiskNotice = computed(() =>
   address.value.length > 10 && eligibility.value.route !== "pass" && eligibility.value.route !== "reject",
 );
+// SPEC-7: 提交进行中(风控校验加载态)。
+const submitting = ref(false);
+// ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
+const heldLine = computed(() => {
+  const b = app.user.earningBuckets;
+  if (b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0) return "";
+  return fmt(t.value.wallet.heldBucketsLine, {
+    p: b.pendingReviewUsdt.toFixed(2),
+    l: b.bonusLockedUsdt.toFixed(2),
+  });
+});
+// 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案)。
+const riskNoticeBody = computed(() => {
+  const dict = t.value.wallet.riskReasons as Record<string, string>;
+  const lines = eligibility.value.riskReasons.map((code) => dict[code]).filter(Boolean);
+  return lines.length ? lines.join(";") + "。" : t.value.wallet.withdrawRouteReviewBody;
+});
 const submitDisabledReason = computed(() => {
   if (!walletPaired.value) return t.value.walletV3.submitReasonUnpaired;
   if (amountNum.value <= 0) return t.value.walletV3.submitReasonAmountRequired;
@@ -388,7 +415,8 @@ async function handleResetKyc() {
   }
 }
 
-function handleSubmit() {
+async function handleSubmit() {
+  if (submitting.value) return;
   if (!canSubmit.value) {
     toast.info(submitDisabledReason.value || t.value.walletV3.submitCtaDisabled);
     return;
@@ -396,6 +424,22 @@ function handleSubmit() {
   if (!risk.accepted) {
     // Source pushes to the risk-disclosure page (not yet ported) and returns.
     uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
+    return;
+  }
+  // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
+  // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
+  submitting.value = true;
+  let fresh: WithdrawalEligibility;
+  try {
+    fresh = await requestWithdrawalEligibility(app.accountKey, network.value, address.value, maxWithdrawable.value);
+  } catch {
+    submitting.value = false;
+    toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
+    return;
+  }
+  if (fresh.route === "reject" || !fresh.canSubmit || amountNum.value > fresh.maxWithdrawableUsdt) {
+    submitting.value = false;
+    toast.error(t.value.walletV3.submitReasonReviewBlocked);
     return;
   }
   // ⚠️ MOCK-ONLY NON-ATOMIC cross-store handler (NEX burn + submitWithdrawal +
@@ -406,6 +450,7 @@ function handleSubmit() {
   const toBurn = nexBurned.value;
   if (toBurn > 0 && !app.debitNex(toBurn)) {
     // Balance changed under us — bail without charging; recompute re-clamps next tick.
+    submitting.value = false;
     toast.error(t.value.walletV3.needMoreNexToast);
     return;
   }
@@ -414,17 +459,18 @@ function handleSubmit() {
     network.value,
     address.value,
     fee.value,
-    eligibility.value.route,
-    eligibility.value.riskReasons,
+    fresh.route,
+    fresh.riskReasons,
   );
   if (!withdrawalId) {
     if (toBurn > 0) app.creditNex(toBurn); // rollback the burned NEX
+    submitting.value = false;
     toast.error(t.value.wallet.withdrawInsufficient);
     return;
   }
-  withdrawalRisk.commitWithdrawal(app.accountKey, network.value, address.value);
+  commitWithdrawal(app.accountKey, network.value, address.value);
   const charged = fee.value;
-  const memo = eligibility.value.route === "pass"
+  const memo = fresh.route === "pass"
     ? fmt(t.value.wallet.withdrawBillMemoPass, { network: network.value, fee: charged.toFixed(2) })
     : t.value.wallet.withdrawBillMemoReview;
   bills.add({
@@ -435,7 +481,7 @@ function handleSubmit() {
     memo,
     ref: withdrawalId,
   });
-  if (eligibility.value.route !== "pass") {
+  if (fresh.route !== "pass") {
     toast.info(t.value.wallet.withdrawRouteReviewTitle, t.value.wallet.withdrawRouteReviewBody);
   }
   if (toBurn > 0) {
@@ -451,6 +497,7 @@ function handleSubmit() {
       ref: withdrawalId,
     });
   }
+  submitting.value = false;
   uni.navigateTo({ url: "/pages/me/wallet-withdraw-tracking", fail: () => {} });
 }
 

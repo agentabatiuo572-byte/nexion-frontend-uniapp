@@ -126,39 +126,113 @@ sentinel_present "SPEC-1 settle: Device.lastSettledAt typed" src/store/types.ts 
 # single accrual source: the baseRate accrual must appear EXACTLY once (no 2nd bypass)
 SPEC1_ACC=$(grep -cE 'd\.baseRate \* lifeEff \* phoneFactor' src/store/app.ts 2>/dev/null)
 if [ "$SPEC1_ACC" = "1" ]; then ok "SPEC-1 settle single-source: 1 accrual site"; else bad "SPEC-1 settle: expected 1 accrual site, found $SPEC1_ACC"; fi
-# ── SPEC-7 risk-cluster config + earning buckets sentinels ──
+# ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
+# 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
 sentinel_present "SPEC-7 risk cluster config typed" src/store/config-types.ts 'interface RiskClusterConfig'
-sentinel_present "SPEC-7 risk cluster seeded in platform config" src/mock/platform-config.ts 'riskCluster:'
-sentinel_present "SPEC-7 risk cluster cloned into config store" src/store/config.ts 'riskCluster: \{ \.\.\.DEFAULT_PLATFORM_CONFIG\.riskCluster \}'
+sentinel_present "SPEC-7 release mode has no auto variant (R1)" src/store/config-types.ts '"attest_or_manual" \| "manual_only"'
+sentinel_present "SPEC-7 free-slot binding gate typed (R4)" src/store/config-types.ts 'freeSlotRequiresBinding: boolean'
+sentinel_present "SPEC-7 first-withdrawal-manual typed (R2)" src/store/config-types.ts 'firstWithdrawalManual: boolean'
+sentinel_present "SPEC-7 new-address hold typed (R2)" src/store/config-types.ts 'newAddressHoldHours: number'
+sentinel_present "SPEC-7 welcome gift lock mode typed" src/store/config-types.ts 'WelcomeGiftLockMode'
+sentinel_present "SPEC-7 K4 dimension weights typed (R3)" src/store/config-types.ts 'dimensionWeights'
+sentinel_present "SPEC-7 risk cluster seeded" src/mock/platform-config.ts 'releaseMode: "attest_or_manual"'
+sentinel_present "SPEC-7 withdraw rules seeded" src/mock/platform-config.ts 'firstWithdrawalManual: true'
+sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode: "risk_bucket"'
+sentinel_present "SPEC-7 riskScore cloned into config store" src/store/config.ts 'dimensionWeights: \{ \.\.\.DEFAULT_PLATFORM_CONFIG\.riskScore\.dimensionWeights \}'
+# 引擎层: 身份注册表(独立于会话存储)+ 实时聚簇 + 释放 + 提现前置
+sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexion-risk-registry-v1'
+sentinel_present "SPEC-7 registry tracks first withdrawal (R2)" src/store/risk-identity.ts 'hasWithdrawn'
+sentinel_present "SPEC-7 registry tracks attestation" src/store/risk-identity.ts 'attestedOnlineMs'
+sentinel_present "SPEC-7 realtime cluster evaluator (R5)" src/store/risk-cluster.ts 'export function evaluateAccountCluster'
+sentinel_present "SPEC-7 multi-dimension clustering (R3)" src/store/risk-cluster.ts 'function dimensionHits'
+sentinel_present "SPEC-7 bare identity enters watch (R3)" src/store/risk-cluster.ts 'bare-identity'
+sentinel_present "SPEC-7 unbound free slot pends (R4)" src/store/risk-cluster.ts 'unbound-free-slot'
+sentinel_present "SPEC-7 release ledger exists (R1)" src/store/earning-release.ts 'nexion-earning-ledger-v1'
+sentinel_present "SPEC-7 release sources limited to attest|manual (R1)" src/store/earning-release.ts 'type ReleaseSource = "attest" \| "manual"'
+sentinel_present "SPEC-7 cluster circuit breaker (R1)" src/store/earning-release.ts 'clusterBreakerTripped'
+if grep -qE 'releasedBy: *"(timer|auto)"' src/store/earning-release.ts 2>/dev/null; then
+  bad "SPEC-7 release engine must not have a time/auto release source (R1)"
+else
+  ok "SPEC-7 release engine has no auto release source (R1)"
+fi
+sentinel_present "SPEC-7 eligibility reads live cluster (R5)" src/store/withdrawal-eligibility.ts 'evaluateAccountCluster\(key\)'
+sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-eligibility.ts 'first-withdrawal-review'
+sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility.ts 'new-address-hold'
+# 消费层: 注册 / 结算 / 钱包 / 提现
+sentinel_present "SPEC-7 register evaluates via engine" src/pages/register/register.vue 'evaluateRegistration\(prospectiveIdentity\(\)'
+sentinel_present "SPEC-7 register honors signup gate" src/pages/register/register.vue 'gateRoute === "manual_or_reject"'
+sentinel_present "SPEC-7 register OTP verify is async with loading state" src/pages/register/register.vue 'verifying\.value = true'
+sentinel_present "SPEC-7 register review copy is reason-aware" src/pages/register/register.vue 'rewardReviewBodyUnbound'
+sentinel_present "SPEC-7 register commits identity" src/pages/register/register.vue 'commitRegistration\(identity'
+sentinel_present "SPEC-7 welcome gift routes through buckets (R6)" src/pages/register/register.vue 'creditRewardBucket\(assessment\.giftRoute'
+sentinel_present "SPEC-7 welcome gift claimed per account" src/pages/register/register.vue 'claimGift\(identity\)'
+sentinel_present "SPEC-7 sponsorship tracks claimed accounts" src/store/sponsorship.ts 'giftClaimedByAccount'
+# 新人礼金额可配(2026-07-03 主人批): 金额只从 platform config 读,本地常量禁存(CGM-F-020)
+sentinel_present "SPEC-7 gift amounts read from config" src/store/sponsorship.ts 'rewards\.welcomeGift'
+sentinel_present "SPEC-7 gift usdt amount seeded" src/mock/platform-config.ts 'usdtAmount: 5'
+sentinel_present "SPEC-7 gift nex amount seeded" src/mock/platform-config.ts 'nexAmount: 20'
+if grep -rqE 'WELCOME_GIFT_USDT|WELCOME_GIFT_NEX' src/ 2>/dev/null; then
+  bad "SPEC-7 gift amount local constants must not exist (config is single source)"
+else
+  ok "SPEC-7 no local gift amount constants (config-derived)"
+fi
+sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '\{usd\} USDT \+ \{nex\} NEX'
+sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\} USDT \+ \{nex\} NEX'
+sentinel_present "SPEC-7 settle reads live cluster (R5)" src/store/app.ts 'evaluateAccountCluster\(accountKey\.value\)'
+sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
+sentinel_present "SPEC-7 settle journals non-withdrawable routes (R1)" src/store/app.ts 'appendLedgerEntry\(accountKey\.value'
+SPEC7_LEDGER_SITES=$(grep -cE 'appendLedgerEntry\(accountKey\.value' src/store/app.ts 2>/dev/null)
+if [ "$SPEC7_LEDGER_SITES" = "2" ]; then
+  ok "SPEC-7 both bucket-credit paths journal to ledger (settle + reward)"
+else
+  bad "SPEC-7 expected 2 ledger journal sites (settle + creditRewardBucket), found $SPEC7_LEDGER_SITES"
+fi
+sentinel_present "SPEC-7 settle accrues app attestation" src/store/app.ts 'recordAttestation\(accountKey\.value'
+sentinel_present "SPEC-7 settle applies release engine (R1)" src/store/app.ts 'evaluateAttestRelease\(accountKey\.value'
+sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
+sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
+sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
+sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
+sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 't\.value\.wallet\.riskReasons'
+sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'if \(!import\.meta\.env\.DEV\) return'
 sentinel_present "SPEC-7 earning buckets typed" src/store/types.ts 'interface EarningBuckets'
 sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earningBuckets: EarningBuckets'
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
-sentinel_present "SPEC-7 registration risk store exists" src/store/risk-cluster.ts 'evaluateRegistration'
-sentinel_present "SPEC-7 register evaluates before password step" src/pages/register/register.vue 'registrationRisk\.value = riskCluster\.evaluateRegistration'
-sentinel_present "SPEC-7 register commits cluster route" src/pages/register/register.vue 'riskCluster\.commitRegistration'
-sentinel_present "SPEC-7 welcome gift routes through buckets" src/pages/register/register.vue 'creditRewardBucket\(registrationRoute\.bucketRoute'
-sentinel_present "SPEC-7 welcome gift claimed per account" src/pages/register/register.vue 'claimGift\(identity\)'
-sentinel_present "SPEC-7 sponsorship tracks claimed accounts" src/store/sponsorship.ts 'giftClaimedByAccount'
-sentinel_present "SPEC-7 settlement route evaluator exists" src/store/risk-cluster.ts 'function evaluateSettlement'
-sentinel_present "SPEC-7 settle reads account risk route" src/store/app.ts 'evaluateSettlement\(accountKey\.value\)'
-sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
 sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
-sentinel_present "SPEC-7 withdraw rules config typed" src/store/config-types.ts 'interface WithdrawRulesConfig'
-sentinel_present "SPEC-7 withdraw rules seeded in platform config" src/mock/platform-config.ts 'withdrawRules:'
-sentinel_present "SPEC-7 withdrawal risk store exists" src/store/withdrawal-risk.ts 'evaluateWithdrawal'
 sentinel_present "SPEC-7 withdraw page uses withdrawable bucket" src/pages/me/wallet-withdraw.vue 'app\.user\.earningBuckets\.withdrawableUsdt'
-sentinel_present "SPEC-7 withdraw submit carries risk route" src/pages/me/wallet-withdraw.vue 'eligibility\.value\.route'
+sentinel_present "SPEC-7 withdraw page consumes eligibility engine" src/pages/me/wallet-withdraw.vue 'from "@/store/withdrawal-eligibility"'
+sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/pages/me/wallet-withdraw.vue 'await requestWithdrawalEligibility'
+sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
+sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-withdraw.vue 'riskCheckTimeoutTitle'
+sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
+sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 't\.value\.wallet\.riskReasons'
+sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
+sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wallet-topup.vue 'recordPaymentInstrument\(app\.accountKey'
+sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
+sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
 sentinel_present "SPEC-7 withdrawal debits withdrawable bucket" src/store/app.ts 'withdrawableUsdt: \+\(currentUser\.earningBuckets\.withdrawableUsdt - amount\)'
+# client 零推进: 旧全局推进函数必须已收编为 _dev 前缀(仅 pass 路由)
+sentinel_present "SPEC-7 demo advance is _dev-prefixed" src/store/app.ts 'function _devAdvanceWithdrawal'
+if grep -qE 'function advanceWithdrawal\(' src/store/app.ts 2>/dev/null; then
+  bad "SPEC-7 un-prefixed advanceWithdrawal must not exist (client never advances)"
+else
+  ok "SPEC-7 no un-prefixed withdrawal advancing"
+fi
+if [ -f src/store/withdrawal-risk.ts ]; then
+  bad "SPEC-7 legacy withdrawal-risk.ts must stay deleted (rewritten as withdrawal-eligibility)"
+else
+  ok "SPEC-7 legacy withdrawal-risk.ts removed"
+fi
 if grep -q 'app\.advanceWithdrawal' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null; then
   bad "SPEC-7 tracking page must not auto-advance withdrawals"
 else
   ok "SPEC-7 tracking page is display-only"
 fi
 if grep -q 'app\.creditBalance(gift\.usdt)' src/pages/register/register.vue 2>/dev/null; then
-  bad "SPEC-7 register gift must not credit USDT balance directly"
+  bad "SPEC-7 register gift must not credit USDT balance directly (R6)"
 else
-  ok "SPEC-7 register gift not directly credited to balance"
+  ok "SPEC-7 register gift not directly credited to balance (R6)"
 fi
 if grep -q 'const usdtBalance = computed(() => app\.user\.usdtBalance)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
   bad "SPEC-7 withdraw page must not use total USDT balance as available"
@@ -169,6 +243,27 @@ if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/a
   bad "SPEC-7 settle must not credit NEX balance outside buckets"
 else
   ok "SPEC-7 settle NEX route goes through buckets"
+fi
+# 双端参数 key parity: uniapp 配置契约 ↔ admin 参数寄存器(DR-7 结构一致)
+ADMIN_CFG="../Nexion-admin-prototype/lib/mock/admin/compute-config.ts"
+if [ ! -f "$ADMIN_CFG" ]; then
+  bad "SPEC-7 parity: admin compute-config.ts not found at $ADMIN_CFG"
+else
+  parity_miss=""
+  for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
+           pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
+           maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding \
+           minWithdrawableUsdt sameAddressRoute firstWithdrawalManual newAddressHoldHours lockMode \
+           serverDeviceId ipBucket withdrawAddress paymentInstrument sponsor uaFingerprint signupTiming \
+           weakSignalClusterThreshold; do
+    grep -q "$k" src/store/config-types.ts || parity_miss="${parity_miss}uniapp:$k "
+    grep -q "$k" "$ADMIN_CFG" || parity_miss="${parity_miss}admin:$k "
+  done
+  if [ -z "$parity_miss" ]; then
+    ok "SPEC-7 param key parity (uniapp config-types ↔ admin compute-config)"
+  else
+    bad "SPEC-7 param key parity missing: $parity_miss"
+  fi
 fi
 # ── SPEC-2 电脑算力 sentinels ──
 spec2_pc_gpu_kind_coverage() {

@@ -21,7 +21,7 @@
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.name[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> invited you</text>
-          <text class="rg-sponsor__gift">+${{ WELCOME_GIFT_USDT }} + {{ WELCOME_GIFT_NEX }} NEX</text>
+          <text class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
         </view>
         <text class="rg-sponsor__v">V{{ sponsorPreview.vRank }}</text>
       </view>
@@ -34,7 +34,7 @@
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
       <text class="rg-subtitle">
-        <template v-if="step === 1"><text class="rg-subtitle__hl">{{ t.register.subtitleHighlight }}</text>{{ t.register.subtitleRest }}</template>
+        <template v-if="step === 1"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { usd: giftUsdt }) }}</text>{{ t.register.subtitleRest }}</template>
         <template v-else-if="step === 2">{{ t.register.codeSentTo }} <text class="rg-subtitle__ph">{{ country }} {{ phone }}</text></template>
         <template v-else>{{ t.register.setPasswordHint }}</template>
       </text>
@@ -92,13 +92,13 @@
 
       <view v-if="reviewNotice" class="rg-review">
         <text class="rg-review__title">{{ t.register.rewardReviewTitle }}</text>
-        <text class="rg-review__body">{{ t.register.rewardReviewBody }}</text>
+        <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
 
       <!-- Welcome bonus chip (step 1) -->
       <view v-if="step === 1" class="rg-bonus">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
-        <text class="rg-bonus__t"><text class="rg-bonus__b">{{ t.register.bonusTitle }}</text>{{ t.register.bonusHint }}</text>
+        <text class="rg-bonus__t"><text class="rg-bonus__b">{{ fmt(t.register.bonusTitle, { usd: giftUsdt }) }}</text>{{ t.register.bonusHint }}</text>
       </view>
 
       <!-- Error -->
@@ -108,8 +108,8 @@
       </view>
 
       <!-- Primary CTA -->
-      <view class="rg-cta" :class="ctaEnabled ? 'rg-cta--on' : ''" @click="onCta">
-        <text class="rg-cta__t" :class="ctaEnabled ? 'rg-cta__t--on' : ''">{{ step === 1 ? t.register.sendCode : step === 2 ? t.register.verify : t.register.finish }}</text>
+      <view class="rg-cta" :class="[ctaEnabled && !verifying ? 'rg-cta--on' : '', verifying ? 'rg-cta--busy' : '']" @click="onCta">
+        <text class="rg-cta__t" :class="ctaEnabled && !verifying ? 'rg-cta__t--on' : ''">{{ ctaLabel }}</text>
       </view>
 
       <!-- OAuth (step 1) -->
@@ -143,8 +143,10 @@ import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
-import { useSponsorship, WELCOME_GIFT_USDT, WELCOME_GIFT_NEX } from "@/store/sponsorship";
-import { useRiskCluster, type RegistrationRiskSummary } from "@/store/risk-cluster";
+import { useSponsorship } from "@/store/sponsorship";
+import { useConfig } from "@/store/config";
+import { fmt } from "@/i18n/format";
+import { evaluateRegistration, commitRegistration, type RegistrationAssessment } from "@/store/risk-cluster";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -155,7 +157,10 @@ const session = useSession();
 const app = useApp();
 const bills = useBills();
 const sponsorship = useSponsorship();
-const riskCluster = useRiskCluster();
+const cfg = useConfig();
+// 礼包金额单源派生自 platform config(禁本地常量镜像)。
+const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
 
 const COUNTRIES = [
   { code: "+1", name: "US / Canada" }, { code: "+44", name: "United Kingdom" }, { code: "+49", name: "Germany" },
@@ -184,7 +189,9 @@ const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
 const error = ref<string | null>(null);
-const registrationRisk = ref<RegistrationRiskSummary | null>(null);
+const registrationRisk = ref<RegistrationAssessment | null>(null);
+// OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
+const verifying = ref(false);
 const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -206,8 +213,25 @@ const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
 const ctaEnabled = computed(() => (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
+const ctaLabel = computed(() =>
+  step.value === 2 && verifying.value
+    ? t.value.register.verifying
+    : step.value === 1
+      ? t.value.register.sendCode
+      : step.value === 2
+        ? t.value.register.verify
+        : t.value.register.finish,
+);
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
-const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.status !== "clear");
+const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.cluster.status !== "clear");
+// 分因提示: 同簇重复账号用「设备已有账号活动」口径;裸号/未绑定用「先审核,绑定后释放」口径。
+const reviewNoticeBody = computed(() => {
+  const c = registrationRisk.value?.cluster;
+  if (!c) return "";
+  const dup = c.reasons.includes("duplicate-pending-line") || c.reasons.includes("duplicate-freeze-line");
+  const bare = c.reasons.includes("bare-identity") || c.reasons.includes("unbound-free-slot");
+  return !dup && bare ? t.value.register.rewardReviewBodyUnbound : t.value.register.rewardReviewBody;
+});
 
 // uni <input> delivers the value on e.detail.value at runtime; vue-tsc types
 // the payload as a DOM Event, so we read detail through a narrow cast helper.
@@ -231,6 +255,7 @@ function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = nul
 function pickCountry(c: string) { country.value = c; showCountries.value = false; }
 
 function onCta() {
+  if (verifying.value) return;
   if (step.value === 1) goSendCode();
   else if (step.value === 2) verifyCode();
   else finish();
@@ -256,32 +281,55 @@ function resend() {
   error.value = null;
   startResend();
 }
+function currentSponsorCode(): string | null {
+  return refFromUrl.value?.trim() || invite.value.trim() || null;
+}
 function verifyCode() {
+  if (verifying.value) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
-  registrationRisk.value = riskCluster.evaluateRegistration(prospectiveIdentity());
-  step.value = 3;
+  // ⚠️ MOCK-ONLY: 异步 OTP 校验 + K1 注册前评估的接口形态。PROD: POST
+  // /api/auth/otp/verify → 服务端验码 + K1 评估,返回 { gateRoute, cluster,
+  // giftRoute } 同构结论;client 只消费,不本地判定。
+  verifying.value = true;
+  setTimeout(() => {
+    verifying.value = false;
+    const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
+    registrationRisk.value = assessment;
+    // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
+    if (assessment.gateRoute === "manual_or_reject") {
+      error.value = t.value.register.errorSignupLimited;
+      return;
+    }
+    step.value = 3;
+  }, 600);
 }
 function finish() {
   error.value = null;
   if (!pwdOk.value) { error.value = t.value.register.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.register.passwordMismatch; return; }
   const identity = prospectiveIdentity();
-  const registrationRoute = registrationRisk.value ?? riskCluster.evaluateRegistration(identity);
+  const sponsorCode = currentSponsorCode();
+  // 完成时点重评(含最新邀请码): R5 口径下评估随调随算,不留步骤间缓存。
+  const assessment = evaluateRegistration(identity, { sponsorId: sponsorCode });
+  registrationRisk.value = assessment;
+  if (assessment.gateRoute === "manual_or_reject") {
+    error.value = t.value.register.errorSignupLimited;
+    return;
+  }
   auth.signUp(identity);
   app.bindAccount(identity);
-  riskCluster.commitRegistration(registrationRoute);
+  commitRegistration(identity, { sponsorId: sponsorCode });
   // New account claims this carrier's session; first-time calibration runs as
   // part of onboarding (connect.vue) which then marks this device calibrated.
   session.claim(identity);
-  const sponsorCode = refFromUrl.value?.trim() || invite.value.trim();
   if (sponsorCode) {
     sponsorship.bind(sponsorCode);
     const gift = sponsorship.claimGift(identity);
     if (gift) {
-      const posted = app.creditRewardBucket(registrationRoute.bucketRoute, gift.usdt, gift.nex);
+      const posted = app.creditRewardBucket(assessment.giftRoute, gift.usdt, gift.nex);
       const giftRef = `GIFT-${Date.now().toString(36).toUpperCase()}`;
-      const giftPosted = registrationRoute.bucketRoute === "withdrawable";
+      const giftPosted = assessment.giftRoute === "withdrawable";
       const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
       bills.add({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
       bills.add({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
@@ -374,6 +422,7 @@ function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () =
 .rg-error__t { flex: 1; }
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
 .rg-cta--on { background: var(--v5-brand); }
+.rg-cta--busy { opacity: 0.7; }
 .rg-cta__t { font-size: 15px; font-weight: 600; color: var(--v5-ink-4); }
 .rg-cta__t--on { color: var(--v5-on-brand); }
 .rg-oauth { }

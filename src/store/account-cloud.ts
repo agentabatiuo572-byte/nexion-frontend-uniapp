@@ -51,10 +51,17 @@ const TIME_ANCHOR_KEYS = new Set([
 
 const WITHDRAWAL_STATUS_RANK: Record<Withdrawal["status"], number> = {
   submitted: 0,
-  "review-passed": 1,
-  processing: 2,
-  sent: 3,
-  confirmed: 4,
+  "review-pending": 1,
+  "review-passed": 2,
+  processing: 3,
+  sent: 4,
+  confirmed: 5,
+  // 异常态视为服务端最终结论,合并时胜过主链中间态(同一单不会两异常态互比)。
+  "review-rejected": 6,
+  frozen: 6,
+  "address-invalid": 6,
+  "tx-failed": 6,
+  refunded: 6,
 };
 
 export function normalizeAccountKey(raw: string): string {

@@ -19,6 +19,13 @@ export const useConfig = defineStore("config", () => {
     onlineBonus: { ...DEFAULT_PLATFORM_CONFIG.onlineBonus },
     riskCluster: { ...DEFAULT_PLATFORM_CONFIG.riskCluster },
     withdrawRules: { ...DEFAULT_PLATFORM_CONFIG.withdrawRules },
+    rewards: {
+      welcomeGift: { ...DEFAULT_PLATFORM_CONFIG.rewards.welcomeGift },
+    },
+    riskScore: {
+      dimensionWeights: { ...DEFAULT_PLATFORM_CONFIG.riskScore.dimensionWeights },
+      weakSignalClusterThreshold: DEFAULT_PLATFORM_CONFIG.riskScore.weakSignalClusterThreshold,
+    },
     computeShare: {
       downloadUrl: DEFAULT_PLATFORM_CONFIG.computeShare.downloadUrl,
       content: { ...DEFAULT_PLATFORM_CONFIG.computeShare.content },
@@ -29,8 +36,19 @@ export const useConfig = defineStore("config", () => {
     },
   });
 
+  // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
+  // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
+  // PROD: GET /api/config/platform 失败/超时时由请求层置位。
+  const syncFailed = ref(false);
+
   function isEnabled(flag: FeatureFlagKey): boolean {
     return config.value.featureFlags[flag] === true;
+  }
+
+  // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
+  function _devSetConfigSyncFailed(value: boolean) {
+    if (IS_PRODUCTION) return;
+    syncFailed.value = value;
   }
 
   // ⚠️ MOCK-ONLY demo helper: lets reviewers flip a flag locally to preview a
@@ -56,5 +74,5 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, isEnabled, _devSetFlag, _devSetComputeShareContent };
+  return { config, syncFailed, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
