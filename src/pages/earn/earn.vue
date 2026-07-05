@@ -6,7 +6,7 @@
     PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
     → MissedIncomeBanner → TrialHeroBanner / TrialGhostSlot
     → "My Devices" header + slot rail + DeviceCardPC × N + add-device CTA
-    → DeviceLifecycleBanner → MarketBoard
+    → MarketBoard
     → TaskCenter.
 
   PillTabs + TotalEarnedCard inlined here (page-specific). Wrapped in
@@ -66,7 +66,6 @@
       </EmptySlotsHint>
 
       <ComputeShareEntry />
-      <DeviceLifecycleBanner />
       <!-- Loss-aversion — moved directly above the market board -->
       <MissedIncomeBanner />
       <MarketBoard />
@@ -85,7 +84,6 @@ import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
-import DeviceLifecycleBanner from "@/components/earn/device-lifecycle-banner.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
 import { useApp } from "@/store/app";
