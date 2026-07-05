@@ -25,16 +25,27 @@
     <style>
       html.nx-device-host,
       html.nx-device-host body {
+        --nx-device-host-bg:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 100%),
+          linear-gradient(180deg, #15171b 0%, #08090b 100%);
+        --nx-device-host-bg-size: 26px 26px, 100% 100%;
         width: 100%;
         height: 100%;
         min-height: 100%;
         margin: 0;
         overflow: hidden;
-        background:
-          linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 100%),
-          linear-gradient(180deg, #15171b 0%, #08090b 100%);
-        background-size: 26px 26px, 100% 100%;
+        background: var(--nx-device-host-bg);
+        background-size: var(--nx-device-host-bg-size);
         font-family: "General Sans", "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      html.nx-device-host[data-nx-app-theme="dark"],
+      html.nx-device-host[data-nx-app-theme="dark"] body {
+        --nx-device-host-bg:
+          linear-gradient(135deg, rgba(20, 28, 42, 0.045) 0 1px, transparent 1px 100%),
+          radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0) 54%),
+          linear-gradient(180deg, #f7f9fc 0%, #e8edf4 100%);
+        --nx-device-host-bg-size: 26px 26px, 100% 100%, 100% 100%;
       }
 
       .nx-device-stage {
@@ -120,6 +131,7 @@
         }
 
         document.documentElement.classList.add('nx-device-host')
+        document.documentElement.setAttribute('data-nx-app-theme', 'dark')
         var innerUrl = new URL(window.location.href)
         innerUrl.searchParams.set('nx_device_inner', '1')
         var safeSrc = innerUrl.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -175,7 +187,17 @@
           } catch {}
         }
 
+        function syncThemeFromFrame() {
+          var frame = document.getElementById('nx-app-frame')
+          if (!frame || !frame.contentDocument) return
+          try {
+            var mode = frame.contentDocument.documentElement.getAttribute('data-theme')
+            document.documentElement.setAttribute('data-nx-app-theme', mode === 'light' ? 'light' : 'dark')
+          } catch {}
+        }
+
         function syncRouteDrift() {
+          syncThemeFromFrame()
           if (window.location.hash !== lastHostHash) {
             syncFrameFromHost()
             return
@@ -188,6 +210,7 @@
           if (!frame) return
           frame.addEventListener('load', function () {
             syncFrameFromHost()
+            syncThemeFromFrame()
             try {
               frame.contentWindow.addEventListener('hashchange', syncHostFromFrame)
             } catch {}

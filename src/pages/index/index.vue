@@ -4,16 +4,17 @@
   sections). Built up zone by zone; sections live in src/components/home/*.vue
   and are assembled here inside the chassis + CardStagger entrance.
 
-  ZONE 1 (hook): Greeting → TechMoney → Trial entries → [Conversion → DayOne → LiveFeed]
+  ZONE 1 (hook): Greeting → TechMoney → active trial slot → [Conversion → DayOne → LiveFeed]
   ZONE 2-7: pending (status / AI bridge / rank / money / market / trust).
 -->
 <template>
   <AppChassis active="home">
     <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
       <!-- ZONE 1: hook — earned anchor + conversion stack + social proof -->
-      <GreetingHeader />
-      <TechMoneyCard />
-      <TrialPromoBanner />
+      <view class="home-earnings-cluster">
+        <GreetingHeader />
+        <TechMoneyCard />
+      </view>
       <TrialGhostSlot />
       <DayOneQuestCard />
       <ConversionBanner />
@@ -51,7 +52,6 @@ import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import GreetingHeader from "@/components/home/greeting-header.vue";
 import TechMoneyCard from "@/components/home/tech-money-card.vue";
-import TrialPromoBanner from "@/components/trial-promo-banner.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import ConversionBanner from "@/components/home/conversion-banner.vue";
 import DayOneQuestCard from "@/components/home/day-one-quest-card.vue";
@@ -75,3 +75,11 @@ onLoad(() => {
   locale.ensureSystemDetected();
 });
 </script>
+
+<style scoped>
+.home-earnings-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+</style>

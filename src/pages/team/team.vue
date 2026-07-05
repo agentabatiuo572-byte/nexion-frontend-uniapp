@@ -1,5 +1,5 @@
 <!--
-  Team — invitation network hub: royalty hero (V3+) → V-rank + upgrade progress → InviteEarnCard
+  Team — invitation network hub: InviteEarnCard → royalty hero (V3+) → V-rank + upgrade progress
   → leaderboard entry → 3-up quick-nav (influence / binary / leadership pool) →
   TeamLedgerCard → network composition → Genesis node → tool grid.
   Tab page → <AppChassis active="team">.
@@ -12,6 +12,9 @@
   <AppChassis active="team">
     <view class="pb-4" style="padding-top: 12px; color: var(--v5-ink)">
       <view class="px-4" style="display: flex; flex-direction: column; gap: 24px">
+        <!-- Invite hero -->
+        <InviteEarnCard />
+
         <!-- V3+ royalty hero -->
         <view v-if="myRank >= 3" class="rounded-2xl relative overflow-hidden active:opacity-95" :style="royaltyHeroStyle" @click="go('/pages/team/unilevel')">
           <view class="flex items-center font-mono-tabular" :style="royaltyCapStyle">
@@ -58,9 +61,6 @@
             </view>
           </view>
         </view>
-
-        <!-- Invite hero -->
-        <InviteEarnCard />
 
         <!-- Leaderboard entry -->
         <view class="relative overflow-hidden rounded-2xl active:opacity-95" :style="leaderboardCardStyle" @click="go('/pages/team/leaderboard')">

@@ -3,8 +3,9 @@
   Hybrid: V5 HERO (PillTabs + TotalEarnedCard) on top, V4 device-pool sections
   below. Conversion arc (earned → missed → trial escape → devices → fleet decay
   → market context → tier-locked tasks → footer):
-    PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
-    → MissedIncomeBanner → TrialHeroBanner / TrialGhostSlot
+    TrialHeroBanner / TrialGhostSlot
+    → PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
+    → MissedIncomeBanner
     → "My Devices" header + slot rail + DeviceCardPC × N + add-device CTA
     → MarketBoard
     → TaskCenter.
@@ -15,7 +16,17 @@
 -->
 <template>
   <AppChassis active="earn">
-    <CardStagger class="pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
+    <template #pageTop>
+      <CardStagger class="pt-3 space-y-6" style="color: var(--v5-ink)">
+        <!-- Trial entries -->
+        <view class="mx-4">
+          <TrialHeroBanner class="w-full" />
+        </view>
+        <TrialGhostSlot class="mx-4" />
+      </CardStagger>
+    </template>
+
+    <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">
         <view class="flex gap-0.5" style="background: var(--v5-surface-2); border-radius: 12px; padding: 3px">
@@ -48,12 +59,6 @@
           </view>
         </view>
       </view>
-
-      <!-- Trial entries -->
-      <view class="mx-4">
-        <TrialHeroBanner class="w-full" />
-      </view>
-      <TrialGhostSlot class="mx-4" />
 
       <!-- My devices header -->
       <view class="mx-4 mt-2 mb-1 px-1 flex items-center justify-between">

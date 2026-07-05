@@ -182,7 +182,7 @@ const totalAccrued = computed(() => {
       return s + p.amountUSDT * p.apy * yrs;
     }, 0);
 });
-const todayAccrued = computed(() => activePositions.value.reduce((s, p) => s + (p.amountUSDT * p.apy) / 365, 0));
+const todayAccrued = computed(() => staking.todayAccruedUSDT());
 const avgAPY = computed(() => {
   if (totalLocked.value === 0) return 0;
   const w = activePositions.value.reduce((s, p) => s + p.amountUSDT * p.apy, 0);

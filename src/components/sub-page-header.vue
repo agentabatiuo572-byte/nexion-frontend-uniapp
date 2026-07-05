@@ -38,6 +38,7 @@ import { useNotifications } from "@/store/notifications";
 import { useT } from "@/i18n/use-t";
 import { resolveHeaderTitleText } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
+import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const props = defineProps<{ back: string; title?: string; subtitle?: string }>();
 
@@ -63,7 +64,7 @@ function readRoute(): string {
 // Mirrors Nexion-prototype header.tsx computeTitle.
 const displayTitle = computed(() => props.title ?? resolveHeaderTitleText(readRoute(), t.value.headerTitles));
 const statusBarHeight = computed(() => {
-  try { return uni.getSystemInfoSync().statusBarHeight || 0; } catch { return 0; }
+  try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); }
 });
 
 function goBack() {

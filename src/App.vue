@@ -20,6 +20,7 @@ import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
+import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -562,10 +563,9 @@ function ensureBusinessLoopsAllowed(): boolean {
 }
 
 onLaunch(() => {
-  // Nexion is a dark-default design system (matches prototype theme-provider:
-  // SSR renders <html data-theme="dark">). Apply on H5; App theming at packaging.
+  // Nexion defaults dark, but the persisted user choice drives H5 after launch.
   // #ifdef H5
-  document.documentElement.setAttribute("data-theme", "dark");
+  document.documentElement.setAttribute("data-theme", useTheme().mode);
   // #endif
   if (isStaticReviewRoute(readCurrentRouteOrHash())) {
     stopBusinessLoops();

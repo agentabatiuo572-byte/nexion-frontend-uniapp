@@ -113,6 +113,12 @@ export const useStaking = defineStore("staking", () => {
       }, 0);
   }
 
+  function todayAccruedUSDT() {
+    return positions.value
+      .filter((p) => p.status === "active")
+      .reduce((s, p) => s + (p.amountUSDT * p.apy) / 365, 0);
+  }
+
   function activeCount() {
     return positions.value.filter((p) => p.status === "active").length;
   }
@@ -182,6 +188,7 @@ export const useStaking = defineStore("staking", () => {
     positions,
     totalLocked,
     totalEarnedSoFar,
+    todayAccruedUSDT,
     activeCount,
     stake,
     earlyWithdraw,

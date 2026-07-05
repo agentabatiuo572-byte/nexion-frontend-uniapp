@@ -1,9 +1,9 @@
 <!--
   TechMoneyCard — ZONE 1 home hero "Today's earnings" (ported from
-  mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining
-  (earnings.today) + team commission credited since midnight (commission
-  .todayUSDT()). surface-2 base + aurora + tech-grid + drifting dots make it the
-  conversion focal point. Big streaming number + peer-avg / payback footer.
+  mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining,
+  team commission, staking accrual, and Genesis holder dividends. surface-2
+  base + aurora + tech-grid + drifting dots make it the conversion focal point.
+  Big streaming number + peer-avg / payback footer.
   Source hardcoded the labels; ported to t.home.tech* for bilingual parity.
 -->
 <template>
@@ -51,15 +51,21 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
+import { useGenesis } from "@/store/genesis";
+import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
+const staking = useStaking();
+const genesis = useGenesis();
 
-const earningsToday = computed(() => app.earnings.today);
-const commissionToday = computed(() => commission.todayUSDT());
-const todayTotal = computed(() => earningsToday.value + commissionToday.value);
+const computeToday = computed(() => app.earnings.today);
+const teamToday = computed(() => commission.todayUSDT());
+const stakingToday = computed(() => staking.todayAccruedUSDT());
+const genesisToday = computed(() => genesis.myOwned * genesis.currentDailyDividendPerNodeUSDT());
+const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value + genesisToday.value);
 
 // Streaming number — ticks up; resyncs on a material jump (new commission / day rollover).
 const display = useTicker(() => Math.max(todayTotal.value, 0.06), 0.0009, 1100);
