@@ -45,7 +45,7 @@
             <text class="block truncate" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.requires }} <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-tech-cyan)">{{ teaser.minVRAM }}GB VRAM</text> · {{ teaser.unlockTier }}</text>
           </view>
           <view class="text-right shrink-0">
-            <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand); font-weight: 600; line-height: 1">+${{ teaser.dailyPotentialUSD.toLocaleString() }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ teaser.dailyPotentialUSD.toLocaleString() }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
             <view class="flex items-center justify-end gap-0.5" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 4px">
               <text>{{ t.earn.upgradeNow }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
@@ -73,7 +73,7 @@
       <view v-for="(task, i) in allRecent" :key="i" class="flex items-center justify-between gap-2" style="font-size: 12px">
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
         <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ task.type }}</text></text>
-        <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-brand)">+${{ task.reward.toFixed(3) }}</text>
+        <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning)">+${{ task.reward.toFixed(3) }}</text>
         <text class="text-right shrink-0" style="font-size: 11.5px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
         <view v-if="receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>

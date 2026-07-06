@@ -10,7 +10,7 @@
       <view :style="dotStyle" />
       <text class="block" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-ink); letter-spacing: -0.01em">{{ device.name }}</text>
     </view>
-    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-success); margin-left: 12px">+${{ todayText }}</text>
+    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-warning); margin-left: 12px">+${{ todayText }}</text>
   </view>
 </template>
 

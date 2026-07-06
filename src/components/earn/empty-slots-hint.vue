@@ -10,7 +10,7 @@
       <view class="grid grid-cols-6 gap-1.5">
         <view v-for="(slot, i) in slotCells" :key="i" :style="slotTileStyle(slot)" class="relative grid place-items-center overflow-hidden">
           <template v-if="slot.kind === 'filled'">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path :d="deviceIconPath(slot.deviceKind)" />
               <template v-if="slot.deviceKind === 'phone'"><path d="M12 18h.01" /></template>
             </svg>
@@ -19,7 +19,7 @@
 
           <template v-else-if="slot.kind === 'trial'">
             <view class="absolute inset-x-0 top-0 grid place-items-center" style="bottom: 13px">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
                 <path d="m3.3 7 8.7 5 8.7-5" />
                 <path d="M12 22V12" />
@@ -30,7 +30,7 @@
           </template>
 
           <template v-else>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12h14" />
               <path d="M12 5v14" />
             </svg>
@@ -121,14 +121,14 @@ function liveDotStyle(color: string): CSSProperties {
 
 function slotTileStyle(slot: SlotCell): CSSProperties {
   if (slot.kind === "filled") {
-    return { height: "44px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
+    return { aspectRatio: "1 / 1", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
   }
   if (slot.kind === "trial") {
-    return { height: "44px", borderRadius: "12px", background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)" };
+    return { aspectRatio: "1 / 1", borderRadius: "8px", background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)" };
   }
   return {
-    height: "44px",
-    borderRadius: "12px",
+    aspectRatio: "1 / 1",
+    borderRadius: "8px",
     border: "1px dashed color-mix(in srgb, var(--v5-tech-cyan) 45%, transparent)",
     background: "color-mix(in srgb, var(--v5-tech-cyan) 6%, transparent)",
   };

@@ -2819,7 +2819,7 @@ export const en = {
     royaltyHeroSubtitle: "Direct + Network Yield Bonus this month",
     invite: "Invite & earn",
     twoWayGift: "You +200 · friend +{nex} NEX",
-    yourRank: "Your rank",
+    yourRank: "My rank",
     directBonus: "Direct bonus",
     extendedRoyalty: "Extended royalty",
     directLabel: "Direct",
@@ -2854,7 +2854,7 @@ export const en = {
       genealogySubtitle: "Direct & extended members · Track A/B",
     },
     genesis: {
-      label: "Genesis Node · limited",
+      label: "Genesis Node limited",
       headline: "Permanent share of network volume",
       priceLine: "$9,999 · ~$1.5K/mo yield",
       remaining: "~150 left of 1,000",

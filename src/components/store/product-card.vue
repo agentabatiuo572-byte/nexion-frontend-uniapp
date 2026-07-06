@@ -66,7 +66,7 @@
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
           <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
-          <text class="font-mono-tabular tabular-nums" style="font-size: 13.5px; color: var(--v5-brand); font-weight: 500">{{ nexPerDayText }}</text>
+          <text class="font-mono-tabular tabular-nums" style="font-size: 13.5px; color: var(--v5-warning); font-weight: 500">{{ nexPerDayText }}</text>
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
 
@@ -302,13 +302,13 @@ const earnEyebrowStyle: CSSProperties = {
   fontSize: "10.5px",
   fontWeight: 500,
   letterSpacing: "0.08em",
-  color: "var(--v5-success)",
+  color: "var(--v5-warning)",
 };
 const bigEarnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "26px",
-  color: "var(--v5-success)",
+  color: "var(--v5-warning)",
   letterSpacing: "-0.022em",
   lineHeight: 1,
 };

@@ -62,8 +62,8 @@
 
       <!-- My devices header -->
       <view class="mx-4 mt-2 mb-1 px-1 flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.myDevices }}</text>
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ devices.length + trialSlot }} / {{ MAX_DEVICES }}</text>
+        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
       <EmptySlotsHint>
@@ -92,9 +92,8 @@ import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
 import { useApp } from "@/store/app";
-import { MAX_DEVICES } from "@/store/device-types";
-import { trialReservesSlotNow } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -111,7 +110,7 @@ function toggleDevice(id: string) {
 
 // Earn shows ACTIVE fleet only (inventory lives in /me/devices).
 const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
+const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, { n: devices.value.length }));
 
 // ── HERO total earned ──
 const total = computed(() => {

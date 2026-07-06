@@ -68,13 +68,13 @@
 
         <!-- === Section 1.5: Cloud Share daily output (entry device — same earning model as the card) === -->
         <view v-if="isShare" class="mx-4 mt-3 rounded-2xl border" style="padding: 16px 18px; background: var(--v5-surface); border-color: var(--v5-border)">
-          <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-success)">
+          <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
             <text>{{ t.store.cardYouEarn }}</text>
           </view>
           <view class="flex items-baseline flex-wrap" style="margin-top: 6px; gap: 8px">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 30px; color: var(--v5-success); letter-spacing: -0.022em; line-height: 1">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
-            <text class="font-mono-tabular tabular-nums" style="margin-left: auto; font-size: 12.5px; color: var(--v5-brand); font-weight: 500">+{{ product.dailyEarnNEX }} NEX/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 30px; color: var(--v5-warning); letter-spacing: -0.022em; line-height: 1">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+            <text class="font-mono-tabular tabular-nums" style="margin-left: auto; font-size: 12.5px; color: var(--v5-warning); font-weight: 500">+{{ product.dailyEarnNEX }} NEX/d</text>
           </view>
         </view>
 
@@ -83,10 +83,10 @@
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5)">$0.06/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">$0.06/d</text>
           </view>
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
-          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-brand)">
+          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-warning)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
             <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}/d</text>
           </view>
@@ -125,7 +125,7 @@
               </view>
               <view :style="roiCellStyle(2)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detAnnual }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('ink')">${{ annualYieldText }}</text>
+                <text class="block tabular-nums" :style="roiValStyle('success')">${{ annualYieldText }}</text>
                 <text class="block" :style="roiSubStyle">{{ annualPctText }}{{ t.store.detRoiSuffix }}</text>
               </view>
               <view :style="roiCellStyle(3)">
@@ -553,7 +553,7 @@ function roiCellStyle(index: number): CSSProperties {
 const roiLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)" };
 function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
-    tone === "success" ? "var(--v5-success)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
+    tone === "success" ? "var(--v5-warning)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
     fontFamily: "var(--font-v5)",
     fontSize: "20px",

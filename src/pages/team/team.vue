@@ -1,6 +1,6 @@
 <!--
-  Team — invitation network hub: InviteEarnCard → royalty hero (V3+) → V-rank + upgrade progress
-  → leaderboard entry → 3-up quick-nav (influence / binary / leadership pool) →
+  Team — invitation network hub: InviteEarnCard → royalty hero (V3+) → V-rank summary
+  → unified quick-nav (leaderboard / royalty network / binary / leadership pool / genesis) →
   TeamLedgerCard → network composition → Genesis node → tool grid.
   Tab page → <AppChassis active="team">.
   Reuses v-rank / network / commission / leadership-pool stores (all ported).
@@ -29,94 +29,121 @@
           </view>
         </view>
 
-        <!-- My V-rank + upgrade progress -->
+        <!-- My V-rank summary -->
         <view class="nx-team-rank-link relative overflow-hidden rounded-2xl active:opacity-95" :style="rankCardStyle" @click="go('/pages/team/rank')">
           <NetworkOrbBackdrop :opacity="0.32" />
-          <view class="relative flex items-start justify-between">
-            <view>
-              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-tech-cyan)' }">{{ t.teamV3.yourRank }}</text>
-              <view style="margin-top: 6px">
-                <VBadge :v="myRank" size="lg" />
+          <view class="relative" :style="rankContentStyle">
+            <view :style="rankHeaderStyle">
+              <text class="font-mono-tabular" :style="rankTitleStyle">{{ t.teamV3.yourRank }}</text>
+              <view :style="rankArrowStyle">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
               </view>
-              <text class="block" :style="rankBonusStyle">
-                {{ t.teamV3.directBonus }} {{ Math.round(myRankDef.directBonus * 100) }}%{{ myRankDef.unilevelDepth > 1 ? ` · ${t.teamV3.extendedRoyalty}` : "" }}
-              </text>
             </view>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 6px"><path d="m9 18 6-6-6-6" /></svg>
-          </view>
 
-          <view v-if="rankInfo.next" class="relative" style="margin-top: 16px">
-            <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 6px">
-              <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.teamV3.next }} <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">V{{ rankInfo.next.v }} {{ rankInfo.next.title }}</text></text>
-              <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">{{ Math.round(rankInfo.progressPct * 100) }}%</text>
-            </view>
-            <view class="rounded-full overflow-hidden" :style="rankBarTrackStyle">
-              <view :style="rankBarFillStyle" />
-            </view>
-            <text v-if="rankInfo.missing.length > 0" class="block" :style="missingStyle">
-              {{ t.teamV3.need }} {{ rankInfo.missing.join(" · ") }}
-            </text>
-            <view v-if="rankInfo.next.cultivationBonus > 0" class="inline-flex items-center" :style="prizeChipStyle">
-              <text>{{ t.teamV3.prize }} 🎁 {{ rankInfo.next.cultivationBonus.toLocaleString() }} NEX</text>
+            <view :style="rankBodyStyle">
+              <view :style="rankLevelWrapStyle">
+                <text class="font-display tabular-nums" :style="rankLevelTextStyle">{{ myRankDisplay }}</text>
+              </view>
+              <view v-if="rankInfo.next?.cultivationBonus" :style="rankDividerStyle" />
+              <view v-if="rankInfo.next?.cultivationBonus" :style="rankPrizeWrapStyle">
+                <text class="font-mono-tabular" :style="rankPrizeLabelStyle">{{ t.teamV3.prize }}</text>
+                <text class="font-display tabular-nums" :style="rankPrizeValueStyle">{{ rankInfo.next.cultivationBonus.toLocaleString() }} NEX</text>
+              </view>
             </view>
           </view>
         </view>
 
-        <!-- Leaderboard entry -->
-        <view class="relative overflow-hidden rounded-2xl active:opacity-95" :style="leaderboardCardStyle" @click="go('/pages/team/leaderboard')">
-          <view class="flex items-center" style="gap: 12px">
-            <view class="rounded-xl grid place-items-center shrink-0" :style="trophyIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
+        <!-- Unified quick nav -->
+        <view class="nx-team-quick-panel rounded-2xl overflow-hidden" :style="quickPanelStyle">
+          <!-- Leaderboard -->
+          <view class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
+            <view :style="quickRowMainStyle">
+              <view :style="quickIconStyle('var(--v5-warning)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.leaderboardCard.title }}</text>
+                <text class="block" :style="quickRowMetaStyle">{{ t.teamV3.leaderboardCard.subtitle }}</text>
+              </view>
             </view>
-            <view class="flex-1 min-w-0">
-              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-warning)' }">{{ t.teamV3.leaderboardCard.title }}</text>
-              <text class="block" :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)', marginTop: '2px' }">{{ t.teamV3.leaderboardCard.subtitle }}</text>
+            <view :style="quickRowValueWrapStyle">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </view>
-        </view>
 
-        <!-- 3-up quick nav -->
-        <view class="grid grid-cols-3" style="gap: 8px">
-          <!-- Influence -->
-          <view class="rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/unilevel')">
-            <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
+          <view :style="quickDividerStyle" />
+
+          <!-- Royalty network -->
+          <view class="nx-team-royalty-network-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/unilevel')">
+            <view :style="quickRowMainStyle">
+              <view :style="quickIconStyle('var(--v5-brand)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.sevenLayerNetwork }}</text>
+                <text class="block" :style="quickRowMetaStyle">{{ t.teamV3.directLabel }} · {{ directCount }}  /  {{ t.teamV3.extendedLabel }} · {{ totalMembersCount - directCount }}</text>
+              </view>
             </view>
-            <text class="block font-display tabular-nums" :style="quickBigStyle">{{ totalMembersCount }}</text>
-            <text class="block" :style="quickLabelStyle">{{ t.teamV3.sevenLayerNetwork }}</text>
-            <view class="font-mono-tabular tabular-nums" :style="quickSubStyle">
-              <text class="block">{{ t.teamV3.directLabel }} · {{ directCount }}</text>
-              <text class="block">{{ t.teamV3.extendedLabel }} · {{ totalMembersCount - directCount }}</text>
+            <view :style="quickRowValueWrapStyle">
+              <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ totalMembersCount }}</text>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
+
+          <view :style="quickDividerStyle" />
 
           <!-- Binary -->
-          <view class="nx-team-binary-link rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/binary')">
-            <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
+          <view class="nx-team-binary-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/binary')">
+            <view :style="quickRowMainStyle">
+              <view :style="quickIconStyle('var(--v5-warning)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.todayMatch }}</text>
+                <text class="block" :style="quickRowMetaStyle">A · ${{ leftVol.toFixed(0) }}  /  B · ${{ rightVol.toFixed(0) }}</text>
+              </view>
             </view>
-            <text class="block font-display tabular-nums" :style="quickBigWarnStyle">+${{ binaryMatch.toFixed(2) }}</text>
-            <text class="block" :style="quickLabelStyle">{{ t.teamV3.todayMatch }}</text>
-            <view class="font-mono-tabular tabular-nums" :style="quickSubStyle">
-              <text class="block">A · ${{ leftVol.toFixed(0) }}</text>
-              <text class="block">B · ${{ rightVol.toFixed(0) }}</text>
+            <view :style="quickRowValueWrapStyle">
+              <text class="font-display tabular-nums" :style="quickRowValueWarnStyle">+${{ binaryMatch.toFixed(2) }}</text>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
 
+          <view :style="quickDividerStyle" />
+
           <!-- Leadership pool -->
-          <view class="nx-team-leadership-pool-link rounded-2xl active:opacity-95" :style="quickNavStyle" @click="go('/pages/team/leadership-pool')">
-            <view class="flex items-start justify-between">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
+          <view class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
+            <view :style="quickRowMainStyle">
+              <view :style="quickIconStyle('var(--v5-tech-cyan)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.weeklyPool }}</text>
+                <text class="block" :style="quickRowMetaStyle">{{ leadershipPoolLineA }}  /  {{ leadershipPoolLineB }}</text>
+              </view>
             </view>
-            <text class="block font-display tabular-nums" :style="quickBigStyle">${{ projectedPayout.toFixed(2) }}</text>
-            <text class="block" :style="quickLabelStyle">{{ t.teamV3.weeklyPool }}</text>
-            <view class="font-mono-tabular tabular-nums" :style="quickSubStyle">
-              <text class="block">{{ myVotes }} {{ t.teamV3.votes }}</text>
-              <text class="block">{{ (myShare * 100).toFixed(2) }}%</text>
+            <view :style="quickRowValueWrapStyle">
+              <text class="font-display tabular-nums" :style="quickRowValueWarnStyle">{{ leadershipPoolPrimary }}</text>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+            </view>
+          </view>
+
+          <view :style="quickDividerStyle" />
+
+          <!-- Genesis node -->
+          <view class="nx-team-genesis-link active:opacity-95" :style="quickGenesisRowStyle" @click="go('/pages/genesis/genesis')">
+            <view :style="quickGenesisMainStyle">
+              <view :style="quickIconStyle('var(--v5-brand-2)')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+              </view>
+              <view class="flex-1 min-w-0">
+                <text class="block font-display" :style="quickGenesisTitleStyle">{{ t.teamV3.genesis.headline }}</text>
+                <text class="block font-mono-tabular" :style="quickGenesisMetaStyle">{{ t.teamV3.genesis.remaining }}</text>
+              </view>
+            </view>
+            <view :style="quickGenesisActionStyle">
+              <text class="font-mono-tabular" :style="quickGenesisLabelStyle">{{ t.teamV3.genesis.label }}</text>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
         </view>
@@ -132,50 +159,6 @@
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
         />
-
-        <!-- Network composition -->
-        <view class="rounded-2xl active:opacity-95" :style="compositionCardStyle" @click="go('/pages/team/unilevel')">
-          <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ t.teamV3.networkComposition }}</text>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-          </view>
-          <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
-            <view class="flex items-center" style="gap: 8px; font-size: 11.5px">
-              <text :style="{ width: '80px', color: 'var(--v5-brand)', fontWeight: 600 }">{{ t.teamV3.directLabel }}</text>
-              <view class="flex-1 rounded-full overflow-hidden" :style="compBarTrackStyle">
-                <view class="h-full rounded-full" :style="{ width: directBarPct + '%', background: 'linear-gradient(to right, color-mix(in srgb, var(--v5-brand) 70%, transparent), var(--v5-brand))' }" />
-              </view>
-              <text class="text-right font-mono-tabular tabular-nums" :style="{ width: '32px' }">{{ directCount }}</text>
-            </view>
-            <view class="flex items-center" style="gap: 8px; font-size: 11.5px">
-              <text :style="{ width: '80px', color: 'var(--v5-tech-cyan)', fontWeight: 600 }">{{ t.teamV3.extendedLabel }}</text>
-              <view class="flex-1 rounded-full overflow-hidden" :style="compBarTrackStyle">
-                <view class="h-full rounded-full" :style="{ width: extendedBarPct + '%', background: 'linear-gradient(to right, color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent), var(--v5-tech-cyan))' }" />
-              </view>
-              <text class="text-right font-mono-tabular tabular-nums" :style="{ width: '32px' }">{{ extendedCount }}</text>
-            </view>
-          </view>
-        </view>
-
-        <!-- Genesis node -->
-        <view class="relative overflow-hidden rounded-2xl active:opacity-95" :style="genesisCardStyle" @click="go('/pages/genesis/genesis')">
-          <view class="flex items-start justify-between">
-            <view class="flex items-center" style="gap: 8px">
-              <view class="rounded-xl grid place-items-center" :style="genesisIconStyle">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
-              </view>
-              <view>
-                <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-brand-2)' }">{{ t.teamV3.genesis.label }}</text>
-                <text class="block font-display" :style="{ fontSize: '15px', fontWeight: 600, lineHeight: 1.2, marginTop: '2px' }">{{ t.teamV3.genesis.headline }}</text>
-              </view>
-            </view>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 6px"><path d="m9 18 6-6-6-6" /></svg>
-          </view>
-          <view class="flex items-center justify-between font-mono-tabular" style="margin-top: 12px; font-size: 11px">
-            <text :style="{ color: 'var(--v5-ink-2)' }">{{ t.teamV3.genesis.priceLine }}</text>
-            <text :style="{ color: 'var(--v5-warning)' }">{{ t.teamV3.genesis.remaining }}</text>
-          </view>
-        </view>
 
         <!-- Team tools -->
         <view class="grid" :style="toolGridStyle">
@@ -226,9 +209,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
-import VBadge from "@/components/team/v-badge.vue";
 import InviteEarnCard from "@/components/team/invite-earn-card.vue";
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
 import NetworkOrbBackdrop from "@/components/team/network-orb-backdrop.vue";
@@ -245,7 +227,7 @@ const commission = useCommission();
 const pool = useLeadershipPool();
 
 const myRank = computed(() => vrank.myRank);
-const myRankDef = computed(() => V_RANKS[vrank.myRank]);
+const myRankDisplay = computed(() => `V${vrank.myRank} ${V_RANKS[vrank.myRank].title}`);
 const members = computed(() => network.members);
 const totalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
@@ -260,21 +242,11 @@ const rankInfo = computed(() =>
   }),
 );
 
-// Scroll-grow bar → simple in-view fill (animate on mount via transition).
-const rankBarFilled = ref(false);
-onMounted(() => {
-  // next tick paint then expand
-  setTimeout(() => (rankBarFilled.value = true), 60);
-});
-
 const byLayerBuckets = computed(() => network.byLayer());
 const directCount = computed(() => byLayerBuckets.value[1].length);
 const extendedCount = computed(() =>
   ([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0),
 );
-const compTotal = computed(() => Math.max(1, directCount.value + extendedCount.value));
-const directBarPct = computed(() => (directCount.value / compTotal.value) * 100);
-const extendedBarPct = computed(() => (extendedCount.value / compTotal.value) * 100);
 
 // Commission month aggregates (30d) + direct/extended split.
 const ledger = computed(() => {
@@ -318,6 +290,17 @@ const rightVol = computed(() => binary.value.rightVol);
 const myVotes = computed(() => pool.myVotes(vrank.myRank));
 const myShare = computed(() => pool.mySharePct(vrank.myRank));
 const projectedPayout = computed(() => pool.myProjectedPayout(vrank.myRank));
+const leadershipPoolUnlocked = computed(() => myVotes.value > 0);
+const leadershipPoolKText = computed(() => (pool.currentWeekPoolUSDT / 1000).toFixed(1));
+const leadershipPoolPrimary = computed(() =>
+  leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value}K`,
+);
+const leadershipPoolLineA = computed(() =>
+  leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : t.value.home.poolV3Unlock,
+);
+const leadershipPoolLineB = computed(() =>
+  leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
+);
 
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
@@ -345,64 +328,138 @@ const royaltySubStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", col
 
 const rankCardStyle: CSSProperties = {
   padding: "16px",
-  background: "radial-gradient(80% 60% at 80% 0%, var(--v5-tech-cyan-soft) 0%, transparent 65%), var(--v5-surface)",
+  background: "var(--v5-surface)",
 };
-const rankBonusStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "6px" };
-const rankBarTrackStyle: CSSProperties = { height: "6px", background: "var(--v5-surface-3)" };
-const rankBarFillStyle = computed<CSSProperties>(() => ({
-  height: "100%",
+const rankContentStyle: CSSProperties = {
+  minHeight: "104px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
+  gap: "16px",
+};
+const rankHeaderStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+const rankTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
+const rankArrowStyle: CSSProperties = {
+  width: "28px",
+  height: "28px",
+  display: "grid",
+  placeItems: "center",
   borderRadius: "999px",
-  background: "linear-gradient(to right, var(--v5-tech-cyan), var(--v5-brand))",
-  width: rankBarFilled.value ? `${rankInfo.value.progressPct * 100}%` : "0%",
-  transition: rankBarFilled.value ? "width 1.1s cubic-bezier(0.16,1,0.3,1)" : "none",
-}));
-const missingStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
-const prizeChipStyle: CSSProperties = {
-  marginTop: "10px",
-  gap: "4px",
-  padding: "4px 8px",
-  borderRadius: "6px",
-  background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
-  color: "var(--v5-brand)",
-  fontSize: "10.5px",
+  background: "color-mix(in srgb, var(--v5-ink) 5%, transparent)",
+};
+const rankBodyStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "minmax(0, 1fr) 1px minmax(0, 1fr)",
+  alignItems: "center",
+  gap: "14px",
+};
+const rankLevelWrapStyle: CSSProperties = {
+  minHeight: "44px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "flex-start",
+};
+const rankLevelTextStyle: CSSProperties = {
+  fontSize: "18px",
   fontWeight: 600,
+  lineHeight: 1,
+  color: "var(--v5-ink)",
+  whiteSpace: "nowrap",
+};
+const rankDividerStyle: CSSProperties = {
+  width: "1px",
+  height: "34px",
+  background: "color-mix(in srgb, var(--v5-ink) 12%, transparent)",
+};
+const rankPrizeWrapStyle: CSSProperties = {
+  minHeight: "44px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  justifyContent: "center",
+};
+const rankPrizeLabelStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)", lineHeight: 1.1 };
+const rankPrizeValueStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "14px",
+  fontWeight: 600,
+  lineHeight: 1,
+  color: "var(--v5-ink)",
+  whiteSpace: "nowrap",
 };
 
-const leaderboardCardStyle: CSSProperties = {
-  padding: "16px",
+const quickPanelStyle: CSSProperties = {
   background: "var(--v5-surface)",
+  border: "1px solid var(--v5-border)",
 };
-const trophyIconStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)",
-};
-
-const quickNavStyle: CSSProperties = {
+const quickRowStyle: CSSProperties = {
+  minHeight: "74px",
   padding: "14px",
-  background: "var(--v5-surface)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: "12px",
 };
-const quickBigStyle: CSSProperties = { marginTop: "10px", fontSize: "18px", fontWeight: 600, lineHeight: 1 };
-const quickBigWarnStyle: CSSProperties = { marginTop: "10px", fontSize: "18px", fontWeight: 600, lineHeight: 1, color: "var(--v5-warning)" };
-const quickLabelStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "4px" };
-const quickSubStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "6px", lineHeight: 1.4 };
-
-const compositionCardStyle: CSSProperties = {
-  padding: "16px",
-  background: "var(--v5-surface)",
-  borderRadius: "16px",
+const quickRowMainStyle: CSSProperties = {
+  minWidth: 0,
+  flex: 1,
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
 };
-const compBarTrackStyle: CSSProperties = { height: "8px", background: "var(--v5-surface-3)" };
-
-const genesisCardStyle: CSSProperties = {
-  padding: "16px",
-  background: "var(--v5-surface)",
+function quickIconStyle(color: string): CSSProperties {
+  return {
+    width: "36px",
+    height: "36px",
+    borderRadius: "12px",
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+  };
+}
+const quickRowTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, lineHeight: 1.2, color: "var(--v5-ink)" };
+const quickRowMetaStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "11px",
+  lineHeight: 1.35,
+  color: "var(--v5-ink-3)",
+  whiteSpace: "normal",
 };
-const genesisIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
+const quickRowValueWrapStyle: CSSProperties = {
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
 };
+const quickRowValueStyle: CSSProperties = { fontSize: "17px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)", whiteSpace: "nowrap" };
+const quickRowValueWarnStyle: CSSProperties = { ...quickRowValueStyle, color: "var(--v5-warning)" };
+const quickDividerStyle: CSSProperties = {
+  height: "1px",
+  marginLeft: "62px",
+  background: "var(--v5-border)",
+};
+const quickGenesisRowStyle: CSSProperties = {
+  ...quickRowStyle,
+  minHeight: "96px",
+};
+const quickGenesisMainStyle: CSSProperties = {
+  ...quickRowMainStyle,
+  alignItems: "center",
+};
+const quickGenesisActionStyle: CSSProperties = {
+  flexShrink: 0,
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+const quickGenesisLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.2, whiteSpace: "nowrap" };
+const quickGenesisTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, lineHeight: 1.2, color: "var(--v5-ink)" };
+const quickGenesisMetaStyle: CSSProperties = { marginTop: "5px", fontSize: "11px", color: "var(--v5-warning)", lineHeight: 1.2 };
 
 const toolGridStyle: CSSProperties = {
   display: "grid",

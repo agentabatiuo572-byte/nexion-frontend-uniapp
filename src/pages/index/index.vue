@@ -5,7 +5,7 @@
   and are assembled here inside the chassis + CardStagger entrance.
 
   ZONE 1 (hook): Greeting → TechMoney → active trial slot → [Conversion → DayOne → LiveFeed]
-  ZONE 2-7: pending (status / AI bridge / rank / money / market / trust).
+  ZONE 2-7: pending (status / AI bridge / money / market / trust).
 -->
 <template>
   <AppChassis active="home">
@@ -28,9 +28,6 @@
 
       <!-- ZONE 3: AI advisor bridge -->
       <NovaCardSlot />
-
-      <!-- ZONE 4: rank & team -->
-      <LeadershipPoolCard />
 
       <!-- ZONE 5: money & ROI -->
       <DoTheMathCard />
@@ -61,7 +58,6 @@ import MyFleetSection from "@/components/home/my-fleet-section.vue";
 import OnGridSection from "@/components/home/on-grid-section.vue";
 import NetworkPulseCard from "@/components/home/network-pulse-card.vue";
 import NovaCardSlot from "@/components/home/nova-card-slot.vue";
-import LeadershipPoolCard from "@/components/home/leadership-pool-card.vue";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
 import NexPriceCard from "@/components/home/nex-price-card.vue";

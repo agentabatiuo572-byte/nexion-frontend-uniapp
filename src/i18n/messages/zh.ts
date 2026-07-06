@@ -2766,7 +2766,7 @@ export const zh: Messages = {
     royaltyHeroSubtitle: "本月直接版税 + 网络收益奖金合计",
     invite: "邀请赚币",
     twoWayGift: "你 +200 · 朋友 +{nex} NEX",
-    yourRank: "你的等级",
+    yourRank: "我的等级",
     directBonus: "直推奖",
     extendedRoyalty: "扩展网络版税",
     directLabel: "直推",
@@ -2801,7 +2801,7 @@ export const zh: Messages = {
       genealogySubtitle: "直推 & 扩展成员 · 双轨拆分",
     },
     genesis: {
-      label: "创世节点 · 限量",
+      label: "创世节点 限量",
       headline: "永久分享网络成交额",
       priceLine: "$9,999 · ~$1.5K/月收益",
       remaining: "1,000 张剩约 150",

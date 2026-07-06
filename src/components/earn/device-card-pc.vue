@@ -53,7 +53,7 @@
       </view>
       <view class="flex items-center gap-2.5 shrink-0">
         <view class="text-right">
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 18px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 18px; line-height: 1; font-weight: 600; color: var(--v5-warning); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
           <text class="block" style="font-size: 10px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
         </view>
         <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
@@ -168,7 +168,7 @@
       </view>
       <view class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
-        <text style="color: var(--v5-brand)">{{ t.earn.reward }} +${{ task.reward.toFixed(3) }}</text>
+        <text style="color: var(--v5-warning)">{{ t.earn.reward }} +${{ task.reward.toFixed(3) }}</text>
       </view>
     </view>
 
@@ -200,7 +200,7 @@
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-brand-2); line-height: 1">−${{ lockedTotalDaily }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning); line-height: 1">−${{ lockedTotalDaily }}</text>
         <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
       <view class="space-y-1.5">
@@ -210,7 +210,7 @@
             <text class="truncate">{{ it.model }}</text>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; color: var(--v5-brand); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
             <text class="tabular-nums text-right" style="font-size: 10.5px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 40px">{{ it.vram }}</text>
           </view>
         </view>
@@ -224,9 +224,9 @@
     <view style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
-        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-tech-cyan); font-weight: 600">
-          <text style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-tech-cyan) 75%, transparent)">+</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-warning); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
+        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">
+          <text style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-warning) 75%, transparent)">+</text>
           <text>{{ device.todayEarningsNEX.toFixed(1) }} NEX</text>
         </view>
       </view>

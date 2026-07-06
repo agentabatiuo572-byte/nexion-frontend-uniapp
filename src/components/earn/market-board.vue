@@ -28,7 +28,6 @@
         :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
       >
         <view class="flex items-center gap-2.5">
-          <text class="shrink-0 text-center" style="font-size: 14px; width: 20px">{{ w.emoji }}</text>
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
               <text class="truncate" style="font-size: 12.5px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
@@ -55,13 +54,11 @@
         :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
         @click="d.kind ? goDetail(d.kind) : undefined"
       >
-        <text class="tabular-nums text-center shrink-0" style="font-family: var(--font-v5); font-size: 11px; color: var(--v5-ink-4); width: 16px">{{ d.rank }}</text>
-        <text class="shrink-0 text-center" style="font-size: 14px; width: 20px">{{ d.emoji }}</text>
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '12.5px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 500 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 10.5px; color: var(--v5-warning)">⭐ Best</text></text>
+          <text class="block truncate" :style="{ fontSize: '14px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 10.5px; color: var(--v5-warning)">Best</text></text>
           <text v-if="d.bestFor" class="block truncate" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
         </view>
-        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '12.5px', fontWeight: 600, color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-brand)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
+        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
         <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
@@ -75,7 +72,6 @@ import type { DeviceKind } from "@/store/types";
 
 interface WorkloadPrice {
   code: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
-  emoji: string;
   label: string;
   unit: string;
   price: number;
@@ -87,7 +83,6 @@ interface WorkloadPrice {
 interface DeviceRanking {
   rank: 1 | 2 | 3 | 4 | 5;
   name: string;
-  emoji: string;
   dailyEarn: number;
   bestFor?: string;
   isPhone?: boolean;
@@ -97,20 +92,20 @@ interface DeviceRanking {
 const t = useT();
 
 const PRICE_INDEX: WorkloadPrice[] = [
-  { code: "IG", emoji: "🖼", label: "Image Gen", unit: "per image", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
-  { code: "LL", emoji: "💬", label: "LLM Inference", unit: "per 1k tok", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagship: { label: "405B flagship", delta: 32.1 } },
-  { code: "VG", emoji: "🎬", label: "Video Gen", unit: "per sec", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
-  { code: "FT", emoji: "🔧", label: "Fine-tune", unit: "per job", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
-  { code: "EM", emoji: "📐", label: "Embedding", unit: "per 1k chunks", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
-  { code: "SP", emoji: "🎙", label: "Speech", unit: "per audio sec", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
+  { code: "IG", label: "Image Gen", unit: "per image", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
+  { code: "LL", label: "LLM Inference", unit: "per 1k tok", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagship: { label: "405B flagship", delta: 32.1 } },
+  { code: "VG", label: "Video Gen", unit: "per sec", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
+  { code: "FT", label: "Fine-tune", unit: "per job", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
+  { code: "EM", label: "Embedding", unit: "per 1k chunks", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
+  { code: "SP", label: "Speech", unit: "per audio sec", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [
-  { rank: 1, name: "NexionRack P1", emoji: "🗄", dailyEarn: 45, bestFor: "Training + 405B LLM", kind: "stellarrack-p1" },
-  { rank: 2, name: "NexionBox Pro", emoji: "📦", dailyEarn: 13, bestFor: "Flagship compute", kind: "stellarbox-pro" },
-  { rank: 3, name: "NexionBox S1", emoji: "📦", dailyEarn: 7, bestFor: "LLM 70B", kind: "stellarbox-s1" },
-  { rank: 4, name: "Inference Share", emoji: "☁", dailyEarn: 0.19, bestFor: "Low barrier entry", kind: "cloud-share" },
-  { rank: 5, name: "Your phone", emoji: "📱", dailyEarn: 0.06, bestFor: "Mobile NPU tier", isPhone: true },
+  { rank: 1, name: "NexionRack P1", dailyEarn: 45, bestFor: "Training + 405B LLM", kind: "stellarrack-p1" },
+  { rank: 2, name: "NexionBox Pro", dailyEarn: 13, bestFor: "Flagship compute", kind: "stellarbox-pro" },
+  { rank: 3, name: "NexionBox S1", dailyEarn: 7, bestFor: "LLM 70B", kind: "stellarbox-s1" },
+  { rank: 4, name: "Inference Share", dailyEarn: 0.19, bestFor: "Low barrier entry", kind: "cloud-share" },
+  { rank: 5, name: "Your phone", dailyEarn: 0.06, bestFor: "Mobile NPU tier", isPhone: true },
 ];
 
 function formatPrice(n: number): string {

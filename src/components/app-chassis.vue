@@ -39,9 +39,7 @@
           <image class="nx-logo-img nx-logo-img--dark" src="/static/img/brand/header-logo-dark.png" mode="aspectFit" />
         </view>
       </view>
-      <view class="nx-header__center">
-        <text class="nx-title">{{ isHome ? t.tabs.home : pageTitle }}</text>
-      </view>
+      <view class="nx-header__center" />
       <view class="nx-header__r">
         <view class="nx-icon-btn" @click="goSearch">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
@@ -411,16 +409,6 @@ function navBack() {
   navBackTo(navHeader.value?.backHref);
 }
 
-const pageTitle = computed(() => {
-  const map: Record<string, string> = {
-    earn: t.value.headerTitles.earn,
-    store: t.value.headerTitles.store,
-    team: t.value.headerTitles.team,
-    me: t.value.headerTitles.me,
-  };
-  return map[activeTab.value] ?? "";
-});
-
 const unread = computed(() => notifications.unread);
 const unreadLabel = computed(() => (unread.value > 99 ? "99+" : String(unread.value)));
 
@@ -756,17 +744,6 @@ html[data-theme="dark"] .nx-logo-img--dark {
   font-weight: 500;
   color: var(--v5-ink-4);
   white-space: nowrap;
-}
-.nx-title {
-  max-width: 100%;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.012em;
-  color: var(--v5-ink);
-  font-family: var(--font-v5);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .nx-header__r {
   display: flex;
