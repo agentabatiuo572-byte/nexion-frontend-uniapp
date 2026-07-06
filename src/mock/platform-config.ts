@@ -41,6 +41,14 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。
     welcomeGift: { lockMode: "risk_bucket", usdtAmount: 5, nexAmount: 20 },
   },
+  // FEAT-AUTH01 OTP 闸门 mock seed(PRD §4.6.2/§16.2.1;运营在 K 域调)。
+  otpGate: {
+    resendSeconds: 60,
+    captchaAfterSends: 2,
+    otpTtlSeconds: 300,
+    maxVerifyAttempts: 5,
+    captchaTicketTtlSeconds: 120,
+  },
   // SPEC-7 §5b 七维权重 mock seed(K4 权威可配)。强维 0.8+,中维 0.4-0.5,弱维 ≤0.3。
   riskScore: {
     dimensionWeights: {

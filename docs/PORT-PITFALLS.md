@@ -424,3 +424,11 @@
 - **对策**：新增 `weekStartMondayUTC()` 助手——`getUTCDay`(周一→0…周日→6)+ `Date.UTC` 取本周一 00:00 UTC,替换 epoch-modulo 式;`nextPayoutTs`(下周一)/ history(往周一)随之正确。
 - **已转**：`verify.sh` 哨兵「no epoch-modulo week boundary」grep `% ONE_WEEK`(排除 JSDoc/`//` 注释行,容忍文档引用反例)。**负向探针验真**:真代码行 `now % ONE_WEEK` CAUGHT、注释行 EXCLUDED;verify 25/0;5173 双语实景「5天 / settles in 5d」与玩法页周一/周日 UTC 口径自洽、console 0。
 - **元教训**：**纪元锚点不是周一**——任何「时间戳 `% 周期`」做日历对齐都隐含「从周四起算」的偏差。日历周界(周/月)必须走 `getUTCDay`/`Date.UTC` 显式派生,绝不用 epoch-modulo。纯逻辑值 bug 无机器症状,必**回源核权威口径(PRD/文案)+ 实景核派生数字**,不能只信 tsc+verify 绿。
+
+## P-058 · playwright 脚本顶层 frame 裸 import 源码模块 → 双 Pinia「no active Pinia」稳定假红
+
+- **现象**:`scripts/spec4-account-cloud-app-sync.mjs` 在 verify 中稳定 FAIL:`page.evaluate` 里 `await import("/src/store/app.ts")` 后 `useApp()` 报「getActivePinia() was called but there was no active Pinia」;页面本身 console 0 error 运行正常。git stash 判别与工作区改动无关(干净 HEAD 同样挂)。
+- **根因**:uni-app H5 dev 把应用渲染在**同源 iframe** 里;`page.evaluate` 默认跑在**顶层 frame**。顶层 frame 裸动态 import `/src/store/app.ts` 时 vite 照样服务模块,但这是在一个从没跑过 `main.ts` 的 realm 里**凭空构建第二套模块图**——第二份 pinia 模块自然没有 active 实例。模块图分裂不是时序 flake,是 frame 上下文错位,必然复现。
+- **对策**:脚本改用应用 frame 上下文——`page.frames().find(f => f !== page.mainFrame())` 轮询取 iframe(build 产物无 iframe 时回退主 frame),`appFrame.evaluate(...)`。同 frame 内动态 import 命中 vite 模块缓存,拿到的就是页面主链的 store 实例,零产品代码改动。
+- **已转**:本台账 + 修复落地(verify 169/0)。硬规则:**任何要碰 store/import 源码模块的 walkthrough/验收脚本,evaluate 必须进应用 iframe frame**(参照 spec4-app-sync 的 `resolveAppFrame()` 写法);纯 localStorage 读写因同源共享可豁免但建议统一走 frame。
+- **元教训**:「脚本以前过、现在稳定挂、代码没动」≠ 环境玄学——先 **git stash 二分定责**(我的改动 vs 存量),再看**执行上下文**(frame/realm/进程)是否与被测物错位;evaluate 的 frame 归属是 playwright 对 iframe 型应用(uni H5 dev)的第一陷阱。

@@ -119,6 +119,7 @@
       </view>
     </view>
 
+    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </view>
 </template>
@@ -127,7 +128,10 @@
 import { ref, computed, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
+import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
@@ -148,7 +152,6 @@ const COUNTRIES = [
   { code: "+82", name: "South Korea" }, { code: "+55", name: "Brazil" }, { code: "+62", name: "Indonesia" },
   { code: "+63", name: "Philippines" }, { code: "+66", name: "Thailand" }, { code: "+971", name: "UAE" }, { code: "+7", name: "Russia" },
 ];
-const RESEND_SECONDS = 60;
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
   { label: "Google", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.5 3.6-5.5 3.6-3.3 0-6-2.7-6-6.1S8.7 5.5 12 5.5c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3 14.6 2 12 2 6.9 2 2.7 6.1 2.7 11.6S6.9 21.3 12 21.3c6.9 0 9.4-4.9 9.4-7.4 0-.5 0-.9-.1-1.3L12 10.2z"/></svg>' },
@@ -186,8 +189,12 @@ onLoad((options) => {
   if (o.ref) refOnLogin.value = o.ref;
 });
 
+const showCaptcha = ref(false);
+
 const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
 const phoneOk = computed(() => /^\d{6,15}$/.test(phoneClean.value));
+const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
+const otpScene = computed<OtpScene>(() => (mode.value === "reset" ? "reset" : "login"));
 const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
 // Login mode accepts any non-empty password (existing users may have shorter
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
@@ -208,7 +215,7 @@ const primaryText = computed(() => {
   return t.value.login.finishReset;
 });
 const canPrimary = computed(() => {
-  if (step.value === 1) return mode.value === "password" ? (phoneOk.value && pwdOk.value && !loading.value) : phoneOk.value;
+  if (step.value === 1) return mode.value === "password" ? (phoneOk.value && pwdOk.value && !loading.value) : (phoneOk.value && !loading.value);
   if (step.value === 2) return codeOk.value && !loading.value;
   return pwdMatch.value && !loading.value;
 });
@@ -255,27 +262,49 @@ function finishSignIn() {
   uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
 }
 
-function startResend() {
-  resendLeft.value = RESEND_SECONDS;
+function startResend(sec: number) {
+  resendLeft.value = sec;
   if (resendTimer) clearInterval(resendTimer);
   resendTimer = setInterval(() => {
     resendLeft.value = Math.max(0, resendLeft.value - 1);
     if (resendLeft.value <= 0 && resendTimer) clearInterval(resendTimer);
   }, 1000);
 }
+// FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块)。倒计时以 server 返回的
+// resendAfterSec 为准,client 不再持有 60s 业务常量。
+async function requestCode(captchaTicket?: string) {
+  if (loading.value) return;
+  loading.value = true;
+  const res = await otpSend(fullPhone.value, otpScene.value, captchaTicket);
+  loading.value = false;
+  if (!mounted) return;
+  if (res.ok) {
+    code.value = ["", "", "", "", "", ""];
+    focusIdx.value = 0;
+    step.value = 2;
+    startResend(res.resendAfterSec);
+    return;
+  }
+  if (res.error === "captcha_required") { showCaptcha.value = true; return; }
+  if (res.error === "rate_limited") {
+    error.value = fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec });
+    if (step.value === 2) startResend(res.retryAfterSec);
+  }
+}
+function onCaptchaOk(ticket: string) {
+  showCaptcha.value = false;
+  void requestCode(ticket);
+}
 function resend() {
   if (resendLeft.value > 0) return;
-  code.value = ["", "", "", "", "", ""];
-  focusIdx.value = 0;
   error.value = null;
-  startResend();
+  void requestCode();
 }
 
 function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.login.errorInvalidPhone; return; }
-  step.value = 2;
-  startResend();
+  void requestCode();
 }
 function signInWithPassword() {
   if (loading.value || signInTimer) return;
@@ -286,15 +315,32 @@ function signInWithPassword() {
     finishSignIn();
   }, 700);
 }
-function verifyCode() {
+async function verifyCode() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
-  if (mode.value === "reset") { step.value = 3; return; }
   loading.value = true;
-  signInTimer = setTimeout(() => {
-    finishSignIn();
-  }, 700);
+  // FEAT-AUTH01: server 同构校验(TTL/attemptsLeft/一码一)。PROD: 用返回的
+  // verifyToken 换 session;mock 下通过即视为凭证有效。
+  const res = await otpVerify(fullPhone.value, otpScene.value, code.value.join(""));
+  if (!mounted) return;
+  if (!res.ok) {
+    loading.value = false;
+    if (res.error === "otp_invalid") {
+      error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
+    } else if (res.error === "otp_expired") {
+      error.value = t.value.authOtp.errorOtpExpired;
+    } else if (res.error === "otp_attempts_exceeded") {
+      error.value = t.value.authOtp.errorOtpExhausted;
+      code.value = ["", "", "", "", "", ""];
+      focusIdx.value = 0;
+    } else {
+      error.value = t.value.authOtp.errorOtpNotFound;
+    }
+    return;
+  }
+  if (mode.value === "reset") { loading.value = false; step.value = 3; return; }
+  finishSignIn();
 }
 function finishReset() {
   if (loading.value || signInTimer) return;

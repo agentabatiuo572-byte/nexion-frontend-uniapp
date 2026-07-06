@@ -26,6 +26,7 @@ export const useConfig = defineStore("config", () => {
       dimensionWeights: { ...DEFAULT_PLATFORM_CONFIG.riskScore.dimensionWeights },
       weakSignalClusterThreshold: DEFAULT_PLATFORM_CONFIG.riskScore.weakSignalClusterThreshold,
     },
+    otpGate: { ...DEFAULT_PLATFORM_CONFIG.otpGate },
     computeShare: {
       downloadUrl: DEFAULT_PLATFORM_CONFIG.computeShare.downloadUrl,
       content: { ...DEFAULT_PLATFORM_CONFIG.computeShare.content },

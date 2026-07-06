@@ -627,10 +627,32 @@ server 持有锁定计数器(IP + userId 维度),client 仅显示倒计时(`erro
 
 **OTP code 有效期**:
 
-- 6 位 OTP 在 server-side 有效 **5 分钟**
+- 6 位 OTP 在 server-side 有效 **5 分钟**(`otpGate.otpTtlSeconds`)
 - 同一手机号同时仅 1 个 active code,新 `send` 自动失效旧 code
+- 单个 code 允许连续输错 5 次(`otpGate.maxVerifyAttempts`),用尽即作废,client 清空输入格并引导重新 send
 - 过期后 verify 返 `errors.otpExpired`,client 引导重新 send
-- Resend 60 秒倒计时(client `RESEND_SECONDS = 60`)防短信轰炸,server-side 同步限频:同一手机号 24h 内 ≥ 3 次 send 触发 CAPTCHA(参 §16.2.1)
+- Resend 冷却 60 秒(`otpGate.resendSeconds`):client 倒计时以 `send` 响应的 `resendAfterSec` 为准(不持有本地常量);冷却内重复请求 server 返 `rate_limited`(附剩余秒数),不生成新码、不失效现有码、不计入发送次数
+
+**人机验证闸门(防短信轰炸)**:
+
+同一手机号 24h 滑动窗内成功 send 达 `otpGate.captchaAfterSends`(默认 2)次后,下一次 send 前必须通过滑块拼图验证——即「24h 内 ≥3 次触发 CAPTCHA」(阈值口径 §16.2.1,参数 §13.3):
+
+- server 出题(目标缺口位置随机),用户拖动拼图块入缺口。位置不符 → 复位换题可立即重试并累计失败;连续 5 次失败 → 验证暂时关闭、本次发送中止(发送计数不增加),可重新点发送再次拉起。弹层可刷新换题(失败计数不清零)、可取消(取消即中止本次发送)。
+- 验证通过签发一次性 `captchaTicket`(有效 `otpGate.captchaTicketTtlSeconds` = 120s):**必须显式随 send 提交且与签发值一致**才放行,放行即消费;未出示、已消费或已过期一律返 `captcha_required` 要求重新验证,禁止复用。
+- send 判定顺序:① 冷却检查 → `rate_limited`;② 24h 限频 + ticket 校验 → `captcha_required`;③ 放行(生成新码、旧码作废、计入发送记录)。锁定期间 send 一律拒绝不签发(见上文锁定规则)。
+- 登录 OTP、注册、重置密码三场景共用本闸门与滑块验证,发送计数按手机号维度跨场景共享。
+
+```mermaid
+stateDiagram-v2
+    [*] --> active : send 放行(生成码 · 5 次尝试额度 · TTL 5min)
+    active --> consumed : verify 正确(签发 verifyToken · 终态)
+    active --> active : verify 错误(尝试额度 −1 仍 >0)
+    active --> exhausted : 第 5 次错误(作废 · 终态)
+    active --> expired : TTL 到期(终态)
+    active --> active : 新 send 覆盖(旧码即刻作废)
+```
+
+verify 业务错误:`otp_invalid`(附剩余次数)/ `otp_expired` / `otp_attempts_exceeded` / `otp_not_found`(终态或无记录时提交);成功签发一次性 `verifyToken`,由后续会话创建 / 注册提交 / 重置密码端点重新出示校验,不得仅凭 verify 成功响应放行敏感操作
 
 #### 4.6.3 服务端存储与传输
 
@@ -1419,41 +1441,41 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 ### 6.11 载体分层与收益服务端结算
 
-**目的**:让手机算力收益与「页面是否开着」解耦——收益按账户登记的算力档位 + 真实在线时长结算,关页面 / 切后台的时段在重开 / 回前台时一次补算;同时按客户端载体(签名 App / H5 网页)分层计产,App 常驻获得完整在线加成,H5 非常驻只走基础托管基线,形成「升级 App 拿在线加成」的真实差。
+**目的**:让手机算力收益与「页面是否开着」解耦——收益按账户登记的算力档位 + 真实在线时长结算,关页面 / 切后台的时段在重开 / 回前台时一次补算;同时按**设备真实在线信号(App 后台心跳)**分层计产:设备真在线获得完整在线加成,无心跳(网页查看 / App 未常驻 / 离线)只走基础托管基线,形成「升级 App 拿在线加成」的真实差。**查看方式(App / 网页)本身不改变收益,只有设备真在线才吃加成**——常驻 App 是唯一能持续上报设备心跳的载体。
 
 **登记 + 服务端结算**:
 - **激活 = 登记**:设备激活(进槽位)即记结算锚点 `lastSettledAt = now`,作为收益的起算点。
-- **结算口径(单一来源)**:`settle()` 按墙钟增量 Δ = now − lastSettledAt 累计「收益 += 登记档位 baseRate × 载体因子 × 实时状态因子 × (Δ / 一天)」,并把锚点前移到 now;所有收益累积只走此一处,无第二条旁路。
+- **结算口径(单一来源)**:`settle()` 按墙钟增量 Δ = now − lastSettledAt 累计「收益 += 登记档位 baseRate × 在线因子 × 实时状态因子 × (Δ / 一天)」,并把锚点前移到 now;所有收益累积只走此一处,无第二条旁路。
 - **触发**:进前台 / 客户端 tick 调 `settle()`;关页面或切后台期间的 Δ 在重开 / 回前台时一次补算(原型为客户端 mock 服务端 tick,正式环境由服务端按同一 `lastSettledAt` 结算下推)。
 - **冻结不回溯**:设备未激活 / 会话失效冻结时锚点清空,恢复时按当前时刻重锚,冻结期不计产、不补发。
 
-**载体分层(算力显示与收益同口径)**:
+**在线分层(算力显示与收益同口径)**:
 
-| 载体 | 判定 | 计产口径 |
+| 设备在线态 | 判定 | 计产口径 |
 |---|---|---|
-| 签名 App(常驻)| 客户端构建为 App | 基线 × 充电 × 散热 × 连续在线 × 抖动(完整在线加成;连续在线达满额时长后稳定加成至 1.0)|
-| H5 网页(非常驻)| 客户端构建为 H5 / 浏览器标签 | 基线 × `h5BaseFactor`(基础托管,默认 0.6)× 在线 × 抖动(不可测充电 / 散热、不可累计连续在线,故走基础托管基线)|
+| 真在线(有新鲜心跳)| 设备 `onlineHeartbeatAt` 在超时窗口内(常驻 App 后台持续上报心跳)| 基线 × 充电 × 散热 × 连续在线 × 抖动(完整在线加成;连续在线达满额时长后稳定加成至 1.0)|
+| 离线(无 / 陈旧心跳)| 无心跳:网页查看、App 未常驻 / 被杀、心跳超时、离线 | 基线 × `h5BaseFactor`(基础托管,默认 0.6)× 在线 × 抖动(无常驻上报,不可测充电 / 散热、不可累计连续在线,故走基础托管基线)|
 
-非手机设备(S1 / Pro / Rack / Cloud)载体因子恒为 1,不受 App / H5 影响。
+在线态只看是否收到设备心跳,与「用 App 还是网页查看」无关——只有常驻 App 能持续产生心跳,故拿加成的实质是「设备真在后台在线」。非手机设备(S1 / Pro / Rack / Cloud)在线因子恒为 1,不受影响。
 
-**叙事**:H5 载体的手机算力卡标「基础托管模式 · 登记算力网络」,并给「升级 App 拿在线加成」弱引导;不出现「模拟 / 网页挖矿」等字眼(真平台口径)。
+**叙事**:无心跳(离线)设备的手机算力卡标「基础托管模式 · 登记算力网络」,并给「升级 App 拿在线加成」弱引导(仅常驻 App 能上报设备心跳);不出现「模拟 / 网页挖矿」等字眼(真平台口径)。
 
-**运营可配**:载体因子由在线加成系数配置驱动(`onlineBonus`:`h5BaseFactor` / `continuityFullHours`),运营在后台「算力与设备配置」调整,与后台 compute-config 同 key;改后对全网生效、不回溯已结算收益、以服务端为准。
+**运营可配**:在线因子由在线加成系数配置驱动(`onlineBonus`:`h5BaseFactor` / `continuityFullHours`),运营在后台「算力与设备配置」调整,与后台 compute-config 同 key;改后对全网生效、不回溯已结算收益、以服务端为准。
 
 ```mermaid
 flowchart TD
   A[激活设备] -->|登记| B[记锚点 lastSettledAt = now]
   B --> C{触发结算}
   C -->|tick / 回前台 onShow| D["settle:Δ = now − lastSettledAt"]
-  D --> E{客户端载体}
-  E -->|App 常驻| F["收益 += 档位baseRate × 充电×散热×连续在线×抖动 × Δ/天"]
-  E -->|H5 非常驻| G["收益 += 档位baseRate × 基础托管0.6 × 在线×抖动 × Δ/天"]
+  D --> E{设备在线态}
+  E -->|有心跳·真在线| F["收益 += 档位baseRate × 充电×散热×连续在线×抖动 × Δ/天"]
+  E -->|无心跳·离线/网页| G["收益 += 档位baseRate × 基础托管0.6 × 在线×抖动 × Δ/天"]
   F --> H[重锚 lastSettledAt = now]
   G --> H
   H -. 关页面期间累积 .-> C
 ```
 
-**数据**:Device 新增 `lastSettledAt`(登记 / 结算锚点,§12.2);在线加成系数读自平台配置 `onlineBonus`(§13.3)。
+**数据**:Device 有 `lastSettledAt`(登记 / 结算锚点)+ `onlineHeartbeatAt`(设备在线心跳戳,决定在线因子档)(§12.2);在线加成系数读自平台配置 `onlineBonus`(§13.3)。设备心跳经 `/api/device/:id/heartbeat` 上报,服务端持 `lastHeartbeatAt` + 超时判定下推在线态(客户端只读结论,永不用查看载体定因子)。
 
 ---
 
@@ -3461,7 +3483,7 @@ interface TrialConfig {
 | `useProductPhaseOverride.pinned`(localStorage)+ URL `?dev=1` | 跳 phase 解锁高 invite multiplier / 短 cooldown | `?dev=1` 移除生产支持 + phase 完全 server 决策 |
 | `MAX_DEVICES=6` 改常量 | 多设备 yield | server `POST /api/devices/activate` enforce slot cap,client 限制纯 UI |
 | `_devSeedLegacyDevice` / `_devFastForwardAll` / `_devBumpEarningsTotal` 生产 bundle 仍在 | 伪造老化设备 / 改 lifetime USD 领里程奖 | build-time strip(`process.env.NODE_ENV === "production"` 块剥离)+ tree-shake |
-| OTP `verifyCode()` client 仅做正则 | 任意 6 位数字过 → 批量开号 | `POST /api/auth/otp/verify` 必调 |
+| OTP 闸门状态(`nx_otp_*` storage)篡改 | 清发送计数绕滑块 / 伪造 active code → 批量开号 | client 已按 server 同构接口消费(send 闸门 / TTL / 尝试次数 / 一码一 / 一次性 ticket,规则 §4.6.2);PROD 状态全 server 持有,`POST /api/auth/otp/{send,verify}` + captcha 接口整体替换,`verifyToken` 由后续端点二次校验 |
 | Bills 客户端 push 无 server 二次入账 | 伪造账单 | server 是唯一账本,client 拉 `GET /api/bills?cursor=` 不写 |
 | Order ID + Withdrawal ID + Bill ID + Card tokenId 客户端 mint | 可枚举 / 撞 ID / 伪造 PSP token | server 单源 ID,响应携带 |
 
@@ -4689,6 +4711,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 衰减曲线
   activatedAt: number | null;   // epoch ms 激活进槽位的时刻;null = 已购未激活(库存中)
   lastSettledAt?: number | null; // epoch ms 收益结算锚点(= 登记时刻);收益按 now−lastSettledAt 墙钟结算(§6.11);null = 当前不计产(未激活 / 冻结),恢复时重锚不回溯
+  onlineHeartbeatAt?: number | null; // epoch ms 设备最近一次在线心跳(常驻 App 后台上报);在超时窗口内 = 设备真在线 → 吃在线加成,否则基础托管基线(§6.11);决定在线因子档,与查看载体无关;PROD 服务端持 lastHeartbeatAt + timeout 下推在线结论
   pendingDeactivate?: boolean;  // true = 等当前任务完成后自动取消激活(graceful deactivation)
   generation: number;           // 1 = 原型规格;2 = trade-in 升级(Pro v2 / Rack P2)
   status: "online" | "offline";   // 无 "paused":用户无手动暂停;被动中断由 pausedReason + interruptedAt 表达
@@ -5293,6 +5316,7 @@ progressPct = avg(checks);
 | `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
 | `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
 | 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
+| OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
 | `Notification CAP` | 200 | 通知中心最多 |
 | `MAX_DEVICES` | 6 | **激活槽位上限**(不限购,激活进槽时 `activateDevice()` 守卫,Sprint #146-1)|
 | `INTERRUPT_GRACE_MS` | 30,000(30s) | phone 掉电/掉网后任务重连宽限窗口;窗口内恢复则续跑原任务,超时则取消(`lib/store/interrupt.ts`)|
@@ -5429,7 +5453,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 ### 14.3 命名空间
 
-`tabs / headerTitles / headerSubtitles / intro / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / wrapped / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
+`tabs / headerTitles / headerSubtitles / intro / authOtp / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / wrapped / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
 
 **关键 namespace 说明**:
 - `headerTitles` — 60+ 路由的 header 显示标题映射。包含 tab roots(earn / store / team / me / 等)+ Me 子树(meWallet / meProfile / meSecurity / meWalletBills / ...)+ Team 子树(teamRank / teamUnilevel / teamBinary / ...)+ Store 子树 + Genesis / Trust / 动态路由(storeProduct / tx / ...)+ `howItWorksSuffix`(EN: ` · How it works` / ZH: ` · 玩法说明`)拼接 how-it-works 子路由。
@@ -5470,7 +5494,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 - 密码存储与传输遵循 §4.6.3:服务端 argon2id + 随机 salt,客户端永不存密码或 hash
 - 密码强度、错误尝试锁定、修改流程见 §4.6
 - KYC-Express 验证地址记录后,提现地址必须匹配
-- 触发 CAPTCHA 阈值:同一手机号 24h 内 3+ 次验证码请求
+- 触发 CAPTCHA 阈值:同一手机号 24h 内 3+ 次验证码请求(`otpGate.captchaAfterSends`,平台配置后台可调;滑块验证流程 / 一次性 ticket 规则 / send 判定顺序见 §4.6.2)
 
 #### 16.2.2 Web baseline(浏览器安全头 + 路由防护)
 

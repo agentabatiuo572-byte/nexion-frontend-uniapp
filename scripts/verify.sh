@@ -192,6 +192,22 @@ sentinel_present "SPEC-7 settle applies release engine (R1)" src/store/app.ts 'e
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
 sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
+
+# FEAT-AUTH01 OTP 防轰炸闸门(PRD §4.6.2/§16.2.1;规格 PRD/specs/FEAT-AUTH01-otp-antibomb-gate.md)
+sentinel_present "AUTH01 captcha ticket must be explicit (audit P0 fix)" src/store/auth-otp.ts '!!captchaTicket &&'
+sentinel_present "AUTH01 cooldown rejects without minting new code" src/store/auth-otp.ts 'error: "rate_limited"'
+sentinel_present "AUTH01 otpGate thresholds read from config" src/store/auth-otp.ts 'useConfig\(\)\.config\.otpGate'
+sentinel_present "AUTH01 otpGate seeded in platform config" src/mock/platform-config.ts 'captchaAfterSends: 2'
+sentinel_present "AUTH01 login send gated via store" src/pages/login/login.vue 'await otpSend\('
+sentinel_present "AUTH01 register send gated via store" src/pages/register/register.vue 'await otpSend\('
+sentinel_present "AUTH01 login verify via store" src/pages/login/login.vue 'await otpVerify\('
+sentinel_present "AUTH01 register verify via store" src/pages/register/register.vue 'await otpVerify\('
+sentinel_present "AUTH01 captcha fail cap single-source" src/components/captcha-slider.vue 'MAX_CAPTCHA_FAILS'
+if grep -qE 'const RESEND_SECONDS' src/pages/login/login.vue src/pages/register/register.vue 2>/dev/null; then
+  bad "AUTH01 resend seconds local constants must not exist (otpGate config is single source)"
+else
+  ok "AUTH01 no local resend-seconds constants (config-derived)"
+fi
 sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
 sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 't\.value\.wallet\.riskReasons'
 sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'if \(!import\.meta\.env\.DEV\) return'

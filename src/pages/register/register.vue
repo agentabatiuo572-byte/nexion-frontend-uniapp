@@ -130,15 +130,18 @@
       </view>
     </view>
 
+    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { ref, computed, onUnmounted } from "vue";
+import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
+import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
+import { otpSend, otpVerify } from "@/store/auth-otp";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
@@ -168,7 +171,6 @@ const COUNTRIES = [
   { code: "+82", name: "South Korea" }, { code: "+55", name: "Brazil" }, { code: "+62", name: "Indonesia" },
   { code: "+63", name: "Philippines" }, { code: "+66", name: "Thailand" }, { code: "+971", name: "UAE" }, { code: "+7", name: "Russia" },
 ];
-const RESEND_SECONDS = 60;
 
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
@@ -189,11 +191,13 @@ const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
 const error = ref<string | null>(null);
+const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
 // OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
 const verifying = ref(false);
 const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
+let mounted = true;
 
 const refFromUrl = ref<string | null>(null);
 const sponsorPreview = ref<SponsorMeta | null>(null);
@@ -208,6 +212,7 @@ onLoad((options) => {
 
 const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
 const phoneOk = computed(() => /^\d{6,15}$/.test(phoneClean.value));
+const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
@@ -263,11 +268,34 @@ function onCta() {
 function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
-  step.value = 2;
-  startResend();
+  void requestCode();
 }
-function startResend() {
-  resendLeft.value = RESEND_SECONDS;
+// FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
+async function requestCode(captchaTicket?: string) {
+  if (verifying.value) return;
+  verifying.value = true;
+  const res = await otpSend(fullPhone.value, "register", captchaTicket);
+  if (!mounted) return;
+  verifying.value = false;
+  if (res.ok) {
+    code.value = ["", "", "", "", "", ""];
+    focusIdx.value = 0;
+    step.value = 2;
+    startResend(res.resendAfterSec);
+    return;
+  }
+  if (res.error === "captcha_required") { showCaptcha.value = true; return; }
+  if (res.error === "rate_limited") {
+    error.value = fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec });
+    if (step.value === 2) startResend(res.retryAfterSec);
+  }
+}
+function onCaptchaOk(ticket: string) {
+  showCaptcha.value = false;
+  void requestCode(ticket);
+}
+function startResend(sec: number) {
+  resendLeft.value = sec;
   if (resendTimer) clearInterval(resendTimer);
   resendTimer = setInterval(() => {
     resendLeft.value = Math.max(0, resendLeft.value - 1);
@@ -276,33 +304,48 @@ function startResend() {
 }
 function resend() {
   if (resendLeft.value > 0) return;
-  code.value = ["", "", "", "", "", ""];
-  focusIdx.value = 0;
   error.value = null;
-  startResend();
+  void requestCode();
 }
 function currentSponsorCode(): string | null {
   return refFromUrl.value?.trim() || invite.value.trim() || null;
 }
-function verifyCode() {
+async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
-  // ⚠️ MOCK-ONLY: 异步 OTP 校验 + K1 注册前评估的接口形态。PROD: POST
-  // /api/auth/otp/verify → 服务端验码 + K1 评估,返回 { gateRoute, cluster,
-  // giftRoute } 同构结论;client 只消费,不本地判定。
+  // ⚠️ MOCK-ONLY: server 同构 OTP 校验(FEAT-AUTH01,TTL/attemptsLeft/一码一)
+  // + K1 注册前评估的接口形态。PROD: POST /api/auth/otp/verify → 服务端验码 +
+  // K1 评估,返回 { gateRoute, cluster, giftRoute } 同构结论;client 只消费,
+  // 不本地判定。返回的 verifyToken 在 PROD 必须由后续注册提交端点
+  // (POST /api/auth/register)重新出示校验;mock 下通过即视为凭证有效。
   verifying.value = true;
-  setTimeout(() => {
+  const res = await otpVerify(fullPhone.value, "register", codeStr.value);
+  if (!mounted) return;
+  if (!res.ok) {
     verifying.value = false;
-    const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
-    registrationRisk.value = assessment;
-    // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
-    if (assessment.gateRoute === "manual_or_reject") {
-      error.value = t.value.register.errorSignupLimited;
-      return;
+    if (res.error === "otp_invalid") {
+      error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
+    } else if (res.error === "otp_expired") {
+      error.value = t.value.authOtp.errorOtpExpired;
+    } else if (res.error === "otp_attempts_exceeded") {
+      error.value = t.value.authOtp.errorOtpExhausted;
+      code.value = ["", "", "", "", "", ""];
+      focusIdx.value = 0;
+    } else {
+      error.value = t.value.authOtp.errorOtpNotFound;
     }
-    step.value = 3;
-  }, 600);
+    return;
+  }
+  const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
+  registrationRisk.value = assessment;
+  verifying.value = false;
+  // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
+  if (assessment.gateRoute === "manual_or_reject") {
+    error.value = t.value.register.errorSignupLimited;
+    return;
+  }
+  step.value = 3;
 }
 function finish() {
   error.value = null;
@@ -357,6 +400,13 @@ function back() {
 function close() { uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }); }
 function goLogin() { uni.reLaunch({ url: "/pages/login/login", fail: () => {} }); }
 function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} }); }
+
+function cleanup() {
+  mounted = false;
+  if (resendTimer) clearInterval(resendTimer);
+}
+onUnload(() => cleanup());
+onUnmounted(() => cleanup());
 </script>
 
 <style scoped>

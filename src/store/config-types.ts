@@ -102,6 +102,21 @@ export interface RiskScoreConfig {
   weakSignalClusterThreshold: number;
 }
 
+// ── FEAT-AUTH01 OTP 发送闸门参数(PRD §4.6.2/§16.2.1;K 域风控可配)────
+// server/admin canonical. Client reads as config, never as business constants.
+export interface OtpGateConfig {
+  // Resend 冷却(秒);client 倒计时以 otpSend 响应的 resendAfterSec 为准。
+  resendSeconds: number;
+  // 24h 滑动窗内成功 send 达到此值后,下一次 send 需过滑块(≥3 次触发 → 值为 2)。
+  captchaAfterSends: number;
+  // OTP server-side 有效期(秒)。
+  otpTtlSeconds: number;
+  // 单个 code 允许的 verify 错误次数,用尽即作废。
+  maxVerifyAttempts: number;
+  // 滑块通过后签发 ticket 的有效期(秒),单次使用。
+  captchaTicketTtlSeconds: number;
+}
+
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
   onlineBonus: OnlineBonus;
@@ -109,6 +124,7 @@ export interface PlatformConfig {
   withdrawRules: WithdrawRulesConfig;
   rewards: RewardsConfig;
   riskScore: RiskScoreConfig;
+  otpGate: OtpGateConfig;
   computeShare: {
     downloadUrl: string;
     content: ComputeShareContent;
