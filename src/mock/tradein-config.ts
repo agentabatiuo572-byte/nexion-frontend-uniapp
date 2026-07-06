@@ -233,3 +233,72 @@ export function previousTier(kind: DeviceKind): DeviceKind | null {
   const idx = UPGRADE_LADDER.indexOf(kind);
   return idx > 0 ? UPGRADE_LADDER[idx - 1] : null;
 }
+
+// ───────────────────────── FEAT-DEV02: earnings-ladder credit (successor) ────
+// Successor of the age-based salvage engine above. PR-D switches the sheets /
+// checkout consumers to this engine and deletes computeSalvageRate /
+// computeSalvageCredit / minHoldingMonths (the two engines coexist only during
+// the migration window — do NOT wire new consumers to the old one).
+// Server-authoritative: same GET /api/config/tradein payload, `creditLadder` +
+// `ladderRules` keys; admin edits via「升级置换阶梯」panel (E domain).
+// Ladder semantics (FEAT-DEV02 ③, Aligned 2026-07-06): credit = paidPrice ×
+// creditPct(band of cumulative-output ÷ paid-price) × promoMult, checkout-only,
+// NEVER credited to balance. Bands are left-closed right-open, contiguous from
+// 0%, strictly decreasing creditPct (structure enforced by
+// scripts/check-capacity-curve-parity.mjs).
+
+export interface CreditLadderRow {
+  /** Inclusive lower bound of cumulative-output ÷ paid-price, in percent. */
+  minRatioPct: number;
+  /** Exclusive upper bound in percent; null = open-ended top band. */
+  maxRatioPct: number | null;
+  /** Percent of the paid price returned as checkout-only credit. */
+  creditPct: number;
+}
+
+export const TRADEIN_CREDIT_LADDER: CreditLadderRow[] = [
+  { minRatioPct: 0, maxRatioPct: 25, creditPct: 75 },
+  { minRatioPct: 25, maxRatioPct: 50, creditPct: 60 },
+  { minRatioPct: 50, maxRatioPct: 75, creditPct: 45 },
+  { minRatioPct: 75, maxRatioPct: 100, creditPct: 30 },
+  { minRatioPct: 100, maxRatioPct: null, creditPct: 15 },
+];
+
+export const TRADEIN_LADDER_RULES = {
+  /** Target catalog price must be STRICTLY greater than the device's paid price. */
+  requireHigherPrice: true,
+  /** Max devices credited against a single checkout. */
+  maxDevicesPerOrder: 1,
+  /** Promo multiplier applied to the final credit. */
+  promoMult: 1.0,
+} as const;
+
+/**
+ * USD checkout credit for retiring a device against a higher-priced purchase.
+ *
+ *   credit = paidPrice × creditPct(band of cumulative ÷ paidPrice) × promoMult
+ *
+ * paidPrice ≤ 0 (gifted/free device) → 0: NOT eligible at all (FEAT-DEV02A
+ * 异常3 — not an Infinity-ratio band). Clamped to the target price so payable
+ * can never go negative (defensive: unreachable under default rules where
+ * requireHigherPrice holds and creditPct ≤ 100, but the ladder is
+ * operator-editable).
+ */
+export function computeTradeInCredit(
+  paidPriceUsdt: number,
+  cumulativeEarningsUsdt: number,
+  targetPriceUsdt: number,
+  ladder: CreditLadderRow[] = TRADEIN_CREDIT_LADDER,
+  promoMult: number = TRADEIN_LADDER_RULES.promoMult,
+): number {
+  if (paidPriceUsdt <= 0) return 0;
+  const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / paidPriceUsdt) * 100;
+  const row = ladder.find(
+    (r) => ratioPct >= r.minRatioPct && (r.maxRatioPct === null || ratioPct < r.maxRatioPct),
+  );
+  if (!row) return 0;
+  const raw = paidPriceUsdt * (row.creditPct / 100) * promoMult;
+  // Lower clamp guards operator-editable inputs (negative promoMult / target
+  // price) — credit may reduce payable, never increase it or go negative.
+  return +Math.max(0, Math.min(raw, targetPriceUsdt)).toFixed(2);
+}

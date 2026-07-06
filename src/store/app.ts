@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
-import { ONE_DAY_MS, makeInitialDevices, createDevice, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
+import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
@@ -153,6 +153,13 @@ function createInitialGlobal(): GlobalStats {
   };
 }
 
+// FEAT-DEV02: legacy persisted snapshots (pre trade-in economics fields) get
+// their devices backfilled at the consumption gate — account-cloud stays
+// value-import-free for the SPEC-4 VM sentinel (see device-types.ts).
+function hydrateSnapshotEconomics(s: AccountCloudSnapshot | null): AccountCloudSnapshot | null {
+  return s ? { ...s, devices: (s.devices ?? []).map(backfillDeviceEconomics) } : null;
+}
+
 function createSeedSnapshot(accountKey: string, email: string, entrySurface: EntrySurface): AccountCloudSnapshot {
   return {
     schema: 1,
@@ -209,6 +216,9 @@ function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: Onl
     ...d,
     todayEarnings: +(d.todayEarnings + inc).toFixed(3),
     todayEarningsNEX: +(d.todayEarningsNEX + incNEX).toFixed(2),
+    // FEAT-DEV02: lifetime output accrues in lockstep with the USD increment.
+    // Deactivation / today-zeroing paths never touch this field (ladder numerator).
+    cumulativeEarningsUsdt: +((d.cumulativeEarningsUsdt ?? 0) + inc).toFixed(3),
     lastSettledAt: now,
   };
 }
@@ -228,7 +238,7 @@ function freezeComputeShareDevice(d: Device): Device {
 
 export const useApp = defineStore("app", () => {
   const bootSurface = getEntrySurface();
-  const bootSnapshot = readAccountSnapshot("default") ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface);
+  const bootSnapshot = hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface);
   const accountKey = ref(bootSnapshot.accountKey);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
@@ -308,7 +318,7 @@ export const useApp = defineStore("app", () => {
 
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
     const key = normalizeAccountKey(rawAccountKey);
-    const snapshot = readAccountSnapshot(key) ?? createSeedSnapshot(key, rawAccountKey, surface);
+    const snapshot = hydrateSnapshotEconomics(readAccountSnapshot(key)) ?? createSeedSnapshot(key, rawAccountKey, surface);
     accountKey.value = snapshot.accountKey;
     entrySurface.value = surface;
     const boundSnapshot: AccountCloudSnapshot = {

@@ -746,6 +746,21 @@ device_yield_parity() {
   fi
 }
 device_yield_parity
+# FEAT-DEV01 等效换皮 P0 (2026-07-06): the task-capacity band literals in
+# device-lifecycle.ts must reproduce the retired degradation curve EXACTLY
+# (0.25-month-step diff<1e-9, floor, exempt kinds, subsidy display-only) and the
+# FEAT-DEV02 credit-ladder literal must be structurally sound (starts at 0,
+# contiguous, strictly decreasing creditPct, (0,100], open-ended top band).
+# Golden lives in the script — an INTENTIONAL schedule retune must update
+# golden + admin canon-numbers.json together.
+capacity_curve_parity() {
+  if "$NODE_BIN" scripts/check-capacity-curve-parity.mjs >/tmp/uni-capacity-parity.log 2>&1; then
+    ok "$(cat /tmp/uni-capacity-parity.log)"
+  else
+    bad "task-capacity curve parity / credit-ladder structure"; sed 's/^/        /' /tmp/uni-capacity-parity.log
+  fi
+}
+capacity_curve_parity
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

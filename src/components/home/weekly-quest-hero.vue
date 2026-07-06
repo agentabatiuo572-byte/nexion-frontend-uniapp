@@ -102,8 +102,10 @@ const quest = computed<Tier1QuestDef | null>(() => {
   const hasS1Only =
     devices.some((d) => d.kind === "stellarbox-s1") &&
     !devices.some((d) => d.kind === "stellarbox-pro" || d.kind === "stellarrack-p1");
-  const hasProOrRackOldGen = devices.some(
-    (d) => (d.kind === "stellarbox-pro" || d.kind === "stellarrack-p1") && d.generation === 1,
+  // FEAT-DEV02: generation retired — owning the original-tier kind IS the
+  // trade-up signal (Pro v2 / Rack P2 are distinct kinds already).
+  const hasProOrRackP1 = devices.some(
+    (d) => d.kind === "stellarbox-pro" || d.kind === "stellarrack-p1",
   );
   const hasRackAnyGen = devices.some((d) => d.kind === "stellarrack-p1");
   return dispatchTier1({
@@ -113,7 +115,7 @@ const quest = computed<Tier1QuestDef | null>(() => {
     myRank: vRank.myRank,
     hasHardware,
     hasS1Only,
-    hasProOrRackOldGen,
+    hasProOrRackP1,
     hasRackAnyGen,
     hasPremium: false, // mock placeholder (source parity)
     nexBalance: app.user.nexBalance,

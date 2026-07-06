@@ -33,6 +33,9 @@ const ADDITIVE_NUMBER_KEYS = new Set([
   "total",
   "todayEarnings",
   "todayEarningsNEX",
+  // FEAT-DEV02: per-device lifetime output — additive three-way-diff merge,
+  // same mechanics as todayEarnings (carrier deltas add, no double count).
+  "cumulativeEarningsUsdt",
 ]);
 
 const TIME_ANCHOR_KEYS = new Set([
@@ -87,6 +90,13 @@ function writeTable(table: AccountCloudTable): void {
   }
 }
 
+// NOTE (FEAT-DEV02): this module stays VALUE-IMPORT-FREE on purpose — the
+// SPEC-4 merge sentinel transpiles it into a bare node VM where Vite aliases
+// don't resolve. Legacy-snapshot backfill of the trade-in economics fields
+// (cumulativeEarningsUsdt / paidPriceUsdt) therefore lives in
+// device-types.ts backfillDeviceEconomics(), applied by app.ts at the two
+// snapshot consumption points (boot + account switch). Merge handles missing
+// fields gracefully (last-write), and the live state is always backfilled.
 export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | null {
   const key = normalizeAccountKey(accountKey);
   const row = readTable()[key];

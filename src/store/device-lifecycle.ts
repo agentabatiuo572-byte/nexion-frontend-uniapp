@@ -1,94 +1,110 @@
 /**
- * ⚠️ MOCK-ONLY DEGRADATION_PER_MONTH + MIN_EFFICIENCY constants.
- * Production: endpoint TBD; candidate: GET /api/config/lifecycle.
- * Not yet listed in PRD §9.11 — see lib/v3/_config/README.md inventory.
- * Degradation curve drives user earnings, must be server-authoritative +
- * server-time-based.
- * All `now: number = mockServerNow()` defaults route through the central
- * server-time helper for single-point cutover.
- * See lib/v3/_config/README.md.
+ * ⚠️ MOCK-ONLY TASK-CAPACITY schedule — server-authoritative business config.
+ * Production: GET /api/config/task-capacity (TBD; candidate name, PRD §6.8).
+ * Admin mutates via the ops console「任务产能节奏」panel (E domain); the values
+ * here are the client seed/UI cache. FEAT-DEV01 (Aligned 2026-07-06).
  *
- * Device lifecycle — degradation curve engine.
+ * Model: the platform's AI task pool keeps upgrading — newer models demand more
+ * VRAM, so high-tier tasks grow while low-tier task volume shrinks. A device
+ * with fixed VRAM therefore books fewer tasks month over month. This module
+ * quantifies that as a capacity multiplier in [CAPACITY_FLOOR, 1.0] applied to
+ * baseRate. (Successor of the retired "hardware degradation" framing — SAME
+ * math by product decision 等效换皮: the band table must reproduce the legacy
+ * curve exactly, enforced by scripts/check-capacity-curve-parity.mjs at
+ * 0.25-month steps. An INTENTIONAL retune updates that golden + canon together.)
  *
- * Real compute hardware loses effective output over time (thermal wear,
- * driver bit-rot, network-difficulty inflation). Nexion models this with a
- * three-stage monthly degradation curve, calibrated to make a fresh device
- * produce ~22% of its baseline yield by month 12 — at which point the user
- * is expected to make a choice (trade-in / new device / NEX v2 lock).
+ * The schedule is kept as a REGEX-EXTRACTABLE literal: the admin repo's
+ * canon-sentinel.mjs text-parses these numbers against canon-numbers.json and
+ * the E-domain defaults — keep plain number literals, one band per line.
  *
- *   Month 1-3   −4% / mo   100% → 88.5%
- *   Month 4-8   −6% / mo   88.5% → 65.1%
- *   Month 9-12  −23.7% / mo 65.1% → ~22% (floor)
- *
- * The curve is pure / stateless: pass `purchasedAt` (and an optional `now`
- * for tests) and you get current efficiency back. UI calls `useEfficiency`
- * which re-derives whenever the store ticks the per-device timer.
- *
- * Phone and cloud-share devices are exempt — phone yield is already trivial,
- * and cloud-share is rented compute that the platform refreshes on its side.
+ * Derived display values (capacity %, tasks/day) are computed on demand from
+ * getEfficiency()/getLifecycleSummary() and are NEVER persisted (single-source
+ * derivation gate). The consumer API below (getMonthsOwned / getEfficiency /
+ * isDegradable / getLifecycleSummary / getNetworkMonthlyLoss) is shape-frozen.
  */
 
 import type { Device, DeviceKind } from "./types";
-
-export const DEGRADATION_PER_MONTH = {
-  early:  -0.04, // months 1-3
-  middle: -0.06, // months 4-8
-  late:   -0.237, // months 9-12 — calibrated so eff(month 12) ≈ MIN_EFFICIENCY (22%): 0.96^3·0.94^5·0.763^4 ≈ 0.22
-} as const;
-
 import { ONE_MONTH_MS, mockServerNow } from "./server-time";
 
-const MIN_EFFICIENCY = 0.22; // floor at month 12+
+/** Task-mix capacity schedule. Row i covers months (prevRow.throughMonth,
+ *  throughMonth]; the `throughMonth: null` row is open-ended. monthlyDeltaPct
+ *  compounds per whole month, with linear interpolation inside the current
+ *  month so the UI renders a smooth curve. */
+export const TASK_CAPACITY_BANDS = [
+  { throughMonth: 3, monthlyDeltaPct: -4 },       // months 1-3
+  { throughMonth: 8, monthlyDeltaPct: -6 },       // months 4-8
+  { throughMonth: null, monthlyDeltaPct: -23.7 }, // months 9+ — calibrated so capacity(month 12) ≈ floor: 0.96³·0.94⁵·0.763⁴ ≈ 0.22
+] as const;
 
+/** Capacity never drops below this share of the published daily rate. */
+export const CAPACITY_FLOOR = 0.22;
+
+/** New-device task-subsidy window, in days. DISPLAY-ONLY (FEAT-DEV01B): within
+ *  the window the device card shows the subsidy badge instead of the capacity
+ *  percentage. It must NEVER enter the accrual math below — the capacity curve
+ *  is continuous from day 0 (等效换皮 P0). */
+export const SUBSIDY_DAYS = 30;
+
+/** Kinds exempt from the task-mix decline (constant 100% capacity): phone
+ *  yield is engagement-tier, cloud-share is platform-refreshed rented compute,
+ *  pc-gpu is the user's own shared computer. Admin exposes this as per-SKU
+ *  「参与任务递减」switches. */
+export const CAPACITY_EXEMPT_KINDS: readonly DeviceKind[] = ["phone", "cloud-share", "pc-gpu"];
+
+/** Frozen consumer API — true when the kind follows the capacity schedule. */
 export function isDegradable(kind: DeviceKind): boolean {
-  return kind !== "phone" && kind !== "cloud-share" && kind !== "pc-gpu";
+  return !CAPACITY_EXEMPT_KINDS.includes(kind);
 }
 
 /**
- * 1-based month index since purchase (1 = first month of ownership, 12+ = end of cycle).
- * Returns a fractional month so the UI can render a smooth efficiency curve.
+ * 1-based month index since purchase (1 = first month of ownership, 12+ = deep
+ * schedule). Returns a fractional month so the UI can render a smooth curve.
  */
 export function getMonthsOwned(purchasedAt: number, now: number = mockServerNow()): number {
   return Math.max(0, (now - purchasedAt) / ONE_MONTH_MS);
 }
 
+function monthlyRateAt(month: number): number {
+  for (const band of TASK_CAPACITY_BANDS) {
+    if (band.throughMonth === null || month <= band.throughMonth) {
+      return band.monthlyDeltaPct / 100;
+    }
+  }
+  return TASK_CAPACITY_BANDS[TASK_CAPACITY_BANDS.length - 1].monthlyDeltaPct / 100;
+}
+
 /**
- * Multiplier in [MIN_EFFICIENCY, 1.0]. Smooth across stage boundaries by integrating
- * the monthly rate up to the current fractional month.
+ * Capacity multiplier in [CAPACITY_FLOOR, 1.0]. Smooth across band boundaries
+ * by integrating the monthly rate up to the current fractional month.
  *
- *   eff(t) = product over k in 1..floor(t) of (1 + rate(k))  ×  (1 + rate(floor(t)+1))^(t - floor(t))
+ *   cap(t) = product over k in 1..floor(t) of (1 + rate(k))  ×  (1 + rate(floor(t)+1))^(t - floor(t))
  */
 export function getEfficiency(monthsOwned: number): number {
   if (monthsOwned <= 0) return 1;
-
-  const rateAt = (m: number): number => {
-    if (m <= 3) return DEGRADATION_PER_MONTH.early;
-    if (m <= 8) return DEGRADATION_PER_MONTH.middle;
-    return DEGRADATION_PER_MONTH.late;
-  };
 
   const whole = Math.floor(monthsOwned);
   const frac = monthsOwned - whole;
 
   let eff = 1;
   for (let m = 1; m <= whole; m++) {
-    eff *= 1 + rateAt(m);
+    eff *= 1 + monthlyRateAt(m);
   }
   if (frac > 0) {
-    eff *= 1 + rateAt(whole + 1) * frac;
+    eff *= 1 + monthlyRateAt(whole + 1) * frac;
   }
-  return Math.max(MIN_EFFICIENCY, eff);
+  return Math.max(CAPACITY_FLOOR, eff);
 }
 
 /**
- * Convenience: full degradation summary for a single device.
+ * Convenience: full task-capacity summary for a single device.
+ * (Field names retained from the degradation era — frozen consumer shape.)
  */
 export interface DeviceLifecycleSummary {
   isDegradable: boolean;
   monthsOwned: number;
-  efficiency: number;       // 0..1, applied to baseRate
-  dailyRateAtFull: number;  // baseRate (USD/day at 100% efficiency)
-  dailyRateNow: number;     // baseRate × efficiency
+  efficiency: number;       // 0..1 capacity multiplier, applied to baseRate
+  dailyRateAtFull: number;  // baseRate (USD/day at 100% capacity)
+  dailyRateNow: number;     // baseRate × capacity
   dailyLossUSD: number;     // dailyRateAtFull − dailyRateNow
   monthlyLossUSD: number;   // dailyLossUSD × 30
 }
@@ -126,7 +142,8 @@ export function getLifecycleSummary(
 }
 
 /**
- * Aggregate monthly loss across all degradable devices (used by /earn banner).
+ * Aggregate monthly shortfall across all schedule-following devices (used by
+ * the /earn banner).
  */
 export function getNetworkMonthlyLoss(
   devices: Device[],

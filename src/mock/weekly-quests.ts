@@ -67,7 +67,7 @@ export interface Tier1Context {
   myRank: number;
   hasHardware: boolean;
   hasS1Only: boolean;
-  hasProOrRackOldGen: boolean;
+  hasProOrRackP1: boolean;
   hasRackAnyGen: boolean;
   hasPremium: boolean;
   nexBalance: number;
@@ -84,8 +84,8 @@ export function dispatchTier1(ctx: Tier1Context): Tier1QuestDef {
   if (ctx.myRank >= 6 && !ctx.hasGenesis) return TIER1_QUESTS.buy_genesis;
   // 3. 有 Rack + 余额 ≥ $2K
   if (ctx.hasRackAnyGen && ctx.balanceUSDT >= 2000) return TIER1_QUESTS.buy_additional_hw;
-  // 4. 有 Pro/Rack 老代际(generation 1)
-  if (ctx.hasProOrRackOldGen) return TIER1_QUESTS.tradein_upgrade;
+  // 4. 有 Pro/Rack P1(原始档 kind 即可升级置换;代际概念已删,FEAT-DEV02)
+  if (ctx.hasProOrRackP1) return TIER1_QUESTS.tradein_upgrade;
   // 5. 有 S1 only
   if (ctx.hasS1Only) return TIER1_QUESTS.upgrade_s1_to_pro_v2;
   // 6. Phase P4+ 无 Premium

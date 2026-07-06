@@ -336,8 +336,6 @@ function onConfirmTradein() {
   const newDevice: Device = {
     ...createDevice(s.newKind, newId),
     activatedAt: Date.now(),
-    // Lineage: each trade-in bumps generation (gen 1 → 2, 2 → 3 on repeats).
-    generation: (oldDevice.generation ?? 1) + 1,
   };
   // removedDevice snapshot is the ONLY safe rollback source (array already
   // mutated, can't re-query) — Batch B audit Round 1 P0 #4.

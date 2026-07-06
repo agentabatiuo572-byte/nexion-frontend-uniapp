@@ -90,7 +90,6 @@ export interface Device {
   // until tick() sees currentTask transition complete → triggers deactivation.
   // Cleared by activateDevice() and by tick() after auto-deactivation fires.
   pendingDeactivate?: boolean;
-  generation: number;  // 1 = original spec; 2 = post-trade-in upgrade (e.g. Pro v2 / Rack P2)
   status: DeviceStatus;
   // Live simulation state
   gpuUsage: number; // 0-100
@@ -101,6 +100,16 @@ export interface Device {
   recentTasks: CompletedTask[]; // last 10
   todayEarnings: number;
   todayEarningsNEX: number;
+  // FEAT-DEV02 置换阶梯分子: lifetime USD output of THIS device. Accrued ONLY by
+  // app.ts settleDevice() in lockstep with todayEarnings; NEVER reset by
+  // deactivation / today-zeroing. Multi-account snapshots merge it additively
+  // (account-cloud ADDITIVE_NUMBER_KEYS three-way diff — no double count).
+  // NEX output intentionally excluded from the trade-in base (FEAT-DEV02 ③).
+  cumulativeEarningsUsdt: number;
+  // FEAT-DEV02 置换阶梯分母: what the user actually paid (catalog price at
+  // purchase today; promo pricing would write the actual paid amount). 0 =
+  // free/gifted (phone, pc-gpu) → never trade-in eligible. Immutable once set.
+  paidPriceUsdt: number;
   // For NexionBox cards
   location?: string;
   hashRate?: number;

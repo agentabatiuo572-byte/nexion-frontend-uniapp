@@ -1,6 +1,8 @@
 import type { GpuTier } from "./config-types";
 import type { Device, DeviceKind } from "./types";
 import { pickRandomTask } from "@/mock/tasks";
+import { getEfficiency, getMonthsOwned, isDegradable } from "./device-lifecycle";
+import { ONE_MONTH_MS } from "./server-time";
 import { getCachedCapability, fallbackCapability } from "@/lib/device-capability";
 import { getDeviceId } from "@/lib/device-id";
 import { gpuTierDailyNex, gpuTierDailyRate, gpuTierVram, matchGpuTier } from "@/lib/gpu-tiers";
@@ -84,7 +86,6 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
     purchasedAt: Date.now(),
     // New devices land in inventory inactive (activatedAt=null); opt-in via /me/devices.
     activatedAt: null,
-    generation: 1,
     status: "online",
     gpuUsage: isCloud ? 0 : isPhone ? 78 : 82, // phone re-interprets gpuUsage as npuUtilization%
     gpuTemp: isCloud || isPhone ? 0 : 68,
@@ -94,6 +95,8 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
     recentTasks: [],
     todayEarnings: 0,
     todayEarningsNEX: 0,
+    cumulativeEarningsUsdt: 0,
+    paidPriceUsdt: DEVICE_PRICE_USDT[kind],
     hashRate: spec.hashRate,
     location: spec.location,
     dayCount: 47,
@@ -132,6 +135,38 @@ export function makeInitialDevices(): Device[] {
     return d;
   });
   return [phone, ...rest];
+}
+
+// FEAT-DEV02 backfill — snapshots persisted before the trade-in economics
+// fields existed get deterministic estimates (schema stays 1: adding fields
+// with derivable defaults is not a breaking shape change — bumping the schema
+// version would orphan every existing snapshot). Lives HERE (not in
+// account-cloud.ts) so the merge module stays value-import-free for the
+// SPEC-4 VM sentinel; app.ts applies it at snapshot consumption (boot +
+// account switch), which keeps all live state normalized.
+export function backfillDeviceEconomics(d: Device): Device {
+  const hasCum = typeof d.cumulativeEarningsUsdt === "number";
+  const hasPaid = typeof d.paidPriceUsdt === "number";
+  if (hasCum && hasPaid) return d;
+  const paidPriceUsdt = hasPaid ? d.paidPriceUsdt : DEVICE_PRICE_USDT[d.kind] ?? 0;
+  let cumulativeEarningsUsdt = d.cumulativeEarningsUsdt;
+  if (!hasCum) {
+    if (d.kind === "cloud-share") {
+      // cloud-share never accrues via settleDevice — the estimate must match.
+      cumulativeEarningsUsdt = 0;
+    } else {
+      // Expected lifetime output = baseRate × ∫ capacity(m) dm × days/month.
+      const months = getMonthsOwned(d.purchasedAt, Date.now());
+      const STEP = 0.25;
+      let integral = 0;
+      for (let m = 0; m < months; m += STEP) {
+        const span = Math.min(STEP, months - m);
+        integral += (isDegradable(d.kind) ? getEfficiency(m + span / 2) : 1) * span;
+      }
+      cumulativeEarningsUsdt = +(d.baseRate * integral * (ONE_MONTH_MS / ONE_DAY_MS)).toFixed(3);
+    }
+  }
+  return { ...d, cumulativeEarningsUsdt, paidPriceUsdt };
 }
 
 // Re-export specs so derivePromoUpgrade (below) + future pages can read base rates.

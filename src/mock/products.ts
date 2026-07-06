@@ -56,9 +56,8 @@ export interface Product {
   features: string[];
   // v3.1 AI workload throughput specs (§5.3.1)
   ai?: AIPerformance;
-  // Sprint 2 second phase: generation cohort + lifecycle status
-  generation?: number;      // 1 = original; 2 = Pro v2 / Rack P2 era
-  status?: "active" | "legacy"; // legacy = superseded by a newer generation
+  // Sprint 2 second phase: catalog lifecycle status
+  status?: "active" | "legacy"; // legacy = superseded in the catalog (still owned & serviced)
   supersededBy?: string;    // product id of the next-gen replacement
   tradeinDiscount?: number; // USD off when trading in a legacy device for this product
   // Sprint 2 final phase: platform-lifecycle release gate. Pro v2 ships when the
@@ -104,7 +103,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "LLM 70B inference pool",
       bestForCategory: ["IG", "LL"],
     },
-    generation: 1,
     status: "legacy",
     supersededBy: "stellarbox-pro-v2",
   },
@@ -143,7 +141,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "Flagship compute pool (Fine-tune + 405B inference)",
       bestForCategory: ["LL", "FT", "VG"],
     },
-    generation: 1,
     status: "legacy",
     supersededBy: "stellarrack-p2",
   },
@@ -180,7 +177,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "Flagship AI + multi-tenant 405B",
       bestForCategory: ["LL", "FT", "VG"],
     },
-    generation: 2,
     status: "active",
     tradeinDiscount: 300,
     unlocksAtPhase: "P3",
@@ -220,7 +216,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "Training pool (RLHF / from-scratch 8B)",
       bestForCategory: ["LL", "FT", "VG"],
     },
-    generation: 1,
     status: "legacy",
     supersededBy: "stellarrack-p2",
   },
@@ -257,7 +252,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "Training pool (RLHF / 70B from-scratch)",
       bestForCategory: ["LL", "FT", "VG"],
     },
-    generation: 2,
     status: "active",
     tradeinDiscount: 800,
     unlocksAtPhase: "P5",
@@ -286,7 +280,6 @@ export const PRODUCTS: Product[] = [
       unlocks: "Fractional access to network's IG + EM + SP pools",
       bestForCategory: ["IG", "EM", "SP"],
     },
-    generation: 1,
     status: "active",
   },
 ];
