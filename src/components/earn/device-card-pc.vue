@@ -67,11 +67,21 @@
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
-        <view v-if="degradable && lifecycle" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" @click.stop="goDevices">
+        <view v-if="degradable && inSubsidy" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" @click.stop="openExplainer">
+          <text>{{ subsidyText }}</text>
+        </view>
+        <view v-else-if="degradable && lifecycle" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" @click.stop="openExplainer">
+          <text style="opacity: 0.9">{{ t.earn.capacityChipLabel }}</text>
           <text>{{ (lifecycle.efficiency * 100).toFixed(0) }}%</text>
           <text style="opacity: 0.65">·</text>
           <text style="opacity: 0.9">{{ monthsLabel }}</text>
         </view>
+      </view>
+
+      <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
+      <view v-if="degradable && !inSubsidy && lifecycle" class="flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" @click.stop="openExplainer">
+        <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
+        <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
 
     <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
@@ -220,6 +230,33 @@
       </view>
     </view>
 
+    <!-- FEAT-DEV01: hardware locked-tasks loss-ad(从 VRAM 门控任务池真派生;顶配设备无锁定项自动隐藏) -->
+    <view v-if="hwTeasers.length" style="padding: 12px 20px 4px">
+      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+        <text>{{ t.earn.lockedTasksTitle }}</text>
+      </view>
+      <view class="flex items-baseline gap-1.5 mb-2.5">
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning); line-height: 1">−${{ hwLockedDaily }}</text>
+        <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
+      </view>
+      <view class="space-y-1.5">
+        <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 11.5px; color: var(--v5-ink-2)">
+          <view class="flex items-center gap-1.5 min-w-0">
+            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+            <text class="truncate">{{ it.model }}</text>
+          </view>
+          <view class="flex items-center gap-2 shrink-0 ml-2">
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="tabular-nums text-right" style="font-size: 10.5px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
+          </view>
+        </view>
+      </view>
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" @click.stop="goUnlockHw">
+        <text :style="unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
+      </view>
+    </view>
+
     <!-- Earnings — today only (est-this-hour removed per accordion redesign) -->
     <view style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
@@ -241,7 +278,10 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind } from "@/store/types";
-import { getLifecycleSummary, isDegradable } from "@/store/device-lifecycle";
+import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
+import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/tasks";
+import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
+import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
 import { computeLiveHashpower } from "@/lib/hashpower";
 import { getCarrier } from "@/lib/carrier";
@@ -452,6 +492,57 @@ const monthsLabel = computed(() => {
   if (!s) return "";
   return s.monthsOwned < 1 ? `${Math.floor(s.monthsOwned * 30)}d` : `${s.monthsOwned.toFixed(1)}mo`;
 });
+
+// ── FEAT-DEV01: 任务产能口径(补贴 badge / 产能行 / 硬件 loss-ad / W-CAP1 入口)──
+const explainer = useCapacityExplainer();
+function openExplainer() {
+  explainer.open();
+}
+const DAY_MS = 86400000;
+// 时钟回拨防护:剩余窗口 clamp 到 [0, SUBSIDY_DAYS](规格 DEV01B 异常3)。
+const subsidyRemainMs = computed(() =>
+  degradable.value ? Math.min(SUBSIDY_DAYS * DAY_MS, Math.max(0, props.device.purchasedAt + SUBSIDY_DAYS * DAY_MS - now.value)) : 0,
+);
+const inSubsidy = computed(() => degradable.value && subsidyRemainMs.value > 0);
+const subsidyText = computed(() => {
+  if (subsidyRemainMs.value <= DAY_MS) return t.value.earn.subsidyBadgeLastDay;
+  return fmt(t.value.earn.subsidyBadge, { n: Math.ceil(subsidyRemainMs.value / DAY_MS) });
+});
+const subsidyChipStyle: CSSProperties = {
+  padding: "3px 9px",
+  borderRadius: "999px",
+  fontSize: "10.5px",
+  fontWeight: 600,
+  fontFamily: "var(--font-v5)",
+  background: "var(--v5-brand-soft)",
+  color: "var(--v5-brand-deep)",
+};
+const capacityPct = computed(() => (lifecycle.value ? Math.round(lifecycle.value.efficiency * 100) : 100));
+const capacityFloored = computed(() => !!lifecycle.value && lifecycle.value.efficiency <= CAPACITY_FLOOR + 1e-9);
+// 展示派生:今日接单 ≈ 当前日产 ÷ 可接任务均价(单源 tasks.ts,确定性、不落库)。
+const tasksToday = computed(() => {
+  const s = lifecycle.value;
+  if (!s) return 0;
+  return Math.max(1, Math.min(999, Math.round(s.dailyRateNow / Math.max(avgEligibleReward(props.device.vramTotal), 1e-6))));
+});
+const capacityRowText = computed(() =>
+  capacityFloored.value
+    ? fmt(t.value.earn.capacityRowFloored, { pct: capacityPct.value })
+    : fmt(t.value.earn.capacityRow, { pct: capacityPct.value, n: tasksToday.value }),
+);
+const capacityRowStyle = computed<CSSProperties>(() => ({
+  fontSize: "11.5px",
+  color: capacityFloored.value ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
+  fontWeight: capacityFloored.value ? 600 : 400,
+}));
+// 硬件版高阶任务 loss-ad:真派生(VRAM 门控),补贴期内不渲染(满产叙事自洽)。
+const hwTeasers = computed<LockedTeaser[]>(() =>
+  degradable.value && !inSubsidy.value ? getLockedTeasers(props.device.vramTotal, 3) : [],
+);
+const hwLockedDaily = computed(() => hwTeasers.value.reduce((s, x) => s + x.dailyPotentialUSD, 0));
+function goUnlockHw() {
+  navTo("/pages/store/store");
+}
 
 // Long-press quick menu
 const menuOpen = ref(false);

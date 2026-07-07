@@ -170,6 +170,21 @@ function buildTask(tpl: TaskTemplate, model: ModelVariant): CurrentTask {
   };
 }
 
+// FEAT-DEV01: mean per-task reward across the templates a device of `maxVram`
+// can actually book — display-only denominator for the device card's
+// "≈N tasks booked today" line (tasksToday = dailyRateNow ÷ this). Derived from
+// the same TASK_TEMPLATES the simulator draws from (single source), never
+// persisted, deterministic (no RNG).
+export function avgEligibleReward(maxVram?: number): number {
+  const pools = TASK_TEMPLATES.map((tpl) => ({
+    tpl,
+    eligible: !maxVram || maxVram <= 0 ? tpl.models : tpl.models.filter((m) => m.minVRAM <= maxVram),
+  })).filter((e) => e.eligible.length > 0);
+  if (!pools.length) return (TASK_TEMPLATES[0].minReward + TASK_TEMPLATES[0].maxReward) / 2;
+  const sum = pools.reduce((s, e) => s + (e.tpl.minReward + e.tpl.maxReward) / 2, 0);
+  return sum / pools.length;
+}
+
 // ───── Upgrade Unlocks (locked-tier teasers for §5.2.4 Task Center) ─────
 
 export interface LockedTeaser {

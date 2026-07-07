@@ -65,6 +65,20 @@
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
       </view>
+      <!-- FEAT-DEV01: 任务池升级提示线(信息态 · 行内展开;详情入口 → W-CAP1 说明弹层) -->
+      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px" @tap="taskPoolOpen = !taskPoolOpen" @click="taskPoolOpen = !taskPoolOpen">
+        <view class="flex items-center justify-between gap-2">
+          <view class="flex items-center gap-1.5 min-w-0">
+            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
+            <text class="truncate" style="font-size: 11.5px; font-weight: 600; color: var(--v5-ink-2)">{{ t.earn.taskPoolLineTitle }}</text>
+          </view>
+          <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: taskPoolOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }"><path d="m6 9 6 6 6-6" /></svg>
+        </view>
+        <view v-if="taskPoolOpen" style="margin-top: 6px">
+          <text style="font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 11px; color: var(--v5-brand); font-weight: 600" @tap.stop="openExplainer" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
+        </view>
+      </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
       <EmptySlotsHint>
         <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
@@ -72,9 +86,13 @@
 
       <ComputeShareEntry />
       <!-- Loss-aversion — moved directly above the market board -->
+      <!-- FEAT-DEV01: 车队任务产能聚合 banner(原生命周期 banner,此前未挂载=孤儿组件,本次归位) -->
+      <DeviceLifecycleBanner />
       <MissedIncomeBanner />
       <MarketBoard />
       <TaskCenter />
+      <!-- FEAT-DEV01: W-CAP1 任务产能说明弹层(单实例;设备卡/补贴 badge/提示线共用入口) -->
+      <CapacityExplainerSheet />
     </CardStagger>
   </AppChassis>
 </template>
@@ -86,6 +104,8 @@ import CardStagger from "@/components/card-stagger.vue";
 import TrialHeroBanner from "@/components/trial-hero-banner.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
+import DeviceLifecycleBanner from "@/components/earn/device-lifecycle-banner.vue";
+import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
@@ -94,6 +114,7 @@ import TaskCenter from "@/components/earn/task-center.vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -101,6 +122,13 @@ const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 const app = useApp();
 const t = useT();
 const range = ref<Range>("Today");
+
+// FEAT-DEV01: 任务池提示线展开态 + W-CAP1 弹层入口。
+const taskPoolOpen = ref(false);
+const capacityExplainer = useCapacityExplainer();
+function openExplainer() {
+  capacityExplainer.open();
+}
 
 // Accordion: only one device detail open at a time (null = all collapsed).
 const expandedId = ref<string | null>(null);

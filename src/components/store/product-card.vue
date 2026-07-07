@@ -70,6 +70,12 @@
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
 
+        <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
+        <view v-if="product.ai?.unlocks" class="mt-1.5 flex items-center gap-1.5">
+          <svg class="shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
+          <text class="min-w-0 truncate" style="font-size: 11px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: product.ai.unlocks }) }}</text>
+        </view>
+
         <!-- Purchase gate — locked state (等级门/锁额) -->
         <view v-if="gateLockedView" class="mt-2.5" :style="gateBoxStyle">
           <view class="flex items-center justify-between" role="button" tabindex="0" @tap.stop="toggleGateDetails" @click.stop="toggleGateDetails">
