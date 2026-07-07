@@ -63,11 +63,14 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
               <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
             </view>
-            <!-- FEAT-DEV02:旧机抵扣行 + 移除出口(移除即恢复原价) -->
+            <!-- FEAT-DEV02:旧机抵扣行 + 移除出口(移除即恢复原价);移除后给找回入口 -->
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
               <text class="flex-1" style="font-size: 11.5px; color: var(--v5-success)">{{ tradeinChipText }}</text>
               <text style="font-size: 11.5px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+            </view>
+            <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <text style="font-size: 11.5px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -362,8 +365,17 @@ const tradeinChipText = computed(() => {
     credit: tradeinCreditText.value,
   });
 });
+const removedTradein = ref(false);
 function removeTradein() {
   tradein.clearApplied();
+  removedTradein.value = true;
+}
+// 移除后的找回入口(PR-D 债 #2:intercept 一次性,移除后本页原无恢复路径)。
+function reAddTradein() {
+  removedTradein.value = false;
+  interceptFired = false;
+  fireTradeinIntercept();
+  if (tradein.state.kind === "none") toast.warn(t.value.tradein.errPleaseRetry);
 }
 
 const netPrice = computed(() =>
@@ -564,7 +576,9 @@ watch(step, (s) => {
       const chargeTotal = +(net + fee).toFixed(2);
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
-        // Insufficient balance — bail out of the auto-advance chain (402).
+        // Insufficient balance — bail out of the auto-advance chain (402),
+        // with an explicit toast (was a silent bounce, PR-D debt #3).
+        toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
         step.value = "select-payment";
         return;
       }

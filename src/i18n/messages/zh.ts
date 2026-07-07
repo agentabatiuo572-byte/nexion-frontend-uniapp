@@ -809,6 +809,7 @@ export const zh: Messages = {
     checkoutCreditChip: "{name} 抵扣 −${credit}",
     checkoutRowLabel: "旧机抵扣",
     checkoutRemove: "移除",
+    checkoutReAdd: "用旧机抵扣 ›",
     // 设备列表升级置换条
     stripCredit: "可抵 ${credit}",
     stripCta: "升级置换",
@@ -4349,7 +4350,7 @@ export const zh: Messages = {
     tier1_buy_additional_hw_body: "用第二台设备扩日产能。高端算力承接持续 AI 需求。",
     tier1_buy_additional_hw_cta: "去商城",
     tier1_tradein_upgrade_title: "下架旧设备 · 抵扣升级高算力",
-    tier1_tradein_upgrade_body: "随时下架折抵:累计产出越少,抵扣比例越高——越早升级抵得越多。Pro v2 / Rack P2 算力 2.5×,可接更多高阶任务。",
+    tier1_tradein_upgrade_body: "随时下架折抵:累计产出越少,抵扣比例越高——越早升级抵得越多。Pro v2 起算力 2.5×、Rack P2 更高,可接更多高阶任务。",
     tier1_tradein_upgrade_cta: "查看升级置换",
     tier1_upgrade_s1_to_pro_v2_title: "升级 NexionBox S1 → Pro v2",
     tier1_upgrade_s1_to_pro_v2_body: "2.5× 算力,256GB VRAM,更强芯片。日产上限立即翻倍。",

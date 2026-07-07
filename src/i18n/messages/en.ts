@@ -825,6 +825,7 @@ export const en = {
     checkoutCreditChip: "{name} credit −${credit}",
     checkoutRowLabel: "Trade-in credit",
     checkoutRemove: "Remove",
+    checkoutReAdd: "Use trade-in credit ›",
     // Device list upgrade strip
     stripCredit: "Credit ${credit}",
     stripCta: "Upgrade trade-in",
@@ -4446,7 +4447,7 @@ export const en = {
     tier1_buy_additional_hw_body: "Scale daily yield with a second device. Flagship-tier compute fills incoming AI demand.",
     tier1_buy_additional_hw_cta: "Browse Store",
     tier1_tradein_upgrade_title: "Retire a device · credit your upgrade",
-    tier1_tradein_upgrade_body: "Retire anytime for checkout credit: the less it has produced, the bigger the credit — upgrading early pays more. Pro v2 / Rack P2 pack 2.5× the compute and book more higher-tier tasks.",
+    tier1_tradein_upgrade_body: "Retire anytime for checkout credit: the less it has produced, the bigger the credit — upgrading early pays more. Pro v2 packs 2.5× the compute, Rack P2 far more — booking more higher-tier tasks.",
     tier1_tradein_upgrade_cta: "See upgrade trade-in",
     tier1_upgrade_s1_to_pro_v2_title: "Upgrade NexionBox S1 → Pro v2",
     tier1_upgrade_s1_to_pro_v2_body: "2.5× throughput, 256GB VRAM, stronger silicon. Compound your daily ceiling immediately.",

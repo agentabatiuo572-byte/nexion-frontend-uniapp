@@ -161,6 +161,18 @@
         </view>
       </template>
 
+      <!-- 空态兜底:kind 已定但对应 view 为 null(设备/目标在弹层开着时消失,
+           PR-D 债 #1)。置于全部具体分支之后、block 之前,只接住 view-null 漏网。 -->
+      <template v-else-if="state.kind === 'retire' || state.kind === 'tradein' || state.kind === 'replace'">
+        <view class="tis-head">
+          <text class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
+          <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
+        </view>
+        <view class="tis-ghost" @click="hide">
+          <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
+        </view>
+      </template>
+
       <!-- ─────────── 4. block — pending-task block ─────────── -->
       <template v-else-if="state.kind === 'block'">
         <view class="tis-block-head">
@@ -649,10 +661,10 @@ function onForce() {
 }
 .tis-close {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 36px;
-  height: 36px;
+  top: 8px;
+  right: 8px;
+  width: 44px; /* 44×44 点按区(移动端最小触控标准;PR-D 债 #4) */
+  height: 44px;
   border-radius: 999px;
   background: var(--v5-surface-2);
   display: grid;

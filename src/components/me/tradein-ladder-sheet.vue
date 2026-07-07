@@ -97,10 +97,11 @@ const sheetStyle: CSSProperties = {
   padding: "18px 18px 30px",
   boxShadow: "var(--v5-card-shadow-lift-strong)",
 };
+// 44×44 点按区(移动端最小触控标准;PR-D 债 #4)。
 const closeBtnStyle: CSSProperties = {
-  width: "30px",
-  height: "30px",
-  borderRadius: "10px",
+  width: "44px",
+  height: "44px",
+  borderRadius: "12px",
   background: "var(--v5-surface-2)",
   border: "1px solid var(--v5-border)",
 };
