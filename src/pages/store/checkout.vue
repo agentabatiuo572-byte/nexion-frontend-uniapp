@@ -213,6 +213,8 @@ import { fmt } from "@/i18n/format";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
 import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
+import { getMonthsSince, isPhaseReached, tradeInEarlyWindowOk } from "@/store/product-phase";
+import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -264,6 +266,8 @@ const PAYMENT_METHODS = computed<PaymentMethod[]>(() => [
 ]);
 
 const tradein = useTradeinSheet();
+// 上架节奏门判定与商城正门同源(含 demo pin)。
+const phase = useProductPhase();
 
 const productId = ref("stellarbox-s1");
 onLoad((options) => {
@@ -271,6 +275,17 @@ onLoad((options) => {
   // accept ?product= (canonical) or ?id= (per task spec)
   if (o.product) productId.value = o.product;
   else if (o.id) productId.value = o.id;
+  // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
+  // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
+  const pp = getProduct(productId.value);
+  if (pp?.unlocksAtPhase && !isPhaseReached(phase.value, pp.unlocksAtPhase)) {
+    const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
+    if (!(viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt)))) {
+      uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
+      navTo("/store");
+      return;
+    }
+  }
   // Hard purchase gate (等级门/锁额): refuse checkout for ineligible / sold-out
   // SKUs — deep-link defense (store cards & detail already redirect blocked users
   // to /team/quota). Server re-checks on POST /api/orders (server-canonical).

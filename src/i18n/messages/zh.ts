@@ -793,6 +793,7 @@ export const zh: Messages = {
     retireTitle: "升级置换",
     retireSubtitle: "选择 {name} 的升级目标,抵扣额已按累计产出计算",
     retireTargetOption: "{name} · ${price} · 抵后约 ${net}",
+    retireEarlyTag: "抢先升级",
     // 置换确认(去结算)
     sheetTitle: "用 {from} 换 {to}",
     sheetOldDeviceLabel: "置换旧机",
@@ -811,7 +812,7 @@ export const zh: Messages = {
     // 设备列表升级置换条
     stripCredit: "可抵 ${credit}",
     stripCta: "升级置换",
-    stripNoTarget: "当前已是最高算力档位",
+    stripNoTarget: "暂无可升级机型",
     // 抵扣阶梯说明弹层
     ladderTitle: "置换抵扣规则",
     ladderIntro: "抵扣金额 = 购入价 × 对应档位比例。档位按该设备累计产出与购入价的比值确定:产出越多,抵扣比例越低。",
@@ -1546,6 +1547,7 @@ export const zh: Messages = {
     lockedNotifyMe: "上线时通知我",
     notifyToast: "{name} 上线后我们会通知你",
     comingSoonHeading: "即将上架",
+    releaseComingToast: "该机型即将上架,敬请期待",
     cardHighTierLine: "可接高阶任务:{pool}",
     comingSoonSubtitle: "批量生产将在周期后期出货",
     tradeinUpgrade: {

@@ -809,6 +809,7 @@ export const en = {
     retireTitle: "Upgrade trade-in",
     retireSubtitle: "Pick an upgrade target for {name} — credit is based on its lifetime output",
     retireTargetOption: "{name} · ${price} · ≈${net} after credit",
+    retireEarlyTag: "Early upgrade",
     // Trade-in confirm (proceeds to checkout)
     sheetTitle: "Trade in your {from} → {to}",
     sheetOldDeviceLabel: "Trading in",
@@ -827,7 +828,7 @@ export const en = {
     // Device list upgrade strip
     stripCredit: "Credit ${credit}",
     stripCta: "Upgrade trade-in",
-    stripNoTarget: "Already the top compute tier",
+    stripNoTarget: "No upgrade targets available yet",
     // Credit ladder explainer sheet
     ladderTitle: "Trade-in credit rules",
     ladderIntro: "Credit = purchase price × the band rate. The band comes from lifetime output ÷ purchase price — the more it has produced, the lower the rate.",
@@ -1564,6 +1565,7 @@ export const en = {
     lockedNotifyMe: "Notify me when live",
     notifyToast: "We'll ping you when {name} ships",
     comingSoonHeading: "Arriving soon",
+    releaseComingToast: "This model is arriving soon — stay tuned",
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
     tradeinUpgrade: {

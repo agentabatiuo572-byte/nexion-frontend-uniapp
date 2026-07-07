@@ -168,3 +168,42 @@ export const useProductPhaseOverride = defineStore("productPhaseOverride", () =>
 
   return { pinned, setPinned };
 });
+
+// ───────── FEAT-DEV02b:置换侧抢先购(上架节奏门 × 升级置换融合,2026-07-07 主人拍板) ─────────
+// Server-canonical: GET /api/config/release-gates (TBD)。后台 E1「上架节奏门」配置项。
+// 默认关闭 = 上架门对置换路径同样生效(未正式上架的 SKU 不可作置换目标,深链同拦)。
+// 开启后,**仅置换路径**可在正式上架前 leadDays 天内购买该 SKU;商城正门(列表 Locked
+// 卡/详情/非置换深链)不受影响。与 admin「强制解锁」优先级:强制解锁=全面正式上架
+// (released),本开关随之无作用面,不冲突。字面量保持可正则抽取(canon 三端对账预留)。
+export const TRADEIN_EARLY_ACCESS = {
+  /** 总开关(默认关)。 */
+  enabled: false,
+  /** 提前天数:正式上架时点前 N 天起置换侧可购(运营档位建议 7/14/30/60/90)。 */
+  leadDays: 30,
+} as const;
+
+/** 抢先购窗口判定(仅窗口,不含"已正式上架"):开关开 ∧ 距上架月界 ≤ leadDays。
+ *  基于真实注册月龄(demo 的 phase pin 覆盖不影响窗口计算,pin 已上架时走 released 分支)。 */
+export function tradeInEarlyWindowOk(
+  unlocksAtPhase: PhaseId | undefined,
+  monthsSinceJoin: number,
+): boolean {
+  if (!unlocksAtPhase) return true;
+  if (!TRADEIN_EARLY_ACCESS.enabled) return false;
+  const gate = PHASES.find((p) => p.id === unlocksAtPhase);
+  if (!gate) return true;
+  return monthsSinceJoin >= gate.monthsFrom - TRADEIN_EARLY_ACCESS.leadDays / 30;
+}
+
+/** 置换目标可用性 = 已正式上架(与正门同源,含 demo pin)∨ 抢先购窗口内。
+ *  三个置换目标面(retire 列表 / 设备行 strip / 商城横幅)统一走本判定;
+ *  结算深链另需叠加「携置换上下文」条件(见 checkout 上架门拦截)。 */
+export function isTradeInTargetAvailable(
+  unlocksAtPhase: PhaseId | undefined,
+  currentPhase: PhaseParams,
+  monthsSinceJoin: number,
+): boolean {
+  if (!unlocksAtPhase) return true;
+  if (isPhaseReached(currentPhase, unlocksAtPhase)) return true;
+  return tradeInEarlyWindowOk(unlocksAtPhase, monthsSinceJoin);
+}

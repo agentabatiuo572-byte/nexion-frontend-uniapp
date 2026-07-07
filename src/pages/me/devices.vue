@@ -162,6 +162,8 @@ import { MAX_DEVICES } from "@/store/device-types";
 import { PRODUCTS } from "@/mock/products";
 import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
+import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase";
+import { useProductPhase } from "@/composables/use-product-phase";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 
@@ -195,6 +197,9 @@ const sheetDevice = ref<Device | null>(null);
 // promoMult>≈1.47 时 clamp 才可能绑定,届时各面按各自目标价如实显示。
 const tradeinSheet = useTradeinSheet();
 const ladderDevice = ref<Device | null>(null);
+// 上架节奏门(FEAT-DEV02b):未正式上架且不在抢先购窗口的 SKU 不算升级目标。
+const phase = useProductPhase();
+const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
 
 function tradeinStrip(d: Device): {
   tradeinCreditText?: string;
@@ -205,7 +210,9 @@ function tradeinStrip(d: Device): {
   const paid = d.paidPriceUsdt ?? 0;
   if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
   const targets = PRODUCTS.filter(
-    (p) => !TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid,
+    (p) =>
+      (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+      isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
   );
   if (targets.length === 0) return { tradeinDisabledText: t.value.tradein.stripNoTarget };
   const credit = computeTradeInCredit(

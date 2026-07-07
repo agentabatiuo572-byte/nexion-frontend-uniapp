@@ -34,11 +34,16 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { PRODUCTS } from "@/mock/products";
 import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase";
+import { useProductPhase } from "@/composables/use-product-phase";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const app = useApp();
 const w = computed(() => t.value.store.tradeinUpgrade);
+// 上架节奏门(FEAT-DEV02b):横幅报价目标同样只取已上架/抢先购窗口内的 SKU。
+const phase = useProductPhase();
+const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
 
 // 最优可置换设备:抵扣额最高者;目标取其最低升级价 SKU(最易达成的下一档)。
 const best = computed(() => {
@@ -48,7 +53,9 @@ const best = computed(() => {
     const paid = d.paidPriceUsdt ?? 0;
     if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) continue;
     const targets = PRODUCTS.filter(
-      (p) => !TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid,
+      (p) =>
+        (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+        isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
     );
     if (targets.length === 0) continue;
     const target = targets.reduce((a, b) => (a.price < b.price ? a : b));

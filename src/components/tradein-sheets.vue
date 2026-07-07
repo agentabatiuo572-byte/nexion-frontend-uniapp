@@ -212,6 +212,8 @@ import {
 } from "@/store/device-types";
 import { computeTradeInCredit, ladderBandFor, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
+import { getMonthsSince, isPhaseReached, isTradeInTargetAvailable } from "@/store/product-phase";
+import { useProductPhase } from "@/composables/use-product-phase";
 import { navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
@@ -221,6 +223,9 @@ const sheet = useTradeinSheet();
 const app = useApp();
 const bills = useBills();
 const t = useT();
+// 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
+const phase = useProductPhase();
+const monthsSinceJoin = computed(() => getMonthsSince(app.user.joinedAt));
 
 const state = computed(() => sheet.state);
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
@@ -316,17 +321,21 @@ const retireView = computed(() => {
   if (!device) return null;
   const paid = device.paidPriceUsdt ?? 0;
   // 目标 = 目录中合规的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
-  // 「仅限更高价」是运营可配规则,消费 flag 不硬编码。
+  // 「仅限更高价」与「已上架 ∨ 抢先购窗口」均为运营可配规则,消费 flag 不硬编码。
   const targets = PRODUCTS.filter(
-    (p) => !TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid,
-  ).map((p) => ({
-    id: p.id,
-    label: fmt(t.value.tradein.retireTargetOption, {
+    (p) =>
+      (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+      isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
+  ).map((p) => {
+    // 抢先购窗口内的未正式上架目标,行尾加「抢先升级」标(默认关闭时零渲染)。
+    const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase);
+    const base = fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
       price: p.price.toLocaleString(),
       net: Math.max(0, +(p.price - previewCredit(device, p.price)).toFixed(2)).toLocaleString(),
-    }),
-  }));
+    });
+    return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
+  });
   return {
     subtitle: fmt(t.value.tradein.retireSubtitle, { name: device.name }),
     targets,
