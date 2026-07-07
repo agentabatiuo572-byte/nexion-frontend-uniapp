@@ -191,7 +191,8 @@ export function tradeInEarlyWindowOk(
   if (!unlocksAtPhase) return true;
   if (!TRADEIN_EARLY_ACCESS.enabled) return false;
   const gate = PHASES.find((p) => p.id === unlocksAtPhase);
-  if (!gate) return true;
+  // fail-closed:限售门遇未知 phase(server 配置脏数据)宁少卖不提前卖。
+  if (!gate) return false;
   return monthsSinceJoin >= gate.monthsFrom - TRADEIN_EARLY_ACCESS.leadDays / 30;
 }
 

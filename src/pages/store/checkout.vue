@@ -539,6 +539,22 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
+      // 上架节奏门支付时复验(与 onLoad 同谓词):未正式上架 SKU 必须在支付
+      // 瞬间仍「携有效抵扣上下文 ∧ 抢先购窗口」——堵住「过门后移除抵扣 →
+      // 全价买未上架机」的旁路(对抗审查 F1)。
+      if (p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)) {
+        if (!(ti && tradeInEarlyWindowOk(p.unlocksAtPhase, getMonthsSince(app.user.joinedAt)))) {
+          toast.warn(t.value.store.releaseComingToast);
+          step.value = "select-payment";
+          return;
+        }
+      }
+      // 购买门支付时复验(同构纵深):onLoad 拦截后若经返回键回到留栈实例,
+      // 支付时刻仍按门拒单(对抗审查 F4b)。
+      if (purchaseGate.value.blocked) {
+        step.value = "select-payment";
+        return;
+      }
       const tradeInCredit = ti?.credit ?? 0;
       const net = Math.max(0, +(p.price - discount - tradeInCredit).toFixed(2));
       // Card payment charges the displayed total INCLUDING the 3.5% fee
