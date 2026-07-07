@@ -146,10 +146,13 @@ import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, BUNDLE_DISCOUNT_TIERS, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
+import { isPhaseReached } from "@/store/product-phase";
+import { useProductPhase } from "@/composables/use-product-phase";
 import { toast } from "@/store/ui";
 
 const t = useT();
 const cart = useCart();
+const phase = useProductPhase();
 
 // Sticky chassis nav header — back + "Bundle" title (mirrors the prototype's
 // <SetPageHeader backHref="/store"/>, whose chassis Header resolves the route
@@ -168,8 +171,14 @@ const discountUSD = computed(() => subtotal.value * discountPct.value);
 const total = computed(() => subtotal.value - discountUSD.value);
 const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + p.dailyEarn, 0));
 
+// 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
 const suggestions = computed(() =>
-  PRODUCTS.filter((p) => !cart.items.includes(p.id) && p.tier !== "Share").slice(0, 3),
+  PRODUCTS.filter(
+    (p) =>
+      !cart.items.includes(p.id) &&
+      p.tier !== "Share" &&
+      (!p.unlocksAtPhase || isPhaseReached(phase.value, p.unlocksAtPhase)),
+  ).slice(0, 3),
 );
 
 const tiersReversed = computed(() => BUNDLE_DISCOUNT_TIERS.slice().reverse());

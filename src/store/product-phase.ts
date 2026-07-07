@@ -139,6 +139,9 @@ export function isPhaseReached(current: PhaseParams, target: PhaseId): boolean {
 const OVERRIDE_STORAGE_KEY = "nexion-product-phase-override-v1";
 
 function hydratePinned(): PhaseId | null {
+  // 产线读守卫:setPinned 在 production no-op 只拦「写」,不拦手写 localStorage 的
+  // 「读」——否则用户手工塞 {pinned:"P5"} 即可绕开上架门/phase 派发(审查 F8)。
+  if (IS_PRODUCTION) return null;
   try {
     const s = uni.getStorageSync(OVERRIDE_STORAGE_KEY) as { pinned?: PhaseId } | "";
     if (s && typeof s === "object" && typeof s.pinned === "string") return s.pinned;
