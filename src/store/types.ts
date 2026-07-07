@@ -179,7 +179,7 @@ export interface UserState {
   earningBuckets: EarningBuckets;
   /** Lifetime sum of completed USDT deposits/topups. Used by tradein eligibility
    *  `cumulative-deposit-usdt` rule. Seeded 0; incremented ONLY by recordDeposit
-   *  action (NOT earnings, NOT exchange, NOT salvage refund, NOT KYC bonus,
+   *  action (NOT earnings, NOT exchange, NOT trade-in credit, NOT KYC bonus,
    *  NOT weekly-quest reward).
    *  ⚠️ MOCK-ONLY: production server-canonical via
    *  GET /api/users/me.cumulativeDepositUsdt

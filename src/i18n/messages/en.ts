@@ -815,7 +815,7 @@ export const en = {
     sheetEarnedLabel: "Lifetime output",
     sheetBandLabel: "Credit band",
     sheetBandText: "Band {band} · {pct}% of price",
-    sheetSalvageLabel: "Credit",
+    sheetCreditLabel: "Credit",
     sheetNetCostLabel: "Est. payable",
     sheetCta: "Confirm · checkout ${amount}",
     sheetCancel: "Cancel",

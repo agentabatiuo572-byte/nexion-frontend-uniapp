@@ -9,7 +9,7 @@
  * Schema:
  *   - enabled: 置换总开关(关闭=前端全部置换入口隐藏)。
  *   - eligibility: per-deviceKind 购买资格门(mode: open|any-of|all-of + rules[];
- *     转化漏斗机制,与代际无关,保留;`trade-in` 规则已去 fromKind 定向 ——
+ *     转化漏斗机制,与置换资格正交;`trade-in` 规则不限定来源型号 ——
  *     任意合格设备的置换即满足该通道)。
  *   - promo: 置换推送节奏(冷却/频次/延迟/最低龄/路由;只控推送,不限制用户随时主动置换)。
  *   - inventory: 回收库存软/硬上限(预留)。
@@ -28,7 +28,7 @@ export type EligibilityRule =
   | { type: "kyc-tier"; tier: "basic" | "verified" | "enhanced" }
   | { type: "days-active"; days: number }
   | { type: "referral-count"; count: number }
-  // FEAT-DEV02:fromKind 可省 = 任意合格设备的置换均满足本通道(代际定向已删)。
+  // FEAT-DEV02:fromKind 可省 = 任意合格设备的置换均满足本通道。
   | { type: "trade-in"; fromKind?: DeviceKind };
 
 export type EligibilityMode = "open" | "any-of" | "all-of";
@@ -156,7 +156,7 @@ export function previousTier(kind: DeviceKind): DeviceKind | null {
 }
 
 // ───────────────────────── FEAT-DEV02: earnings-ladder credit ────
-// 唯一抵扣引擎(旧月龄残值引擎已删)。Server-authoritative: same GET
+// 唯一抵扣引擎(无持有时长门槛)。Server-authoritative: same GET
 // /api/config/tradein payload, `creditLadder` + `ladderRules` keys; admin edits
 // via「升级置换阶梯」panel (E domain);canon 哨兵三端对账默认值。
 // Ladder semantics (FEAT-DEV02 ③, Aligned 2026-07-06): credit = paidPrice ×

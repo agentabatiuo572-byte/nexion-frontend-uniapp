@@ -799,7 +799,7 @@ export const zh: Messages = {
     sheetEarnedLabel: "累计产出",
     sheetBandLabel: "抵扣档位",
     sheetBandText: "第 {band} 档 · 抵原价 {pct}%",
-    sheetSalvageLabel: "本次抵扣",
+    sheetCreditLabel: "本次抵扣",
     sheetNetCostLabel: "预计应付",
     sheetCta: "确认置换 · 去结算 ${amount}",
     sheetCancel: "取消",

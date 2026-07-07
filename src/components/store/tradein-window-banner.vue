@@ -1,7 +1,7 @@
 <!--
   TradeinWindowBanner — FEAT-DEV02 升级置换横幅(/store 顶部)。
-  旧版按平台 phase + 代际固定抵扣($300/$800)已删;现按「用户最优可置换设备」
-  动态派生:可抵额 = 阶梯引擎真值,目标 = 该设备最低升级价 SKU。无合格设备即隐藏。
+  按「用户最优可置换设备」动态派生:可抵额 = 阶梯引擎真值,目标 = 该设备
+  最低升级价 SKU。无合格设备即隐藏,无 phase 窗口概念。
   Tapping routes to /me/devices (the trade-in entry).
 -->
 <template>

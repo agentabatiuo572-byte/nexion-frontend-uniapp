@@ -150,7 +150,7 @@ const stockLow = computed(
   () => !isShare.value && props.product.stock != null && props.product.stock < 50,
 );
 // FEAT-DEV02:动态置换角标——用户任一设备可抵本卡时展示「最高可抵 $X」(取
-// 可抵额最高的设备,阶梯实时派生;固定 $300/$800 代际映射已删)。
+// 可抵额最高的设备,阶梯实时派生,无固定映射)。
 const { tradeInSources: cardTradeinDevices } = useDeviceEligibility(props.product.id as DeviceKind);
 const bestTradeinCredit = computed(() => {
   const d = cardTradeinDevices.value[0];

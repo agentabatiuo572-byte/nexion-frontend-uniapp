@@ -110,7 +110,7 @@
             <text class="tis-row-value">{{ tradeinView.bandText }}</text>
           </view>
           <view class="tis-row">
-            <text class="tis-row-label">{{ t.tradein.sheetSalvageLabel }}</text>
+            <text class="tis-row-label">{{ t.tradein.sheetCreditLabel }}</text>
             <text class="tis-row-value tis-row-brand tis-num">−${{ tradeinView.credit }}</text>
           </view>
           <view class="tis-hr" />
