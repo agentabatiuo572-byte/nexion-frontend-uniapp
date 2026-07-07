@@ -565,6 +565,19 @@ no_native_button() {
   else bad "native <button> tag (uni default chrome — use <view @click>)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_native_button
+# @tap binding guard (PITFALLS P-059): uni H5 registers BOTH @tap and @click as
+# click listeners → a dual-bound element fires its handler TWICE per tap/click
+# (steppers +2, toggles open-then-close, navigateTo ×2 → stack corruption via
+# the navTo fallback chain). uni's compiler maps @click → tap on mp targets, so
+# single @click is correct on every platform. Comment MENTIONS of "@tap"
+# (migration notes) are fine — only the binding form `@tap...=` is banned.
+no_tap_binding() {
+  local hits
+  hits=$(grep -rnE '@tap(\.[a-z]+)*=' src 2>/dev/null | head -5)
+  if [ -z "$hits" ]; then ok "no @tap binding (single @click correct on all targets, P-059) (0 hits)";
+  else bad "@tap binding — H5 double-fires alongside click; use single @click (P-059)"; echo "$hits" | sed 's/^/        /'; fi
+}
+no_tap_binding
 # Raw navigateBack guard (PITFALLS P-054): uni H5 navigateBack on a single-entry
 # stack (cold-open/deep-link) returns SUCCESS as a no-op — fail never fires →
 # dead back button. Use navBack() helper (src/lib/route.ts, the one legit caller).

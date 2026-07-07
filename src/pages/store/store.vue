@@ -44,7 +44,7 @@
       </view>
 
       <!-- Orders entry -->
-      <view class="flex items-center justify-center gap-1.5" :style="ordersChipStyle" role="button" tabindex="0" :aria-label="t.store.ordersChip" @tap.stop="goOrders" @click.stop="goOrders">
+      <view class="flex items-center justify-center gap-1.5" :style="ordersChipStyle" role="button" tabindex="0" :aria-label="t.store.ordersChip" @click.stop="goOrders">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24" /><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
         <text>{{ t.store.ordersChip }}</text>
         <text v-if="orderCount > 0" class="tabular-nums ml-0.5" style="color: var(--v5-brand); font-weight: 600">{{ orderCount }}</text>

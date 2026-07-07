@@ -29,8 +29,8 @@
       <!-- Product not found -->
       <view v-if="!product" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
-        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @tap.stop="goStore" @click.stop="goStore">
-          <text @tap.stop="goStore" @click.stop="goStore">{{ t.store.coBackToStore }}</text>
+        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
+          <text @click.stop="goStore">{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
@@ -79,7 +79,6 @@
               :style="methodRowStyle(payment === m.id)"
               role="button"
               tabindex="0"
-              @tap.stop="selectPayment(m.id)"
               @click.stop="selectPayment(m.id)"
             >
               <view class="grid place-items-center shrink-0" :style="methodIconStyle(payment === m.id)">
@@ -97,8 +96,8 @@
               <text style="margin-top: 1px">⚠</text>
               <text class="flex-1" style="margin-left: 6px">{{ slotsFullText }}</text>
             </view>
-            <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" role="button" tabindex="0" :aria-label="t.store.coContinue" @tap.stop="goConfirm" @click.stop="goConfirm">
-              <text @tap.stop="goConfirm" @click.stop="goConfirm">{{ t.store.coContinue }}</text>
+            <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" role="button" tabindex="0" :aria-label="t.store.coContinue" @click.stop="goConfirm">
+              <text @click.stop="goConfirm">{{ t.store.coContinue }}</text>
             </view>
           </view>
         </view>
@@ -121,11 +120,11 @@
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
             <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
           </view>
-          <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @tap.stop="onConfirmPay" @click.stop="onConfirmPay">
-            <text @tap.stop="onConfirmPay" @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
+          <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="onConfirmPay">
+            <text @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
           </view>
-          <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @tap.stop="goSelectPayment" @click.stop="goSelectPayment">
-            <text @tap.stop="goSelectPayment" @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
+          <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @click.stop="goSelectPayment">
+            <text @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
           </view>
         </view>
 
@@ -189,11 +188,11 @@
           <text class="block" :style="liveTitleStyle">{{ t.store.coOrderPlaced }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
           <view class="flex" style="margin-top: 20px; gap: 8px">
-            <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @tap.stop="goTrack" @click.stop="goTrack">
-              <text @tap.stop="goTrack" @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
+            <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
+              <text @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
             </view>
-            <view class="grid place-items-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" :aria-label="t.store.coDone" @tap.stop="goStore" @click.stop="goStore">
-              <text @tap.stop="goStore" @click.stop="goStore">{{ t.store.coDone }}</text>
+            <view class="grid place-items-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" :aria-label="t.store.coDone" @click.stop="goStore">
+              <text @click.stop="goStore">{{ t.store.coDone }}</text>
             </view>
           </view>
         </view>

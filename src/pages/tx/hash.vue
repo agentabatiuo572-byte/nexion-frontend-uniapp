@@ -16,7 +16,7 @@
           <text :style="confirmedStyle">{{ w.confirmed }}</text>
         </view>
         <text class="block" :style="hashStyle">{{ hash }}</text>
-        <view class="flex items-center active:opacity-70" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copyButtonText" @tap.stop="copyHash" @click.stop="copyHash">
+        <view class="flex items-center active:opacity-70" :style="copyBtnStyle" role="button" tabindex="0" :aria-label="copyButtonText" @click.stop="copyHash">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           <text>{{ copyButtonText }}</text>
         </view>
@@ -45,11 +45,11 @@
         </view>
         <text class="block" :style="extBodyStyle">{{ w.externalBody }}</text>
         <view class="grid grid-cols-2" style="gap: 8px; margin-top: 12px">
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for Etherscan" @tap.stop="copyHash" @click.stop="copyHash">
+          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for Etherscan" @click.stop="copyHash">
             <text>Etherscan</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </view>
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for TRONScan" @tap.stop="copyHash" @click.stop="copyHash">
+          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for TRONScan" @click.stop="copyHash">
             <text>TRONScan</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </view>

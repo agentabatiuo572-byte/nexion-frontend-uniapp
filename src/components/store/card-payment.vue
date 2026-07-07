@@ -33,7 +33,6 @@
         :style="cardRowStyle(card.tokenId === selectedTokenId)"
         role="button"
         tabindex="0"
-        @tap.stop="selectCard(card.tokenId)"
         @click.stop="selectCard(card.tokenId)"
       >
         <view class="grid place-items-center shrink-0" :style="cardRowIconStyle">
@@ -90,11 +89,11 @@
 
     <!-- Pay + cancel -->
     <view style="padding: 8px 16px 16px">
-      <view class="w-full grid place-items-center active:opacity-90" :style="payBtnStyle" role="button" tabindex="0" :aria-label="payLabel" @tap.stop="onPay" @click.stop="onPay">
-        <text @tap.stop="onPay" @click.stop="onPay">{{ payLabel }}</text>
+      <view class="w-full grid place-items-center active:opacity-90" :style="payBtnStyle" role="button" tabindex="0" :aria-label="payLabel" @click.stop="onPay">
+        <text @click.stop="onPay">{{ payLabel }}</text>
       </view>
-      <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @tap.stop="emitCancel" @click.stop="emitCancel">
-        <text @tap.stop="emitCancel" @click.stop="emitCancel">{{ t.store.coCancel }}</text>
+      <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="emitCancel">
+        <text @click.stop="emitCancel">{{ t.store.coCancel }}</text>
       </view>
     </view>
   </view>

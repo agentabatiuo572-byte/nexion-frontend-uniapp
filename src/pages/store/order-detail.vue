@@ -19,7 +19,7 @@
       <!-- Order not found -->
       <view v-if="!order" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
-        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @tap.stop="goOrders" @click.stop="goOrders">
+        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
           <text>{{ t.orders.title }} →</text>
         </view>
       </view>
@@ -57,7 +57,7 @@
               <text class="block" style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ activatedHint }}</text>
             </view>
           </view>
-          <view class="block text-center active:opacity-85" :style="earnBtnStyle" role="button" tabindex="0" aria-label="View on Earn" @tap.stop="goEarn" @click.stop="goEarn">
+          <view class="block text-center active:opacity-85" :style="earnBtnStyle" role="button" tabindex="0" aria-label="View on Earn" @click.stop="goEarn">
             <text>View on Earn →</text>
           </view>
         </view>
@@ -104,7 +104,7 @@
 
         <!-- Cancel action (only while placed) -->
         <view v-if="cancellable" class="mx-4" style="margin-top: 12px; margin-bottom: 24px">
-          <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.orders.cancelOrder" @tap.stop="handleCancel" @click.stop="handleCancel">
+          <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.orders.cancelOrder" @click.stop="handleCancel">
             <text>{{ t.orders.cancelOrder }}</text>
           </view>
         </view>

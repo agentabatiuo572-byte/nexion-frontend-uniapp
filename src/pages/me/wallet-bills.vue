@@ -46,7 +46,6 @@
             role="button"
             tabindex="0"
             :aria-label="billAria(b)"
-            @tap.stop="goBill(b)"
             @click.stop="goBill(b)"
           >
             <view class="grid place-items-center shrink-0" :style="iconChipStyle(b.type)">

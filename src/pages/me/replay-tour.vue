@@ -52,13 +52,13 @@
         </view>
         <text class="block" :style="sectionIntroStyle">{{ w.demoLifecycleIntro }}</text>
         <view style="display: flex; flex-direction: column; gap: 8px">
-          <DemoAction :icon="ICONS.box" accent="var(--v5-brand)" :title="w.demoSeedTitle" :hint="w.demoSeedHint" :cta-label="w.demoSeedCta" @tap="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.server" accent="var(--v5-warning)" :title="w.demoSeedRack" :hint="w.demoSeedRackHint" :cta-label="w.demoSeedRackCta" @tap="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.fastForward" accent="var(--v5-tech-cyan)" :title="w.demoFastForwardTitle" :hint="w.demoFastForwardHint" :cta-label="w.demoFastForwardCta" @tap="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.trophy" accent="var(--v5-brand)" :title="w.demoMilestoneTitle" :hint="w.demoMilestoneHint" :cta-label="w.demoMilestoneCta" @tap="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.layers" accent="var(--v5-tech-cyan)" :title="w.demoPhaseTitle" :hint="phaseHint" :cta-label="pinnedPhase ?? w.demoPhaseCta" @tap="cyclePhase" />
-          <DemoAction :icon="ICONS.bell" accent="var(--v5-warning)" :title="w.demoNovaTitle" :hint="w.demoNovaHint" :cta-label="w.demoNovaCta" @tap="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.refresh" accent="var(--v5-brand-2)" :title="w.demoResetTitle" :hint="w.demoResetHint" :cta-label="w.demoResetCta" @tap="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.box" accent="var(--v5-brand)" :title="w.demoSeedTitle" :hint="w.demoSeedHint" :cta-label="w.demoSeedCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.server" accent="var(--v5-warning)" :title="w.demoSeedRack" :hint="w.demoSeedRackHint" :cta-label="w.demoSeedRackCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.fastForward" accent="var(--v5-tech-cyan)" :title="w.demoFastForwardTitle" :hint="w.demoFastForwardHint" :cta-label="w.demoFastForwardCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.trophy" accent="var(--v5-brand)" :title="w.demoMilestoneTitle" :hint="w.demoMilestoneHint" :cta-label="w.demoMilestoneCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.layers" accent="var(--v5-tech-cyan)" :title="w.demoPhaseTitle" :hint="phaseHint" :cta-label="pinnedPhase ?? w.demoPhaseCta" @click="cyclePhase" />
+          <DemoAction :icon="ICONS.bell" accent="var(--v5-warning)" :title="w.demoNovaTitle" :hint="w.demoNovaHint" :cta-label="w.demoNovaCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.refresh" accent="var(--v5-brand-2)" :title="w.demoResetTitle" :hint="w.demoResetHint" :cta-label="w.demoResetCta" @click="onDemoUnavailable" />
         </view>
       </view>
 

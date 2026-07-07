@@ -432,3 +432,11 @@
 - **对策**:脚本改用应用 frame 上下文——`page.frames().find(f => f !== page.mainFrame())` 轮询取 iframe(build 产物无 iframe 时回退主 frame),`appFrame.evaluate(...)`。同 frame 内动态 import 命中 vite 模块缓存,拿到的就是页面主链的 store 实例,零产品代码改动。
 - **已转**:本台账 + 修复落地(verify 169/0)。硬规则:**任何要碰 store/import 源码模块的 walkthrough/验收脚本,evaluate 必须进应用 iframe frame**(参照 spec4-app-sync 的 `resolveAppFrame()` 写法);纯 localStorage 读写因同源共享可豁免但建议统一走 frame。
 - **元教训**:「脚本以前过、现在稳定挂、代码没动」≠ 环境玄学——先 **git stash 二分定责**(我的改动 vs 存量),再看**执行上下文**(frame/realm/进程)是否与被测物错位;evaluate 的 frame 归属是 playwright 对 iframe 型应用(uni H5 dev)的第一陷阱。
+
+## P-059 · 同元素 @tap+@click 双绑 → H5 真实点击/触摸链路 handler 双触发(步进器 ±2、开关开了又关、导航栈损毁)
+
+- **现象**:PR-C 验收实测(2026-07-07 复证):H5 端同一元素同挂 `@tap` 与 `@click`,一次触摸 handler 跑两次——数量步进器一摸 1→3(+2);折叠开关开了立刻关(回原位,看似"没反应");导航类 `navigateTo` 连发两次,第二次撞 uni 导航锁 fail → `navTo` fallback 链(redirectTo/reLaunch)把页面栈**重写坍缩**(实测 [index,…] → 仅 [目标页],用户按返回=直接退出而非回上页)。全仓清扫揪出存量 **57 处双绑 / 16 文件**(checkout 13 处最重)。
+- **根因**:uni H5 runtime 把 `@tap` 与 `@click` **都注册为 click 监听**(H5 无原生 tap,tap 即 click 别名+触摸增强)——同一个 click 事件依次触发两个 handler。所以不止真机触摸:**鼠标点击、`el.click()`、任何合成 click 都双触发**。写双绑的动机(「保险起见两端都绑」)在 uni 语义下是反的:uni 编译器在小程序端把 `@click` 自动映射为 tap,`@click` 单绑本就全端正确,`@tap` 没有任何补充价值。
+- **对策**:**单绑 `@click` 是全端唯一正确姿势**(修饰符照常:`@click.stop` 等)。双绑一律删 `@tap` 保 `@click`;单绑 `@tap` 也统一改名 `@click`(风格与哨兵一致)。修复实测:同一触摸序列步进器 1→2、开关正常展开、导航栈 +1。
+- **已转**:`verify.sh` 哨兵「no @tap binding」——grep 绑定形态 `@tap(\.[a-z]+)*=`,命中即 fail;注释里**提及** "@tap"(如本条与 earn.vue 迁移注释)不带绑定等号,不误伤。负向探针验真:临时造 `@tap="x"`/`@tap.stop="x"` 均 CAUGHT,注释提及放行。
+- **元教训**:「两端都绑更保险」类**冗余防御**在编译器已做端间映射的体系里=自我攻击;跨端事件这类「框架承诺」要用**真实事件链路**(触摸序列/合成 click)实测验证,不能靠肉眼「渲染了、能点」——双触发的开关类症状(开了又关)恰恰伪装成「没反应」,极易误判为"点击不灵"再叠一层错误修补。

@@ -11,7 +11,7 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <view class="relative overflow-hidden block" :style="cardStyle" role="button" tabindex="0" @tap="goDetail" @click="goDetail">
+  <view class="relative overflow-hidden block" :style="cardStyle" role="button" tabindex="0" @click="goDetail">
     <view v-if="featured" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Hero photo banner ───── -->
@@ -78,7 +78,7 @@
 
         <!-- Purchase gate — locked state (等级门/锁额) -->
         <view v-if="gateLockedView" class="mt-2.5" :style="gateBoxStyle">
-          <view class="flex items-center justify-between" role="button" tabindex="0" @tap.stop="toggleGateDetails" @click.stop="toggleGateDetails">
+          <view class="flex items-center justify-between" role="button" tabindex="0" @click.stop="toggleGateDetails">
             <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
               <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
@@ -96,7 +96,7 @@
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @tap.stop="goDevices" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
     </view>
@@ -110,9 +110,9 @@
           <text style="font-size: 26px; font-weight: 600">{{ priceText }}</text>
         </view>
       </view>
-      <view class="inline-flex items-center justify-center whitespace-nowrap" :style="buyBtnDynStyle" @tap.stop="onBuy" @click.stop="onBuy">
+      <view class="inline-flex items-center justify-center whitespace-nowrap" :style="buyBtnDynStyle" @click.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-        <text @tap.stop="onBuy" @click.stop="onBuy">{{ buyLabel }}</text>
+        <text @click.stop="onBuy">{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>

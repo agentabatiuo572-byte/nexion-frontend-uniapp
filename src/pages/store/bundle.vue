@@ -43,7 +43,7 @@
       <view class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
         <view class="px-4 py-2.5 flex items-center justify-between" style="border-bottom: 1px solid var(--v5-border)">
           <text :style="itemsHeadingStyle">{{ t.bundle.itemsHeading }}</text>
-          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 11.5px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @tap.stop="clear" @click.stop="clear">{{ t.bundle.clear }}</text>
+          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 11.5px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear">{{ t.bundle.clear }}</text>
         </view>
 
         <!-- Empty state -->
@@ -67,7 +67,7 @@
               <text style="color: var(--v5-ink-4)">Price </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">Earns +${{ p.dailyEarn.toFixed(2) }}/d</text>
             </text>
           </view>
-          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="`Remove ${p.name}`" @tap.stop="remove(p.id)" @click.stop="remove(p.id)">
+          <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="`Remove ${p.name}`" @click.stop="remove(p.id)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -85,7 +85,6 @@
             role="button"
             tabindex="0"
             :aria-label="`Add ${p.name}`"
-            @tap.stop="onAddSuggestion(p)"
             @click.stop="onAddSuggestion(p)"
           >
             <view class="flex-1 min-w-0 text-left">
@@ -128,7 +127,7 @@
             <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ cumulativeDailyEarn.toFixed(2) }}/d</text>
           </view>
           <!-- Checkout CTA (intentional placeholder — see header comment) -->
-          <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" :aria-label="checkoutCtaText" @tap.stop="onCheckout" @click.stop="onCheckout">
+          <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" :aria-label="checkoutCtaText" @click.stop="onCheckout">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
             <text :style="ctaLabelStyle">{{ checkoutCtaText }}</text>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>

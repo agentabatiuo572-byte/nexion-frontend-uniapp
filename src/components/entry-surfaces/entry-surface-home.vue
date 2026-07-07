@@ -9,10 +9,10 @@
           <text class="entry-title">{{ data.title }}</text>
           <text class="entry-body">{{ data.body }}</text>
           <view class="entry-actions">
-            <view class="entry-action entry-action--primary" role="button" tabindex="0" :aria-label="data.primary.label" @tap="go(data.primary.href)" @click="go(data.primary.href)">
+            <view class="entry-action entry-action--primary" role="button" tabindex="0" :aria-label="data.primary.label" @click="go(data.primary.href)">
               <text>{{ data.primary.label }}</text>
             </view>
-            <view class="entry-action entry-action--ghost" role="button" tabindex="0" :aria-label="data.secondary.label" @tap="go(data.secondary.href)" @click="go(data.secondary.href)">
+            <view class="entry-action entry-action--ghost" role="button" tabindex="0" :aria-label="data.secondary.label" @click="go(data.secondary.href)">
               <text>{{ data.secondary.label }}</text>
             </view>
           </view>
@@ -55,7 +55,7 @@
         </view>
       </view>
 
-      <view class="entry-link" role="button" tabindex="0" aria-label="查看三端完整入口链接" @tap="go('/pages/entry-surfaces/index')" @click="go('/pages/entry-surfaces/index')">
+      <view class="entry-link" role="button" tabindex="0" aria-label="查看三端完整入口链接" @click="go('/pages/entry-surfaces/index')">
         <text>查看三端完整入口链接</text>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M7 17 17 7" />

@@ -8,7 +8,7 @@
       </view>
 
       <view class="entry-index__list">
-        <view v-for="item in links" :key="item.route" class="entry-index__row" role="button" tabindex="0" :aria-label="item.label" @tap="open(item.route)" @click="open(item.route)">
+        <view v-for="item in links" :key="item.route" class="entry-index__row" role="button" tabindex="0" :aria-label="item.label" @click="open(item.route)">
           <view class="entry-index__row-copy">
             <text class="entry-index__row-label">{{ item.label }}</text>
             <text class="entry-index__row-url">{{ item.fullUrl }}</text>

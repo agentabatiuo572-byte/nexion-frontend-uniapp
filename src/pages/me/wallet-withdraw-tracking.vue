@@ -12,7 +12,7 @@
       <!-- Empty -->
       <view v-if="!wd" class="px-5 text-center" style="padding-top: 16px">
         <text class="block" :style="emptyTextStyle">{{ t.wallet.noActiveWithdrawal }}</text>
-        <view class="active:opacity-70" style="display: inline-block; margin-top: 12px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @tap.stop="goWithdraw" @click.stop="goWithdraw">
+        <view class="active:opacity-70" style="display: inline-block; margin-top: 12px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
           <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
       </view>
@@ -69,7 +69,7 @@
         </view>
 
         <view class="mx-4" style="margin-top: 16px; margin-bottom: 8px">
-          <view class="flex items-center justify-center active:opacity-80" :style="backBtnStyle" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @tap.stop="goWallet" @click.stop="goWallet">
+          <view class="flex items-center justify-center active:opacity-80" :style="backBtnStyle" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet">
             <text>{{ t.wallet.trackBackToWallet }}</text>
           </view>
         </view>

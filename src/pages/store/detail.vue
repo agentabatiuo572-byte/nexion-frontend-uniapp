@@ -101,11 +101,11 @@
             <view class="flex items-center justify-between">
               <text style="font-size: 13.5px; color: var(--v5-ink-3)">{{ t.store.detQuantity }}</text>
               <view class="flex items-center" :style="stepperStyle">
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty <= 1)" role="button" tabindex="0" aria-label="Decrease quantity" @tap.stop="dec" @click.stop="dec">
+                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty <= 1)" role="button" tabindex="0" aria-label="Decrease quantity" @click.stop="dec">
                   <text>−</text>
                 </view>
                 <text class="tabular-nums text-center" :style="qtyNumStyle">{{ qty }}</text>
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty >= 6)" role="button" tabindex="0" aria-label="Increase quantity" @tap.stop="inc" @click.stop="inc">
+                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty >= 6)" role="button" tabindex="0" aria-label="Increase quantity" @click.stop="inc">
                   <text>+</text>
                 </view>
               </view>
@@ -209,7 +209,7 @@
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detFaq" /></view>
         <view class="mx-4 rounded-2xl border" :style="faqCardStyle">
           <view v-for="(f, i) in faqs" :key="i" :style="faqItemStyle(i)">
-            <view class="w-full flex items-center justify-between text-left active:opacity-80" :style="faqQStyle" role="button" tabindex="0" :aria-label="f.q" @tap.stop="toggleFaq(i)" @click.stop="toggleFaq(i)">
+            <view class="w-full flex items-center justify-between text-left active:opacity-80" :style="faqQStyle" role="button" tabindex="0" :aria-label="f.q" @click.stop="toggleFaq(i)">
               <text class="flex-1" style="padding-right: 8px">{{ f.q }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" :style="{ transform: openFaq === i ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }"><path d="m9 18 6-6-6-6" /></svg>
             </view>

@@ -33,8 +33,8 @@
         </svg>
       </view>
       <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.store.coOrPaste }}</text>
-      <view class="w-full flex items-center rounded-xl border active:opacity-90" :style="addressBtnStyle" role="button" tabindex="0" :aria-label="t.store.coAddressCopied" @tap.stop="copyAddress" @click.stop="copyAddress">
-        <text class="flex-1 font-mono" style="text-align: left; font-size: 11.5px; color: var(--v5-ink-2); word-break: break-all" @tap.stop="copyAddress" @click.stop="copyAddress">{{ address }}</text>
+      <view class="w-full flex items-center rounded-xl border active:opacity-90" :style="addressBtnStyle" role="button" tabindex="0" :aria-label="t.store.coAddressCopied" @click.stop="copyAddress">
+        <text class="flex-1 font-mono" style="text-align: left; font-size: 11.5px; color: var(--v5-ink-2); word-break: break-all" @click.stop="copyAddress">{{ address }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
       </view>
     </view>
@@ -53,11 +53,11 @@
 
     <!-- Confirm + cancel -->
     <view style="padding: 8px 16px 16px">
-      <view class="w-full inline-flex items-center justify-center active:opacity-90 active:scale-[0.98]" :style="confirmBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCompletedPayment" @tap.stop="emitComplete" @click.stop="emitComplete">
-        <text @tap.stop="emitComplete" @click.stop="emitComplete">{{ t.store.coCompletedPayment }}</text>
+      <view class="w-full inline-flex items-center justify-center active:opacity-90 active:scale-[0.98]" :style="confirmBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCompletedPayment" @click.stop="emitComplete">
+        <text @click.stop="emitComplete">{{ t.store.coCompletedPayment }}</text>
       </view>
-      <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @tap.stop="emitCancel" @click.stop="emitCancel">
-        <text @tap.stop="emitCancel" @click.stop="emitCancel">{{ t.store.coCancel }}</text>
+      <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="emitCancel">
+        <text @click.stop="emitCancel">{{ t.store.coCancel }}</text>
       </view>
       <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5">{{ sendExactLabel }}</text>
     </view>
