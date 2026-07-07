@@ -5,11 +5,12 @@
 -->
 <template>
   <view v-if="visible" class="fixed inset-0" style="z-index: 900">
-    <view class="absolute inset-0" style="background: rgba(19, 20, 26, 0.44)" @tap="close" @click="close" />
+    <!-- 仅 @click(uni 编译器小程序端自动映射 tap;H5 双绑会双触发) -->
+    <view class="absolute inset-0" style="background: rgba(19, 20, 26, 0.44)" @click="close" />
     <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 16px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
-        <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" @tap.stop="close" @click.stop="close">
+        <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" @click.stop="close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -30,7 +31,7 @@
         <view style="margin-top: 6px"><text :style="secBodyStyle">{{ t.earn.capExplainS2Body }}</text></view>
       </view>
 
-      <view class="mt-5 w-full grid place-items-center active:scale-[0.98]" :style="ctaStyle" @tap.stop="goStore" @click.stop="goStore">
+      <view class="mt-5 w-full grid place-items-center active:scale-[0.98]" :style="ctaStyle" @click.stop="goStore">
         <text :style="ctaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>

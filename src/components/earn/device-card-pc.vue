@@ -84,6 +84,14 @@
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
 
+      <!-- FEAT-DEV01 异常1:产能触底 → 独立升级主 CTA(直达商城,权重提升;规格 ⑥ 矩阵第 6 行)。
+           触底且有锁定任务清单时由下方 loss-ad 承载主 CTA(其样式随 floored 升权),此处不重复渲染 -->
+      <view v-if="capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
+        <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" @click.stop="goUnlockHw">
+          <text :style="flooredCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
+        </view>
+      </view>
+
     <!-- Phone: live hashpower (effective vs calibrated capability ceiling) -->
     <view v-if="phoneRunning" style="padding: 0 20px 12px">
       <view class="flex items-center justify-between" style="margin-bottom: 8px">
@@ -252,8 +260,8 @@
           </view>
         </view>
       </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" @click.stop="goUnlockHw">
-        <text :style="unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" @click.stop="goUnlockHw">
+        <text :style="capacityFloored ? flooredCtaLabelStyle : unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
 
@@ -543,6 +551,17 @@ const hwLockedDaily = computed(() => hwTeasers.value.reduce((s, x) => s + x.dail
 function goUnlockHw() {
   navTo("/pages/store/store");
 }
+// 触底态主 CTA:brand-2 实底提权(规格 异常1「升级 CTA 权重提升(主按钮态)」)。
+const flooredCtaStyle: CSSProperties = {
+  height: "44px",
+  borderRadius: "999px",
+  background: "var(--v5-brand-2)",
+};
+const flooredCtaLabelStyle: CSSProperties = {
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "var(--v5-on-brand-2)",
+};
 
 // Long-press quick menu
 const menuOpen = ref(false);

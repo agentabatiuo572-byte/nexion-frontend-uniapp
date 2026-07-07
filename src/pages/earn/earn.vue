@@ -66,7 +66,8 @@
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
       </view>
       <!-- FEAT-DEV01: 任务池升级提示线(信息态 · 行内展开;详情入口 → W-CAP1 说明弹层) -->
-      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px" @tap="taskPoolOpen = !taskPoolOpen" @click="taskPoolOpen = !taskPoolOpen">
+      <!-- 仅 @click:uni 编译器在小程序端将 click 映射为 tap;H5 下 @tap+@click 双绑会双触发(本页实测,开关类必单绑) -->
+      <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px" @click="taskPoolOpen = !taskPoolOpen">
         <view class="flex items-center justify-between gap-2">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -76,7 +77,7 @@
         </view>
         <view v-if="taskPoolOpen" style="margin-top: 6px">
           <text style="font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
-          <text class="block" style="margin-top: 6px; font-size: 11px; color: var(--v5-brand); font-weight: 600" @tap.stop="openExplainer" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
+          <text class="block" style="margin-top: 6px; font-size: 11px; color: var(--v5-brand); font-weight: 600" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
         </view>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
