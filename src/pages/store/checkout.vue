@@ -67,7 +67,7 @@
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
               <text class="flex-1" style="font-size: 11.5px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-              <text style="font-size: 11.5px; color: var(--v5-ink-4); padding: 4px 6px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+              <text style="font-size: 11.5px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -212,7 +212,8 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
-import { computeTradeInCredit } from "@/mock/tradein-config";
+import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -322,11 +323,12 @@ const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString(
 // 生效。抵扣只减应付,永不入余额;真值 server-authoritative(POST /api/orders
 // 服务端同事务复算+下架)。
 const appliedTradeinView = computed(() => {
+  if (!DEFAULT_TRADEIN_CONFIG.enabled) return null;
   const a = tradein.appliedTradein;
   const p = product.value;
   if (!a || !p || a.targetKind !== p.id) return null;
   const device = app.devices.find((d) => d.id === a.oldDeviceId);
-  if (!device || device.currentTask) return null;
+  if (!device || isDeviceTaskBlocked(device)) return null;
   const credit = computeTradeInCredit(
     device.paidPriceUsdt ?? 0,
     Math.max(0, device.cumulativeEarningsUsdt ?? 0),
@@ -336,7 +338,8 @@ const appliedTradeinView = computed(() => {
 });
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
 const hasTradein = computed(() => tradeinCredit.value > 0);
-const tradeinCreditText = computed(() => tradeinCredit.value.toLocaleString());
+// toFixed(2) 与其余六个抵扣展示面统一(strip/弹层/横幅均两位小数)。
+const tradeinCreditText = computed(() => tradeinCredit.value.toFixed(2));
 const tradeinChipText = computed(() => {
   const ti = appliedTradeinView.value;
   if (!ti) return "";
@@ -514,6 +517,14 @@ watch(step, (s) => {
       // 扣款→下架的同步原子块。抵扣只减应付;新机由订单履约管线 addDevice
       // 未激活入库,本块不生成设备。
       const ti = appliedTradeinView.value;
+      // 抵扣在支付瞬间失效(设备消失/任务开始/开关关闭)→ 拒单重报价,
+      // 绝不按确认页没展示过的全价静默扣款。
+      if (tradein.appliedTradein?.targetKind === p.id && !ti) {
+        tradein.clearApplied();
+        toast.warn(t.value.tradein.errPleaseRetry);
+        step.value = "select-payment";
+        return;
+      }
       const tradeInCredit = ti?.credit ?? 0;
       const net = Math.max(0, +(p.price - discount - tradeInCredit).toFixed(2));
       // Card payment charges the displayed total INCLUDING the 3.5% fee
@@ -545,16 +556,19 @@ watch(step, (s) => {
       orderId.value = ord.id;
       // Consume the voucher (single-use) once the order is persisted.
       if (discount > 0 && usedVoucherId) voucher.markUsed(usedVoucherId);
+      // 账单 memo 走 i18n(用户账单页直接渲染,禁硬编码英文)。
       const memoParts: string[] = [];
-      if (discount > 0) memoParts.push(`voucher -$${discount}`);
-      if (ti) memoParts.push(`trade-in ${ti.device.name} -$${tradeInCredit}`);
-      if (fee > 0) memoParts.push(`incl. 3.5% card fee $${fee}`);
+      if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
+      if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: ti.device.name, amount: tradeInCredit }));
+      if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee }));
       bills.add({
         type: "purchase",
         symbol: "USDT",
         amount: -chargeTotal,
         status: "posted",
-        memo: memoParts.length ? `Purchase · ${p.name} (${memoParts.join(", ")})` : `Purchase · ${p.name}`,
+        memo: memoParts.length
+          ? fmt(t.value.store.coBillMemoWithParts, { name: p.name, parts: memoParts.join(" · ") })
+          : fmt(t.value.store.coBillMemoBase, { name: p.name }),
         ref: ord.id,
       });
       if (wasEmptyBefore.value) firstOrderCelebrating.value = true;

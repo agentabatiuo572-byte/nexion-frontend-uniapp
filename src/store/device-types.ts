@@ -45,6 +45,9 @@ export interface CreateDeviceOptions {
   gpuModel?: string;
   gpuTier?: GpuTier;
   gpuTiers?: GpuTier[];
+  /** 实付净额(FEAT-DEV02 阶梯抵扣基数)。缺省回退目录价——仅限无订单上下文
+   *  的种子/演示路径;真实购买链(订单履约/trial 转正)必须传实付。 */
+  paidPriceUsdt?: number;
 }
 
 // ───── Default device factory ─────
@@ -96,7 +99,7 @@ export function createDevice(kind: DeviceKind, id: string, options: CreateDevice
     todayEarnings: 0,
     todayEarningsNEX: 0,
     cumulativeEarningsUsdt: 0,
-    paidPriceUsdt: DEVICE_PRICE_USDT[kind],
+    paidPriceUsdt: options.paidPriceUsdt ?? DEVICE_PRICE_USDT[kind],
     hashRate: spec.hashRate,
     location: spec.location,
     dayCount: 47,

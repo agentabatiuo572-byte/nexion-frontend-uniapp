@@ -24,11 +24,16 @@
       </view>
     </view>
     <!-- FEAT-DEV02:升级置换条(可选)——左「可抵 $X」chip → 阶梯说明;右「升级置换」→ retire 流;
-         无更高价目标时右侧置灰原因(业务链必有禁用原因)。 -->
+         无更高价目标时右侧置灰原因(业务链必有禁用原因)。点击绑在带 padding 的
+         wrapper view 上,左右可点区实高 ≥44px(text 裸 padding 只有 ~29px,虚标教训)。 -->
     <view v-if="tradeinCreditText || tradeinDisabledText" class="w-full flex items-center justify-between" :style="tradeinStripStyle">
-      <text v-if="tradeinCreditText" :style="tradeinChipStyle" @click.stop="emit('ladder')">{{ tradeinCreditText }} ›</text>
+      <view v-if="tradeinCreditText" class="flex-1 active:opacity-70" :style="tradeinTapLeftStyle" @click.stop="emit('ladder')">
+        <text :style="tradeinChipStyle">{{ tradeinCreditText }} ›</text>
+      </view>
       <text v-else :style="tradeinMutedStyle">{{ tradeinDisabledText }}</text>
-      <text v-if="tradeinCtaLabel" :style="tradeinCtaStyle" @click.stop="emit('tradein')">{{ tradeinCtaLabel }}</text>
+      <view v-if="tradeinCtaLabel" class="active:opacity-70" :style="tradeinTapRightStyle" @click.stop="emit('tradein')">
+        <text :style="tradeinCtaStyle">{{ tradeinCtaLabel }}</text>
+      </view>
     </view>
     <view class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !disabled }" :style="actionStyle" @click="onAction">
       <svg v-if="active" width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15" /><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" /><path d="M12 2v4" /><line x1="2" x2="22" y1="2" y2="22" /></svg>
@@ -115,30 +120,35 @@ const actionStyle: CSSProperties = {
   height: "44px",
   borderTop: "1px solid var(--v5-border)",
 };
-// FEAT-DEV02 置换条:soft tint 无描边(卡内嵌套禁 border 铁律);左右可点区各 ≥44px 高由 padding 保障。
+// FEAT-DEV02 置换条:soft tint 无描边(卡内嵌套禁 border 铁律);左右 wrapper
+// 各 padding 14px 上下 → 可点区实高 ≈45px(14+17+14)。
 const tradeinStripStyle: CSSProperties = {
-  padding: "10px 16px",
+  padding: "0 16px",
   borderTop: "1px solid var(--v5-border)",
   background: "color-mix(in srgb, var(--v5-brand) 5%, transparent)",
+};
+const tradeinTapLeftStyle: CSSProperties = {
+  padding: "14px 12px 14px 0",
+};
+const tradeinTapRightStyle: CSSProperties = {
+  padding: "14px 0 14px 16px",
 };
 const tradeinChipStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-success)",
-  padding: "6px 0",
 };
 const tradeinCtaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12.5px",
   fontWeight: 600,
   color: "var(--v5-brand)",
-  padding: "6px 0 6px 12px",
 };
 const tradeinMutedStyle: CSSProperties = {
   fontSize: "11.5px",
   color: "var(--v5-ink-4)",
-  padding: "6px 0",
+  padding: "14px 0",
 };
 const actionLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",

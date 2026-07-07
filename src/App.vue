@@ -180,7 +180,8 @@ function handleAutoRedeem(shadowUSDBeforeRedeem: number, shadowNEXBeforeRedeem: 
     });
   }
   const beforeDevices = app.devices.length;
-  app.addDevice(cfg.trialProductId);
+  // 实付 = 促销价 − 收益抵扣;作为该设备日后置换抵扣的基数(FEAT-DEV02)。
+  app.addDevice(cfg.trialProductId, { paidPriceUsdt: chargeAmount });
   const deviceAdded = app.devices.length > beforeDevices;
   const newId = deviceAdded ? app.devices[app.devices.length - 1]?.id : null;
   if (newId && app.activeSlotCount < MAX_DEVICES) {

@@ -517,7 +517,7 @@ export const en = {
     taskLockCumulative: "since signup",
     taskLockSubtitle: "{a} · {b}",
     taskLockCtaUpgrade: "See higher tiers",
-    taskLockCtaTradein: "Trade in & upgrade",
+    taskLockCtaTradein: "Upgrade to higher compute",
     lockedTasksTitle: "Tasks you're locked out of",
     lockedMissedDaily: "lost every day",
     unlockNMoreTasks: "Unlock {n} more tasks →",
@@ -1464,7 +1464,7 @@ export const en = {
     onlyXLeft: "units left this week",
     bestSeller: "Best Seller",
     trending: "Trending",
-    legacyBadge: "LEGACY",
+    legacyBadge: "Classic",
     secRecommended: "Recommended for you",
     secRecommendedTag: "popular",
     secMoreTiers: "More tiers",
@@ -1556,7 +1556,7 @@ export const en = {
     coTrackOrder: "Track Order →",
     coDone: "Done",
     coLoading: "Loading…",
-    // Sprint 2 finale — phase-gated gen-2 products
+    // Sprint 2 finale — phase-gated release-rhythm products (unlocksAtPhase)
     lockedTitle: "New silicon — coming next quarter",
     lockedBody:
       "{name} is finishing data-center qualification. Production batches ship to early operators in the next platform cycle.",
@@ -1572,6 +1572,12 @@ export const en = {
       body: "Upgrade to {target} for about ${net} more. Credit is based on lifetime output — the earlier you trade, the more you keep.",
       cta: "View my devices",
     },
+    // FEAT-DEV02 — checkout bill memo (rendered verbatim on the bills page, must be i18n)
+    coBillMemoBase: "Purchase · {name}",
+    coBillMemoWithParts: "Purchase · {name} ({parts})",
+    coBillVoucherPart: "voucher −${amount}",
+    coBillTradeinPart: "trade-in {name} −${amount}",
+    coBillCardFeePart: "incl. 3.5% card fee ${amount}",
     // Sprint A-1 / E.1: first-order celebration
     firstOrderTitle: "🎉 Your first NexionBox is on its way",
     firstOrderBody: "We'll provision your slot in the data center within minutes.",

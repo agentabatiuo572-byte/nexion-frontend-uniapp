@@ -1554,6 +1554,12 @@ export const zh: Messages = {
       body: "升级 {target} 只需再付约 ${net}。抵扣按累计产出计算,越早置换抵得越多。",
       cta: "查看我的设备",
     },
+    // FEAT-DEV02 — 结算账单 memo(账单页直接渲染,必须 i18n)
+    coBillMemoBase: "购买 · {name}",
+    coBillMemoWithParts: "购买 · {name}({parts})",
+    coBillVoucherPart: "券抵 −${amount}",
+    coBillTradeinPart: "置换 {name} 抵扣 −${amount}",
+    coBillCardFeePart: "含 3.5% 卡手续费 ${amount}",
     // Sprint A-1 / E.1: 首单庆祝
     firstOrderTitle: "🎉 你的第一台 NexionBox 已下单",
     firstOrderBody: "我们将在数分钟内为你在数据中心配置算力槽位。",

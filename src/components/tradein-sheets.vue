@@ -210,7 +210,8 @@ import {
   DEVICE_SPECS,
   createDevice,
 } from "@/store/device-types";
-import { computeTradeInCredit, ladderBandFor } from "@/mock/tradein-config";
+import { computeTradeInCredit, ladderBandFor, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
+import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import { navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
@@ -314,8 +315,11 @@ const retireView = computed(() => {
   const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!device) return null;
   const paid = device.paidPriceUsdt ?? 0;
-  // 目标 = 目录中严格更高价的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
-  const targets = PRODUCTS.filter((p) => p.price > paid).map((p) => ({
+  // 目标 = 目录中合规的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
+  // 「仅限更高价」是运营可配规则,消费 flag 不硬编码。
+  const targets = PRODUCTS.filter(
+    (p) => !TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid,
+  ).map((p) => ({
     id: p.id,
     label: fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
@@ -359,7 +363,8 @@ const tradeinView = computed(() => {
       from: kindLabel(oldDevice.kind),
       to: kindLabel(s.newKind),
     }),
-    oldDeviceText: `${oldDevice.name} · ${oldDevice.id}`,
+    // 只给设备名——内部 id 是工程标识,禁止渲染(页面文案禁字段名/枚举值)。
+    oldDeviceText: oldDevice.name,
     earned: earned.toFixed(2),
     bandText: band
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
@@ -379,8 +384,9 @@ function onConfirmTradein() {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
   }
-  // 入口后任务才开始的竞态:退回阻断提示(下架须先完成当前任务,规格 DEV02A 异常2)。
-  if (oldDevice.currentTask) {
+  // 入口后任务才开始的竞态:退回阻断提示(规格 DEV02A 异常2)。判定单源
+  // isDeviceTaskBlocked——库存机的出厂任务不在跑,不阻断。
+  if (isDeviceTaskBlocked(oldDevice)) {
     sheet.showRetireBlock(oldDevice.id, oldDevice.name);
     return;
   }
@@ -475,6 +481,7 @@ function onReplace() {
       oldKind: kindLabel(lowest.kind),
     }),
   );
+  confirming.value = false;
   hide();
   goDevices();
 }
@@ -501,6 +508,7 @@ function onKeepBuy() {
     memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
   });
   toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
+  confirming.value = false;
   hide();
   goDevices();
 }
@@ -588,6 +596,7 @@ function onForce() {
       oldKind: kindLabel(lowest.kind),
     }),
   );
+  confirming.value = false;
   hide();
   goDevices();
 }

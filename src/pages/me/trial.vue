@@ -244,7 +244,8 @@ async function handleRedeem() {
     bills.add({ type: "bonus", symbol: "NEX", amount: shadowNEXBeforeRedeem, status: "posted", memo: "Trial earnings → balance · NEX", ref: `${purchaseRef}-EARN-NEX` });
   }
   // Provision device (mirrors simulation-provider auto-redeem path).
-  app.addDevice(cfg.value.trialProductId);
+  // 实付 = 促销价 − 收益抵扣;作为该设备日后置换抵扣的基数(FEAT-DEV02)。
+  app.addDevice(cfg.value.trialProductId, { paidPriceUsdt: chargeAmount });
   const newId = app.devices[app.devices.length - 1]?.id;
   if (newId && app.activeSlotCount < MAX_DEVICES) {
     app.activateDevice(newId);

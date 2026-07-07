@@ -254,7 +254,7 @@ export function eligibleTradeInDevices(
       if (paid <= 0) return false;
       if (!TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return false;
       if (TRADEIN_LADDER_RULES.requireHigherPrice && !(targetPrice > paid)) return false;
-      if (d.currentTask) return false; // 任务运行中 → 入口阻断,不入候选
+      if (isDeviceTaskBlocked(d)) return false; // 激活中且任务运行 → 入口阻断,不入候选
       return true;
     })
     .sort(
@@ -264,11 +264,12 @@ export function eligibleTradeInDevices(
     );
 }
 
-/** 单设备视角:是否存在任一更高价可购目标(设备列表「升级置换」入口显隐/置灰)。 */
-export function hasHigherPricedTarget(device: Device): boolean {
-  const paid = device.paidPriceUsdt ?? 0;
-  if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(device.kind)) return false;
-  return Object.values(DEVICE_PRICE_USDT).some((p) => p > paid);
+/** 置换任务阻断判定单源:只有「激活中且有运行中任务」才算阻断——库存机上的
+ *  出厂任务不在跑(tick 跳过未激活设备),不能锁死下架;激活机走「先停用(自带
+ *  等任务/强停保护)→ 库存态再置换」既有链路。四个消费点(候选过滤/设备页入口/
+ *  确认弹层/结算复检)必须同用本判定。 */
+export function isDeviceTaskBlocked(d: Pick<Device, "activatedAt" | "currentTask">): boolean {
+  return d.activatedAt !== null && !!d.currentTask;
 }
 
 /**

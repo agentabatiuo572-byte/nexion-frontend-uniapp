@@ -160,7 +160,8 @@ import { useTrialConfig } from "@/store/trial-config";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
 import { PRODUCTS } from "@/mock/products";
-import { computeTradeInCredit, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
+import { computeTradeInCredit, TRADEIN_LADDER_RULES, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { isDeviceTaskBlocked } from "@/mock/eligibility";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 
@@ -188,10 +189,10 @@ const slotMeterLabel = computed(() =>
 const sheetDevice = ref<Device | null>(null);
 
 // ── FEAT-DEV02 升级置换条 ──────────────────────────────────────────────
-// 免费设备(paidPriceUsdt=0)/不在 applyTo 白名单 → 返回空对象=行内零痕迹;
-// 无更高价目标 → 只给禁用原因;其余给「可抵 $X」chip + 置换 CTA。抵扣额与
-// 目标无关(clamp 只在目标价<抵扣时生效,更高价目标永不触发),取最低升级价
-// 参与计算即为真值。
+// 总开关关 / 免费设备(paidPriceUsdt=0)/不在 applyTo 白名单 → 返回空对象 =
+// 行内零痕迹;无合规目标 → 只给禁用原因;其余给「可抵 $X」chip + 置换 CTA。
+// 默认规则(promoMult=1)下抵扣额与目标无关,取最低升级价参与计算即为真值;
+// promoMult>≈1.47 时 clamp 才可能绑定,届时各面按各自目标价如实显示。
 const tradeinSheet = useTradeinSheet();
 const ladderDevice = ref<Device | null>(null);
 
@@ -200,9 +201,12 @@ function tradeinStrip(d: Device): {
   tradeinCtaLabel?: string;
   tradeinDisabledText?: string;
 } {
+  if (!DEFAULT_TRADEIN_CONFIG.enabled) return {};
   const paid = d.paidPriceUsdt ?? 0;
   if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
-  const targets = PRODUCTS.filter((p) => p.price > paid);
+  const targets = PRODUCTS.filter(
+    (p) => !TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid,
+  );
   if (targets.length === 0) return { tradeinDisabledText: t.value.tradein.stripNoTarget };
   const credit = computeTradeInCredit(
     paid,
@@ -216,8 +220,9 @@ function tradeinStrip(d: Device): {
 }
 
 function handleTradein(d: Device) {
-  // 任务运行中:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格 DEV02A 异常2)。
-  if (d.currentTask) {
+  // 激活中且任务运行:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格
+  // DEV02A 异常2)。库存机的出厂任务不在跑,不阻断——判定单源 isDeviceTaskBlocked。
+  if (isDeviceTaskBlocked(d)) {
     tradeinSheet.showRetireBlock(d.id, d.name);
     return;
   }
