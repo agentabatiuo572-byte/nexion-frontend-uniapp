@@ -20,7 +20,13 @@ import type {
   EligibilityMode,
   TradeinConfig,
 } from "@/mock/tradein-config";
-import { previousTier, UPGRADE_LADDER } from "@/mock/tradein-config";
+import {
+  previousTier,
+  UPGRADE_LADDER,
+  TRADEIN_LADDER_RULES,
+  computeTradeInCredit,
+} from "@/mock/tradein-config";
+import { DEVICE_PRICE_USDT } from "@/store/device-types";
 
 // ─────────────────────────────────────────────────────────────── Context
 
@@ -164,12 +170,14 @@ export function checkRule(
       };
 
     case "trade-in":
-      // Trade-in rule only passes when user is currently in a trade-in flow
-      // trading in fromKind (ctx.tradeInFromKind === rule.fromKind).
+      // FEAT-DEV02:去 fromKind 定向——处于置换流程(任意合格设备)即通过;
+      // 若规则仍指定 fromKind(遗留配置),按定向匹配。
       return {
-        pass: ctx.tradeInFromKind === rule.fromKind,
+        pass:
+          ctx.tradeInFromKind != null &&
+          (rule.fromKind == null || ctx.tradeInFromKind === rule.fromKind),
         current: ctx.tradeInFromKind ?? "none",
-        required: rule.fromKind,
+        required: rule.fromKind ?? "any",
         hintKey: "tradein.eligibilityHintTradeIn",
       };
   }
@@ -227,35 +235,40 @@ export function checkEligibility(
 // ─────────────────────────────────────────────────────────────── Trade-in eligibility
 
 /**
- * Returns the set of owned device kinds that, if traded in, would unlock
- * the target kind via the `trade-in` rule.
- *
- * Used by Path A trade-in UI: "Trade in your S1 to unlock Pro" affordance.
+ * FEAT-DEV02:目标 SKU 视角的可抵扣设备清单(设备级,替代旧的 kind 级 sources)。
+ * 资格 = 实付价 > 0(赠送/免费排除)∧ kind ∈ ladder applyTo ∧ 目标目录价严格更高
+ * ∧ 置换总开关开 ∧ 无运行中任务(需先完成/放弃当前任务,入口层给阻断提示)。
+ * 活跃与库存设备都可抵(随时下架);排序按可抵金额高→低(转化优先)。
  */
-export function eligibleTradeInSources(
+export function eligibleTradeInDevices(
   targetKind: DeviceKind,
   cfg: TradeinConfig,
   ctx: EligibilityContext,
-): DeviceKind[] {
-  const elig = cfg.eligibility[targetKind];
-  if (!elig) return [];
+): Device[] {
+  if (!cfg.enabled) return [];
+  const targetPrice = DEVICE_PRICE_USDT[targetKind] ?? 0;
+  if (targetPrice <= 0) return [];
+  return ctx.devices
+    .filter((d) => {
+      const paid = d.paidPriceUsdt ?? 0;
+      if (paid <= 0) return false;
+      if (!TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return false;
+      if (TRADEIN_LADDER_RULES.requireHigherPrice && !(targetPrice > paid)) return false;
+      if (d.currentTask) return false; // 任务运行中 → 入口阻断,不入候选
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        computeTradeInCredit(b.paidPriceUsdt ?? 0, b.cumulativeEarningsUsdt ?? 0, targetPrice) -
+        computeTradeInCredit(a.paidPriceUsdt ?? 0, a.cumulativeEarningsUsdt ?? 0, targetPrice),
+    );
+}
 
-  const sources: DeviceKind[] = [];
-  for (const rule of elig.rules) {
-    if (rule.type === "trade-in") {
-      // User must own at least 1 ACTIVE device of rule.fromKind to trade in.
-      // Inventory devices (activatedAt === null) are explicitly excluded so
-      // the UI hint matches the action contract — showing "Trade in your S1
-      // to unlock Pro" when the only S1 is inactive would silently fail.
-      const activeCount = ctx.devices.filter(
-        (d) => d.kind === rule.fromKind && d.activatedAt !== null,
-      ).length;
-      if (activeCount > 0) {
-        sources.push(rule.fromKind);
-      }
-    }
-  }
-  return sources;
+/** 单设备视角:是否存在任一更高价可购目标(设备列表「升级置换」入口显隐/置灰)。 */
+export function hasHigherPricedTarget(device: Device): boolean {
+  const paid = device.paidPriceUsdt ?? 0;
+  if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(device.kind)) return false;
+  return Object.values(DEVICE_PRICE_USDT).some((p) => p > paid);
 }
 
 /**

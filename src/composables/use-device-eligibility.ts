@@ -1,5 +1,5 @@
 import { computed, type ComputedRef } from "vue";
-import type { DeviceKind } from "@/store/types";
+import type { Device, DeviceKind } from "@/store/types";
 import { useApp } from "@/store/app";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -8,7 +8,7 @@ import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import {
   checkEligibility,
-  eligibleTradeInSources,
+  eligibleTradeInDevices,
   type EligibilityContext,
   type EligibilityResult,
 } from "@/mock/eligibility";
@@ -32,10 +32,10 @@ import { DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 export interface UseDeviceEligibilityResult {
   /** Full eligibility evaluation (eligible / mode / passed / missing). */
   result: ComputedRef<EligibilityResult>;
-  /** True if the user owns ≥1 ACTIVE device matching a `trade-in` rule. */
+  /** True if the user owns ≥1 device retirable toward the target kind. */
   canTradeIn: ComputedRef<boolean>;
-  /** Owned device kinds whose trade-in would unlock the target kind. */
-  tradeInSources: ComputedRef<DeviceKind[]>;
+  /** FEAT-DEV02:可下架抵扣本目标的设备清单(设备级,按可抵额降序)。 */
+  tradeInSources: ComputedRef<Device[]>;
   /** True when active slots are at MAX_DEVICES (Path B slot-full prompt). */
   capped: ComputedRef<boolean>;
 }
@@ -70,7 +70,7 @@ export function useDeviceEligibility(
     checkEligibility(kind, DEFAULT_TRADEIN_CONFIG, ctx.value),
   );
   const tradeInSources = computed(() =>
-    eligibleTradeInSources(kind, DEFAULT_TRADEIN_CONFIG, ctx.value),
+    eligibleTradeInDevices(kind, DEFAULT_TRADEIN_CONFIG, ctx.value),
   );
   const canTradeIn = computed(() => tradeInSources.value.length > 0);
   const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));

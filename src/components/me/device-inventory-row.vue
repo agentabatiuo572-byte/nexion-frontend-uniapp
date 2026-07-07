@@ -23,6 +23,13 @@
         </view>
       </view>
     </view>
+    <!-- FEAT-DEV02:升级置换条(可选)——左「可抵 $X」chip → 阶梯说明;右「升级置换」→ retire 流;
+         无更高价目标时右侧置灰原因(业务链必有禁用原因)。 -->
+    <view v-if="tradeinCreditText || tradeinDisabledText" class="w-full flex items-center justify-between" :style="tradeinStripStyle">
+      <text v-if="tradeinCreditText" :style="tradeinChipStyle" @click.stop="emit('ladder')">{{ tradeinCreditText }} ›</text>
+      <text v-else :style="tradeinMutedStyle">{{ tradeinDisabledText }}</text>
+      <text v-if="tradeinCtaLabel" :style="tradeinCtaStyle" @click.stop="emit('tradein')">{{ tradeinCtaLabel }}</text>
+    </view>
     <view class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !disabled }" :style="actionStyle" @click="onAction">
       <svg v-if="active" width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15" /><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" /><path d="M12 2v4" /><line x1="2" x2="22" y1="2" y2="22" /></svg>
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
@@ -44,11 +51,15 @@ const props = withDefaults(
     deactivateLabel: string;
     slotsFullLabel: string;
     pendingChipLabel: string;
+    /** FEAT-DEV02 升级置换条(全部可选;都不传=不渲染,免费设备零痕迹) */
+    tradeinCreditText?: string;
+    tradeinCtaLabel?: string;
+    tradeinDisabledText?: string;
   }>(),
   { disabled: false },
 );
 
-const emit = defineEmits<{ (e: "toggle"): void }>();
+const emit = defineEmits<{ (e: "toggle"): void; (e: "tradein"): void; (e: "ladder"): void }>();
 
 const isPhone = computed(() => props.device.kind === "phone");
 const iconColor = computed(() => (props.active ? "var(--v5-brand)" : "var(--v5-ink-3)"));
@@ -103,6 +114,31 @@ const actionStyle: CSSProperties = {
   gap: "6px",
   height: "44px",
   borderTop: "1px solid var(--v5-border)",
+};
+// FEAT-DEV02 置换条:soft tint 无描边(卡内嵌套禁 border 铁律);左右可点区各 ≥44px 高由 padding 保障。
+const tradeinStripStyle: CSSProperties = {
+  padding: "10px 16px",
+  borderTop: "1px solid var(--v5-border)",
+  background: "color-mix(in srgb, var(--v5-brand) 5%, transparent)",
+};
+const tradeinChipStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "var(--v5-success)",
+  padding: "6px 0",
+};
+const tradeinCtaStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12.5px",
+  fontWeight: 600,
+  color: "var(--v5-brand)",
+  padding: "6px 0 6px 12px",
+};
+const tradeinMutedStyle: CSSProperties = {
+  fontSize: "11.5px",
+  color: "var(--v5-ink-4)",
+  padding: "6px 0",
 };
 const actionLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",

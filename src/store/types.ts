@@ -278,37 +278,13 @@ export interface AppState {
     id: string,
     patch: Partial<Pick<Device, "isCharging" | "isWifiConnected" | "batteryLevel">>,
   ) => void;
-  // Sprint trade-in foundation (Batch B) — atomic device-array actions.
-  // Composers (UI handlers) must wrap with bills + receipts + balance per
-  // ⚠️ MOCK-ONLY CROSS-STORE block at the implementation site in
-  // lib/store/index.ts (each action's JSDoc above the body documents the
-  // composer pattern + production endpoint).
-  /** Recycle a device for salvage credit. Removes from devices[], returns
-   *  salvage amount in USDT. Does NOT touch balance. */
-  recycleDevice: (id: string) => {
-    ok: boolean;
-    salvageCredit: number;
-    ageMonths: number;
-    removedDevice: Device | null;
-    error?: string;
-  };
-  /** Atomic Path-A trade-in: recycle old + add new + activate new in ONE set.
-   *  Returns salvageCredit so caller applies via debitBalance(price - salvage).
-   *  NEVER credits balance directly (Architect invariant #M2). */
-  replaceDevice: (oldId: string, newKind: DeviceKind) => {
-    ok: boolean;
-    salvageCredit: number;
-    newDeviceId: string | null;
-    ageMonths: number;
-    /** Snapshot of removed device. Caller uses this to manually re-insert if
-     *  the post-replace debit step fails. NEVER mutate this snapshot —
-     *  treat as opaque rollback token. */
-    removedDevice: Device | null;
-    error?: string;
-  };
-  /** Path-B: send active device to inventory (zeroes telemetry, preserves
-   *  device in array with activatedAt=null). Semantic alias of deactivateDevice. */
-  moveToInventory: (id: string) => boolean;
+  // FEAT-DEV02 upgrade trade-in — there is deliberately NO dedicated store
+  // action: the checkout persist block composes it atomically (debit net →
+  // remove old device → createOrder{tradeInCredit, tradeInDeviceId} → bill).
+  // Credit = computeTradeInCredit(paidPriceUsdt, cumulativeEarningsUsdt,
+  // targetPrice) — checkout-only, NEVER credited to balance. Production:
+  // POST /api/orders carries tradeInDeviceId; server re-computes the credit
+  // and retires the device in the same transaction.
   /** Atomic deposit: credits usdtBalance + bumps cumulativeDepositUsdt in ONE set.
    *  Topup page calls this instead of bare creditBalance so eligibility rules
    *  (`cumulative-deposit-usdt`) stay in sync with actual deposit flow. */

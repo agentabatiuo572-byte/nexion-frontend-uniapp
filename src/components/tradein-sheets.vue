@@ -2,19 +2,23 @@
   Trade-in sheet flow — chassis-level bottom sheets. Ported from
   Nexion-prototype/app/components/tradein-sheets.tsx (Batch C, 2026-05-27).
 
-  Four overlapping sheets share ONE `useTradeinSheet` discriminated-union state
+  Five overlapping sheets share ONE `useTradeinSheet` discriminated-union state
   machine so only one is visible at a time (prevents double-open from rapid
   taps). Branch is gated by `state.kind`, not local props:
 
-    1. choice  — TradeInOrFullChoiceSheet: entry fork at checkout when the user
-       owns a device tradeable for the target kind. Trade in (→ tradein) or pay
-       full price (→ replace if slot-full, else dismiss + caller proceeds).
-    2. tradein — Path A explicit trade-in. Salvage credit preview + net cost +
-       atomic confirm. Composer rolls back if debit fails after the swap.
-    3. replace — Path B slot-full prompt. Demote the lowest-yield active device
-       (or keep all slots + store new device in inventory).
-    4. block   — Path B sub-flow when the demote target is mid-task; user waits
-       or force-replaces (forfeits the running reward).
+    1.   choice  — entry fork at checkout when the user owns ≥1 retirable
+         device toward the target SKU. Trade in (→ tradein) or pay full price
+         (→ replace if slot-full, else dismiss + caller proceeds).
+    1.5  retire  — FEAT-DEV02 devices-page entry: pick a higher-priced upgrade
+         target for the chosen device (select list, no free input) → tradein.
+    2.   tradein — confirm card (lifetime output / ladder band / credit / est.
+         payable). Confirm writes the checkout credit context
+         (sheet.applyTradein) and routes to checkout — money + device mutation
+         happen atomically in checkout's persist block, not here.
+    3.   replace — Path B slot-full prompt. Demote the lowest-yield active
+         device (or keep all slots + store new device in inventory).
+    4.   block   — mid-task gate, split by origin: replace → wait / force
+         (forfeits reward); retire → view task / dismiss (no force teardown).
 
   Port notes:
     · framer slide/fade           → CSS @keyframes (tradein-fade / -slide-up)
@@ -26,14 +30,14 @@
   ⚠️ MOCK-ONLY CROSS-STORE COMPOSERS
   ---
   Touches stores: useApp (devices/balance), useBills, useTradeinSheet.
-  Each composer's ordering matters; rollback rules documented inline. uni's
-  app store exposes no atomic replaceDevice/moveToInventory, so the device-array
-  swap is composed here over app.devices (page/composer layer owns cross-store
-  orchestration; the store keeps its slot-cap authority). Production: each flow
-  maps to a single server transaction; the client mirrors the rollback.
+  Path B (replace/keep-buy/force) composers mutate app.devices + debit here with
+  documented rollback ordering. The FEAT-DEV02 trade-in path deliberately does
+  NOT mutate here — it defers to checkout's single persist block. Production:
+  each flow maps to a single server transaction; the client mirrors the rollback.
 
   Endpoints (all TBD; candidate names, not yet in PRD §9.11):
-    - Path A trade-in:  POST /api/devices/replace
+    - Trade-in:         POST /api/orders (tradeInDeviceId; server re-computes
+                        the ladder credit + retires the device transactionally)
     - Path B replace:   POST /api/devices/deactivate + POST /api/store/checkout
     - Path B keep+buy:  POST /api/store/checkout (new device lands inactive)
 -->
@@ -54,9 +58,9 @@
         <view class="tis-opt-list">
           <view
             v-for="src in choiceSources"
-            :key="src.fromKind"
+            :key="src.id"
             class="tis-opt"
-            @click="onChooseTradein(src.fromKind)"
+            @click="onChooseTradein(src.id)"
           >
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></svg>
             <text class="tis-opt-text">{{ src.label }}</text>
@@ -68,37 +72,57 @@
         </view>
       </template>
 
-      <!-- ─────────── 2. tradein — Path A explicit trade-in ─────────── -->
+      <!-- ─────────── 1.5 retire — FEAT-DEV02 主动下架:选升级目标 ─────────── -->
+      <template v-else-if="state.kind === 'retire' && retireView">
+        <view class="tis-head">
+          <text class="tis-title">{{ t.tradein.retireTitle }}</text>
+          <text class="tis-subtitle">{{ retireView.subtitle }}</text>
+        </view>
+        <view class="tis-opt-list">
+          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" @click="onPickTarget(p.id)">
+            <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
+            <text class="tis-opt-text">{{ p.label }}</text>
+          </view>
+        </view>
+        <view class="tis-ghost" @click="hide">
+          <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
+        </view>
+      </template>
+
+      <!-- ─────────── 2. tradein — 置换确认(去结算) ─────────── -->
       <template v-else-if="state.kind === 'tradein' && tradeinView">
         <view class="tis-head tis-head-mb4">
           <text class="tis-title">{{ tradeinView.title }}</text>
         </view>
 
-        <!-- surrender / salvage / net cost — soft surface card, no border -->
+        <!-- 旧机 / 累计产出 / 档位 / 抵扣 / 预计应付 — soft surface card, no border -->
         <view class="tis-card">
           <view class="tis-row">
             <text class="tis-row-label">{{ t.tradein.sheetOldDeviceLabel }}</text>
             <text class="tis-row-value">{{ tradeinView.oldDeviceText }}</text>
           </view>
           <view class="tis-row">
+            <text class="tis-row-label">{{ t.tradein.sheetEarnedLabel }}</text>
+            <text class="tis-row-value tis-num">${{ tradeinView.earned }}</text>
+          </view>
+          <view class="tis-row">
+            <text class="tis-row-label">{{ t.tradein.sheetBandLabel }}</text>
+            <text class="tis-row-value">{{ tradeinView.bandText }}</text>
+          </view>
+          <view class="tis-row">
             <text class="tis-row-label">{{ t.tradein.sheetSalvageLabel }}</text>
-            <text class="tis-row-value tis-row-brand tis-num">${{ tradeinView.salvage }}</text>
+            <text class="tis-row-value tis-row-brand tis-num">−${{ tradeinView.credit }}</text>
           </view>
           <view class="tis-hr" />
           <view class="tis-row">
             <text class="tis-row-label">{{ t.tradein.sheetNetCostLabel }}</text>
-            <text class="tis-row-value tis-row-emph tis-num">${{ tradeinView.netCost }}</text>
+            <text class="tis-row-value tis-row-emph tis-num">${{ tradeinView.estNet }}</text>
           </view>
         </view>
 
         <text class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
 
-        <view
-          class="tis-cta"
-          :class="{ 'tis-cta-disabled': tradeinView.insufficient }"
-          :style="tradeinView.insufficient ? undefined : ctaHalo"
-          @click="onConfirmTradein"
-        >
+        <view class="tis-cta" :style="ctaHalo" @click="onConfirmTradein">
           <text class="tis-cta-text">{{ tradeinView.ctaText }}</text>
         </view>
         <view class="tis-ghost" @click="hide">
@@ -143,20 +167,31 @@
           <svg class="tis-block-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <view class="tis-block-meta">
             <text class="tis-title">{{ blockTitle }}</text>
-            <text class="tis-block-warn">{{ t.tradein.blockWarning }}</text>
+            <text class="tis-block-warn">{{ state.origin === 'retire' ? t.tradein.retireBlockWarning : t.tradein.blockWarning }}</text>
           </view>
         </view>
 
-        <view class="tis-cta" @click="onWait">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
-          <text class="tis-cta-text">{{ t.tradein.blockWaitCta }}</text>
-        </view>
-        <view class="tis-warn-ghost" @click="onForce">
-          <text class="tis-warn-ghost-text">{{ t.tradein.blockForceCta }}</text>
-        </view>
-        <view class="tis-ghost" @click="hide">
-          <text class="tis-ghost-text">{{ t.tradein.blockCancel }}</text>
-        </view>
+        <!-- retire 阻断:等任务完成即可下架 → 查看任务 / 知道了(无 force,规格 DEV02A 异常2) -->
+        <template v-if="state.origin === 'retire'">
+          <view class="tis-cta" @click="onGoTasks">
+            <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
+          </view>
+          <view class="tis-ghost" @click="hide">
+            <text class="tis-ghost-text">{{ t.tradein.retireBlockOk }}</text>
+          </view>
+        </template>
+        <template v-else>
+          <view class="tis-cta" @click="onWait">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
+            <text class="tis-cta-text">{{ t.tradein.blockWaitCta }}</text>
+          </view>
+          <view class="tis-warn-ghost" @click="onForce">
+            <text class="tis-warn-ghost-text">{{ t.tradein.blockForceCta }}</text>
+          </view>
+          <view class="tis-ghost" @click="hide">
+            <text class="tis-ghost-text">{{ t.tradein.blockCancel }}</text>
+          </view>
+        </template>
       </template>
     </view>
   </view>
@@ -169,15 +204,14 @@ import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
-import { getProduct } from "@/mock/products";
-import { getLifecycleSummary } from "@/store/device-lifecycle";
+import { getProduct, PRODUCTS } from "@/mock/products";
 import {
   MAX_DEVICES,
-  DEVICE_PRICE_USDT,
   DEVICE_SPECS,
   createDevice,
 } from "@/store/device-types";
-import { computeSalvageCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
+import { computeTradeInCredit, ladderBandFor } from "@/mock/tradein-config";
+import { navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -205,23 +239,13 @@ function kindLabel(kind: DeviceKind): string {
   return getProduct(kind)?.name ?? DEVICE_SPECS[kind]?.name ?? kind;
 }
 
-/** Preview-only salvage credit. Real value is server-authoritative; what we
- *  compute here mirrors the swap composer below. */
-function previewSalvage(oldDevice: Device): number {
-  const lifecycle = getLifecycleSummary(oldDevice);
-  const price = DEVICE_PRICE_USDT[oldDevice.kind] ?? 0;
-  return +computeSalvageCredit(price, lifecycle.monthsOwned, DEFAULT_TRADEIN_CONFIG).toFixed(2);
-}
-
-/** Pick the highest-tier owned active device matching `fromKind`. If multiple
- *  owned of the same kind, pick the one with most-decayed salvage (oldest,
- *  lowest credit) so the user trades the device closest to EOL. */
-function chooseOldDevice(fromKind: DeviceKind): Device | null {
-  const candidates = app.slotDevices.filter(
-    (d) => d.kind === fromKind && d.activatedAt !== null,
+/** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
+function previewCredit(oldDevice: Device, targetPriceUsdt: number): number {
+  return computeTradeInCredit(
+    oldDevice.paidPriceUsdt ?? 0,
+    Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0),
+    targetPriceUsdt,
   );
-  if (candidates.length === 0) return null;
-  return candidates.reduce((acc, d) => (previewSalvage(d) < previewSalvage(acc) ? d : acc));
 }
 
 const ctaHalo = computed(() => ({
@@ -244,23 +268,22 @@ function goDevices() {
 const choiceSources = computed(() => {
   const s = state.value;
   if (s.kind !== "choice") return [];
-  return s.tradeInSources.map((fromKind) => {
-    const oldDevice = chooseOldDevice(fromKind);
-    const credit = oldDevice ? previewSalvage(oldDevice) : 0;
-    return {
-      fromKind,
+  return s.tradeInSources
+    .map((id) => app.devices.find((d) => d.id === id))
+    .filter((d): d is Device => !!d)
+    .map((d) => ({
+      id: d.id,
       label: fmt(t.value.tradein.choiceTradeInOption, {
-        fromKind: kindLabel(fromKind),
-        credit: credit.toFixed(2),
+        name: d.name,
+        credit: previewCredit(d, s.newPrice).toFixed(2),
       }),
-    };
-  });
+    }));
 });
 
-function onChooseTradein(fromKind: DeviceKind) {
+function onChooseTradein(deviceId: string) {
   const s = state.value;
   if (s.kind !== "choice") return;
-  const oldDevice = chooseOldDevice(fromKind);
+  const oldDevice = app.devices.find((d) => d.id === deviceId) ?? null;
   if (!oldDevice) {
     // Race: device disappeared between hint computation and click. Bail out
     // gracefully — user can retry from the product page.
@@ -283,29 +306,67 @@ function onChooseFullPrice() {
   }
 }
 
-// ───────────────────────── 2. tradein (Path A) ─────────────────────────
+// ───────────────────── 1.5 retire — 主动下架:选升级目标 ─────────────────────
+
+const retireView = computed(() => {
+  const s = state.value;
+  if (s.kind !== "retire") return null;
+  const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
+  if (!device) return null;
+  const paid = device.paidPriceUsdt ?? 0;
+  // 目标 = 目录中严格更高价的可购 SKU(select 列表,不手输;规格 DEV02A ⑥)。
+  const targets = PRODUCTS.filter((p) => p.price > paid).map((p) => ({
+    id: p.id,
+    label: fmt(t.value.tradein.retireTargetOption, {
+      name: p.name,
+      price: p.price.toLocaleString(),
+      net: Math.max(0, +(p.price - previewCredit(device, p.price)).toFixed(2)).toLocaleString(),
+    }),
+  }));
+  return {
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: device.name }),
+    targets,
+  };
+});
+
+function onPickTarget(productId: string) {
+  const s = state.value;
+  if (s.kind !== "retire") return;
+  const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
+  const p = getProduct(productId);
+  if (!device || !p) {
+    hide();
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
+  sheet.showTradein(device.id, productId as DeviceKind, p.price);
+}
+
+// ───────────────────────── 2. tradein — 置换确认(去结算) ─────────────────────
 
 const tradeinView = computed(() => {
   const s = state.value;
   if (s.kind !== "tradein") return null;
   const oldDevice = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!oldDevice) return null; // device vanished (already traded) — render nothing
-  const salvage = previewSalvage(oldDevice);
-  const netCost = Math.max(0, +(s.newPrice - salvage).toFixed(2));
-  const insufficient = netCost > app.user.usdtBalance;
-  const shortfall = insufficient ? +(netCost - app.user.usdtBalance).toFixed(2) : 0;
+  const paid = oldDevice.paidPriceUsdt ?? 0;
+  const earned = Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0);
+  const credit = previewCredit(oldDevice, s.newPrice);
+  const band = ladderBandFor(paid, earned);
+  const estNet = Math.max(0, +(s.newPrice - credit).toFixed(2));
   return {
     title: fmt(t.value.tradein.sheetTitle, {
       from: kindLabel(oldDevice.kind),
       to: kindLabel(s.newKind),
     }),
     oldDeviceText: `${oldDevice.name} · ${oldDevice.id}`,
-    salvage: salvage.toFixed(2),
-    netCost: netCost.toFixed(2),
-    insufficient,
-    ctaText: insufficient
-      ? fmt(t.value.tradein.sheetInsufficient, { shortfall: shortfall.toFixed(2) })
-      : fmt(t.value.tradein.sheetCta, { amount: netCost.toFixed(2) }),
+    earned: earned.toFixed(2),
+    bandText: band
+      ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
+      : "—",
+    credit: credit.toFixed(2),
+    estNet: estNet.toFixed(2),
+    ctaText: fmt(t.value.tradein.sheetCta, { amount: estNet.toFixed(2) }),
   };
 });
 
@@ -313,59 +374,30 @@ function onConfirmTradein() {
   const s = state.value;
   if (s.kind !== "tradein" || confirming.value) return;
   const oldDevice = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
-  if (!oldDevice || oldDevice.activatedAt === null) {
-    toast.warn(t.value.tradein.errReplaceUnavailable);
+  if (!oldDevice) {
+    hide();
+    toast.warn(t.value.tradein.errPleaseRetry);
     return;
   }
-  // Slot-cap defense-in-depth: replace is same-slot, but refuse if the result
-  // would exceed MAX_DEVICES (the store keeps this authority for direct calls).
-  const postActiveCount =
-    app.slotDevices.filter((d) => d.id !== oldDevice.id && d.activatedAt !== null).length + 1;
-  if (postActiveCount > MAX_DEVICES) {
-    toast.warn(t.value.tradein.errReplaceUnavailable);
+  // 入口后任务才开始的竞态:退回阻断提示(下架须先完成当前任务,规格 DEV02A 异常2)。
+  if (oldDevice.currentTask) {
+    sheet.showRetireBlock(oldDevice.id, oldDevice.name);
     return;
   }
   confirming.value = true;
-
-  // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path A trade-in.
-  // Order: snapshot old → atomic swap (remove old + add active new) → compute
-  // netCost → debit → on fail re-insert removedDevice snapshot + remove new →
-  // on success write bill + toast + route.
-  const salvage = previewSalvage(oldDevice);
-  const newId = `${s.newKind}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1000)}`;
-  const newDevice: Device = {
-    ...createDevice(s.newKind, newId),
-    activatedAt: Date.now(),
-  };
-  // removedDevice snapshot is the ONLY safe rollback source (array already
-  // mutated, can't re-query) — Batch B audit Round 1 P0 #4.
-  const removedDevice = oldDevice;
-  app.devices = [...app.devices.filter((d) => d.id !== oldDevice.id), newDevice];
-
-  const actualNetCost = Math.max(0, +(s.newPrice - salvage).toFixed(2));
-  const debited = app.debitBalance(actualNetCost);
-  if (!debited) {
-    // Rollback: re-insert removedDevice snapshot, remove the new device.
-    app.devices = [...app.devices.filter((d) => d.id !== newId), removedDevice];
-    const shortfall = +(actualNetCost - app.user.usdtBalance).toFixed(2);
-    toast.warn(fmt(t.value.tradein.sheetInsufficient, { shortfall: shortfall.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  bills.add({
-    type: "purchase",
-    symbol: "USDT",
-    amount: -actualNetCost,
-    status: "posted",
-    memo: fmt(t.value.tradein.sheetBillMemo, {
-      from: kindLabel(removedDevice.kind),
-      to: kindLabel(s.newKind),
-      credit: salvage.toFixed(2),
-    }),
-  });
-  toast.success(fmt(t.value.tradein.sheetSuccessToast, { to: kindLabel(s.newKind) }));
+  // FEAT-DEV02:确认 = 写入结算抵扣上下文,原子事务(净额扣款 + 移除旧机 + 新机
+  // 未激活入库)统一发生在结算页持久块——本弹层不再直接动钱/动设备数组。
+  sheet.applyTradein(oldDevice.id, s.newKind);
+  const targetId = s.newKind;
   hide();
-  goDevices();
+  const cur = (getCurrentPages().slice(-1)[0] as { route?: string } | undefined)?.route ?? "";
+  if (!cur.includes("store/checkout")) {
+    // 弹层退场后再路由(与 goDevices 同节奏),choice 路径本就在结算页则原地接管。
+    setTimeout(() => {
+      navTo(`/pages/store/checkout?product=${targetId}`);
+    }, 260);
+  }
+  confirming.value = false;
 }
 
 // ───────────────────────── 3. replace (Path B) ─────────────────────────
@@ -486,9 +518,17 @@ function onWait() {
   hide();
 }
 
+// retire 阻断:查看任务 → earn 页(该设备任务区)。
+function onGoTasks() {
+  hide();
+  setTimeout(() => {
+    navTo("/earn");
+  }, 260);
+}
+
 function onForce() {
   const s = state.value;
-  if (s.kind !== "block" || confirming.value) return;
+  if (s.kind !== "block" || s.origin !== "replace" || confirming.value) return;
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId);
   if (!lowest) {
     hide();

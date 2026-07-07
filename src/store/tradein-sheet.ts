@@ -25,8 +25,14 @@ export type TradeinSheetState =
       kind: "choice";
       targetKind: DeviceKind;
       newPrice: number;
-      /** Owned device kinds the user could trade in for `targetKind`. */
-      tradeInSources: DeviceKind[];
+      /** Owned device ids the user could retire toward `targetKind`
+       *  (FEAT-DEV02: device-level, ladder credit is per-device). */
+      tradeInSources: string[];
+    }
+  | {
+      /** FEAT-DEV02 主动下架入口(设备列表)——先选目标 SKU,再进 tradein 确认。 */
+      kind: "retire";
+      oldDeviceId: string;
     }
   | {
       kind: "tradein";
@@ -48,22 +54,45 @@ export type TradeinSheetState =
     }
   | {
       kind: "block";
+      origin: "replace";
       /** Lowest active device blocking the replace because of a running task. */
       oldDeviceId: string;
       oldDeviceName: string;
       newKind: DeviceKind;
       newPrice: number;
+    }
+  | {
+      /** FEAT-DEV02:retire 入口的任务阻断——当前任务完成后可下架,只给 查看任务/知道了。 */
+      kind: "block";
+      origin: "retire";
+      oldDeviceId: string;
+      oldDeviceName: string;
     };
 
 export const useTradeinSheet = defineStore("tradeinSheet", () => {
   const state = ref<TradeinSheetState>({ kind: "none" });
 
+  /** FEAT-DEV02 结算抵扣上下文:确认置换后写入,checkout 读它渲染抵扣行并在
+   *  持久块原子执行(移除旧机+净额扣款+新机未激活入库);「移除」清空恢复原价。
+   *  仅内存态(不持久):刷新丢弃=放弃抵扣,旧设备原状,无半执行风险。 */
+  const appliedTradein = ref<{ oldDeviceId: string; targetKind: DeviceKind } | null>(null);
+  function applyTradein(oldDeviceId: string, targetKind: DeviceKind) {
+    appliedTradein.value = { oldDeviceId, targetKind };
+  }
+  function clearApplied() {
+    appliedTradein.value = null;
+  }
+
   function showChoice(
     targetKind: DeviceKind,
     newPrice: number,
-    tradeInSources: DeviceKind[],
+    tradeInSources: string[],
   ) {
     state.value = { kind: "choice", targetKind, newPrice, tradeInSources };
+  }
+
+  function showRetire(oldDeviceId: string) {
+    state.value = { kind: "retire", oldDeviceId };
   }
 
   function showTradein(oldDeviceId: string, newKind: DeviceKind, newPrice: number) {
@@ -96,12 +125,16 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     newKind: DeviceKind,
     newPrice: number,
   ) {
-    state.value = { kind: "block", oldDeviceId, oldDeviceName, newKind, newPrice };
+    state.value = { kind: "block", origin: "replace", oldDeviceId, oldDeviceName, newKind, newPrice };
+  }
+
+  function showRetireBlock(oldDeviceId: string, oldDeviceName: string) {
+    state.value = { kind: "block", origin: "retire", oldDeviceId, oldDeviceName };
   }
 
   function hide() {
     state.value = { kind: "none" };
   }
 
-  return { state, showChoice, showTradein, showReplace, showBlock, hide };
+  return { state, appliedTradein, applyTradein, clearApplied, showChoice, showRetire, showTradein, showReplace, showBlock, showRetireBlock, hide };
 });

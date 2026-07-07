@@ -12,11 +12,10 @@
   Wrapped in <AppChassis active="me">; SubPageHeader (back chevron) scrolls
   with content (no chassis-level back row in uni — see sub-page-header.vue).
 
-  DEGRADED vs source: TradeInPromoBanner is omitted — it's config-gated by
-  DEFAULT_TRADEIN_CONFIG (not yet ported) and routes to a trade-in checkout
-  flow outside this batch. The trade-in CTA surface returns when that config +
-  flow land. Core inventory management (activate/deactivate/slot meter/trial
-  row/empty state) is fully ported.
+  FEAT-DEV02: each paid eligible device row carries an upgrade trade-in strip
+  (「可抵 $X」chip → ladder sheet · 「升级置换」CTA → retire flow via the
+  chassis-mounted TradeinSheets). Free devices (paidPriceUsdt=0) show no trace;
+  a device with no higher-priced target shows the disabled reason instead.
 -->
 <template>
   <AppChassis active="me">
@@ -81,7 +80,10 @@
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
+              v-bind="tradeinStrip(d)"
               @toggle="handleDeactivate(d)"
+              @tradein="handleTradein(d)"
+              @ladder="ladderDevice = d"
             />
           </view>
         </view>
@@ -103,7 +105,10 @@
               :deactivate-label="t.myDevices.inventoryRowDeactivate"
               :slots-full-label="t.myDevices.inventoryRowSlotsFull"
               :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
+              v-bind="tradeinStrip(d)"
               @toggle="handleActivate(d)"
+              @tradein="handleTradein(d)"
+              @ladder="ladderDevice = d"
             />
           </view>
           <view v-if="slotsFull" class="flex items-center" :style="slotsFullWarnStyle">
@@ -135,6 +140,7 @@
       @force="onSheetForce"
       @dismiss="sheetDevice = null"
     />
+    <TradeinLadderSheet :device="ladderDevice" @close="ladderDevice = null" />
   </AppChassis>
 </template>
 
@@ -144,13 +150,17 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
+import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
+import { useTradeinSheet } from "@/store/tradein-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
+import { PRODUCTS } from "@/mock/products";
+import { computeTradeInCredit, TRADEIN_LADDER_RULES } from "@/mock/tradein-config";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 
@@ -176,6 +186,43 @@ const slotMeterLabel = computed(() =>
 
 // Deactivate sheet (running-task branch) — page-driven (no chassis store).
 const sheetDevice = ref<Device | null>(null);
+
+// ── FEAT-DEV02 升级置换条 ──────────────────────────────────────────────
+// 免费设备(paidPriceUsdt=0)/不在 applyTo 白名单 → 返回空对象=行内零痕迹;
+// 无更高价目标 → 只给禁用原因;其余给「可抵 $X」chip + 置换 CTA。抵扣额与
+// 目标无关(clamp 只在目标价<抵扣时生效,更高价目标永不触发),取最低升级价
+// 参与计算即为真值。
+const tradeinSheet = useTradeinSheet();
+const ladderDevice = ref<Device | null>(null);
+
+function tradeinStrip(d: Device): {
+  tradeinCreditText?: string;
+  tradeinCtaLabel?: string;
+  tradeinDisabledText?: string;
+} {
+  const paid = d.paidPriceUsdt ?? 0;
+  if (paid <= 0 || !TRADEIN_LADDER_RULES.applyTo.includes(d.kind)) return {};
+  const targets = PRODUCTS.filter((p) => p.price > paid);
+  if (targets.length === 0) return { tradeinDisabledText: t.value.tradein.stripNoTarget };
+  const credit = computeTradeInCredit(
+    paid,
+    Math.max(0, d.cumulativeEarningsUsdt ?? 0),
+    Math.min(...targets.map((p) => p.price)),
+  );
+  return {
+    tradeinCreditText: fmt(t.value.tradein.stripCredit, { credit: credit.toFixed(2) }),
+    tradeinCtaLabel: t.value.tradein.stripCta,
+  };
+}
+
+function handleTradein(d: Device) {
+  // 任务运行中:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格 DEV02A 异常2)。
+  if (d.currentTask) {
+    tradeinSheet.showRetireBlock(d.id, d.name);
+    return;
+  }
+  tradeinSheet.showRetire(d.id);
+}
 
 async function handleActivate(d: Device) {
   if (slotsFull.value) {

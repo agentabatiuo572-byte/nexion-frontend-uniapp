@@ -37,8 +37,12 @@ export interface Order {
   productName: string;
   quantity: number;
   unitPrice: number;        // USDT
-  discount: number;         // USDT
-  total: number;            // USDT
+  discount: number;         // USDT (voucher)
+  /** FEAT-DEV02 旧机抵扣(USDT)——仅结算抵减,永不入余额;服务端同事务复算。 */
+  tradeInCredit?: number;
+  /** 被下架抵扣的旧设备 id(履约与审计追溯用)。 */
+  tradeInDeviceId?: string;
+  total: number;            // USDT = unitPrice − discount − tradeInCredit
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
   placedAt: number;
@@ -56,6 +60,8 @@ export interface CreateOrderInput {
   unitPrice: number;
   paymentMethod: string;
   discount?: number;
+  tradeInCredit?: number;
+  tradeInDeviceId?: string;
 }
 
 const STORAGE_KEY = "nexion-orders-v4";
@@ -123,7 +129,7 @@ export const useOrders = defineStore("orders", () => {
   }
 
   function createOrder(input: CreateOrderInput): Order {
-    const { productId, productName, unitPrice, paymentMethod, discount = 0 } = input;
+    const { productId, productName, unitPrice, paymentMethod, discount = 0, tradeInCredit = 0, tradeInDeviceId } = input;
     const id = genOrderId();
     const now = Date.now();
     const order: Order = {
@@ -133,7 +139,8 @@ export const useOrders = defineStore("orders", () => {
       quantity: 1,
       unitPrice,
       discount,
-      total: unitPrice - discount,
+      ...(tradeInCredit > 0 && { tradeInCredit, tradeInDeviceId }),
+      total: Math.max(0, +(unitPrice - discount - tradeInCredit).toFixed(2)),
       paymentMethod,
       // Resting state right after checkout is "paid"
       status: "paid",

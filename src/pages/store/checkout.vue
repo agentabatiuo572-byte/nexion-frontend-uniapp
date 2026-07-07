@@ -63,6 +63,12 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
               <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
             </view>
+            <!-- FEAT-DEV02:旧机抵扣行 + 移除出口(移除即恢复原价) -->
+            <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
+              <text class="flex-1" style="font-size: 11.5px; color: var(--v5-success)">{{ tradeinChipText }}</text>
+              <text style="font-size: 11.5px; color: var(--v5-ink-4); padding: 4px 6px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+            </view>
           </view>
           <view style="padding: 12px">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); padding: 0 8px 8px">{{ t.store.coPaymentMethod }}</text>
@@ -107,8 +113,9 @@
             <CheckoutRow :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
             <!-- Subtotal revealed when a voucher applies (to show the discount) or
                  when a card fee applies; voucher row sits between subtotal & fee. -->
-            <CheckoutRow v-if="hasVoucher || isCard" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
+            <CheckoutRow v-if="hasVoucher || isCard || hasTradein" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
+            <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
             <CheckoutRow v-if="isCard" :label="t.store.coRowCardFee" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
@@ -205,6 +212,7 @@ import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
+import { computeTradeInCredit } from "@/mock/tradein-config";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -307,7 +315,43 @@ const voucherMatch = computed(() => {
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
 const hasVoucher = computed(() => voucherDiscount.value > 0);
 const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString());
-const netPrice = computed(() => +(((product.value?.price ?? 0) - voucherDiscount.value).toFixed(2)));
+
+// ─── FEAT-DEV02 旧机抵扣 ─────────────────────────────────────────────────
+// retire 流(设备页下架)或本页 choice 弹层确认后,tradein.appliedTradein 携带
+// {oldDeviceId, targetKind};仅当目标与本单 SKU 匹配且旧机仍在、无运行中任务时
+// 生效。抵扣只减应付,永不入余额;真值 server-authoritative(POST /api/orders
+// 服务端同事务复算+下架)。
+const appliedTradeinView = computed(() => {
+  const a = tradein.appliedTradein;
+  const p = product.value;
+  if (!a || !p || a.targetKind !== p.id) return null;
+  const device = app.devices.find((d) => d.id === a.oldDeviceId);
+  if (!device || device.currentTask) return null;
+  const credit = computeTradeInCredit(
+    device.paidPriceUsdt ?? 0,
+    Math.max(0, device.cumulativeEarningsUsdt ?? 0),
+    p.price,
+  );
+  return credit > 0 ? { device, credit } : null;
+});
+const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
+const hasTradein = computed(() => tradeinCredit.value > 0);
+const tradeinCreditText = computed(() => tradeinCredit.value.toLocaleString());
+const tradeinChipText = computed(() => {
+  const ti = appliedTradeinView.value;
+  if (!ti) return "";
+  return fmt(t.value.tradein.checkoutCreditChip, {
+    name: ti.device.name,
+    credit: tradeinCreditText.value,
+  });
+});
+function removeTradein() {
+  tradein.clearApplied();
+}
+
+const netPrice = computed(() =>
+  Math.max(0, +(((product.value?.price ?? 0) - voucherDiscount.value - tradeinCredit.value).toFixed(2))),
+);
 // P2-1: if the user CLAIMED a voucher that applies to this SKU but it has expired
 // (so bestVoucherFor skipped it), surface a muted "已过期" note instead of silently
 // showing no discount. Only when no active voucher applies.
@@ -317,19 +361,18 @@ const expiredVoucherForSku = computed(() => {
   return voucher.expiredVouchers.some((def) => voucherAppliesToSku(def, p.id));
 });
 
-// ─── Batch C trade-in intercept (one-shot) ───────────────────────────────
-// Product ids that map to a real DeviceKind (mirrors source KNOWN_KINDS). The
-// catalog-only ids "stellarbox-pro-v2" / "stellarrack-p2" are NOT in the
-// eligibility/DEVICE_KINDS schema yet, so they take the plain checkout path
-// (no intercept) — exactly as the source gates them. Fire on first mount only:
-// choice (has an active tradeable device) → replace (slots capped) → fall
-// through to normal payment. Non-device checkouts (the v2/P2 catalog ids) never
-// intercept.
+// ─── Trade-in intercept (one-shot) ───────────────────────────────────────
+// FEAT-DEV02: every catalog SKU is a real DeviceKind now (v2/P2 included), so
+// all device checkouts intercept. Fire on first mount only: skip when a retire
+// context already targets this SKU (arrived from the devices-page flow) →
+// choice (owns ≥1 retirable device) → slot-full replace → normal payment.
 const KNOWN_KINDS: DeviceKind[] = [
   "phone",
   "stellarbox-s1",
   "stellarbox-pro",
+  "stellarbox-pro-v2",
   "stellarrack-p1",
+  "stellarrack-p2",
   "cloud-share",
 ];
 let interceptFired = false;
@@ -339,12 +382,13 @@ function fireTradeinIntercept() {
   const p = getProduct(productId.value);
   if (!p || !KNOWN_KINDS.includes(p.id as DeviceKind)) return;
   const kind = p.id as DeviceKind;
+  if (tradein.appliedTradein?.targetKind === kind) return;
   // Compose eligibility from the stores at the page layer (P-031/032).
   const { canTradeIn, tradeInSources, capped } = useDeviceEligibility(kind);
   // Priority: trade-in (only with ≥1 active-tradein source) → slot-full
   // replace → normal flow.
   if (canTradeIn.value && tradeInSources.value.length > 0) {
-    tradein.showChoice(kind, p.price, tradeInSources.value);
+    tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
     return;
   }
   if (capped.value) {
@@ -466,7 +510,12 @@ watch(step, (s) => {
       // subtotal; card fee (if any) is computed on the discounted subtotal.
       const discount = voucherDiscount.value;
       const usedVoucherId = voucherMatch.value?.def.id ?? null;
-      const net = +(p.price - discount).toFixed(2);
+      // FEAT-DEV02:先快照抵扣上下文(clearApplied 会把 computed 归零),再走
+      // 扣款→下架的同步原子块。抵扣只减应付;新机由订单履约管线 addDevice
+      // 未激活入库,本块不生成设备。
+      const ti = appliedTradeinView.value;
+      const tradeInCredit = ti?.credit ?? 0;
+      const net = Math.max(0, +(p.price - discount - tradeInCredit).toFixed(2));
       // Card payment charges the displayed total INCLUDING the 3.5% fee
       // (chain payments have no fee). Mock approximation of server-side PSP
       // debit — production: POST /api/orders does authorize+capture atomically.
@@ -478,18 +527,27 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
+      // 扣款成功后同步移除旧机(下架),再清抵扣上下文——全程同步无 await,
+      // 不存在半执行窗口;失败路径(上面 return)未动任何状态。
+      if (ti) {
+        app.devices = app.devices.filter((d) => d.id !== ti.device.id);
+        app.persistAccountSnapshot();
+        tradein.clearApplied();
+      }
       const ord = orders.createOrder({
         productId: p.id as Order["productId"],
         productName: p.name,
         unitPrice: p.price,
         paymentMethod: payment.value,
         discount,
+        ...(ti && { tradeInCredit, tradeInDeviceId: ti.device.id }),
       });
       orderId.value = ord.id;
       // Consume the voucher (single-use) once the order is persisted.
       if (discount > 0 && usedVoucherId) voucher.markUsed(usedVoucherId);
       const memoParts: string[] = [];
       if (discount > 0) memoParts.push(`voucher -$${discount}`);
+      if (ti) memoParts.push(`trade-in ${ti.device.name} -$${tradeInCredit}`);
       if (fee > 0) memoParts.push(`incl. 3.5% card fee $${fee}`);
       bills.add({
         type: "purchase",
@@ -528,7 +586,8 @@ function goTrack() {
   navTo(url);
 }
 
-function cleanup() { clearAdvance(); }
+// 离开结算页即放弃未使用的抵扣上下文(内存态,无半执行风险)。
+function cleanup() { clearAdvance(); tradein.clearApplied(); }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 

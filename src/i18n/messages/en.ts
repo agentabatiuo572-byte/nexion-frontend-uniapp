@@ -789,25 +789,6 @@ export const en = {
   },
 
   tradein: {
-    navTitle: "Trade-in & Upgrade",
-    heroLabel: "TOTAL SALVAGE CREDIT",
-    heroSubtitle: "across {n} eligible legacy device(s)",
-    heroNote: "30% of (price × current efficiency) — platform retention covers refurb & resale",
-    eligibleHeading: "Your eligible devices",
-    newGenHeading: "Available upgrades",
-    newGenBadge: "NEW GEN",
-    emptyTitle: "No eligible devices",
-    emptyBody: "Trade-in unlocks once you own a NexionBox or Rack. Pick up your first hardware below.",
-    emptyCta: "Shop NexionBox",
-    rowEfficiency: "efficiency",
-    rowMonths: "old",
-    rowSalvageLabel: "Salvage",
-    rowTradeinLabel: "Trade-in bonus",
-    rowUpgradeLabel: "Upgrade to",
-    rowUpgradePrice: "Net upgrade cost",
-    rowCtaConfirm: "Trade in now",
-    rowCtaView: "See specs",
-    toastSuccess: "Trade-in request submitted · {from} → {to}. Compliance review 24h, then your new device ships.",
     // Batch B (2026-05-27) — purchase eligibility hint i18n keys.
     // Surfaced under product buy buttons when checkEligibility() returns
     // missing rules. Each takes parameters per the eligibility schema.
@@ -819,23 +800,44 @@ export const en = {
     eligibilityHintKyc: "Complete {tier} verification",
     eligibilityHintDaysActive: "Active for {days}+ days",
     eligibilityHintReferral: "Confirm {count}+ referrals",
-    eligibilityHintTradeIn: "Trade in your {fromKind} to unlock",
-    // Batch C (2026-05-27) — trade-in sheet flow (Path A explicit + Path B replace).
-    // TradeInOrFullChoiceSheet (entry fork)
+    eligibilityHintTradeIn: "Unlock by buying via upgrade trade-in",
+    // FEAT-DEV02 — checkout intercept entry fork (device-level credit)
     choiceTitle: "How would you like to pay?",
-    choiceTradeInOption: "Trade in your {fromKind} for ${credit} credit",
+    choiceTradeInOption: "Trade in {name} · ${credit} credit",
     choiceFullPriceOption: "Pay full price · keep current devices",
-    // TradeInSheet (Path A — explicit trade-in)
+    // FEAT-DEV02 — retire flow: pick an upgrade target
+    retireTitle: "Upgrade trade-in",
+    retireSubtitle: "Pick an upgrade target for {name} — credit is based on its lifetime output",
+    retireTargetOption: "{name} · ${price} · ≈${net} after credit",
+    // Trade-in confirm (proceeds to checkout)
     sheetTitle: "Trade in your {from} → {to}",
-    sheetOldDeviceLabel: "Surrendering",
-    sheetSalvageLabel: "Salvage credit",
-    sheetNetCostLabel: "You pay",
-    sheetCta: "Trade in & pay ${amount}",
+    sheetOldDeviceLabel: "Trading in",
+    sheetEarnedLabel: "Lifetime output",
+    sheetBandLabel: "Credit band",
+    sheetBandText: "Band {band} · {pct}% of price",
+    sheetSalvageLabel: "Credit",
+    sheetNetCostLabel: "Est. payable",
+    sheetCta: "Confirm · checkout ${amount}",
     sheetCancel: "Cancel",
-    sheetDisclaimer: "Old device stops earning and is recycled the moment you confirm. Salvage credit only offsets this trade-in — it can't be withdrawn or added to your balance.",
-    sheetSuccessToast: "Trade-in complete · {to} is online and earning.",
-    sheetInsufficient: "Top up ${shortfall} more to complete this trade-in.",
-    sheetBillMemo: "Trade in {from} → {to} · salvage ${credit}",
+    sheetDisclaimer: "After confirming you'll pay at checkout; once paid, the old device stops taking tasks and leaves your fleet. Credit only reduces this purchase — it never enters your balance and can't be withdrawn. The more a device has produced, the smaller its credit — trading earlier keeps more of it.",
+    // Checkout credit row
+    checkoutCreditChip: "{name} credit −${credit}",
+    checkoutRowLabel: "Trade-in credit",
+    checkoutRemove: "Remove",
+    // Device list upgrade strip
+    stripCredit: "Credit ${credit}",
+    stripCta: "Upgrade trade-in",
+    stripNoTarget: "Already the top compute tier",
+    // Credit ladder explainer sheet
+    ladderTitle: "Trade-in credit rules",
+    ladderIntro: "Credit = purchase price × the band rate. The band comes from lifetime output ÷ purchase price — the more it has produced, the lower the rate.",
+    ladderColRatio: "Output ÷ price",
+    ladderColCredit: "Credit rate",
+    ladderRangeFirst: "Under {max}%",
+    ladderRangeMid: "{min}% – under {max}%",
+    ladderRangeTop: "{min}% and above",
+    ladderDeviceLine: "{name}: lifetime output ${earned}, output ratio {ratio}%, currently band {band}.",
+    ladderFootnote: "Credit applies only at checkout toward a higher-priced device — never to your balance, never withdrawable. Rates may adjust with the platform task mix.",
     // ReplaceLowestSheet (Path B — slot full)
     replaceTitle: "All slots in use",
     replaceWarning: "Your lowest-yield active device must step down before {newKind} can come online.",
@@ -851,6 +853,10 @@ export const en = {
     blockWaitCta: "Wait for task to finish",
     blockForceCta: "Force replace · forfeit reward",
     blockCancel: "Cancel",
+    // FEAT-DEV02 — retire-flow task block (no force teardown; retire after it completes)
+    retireBlockWarning: "This device has a task in progress. You can retire it right after the task completes — current earnings aren't affected.",
+    retireBlockViewTask: "View task progress",
+    retireBlockOk: "Got it",
     // Batch C R1 P1 cluster — i18n for Path B bill memos + composer errors
     replaceBillMemo: "Purchase · {newKind} (replaced {oldKind})",
     keepBuyBillMemo: "Purchase · {newKind} (added to inventory)",
@@ -1308,10 +1314,6 @@ export const en = {
     // Trade-in promo banner — surfaces when user has an eligible device for
     // an upgrade. Config-gated by DEFAULT_TRADEIN_CONFIG.promo (kill switch,
     // cooldown, max-per-session, routes).
-    inventoryPromoTitle: "Upgrade your rig",
-    inventoryPromoSubtitle: "Trade in {fromKind} → {toKind} · save ${credit}",
-    inventoryPromoCta: "View trade-in",
-    inventoryPromoDismiss: "Not now",
   },
   // DeactivateSheet — chassis overlay when deactivating a device with a running task.
   deactivateSheet: {
@@ -1564,16 +1566,11 @@ export const en = {
     comingSoonHeading: "Arriving soon",
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
-    tradeinLockedNote: "Upgrade target ships next quarter — eligible automatically",
-    tradeinWindow: {
-      label: "Limited window",
-      titleBox: "Pro v2 trade-in open — $300 off",
-      bodyBox: "Retire your legacy NexionBox and roll salvage into new-gen silicon.",
-      titleRack: "Final rack upgrade — $800 off",
-      bodyRack: "H100 Rack ships now. Trade in any legacy A100 rack before the window closes.",
-      titleCombined: "Final fleet upgrade — $1,100 off",
-      bodyCombined: "Both new-gen tiers are open. Trade in legacy box + rack together for max credit.",
-      cta: "Open trade-in",
+    tradeinUpgrade: {
+      label: "Upgrade trade-in",
+      title: "Your {name} is worth ${credit} in credit",
+      body: "Upgrade to {target} for about ${net} more. Credit is based on lifetime output — the earlier you trade, the more you keep.",
+      cta: "View my devices",
     },
     // Sprint A-1 / E.1: first-order celebration
     firstOrderTitle: "🎉 Your first NexionBox is on its way",
@@ -1662,7 +1659,7 @@ export const en = {
     gateSoldOut: "Sold out this cycle",
     gateBlockedToast: "Eligibility not met — see how to unlock",
     gateSoldOutToast: "Sold out for this cycle",
-    cardLegacyGen1: "Legacy · Gen 1",
+    cardLegacyBadge: "Classic",
     cardCloudDistributed: "Cloud · Distributed",
     tickerBought: "bought",
     tickerAgo: "ago",

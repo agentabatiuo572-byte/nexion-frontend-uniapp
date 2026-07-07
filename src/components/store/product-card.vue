@@ -39,7 +39,7 @@
       <!-- Tier-code chip + Legacy chip (photo) -->
       <view v-if="photo" class="absolute flex flex-col items-start gap-1.5" style="bottom: 12px; left: 14px; pointer-events: none">
         <text class="font-mono-tabular" :style="tierChipStyle">{{ photo.tierCode }}</text>
-        <text v-if="product.status === 'legacy'" class="font-mono-tabular" :style="legacyChipStyle">{{ t.store.cardLegacyGen1 }}</text>
+        <text v-if="product.status === 'legacy'" class="font-mono-tabular" :style="legacyChipStyle">{{ t.store.cardLegacyBadge }}</text>
       </view>
       <!-- Cloud chip -->
       <view v-if="isShare" class="absolute" style="bottom: 28px; left: 14px; pointer-events: none">
@@ -122,6 +122,9 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
+import type { DeviceKind } from "@/store/types";
+import { useDeviceEligibility } from "@/composables/use-device-eligibility";
+import { computeTradeInCredit } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
@@ -146,12 +149,15 @@ const photo = computed(() => (isShare.value ? null : PRODUCT_PHOTO[props.product
 const stockLow = computed(
   () => !isShare.value && props.product.stock != null && props.product.stock < 50,
 );
-const showTradein = computed(
-  () =>
-    props.product.status === "legacy" &&
-    !!props.product.supersededBy &&
-    !!props.product.tradeinDiscount,
-);
+// FEAT-DEV02:动态置换角标——用户任一设备可抵本卡时展示「最高可抵 $X」(取
+// 可抵额最高的设备,阶梯实时派生;固定 $300/$800 代际映射已删)。
+const { tradeInSources: cardTradeinDevices } = useDeviceEligibility(props.product.id as DeviceKind);
+const bestTradeinCredit = computed(() => {
+  const d = cardTradeinDevices.value[0];
+  if (!d) return 0;
+  return computeTradeInCredit(d.paidPriceUsdt ?? 0, d.cumulativeEarningsUsdt ?? 0, props.product.price);
+});
+const showTradein = computed(() => bestTradeinCredit.value > 0);
 
 // ── Purchase gate (等级门 + 锁额) — locked state + Buy redirect ──
 const { gate } = usePurchaseGate(() => props.product);
@@ -200,7 +206,7 @@ function toggleGateDetails() {
 const dailyEarnText = computed(() => props.product.dailyEarn.toFixed(2));
 const nexPerDayText = computed(() => fmt(t.value.store.cardNexPerDay, { n: props.product.dailyEarnNEX }));
 const tradeCreditText = computed(() =>
-  fmt(t.value.store.cardTradeCredit, { n: props.product.tradeinDiscount ?? 0 }),
+  fmt(t.value.store.cardTradeCredit, { n: bestTradeinCredit.value.toFixed(2) }),
 );
 const priceText = computed(() =>
   isShare.value ? String(props.product.price) : props.product.price.toLocaleString(),

@@ -2,22 +2,17 @@
  * ⚠️ MOCK-ONLY TRADEIN_CONFIG — server-authoritative business config.
  * Production: GET /api/config/tradein (TBD; candidate name, not yet in PRD §9.11).
  * Admin mutates via PUT /api/admin/tradein/config (TBD; candidate).
- * Ported from Nexion-prototype/lib/v3/_config/tradein-config.ts (plain data +
- * pure helpers, zero React deps → copied faithfully). Salvage / age curve is
- * the only part the trade-in sheets consume (computeSalvageCredit +
- * DEFAULT_TRADEIN_CONFIG); the eligibility / promo schema is mirrored so the
- * mock stays backend-replaceable when /me/devices wires the promo banner.
+ * FEAT-DEV02 (Aligned 2026-07-06):随时下架 + 产出阶梯抵扣。抵扣由文件底部的
+ * TRADEIN_CREDIT_LADDER / computeTradeInCredit 承载(按「累计产出 ÷ 实付价」
+ * 落档,仅结算抵减,永不入余额);无持有时长门槛。
  *
  * Schema:
- *   - eligibility: per-deviceKind rule sets (mode: open|any-of|all-of + rules[])
- *   - salvage: trade-in credit (in-checkout deduction only, NEVER to balance)
- *     with age-based decay reverse-derived from 12-month platform lifecycle.
- *   - promo: trade-in promo banner config (cooldown / delay / routes).
- *
- * Default values reverse-derived from §13 12-month lifecycle:
- *   - salvage 30% baseline, 2.5%/mo decay, 0 floor at month 12 (matches device EOL)
- *   - Pro/P1 eligibility = own-prev-tier OR V-rank OR cumulative-deposit OR trade-in
- *     (4 channels per tier → conversion path each direction)
+ *   - enabled: 置换总开关(关闭=前端全部置换入口隐藏)。
+ *   - eligibility: per-deviceKind 购买资格门(mode: open|any-of|all-of + rules[];
+ *     转化漏斗机制,与代际无关,保留;`trade-in` 规则已去 fromKind 定向 ——
+ *     任意合格设备的置换即满足该通道)。
+ *   - promo: 置换推送节奏(冷却/频次/延迟/最低龄/路由;只控推送,不限制用户随时主动置换)。
+ *   - inventory: 回收库存软/硬上限(预留)。
  */
 
 import type { DeviceKind } from "@/store/types";
@@ -33,7 +28,8 @@ export type EligibilityRule =
   | { type: "kyc-tier"; tier: "basic" | "verified" | "enhanced" }
   | { type: "days-active"; days: number }
   | { type: "referral-count"; count: number }
-  | { type: "trade-in"; fromKind: DeviceKind };
+  // FEAT-DEV02:fromKind 可省 = 任意合格设备的置换均满足本通道(代际定向已删)。
+  | { type: "trade-in"; fromKind?: DeviceKind };
 
 export type EligibilityMode = "open" | "any-of" | "all-of";
 
@@ -48,27 +44,6 @@ export interface TradeinConfig {
   enabled: boolean;
   /** Eligibility per device kind. Devices not listed = treated as `open`. */
   eligibility: Partial<Record<DeviceKind, DeviceEligibility>>;
-  /** Trade-in salvage credit — applied AT CHECKOUT only, never to balance. */
-  salvage: {
-    enabled: boolean;
-    /** Baseline salvage rate at month 0 (e.g. 0.30 = 30% of original price). */
-    rate: number;
-    /** Mode locked to "credit-only-at-checkout" — never credits balance. */
-    mode: "credit-only-at-checkout";
-    /** Device kinds that yield salvage credit when recycled. */
-    applyTo: DeviceKind[];
-    /** Age-based decay. monthlyDecay reverse-derived from 12-month lifecycle. */
-    ageAdjustment: {
-      /** % decay per month (0.025 = 2.5%/mo). At baseline=30%, hits 0 at month 12. */
-      monthlyDecay: number;
-      /** Minimum salvage rate (0 = can decay to zero). */
-      floor: number;
-    };
-    /** Minimum holding period before any salvage is paid. Prevents buy-then-
-     *  instant-trade-in arbitrage (user could net 30% of price back day 1).
-     *  Server is sole authority; client value is render hint. Months as float. */
-    minHoldingMonths: number;
-  };
   /** Trade-in promo banner config. Surfaces when user has eligible device. */
   promo: {
     enabled: boolean;
@@ -108,7 +83,7 @@ export const DEFAULT_TRADEIN_CONFIG: TradeinConfig = {
         { type: "own-kind", kind: "stellarbox-s1", count: 1 },
         { type: "v-rank-min", level: 2 },
         { type: "cumulative-deposit-usdt", amount: 1000 },
-        { type: "trade-in", fromKind: "stellarbox-s1" },
+        { type: "trade-in" },
       ],
     },
     "stellarbox-pro-v2": {
@@ -118,7 +93,7 @@ export const DEFAULT_TRADEIN_CONFIG: TradeinConfig = {
         { type: "own-kind", kind: "stellarbox-pro", count: 1 },
         { type: "v-rank-min", level: 2 },
         { type: "cumulative-deposit-usdt", amount: 1000 },
-        { type: "trade-in", fromKind: "stellarbox-pro" },
+        { type: "trade-in" },
       ],
     },
     "stellarrack-p1": {
@@ -127,7 +102,7 @@ export const DEFAULT_TRADEIN_CONFIG: TradeinConfig = {
         { type: "own-kind", kind: "stellarbox-pro", count: 1 },
         { type: "v-rank-min", level: 4 },
         { type: "cumulative-deposit-usdt", amount: 5000 },
-        { type: "trade-in", fromKind: "stellarbox-pro" },
+        { type: "trade-in" },
       ],
     },
     "stellarrack-p2": {
@@ -136,28 +111,9 @@ export const DEFAULT_TRADEIN_CONFIG: TradeinConfig = {
         { type: "own-kind", kind: "stellarrack-p1", count: 1 },
         { type: "v-rank-min", level: 4 },
         { type: "cumulative-deposit-usdt", amount: 5000 },
-        { type: "trade-in", fromKind: "stellarrack-p1" },
+        { type: "trade-in" },
       ],
     },
-  },
-  salvage: {
-    enabled: true,
-    rate: 0.3,
-    mode: "credit-only-at-checkout",
-    applyTo: ["stellarbox-s1", "stellarbox-pro", "stellarbox-pro-v2", "stellarrack-p1", "stellarrack-p2"],
-    ageAdjustment: {
-      // 30% / 12 months = 2.5%/mo → salvage hits 0 at platform EOL (month 12).
-      // Pairs with device-lifecycle.ts efficiency curve (also bottoms ~22%
-      // at month 12). Operationally this nudges users toward upgrade /
-      // exit by EOL rather than holding a dead device.
-      monthlyDecay: 0.025,
-      floor: 0,
-    },
-    // 30 days = 1 month. Buy-then-instant-trade-in cycles inside this window
-    // get 0 salvage. Matches the spirit of "device must actually be deployed
-    // to earn the wear-and-tear credit". Server is canonical; admin can lower
-    // for promo windows (e.g. holiday upgrade campaign).
-    minHoldingMonths: 1,
   },
   promo: {
     enabled: true,
@@ -183,41 +139,6 @@ export const DEFAULT_TRADEIN_CONFIG: TradeinConfig = {
 
 // ─────────────────────────────────────────────────────────────── Helpers
 
-/**
- * Compute current salvage rate for a device of given age.
- * Returns a fraction [0, rate].
- *
- *   rate(t) = max(floor, baseline - monthlyDecay * t_months)
- *
- * Example: baseline=0.30, monthlyDecay=0.025, floor=0
- *   month 0  → 0.30
- *   month 6  → 0.15
- *   month 12 → 0.00
- */
-export function computeSalvageRate(ageMonths: number, cfg: TradeinConfig): number {
-  if (!cfg.salvage.enabled) return 0;
-  // Buy-then-instant-trade-in arbitrage guard. Devices must be held at least
-  // minHoldingMonths before salvage credit is paid. Server enforces; here we
-  // mirror so UI hints render the correct (zero) credit on fresh devices.
-  if (ageMonths < cfg.salvage.minHoldingMonths) return 0;
-  const baseline = cfg.salvage.rate;
-  const decay = cfg.salvage.ageAdjustment.monthlyDecay * Math.max(0, ageMonths);
-  return Math.max(cfg.salvage.ageAdjustment.floor, baseline - decay);
-}
-
-/**
- * USD salvage credit for a specific device at trade-in time.
- *
- *   salvage = price × computeSalvageRate(ageMonths)
- */
-export function computeSalvageCredit(
-  originalPriceUsdt: number,
-  ageMonths: number,
-  cfg: TradeinConfig,
-): number {
-  return originalPriceUsdt * computeSalvageRate(ageMonths, cfg);
-}
-
 /** Upgrade ladder used by `own-prev-tier` rule and trade-in inference. */
 export const UPGRADE_LADDER: DeviceKind[] = [
   "phone",
@@ -234,13 +155,10 @@ export function previousTier(kind: DeviceKind): DeviceKind | null {
   return idx > 0 ? UPGRADE_LADDER[idx - 1] : null;
 }
 
-// ───────────────────────── FEAT-DEV02: earnings-ladder credit (successor) ────
-// Successor of the age-based salvage engine above. PR-D switches the sheets /
-// checkout consumers to this engine and deletes computeSalvageRate /
-// computeSalvageCredit / minHoldingMonths (the two engines coexist only during
-// the migration window — do NOT wire new consumers to the old one).
-// Server-authoritative: same GET /api/config/tradein payload, `creditLadder` +
-// `ladderRules` keys; admin edits via「升级置换阶梯」panel (E domain).
+// ───────────────────────── FEAT-DEV02: earnings-ladder credit ────
+// 唯一抵扣引擎(旧月龄残值引擎已删)。Server-authoritative: same GET
+// /api/config/tradein payload, `creditLadder` + `ladderRules` keys; admin edits
+// via「升级置换阶梯」panel (E domain);canon 哨兵三端对账默认值。
 // Ladder semantics (FEAT-DEV02 ③, Aligned 2026-07-06): credit = paidPrice ×
 // creditPct(band of cumulative-output ÷ paid-price) × promoMult, checkout-only,
 // NEVER credited to balance. Bands are left-closed right-open, contiguous from
@@ -271,6 +189,16 @@ export const TRADEIN_LADDER_RULES = {
   maxDevicesPerOrder: 1,
   /** Promo multiplier applied to the final credit. */
   promoMult: 1.0,
+  /** Kinds eligible for retire-and-credit(与 paidPriceUsdt>0 双重门;镜像 admin
+   *  E.tradein.applyTo,phone/pc-gpu 免费天然排除但仍列显式白名单)。 */
+  applyTo: [
+    "cloud-share",
+    "stellarbox-s1",
+    "stellarbox-pro",
+    "stellarbox-pro-v2",
+    "stellarrack-p1",
+    "stellarrack-p2",
+  ] as DeviceKind[],
 } as const;
 
 /**
@@ -284,6 +212,20 @@ export const TRADEIN_LADDER_RULES = {
  * requireHigherPrice holds and creditPct ≤ 100, but the ladder is
  * operator-editable).
  */
+/** 产出比所在档(1-based)与该档抵扣率;paidPrice≤0 → null(不可置换,非落档)。 */
+export function ladderBandFor(
+  paidPriceUsdt: number,
+  cumulativeEarningsUsdt: number,
+  ladder: CreditLadderRow[] = TRADEIN_CREDIT_LADDER,
+): { band: number; creditPct: number } | null {
+  if (paidPriceUsdt <= 0) return null;
+  const ratioPct = (Math.max(0, cumulativeEarningsUsdt) / paidPriceUsdt) * 100;
+  const idx = ladder.findIndex(
+    (r) => ratioPct >= r.minRatioPct && (r.maxRatioPct === null || ratioPct < r.maxRatioPct),
+  );
+  return idx < 0 ? null : { band: idx + 1, creditPct: ladder[idx].creditPct };
+}
+
 export function computeTradeInCredit(
   paidPriceUsdt: number,
   cumulativeEarningsUsdt: number,

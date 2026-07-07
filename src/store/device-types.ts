@@ -29,7 +29,7 @@ const DEVICE_SPECS: Record<
   "cloud-share": { name: "Cloud Share", gpu: "Distributed", vramTotal: 0, basePower: 0, baseRate: 0.19, baseRateNEX: 3 },
 };
 
-// Device retail price (USDT) — used by salvage calc. MOCK-ONLY (prod: GET /api/store/catalog).
+// Device retail price (USDT) — catalog price single source. MOCK-ONLY (prod: GET /api/store/catalog).
 export const DEVICE_PRICE_USDT: Record<DeviceKind, number> = {
   phone: 0,
   "pc-gpu": 0,

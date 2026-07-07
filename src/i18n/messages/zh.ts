@@ -504,7 +504,7 @@ export const zh: Messages = {
     taskLockCumulative: "注册以来累计",
     taskLockSubtitle: "{a} · {b}",
     taskLockCtaUpgrade: "查看高阶设备",
-    taskLockCtaTradein: "升级到新一代",
+    taskLockCtaTradein: "升级更高算力设备",
     lockedTasksTitle: "你被锁定无法接的任务",
     lockedMissedDaily: "每天流失",
     unlockNMoreTasks: "解锁 {n} 个高价任务 →",
@@ -775,25 +775,6 @@ export const zh: Messages = {
   },
 
   tradein: {
-    navTitle: "Trade-in 升级",
-    heroLabel: "残值总额",
-    heroSubtitle: "{n} 台符合条件的老设备",
-    heroNote: "残值 = 原价 × 当前效率 × 30%(平台保留 70% 用于翻新转售)",
-    eligibleHeading: "符合条件的设备",
-    newGenHeading: "新代际可升级",
-    newGenBadge: "新代",
-    emptyTitle: "暂无符合条件的设备",
-    emptyBody: "持有 NexionBox 或 Rack 后可解锁 Trade-in。下方先选购第一台硬件。",
-    emptyCta: "查看商城",
-    rowEfficiency: "效率",
-    rowMonths: "已持有",
-    rowSalvageLabel: "残值回收",
-    rowTradeinLabel: "Trade-in 优惠",
-    rowUpgradeLabel: "升级到",
-    rowUpgradePrice: "升级净价",
-    rowCtaConfirm: "确认 Trade-in",
-    rowCtaView: "查看规格",
-    toastSuccess: "Trade-in 申请已提交 · {from} → {to}。合规审核 24 小时后新设备发出。",
     // Batch B (2026-05-27) — 购买资格 hint i18n keys (en/zh 镜像)
     eligibilityHintOpen: "现在可购买",
     eligibilityHintOwnKind: "拥有至少 {count} 台 {kind} 即可解锁",
@@ -803,23 +784,44 @@ export const zh: Messages = {
     eligibilityHintKyc: "完成 {tier} 实名认证",
     eligibilityHintDaysActive: "活跃 {days}+ 天",
     eligibilityHintReferral: "确认 {count}+ 位直推",
-    eligibilityHintTradeIn: "置换你的 {fromKind} 即可解锁",
-    // Batch C (2026-05-27) — 置换流程 sheet 文案
-    // TradeInOrFullChoiceSheet (入口分叉)
+    eligibilityHintTradeIn: "通过升级置换购买即可解锁",
+    // FEAT-DEV02 — 结算拦截入口分叉(设备级抵扣)
     choiceTitle: "选择支付方式",
-    choiceTradeInOption: "用 {fromKind} 置换 · 抵扣 ${credit}",
+    choiceTradeInOption: "用 {name} 置换 · 抵扣 ${credit}",
     choiceFullPriceOption: "全价购买 · 保留所有现有设备",
-    // TradeInSheet (Path A · 显式置换)
+    // FEAT-DEV02 — 主动下架:选升级目标
+    retireTitle: "升级置换",
+    retireSubtitle: "选择 {name} 的升级目标,抵扣额已按累计产出计算",
+    retireTargetOption: "{name} · ${price} · 抵后约 ${net}",
+    // 置换确认(去结算)
     sheetTitle: "用 {from} 换 {to}",
-    sheetOldDeviceLabel: "回收",
-    sheetSalvageLabel: "回收抵扣",
-    sheetNetCostLabel: "实付",
-    sheetCta: "确认置换 · 支付 ${amount}",
+    sheetOldDeviceLabel: "置换旧机",
+    sheetEarnedLabel: "累计产出",
+    sheetBandLabel: "抵扣档位",
+    sheetBandText: "第 {band} 档 · 抵原价 {pct}%",
+    sheetSalvageLabel: "本次抵扣",
+    sheetNetCostLabel: "预计应付",
+    sheetCta: "确认置换 · 去结算 ${amount}",
     sheetCancel: "取消",
-    sheetDisclaimer: "确认后旧设备立即停止并回收,无法找回。回收抵扣仅用于本次置换,不会进入账户余额、不可提现。",
-    sheetSuccessToast: "置换完成 · {to} 已上线开始工作。",
-    sheetInsufficient: "还差 ${shortfall} 才能完成本次置换。",
-    sheetBillMemo: "置换 {from} → {to} · 回收抵扣 ${credit}",
+    sheetDisclaimer: "确认后前往结算页支付;支付完成时旧设备停止接单并从你的设备中移除。抵扣仅用于本次购买,不会进入账户余额、不可提现。累计产出越多,可抵金额越低——越早置换越划算。",
+    // 结算页抵扣行
+    checkoutCreditChip: "{name} 抵扣 −${credit}",
+    checkoutRowLabel: "旧机抵扣",
+    checkoutRemove: "移除",
+    // 设备列表升级置换条
+    stripCredit: "可抵 ${credit}",
+    stripCta: "升级置换",
+    stripNoTarget: "当前已是最高算力档位",
+    // 抵扣阶梯说明弹层
+    ladderTitle: "置换抵扣规则",
+    ladderIntro: "抵扣金额 = 购入价 × 对应档位比例。档位按该设备累计产出与购入价的比值确定:产出越多,抵扣比例越低。",
+    ladderColRatio: "累计产出 ÷ 购入价",
+    ladderColCredit: "抵扣比例",
+    ladderRangeFirst: "不足 {max}%",
+    ladderRangeMid: "{min}% – 不足 {max}%",
+    ladderRangeTop: "{min}% 及以上",
+    ladderDeviceLine: "{name}:累计产出 ${earned},产出比 {ratio}%,当前第 {band} 档。",
+    ladderFootnote: "抵扣仅在购买更高价设备时结算抵减,不进入余额、不可提现;规则可能随平台任务结构调整。",
     // ReplaceLowestSheet (Path B · 槽位已满)
     replaceTitle: "槽位已满",
     replaceWarning: "需要让出收益最低的活跃设备,{newKind} 才能上线。",
@@ -835,6 +837,10 @@ export const zh: Messages = {
     blockWaitCta: "等任务结束",
     blockForceCta: "强制置换 · 放弃奖励",
     blockCancel: "取消",
+    // FEAT-DEV02 — retire 入口的任务阻断(无强制拆除,完成即可下架)
+    retireBlockWarning: "该设备有任务正在进行,完成后即可下架置换,当前收益不受影响。",
+    retireBlockViewTask: "查看任务进度",
+    retireBlockOk: "知道了",
     // Batch C R1 P1 cluster — i18n 修补 Path B 账单 memo + composer 异常文案
     replaceBillMemo: "购买 · {newKind} · 已让出 {oldKind}",
     keepBuyBillMemo: "购买 · {newKind} · 入仓库",
@@ -1291,10 +1297,6 @@ export const zh: Messages = {
     inventoryRowSlotsFull: "槽位已满",
     // 置换促销 banner — 当用户拥有可置换设备时显示,受 DEFAULT_TRADEIN_CONFIG.promo
     // 后台 kill switch / cooldown / 单会话最大次数 / 路由白名单控制
-    inventoryPromoTitle: "升级你的算力",
-    inventoryPromoSubtitle: "用 {fromKind} 换 {toKind} · 立省 ${credit}",
-    inventoryPromoCta: "查看置换",
-    inventoryPromoDismiss: "稍后再说",
   },
   // DeactivateSheet — chassis overlay when deactivating a device with a running task.
   deactivateSheet: {
@@ -1445,7 +1447,7 @@ export const zh: Messages = {
     onlyXLeft: "件本周剩余",
     bestSeller: "热销",
     trending: "上升",
-    legacyBadge: "上一代",
+    legacyBadge: "经典款",
     secRecommended: "为你推荐",
     secRecommendedTag: "热门",
     secMoreTiers: "更多型号",
@@ -1537,8 +1539,8 @@ export const zh: Messages = {
     coTrackOrder: "追踪订单 →",
     coDone: "完成",
     coLoading: "加载中…",
-    // Sprint 2 收尾 — 代际 phase-gated 产品
-    lockedTitle: "新一代硅片 · 下季度上线",
+    // Sprint 2 收尾 — phase-gated 上架节奏产品(上架门与设备置换无关)
+    lockedTitle: "更高算力硅片 · 下季度上线",
     lockedBody: "{name} 正在数据中心完成认证。下一个平台周期向早期运营者批量出货。",
     lockedEta: "预计上线",
     lockedNotifyMe: "上线时通知我",
@@ -1546,16 +1548,11 @@ export const zh: Messages = {
     comingSoonHeading: "即将上架",
     cardHighTierLine: "可接高阶任务:{pool}",
     comingSoonSubtitle: "批量生产将在周期后期出货",
-    tradeinLockedNote: "升级目标下季度上线 · 届时自动可换",
-    tradeinWindow: {
-      label: "限时窗口",
-      titleBox: "Pro v2 Trade-in 开放 · 立减 $300",
-      bodyBox: "退役旧款 NexionBox · 折余值换新一代硅片",
-      titleRack: "最后机柜升级 · 立减 $800",
-      bodyRack: "H100 Rack 已发售 · 在窗口关闭前换掉任意一代 A100 机柜",
-      titleCombined: "最后一次整队升级 · 立减 $1,100",
-      bodyCombined: "新一代两档全开 · 旧款 box + rack 一起换 = 最大折抵",
-      cta: "进入 Trade-in",
+    tradeinUpgrade: {
+      label: "升级置换",
+      title: "你的 {name} 可抵 ${credit}",
+      body: "升级 {target} 只需再付约 ${net}。抵扣按累计产出计算,越早置换抵得越多。",
+      cta: "查看我的设备",
     },
     // Sprint A-1 / E.1: 首单庆祝
     firstOrderTitle: "🎉 你的第一台 NexionBox 已下单",
@@ -1643,7 +1640,7 @@ export const zh: Messages = {
     gateSoldOut: "本期售罄",
     gateBlockedToast: "未达成购买资格 · 查看解锁条件",
     gateSoldOutToast: "本期名额已售罄",
-    cardLegacyGen1: "上一代 · Gen 1",
+    cardLegacyBadge: "经典款",
     cardCloudDistributed: "云端 · 分布式",
     tickerBought: "购买了",
     tickerAgo: "前",

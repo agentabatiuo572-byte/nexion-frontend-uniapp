@@ -57,9 +57,7 @@ export interface Product {
   // v3.1 AI workload throughput specs (§5.3.1)
   ai?: AIPerformance;
   // Sprint 2 second phase: catalog lifecycle status
-  status?: "active" | "legacy"; // legacy = superseded in the catalog (still owned & serviced)
-  supersededBy?: string;    // product id of the next-gen replacement
-  tradeinDiscount?: number; // USD off when trading in a legacy device for this product
+  status?: "active" | "legacy"; // legacy = older catalog listing (still owned & serviced)
   // Sprint 2 final phase: platform-lifecycle release gate. Pro v2 ships when the
   // platform reaches P3 (~month 5); Rack P2 ships at P5 (~month 10). Listings
   // and direct-URL hits before that surface a "coming soon" lock card.
@@ -104,7 +102,6 @@ export const PRODUCTS: Product[] = [
       bestForCategory: ["IG", "LL"],
     },
     status: "legacy",
-    supersededBy: "stellarbox-pro-v2",
   },
   {
     id: "stellarbox-pro",
@@ -142,14 +139,13 @@ export const PRODUCTS: Product[] = [
       bestForCategory: ["LL", "FT", "VG"],
     },
     status: "legacy",
-    supersededBy: "stellarrack-p2",
   },
   {
     id: "stellarbox-pro-v2",
     name: "NexionBox Pro v2",
     tier: "Pro",
-    tagline: "2.5× S1 throughput — new generation silicon.",
-    badge: "New Gen",
+    tagline: "2.5× S1 throughput — built for higher-tier task pools.",
+    badge: "Upgrade Pick",
     gpu: "8× RTX 5090",
     vram: "256GB VRAM",
     hashRate: "5,120 MH/s",
@@ -164,9 +160,9 @@ export const PRODUCTS: Product[] = [
     rating: 4.9,
     reviews: 187,
     features: [
-      "8× RTX 5090 — new silicon generation",
+      "8× RTX 5090 — top-bin silicon",
       "2.5× S1 throughput on AI workloads",
-      "Trade-in: $300 off when retiring a legacy NexionBox",
+      "Upgrade trade-in: retire an owned device for checkout credit",
       "Hardware insurance + 5-year warranty",
     ],
     ai: {
@@ -178,7 +174,6 @@ export const PRODUCTS: Product[] = [
       bestForCategory: ["LL", "FT", "VG"],
     },
     status: "active",
-    tradeinDiscount: 300,
     unlocksAtPhase: "P3",
   },
   {
@@ -217,14 +212,13 @@ export const PRODUCTS: Product[] = [
       bestForCategory: ["LL", "FT", "VG"],
     },
     status: "legacy",
-    supersededBy: "stellarrack-p2",
   },
   {
     id: "stellarrack-p2",
     name: "NexionRack P2",
     tier: "Flagship",
-    tagline: "Datacenter H100 rack — final-tier upgrade window.",
-    badge: "New Gen",
+    tagline: "Datacenter H100 rack — the top compute tier.",
+    badge: "Flagship",
     gpu: "8× NVIDIA H100",
     vram: "1,024GB VRAM",
     hashRate: "9,600 MH/s",
@@ -240,7 +234,7 @@ export const PRODUCTS: Product[] = [
     reviews: 41,
     features: [
       "8× H100 SXM5 — datacenter-grade Hopper",
-      "Trade-in: $800 off when retiring a legacy Rack",
+      "Upgrade trade-in: retire an owned device for checkout credit",
       "Dedicated tier-3 DC slot · 24/7 VIP support",
       "10-year extended warranty + insurance",
     ],
@@ -253,7 +247,6 @@ export const PRODUCTS: Product[] = [
       bestForCategory: ["LL", "FT", "VG"],
     },
     status: "active",
-    tradeinDiscount: 800,
     unlocksAtPhase: "P5",
   },
   {
@@ -283,13 +276,6 @@ export const PRODUCTS: Product[] = [
     status: "active",
   },
 ];
-
-// Map a legacy product id to the next-gen replacement it upgrades into.
-export const TRADEIN_UPGRADE_MAP: Record<string, string> = {
-  "stellarbox-s1":   "stellarbox-pro-v2",
-  "stellarbox-pro":  "stellarbox-pro-v2",
-  "stellarrack-p1":  "stellarrack-p2",
-};
 
 export function getProduct(id: string): Product | undefined {
   return PRODUCTS.find((p) => p.id === id);

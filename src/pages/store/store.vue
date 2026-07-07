@@ -5,8 +5,8 @@
     "Recommended" header + featured ProductCard → PurchaseTicker →
     "More tiers" header + rest ProductCards → "Coming soon" LockedProductCards →
     Orders entry chip → footer note.
-  Gen-2 products (Pro v2 / Rack P2) are phase-gated: shown as live cards once the
-  platform phase is reached, otherwise rendered as locked "Coming soon" cards.
+  Phase-gated products (Pro v2 / Rack P2, unlocksAtPhase): shown as live cards
+  once the platform phase is reached, otherwise as locked "Coming soon" cards.
   Wrapped in <AppChassis active="store">; entrance via <CardStagger>.
 -->
 <template>
