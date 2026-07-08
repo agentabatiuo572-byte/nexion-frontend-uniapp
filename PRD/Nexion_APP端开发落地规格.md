@@ -175,8 +175,8 @@ trade-in/replace composer 等跨 store 操作:任一步失败全 rollback(设备
 |---|---|---|---|---|---|
 | `/genesis` | 一级预售 | 限量 1000 张($9,999) | `useGenesis`(TOTAL_SLOTS/unitPrice/dividendShare)、`useApp.debitBalance` | Confirm sheet 数量±+费用拆解 | §10.1 |
 | `/genesis/marketplace` | 二级市场 | 挂单/购买/二级交易 | `useGenesis.ownedTokenIds/purchase`、marketplace stats | Mine tab List=挂单入口;挂单+取消各二次 confirm;OpenSea modal | §10.2 |
-| `/genesis/holder` | 持有人 Dashboard | 分红/权益/持仓/流动性 | `useGenesis.myOwned`、`currentDailyDividendPerNodeUSDT()` | myOwned>0 完整态/===0 空态($0.00 不伪造) | §10.3 |
-| `/genesis/how-it-works` | 玩法说明 | founder 股权+永续分红类比 | 静态 i18n | — | §10.1.3 |
+| `/genesis/holder` | 持有人 Dashboard | 排放/权益/持仓/流动性(上所前额度+积分 / 上所后 NEX 排放) | `useGenesis.myOwned`、`dividendsOpen`、排放快照 | myOwned>0 完整态/===0 空态(不伪造) | §10.3 |
+| `/genesis/how-it-works` | 玩法说明 | founder 股权+协议排放权益类比 | 静态 i18n | — | §10.1.3 |
 
 ### 1.9 扩展功能(§11)
 
@@ -336,8 +336,8 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **Premium**:月费 $99(50% off 首月);P4+ 解锁。
 - **⚠️ 第7章#2:Staking APY 三套并存,收敛 `GET /api/config/staking/pools`**。
 
-### 3.J Genesis 节点(分红/一级/二级)— §10.1.1/§10.3.3
-- **每日分红/节点** = `platformDailyVolumeUSD × 0.1% / 1000`(0.1% 池÷1,000 张);基数 ~$24M → ~$24/node/日。
+### 3.J Genesis 节点(排放/一级/二级)— §10.1.1/§10.3.3
+- **单节点排放参考等值** = `platformDailyVolumeUSD × 0.1% / 1000`(0.1% 池÷1,000 张);基数 ~$24M → ~$24/node/日等值(上所后 NEX 排放,参考非保证;上所前不派发,由 `dividendsOpen`/H1 `genesisDivOpen` 门控)。保底口径(节点价 × 0.1% ≈ $10/node/日)挂后台负债科目#4。
 - **一级预售**:限量 1,000 张,单价 $9,999;回本 `$9,999 / dailyDividend ≈ 14 个月`。
 - **二级版税**:卖家成交扣 2.5%(进网络金库);二级地板 $25,000(mock)。
 - holder lifetime(mock)= `todayShare × 142`;pending payout = `todayShare × 0.8`。

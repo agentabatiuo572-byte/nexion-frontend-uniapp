@@ -4061,7 +4061,7 @@ export const zh: Messages = {
     listBannerBody: "自定价 · 地板 ${k}K · 2.5% 版税。",
     listBannerCta: "去挂单",
     listBannerNoneTitle: "还没有 Genesis?",
-    listBannerNoneBody: "从下方列表购买,或预订一级铸造,即可开始分红 + 后续挂单。",
+    listBannerNoneBody: "从下方列表购买,或预订一级铸造,即可锁定排放额度 + 后续挂单。",
     listBannerNoneCta: "预订一级",
     timeMinAgo: "{n}m 前",
     timeHrAgo: "{n}h 前",

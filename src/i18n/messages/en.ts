@@ -4151,7 +4151,7 @@ export const en = {
     listBannerBody: "Holders set their own price · floor ${k}K · pay 2.5% royalty.",
     listBannerCta: "List a node",
     listBannerNoneTitle: "Don't have a Genesis yet?",
-    listBannerNoneBody: "Buy a listing below or reserve a fresh mint to start earning + listable.",
+    listBannerNoneBody: "Buy a listing below or reserve a fresh mint to lock in your emission allocation + listable.",
     listBannerNoneCta: "Reserve primary",
     timeMinAgo: "{n}m ago",
     timeHrAgo: "{n}h ago",

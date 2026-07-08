@@ -147,6 +147,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 
 **框架规则**:
 - Header / TabBar 锁定在 chassis 边界,内容独立滚动
+- **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
 - **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexion-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
@@ -235,7 +236,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /genesis                         创世节点预售
 /genesis/how-it-works            Genesis 创世节点说明页
 /genesis/marketplace             二级市场
-/genesis/holder                  持有人 dashboard(分红 / 权益 / 持仓)
+/genesis/holder                  持有人 dashboard(排放 / 权益 / 持仓)
 /trust                           信任中心
 /trust/nex                       NEX 平台代币说明页
 /daily                           每日签到
@@ -1265,13 +1266,13 @@ sequenceDiagram
 
 位置:MissedIncomeBanner 与 DeviceLifecycleBanner 之间。**无条件渲染**(任何用户都被锁定在某个 task tier 之外,banner 永远有数字)。
 
-**目的**:在"设备 baseline 差额"(§6.6)与"硬件效率衰减"(§6.8)之外补第三层语义 — **任务 tier 锁定** — 把"高价 AI 任务无法承接,本月被锁掉的潜在收益"以累计数字呈现。三 banner narrative:
+**目的**:在"设备 baseline 差额"(§6.6)与"任务产能递减"(§6.8)之外补第三层语义 — **任务 tier 锁定** — 把"高价 AI 任务无法承接,本月被锁掉的潜在收益"以累计数字呈现。三 banner narrative:
 
 | Banner | 损失类型 | 触发条件 |
 |---|---|---|
 | §6.6 MissedIncomeBanner | 与 S1 baseline 的日产差额 | 所有用户(对比锚 = S1)|
 | §6.7 TaskLockCumulativeBanner | 高价任务 tier 锁定的月度累计 | 所有用户(每用户都被锁某 tier)|
-| §6.8 DeviceLifecycleBanner | 已购设备的衰减损失 | 仅持有 degradable 硬件用户 |
+| §6.8 DeviceCapacityBanner(车队任务产能) | 已购设备接单量递减的损失 | 仅持有参与递减硬件的用户 |
 
 **UI 规格**:
 
@@ -1282,7 +1283,7 @@ sequenceDiagram
   - 左:`since signup` + 大字 `−$X,XXX`(累计)
   - 右:pill CTA(44pt tap target)
     - **P1-P2** 文案:`See higher tiers →` → `/store`(新用户引导到主商城)
-    - **P3+** 文案:`Trade in for new gen →` → `/me/devices`(老用户引导到设备仓库 + promo banner,Batch E 已迁)
+    - **P3+** 文案:`升级更高算力设备 →` → `/me/devices`(老用户引导到设备仓库的升级置换入口,§7.5)
 - 整张卡 `<Link>` 包裹
 
 **计算公式**(`lib/store/task-lock.ts`):
@@ -1306,52 +1307,55 @@ cumulativeUSD     = Σ MONTHLY_LOCKED_TASK_USD[getPhaseForMonth(m).id]  // m ∈
 
 **铁律**:文案不暴露 `phase id / phase name / "P3-P4" / "subscription push"` 等 PM 内部术语,只显示具体 model 名 + 美元数字(参 [[feedback-no-meta-in-product]])。
 
-### 6.8 设备生命周期 Banner(DeviceLifecycleBanner)
+### 6.8 车队任务产能 Banner(DeviceCapacityBanner)
 
-位置:**My Devices 列表 + EmptySlotsHint 之后**(仅在用户至少持有 1 台 degradable 硬件时渲染,phone-only 用户零显示)。语义上"刚扫完自己具体设备 → 立刻看到舰队衰减提示"比单看一个抽象数字更有共鸣,转化力更强。
+位置:**My Devices 列表 + EmptySlotsHint 之后**(仅在用户至少持有 1 台参与产能递减的硬件时渲染,phone-only 用户零显示)。语义上"刚扫完自己具体设备 → 立刻看到车队接单量递减提示"比单看一个抽象数字更有共鸣,转化力更强。
 
-**目的**:把"硬件随月份衰减 + 累计月度损失"实时呈现,持续推动用户走 trade-in / 升级路径。
+**机制叙事(权威口径)**:平台 AI 任务池的算力要求随时间演进 — 高阶任务(大模型推理/训练)占比增大、低阶任务减少;设备算力固定,随持有月数可承接的任务份额逐步下降。**不使用"硬件衰减/损耗/老化"叙事**(硬件性能相关文案统一走"随使用逐步损耗"的定性表达,禁止具体数值,参 memory 硬件衰减文案规约);正向出口 = 升级更高算力设备承接高阶任务(§7.5 升级置换)。
 
-**衰减曲线**(per-device,基于 `purchasedAt` 计算):
+**任务产能节奏**(per-device,基于 `purchasedAt` 计算;数值与旧效率曲线**逐点等效**,机器门 `check-capacity-curve-parity.mjs` 以 golden 表锁定 diff<1e-9):
 
-| 月段 | 月度衰减率 | 累计效率(段末) |
+| 月段 | 月度产能递减 | 累计产能(段末) |
 |---|---|---|
 | 月 1-3 | −4% / 月 | 100% → 88.5% |
 | 月 4-8 | −6% / 月 | 88.5% → 65.1% |
 | 月 9-12+ | −23.7% / 月 | 65.1% → ~22%(floor) |
 
-**豁免设备**:phone(产能本就 trivial)、cloud-share(平台租赁算力,云端自维护)。
+**豁免设备**(不参与递减,产能恒 100%):phone(产能本就 trivial)、cloud-share(平台托管算力池)、pc-gpu(共享算力按实时贡献计)。后台可按 SKU 配置豁免开关(后台 PRD E 域「任务产能节奏」面板)。
 
-**核心 utility**(`lib/store/device-lifecycle.ts`):
+**新机任务补贴**:新购设备 30 天内展示「新机任务补贴」标识 — 解释"新买的低阶设备为何满产"(平台对新购设备定向倾斜任务分配)。**纯展示派生**(`now − purchasedAt ≤ subsidyDays`),不改任何结算数学(曲线首月本就 100%,补贴期恰与其重合,经济零变化);补贴天数后台可配。
+
+**核心 utility**(`src/store/device-lifecycle.ts`,API 形状冻结、内部读产能阶梯配置):
 
 ```
-DEGRADATION_PER_MONTH = { early: -0.04, middle: -0.06, late: -0.237 }
-MIN_EFFICIENCY = 0.22   // late 率使月 9-12 实际累计落到 22% floor(−10% 时只到 ~43%,与 floor 矛盾)
-ONE_MONTH_MS = 30 * ONE_DAY_MS
+TASK_CAPACITY_BANDS = [ {throughMonth:3, monthlyDeltaPct:-4},
+                        {throughMonth:8, monthlyDeltaPct:-6},
+                        {throughMonth:null, monthlyDeltaPct:-23.7} ]   // 服务端可配(GET /api/config/task-capacity, TBD)
+CAPACITY_FLOOR = 0.22
+SUBSIDY_DAYS   = 30
+CAPACITY_EXEMPT_KINDS = ["phone", "cloud-share", "pc-gpu"]
 
-isDegradable(kind)                  → kind ∉ {phone, cloud-share}
+isDegradable(kind)                  → kind ∉ CAPACITY_EXEMPT_KINDS
 getMonthsOwned(purchasedAt, now)    → 浮点月数(平滑曲线)
-getEfficiency(monthsOwned)          → 累计效率 ∏(1+rate)(跨 stage 边界积分)
+getEfficiency(monthsOwned)          → 累计产能系数 ∏(1+rate)(跨段边界积分,floor 封底)
 getLifecycleSummary(device)         → { isDegradable, monthsOwned, efficiency,
                                         dailyRateAtFull, dailyRateNow,
                                         dailyLossUSD, monthlyLossUSD }
 getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 ```
 
-**UI 规格**:
+**展示派生(永不落库)**:设备卡"今日接单 ≈ N 单"由 `dailyRateNow ÷ 单任务均价`(`src/mock/tasks.ts` 价格表)实时派生;产能百分比、接单数、补贴标识均为展示层派生值,存储中不新增任何任务计数字段。
 
-- 边框按平均效率分档:≥85% / 65-85% / <65%
-- 顶部 `FLEET EFFICIENCY` 标签(Activity icon)
-- 大字 `XX.X%`(`<TickerNumber>` 0.8s 动画)+ 副字 `average across N hardware devices`
-- 单条 progress bar:宽度 = avgEfficiency
-- 底部 row:
-  - 左:`Monthly loss vs day-1 yield` + 大字 `−$X.XX` + 小字 `oldest · Nd` 或 `oldest · N.N mo`
-  - 右:pill CTA `Trade-in options →` → /me/devices(Batch E:trade-in surface 已迁;见 §7.5)
-- 整张卡 `<Link>` 包裹
+**行为要点**:
 
-**SSR 处理**:沿用 §16.5 mounted 守卫,server 输出 `<Skeleton.Hero accent="purple">` + 2 条 `<Skeleton.Line>`,client mount 后填入派生数字。
+- 边框按车队平均产能分档:≥85% / 65-85% / <65%
+- 主数字 = 车队平均产能 `XX.X%`;辅行 = 相对满产的月度差额 `−$X.XX` + 最老设备月龄
+- CTA `升级更高算力设备 →` → /me/devices(§7.5 升级置换入口);整卡可点
+- 配套:/earn 任务池区顶部有"AI 任务算力需求升级中"提示线(W-CAP1 产能规则说明弹层三入口之一)
 
-**刷新节奏**:client mount 后 setInterval(60s)重计算,monthsOwned / efficiency 在用户停留期间持续平滑变化。
+**SSR 处理**:沿用 §16.5 mounted 守卫,server 输出骨架,client mount 后填入派生数字。
+
+**刷新节奏**:client mount 后 setInterval(60s)重计算,monthsOwned / 产能系数在用户停留期间持续平滑变化。
 
 ### 6.9 设备槽位卡(EmptySlotsHint)
 
@@ -1483,41 +1487,42 @@ flowchart TD
 
 ### 7.1 商品列表 `/store`
 
-6 种产品卡片(含双代际),代际淘汰由 §6.8 设备生命周期衰减曲线驱动:
+6 种产品卡片,固定 SKU 算力/价格阶梯;升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
 
-| 产品 | 代际 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
-|---|---|---|---|---|---|---|
-| Phone(基准) | — | — | $0 | $0.06 | 10 | 1× |
-| NexionBox S1 | Gen 1 | **legacy** | $649 | $7.00 | 40 | 117× |
-| NexionBox Pro | Gen 1 | **legacy** | $1,199 | $13.00 | 80 | 217× |
-| NexionBox Pro v2 | Gen 2 | active | $1,319 | $14.00 | 90 | 233× |
-| NexionRack P1 | Gen 1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
-| NexionRack P2 | Gen 2 | active | $7,499 | $75.00 | 500 | 1,250× |
-| Cloud Share | Gen 1 | active | $19.9 | $0.19 | 3 | 3× |
+| 产品 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
+|---|---|---|---|---|---|
+| Phone(基准) | — | $0 | $0.06 | 10 | 1× |
+| NexionBox S1 | **legacy** | $649 | $7.00 | 40 | 117× |
+| NexionBox Pro | **legacy** | $1,199 | $13.00 | 80 | 217× |
+| NexionBox Pro v2 | active | $1,319 | $14.00 | 90 | 233× |
+| NexionRack P1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
+| NexionRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
+| Cloud Share | active | $19.9 | $0.19 | 3 | 3× |
 
-**Legacy 代际**:S1 / Pro / Rack P1 标 status="legacy",ProductCard 左下角显示 `LEGACY` chip(i18n `store.legacyBadge`)。Legacy 仍可购买,但伴随 §6.8 衰减曲线在 12 个月内退化到 ~22%,引导用户走 §7.5 Trade-in 升级。
+**经典款(市场售卖状态)**:S1 / Pro / Rack P1 标 `status="legacy"`(目录较早上架的型号,与置换资格**正交**),ProductCard 左下角显示「经典款 / Classic」chip(i18n `store.cardLegacyBadge`)。仍正常售卖;§6.8 产能递减 + §7.5 阶梯抵扣共同引导升级更高算力。
 
-**代际映射**(`TRADEIN_UPGRADE_MAP`):
-- S1 → Pro v2(Trade-in 抵扣 $300)
-- Pro → Pro v2(Trade-in 抵扣 $300)
-- Rack P1 → Rack P2(Trade-in 抵扣 $800)
+**升级置换(设备级,无固定映射)**:任何已购付费设备可随时下架,按其累计产出落阶梯折抵购买**任何更高价 SKU**(默认规则;详见 §7.5)。
 
-**Gen-2 代际发布门**(`Product.unlocksAtPhase`):
+**上架节奏门**(`Product.unlocksAtPhase`,控市场投放节奏):
 
 | 产品 | unlocksAtPhase | 时点(参 §13.4 phase 月段)|
 |---|---|---|
-| NexionBox Pro v2 | `P3` | 月 ≥ 4(首波代际升级窗口)|
-| NexionRack P2 | `P5` | 月 ≥ 8(最后升级窗口)|
+| NexionBox Pro v2 | `P3` | 月 ≥ 4 |
+| NexionRack P2 | `P5` | 月 ≥ 8 |
+
+上架门对**置换路径同样生效**(未正式上架的 SKU 不可作置换目标,结算深链同拦)——例外为「置换侧抢先购」开关(`tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项,**默认关闭**,后台 E1 面板可配):开启后**仅置换路径**可在正式上架前 `leadDays` 天(运营档位 7/14/30/60/90)内购买该 SKU,置换目标行带「抢先升级」标;商城正门(列表 Locked 卡/详情/非置换深链)始终不受抢先购影响。与运营「强制解锁」动作的优先级:强制解锁=全面正式上架,抢先购开关随之无作用面,两者不冲突。
+
+**两层口径(预热 vs 购买)**:**转化预热面**(首页/收益页升级推广位等纯营销入口)允许预告未上架机型——点击落"即将上架"卡(带上线通知订阅),为发售蓄水;**购买面**(商城列表/详情购买、组合建议、置换目标、结算)严格按上架门(置换侧叠抢先购窗口)拦截,且支付时刻二次复验。
 
 **列表渲染**(`/store`):
 
-- 已发布产品(`unlocksAtPhase` 未设 / 已 reached)→ 渲染常规 `<ProductCard>`
-- 未发布产品 → 过滤出主列表,聚合到底部 **"Next generation" coming-soon section**,每张以 `<LockedProductCard inline>` 渲染(横向卡 + lock icon + 名称 + tagline + ETA + "Notify me when live" pill)
+- 已上架产品(`unlocksAtPhase` 未设 / 已 reached)→ 渲染常规 `<ProductCard>`
+- 未上架产品 → 过滤出主列表,聚合到底部 **"Coming soon"(即将上架)section**,每张以 `<LockedProductCard inline>` 渲染(名称 + tagline + ETA + "上线时通知我" pill)
 - SSR 阶段(mounted=false)默认把 `unlocksAtPhase` 产品视为锁定,与 first paint hydration 对齐(参 §16.5);client mount 后按真实 phase 重算
 
 **购买门(等级门 + 锁额门)**(`Product.purchaseGate`):
 
-代际发布门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
+上架节奏门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
 
 数据结构 `PurchaseGate`(全字段可选,任一条件省略=不校验该项;`purchaseGate` 整体未设=自由购买无门):
 
@@ -1562,7 +1567,7 @@ flowchart TD
 
 **列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexionBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
-**Promo strip 互斥**:VsPhoneHero 之下若 `<TradeinWindowBanner>`(§7.6)正在显示,则 S1 promo `$200 off NexionBox S1` strip **隐藏**(S1 是 legacy,window 开放时推销 S1 与"换到新一代"叙事冲突)。其它情况(无 legacy fleet / 未到 P3)S1 promo 正常显示。
+**Promo 并存**:升级置换横幅(§7.6)已改为按「用户是否持有可置换设备」动态显隐(无 phase 窗口),与 S1 促销条各自独立渲染;旧「window 开放时隐藏 S1 promo」互斥规则随 phase 窗口机制一并退役。
 
 **卡片 ROI-first hero metric**(自上而下):
 
@@ -1763,138 +1768,155 @@ stateDiagram-v2
 
 **文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:排行榜 Podium 实物奖品(Genesis Node / NexionBox 等,见 §8.11.5)保留 shipping 语义。
 
-### 7.5 Trade-in & Upgrade — Checkout Intercept + Inventory Surface
+### 7.5 升级置换(Trade-in)— 随时下架 + 产出阶梯抵扣
 
-旧代际硬件残值置换 + 代际升级路径。**独立 `/store/tradein` 页已下线**,功能拆解为两个表面:
+**代际概念已取消**。任何已购付费设备可**随时下架**,按其累计产出落阶梯折算抵扣金额,用于购买**任何更高价 SKU**(默认规则,后台可配)。三个入口表面:
 
-1. **Checkout intercept**(`/store/checkout` mount-time)— 用户从 `/store/[productId]` 点 Buy now 进入 checkout 时,自动评估资格 + 槽位,优先弹三件 sheet 之一;
-2. **Inventory surface**(`/me/devices` 设备仓库)— 持久 `<TradeInPromoBanner>` 推送升级机会,点 CTA 跳到目标商品详情触发上述 intercept。
+1. **设备仓库置换条**(`/me/devices`,主动入口)— 每台合规设备行内「可抵 $X」chip(→阶梯规则说明弹层)+「升级置换」CTA(→选目标 → 确认 → 去结算);
+2. **Checkout intercept**(`/store/checkout` mount-time)— 买任一设备 SKU 时,若持有可置换设备自动弹分叉 sheet(置换抵扣 / 全价购买);
+3. **商城横幅**(`/store` 顶部,§7.6)— 按用户最优可置换设备动态报价,CTA 跳设备仓库。
 
-#### 7.5.1 Eligibility 评估 + 残值公式
+**总不变量**:抵扣**仅在结算时抵减应付款,永不写入余额**、不可提现、不可拆分;真值 server-authoritative(`POST /api/orders` 携 `tradeInDeviceId`,服务端同事务复算抵扣 + 下架旧机)。
 
-每个商品的购买资格由 `lib/v3/_config/tradein-config.ts` 的 `eligibility[kind]` 定义,模式 `open / any-of / all-of`,9 种规则类型:`open / own-kind / own-prev-tier / v-rank-min / cumulative-deposit-usdt / kyc-tier / days-active / referral-count / trade-in`。
+#### 7.5.1 Eligibility 评估 + 产出阶梯抵扣
+
+**购买资格**(与旧版一致,仅 trade-in 规则去定向):`eligibility[kind]` 定义,模式 `open / any-of / all-of`,9 种规则类型:`open / own-kind / own-prev-tier / v-rank-min / cumulative-deposit-usdt / kyc-tier / days-active / referral-count / trade-in`。`trade-in` 规则**不再限定来源型号**(fromKind 可省,任意合格设备的置换即满足该通道)。
 
 **默认 eligibility**:
 - **S1**:`open`(任何用户可购)
-- **Pro**:`any-of`〔own ≥1 S1 / V-Rank ≥2 / 累计入金 ≥$1000 / trade-in from S1〕
-- **P1**:`any-of`〔own ≥1 Pro / V-Rank ≥4 / 累计入金 ≥$5000 / trade-in from Pro〕
+- **Pro / Pro v2**:`any-of`〔own ≥1 S1 / V-Rank ≥2 / 累计入金 ≥$1000 / trade-in〕
+- **Rack P1 / P2**:`any-of`〔own ≥1 上一档 / V-Rank ≥4 / 累计入金 ≥$5000 / trade-in〕
 
-**残值公式**(`computeSalvageRate` + `computeSalvageCredit`):
+**设备置换资格**(计算候选清单 `eligibleTradeInDevices(targetKind)`):实付价 > 0(赠送/免费设备排除,前端零痕迹)∧ kind ∈ `applyTo` 白名单 ∧ 目标目录价严格更高(`requireHigherPrice`,可配)∧ 非「激活中且任务运行」(阻断判定单源 `isDeviceTaskBlocked`:**库存设备上的出厂任务不在跑、不阻断**;激活设备走「先停用(自带等任务/强停保护)→ 库存态再置换」既有链路)。活跃与库存设备均可置换;候选按可抵额降序。
+
+**置换目标合规**(三个目标面——retire 目标列表 / 设备行 strip / 商城横幅——统一判定 `isTradeInTargetAvailable`):目标 SKU **已正式上架(unlocksAtPhase 已达,与商城正门同源)∨ 处于抢先购窗口**(§7.1 `tradeInEarlyAccess` 开关,默认关);未上架且不在窗口的 SKU 不出现在任何置换目标面。
+
+**产出阶梯抵扣公式**(`computeTradeInCredit`,唯一抵扣引擎;无持有时长门槛——套利防护由阶梯本身承担:刚买产出≈0 → 落最高档,抵扣 ≤75% 实付,立即置换必亏 25%):
 
 ```
-rate(t_months) = max(floor, baseline − monthlyDecay × t_months)  // baseline=0.30, monthlyDecay=0.025, floor=0
-credit          = price × rate(ageMonths)                          // floor 触底后为 $0
+ratio  = cumulativeEarningsUsdt ÷ paidPriceUsdt        // 产出比(分子=该设备累计 USD 产出,分母=实付净额)
+credit = paidPriceUsdt × creditPct(band(ratio)) × promoMult,  clamp 到 [0, 目标价]
 ```
 
-**守卫**:`if (ageMonths < minHoldingMonths) return 0`(默认 minHoldingMonths=1 月,防"买入立即 trade-in 套利")。所有参数 server-canonical via `GET /api/config/tradein`,运营可热改无需 client redeploy。
+| 档 | 产出比区间(左闭右开) | 抵扣比例(默认) |
+|---|---|---|
+| 1 | 0% – <25% | 75% |
+| 2 | 25% – <50% | 60% |
+| 3 | 50% – <75% | 45% |
+| 4 | 75% – <100% | 30% |
+| 5 | ≥100% | 15% |
 
-**铁律**:salvage credit **永不写余额** — 仅在置换 checkout 中作为扣减项使用(`debitBalance(price − credit)`),不可提现、不可累加。
+- **实付基数**:`paidPriceUsdt` = 实付净额(订单 total,已扣券与置换抵扣;trial 转正 = 促销价 − 收益抵扣),非目录价 — 防券/试用低价买入套利。
+- **paidPrice = 0(赠送)⇒ 不可置换**(资格排除,非"∞ 产出比落档 5")。
+- **规则参数**(后台「升级置换阶梯」面板可配,详见后台 PRD E 域):阶梯 5 档界点与比例(区间连续、比例严格递减,结构由机器哨兵锁)/ `requireHigherPrice`(默认 true)/ `maxDevicesPerOrder`(默认 1)/ `promoMult`(默认 1.0;>≈1.47 时 clamp 可能绑定)/ `applyTo` SKU 白名单 / `enabled` 总开关(关闭 = 全部置换入口隐藏)。
+- 所有参数 server-canonical via `GET /api/config/tradein`,运营可热改无需 client redeploy。
+
+**铁律**:抵扣 **永不写余额** — 仅在结算中作为扣减项(`debitBalance(price − discount − credit)`),不可提现、不可累加;累计产出越多抵扣越低(合规口径向用户明示,引导尽早置换)。
 
 #### 7.5.2 Checkout intercept 触发条件
 
-结账页 mount 时按序评估:
+结账页 mount 时按序评估(**全部设备 SKU 均可触发**,旧 v2/P2 白名单排除已取消):
 
-0. **购买门硬拦截**(置于 trade-in / MAX_DEVICES intercept 之前):对挂 `purchaseGate` 的商品跑 `evaluatePurchaseGate`(§7.1),若 `blocked`(资格未达成或锁额售罄)→ 阻断支付 + 中性提示 + CTA 跳 `/team/quota`。服务端在下单时二次校验为权威(`POST /api/orders` 对未达成资格 reject),前端拦截仅为体验前置。
-1. 若 `useDeviceEligibility(productKind).canTradeIn === true` → 显示 `<TradeInOrFullChoiceSheet>`(分叉:trade-in 哪台旧设备 / 全价购买)
-2. 否则若 `activeCount >= MAX_DEVICES` → 显示 `<ReplaceLowestSheet>`(让出最低产出设备)
-3. 否则正常 checkout 流程(支付方式选择 → 确认 → 扣款)
+-1. **上架节奏门**(先于购买门——没上架谈不上资格):`unlocksAtPhase` 未达的 SKU,仅当「携置换上下文 ∧ 抢先购窗口内(开关默认关)」放行;否则提示「即将上架」+ 跳回 `/store`(深链防线,与商城正门口径同源)。
+0. **购买门硬拦截**:对挂 `purchaseGate` 的商品跑 `evaluatePurchaseGate`(§7.1),若 `blocked` → 阻断支付 + 跳 `/team/quota`。**门优先级高于置换**——向被锁 SKU 置换同样被拦(retire 流选中被锁目标时在此兜底)。服务端下单二次校验为权威。
+1. **已带置换上下文**(用户从设备仓库 retire 流确认后到达,`appliedTradein.targetKind` = 本单 SKU)→ 不再弹分叉,直接渲染抵扣行。
+2. 若持有 ≥1 台可置换候选 → 弹**分叉 sheet**(选哪台设备置换(设备级,含各台实时可抵额)/ 全价购买)。
+3. 否则若 `activeCount ≥ MAX_DEVICES` → 弹**让位 sheet**(让出最低产出设备)。
+4. 否则正常 checkout 流程。
 
-`KNOWN_KINDS` 白名单仅包括基础 DeviceKind(s1/pro/p1/cloud-share/phone)。v2/P2 catalog 不触发 intercept(走正常 checkout)。
+#### 7.5.3 Sheet 状态机 + 结算原子块
 
-#### 7.5.3 三件 sheet 组件 + 状态机
+`useTradeinSheet` 单一 discriminated union 防双开:`{ kind: "none" | "choice" | "retire" | "tradein" | "replace" | "block" }`,block 态按来源分裂(`origin: "replace" | "retire"`)。
 
-`useTradeinSheet` 单一 discriminated union 防双开:`{ kind: "none" | "choice" | "tradein" | "replace" | "block" }`。
+| Sheet 态 | 触发 | 主流程 |
+|---|---|---|
+| `choice` | Checkout intercept 分叉 | 列全部可置换设备(每台带实时抵扣额),选设备 → tradein;或全价购买(槽满 fallback replace) |
+| `retire` | 设备仓库「升级置换」CTA | 选升级目标(**点选列表**,仅列合规目标 SKU,每行带抵后价;无自由输入)→ tradein |
+| `tradein` | 置换确认 | 确认卡:旧机 / 累计产出 / 抵扣档位 / 本次抵扣 / 预计应付 + 合规披露 → 确认写入结算抵扣上下文(`appliedTradein`,仅内存态,离开结算页即弃)→ 去结算 |
+| `replace` | Path B 槽满 | 让出最低产出设备 / 保留全部槽位入库 / 取消(原有流程不变) |
+| `block(origin=retire)` | 目标设备激活中且任务运行 | 「任务完成后即可下架」+ 查看任务进度 / 知道了(**无强拆选项**) |
+| `block(origin=replace)` | 让位目标 mid-task | Wait / Force-replace(放弃任务,原有流程不变) |
 
-| Sheet | 触发 | 主流程 | Composer 关键 |
-|---|---|---|---|
-| `<TradeInOrFullChoiceSheet>` | Intercept Path A 入口 | 列出 tradeInSources[],用户选某 fromKind 或 "Pay full" | choose tradein → showTradein;choose full → 槽满 fallback showReplace 或 hide |
-| `<TradeInSheet>` | Path A confirm | 旧设备摘要 + salvage 抵扣 + 净付 + 法务披露 | `replaceDevice → debitBalance → 失败 rollback (re-insert removedDevice snapshot, remove new) → addBill → router.replace` |
-| `<ReplaceLowestSheet>` | Path B 槽满 | 列最低产出 active device,提供 Replace / Keep & buy / Cancel | Pending-task gate → `moveToInventory → addDevice → activateDevice → debitBalance → bill` |
-| `<PendingTaskBlockSheet>` | Replace 时 lowest 有 in-flight task | Wait / Force-replace(放弃任务) | 任务快照 → `addDevice → moveToInventory → activateDevice → debitBalance → 清 currentTask (LAST,success-only)`,失败分支均 restore taskSnapshot |
+**结算原子块**(钱与设备的唯一变更点,checkout 持久块同步执行、无 await 无半执行窗口):
+
+```
+支付确认 → 复检抵扣上下文(设备仍在 ∧ 非任务阻断 ∧ 开关开;失效 → 拒单重报价,绝不静默按全价扣)
+        → debitBalance(净额 = 价 − 券 − 抵扣, ≥0)      // 失败 → 退回支付步,零状态变更
+        → 移除旧设备(下架) + 持久化
+        → createOrder{ tradeInCredit, tradeInDeviceId }   // order.total = 价 − 券 − 抵扣
+        → 账单(i18n memo 含置换明细) → 清抵扣上下文
+```
+
+新设备由订单履约管线生成(**未激活入库**,`paidPriceUsdt = order.total`),不在本块内。
 
 **关键不变量**:
-- M1(原子):每个 composer 任一步失败,所有先前步骤 rollback,设备数组 + 余额 + bill 回到调用前状态
-- M2(salvage 不入余额):`debitBalance(price − salvage)` 是唯一接触余额的调用,salvage 不通过 `creditBalance` 路径
-- M3(双击防御):每个 composer 入口 `confirmingRef` 守卫;成功路径不 reset(避 unmount 前再触发)
-- M4(generation lineage):新设备 `generation = (oldDevice.generation ?? 1) + 1`(不写死 2)
+- M1(原子):扣款成功前零状态变更;扣款后同步序列无失败分支(移除为幂等 filter)
+- M2(抵扣不入余额):`debitBalance(净额)` 是唯一接触余额的调用,抵扣不经 `creditBalance` 路径
+- M3(双击防御):每个 composer 入口 confirming 守卫,成功/失败路径均复位
+- M4(判定单源):任务阻断 `isDeviceTaskBlocked` 与抵扣引擎 `computeTradeInCredit` 各自单源,全部消费面(候选/入口/确认/结算复检 × 七个抵扣展示面)禁止旁路自算
 
-#### 7.5.4 `/me/devices` 设备仓库 + 推送 Banner
+**业务流程图(retire 主链)**:
 
-`<TradeInPromoBanner>` 配置门控,挂在 `/me/devices` 顶部。配置参数全部 server-canonical:
+```mermaid
+flowchart TD
+  A["/me/devices 设备行<br/>「可抵 $X」+「升级置换」"] -->|点升级置换| B{激活中且任务运行?}
+  B -- 是 --> C["阻断层:任务完成后可下架<br/>查看任务进度 / 知道了(无强拆)"]
+  C -->|查看任务| C2[/earn 任务区/]
+  B -- 否 --> D["选升级目标(点选列表,<br/>仅更高价 SKU,每行带抵后价)"]
+  D --> E["置换确认卡:累计产出 / 档位 /<br/>抵扣额 / 预计应付 + 合规披露"]
+  E -->|确认| F[写入结算抵扣上下文 → 去结算]
+  F --> G{结算页:购买门 blocked?}
+  G -- 是 --> H[/team/quota 解锁引导/]
+  G -- 否 --> I["结算页:抵扣行(−$X)+ 移除出口<br/>移除 → 恢复原价可全价购买"]
+  I -->|支付| J{支付时复检:设备在 ∧<br/>非阻断 ∧ 开关开?}
+  J -- 失效 --> K[拒单重报价:回支付步 + 提示]
+  J -- 通过 --> L["原子块:扣净额 → 旧机下架移除<br/>→ 订单(含抵扣明细) → 账单"]
+  L --> M["新机经履约管线未激活入库<br/>(实付=订单净额,作为下一跳抵扣基数)"]
+```
 
-| 参数 | 默认 | 用途 |
-|---|---|---|
-| `enabled` | true | kill switch |
-| `cooldownHours` | 24 | 用户 dismiss 后多久不再弹(localStorage cache,server reconciles)|
-| `maxPerSession` | 1 | 单会话最多弹几次(sessionStorage)|
-| `delayMs` | 1500 | 进页后延迟弹出(让首屏 content 先渲染)|
-| `routes` | `["/me/devices"]` | 路由白名单(`cfg.routes.includes(pathname)` 检查)|
-| `triggerWhen.hasEligibleDeviceInInventoryOrSlot` | true | 粗 kill switch |
-| `triggerWhen.minDeviceAgeDays` | 30 | 不为太新设备弹 promo |
+#### 7.5.4 `/me/devices` 设备仓库置换条 + 阶梯说明弹层
 
-**评估**:`nextUpgradeTier(ctx)` 返回当前用户可升级的下一档(S1→Pro / Pro→P1);`pickPromoSource(devices, targetKind, minAgeDays)` 选最老 active device(EOL 优先)。`credit ≤ 0` 时不弹(防"save $0" 尴尬)。
+**常驻置换条**(取代旧 `<TradeInPromoBanner>` 弹出式推送,入口从"节奏推送"升级为"行内常驻"):每台设备行底部按资格渲染:
 
-CTA 行为:`router.push(/store/{nextTierKind})` → 用户在目标商品页 Buy now → checkout intercept 自动开 ChoiceSheet。
+- 合规设备:「可抵 $X ›」chip(点开**阶梯规则说明弹层**:5 档表 + 当前档高亮 + 该设备产出比/落档描述 + 合规脚注,数据全派生自阶梯单源)+「升级置换」CTA(→ §7.5.3 retire 流)
+- 免费设备(paidPrice=0)/ 不在 applyTo:**零痕迹**(不渲染置换条)
+- 无更高价目标(已持最高档):显示禁用原因「当前已是最高算力档位」
+- 激活中且任务运行:CTA 可点,进阻断层(业务链必有下一步)
+
+旧 promo 推送配置组(`cooldownHours / maxPerSession / delayMs / routes / triggerWhen`)保留为后台预留参数(server-canonical),当前版本无弹出式推送消费者。
 
 #### 7.5.5 i18n
 
-`tradein.*` namespace 共 35 keys(旧 11 keys + Batch B/C/D 24 新 keys):
-- 旧入口(保留兼容老 caller):heroLabel / rowSalvageLabel / rowUpgradePrice 等 11
-- Eligibility hint 9 keys(`eligibilityHint{Open|OwnKind|...|TradeIn}`)
-- Sheet 文案 25 keys(sheet*/replace*/block*/choice*)
-- 错误文案 6 keys(errReplaceUnavailable / errPleaseRetry 等)
-- Memo template 5 keys(sheetBillMemo / replaceBillMemo / keepBuyBillMemo / forceReplaceBillMemo / etc.)
-
-`myDevices.inventory*` namespace 24 keys(/me/devices 仓库页全文 + promo banner)。
+`tradein.*` namespace 按面组织(en/zh 全镜像):eligibility hint 组(9)/ choice 分叉组 / retire 目标选择组 / tradein 确认卡组(含档位行)/ checkout 抵扣行组(含移除)/ 设备行置换条组(strip*)/ 阶梯说明弹层组(ladder*)/ replace & block 组(含 retire 阻断专用文案)/ 错误组。结算账单 memo 走 `store.coBillMemo*` 模板(账单页直接渲染,禁硬编码英文)。
 
 #### 7.5.6 Demo 演示工具(PM-facing)
 
-`/me/replay-tour` 顶部新手引导回放后,挂"Lifecycle demo"section,4 个 PM-facing 演示 action,让 prototype 演示者绕过"购买 → 等月份"的真时间延迟,立即呈现衰减曲线 + Trade-in 流程效果。
+`/me/replay-tour` 顶部新手引导回放后,挂"Lifecycle demo"section,PM-facing 演示 action,让 prototype 演示者绕过"购买 → 等月份"的真时间延迟,立即呈现任务产能递减 + 升级置换流程效果。
 
 | Action | Store call | 效果 | i18n key |
 |---|---|---|---|
-| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexionBox-S1(落地效率 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
-| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexionRack-P1(落地效率 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
-| Fast-forward | `_devFastForwardAll(3)` | 全部 degradable 设备 purchasedAt 拨回 3 个月 | `replay.demoFastForwardTitle/Hint/Cta` |
+| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexionBox-S1(落地产能 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
+| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexionRack-P1(落地产能 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
+| Fast-forward | `_devFastForwardAll(3)` | 全部参与递减设备 purchasedAt 拨回 3 个月 | `replay.demoFastForwardTitle/Hint/Cta` |
 | Reset | `_devResetDevices()` | 重置回 phone-only(purchasedAt = user.joinedAt) | `replay.demoResetTitle/Hint/Cta` |
 | Trigger milestone | `useMilestones.reset() + _devBumpEarningsTotal(150)` | 重置已触发的里程碑 + 拨高 earnings 跨过 $100 阈值,§11.3a watcher 下次 poll 时 fire celebration overlay | `replay.demoMilestoneTitle/Hint/Cta` |
 | Trigger Nova push | `useStella.push(monthlyTaskLockPush + tradeinNudge)` 走唯一 cooldownKey 绕过节流 | Sprint 2 收尾(Gap D)— 立即 force-fire 月度任务锁定推送 + Trade-in nudge(若条件满足),文案随当前 phase 切换,PM 演示无需等真 cadence | `replay.demoStellaTitle/Hint/Cta` |
 
 每个 action 触发 toast 反馈(模板 `replay.demoToastSeeded/FastForwarded/Reset/Full`),容量校验 MAX_DEVICES。
 
-**设计意图**:快速展示"用户买了 NexionBox 4-5 个月后看到效率衰减 + Trade-in 引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
+**设计意图**:快速展示"用户买了 NexionBox 4-5 个月后看到接单量递减 + 升级置换引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
 
-### 7.6 Trade-in Window Banner(TradeinWindowBanner)
+### 7.6 升级置换横幅(TradeinWindowBanner)
 
-位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 平台 phase × 用户 legacy fleet 双门控,其中任一不满足即整 banner 隐藏。开放时同步抑制 §7.1 末段提到的 S1 promo strip(防止"换到新一代"叙事与"$200 off S1"促销并存)。
+位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 用户持有 ≥1 台可置换设备(§7.5.1 资格:实付>0 ∧ applyTo ∧ 存在合规目标 ∧ 抵扣>0 ∧ 总开关开)即显示;无合格设备整横幅隐藏,无 phase 窗口概念。
 
-**目的**:把 §13.4 phase 推进引发的"新一代上市 · trade-in 窗口开放"事件以高紧迫感入口固化在 `/store` 顶部。与 §6.8 DeviceLifecycleBanner(/earn 入口)互补 — 用户从 Earn 或 Store 任一侧进入 §7.5 trade-in 流程都有 1-tap 路径。CTA target 为 `/me/devices`(Batch E:trade-in surface 已从独立页迁到设备仓库 + checkout intercept)。
+**目的**:把用户手上"最划算的一台置换机会"以动态报价固化在 `/store` 顶部,与 §6.8 车队产能 Banner(/earn 入口)、设备仓库置换条(§7.5.4)互补 — 三侧任一进入 §7.5 置换流程都有 1-tap 路径。CTA target 为 `/me/devices`。
 
-**显示矩阵**(phase × ownership):
+**报价派生**(全实时,无写死金额):遍历用户可置换设备,每台按其**最低升级价目标**计算阶梯抵扣,取**抵扣额最高**的一台展示 —— `你的 {name} 可抵 ${credit}` + `升级 {target} 只需再付约 ${net}`(net = 目标价 − 抵扣)。
 
-| phase | 用户持 legacy box | 用户持 legacy rack | banner variant | 文案 |
-|---|---|---|---|---|
-| P1-P2 | 任意 | 任意 | hidden | gen-2 未发布 |
-| P3-P4 | ✓ | — | `box` | `Pro v2 trade-in open — $300 off` |
-| P3-P4 | — | ✓ | hidden | rack window 待 P5 开 |
-| P3-P4 | — | — | hidden | 无 legacy 可换 |
-| P5-P6 | ✓ | — | `box`(final 升级)| `Pro v2 trade-in open — $300 off` |
-| P5-P6 | — | ✓ | `rack` | `Final rack upgrade — $800 off` |
-| P5-P6 | ✓ | ✓ | `combined` | `Final fleet upgrade — $1,100 off` |
-| P5-P6 | — | — | hidden | 无 legacy 可换 |
+**i18n**(`store.tradeinUpgrade.*`):`label` / `title{name,credit}` / `body{target,net}` / `cta`。旧 `store.tradeinWindow.*` 窗口键组已删除。
 
-**Legacy 设备识别**:
-- legacy box = 用户拥有 `kind ∈ {stellarbox-s1, stellarbox-pro}` 任一
-- legacy rack = 用户拥有 `kind = stellarrack-p1`
-
-**Hook**:`useTradeinWindowState()` 暴露 `{ visible, variant, isFinal }`,供 `/store/page.tsx` 同时控制 banner 渲染 + S1 promo strip 互斥。SSR mounted=false 时返回 `visible=false`,与 first paint hydration 对齐(参 §16.5)。
-
-**i18n**(`store.tradeinWindow.*` 8 keys):
-- `label`(`LIMITED WINDOW`)
-- `titleBox` / `bodyBox` / `titleRack` / `bodyRack` / `titleCombined` / `bodyCombined`
-- `cta`(`Open trade-in`)
-
-**铁律**:文案永不暴露 `phase id / "P3" / "final phase" / "deposit lock-in"` 等 PM 术语;只用"trade-in open / final upgrade window / new silicon now available"等真实平台话术。
+**铁律**:文案永不暴露 phase / 内部参数名等 PM 术语;抵扣口径向用户明示"按累计产出计算、越早置换抵得越多"(合规透明,同时构成紧迫感)。
 
 ### 7.7 代金券(Voucher · 领券促销)
 
@@ -2481,7 +2503,7 @@ i18n keys 在 `poolHowItWorks.*` namespace(en + zh 双语镜像)~40 keys。
 | Peer | 同 V 级团员业绩 5% | 每月 | USDT |
 | Cultivation | 下属升 V 一次性 NEX | 实时 | V1 500 / V2 2K / V3 10K / V4 50K / V5 200K NEX |
 | Leadership | 领导池周分红 | 每周 | USDT(V3+ 解锁) |
-| Genesis | 创世节点持有人分红 | 每日 | USDT(创世持有人) |
+| Genesis | 创世节点持有人排放 | 上所后 | $NEX(创世持有人,vesting 释放) |
 
 UI:返回按钮同行 `📖 新手?了解 6 类佣金 →` chip 链 `/team/commissions/how-it-works` + 6 类汇总 grid + filter pills(全部 / 网络版税 / 平衡匹配 / 平级 / 培育 / 领导池 / 创世)+ 时间线 + 每条状态(冷却 N 天 / Ready / Withdrawn)+ tap 详情。
 
@@ -3406,18 +3428,18 @@ interface TrialConfig {
 | V-Rank ladder(13 级 selfBuyUSD / directRefs / teamVolumeUSD / votes / prize) | `lib/v3/v-rank.ts:49-140` | `GET /api/config/v-ranks` | 阶段调整门槛 |
 | V_VOTES + GLOBAL_V_DISTRIBUTION | `lib/v3/leadership-pool.ts:27-43` | `GET /api/config/leadership-pool` | 周池金额 + vote weight |
 | Staking pools 统一(USDT 锁仓 + NEX 池)| `lib/v3/staking.ts:28-40` + `lib/mock/staking-pools.ts:13-46` | `GET /api/config/staking/pools` | APY / penalty / enabled / minStake |
-| Genesis 节点经济(TOTAL_SLOTS / unitPriceUSDT / dailyDividendShare) | `lib/v3/genesis.ts:25,76,82` | `GET /api/genesis/state` | 供应 / 单价 / 分红比例 |
+| Genesis 节点经济(TOTAL_SLOTS / unitPriceUSDT / dailyDividendShare) | `lib/v3/genesis.ts:25,76,82` | `GET /api/genesis/state` | 供应 / 单价 / 排放比例 |
 | Genesis 二级市场 stats(floor / vol_24h / sales_24h / listed / owners) | `app/(main)/genesis/marketplace/page.tsx:48-52` | SSE `/api/genesis/marketplace/stats` | 实时市场数据 |
 | NEX 市场参数 + 拉盘曲线(price / pump 概率 / 幅度) | `lib/v3/market.ts:50-76` | WebSocket `/api/market/nex` | server canonical |
 | Exchange 三阈值(USER_DAILY_CAP / PLATFORM_DAILY_CAP / KYC_LIFETIME) | `lib/v3/exchange.ts:20-22` | `GET /api/config/exchange/caps` | 合规调阈值 |
 | Phase engine 全表(每 phase 多个时变 dial × 6 phases,含 `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` | 12 月节奏 dial 调优 |
 | Task pricing 表(6 类 min/maxReward + QUEUE_SATURATION)| `lib/mock/tasks.ts:31-193` | `GET /api/config/task-pricing` | 每周市场行情 |
 | Device specs(baseRate / baseRateNEX / price 全表) | `lib/store/index.ts:33-86` | `GET /api/products/specs` | 产品上下架 / 定价 |
-| Device degradation 曲线(-4% / -6% / -23.7% + MIN_EFFICIENCY) | `lib/store/device-lifecycle.ts:31-39` | `GET /api/config/lifecycle` | 衰减曲线决定终身收益 |
+| 任务产能节奏(3 段月界+递减幅度 + 产能下限 + 豁免 SKU + 新机补贴天数) | `src/store/device-lifecycle.ts`(TASK_CAPACITY_BANDS 等) | `GET /api/config/task-capacity`(TBD) | 产能节奏决定终身收益;运营可调段界/幅度/补贴 |
 | Sponsorship welcome gift(金额 + 发放模式)| `platform-config.rewards.welcomeGift` | `GET /api/config/platform` | 后台调额度 / 发放模式 |
 | Earnings milestones(5 档阈值 + NEX 奖励) | `lib/store/milestones.ts:28-34` | `GET /api/config/milestones` | 阶段调整 |
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x / 7d streak,作用于签到 NEX 发放)| `lib/v3/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier | A/B 实验值 |
-| Trade-in 全配置(`salvage.rate=0.30` / `monthlyDecay=0.025` / `minHoldingMonths=1` + `eligibility[kind].rules[]` + `promo.{enabled,cooldownHours,maxPerSession,delayMs,routes,triggerWhen}` + `inventory.softMax`)| `lib/v3/_config/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 折旧定价 + 资格门槛 + promo 节奏 |
+| 升级置换全配置(抵扣阶梯 5 档界点/比例 + `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult` / `applyTo` / `enabled` + `eligibility[kind].rules[]` + promo 预留组 + `inventory.softMax`)| `src/mock/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 抵扣定价 + 资格门槛;阶梯结构由哨兵锁(连续/递减) |
 | Tradein composer endpoints | `lib/store/index.ts:recycleDevice / replaceDevice / moveToInventory` | `POST /api/devices/recycle` / `POST /api/devices/replace` / `POST /api/devices/deactivate` (TBD; candidates) | 服务端原子 tx 替代 client composer |
 | Trade-in promo dismissal log | `app/components/tradein-promo-banner.tsx` localStorage | `GET/POST /api/users/me/promo-dismissals` (TBD; candidate) | 跨设备 cooldown 一致性 |
 | User cumulativeDepositUsdt | `recordDeposit` action | `GET /api/users/me.cumulativeDepositUsdt` (TBD; candidate) | trade-in 资格门槛源 |
@@ -3450,7 +3472,7 @@ interface TrialConfig {
 
 - staking:APY / penalty / minStake / lockDays。
 - Genesis:slot price $24.08、年化 87.9%、royalty/dividend、一级/二级市场开关。
-- 设备生命周期:decay -4% / -6% / -23.7%, floor 22%, salvage formula。
+- 设备任务产能:递减 -4% / -6% / -23.7%, floor 22%, 产出阶梯抵扣公式。
 - 商品与收益:SKU price、daily earning、route threshold、trial price。
 - Team:unilevel 7 层、V Rank 条件、binary cap、leadership pool rule。
 - Wallet:withdraw min / fee / cap / KYC gate。
@@ -3559,41 +3581,48 @@ interface TrialConfig {
 
 #### 10.1.1 规则
 
-- 限量 1,000 张
-- 单价 $9,999
-- 持有特权:
-  - 全网每日交易 0.1% 池子均分(单张日产约 $24)
-  - V5 Wing Leader 资格直通(跳过 $150K 业绩门槛)
-  - 闭门 AMA + 年度峰会(Lisbon 2026)
-  - 持有人专属 Discord 通道
+- 限量 1,000 张;一级预售按累计售出分 3 档阶梯定价,售罄硬跳价:
+
+  | 档 | 累计售出区间 | 席位 | 单价 |
+  |---|---|---|---|
+  | 白名单 / OG | 0–99 | 100 | $7,999 |
+  | 公售 Tier 1 | 100–549 | 450 | $9,999 |
+  | 尾盘档 | 550–999 | 450 | $11,999 |
+
+- 席位 = 创世 OG 身份 + $NEX 协议排放优先权;持有特权:
+  - **$NEX 排放优先额度**:上所后按 vesting 曲线释放的优先排放份额(以 $NEX 计价,非每日现金分红)
+  - 生态奖励池份额
+  - DAO 治理(1 席 = 1 票)
+  - 年度忠诚空投
+  - 二级流动性(可转让,2.5% 网络版税)
+- **分红延期**:排放**上所(运营中期)后才开阀**——上所前只持有预留额度、赚积分冲排行榜,无每日收益、无可领余额。开阀由全局信号 `nexListed`(server-canonical,fail-closed:脏 / 未知数据默认不开)控制,后台 H1 `genesisDivOpen` 逐月旋钮据平台生命周期第 7 月(上所窗口)翻开。
 
 #### 10.1.2 UI
 
-- header 之下 entry chip `📖 New here? Learn how Genesis Nodes work →` 链 `/genesis/how-it-works`
-- Hero:销售进度条(`847/1,000 sold` + 倒计时)+ `~150 left`
-- 单价 + 日预估收益 hero
-- 4 项 perks 卡片
-- Live social proof(每 8-14s 滚动 `Tom from SF just bought 2 Genesis Nodes`)
-- 销售 ticker(每 30s 销售数自动 +1-3)
-- Sticky 底部 CTA `Reserve a Genesis Node · $9,999`
-- Confirm sheet:数量调节 ± + 小计 / 网络费 / 日分红预估 / 合计
+- header 之下 entry chip 链 `/genesis/how-it-works`
+- Hero:极简吊钩(标题「优先领 $NEX」+ 副标「限量 1000 · 售完即止」+ 免责「上所后释放 · 参考非保证」)+ 销售进度条(`847/1,000` + 剩余)
+- 阶梯档卡:3 档(已售档打钩灰显 / 当前档高亮 / 未来档预告更高价)+ 当前档价 + 「较白名单 +50%」溢价说明
+- 权益卡 4 层(优先领 $NEX / 生态奖励池份额 / DAO 治理权 / 年度空投)+ 「玩法详情 →」链 `/genesis/how-it-works`
+- Live social proof(每 8-14s 滚动)+ 销售 ticker(每 30s 销售数自动 +1-3)
+- Sticky 底部 CTA `认购 · $<当前档价>`(售罄→「去二级市场」)
+- Confirm sheet:数量调节 ± + 小计 / 网络费 / 到手(创世 OG 席位 · 上所优先权)/ 合计
 
 #### 10.1.3 玩法说明页 `/genesis/how-it-works`
 
-零基础说明页,文风对标传统 founder 股权 + 永续分红类比,降低 NFT 概念门槛。
+零基础说明页,文风对标传统 founder 股权 + 协议排放权益类比,降低 NFT 概念门槛。
 
 **页面结构**:
 1. iOS nav back to `/genesis` + 标题 `About Genesis Nodes`
 2. Hero + 标签 `GENESIS NODES` + 大标题 `1,000 founder NFTs. Each a permanent share of the network.`
 3. §1 What is a Genesis Node?(2 段:类比 founder 股权 + 限量 1,000 张永不增发)
 4. §2 持有 1 张的 4 项权益 IconRow:
-   - 🪙 全网每日成交 0.1%(永久,当前约 $24/day)
+   - 🪙 $NEX 协议排放优先额度(上所后按 vesting 曲线释放,$NEX 计价)
    - 🎟 每月 Genesis 抽奖券(中奖额外 ~$5,000 NFT)
    - 📜 创始成员证书(链上验证)
    - 🗳 DAO 投票权(每张 1 票)
-5. §3 获取途径 3 步 StepRow:预售 $9,999 固定价 / 二级 OpenSea 竞价 / 持有自动收分红 + CalloutBox `💡 Why pre-sale beats secondary`(地板价通常 1.5-3× 创始价)
-6. §4 二级市场交易 4 步流程(打开 marketplace → 挂单 → 设价上 OpenSea → 卖出后分红跟随 NFT)+ CalloutBox `⚠️ Once sold, dividends move with the NFT`
-7. §5 FAQ 5 问(为什么只有 1,000 张 / 分红比例会变吗 / $9,999 是不是太贵 / 平台关停怎么办 / 能持多张吗)
+5. §3 获取途径 3 步 StepRow:预售阶梯价认购 / 二级 OpenSea 竞价 / 持有获排放优先权(上所后开阀)+ CalloutBox `💡 Why pre-sale beats secondary`(尾盘档价通常高于早期档价)
+6. §4 二级市场交易 4 步流程(打开 marketplace → 挂单 → 设价上 OpenSea → 卖出后排放权跟随 NFT)+ CalloutBox `⚠️ Once sold, emission moves with the NFT`
+7. §5 FAQ 5 问(为什么只有 1,000 张 / 排放什么时候开始、怎么算 / 阶梯价怎么定 / 平台关停怎么办 / 能持多张吗)
 8. 双 CTA:`Got it · go to pre-sale` 链 `/genesis` + `Browse secondary market` 链 `/genesis/marketplace`
 
 i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
@@ -3696,50 +3725,45 @@ sequenceDiagram
 
 #### 10.3.1 目的
 
-为 Genesis Node 持有人提供完整的 holder portal,集中展示分红 / 权益 / 持仓 / 二级流动性,
-对标 BNB Holder Dashboard / Bybit VIP / BlockFi Tier benefits。
-当 `useGenesis.myOwned === 0` 时**显示真实空状态**(0 nodes / $0.00 lifetime / 0 pending)+ 引导购买,
-不伪造数据。Perks / Live feed / Footer 保留作为"购买能得到什么"的预览。
+为 Genesis Node 持有人提供完整的 holder portal,集中展示排放 / 权益 / 持仓 / 二级流动性。
+看板由全局上所信号 `dividendsOpen`(= 服务端 `nexListed`,fail-closed)分**两态**渲染:上所前作战舱(排放优先额度 + 上所进度 + 积分榜)/ 上所后排放态(NEX 排放 vesting)。
+当 `useGenesis.myOwned === 0` 时**显示真实空状态**(0 节点 / 无排放数字)+ 引导购买,不伪造数据。Perks / Footer 保留作为"购买能得到什么"的预览。
 
 DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列表显示"1 节点 = 1 票")**不提供 active 投票 UI**,未来如开放可重新加 Active Governance section。
 
-#### 10.3.2 页面结构(自上而下 8-10 段,按持有状态分支)
+#### 10.3.2 页面结构(按 `dividendsOpen` 两态 × 持有状态分支)
 
-**当 `myOwned > 0`(完整状态)**:
+**A. 上所前(`dividendsOpen === false`)· 排放优先额度作战舱**
 
-1. **Hero** — 👑 大字 N Nodes + `Lifetime dividends $X` + 3 cell:Today / Pending payout / Next payout HH:MM:SS 倒计时(每日 00:00 UTC 刷新)
-2. **30-DAY EARNINGS bar chart**(30 根条带)+ 顶部 `Total this month $X` chip
-3. **YOUR NODES 列表** — N 个 NFT 卡(`NEX-GEN-XXXX` serial / 铸造日期 / Lifetime / 30d 统计 / ExternalLink → 二级市场)
-4-7. Live feed / Perks / Quick Actions / Footer(同下方)
+`myOwned > 0`:
+1. **Hero** — 排放优先额度卡:优先级 + 区间表述(非保证死数)+ 免责「上所后按排放与参与度确定」;**无每日收益数字、无可领余额**
+2. **上所进度条 / 倒计时** — 真实话术「上所后开放」,不渲染 P1–P6 阶段字面
+3. **积分排行榜名次卡** + 锁仓加倍 CTA(升 OG 排放优先倍率)+ 里程碑追溯奖励条
+4. **动态条**(替代旧 live feed)— 「额度锁定 / 积分入账 / 里程碑达成」滚动;原 30 天柱图改标「积分趋势」
 
-**当 `myOwned === 0`(空状态)**:
+`myOwned === 0`:单一引导卡「你还没有创世节点」+ 认购 CTA(跳 `/genesis`),不显任何虚假持有 / 额度数字。
 
-1. **Hero** — 显示 `0 Nodes` + 所有金额 `$0.00`(真实空状态,不骗用户)
-2. **Not-holder CTA 大卡** — "You don't hold any Genesis Nodes yet" + 剩余张数 + ChevronRight → `/genesis` 购买
-3. **预览提示 banner** — "Preview · perks, dividend feed below show what holders actually receive. Buy a node to activate your dashboard."
-4. **30-day chart 隐藏 / Holdings 列表隐藏**(避免渲染假数据)
-5-7. Live feed / Perks 保留(全网公开信息,可作为"购买能得到什么"预览)
+**B. 上所后(`dividendsOpen === true`)· NEX 排放态**
 
-**共享后续段**(自上而下):
-5. **LIVE DIVIDEND FEED**(5 行实时滚动)— `Anon #XXXX · 来源 · +$X.XX · Ns ago`,ping 脉冲 + 派发规则 footer `Every transaction drips · paid daily 00:00 UTC`
-6. **YOUR NODES 列表**(N 个 NFT 卡,最多 6)— Crown icon + `NEX-GEN-XXXX` serial + 铸造日期 + Lifetime / 30d 统计 + 二级市场 ExternalLink
-7. **HOLDER PERKS 6 项**(描述性权益,无交互入口):
-   - 💎 0.1% 平台分润(永久,每日 USDT 到账)
-   - 🚀 V5 直通(跳过 $150K 团队业绩门槛)
-   - 🎟 Founders Circle(闭门 TG 群 + AMA + alpha)
-   - 🗳 DAO 治理(1 节点 = 1 票,文字承诺,投票 UI 未开放)
-   - 🎁 年度忠诚空投(限量 NFT + 周边)
-   - 💰 二级流动性(OpenSea / 站内市场,floor $25K+)
-8. **QUICK ACTIONS 3 cell**:Buy another node $10K / Sell on market floor $25K / Claim pending $X.XX
-9. **Footer note** — `Genesis Nodes are ERC-721 on Ethereum mainnet · Smart contract 0xNX...A98F · Audited by CertiK and Halborn`
+`myOwned > 0`:
+1. **Hero** — NEX 排放收益:已释放 NEX 大数 + 参考 USDT 等值(「≈$X 参考 · 非保证」)+ vesting 环形进度(已释放 / 锁定中)
+2. **排放明细 feed** — 复用原 feed 组件,数字换 NEX;下次释放倒计时
+3. **YOUR NODES 列表** — N 个 NFT 卡(`NEX-GEN-XXXX` serial / 铸造日 / 二级市场 ExternalLink)
+
+`myOwned === 0`:同上所前空状态引导。
+
+**共享 Perks**(描述性权益,无交互入口):$NEX 协议排放优先额度 / 生态奖励池份额 / V5 直通 / Founders Circle(闭门 TG + AMA + alpha)/ DAO 治理(1 节点 = 1 票,文字承诺)/ 年度忠诚空投 + 二级流动性(OpenSea / 站内市场)。
+
+**Footer note** — `Genesis Nodes are ERC-721 on Ethereum mainnet · Smart contract 0xNX...A98F · Audited by CertiK and Halborn`
 
 #### 10.3.3 业务规则
 
-- **持仓数据**:用真实 `myOwned`,0 时显示 0 nodes / $0.00,不伪造预览数据
-- **每日分红**:`dailyDividendPerNode = platformDailyVolumeUSD × 0.1% / 1000`(全平台单一来源 `useGenesis.currentDailyDividendPerNodeUSDT()`:0.1% × 当前平台日交易量 ÷ 1,000 张;`/genesis`、购买 sheet、holder 三处统一调用此函数。平台日交易量基数 ~$24M → 当前约 $24/node/日,$9,999 一张约 14 个月回本——可信卖点,不暴露话术)
-- **Lifetime 累计**(mock):`todayShare × 142` 假设持有 142 天(仅当 hasNodes 时计算)
-- **Pending payout**:`todayShare × 0.8`(尚未到 00:00 UTC 派发的部分)
-- **Next payout 倒计时**:每秒 tick(`setInterval(setTick, 1000)`)
+- **持仓数据**:用真实 `myOwned`,0 时显示空状态,不伪造预览数据。
+- **上所门(核心)**:`dividendsOpen = (nexListed === true)`,服务端权威 + fail-closed(脏 / 未知默认 false,绝不误显 live 排放);client **禁**本地由 false 推 true。后台 H1 `genesisDivOpen` 逐月旋钮据平台生命周期第 7 月(上所窗口)翻开。
+- **上所前**:只持有排放优先额度(区间 / 优先级表述,派生自持有量 × `airdropPct`,默认 8%)+ 积分名次;**零累积可领余额**(推迟期不攒数,TGE 从 0 起按排放浮动发)。
+- **上所后排放**:`emittedNEX`(累计已释放)/ `lockedNEX`(锁定中)/ `nextReleaseAt`(下次释放锚)均 server-canonical,按 vesting 曲线(TGE 10% + 18 月线性 + 每 6 月减半,后台 G4 `G.genesis.emissionCurve` 可配)派发,client 不本地推进。
+- **参考等值**:`refUSDTValue ≈ emittedNEX × 平台参考价`,标「参考非保证」;取不到 = 隐藏(不显 $0 / NaN)。承接双口径设计——保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4,展示口径改 NEX 计价参考。
+- **熔断**:`J.killswitch.genesis` 触发 → 排放区显「维护中,暂停派发」态,不报错白屏。
 
 #### 10.3.4 入口
 
@@ -3846,7 +3870,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 
 | Channel | 默认频率 | 触发条件 / 内容 |
 |---|---|---|
-| tradein-nudge | 15 min tick / 60 min cd(P3-P4)/ 24 h cd(P5-P6 final window)| Sprint 2 第三阶段 + 收尾 — `isPhaseReached(P3)` 才 fire(P1-P2 无 gen-2 可换 → skip);degradable fleet 平均效率 < 65% 时触发;文案两 variant:正常档钩子 `efficiency / month loss` + CTA `See trade-in options →`;P5+ final 档切换为 `**Final upgrade window** — your X is at Y% and bleeding −$Z/month. New-gen trade-in credit closes when this window does.` + CTA `Open trade-in →`,cooldown 收紧推紧迫感 |
+| tradein-nudge | 15 min tick / 60 min cooldown | 车队(参与递减设备)平均产能 < 65% 且持有可置换设备时触发;文案钩子 = 当前产能 / 月度差额 + 该设备实时可抵额,CTA `查看置换选项 →` 跳 /me/devices 置换入口;无 phase 分档(代际窗口叙事已删) |
 | monthly-task-lock | 30 min tick / 30 d cd(P1-P2)/ 7 d cd(P3-P4)/ 3.5 d cd(P5-P6) | Sprint 2 收尾(Gap D)— 月度任务锁定累计推送,phase-keyed 节奏。读 `getTaskLockSummary(joinedAt)` 取 thisMonthUSD,`getLockedTeasers(maxVram, 1)[0]` 取最佳 model 名。文案三 variant(early/mid/late phase bucket):early `Heads up — $N premium tasks (model) unaccepted this month. NexionBox would clear most.` → /store;mid `Premium queue's running hot — missed $N this month (model pool). Pro v2 catches 2.5× throughput.` → /me/devices;late `**Final upgrade window.** Lost ~$N this month on model alone, plus fleet degrading. Rack P2 trade-in closes when this window does.` → /me/devices(Batch E 迁移)|
 | social-event | 20 min tick / 30 min cd | Sprint A-2 / A.5 — 5 类全网"真实事件"等概率派发:大额提现走推荐网络 30% / V 级升级 25% / Genesis 二级成交 20% / AI 客户月 NEX 消费 +18-50% 15% / 网络小时新增 10%。文案严守真实平台叙事风,无 PM 内部术语 |
 | quest-grace-reminder | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务进 grace 窗口(24-72h)且未 claim 时 push,CTA → `/` 回 Home 继续。详 §5.15.5 |
@@ -4071,7 +4095,7 @@ sequenceDiagram
 
 **Persist**:`useMilestones` zustand persist(key `nexion-milestones-v1`)记录 firedIds,刷新不重触发。
 
-**Demo 触发入口**(`/me/replay-tour` Lifecycle demo section,Sprint 2 第三阶段 §7.5.7 同位置):"Trigger earnings milestone" 按钮 → `resetMilestones() + _devBumpEarningsTotal(150)` → 下一次 poll 时 fire $100 阈值。
+**Demo 触发入口**(`/me/replay-tour` Lifecycle demo section,Sprint 2 第三阶段 §7.5.6 同位置):"Trigger earnings milestone" 按钮 → `resetMilestones() + _devBumpEarningsTotal(150)` → 下一次 poll 时 fire $100 阈值。
 
 **i18n**:`milestones.*` 7 keys(title 模板 + 5 阈值业务文案 + genericBody fallback)。
 
@@ -4090,7 +4114,7 @@ sequenceDiagram
 2. **Hero**(AlertTriangle):`REQUIRED READING` 标签 + `Read this before staking, locking, or withdrawing.` + 副文
 3. **7 章节**(每章 mono 编号 01-07 + 标题 + body):
    - 01 收益预估只是预测,不是承诺(±15% 周波动)
-   - 02 硬件衰减曲线(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
+   - 02 任务产能节奏(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
    - 03 NEX 代币市场风险(±20% 日 / 非 FDIC 保险)
    - 04 提现窗口 + 合规审查(30d / 45d enhanced / 无 NEX 抵扣时按惩罚费率收手续费)
    - 05 Staking 锁仓不可撤销(提前赎回扣全息 + 5-15% 本金)
@@ -4248,6 +4272,9 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 - `support` 为用户发起线程,用户发送后由真人客服按类别模板回复。
 - `ai`(Nova)承载所有自动 push;Nova bubble 未读徽标聚合**全部类别**未读(AI + 人工)。
 - 人工 / 顾问回复为按类别循环模板(真后台接入后替换为真实坐席消息流)。
+- **发送频控**:单会话发送限流,每 15 秒最多 5 条(滚动窗口);超限时提示稍后再试,防刷屏。
+- **消息回执与状态**:用户发出的消息显示「已送达 / 已读」回执;坐席回复前依「已读 → 正在输入…(气泡)→ 回复」节奏推进(约 2 秒),使接待过程可感知。真后台接入后由消息已读事件与 typing 事件驱动。
+- **消息定位**:进入会话、发送或收到新消息后,线程自动滚动定位到最新一条。
 
 **数据模型**:§12.9a Conversation。**i18n**:`conversations.*` 命名空间 + `support.chLiveChat` 渠道键。
 
@@ -4606,7 +4633,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 |---|---|---|---|---|---|
 | 1 | `myRank ≥ 6 + 无 Genesis` | `buy_genesis` | +2,500 NEX | A 直接 | Genesis-Believer |
 | 2 | 有 Rack + `balanceUSDT ≥ 2,000` | `buy_additional_hw` | +2,000 NEX | A 直接 | — |
-| 3 | 有 Pro/Rack 老代际(generation 1) | `tradein_upgrade` | +1,800 NEX | A 直接 | — |
+| 3 | 有 Pro/Rack(存在更高价升级目标) | `tradein_upgrade` | +1,800 NEX | A 直接 | — |
 | 4 | 仅有 S1 | `upgrade_s1_to_pro_v2` | +1,500 NEX | A 直接 | — |
 | 5 | 无 hardware + `balanceUSDT ≥ 200` | `buy_first_box` | +1,000 NEX + $10 | A 直接 | — |
 | 6 | 无 hardware + `balanceUSDT < 200` | `topup_balance` | +100 NEX | A 充值 | — |
@@ -4689,7 +4716,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   nexBalance: number;
   pendingEarnings: number;
   cumulativeDepositUsdt: number; // 终身已确认 USDT 入金累计,仅由 recordDeposit 写入;
-                                 // 非 earnings / exchange / salvage refund / KYC bonus 增长。
+                                 // 非 earnings / exchange / 置换抵扣 / KYC bonus 增长。
                                  // 驱动 §7.5 trade-in `cumulative-deposit-usdt` 资格规则
                                  // (Pro $1000 / Rack P1 $5000)。server-canonical via
                                  // GET /api/users/me。
@@ -4708,12 +4735,14 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   basePower: number;            // W
   baseRate: number;             // daily USDT 基准(满效率,参 §6.8 设备生命周期)
   baseRateNEX: number;          // daily NEX 基准(平台代币,spec §8.1 静态收益 80%)
-  purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 衰减曲线
+  purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 任务产能节奏 + 新机补贴期
   activatedAt: number | null;   // epoch ms 激活进槽位的时刻;null = 已购未激活(库存中)
   lastSettledAt?: number | null; // epoch ms 收益结算锚点(= 登记时刻);收益按 now−lastSettledAt 墙钟结算(§6.11);null = 当前不计产(未激活 / 冻结),恢复时重锚不回溯
   onlineHeartbeatAt?: number | null; // epoch ms 设备最近一次在线心跳(常驻 App 后台上报);在超时窗口内 = 设备真在线 → 吃在线加成,否则基础托管基线(§6.11);决定在线因子档,与查看载体无关;PROD 服务端持 lastHeartbeatAt + timeout 下推在线结论
   pendingDeactivate?: boolean;  // true = 等当前任务完成后自动取消激活(graceful deactivation)
-  generation: number;           // 1 = 原型规格;2 = trade-in 升级(Pro v2 / Rack P2)
+  cumulativeEarningsUsdt: number; // 该设备终身 USD 产出(settle 与今日收益同步累加;停用/清零今日不回退);
+                                  // §7.5 抵扣阶梯分子。多端合并走 additive 语义(不双计)
+  paidPriceUsdt: number;        // 实付净额(订单 total / trial 转正实付;赠送=0 ⇒ 不可置换);§7.5 阶梯分母
   status: "online" | "offline";   // 无 "paused":用户无手动暂停;被动中断由 pausedReason + interruptedAt 表达
   gpuUsage: number;             // 0-100
   gpuTemp: number;              // °C
@@ -4773,7 +4802,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 **Store actions**:
 - `addDevice(kind)` — 新购入库存,**无上限**(`activatedAt=null`)
 - `activateDevice(id) → boolean` — 进槽位,**返回 false 当且仅当**:设备不存在 / 已激活 / **(当前激活数 + 试用预留槽 `trialReservesSlotNow() ? 1 : 0`)≥ `MAX_DEVICES`(6)**;成功时清零 `pendingDeactivate`(恢复激活时清除遗留挂起标记)
-- `deactivateDevice(id)` — **立即**出槽位:清零运行态遥测 + `currentTask=null`(放弃任务奖励)+ `pendingDeactivate=false`,保留 `purchasedAt` / `generation` / 其他元数据
+- `deactivateDevice(id)` — **立即**出槽位:清零运行态遥测 + `currentTask=null`(放弃任务奖励)+ `pendingDeactivate=false`,保留 `purchasedAt` / `cumulativeEarningsUsdt` / `paidPriceUsdt` / 其他元数据
 - `scheduleDeactivation(id)` — **优雅出槽位**:若 `currentTask !== null` 则只设 `pendingDeactivate=true`(等任务完成);若 `currentTask === null` 则立即执行 `deactivateDevice` 等效行为
 - `tick()` 守卫:`activatedAt === null` 的设备不参与 earnings / task 累计;任务完成处理时检查 `pendingDeactivate=true` → 自动执行 deactivate(清零 telemetry + `activatedAt=null`,不再 pickRandomTask)
 
@@ -4923,6 +4952,7 @@ ConvMessage:
   ctaKey?: string;      // 预置消息 CTA 文案 i18n key
   ctaHref?: string;     // CTA 目标(逻辑路由,经路由映射层跳转)
   ts: number;
+  status?: "sent" | "read";  // 送达回执:用户消息用;坐席已读后置 read(坐席端同源镜像)
 }
 ```
 
@@ -4940,7 +4970,7 @@ Conversation:
 }
 ```
 
-派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计(Nova 未读由 `useStella.unread` 提供,bubble 在页面层合并)。
+派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计(Nova 未读由 `useStella.unread` 提供,bubble 在页面层合并)。`typingIds` 记录各会话「坐席正在输入」瞬态(非持久,真后台由 typing 事件驱动)。
 
 ### 12.10 Exchange Cap(useExchangeV3)
 
@@ -5226,7 +5256,7 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 ```
 marketMult  = 0.95 + Math.random() × 0.1    // 0.95-1.05
 variation   = 0.85 + Math.random() × 0.3    // 0.85-1.15
-lifeEff     = isDegradable(kind) ? getEfficiency(getMonthsOwned(purchasedAt)) : 1   // §6.8 生命周期衰减系数
+lifeEff     = isDegradable(kind) ? getEfficiency(getMonthsOwned(purchasedAt)) : 1   // §6.8 任务产能系数
 incUSDT     = baseRate    × lifeEff × marketMult × variation × tickMs / ONE_DAY_MS
 incNEX      = baseRateNEX × lifeEff × marketMult × variation × tickMs / ONE_DAY_MS
 todayEarnings     += incUSDT
@@ -5234,7 +5264,7 @@ todayEarningsNEX  += incNEX
 user.nexBalance   += incNEX       // 每 tick NEX 自动滴灌入用户钱包持仓
 ```
 
-每 1.8s 触发一次 tick,USDT 跟 NEX 同步跳动。USDT 用于提现 / 出金,NEX 用于团队佣金结算 / 二级市场拉盘叙事 / 用户囤币 FOMO。`lifeEff` 使 degradable 硬件的实时收益随持有月数衰减(§6.8 曲线),phone / cloud-share 恒为 1。
+每 1.8s 触发一次 tick,USDT 跟 NEX 同步跳动。USDT 用于提现 / 出金,NEX 用于团队佣金结算 / 二级市场拉盘叙事 / 用户囤币 FOMO。`lifeEff` 使参与递减的硬件实时收益随持有月数下降(§6.8 任务产能节奏),豁免 SKU(phone / cloud-share / pc-gpu)恒为 1。设备终身产出 `cumulativeEarningsUsdt` 与今日收益同增量累加(§7.5 抵扣阶梯分子;午夜清零今日、停用清零遥测均不回退它)。
 
 **年化 ROI(展示值)**:`annualRoiPct = round(dailyEarn × 365 / price × 100)`,从日产与售价单一派生(不单独存储),与回本天数 `price / dailyEarn` 同源,避免两数互相矛盾;商品卡 / 详情 / 结账三处统一调用此派生函数。
 
@@ -5336,18 +5366,19 @@ progressPct = avg(checks);
 | Partner Status Premium | $50,000+ | 新品优先购 |
 | Partner Status Diamond | $500,000+ | 创始人 AMA + VIP(顶档)|
 | Influence Score 公式 | clamp(1 + log10(networkVolume / 100), 1.0, 5.0) | Network Yield Bonus 算法倍率 |
-| 设备衰减率(月 1-3) | −4% / 月 | 累计 100% → 88.5% |
-| 设备衰减率(月 4-8) | −6% / 月 | 累计 88.5% → 65.1% |
-| 设备衰减率(月 9-12+) | −23.7% / 月 | 累计 65.1% → ~22%(floor) |
-| 设备衰减 floor | 22% | 月 12 后效率不再下降,用户必须 trade-in / 锁仓 / 退场 |
-| 衰减豁免 | phone / cloud-share | phone 产能 trivial / cloud 平台维护 |
-| 代际淘汰节点 | Pro v2 / Rack P2 | Trade-in 抵扣 $300 / $800(详见 §7.5) |
-| 代际发布门 | Pro v2 P3 / Rack P2 P5 | `Product.unlocksAtPhase` 字段,未 reached 时 /store 列表过滤 + 详情页 swap LockedProductCard + /tradein new gen grid 隐藏(详见 §7.1 / §7.2 / §7.5) |
-| Trade-in 残值回收率 | 30% | 平台保留 70% 用于翻新转售 |
-| 升级映射 | S1/Pro → Pro v2 / Rack P1 → Rack P2 | `TRADEIN_UPGRADE_MAP` 常量 |
+| 任务产能递减(月 1-3) | −4% / 月 | 累计 100% → 88.5%(段界与幅度后台可配) |
+| 任务产能递减(月 4-8) | −6% / 月 | 累计 88.5% → 65.1% |
+| 任务产能递减(月 9-12+) | −23.7% / 月 | 累计 65.1% → ~22%(floor) |
+| 任务产能下限 floor | 22% | 月 12 后产能不再下降,引导升级置换 |
+| 产能递减豁免 | phone / cloud-share / pc-gpu | phone 产能 trivial / cloud 平台托管 / pc-gpu 按实时贡献;后台可按 SKU 配开关 |
+| 新机任务补贴 | 30 天 | 纯展示标识(曲线首月本就 100%,零经济变化);天数后台可配 |
+| 上架节奏门 | Pro v2 P3 / Rack P2 P5 | `Product.unlocksAtPhase` 字段,未 reached 时 /store 列表过滤 + 详情页 swap LockedProductCard + **置换目标面同拦**(详见 §7.1 / §7.2 / §7.5.1) |
+| 置换侧抢先购 | 关闭(leadDays 30) | `tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项;开启后仅置换路径可在正式上架前 leadDays 天购买,目标行带「抢先升级」标;正门不受影响(§7.1) |
+| 置换抵扣阶梯 | 75% / 60% / 45% / 30% / 15% | 按产出比(累计产出÷实付)落档:<25% / <50% / <75% / <100% / ≥100%,左闭右开;仅结算抵减,永不入余额(§7.5.1) |
+| 置换阶梯规则 | 仅限更高价 · 单笔 1 台 · promoMult 1.0 | `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult`,连同 `applyTo` 白名单与总开关均后台可配 |
 | 任务锁定月度阈值 | P1-P2 $40 / P3-P4 $140 / P5-P6 $450 | `MONTHLY_LOCKED_TASK_USD` 常量,§6.7 TaskLockCumulativeBanner 主数字基准,日历月 partial accrual + 累计 |
 | Nova task-lock 推送节奏 | P1-P2 30 d / P3-P4 7 d / P5-P6 3.5 d | `monthly-task-lock` cooldownKey,30 min tick / phase-keyed cadence(§11.0A.2a),与 §6.7 banner 形成"屏内 + 召回"双层 funnel |
-| Nova tradein 推送节奏 | P3-P4 60 min / P5-P6 24 h | `tradein-nudge` cooldownKey,P1-P2 直接 skip(无 gen-2 可换),P5+ 切 final-window 文案 + 收紧 cooldown(§11.0A.2a)|
+| Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
 | 提现惩罚费率 / NEX 抵扣率 | 费率 P1-P4 20% · P5 25% · P6 30%;抵扣率 $0.40 / NEX(恒定) | `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`,`computeWithdrawFee()`,phase 派发(§9.3.2 / §13.4.1)|
 | Nova ambient 总频率 | 30-60 min cooldown(per channel,§11.0A.1 / §11.0A.2a 表)| v3 收敛后 30 分钟主动浏览 1-3 次,事件触发类(quest / weekly refresh / wrapped)按日历滚动不入此口径 |
 | `QUEST_WINDOW_MS` | 86,400,000(24h) | 首日任务活动窗口 |
@@ -5367,7 +5398,7 @@ progressPct = avg(checks);
 | Genesis 二级地板 | $25,000 | 二级市场 floor(mock,模拟 +18% 7d 涨)|
 | Genesis 挂单成交概率 | ~18% / 6s | 用户有活跃挂单时,每 6 秒一拍以此概率成交其最早挂单(§10.2.4,客户端模拟撮合,真后台改服务端撮合)|
 | Genesis 销售进度 ticker | +1~3 张 / 30s | 销售进度条 FOMO 抖动(独立于真实成交)|
-| Genesis 单节点日分红口径 | 平台日交易额 × 0.1% ÷ 1000 | 三处入口(`/genesis` / 购买 sheet / 持有人看板)共用,调到 ~$24/节点/日(≈14 月回本)|
+| Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
 | 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexion-milestones-v1` 持久化已触发档 |
 | 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(§5.15.7),`nexion-quest-v1` 持久化幂等 |
@@ -5589,7 +5620,7 @@ app/
 - auth / profile / security / wallet-pairing / bills / orders / staking / achievements / receipts / stella / ui / refresh / locale / exchange / **nex-faucet**(§12.12 签到水龙头 + 提现销毁闸纯函数)/ **milestones**(§11.3a)/ **risk-disclosure**(§11.4a)/ product-phase + product-phase-override(§13.4)/ **cart**(套餐 cart)/ **goals**(目标设置)/ **preferences**(P8 + P9 偏好)/ **weekly-quest**(§11.13)/ **monthly-challenge**(§11.14)/ **event-quest**(§11.10.6)/ **daily-powerup**(§9.8.6)
 
 **通用 utility**(`lib/store/` 和 `lib/hooks/`,无独立 store 状态):
-- `device-lifecycle.ts` — Device 衰减曲线引擎(§6.8 / §13.3 衰减参数)
+- `device-lifecycle.ts` — Device 任务产能引擎(§6.8 / §13.3 产能节奏参数)
 - `lib/hooks/use-tween-number.ts` — 数字 tick 平滑过渡
 - `lib/hooks/use-haptic.ts` — 触感反馈
 - `lib/hooks/use-long-press.ts` — 长按检测
@@ -5598,7 +5629,7 @@ app/
 **Mobile-native 通用组件**(`app/components/mobile/`):
 - StickyBottomCTA / SegmentedControl / SettingsRow / BottomSheetPicker / SwipeRow — barrel export `app/components/mobile/index.ts`。
 
-**PM-facing demo actions**(`useApp` 上的 `_dev` 前缀方法,只在 `/me/replay-tour` 的 Lifecycle demo section 暴露,详见 §7.5.7):
+**PM-facing demo actions**(`useApp` 上的 `_dev` 前缀方法,只在 `/me/replay-tour` 的 Lifecycle demo section 暴露,详见 §7.5.6):
 - `_devSeedLegacyDevice(kind, monthsAgo)` — 加一台已使用 N 个月的 degradable 设备
 - `_devFastForwardAll(months)` — 全部 degradable 设备 purchasedAt 拨回 N 个月
 - `_devResetDevices()` — 重置 fleet 回 phone-only 初始状态

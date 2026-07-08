@@ -2,7 +2,7 @@
   Genesis Holder Dashboard — 分红延期改造后的两态看板。
 
   由 genesis.dividendsOpen（全平台上所信号，fail-closed）决定：
-  - 上所前(!dividendsOpen)：排放优先额度 + 上所进度 + 积分榜，无 live 分红 / 无可领余额。
+  - 上所前(!dividendsOpen)：排放优先额度 + 上所进度 + 积分榜，无 live 排放 / 无可领余额。
   - 上所后(dividendsOpen)：NEX 排放（vesting 曲线：已释放/锁定中）+ 排放明细，NEX 计价。
   myOwned === 0 → 空状态 CTA + preview（no fake holder numbers）。
   Wrapped in <AppChassis active="me">. 排放数据源 = store emissionSnapshot()（backend-replaceable）。
@@ -252,7 +252,7 @@ const emissionFeed = computed(() => {
   ];
 });
 
-// Holdings list — 席位 + 铸造日 + 预留额度（无分红数字）。
+// Holdings list — 席位 + 铸造日 + 预留额度（无排放数字）。
 const holdings = computed(() => {
   const list: Array<{ id: string; mintedAt: number; allocText: string }> = [];
   const count = Math.min(owned.value, 6);

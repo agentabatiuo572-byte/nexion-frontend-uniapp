@@ -23,7 +23,7 @@ export type PhaseId = "P1" | "P2" | "P3" | "P4" | "P5" | "P6";
  * 创世节点排放开阀的平台生命周期月（P4「上所」窗口）。
  * ⚠️ 上所是**全平台一次性事件**，非按用户 joinedAt 月龄——故排放开阀的运行时信号是
  * genesis store 的 server-canonical `nexListed`（fail-closed），**不得**用按用户月龄的
- * `isPhaseReached(userPhase, "P4")`（否则晚注册用户永远等不到分红）。本常量仅记录
+ * `isPhaseReached(userPhase, "P4")`（否则晚注册用户永远等不到排放）。本常量仅记录
  * 「该在第几月开」的运营意图，后台 H1 `genesisDivOpen` 逐月旋钮据此翻。
  */
 export const GENESIS_DIVIDEND_OPENS_AT_PLATFORM_MONTH = 7;

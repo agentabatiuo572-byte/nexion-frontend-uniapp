@@ -7,7 +7,7 @@ import { ref, computed } from "vue";
  * 改造（分红延期 → 上所排放权益化，规格 FEAT-GEN-dividend-defer-emission）：
  *  - 定价：单一 $9,999 → 3 档阶梯，累计售出决定当前档，售罄硬跳价。
  *  - 收益：每日分红（挂平台交易量）→ NEX 协议排放，**上所后才开阀**（nexListed，
- *    fail-closed）；上所前只有「预留额度 + 排放优先权」，无 live 分红/无可领余额。
+ *    fail-closed）；上所前只有「预留额度 + 排放优先权」，无 live 排放/无可领余额。
  *  - 排放：一次性空投 → vesting 曲线（TGE 解锁 + 线性 + 每 N 月减半）。
  *  所有值 backend-replaceable：nexListed/tier 价/排放曲线在真后台是 server-canonical，
  *  这里用可序列化 mock；运营可配对应 admin G4（G.genesis.*）。
@@ -94,7 +94,7 @@ function defaults(): GenesisData {
     myOwned: 0,
     ownedTokenIds: [],
     myListings: [],
-    nexListed: false, // fail-closed：未上所，分红/排放未开阀
+    nexListed: false, // fail-closed：未上所，排放未开阀
     nexListedAt: null,
   };
 }
@@ -172,7 +172,7 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   // ── 上所开阀门（全平台一次性事件；fail-closed）──
-  /** 派生门：仅 nexListed === true 才开；脏/未知数据默认不开（不误显 live 分红）。 */
+  /** 派生门：仅 nexListed === true 才开；脏/未知数据默认不开（不误显 live 排放）。 */
   const dividendsOpen = computed(() => nexListed.value === true);
   /**
    * 翻转上所信号。真后台为 server-canonical（GET /api/config/genesis），此处 mock。
