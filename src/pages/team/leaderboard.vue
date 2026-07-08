@@ -73,7 +73,7 @@
               <text class="block truncate" :style="podiumHandleStyle">{{ p.row.handle }}</text>
               <text class="block" :style="{ fontSize: '11px' }">{{ p.row.flag }}</text>
               <text class="block font-mono-tabular tabular-nums" :style="podiumEarnStyle(p.prize.color)">{{ fmtCompactUSD(p.row.earnedUSDT) }}</text>
-              <text class="block" :style="{ marginTop: '2px', fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ p.row.directs }} directs</text>
+              <text class="block" :style="{ marginTop: '2px', fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ p.row.directs }} directs</text>
             </view>
           </view>
           <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px">
@@ -109,13 +109,13 @@
               <view class="min-w-0">
                 <view class="flex items-center" style="gap: 6px">
                   <text class="truncate" :style="{ fontWeight: 600, color: 'var(--v5-ink)', fontSize: '12.5px' }">{{ row.handle }}</text>
-                  <text :style="{ fontSize: '10px' }">{{ row.flag }}</text>
+                  <text :style="{ fontSize: '11px' }">{{ row.flag }}</text>
                   <svg v-if="row.hasDevice" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
                 </view>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <text class="font-mono-tabular" :style="vRankChipStyle">V{{ row.vRank }}</text>
-                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-4)' }">{{ row.teamSize.toLocaleString() }} team</text>
-                  <text v-if="row.delta !== 0" class="font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: row.delta > 0 ? 'var(--v5-brand)' : 'var(--v5-brand-2)' }">{{ row.delta > 0 ? "↑" : "↓" }}{{ Math.abs(row.delta) }}</text>
+                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '11px', color: 'var(--v5-ink-4)' }">{{ row.teamSize.toLocaleString() }} team</text>
+                  <text v-if="row.delta !== 0" class="font-mono-tabular tabular-nums" :style="{ fontSize: '11px', color: row.delta > 0 ? 'var(--v5-brand)' : 'var(--v5-brand-2)' }">{{ row.delta > 0 ? "↑" : "↓" }}{{ Math.abs(row.delta) }}</text>
                 </view>
               </view>
             </view>
@@ -183,7 +183,7 @@ function go(url: string) {
 }
 
 // ─── styles ───
-const heroStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const heroStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 function heroGlowStyle(kind: "warning" | "brand"): CSSProperties {
   const bg =
     kind === "warning"
@@ -210,7 +210,7 @@ function pillLabelStyle(p: LeaderPeriod): CSSProperties {
   return { fontSize: "11.5px", fontWeight: on ? 600 : 500, color: on ? "var(--v5-ink)" : "var(--v5-ink-3)" };
 }
 
-const myRankStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const myRankStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const myRankBigStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const climbCtaStyle: CSSProperties = {
   gap: "6px",
@@ -224,7 +224,7 @@ const climbCtaStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 
-const podiumCardStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", borderRadius: "16px" };
+const podiumCardStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", borderRadius: "16px" };
 function podiumColStyle(isFirst: boolean): CSSProperties {
   return {
     padding: "10px",
@@ -237,14 +237,14 @@ function podiumAvatarStyle(color: string): CSSProperties {
 }
 const podiumHandleStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "11.5px", color: "var(--v5-ink)" };
 function podiumEarnStyle(color: string): CSSProperties {
-  return { marginTop: "4px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12.5px", fontWeight: 600, color };
+  return { marginTop: "4px", fontFamily: "var(--font-numbers)", fontSize: "12.5px", fontWeight: 600, color };
 }
 
-const listCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+const listCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px" };
 const listHeadStyle: CSSProperties = {
   gridTemplateColumns: "32px 1fr 56px 84px",
-  padding: "10px 12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  padding: "8px 12px",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -254,7 +254,7 @@ const listHeadStyle: CSSProperties = {
 function listRowStyle(isLast: boolean): CSSProperties {
   return {
     gridTemplateColumns: "32px 1fr 56px 84px",
-    padding: "10px 12px",
+    padding: "8px 12px",
     fontSize: "12px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
@@ -264,7 +264,7 @@ const vRankChipStyle: CSSProperties = {
   padding: "0 4px",
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 
@@ -280,5 +280,5 @@ const shareCtaStyle: CSSProperties = {
   fontSize: "14px",
   letterSpacing: "-0.005em",
 };
-const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 </script>

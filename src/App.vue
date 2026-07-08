@@ -563,10 +563,9 @@ function ensureBusinessLoopsAllowed(): boolean {
 }
 
 onLaunch(() => {
-  // Nexion defaults dark, but the persisted user choice drives H5 after launch.
-  // #ifdef H5
-  document.documentElement.setAttribute("data-theme", useTheme().mode);
-  // #endif
+  // Apply the persisted theme on H5. The store defaults to dark on first run,
+  // but saved light mode must survive direct route entry and refresh.
+  useTheme().setMode(useTheme().mode);
   if (isStaticReviewRoute(readCurrentRouteOrHash())) {
     stopBusinessLoops();
     return;
@@ -590,8 +589,38 @@ onHide(() => {
 </script>
 
 <style>
+:root {
+  --nx-statusbar-h: 44px;
+  --nx-header-row-h: 52px;
+  --nx-page-x: clamp(20px, 5.8vw, 24px);
+  --nx-card-gap: 16px;
+  --nx-module-gap: 24px;
+  --nx-tabbar-h: 64px;
+  --nx-home-indicator-h: 20px;
+}
+
 /* Global app surface — token-driven, dark by default. */
 page {
   background-color: var(--v5-bg);
+  font-family: var(--font-body);
+}
+
+.nx-page-enter .px-4 {
+  padding-left: var(--nx-page-x) !important;
+  padding-right: var(--nx-page-x) !important;
+}
+
+.nx-page-enter .mx-4 {
+  margin-left: var(--nx-page-x) !important;
+  margin-right: var(--nx-page-x) !important;
+}
+
+.nx-page-enter .nx-card-stagger.space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: var(--nx-module-gap) !important;
+}
+
+.nx-page-enter .nx-card-stagger.space-y-4 > :not([hidden]) ~ :not([hidden]),
+.nx-page-enter .nx-card-stagger.space-y-3 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: var(--nx-card-gap) !important;
 }
 </style>

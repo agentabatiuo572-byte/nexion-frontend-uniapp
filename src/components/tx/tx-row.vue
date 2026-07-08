@@ -18,12 +18,12 @@ const props = withDefaults(
 );
 
 const rowStyle = computed<CSSProperties>(() => ({
-  padding: "10px 16px",
+  padding: "8px 16px",
   borderBottom: props.last ? "none" : "1px solid var(--v5-border)",
 }));
 const labelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 const valueStyle = computed<CSSProperties>(() => ({
-  fontFamily: props.mono ? "var(--font-jet-mono), ui-monospace, monospace" : props.bold ? "var(--font-v5)" : undefined,
+  fontFamily: props.mono ? "var(--font-numbers)" : props.bold ? "var(--font-v5)" : undefined,
   fontSize: props.bold ? "14px" : "12px",
   fontWeight: props.bold ? 600 : 400,
   color: props.tint ?? "var(--v5-ink)",

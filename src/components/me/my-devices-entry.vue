@@ -66,7 +66,7 @@ function goDevices() {
 }
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   padding: "14px 16px",
   display: "grid",
@@ -106,7 +106,7 @@ const fleetTitleStyle: CSSProperties = {
 };
 const fleetMetaStyle: CSSProperties = {
   marginTop: "3px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };

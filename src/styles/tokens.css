@@ -46,15 +46,32 @@
      migrated module-by-module. Adopt v5 prefix to avoid mass-cascade. */
   --v5-bg: #F4F1E9;          /* warm cream page */
   --v5-surface: #FFFFFF;
+  --v5-surface-bg: var(--v5-surface);
   --v5-surface-2: #FAF7F0;
   --v5-surface-3: #F0EBE0;
+  --v5-shell-bg: var(--v5-bg);
   --v5-border: #E5DFD0;
   --v5-border-strong: #D5CDB8;
+  --v5-border-subtle: var(--v5-border);
+  --v5-border-visible: var(--v5-border-strong);
+  --v5-border-divider: var(--v5-border);
+  --v5-border-green: rgba(14,142,74,0.30);
+  --v5-border-warning: rgba(198,131,22,0.35);
+  --border-subtle: 1px solid var(--v5-border-subtle);
+  --border-visible: 1px solid var(--v5-border-visible);
+  --border-strong: 1px solid var(--v5-border-strong);
+  --border-divider: 1px solid var(--v5-border-divider);
+  --border-green: 1px solid var(--v5-border-green);
+  --border-warning: 1px solid var(--v5-border-warning);
 
   --v5-ink: #13141A;          /* primary text */
   --v5-ink-2: #3C3F47;
   --v5-ink-3: #6A6F78;
   --v5-ink-4: #A4A8B0;
+  --color-text-primary: var(--v5-ink);
+  --color-text-secondary: var(--v5-ink-2);
+  --color-text-tertiary: var(--v5-ink-3);
+  --color-text-disabled: var(--v5-ink-4);
 
   --v5-brand: #0E48E6;        /* electric blue */
   --v5-brand-deep: #0833B8;
@@ -135,20 +152,68 @@
     radial-gradient(50% 35% at 82% 80%, rgba(12,196,214,0.16), transparent 60%),
     radial-gradient(60% 45% at 50% 15%, rgba(180,190,210,0.10), transparent 65%);
 
-  /* next/font injected --font-display (Manrope) + --font-jet-mono (JetBrains
-     Mono) on :root in the prototype's layout.tsx. uni has NO layout.tsx, so if
-     left undefined the `var(--font-display)` / `var(--font-jet-mono)` refs below
-     are "guaranteed-invalid" → the ENTIRE font-family declaration is dropped →
-     every text node falls back to the browser default (Times New Roman serif).
-     Defining them here makes all three usages (--font-v5 / body / .font-mono-
-     tabular) valid → clean sans-serif even before the web fonts load. (P-038) */
-  --font-display: "General Sans", "Manrope", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-jet-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  /* Typography families. Space Grotesk / Inter / Rajdhani / JetBrains Mono
+     and Noto fallbacks are loaded in index.html. Keep full fallback chains
+     so core readability survives when web fonts are blocked. */
+  --font-zh: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", "Heiti SC", sans-serif;
+  --font-ja: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --font-ko: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-ar: "Noto Sans Arabic", "Geeza Pro", "Tahoma", sans-serif;
+  --font-cjk-sc: var(--font-zh);
+  --font-arabic: var(--font-ar);
+  --font-body: "Inter0", "Inter", var(--font-zh), var(--font-ja), var(--font-ko), var(--font-ar),
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-interface: var(--font-body);
+  --font-display: "Space Grotesk", var(--font-body);
+  --font-amount: var(--font-display);
+  --font-brand: "Rajdhani", var(--font-body);
+  --font-brand-accent: var(--font-brand);
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-jet-mono: var(--font-mono);
+  --font-numbers: var(--font-mono);
+  --font-address: var(--font-mono);
+  --font-v5: var(--font-body);
 
-  /* v5 font stack — for use in inline style fontFamily. */
-  --font-v5: "General Sans", var(--font-display), "Manrope", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --typography-display-hero-size: 60px;
+  --typography-display-hero-line: 68px;
+  --typography-display-hero-weight: 600;
+  --typography-display-xl-size: 48px;
+  --typography-display-xl-line: 56px;
+  --typography-display-xl-weight: 600;
+  --typography-display-l-size: 40px;
+  --typography-display-l-line: 48px;
+  --typography-display-l-weight: 600;
+  --typography-heading-h1-size: 34px;
+  --typography-heading-h1-line: 42px;
+  --typography-heading-h1-weight: 600;
+  --typography-heading-h2-size: 26px;
+  --typography-heading-h2-line: 34px;
+  --typography-heading-h2-weight: 600;
+  --typography-heading-h3-size: 20px;
+  --typography-heading-h3-line: 28px;
+  --typography-heading-h3-weight: 600;
+  --typography-body-m-size: 15px;
+  --typography-body-m-line: 22px;
+  --typography-body-m-regular-weight: 400;
+  --typography-body-m-medium-weight: 500;
+  --typography-body-s-size: 13px;
+  --typography-body-s-line: 18px;
+  --typography-body-s-weight: 400;
+  --typography-caption-size: 11px;
+  --typography-caption-line: 14px;
+  --typography-caption-weight: 500;
+  --typography-tab-label-size: 11px;
+  --typography-tab-label-line: 14px;
+  --typography-tab-label-weight: 600;
+  --typography-number-mono-size: 15px;
+  --typography-number-mono-line: 22px;
+  --typography-number-mono-weight: 500;
+  --typography-button-m-size: 15px;
+  --typography-button-m-line: 20px;
+  --typography-button-m-weight: 600;
+  --typography-input-m-size: 15px;
+  --typography-input-m-line: 22px;
+  --typography-input-m-weight: 400;
 }
 
 /* ─────────────────────────────────────────────────────────────────────
@@ -166,25 +231,43 @@
    buttons / home indicator) remain identical — see the light SKILL.
    ───────────────────────────────────────────────────────────────────── */
 html[data-theme="dark"] {
-  /* Surface ladder — neutral obsidian, NO hue tint. Wider luminance steps
-     than v4 baseline so cards visibly LIFT off the page floor (×1.5 step
-     so 95% of users register hierarchy at first glance).
-       bg #000 → surface #141414 (+8%) → surface-2 #1F1F1F (+12%)
-       → surface-3 #2A2A2A (+16%). Borders are micro-bright (white α0.06)
-     rather than darker-than-bg (which collapses to invisible). */
-  --v5-bg: #000000;             /* pure black page floor */
-  --v5-surface: #141414;        /* card surface — +8% lift */
-  --v5-surface-2: #1F1F1F;      /* nested chip / pill bg — +12% */
-  --v5-surface-3: #2A2A2A;      /* recessed input / inset — +16% */
-  --v5-border: rgba(255,255,255,0.06);          /* micro-bright card edge */
-  --v5-border-strong: rgba(255,255,255,0.12);
+  /* Full-version H5 dark surface tokens. Use --v5-surface-bg for actual card
+     backgrounds; keep --v5-surface solid for color-mix() / color-stop math. */
+  --h5-bg-dark: #0B0F0A;
+  --h5-surface-dark: linear-gradient(180deg, #111317 0%, #15181C 100%);
+  --h5-card-base-dark: linear-gradient(180deg, #111317 0%, #15181C 100%);
+  --h5-card-base-dark-solid: #15181C;
+  --h5-surface-dark-2: #1F1F1F;
+  --h5-surface-dark-3: #2A2A2A;
+  --h5-shell-dark: #24272D;
+  --v5-bg: var(--h5-bg-dark);
+  --v5-surface: var(--h5-card-base-dark-solid);
+  --v5-surface-bg: var(--h5-card-base-dark);
+  --v5-surface-2: var(--h5-surface-dark-2);
+  --v5-surface-3: var(--h5-surface-dark-3);
+  --v5-shell-bg: var(--h5-shell-dark);
+  --v5-border-subtle: rgba(38,48,68,0.72);
+  --v5-border-visible: #5E6D86;
+  --v5-border-strong: rgba(77,139,255,0.45);
+  --v5-border-divider: rgba(27,34,48,0.9);
+  --v5-border-green: rgba(109,229,126,0.35);
+  --v5-border-warning: rgba(255,170,71,0.55);
+  --v5-border: var(--v5-border-subtle);
+  --border-subtle: 1px solid var(--v5-border-subtle);
+  --border-visible: 1px solid var(--v5-border-visible);
+  --border-strong: 1px solid var(--v5-border-strong);
+  --border-divider: 1px solid var(--v5-border-divider);
+  --border-green: 1px solid var(--v5-border-green);
+  --border-warning: 1px solid var(--v5-border-warning);
 
-  /* Ink — slightly off-white for less eye strain, brighter secondary tier
-     so info hierarchy doesn't collapse into one grey blur. */
-  --v5-ink: #F5F7FA;            /* primary text — cool off-white */
-  --v5-ink-2: #D1D5DB;          /* secondary, brighter than before */
-  --v5-ink-3: #9BA3B5;          /* tertiary — readable mid-grey (was #8A95A8) */
-  --v5-ink-4: #6B7385;          /* quaternary / disabled */
+  --color-text-primary: #F5F7FA;
+  --color-text-secondary: #B8C0CC;
+  --color-text-tertiary: #9BA3B5;
+  --color-text-disabled: #525A66;
+  --v5-ink: var(--color-text-primary);
+  --v5-ink-2: var(--color-text-secondary);
+  --v5-ink-3: var(--color-text-tertiary);
+  --v5-ink-4: var(--color-text-disabled);
 
   /* Brand — lemon green retained as Nexion signature. Soft alpha bumped from
      0.14 → 0.20 so the brand "glow" on Hero cards / Earn / CTA pills actually
@@ -256,7 +339,7 @@ html[data-theme="dark"] {
      translucency + blur. No hue tint, just black + alpha for frosted glass.
      Solid uniform alpha so backdrop-filter blur box = visible content rect
      (gradient fade-to-0 leaves a blur halo with no cover — see light note). */
-  --v5-chrome-bg: rgba(0,0,0,0.55);
+  --v5-chrome-bg: #0B0F0A;
   --v5-chrome-border: transparent;
   /* Glass tiles (back / bell / icon buttons in header) — lifted from page bg.
      Pure-black bg on pure-black page would disappear; use a slight white
@@ -301,13 +384,145 @@ html[data-theme="dark"] [data-v5-lift] {
 }
 
 
-/* Display font — alias to var(--font-v5) per V5 SKILL.
-   Both .font-display Tailwind class and inline `fontFamily: var(--font-v5)`
-   now resolve to the same chain: General Sans → Manrope → system.
-   Max font-weight 600 per v5 design rules — never 700+. */
+/* Display font — alias to the product typography stack. */
 .font-display {
-  font-family: var(--font-v5);
+  font-family: var(--font-display);
   letter-spacing: -0.01em;
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-brand,
+.font-brand-accent,
+.code-tag {
+  font-family: var(--font-brand-accent);
+}
+
+.font-mono,
+.font-mono-tabular,
+.hash,
+.nx-hash,
+.nx-address,
+.nx-tx-id {
+  direction: ltr;
+  font-family: var(--font-numbers);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv11", "ss01", "ss03";
+  unicode-bidi: isolate;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv11", "ss01", "ss03";
+}
+
+.typography-display-hero {
+  font-family: var(--font-display);
+  font-size: var(--typography-display-hero-size);
+  line-height: var(--typography-display-hero-line);
+  font-weight: var(--typography-display-hero-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.typography-display-xl {
+  font-family: var(--font-display);
+  font-size: var(--typography-display-xl-size);
+  line-height: var(--typography-display-xl-line);
+  font-weight: var(--typography-display-xl-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.typography-display-l {
+  font-family: var(--font-display);
+  font-size: var(--typography-display-l-size);
+  line-height: var(--typography-display-l-line);
+  font-weight: var(--typography-display-l-weight);
+  font-variant-numeric: tabular-nums;
+}
+
+.typography-heading-h1,
+.typography-heading-h2,
+.typography-heading-h3 {
+  font-family: var(--font-display);
+}
+
+.typography-heading-h1 {
+  font-size: var(--typography-heading-h1-size);
+  line-height: var(--typography-heading-h1-line);
+  font-weight: var(--typography-heading-h1-weight);
+}
+
+.typography-heading-h2 {
+  font-size: var(--typography-heading-h2-size);
+  line-height: var(--typography-heading-h2-line);
+  font-weight: var(--typography-heading-h2-weight);
+}
+
+.typography-heading-h3 {
+  font-size: var(--typography-heading-h3-size);
+  line-height: var(--typography-heading-h3-line);
+  font-weight: var(--typography-heading-h3-weight);
+}
+
+.typography-body-m-regular {
+  font-family: var(--font-body);
+  font-size: var(--typography-body-m-size);
+  line-height: var(--typography-body-m-line);
+  font-weight: var(--typography-body-m-regular-weight);
+}
+
+.typography-body-m-medium {
+  font-family: var(--font-body);
+  font-size: var(--typography-body-m-size);
+  line-height: var(--typography-body-m-line);
+  font-weight: var(--typography-body-m-medium-weight);
+}
+
+.typography-body-s {
+  font-family: var(--font-body);
+  font-size: var(--typography-body-s-size);
+  line-height: var(--typography-body-s-line);
+  font-weight: var(--typography-body-s-weight);
+}
+
+.typography-caption {
+  font-family: var(--font-interface);
+  font-size: var(--typography-caption-size);
+  line-height: var(--typography-caption-line);
+  font-weight: var(--typography-caption-weight);
+}
+
+.typography-tab-label {
+  font-family: var(--font-interface);
+  font-size: var(--typography-tab-label-size);
+  line-height: var(--typography-tab-label-line);
+  font-weight: var(--typography-tab-label-weight);
+}
+
+.typography-number-mono {
+  direction: ltr;
+  font-family: var(--font-numbers);
+  font-size: var(--typography-number-mono-size);
+  line-height: var(--typography-number-mono-line);
+  font-weight: var(--typography-number-mono-weight);
+  font-variant-numeric: tabular-nums;
+  unicode-bidi: plaintext;
+}
+
+.typography-button-m {
+  font-family: var(--font-interface);
+  font-size: var(--typography-button-m-size);
+  line-height: var(--typography-button-m-line);
+  font-weight: var(--typography-button-m-weight);
+}
+
+.typography-input-m {
+  font-family: var(--font-interface);
+  font-size: var(--typography-input-m-size);
+  line-height: var(--typography-input-m-line);
+  font-weight: var(--typography-input-m-weight);
 }
 
 body {
@@ -315,17 +530,53 @@ body {
      v5 token replaces legacy --bg-base (which was hardcoded #000 v2 token). */
   background: var(--v5-bg);
   color: var(--v5-ink);
-  /* v5 default body font — General Sans (Fontshare, loaded via <link> in
-     layout.tsx). Falls back to Manrope (next/font, var(--font-display))
-     during load, then system fonts. */
-  font-family: "General Sans", var(--font-display), "Manrope", -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-body);
+  font-size: var(--typography-body-m-size);
+  line-height: var(--typography-body-m-line);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "cv11", "ss01", "ss03";
   /* Suppress native overscroll bounce so our pull-to-refresh owns the gesture
      at scrollY === 0. Without this, iOS Safari's elastic bounce competes with
      the indicator. */
   overscroll-behavior-y: contain;
+}
+
+page,
+uni-page,
+uni-page-body,
+uni-view,
+uni-scroll-view {
+  font-family: var(--font-body);
+}
+
+uni-text {
+  font-family: inherit;
+}
+
+button,
+input,
+textarea,
+select,
+uni-button,
+uni-input,
+uni-textarea {
+  font-family: var(--font-interface);
+}
+
+button {
+  font-size: var(--typography-button-m-size);
+  line-height: var(--typography-button-m-line);
+  font-weight: var(--typography-button-m-weight);
+}
+
+input,
+textarea,
+select {
+  font-size: var(--typography-input-m-size);
+  line-height: var(--typography-input-m-line);
+  font-weight: var(--typography-input-m-weight);
 }
 
 /* Lime-tinted dot grid for hero zones */
@@ -492,10 +743,19 @@ body {
 
 /* ─── Mission Control (Home v2) ─── */
 
-/* Mono font helper — JetBrains Mono used for live numbers, tiny labels. */
+/* Mono font helper — JetBrains Mono used for numbers, IDs, timestamps, hashes, and compute units. */
+.font-mono,
 .font-mono-tabular {
-  font-family: var(--font-jet-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: var(--font-numbers);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv11", "ss01", "ss03";
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "cv11", "ss01", "ss03";
 }
 
 /* Slow spin used by the orbital particle ring around the phone hero. */

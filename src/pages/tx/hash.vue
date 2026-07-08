@@ -34,7 +34,7 @@
         <Row :label="w.contract" :value="trunc(contract)" mono />
         <Row :label="w.value" :value="`${valueUSDT} USDT`" tint="var(--v5-brand)" bold />
         <Row :label="w.gas" :value="`${gasUsedGwei} Gwei`" mono />
-        <Row :label="w.network" value="Ethereum Mainnet (chain id 1)" last />
+        <Row :label="w.network" value="以太坊主网(chain id 1)" last />
       </view>
 
       <!-- External link explainer -->
@@ -193,20 +193,20 @@ const heroStyle: CSSProperties = {
     "radial-gradient(80% 60% at 90% 0%, rgba(41,210,127,0.16) 0%, transparent 60%), linear-gradient(180deg, #0A1410 0%, #0F0F0F 100%)",
   border: "1px solid rgba(41,210,127,0.35)",
 };
-const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-success)" };
-const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
+const confirmedStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-success)" };
+const hashStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
 const copyBtnStyle: CSSProperties = {
   marginTop: "8px",
   display: "inline-flex",
   padding: "4px 8px",
   borderRadius: "6px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
-const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", overflow: "hidden" };
-const extCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
+const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", overflow: "hidden" };
+const extCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", padding: "16px" };
 const extTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const extBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const extBtnStyle: CSSProperties = {
@@ -216,5 +216,5 @@ const extBtnStyle: CSSProperties = {
   fontSize: "11.5px",
   color: "var(--v5-ink-2)",
 };
-const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "10px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
+const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "11px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
 </script>

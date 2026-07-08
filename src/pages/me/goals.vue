@@ -130,7 +130,7 @@ const days = ref(90);
 
 const recommendation = computed(() => {
   const perDay = target.value / days.value;
-  if (perDay <= 0.19) return { tier: "Cloud Share", reason: t.value.goals.recCloudShare };
+  if (perDay <= 0.19) return { tier: "云算力份额", reason: t.value.goals.recCloudShare };
   if (perDay <= 7) return { tier: "NexionBox S1", reason: t.value.goals.recS1 };
   if (perDay <= 13) return { tier: "NexionBox Pro", reason: t.value.goals.recPro };
   return { tier: "NexionRack P1", reason: t.value.goals.recRack };
@@ -192,7 +192,7 @@ function presetTargetStyle(p: number): CSSProperties {
 }
 function presetTargetLabelStyle(p: number): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "11px",
     color: target.value === p ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
@@ -206,7 +206,7 @@ function presetDeadlineStyle(d: number): CSSProperties {
 }
 function presetDeadlineLabelStyle(d: number): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "12px",
     fontWeight: days.value === d ? 600 : 400,
     color: days.value === d ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -222,7 +222,7 @@ const heroStyle: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--v5-warning) 32%, transparent)",
 };
 const heroLabelStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-warning)",
 };
@@ -243,26 +243,26 @@ const heroSubStyle: CSSProperties = {
 const setterCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const setterCapStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.14em",
   color: "var(--v5-ink-3)",
 };
 const dollarStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "24px",
   color: "var(--v5-warning)",
 };
 const targetInputStyle: CSSProperties = {
   height: "40px",
   background: "transparent",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "28px",
   fontWeight: 600,
   color: "var(--v5-ink)",
@@ -277,7 +277,7 @@ const recCardStyle: CSSProperties = {
 const recHeaderStyle: CSSProperties = {
   marginBottom: "6px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.14em",
   color: "var(--v5-brand)",
 };
@@ -323,13 +323,13 @@ const activeCapStyle: CSSProperties = {
   marginBottom: "8px",
   padding: "0 4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.14em",
   color: "var(--v5-ink-3)",
 };
 const goalCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "14px",
 };
@@ -348,17 +348,17 @@ const goalRemoveStyle: CSSProperties = {
 const goalDeadlineStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const goalFootMutedStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const goalFootPctStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-warning)",
 };
 const achievedBadgeStyle: CSSProperties = {
@@ -369,8 +369,8 @@ const achievedBadgeStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
 };
 const achievedLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-brand)",
 };
 </script>

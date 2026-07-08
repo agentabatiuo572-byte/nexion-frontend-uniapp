@@ -9,7 +9,7 @@
   <view class="flex items-center justify-between" style="margin: 22px 2px 12px">
     <view class="inline-flex items-center" style="gap: 8px">
       <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ title }}</text>
-      <text v-if="count" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)">{{ count }}</text>
+      <text v-if="count" style="font-family: var(--font-numbers); font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)">{{ count }}</text>
     </view>
     <view v-if="link && linkLabel" class="inline-flex items-center gap-0.5" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink-3)" @click="go">
       <text>{{ linkLabel }}</text>

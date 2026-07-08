@@ -89,7 +89,7 @@
               <text class="block truncate" :style="leaderPrevStyle">{{ p.prev }}</text>
             </view>
             <view class="flex items-center shrink-0" :style="inBadgeStyle">
-              <text style="margin-right: 4px">in</text>
+              <text style="margin-right: 4px">查看</text>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
             </view>
           </view>
@@ -212,57 +212,57 @@ const app = useApp();
 const global = computed(() => app.global);
 
 const COMPLIANCE = [
-  { label: "SOC 2 Type II", body: "Q1 2026 audit complete", tint: "var(--v5-brand)" },
-  { label: "ISO 27001", body: "Certification renewed", tint: "var(--v5-brand)" },
-  { label: "GDPR", body: "EU data residency", tint: "var(--v5-tech-cyan)" },
-  { label: "HIPAA", body: "Healthcare verticals", tint: "var(--v5-tech-cyan)" },
+  { label: "SOC 2 Type II", body: "2026 Q1 审计完成", tint: "var(--v5-brand)" },
+  { label: "ISO 27001", body: "认证已续期", tint: "var(--v5-brand)" },
+  { label: "GDPR", body: "欧盟数据驻留", tint: "var(--v5-tech-cyan)" },
+  { label: "HIPAA", body: "医疗行业场景", tint: "var(--v5-tech-cyan)" },
   { label: "MSB License", body: "FinCEN MSB1234567", tint: "var(--v5-warning)" },
-  { label: "KYT · Chainalysis", body: "Real-time monitoring", tint: "var(--v5-warning)" },
+  { label: "KYT · Chainalysis", body: "实时监控", tint: "var(--v5-warning)" },
 ];
 const PARTNERS = [
-  { name: "NVIDIA", tag: "Hardware partner" },
-  { name: "Intel", tag: "TEE provider" },
-  { name: "AMD", tag: "EPYC reference" },
-  { name: "Pocket", tag: "Customer · SDXL" },
-  { name: "Helix Labs", tag: "Customer · LLM" },
-  { name: "Echo", tag: "Customer · Whisper" },
-  { name: "Mosaic", tag: "Customer · Flux" },
-  { name: "Vector", tag: "Customer · Embedding" },
+  { name: "NVIDIA", tag: "硬件伙伴" },
+  { name: "Intel", tag: "TEE 供应方" },
+  { name: "AMD", tag: "EPYC 参考平台" },
+  { name: "Pocket", tag: "客户 · SDXL" },
+  { name: "Helix Labs", tag: "客户 · LLM" },
+  { name: "Echo", tag: "客户 · Whisper" },
+  { name: "Mosaic", tag: "客户 · Flux" },
+  { name: "Vector", tag: "客户 · 向量嵌入" },
 ];
 const INVESTORS = [
-  { name: "a16z crypto", stage: "Series B" },
-  { name: "Sequoia", stage: "Series A + B" },
-  { name: "Pantera", stage: "Seed + A" },
-  { name: "Polychain", stage: "Series A" },
-  { name: "Multicoin", stage: "Seed" },
-  { name: "Coinbase Ventures", stage: "Strategic" },
+  { name: "a16z crypto", stage: "B 轮" },
+  { name: "Sequoia", stage: "A 轮 + B 轮" },
+  { name: "Pantera", stage: "种子轮 + A 轮" },
+  { name: "Polychain", stage: "A 轮" },
+  { name: "Multicoin", stage: "种子轮" },
+  { name: "Coinbase Ventures", stage: "战略投资" },
 ];
 const LEADERSHIP = [
-  { name: "James Chen", role: "CEO & Co-founder", prev: "ex-Coinbase · ex-NVIDIA", tint: "var(--v5-brand)" },
-  { name: "Sarah Park", role: "CTO & Co-founder", prev: "ex-OpenAI · MIT CSAIL", tint: "var(--v5-tech-cyan)" },
-  { name: "Marcus Reid", role: "Chief Compliance Officer", prev: "ex-Circle · ex-FinCEN", tint: "var(--v5-warning)" },
-  { name: "Lena Volkov", role: "Head of AI Infrastructure", prev: "ex-Anthropic · ex-DeepMind", tint: "var(--v5-tech-cyan)" },
-  { name: "Aisha Tariq", role: "VP Engineering", prev: "ex-Stripe · ex-AWS", tint: "var(--v5-brand)" },
+  { name: "James Chen", role: "CEO 兼联合创始人", prev: "前 Coinbase · 前 NVIDIA", tint: "var(--v5-brand)" },
+  { name: "Sarah Park", role: "CTO 兼联合创始人", prev: "前 OpenAI · MIT CSAIL", tint: "var(--v5-tech-cyan)" },
+  { name: "Marcus Reid", role: "首席合规官", prev: "前 Circle · 前 FinCEN", tint: "var(--v5-warning)" },
+  { name: "Lena Volkov", role: "AI 基础设施负责人", prev: "前 Anthropic · 前 DeepMind", tint: "var(--v5-tech-cyan)" },
+  { name: "Aisha Tariq", role: "工程副总裁", prev: "前 Stripe · 前 AWS", tint: "var(--v5-brand)" },
 ];
 const PRESS = [
-  { outlet: "TechCrunch", title: "Nexion raises $80M to decentralize AI compute", date: "2026-03" },
-  { outlet: "CoinDesk", title: "How Nexion is powering the next wave of DePIN", date: "2026-02" },
-  { outlet: "Forbes", title: "The grid is shifting — and Nexion is leading", date: "2026-01" },
-  { outlet: "The Block", title: "Inside the $487M Nexion network", date: "2025-12" },
+  { outlet: "TechCrunch", title: "Nexion 获 $80M 融资,推动 AI 算力去中心化", date: "2026-03" },
+  { outlet: "CoinDesk", title: "Nexion 如何驱动下一波 DePIN", date: "2026-02" },
+  { outlet: "Forbes", title: "算力网络正在转向,Nexion 走在前面", date: "2026-01" },
+  { outlet: "The Block", title: "走进 $487M 的 Nexion 网络", date: "2025-12" },
 ];
 const Q3_FINANCIALS = [
   { metric: "MRR", value: "$4.87M", delta: "+22%" },
-  { metric: "Active accounts", value: "184,206", delta: "+38%" },
-  { metric: "Devices online", value: "28,432", delta: "+12%" },
-  { metric: "Payouts processed", value: "$31.2M", delta: "+27%" },
+  { metric: "活跃账号", value: "184,206", delta: "+38%" },
+  { metric: "在线设备", value: "28,432", delta: "+12%" },
+  { metric: "已处理付款", value: "$31.2M", delta: "+27%" },
 ];
 const LISTINGS = [
-  { exchange: "PancakeSwap", state: "Live", tint: "var(--v5-success)" },
-  { exchange: "Uniswap V3", state: "Live", tint: "var(--v5-success)" },
-  { exchange: "CoinGecko", state: "Listed", tint: "var(--v5-success)" },
-  { exchange: "CoinMarketCap", state: "Listed", tint: "var(--v5-success)" },
-  { exchange: "Binance", state: "Tier-1 review", tint: "var(--v5-warning)" },
-  { exchange: "Coinbase", state: "Application Q3", tint: "var(--v5-warning)" },
+  { exchange: "PancakeSwap", state: "已上线", tint: "var(--v5-success)" },
+  { exchange: "Uniswap V3", state: "已上线", tint: "var(--v5-success)" },
+  { exchange: "CoinGecko", state: "已收录", tint: "var(--v5-success)" },
+  { exchange: "CoinMarketCap", state: "已收录", tint: "var(--v5-success)" },
+  { exchange: "Binance", state: "一线交易所审核中", tint: "var(--v5-warning)" },
+  { exchange: "Coinbase", state: "Q3 申请中", tint: "var(--v5-warning)" },
 ];
 const KYC_PROVIDERS = ["Jumio", "Sumsub", "Chainalysis", "Elliptic", "ComplyAdvantage"];
 
@@ -281,26 +281,26 @@ const heroStyle: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroHeadlineStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25, marginTop: "2px" };
 const heroStatsStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)", gap: "8px" };
-const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", overflow: "hidden" };
-const complianceCardStyle: CSSProperties = { borderRadius: "12px", padding: "10px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", overflow: "hidden" };
+const complianceCardStyle: CSSProperties = { borderRadius: "12px", padding: "10px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 function dotStyle(tint: string): CSSProperties {
   return { width: "6px", height: "6px", borderRadius: "999px", background: tint };
 }
 const complianceLabelStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-ink)" };
-const complianceBodyStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
-const partnerCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const complianceBodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
+const partnerCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const partnerNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, letterSpacing: "-0.025em" };
-const partnerTagStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "4px" };
+const partnerTagStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px" };
 function investorRowStyle(last: boolean): CSSProperties {
-  return { padding: "10px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
 const investorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600 };
-const investorStageStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const investorStageStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
 function leaderRowStyle(last: boolean): CSSProperties {
-  return { gap: "12px", padding: "10px 12px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
+  return { gap: "12px", padding: "8px 12px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
 function leaderAvatarStyle(tint: string): CSSProperties {
   return {
@@ -315,19 +315,19 @@ function leaderInitialStyle(tint: string): CSSProperties {
   return { fontFamily: "var(--font-v5)", fontSize: "14px", fontWeight: 600, color: tint };
 }
 const leaderNameStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const leaderRoleStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)" };
-const leaderPrevStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const leaderRoleStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand)" };
+const leaderPrevStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const inBadgeStyle: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   background: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)",
   color: "var(--v5-tech-cyan)",
 };
-const pressCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
-const pressOutletStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-brand)" };
-const pressDateStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const pressCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
+const pressOutletStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.05em", color: "var(--v5-brand)" };
+const pressDateStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
 const pressTitleStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink)", lineHeight: 1.375 };
 const q3HeadStyle: CSSProperties = {
   padding: "10px 16px",
@@ -335,7 +335,7 @@ const q3HeadStyle: CSSProperties = {
   background: "linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 8%, transparent), transparent, color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent))",
 };
 const q3TitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const q3DownloadStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-brand)" };
+const q3DownloadStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-brand)" };
 function q3CellStyle(i: number): CSSProperties {
   return {
     padding: "12px 16px",
@@ -343,18 +343,18 @@ function q3CellStyle(i: number): CSSProperties {
     borderRight: i % 2 === 0 ? "1px solid var(--v5-border)" : "none",
   };
 }
-const q3MetricStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
-const q3ValueStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
-const q3DeltaStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-success)" };
-const q3FootStyle: CSSProperties = { padding: "8px 16px", borderTop: "1px solid var(--v5-border)", fontSize: "10px", color: "var(--v5-ink-4)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
+const q3MetricStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
+const q3ValueStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
+const q3DeltaStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-success)" };
+const q3FootStyle: CSSProperties = { padding: "8px 16px", borderTop: "1px solid var(--v5-border)", fontSize: "11px", color: "var(--v5-ink-4)", fontFamily: "var(--font-numbers)" };
 function listingRowStyle(last: boolean): CSSProperties {
-  return { padding: "10px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
 const listingNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600 };
 function listingStateStyle(tint: string): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontFamily: "var(--font-numbers)",
+    fontSize: "11px",
     padding: "2px 8px",
     borderRadius: "999px",
     background: `color-mix(in srgb, ${tint} 12.5%, transparent)`,
@@ -366,13 +366,13 @@ const bugIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRa
 const bugAmountStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const bugHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 const bugCtaStyle: CSSProperties = { marginTop: "8px", display: "inline-flex", minHeight: "44px", fontSize: "11.5px", color: "var(--v5-brand-2)", fontWeight: 600 };
-const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const kycBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const kycChipStyle: CSSProperties = {
   padding: "2px 8px",
   borderRadius: "999px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
   color: "var(--v5-ink-2)",
 };

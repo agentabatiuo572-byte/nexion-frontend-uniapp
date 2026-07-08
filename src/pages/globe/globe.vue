@@ -39,74 +39,66 @@
 
       <!-- Map -->
       <view class="mx-4 border rounded-2xl relative overflow-hidden" :style="mapCardStyle">
-        <svg :viewBox="`0 0 ${W} ${H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.9" />
-              <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.2" />
-              <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
-            </radialGradient>
-            <radialGradient id="you-glow" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="var(--v5-tech-cyan)" stop-opacity="1" />
-              <stop offset="100%" stop-color="var(--v5-tech-cyan)" stop-opacity="0" />
-            </radialGradient>
-          </defs>
+        <view class="nx-globe-map-stage">
+          <image class="nx-globe-map-layer nx-globe-bg-map" src="/static/maps/simplemaps-world.svg?v=h5-map-4" mode="aspectFit" />
+          <svg :viewBox="`0 0 ${MAP_W} ${MAP_H}`" class="nx-globe-map-layer nx-globe-network-layer" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.9" />
+                <stop offset="60%" stop-color="var(--v5-brand)" stop-opacity="0.2" />
+                <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
+              </radialGradient>
+              <radialGradient id="you-glow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="var(--v5-tech-cyan)" stop-opacity="1" />
+                <stop offset="100%" stop-color="var(--v5-tech-cyan)" stop-opacity="0" />
+              </radialGradient>
+            </defs>
 
-          <!-- Dot continents -->
-          <circle
-            v-for="(d, i) in dots"
-            :key="`dot-${i}`"
-            :cx="d.x"
-            :cy="d.y"
-            :r="d.r"
-            :fill="d.bright ? 'var(--v5-brand)' : 'var(--v5-ink-4)'"
-            :opacity="d.bright ? 0.5 : 0.25"
-          />
+            <!-- Connection lines from "you" → other regions -->
+            <line
+              v-for="r in otherRegions"
+              :key="`line-${r.id}`"
+              :x1="me.mapX"
+              :y1="me.mapY"
+              :x2="r.mapX"
+              :y2="r.mapY"
+              stroke="var(--v5-brand)"
+              stroke-opacity="0.08"
+              stroke-width="2.5"
+              stroke-dasharray="8 12"
+            />
 
-          <!-- Connection lines from "you" → other regions -->
-          <line
-            v-for="r in otherRegions"
-            :key="`line-${r.id}`"
-            :x1="me.cx * W"
-            :y1="me.cy * H"
-            :x2="r.cx * W"
-            :y2="r.cy * H"
-            stroke="var(--v5-brand)"
-            stroke-opacity="0.08"
-            stroke-width="0.6"
-            stroke-dasharray="2 3"
-          />
-
-          <!-- Region nodes -->
-          <g v-for="r in REGIONS" :key="r.id" class="cursor-pointer" @click="select(r)">
-            <circle :cx="r.cx * W" :cy="r.cy * H" r="18" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
-            <circle :cx="r.cx * W" :cy="r.cy * H" r="5" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
-            <!-- Pulse ring -->
-            <circle
-              v-if="pulseRegionId === r.id"
-              :key="`pulse-${r.id}-${pulseTick}`"
-              :cx="r.cx * W"
-              :cy="r.cy * H"
-              r="5"
-              fill="none"
-              :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'"
-              stroke-width="1"
-            >
-              <animate attributeName="r" values="5;24" dur="1.6s" repeatCount="1" />
-              <animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="1" />
-            </circle>
-            <text
-              v-if="r.isYou"
-              :x="r.cx * W + 8"
-              :y="r.cy * H - 8"
-              fill="var(--v5-tech-cyan)"
-              font-size="10"
-              font-weight="600"
-              font-family="ui-monospace, monospace"
-            >{{ t.globe.yourNodeBadge }}</text>
-          </g>
-        </svg>
-        <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
+            <!-- Region nodes -->
+            <g v-for="r in positionedRegions" :key="r.id" class="cursor-pointer" @click="select(r)">
+              <circle :cx="r.mapX" :cy="r.mapY" r="74" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
+              <circle :cx="r.mapX" :cy="r.mapY" r="20" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
+              <!-- Pulse ring -->
+              <circle
+                v-if="pulseRegionId === r.id"
+                :key="`pulse-${r.id}-${pulseTick}`"
+                :cx="r.mapX"
+                :cy="r.mapY"
+                r="20"
+                fill="none"
+                :stroke="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'"
+                stroke-width="4"
+              >
+                <animate attributeName="r" values="20;98" dur="1.6s" repeatCount="1" />
+                <animate attributeName="opacity" values="1;0" dur="1.6s" repeatCount="1" />
+              </circle>
+              <text
+                v-if="r.isYou"
+                :x="r.mapX + 34"
+                :y="r.mapY - 34"
+                fill="var(--v5-tech-cyan)"
+                font-size="45"
+                font-weight="600"
+                font-family="var(--font-numbers)"
+              >{{ t.globe.yourNodeBadge }}</text>
+            </g>
+          </svg>
+        </view>
+        <text class="block text-center" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
       </view>
 
       <!-- Region cards -->
@@ -162,10 +154,10 @@
             <view class="rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M12 20h.01" /><path d="M2 8.82a15 15 0 0 1 20 0" /><path d="M5 12.859a10 10 0 0 1 14 0" /><path d="M8.5 16.429a5 5 0 0 1 7 0" /></svg>
               <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.avgLatencyMs }}ms</text>
-              <text class="block" :style="drawerStatLabelStyle">Latency</text>
+              <text class="block" :style="drawerStatLabelStyle">延迟</text>
             </view>
           </view>
-          <text class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>
+          <text class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · 在线率 {{ uptimeText }}</text>
         </view>
       </view>
     </view>
@@ -184,8 +176,21 @@ import { fmt } from "@/i18n/format";
 const t = useT();
 const app = useApp();
 
-const W = 440;
-const H = 240;
+const MAP_W = 2000;
+const MAP_H = 857;
+
+type GlobeRegion = RegionData & { mapX: number; mapY: number };
+
+const REGION_MAP_POINTS: Record<string, { mapX: number; mapY: number }> = {
+  // Coordinates are in the SimpleMaps SVG viewBox, so nodes stay locked to the
+  // Robinson-projection map after CSS scaling and centering.
+  ap: { mapX: 1607, mapY: 487 }, // Singapore / Southeast Asia
+  eu: { mapX: 1038, mapY: 175 }, // Germany / Western Europe
+  na: { mapX: 491, mapY: 263 }, // mainland United States
+  me: { mapX: 1284, mapY: 346 }, // United Arab Emirates
+  sa: { mapX: 679, mapY: 593 }, // Brazil
+  af: { mapX: 1121, mapY: 685 }, // South Africa
+};
 
 const selected = ref<RegionData | null>(null);
 const pulseTick = ref(0);
@@ -195,8 +200,11 @@ const global = computed(() => app.global);
 const activeNodesText = computed(() => global.value.activeDevices.toLocaleString());
 const activeJobsText = computed(() => global.value.todayIncrement.toLocaleString());
 
-const me = REGIONS.find((r) => r.isYou)!;
-const otherRegions = computed(() => REGIONS.filter((r) => !r.isYou));
+const positionedRegions = computed<GlobeRegion[]>(() =>
+  REGIONS.map((r) => ({ ...r, ...(REGION_MAP_POINTS[r.id] ?? { mapX: r.cx * MAP_W, mapY: r.cy * MAP_H }) })),
+);
+const me = computed(() => positionedRegions.value.find((r) => r.isYou)!);
+const otherRegions = computed(() => positionedRegions.value.filter((r) => !r.isYou));
 
 // Pick a random region to pulse each tick (client-only timer).
 const pulseRegionId = computed<string | null>(() => {
@@ -207,8 +215,6 @@ const pulseRegionId = computed<string | null>(() => {
 // Per-region uptime — stable per open (computed from a ref so it doesn't churn).
 const uptimeSeed = ref(0);
 const uptimeText = computed(() => (99 + uptimeSeed.value).toFixed(2) + "%");
-
-const dots = computed(() => generateDotMap(W, H));
 
 function select(r: RegionData) {
   uptimeSeed.value = Math.random();
@@ -238,68 +244,14 @@ onUnmounted(() => {
   if (pulseTimer) clearInterval(pulseTimer);
 });
 
-// Procedural dot-map silhouette (loose continent blobs).
-function generateDotMap(w: number, h: number): Array<{ x: number; y: number; r: number; bright: boolean }> {
-  const out: Array<{ x: number; y: number; r: number; bright: boolean }> = [];
-  const blobs = [
-    { cx: 0.22, cy: 0.4, r: 0.13 },
-    { cx: 0.3, cy: 0.7, r: 0.08 },
-    { cx: 0.5, cy: 0.36, r: 0.11 },
-    { cx: 0.55, cy: 0.62, r: 0.12 },
-    { cx: 0.78, cy: 0.5, r: 0.16 },
-    { cx: 0.85, cy: 0.72, r: 0.06 },
-  ];
-  const cols = 60;
-  const rows = 30;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const nx = (c + 0.5) / cols;
-      const ny = (r + 0.5) / rows;
-      let nearest = Infinity;
-      for (const b of blobs) {
-        const dx = nx - b.cx;
-        const dy = ny - b.cy;
-        const d = Math.sqrt(dx * dx + dy * dy) - b.r;
-        if (d < nearest) nearest = d;
-      }
-      const rng = mulberry32(r * 1000 + c);
-      if (nearest < 0.02) {
-        out.push({
-          x: Math.round(nx * w * 100) / 100,
-          y: Math.round(ny * h * 100) / 100,
-          r: Math.round((0.9 + rng() * 0.6) * 100) / 100,
-          bright: rng() < 0.55,
-        });
-      } else if (nearest < 0.07 && rng() < 0.25) {
-        out.push({
-          x: Math.round(nx * w * 100) / 100,
-          y: Math.round(ny * h * 100) / 100,
-          r: 0.6,
-          bright: false,
-        });
-      }
-    }
-  }
-  return out;
-}
-
-function mulberry32(seed: number) {
-  return function () {
-    let s = (seed += 0x6d2b79f5);
-    s = Math.imul(s ^ (s >>> 15), s | 1);
-    s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
-    return ((s ^ (s >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
 // ── styles ──
 const statTileStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "12px",
 };
 const statValStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "20px",
   fontWeight: 600,
   marginTop: "4px",
@@ -311,7 +263,7 @@ const mapCardStyle: CSSProperties = {
   padding: "12px",
 };
 const regionCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
   gap: "12px",
@@ -328,7 +280,7 @@ function regionIconBox(isYou?: boolean): CSSProperties {
   };
 }
 const youChipStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   padding: "2px 6px",
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
@@ -343,7 +295,7 @@ const regionRateStyle: CSSProperties = {
 const drawerCardStyle: CSSProperties = {
   width: "100%",
   maxWidth: "420px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
@@ -370,14 +322,14 @@ const drawerStatStyle: CSSProperties = {
   padding: "10px",
 };
 const drawerStatValStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "14px",
   fontWeight: 600,
   marginTop: "4px",
   color: "var(--v5-ink)",
 };
 const drawerStatLabelStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
   marginTop: "2px",
 };
@@ -398,5 +350,28 @@ const drawerStatLabelStyle: CSSProperties = {
   inset: 0;
   background: color-mix(in srgb, var(--v5-surface-3) 80%, transparent);
   backdrop-filter: blur(4px);
+}
+.nx-globe-map-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 440 / 240;
+}
+.nx-globe-map-layer {
+  position: absolute;
+  left: calc(50% - 16px);
+  top: 24px;
+  width: calc(100% - 20px);
+  height: 145px;
+  transform: translateX(-50%) scale(1.18);
+  transform-origin: center center;
+}
+.nx-globe-bg-map {
+  z-index: 0;
+  opacity: 1;
+  pointer-events: none;
+}
+.nx-globe-network-layer {
+  z-index: 1;
+  overflow: visible;
 }
 </style>

@@ -73,7 +73,7 @@
                 <text class="font-display" :style="rowTitleStyle">V{{ r.v }} {{ r.title }}</text>
                 <view v-if="rowStatus(r.v) === 'done'" class="flex items-center" style="gap: 2px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  <text :style="{ fontSize: '10px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>
+                  <text :style="{ fontSize: '11px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>
                 </view>
                 <text v-else-if="rowStatus(r.v) === 'current'" class="font-mono-tabular" :style="currentTagStyle">{{ t.rank.current }}</text>
               </view>
@@ -134,7 +134,7 @@ function formatConditions(r: VRankDef): string {
   const parts: string[] = [];
   if (c.selfBuyUSD) parts.push(`Self-buy ≥ $${c.selfBuyUSD}`);
   if (c.directRefs) parts.push(`Direct refs ≥ ${c.directRefs}`);
-  if (c.teamVolumeUSD) parts.push(`Team $${c.teamVolumeUSD.toLocaleString()}`);
+  if (c.teamVolumeUSD) parts.push(`团队 $${c.teamVolumeUSD.toLocaleString()}`);
   if (c.vDownlines) {
     for (const [v, n] of Object.entries(c.vDownlines)) {
       parts.push(`${n}× V${v}`);
@@ -159,7 +159,7 @@ const howEntryStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
 };
 
-const heroStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
+const heroStyle: CSSProperties = { background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", padding: "16px" };
 const heroGlowStyle: CSSProperties = {
   position: "absolute",
   inset: "-20%",
@@ -171,7 +171,7 @@ const heroGlowStyle: CSSProperties = {
   opacity: 0.85,
 };
 const heroCapStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
@@ -211,10 +211,10 @@ const upgradeCtaStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 
-const ladderCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+const ladderCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px" };
 function rowStyle(status: "done" | "current" | "locked", isLast: boolean): CSSProperties {
   return {
-    padding: "14px 16px",
+    padding: "8px 16px",
     gap: "12px",
     background: status === "current" ? "color-mix(in srgb, var(--v5-brand) 4%, transparent)" : "transparent",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
@@ -223,8 +223,8 @@ function rowStyle(status: "done" | "current" | "locked", isLast: boolean): CSSPr
 // SKILL leading-tight = 1.25 (原版 .font-display text-[14px] leading-tight; was 1.1)
 const rowTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, lineHeight: 1.25, color: "var(--v5-ink)" };
 const currentTagStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 600,
   color: "var(--v5-brand)",
   letterSpacing: "0.06em",
@@ -243,8 +243,8 @@ function chipStyle(kind: "default" | "purple" | "lemon"): CSSProperties {
     alignItems: "center",
     padding: "1px 6px",
     borderRadius: "4px",
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontFamily: "var(--font-numbers)",
+    fontSize: "11px",
     letterSpacing: "0.02em",
     ...map[kind],
   };

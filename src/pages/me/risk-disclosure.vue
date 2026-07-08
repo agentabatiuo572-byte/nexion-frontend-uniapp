@@ -175,7 +175,7 @@ const heroIconBoxStyle: CSSProperties = {
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 22%, transparent)",
 };
-const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const heroSubStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const acceptedChipStyle: CSSProperties = {
@@ -185,20 +185,20 @@ const acceptedChipStyle: CSSProperties = {
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-brand) 14%, transparent)",
   color: "var(--v5-brand)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   display: "inline-flex",
 };
 const sectionsStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
   display: "flex",
   flexDirection: "column",
   gap: "14px",
 };
-const blockNumStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-brand-2)" };
+const blockNumStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-brand-2)" };
 const blockTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const blockBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 function blockStyle(selected: boolean): CSSProperties {
@@ -212,8 +212,8 @@ function blockStyle(selected: boolean): CSSProperties {
 }
 const selectedBlockStyle: CSSProperties = {
   marginBottom: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-brand-2)",
 };
 const hintStyle: CSSProperties = {
@@ -227,7 +227,7 @@ const hintTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warn
 const ackCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
@@ -250,5 +250,5 @@ const acceptBtnStyle = computed<CSSProperties>(() => ({
   fontSize: "14px",
   fontWeight: 600,
 }));
-const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "10px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
+const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
 </script>

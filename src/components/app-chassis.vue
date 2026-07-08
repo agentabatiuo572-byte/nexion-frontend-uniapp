@@ -11,41 +11,24 @@
   `active` prop is an optional fallback for the very first frame.
 -->
 <template>
-  <view class="nx-chassis" style="background: var(--v5-bg)">
-    <view class="nx-top-chrome" :style="{ height: topChromeHeight + 'px' }" />
-
+  <view class="nx-device-shell">
+    <view class="nx-device-screen">
+      <view class="nx-chassis" style="background: var(--v5-shell-bg, var(--v5-bg))">
     <!-- Status bar safe area (real on device, ~0 on desktop H5) -->
-    <view class="nx-statusbar" :style="{ height: statusBarHeight + 'px' }">
-      <view v-if="showPreviewStatusBar" class="nx-statusbar__inner" aria-hidden="true">
-        <text class="nx-statusbar__time">{{ statusTime }}</text>
-        <view class="nx-statusbar__icons">
-          <view class="nx-statusbar__signal">
-            <view />
-            <view />
-            <view />
-            <view />
-          </view>
-          <view class="nx-statusbar__wifi"><view /></view>
-          <view class="nx-statusbar__battery" />
-        </view>
-      </view>
-    </view>
+    <view class="nx-statusbar" :style="{ height: statusBarHeight + 'px' }" />
 
     <!-- Header brand row — TAB routes only (sub-pages carry their own back row) -->
-    <view v-if="isTabRoute" class="nx-header" :style="{ top: statusBarHeight + 'px' }">
+    <view v-if="isTabRoute" class="nx-header" :class="{ 'nx-header--scrolled': headerScrolled }" :style="{ top: statusBarHeight + 'px' }">
       <view class="nx-header__l">
-        <view class="nx-logo" aria-hidden="true">
-          <image class="nx-logo-img nx-logo-img--light" src="/static/img/brand/header-logo-light.png" mode="aspectFit" />
-          <image class="nx-logo-img nx-logo-img--dark" src="/static/img/brand/header-logo-dark.png" mode="aspectFit" />
-        </view>
+        <image class="nx-brand-logo" :class="{ 'nx-brand-logo--with-title': !isHome }" :src="brandLogoSrc" mode="aspectFit" />
       </view>
-      <view class="nx-header__center" />
+      <text v-if="pageTitle" class="nx-title">{{ pageTitle }}</text>
       <view class="nx-header__r">
         <view class="nx-icon-btn" @click="goSearch">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+          <svg width="25.2" height="25.2" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34" /><circle cx="11" cy="11" r="8" /></svg>
         </view>
         <view class="nx-icon-btn nx-bell" @click="goNotifications">
-          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          <svg width="25.2" height="25.2" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>
           <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
       </view>
@@ -87,6 +70,7 @@
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
       @touchcancel="onTouchEnd"
+      @scroll="onScroll"
     >
       <!-- themed pull-to-refresh indicator — anchored just below the header,
            centered in the pull gap. -->
@@ -113,10 +97,8 @@
              chrome to frost → it read as solid black. (P-041) `backwards` fill on
              the entrance so no transform lingers. -->
         <view class="nx-page-enter" :style="{ paddingTop: contentTop + 'px', paddingBottom: contentBottom + 'px' }">
-          <slot name="pageTop" />
-          <!-- Voucher fallback banner — chassis-injected at content top so the
-               5 protected tab pages stay untouched (ALIGNMENT red-line). Self-
-               hides unless a claimable voucher targets the current surface. -->
+          <!-- Benefit lane — chassis-injected at content top. It hosts voucher
+               and Home device-trial cards in one left-looping lane. -->
           <VoucherBanner v-if="bannerSurface" :surface="bannerSurface" />
           <slot />
         </view>
@@ -166,12 +148,15 @@
     </template>
 
     <!-- Global overlay host (toast / confirm / netError) -->
-    <GlobalUi />
+        <GlobalUi />
+      </view>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
@@ -195,10 +180,11 @@ import { useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useVoucher } from "@/store/voucher";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
+import { useTheme } from "@/store/theme";
 import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
+import { installRouteScrollNavigationGuard, restoreBackScrollForRoute, saveRouteScroll } from "@/lib/scroll-restore";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
-import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const props = defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
@@ -214,9 +200,15 @@ const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
 const voucher = useVoucher();
 const voucherClaimSheet = useVoucherClaimSheet();
+const theme = useTheme();
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
 let voucherPushTimer: ReturnType<typeof setTimeout> | null = null;
-let statusClockTimer: ReturnType<typeof setInterval> | null = null;
+
+const brandLogoSrc = computed(() =>
+  theme.mode === "light"
+    ? "/static/brand/nexion-logo-light.png"
+    : "/static/brand/nexion-logo-dark.png",
+);
 
 // ── Pull-to-refresh — touch gesture ported from the prototype's PullToRefresh
 // (lib/store/refresh + ui/pull-to-refresh.tsx). The plain overflow:auto view
@@ -241,7 +233,9 @@ function scheduleDeactivate() {
   }, 340);
 }
 const scrollEl = ref<unknown>(null);
+const headerScrolled = ref(false);
 let startY: number | null = null;
+let nativeScrollEl: HTMLElement | null = null;
 
 const refreshing = computed(() => refresh.isRefreshing);
 const indicatorY = computed(() => (refreshing.value ? HOLD_PX : pullY.value));
@@ -253,6 +247,54 @@ function currentScrollTop(): number {
   const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
   const el = (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
   return el?.scrollTop ?? 0;
+}
+function scrollElement(): HTMLElement | null {
+  const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
+  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
+}
+function saveCurrentRouteScroll(): void {
+  const r = route.value || readRoute();
+  if (r) saveRouteScroll(r, currentScrollTop());
+}
+function restoreCurrentRouteScroll(): void {
+  const r = readRoute();
+  if (r) route.value = r;
+  restoreBackScrollForRoute(r, (top) => {
+    const apply = () => {
+      const el = scrollElement();
+      if (!el) return;
+      el.scrollTop = top;
+      headerScrolled.value = top > 2;
+    };
+    nextTick(() => {
+      apply();
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => requestAnimationFrame(apply));
+      } else {
+        setTimeout(apply, 32);
+      }
+    });
+  });
+}
+function onScroll(): void {
+  const top = currentScrollTop();
+  headerScrolled.value = top > 2;
+  const r = route.value || readRoute();
+  if (r) saveRouteScroll(r, top);
+}
+function attachNativeScroll(): void {
+  nextTick(() => {
+    const el = scrollElement();
+    if (!el || el === nativeScrollEl) return;
+    if (nativeScrollEl) nativeScrollEl.removeEventListener("scroll", onScroll);
+    nativeScrollEl = el;
+    nativeScrollEl.addEventListener("scroll", onScroll, { passive: true });
+  });
+}
+function detachNativeScroll(): void {
+  if (!nativeScrollEl) return;
+  nativeScrollEl.removeEventListener("scroll", onScroll);
+  nativeScrollEl = null;
 }
 function touchY(e: TouchEvent): number | null {
   const tp = e.touches?.[0] ?? e.changedTouches?.[0];
@@ -312,15 +354,11 @@ function readRoute(): string {
   return "";
 }
 const route = ref(readRoute());
-const statusTime = ref("9:41");
-function updateStatusTime() {
-  const now = new Date();
-  statusTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
-}
 onMounted(() => {
   route.value = readRoute();
-  updateStatusTime();
-  statusClockTimer = setInterval(updateStatusTime, 30_000);
+  installRouteScrollNavigationGuard();
+  attachNativeScroll();
+  restoreCurrentRouteScroll();
   const closeTransient = (trialClaimSheet as { closeTransient?: () => void }).closeTransient;
   if (typeof closeTransient === "function") closeTransient();
   else trialClaimSheet.open = false;
@@ -363,6 +401,8 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  saveCurrentRouteScroll();
+  detachNativeScroll();
   if (autoPushTimer) {
     clearTimeout(autoPushTimer);
     autoPushTimer = null;
@@ -371,10 +411,18 @@ onUnmounted(() => {
     clearTimeout(voucherPushTimer);
     voucherPushTimer = null;
   }
-  if (statusClockTimer) {
-    clearInterval(statusClockTimer);
-    statusClockTimer = null;
-  }
+});
+onActivated(() => {
+  route.value = readRoute();
+  attachNativeScroll();
+  restoreCurrentRouteScroll();
+});
+onDeactivated(() => {
+  saveCurrentRouteScroll();
+});
+onShow(() => {
+  route.value = readRoute();
+  restoreCurrentRouteScroll();
 });
 
 const routeTab = computed(() => TAB_ROUTE_KEY[route.value]);
@@ -387,46 +435,50 @@ const isTabRoute = computed(() => routeTab.value !== undefined || (route.value =
 const activeTab = computed(() => routeTab.value ?? props.active ?? "home");
 const isHome = computed(() => activeTab.value === "home");
 
-// Voucher fallback banner surface = current tab route (home/store/me/earn). team
+// Voucher fallback banner surface = current tab route (home/store/earn). team/me
 // is not a configured claim surface. The VoucherBanner self-hides unless a
 // claimable voucher targets the surface, so this only maps the route → surface.
 const bannerSurface = computed<"home" | "store" | "me" | "earn" | null>(() => {
   // Tab pages only — sub-pages (checkout/detail/…) pass active="store" etc. but
-  // must NOT carry the banner (it's scoped to the 4 first-level surfaces).
+  // must NOT carry the banner (it's scoped to the first-level claim surfaces).
   if (!isTabRoute.value) return null;
   const tab = activeTab.value;
-  return tab === "home" || tab === "store" || tab === "me" || tab === "earn" ? tab : null;
+  return tab === "home" || tab === "store" || tab === "earn" ? tab : null;
 });
 
 // Sub-page nav header (registered via useSetPageHeader). Null on tab routes → brand
 // row. navHeaderH drives both the row height and the content-top inset, so only
 // converted sub-pages get the inset (un-converted ones keep contentTop+0, unchanged).
 const navHeader = computed(() => (isTabRoute.value ? null : pageHeader.header));
-const navHeaderH = computed(() => (navHeader.value ? (navHeader.value.subtitle ? 56 : 44) : 0));
+const navHeaderH = computed(() => (navHeader.value ? 52 : 0));
 function navBack() {
   // Stack-aware back: pop real history (restores prev page + scroll), else fall
   // back to the declared backHref. navigateBack alone no-ops on cold-open (P-054).
   navBackTo(navHeader.value?.backHref);
 }
 
+const pageTitle = computed(() => {
+  const map: Record<string, string> = {
+    home: t.value.tabs.home,
+    earn: t.value.headerTitles.earn,
+    store: t.value.headerTitles.store,
+    team: t.value.headerTitles.team,
+    me: t.value.headerTitles.me,
+  };
+  return map[activeTab.value] ?? "";
+});
+
 const unread = computed(() => notifications.unread);
 const unreadLabel = computed(() => (unread.value > 99 ? "99+" : String(unread.value)));
 
 // ── layout insets ──
-const statusBarHeight = computed(() => {
-  try {
-    return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight();
-  } catch {
-    return h5DevicePreviewStatusBarHeight();
-  }
-});
-const showPreviewStatusBar = computed(() => h5DevicePreviewStatusBarHeight() > 0);
 const HEADER_H = 52;
-const TABBAR_INSET = 92; // floating pill (64) + home indicator (22) + gap
-const SUB_BOTTOM = 26; // home indicator only
+const STATUS_BAR_H = 44;
+const TABBAR_INSET = 84; // floating pill (64) + home indicator (20)
+const SUB_BOTTOM = 20; // home indicator only
+const statusBarHeight = computed(() => STATUS_BAR_H);
 const contentTop = computed(() => statusBarHeight.value + (isTabRoute.value ? HEADER_H : navHeaderH.value));
 const contentBottom = computed(() => (isTabRoute.value ? TABBAR_INSET : SUB_BOTTOM));
-const topChromeHeight = computed(() => contentTop.value);
 
 // lucide-style outline paths (Home / Zap / ShoppingBag / Users / User)
 const tabs = computed(() => [
@@ -463,21 +515,65 @@ function goNotifications() {
 </script>
 
 <style scoped>
-.nx-chassis {
+.nx-device-shell,
+.nx-device-screen {
   position: fixed;
   inset: 0;
   overflow: hidden;
 }
-.nx-top-chrome {
+.nx-device-screen {
+  background: var(--v5-shell-bg, var(--v5-bg));
+}
+.nx-chassis {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 90;
-  background: var(--v5-chrome-bg);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  pointer-events: none;
+  inset: 0;
+  overflow: hidden;
+}
+@media (min-width: 480px) {
+  :global(html),
+  :global(body),
+  :global(#app) {
+    min-width: 100%;
+    min-height: 100%;
+  }
+  :global(body) {
+    margin: 0;
+    overflow: hidden;
+    background: var(--v5-shell-bg, var(--v5-bg));
+  }
+  .nx-device-shell {
+    top: 50%;
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    width: 414px;
+    height: 896px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: translate(-50%, -50%) translateZ(0);
+  }
+  .nx-device-screen {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    background: #f4f1e9;
+  }
+}
+@media (min-width: 480px) and (max-height: 935px) {
+  :global(body) {
+    min-height: 928px;
+    overflow: auto;
+  }
+  .nx-device-shell {
+    position: absolute;
+    top: 16px;
+    transform: translateX(-50%) translateZ(0);
+  }
 }
 .nx-statusbar {
   position: absolute;
@@ -485,120 +581,9 @@ function goNotifications() {
   left: 0;
   right: 0;
   z-index: 110;
-}
-.nx-statusbar__inner {
-  position: absolute;
-  top: 13px;
-  left: 28px;
-  right: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--v5-ink);
-  pointer-events: none;
-}
-.nx-statusbar__time {
-  min-width: 58px;
-  text-align: center;
-  font-family: var(--font-v5);
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 1;
-}
-.nx-statusbar__icons {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 76px;
-  justify-content: flex-end;
-}
-.nx-statusbar__signal {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 13px;
-}
-.nx-statusbar__signal view {
-  width: 3px;
-  border-radius: 2px;
-  background: currentColor;
-}
-.nx-statusbar__signal view:nth-child(1) {
-  height: 5px;
-}
-.nx-statusbar__signal view:nth-child(2) {
-  height: 7px;
-}
-.nx-statusbar__signal view:nth-child(3) {
-  height: 10px;
-}
-.nx-statusbar__signal view:nth-child(4) {
-  height: 13px;
-}
-.nx-statusbar__wifi {
-  position: relative;
-  width: 18px;
-  height: 13px;
-  overflow: hidden;
-}
-.nx-statusbar__wifi::before,
-.nx-statusbar__wifi::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  border: 2px solid currentColor;
-  border-color: currentColor transparent transparent transparent;
-  border-radius: 999px;
-  transform: translateX(-50%);
-}
-.nx-statusbar__wifi::before {
-  top: 0;
-  width: 18px;
-  height: 18px;
-}
-.nx-statusbar__wifi::after {
-  top: 5px;
-  width: 10px;
-  height: 10px;
-}
-.nx-statusbar__wifi view {
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: currentColor;
-  transform: translateX(-50%);
-}
-.nx-statusbar__battery {
-  position: relative;
-  width: 25px;
-  height: 12px;
-  border: 1.6px solid currentColor;
-  border-radius: 4px;
-}
-.nx-statusbar__battery::before {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 17px;
-  height: 6px;
-  border-radius: 2px;
-  background: currentColor;
-}
-.nx-statusbar__battery::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  right: -4px;
-  width: 2px;
-  height: 5px;
-  border-radius: 0 2px 2px 0;
-  background: currentColor;
-  opacity: 0.75;
+  background: var(--v5-chrome-bg);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
 }
 .nx-header {
   position: absolute;
@@ -609,8 +594,41 @@ function goNotifications() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--v5-chrome-border);
+  box-sizing: border-box;
+  padding: 0 var(--nx-page-x);
+  background: rgba(244,241,233,0.58);
+  border-bottom: 1px solid transparent;
+  box-shadow: none;
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+html[data-theme="dark"] .nx-header {
+  background: #0B0F0A;
+}
+.nx-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.045) 48%, transparent 100%);
+  transition: opacity 0.18s ease, bottom 0.18s ease, height 0.18s ease;
+}
+.nx-header--scrolled {
+  border-bottom-color: transparent;
+  box-shadow: 0 10px 24px rgba(24,84,180,0.2);
+}
+html[data-theme="dark"] .nx-header--scrolled {
+  box-shadow: 0 10px 24px rgba(0,0,0,0.2);
+}
+.nx-header--scrolled::after {
+  bottom: -18px;
+  height: 18px;
+  opacity: 0.9;
 }
 /* Page nav header (sub-pages) — its OWN chrome surface so the brand row
    (.nx-header) stays byte-identical for the 5 tab pages. Mirrors the prototype
@@ -623,8 +641,11 @@ function goNotifications() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 20px;
+  background: var(--v5-chrome-bg);
   border-bottom: 1px solid var(--v5-chrome-border);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
 }
 .nx-nav-side {
   width: 44px;
@@ -638,13 +659,13 @@ function goNotifications() {
 }
 .nx-nav-glass {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--v5-glass-bg);
-  border: 1px solid var(--v5-glass-border);
+  border: none;
   box-shadow: var(--v5-glass-shadow);
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);
@@ -692,77 +713,97 @@ function goNotifications() {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
   width: 104px;
+  min-width: 0;
   flex-shrink: 0;
 }
-.nx-header__center {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  height: 52px;
-  max-width: calc(100% - 208px);
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-width: 0;
-  text-align: center;
-  pointer-events: none;
-}
 .nx-logo {
-  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--v5-ink);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.nx-logo__n {
+  color: var(--v5-bg);
+  font-weight: 600;
+  font-size: 15px;
+  font-family: var(--font-v5);
+  line-height: 1;
+}
+.nx-brand-logo {
   width: 96px;
   height: 27px;
   display: block;
   flex-shrink: 0;
 }
-.nx-logo-img {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.nx-logo-img--dark {
-  display: none;
-}
-html[data-theme="dark"] .nx-logo-img--light {
-  display: none;
-}
-html[data-theme="dark"] .nx-logo-img--dark {
-  display: block;
+.nx-brand-logo--with-title {
+  width: 96px;
+  height: 27px;
 }
 .nx-brand {
   font-size: 19px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--v5-ink);
-  white-space: nowrap;
 }
-.nx-ver {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--v5-ink-4);
+.nx-title {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 208px);
+  height: 52px;
+  line-height: 52px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--v5-ink);
+  font-family: var(--font-v5);
+  text-align: center;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .nx-header__r {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 2px;
+  width: 104px;
   flex-shrink: 0;
 }
 .nx-icon-btn {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--v5-glass-bg);
+  box-shadow: var(--v5-glass-shadow);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: opacity .12s ease;
+}
+.nx-icon-btn:active {
+  opacity: 0.72;
+}
+.nx-icon-btn > svg {
+  width: 25.2px;
+  height: 25.2px;
+  min-width: 25.2px;
+  min-height: 25.2px;
+  display: block;
+  flex-shrink: 0;
 }
 .nx-badge {
   position: absolute;
-  top: 4px;
-  right: 2px;
+  top: 2px;
+  right: -2px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
@@ -773,8 +814,8 @@ html[data-theme="dark"] .nx-logo-img--dark {
   justify-content: center;
 }
 .nx-badge__t {
-  font-size: 9.5px;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 500;
   color: var(--v5-on-brand-2);
   font-family: var(--font-v5);
   line-height: 1;
@@ -794,6 +835,7 @@ html[data-theme="dark"] .nx-logo-img--dark {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior-y: contain;
+  background: var(--v5-bg);
 }
 /* hide scrollbar (match the prototype's no-scrollbar utility) */
 .nx-content::-webkit-scrollbar {
@@ -808,7 +850,7 @@ html[data-theme="dark"] .nx-logo-img--dark {
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   display: grid;
@@ -856,6 +898,7 @@ html[data-theme="dark"] .nx-logo-img--dark {
 }
 .nx-tabbar-pill {
   margin: 0 12px;
+  height: 64px;
   display: flex;
   align-items: stretch;
   padding: 4px;
@@ -886,7 +929,7 @@ html[data-theme="dark"] .nx-logo-img--dark {
 }
 .nx-tab {
   flex: 1;
-  height: 56px;
+  height: 54px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -895,17 +938,18 @@ html[data-theme="dark"] .nx-logo-img--dark {
   border-radius: 16px;
 }
 .nx-tab__label {
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--font-v5);
+  font-size: var(--typography-tab-label-size);
+  font-weight: var(--typography-tab-label-weight);
+  line-height: var(--typography-tab-label-line);
+  font-family: var(--font-interface);
   letter-spacing: -0.005em;
 }
 .nx-home-indicator {
-  height: 22px;
+  height: 20px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 8px;
+  padding-top: 7px;
 }
 .nx-home-indicator::after {
   content: "";

@@ -77,6 +77,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/earn/device-detail",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/compute-share/download",
       "style": { "navigationStyle": "custom" }
     },
@@ -102,6 +106,10 @@
     },
     {
       "path": "pages/me/profile",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/account",
       "style": { "navigationStyle": "custom" }
     },
     {

@@ -76,10 +76,10 @@ const floorHintText = computed(() => fmt(t.value.marketplace.floorShort, { k: (F
 
 function relativeTime(ts: number): string {
   const ms = Date.now() - ts;
-  if (ms < 60_000) return "<1m";
-  if (ms < 3600_000) return `${Math.floor(ms / 60_000)}m`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3600_000)}h`;
-  return `${Math.floor(ms / 86_400_000)}d`;
+  if (ms < 60_000) return "<1 分钟";
+  if (ms < 3600_000) return `${Math.floor(ms / 60_000)} 分钟`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3600_000)} 小时`;
+  return `${Math.floor(ms / 86_400_000)} 天`;
 }
 
 function onAskInput(e: Event) {
@@ -126,7 +126,7 @@ async function handleCancel() {
 
 const cardStyle = computed<CSSProperties>(() => ({
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: isListed.value ? "1px solid rgba(255,200,61,0.35)" : "1px solid var(--v5-border)",
 }));
 const artStyle = computed<CSSProperties>(() => ({
@@ -143,8 +143,8 @@ const listedBadgeStyle: CSSProperties = {
   borderRadius: "6px",
   background: "rgba(196,131,22,0.22)",
   color: "var(--v5-warning)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 };
@@ -165,14 +165,14 @@ const tokenIdStyle: CSSProperties = {
 };
 const yoursStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: isListed.value ? "var(--v5-warning)" : "var(--v5-brand)",
 }));
 const askLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-warning)",
@@ -180,7 +180,7 @@ const askLabelStyle: CSSProperties = {
 };
 const askPriceStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",
@@ -189,8 +189,8 @@ const askPriceStyle: CSSProperties = {
 };
 const listedAgoStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const cancelBtnStyle: CSSProperties = {
@@ -206,7 +206,7 @@ const cancelBtnStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const listLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -220,13 +220,13 @@ const inputWrapStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
 };
 const dollarStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "14px",
   color: "var(--v5-ink-3)",
   flexShrink: 0,
 };
 const inputStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "15px",
   color: "var(--v5-ink)",
@@ -235,8 +235,8 @@ const inputStyle: CSSProperties = {
 };
 const floorHintStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const listBtnStyle: CSSProperties = {

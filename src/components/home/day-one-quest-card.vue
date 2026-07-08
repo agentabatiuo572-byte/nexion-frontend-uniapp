@@ -5,55 +5,52 @@
   (each task taps to its route) · expand/collapse toggle.
 -->
 <template>
-  <view :style="rootStyle">
-    <view style="padding: 16px 18px 4px">
+  <view class="day-one-card">
+    <view class="day-one-main">
       <!-- Reward + countdown -->
-      <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
+      <view class="day-one-head">
         <view>
-          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneFirstDayReward }}</text>
-          <view style="margin-top: 4px; display: flex; align-items: baseline; gap: 4px; font-family: var(--font-v5); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.022em; color: var(--v5-ink); line-height: 1">
-            <text style="font-size: 14px; color: var(--v5-ink-4); font-weight: 500">+</text>
-            <text style="font-size: 30px">{{ reward }}</text>
-            <text style="font-size: 13px; color: var(--v5-brand); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
+          <text class="day-one-title">{{ t.home.dayOneFirstDayReward }}</text>
+          <view class="day-one-amount-row">
+            <text class="day-one-amount">+{{ reward }}</text>
+            <text class="day-one-unit">NEX</text>
           </view>
         </view>
-        <view style="text-align: right">
-          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
-          <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 16px; color: #9B89E0; font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
+        <view class="day-one-countdown">
+          <text class="day-one-countdown-label">{{ t.home.dayOneEndsIn }}</text>
+          <text class="day-one-countdown-time">{{ remainingLabel }}</text>
         </view>
       </view>
 
       <!-- Progress -->
-      <view style="margin-top: 16px">
-        <view ref="elRef" style="height: 8px; border-radius: 4px; overflow: hidden; background: var(--v5-surface-2); position: relative">
-          <view :style="barStyle" />
+      <view class="day-one-progress">
+        <view ref="elRef" class="day-one-progress-track">
+          <view class="day-one-progress-fill" :style="barStyle" />
         </view>
-        <view style="margin-top: 6px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
-          <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
-          <text style="color: var(--v5-brand); font-variant-numeric: tabular-nums">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
+        <view class="day-one-progress-meta">
+          <text class="day-one-progress-left"><text>{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
+          <text class="day-one-progress-right">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
         </view>
       </view>
 
       <!-- Tasks list (collapsible) -->
-      <view v-if="expanded" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px dashed var(--v5-border)">
+      <view v-if="expanded" class="day-one-task-list">
         <view
           v-for="task in tasks"
           :key="task.id"
-          :class="isDone(task) ? '' : 'active:scale-[0.98] active:opacity-80 transition-transform'"
+          class="day-one-task-row"
+          :class="isDone(task) ? 'day-one-task-row--done' : 'active:scale-[0.98] active:opacity-80'"
           :style="rowStyle(task)"
           @click="onRowTap(task)"
         >
-          <view :style="circleStyle(task)">
-            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0F0F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12l5 5L20 7" />
-            </svg>
-            <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; font-weight: 500" :style="{ color: task.color }">{{ task.order }}</text>
+          <view class="day-one-task-index" :class="{ 'day-one-task-index--done': isDone(task) }" :style="taskColorStyle(task)">
+            <text class="day-one-task-index-text">{{ task.order }}</text>
           </view>
-          <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
-            <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
-            <text :style="catStyle(task)">{{ task.cat }}</text>
+          <view class="day-one-task-copy">
+            <text class="day-one-task-label" :class="{ 'day-one-task-label--done': isDone(task) }">{{ task.label }}</text>
+            <text class="day-one-task-cat" :class="{ 'day-one-task-cat--done': isDone(task) }">{{ task.cat }}</text>
           </view>
-          <text :style="rewardStyle(task)">+{{ task.nex }} NEX<text v-if="task.usdt" :style="{ color: isDone(task) ? 'var(--v5-ink-4)' : 'var(--v5-brand-2)', marginLeft: '4px' }">+${{ task.usdt }}</text></text>
+          <text class="day-one-task-reward" :class="{ 'day-one-task-reward--done': isDone(task) }">+{{ task.nex }} NEX<text v-if="task.usdt" class="day-one-task-usdt">+${{ task.usdt }}</text></text>
           <view>
             <svg v-if="!isDone(task)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.7">
               <path d="M9 18l6-6-6-6" />
@@ -64,8 +61,8 @@
     </view>
 
     <!-- Expand toggle -->
-    <view :style="toggleStyle" @click="expanded = !expanded">
-      <text style="font-family: var(--font-v5); font-size: 11.5px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
+    <view class="day-one-toggle" @click="expanded = !expanded">
+      <text class="day-one-toggle-text">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path :d="expanded ? 'M19 15l-7-7-7 7' : 'M5 9l7 7 7-7'" />
       </svg>
@@ -139,81 +136,252 @@ const barStyle = computed<CSSProperties>(() => ({
   width: `${inView.value ? progressPct.value : 0}%`,
   transition: inView.value ? PROGRESS_GROW_TRANSITION : "none",
   willChange: "width",
-  background: "linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
-  borderRadius: "4px",
-  boxShadow: "0 0 8px rgba(198,255,58,0.55)",
 }));
 
 function rowStyle(task: QuestTask): CSSProperties {
   return {
-    display: "grid",
-    gridTemplateColumns: "20px 1fr auto 14px",
-    gap: "10px",
-    alignItems: "center",
-    padding: "8px 0",
+    "--task-color": task.color,
     cursor: isDone(task) ? "default" : "pointer",
-  };
+  } as CSSProperties;
 }
-function circleStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
-  return {
-    width: "18px",
-    height: "18px",
-    borderRadius: "50%",
-    background: d ? task.color : "transparent",
-    border: d ? "none" : `1px solid ${task.color}55`,
-    display: "grid",
-    placeItems: "center",
-  };
+function taskColorStyle(task: QuestTask): CSSProperties {
+  return { "--task-color": task.color } as CSSProperties;
 }
-function labelStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
-  return {
-    fontFamily: "var(--font-v5)",
-    fontSize: "13px",
-    color: d ? "var(--v5-ink-4)" : "var(--v5-ink)",
-    fontWeight: 500,
-    textDecoration: d ? "line-through" : "none",
-  };
+</script>
+
+<style scoped>
+.day-one-card {
+  --v5-surface-bg: var(--v5-surface);
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  color: var(--v5-ink);
+  box-shadow: var(--v5-card-shadow-lift);
+  background:
+    radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%),
+    var(--v5-surface-bg);
 }
-function catStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
-  return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
-    color: d ? "var(--v5-ink-4)" : task.color,
-    opacity: d ? 0.5 : 0.8,
-    letterSpacing: "0.04em",
-  };
+html[data-theme="dark"] .day-one-card {
+  background:
+    radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%),
+    linear-gradient(180deg, #111317 0%, #15181C 100%);
 }
-function rewardStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
-  return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "12px",
-    color: d ? "var(--v5-ink-4)" : task.color,
-    fontVariantNumeric: "tabular-nums",
-    fontWeight: 500,
-  };
+.day-one-main {
+  padding: 16px 16px 4px;
+}
+.day-one-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.day-one-title {
+  display: block;
+  font-family: var(--font-v5);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--v5-ink);
+}
+.day-one-amount-row {
+  margin-top: 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.day-one-amount {
+  font-family: var(--font-amount);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.024em;
+  line-height: 1;
+  color: var(--v5-ink);
+  font-variant-numeric: tabular-nums;
+}
+.day-one-unit {
+  font-family: var(--font-numbers);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--v5-brand);
+}
+.day-one-countdown {
+  text-align: right;
+}
+.day-one-countdown-label {
+  display: block;
+  font-family: var(--font-numbers);
+  font-size: 12px;
+  font-weight: 500;
+  color: #9B89E0;
+  letter-spacing: 0.04em;
+}
+.day-one-countdown-time {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-numbers);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1;
+  color: #9B89E0;
+  font-variant-numeric: tabular-nums;
+}
+.day-one-progress {
+  margin-top: 16px;
+}
+.day-one-progress-track {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--v5-surface-2);
+  position: relative;
+}
+.day-one-progress-fill {
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2F35FF 0%, #126BFF 46%, #18C8FF 100%);
+  box-shadow: 0 0 8px rgba(18,107,255,0.42);
+}
+html[data-theme="dark"] .day-one-progress-fill {
+  background: linear-gradient(90deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%);
+  box-shadow: 0 0 8px rgba(198,255,58,0.55);
+}
+.day-one-progress-meta {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-numbers);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.day-one-progress-left {
+  color: var(--v5-ink);
+}
+.day-one-progress-right {
+  color: var(--v5-brand);
+}
+.day-one-task-list {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--v5-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.day-one-task-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) max-content 14px;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 8px;
+  margin: 0 -8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--task-color) 10%, transparent);
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.day-one-task-row--done {
+  background: transparent;
+}
+.day-one-task-index {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--task-color) 55%, transparent);
+  display: grid;
+  place-items: center;
+}
+.day-one-task-index--done {
+  background: var(--task-color);
+  border: none;
+}
+.day-one-task-index--done .day-one-task-index-text {
+  color: #0F0F0F;
+}
+.day-one-task-index-text {
+  font-family: var(--font-numbers);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--task-color);
+  text-align: center;
+}
+.day-one-task-copy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.day-one-task-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-v5);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--v5-ink);
+}
+.day-one-task-label--done {
+  color: var(--v5-ink-4);
+  text-decoration: line-through;
+}
+.day-one-task-cat {
+  max-width: 42px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  font-family: var(--font-numbers);
+  font-size: 10.5px;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  color: var(--task-color);
+  opacity: 0.8;
+}
+.day-one-task-cat--done {
+  color: var(--v5-ink-4);
+  opacity: 0.5;
+}
+.day-one-task-reward {
+  font-family: var(--font-numbers);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  color: var(--task-color);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.day-one-task-reward--done {
+  color: var(--v5-ink-4);
+}
+.day-one-task-usdt {
+  margin-left: 4px;
+  color: inherit;
+}
+.day-one-toggle {
+  margin-top: 14px;
+  width: 100%;
+  height: 32px;
+  border-top: 1px solid var(--v5-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.day-one-toggle-text {
+  font-family: var(--font-v5);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--v5-ink-3);
 }
 
-const rootStyle: CSSProperties = {
-  position: "relative",
-  borderRadius: "16px",
-  background:
-    "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
-  overflow: "hidden",
-  color: "var(--v5-ink)",
-  boxShadow: "var(--v5-card-shadow-lift)",
-};
-const toggleStyle: CSSProperties = {
-  marginTop: "14px",
-  width: "100%",
-  height: "32px",
-  borderTop: "1px solid var(--v5-border)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "5px",
-};
-</script>
+@media (max-width: 390px) {
+  .day-one-task-copy {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+}
+</style>

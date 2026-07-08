@@ -143,19 +143,19 @@ function handleClaim(p: PowerUp) {
 
 // ── styles ──
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const headLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-success)",
   letterSpacing: "0.06em",
 };
 const streakStatStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
@@ -179,8 +179,8 @@ function thresholdChipStyle(p: PowerUp): CSSProperties {
     borderRadius: "4px",
     background: unlocked ? `color-mix(in srgb, ${p.tint} 10%, transparent)` : "var(--v5-surface-2)",
     color: unlocked ? p.tint : "var(--v5-ink-4)",
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontFamily: "var(--font-numbers)",
+    fontSize: "11px",
     fontWeight: 500,
   };
 }
@@ -201,8 +201,8 @@ const activatedBadgeStyle: CSSProperties = {
   padding: "3px 8px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 function activateBtnStyle(p: PowerUp): CSSProperties {
@@ -221,8 +221,8 @@ function activateBtnStyle(p: PowerUp): CSSProperties {
 }
 const lockedLabelStyle: CSSProperties = {
   padding: "3px 8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 const footerReadyStyle = computed<CSSProperties>(() => ({

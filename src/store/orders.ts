@@ -47,7 +47,7 @@ export interface Order {
   timeline: OrderTimelineEvent[];
   deviceId?: string;        // the spawned device id once activated
   // Data-center the unit was provisioned in (Singapore / Frankfurt)
-  dataCenter: "Singapore DC" | "Frankfurt DC";
+  dataCenter: "新加坡数据中心" | "法兰克福数据中心";
 }
 
 export interface CreateOrderInput {
@@ -75,16 +75,16 @@ export function timelineFor(_productId: Order["productId"]): OrderStatus[] {
 function pickDataCenter(productId: Order["productId"]): Order["dataCenter"] {
   // NexionRack (P1/P2) lives in Frankfurt, everything else in Singapore.
   return productId === "stellarrack-p1" || productId === "stellarrack-p2"
-    ? "Frankfurt DC"
-    : "Singapore DC";
+    ? "法兰克福数据中心"
+    : "新加坡数据中心";
 }
 
 function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefined {
   switch (next) {
     case "provisioning":
-      return `Allocating rack slot in ${dc}…`;
+      return `正在 ${dc} 分配机架槽位…`;
     case "activated":
-      return "Device live · joined Nexion network";
+      return "设备已上线 · 已加入 Nexion 网络";
     default:
       return undefined;
   }
@@ -141,8 +141,8 @@ export const useOrders = defineStore("orders", () => {
       paidAt: now,
       dataCenter: pickDataCenter(productId),
       timeline: [
-        { status: "placed", ts: now, note: "Order received" },
-        { status: "paid", ts: now + 1000, note: `Settled via ${paymentMethod}` },
+        { status: "placed", ts: now, note: "订单已接收" },
+        { status: "paid", ts: now + 1000, note: `已通过 ${paymentMethod} 结算` },
       ],
     };
     orders.value = [order, ...orders.value];
@@ -175,7 +175,7 @@ export const useOrders = defineStore("orders", () => {
     }
     const targetStatus = next === "activated" && activationBlocked ? cur.status : next;
     const targetNote = activationBlocked
-      ? "Waiting for an empty device slot"
+      ? "等待空闲设备槽位"
       : statusNote(next, cur.dataCenter);
 
     orders.value = orders.value.map((o) =>
@@ -208,7 +208,7 @@ export const useOrders = defineStore("orders", () => {
               {
                 status: "activated",
                 ts: Date.now(),
-                note: "Device live · joined Nexion network",
+                note: "设备已上线 · 已加入 Nexion 网络",
               },
             ],
           }
@@ -231,7 +231,7 @@ export const useOrders = defineStore("orders", () => {
               {
                 status: "cancelled",
                 ts: Date.now(),
-                note: "Order cancelled · refund queued",
+                note: "订单已取消 · 退款已排队",
               },
             ],
           }

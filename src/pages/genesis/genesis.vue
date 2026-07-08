@@ -193,23 +193,23 @@ const genesis = useGenesis();
 
 const sheetOpen = ref(false);
 
-// Holder perks — faithful English data (matches source inline PERKS array).
+// Holder perks — localized display data.
 const PERKS = [
-  { ico: "🪙", title: "Daily dividend", desc: "0.1% of platform volume per node · ~$24/day" },
-  { ico: "🎟", title: "Monthly raffle", desc: "Auto-entry · winners get NFT prize + USDT" },
-  { ico: "🗳", title: "DAO governance", desc: "1 node = 1 vote on platform proposals" },
-  { ico: "🎁", title: "Annual airdrop", desc: "Loyalty NFT + physical merch" },
-  { ico: "💎", title: "Floor & liquidity", desc: "OpenSea floor $25K · 2.5× mint" },
+  { ico: "🪙", title: "每日分红", desc: "每个节点分享平台成交量 0.1% · 约 $24/天" },
+  { ico: "🎟", title: "月度抽奖", desc: "自动参与 · 获胜者获得 NFT 奖品 + USDT" },
+  { ico: "🗳", title: "DAO 治理", desc: "1 个节点 = 1 票平台提案投票权" },
+  { ico: "🎁", title: "年度空投", desc: "忠诚 NFT + 实体周边" },
+  { ico: "💎", title: "地板价与流动性", desc: "OpenSea 地板价 $25K · 铸造价 2.5×" },
 ];
 
 const LIVE_MARKET = [
-  { id: 247, price: 25.5, ago: "12m" },
-  { id: 481, price: 28.2, ago: "34m" },
+  { id: 247, price: 25.5, ago: "12 分钟前" },
+  { id: 481, price: 28.2, ago: "34 分钟前" },
 ];
 
 const BUYER_NAMES = [
-  "Alex from SF", "Marina from Berlin", "Tom from Tokyo", "Sara from Singapore",
-  "Carlos from Madrid", "Yuki from Seoul", "Diego from São Paulo", "Lena from Frankfurt",
+  "Alex · 旧金山", "Marina · 柏林", "Tom · 东京", "Sara · 新加坡",
+  "Carlos · 马德里", "Yuki · 首尔", "Diego · 圣保罗", "Lena · 法兰克福",
 ];
 
 const faqKeys = ["q1", "q2", "q3"] as const;
@@ -274,7 +274,7 @@ const howPillStyle: CSSProperties = {
   padding: "0 14px",
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "12.5px",
   fontWeight: 500,
   color: "var(--v5-brand)",
@@ -347,14 +347,14 @@ const crownChipStyle: CSSProperties = {
   borderRadius: "999px",
   background: "rgba(212,175,90,0.10)",
   color: "#D4AF5A",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.14em",
 };
 const titleStyle: CSSProperties = {
   marginTop: "18px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "28px",
   letterSpacing: "-0.024em",
@@ -368,14 +368,14 @@ const priceRowStyle: CSSProperties = {
   gap: "10px",
 };
 const priceStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "32px",
   letterSpacing: "-0.022em",
   color: "#F4E5C2",
 };
 const priceUnitStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "rgba(244,229,194,0.55)",
   letterSpacing: "0.04em",
@@ -411,7 +411,7 @@ const barShimmerStyle: CSSProperties = {
 };
 const barMetaStyle: CSSProperties = {
   marginTop: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "rgba(244,229,194,0.55)",
   letterSpacing: "0.04em",
@@ -424,14 +424,14 @@ const urgentStyle: CSSProperties = {
 const socialStyle: CSSProperties = {
   padding: "8px 12px",
   gap: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   fontFamily: "var(--font-v5)",
   fontSize: "12.5px",
 };
 const socialDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "50%", background: "var(--v5-success)" };
 const socialTimeStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
@@ -444,32 +444,32 @@ const secTitleStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const secLinkStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   color: "var(--v5-brand)",
   fontWeight: 500,
 };
 const perksCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "14px",
   padding: "4px 16px",
 };
 const holdingsCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "18px",
 };
 const holdingsLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
 };
 const holdingsValueStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "26px",
   letterSpacing: "-0.022em",
@@ -478,14 +478,14 @@ const holdingsValueStyle: CSSProperties = {
 };
 const holdingsDailyStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",
   color: "var(--v5-success)",
 };
 const faqCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",

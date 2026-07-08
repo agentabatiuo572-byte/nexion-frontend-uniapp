@@ -39,7 +39,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </view>
         </view>
-        <text class="block text-center" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">{{ t.walletV3.kycPowered }}</text>
+        <text class="block text-center" style="margin-top: 8px; font-size: 11px; color: var(--v5-ink-4); line-height: 1.4">{{ t.walletV3.kycPowered }}</text>
       </view>
 
       <!-- KYC verified pill -->
@@ -49,7 +49,7 @@
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
           <text class="block" style="font-size: 12px; color: var(--v5-brand); font-weight: 500">{{ t.walletV3.kycVerified }}</text>
-          <text class="block truncate font-mono" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ pairedAddressShort }}{{ pairedNetwork ? ' · ' + pairedNetwork : '' }}</text>
+          <text class="block truncate font-mono" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 2px">{{ pairedAddressShort }}{{ pairedNetwork ? ' · ' + pairedNetwork : '' }}</text>
         </view>
         <view v-if="devMode" class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetKyc">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
@@ -64,7 +64,7 @@
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.walletV3.complianceHoldTitle }}</text>
-          <text class="block" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ holdBody }}</text>
+          <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ holdBody }}</text>
         </view>
       </view>
 
@@ -77,12 +77,12 @@
           </view>
         </view>
         <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
-          <text style="font-family: var(--font-v5); font-size: 24px; color: var(--v5-ink-3)" class="shrink-0">$</text>
+          <text style="font-family: var(--font-amount); font-size: 24px; color: var(--v5-ink-3)" class="shrink-0">$</text>
           <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" @input="onAmount" />
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
-          <text>{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-v5)">${{ maxWithdrawable.toFixed(2) }}</text></text>
+          <text>{{ t.wallet.withdrawableAvailable }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-family: var(--font-amount)">${{ maxWithdrawable.toFixed(2) }}</text></text>
           <text>{{ minAmountLine }}</text>
         </view>
         <!-- SPEC-7 ⑤ 默认态: 折叠展示不可提部分(审核中/锁定不参与最大值) -->
@@ -95,7 +95,7 @@
         </view>
         <view class="flex-1 min-w-0" style="margin-left: 10px">
           <text class="block" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ t.wallet.withdrawRouteReviewTitle }}</text>
-          <text class="block" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ riskNoticeBody }}</text>
+          <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.4">{{ riskNoticeBody }}</text>
         </view>
       </view>
 
@@ -194,7 +194,7 @@
               </view>
             </view>
           </view>
-          <text class="block" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.4">{{ feeOffsetRuleText }}</text>
+          <text class="block" style="margin-top: 8px; font-size: 11px; color: var(--v5-ink-3); line-height: 1.4">{{ feeOffsetRuleText }}</text>
         </view>
       </view>
 
@@ -217,7 +217,7 @@
             <template v-else>
               <view class="grid place-items-center" style="gap: 2px">
                 <text>{{ t.walletV3.submitCtaDisabled }}</text>
-                <text v-if="submitDisabledReason" style="font-size: 10.5px; font-weight: 400; color: var(--v5-ink-3)">{{ submitDisabledReason }}</text>
+                <text v-if="submitDisabledReason" style="font-size: 11px; font-weight: 400; color: var(--v5-ink-3)">{{ submitDisabledReason }}</text>
               </view>
             </template>
           </view>
@@ -254,8 +254,8 @@ import type { Withdrawal } from "@/store/types";
 const NETWORKS: { id: Withdrawal["network"]; label: string; recommended?: boolean }[] = [
   { id: "USDT-TRC20", label: "USDT (TRC20)", recommended: true },
   { id: "USDT-ERC20", label: "USDT (ERC20)" },
-  { id: "BTC", label: "Bitcoin" },
-  { id: "ETH", label: "Ethereum" },
+  { id: "BTC", label: "比特币" },
+  { id: "ETH", label: "以太坊" },
 ];
 
 const t = useT();
@@ -523,7 +523,7 @@ const kycGateCtaStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
   color: "var(--v5-ink)",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "13.5px",
   fontWeight: 600,
 };
@@ -545,7 +545,7 @@ const resetBtnStyle: CSSProperties = {
   padding: "0 8px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const holdBannerStyle: CSSProperties = {
@@ -561,16 +561,16 @@ const holdIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
 const surfaceCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
 const surfaceCardFlush: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
 };
 const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -578,14 +578,14 @@ const metaLabelStyle: CSSProperties = {
 };
 const amountInputStyle: CSSProperties = {
   background: "transparent",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "28px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 function networkRowStyle(active: boolean, divider: boolean): CSSProperties {
   return {
-    padding: "12px 20px",
+    padding: "8px 20px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
@@ -604,15 +604,15 @@ const recommendedChipStyle: CSSProperties = {
   borderRadius: "6px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 };
 const addressInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "48px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "12px",
   padding: "12px",
   boxSizing: "border-box",
@@ -638,7 +638,7 @@ const nexGateStyle = computed<CSSProperties>(() => ({
 }));
 const nexGateLabelStyle = computed<CSSProperties>(() => ({
   gap: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",

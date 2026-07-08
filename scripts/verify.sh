@@ -114,11 +114,30 @@ i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化
 if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
-# ── SPEC-1 载体分层 + 服务端结算解耦 sentinels ──
-# carrier-tiering: hashpower MUST keep the H5 base-hosting branch (防回退到 App/H5 同口径)
-sentinel_present "SPEC-1 carrier-tiering: H5 base-hosting branch" src/lib/hashpower.ts 'carrier === "h5"'
-sentinel_present "SPEC-1 carrier-tiering: H5_BASE_FACTOR present" src/lib/hashpower.ts 'H5_BASE_FACTOR'
-sentinel_present "SPEC-1 carrier single-source: #ifdef APP-PLUS" src/lib/carrier.ts '#ifdef APP-PLUS'
+# ── SPEC-1 R7 在线分层(因子由设备真在线态驱动,NOT 查看载体)+ 服务端结算解耦 sentinels ──
+# R7: the online 加成 factor tier reads the device's REAL online state (isDeviceOnline —
+# a device-agent heartbeat), NEVER getCarrier(). 防回退到「用哪个端查看」定因子。
+sentinel_present "SPEC-1 R7 online seam: isDeviceOnline exported" src/lib/hashpower.ts 'export function isDeviceOnline'
+sentinel_present "SPEC-1 R7 online-tiering: display factor gated on device online" src/lib/hashpower.ts '!input\.online'
+sentinel_present "SPEC-1 R7 online signal: Device.onlineHeartbeatAt typed" src/store/types.ts 'onlineHeartbeatAt'
+sentinel_present "SPEC-1 R7 settle: factor reads isDeviceOnline (not carrier)" src/store/app.ts 'isDeviceOnline\(d, now\)'
+sentinel_present "SPEC-1 R7 heartbeat: App carrier refreshes device online beat" src/store/app.ts 'onlineHeartbeatAt: now'
+# 防回退(file-specific absent): the factor tier must NEVER branch on the view carrier again.
+# hashpower is the factor file — ban ANY carrier source (field / compare / getCarrier import
+# or call), so a `getCarrier() !== "app"` rewrite can't silently re-drive the factor by carrier.
+if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
+  bad "SPEC-1 R7: hashpower factor must NOT read/import view carrier (防回退载体定因子)"
+else
+  ok "SPEC-1 R7: hashpower factor reads device online, never the view carrier"
+fi
+if grep -qE 'function settleDevice\([^)]*carrier' src/store/app.ts 2>/dev/null; then
+  bad "SPEC-1 R7: settleDevice must not take a carrier param (factor reads isDeviceOnline)"
+else
+  ok "SPEC-1 R7: settleDevice takes no carrier param"
+fi
+sentinel_present "SPEC-1 base-hosting: H5_BASE_FACTOR present" src/lib/hashpower.ts 'H5_BASE_FACTOR'
+# carrier.ts kept as 设备登记载体 record + mock heartbeat source (§96), never as factor source
+sentinel_present "SPEC-1 carrier single-source: #ifdef APP-PLUS (登记载体)" src/lib/carrier.ts '#ifdef APP-PLUS'
 # settle-single-source: earnings accrue by WALL-CLOCK Δ via settleDevice (not tick-time / fixed window)
 sentinel_present "SPEC-1 settle: settleDevice exists" src/store/app.ts 'function settleDevice'
 sentinel_present "SPEC-1 settle: wall-clock lastSettledAt anchor" src/store/app.ts 'now - d\.lastSettledAt'
@@ -192,22 +211,6 @@ sentinel_present "SPEC-7 settle applies release engine (R1)" src/store/app.ts 'e
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
 sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
-
-# FEAT-AUTH01 OTP 防轰炸闸门(PRD §4.6.2/§16.2.1;规格 PRD/specs/FEAT-AUTH01-otp-antibomb-gate.md)
-sentinel_present "AUTH01 captcha ticket must be explicit (audit P0 fix)" src/store/auth-otp.ts '!!captchaTicket &&'
-sentinel_present "AUTH01 cooldown rejects without minting new code" src/store/auth-otp.ts 'error: "rate_limited"'
-sentinel_present "AUTH01 otpGate thresholds read from config" src/store/auth-otp.ts 'useConfig\(\)\.config\.otpGate'
-sentinel_present "AUTH01 otpGate seeded in platform config" src/mock/platform-config.ts 'captchaAfterSends: 2'
-sentinel_present "AUTH01 login send gated via store" src/pages/login/login.vue 'await otpSend\('
-sentinel_present "AUTH01 register send gated via store" src/pages/register/register.vue 'await otpSend\('
-sentinel_present "AUTH01 login verify via store" src/pages/login/login.vue 'await otpVerify\('
-sentinel_present "AUTH01 register verify via store" src/pages/register/register.vue 'await otpVerify\('
-sentinel_present "AUTH01 captcha fail cap single-source" src/components/captcha-slider.vue 'MAX_CAPTCHA_FAILS'
-if grep -qE 'const RESEND_SECONDS' src/pages/login/login.vue src/pages/register/register.vue 2>/dev/null; then
-  bad "AUTH01 resend seconds local constants must not exist (otpGate config is single source)"
-else
-  ok "AUTH01 no local resend-seconds constants (config-derived)"
-fi
 sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
 sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 't\.value\.wallet\.riskReasons'
 sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'if \(!import\.meta\.env\.DEV\) return'

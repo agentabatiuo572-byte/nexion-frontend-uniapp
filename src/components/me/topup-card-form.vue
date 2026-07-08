@@ -11,14 +11,14 @@
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
       <text class="font-mono-tabular" style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
-      <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">Change</text>
+      <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">更换</text>
     </view>
 
     <!-- Processing / 3DS -->
     <view v-if="phase === 'processing' || phase === '3ds'" class="rounded-2xl border text-center" :style="centerCardStyle">
       <view :style="spinnerStyle" />
-      <text class="block" :style="centerTitleStyle">{{ phase === 'processing' ? 'Authorizing card…' : '3D Secure verification' }}</text>
-      <text class="block" :style="centerBodyStyle">{{ phase === 'processing' ? 'Submitting to issuing bank · do not close this window' : 'Your bank may text you a code · standing by for confirmation' }}</text>
+      <text class="block" :style="centerTitleStyle">{{ phase === 'processing' ? '正在授权银行卡…' : '3D Secure 验证' }}</text>
+      <text class="block" :style="centerBodyStyle">{{ phase === 'processing' ? '正在提交至发卡行 · 请勿关闭页面' : '银行可能会发送验证码 · 正在等待确认' }}</text>
       <view class="inline-flex items-center font-mono-tabular" :style="pciChipStyle">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text style="margin-left: 6px">PCI DSS Level 1 · 3DS 2.2</text>
@@ -30,34 +30,34 @@
       <view :style="successIconStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
       </view>
-      <text class="block" :style="successTitleStyle">Payment successful</text>
-      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">${{ usdtAmount.toFixed(2) }} USDT credited to your wallet</text>
+      <text class="block" :style="successTitleStyle">支付成功</text>
+      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">${{ usdtAmount.toFixed(2) }} USDT 已存入钱包</text>
       <text class="block font-mono-tabular" style="margin-top: 12px; font-size: 11px; color: var(--v5-ink-4)">{{ receiptLine }}</text>
-      <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet">Back to wallet</view>
+      <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet">返回钱包</view>
     </view>
 
     <!-- Fail -->
     <view v-else-if="phase === 'fail'" class="rounded-2xl border text-center" :style="centerCardStyle">
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
-      <text class="block" :style="failTitleStyle">Card declined</text>
-      <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">Reason: do_not_honor (issuer)</text>
-      <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">Contact your card issuer or try a different card. No charge was made.</text>
-      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'">Try again</view>
+      <text class="block" :style="failTitleStyle">银行卡被拒</text>
+      <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">原因: 发卡行未授权</text>
+      <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">请联系发卡行,或换一张卡重试。本次未扣款。</text>
+      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'">重试</view>
     </view>
 
     <!-- Form -->
     <template v-else>
       <!-- Amount preview -->
       <view class="rounded-2xl border" :style="amountCardStyle">
-        <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">You receive</text>
+        <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">你将收到</text>
         <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
-          <text style="font-family: var(--font-v5); font-size: 14px; color: var(--v5-ink-3)">$</text>
+          <text style="font-family: var(--font-amount); font-size: 14px; color: var(--v5-ink-3)">$</text>
           <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" @input="onAmount" />
           <text class="font-mono-tabular" style="font-size: 14px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
-          <text style="font-size: 11px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
-          <text class="text-right" style="font-size: 11px"><text style="color: var(--v5-ink-3)">Card charged </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
+          <text style="font-size: 11px; color: var(--v5-ink-3)">银行卡手续费 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
+          <text class="text-right" style="font-size: 11px"><text style="color: var(--v5-ink-3)">实际扣款 </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
         </view>
       </view>
 
@@ -104,13 +104,13 @@
       <!-- Submit -->
       <view class="w-full flex items-center justify-center active:opacity-90" :style="submitBtnStyle" @click="handleSubmit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" :stroke="isValid ? 'var(--v5-ink)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 6px">Pay ${{ chargeUSD.toFixed(2) }}</text>
+        <text style="margin-left: 6px">支付 ${{ chargeUSD.toFixed(2) }}</text>
       </view>
 
       <!-- Trust footer -->
       <view class="flex items-start" :style="trustFootStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 8px; font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). Nexion never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
+        <text style="margin-left: 8px; font-size: 11px; color: var(--v5-ink-3); line-height: 1.625">银行卡由 Checkout.com 处理(PCI DSS Level 1)。Nexion 不会保存完整卡号。超过 $50 的交易会启用 3D Secure 2.2。</text>
       </view>
     </template>
   </view>
@@ -136,15 +136,15 @@ const cvv = ref("");
 const holder = ref("");
 const zip = ref("");
 const COUNTRY_LABELS = [
-  "🇺🇸 United States",
-  "🇬🇧 United Kingdom",
-  "🇨🇦 Canada",
-  "🇦🇺 Australia",
-  "🇩🇪 Germany",
-  "🇯🇵 Japan",
-  "🇸🇬 Singapore",
-  "🇭🇰 Hong Kong",
-  "🇦🇪 UAE",
+  "🇺🇸 美国",
+  "🇬🇧 英国",
+  "🇨🇦 加拿大",
+  "🇦🇺 澳大利亚",
+  "🇩🇪 德国",
+  "🇯🇵 日本",
+  "🇸🇬 新加坡",
+  "🇭🇰 中国香港",
+  "🇦🇪 阿联酋",
 ];
 const countryIdx = ref(0);
 const phase = ref<"form" | "processing" | "3ds" | "success" | "fail">("form");
@@ -174,7 +174,7 @@ const isValid = computed(
 const receiptLine = computed(() => {
   const receiptNo = Math.floor(Math.random() * 900000 + 100000);
   const last4 = cardNum.value.replace(/\s/g, "").slice(-4);
-  return `Receipt #CK-${receiptNo} · Charged $${chargeUSD.value.toFixed(2)} to ••••${last4}`;
+  return `收据 #CK-${receiptNo} · 已从 ••••${last4} 扣款 $${chargeUSD.value.toFixed(2)}`;
 });
 
 // ── input handlers (uni input event → e.detail.value) ──
@@ -220,7 +220,7 @@ async function handleSubmit() {
       symbol: "USDT",
       amount: usdtAmount.value,
       status: "posted",
-      memo: "Card top-up",
+      memo: "银行卡充值",
       ref: `TOPUP-${Date.now().toString(36).toUpperCase()}`,
     });
     phase.value = "success";
@@ -235,7 +235,7 @@ function goWallet() {
 
 // ── styles ──
 const centerCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "24px",
 };
@@ -270,7 +270,7 @@ const pciChipStyle: CSSProperties = {
   padding: "4px 10px",
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const successIconStyle: CSSProperties = {
@@ -329,13 +329,13 @@ const tryAgainBtnStyle: CSSProperties = {
   fontWeight: 600,
 };
 const amountCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
 const amountInputStyle: CSSProperties = {
   background: "transparent",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "30px",
   letterSpacing: "-0.022em",
@@ -348,7 +348,7 @@ const feeRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const formCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
@@ -358,7 +358,7 @@ const fieldStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
 };
 const fieldLabelStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",

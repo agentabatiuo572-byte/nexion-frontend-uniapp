@@ -96,10 +96,10 @@ const extendedSubtitle = computed(() =>
 const expanded = reactive<Record<"direct" | "extended", boolean>>({ direct: true, extended: true });
 
 // ─── styles ───
-const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "14px" };
-const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const metricCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "14px" };
+const metricLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", lineHeight: 1, color };
 }
-const metricSuffixStyle: CSSProperties = { marginTop: "4px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const metricSuffixStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)" };
 </script>

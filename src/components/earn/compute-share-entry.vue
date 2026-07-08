@@ -65,8 +65,8 @@ const iconStyle: CSSProperties = {
   flexShrink: 0,
 };
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-tech-cyan)",
   letterSpacing: "0.06em",
 };

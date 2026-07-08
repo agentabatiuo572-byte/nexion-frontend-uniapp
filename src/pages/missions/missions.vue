@@ -169,7 +169,7 @@ const heroStyle: CSSProperties = {
   position: "relative",
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const heroAuroraStyle: CSSProperties = {
@@ -230,9 +230,9 @@ const sectionTitleStyle: CSSProperties = {
 };
 const rowStyle: CSSProperties = {
   gap: "12px",
-  padding: "12px 14px",
+  padding: "8px 14px",
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 function rowIconBox(tint: string): CSSProperties {
@@ -262,11 +262,11 @@ const badgeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-warning)",
   color: "var(--v5-on-brand)",
-  fontSize: "10px",
+  fontSize: "11px",
   fontWeight: 500,
 };
 const monthCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "14px",
 };

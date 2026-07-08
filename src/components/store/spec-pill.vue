@@ -20,7 +20,7 @@ const pillStyle = computed<CSSProperties>(() => ({
   borderRadius: "7px",
   background: "var(--v5-surface-2)",
   color: props.ai ? "var(--v5-tech-cyan)" : "var(--v5-ink-2)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   letterSpacing: "-0.005em",
 }));

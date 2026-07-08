@@ -75,12 +75,12 @@ function statusPillStyle(status: string): CSSProperties {
 
 const cardStyle: CSSProperties = {
   padding: "14px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
 };
 const browseBtnStyle: CSSProperties = {
   minHeight: "44px",
-  padding: "10px 16px",
+  padding: "8px 16px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
   borderRadius: "999px",

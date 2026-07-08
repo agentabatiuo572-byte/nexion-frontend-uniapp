@@ -65,8 +65,8 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
               <text :style="fieldLabelStyle">{{ t.profile.region }}</text>
             </view>
-            <picker mode="selector" :range="REGIONS" :value="regionIdx" @change="onRegion">
-              <text class="block" :style="pickerStyle">{{ region }}</text>
+            <picker mode="selector" :range="REGION_LABELS" :value="regionIdx" @change="onRegion">
+              <text class="block" :style="pickerStyle">{{ regionLabel }}</text>
             </picker>
           </view>
           <view>
@@ -74,8 +74,8 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               <text :style="fieldLabelStyle">{{ t.profile.timezone }}</text>
             </view>
-            <picker mode="selector" :range="TIMEZONES" :value="timezoneIdx" @change="onTimezone">
-              <text class="block truncate" :style="pickerStyle">{{ timezone }}</text>
+            <picker mode="selector" :range="TIMEZONE_LABELS" :value="timezoneIdx" @change="onTimezone">
+              <text class="block truncate" :style="pickerStyle">{{ timezoneLabel }}</text>
             </picker>
           </view>
         </view>
@@ -131,24 +131,26 @@ import { useWalletPairing } from "@/store/wallet-pairing";
 import { toast } from "@/store/ui";
 
 const REGIONS = [
-  "Singapore",
-  "Hong Kong",
-  "Tokyo, JP",
-  "Seoul, KR",
-  "Berlin, DE",
-  "London, UK",
-  "Dubai, AE",
-  "New York, US",
+  { value: "Singapore", label: "新加坡" },
+  { value: "Hong Kong", label: "中国香港" },
+  { value: "Tokyo, JP", label: "日本东京" },
+  { value: "Seoul, KR", label: "韩国首尔" },
+  { value: "Berlin, DE", label: "德国柏林" },
+  { value: "London, UK", label: "英国伦敦" },
+  { value: "Dubai, AE", label: "阿联酋迪拜" },
+  { value: "New York, US", label: "美国纽约" },
 ];
+const REGION_LABELS = REGIONS.map((r) => r.label);
 const TIMEZONES = [
-  "Asia/Singapore (UTC+8)",
-  "Asia/Tokyo (UTC+9)",
-  "Asia/Hong_Kong (UTC+8)",
-  "Europe/Berlin (UTC+1)",
-  "Europe/London (UTC+0)",
-  "Asia/Dubai (UTC+4)",
-  "America/New_York (UTC-5)",
+  { value: "Asia/Singapore (UTC+8)", label: "新加坡 (UTC+8)" },
+  { value: "Asia/Tokyo (UTC+9)", label: "东京 (UTC+9)" },
+  { value: "Asia/Hong_Kong (UTC+8)", label: "中国香港 (UTC+8)" },
+  { value: "Europe/Berlin (UTC+1)", label: "柏林 (UTC+1)" },
+  { value: "Europe/London (UTC+0)", label: "伦敦 (UTC+0)" },
+  { value: "Asia/Dubai (UTC+4)", label: "迪拜 (UTC+4)" },
+  { value: "America/New_York (UTC-5)", label: "纽约 (UTC-5)" },
 ];
+const TIMEZONE_LABELS = TIMEZONES.map((z) => z.label);
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
 type Tier = (typeof TIERS)[number];
 
@@ -188,15 +190,17 @@ const tierProgressLine = computed(() => {
 });
 
 const joinedDate = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(undefined, {
+  new Date(app.user.joinedAt).toLocaleDateString("zh-CN", {
     year: "numeric",
     month: "short",
     day: "numeric",
   }),
 );
 
-const regionIdx = computed(() => Math.max(0, REGIONS.indexOf(region.value)));
-const timezoneIdx = computed(() => Math.max(0, TIMEZONES.indexOf(timezone.value)));
+const regionLabel = computed(() => REGIONS.find((r) => r.value === region.value || r.label === region.value)?.label ?? region.value);
+const timezoneLabel = computed(() => TIMEZONES.find((z) => z.value === timezone.value || z.label === timezone.value)?.label ?? timezone.value);
+const regionIdx = computed(() => Math.max(0, REGIONS.findIndex((r) => r.value === region.value || r.label === region.value)));
+const timezoneIdx = computed(() => Math.max(0, TIMEZONES.findIndex((z) => z.value === timezone.value || z.label === timezone.value)));
 
 const dirty = computed(
   () =>
@@ -217,10 +221,10 @@ function onBio(e: Event) {
   bio.value = detailVal(e).slice(0, 140);
 }
 function onRegion(e: Event) {
-  region.value = REGIONS[Number(detailVal(e))] ?? region.value;
+  region.value = REGIONS[Number(detailVal(e))]?.label ?? region.value;
 }
 function onTimezone(e: Event) {
-  timezone.value = TIMEZONES[Number(detailVal(e))] ?? timezone.value;
+  timezone.value = TIMEZONES[Number(detailVal(e))]?.label ?? timezone.value;
 }
 
 function handleSave() {
@@ -231,7 +235,7 @@ function handleSave() {
     return;
   }
   isSaving.value = true;
-  profile.setDisplayName(name.value.trim() || "Anonymous");
+  profile.setDisplayName(name.value.trim() || "匿名用户");
   profile.setBio(bio.value.trim());
   profile.setRegion(region.value);
   profile.setTimezone(timezone.value);
@@ -254,7 +258,7 @@ function goWallet() {
 // ── styles ──
 const avatarCardStyle: CSSProperties = {
   marginTop: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "20px",
@@ -299,7 +303,7 @@ const joinedStyle: CSSProperties = {
 };
 const fieldsCardStyle: CSSProperties = {
   marginTop: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
@@ -360,7 +364,7 @@ const fieldHintStyle: CSSProperties = {
 };
 const tierCardStyle: CSSProperties = {
   marginTop: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
@@ -397,7 +401,7 @@ const tierProgressStyle: CSSProperties = {
 const walletCardStyle: CSSProperties = {
   marginTop: "12px",
   gap: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
@@ -416,7 +420,7 @@ const walletTitleStyle: CSSProperties = {
 };
 const walletSubStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
 };

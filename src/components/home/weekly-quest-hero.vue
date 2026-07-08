@@ -171,7 +171,7 @@ const cardStyle: CSSProperties = {
   position: "relative",
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-warning-soft)",
 };
 const accentLineStyle: CSSProperties = {
@@ -197,7 +197,7 @@ const washStyle: CSSProperties = {
 };
 const labelStyle: CSSProperties = {
   gap: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-warning)",
@@ -205,7 +205,7 @@ const labelStyle: CSSProperties = {
 };
 const titleStyle: CSSProperties = {
   marginTop: "10px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",
@@ -219,7 +219,7 @@ const bodyStyle: CSSProperties = {
   lineHeight: 1.5,
 };
 const rewardStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "24px",
   letterSpacing: "-0.018em",
@@ -227,13 +227,13 @@ const rewardStyle: CSSProperties = {
   lineHeight: 1,
 };
 const nexUnitStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-warning)",
   marginLeft: "2px",
 };
 const usdtStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-success)",
   marginLeft: "6px",
@@ -244,8 +244,8 @@ const promoChipStyle: CSSProperties = {
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
   color: "var(--v5-brand-2)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
 };
 const ctaStyle: CSSProperties = {

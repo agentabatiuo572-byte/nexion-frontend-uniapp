@@ -146,7 +146,7 @@ function handlePurchase() {
       symbol: "USDT",
       amount: -cost,
       status: "posted",
-      memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
+      memo: `创世节点首发 · ${qty.value} 个名额 @ $${price.value}`,
       ref: `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`,
     });
     toast.success(
@@ -160,7 +160,7 @@ function handlePurchase() {
 }
 
 const panelStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderTop: "1px solid var(--v5-border)",
   padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
 };
@@ -190,7 +190,7 @@ const minusBtnStyle = computed<CSSProperties>(() => ({
   width: "44px",
   height: "44px",
   borderRadius: "999px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   color: qty.value <= 1 ? "var(--v5-ink-4)" : "var(--v5-ink)",
 }));
@@ -203,7 +203,7 @@ const plusBtnStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
 };
 const qtyStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "48px",
   letterSpacing: "-0.034em",
@@ -231,7 +231,7 @@ const rowValStyle: CSSProperties = {
 };
 const rowValSuccessStyle: CSSProperties = { ...rowValStyle, color: "var(--v5-success)" };
 const rowValBoldStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",

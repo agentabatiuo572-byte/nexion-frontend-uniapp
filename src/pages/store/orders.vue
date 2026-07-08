@@ -46,7 +46,7 @@
               <text class="block truncate" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
               <view class="flex items-center justify-between" style="margin-top: 6px">
                 <text style="font-size: 11px; color: var(--v5-ink-4)">{{ dateText(o.placedAt) }}</text>
-                <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">${{ o.total.toLocaleString() }}</text>
+                <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">${{ o.total.toLocaleString() }}</text>
               </view>
             </view>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
@@ -113,7 +113,7 @@ function goDetail(id: string) {
 
 // ─── styles ───
 const emptyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px dashed var(--v5-border)",
   padding: "32px",
 };
@@ -130,7 +130,7 @@ const browseBtnStyle: CSSProperties = {
 };
 const orderCardStyle: CSSProperties = {
   marginBottom: "10px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
@@ -145,7 +145,7 @@ function iconBoxStyle(status: OrderStatus): CSSProperties {
 function statusChipStyle(status: OrderStatus): CSSProperties {
   const b = badge(status);
   return {
-    fontSize: "10px",
+    fontSize: "11px",
     padding: "2px 6px",
     borderRadius: "4px",
     background: b.bg,

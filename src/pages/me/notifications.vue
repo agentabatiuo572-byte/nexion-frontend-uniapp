@@ -154,7 +154,7 @@ function onTap(n: Notification) {
 }
 
 const unreadBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   background: "var(--v5-danger)",
   color: "var(--v5-on-brand)",
   padding: "2px 6px",
@@ -180,7 +180,7 @@ function pillStyle(active: boolean): CSSProperties {
 }
 const emptyCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "32px",
   textAlign: "center",
@@ -189,14 +189,14 @@ const emptyTitleStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-in
 const emptyBodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 const listStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
 function rowStyle(divider: boolean, unread: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderBottom: divider ? "1px solid var(--v5-border)" : "none",
     background: unread ? "var(--v5-surface-2)" : "transparent",
   };
@@ -225,9 +225,9 @@ function titleStyle(unread: boolean): CSSProperties {
     fontWeight: unread ? 600 : 400,
   };
 }
-const timeStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const timeStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 const bodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
 function ctaStyle(k: NotifKind): CSSProperties {
-  return { fontSize: "10.5px", fontWeight: 600, color: KIND_META[k].tint, marginTop: "6px" };
+  return { fontSize: "11px", fontWeight: 600, color: KIND_META[k].tint, marginTop: "6px" };
 }
 </script>

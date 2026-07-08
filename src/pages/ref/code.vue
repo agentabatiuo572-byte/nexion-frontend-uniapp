@@ -98,7 +98,7 @@
           <text>SOC 2 Type II</text>
           <text>ISO 27001</text>
           <text>GDPR · MSB</text>
-          <text>CertiK audited</text>
+          <text>CertiK 已审计</text>
         </view>
       </view>
 
@@ -190,15 +190,15 @@ const brandMarkStyle: CSSProperties = { width: "28px", height: "28px", borderRad
 const brandMarkTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, color: "var(--v5-on-brand)", fontSize: "14px" };
 const brandNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "15px", letterSpacing: "-0.025em", color: "var(--v5-ink)" };
 const refChipStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.05em",
   padding: "2px 6px",
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-ink) 4%, transparent)",
 };
-const sponsorCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", marginBottom: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const sponsorCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", marginBottom: "12px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
@@ -209,8 +209,8 @@ const avatarTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeigh
 const sponsorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const sponsorTagStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const vRankChipStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   letterSpacing: "0.05em",
   padding: "2px 6px",
   borderRadius: "4px",
@@ -218,7 +218,7 @@ const vRankChipStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 600,
 };
-const cityLineStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const cityLineStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
 const giftCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "20px",
@@ -227,13 +227,13 @@ const giftCardStyle: CSSProperties = {
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand) 22%, transparent) 0%, transparent 65%), var(--v5-surface)",
   border: "1px solid color-mix(in srgb, var(--v5-brand) 40%, transparent)",
 };
-const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
-const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
-const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-brand)", fontWeight: 600, lineHeight: 1 };
+const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
+const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+const giftNexStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "20px", color: "var(--v5-brand)", fontWeight: 600, lineHeight: 1 };
 const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
-const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 function perkRowStyle(divider: boolean): CSSProperties {
-  return { gap: "12px", padding: "12px 16px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
+  return { gap: "12px", padding: "8px 16px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
 }
 function perkIconBoxStyle(tint: string): CSSProperties {
   return { width: "36px", height: "36px", borderRadius: "12px", background: `color-mix(in srgb, ${tint} 18%, transparent)` };
@@ -250,21 +250,21 @@ const ctaStyle: CSSProperties = {
   fontSize: "15px",
   boxShadow: "var(--v5-spotlight-brand)",
 };
-const signinStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const signinLinkStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)" };
-const proofCardStyle: CSSProperties = { marginTop: "20px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const signinStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
+const signinLinkStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand)" };
+const proofCardStyle: CSSProperties = { marginTop: "20px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const proofHeadStyle: CSSProperties = {
   marginBottom: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
-const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 const partnerHeadStyle: CSSProperties = {
   marginBottom: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
@@ -277,7 +277,7 @@ const partnerChipStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-ink) 4%, transparent)",
   color: "color-mix(in srgb, var(--v5-ink) 85%, transparent)",
 };
-const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "10.5px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
+const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "11px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
 const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 </script>

@@ -34,12 +34,12 @@ export type ThermalState = "nominal" | "fair" | "serious" | "critical";
 export type TaskCategory = "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
 
 export const TASK_CATEGORY_LABEL: Record<TaskCategory, string> = {
-  IG: "Image Gen",
-  VG: "Video Gen",
-  LL: "LLM Inference",
-  FT: "Fine-tune",
-  EM: "Embedding",
-  SP: "Speech",
+  IG: "图像生成",
+  VG: "视频生成",
+  LL: "LLM 推理",
+  FT: "模型微调",
+  EM: "向量嵌入",
+  SP: "语音处理",
 };
 
 export interface CurrentTask {
@@ -85,6 +85,18 @@ export interface Device {
   // PROD: the server holds this anchor and settles on the foreground call).
   // null = not currently earning (inactive / frozen); re-anchored on resume.
   lastSettledAt?: number | null;
+  // SPEC-1 R7 设备真在线信号: epoch ms of the last device-agent online heartbeat.
+  // The resident signed APP pings this while running; a browser tab / killed app
+  // never refreshes it, so it goes stale → 基础托管 baseline. Drives the online 加成
+  // factor tier (isDeviceOnline in lib/hashpower.ts) — REPLACING the build-time view
+  // carrier as the factor source, so "用哪个端查看" no longer changes earnings.
+  // PROD: server holds device.lastHeartbeatAt + timeout and pushes the online 结论;
+  // client reads this (or that boolean) — never the view carrier.
+  // Persisted in the account-cloud snapshot (a TIME_ANCHOR merge key → freshest beat wins):
+  // on reopen a beat still inside the window keeps the device online — this mirrors PROD's
+  // server-held lastHeartbeatAt not yet timed out, NOT a bypass (H5 never stamps it, so H5
+  // reopen stays baseline; App reopen re-stamps on the next settle regardless).
+  onlineHeartbeatAt?: number | null;
   // Sprint #146-1 supplement: when user requests "deactivate after current task
   // completes" (instead of forfeit-and-deactivate-now), this flag stays true
   // until tick() sees currentTask transition complete → triggers deactivation.

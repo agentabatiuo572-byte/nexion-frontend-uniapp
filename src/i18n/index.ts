@@ -50,8 +50,8 @@ export function localesByPriority(): Record<0 | 1 | 2 | 3, LocaleEntry[]> {
 }
 
 export const PRIORITY_LABELS: Record<0 | 1 | 2 | 3, string> = {
-  0: "Recommended",
-  1: "Major markets",
-  2: "Growing regions",
-  3: "Europe",
+  0: "推荐",
+  1: "主要市场",
+  2: "增长区域",
+  3: "欧洲",
 };

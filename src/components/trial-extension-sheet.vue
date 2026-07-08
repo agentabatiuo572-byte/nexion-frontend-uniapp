@@ -184,7 +184,7 @@ function onDecline() {
   z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   border-bottom: none;
   padding: 22px 18px;
@@ -242,8 +242,8 @@ function onDecline() {
   flex-direction: column;
 }
 .tes-cap {
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-brand);
@@ -291,8 +291,8 @@ function onDecline() {
 .tes-hero-label {
   position: relative;
   display: block;
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-brand);
@@ -312,7 +312,7 @@ function onDecline() {
   line-height: 1;
 }
 .tes-hero-num {
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-size: 38px;
   font-weight: 600;
   letter-spacing: -0.024em;
@@ -322,7 +322,7 @@ function onDecline() {
 }
 .tes-hero-nex {
   margin-left: 8px;
-  font-family: var(--font-jet-mono), monospace;
+  font-family: var(--font-numbers);
   font-size: 13.5px;
   font-weight: 500;
   color: var(--v5-ink-3);

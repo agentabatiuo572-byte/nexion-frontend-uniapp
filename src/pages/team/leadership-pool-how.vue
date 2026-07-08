@@ -133,10 +133,10 @@ const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)",
 const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px", lineHeight: 1.5 };
 const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)" };
 
-const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px" };
+const tableCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "12px" };
 const tableHeadStyle: CSSProperties = {
   padding: "8px 12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",

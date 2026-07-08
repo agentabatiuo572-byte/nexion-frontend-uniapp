@@ -38,7 +38,6 @@ import { useNotifications } from "@/store/notifications";
 import { useT } from "@/i18n/use-t";
 import { resolveHeaderTitleText } from "@/lib/header-title";
 import { navBack } from "@/lib/route";
-import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 
 const props = defineProps<{ back: string; title?: string; subtitle?: string }>();
 
@@ -46,7 +45,7 @@ const drawer = useMessageDrawer();
 const notifications = useNotifications();
 const t = useT();
 const unread = computed(() => notifications.unread);
-const rowH = computed(() => (props.subtitle ? 56 : 44));
+const rowH = computed(() => 52);
 
 // Current uni route — last entry in getCurrentPages() (same readRoute() pattern
 // as app-chassis.vue). Used to derive a route-based title when none is passed.
@@ -63,9 +62,7 @@ function readRoute(): string {
 // .spv-title v-if doesn't render, matching the prototype's unmapped="" behaviour).
 // Mirrors Nexion-prototype header.tsx computeTitle.
 const displayTitle = computed(() => props.title ?? resolveHeaderTitleText(readRoute(), t.value.headerTitles));
-const statusBarHeight = computed(() => {
-  try { return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight(); } catch { return h5DevicePreviewStatusBarHeight(); }
-});
+const statusBarHeight = computed(() => 44);
 
 function goBack() {
   navBack(props.back);
@@ -84,7 +81,7 @@ function goBell() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 20px;
   background: var(--v5-chrome-bg);
   border-bottom: 1px solid var(--v5-chrome-border);
   backdrop-filter: saturate(180%) blur(24px);
@@ -102,13 +99,13 @@ function goBell() {
 }
 .spv-glass {
   position: relative;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--v5-glass-bg);
-  border: 1px solid var(--v5-glass-border);
+  border: none;
   box-shadow: var(--v5-glass-shadow);
   backdrop-filter: blur(10px) saturate(140%);
   -webkit-backdrop-filter: blur(10px) saturate(140%);

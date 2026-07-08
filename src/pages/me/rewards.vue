@@ -38,7 +38,7 @@
               </view>
               <view class="shrink-0 inline-flex items-center active:opacity-80" :style="useBtnStyle" role="button" tabindex="0" :aria-label="t.rewards.useCta" @click="onUse(v)">
                 <text class="vcs-cta-t" :style="useBtnTextStyle">{{ t.rewards.useCta }}</text>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="m9 18 6-6-6-6" /></svg>
               </view>
             </view>
           </view>
@@ -161,7 +161,7 @@ const secHeadStyle: CSSProperties = {
 };
 const cardStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -169,7 +169,7 @@ const cardStyle: CSSProperties = {
 function rowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: i === 0 ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
   };
 }
@@ -189,7 +189,7 @@ const valueStyle: CSSProperties = { fontWeight: 600, color: "var(--v5-brand)" };
 const rowSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
 const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
 const rewardAmountStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "13.5px",
   fontWeight: 600,
   color: "var(--v5-brand)",
@@ -215,7 +215,7 @@ const expiredBadgeStyle: CSSProperties = {
 };
 const emptyStyle: CSSProperties = {
   margin: "20px 16px 0",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px dashed var(--v5-border)",
   borderRadius: "16px",
   padding: "32px",

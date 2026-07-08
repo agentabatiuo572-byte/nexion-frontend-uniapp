@@ -11,7 +11,7 @@
     <view class="flex items-baseline justify-between">
       <text class="block tabular-nums" :style="principalStyle">${{ amountText }}</text>
       <view class="flex items-center" style="gap: 6px">
-        <text :style="termChipStyle">{{ p.termDays }}d · {{ apyPct }}% APY</text>
+        <text :style="termChipStyle">{{ p.termDays }}天 · {{ apyPct }}% 年化</text>
         <text v-if="isClaimed" :style="statusChipStyle('var(--v5-success)')">{{ t.stakingV3.position.claimed }}</text>
         <text v-if="isEarlyOut" :style="statusChipStyle('var(--v5-brand-2)')">{{ t.stakingV3.position.earlyWithdrew }}</text>
         <text v-if="isMatured && !isClaimed && !isEarlyOut" :style="maturedChipStyle">{{ t.stakingV3.position.matured }}</text>
@@ -27,7 +27,7 @@
       <!-- 3-cell grid -->
       <view class="grid grid-cols-3" :style="cellGridStyle">
         <view>
-          <text class="block" :style="cellKStyle">Days in</text>
+          <text class="block" :style="cellKStyle">已锁天数</text>
           <text class="block tabular-nums" :style="cellVStyle(false)">{{ daysIn }} / {{ p.termDays }}</text>
         </view>
         <view>
@@ -35,8 +35,8 @@
           <text class="block tabular-nums" :style="cellVStyle(true)">+${{ accruedText }}</text>
         </view>
         <view>
-          <text class="block" :style="cellKStyle">{{ isMatured ? "Status" : "Remaining" }}</text>
-          <text class="block tabular-nums" :style="cellVStyle(false)">{{ isMatured ? t.stakingV3.position.unlocked : `${remainingDays}d` }}</text>
+          <text class="block" :style="cellKStyle">{{ isMatured ? "状态" : "剩余" }}</text>
+          <text class="block tabular-nums" :style="cellVStyle(false)">{{ isMatured ? t.stakingV3.position.unlocked : `${remainingDays}天` }}</text>
         </view>
       </view>
 
@@ -100,13 +100,13 @@ function onTrack() {
 }
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "14px",
   padding: "14px",
 };
 const principalStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",
@@ -117,21 +117,21 @@ const termChipStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
 };
 function statusChipStyle(tint: string): CSSProperties {
   return {
-    fontSize: "10.5px",
+    fontSize: "11px",
     color: tint,
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
   };
 }
 const maturedChipStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontWeight: 600,
 };
 const progressTrackStyle: CSSProperties = {
@@ -155,7 +155,7 @@ const cellGridStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const cellKStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
@@ -204,6 +204,6 @@ const closedNoteStyle: CSSProperties = {
   marginTop: "8px",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
 };
 </script>

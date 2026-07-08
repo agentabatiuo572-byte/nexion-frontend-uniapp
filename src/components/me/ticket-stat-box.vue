@@ -26,13 +26,13 @@ const boxStyle = computed<CSSProperties>(() => ({
   border: `1px solid color-mix(in srgb, ${props.tint} 20%, transparent)`,
 }));
 const headStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: props.tint,
 }));
 const valueStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",

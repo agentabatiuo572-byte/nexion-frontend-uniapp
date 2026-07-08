@@ -42,7 +42,7 @@
               <text class="block" :style="inviteTitleStyle">{{ t.quota.inviteFriendsTitle }}</text>
               <text class="block" :style="inviteHintStyle">{{ inviteHint }}</text>
             </view>
-            <text class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-brand)' }">{{ t.quota.shareTag }}</text>
+            <text class="font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-brand)' }">{{ t.quota.shareTag }}</text>
           </view>
         </view>
       </view>
@@ -127,7 +127,7 @@ const heroStyle: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 25%, transparent)",
 };
 const heroIconStyle: CSSProperties = { width: "40px", height: "40px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroBigStyle: CSSProperties = { fontSize: "28px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const heroSuffixStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const heroBodyStyle: CSSProperties = {

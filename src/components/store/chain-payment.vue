@@ -42,11 +42,11 @@
     <!-- Amount / Network grid -->
     <view class="grid" style="padding: 0 20px 12px; grid-template-columns: 1fr 1fr; gap: 12px">
       <view>
-        <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ t.store.coAmount }}</text>
+        <text class="block font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.store.coAmount }}</text>
         <text class="block tabular-nums" :style="gridValStyle">{{ amountLabel }}</text>
       </view>
       <view>
-        <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ t.store.coNetwork }}</text>
+        <text class="block font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.store.coNetwork }}</text>
         <text class="block" :style="gridValStyle">{{ network }}</text>
       </view>
     </view>
@@ -59,7 +59,7 @@
       <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @tap.stop="emitCancel" @click.stop="emitCancel">
         <text @tap.stop="emitCancel" @click.stop="emitCancel">{{ t.store.coCancel }}</text>
       </view>
-      <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5">{{ sendExactLabel }}</text>
+      <text class="block text-center" style="font-size: 11px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5">{{ sendExactLabel }}</text>
     </view>
   </view>
 </template>
@@ -182,7 +182,7 @@ const qrCells = computed<{ i: number; x: number; y: number }[]>(() => {
 });
 
 // ─── styles ───
-const cardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)" };
+const cardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)" };
 const headerStyle: CSSProperties = { padding: "16px 20px", gap: "12px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const iconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
 const headerTitleStyle: CSSProperties = {

@@ -33,7 +33,7 @@
             <!-- meta-row -->
             <view class="flex items-center justify-between" style="margin-bottom: 8px">
               <text :style="metaLabelStyle">{{ t.stakingV3.totalLocked }}</text>
-              <text v-if="activePositions.length > 0" :style="earningChipStyle">earning</text>
+              <text v-if="activePositions.length > 0" :style="earningChipStyle">计息中</text>
             </view>
 
             <!-- big -->
@@ -44,10 +44,10 @@
 
             <!-- delta -->
             <view class="tabular-nums" :style="deltaStyle">
-              <text>+${{ todayAccruedText }} today</text>
-              <text style="color: var(--v5-ink-4)"> · {{ activePositions.length }} active</text>
+              <text>今日 +${{ todayAccruedText }}</text>
+              <text style="color: var(--v5-ink-4)"> · {{ activePositions.length }} 笔生效</text>
               <text v-if="maturedCount > 0" style="color: var(--v5-ink-4)"> · </text>
-              <text v-if="maturedCount > 0" style="color: var(--v5-brand-2); font-weight: 500">{{ maturedCount }} matured</text>
+              <text v-if="maturedCount > 0" style="color: var(--v5-brand-2); font-weight: 500">{{ maturedCount }} 笔已到期</text>
             </view>
 
             <!-- 2-col -->
@@ -140,8 +140,8 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
 const RIBBONS: Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>> = {
-  180: { label: "Most popular", tone: "cyan" },
-  365: { label: "Highest yield", tone: "gold" },
+  180: { label: "最受欢迎", tone: "cyan" },
+  365: { label: "收益最高", tone: "gold" },
 };
 
 const t = useT();
@@ -182,7 +182,7 @@ const totalAccrued = computed(() => {
       return s + p.amountUSDT * p.apy * yrs;
     }, 0);
 });
-const todayAccrued = computed(() => staking.todayAccruedUSDT());
+const todayAccrued = computed(() => activePositions.value.reduce((s, p) => s + (p.amountUSDT * p.apy) / 365, 0));
 const avgAPY = computed(() => {
   if (totalLocked.value === 0) return 0;
   const w = activePositions.value.reduce((s, p) => s + p.amountUSDT * p.apy, 0);
@@ -278,7 +278,7 @@ const howPillStyle: CSSProperties = {
 const heroStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   boxShadow: "var(--v5-card-shadow-lift-strong)",
 };
@@ -304,7 +304,7 @@ const gridStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
@@ -314,18 +314,18 @@ const earningChipStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-tech-cyan-soft)",
   color: "var(--v5-tech-cyan)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
 };
 const bigDollarStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "22px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const bigNumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "48px",
   fontWeight: 600,
   letterSpacing: "-0.034em",
@@ -335,7 +335,7 @@ const bigNumStyle: CSSProperties = {
 };
 const deltaStyle: CSSProperties = {
   marginTop: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   color: "var(--v5-success)",
 };
@@ -346,13 +346,13 @@ const belowGridStyle: CSSProperties = {
   gap: "14px",
 };
 const statKStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 function statVStyle(tint: string): CSSProperties {
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 500,
     fontSize: "18px",
     letterSpacing: "-0.014em",
@@ -370,20 +370,20 @@ const secTitleStyle: CSSProperties = {
 };
 const countStyle: CSSProperties = {
   marginLeft: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const vaultCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "0 16px",
 };
 const emptyStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "24px 16px",
   fontSize: "12.5px",

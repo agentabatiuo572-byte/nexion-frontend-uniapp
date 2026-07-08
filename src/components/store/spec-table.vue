@@ -26,13 +26,13 @@ const props = withDefaults(
 );
 
 const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "0 16px",
 };
 function rowStyle(i: number): CSSProperties {
   return {
-    padding: "12px 0",
+    padding: "8px 0",
     borderBottom: i < props.rows.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }

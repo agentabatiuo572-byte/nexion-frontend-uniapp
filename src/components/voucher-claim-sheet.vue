@@ -15,7 +15,7 @@
       <view class="vcs-head">
         <view class="vcs-head-l">
           <view class="vcs-tk-box">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v2" /><path d="M13 17v2" /><path d="M13 11v2" /></svg>
+            <view class="vcs-ticket-icon" aria-hidden="true" />
           </view>
           <view class="vcs-head-meta">
             <text class="vcs-cap">{{ t.voucher.popupCap }}</text>
@@ -49,7 +49,7 @@
               @click.stop="voucher.isClaimed(v.id) ? onUse(v) : onClaim(v)"
             >
               <text class="vcs-cta-t">{{ voucher.isClaimed(v.id) ? t.voucher.useCta : t.voucher.claimCta }}</text>
-              <svg v-if="voucher.isClaimed(v.id)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              <svg v-if="voucher.isClaimed(v.id)" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
         </view>
@@ -159,7 +159,7 @@ function onUse(v: VoucherDef) {
   z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border-top: 1px solid var(--v5-border);
   padding: 20px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
@@ -192,13 +192,20 @@ function onUse(v: VoucherDef) {
   flex-shrink: 0;
   background: color-mix(in srgb, var(--v5-brand) 14%, transparent);
 }
+.vcs-ticket-icon {
+  width: 18px;
+  height: 18px;
+  background: var(--v5-brand);
+  -webkit-mask: url("/static/icons/ticket.svg") center / contain no-repeat;
+  mask: url("/static/icons/ticket.svg") center / contain no-repeat;
+}
 .vcs-head-meta {
   display: flex;
   flex-direction: column;
 }
 .vcs-cap {
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-brand);
@@ -243,7 +250,7 @@ function onUse(v: VoucherDef) {
   gap: 14px;
   border-radius: 16px;
   padding: 14px;
-  background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2));
+  background: var(--v5-surface-2);
   border: 1px solid color-mix(in srgb, var(--v5-brand) 26%, transparent);
 }
 .vcs-card-l {
@@ -258,7 +265,7 @@ function onUse(v: VoucherDef) {
   padding-right: 12px;
 }
 .vcs-val {
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -268,7 +275,7 @@ function onUse(v: VoucherDef) {
   font-variant-numeric: tabular-nums;
 }
 .vcs-cond {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--v5-ink-4);
   text-align: center;
   line-height: 1.3;
@@ -293,8 +300,8 @@ function onUse(v: VoucherDef) {
   line-height: 1.35;
 }
 .vcs-expiry {
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   color: var(--v5-ink-4);
   margin-top: 2px;
 }

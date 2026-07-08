@@ -23,7 +23,7 @@ const props = defineProps<{
 
 const valueStyle = computed<CSSProperties>(() => {
   if (props.big) {
-    return { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+    return { fontFamily: "var(--font-amount)", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
   }
   if (props.mono) {
     return { fontSize: "11.5px", color: "var(--v5-ink-2)" };

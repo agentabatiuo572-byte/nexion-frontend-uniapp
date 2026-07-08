@@ -37,6 +37,7 @@ export interface CommissionEvent {
 }
 
 const ONE_DAY = 86400 * 1000;
+const ONE_HOUR = 60 * 60 * 1000;
 
 /** Unilevel 各层 USDT 比例 */
 export const UNILEVEL_USDT: Record<number, number> = {
@@ -49,20 +50,12 @@ export const UNILEVEL_NEX: Record<number, number> = {
 
 const now = Date.now();
 
-function localDayStart(ts = Date.now()): number {
-  const d = new Date(ts);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-}
-
-function recentTodayTs(minutesAgo: number): number {
-  return Math.max(localDayStart(now), now - minutesAgo * 60 * 1000);
-}
-
 /**
- * Mock "today" commission events — `ts` is clamped inside the current local day
- * so overnight dev sessions still read a non-zero commission component. Real
- * backend: server delivers today-bucketed events via SSE (PRD §9.11c.1).
+ * Mock "today" commission events — `ts` set a few hours ago so they always
+ * fall within local today. These exist so Home Hero's cross-stream "today"
+ * aggregate (`earnings.today + commission.todayUSDT()`) reads a non-zero
+ * commission component. Real backend: server delivers today-bucketed events
+ * via SSE (PRD §9.11c.1, endpoint pending).
  */
 function buildTodayDemoEvents(): CommissionEvent[] {
   return [
@@ -70,12 +63,12 @@ function buildTodayDemoEvents(): CommissionEvent[] {
       id: "c-today-1", kind: "unilevel", sourceUserId: "net-12", sourceUserName: "Mei L.",
       layer: 1, orderId: "ord-today-1", orderAmountUSD: 299,
       amountUSDT: 29.90, amountNEX: 14_950,
-      ts: recentTodayTs(50), unlockAt: recentTodayTs(50) + 30 * ONE_DAY, status: "cooling",
+      ts: now - 4 * ONE_HOUR, unlockAt: now + 30 * ONE_DAY - 4 * ONE_HOUR, status: "cooling",
     },
     {
-      id: "c-today-2", kind: "binary", sourceUserId: "match-today", sourceUserName: "Daily binary match",
+      id: "c-today-2", kind: "binary", sourceUserId: "match-today", sourceUserName: "每日平衡匹配",
       amountUSDT: 17.30, amountNEX: 0,
-      ts: recentTodayTs(20), unlockAt: recentTodayTs(20) + 30 * ONE_DAY, status: "cooling",
+      ts: now - 2 * ONE_HOUR, unlockAt: now + 30 * ONE_DAY - 2 * ONE_HOUR, status: "cooling",
     },
   ];
 }
@@ -102,12 +95,12 @@ function seedEvents(): CommissionEvent[] {
       ts: now - 8 * ONE_DAY, unlockAt: now + 22 * ONE_DAY, status: "cooling",
     },
     {
-      id: "c-4", kind: "binary", sourceUserId: "match-1", sourceUserName: "Daily binary match",
+      id: "c-4", kind: "binary", sourceUserId: "match-1", sourceUserName: "每日平衡匹配",
       amountUSDT: 12.40, amountNEX: 0,
       ts: now - 1 * ONE_DAY, unlockAt: now + 29 * ONE_DAY, status: "cooling",
     },
     {
-      id: "c-5", kind: "binary", sourceUserId: "match-2", sourceUserName: "Daily binary match",
+      id: "c-5", kind: "binary", sourceUserId: "match-2", sourceUserName: "每日平衡匹配",
       amountUSDT: 9.20, amountNEX: 0,
       ts: now - 2 * ONE_DAY, unlockAt: now + 28 * ONE_DAY, status: "cooling",
     },
@@ -127,7 +120,7 @@ function seedEvents(): CommissionEvent[] {
       ts: now - 24 * ONE_DAY, unlockAt: now - 24 * ONE_DAY, status: "unlocked",
     },
     {
-      id: "c-9", kind: "leadership", sourceUserId: "pool-w42", sourceUserName: "Week 42 pool",
+      id: "c-9", kind: "leadership", sourceUserId: "pool-w42", sourceUserName: "第 42 周奖池",
       amountUSDT: 8.74, amountNEX: 0,
       ts: now - 3 * ONE_DAY, unlockAt: now - 3 * ONE_DAY, status: "unlocked",
     },
@@ -141,13 +134,10 @@ function hydrate(): CommissionEvent[] {
     const s = uni.getStorageSync(STORAGE_KEY) as { events?: CommissionEvent[] } | "";
     if (s && typeof s === "object" && Array.isArray(s.events)) {
       const existing = s.events;
-      // Keep mock "today" events actually inside the current local day. Persisted
-      // demos otherwise go stale across midnight and Home collapses back to device-only.
-      const dayStart = localDayStart();
-      const todayDemo = existing.filter((e) => e.id.startsWith("c-today-"));
-      const hasFreshTodaySeed = todayDemo.some((e) => e.ts >= dayStart);
-      if (hasFreshTodaySeed) return existing;
-      return [...buildTodayDemoEvents(), ...existing.filter((e) => !e.id.startsWith("c-today-"))];
+      // Ensure today's demo seed is present (parity with the v1→v2 migrate that
+      // injects today events so Home Hero's cross-stream "today" reads non-zero).
+      const hasTodaySeed = existing.some((e) => e.id.startsWith("c-today-"));
+      return hasTodaySeed ? existing : [...buildTodayDemoEvents(), ...existing];
     }
   } catch {
     // first run
@@ -213,7 +203,9 @@ export const useCommission = defineStore("commission", () => {
   }
   /** sum since local midnight — Home Hero "today's earnings" cross-stream. */
   function todayUSDT() {
-    const cutoff = localDayStart();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cutoff = today.getTime();
     return events.value.filter((e) => e.ts >= cutoff).reduce((s, e) => s + e.amountUSDT, 0);
   }
   function monthUSDT() {

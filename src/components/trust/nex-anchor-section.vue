@@ -47,9 +47,9 @@ import { fmt } from "@/i18n/format";
 import { useMarket } from "@/store/market";
 
 const NEX_CLIENTS = [
-  { name: "Helix Labs", city: "San Francisco", monthlyNex: 1_240_000 },
-  { name: "Mosaic Studios", city: "Berlin", monthlyNex: 412_000 },
-  { name: "Echo Earbuds", city: "Tokyo", monthlyNex: 287_000 },
+  { name: "Helix Labs", city: "旧金山", monthlyNex: 1_240_000 },
+  { name: "Mosaic Studios", city: "柏林", monthlyNex: 412_000 },
+  { name: "Echo Earbuds", city: "东京", monthlyNex: 287_000 },
 ];
 const ACTIVE_AI_CLIENTS = 1247;
 
@@ -97,6 +97,6 @@ const clientDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadiu
 const clientNameStyle: CSSProperties = { fontSize: "11.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
 const clientSepStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)" };
 const clientCityStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)" };
-const clientPaidStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11.5px", color: "var(--v5-brand-2)" };
+const clientPaidStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11.5px", color: "var(--v5-brand-2)" };
 const clientsCtaStyle: CSSProperties = { marginTop: "12px", paddingTop: "8px", borderTop: "1px solid var(--v5-border)", fontSize: "11px", color: "var(--v5-brand)" };
 </script>

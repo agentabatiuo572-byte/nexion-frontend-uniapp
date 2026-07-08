@@ -111,12 +111,12 @@ interface TickerItem {
   amount: string;
 }
 const TICKER_ITEMS: TickerItem[] = [
-  { name: "Sarah K.", action: "just joined your network", amount: "+$45.20" },
-  { name: "Tom W.", action: "bought NexionBox S1", amount: "+$130.00" },
-  { name: "Carlos R.", action: "upgraded to V3 Captain", amount: "+$28.40" },
-  { name: "Mei L.", action: "added a second device", amount: "+$76.00" },
-  { name: "Akira S.", action: "staked $5K · 180d", amount: "+$54.00" },
-  { name: "Priya N.", action: "claimed her Day-One bonus", amount: "+$12.00" },
+  { name: "Sarah K.", action: "刚加入你的网络", amount: "+$45.20" },
+  { name: "Tom W.", action: "购买了 NexionBox S1", amount: "+$130.00" },
+  { name: "Carlos R.", action: "升级到 V3 舰长", amount: "+$28.40" },
+  { name: "Mei L.", action: "添加了第二台设备", amount: "+$76.00" },
+  { name: "Akira S.", action: "质押 $5K · 180 天", amount: "+$54.00" },
+  { name: "Priya N.", action: "领取了首日奖励", amount: "+$12.00" },
 ];
 
 const multiplier = computed(() => phase.value.inviteBonusMultiplier);
@@ -225,12 +225,14 @@ const bodyGridStyle: CSSProperties = {
 };
 const leftDollarSignStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, opacity: 0.75, color: "var(--v5-ink-3)" };
 const leftDollarStyle: CSSProperties = {
+  fontFamily: "var(--font-amount)",
   fontSize: "30px",
   fontWeight: 600,
   letterSpacing: "-0.024em",
   color: "var(--v5-ink)",
 };
 const strikeStyle: CSSProperties = {
+  fontFamily: "var(--font-amount)",
   fontSize: "11.5px",
   color: "var(--v5-ink-4)",
   textDecoration: "line-through",
@@ -281,5 +283,5 @@ const tickerWrapStyle: CSSProperties = {
   height: "34px",
   zIndex: 1,
 };
-const tickerAmtStyle: CSSProperties = { marginLeft: "auto", color: "var(--v5-brand)", fontWeight: 600 };
+const tickerAmtStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-amount)", color: "var(--v5-brand)", fontWeight: 600 };
 </script>

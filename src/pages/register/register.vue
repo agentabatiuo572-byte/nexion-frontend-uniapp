@@ -20,7 +20,7 @@
       <view v-if="sponsorPreview" class="rg-sponsor">
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.name[0] }}</text></view>
         <view class="rg-sponsor__body">
-          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> invited you</text>
+          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> 邀请了你</text>
           <text class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
         </view>
         <text class="rg-sponsor__v">V{{ sponsorPreview.vRank }}</text>
@@ -130,18 +130,15 @@
       </view>
     </view>
 
-    <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue";
-import { onLoad, onUnload } from "@dcloudio/uni-app";
+import { ref, computed } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
-import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
-import { otpSend, otpVerify } from "@/store/auth-otp";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
@@ -171,6 +168,7 @@ const COUNTRIES = [
   { code: "+82", name: "South Korea" }, { code: "+55", name: "Brazil" }, { code: "+62", name: "Indonesia" },
   { code: "+63", name: "Philippines" }, { code: "+66", name: "Thailand" }, { code: "+971", name: "UAE" }, { code: "+7", name: "Russia" },
 ];
+const RESEND_SECONDS = 60;
 
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
@@ -191,13 +189,11 @@ const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
 const error = ref<string | null>(null);
-const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
 // OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
 const verifying = ref(false);
 const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
-let mounted = true;
 
 const refFromUrl = ref<string | null>(null);
 const sponsorPreview = ref<SponsorMeta | null>(null);
@@ -212,7 +208,6 @@ onLoad((options) => {
 
 const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
 const phoneOk = computed(() => /^\d{6,15}$/.test(phoneClean.value));
-const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
@@ -268,34 +263,11 @@ function onCta() {
 function goSendCode() {
   error.value = null;
   if (!phoneOk.value) { error.value = t.value.register.errorInvalidPhone; return; }
-  void requestCode();
+  step.value = 2;
+  startResend();
 }
-// FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
-async function requestCode(captchaTicket?: string) {
-  if (verifying.value) return;
-  verifying.value = true;
-  const res = await otpSend(fullPhone.value, "register", captchaTicket);
-  if (!mounted) return;
-  verifying.value = false;
-  if (res.ok) {
-    code.value = ["", "", "", "", "", ""];
-    focusIdx.value = 0;
-    step.value = 2;
-    startResend(res.resendAfterSec);
-    return;
-  }
-  if (res.error === "captcha_required") { showCaptcha.value = true; return; }
-  if (res.error === "rate_limited") {
-    error.value = fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec });
-    if (step.value === 2) startResend(res.retryAfterSec);
-  }
-}
-function onCaptchaOk(ticket: string) {
-  showCaptcha.value = false;
-  void requestCode(ticket);
-}
-function startResend(sec: number) {
-  resendLeft.value = sec;
+function startResend() {
+  resendLeft.value = RESEND_SECONDS;
   if (resendTimer) clearInterval(resendTimer);
   resendTimer = setInterval(() => {
     resendLeft.value = Math.max(0, resendLeft.value - 1);
@@ -304,48 +276,33 @@ function startResend(sec: number) {
 }
 function resend() {
   if (resendLeft.value > 0) return;
+  code.value = ["", "", "", "", "", ""];
+  focusIdx.value = 0;
   error.value = null;
-  void requestCode();
+  startResend();
 }
 function currentSponsorCode(): string | null {
   return refFromUrl.value?.trim() || invite.value.trim() || null;
 }
-async function verifyCode() {
+function verifyCode() {
   if (verifying.value) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
-  // ⚠️ MOCK-ONLY: server 同构 OTP 校验(FEAT-AUTH01,TTL/attemptsLeft/一码一)
-  // + K1 注册前评估的接口形态。PROD: POST /api/auth/otp/verify → 服务端验码 +
-  // K1 评估,返回 { gateRoute, cluster, giftRoute } 同构结论;client 只消费,
-  // 不本地判定。返回的 verifyToken 在 PROD 必须由后续注册提交端点
-  // (POST /api/auth/register)重新出示校验;mock 下通过即视为凭证有效。
+  // ⚠️ MOCK-ONLY: 异步 OTP 校验 + K1 注册前评估的接口形态。PROD: POST
+  // /api/auth/otp/verify → 服务端验码 + K1 评估,返回 { gateRoute, cluster,
+  // giftRoute } 同构结论;client 只消费,不本地判定。
   verifying.value = true;
-  const res = await otpVerify(fullPhone.value, "register", codeStr.value);
-  if (!mounted) return;
-  if (!res.ok) {
+  setTimeout(() => {
     verifying.value = false;
-    if (res.error === "otp_invalid") {
-      error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
-    } else if (res.error === "otp_expired") {
-      error.value = t.value.authOtp.errorOtpExpired;
-    } else if (res.error === "otp_attempts_exceeded") {
-      error.value = t.value.authOtp.errorOtpExhausted;
-      code.value = ["", "", "", "", "", ""];
-      focusIdx.value = 0;
-    } else {
-      error.value = t.value.authOtp.errorOtpNotFound;
+    const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
+    registrationRisk.value = assessment;
+    // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
+    if (assessment.gateRoute === "manual_or_reject") {
+      error.value = t.value.register.errorSignupLimited;
+      return;
     }
-    return;
-  }
-  const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
-  registrationRisk.value = assessment;
-  verifying.value = false;
-  // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
-  if (assessment.gateRoute === "manual_or_reject") {
-    error.value = t.value.register.errorSignupLimited;
-    return;
-  }
-  step.value = 3;
+    step.value = 3;
+  }, 600);
 }
 function finish() {
   error.value = null;
@@ -400,13 +357,6 @@ function back() {
 function close() { uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }); }
 function goLogin() { uni.reLaunch({ url: "/pages/login/login", fail: () => {} }); }
 function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} }); }
-
-function cleanup() {
-  mounted = false;
-  if (resendTimer) clearInterval(resendTimer);
-}
-onUnload(() => cleanup());
-onUnmounted(() => cleanup());
 </script>
 
 <style scoped>
@@ -425,8 +375,8 @@ onUnmounted(() => cleanup());
 .rg-sponsor__body { flex: 1; min-width: 0; }
 .rg-sponsor__name { display: block; font-size: 12.5px; color: #fff; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .rg-sponsor__name-b { font-weight: 600; }
-.rg-sponsor__gift { display: block; font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--v5-brand); margin-top: 2px; }
-.rg-sponsor__v { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 15%, transparent); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.rg-sponsor__gift { display: block; font-variant-numeric: tabular-nums; font-size: 11px; color: var(--v5-brand); margin-top: 2px; }
+.rg-sponsor__v { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--v5-brand); background: color-mix(in srgb, var(--v5-brand) 15%, transparent); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
 .rg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
 .rg-dot { height: 4px; width: 16px; border-radius: 9999px; background: var(--v5-surface-2); transition: all 0.3s; }
 .rg-dot--active { width: 32px; background: var(--v5-brand); }
@@ -470,7 +420,7 @@ onUnmounted(() => cleanup());
 .rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
 .rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent); border-radius: 8px; padding: 8px 12px; }
 .rg-error__t { flex: 1; }
-.rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
+.rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface-bg); display: flex; align-items: center; justify-content: center; }
 .rg-cta--on { background: var(--v5-brand); }
 .rg-cta--busy { opacity: 0.7; }
 .rg-cta__t { font-size: 15px; font-weight: 600; color: var(--v5-ink-4); }
@@ -480,7 +430,7 @@ onUnmounted(() => cleanup());
 .rg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
 .rg-divider__t { padding: 0 12px; font-size: 11.5px; color: var(--v5-ink-3); }
 .rg-social { display: flex; align-items: center; gap: 10px; }
-.rg-social__btn { flex: 1; min-width: 0; height: 64px; border-radius: 16px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform 0.15s, opacity 0.15s; }
+.rg-social__btn { flex: 1; min-width: 0; height: 64px; border-radius: 16px; background: var(--v5-surface-bg); border: 1px solid var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform 0.15s, opacity 0.15s; }
 .rg-social__btn:active { transform: scale(0.98); opacity: 0.8; }
 .rg-social__ic { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
 .rg-social__lbl { font-size: 11px; font-weight: 500; color: var(--v5-ink-3); }

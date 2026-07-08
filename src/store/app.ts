@@ -6,8 +6,8 @@ import { ONE_DAY_MS, makeInitialDevices, createDevice, MAX_DEVICES, type CreateD
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
-import { continuityFactor, thermalFactor } from "@/lib/hashpower";
-import { getCarrier, type Carrier } from "@/lib/carrier";
+import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
+import { getCarrier } from "@/lib/carrier";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { useConfig } from "@/store/config";
@@ -166,6 +166,20 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
   };
 }
 
+function normalizeDefaultFleetSnapshot(snapshot: AccountCloudSnapshot): AccountCloudSnapshot {
+  const legacyDemoKinds: DeviceKind[] = ["cloud-share", "stellarbox-s1", "stellarbox-pro", "stellarrack-p1"];
+  const hasLegacyDemoFleet = legacyDemoKinds.every((kind) => snapshot.devices.some((d) => d.kind === kind));
+  const hasLegacySeedIds = snapshot.devices.some((d) => d.id.endsWith("-seed"));
+  if (!hasLegacySeedIds && !hasLegacyDemoFleet) return snapshot;
+  const seededPhone = makeInitialDevices()[0];
+  const existingPhone = snapshot.devices.find((d) => d.kind === "phone");
+  const phone: Device = { ...seededPhone, id: existingPhone?.id ?? seededPhone.id };
+  return {
+    ...snapshot,
+    devices: [phone, ...snapshot.devices.filter((d) => d.kind !== "phone" && !d.id.endsWith("-seed") && !legacyDemoKinds.includes(d.kind))],
+  };
+}
+
 /** SPEC-1 §4.2 — the single earnings-accrual path (settle-single-source).
  *  Accrues a device by the WALL-CLOCK Δ since its `lastSettledAt` anchor (NOT by
  *  accumulated tick time), then re-anchors to `now`. Driving accrual off the
@@ -174,10 +188,11 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
  *  shot on the next settle(). The mock store is NOT persisted, so a full page reload
  *  resets state — true closed-tab catch-up is the PROD server's job (it holds
  *  lastSettledAt and settles on the foreground call).
- *  载体分层: phone App accrues continuity×thermal (online 加成); phone H5 = flat
- *  基础托管 (h5BaseFactor); non-phone = 1 — same carrier 口径 as lib/hashpower.ts
- *  (display uses the full live factor set; accrual uses this bounded subset). */
-function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: OnlineBonus): Device {
+ *  R7 在线分层: phone online (fresh heartbeat) accrues continuity×thermal (在线加成);
+ *  phone offline (no/stale beat) = flat 基础托管 (h5BaseFactor); non-phone = 1 —
+ *  factor source = isDeviceOnline(d, now), NOT the view carrier (same 口径 as
+ *  lib/hashpower.ts display; accrual uses this bounded subset). */
+function settleDevice(d: Device, now: number, onlineBonus: OnlineBonus): Device {
   // Not earning right now (idle / offline / cloud-share / phone gated) → drop a
   // stale anchor so the idle gap is never back-paid when the device resumes.
   if (
@@ -199,9 +214,9 @@ function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: Onl
   const lifeEff = isDegradable(d.kind) ? getEfficiency(getMonthsOwned(d.purchasedAt)) : 1;
   const phoneFactor =
     d.kind === "phone"
-      ? carrier === "h5"
-        ? onlineBonus.h5BaseFactor
-        : continuityFactor(now - (d.miningSince ?? now), onlineBonus.continuityFullHours * 60 * 60 * 1000) * thermalFactor(d.thermalState)
+      ? isDeviceOnline(d, now)
+        ? continuityFactor(now - (d.miningSince ?? now), onlineBonus.continuityFullHours * 60 * 60 * 1000) * thermalFactor(d.thermalState)
+        : onlineBonus.h5BaseFactor
       : 1;
   const inc = (d.baseRate * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
   const incNEX = (d.baseRateNEX * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
@@ -228,7 +243,7 @@ function freezeComputeShareDevice(d: Device): Device {
 
 export const useApp = defineStore("app", () => {
   const bootSurface = getEntrySurface();
-  const bootSnapshot = readAccountSnapshot("default") ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface);
+  const bootSnapshot = normalizeDefaultFleetSnapshot(readAccountSnapshot("default") ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface));
   const accountKey = ref(bootSnapshot.accountKey);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
@@ -442,18 +457,32 @@ export const useApp = defineStore("app", () => {
     const onlineBonus = cfgStore.config.onlineBonus;
     // R5 簇状态实时性: 每轮结算现算当前簇,禁用注册时缓存的状态。
     const clusterEval = evaluateAccountCluster(accountKey.value);
+    // R7: App 载体是 mock 的设备在线心跳源 —— 为在跑的手机刷 onlineHeartbeatAt(模拟常驻
+    // App agent 上报;PROD = 服务端收设备心跳落此戳)。收益/显示因子只读这个设备态
+    // (isDeviceOnline),不读 getCarrier(),故「用哪个端查看」不再改因子;H5 载体不刷 →
+    // 心跳陈旧 → 基础托管。心跳只碰 onlineHeartbeatAt,不动 lastSettledAt/attest 锚点。
+    // ⚠️ 此心跳 gate(phone+status online+!paused+activated)必须与 settleDevice 的 phone
+    // earning gate 保持一致 —— 改一处同步另一处,否则会「不赚钱却标 online」致 display/accrual 脱节。
+    const beated =
+      carrier === "app"
+        ? devices.value.map((d) =>
+            d.kind === "phone" && d.status === "online" && d.pausedReason == null && d.activatedAt !== null
+              ? { ...d, onlineHeartbeatAt: now }
+              : d,
+          )
+        : devices.value;
     // 结算前锚点快照(用于下方 attest 累计的墙钟差,避免复用会跳跃重锚的锚点重复计)。
-    const anchorBefore = new Map(devices.value.map((d) => [d.id, d.lastSettledAt ?? null]));
-    const settled = devices.value.map((d) =>
+    const anchorBefore = new Map(beated.map((d) => [d.id, d.lastSettledAt ?? null]));
+    const settled = beated.map((d) =>
       d.kind === "pc-gpu" && !computeShareEnabled.value
         ? freezeComputeShareDevice(d)
-        : settleDevice(d, carrier, now, onlineBonus),
+        : settleDevice(d, now, onlineBonus),
     );
-    // App 载体 + 手机设备真在跑 → 累计「App 在线证明」(R1 attest 释放源)。
+    // App 载体 + 手机设备真在跑 → 累计「App 在线证明」(R1 attest 释放源,SPEC-7 口径)。
     // 用 settleDevice 实际推进的锚点差(after > before 才是真结算的墙钟那一拍),
     // 与收益累计同源;首次登记(before=null)/未达结算间隔(锚点未动)都不计,
     // 修 audit U1「复用外层旧锚点每 tick 重算全量差 → 系统性多计 ~1.5x」。
-    // R7 落地后此处信号源换成设备真在线心跳。
+    // (R7: 因子源已改设备心跳 isDeviceOnline;attestation 是 SPEC-7 独立口径,仍按 App 载体在跑累计。)
     if (carrier === "app") {
       for (const d of settled) {
         if (d.kind !== "phone" || d.pausedReason != null) continue;

@@ -43,7 +43,7 @@
           <view ref="barEl" class="flex-1 rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
             <view class="h-full rounded-full" :style="barFillStyle" />
           </view>
-          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 10px; color: var(--v5-ink-3)">{{ ev.progress.current.toLocaleString() }}/{{ ev.progress.total.toLocaleString() }}</text>
+          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 11px; color: var(--v5-ink-3)">{{ ev.progress.current.toLocaleString() }}/{{ ev.progress.total.toLocaleString() }}</text>
         </view>
       </view>
 
@@ -153,7 +153,7 @@ function onDecorativeCta() {
 }
 
 const cardStyle = computed<CSSProperties>(() => ({
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   opacity: dim.value ? 0.6 : 1,
 }));
@@ -172,7 +172,7 @@ const emojiChipStyle = computed<CSSProperties>(() => ({
   background: `color-mix(in srgb, ${props.ev.tint} 8%, transparent)`,
 }));
 const kindLineStyle = computed<CSSProperties>(() => ({
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.12em",
   textTransform: "uppercase",
   color: props.ev.tint,
@@ -194,7 +194,7 @@ const subtitleStyle: CSSProperties = {
 const chipStyle = computed<CSSProperties>(() => ({
   padding: "4px 8px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 500,
   whiteSpace: "nowrap",
   background: statusChip.value!.bg,
@@ -204,7 +204,7 @@ const rewardStyle = computed<CSSProperties>(() => ({
   fontSize: "12px",
   fontWeight: 600,
   color: props.ev.tint,
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
 }));
 const barFillStyle = computed<CSSProperties>(() => ({
   width: `${barInView.value ? progressPct.value : 0}%`,

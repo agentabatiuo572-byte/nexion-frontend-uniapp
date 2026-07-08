@@ -74,7 +74,7 @@ const timeAgo = computed(() => {
 
 const rowStyle = computed<CSSProperties>(() => ({
   gap: "12px",
-  padding: "12px 16px",
+  padding: "8px 16px",
   borderBottom: props.isLast ? "none" : "1px solid var(--v5-border)",
 }));
 const iconBoxStyle = computed<CSSProperties>(() => ({
@@ -96,27 +96,27 @@ const kindBadgeStyle = computed<CSSProperties>(() => ({
   borderRadius: "4px",
   background: `color-mix(in srgb, ${tint.value} 10%, transparent)`,
   color: tint.value,
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 }));
 const addrStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const priceStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "13px",
   color: "var(--v5-brand)",
   letterSpacing: "-0.008em",
 };
 const timeStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 </script>

@@ -94,7 +94,7 @@
           <view v-for="(f, i) in feed" :key="i" class="px-4 flex items-center" :style="feedRowStyle(i === feed.length - 1)">
             <view class="flex-1 min-w-0">
               <text class="block truncate" style="color: var(--v5-ink); font-size: 11.5px">{{ f.who }}</text>
-              <text class="block truncate" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ f.label }}</text>
+              <text class="block truncate" style="font-size: 11px; color: var(--v5-ink-3)">{{ f.label }}</text>
             </view>
             <text class="tabular-nums" :style="feedAmtStyle">+{{ usd(f.amount) }}</text>
             <text class="text-right" :style="feedAgoStyle">{{ feedAgo(f.ts) }}s</text>
@@ -112,8 +112,8 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="holdingIdStyle">{{ h.id }}</text>
-                <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
-                <view class="flex items-center font-mono-tabular" style="margin-top: 6px; gap: 12px; font-size: 10.5px">
+                <text class="block font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
+                <view class="flex items-center font-mono-tabular" style="margin-top: 6px; gap: 12px; font-size: 11px">
                   <text style="color: var(--v5-brand)">{{ t.genesisHolder.holdingCard.lifetime }} {{ usd1(h.lifetime) }}</text>
                   <text style="color: var(--v5-brand-2)">{{ t.genesisHolder.holdingCard.thisMonth }} {{ usd1(h.thisMonth) }}</text>
                 </view>
@@ -129,7 +129,7 @@
         <view :style="perksCardStyle">
           <text class="block" :style="perksLabelStyle">{{ t.genesisHolder.perksLabel }}</text>
           <view style="display: flex; flex-direction: column; gap: 8px">
-            <view v-for="k in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle">
+            <view v-for="(k, i) in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle(i === perkKeys.length - 1)">
               <view class="flex items-center justify-center" :style="perkIconStyle">
                 <text style="font-size: 18px; line-height: 1">{{ t.genesisHolder.perks[k].icon }}</text>
               </view>
@@ -164,7 +164,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
               </view>
               <text :style="actionLabelStyle">{{ t.genesisHolder.actions.claim }}</text>
-              <text class="tabular-nums" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10.5px; color: var(--v5-brand)">{{ pendingText }}</text>
+              <text class="tabular-nums" style="font-family: var(--font-numbers); font-size: 11px; color: var(--v5-brand)">{{ pendingText }}</text>
             </view>
           </view>
         </view>
@@ -288,11 +288,11 @@ const chartData = computed(() => {
 // Live dividend feed (mock, fixed at mount).
 const feedBase = Date.now();
 const feed = [
-  { ts: feedBase - 12000, who: "Anon #2017", amount: 0.42, label: "store purchase · NexionBox Pro" },
-  { ts: feedBase - 47000, who: "Anon #8819", amount: 0.18, label: "exchange · NEX → USDT" },
-  { ts: feedBase - 91000, who: "Anon #4471", amount: 0.96, label: "Genesis primary sale" },
-  { ts: feedBase - 142000, who: "Anon #1102", amount: 0.07, label: "staking unlock fee" },
-  { ts: feedBase - 200000, who: "Anon #6638", amount: 0.32, label: "store purchase · Cloud Share" },
+  { ts: feedBase - 12000, who: "匿名 #2017", amount: 0.42, label: "商店购买 · NexionBox Pro" },
+  { ts: feedBase - 47000, who: "匿名 #8819", amount: 0.18, label: "兑换 · NEX → USDT" },
+  { ts: feedBase - 91000, who: "匿名 #4471", amount: 0.96, label: "创世节点首发销售" },
+  { ts: feedBase - 142000, who: "匿名 #1102", amount: 0.07, label: "质押解锁费" },
+  { ts: feedBase - 200000, who: "匿名 #6638", amount: 0.32, label: "商店购买 · 云算力份额" },
 ];
 function feedAgo(ts: number): number {
   void tick.value;
@@ -301,7 +301,7 @@ function feedAgo(ts: number): number {
 
 function handleClaim() {
   if (pendingPayout.value < 0.01) {
-    toast.info("Nothing to claim yet", "Next payout 00:00 UTC daily");
+    toast.info("暂时没有可领取收益", "下一次付款为每日 00:00 UTC");
     return;
   }
   toast.success(t.value.genesisHolder.actions.claimedToast, fmtUSD(pendingPayout.value));
@@ -316,7 +316,7 @@ function goMarketplace() {
 // ── styles ──
 const heroCardStyle: CSSProperties = {
   padding: "18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
@@ -328,13 +328,13 @@ const avatarStyle: CSSProperties = {
   boxShadow: "0 4px 12px rgba(212,175,90,0.25)",
 };
 const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.04em",
 };
 const heroNumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "48px",
   letterSpacing: "-0.034em",
@@ -342,14 +342,14 @@ const heroNumStyle: CSSProperties = {
   lineHeight: 1,
 };
 const heroNodesStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "14px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const lifetimeStyle: CSSProperties = {
   marginTop: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   color: "var(--v5-success)",
 };
@@ -360,7 +360,7 @@ const heroStatGridStyle: CSSProperties = {
   gap: "14px",
 };
 const cellLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
@@ -368,7 +368,7 @@ const cellLabelStyle: CSSProperties = {
 function cellValStyle(tint: string): CSSProperties {
   return {
     marginTop: "3px",
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 500,
     fontSize: "18px",
     letterSpacing: "-0.014em",
@@ -378,7 +378,7 @@ function cellValStyle(tint: string): CSSProperties {
 }
 const cellValMonoStyle: CSSProperties = {
   marginTop: "3px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontWeight: 500,
   fontSize: "14px",
   letterSpacing: "-0.005em",
@@ -414,19 +414,19 @@ const previewStyle: CSSProperties = {
 const previewTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warning)", lineHeight: 1.625 };
 const chartCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const chartLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const chartTotalStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-brand)",
@@ -439,12 +439,12 @@ const chartBoxStyle: CSSProperties = {
 };
 const feedCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const feedDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "999px", background: "var(--v5-brand)" };
 const feedLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -460,27 +460,27 @@ function feedRowStyle(isLast: boolean): CSSProperties {
   };
 }
 const feedAmtStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
 const feedAgoStyle: CSSProperties = {
   width: "40px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 const feedNoteStyle: CSSProperties = {
   paddingTop: "8px",
   paddingBottom: "8px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   borderTop: "1px solid var(--v5-border)",
 };
 const sectionLabelStyle: CSSProperties = {
   marginBottom: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -488,7 +488,7 @@ const sectionLabelStyle: CSSProperties = {
 };
 const holdingCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "14px",
   gap: "12px",
@@ -501,7 +501,7 @@ const holdingArtStyle: CSSProperties = {
   border: "1px solid rgba(255,107,53,0.40)",
 };
 const holdingIdStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-ink)",
@@ -515,19 +515,26 @@ const holdingLinkStyle: CSSProperties = {
 };
 const perksCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const perksLabelStyle: CSSProperties = {
   marginBottom: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
 };
-const perkRowStyle: CSSProperties = { gridTemplateColumns: "36px 1fr", gap: "12px", padding: "10px 0" };
+function perkRowStyle(isLast: boolean): CSSProperties {
+  return {
+    gridTemplateColumns: "36px 1fr",
+    gap: "12px",
+    padding: "10px 0",
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 const perkIconStyle: CSSProperties = {
   width: "36px",
   height: "36px",
@@ -544,7 +551,7 @@ const perkLabelStyle: CSSProperties = {
 const perkBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.4 };
 const actionTileStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "12px",
   display: "flex",
@@ -564,12 +571,12 @@ function actionIconStyle(tint: string): CSSProperties {
 }
 const actionLabelStyle: CSSProperties = { fontSize: "11px", fontWeight: 600, color: "var(--v5-ink-2)" };
 const actionSubStyle: CSSProperties = {
-  fontSize: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "11px",
+  fontFamily: "var(--font-numbers)",
   color: "var(--v5-ink-3)",
 };
 const noteStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   paddingTop: "8px",

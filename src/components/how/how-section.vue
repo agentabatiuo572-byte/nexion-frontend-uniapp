@@ -41,7 +41,7 @@ const ACCENT_BORDER: Record<Accent, string> = {
 };
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "18px",

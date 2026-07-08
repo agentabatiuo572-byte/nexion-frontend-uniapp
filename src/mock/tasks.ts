@@ -163,7 +163,7 @@ function buildTask(tpl: TaskTemplate, model: ModelVariant): CurrentTask {
     type: TASK_CATEGORY_LABEL[tpl.category],
     model: model.name,
     client: client.name,
-    location: `${client.city}, ${client.country}`,
+    location: client.city,
     totalSec: Math.round(totalSec),
     startedAt: Date.now(),
     reward: +reward.toFixed(3),

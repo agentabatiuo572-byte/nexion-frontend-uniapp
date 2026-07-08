@@ -16,7 +16,7 @@ import { computed, type CSSProperties } from "vue";
 const props = withDefaults(defineProps<{ value: string; label: string; big?: boolean }>(), { big: false });
 
 const valueStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: props.big ? "26px" : "20px",
   fontWeight: 600,
   color: "var(--v5-warning)",
@@ -25,7 +25,7 @@ const valueStyle = computed<CSSProperties>(() => ({
 }));
 const labelStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };

@@ -19,7 +19,7 @@ const props = withDefaults(
 
 const labelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const valueStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: props.bold ? "14px" : "12.5px",
   letterSpacing: "-0.008em",

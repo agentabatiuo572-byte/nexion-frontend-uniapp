@@ -95,7 +95,7 @@
         <view class="grid place-items-center active:opacity-70" :style="navBtnStyle(idx === 0)" @click.stop="prev">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
-        <text class="font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ idx + 1 }} / {{ CARDS }}</text>
+        <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ idx + 1 }} / {{ CARDS }}</text>
         <view class="grid place-items-center active:opacity-70" :style="navBtnStyle(idx === CARDS - 1)" @click.stop="next">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
@@ -163,7 +163,7 @@ const overlayStyle: CSSProperties = {
   top: "0",
   bottom: "0",
   zIndex: 110,
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   display: "flex",
   flexDirection: "column",
 };
@@ -184,7 +184,7 @@ function barFillStyle(i: number): CSSProperties {
   };
 }
 const topRowStyle: CSSProperties = { padding: "8px 12px 0" };
-const labelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const labelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 const leftZoneStyle: CSSProperties = { position: "absolute", left: "0", top: "0", bottom: "0", width: "25%", zIndex: 10 };
 const rightZoneStyle: CSSProperties = { position: "absolute", right: "0", top: "0", bottom: "0", width: "25%", zIndex: 10 };
 
@@ -241,7 +241,7 @@ const card2BodyStyle: CSSProperties = {
   lineHeight: 1.625,
 };
 function kickerStyle(color: string): CSSProperties {
-  return { fontSize: "10px", letterSpacing: "0.18em", color };
+  return { fontSize: "11px", letterSpacing: "0.18em", color };
 }
 const bigNumStyle: CSSProperties = { marginTop: "12px", fontSize: "88px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.025em", color: "var(--v5-ink)" };
 const num60Style: CSSProperties = { marginTop: "24px", fontSize: "60px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };

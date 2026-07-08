@@ -43,7 +43,7 @@ function go() {
 
 const rowStyle = computed<CSSProperties>(() => ({
   gap: "12px",
-  padding: "13px 0",
+  padding: "8px 0",
   borderBottom: props.last ? "none" : "1px solid var(--v5-border)",
 }));
 const iconChipStyle: CSSProperties = {

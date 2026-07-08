@@ -59,15 +59,15 @@
             d="M 270 230 Q 222 230 222 192 Q 222 152 268 152 Q 280 118 320 118 Q 354 96 392 122 Q 426 96 462 122 Q 498 118 510 152 Q 552 152 552 192 Q 552 230 502 230 Z"
             fill="url(#cloud-puff)" stroke="var(--v5-brand)" stroke-opacity="0.6" stroke-width="1.6" />
           <path d="M 270 162 Q 318 132 388 138" stroke="var(--v5-brand)" stroke-opacity="0.5" stroke-width="1.2" fill="none" />
-          <text x="386" y="190" text-anchor="middle" font-size="22" font-weight="700" fill="var(--v5-brand)" fill-opacity="0.65" letter-spacing="5" font-family="ui-monospace, monospace">CLOUD SHARE</text>
-          <text x="386" y="212" text-anchor="middle" font-size="10" font-weight="600" fill="var(--v5-ink-3)" letter-spacing="3" font-family="ui-monospace, monospace">DISTRIBUTED · NO HARDWARE</text>
+          <text x="386" y="190" text-anchor="middle" font-size="22" font-weight="600" fill="var(--v5-brand)" fill-opacity="0.65" letter-spacing="5" font-family="var(--font-numbers)">云算力份额</text>
+          <text x="386" y="212" text-anchor="middle" font-size="11" font-weight="600" fill="var(--v5-ink-3)" letter-spacing="3" font-family="var(--font-numbers)">分布式 · 无硬件</text>
         </g>
 
         <g v-for="(n, i) in cloudNodes" :key="i">
           <rect :x="n.x - 30" :y="n.y - 18" width="60" height="36" rx="4" fill="#15181E" stroke="var(--v5-brand)" stroke-opacity="0.5" stroke-width="1" />
           <line v-for="(dx, j) in pinDx" :key="`t-${j}`" :x1="n.x + dx" :y1="n.y - 18" :x2="n.x + dx" :y2="n.y - 22" stroke="#2A2F38" stroke-width="0.8" />
           <line v-for="(dx, j) in pinDx" :key="`b-${j}`" :x1="n.x + dx" :y1="n.y + 18" :x2="n.x + dx" :y2="n.y + 22" stroke="#2A2F38" stroke-width="0.8" />
-          <text :x="n.x" :y="n.y + 4" text-anchor="middle" font-size="13" font-weight="800" fill="var(--v5-brand)" letter-spacing="2" font-family="ui-monospace, monospace">{{ n.label }}</text>
+          <text :x="n.x" :y="n.y + 4" text-anchor="middle" font-size="13" font-weight="600" fill="var(--v5-brand)" letter-spacing="2" font-family="var(--font-numbers)">{{ n.label }}</text>
           <circle :cx="n.x" :cy="n.y - 26" r="2.3" fill="var(--v5-brand)"><animate attributeName="opacity" values="1;0.2;1" :dur="`${1.8 + i * 0.3}s`" repeatCount="indefinite" /></circle>
         </g>
       </svg>
@@ -131,7 +131,7 @@ const brandStyle: CSSProperties = {
 };
 const tierCodeStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.18em",
   color: "rgba(255,255,255,0.75)",
   textTransform: "uppercase",

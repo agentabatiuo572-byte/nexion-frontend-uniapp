@@ -21,7 +21,7 @@
       <!-- CTA — right-aligned -->
       <view class="inline-flex items-center shrink-0 active:opacity-70" :style="claimBtnStyle">
         <text>{{ t.trial.entryClaimCta }}</text>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
     </view>
   </view>
@@ -75,9 +75,9 @@ const subStyle: CSSProperties = {
 const claimBtnStyle: CSSProperties = {
   height: "32px",
   padding: "0 13px",
-  background: "color-mix(in srgb, var(--v5-success) 10%, transparent)",
+  background: "var(--v5-brand)",
   borderRadius: "999px",
-  color: "var(--v5-success)",
+  color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "12.5px",

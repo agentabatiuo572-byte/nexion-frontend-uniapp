@@ -49,7 +49,7 @@ const boxStyle = computed<CSSProperties>(() => ({
 const digitStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: `${props.size * 0.45}px`,
+  fontSize: `${Math.max(11, props.size * 0.45)}px`,
   color: c.value.text,
 }));
 </script>

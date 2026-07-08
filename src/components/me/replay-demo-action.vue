@@ -26,7 +26,7 @@ const emit = defineEmits<{ tap: [] }>();
 
 const cardStyle: CSSProperties = {
   gap: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "14px",
@@ -46,7 +46,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   fontSize: "11.5px",
   fontWeight: 600,
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   background: `color-mix(in srgb, ${props.accent} 12%, transparent)`,
   color: props.accent,
 }));

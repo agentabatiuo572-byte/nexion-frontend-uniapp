@@ -133,7 +133,7 @@ function numStyle(color: string): CSSProperties {
   };
 }
 const labelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };

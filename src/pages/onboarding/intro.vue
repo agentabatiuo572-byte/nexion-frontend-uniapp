@@ -362,7 +362,7 @@ function goTerms() {
   width: 100%;
   height: 54px;
   border-radius: 9999px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-surface-2);
   display: flex;
   align-items: center;

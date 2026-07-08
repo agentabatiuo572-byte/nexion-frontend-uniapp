@@ -19,7 +19,7 @@ const props = defineProps<{ ico: string; name: string; desc: string; isLast: boo
 const rowStyle = computed<CSSProperties>(() => ({
   gridTemplateColumns: "36px 1fr",
   gap: "12px",
-  padding: "14px 0",
+  padding: "8px 0",
   borderBottom: props.isLast ? "none" : "1px solid var(--v5-border)",
 }));
 const iconStyle: CSSProperties = {

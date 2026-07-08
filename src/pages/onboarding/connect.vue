@@ -70,7 +70,7 @@
           <text class="cn-score__tier">{{ tierLabel }}</text>
           <view class="cn-score__yield">
             <text class="cn-score__yield-cap">{{ t.onboarding.resultEstYield }}</text>
-            <text class="cn-score__yield-v">${{ FINAL_YIELD.toFixed(2) }}/d</text>
+            <text class="cn-score__yield-v">${{ FINAL_YIELD.toFixed(2) }}/天</text>
           </view>
         </view>
 
@@ -288,7 +288,7 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 .cn-bars { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
-.cn-bar { flex: 1; height: 4px; border-radius: 9999px; background: var(--v5-surface); overflow: hidden; }
+.cn-bar { flex: 1; height: 4px; border-radius: 9999px; background: var(--v5-surface-bg); overflow: hidden; }
 .cn-bar__fill { height: 100%; width: 0; background: var(--v5-brand); }
 .cn-bar__fill--full { width: 100%; }
 .cn-step { display: block; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
@@ -296,8 +296,8 @@ onUnmounted(() => {
 .cn-sub { display: block; margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); }
 .cn-phase { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
 
-.cn-why { background: var(--v5-surface); border: 1px solid var(--v5-border); border-radius: 16px; padding: 16px; }
-.cn-why__h { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
+.cn-why { background: var(--v5-surface-bg); border: 1px solid var(--v5-border); border-radius: 16px; padding: 16px; }
+.cn-why__h { display: block; font-family: var(--font-numbers); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-why__list { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .cn-point { display: flex; align-items: flex-start; gap: 10px; }
 .cn-point__ic { width: 24px; height: 24px; border-radius: 6px; background: var(--v5-surface-2); border: 1px solid var(--v5-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
@@ -307,35 +307,35 @@ onUnmounted(() => {
 .cn-prog-row__t { font-size: 11.5px; color: var(--v5-ink-3); }
 .cn-spin { animation: cn-spin 0.9s linear infinite; }
 @keyframes cn-spin { to { transform: rotate(360deg); } }
-.cn-test { border-radius: 12px; padding: 12px; background: var(--v5-surface); border: 1px solid var(--v5-border); }
+.cn-test { border-radius: 12px; padding: 12px; background: var(--v5-surface-bg); border: 1px solid var(--v5-border); }
 .cn-test__top { display: flex; align-items: center; gap: 10px; }
 .cn-test__ic { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cn-test__body { flex: 1; min-width: 0; }
 .cn-test__title { display: block; font-size: 12.5px; font-weight: 600; color: var(--v5-ink); line-height: 1.25; }
-.cn-test__metric { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; font-size: 11px; color: var(--v5-ink-3); margin-top: 2px; }
+.cn-test__metric { display: block; font-family: var(--font-numbers); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--v5-ink-3); margin-top: 2px; }
 .cn-test__track { margin-top: 10px; height: 4px; border-radius: 9999px; background: var(--v5-surface-2); overflow: hidden; }
 .cn-test__fill { height: 100%; border-radius: 9999px; transition: width 0.15s linear; }
 
 .cn-score { position: relative; overflow: hidden; border-radius: 16px; padding: 20px; text-align: center; background: radial-gradient(70% 80% at 50% 0%, color-mix(in oklab, var(--v5-brand) 18%, transparent) 0%, transparent 60%), var(--v5-surface); border: 1px solid var(--v5-border); box-shadow: var(--v5-card-shadow-lift-strong); }
 .cn-score__cap { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-score__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.18em; color: var(--v5-brand); }
+.cn-score__cap-t { font-family: var(--font-numbers); font-size: 11px; letter-spacing: 0.18em; color: var(--v5-brand); }
 .cn-score__num { margin-top: 12px; display: flex; align-items: baseline; justify-content: center; gap: 4px; }
-.cn-score__v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.025em; color: var(--v5-brand); font-size: 48px; font-weight: 600; }
-.cn-score__d { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); font-size: 20px; font-weight: 500; }
+.cn-score__v { font-family: var(--font-amount); font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -0.025em; color: var(--v5-brand); font-size: 48px; font-weight: 600; }
+.cn-score__d { font-family: var(--font-amount); font-variant-numeric: tabular-nums; color: var(--v5-ink-3); font-size: 20px; font-weight: 500; }
 .cn-score__tier { display: block; margin-top: 8px; font-size: 13.5px; font-weight: 600; color: var(--v5-ink); }
 .cn-score__yield { margin: 12px auto 0; display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); }
-.cn-score__yield-cap { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
-.cn-score__yield-v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); font-size: 15px; font-weight: 600; }
+.cn-score__yield-cap { font-family: var(--font-numbers); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
+.cn-score__yield-v { font-family: var(--font-amount); font-variant-numeric: tabular-nums; color: var(--v5-brand); font-size: 15px; font-weight: 600; }
 
-.cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface); border: 1px solid var(--v5-border); }
+.cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface-bg); border: 1px solid var(--v5-border); }
 .cn-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
 .cn-row__check { width: 24px; height: 24px; border-radius: 6px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cn-row__label { color: var(--v5-ink-3); }
-.cn-row__val { margin-left: auto; font-family: var(--font-jet-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--v5-ink); font-weight: 600; }
+.cn-row__val { margin-left: auto; font-family: var(--font-numbers); font-variant-numeric: tabular-nums; color: var(--v5-ink); font-weight: 600; }
 
 .cn-policy { border-radius: 16px; padding: 14px; background: color-mix(in oklab, var(--v5-warning) 8%, transparent); border: 1px solid color-mix(in oklab, var(--v5-warning) 22%, transparent); }
 .cn-policy__cap { display: flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-warning); }
-.cn-policy__cap-t { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; color: var(--v5-warning); }
+.cn-policy__cap-t { font-family: var(--font-numbers); font-size: 11px; letter-spacing: 0.16em; color: var(--v5-warning); }
 .cn-policy__list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .cn-policy__line { display: flex; align-items: flex-start; gap: 6px; }
 .cn-policy__dot { flex-shrink: 0; margin-top: 6px; width: 4px; height: 4px; border-radius: 9999px; background: color-mix(in oklab, var(--v5-warning) 55%, transparent); }

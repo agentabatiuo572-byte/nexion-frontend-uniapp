@@ -82,14 +82,14 @@
             </view>
             <view class="md-row-body">
               <view class="md-row-titlewrap">
-                <text class="md-row-title" :style="{ color: n.readAt ? 'rgba(255,255,255,0.45)' : 'var(--v5-ink)' }">{{ n.title }}</text>
+                <text class="md-row-title" :style="{ color: n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink)' }">{{ n.title }}</text>
                 <view v-if="!n.readAt" class="md-unread-dot" />
                 <view class="md-chevron" :class="{ 'md-chevron--open': expandedId === n.id }">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="n.readAt ? '#3F4754' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                 </view>
               </view>
-              <text v-if="n.body" class="md-row-preview" :style="{ color: n.readAt ? 'rgba(255,255,255,0.30)' : 'var(--v5-ink-3)' }">{{ n.body }}</text>
-              <text class="md-row-time" :style="{ color: n.readAt ? 'rgba(255,255,255,0.25)' : 'var(--v5-ink-4)' }">{{ timeAgo(n.ts) }}</text>
+              <text v-if="n.body" class="md-row-preview" :style="{ color: n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink-3)' }">{{ n.body }}</text>
+              <text class="md-row-time" :style="{ color: 'var(--v5-ink-4)' }">{{ timeAgo(n.ts) }}</text>
             </view>
           </view>
 
@@ -229,7 +229,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: md-fade 0.18s ease-out;
@@ -243,8 +243,8 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   width: 88%;
   display: flex;
   flex-direction: column;
-  background: #0f0f0f;
-  border-left: 1px solid var(--v5-surface-3);
+  background: var(--v5-surface-bg);
+  border-left: 1px solid var(--v5-border);
   animation: md-slide-in 0.28s ease-out;
 }
 @keyframes md-fade {
@@ -261,7 +261,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--v5-surface-2);
+  border-bottom: 1px solid var(--v5-border);
 }
 .md-head-l {
   display: flex;
@@ -288,7 +288,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: #0f0f0f;
+  background: var(--v5-surface-2);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -296,7 +296,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 /* ── tabs ── */
 .md-tabs {
   white-space: nowrap;
-  border-bottom: 1px solid color-mix(in srgb, var(--v5-surface-2) 60%, transparent);
+  border-bottom: 1px solid var(--v5-border);
 }
 .md-tabs-inner {
   display: flex;
@@ -312,7 +312,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-2);
   border: 1px solid transparent;
 }
 .md-tab--on {
@@ -342,7 +342,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 }
 .md-tab-badge-t {
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   line-height: 1;
 }
@@ -379,7 +379,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   color: var(--v5-ink-3);
 }
 .md-item {
-  border-bottom: 1px solid color-mix(in srgb, var(--v5-surface-2) 60%, transparent);
+  border-bottom: 1px solid var(--v5-border);
 }
 .md-item--unread {
   background: color-mix(in srgb, var(--v5-brand) 3%, transparent);
@@ -387,7 +387,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-row {
   display: flex;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 8px 20px;
 }
 .md-row-ico {
   width: 36px;
@@ -452,17 +452,17 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-detail-inner {
   margin-left: 48px;
   padding: 4px 20px 16px;
-  border-left: 2px solid var(--v5-surface-2);
+  border-left: 2px solid var(--v5-border);
 }
 .md-detail-body {
   display: block;
   font-size: 12px;
-  color: #c8d0dc;
+  color: var(--v5-ink-2);
   line-height: 1.625;
 }
 .md-detail-abs {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--v5-ink-4);
   margin-top: 10px;
 }
@@ -473,7 +473,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   height: 36px;
   padding: 0 14px;
   margin-top: 12px;
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--v5-brand);
 }
 .md-detail-cta-t {
@@ -486,7 +486,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-foot {
   padding: 12px 20px;
   text-align: center;
-  border-top: 1px solid var(--v5-surface-2);
+  border-top: 1px solid var(--v5-border);
 }
 .md-foot-t {
   font-size: 12px;

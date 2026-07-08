@@ -12,7 +12,7 @@
     </view>
     <view class="flex-1" style="margin-left: 12px; font-size: 12.5px">
       <text :style="labelStyle">{{ label }}</text>
-      <text v-if="pendingHint && isActive" style="margin-left: 6px; font-size: 10.5px; color: var(--v5-ink-4)">({{ pendingHint }})</text>
+      <text v-if="pendingHint && isActive" style="margin-left: 6px; font-size: 11px; color: var(--v5-ink-4)">({{ pendingHint }})</text>
     </view>
     <view v-if="isActive" :style="spinnerStyle" />
   </view>
@@ -30,7 +30,7 @@ const isActive = computed(() => props.enabled && !props.done);
 const isPending = computed(() => !props.enabled);
 
 const rowStyle = computed<CSSProperties>(() => ({
-  padding: "10px 12px",
+  padding: "8px 12px",
   borderRadius: "12px",
   background: props.done
     ? "color-mix(in srgb, var(--v5-brand) 8%, transparent)"

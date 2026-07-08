@@ -101,16 +101,16 @@ export const PERIOD_PRIZE: Record<
   LeaderPeriod,
   { poolUSD: number; topN: number; resetsIn: string; label: string }
 > = {
-  today: { poolUSD: 5000, topN: 20, resetsIn: "08:42:11", label: "Daily" },
-  week: { poolUSD: 50000, topN: 50, resetsIn: "3d 12h", label: "Weekly" },
-  month: { poolUSD: 250000, topN: 100, resetsIn: "12d", label: "Monthly" },
-  all: { poolUSD: 1000000, topN: 100, resetsIn: "—", label: "All-time" },
+  today: { poolUSD: 5000, topN: 20, resetsIn: "08:42:11", label: "今日" },
+  week: { poolUSD: 50000, topN: 50, resetsIn: "3 天 12 小时", label: "本周" },
+  month: { poolUSD: 250000, topN: 100, resetsIn: "12 天", label: "本月" },
+  all: { poolUSD: 1000000, topN: 100, resetsIn: "—", label: "总榜" },
 };
 
 /** Hardware rewards for podium positions (real platforms ship branded merch).
  *  Medal colors are intrinsic gold/silver/bronze, not theme tokens. */
 export const PODIUM_PRIZE = [
-  { medal: "🥇", color: "#FFC83D", reward: "Genesis Node + Rack ×1" },
+  { medal: "🥇", color: "#FFC83D", reward: "创世节点 + Rack ×1" },
   { medal: "🥈", color: "#C9D2DC", reward: "NexionBox Pro ×3" },
   { medal: "🥉", color: "#C77546", reward: "NexionBox Pro ×1" },
 ];

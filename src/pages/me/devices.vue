@@ -47,9 +47,9 @@
         <!-- Trial device — NexionBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
-          <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
+          <view class="flex items-center" style="gap: 12px; padding: 8px 16px">
             <view class="grid place-items-center shrink-0" :style="trialIconBoxStyle">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+              <image src="/static/img/products/nexionbox-s1-ranking.png" mode="aspectFill" style="width: 44px; height: 44px; border-radius: 6px" />
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
@@ -86,34 +86,8 @@
           </view>
         </view>
 
-        <!-- Inventory (purchased but not activated) -->
-        <view v-if="inactiveDevices.length > 0" style="margin-top: 12px">
-          <view class="flex items-center justify-between" style="padding: 0 4px; margin-bottom: 8px">
-            <text :style="sectionTitleStyle">{{ t.myDevices.inventorySectionInventory }}</text>
-            <text :style="sectionCountStyle">{{ inactiveDevices.length }}</text>
-          </view>
-          <view style="display: flex; flex-direction: column; gap: 8px">
-            <DeviceInventoryRow
-              v-for="d in inactiveDevices"
-              :key="d.id"
-              :device="d"
-              :active="false"
-              :disabled="slotsFull"
-              :activate-label="t.myDevices.inventoryRowActivate"
-              :deactivate-label="t.myDevices.inventoryRowDeactivate"
-              :slots-full-label="t.myDevices.inventoryRowSlotsFull"
-              :pending-chip-label="t.myDevices.inventoryPendingDeactivateChip"
-              @toggle="handleActivate(d)"
-            />
-          </view>
-          <view v-if="slotsFull" class="flex items-center" :style="slotsFullWarnStyle">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-            <text>{{ t.myDevices.inventorySlotsFullWarning }}</text>
-          </view>
-        </view>
-
         <!-- Empty inventory -->
-        <view v-if="activeDevices.length === 0 && inactiveDevices.length === 0" :style="emptyCardStyle">
+        <view v-if="activeDevices.length === 0" :style="emptyCardStyle">
           <view class="grid place-items-center" :style="emptyIconStyle">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
           </view>
@@ -163,12 +137,10 @@ const trialActive = computed(() =>
   ["active", "grace", "extended"].includes(trial.status),
 );
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));
 const slotsUsed = computed(() => app.activeSlotCount + trialReserved.value);
-const slotsFull = computed(() => slotsUsed.value >= MAX_DEVICES);
 
 const slotMeterLabel = computed(() =>
   fmt(t.value.myDevices.inventorySlotMeter, { active: slotsUsed.value, max: MAX_DEVICES }),
@@ -176,21 +148,6 @@ const slotMeterLabel = computed(() =>
 
 // Deactivate sheet (running-task branch) — page-driven (no chassis store).
 const sheetDevice = ref<Device | null>(null);
-
-async function handleActivate(d: Device) {
-  if (slotsFull.value) {
-    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
-    return;
-  }
-  // Pass the trial-reserved slot count so the store's MAX_DEVICES guard stays
-  // authoritative without app.ts importing the trial store.
-  const ok = app.activateDevice(d.id, trialReserved.value);
-  if (ok) {
-    toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: d.name }));
-  } else {
-    toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
-  }
-}
 
 async function handleDeactivate(d: Device) {
   // Running task → dedicated sheet offering wait / force / cancel.
@@ -254,18 +211,18 @@ function segStyle(i: number): CSSProperties {
 }
 
 const subtitleStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
 };
 const meterCardStyle: CSSProperties = {
   borderRadius: "16px",
   border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
+  background: "linear-gradient(180deg, #111317 0%, #15181C 100%)",
   padding: "12px 16px",
 };
 const meterLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
 };
@@ -284,13 +241,14 @@ const trialCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
   border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
+  background: "linear-gradient(180deg, #111317 0%, #15181C 100%)",
 };
 const trialIconBoxStyle: CSSProperties = {
-  width: "40px",
-  height: "40px",
-  borderRadius: "8px",
-  background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
+  width: "44px",
+  height: "44px",
+  borderRadius: "6px",
+  overflow: "hidden",
+  background: "transparent",
 };
 const trialNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -303,14 +261,14 @@ const trialBadgeStyle: CSSProperties = {
   borderRadius: "4px",
   background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)",
   color: "var(--v5-brand-2)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
 const trialSubStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
 };
@@ -332,15 +290,9 @@ const sectionTitleStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const sectionCountStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
-};
-const slotsFullWarnStyle: CSSProperties = {
-  gap: "6px",
-  marginTop: "8px",
-  fontSize: "11.5px",
-  color: "var(--v5-warning)",
 };
 const emptyCardStyle: CSSProperties = {
   marginTop: "12px",

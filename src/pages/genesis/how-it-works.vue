@@ -127,14 +127,14 @@ const flowBoxStyle: CSSProperties = {
   gap: "10px",
 };
 const flowLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-warning)",
   letterSpacing: "0.08em",
 };
 const flowNumStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   color: "var(--v5-warning)",
   flexShrink: 0,

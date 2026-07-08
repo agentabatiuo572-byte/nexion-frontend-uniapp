@@ -28,16 +28,15 @@ export function replyToQuickPrompt(
     case "explain-today": {
       const top = topDevice(ctx.devices);
       const topLine = top
-        ? `Top earner: **${top.name}** (${top.gpu}) at $${top.todayEarnings.toFixed(2)} today.`
-        : "No active devices yet — connect one to start earning.";
+        ? `今日最高收益设备:**${top.name}**(${top.gpu}),今日 $${top.todayEarnings.toFixed(2)}。`
+        : "还没有活跃设备,连接一台设备即可开始赚取收益。";
       return {
         kind: "nova-reply",
         text:
-          `You've earned **$${ctx.earningsToday.toFixed(2)}** so far today across ` +
-          `${ctx.onlineCount} active device${ctx.onlineCount === 1 ? "" : "s"}.\n\n` +
+          `今天到目前为止,你的 ${ctx.onlineCount} 台活跃设备共赚到 **$${ctx.earningsToday.toFixed(2)}**。\n\n` +
           `${topLine}\n\n` +
-          `Most of your jobs ran on the Image Gen + Speech pools — typical for your VRAM tier. ` +
-          `Want me to explain how to unlock LLM Inference?`,
+          `大部分任务来自图像生成和语音处理池,这符合你当前显存档位的典型分布。` +
+          `需要我说明如何解锁 LLM 推理任务吗?`,
       };
     }
     case "how-to-boost": {
@@ -47,22 +46,22 @@ export function replyToQuickPrompt(
         return {
           kind: "nova-reply",
           text:
-            `Three quick wins:\n\n` +
-            `1. Keep at least one device online overnight — the LLM pool peaks 02:00-06:00 UTC.\n` +
-            `2. Your current rig caps at **${maxVram}GB VRAM**. Upgrading to **${teaser.unlockTier}** ` +
-            `unlocks **${teaser.model}** (${teaser.type}) — a single job pays ${teaser.rewardHint}.\n` +
-            `3. Refer a friend with the code in /team — you earn 5% of their lifetime payouts.`,
-          ctaLabel: "Browse Store →",
+            `三个快速提升点:\n\n` +
+            `1. 至少保持一台设备整夜在线,LLM 任务池在 UTC 02:00-06:00 达到峰值。\n` +
+            `2. 你当前设备上限为 **${maxVram}GB 显存**。升级到 **${teaser.unlockTier}** ` +
+            `可解锁 **${teaser.model}**(${teaser.type}),单个任务收益 ${teaser.rewardHint}。\n` +
+            `3. 使用团队页的邀请码邀请朋友,你可获得其终身收益的 5%。`,
+          ctaLabel: "浏览商店 →",
           ctaHref: "/store",
         };
       }
       return {
         kind: "nova-reply",
         text:
-          `You already run the highest tier — nice. Two ways to scale further:\n\n` +
-          `1. Add a second NexionBox to handle parallel fine-tune jobs.\n` +
-          `2. Push referrals via /team — your tier earns 8% lifetime split on each referral.`,
-        ctaLabel: "Open Team →",
+          `你已经在运行最高档位。进一步放大的方式有两个:\n\n` +
+          `1. 添加第二台 NexionBox,并行处理微调任务。\n` +
+          `2. 通过团队页做邀请,你当前等级可获得每位邀请对象 8% 的终身分成。`,
+        ctaLabel: "打开团队 →",
         ctaHref: "/team",
       };
     }
@@ -70,24 +69,24 @@ export function replyToQuickPrompt(
       const events = [
         {
           text:
-            `🔥 **LLM Inference** prices jumped **+18%** in the last hour after Anthropic's ` +
-            `Claude 4.6 launch. Demand surge expected through tonight.`,
+            `🔥 Anthropic Claude 4.6 发布后,**LLM 推理**价格在过去一小时上涨 **+18%**。` +
+            `预计今晚需求仍会维持高位。`,
         },
         {
           text:
-            `📈 **Video Gen** tier seeing 2.4× normal volume — Atrium AI is running a campaign ` +
-            `render today. Throughput-bound, well-paying.`,
+            `📈 **视频生成**档位当前任务量为平时 2.4×,Atrium AI 今天在跑活动渲染。` +
+            `吞吐受限,单价较高。`,
         },
         {
           text:
-            `💎 **Fine-tune** queue depth at **812 jobs** (vs 280 baseline). High-VRAM devices ` +
-            `getting first pick. Flagship compute pool at +30% of standard rate.`,
+            `💎 **模型微调**队列深度达到 **812 个任务**(基线 280)。高显存设备优先接单,` +
+            `旗舰算力池价格高于标准费率 30%。`,
         },
       ];
       return {
         kind: "nova-reply",
         text: events[Math.floor(Math.random() * events.length)].text,
-        ctaLabel: "Open Market →",
+        ctaLabel: "打开市场 →",
         ctaHref: "/earn",
       };
     }
@@ -98,22 +97,22 @@ export function replyToQuickPrompt(
         return {
           kind: "nova-reply",
           text:
-            `Right now the highest-paying open jobs in your pool:\n\n` +
-            `• **Llama 3.1 405B inference** — $0.62 per 1k tokens (Helix Labs)\n` +
-            `• **Sora-class video** — $1.80 per 8s clip (Atrium AI)\n` +
-            `• **DPO · Llama 3.1 70B fine-tune** — $0.42 per job (Northwind Research)\n\n` +
-            `Your devices can run all of these. Routing handled automatically.`,
+            `当前你可接任务池里收益最高的任务:\n\n` +
+            `• **Llama 3.1 405B 推理** — 每 1k token $0.62(Helix Labs)\n` +
+            `• **Sora-class 视频** — 每 8 秒片段 $1.80(Atrium AI)\n` +
+            `• **DPO · Llama 3.1 70B 微调** — 每任务 $0.42(Northwind Research)\n\n` +
+            `你的设备都可以运行这些任务,路由会自动处理。`,
         };
       }
       const lines = lockedTop
-        .map((t) => `• **${t.model}** (${t.type}) — ${t.rewardHint} · needs ${t.unlockTier}`)
+        .map((t) => `• **${t.model}**(${t.type}) — ${t.rewardHint} · 需要 ${t.unlockTier}`)
         .join("\n");
       return {
         kind: "nova-reply",
         text:
-          `Top jobs above your current VRAM cap (${maxVram}GB):\n\n${lines}\n\n` +
-          `Each unlocks once you upgrade — let me know when you're ready.`,
-        ctaLabel: "Browse Store →",
+          `高于你当前显存上限(${maxVram}GB)的高收益任务:\n\n${lines}\n\n` +
+          `这些任务在升级后即可解锁,准备好时可以进入商店选择设备。`,
+        ctaLabel: "浏览商店 →",
         ctaHref: "/store",
       };
     }
@@ -132,9 +131,9 @@ export function welcomeMessage(): PushBody {
   return {
     kind: "welcome",
     text:
-      `Hey — I'm **Nova**, your compute advisor. I'll watch the market and ping you ` +
-      `when there's an opportunity to earn more.\n\nTry the chips below to start.`,
-    ctaLabel: "Browse Store →",
+      `你好,我是 **Nova**,你的算力顾问。我会关注市场变化,在出现更高收益机会时提醒你。\n\n` +
+      `可以先试试下面的快捷问题。`,
+    ctaLabel: "浏览商店 →",
     ctaHref: "/store",
   };
 }

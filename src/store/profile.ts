@@ -25,9 +25,9 @@ function hydrate(): Persisted {
   }
   return {
     displayName: "Alex T.",
-    bio: "Running an AI-friendly node from my phone. Always up for swapping notes on yield strategies.",
-    region: "Singapore",
-    timezone: "Asia/Singapore (UTC+8)",
+    bio: "正在用手机运行 AI 友好节点,欢迎交流收益策略。",
+    region: "新加坡",
+    timezone: "新加坡 (UTC+8)",
     avatarSeed: "alex-seed",
   };
 }

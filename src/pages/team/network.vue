@@ -80,13 +80,13 @@
             <!-- center YOU node -->
             <g>
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
-              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="700" font-size="11" fill="var(--v5-on-brand)">YOU</text>
-              <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">V{{ myRank }}</text>
+              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">你</text>
+              <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">V{{ myRank }}</text>
             </g>
 
             <!-- orbit labels -->
-            <text x="180" y="118" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(198,255,58,0.45)" letter-spacing="1.5">DIRECT</text>
-            <text x="180" y="8" text-anchor="middle" font-family="var(--font-jet-mono)" font-size="7" fill="rgba(144,119,255,0.55)" letter-spacing="1.5">EXTENDED</text>
+            <text x="180" y="118" text-anchor="middle" font-family="var(--font-numbers)" font-size="11" fill="rgba(198,255,58,0.45)" letter-spacing="1.5">直推</text>
+            <text x="180" y="8" text-anchor="middle" font-family="var(--font-numbers)" font-size="11" fill="rgba(144,119,255,0.55)" letter-spacing="1.5">扩展</text>
           </svg>
 
           <!-- Legend -->
@@ -149,7 +149,7 @@
             <text>{{ t.network.title }}: </text>
             <text :style="{ color: 'var(--v5-ink)' }">{{ rankTitle(selected) }}</text>
             <text> · {{ t.network.status }}: </text>
-            <text :style="{ color: statusColor(selected.status) }">{{ selected.status }}</text>
+            <text :style="{ color: statusColor(selected.status) }">{{ statusText(selected.status) }}</text>
           </view>
         </view>
       </view>
@@ -239,13 +239,16 @@ function daysJoined(m: NetworkMember): number {
 function rankTitle(m: NetworkMember): string {
   return V_RANKS[m.vRank].title;
 }
+function statusText(status: MemberStatus): string {
+  return status === "active" ? "在线" : status === "idle" ? "空闲" : "离线";
+}
 function statusColor(status: MemberStatus): string {
   return status === "active" ? "var(--v5-brand)" : status === "idle" ? "var(--v5-warning)" : "var(--v5-ink-4)";
 }
 
 // ─── styles ───
-const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "12px" };
-const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const metricCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "12px" };
+const metricLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", color };
 }
@@ -254,13 +257,13 @@ const orbCardStyle: CSSProperties = {
   background: "radial-gradient(60% 50% at 50% 50%, rgba(124,92,255,0.18) 0%, transparent 65%), var(--v5-bg)",
   border: "1px solid rgba(255,255,255,0.06)",
 };
-const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "10px", color: "var(--v5-ink-3)" };
+const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "11px", color: "var(--v5-ink-3)" };
 // SKILL leading-relaxed = 1.625 (原版 .text-[11px] leading-relaxed; was 1.6)
 const footerStyle: CSSProperties = { padding: "0 4px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 const sheetStyle: CSSProperties = {
   width: "100%",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px 16px 0 0",
   padding: "16px",
   borderTop: "1px solid var(--v5-border)",
@@ -270,7 +273,7 @@ function sheetBadgeStyle(m: NetworkMember): CSSProperties {
   const isDirect = m.layer === 1;
   const color = isDirect ? "var(--v5-brand)" : "var(--v5-tech-cyan)";
   return {
-    fontSize: "10px",
+    fontSize: "11px",
     letterSpacing: "0.12em",
     padding: "1px 4px",
     borderRadius: "4px",
@@ -279,7 +282,7 @@ function sheetBadgeStyle(m: NetworkMember): CSSProperties {
   };
 }
 const sheetCloseStyle: CSSProperties = { width: "32px", height: "32px" };
-const sheetStatLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const sheetStatLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 function sheetStatValStyle(color: string): CSSProperties {
   return { fontSize: "15px", fontWeight: 600, marginTop: "2px", color };
 }

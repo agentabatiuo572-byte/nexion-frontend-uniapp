@@ -97,7 +97,7 @@ function onTap() {
 }
 .scb-eyebrow {
   display: block;
-  font-family: var(--font-jet-mono), monospace;
+  font-family: var(--font-numbers);
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.1em;

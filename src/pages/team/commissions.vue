@@ -24,14 +24,14 @@
         <view class="rounded-2xl border" :style="cardStyle">
           <view class="grid grid-cols-2 border-b" :style="overviewTopStyle">
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">Withdrawable</text>
+              <text class="block font-mono-tabular" :style="overviewCapStyle">可提现</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-brand)')">${{ commission.unlockedUSDT().toFixed(2) }}</text>
               <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ commission.unlockedNEX().toLocaleString() }} NEX</text>
             </view>
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">Cooling</text>
+              <text class="block font-mono-tabular" :style="overviewCapStyle">冷却中</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-warning)')">${{ commission.coolingUSDT().toFixed(2) }}</text>
-              <text class="block font-mono-tabular" :style="overviewSmallStyle">Unlocks in 30d</text>
+              <text class="block font-mono-tabular" :style="overviewSmallStyle">30 天后解锁</text>
             </view>
           </view>
           <view class="grid grid-cols-2" style="gap: 8px; font-size: 11px">
@@ -59,7 +59,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>
             </text>
             <text class="block tabular-nums" :style="kindAmtStyle">${{ byKind[k].usdt.toFixed(0) }}</text>
-            <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.kind[k] }}</text>
+            <text class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.kind[k] }}</text>
             <text class="block font-mono-tabular" :style="kindCountStyle">{{ byKind[k].count }} {{ t.commissions.events }}</text>
           </view>
         </view>
@@ -105,11 +105,11 @@
                 <text class="block font-mono-tabular" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
               </view>
               <view class="text-right">
-                <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--v5-brand)' }">+${{ e.amountUSDT.toFixed(2) }}</text>
-                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-warning)' }">+{{ e.amountNEX.toLocaleString() }} NEX</text>
-                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
-                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
-                <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
+                <text v-if="e.amountUSDT > 0" class="block tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '12.5px', fontWeight: 600, color: 'var(--v5-brand)' }">+${{ e.amountUSDT.toFixed(2) }}</text>
+                <text v-if="e.amountNEX > 0" class="block tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '11px', color: 'var(--v5-warning)' }">+{{ e.amountNEX.toLocaleString() }} NEX</text>
+                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '11px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
+                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '11px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
+                <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
               </view>
             </view>
           </template>
@@ -193,13 +193,13 @@ const howItWorksStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
 };
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };
 const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
@@ -218,14 +218,14 @@ const overviewCapStyle: CSSProperties = {
 function overviewBigStyle(color: string): CSSProperties {
   return {
     marginTop: "4px",
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 600,
     fontSize: "20px",
     letterSpacing: "-0.018em",
     color,
   };
 }
-const overviewSmallStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const overviewSmallStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
 
 function kindCardStyle(k: CommissionKind): CSSProperties {
   const active = filter.value === k;
@@ -238,7 +238,7 @@ function kindCardStyle(k: CommissionKind): CSSProperties {
 }
 const kindAmtStyle: CSSProperties = {
   marginTop: "6px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "15px",
   letterSpacing: "-0.014em",
@@ -247,7 +247,7 @@ const kindAmtStyle: CSSProperties = {
 };
 const kindCountStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 
@@ -269,7 +269,7 @@ function pillTextStyle(active: boolean): CSSProperties {
 const emptyStyle: CSSProperties = { padding: "32px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function eventRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "12px 16px",
+    padding: "8px 16px",
     gap: "12px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
@@ -283,7 +283,7 @@ function eventIconStyle(kind: CommissionKind): CSSProperties {
   };
 }
 const directBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand)",
   background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
@@ -291,12 +291,12 @@ const directBadgeStyle: CSSProperties = {
   borderRadius: "4px",
 };
 const extendedBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
   padding: "0 4px",
   borderRadius: "4px",
 };
-const eventMetaStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const eventMetaStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
 </script>

@@ -204,14 +204,14 @@ const heroBgStyle: CSSProperties = {
     "radial-gradient(70% 80% at 100% 100%, rgba(198,255,58,0.16) 0%, transparent 60%)," +
     "var(--v5-surface)",
 };
-const heroLabelStyle: CSSProperties = { fontSize: "10.5px", letterSpacing: "0.16em", color: "var(--v5-brand-2)", fontWeight: 500 };
+const heroLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand-2)", fontWeight: 500 };
 const heroTitleStyle: CSSProperties = { marginTop: "8px", fontSize: "26px", lineHeight: 1.25, fontWeight: 600, color: "var(--v5-ink)" }; // SKILL: leading-tight=1.25 (was 1.2)
 const heroSubStyle: CSSProperties = { marginTop: "8px", fontSize: "13.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 
-const sectionStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "16px" };
+const sectionStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "16px" };
 const sectionHeadStyle: CSSProperties = {
   gap: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-brand-2)",
   fontWeight: 500,
@@ -220,12 +220,12 @@ const sectionHeadStyle: CSSProperties = {
 const bodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 
-const ladderCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)", borderRadius: "12px", padding: "12px" };
+const ladderCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)", borderRadius: "12px", padding: "12px" };
 const ladderVStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", width: "28px" };
 const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
 const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
 
-const reqCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
+const reqCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
 const reqLabelStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-brand)" };
 const reqBodyStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 
@@ -243,11 +243,11 @@ function ruleTitleStyle(color: string): CSSProperties {
 }
 const ruleBodyStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 
-const unlockRowStyle: CSSProperties = { gap: "10px", background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
+const unlockRowStyle: CSSProperties = { gap: "10px", background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "8px 12px" };
 const unlockLabelStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "color-mix(in srgb, var(--v5-ink) 95%, transparent)" };
 const unlockBodyStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 
-const startCardStyle: CSSProperties = { marginTop: "12px", background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px", padding: "12px" };
+const startCardStyle: CSSProperties = { marginTop: "12px", background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "12px", padding: "12px" };
 const startLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "4px" };
 
 const phaseNumStyle: CSSProperties = {
@@ -281,7 +281,7 @@ const unlockResultCardStyle: CSSProperties = {
 const unlockResultLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "6px" };
 const unlockResultItemStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
 
-const faqCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
+const faqCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
 const faqQStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "color-mix(in srgb, var(--v5-ink) 95%, transparent)" };
 const faqAStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625
 

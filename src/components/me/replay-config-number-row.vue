@@ -36,7 +36,7 @@ const btnTextStyle: CSSProperties = { fontSize: "14px", color: "var(--v5-ink-2)"
 const valueStyle: CSSProperties = {
   minWidth: "44px",
   textAlign: "center",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   color: "var(--v5-ink)",
   fontWeight: 500,

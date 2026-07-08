@@ -25,7 +25,7 @@
         <view v-else key="reveal" class="est-phone anim-up">
           <view class="est-phone__pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text class="est-phone__pill-t">Detected</text>
+            <text class="est-phone__pill-t">已识别</text>
           </view>
           <view class="est-phone__icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -38,7 +38,7 @@
           </view>
           <view class="est-phone__rate">
             <text class="est-phone__rate-v">~$0.06</text>
-            <text class="est-phone__rate-u">/day</text>
+            <text class="est-phone__rate-u">/天</text>
           </view>
         </view>
       </transition>
@@ -55,7 +55,7 @@
           <text class="cmp__label">{{ t.onboarding.withS1 }}</text>
           <text class="cmp__sub">{{ multS1 }}× {{ t.onboarding.yourCurrentRate }}</text>
         </view>
-        <text class="cmp__val">${{ s1.toFixed(2) }}/day</text>
+          <text class="cmp__val">${{ s1.toFixed(2) }}/天</text>
       </view>
       <view class="cmp">
         <view class="cmp__icon">
@@ -63,9 +63,9 @@
         </view>
         <view class="cmp__body">
           <text class="cmp__label">{{ t.onboarding.withPro }}</text>
-          <text class="cmp__sub">~${{ (pro * 30).toFixed(0) }}/mo</text>
+          <text class="cmp__sub">约 ${{ (pro * 30).toFixed(0) }}/月</text>
         </view>
-        <text class="cmp__val">${{ pro.toFixed(2) }}/day</text>
+        <text class="cmp__val">${{ pro.toFixed(2) }}/天</text>
       </view>
     </view>
 
@@ -127,7 +127,7 @@ function goConnect() {
   flex: 1;
   height: 4px;
   border-radius: 9999px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   overflow: hidden;
 }
 .est-bar__fill {
@@ -202,7 +202,7 @@ function goConnect() {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -211,7 +211,7 @@ function goConnect() {
   background: var(--v5-brand);
 }
 .est-phone__pill-t {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -248,7 +248,7 @@ function goConnect() {
 }
 .est-phone__rate-v {
   display: block;
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-variant-numeric: tabular-nums;
   font-size: 18px;
   font-weight: 600;
@@ -256,7 +256,7 @@ function goConnect() {
 }
 .est-phone__rate-u {
   display: block;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--v5-ink-4);
 }
 .est-compare {
@@ -285,7 +285,7 @@ function goConnect() {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -308,7 +308,7 @@ function goConnect() {
   margin-top: 2px;
 }
 .cmp__val {
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -322,7 +322,7 @@ function goConnect() {
   width: 100%;
   height: 48px;
   border-radius: 9999px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   display: flex;
   align-items: center;
   justify-content: center;

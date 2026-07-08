@@ -37,7 +37,6 @@ const iconKind = computed(() => {
 });
 
 function go() {
-  const url = props.device.kind === "phone" ? "/pages/earn/earn" : `/pages/store/detail?id=${props.device.kind}`;
-  uni.navigateTo({ url, fail: () => {} });
+  uni.navigateTo({ url: `/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}`, fail: () => {} });
 }
 </script>

@@ -60,7 +60,7 @@
             <text class="block font-mono-tabular" :style="statusCapStyle('var(--v5-ink-3)')">{{ t.pool.locked }}</text>
             <text class="block" :style="lockedHeadStyle">
               <text>{{ requiresV3Parts[0] }}</text>
-              <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">V3 Captain</text>
+              <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">V3 舰长</text>
               <text>{{ requiresV3Parts[1] }}</text>
             </text>
             <text class="block" :style="lockedSubStyle">{{ currentlyVText }}</text>
@@ -92,13 +92,13 @@
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
                 <text :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--v5-ink)' }">V{{ row.v }} {{ row.title }}</text>
-                <text v-if="row.isMine" class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-brand)' }">{{ t.pool.youTag }}</text>
+                <text v-if="row.isMine" class="font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-brand)' }">{{ t.pool.youTag }}</text>
               </view>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">{{ row.peopleVotes }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ row.peopleVotes }}</text>
             </view>
             <view class="text-right">
               <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '11.5px', color: 'var(--v5-ink)' }">{{ (row.shareOfPool * 100).toFixed(2) }}%</text>
-              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
+              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
             </view>
           </view>
         </view>
@@ -114,7 +114,7 @@
           >
             <view>
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ h.weekId }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
             </view>
             <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '11.5px', color: h.payoutUSDT > 0 ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ h.payoutUSDT > 0 ? `+$${h.payoutUSDT.toFixed(2)}` : "—" }}</text>
           </view>
@@ -155,7 +155,7 @@ const weeklyDescText = computed(() => {
   return fmt(t.value.pool.weeklyDesc, { n });
 });
 const requiresV3Parts = computed(() => {
-  const parts = t.value.pool.requiresV3.split("V3 Captain");
+  const parts = t.value.pool.requiresV3.split("V3 舰长");
   return [parts[0] ?? "", parts[1] ?? ""];
 });
 const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: vState.myRank, title: V_RANKS[vState.myRank].title }));
@@ -212,17 +212,17 @@ const heroStyle: CSSProperties = {
     "linear-gradient(180deg, var(--v5-surface) 0%, var(--v5-bg) 100%)",
   border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent)",
 };
-const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const heroDescStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)" };
 
-const statusUnlockedStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface)", border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)" };
+const statusUnlockedStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface-bg)", border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)" };
 const statusLockedStyle: CSSProperties = { padding: "16px", background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)", border: "1px solid var(--v5-border)" };
 function statusCapStyle(color: string): CSSProperties {
-  return { fontSize: "10px", letterSpacing: "0.16em", color };
+  return { fontSize: "11px", letterSpacing: "0.16em", color };
 }
 const projectedStyle: CSSProperties = { marginTop: "8px", fontSize: "30px", fontWeight: 600, lineHeight: 1, color: "var(--v5-brand)" };
-const statLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const statLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 const statValueStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "2px" };
 const lockedHeadStyle: CSSProperties = { marginTop: "8px", fontSize: "14px", color: "var(--v5-ink)" };
 // SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[11px] leading-snug; was 1.45)
@@ -246,19 +246,19 @@ const concentrationStripStyle: CSSProperties = {
 };
 const concentrationTextStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.45 };
 
-const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+const tableCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px" };
 const tableHeadStyle: CSSProperties = { padding: "14px 16px 8px" };
-const tableHeadCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const tableHeadCapStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function voteRowStyle(isMine: boolean, isLast: boolean): CSSProperties {
   return {
-    padding: "10px 16px",
+    padding: "8px 16px",
     gap: "12px",
     background: isMine ? "color-mix(in srgb, var(--v5-brand) 5%, transparent)" : "transparent",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
-const pastHeadStyle: CSSProperties = { padding: "14px 16px 8px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const pastHeadStyle: CSSProperties = { padding: "14px 16px 8px", fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "10px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 </script>

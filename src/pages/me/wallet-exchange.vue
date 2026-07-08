@@ -104,7 +104,7 @@
       <view :style="dashStyle">
         <view class="flex items-center justify-between" style="margin-bottom: 12px">
           <text :style="dashTitleStyle">{{ t.exchange.capsLabel }}</text>
-          <text class="font-mono-tabular" style="font-size: 10px; color: var(--v5-ink-3)">{{ t.exchange.capsReset }}</text>
+          <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.exchange.capsReset }}</text>
         </view>
 
         <!-- Per-user cap -->
@@ -145,7 +145,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
             <text style="margin-left: 8px; font-size: 11px; color: var(--v5-warning)">{{ kycUnverifiedLabel }}</text>
           </template>
-          <text class="font-mono-tabular" style="margin-left: auto; font-size: 10px; color: var(--v5-ink-3)">{{ lifetimeLabel }}</text>
+          <text class="font-mono-tabular" style="margin-left: auto; font-size: 11px; color: var(--v5-ink-3)">{{ lifetimeLabel }}</text>
         </view>
 
         <!-- Queue -->
@@ -430,17 +430,17 @@ const refreshBtnStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   borderRadius: "999px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
 };
 const swapCardStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };
 const cardLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
@@ -448,13 +448,13 @@ const cardLabelStyle: CSSProperties = {
 };
 const amountInputStyle: CSSProperties = {
   background: "transparent",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "28px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const receiveValueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "28px",
   fontWeight: 600,
   color: "var(--v5-ink)",
@@ -506,12 +506,12 @@ const infoStyle: CSSProperties = {
 const dashStyle: CSSProperties = {
   margin: "12px 16px 0",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const dashTitleStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
@@ -551,7 +551,7 @@ const queueWrapStyle: CSSProperties = {
 };
 const queueTitleStyle: CSSProperties = {
   marginBottom: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
@@ -566,7 +566,7 @@ const historyTitleStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const historyEmptyStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px dashed var(--v5-border)",
   borderRadius: "16px",
   padding: "24px",
@@ -575,7 +575,7 @@ const historyEmptyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const historyListStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -583,7 +583,7 @@ const historyListStyle: CSSProperties = {
 function historyRowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: i !== 0 ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
 }

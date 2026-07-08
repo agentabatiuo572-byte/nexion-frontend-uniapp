@@ -55,17 +55,17 @@
 
             <!-- You node -->
             <circle cx="170" cy="22" r="14" fill="var(--v5-surface)" stroke="var(--v5-ink)" stroke-opacity="0.55" stroke-width="1.5" />
-            <text x="170" y="26" text-anchor="middle" font-size="10" fill="var(--v5-ink)" font-weight="600">{{ w.diagYou }}</text>
+            <text x="170" y="26" text-anchor="middle" font-size="11" fill="var(--v5-ink)" font-weight="600">{{ w.diagYou }}</text>
 
             <!-- Left wing main node -->
             <circle cx="86" cy="78" r="12" fill="var(--v5-brand)" fill-opacity="0.18" stroke="var(--v5-brand)" stroke-opacity="0.7" stroke-width="1.3" />
-            <text x="86" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-brand)" font-weight="600">A</text>
-            <text x="86" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagLeftLabel }}</text>
+            <text x="86" y="81.5" text-anchor="middle" font-size="11" fill="var(--v5-brand)" font-weight="600">A</text>
+            <text x="86" y="104" text-anchor="middle" font-size="11" fill="var(--v5-ink-3)">{{ w.diagLeftLabel }}</text>
 
             <!-- Right wing main node -->
             <circle cx="254" cy="78" r="12" fill="var(--v5-tech-cyan)" fill-opacity="0.22" stroke="var(--v5-tech-cyan-soft)" stroke-opacity="0.75" stroke-width="1.3" />
-            <text x="254" y="81.5" text-anchor="middle" font-size="9" fill="var(--v5-tech-cyan-soft)" font-weight="600">B</text>
-            <text x="254" y="104" text-anchor="middle" font-size="9.5" fill="var(--v5-ink-3)">{{ w.diagRightLabel }}</text>
+            <text x="254" y="81.5" text-anchor="middle" font-size="11" fill="var(--v5-tech-cyan-soft)" font-weight="600">B</text>
+            <text x="254" y="104" text-anchor="middle" font-size="11" fill="var(--v5-ink-3)">{{ w.diagRightLabel }}</text>
 
             <!-- Left children -->
             <circle cx="56" cy="132" r="5.5" fill="var(--v5-brand)" fill-opacity="0.7" stroke="var(--v5-brand)" stroke-opacity="0.9" stroke-width="0.6" />
@@ -78,11 +78,11 @@
           </svg>
           <view class="grid grid-cols-2" style="margin-top: 12px; gap: 8px">
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand)')">
-              <text class="block" :style="{ color: 'var(--v5-brand)', fontWeight: 500, fontSize: '10.5px' }">{{ w.diagLeftLabel }}</text>
+              <text class="block" :style="{ color: 'var(--v5-brand)', fontWeight: 500, fontSize: '11px' }">{{ w.diagLeftLabel }}</text>
               <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$3,000/mo</text>
             </view>
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand-2)')">
-              <text class="block" :style="{ color: 'var(--v5-brand-2)', fontWeight: 500, fontSize: '10.5px' }">{{ w.diagRightLabel }}</text>
+              <text class="block" :style="{ color: 'var(--v5-brand-2)', fontWeight: 500, fontSize: '11px' }">{{ w.diagRightLabel }}</text>
               <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$2,000/mo</text>
             </view>
           </view>
@@ -116,11 +116,11 @@
         <view :style="mathCardStyle">
           <view class="grid grid-cols-2" style="gap: 12px">
             <view>
-              <text class="block" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagLeftLabel }}</text>
+              <text class="block" :style="{ fontSize: '11px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagLeftLabel }}</text>
               <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)', marginTop: '2px' }">$3,000</text>
             </view>
             <view>
-              <text class="block" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagRightLabel }}</text>
+              <text class="block" :style="{ fontSize: '11px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagRightLabel }}</text>
               <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)', marginTop: '2px' }">$2,000</text>
             </view>
           </view>
@@ -154,7 +154,7 @@
               <text class="font-display tabular-nums" :style="{ fontSize: '14px', fontWeight: 600, color: tl.blocked ? 'var(--v5-brand-2)' : 'var(--v5-brand)' }">{{ tl.bonusVal }}</text>
             </view>
             <text class="block" :style="{ marginTop: '4px', fontSize: '12px', color: 'var(--v5-ink-2)', lineHeight: 1.375 }">{{ tl.text }}</text>
-            <view class="flex items-center font-mono-tabular" :style="{ marginTop: '6px', gap: '12px', fontSize: '10.5px', color: 'var(--v5-ink-4)' }">
+            <view class="flex items-center font-mono-tabular" :style="{ marginTop: '6px', gap: '12px', fontSize: '11px', color: 'var(--v5-ink-4)' }">
               <text>L {{ tl.leftVal }}</text>
               <text>·</text>
               <text>R {{ tl.rightVal }}</text>
@@ -241,14 +241,14 @@ const heroBgStyle: CSSProperties = {
     "radial-gradient(70% 80% at 100% 100%, rgba(124,92,255,0.18) 0%, transparent 60%)," +
     "var(--v5-surface)",
 };
-const heroLabelStyle: CSSProperties = { fontSize: "10.5px", letterSpacing: "0.16em", color: "var(--v5-brand)", fontWeight: 500 };
+const heroLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-brand)", fontWeight: 500 };
 const heroTitleStyle: CSSProperties = { marginTop: "8px", fontSize: "26px", lineHeight: 1.25, fontWeight: 600, color: "var(--v5-ink)" };
 const heroSubStyle: CSSProperties = { marginTop: "8px", fontSize: "13.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
-const sectionStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "16px" };
+const sectionStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "16px" };
 const sectionHeadStyle: CSSProperties = {
   gap: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-brand)",
   fontWeight: 500,
@@ -257,7 +257,7 @@ const sectionHeadStyle: CSSProperties = {
 const bodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
 const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
-const diagramCardStyle: CSSProperties = { marginTop: "12px", background: "var(--v5-surface)", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)", borderRadius: "12px", padding: "16px" };
+const diagramCardStyle: CSSProperties = { marginTop: "12px", background: "var(--v5-surface-bg)", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)", borderRadius: "12px", padding: "16px" };
 function trackTotalStyle(color: string): CSSProperties {
   return { background: `color-mix(in srgb, ${color} 8%, transparent)`, padding: "6px 8px" };
 }
@@ -295,7 +295,7 @@ const qualifyChipStyle: CSSProperties = {
 
 function timelineRowStyle(highlight: boolean): CSSProperties {
   return {
-    padding: "10px 12px",
+    padding: "8px 12px",
     background: highlight ? "color-mix(in srgb, var(--v5-brand) 8%, transparent)" : "var(--v5-surface)",
     borderColor: highlight ? "color-mix(in srgb, var(--v5-brand) 40%, transparent)" : "var(--v5-border)",
   };
@@ -308,7 +308,7 @@ const takeawayStyle: CSSProperties = {
   padding: "8px 12px",
 };
 
-const faqCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
+const faqCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "10px", padding: "10px 12px" };
 const faqQStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "color-mix(in srgb, var(--v5-ink) 95%, transparent)" };
 const faqAStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 

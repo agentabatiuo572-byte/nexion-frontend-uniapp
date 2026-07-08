@@ -1,60 +1,69 @@
 <!--
   Me — ported from Nexion-prototype/app/(main)/me/page.tsx (13 sections).
   Top→bottom: ProfileRow → WalletCard → WithdrawalLockedWarning (if balance < $20)
-  → TrialEntry (hero, if eligible) → OKX-style quick sections (network / devices
-  / earn extras / account / preferences / help) → TrialEntry (active row, if
-  trial running) → OrdersCard (if any orders) → Sign out → version footer.
+  → OKX-style quick sections (earn extras / OrdersCard if any orders /
+  preferences / help) → Sign out → version footer.
 
   Wrapped in <AppChassis active="me">; entrance via <CardStagger>.
 
   Secondary settings-row display values are wired to the live ported stores
-  (security 2FA / achievements count / notifications unread / receipts / orders /
-  points), matching the source. KYC state is driven by the wallet-pairing store.
+  (achievements count / receipts / orders / points), matching the source.
   Some settings targets are not-yet-ported pages → nav fail:()=>{}.
 
   Settings-row value formatting matches the source: mono-tabular accent text.
 -->
 <template>
   <AppChassis active="me">
-    <CardStagger class="px-4 pt-3 pb-4 space-y-3" style="color: var(--v5-ink)">
+    <CardStagger class="px-4 pt-2 pb-4 space-y-3" style="color: var(--v5-ink)">
       <ProfileRow />
 
       <WalletCard />
 
       <WithdrawalLockedWarning v-if="showWithdrawalLocked" :balance="usdtBalance" />
 
-      <!-- Hero slot — zero-cost trial activation right after wallet -->
-      <TrialEntry v-if="trialIsHero" />
-
       <view v-for="section in quickSections" :key="section.key">
         <SectionHeader :title="section.title" :count="section.count" />
-        <view :style="quickGridCardStyle">
+        <view v-if="section.layout === 'list'" :style="quickListCardStyle">
+          <view
+            v-for="(item, index) in section.items"
+            :key="item.key"
+            class="active:opacity-80"
+            :style="quickListRowStyle(index === section.items.length - 1)"
+            @click="goQuick(item)"
+          >
+            <view :style="quickListIconStyle(item.tone)">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" :stroke-width="item.strokeWidth ?? 2" stroke-linecap="round" stroke-linejoin="round">
+                <path v-for="path in iconPaths[item.icon]" :key="path" :d="path" />
+              </svg>
+              <text v-if="item.badge" :style="quickBadgeStyle">{{ item.badge }}</text>
+            </view>
+            <text class="flex-1 truncate" :style="quickListLabelStyle">{{ item.label }}</text>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="quickListChevronStyle()">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </view>
+        </view>
+        <view v-else :style="quickGridCardStyle">
           <view :style="quickGridStyle">
             <view
               v-for="item in section.items"
               :key="item.key"
               class="active:opacity-80"
-              :data-quick-key="item.key"
               :style="quickItemStyle"
-              @click="handleQuickItem(item)"
+              @click="goQuick(item)"
             >
               <view :style="quickIconStyle(item.tone)">
-                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" :stroke-width="item.strokeWidth ?? 2" stroke-linecap="round" stroke-linejoin="round">
                   <path v-for="path in iconPaths[item.icon]" :key="path" :d="path" />
                 </svg>
                 <text v-if="item.badge" :style="quickBadgeStyle">{{ item.badge }}</text>
               </view>
               <text :style="quickLabelStyle">{{ item.label }}</text>
-              <text v-if="item.meta" class="truncate" :style="quickMetaStyle(item.tone)">{{ item.meta }}</text>
             </view>
           </view>
         </view>
+        <OrdersCard v-if="section.key === 'earn-extras' && orderCount > 0" />
       </view>
-
-      <!-- Active-state row once trial is running -->
-      <TrialEntry v-if="trialIsActive" />
-
-      <OrdersCard v-if="orderCount > 0" />
 
       <!-- Sign out -->
       <view class="w-full inline-flex items-center justify-center active:opacity-90" :style="signOutStyle" @click="handleSignOut">
@@ -75,7 +84,6 @@ import SectionHeader from "@/components/me/section-header.vue";
 import ProfileRow from "@/components/me/profile-row.vue";
 import WalletCard from "@/components/me/wallet-card.vue";
 import WithdrawalLockedWarning from "@/components/me/withdrawal-locked-warning.vue";
-import TrialEntry from "@/components/me/trial-entry.vue";
 import OrdersCard from "@/components/me/orders-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -83,19 +91,11 @@ import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
-import { useProfile } from "@/store/profile";
-import { useReceipts } from "@/store/receipts";
 import { useOrders } from "@/store/orders";
 import { useLocaleStore } from "@/store/locale";
-import { useWalletPairing } from "@/store/wallet-pairing";
 import { useNexFaucet } from "@/store/nex-faucet";
-import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
-import { useSecurity } from "@/store/security";
-import { useNotifications } from "@/store/notifications";
 import { useGenesis } from "@/store/genesis";
 import { useAchievements } from "@/store/achievements";
-import { MAX_DEVICES } from "@/store/device-types";
-import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
 import { ACHIEVEMENTS } from "@/mock/achievements";
 import { confirm as uiConfirm } from "@/store/ui";
@@ -106,17 +106,10 @@ const t = useT();
 const app = useApp();
 const auth = useAuth();
 const session = useSession();
-const profile = useProfile();
-const receipts = useReceipts();
 const orders = useOrders();
 const locale = useLocaleStore();
-const pairing = useWalletPairing();
 const faucet = useNexFaucet();
-const trial = useFreeTrial();
-const security = useSecurity();
-const notifications = useNotifications();
 const achievements = useAchievements();
-const vrank = useVRank();
 const theme = useTheme();
 
 const iconPaths = {
@@ -129,8 +122,8 @@ const iconPaths = {
   slots: ["M4 4h6v6H4z", "M14 4h6v6h-6z", "M4 14h6v6H4z", "M14 14h6v6h-6z"],
   target: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20", "M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12", "M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4"],
   trophy: ["M6 9H4.5a2.5 2.5 0 0 1 0-5H6", "M18 9h1.5a2.5 2.5 0 0 0 0-5H18", "M4 22h16", "M10 14.7V17c0 .55-.47.98-.97 1.2A4 4 0 0 0 7 22", "M14 14.7V17c0 .55.47.98.97 1.2A4 4 0 0 1 17 22", "M18 2H6v7a6 6 0 0 0 12 0z"],
-  flame: ["M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.1-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"],
-  book: ["M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"],
+  checkIn: ["M16 2v4M8 2v4m13 10v-4c0-3.771 0-5.657-1.172-6.828S16.771 4 13 4h-2C7.229 4 5.343 4 4.172 5.172S3 8.229 3 12v2c0 3.771 0 5.657 1.172 6.828S7.229 22 11 22h1M3 10h18", "M21 19.5h-6.5m2 2.5c-.506-.491-2.5-1.8-2.5-2.5s1.994-2.009 2.5-2.5"],
+  book: ["M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20", "M8 11h8", "M8 7h6"],
   lock: ["M7 11V7a5 5 0 0 1 10 0v4", "M5 11h14v10H5z"],
   crown: ["M2 6l5 4 5-7 5 7 5-4-3 13H5z", "M5 22h14"],
   gift: ["M20 12v10H4V12", "M2 7h20v5H2z", "M12 22V7", "M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z", "M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"],
@@ -143,7 +136,6 @@ const iconPaths = {
   trust: ["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10", "m9 12 2 2 4-4"],
   sliders: ["M4 21v-7", "M4 10V3", "M12 21v-9", "M12 8V3", "M20 21v-5", "M20 12V3", "M2 14h4", "M10 8h4", "M18 16h4"],
   moon: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"],
-  sun: ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8"],
   globe: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20", "M2 12h20", "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"],
   rewind: ["M3 12a9 9 0 1 0 9-9 9.8 9.8 0 0 0-6.7 2.7L3 8", "M3 3v5h5"],
   help: ["M9.1 9a3 3 0 1 1 5.8 1c0 2-3 3-3 3", "M12 17h.01", "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20"],
@@ -160,48 +152,28 @@ type QuickTone = "brand" | "purple" | "orange" | "success" | "warning" | "muted"
 interface QuickItem {
   key: string;
   label: string;
-  href: string;
+  href?: string;
   icon: QuickIcon;
   meta?: string;
   badge?: string;
   tone?: QuickTone;
+  strokeWidth?: number;
 }
 
 interface QuickSection {
   key: string;
   title: string;
   count?: string;
+  layout?: "grid" | "list";
   items: QuickItem[];
 }
 
 const usdtBalance = computed(() => app.user.usdtBalance);
 const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
-const profileName = computed(() => profile.displayName);
-const kycVerified = computed(() => pairing.walletPaired);
-const receiptCount = computed(() => receipts.receipts.length);
 const orderCount = computed(() => orders.orders.length);
 const streakDays = computed(() => faucet.signInStreak);
 const localeUpper = computed(() => locale.code.toUpperCase());
-const activeCount = computed(() => app.activeSlotCount);
-const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const slotsUsed = computed(() => activeCount.value + trialSlot.value);
-const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);
-const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: MAX_DEVICES }));
-const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: slotsUsed.value }));
-const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
-const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
-const rankValue = computed(() => `V${vrank.myRank}`);
 const themeModeLabel = computed(() => (theme.mode === "dark" ? t.value.me.themeMetaDark : t.value.me.themeMetaLight));
-
-// Trial routing — hero slot (eligible to start) vs active row (running).
-const trialStatus = computed(() => trial.status);
-const trialIsActive = computed(
-  () =>
-    trialStatus.value === "active" ||
-    trialStatus.value === "grace" ||
-    trialStatus.value === "extended",
-);
-const trialIsHero = computed(() => !trialIsActive.value && trial.canStart());
 
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.
@@ -210,8 +182,6 @@ const ownsGenesis = computed(() => genesis.myOwned > 0);
 const myGenesisValue = computed(() => fmt(t.value.me.myGenesisNodeValue, { n: String(genesis.myOwned) }));
 
 // ── Secondary display values, wired to the live ported stores (matches source) ──
-const twoFactorEnabled = computed(() => security.twoFactorEnabled);
-const unreadNotifs = computed(() => notifications.unread);
 const achievementsUnlocked = computed(
   () => achievements.records.filter((r) => r.unlockedAt > 0).length,
 );
@@ -223,84 +193,51 @@ const achievementsValue = computed(() =>
 const eventsLiveLabel = computed(() => fmt(t.value.me.nLive, { n: "9" }));
 const quickSections = computed<QuickSection[]>(() => [
   {
-    key: "network",
-    title: t.value.me.myNetwork,
-    items: [
-      { key: "team", label: t.value.me.team, href: "/team", icon: "network", meta: t.value.me.networkOverviewMeta, tone: "brand" },
-      { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
-      { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: t.value.me.networkInviteMeta, tone: "orange" },
-      { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "success" },
-    ],
-  },
-  {
-    key: "devices",
-    title: t.value.myDevices.sectionTitle,
-    count: deviceSectionCount.value,
-    items: [
-      { key: "inventory", label: t.value.myDevices.inventoryTitle, href: "/me/devices", icon: "device", meta: onlineLabel.value, tone: "success" },
-      { key: "add", label: t.value.me.deviceAddLabel, href: "/store", icon: "plus", meta: t.value.me.deviceAddMeta, tone: "brand" },
-      { key: "slots", label: t.value.myDevices.inventorySlotsLabel, href: "/me/devices", icon: "slots", meta: emptySlotsLabel.value, tone: "purple" },
-      { key: "goals", label: t.value.me.goalsRow, href: "/me/goals", icon: "target", meta: t.value.me.setTarget, tone: "orange" },
-    ],
-  },
-  {
     key: "earn-extras",
     title: t.value.me.secEarnExtras,
     items: [
-      { key: "missions", label: t.value.me.missionsRow, href: "/missions", icon: "trophy", meta: t.value.me.missionsValue, tone: "brand" },
-      { key: "daily", label: t.value.me.dailyCheckin, href: "/daily", icon: "flame", meta: `${streakDays.value} ${t.value.me.dayStreak}`, tone: "orange" },
-      { key: "events", label: t.value.me.eventsCenter, href: "/events", icon: "ticket", meta: eventsLiveLabel.value, tone: "orange" },
-      { key: "learn", label: t.value.me.learnRow, href: "/learn", icon: "book", meta: t.value.me.earnNex, tone: "muted" },
-      { key: "staking", label: t.value.me.stakingVault, href: "/staking", icon: "lock", meta: t.value.me.upTo180, tone: "success" },
-      { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "warning" },
-      { key: "achievements", label: t.value.me.achievements, href: "/me/achievements", icon: "gift", meta: achievementsValue.value, tone: "brand" },
-      { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "sparkle", meta: t.value.rewards.entryValue, tone: "brand" },
-      { key: "wrapped", label: t.value.me.wrappedRow, href: "/me/wrapped", icon: "sparkle", meta: "2026", tone: "purple" },
-    ],
-  },
-  {
-    key: "account",
-    title: t.value.me.secAccount,
-    items: [
-      { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
-      { key: "kyc", label: t.value.me.identityKyc, href: "/me/security", icon: "shield", meta: kycVerified.value ? t.value.me.kycVerified : t.value.me.kycPending, tone: kycVerified.value ? "success" : "orange" },
-      { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
-      { key: "notifications", label: t.value.me.notifications, href: "/me/notifications", icon: "bell", badge: unreadNotifs.value > 0 ? String(unreadNotifs.value) : undefined, tone: "purple" },
-      { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: String(receiptCount.value), tone: "brand" },
-      { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
-      { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
-      { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
+      { key: "goals", label: "收益目标", href: "/me/goals", icon: "target", meta: t.value.me.setTarget, tone: "orange" },
+      { key: "missions", label: "任务中心", href: "/missions", icon: "trophy", meta: t.value.me.missionsValue, tone: "brand" },
+      { key: "daily", label: "每日签到", href: "/daily", icon: "checkIn", meta: `${streakDays.value} ${t.value.me.dayStreak}`, tone: "orange", strokeWidth: 1.5 },
+      { key: "events", label: "活动中心", href: "/events", icon: "ticket", meta: eventsLiveLabel.value, tone: "orange" },
+      { key: "learn", label: "教程中心", href: "/learn", icon: "book", meta: t.value.me.earnNex, tone: "muted", strokeWidth: 1.75 },
+      { key: "staking", label: "质押金库", href: "/staking", icon: "lock", meta: t.value.me.upTo180, tone: "success" },
+      { key: "genesis", label: "创世节点", href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "warning" },
+      { key: "achievements", label: "成就徽章", href: "/me/achievements", icon: "gift", meta: achievementsValue.value, tone: "brand" },
+      { key: "rewards", label: "奖励中心", href: "/me/rewards", icon: "sparkle", meta: t.value.rewards.entryValue, tone: "brand" },
+      { key: "wrapped", label: "年度回顾", href: "/me/wrapped", icon: "sparkle", meta: "2026", tone: "purple" },
     ],
   },
   {
     key: "preferences",
     title: t.value.me.secPreferences,
+    layout: "list",
     items: [
-      { key: "preferences", label: t.value.me.preferencesRow, href: "/me/preferences", icon: "sliders", tone: "muted" },
-      { key: "theme", label: t.value.me.themeRow, href: "/me/preferences", icon: theme.mode === "dark" ? "moon" : "sun", meta: themeModeLabel.value, tone: "purple" },
-      { key: "language", label: t.value.me.languageRow, href: "/me/language", icon: "globe", meta: localeUpper.value, tone: "brand" },
+      { key: "preferences", label: "偏好设置", href: "/me/preferences", icon: "sliders", tone: "muted" },
+      { key: "theme", label: "主题模式", icon: "moon", meta: themeModeLabel.value, tone: "purple" },
+      { key: "language", label: "语言设置", href: "/me/language", icon: "globe", meta: localeUpper.value, tone: "brand" },
     ],
   },
   {
     key: "help",
     title: t.value.me.secHelp,
+    layout: "list",
     items: [
-      { key: "replay", label: t.value.me.replayTour, href: "/me/replay-tour", icon: "rewind", tone: "muted" },
-      { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
-      { key: "support", label: t.value.me.liveSupportRow, href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
-      { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
-      { key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: unreadNotifs.value > 0 ? String(unreadNotifs.value) : undefined, tone: "purple" },
-      { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
+      { key: "replay", label: "新手引导", href: "/me/replay-tour", icon: "rewind", tone: "muted" },
+      { key: "faq", label: "帮助中心", href: "/me/help", icon: "help", tone: "muted" },
+      { key: "support", label: "在线客服", href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
+      { key: "tickets", label: "服务工单", href: "/me/support-tickets", icon: "ticket", tone: "orange" },
+      { key: "developer", label: "开发中心", href: "/developer", icon: "code", tone: "muted" },
     ],
   },
 ]);
 
-function handleQuickItem(item: QuickItem) {
+function goQuick(item: QuickItem) {
   if (item.key === "theme") {
     theme.toggle();
     return;
   }
-  navTo(item.href);
+  if (item.href) navTo(item.href);
 }
 
 function toneColor(tone: QuickTone = "muted"): string {
@@ -324,7 +261,7 @@ function toneColor(tone: QuickTone = "muted"): string {
 
 const quickGridCardStyle: CSSProperties = {
   padding: "18px 10px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
 };
 const quickGridStyle: CSSProperties = {
@@ -342,8 +279,15 @@ const quickItemStyle: CSSProperties = {
   alignItems: "center",
   gap: "7px",
 };
+const DARK_MODE_ICON_COLOR = "#B8C0CC";
+
+function quickForegroundColor(tone: QuickTone = "muted"): string {
+  return theme.mode === "dark" ? DARK_MODE_ICON_COLOR : toneColor(tone);
+}
+
 function quickIconStyle(tone: QuickTone = "muted"): CSSProperties {
-  const color = toneColor(tone);
+  const color = quickForegroundColor(tone);
+  const tint = toneColor(tone);
   return {
     position: "relative",
     width: "44px",
@@ -351,7 +295,7 @@ function quickIconStyle(tone: QuickTone = "muted"): CSSProperties {
     borderRadius: "14px",
     display: "grid",
     placeItems: "center",
-    background: `color-mix(in srgb, ${color} 14%, transparent)`,
+    background: `color-mix(in srgb, ${tint} 14%, transparent)`,
     color,
   };
 }
@@ -365,8 +309,8 @@ const quickBadgeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 600,
   lineHeight: "17px",
   textAlign: "center",
@@ -382,17 +326,49 @@ const quickLabelStyle: CSSProperties = {
   whiteSpace: "normal",
   wordBreak: "break-word",
 };
-function quickMetaStyle(tone: QuickTone = "muted"): CSSProperties {
+
+const quickListCardStyle: CSSProperties = {
+  padding: "4px 0",
+  background: "var(--v5-surface-bg)",
+  borderRadius: "16px",
+  overflow: "hidden",
+};
+function quickListRowStyle(isLast: boolean): CSSProperties {
   return {
-    maxWidth: "76px",
-    marginTop: "-3px",
-    fontFamily: "var(--font-v5)",
-    fontSize: "10.5px",
-    lineHeight: 1.2,
-    color: toneColor(tone),
-    textAlign: "center",
-    opacity: 0.9,
-    whiteSpace: "nowrap",
+    minHeight: "54px",
+    padding: "8px 14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    borderBottom: isLast ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)",
+  };
+}
+function quickListIconStyle(tone: QuickTone = "muted"): CSSProperties {
+  const color = quickForegroundColor(tone);
+  const tint = toneColor(tone);
+  return {
+    position: "relative",
+    width: "34px",
+    height: "34px",
+    borderRadius: "12px",
+    display: "grid",
+    placeItems: "center",
+    background: `color-mix(in srgb, ${tint} 12%, transparent)`,
+    color,
+    flexShrink: 0,
+  };
+}
+const quickListLabelStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "14px",
+  fontWeight: 500,
+  lineHeight: "20px",
+  color: "var(--v5-ink)",
+};
+function quickListChevronStyle(): CSSProperties {
+  return {
+    color: theme.mode === "dark" ? DARK_MODE_ICON_COLOR : "var(--v5-ink-4)",
+    flexShrink: 0,
   };
 }
 
@@ -419,7 +395,7 @@ const signOutStyle: CSSProperties = {
   marginTop: "6px",
   height: "44px",
   padding: "0 18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid color-mix(in srgb, var(--v5-danger) 25%, transparent)",
   color: "var(--v5-danger)",
   borderRadius: "999px",

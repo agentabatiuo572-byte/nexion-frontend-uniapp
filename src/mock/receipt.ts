@@ -192,14 +192,14 @@ function unitPricing(
     case "IG": {
       const unit = gross / Math.max(1, details.outputCount);
       return {
-        unitPriceLabel: `$${unit.toFixed(4)} / image`,
-        unitsLabel: `${details.outputCount} images`,
+        unitPriceLabel: `$${unit.toFixed(4)} / 张`,
+        unitsLabel: `${details.outputCount} 张图片`,
       };
     }
     case "VG": {
       const unit = gross / Math.max(1, details.durationSec);
       return {
-        unitPriceLabel: `$${unit.toFixed(3)} / sec`,
+        unitPriceLabel: `$${unit.toFixed(3)} / 秒`,
         unitsLabel: `${details.durationSec}s @ ${details.resolution}`,
       };
     }
@@ -207,33 +207,33 @@ function unitPricing(
       const tokens = details.inputTokens + details.outputTokens;
       const unitPer1k = (gross / Math.max(1, tokens)) * 1000;
       return {
-        unitPriceLabel: `$${unitPer1k.toFixed(4)} / 1k tok`,
-        unitsLabel: `${(tokens / 1000).toFixed(1)}k tokens`,
+        unitPriceLabel: `$${unitPer1k.toFixed(4)} / 1k token`,
+        unitsLabel: `${(tokens / 1000).toFixed(1)}k token`,
       };
     }
     case "FT": {
       return {
-        unitPriceLabel: `$${gross.toFixed(3)} / job`,
-        unitsLabel: `${details.trainingSteps} steps`,
+        unitPriceLabel: `$${gross.toFixed(3)} / 任务`,
+        unitsLabel: `${details.trainingSteps} 步`,
       };
     }
     case "EM": {
       const unit = (gross / Math.max(1, details.chunksCount)) * 1000;
       return {
-        unitPriceLabel: `$${unit.toFixed(4)} / 1k chunks`,
-        unitsLabel: `${details.chunksCount.toLocaleString()} chunks`,
+        unitPriceLabel: `$${unit.toFixed(4)} / 1k 片段`,
+        unitsLabel: `${details.chunksCount.toLocaleString()} 片段`,
       };
     }
     case "SP": {
       const unit = gross / Math.max(1, details.audioDurationSec);
       return {
-        unitPriceLabel: `$${unit.toFixed(4)} / audio sec`,
-        unitsLabel: `${(details.audioDurationSec / 60).toFixed(1)} min`,
+        unitPriceLabel: `$${unit.toFixed(4)} / 音频秒`,
+        unitsLabel: `${(details.audioDurationSec / 60).toFixed(1)} 分钟`,
       };
     }
   }
   // Fallback (unreachable due to exhaustive switch above, but TS needs it)
-  return { unitPriceLabel: `$${gross.toFixed(3)}`, unitsLabel: "1 job" };
+  return { unitPriceLabel: `$${gross.toFixed(3)}`, unitsLabel: "1 个任务" };
 }
 
 // Resolve client address from roster by name (used during receipt build).
@@ -318,11 +318,11 @@ export function generateKycReceipt(input: {
   return {
     id: input.complianceCheckId,
     category: "KY",
-    type: "Wallet Pairing",
+    type: "钱包配对",
     model: "KYC-Express",
 
     // Authority "signer" — virtual compliance org
-    client: "Nexion Compliance Authority",
+    client: "Nexion 合规机构",
     clientAddress: "0x" + randomHex(40),
 
     signature: "0x" + randomHex(64),
@@ -330,7 +330,7 @@ export function generateKycReceipt(input: {
     blockNumber: 18_700_000 + Math.floor(Math.random() * 50_000),
 
     // Device fields repurposed for the verified wallet
-    deviceName: "Verified wallet",
+    deviceName: "已验证钱包",
     deviceGpu: input.network,
     deviceFingerprint: randomHex(16),
 
@@ -339,8 +339,8 @@ export function generateKycReceipt(input: {
     vramTotalGb: 0,
     energyKwh: 0,
 
-    unitPriceLabel: "$1.00 / verification",
-    unitsLabel: "1 wallet paired",
+    unitPriceLabel: "$1.00 / 验证",
+    unitsLabel: "1 个钱包已配对",
     gross: 1.0,
     fee: 0,
     netPaid: 1.0,                     // Fully credited

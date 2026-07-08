@@ -28,8 +28,8 @@
         <view class="mx-4 mb-3 flex items-center" :style="complianceBannerStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <view class="flex-1 min-w-0" style="margin-left: 10px; font-size: 11.5px; line-height: 1.375">
-            <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">Compliance check</text>
-            <text style="color: var(--v5-ink-3); margin-left: 6px">· Powered by Chainalysis KYT · MiCA-aligned</text>
+            <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">合规检查</text>
+            <text style="color: var(--v5-ink-3); margin-left: 6px">· Chainalysis KYT 支持 · 符合 MiCA</text>
           </view>
         </view>
 
@@ -38,14 +38,14 @@
           <view class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.kycExpress.flow.verificationDeposit }}</text>
             <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
-              <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
-              <text style="font-size: 12px; color: var(--v5-ink-3)">USDT · locked</text>
+              <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
+              <text style="font-size: 12px; color: var(--v5-ink-3)">USDT · 锁定验证</text>
             </view>
             <text class="block" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
           </view>
 
           <view class="mx-4 mt-3 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">Network</text>
+            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">网络</text>
             <view
               v-for="(c, i) in KYC_CHANNELS"
               :key="c.id"
@@ -58,7 +58,7 @@
               </view>
               <view class="flex-1" style="margin-left: 12px">
                 <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }}</text>
+                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">手续费 {{ c.fee }} · {{ c.time }}</text>
               </view>
             </view>
           </view>
@@ -70,14 +70,14 @@
                 <text>{{ t.kycExpress.flow.generateAddressCta }}</text>
               </view>
             </view>
-            <text class="block text-center" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">Per MiCA Art. 22 · FATF Travel Rule · US FinCEN Rule 314(b)</text>
+            <text class="block text-center" style="margin-top: 8px; font-size: 11px; color: var(--v5-ink-4); line-height: 1.4">依据 MiCA 第 22 条 · FATF 旅行规则 · 美国 FinCEN 314(b)</text>
           </view>
         </view>
 
         <!-- awaiting -->
         <view v-else-if="kycPhase === 'awaiting'" class="mx-4 rounded-2xl border nx-step-in" :style="surfaceCardStyle">
           <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">Send $1.00 via {{ network }}</text>
+            <text class="font-mono-tabular" :style="metaLabelStyle">通过 {{ network }} 发送 $1.00</text>
             <text class="tabular-nums" style="font-size: 11px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
           </view>
 
@@ -85,7 +85,7 @@
           <view :style="qrBoxStyle">
             <view :style="qrInnerStyle" />
           </view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">Scan with your wallet · or copy address below</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">用钱包扫码 · 或复制下方地址</text>
 
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); word-break: break-all">{{ depositAddress }}</text>
@@ -96,35 +96,35 @@
           </view>
 
           <view class="flex items-center justify-between" style="margin-top: 12px; font-size: 12.5px">
-            <text style="color: var(--v5-ink-3)">Send exactly</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-brand)">1.00 USDT</text>
+            <text style="color: var(--v5-ink-3)">请精确发送</text>
+            <text class="tabular-nums" style="font-family: var(--font-amount); font-weight: 600; color: var(--v5-brand)">1.00 USDT</text>
           </view>
 
           <view class="flex items-center rounded-xl" :style="awaitingBarStyle">
             <view :style="miniSpinnerStyle" />
-            <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">Awaiting on-chain confirmation…</text>
-            <text style="font-size: 10.5px; color: var(--v5-ink-4)">auto-detect</text>
+            <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">等待链上确认…</text>
+            <text style="font-size: 11px; color: var(--v5-ink-4)">自动识别</text>
           </view>
 
           <view class="nx-kyc-payment-sent-cta w-full grid place-items-center active:opacity-80" :style="markSentBtnStyle" @click="kycPhase = 'verifying'">
             <text>{{ t.kycExpress.flow.paymentSentCta }}</text>
           </view>
 
-          <text class="block" style="margin-top: 12px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">Address valid for 30 minutes. Only send {{ network }} to this address — cross-chain transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 12px; font-size: 11px; color: var(--v5-ink-4); line-height: 1.4">地址 30 分钟内有效。只能向此地址发送 {{ network }} — 跨链转账无法找回。</text>
         </view>
 
         <!-- verifying -->
         <view v-else-if="kycPhase === 'verifying'" class="mx-4 rounded-2xl border nx-step-in" :style="surfaceCardStyle">
           <view class="flex items-center" style="gap: 6px; font-size: 12.5px; color: var(--v5-brand)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-            <text>Payment received from <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
+            <text>已收到来自 <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text> 的付款</text>
           </view>
-          <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · sender wallet</text>
+          <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · 发送钱包</text>
 
           <view style="margin-top: 20px" class="space-y-3">
             <VerifyRow :step="1" :label="t.wallet.verifyReceiving" :done="step1Done" />
             <VerifyRow :step="2" :label="t.wallet.verifyKyt" :done="step2Done" :enabled="step1Done" />
-            <VerifyRow :step="3" :label="t.wallet.verifyPairing" :done="false" :enabled="step2Done" pending-hint="finalizing" />
+            <VerifyRow :step="3" :label="t.wallet.verifyPairing" :done="false" :enabled="step2Done" pending-hint="收尾中" />
           </view>
         </view>
 
@@ -136,13 +136,13 @@
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             </view>
             <text class="block text-center" :style="completeTitleStyle">{{ t.kycExpress.flow.verificationComplete }}</text>
-            <text class="block text-center" style="margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.45">Wallet paired · $1.00 credited to your balance</text>
+            <text class="block text-center" style="margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.45">钱包已配对 · $1.00 已计入余额</text>
 
             <view style="margin-top: 16px" class="space-y-2">
-              <CompleteRow k="Paired wallet" :v="senderShort" mono />
-              <CompleteRow k="Network" :v="network" />
-              <CompleteRow k="Compliance ID" :v="complianceId" mono accent />
-              <CompleteRow k="Verified at" :v="verifiedAt" />
+              <CompleteRow k="已配对钱包" :v="senderShort" mono />
+              <CompleteRow k="网络" :v="network" />
+              <CompleteRow k="合规编号" :v="complianceId" mono accent />
+              <CompleteRow k="验证时间" :v="verifiedAt" />
             </view>
 
             <view class="nx-kyc-continue-withdraw-cta w-full flex items-center justify-center active:opacity-85" :style="completeBtnStyle" @click="goWithdraw">
@@ -157,7 +157,7 @@
       <template v-else>
         <!-- channel list -->
         <view v-if="!selected" class="mx-4 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">Select Channel</text>
+          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">选择渠道</text>
           <view
             v-for="(c, i) in ALL_CHANNELS"
             :key="c.id"
@@ -167,9 +167,12 @@
           >
             <view class="flex-1">
               <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }} · Min {{ c.min }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">手续费 {{ c.fee }} · {{ c.time }} · 最低 {{ c.min }}</text>
             </view>
-            <text style="color: var(--v5-brand); font-size: 12px">Use →</text>
+            <view class="flex items-center shrink-0" style="gap: 2px; color: var(--v5-brand); font-size: 12px">
+              <text>使用</text>
+              <ChevronRightIcon />
+            </view>
           </view>
         </view>
 
@@ -179,11 +182,11 @@
         <!-- chain deposit card -->
         <view v-else class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
           <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">Send via {{ selected }}</text>
-            <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">Change</text>
+            <text class="font-mono-tabular" :style="metaLabelStyle">通过 {{ selected }} 发送</text>
+            <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">更换</text>
           </view>
           <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">Scan QR or copy the address below</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">扫描二维码或复制下方地址</text>
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ DEMO_ADDRESS }}</text>
             <view class="nx-topup-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyDemoAddress">
@@ -193,9 +196,9 @@
           </view>
           <view class="flex items-center" style="margin-top: 16px; gap: 8px; font-size: 12.5px; color: var(--v5-ink-3)">
             <view :style="miniSpinnerStyle" />
-            <text>Awaiting confirmation… (auto-detects within 5 minutes)</text>
+            <text>等待确认…(5 分钟内自动识别)</text>
           </view>
-          <text class="block" style="margin-top: 16px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.4">Address expires in 30:00 minutes. Send only the selected asset to this address — wrong-asset transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 16px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.4">地址将在 30:00 后过期。仅向此地址发送所选资产 — 发错资产无法找回。</text>
         </view>
       </template>
     </view>
@@ -206,6 +209,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import ChevronRightIcon from "@/components/icons/chevron-right-icon.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import VerifyRow from "@/components/me/verify-row.vue";
@@ -225,11 +229,11 @@ interface Channel {
   min: string;
 }
 const ALL_CHANNELS: Channel[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5 min", min: "$10" },
-  { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15 min", min: "$10" },
-  { id: "BTC", label: "Bitcoin", fee: "0.5%", time: "30 min", min: "$20" },
-  { id: "ETH", label: "Ethereum", fee: "0.5%", time: "15 min", min: "$20" },
-  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "Instant", min: "$10" },
+  { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5 分钟", min: "$10" },
+  { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15 分钟", min: "$10" },
+  { id: "BTC", label: "比特币", fee: "0.5%", time: "30 分钟", min: "$20" },
+  { id: "ETH", label: "以太坊", fee: "0.5%", time: "15 分钟", min: "$20" },
+  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "即时", min: "$10" },
 ];
 const KYC_CHANNELS = ALL_CHANNELS.filter((c) => c.id === "USDT-TRC20" || c.id === "USDT-ERC20");
 
@@ -373,7 +377,7 @@ function startVerifying() {
       symbol: "USDT",
       amount: 1,
       status: "posted",
-      memo: "KYC-Express compliance bonus",
+      memo: "KYC-Express 合规验证奖励",
       ref: `KYC-${pairing.complianceCheckId ?? "PENDING"}`,
     });
     kycPhase.value = "complete";
@@ -411,16 +415,16 @@ const complianceBannerStyle: CSSProperties = {
   padding: "12px 16px",
 };
 const surfaceCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
 const surfaceCardFlush: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
 };
 const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -428,14 +432,14 @@ const metaLabelStyle: CSSProperties = {
 };
 function networkRowStyle(active: boolean, divider: boolean): CSSProperties {
   return {
-    padding: "12px 20px",
+    padding: "8px 20px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
 }
 function channelRowStyle(divider: boolean): CSSProperties {
   return {
-    padding: "12px 20px",
+    padding: "8px 20px",
     gap: "12px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
@@ -482,7 +486,7 @@ const addressRowStyle: CSSProperties = {
   marginTop: "16px",
   padding: "12px",
   gap: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
 };
 const copyBtnStyle: CSSProperties = {
   width: "36px",
@@ -517,7 +521,7 @@ const miniSpinnerStyle: CSSProperties = {
 const completeCardStyle: CSSProperties = {
   padding: "20px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid color-mix(in srgb, var(--v5-success) 30%, transparent)",
 };
 const completeWashStyle: CSSProperties = {

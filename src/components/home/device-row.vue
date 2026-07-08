@@ -1,43 +1,92 @@
-<!--
-  DeviceRow — one row in ZONE 2 fleet's device list (below the slot rack):
-  status dot · device name · today earnings. Status is the dot colour (green =
-  online/earning, dim = offline). No icon (those live in the rack above), no GPU
-  spec, no task block — kept simple per design. Tapping opens detail / earn.
--->
 <template>
-  <view class="flex items-center justify-between active:opacity-70" :style="rowStyle" @click="go">
-    <view class="flex items-center min-w-0" style="gap: 9px; flex: 1 1 auto">
-      <view :style="dotStyle" />
-      <text class="block" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-ink); letter-spacing: -0.01em">{{ device.name }}</text>
+  <view class="active:opacity-70" :style="rowStyle" @click="go">
+    <view class="relative" :style="mediaStyle">
+      <image v-if="deviceImage && !isPhone" :src="deviceImage" mode="aspectFill" style="width: 44px; height: 44px; border-radius: 6px" />
+      <image v-else-if="isPhone" src="/static/img/devices/real-phone-ui.png" mode="aspectFit" style="width: 48px; height: 48px" />
+      <view v-else class="grid place-items-center" :style="iconFrameStyle">
+        <svg v-if="iconKind === 'server'" width="22" height="22" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+        <svg v-else-if="iconKind === 'cpu'" width="22" height="22" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
+        <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
+      </view>
+      <view v-if="isOnline" :style="dotStyle" />
     </view>
-    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-warning); margin-left: 12px">+${{ todayText }}</text>
+
+    <view class="min-w-0">
+      <text class="block truncate" style="font-family: var(--font-v5); font-weight: 600; font-size: 14px; line-height: 18px; color: var(--v5-ink); letter-spacing: -0.01em">{{ device.name }}</text>
+      <text class="block truncate" style="margin-top: 3px; font-size: 12px; line-height: 16px; color: var(--v5-ink-3)">{{ device.gpu }}</text>
+    </view>
+
+    <view style="text-align: right">
+      <template v-if="isActive">
+        <text class="tabular-nums block" style="font-family: var(--font-amount); font-weight: 600; font-size: 15px; line-height: 18px; color: var(--v5-success)">+${{ todayText }}</text>
+        <text class="font-mono-tabular block" style="margin-top: 3px; font-size: 11.5px; line-height: 15px; color: var(--v5-ink-3)">{{ nexText }}</text>
+      </template>
+      <template v-else>
+        <text class="block" style="font-family: var(--font-v5); font-weight: 500; font-size: 12.5px; line-height: 18px; color: var(--v5-warning)">{{ t.myDevices.inventorySectionInventory }}</text>
+        <text class="block" style="margin-top: 3px; font-size: 11.5px; line-height: 15px; color: var(--v5-ink-3)">{{ t.myDevices.inventoryRowActivate }}</text>
+      </template>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
+import { useT } from "@/i18n/use-t";
+import { rankingDeviceImage } from "@/lib/device-art";
 
-const props = defineProps<{ device: Device; divider: boolean }>();
+const props = withDefaults(defineProps<{ device: Device; divider?: boolean; target?: "home" | "detail" }>(), {
+  target: "home",
+});
+const t = useT();
 
-const isOnline = computed(() => props.device.status === "online");
+const isPhone = computed(() => props.device.kind === "phone");
+const deviceImage = computed(() => rankingDeviceImage(props.device.kind));
+const isActive = computed(() => props.device.activatedAt !== null);
+const isOnline = computed(() => props.device.status === "online" && isActive.value);
 const rowStyle = computed<CSSProperties>(() => ({
-  padding: "13px 14px",
+  display: "grid",
+  gridTemplateColumns: isPhone.value ? "48px minmax(0, 1fr) max-content" : "44px minmax(0, 1fr) max-content",
+  columnGap: "12px",
+  alignItems: "center",
+  padding: "8px 0",
   borderBottom: props.divider ? "1px solid var(--v5-border)" : "none",
 }));
-const dotStyle = computed<CSSProperties>(() => ({
-  width: "7px",
-  height: "7px",
-  borderRadius: "50%",
+const mediaStyle = computed<CSSProperties>(() => ({
+  width: isPhone.value ? "48px" : "44px",
+  height: isPhone.value ? "48px" : "44px",
   flexShrink: 0,
-  background: isOnline.value ? "var(--v5-success)" : "var(--v5-ink-4)",
+}));
+const iconFrameStyle = computed<CSSProperties>(() => ({
+  width: "44px",
+  height: "44px",
+  borderRadius: "10px",
+  background: isOnline.value ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+}));
+const iconColor = computed(() => (isOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)"));
+const iconKind = computed(() => {
+  const k = props.device.kind;
+  if (k.startsWith("stellarrack")) return "server";
+  if (k === "cloud-share" || k === "pc-gpu") return "cpu";
+  return "box";
+});
+const dotStyle = computed<CSSProperties>(() => ({
+  position: "absolute",
+  right: "-2px",
+  bottom: "-2px",
+  width: "10px",
+  height: "10px",
+  borderRadius: "50%",
+  background: "var(--v5-success)",
+  border: "2px solid var(--v5-bg)",
+  animation: "v5-hb-pulse-success 1.6s ease-in-out infinite",
 }));
 const todayText = computed(() =>
   props.device.todayEarnings.toFixed(props.device.todayEarnings < 1 ? 3 : 2),
 );
+const nexText = computed(() => `${props.device.todayEarningsNEX.toFixed(1)} NEX`);
 
 function go() {
-  const url = props.device.kind === "phone" ? "/pages/earn/earn" : `/pages/store/detail?id=${props.device.kind}`;
-  uni.navigateTo({ url, fail: () => {} });
+  uni.navigateTo({ url: `/pages/earn/device-detail?id=${encodeURIComponent(props.device.id)}`, fail: () => {} });
 }
 </script>

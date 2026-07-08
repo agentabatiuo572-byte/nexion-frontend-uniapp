@@ -193,7 +193,7 @@ function cyclePhase() {
 
 // Out-of-scope demo actions (see scope note in the file header).
 function onDemoUnavailable() {
-  toast.info("Demo tooling", "This dev action isn't wired in the uni build yet.");
+  toast.info("演示工具", "此开发操作尚未接入 uni 构建。");
 }
 
 function goStep(href: string) {
@@ -203,7 +203,7 @@ function goStep(href: string) {
 const gateTextStyle: CSSProperties = { marginTop: "32px", fontSize: "12.5px", color: "var(--v5-ink-3)" };
 const pageTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, lineHeight: 1.25, marginBottom: "8px", color: "var(--v5-ink)" };
 const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.625, marginBottom: "16px" };
-const stepCardStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", borderRadius: "16px", padding: "16px" };
+const stepCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", borderRadius: "16px", padding: "16px" };
 function stepIconBoxStyle(color: string): CSSProperties {
   return { width: "48px", height: "48px", borderRadius: "12px", background: `color-mix(in srgb, ${color} 10%, transparent)` };
 }
@@ -217,7 +217,7 @@ const configIntroStyle: CSSProperties = { paddingLeft: "4px", marginBottom: "12p
 const configCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "14px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   display: "flex",
   flexDirection: "column",

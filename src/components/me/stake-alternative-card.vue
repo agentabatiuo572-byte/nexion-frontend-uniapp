@@ -28,7 +28,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
-    <text class="block" style="margin-top: 8px; font-size: 10px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
+    <text class="block" style="margin-top: 8px; font-size: 11px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
   </view>
 </template>
 
@@ -80,7 +80,7 @@ function goStaking() {
 const cardStyle: CSSProperties = {
   padding: "16px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const washStyle: CSSProperties = {
@@ -95,7 +95,7 @@ const washStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   gap: "6px",
   marginBottom: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
@@ -112,7 +112,7 @@ function tierCellStyle(tone: Tone): CSSProperties {
 }
 function tierLabelStyle(tone: Tone): CSSProperties {
   return {
-    fontSize: "10.5px",
+    fontSize: "11px",
     fontWeight: 500,
     color: toneColor(tone),
     letterSpacing: "0.06em",
@@ -120,7 +120,7 @@ function tierLabelStyle(tone: Tone): CSSProperties {
 }
 const tierValueStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "15px",
   letterSpacing: "-0.014em",
@@ -130,8 +130,8 @@ const tierValueStyle: CSSProperties = {
 function tierDeltaStyle(tone: Tone): CSSProperties {
   return {
     marginTop: "2px",
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontFamily: "var(--font-numbers)",
+    fontSize: "11px",
     color: toneColor(tone),
   };
 }

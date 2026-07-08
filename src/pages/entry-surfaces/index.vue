@@ -80,10 +80,10 @@ function open(route: string) {
   padding: 0 12px;
   border: 1px solid var(--v5-border);
   border-radius: 8px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   color: var(--v5-ink-2);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .entry-index__title {
@@ -118,7 +118,7 @@ function open(route: string) {
   padding: 14px;
   border: 1px solid var(--v5-border);
   border-radius: 8px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   box-shadow: var(--v5-card-shadow-lift);
 }
 

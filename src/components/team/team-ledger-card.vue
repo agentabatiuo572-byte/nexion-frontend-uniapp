@@ -129,7 +129,7 @@ const bigNumStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 const fracStyle: CSSProperties = { color: "var(--v5-ink-2)", fontSize: "28px", fontWeight: 500 };
-const nexStyle: CSSProperties = { marginTop: "8px", fontSize: "14px", color: "var(--v5-brand)" };
+const nexStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-amount)", fontSize: "14px", color: "var(--v5-brand)" };
 const lifetimeStyle: CSSProperties = {
   marginTop: "8px",
   fontSize: "13.5px",

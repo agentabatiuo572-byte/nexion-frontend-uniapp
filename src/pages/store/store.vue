@@ -117,7 +117,7 @@ function goOrders() {
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
 // soft bg tint + content color, no border).
 const amberTagStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
@@ -129,8 +129,8 @@ const amberTagStyle: CSSProperties = {
 const ordersChipStyle: CSSProperties = {
   marginTop: "8px",
   padding: "11px 18px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border-strong)",
+  background: "var(--v5-surface-bg)",
+  border: "1px solid var(--v5-brand-border)",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontSize: "12.5px",

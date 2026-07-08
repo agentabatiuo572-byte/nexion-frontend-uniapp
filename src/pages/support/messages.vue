@@ -273,7 +273,7 @@ function avaStyle(tint: string): CSSProperties {
   align-items: center;
   gap: 12px;
   min-height: 64px;
-  padding: 12px 16px;
+  padding: 8px 16px;
   border-bottom: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent);
 }
 .nx-conv-ava {
@@ -302,7 +302,7 @@ function avaStyle(tint: string): CSSProperties {
 }
 .nx-conv-rowtime {
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--v5-ink-4);
 }
 .nx-conv-rowbot {
@@ -333,7 +333,7 @@ function avaStyle(tint: string): CSSProperties {
   place-items: center;
 }
 .nx-conv-unread-t {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   font-family: var(--font-v5);
   color: var(--v5-on-brand-2);

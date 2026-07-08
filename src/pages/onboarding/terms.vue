@@ -168,8 +168,8 @@ function goRisk() {
 }
 .tos-eyebrow {
   display: block;
-  font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 10px;
+  font-family: var(--font-numbers);
+  font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--v5-brand);
 }
@@ -194,7 +194,7 @@ function goRisk() {
 /* Numbered sections */
 .tos-sections {
   border-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   padding: 18px;
   display: flex;
@@ -208,8 +208,8 @@ function goRisk() {
   margin-bottom: 5px;
 }
 .tos-block__num {
-  font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 10.5px;
+  font-family: var(--font-numbers);
+  font-size: 11px;
   color: var(--v5-brand);
 }
 .tos-block__title {
@@ -247,7 +247,7 @@ function goRisk() {
 .tos-footer {
   display: block;
   margin-top: 18px;
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.6;
   color: var(--v5-ink-4);
   text-align: center;

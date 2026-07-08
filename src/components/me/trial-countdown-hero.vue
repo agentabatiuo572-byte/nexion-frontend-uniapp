@@ -105,18 +105,18 @@ const endDateLine = computed(() =>
   }),
 );
 
-const cardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "20px" };
+const cardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface-bg)", padding: "20px" };
 const ribbonStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   textTransform: "uppercase",
   letterSpacing: "0.06em",
   color: tint.value,
 }));
-const boxNameStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11.5px", color: "var(--v5-ink-3)" };
-const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 500, color: "var(--v5-ink-3)", opacity: 0.75 };
-const shadowUsdStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "30px", fontWeight: 600, letterSpacing: "-0.024em", color: "var(--v5-ink)" };
-const shadowNexStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12.5px", color: "var(--v5-tech-cyan)", marginLeft: "6px" };
+const boxNameStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const dollarStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "15px", fontWeight: 500, color: "var(--v5-ink-3)", opacity: 0.75 };
+const shadowUsdStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "30px", fontWeight: 600, letterSpacing: "-0.024em", color: "var(--v5-ink)" };
+const shadowNexStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "12.5px", color: "var(--v5-tech-cyan)", marginLeft: "6px" };
 const ctaLineStyle: CSSProperties = { marginTop: "4px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
 const barTrackStyle: CSSProperties = { marginTop: "16px", height: "6px", borderRadius: "999px", background: "var(--v5-surface-3)", overflow: "hidden" };
 const barFillStyle = computed<CSSProperties>(() => ({
@@ -125,5 +125,5 @@ const barFillStyle = computed<CSSProperties>(() => ({
   background: tint.value,
   transition: "width 500ms ease",
 }));
-const datesRowStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-4)" };
+const datesRowStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-4)" };
 </script>

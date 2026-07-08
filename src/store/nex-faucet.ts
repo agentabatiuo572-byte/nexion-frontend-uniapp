@@ -147,10 +147,10 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
         delta: gained,
         reason:
           multiplier > 1
-            ? `Daily +${baseGain + bonus} × ${multiplier}x lucky`
+            ? `每日 +${baseGain + bonus} × ${multiplier} 倍幸运`
             : bonus
-              ? `Day-${newStreak} streak bonus`
-              : "Daily check-in",
+              ? `第 ${newStreak} 天连签奖励`
+              : "每日签到",
       },
       ...history.value.slice(0, 49),
     ];

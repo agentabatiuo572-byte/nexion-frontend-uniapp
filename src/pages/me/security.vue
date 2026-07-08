@@ -296,7 +296,7 @@ function iconBox(bg: string): CSSProperties {
 const cardStyle: CSSProperties = {
   marginTop: "12px",
   padding: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };

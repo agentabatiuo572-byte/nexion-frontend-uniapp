@@ -27,7 +27,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Hero -->
         <view class="rounded-2xl" :style="heroStyle">
-          <text class="block font-mono-tabular" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-brand)' }">{{ t.unilevel.heroLabel }}</text>
+          <text class="block font-mono-tabular" :style="{ fontSize: '11px', letterSpacing: '0.16em', color: 'var(--v5-brand)' }">{{ t.unilevel.heroLabel }}</text>
           <text class="block font-display tabular-nums" :style="heroBigStyle">${{ totalRoyalty.toFixed(2) }}</text>
           <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
             <text>{{ heroRateLineText }}</text>
@@ -41,11 +41,11 @@
             <view class="flex-1 min-w-0">
               <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
               <text class="block" :style="compSubStyle">{{ t.unilevel.directSub }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
             </view>
             <view class="text-right shrink-0">
               <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
-              <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
+              <text class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
             </view>
           </view>
         </view>
@@ -57,14 +57,14 @@
             <view class="flex-1 min-w-0">
               <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
               <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
-              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
+              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 11px">
                 <view>
                   <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
                   <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
                 </view>
                 <view>
                   <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
-                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
+                  <text class="block tabular-nums" :style="{ fontFamily: 'var(--font-amount)', color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
                 </view>
               </view>
             </view>
@@ -74,32 +74,32 @@
           </view>
           <view class="flex items-start" :style="algoNoteStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
+            <text :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
           </view>
         </view>
 
         <!-- Partner Status tier progression -->
-        <view class="rounded-2xl border" :style="{ padding: '16px', background: 'var(--v5-surface)', borderColor: 'var(--v5-border)' }">
-          <text class="block font-mono-tabular" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
+        <view class="rounded-2xl border" :style="{ padding: '16px', background: 'var(--v5-surface-bg)', borderColor: 'var(--v5-border)' }">
+          <text class="block font-mono-tabular" :style="{ fontSize: '11px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
           <text class="block" :style="{ marginTop: '6px', fontSize: '11px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.rateTierNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
 
           <view class="grid grid-cols-4" style="margin-top: 12px; gap: 6px">
             <view v-for="tier in RATE_TIERS" :key="tier.id" class="rounded-lg text-center" :style="tierCardStyle(tier)">
               <text class="block font-display" :style="{ fontSize: '11px', fontWeight: 600, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-3)' }">{{ t.unilevel.rateTiers[tier.id].name }}</text>
-              <text class="block" :style="{ fontSize: '8.5px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25 (was 1.1) -->
-              <text class="block font-mono-tabular" :style="{ fontSize: '8.5px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
+              <text class="block" :style="{ fontSize: '11px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25 (was 1.1) -->
+              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
             </view>
           </view>
 
           <view v-if="next" style="margin-top: 12px">
-            <view class="flex items-center justify-between" style="font-size: 10.5px; margin-bottom: 6px">
+            <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 6px">
               <text :style="{ color: 'var(--v5-ink-3)' }">{{ rateTierCurrentText }}</text>
               <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">${{ monthlyNetworkVolume.toLocaleString() }} / ${{ next.minVolume.toLocaleString() }}</text>
             </view>
             <view class="rounded-full overflow-hidden" :style="{ height: '8px', background: 'color-mix(in srgb, var(--v5-surface-2) 60%, transparent)' }">
               <view class="rounded-full" :style="tierProgressFillStyle" />
             </view>
-            <text class="block" :style="{ marginTop: '8px', fontSize: '10.5px', color: 'var(--v5-ink-3)', lineHeight: 1.375 }">{{ rateTierProgressText }}</text> <!-- SKILL: leading-snug=1.375 (was 1.45) -->
+            <text class="block" :style="{ marginTop: '8px', fontSize: '11px', color: 'var(--v5-ink-3)', lineHeight: 1.375 }">{{ rateTierProgressText }}</text> <!-- SKILL: leading-snug=1.375 (was 1.45) -->
           </view>
           <view v-else class="inline-flex items-center" :style="maxedChipStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
@@ -128,7 +128,7 @@
         </scroll-view>
 
         <!-- Member list -->
-        <view class="rounded-2xl border overflow-hidden" :style="{ background: 'var(--v5-surface)', borderColor: 'var(--v5-border)', borderRadius: '16px' }">
+        <view class="rounded-2xl border overflow-hidden" :style="{ background: 'var(--v5-surface-bg)', borderColor: 'var(--v5-border)', borderRadius: '16px' }">
           <view v-if="filteredMembers.length === 0" class="text-center" :style="{ padding: '32px', fontSize: '12px', color: 'var(--v5-ink-3)' }">
             <text>{{ t.unilevel.noMembers }}</text>
           </view>
@@ -150,12 +150,12 @@
                 </view>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <view class="rounded-full" :style="{ width: '6px', height: '6px', background: statusColor(m.status) }" />
-                  <text :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ m.status }} · {{ m.city }}</text>
+                  <text :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ m.status }} · {{ m.city }}</text>
                   <text class="font-mono-tabular" :style="memberBadgeStyle(m.kind)">{{ m.kind === "direct" ? t.unilevel.memberBadgeDirect : t.unilevel.memberBadgeExtended }}</text>
                 </view>
               </view>
               <view class="text-right">
-                <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ memberCommission(m).toFixed(2) }}</text>
+                <text class="tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '12px', color: 'var(--v5-brand)' }">+${{ memberCommission(m).toFixed(2) }}</text>
               </view>
             </view>
           </template>
@@ -314,7 +314,7 @@ function compBadgeStyle(color: string): CSSProperties {
   };
 }
 const compTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
+const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
 const algoNoteStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
@@ -364,11 +364,11 @@ function pillCountStyle(active: boolean): CSSProperties {
 }
 
 function memberRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "12px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 const memberAvatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface-2)" };
 const spillTagStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-brand-2)",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
   padding: "0 4px",
@@ -380,7 +380,7 @@ function memberBadgeStyle(kind: "direct" | "extended"): CSSProperties {
     marginLeft: "auto",
     padding: "0 4px",
     borderRadius: "4px",
-    fontSize: "8.5px",
+    fontSize: "11px",
     letterSpacing: "0.04em",
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
     color,

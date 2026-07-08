@@ -46,7 +46,7 @@ const NOW = Date.now();
 export const TICKETS: Ticket[] = [
   {
     id: "TK-1024",
-    subject: "Withdrawal pending more than 24 hours",
+    subject: "提现超过 24 小时仍在处理中",
     category: "withdrawal",
     status: "open",
     priority: "high",
@@ -56,15 +56,15 @@ export const TICKETS: Ticket[] = [
     unread: 2,
     owner: "Marina K.",
     messages: [
-      { ts: NOW - 1.5 * DAY, author: "user", body: "Hi, I requested a $250 USDT withdrawal yesterday at 14:20 UTC and it's still showing 'pending'. Tx hash should be 0xab12... Can you check status?" },
-      { ts: NOW - 1.4 * DAY, author: "agent", agentName: "Marina K.", body: "Hi! I've escalated this to our payment desk — they'll verify the on-chain status within 4 hours. Reference #PD-7723." },
-      { ts: NOW - 6 * HOUR, author: "agent", agentName: "Marina K.", body: "Update: payment desk found a TRC20 network congestion delay. Your tx is queued behind 4,200 others. ETA 8-12h. You'll get a push notification when it lands." },
-      { ts: NOW - 4 * HOUR, author: "agent", agentName: "Marina K.", body: "Quick check — has the USDT arrived in your wallet yet? If not we can issue a manual replay." },
+      { ts: NOW - 1.5 * DAY, author: "user", body: "你好,我昨天 UTC 14:20 申请了 $250 USDT 提现,现在仍显示「处理中」。交易哈希应该是 0xab12... 能帮我查一下状态吗?" },
+      { ts: NOW - 1.4 * DAY, author: "agent", agentName: "Marina K.", body: "你好!我已升级给支付团队处理,他们会在 4 小时内核验链上状态。参考编号 #PD-7723。" },
+      { ts: NOW - 6 * HOUR, author: "agent", agentName: "Marina K.", body: "更新:支付团队确认是 TRC20 网络拥堵延迟。你的交易排在约 4,200 笔队列之后,预计 8-12 小时入账。到账时会推送通知。" },
+      { ts: NOW - 4 * HOUR, author: "agent", agentName: "Marina K.", body: "快速确认一下:USDT 是否已到你的钱包?如果还没有,我们可以发起手动重放。" },
     ],
   },
   {
     id: "TK-1023",
-    subject: "KYC documents rejected — what's wrong?",
+    subject: "KYC 资料被拒,原因是什么?",
     category: "kyc",
     status: "pending_user",
     priority: "normal",
@@ -74,13 +74,13 @@ export const TICKETS: Ticket[] = [
     unread: 1,
     owner: "Tomas R.",
     messages: [
-      { ts: NOW - 2 * DAY, author: "user", body: "Just got 'KYC rejected' but no reason was shown. My passport is valid through 2031." },
-      { ts: NOW - 9 * HOUR, author: "agent", agentName: "Tomas R.", body: "Looked it up — the rejection reason was 'blurry photo, MRZ unreadable'. Please re-upload with better lighting and the bottom 2 lines clearly visible. Sumsub link reset, you have 3 retries left in 24h." },
+      { ts: NOW - 2 * DAY, author: "user", body: "刚收到「KYC 被拒」,但没有显示原因。我的护照有效期到 2031 年。" },
+      { ts: NOW - 9 * HOUR, author: "agent", agentName: "Tomas R.", body: "我查到了,拒绝原因是「照片模糊,MRZ 机读区不可读」。请在光线更好的环境重新上传,确保证件底部两行清晰可见。Sumsub 链接已重置,24 小时内还有 3 次重试机会。" },
     ],
   },
   {
     id: "TK-1019",
-    subject: "NexionBox Pro disconnected after firmware v3.4",
+    subject: "NexionBox Pro 升级 v3.4 固件后离线",
     category: "hardware",
     status: "in_progress",
     priority: "high",
@@ -90,15 +90,15 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Hiro T.",
     messages: [
-      { ts: NOW - 3 * DAY, author: "user", body: "After the v3.4 firmware push my NexionBox Pro went offline and won't reconnect. LEDs flash amber-amber-red repeatedly." },
-      { ts: NOW - 2.9 * DAY, author: "agent", agentName: "Hiro T.", body: "Amber-amber-red = WiFi auth failure post-update. Common after 3.4. Quick fix: hold power button 10s to reset, then re-pair via app. If that fails, we'll ship a replacement free of charge." },
-      { ts: NOW - 2 * DAY, author: "user", body: "Reset worked but it's only earning 60% of normal rate now." },
-      { ts: NOW - 1 * DAY, author: "agent", agentName: "Hiro T.", body: "Detected a thermal throttle — your unit is 12°C above baseline. Could be dust in the intake. We're shipping you a free cleaning kit (ETA 4d). Should restore full rate." },
+      { ts: NOW - 3 * DAY, author: "user", body: "v3.4 固件推送后,我的 NexionBox Pro 离线且无法重新连接。指示灯一直按黄-黄-红闪烁。" },
+      { ts: NOW - 2.9 * DAY, author: "agent", agentName: "Hiro T.", body: "黄-黄-红表示升级后 WiFi 认证失败,3.4 后较常见。快速修复:长按电源键 10 秒重置,再通过 App 重新配对。如果仍失败,我们会免费寄送替换设备。" },
+      { ts: NOW - 2 * DAY, author: "user", body: "重置成功了,但现在收益只有正常水平的 60%。" },
+      { ts: NOW - 1 * DAY, author: "agent", agentName: "Hiro T.", body: "检测到热降频,你的设备比基线高 12°C。可能是进风口积尘。我们会免费寄一套清洁工具(预计 4 天到),应可恢复满速。" },
     ],
   },
   {
     id: "TK-1011",
-    subject: "Cannot login from my new phone",
+    subject: "新手机无法登录",
     category: "account",
     status: "resolved",
     priority: "normal",
@@ -108,14 +108,14 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Sara L.",
     messages: [
-      { ts: NOW - 7 * DAY, author: "user", body: "Got a new phone, can't login — 2FA codes don't match." },
-      { ts: NOW - 6.9 * DAY, author: "agent", agentName: "Sara L.", body: "Phone changes invalidate the old TOTP secret. I've started recovery — check your email for a video verification link. After live face-match we'll reset 2FA in 15 min." },
-      { ts: NOW - 5 * DAY, author: "user", body: "All good, recovered. Thanks!" },
+      { ts: NOW - 7 * DAY, author: "user", body: "换了新手机后无法登录,2FA 验证码不匹配。" },
+      { ts: NOW - 6.9 * DAY, author: "agent", agentName: "Sara L.", body: "更换手机会使旧的 TOTP 密钥失效。我已启动恢复流程,请查看邮箱中的视频验证链接。完成真人面部匹配后,我们会在 15 分钟内重置 2FA。" },
+      { ts: NOW - 5 * DAY, author: "user", body: "已经恢复了,谢谢!" },
     ],
   },
   {
     id: "TK-1007",
-    subject: "Genesis Node #4192 not received",
+    subject: "未收到创世节点 #4192",
     category: "genesis",
     status: "closed",
     priority: "urgent",
@@ -125,14 +125,14 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Carlos M.",
     messages: [
-      { ts: NOW - 12 * DAY, author: "user", body: "Purchased Genesis Node #4192 two days ago, tx confirmed but NFT not in wallet." },
-      { ts: NOW - 11.9 * DAY, author: "agent", agentName: "Carlos M.", body: "Confirmed your purchase. Mint queue had a backlog on May 8. I'm bumping yours to priority — should arrive in 6 hours max." },
-      { ts: NOW - 10 * DAY, author: "user", body: "Received, all good." },
+      { ts: NOW - 12 * DAY, author: "user", body: "两天前购买了创世节点 #4192,交易已确认,但 NFT 没进钱包。" },
+      { ts: NOW - 11.9 * DAY, author: "agent", agentName: "Carlos M.", body: "已确认你的购买。5 月 8 日铸造队列积压,我已把你的订单提升优先级,最迟 6 小时内到账。" },
+      { ts: NOW - 10 * DAY, author: "user", body: "已收到,没问题了。" },
     ],
   },
   {
     id: "TK-1003",
-    subject: "Need invoice for 2025 tax filing",
+    subject: "需要 2025 报税发票",
     category: "account",
     status: "resolved",
     priority: "low",
@@ -142,13 +142,13 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Aisha O.",
     messages: [
-      { ts: NOW - 18 * DAY, author: "user", body: "Can I get a yearly earnings statement for tax purposes?" },
-      { ts: NOW - 17.9 * DAY, author: "agent", agentName: "Aisha O.", body: "Sure — go to /me/wallet/bills and use the year-end PDF export at the top right. I've also DM-ed you a Form 1099-MISC-equivalent for non-US users." },
+      { ts: NOW - 18 * DAY, author: "user", body: "我能获取一份年度收益报表用于报税吗?" },
+      { ts: NOW - 17.9 * DAY, author: "agent", agentName: "Aisha O.", body: "可以,请进入 /me/wallet/bills,使用右上角的年终 PDF 导出。我也已私信你一份面向非美国用户的 1099-MISC 等效表。" },
     ],
   },
   {
     id: "TK-0998",
-    subject: "Earnings paused after region change",
+    subject: "地区变更后收益暂停",
     category: "earnings",
     status: "closed",
     priority: "normal",
@@ -158,30 +158,30 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Yuki H.",
     messages: [
-      { ts: NOW - 24 * DAY, author: "user", body: "Moved from PH to JP — earnings dropped to zero overnight." },
-      { ts: NOW - 23.9 * DAY, author: "agent", agentName: "Yuki H.", body: "Region changes pause earnings while we re-verify tax jurisdiction. Took 24-48h normally. Resumed yours now — you'll see backfill in 2h." },
+      { ts: NOW - 24 * DAY, author: "user", body: "我从菲律宾搬到日本后,收益一夜之间变成 0。" },
+      { ts: NOW - 23.9 * DAY, author: "agent", agentName: "Yuki H.", body: "地区变更会暂停收益,用于重新核验税务辖区。通常需要 24-48 小时。你的收益已恢复,2 小时内会看到补发。" },
     ],
   },
 ];
 
 export const CATEGORY_LABEL: Record<TicketCategory, string> = {
-  account: "Account",
-  withdrawal: "Withdrawal",
-  deposit: "Deposit",
+  account: "账户",
+  withdrawal: "提现",
+  deposit: "充值",
   kyc: "KYC",
-  hardware: "Hardware",
-  earnings: "Earnings",
-  genesis: "Genesis",
-  technical: "Technical",
-  other: "Other",
+  hardware: "硬件",
+  earnings: "收益",
+  genesis: "创世",
+  technical: "技术",
+  other: "其他",
 };
 
 export const STATUS_LABEL: Record<TicketStatus, string> = {
-  open: "Open",
-  in_progress: "In progress",
-  pending_user: "Awaiting you",
-  resolved: "Resolved",
-  closed: "Closed",
+  open: "待处理",
+  in_progress: "处理中",
+  pending_user: "等待你回复",
+  resolved: "已解决",
+  closed: "已关闭",
 };
 
 // Mapped to v5 design tokens (theme-aware) — source used literal hex.
@@ -194,8 +194,8 @@ export const STATUS_COLOR: Record<TicketStatus, string> = {
 };
 
 export const PRIORITY_LABEL: Record<TicketPriority, string> = {
-  low: "Low",
-  normal: "Normal",
-  high: "High",
-  urgent: "Urgent",
+  low: "低",
+  normal: "普通",
+  high: "高",
+  urgent: "紧急",
 };

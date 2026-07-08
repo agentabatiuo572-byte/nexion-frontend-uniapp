@@ -49,8 +49,8 @@ const labelStyle: CSSProperties = {
   lineHeight: 1.1,
 };
 const subStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.04em",
   color: "var(--v5-ink-4)",

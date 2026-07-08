@@ -20,7 +20,7 @@
         </view>
         <view class="flex-1 min-w-0">
           <view class="flex items-center justify-between" style="gap: 8px" role="button" tabindex="0" @tap.stop="toggleDetails" @click.stop="toggleDetails">
-            <text class="font-mono-tabular" style="font-size: 10.5px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+            <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ stageText }}</text>
               <view class="grid place-items-center" :style="toggleStyle">
@@ -57,7 +57,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ t.store.lockedNotifyMe }}</text>
         </view>
-        <view v-if="queue" class="shrink-0 text-right font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.3">
+        <view v-if="queue" class="shrink-0 text-right font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.3">
           <text class="block tabular-nums" style="color: var(--v5-brand-2); font-weight: 600; font-size: 12px">{{ queueText }}</text>
           <text class="block">{{ t.store.lockedInQueue }}</text>
         </view>
@@ -117,7 +117,7 @@ function toggleDetails() {
 }
 
 const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
 };
 

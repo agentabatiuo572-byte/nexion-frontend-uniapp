@@ -192,7 +192,7 @@ interface ApiCardDef {
   ellipses?: Array<{ cx: number; cy: number; rx: number; ry: number }>;
   lines?: Array<{ x1: number; y1: number; x2: number; y2: number }>;
 }
-const apiCards: ApiCardDef[] = [
+const apiCards = computed<ApiCardDef[]>(() => [
   {
     title: t.value.developer.apiCompute,
     desc: t.value.developer.apiComputeD,
@@ -219,11 +219,11 @@ const apiCards: ApiCardDef[] = [
     color: "var(--v5-tech-cyan)",
     icon: ["M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18", "m21 12-3-3 3-3", "M3 12a9 9 0 0 0 9 9"],
   },
-];
+]);
 
 function submitRequest() {
   if (!company.value.trim() || !email.value.trim() || !useCase.value.trim()) {
-    toast.warn("Please complete all required fields");
+    toast.warn("请填写所有必填字段");
     return;
   }
   toast.success(t.value.developer.formSubmittedToast);
@@ -258,7 +258,7 @@ const heroTaglineStyle: CSSProperties = {
   lineHeight: 1.375,
 };
 const badgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   padding: "2px 8px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-ink) 5%, transparent)",
@@ -290,7 +290,7 @@ function pillLabelStyle(v: Tab): CSSProperties {
   };
 }
 const apiCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
   gap: "12px",
@@ -312,7 +312,7 @@ const partnerTitleStyle: CSSProperties = {
   padding: "12px 8px 4px",
 };
 const partnerGridStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
   gridTemplateColumns: "repeat(4, 1fr)",
@@ -325,7 +325,7 @@ const partnerCellStyle: CSSProperties = {
   borderRadius: "8px",
 };
 const formCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
@@ -360,7 +360,7 @@ const snippetWrapStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 const snippetTextStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-success)",
   lineHeight: 1.625,
   whiteSpace: "pre",
@@ -371,7 +371,7 @@ const docsComingStyle: CSSProperties = {
   border: "1px solid color-mix(in srgb, var(--v5-warning) 25%, transparent)",
 };
 const emptyTabStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "32px",
 };

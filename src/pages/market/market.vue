@@ -229,7 +229,7 @@ const heroStyle: CSSProperties = {
 };
 const heroCapStyle: CSSProperties = {
   gap: "8px",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-brand)",
 };
@@ -288,17 +288,17 @@ const sellBtnStyle: CSSProperties = {
 const sellTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };
 const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
-const statLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const statLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 const statValueStyle: CSSProperties = {
   marginTop: "4px",
   fontSize: "13.5px",
@@ -324,14 +324,14 @@ const pendingChipStyle: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 600,
 };
 const catGridStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
 };
 function catItemStyle(active: boolean): CSSProperties {
@@ -344,8 +344,8 @@ function catItemStyle(active: boolean): CSSProperties {
 }
 const tableHeadStyle: CSSProperties = {
   gridTemplateColumns: "32px 1fr 76px 72px",
-  padding: "10px 12px",
-  fontSize: "10px",
+  padding: "8px 12px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   borderColor: "var(--v5-border)",
 };
@@ -356,7 +356,7 @@ const emptyStyle: CSSProperties = {
   lineHeight: 1.625,
 };
 const noteStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   paddingTop: "4px",

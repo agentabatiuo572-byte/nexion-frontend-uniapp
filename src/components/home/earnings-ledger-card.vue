@@ -5,24 +5,29 @@
   nouns, untranslated).
 -->
 <template>
-  <view>
-    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}</text>
-      <text class="font-mono-tabular active:opacity-70" style="font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
+  <view class="earnings-ledger">
+    <view class="earnings-ledger__header">
+      <text class="earnings-ledger__title">{{ t.home.earningsLedgerTitle }}</text>
+      <view class="earnings-ledger__link" @click="goAll">
+        <text>{{ t.home.earningsLedgerViewAll }}</text>
+        <ChevronRightIcon />
+      </view>
     </view>
 
-    <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
+    <view class="earnings-ledger__list">
       <view
         v-for="(r, i) in ROWS"
         :key="r.id"
-        class="grid items-center gap-2.5"
-        :style="{ gridTemplateColumns: '1fr auto 36px', padding: '10px 0', borderBottom: i < ROWS.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
+        class="earnings-ledger__row"
+        :class="{ 'earnings-ledger__row--last': i === ROWS.length - 1 }"
       >
-        <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
+        <view class="earnings-ledger__main">
+          <text class="earnings-ledger__text">
+            <text class="earnings-ledger__model">{{ r.model }}</text><text class="earnings-ledger__client"> · {{ r.who }}</text>
+          </text>
         </view>
-        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ r.amt }}</text>
-        <text class="font-mono-tabular text-right" style="font-size: 11px; color: var(--v5-ink-4)">{{ r.t }}</text>
+        <text class="earnings-ledger__amount">{{ r.amt }}</text>
+        <text class="earnings-ledger__time">{{ r.t }}</text>
       </view>
     </view>
   </view>
@@ -30,6 +35,7 @@
 
 <script setup lang="ts">
 import { useT } from "@/i18n/use-t";
+import ChevronRightIcon from "@/components/icons/chevron-right-icon.vue";
 
 const t = useT();
 
@@ -45,3 +51,98 @@ function goAll() {
   uni.navigateTo({ url: "/pages/me/wallet-bills", fail: () => {} });
 }
 </script>
+
+<style scoped>
+.earnings-ledger__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 6.5px;
+}
+
+.earnings-ledger__title {
+  font-family: var(--font-v5);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--v5-ink);
+}
+
+.earnings-ledger__link {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--v5-brand);
+}
+
+.earnings-ledger__link:active {
+  opacity: 0.7;
+}
+
+.earnings-ledger__list {
+  padding: 0 2px;
+  border-top: 1px solid var(--v5-border);
+  background: transparent;
+}
+
+.earnings-ledger__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content 36px;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--v5-border);
+}
+
+.earnings-ledger__row--last {
+  border-bottom: 0;
+}
+
+.earnings-ledger__main {
+  min-width: 0;
+}
+
+.earnings-ledger__text {
+  display: block;
+  overflow: hidden;
+  font-family: var(--font-v5);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.earnings-ledger__model {
+  color: var(--v5-ink);
+}
+
+.earnings-ledger__client {
+  color: var(--v5-ink-3);
+}
+
+.earnings-ledger__amount {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--v5-success);
+  white-space: nowrap;
+}
+
+.earnings-ledger__time {
+  width: 36px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--v5-ink-4);
+  text-align: right;
+  white-space: nowrap;
+}
+</style>

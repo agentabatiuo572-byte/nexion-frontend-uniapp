@@ -112,7 +112,7 @@ function goBack() {
   uni.navigateTo({ url: "/pages/me/wallet-repurchase", fail: () => {} });
 }
 
-const monoFamily = "var(--font-jet-mono), ui-monospace, monospace";
+const monoFamily = "var(--font-numbers)";
 const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "8px" };
 const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px" };
@@ -160,7 +160,7 @@ const exUnlockLabelStyle: CSSProperties = {
   letterSpacing: "0.06em",
 };
 const exUnlockValueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "15px",
   letterSpacing: "-0.014em",

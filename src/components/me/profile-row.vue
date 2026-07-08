@@ -2,8 +2,7 @@
   ProfileRow — ported from me/page.tsx ProfileRow.
   Strict port of styles-v4.css .profile-row: avatar (56 circle, brand solid) +
   name (display 600 18 -0.018) + phone mask (mono 12.5 ink-3) + 2 code-tag chips
-  (KYC verified/pending + Joined Nd). Taps through to /me/profile (not yet ported
-  → nav fail:()=>{}).
+  (KYC verified/pending + Joined Nd). Taps through to the account entry list.
 -->
 <template>
   <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" @click="goProfile">
@@ -53,7 +52,7 @@ const daysJoined = computed(() => Math.max(1, Math.floor((Date.now() - app.user.
 const joinedLabel = computed(() => fmt(t.value.me.profileJoinedDay, { n: daysJoined.value }));
 
 function goProfile() {
-  uni.navigateTo({ url: "/pages/me/profile", fail: () => {} });
+  uni.navigateTo({ url: "/pages/me/account", fail: () => {} });
 }
 
 const avatarStyle: CSSProperties = {
@@ -78,7 +77,7 @@ const nameStyle: CSSProperties = {
 };
 const metaStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   color: "var(--v5-ink-3)",
 };
@@ -86,7 +85,7 @@ const codeTagBase: CSSProperties = {
   gap: "4px",
   padding: "2px 8px",
   borderRadius: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   lineHeight: 1.5,

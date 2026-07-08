@@ -67,7 +67,7 @@
             <view class="text-right shrink-0" style="margin-left: 8px">
               <view :style="amountStyle(b.amount)">
                 <text>{{ b.amount >= 0 ? "+" : "-" }}{{ fmtAmount(b) }}</text>
-                <text style="font-size: 10px; color: var(--v5-ink-4); margin-left: 4px">{{ b.symbol }}</text>
+                <text style="font-size: 11px; color: var(--v5-ink-4); margin-left: 4px">{{ b.symbol }}</text>
               </view>
               <text
                 v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'"
@@ -212,7 +212,7 @@ function tabLabel(tb: Tab): string {
 
 const emptyStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px dashed var(--v5-border)",
   borderRadius: "16px",
   padding: "32px",
@@ -223,25 +223,25 @@ const emptyTextStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink
 const listWrapStyle: CSSProperties = { margin: "0 16px 12px" };
 const sectionStyle: CSSProperties = {
   marginBottom: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
 };
 const monthHeaderStyle: CSSProperties = {
   padding: "8px 16px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderBottom: "1px solid var(--v5-border)",
 };
 function rowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: i !== 0 ? "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)" : "none",
   };
 }
@@ -260,7 +260,7 @@ const typeLabelStyle: CSSProperties = {
 };
 function statusBadgeStyle(s: BillStatus): CSSProperties {
   const base: CSSProperties = {
-    fontSize: "10px",
+    fontSize: "11px",
     padding: "1px 6px",
     borderRadius: "4px",
   };
@@ -270,17 +270,17 @@ function statusBadgeStyle(s: BillStatus): CSSProperties {
   return { ...base, background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)", color: "var(--v5-brand-2)" };
 }
 const memoStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)" };
-const timeStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-4)" };
+const timeStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
 function amountStyle(amount: number): CSSProperties {
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontSize: "13.5px",
     fontWeight: 600,
     color: amount >= 0 ? "var(--v5-brand)" : "var(--v5-brand-2)",
     fontVariantNumeric: "tabular-nums",
   };
 }
-const balanceAfterStyle: CSSProperties = { marginTop: "2px", fontSize: "10px", color: "var(--v5-ink-4)" };
+const balanceAfterStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
 const footerStyle: CSSProperties = {
   margin: "12px 24px 24px",
   textAlign: "center",

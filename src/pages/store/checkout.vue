@@ -249,10 +249,10 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => [
-  { id: "usdt-trc20", label: "USDT (TRC20)", hint: "Lowest fee · 5 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "usdt-erc20", label: "USDT (ERC20)", hint: "15 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "btc", label: "Bitcoin", hint: "30 min", iconPath: "M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727" },
-  { id: "card", label: "Card", hint: "Instant · +3.5% fee", iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
+  { id: "usdt-trc20", label: "USDT (TRC20)", hint: "最低手续费 · 5 分钟", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  { id: "usdt-erc20", label: "USDT (ERC20)", hint: "15 分钟", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  { id: "btc", label: "比特币", hint: "30 分钟", iconPath: "M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727" },
+  { id: "card", label: "银行卡", hint: "即时到账 · +3.5% 手续费", iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
 ]);
 
 const tradein = useTradeinSheet();
@@ -513,7 +513,7 @@ watch(step, (s) => {
   if (s === "live" && product.value && orderId.value) {
     toast.success(
       t.value.store.coOrderPlaced,
-      `Your ${product.value.name} is being provisioned in our data center.`,
+      `你的 ${product.value.name} 正在数据中心部署。`,
     );
   }
 });
@@ -539,7 +539,7 @@ const notFoundBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "13.5px",
   fontWeight: 600,
 };
@@ -549,10 +549,10 @@ function stepFillStyle(i: number): CSSProperties {
   const w = i < stepDisplay.value ? "100%" : i === stepDisplay.value ? "50%" : "0%";
   return { width: w, background: "var(--v5-brand)", transition: "width 0.5s" };
 }
-const surfaceCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)" };
+const surfaceCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)" };
 const payHeadStyle: CSSProperties = { padding: "16px 20px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const payTotalStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",
@@ -593,7 +593,7 @@ const primaryBtnStyle: CSSProperties = {
   fontWeight: 600,
 };
 const confirmCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
@@ -616,7 +616,7 @@ const changePayBtnStyle: CSSProperties = {
   fontSize: "12.5px",
 };
 const centerCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "24px",
 };

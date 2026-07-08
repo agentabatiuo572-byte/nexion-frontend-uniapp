@@ -4,8 +4,8 @@
 
   Reads as a high-tier device under test-drive: device identity + live shadow
   earnings hero + trial-cycle progress + a buy CTA that converts. Hidden unless
-  the trial is active/grace/extended. Hierarchy via internal aurora glow + lift
-  (NOT an accent border), distinct from TrialHeroBanner (idle coupon entry).
+  the trial is active/grace/extended. Hierarchy via internal aurora glow + lift,
+  distinct from TrialHeroBanner (idle coupon entry).
 
   Spacing: caller controls horizontal margin via inherited `class` (no internal
   mx-* — the home wrapper owns padding; avoids the double-margin pitfall).
@@ -16,7 +16,8 @@
     v-if="visible"
     class="relative overflow-hidden rounded-2xl"
     :style="{
-      background: 'var(--v5-surface)',
+      background: 'var(--v5-surface-bg)',
+      border: '1px solid var(--v5-border-strong)',
       boxShadow: 'var(--v5-card-shadow-lift)',
     }"
   >
@@ -71,10 +72,10 @@
           style="color: var(--v5-ink-4); letter-spacing: 0.04em"
         >{{ t.trial.ghostSubtitle }}</text>
         <view class="mt-1 flex items-baseline gap-1.5">
-          <text class="font-display tabular-nums" style="font-size: 15px; font-weight: 500; color: var(--v5-ink-3)">$</text>
+          <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; font-weight: 500; color: var(--v5-ink-3)">$</text>
           <text
-            class="font-mono-tabular tabular-nums"
-            style="font-size: 30px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.02em; line-height: 1"
+            class="tabular-nums"
+            style="font-family: var(--font-amount); font-size: 30px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.02em; line-height: 1"
           >{{ shadowUSD.toFixed(2) }}</text>
           <text class="font-mono-tabular text-[12px] ml-1" style="color: var(--v5-tech-cyan)">{{ shadowNexText }}</text>
         </view>
@@ -156,8 +157,8 @@ const etaLabel = computed(() => {
   const hours = Math.floor((m % ONE_DAY) / 3_600_000);
   const minutes = Math.floor((m % 3_600_000) / 60_000);
   return days > 0
-    ? `${days}d ${String(hours).padStart(2, "0")}h`
-    : `${hours}h ${String(minutes).padStart(2, "0")}m`;
+    ? `${days}天 ${String(hours).padStart(2, "0")}小时`
+    : `${hours}小时 ${String(minutes).padStart(2, "0")}分钟`;
 });
 
 const progressPct = computed(() => {

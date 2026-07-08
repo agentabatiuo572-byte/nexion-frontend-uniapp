@@ -177,8 +177,8 @@ const heroStyle: CSSProperties = {
   padding: "16px",
 };
 const eyebrowStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-tech-cyan)",
   letterSpacing: "0.08em",
 };
@@ -203,13 +203,13 @@ const urlBoxStyle: CSSProperties = {
   padding: "10px 12px",
 };
 const urlLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 const urlValueStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   lineHeight: 1.35,
   color: "var(--v5-ink-2)",
@@ -243,12 +243,12 @@ const demoStyle: CSSProperties = {
   marginTop: "14px",
   borderRadius: "16px",
   border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   padding: "16px",
 };
 const demoLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-brand)",
   letterSpacing: "0.06em",
 };

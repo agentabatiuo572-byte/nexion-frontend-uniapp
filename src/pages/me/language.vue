@@ -56,14 +56,14 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
-import { LOCALES, PRIORITY_LABELS, localesByPriority, type LocaleCode } from "@/i18n";
+import { LOCALES, localesByPriority, type LocaleCode } from "@/i18n";
 
 const t = useT();
 const locale = useLocaleStore();
 const code = computed(() => locale.code);
 const grouped = localesByPriority();
 const priorities = [0, 1, 2, 3] as const;
-const priorityLabels = PRIORITY_LABELS;
+const priorityLabels = computed(() => t.value.language.priorityLabels);
 const localeCount = LOCALES.length;
 
 function pick(next: LocaleCode) {
@@ -81,7 +81,7 @@ const introStyle: CSSProperties = {
   lineHeight: 1.625,
 };
 const sectionStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -91,7 +91,7 @@ const sectionLabelStyle: CSSProperties = { fontSize: "11.5px", letterSpacing: "0
 function rowStyle(divider: boolean, active: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
@@ -106,7 +106,7 @@ function nameStyle(active: boolean): CSSProperties {
 }
 const codeStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)" };
 const rtlBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-warning)",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   borderRadius: "4px",

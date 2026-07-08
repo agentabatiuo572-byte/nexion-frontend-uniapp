@@ -23,7 +23,7 @@
       </view>
 
       <view class="relative mt-2 flex items-baseline gap-2">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ (avgEfficiency * 100).toFixed(1) }}%</text>
+        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 30px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ (avgEfficiency * 100).toFixed(1) }}%</text>
         <text class="text-[11px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ subtitleText }}</text>
       </view>
 
@@ -34,11 +34,13 @@
       <view class="relative mt-4 flex items-center justify-between gap-3">
         <view class="min-w-0" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.lifecycleMonthlyLoss }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ totalMonthlyLossUSD.toFixed(2) }}<text style="font-size: 10.5px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-amount); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ totalMonthlyLossUSD.toFixed(2) }}<text style="font-size: 11px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
         </view>
-        <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
+        <view class="shrink-0 inline-flex items-center active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.lifecycleCta }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          <svg :style="chevronIconStyle" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 2l5 5-5 5" />
+          </svg>
         </view>
       </view>
     </view>
@@ -124,11 +126,21 @@ const ctaStyle = computed<CSSProperties>(() => ({
   padding: "0 16px",
   borderRadius: "999px",
   background: accent.value,
+  gap: "8px",
+  alignItems: "center",
+  justifyContent: "center",
 }));
 const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontSize: "12.5px",
   fontWeight: 600,
+};
+const chevronIconStyle: CSSProperties = {
+  width: "8px",
+  height: "14px",
+  display: "block",
+  flexShrink: 0,
+  color: "var(--v5-on-brand)",
 };
 
 function goDevices() {

@@ -198,16 +198,16 @@ function handleClaim(id: string) {
 }
 
 const heroStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "20px",
 };
 const heroIconBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "16px", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const heroCountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
+const heroCountStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
 const heroTotalStyle: CSSProperties = { fontSize: "14px", color: "var(--v5-ink-4)" };
-const heroPctStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
+const heroPctStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
 const barTrackStyle: CSSProperties = { marginTop: "12px", height: "8px", borderRadius: "999px", background: "var(--v5-surface-2)", overflow: "hidden" };
 const barFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
@@ -224,7 +224,7 @@ const catHeadStyle: CSSProperties = {
   padding: "12px 8px 4px",
 };
 const listStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -232,7 +232,7 @@ const listStyle: CSSProperties = {
 function rowStyle(divider: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
 }
@@ -252,7 +252,7 @@ function aLabelStyle(ul: boolean): CSSProperties {
 function aDescStyle(ul: boolean): CSSProperties {
   return { fontSize: "11.5px", marginTop: "2px", lineHeight: 1.375, color: ul ? "var(--v5-ink-3)" : "var(--v5-ink-4)" };
 }
-const aWhenStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-4)", marginTop: "2px" };
+const aWhenStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", marginTop: "2px" };
 function rewardStyle(ul: boolean): CSSProperties {
   return { fontSize: "11.5px", fontWeight: 500, color: ul ? "var(--v5-brand)" : "var(--v5-ink-4)" };
 }

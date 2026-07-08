@@ -221,7 +221,7 @@ const trialBoxStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
   padding: "14px 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid color-mix(in srgb, var(--v5-warning) 40%, transparent)",
 };
 const trialIconStyle: CSSProperties = {
@@ -237,7 +237,7 @@ const formCardStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
   border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   overflow: "hidden",
 };
 const formHeadStyle: CSSProperties = {

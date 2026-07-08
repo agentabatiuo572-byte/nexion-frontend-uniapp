@@ -110,7 +110,7 @@ const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)"
 const stepsBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "12px",
   display: "flex",

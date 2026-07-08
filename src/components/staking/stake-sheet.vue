@@ -188,7 +188,7 @@ function submit() {
 }
 
 const panelStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderTop: "1px solid var(--v5-border)",
   padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
 };
@@ -215,14 +215,14 @@ const amountLabelStyle: CSSProperties = {
   fontWeight: 500,
 };
 const dollarStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "26px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "-0.022em",
 };
 const inputStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "48px",
   fontWeight: 600,
   letterSpacing: "-0.034em",
@@ -231,7 +231,7 @@ const inputStyle: CSSProperties = {
   background: "transparent",
 };
 const usdtStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "13.5px",
   color: "var(--v5-ink-3)",
 };
@@ -278,7 +278,7 @@ const rowValStyle: CSSProperties = {
 };
 const rowValSuccessStyle: CSSProperties = { ...rowValStyle, color: "var(--v5-success)" };
 const rowValBoldStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",

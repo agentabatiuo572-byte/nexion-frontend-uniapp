@@ -94,7 +94,7 @@ function iconBoxStyle(tone: MenuTone): CSSProperties {
   border-radius: 20px;
   border: 1px solid var(--v5-border);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--v5-surface-bg) 94%, #111317 6%) 0%, color-mix(in srgb, var(--v5-surface-bg) 84%, #111317 16%) 100%);
+    linear-gradient(180deg, color-mix(in srgb, var(--v5-surface) 94%, #111317 6%) 0%, color-mix(in srgb, var(--v5-surface) 84%, #111317 16%) 100%);
   overflow: hidden;
 }
 

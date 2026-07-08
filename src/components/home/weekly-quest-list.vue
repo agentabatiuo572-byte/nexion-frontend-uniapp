@@ -177,20 +177,20 @@ function onClaimBonus() {
 
 // ── styles ──
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const headerStyle: CSSProperties = { borderBottom: "1px solid var(--v5-border)" };
 const tier2LabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const countStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-2)",
 };
@@ -203,7 +203,7 @@ const claimedLabelStyle: CSSProperties = {
   textDecoration: "line-through",
 };
 const claimedRewardStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-success)",
 };
@@ -217,7 +217,7 @@ const claimLabelStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const claimRewardStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontWeight: 500,
   fontSize: "11px",
   color: "var(--v5-warning)",
@@ -239,13 +239,13 @@ const pendingLabelStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const pendingRewardStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-amount)",
   fontWeight: 500,
   fontSize: "11px",
   color: "var(--v5-brand)",
 };
 const pendingUsdtStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-amount)",
   fontSize: "11px",
   color: "var(--v5-success)",
 };

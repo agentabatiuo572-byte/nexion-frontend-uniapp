@@ -195,7 +195,7 @@ const activity = computed(() => {
       ts: Date.now() - i * 86400_000,
       kind: "mining",
       nex: todayNEX.value * (0.6 + i * 0.1),
-      label: "Mining payout · fleet",
+      label: "挖矿收益 · 设备舰队",
     });
   }
   return items.sort((a, b) => b.ts - a.ts).slice(0, 10);
@@ -267,7 +267,7 @@ const heroStyle: CSSProperties = {
   marginTop: "4px",
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const heroBlobStyle: CSSProperties = {
@@ -280,14 +280,14 @@ const heroBlobStyle: CSSProperties = {
   opacity: 0.85,
 };
 const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-brand-2)",
 };
 const heroNumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "32px",
   letterSpacing: "-0.022em",
@@ -296,20 +296,20 @@ const heroNumStyle: CSSProperties = {
 };
 const heroUnitStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
 const heroUsdStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "15px",
   fontWeight: 500,
   color: "var(--v5-ink-2)",
 };
 const heroChangeStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
@@ -326,7 +326,7 @@ const viewMarketStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 10px",
   borderRadius: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.04em",
@@ -335,7 +335,7 @@ const viewMarketStyle: CSSProperties = {
 const quickCellStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "12px",
   textAlign: "center",
@@ -359,12 +359,12 @@ const quickLabelStyle: CSSProperties = {
 const cardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const cardLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
@@ -384,24 +384,24 @@ function breakdownIconStyle(tint: string): CSSProperties {
   };
 }
 const breakdownLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
-const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)" };
 const breakdownValueStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const pnlValueStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   fontWeight: 600,
   color: pnl.value >= 0 ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
 const pnlCellLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.04em",
   color: "var(--v5-ink-4)",
 };
 const pnlCellValueStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   color: "var(--v5-ink)",
 };
@@ -418,7 +418,7 @@ const useTileSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", col
 const activityCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
@@ -427,7 +427,7 @@ const viewAllStyle: CSSProperties = {
   margin: "-12px -8px -12px 0",
   padding: "0 10px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-brand-2)",
   gap: "2px",
 };
@@ -435,7 +435,7 @@ const activityEmptyStyle: CSSProperties = { padding: "24px", textAlign: "center"
 function activityRowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "10px 16px",
+    padding: "8px 16px",
     borderTop: i === 0 ? "none" : "1px solid var(--v5-border)",
   };
 }
@@ -450,24 +450,24 @@ function activityIconStyle(kind: string): CSSProperties {
 const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", color: "var(--v5-ink)" };
 const activityTimeStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const activityNexStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12.5px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
 const activityUsdStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const noteStyle: CSSProperties = {
   paddingTop: "4px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   textAlign: "center",

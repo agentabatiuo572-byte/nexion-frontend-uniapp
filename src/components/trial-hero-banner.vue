@@ -33,7 +33,7 @@
             <svg width="10" height="10" viewBox="0 0 24 24" fill="#9B89E0">
               <path d="M12 2l2.6 7.2L22 10l-5.6 4.6L18 22l-6-4-6 4 1.6-7.4L2 10l7.4-.8z" />
             </svg>
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: #9B89E0; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase">{{ t.trial.heroBadge }}</text>
+            <text style="font-family: var(--font-numbers); font-size: 11px; color: #9B89E0; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase">{{ t.trial.heroBadge }}</text>
           </view>
           <text
             class="block"
@@ -52,15 +52,15 @@
 
         <!-- RIGHT stub -->
         <view style="padding: 16px 16px 14px 4px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 116px">
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10.5px; color: var(--v5-ink-4); letter-spacing: 0.06em">{{ earnLabelText }}</text>
+          <text style="font-family: var(--font-numbers); font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.06em">{{ earnLabelText }}</text>
           <view
             class="inline-flex items-baseline"
-            style="margin-top: 6px; gap: 1px; font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.024em; line-height: 1"
+            style="margin-top: 6px; gap: 1px; font-family: var(--font-amount); font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.024em; line-height: 1"
           >
-            <text style="font-size: 20px; font-weight: 500; color: #9B89E0">$</text>
+            <text style="font-family: var(--font-amount); font-size: 20px; font-weight: 500; color: #9B89E0">$</text>
             <text style="font-size: 36px">{{ est }}</text>
           </view>
-          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-4)">{{ dailyEarnText }}</text>
+          <text style="margin-top: 5px; font-family: var(--font-numbers); font-size: 11px; color: var(--v5-ink-4)">{{ dailyEarnText }}</text>
         </view>
       </view>
 
@@ -69,7 +69,7 @@
 
       <!-- Bottom strip: scarcity + Claim CTA -->
       <view style="position: relative; z-index: 1; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
-        <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12.5px; color: #FF6B35; font-weight: 500">
+        <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-numbers); font-size: 12.5px; color: #FF6B35; font-weight: 500">
           <view style="width: 6px; height: 6px; border-radius: 50%; background: #FF6B35; box-shadow: 0 0 6px rgba(255,107,53,0.70); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
           <text style="color: #FF6B35">{{ trialsLeftText }}</text>
         </view>
@@ -78,7 +78,7 @@
           style="padding: 8px 14px; border-radius: 999px; background: transparent; color: #9B89E0; font-family: var(--font-v5); font-weight: 600; font-size: 13.5px; border: 1px solid rgba(155,137,224,0.45); gap: 5px; letter-spacing: -0.005em; white-space: nowrap"
         >
           <text style="color: #9B89E0">{{ t.trial.heroClaimCta }}</text>
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px; color: #9B89E0">→</text>
+          <text style="font-family: var(--font-numbers); opacity: 0.8; font-size: 12px; color: #9B89E0">→</text>
         </view>
       </view>
     </view>
@@ -117,7 +117,7 @@ const trialsLeft = 47;
 const taglineText = computed(() => fmt(t.value.trial.heroTagline, { days: trialDays.value }));
 const earnLabelText = computed(() => fmt(t.value.trial.heroEarnLabel, { days: trialDays.value }));
 const trialsLeftText = computed(() => fmt(t.value.trial.heroTrialsLeft, { n: trialsLeft }));
-const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/d × ${trialDays.value}`);
+const dailyEarnText = computed(() => `$${dailyEarn.value.toFixed(2)}/天 × ${trialDays.value}`);
 
 const COUPON_MASK =
   "radial-gradient(circle at 62% 0, transparent 7px, #000 7.5px), " +

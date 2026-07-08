@@ -14,7 +14,7 @@ defineProps<{ q: string; a: string }>();
 const boxStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "12px",
-  padding: "12px 14px",
+  padding: "8px 14px",
 };
 const qStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

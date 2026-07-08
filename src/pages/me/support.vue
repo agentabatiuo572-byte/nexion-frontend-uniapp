@@ -127,7 +127,7 @@ const onlineTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-bran
 const avgStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)" };
 const cardStyle: CSSProperties = {
   marginBottom: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -135,7 +135,7 @@ const cardStyle: CSSProperties = {
 function channelRowStyle(divider: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "14px 16px",
+    padding: "8px 16px",
     borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
 }
@@ -149,7 +149,7 @@ const channelLabelStyle: CSSProperties = {
 };
 const channelHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const pinnedCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",

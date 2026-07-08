@@ -1,19 +1,19 @@
 <!--
   TechMoneyCard — ZONE 1 home hero "Today's earnings" (ported from
-  mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining,
-  team commission, staking accrual, and Genesis holder dividends. surface-2
-  base + aurora + tech-grid + drifting dots make it the conversion focal point.
-  Big streaming number + peer-avg / payback footer.
+  mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining
+  (earnings.today) + team commission credited since midnight (commission
+  .todayUSDT()). surface-2 base + aurora + tech-grid + drifting dots make it the
+  conversion focal point. Big streaming number + peer-avg / payback footer.
   Source hardcoded the labels; ported to t.home.tech* for bilingual parity.
 -->
 <template>
   <view
     class="relative isolate"
-    style="padding: 8px 2px 12px"
+    style="padding: 8px 0 12px"
   >
     <!-- Left purple glow — soft radial, blurred so its edges feather into the black page bg -->
     <view
-      style="position: absolute; inset: 0; background: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--accent-purple) 45%, transparent) 0%, transparent 66%); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
+      style="position: absolute; inset: 0; background: radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--accent-purple) 50%, transparent) 0%, transparent 66%); filter: blur(24px); z-index: 0; pointer-events: none; animation: v5-aurora-drift 14s ease-in-out infinite alternate"
     />
     <!-- Tech grid (brand-tinted, masked) -->
     <view
@@ -26,19 +26,25 @@
 
     <view class="relative" style="z-index: 1">
       <view class="flex justify-between items-center gap-2">
-        <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
-        <text
+        <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.techTodaysEarnings }}</text>
+        <view
           class="inline-flex items-center gap-1 font-mono-tabular"
-          style="font-size: 10.5px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
-        >{{ t.home.techStreaming }}</text>
+          style="font-size: 11px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
+        >
+          <view class="tech-live-dot" aria-hidden="true">
+            <view class="tech-live-dot__core" />
+            <view class="tech-live-dot__ring" />
+          </view>
+          <text>{{ t.home.techStreaming }}</text>
+        </view>
       </view>
 
       <view
         class="mt-2.5 flex items-baseline gap-1"
-        style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
+        style="font-family: var(--font-amount); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
       >
-        <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-        <text class="tabular-nums" style="font-size: 48px">{{ intPart }}<text style="font-size: 32px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
+        <text style="font-family: var(--font-amount); font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
+        <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 48px">{{ intPart }}<text style="font-family: var(--font-amount); font-size: 32px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
       </view>
 
       <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success)">{{ t.home.techVsYesterday }}</text>
@@ -51,21 +57,15 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
-import { useGenesis } from "@/store/genesis";
-import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
-const staking = useStaking();
-const genesis = useGenesis();
 
-const computeToday = computed(() => app.earnings.today);
-const teamToday = computed(() => commission.todayUSDT());
-const stakingToday = computed(() => staking.todayAccruedUSDT());
-const genesisToday = computed(() => genesis.myOwned * genesis.currentDailyDividendPerNodeUSDT());
-const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value + genesisToday.value);
+const earningsToday = computed(() => app.earnings.today);
+const commissionToday = computed(() => commission.todayUSDT());
+const todayTotal = computed(() => earningsToday.value + commissionToday.value);
 
 // Streaming number — ticks up; resyncs on a material jump (new commission / day rollover).
 const display = useTicker(() => Math.max(todayTotal.value, 0.06), 0.0009, 1100);
@@ -99,3 +99,41 @@ function dotStyle(d: Dot): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+.tech-live-dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  color: inherit;
+}
+.tech-live-dot__core,
+.tech-live-dot__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+.tech-live-dot__core {
+  background: currentColor;
+}
+.tech-live-dot__ring {
+  border: 1px solid currentColor;
+  opacity: 0.5;
+  animation: tech-live-pulse 1.6s ease-out infinite;
+}
+@keyframes tech-live-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  72% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+</style>

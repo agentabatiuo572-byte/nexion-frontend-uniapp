@@ -4,37 +4,33 @@
   sections). Built up zone by zone; sections live in src/components/home/*.vue
   and are assembled here inside the chassis + CardStagger entrance.
 
-  ZONE 1 (hook): Greeting → TechMoney → active trial slot → [Conversion → DayOne → LiveFeed]
-  ZONE 2-7: pending (status / AI bridge / money / market / trust).
+  ZONE 1 (hook): Greeting → TechMoney → Trial entries → [Conversion → DayOne → LiveFeed]
+  ZONE 2-7: pending (status / AI bridge / rank / money / market / trust).
 -->
 <template>
   <AppChassis active="home">
     <CardStagger class="px-4 pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
       <!-- ZONE 1: hook — earned anchor + conversion stack + social proof -->
-      <view class="home-earnings-cluster">
-        <GreetingHeader />
-        <TechMoneyCard />
-      </view>
-      <TrialGhostSlot />
+      <GreetingHeader />
+      <TechMoneyCard class="home-tech-money-card" />
       <DayOneQuestCard />
       <ConversionBanner />
       <LiveFeedCard />
 
       <!-- ZONE 2: status — your fleet, the grid, network pulse -->
       <QuickActionRow />
-      <MyFleetSection />
+      <MyFleetSection :max-items="3" />
       <OnGridSection />
       <NetworkPulseCard />
 
       <!-- ZONE 3: AI advisor bridge -->
       <NovaCardSlot />
+      <EarningsLedgerCard />
 
       <!-- ZONE 5: money & ROI -->
       <DoTheMathCard />
-      <EarningsLedgerCard />
 
       <!-- ZONE 6: market -->
-      <NexPriceCard />
       <MarketBoardCard />
 
       <!-- ZONE 7: trust close -->
@@ -49,7 +45,6 @@ import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import GreetingHeader from "@/components/home/greeting-header.vue";
 import TechMoneyCard from "@/components/home/tech-money-card.vue";
-import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import ConversionBanner from "@/components/home/conversion-banner.vue";
 import DayOneQuestCard from "@/components/home/day-one-quest-card.vue";
 import LiveFeedCard from "@/components/home/live-feed-card.vue";
@@ -60,7 +55,6 @@ import NetworkPulseCard from "@/components/home/network-pulse-card.vue";
 import NovaCardSlot from "@/components/home/nova-card-slot.vue";
 import DoTheMathCard from "@/components/home/do-the-math-card.vue";
 import EarningsLedgerCard from "@/components/home/earnings-ledger-card.vue";
-import NexPriceCard from "@/components/home/nex-price-card.vue";
 import MarketBoardCard from "@/components/home/market-board-card.vue";
 import TrustChipWall from "@/components/home/trust-chip-wall.vue";
 import { useLocaleStore } from "@/store/locale";
@@ -72,10 +66,12 @@ onLoad(() => {
 });
 </script>
 
-<style scoped>
-.home-earnings-cluster {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+<style>
+.nx-page-enter .nx-card-stagger.space-y-6 > .home-tech-money-card.home-tech-money-card {
+  margin-top: 8px !important;
+}
+
+.nx-page-enter .nx-card-stagger.space-y-6 > .trust-chip-wall.trust-chip-wall {
+  margin-top: 20px !important;
 }
 </style>

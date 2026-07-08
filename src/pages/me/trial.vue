@@ -269,12 +269,12 @@ function goDevices() {
   uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
 }
 
-const cardSecStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "16px" };
+const cardSecStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface-bg)", padding: "16px" };
 const cardIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const cardNumStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
+const cardNumStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-numbers)" };
 const cardFooterStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const manageStyle: CSSProperties = { gap: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--v5-tech-cyan)" };
+const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--v5-tech-cyan)" };
 const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "6px 0" };
 const remainderNoteStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625 };
 const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13.5px", fontWeight: 600 };
@@ -291,7 +291,7 @@ const idleIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderR
 const idleTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
 const idleBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375, padding: "0 8px" };
 const idleCtaStyle: CSSProperties = { marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13.5px", fontWeight: 600 };
-const terminalCardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "24px 20px", textAlign: "center" };
+const terminalCardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface-bg)", padding: "24px 20px", textAlign: "center" };
 const terminalIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "var(--v5-surface-2)", margin: "0 auto" };
 const cooldownLinkStyle: CSSProperties = { marginTop: "16px", fontSize: "12.5px", color: "var(--v5-ink-2)" };
 </script>

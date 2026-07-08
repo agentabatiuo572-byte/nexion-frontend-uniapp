@@ -68,7 +68,7 @@ function reLogin() {
   border-radius: 20px;
   padding: 28px 22px;
   text-align: center;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   box-shadow: var(--v5-card-shadow-lift-strong);
 }

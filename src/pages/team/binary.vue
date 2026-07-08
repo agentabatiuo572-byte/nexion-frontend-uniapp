@@ -50,14 +50,14 @@
               <text v-if="wing.isWeak" class="font-mono-tabular" :style="weakBadgeStyle">{{ t.binary.weakBadge }}</text>
             </view>
             <text class="block font-display tabular-nums" :style="wingVolStyle">${{ wing.monthVol.toLocaleString() }}</text>
-            <text class="block" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ wingMembersText(wing.count) }}</text>
+            <text class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '4px' }">{{ wingMembersText(wing.count) }}</text>
             <view v-if="wing.top" class="flex items-center border-t" :style="topMemberStyle">
               <text :style="{ fontSize: '14px' }">{{ wing.top.avatar }}</text>
               <view class="flex-1 min-w-0">
                 <text class="block truncate" :style="{ fontSize: '11px' }">{{ wing.top.name }}</text>
                 <view class="flex items-center" style="gap: 4px; margin-top: 2px">
                   <VBadge :v="wing.top.vRank" size="sm" :show-title="false" />
-                  <text class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">${{ wing.top.monthVolumeUSD }}</text>
+                  <text class="font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">${{ wing.top.monthVolumeUSD }}</text>
                 </view>
               </view>
             </view>
@@ -86,7 +86,7 @@
                 <view class="h-full rounded-full" :style="{ width: strongVol > 0 ? `${(weakVol / strongVol) * 100}%` : '0%', background: 'var(--v5-warning)' }" />
               </view>
             </view>
-            <text class="block" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '8px', lineHeight: 1.375 }">{{ gapHintText }}</text>
+            <text class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '8px', lineHeight: 1.375 }">{{ gapHintText }}</text>
           </view>
         </view>
 
@@ -115,9 +115,9 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
             <view class="flex-1 min-w-0">
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ new Date(e.ts).toLocaleDateString() }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ new Date(e.ts).toLocaleDateString() }}</text>
             </view>
-            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13.5px', color: 'var(--v5-warning)', fontWeight: 600 }">+${{ e.amountUSDT.toFixed(2) }}</text>
+            <text class="tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '13.5px', color: 'var(--v5-warning)', fontWeight: 600 }">+${{ e.amountUSDT.toFixed(2) }}</text>
           </view>
         </view>
       </view>
@@ -246,7 +246,7 @@ const heroStyle: CSSProperties = {
     "radial-gradient(80% 60% at 50% 0%, rgba(245,165,36,0.20) 0%, transparent 65%), linear-gradient(180deg, #1A1610 0%, #0E0E0E 100%)",
   border: "1px solid rgba(245,165,36,0.30)",
 };
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
 const heroAmtStyle: CSSProperties = {
   marginTop: "8px",
   fontSize: "48px",
@@ -279,7 +279,7 @@ function wingStyle(isWeak: boolean): CSSProperties {
   };
 }
 const weakBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
   color: "var(--v5-warning)",
   padding: "2px 6px",
@@ -295,12 +295,12 @@ const topMemberStyle: CSSProperties = {
 
 const cardStyle: CSSProperties = {
   padding: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
 const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
@@ -327,13 +327,13 @@ const spilloverIconStyle: CSSProperties = {
 
 const recentCapStyle: CSSProperties = {
   padding: "12px 16px 8px",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
 function recentRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "10px 16px",
+    padding: "8px 16px",
     gap: "10px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };

@@ -225,7 +225,7 @@ const contactLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-bra
 const searchIconStyle: CSSProperties = { position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 1 };
 const searchInputStyle: CSSProperties = {
   width: "100%",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "12px",
   padding: "10px 12px 10px 36px",
@@ -248,7 +248,7 @@ function chipStyle(active: boolean): CSSProperties {
 }
 const cardStyle: CSSProperties = {
   marginBottom: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -265,7 +265,7 @@ const faqBodyStyle: CSSProperties = { padding: "0 16px 12px" };
 const faqAStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const botCardStyle: CSSProperties = {
   marginBottom: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -297,7 +297,7 @@ function sendBtnStyle(active: boolean): CSSProperties {
   return { width: "32px", height: "32px", borderRadius: "8px", background: active ? "var(--v5-brand-2)" : "var(--v5-surface-2)" };
 }
 const contactCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",

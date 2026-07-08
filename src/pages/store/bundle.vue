@@ -64,7 +64,7 @@
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="itemNameStyle">{{ p.name }}</text>
             <text class="block" :style="itemMetaStyle">
-              <text style="color: var(--v5-ink-4)">Price </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">Earns +${{ p.dailyEarn.toFixed(2) }}/d</text>
+              <text style="color: var(--v5-ink-4)">价格 </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">收益 +${{ p.dailyEarn.toFixed(2) }}/天</text>
             </text>
           </view>
           <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" style="width: 28px; height: 28px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="`Remove ${p.name}`" @tap.stop="remove(p.id)" @click.stop="remove(p.id)">
@@ -91,7 +91,7 @@
             <view class="flex-1 min-w-0 text-left">
               <text class="block truncate" :style="suggestionNameStyle">{{ p.name }}</text>
               <text class="block" :style="itemMetaStyle">
-                <text style="color: var(--v5-ink-4)">Price </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">Earns +${{ p.dailyEarn.toFixed(2) }}/d</text>
+                <text style="color: var(--v5-ink-4)">价格 </text>${{ p.price.toLocaleString() }}<text style="color: var(--v5-ink-4)"> · </text><text style="color: var(--v5-success)">收益 +${{ p.dailyEarn.toFixed(2) }}/天</text>
               </text>
             </view>
             <view class="shrink-0 rounded-full grid place-items-center" style="width: 28px; height: 28px; background: var(--v5-brand-soft); color: var(--v5-brand)">
@@ -125,7 +125,7 @@
           <!-- Combined daily -->
           <view class="flex items-center justify-between" style="min-height: 24px">
             <text :style="rowLabelStyle(false)">{{ t.bundle.combinedDaily }}</text>
-            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ cumulativeDailyEarn.toFixed(2) }}/d</text>
+            <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ cumulativeDailyEarn.toFixed(2) }}/天</text>
           </view>
           <!-- Checkout CTA (intentional placeholder — see header comment) -->
           <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" :aria-label="checkoutCtaText" @tap.stop="onCheckout" @click.stop="onCheckout">
@@ -204,7 +204,7 @@ function onCheckout() {
 const heroStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const heroAuroraStyle: CSSProperties = {
@@ -229,7 +229,7 @@ const totalAuroraStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand)",
@@ -253,7 +253,7 @@ function tierCellStyle(tier: BundleDiscountTier): CSSProperties {
 }
 function tierLabelStyle(_tier: BundleDiscountTier): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "11px",
     fontWeight: 500,
     color: "var(--v5-ink-3)",
@@ -264,7 +264,7 @@ function tierPctStyle(tier: BundleDiscountTier): CSSProperties {
   const active = tierIsActive(tier);
   return {
     marginTop: "2px",
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 600,
     fontSize: "15px",
     letterSpacing: "-0.014em",
@@ -274,11 +274,11 @@ function tierPctStyle(tier: BundleDiscountTier): CSSProperties {
 
 const cardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const itemsHeadingStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -300,15 +300,15 @@ const itemNameStyle: CSSProperties = {
 };
 const itemMetaStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 
 const suggestionsHeadingStyle: CSSProperties = {
   marginBottom: "10px",
   padding: "0 4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -317,7 +317,7 @@ const suggestionsHeadingStyle: CSSProperties = {
 const suggestionRowStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const suggestionNameStyle: CSSProperties = {
@@ -338,7 +338,7 @@ function rowLabelStyle(big: boolean): CSSProperties {
 }
 function rowValueStyle(tint?: string, big = false): CSSProperties {
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 600,
     fontSize: big ? "18px" : "13px",
     letterSpacing: big ? "-0.014em" : "-0.008em",

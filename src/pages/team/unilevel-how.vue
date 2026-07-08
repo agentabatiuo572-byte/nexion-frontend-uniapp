@@ -166,10 +166,10 @@ const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3
 const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)" };
 const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
 
-const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px" };
+const tableCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "12px" };
 const tableHeadStyle: CSSProperties = {
   padding: "8px 12px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.14em", // SKILL: prototype thead tracking-[0.14em] (was 0.06em)
@@ -179,7 +179,7 @@ const thMidStyle: CSSProperties = { flex: "1.5", textAlign: "left" };
 const thRightStyle: CSSProperties = { flex: "1.4", textAlign: "right" };
 function tableRowStyle(_isFirst: boolean): CSSProperties {
   // SKILL: prototype every <tr> has border-t border-[var(--v5-border)]/60 (incl. first row)
-  return { padding: "10px 12px", borderTop: "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)", fontSize: "12px" };
+  return { padding: "8px 12px", borderTop: "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)", fontSize: "12px" };
 }
 function tierNameStyle(color: string): CSSProperties {
   return { flex: "1.1", fontWeight: 600, color };
@@ -189,7 +189,7 @@ function tierPerkStyle(color: string): CSSProperties {
   return { flex: "1.4", textAlign: "right", fontWeight: 600, color };
 }
 
-const signalCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px", padding: "12px" };
+const signalCardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "12px", padding: "12px" };
 const signalBadgeStyle: CSSProperties = {
   width: "28px",
   height: "28px",

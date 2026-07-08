@@ -30,11 +30,11 @@ interface Purchase { who: string; co: string; prod: string; t: string; color: st
 // Decorative avatar accents only (not design tokens). Alex's blue was nudged to
 // #1A4FD0 so no value trips the verify hardcoded-light-hex sentinel.
 const purchases: Purchase[] = [
-  { who: "Maya", co: "ID", prod: "NexionBox S1", t: "3m", color: "#C68316" },
-  { who: "cypher.eth", co: "US", prod: "NexionRack P1", t: "7m", color: "#0833B8" },
-  { who: "Hideo", co: "JP", prod: "NexionBox Pro", t: "12m", color: "#0E8E4A" },
-  { who: "Alex", co: "DE", prod: "NexionBox S1", t: "14m", color: "#1A4FD0" },
-  { who: "Layla", co: "AE", prod: "NexionBox S1 ×2", t: "21m", color: "#B9554A" },
+  { who: "Maya", co: "印尼", prod: "NexionBox S1", t: "3 分钟", color: "#C68316" },
+  { who: "cypher.eth", co: "美国", prod: "NexionRack P1", t: "7 分钟", color: "#0833B8" },
+  { who: "Hideo", co: "日本", prod: "NexionBox Pro", t: "12 分钟", color: "#0E8E4A" },
+  { who: "Alex", co: "德国", prod: "NexionBox S1", t: "14 分钟", color: "#1A4FD0" },
+  { who: "Layla", co: "阿联酋", prod: "NexionBox S1 ×2", t: "21 分钟", color: "#B9554A" },
 ];
 
 const i = ref(0);
@@ -54,7 +54,7 @@ const initial = computed(() => cur.value.who[0]);
 
 const rootStyle: CSSProperties = {
   padding: "10px 14px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "12px",
 };
 

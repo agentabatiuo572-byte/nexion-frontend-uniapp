@@ -41,7 +41,7 @@ import { useT } from "@/i18n/use-t";
 const t = useT();
 
 const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   padding: "20px",
   gridTemplateColumns: "minmax(0,1fr) 100px",

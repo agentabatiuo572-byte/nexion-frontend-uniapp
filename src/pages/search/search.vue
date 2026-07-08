@@ -55,7 +55,7 @@
             >
               <view class="flex-1 min-w-0">
                 <text class="block truncate" style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
-                <text v-if="h.sublabel" class="block truncate" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
+                <text v-if="h.sublabel" class="block truncate" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
               </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
             </view>
@@ -93,42 +93,42 @@ const q = ref("");
 const devices = computed(() => app.visibleDevices);
 const members = computed(() => network.members);
 
-// Static route catalog. href = uni page path when the page is ported,
-// otherwise a placeholder path that navigate's fail:()=>{} swallows.
-const ROUTES: ReadonlyArray<{ label: string; href: string; sub: string }> = [
-  { label: "Home / Mission Control", href: "/pages/index/index", sub: "Live earnings · ticker · dashboard" },
-  { label: "Earn / Fleet", href: "/pages/earn/earn", sub: "Device cards · task center · efficiency" },
-  { label: "Store", href: "/pages/store/store", sub: "NexionBox / Rack / Cloud Share" },
-  { label: "Trade-in", href: "/pages/me/devices", sub: "Legacy salvage + upgrade path" },
-  { label: "Team hub", href: "/pages/team/team", sub: "Royalty / V-rank / network" },
-  { label: "Influence Network Royalty", href: "/pages/team/unilevel", sub: "Direct + Network Yield Bonus" },
-  { label: "Network visualization", href: "/pages/team/network", sub: "Direct / Extended orbits" },
-  { label: "Wallet", href: "/pages/me/wallet", sub: "Balance + withdraw + topup" },
-  { label: "Withdraw", href: "/pages/me/wallet-withdraw", sub: "Cash out USDT to chain" },
-  { label: "Staking Vault", href: "/pages/staking/staking", sub: "4 lock tiers up to 180%" },
-  { label: "Genesis marketplace", href: "/pages/genesis/marketplace", sub: "Secondary Genesis trading" },
-  { label: "Goals", href: "/pages/me/goals", sub: "Set earnings target + recommended path" },
-  { label: "Risk disclosure", href: "/pages/me/risk-disclosure", sub: "Required reading" },
-  { label: "Developer / API", href: "/pages/developer/developer", sub: "Public API + partner integrations" },
-  { label: "Globe / Network map", href: "/pages/globe/globe", sub: "Worldwide active nodes" },
-  { label: "Market", href: "/pages/market/market", sub: "AI workload prices + NEX K-line" },
-  { label: "Learn / Academy", href: "/pages/learn/learn", sub: "Lessons · learn-to-earn NEX" },
-  { label: "Events", href: "/pages/events/events", sub: "Promotions · contests · seasonal" },
-  { label: "Missions", href: "/pages/missions/missions", sub: "Quests · streaks · challenges" },
-];
-
-const FAQ: ReadonlyArray<{ label: string; href: string; sub: string }> = [
-  { label: "How Unilevel Royalty works", href: "/pages/team/unilevel", sub: "Direct + Network Yield Bonus + Rate Tier" },
-  { label: "How Staking works", href: "/pages/staking/staking", sub: "Lock periods + APY + early unlock penalty" },
-  { label: "How Genesis works", href: "/pages/genesis/genesis", sub: "Founder NFT + perks + secondary" },
-  { label: "NEX token explained", href: "/pages/me/wallet", sub: "Sources · uses · burn mechanism" },
-];
+// href = uni page path when the page is ported, otherwise navigate's fail
+// handler swallows the placeholder.
+const ROUTE_HREFS = [
+  "/pages/index/index",
+  "/pages/earn/earn",
+  "/pages/store/store",
+  "/pages/me/devices",
+  "/pages/team/team",
+  "/pages/team/unilevel",
+  "/pages/team/network",
+  "/pages/me/wallet",
+  "/pages/me/wallet-withdraw",
+  "/pages/staking/staking",
+  "/pages/genesis/marketplace",
+  "/pages/me/goals",
+  "/pages/me/risk-disclosure",
+  "/pages/developer/developer",
+  "/pages/globe/globe",
+  "/pages/market/market",
+  "/pages/learn/learn",
+  "/pages/events/events",
+  "/pages/missions/missions",
+] as const;
+const FAQ_HREFS = ["/pages/team/unilevel", "/pages/staking/staking", "/pages/genesis/genesis", "/pages/me/wallet"] as const;
+const ROUTES = computed(() =>
+  t.value.search.routeCatalog.map((r, i) => ({ ...r, href: ROUTE_HREFS[i] ?? "/pages/index/index" })),
+);
+const FAQ = computed(() =>
+  t.value.search.faqCatalog.map((f, i) => ({ ...f, href: FAQ_HREFS[i] ?? "/pages/me/help" })),
+);
 
 const results = computed<Hit[]>(() => {
   const query = q.value.trim().toLowerCase();
   if (!query) return [];
   const out: Hit[] = [];
-  for (const r of ROUTES) {
+  for (const r of ROUTES.value) {
     if (r.label.toLowerCase().includes(query) || r.sub.toLowerCase().includes(query)) {
       out.push({ group: "route", label: r.label, sublabel: r.sub, href: r.href });
     }
@@ -158,7 +158,7 @@ const results = computed<Hit[]>(() => {
       });
     }
   }
-  for (const f of FAQ) {
+  for (const f of FAQ.value) {
     if (f.label.toLowerCase().includes(query) || f.sub.toLowerCase().includes(query)) {
       out.push({ group: "faq", label: f.label, sublabel: f.sub, href: f.href });
     }
@@ -193,7 +193,7 @@ function openHit(h: Hit) {
 // ── styles ──
 const inputWrapStyle: CSSProperties = {
   gap: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "12px",
   padding: "0 12px",
@@ -207,29 +207,29 @@ const inputStyle: CSSProperties = {
   height: "100%",
 };
 const emptyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
 const noResultsStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "20px",
 };
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
 const resultCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
 };
 function rowStyle(isLast: boolean): CSSProperties {
   return {
     gap: "8px",
-    padding: "10px 14px",
+    padding: "8px 14px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }

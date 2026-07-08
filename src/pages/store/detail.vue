@@ -3,7 +3,7 @@
   {page.tsx + _client.tsx}. Dynamic [productId] → `?id=` query (onLoad).
 
   Wrapped in <AppChassis active="store">. Top→bottom:
-    in-page header (back + title/tier) → Hero (ProductRender + ribbon +
+    in-page header (back + title) → Hero (ProductRender + ribbon +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
     ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec → Reviews
     (rating summary + bars + 3 rows) → Trust badges → FAQ accordion →
@@ -17,7 +17,7 @@
 <template>
   <AppChassis active="store">
     <view style="color: var(--v5-ink)">
-      <!-- Back + title/tier now live in the sticky chassis nav header
+      <!-- Back + title now live in the sticky chassis nav header
            (useSetPageHeader below) so they pin on scroll + frost content,
            mirroring the prototype's SetPageHeader. -->
 
@@ -67,14 +67,14 @@
         </view>
 
         <!-- === Section 1.5: Cloud Share daily output (entry device — same earning model as the card) === -->
-        <view v-if="isShare" class="mx-4 mt-3 rounded-2xl border" style="padding: 16px 18px; background: var(--v5-surface); border-color: var(--v5-border)">
-          <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-warning)">
+        <view v-if="isShare" class="mx-4 mt-3 rounded-2xl border" style="padding: 16px 18px; background: var(--v5-surface-bg); border-color: var(--v5-border)">
+          <view class="font-mono-tabular inline-flex items-center" style="gap: 6px; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--v5-success)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
             <text>{{ t.store.cardYouEarn }}</text>
           </view>
           <view class="flex items-baseline flex-wrap" style="margin-top: 6px; gap: 8px">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 30px; color: var(--v5-warning); letter-spacing: -0.022em; line-height: 1">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
-            <text class="font-mono-tabular tabular-nums" style="margin-left: auto; font-size: 12.5px; color: var(--v5-warning); font-weight: 500">+{{ product.dailyEarnNEX }} NEX/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-amount); font-weight: 600; font-size: 30px; color: var(--v5-success); letter-spacing: -0.022em; line-height: 1">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+            <text class="tabular-nums" style="margin-left: auto; font-family: var(--font-amount); font-size: 12.5px; color: var(--v5-brand); font-weight: 500">+{{ product.dailyEarnNEX }} NEX/天</text>
           </view>
         </view>
 
@@ -83,12 +83,12 @@
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">$0.06/d</text>
+              <text class="tabular-nums" style="font-family: var(--font-amount)">$0.06/天</text>
           </view>
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
-          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-warning)">
+          <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 11.5px; color: var(--v5-brand)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-amount); font-weight: 600">${{ dailyEarnText }}/天</text>
           </view>
           <text class="shrink-0" :style="vsMultChipStyle">{{ speedup }}×</text>
         </view>
@@ -125,7 +125,7 @@
               </view>
               <view :style="roiCellStyle(2)">
                 <text class="block font-mono-tabular" :style="roiLabelStyle">{{ t.store.detAnnual }}</text>
-                <text class="block tabular-nums" :style="roiValStyle('success')">${{ annualYieldText }}</text>
+                <text class="block tabular-nums" :style="roiValStyle('ink')">${{ annualYieldText }}</text>
                 <text class="block" :style="roiSubStyle">{{ annualPctText }}{{ t.store.detRoiSuffix }}</text>
               </view>
               <view :style="roiCellStyle(3)">
@@ -162,7 +162,7 @@
               <view v-for="b in ratingBars" :key="b.star" class="flex items-center" style="gap: 8px">
                 <text class="tabular-nums" style="width: 10px; font-size: 11px; color: var(--v5-ink-3)">{{ b.star }}</text>
                 <RatingBar :pct="b.pct" />
-                <text class="tabular-nums text-right" style="width: 30px; font-size: 10.5px; color: var(--v5-ink-3)">{{ b.pct }}%</text>
+                <text class="tabular-nums text-right" style="width: 30px; font-size: 11px; color: var(--v5-ink-3)">{{ b.pct }}%</text>
               </view>
             </view>
           </view>
@@ -268,12 +268,11 @@ const isLocked = computed(() => {
 // Per-user purchase gate (等级门 + 锁额) — drives the sticky Buy CTA below.
 const { gate: purchaseGate } = usePurchaseGate(product);
 
-// Sticky chassis nav header (back + centered title/tier) — replaces the old
+// Sticky chassis nav header (back + centered title) — replaces the old
 // in-page back row so it pins on scroll + frosts content (mirrors prototype
 // SetPageHeader). Getter form: title resolves once the product loads (onLoad).
 useSetPageHeader(() => ({
   title: product.value?.name ?? t.value.store.coProductNotFound,
-  subtitle: product.value?.tier,
   backHref: "/store",
 }));
 
@@ -299,7 +298,7 @@ const paybackDays = computed(() =>
 const paybackLabel = computed(() => {
   if (!product.value || isShare.value) return "";
   const d = Math.round(product.value.price / product.value.dailyEarn);
-  return d >= 60 ? `${(d / 30).toFixed(1)} months` : `${d} days`;
+  return d >= 60 ? `${(d / 30).toFixed(1)} 个月` : `${d} 天`;
 });
 
 // Hardware spec rows — real fields + plausible managed-service spec
@@ -308,11 +307,11 @@ const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
   if (!p) return [];
   return [
     { k: "GPU", v: p.gpu },
-    { k: "VRAM", v: p.vram },
-    { k: "Power", v: p.power ?? "—" },
-    { k: "Datacenter", v: "Singapore" },
-    { k: "Uptime SLA", v: "99.9%" },
-    { k: "Warranty", v: "24 months" },
+    { k: "显存", v: p.vram },
+    { k: "功耗", v: p.power ?? "—" },
+    { k: "数据中心", v: "新加坡" },
+    { k: "在线 SLA", v: "99.9%" },
+    { k: "质保", v: "24 个月" },
   ];
 });
 
@@ -321,19 +320,19 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
   const ai = product.value?.ai;
   if (!ai) return [];
   const rows: { k: string; v: string }[] = [];
-  if (ai.imageGenPerMin) rows.push({ k: "Image gen (SDXL)", v: `${ai.imageGenPerMin} img/min` });
-  if (ai.llmTokensPerSec) rows.push({ k: "LLM inference", v: `${(ai.llmTokensPerSec / 1000).toFixed(1)}k tok/sec` });
-  if (ai.videoMinPerHour) rows.push({ k: "Video gen", v: `${ai.videoMinPerHour} min / hour` });
-  if (ai.fineTuneMins) rows.push({ k: "Fine-tune (LoRA)", v: `~${ai.fineTuneMins} min` });
-  if (ai.unlocks) rows.push({ k: "Unlocks pool", v: ai.unlocks });
+  if (ai.imageGenPerMin) rows.push({ k: "图像生成(SDXL)", v: `${ai.imageGenPerMin} 张/分钟` });
+  if (ai.llmTokensPerSec) rows.push({ k: "LLM 推理", v: `${(ai.llmTokensPerSec / 1000).toFixed(1)}k token/秒` });
+  if (ai.videoMinPerHour) rows.push({ k: "视频生成", v: `${ai.videoMinPerHour} 分钟/小时` });
+  if (ai.fineTuneMins) rows.push({ k: "微调(LoRA)", v: `约 ${ai.fineTuneMins} 分钟` });
+  if (ai.unlocks) rows.push({ k: "解锁任务池", v: ai.unlocks });
   return rows;
 });
 
-// Mock reviews / FAQ / trust — faithful English data (not i18n; matches source)
+// Mock reviews / FAQ / trust — localized for Chinese-mode preview.
 const reviews = [
-  { name: "Maya · ID", stars: 5, time: "2 days ago", text: "Paid back in about 3 months. Withdrew $186 first month no questions.", color: "#C68316" },
-  { name: "cypher.eth", stars: 5, time: "1 week ago", text: "Tax-deductible business expense, AI workloads are legitimate. Best ROI in my portfolio.", color: "#7250C8" },
-  { name: "Hideo · JP", stars: 4, time: "2 weeks ago", text: "Stable yields. Customer service slow on the first activation. Now running fine.", color: "#0E8E4A" },
+  { name: "Maya · ID", stars: 5, time: "2 天前", text: "大约 3 个月回本。第一个月提现 $186,流程很顺。", color: "#C68316" },
+  { name: "cypher.eth", stars: 5, time: "1 周前", text: "AI 工作负载是真实业务支出,回报率在我的组合里最高。", color: "#7250C8" },
+  { name: "Hideo · JP", stars: 4, time: "2 周前", text: "收益稳定。首次激活客服稍慢,现在运行正常。", color: "#0E8E4A" },
 ];
 const ratingBars = [
   { star: 5, pct: 78 },
@@ -345,10 +344,10 @@ const ratingBars = [
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
 const compliance = ["SOC 2 Type II", "ISO 27001", "Chainalysis KYT"];
 const faqs = [
-  { q: "Where is the device physically?", a: "In our Singapore datacenter. You never receive hardware — all maintenance and power is included." },
-  { q: "Can I withdraw earnings anytime?", a: "Yes, from $20. First withdrawal processes within 24 hours. KYC-Express ($1 deposit) required to verify your wallet." },
-  { q: "What if AI demand drops?", a: "Earnings scale with AI workload pool pricing. Historical floor: $24/day even during low-demand periods." },
-  { q: "Is there a refund window?", a: "7-day money-back if device hasn't been activated. After activation, resale on marketplace." },
+  { q: "设备实际放在哪里?", a: "在我们的新加坡数据中心。你不会收到实体硬件,维护和电力都已包含。" },
+  { q: "收益可以随时提现吗?", a: "可以,满 $20 即可。首次提现通常 24 小时内处理,需要通过 KYC-Express($1 验证金)确认钱包归属。" },
+  { q: "如果 AI 需求下降怎么办?", a: "收益会随 AI 工作负载池价格变化。即使低需求期,历史底部也约为 $24/天。" },
+  { q: "有退款窗口吗?", a: "设备未激活前支持 7 天退款。激活后可在市场转售。" },
 ];
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──
@@ -418,7 +417,7 @@ watch(
     sticky.show({
       href: `/pages/store/checkout?product=${product.value.id}`,
       amount: `$${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `$${dailyEarnText.value}/d · ${paybackLabel.value} payback`,
+      amountSubtext: isShare.value ? undefined : `$${dailyEarnText.value}/天 · ${paybackLabel.value} 回本`,
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     });
@@ -430,12 +429,12 @@ onUnmounted(() => sticky.hide());
 
 // ─── styles ───
 const notFoundStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "40px 16px",
 };
 const heroCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
 };
 const auroraStyle: CSSProperties = {
@@ -456,7 +455,7 @@ const ribbonStyle: CSSProperties = {
   padding: "3px 10px 4px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontVariantNumeric: "tabular-nums",
   fontSize: "11px",
   fontWeight: 500,
@@ -490,14 +489,14 @@ function codeChip(tone: "success" | "amber"): CSSProperties {
     borderRadius: "4px",
     background: palette.bg,
     color: palette.color,
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "11px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
   };
 }
 const vsStripStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "12px 14px",
   gap: "12px",
@@ -514,7 +513,7 @@ const vsMultChipStyle: CSSProperties = {
   lineHeight: 1,
 };
 const roiCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
@@ -553,9 +552,9 @@ function roiCellStyle(index: number): CSSProperties {
 const roiLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)" };
 function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   const color =
-    tone === "success" ? "var(--v5-warning)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
+    tone === "success" ? "var(--v5-success)" : tone === "brand" ? "var(--v5-brand)" : "var(--v5-ink)";
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontSize: "20px",
     fontWeight: 600,
     color,
@@ -566,7 +565,7 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
 }
 const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
 const reviewsCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "4px 14px",
 };
@@ -607,7 +606,7 @@ const readAllStyle: CSSProperties = {
   color: "var(--v5-brand)",
 };
 const trustCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
@@ -629,7 +628,7 @@ const complianceChipStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const faqCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "0 14px",
 };

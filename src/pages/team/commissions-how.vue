@@ -158,7 +158,7 @@ const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "11.5px", color: 
 
 const statusBoxStyle: CSSProperties = {
   marginTop: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "12px",
   padding: "12px",
@@ -174,7 +174,7 @@ function statusChipStyle(color: string): CSSProperties {
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
     border: `1px solid color-mix(in srgb, ${color} 35%, transparent)`,
     color,
-    fontSize: "10.5px",
+    fontSize: "11px",
   };
 }
 const statusDescStyle: CSSProperties = { color: "var(--v5-ink-3)", lineHeight: 1.5 };
@@ -187,7 +187,7 @@ const exampleBoxStyle: CSSProperties = {
 };
 const exampleDayStyle: CSSProperties = {
   marginBottom: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -203,14 +203,14 @@ const exampleTotalRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const exampleTotalLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const exampleTotalValueStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",

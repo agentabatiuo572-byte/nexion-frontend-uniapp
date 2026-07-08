@@ -132,13 +132,13 @@ async function handleClearAll() {
   if (ok) {
     const n = receipts.value.length;
     receiptsStore.clear();
-    toast.success(t.value.receipt.clearAll, `${n} receipts removed`);
+    toast.success(t.value.receipt.clearAll, `已删除 ${n} 张收据`);
   }
 }
 
 function copySig(r: Receipt) {
   uni.setClipboardData({ data: r.signature, showToast: false, fail: () => {} });
-  toast.success("Signature copied", r.signature.substring(0, 16) + "...");
+  toast.success("签名已复制", r.signature.substring(0, 16) + "...");
 }
 
 function rowAmount(r: Receipt): string {
@@ -176,7 +176,7 @@ const clearBtnStyle: CSSProperties = { width: "44px", height: "44px", borderRadi
 
 const emptyStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px dashed var(--v5-border)",
   borderRadius: "16px",
   padding: "32px",
@@ -187,7 +187,7 @@ const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", co
 
 const listStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
@@ -195,7 +195,7 @@ const listStyle: CSSProperties = {
 function rowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "8px 16px",
     borderTop: i === 0 ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
   };
 }
@@ -218,7 +218,7 @@ const rowTitleStyle: CSSProperties = {
 const rowSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
 function rowAmountStyle(r: Receipt): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "13.5px",
     fontWeight: 600,
     color: r.category === "KY" ? "var(--v5-brand-2)" : "var(--v5-brand)",

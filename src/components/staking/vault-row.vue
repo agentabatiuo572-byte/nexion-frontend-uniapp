@@ -12,11 +12,11 @@
     <view style="min-width: 0">
       <view class="flex items-baseline flex-wrap" style="gap: 6px">
         <text class="tabular-nums" :style="apyStyle">{{ apyPct }}%</text>
-        <text :style="apyUnitStyle">APY</text>
+        <text :style="apyUnitStyle">年化</text>
         <text v-if="ribbon" :style="ribbonStyle">{{ ribbon.label }}</text>
       </view>
       <text class="block" :style="blurbStyle">{{ blurb }}</text>
-      <text class="block tabular-nums" :style="metaStyle">Min ${{ minText }} · {{ penaltyPct }}% {{ penaltySuffix }}</text>
+      <text class="block tabular-nums" :style="metaStyle">最低 ${{ minText }} · {{ penaltyPct }}% {{ penaltySuffix }}</text>
     </view>
 
     <!-- Arrow -->
@@ -67,7 +67,7 @@ const rowStyle = computed<CSSProperties>(() => ({
   gridTemplateColumns: "auto 1fr auto",
   gap: "12px",
   alignItems: "center",
-  padding: "14px 0",
+  padding: "8px 0",
   borderBottom: props.isLast ? "none" : "1px solid var(--v5-border)",
 }));
 const tierChipStyle = computed<CSSProperties>(() => ({
@@ -75,7 +75,7 @@ const tierChipStyle = computed<CSSProperties>(() => ({
   background: tone.value.softBg,
   border: `1px solid ${tone.value.borderColor}`,
   borderRadius: "999px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: tone.value.text,
@@ -83,7 +83,7 @@ const tierChipStyle = computed<CSSProperties>(() => ({
   whiteSpace: "nowrap",
 }));
 const apyStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "18px",
   letterSpacing: "-0.014em",
@@ -102,8 +102,8 @@ const ribbonStyle = computed<CSSProperties>(() => ({
   background: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-soft)" : "var(--v5-warning-soft)",
   border: `1px solid ${props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-border)" : "rgba(198,131,22,0.30)"}`,
   color: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan)" : "var(--v5-warning)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.02em",
 }));
@@ -115,7 +115,7 @@ const blurbStyle: CSSProperties = {
   lineHeight: 1.4,
 };
 const metaStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   marginTop: "3px",

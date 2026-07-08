@@ -24,10 +24,10 @@ const labelStyle = computed<CSSProperties>(() => ({
 }));
 const valueStyle = computed<CSSProperties>(() => {
   if (props.big) {
-    return { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)" };
+    return { fontFamily: "var(--font-amount)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)" };
   }
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontSize: "12.5px",
     color: props.accent ? "var(--v5-brand)" : "var(--v5-ink)",
   };

@@ -26,21 +26,7 @@ await page.evaluate(() => localStorage.clear());
 await page.goto(`${baseUrl}/#/`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1800);
 
-// uni-app H5 dev 把应用渲染在同源 iframe 里;evaluate 必须进应用 frame——
-// 在顶层 frame 裸 import("/src/store/app.ts") 会凭空构建第二套模块图
-// (第二份 pinia,报 no active Pinia)。同 frame 内动态 import 命中 vite
-// 模块缓存,拿到的才是页面主链的 store 实例。build 产物无 iframe 时回退主 frame。
-async function resolveAppFrame() {
-  for (let i = 0; i < 50; i++) {
-    const frame = page.frames().find((f) => f !== page.mainFrame());
-    if (frame) return frame;
-    await page.waitForTimeout(200);
-  }
-  return page.mainFrame();
-}
-const appFrame = await resolveAppFrame();
-
-const result = await appFrame.evaluate(
+const result = await page.evaluate(
   async ({ accountKey, unwrapText, wrapText }) => {
     const unwrap = eval(`(${unwrapText})`);
     const wrap = eval(`(${wrapText})`);

@@ -191,7 +191,7 @@ function onConfirmUnbind() {
   z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border-top: 1px solid var(--v5-border);
   padding: 20px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
@@ -237,8 +237,8 @@ function onConfirmUnbind() {
   flex-direction: column;
 }
 .tur-cap {
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-warning);
@@ -275,8 +275,8 @@ function onConfirmUnbind() {
 }
 .tur-loss-label {
   display: block;
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-warning);
@@ -298,7 +298,7 @@ function onConfirmUnbind() {
 }
 .tur-loss-nex {
   font-size: 12.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-family: var(--font-numbers);
   color: var(--v5-ink-3);
   font-variant-numeric: tabular-nums;
 }

@@ -69,8 +69,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     content: {
       zhTitle: "电脑显卡算力共享",
       zhGuide: "下载桌面客户端,使用同一账号登录,连接后电脑会出现在设备仓库中。",
-      enTitle: "Computer GPU share",
-      enGuide: "Download the desktop client, sign in with the same account, and the computer appears in device inventory after connection.",
+      enTitle: "电脑 GPU 共享",
+      enGuide: "下载桌面客户端,使用同一账号登录,连接后电脑会出现在设备仓库中。",
     },
     gpuTiers: GPU_TIERS,
   },

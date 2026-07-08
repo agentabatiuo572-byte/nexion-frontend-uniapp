@@ -359,11 +359,11 @@ export const TOKENS: Token[] = [
 ];
 
 export const CATEGORIES: Array<{ id: TokenCategory | "all" | "watchlist"; label: string }> = [
-  { id: "all", label: "All" },
-  { id: "watchlist", label: "Watchlist" },
+  { id: "all", label: "全部" },
+  { id: "watchlist", label: "关注" },
   { id: "ai", label: "AI" },
   { id: "depin", label: "DePIN" },
-  { id: "infra", label: "Infra" },
+  { id: "infra", label: "基础设施" },
 ];
 
 export const TIMEFRAMES = ["1H", "24H", "7D", "1M", "ALL"] as const;

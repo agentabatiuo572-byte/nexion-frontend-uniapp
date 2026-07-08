@@ -58,7 +58,7 @@ const AURORA: Record<Accent, string> = {
 const cardStyle: CSSProperties = {
   padding: "22px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const auroraStyle = computed<CSSProperties>(() => ({
@@ -86,7 +86,7 @@ const chipStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   background: ACCENT_SOFT[props.accent],
   color: ACCENT_TEXT[props.accent],
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",

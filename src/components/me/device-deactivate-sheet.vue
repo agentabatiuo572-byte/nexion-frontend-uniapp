@@ -124,7 +124,7 @@ const sheetStyle: CSSProperties = {
   zIndex: 80,
   borderTopLeftRadius: "16px",
   borderTopRightRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderTop: "1px solid var(--v5-border)",
   padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
 };
@@ -161,18 +161,18 @@ const taskModelStyle: CSSProperties = {
 };
 const taskRewardStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const pctStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "12px",
   color: "var(--v5-brand)",
 };
 const etaStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const trackStyle: CSSProperties = {

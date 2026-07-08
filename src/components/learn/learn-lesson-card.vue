@@ -43,10 +43,10 @@
           <view ref="barEl" class="flex-1 rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
             <view class="h-full rounded-full" :style="barFillStyle" />
           </view>
-          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 10px; color: var(--v5-ink-3)">{{ lesson.durationMin }} {{ t.learn.minRead }}</text>
+          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 11px; color: var(--v5-ink-3)">{{ lesson.durationMin }} {{ t.learn.minRead }}</text>
         </view>
         <view v-else class="flex-1 flex items-center justify-end">
-          <text class="font-mono-tabular tabular-nums" style="font-size: 10.5px; color: var(--v5-ink-3)">⏱ {{ lesson.durationMin }} {{ t.learn.minRead }}</text>
+          <text class="font-mono-tabular tabular-nums" style="font-size: 11px; color: var(--v5-ink-3)">⏱ {{ lesson.durationMin }} {{ t.learn.minRead }}</text>
         </view>
       </view>
     </view>
@@ -96,7 +96,7 @@ function open() {
 }
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const hairlineStyle = computed<CSSProperties>(() => ({
@@ -114,7 +114,7 @@ const emojiChipStyle = computed<CSSProperties>(() => ({
   background: `color-mix(in srgb, ${props.lesson.tint} 8%, transparent)`,
 }));
 const catLineStyle = computed<CSSProperties>(() => ({
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.12em",
   textTransform: "uppercase",
   color: props.lesson.tint,
@@ -136,7 +136,7 @@ const subtitleStyle: CSSProperties = {
 const chipStyle = computed<CSSProperties>(() => ({
   padding: "4px 8px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 500,
   whiteSpace: "nowrap",
   background: statusChip.value!.bg,

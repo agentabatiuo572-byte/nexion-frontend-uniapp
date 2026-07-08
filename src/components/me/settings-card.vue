@@ -14,7 +14,7 @@ import type { CSSProperties } from "vue";
 
 const cardStyle: CSSProperties = {
   padding: "0 14px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
 };
 </script>

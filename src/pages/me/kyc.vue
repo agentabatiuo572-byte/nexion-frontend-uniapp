@@ -146,7 +146,7 @@ const ctaLabelStyle: CSSProperties = {
 const ctaNoteStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 </script>

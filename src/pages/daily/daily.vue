@@ -103,7 +103,7 @@
             <text :style="leaderBestStyle">{{ yourBestText }}</text>
           </view>
           <view class="px-2" style="padding-bottom: 8px">
-            <view v-for="(s, i) in TOP_STREAKERS" :key="s.name" class="flex items-center" style="gap: 10px; padding: 8px">
+            <view v-for="(s, i) in TOP_STREAKERS" :key="s.name" class="flex items-center" :style="topStreakerRowStyle(i === TOP_STREAKERS.length - 1)">
               <text class="tabular-nums text-center" :style="rankStyle">{{ i + 1 }}</text>
               <text class="block grid place-items-center" :style="avatarStyle">{{ s.name.charAt(0) }}</text>
               <view class="flex-1 min-w-0 flex items-center" style="gap: 6px">
@@ -305,24 +305,24 @@ function formatTs(ts: number): string {
 function handleCheckIn() {
   const r = faucet.signIn();
   if (!r.ok) {
-    toast.info("Already checked in today", "Come back tomorrow for more NEX.");
+    toast.info("今天已签到", "明天再来领取更多 NEX。");
     return;
   }
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
   // (store never imports app). Production: server grants NEX on /api/nex/sign-in.
   app.creditNex(r.gained);
-  bills.add({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` });
+  bills.add({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `每日签到 · 连续 ${r.streak} 天` });
   try {
     uni.vibrateShort({ fail: () => {} });
   } catch {
     // vibrate unavailable
   }
   if (r.multiplier > 1) {
-    toast.success(`🎲 Lucky ×${r.multiplier}! +${r.gained} NEX`, `${r.streak}-day streak`);
+    toast.success(`🎲 幸运 ×${r.multiplier}! +${r.gained} NEX`, `连续 ${r.streak} 天`);
   } else if (r.gained > 2) {
-    toast.success(`🔥 ${r.streak}-day streak! +${r.gained} NEX`, "Day-7 bonus unlocked");
+    toast.success(`🔥 连续 ${r.streak} 天! +${r.gained} NEX`, "第 7 天奖励已解锁");
   } else {
-    toast.success(`+${r.gained} NEX`, `${r.streak}-day streak`);
+    toast.success(`+${r.gained} NEX`, `连续 ${r.streak} 天`);
   }
 }
 
@@ -337,16 +337,16 @@ function handleClaimMilestone(m: Milestone) {
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
   const rewardDisplay = t.value.daily.milestones[m.rewardKey];
-  faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
+  faucet.claimMilestone(m.day, gainedNex, `里程碑第 ${m.day} 天:${rewardDisplay}`);
   // USDT / NEX milestone rewards actually credit the wallet + write a bill.
   if (m.reward.type === "usdt" || m.reward.type === "nex") {
     const ref = `STREAK-D${m.day}-${Date.now().toString(36).toUpperCase()}`;
     if (m.reward.type === "usdt") {
       app.creditBalance(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "USDT", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
+      bills.add({ type: "bonus", symbol: "USDT", amount: m.reward.amount, status: "posted", memo: `连续签到里程碑 · 第 ${m.day} 天`, ref });
     } else {
       app.creditNex(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "NEX", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
+      bills.add({ type: "bonus", symbol: "NEX", amount: m.reward.amount, status: "posted", memo: `连续签到里程碑 · 第 ${m.day} 天`, ref });
     }
   }
   // Day-30 "spin" milestone grants a bonus Lucky Spin ticket + opens the wheel.
@@ -355,7 +355,7 @@ function handleClaimMilestone(m: Milestone) {
     luckySpin.openSheet();
   }
   // spin / badge milestones are non-currency unlocks → claim (+ spin sheet above).
-  toast.success(rewardDisplay, `Day-${m.day} milestone claimed`);
+  toast.success(rewardDisplay, `第 ${m.day} 天里程碑已领取`);
 }
 
 function handleUseSaver() {
@@ -387,7 +387,7 @@ const fireStyle: CSSProperties = {
   lineHeight: 1,
 };
 const streakNumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "56px",
   letterSpacing: "-0.034em",
@@ -395,7 +395,7 @@ const streakNumStyle: CSSProperties = {
 };
 const streakLblStyle: CSSProperties = {
   marginTop: "6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "rgba(255,255,255,0.82)",
   letterSpacing: "0.06em",
@@ -413,25 +413,25 @@ const signInBtnStyle = computed<CSSProperties>(() => ({
 }));
 const nextClaimStyle: CSSProperties = {
   marginTop: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "rgba(255,255,255,0.85)",
 };
 const luckyHintStyle: CSSProperties = {
   marginTop: "-4px",
   display: "block",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
 };
 const milestoneCardStyle: CSSProperties = {
   padding: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const milestoneLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-warning)",
@@ -442,7 +442,7 @@ function milestoneRowStyle(m: Milestone): CSSProperties {
   const canClaim = streak.value >= m.day && !claimed;
   return {
     gap: "12px",
-    padding: "10px 12px",
+    padding: "8px 12px",
     borderRadius: "12px",
     background: claimed ? "var(--v5-surface-2)" : canClaim ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
   };
@@ -459,7 +459,7 @@ function milestoneIconStyle(m: Milestone): CSSProperties {
   };
 }
 const milestoneDayStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
@@ -480,7 +480,7 @@ function milestoneBtnStyle(m: Milestone): CSSProperties {
     borderRadius: "999px",
     background: canClaim ? "var(--v5-brand)" : "transparent",
     color: canClaim ? "var(--v5-ink)" : "var(--v5-ink-4)",
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 500,
     fontSize: "12px",
     letterSpacing: "-0.005em",
@@ -499,7 +499,7 @@ const saverIconStyle: CSSProperties = {
   color: "var(--v5-on-brand-2)",
 };
 const saverLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
@@ -531,25 +531,25 @@ const saverBtnStyle = computed<CSSProperties>(() => ({
   flexShrink: 0,
 }));
 const leaderCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const leaderLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const leaderBestStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 const rankStyle: CSSProperties = {
   width: "20px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
@@ -571,7 +571,7 @@ const streakerNameStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const streakerCountStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontWeight: 500,
   fontSize: "12px",
   color: "var(--v5-brand-2)",
@@ -579,12 +579,12 @@ const streakerCountStyle: CSSProperties = {
 const leaderSubStyle: CSSProperties = { paddingBottom: "12px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const statStyle: CSSProperties = {
   padding: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const statLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.02em",
@@ -592,7 +592,7 @@ const statLabelStyle: CSSProperties = {
 function statValStyle(tint: string): CSSProperties {
   return {
     marginTop: "4px",
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 500,
     fontSize: "20px",
     letterSpacing: "-0.018em",
@@ -617,31 +617,38 @@ const withdrawTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600,
 const withdrawRuleStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const historyLabelStyle: CSSProperties = {
   marginBottom: "8px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const historyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const historyEmptyStyle: CSSProperties = { padding: "24px", fontSize: "12.5px", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "10px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+}
+function topStreakerRowStyle(isLast: boolean): CSSProperties {
+  return {
+    gap: "10px",
+    padding: "8px",
+    borderBottom: isLast ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)",
+  };
 }
 const historyReasonStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", color: "var(--v5-ink)" };
 const historyTimeStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 function historyDeltaStyle(delta: number): CSSProperties {
   return {
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     fontWeight: 600,
     fontSize: "13px",
     color: delta > 0 ? "var(--v5-success)" : delta < 0 ? "var(--v5-brand-2)" : "var(--v5-ink-3)",

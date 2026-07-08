@@ -39,7 +39,7 @@ import { useT } from "@/i18n/use-t";
 const t = useT();
 
 const rootStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   padding: "14px 16px",
 };
@@ -56,7 +56,7 @@ const auroraStyle: CSSProperties = {
 };
 
 const phoneNumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "22px",
   color: "var(--v5-ink-2)",
@@ -65,7 +65,7 @@ const phoneNumStyle: CSSProperties = {
 };
 
 const s1NumStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "22px",
   color: "var(--v5-success)",

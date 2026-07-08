@@ -16,13 +16,13 @@ const props = defineProps<{ label: string; value: string; tint?: string }>();
 
 const boxStyle: CSSProperties = {
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "8px 0",
 };
-const labelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const labelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
 const valueStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontSize: "13.5px",
   fontWeight: 600,
   marginTop: "2px",

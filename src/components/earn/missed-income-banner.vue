@@ -26,9 +26,9 @@
       <!-- Big missed-today number -->
       <view class="relative mt-2 flex items-baseline gap-2">
         <view class="flex items-baseline">
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em; font-size: 30px; font-weight: 600">−</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2); opacity: 0.75">$</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; font-weight: 600; line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-amount); line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em; font-size: 30px; font-weight: 600">−</text>
+          <text class="tabular-nums" style="font-family: var(--font-amount); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2); opacity: 0.75">$</text>
+          <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 30px; font-weight: 600; line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
         </view>
         <text class="text-[11px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
       </view>
@@ -36,34 +36,37 @@
       <!-- Dual progress bars -->
       <view class="relative mt-3 space-y-2">
         <view>
-          <view class="flex items-center justify-between mb-1" style="font-size: 10.5px">
+          <view class="flex items-center justify-between mb-1" style="font-size: 11px">
             <text style="color: var(--v5-ink-3)">{{ baseLabel }}</text>
-            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ promo.baseDaily.toFixed(2) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ promo.baseDaily.toFixed(2) }}/天</text>
           </view>
-          <view ref="elRef" class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
+          <view ref="elRef" class="h-1 rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
             <view class="h-full rounded-full" :style="phoneBarStyle" />
           </view>
         </view>
         <view>
-          <view class="flex items-center justify-between mb-1" style="font-size: 10.5px">
+          <view class="flex items-center justify-between mb-1" style="font-size: 11px">
             <text style="color: var(--v5-brand)">{{ ceilingText }}</text>
-            <text class="tabular-nums" style="color: var(--v5-brand)">${{ promo.targetDaily.toFixed(2) }}/d</text>
+            <text class="tabular-nums" style="color: var(--v5-brand)">${{ promo.targetDaily.toFixed(2) }}/天</text>
           </view>
-          <view class="h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
-            <view class="h-full w-full rounded-full" style="background: color-mix(in srgb, var(--v5-brand) 45%, transparent)" />
+          <view class="h-1 rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
+            <view class="h-full w-full rounded-full" style="background: linear-gradient(90deg, #CFFF34 0%, #A9F044 42%, #55DDBD 100%)" />
           </view>
         </view>
       </view>
 
       <!-- Cumulative miss + CTA -->
+      <view class="relative" :style="dividerStyle" />
       <view class="relative mt-4 flex items-center justify-between gap-3">
         <view class="min-w-0" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.cumulativeMissed }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 10.5px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-amount); font-size: 15px; font-weight: 600; color: var(--v5-brand-2); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 11px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
         </view>
-        <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
+        <view class="shrink-0 inline-flex items-center active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.stopBleeding }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          <svg :style="chevronIconStyle" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 2l5 5-5 5" />
+          </svg>
         </view>
       </view>
     </view>
@@ -140,6 +143,7 @@ function goStore() {
 const rootStyle: CSSProperties = {
   background:
     "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), var(--v5-surface) 45%, var(--v5-bg))",
+  borderRadius: "16px",
   padding: "16px",
 };
 const glowStyle: CSSProperties = {
@@ -147,20 +151,34 @@ const glowStyle: CSSProperties = {
 };
 const labelStyle: CSSProperties = {
   fontSize: "11px",
-  letterSpacing: "0.16em",
-  textTransform: "uppercase",
+  letterSpacing: "0",
   color: "var(--v5-brand-2)",
   fontWeight: 500,
+};
+const dividerStyle: CSSProperties = {
+  marginTop: "16px",
+  borderTop: "1px dashed color-mix(in srgb, var(--v5-brand) 24%, transparent)",
+  opacity: 0.62,
 };
 const ctaStyle: CSSProperties = {
   height: "36px",
   padding: "0 16px",
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
+  gap: "8px",
+  alignItems: "center",
+  justifyContent: "center",
 };
 const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontSize: "12.5px",
-  fontWeight: 600,
+  fontWeight: 500,
+};
+const chevronIconStyle: CSSProperties = {
+  width: "8px",
+  height: "14px",
+  display: "block",
+  flexShrink: 0,
+  color: "var(--v5-on-brand)",
 };
 </script>

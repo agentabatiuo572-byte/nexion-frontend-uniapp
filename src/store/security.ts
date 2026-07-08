@@ -28,7 +28,7 @@ function mockSessions(): Session[] {
     {
       id: "sess-cur",
       device: "iPhone 15 Pro · Safari",
-      location: "Singapore, SG",
+      location: "新加坡",
       ip: "203.116.42.18",
       lastActiveMs: now,
       current: true,
@@ -36,7 +36,7 @@ function mockSessions(): Session[] {
     {
       id: "sess-mbp",
       device: "MacBook Pro · Chrome",
-      location: "Singapore, SG",
+      location: "新加坡",
       ip: "203.116.42.18",
       lastActiveMs: now - 3 * 3600 * 1000,
       current: false,
@@ -44,7 +44,7 @@ function mockSessions(): Session[] {
     {
       id: "sess-ipad",
       device: "iPad Air · Safari",
-      location: "Bangkok, TH",
+      location: "曼谷",
       ip: "171.96.x.x",
       lastActiveMs: now - 28 * 3600 * 1000,
       current: false,

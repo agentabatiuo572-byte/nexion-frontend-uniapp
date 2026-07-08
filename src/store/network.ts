@@ -48,8 +48,8 @@ const NAMES = [
 ];
 
 const CITIES = [
-  "Berlin", "SF", "Tokyo", "Seoul", "Singapore", "London", "Bangkok",
-  "Dubai", "Mumbai", "Shanghai", "Sydney", "Toronto", "Madrid", "Paris",
+  "柏林", "旧金山", "东京", "首尔", "新加坡", "伦敦", "曼谷",
+  "迪拜", "孟买", "上海", "悉尼", "多伦多", "马德里", "巴黎",
 ];
 
 const EMOJIS = ["👨‍💻", "👩‍💻", "🧑‍🔬", "👨‍🎨", "👩‍🔧", "🧑‍✈", "🧑‍🚀"];
@@ -180,7 +180,7 @@ export const useNetwork = defineStore("network", () => {
     const now = Date.now();
     const newMembers: NetworkMember[] = Array.from({ length: n }).map((_, i) => ({
       id: `spillover-${now}-${i}`,
-      name: `Spillover #${totalMembers.value + i + 1}`,
+      name: `空降成员 #${totalMembers.value + i + 1}`,
       avatar: "🪂",
       vRank: 0 as VRank,
       layer: 1,
@@ -190,7 +190,7 @@ export const useNetwork = defineStore("network", () => {
       monthVolumeUSD: 0,
       totalVolumeUSD: 0,
       status: "active",
-      city: "Auto-placed",
+      city: "系统空降",
     }));
     members.value = [...members.value, ...newMembers];
     totalMembers.value = totalMembers.value + n;

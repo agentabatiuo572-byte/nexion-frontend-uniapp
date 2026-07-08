@@ -149,7 +149,7 @@
               <view class="flex items-start justify-between">
                 <view>
                   <text class="block" :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ c.name }}</text>
-                  <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ hostedByText(c) }}</text>
+                  <text class="block font-mono-tabular" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ hostedByText(c) }}</text>
                 </view>
                 <text class="font-display tabular-nums" :style="{ fontSize: '14px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ c.amount.toLocaleString() }}</text>
               </view>
@@ -289,7 +289,7 @@ const heroIconStyle: CSSProperties = {
   height: "40px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
 const heroHeadlineStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, lineHeight: 1.25, marginTop: "2px" }; // SKILL: leading-tight=1.25 (was 1.2)
 const heroBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625 (was 1.6)
 
@@ -328,7 +328,7 @@ const pathCtaStyle: CSSProperties = {
 // SKILL: prototype BucketRow gates opacity on unlocked (1 / 0.7) — was dropped in port
 const bucketStyle = computed<CSSProperties>(() => ({
   padding: "14px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
   gap: "12px",
@@ -336,8 +336,8 @@ const bucketStyle = computed<CSSProperties>(() => ({
 }));
 const selectedBucketStyle: CSSProperties = {
   marginTop: "-4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-brand-2)",
 };
 function bucketIconStyle(tint: string): CSSProperties {
@@ -351,7 +351,7 @@ function bucketIconStyle(tint: string): CSSProperties {
 
 const cardStyle: CSSProperties = {
   padding: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
@@ -363,12 +363,12 @@ const formCapStyle: CSSProperties = {
   marginBottom: "12px",
 };
 const fieldStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "12px",
   padding: "10px 12px",
   border: "1px solid var(--v5-border)",
 };
-const fieldLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
+const fieldLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
   width: "100%",
   background: "transparent",
@@ -393,20 +393,20 @@ const submitStyle = computed<CSSProperties>(() => ({
 }));
 const previewOnlyStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 
 const approvedCapStyle: CSSProperties = {
   padding: "0 4px",
   marginBottom: "8px",
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
 const caseStyle: CSSProperties = {
   padding: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   borderRadius: "12px",
 };

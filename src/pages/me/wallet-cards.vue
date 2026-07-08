@@ -153,14 +153,14 @@ const cardRowStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
   border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   overflow: "hidden",
 };
 const cardRowHeadStyle: CSSProperties = { padding: "16px 20px", gap: "12px" };
 const cardIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)" };
 const cardNameStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
 const defaultBadgeStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-brand)",
   background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
   borderRadius: "6px",

@@ -236,7 +236,7 @@ onUnmounted(clearTimer);
   position: relative;
   width: 88%;
   max-width: 300px;
-  border: 1px solid var(--v5-border-strong);
+  border: 1px solid var(--v5-milestone-card-border, var(--v5-border-strong));
   border-radius: 18px;
   padding: 20px;
   overflow: hidden;
@@ -246,6 +246,9 @@ onUnmounted(clearTimer);
     var(--v5-surface);
   box-shadow: var(--v5-card-shadow-lift-strong);
   animation: ms-card-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+:global(html[data-theme="dark"]) {
+  --v5-milestone-card-border: var(--v5-brand-border);
 }
 @keyframes ms-card-pop {
   0% { transform: scale(0.6) translateY(24px); opacity: 0; }

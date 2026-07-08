@@ -176,7 +176,7 @@ function onRetry() {
 .nx-modal {
   width: 100%;
   max-width: 320px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   border-radius: 18px;
   box-shadow: var(--v5-card-shadow-lift-strong);

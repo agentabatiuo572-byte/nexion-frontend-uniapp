@@ -18,14 +18,14 @@ import type { CSSProperties } from "vue";
 defineProps<{ label: string; suffix?: string }>();
 
 const labelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
 const suffixStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 </script>

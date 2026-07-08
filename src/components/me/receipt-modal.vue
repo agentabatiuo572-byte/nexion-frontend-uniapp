@@ -23,13 +23,13 @@
 
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ isKyc ? "Wallet Ownership Verification" : "Proof of Compute" }}</text>
+        <text class="block" :style="headerKickerStyle">{{ isKyc ? "钱包归属验证" : "算力证明" }}</text>
         <view class="flex items-center" style="margin-top: 6px; gap: 8px">
           <text class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">{{ isKyc ? "KYC VERIFIED" : "VERIFIED" }}</text>
+            <text style="margin-left: 4px">{{ isKyc ? "KYC 已验证" : "已验证" }}</text>
           </text>
-          <text style="font-size: 11px; color: var(--v5-ink-3)">{{ isKyc ? "Paired" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text style="font-size: 11px; color: var(--v5-ink-3)">{{ isKyc ? "已配对" : "已结算" }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
       </view>
 
@@ -51,7 +51,7 @@
             @click="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
             <text class="truncate" style="color: var(--v5-brand)">{{ row.v }}</text>
-            <text v-if="row.hint" style="color: var(--v5-ink-4); font-size: 10px">({{ row.hint }})</text>
+            <text v-if="row.hint" style="color: var(--v5-ink-4); font-size: 11px">({{ row.hint }})</text>
             <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
             <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
@@ -63,7 +63,7 @@
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="font-size: 11.5px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
-            <text style="margin-left: auto; font-size: 10px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
+            <text style="margin-left: auto; font-size: 11px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">已通过</text>
           </view>
         </view>
       </view>
@@ -180,40 +180,40 @@ function detailRows(d: ReceiptDetails): DescRow[] {
   switch (d.kind) {
     case "IG":
       return [
-        { k: "resolution", v: d.resolution },
-        { k: "batch_size", v: String(d.batchSize) },
-        { k: "output", v: `${d.outputCount} images` },
+        { k: "分辨率", v: d.resolution },
+        { k: "批量大小", v: String(d.batchSize) },
+        { k: "输出", v: `${d.outputCount} 张图片` },
       ];
     case "VG":
       return [
-        { k: "resolution", v: d.resolution },
-        { k: "clip_duration", v: `${d.durationSec}s` },
-        { k: "fps", v: String(d.fps) },
-        { k: "frames", v: String(d.frames) },
+        { k: "分辨率", v: d.resolution },
+        { k: "片段时长", v: `${d.durationSec}秒` },
+        { k: "帧率", v: String(d.fps) },
+        { k: "帧数", v: String(d.frames) },
       ];
     case "LL":
       return [
-        { k: "model_size", v: d.modelSize },
-        { k: "input_tokens", v: d.inputTokens.toLocaleString() },
-        { k: "output_tokens", v: d.outputTokens.toLocaleString() },
-        { k: "latency", v: `p50 ${d.latencyP50ms}ms · p95 ${d.latencyP95ms}ms` },
+        { k: "模型规模", v: d.modelSize },
+        { k: "输入 token", v: d.inputTokens.toLocaleString() },
+        { k: "输出 token", v: d.outputTokens.toLocaleString() },
+        { k: "延迟", v: `p50 ${d.latencyP50ms}ms · p95 ${d.latencyP95ms}ms` },
       ];
     case "FT":
       return [
-        { k: "training_steps", v: String(d.trainingSteps) },
-        { k: "final_loss", v: d.finalLoss.toFixed(3) },
+        { k: "训练步数", v: String(d.trainingSteps) },
+        { k: "最终损失", v: d.finalLoss.toFixed(3) },
       ];
     case "EM":
       return [
-        { k: "chunks", v: d.chunksCount.toLocaleString() },
-        { k: "total_tokens", v: d.totalTokens.toLocaleString() },
-        { k: "embedding_dim", v: String(d.embeddingDim) },
+        { k: "分块数", v: d.chunksCount.toLocaleString() },
+        { k: "总 token", v: d.totalTokens.toLocaleString() },
+        { k: "嵌入维度", v: String(d.embeddingDim) },
       ];
     case "SP":
       return [
-        { k: "audio_duration", v: `${(d.audioDurationSec / 60).toFixed(1)} min` },
-        { k: "wer", v: d.wer.toFixed(3) },
-        { k: "language", v: d.languageDetected },
+        { k: "音频时长", v: `${(d.audioDurationSec / 60).toFixed(1)} 分钟` },
+        { k: "词错误率", v: d.wer.toFixed(3) },
+        { k: "识别语言", v: d.languageDetected },
       ];
   }
 }
@@ -225,36 +225,36 @@ const sections = computed<DescSection[]>(() => {
     return [
       {
         rows: [
-          { k: "compliance_id", v: r.id, accent: true },
-          { k: "type", v: r.type },
-          { k: "program", v: r.model },
-          { k: "authority", v: r.client },
+          { k: "合规编号", v: r.id, accent: true },
+          { k: "类型", v: r.type },
+          { k: "项目", v: r.model },
+          { k: "机构", v: r.client },
         ],
       },
       {
         rows: [
-          { k: "paired_wallet", copyKey: "paired_wallet", copyValue: r.kycWalletAddress ?? "0x", v: shortenHex(r.kycWalletAddress ?? "0x", 6, 4) },
-          { k: "network", v: r.kycNetwork ?? "—" },
-          { k: "signature", copyKey: "kyc_signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
+          { k: "已配对钱包", copyKey: "paired_wallet", copyValue: r.kycWalletAddress ?? "0x", v: shortenHex(r.kycWalletAddress ?? "0x", 6, 4) },
+          { k: "网络", v: r.kycNetwork ?? "—" },
+          { k: "签名", copyKey: "kyc_signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
         ],
       },
       {
-        heading: "Compliance frameworks",
+        heading: "合规框架",
         rows: [],
         checks: r.kycChecks ?? [],
       },
       {
         rows: [
-          { k: "deposit", v: `${r.gross.toFixed(2)} USDT` },
-          { k: "purpose", v: "Wallet ownership proof", muted: true },
-          { k: "credited", v: `+$${r.netPaid.toFixed(2)}`, accent: true, strong: true },
+          { k: "验证金", v: `${r.gross.toFixed(2)} USDT` },
+          { k: "用途", v: "钱包归属证明", muted: true },
+          { k: "已入账", v: `+$${r.netPaid.toFixed(2)}`, accent: true, strong: true },
         ],
       },
       {
         rows: [
-          { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
-          { k: "block", v: `#${r.blockNumber.toLocaleString()}` },
-          { k: "verified_at", v: fmtDate(r.settledAt) },
+          { k: "交易哈希", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
+          { k: "区块", v: `#${r.blockNumber.toLocaleString()}` },
+          { k: "验证时间", v: fmtDate(r.settledAt) },
         ],
       },
     ];
@@ -263,56 +263,56 @@ const sections = computed<DescSection[]>(() => {
   return [
     {
       rows: [
-        { k: "job_id", v: r.id, accent: true },
-        { k: "type", v: r.type },
-        { k: "model", v: r.model },
+        { k: "任务编号", v: r.id, accent: true },
+        { k: "类型", v: r.type },
+        { k: "模型", v: r.model },
         ...(r.details ? detailRows(r.details) : []),
       ],
     },
     {
       rows: [
-        { k: "client", v: r.client },
-        { k: "client_addr", copyKey: "client_addr", copyValue: r.clientAddress, v: shortenHex(r.clientAddress, 6, 4) },
-        { k: "signature", copyKey: "signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
+        { k: "客户", v: r.client },
+        { k: "客户地址", copyKey: "client_addr", copyValue: r.clientAddress, v: shortenHex(r.clientAddress, 6, 4) },
+        { k: "签名", copyKey: "signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
       ],
     },
     {
       rows: [
-        { k: "device", v: r.deviceName },
-        { k: "gpu", v: r.deviceGpu },
-        { k: "gpu_fingerprint", v: r.deviceFingerprint },
+        { k: "设备", v: r.deviceName },
+        { k: "GPU", v: r.deviceGpu },
+        { k: "GPU 指纹", v: r.deviceFingerprint },
       ],
     },
     {
       rows: [
-        { k: "duration", v: fmtDuration(r.durationSec) },
-        ...(r.vramTotalGb > 0 ? [{ k: "vram_peak", v: `${r.vramPeakGb.toFixed(1)} / ${r.vramTotalGb} GB` }] : []),
-        { k: "energy", v: `${r.energyKwh.toFixed(3)} kWh` },
+        { k: "时长", v: fmtDuration(r.durationSec) },
+        ...(r.vramTotalGb > 0 ? [{ k: "显存峰值", v: `${r.vramPeakGb.toFixed(1)} / ${r.vramTotalGb} GB` }] : []),
+        { k: "能耗", v: `${r.energyKwh.toFixed(3)} kWh` },
       ],
     },
     {
       rows: [
-        { k: "unit_price", v: r.unitPriceLabel },
-        { k: "units", v: r.unitsLabel },
-        { k: "gross", v: `$${r.gross.toFixed(4)}` },
-        { k: "network_fee", v: `-$${r.fee.toFixed(4)}`, muted: true },
-        { k: "net_paid", v: `+$${r.netPaid.toFixed(4)} USDT`, accent: true, strong: true },
+        { k: "单价", v: r.unitPriceLabel },
+        { k: "单位", v: r.unitsLabel },
+        { k: "总额", v: `$${r.gross.toFixed(4)}` },
+        { k: "网络费", v: `-$${r.fee.toFixed(4)}`, muted: true },
+        { k: "实付", v: `+$${r.netPaid.toFixed(4)} USDT`, accent: true, strong: true },
       ],
     },
     {
       rows: [
-        { k: "tx_hash", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
-        { k: "block", v: `#${r.blockNumber.toLocaleString()}` },
+        { k: "交易哈希", copyKey: "tx_hash", copyValue: r.txHash, v: shortenHex(r.txHash, 8, 6) },
+        { k: "区块", v: `#${r.blockNumber.toLocaleString()}` },
       ],
     },
   ];
 });
 
 function fmtDuration(sec: number): string {
-  if (sec < 60) return `${sec}s`;
+  if (sec < 60) return `${sec} 秒`;
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return `${m}m ${s.toString().padStart(2, "0")}s (${sec} sec)`;
+  return `${m}分 ${s.toString().padStart(2, "0")}秒(共 ${sec} 秒)`;
 }
 function fmtDate(ts: number): string {
   const d = new Date(ts);
@@ -359,7 +359,7 @@ const headerStyle: CSSProperties = {
   borderBottom: "1px solid color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
 };
 const headerKickerStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.18em",
   textTransform: "uppercase",
   color: "var(--v5-ink-4)",
@@ -369,7 +369,7 @@ const stampStyle = computed<CSSProperties>(() => ({
   // Prototype: px-1.5 py-0.5 = 2px 6px, rounded-md = 6px, rotate(-4deg).
   padding: "2px 6px",
   borderRadius: "6px",
-  fontSize: "10px",
+  fontSize: "11px",
   fontWeight: 600,
   letterSpacing: "0.08em",
   color: stampColor.value,
@@ -384,7 +384,7 @@ function sectionStyle(si: number): CSSProperties {
 }
 const sectionHeadStyle: CSSProperties = {
   marginBottom: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-tech-cyan)",
@@ -423,7 +423,7 @@ const ctaRowStyle: CSSProperties = {
 const ctaBtnStyle: CSSProperties = {
   height: "44px",
   borderRadius: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-surface-2)",
   gap: "6px",
 };

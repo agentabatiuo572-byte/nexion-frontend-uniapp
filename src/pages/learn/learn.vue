@@ -58,7 +58,7 @@
         </view>
 
         <!-- footer note -->
-        <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625; padding-top: 4px">{{ t.learn.note }}</text>
+        <text class="block text-center" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.625; padding-top: 4px">{{ t.learn.note }}</text>
       </view>
     </CardStagger>
   </AppChassis>
@@ -114,7 +114,7 @@ function tabLabelStyle(id: TabId): CSSProperties {
 }
 
 const emptyStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "32px",
 };

@@ -39,12 +39,12 @@
             </view>
             <view class="flex items-center" style="margin-top: 2px; gap: 6px">
               <view class="rounded-full" :style="statusDotStyle(m.status)" />
-              <text :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ daysAgo(m.joinedAt) }}d ago</text>
+              <text :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ daysAgo(m.joinedAt) }}d ago</text>
             </view>
           </view>
           <view class="text-right shrink-0">
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
+            <text class="block tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
+            <text class="block tabular-nums" :style="{ fontFamily: 'var(--font-amount)', fontSize: '11px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
           </view>
         </view>
       </view>
@@ -86,7 +86,7 @@ function statusColor(status: MemberStatus): string {
 }
 
 // ─── styles ───
-const cardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+const cardStyle: CSSProperties = { background: "var(--v5-surface-bg)", borderColor: "var(--v5-border)", borderRadius: "16px" };
 const headerStyle: CSSProperties = { width: "100%", padding: "12px 16px", gap: "12px" };
 const badgeStyle = computed<CSSProperties>(() => ({
   width: "36px",
@@ -98,10 +98,10 @@ const badgeStyle = computed<CSSProperties>(() => ({
   letterSpacing: "0.06em",
 }));
 const titleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)" };
 const emptyStyle: CSSProperties = { padding: "24px 16px", fontSize: "12px", color: "var(--v5-ink-3)", borderTop: "1px solid var(--v5-border)" };
 function rowStyle(isLast: boolean): CSSProperties {
-  return { padding: "10px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "8px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 const avatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface-2)" };
 function statusDotStyle(status: MemberStatus): CSSProperties {

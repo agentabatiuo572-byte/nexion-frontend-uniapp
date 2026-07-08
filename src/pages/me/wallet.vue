@@ -61,19 +61,19 @@
       <view :style="listCardStyle">
         <WalletListRow icon-bg="var(--v5-success-soft)" :first="true" :label="t.wallet.todayLabel">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-brand)">+${{ pending.toFixed(2) }}</text></template>
         </WalletListRow>
         <WalletListRow icon-bg="var(--v5-warning-soft)" :label="t.wallet.reviewingEarnings" :sublabel="t.wallet.reviewingEarningsSub" @click="showPendingSheet">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ pendingReview.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-ink)">${{ pendingReview.toFixed(2) }}</text></template>
         </WalletListRow>
         <WalletListRow icon-bg="var(--v5-brand-2-soft)" :label="t.wallet.lockedRewards" :sublabel="t.wallet.lockedRewardsSub" @click="showLockedSheet">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ lockedRewards.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-ink)">${{ lockedRewards.toFixed(2) }}</text></template>
         </WalletListRow>
         <WalletListRow icon-bg="var(--v5-tech-cyan-soft)" :label="t.wallet.allTimeEarnings" :sublabel="allTimeSublabel">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z" /><path d="M3 10h18" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink)">${{ allTimeEarned.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-ink)">${{ allTimeEarned.toFixed(2) }}</text></template>
         </WalletListRow>
       </view>
 
@@ -91,7 +91,7 @@
         </WalletListRow>
         <WalletListRow v-if="showWithdrawal" icon-bg="color-mix(in srgb, var(--v5-warning) 22%, transparent)" :label="withdrawalRowLabel" :sublabel="withdrawalRowSub" chevron href="/pages/me/wallet-withdraw-tracking">
           <template #icon><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v14" /><path d="m6 9 6-6 6 6" /><path d="M19 21H5" /></svg></template>
-          <template #value><text class="tabular-nums" style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-danger)">-${{ latestWithdrawal!.amount.toFixed(2) }}</text></template>
+          <template #value><text class="tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-danger)">-${{ latestWithdrawal!.amount.toFixed(2) }}</text></template>
         </WalletListRow>
       </view>
 
@@ -247,7 +247,7 @@ const heroStyle: CSSProperties = {
   padding: "20px",
 };
 const heroLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -255,7 +255,7 @@ const heroLabelStyle: CSSProperties = {
 };
 const heroNumStyle: CSSProperties = {
   marginTop: "6px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "48px",
   letterSpacing: "-0.034em",
@@ -295,7 +295,7 @@ const nexCalloutStyle: CSSProperties = {
   background: "var(--v5-brand-2-soft)",
 };
 const nexCalloutLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",

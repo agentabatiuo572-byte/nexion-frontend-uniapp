@@ -26,8 +26,8 @@ const badgeStyle = computed<CSSProperties>(() => ({
   borderRadius: "4px",
   background: STYLES[props.brand].bg,
   color: props.brand === "unknown" ? "var(--v5-ink-3)" : "#ffffff",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 600,
   letterSpacing: "0.06em",
 }));

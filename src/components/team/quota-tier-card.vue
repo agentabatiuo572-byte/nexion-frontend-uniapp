@@ -132,9 +132,9 @@ const iconBoxStyle = computed<CSSProperties>(() => ({
   background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "rgba(255,255,255,0.04)",
 }));
 const nameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1.1, color: "var(--v5-ink)" };
-const stockLineStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const stockLineStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const badgeStyle = computed<CSSProperties>(() => ({
-  fontSize: "10px",
+  fontSize: "11px",
   letterSpacing: "0.04em",
   padding: "1px 6px",
   borderRadius: "4px",
@@ -151,9 +151,9 @@ const stockFillStyle = computed<CSSProperties>(() => ({
   willChange: "width",
   background: props.tier.tint,
 }));
-const stockStatsStyle: CSSProperties = { marginTop: "4px", fontSize: "10px", color: "var(--v5-ink-3)" };
+const stockStatsStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)" };
 
-const unlockHeadStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.04em", color: "var(--v5-ink-3)" };
+const unlockHeadStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.04em", color: "var(--v5-ink-3)" };
 const perksWrapStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",

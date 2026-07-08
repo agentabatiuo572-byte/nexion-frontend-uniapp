@@ -9,7 +9,7 @@ function cloneTicket(ticket: Ticket): Ticket {
   return {
     ...ticket,
     lastReplyAt: raw.lastReplyAt ?? ticket.updatedAt,
-    owner: raw.owner ?? "Unassigned",
+    owner: raw.owner ?? "未分配",
     messages: ticket.messages.map((message) => ({ ...message })),
   };
 }
@@ -62,7 +62,7 @@ export const useTickets = defineStore("tickets", () => {
       updatedAt: now,
       lastReplyAt: now,
       unread: 0,
-      owner: "Unassigned",
+      owner: "未分配",
       messages: [{ ts: now, author: "user", body: input.body.trim() }],
     };
     tickets.value = [ticket, ...tickets.value];

@@ -282,7 +282,7 @@ const heroLabelStyle = computed<CSSProperties>(() => ({
   color: statusColor.value,
 }));
 const summaryCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderColor: "var(--v5-border)",
   padding: "16px",
 };
@@ -307,7 +307,7 @@ const earnBtnStyle: CSSProperties = {
 };
 const sectionLabelStyle: CSSProperties = {
   marginBottom: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",

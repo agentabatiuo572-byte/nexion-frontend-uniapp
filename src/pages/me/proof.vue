@@ -43,7 +43,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--v5-on-brand)" stroke="var(--v5-on-brand)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
             </view>
             <text class="font-display" :style="brandNameStyle">Nexion</text>
-            <text style="margin-left: auto; font-size: 10px; letter-spacing: 0.18em; color: var(--v5-ink-3)">Proof of contribution</text>
+            <text style="margin-left: auto; font-size: 11px; letter-spacing: 0.18em; color: var(--v5-ink-3)">贡献证明</text>
           </view>
 
           <!-- profile -->
@@ -91,7 +91,7 @@
             </view>
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ topPctLabel }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">Top {{ topPct }}%</text>
+              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">前 {{ topPct }}%</text>
             </view>
           </view>
 
@@ -218,7 +218,7 @@ const longestStreak = computed(() => faucet.longestStreak);
 const longestOrCurrent = computed(() => longestStreak.value || streak.value || 0);
 
 const joined = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(undefined, { month: "short", year: "numeric" }),
+  new Date(app.user.joinedAt).toLocaleDateString("zh-CN", { month: "short", year: "numeric" }),
 );
 const activeDays = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
 
@@ -236,10 +236,10 @@ const topPct = computed(() => {
 
 const shareText = computed(() => {
   if (variant.value === "streak")
-    return `🔥 ${longestOrCurrent.value}-day streak on Nexion. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
+    return `🔥 我在 Nexion 连续签到 ${longestOrCurrent.value} 天。每日签到即可获得被动 NEX。加入: ${referralLink.value}`;
   if (variant.value === "network")
-    return `🌐 My Nexion network is ${totalMembers.value} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotal.value.toFixed(2)} on Nexion in ${activeDays.value} days. Join my network: ${referralLink.value}`;
+    return `🌐 我的 Nexion 网络已有 ${totalMembers.value} 人,覆盖 7 层。一起获得团队复利收益: ${referralLink.value}`;
+  return `💸 我在 Nexion 的 ${activeDays.value} 天累计赚到 $${earningsTotal.value.toFixed(2)}。加入我的网络: ${referralLink.value}`;
 });
 
 // ── derived labels ──
@@ -258,7 +258,7 @@ function nativeShare() {
       provider: "weixin",
       type: 0,
       href: referralLink.value,
-      title: "Nexion · Proof of Contribution",
+      title: "Nexion · 贡献证明",
       summary: shareText.value,
       success: () => {},
       fail: () => copyText(shareText.value, t.value.proof.sharedToast),
@@ -271,7 +271,7 @@ function copyLink() {
   copyText(referralLink.value, t.value.proof.copiedToast);
 }
 function copyShareText(networkName: string) {
-  copyText(shareText.value, t.value.proof.sharedToast, `Open ${networkName} and paste`);
+  copyText(shareText.value, t.value.proof.sharedToast, `打开 ${networkName} 后粘贴`);
 }
 function downloadPng() {
   toast.success(t.value.proof.downloadToast, "");
@@ -327,7 +327,7 @@ const variantTabsStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 function variantPillStyle(v: Variant): CSSProperties {
@@ -363,7 +363,7 @@ const brandNameStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, lette
 const profileNameStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)" };
 const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
 function heroKickerStyle(color: string): CSSProperties {
-  return { fontSize: "10px", letterSpacing: "0.16em", color };
+  return { fontSize: "11px", letterSpacing: "0.16em", color };
 }
 const heroBigStyle: CSSProperties = {
   marginTop: "4px",
@@ -381,7 +381,7 @@ const miniStatStyle: CSSProperties = {
   border: "1px solid var(--v5-border)",
   textAlign: "center",
 };
-const miniLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const miniLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 const miniValueStyle: CSSProperties = { marginTop: "2px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const miniValueSmallStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", fontWeight: 600, color: "var(--v5-ink)" };
 const chipsLabelStyle: CSSProperties = {
@@ -398,7 +398,7 @@ function chipStyle(tintColor: string): CSSProperties {
   return {
     padding: "2px 8px",
     borderRadius: "6px",
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     background: `color-mix(in srgb, ${tintColor} 13%, transparent)`,
     color: tintColor,
@@ -412,7 +412,7 @@ const refBlockStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
   border: "1px solid var(--v5-border)",
 };
-const refLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
+const refLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
 const refCodeStyle: CSSProperties = {
   marginTop: "2px",
   fontSize: "20px",
@@ -426,7 +426,7 @@ const refLinkStyle: CSSProperties = {
   marginLeft: "-4px",
   padding: "0 4px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const qrBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "8px", background: "#ffffff" };
@@ -436,9 +436,9 @@ function qrCellStyle(on: boolean): CSSProperties {
 }
 const nativeBtnStyle: CSSProperties = { height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
 const nativeBtnTextStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-on-brand)" };
-const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "11px", color: "var(--v5-ink-3)" };
 const destBtnStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "12px",
@@ -447,7 +447,7 @@ const destBtnStyle: CSSProperties = {
 function destIconStyle(color: string): CSSProperties {
   return { width: "36px", height: "36px", margin: "0 auto", borderRadius: "8px", background: `color-mix(in srgb, ${color} 12%, transparent)`, color };
 }
-const destLabelStyle: CSSProperties = { marginTop: "6px", fontSize: "10.5px", color: "var(--v5-ink-2)", lineHeight: 1.25 };
+const destLabelStyle: CSSProperties = { marginTop: "6px", fontSize: "11px", color: "var(--v5-ink-2)", lineHeight: 1.25 };
 const tipStyle: CSSProperties = {
   margin: "16px 0 8px",
   padding: "12px",

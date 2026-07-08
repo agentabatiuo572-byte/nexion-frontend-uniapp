@@ -5,7 +5,7 @@
   come from nextRankProgress (English, faithful).
 -->
 <template>
-  <view class="block" style="background: var(--v5-surface); border-radius: 16px; padding: 14px 16px; position: relative; overflow: hidden" @click="goRank">
+  <view class="block" style="background: var(--v5-surface-bg); border-radius: 16px; padding: 14px 16px; position: relative; overflow: hidden" @click="goRank">
     <view class="flex justify-between items-center font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">
       <text>{{ t.home.rankYourRank }}</text>
       <text style="color: var(--v5-ink-4)">{{ t.home.rankStep }} <text style="color: var(--v5-ink)">{{ myRank + 1 }}</text>/{{ totalRanks }}</text>

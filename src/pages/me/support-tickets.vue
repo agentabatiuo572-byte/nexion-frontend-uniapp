@@ -138,8 +138,6 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
 import {
-  CATEGORY_LABEL,
-  STATUS_LABEL,
   STATUS_COLOR,
   type Ticket,
   type TicketCategory,
@@ -199,10 +197,10 @@ const createdLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.de
 const updatedLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.detail.lastUpdate, { when: relWhen(detailTicket.value.updatedAt) }) : ""));
 
 function catLabel(c: TicketCategory): string {
-  return CATEGORY_LABEL[c];
+  return t.value.tickets.categoryLabels[c];
 }
 function statusLabel(s: TicketStatus): string {
-  return STATUS_LABEL[s];
+  return t.value.tickets.statusLabels[s];
 }
 function tabLabel(id: Tab): string {
   const key = id === "all" ? "tabAll" : id === "open" ? "tabOpen" : id === "resolved" ? "tabResolved" : "tabClosed";
@@ -221,10 +219,10 @@ function canClose(tk: Ticket): boolean {
 }
 function relWhen(ts: number): string {
   const ms = Date.now() - ts;
-  if (ms < 60_000) return "just now";
-  if (ms < 3600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
+  if (ms < 60_000) return t.value.wallet.timeJustNow;
+  if (ms < 3600_000) return fmt(t.value.wallet.timeMinutesAgo, { n: Math.floor(ms / 60_000) });
+  if (ms < 86_400_000) return fmt(t.value.wallet.timeHoursAgo, { n: Math.floor(ms / 3600_000) });
+  return fmt(t.value.wallet.timeDaysAgo, { n: Math.floor(ms / 86_400_000) });
 }
 
 function detailVal(e: Event): string {
@@ -271,13 +269,13 @@ const avgRowStyle: CSSProperties = {
   gap: "8px",
   padding: "8px 12px",
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   fontSize: "11.5px",
 };
 const avgLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
-const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", color: "var(--v5-brand-2)", fontWeight: 600 };
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-numbers)", color: "var(--v5-brand-2)", fontWeight: 600 };
+const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)" };
 function tabStyle(active: boolean): CSSProperties {
   return {
     height: "44px",
@@ -291,11 +289,11 @@ function tabStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
-const emptyStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "32px", textAlign: "center" };
+const emptyStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", padding: "32px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const noteStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
-const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const formLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", color: "var(--v5-ink-3)", marginBottom: "8px" };
+const noteStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
+const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const formLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)", marginBottom: "8px" };
 function catChipStyle(active: boolean): CSSProperties {
   return {
     height: "44px",
@@ -332,15 +330,15 @@ const textareaStyle: CSSProperties = {
 };
 const cancelBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontWeight: 600, fontSize: "14px" };
 const submitBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
-const detailMetaStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
+const detailMetaStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", padding: "16px" };
 function statusTextStyle(s: TicketStatus): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
+  return { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
 }
-const dotSepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "10px" };
-const catTextStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const dotSepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "11px" };
+const catTextStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
 const detailSubjectStyle: CSSProperties = { marginTop: "6px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
-const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
+const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
+const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
 function msgBubbleStyle(isUser: boolean): CSSProperties {
   return {
     borderRadius: "16px",
@@ -353,11 +351,11 @@ function msgBubbleStyle(isUser: boolean): CSSProperties {
 }
 const msgHeadStyle: CSSProperties = { marginBottom: "4px" };
 function msgAuthorStyle(isUser: boolean): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", fontWeight: 600, color: isUser ? "var(--v5-brand)" : "var(--v5-brand-2)" };
+  return { fontFamily: "var(--font-numbers)", fontSize: "11px", letterSpacing: "0.06em", fontWeight: 600, color: isUser ? "var(--v5-brand)" : "var(--v5-brand-2)" };
 }
-const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", color: "var(--v5-ink-3)" };
 const msgBodyStyle: CSSProperties = { fontSize: "12.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
-const replyCardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "12px" };
+const replyCardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", padding: "12px" };
 const replyTextareaStyle: CSSProperties = {
   width: "100%",
   height: "84px",

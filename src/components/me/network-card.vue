@@ -150,7 +150,7 @@ function goTeam() {
 // ── styles ──
 const maxCardStyle: CSSProperties = {
   padding: "14px 18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   display: "flex",
   alignItems: "center",
@@ -167,7 +167,7 @@ const maxIconStyle: CSSProperties = {
 };
 const cardStyle: CSSProperties = {
   padding: "16px 18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   display: "flex",
   alignItems: "center",

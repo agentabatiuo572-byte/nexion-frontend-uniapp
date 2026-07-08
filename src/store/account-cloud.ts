@@ -41,6 +41,10 @@ const TIME_ANCHOR_KEYS = new Set([
   "activatedAt",
   "lastSettledAt",
   "miningSince",
+  // SPEC-1 R7 device online heartbeat: a time anchor like its siblings — multi-carrier
+  // merge must keep the FRESHEST beat (Math.max), else an older端 beat could wrongly
+  // read as timed-out/offline. (last-write-wins would not guarantee freshest.)
+  "onlineHeartbeatAt",
   "interruptedAt",
   "startedAt",
   "completedAt",

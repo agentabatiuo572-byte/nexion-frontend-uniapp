@@ -89,7 +89,7 @@ const hairlineStyle: CSSProperties = {
   opacity: 0.75,
 };
 const capLabelStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.18em",
   color: "var(--v5-warning)",
 };

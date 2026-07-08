@@ -577,7 +577,7 @@ function onForce() {
   z-index: 800;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 38px);

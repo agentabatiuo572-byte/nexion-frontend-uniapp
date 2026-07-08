@@ -20,7 +20,7 @@ const props = defineProps<{ id: number; price: number; ago: string }>();
 const paddedId = computed(() => props.id.toString().padStart(4, "0"));
 
 const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "14px",
   padding: "12px",
@@ -40,20 +40,20 @@ const artStyle: CSSProperties = {
 };
 const idLineStyle: CSSProperties = {
   marginTop: "10px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const priceStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "17px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.014em",
 };
 const agoStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
 </script>

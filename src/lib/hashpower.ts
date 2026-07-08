@@ -2,15 +2,18 @@
  * Live effective hashpower derivation — single source for the phone card's
  * real-time "算力" number and curve.
  *
- *   App (resident):    effectiveTops = baselineTops × charge × network × thermal × continuity × jitter
- *   H5  (non-resident): effectiveTops = baselineTops × H5_BASE_FACTOR × network × jitter   (基础托管)
+ *   online  (fresh heartbeat): effectiveTops = baselineTops × charge × network × thermal × continuity × jitter
+ *   offline (no/stale beat):   effectiveTops = baselineTops × H5_BASE_FACTOR × network × jitter   (基础托管)
  *
- * SPEC-1 载体分层: the signed APP runs resident (background mining) and earns the
- * full online-amplified live factors; H5 runs in a browser tab — not resident,
- * can't read charge/thermal, can't accrue continuity — so it is capped at the
- * 基础托管 baseline (H5_BASE_FACTOR). This makes App's online 加成 visibly higher
- * (the honest "升级到 App 拿在线加成" conversion hook) and is the truthful model
- * for a non-resident web carrier.
+ * SPEC-1 R7 在线分层: the online 加成 tier is driven by the device's REAL online
+ * signal (isDeviceOnline — a fresh device-agent heartbeat, produced by the resident
+ * signed APP), NOT by the build-time view carrier. A device with a fresh heartbeat
+ * earns the full online-amplified live factors; a device with no/stale heartbeat
+ * (browser tab, killed app, offline) is capped at the 基础托管 baseline
+ * (H5_BASE_FACTOR — can't read charge/thermal, can't accrue continuity when not
+ * resident). Viewing the SAME device from App vs H5 no longer changes the factor;
+ * only the device being truly online does. The honest "升级到 App 拿在线加成"
+ * hook still holds — only the resident app produces the heartbeat.
  *
  * INVARIANT: every factor ∈ (0, 1], so the live value can never exceed the
  * device's own calibrated baseline ceiling. Combined with device-capability's
@@ -26,7 +29,6 @@
  * Math.random) so the curve is stable across re-renders.
  */
 import type { ThermalState } from "@/store/types";
-import type { Carrier } from "@/lib/carrier";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 
 /** Continuous-online time at which the stability bonus reaches full — DEFAULT 2h,
@@ -42,6 +44,27 @@ const CONTINUITY_FLOOR = 0.85; // fresh session / just-switched device starts he
  *  DEFAULT seeded from the config; the LIVE value flows via the caller's
  *  onlineBonus (read from the config store) — backend-replaceable, this is the fallback. */
 export const H5_BASE_FACTOR = DEFAULT_PLATFORM_CONFIG.onlineBonus.h5BaseFactor;
+
+/** SPEC-1 R7 设备真在线判定窗口. A device earns the 在线加成 tier only while its last
+ *  device-agent heartbeat is within this window; otherwise it drops to 基础托管 baseline.
+ *  mock: the resident App refreshes onlineHeartbeatAt every settle tick, so a live App
+ *  stays online; a browser tab / killed app never refreshes → goes stale → baseline.
+ *  ponytail: mock proxy for the server's heartbeat-timeout logic — PROD ships the online
+ *  结论 as a boolean (server holds lastHeartbeatAt + timeout) so isDeviceOnline reads that
+ *  and this const is deleted. Window is generous to tolerate tick jitter and a
+ *  backgrounded→foreground gap; tune here if the App heartbeat cadence changes. */
+export const ONLINE_HEARTBEAT_TIMEOUT_MS = 3 * 60 * 1000;
+
+/** SPEC-1 R7 单一在线判定接缝: the earnings/display factor tier reads THIS (device online
+ *  state), never the build-time view carrier. Decouples 因子 from "用哪个端查看" — the R7 fix.
+ *  PROD: swap the body for `return d.online === true` (server-pushed 结论). */
+export function isDeviceOnline(
+  d: { onlineHeartbeatAt?: number | null },
+  now: number,
+  timeoutMs: number = ONLINE_HEARTBEAT_TIMEOUT_MS,
+): boolean {
+  return d.onlineHeartbeatAt != null && now - d.onlineHeartbeatAt < timeoutMs;
+}
 
 export type HashFactorKey = "offline" | "battery" | "thermal" | "continuity" | "peak";
 
@@ -92,8 +115,10 @@ function smoothJitter(nowSeed: number): number {
 
 export interface LiveHashInput {
   baselineTops: number;
-  /** SPEC-1 载体分层: 'app' resident → full live factors; 'h5' non-resident → 基础托管 baseline. */
-  carrier: Carrier;
+  /** SPEC-1 R7 在线分层: true (device online, fresh heartbeat) → full live factors;
+   *  false (no/stale heartbeat) → 基础托管 baseline. Source = isDeviceOnline(device, now),
+   *  NOT the view carrier — viewing App vs H5 no longer changes the factor. */
+  online: boolean;
   isCharging: boolean;
   isOnline: boolean;
   thermalState?: ThermalState;
@@ -115,18 +140,19 @@ export function computeLiveHashpower(input: LiveHashInput): LiveHashpower {
     ? input.onlineBonus.continuityFullHours * 60 * 60 * 1000
     : CONTINUITY_FULL_MS;
 
-  // ── H5 非常驻载体: 基础托管基线 ──
-  // A browser tab can't reliably read charging/thermal and can't accrue
-  // continuous-online time, so it earns a flat fraction (h5Base) of its
-  // baseline. Network still gates (offline → 0). Lower than App by design.
-  if (input.carrier === "h5") {
+  // ── 设备离线 (无/陈旧心跳): 基础托管基线 ──
+  // A device with no fresh heartbeat (browser tab / killed app / offline) can't
+  // reliably read charging/thermal and can't accrue continuous-online time, so it
+  // earns a flat fraction (h5Base) of its baseline. Network still gates (offline → 0).
+  // Lower than an online device by design (R7: 只有设备真在线才吃在线加成).
+  if (!input.online) {
     const effectiveTops = +(input.baselineTops * h5Base * network * jitter).toFixed(1);
     const effectivePct = input.baselineTops > 0 ? Math.round((effectiveTops / input.baselineTops) * 100) : 0;
     const factors: HashFactors = { charge: h5Base, network, thermal: 1, continuity: 1, jitter };
     return { effectiveTops, effectivePct, factors, dominant: network === 0 ? "offline" : "peak" };
   }
 
-  // ── App 常驻载体: 全因子在线增强 (unchanged behavior) ──
+  // ── 设备在线 (心跳新鲜): 全因子在线增强 ──
   const charge = input.isCharging ? 1 : 0.6;
   const thermal = thermalFactor(input.thermalState);
   const continuity = continuityFactor(input.continuityMs, continuityFullMs);

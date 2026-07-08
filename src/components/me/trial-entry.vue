@@ -12,7 +12,7 @@
   <view v-if="isActive" class="block active:opacity-90" :style="activeRowStyle" role="button" tabindex="0" :aria-label="activeTitle" @click="goTrial">
     <view style="flex: 1; min-width: 0">
       <text class="block" style="font-family: var(--font-v5); font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ activeTitle }}</text>
-      <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px; font-family: var(--font-jet-mono), ui-monospace, monospace">{{ t.trial.entryDeviceName }}</text>
+      <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px; font-family: var(--font-numbers)">{{ t.trial.entryDeviceName }}</text>
     </view>
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
   </view>
@@ -53,7 +53,7 @@ function goTrial() {
 const activeRowStyle: CSSProperties = {
   marginTop: "10px",
   padding: "14px 16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   borderRadius: "16px",
   display: "flex",
   alignItems: "center",

@@ -189,10 +189,10 @@ function benefitStyle(tint: string, i: number): CSSProperties {
   };
 }
 const benefitTextStyle: CSSProperties = { fontSize: "11px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
-const cardStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", borderRadius: "16px" };
-const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "24px", color: "var(--v5-ink-3)" };
-const amountInputStyle: CSSProperties = { fontFamily: "var(--font-v5)", flex: "1", minWidth: "0", background: "transparent", fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)" };
+const cardStyle: CSSProperties = { background: "var(--v5-surface-bg)", border: "1px solid var(--v5-border)", borderRadius: "16px" };
+const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-numbers)", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
+const dollarStyle: CSSProperties = { fontFamily: "var(--font-amount)", fontSize: "24px", color: "var(--v5-ink-3)" };
+const amountInputStyle: CSSProperties = { fontFamily: "var(--font-amount)", flex: "1", minWidth: "0", background: "transparent", fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)" };
 const usdtStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function presetStyle(active: boolean): CSSProperties {
   return {

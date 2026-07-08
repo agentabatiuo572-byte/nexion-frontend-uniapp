@@ -39,12 +39,12 @@
       <!-- REWARD pill -->
       <view class="mt-4 inline-flex items-center" :style="rewardPillStyle">
         <text style="font-size: 14px; margin-right: 6px">🎁</text>
-        <text style="font-family: var(--font-v5)">{{ t.learn.reward }} +{{ lesson.rewardNEX }} NEX</text>
+        <text style="font-family: var(--font-amount)">{{ t.learn.reward }} +{{ lesson.rewardNEX }} NEX</text>
       </view>
 
       <!-- PROGRESS -->
       <view v-if="showProgress" class="mt-4">
-        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 10.5px; margin-bottom: 6px">
+        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 11px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3); text-transform: uppercase; letter-spacing: 0.08em">{{ t.learn.progressLabel }}</text>
           <text class="tabular-nums" :style="{ color: lesson.tint, fontWeight: 600 }">{{ progressPct }}%</text>
         </view>
@@ -106,7 +106,7 @@ const hairlineStyle = computed<CSSProperties>(() => ({
   opacity: 0.6,
 }));
 const capLabelStyle = computed<CSSProperties>(() => ({
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.18em",
   color: props.lesson.tint,
 }));

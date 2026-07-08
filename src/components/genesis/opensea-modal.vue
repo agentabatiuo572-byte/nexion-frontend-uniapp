@@ -123,8 +123,8 @@ const loadingTitleStyle: CSSProperties = {
 };
 const loadingSubStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
 const errIconStyle: CSSProperties = {
@@ -148,7 +148,7 @@ const errMsgStyle: CSSProperties = {
   marginLeft: "auto",
   marginRight: "auto",
   maxWidth: "280px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11.5px",
   color: "var(--v5-brand-2)",
   lineHeight: 1.55,
@@ -160,7 +160,7 @@ const errHintStyle: CSSProperties = {
   borderRadius: "6px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
-  fontSize: "10.5px",
+  fontSize: "11px",
   fontWeight: 500,
 };
 const retryBtnStyle: CSSProperties = {
@@ -207,7 +207,7 @@ const backBtnStyle: CSSProperties = {
   width: 100%;
   max-width: 360px;
   border-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border: 1px solid var(--v5-border);
   padding: 20px;
 }

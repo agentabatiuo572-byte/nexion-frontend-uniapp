@@ -36,90 +36,90 @@ export interface VRankDef {
 
 export const V_RANKS: VRankDef[] = [
   {
-    v: 0, title: "Cadet", cnTitle: "学员",
+    v: 0, title: "学员", cnTitle: "学员",
     conditions: {}, directBonus: 0.05, unilevelDepth: 1,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 0,
   },
   {
-    v: 1, title: "Pilot", cnTitle: "飞行员",
+    v: 1, title: "飞行员", cnTitle: "飞行员",
     conditions: { selfBuyUSD: 299, directRefs: 3 },
     directBonus: 0.10, unilevelDepth: 2,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 500,
   },
   {
-    v: 2, title: "Operator", cnTitle: "操作员",
+    v: 2, title: "操作员", cnTitle: "操作员",
     conditions: { teamVolumeUSD: 5000 },
     directBonus: 0.10, unilevelDepth: 3,
     peerBonus: 0, leadershipVotes: 0,
     cultivationBonus: 2000,
   },
   {
-    v: 3, title: "Captain", cnTitle: "舰长",
+    v: 3, title: "舰长", cnTitle: "舰长",
     conditions: { teamVolumeUSD: 20_000, vDownlines: { 1: 2 } },
     directBonus: 0.10, unilevelDepth: 4,
     peerBonus: 0.05, leadershipVotes: 1,
     cultivationBonus: 10_000,
   },
   {
-    v: 4, title: "Commander", cnTitle: "指挥官",
+    v: 4, title: "指挥官", cnTitle: "指挥官",
     conditions: { teamVolumeUSD: 50_000, vDownlines: { 2: 3 } },
     directBonus: 0.10, unilevelDepth: 5,
     peerBonus: 0.05, leadershipVotes: 2,
     cultivationBonus: 50_000,
   },
   {
-    v: 5, title: "Wing Leader", cnTitle: "翼领",
+    v: 5, title: "翼领", cnTitle: "翼领",
     conditions: { teamVolumeUSD: 150_000, vDownlines: { 3: 4 } },
     directBonus: 0.10, unilevelDepth: 6,
     peerBonus: 0.05, leadershipVotes: 4,
     cultivationBonus: 200_000,
   },
   {
-    v: 6, title: "Squadron", cnTitle: "中队长",
+    v: 6, title: "中队长", cnTitle: "中队长",
     conditions: { teamVolumeUSD: 500_000, vDownlines: { 4: 5 } },
     directBonus: 0.10, unilevelDepth: 7,
     peerBonus: 0.05, leadershipVotes: 8,
     cultivationBonus: 800_000,
   },
   {
-    v: 7, title: "Fleet Cmdr", cnTitle: "舰队司令",
+    v: 7, title: "舰队司令", cnTitle: "舰队司令",
     conditions: { teamVolumeUSD: 1_000_000, vDownlines: { 5: 6 } },
     directBonus: 0.10, unilevelDepth: 8,
     peerBonus: 0.05, leadershipVotes: 16,
     cultivationBonus: 3_200_000,
   },
   {
-    v: 8, title: "Star Admiral", cnTitle: "星上将",
+    v: 8, title: "星上将", cnTitle: "星上将",
     conditions: { teamVolumeUSD: 3_000_000, vDownlines: { 6: 7 } },
     directBonus: 0.10, unilevelDepth: 9,
     peerBonus: 0.05, leadershipVotes: 32,
     cultivationBonus: 10_000_000,
   },
   {
-    v: 9, title: "Galaxy Lord", cnTitle: "星河领主",
+    v: 9, title: "星河领主", cnTitle: "星河领主",
     conditions: { teamVolumeUSD: 10_000_000 },
     directBonus: 0.10, unilevelDepth: 10,
     peerBonus: 0.05, leadershipVotes: 64,
     cultivationBonus: 0,
   },
   {
-    v: 10, title: "Nexion Founder", cnTitle: "联合创始",
+    v: 10, title: "联合创始", cnTitle: "联合创始",
     conditions: { teamVolumeUSD: 30_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 128,
     cultivationBonus: 0,
   },
   {
-    v: 11, title: "Cosmic Sovereign", cnTitle: "宇宙至尊",
+    v: 11, title: "宇宙至尊", cnTitle: "宇宙至尊",
     conditions: { teamVolumeUSD: 100_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 256,
     cultivationBonus: 0,
   },
   {
-    v: 12, title: "Singularity", cnTitle: "奇点",
+    v: 12, title: "奇点", cnTitle: "奇点",
     conditions: { teamVolumeUSD: 500_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 512,
@@ -217,20 +217,20 @@ export function nextRankProgress(state: VRankData): {
   if (c.selfBuyUSD) {
     checks.push(Math.min(1, state.selfBuyUSD / c.selfBuyUSD));
     if (state.selfBuyUSD < c.selfBuyUSD) {
-      missing.push(`Self-buy $${(c.selfBuyUSD - state.selfBuyUSD).toLocaleString()} more`);
+      missing.push(`还需自购 $${(c.selfBuyUSD - state.selfBuyUSD).toLocaleString()}`);
     }
   }
   if (c.directRefs) {
     checks.push(Math.min(1, state.directRefs / c.directRefs));
     if (state.directRefs < c.directRefs) {
       const n = c.directRefs - state.directRefs;
-      missing.push(`${n} more direct invite${n === 1 ? "" : "s"}`);
+      missing.push(`还需 ${n} 位直推`);
     }
   }
   if (c.teamVolumeUSD) {
     checks.push(Math.min(1, state.teamVolumeUSD / c.teamVolumeUSD));
     if (state.teamVolumeUSD < c.teamVolumeUSD) {
-      missing.push(`$${(c.teamVolumeUSD - state.teamVolumeUSD).toLocaleString()} more team volume`);
+      missing.push(`还需 $${(c.teamVolumeUSD - state.teamVolumeUSD).toLocaleString()} 团队业绩`);
     }
   }
   if (c.vDownlines) {
@@ -240,7 +240,7 @@ export function nextRankProgress(state: VRankData): {
       if (have < n) {
         const def = V_RANKS[Number(v)];
         const need = n - have;
-        missing.push(`${need} more ${def.title} (V${v})`);
+        missing.push(`还需 ${need} 位 ${def.title}(V${v})`);
       }
     }
   }

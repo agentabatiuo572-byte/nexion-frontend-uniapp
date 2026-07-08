@@ -1,3 +1,5 @@
+import { clearBackScrollRestore, markBackScrollRestore, restoreBackScrollInDom } from "@/lib/scroll-restore";
+
 // Map a prototype-style LOGICAL path (the web routes baked into nova /
 // notification CTA data, e.g. "/team/commissions", "/genesis",
 // "/me/wallet/exchange", "/store") to the actual uni-app route, then navigate.
@@ -49,8 +51,25 @@ export function navBack(fallbackHref?: string): void {
   let len = 1;
   try { len = getCurrentPages().length; } catch { /* unavailable → treat as cold-open */ }
   if (len > 1) {
+    let leavingRoute = "";
+    try {
+      const ps = getCurrentPages();
+      leavingRoute = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    } catch {
+      leavingRoute = "";
+    }
     // Real history: pop (restores the previous page + its scroll position).
-    uni.navigateBack({ fail: () => { if (fallbackHref) navTo(fallbackHref); } });
+    markBackScrollRestore();
+    setTimeout(() => restoreBackScrollInDom(leavingRoute), 80);
+    uni.navigateBack({
+      success: () => {
+        setTimeout(() => restoreBackScrollInDom(leavingRoute), 0);
+      },
+      fail: () => {
+        clearBackScrollRestore();
+        if (fallbackHref) navTo(fallbackHref);
+      },
+    });
     return;
   }
   // Cold-open / no history: navigateBack would no-op here, so go to the declared

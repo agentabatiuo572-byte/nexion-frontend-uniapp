@@ -125,12 +125,12 @@ const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3
 const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.625, marginBottom: "12px" };
 const tableStyle: CSSProperties = {
   borderRadius: "12px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
 const tableHeadStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "11px",
   letterSpacing: "0.14em",
   color: "var(--v5-ink-3)",
 };

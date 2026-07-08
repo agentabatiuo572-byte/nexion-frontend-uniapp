@@ -35,7 +35,7 @@
       </view>
 
       <template v-if="amountNum > 0">
-        <text class="block" :style="periodLabelStyle">After 365 days</text>
+        <text class="block" :style="periodLabelStyle">365 天后</text>
 
         <!-- Single bar -->
         <view class="flex items-center" style="margin-top: 8px; gap: 10px">
@@ -64,7 +64,7 @@
         <!-- Footnote nudging toward re-staking -->
         <view v-if="extraFromCompounding > 0" class="tabular-nums" :style="footnoteStyle">
           <text style="color: var(--v5-brand); font-weight: 500">+${{ extraText }}</text>
-          <text> from compounding · re-stake {{ cycles }}× at maturity</text>
+          <text> 来自复利 · 到期后复投 {{ cycles }} 次</text>
         </view>
       </template>
 
@@ -121,7 +121,7 @@ function onAmountInput(e: Event) {
 
 const cardStyle: CSSProperties = {
   padding: "18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
@@ -158,7 +158,7 @@ const apyChipStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
 };
@@ -200,7 +200,7 @@ function segPillStyle(active: boolean): CSSProperties {
 }
 const periodLabelStyle: CSSProperties = {
   marginTop: "14px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
@@ -230,7 +230,7 @@ const barLabelStyle: CSSProperties = {
   top: 0,
   bottom: 0,
   left: "12px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink)",
   fontWeight: 500,
@@ -238,7 +238,7 @@ const barLabelStyle: CSSProperties = {
 };
 function barAmtStyle(tint: string): CSSProperties {
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontSize: "16px",
     fontWeight: 600,
     color: tint,
@@ -246,7 +246,7 @@ function barAmtStyle(tint: string): CSSProperties {
   };
 }
 const barDeltaStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-success)",
   marginTop: "1px",

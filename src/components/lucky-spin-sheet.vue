@@ -233,7 +233,7 @@ const slicesSvg = computed(() =>
         `<g opacity="${s.dim ? 0.32 : 1}">` +
         `<path d="${s.path}" fill="${s.fill}" stroke="var(--v5-bg)" stroke-width="1.5" />` +
         `<text x="${s.mid.x}" y="${s.mid.y}" text-anchor="middle" dominant-baseline="middle" ` +
-        `style="font-size:9px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${lsShort(s.sp)}</text>` +
+        `style="font-size:11px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${lsShort(s.sp)}</text>` +
         `</g>`,
     )
     .join(""),
@@ -421,7 +421,7 @@ onUnmounted(() => clearSettleTimer());
   overflow-y: auto;
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
-  background: var(--v5-surface);
+  background: var(--v5-surface-bg);
   border-top: 1px solid var(--v5-border);
   padding: 18px 16px;
   padding-bottom: calc(env(safe-area-inset-bottom) + 32px);
@@ -452,8 +452,8 @@ onUnmounted(() => clearSettleTimer());
   flex-direction: column;
 }
 .lss-cap {
-  font-size: 10.5px;
-  font-family: var(--font-jet-mono), monospace;
+  font-size: 11px;
+  font-family: var(--font-numbers);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-brand);
@@ -586,7 +586,7 @@ onUnmounted(() => clearSettleTimer());
 }
 .lss-won-prize {
   display: block;
-  font-family: var(--font-v5);
+  font-family: var(--font-amount);
   font-weight: 600;
   margin-top: 4px;
   font-variant-numeric: tabular-nums;
@@ -791,8 +791,8 @@ onUnmounted(() => clearSettleTimer());
   color: var(--v5-ink-2);
 }
 .lss-hist-time {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--v5-ink-4);
-  font-family: var(--font-jet-mono), monospace;
+  font-family: var(--font-numbers);
 }
 </style>

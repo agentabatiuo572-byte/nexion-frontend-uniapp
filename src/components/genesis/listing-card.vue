@@ -55,7 +55,7 @@ const lastSaleText = computed(() => fmt(t.value.marketplace.lastSale, { k: (prop
 
 const cardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const artStyle: CSSProperties = {
@@ -74,7 +74,7 @@ const tokenIdStyle: CSSProperties = {
 };
 const founderStyle: CSSProperties = {
   marginTop: "4px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   letterSpacing: "0.06em",
@@ -90,7 +90,7 @@ const dotStyle: CSSProperties = {
   background: "var(--v5-success)",
 };
 const priceLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -98,21 +98,21 @@ const priceLabelStyle: CSSProperties = {
 };
 const priceStyle: CSSProperties = {
   marginTop: "2px",
-  fontFamily: "var(--font-v5)",
+  fontFamily: "var(--font-amount)",
   fontWeight: 600,
   fontSize: "15px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
 const lastSaleStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const deltaStyle = computed<CSSProperties>(() => ({
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 600,
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));

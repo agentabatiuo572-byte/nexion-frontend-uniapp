@@ -22,7 +22,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
-                <text class="truncate" :style="collTitleStyle">Nexion Genesis Node</text>
+                <text class="truncate" :style="collTitleStyle">Nexion 创世节点</text>
                 <text class="shrink-0" :style="verifiedStyle">✓</text>
               </view>
               <text class="block" :style="ercLineStyle">{{ t.marketplace.erc721Line }}</text>
@@ -110,7 +110,7 @@
           </view>
         </template>
 
-        <text class="block px-2" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">{{ t.marketplace.royaltyFooter }}</text>
+        <text class="block px-2" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.625">{{ t.marketplace.royaltyFooter }}</text>
       </view>
     </view>
 
@@ -207,7 +207,7 @@ function handleBuy(l: Listing) {
       symbol: "USDT",
       amount: -l.priceUSDT,
       status: "posted",
-      memo: `Genesis secondary · token #${l.tokenId}`,
+      memo: `创世节点二级市场 · token #${l.tokenId}`,
       ref: `GENESIS-SEC-${l.tokenId}`,
     });
     toast.success(
@@ -227,7 +227,7 @@ function goGenesis() {
 // ── styles ──
 const heroStyle: CSSProperties = {
   padding: "18px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
@@ -250,13 +250,13 @@ const verifiedStyle: CSSProperties = {
   borderRadius: "4px",
   background: "var(--v5-success-soft)",
   color: "var(--v5-success)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   fontWeight: 500,
 };
 const ercLineStyle: CSSProperties = {
   marginTop: "3px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.02em",
@@ -268,14 +268,14 @@ const statGridStyle: CSSProperties = {
   gap: "8px",
 };
 const statLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontFamily: "var(--font-numbers)",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.04em",
 };
 function statValStyle(tint?: string): CSSProperties {
   return {
-    fontFamily: "var(--font-v5)",
+    fontFamily: "var(--font-amount)",
     fontWeight: 600,
     fontSize: "14px",
     color: tint ?? "var(--v5-ink)",
@@ -291,7 +291,7 @@ const floorDeltaStyle: CSSProperties = {
 const viewOpenSeaStyle: CSSProperties = {
   minHeight: "32px",
   padding: "0 6px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   color: "var(--v5-brand)",
   fontWeight: 500,
@@ -313,7 +313,7 @@ function tabPillStyle(active: boolean): CSSProperties {
   };
 }
 const sortLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontFamily: "var(--font-numbers)",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
@@ -329,7 +329,7 @@ function sortPillStyle(active: boolean): CSSProperties {
     borderRadius: "999px",
     fontSize: "11px",
     fontWeight: 500,
-    fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-numbers)",
     letterSpacing: "0.06em",
     background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -340,12 +340,12 @@ function sortPillStyle(active: boolean): CSSProperties {
 }
 const listCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
 };
 const emptyCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-bg)",
   border: "1px solid var(--v5-border)",
   padding: "32px",
 };

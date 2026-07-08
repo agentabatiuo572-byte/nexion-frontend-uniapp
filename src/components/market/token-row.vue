@@ -24,7 +24,7 @@
       <view class="min-w-0">
         <view class="flex items-center" style="gap: 6px">
           <text class="truncate" :style="symbolStyle">{{ token.symbol }}</text>
-          <text v-if="isNEX" class="font-mono-tabular" :style="oursStyle">OURS</text>
+          <text v-if="isNEX" class="font-mono-tabular" :style="oursStyle">自营</text>
         </view>
         <text class="block truncate" :style="subStyle">{{ token.name }} · {{ fmtBig(token.marketCapUSD) }}</text>
       </view>
@@ -94,7 +94,7 @@ const sparkPoints = computed(() => {
 
 const rowStyle = computed<CSSProperties>(() => ({
   gridTemplateColumns: "32px 1fr 76px 72px",
-  padding: "10px 12px",
+  padding: "8px 12px",
   fontSize: "12px",
   borderBottom: "1px solid var(--v5-border)",
 }));
@@ -108,7 +108,7 @@ const iconTextStyle = computed<CSSProperties>(() => {
   const dark =
     props.token.color === "#000000" || props.token.color === "#222326" || props.token.color === "#181EA9";
   return {
-    fontSize: "10px",
+    fontSize: "11px",
     fontWeight: 600,
     color: dark ? "var(--v5-ink)" : "var(--v5-on-brand)",
   };
@@ -119,14 +119,14 @@ const symbolStyle: CSSProperties = {
   fontSize: "12.5px",
 };
 const oursStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   padding: "0 4px",
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)",
   color: "var(--v5-brand)",
 };
 const subStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "11px",
   color: "var(--v5-ink-4)",
   marginTop: "2px",
 };

@@ -3,11 +3,10 @@
   Hybrid: V5 HERO (PillTabs + TotalEarnedCard) on top, V4 device-pool sections
   below. Conversion arc (earned → missed → trial escape → devices → fleet decay
   → market context → tier-locked tasks → footer):
-    TrialHeroBanner / TrialGhostSlot
-    → PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
-    → MissedIncomeBanner
-    → "My Devices" header + slot rail + DeviceCardPC × N + add-device CTA
-    → MarketBoard
+    PillTabs (Today/Week/Month/All) + TotalEarnedCard (range total + breakdown)
+    → MissedIncomeBanner → TrialHeroBanner / TrialGhostSlot
+    → Home-style MyFleetSection (device rows route to detail)
+    → DeviceLifecycleBanner → MarketBoard
     → TaskCenter.
 
   PillTabs + TotalEarnedCard inlined here (page-specific). Wrapped in
@@ -16,61 +15,68 @@
 -->
 <template>
   <AppChassis active="earn">
-    <template #pageTop>
-      <CardStagger class="pt-3 space-y-6" style="color: var(--v5-ink)">
-        <!-- Trial entries -->
+    <CardStagger class="pt-3 pb-4 space-y-6" style="color: var(--v5-ink)">
+      <view style="display: flex; flex-direction: column; gap: 8px">
+        <!-- ===== HERO: pill tabs ===== -->
         <view class="mx-4">
-          <TrialHeroBanner class="w-full" />
-        </view>
-        <TrialGhostSlot class="mx-4" />
-      </CardStagger>
-    </template>
-
-    <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
-      <!-- ===== HERO: pill tabs ===== -->
-      <view class="mx-4">
-        <view class="flex gap-0.5" style="background: var(--v5-surface-2); border-radius: 12px; padding: 3px">
-          <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" @click="range = r">
-            <text :style="pillLabelStyle(r)">{{ r }}</text>
+          <view class="earn-range-bar flex" :style="rangeBarStyle">
+            <view
+              v-for="r in ranges"
+              :key="r.key"
+              class="earn-range-pill flex-1 grid place-items-center active:opacity-70"
+              :class="{ 'is-active': range === r.key }"
+              :style="pillStyle(r)"
+              @click="range = r.key"
+            >
+              <text :style="pillLabelStyle(r)">{{ r.label }}</text>
+            </view>
           </view>
         </view>
-      </view>
 
-      <!-- ===== HERO: total earned card ===== -->
-      <view class="mx-4">
-        <view class="relative overflow-hidden" :style="totalCardStyle">
-          <!-- drifting dots (particle effect; card background removed per design) -->
-          <view aria-hidden style="position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden">
-            <view v-for="(d, i) in HERO_DOTS" :key="i" :style="heroDotStyle(d)" />
-          </view>
-
-          <view class="relative" style="z-index: 1">
-            <view class="flex justify-between items-center gap-2">
-              <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">Compute earned · {{ rangeKey }}</text>
-              <text class="font-mono-tabular" :style="usdtTagStyle">USDT</text>
+        <!-- ===== HERO: total earned card ===== -->
+        <view class="mx-4">
+          <view class="relative isolate" :style="totalCardStyle">
+            <!-- Left aurora glow, matched to Home today's earnings. -->
+            <view
+              aria-hidden
+              :style="totalAuroraStyle"
+            ></view>
+            <!-- 24px tech grid -->
+            <view
+              aria-hidden
+              style="position: absolute; inset: 0; background-image: linear-gradient(to right, color-mix(in oklab, var(--v5-brand) 9%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklab, var(--v5-brand) 9%, transparent) 1px, transparent 1px); background-size: 24px 24px; -webkit-mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); mask-image: radial-gradient(ellipse at center, #000 35%, transparent 85%); z-index: 0; pointer-events: none"
+            ></view>
+            <!-- drifting dots -->
+            <view aria-hidden style="position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden">
+              <view v-for="(d, i) in HERO_DOTS" :key="i" :style="heroDotStyle(d)" />
             </view>
 
-            <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)">
-              <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-              <text class="tabular-nums" style="font-size: 48px">{{ totalInt }}<text style="font-size: 32px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
+            <view class="relative" style="z-index: 1">
+              <view class="flex justify-between items-center gap-2">
+                <text style="font-family: var(--font-v5); font-size: 11px; font-weight: 500; color: #8B94A3; letter-spacing: 0">{{ t.earn.computeEarnings }} · {{ rangeLabel }}</text>
+                <text class="font-mono-tabular" :style="usdtTagStyle">USDT</text>
+              </view>
+
+              <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-amount); font-weight: 600; letter-spacing: 0; line-height: 1; color: var(--v5-ink)">
+                <text style="font-family: var(--font-amount); font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
+                <text class="tabular-nums" style="font-family: var(--font-amount); font-size: 48px; font-weight: 600">{{ totalInt }}<text style="font-family: var(--font-amount); font-size: 32px; color: var(--v5-ink-3); font-weight: 500">.{{ totalCents }}</text></text>
+              </view>
+              <text class="block mt-2 tabular-nums" style="font-family: var(--font-amount); font-size: 15px; color: var(--v5-brand); font-weight: 500; letter-spacing: 0">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0">NEX</text></text>
+              <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
             </view>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-brand); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">NEX</text></text>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
           </view>
         </view>
       </view>
 
-      <!-- My devices header -->
-      <view class="mx-4 mt-2 mb-1 px-1 flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
+      <TrialGhostSlot class="mx-4" />
+
+      <!-- My devices — same compact list as Home; rows open the detail page. -->
+      <view class="mx-4">
+        <MyFleetSection context="earn" :max-items="3" />
       </view>
-      <!-- Device pool — one card, accordion rows (one detail open at a time) -->
-      <EmptySlotsHint>
-        <DeviceCardPC v-for="(d, i) in devices" :key="d.id" :device="d" :expanded="expandedId === d.id" :divider="i !== 0" @toggle="toggleDevice(d.id)" />
-      </EmptySlotsHint>
 
       <ComputeShareEntry />
+      <DeviceLifecycleBanner />
       <!-- Loss-aversion — moved directly above the market board -->
       <MissedIncomeBanner />
       <MarketBoard />
@@ -83,46 +89,44 @@
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
-import TrialHeroBanner from "@/components/trial-hero-banner.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
-import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
-import EmptySlotsHint from "@/components/earn/empty-slots-hint.vue";
+import DeviceLifecycleBanner from "@/components/earn/device-lifecycle-banner.vue";
 import MarketBoard from "@/components/earn/market-board.vue";
 import TaskCenter from "@/components/earn/task-center.vue";
+import MyFleetSection from "@/components/home/my-fleet-section.vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
-type Range = "Today" | "Week" | "Month" | "All";
-const RANGES: Range[] = ["Today", "Week", "Month", "All"];
-
+type RangeKey = "today" | "thisWeek" | "thisMonth" | "total";
+interface RangeOption {
+  key: RangeKey;
+  label: string;
+  jobs: string;
+}
 const app = useApp();
 const t = useT();
-const range = ref<Range>("Today");
-
-// Accordion: only one device detail open at a time (null = all collapsed).
-const expandedId = ref<string | null>(null);
-function toggleDevice(id: string) {
-  expandedId.value = expandedId.value === id ? null : id;
-}
-
-// Earn shows ACTIVE fleet only (inventory lives in /me/devices).
-const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
-const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, { n: devices.value.length }));
+const range = ref<RangeKey>("today");
+const ranges = computed<RangeOption[]>(() => [
+  { key: "today", label: t.value.earn.todayTab, jobs: "14" },
+  { key: "thisWeek", label: t.value.earn.weekTab, jobs: "98" },
+  { key: "thisMonth", label: t.value.earn.monthTab, jobs: "412" },
+  { key: "total", label: t.value.earn.allTab, jobs: "1,247" },
+]);
 
 // ── HERO total earned ──
 const total = computed(() => {
-  const e = app.earnings;
-  return range.value === "Today" ? e.today
-    : range.value === "Week" ? e.thisWeek
-      : range.value === "Month" ? e.thisMonth
-        : e.total;
+  return app.earnings[range.value];
 });
-const rangeKey = computed(() => range.value.toLowerCase());
-const totalInt = computed(() => Math.floor(total.value).toLocaleString());
-const totalCents = computed(() => String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
+const activeRange = computed(() => ranges.value.find((r) => r.key === range.value) ?? ranges.value[0]);
+const rangeLabel = computed(() => activeRange.value.label);
+const totalParts = computed(() =>
+  total.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split("."),
+);
+const totalInt = computed(() => totalParts.value[0] ?? "0");
+const totalCents = computed(() => totalParts.value[1] ?? "00");
 // NEX earned for the range — backend gives per-range NEX; mock scales today's NEX by the USDT ratio.
 const nexTotal = computed(() => {
   const e = app.earnings;
@@ -130,34 +134,33 @@ const nexTotal = computed(() => {
   return total.value * ratio;
 });
 const nexFmt = computed(() => nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
-const jobsText = computed(() =>
-  range.value === "Today" ? "14 jobs"
-    : range.value === "Week" ? "98 jobs"
-      : range.value === "Month" ? "412 jobs"
-        : "1,247 jobs",
-);
+const jobsText = computed(() => fmt(t.value.earn.jobsCount, { n: activeRange.value.jobs }));
 
 // drifting hero dots
 const HERO_DOTS = [
-  { left: "12%", delay: 0, color: "var(--v5-tech-cyan)" },
+  { left: "12%", delay: 0, color: "#0CC4D6" },
   { left: "32%", delay: 1.6, color: "var(--v5-brand)" },
   { left: "54%", delay: 3.2, color: "var(--v5-brand-2)" },
-  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan)" },
+  { left: "72%", delay: 4.8, color: "#0CC4D6" },
   { left: "88%", delay: 6.4, color: "var(--v5-brand)" },
 ];
 
 // ── styles ──
-function pillStyle(r: Range): CSSProperties {
-  const on = range.value === r;
+const rangeBarStyle = computed<CSSProperties>(() => ({
+  borderRadius: "12px",
+  padding: "3px",
+  gap: "2px",
+}));
+function pillStyle(r: RangeOption): CSSProperties {
+  const on = range.value === r.key;
   return {
     height: "32px",
-    background: on ? "var(--v5-brand-soft)" : "transparent",
-    border: "1px solid transparent",
+    border: "0",
     borderRadius: "9px",
   };
 }
-function pillLabelStyle(r: Range): CSSProperties {
-  const on = range.value === r;
+function pillLabelStyle(r: RangeOption): CSSProperties {
+  const on = range.value === r.key;
   return {
     color: on ? "var(--v5-brand)" : "var(--v5-ink-3)",
     fontFamily: "var(--font-v5)",
@@ -166,7 +169,17 @@ function pillLabelStyle(r: Range): CSSProperties {
   };
 }
 const totalCardStyle: CSSProperties = {
-  padding: "0 0 10px",
+  padding: "8px 2px 12px",
+};
+const totalAuroraStyle: CSSProperties = {
+  position: "absolute",
+  inset: "0",
+  background:
+    "radial-gradient(52% 80% at 14% 50%, color-mix(in srgb, var(--accent-purple) 45%, transparent) 0%, transparent 66%)",
+  filter: "blur(24px)",
+  zIndex: 0,
+  pointerEvents: "none",
+  animation: "v5-aurora-drift 14s ease-in-out infinite alternate",
 };
 function heroDotStyle(d: { left: string; delay: number; color: string }): CSSProperties {
   return {
@@ -183,13 +196,40 @@ function heroDotStyle(d: { left: string; delay: number; color: string }): CSSPro
   };
 }
 const usdtTagStyle: CSSProperties = {
-  fontSize: "10.5px",
-  padding: "2px 7px",
-  borderRadius: "4px",
+  fontSize: "10px",
+  padding: "1px 6px",
+  borderRadius: "3px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
   fontWeight: 500,
-  letterSpacing: "0.04em",
+  letterSpacing: "0",
   whiteSpace: "nowrap",
 };
 </script>
+
+<style>
+:root {
+  --earn-range-bg:
+    radial-gradient(120% 140% at 0% 0%, rgba(77,139,255,0.12), transparent 68%),
+    radial-gradient(100% 120% at 100% 100%, rgba(23,109,255,0.08), transparent 66%),
+    var(--v5-surface-bg);
+  --earn-range-active-bg: var(--v5-brand-soft);
+}
+
+html[data-theme="dark"] {
+  --earn-range-bg: linear-gradient(180deg, #111317 0%, #15181C 100%);
+  --earn-range-active-bg: rgba(158, 220, 29, 0.18);
+}
+
+.earn-range-bar {
+  background: var(--earn-range-bg);
+}
+
+.earn-range-pill {
+  background: transparent;
+}
+
+.earn-range-pill.is-active {
+  background: var(--earn-range-active-bg);
+}
+</style>
