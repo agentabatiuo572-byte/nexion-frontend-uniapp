@@ -2,12 +2,12 @@
   LiveFeedCard — ZONE 1 dual-tab live ticker (ported from mission-control.tsx
   LiveFeedCard). Activity tab = platform-wide job feed (3.2s); Earnings tab =
   peer purchase feed (6.5s, taps through to /team/commissions). Segmented tab
-  switch + live pulse. FEED_POOL mock data; names/job strings are proper nouns
+  switch + top-right see-all affordance. FEED_POOL mock data; names/job strings are proper nouns
   (untranslated, like the source). Chrome labels keyed for bilingual parity.
 -->
 <template>
   <view>
-    <!-- Tab switcher + live pulse -->
+    <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
       <view class="flex gap-0.5" style="padding: 3px; background: var(--v5-surface-2); border-radius: 9px">
         <view
@@ -20,9 +20,11 @@
           <text :style="{ color: tab === tb.id ? 'var(--v5-ink)' : 'var(--v5-ink-3)', fontWeight: tab === tb.id ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ tb.label }}</text>
         </view>
       </view>
-      <view class="inline-flex items-center font-mono-tabular" style="gap: 6px; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; font-weight: 500" :style="{ background: pulseBg, color: pulseColor }">
-        <PulseDot :color="pulseColor" :size="5" />
-        <text :style="{ color: pulseColor }">{{ t.home.liveFeedLive }}</text>
+      <view v-if="tab === 'earnings'" class="inline-flex items-center gap-1 font-mono-tabular active:opacity-70 transition-opacity" style="min-height: 32px; font-size: 11px; color: var(--v5-ink-3)" @click.stop="goCommissions">
+        <text style="color: var(--v5-ink-3)">{{ t.home.liveFeedSeeAll }}</text>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18l6-6-6-6" />
+        </svg>
       </view>
     </view>
 
@@ -56,12 +58,6 @@
           <text class="font-mono-tabular tabular-nums whitespace-nowrap" style="color: var(--v5-success); font-weight: 500">+${{ it.amount.toFixed(2) }}</text>
         </view>
       </view>
-      <view class="px-0.5 py-2 flex items-center justify-end gap-1 font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3); border-top: 1px solid var(--v5-border)">
-        <text style="color: var(--v5-ink-3)">{{ t.home.liveFeedSeeAll }}</text>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 18l6-6-6-6" />
-        </svg>
-      </view>
     </view>
   </view>
 </template>
@@ -70,7 +66,6 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import PulseDot from "./pulse-dot.vue";
 
 interface FeedRow {
   k: number;
@@ -148,9 +143,6 @@ onUnmounted(() => {
   if (actTimer) clearInterval(actTimer);
   if (earnTimer) clearInterval(earnTimer);
 });
-
-const pulseColor = computed(() => (tab.value === "activity" ? "var(--v5-tech-cyan)" : "var(--v5-success)"));
-const pulseBg = computed(() => (tab.value === "activity" ? "var(--v5-tech-cyan-soft)" : "var(--v5-success-soft)"));
 
 function tabStyle(id: "activity" | "earnings"): CSSProperties {
   const on = tab.value === id;
