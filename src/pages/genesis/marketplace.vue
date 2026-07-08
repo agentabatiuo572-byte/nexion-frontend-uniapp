@@ -133,7 +133,8 @@ import { useBills } from "@/store/bills";
 import { useGenesis } from "@/store/genesis";
 import { toast } from "@/store/ui";
 
-const FLOOR = 25_000;
+// 二级地板 = 尾盘档($11,999) + 溢价（去旧 $25K 叙事，与前端阶梯定价一致）。
+const FLOOR = 13_400;
 const VOL_24H = 1_247_300;
 const LISTED = 89;
 const OWNERS = 953;
@@ -151,25 +152,25 @@ const openSeaOpen = ref(false);
 
 const now = Date.now();
 const SEED_LISTINGS: Listing[] = [
-  { tokenId: 7, priceUSDT: 32_500, lastSaleUSDT: 9_999, seller: "0x4f8b2c7e1a90", listedAt: now - 1 * HOUR, traits: { tier: "Founder #007", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 23, priceUSDT: 28_900, lastSaleUSDT: 24_500, seller: "0xa1d9c2e8b720", listedAt: now - 3 * HOUR, traits: { tier: "Founder #023", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 142, priceUSDT: 26_800, lastSaleUSDT: 22_300, seller: "0x91e3f8074bcd", listedAt: now - 8 * HOUR, traits: { tier: "Founder #142", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 388, priceUSDT: 25_400, lastSaleUSDT: 20_100, seller: "0x6b4c1afe2d83", listedAt: now - 14 * HOUR, traits: { tier: "Founder #388", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 501, priceUSDT: 25_100, lastSaleUSDT: 9_999, seller: "0xc7e29a4f8b16", listedAt: now - 1 * ONE_DAY, traits: { tier: "Founder #501", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 627, priceUSDT: 25_000, lastSaleUSDT: 9_999, seller: "0x29ab78ed4c10", listedAt: now - 2 * ONE_DAY, traits: { tier: "Founder #627", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 784, priceUSDT: 24_800, lastSaleUSDT: 9_999, seller: "0xf2b04e9d318a", listedAt: now - 2.5 * ONE_DAY, traits: { tier: "Founder #784", boost: "2.5×", mintYear: 2026 } },
-  { tokenId: 829, priceUSDT: 24_500, lastSaleUSDT: 9_999, seller: "0xae73c1b80249", listedAt: now - 3 * ONE_DAY, traits: { tier: "Founder #829", boost: "2.5×", mintYear: 2026 } },
+  { tokenId: 7, priceUSDT: 16_500, lastSaleUSDT: 7_999, seller: "0x4f8b2c7e1a90", listedAt: now - 1 * HOUR, traits: { tier: "Founder #007", boost: "2.0×", mintYear: 2026 } },
+  { tokenId: 23, priceUSDT: 15_200, lastSaleUSDT: 11_999, seller: "0xa1d9c2e8b720", listedAt: now - 3 * HOUR, traits: { tier: "Founder #023", boost: "1.5×", mintYear: 2026 } },
+  { tokenId: 142, priceUSDT: 14_600, lastSaleUSDT: 11_999, seller: "0x91e3f8074bcd", listedAt: now - 8 * HOUR, traits: { tier: "Founder #142", boost: "1.5×", mintYear: 2026 } },
+  { tokenId: 388, priceUSDT: 14_100, lastSaleUSDT: 9_999, seller: "0x6b4c1afe2d83", listedAt: now - 14 * HOUR, traits: { tier: "Founder #388", boost: "1.5×", mintYear: 2026 } },
+  { tokenId: 501, priceUSDT: 13_800, lastSaleUSDT: 7_999, seller: "0xc7e29a4f8b16", listedAt: now - 1 * ONE_DAY, traits: { tier: "Founder #501", boost: "2.0×", mintYear: 2026 } },
+  { tokenId: 627, priceUSDT: 13_500, lastSaleUSDT: 9_999, seller: "0x29ab78ed4c10", listedAt: now - 2 * ONE_DAY, traits: { tier: "Founder #627", boost: "1.5×", mintYear: 2026 } },
+  { tokenId: 784, priceUSDT: 13_400, lastSaleUSDT: 9_999, seller: "0xf2b04e9d318a", listedAt: now - 2.5 * ONE_DAY, traits: { tier: "Founder #784", boost: "1.5×", mintYear: 2026 } },
+  { tokenId: 829, priceUSDT: 13_400, lastSaleUSDT: 11_999, seller: "0xae73c1b80249", listedAt: now - 3 * ONE_DAY, traits: { tier: "Founder #829", boost: "1.5×", mintYear: 2026 } },
 ];
 
 const SEED_ACTIVITY: ActivityEvent[] = [
-  { id: "a-1", kind: "sale", tokenId: 12, priceUSDT: 27_500, from: "0x4f8b2c7e1a90", to: "0x6a1c93f0e2b8", ts: now - 18 * 60_000 },
-  { id: "a-2", kind: "list", tokenId: 7, priceUSDT: 32_500, from: "0x4f8b2c7e1a90", to: "—", ts: now - 1 * HOUR },
-  { id: "a-3", kind: "sale", tokenId: 218, priceUSDT: 25_900, from: "0xa1d9c2e8b720", to: "0x91e3f8074bcd", ts: now - 4 * HOUR },
+  { id: "a-1", kind: "sale", tokenId: 12, priceUSDT: 14_800, from: "0x4f8b2c7e1a90", to: "0x6a1c93f0e2b8", ts: now - 18 * 60_000 },
+  { id: "a-2", kind: "list", tokenId: 7, priceUSDT: 16_500, from: "0x4f8b2c7e1a90", to: "—", ts: now - 1 * HOUR },
+  { id: "a-3", kind: "sale", tokenId: 218, priceUSDT: 13_900, from: "0xa1d9c2e8b720", to: "0x91e3f8074bcd", ts: now - 4 * HOUR },
   { id: "a-4", kind: "transfer", tokenId: 88, from: "0xc7e29a4f8b16", to: "0x6b4c1afe2d83", ts: now - 6 * HOUR },
-  { id: "a-5", kind: "sale", tokenId: 451, priceUSDT: 25_400, from: "0x29ab78ed4c10", to: "0xae73c1b80249", ts: now - 8 * HOUR },
-  { id: "a-6", kind: "list", tokenId: 142, priceUSDT: 26_800, from: "0x91e3f8074bcd", to: "—", ts: now - 8 * HOUR },
+  { id: "a-5", kind: "sale", tokenId: 451, priceUSDT: 14_100, from: "0x29ab78ed4c10", to: "0xae73c1b80249", ts: now - 8 * HOUR },
+  { id: "a-6", kind: "list", tokenId: 142, priceUSDT: 14_600, from: "0x91e3f8074bcd", to: "—", ts: now - 8 * HOUR },
   { id: "a-7", kind: "mint", tokenId: 847, from: "—", to: "0x4f8b2c7e1a90", ts: now - 12 * HOUR },
-  { id: "a-8", kind: "sale", tokenId: 64, priceUSDT: 25_100, from: "0xf2b04e9d318a", to: "0xae73c1b80249", ts: now - 14 * HOUR },
+  { id: "a-8", kind: "sale", tokenId: 64, priceUSDT: 13_800, from: "0xf2b04e9d318a", to: "0xae73c1b80249", ts: now - 14 * HOUR },
 ];
 
 const ownedCount = computed(() => genesis.myOwned);
@@ -197,11 +198,13 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + purchase + bill.
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + acquire + bill.
+  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
+  // 不受售罄门影响。承接失败(已持有该 token)必须退款,杜绝「扣钱不给货」。
   // PRODUCTION: server validates listing, debits buyer, credits seller minus
   // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
-  const r = genesis.purchase(1, [l.tokenId]);
-  if (r.ok) {
+  const ok = genesis.acquireSecondary(l.tokenId);
+  if (ok) {
     bills.add({
       type: "purchase",
       symbol: "USDT",
@@ -217,6 +220,10 @@ function handleBuy(l: Listing) {
         held: ownedCount.value,
       }),
     );
+  } else {
+    // 承接失败(已持有该 token)→ 退款,不留「扣钱无货」。
+    app.creditBalance(l.priceUSDT);
+    toast.error(t.value.marketplace.insufficient, fmt(t.value.marketplace.acquiredDesc, { paid: l.priceUSDT.toLocaleString(), held: ownedCount.value }));
   }
 }
 
@@ -302,7 +309,7 @@ function tabPillStyle(active: boolean): CSSProperties {
     height: "40px",
     borderRadius: "8px",
     background: active ? "var(--v5-brand)" : "transparent",
-    color: active ? "var(--v5-ink)" : "var(--v5-ink-3)",
+    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
     fontFamily: "var(--font-v5)",
     fontSize: "12.5px",
     fontWeight: 500,
@@ -324,15 +331,16 @@ const sortLabelStyle: CSSProperties = {
 function sortPillStyle(active: boolean): CSSProperties {
   return {
     flexShrink: 0,
-    height: "44px",
-    padding: "0 14px",
+    height: "32px",
+    padding: "0 12px",
     borderRadius: "999px",
     fontSize: "11px",
     fontWeight: 500,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    letterSpacing: "0.06em",
-    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
-    color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
+    letterSpacing: "0.04em",
+    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+    color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
+    border: active ? "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)" : "1px solid transparent",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

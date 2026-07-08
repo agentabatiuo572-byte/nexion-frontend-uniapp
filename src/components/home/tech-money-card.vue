@@ -1,7 +1,8 @@
 <!--
   TechMoneyCard — ZONE 1 home hero "Today's earnings" (ported from
   mission-control.tsx TechMoneyCard). CROSS-STREAM aggregate: device mining,
-  team commission, staking accrual, and Genesis holder dividends. surface-2
+  team commission, and staking accrual. (Genesis 已移出每日 USD 聚合——
+  分红延期改造后它是上所后 NEX 排放，见 holder 页。) surface-2
   base + aurora + tech-grid + drifting dots make it the conversion focal point.
   Big streaming number + peer-avg / payback footer.
   Source hardcoded the labels; ported to t.home.tech* for bilingual parity.
@@ -51,7 +52,6 @@ import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
-import { useGenesis } from "@/store/genesis";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
 
@@ -59,13 +59,13 @@ const t = useT();
 const app = useApp();
 const commission = useCommission();
 const staking = useStaking();
-const genesis = useGenesis();
 
+// 创世节点不再计入「今日 USD 收益」——分红延期改造后它是上所后 NEX 排放（在 holder 页按
+// NEX 展示），非每日 USD 现金，故从首页每日聚合移除（去旧「平台交易量日分红」雷）。
 const computeToday = computed(() => app.earnings.today);
 const teamToday = computed(() => commission.todayUSDT());
 const stakingToday = computed(() => staking.todayAccruedUSDT());
-const genesisToday = computed(() => genesis.myOwned * genesis.currentDailyDividendPerNodeUSDT());
-const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value + genesisToday.value);
+const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value);
 
 // Streaming number — ticks up; resyncs on a material jump (new commission / day rollover).
 const display = useTicker(() => Math.max(todayTotal.value, 0.06), 0.0009, 1100);

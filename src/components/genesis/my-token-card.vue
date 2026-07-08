@@ -54,7 +54,7 @@ import { fmt } from "@/i18n/format";
 import { useGenesis } from "@/store/genesis";
 import { toast, confirm } from "@/store/ui";
 
-const FLOOR = 25_000;
+const FLOOR = 13_400; // 二级地板 = 尾盘档 + 溢价（与 marketplace 一致，去旧 $25K）。
 
 const props = defineProps<{ tokenId: number }>();
 
@@ -243,11 +243,11 @@ const listBtnStyle: CSSProperties = {
   marginTop: "10px",
   height: "44px",
   borderRadius: "999px",
+  // 迷你表单提交(输入挂单价→挂单):全宽实心柠檬绿合理;仅去光晕(网格多卡,光晕铁律仅限主 CTA)。
   background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontWeight: 500,
+  fontWeight: 550,
   fontSize: "13px",
   letterSpacing: "-0.005em",
 };

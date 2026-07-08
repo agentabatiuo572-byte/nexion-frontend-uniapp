@@ -58,7 +58,7 @@
                 <text v-if="r.time" class="nx-conv-rowtime">{{ r.time }}</text>
               </view>
               <view class="nx-conv-rowbot">
-                <text class="nx-conv-rowprev">{{ r.preview }}</text>
+                <text class="nx-conv-rowprev" :style="r.typing ? { color: r.tint } : undefined">{{ r.preview }}</text>
                 <view v-if="r.unread > 0" class="nx-conv-unread"><text class="nx-conv-unread-t">{{ r.unread > 9 ? "9+" : String(r.unread) }}</text></view>
               </view>
             </view>
@@ -105,6 +105,8 @@ interface Row {
   time: string;
   unread: number;
   isAi: boolean;
+  /** Agent is typing right now → preview swaps to the live "typing…" hint. */
+  typing: boolean;
   tint: string;
   avatarIcon: string;
 }
@@ -146,10 +148,11 @@ const rows = computed<Row[]>(() => {
       {
         id: "ai",
         name: t.value.nova.name,
-        preview: last ? cleanPreview(last.text) : t.value.conversations.roleAi,
+        preview: nova.typing ? t.value.conversations.agentTyping : last ? cleanPreview(last.text) : t.value.conversations.roleAi,
         time: last ? relTime(last.ts) : "",
         unread: nova.unread,
         isAi: true,
+        typing: nova.typing,
         tint: "var(--v5-brand-2)",
         avatarIcon: "",
       },
@@ -158,13 +161,15 @@ const rows = computed<Row[]>(() => {
   const avatarIcon = sel === "advisor" ? ADVISOR_ICON : SUPPORT_ICON;
   return convStore.byType(sel).map((c) => {
     const last = c.messages.length ? c.messages[c.messages.length - 1] : null;
+    const typing = convStore.typingIds[c.id] === true;
     return {
       id: c.id,
       name: c.agentName,
-      preview: last ? cleanPreview(msgText(last, c.agentName)) : t.value.conversations[c.roleKey],
+      preview: typing ? t.value.conversations.agentTyping : last ? cleanPreview(msgText(last, c.agentName)) : t.value.conversations[c.roleKey],
       time: relTime(c.lastTs),
       unread: c.unread,
       isAi: false,
+      typing,
       tint: c.avatarTint,
       avatarIcon,
     };

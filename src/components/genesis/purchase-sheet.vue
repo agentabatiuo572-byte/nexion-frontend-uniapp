@@ -57,8 +57,8 @@
             <text class="tabular-nums" :style="rowValStyle">{{ t.genesis.networkFeeFree }}</text>
           </view>
           <view class="flex items-center justify-between">
-            <text :style="rowLabelStyle">{{ t.genesis.dailyDividendEst }}</text>
-            <text class="tabular-nums" :style="rowValSuccessStyle">+${{ dividendText }}</text>
+            <text :style="rowLabelStyle">{{ t.genesis.getRow }}</text>
+            <text :style="rowValSuccessStyle">{{ t.genesis.getRowValue }}</text>
           </view>
           <view :style="dividerStyle" />
           <view class="flex items-center justify-between">
@@ -99,12 +99,9 @@ const qty = ref(1);
 
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
-// Q14 single source — same store-owned formula as /genesis + holder.
-const dailyDividend = computed(() => genesis.currentDailyDividendPerNodeUSDT());
 
 const subtitleText = computed(() => fmt(t.value.genesis.confirmSubtitle, { price: price.value.toLocaleString() }));
 const subtotalText = computed(() => (qty.value * price.value).toLocaleString());
-const dividendText = computed(() => (qty.value * dailyDividend.value).toFixed(2));
 
 // Reset qty to 1 each time the sheet opens.
 watch(
@@ -151,10 +148,12 @@ function handlePurchase() {
     });
     toast.success(
       fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
-      fmt(t.value.genesis.purchaseSubtitle, { amount: (qty.value * dailyDividend.value).toFixed(2) }),
+      t.value.genesis.purchaseSubtitle,
     );
     emitClose();
   } else {
+    // 铸造失败(下单与确认间被 tickSales 打到售罄)→ 退款,不留「扣钱无货」。
+    app.creditBalance(cost);
     toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
   }
 }

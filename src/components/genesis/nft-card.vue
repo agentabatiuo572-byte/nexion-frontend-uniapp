@@ -7,17 +7,21 @@
     <text class="block" :style="idLineStyle">NEX-GEN-{{ paddedId }}</text>
     <view class="flex items-baseline justify-between" style="margin-top: 6px">
       <text class="tabular-nums" :style="priceStyle">${{ price }}K</text>
-      <text :style="agoStyle">{{ ago }} ago</text>
+      <text :style="agoStyle">{{ agoText }}</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 
 const props = defineProps<{ id: number; price: number; ago: string }>();
 
+const t = useT();
 const paddedId = computed(() => props.id.toString().padStart(4, "0"));
+const agoText = computed(() => fmt(t.value.genesis.agoLabel, { t: props.ago }));
 
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",

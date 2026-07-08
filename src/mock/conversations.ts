@@ -22,9 +22,14 @@ export type ConversationType = "ai" | "advisor" | "support";
 /** i18n key for a conversation's role subtitle (`t.conversations[roleKey]`). */
 export type ConvRoleKey = "roleAi" | "roleAdvisor" | "roleSupport";
 
+/** Delivery receipt for user-sent messages: sent = delivered/unread, read = seen by agent. */
+export type ConvMessageStatus = "sent" | "read";
+
 export interface ConvMessage {
   id: string;
   sender: "user" | "agent";
+  /** Receipt state — only meaningful when sender === "user". */
+  status?: ConvMessageStatus;
   /** Literal text (runtime-sent messages / real backend). */
   text?: string;
   /** i18n seed key (mock seed) — preferred over `text` when present. */
@@ -101,7 +106,7 @@ export function seedConversations(now: number = Date.now()): Conversation[] {
       unread: 0,
       lastTs: now - 5 * HOUR,
       messages: [
-        { id: "sp-1", sender: "user", textKey: "supportUserQ", ts: now - 6 * HOUR },
+        { id: "sp-1", sender: "user", textKey: "supportUserQ", status: "read", ts: now - 6 * HOUR },
         { id: "sp-2", sender: "agent", textKey: "supportResolved", ts: now - 5 * HOUR },
       ],
     },

@@ -33,6 +33,8 @@ export interface NovaMessage {
   id: string;
   sender: NovaSender;
   kind: NovaMessageKind;
+  /** Delivery receipt — only meaningful when sender === "user" (sent = unread, read = seen). */
+  status?: "sent" | "read";
   text: string;        // Pre-formatted (placeholders already substituted)
   ts: number;          // epoch ms
   ctaLabel?: string;
@@ -49,6 +51,8 @@ export const useNova = defineStore("nova", () => {
   const messages = ref<NovaMessage[]>([]);   // chronological (oldest first)
   const unread = ref(0);
   const isOpen = ref(false);
+  // Ephemeral "Nova is typing" flag (WS typing event in a real backend; never persisted).
+  const typing = ref(false);
   // throttle keys → last fire timestamp (prevents same auto-push firing too often).
   const cooldowns = ref<Record<string, number>>({});
 
@@ -85,18 +89,30 @@ export const useNova = defineStore("nova", () => {
     const t = Date.now();
     messages.value = [
       ...messages.value,
-      { id: nextId(), sender: "user", kind, text, ts: t },
+      { id: nextId(), sender: "user", kind, status: "sent", text, ts: t },
     ];
+  }
+
+  /** Nova read the thread → every user message flips to "read" (已读 receipt). */
+  function markUserRead() {
+    messages.value = messages.value.map((m) =>
+      m.sender === "user" && m.status !== "read" ? { ...m, status: "read" as const } : m,
+    );
+  }
+
+  function setTyping(on: boolean) {
+    typing.value = on;
   }
 
   function reset() {
     messages.value = [];
     unread.value = 0;
     cooldowns.value = {};
+    typing.value = false;
   }
 
   return {
-    messages, unread, isOpen, cooldowns,
-    open, close, push, sendUser, reset,
+    messages, unread, isOpen, typing, cooldowns,
+    open, close, push, sendUser, markUserRead, setTyping, reset,
   };
 });

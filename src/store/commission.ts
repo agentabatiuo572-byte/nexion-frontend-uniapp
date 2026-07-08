@@ -7,7 +7,7 @@ import { ref } from "vue";
  * server-authoritative in production (GET /api/config/commission/rates).
  *
  * v3 玩法 — 佣金事件流(5 类):unilevel 7 层 / binary 对碰 / peer 平级 /
- * cultivation 培育 / leadership 领导池 / genesis 创世日分红。
+ * cultivation 培育 / leadership 领导池 / genesis 创世排放(上所后,非每日分红)。
  * 状态:cooling → unlocked → withdrawn。USDT 默认 30 天冷却期。
  */
 

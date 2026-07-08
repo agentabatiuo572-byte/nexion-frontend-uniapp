@@ -48,23 +48,12 @@
               <text>{{ t.genesis.heroCrown }}</text>
             </view>
 
-            <!-- Title (two block lines = guaranteed break on H5 + App) -->
-            <view :style="titleStyle">
-              <text class="block">
-                <text class="tabular-nums" style="color: #D4AF5A">{{ totalText }}</text>
-                <text> {{ t.genesis.heroTitleA }}</text>
-              </text>
-              <text class="block">{{ t.genesis.heroTitleB }}</text>
-            </view>
+            <!-- Title — punchy, restrained (high-end OG seat, not a bark) -->
+            <text class="block" :style="titleStyle">{{ t.genesis.heroTitle }}</text>
 
-            <!-- Price row -->
-            <view class="flex items-baseline justify-between" :style="priceRowStyle">
-              <text class="tabular-nums" :style="priceStyle">${{ priceText }}</text>
-              <text :style="priceUnitStyle">{{ t.genesis.heroUnit }}</text>
-            </view>
-
-            <!-- Sub -->
-            <text class="block" :style="heroSubStyle">{{ t.genesis.heroDescription }}</text>
+            <!-- Sub + disclaimer -->
+            <text class="block" :style="heroSubStyle">{{ t.genesis.heroSub }}</text>
+            <text class="block" :style="heroDiscStyle">{{ t.genesis.heroDisc }}</text>
 
             <!-- Sales bar -->
             <view style="margin-top: 18px">
@@ -95,36 +84,39 @@
           <text class="shrink-0" :style="socialTimeStyle">{{ t.genesis.justNow }}</text>
         </view>
 
-        <!-- ════ Holder perks ════ -->
+        <!-- ════ Tier ladder — 售罄跳价 ════ -->
         <view class="flex items-center justify-between" :style="secHeaderStyle">
-          <text :style="secTitleStyle">{{ t.genesis.secHolderPerks }}</text>
-          <text :style="secLinkStyle" @click="goHolder">Holder dashboard →</text>
+          <text :style="secTitleStyle">{{ t.genesis.tier.title }}</text>
         </view>
-        <view :style="perksCardStyle">
-          <PerkRow v-for="(p, i) in PERKS" :key="p.title" :ico="p.ico" :name="p.title" :desc="p.desc" :is-last="i === PERKS.length - 1" />
-        </view>
-
-        <!-- ════ My holdings ════ -->
-        <view :style="holdingsCardStyle">
-          <view class="flex items-center justify-between">
-            <view>
-              <text class="block" :style="holdingsLabelStyle">{{ t.genesis.yourHoldings }}</text>
-              <view class="tabular-nums" :style="holdingsValueStyle">
-                <text>{{ owned }}</text>
-                <text style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink-3); margin-left: 6px">/ unlimited</text>
+        <view :style="ladderCardStyle">
+          <view v-for="tr in tiers" :key="tr.id" class="flex items-center" :style="tierRowStyle(tr.isCurrent)">
+            <view class="flex-1 min-w-0">
+              <view class="flex items-center" style="gap: 8px">
+                <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
+                <text :style="tr.isCurrent ? tierChipLiveStyle : tierChipSoldStyle">{{ tr.isCurrent ? t.genesis.tier.live : t.genesis.tier.soldOut }}</text>
               </view>
+              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
             </view>
-            <view class="text-right">
-              <text class="block" :style="holdingsLabelStyle">{{ t.genesis.yourDaily }}</text>
-              <text class="block tabular-nums" :style="holdingsDailyStyle">+${{ ownedDailyText }}</text>
+            <view class="text-right shrink-0">
+              <text class="block tabular-nums" :style="tierPriceStyle">${{ tr.priceText }}</text>
+              <text v-if="tr.isCurrent" class="block" :style="tierCurrentStyle">{{ t.genesis.tier.current }}</text>
             </view>
           </view>
+          <text class="block" :style="tierPremiumStyle">{{ t.genesis.tier.premium }}</text>
+        </view>
+
+        <!-- ════ Value / perks ════ -->
+        <view class="flex items-center justify-between" :style="secHeaderStyle">
+          <text :style="secTitleStyle">{{ t.genesis.value.title }}</text>
+        </view>
+        <view :style="perksCardStyle">
+          <PerkRow v-for="(p, i) in PERKS" :key="p.name" :ico="p.ico" :name="p.name" :desc="p.desc" :is-last="i === PERKS.length - 1" />
         </view>
 
         <!-- ════ Live market ════ -->
-        <view class="flex items-center justify-between active:opacity-80" :style="secHeaderStyle" role="button" tabindex="0" aria-label="View marketplace" @click="goMarketplace">
+        <view class="flex items-center justify-between active:opacity-80" :style="secHeaderStyle" role="button" tabindex="0" :aria-label="t.genesis.viewMarketplace" @click="goMarketplace">
           <text :style="secTitleStyle">{{ t.genesis.secLiveMarket }}</text>
-          <text :style="secLinkStyle" style="pointer-events: none">View marketplace →</text>
+          <text :style="secLinkStyle" style="pointer-events: none">{{ t.genesis.viewMarketplace }}</text>
         </view>
         <view class="grid grid-cols-2" style="gap: 10px">
           <NftCard v-for="n in LIVE_MARKET" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
@@ -141,14 +133,6 @@
           </view>
         </view>
 
-        <!-- ════ Secondary market link ════ -->
-        <view class="flex items-center justify-between active:opacity-80" :style="openseaStyle" role="button" tabindex="0" :aria-label="t.genesis.openseaLine" @click="goMarketplace">
-          <text style="pointer-events: none">
-            <text>{{ t.genesis.openseaLine }} </text>
-            <text class="tabular-nums" style="font-weight: 600; color: var(--v5-warning)">$25,000</text>
-          </text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-        </view>
       </view>
     </view>
 
@@ -185,7 +169,8 @@ import PerkRow from "@/components/genesis/perk-row.vue";
 import NftCard from "@/components/genesis/nft-card.vue";
 import GenesisPurchaseSheet from "@/components/genesis/purchase-sheet.vue";
 import { useT } from "@/i18n/use-t";
-import { useGenesis } from "@/store/genesis";
+import { fmt } from "@/i18n/format";
+import { useGenesis, GENESIS_TIERS } from "@/store/genesis";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
@@ -193,18 +178,18 @@ const genesis = useGenesis();
 
 const sheetOpen = ref(false);
 
-// Holder perks — faithful English data (matches source inline PERKS array).
-const PERKS = [
-  { ico: "🪙", title: "Daily dividend", desc: "0.1% of platform volume per node · ~$24/day" },
-  { ico: "🎟", title: "Monthly raffle", desc: "Auto-entry · winners get NFT prize + USDT" },
-  { ico: "🗳", title: "DAO governance", desc: "1 node = 1 vote on platform proposals" },
-  { ico: "🎁", title: "Annual airdrop", desc: "Loyalty NFT + physical merch" },
-  { ico: "💎", title: "Floor & liquidity", desc: "OpenSea floor $25K · 2.5× mint" },
-];
+// Value props — i18n-driven（迁离硬编码英文，去日分红/$25K 地板雷）。
+const PERKS = computed(() => [
+  { ico: "🪙", name: t.value.genesis.value.emissionName, desc: t.value.genesis.value.emissionDesc },
+  { ico: "🌐", name: t.value.genesis.value.poolName, desc: t.value.genesis.value.poolDesc },
+  { ico: "🗳", name: t.value.genesis.value.daoName, desc: t.value.genesis.value.daoDesc },
+  { ico: "🎁", name: t.value.genesis.value.airdropName, desc: t.value.genesis.value.airdropDesc },
+]);
 
+// Secondary-market recent fills（价格随尾盘档溢价，非旧 $25K 地板叙事）。
 const LIVE_MARKET = [
-  { id: 247, price: 25.5, ago: "12m" },
-  { id: 481, price: 28.2, ago: "34m" },
+  { id: 247, price: 13.4, ago: "12m" },
+  { id: 481, price: 14.2, ago: "34m" },
 ];
 
 const BUYER_NAMES = [
@@ -219,17 +204,32 @@ function answerKey(k: "q1" | "q2" | "q3"): "a1" | "a2" | "a3" {
 
 const sold = computed(() => genesis.soldSlots);
 const total = computed(() => genesis.totalSlots);
-const owned = computed(() => genesis.myOwned);
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const soldPct = computed(() => (sold.value / total.value) * 100);
-// Q14 single source — store-owned formula shared by sheet + holder.
-const dailyDividend = computed(() => genesis.currentDailyDividendPerNodeUSDT());
 
 const totalText = computed(() => total.value.toLocaleString());
 const soldText = computed(() => sold.value.toLocaleString());
 const priceText = computed(() => price.value.toLocaleString());
-const ownedDailyText = computed(() => (owned.value * dailyDividend.value).toFixed(2));
+
+// 阶梯档展示：累计售出决定各档 售罄/当前 态（wl/t1 售罄、t2 尾盘当前）。
+type TierLabelKey = "wl" | "t1" | "tail";
+const tiers = computed(() =>
+  GENESIS_TIERS.map((tier) => {
+    const s = sold.value;
+    const isCurrent = s >= tier.from && s < tier.to;
+    const left = Math.max(0, tier.to - Math.max(tier.from, s));
+    const labelKey: TierLabelKey = tier.id === "t2" ? "tail" : (tier.id as "wl" | "t1");
+    return {
+      id: tier.id,
+      labelKey,
+      priceText: tier.priceUSDT.toLocaleString(),
+      isCurrent,
+      left,
+      seatsTotal: tier.to - tier.from,
+    };
+  }),
+);
 
 const { elRef: salesBarRef, inView: salesBarInView } = useScrollGrowProgress();
 
@@ -251,9 +251,6 @@ function openSheet() {
 }
 function goHowItWorks() {
   uni.navigateTo({ url: "/pages/genesis/how-it-works", fail: () => {} });
-}
-function goHolder() {
-  uni.navigateTo({ url: "/pages/genesis/holder", fail: () => {} });
 }
 function goMarketplace() {
   uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
@@ -361,31 +358,17 @@ const titleStyle: CSSProperties = {
   lineHeight: 1.18,
   color: "#F4E5C2",
 };
-const priceRowStyle: CSSProperties = {
-  marginTop: "18px",
-  paddingTop: "16px",
-  borderTop: "1px solid rgba(212,175,90,0.18)",
-  gap: "10px",
-};
-const priceStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "32px",
-  letterSpacing: "-0.022em",
-  color: "#F4E5C2",
-};
-const priceUnitStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
-  color: "rgba(244,229,194,0.55)",
-  letterSpacing: "0.04em",
-  whiteSpace: "nowrap",
-};
 const heroSubStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "13px",
   color: "rgba(244,229,194,0.72)",
   lineHeight: 1.55,
+};
+const heroDiscStyle: CSSProperties = {
+  marginTop: "6px",
+  fontSize: "11px",
+  color: "rgba(244,229,194,0.5)",
+  lineHeight: 1.5,
 };
 const barTrackStyle: CSSProperties = {
   height: "4px",
@@ -455,34 +438,74 @@ const perksCardStyle: CSSProperties = {
   borderRadius: "14px",
   padding: "4px 16px",
 };
-const holdingsCardStyle: CSSProperties = {
+// ── Tier ladder ──
+const ladderCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "18px",
+  borderRadius: "14px",
+  padding: "6px 16px 14px",
 };
-const holdingsLabelStyle: CSSProperties = {
+function tierRowStyle(isCurrent: boolean): CSSProperties {
+  return {
+    gap: "12px",
+    padding: "12px 0",
+    borderBottom: "1px solid var(--v5-border)",
+    opacity: isCurrent ? 1 : 0.6,
+  };
+}
+const tierNameStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "13.5px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+  letterSpacing: "-0.008em",
+};
+const tierChipLiveStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "10px",
+  fontWeight: 500,
+  padding: "1px 7px",
+  borderRadius: "999px",
+  background: "color-mix(in srgb, var(--v5-warning) 16%, transparent)",
+  color: "var(--v5-warning)",
+  letterSpacing: "0.02em",
+  whiteSpace: "nowrap",
+};
+const tierChipSoldStyle: CSSProperties = {
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "10px",
+  fontWeight: 500,
+  padding: "1px 7px",
+  borderRadius: "999px",
+  background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
+  whiteSpace: "nowrap",
 };
-const holdingsValueStyle: CSSProperties = {
-  marginTop: "4px",
+const tierMetaStyle: CSSProperties = {
+  marginTop: "3px",
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "10.5px",
+  color: "var(--v5-ink-3)",
+};
+const tierPriceStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
+  fontSize: "15px",
   fontWeight: 600,
-  fontSize: "26px",
-  letterSpacing: "-0.022em",
-  lineHeight: 1,
   color: "var(--v5-ink)",
-};
-const holdingsDailyStyle: CSSProperties = {
-  marginTop: "4px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "18px",
   letterSpacing: "-0.014em",
-  color: "var(--v5-success)",
+};
+const tierCurrentStyle: CSSProperties = {
+  marginTop: "2px",
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "10px",
+  color: "#D4AF5A",
+  letterSpacing: "0.02em",
+};
+const tierPremiumStyle: CSSProperties = {
+  marginTop: "10px",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
 };
 const faqCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
@@ -496,14 +519,6 @@ const faqCardStyle: CSSProperties = {
   flexDirection: "column",
   gap: "10px",
 };
-const openseaStyle: CSSProperties = {
-  padding: "12px 16px",
-  borderRadius: "12px",
-  background: "var(--v5-warning-soft)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
-  color: "var(--v5-ink-2)",
-};
 
 // Sticky dock styles (folds GenesisDockHost) — anchored to chassis bottom.
 const dockWrapStyle: CSSProperties = {
@@ -515,6 +530,9 @@ const dockWrapStyle: CSSProperties = {
 const dockBtnStyle = computed<CSSProperties>(() => ({
   height: "54px",
   borderRadius: "999px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
   background:
     remaining.value > 0
       ? "linear-gradient(180deg, rgba(50,38,20,0.55) 0%, rgba(20,14,8,0.72) 100%)"

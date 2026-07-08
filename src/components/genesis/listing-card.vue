@@ -18,9 +18,11 @@
         <text :style="lastSaleStyle">{{ lastSaleText }}</text>
         <text class="tabular-nums" :style="deltaStyle">{{ isUp ? "+" : "" }}{{ deltaPct }}%</text>
       </view>
-      <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="buyBtnStyle" role="button" tabindex="0" :aria-label="t.marketplace.buyCta" @click="emit('buy')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
-        <text style="pointer-events: none" @click.stop="emit('buy')">{{ t.marketplace.buyCta }}</text>
+      <view class="flex justify-end" style="margin-top: 10px">
+        <view class="inline-flex items-center active:scale-[0.95]" :style="buyBtnStyle" role="button" tabindex="0" :aria-label="t.marketplace.buyCta" @click="emit('buy')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px; pointer-events: none"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
+          <text style="pointer-events: none" @click.stop="emit('buy')">{{ t.marketplace.buyCta }}</text>
+        </view>
       </view>
     </view>
   </view>
@@ -117,15 +119,15 @@ const deltaStyle = computed<CSSProperties>(() => ({
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
 const buyBtnStyle: CSSProperties = {
-  marginTop: "10px",
-  height: "44px",
+  // 右下角小按钮:实心柠檬绿保留(醒目),但缩面积——不再满宽横条,auto 宽 + 36px 高。
+  height: "36px",
+  padding: "0 16px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "13px",
+  fontWeight: 550,
+  fontSize: "12.5px",
   letterSpacing: "-0.005em",
 };
 </script>

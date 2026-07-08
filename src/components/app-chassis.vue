@@ -171,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, onActivated, nextTick, type CSSProperties } from "vue";
 import GlobalUi from "@/components/global-ui.vue";
 import NovaBubble from "@/components/nova/nova-bubble.vue";
 import TrialClaimSheet from "@/components/trial-claim-sheet.vue";
@@ -199,6 +199,7 @@ import { VOUCHER_POPUP } from "@/mock/vouchers";
 import { navBack as navBackTo } from "@/lib/route";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
+import { saveScrollPos, getScrollPos, dropScrollPos } from "@/lib/scroll-memory";
 
 const props = defineProps<{
   active?: "home" | "earn" | "store" | "team" | "me";
@@ -249,11 +250,45 @@ const refresherVisible = computed(() => refreshing.value || pullY.value > 6);
 
 // uni <view> template ref → DOM element via $el on H5 (P-019); read scrollTop
 // directly so the pull only arms when the content is at the very top.
-function currentScrollTop(): number {
+function chassisScrollDom(): HTMLElement | null {
   const raw = scrollEl.value as { $el?: HTMLElement } | HTMLElement | null;
-  const el = (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
-  return el?.scrollTop ?? 0;
+  return (raw && typeof raw === "object" && "$el" in raw ? raw.$el : raw) as HTMLElement | null;
 }
+function currentScrollTop(): number {
+  return chassisScrollDom()?.scrollTop ?? 0;
+}
+
+// ── scroll-position restore on back-navigation — uni hides stacked pages with
+// display:none (zeroing this inner container's scrollTop) and only auto-restores
+// PAGE-level scroll, so every navigateBack used to land the parent page at the
+// top. Record continuously, restore on keep-alive re-activation; a fresh mount
+// (forward navigation / reLaunch) intentionally starts clean at the top. ──
+let scrollMemKey = "";
+function pageScrollKey(): string {
+  try {
+    const ps = getCurrentPages();
+    const top = ps.length ? (ps[ps.length - 1] as { $page?: { fullPath?: string }; route?: string }) : undefined;
+    return top?.$page?.fullPath ?? top?.route ?? route.value;
+  } catch {
+    return route.value;
+  }
+}
+function onChassisScroll() {
+  const el = chassisScrollDom();
+  if (el) saveScrollPos(scrollMemKey, el.scrollTop);
+}
+function restoreChassisScroll() {
+  const saved = getScrollPos(scrollMemKey);
+  if (saved === undefined || saved <= 0) return;
+  void nextTick(() => {
+    const el = chassisScrollDom();
+    if (el) el.scrollTop = saved;
+  });
+}
+onActivated(() => {
+  scrollMemKey = pageScrollKey();
+  restoreChassisScroll();
+});
 function touchY(e: TouchEvent): number | null {
   const tp = e.touches?.[0] ?? e.changedTouches?.[0];
   return tp ? tp.clientY : null;
@@ -319,6 +354,15 @@ function updateStatusTime() {
 }
 onMounted(() => {
   route.value = readRoute();
+  // Fresh mount = fresh landing: start at top and wipe stale memory; only a
+  // keep-alive re-activation (back-navigation) restores. H5-only listener —
+  // App-side pages live in their own webview, which keeps scroll natively.
+  scrollMemKey = pageScrollKey();
+  dropScrollPos(scrollMemKey);
+  const scrollDom = chassisScrollDom();
+  if (scrollDom && typeof scrollDom.addEventListener === "function") {
+    scrollDom.addEventListener("scroll", onChassisScroll, { passive: true });
+  }
   updateStatusTime();
   statusClockTimer = setInterval(updateStatusTime, 30_000);
   const closeTransient = (trialClaimSheet as { closeTransient?: () => void }).closeTransient;
@@ -363,6 +407,10 @@ onMounted(() => {
   }
 });
 onUnmounted(() => {
+  const scrollDom = chassisScrollDom();
+  if (scrollDom && typeof scrollDom.removeEventListener === "function") {
+    scrollDom.removeEventListener("scroll", onChassisScroll);
+  }
   if (autoPushTimer) {
     clearTimeout(autoPushTimer);
     autoPushTimer = null;

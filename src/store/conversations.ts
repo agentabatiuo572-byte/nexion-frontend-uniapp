@@ -33,6 +33,9 @@ export const useConversations = defineStore("conversations", () => {
   const conversations = ref<Conversation[]>(seedConversations());
   // Per-conversation reply cursor → cycles the template list for a sense of progress.
   const replyCursor = ref<Record<string, number>>({});
+  // Ephemeral "agent is typing" flags (conversation id → on). Backend-replaceable:
+  // a real backend feeds this from WS typing events; never persisted.
+  const typingIds = ref<Record<string, boolean>>({});
 
   // Human-side total unread (AI unread is the nova store's concern; the bubble
   // combines the two at the page layer).
@@ -63,9 +66,23 @@ export const useConversations = defineStore("conversations", () => {
     const t = Date.now();
     conversations.value = conversations.value.map((c) =>
       c.id === id
-        ? { ...c, messages: [...c.messages, { id: nextId(), sender: "user", text: body, ts: t }], lastTs: t }
+        ? { ...c, messages: [...c.messages, { id: nextId(), sender: "user", text: body, status: "sent", ts: t }], lastTs: t }
         : c,
     );
+  }
+
+  /** Agent read the thread → every user message flips to "read" (已读 receipt). */
+  function markUserRead(id: string) {
+    conversations.value = conversations.value.map((c) =>
+      c.id === id
+        ? { ...c, messages: c.messages.map((m) => (m.sender === "user" && m.status !== "read" ? { ...m, status: "read" as const } : m)) }
+        : c,
+    );
+  }
+
+  /** Toggle the ephemeral "agent is typing" flag for one conversation. */
+  function setTyping(id: string, on: boolean) {
+    typingIds.value = { ...typingIds.value, [id]: on };
   }
 
   /** Push the next cycled template reply for a conversation (resolved bilingual). */
@@ -87,15 +104,19 @@ export const useConversations = defineStore("conversations", () => {
   function reset() {
     conversations.value = seedConversations();
     replyCursor.value = {};
+    typingIds.value = {};
   }
 
   return {
     conversations,
+    typingIds,
     totalUnread,
     byType,
     get,
     open,
     sendUser,
+    markUserRead,
+    setTyping,
     pushAgentReply,
     reset,
   };

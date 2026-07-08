@@ -49,7 +49,7 @@
         <view :style="cardStyle">
           <DocRow primary="Smart contract audit · CertiK" secondary="Report v2026-04-12 · No critical findings" :cta="tr.download" />
           <DocRow primary="Reserve proof · Etherscan" secondary="On-chain 102.4% backed · USDT cold-stored" :cta="tr.viewOnChain" />
-          <DocRow primary="Resource attestation · Trail of Bits" secondary="Quarterly attestation of Genesis node yields" :cta="tr.latest" last />
+          <DocRow primary="Resource attestation · Trail of Bits" secondary="Quarterly attestation of Genesis reserves & emission schedule" :cta="tr.latest" last />
         </view>
 
         <!-- Partner wall -->

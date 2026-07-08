@@ -11,8 +11,10 @@
 -->
 <template>
   <view class="nx-conv-thread">
-    <!-- Message list -->
-    <scroll-view scroll-y class="nx-conv-list" :scroll-into-view="bottomAnchor" :scroll-with-animation="true">
+    <!-- Message list. :scroll-into-view drives auto-scroll on App (native); on H5 it
+         stays "" and domToBottom() handles it (uni's declarative scroll lands short
+         of a freshly-laid-out bubble). -->
+    <scroll-view scroll-y class="nx-conv-list" :scroll-into-view="scrollAnchor" :scroll-with-animation="true">
       <view v-if="messages.length === 0 && emptyHint" class="nx-conv-empty">
         <text class="nx-conv-empty-t">{{ emptyHint }}</text>
       </view>
@@ -43,8 +45,25 @@
             </view>
           </view>
         </view>
+        <!-- delivery receipt (user messages only, pre-localised by the page) -->
+        <view v-if="m.receipt" class="nx-conv-receipt">
+          <text class="nx-conv-receipt-t">{{ m.receipt }}</text>
+        </view>
       </view>
-      <view :id="bottomAnchor" class="nx-conv-bottom-anchor" />
+
+      <!-- "agent is typing" bubble — three blinking dots, agent side -->
+      <view v-if="typing" class="nx-conv-msg-row">
+        <view class="nx-conv-bubble-row nx-conv-left">
+          <view class="nx-conv-bubble nx-conv-typing" role="status" :aria-label="typingLabel">
+            <view class="nx-conv-typing-dots" aria-hidden="true">
+              <view />
+              <view />
+              <view />
+            </view>
+          </view>
+        </view>
+      </view>
+      <view id="nx-conv-end" class="nx-conv-bottom-anchor" />
     </scroll-view>
 
     <!-- Quick reply chips (AI only) -->
@@ -76,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type CSSProperties } from "vue";
+import { ref, computed, watch, nextTick, onMounted, type CSSProperties } from "vue";
 import type { ThreadMsg, QuickChip } from "./thread-types";
 
 const props = defineProps<{
@@ -84,6 +103,11 @@ const props = defineProps<{
   inputPlaceholder: string;
   quickChips?: QuickChip[];
   emptyHint?: string;
+  /** "Agent is typing" indicator (pre-localised aria label via typingLabel). */
+  typing?: boolean;
+  typingLabel?: string;
+  /** Bumped by the page on re-reveal (navigateBack) to force a re-scroll to bottom. */
+  revealTick?: number;
 }>();
 
 const emit = defineEmits<{
@@ -109,15 +133,51 @@ function onCta(m: ThreadMsg) {
   if (m.ctaHref) emit("cta", m.ctaHref, m.ctaLabel ?? "");
 }
 
-// ── auto-scroll: bump a bottom-anchor id whenever the list grows ──
-const bottomAnchor = ref("nx-conv-end-0");
+// ── auto-scroll to newest. uni's declarative :scroll-top / :scroll-into-view both
+// compute against the pre-layout height, so a freshly-added reply bubble leaves
+// them stopping short of the real bottom. On H5 we drive the real overflow node
+// directly (scrollTop = scrollHeight), scoped to THIS thread's scroll-view via its
+// ref (so a hidden sibling chat instance is never targeted); a delayed second pass
+// compensates async bubble layout. On non-H5 (App) we fall back to scroll-into-view
+// against the bottom anchor. ──
+const scrollAnchor = ref("");
+function scrollToEnd() {
+  void nextTick(() => {
+    // #ifdef H5
+    domToBottom();
+    setTimeout(domToBottom, 90);
+    // #endif
+    // #ifndef H5
+    scrollAnchor.value = "";
+    void nextTick(() => { scrollAnchor.value = "nx-conv-end"; });
+    setTimeout(() => { scrollAnchor.value = ""; void nextTick(() => { scrollAnchor.value = "nx-conv-end"; }); }, 90);
+    // #endif
+  });
+}
+// #ifdef H5
+function domToBottom() {
+  // Drive the real overflow node directly. uni renders TWO nested nodes whose class
+  // includes "uni-scroll-view" — only the deeper one actually overflows — so we pick
+  // the descendant that truly scrolls (scrollHeight > clientHeight) rather than the
+  // first class match (which is a non-scrolling wrapper). Every mounted list is
+  // pinned to its bottom: only one chat thread is visible at a time, and a hidden
+  // keep-alive sibling being scrolled is harmless (it should also open at bottom).
+  document.querySelectorAll(".nx-conv-list").forEach((host) => {
+    const scroller = [host, ...Array.from(host.querySelectorAll("*"))]
+      .find((e) => (e as HTMLElement).scrollHeight - (e as HTMLElement).clientHeight > 4) as HTMLElement | undefined;
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
+  });
+}
+// #endif
 watch(
-  () => props.messages.length,
-  (len) => {
-    bottomAnchor.value = `nx-conv-end-${len}`;
+  () => [props.messages.length, props.typing, props.revealTick] as const,
+  () => {
+    scrollToEnd();
   },
-  { immediate: true },
 );
+onMounted(() => {
+  scrollToEnd();
+});
 
 // ── bubble styling ──
 function bubbleStyle(m: ThreadMsg): CSSProperties {
@@ -224,6 +284,46 @@ const sendStyle = computed<CSSProperties>(() => ({
 }
 .nx-conv-bottom-anchor {
   height: 1px;
+}
+.nx-conv-receipt {
+  display: flex;
+  justify-content: flex-end;
+  padding: 3px 4px 0;
+}
+.nx-conv-receipt-t {
+  font-size: 10.5px;
+  color: var(--v5-ink-4);
+}
+.nx-conv-typing {
+  background: var(--v5-surface-2);
+}
+.nx-conv-typing-dots {
+  display: flex;
+  gap: 4px;
+  padding: 13px 14px;
+}
+.nx-conv-typing-dots view {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--v5-ink-3);
+  animation: nx-typing-blink 1.2s ease-in-out infinite;
+}
+.nx-conv-typing-dots view:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.nx-conv-typing-dots view:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes nx-typing-blink {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+  }
+  30% {
+    opacity: 1;
+  }
 }
 .nx-conv-chips {
   border-top: 1px solid var(--v5-border);

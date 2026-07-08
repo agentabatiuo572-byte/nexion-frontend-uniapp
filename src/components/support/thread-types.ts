@@ -10,6 +10,8 @@ export interface ThreadMsg {
   tone: "agent" | "user" | "system";
   /** Pre-formatted text (supports **bold** + \n line breaks). */
   text: string;
+  /** Pre-localised delivery receipt shown under the bubble (user messages only). */
+  receipt?: string;
   ctaLabel?: string;
   /** Logical route (mapped by lib/route navTo at tap time). */
   ctaHref?: string;

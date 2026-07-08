@@ -440,3 +440,27 @@
 - **对策**:**单绑 `@click` 是全端唯一正确姿势**(修饰符照常:`@click.stop` 等)。双绑一律删 `@tap` 保 `@click`;单绑 `@tap` 也统一改名 `@click`(风格与哨兵一致)。修复实测:同一触摸序列步进器 1→2、开关正常展开、导航栈 +1。
 - **已转**:`verify.sh` 哨兵「no @tap binding」——grep 绑定形态 `@tap(\.[a-z]+)*=`,命中即 fail;注释里**提及** "@tap"(如本条与 earn.vue 迁移注释)不带绑定等号,不误伤。负向探针验真:临时造 `@tap="x"`/`@tap.stop="x"` 均 CAUGHT,注释提及放行。
 - **元教训**:「两端都绑更保险」类**冗余防御**在编译器已做端间映射的体系里=自我攻击;跨端事件这类「框架承诺」要用**真实事件链路**(触摸序列/合成 click)实测验证,不能靠肉眼「渲染了、能点」——双触发的开关类症状(开了又关)恰恰伪装成「没反应」,极易误判为"点击不灵"再叠一层错误修补。
+
+## P-060 · uni scroll-view 有两层 `.uni-scroll-view`(外 wrapper overflow=0 + 内真滚层)+ 声明式滚不到底 → 聊天「自动到底」查错元素假通过、实际差一截
+
+- **现象**:会话中心聊天页「发消息/收回复自动滚到最新」实测**没到底**(差 ~75-177px);更隐蔽的是**验证一直假通过**——脚本查 `.nx-conv-list`(uni-scroll-view 标签外壳)的 `scrollHeight-clientHeight` 恒 =0,`atBottom`(差值<8)恒真,导致「没到底」这个真 bug 被绿灯放过多轮。
+- **根因**:① uni H5 `<scroll-view>` 编译成**两层**都含 class `uni-scroll-view` 的节点——外层标签 `overflow:0`(wrapper,不滚),深一层 div 才是真滚动层(`overflow>0`);`host.querySelector('.uni-scroll-view')` 命中**第一个(wrapper)**,设它 `scrollTop` 无效。② uni 声明式 `:scroll-top`/`:scroll-into-view` 都对**布局前高度**算偏移——刚 append 的 reply 气泡还没进 scrollable range,滚动量偏小停在半路;`:scroll-top` 设超大值本想让 view clamp 到底,但 `bump` 抖动只差 1px 被 uni 判定"未变"不重滚。
+- **对策**:H5 用 **DOM 直接驱动真滚层**——`[host,...host.querySelectorAll('*')].find(e => e.scrollHeight-e.clientHeight>4)`(按**实际溢出**找,不认 class),`scroller.scrollTop = scroller.scrollHeight`;双 kick(nextTick 立即 + `setTimeout 90` 补偿异步气泡布局);App 端保留 `:scroll-into-view` fallback(条件编译 `#ifdef H5`)。实景确认 `top:602 max:602 atBottom:true`。
+- **已转**:本台账 + `components/support/conversation-thread.vue` 的 `domToBottom()`。硬规则:**验证滚动位置/尺寸必须查「真正溢出的元素」(find `scrollHeight-clientHeight>4`),绝不查 `.nx-conv-list` 这类 uni-scroll-view 外壳**(其 max 恒 0 → 一切 atBottom 断言假通过);uni 聊天滚到底 H5 走 DOM,不信声明式 scroll-top/into-view。
+- **元教训**:**「验证工具查错元素」比 bug 本身更危险**——外壳 max=0 让 atBottom 恒真,把「没到底」伪装成「到底了」骗过多轮自检(完成铁律"运行时证明对"的反面活样本:渲染了 ≠ 位置对)。查任何滚动/尺寸断言前,先证伪「我查的这个元素真的是会变的那个吗」(打印 sh/ch/scrollable 三元组);uni 同 class 多层节点是 H5 port 的隐形陷阱。
+
+## P-061 · uni H5 `navigateTo` 前进离开 = 「隐藏但存活」中间态,`onUnload`/`watch` 全漏 → Nova 未读被永久压制 + 返回后列表跳顶
+
+- **现象**:两个 P1(对抗审查揪出,实景复现):① AI 聊天页发消息后 1.1s 内点「转人工」pill 前进离开,延时的 `nova.push` 触发时 `isOpen` 仍 true → 未读被吃,且 `isOpen` **永久卡 true**,之后所有 Nova 主动推送未读全静默丢失(直到点 tab reLaunch 才复位)。② 聊天滚到底 → 前进离开(`display:none` 清零内部 scrollTop)→ `navigateBack` 返回(keep-alive 不重新 mount)→ `watch([messages,typing])` 不触发 → 列表停在顶部,用户「消息全没了」。
+- **根因**:uni H5 `navigateTo` 是 **push/keep-alive**——前进离开时源页只 `display:none` **不销毁**,`onUnload`/`onUnmounted` 都不触发(它们只在真 `navigateBack` 销毁时跑);清理逻辑(`nova.close`)与滚动恢复(数据 watch)全挂在这两个漏掉的时机上。这个「隐藏但存活」中间态是 keep-alive 型路由的通用盲区。
+- **对策**:用 uni **页面级 `onShow`/`onHide`** 覆盖中间态——`onHide` 关 Nova(前进离开也置 isOpen=false → 后续 push 正常累积未读);`onShow`(首次进 + navigateBack 再现都触发)重开 Nova 清未读 + bump `revealTick` 让 thread 重新滚到底。`onShow` 无条件递增 `revealTick`、`conversation-thread` 的 watch 纳入 `revealTick` → 返回即回底。
+- **已转**:本台账 + `pages/support/chat.vue` 的 `onShow`/`onHide`。硬规则:**keep-alive 页面(uni 所有 navigateTo 目标)里「离开要清、回来要恢复」的逻辑必须挂 `onHide`/`onShow`,不能只挂 `onUnload`/`onUnmounted`**(那俩只覆盖真销毁,漏掉前进离开);验证这类必跑「发消息→前进离开→等副作用→navigateBack」完整往返,不能只测真返回。
+- **元教训**:同物理路由互跳(如 `/pages/support/chat?type=ai` → `?cid=x`)uni `navigateTo` 会**坍缩成 redirectTo 不 push**——验证「前进再返回」要用**不同路由**页面前进(实测用 `/pages/genesis/genesis`),否则栈没那一层、navigateBack 直接回更上层,验证路径本身就错。
+
+## P-062 · bare 全屏页(不套 AppChassis)缺 `GlobalUi` 宿主 → toast/confirm/netError 进 store 却无处渲染,静默失败
+
+- **现象**:聊天页 `chat.vue` 是 `position:fixed inset:0` 的 bare 全屏页(为聚焦对话不要 tabbar/nova 浮标,刻意不套 `AppChassis`)。发送限频命中时 `toast.warn(...)` 正常写进 ui store,但**用户看不到任何提示**——限频「拦」对了,「提示」没落地。
+- **根因**:toast/confirm/netError 的**渲染宿主 `<GlobalUi />` 只在 `AppChassis` 里挂**。bare page 不套 chassis → 该页整条 overlay 链无渲染出口,任何在此页 raise 的 toast/confirm 都进 store 石沉大海。
+- **对策**:bare page 自带宿主——`chat.vue` 模板末尾加 `<GlobalUi />`(它自 gate `showBusinessOverlays` 按路由判,chat 路由非 static-review → 正常显示;与 `login.vue`/`register.vue` 既有 bare 页挂法一致)。实景确认限频 toast 双语弹出。
+- **已转**:本台账。硬规则:**任何 bare 全屏页(不套 `AppChassis`)只要可能 raise toast/confirm/netError,必须自带 `<GlobalUi />`**;写 bare page 时先自问「这页的 overlay 往哪渲染」。
+- **元教训**:全局能力(toast/confirm)默认**依附某个容器**(这里 AppChassis)——脱离容器的页面白拿一个「调了不报错但没效果」的静默陷阱;「声明(调了 toast)≠实现(渲染出来)」,验证反馈类交互必**实景看到那个 toast/弹窗**,不能只确认「代码调了」。

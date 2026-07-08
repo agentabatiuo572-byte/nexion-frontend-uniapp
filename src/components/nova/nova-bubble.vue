@@ -94,8 +94,8 @@ function teamEventMessage(): ChannelMsg {
 function stakingEventMessage(): ChannelMsg {
   const r = Math.random();
   if (r < 0.4) return { text: "⚡ 180-day vault APY just rose from 80% → 95% (24h window only).", ctaLabel: "Lock now", ctaHref: "/staking" };
-  if (r < 0.7) { const slot = 7 + Math.floor(Math.random() * 18); return { text: `🔥 Only ${slot} Genesis Nodes left · 0.1% lifetime TVL dividend + V5 fast-track.`, ctaLabel: "Reserve", ctaHref: "/genesis" }; }
-  if (r < 0.9) return { text: "Lock 180 days now for 2× airdrop multiplier when $NEX lists on Binance.", ctaLabel: "Lock 180d", ctaHref: "/staking" };
+  if (r < 0.7) { const slot = 7 + Math.floor(Math.random() * 18); return { text: `🔥 Only ${slot} Genesis seats left · OG status + $NEX emission priority.`, ctaLabel: "Claim seat", ctaHref: "/genesis" }; }
+  if (r < 0.9) return { text: "Lock your $NEX now to boost your emission priority when it lists.", ctaLabel: "Lock 180d", ctaHref: "/staking" };
   return { text: "Your 90-day stake matures in 12 days · auto-claim or extend for 35% bonus APY.", ctaLabel: "Manage", ctaHref: "/staking" };
 }
 
