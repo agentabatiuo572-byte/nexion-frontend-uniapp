@@ -87,8 +87,6 @@
 
       <ComputeShareEntry />
       <!-- Loss-aversion — moved directly above the market board -->
-      <!-- FEAT-DEV01: 车队任务产能聚合 banner(原生命周期 banner,此前未挂载=孤儿组件,本次归位) -->
-      <DeviceLifecycleBanner />
       <MissedIncomeBanner />
       <MarketBoard />
       <TaskCenter />
@@ -105,7 +103,6 @@ import CardStagger from "@/components/card-stagger.vue";
 import TrialHeroBanner from "@/components/trial-hero-banner.vue";
 import TrialGhostSlot from "@/components/trial-ghost-slot.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
-import DeviceLifecycleBanner from "@/components/earn/device-lifecycle-banner.vue";
 import CapacityExplainerSheet from "@/components/earn/capacity-explainer-sheet.vue";
 import MissedIncomeBanner from "@/components/earn/missed-income-banner.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
