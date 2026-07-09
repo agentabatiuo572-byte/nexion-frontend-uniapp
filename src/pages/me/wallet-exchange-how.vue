@@ -22,7 +22,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s2Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s2Step1Title" :body="w.s2Step1Body" accent="purple" />
           <HowStepRow :n="2" :title="w.s2Step2Title" :body="w.s2Step2Body" accent="purple" />
           <HowStepRow :n="3" :title="w.s2Step3Title" :body="w.s2Step3Body" accent="purple" />
@@ -33,8 +33,8 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4" /><path d="M3.34 19a10 10 0 1 1 17.32 0" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s3Intro }}</text>
-        <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
+        <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <IconRow emoji="📅" :label="w.lim1Label" :body="w.lim1Body" />
           <IconRow emoji="🌐" :label="w.lim2Label" :body="w.lim2Body" />
           <IconRow emoji="🪪" :label="w.lim3Label" :body="w.lim3Body" />
@@ -46,7 +46,7 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s4Intro }}</text>
+        <text class="block" :style="introStyle">{{ w.s4Intro }}</text>
         <view :style="stepsBoxStyle">
           <view class="flex items-start" style="gap: 8px">
             <text class="shrink-0" :style="stepNumStyle">1.</text>
@@ -105,8 +105,8 @@ function goBack() {
   uni.navigateTo({ url: "/pages/me/wallet-exchange", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px" };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const stepsBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
@@ -118,8 +118,8 @@ const stepsBoxStyle: CSSProperties = {
   gap: "8px",
   fontSize: "12px",
 };
-const stepNumStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const stepBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.55 };
+const stepNumStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.62 };
+const stepBodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 }; // how-row scale: body 13/1.62 ink-2
 const ctaStyle: CSSProperties = {
   gap: "6px",
   height: "50px",

@@ -11,7 +11,7 @@
       <SubPageHeader :back="returnTo" />
 
       <!-- Hero -->
-      <view class="mx-4 relative overflow-hidden" :style="heroStyle">
+      <view class="mx-4" :style="heroStyle">
         <view class="flex items-center" style="gap: 8px; margin-bottom: 6px">
           <view class="grid place-items-center" :style="heroIconBoxStyle">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
@@ -161,13 +161,14 @@ function onAccept() {
   uni.navigateTo({ url: returnTo.value, fail: () => uni.reLaunch({ url: returnTo.value, fail: () => {} }) });
 }
 
+// Spotlight hero (whitelist ≤1): neutral border per the big-card rule (accent
+// border dropped); the brand-2 mood lives in the icon + label. Header provides
+// the 24px top breathing, so no top margin here.
 const heroStyle: CSSProperties = {
-  marginTop: "8px",
   borderRadius: "16px",
   padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 90% 0%, color-mix(in srgb, var(--v5-brand-2) 18%, transparent) 0%, transparent 60%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 40%, transparent)",
+  background: "var(--v5-surface)",
+  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = {
   width: "36px",
@@ -188,26 +189,27 @@ const acceptedChipStyle: CSSProperties = {
   fontSize: "10.5px",
   display: "inline-flex",
 };
+// De-carded: disclosure sections read on the page floor (legal page → clear,
+// legible paragraphs). Card shell dropped; blocks separated by whitespace.
 const sectionsStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
+  marginTop: "20px",
   display: "flex",
   flexDirection: "column",
-  gap: "14px",
+  gap: "18px",
 };
 const blockNumStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-brand-2)" };
-const blockTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const blockBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+// Unit title + paragraph body per the de-card typography ladder (body = ink-2,
+// never ink-3, at a legible 13.5/1.65 for a legal disclosure).
+const blockTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const blockBodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+// Selected section keeps a soft brand-2 read-tracking tint (no border — inner
+// blocks use soft fill, not a stroke); horizontal bleed reaches the gutter.
 function blockStyle(selected: boolean): CSSProperties {
   return {
     borderRadius: "12px",
-    padding: "10px",
-    margin: "-10px",
+    padding: "8px 12px",
+    margin: "0 -12px",
     background: selected ? "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)" : "transparent",
-    border: selected ? "1px solid color-mix(in srgb, var(--v5-brand-2) 24%, transparent)" : "1px solid transparent",
   };
 }
 const selectedBlockStyle: CSSProperties = {
@@ -224,12 +226,12 @@ const hintStyle: CSSProperties = {
   padding: "12px",
 };
 const hintTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warning)" };
+// Acknowledgment gate — de-carded onto the page floor; a hairline opens the
+// action group (checkbox control + brand CTA pill are whitelisted as-is).
 const ackCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
+  marginTop: "16px",
+  paddingTop: "16px",
+  borderTop: "1px solid var(--v5-border)",
 };
 const checkboxStyle = computed<CSSProperties>(() => ({
   width: "20px",

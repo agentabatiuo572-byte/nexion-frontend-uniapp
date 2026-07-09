@@ -18,7 +18,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
         </template>
         <text class="block" :style="paraStyle">{{ w.s1Para1 }}</text>
-        <text class="block" :style="{ ...paraStyle, marginTop: '8px' }">{{ w.s1Para2 }}</text>
+        <text class="block" :style="{ ...paraStyle, marginTop: '10px' }">{{ w.s1Para2 }}</text>
       </HowSection>
 
       <HowSection :title="w.s2Title" accent="lemon">
@@ -50,8 +50,8 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s3Intro }}</text>
-        <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
+        <text class="block" :style="captionStyle">{{ w.s3Intro }}</text>
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <view class="rounded-xl border" :style="signalCardStyle">
             <view class="flex items-start" style="gap: 10px">
               <text class="grid place-items-center shrink-0" :style="signalBadgeStyle">A</text>
@@ -78,7 +78,7 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><line x1="8" x2="16" y1="6" y2="6" /><line x1="16" x2="16" y1="14" y2="18" /><path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" /><path d="M12 14h.01" /><path d="M8 14h.01" /><path d="M12 18h.01" /><path d="M8 18h.01" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s4Intro }}</text>
+        <text class="block" :style="captionStyle">{{ w.s4Intro }}</text>
         <view :style="mathCardStyle">
           <text class="block" :style="scenarioStyle">{{ w.s4Scenario }}</text>
           <text class="block" :style="setupStyle">{{ w.s4Setup }}</text>
@@ -93,7 +93,7 @@
             </view>
           </view>
           <view class="flex items-center justify-between" :style="mathTotalRowStyle">
-            <text :style="{ fontSize: '11px', color: 'var(--v5-ink-3)' }">{{ w.totalYouEarn }}</text>
+            <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ w.totalYouEarn }}</text>
             <text class="font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-ink)' }">$182.40</text>
           </view>
         </view>
@@ -105,7 +105,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s5Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s5Step1Title" :body="w.s5Step1Body" accent="lemon" />
           <HowStepRow :n="2" :title="w.s5Step2Title" :body="w.s5Step2Body" accent="lemon" />
           <HowStepRow :n="3" :title="w.s5Step3Title" :body="w.s5Step3Body" accent="lemon" />
@@ -161,10 +161,10 @@ function goBack() {
 }
 
 // ─── styles ───
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625 (was 1.6)
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "12px", lineHeight: 1.5 }; // SKILL: prototype no leading class=leading-normal=1.5 (was 1.55)
-const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)" };
-const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 }; // readability: body note 12/1.5 (was 11.5/1.375)
 
 const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px" };
 const tableHeadStyle: CSSProperties = {
@@ -199,8 +199,8 @@ const signalBadgeStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 600,
 };
-const signalNameStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const signalBodyStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625 (was 1.5)
+const signalNameStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
+const signalBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 }; // how-row scale: body 13/1.62 ink-2
 
 const mathCardStyle: CSSProperties = {
   marginTop: "12px",
@@ -209,7 +209,7 @@ const mathCardStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "16px",
 };
-const scenarioStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginBottom: "4px" };
+const scenarioStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "4px" };
 const setupStyle: CSSProperties = { fontSize: "13.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625, marginBottom: "12px" }; // SKILL: leading-relaxed=1.625 (was 1.5)
 const mathTotalRowStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)" };
 

@@ -11,7 +11,7 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="t.trial.pageHeaderSubtitle" />
 
-      <view class="mx-4" style="margin-top: 12px; display: flex; flex-direction: column; gap: 12px">
+      <view class="mx-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Active cycle -->
         <template v-if="isActiveCycle">
           <CountdownHero
@@ -26,7 +26,7 @@
             :extended-ends-at="freeTrial.extendedEndsAt"
           />
 
-          <view v-if="boundCard" :style="cardSecStyle">
+          <view v-if="boundCard" :style="boundCardStyle">
             <view class="flex items-center" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="cardIconBoxStyle">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>
@@ -42,8 +42,8 @@
             </view>
           </view>
 
-          <!-- Discount preview -->
-          <view :style="cardSecStyle">
+          <!-- Discount preview — de-carded: offer + price rows on the page floor -->
+          <view :style="discountWrapStyle">
             <text class="block" :style="discountLabelStyle">{{ discountBannerLabel }}</text>
             <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
               <Row :label="t.trial.rowSubtotal" :value="`$${discountInfo.subtotal.toLocaleString()}`" />
@@ -270,12 +270,17 @@ function goDevices() {
   uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
 }
 
-const cardSecStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "16px" };
+// De-carded: the bound-card info row + discount offer sit on the page floor,
+// each opened by a hairline. The CountdownHero above stays the sole spotlight.
+const boundCardStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
+const discountWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const cardIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
 const cardNumStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
 const cardFooterStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const manageStyle: CSSProperties = { gap: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--v5-tech-cyan)" };
+// Discount hook — savings accent kept prominent; de-uppercased (a full
+// sentence, not a mono cap kicker).
+const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
 const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "6px 0" };
 const remainderNoteStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625 };
 const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13.5px", fontWeight: 600 };

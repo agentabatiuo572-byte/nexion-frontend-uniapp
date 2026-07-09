@@ -222,7 +222,8 @@ function avaStyle(tint: string): CSSProperties {
 .nx-conv-center {
   display: flex;
   gap: 0;
-  padding: 4px 0 0;
+  /* No top padding — the sub-page header already supplies the 24px header→content gap. */
+  padding: 0;
 }
 .nx-conv-rail {
   width: 76px;

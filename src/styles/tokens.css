@@ -440,19 +440,6 @@ body {
   .nx-step-in { animation: none; }
 }
 
-/* Wrapped story-card enter (framer AnimatePresence x:30→0 / opacity:0→1).
-   Used by me/wrapped.vue, keyed on idx so each card re-plays on advance. */
-.nx-story-in {
-  animation: nx-story-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-@keyframes nx-story-in {
-  from { opacity: 0; transform: translateX(30px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .nx-story-in { animation: none; }
-}
-
 /* Hero glow now lime-tinted */
 .hero-glow {
   background:

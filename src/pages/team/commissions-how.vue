@@ -27,7 +27,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s2Caption }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <HowIconRow emoji="👥" :label="w.k1Label" :body="w.k1Body" />
           <HowIconRow emoji="⚖️" :label="w.k2Label" :body="k2BodyText" />
           <HowIconRow emoji="🤝" :label="w.k3Label" :body="w.k3Body" />
@@ -41,7 +41,7 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s3Intro }}</text>
+        <text class="block" :style="captionStyle">{{ w.s3Intro }}</text>
         <view class="rounded-xl border" :style="statusBoxStyle">
           <view class="flex items-start" style="gap: 10px">
             <text class="shrink-0 font-mono-tabular" :style="statusChipStyle('var(--v5-warning)')">{{ w.statusCooling }}</text>
@@ -152,9 +152,9 @@ function goBack() {
 }
 
 // ─── styles ───
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "12px", lineHeight: 1.5 };
-const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 
 const statusBoxStyle: CSSProperties = {
   marginTop: "12px",

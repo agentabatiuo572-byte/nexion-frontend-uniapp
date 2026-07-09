@@ -18,12 +18,14 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
 
-      <!-- How-it-works entry + refresh -->
+      <!-- How-it-works entry + refresh — pill compacted to match the other pages;
+           it stays paired with the rate-refresh button (no de-carded hero here to
+           merge into — owner 2026-07-09). -->
       <view class="flex items-center" :style="topRowStyle">
-        <view class="inline-flex items-center active:scale-[0.98]" :style="howStyle" @click="goHowItWorks">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
-          <text style="margin: 0 8px">{{ t.exchange.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" @click="goHowItWorks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
+          <text style="margin: 0 6px">{{ t.exchange.howItWorksEntry }}</text>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
         <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" @click="onRefresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
@@ -417,12 +419,12 @@ function swapLine(h: SwapEvent): string {
 // ── styles ──
 const topRowStyle: CSSProperties = { padding: "0 16px 8px", gap: "8px" };
 const howStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 14px",
+  height: "34px",
+  padding: "0 12px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
 const refreshBtnStyle: CSSProperties = {
@@ -432,10 +434,11 @@ const refreshBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface)",
 };
+// Recessed swap field (topup tone): surface-2 fill, no border — pay/receive read
+// as a matched field pair around the flip control, numbers stay full-ink.
 const swapCardStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
   borderRadius: "16px",
   padding: "16px",
 };
@@ -503,12 +506,11 @@ const infoStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-brand-2) 90%, transparent)",
   lineHeight: 1.625,
 };
+// De-carded: the risk-control dashboard sits on the page floor; the mono title
+// opens it and the inner kyc/queue hairlines carry the section breaks.
 const dashStyle: CSSProperties = {
-  margin: "12px 16px 0",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
+  margin: "16px 16px 0",
+  padding: "0 2px",
 };
 const dashTitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -557,33 +559,33 @@ const queueTitleStyle: CSSProperties = {
   letterSpacing: "0.06em",
   color: "var(--v5-warning)",
 };
+// Section label (de-card spec): 15px/600/ink at the 18px content edge.
 const historyTitleStyle: CSSProperties = {
-  padding: "12px 8px 4px",
+  padding: "0 2px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "15px",
   fontWeight: 600,
-  letterSpacing: "-0.025em",
-  color: "var(--v5-ink-3)",
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
+// Empty state (de-card white-list): dashed outline, no fill.
 const historyEmptyStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px dashed var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   borderRadius: "16px",
   padding: "24px",
   textAlign: "center",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
+// Transparent hairline group: container border-top opens it, rows self-divide.
 const historyListStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  overflow: "hidden",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 function historyRowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "12px 0",
     borderTop: i !== 0 ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
 }

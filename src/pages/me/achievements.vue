@@ -31,7 +31,7 @@
       </view>
 
       <!-- Categories -->
-      <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 16px">
+      <view style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
         <view v-for="grp in groups" :key="grp.cat" class="mx-4">
           <text class="block" :style="catHeadStyle">{{ catLabel(grp.cat) }}</text>
           <view :style="listStyle">
@@ -197,12 +197,10 @@ function handleClaim(id: string) {
   toast.success(w.value.claimToast);
 }
 
-const heroStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "20px",
-};
+// De-carded: progress stat + bar sit on the page floor (surface/border/padding
+// dropped). Warning icon tint box + progress bar kept. 2px inset aligns with the
+// category labels + badge lists below.
+const heroStyle: CSSProperties = { padding: "0 2px" };
 const heroIconBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "16px", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const heroCountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
@@ -216,16 +214,18 @@ const barFillStyle = computed<CSSProperties>(() => ({
   transition: "width 700ms ease",
 }));
 const catHeadStyle: CSSProperties = {
+  padding: "0 2px",
+  marginBottom: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "15px",
   fontWeight: 600,
-  letterSpacing: "-0.025em",
-  color: "var(--v5-ink-3)",
-  padding: "12px 8px 4px",
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
+// Badge list keeps a filled tile identity (achievement/badge semantic, de-card
+// white-list) — the single visual difference is the fill; outer border dropped.
 const listStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
 };

@@ -1,7 +1,8 @@
 <!--
   Genealogy — ported from Nexion-prototype/app/(main)/team/tree/page.tsx.
-  Sprint-1.5 royalty roster: two metric cards (total network / monthly volume)
-  + Direct section + Extended section (each a collapsible TeamRosterSection).
+  Sprint-1.5 royalty roster: two metric stat tiles (total network / monthly
+  volume; DECARD 2026-07-09: fill only, borders dropped) + Direct section +
+  Extended section (each a collapsible TeamRosterSection row container).
   No 7-layer sections / binary wing / L1-L7 labels (de-MLM'd). Sub-page →
   <AppChassis active="team"> w/ back → /team. Reuses network + commission
   (UNILEVEL_USDT) stores. useMemo → computed. React Set/Record toggle state →
@@ -12,15 +13,16 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.tree.pageTitle" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px">
-        <!-- Top metrics -->
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 16px">
+        <!-- Top metrics — stat tiles: fill only, borders dropped (single
+             visual difference; ticket-stat-box idiom). -->
         <view class="grid grid-cols-2" style="gap: 8px">
-          <view class="rounded-2xl border" :style="metricCardStyle">
+          <view class="rounded-2xl" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.tree.totalNetwork }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ members.length }}</text>
             <text class="block" :style="metricSuffixStyle">{{ members.length === 1 ? t.tree.member : t.tree.membersPlural }}</text>
           </view>
-          <view class="rounded-2xl border" :style="metricCardStyle">
+          <view class="rounded-2xl" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.tree.monthlyVolume }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">${{ (totalVol / 1000).toFixed(1) }}K</text>
             <text class="block" :style="metricSuffixStyle">{{ t.tree.acrossNetwork }}</text>
@@ -32,7 +34,7 @@
           color="var(--v5-brand)"
           :title="t.tree.directTitle"
           :subtitle="directSubtitle"
-          accent-bg="rgba(198,255,58,0.12)"
+          accent-bg="color-mix(in srgb, var(--v5-brand) 12%, transparent)"
           accent-text="var(--v5-brand)"
           :badge="t.tree.badgeDirect"
           :members="direct"
@@ -47,7 +49,7 @@
           color="var(--v5-tech-cyan)"
           :title="t.tree.extendedTitle"
           :subtitle="extendedSubtitle"
-          accent-bg="rgba(124,92,255,0.14)"
+          accent-bg="color-mix(in srgb, var(--v5-tech-cyan) 14%, transparent)"
           accent-text="var(--v5-tech-cyan)"
           :badge="t.tree.badgeExtended"
           :members="extended"
@@ -96,7 +98,8 @@ const extendedSubtitle = computed(() =>
 const expanded = reactive<Record<"direct" | "extended", boolean>>({ direct: true, extended: true });
 
 // ─── styles ───
-const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "14px" };
+// Stat tile: fill only, no border (radius via rounded-2xl class).
+const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", padding: "14px" };
 const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", lineHeight: 1, color };

@@ -23,6 +23,13 @@ dist
 .claude/
 .vscode/*
 
+# chrome-baseline transient run outputs (regenerated each run; only baseline/ + _check/ are tracked references)
+scripts/.baseline/current/
+scripts/.baseline/current2/
+scripts/.baseline/warmup/
+scripts/.baseline/final-check/
+scripts/.baseline/baseline-*/
+
 # Editor directories and files
 .idea
 *.suo

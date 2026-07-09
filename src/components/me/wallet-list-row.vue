@@ -44,10 +44,12 @@ function go() {
   uni.navigateTo({ url: props.href, fail: () => {} });
 }
 
+// Content aligns to the transparent group's gutter (page 16px + 2px inset); the
+// row's own horizontal padding is dropped so it no longer double-insets.
 const rowStyle = computed<CSSProperties>(() => ({
   gap: "12px",
   minHeight: "44px",
-  padding: "0 16px",
+  padding: "0",
   borderTop: props.first ? "none" : "1px solid var(--v5-border)",
 }));
 const iconChipStyle = computed<CSSProperties>(() => ({

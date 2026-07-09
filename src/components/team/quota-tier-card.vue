@@ -7,6 +7,9 @@
   Condition `kind` ("invites"|"volume") drives $ formatting instead of locale
   string-matching. `${tint}10` alpha-hex → color-mix. banned hex #0F0F0F →
   var(--v5-surface). emits navigate('/pages/store/detail?id=...') for CTA.
+  DECARD 2026-07-09: whitelist tier card (selection/comparison semantics) —
+  fill kept, outer border dropped (filled no border, single visual difference);
+  locked-state rgba-white fills → surface-2 token.
 -->
 <template>
   <view class="rounded-2xl" :style="cardStyle">
@@ -119,17 +122,18 @@ const stockLineText = computed(() =>
 );
 
 // ─── styles ───
+// Whitelist tier card: fill only, no border — unlocked keeps the tint-wash
+// gradient as the single visual difference vs the locked plain surface.
 const cardStyle = computed<CSSProperties>(() => ({
   padding: "16px",
   background: unlocked.value
     ? `linear-gradient(180deg, color-mix(in srgb, ${props.tier.tint} 10%, transparent) 0%, var(--v5-surface) 100%)`
     : "var(--v5-surface)",
-  border: `1px solid ${unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 40%, transparent)` : "var(--v5-surface-2)"}`,
 }));
 const iconBoxStyle = computed<CSSProperties>(() => ({
   width: "40px",
   height: "40px",
-  background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "rgba(255,255,255,0.04)",
+  background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "var(--v5-surface-2)",
 }));
 const nameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1.1, color: "var(--v5-ink)" };
 const stockLineStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
@@ -139,7 +143,7 @@ const badgeStyle = computed<CSSProperties>(() => ({
   padding: "1px 6px",
   borderRadius: "4px",
   fontWeight: 600,
-  background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "rgba(255,255,255,0.06)",
+  background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "var(--v5-surface-2)",
   color: unlocked.value ? props.tier.tint : "var(--v5-ink-4)",
 }));
 

@@ -21,10 +21,9 @@
       <SubPageHeader back="/pages/me/wallet" />
 
       <view :style="bodyStyle">
-        <!-- Hero -->
-        <view class="relative overflow-hidden" :style="heroStyle">
-          <view :style="heroBlobStyle" />
-          <view class="relative">
+        <!-- Hero — de-carded: balance sits on the page floor, floor glow deleted. -->
+        <view :style="heroStyle">
+          <view>
             <text class="block" :style="heroLabelStyle">{{ t.nexWallet.holdingsLabel }}</text>
             <view class="flex items-end justify-between" style="margin-top: 10px">
               <view>
@@ -63,7 +62,7 @@
         <!-- Position breakdown -->
         <view :style="cardStyle">
           <text class="block" :style="cardLabelStyle">{{ t.nexWallet.breakdown.label }}</text>
-          <view style="margin-top: 12px">
+          <view style="margin-top: 10px; border-top: 1px solid var(--v5-border)">
             <view v-for="(br, i) in breakdownRows" :key="br.label" class="flex items-center" :style="breakdownRowStyle(i)">
               <view class="grid place-items-center shrink-0" :style="breakdownIconStyle(br.tint)">
                 <view v-html="br.icon" />
@@ -106,9 +105,9 @@
           </view>
         </view>
 
-        <!-- Recent NEX activity -->
-        <view :style="activityCardStyle">
-          <view class="flex items-center justify-between" style="padding: 12px 16px 8px">
+        <!-- Recent NEX activity — de-carded: header + hairline row group on the floor. -->
+        <view :style="activityWrapStyle">
+          <view class="flex items-center justify-between" :style="activityHeadStyle">
             <text :style="cardLabelStyle">{{ t.nexWallet.activity.label }}</text>
             <view class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="goBills">
               <text>{{ t.nexWallet.activity.viewAll }}</text>
@@ -118,7 +117,8 @@
           <view v-if="activity.length === 0" :style="activityEmptyStyle">
             <text>{{ t.nexWallet.activity.empty }}</text>
           </view>
-          <view v-for="(a, i) in activity" :key="a.id" v-else class="flex items-center" :style="activityRowStyle(i)">
+          <view v-else :style="activityListStyle">
+            <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
             <view class="grid place-items-center shrink-0" :style="activityIconStyle(a.kind)">
               <svg v-if="a.kind === 'mining'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v2" /><path d="M12 2v2" /><path d="M17 20v2" /><path d="M17 2v2" /><path d="M2 12h2" /><path d="M2 17h2" /><path d="M2 7h2" /><path d="M20 12h2" /><path d="M20 17h2" /><path d="M20 7h2" /><path d="M7 20v2" /><path d="M7 2v2" /><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="8" y="8" width="8" height="8" rx="1" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
@@ -131,6 +131,7 @@
               <text class="block tabular-nums" :style="activityNexStyle">+{{ fmtNum(a.nex, 2) }} NEX</text>
               <text class="block" :style="activityUsdStyle">≈ {{ fmtUSD(a.nex * nexPrice) }}</text>
             </view>
+          </view>
           </view>
         </view>
 
@@ -263,21 +264,10 @@ function tintIcon(svg: string, color: string): string {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
+// De-carded hero — balance sits on the page floor (2px optical inset); the floor
+// glow blob is deleted outright, not re-tuned (owner call 2026-07-08).
 const heroStyle: CSSProperties = {
-  marginTop: "4px",
-  padding: "18px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
-const heroBlobStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(45% 55% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%), radial-gradient(35% 45% at 15% 90%, var(--v5-brand-soft) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
+  padding: "0 2px",
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -289,7 +279,7 @@ const heroLabelStyle: CSSProperties = {
 const heroNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "32px",
+  fontSize: "30px",
   letterSpacing: "-0.022em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -332,11 +322,11 @@ const viewMarketStyle: CSSProperties = {
   letterSpacing: "0.04em",
   color: "var(--v5-brand-2)",
 };
+// Quick action cells — filled surface-2 tiles, no border (single visual difference).
 const quickCellStyle: CSSProperties = {
   marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  borderRadius: "12px",
+  background: "var(--v5-surface-2)",
   padding: "12px",
   textAlign: "center",
 };
@@ -356,12 +346,10 @@ const quickLabelStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink-2)",
 };
+// De-carded section on the page floor — mono label + content, 2px optical inset.
 const cardStyle: CSSProperties = {
   marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
+  padding: "0 2px",
 };
 const cardLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -371,7 +359,11 @@ const cardLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 function breakdownRowStyle(i: number): CSSProperties {
-  return { gap: "12px", marginTop: i === 0 ? "0" : "10px" };
+  return {
+    gap: "12px",
+    padding: "12px 0",
+    borderBottom: i < breakdownRows.value.length - 1 ? "1px solid var(--v5-border)" : "none",
+  };
 }
 function breakdownIconStyle(tint: string): CSSProperties {
   return {
@@ -415,28 +407,25 @@ const useTileLabelStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const useTileSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
-const activityCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  overflow: "hidden",
-};
+// De-carded activity — header + hairline row group on the page floor.
+const activityWrapStyle: CSSProperties = { marginTop: "12px" };
+const activityHeadStyle: CSSProperties = { padding: "0 2px 8px" };
+const activityListStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 const viewAllStyle: CSSProperties = {
   minHeight: "44px",
-  margin: "-12px -8px -12px 0",
+  margin: "-12px -2px -12px 0",
   padding: "0 10px",
   borderRadius: "6px",
   fontSize: "10.5px",
   color: "var(--v5-brand-2)",
   gap: "2px",
 };
-const activityEmptyStyle: CSSProperties = { padding: "24px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
+const activityEmptyStyle: CSSProperties = { padding: "24px 2px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 function activityRowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "10px 16px",
-    borderTop: i === 0 ? "none" : "1px solid var(--v5-border)",
+    padding: "10px 0",
+    borderBottom: i < activity.value.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
 function activityIconStyle(kind: string): CSSProperties {

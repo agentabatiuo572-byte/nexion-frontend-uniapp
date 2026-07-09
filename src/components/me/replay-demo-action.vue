@@ -2,9 +2,10 @@
   ReplayDemoAction — icon + title/hint + accent CTA chip row for the demo lifecycle
   panel. Ported from the inline DemoAction in Nexion-prototype me/replay-tour/page.tsx.
   Icon is an inline SVG string with `stroke` set by the caller. Emits `tap`.
+  De-carded: transparent hairline row (card shell dropped); `last` drops the divider.
 -->
 <template>
-  <view class="w-full flex items-center active:scale-[0.99] active:opacity-90" :style="cardStyle" @click="emit('tap')">
+  <view class="flex items-center active:opacity-70" :style="cardStyle" @click="emit('tap')">
     <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
       <view v-html="icon" />
     </view>
@@ -21,17 +22,19 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 
-const props = defineProps<{ icon: string; accent: string; title: string; hint: string; ctaLabel: string }>();
+const props = withDefaults(
+  defineProps<{ icon: string; accent: string; title: string; hint: string; ctaLabel: string; last?: boolean }>(),
+  { last: false },
+);
 const emit = defineEmits<{ tap: [] }>();
 
-const cardStyle: CSSProperties = {
+// De-carded: sits on the page floor, hairline divider closes each row (last = none).
+const cardStyle = computed<CSSProperties>(() => ({
   gap: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "14px",
+  padding: "14px 0",
   textAlign: "left",
-};
+  borderBottom: props.last ? "none" : "1px solid var(--v5-border)",
+}));
 const iconBoxStyle = computed<CSSProperties>(() => ({
   width: "40px",
   height: "40px",

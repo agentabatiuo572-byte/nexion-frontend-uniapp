@@ -15,24 +15,28 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.network.pageTitle" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px">
-        <!-- Top metrics -->
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 16px">
+        <!-- Top metrics — filled stat tiles, no border (single visual difference) -->
         <view class="grid grid-cols-3" style="gap: 8px">
-          <view class="rounded-2xl border text-center" :style="metricCardStyle">
+          <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.members }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ members.length }}</text>
           </view>
-          <view class="rounded-2xl border text-center" :style="metricCardStyle">
+          <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.activeNow }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ activeCount }}</text>
           </view>
-          <view class="rounded-2xl border text-center" :style="metricCardStyle">
+          <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.direct }}</text>
             <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ directCount }}</text>
           </view>
         </view>
 
-        <!-- Network orb -->
+        <!-- Network orb — kept as a whitelist visualization card: the in-card
+             radial wash + clipping boundary belong to the orb graphic (bg +
+             overflow-hidden = legal in-card glow, NOT a floor aura). De-carding
+             it would strand the wash on the page floor → conservative keep,
+             neutral token border. -->
         <view class="relative overflow-hidden rounded-2xl" :style="orbCardStyle">
           <svg viewBox="0 0 360 360" class="block w-full" preserveAspectRatio="xMidYMid meet" style="width: 100%">
             <defs>
@@ -80,7 +84,7 @@
             <!-- center YOU node -->
             <g>
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
-              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="700" font-size="11" fill="var(--v5-on-brand)">YOU</text>
+              <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">YOU</text>
               <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">V{{ myRank }}</text>
             </g>
 
@@ -244,15 +248,19 @@ function statusColor(status: MemberStatus): string {
 }
 
 // ─── styles ───
-const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px", padding: "12px" };
+// Filled stat tile, no border (single visual difference).
+const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px", padding: "12px" };
 const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", color };
 }
 
+// Visualization card (whitelist): flat part of the bg equals the page floor, so
+// the neutral border IS the card boundary — dropping it would turn the radial
+// wash into a floor aura (which must then be deleted, degrading the orb).
 const orbCardStyle: CSSProperties = {
   background: "radial-gradient(60% 50% at 50% 50%, rgba(124,92,255,0.18) 0%, transparent 65%), var(--v5-bg)",
-  border: "1px solid rgba(255,255,255,0.06)",
+  border: "1px solid var(--v5-border)",
 };
 const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "10px", color: "var(--v5-ink-3)" };
 // SKILL leading-relaxed = 1.625 (原版 .text-[11px] leading-relaxed; was 1.6)

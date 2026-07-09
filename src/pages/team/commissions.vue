@@ -1,7 +1,8 @@
 <!--
   Commissions — ported from Nexion-prototype/app/(main)/team/commissions/page.tsx.
-  5+1-kind commission event stream: overview card → 6-kind summary grid (tap to
-  filter) → filter pills → event list. Sub-page → <AppChassis active="team"> with
+  5+1-kind commission event stream: overview hero (de-carded, floor-sitting) →
+  6-kind summary tiles (tap to filter) → filter pills → event list (transparent
+  hairline group). Sub-page → <AppChassis active="team"> with
   in-page back row (back → /team). Reuses commission store. mount-effect
   unlockMatured → onMounted. lucide kind icons → inline SVG. <button>→<view @click>.
 -->
@@ -10,19 +11,21 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamCommissions" :subtitle="t.headerSubtitles.teamCommissions" />
 
-      <!-- How-it-works entry -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/commissions-how')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-          <text>{{ t.commissions.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        </view>
-      </view>
-
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- overview -->
-        <view class="rounded-2xl border" :style="cardStyle">
-          <view class="grid grid-cols-2 border-b" :style="overviewTopStyle">
+        <!-- overview — de-carded: the two headline numbers sit on the page floor.
+             Dual-number hero (Withdrawable/Cooling grid) has no single cap to host
+             the rules-intro pill, so the pill rides a tight top-right row hugging
+             the grid (owner 2026-07-09: kill the empty gap above the hero). -->
+        <view :style="heroWrapStyle">
+          <!-- rules-intro pill hugs the top-right; 4px above the grid so no empty gap. -->
+          <view class="flex items-center justify-end" style="margin-bottom: 4px">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/commissions-how')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <text>{{ t.commissions.howItWorksEntry }}</text>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </view>
+          </view>
+          <view class="grid grid-cols-2" style="gap: 12px">
             <view>
               <text class="block font-mono-tabular" :style="overviewCapStyle">Withdrawable</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-brand)')">${{ commission.unlockedUSDT().toFixed(2) }}</text>
@@ -34,7 +37,7 @@
               <text class="block font-mono-tabular" :style="overviewSmallStyle">Unlocks in 30d</text>
             </view>
           </view>
-          <view class="grid grid-cols-2" style="gap: 8px; font-size: 11px">
+          <view class="grid grid-cols-2" :style="heroFooterStyle">
             <view class="flex items-center justify-between">
               <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.commissions.thisMonth }}</text>
               <text class="font-display tabular-nums" :style="{ fontWeight: 600 }">${{ commission.monthUSDT().toFixed(2) }}</text>
@@ -68,7 +71,7 @@
         <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%">
           <view class="inline-flex" style="gap: 6px">
             <view class="shrink-0 rounded-full grid place-items-center active:opacity-70" :style="pillStyle(filter === 'all', 'var(--v5-brand)')" @click="filter = 'all'">
-              <text :style="pillTextStyle(filter === 'all')">{{ t.commissions.all }} ({{ commission.events.length }})</text>
+              <text :style="pillTextStyle(filter === 'all', 'var(--v5-brand)')">{{ t.commissions.all }} ({{ commission.events.length }})</text>
             </view>
             <view
               v-for="k in KIND_ORDER"
@@ -77,17 +80,16 @@
               :style="pillStyle(filter === k, KIND[k].color)"
               @click="filter = k"
             >
-              <text :style="pillTextStyle(filter === k)">{{ t.commissions.kind[k] }} ({{ byKind[k].count }})</text>
+              <text :style="pillTextStyle(filter === k, KIND[k].color)">{{ t.commissions.kind[k] }} ({{ byKind[k].count }})</text>
             </view>
           </view>
         </scroll-view>
 
-        <!-- event list -->
-        <view class="rounded-2xl border overflow-hidden" :style="cardFlushStyle">
-          <view v-if="filtered.length === 0" class="text-center" :style="emptyStyle">
-            <text>{{ filter === "all" ? t.commissions.noEvents : noKindText }}</text>
-          </view>
-          <template v-else>
+        <!-- event list — transparent hairline group on the page floor -->
+        <view v-if="filtered.length === 0" class="text-center" :style="emptyStyle">
+          <text>{{ filter === "all" ? t.commissions.noEvents : noKindText }}</text>
+        </view>
+        <view v-else :style="listGroupStyle">
             <view
               v-for="(e, i) in filtered"
               :key="e.id"
@@ -112,7 +114,6 @@
                 <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
               </view>
             </view>
-          </template>
         </view>
       </view>
     </view>
@@ -182,32 +183,26 @@ function go(url: string) {
 }
 
 // ─── styles ───
+// Soft tint pill — chip idiom, fill only (no border, single visual difference).
 const howItWorksStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 14px",
-  minHeight: "44px",
+  gap: "6px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
-const cardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-  padding: "16px",
-};
-const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-};
-const overviewTopStyle: CSSProperties = {
-  gap: "12px",
-  marginBottom: "12px",
-  paddingBottom: "12px",
-  borderColor: "var(--v5-border)",
+// De-carded overview hero — numbers on the page floor; hairline footer closes the block.
+const heroWrapStyle: CSSProperties = { padding: "6px 2px 0" };
+// -2px side margins pull the hairline back to full width (2px optical inset above).
+const heroFooterStyle: CSSProperties = {
+  margin: "12px -2px 0",
+  padding: "12px 2px 0",
+  borderTop: "1px solid var(--v5-border)",
+  gap: "8px",
+  fontSize: "11px",
 };
 const overviewCapStyle: CSSProperties = {
   fontSize: "11px",
@@ -227,13 +222,13 @@ function overviewBigStyle(color: string): CSSProperties {
 }
 const overviewSmallStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
 
+// Selection tiles — filled, no border/ring; active = soft kind tint (single difference).
 function kindCardStyle(k: CommissionKind): CSSProperties {
   const active = filter.value === k;
   return {
     padding: "10px",
     borderRadius: "12px",
-    background: active ? "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)" : "var(--v5-surface)",
-    boxShadow: active ? `inset 0 0 0 1px color-mix(in srgb, ${KIND[k].color} 50%, transparent)` : "inset 0 0 0 1px var(--v5-surface-2)",
+    background: active ? `color-mix(in srgb, ${KIND[k].color} 12%, transparent)` : "var(--v5-surface)",
   };
 }
 const kindAmtStyle: CSSProperties = {
@@ -258,18 +253,26 @@ function pillStyle(active: boolean, color: string): CSSProperties {
     background: active ? color : "var(--v5-surface-2)",
   };
 }
-function pillTextStyle(active: boolean): CSSProperties {
+// Bright active fill → on-brand text (brand-2 fill takes on-brand-2), incl. inactive fallback.
+function pillTextStyle(active: boolean, color: string): CSSProperties {
   return {
     fontSize: "11px",
     fontWeight: 600,
-    color: active ? "var(--v5-ink)" : "var(--v5-ink-3)",
+    color: active
+      ? color === "var(--v5-brand-2)"
+        ? "var(--v5-on-brand-2)"
+        : "var(--v5-on-brand)"
+      : "var(--v5-ink-3)",
   };
 }
 
-const emptyStyle: CSSProperties = { padding: "32px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Empty state — dashed outline hint, no fill (V5 empty-state idiom).
+const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Transparent hairline group — border-top opens the group, rows separate with hairlines.
+const listGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 function eventRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "12px 16px",
+    padding: "12px 0",
     gap: "12px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };

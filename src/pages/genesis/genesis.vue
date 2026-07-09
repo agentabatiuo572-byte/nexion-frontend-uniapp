@@ -18,15 +18,6 @@
     <view style="color: var(--v5-ink); padding-bottom: 120px">
       <SubPageHeader back="/pages/me/me" />
 
-      <!-- Top-right "How it works →" pill -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
-          <text style="margin: 0 6px">{{ t.genesis.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
-
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ════ HERO — dark obsidian gold ════ -->
         <view class="relative overflow-hidden" :style="heroStyle">
@@ -42,10 +33,18 @@
           <view aria-hidden class="gen-anim" :style="sheenStyle" />
 
           <view class="relative" style="z-index: 2">
-            <!-- Crown chip -->
-            <view class="inline-flex items-center" :style="crownChipStyle">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-              <text>{{ t.genesis.heroCrown }}</text>
+            <!-- Crown chip + rules-intro pill share the top row (gold-toned pill
+                 so it reads on the obsidian-gold hero; owner 2026-07-09 kill gap). -->
+            <view class="flex items-center justify-between" style="gap: 8px">
+              <view class="inline-flex items-center" :style="crownChipStyle">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
+                <text>{{ t.genesis.heroCrown }}</text>
+              </view>
+              <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
+                <text style="margin: 0 6px">{{ t.genesis.howItWorksEntry }}</text>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+              </view>
             </view>
 
             <!-- Title — punchy, restrained (high-end OG seat, not a bark) -->
@@ -122,14 +121,14 @@
           <NftCard v-for="n in LIVE_MARKET" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
         </view>
 
-        <!-- ════ FAQ snippet ════ -->
-        <view :style="faqCardStyle">
-          <view v-for="k in faqKeys" :key="k">
-            <text class="block">
+        <!-- ════ FAQ snippet — de-carded: floor hairline group ════ -->
+        <view :style="faqWrapStyle">
+          <view v-for="(k, i) in faqKeys" :key="k" :style="faqRowStyle(i)">
+            <text class="block" :style="faqQStyle">
               <text style="color: var(--v5-ink); font-weight: 600">Q.</text>
               <text> {{ t.genesis.faq[k] }}</text>
             </text>
-            <text class="block">{{ t.genesis.faq[answerKey(k)] }}</text>
+            <text class="block" :style="faqAStyle">{{ t.genesis.faq[answerKey(k)] }}</text>
           </view>
         </view>
 
@@ -266,15 +265,18 @@ onUnmounted(() => {
 });
 
 // ── styles ──
+// Gold-toned pill (matches the obsidian-gold hero's crown chip — a green
+// brand-soft would clash on the gold). Hardcoded gold is the .genesis-hero
+// design exception (see file header), not a v5 token slip.
 const howPillStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 14px",
+  height: "34px",
+  padding: "0 12px",
   borderRadius: "999px",
-  background: "var(--v5-brand-soft)",
+  background: "rgba(212,175,90,0.14)",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "12px",
   fontWeight: 500,
-  color: "var(--v5-brand)",
+  color: "#D4AF5A",
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
 };
@@ -404,11 +406,11 @@ const urgentStyle: CSSProperties = {
   fontWeight: 500,
   animation: "gen-urgent 1.8s ease-in-out infinite",
 };
+// Live social-proof bubble — filled surface, no border (chat-bubble idiom).
 const socialStyle: CSSProperties = {
   padding: "8px 12px",
   gap: "8px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   fontFamily: "var(--font-v5)",
   fontSize: "12.5px",
 };
@@ -432,18 +434,15 @@ const secLinkStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 500,
 };
+// De-carded: floor hairline group — PerkRow already carries its own dividers.
 const perksCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "14px",
-  padding: "4px 16px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
-// ── Tier ladder ──
+// ── Tier ladder — de-carded: floor hairline group (rows sit on the page). ──
 const ladderCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "14px",
-  padding: "6px 16px 14px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 function tierRowStyle(isCurrent: boolean): CSSProperties {
   return {
@@ -507,17 +506,28 @@ const tierPremiumStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
-const faqCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "16px",
-  fontSize: "12.5px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.55,
-  display: "flex",
-  flexDirection: "column",
-  gap: "10px",
+// De-carded: floor hairline group + typed Q/A layering (title ink, body ink-2).
+const faqWrapStyle: CSSProperties = {
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
+};
+function faqRowStyle(i: number): CSSProperties {
+  return {
+    padding: "12px 0",
+    borderBottom: i < faqKeys.length - 1 ? "1px solid var(--v5-border)" : "none",
+  };
+}
+const faqQStyle: CSSProperties = {
+  fontSize: "13.5px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+  lineHeight: 1.4,
+};
+const faqAStyle: CSSProperties = {
+  marginTop: "5px",
+  fontSize: "13px",
+  color: "var(--v5-ink-2)",
+  lineHeight: 1.62,
 };
 
 // Sticky dock styles (folds GenesisDockHost) — anchored to chassis bottom.

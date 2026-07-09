@@ -176,9 +176,10 @@ function onClaimBonus() {
 }
 
 // ── styles ──
+// Form-b: filled container, no border — quest rows keep their hairline dividers,
+// tinted claim states, and champion bonus row inside.
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const headerStyle: CSSProperties = { borderBottom: "1px solid var(--v5-border)" };

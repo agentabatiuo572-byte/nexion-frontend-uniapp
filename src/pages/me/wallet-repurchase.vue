@@ -8,24 +8,25 @@
   <AppChassis active="me">
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="flex items-center active:scale-[0.98]" :style="howLinkStyle" @click="goHow">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
-          <text style="margin: 0 8px">{{ w.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- hero -->
+        <!-- hero — rules-intro pill rides the title row (owner 2026-07-09: kill
+             the empty gap above the hero). -->
         <view :style="heroStyle">
-          <view class="flex items-center" style="gap: 8px">
-            <view class="grid place-items-center" :style="heroIconBoxStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+          <view class="flex items-center justify-between" style="gap: 8px">
+            <view class="flex items-center" style="gap: 8px">
+              <view class="grid place-items-center" :style="heroIconBoxStyle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+              </view>
+              <view>
+                <text class="block" :style="heroTitleStyle">{{ w.hero }}</text>
+                <text class="block" :style="heroPtsStyle">{{ w.benefits.apy }}</text>
+              </view>
             </view>
-            <view>
-              <text class="block" :style="heroTitleStyle">{{ w.hero }}</text>
-              <text class="block" :style="heroPtsStyle">{{ w.benefits.apy }}</text>
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" @click="goHow">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
+              <text style="margin: 0 6px">{{ w.howItWorksEntry }}</text>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
             </view>
           </view>
 
@@ -38,7 +39,7 @@
         </view>
 
         <!-- amount input -->
-        <view :style="cardStyle" style="padding: 20px">
+        <view :style="cardStyle">
           <text class="block" :style="monoLabelStyle">{{ w.amountLabel }}</text>
           <view class="flex items-baseline" style="gap: 8px; margin-top: 8px">
             <text class="shrink-0" :style="dollarStyle">$</text>
@@ -62,7 +63,7 @@
         </view>
 
         <!-- projection -->
-        <view :style="cardStyle" style="padding: 16px">
+        <view :style="cardStyle">
           <text class="block" :style="monoLabelStyle">{{ w.after90 }}</text>
           <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
             <Row :label="w.principal" :value="`$${amount.toFixed(2)}`" />
@@ -157,23 +158,26 @@ function goHow() {
   uni.navigateTo({ url: "/pages/me/wallet-repurchase-how", fail: () => {} });
 }
 
+// Secondary nav pill — soft brand-2 tint carries the affordance, no border (chip rule).
 const howLinkStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
-  padding: "0 14px",
-  minHeight: "44px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
+// Spotlight hero kept (single per screen) but neutralised: the accent floor-adjacent
+// glow is dropped and the accent border → neutral (big-card rule). The colourful
+// benefit tiles inside carry the visual interest.
 const heroStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand) 18%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)",
+  background: "var(--v5-surface)",
+  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "18px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };
@@ -189,7 +193,8 @@ function benefitStyle(tint: string, i: number): CSSProperties {
   };
 }
 const benefitTextStyle: CSSProperties = { fontSize: "11px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
-const cardStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", borderRadius: "16px" };
+// De-carded data sections (amount input, projection) on the page floor, 2px inset.
+const cardStyle: CSSProperties = { padding: "0 2px" };
 const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
 const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "24px", color: "var(--v5-ink-3)" };
 const amountInputStyle: CSSProperties = { fontFamily: "var(--font-v5)", flex: "1", minWidth: "0", background: "transparent", fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)" };

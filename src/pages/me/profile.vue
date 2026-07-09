@@ -15,8 +15,8 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.profile.title" />
 
-      <!-- Avatar + email -->
-      <view class="mx-4" :style="avatarCardStyle">
+      <!-- Avatar + email — de-carded: identity sits on the page floor. -->
+      <view :style="avatarBlockStyle">
         <view class="flex items-center" style="gap: 16px">
           <view class="relative">
             <view class="grid place-items-center" :style="avatarStyle">
@@ -37,12 +37,11 @@
         </view>
       </view>
 
-      <!-- Editable fields -->
-      <view class="mx-4 overflow-hidden" :style="fieldsCardStyle">
-        <text class="block" :style="sectionCapStyle">{{ t.profile.sectionPublic }}</text>
-
-        <view :style="fieldBlockStyle">
-          <view class="flex items-center" style="gap: 6px; margin-top: 10px">
+      <!-- Editable fields — de-carded: section label + fields on the floor. -->
+      <text class="block" :style="sectionLabelStyle">{{ t.profile.sectionPublic }}</text>
+      <view :style="fieldsWrapStyle">
+        <view>
+          <view class="flex items-center" style="gap: 6px">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
             <text :style="fieldLabelStyle">{{ t.profile.displayName }}</text>
           </view>
@@ -50,8 +49,8 @@
           <text class="block" :style="fieldHintStyle">{{ t.profile.displayNameHint }}</text>
         </view>
 
-        <view :style="fieldBlockStyle">
-          <text class="block" :style="[fieldLabelStyle, { marginTop: '10px' }]">{{ t.profile.bio }}</text>
+        <view>
+          <text class="block" :style="fieldLabelStyle">{{ t.profile.bio }}</text>
           <textarea class="w-full" :style="textareaStyle" :value="bio" :placeholder="t.profile.bioPlaceholder" :maxlength="140" auto-height @input="onBio" />
           <view class="flex justify-between" style="margin-top: 4px">
             <text :style="fieldHintStyle">{{ t.profile.bioHint }}</text>
@@ -59,9 +58,9 @@
           </view>
         </view>
 
-        <view class="grid" :style="[fieldBlockStyle, { gridTemplateColumns: '1fr 1fr', gap: '12px' }]">
+        <view class="grid" :style="{ gridTemplateColumns: '1fr 1fr', gap: '12px' }">
           <view>
-            <view class="flex items-center" style="gap: 6px; margin-top: 10px">
+            <view class="flex items-center" style="gap: 6px">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
               <text :style="fieldLabelStyle">{{ t.profile.region }}</text>
             </view>
@@ -70,7 +69,7 @@
             </picker>
           </view>
           <view>
-            <view class="flex items-center" style="gap: 6px; margin-top: 10px">
+            <view class="flex items-center" style="gap: 6px">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
               <text :style="fieldLabelStyle">{{ t.profile.timezone }}</text>
             </view>
@@ -81,17 +80,17 @@
         </view>
       </view>
 
-      <!-- Tier -->
-      <view class="mx-4" :style="tierCardStyle">
-        <view class="flex items-center justify-between" style="margin-bottom: 8px">
-          <text :style="tierCapStyle">{{ t.profile.tierTitle }}</text>
-          <text :style="tierLabelStyle">{{ tierLabel }}</text>
-        </view>
+      <!-- Tier — de-carded: section label + progress on the floor. -->
+      <view class="flex items-center justify-between" :style="tierHeaderStyle">
+        <text :style="tierTitleStyle">{{ t.profile.tierTitle }}</text>
+        <text :style="tierLabelStyle">{{ tierLabel }}</text>
+      </view>
+      <view :style="tierBarWrapStyle">
         <view :style="tierTrackStyle">
           <view :style="tierFillStyle" />
         </view>
-        <text class="block" :style="tierProgressStyle">{{ tierProgressLine }} · 62%</text>
       </view>
+      <text class="block" :style="tierProgressStyle">{{ tierProgressLine }} · 62%</text>
 
       <!-- Wallet binding -->
       <view class="mx-4 flex items-center active:opacity-90" :style="walletCardStyle" @click="goWallet">
@@ -252,12 +251,11 @@ function goWallet() {
 }
 
 // ── styles ──
-const avatarCardStyle: CSSProperties = {
-  marginTop: "8px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "20px",
+// De-carded: identity block sits on the page floor (2px optical inset aligns it
+// with the section labels + fields below; header→content gap is global).
+const avatarBlockStyle: CSSProperties = {
+  margin: "0 16px",
+  padding: "0 2px",
 };
 const avatarStyle: CSSProperties = {
   width: "64px",
@@ -297,22 +295,22 @@ const joinedStyle: CSSProperties = {
   fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
-const fieldsCardStyle: CSSProperties = {
-  marginTop: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-};
-const sectionCapStyle: CSSProperties = {
-  padding: "12px 16px 8px",
+// Section label (de-card spec): 15/600/ink at the 18px content edge.
+const sectionLabelStyle: CSSProperties = {
+  margin: "22px 18px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
-  letterSpacing: "0.18em",
-  color: "var(--v5-ink-4)",
+  fontSize: "15px",
+  fontWeight: 600,
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
-const fieldBlockStyle: CSSProperties = {
-  padding: "0 16px 12px",
-  borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
+// Fields sit on the floor, separated by whitespace (form idiom — no hairlines).
+const fieldsWrapStyle: CSSProperties = {
+  margin: "0 16px",
+  padding: "0 2px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "16px",
 };
 const fieldLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -358,18 +356,22 @@ const fieldHintStyle: CSSProperties = {
   fontSize: "11px",
   color: "var(--v5-ink-4)",
 };
-const tierCardStyle: CSSProperties = {
-  marginTop: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "16px",
+// De-carded tier: section-label header (title + tier badge) then the bar +
+// progress line on the floor.
+const tierHeaderStyle: CSSProperties = {
+  margin: "22px 16px 8px",
+  padding: "0 2px",
 };
-const tierCapStyle: CSSProperties = {
+const tierTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
-  letterSpacing: "0.16em",
-  color: "var(--v5-ink-3)",
+  fontSize: "15px",
+  fontWeight: 600,
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
+};
+const tierBarWrapStyle: CSSProperties = {
+  margin: "0 16px",
+  padding: "0 2px",
 };
 const tierLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -389,16 +391,16 @@ const tierFillStyle: CSSProperties = {
   background: "linear-gradient(to right, var(--v5-brand), color-mix(in srgb, var(--v5-brand) 55%, var(--v5-success)))",
 };
 const tierProgressStyle: CSSProperties = {
-  marginTop: "8px",
+  margin: "8px 18px 0",
   fontFamily: "var(--font-v5)",
   fontSize: "11.5px",
   color: "var(--v5-ink-4)",
 };
+// Wallet-binding nav row keeps its surface (nav-list whitelist) — border dropped.
 const walletCardStyle: CSSProperties = {
-  marginTop: "12px",
+  marginTop: "20px",
   gap: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };

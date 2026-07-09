@@ -170,11 +170,10 @@ function goDevices() {
   uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
 }
 
+// De-carded: download hero sits on the page floor (accent border + tint
+// gradient dropped). 2px optical inset aligns with the mx-4 gutter.
 const heroStyle: CSSProperties = {
-  borderRadius: "16px",
-  border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 26%, transparent)",
-  background: "linear-gradient(160deg, color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent), var(--v5-surface) 68%)",
-  padding: "16px",
+  padding: "0 2px",
 };
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -185,16 +184,16 @@ const eyebrowStyle: CSSProperties = {
 const headlineStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "22px",
+  fontSize: "20px",
   lineHeight: 1.12,
-  fontWeight: 650,
+  fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const bodyStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "12.5px",
-  lineHeight: 1.45,
-  color: "var(--v5-ink-3)",
+  fontSize: "13.5px",
+  lineHeight: 1.6,
+  color: "var(--v5-ink-2)",
 };
 const urlBoxStyle: CSSProperties = {
   marginTop: "14px",
@@ -224,8 +223,8 @@ const downloadButtonStyle: CSSProperties = {
   background: "var(--v5-tech-cyan)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13px",
-  fontWeight: 650,
+  fontSize: "13.5px",
+  fontWeight: 600,
 };
 const devicesButtonStyle: CSSProperties = {
   minHeight: "44px",
@@ -239,12 +238,11 @@ const devicesButtonStyle: CSSProperties = {
   fontSize: "12.5px",
   fontWeight: 600,
 };
+// De-carded: the demo panel sits on the floor as a second section; its mono
+// eyebrow (demoLabel) opens the section. 20px section gap above.
 const demoStyle: CSSProperties = {
-  marginTop: "14px",
-  borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
-  padding: "16px",
+  marginTop: "20px",
+  padding: "0 2px",
 };
 const demoLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -256,7 +254,7 @@ const demoTitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
   fontSize: "15px",
-  fontWeight: 650,
+  fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const demoBodyStyle: CSSProperties = {
@@ -272,7 +270,7 @@ const tierPillStyle: CSSProperties = {
   color: "var(--v5-tech-cyan)",
   fontFamily: "var(--font-v5)",
   fontSize: "11px",
-  fontWeight: 650,
+  fontWeight: 600,
   flexShrink: 0,
 };
 const modelLabelStyle: CSSProperties = {
@@ -288,8 +286,7 @@ function modelButtonStyle(model: string): CSSProperties {
   return {
     minHeight: "42px",
     borderRadius: "10px",
-    border: on ? "1px solid var(--v5-tech-cyan)" : "1px solid var(--v5-border)",
-    background: on ? "color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent)" : "var(--v5-surface-2)",
+    background: on ? "color-mix(in srgb, var(--v5-tech-cyan) 14%, transparent)" : "var(--v5-surface-2)",
     color: on ? "var(--v5-tech-cyan)" : "var(--v5-ink-2)",
     display: "grid",
     placeItems: "center",
@@ -318,6 +315,6 @@ const connectButtonStyle = computed<CSSProperties>(() => ({
   color: slotsFull.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontSize: "13.5px",
-  fontWeight: 650,
+  fontWeight: 600,
 }));
 </script>

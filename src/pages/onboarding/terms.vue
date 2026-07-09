@@ -195,11 +195,15 @@ function goRisk() {
 .tos-sections {
   border-radius: 16px;
   background: var(--v5-surface);
-  border: 1px solid var(--v5-border);
-  padding: 18px;
+  padding: 2px 18px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+}
+.tos-block {
+  padding: 14px 0;
+}
+.tos-block:not(:last-child) {
+  border-bottom: 1px solid var(--v5-border);
 }
 .tos-block__head {
   display: flex;
@@ -220,8 +224,8 @@ function goRisk() {
 }
 .tos-block__body {
   display: block;
-  font-size: 12px;
-  color: var(--v5-ink-3);
+  font-size: 13.5px;
+  color: var(--v5-ink-2);
   line-height: 1.65;
 }
 

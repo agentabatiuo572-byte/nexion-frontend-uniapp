@@ -117,6 +117,49 @@ export interface OtpGateConfig {
   captchaTicketTtlSeconds: number;
 }
 
+// ── FEAT-SHARE01 分享链路配置(§13.3 share.*;K/E 域运营可调)─────────────
+// server/admin canonical. Client reads as config, never as business constants.
+// baseUrl 为空(mock/dev)时由 lib/share 回退运行时 origin,不产出死链。
+
+// web = H5 可直接唤起的分享 intent URL;scheme = 仅 App 直发(H5 走复制降级);
+// copy / poster / system = 本地动作,无外链模板。
+export type ShareIntentType = "web" | "scheme" | "copy" | "poster" | "system";
+
+export type ShareChannelKey =
+  | "zalo"
+  | "telegram"
+  | "whatsapp"
+  | "messenger"
+  | "sms"
+  | "x"
+  | "copy"
+  | "poster"
+  | "system";
+
+export interface ShareChannelDef {
+  key: ShareChannelKey;
+  intentType: ShareIntentType;
+  // web 型必填:intent 模板,{link}/{text} 占位(URL-encode 后代入)。
+  urlTemplate?: string;
+  // App 壳已装检测参数(H5 忽略;v1 仅承载结构,检测在组件层接入)。
+  androidPackage?: string;
+  iosScheme?: string;
+  enabled: boolean;
+}
+
+export interface ShareConfig {
+  // 短链前缀(如 https://nexion.ai/ref/)。空串 = dev 回退运行时 origin。
+  baseUrl: string;
+  // 顺序即渠道面板展示序(越南盘默认 Zalo 首位)。
+  channels: ShareChannelDef[];
+  // 注册成功页下载引导;全空 = 未上架态(隐藏下载 CTA)。
+  appDownload: {
+    iosUrl: string;
+    androidUrl: string;
+    apkUrl: string;
+  };
+}
+
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
   onlineBonus: OnlineBonus;
@@ -130,4 +173,5 @@ export interface PlatformConfig {
     content: ComputeShareContent;
     gpuTiers: GpuTier[];
   };
+  share: ShareConfig;
 }

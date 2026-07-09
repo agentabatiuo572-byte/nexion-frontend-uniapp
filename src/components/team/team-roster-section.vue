@@ -5,9 +5,11 @@
   city/age + per-member royalty contribution). Members sorted by month volume.
   Each member's contribution = month vol × layer rate (UNILEVEL_USDT; direct = 10%).
   <button>→<view @click>. <span>/<div> text leaves→<text>. emits toggle.
+  DECARD 2026-07-09: form-b row container — surface fill kept, outer border
+  dropped (rows already hairline-separated inside).
 -->
 <template>
-  <view class="rounded-2xl border overflow-hidden" :style="cardStyle">
+  <view class="rounded-2xl overflow-hidden" :style="cardStyle">
     <view class="flex items-center active:opacity-90" :style="headerStyle" @click="emit('toggle')">
       <text class="rounded-xl grid place-items-center font-display" :style="badgeStyle">{{ badge }}</text>
       <view class="flex-1 text-left min-w-0">
@@ -86,7 +88,9 @@ function statusColor(status: MemberStatus): string {
 }
 
 // ─── styles ───
-const cardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+// Row container: fill only, no border (radius via rounded-2xl class;
+// overflow-hidden kept — it clips row corners inside the rounded fill).
+const cardStyle: CSSProperties = { background: "var(--v5-surface)" };
 const headerStyle: CSSProperties = { width: "100%", padding: "12px 16px", gap: "12px" };
 const badgeStyle = computed<CSSProperties>(() => ({
   width: "36px",

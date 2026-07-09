@@ -34,12 +34,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(__dirname, ".baseline");
 const BASE = process.env.BASE_URL || "http://localhost:5173";
 
+// ?nx_device=off — without it localhost wraps the app in the device-shell
+// iframe and the outer page has no .nx-header/.nx-tabbar-pill to capture
+// (P-058 class of bug; broke every capture after the shell shipped).
 const PAGES = [
-  ["home", "/#/pages/index/index"],
-  ["earn", "/#/pages/earn/earn"],
-  ["store", "/#/pages/store/store"],
-  ["team", "/#/pages/team/team"],
-  ["me", "/#/pages/me/me"],
+  ["home", "/?nx_device=off#/pages/index/index"],
+  ["earn", "/?nx_device=off#/pages/earn/earn"],
+  ["store", "/?nx_device=off#/pages/store/store"],
+  ["team", "/?nx_device=off#/pages/team/team"],
+  ["me", "/?nx_device=off#/pages/me/me"],
 ];
 
 async function capture(label) {

@@ -112,8 +112,32 @@ sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|
 # (added 2026-06-22: 转化→推荐 task surfaced 3 user-facing leaks past the gate.)
 i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate' src/i18n/messages 2>/dev/null | head -5)
 if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
+# copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
+# literal stars/backticks, and route-path literals violate the no-jargon rule.
+# (added 2026-07-09: owner caught **直接版税** + `/team/binary` in how-page copy.)
+i18n_md=$(grep -rEnI '\*\*[^*]+\*\*|`/[a-z]' src/i18n/messages 2>/dev/null | head -5)
+if [ -z "$i18n_md" ]; then ok "no markdown residue in i18n copy (0 hits)"; else bad "markdown residue in i18n copy (** or \`/path\`)"; echo "$i18n_md" | sed 's/^/        /'; fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
+# safe-area base padding (PITFALLS P-065): any padding that references
+# env(safe-area-inset-bottom) must carry a base offset ≥22px — a bare env()
+# (base 0) or a small base hugs the iOS home indicator. House baseline = 38px
+# (bottom sheets); 22px floor admits the chat composer. Both operand orders +
+# the env(…, 0px) fallback form are parsed.
+sa_bad=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const bad=[];
+const re1=/(\d+(?:\.\d+)?)px\s*\+\s*env\(safe-area-inset-bottom(?:,[^)]*)?\)/;
+const re2=/env\(safe-area-inset-bottom(?:,[^)]*)?\)\s*\+\s*(\d+(?:\.\d+)?)px/;
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);const s=fs.statSync(p);
+if(s.isDirectory())walk(p);else if(/\.(vue|css)$/.test(f)){
+fs.readFileSync(p,"utf8").split(/\r?\n/).forEach((ln,i)=>{
+if(!ln.includes("safe-area-inset-bottom"))return;
+const m=ln.match(re1)||ln.match(re2);
+const base=m?parseFloat(m[1]):0;
+if(base<22)bad.push(p.split(path.sep).join("/")+":"+(i+1)+" base="+base+"px");});}}})("src");
+if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
+if [ -z "$sa_bad" ]; then ok "safe-area-inset-bottom base padding >=22px (P-065)"; else bad "safe-area base padding <22px (iOS home-indicator hug)"; echo "$sa_bad" | sed 's/^/        /'; fi
 # ── SPEC-1 载体分层 + 服务端结算解耦 sentinels ──
 # carrier-tiering: hashpower MUST keep the H5 base-hosting branch (防回退到 App/H5 同口径)
 sentinel_present "SPEC-1 carrier-tiering: H5 base-hosting branch" src/lib/hashpower.ts 'carrier === "h5"'
@@ -740,6 +764,11 @@ subpage_header_sticky() {
   [ -f "$f" ] || { bad "sub-page-header.vue missing"; return; }
   if grep -qE 'position:\s*sticky' "$f"; then ok "SubPageHeader sticky (pins + frosts on scroll)";
   else bad "SubPageHeader not sticky (吸顶/磨砂 broken for ~55 pages)"; fi
+  # De-card sweep 2026-07-09: .spv margin-bottom is the SINGLE SOURCE of the
+  # nav→content 24px breathing for ~55 SubPageHeader pages. If it's removed,
+  # every sub-page's header jams against content (the "太紧" regression).
+  if grep -qE 'margin-bottom:\s*24px' "$f"; then ok "SubPageHeader nav→content 24px gap (single-source breathing)";
+  else bad "SubPageHeader lost margin-bottom:24px (~55 pages jam header against content)"; fi
 }
 subpage_header_sticky
 # Device daily-yield single-source parity (2026-06-18 drift incident): the same

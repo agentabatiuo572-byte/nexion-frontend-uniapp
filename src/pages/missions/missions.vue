@@ -19,11 +19,10 @@
     <CardStagger class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/index/index" />
 
-      <!-- Hero -->
-      <view class="mx-4 mt-2 relative overflow-hidden" :style="heroStyle">
-        <view aria-hidden :style="heroAuroraStyle" />
-        <view aria-hidden :style="heroGridStyle" />
-        <view class="relative">
+      <!-- Hero — de-carded: chip + title + subtitle sit on the page floor; aurora
+           + grid floor decoration deleted outright (owner call 2026-07-08). -->
+      <view class="mx-4" :style="heroStyle">
+        <view>
           <view class="inline-flex items-center font-mono-tabular" :style="heroChipStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
             {{ t.missions.heroLabel }}
@@ -67,7 +66,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /><path d="M17 14h-6" /><path d="M13 18H7" /><path d="M7 14h.01" /><path d="M17 18h.01" /></svg>
           <text :style="sectionTitleStyle">{{ t.missions.monthHeading }}</text>
         </view>
-        <view class="mx-4 rounded-xl border" :style="monthCardStyle">
+        <view class="mx-4 rounded-xl" :style="monthCardStyle">
           <view class="flex items-center" style="gap: 10px">
             <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-warning)')">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
@@ -165,33 +164,10 @@ function go(url: string) {
 }
 
 // ── styles ──
+// De-carded hero — content on the page floor (2px optical inset); surface/border
+// + aurora/grid glows deleted outright, not re-tuned.
 const heroStyle: CSSProperties = {
-  position: "relative",
-  padding: "18px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
-const heroAuroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-success-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.20) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
-};
-const heroGridStyle: CSSProperties = {
-  position: "absolute",
-  inset: "0",
-  backgroundImage:
-    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)",
-  backgroundSize: "24px 24px",
-  pointerEvents: "none",
+  padding: "0 2px",
 };
 const heroChipStyle: CSSProperties = {
   gap: "6px",
@@ -228,12 +204,12 @@ const sectionTitleStyle: CSSProperties = {
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
+// Filled nav row, no border — chevron + active:opacity carry the tap affordance.
 const rowStyle: CSSProperties = {
   gap: "12px",
   padding: "12px 14px",
   borderRadius: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 function rowIconBox(tint: string): CSSProperties {
   return {
@@ -265,9 +241,9 @@ const badgeStyle: CSSProperties = {
   fontSize: "10px",
   fontWeight: 500,
 };
+// Form-b filled placeholder, no border (border UnoCSS class dropped in template).
 const monthCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "14px",
 };
 const monthBodyStyle: CSSProperties = {

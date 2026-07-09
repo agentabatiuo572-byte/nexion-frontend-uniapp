@@ -25,7 +25,7 @@
           v-for="(c, i) in channels"
           :key="c.id"
           class="w-full flex items-center active:opacity-90"
-          :style="channelRowStyle(i !== 0)"
+          :style="channelRowStyle(i !== channels.length - 1)"
           role="button"
           tabindex="0"
           :aria-label="c.label"
@@ -106,13 +106,12 @@ function onChannel(c: Channel) {
   toast.info(c.label, c.hint);
 }
 
+// Live status — plain indicator line on the page floor; the pulsing brand dot +
+// brand "online" text carry the affordance, the boxed chrome added nothing.
 const statusStyle: CSSProperties = {
   gap: "8px",
   marginBottom: "12px",
-  padding: "8px 12px",
-  background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent)",
-  borderRadius: "12px",
+  padding: "0 2px",
 };
 const pingStyle: CSSProperties = {
   position: "absolute",
@@ -125,18 +124,18 @@ const pingStyle: CSSProperties = {
 const dotStyle: CSSProperties = { width: "8px", height: "8px", borderRadius: "999px", background: "var(--v5-brand)" };
 const onlineTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", fontWeight: 500 };
 const avgStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)" };
+// Channels — transparent hairline nav list on the floor (2px optical indent,
+// border-top opens the group; per-row hairlines below). No card chrome.
 const cardStyle: CSSProperties = {
-  marginBottom: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  overflow: "hidden",
+  marginBottom: "20px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
-function channelRowStyle(divider: boolean): CSSProperties {
+function channelRowStyle(notLast: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "14px 16px",
-    borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
+    padding: "14px 0",
+    borderBottom: notLast ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
   };
 }
 function iconBoxStyle(bg: string): CSSProperties {
@@ -148,11 +147,10 @@ const channelLabelStyle: CSSProperties = {
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
 const channelHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+// Pinned notes — block on the page floor; the pin-icon header stands in for a
+// section label, whitespace above separates it from the channels group.
 const pinnedCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "16px",
+  padding: "0 2px",
 };
 const pinnedTitleStyle: CSSProperties = {
   fontSize: "12.5px",
@@ -167,5 +165,5 @@ const pinDotStyle: CSSProperties = {
   background: "var(--v5-warning)",
   flexShrink: 0,
 };
-const pinTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const pinTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
 </script>

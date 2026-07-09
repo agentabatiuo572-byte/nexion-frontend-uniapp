@@ -48,7 +48,7 @@
       </scroll-view>
 
       <!-- FAQ list -->
-      <view class="mx-4" :style="cardStyle">
+      <view class="mx-4" :style="faqWrapStyle">
         <view v-if="filtered.length === 0" :style="emptyStyle">
           <text :style="emptyTextStyle">{{ emptyResults }}</text>
         </view>
@@ -109,8 +109,8 @@
         </view>
       </view>
 
-      <!-- Contact card -->
-      <view class="mx-4" :style="contactCardStyle">
+      <!-- Contact -->
+      <view class="mx-4" :style="contactRowStyle">
         <view class="flex items-center" style="gap: 12px">
           <view class="grid place-items-center" :style="mailBoxStyle">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
@@ -223,10 +223,10 @@ function goTicketCreate() {
 
 const contactLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", minHeight: "44px", paddingLeft: "10px", paddingRight: "10px" };
 const searchIconStyle: CSSProperties = { position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 1 };
+// Search — recessed fill, no border (input idiom: surface-3, single visual difference).
 const searchInputStyle: CSSProperties = {
   width: "100%",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-3)",
   borderRadius: "12px",
   padding: "10px 12px 10px 36px",
   fontSize: "13.5px",
@@ -246,27 +246,27 @@ function chipStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
 }
-const cardStyle: CSSProperties = {
-  marginBottom: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  overflow: "hidden",
+// FAQ list — transparent hairline group on the page floor (2px optical indent,
+// border-top opens the group; per-item hairlines below). No card chrome.
+const faqWrapStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 const emptyStyle: CSSProperties = { padding: "24px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "13.5px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };
 const faqDividerStyle: CSSProperties = { borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const faqHeadStyle: CSSProperties = { gap: "12px", padding: "12px 16px", minHeight: "48px" };
-const faqQStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 500, color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
+const faqHeadStyle: CSSProperties = { gap: "12px", padding: "14px 0", minHeight: "48px" };
+const faqQStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
 function chevStyle(open: boolean): CSSProperties {
   return { transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 150ms ease" };
 }
-const faqBodyStyle: CSSProperties = { padding: "0 16px 12px" };
-const faqAStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const faqBodyStyle: CSSProperties = { padding: "0 0 14px" };
+const faqAStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 };
+// NexionBot — a contained chat widget (single surface container, no border).
 const botCardStyle: CSSProperties = {
   marginBottom: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
 };
@@ -296,11 +296,10 @@ const botInputStyle: CSSProperties = { flex: "1", background: "transparent", fon
 function sendBtnStyle(active: boolean): CSSProperties {
   return { width: "32px", height: "32px", borderRadius: "8px", background: active ? "var(--v5-brand-2)" : "var(--v5-surface-2)" };
 }
-const contactCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "16px",
+// Contact — trailing action row on the floor; hairline opens it under the bot.
+const contactRowStyle: CSSProperties = {
+  padding: "16px 2px 0",
+  borderTop: "1px solid var(--v5-border)",
 };
 const mailBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)" };
 const contactTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
@@ -317,3 +316,10 @@ const contactCtaStyle: CSSProperties = {
   fontWeight: 600,
 };
 </script>
+
+<style scoped>
+/* placeholder-class="ph" target — referenced by the search + bot inputs (P2). */
+.ph {
+  color: var(--v5-ink-4);
+}
+</style>

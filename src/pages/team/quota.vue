@@ -1,32 +1,38 @@
 <!--
   Hardware Quota — ported from Nexion-prototype/app/(main)/team/quota/page.tsx.
   Higher tiers (NexionBox Pro / Rack P1) gated behind activated-direct-invite /
-  team-volume milestones. Hero (active-invites count) + 2 QuotaTierCards + invite
-  CTA → /team. Sub-page → <AppChassis active="team"> w/ back → /team. Reuses
-  network + v-rank stores. useMemo → computed. condition `kind` flag replaces
-  locale string-match. banned hex #11131A → var(--v5-surface). <Link>→<view @click>.
+  team-volume milestones. De-carded hero (active-invites count directly on the
+  page floor, hairline footer) + 2 QuotaTierCards (whitelist tier cards, fill
+  no border) + invite CTA (tint fill, border dropped) → /team. Sub-page →
+  <AppChassis active="team"> w/ back → /team. Reuses network + v-rank stores.
+  useMemo → computed. condition `kind` flag replaces locale string-match.
+  banned hex #11131A → var(--v5-surface). <Link>→<view @click>.
 -->
 <template>
   <AppChassis active="team">
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.quota.pageTitle" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 4px">
-        <!-- Hero -->
-        <view class="rounded-2xl" :style="heroStyle">
-          <view class="flex items-center" style="gap: 8px">
-            <view class="rounded-xl grid place-items-center" :style="heroIconStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-            </view>
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
+        <!-- Hero — de-carded: invites count sits directly on the page floor.
+             The bordered card + page-floor radial glow were deleted outright
+             (owner call 2026-07-08: floor auras are removed, not re-tuned). -->
+        <view :style="heroStyle">
+          <view class="flex items-start justify-between">
             <view>
               <text class="block font-mono-tabular" :style="heroCapStyle">{{ t.quota.yourInvites }}</text>
-              <view class="flex items-baseline" style="gap: 4px; margin-top: 2px">
+              <view class="flex items-baseline" style="margin-top: 8px; gap: 6px">
                 <text class="font-display tabular-nums" :style="heroBigStyle">{{ activeDirect }}</text>
                 <text class="font-mono-tabular" :style="heroSuffixStyle">{{ fmt(t.quota.totalSuffix, { n: directInvites }) }}</text>
               </view>
             </view>
+            <view class="rounded-2xl grid place-items-center" :style="heroIconStyle">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+            </view>
           </view>
-          <text class="block" :style="heroBodyStyle">{{ t.quota.heroBody }}</text>
+          <view :style="heroFooterStyle">
+            <text class="block" :style="heroBodyStyle">{{ t.quota.heroBody }}</text>
+          </view>
         </view>
 
         <!-- Tier cards -->
@@ -117,33 +123,27 @@ function go(url: string) {
 }
 
 // ─── styles ───
-const heroStyle: CSSProperties = {
-  padding: "16px",
-  // SKILL 原版 radial glow = rgba(124,92,255,...) 紫色 → dark 主题 --v5-tech-cyan(=#8E72FF 紫);
-  // 与 leadership-pool.vue 同源映射一致(was --v5-brand-2 橙, 与图标 chip 撞色 = port bug)
-  background:
-    "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent) 0%, transparent 65%)," +
-    "linear-gradient(180deg, var(--v5-surface) 0%, var(--v5-on-brand) 100%)",
-  border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 25%, transparent)",
-};
-const heroIconStyle: CSSProperties = { width: "40px", height: "40px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
-const heroBigStyle: CSSProperties = { fontSize: "28px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+// De-carded hero: no surface/border/glow — content sits directly on the page
+// floor (leaderboard prize-hero idiom, 2px optical inset).
+const heroStyle: CSSProperties = { padding: "6px 2px 0" };
+const heroIconStyle: CSSProperties = { width: "48px", height: "48px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, color: "var(--v5-brand-2)", letterSpacing: "0.06em" };
+const heroBigStyle: CSSProperties = { fontSize: "30px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroSuffixStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+// -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
+const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const heroBodyStyle: CSSProperties = {
-  marginTop: "12px",
-  paddingTop: "12px",
-  borderTop: "1px solid var(--v5-border)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
   // SKILL leading-relaxed = 1.625 (原版 .text-[12px] leading-relaxed; was 1.6)
   lineHeight: 1.625,
 };
 
+// Conversion entry — tint fill only, border dropped (filled no border: single
+// visual difference).
 const inviteCtaStyle: CSSProperties = {
   padding: "16px",
   background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
-  border: "1px solid var(--v5-border)",
 };
 const inviteIconStyle: CSSProperties = { width: "40px", height: "40px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
 const inviteTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };

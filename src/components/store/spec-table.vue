@@ -4,7 +4,7 @@
   Value is ink (hardware) or brand (`brandValue`, for AI throughput rows).
 -->
 <template>
-  <view class="mx-4 rounded-2xl border overflow-hidden" :style="rootStyle">
+  <view class="mx-4 rounded-2xl overflow-hidden" :style="rootStyle">
     <view
       v-for="(r, i) in rows"
       :key="r.k"
@@ -27,7 +27,6 @@ const props = withDefaults(
 
 const rootStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "0 16px",
 };
 function rowStyle(i: number): CSSProperties {

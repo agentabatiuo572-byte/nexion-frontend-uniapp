@@ -85,6 +85,11 @@ function goBell() {
   align-items: center;
   gap: 8px;
   padding: 0 12px;
+  /* Global header→content breathing (owner 2026-07-09: nav sat too close to
+     content across every sub-page). One place, all ~55 sub-pages; tab pages use
+     the chassis header so they're untouched. Pages must NOT add their own top
+     padding on top of this — reset to 0 when de-carding. */
+  margin-bottom: 24px;
   background: var(--v5-chrome-bg);
   border-bottom: 1px solid var(--v5-chrome-border);
   backdrop-filter: saturate(180%) blur(24px);

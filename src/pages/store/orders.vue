@@ -2,14 +2,16 @@
   Orders list — ported from Nexion-prototype/app/(main)/store/orders/page.tsx.
   Order list from the orders store: empty state (browse-store CTA) or a list of
   status-badged cards, each navigating to order-detail (?id=). Wrapped in
-  <AppChassis active="store">; back + "Orders" title/subtitle live in the sticky
-  chassis nav header via useSetPageHeader (mirrors the prototype's
-  <SetPageHeader backHref="/store"/>, whose chassis Header fills in the route
-  title headerTitles.storeOrders + subtitle headerSubtitles.storeOrders).
+  <AppChassis active="store">; back + "Orders" title live in the sticky
+  chassis nav header via useSetPageHeader (title-only — no subtitle: the
+  platform is IDC-hosted colocation, nothing is physically shipped to the
+  user, so a "track your shipment" line doesn't apply — see 更新日志 2026-07-08).
 -->
 <template>
   <AppChassis active="store">
-    <view style="color: var(--v5-ink)">
+    <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
+         24px .spv gap, so the nav→content breathing is supplied here once. -->
+    <view style="color: var(--v5-ink); padding-top: 24px">
       <!-- Empty state -->
       <view v-if="orderList.length === 0" class="mx-4 rounded-2xl text-center active:opacity-95" :style="emptyCardStyle" role="button" tabindex="0" :aria-label="t.orders.browseStore" @click.stop="goStore">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
@@ -21,13 +23,14 @@
         </view>
       </view>
 
-      <!-- Order list -->
-      <view v-else class="mx-4" style="padding-bottom: 16px">
+      <!-- Order list — transparent hairline group (row cards flattened; the
+           container border-top opens the group, each row keeps a divider). -->
+      <view v-else class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
         <view
-          v-for="o in orderList"
+          v-for="(o, i) in orderList"
           :key="o.id"
-          class="block rounded-2xl border active:opacity-90"
-          :style="orderCardStyle"
+          class="block active:opacity-90"
+          :style="orderRowStyle(i === orderList.length - 1)"
           role="button"
           tabindex="0"
           :aria-label="`${o.productName} ${o.id}`"
@@ -68,12 +71,12 @@ const t = useT();
 const orders = useOrders();
 const orderList = computed(() => orders.orders);
 
-// Sticky chassis nav header — back + "Orders" title + "Track your hardware
-// shipments" subtitle (mirrors the prototype's <SetPageHeader backHref="/store"/>,
-// whose chassis Header resolves headerTitles.storeOrders + headerSubtitles.storeOrders).
+// Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted
+// colocation, nothing ships to the user, so the old "track your hardware
+// shipments" subtitle was retired — deliberate product decision, see
+// docs/前端产品更新日志.md 2026-07-08).
 useSetPageHeader(() => ({
   title: t.value.headerTitles.storeOrders,
-  subtitle: t.value.headerSubtitles.storeOrders,
   backHref: "/store",
 }));
 
@@ -111,9 +114,9 @@ function goDetail(id: string) {
 }
 
 // ─── styles ───
+// Empty state — dashed outline on the page floor, no fill (whitelist idiom).
 const emptyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  border: "1px dashed var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
 };
 const browseBtnStyle: CSSProperties = {
@@ -127,12 +130,12 @@ const browseBtnStyle: CSSProperties = {
   fontSize: "13.5px",
   fontWeight: 600,
 };
-const orderCardStyle: CSSProperties = {
-  marginBottom: "10px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
-};
+function orderRowStyle(isLast: boolean): CSSProperties {
+  return {
+    padding: "14px 0",
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 function iconBoxStyle(status: OrderStatus): CSSProperties {
   return {
     width: "40px",

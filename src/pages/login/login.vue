@@ -135,7 +135,7 @@ import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
-import { useSponsorship } from "@/store/sponsorship";
+import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { safeReturnTo } from "@/routing/safe-return-to";
@@ -186,7 +186,9 @@ let mounted = true;
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.return) returnParam.value = o.return;
-  if (o.ref) refOnLogin.value = o.ref;
+  // [FEAT-SHARE4] 与注册页同一 client 预检:非法码不入绑定链(服务端权威校验另行)。
+  const normRef = normalizeRefCode(o.ref);
+  if (normRef) refOnLogin.value = normRef;
 });
 
 const showCaptcha = ref(false);

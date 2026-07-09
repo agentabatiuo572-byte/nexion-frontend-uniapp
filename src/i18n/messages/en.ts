@@ -48,7 +48,6 @@ export const en = {
     meProof: "Proof of contribution",
     meLanguage: "Language",
     meGoals: "Goals",
-    meWrapped: "Wrapped",
     meRiskDisclosure: "Risk disclosure",
     meReplayTour: "Replay tour",
     // Team subtree
@@ -98,8 +97,6 @@ export const en = {
     meAchievements: "Badges and NEX for milestones",
     meProof: "Verifiable contribution record",
     meSupportTickets: "Track conversations with support",
-    // Store subtree
-    storeOrders: "Track your hardware shipments",
     // Team subtree
     teamUnilevel: "Royalties from direct + extended network",
     teamBinary: "Track A & B · auto-matched network",
@@ -233,6 +230,8 @@ export const en = {
     inviteLabel: "Invitation code",
     inviteOptional: "(optional)",
     invitePlaceholder: "Enter invite code (optional)",
+    inviteLockedLabel: "Locked",
+    inviteLockedTag: "Invite code from your link · can't be changed",
     resend: "Resend",
     resendIn: "Resend in {s}s",
     verify: "Verify and continue",
@@ -250,6 +249,23 @@ export const en = {
     giftCreditedToastSub: "Credited to wallet",
     giftPendingToast: "Welcome gift pending review",
     giftPendingToastSub: "Signup is complete. The reward is held until account review is complete.",
+    doneTitle: "You're in",
+    doneSubTeam: "Welcome to Nexion — you joined {name}'s team",
+    doneSubSolo: "Welcome to Nexion",
+    doneGiftPosted: "Credited — visible in your balance",
+    doneGiftPending: "Locked · releases after review",
+    doneGiftPendingNote: "Staying online in the APP speeds up the release.",
+    doneWhyApp1: "APP online hours speed up gift & yield release",
+    doneWhyApp2: "Real-time yield alerts — wake up to earnings",
+    doneWhyApp3: "Steadier connection & compute scheduling",
+    doneDownloadCta: "Download the Nexion APP",
+    doneDownloadIos: "Download for iOS",
+    doneDownloadAndroid: "Download for Android",
+    doneComingSoonTitle: "APP launching soon",
+    doneComingSoonBody: "Use the web version for now — we'll let you know the moment it launches.",
+    doneContinueWeb: "Continue on web",
+    doneContinue: "Continue",
+    doneDlFailed: "Couldn't open the download page — link copied",
     giftBillMemo: "Welcome gift - referral bonus",
     giftPendingBillMemo: "Welcome gift - pending review",
     back: "Back",
@@ -658,23 +674,6 @@ export const en = {
     },
   },
 
-  wrapped: {
-    label: "WRAPPED",
-    card1Title: "Your Nexion year.",
-    card1Body: "Six stories from your network journey. Tap to scroll through.",
-    card2Label: "TOTAL EARNED",
-    card2Body: "Across {days} active days. Every cent flowed through hardware-verified AI inference.",
-    card3Devices: "{n} active device(s)",
-    card3Body: "Streaming compute for {days} consecutive days. Nexion never sleeps.",
-    card4Title: "Friends invited",
-    card4Body: "Every account you brought in unlocked compounding Direct Royalty + Network Yield Bonus for you.",
-    card5Body: "From V0 onboarding to your current rank — earned by sustained network growth.",
-    card6Title: "Ready for year two?",
-    card6Body: "Founders-tier perks unlock at V6+. Keep your fleet active, keep inviting, keep stacking.",
-    shareCta: "Share Wrapped",
-    shareToast: "Wrapped card copied to clipboard — paste anywhere",
-    doneCta: "Done",
-  },
 
   goals: {
     navTitle: "Earning goals",
@@ -1690,7 +1689,7 @@ export const en = {
   },
   team: {
     title: "My Team",
-    subtitle: "Earn 5% from your friends' earnings, forever.",
+    subtitle: "Earn 10% royalty on every friend's order, forever.",
     referralCode: "Your Referral Code",
     copyCode: "Copy",
     copied: "Copied!",
@@ -2059,7 +2058,6 @@ export const en = {
     networkCardInvitesWord: "invites",
     networkCardServerEligible: "All conditions met · awaiting confirmation",
     secAccount: "Account",
-    secEarnExtras: "Earn extras",
     secPreferences: "Preferences",
     secHelp: "Help & Support",
     profile: "Profile",
@@ -2105,14 +2103,16 @@ export const en = {
     walletCardsMeta: "Card manager",
     goalsRow: "Earning goals",
     setTarget: "Set target",
-    wrappedRow: "Annual Wrapped",
     riskRow: "Risk disclosure",
     preferencesRow: "Preferences",
     themeRow: "Theme",
     themeLight: "Light",
     themeDark: "Dark",
+    themeSystem: "System",
     themeMetaLight: "Light",
     themeMetaDark: "Dark",
+    themeMetaSystem: "System",
+    themePickerTitle: "Appearance",
     missionsRow: "Mission Center",
     missionsValue: "Quests & streaks",
     languageRow: "Language",
@@ -2159,11 +2159,7 @@ export const en = {
     proofOfCompute: "Proof of Compute",
     back: "Back",
     viewReceipt: "View receipt",
-    viewOnExplorer: "View on Explorer",
-    share: "Share",
     copied: "Copied to clipboard",
-    explorerHint: "Explorer link copied to clipboard",
-    shareHint: "Share link copied to clipboard",
     clearAll: "Clear all",
     clearConfirm: "Delete all receipts? This cannot be undone.",
     emptyTitle: "No receipts yet",
@@ -2374,11 +2370,11 @@ export const en = {
     // Seed message bodies (proactive advisor + support) — {name} filled from mock
     seed: {
       advisorWelcome:
-        "Hi, I'm **{name}**, your growth advisor 👋 I keep an eye on your rigs and ping you when there's a clear win.",
+        "Hi, I'm {name}, your growth advisor 👋 I keep an eye on your rigs and ping you when there's a clear win.",
       advisorIdleGpu:
-        "Heads up — your devices have been idling ~30% the last few days. Upgrading to **NexionBox Pro** earns noticeably more on the same plug. Want me to show you?",
+        "Heads up — your devices have been idling ~30% the last few days. Upgrading to NexionBox Pro earns noticeably more on the same plug. Want me to show you?",
       advisorStaking:
-        "The 180-day vault is at **95% APY, today only**. Locking even part of your balance now compounds fast — quick to set up 👇",
+        "The 180-day vault is at 95% APY, today only. Locking even part of your balance now compounds fast — quick to set up 👇",
       supportResolved:
         "Glad that's sorted! I've closed this one — reopen anytime if anything else comes up. 🙌",
       supportUserQ:
@@ -2470,7 +2466,7 @@ export const en = {
       "NEX is the Nexion platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
     historyTitle: "Recent swaps",
     historyEmpty: "Your first swap will appear here.",
-    howItWorksEntry: "New here? Learn how exchange works",
+    howItWorksEntry: "Rules",
     // v3 risk-control dashboard
     capsLabel: "Daily exchange caps",
     capsReset: "Resets midnight",
@@ -2954,6 +2950,7 @@ export const en = {
     cta: {
       share: "Share my invite link",
       poster: "Share invite poster",
+      loadMore: "View more",
     },
     note: "Rankings update every 5 minutes. Pool pays out automatically at period reset.",
   },
@@ -3035,7 +3032,7 @@ export const en = {
       claimedTitle: "Position claimed",
       claimedSubtitle: "+${total} returned (interest ${interest})",
     },
-    howItWorksEntry: "New here? Learn how staking works",
+    howItWorksEntry: "Rules",
   },
 
   stakingHowItWorks: {
@@ -3089,7 +3086,7 @@ export const en = {
       "$20 USDT minimum per position. Below this, the interest amounts are too small to be meaningful after the lock period.",
     faqQ2: "Can I stake from NEX balance instead of USDT?",
     faqA2:
-      "No — staking is USDT-only. Convert NEX to USDT in `/me/wallet/exchange` first, then stake.",
+      "No — staking is USDT-only. Convert NEX to USDT in Wallet → Exchange first, then stake.",
     faqQ3: "What happens at maturity if I don't claim?",
     faqA3:
       "Nothing bad. The position sits in matured state and waits for you. Interest doesn't keep accruing past maturity — to keep earning, claim and stake again.",
@@ -3203,7 +3200,7 @@ export const en = {
     socialBought: "bought",
     justNow: "just now",
     openseaLine: "View on OpenSea · floor",
-    howItWorksEntry: "New here? Learn how Genesis Nodes work",
+    howItWorksEntry: "Rules",
     // Secondary-market resale fill (mock auto-sell of a listed node). The
     // server-side equivalent is a settlement webhook that credits the seller
     // net of the {GENESIS_ROYALTY_RATE} royalty; the toast mirrors that event.
@@ -3292,7 +3289,7 @@ export const en = {
     needTeam: "${n} more team volume",
     needV: "{n} more {title} (V{v})",
     upgradeCta: "Upgrade path (buy device + invite)",
-    howItWorksEntry: "New here? Learn how ranks work",
+    howItWorksEntry: "Rules",
   },
 
   rankHowItWorks: {
@@ -3387,12 +3384,13 @@ export const en = {
 
   unilevel: {
     pageTitle: "Influence Network Royalty",
-    pageSubtitle: "Earn a royalty cut from every friend who buys + an algorithmic bonus from your extended network.",
+    pageSubtitle: "Earn a royalty cut from every partner who buys + an algorithmic bonus from your extended network.",
     people: "people",
-    noMembers: "No royalty source yet · invite friends to start earning",
+    noMembers: "No royalty source yet · invite partners to start earning",
     spillTag: "REFERRED-IN",
     wing: "track",
-    howItWorksEntry: "How the Royalty Program works",
+    howItWorksEntry: "Rules",
+    loadMore: "View more",
 
     // Hero
     heroLabel: "ROYALTY THIS MONTH",
@@ -3400,9 +3398,9 @@ export const en = {
 
     // Component A: Direct Royalty
     directLabel: "Direct Royalty",
-    directSub: "Royalty cut from every order placed by friends you invited.",
+    directSub: "Royalty cut from every order placed by partners you invited.",
     directRateText: "{rate}% royalty rate",
-    directMembersText: "{n} direct friends contributing",
+    directMembersText: "{n} direct partners contributing",
 
     // Component B: Network Yield Bonus
     networkLabel: "Network Yield Bonus",
@@ -3425,7 +3423,7 @@ export const en = {
     },
 
     // Member list filter
-    filterAll: "All friends",
+    filterAll: "All partners",
     filterDirect: "Direct",
     filterExtended: "Extended",
     memberBadgeDirect: "DIRECT",
@@ -3542,7 +3540,7 @@ export const en = {
     recentMatches: "Recent matches",
     left: "A",
     right: "B",
-    howItWorksEntry: "New here? Learn how the program works",
+    howItWorksEntry: "Rules",
   },
 
   binaryHowItWorks: {
@@ -3637,7 +3635,7 @@ export const en = {
     pastPools: "Past weekly pools",
     poolTotalShort: "Pool ${k}K · {n} votes",
     youTag: "YOU",
-    howItWorksEntry: "New here? Learn how the Leadership Pool works",
+    howItWorksEntry: "Rules",
     concentrationHint: "Top {n} leaders take ~{pct}% of the pool · the higher you climb, the more you take",
   },
 
@@ -3727,7 +3725,7 @@ export const en = {
       leadership: "Leadership",
       genesis: "Genesis",
     },
-    howItWorksEntry: "New here? Learn how commissions work",
+    howItWorksEntry: "Rules",
   },
 
   commissionsHowItWorks: {
@@ -3747,7 +3745,7 @@ export const en = {
       "Paid when anyone in your influence network places a qualifying order. Direct invites pay your current rate; the extended network pays via the algorithmic Network Yield Bonus. Most frequent channel.",
     k2Label: "Balance Match Bonus",
     k2Body:
-      "Paid {freq} based on the smaller of your two tracks × 10%. Requires both tracks ≥ $1,000/month. See `/team/binary` for details.",
+      "Paid {freq} based on the smaller of your two tracks × 10%. Requires both tracks ≥ $1,000/month. See Team → Balance Match for details.",
     k3Label: "Peer · same-rank bonus",
     k3Body:
       "Unlocks at V3. When teammates at your rank or higher make qualifying purchases, you receive 5% — a reward for leaders who develop other leaders.",
@@ -3759,7 +3757,7 @@ export const en = {
       "Unlocks at V3. The platform contributes 5% of total weekly volume to a pool, split among V3+ users by vote weight. Settles every Monday.",
     k6Label: "Genesis · founder emissions",
     k6Body:
-      "If you hold Genesis units (creation-slot NFTs, see `/genesis`), you receive a perpetual share of platform revenue weighted by units held.",
+      "If you hold Genesis units (creation-slot NFTs, see your Genesis page), you receive a perpetual share of platform revenue weighted by units held.",
     s3Title: "Settlement lifecycle",
     s3Intro:
       "Every commission goes through three stages before it's truly yours to withdraw.",
@@ -3822,7 +3820,7 @@ export const en = {
     toastSubtitle: "${a} locked at 35% APY for 90 days",
     insufficient: "Insufficient balance",
     insufficientSub: "Only ${a} available",
-    howItWorksEntry: "New here? Learn how Re-invest works",
+    howItWorksEntry: "Rules",
   },
 
   repurchaseHowItWorks: {
@@ -3876,10 +3874,10 @@ export const en = {
       "Re-invest pays the same interest as standard 90-day staking, plus Genesis lottery + cultivation multiplier all stacked on top. Same lock duration, three times the upside.",
     faqQ2: "Can I re-invest from NEX balance instead of USDT?",
     faqA2:
-      "No — Re-invest is USDT-only. Convert NEX to USDT in `/me/wallet/exchange` first, then re-invest.",
+      "No — Re-invest is USDT-only. Convert NEX to USDT in Wallet → Exchange first, then re-invest.",
     faqQ4: "How is the Genesis lottery drawn?",
     faqA4:
-      "Drawn the first of each month, transparent on-chain. Winners are announced and the fractional NFT lands in their `/genesis` page automatically. Holding multiple tickets increases your odds proportionally.",
+      "Drawn the first of each month, transparent on-chain. Winners are announced and the fractional NFT lands on their Genesis page automatically. Holding multiple tickets increases your odds proportionally.",
     ctaBack: "Got it · Re-invest now",
   },
 
@@ -4268,6 +4266,8 @@ export const en = {
     privacy: "Privacy",
     trustCenter: "Trust Center",
     sponsorCityLine: "{city} · {n} network members",
+    alreadyBar: "You're already on Nexion. Invite links are for new users — the welcome gift is once per account.",
+    enterApp: "Enter Nexion",
   },
 
   upsell: {
@@ -4536,6 +4536,50 @@ export const en = {
     unreadCount: "{n} unread",
     allCaughtUp: "All caught up",
     prefsFooter: "Notification preferences in Settings →",
+  },
+
+  // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).
+  share: {
+    posterTitle: "Share poster",
+    channelTitle: "Invite friends",
+    rewardLine: "Every registered friend adds ${usd} for you",
+    posterRewardLine: "Friends get ${usd} + {nex} NEX on sign-up · scan goes straight to register",
+    scanTip: "Scan to join · gift on sign-up",
+    tplGift: "Gift",
+    tplYield: "My yield",
+    tplBrand: "Network",
+    showUsername: "Show username",
+    generating: "Generating…",
+    genFailed: "Couldn't generate the poster",
+    retry: "Retry",
+    saveImage: "Save image",
+    saved: "Poster saved",
+    saveLongPress: "Saving is limited here — long-press the poster to save",
+    copyLink: "Copy link",
+    more: "More",
+    cancel: "Cancel",
+    smsLabel: "SMS",
+    openFailedCopied: "Couldn't open {channel} — invite text copied, paste it there",
+    schemeCopied: "Invite text copied — open {channel} and paste to send",
+    noCodeYet: "Your invite code is being prepared — try again shortly",
+    copyFailed: "Copy failed — try again",
+    shareText: "I earn daily compute yield on Nexion. Sign up with my link and grab ${usd} + {nex} NEX free → {link}",
+    questRewardMemo: "Day-one quest · Invite a friend",
+    questRewardToast: "Quest complete: invite a friend",
+    posterGiftCap: "WELCOME GIFT",
+    posterGiftTitle: "Sign up & get",
+    posterGiftAmount: "${usd} + {nex} NEX",
+    posterGiftSub1: "AI compute yield platform · earnings from day one",
+    posterGiftSub2: "47 countries · 28,432 joined this month",
+    posterYieldCap: "TODAY'S EARNINGS",
+    posterYieldSub: "My devices produced today",
+    posterYieldDevices: "Devices",
+    posterYieldUnit: "{n} running",
+    posterYieldYou: "You get on sign-up",
+    posterBrandCap: "NETWORK",
+    posterBrandTitle1: "Run AI compute",
+    posterBrandTitle2: "together with me",
+    posterBrandSub: "Sign up and start with ${usd} + {nex} NEX",
   },
 };
 

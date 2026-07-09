@@ -23,7 +23,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s2Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <IconRow emoji="⚡" :label="w.benefit1Label" :body="w.benefit1Body" />
           <IconRow emoji="🎟" :label="w.benefit3Label" :body="w.benefit3Body" />
           <IconRow emoji="📈" :label="w.benefit4Label" :body="w.benefit4Body" />
@@ -35,7 +35,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" />
@@ -113,10 +113,10 @@ function goBack() {
 }
 
 const monoFamily = "var(--font-jet-mono), ui-monospace, monospace";
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "8px" };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px" };
-const introMuted: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "12px" };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
+const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const introMuted: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
 const exampleBoxStyle: CSSProperties = {
   padding: "14px",
   borderRadius: "12px",

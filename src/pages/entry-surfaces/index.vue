@@ -60,17 +60,16 @@ function open(route: string) {
 <style scoped>
 .entry-index {
   min-height: 100%;
-  padding: 16px;
+  padding: 0 16px 16px;
+  /* chassis-nav 页(useSetPageHeader,无 SubPageHeader):全局 24px 顶距不生效,此处单一 padding-top 作 nav→content 呼吸单源 */
+  padding-top: 24px;
   color: var(--v5-ink);
   font-family: var(--font-v5);
-  background:
-    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--v5-brand) 14%, transparent), transparent 32%),
-    radial-gradient(circle at 88% 6%, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), transparent 30%),
-    var(--v5-bg);
+  background: var(--v5-bg);
 }
 
 .entry-index__head {
-  padding: 18px 0 10px;
+  padding: 0 0 10px;
 }
 
 .entry-index__eyebrow {
@@ -78,20 +77,19 @@ function open(route: string) {
   align-items: center;
   min-height: 30px;
   padding: 0 12px;
-  border: 1px solid var(--v5-border);
   border-radius: 8px;
   background: var(--v5-surface);
   color: var(--v5-ink-2);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .entry-index__title {
   display: block;
   margin-top: 18px;
   color: var(--v5-ink);
-  font-size: 34px;
-  font-weight: 900;
+  font-size: 30px;
+  font-weight: 600;
   line-height: 1.08;
 }
 
@@ -99,14 +97,14 @@ function open(route: string) {
   display: block;
   margin-top: 12px;
   color: var(--v5-ink-2);
-  font-size: 14px;
-  line-height: 1.62;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 .entry-index__list {
-  display: grid;
-  gap: 10px;
   margin-top: 18px;
+  border-radius: 16px;
+  background: var(--v5-surface);
 }
 
 .entry-index__row {
@@ -114,12 +112,16 @@ function open(route: string) {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 92px;
-  padding: 14px;
-  border: 1px solid var(--v5-border);
-  border-radius: 8px;
-  background: var(--v5-surface);
-  box-shadow: var(--v5-card-shadow-lift);
+  min-height: 60px;
+  padding: 13px 14px;
+}
+
+.entry-index__row:not(:last-child) {
+  border-bottom: 1px solid var(--v5-border);
+}
+
+.entry-index__row:active {
+  opacity: 0.7;
 }
 
 .entry-index__row-copy {
@@ -130,7 +132,7 @@ function open(route: string) {
   display: block;
   color: var(--v5-ink);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .entry-index__row-url {
@@ -149,7 +151,7 @@ function open(route: string) {
   }
 
   .entry-index__title {
-    font-size: 44px;
+    font-size: 48px;
   }
 }
 </style>

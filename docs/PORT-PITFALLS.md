@@ -464,3 +464,28 @@
 - **对策**:bare page 自带宿主——`chat.vue` 模板末尾加 `<GlobalUi />`(它自 gate `showBusinessOverlays` 按路由判,chat 路由非 static-review → 正常显示;与 `login.vue`/`register.vue` 既有 bare 页挂法一致)。实景确认限频 toast 双语弹出。
 - **已转**:本台账。硬规则:**任何 bare 全屏页(不套 `AppChassis`)只要可能 raise toast/confirm/netError,必须自带 `<GlobalUi />`**;写 bare page 时先自问「这页的 overlay 往哪渲染」。
 - **元教训**:全局能力(toast/confirm)默认**依附某个容器**(这里 AppChassis)——脱离容器的页面白拿一个「调了不报错但没效果」的静默陷阱;「声明(调了 toast)≠实现(渲染出来)」,验证反馈类交互必**实景看到那个 toast/弹窗**,不能只确认「代码调了」。
+
+## P-063 · canvas 无法解析 CSS var → 海报/图形绘制的 token 纪律需「运行时读取 + 画稿常量」双轨
+
+- **现象**:FEAT-SHARE01 邀请海报用 uni canvas 绘制,`setFillStyle("var(--v5-brand)")` 无效(canvas 2D 填充不走 CSS 级联),若直接写死 hex 又违反「颜色用 token 不写 hex」铁律,且亮/暗主题切换后海报 brand 色会与 app 当前主题脱节。
+- **根因**:canvas 是位图绘制 API,不在 DOM 样式系统内——CSS 自定义属性对它天然不可见;而 V5 token 铁律的适用前提是「样式走 CSS」。
+- **对策**:双轨——① 主题相关色(brand / on-brand / accent)运行时 `getComputedStyle(document.documentElement).getPropertyValue("--v5-*")` 读真值(H5;非 H5 回退常量),海报随当前主题;② 画稿固有色(海报暗底渐变、暗底上的墨色)= 营销画面常量,与 UI 主题无关,文件头注释声明豁免理由。禁第三种形态(裸写死主题色)。
+- **已转**:本台账 + `share-poster-sheet.vue` 头注 + `cssVar()` helper。硬规则:**canvas/位图绘制里的主题色必须运行时读 token(带回退),画稿常量必须头注声明豁免**;审查 canvas 代码时把 `setFillStyle/fillStyle` 里的 hex 逐个归类「主题色(必须 cssVar)/画稿常量(必须有豁免注释)」。
+- **⚠️ 适用域更新(2026-07-08)**:主人拍板分享海报为**恒定深色画稿**(浅/深模式同一张图),`share-poster-sheet.vue` 已删 `cssVar()`,全部颜色转画稿常量(轨②)并头注豁免——「轨①运行时读 token」对该文件不再适用,**勿按本条把 cssVar 加回去**。双轨规则对未来其它「需随主题变」的 canvas 场景仍有效。
+- **元教训**:铁律有隐含适用域(token 铁律 ⊆ CSS 渲染域);出域场景(canvas / 邮件模板 / 导出图)要人为把「单源」精神翻译过去,而不是机械 grep hex=0 或干脆放弃纪律。
+
+## P-064 · uni H5 storage 值带 `{type,data}` 包装 → 外部/测试直写 localStorage 必须同格式,否则 hydrate 静默回退默认值
+
+- **现象**:实景走查想模拟登出,直接 `localStorage.setItem('nexion-auth-v1', JSON.stringify({isAuthenticated:false,...}))`,刷新后仍是登录态——像「改不动」;读侧 `JSON.parse(...).pendingCode` 也一直 undefined,像「没写进去」。
+- **根因**:uni H5 端 `uni.setStorageSync` 会把对象包装成 `{"type":"object","data":{…}}` 落 localStorage;`uni.getStorageSync` 读到**裸 JSON**(无包装)时按字符串返回,store 的 `typeof s === "object"` hydrate 守卫判失败 → 静默走默认值分支。写读两侧都「不报错但不生效」。
+- **对策**:任何绕开 uni API 直操 localStorage 的场景(Playwright 走查注入 / 调试脚本 / 数据迁移)一律读改写 `{type:"object",data:…}` 包装;或干脆在页面上下文里调 `uni.setStorageSync`。走查前先 `getItem` 看一眼真实格式再动手。
+- **已转**:本台账。硬规则:**E2E/走查脚本注入 uni 持久层,必须先读真实存储格式对齐包装**;凡「注入后行为没变」先怀疑格式不匹配,不是逻辑没生效。
+- **元教训**:框架适配层会给「标准 API」加私有约定;测试代码绕过适配层时,绕过的不只是 API 还有约定——注入型测试的第一步永远是「看一条真数据长什么样」。
+
+## P-065 · bottom sheet 底部留白必须「基础值 + env(safe-area-inset-bottom)」,新组件要对齐工程 38px 众数基准
+
+- **现象**:FEAT-SHARE01 两个新分享 sheet 底部贴屏幕边——渠道面板 `padding-bottom: env(safe-area-inset-bottom)` 裸用(浏览器/无刘海设备 env=0 → 基础留白 0),海报面板基础值只给 16px;主人指出「离屏幕边框太近,要考虑 iOS 底部小横条」。
+- **根因**:两层——① `env(safe-area-inset-bottom)` 只在 iOS 刘海屏 PWA/App 内有值,它是「避开小横条的系统区」,不是「视觉留白」,裸用=在其他环境完全贴边;② 写新 sheet 时没先 grep 工程既有 sheet 的基准:全站 10+ 个 bottom sheet 全是 `calc(env(safe-area-inset-bottom) + 38px)`,38px 是众数基准(同 `feedback_width_alignment_audit` 「先实测众数」的纵向版)。
+- **对策**:bottom sheet 一律 `padding-bottom: calc(env(safe-area-inset-bottom) + 38px)`;非 sheet 的贴底条(聊天输入条等)最低 22px。新做任何贴底组件前先 grep `safe-area-inset-bottom` 对齐既有基准。
+- **已转**:verify.sh 哨兵 `safe-area-inset-bottom base padding >=22px (P-065)`(node 解析两种词序 + env fallback 形态,基础值 <22px 即 FAIL;已探针验证真抓 0px/16px 反例)。
+- **元教训**:safe-area 类 env 变量是「条件性系统补偿」,永远要叠加设计留白而不是替代它;新组件的间距基准先问「工程里同类怎么写」,不是拍脑袋给个小值。

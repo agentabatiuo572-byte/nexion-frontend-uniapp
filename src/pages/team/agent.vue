@@ -1,8 +1,9 @@
 <!--
   Agent — ported from Nexion-prototype/app/(main)/team/agent/page.tsx.
-  Regional Ambassador dashboard (V5+ gated): hero → eligibility status
-  (eligible / locked + path CTA) → 4 reimbursable buckets → application form
-  (date/city/budget, gated submit) → recently-approved cases. Sub-page →
+  Regional Ambassador dashboard (V5+ gated), de-carded: floor hero →
+  eligibility tint banner (eligible / locked + path CTA) → 4 reimbursable
+  buckets (transparent hairline rows) → application form on the floor
+  (recessed fields, gated submit) → approved-case rows. Sub-page →
   <AppChassis active="team"> with in-page back row. Reuses v-rank store +
   v-badge. lucide → inline SVG; <input>→uni input; toast via store/ui.
 -->
@@ -11,10 +12,10 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamAgent" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- hero -->
-        <view class="rounded-2xl" :style="heroStyle">
-          <view class="flex items-center" style="gap: 8px">
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 18px">
+        <!-- hero — de-carded: sits on the page floor (radial glow deleted outright) -->
+        <view :style="heroStyle">
+          <view class="flex items-center" style="gap: 10px">
             <view class="rounded-xl grid place-items-center" :style="heroIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6" /><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11" /></svg>
             </view>
@@ -27,7 +28,7 @@
         </view>
 
         <!-- eligibility -->
-        <view v-if="unlocked" class="rounded-2xl border" :style="eligibleStyle">
+        <view v-if="unlocked" class="rounded-2xl" :style="eligibleStyle">
           <view class="flex items-center" style="gap: 12px">
             <view class="rounded-xl grid place-items-center" :style="eligibleIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
@@ -41,7 +42,7 @@
             </view>
           </view>
         </view>
-        <view v-else class="rounded-2xl border" :style="lockedStyle">
+        <view v-else class="rounded-2xl" :style="lockedStyle">
           <view class="flex items-center" style="gap: 12px">
             <view class="rounded-xl grid place-items-center" :style="lockedIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
@@ -52,18 +53,18 @@
             </view>
             <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" @click="go('/pages/team/rank')">
               <text>{{ t.agent.pathCta }}</text>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </view>
           </view>
         </view>
 
-        <!-- buckets -->
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <!-- buckets — transparent hairline rows -->
+        <view :style="bucketsGroupStyle">
           <view
-            v-for="b in BUCKETS"
+            v-for="(b, i) in BUCKETS"
             :key="b.id"
-            class="rounded-2xl border flex items-start"
-            :style="bucketStyle"
+            class="flex items-start active:opacity-70"
+            :style="bucketRowStyle(i === BUCKETS.length - 1)"
             role="button"
             tabindex="0"
             :aria-label="b.title"
@@ -83,8 +84,8 @@
         </view>
         <text v-if="selectedBucketTitle" class="block text-center" :style="selectedBucketStyle">{{ selectedBucketTitle }} · {{ t.agent.newApplication }}</text>
 
-        <!-- application form -->
-        <view class="rounded-2xl border relative overflow-hidden" :style="cardStyle">
+        <!-- application form — transparent block, recessed fields -->
+        <view :style="formBlockStyle">
           <text class="block font-mono-tabular" :style="formCapStyle">{{ t.agent.newApplication }}</text>
           <view style="display: flex; flex-direction: column; gap: 8px">
             <view :style="fieldStyle">
@@ -141,11 +142,11 @@
           <text v-if="!unlocked" class="block text-center" :style="previewOnlyStyle">{{ t.agent.previewOnly }}</text>
         </view>
 
-        <!-- approved cases -->
-        <view>
+        <!-- approved cases — transparent hairline rows -->
+        <view :style="casesBlockStyle">
           <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.recentlyApproved }}</text>
-          <view style="display: flex; flex-direction: column; gap: 8px">
-            <view v-for="(c, i) in APPROVED_CASES" :key="i" class="rounded-xl border" :style="caseStyle">
+          <view :style="casesGroupStyle">
+            <view v-for="(c, i) in APPROVED_CASES" :key="i" :style="caseRowStyle(i === APPROVED_CASES.length - 1)">
               <view class="flex items-start justify-between">
                 <view>
                   <text class="block" :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ c.name }}</text>
@@ -215,7 +216,7 @@ const BUCKETS = computed<Bucket[]>(() => [
     title: t.value.agent.buckets.dev.title,
     range: t.value.agent.bucketRangeHourly,
     rule: t.value.agent.buckets.dev.rule,
-    tint: "#30B0C7",
+    tint: "var(--v5-tech-cyan)",
     paths: ["m16 18 6-6-6-6", "m8 6-6 6 6 6"],
   },
 ]);
@@ -278,26 +279,23 @@ function go(url: string) {
 }
 
 // ─── styles ───
-const heroStyle: CSSProperties = {
-  padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 50% 0%, rgba(255,190,61,0.18) 0%, transparent 65%), linear-gradient(180deg, #1A1308 0%, var(--v5-on-brand) 100%)",
-  border: "1px solid rgba(255,190,61,0.30)",
-};
+// De-carded hero on the page floor — the old radial glow card was a page-floor
+// aura → deleted outright (owner call 2026-07-08), not re-tuned.
+const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 const heroIconStyle: CSSProperties = {
   width: "40px",
   height: "40px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
 const heroHeadlineStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, lineHeight: 1.25, marginTop: "2px" }; // SKILL: leading-tight=1.25 (was 1.2)
-const heroBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 }; // SKILL: leading-relaxed=1.625 (was 1.6)
+// Paragraph tier: 13.5 / 1.65 / ink-2 (body copy must not sit in ink-3).
+const heroBodyStyle: CSSProperties = { marginTop: "10px", fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
 
+// Status banners — tint fill only, border chrome dropped (single difference).
 const eligibleStyle: CSSProperties = {
   padding: "16px",
   background: "color-mix(in srgb, var(--v5-brand) 8%, transparent)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
 };
 const eligibleIconStyle: CSSProperties = {
   width: "40px",
@@ -307,8 +305,6 @@ const eligibleIconStyle: CSSProperties = {
 const lockedStyle: CSSProperties = {
   padding: "16px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
 };
 const lockedIconStyle: CSSProperties = {
   width: "40px",
@@ -320,20 +316,22 @@ const pathCtaStyle: CSSProperties = {
   height: "44px",
   gap: "4px",
   background: "var(--v5-brand-2)",
-  color: "var(--v5-ink)",
+  color: "var(--v5-on-brand-2)", // bright brand-2 fill → on-brand-2 text (incl. svg stroke)
   fontSize: "11.5px",
   fontWeight: 600,
 };
 
-// SKILL: prototype BucketRow gates opacity on unlocked (1 / 0.7) — was dropped in port
-const bucketStyle = computed<CSSProperties>(() => ({
-  padding: "14px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-  gap: "12px",
-  opacity: unlocked.value ? 1 : 0.7,
-}));
+// Transparent hairline rows — border-top opens the group, +12px top margin for
+// 24px section rhythm. SKILL: opacity still gates on unlocked (1 / 0.7).
+const bucketsGroupStyle: CSSProperties = { marginTop: "12px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+function bucketRowStyle(isLast: boolean): CSSProperties {
+  return {
+    padding: "13px 0",
+    gap: "12px",
+    opacity: unlocked.value ? 1 : 0.7,
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 const selectedBucketStyle: CSSProperties = {
   marginTop: "-4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -349,12 +347,8 @@ function bucketIconStyle(tint: string): CSSProperties {
   };
 }
 
-const cardStyle: CSSProperties = {
-  padding: "16px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-};
+// Transparent form block — 2px optical inset, +12px top margin (24px rhythm).
+const formBlockStyle: CSSProperties = { marginTop: "12px", padding: "0 2px" };
 const formCapStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 500,
@@ -362,11 +356,11 @@ const formCapStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   marginBottom: "12px",
 };
+// Input idiom — recessed surface-3 fill, no border (single difference).
 const fieldStyle: CSSProperties = {
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-3)",
   borderRadius: "12px",
   padding: "10px 12px",
-  border: "1px solid var(--v5-border)",
 };
 const fieldLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
@@ -397,17 +391,21 @@ const previewOnlyStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 
+// Transparent hairline rows — cap label outside, border-top opens the group.
+const casesBlockStyle: CSSProperties = { marginTop: "12px" };
 const approvedCapStyle: CSSProperties = {
-  padding: "0 4px",
+  padding: "0 2px",
   marginBottom: "8px",
-  fontSize: "10px",
-  letterSpacing: "0.16em",
+  fontSize: "11px",
+  fontWeight: 500,
+  letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
-const caseStyle: CSSProperties = {
-  padding: "12px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "12px",
-};
+const casesGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+function caseRowStyle(isLast: boolean): CSSProperties {
+  return {
+    padding: "12px 0",
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 </script>

@@ -174,27 +174,12 @@ function go(href: string) {
 <style scoped>
 .entry-page {
   min-height: 100%;
-  padding: 16px;
+  padding: 0 16px 16px;
+  /* chassis-nav 页(useSetPageHeader,无 SubPageHeader):全局 24px 顶距不生效,此处单一 padding-top 作 nav→content 呼吸单源 */
+  padding-top: 24px;
   color: var(--v5-ink);
   font-family: var(--font-v5);
-  background:
-    radial-gradient(circle at 22% 8%, color-mix(in srgb, var(--v5-brand) 14%, transparent), transparent 32%),
-    radial-gradient(circle at 82% 4%, color-mix(in srgb, var(--v5-brand-2) 12%, transparent), transparent 28%),
-    var(--v5-bg);
-}
-
-.entry-page--h5 {
-  background:
-    radial-gradient(circle at 22% 8%, color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent), transparent 32%),
-    radial-gradient(circle at 82% 4%, color-mix(in srgb, var(--v5-brand) 10%, transparent), transparent 28%),
-    var(--v5-bg);
-}
-
-.entry-page--white {
-  background:
-    radial-gradient(circle at 22% 8%, color-mix(in srgb, var(--v5-brand-2) 14%, transparent), transparent 32%),
-    radial-gradient(circle at 82% 4%, color-mix(in srgb, var(--v5-tech-cyan) 13%, transparent), transparent 28%),
-    var(--v5-bg);
+  background: var(--v5-bg);
 }
 
 .entry-hero {
@@ -202,7 +187,7 @@ function go(href: string) {
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   min-height: 430px;
-  padding: 18px 0 10px;
+  padding: 0 0 10px;
 }
 
 .entry-copy {
@@ -217,20 +202,19 @@ function go(href: string) {
   align-items: center;
   min-height: 30px;
   padding: 0 12px;
-  border: 1px solid var(--v5-border);
   border-radius: 8px;
   background: var(--v5-surface);
   color: var(--v5-ink-2);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .entry-title {
   display: block;
   margin-top: 18px;
   color: var(--v5-ink);
-  font-size: 35px;
-  font-weight: 800;
+  font-size: 30px;
+  font-weight: 600;
   line-height: 1.04;
   overflow-wrap: anywhere;
 }
@@ -240,8 +224,8 @@ function go(href: string) {
   margin-top: 14px;
   max-width: 560px;
   color: var(--v5-ink-2);
-  font-size: 14px;
-  line-height: 1.62;
+  font-size: 13.5px;
+  line-height: 1.65;
 }
 
 .entry-actions {
@@ -259,9 +243,13 @@ function go(href: string) {
   min-height: 48px;
   padding: 0 16px;
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 13.5px;
+  font-weight: 600;
   text-align: center;
+}
+
+.entry-action:active {
+  opacity: 0.7;
 }
 
 .entry-action--primary {
@@ -299,7 +287,6 @@ function go(href: string) {
   gap: 12px;
   min-height: 52px;
   padding: 12px;
-  border: 1px solid var(--v5-border);
   border-radius: 8px;
   background: var(--v5-surface);
 }
@@ -307,13 +294,13 @@ function go(href: string) {
 .entry-mode-label {
   color: var(--v5-ink-3);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .entry-mode-value {
   color: var(--v5-brand);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .entry-grid {
@@ -327,7 +314,6 @@ function go(href: string) {
   min-width: 0;
   min-height: 82px;
   padding: 12px 10px;
-  border: 1px solid var(--v5-border);
   border-radius: 8px;
   background: var(--v5-surface);
 }
@@ -336,7 +322,7 @@ function go(href: string) {
   display: block;
   color: var(--v5-ink);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -349,20 +335,21 @@ function go(href: string) {
 }
 
 .entry-flow {
-  display: grid;
-  gap: 10px;
   margin-top: 12px;
+  border-radius: 16px;
+  background: var(--v5-surface);
 }
 
 .entry-step {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 76px;
-  padding: 12px;
-  border: 1px solid var(--v5-border);
-  border-radius: 8px;
-  background: var(--v5-surface);
+  min-height: 64px;
+  padding: 13px 14px;
+}
+
+.entry-step:not(:last-child) {
+  border-bottom: 1px solid var(--v5-border);
 }
 
 .entry-step-dot {
@@ -381,16 +368,16 @@ function go(href: string) {
 .entry-step-title {
   display: block;
   color: var(--v5-ink);
-  font-size: 13px;
-  font-weight: 850;
+  font-size: 13.5px;
+  font-weight: 600;
 }
 
 .entry-step-body {
   display: block;
   margin-top: 4px;
-  color: var(--v5-ink-3);
+  color: var(--v5-ink-2);
   font-size: 12px;
-  line-height: 1.48;
+  line-height: 1.6;
 }
 
 .entry-link {
@@ -401,12 +388,15 @@ function go(href: string) {
   min-height: 48px;
   margin-top: 12px;
   padding: 0 14px;
-  border: 1px solid var(--v5-border-strong);
   border-radius: 8px;
   background: var(--v5-surface-2);
   color: var(--v5-ink-2);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.entry-link:active {
+  opacity: 0.7;
 }
 
 @media (min-width: 700px) {
@@ -426,7 +416,7 @@ function go(href: string) {
   }
 
   .entry-title {
-    font-size: 46px;
+    font-size: 48px;
   }
 }
 </style>

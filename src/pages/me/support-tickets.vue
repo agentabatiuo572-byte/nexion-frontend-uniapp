@@ -1,9 +1,9 @@
 <!--
   Support tickets (ported from Nexion-prototype/app/(main)/me/support/tickets/page.tsx).
-  Three local view modes: list (stats + tabs + ticket cards), create (category/subject/
-  description form), detail (message thread + reply). Tickets are backed by a
-  Pinia store so create/reply/close persist across refresh. Wrapped in
-  <AppChassis active="me">.
+  Three local view modes: list (stat tiles + tabs + transparent hairline ticket
+  rows), create (category/subject/description form), detail (message thread +
+  reply). Tickets are backed by a Pinia store so create/reply/close persist
+  across refresh. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
@@ -45,8 +45,8 @@
         <view v-if="filtered.length === 0" :style="emptyStyle">
           <text :style="emptyTextStyle">{{ t.tickets.emptyList }}</text>
         </view>
-        <view v-else style="display: flex; flex-direction: column; gap: 8px">
-          <TicketRow v-for="tk in filtered" :key="tk.id" :tk="tk" @open="mode = { kind: 'detail', id: tk.id }" />
+        <view v-else style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
+          <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="mode = { kind: 'detail', id: tk.id }" />
         </view>
 
         <text class="block text-center" :style="noteStyle">{{ t.tickets.note }}</text>
@@ -266,18 +266,17 @@ function closeTicket() {
 }
 
 const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "12.5px", color: "var(--v5-brand)" };
-const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "16px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
+const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
+// Plain info line on the page floor — the boxed chrome added nothing.
 const avgRowStyle: CSSProperties = {
   gap: "8px",
-  padding: "8px 12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  padding: "0 6px",
   fontSize: "11.5px",
 };
 const avgLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", color: "var(--v5-brand-2)", fontWeight: 600 };
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+// Segmented control — filled container, no border (single visual difference).
+const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface-2)" };
 function tabStyle(active: boolean): CSSProperties {
   return {
     height: "44px",
@@ -291,7 +290,8 @@ function tabStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
-const emptyStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "32px", textAlign: "center" };
+// Empty state — dashed outline hint, no fill (V5 empty-state idiom).
+const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
 const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
@@ -305,16 +305,16 @@ function catChipStyle(active: boolean): CSSProperties {
     borderRadius: "999px",
     fontSize: "11.5px",
     fontWeight: 600,
-    background: active ? "var(--v5-brand)" : "var(--v5-surface)",
+    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
+// Inputs — recessed fill, no border (input idiom: surface-3, single difference).
 const inputStyle: CSSProperties = {
   width: "100%",
   height: "44px",
   borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-3)",
   padding: "0 12px",
   fontSize: "14px",
   color: "var(--v5-ink)",
@@ -323,8 +323,7 @@ const textareaStyle: CSSProperties = {
   width: "100%",
   height: "140px",
   borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-3)",
   padding: "10px 12px",
   fontSize: "13.5px",
   color: "var(--v5-ink)",
@@ -332,7 +331,8 @@ const textareaStyle: CSSProperties = {
 };
 const cancelBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontWeight: 600, fontSize: "14px" };
 const submitBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
-const detailMetaStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
+// Ticket header — sits on the page floor, hairline closes the block.
+const detailMetaStyle: CSSProperties = { padding: "4px 2px 14px", borderBottom: "1px solid var(--v5-border)" };
 function statusTextStyle(s: TicketStatus): CSSProperties {
   return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
 }
@@ -341,12 +341,13 @@ const catTextStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-mono
 const detailSubjectStyle: CSSProperties = { marginTop: "6px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
 const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
 const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
+// Chat bubbles keep their fill (bubble semantics) — borders dropped,
+// the fill alone is the single visual difference.
 function msgBubbleStyle(isUser: boolean): CSSProperties {
   return {
     borderRadius: "16px",
     padding: "14px",
-    background: isUser ? "color-mix(in srgb, var(--v5-brand) 8%, transparent)" : "var(--v5-surface)",
-    border: isUser ? "1px solid color-mix(in srgb, var(--v5-brand) 25%, transparent)" : "1px solid var(--v5-border)",
+    background: isUser ? "color-mix(in srgb, var(--v5-brand) 9%, transparent)" : "var(--v5-surface)",
     marginLeft: isUser ? "24px" : "0",
     marginRight: isUser ? "0" : "24px",
   };
@@ -357,13 +358,13 @@ function msgAuthorStyle(isUser: boolean): CSSProperties {
 }
 const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
 const msgBodyStyle: CSSProperties = { fontSize: "12.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
-const replyCardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "12px" };
+// Reply zone — wrapper card dropped; the recessed textarea is the unit.
+const replyCardStyle: CSSProperties = { padding: "4px 2px 0" };
 const replyTextareaStyle: CSSProperties = {
   width: "100%",
   height: "84px",
-  borderRadius: "8px",
-  background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border)",
+  borderRadius: "12px",
+  background: "var(--v5-surface-3)",
   padding: "8px 12px",
   fontSize: "13.5px",
   color: "var(--v5-ink)",
@@ -381,3 +382,10 @@ function sendReplyStyle(active: boolean): CSSProperties {
   };
 }
 </script>
+
+<style scoped>
+/* placeholder-class="ph" target — was referenced but never defined (audit P2). */
+.ph {
+  color: var(--v5-ink-4);
+}
+</style>

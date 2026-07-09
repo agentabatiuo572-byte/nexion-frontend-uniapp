@@ -154,7 +154,6 @@ function onDecorativeCta() {
 
 const cardStyle = computed<CSSProperties>(() => ({
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   opacity: dim.value ? 0.6 : 1,
 }));
 const hairlineStyle = computed<CSSProperties>(() => ({

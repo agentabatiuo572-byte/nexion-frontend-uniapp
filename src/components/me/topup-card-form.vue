@@ -15,7 +15,7 @@
     </view>
 
     <!-- Processing / 3DS -->
-    <view v-if="phase === 'processing' || phase === '3ds'" class="rounded-2xl border text-center" :style="centerCardStyle">
+    <view v-if="phase === 'processing' || phase === '3ds'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="spinnerStyle" />
       <text class="block" :style="centerTitleStyle">{{ phase === 'processing' ? 'Authorizing card…' : '3D Secure verification' }}</text>
       <text class="block" :style="centerBodyStyle">{{ phase === 'processing' ? 'Submitting to issuing bank · do not close this window' : 'Your bank may text you a code · standing by for confirmation' }}</text>
@@ -26,7 +26,7 @@
     </view>
 
     <!-- Success -->
-    <view v-else-if="phase === 'success'" class="rounded-2xl border text-center" :style="centerCardStyle">
+    <view v-else-if="phase === 'success'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="successIconStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
       </view>
@@ -37,7 +37,7 @@
     </view>
 
     <!-- Fail -->
-    <view v-else-if="phase === 'fail'" class="rounded-2xl border text-center" :style="centerCardStyle">
+    <view v-else-if="phase === 'fail'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
       <text class="block" :style="failTitleStyle">Card declined</text>
       <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">Reason: do_not_honor (issuer)</text>
@@ -47,8 +47,8 @@
 
     <!-- Form -->
     <template v-else>
-      <!-- Amount preview -->
-      <view class="rounded-2xl border" :style="amountCardStyle">
+      <!-- Amount preview — keeps its surface (input zone), border dropped -->
+      <view class="rounded-2xl" :style="amountCardStyle">
         <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">You receive</text>
         <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
           <text style="font-family: var(--font-v5); font-size: 14px; color: var(--v5-ink-3)">$</text>
@@ -61,8 +61,8 @@
         </view>
       </view>
 
-      <!-- Card form -->
-      <view class="rounded-2xl border space-y-3" :style="formCardStyle">
+      <!-- Card form — outer shell dropped; the surface-2 fields are the units -->
+      <view class="space-y-3" :style="formCardStyle">
         <view :style="fieldStyle">
           <text class="block font-mono-tabular" :style="fieldLabelStyle">{{ t.wallet.ffCardNumber }}</text>
           <view class="flex items-center" style="margin-top: 2px; gap: 8px">
@@ -103,7 +103,7 @@
 
       <!-- Submit -->
       <view class="w-full flex items-center justify-center active:opacity-90" :style="submitBtnStyle" @click="handleSubmit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" :stroke="isValid ? 'var(--v5-ink)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" :stroke="isValid ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text style="margin-left: 6px">Pay ${{ chargeUSD.toFixed(2) }}</text>
       </view>
 
@@ -234,9 +234,9 @@ function goWallet() {
 }
 
 // ── styles ──
+// Filled state card — bg only, no border (single visual difference).
 const centerCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "24px",
 };
 const spinnerStyle: CSSProperties = {
@@ -330,7 +330,6 @@ const tryAgainBtnStyle: CSSProperties = {
 };
 const amountCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "16px",
 };
 const amountInputStyle: CSSProperties = {
@@ -347,10 +346,9 @@ const feeRowStyle: CSSProperties = {
   gap: "8px",
   borderTop: "1px solid var(--v5-border)",
 };
+// De-carded — fields sit directly on the page floor.
 const formCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  padding: "16px",
+  padding: "2px 0 0",
 };
 const fieldStyle: CSSProperties = {
   padding: "8px 12px",
@@ -369,20 +367,20 @@ const fieldInputStyle: CSSProperties = {
   fontSize: "14px",
   color: "var(--v5-ink)",
 };
+// on-brand: near-black on the brand fill — ink (near-white in dark) fails AA.
 const submitBtnStyle = computed<CSSProperties>(() => ({
   gap: "6px",
   height: "50px",
   borderRadius: "999px",
   background: isValid.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: isValid.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
+  color: isValid.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "14px",
   letterSpacing: "-0.005em",
 }));
+// Plain trust note on the page floor — the boxed chrome added nothing.
 const trustFootStyle: CSSProperties = {
-  padding: "12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
+  padding: "2px 6px 0",
 };
 </script>

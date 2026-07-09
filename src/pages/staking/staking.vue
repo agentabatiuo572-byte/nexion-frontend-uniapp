@@ -14,26 +14,24 @@
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
 
-      <!-- Top-right "How it works →" pill -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
-          <text style="margin: 0 6px">{{ t.stakingV3.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-        </view>
-      </view>
-
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Hero: tech-money-card -->
-        <view class="relative overflow-hidden" :style="heroStyle">
-          <view aria-hidden class="gen-anim" :style="auroraStyle" />
-          <view aria-hidden :style="gridStyle" />
-
-          <view class="relative">
-            <!-- meta-row -->
+        <!-- Hero — de-carded: total-locked sits on the page floor; aurora + grid
+             floor decoration deleted outright (owner call 2026-07-08). Rules-intro
+             pill rides the meta-row (owner 2026-07-09: kill the empty gap above). -->
+        <view :style="heroStyle">
+          <view>
+            <!-- meta-row — rules-intro pill joins the earning chip on the right
+                 (owner 2026-07-09: kill the empty gap above the hero). -->
             <view class="flex items-center justify-between" style="margin-bottom: 8px">
               <text :style="metaLabelStyle">{{ t.stakingV3.totalLocked }}</text>
-              <text v-if="activePositions.length > 0" :style="earningChipStyle">earning</text>
+              <view class="flex items-center" style="gap: 8px">
+                <text v-if="activePositions.length > 0" :style="earningChipStyle">earning</text>
+                <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
+                  <text style="margin: 0 6px">{{ t.stakingV3.howItWorksEntry }}</text>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                </view>
+              </view>
             </view>
 
             <!-- big -->
@@ -264,44 +262,21 @@ function handleClaim(p: StakingPosition) {
 
 // ── styles ──
 const howPillStyle: CSSProperties = {
-  minHeight: "44px",
-  padding: "0 14px",
+  height: "34px",
+  padding: "0 12px",
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand)",
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
 };
+// De-carded hero — total-locked sits directly on the page floor (2px optical
+// inset); surface/border/shadow + aurora/grid glows deleted, not re-tuned.
 const heroStyle: CSSProperties = {
-  padding: "18px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  boxShadow: "var(--v5-card-shadow-lift-strong)",
-};
-const auroraStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(40% 50% at 80% 20%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
-    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.25) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-  animation: "v5-aurora-drift 14s ease-in-out infinite",
-};
-const gridStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  backgroundImage:
-    "linear-gradient(to right, rgba(19,20,26,0.04) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, rgba(19,20,26,0.04) 1px, transparent 1px)",
-  backgroundSize: "24px 24px",
-  pointerEvents: "none",
+  padding: "0 2px",
 };
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -375,16 +350,16 @@ const countStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
+// Form-b: single filled container, no border — VaultRow supplies internal hairlines.
 const vaultCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "0 16px",
 };
+// Empty state — dashed outline, no fill (de-card empty-state idiom).
 const emptyStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "24px 16px",
   fontSize: "12.5px",
   color: "var(--v5-ink-3)",

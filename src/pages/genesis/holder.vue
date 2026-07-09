@@ -12,7 +12,7 @@
     <view style="padding-bottom: 32px">
       <SubPageHeader back="/pages/genesis/genesis" />
 
-      <view class="px-4" style="padding-top: 8px; display: flex; flex-direction: column; gap: 12px">
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
         <template v-if="!hasNodes">
           <view class="active:scale-[0.99]" :style="ctaCardStyle" @click="goGenesis">
@@ -121,26 +121,28 @@
             <text class="block" :style="discStyle">{{ t.genesisHolder.post.disc }}</text>
           </view>
 
-          <!-- Emission log -->
-          <view class="overflow-hidden" :style="feedCardStyle">
-            <view class="px-4 flex items-center" style="padding-top: 12px; padding-bottom: 8px; gap: 6px">
+          <!-- Emission log — de-carded: header + hairline row group on the floor -->
+          <view>
+            <view class="flex items-center" :style="feedHeadStyle">
               <view class="mc-pulse" :style="feedDotStyle" />
               <text :style="feedLabelStyle">{{ t.genesisHolder.post.feedLabel }}</text>
             </view>
-            <view v-for="(f, i) in emissionFeed" :key="i" class="px-4 flex items-center" :style="feedRowStyle(i === emissionFeed.length - 1)">
-              <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 11.5px">{{ f.label }}</text>
-              <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
+            <view :style="feedListStyle">
+              <view v-for="(f, i) in emissionFeed" :key="i" class="flex items-center" :style="feedRowStyle(i === emissionFeed.length - 1)">
+                <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 11.5px">{{ f.label }}</text>
+                <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
+              </view>
             </view>
           </view>
         </template>
 
         <!-- ══ Shared: holdings + perks + actions (hasNodes) ══ -->
         <template v-if="hasNodes">
-          <!-- Holdings list -->
-          <view>
+          <!-- Holdings list — de-carded: floor hairline group -->
+          <view style="padding: 0 2px">
             <text class="block" :style="sectionLabelStyle">{{ t.genesisHolder.holdingsLabel }}</text>
-            <view style="display: flex; flex-direction: column; gap: 8px">
-              <view v-for="h in holdings" :key="h.id" class="flex items-center" :style="holdingCardStyle">
+            <view :style="holdingListStyle">
+              <view v-for="(h, i) in holdings" :key="h.id" class="flex items-center" :style="holdingRowStyle(i)">
                 <view class="shrink-0 grid place-items-center" :style="holdingArtStyle">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
                 </view>
@@ -156,11 +158,11 @@
             </view>
           </view>
 
-          <!-- Perks -->
-          <view :style="perksCardStyle">
+          <!-- Perks — de-carded: floor hairline group -->
+          <view :style="perksWrapStyle">
             <text class="block" :style="perksLabelStyle">{{ t.genesisHolder.perksLabel }}</text>
-            <view style="display: flex; flex-direction: column; gap: 8px">
-              <view v-for="k in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle">
+            <view :style="perkListStyle">
+              <view v-for="(k, i) in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle(i)">
                 <view class="flex items-center justify-center" :style="perkIconStyle">
                   <text style="font-size: 18px; line-height: 1">{{ t.genesisHolder.perks[k].icon }}</text>
                 </view>
@@ -285,11 +287,10 @@ function goStaking() {
 }
 
 // ── styles ──
+// De-carded hero (both pre- and post-listing): the big number sits on the page
+// floor (2px optical inset); internal stat-grid divider stays as a hairline.
 const heroCardStyle: CSSProperties = {
-  padding: "18px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
+  padding: "0 2px",
 };
 const avatarStyle: CSSProperties = {
   width: "56px",
@@ -353,12 +354,9 @@ const discStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   lineHeight: 1.5,
 };
-// generic card
+// generic section — de-carded: label + content on the page floor (2px inset)
 const cardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
+  padding: "0 2px",
 };
 const cardTitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -479,12 +477,9 @@ const lockValStyle: CSSProperties = {
   color: "var(--v5-ink)",
   lineHeight: 1.1,
 };
-// feed
-const feedCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
+// feed — de-carded: header on the floor + hairline row group
+const feedHeadStyle: CSSProperties = { padding: "0 2px 8px", gap: "6px" };
+const feedListStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 const feedDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "999px", background: "var(--v5-brand)" };
 const feedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -545,13 +540,15 @@ const sectionLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const holdingCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "14px",
-  gap: "12px",
-};
+// De-carded: floor hairline group — each holding is a hairline-separated row.
+const holdingListStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
+function holdingRowStyle(i: number): CSSProperties {
+  return {
+    padding: "14px 0",
+    gap: "12px",
+    borderBottom: i < holdings.value.length - 1 ? "1px solid var(--v5-border)" : "none",
+  };
+}
 const holdingArtStyle: CSSProperties = {
   width: "48px",
   height: "48px",
@@ -572,13 +569,9 @@ const holdingLinkStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
   color: "var(--v5-ink-3)",
 };
-// perks
-const perksCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
-};
+// perks — de-carded: label + hairline row group on the floor (2px inset)
+const perksWrapStyle: CSSProperties = { padding: "0 2px" };
+const perkListStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
 const perksLabelStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -587,7 +580,14 @@ const perksLabelStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
 };
-const perkRowStyle: CSSProperties = { gridTemplateColumns: "36px 1fr", gap: "12px", padding: "10px 0" };
+function perkRowStyle(i: number): CSSProperties {
+  return {
+    gridTemplateColumns: "36px 1fr",
+    gap: "12px",
+    padding: "10px 0",
+    borderBottom: i < perkKeys.length - 1 ? "1px solid var(--v5-border)" : "none",
+  };
+}
 const perkIconStyle: CSSProperties = {
   width: "36px",
   height: "36px",
@@ -603,10 +603,10 @@ const perkLabelStyle: CSSProperties = {
 };
 const perkBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.4 };
 // actions
+// Quick-action tiles — filled surface-2, no border (single visual difference).
 const actionTileStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
   padding: "12px",
   display: "flex",
   flexDirection: "column",

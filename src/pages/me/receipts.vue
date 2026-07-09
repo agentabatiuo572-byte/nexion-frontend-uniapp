@@ -44,7 +44,7 @@
       <!-- List -->
       <view v-else :style="listStyle">
         <view
-          v-for="(r, i) in filtered"
+          v-for="(r, i) in visibleReceipts"
           :key="`${r.signature}-${i}`"
           class="flex items-center active:opacity-80"
           :style="rowStyle(i)"
@@ -73,6 +73,10 @@
         </view>
       </view>
 
+      <!-- Always mounted (even while empty) so the observer below attaches at
+           first mount rather than missing it if this tab starts with 0 items. -->
+      <view ref="loadMoreSentinel" style="height: 1px" />
+
       <text class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
 
       <ReceiptModal :receipt="open" @close="open = null" />
@@ -81,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watchEffect, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
@@ -90,17 +94,50 @@ import { useT } from "@/i18n/use-t";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
+import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 
 type Tab = "ALL" | ReceiptCategory;
 const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
+// One screen's worth per load — reduces initial render + (future) server load.
+const PAGE_SIZE = 10;
 
 const t = useT();
 const receiptsStore = useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | null>(null);
+const visibleCount = ref(PAGE_SIZE);
+watch(tab, () => { visibleCount.value = PAGE_SIZE; });
 
 const receipts = computed(() => receiptsStore.receipts);
 const filtered = computed(() => filterByCategory(receipts.value, tab.value));
+const visibleReceipts = computed(() => filtered.value.slice(0, visibleCount.value));
+const hasMore = computed(() => visibleCount.value < filtered.value.length);
+
+// Sentinel row (always mounted so the observer attaches from the start —
+// hasMore can flip true later as receipts arrive) sits at the list end;
+// watchEffect re-checks on every dependency change, not just inView flips,
+// so a tab/data change that leaves the sentinel already in view still loads.
+// ponytail: on a viewport tall enough to fit >1 page of rows, this can load
+// several pages back-to-back before the sentinel actually scrolls out of
+// view (Vue's reactive re-run can outrun the browser's next real
+// intersection check). Harmless on real phone viewports (one page ≈ one
+// screen); if a very tall/tablet viewport needs a hard one-page-per-scroll
+// cap, gate the bump behind a nextTick() + rAF pair before re-checking.
+// ponytail: useScrollGrowProgress falls back to inView=true when
+// IntersectionObserver is unavailable (its other 20 call sites are cosmetic
+// scroll-in animations, where "show the final state" is a safe default) —
+// here that fallback means pagination silently no-ops and every matching
+// receipt renders at once instead of erroring. Modern App-webview targets
+// (WKWebView/Android System WebView) support IntersectionObserver, so this
+// should stay latent; if it ever fires for real, the fix is a local
+// capability check in this file, not changing the shared composable's
+// default for its other 20 cosmetic consumers.
+const { elRef: loadMoreSentinel, inView: loadMoreInView } = useScrollGrowProgress({ threshold: 0 });
+watchEffect(() => {
+  if (loadMoreInView.value && hasMore.value) {
+    visibleCount.value = Math.min(filtered.value.length, visibleCount.value + PAGE_SIZE);
+  }
+});
 
 const counts = computed<Record<Tab, number>>(() => {
   const c: Record<Tab, number> = { ALL: receipts.value.length, IG: 0, VG: 0, LL: 0, FT: 0, EM: 0, SP: 0, KY: 0 };
@@ -158,13 +195,14 @@ function shortDate(ts: number): string {
 const tabsRowStyle: CSSProperties = { margin: "0 16px 12px", gap: "8px" };
 function tabPillStyle(c: Tab): CSSProperties {
   const on = tab.value === c;
+  // Filter chip — filled tint (active) vs surface-2 (idle), no border: the fill
+  // + text color is the single visual difference (V5 chip idiom).
   return {
     height: "44px",
     padding: "0 16px",
     borderRadius: "999px",
     gap: "4px",
     background: on ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface-2)",
-    border: on ? "1px solid color-mix(in srgb, var(--v5-brand) 35%, transparent)" : "1px solid transparent",
   };
 }
 function tabLabelStyle(c: Tab): CSSProperties {
@@ -174,10 +212,10 @@ function tabLabelStyle(c: Tab): CSSProperties {
 const tabCountStyle: CSSProperties = { fontSize: "11.5px", opacity: 0.7 };
 const clearBtnStyle: CSSProperties = { width: "44px", height: "44px", borderRadius: "999px" };
 
+// Empty state — dashed outline hint, no fill (V5 empty-state idiom).
 const emptyStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
-  border: "1px dashed var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   borderRadius: "16px",
   padding: "32px",
   textAlign: "center",
@@ -185,18 +223,19 @@ const emptyStyle: CSSProperties = {
 const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13.5px", color: "var(--v5-ink-2)" };
 const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
+// De-carded: transparent hairline group (earnings-ledger idiom). The surface +
+// outer border was redundant boundary weight — rows are already hairline-split.
+// border-top opens the group; 2px optical inset aligns rows under the gutter.
 const listStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  overflow: "hidden",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 function rowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
-    borderTop: i === 0 ? "none" : "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
+    padding: "13px 0",
+    borderBottom: i < visibleReceipts.value.length - 1 ? "1px solid var(--v5-border)" : "none",
   };
 }
 function rowIconStyle(r: Receipt): CSSProperties {

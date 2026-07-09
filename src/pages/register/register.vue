@@ -67,8 +67,17 @@
             <text v-else class="rg-resend__btn" @click="resend">{{ t.register.resend }}</text>
           </view>
           <view class="rg-invite">
-            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ t.register.inviteOptional }}</text></text>
-            <input class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :value="invite" @input="onInvite" />
+            <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
+            <!-- [FEAT-SHARE4] 链接来源码锁定置灰:不可修改不可删除(主人 2026-07-08 拍板);
+                 无码自然进入才渲染可手输框。 -->
+            <view v-if="lockedRef">
+              <view class="rg-locked">
+                <text class="rg-locked__code">{{ lockedRef }}</text>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+              </view>
+              <text class="rg-locked__tag">{{ t.register.inviteLockedTag }}</text>
+            </view>
+            <input v-else class="rg-field" type="text" :placeholder="t.register.invitePlaceholder" :value="invite" @input="onInvite" />
           </view>
         </view>
 
@@ -146,7 +155,7 @@ import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
-import { useSponsorship } from "@/store/sponsorship";
+import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 import { useConfig } from "@/store/config";
 import { fmt } from "@/i18n/format";
 import { evaluateRegistration, commitRegistration, type RegistrationAssessment } from "@/store/risk-cluster";
@@ -199,14 +208,17 @@ const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 let mounted = true;
 
-const refFromUrl = ref<string | null>(null);
+// [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
+// 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
+const lockedRef = ref<string | null>(null);
 const sponsorPreview = ref<SponsorMeta | null>(null);
 
 onLoad((options) => {
-  const r = options && (options as Record<string, string>).ref;
-  if (r) {
-    refFromUrl.value = r;
-    sponsorPreview.value = pickSponsor(r);
+  const raw = options && (options as Record<string, string>).ref;
+  const norm = normalizeRefCode(raw) ?? sponsorship.pendingCode;
+  if (norm) {
+    lockedRef.value = norm;
+    sponsorPreview.value = pickSponsor(norm);
   }
 });
 
@@ -308,7 +320,8 @@ function resend() {
   void requestCode();
 }
 function currentSponsorCode(): string | null {
-  return refFromUrl.value?.trim() || invite.value.trim() || null;
+  // 锁定码优先(?ref / pendingRefCode);仅无锁定时才取手输([FEAT-SHARE4] ③)。
+  return lockedRef.value || invite.value.trim() || null;
 }
 async function verifyCode() {
   if (verifying.value) return;
@@ -366,6 +379,7 @@ function finish() {
   // New account claims this carrier's session; first-time calibration runs as
   // part of onboarding (connect.vue) which then marks this device calibrated.
   session.claim(identity);
+  let giftParam: "posted" | "pending" | "none" = "none";
   if (sponsorCode) {
     sponsorship.bind(sponsorCode);
     const gift = sponsorship.claimGift(identity);
@@ -373,6 +387,7 @@ function finish() {
       const posted = app.creditRewardBucket(assessment.giftRoute, gift.usdt, gift.nex);
       const giftRef = `GIFT-${Date.now().toString(36).toUpperCase()}`;
       const giftPosted = assessment.giftRoute === "withdrawable";
+      giftParam = giftPosted ? "posted" : "pending";
       const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
       bills.add({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
       bills.add({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
@@ -383,7 +398,17 @@ function finish() {
       }
     }
   }
+  // [FEAT-SHARE5] H5 注册完成 → 成功页(礼包确认 + 引导下载 APP);
+  // APP 壳内注册装 APP 引导无意义,直进 onboarding(异常2)。
+  // #ifdef H5
+  uni.reLaunch({
+    url: `/pages/register/success?gift=${giftParam}`,
+    fail: () => uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} }),
+  });
+  // #endif
+  // #ifndef H5
   uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} });
+  // #endif
 }
 function prospectiveIdentity() {
   return `${country.value}${phoneClean.value}@demo.nexion.ai`;
@@ -455,6 +480,10 @@ onUnmounted(() => cleanup());
 .rg-resend__btn { color: var(--v5-brand); font-weight: 500; }
 .rg-invite__lbl { display: block; font-size: 11.5px; color: var(--v5-ink-3); margin-bottom: 6px; padding: 0 4px; }
 .rg-invite__opt { color: var(--v5-ink-4); }
+/* [FEAT-SHARE4] 链接来源码锁定态:同 rg-field 形制但压暗 + 锁标,无输入交互。 */
+.rg-locked { display: flex; align-items: center; gap: 8px; background: #0A0A0A; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; opacity: 0.9; }
+.rg-locked__code { flex: 1; font-size: 14px; color: var(--text-muted); font-family: var(--font-jet-mono), ui-monospace, monospace; letter-spacing: 0.04em; }
+.rg-locked__tag { display: block; margin-top: 8px; padding: 0 4px; font-size: 11px; color: var(--v5-brand); }
 .rg-step3 { display: flex; flex-direction: column; gap: 12px; }
 .rg-field { background: #0F0F0F; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; font-size: 14px; color: #fff; }
 .rg-field-wrap { display: flex; align-items: center; background: #0F0F0F; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }

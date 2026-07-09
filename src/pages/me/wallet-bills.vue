@@ -178,8 +178,9 @@ function goBill(b: Bill) {
 // Mirrors prototype shared SegmentedControl (segmented-control.tsx):
 // container gap-0.5(2px)/p-1(4px)/rounded-2xl(16px) surface-2 bg; segment
 // h-11(44px)/rounded-[10px]; active = brand-filled indicator + on-brand text.
+// Header→content breathing is global (SubPageHeader 24px); no extra top offset.
 const segWrapStyle: CSSProperties = {
-  margin: "8px 16px 12px",
+  margin: "0 16px 12px",
   background: "var(--v5-surface-2)",
   borderRadius: "16px",
   padding: "4px",
@@ -209,10 +210,10 @@ function tabLabel(tb: Tab): string {
   return t.value.bills.tabOut;
 }
 
+// Empty state (de-card white-list): dashed outline, no fill.
 const emptyStyle: CSSProperties = {
   margin: "0 16px",
-  background: "var(--v5-surface)",
-  border: "1px dashed var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   borderRadius: "16px",
   padding: "32px",
   textAlign: "center",
@@ -220,27 +221,26 @@ const emptyStyle: CSSProperties = {
 const emptyTextStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)" };
 
 const listWrapStyle: CSSProperties = { margin: "0 16px 12px" };
+// Transparent hairline group per month: container border-top opens it, the mono
+// month header + rows carry their own dividers (first row = no top border).
 const sectionStyle: CSSProperties = {
-  marginBottom: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  overflow: "hidden",
+  marginBottom: "20px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 const monthHeaderStyle: CSSProperties = {
-  padding: "8px 16px",
+  padding: "8px 0",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
-  background: "var(--v5-surface)",
   borderBottom: "1px solid var(--v5-border)",
 };
 function rowStyle(i: number): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "12px 0",
     borderTop: i !== 0 ? "1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)" : "none",
   };
 }

@@ -178,25 +178,25 @@ function pillStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
+// Empty state — dashed outline hint, no fill (V5 empty-state idiom).
 const emptyCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
   textAlign: "center",
 };
 const emptyTitleStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink)" };
 const emptyBodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
+// Transparent hairline group — border-top opens the timeline, rows carry dividers;
+// the unread row keeps its surface-2 highlight tint.
 const listStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  overflow: "hidden",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 function rowStyle(divider: boolean, unread: boolean): CSSProperties {
   return {
     gap: "12px",
-    padding: "12px 16px",
+    padding: "12px 0",
     borderBottom: divider ? "1px solid var(--v5-border)" : "none",
     background: unread ? "var(--v5-surface-2)" : "transparent",
   };

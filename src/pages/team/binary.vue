@@ -1,9 +1,10 @@
 <!--
   Binary — ported from Nexion-prototype/app/(main)/team/binary/page.tsx.
   Balance Match (Track A vs Track B): match = min(A,B)/30 × 10%, daily cap from
-  phase (P1-P3 $5K → P4+ $2K). Blocked if either track < $1,000/mo. Hero →
-  block warning → 2 wing cards (top member + VBadge) → strong/weak gap → auto-
-  placement entry → recent matches. Sub-page → <AppChassis active="team"> with
+  phase (P1-P3 $5K → P4+ $2K). Blocked if either track < $1,000/mo. De-carded:
+  floor hero → tint block warning → 2 filled wing columns (top member + VBadge)
+  → transparent gap block → auto-placement tint row → recent matches
+  (transparent hairline group). Sub-page → <AppChassis active="team"> with
   in-page back row. Reuses network + commission stores + use-product-phase.
   De-MLM'd copy preserved (Track A/B / 平衡匹配, no "binary leg"/"spillover" in UI).
 -->
@@ -12,25 +13,24 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamBinary" :subtitle="t.headerSubtitles.teamBinary" />
 
-      <!-- How-it-works entry -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/binary-how')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-          <text>{{ t.binary.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        </view>
-      </view>
-
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- match hero -->
-        <view class="rounded-2xl text-center" :style="heroStyle">
-          <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
+        <!-- match hero — de-carded: the number sits on the page floor. Rules-intro
+             pill rides the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
+        <view :style="heroStyle">
+          <view class="flex items-center justify-between" style="gap: 8px">
+            <text class="block font-mono-tabular" :style="heroCapStyle">{{ estimateText }}</text>
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howItWorksStyle" @click="go('/pages/team/binary-how')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <text>{{ t.binary.howItWorksEntry }}</text>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </view>
+          </view>
           <text class="block font-display tabular-nums" :style="heroAmtStyle">+${{ periodMatch.toFixed(2) }}</text>
           <text class="block" :style="heroFormulaStyle">{{ formulaText }}</text>
         </view>
 
         <!-- blocked warning -->
-        <view v-if="blocked" class="rounded-2xl border flex items-start" :style="blockedStyle">
+        <view v-if="blocked" class="rounded-2xl flex items-start" :style="blockedStyle">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
           <view style="font-size: 12px; line-height: 1.375">
             <text class="block" :style="{ color: 'var(--v5-ink)', fontWeight: 600 }">{{ t.binary.blocked }}</text>
@@ -64,8 +64,8 @@
           </view>
         </view>
 
-        <!-- strong / weak gap -->
-        <view class="rounded-2xl border" :style="cardStyle">
+        <!-- strong / weak gap — transparent block on the page floor -->
+        <view :style="gapBlockStyle">
           <text class="block font-mono-tabular" :style="gapCapStyle">{{ t.binary.strongWeakGap }}</text>
           <view style="display: flex; flex-direction: column; gap: 8px">
             <view>
@@ -91,7 +91,7 @@
         </view>
 
         <!-- auto-placement entry -->
-        <view class="rounded-2xl border active:scale-[0.99]" :style="spilloverStyle" @click="go('/pages/team/unilevel')">
+        <view class="rounded-2xl active:scale-[0.99]" :style="spilloverStyle" @click="go('/pages/team/unilevel')">
           <view class="flex items-start" style="gap: 10px">
             <view class="rounded-lg grid place-items-center shrink-0" :style="spilloverIconStyle">
               <text :style="{ fontSize: '20px' }">↳</text>
@@ -103,9 +103,10 @@
           </view>
         </view>
 
-        <!-- recent matches -->
-        <view v-if="recentBinaries.length > 0" class="rounded-2xl border overflow-hidden" :style="cardFlushStyle">
+        <!-- recent matches — transparent hairline group -->
+        <view v-if="recentBinaries.length > 0" :style="recentBlockStyle">
           <text class="block font-mono-tabular" :style="recentCapStyle">{{ t.binary.recentMatches }}</text>
+          <view :style="recentGroupStyle">
           <view
             v-for="(e, i) in recentBinaries"
             :key="e.id"
@@ -118,6 +119,7 @@
               <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ new Date(e.ts).toLocaleDateString() }}</text>
             </view>
             <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '13.5px', color: 'var(--v5-warning)', fontWeight: 600 }">+${{ e.amountUSDT.toFixed(2) }}</text>
+          </view>
           </view>
         </view>
       </view>
@@ -230,38 +232,36 @@ function go(url: string) {
 }
 
 // ─── styles ───
+// Soft tint pill — chip idiom, fill only (no border, single visual difference).
 const howItWorksStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 14px",
-  minHeight: "44px",
+  gap: "6px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
-const heroStyle: CSSProperties = {
-  padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 50% 0%, rgba(245,165,36,0.20) 0%, transparent 65%), linear-gradient(180deg, #1A1610 0%, #0E0E0E 100%)",
-  border: "1px solid rgba(245,165,36,0.30)",
-};
-const heroCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-warning)" };
+// De-carded hero — cap + number + formula on the page floor. The old radial
+// glow card was a page-floor aura → deleted outright (owner call 2026-07-08).
+const heroStyle: CSSProperties = { padding: "6px 2px 0" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
 const heroAmtStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "48px",
+  fontSize: "30px",
   fontWeight: 600,
   lineHeight: 1,
+  letterSpacing: "-0.022em",
   color: "var(--v5-warning)",
 };
-const heroFormulaStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "8px" };
+const heroFormulaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "6px" };
 
+// Status callout — tint fill only, border chrome dropped (single difference).
 const blockedStyle: CSSProperties = {
   padding: "14px",
   gap: "10px",
   background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
 };
 const inviteCtaStyle: CSSProperties = {
   marginTop: "8px",
@@ -271,11 +271,12 @@ const inviteCtaStyle: CSSProperties = {
   textDecoration: "underline",
 };
 
+// Filled wing columns (podium idiom) — weak side takes the warning-soft fill;
+// single visual difference, no borders, no hardcoded hex.
 function wingStyle(isWeak: boolean): CSSProperties {
   return {
     padding: "14px",
-    background: "#0F0F0F",
-    border: `1px solid ${isWeak ? "rgba(245,165,36,0.40)" : "rgba(255,255,255,0.06)"}`,
+    background: isWeak ? "var(--v5-warning-soft)" : "var(--v5-surface-2)",
   };
 }
 const weakBadgeStyle: CSSProperties = {
@@ -293,17 +294,8 @@ const topMemberStyle: CSSProperties = {
   gap: "6px",
 };
 
-const cardStyle: CSSProperties = {
-  padding: "16px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-};
-const cardFlushStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
-};
+// Transparent gap block — 2px optical inset, +12px top margin for 24px section rhythm.
+const gapBlockStyle: CSSProperties = { marginTop: "12px", padding: "0 2px" };
 const gapCapStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 500,
@@ -313,11 +305,10 @@ const gapCapStyle: CSSProperties = {
 };
 const gapBarTrackStyle: CSSProperties = { height: "8px", background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)" };
 
+// Nav row tile — soft tint fill only, border chrome dropped.
 const spilloverStyle: CSSProperties = {
   padding: "14px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  borderColor: "var(--v5-border)",
-  borderRadius: "16px",
 };
 const spilloverIconStyle: CSSProperties = {
   width: "36px",
@@ -325,15 +316,20 @@ const spilloverIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
 };
 
+// Transparent hairline group — cap label outside, border-top opens the rows.
+const recentBlockStyle: CSSProperties = { marginTop: "12px" };
 const recentCapStyle: CSSProperties = {
-  padding: "12px 16px 8px",
-  fontSize: "10px",
-  letterSpacing: "0.16em",
+  padding: "0 2px",
+  marginBottom: "8px",
+  fontSize: "11px",
+  fontWeight: 500,
+  letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
+const recentGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 function recentRowStyle(isLast: boolean): CSSProperties {
   return {
-    padding: "10px 16px",
+    padding: "11px 0",
     gap: "10px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };

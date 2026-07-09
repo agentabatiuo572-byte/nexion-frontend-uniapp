@@ -9,7 +9,7 @@
       <SubPageHeader back="/pages/me/me" />
 
       <!-- Sound + haptics -->
-      <view class="mx-4" style="margin-top: 8px">
+      <view class="mx-4">
         <text class="block" :style="headingStyle">{{ w.feedbackHeading }}</text>
         <view :style="cardStyle">
           <ToggleRow :label="w.soundLabel" :hint="w.soundHint" :value="prefs.soundEnabled" @toggle="prefs.toggleSound">
@@ -74,17 +74,21 @@ function dotStyle(k: NotifKind): CSSProperties {
   return { width: "8px", height: "8px", borderRadius: "999px", background: NOTIF_COLOR[k] };
 }
 
+// Section label (de-card spec): 15/600/ink, sentence-case, sits above the group.
 const headingStyle: CSSProperties = {
-  fontSize: "10px",
-  letterSpacing: "0.14em",
-  color: "var(--v5-ink-3)",
-  marginBottom: "8px",
-  paddingLeft: "4px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "15px",
+  fontWeight: 600,
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
+  marginBottom: "12px",
+  paddingLeft: "2px",
 };
+// Settings group (form b): single surface container, no border — the toggle rows
+// carry their own internal hairline dividers (PreferenceToggleRow `last` prop).
 const cardStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
 const footerStyle: CSSProperties = {

@@ -21,7 +21,9 @@
 -->
 <template>
   <AppChassis active="store">
-    <view style="color: var(--v5-ink)">
+    <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
+         24px .spv gap, so the nav→content breathing is supplied here once. -->
+    <view style="color: var(--v5-ink); padding-top: 24px">
       <!-- Back + title now live in the sticky chassis nav header
            (useSetPageHeader below) so they pin on scroll, mirroring the
            prototype's <SetPageHeader>. -->
@@ -48,7 +50,7 @@
         </view>
 
         <!-- === select-payment === -->
-        <view v-if="step === 'select-payment'" class="mx-4 rounded-2xl border overflow-hidden nx-step-in" :style="surfaceCardStyle">
+        <view v-if="step === 'select-payment'" class="mx-4 rounded-2xl overflow-hidden nx-step-in" :style="surfaceCardStyle">
           <view class="border-b" :style="payHeadStyle">
             <view class="flex items-center justify-between">
               <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
@@ -106,7 +108,7 @@
         </view>
 
         <!-- === confirm === -->
-        <view v-else-if="step === 'confirm'" class="mx-4 rounded-2xl border nx-step-in" :style="confirmCardStyle">
+        <view v-else-if="step === 'confirm'" class="mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
           <text class="block font-mono-tabular" style="font-size: 13.5px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
           <view style="margin-top: 12px">
             <CheckoutRow :label="t.store.coRowProduct" :value="product.name" />
@@ -138,7 +140,7 @@
         </view>
 
         <!-- === awaiting === -->
-        <view v-else-if="step === 'awaiting'" class="mx-4 rounded-2xl border text-center nx-step-in" :style="centerCardStyle">
+        <view v-else-if="step === 'awaiting'" class="mx-4 rounded-2xl text-center nx-step-in" :style="centerCardStyle">
           <view class="mx-auto grid place-items-center nx-spin" :style="spinnerWrapStyle">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
@@ -147,7 +149,7 @@
         </view>
 
         <!-- === confirmed === -->
-        <view v-else-if="step === 'confirmed'" class="mx-4 rounded-2xl border text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
+        <view v-else-if="step === 'confirmed'" class="mx-4 rounded-2xl text-center relative overflow-hidden nx-pop-in" :style="centerCardStyle">
           <template v-if="firstOrderCelebrating">
             <view aria-hidden :style="celebrateGlowStyle" />
             <view class="relative">
@@ -172,7 +174,7 @@
         </view>
 
         <!-- === activating === -->
-        <view v-else-if="step === 'activating'" class="mx-4 rounded-2xl border text-center nx-step-in" :style="centerCardStyle">
+        <view v-else-if="step === 'activating'" class="mx-4 rounded-2xl text-center nx-step-in" :style="centerCardStyle">
           <view class="mx-auto grid place-items-center nx-spin" :style="spinnerWrapStyle">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
@@ -184,7 +186,7 @@
         </view>
 
         <!-- === live === -->
-        <view v-else-if="step === 'live'" class="mx-4 rounded-2xl border text-center nx-pop-in" :style="liveCardStyle">
+        <view v-else-if="step === 'live'" class="mx-4 rounded-2xl text-center nx-pop-in" :style="liveCardStyle">
           <view class="mx-auto grid place-items-center" :style="liveSpinnerWrapStyle">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" /><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" /><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" /><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" /></svg>
           </view>
@@ -666,7 +668,7 @@ function stepFillStyle(i: number): CSSProperties {
   const w = i < stepDisplay.value ? "100%" : i === stepDisplay.value ? "50%" : "0%";
   return { width: w, background: "var(--v5-brand)", transition: "width 0.5s" };
 }
-const surfaceCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)" };
+const surfaceCardStyle: CSSProperties = { background: "var(--v5-surface)" };
 const payHeadStyle: CSSProperties = { padding: "16px 20px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const payTotalStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -711,7 +713,6 @@ const primaryBtnStyle: CSSProperties = {
 };
 const confirmCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "20px",
 };
 const confirmCtaStyle: CSSProperties = {
@@ -734,7 +735,6 @@ const changePayBtnStyle: CSSProperties = {
 };
 const centerCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "24px",
 };
 // awaiting / activating / confirmed-check spinner — brand 15% (source).
@@ -775,7 +775,6 @@ const liveCardStyle: CSSProperties = {
   // uses --v5-surface (not the source's hardcoded #0F0F0F) for dual-theme safety.
   background:
     "linear-gradient(to bottom right, color-mix(in srgb, var(--v5-brand) 15%, transparent), var(--v5-surface), color-mix(in srgb, var(--v5-brand) 10%, transparent))",
-  borderColor: "var(--v5-border)",
   padding: "24px",
 };
 const liveTitleStyle: CSSProperties = {

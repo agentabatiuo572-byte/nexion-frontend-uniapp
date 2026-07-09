@@ -55,10 +55,10 @@ const isUp = computed(() => delta.value > 0);
 const priceText = computed(() => props.l.priceUSDT.toLocaleString());
 const lastSaleText = computed(() => fmt(t.value.marketplace.lastSale, { k: (props.l.lastSaleUSDT / 1000).toFixed(1) }));
 
+// Collectible tile — filled surface, no border (single visual difference).
 const cardStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const artStyle: CSSProperties = {
   aspectRatio: "1 / 1",

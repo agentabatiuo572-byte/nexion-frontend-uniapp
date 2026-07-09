@@ -4,10 +4,11 @@
   multiplier) + reward numbers/social-proof (left) + share buttons (right) +
   live commission ticker (bottom). framer AnimatePresence ticker → CSS re-keyed
   fade (nx-step-in). framer ping dot → reusable PulseDot.
-  DEGRADED vs source (infra not ported — see PORT report §7):
-    • SharePoster modal omitted → share/poster buttons copy link + toast;
-    • useQuest.markComplete("invite_friend") omitted (quest store not ported);
-    • navigator.share → uni.share with clipboard fallback.
+  [FEAT-SHARE01] 2026-07-08 四入口接真链路(此前 DEGRADED 注记已解除):
+    • 海报 → SharePosterSheet(真二维码 canvas 海报);
+    • 立即分享 → ShareChannelSheet(渠道 intent 面板);
+    • 邀请码/链接复制 → lib/share 单源链接 + 分享事件(quest invite_friend 接线);
+    • 码为空四入口置灰 + toast(FEAT-SHARE1 异常2);复制失败禁误报(异常3)。
   <button>→<view @click>; <span>→<text>; <div>→<view>.
 -->
 <template>
@@ -49,8 +50,8 @@
         </view>
       </view>
 
-      <!-- RIGHT — actions -->
-      <view class="flex flex-col shrink-0" style="width: 158px; gap: 8px">
+      <!-- RIGHT — actions(码为空整列置灰,点击仍有 toast 反馈) -->
+      <view class="flex flex-col shrink-0" :class="referralCode ? '' : 'opacity-50'" style="width: 158px; gap: 8px">
         <view class="rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(false)" @click="openPoster">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01" /></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ t.team.inviteSharePoster }}</text>
@@ -64,10 +65,10 @@
         <view class="rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedLink)" @click="copyLink">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><template v-if="copiedLink"><path d="M20 6 9 17l-5-5" /></template><template v-else><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" /></template></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ copiedLink ? t.team.copied : t.team.inviteShareLink }}</text>
-          <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedLink)">nexion.ai/ref/…</text>
+          <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedLink)">{{ linkLabel }}</text>
         </view>
 
-        <view class="rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" @click="shareOrFallback">
+        <view class="rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" @click="openShare">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
           <text :style="primaryCtaTextStyle">{{ shareParts[0] }}<text :style="{ fontWeight: 600 }">${{ dollarReward }}</text>{{ shareParts[1] }}</text>
         </view>
@@ -85,25 +86,40 @@
       </view>
     </view>
   </view>
+
+  <!-- [FEAT-SHARE2/3] 分享面板(fragment 兄弟节点,避开卡片 overflow-hidden) -->
+  <SharePosterSheet :open="posterOpen" @close="posterOpen = false" />
+  <ShareChannelSheet
+    :open="shareOpen"
+    @close="shareOpen = false"
+    @open-poster="
+      shareOpen = false;
+      posterOpen = true;
+    "
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import PulseDot from "@/components/home/pulse-dot.vue";
+import ShareChannelSheet from "@/components/team/share-channel-sheet.vue";
+import SharePosterSheet from "@/components/team/share-poster-sheet.vue";
 import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import { buildShareLink, copyText, INVITER_REWARD_NEX, INVITER_REWARD_USDT_ESTIMATE, recordShareEvent } from "@/lib/share";
 
 const t = useT();
 const app = useApp();
 const commission = useCommission();
 const phase = useProductPhase();
 
-const BASE_REWARD_NEX = 200;
-const BASE_REWARD_DOLLAR_LABEL = 200;
+// F4 口径单源:估值/NEX 常量取 lib/share(渠道面板同源),禁本地镜像。
+const BASE_REWARD_NEX = INVITER_REWARD_NEX;
+const BASE_REWARD_DOLLAR_LABEL = INVITER_REWARD_USDT_ESTIMATE;
 
 interface TickerItem {
   name: string;
@@ -126,7 +142,12 @@ const nexReward = computed(() => Math.round(BASE_REWARD_NEX * multiplier.value))
 const lifetimeEarned = computed(() => commission.totalUSDTLifetime());
 
 const referralCode = computed(() => app.user.referralCode);
-const referralUrl = computed(() => `https://nexion.ai/ref/${referralCode.value}`);
+// 展示用短链标签从真实链接派生(禁写死 nexion.ai 与实际复制内容脱节,审计 P2)。
+const linkLabel = computed(() => {
+  const bare = buildShareLink().replace(/^https?:\/\//, "");
+  if (!bare) return "—";
+  return bare.length > 15 ? `${bare.slice(0, 15)}…` : bare;
+});
 
 const promoChipText = computed(() =>
   fmt(t.value.team.invitePromoChip, {
@@ -137,48 +158,48 @@ const shareParts = computed(() => t.value.team.shareAndEarn.split("{n}"));
 
 const copiedCode = ref(false);
 const copiedLink = ref(false);
+const posterOpen = ref(false);
+const shareOpen = ref(false);
 const tickerIdx = ref(0);
 const tickerItem = computed(() => TICKER_ITEMS[tickerIdx.value]);
 
-function copyToClipboard(data: string) {
-  uni.setClipboardData({ data, showToast: false, fail: () => {} });
+// FEAT-SHARE1 异常2:码为空四入口置灰 + toast,不产出空码链接。
+function guardCode(): boolean {
+  if (referralCode.value) return true;
+  toast.info(t.value.share.noCodeYet);
+  return false;
 }
 
-function copyCode() {
-  copyToClipboard(referralCode.value);
+async function copyCode() {
+  if (!guardCode()) return;
+  const ok = await copyText(referralCode.value);
+  if (!ok) {
+    // 异常3:剪贴板失败禁误报成功态。
+    toast.info(t.value.share.copyFailed);
+    return;
+  }
   copiedCode.value = true;
+  recordShareEvent("code", "team_hero");
   setTimeout(() => (copiedCode.value = false), 1500);
 }
-function copyLink() {
-  copyToClipboard(referralUrl.value);
+async function copyLink() {
+  if (!guardCode()) return;
+  const ok = await copyText(buildShareLink());
+  if (!ok) {
+    toast.info(t.value.share.copyFailed);
+    return;
+  }
   copiedLink.value = true;
+  recordShareEvent("link", "team_hero");
   setTimeout(() => (copiedLink.value = false), 1500);
 }
 function openPoster() {
-  // SharePoster modal not ported — copy link + confirm.
-  copyToClipboard(referralUrl.value);
-  toast.success(t.value.team.inviteLinkCopied);
+  if (!guardCode()) return;
+  posterOpen.value = true;
 }
-function shareOrFallback() {
-  const text = t.value.team.inviteShareText.replace("{url}", referralUrl.value);
-  // Try native uni share (App / mini-program); fall back to clipboard copy on H5.
-  uni.share?.({
-    provider: "weixin",
-    type: 0,
-    href: referralUrl.value,
-    title: "Nexion",
-    summary: text,
-    success: () => {},
-    fail: () => {
-      copyToClipboard(referralUrl.value);
-      toast.success(t.value.team.inviteLinkCopied);
-    },
-  });
-  // On platforms where uni.share is undefined, do the copy fallback directly.
-  if (typeof uni.share !== "function") {
-    copyToClipboard(referralUrl.value);
-    toast.success(t.value.team.inviteLinkCopied);
-  }
+function openShare() {
+  if (!guardCode()) return;
+  shareOpen.value = true;
 }
 
 let tickerTimer: ReturnType<typeof setInterval> | null = null;

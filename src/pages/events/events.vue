@@ -42,7 +42,7 @@
         </view>
 
         <!-- Event list -->
-        <view v-if="filtered.length === 0 && emptyKey" class="rounded-2xl border text-center" :style="emptyStyle">
+        <view v-if="filtered.length === 0 && emptyKey" class="rounded-2xl text-center" :style="emptyStyle">
           <text style="font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.625">{{ t.events.empty[emptyKey] }}</text>
         </view>
         <view v-else class="space-y-2.5">
@@ -212,8 +212,7 @@ function pillLabelStyle(id: TabId): CSSProperties {
   };
 }
 const emptyStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
 };
 </script>

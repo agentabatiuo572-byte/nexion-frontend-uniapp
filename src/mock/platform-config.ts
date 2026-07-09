@@ -74,4 +74,22 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     },
     gpuTiers: GPU_TIERS,
   },
+  // FEAT-SHARE01 分享链路 mock seed(§13.3 share.*;运营在 admin 调)。
+  // baseUrl 留空 = dev 回退运行时 origin(扫码可达本机);PROD/admin 配
+  // https://nexion.ai/ref/(F1 域名单源)。appDownload 全空 = APP 未上架态。
+  share: {
+    baseUrl: "",
+    channels: [
+      { key: "zalo", intentType: "scheme", androidPackage: "com.zing.zalo", iosScheme: "zalo://", enabled: true },
+      { key: "telegram", intentType: "web", urlTemplate: "https://t.me/share/url?url={link}&text={text}", enabled: true },
+      { key: "whatsapp", intentType: "web", urlTemplate: "https://wa.me/?text={text}", enabled: true },
+      { key: "messenger", intentType: "scheme", androidPackage: "com.facebook.orca", iosScheme: "fb-messenger://", enabled: true },
+      { key: "sms", intentType: "web", urlTemplate: "sms:?body={text}", enabled: true },
+      { key: "x", intentType: "web", urlTemplate: "https://twitter.com/intent/tweet?text={text}", enabled: true },
+      { key: "copy", intentType: "copy", enabled: true },
+      { key: "poster", intentType: "poster", enabled: true },
+      { key: "system", intentType: "system", enabled: true },
+    ],
+    appDownload: { iosUrl: "", androidUrl: "", apkUrl: "" },
+  },
 };

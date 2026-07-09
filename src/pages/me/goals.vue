@@ -24,14 +24,14 @@
         <text class="block" :style="heroSubStyle">{{ heroSubLine }}</text>
       </view>
 
-      <!-- Setter -->
-      <view class="mx-4" :style="setterCardStyle">
-        <text class="block" :style="setterCapStyle">{{ t.goals.targetLabel }}</text>
-        <view class="flex items-center" style="gap: 8px">
+      <!-- Setter — de-carded: labels + recessed input sit on the page floor -->
+      <view class="mx-4" :style="setterWrapStyle">
+        <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
+        <view class="flex items-center" :style="inputBoxStyle">
           <text :style="dollarStyle">$</text>
           <input class="flex-1" :style="targetInputStyle" type="digit" :value="String(target)" @input="onTarget" />
         </view>
-        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px">
+        <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px">
           <view
             v-for="p in PRESET_TARGETS"
             :key="p"
@@ -43,7 +43,7 @@
           </view>
         </view>
 
-        <text class="block" :style="[setterCapStyle, { marginTop: '16px' }]">{{ t.goals.deadlineLabel }}</text>
+        <text class="block" :style="[fieldLabelStyle, { marginTop: '18px' }]">{{ t.goals.deadlineLabel }}</text>
         <view class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px">
           <view
             v-for="d in PRESET_DEADLINES_DAYS"
@@ -76,11 +76,11 @@
         </view>
       </view>
 
-      <!-- Active goals list -->
-      <view v-if="goals.length > 0" class="mx-4" style="margin-top: 20px">
-        <text class="block" :style="activeCapStyle">{{ t.goals.activeGoals }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
-          <view v-for="g in goals" :key="g.id" :style="goalCardStyle">
+      <!-- Active goals — de-carded: transparent hairline group on the page floor -->
+      <view v-if="goals.length > 0">
+        <text class="block" :style="sectionLabelStyle">{{ t.goals.activeGoals }}</text>
+        <view :style="goalGroupStyle">
+          <view v-for="(g, gi) in goals" :key="g.id" :style="goalRowStyle(gi === goals.length - 1)">
             <view class="flex items-center justify-between">
               <text class="font-mono-tabular" :style="goalTargetStyle">${{ g.targetUSDT.toLocaleString() }}</text>
               <view class="grid place-items-center active:opacity-70" :style="goalRemoveStyle" @click="remove(g.id)">
@@ -213,14 +213,10 @@ function presetDeadlineLabelStyle(d: number): CSSProperties {
   };
 }
 
-const heroStyle: CSSProperties = {
-  marginTop: "8px",
-  borderRadius: "16px",
-  padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 100% 0%, color-mix(in srgb, var(--v5-warning) 18%, transparent) 0%, transparent 60%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 32%, transparent)",
-};
+// De-carded: hero intro sits on the page floor — surface/border + the warning
+// radial dropped (a page-floor aura per owner call: deleted, not re-tuned).
+// 2px inset (mx-4 + this) aligns with the labels + groups below at 18px.
+const heroStyle: CSSProperties = { padding: "0 2px" };
 const heroLabelStyle: CSSProperties = {
   fontSize: "10px",
   letterSpacing: "0.16em",
@@ -236,27 +232,30 @@ const heroTitleStyle: CSSProperties = {
 const heroSubStyle: CSSProperties = {
   marginTop: "6px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12px",
+  fontSize: "12.5px",
   color: "var(--v5-ink-3)",
-  lineHeight: 1.625,
+  lineHeight: 1.6,
 };
-const setterCardStyle: CSSProperties = {
-  marginTop: "12px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "16px",
-};
-const setterCapStyle: CSSProperties = {
+// Setter — de-carded floor block; the $ input gets a recessed surface-3 box
+// (de-card white-list: input = surface-3 recessed, no border).
+const setterWrapStyle: CSSProperties = { marginTop: "18px", padding: "0 2px" };
+const fieldLabelStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
-  letterSpacing: "0.14em",
+  fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-ink-3)",
+};
+const inputBoxStyle: CSSProperties = {
+  gap: "8px",
+  height: "52px",
+  padding: "0 14px",
+  borderRadius: "12px",
+  background: "var(--v5-surface-3)",
 };
 const dollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "24px",
+  fontSize: "20px",
   color: "var(--v5-warning)",
 };
 const targetInputStyle: CSSProperties = {
@@ -291,9 +290,9 @@ const recPathStyle: CSSProperties = {
 const recReasonStyle: CSSProperties = {
   marginTop: "6px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.625,
+  fontSize: "13px",
+  color: "var(--v5-ink-2)",
+  lineHeight: 1.6,
 };
 const recCtaStyle: CSSProperties = {
   marginTop: "12px",
@@ -319,20 +318,27 @@ const saveLabelStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
-const activeCapStyle: CSSProperties = {
-  marginBottom: "8px",
-  padding: "0 4px",
+const sectionLabelStyle: CSSProperties = {
+  margin: "22px 18px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
-  letterSpacing: "0.14em",
-  color: "var(--v5-ink-3)",
+  fontSize: "15px",
+  fontWeight: 600,
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
-const goalCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  padding: "14px",
+// Active goals — transparent hairline group (leaderboard rest-list idiom): the
+// container border-top opens the group, each row carries its own divider.
+const goalGroupStyle: CSSProperties = {
+  margin: "0 16px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
+function goalRowStyle(isLast: boolean): CSSProperties {
+  return {
+    padding: "14px 0",
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 const goalTargetStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",

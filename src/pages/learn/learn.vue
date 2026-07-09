@@ -50,7 +50,7 @@
         </scroll-view>
 
         <!-- Lesson list -->
-        <view v-if="filtered.length === 0" class="rounded-2xl border text-center" :style="emptyStyle">
+        <view v-if="filtered.length === 0" class="rounded-2xl text-center" :style="emptyStyle">
           <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.learn.emptyCategory }}</text>
         </view>
         <view v-else class="space-y-2.5">
@@ -101,7 +101,6 @@ function tabStyle(id: TabId): CSSProperties {
     padding: "0 16px",
     borderRadius: "999px",
     background: active ? "var(--v5-brand)" : "var(--v5-surface)",
-    border: active ? "none" : "1px solid var(--v5-border)",
   };
 }
 function tabLabelStyle(id: TabId): CSSProperties {
@@ -114,8 +113,7 @@ function tabLabelStyle(id: TabId): CSSProperties {
 }
 
 const emptyStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
 };
 </script>

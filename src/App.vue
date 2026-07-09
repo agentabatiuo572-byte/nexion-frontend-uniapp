@@ -565,8 +565,11 @@ function ensureBusinessLoopsAllowed(): boolean {
 
 onLaunch(() => {
   // Nexion defaults dark, but the persisted user choice drives H5 after launch.
+  // `resolved` collapses the light/dark/system choice to the concrete theme
+  // (system → OS scheme). Instantiating the store here also registers its live
+  // OS-scheme listener for "system" mode.
   // #ifdef H5
-  document.documentElement.setAttribute("data-theme", useTheme().mode);
+  document.documentElement.setAttribute("data-theme", useTheme().resolved);
   // #endif
   if (isStaticReviewRoute(readCurrentRouteOrHash())) {
     stopBusinessLoops();

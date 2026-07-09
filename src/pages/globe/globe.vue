@@ -21,14 +21,14 @@
 
       <!-- Top stats -->
       <view class="mx-4 mb-3 grid grid-cols-2 gap-2">
-        <view class="border rounded-2xl" :style="statTileStyle">
+        <view class="rounded-2xl" :style="statTileStyle">
           <view class="flex items-center" style="gap: 6px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
             <text style="font-size: 11px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeNodes }}</text>
           </view>
           <text class="block tabular-nums" :style="statValStyle">{{ activeNodesText }}</text>
         </view>
-        <view class="border rounded-2xl" :style="statTileStyle">
+        <view class="rounded-2xl" :style="statTileStyle">
           <view class="flex items-center" style="gap: 6px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
             <text style="font-size: 11px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeJobs }}</text>
@@ -37,8 +37,9 @@
         </view>
       </view>
 
-      <!-- Map -->
-      <view class="mx-4 border rounded-2xl relative overflow-hidden" :style="mapCardStyle">
+      <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
+           to clip the region glow halos at the rounded panel edge (functional). -->
+      <view class="mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
         <svg :viewBox="`0 0 ${W} ${H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
           <defs>
             <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
@@ -109,13 +110,14 @@
         <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
       </view>
 
-      <!-- Region cards -->
-      <view class="mx-4 mt-4 mb-6 space-y-2">
+      <!-- Region list — de-carded: transparent hairline group (earnings-ledger
+           idiom), rows carry their own dividers (last row = no bottom border). -->
+      <view class="mx-4 mt-4 mb-6" :style="regionListStyle">
         <view
-          v-for="r in REGIONS"
+          v-for="(r, i) in REGIONS"
           :key="r.id"
-          class="w-full border rounded-2xl flex items-center active:opacity-80"
-          :style="regionCardStyle"
+          class="w-full flex items-center active:opacity-80"
+          :style="regionRowStyle(i === REGIONS.length - 1)"
           @click="select(r)"
         >
           <view class="grid place-items-center shrink-0" :style="regionIconBox(r.isYou)">
@@ -295,7 +297,6 @@ function mulberry32(seed: number) {
 // ── styles ──
 const statTileStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "12px",
 };
 const statValStyle: CSSProperties = {
@@ -307,16 +308,20 @@ const statValStyle: CSSProperties = {
 };
 const mapCardStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
-  borderColor: "var(--v5-border)",
   padding: "12px",
 };
-const regionCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  padding: "16px",
-  gap: "12px",
-  textAlign: "left",
+const regionListStyle: CSSProperties = {
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
+function regionRowStyle(last: boolean): CSSProperties {
+  return {
+    padding: "16px 0",
+    gap: "12px",
+    textAlign: "left",
+    borderBottom: last ? "none" : "1px solid var(--v5-border)",
+  };
+}
 function regionIconBox(isYou?: boolean): CSSProperties {
   return {
     width: "40px",

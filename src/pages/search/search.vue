@@ -30,22 +30,22 @@
       </view>
 
       <!-- Empty state -->
-      <view v-if="!q.trim()" class="mx-4 mt-4 rounded-2xl border text-center" :style="emptyCardStyle">
+      <view v-if="!q.trim()" class="mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         <text class="block" style="font-size: 13.5px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
       </view>
 
       <!-- No results -->
-      <view v-else-if="results.length === 0" class="mx-4 mt-4 rounded-2xl border text-center" :style="noResultsStyle">
+      <view v-else-if="results.length === 0" class="mx-4 mt-4 rounded-2xl text-center" :style="noResultsStyle">
         <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.search.noResults }}</text>
       </view>
 
       <!-- Results -->
       <view v-else class="mx-4 mt-3 space-y-3">
         <view v-for="grp in groupedList" :key="grp.group">
-          <text class="block px-1 font-mono-tabular" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
-          <view class="rounded-2xl border overflow-hidden" :style="resultCardStyle">
+          <text class="block font-mono-tabular" :style="groupLabelStyle">{{ groupLabel(grp.group) }}</text>
+          <view :style="resultCardStyle">
             <view
               v-for="(h, i) in grp.hits"
               :key="`${h.group}-${h.label}-${i}`"
@@ -191,10 +191,10 @@ function openHit(h: Hit) {
 }
 
 // ── styles ──
+// White-list recessed input: surface-2 fill, no border.
 const inputWrapStyle: CSSProperties = {
   gap: "8px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
   borderRadius: "12px",
   padding: "0 12px",
   height: "48px",
@@ -206,30 +206,34 @@ const inputStyle: CSSProperties = {
   color: "var(--v5-ink)",
   height: "100%",
 };
+// White-list empty state: dashed border-strong, no fill.
 const emptyCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "20px",
+  border: "1px dashed var(--v5-border-strong)",
+  background: "transparent",
 };
 const noResultsStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "20px",
+  border: "1px dashed var(--v5-border-strong)",
+  background: "transparent",
 };
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
+  paddingLeft: "2px",
   fontSize: "10px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
+// Transparent hairline group (earnings-ledger idiom): border-top opens the
+// group + 2px optical inset; rows carry their own dividers (last = none).
 const resultCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 function rowStyle(isLast: boolean): CSSProperties {
   return {
     gap: "8px",
-    padding: "10px 14px",
+    padding: "13px 0",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }

@@ -1,8 +1,10 @@
 <!--
   V Rank — ported from Nexion-prototype/app/(main)/team/rank/page.tsx.
-  My-rank hero (VBadgeIcon 48 + progress bar to next rank w/ scroll-grow + missing
-  list + upgrade CTA → /store) + full 13-rank ladder (VBadgeIcon 36 + conditions +
-  perk chips). Sub-page → <AppChassis active="team"> w/ in-page back → /team.
+  My-status block de-carded (DECARD form c): cap + VBadgeIcon 48 + progress bar
+  w/ scroll-grow + missing list + upgrade CTA sit directly on the page floor,
+  hairline splits the progress zone. 13-rank ladder = single surface container
+  (form b, no border), rows hairlined, current row tinted. Sub-page →
+  <AppChassis active="team"> w/ in-page back → /team.
   Reuses v-rank store + nextRankProgress + V_RANKS + useScrollGrowProgress (P-019
   $el-safe). useMemo → computed. lucide → inline <svg>. <Link>→<view @click>.
 -->
@@ -11,21 +13,21 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.rank.pageTitle" />
 
-      <!-- How-it-works entry -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:scale-[0.98] transition-transform" :style="howEntryStyle" @click="go('/pages/team/rank-how')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-          <text>{{ t.rank.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        </view>
-      </view>
-
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- My status hero -->
-        <view class="rounded-2xl relative overflow-hidden" :style="heroStyle">
-          <view aria-hidden :style="heroGlowStyle" />
-          <view class="relative">
-            <text class="block" :style="heroCapStyle">{{ t.rank.currentRank }}</text>
+        <!-- My status — de-carded: sits directly on the page floor (card shell +
+             in-card glow dropped; a glow on the page floor would be a floor aura,
+             which gets deleted per owner call 2026-07-08). Rules-intro pill rides
+             the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
+        <view :style="heroStyle">
+          <view>
+            <view class="flex items-center justify-between" style="gap: 8px">
+              <text class="block" :style="heroCapStyle">{{ t.rank.currentRank }}</text>
+              <view class="inline-flex items-center shrink-0 active:scale-[0.98] transition-transform" :style="howEntryStyle" @click="go('/pages/team/rank-how')">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+                <text>{{ t.rank.howItWorksEntry }}</text>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+              </view>
+            </view>
             <view class="flex items-center" style="margin-top: 8px; gap: 12px">
               <VBadgeIcon :v="myRank" :size="48" />
               <view>
@@ -34,7 +36,7 @@
               </view>
             </view>
 
-            <view v-if="prog.next" style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--v5-border)">
+            <view v-if="prog.next" :style="progressWrapStyle">
               <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 6px">
                 <text :style="{ color: 'var(--v5-ink-3)' }">
                   <text>{{ t.rank.next }} </text>
@@ -59,8 +61,9 @@
           </view>
         </view>
 
-        <!-- 13-rank ladder -->
-        <view class="rounded-2xl border overflow-hidden" :style="ladderCardStyle">
+        <!-- 13-rank ladder — single surface container (form b): outer border
+             dropped, the fill is the single visual difference; rows hairlined. -->
+        <view class="rounded-2xl overflow-hidden" :style="ladderCardStyle">
           <view
             v-for="(r, idx) in V_RANKS"
             :key="r.v"
@@ -148,28 +151,23 @@ function go(url: string) {
 }
 
 // ─── styles ───
+// Soft tint only — pills carry no border (chip/pill whitelist rule).
 const howEntryStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 14px",
-  minHeight: "44px",
+  gap: "6px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
 
-const heroStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
-const heroGlowStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background:
-    "radial-gradient(45% 55% at 85% 15%, var(--v5-brand-2-soft) 0%, transparent 60%)," +
-    "radial-gradient(35% 45% at 15% 90%, var(--v5-brand-soft) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-};
+// De-carded hero: no surface/border/glow — content sits directly on the page
+// floor with a 2px optical inset (leaderboard.vue prize-hero idiom).
+const heroStyle: CSSProperties = { padding: "10px 2px 0" };
+// -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
+const progressWrapStyle: CSSProperties = { margin: "16px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const heroCapStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
@@ -180,7 +178,7 @@ const heroCapStyle: CSSProperties = {
 const heroRankStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "24px",
+  fontSize: "26px",
   letterSpacing: "-0.018em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -211,7 +209,9 @@ const upgradeCtaStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 
-const ladderCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+// Form b container — no border (fill is the single visual difference);
+// overflow-hidden stays: the tinted current row must clip to the radius.
+const ladderCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px", marginTop: "12px" };
 function rowStyle(status: "done" | "current" | "locked", isLast: boolean): CSSProperties {
   return {
     padding: "14px 16px",

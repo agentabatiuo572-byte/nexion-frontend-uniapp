@@ -190,6 +190,7 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
+import { buildShareLink } from "@/lib/share";
 import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
@@ -222,7 +223,8 @@ const joined = computed(() =>
 );
 const activeDays = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
 
-const referralLink = computed(() => `https://nexion.ai/ref/${app.user.referralCode}`);
+// [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexion.ai/ref/)。
+const referralLink = computed(() => buildShareLink());
 const refCode = computed(() => app.user.referralCode);
 
 const topPct = computed(() => {
@@ -323,12 +325,12 @@ const variantLabelStyle: CSSProperties = {
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
+// Segmented control — filled surface-2 container, no border (active pill is brand).
 const variantTabsStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
 };
 function variantPillStyle(v: Variant): CSSProperties {
   const on = variant.value === v;
@@ -339,24 +341,19 @@ function variantPillTextStyle(v: Variant): CSSProperties {
   return { fontSize: "11.5px", fontWeight: 600, color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
 }
 const shareCardStyle = computed<CSSProperties>(() => {
-  // Gradient literals → token color-mix (lemon brand / tech-cyan / brand-2 /
-  // warning over a near-black surface; matches source intent, token-disciplined).
-  const map: Record<Variant, { grad: string; border: string }> = {
-    earnings: {
-      grad: "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 18%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent) 100%)",
-      border: "color-mix(in srgb, var(--v5-brand) 35%, transparent)",
-    },
-    streak: {
-      grad: "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-warning) 18%, transparent) 100%)",
-      border: "color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
-    },
-    network: {
-      grad: "linear-gradient(135deg, color-mix(in srgb, var(--v5-tech-cyan) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-brand) 16%, transparent) 100%)",
-      border: "color-mix(in srgb, var(--v5-tech-cyan) 35%, transparent)",
-    },
+  // Proof "certificate" — single container (form b): the gradient fill is the
+  // poster look; the accent border is dropped (filled = no border). Gradient
+  // literals → token color-mix (lemon brand / tech-cyan / brand-2 / warning over
+  // a near-black surface; matches source intent, token-disciplined).
+  const grad: Record<Variant, string> = {
+    earnings:
+      "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 18%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-tech-cyan) 16%, transparent) 100%)",
+    streak:
+      "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-warning) 18%, transparent) 100%)",
+    network:
+      "linear-gradient(135deg, color-mix(in srgb, var(--v5-tech-cyan) 20%, transparent) 0%, color-mix(in srgb, var(--v5-on-brand) 95%, transparent) 60%, color-mix(in srgb, var(--v5-brand) 16%, transparent) 100%)",
   };
-  const m = map[variant.value];
-  return { marginTop: "12px", borderRadius: "16px", padding: "20px", background: m.grad, border: `1px solid ${m.border}` };
+  return { marginTop: "12px", borderRadius: "16px", padding: "20px", background: grad[variant.value] };
 });
 const brandMarkStyle: CSSProperties = { width: "28px", height: "28px", borderRadius: "6px", background: "var(--v5-brand)" };
 const brandNameStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--v5-ink)" };
@@ -374,11 +371,11 @@ const heroBigStyle: CSSProperties = {
 };
 const heroBigInlineStyle: CSSProperties = { fontSize: "30px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
 const heroUnitStyle: CSSProperties = { fontSize: "14px", fontWeight: 500, color: "var(--v5-ink-3)" };
+// Nested tint blocks inside the share card — soft surface-2 fill, no border.
 const miniStatStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
   borderRadius: "8px",
   padding: "8px",
-  border: "1px solid var(--v5-border)",
   textAlign: "center",
 };
 const miniLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
@@ -410,7 +407,6 @@ const refBlockStyle: CSSProperties = {
   borderRadius: "12px",
   gap: "12px",
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
-  border: "1px solid var(--v5-border)",
 };
 const refLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
 const refCodeStyle: CSSProperties = {
@@ -437,9 +433,9 @@ function qrCellStyle(on: boolean): CSSProperties {
 const nativeBtnStyle: CSSProperties = { height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
 const nativeBtnTextStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-on-brand)" };
 const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+// Share-destination icon grid (form b) — filled surface tiles, no border.
 const destBtnStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "12px",
   textAlign: "center",

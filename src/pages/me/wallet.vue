@@ -18,8 +18,8 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/me" :title="t.headerTitles.meWallet" :subtitle="t.headerSubtitles.meWallet" />
 
-      <!-- Balance hero -->
-      <view class="relative overflow-hidden" :style="heroStyle">
+      <!-- Balance hero — de-carded: balance + actions sit on the page floor. -->
+      <view :style="heroStyle">
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
         <view class="inline-flex items-center" style="margin-top: 8px; gap: 6px" @click="goNex">
@@ -237,14 +237,12 @@ function goExchange() {
 }
 
 // ── styles ──
+// De-carded: balance sits directly on the page floor (surface/ambient overlay/
+// shadow dropped — the ambient would read as a floor glow once un-carded). 2px
+// optical inset aligns the big number with the section labels + list rows.
 const heroStyle: CSSProperties = {
-  margin: "0 16px 20px",
-  borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-surface-2) 85%, transparent)",
-  backgroundImage: "var(--v5-ambient-overlay-brand)",
-  backdropFilter: "blur(12px)",
-  boxShadow: "var(--v5-card-shadow-lift-strong)",
-  padding: "20px",
+  margin: "0 16px 12px",
+  padding: "0 2px",
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -273,23 +271,25 @@ const actionLabelStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-ink-2)",
 };
+// Section label (de-card spec): 15px/600/ink, sits above the transparent list
+// group at the 18px content edge (16px gutter + 2px inset).
 const listTitleStyle: CSSProperties = {
-  margin: "0 32px 6px",
+  margin: "22px 18px 12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "15px",
   fontWeight: 600,
-  letterSpacing: "-0.01em",
-  color: "var(--v5-ink-3)",
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
+// Transparent hairline group (earnings-ledger idiom): the container border-top
+// opens the group, rows carry their own dividers (first row = no top border).
 const listCardStyle: CSSProperties = {
-  margin: "0 16px 20px",
-  background: "color-mix(in srgb, var(--v5-surface) 85%, transparent)",
-  backdropFilter: "blur(12px)",
-  borderRadius: "12px",
-  overflow: "hidden",
+  margin: "0 16px",
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
 const nexCalloutStyle: CSSProperties = {
-  margin: "8px 16px 20px",
+  margin: "20px 16px 24px",
   padding: "12px 16px",
   borderRadius: "12px",
   background: "var(--v5-brand-2-soft)",

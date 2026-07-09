@@ -14,8 +14,8 @@
       <SubPageHeader back="/pages/genesis/genesis" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Collection hero -->
-        <view class="relative overflow-hidden" :style="heroStyle">
+        <!-- Collection hero — de-carded: sits on the page floor. -->
+        <view :style="heroStyle">
           <view class="flex items-start" style="gap: 12px">
             <view class="grid place-items-center shrink-0" :style="avatarStyle">
               <text style="font-size: 28px">👑</text>
@@ -232,11 +232,10 @@ function goGenesis() {
 }
 
 // ── styles ──
+// De-carded hero: stats sit directly on the page floor (2px optical inset); the
+// internal stat-grid + floor-delta dividers stay as hairlines.
 const heroStyle: CSSProperties = {
-  padding: "18px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
+  padding: "0 2px",
 };
 const avatarStyle: CSSProperties = {
   width: "56px",
@@ -346,15 +345,15 @@ function sortPillStyle(active: boolean): CSSProperties {
     justifyContent: "center",
   };
 }
+// Activity feed — single filled surface container, no border (rows carry hairlines).
 const listCardStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
+// Empty state — dashed outline, no fill (whitelist empty-state idiom).
 const emptyCardStyle: CSSProperties = {
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  border: "1px dashed var(--v5-border-strong)",
   padding: "32px",
 };
 const reserveBtnStyle: CSSProperties = {

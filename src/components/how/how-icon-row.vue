@@ -35,17 +35,19 @@ const emojiBoxStyle: CSSProperties = {
   borderRadius: "10px",
   background: "var(--v5-brand-soft)",
 };
+// Typography pass 2026-07-08 — label 13.5, body 13/1.62 ink-2 (was a wall of text).
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "13px",
+  fontSize: "13.5px",
+  lineHeight: 1.4,
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
 const bodyStyle: CSSProperties = {
-  marginTop: "3px",
-  fontSize: "12.5px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.5,
+  marginTop: "5px",
+  fontSize: "13px",
+  color: "var(--v5-ink-2)",
+  lineHeight: 1.62,
 };
 </script>

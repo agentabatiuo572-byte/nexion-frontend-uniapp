@@ -216,7 +216,7 @@ function handleBind() {
 }
 
 // ── styles ──
-const bodyStyle: CSSProperties = { padding: "12px 16px 0" };
+const bodyStyle: CSSProperties = { padding: "0 16px" };
 const trialBoxStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
@@ -233,15 +233,14 @@ const trialIconStyle: CSSProperties = {
 const trialTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
 const trialBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
+// De-carded form wrapper — the head + recessed input fields sit on the page
+// floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the
+// packaging card drops (owner: form page keeps input structure intact).
 const formCardStyle: CSSProperties = {
   marginBottom: "12px",
-  borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
-  overflow: "hidden",
 };
 const formHeadStyle: CSSProperties = {
-  padding: "16px 20px",
+  padding: "0 2px 14px",
   borderBottom: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
   gap: "12px",
 };
@@ -260,7 +259,7 @@ const brandChipStyle: CSSProperties = {
   borderRadius: "6px",
   padding: "4px 8px",
 };
-const formFieldsStyle: CSSProperties = { padding: "20px" };
+const formFieldsStyle: CSSProperties = { padding: "16px 2px 0" };
 const labelStyle: CSSProperties = { marginBottom: "4px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
   // uni <input> renders taller than a native one — pin a fixed 40px box (=

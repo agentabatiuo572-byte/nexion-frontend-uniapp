@@ -17,12 +17,15 @@
 -->
 <template>
   <AppChassis active="store">
-    <view class="pb-6" style="color: var(--v5-ink)">
+    <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
+         24px .spv gap, so the nav→content breathing is supplied here once. -->
+    <view class="pb-6" style="color: var(--v5-ink); padding-top: 24px">
       <!-- Back + "Bundle" title now live in the sticky chassis nav header
            (useSetPageHeader below), mirroring the prototype's <SetPageHeader>. -->
 
-      <!-- Hero — v5 light surface + brand aurora -->
-      <view class="mx-4 mt-2 relative overflow-hidden" :style="heroStyle">
+      <!-- Hero — filled commercial spotlight (border dropped; aurora stays clipped
+           inside the surface + overflow-hidden, so it's not a page-floor glow). -->
+      <view class="mx-4 relative overflow-hidden" :style="heroStyle">
         <view aria-hidden :style="heroAuroraStyle" />
         <view class="relative">
           <view class="flex items-center" style="gap: 6px; margin-bottom: 8px">
@@ -76,12 +79,12 @@
       <!-- Suggestions -->
       <view v-if="suggestions.length > 0" class="mx-4 mt-3">
         <text class="block" :style="suggestionsHeadingStyle">{{ t.bundle.suggestionsHeading }}</text>
-        <view class="space-y-2">
+        <view class="overflow-hidden" :style="cardStyle">
           <view
-            v-for="p in suggestions"
+            v-for="(p, i) in suggestions"
             :key="p.id"
             class="w-full flex items-center gap-3 active:opacity-80"
-            :style="suggestionRowStyle"
+            :style="suggestionRowStyle(i === suggestions.length - 1)"
             role="button"
             tabindex="0"
             :aria-label="`Add ${p.name}`"
@@ -213,7 +216,6 @@ const heroStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const heroAuroraStyle: CSSProperties = {
   position: "absolute",
@@ -280,10 +282,11 @@ function tierPctStyle(tier: BundleDiscountTier): CSSProperties {
   };
 }
 
+// Shared form-b container (items list + suggestions list): surface, no border,
+// internal hairline rows. overflow-hidden on the element clips the row corners.
 const cardStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const itemsHeadingStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -322,12 +325,13 @@ const suggestionsHeadingStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const suggestionRowStyle: CSSProperties = {
-  padding: "10px 12px",
-  borderRadius: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
+// Suggestion rows now live in one form-b container → hairline-separated rows.
+function suggestionRowStyle(isLast: boolean): CSSProperties {
+  return {
+    padding: "12px 14px",
+    borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
+  };
+}
 const suggestionNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,

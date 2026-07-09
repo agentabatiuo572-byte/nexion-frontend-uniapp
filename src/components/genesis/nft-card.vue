@@ -23,9 +23,10 @@ const t = useT();
 const paddedId = computed(() => props.id.toString().padStart(4, "0"));
 const agoText = computed(() => fmt(t.value.genesis.agoLabel, { t: props.ago }));
 
+// Collectible tile — filled surface, no border (single visual difference); the
+// gradient art is the NFT's own visual identity.
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "14px",
   padding: "12px",
 };

@@ -7,9 +7,7 @@
   components collapse into {k, v, accent, muted, strong, copyValue, hint} rows).
   framer AnimatePresence → v-if + CSS. ESC handler dropped (mobile).
   Tap-to-copy on hash/signature/wallet rows (uni.setClipboardData + toast +
-  transient ✓ icon, mirrors prototype RowCopy) and the footer Explorer/Share
-  CTAs are wired. Explorer/Share copy the tx_hash reference to the clipboard
-  (no real explorer/share backend in the mock — backend-replaceable). Driven by
+  transient ✓ icon, mirrors prototype RowCopy). Driven by
   :receipt prop (null = hidden) + @close emit (P-032: page-mounted sheet,
   prop/emit — no chassis-level overlay host).
 -->
@@ -65,18 +63,6 @@
             <text style="font-size: 11.5px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
             <text style="margin-left: auto; font-size: 10px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
           </view>
-        </view>
-      </view>
-
-      <!-- Footer CTAs (mirror prototype: View on Explorer / Share) -->
-      <view :style="ctaRowStyle">
-        <view class="flex items-center justify-center active:scale-95" :style="ctaBtnStyle" @click="onExplorer">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-          <text :style="ctaLabelStyle">{{ t.receipt.viewOnExplorer }}</text>
-        </view>
-        <view class="flex items-center justify-center active:scale-95" :style="ctaBtnStyle" @click="onShare">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.59 13.51 6.83 3.98" /><path d="m15.41 6.51-6.82 3.98" /></svg>
-          <text :style="ctaLabelStyle">{{ t.receipt.share }}</text>
         </view>
       </view>
     </view>
@@ -135,24 +121,6 @@ async function copyRow(field: string, value: string): Promise<void> {
     copiedField.value = null;
     copyResetTimer = null;
   }, 1400);
-}
-
-// ── footer CTAs (mirror prototype onExplorer / onShare) ──
-// No real explorer/share backend in the mock — copy the reference to the
-// clipboard so the action has a tangible result on both App + H5.
-function onExplorer(): void {
-  const r = props.receipt;
-  if (!r) return;
-  void writeClipboard(r.txHash).then((ok) => {
-    if (ok) toast.success(t.value.receipt.explorerHint);
-  });
-}
-function onShare(): void {
-  const r = props.receipt;
-  if (!r) return;
-  void writeClipboard(r.txHash).then((ok) => {
-    if (ok) toast.success(t.value.receipt.shareHint);
-  });
 }
 
 onUnmounted(() => {
@@ -410,22 +378,4 @@ function valueStyle(row: DescRow): CSSProperties {
 }
 // Prototype RowCopy: `flex items-center gap-1` (4px) — value + hint + copy icon.
 const copyRowStyle: CSSProperties = { gap: "4px" };
-// Prototype CTA wrap: `px-5 pb-5 pt-2 grid grid-cols-2 gap-2`.
-const ctaRowStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "8px",
-  padding: "8px 20px 20px",
-};
-// Prototype CTA button: `h-10 rounded-lg bg-[var(--v5-surface)] border
-// border-[var(--v5-surface-2)] text-[12px] flex items-center justify-center
-// gap-1.5`. Height bumped 40→44px to clear the mobile 44pt tap-target rule.
-const ctaBtnStyle: CSSProperties = {
-  height: "44px",
-  borderRadius: "8px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-surface-2)",
-  gap: "6px",
-};
-const ctaLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
 </script>

@@ -9,8 +9,8 @@
     <view style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet-bills" />
 
-      <!-- Status hero -->
-      <view class="mx-4 relative overflow-hidden" :style="heroStyle">
+      <!-- Status hero — single-record container (form b: surface fill, no border) -->
+      <view class="mx-4" :style="heroStyle">
         <view class="flex items-center" style="gap: 8px; margin-bottom: 8px">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
           <text :style="confirmedStyle">{{ w.confirmed }}</text>
@@ -182,31 +182,34 @@ onUnmounted(() => {
   if (copyResetTimer) clearTimeout(copyResetTimer);
 });
 
+// De-carded: the page-floor emerald radial glow + green-black gradient + emerald
+// border (all hardcoded hex) are dropped — the tx record now sits in a flat
+// surface container (form b). "Confirmed" reads from the green check + label +
+// success-tinted confirmations stat, no decorative aura needed.
 const heroStyle: CSSProperties = {
-  marginTop: "8px",
   borderRadius: "16px",
   padding: "16px",
-  // Decorative emerald glow + green-black base are hardcoded literals in the
-  // source (tx/[hash]/page.tsx) — kept verbatim so the dark render matches the
-  // prototype exactly (the success token is lemon in v5 dark, not emerald).
-  background:
-    "radial-gradient(80% 60% at 90% 0%, rgba(41,210,127,0.16) 0%, transparent 60%), linear-gradient(180deg, #0A1410 0%, #0F0F0F 100%)",
-  border: "1px solid rgba(41,210,127,0.35)",
+  background: "var(--v5-surface)",
 };
 const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-success)" };
 const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
+// Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
 const copyBtnStyle: CSSProperties = {
   marginTop: "8px",
   display: "inline-flex",
   padding: "4px 8px",
   borderRadius: "6px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
   fontSize: "10.5px",
   color: "var(--v5-ink-3)",
 };
-const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", overflow: "hidden" };
-const extCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "16px" };
+// Tx fields — single-record container (form b: surface fill, no border); the
+// TxRow hairlines are the internal dividers.
+const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", overflow: "hidden" };
+// External-explorer explainer — de-carded to the page floor (ancillary guidance,
+// not part of the receipt); content aligns to the mx-4 gutter, buttons keep their
+// surface-2 fill.
+const extCardStyle: CSSProperties = { marginTop: "12px" };
 const extTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const extBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const extBtnStyle: CSSProperties = {

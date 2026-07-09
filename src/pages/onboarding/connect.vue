@@ -296,11 +296,11 @@ onUnmounted(() => {
 .cn-sub { display: block; margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); }
 .cn-phase { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
 
-.cn-why { background: var(--v5-surface); border: 1px solid var(--v5-border); border-radius: 16px; padding: 16px; }
+.cn-why { background: var(--v5-surface); border-radius: 16px; padding: 16px; }
 .cn-why__h { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-why__list { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .cn-point { display: flex; align-items: flex-start; gap: 10px; }
-.cn-point__ic { width: 24px; height: 24px; border-radius: 6px; background: var(--v5-surface-2); border: 1px solid var(--v5-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+.cn-point__ic { width: 24px; height: 24px; border-radius: 6px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
 .cn-point__t { flex: 1; font-size: 12.5px; line-height: 1.375; color: var(--v5-ink); }
 
 .cn-prog-row { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
@@ -327,7 +327,7 @@ onUnmounted(() => {
 .cn-score__yield-cap { font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-brand); }
 .cn-score__yield-v { font-family: var(--font-v5); font-variant-numeric: tabular-nums; color: var(--v5-brand); font-size: 15px; font-weight: 600; }
 
-.cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface); border: 1px solid var(--v5-border); }
+.cn-summary { border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--v5-surface); }
 .cn-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
 .cn-row__check { width: 24px; height: 24px; border-radius: 6px; background: color-mix(in oklab, var(--v5-brand) 14%, transparent); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .cn-row__label { color: var(--v5-ink-3); }

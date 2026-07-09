@@ -41,6 +41,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/register/success",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/login/login",
       "style": { "navigationStyle": "custom" }
     },
@@ -146,10 +150,6 @@
     },
     {
       "path": "pages/me/proof",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/wrapped",
       "style": { "navigationStyle": "custom" }
     },
     {

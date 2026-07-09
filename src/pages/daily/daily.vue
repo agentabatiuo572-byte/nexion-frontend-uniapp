@@ -424,11 +424,10 @@ const luckyHintStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
 };
+// De-carded outer info card — mono label + tinted milestone rows sit on the page
+// floor (2px optical inset); the game affordance (claimable row glow) is kept.
 const milestoneCardStyle: CSSProperties = {
-  padding: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
+  padding: "0 2px",
 };
 const milestoneLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -530,9 +529,9 @@ const saverBtnStyle = computed<CSSProperties>(() => ({
   justifyContent: "center",
   flexShrink: 0,
 }));
+// Form-b: filled container, no border — the social streak list stays grouped.
 const leaderCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const leaderLabelStyle: CSSProperties = {
@@ -577,10 +576,10 @@ const streakerCountStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
 };
 const leaderSubStyle: CSSProperties = { paddingBottom: "12px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
+// Filled stat tiles, no border (single visual difference).
 const statStyle: CSSProperties = {
   padding: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const statLabelStyle: CSSProperties = {
@@ -601,11 +600,11 @@ function statValStyle(tint: string): CSSProperties {
   };
 }
 const statSubStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)" };
+// Soft brand-2-tinted clickable callout, no border (tap affordance = tint + active-scale).
 const withdrawCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "14px",
   background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
-  border: "1px solid var(--v5-border)",
 };
 const withdrawIconStyle: CSSProperties = {
   width: "40px",
@@ -623,9 +622,9 @@ const historyLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
+// Form-b: filled container, no border — rows already hairline-separated.
 const historyCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const historyEmptyStyle: CSSProperties = { padding: "24px", fontSize: "12.5px", color: "var(--v5-ink-3)" };

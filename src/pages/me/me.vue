@@ -12,6 +12,11 @@
   points), matching the source. KYC state is driven by the wallet-pairing store.
   Some settings targets are not-yet-ported pages → nav fail:()=>{}.
 
+  Account section's "orders" row was relocated here from store.vue's old
+  bottom Orders chip (single canonical entry point, not scroll-buried);
+  account section's "notifications" row was removed (duplicated the chassis
+  header bell → message drawer already present on every tab route).
+
   Settings-row value formatting matches the source: mono-tabular accent text.
 -->
 <template>
@@ -65,10 +70,12 @@
       <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 11px; color: var(--v5-ink-4)">Nexion · v3.2.0 · build 6824</text>
     </CardStagger>
   </AppChassis>
+
+  <ThemePickerSheet :open="themePickerOpen" @close="themePickerOpen = false" />
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SectionHeader from "@/components/me/section-header.vue";
@@ -77,6 +84,7 @@ import WalletCard from "@/components/me/wallet-card.vue";
 import WithdrawalLockedWarning from "@/components/me/withdrawal-locked-warning.vue";
 import TrialEntry from "@/components/me/trial-entry.vue";
 import OrdersCard from "@/components/me/orders-card.vue";
+import ThemePickerSheet from "@/components/me/theme-picker-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
@@ -118,6 +126,7 @@ const notifications = useNotifications();
 const achievements = useAchievements();
 const vrank = useVRank();
 const theme = useTheme();
+const themePickerOpen = ref(false);
 
 const iconPaths = {
   network: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 7a4 4 0 1 0 0 .01", "M22 21v-2a4 4 0 0 0-3-3.87", "M16 3.13a4 4 0 0 1 0 7.75"],
@@ -139,10 +148,12 @@ const iconPaths = {
   shield: ["M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1z", "m9 12 2 2 4-4"],
   bell: ["M10.3 21a2 2 0 0 0 3.4 0", "M4 17h16", "M18 8A6 6 0 0 0 6 8c0 4.5-1.4 6-2.7 7.3A1 1 0 0 0 4 17h16a1 1 0 0 0 .7-1.7C19.4 14 18 12.5 18 8"],
   receipt: ["M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2z", "M8 7h8", "M8 12h8", "M8 17h5"],
+  package: ["M16.5 9.4 7.55 4.24", "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z", "m3.3 7 8.7 5 8.7-5", "M12 22V12"],
   warning: ["M12 9v4", "M12 17h.01", "m10.3 4.3-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-2.7l-8-14a2 2 0 0 0-3.4 0z"],
   trust: ["M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10", "m9 12 2 2 4-4"],
   sliders: ["M4 21v-7", "M4 10V3", "M12 21v-9", "M12 8V3", "M20 21v-5", "M20 12V3", "M2 14h4", "M10 8h4", "M18 16h4"],
   moon: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"],
+  monitor: ["M3 4h18v12H3z", "M8 20h8", "M12 16v4"],
   sun: ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8"],
   globe: ["M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20", "M2 12h20", "M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"],
   rewind: ["M3 12a9 9 0 1 0 9-9 9.8 9.8 0 0 0-6.7 2.7L3 8", "M3 3v5h5"],
@@ -191,7 +202,13 @@ const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: slots
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
 const rankValue = computed(() => `V${vrank.myRank}`);
-const themeModeLabel = computed(() => (theme.mode === "dark" ? t.value.me.themeMetaDark : t.value.me.themeMetaLight));
+const themeModeLabel = computed(() =>
+  theme.mode === "system"
+    ? t.value.me.themeMetaSystem
+    : theme.mode === "dark"
+      ? t.value.me.themeMetaDark
+      : t.value.me.themeMetaLight,
+);
 
 // Trial routing — hero slot (eligible to start) vs active row (running).
 const trialStatus = computed(() => trial.status);
@@ -244,28 +261,13 @@ const quickSections = computed<QuickSection[]>(() => [
     ],
   },
   {
-    key: "earn-extras",
-    title: t.value.me.secEarnExtras,
-    items: [
-      { key: "missions", label: t.value.me.missionsRow, href: "/missions", icon: "trophy", meta: t.value.me.missionsValue, tone: "brand" },
-      { key: "daily", label: t.value.me.dailyCheckin, href: "/daily", icon: "flame", meta: `${streakDays.value} ${t.value.me.dayStreak}`, tone: "orange" },
-      { key: "events", label: t.value.me.eventsCenter, href: "/events", icon: "ticket", meta: eventsLiveLabel.value, tone: "orange" },
-      { key: "learn", label: t.value.me.learnRow, href: "/learn", icon: "book", meta: t.value.me.earnNex, tone: "muted" },
-      { key: "staking", label: t.value.me.stakingVault, href: "/staking", icon: "lock", meta: t.value.me.upTo180, tone: "success" },
-      { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "warning" },
-      { key: "achievements", label: t.value.me.achievements, href: "/me/achievements", icon: "gift", meta: achievementsValue.value, tone: "brand" },
-      { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "sparkle", meta: t.value.rewards.entryValue, tone: "brand" },
-      { key: "wrapped", label: t.value.me.wrappedRow, href: "/me/wrapped", icon: "sparkle", meta: "2026", tone: "purple" },
-    ],
-  },
-  {
     key: "account",
     title: t.value.me.secAccount,
     items: [
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
       { key: "kyc", label: t.value.me.identityKyc, href: "/me/security", icon: "shield", meta: kycVerified.value ? t.value.me.kycVerified : t.value.me.kycPending, tone: kycVerified.value ? "success" : "orange" },
       { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
-      { key: "notifications", label: t.value.me.notifications, href: "/me/notifications", icon: "bell", badge: unreadNotifs.value > 0 ? String(unreadNotifs.value) : undefined, tone: "purple" },
+      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
       { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: String(receiptCount.value), tone: "brand" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
       { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
@@ -277,7 +279,7 @@ const quickSections = computed<QuickSection[]>(() => [
     title: t.value.me.secPreferences,
     items: [
       { key: "preferences", label: t.value.me.preferencesRow, href: "/me/preferences", icon: "sliders", tone: "muted" },
-      { key: "theme", label: t.value.me.themeRow, href: "/me/preferences", icon: theme.mode === "dark" ? "moon" : "sun", meta: themeModeLabel.value, tone: "purple" },
+      { key: "theme", label: t.value.me.themeRow, href: "/me/preferences", icon: theme.mode === "system" ? "monitor" : theme.mode === "dark" ? "moon" : "sun", meta: themeModeLabel.value, tone: "purple" },
       { key: "language", label: t.value.me.languageRow, href: "/me/language", icon: "globe", meta: localeUpper.value, tone: "brand" },
     ],
   },
@@ -297,7 +299,7 @@ const quickSections = computed<QuickSection[]>(() => [
 
 function handleQuickItem(item: QuickItem) {
   if (item.key === "theme") {
-    theme.toggle();
+    themePickerOpen.value = true;
     return;
   }
   navTo(item.href);

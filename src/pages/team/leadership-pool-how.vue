@@ -17,7 +17,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
         </template>
         <text class="block" :style="paraStyle">{{ w.s1Para1 }}</text>
-        <text class="block" :style="{ ...paraStyle, marginTop: '8px' }">{{ w.s1Para2 }}</text>
+        <text class="block" :style="{ ...paraStyle, marginTop: '10px' }">{{ w.s1Para2 }}</text>
       </HowSection>
 
       <HowSection :title="w.s2Title" accent="purple">
@@ -50,7 +50,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /></svg>
         </template>
         <text class="block" :style="captionStyle">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" accent="purple" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" accent="purple" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" accent="purple" />
@@ -62,8 +62,8 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
         </template>
-        <text class="block" :style="paraStyle">{{ w.s4Intro }}</text>
-        <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
+        <text class="block" :style="captionStyle">{{ w.s4Intro }}</text>
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <HowIconRow emoji="🚀" :label="w.way1Label" :body="w.way1Body" />
           <HowIconRow emoji="💎" :label="w.way2Label" :body="w.way2Body" />
           <HowIconRow emoji="🤝" :label="w.way3Label" :body="w.way3Body" />
@@ -127,11 +127,9 @@ function goBack() {
 }
 
 // ─── styles ───
-// SKILL leading-relaxed = 1.625 (原版 .text-[13.5px] leading-relaxed; was 1.6)
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-// SKILL 原版 <p> 无 leading-* → 默认 normal 1.5 (was 1.55)
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px", lineHeight: 1.5 };
-const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)" };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)" };
 
 const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px" };
 const tableHeadStyle: CSSProperties = {

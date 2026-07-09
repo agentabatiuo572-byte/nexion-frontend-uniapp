@@ -124,11 +124,12 @@ async function handleCancel() {
   }
 }
 
-const cardStyle = computed<CSSProperties>(() => ({
+// Collectible tile — filled surface, no border (single visual difference); the
+// listed state is signaled by the badge + warning-tinted art + "yours" label.
+const cardStyle: CSSProperties = {
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: isListed.value ? "1px solid rgba(255,200,61,0.35)" : "1px solid var(--v5-border)",
-}));
+};
 const artStyle = computed<CSSProperties>(() => ({
   aspectRatio: "1 / 1",
   background: isListed.value

@@ -35,6 +35,11 @@ export const useConfig = defineStore("config", () => {
         keywords: [...tier.keywords],
       })),
     },
+    share: {
+      baseUrl: DEFAULT_PLATFORM_CONFIG.share.baseUrl,
+      channels: DEFAULT_PLATFORM_CONFIG.share.channels.map((c) => ({ ...c })),
+      appDownload: { ...DEFAULT_PLATFORM_CONFIG.share.appDownload },
+    },
   });
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示

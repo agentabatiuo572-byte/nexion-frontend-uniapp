@@ -41,8 +41,8 @@
 
       <!-- Overview -->
       <template v-if="tab === 'overview'">
-        <view class="mx-4 mt-3 space-y-2">
-          <view v-for="c in apiCards" :key="c.title" class="border rounded-2xl flex items-start" :style="apiCardStyle">
+        <view class="mx-4 mt-3" :style="apiListStyle">
+          <view v-for="(c, i) in apiCards" :key="c.title" class="flex items-start" :style="apiRowStyle(i === apiCards.length - 1)">
             <view class="grid place-items-center shrink-0" :style="apiIconBoxStyle(c.color)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="c.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in c.icon" :key="di" :d="d" /><template v-for="(r, ri) in (c.rects || [])" :key="`r${ri}`"><rect :x="r.x" :y="r.y" :width="r.w" :height="r.h" :rx="r.rx" /></template><template v-for="(e, ei) in (c.ellipses || [])" :key="`e${ei}`"><ellipse :cx="e.cx" :cy="e.cy" :rx="e.rx" :ry="e.ry" /></template><template v-for="(ln, li) in (c.lines || [])" :key="`l${li}`"><line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" /></template></svg>
             </view>
@@ -56,15 +56,15 @@
         <!-- Partners -->
         <view class="mx-4 mt-4">
           <text class="block" :style="partnerTitleStyle">{{ t.developer.partners }}</text>
-          <view class="border rounded-2xl grid" :style="partnerGridStyle">
-            <view v-for="p in PARTNERS" :key="p.id" class="grid place-items-center border" :style="partnerCellStyle">
+          <view class="rounded-2xl grid" :style="partnerGridStyle">
+            <view v-for="p in PARTNERS" :key="p.id" class="grid place-items-center" :style="partnerCellStyle">
               <text style="font-size: 11px; color: var(--v5-ink-3); font-weight: 500">{{ p.label }}</text>
             </view>
           </view>
         </view>
 
         <!-- Request access form -->
-        <view class="mx-4 mt-4 mb-6 border rounded-2xl" :style="formCardStyle">
+        <view class="mx-4 mt-4 mb-6 rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 4px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
@@ -84,7 +84,7 @@
 
       <!-- Docs -->
       <view v-else-if="tab === 'docs'" class="mx-4 mt-3 mb-6">
-        <view class="border rounded-2xl" :style="formCardStyle">
+        <view class="rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 8px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
             <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
@@ -100,7 +100,7 @@
 
       <!-- API keys -->
       <view v-else-if="tab === 'keys'" class="mx-4 mt-3 mb-6">
-        <view class="border rounded-2xl text-center" :style="emptyTabStyle">
+        <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
           <text class="block" style="font-size: 13.5px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.keysEmpty }}</text>
           <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
@@ -112,7 +112,7 @@
 
       <!-- Webhooks -->
       <view v-else class="mx-4 mt-3 mb-6">
-        <view class="border rounded-2xl text-center" :style="emptyTabStyle">
+        <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text class="block" style="font-size: 13.5px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.webhooksEmpty }}</text>
           <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
@@ -289,12 +289,19 @@ function pillLabelStyle(v: Tab): CSSProperties {
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
-const apiCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  padding: "16px",
-  gap: "12px",
+// De-carded: the 4 API cards merge into a transparent hairline list (rows carry
+// their own dividers, last = none) instead of 4 stacked bordered cards.
+const apiListStyle: CSSProperties = {
+  padding: "0 2px",
+  borderTop: "1px solid var(--v5-border)",
 };
+function apiRowStyle(last: boolean): CSSProperties {
+  return {
+    padding: "14px 0",
+    gap: "12px",
+    borderBottom: last ? "none" : "1px solid var(--v5-border)",
+  };
+}
 function apiIconBoxStyle(color: string): CSSProperties {
   return {
     width: "40px",
@@ -313,7 +320,6 @@ const partnerTitleStyle: CSSProperties = {
 };
 const partnerGridStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "16px",
   gridTemplateColumns: "repeat(4, 1fr)",
   gap: "12px",
@@ -321,12 +327,10 @@ const partnerGridStyle: CSSProperties = {
 const partnerCellStyle: CSSProperties = {
   aspectRatio: "3 / 2",
   background: "var(--v5-surface-2)",
-  borderColor: "var(--v5-border)",
   borderRadius: "8px",
 };
 const formCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "16px",
 };
 const formInputStyle: CSSProperties = {
@@ -354,7 +358,6 @@ const submitBtnStyle: CSSProperties = {
 };
 const snippetWrapStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "8px",
   padding: "12px",
   whiteSpace: "nowrap",
@@ -370,10 +373,11 @@ const docsComingStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--v5-warning) 25%, transparent)",
 };
+// White-list empty state: dashed border-strong, no fill.
 const emptyTabStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "32px",
+  border: "1px dashed var(--v5-border-strong)",
+  background: "transparent",
 };
 const smallBtnStyle: CSSProperties = {
   height: "36px",

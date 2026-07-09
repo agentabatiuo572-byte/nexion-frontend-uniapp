@@ -26,9 +26,9 @@
       <text class="block mx-4" :style="pageTitleStyle">{{ w.title }}</text>
       <text class="block mx-4" :style="introStyle">{{ w.intro }}</text>
 
-      <!-- Onboarding replay steps -->
-      <view class="mx-4" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px">
-        <view v-for="s in steps" :key="s.id" class="block active:opacity-90" :style="stepCardStyle" @click="goStep(s.href)">
+      <!-- Onboarding replay steps — transparent hairline group -->
+      <view class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border); margin-bottom: 24px">
+        <view v-for="(s, i) in steps" :key="s.id" class="block active:opacity-70" :style="stepRowStyle(i !== steps.length - 1)" @click="goStep(s.href)">
           <view class="flex items-center" style="gap: 16px">
             <view class="grid place-items-center shrink-0" :style="stepIconBoxStyle(s.color)">
               <view v-html="s.icon" />
@@ -46,19 +46,19 @@
 
       <!-- Demo lifecycle panel -->
       <view class="mx-4" style="margin-bottom: 32px">
-        <view class="flex items-center" style="gap: 8px; margin-bottom: 12px; padding-left: 4px">
+        <view class="flex items-center" style="gap: 8px; margin-bottom: 12px; padding-left: 2px">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
           <text :style="sectionHeadStyle">{{ w.demoLifecycleHeading }}</text>
         </view>
         <text class="block" :style="sectionIntroStyle">{{ w.demoLifecycleIntro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
           <DemoAction :icon="ICONS.box" accent="var(--v5-brand)" :title="w.demoSeedTitle" :hint="w.demoSeedHint" :cta-label="w.demoSeedCta" @click="onDemoUnavailable" />
           <DemoAction :icon="ICONS.server" accent="var(--v5-warning)" :title="w.demoSeedRack" :hint="w.demoSeedRackHint" :cta-label="w.demoSeedRackCta" @click="onDemoUnavailable" />
           <DemoAction :icon="ICONS.fastForward" accent="var(--v5-tech-cyan)" :title="w.demoFastForwardTitle" :hint="w.demoFastForwardHint" :cta-label="w.demoFastForwardCta" @click="onDemoUnavailable" />
           <DemoAction :icon="ICONS.trophy" accent="var(--v5-brand)" :title="w.demoMilestoneTitle" :hint="w.demoMilestoneHint" :cta-label="w.demoMilestoneCta" @click="onDemoUnavailable" />
           <DemoAction :icon="ICONS.layers" accent="var(--v5-tech-cyan)" :title="w.demoPhaseTitle" :hint="phaseHint" :cta-label="pinnedPhase ?? w.demoPhaseCta" @click="cyclePhase" />
           <DemoAction :icon="ICONS.bell" accent="var(--v5-warning)" :title="w.demoNovaTitle" :hint="w.demoNovaHint" :cta-label="w.demoNovaCta" @click="onDemoUnavailable" />
-          <DemoAction :icon="ICONS.refresh" accent="var(--v5-brand-2)" :title="w.demoResetTitle" :hint="w.demoResetHint" :cta-label="w.demoResetCta" @click="onDemoUnavailable" />
+          <DemoAction :icon="ICONS.refresh" accent="var(--v5-brand-2)" :title="w.demoResetTitle" :hint="w.demoResetHint" :cta-label="w.demoResetCta" last @click="onDemoUnavailable" />
         </view>
       </view>
 
@@ -203,22 +203,27 @@ function goStep(href: string) {
 const gateTextStyle: CSSProperties = { marginTop: "32px", fontSize: "12.5px", color: "var(--v5-ink-3)" };
 const pageTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, lineHeight: 1.25, marginBottom: "8px", color: "var(--v5-ink)" };
 const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.625, marginBottom: "16px" };
-const stepCardStyle: CSSProperties = { background: "var(--v5-surface)", border: "1px solid var(--v5-border)", borderRadius: "16px", padding: "16px" };
+// De-carded: step rows sit on the page floor, hairline divider between them.
+function stepRowStyle(divider: boolean): CSSProperties {
+  return { padding: "14px 0", borderBottom: divider ? "1px solid var(--v5-border)" : "none" };
+}
 function stepIconBoxStyle(color: string): CSSProperties {
   return { width: "48px", height: "48px", borderRadius: "12px", background: `color-mix(in srgb, ${color} 10%, transparent)` };
 }
 const stepTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "color-mix(in srgb, var(--v5-ink) 95%, transparent)" };
 const stepHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.625 };
 const playBtnStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "999px", background: "var(--v5-surface-2)" };
-const sectionHeadStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink-3)" };
-const sectionIntroStyle: CSSProperties = { paddingLeft: "4px", marginBottom: "12px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
-const configTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", marginBottom: "8px", paddingLeft: "4px" };
-const configIntroStyle: CSSProperties = { paddingLeft: "4px", marginBottom: "12px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+// Section labels (de-card spec): 15/600/ink, aligned to the 2px group inset.
+const sectionHeadStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--v5-ink)" };
+const sectionIntroStyle: CSSProperties = { paddingLeft: "2px", marginBottom: "12px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const configTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, letterSpacing: "-0.012em", color: "var(--v5-ink)", marginBottom: "8px", paddingLeft: "2px" };
+const configIntroStyle: CSSProperties = { paddingLeft: "2px", marginBottom: "12px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+// Trial-config panel (form b): single surface container, no border — a live
+// config editor reads as a grouped control panel; the stepper rows keep gap.
 const configCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "14px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   display: "flex",
   flexDirection: "column",
   gap: "10px",

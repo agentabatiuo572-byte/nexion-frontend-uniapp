@@ -1,40 +1,44 @@
 <!--
   Global Leadership Pool — ported from
   Nexion-prototype/app/(main)/team/leadership-pool/page.tsx.
-  Week-pool hero ($X K + settles-in) + my-status card (unlocked: projected
-  dividend + votes/share stats / locked: V3-gate + path CTA) + V-rank vote-weight
-  table (VBadgeIcon rows, mine highlighted) + past-pools history. Sub-page →
-  <AppChassis active="team"> w/ back → /team. Reuses leadership-pool + v-rank
-  stores + VBadge/VBadgeIcon. useMemo → computed. banned hex #15131F/#0E0E0E →
-  tokens. <Link>→<view @click>.
+  Week-pool hero de-carded (DECARD form c): $X K sits directly on the page floor
+  (card gradient/radial + accent border deleted, not tuned). My-status block also
+  on the floor, opened by a hairline (unlocked: projected dividend + votes/share
+  stats / locked: V3-gate + path CTA). V-rank vote-weight table = single surface
+  container (form b, no border, mine-row tinted). Past-pools history = transparent
+  hairline group (form a). Sub-page → <AppChassis active="team"> w/ back → /team.
+  Reuses leadership-pool + v-rank stores + VBadge/VBadgeIcon. useMemo → computed.
+  <Link>→<view @click>.
 -->
 <template>
   <AppChassis active="team">
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.pool.pageTitle" />
 
-      <!-- How-it-works entry -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="inline-flex items-center active:scale-[0.98] transition-transform" :style="howEntryStyle" @click="go('/pages/team/leadership-pool-how')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-          <text>{{ t.pool.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        </view>
-      </view>
-
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Week pool hero -->
-        <view class="rounded-2xl text-center" :style="heroStyle">
-          <view class="flex items-center justify-center font-mono-tabular" :style="heroCapStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
-            <text>{{ t.pool.weekPool }}</text>
+        <!-- Week pool hero — de-carded: big number sits directly on the page
+             floor (card gradient/radial would be a floor aura → deleted per
+             owner call 2026-07-08, accent border dropped with it). Rules-intro
+             pill rides the cap row (owner 2026-07-09: kill the empty gap above). -->
+        <view class="text-center" :style="heroStyle">
+          <view class="flex items-center justify-between" style="gap: 8px">
+            <view class="flex items-center justify-center font-mono-tabular" :style="heroCapStyle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
+              <text>{{ t.pool.weekPool }}</text>
+            </view>
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98] transition-transform" :style="howEntryStyle" @click="go('/pages/team/leadership-pool-how')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <text>{{ t.pool.howItWorksEntry }}</text>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </view>
           </view>
           <text class="block font-display tabular-nums" :style="heroBigStyle">${{ (pool.currentWeekPoolUSDT / 1000).toFixed(1) }}K</text>
           <text class="block" :style="heroDescStyle">{{ weeklyDescText }}</text>
         </view>
 
-        <!-- My status -->
-        <view class="rounded-2xl" :style="unlocked ? statusUnlockedStyle : statusLockedStyle">
+        <!-- My status — transparent block on the page floor, opened by a
+             hairline (was a bordered card in both unlocked/locked variants). -->
+        <view :style="statusStyle">
           <template v-if="unlocked">
             <view class="flex items-center justify-between">
               <text class="font-mono-tabular" :style="statusCapStyle('var(--v5-brand)')">{{ t.pool.projectedDividend }}</text>
@@ -76,8 +80,9 @@
           <text :style="concentrationTextStyle">{{ concentrationText }}</text>
         </view>
 
-        <!-- V-rank vote-weight table -->
-        <view class="rounded-2xl border overflow-hidden" :style="tableCardStyle">
+        <!-- V-rank vote-weight table — single surface container (form b): outer
+             border dropped, rows hairlined, my row tinted (clip needs overflow). -->
+        <view class="rounded-2xl overflow-hidden" :style="tableCardStyle">
           <view class="flex items-center justify-between" :style="tableHeadStyle">
             <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ t.pool.rankWeights }}</text>
             <text class="font-mono-tabular" :style="tableHeadCapStyle">{{ totalPeopleText }}</text>
@@ -103,8 +108,8 @@
           </view>
         </view>
 
-        <!-- Past pools -->
-        <view v-if="pool.history.length > 0" class="rounded-2xl border overflow-hidden" :style="tableCardStyle">
+        <!-- Past pools — transparent hairline group (form a, ledger idiom). -->
+        <view v-if="pool.history.length > 0" :style="pastGroupStyle">
           <text class="block font-mono-tabular" :style="pastHeadStyle">{{ t.pool.pastPools }}</text>
           <view
             v-for="(h, i) in pool.history"
@@ -194,30 +199,28 @@ function go(url: string) {
 }
 
 // ─── styles ───
+// Soft tint only — pills carry no border (chip/pill whitelist rule).
 const howEntryStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 14px",
-  minHeight: "44px",
+  gap: "6px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
 
-const heroStyle: CSSProperties = {
-  padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent) 0%, transparent 65%)," +
-    "linear-gradient(180deg, var(--v5-surface) 0%, var(--v5-bg) 100%)",
-  border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 30%, transparent)",
-};
+// De-carded hero: no surface/border/glow — the big number sits directly on the
+// page floor with a 2px optical inset (leaderboard.vue prize-hero idiom).
+const heroStyle: CSSProperties = { padding: "10px 2px 0" };
 const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const heroDescStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)" };
 
-const statusUnlockedStyle: CSSProperties = { padding: "16px", background: "var(--v5-surface)", border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)" };
-const statusLockedStyle: CSSProperties = { padding: "16px", background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)", border: "1px solid var(--v5-border)" };
+// Transparent status block — was a bordered card in both variants; a hairline
+// opens the zone and the 2px optical inset keeps content on the 16px gutter.
+const statusStyle: CSSProperties = { padding: "14px 2px 0", borderTop: "1px solid var(--v5-border)" };
 function statusCapStyle(color: string): CSSProperties {
   return { fontSize: "10px", letterSpacing: "0.16em", color };
 }
@@ -246,7 +249,9 @@ const concentrationStripStyle: CSSProperties = {
 };
 const concentrationTextStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.45 };
 
-const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "16px" };
+// Form b container — no border (fill is the single visual difference);
+// overflow-hidden stays: the tinted mine-row must clip to the radius.
+const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px" };
 const tableHeadStyle: CSSProperties = { padding: "14px 16px 8px" };
 const tableHeadCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function voteRowStyle(isMine: boolean, isLast: boolean): CSSProperties {
@@ -257,8 +262,11 @@ function voteRowStyle(isMine: boolean, isLast: boolean): CSSProperties {
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
-const pastHeadStyle: CSSProperties = { padding: "14px 16px 8px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+// Transparent hairline group (form a) — border-top opens the group, rows keep
+// their hairlines, content sits on the 2px optical inset.
+const pastGroupStyle: CSSProperties = { marginTop: "12px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+const pastHeadStyle: CSSProperties = { padding: "12px 0 8px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "10px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "12px 0", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 </script>

@@ -14,8 +14,8 @@
       <SubPageHeader back="/pages/index/index" :title="t.headerTitles.market" :subtitle="t.headerSubtitles.market" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- ───────── NEX HERO ───────── -->
-        <view class="rounded-2xl" :style="heroStyle">
+        <!-- ───────── NEX HERO (de-carded: sits on the page floor) ───────── -->
+        <view :style="heroStyle">
           <view class="flex items-center font-mono-tabular" :style="heroCapStyle">
             <text>{{ t.marketPage.nexHero.yourToken }}</text>
           </view>
@@ -69,7 +69,7 @@
         </view>
 
         <!-- ───────── STATS GRID ───────── -->
-        <view class="rounded-2xl border" :style="cardStyle">
+        <view class="rounded-2xl" :style="cardStyle">
           <view class="grid grid-cols-3" style="row-gap: 12px; column-gap: 8px">
             <view v-for="cell in statCells" :key="cell.label">
               <text class="block" :style="statLabelStyle">{{ cell.label }}</text>
@@ -86,7 +86,7 @@
         </view>
 
         <!-- ───────── EXCHANGE LISTINGS ───────── -->
-        <view class="rounded-2xl border" :style="cardStyle">
+        <view class="rounded-2xl" :style="cardStyle">
           <text class="block font-mono-tabular" :style="listLabelStyle">{{ t.marketPage.listings.label }}</text>
           <text class="block" :style="listExStyle">{{ t.marketPage.listings.exchanges }}</text>
           <view class="inline-flex items-center" :style="pendingChipStyle">
@@ -95,7 +95,7 @@
         </view>
 
         <!-- ───────── CATEGORY TABS ───────── -->
-        <view class="grid grid-cols-5 border" :style="catGridStyle">
+        <view class="grid grid-cols-5" :style="catGridStyle">
           <view
             v-for="cat in CATEGORIES"
             :key="cat.id"
@@ -109,7 +109,7 @@
         </view>
 
         <!-- ───────── TOKEN LIST ───────── -->
-        <view class="rounded-2xl border overflow-hidden" :style="cardFlushStyle">
+        <view class="rounded-2xl overflow-hidden" :style="cardFlushStyle">
           <view class="grid items-center border-b font-mono-tabular" :style="tableHeadStyle">
             <text></text>
             <text>{{ t.marketPage.columns.asset }}</text>
@@ -221,11 +221,11 @@ function goExchange() {
 }
 
 // ─── styles ───
+// De-carded: the NEX hero sits on the page floor (surface gradient + accent
+// border + brand glow dropped; the banned dark hex stops went with them). 2px
+// optical inset aligns the price block with the section containers below.
 const heroStyle: CSSProperties = {
-  padding: "16px",
-  background:
-    "radial-gradient(80% 60% at 80% 0%, color-mix(in srgb, var(--v5-brand) 16%, transparent) 0%, transparent 65%), linear-gradient(180deg, #131A0A 0%, #0E0E0E 100%)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)",
+  padding: "0 2px",
 };
 const heroCapStyle: CSSProperties = {
   gap: "8px",
@@ -282,20 +282,19 @@ const buyTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color
 const sellBtnStyle: CSSProperties = {
   height: "44px",
   gap: "6px",
-  background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
-  border: "1px solid var(--v5-border)",
+  background: "var(--v5-surface-2)",
 };
 const sellTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 
+// De-carded form-b containers (single surface, no border): stats grid, exchange
+// listings, and the token table keep their radius + internal hairline dividers.
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };
 const cardFlushStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   borderRadius: "16px",
 };
 const statLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
@@ -331,8 +330,7 @@ const catGridStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+  background: "var(--v5-surface-2)",
 };
 function catItemStyle(active: boolean): CSSProperties {
   return {

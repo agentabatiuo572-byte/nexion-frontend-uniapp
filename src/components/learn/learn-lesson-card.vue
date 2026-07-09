@@ -97,7 +97,6 @@ function open() {
 
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const hairlineStyle = computed<CSSProperties>(() => ({
   top: "0",

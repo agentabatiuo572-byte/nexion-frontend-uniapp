@@ -80,9 +80,9 @@ function onAction() {
   emit("toggle");
 }
 
+// De-carded device card (form b): filled surface, no border (single visual diff).
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const iconBoxStyle = computed<CSSProperties>(() => ({

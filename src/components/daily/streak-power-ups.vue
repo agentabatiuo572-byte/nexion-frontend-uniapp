@@ -1,11 +1,11 @@
 <!--
-  StreakPowerUps — high-value conversion perks unlocked at streak milestones
+  StreakPowerUps — high-value perks unlocked at streak milestones
   7 / 14 / 30 / 60 (ported from
   Nexion-prototype/app/components/daily/streak-power-ups.tsx).
 
   Unlock state derives from current streak vs threshold; the "activated"
   decision is durable in the daily-powerup store. Claim routes the user into a
-  deeper conversion touchpoint (genesis / NEX / unilevel). Source
+  deeper linked touchpoint (genesis / NEX / unilevel). Source
   tints (#C6FF3A / #7C5CFF / #FFBE3D / #FFFFFF) → v5 tokens for token discipline.
   Achievement-badge side-effect from the source is omitted (no achievements
   store in this sample).
@@ -137,14 +137,15 @@ function handleClaim(p: PowerUp) {
   if (powerUp.claim(p.id)) {
     toast.success(fmt(w.value.toastTitle, { name: w.value[`${p.key}_label`] }), w.value.toastBody);
   }
-  // Route into the deeper conversion touchpoint (no-op if not yet ported).
+  // Route into the deeper linked touchpoint (no-op if not yet ported).
   uni.navigateTo({ url: p.href, fail: () => {} });
 }
 
 // ── styles ──
+// Form-b: filled container, no border — game rows (tinted icons, activate CTAs,
+// dynamic footer) keep their full visual weight inside.
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const headLabelStyle: CSSProperties = {

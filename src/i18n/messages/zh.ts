@@ -47,7 +47,6 @@ export const zh: Messages = {
     meProof: "贡献凭证",
     meLanguage: "语言",
     meGoals: "目标",
-    meWrapped: "年度回顾",
     meRiskDisclosure: "风险披露",
     meReplayTour: "重播引导",
     teamRank: "V 级头衔",
@@ -88,7 +87,6 @@ export const zh: Messages = {
     meAchievements: "成就徽章与 NEX 奖励",
     meProof: "可验证的贡献证明",
     meSupportTickets: "与支持团队的对话记录",
-    storeOrders: "追踪您的硬件发货状态",
     teamUnilevel: "来自直推与扩展网络的分红",
     teamBinary: "A & B 双轨 · 自动匹配",
     teamLeaderboard: "实时排名 · $50K 周奖池",
@@ -221,6 +219,8 @@ export const zh: Messages = {
     inviteLabel: "邀请码",
     inviteOptional: "(选填)",
     invitePlaceholder: "输入邀请码(选填)",
+    inviteLockedLabel: "已锁定",
+    inviteLockedTag: "邀请码来自邀请链接 · 不可修改",
     resend: "重新发送",
     resendIn: "{s}秒后可重发",
     verify: "验证并继续",
@@ -238,6 +238,23 @@ export const zh: Messages = {
     giftCreditedToastSub: "已存入钱包",
     giftPendingToast: "新人奖励待审核",
     giftPendingToastSub: "账号已创建,奖励会保留到账户审核完成。",
+    doneTitle: "注册成功",
+    doneSubTeam: "欢迎加入 Nexion,{name} 的团队",
+    doneSubSolo: "欢迎加入 Nexion",
+    doneGiftPosted: "已入账,余额可见",
+    doneGiftPending: "已锁定 · 审核通过后释放",
+    doneGiftPendingNote: "在 APP 保持在线可加速解锁。",
+    doneWhyApp1: "APP 在线时长可加速礼包与收益解锁",
+    doneWhyApp2: "设备收益实时推送,睡醒先看进账",
+    doneWhyApp3: "更稳的连接与算力调度",
+    doneDownloadCta: "下载 Nexion APP",
+    doneDownloadIos: "iOS 下载",
+    doneDownloadAndroid: "Android 下载",
+    doneComingSoonTitle: "APP 即将上线",
+    doneComingSoonBody: "先用网页版体验全部功能,上线后第一时间提醒你。",
+    doneContinueWeb: "先用网页版继续",
+    doneContinue: "继续",
+    doneDlFailed: "未能打开下载页,链接已复制",
     giftBillMemo: "新人奖励 - 邀请奖励",
     giftPendingBillMemo: "新人奖励 - 待审核",
     back: "返回",
@@ -644,23 +661,6 @@ export const zh: Messages = {
     },
   },
 
-  wrapped: {
-    label: "年度回顾",
-    card1Title: "你的 Nexion 年度回顾。",
-    card1Body: "6 个故事卡片串联你这一年的网络旅程。点击右侧翻页。",
-    card2Label: "累计赚到",
-    card2Body: "{days} 个活跃日积累。每分钱都来自硬件验证的 AI 推理。",
-    card3Devices: "{n} 台在线设备",
-    card3Body: "持续 {days} 天的算力流。Nexion 不眠不休。",
-    card4Title: "邀请的朋友",
-    card4Body: "你引入的每个账户都为你解锁了复利级的直接版税 + 网络收益奖金。",
-    card5Body: "从 V0 入职到当前等级 — 持续网络成长换来的。",
-    card6Title: "准备好第二年了?",
-    card6Body: "Founders 等级权益在 V6+ 开放。保持设备活跃,继续邀请,继续叠加。",
-    shareCta: "分享回顾",
-    shareToast: "回顾卡片已复制 — 粘贴到任意应用",
-    doneCta: "完成",
-  },
 
   goals: {
     navTitle: "收益目标",
@@ -1671,7 +1671,7 @@ export const zh: Messages = {
   },
   team: {
     title: "我的团队",
-    subtitle: "永久获得朋友收益的 5% 分成。",
+    subtitle: "好友每笔订单,你永久拿 10% 直推分成。",
     referralCode: "你的推荐码",
     copyCode: "复制",
     copied: "已复制!",
@@ -2035,7 +2035,6 @@ export const zh: Messages = {
     networkCardInvitesWord: "直推",
     networkCardServerEligible: "条件全部达成 · 等待确认",
     secAccount: "账户",
-    secEarnExtras: "增值玩法",
     secPreferences: "偏好",
     secHelp: "帮助与支持",
     profile: "个人资料",
@@ -2081,14 +2080,16 @@ export const zh: Messages = {
     walletCardsMeta: "卡片管理",
     goalsRow: "收益目标",
     setTarget: "设定目标",
-    wrappedRow: "年度回顾",
     riskRow: "风险提示书",
     preferencesRow: "偏好设置",
     themeRow: "主题",
     themeLight: "浅色",
     themeDark: "深色",
+    themeSystem: "跟随系统",
     themeMetaLight: "浅色",
     themeMetaDark: "深色",
+    themeMetaSystem: "跟随系统",
+    themePickerTitle: "外观",
     missionsRow: "任务中心",
     missionsValue: "任务与连续打卡",
     languageRow: "语言",
@@ -2134,11 +2135,7 @@ export const zh: Messages = {
     proofOfCompute: "Proof of Compute",
     back: "返回",
     viewReceipt: "查看收据",
-    viewOnExplorer: "在 Explorer 中查看",
-    share: "分享",
     copied: "已复制到剪贴板",
-    explorerHint: "Explorer 链接已复制到剪贴板",
-    shareHint: "分享链接已复制到剪贴板",
     clearAll: "清空全部",
     clearConfirm: "确定要删除全部收据吗?该操作不可撤销。",
     emptyTitle: "暂无收据",
@@ -2339,11 +2336,11 @@ export const zh: Messages = {
     // 预置消息正文(顾问主动 + 客服)— {name} 由 mock 填充
     seed: {
       advisorWelcome:
-        "你好,我是你的专属顾问 **{name}** 👋 我会盯着你的算力,有明显的机会第一时间提醒你。",
+        "你好,我是你的专属顾问 {name} 👋 我会盯着你的算力,有明显的机会第一时间提醒你。",
       advisorIdleGpu:
-        "提醒一下 — 你的设备这几天闲置了约 30%。升级到 **NexionBox Pro**,同样插着能多赚不少。要我给你看看吗?",
+        "提醒一下 — 你的设备这几天闲置了约 30%。升级到 NexionBox Pro,同样插着能多赚不少。要我给你看看吗?",
       advisorStaking:
-        "180 天锁仓**今天 95% 年化,仅限今天**。现在哪怕锁一部分,复利也跑得很快 — 设置很快 👇",
+        "180 天锁仓今天 95% 年化、仅限今天。现在哪怕锁一部分,复利也跑得很快 — 设置很快 👇",
       supportResolved:
         "搞定就好!这条我先关掉了 — 之后有任何问题随时再开。🙌",
       supportUserQ:
@@ -2433,7 +2430,7 @@ export const zh: Messages = {
     nexInfo: "NEX 是 Nexion 平台代币,可兑换 USDT,或用于抵扣 USDT 提现手续费。",
     historyTitle: "最近兑换",
     historyEmpty: "首次兑换记录会显示在这里。",
-    howItWorksEntry: "新手?了解兑换玩法",
+    howItWorksEntry: "规则介绍",
     // v3 风控面板
     capsLabel: "每日兑换额度",
     capsReset: "午夜重置",
@@ -2901,6 +2898,7 @@ export const zh: Messages = {
     cta: {
       share: "分享我的邀请链接",
       poster: "分享邀请海报",
+      loadMore: "查看更多",
     },
     note: "排名每 5 分钟更新一次。奖池在周期结束时自动派发。",
   },
@@ -2980,7 +2978,7 @@ export const zh: Messages = {
       claimedTitle: "持仓已领取",
       claimedSubtitle: "+${total} 返回(利息 ${interest})",
     },
-    howItWorksEntry: "新手?了解质押玩法",
+    howItWorksEntry: "规则介绍",
   },
 
   stakingHowItWorks: {
@@ -3017,7 +3015,7 @@ export const zh: Messages = {
     r1Body: "一旦质押,这笔钱在到期日前无法用作任何事——不能提现、不能消费、不能转账。",
     r2Label: "提前赎回会损失利息",
     r2Body:
-      "你可以随时提前赎回,但只能拿回本金扣减罚款(通常本金的 5-15%)。所有已累计的利息**全部损失**。",
+      "你可以随时提前赎回,但只能拿回本金扣减罚款(通常本金的 5-15%)。所有已累计的利息全部损失。",
     r3Label: "年化是浮动的,会调整",
     r3Body:
       "你锁仓时看到的利率就是这笔的固定锁定利率。后续市场变化只影响新质押,你已有持仓按原利率到期。",
@@ -3029,7 +3027,7 @@ export const zh: Messages = {
     faqA1: "每笔最低 $20 USDT,低于这个金额的利息太少没意义。",
     faqQ2: "可以用 NEX 余额质押吗?",
     faqA2:
-      "不行——质押只支持 USDT。先在 `/me/wallet/exchange` 把 NEX 换成 USDT,再质押。",
+      "不行——质押只支持 USDT。先在「钱包 → 兑换」把 NEX 换成 USDT,再质押。",
     faqQ3: "到期没 claim 会怎样?",
     faqA3:
       "没事。持仓保持 matured 状态等你领取。到期后不再生息——想继续赚要 claim 后再质押新一笔。",
@@ -3143,7 +3141,7 @@ export const zh: Messages = {
     socialBought: "购买了",
     justNow: "刚刚",
     openseaLine: "在 OpenSea 查看 · 地板价",
-    howItWorksEntry: "新手?了解 Genesis 节点玩法",
+    howItWorksEntry: "规则介绍",
     // 二级市场成交回填(已挂单节点的 mock 自动售出)。后台等价物是结算
     // webhook 在扣除 {GENESIS_ROYALTY_RATE} 版税后给卖家入账;toast 镜像该事件。
     soldToastTitle: "创世节点 #{id} 已售出",
@@ -3226,7 +3224,7 @@ export const zh: Messages = {
     needTeam: "团队再 ${n}",
     needV: "再 {n} 个 {title}(V{v})",
     upgradeCta: "升级路径(购买设备 + 邀请)",
-    howItWorksEntry: "新手?了解等级体系",
+    howItWorksEntry: "规则介绍",
   },
 
   rankHowItWorks: {
@@ -3244,7 +3242,7 @@ export const zh: Messages = {
     s2Caption: "从 Cadet 到 Singularity,每一阶都有自己的条件和奖励。",
     s3Title: "如何升级",
     s3Intro:
-      "每个等级都有自己的一组条件。要晋升到下一阶,你必须**同时**满足所有条件。",
+      "每个等级都有自己的一组条件。要晋升到下一阶,你必须同时满足所有条件。",
     req1Label: "1. 自买金额",
     req1Body:
       "你自己购买设备(NexionBox / Cloud Share)累计支付的 USDT。退款会扣减。NEX 代币内购、礼包赠送不计入。",
@@ -3314,20 +3312,21 @@ export const zh: Messages = {
 
   unilevel: {
     pageTitle: "影响力网络版税",
-    pageSubtitle: "直推朋友下单时拿版税分成 + 扩展网络活跃时拿算法奖金。",
+    pageSubtitle: "直推合伙人下单时拿版税分成 + 扩展网络活跃时拿算法奖金。",
     people: "人",
-    noMembers: "暂无版税来源 · 邀请朋友开始获得版税",
+    noMembers: "暂无版税来源 · 邀请合伙人开始获得版税",
     spillTag: "转入用户",
     wing: "轨道",
-    howItWorksEntry: "版税计划玩法",
+    howItWorksEntry: "规则介绍",
+    loadMore: "查看更多",
 
     heroLabel: "本月版税",
     heroRateLine: "合伙人等级 · {tier} · 固定 {rate}% 版税",
 
     directLabel: "直推版税",
-    directSub: "你直接邀请的朋友下单时,按比例拿版税分成。",
+    directSub: "你直接邀请的合伙人下单时,按比例拿版税分成。",
     directRateText: "{rate}% 版税费率",
-    directMembersText: "{n} 位直推朋友在贡献",
+    directMembersText: "{n} 位直推合伙人在贡献",
 
     networkLabel: "网络影响力奖金",
     networkSub: "基于扩展网络月度算力活跃度的算法奖金。",
@@ -3347,7 +3346,7 @@ export const zh: Messages = {
       diamond:  { name: "Diamond",  perk: "VIP · AMA" },
     },
 
-    filterAll: "全部朋友",
+    filterAll: "全部合伙人",
     filterDirect: "直推",
     filterExtended: "扩展",
     memberBadgeDirect: "直推",
@@ -3362,7 +3361,7 @@ export const zh: Messages = {
       "两大版税组件 + 4 档随月度网络活跃度成长、解锁权益的合伙人等级。版税费率恒定 10%。",
     s1Title: "什么是影响力网络版税?",
     s1Para1:
-      "两个组件构成你的月度版税。**直接版税**按当前费率派发给你直推朋友的每一笔订单;**网络收益奖金**是根据你扩展网络算力活跃度计算的算法月度奖金。",
+      "两个组件构成你的月度版税。直接版税按当前费率派发给你直推朋友的每一笔订单;网络收益奖金是根据你扩展网络算力活跃度计算的算法月度奖金。",
     s1Para2:
       "网络中任何人的订单(买设备 / 充值 / 升级)持续派发版税。行业对标:Amazon Associates 联盟、Stripe Partners、Crypto.com Affiliate、YouTube AdSense 引荐计划。",
     s2Title: "合伙人等级",
@@ -3462,7 +3461,7 @@ export const zh: Messages = {
     recentMatches: "最近匹配",
     left: "A",
     right: "B",
-    howItWorksEntry: "新手?了解玩法说明",
+    howItWorksEntry: "规则介绍",
   },
 
   binaryHowItWorks: {
@@ -3557,7 +3556,7 @@ export const zh: Messages = {
     pastPools: "历史周池",
     poolTotalShort: "池 ${k}K · {n} 票",
     youTag: "你",
-    howItWorksEntry: "新手?了解领导池玩法",
+    howItWorksEntry: "规则介绍",
     concentrationHint: "顶部 {n} 名领袖分走约 {pct}% 池子 · 升得越高,吃得越多",
   },
 
@@ -3646,7 +3645,7 @@ export const zh: Messages = {
       leadership: "领导池",
       genesis: "创世",
     },
-    howItWorksEntry: "新手?了解 6 类佣金",
+    howItWorksEntry: "规则介绍",
   },
 
   commissionsHowItWorks: {
@@ -3665,10 +3664,10 @@ export const zh: Messages = {
       "你的影响力网络中任何人下合格订单都给你版税。直推朋友按当前费率结算;扩展网络通过算法 Network Yield Bonus 结算。最常见的渠道。",
     k2Label: "Binary · 平衡匹配奖",
     k2Body:
-      "按{freq}结算,基于较小一侧月业绩 × 10%。需双侧 ≥ $1,000/月。详见 `/team/binary`。",
+      "按{freq}结算,基于较小一侧月业绩 × 10%。需双侧 ≥ $1,000/月。详见「团队 → 平衡匹配」。",
     k3Label: "Peer · 平级奖",
     k3Body:
-      "V3 解锁。当你**同等级或更高等级**的队友下合格订单时,你额外拿 5%——奖励带出 leader 的 leader。",
+      "V3 解锁。当你同等级或更高等级的队友下合格订单时,你额外拿 5%——奖励带出 leader 的 leader。",
     k4Label: "Cultivation · 培育奖(NEX)",
     k4Body:
       "你直推的人达到新 V 级时,你一次性拿 NEX 奖励。金额随对方 V 级递增:V1 = 500 NEX,V8 = 10M NEX。",
@@ -3677,7 +3676,7 @@ export const zh: Messages = {
       "V3 解锁。平台每周注入总业绩的 5% 到池子,按 V3+ 用户的票数权重分配。每周一结算。",
     k6Label: "Genesis · 创世排放",
     k6Body:
-      "如果你持有 Genesis 创世节点 NFT(详见 `/genesis`),你按持有量持续分享平台收入。",
+      "如果你持有 Genesis 创世节点 NFT(详见创世页),你按持有量持续分享平台收入。",
     s3Title: "结算生命周期",
     s3Intro: "每笔佣金要经过 3 个阶段,才真正能提走。",
     statusCooling: "冷却中",
@@ -3736,7 +3735,7 @@ export const zh: Messages = {
     toastSubtitle: "${a} 锁仓 35% APY 90 天",
     insufficient: "余额不足",
     insufficientSub: "仅 ${a} 可用",
-    howItWorksEntry: "新手?了解复投玩法",
+    howItWorksEntry: "规则介绍",
   },
 
   repurchaseHowItWorks: {
@@ -3790,10 +3789,10 @@ export const zh: Messages = {
       "复投跟普通 90 天质押付一样的利息,但额外叠加 Genesis 抽奖券 + 培育倍率。锁仓时长相同,3 倍多回报。",
     faqQ2: "可以用 NEX 余额复投吗?",
     faqA2:
-      "不行——复投只支持 USDT。先在 `/me/wallet/exchange` 把 NEX 换成 USDT,再复投。",
+      "不行——复投只支持 USDT。先在「钱包 → 兑换」把 NEX 换成 USDT,再复投。",
     faqQ4: "Genesis 抽奖怎么开?",
     faqA4:
-      "每月 1 号链上透明开奖。中奖者公告,分数化 NFT 自动入 `/genesis` 页。持多张券概率成比例提升。",
+      "每月 1 号链上透明开奖。中奖者公告,分数化 NFT 自动入你的创世页。持多张券概率成比例提升。",
     ctaBack: "明白了 · 立即复投",
   },
 
@@ -4176,6 +4175,8 @@ export const zh: Messages = {
     privacy: "隐私",
     trustCenter: "信任中心",
     sponsorCityLine: "{city} · {n} 位网络成员",
+    alreadyBar: "你已注册 Nexion。邀请链接对新用户有效,新人礼每账号仅一次。",
+    enterApp: "进入 Nexion",
   },
 
   upsell: {
@@ -4439,5 +4440,49 @@ export const zh: Messages = {
     unreadCount: "{n} 条未读",
     allCaughtUp: "全部已读",
     prefsFooter: "通知偏好设置在「设置」中 →",
+  },
+
+  // FEAT-SHARE01 邀请分享全链路(海报面板/渠道面板/入口)。
+  share: {
+    posterTitle: "分享海报",
+    channelTitle: "邀请好友",
+    rewardLine: "每位注册好友为你带来 ${usd}",
+    posterRewardLine: "好友注册即领 ${usd} + {nex} NEX · 扫码直达注册",
+    scanTip: "扫码注册 · 新人礼直达",
+    tplGift: "新人礼",
+    tplYield: "我的产出",
+    tplBrand: "我的网络",
+    showUsername: "展示用户名",
+    generating: "生成中…",
+    genFailed: "海报生成失败",
+    retry: "重试",
+    saveImage: "保存图片",
+    saved: "海报已保存",
+    saveLongPress: "当前浏览器限制保存,长按海报图片保存",
+    copyLink: "复制链接",
+    more: "更多",
+    cancel: "取消",
+    smsLabel: "短信",
+    openFailedCopied: "未能打开 {channel},邀请文案已复制,粘贴即可发送",
+    schemeCopied: "邀请文案已复制,打开 {channel} 粘贴发送",
+    noCodeYet: "邀请码生成中,请稍后再试",
+    copyFailed: "复制失败,请重试",
+    shareText: "我在 Nexion 每天都有算力收益进账。用我的链接注册,白拿 ${usd} + {nex} NEX → {link}",
+    questRewardMemo: "首日任务 · 邀请好友",
+    questRewardToast: "任务完成:邀请好友",
+    posterGiftCap: "WELCOME GIFT",
+    posterGiftTitle: "注册即送",
+    posterGiftAmount: "${usd} + {nex} NEX",
+    posterGiftSub1: "AI 算力收益平台 · 第 1 天就有进账",
+    posterGiftSub2: "全球 47 国 · 本月 28,432 人加入",
+    posterYieldCap: "TODAY'S EARNINGS",
+    posterYieldSub: "我的设备今日产出",
+    posterYieldDevices: "运行设备",
+    posterYieldUnit: "{n} 台",
+    posterYieldYou: "你注册可领",
+    posterBrandCap: "NETWORK",
+    posterBrandTitle1: "和我一起",
+    posterBrandTitle2: "跑 AI 算力节点",
+    posterBrandSub: "注册就领 ${usd} + {nex} NEX 新人礼",
   },
 };

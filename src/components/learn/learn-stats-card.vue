@@ -2,8 +2,8 @@
   LearnStatsCard — "Your Learning" stats summary (ported from StatsCard in
   Nexion-prototype/app/(main)/learn/page.tsx).
 
-  Surface w/ brand-2 radial glow + grad-cap icon + completed N/total row +
-  earned-NEX right column + scroll-grow completion bar.
+  Flat surface tile + grad-cap icon + completed N/total row + earned-NEX
+  right column + scroll-grow completion bar.
 -->
 <template>
   <view class="rounded-2xl" :style="cardStyle">
@@ -41,10 +41,7 @@ const pct = computed(() => (props.total > 0 ? Math.min(100, (props.done / props.
 const completedRow = computed(() => fmt(t.value.learn.completedRow, { n: props.done, total: props.total }));
 
 const cardStyle: CSSProperties = {
-  background:
-    "radial-gradient(80% 60% at 80% 0%, color-mix(in oklab, var(--v5-brand-2) 14%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  boxShadow: "var(--v5-card-shadow-lift-strong)",
+  background: "var(--v5-surface)",
   padding: "16px",
 };
 const iconBoxStyle: CSSProperties = {

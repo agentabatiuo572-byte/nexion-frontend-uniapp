@@ -9,8 +9,8 @@
     <view style="padding-bottom: 16px">
       <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
 
-      <!-- Empty -->
-      <view v-if="!wd" class="px-5 text-center" style="padding-top: 16px">
+      <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
+      <view v-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ t.wallet.noActiveWithdrawal }}</text>
         <view class="active:opacity-70" style="display: inline-block; margin-top: 12px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
           <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
@@ -18,57 +18,60 @@
       </view>
 
       <template v-else>
-        <!-- Summary -->
-        <view class="mx-4 relative overflow-hidden hero-glow" :style="summaryStyle">
-          <view class="dot-grid" :style="dotGridStyle" />
-          <view class="relative text-center">
+        <!-- Single-theme continuous flow: page-floor blocks separated by 12px,
+             hairlines open the stepper + ETA groups (de-carded). -->
+        <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+          <!-- Amount hero — de-carded to the page floor (no surface/border; the
+               floor glow + dot-grid are deleted, not re-tuned). -->
+          <view :style="heroStyle">
             <text class="block" :style="amountLabelStyle">{{ t.wallet.trackAmountLabel }}</text>
             <text class="block" :style="amountStyle">${{ wd.amount.toFixed(2) }}</text>
             <text class="block" :style="viaStyle">{{ viaLine }}</text>
             <text class="block" :style="addrStyle">{{ wd.address }}</text>
           </view>
-        </view>
 
-        <!-- Status stepper -->
-        <view class="mx-4" :style="stepperCardStyle">
-          <text class="block" :style="progressLabelStyle">{{ t.wallet.trackProgressLabel }}</text>
-          <view class="relative">
-            <view v-for="(step, i) in steps" :key="step.key" class="flex relative" :style="stepLiStyle(i === steps.length - 1)">
-              <!-- connector -->
-              <view v-if="i < steps.length - 1" :style="connectorStyle(i < currentIdx)" />
-              <!-- icon -->
-              <view class="grid place-items-center shrink-0" style="width: 24px; height: 24px">
-                <view v-if="i < currentIdx" class="grid place-items-center" :style="doneIconStyle">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          <!-- Status stepper — outer card dropped, stepper structure kept;
+               hairline opens the group. -->
+          <view :style="stepperStyle">
+            <text class="block" :style="progressLabelStyle">{{ t.wallet.trackProgressLabel }}</text>
+            <view class="relative">
+              <view v-for="(step, i) in steps" :key="step.key" class="flex relative" :style="stepLiStyle(i === steps.length - 1)">
+                <!-- connector -->
+                <view v-if="i < steps.length - 1" :style="connectorStyle(i < currentIdx)" />
+                <!-- icon -->
+                <view class="grid place-items-center shrink-0" style="width: 24px; height: 24px">
+                  <view v-if="i < currentIdx" class="grid place-items-center" :style="doneIconStyle">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                  </view>
+                  <view v-else-if="i === currentIdx" class="grid place-items-center glow-green" :style="currentIconStyle">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                  </view>
+                  <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2"><circle cx="12" cy="12" r="9" /></svg>
                 </view>
-                <view v-else-if="i === currentIdx" class="grid place-items-center glow-green" :style="currentIconStyle">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                <!-- text -->
+                <view style="flex: 1; padding-top: 2px">
+                  <text class="block" :style="stepLabelStyle(i > currentIdx)">{{ step.label }}</text>
+                  <text class="block" :style="stepHintStyle">{{ step.hint }}</text>
+                  <text v-if="i <= currentIdx" class="block" :style="stepTimeStyle">{{ relTime(wd.submittedAt + i * STEP_DELAY_MS) }}</text>
                 </view>
-                <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2"><circle cx="12" cy="12" r="9" /></svg>
-              </view>
-              <!-- text -->
-              <view style="flex: 1; padding-top: 2px">
-                <text class="block" :style="stepLabelStyle(i > currentIdx)">{{ step.label }}</text>
-                <text class="block" :style="stepHintStyle">{{ step.hint }}</text>
-                <text v-if="i <= currentIdx" class="block" :style="stepTimeStyle">{{ relTime(wd.submittedAt + i * STEP_DELAY_MS) }}</text>
               </view>
             </view>
           </view>
-        </view>
 
-        <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结) -->
-        <view class="mx-4 flex items-start" :style="isFrozenHold ? etaFrozenCardStyle : etaCardStyle">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="isFrozenHold ? 'var(--v5-danger)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          <view style="flex: 1">
-            <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
-            <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
-            <view v-if="heldReasonLines.length" style="margin-top: 6px">
-              <text v-for="line in heldReasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
+          <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结)
+               normal = floor note (hairline opens it); frozen = danger accent callout. -->
+          <view class="flex items-start" :style="isFrozenHold ? etaFrozenCardStyle : etaCardStyle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="isFrozenHold ? 'var(--v5-danger)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+            <view style="flex: 1">
+              <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
+              <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
+              <view v-if="heldReasonLines.length" style="margin-top: 6px">
+                <text v-for="line in heldReasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
+              </view>
             </view>
           </view>
-        </view>
 
-        <view class="mx-4" style="margin-top: 16px; margin-bottom: 8px">
+          <!-- Back to wallet -->
           <view class="flex items-center justify-center active:opacity-80" :style="backBtnStyle" role="button" tabindex="0" :aria-label="t.wallet.trackBackToWallet" @click.stop="goWallet">
             <text>{{ t.wallet.trackBackToWallet }}</text>
           </view>
@@ -150,35 +153,16 @@ function goWallet() {
 
 const emptyTextStyle: CSSProperties = { fontSize: "14px", color: "var(--v5-ink-2)" };
 const emptyLinkStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-brand)" };
-const summaryStyle: CSSProperties = {
-  borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
-  padding: "20px",
-};
-// Position/mask only — dot pattern (lemon 0.14 @ 18px) comes from the global
-// `.dot-grid` class (tokens.css), matching the prototype's `dot-grid` exactly.
-const dotGridStyle: CSSProperties = {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  top: 0,
-  height: "80px",
-  opacity: 0.5,
-  maskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
-  WebkitMaskImage: "linear-gradient(to bottom, black 0%, transparent 100%)",
-};
+// De-carded amount hero — left-aligned on the page floor (2px optical inset);
+// no surface/border, and the floor glow + dot-grid element are deleted outright.
+const heroStyle: CSSProperties = { padding: "0 2px" };
 const amountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
 const amountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "30px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "4px", fontVariantNumeric: "tabular-nums" };
 const viaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
 const addrStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)", marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", wordBreak: "break-all" };
-const stepperCardStyle: CSSProperties = {
-  marginTop: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-  borderRadius: "16px",
-  padding: "20px",
-};
+// De-carded — the stepper structure is kept; a hairline opens the group and
+// content sits at the 2px optical inset (no surface/border).
+const stepperStyle: CSSProperties = { padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const progressLabelStyle: CSSProperties = { marginBottom: "14px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
 function stepLiStyle(last: boolean): CSSProperties {
   return { gap: "12px", paddingBottom: last ? "0" : "20px" };
@@ -200,16 +184,14 @@ function stepLabelStyle(pending: boolean): CSSProperties {
 }
 const stepHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const stepTimeStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "11.5px", color: "var(--v5-ink-4)", marginTop: "2px", fontVariantNumeric: "tabular-nums" };
-const etaCardStyle: CSSProperties = {
-  marginTop: "12px",
-  gap: "12px",
-  background: "var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
-  borderRadius: "16px",
-  padding: "16px",
-};
+// Normal ETA — floor note; a hairline opens it (no surface/border).
+const etaCardStyle: CSSProperties = { gap: "12px", padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
+// Frozen/held ETA — danger accent callout (tint + border: the whitelisted
+// accent-callout exception, reserved for a genuine alert state).
 const etaFrozenCardStyle: CSSProperties = {
-  ...etaCardStyle,
+  gap: "12px",
+  padding: "16px",
+  borderRadius: "16px",
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--v5-danger) 30%, transparent)",
 };

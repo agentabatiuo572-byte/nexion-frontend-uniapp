@@ -15,7 +15,7 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
 
-      <!-- ───── Password ───── -->
+      <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="mx-4" :style="cardStyle">
         <view class="flex items-center active:opacity-90" :style="rowStyle" @click="editingPwd = !editingPwd">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
@@ -41,11 +41,7 @@
             </view>
           </view>
         </view>
-      </view>
-
-      <!-- ───── Two-factor ───── -->
-      <view class="mx-4" :style="cardStyle">
-        <view class="flex items-center" :style="rowStyle">
+        <view class="flex items-center" :style="rowBorderedStyle">
           <view class="grid place-items-center shrink-0" :style="iconBox(twoFactorEnabled ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" :stroke="twoFactorEnabled ? 'var(--v5-success)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           </view>
@@ -60,7 +56,7 @@
       <text class="block mx-4" :style="footerStyle">{{ t.security.twoFactorHint }}</text>
 
       <!-- ───── KYC-Express ───── -->
-      <view class="mx-4" :style="cardStyle">
+      <view class="mx-4" :style="[cardStyle, groupGap]">
         <view class="flex items-center active:opacity-90" :style="rowStyle" @click="goKyc">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-tech-cyan-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
@@ -75,7 +71,7 @@
 
       <!-- ───── Active sessions ───── -->
       <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
-      <view class="mx-4" :style="cardStyle">
+      <view class="mx-4" :style="[cardStyle, groupGap]">
         <view v-for="(s, i) in sessions" :key="s.id" class="flex items-center" :style="i === 0 ? rowStyle : rowBorderedStyle">
           <view class="grid place-items-center shrink-0" :style="iconBox(s.current ? 'var(--v5-success-soft)' : 'var(--v5-surface-3)')">
             <!-- Smartphone -->
@@ -101,7 +97,7 @@
       <text class="block mx-4" :style="footerStyle">{{ t.security.sessionsHint }}</text>
 
       <!-- ───── Danger zone ───── -->
-      <view class="mx-4" :style="cardStyle">
+      <view class="mx-4" :style="[cardStyle, groupGap]">
         <view class="flex items-center active:opacity-90" :style="rowStyle" @click="handleDeleteAccount">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
@@ -293,13 +289,14 @@ function iconBox(bg: string): CSSProperties {
   };
 }
 
+// De-carded settings group (form b): filled surface, no border. The first group
+// sits at the global 24px header gap (no top margin); groupGap spaces the rest.
 const cardStyle: CSSProperties = {
-  marginTop: "12px",
   padding: "0 16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
+const groupGap: CSSProperties = { marginTop: "12px" };
 const rowStyle: CSSProperties = {
   gap: "12px",
   minHeight: "52px",
@@ -324,19 +321,21 @@ const rowSubStyle: CSSProperties = {
 };
 const chevronStyle: CSSProperties = { flexShrink: 0 };
 const footerStyle: CSSProperties = {
-  marginTop: "6px",
+  marginTop: "10px",
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
 };
+// Section label (de-card spec): 15/600/ink.
 const sectionHeadStyle: CSSProperties = {
-  marginTop: "20px",
+  marginTop: "22px",
+  marginBottom: "0",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "15px",
   fontWeight: 600,
-  letterSpacing: "-0.025em",
-  color: "var(--v5-ink-3)",
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
 const pwdFormStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",

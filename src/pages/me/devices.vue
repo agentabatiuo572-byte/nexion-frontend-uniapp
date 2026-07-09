@@ -22,13 +22,13 @@
     <view class="pb-8" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.myDevices.inventoryTitle" />
 
-      <view class="mx-4 mt-1" style="margin-bottom: 12px">
+      <view class="mx-4" :style="slotCaptionStyle">
         <text class="block" :style="subtitleStyle">{{ slotMeterLabel }}</text>
       </view>
 
-      <view class="mx-4" style="margin-top: 12px">
-        <!-- Slot meter -->
-        <view :style="meterCardStyle">
+      <view class="mx-4">
+        <!-- Slot meter — de-carded: sits on the page floor. -->
+        <view :style="meterBlockStyle">
           <view class="flex items-center justify-between">
             <text :style="meterLabelStyle">{{ t.myDevices.inventorySlotsLabel }}</text>
             <view class="flex items-baseline" style="gap: 4px">
@@ -312,16 +312,19 @@ function segStyle(i: number): CSSProperties {
   };
 }
 
+// Lead caption sits at the content edge (2px inset); no top margin (global gap).
+const slotCaptionStyle: CSSProperties = {
+  padding: "0 2px",
+  marginBottom: "10px",
+};
 const subtitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11.5px",
   color: "var(--v5-ink-3)",
 };
-const meterCardStyle: CSSProperties = {
-  borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
-  background: "var(--v5-surface)",
-  padding: "12px 16px",
+// De-carded: slot meter sits on the page floor (2px optical inset).
+const meterBlockStyle: CSSProperties = {
+  padding: "0 2px",
 };
 const meterLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -339,10 +342,10 @@ const meterMaxStyle: CSSProperties = {
   fontSize: "13.5px",
   color: "var(--v5-ink-3)",
 };
+// De-carded device card (form b): filled surface, no border.
 const trialCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
   background: "var(--v5-surface)",
 };
 const trialIconBoxStyle: CSSProperties = {
@@ -401,11 +404,11 @@ const slotsFullWarnStyle: CSSProperties = {
   fontSize: "11.5px",
   color: "var(--v5-warning)",
 };
+// Empty state (de-card whitelist): dashed outline, no fill.
 const emptyCardStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "16px",
   border: "1px dashed var(--v5-border-strong)",
-  background: "color-mix(in srgb, var(--v5-surface) 40%, transparent)",
   padding: "32px 20px",
   textAlign: "center",
 };

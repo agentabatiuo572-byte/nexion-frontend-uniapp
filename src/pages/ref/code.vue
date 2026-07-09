@@ -17,11 +17,17 @@
           <text :style="brandMarkTextStyle">N</text>
         </view>
         <text :style="brandNameStyle">Nexion</text>
-        <text :style="refChipStyle">REF/{{ codeUpper }}</text>
+        <text v-if="hasCode" :style="refChipStyle">REF/{{ codeUpper }}</text>
       </view>
 
-      <!-- Sponsor hero -->
-      <view :style="sponsorCardStyle">
+      <!-- [FEAT-SHARE4] 异常2:本机已登录 → 提示条 + CTA 变「进入」,不重复领礼 -->
+      <view v-if="authed" :style="alreadyBarStyle">
+        <text>{{ t.ref.alreadyBar }}</text>
+      </view>
+
+      <!-- Sponsor hero([FEAT-SHARE4] 异常1:无码/非法码 → 整块隐藏;已登录也隐藏,
+           避免「你已注册礼包仅一次」提示条与「X 邀请了你领礼」同屏互相矛盾(审计 P1) -->
+      <view v-if="hasCode && !authed" :style="sponsorCardStyle">
         <view class="flex items-center" style="gap: 12px">
           <view class="grid place-items-center" :style="avatarStyle">
             <text :style="avatarTextStyle">{{ initial }}</text>
@@ -60,14 +66,18 @@
         </view>
       </view>
 
-      <!-- CTA -->
-      <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="goRegister">
+      <!-- CTA(已登录 → 进入 Nexion,隐藏注册入口;异常2) -->
+      <view v-if="!authed" class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="goRegister">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
+      <view v-else class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="enterApp">
+        <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+      </view>
 
-      <view class="text-center" style="margin-top: 8px">
+      <view v-if="!authed" class="text-center" style="margin-top: 8px">
         <text :style="signinStyle">{{ t.ref.signinInstead }} </text>
         <text :style="signinLinkStyle" @click="goLogin">{{ t.ref.continue }}</text>
       </view>
@@ -123,18 +133,27 @@ import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
 import { useConfig } from "@/store/config";
+import { useAuth } from "@/store/auth";
+import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
 
 const t = useT();
 const code = ref("");
 const cfg = useConfig();
+const auth = useAuth();
+const sponsorship = useSponsorship();
 // 礼包金额单源派生自 platform config(禁写死镜像)。
 const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
 const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
+// [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
 onLoad((options) => {
-  code.value = options?.code ?? "";
+  const norm = normalizeRefCode(options?.code ?? "");
+  code.value = norm ?? "";
+  if (norm) sponsorship.capturePending(norm);
 });
+const hasCode = computed(() => !!code.value);
+const authed = computed(() => auth.isAuthenticated);
 
 const codeUpper = computed(() => code.value.toUpperCase());
 const sponsor = computed(() => pickSponsor(code.value));
@@ -159,10 +178,15 @@ function perkLabel(k: PerkKey): string {
 }
 
 function goRegister() {
-  uni.navigateTo({ url: `/pages/register/register?ref=${encodeURIComponent(code.value)}`, fail: () => {} });
+  const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
+  uni.navigateTo({ url: `/pages/register/register${q}`, fail: () => {} });
 }
 function goLogin() {
-  uni.navigateTo({ url: `/pages/login/login?ref=${encodeURIComponent(code.value)}`, fail: () => {} });
+  const q = code.value ? `?ref=${encodeURIComponent(code.value)}` : "";
+  uni.navigateTo({ url: `/pages/login/login${q}`, fail: () => {} });
+}
+function enterApp() {
+  uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
 }
 function goTrust() {
   uni.navigateTo({ url: "/pages/trust/trust", fail: () => {} });
@@ -198,7 +222,16 @@ const refChipStyle: CSSProperties = {
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-ink) 4%, transparent)",
 };
-const sponsorCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", marginBottom: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const sponsorCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", marginBottom: "12px", background: "var(--v5-surface)" };
+const alreadyBarStyle: CSSProperties = {
+  borderRadius: "12px",
+  padding: "10px 12px",
+  marginBottom: "12px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+  fontSize: "11.5px",
+  color: "var(--v5-ink-2)",
+  lineHeight: 1.55,
+};
 const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
@@ -231,7 +264,7 @@ const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-mo
 const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-brand)", fontWeight: 600, lineHeight: 1 };
 const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
-const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface)" };
 function perkRowStyle(divider: boolean): CSSProperties {
   return { gap: "12px", padding: "12px 16px", borderBottom: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none" };
 }
@@ -252,7 +285,7 @@ const ctaStyle: CSSProperties = {
 };
 const signinStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)" };
 const signinLinkStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)" };
-const proofCardStyle: CSSProperties = { marginTop: "20px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const proofCardStyle: CSSProperties = { marginTop: "20px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
 const proofHeadStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -260,7 +293,7 @@ const proofHeadStyle: CSSProperties = {
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
-const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
 const partnerHeadStyle: CSSProperties = {
   marginBottom: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

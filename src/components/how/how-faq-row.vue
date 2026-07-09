@@ -16,17 +16,19 @@ const boxStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "12px 14px",
 };
+// Typography pass 2026-07-08 — q 13.5, a 13/1.62 ink-2 (was a wall of text).
 const qStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "13px",
+  fontSize: "13.5px",
+  lineHeight: 1.4,
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
 const aStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "12.5px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.5,
+  marginTop: "5px",
+  fontSize: "13px",
+  color: "var(--v5-ink-2)",
+  lineHeight: 1.62,
 };
 </script>

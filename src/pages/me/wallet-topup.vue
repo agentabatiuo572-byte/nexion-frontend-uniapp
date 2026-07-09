@@ -1,7 +1,8 @@
 <!--
   WalletTopup — ported from Nexion-prototype/app/(main)/me/wallet/topup/page.tsx.
   Two flows selected by ?kyc=1 (onLoad):
-   • Regular: channel list → chain QR deposit card OR Visa/MC card form.
+   • Regular: channel list (transparent hairline group) → de-carded chain QR
+     deposit block OR Visa/MC card form.
    • KYC-Express ($1 wallet-ownership verification): compliance banner +
      phase machine select → awaiting (QR + 30min countdown + 12s auto-detect) →
      verifying (3-step animation) → complete (pairs wallet via useWalletPairing,
@@ -35,7 +36,8 @@
 
         <!-- select -->
         <view v-if="kycPhase === 'select'" class="nx-step-in">
-          <view class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
+          <!-- Verification amount — de-carded, sits on the page floor. -->
+          <view class="mx-4" :style="openBlockStyle">
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.kycExpress.flow.verificationDeposit }}</text>
             <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
               <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
@@ -44,13 +46,14 @@
             <text class="block" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
           </view>
 
-          <view class="mx-4 mt-3 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">Network</text>
+          <!-- Network picker — control rows keep their tint; card shell dropped. -->
+          <view class="mx-4 mt-4" style="padding: 0 2px; display: flex; flex-direction: column; gap: 4px">
+            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">Network</text>
             <view
-              v-for="(c, i) in KYC_CHANNELS"
+              v-for="c in KYC_CHANNELS"
               :key="c.id"
-              class="w-full flex items-center active:opacity-90"
-              :style="networkRowStyle(network === c.id, i !== 0)"
+              class="flex items-center active:opacity-90"
+              :style="networkRowStyle(network === c.id)"
               @click="selectKycNetwork(c.id)"
             >
               <view class="grid place-items-center" :style="radioStyle(network === c.id)">
@@ -66,7 +69,7 @@
           <view class="mx-4 mt-4 mb-2">
             <view class="nx-kyc-generate-address-cta w-full grid place-items-center active:opacity-90" :style="kycPrimaryBtnStyle" @click="kycPhase = 'awaiting'">
               <view class="inline-flex items-center" style="gap: 8px">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
                 <text>{{ t.kycExpress.flow.generateAddressCta }}</text>
               </view>
             </view>
@@ -75,7 +78,7 @@
         </view>
 
         <!-- awaiting -->
-        <view v-else-if="kycPhase === 'awaiting'" class="mx-4 rounded-2xl border nx-step-in" :style="surfaceCardStyle">
+        <view v-else-if="kycPhase === 'awaiting'" class="mx-4 nx-step-in" :style="openBlockStyle">
           <view class="flex items-center justify-between">
             <text class="font-mono-tabular" :style="metaLabelStyle">Send $1.00 via {{ network }}</text>
             <text class="tabular-nums" style="font-size: 11px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
@@ -114,7 +117,7 @@
         </view>
 
         <!-- verifying -->
-        <view v-else-if="kycPhase === 'verifying'" class="mx-4 rounded-2xl border nx-step-in" :style="surfaceCardStyle">
+        <view v-else-if="kycPhase === 'verifying'" class="mx-4 nx-step-in" :style="openBlockStyle">
           <view class="flex items-center" style="gap: 6px; font-size: 12.5px; color: var(--v5-brand)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             <text>Payment received from <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
@@ -155,14 +158,14 @@
 
       <!-- ════════ Regular top-up flow ════════ -->
       <template v-else>
-        <!-- channel list -->
-        <view v-if="!selected" class="mx-4 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">Select Channel</text>
+        <!-- channel list — transparent hairline group (earnings-ledger idiom) -->
+        <view v-if="!selected" class="mx-4" style="padding: 0 2px">
+          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 10px' }]">Select Channel</text>
           <view
-            v-for="(c, i) in ALL_CHANNELS"
+            v-for="c in ALL_CHANNELS"
             :key="c.id"
-            :class="['w-full flex items-center active:opacity-90', channelClass(c.id)]"
-            :style="channelRowStyle(i !== 0)"
+            :class="['w-full flex items-center active:opacity-70', channelClass(c.id)]"
+            :style="channelRowStyle"
             @click="selected = c.id"
           >
             <view class="flex-1">
@@ -176,8 +179,8 @@
         <!-- card pay form -->
         <TopupCardForm v-else-if="selected === 'CARD'" @change-channel="selected = null" />
 
-        <!-- chain deposit card -->
-        <view v-else class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
+        <!-- chain deposit — de-carded, QR + address sit on the page floor -->
+        <view v-else class="mx-4" :style="openBlockStyle">
           <view class="flex items-center justify-between">
             <text class="font-mono-tabular" :style="metaLabelStyle">Send via {{ selected }}</text>
             <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">Change</text>
@@ -398,7 +401,7 @@ function goWithdraw() {
 const kycH1Style: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "22px",
+  fontSize: "20px",
   letterSpacing: "-0.018em",
   color: "var(--v5-ink)",
   lineHeight: 1.25,
@@ -410,14 +413,10 @@ const complianceBannerStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "12px 16px",
 };
-const surfaceCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  padding: "20px",
-};
-const surfaceCardFlush: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
+// De-carded step container — content sits on the page floor, 2px optical inset.
+// Header breathing is global (SubPageHeader margin), so no top padding here.
+const openBlockStyle: CSSProperties = {
+  padding: "0 2px",
 };
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -426,20 +425,21 @@ const metaLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-function networkRowStyle(active: boolean, divider: boolean): CSSProperties {
+// Radio control rows on the page floor — soft tint marks the active one.
+function networkRowStyle(active: boolean): CSSProperties {
   return {
-    padding: "12px 20px",
-    borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
+    padding: "12px 10px",
+    margin: "0 -10px",
+    borderRadius: "12px",
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
 }
-function channelRowStyle(divider: boolean): CSSProperties {
-  return {
-    padding: "12px 20px",
-    gap: "12px",
-    borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
-  };
-}
+// Hairline list rows — the first border-top doubles as the group opener.
+const channelRowStyle: CSSProperties = {
+  padding: "13px 0",
+  gap: "12px",
+  borderTop: "1px solid var(--v5-border)",
+};
 function radioStyle(active: boolean): CSSProperties {
   return {
     width: "20px",
@@ -449,11 +449,12 @@ function radioStyle(active: boolean): CSSProperties {
     background: active ? "color-mix(in srgb, var(--v5-brand) 20%, transparent)" : "transparent",
   };
 }
+// on-brand-2: near-black on the warm-orange fill — white/ink fails AA in dark.
 const kycPrimaryBtnStyle: CSSProperties = {
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
-  color: "var(--v5-ink)",
+  color: "var(--v5-on-brand-2)",
   fontFamily: "var(--font-v5)",
   fontSize: "14px",
   fontWeight: 600,
@@ -476,19 +477,19 @@ const qrInnerStyle: CSSProperties = {
     "radial-gradient(circle, rgba(0,0,0,0.85) 25%, #fff 25%, #fff 50%, rgba(0,0,0,0.85) 50%, rgba(0,0,0,0.85) 75%, #fff 75%)",
   backgroundSize: "12px 12px",
 };
-// Prototype: address row container is bg-[var(--v5-surface)]; the copy button
-// inside is bg-[var(--v5-surface-2)] (the uniapp port had these swapped).
+// On the de-carded page floor the address row reads as an input — one step
+// above the bg, copy button one step above the row.
 const addressRowStyle: CSSProperties = {
   marginTop: "16px",
   padding: "12px",
   gap: "8px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-2)",
 };
 const copyBtnStyle: CSSProperties = {
   width: "36px",
   height: "36px",
   borderRadius: "8px",
-  background: "var(--v5-surface-2)",
+  background: "var(--v5-surface-3)",
 };
 const awaitingBarStyle: CSSProperties = {
   marginTop: "16px",
@@ -514,11 +515,13 @@ const miniSpinnerStyle: CSSProperties = {
   animation: "spin 1s linear infinite",
   flexShrink: 0,
 };
+// Completion spotlight keeps its surface; accent border → neutral (big-card rule),
+// the success mood lives in the wash + icon instead.
 const completeCardStyle: CSSProperties = {
   padding: "20px",
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-success) 30%, transparent)",
+  border: "1px solid var(--v5-border)",
 };
 const completeWashStyle: CSSProperties = {
   position: "absolute",

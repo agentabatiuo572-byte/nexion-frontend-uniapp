@@ -15,7 +15,9 @@
 -->
 <template>
   <AppChassis active="store">
-    <view style="color: var(--v5-ink)">
+    <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
+         24px .spv gap, so the nav→content breathing is supplied here once. -->
+    <view style="color: var(--v5-ink); padding-top: 24px">
       <!-- Order not found -->
       <view v-if="!order" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
@@ -25,8 +27,8 @@
       </view>
 
       <template v-else>
-        <!-- Hero status -->
-        <view class="mx-4 rounded-2xl border" :style="heroStyle">
+        <!-- Hero status — filled status-tint tile (accent border dropped). -->
+        <view class="mx-4 rounded-2xl" :style="heroStyle">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="heroIconStyle">
               <svg v-if="isProvisioning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="nx-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -48,7 +50,7 @@
         </view>
 
         <!-- Activated → Earn jump -->
-        <view v-if="order.status === 'activated'" class="mx-4 rounded-2xl border" :style="summaryCardStyle" style="margin-top: 12px">
+        <view v-if="order.status === 'activated'" class="mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="earnIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" /></svg>
@@ -63,7 +65,7 @@
         </view>
 
         <!-- Order summary -->
-        <view class="mx-4 rounded-2xl border" :style="summaryCardStyle" style="margin-top: 12px">
+        <view class="mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
           <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono />
           <DetailRow :label="t.orders.quantity" :value="`${order.quantity}`" />
@@ -88,7 +90,7 @@
         </view>
 
         <!-- Timeline -->
-        <view class="mx-4 rounded-2xl border" :style="summaryCardStyle" style="margin-top: 12px">
+        <view class="mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.timelineTitle }}</text>
           <view class="relative" :style="timelineWrapStyle">
             <view v-for="(stage, i) in stages" :key="stage" :style="{ marginTop: i !== 0 ? '12px' : '0' }">
@@ -267,7 +269,6 @@ const notFoundBtnStyle: CSSProperties = {
 const heroStyle = computed<CSSProperties>(() => ({
   padding: "20px",
   background: tint(statusColor.value, 6),
-  borderColor: tint(statusColor.value, 25),
 }));
 const heroIconStyle = computed<CSSProperties>(() => ({
   width: "48px",
@@ -281,9 +282,10 @@ const heroLabelStyle = computed<CSSProperties>(() => ({
   lineHeight: "1.2",
   color: statusColor.value,
 }));
+// Order summary / timeline / earn-jump — form-b single containers (surface, no
+// border). Internal hairlines (timestamp divider, timeline rail) do the parceling.
 const summaryCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
   padding: "16px",
 };
 const earnIconStyle: CSSProperties = {

@@ -1,10 +1,12 @@
 <!--
   Influence Network Royalty — ported from
   Nexion-prototype/app/(main)/team/unilevel/page.tsx.
-  Partner-program model: hero (monthly royalty total + partner status) + Direct
-  Royalty card + Network Yield Bonus card (influence score / activity) + Partner
-  Status tier progression (4 cards + progress to next) + filter pills + member
-  list. Sub-page → <AppChassis active="team"> w/ back → /team. Reuses network
+  Partner-program model: de-carded hero (monthly royalty total on the page
+  floor + partner-status chip) + Direct Royalty / Network Yield Bonus rows
+  (two tinted cards merged into one transparent hairline group) + Partner
+  Status tier progression (transparent section; 4 filled tier cells, podium
+  idiom + progress to next) + filter pills + member list (transparent hairline
+  group). Sub-page → <AppChassis active="team"> w/ back → /team. Reuses network
   (byLayer) + commission (UNILEVEL_USDT) stores + VBadge. useMemo → computed.
   React local state → ref. TickerNumber → direct value render (entrance tween dropped,
   values are store-derived not interval-driven). `${color}NN` alpha-hex →
@@ -15,28 +17,31 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.unilevel.pageTitle" />
 
-      <!-- How-it-works entry -->
-      <view class="px-4 flex items-center justify-end" style="padding-top: 8px; padding-bottom: 8px">
-        <view class="nx-unilevel-how-link inline-flex items-center active:scale-[0.98]" :style="howEntryStyle" @click="go('/pages/team/unilevel-how')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
-          <text>{{ t.unilevel.howItWorksEntry }}</text>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
-        </view>
-      </view>
-
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Hero -->
-        <view class="rounded-2xl" :style="heroStyle">
-          <text class="block font-mono-tabular" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-brand)' }">{{ t.unilevel.heroLabel }}</text>
+      <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
+        <!-- Hero — de-carded: royalty total sits directly on the page floor
+             (bordered card + page-floor radial glow deleted outright, owner
+             call 2026-07-08). Rules-intro pill sits on the section-title row
+             (owner 2026-07-09: kill the empty gap above 本月版税). -->
+        <view :style="heroStyle">
+          <view class="flex items-center justify-between" style="gap: 8px">
+            <text class="font-mono-tabular" :style="heroCapStyle">{{ t.unilevel.heroLabel }}</text>
+            <view class="nx-unilevel-how-link inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" @click="go('/pages/team/unilevel-how')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <text>{{ t.unilevel.howItWorksEntry }}</text>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
+            </view>
+          </view>
           <text class="block font-display tabular-nums" :style="heroBigStyle">${{ totalRoyalty.toFixed(2) }}</text>
           <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
             <text>{{ heroRateLineText }}</text>
           </view>
         </view>
 
-        <!-- Component A: Direct Royalty -->
-        <view class="rounded-2xl" :style="{ padding: '16px', background: 'var(--v5-success-soft)' }">
-          <view class="flex items-start" style="gap: 12px">
+        <!-- Royalty breakdown — Direct (D) + Network (N): two tinted cards
+             merged into one transparent hairline row group (form a); colored
+             badge chips + values carry the semantic identity. -->
+        <view :style="compGroupStyle">
+          <view class="flex items-start" style="gap: 12px" :style="compRowStyle(true)">
             <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
             <view class="flex-1 min-w-0">
               <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
@@ -48,58 +53,59 @@
               <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
             </view>
           </view>
-        </view>
-
-        <!-- Component B: Network Yield Bonus -->
-        <view class="rounded-2xl" :style="{ padding: '16px', background: 'var(--v5-tech-cyan-soft)' }">
-          <view class="flex items-start" style="gap: 12px">
-            <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
-              <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
-              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
-                <view>
-                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
-                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
-                </view>
-                <view>
-                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
-                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
+          <view :style="compRowStyle(false)">
+            <view class="flex items-start" style="gap: 12px">
+              <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
+              <view class="flex-1 min-w-0">
+                <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
+                <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
+                <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
+                  <view>
+                    <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
+                    <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
+                  </view>
+                  <view>
+                    <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
+                    <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
+                  </view>
                 </view>
               </view>
+              <view class="text-right shrink-0">
+                <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
+              </view>
             </view>
-            <view class="text-right shrink-0">
-              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
+            <view class="flex items-start" :style="algoNoteStyle">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+              <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
             </view>
-          </view>
-          <view class="flex items-start" :style="algoNoteStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
           </view>
         </view>
 
-        <!-- Partner Status tier progression -->
-        <view class="rounded-2xl border" :style="{ padding: '16px', background: 'var(--v5-surface)', borderColor: 'var(--v5-border)' }">
-          <text class="block font-mono-tabular" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
-          <text class="block" :style="{ marginTop: '6px', fontSize: '11px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.rateTierNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
+        <!-- Partner Status tier progression — de-carded to a transparent
+             section: outer surface card dropped; the four tier cells keep
+             their fills, borders dropped (selection/comparison whitelist,
+             podium idiom: current cell tinted, rest dimmed surface-2). -->
+        <view :style="tierSectionStyle">
+          <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
+          <text class="block" :style="{ marginTop: '8px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ t.unilevel.rateTierNote }}</text>
 
-          <view class="grid grid-cols-4" style="margin-top: 12px; gap: 6px">
+          <view class="grid grid-cols-4" style="margin-top: 16px; gap: 6px">
             <view v-for="tier in RATE_TIERS" :key="tier.id" class="rounded-lg text-center" :style="tierCardStyle(tier)">
               <text class="block font-display" :style="{ fontSize: '11px', fontWeight: 600, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-3)' }">{{ t.unilevel.rateTiers[tier.id].name }}</text>
-              <text class="block" :style="{ fontSize: '8.5px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25 (was 1.1) -->
-              <text class="block font-mono-tabular" :style="{ fontSize: '8.5px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
+              <text class="block" :style="{ fontSize: '10px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25; 10px = scale floor (was off-scale 8.5) -->
+              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
             </view>
           </view>
 
-          <view v-if="next" style="margin-top: 12px">
-            <view class="flex items-center justify-between" style="font-size: 10.5px; margin-bottom: 6px">
+          <view v-if="next" style="margin-top: 18px">
+            <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 8px">
               <text :style="{ color: 'var(--v5-ink-3)' }">{{ rateTierCurrentText }}</text>
               <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">${{ monthlyNetworkVolume.toLocaleString() }} / ${{ next.minVolume.toLocaleString() }}</text>
             </view>
             <view class="rounded-full overflow-hidden" :style="{ height: '8px', background: 'color-mix(in srgb, var(--v5-surface-2) 60%, transparent)' }">
               <view class="rounded-full" :style="tierProgressFillStyle" />
             </view>
-            <text class="block" :style="{ marginTop: '8px', fontSize: '10.5px', color: 'var(--v5-ink-3)', lineHeight: 1.375 }">{{ rateTierProgressText }}</text> <!-- SKILL: leading-snug=1.375 (was 1.45) -->
+            <text class="block" :style="{ marginTop: '10px', fontSize: '11.5px', color: 'var(--v5-ink-3)', lineHeight: 1.5 }">{{ rateTierProgressText }}</text>
           </view>
           <view v-else class="inline-flex items-center" :style="maxedChipStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
@@ -107,8 +113,8 @@
           </view>
         </view>
 
-        <!-- Filter pills -->
-        <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%">
+        <!-- Filter pills — opens the member-list section, extra top break. -->
+        <scroll-view scroll-x class="nx-no-scrollbar" style="white-space: nowrap; width: 100%; margin-top: 6px">
           <view class="inline-flex" style="gap: 6px">
             <view class="nx-unilevel-filter-all shrink-0 inline-flex items-center active:opacity-70" :style="pillStyle(filter === 'all')" @click="filter = 'all'">
               <text :style="pillTextStyle(filter === 'all')">{{ t.unilevel.filterAll }}</text>
@@ -127,17 +133,19 @@
           </view>
         </scroll-view>
 
-        <!-- Member list -->
-        <view class="rounded-2xl border overflow-hidden" :style="{ background: 'var(--v5-surface)', borderColor: 'var(--v5-border)', borderRadius: '16px' }">
-          <view v-if="filteredMembers.length === 0" class="text-center" :style="{ padding: '32px', fontSize: '12px', color: 'var(--v5-ink-3)' }">
+        <!-- Member list — de-carded: transparent hairline group (leaderboard
+             rest-list idiom); the surface + border shell was redundant
+             boundary weight around already hairline-separated rows. -->
+        <view :style="memberGroupStyle">
+          <view v-if="filteredMembers.length === 0" class="text-center" :style="{ padding: '24px 0', fontSize: '12px', color: 'var(--v5-ink-3)' }">
             <text>{{ t.unilevel.noMembers }}</text>
           </view>
           <template v-else>
             <view
-              v-for="(m, i) in filteredMembers"
+              v-for="(m, i) in visibleMembers"
               :key="m.id"
               class="nx-unilevel-member-row flex items-center"
-              :style="memberRowStyle(i === filteredMembers.length - 1)"
+              :style="memberRowStyle(i === visibleMembers.length - 1)"
             >
               <view class="rounded-full grid place-items-center shrink-0" :style="memberAvatarStyle">
                 <text style="font-size: 18px; line-height: 1">{{ m.avatar }}</text>
@@ -158,6 +166,11 @@
                 <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ memberCommission(m).toFixed(2) }}</text>
               </view>
             </view>
+            <!-- View more — explicit user click (leaderboard idiom), 44px ghost. -->
+            <view v-if="hasMoreMembers" class="nx-unilevel-load-more flex items-center justify-center active:opacity-70" :style="loadMoreBtnStyle" @click="loadMoreMembers">
+              <text :style="loadMoreLabelStyle">{{ t.unilevel.loadMore }}</text>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </view>
           </template>
         </view>
       </view>
@@ -166,7 +179,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -243,6 +256,17 @@ const filteredMembers = computed<PlottedMember[]>(() => {
   return extendedMembers.value.map((m) => ({ ...m, kind: "extended" as const }));
 });
 
+// Paginated load-more (leaderboard rest-list idiom): one screen per page,
+// explicit "View more" click. Resets to page 1 when the filter changes.
+const PAGE_SIZE = 20;
+const visibleCount = ref(PAGE_SIZE);
+watch(filter, () => { visibleCount.value = PAGE_SIZE; });
+const visibleMembers = computed(() => filteredMembers.value.slice(0, visibleCount.value));
+const hasMoreMembers = computed(() => visibleCount.value < filteredMembers.value.length);
+function loadMoreMembers() {
+  visibleCount.value = Math.min(filteredMembers.value.length, visibleCount.value + PAGE_SIZE);
+}
+
 // i18n text
 const heroRateLineText = computed(() =>
   fmt(t.value.unilevel.heroRateLine, { rate: (UNILEVEL_USDT[1] * 100).toFixed(0), tier: t.value.unilevel.rateTiers[currentTier.value.id].name }),
@@ -274,25 +298,24 @@ function go(url: string) {
 }
 
 // ─── styles ───
+// Pill chip on the title row: compact (34px) so it doesn't dominate the
+// section-title line; soft tint only, no border (chip whitelist).
 const howEntryStyle: CSSProperties = {
-  gap: "8px",
-  padding: "0 14px",
-  minHeight: "44px",
+  gap: "6px",
+  padding: "0 12px",
+  height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "12px",
+  fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
 
-const heroStyle = computed<CSSProperties>(() => ({
-  padding: "16px",
-  background:
-    `radial-gradient(80% 60% at 80% 0%, color-mix(in srgb, ${currentTier.value.color} 12%, transparent) 0%, transparent 65%),` +
-    "linear-gradient(180deg, var(--v5-surface) 0%, var(--v5-bg) 100%)",
-  border: `1px solid color-mix(in srgb, ${currentTier.value.color} 20%, transparent)`,
-}));
-const heroBigStyle: CSSProperties = { marginTop: "6px", fontSize: "30px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+// De-carded hero: no surface/border/glow — content sits directly on the page
+// floor (page-floor auras are deleted outright per owner call, not re-tuned).
+const heroStyle: CSSProperties = { padding: "6px 2px 0" };
+const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
+const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "30px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroTierChipStyle = computed<CSSProperties>(() => ({
   marginTop: "12px",
   padding: "4px 10px",
@@ -303,6 +326,12 @@ const heroTierChipStyle = computed<CSSProperties>(() => ({
   color: currentTier.value.color,
 }));
 
+// Transparent hairline row group (form a): border-top opens the group,
+// 2px optical inset, rows split by hairlines, last row open.
+const compGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
+function compRowStyle(withDivider: boolean): CSSProperties {
+  return { padding: "13px 0", borderBottom: withDivider ? "1px solid var(--v5-border)" : "none" };
+}
 function compBadgeStyle(color: string): CSSProperties {
   return {
     width: "40px",
@@ -315,19 +344,21 @@ function compBadgeStyle(color: string): CSSProperties {
 }
 const compTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
+// Inner note row — the hairline it used to carry is now the group's job.
 const algoNoteStyle: CSSProperties = {
-  marginTop: "12px",
-  paddingTop: "12px",
-  borderTop: "1px solid var(--v5-border)",
+  marginTop: "10px",
   gap: "6px",
 };
 
+// De-carded transparent section (outer card dropped).
+const tierSectionStyle: CSSProperties = { padding: "10px 2px 0" };
+// Tier cells: fill only, no border (podium idiom — current cell tinted,
+// the rest dimmed surface-2; text color carries the current accent).
 function tierCardStyle(tier: RateTier): CSSProperties {
   const isCurrent = tier.id === currentTier.value.id;
   return {
     padding: "8px",
-    background: isCurrent ? tier.bg : "rgba(255,255,255,0.02)",
-    border: `1px solid ${isCurrent ? `color-mix(in srgb, ${tier.color} 55%, transparent)` : "rgba(255,255,255,0.04)"}`,
+    background: isCurrent ? tier.bg : "color-mix(in srgb, var(--v5-surface-2) 55%, transparent)",
   };
 }
 const tierProgressFillStyle = computed<CSSProperties>(() => ({
@@ -363,10 +394,16 @@ function pillCountStyle(active: boolean): CSSProperties {
   return { fontSize: "12px", opacity: 0.65, color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
 }
 
+// Transparent hairline group — border-top opener + 2px optical inset;
+// rows sit on the page floor, content aligned to the 16px gutter.
+const memberGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 function memberRowStyle(isLast: boolean): CSSProperties {
-  return { padding: "12px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
+  return { padding: "12px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
 const memberAvatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface-2)" };
+// Ghost "View more" affordance — 44px tap target, boxed chrome dropped.
+const loadMoreBtnStyle: CSSProperties = { gap: "6px", height: "44px", marginTop: "2px" };
+const loadMoreLabelStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 500, color: "var(--v5-ink-3)" };
 const spillTagStyle: CSSProperties = {
   fontSize: "10px",
   color: "var(--v5-brand-2)",
@@ -380,7 +417,7 @@ function memberBadgeStyle(kind: "direct" | "extended"): CSSProperties {
     marginLeft: "auto",
     padding: "0 4px",
     borderRadius: "4px",
-    fontSize: "8.5px",
+    fontSize: "10px",
     letterSpacing: "0.04em",
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
     color,

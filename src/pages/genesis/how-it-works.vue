@@ -24,7 +24,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s2Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <IconRow emoji="🪙" :label="w.perk1Label" :body="w.perk1Body" />
           <IconRow emoji="👥" :label="w.perk2Label" :body="w.perk2Body" />
           <IconRow emoji="📜" :label="w.perk3Label" :body="w.perk3Body" />
@@ -37,7 +37,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" accent="amber" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" accent="amber" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" accent="amber" />
@@ -113,9 +113,9 @@ function goMarketplace() {
   uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "8px" };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", marginBottom: "12px" };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
+const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const flowBoxStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "12px",

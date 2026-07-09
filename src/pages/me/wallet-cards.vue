@@ -130,7 +130,7 @@ function goNew() {
 }
 
 // ── styles ──
-const bodyStyle: CSSProperties = { padding: "12px 16px 0" };
+const bodyStyle: CSSProperties = { padding: "0 16px" };
 const emptyStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
@@ -149,10 +149,12 @@ const emptyIconStyle: CSSProperties = {
 const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
 const emptyHintStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 
+// Each saved card keeps its card-face identity as a filled surface; the outer
+// border is dropped (filled = single visual difference). The head→actions
+// hairline divider stays as the internal separator.
 const cardRowStyle: CSSProperties = {
   marginBottom: "12px",
   borderRadius: "16px",
-  border: "1px solid var(--v5-border)",
   background: "var(--v5-surface)",
   overflow: "hidden",
 };

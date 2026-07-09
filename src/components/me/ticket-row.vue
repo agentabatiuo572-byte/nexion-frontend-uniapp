@@ -1,10 +1,11 @@
 <!--
-  TicketRow — a ticket card in the support tickets list (status/category/id meta,
-  unread chip, subject, updated-time + message count). Ported from the inline
-  TicketRow in Nexion-prototype me/support/tickets/page.tsx. Emits `open` on tap.
+  TicketRow — a transparent hairline row in the support tickets list
+  (status/category/id meta, unread chip, subject, updated-time + message count).
+  Ported from the inline TicketRow in Nexion-prototype me/support/tickets/page.tsx
+  (was one card per ticket; de-carded 2026-07). Emits `open` on tap.
 -->
 <template>
-  <view class="w-full active:scale-[0.99]" :style="cardStyle" role="button" tabindex="0" :aria-label="openLabel" @click="emit('open')">
+  <view class="w-full active:opacity-70" :style="rowStyle" role="button" tabindex="0" :aria-label="openLabel" @click="emit('open')">
     <view class="flex items-start" style="gap: 12px">
       <view class="grid place-items-center shrink-0" :style="iconBoxStyle">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="statusColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
@@ -32,7 +33,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { CATEGORY_LABEL, STATUS_LABEL, STATUS_COLOR, type Ticket } from "@/mock/tickets";
 
-const props = defineProps<{ tk: Ticket }>();
+const props = withDefaults(defineProps<{ tk: Ticket; divider?: boolean }>(), { divider: true });
 const emit = defineEmits<{ open: [] }>();
 const t = useT();
 
@@ -50,7 +51,12 @@ function relWhen(ts: number): string {
   return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
-const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", padding: "14px" };
+// Transparent hairline row (was one card per ticket) — parent opens the group
+// with a border-top; the last row drops its divider.
+const rowStyle = computed<CSSProperties>(() => ({
+  padding: "13px 0",
+  borderBottom: props.divider ? "1px solid var(--v5-border)" : "none",
+}));
 const iconBoxStyle = computed<CSSProperties>(() => ({
   width: "36px",
   height: "36px",

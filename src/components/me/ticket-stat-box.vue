@@ -4,7 +4,7 @@
   Icon is an inline SVG string with `stroke="currentColor"` so it inherits `tint`.
 -->
 <template>
-  <view :style="boxStyle" role="button" tabindex="0" :aria-label="label" @click="emit('select')">
+  <view class="active:opacity-70" :style="boxStyle" role="button" tabindex="0" :aria-label="label" @click="emit('select')">
     <view class="flex items-center" :style="headStyle">
       <view v-html="icon" />
       <text class="truncate" style="margin-left: 4px">{{ label }}</text>
@@ -19,11 +19,11 @@ import { computed, type CSSProperties } from "vue";
 const props = defineProps<{ tint: string; label: string; value: number; icon: string }>();
 const emit = defineEmits<{ select: [] }>();
 
+// Soft tint only — tinted tiles carry no border (inner-element rule).
 const boxStyle = computed<CSSProperties>(() => ({
   borderRadius: "16px",
   padding: "12px",
-  background: `color-mix(in srgb, ${props.tint} 6%, transparent)`,
-  border: `1px solid color-mix(in srgb, ${props.tint} 20%, transparent)`,
+  background: `color-mix(in srgb, ${props.tint} 8%, transparent)`,
 }));
 const headStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

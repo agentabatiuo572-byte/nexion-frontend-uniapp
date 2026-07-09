@@ -26,7 +26,7 @@
       <template v-else>
         <!-- Available vouchers -->
         <view v-if="available.length > 0">
-          <text class="block" :style="secHeadStyle">{{ t.rewards.secAvailable }}</text>
+          <text class="block" :style="secHead('available')">{{ t.rewards.secAvailable }}</text>
           <view :style="cardStyle">
             <view v-for="(v, i) in available" :key="v.id" class="flex items-center" :style="rowStyle(i)">
               <view class="grid place-items-center shrink-0" :style="vIconStyle(false)">
@@ -46,7 +46,7 @@
 
         <!-- Expired vouchers -->
         <view v-if="expired.length > 0">
-          <text class="block" :style="secHeadStyle">{{ t.rewards.secExpired }}</text>
+          <text class="block" :style="secHead('expired')">{{ t.rewards.secExpired }}</text>
           <view :style="cardStyle">
             <view v-for="(v, i) in expired" :key="v.id" class="flex items-center" :style="rowStyle(i)">
               <view class="grid place-items-center shrink-0" :style="vIconStyle(true)">
@@ -63,7 +63,7 @@
 
         <!-- System rewards (bills-derived) -->
         <view v-if="systemRewards.length > 0">
-          <text class="block" :style="secHeadStyle">{{ t.rewards.secSystem }}</text>
+          <text class="block" :style="secHead('system')">{{ t.rewards.secSystem }}</text>
           <view :style="cardStyle">
             <view v-for="(b, i) in systemRewards" :key="b.id" class="flex items-center" :style="rowStyle(i)">
               <view class="grid place-items-center shrink-0" :style="vIconStyle(false)">
@@ -111,6 +111,13 @@ const systemRewards = computed(() => bills.bills.filter((b) => REWARD_TYPES.incl
 
 const isEmpty = computed(() => available.value.length === 0 && expired.value.length === 0 && systemRewards.value.length === 0);
 
+// First visible section — its label drops the 22px top so it doesn't stack on
+// the global 24px header gap (page opens directly with a section label).
+const firstSec = computed(() => (available.value.length ? "available" : expired.value.length ? "expired" : "system"));
+function secHead(kind: string): CSSProperties {
+  return kind === firstSec.value ? { ...secHeadStyle, marginTop: "2px" } : secHeadStyle;
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
@@ -152,17 +159,18 @@ function onUse(v: VoucherDef) {
 
 // ── styles ──
 const secHeadStyle: CSSProperties = {
-  margin: "20px 24px 8px",
-  fontSize: "11px",
+  margin: "22px 18px 12px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "15px",
   fontWeight: 600,
-  letterSpacing: "0.06em",
-  textTransform: "uppercase",
-  color: "var(--v5-ink-4)",
+  letterSpacing: "-0.012em",
+  color: "var(--v5-ink)",
 };
+// Prize/voucher list keeps a filled tile identity (badge/prize semantic, de-card
+// white-list) — the single visual difference is the fill; outer border dropped.
 const cardStyle: CSSProperties = {
   margin: "0 16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   overflow: "hidden",
 };
@@ -213,10 +221,10 @@ const expiredBadgeStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   fontSize: "11px",
 };
+// Empty state — de-card white-list: dashed border-strong, no fill.
 const emptyStyle: CSSProperties = {
-  margin: "20px 16px 0",
-  background: "var(--v5-surface)",
-  border: "1px dashed var(--v5-border)",
+  margin: "0 16px",
+  border: "1px dashed var(--v5-border-strong)",
   borderRadius: "16px",
   padding: "32px",
   textAlign: "center",

@@ -68,8 +68,8 @@
         </view>
       </view>
 
-      <!-- Amount input -->
-      <view class="mx-4 rounded-2xl border" :style="surfaceCardStyle">
+      <!-- Amount input — de-carded: the field sits on the page floor (topup tone). -->
+      <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
           <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" @click="useMax">
@@ -99,14 +99,14 @@
         </view>
       </view>
 
-      <!-- Network select -->
-      <view class="mx-4 mt-3 rounded-2xl border overflow-hidden" :style="surfaceCardFlush">
-        <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '16px 20px 8px' }]">{{ t.wallet.networkLabel }}</text>
+      <!-- Network select — de-carded: radio rows sit on the floor (topup tone). -->
+      <view class="mx-4 mt-4" style="padding: 0 2px; display: flex; flex-direction: column; gap: 4px">
+        <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">{{ t.wallet.networkLabel }}</text>
         <view
-          v-for="(n, i) in NETWORKS"
+          v-for="n in NETWORKS"
           :key="n.id"
-          class="w-full flex items-center active:opacity-90"
-          :style="networkRowStyle(network === n.id, i !== 0)"
+          class="flex items-center active:opacity-90"
+          :style="networkRowStyle(network === n.id)"
           @click="network = n.id"
         >
           <view class="grid place-items-center" :style="radioStyle(network === n.id)">
@@ -122,14 +122,14 @@
         </view>
       </view>
 
-      <!-- Address input -->
-      <view class="mx-4 mt-3 rounded-2xl border" :style="surfaceCardStyle">
+      <!-- Address input — de-carded: label on the floor, input recessed (surface-3). -->
+      <view class="mx-4 mt-4" style="padding: 0 2px">
         <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.withdrawAddressLabel }}</text>
         <input class="nx-withdraw-address-input mt-2 w-full font-mono" :style="addressInputStyle" type="text" :value="address" :placeholder="addressPlaceholder" @input="onAddress" />
       </view>
 
-      <!-- Summary: gross fee → NEX offset → net fee → receive -->
-      <view class="mx-4 mt-3 rounded-2xl border space-y-1.5" :style="[surfaceCardStyle, { padding: '16px' }]">
+      <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
+      <view class="mx-4 mt-4 space-y-1.5" style="padding: 0 2px">
         <view v-if="nexBurned > 0" class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeGrossLabel }}</text>
           <text class="tabular-nums" :style="{ fontSize: '12.5px', color: 'var(--v5-ink-3)', textDecoration: 'line-through' }">${{ grossFee.toFixed(2) }}</text>
@@ -560,15 +560,6 @@ const holdIconStyle: CSSProperties = {
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
-const surfaceCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-  padding: "20px",
-};
-const surfaceCardFlush: CSSProperties = {
-  background: "var(--v5-surface)",
-  borderColor: "var(--v5-border)",
-};
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
@@ -583,10 +574,13 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
-function networkRowStyle(active: boolean, divider: boolean): CSSProperties {
+// Radio rows on the page floor (topup tone): soft brand tint marks the active
+// one; -10px side margins let the tint bleed to the 2px-inset group edge.
+function networkRowStyle(active: boolean): CSSProperties {
   return {
-    padding: "12px 20px",
-    borderTop: divider ? "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" : "none",
+    padding: "12px 10px",
+    margin: "0 -10px",
+    borderRadius: "12px",
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
 }
@@ -609,16 +603,16 @@ const recommendedChipStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.06em",
 };
+// Recessed input idiom (de-card white-list): surface-3 fill, no border.
 const addressInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "48px",
-  background: "var(--v5-surface)",
+  background: "var(--v5-surface-3)",
   borderRadius: "12px",
   padding: "12px",
   boxSizing: "border-box",
   fontSize: "13.5px",
   color: "var(--v5-ink)",
-  border: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
 };
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",

@@ -99,8 +99,8 @@
         <SectionHeader :label="tr.inThePress">
           <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" /><path d="M18 14h-8" /><path d="M15 18h-5" /><path d="M10 6h8v4h-8V6Z" /></svg></template>
         </SectionHeader>
-        <view style="display: flex; flex-direction: column; gap: 8px">
-          <view v-for="p in PRESS" :key="p.title" class="active:scale-[0.99]" :style="pressCardStyle">
+        <view :style="cardStyle">
+          <view v-for="(p, i) in PRESS" :key="p.title" class="block active:opacity-80" :style="pressRowStyle(i === PRESS.length - 1)">
             <view class="flex items-center justify-between" style="margin-bottom: 2px">
               <text :style="pressOutletStyle">{{ p.outlet }}</text>
               <text :style="pressDateStyle">{{ p.date }}</text>
@@ -278,20 +278,22 @@ const heroStyle: CSSProperties = {
   padding: "16px",
   background:
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand-2) 18%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
+  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
 const heroHeadlineStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25, marginTop: "2px" };
 const heroStatsStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)", gap: "8px" };
-const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)", overflow: "hidden" };
-const complianceCardStyle: CSSProperties = { borderRadius: "12px", padding: "10px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+// De-carded form-b container (single surface, no border): rows carry their own
+// hairline dividers. Used by Audits / Investors / Leadership / Press / Q3 / Listings.
+const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", overflow: "hidden" };
+const complianceCardStyle: CSSProperties = { borderRadius: "12px", padding: "10px", background: "var(--v5-surface)" };
 function dotStyle(tint: string): CSSProperties {
   return { width: "6px", height: "6px", borderRadius: "999px", background: tint };
 }
 const complianceLabelStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-ink)" };
 const complianceBodyStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
-const partnerCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const partnerCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)" };
 const partnerNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, letterSpacing: "-0.025em" };
 const partnerTagStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "4px" };
 function investorRowStyle(last: boolean): CSSProperties {
@@ -325,7 +327,9 @@ const inBadgeStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)",
   color: "var(--v5-tech-cyan)",
 };
-const pressCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+function pressRowStyle(last: boolean): CSSProperties {
+  return { padding: "12px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
+}
 const pressOutletStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-brand)" };
 const pressDateStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
 const pressTitleStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink)", lineHeight: 1.375 };
@@ -366,7 +370,7 @@ const bugIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRa
 const bugAmountStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const bugHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 const bugCtaStyle: CSSProperties = { marginTop: "8px", display: "inline-flex", minHeight: "44px", fontSize: "11.5px", color: "var(--v5-brand-2)", fontWeight: 600 };
-const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface)", border: "1px solid var(--v5-border)" };
+const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
 const kycBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const kycChipStyle: CSSProperties = {
   padding: "2px 8px",

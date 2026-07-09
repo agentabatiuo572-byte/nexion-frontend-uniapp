@@ -44,7 +44,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s3Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 10px">
+        <view style="display: flex; flex-direction: column; gap: 14px">
           <HowStepRow :n="1" :title="w.s3Step1Title" :body="w.s3Step1Body" accent="amber" />
           <HowStepRow :n="2" :title="w.s3Step2Title" :body="w.s3Step2Body" accent="amber" />
           <HowStepRow :n="3" :title="w.s3Step3Title" :body="w.s3Step3Body" accent="amber" />
@@ -56,7 +56,7 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
         </template>
         <text class="block" :style="introStyle">{{ w.s4Intro }}</text>
-        <view style="display: flex; flex-direction: column; gap: 8px">
+        <view style="display: flex; flex-direction: column; gap: 10px">
           <IconRow emoji="🔒" :label="w.r1Label" :body="w.r1Body" />
           <IconRow emoji="⚠️" :label="w.r2Label" :body="w.r2Body" />
           <IconRow emoji="📉" :label="w.r3Label" :body="w.r3Body" />
@@ -119,10 +119,10 @@ function goStaking() {
   uni.navigateTo({ url: "/pages/staking/staking", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
-const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "8px" };
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "12px" };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.625, marginBottom: "12px" };
+const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
+const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
 const tableStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
@@ -156,7 +156,7 @@ const tdReturnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   color: "var(--v5-brand-2)",
 };
-const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-4)" };
+const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const ctaStyle: CSSProperties = {
   gap: "8px",
   width: "100%",
