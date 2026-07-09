@@ -219,7 +219,6 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/risk-disclosure              平台风险提示书(scroll-to-bottom + 强制确认)
 /me/achievements                 成就墙
 /me/goals                        收益目标设置(target + deadline + 推荐路径)
-/me/wrapped                      年度 Wrapped(Spotify 风全屏 6 卡片)
 /me/preferences                  偏好设置(音效 / 触感 / 通知 6 类偏好)
 /missions                        Mission Center(任务中心,聚合所有任务体系的统一入口)
 /me/proof                        Proof of Compute
@@ -247,6 +246,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /search                          全局搜索(routes / 设备 / 商品 / 网络成员 / FAQ)
 /login                           登录(支持 ?ref=CODE)
 /register                        注册(支持 ?ref=CODE)
+/register/success                注册成功页(礼包确认 + 引导下载 APP,仅 H5,§4.1.1)
 /onboarding/intro                启动语
 /onboarding/estimator            收益估算
 /onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
@@ -281,11 +281,28 @@ TabBar:active tab 显示背景 chip 高亮。
 **注册成功后行为**:
 1. 自动创建 user(persist 到 localStorage)
 2. 自动 `addDevice("phone")` 接入手机算力(进入 Phase 0 多阶段揭示)
-3. 跳转 `/onboarding/estimator`(L0 → L1)
+3. H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
 
-支持 `?ref=CODE` URL 参数携带推荐码(详见 §4.3)。
+**邀请码携带与锁定**(绑定规则详见 §4.3):
+- 第 2 步含邀请码输入框(选填)。码来源优先级:`?ref` URL 参数 > 落地页暂存码 pendingRefCode(§4.3.1)> 用户手输。
+- 链接来源码(`?ref` / pendingRefCode)通过格式预检(`NEXION-XXXX`,大小写不敏感,统一大写)后**锁定置灰展示——不可修改、不可清除**,框内锁形图示 + 「邀请码来自邀请链接 · 不可修改」提示;注册前换码的唯一途径是打开新的邀请链接。
+- 缺失 / 非法码视同无码,输入框保持可手输;登录页 `?ref` 同一预检,非法码不入绑定链。
 
 注册页底部含合规脚注「创建账号即表示同意服务条款和隐私政策」,其中「服务条款」下划线可点,进入 §4.7.5 服务条款页;「隐私政策」当前为占位文本(无独立页)。
+
+#### 4.1.1 注册成功页 `/register/success`(仅 H5)
+
+**目的**:确认新人礼到账状态,并把 H5 注册的转化终点导向 APP 安装(APP 在线时长驱动礼包与收益释放,§4.3.5)。App 壳内注册不经过本页。
+
+| 元素 | 内容 |
+|---|---|
+| 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 Nexion,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
+| 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);未带码注册整卡隐藏 |
+| 装 APP 权益 3 行 | 在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度 |
+| 下载 CTA | 按 UA 选链接:iOS → `share.appDownload.iosUrl`;Android → `androidUrl`(缺省回退 `apkUrl`);系统未知或对应链接缺失 → 双按钮并列(仅渲染有链接的按钮);三链接全空 → 替换为「APP 即将上线」说明卡,主 CTA 变「继续」,无死按钮 |
+| 次级出口 | 「先用网页版继续」→ `/onboarding/estimator`(既有 onboarding 链) |
+
+**规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;下载链接打开被拦截时自动复制链接并 toast 提示;返回键视同「继续」,不可返回注册流。
 
 ### 4.2 登录流程
 
@@ -356,6 +373,12 @@ TabBar:active tab 显示背景 chip 高亮。
 | CTA(主) | "Claim my $5 + 20 NEX" → `/register?ref=CODE` |
 | CTA(次) | "Sign in" → `/login?ref=CODE` |
 
+**状态变体与归因暂存**:
+- 码格式预检:`NEXION-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
+- 本机已登录 → 顶部提示条「你已注册,邀请链接对新用户有效,新人礼每账号仅一次」,隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 Nexion」(不重复发礼)。
+- **pendingRefCode(归因暂存)**:合法码到达落地页即写入本地暂存;访客当场不注册、此后从任意入口进注册页仍自动带码并锁定(§4.1)。注册前新码 last-touch 覆盖;绑定发生即清除;已绑定设备忽略新码(first-wins,§4.3.2)。
+- 生产短链 `{share.baseUrl}CODE`(§13.3)由服务端 302 至本页;`share.baseUrl` 未配置(开发 / 演示)时分享链接回退当前站点地址直连本页,扫码当场可达。
+
 #### 4.3.2 注册时绑定 sponsor
 
 `/register?ref=CODE` 顶部显示 sponsor 确认卡(头像 + sponsor 名 + V chip + 礼包预告)。
@@ -367,6 +390,7 @@ TabBar:active tab 显示背景 chip 高亮。
 - 礼包金额由平台配置 `rewards.welcomeGift.{usdtAmount,nexAmount}` 决定(默认 $5 + 20 NEX,后台可调),前端展示与入账同源派生
 - **首次绑定生效,后续 URL ?ref 不可覆盖**
 - 每个账号 welcome gift **仅一次**
+- 绑定成功即清除 pendingRefCode(§4.3.1),注册 / 登录两路共用同一清除点
 
 #### 4.3.3 登录时绑定
 
@@ -2018,19 +2042,31 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 1. **邀请码展示 + 复制**:展示 `user.referralCode`(如 `NEXION-8K9X`),配复制按钮 · 点击调 `navigator.clipboard.writeText(code)` + toast `Copied {code}` + 1.6s 内反馈 Check
 
 2. **双向奖励**:
-   - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 5% lifetime commission`
-   - They get(被邀人):`20 NEX welcome` / `instant credit on first device pairing`
+   - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 10% direct royalty`(佣金费率单一来源 §4.3.4 / §8.3.1)
+   - They get(被邀人):welcome gift 同源 `rewards.welcomeGift`(默认 `$5 + 20 NEX`,§4.3.2),不另设常量
 
 3. **Social proof**:`247 inviters earned today · 30-day cooldown per friend`(mock 实时社会证明,无需对接后端)
 
-4. **分享动作**:
-   - Share link 主入口:跳 `/team/leaderboard`(查邀请排行)
-   - Poster:打开海报功能(P-mini phase 占位 toast `Poster ready`,Sprint 3 接入真实 canvas 渲染)
+4. **分享动作(四入口,链接单源构造)**:
+   - 分享链接 = `share.baseUrl + referralCode`(§13.3;未配置时回退当前站点地址直连落地页,扫码可达);四入口产出的码 / 链接 / 二维码同源一致;邀请码为空时四入口置灰并 toast 提示。
+   - **海报**:打开分享海报面板——canvas 生成 750×1000 海报,含**可扫二维码**(payload = 分享链接)、邀请码、可开关的用户名;模板轮播:新人礼(恒可用)/ 我的产出(取用户设备今日实际产出,无设备自动隐藏)/ 我的网络;海报仅承载被邀方向价值(新人礼 + 产品故事),**不出现邀请人向金额**;面板含被邀方奖励说明行、底部渠道行、保存图片(受限浏览器降级为长按保存引导)、复制链接;生成中 / 失败态禁分享与保存,失败可重试。
+   - **邀请码 / 链接**:复制到剪贴板;复制失败不展示成功态、不计分享事件。
+   - **立即分享**:打开渠道面板——顶部邀请人奖励说明行(数额随 §8.1.1.1 阶段倍率)+ 渠道 grid(`share.channels` 配置驱动,顺序即展示序,§13.3)+ 弱化「取消」。渠道行为:web intent 型直接唤起并预填文案 + 链接(被拦截自动复制降级);无网页直发口的渠道(Zalo / Messenger)在 H5 走「复制文案 + 引导到该 App 粘贴」;系统分享项仅在浏览器支持时显示;渠道配置为空时兜底「复制 + 海报」两项,面板永不空。分享文案模板含礼包金额占位,与 `rewards.welcomeGift` 同源。
+   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发首日任务 `invite_friend` 完成(§5.15.3,仅首次发奖,重复分享不重复计酬)。
 
-**关键参数**(`INVITE_REWARDS` 常量,Sprint 3 第三阶段接 phase multiplier):
-- `REWARD_USDT_LIFETIME_ESTIMATE` = 200(`You get` 数额,代表被邀人 lifetime 平均贡献 ≈ unilevel + binary + 平级奖之和)
+```mermaid
+flowchart LR
+  A[邀请卡四入口<br/>海报 / 码 / 链接 / 渠道] -->|扫码 · 点链| R[落地页 /ref/CODE<br/>§4.3.1]
+  R -->|领取 CTA 自动带码| G[注册 ?ref 锁定<br/>§4.1]
+  R -.中途离开.-> P[pendingRefCode 暂存] -.此后任意入口注册.-> G
+  G -->|bind first-wins + 礼包分桶 §4.3.2/4.3.5| S[注册成功页 · 仅 H5<br/>§4.1.1]
+  S -->|下载 APP / 继续网页版| O[onboarding]
+```
+
+**关键参数**:
+- `REWARD_USDT_LIFETIME_ESTIMATE` = 200(`You get` 数额,代表被邀人 lifetime 平均贡献 ≈ unilevel + binary + 平级奖之和;× §8.1.1.1 阶段倍率展示)
 - `REWARD_NEX_INVITER` = 200(邀请人 NEX 一次性 bonus)
-- `REWARD_NEX_INVITEE` = 200(被邀人 welcome NEX,首次设备配对触发)
+- 被邀人礼包:同源 `rewards.welcomeGift`(§13.3),不另设常量
 
 #### 8.1.2 团队收益卡(TeamLedgerCard)
 
@@ -4142,6 +4178,7 @@ sequenceDiagram
 每完成一笔 AI 推理任务生成"推理收据":
 - 任务 ID + 客户名 + AI 模型 + 设备/GPU + 时长 + 能耗 + 单价 + 收益明细(gross / network fee / net paid)
 - 客户地址 + 签名(rsa-sha256)+ attestation tx_hash + 区块号
+- 列表按分类 tab(全部 / 图像 / 视频 / LLM / 微调 / Embedding / 语音 / KYC)分屏加载:每个 tab 首次载入只渲染一屏,下滑接近列表底部时加载下一屏;切换 tab 重置回第一屏
 - 列表行点击打开 Proof-of-Compute 详情 sheet;**详情为纯信息展示**,所有字段只读,不提供复制 / 分享 / 在 explorer 查看等操作
 
 #### 11.5.2 Proof of Contribution 分享卡 `/me/proof`
@@ -4514,85 +4551,76 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 - **Store**:`useGoals` zustand persist(`nexion-goals-v1`)— `Goal[]` + setGoal/markAchieved/remove
 - **i18n**:`goals.*` namespace ~17 keys
 
-#### 11.12.4 年度 Wrapped `/me/wrapped`(Sprint A-3 / E.5 + F.4)
-
-- **目的**:Spotify Wrapped 风全屏故事卡片,年度数据回顾 + 社交分享驱动 referral
-- **6 卡片**:hero / total earned / devices owned / network grew / V-rank reached / share & done
-- **导航**:tap 左侧 1/4 区 prev / 右侧 1/4 区 next,底部 prev/next 按钮
-- **z-index**:`z-[80]`(IOSFrame 内全屏 overlay,非 portal)
-- **数据源**:`useApp.earnings.total` + `useCommission.totalUSDTLifetime` + `useNetwork.totalMembers` + `useVRank.myRank`
-- **i18n**:`wrapped.*` namespace ~13 keys
-
-#### 11.12.5 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
+#### 11.12.4 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
 
 - **目的**:音效 / 触感 / 通知 6 类偏好的统一切换中心
 - **2 组 toggle**:Feedback(sound + haptics)+ Notifications(6 种 NotifKind 各自 mute)
 - **Store**:`usePreferences` zustand persist(`nexion-preferences-v1`)
 - **i18n**:`preferences.*` namespace ~14 keys
 
-#### 11.12.6 全局搜索 `/search`(Sprint P-full / P6)
+#### 11.12.5 全局搜索 `/search`(Sprint P-full / P6)
 
 - **入口**:IOSFrame Header 右上角 Search icon,所有 tab 路由可见
 - **索引**:20+ 静态路由 + Store products + 用户设备 + 网络成员 + FAQ 条目
 - **结果**:实时过滤(input change)+ 5 组分类(route / product / device / member / faq)+ 跳转 ChevronUpRight 图标
 - **i18n**:`search.*` namespace ~10 keys
 
-#### 11.12.7 长按设备菜单(Sprint P-full / P4)
+#### 11.12.6 长按设备菜单(Sprint P-full / P4)
 
 - **位置**:`<DeviceCardPC>` 内嵌(`app/components/device-card-pc.tsx`)
 - **触发**:`onPointerDown` 480ms 长按 → `DeviceQuickMenu` bottom sheet
 - **2 actions**:Detailed stats(跳 /earn)+ Trade-in(degradable only,跳 /me/devices)。**无手动暂停/恢复** — 真实平台节点要么运行、要么被动中断,用户不持有暂停任务或设备的能力
 - **i18n**:`earn.quickMenu.*`(stats / tradein / cancel)
 
-#### 11.12.8 Compliance Re-verification banner(Sprint A-3 / A.7)
+#### 11.12.7 Compliance Re-verification banner(Sprint A-3 / A.7)
 
 - **位置**:`(main)/layout.tsx` 内挂载,phase P5+(`complianceHoldEnabled`)触发
 - **24h dismiss cooldown**:localStorage `nexion-compliance-banner-dismissed-at`
 - **文案**:`Compliance re-verification window` + `Random KYC + KYT spot checks are active`(用户视角真实庞氏话术)
 - **i18n**:`complianceBanner.*` 3 keys
 
-#### 11.12.9 404 mascot(Sprint A-3 / E.4)
+#### 11.12.8 404 mascot(Sprint A-3 / E.4)
 
 - `app/not-found.tsx` 重做,加 Nova vocabulary 风 SVG mascot(helmet + visor + 双 ? LED + antenna LED + Sparkle)
 - spring 入场 + LED 脉冲 + 文案 `Nova checked every corner of the network`
 
-#### 11.12.10 重投奖励 3 重动画(Sprint A-2 / B.5)
+#### 11.12.9 重投奖励 3 重动画(Sprint A-2 / B.5)
 
 - `<motion.div>` stagger 入场 + `key={amount}` 让金额变化时 re-trigger
 - 3 个 Benefit pills(Zap / Check / Diamond)依次 spring scale 入场(stagger 0.12s,delay 0.05s)
 
-#### 11.12.11 Staking 复利计算器(Sprint A-2 / B.4)
+#### 11.12.10 Staking 复利计算器(Sprint A-2 / B.4)
 
 - `<CompoundCalculator>` 嵌在 `/staking` 4 plan cards 后 + Positions 前
 - 输入金额 + 4 档 term 切换(30/90/180/365d)+ 双卡 projection(单次 vs N× 复投 1 年终值)
 - 公式:`compound = principal × ∏(1 + apy × term/365) for cycles = floor(365/term)`
 - i18n `stakingV3.calc.*` 5 keys
 
-#### 11.12.12 半年 Wrapped Mini(Sprint A-2 / F.1)
+#### 11.12.11 半年 Wrapped Mini(Sprint A-2 / F.1)
 
 - Nova push trigger,`elapsed >= 14 days`(原型压缩自 6 月)时 fire 一次,30 天 cooldown 几乎一次性
 - 文案钩子总收益 + 推荐人数 + V 级,CTA → /me/proof
 - 模板 `wrappedMiniPush()` in `stella-templates.ts`
 
-#### 11.12.13 Team royalty hero 置顶(Sprint A-2 / D.1)
+#### 11.12.12 Team royalty hero 置顶(Sprint A-2 / D.1)
 
 - `/team` 主页 V3+ 用户 InviteEarnCard 之前置顶 Royalty card
 - 显示本月总版税(`monthUSDT`)+ Network Yield Bonus NEX 计数,跳 `/team/unilevel`
 - i18n `teamV3.royaltyHeroLabel/Subtitle`
 
-#### 11.12.14 Genesis 卡 3D 倾斜(Sprint A-2 / E.3)
+#### 11.12.13 Genesis 卡 3D 倾斜(Sprint A-2 / E.3)
 
 - 新通用组件 `<TiltCard>`(`app/components/ui/tilt-card.tsx`)
 - mouse pointer 跟踪 perspective + rotateX/Y(±9°)+ scale 1.02 hover
 - Reset on leave(240ms cubic-bezier 弹回)
 - 接入:`<ListingCard>` 在 `/genesis/marketplace`
 
-#### 11.12.15 Home 行情入口(Sprint A-2 / D.2)
+#### 11.12.14 Home 行情入口(Sprint A-2 / D.2)
 
 - `<MarketBoard>` 主体在 `/earn`(操作时的决策辅助)+ `/market` 专用路由
 - 不在 Home `<MissionControl>` 渲染:Home 16 sections 已聚焦"状态总览 + 转化触发",再嵌 MarketBoard 会重复 4 子卡内容并稀释主转化注意力(Earnings hero → Quest → Buy)
 
-#### 11.12.16 邀请 promo chip(Sprint 3 第三阶段 / inviteBonusMultiplier)
+#### 11.12.15 邀请 promo chip(Sprint 3 第三阶段 / inviteBonusMultiplier)
 
 - 见 §8.1.1.1
 
@@ -4917,7 +4945,15 @@ MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
   sponsor: { name, vRank, title, city, downlines } | null;
   giftClaimed: boolean;
   boundAt: number | null;
+  pendingCode: string | null;   // 落地页归因暂存码(§4.3.1):注册前 last-touch 覆盖,绑定即清,已绑定忽略
+  pendingAt: number | null;
 }
+```
+
+分享事件(client 记录,server-canonical `POST /api/share/event`,§8.1.1):
+
+```
+{ channel: "poster"|"code"|"link"|渠道 key; surface: "team_hero"|"poster_sheet"|"share_sheet"|"proof"; sharedAt: number }
 ```
 
 ### 12.9 Notification(useNotifications.items[])
@@ -5345,6 +5381,9 @@ progressPct = avg(checks);
 | `KYC_LIFETIME_THRESHOLD_USD` | 100 | 累计兑换触发 KYC 线 |
 | `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
 | `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
+| `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexion.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
+| `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
+| `share.appDownload.{iosUrl,androidUrl,apkUrl}` | 全空 | 注册成功页下载引导链接(§4.1.1);全空 = 「APP 即将上线」降级态;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
 | 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
 | OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
 | `Notification CAP` | 200 | 通知中心最多 |
@@ -5484,7 +5523,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 ### 14.3 命名空间
 
-`tabs / headerTitles / headerSubtitles / intro / authOtp / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / wrapped / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
+`tabs / headerTitles / headerSubtitles / intro / authOtp / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
 
 **关键 namespace 说明**:
 - `headerTitles` — 60+ 路由的 header 显示标题映射。包含 tab roots(earn / store / team / me / 等)+ Me 子树(meWallet / meProfile / meSecurity / meWalletBills / ...)+ Team 子树(teamRank / teamUnilevel / teamBinary / ...)+ Store 子树 + Genesis / Trust / 动态路由(storeProduct / tx / ...)+ `howItWorksSuffix`(EN: ` · How it works` / ZH: ` · 玩法说明`)拼接 how-it-works 子路由。
