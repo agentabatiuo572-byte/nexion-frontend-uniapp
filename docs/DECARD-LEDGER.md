@@ -16,11 +16,11 @@
 | B6 | 入口表单:login、register、register/success、session/kicked、onboarding intro/estimator/connect/terms | 8 | ✅ done 2026-07-09(全屏自绘页降力度;connect/terms 真去卡、terms 正文升可读;login/register/success/kicked/intro/estimator 本轮 0 去卡改动——工作树 diff 是 earlier 会话 FEAT-SHARE 邀请链,非去卡)。独立审查 PASS |
 | B7 | 营销/杂项:entry-surfaces ×4、compute-share/download、trust/trust、ref/code、globe、search、market、developer | 11 | ✅ done 2026-07-09(12 内容/营销页真去卡全 PASS;entry-surfaces chassis-nav 每页24px;globe 地图可视化保守留;market 顺带清违禁暗 hex;developer dev-only 轻改)。独立审查 PASS |
 
-## 🔴 收尾关键说明(提交前必读)
+## ✅ 收尾关键说明(已全部提交 · commit 7f4d71e)
 
-1. **工作树非纯去卡切片**:未提交工作树 = B1-B7 全量去卡(~100 文件)+ 独立在研的 **FEAT-SHARE 邀请链功能**(earlier 会话:lib/share.ts、share-poster/channel-sheet、register/success.vue、sponsorship.ts+44、i18n+200)+ 主题选择器等多轮。**提交时去卡样式与 FEAT-SHARE 分开成独立 commit**,别一把 add;login/register 的 diff 主要是 FEAT-SHARE 非去卡。
+1. **一把合并提交(主人 2026-07-09 定)**:去卡样式 + FEAT-SHARE 邀请链 + 主题选择器三摊在共享文件(i18n en/zh、me/team/proof.vue)里物理交织,无法按文件干净拆分(hunk 级 `git add -p` 交互在本环境不可用),故合并成单 commit `7f4d71e`(194 文件 +4135/−2674),message 里分三段写清。仓库卫生同批处理:wrapped.vue 退役页转干净删除、gitignore chrome-baseline 瞬态输出。
 2. **orders 副标题**:earlier 会话已刻意删「追踪硬件发货状态」(IDC 托管不发货,更新日志 2026-07-08 在案)。main 一度误判越界还原,查日志后确认是既有产品决策,**已撤销还原、恢复删除**(net 无变化)。教训:多轮工作树里的「越界」先查更新日志/上下文再动手。
-3. **splash 氛围光不一致(待主人裁)**:entry-surfaces 满屏氛围光已删;login/intro/ref 保留。需主人定「splash 页光晕全删 or 全留」统一。
+3. **splash 氛围光(主人 2026-07-09 裁定:保持现状)**:intro/ref 是营销闪屏/落地页,氛围光是刻意高级感,保留;entry-surfaces 是 App 内首页(内容页),按去卡规则删光。视作两类页面,不强行统一。login 是纯表单页本就无氛围光。**此项 close,无代码改动。**
 
 ## 收尾后主人追加微调(2026-07-09,全 tsc0/mirror4036/verify174 绿)
 
