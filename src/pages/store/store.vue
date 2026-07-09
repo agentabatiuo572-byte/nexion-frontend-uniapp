@@ -43,7 +43,7 @@
         </view>
       </view>
 
-      <text class="block text-center font-mono-tabular" style="margin-top: 4px; padding-bottom: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.pageFooter }}</text>
+      <text class="block text-center font-mono-tabular" style="margin-top: 20px; padding-bottom: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.pageFooter }}</text>
     </CardStagger>
   </AppChassis>
 </template>

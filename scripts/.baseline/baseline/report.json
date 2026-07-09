@@ -4,7 +4,7 @@
     "pillCount": 1,
     "tabCount": 5,
     "headerH": 52,
-    "headerBackdrop": "saturate(1.8) blur(24px)",
+    "headerBackdrop": "none",
     "fontFamily": "\"General Sans\", \"General Sans\", Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif, Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
     "consoleErrors": []
   },
@@ -13,7 +13,7 @@
     "pillCount": 1,
     "tabCount": 5,
     "headerH": 52,
-    "headerBackdrop": "saturate(1.8) blur(24px)",
+    "headerBackdrop": "none",
     "fontFamily": "\"General Sans\", \"General Sans\", Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif, Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
     "consoleErrors": []
   },
@@ -22,7 +22,7 @@
     "pillCount": 1,
     "tabCount": 5,
     "headerH": 52,
-    "headerBackdrop": "saturate(1.8) blur(24px)",
+    "headerBackdrop": "none",
     "fontFamily": "\"General Sans\", \"General Sans\", Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif, Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
     "consoleErrors": []
   },
@@ -31,7 +31,7 @@
     "pillCount": 1,
     "tabCount": 5,
     "headerH": 52,
-    "headerBackdrop": "saturate(1.8) blur(24px)",
+    "headerBackdrop": "none",
     "fontFamily": "\"General Sans\", \"General Sans\", Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif, Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
     "consoleErrors": []
   },
@@ -40,7 +40,7 @@
     "pillCount": 1,
     "tabCount": 5,
     "headerH": 52,
-    "headerBackdrop": "saturate(1.8) blur(24px)",
+    "headerBackdrop": "none",
     "fontFamily": "\"General Sans\", \"General Sans\", Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif, Manrope, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, sans-serif",
     "consoleErrors": []
   }

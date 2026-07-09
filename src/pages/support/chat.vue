@@ -12,8 +12,11 @@
 -->
 <template>
   <view class="cp-root">
+    <!-- Simulated device status bar (preview shell only) — bare page draws its own. -->
+    <DeviceStatusBar />
+
     <!-- Header -->
-    <view class="cp-head">
+    <view class="cp-head" :style="{ paddingTop: statusBarHeight + 10 + 'px' }">
       <view class="cp-back active:opacity-60" role="button" tabindex="0" :aria-label="t.conversations.back" @click="goBack">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
@@ -64,11 +67,13 @@ import { onLoad, onUnload, onShow, onHide } from "@dcloudio/uni-app";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import ConversationThread from "@/components/support/conversation-thread.vue";
 import GlobalUi from "@/components/global-ui.vue";
+import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import type { ThreadMsg, QuickChip } from "@/components/support/thread-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo, navBack } from "@/lib/route";
 import { createSendLimiter } from "@/lib/send-limiter";
+import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
@@ -82,6 +87,18 @@ const app = useApp();
 
 const cid = ref("");
 const isAi = ref(false);
+
+// Bare full-screen page (no AppChassis), so it must reserve the device status-bar
+// space itself. Match the chassis source (real device height, else the H5
+// device-preview simulated height) — env(safe-area-inset-top) is 0 inside the H5
+// shell iframe, which left the header tucked under the simulated status bar.
+const statusBarHeight = computed(() => {
+  try {
+    return uni.getSystemInfoSync().statusBarHeight || h5DevicePreviewStatusBarHeight();
+  } catch {
+    return h5DevicePreviewStatusBarHeight();
+  }
+});
 // Bumped on every re-reveal so the thread re-pins to the newest message. uni H5
 // navigateTo pushes a keep-alive page and hides it with display:none (zeroing the
 // inner list's scrollTop); on navigateBack the page is re-shown, not re-mounted,
@@ -307,7 +324,7 @@ function goBack() {
   align-items: center;
   gap: 10px;
   padding: 10px 14px 12px;
-  padding-top: calc(env(safe-area-inset-top) + 10px);
+  /* top padding is bound inline to the device status-bar height (see cp-head :style) */
   border-bottom: 1px solid var(--v5-border);
 }
 .cp-back {

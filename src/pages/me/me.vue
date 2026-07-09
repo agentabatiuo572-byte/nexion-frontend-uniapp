@@ -418,7 +418,10 @@ async function handleSignOut() {
 
 const signOutStyle: CSSProperties = {
   gap: "6px",
-  marginTop: "6px",
+  // Footer action: separated from the last settings section by the page's own
+  // section rhythm (24px), not crammed against it (was 6px — tighter than the
+  // 12px base gap, so the exit action read as part of Help & Support).
+  marginTop: "24px",
   height: "44px",
   padding: "0 18px",
   background: "var(--v5-surface)",
