@@ -120,6 +120,7 @@ export const EVENTS: NexEvent[] = [
     countdown: "2d 09h",
     joined: false,
     ctaLabel: "Join the race",
+    href: "/pages/team/leaderboard",
   },
   {
     id: "evt-spring-spin",
@@ -150,6 +151,7 @@ export const EVENTS: NexEvent[] = [
     countdown: "4d 03h",
     joined: false,
     ctaLabel: "Re-invest now",
+    href: "/pages/me/wallet-repurchase",
   },
   {
     id: "evt-onboarding-7d",

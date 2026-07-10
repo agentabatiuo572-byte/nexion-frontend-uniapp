@@ -112,7 +112,6 @@ const ROUTES: ReadonlyArray<{ label: string; href: string; sub: string }> = [
   { label: "Developer / API", href: "/pages/developer/developer", sub: "Public API + partner integrations" },
   { label: "Globe / Network map", href: "/pages/globe/globe", sub: "Worldwide active nodes" },
   { label: "Market", href: "/pages/market/market", sub: "AI workload prices + NEX K-line" },
-  { label: "Learn / Academy", href: "/pages/learn/learn", sub: "Lessons · learn-to-earn NEX" },
   { label: "Events", href: "/pages/events/events", sub: "Promotions · contests · seasonal" },
   { label: "Missions", href: "/pages/missions/missions", sub: "Quests · streaks · challenges" },
 ];

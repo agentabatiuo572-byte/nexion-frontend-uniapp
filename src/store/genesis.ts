@@ -27,10 +27,6 @@ export { GENESIS_TIERS, type GenesisTier };
 
 const TOTAL_SLOTS = 1000;
 
-/** Secondary-market royalty taken to the network treasury on every resale
- *  (Q13). Seller nets askPrice × (1 − GENESIS_ROYALTY_RATE). */
-export const GENESIS_ROYALTY_RATE = 0.025;
-
 // 阶梯档位(GENESIS_TIERS)+ tierForSold 现在是运营可配的,单源在 genesis-config
 // store(admin G4 `G.genesis.tiers`)。累计售出决定当前档,售罄硬跳价——派生逻辑
 // 见下方 currentTier/unitPriceUSDT/tierRemaining,全部读 live config。
@@ -397,16 +393,6 @@ export const useGenesis = defineStore("genesis", () => {
     return true;
   }
 
-  function fulfillSale(tokenId: number): MyListing | null {
-    const listing = myListings.value.find((l) => l.tokenId === tokenId);
-    if (!listing) return null;
-    ownedTokenIds.value = ownedTokenIds.value.filter((id) => id !== tokenId);
-    myListings.value = myListings.value.filter((l) => l.tokenId !== tokenId);
-    myOwned.value = Math.max(0, myOwned.value - 1);
-    persist();
-    return listing;
-  }
-
   /**
    * 二级市场承接:买入一个**已存在**的 token（转让,非铸造）。
    * 🔴 不动 soldSlots（该 token 早已计入一级「已铸」+ 派生档价）、不走售罄门 —— 二级承接
@@ -439,6 +425,6 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    purchase, listNode, cancelListing, fulfillSale, acquireSecondary, tickSales, bindAccount,
+    purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

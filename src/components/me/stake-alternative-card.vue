@@ -36,16 +36,19 @@
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { STAKING_APY } from "@/store/staking";
 
 const props = defineProps<{ amountNum: number }>();
 const t = useT();
 const w = computed(() => t.value.walletV3.stakeAlt);
 
 type Tone = "ok" | "warn" | "hot";
+// APY 读质押主表单源(STAKING_APY),不再硬编码镜像 —— 防主表调档后此卡漂移。
+// (核查表「5/12/20」为误报:Round-7 已手动 matched 到 12/35/80,此处进一步焊单源根治。)
 const tiers: Array<{ days: number; apy: number; tone: Tone }> = [
-  { days: 30, apy: 0.12, tone: "ok" },
-  { days: 90, apy: 0.35, tone: "warn" },
-  { days: 180, apy: 0.8, tone: "hot" },
+  { days: 30, apy: STAKING_APY[30], tone: "ok" },
+  { days: 90, apy: STAKING_APY[90], tone: "warn" },
+  { days: 180, apy: STAKING_APY[180], tone: "hot" },
 ];
 const peak = tiers[tiers.length - 1];
 const peakValue = computed(() => props.amountNum * (1 + (peak.apy * peak.days) / 365));

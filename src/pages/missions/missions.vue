@@ -2,15 +2,14 @@
   Mission Center — ported from Nexion-prototype/app/(main)/missions/page.tsx.
 
   Single hub for every task system: hero + sectioned RouteRows (Today /
-  This Week / This Month / Day-One / Events / Achievements).
+  This Week / Day-One / Events / Achievements).
 
   Wrapped in <AppChassis active="home"> (reached from Home). SetPageHeader
   backHref="/" → SubPageHeader back="/pages/index/index".
 
   Scope note: "This Week" now embeds the live <WeeklyQuestHero> +
   <WeeklyQuestList> (ported — Tier 1 priority quest + Tier 2 engagement list +
-  champion bonus, matching the source missions page). "This Month" still shows
-  the i18n "launches soon" copy (Monthly Challenge is Q-2, not yet ported). The
+  champion bonus, matching the source missions page). The
   Events row stat IS live: ongoing / joined / claimable counts derive from the
   ported EVENTS mock + event-quest store, so the badge + stat line are real.
 -->
@@ -58,25 +57,6 @@
         </view>
         <view class="mx-4"><WeeklyQuestHero /></view>
         <WeeklyQuestList />
-      </view>
-
-      <!-- This Month -->
-      <view :style="sectionStyle">
-        <view class="mx-4 flex items-center" :style="sectionHeadStyle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4" /><path d="M16 2v4" /><rect width="18" height="18" x="3" y="4" rx="2" /><path d="M3 10h18" /><path d="M17 14h-6" /><path d="M13 18H7" /><path d="M7 14h.01" /><path d="M17 18h.01" /></svg>
-          <text :style="sectionTitleStyle">{{ t.missions.monthHeading }}</text>
-        </view>
-        <view class="mx-4 rounded-xl" :style="monthCardStyle">
-          <view class="flex items-center" style="gap: 10px">
-            <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-warning)')">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
-            </view>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="rowLabelStyle">{{ t.missions.monthSoonTitle }}</text>
-              <text class="block" :style="monthBodyStyle">{{ t.missions.monthSoonBody }}</text>
-            </view>
-          </view>
-        </view>
       </view>
 
       <!-- Events -->
@@ -240,16 +220,5 @@ const badgeStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontSize: "10px",
   fontWeight: 500,
-};
-// Form-b filled placeholder, no border (border UnoCSS class dropped in template).
-const monthCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  padding: "14px",
-};
-const monthBodyStyle: CSSProperties = {
-  marginTop: "3px",
-  fontSize: "11.5px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.45,
 };
 </script>

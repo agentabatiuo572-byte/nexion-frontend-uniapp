@@ -41,10 +41,10 @@ const toastAfterEarn = await page.evaluate(() => {
 report.earnNav_consoleErrors = [...errs];
 report.toastAfterEarnNav = toastAfterEarn;
 
-// ---- 3) genesis page: resale loop touches genesis store (console proof) ----
+// ---- 3) genesis page: order poll runs live without errors (console proof) ----
 errs.length = 0;
 await page.goto(`${BASE}/#/pages/genesis/genesis`, { waitUntil: "networkidle", timeout: 30000 });
-await wait(6500); // one ORDER_TICK with genesis resale branch
+await wait(6500); // one ORDER_TICK while the genesis page is mounted
 report.genesisLive_consoleErrors = [...errs];
 
 // ---- 4) store tab: order auto-advance loop runs ----

@@ -264,6 +264,16 @@ sentinel_present "P0 neg-balance: account-cloud has fund-invariant clamp" src/st
 sentinel_present "P0 neg-balance: merge writes clamped snapshot" src/store/account-cloud.ts 'const merged = clampAccountFundInvariants\(rawMerged\)'
 # 提现金额有效性守卫(对齐 debitBalance):NaN/±Inf/≤0 拒,防负数反向加钱 / NaN 污染余额。
 sentinel_present "P0 neg-balance: withdrawal rejects invalid amount" src/store/app.ts 'if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null'
+# 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
+# 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。
+nex_guard_sites=$(grep -cE '!Number\.isFinite\(amount\) \|\| amount < 0' src/store/app.ts)
+if [ "${nex_guard_sites:-0}" -ge 4 ]; then
+  ok "P0 dirty-amount: credit/debit × USDT/NEX all reject NaN/negative (×$nex_guard_sites)"
+else
+  bad "P0 dirty-amount: money primitive missing finite guard (only ${nex_guard_sites:-0}/4)"
+fi
+# 单源门(补⑤):提现劝阻卡 APY 必须读 STAKING_APY 主表,不硬编码镜像(防 Round-7 式漂移)。
+sentinel_present "single-source: stake-alt APY reads STAKING_APY (no hardcoded mirror)" src/components/me/stake-alternative-card.vue 'STAKING_APY\['
 # client 零推进: 旧全局推进函数必须已收编为 _dev 前缀(仅 pass 路由)
 sentinel_present "SPEC-7 demo advance is _dev-prefixed" src/store/app.ts 'function _devAdvanceWithdrawal'
 if grep -qE 'function advanceWithdrawal\(' src/store/app.ts 2>/dev/null; then

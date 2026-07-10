@@ -22,7 +22,6 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   // Top-level routes
   "pages/market/market": "market",
   "pages/missions/missions": "missions",
-  "pages/learn/learn": "learn",
   "pages/events/events": "events",
   "pages/daily/daily": "daily",
   "pages/staking/staking": "staking",

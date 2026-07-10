@@ -743,10 +743,15 @@ export const useApp = defineStore("app", () => {
     return true;
   }
   function creditNex(amount: number) {
+    // NaN/Infinity/负数守卫(对齐 creditBalance):脏 amount 会把 nexBalance 污染成 NaN,
+    // 此后一切 debitNex 检查恒过 = 无限 NEX。
+    if (!Number.isFinite(amount) || amount < 0) return;
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance + amount).toFixed(2) };
     persistAccountSnapshot();
   }
   function debitNex(amount: number): boolean {
+    // 对齐 debitBalance:负数 amount 会让 `bal < amount` 恒 false 而反向增币,NaN 污染余额。
+    if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.nexBalance < amount) return false;
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance - amount).toFixed(2) };
     persistAccountSnapshot();

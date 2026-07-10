@@ -15,7 +15,6 @@ import { useTrialExtensionSheet } from "@/store/trial-extension-sheet";
 import { useBills } from "@/store/bills";
 import { MAX_DEVICES } from "@/store/device-types";
 import { tickOrders } from "@/store/orders";
-import { useGenesis, GENESIS_ROYALTY_RATE } from "@/store/genesis";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
 import { useAuth } from "@/store/auth";
@@ -213,50 +212,19 @@ function stopTrialPoll() {
 }
 
 // ── ORDER_TICK 6s loop (ports SimulationProvider's ORDER_TICK loop) ──
-// Single global driver for two unrelated simulations that share the 6s cadence
-// in the prototype (simulation-provider.tsx:36-64):
-//   (a) order auto-advance: placed → paid → provisioning → activated (tickOrders).
-//   (b) Genesis secondary-market: a user's active listing randomly sells.
-// Both compose across stores, so the orchestration lives here at the App layer —
-// stores never import each other (P-031/032). Mirrors ORDER_TICK_MS = 6000.
-// Production: order status arrives via SSE (GET /api/orders/:id); the Genesis
-// resale fires server-side when a buyer fills the listing (no client gamble).
+// Single global driver that advances every in-flight order one stage on the
+// 6s cadence from the prototype (simulation-provider.tsx:36-64):
+//   order auto-advance: placed → paid → provisioning → activated (tickOrders).
+// Orchestration lives at the App layer so stores never import each other
+// (P-031/032). Mirrors ORDER_TICK_MS = 6000.
+// Production: order status arrives via SSE (GET /api/orders/:id).
 const ORDER_TICK_MS = 6000;
-const GENESIS_SALE_CHANCE = 0.18;
 let orderTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollOrders() {
   if (!ensureBusinessLoopsAllowed()) return;
-  // (a) Advance every in-flight order one stage (gated internally per-order).
+  // Advance every in-flight order one stage (gated internally per-order).
   tickOrders(trialReservesSlotNow() ? 1 : 0);
-
-  // (b) Genesis resale — if the user has a live listing, it occasionally fills.
-  const genesis = useGenesis();
-  const listings = genesis.myListings;
-  if (listings.length > 0 && Math.random() < GENESIS_SALE_CHANCE) {
-    const sold = genesis.fulfillSale(listings[0].tokenId);
-    if (sold) {
-      const app = useApp();
-      const bills = useBills();
-      const t = useT().value;
-      // Seller nets ask minus the network royalty (Q13).
-      const net = +(sold.askPriceUSDT * (1 - GENESIS_ROYALTY_RATE)).toFixed(2);
-      app.creditBalance(net);
-      bills.add({
-        type: "bonus",
-        symbol: "USDT",
-        amount: net,
-        status: "posted",
-        // Internal ledger record (not a UI-rendered i18n namespace) — kept literal.
-        memo: `Genesis Node #${sold.tokenId} sold · −${(GENESIS_ROYALTY_RATE * 100).toFixed(1)}% royalty`,
-        ref: `GENESIS-SOLD-${sold.tokenId}-${Date.now().toString(36).toUpperCase()}`,
-      });
-      toast.success(
-        fmt(t.genesis.soldToastTitle, { id: sold.tokenId }),
-        fmt(t.genesis.soldToastBody, { amount: net.toLocaleString() }),
-      );
-    }
-  }
 }
 
 function startOrderPoll() {

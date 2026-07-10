@@ -11,9 +11,10 @@
   Wrapped in <AppChassis active="store">; back + "Bundle" title live in the sticky
   chassis nav header via useSetPageHeader (mirrors the prototype's
   <SetPageHeader backHref="/store"/>, whose chassis Header fills in the route
-  title headerTitles.storeBundle). The checkout CTA is an INTENTIONAL placeholder:
-  the bundle settlement flow is not wired yet, so it surfaces a "coming soon"
-  toast instead of routing (single-product checkout works today).
+  title headerTitles.storeBundle). Checkout settles via balance: reuses the
+  single-product checkout core (debit + createOrder per item + bill + insufficient-
+  balance guard) + the same purchase-gate deep-link defense, then clears the cart
+  and routes to /store/orders.
 -->
 <template>
   <AppChassis active="store">
@@ -147,11 +148,17 @@ import AppChassis from "@/components/app-chassis.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, BUNDLE_DISCOUNT_TIERS, type BundleDiscountTier } from "@/store/cart";
-import { PRODUCTS, getProduct, type Product } from "@/mock/products";
+import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { isPhaseReached } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { toast } from "@/store/ui";
+import { useApp } from "@/store/app";
+import { useOrders, type Order } from "@/store/orders";
+import { useBills } from "@/store/bills";
+import { navTo } from "@/lib/route";
+import { useVRank } from "@/store/v-rank";
+import { useNetwork } from "@/store/network";
 
 const t = useT();
 const cart = useCart();
@@ -208,7 +215,59 @@ function onAddSuggestion(p: Product) {
   toast.success(fmt(t.value.bundle.addedToBundle, { name: p.name }));
 }
 function onCheckout() {
-  toast.info(t.value.bundle.checkoutToast);
+  const list = products.value;
+  if (list.length === 0) return;
+  // 购买资格门(等级门/锁额/售罄)——镜像单品 checkout 的门:suggestions 只挡上架节奏门
+  // (unlocksAtPhase)、挡不住资格门,组合内任一 SKU 不达标即整单拒,防授权旁路(深链防线)。
+  // 真后台仍以 POST /api/orders 服务端复检为准。
+  const vRank = useVRank();
+  const network = useNetwork();
+  const gateCtx = {
+    rank: vRank.myRank,
+    activeDirect: network.members.filter((m) => m.layer === 1 && m.status === "active").length,
+    teamVolumeUSD: vRank.teamVolumeUSD,
+  };
+  const blocked = list.find((p) => evaluatePurchaseGate(p, gateCtx).blocked);
+  if (blocked) {
+    const g = evaluatePurchaseGate(blocked, gateCtx);
+    toast.warn(g.soldOut ? t.value.store.gateSoldOutToast : t.value.store.gateBlockedToast);
+    navTo("/pages/team/quota");
+    return;
+  }
+  const app = useApp();
+  // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
+  const charge = total.value;
+  if (!app.debitBalance(charge)) {
+    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
+    return;
+  }
+  const orders = useOrders();
+  const pct = discountPct.value;
+  // 逐商品建单;组合折扣按单价比例分摊到各单(展示净额)。
+  // ponytail: 账本单源 = debitBalance(total)+bills;各单 net 之和的四舍五入分差不入账。
+  const created = list.map((p) =>
+    orders.createOrder({
+      productId: p.id as Order["productId"],
+      productName: p.name,
+      unitPrice: p.price,
+      paymentMethod: "balance",
+      discount: +(p.price * pct).toFixed(2),
+    }),
+  );
+  useBills().add({
+    type: "purchase",
+    symbol: "USDT",
+    amount: -charge,
+    status: "posted",
+    memo: fmt(t.value.bundle.checkoutBillMemo, { count: list.length }),
+    ref: created[0]?.id ?? "BUNDLE",
+  });
+  cart.clear();
+  toast.success(
+    t.value.bundle.checkoutSuccessTitle,
+    fmt(t.value.bundle.checkoutSuccessBody, { count: list.length }),
+  );
+  navTo("/pages/store/orders");
 }
 
 // ───── style objects ─────
