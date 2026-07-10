@@ -225,7 +225,15 @@ async function handleRedeem() {
   }
 
   // Cross-store orchestration in the handler (stores don't import each other).
-  app.debitBalance(chargeAmount);
+  // confirm 期间并发窗口:余额可能被别端(多端/其他购买)消耗,预检查(上方)已 stale。
+  // debit 失败必须中止不记账单;redeemEarly 已推进 redeemed,故翻 failed 起冷却
+  // (保留 finishedAt),不留 redeemed-but-nothing 死状态。对齐 App.vue handleAutoRedeem。
+  const debitOk = app.debitBalance(chargeAmount);
+  if (!debitOk) {
+    freeTrial.markChargeFailed("insufficient_funds");
+    toast.error(w.value.toastDebitFailedNoBalance);
+    return;
+  }
   const purchaseRef = `TRIAL-EARLY-${Date.now().toString(36).toUpperCase()}`;
   bills.add({
     type: "purchase",
