@@ -21,6 +21,7 @@ export const useConfig = defineStore("config", () => {
     withdrawRules: { ...DEFAULT_PLATFORM_CONFIG.withdrawRules },
     rewards: {
       welcomeGift: { ...DEFAULT_PLATFORM_CONFIG.rewards.welcomeGift },
+      inviterReward: { ...DEFAULT_PLATFORM_CONFIG.rewards.inviterReward },
     },
     riskScore: {
       dimensionWeights: { ...DEFAULT_PLATFORM_CONFIG.riskScore.dimensionWeights },

@@ -1,8 +1,11 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
-const STORAGE_KEY = "nexion-profile-v1";
+// 旧设备级单键 "nexion-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
+const ACCOUNTS_KEY = "nexion-profile-accounts-v1"; // { [accountKey]: Persisted }
 
 interface Persisted {
   displayName: string;
@@ -16,13 +19,9 @@ function defaultSeed(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-function hydrate(): Persisted {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
-    if (s && typeof s === "object" && s.displayName) return s;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): Persisted {
+  const row = readAccountRow<Persisted>(ACCOUNTS_KEY, accountKey);
+  if (row && row.displayName) return row;
   return {
     displayName: "Alex T.",
     bio: "Running an AI-friendly node from my phone. Always up for swapping notes on yield strategies.",
@@ -33,7 +32,9 @@ function hydrate(): Persisted {
 }
 
 export const useProfile = defineStore("profile", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const displayName = ref(init.displayName);
   const bio = ref(init.bio);
   const region = ref(init.region);
@@ -41,17 +42,24 @@ export const useProfile = defineStore("profile", () => {
   const avatarSeed = ref(init.avatarSeed);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        displayName: displayName.value,
-        bio: bio.value,
-        region: region.value,
-        timezone: timezone.value,
-        avatarSeed: avatarSeed.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
+      displayName: displayName.value,
+      bio: bio.value,
+      region: region.value,
+      timezone: timezone.value,
+      avatarSeed: avatarSeed.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的资料(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    displayName.value = next.displayName;
+    bio.value = next.bio;
+    region.value = next.region;
+    timezone.value = next.timezone;
+    avatarSeed.value = next.avatarSeed;
   }
 
   function setDisplayName(v: string) { displayName.value = v; persist(); }
@@ -60,5 +68,5 @@ export const useProfile = defineStore("profile", () => {
   function setTimezone(v: string) { timezone.value = v; persist(); }
   function regenerateAvatar() { avatarSeed.value = defaultSeed(); persist(); }
 
-  return { displayName, bio, region, timezone, avatarSeed, setDisplayName, setBio, setRegion, setTimezone, regenerateAvatar };
+  return { displayName, bio, region, timezone, avatarSeed, setDisplayName, setBio, setRegion, setTimezone, regenerateAvatar, bindAccount };
 });

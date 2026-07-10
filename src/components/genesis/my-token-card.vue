@@ -52,16 +52,18 @@ import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis } from "@/store/genesis";
+import { useGenesisConfig } from "@/store/genesis-config";
 import { toast, confirm } from "@/store/ui";
-
-const FLOOR = 13_400; // 二级地板 = 尾盘档 + 溢价（与 marketplace 一致，去旧 $25K）。
 
 const props = defineProps<{ tokenId: number }>();
 
 const t = useT();
 const genesis = useGenesis();
+const cfg = useGenesisConfig();
+// 二级地板价派生 marketStats 单源(FEAT-GEN09;运营 G4 可配,不缓存硬编码 — 与 marketplace 同源)。
+const floor = computed(() => cfg.config.marketStats.floor);
 
-const askPrice = ref(FLOOR);
+const askPrice = ref(floor.value);
 
 const existing = computed(() => genesis.myListings.find((l) => l.tokenId === props.tokenId));
 const isListed = computed(() => !!existing.value);
@@ -72,7 +74,7 @@ const askingChipText = computed(() =>
 const listedAgoText = computed(() =>
   existing.value ? fmt(t.value.marketplace.listedAgo, { time: relativeTime(existing.value.listedAt) }) : "",
 );
-const floorHintText = computed(() => fmt(t.value.marketplace.floorShort, { k: (FLOOR / 1000).toFixed(1) }));
+const floorHintText = computed(() => fmt(t.value.marketplace.floorShort, { k: (floor.value / 1000).toFixed(1) }));
 
 function relativeTime(ts: number): string {
   const ms = Date.now() - ts;
@@ -92,7 +94,7 @@ async function handleList() {
     title: fmt(t.value.marketplace.confirmListTitle, { id: props.tokenId }),
     message: fmt(t.value.marketplace.confirmListMsg, {
       amount: askPrice.value.toLocaleString(),
-      floor: (FLOOR / 1000).toFixed(1),
+      floor: (floor.value / 1000).toFixed(1),
     }),
     confirmLabel: t.value.marketplace.confirmListCta,
     icon: "info",

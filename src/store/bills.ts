@@ -1,6 +1,9 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { mockServerId } from "./mock-id";
+import { mockServerNow } from "./server-time";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/bills.ts (zustand → Pinia).
 // MOCK-ONLY: 30-day history fabricated client-side; production replaces seed
@@ -22,7 +25,20 @@ export interface Bill {
   balanceAfter?: number;
 }
 
-const STORAGE_KEY = "nexion-bills-v1";
+/**
+ * Reward-type credits (activity bonus / referral commission / achievement;
+ * CS compensation posts as `bonus`) — the "system rewards" family surfaced in
+ * My Rewards (/me/rewards) AND its unread dot on the Me entry. Single source:
+ * both consumers must share this predicate so the dot can never disagree with
+ * the page content.
+ */
+export const REWARD_BILL_TYPES: readonly BillType[] = ["bonus", "refer", "achievement"];
+export function isRewardBill(b: Bill): boolean {
+  return REWARD_BILL_TYPES.includes(b.type) && b.amount > 0;
+}
+
+// 旧设备级单键 "nexion-bills-v1" 废弃(存量无账号归属,mock 可重建);账单按账号分行。
+const ACCOUNTS_KEY = "nexion-bills-accounts-v1"; // { [accountKey]: { bills: Bill[] } }
 
 function mulberry32(seed: number) {
   return function () {
@@ -80,29 +96,32 @@ function recomputeBalance(bills: Bill[]): Bill[] {
   return ordered.sort((a, b) => b.ts - a.ts);
 }
 
-function hydrate(): Bill[] {
-  try {
-    const saved = uni.getStorageSync(STORAGE_KEY) as { bills?: Bill[] } | "";
-    if (saved && saved.bills && saved.bills.length) return saved.bills;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): Bill[] {
+  const row = readAccountRow<{ bills?: Bill[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.bills) && row.bills.length) return row.bills;
   return recomputeBalance(seedBills());
 }
 
 export const useBills = defineStore("bills", () => {
-  const bills = ref<Bill[]>(hydrate());
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
+  // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const bills = ref<Bill[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { bills: bills.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
+  }
+
+  /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    bills.value = hydrate(boundKey);
   }
 
   function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill {
-    const next: Bill = { ...b, id: mockServerId("BL"), ts: Date.now() };
+    // Server-clock domain — the rewards-seen watermark compares against ts,
+    // so both must route through the same single time source.
+    const next: Bill = { ...b, id: mockServerId("BL"), ts: mockServerNow() };
     bills.value = recomputeBalance([next, ...bills.value]);
     persist();
     return next;
@@ -113,5 +132,5 @@ export const useBills = defineStore("bills", () => {
     persist();
   }
 
-  return { bills, add, seed };
+  return { bills, add, seed, bindAccount };
 });

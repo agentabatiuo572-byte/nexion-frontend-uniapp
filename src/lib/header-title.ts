@@ -54,7 +54,6 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/me/language": "meLanguage",
   "pages/me/goals": "meGoals",
   "pages/me/risk-disclosure": "meRiskDisclosure",
-  "pages/me/replay-tour": "meReplayTour",
   // Team subtree
   "pages/team/rank": "teamRank",
   "pages/team/unilevel": "teamUnilevel",

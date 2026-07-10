@@ -25,6 +25,7 @@ import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -379,6 +380,9 @@ function checkSession(): boolean {
     stopBusinessLoops();
     useApp().interruptAllTasks(reason);
     session.kick(reason);
+    // 踢出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
+    useApp().bindAccount("default");
+    rebindAccountScopedStores("default");
     uni.reLaunch({ url: "/pages/session/kicked" });
     return true;
   }
@@ -465,12 +469,16 @@ function bootstrapAccountSession() {
     const app = useApp();
     const session = useSession();
     app.bindAccount(key);
+    rebindAccountScopedStores(key);
     const restored = session.resumeOrClaim(key);
     if (restored.status === "kicked" || restored.status === "logged-out") {
       const reason = restored.status === "kicked" ? "kicked" : "logged-out";
       stopBusinessLoops();
       app.interruptAllTasks(reason);
       session.kick(reason);
+      // 踢出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
+      app.bindAccount("default");
+      rebindAccountScopedStores("default");
       uni.reLaunch({ url: "/pages/session/kicked" });
     }
   }

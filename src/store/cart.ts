@@ -14,6 +14,8 @@
 
 import { defineStore } from "pinia";
 import { ref, watch } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 export interface BundleDiscountTier {
   minItems: number;
@@ -33,30 +35,30 @@ export function bundleDiscountForCount(count: number): number {
   return 0;
 }
 
-const STORAGE_KEY = "nexion-cart-v1";
+// 旧设备级单键 "nexion-cart-v1" 废弃(存量无账号归属,mock 可重建);购物车按账号分行。
+const ACCOUNTS_KEY = "nexion-cart-accounts-v1"; // { [accountKey]: { items: string[] } }
 
-function hydrate(): string[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { items?: string[] } | string[] | "";
-    if (Array.isArray(s)) return s;
-    if (s && typeof s === "object" && Array.isArray(s.items)) return s.items;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): string[] {
+  const row = readAccountRow<{ items?: string[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.items)) return row.items;
   return [];
 }
 
 export const useCart = defineStore("cart", () => {
-  const items = ref<string[]>(hydrate());
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const items = ref<string[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { items: items.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ items: string[] }>(ACCOUNTS_KEY, boundKey, { items: items.value });
   }
   watch(items, persist, { deep: true });
+
+  /** 账号切换重绑:装载该账号的购物车。boundKey 先行,赋值触发 watch 幂等写回本账号行。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    items.value = hydrate(boundKey);
+  }
 
   function add(id: string) {
     if (!items.value.includes(id)) items.value = [...items.value, id];
@@ -71,5 +73,5 @@ export const useCart = defineStore("cart", () => {
     return items.value.includes(id);
   }
 
-  return { items, add, remove, clear, has };
+  return { items, add, remove, clear, has, bindAccount };
 });

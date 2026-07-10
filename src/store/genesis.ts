@@ -1,5 +1,17 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { normalizeAccountKey } from "@/store/account-cloud";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
+import {
+  useGenesisConfig,
+  tierForSold,
+  GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
+  type GenesisTier,
+} from "@/store/genesis-config";
+
+// 阶梯档位类型 + 默认值现定义在 genesis-config.ts(叶子,避免 TDZ 循环);
+// re-export 兼容既有 import 方(canon-sentinel 改读 genesis-config,见 Step 5)。
+export { GENESIS_TIERS, type GenesisTier };
 
 /**
  * Genesis Node 创世节点 — 高价稀缺 OG 席位（1000 限量）。
@@ -19,25 +31,9 @@ const TOTAL_SLOTS = 1000;
  *  (Q13). Seller nets askPrice × (1 − GENESIS_ROYALTY_RATE). */
 export const GENESIS_ROYALTY_RATE = 0.025;
 
-/** 阶梯预售档：累计售出落在 [from, to) 决定当前档，售罄硬跳价（真跳，不重置）。
- *  运营可配 → admin G4 `G.genesis.tierPrices`。 */
-export interface GenesisTier {
-  id: "wl" | "t1" | "t2";
-  from: number; // inclusive cumulative-sold lower bound
-  to: number; // exclusive upper bound
-  priceUSDT: number;
-}
-export const GENESIS_TIERS: readonly GenesisTier[] = [
-  { id: "wl", from: 0, to: 100, priceUSDT: 7999 },
-  { id: "t1", from: 100, to: 550, priceUSDT: 9999 },
-  { id: "t2", from: 550, to: TOTAL_SLOTS, priceUSDT: 11999 },
-];
-function tierForSold(sold: number): GenesisTier {
-  for (const tier of GENESIS_TIERS) {
-    if (sold >= tier.from && sold < tier.to) return tier;
-  }
-  return GENESIS_TIERS[GENESIS_TIERS.length - 1];
-}
+// 阶梯档位(GENESIS_TIERS)+ tierForSold 现在是运营可配的,单源在 genesis-config
+// store(admin G4 `G.genesis.tiers`)。累计售出决定当前档,售罄硬跳价——派生逻辑
+// 见下方 currentTier/unitPriceUSDT/tierRemaining,全部读 live config。
 
 /** 上所后排放曲线。运营可配 → admin G4 `G.genesis.emissionCurve` / `airdropPct`。
  *  nominalPerNodeNEX = 每节点名义预留额度（NEX），展示为「预留额度」非保证死数。
@@ -69,6 +65,124 @@ export interface EmissionSnapshot {
   monthsSinceListing: number;
 }
 
+/** 认购资格门(稀缺性核心,规格 FEAT-GEN08)。四通道 any-of:累计入金 / 旗舰设备 /
+ *  V 等级 / 创世邀请码。server-canonical:真后台由 GET /api/config/genesis 下发,
+ *  运营可配 → admin G4 `G.genesis.eligibility.*`;此处为可序列化 mock 镜像,
+ *  client 禁止本地改松。 */
+export interface GenesisEligibilityConfig {
+  enabled: boolean;
+  mode: "any-of" | "all-of";
+  /** 通道1:累计入金 USD(仅 recordDeposit 口径,earnings/兑换不计)。 */
+  minDepositUsdt: number;
+  /** 通道2:旗舰设备(Flagship tier)持有台数,active+inventory 都计。 */
+  flagshipMin: number;
+  /** 通道3:V 等级(V0-V12 序数)。 */
+  vRankMin: number;
+  /** 通道4:创世邀请码通道开关。 */
+  inviteEnabled: boolean;
+  /** 单人累计持有上限(一级认购+二级承接合计)。 */
+  perUserCap: number;
+  /** 资格门适用范围:primary=仅一级认购;both=二级承接同门。 */
+  appliesTo: "primary" | "both";
+}
+export const GENESIS_ELIGIBILITY: GenesisEligibilityConfig = Object.freeze({
+  enabled: true,
+  mode: "any-of",
+  minDepositUsdt: 5000,
+  flagshipMin: 1,
+  vRankMin: 4,
+  inviteEnabled: true,
+  perUserCap: 5,
+  appliesTo: "both",
+});
+
+/** 创世邀请码格式(mock 端格式校验;真后台 = server 核销接口,格式仅兜底)。 */
+export const GENESIS_INVITE_PATTERN = /^NEXION-OG-[A-Z0-9]{4}$/;
+
+/** 资格求值输入。composable 层从 app / v-rank / genesis 组合(store 不互 import)。 */
+export interface GenesisEligibilityCtx {
+  cumulativeDepositUsdt: number;
+  vRank: number;
+  flagshipCount: number;
+  hasInvite: boolean;
+  myOwned: number;
+}
+
+export interface GenesisGateCondition {
+  key: "deposit" | "flagship" | "vrank" | "invite";
+  met: boolean;
+  current: number;
+  target: number;
+  progressPct: number; // 0-100
+}
+
+export interface GenesisGateResult {
+  /** 资格门总判定(enabled=false 时恒 true)。 */
+  eligible: boolean;
+  conditions: GenesisGateCondition[];
+  unmetCount: number;
+  /** 已达单人持有上限(独立于 eligible 的维度)。 */
+  capReached: boolean;
+  /** 还可增持的张数(perUserCap − myOwned,下限 0)。 */
+  capRemaining: number;
+}
+
+/** 资格门单源求值 — 商城尊享卡 / 预售 dock / 购买 sheet / 二级承接四处共用。
+ *  fail-closed:enabled 脏值按「门开启」处理(`!== false`),宁可多拦不误放。 */
+export function evaluateGenesisEligibility(
+  config: GenesisEligibilityConfig,
+  ctx: GenesisEligibilityCtx,
+): GenesisGateResult {
+  const pct = (cur: number, target: number) => {
+    if (!Number.isFinite(cur)) return 0; // 脏值(老 persist 注入)按零进度,不渲 NaN
+    // floor 而非 round:$4,999/$5,000 显示 99% 而非「100% 但未达成」的自相矛盾。
+    return target <= 0 ? 100 : Math.min(100, Math.floor((cur / target) * 100));
+  };
+  const conditions: GenesisGateCondition[] = [
+    {
+      key: "deposit",
+      met: ctx.cumulativeDepositUsdt >= config.minDepositUsdt,
+      current: ctx.cumulativeDepositUsdt,
+      target: config.minDepositUsdt,
+      progressPct: pct(ctx.cumulativeDepositUsdt, config.minDepositUsdt),
+    },
+    {
+      key: "flagship",
+      met: ctx.flagshipCount >= config.flagshipMin,
+      current: ctx.flagshipCount,
+      target: config.flagshipMin,
+      progressPct: pct(ctx.flagshipCount, config.flagshipMin),
+    },
+    {
+      key: "vrank",
+      met: ctx.vRank >= config.vRankMin,
+      current: ctx.vRank,
+      target: config.vRankMin,
+      progressPct: pct(ctx.vRank, config.vRankMin),
+    },
+  ];
+  if (config.inviteEnabled) {
+    conditions.push({
+      key: "invite",
+      met: ctx.hasInvite,
+      current: ctx.hasInvite ? 1 : 0,
+      target: 1,
+      progressPct: ctx.hasInvite ? 100 : 0,
+    });
+  }
+  const metCount = conditions.filter((c) => c.met).length;
+  const passed = config.mode === "all-of" ? metCount === conditions.length : metCount > 0;
+  const gateOn = config.enabled !== false; // fail-closed
+  const capRemaining = Math.max(0, config.perUserCap - ctx.myOwned);
+  return {
+    eligible: gateOn ? passed : true,
+    conditions,
+    unmetCount: conditions.length - metCount,
+    capReached: capRemaining <= 0,
+    capRemaining,
+  };
+}
+
 /** A user's active secondary-market listing */
 export interface MyListing {
   tokenId: number;
@@ -76,81 +190,117 @@ export interface MyListing {
   listedAt: number;
 }
 
-interface GenesisData {
+/** 全平台市场态(账号无关,设备共享):售出进度 + 上所信号。 */
+interface GenesisGlobalData {
   soldSlots: number;
-  myOwned: number;
-  ownedTokenIds: number[];
-  myListings: MyListing[];
   /** 全平台一次性上所信号（server-canonical mock）。fail-closed：默认 false = 上所前。 */
   nexListed: boolean;
   nexListedAt: number | null;
 }
 
-const STORAGE_KEY = "nexion-genesis";
+/** 用户持仓片(per-account 行,随账号走;P2-8 设备级泄漏修复)。 */
+interface GenesisUserData {
+  myOwned: number;
+  ownedTokenIds: number[];
+  myListings: MyListing[];
+}
 
-function defaults(): GenesisData {
+const STORAGE_KEY = "nexion-genesis"; // 仅全平台片
+const ACCOUNTS_KEY = "nexion-genesis-accounts-v1"; // { [accountKey]: GenesisUserData }
+
+function globalDefaults(): GenesisGlobalData {
   return {
     soldSlots: 847, // 启动状态 → 当前处 T2 尾盘档
-    myOwned: 0,
-    ownedTokenIds: [],
-    myListings: [],
     nexListed: false, // fail-closed：未上所，排放未开阀
     nexListedAt: null,
   };
 }
 
-function hydrate(): GenesisData {
+function userDefaults(): GenesisUserData {
+  return { myOwned: 0, ownedTokenIds: [], myListings: [] };
+}
+
+// 旧全局键里的存量 myOwned/ownedTokenIds/myListings 不迁移:设备级数据无账号
+// 归属,迁给任何账号都是臆断(mock 可重建);下次 persist 全局片时自然清除。
+function hydrateGlobal(): GenesisGlobalData {
   try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<GenesisData> | "";
+    const s = uni.getStorageSync(STORAGE_KEY) as Partial<GenesisGlobalData> | "";
     if (s && typeof s === "object" && typeof s.soldSlots === "number") {
-      const merged = { ...defaults(), ...s };
-      // Backfill missing token IDs (old schema or partial state) so owned nodes
-      // still render in Mine — sequential IDs from the soldSlots range.
-      const owned = merged.myOwned ?? 0;
-      const ids = Array.isArray(merged.ownedTokenIds) ? merged.ownedTokenIds : [];
-      if (owned > ids.length) {
-        const filled = [...ids];
-        for (let i = ids.length; i < owned; i++) {
-          filled.push(merged.soldSlots - (owned - i - 1));
-        }
-        merged.ownedTokenIds = filled;
-      }
-      merged.myListings = Array.isArray(merged.myListings) ? merged.myListings : [];
-      // fail-closed：老 schema 无 nexListed → 视为未上所。
-      merged.nexListed = merged.nexListed === true;
-      merged.nexListedAt = typeof merged.nexListedAt === "number" ? merged.nexListedAt : null;
-      return merged;
+      return {
+        soldSlots: s.soldSlots,
+        // fail-closed：老 schema 无 nexListed → 视为未上所。
+        nexListed: s.nexListed === true,
+        nexListedAt: typeof s.nexListedAt === "number" ? s.nexListedAt : null,
+      };
     }
   } catch {
     // first run
   }
-  return defaults();
+  return globalDefaults();
+}
+
+function hydrateUser(accountKey: string, soldSlots: number): GenesisUserData {
+  const row = readAccountRow<Partial<GenesisUserData>>(ACCOUNTS_KEY, accountKey);
+  if (!row || typeof row.myOwned !== "number") return userDefaults();
+  const owned = row.myOwned;
+  const ids = Array.isArray(row.ownedTokenIds) ? [...row.ownedTokenIds] : [];
+  // Backfill missing token IDs (partial/seeded rows) so owned nodes still
+  // render in Mine — sequential IDs from the soldSlots range.
+  for (let i = ids.length; i < owned; i++) {
+    ids.push(soldSlots - (owned - i - 1));
+  }
+  return {
+    myOwned: owned,
+    ownedTokenIds: ids,
+    myListings: Array.isArray(row.myListings) ? row.myListings : [],
+  };
 }
 
 export const useGenesis = defineStore("genesis", () => {
-  const init = hydrate();
+  const cfg = useGenesisConfig(); // 单向读配置(档位定价);同 free-trial→trial-config 先例
+  const initGlobal = hydrateGlobal();
+  // 账号维度。boot 期与 app store 同款落 "default";账号确定后由
+  // lib/account-scope 的 rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const initUser = hydrateUser(boundKey, initGlobal.soldSlots);
   const totalSlots = ref(TOTAL_SLOTS);
-  const soldSlots = ref(init.soldSlots);
-  const myOwned = ref(init.myOwned);
-  const ownedTokenIds = ref<number[]>(init.ownedTokenIds);
-  const myListings = ref<MyListing[]>(init.myListings);
-  const nexListed = ref(init.nexListed);
-  const nexListedAt = ref<number | null>(init.nexListedAt);
+  const soldSlots = ref(initGlobal.soldSlots);
+  const myOwned = ref(initUser.myOwned);
+  const ownedTokenIds = ref<number[]>(initUser.ownedTokenIds);
+  const myListings = ref<MyListing[]>(initUser.myListings);
+  const nexListed = ref(initGlobal.nexListed);
+  const nexListedAt = ref<number | null>(initGlobal.nexListedAt);
   const lastTickTs = ref(0);
 
   function persist() {
     try {
       uni.setStorageSync(STORAGE_KEY, {
         soldSlots: soldSlots.value,
-        myOwned: myOwned.value,
-        ownedTokenIds: ownedTokenIds.value,
-        myListings: myListings.value,
         nexListed: nexListed.value,
         nexListedAt: nexListedAt.value,
       });
     } catch {
       // storage unavailable
     }
+    writeAccountRow<GenesisUserData>(ACCOUNTS_KEY, boundKey, {
+      myOwned: myOwned.value,
+      ownedTokenIds: ownedTokenIds.value,
+      myListings: myListings.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的持仓行,全平台片顺带刷新(多端可能已推进)。
+   *  业务变更处处即时 persist,旧账号无需先落盘。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const g = hydrateGlobal();
+    soldSlots.value = g.soldSlots;
+    nexListed.value = g.nexListed;
+    nexListedAt.value = g.nexListedAt;
+    const u = hydrateUser(boundKey, g.soldSlots);
+    myOwned.value = u.myOwned;
+    ownedTokenIds.value = u.ownedTokenIds;
+    myListings.value = u.myListings;
   }
 
   function remaining() {
@@ -160,13 +310,13 @@ export const useGenesis = defineStore("genesis", () => {
     return soldSlots.value / TOTAL_SLOTS;
   }
 
-  // ── 阶梯定价（单源派生，售罄硬跳价）──
-  const currentTier = computed(() => tierForSold(soldSlots.value));
+  // ── 阶梯定价（单源派生，售罄硬跳价；档位读 live config，运营 G4 可配）──
+  const currentTier = computed(() => tierForSold(cfg.config.tiers, soldSlots.value));
   /** 当前档单价。兼容旧读法 `genesis.unitPriceUSDT`（原为固定 $9,999，现随档位）。 */
   const unitPriceUSDT = computed(() => currentTier.value.priceUSDT);
   /** 某档剩余席位（售罄档 = 0）。 */
   function tierRemaining(id: GenesisTier["id"]): number {
-    const tier = GENESIS_TIERS.find((t) => t.id === id);
+    const tier = cfg.config.tiers.find((t) => t.id === id);
     if (!tier) return 0;
     return Math.max(0, tier.to - Math.max(tier.from, soldSlots.value));
   }
@@ -206,9 +356,18 @@ export const useGenesis = defineStore("genesis", () => {
     return myOwned.value * GENESIS_EMISSION.nominalPerNodeNEX;
   }
 
-  function purchase(n: number, tokenIds?: number[]): { ok: boolean; cost: number } {
+  // 邀请码核销为 per-user 凭证 → 落 app.setGenesisInviteCode(随 account-cloud
+  // 快照按账号走);genesis store 只保留全平台市场态(soldSlots/nexListed),
+  // 设备级存 per-user 凭证会跨账号继承 → 资格门旁路(审计 P1)。
+
+  function purchase(
+    n: number,
+    tokenIds?: number[],
+  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" } {
     const rem = remaining();
-    if (n > rem) return { ok: false, cost: 0 };
+    if (n > rem) return { ok: false, cost: 0, reason: "sold-out" };
+    // 单人限购守卫（单源 L4：任何调用方自动继承；运营可配 G4 perUserCap）。
+    if (myOwned.value + n > GENESIS_ELIGIBILITY.perUserCap) return { ok: false, cost: 0, reason: "cap" };
     // 按下单时当前档价结算（跨档时以起始档价，简化：整单同价）。
     const cost = n * unitPriceUSDT.value;
     const ids =
@@ -252,10 +411,15 @@ export const useGenesis = defineStore("genesis", () => {
    * 二级市场承接:买入一个**已存在**的 token（转让,非铸造）。
    * 🔴 不动 soldSlots（该 token 早已计入一级「已铸」+ 派生档价）、不走售罄门 —— 二级承接
    * 与一级供应无关。已持有该 token 则 no-op 返 false（调用方须退款）。
-   * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单→扣买家→贷卖家扣版税→转 token）。
+   * 🔴 资格门契约（FEAT-GEN08 appliesTo=both）:资格判定需跨 store ctx,由**调用组合层**
+   * 过 useGenesisEligibility 后才可调本 action（现唯一调用方 marketplace.handleBuy 已拦,
+   * verify gen_gate 哨兵护）;新增调用方必须复刻该门。本层只守 perUserCap。
+   * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   function acquireSecondary(tokenId: number): boolean {
     if (ownedTokenIds.value.includes(tokenId)) return false;
+    // 单人限购同样约束二级承接（持有增长的另一唯一入口）。
+    if (myOwned.value + 1 > GENESIS_ELIGIBILITY.perUserCap) return false;
     ownedTokenIds.value = [...ownedTokenIds.value, tokenId];
     myOwned.value = myOwned.value + 1;
     persist();
@@ -275,6 +439,6 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    purchase, listNode, cancelListing, fulfillSale, acquireSecondary, tickSales,
+    purchase, listNode, cancelListing, fulfillSale, acquireSecondary, tickSales, bindAccount,
   };
 });

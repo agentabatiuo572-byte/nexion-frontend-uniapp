@@ -33,19 +33,19 @@
           <view class="grid grid-cols-4" :style="statGridStyle">
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.floor }}</text>
-              <text class="tabular-nums" :style="statValStyle('var(--v5-success)')">${{ (FLOOR / 1000).toFixed(1) }}K</text>
+              <text class="tabular-nums" :style="statValStyle('var(--v5-success)')">${{ (stats.floor / 1000).toFixed(1) }}K</text>
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.vol24h }}</text>
-              <text class="tabular-nums" :style="statValStyle()">${{ (VOL_24H / 1000).toFixed(0) }}K</text>
+              <text class="tabular-nums" :style="statValStyle()">${{ (stats.vol24h / 1000).toFixed(0) }}K</text>
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.listed }}</text>
-              <text class="tabular-nums" :style="statValStyle()">{{ LISTED }}</text>
+              <text class="tabular-nums" :style="statValStyle()">{{ stats.listed }}</text>
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.owners }}</text>
-              <text class="tabular-nums" :style="statValStyle()">{{ OWNERS }}</text>
+              <text class="tabular-nums" :style="statValStyle()">{{ stats.owners }}</text>
             </view>
           </view>
 
@@ -54,7 +54,7 @@
             <text class="flex items-center" style="gap: 6px; font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-3)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
               <text>{{ t.marketplace.floorUp }} </text>
-              <text class="tabular-nums" style="color: var(--v5-success); font-weight: 600">+18%</text>
+              <text class="tabular-nums" style="color: var(--v5-success); font-weight: 600">+{{ stats.floorDeltaPct }}%</text>
               <text> {{ t.marketplace.past7d }}</text>
             </text>
             <view class="inline-flex items-center active:opacity-80" :style="viewOpenSeaStyle" @click.stop="openSeaOpen = true">
@@ -90,9 +90,9 @@
           </view>
         </template>
 
-        <!-- ACTIVITY TAB -->
+        <!-- ACTIVITY TAB(真实成交 + 虚拟成交混排,FEAT-GEN10)-->
         <view v-else-if="tab === 'activity'" class="overflow-hidden" :style="listCardStyle">
-          <ActivityRow v-for="(e, i) in SEED_ACTIVITY" :key="e.id" :e="e" :is-last="i === SEED_ACTIVITY.length - 1" />
+          <ActivityRow v-for="(e, i) in mergedActivity" :key="e.id" :e="e" :is-last="i === mergedActivity.length - 1" />
         </view>
 
         <!-- MINE TAB -->
@@ -115,6 +115,8 @@
     </view>
 
     <OpenSeaModal v-model:open="openSeaOpen" />
+    <!-- 资格门 sheet(二级同门,FEAT-GEN08;达标 CTA → 预售页)-->
+    <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
 </template>
 
@@ -126,18 +128,17 @@ import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue
 import ActivityRow, { type ActivityEvent } from "@/components/genesis/activity-row.vue";
 import MyTokenCard from "@/components/genesis/my-token-card.vue";
 import OpenSeaModal from "@/components/genesis/opensea-modal.vue";
+import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { onMounted, onUnmounted } from "vue";
 import { useBills } from "@/store/bills";
-import { useGenesis } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesisConfig } from "@/store/genesis-config";
+import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
 
-// 二级地板 = 尾盘档($11,999) + 溢价（去旧 $25K 叙事，与前端阶梯定价一致）。
-const FLOOR = 13_400;
-const VOL_24H = 1_247_300;
-const LISTED = 89;
-const OWNERS = 953;
 const ONE_DAY = 86400 * 1000;
 const HOUR = 3600_000;
 
@@ -145,6 +146,13 @@ const t = useT();
 const app = useApp();
 const bills = useBills();
 const genesis = useGenesis();
+const cfg = useGenesisConfig();
+const { gate, eligible, gatesSecondary } = useGenesisEligibility();
+
+// 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
+const stats = computed(() => cfg.config.marketStats);
+
+const eligSheetOpen = ref(false);
 
 const tab = ref<"listings" | "activity" | "mine">("listings");
 const sortKey = ref<"floor" | "recent" | "lastSale">("floor");
@@ -176,18 +184,121 @@ const SEED_ACTIVITY: ActivityEvent[] = [
 const ownedCount = computed(() => genesis.myOwned);
 const ownedTokenIds = computed(() => genesis.ownedTokenIds);
 
-const listingsTabText = computed(() => fmt(t.value.marketplace.listingsTab, { n: LISTED }));
+const listingsTabText = computed(() => fmt(t.value.marketplace.listingsTab, { n: stats.value.listed }));
 const mineTabText = computed(() => fmt(t.value.marketplace.mineTab, { n: ownedCount.value }));
 
+// 承接成交后本地移除(mock 演示态,刷新重置;真后台由 server 单源回写挂单状态)。
+const soldTokenIds = ref<Set<number>>(new Set());
+
+// listedAt 约定:opsListing 种子存负偏移(相对 now)→ resolve 为绝对 ts;
+// 运营新建的存绝对 epoch(正值)直接用。
+function resolveListedAt(v: number): number {
+  return v < 0 ? now + v : v;
+}
+
+// 挂单池 = 运营挂单(FEAT-GEN10)+ 种子卖单,合并去重、剔除已成交。UI 不暴露 source。
+const mergedListings = computed<Listing[]>(() => {
+  const ops: Listing[] = cfg.config.opsListings.map((o) => ({
+    tokenId: o.tokenId,
+    priceUSDT: o.priceUSDT,
+    lastSaleUSDT: o.lastSaleUSDT,
+    seller: o.seller,
+    listedAt: resolveListedAt(o.listedAt),
+    traits: o.traits,
+  }));
+  const seen = new Set<number>();
+  const out: Listing[] = [];
+  for (const l of [...ops, ...SEED_LISTINGS]) {
+    if (soldTokenIds.value.has(l.tokenId) || seen.has(l.tokenId)) continue;
+    seen.add(l.tokenId);
+    out.push(l);
+  }
+  return out;
+});
+
 const sortedListings = computed(() => {
-  const arr = [...SEED_LISTINGS];
+  const arr = [...mergedListings.value];
   if (sortKey.value === "floor") arr.sort((a, b) => a.priceUSDT - b.priceUSDT);
   if (sortKey.value === "recent") arr.sort((a, b) => b.listedAt - a.listedAt);
   if (sortKey.value === "lastSale") arr.sort((a, b) => b.lastSaleUSDT - a.lastSaleUSDT);
   return arr;
 });
 
+// ── FOMO 成交流(FEAT-GEN10)：虚拟成交（引擎自动 + 运营手动注单）与真实成交混排。
+// 🔴 虚拟成交永不进 bills / 不动 soldSlots / 不动持仓 —— 纯展示流。
+const FOMO_ADDR_POOL = [
+  "0x4f8b2c7e1a90", "0xa1d9c2e8b720", "0x91e3f8074bcd", "0x6b4c1afe2d83",
+  "0xc7e29a4f8b16", "0x29ab78ed4c10", "0xf2b04e9d318a", "0xae73c1b80249",
+  "0x3d70e91ac428", "0x8b52f0173de6",
+];
+const liveFomo = ref<ActivityEvent[]>([]); // 引擎运行时生成(ephemeral,刷新重来)
+let fomoTimer: ReturnType<typeof setTimeout> | null = null;
+let fomoCountToday = 0;
+
+function pickAddr(exclude?: string): string {
+  const i = Math.floor(Math.random() * FOMO_ADDR_POOL.length);
+  const a = FOMO_ADDR_POOL[i];
+  return a === exclude ? FOMO_ADDR_POOL[(i + 1) % FOMO_ADDR_POOL.length] : a;
+}
+
+/** 生成一条虚拟成交（价格=地板 ×(1±band)，随机 token/双方地址）。不碰任何账本。 */
+function genFomoSale(seq: number): ActivityEvent {
+  const band = Math.max(0, Math.min(0.9, cfg.config.fomoPriceBandPct)); // clamp 合法带,防误配(如把 15 当 0.15)产负价/0
+  const floor = stats.value.floor;
+  const price = Math.max(1, Math.round(floor * (1 + (Math.random() * 2 - 1) * band)));
+  const from = pickAddr();
+  return {
+    id: `fomo-${seq}-${genesis.soldSlots}`,
+    kind: "sale",
+    tokenId: 100 + Math.floor(Math.random() * 800),
+    priceUSDT: price,
+    from,
+    to: pickAddr(from),
+    ts: Date.now(),
+  };
+}
+
+function scheduleFomo() {
+  if (!cfg.config.fomoEnabled) return;
+  const { fomoIntervalMinMs: mn, fomoIntervalMaxMs: mx } = cfg.config;
+  const delay = mn + Math.random() * Math.max(0, mx - mn);
+  fomoTimer = setTimeout(() => {
+    if (cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
+      liveFomo.value = [genFomoSale(fomoCountToday), ...liveFomo.value].slice(0, 30);
+      fomoCountToday += 1;
+    }
+    scheduleFomo();
+  }, delay);
+}
+
+// activity 展示流 = 引擎虚拟成交 + 运营手动注单(config.fomoActivity)+ 种子，按 ts 倒序。
+const mergedActivity = computed<ActivityEvent[]>(() => {
+  const manual = cfg.config.fomoActivity.map((e) => ({ ...e, ts: resolveListedAt(e.ts) }));
+  return [...liveFomo.value, ...manual, ...SEED_ACTIVITY].sort((a, b) => b.ts - a.ts);
+});
+
+onMounted(() => {
+  scheduleFomo();
+});
+onUnmounted(() => {
+  if (fomoTimer) clearTimeout(fomoTimer);
+});
+
 function handleBuy(l: Listing) {
+  // 资格门(FEAT-GEN08,appliesTo=both 时二级同门):确认前拦截,零资金动作。
+  // 打开资格 sheet 引导补齐,而非仅 toast。
+  if (gatesSecondary.value && !eligible.value) {
+    eligSheetOpen.value = true;
+    return;
+  }
+  // 单人限购同样约束二级承接(store 层 acquireSecondary L4 兜底)。
+  if (gate.value.capRemaining < 1) {
+    toast.error(
+      t.value.genesisEligibility.toastCapReached,
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+    );
+    return;
+  }
   if (!app.debitBalance(l.priceUSDT)) {
     toast.error(
       t.value.marketplace.insufficient,
@@ -205,6 +316,7 @@ function handleBuy(l: Listing) {
   // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
   const ok = genesis.acquireSecondary(l.tokenId);
   if (ok) {
+    soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
     bills.add({
       type: "purchase",
       symbol: "USDT",
@@ -221,14 +333,20 @@ function handleBuy(l: Listing) {
       }),
     );
   } else {
-    // 承接失败(已持有该 token)→ 退款,不留「扣钱无货」。
+    // 承接失败(已持有该 token)→ 退款;文案如实说「已退款」,不复用成功话术(审计 P2-2)。
     app.creditBalance(l.priceUSDT);
-    toast.error(t.value.marketplace.insufficient, fmt(t.value.marketplace.acquiredDesc, { paid: l.priceUSDT.toLocaleString(), held: ownedCount.value }));
+    toast.error(t.value.marketplace.acquireFailedTitle, t.value.marketplace.acquireFailedRefunded);
   }
 }
 
 function goGenesis() {
   uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
+}
+
+/** 资格 sheet 达标态「立即认购」→ 关 sheet 去预售页(资格已解锁,留本页承接亦可)。 */
+function onEligSubscribe() {
+  eligSheetOpen.value = false;
+  goGenesis();
 }
 
 // ── styles ──

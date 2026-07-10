@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import { mockServerNow } from "./server-time";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import {
   listVouchers,
   getVoucher,
@@ -44,16 +46,12 @@ interface ClaimRecord {
   usedAt: number | null;
 }
 
-const STORAGE_KEY = "nexion-voucher-v1";
+// 旧设备级单键 "nexion-voucher-v1" 废弃(存量无账号归属,mock 可重建);券包账本按账号分行。
+const ACCOUNTS_KEY = "nexion-voucher-accounts-v1"; // { [accountKey]: { claimed: ClaimRecord[] } }
 
-function hydrate(): ClaimRecord[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { claimed?: ClaimRecord[] } | ClaimRecord[] | "";
-    if (Array.isArray(s)) return s;
-    if (s && typeof s === "object" && Array.isArray(s.claimed)) return s.claimed;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): ClaimRecord[] {
+  const row = readAccountRow<{ claimed?: ClaimRecord[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.claimed)) return row.claimed;
   return [];
 }
 
@@ -63,16 +61,20 @@ export interface VoucherMatch {
 }
 
 export const useVoucher = defineStore("voucher", () => {
-  const claimed = ref<ClaimRecord[]>(hydrate());
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const claimed = ref<ClaimRecord[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { claimed: claimed.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ claimed: ClaimRecord[] }>(ACCOUNTS_KEY, boundKey, { claimed: claimed.value });
   }
   watch(claimed, persist, { deep: true });
+
+  /** 账号切换重绑:装载该账号的券包账本。boundKey 先行,赋值触发 watch 把新值幂等写回本账号行。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    claimed.value = hydrate(boundKey);
+  }
 
   function record(id: string): ClaimRecord | undefined {
     return claimed.value.find((c) => c.id === id);
@@ -150,6 +152,7 @@ export const useVoucher = defineStore("voucher", () => {
 
   return {
     claimed,
+    bindAccount,
     isClaimed,
     isUsed,
     claim,

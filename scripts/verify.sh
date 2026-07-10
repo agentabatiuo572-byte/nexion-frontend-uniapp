@@ -252,6 +252,18 @@ sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wall
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
 sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
 sentinel_present "SPEC-7 withdrawal debits withdrawable bucket" src/store/app.ts 'withdrawableUsdt: \+\(currentUser\.earningBuckets\.withdrawableUsdt - amount\)'
+# 负余额不变量(2026-07-10 P0): 购买共用 debitBalance 减总余额时必 clamp 可提额度 ≤ 剩余
+# 总余额,否则可提额度 > 总余额 → 提现门(只看可提额度)放行超总余额提现 → usdtBalance 变负
+# (凭空取钱)。两条哨兵锁 debitBalance 的 clamp + submitWithdrawal 的总余额兜底门。
+sentinel_present "P0 neg-balance: debit clamps withdrawable<=balance" src/store/app.ts 'withdrawableUsdt: Math\.min\(buckets\.withdrawableUsdt, nextUsdt\)'
+sentinel_present "P0 neg-balance: withdrawal gate also checks total balance" src/store/app.ts 'if \(currentUser\.usdtBalance < amount\) return null'
+# merge 层(2026-07-10 审计补): account-cloud 把余额字段当独立加法计数器三路累加,多端并发
+# 扣款合并会把总余额扣穿为负 / 可提额度虚高;写盘前必过资金不变量收口(clamp ≥0 + withdrawable
+# ≤ balance),补住 debitBalance 单会话 clamp 管不到的这条旁路(2 个独立审计 + 复现脚本证实)。
+sentinel_present "P0 neg-balance: account-cloud has fund-invariant clamp" src/store/account-cloud.ts 'function clampAccountFundInvariants'
+sentinel_present "P0 neg-balance: merge writes clamped snapshot" src/store/account-cloud.ts 'const merged = clampAccountFundInvariants\(rawMerged\)'
+# 提现金额有效性守卫(对齐 debitBalance):NaN/±Inf/≤0 拒,防负数反向加钱 / NaN 污染余额。
+sentinel_present "P0 neg-balance: withdrawal rejects invalid amount" src/store/app.ts 'if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null'
 # client 零推进: 旧全局推进函数必须已收编为 _dev 前缀(仅 pass 路由)
 sentinel_present "SPEC-7 demo advance is _dev-prefixed" src/store/app.ts 'function _devAdvanceWithdrawal'
 if grep -qE 'function advanceWithdrawal\(' src/store/app.ts 2>/dev/null; then
@@ -504,6 +516,70 @@ sentinel_present "SPEC-4 register binds account before rewards" src/pages/regist
 sentinel_present "SPEC-4 entry surface supports white-app carrier" src/lib/entry-surface.ts '"white-app"'
 sentinel_present "SPEC-4 session registry storage exists" src/store/session.ts 'nexion-account-sessions-v1'
 sentinel_present "SPEC-4 security page uses live session registry" src/pages/me/security.vue 'session\.activeSessions'
+# P2-8 存储作用域:创世持仓/V 等级按账号隔离,账号切换收口必须重绑(防跨账号继承复发)
+sentinel_present "P2-8 account-scope helper rebinds genesis" src/lib/account-scope.ts 'useGenesis\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds v-rank" src/lib/account-scope.ts 'useVRank\(\)\.bindAccount\(accountKey\)'
+# genesis/v-rank(引爆 P2-8 债的最初两个受害者)补 store 层哨兵,与其余 26 个对齐(28×2=56 条墙)
+sentinel_present "P2-8 genesis store is account-scoped" src/store/genesis.ts 'writeAccountRow'
+sentinel_present "P2-8 v-rank store is account-scoped" src/store/v-rank.ts 'writeAccountRow'
+# P2-8 batch-1 钱类:订单/账单/质押/佣金按账号隔离(收口重绑 + store 用 writeAccountRow;摘任一行必红)
+sentinel_present "P2-8 account-scope helper rebinds orders" src/lib/account-scope.ts 'useOrders\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds bills" src/lib/account-scope.ts 'useBills\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds staking" src/lib/account-scope.ts 'useStaking\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds commission" src/lib/account-scope.ts 'useCommission\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 orders store is account-scoped" src/store/orders.ts 'writeAccountRow'
+sentinel_present "P2-8 bills store is account-scoped" src/store/bills.ts 'writeAccountRow'
+sentinel_present "P2-8 staking store is account-scoped" src/store/staking.ts 'writeAccountRow'
+sentinel_present "P2-8 commission store is account-scoped" src/store/commission.ts 'writeAccountRow'
+# P2-8 batch-2 券/试用/兑换:券包/试用/swap/风控计数/绑卡/签到按账号隔离(摘任一行必红)
+sentinel_present "P2-8 account-scope helper rebinds voucher" src/lib/account-scope.ts 'useVoucher\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds free-trial" src/lib/account-scope.ts 'useFreeTrial\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds exchange" src/lib/account-scope.ts 'useExchange\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds exchange-v3" src/lib/account-scope.ts 'useExchangeV3\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds cards" src/lib/account-scope.ts 'useCards\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds nex-faucet" src/lib/account-scope.ts 'useNexFaucet\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 voucher store is account-scoped" src/store/voucher.ts 'writeAccountRow'
+sentinel_present "P2-8 free-trial store is account-scoped" src/store/free-trial.ts 'writeAccountRow'
+sentinel_present "P2-8 exchange store is account-scoped" src/store/exchange.ts 'writeAccountRow'
+sentinel_present "P2-8 exchange-v3 store is account-scoped" src/store/exchange-v3.ts 'writeAccountRow'
+sentinel_present "P2-8 cards store is account-scoped" src/store/cards.ts 'writeAccountRow'
+sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow'
+# P2-8 wallet-pairing:KYC 配对源头按账号隔离(修 wallet-exchange 镜像旁路 exchange-v3.kycVerified)
+sentinel_present "P2-8 account-scope helper rebinds wallet-pairing" src/lib/account-scope.ts 'useWalletPairing\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 wallet-pairing store is account-scoped" src/store/wallet-pairing.ts 'writeAccountRow'
+# P2-8 batch-3 任务/成就/游戏化:任务/周任务/活动/里程碑/成就/目标/转盘/增益按账号隔离(摘任一行必红)
+sentinel_present "P2-8 account-scope helper rebinds quest" src/lib/account-scope.ts 'useQuest\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds weekly-quest" src/lib/account-scope.ts 'useWeeklyQuest\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds event-quest" src/lib/account-scope.ts 'useEventQuest\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds milestones" src/lib/account-scope.ts 'useMilestones\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds achievements" src/lib/account-scope.ts 'useAchievements\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds goals" src/lib/account-scope.ts 'useGoals\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds lucky-spin" src/lib/account-scope.ts 'useLuckySpin\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds daily-powerup" src/lib/account-scope.ts 'useDailyPowerUp\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeAccountRow'
+sentinel_present "P2-8 weekly-quest store is account-scoped" src/store/weekly-quest.ts 'writeAccountRow'
+sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
+sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
+sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexion-milestones-accounts-v1'
+sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
+sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
+sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow'
+sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow'
+# P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
+sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-scope.ts 'useTickets\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds cart" src/lib/account-scope.ts 'useCart\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds profile" src/lib/account-scope.ts 'useProfile\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds security" src/lib/account-scope.ts 'useSecurity\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 account-scope helper rebinds rewards-seen" src/lib/account-scope.ts 'useRewardsSeen\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 notifications store is account-scoped" src/store/notifications.ts 'writeAccountRow'
+sentinel_present "P2-8 receipts store is account-scoped" src/store/receipts.ts 'writeAccountRow'
+sentinel_present "P2-8 tickets store is account-scoped" src/store/tickets.ts 'writeAccountRow'
+sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAccountRow'
+sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
+sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
+sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
 spec4_account_session_semantics() {
   if "$NODE_BIN" -e '
     const fs=require("fs");
@@ -528,6 +604,9 @@ spec4_account_session_semantics() {
     if(!/accountKey,\s*entrySurface,\s*accountCloudUpdatedAt/.test(app)) throw new Error("account cloud state is not returned to consumers");
     if(!/auth\.signIn\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(login)) throw new Error("login must bind account before session claim");
     if(!/auth\.signUp\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(register)) throw new Error("register must bind account before rewards/session flow");
+    if(!/app\.bindAccount\(key\);\s*[\r\n]+\s*rebindAccountScopedStores\(key\)/.test(appVue)) throw new Error("P2-8: app startup must rebind account-scoped stores (genesis/v-rank) right after bindAccount");
+    if(!/app\.bindAccount\(identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(identity\)/.test(login)) throw new Error("P2-8: login must rebind account-scoped stores right after bindAccount");
+    if(!/app\.bindAccount\(identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(identity\)/.test(register)) throw new Error("P2-8: register must rebind account-scoped stores right after bindAccount");
     if(!/entry === "white-app" \|\| entry === "white" \|\| entry === "cloak" \|\| entry === "janus"/.test(entry)) throw new Error("white-app entry aliases missing");
     const messages=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
     if(/同一时间只能有一台设备运行挖矿|only one device runs mining at a time/.test(messages)) throw new Error("old strong single-device copy leaked");
@@ -626,6 +705,19 @@ no_epoch_week_modulo() {
   else bad "epoch-modulo week boundary aligns to Thursday — use Monday-UTC helper (PRD §8.5.3)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_epoch_week_modulo
+# Debit return-value guard (trial.vue 账单一致性 fix 2026-07-10): debitBalance/
+# debitNex return false on insufficient/NaN/negative and DON'T charge. A bare
+# statement `app.debitBalance(x);` discards that boolean → downstream still records
+# a "purchased" bill / credits / spawns device with NO money moved (账本不一致).
+# Every call MUST consume the return (const x=…;if(!x) / if(!app.debitX) /
+# &&!app.debitNex / ?:+if). Row-start bare call ending `);` = the original bug form.
+debit_return_checked() {
+  local hits
+  hits=$(grep -rnE '^[[:space:]]*app\.debit(Balance|Nex)\(.*\);[[:space:]]*$' src 2>/dev/null | head -5)
+  if [ -z "$hits" ]; then ok "every app.debitBalance/debitNex consumes its return (no bare charge → 账本一致) (0 hits)";
+  else bad "bare debitBalance/debitNex discards false return → bill recorded without charging (fix: const x=…;if(!x){toast;return})"; echo "$hits" | sed 's/^/        /'; fi
+}
+debit_return_checked
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
@@ -771,6 +863,19 @@ subpage_header_sticky() {
   else bad "SubPageHeader lost margin-bottom:24px (~55 pages jam header against content)"; fi
 }
 subpage_header_sticky
+# Genesis eligibility gate anti-regression (FEAT-GEN08, added 2026-07-09): the
+# purchase sheet's confirm handler MUST re-verify eligibility (L3, checkout-F4b
+# pattern) and genesis.ts MUST keep the per-user cap guard in BOTH holding-growth
+# entry points — purchase() + acquireSecondary() (L4 single source). If a future
+# edit silently drops either, scarcity gating degrades to cosmetics — fail loud.
+gen_gate_l3=$(grep -c "gate.value.eligible" src/components/genesis/purchase-sheet.vue 2>/dev/null || echo 0)
+gen_gate_l4=$(grep -c "GENESIS_ELIGIBILITY.perUserCap" src/store/genesis.ts 2>/dev/null || echo 0)
+gen_gate_sec=$(grep -c "gatesSecondary" src/pages/genesis/marketplace.vue 2>/dev/null || echo 0)
+if [ "$gen_gate_l3" -ge 1 ] && [ "$gen_gate_l4" -ge 2 ] && [ "$gen_gate_sec" -ge 1 ]; then
+  ok "genesis eligibility gate wired (L3 sheet re-verify + L4 cap guard ×$gen_gate_l4 + secondary gate)"
+else
+  bad "genesis eligibility gate missing (L3=$gen_gate_l3 need >=1, L4=$gen_gate_l4 need >=2, sec=$gen_gate_sec need >=1)"
+fi
 # Device daily-yield single-source parity (2026-06-18 drift incident): the same
 # per-SKU USDT+NEX daily yield is hand-duplicated across FOUR sources with nothing
 # deriving one from another — device-types.ts (DEVICE_SPECS → what the user is

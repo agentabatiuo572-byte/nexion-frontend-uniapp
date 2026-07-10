@@ -136,6 +136,7 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { safeReturnTo } from "@/routing/safe-return-to";
@@ -254,6 +255,7 @@ function finishSignIn() {
   const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
   auth.signIn(identity);
   app.bindAccount(identity);
+  rebindAccountScopedStores(identity);
   const { requiresRecalibration } = session.claim(identity);
   if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
   if (requiresRecalibration) {

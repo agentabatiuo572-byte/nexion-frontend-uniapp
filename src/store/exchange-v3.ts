@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/v3/exchange.ts (zustand → Pinia).
 // Risk-control layer on top of the basic swap store (exchange.ts).
@@ -31,7 +33,8 @@ export type Gate =
   | { ok: false; reason: "platform-cap"; usedToday: number; cap: number }
   | { ok: false; reason: "kyc-required"; lifetime: number; threshold: number };
 
-const STORAGE_KEY = "nexion-exchange-v3";
+// 旧设备级单键 "nexion-exchange-v3" 废弃(存量无账号归属,mock 可重建);兑换风控计数按账号分行。
+const ACCOUNTS_KEY = "nexion-exchange-v3-accounts-v1"; // { [accountKey]: PersistShape }
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -57,18 +60,19 @@ function defaults(): PersistShape {
   };
 }
 
-function hydrate(): PersistShape {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<PersistShape> | "";
-    if (s && typeof s === "object") return { ...defaults(), ...s };
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): PersistShape {
+  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
+  if (row) return { ...defaults(), ...row };
   return defaults();
 }
 
 export const useExchangeV3 = defineStore("exchangeV3", () => {
-  const init = hydrate();
+  // ponytail: todayPlatformUsedUSD 名义是平台共享计数,但整块 stub 落进 per-account 行——
+  // store 已声明真后台 server-side 拥有全部计数,demo 里平台日上限 $20k 从不触及,每账号各记
+  // 自己那份对显示无差;真后台替换时平台计数归 server 全局、用户计数(含 kyc/终身额)归 per-user。
+  // 关键防泄漏靶:kycVerified / lifetimeExchangedUSD / todayUserUsedUSD 换账号不得继承。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const todayUserUsedUSD = ref(init.todayUserUsedUSD);
   const todayPlatformUsedUSD = ref(init.todayPlatformUsedUSD);
   const dayKey = ref(init.dayKey);
@@ -77,18 +81,26 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
   const queue = ref<QueuedExchange[]>(init.queue);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        todayUserUsedUSD: todayUserUsedUSD.value,
-        todayPlatformUsedUSD: todayPlatformUsedUSD.value,
-        dayKey: dayKey.value,
-        lifetimeExchangedUSD: lifetimeExchangedUSD.value,
-        kycVerified: kycVerified.value,
-        queue: queue.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
+      todayUserUsedUSD: todayUserUsedUSD.value,
+      todayPlatformUsedUSD: todayPlatformUsedUSD.value,
+      dayKey: dayKey.value,
+      lifetimeExchangedUSD: lifetimeExchangedUSD.value,
+      kycVerified: kycVerified.value,
+      queue: queue.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的兑换风控计数(防跨账号继承 KYC 资格/日限/终身额)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    todayUserUsedUSD.value = next.todayUserUsedUSD;
+    todayPlatformUsedUSD.value = next.todayPlatformUsedUSD;
+    dayKey.value = next.dayKey;
+    lifetimeExchangedUSD.value = next.lifetimeExchangedUSD;
+    kycVerified.value = next.kycVerified;
+    queue.value = next.queue;
   }
 
   function resetIfNewDay() {
@@ -145,7 +157,7 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
   return {
     todayUserUsedUSD, todayPlatformUsedUSD, dayKey, lifetimeExchangedUSD,
     kycVerified, queue,
-    resetIfNewDay, canExchange, record, enqueue, setKycVerified,
+    resetIfNewDay, canExchange, record, enqueue, setKycVerified, bindAccount,
   };
 });
 

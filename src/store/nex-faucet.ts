@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * NEX 水龙头 + 提现闸 — 由旧 points.ts 演化(积分系统下线,NEX 接管)。
@@ -37,8 +39,9 @@ interface FaucetData {
   claimedMilestones: number[];
 }
 
-const STORAGE_KEY = "nexion-nex-faucet-v1";
-const LEGACY_POINTS_KEY = "nexion-points-v1";
+// 旧设备级单键 "nexion-nex-faucet-v1" + 旧积分键 "nexion-points-v1" 均废弃(存量无账号归属,
+// 不臆断迁移,mock 可重建);签到状态机按账号分行。
+const ACCOUNTS_KEY = "nexion-nex-faucet-accounts-v1"; // { [accountKey]: FaucetData }
 
 // 签到奖励档(小额 NEX,水龙头定位):基础 +2 NEX / 7 连胜额外 +5 NEX。
 const SIGNIN_BASE_NEX = 2;
@@ -59,43 +62,23 @@ function defaults(): FaucetData {
   };
 }
 
-function hydrate(): FaucetData {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<FaucetData> | "";
-    if (
-      s && typeof s === "object" &&
-      Array.isArray(s.claimedMilestones) && Array.isArray(s.history) &&
-      typeof s.lastSignedInAt === "number"
-    ) {
-      return { ...defaults(), ...s };
-    }
-  } catch {
-    // first run on new key
+function hydrate(accountKey: string): FaucetData {
+  const row = readAccountRow<Partial<FaucetData>>(ACCOUNTS_KEY, accountKey);
+  if (
+    row &&
+    Array.isArray(row.claimedMilestones) && Array.isArray(row.history) &&
+    typeof row.lastSignedInAt === "number"
+  ) {
+    return { ...defaults(), ...row };
   }
-  // 老用户迁移:从旧积分 key 搬签到状态机(丢弃 points 余额)。
-  try {
-    const legacy = uni.getStorageSync(LEGACY_POINTS_KEY) as Record<string, unknown> | "";
-    if (legacy && typeof legacy === "object" && typeof legacy.lastSignedInAt === "number") {
-      const migrated: FaucetData = {
-        ...defaults(),
-        history: Array.isArray(legacy.history) ? (legacy.history as FaucetEvent[]) : defaults().history,
-        lastSignedInAt: (legacy.lastSignedInAt as number) ?? 0,
-        signInStreak: (legacy.signInStreak as number) ?? 0,
-        longestStreak: (legacy.longestStreak as number) ?? 0,
-        streakSavers: (legacy.streakSavers as number) ?? 1,
-        claimedMilestones: Array.isArray(legacy.claimedMilestones) ? (legacy.claimedMilestones as number[]) : [],
-      };
-      try { uni.removeStorageSync(LEGACY_POINTS_KEY); } catch { /* ignore */ }
-      return migrated;
-    }
-  } catch {
-    // no legacy data
-  }
+  // 旧设备级 points 迁移已废除:设备级存量无账号归属,迁给任一账号=臆断多发,mock 可重建。
   return defaults();
 }
 
 export const useNexFaucet = defineStore("nexFaucet", () => {
-  const init = hydrate();
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const history = ref<FaucetEvent[]>(init.history);
   const lastSignedInAt = ref(init.lastSignedInAt);
   const signInStreak = ref(init.signInStreak);
@@ -104,18 +87,26 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const claimedMilestones = ref<number[]>(init.claimedMilestones);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        history: history.value,
-        lastSignedInAt: lastSignedInAt.value,
-        signInStreak: signInStreak.value,
-        longestStreak: longestStreak.value,
-        streakSavers: streakSavers.value,
-        claimedMilestones: claimedMilestones.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<FaucetData>(ACCOUNTS_KEY, boundKey, {
+      history: history.value,
+      lastSignedInAt: lastSignedInAt.value,
+      signInStreak: signInStreak.value,
+      longestStreak: longestStreak.value,
+      streakSavers: streakSavers.value,
+      claimedMilestones: claimedMilestones.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的签到状态机(防跨账号继承连胜/里程碑/saver)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    history.value = next.history;
+    lastSignedInAt.value = next.lastSignedInAt;
+    signInStreak.value = next.signInStreak;
+    longestStreak.value = next.longestStreak;
+    streakSavers.value = next.streakSavers;
+    claimedMilestones.value = next.claimedMilestones;
   }
 
   /**
@@ -191,7 +182,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
-    signIn, useSaver, claimMilestone,
+    signIn, useSaver, claimMilestone, bindAccount,
   };
 });
 

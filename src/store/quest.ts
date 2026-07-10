@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { reactive } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Quest store — ported from Nexion-prototype/lib/store/quest.ts + lib/mock/quest.ts
@@ -65,7 +67,8 @@ export const QUEST_TASKS: readonly QuestTaskDef[] = [
 /** Final bonus when all tasks are complete (display side; mirrors source). */
 export const QUEST_FINAL_BONUS_NEX = 500;
 
-const STORAGE_KEY = "nexion-quest-v1";
+// 旧设备级单键 "nexion-quest-v1" 废弃(存量无账号归属,mock 可重建);任务完成态按账号分行。
+const ACCOUNTS_KEY = "nexion-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 /** Result of a markComplete call — App.vue uses this to compose creditNex + toast. */
 export interface QuestCompleteResult {
@@ -81,31 +84,30 @@ interface PersistShape {
   completed: string[];
 }
 
-function hydrate(): string[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<PersistShape> | "";
-    if (s && typeof s === "object" && Array.isArray(s.completed)) {
-      return s.completed;
-    }
-  } catch {
-    // first run / storage unavailable
-  }
+function hydrate(accountKey: string): string[] {
+  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.completed)) return row.completed;
   return [];
 }
 
 export const useQuest = defineStore("quest", () => {
-  // P-027: reactive Record<id, true> membership map (Vue can't track Set internals).
+  // P-027: reactive Record<id, true> membership map (Vue can't track Set internals)。
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
   const completedMap = reactive<Record<string, boolean>>({});
-  for (const id of hydrate()) completedMap[id] = true;
+  for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        completed: Object.keys(completedMap).filter((k) => completedMap[k]),
-      } satisfies PersistShape);
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
+      completed: Object.keys(completedMap).filter((k) => completedMap[k]),
+    });
+  }
+
+  /** 账号切换重绑:清空并装载该账号的任务完成态(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    for (const k of Object.keys(completedMap)) delete completedMap[k];
+    for (const id of hydrate(boundKey)) completedMap[id] = true;
   }
 
   function isComplete(id: QuestTaskId): boolean {
@@ -141,5 +143,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, QUEST_TASKS, isComplete, markComplete, reset };
+  return { completedMap, QUEST_TASKS, isComplete, markComplete, reset, bindAccount };
 });

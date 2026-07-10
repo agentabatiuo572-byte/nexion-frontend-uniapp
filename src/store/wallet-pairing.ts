@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Withdrawal } from "./types";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Wallet pairing state (v3.2 KYC-Express). Ported from
 // Nexion-prototype/lib/store/wallet-pairing.ts (zustand persist → Pinia + uni storage).
@@ -19,7 +21,8 @@ export interface WalletPairingState {
   pairedAt?: number; // epoch ms
 }
 
-const STORAGE_KEY = "nexion-wallet-pairing-v1";
+// 旧设备级单键 "nexion-wallet-pairing-v1" 废弃(存量无账号归属,mock 可重建);KYC 配对按账号分行。
+const ACCOUNTS_KEY = "nexion-wallet-pairing-accounts-v1"; // { [accountKey]: WalletPairingState }
 
 // Stable id format mirroring §6.9 receipts: KYC-{YYYY}-A{seq}
 let kycSeq = 78234;
@@ -29,26 +32,26 @@ function nextComplianceId(): string {
   return `KYC-${year}-A${kycSeq}`;
 }
 
-function hydrate(): WalletPairingState {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<WalletPairingState> | "";
-    if (s && typeof s === "object" && typeof s.walletPaired === "boolean") {
-      return {
-        walletPaired: s.walletPaired,
-        pairedWalletAddress: s.pairedWalletAddress,
-        pairedNetwork: s.pairedNetwork,
-        complianceCheckId: s.complianceCheckId,
-        pairedAt: s.pairedAt,
-      };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): WalletPairingState {
+  const row = readAccountRow<Partial<WalletPairingState>>(ACCOUNTS_KEY, accountKey);
+  if (row && typeof row.walletPaired === "boolean") {
+    return {
+      walletPaired: row.walletPaired,
+      pairedWalletAddress: row.pairedWalletAddress,
+      pairedNetwork: row.pairedNetwork,
+      complianceCheckId: row.complianceCheckId,
+      pairedAt: row.pairedAt,
+    };
   }
   return { walletPaired: false };
 }
 
 export const useWalletPairing = defineStore("walletPairing", () => {
-  const init = hydrate();
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
+  // 🔴 KYC 配对必按账号:否则 wallet-exchange 的 setKycVerified(walletPaired) 镜像会把设备级
+  // walletPaired 灌进换后账号的 exchange-v3.kycVerified,绕过 >$100 KYC 闸(P2-8 源头修复)。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const walletPaired = ref(init.walletPaired);
   const pairedWalletAddress = ref<string | undefined>(init.pairedWalletAddress);
   const pairedNetwork = ref<Withdrawal["network"] | undefined>(init.pairedNetwork);
@@ -56,17 +59,24 @@ export const useWalletPairing = defineStore("walletPairing", () => {
   const pairedAt = ref<number | undefined>(init.pairedAt);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        walletPaired: walletPaired.value,
-        pairedWalletAddress: pairedWalletAddress.value,
-        pairedNetwork: pairedNetwork.value,
-        complianceCheckId: complianceCheckId.value,
-        pairedAt: pairedAt.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<WalletPairingState>(ACCOUNTS_KEY, boundKey, {
+      walletPaired: walletPaired.value,
+      pairedWalletAddress: pairedWalletAddress.value,
+      pairedNetwork: pairedNetwork.value,
+      complianceCheckId: complianceCheckId.value,
+      pairedAt: pairedAt.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的钱包配对/KYC 状态(防跨账号继承 KYC 资格)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    walletPaired.value = next.walletPaired;
+    pairedWalletAddress.value = next.pairedWalletAddress;
+    pairedNetwork.value = next.pairedNetwork;
+    complianceCheckId.value = next.complianceCheckId;
+    pairedAt.value = next.pairedAt;
   }
 
   function complete(input: { address: string; network: Withdrawal["network"] }) {
@@ -95,6 +105,7 @@ export const useWalletPairing = defineStore("walletPairing", () => {
     pairedAt,
     complete,
     reset,
+    bindAccount,
   };
 });
 

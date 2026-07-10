@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { currentWeekKey, type Tier1QuestId, type Tier2QuestId } from "@/mock/weekly-quests";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Weekly Quest store — ported from Nexion-prototype/lib/store/weekly-quest.ts
@@ -17,7 +19,8 @@ import { currentWeekKey, type Tier1QuestId, type Tier2QuestId } from "@/mock/wee
  * (admin H3 WEEKLY_T1/T2). Persist key carries a version suffix for migration.
  */
 
-const STORAGE_KEY = "nexion-weekly-quest-v1";
+// 旧设备级单键 "nexion-weekly-quest-v1" 废弃(存量无账号归属,mock 可重建);周任务进度按账号分行。
+const ACCOUNTS_KEY = "nexion-weekly-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 interface PersistShape {
   weekKey: string;
@@ -28,21 +31,17 @@ interface PersistShape {
   bonusClaimed: boolean;
 }
 
-function hydrate(): PersistShape {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<PersistShape> | "";
-    if (s && typeof s === "object") {
-      return {
-        weekKey: typeof s.weekKey === "string" ? s.weekKey : currentWeekKey(),
-        tier1Completed: (s.tier1Completed ?? null) as Tier1QuestId | null,
-        tier1Claimed: s.tier1Claimed === true,
-        tier2Completed: Array.isArray(s.tier2Completed) ? s.tier2Completed : [],
-        tier2Claimed: Array.isArray(s.tier2Claimed) ? s.tier2Claimed : [],
-        bonusClaimed: s.bonusClaimed === true,
-      };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): PersistShape {
+  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
+  if (row) {
+    return {
+      weekKey: typeof row.weekKey === "string" ? row.weekKey : currentWeekKey(),
+      tier1Completed: (row.tier1Completed ?? null) as Tier1QuestId | null,
+      tier1Claimed: row.tier1Claimed === true,
+      tier2Completed: Array.isArray(row.tier2Completed) ? row.tier2Completed : [],
+      tier2Claimed: Array.isArray(row.tier2Claimed) ? row.tier2Claimed : [],
+      bonusClaimed: row.bonusClaimed === true,
+    };
   }
   return {
     weekKey: currentWeekKey(),
@@ -55,7 +54,9 @@ function hydrate(): PersistShape {
 }
 
 export const useWeeklyQuest = defineStore("weeklyQuest", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const weekKey = ref(init.weekKey);
   const tier1Completed = ref<Tier1QuestId | null>(init.tier1Completed);
   const tier1Claimed = ref(init.tier1Claimed);
@@ -64,18 +65,26 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
   const bonusClaimed = ref(init.bonusClaimed);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        weekKey: weekKey.value,
-        tier1Completed: tier1Completed.value,
-        tier1Claimed: tier1Claimed.value,
-        tier2Completed: tier2Completed.value,
-        tier2Claimed: tier2Claimed.value,
-        bonusClaimed: bonusClaimed.value,
-      } satisfies PersistShape);
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
+      weekKey: weekKey.value,
+      tier1Completed: tier1Completed.value,
+      tier1Claimed: tier1Claimed.value,
+      tier2Completed: tier2Completed.value,
+      tier2Claimed: tier2Claimed.value,
+      bonusClaimed: bonusClaimed.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的周任务进度(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    weekKey.value = next.weekKey;
+    tier1Completed.value = next.tier1Completed;
+    tier1Claimed.value = next.tier1Claimed;
+    tier2Completed.value = next.tier2Completed;
+    tier2Claimed.value = next.tier2Claimed;
+    bonusClaimed.value = next.bonusClaimed;
   }
 
   /** Roll to current week if persisted weekKey is stale; called on mount. */
@@ -154,5 +163,6 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     claimTier2,
     claimBonus,
     reset,
+    bindAccount,
   };
 });

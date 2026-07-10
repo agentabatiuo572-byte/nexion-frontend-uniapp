@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { reactive } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Event-quest store — ported from Nexion-prototype/lib/store/event-quest.ts
@@ -15,30 +17,29 @@ import { reactive } from "vue";
  * a version suffix for forward migration.
  */
 
-const STORAGE_KEY = "nexion-event-quest-v1";
+// 旧设备级单键 "nexion-event-quest-v1" 废弃(存量无账号归属,mock 可重建);活动参与态按账号分行。
+const ACCOUNTS_KEY = "nexion-event-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 interface PersistShape {
   joined: string[];
   claimed: string[];
 }
 
-function hydrate(): PersistShape {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<PersistShape> | "";
-    if (s && typeof s === "object") {
-      return {
-        joined: Array.isArray(s.joined) ? s.joined : [],
-        claimed: Array.isArray(s.claimed) ? s.claimed : [],
-      };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): PersistShape {
+  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
+  if (row) {
+    return {
+      joined: Array.isArray(row.joined) ? row.joined : [],
+      claimed: Array.isArray(row.claimed) ? row.claimed : [],
+    };
   }
   return { joined: [], claimed: [] };
 }
 
 export const useEventQuest = defineStore("eventQuest", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   // Record<id, true> membership maps (P-027: reactive Record, not Set/ref).
   const joinedMap = reactive<Record<string, boolean>>({});
   const claimedMap = reactive<Record<string, boolean>>({});
@@ -46,14 +47,20 @@ export const useEventQuest = defineStore("eventQuest", () => {
   for (const id of init.claimed) claimedMap[id] = true;
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        joined: Object.keys(joinedMap).filter((k) => joinedMap[k]),
-        claimed: Object.keys(claimedMap).filter((k) => claimedMap[k]),
-      } satisfies PersistShape);
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
+      joined: Object.keys(joinedMap).filter((k) => joinedMap[k]),
+      claimed: Object.keys(claimedMap).filter((k) => claimedMap[k]),
+    });
+  }
+
+  /** 账号切换重绑:清空并装载该账号的活动参与/领取态(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    for (const k of Object.keys(joinedMap)) delete joinedMap[k];
+    for (const k of Object.keys(claimedMap)) delete claimedMap[k];
+    for (const id of next.joined) joinedMap[id] = true;
+    for (const id of next.claimed) claimedMap[id] = true;
   }
 
   function isJoined(id: string): boolean {
@@ -79,5 +86,5 @@ export const useEventQuest = defineStore("eventQuest", () => {
     return true;
   }
 
-  return { joinedMap, claimedMap, isJoined, isClaimed, join, claim };
+  return { joinedMap, claimedMap, isJoined, isClaimed, join, claim, bindAccount };
 });

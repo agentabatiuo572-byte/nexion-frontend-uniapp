@@ -2,10 +2,10 @@
   Influence Network Royalty — ported from
   Nexion-prototype/app/(main)/team/unilevel/page.tsx.
   Partner-program model: de-carded hero (monthly royalty total on the page
-  floor + partner-status chip) + Direct Royalty / Network Yield Bonus rows
-  (two tinted cards merged into one transparent hairline group) + Partner
-  Status tier progression (transparent section; 4 filled tier cells, podium
-  idiom + progress to next) + filter pills + member list (transparent hairline
+  floor + partner-status chip) + Direct Royalty / Network Yield Bonus /
+  Partner Status sections as frosted-glass cards (owner 2026-07-09; chassis
+  glass-tile tokens; tier grid keeps 4 filled cells, podium idiom + progress
+  to next) + filter pills + member list (transparent hairline
   group). Sub-page → <AppChassis active="team"> w/ back → /team. Reuses network
   (byLayer) + commission (UNILEVEL_USDT) stores + VBadge. useMemo → computed.
   React local state → ref. TickerNumber → direct value render (entrance tween dropped,
@@ -37,55 +37,53 @@
           </view>
         </view>
 
-        <!-- Royalty breakdown — Direct (D) + Network (N): two tinted cards
-             merged into one transparent hairline row group (form a); colored
+        <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
+             card each (owner 2026-07-09; chassis glass-tile tokens); colored
              badge chips + values carry the semantic identity. -->
-        <view :style="compGroupStyle">
-          <view class="flex items-start" style="gap: 12px" :style="compRowStyle(true)">
-            <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
-            <view class="flex-1 min-w-0">
-              <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
-              <text class="block" :style="compSubStyle">{{ t.unilevel.directSub }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
-            </view>
-            <view class="text-right shrink-0">
-              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
-              <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
-            </view>
+        <view class="flex items-start" style="gap: 12px" :style="glassCardStyle">
+          <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
+          <view class="flex-1 min-w-0">
+            <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
+            <text class="block" :style="compSubStyle">{{ t.unilevel.directSub }}</text>
+            <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
           </view>
-          <view :style="compRowStyle(false)">
-            <view class="flex items-start" style="gap: 12px">
-              <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
-              <view class="flex-1 min-w-0">
-                <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
-                <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
-                <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
-                  <view>
-                    <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
-                    <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
-                  </view>
-                  <view>
-                    <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
-                    <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
-                  </view>
+          <view class="text-right shrink-0">
+            <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
+            <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
+          </view>
+        </view>
+        <view :style="glassCardStyle">
+          <view class="flex items-start" style="gap: 12px">
+            <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
+            <view class="flex-1 min-w-0">
+              <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
+              <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
+              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
+                <view>
+                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
+                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
+                </view>
+                <view>
+                  <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkActivityLabel }}</text>
+                  <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">${{ monthlyNetworkVolume.toLocaleString() }}</text>
                 </view>
               </view>
-              <view class="text-right shrink-0">
-                <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
-              </view>
             </view>
-            <view class="flex items-start" :style="algoNoteStyle">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-              <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
+            <view class="text-right shrink-0">
+              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
             </view>
+          </view>
+          <view class="flex items-start" :style="algoNoteStyle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
+            <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
           </view>
         </view>
 
-        <!-- Partner Status tier progression — de-carded to a transparent
-             section: outer surface card dropped; the four tier cells keep
-             their fills, borders dropped (selection/comparison whitelist,
-             podium idiom: current cell tinted, rest dimmed surface-2). -->
-        <view :style="tierSectionStyle">
+        <!-- Partner Status tier progression — frosted-glass card (owner
+             2026-07-09); the four tier cells keep their fills, borders
+             dropped (selection/comparison whitelist, podium idiom: current
+             cell tinted, rest dimmed surface-2). -->
+        <view :style="glassCardStyle">
           <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
           <text class="block" :style="{ marginTop: '8px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ t.unilevel.rateTierNote }}</text>
 
@@ -326,12 +324,17 @@ const heroTierChipStyle = computed<CSSProperties>(() => ({
   color: currentTier.value.color,
 }));
 
-// Transparent hairline row group (form a): border-top opens the group,
-// 2px optical inset, rows split by hairlines, last row open.
-const compGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-function compRowStyle(withDivider: boolean): CSSProperties {
-  return { padding: "13px 0", borderBottom: withDivider ? "1px solid var(--v5-border)" : "none" };
-}
+// Frosted-glass card shell (owner 2026-07-09) shared by the D / N / tier
+// sections — theme-aware chassis glass-tile tokens; blur strength matches
+// the genesis dock glass (Vue auto-prefixes backdropFilter inline).
+// Fill only, zero border: bg-filled cards carry no border line (owner ruling
+// 2026-07-09, same day).
+const glassCardStyle: CSSProperties = {
+  padding: "16px",
+  borderRadius: "16px",
+  background: "var(--v5-glass-bg)",
+  backdropFilter: "blur(18px) saturate(180%)",
+};
 function compBadgeStyle(color: string): CSSProperties {
   return {
     width: "40px",
@@ -344,14 +347,12 @@ function compBadgeStyle(color: string): CSSProperties {
 }
 const compTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
-// Inner note row — the hairline it used to carry is now the group's job.
+// Inner note row under the N metrics.
 const algoNoteStyle: CSSProperties = {
   marginTop: "10px",
   gap: "6px",
 };
 
-// De-carded transparent section (outer card dropped).
-const tierSectionStyle: CSSProperties = { padding: "10px 2px 0" };
 // Tier cells: fill only, no border (podium idiom — current cell tinted,
 // the rest dimmed surface-2; text color carries the current accent).
 function tierCardStyle(tier: RateTier): CSSProperties {

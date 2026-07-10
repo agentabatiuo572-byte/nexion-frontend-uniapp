@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Achievement records. Ported from Nexion-prototype/lib/store/achievements.ts
@@ -13,27 +15,28 @@ export interface AchievementRecord {
   claimed: boolean;
 }
 
-const STORAGE_KEY = "nexion-achievements-v1";
+// 旧设备级单键 "nexion-achievements-v1" 废弃(存量无账号归属,mock 可重建);成就记录按账号分行。
+const ACCOUNTS_KEY = "nexion-achievements-accounts-v1"; // { [accountKey]: { records: AchievementRecord[] } }
 
-function hydrate(): AchievementRecord[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { records?: AchievementRecord[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.records)) return s.records;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): AchievementRecord[] {
+  const row = readAccountRow<{ records?: AchievementRecord[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.records)) return row.records;
   return [];
 }
 
 export const useAchievements = defineStore("achievements", () => {
-  const records = ref<AchievementRecord[]>(hydrate());
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const records = ref<AchievementRecord[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { records: records.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ records: AchievementRecord[] }>(ACCOUNTS_KEY, boundKey, { records: records.value });
+  }
+
+  /** 账号切换重绑:装载该账号的成就记录(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    records.value = hydrate(boundKey);
   }
 
   /** Returns true if newly unlocked. */
@@ -65,5 +68,5 @@ export const useAchievements = defineStore("achievements", () => {
     return records.value.length;
   }
 
-  return { records, unlock, claim, isUnlocked, isClaimed, unlockedCount };
+  return { records, unlock, claim, isUnlocked, isClaimed, unlockedCount, bindAccount };
 });

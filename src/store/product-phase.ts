@@ -138,7 +138,7 @@ export function isPhaseReached(current: PhaseParams, target: PhaseId): boolean {
   return currentIdx >= targetIdx;
 }
 
-// PM-facing override (replay-tour demo). Persisted so the demo state survives
+// PM-facing phase override (dev/PM tooling). Persisted so the pinned state survives
 // reload. When `pinned` is null the engine falls back to time-based phase.
 //
 // ⚠️ PRODUCTION GUARD: in production any user could call setPinned to skip

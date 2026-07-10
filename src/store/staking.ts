@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Ported from Nexion-prototype/lib/v3/staking.ts (zustand persist → Pinia + uni storage).
@@ -56,7 +58,8 @@ export interface StakingPosition {
   status: "active" | "matured" | "early-withdrawn" | "claimed";
 }
 
-const STORAGE_KEY = "nexion-v3-staking-v1";
+// 旧设备级单键 "nexion-v3-staking-v1" 废弃(存量无账号归属,mock 可重建);持仓按账号分行。
+const ACCOUNTS_KEY = "nexion-v3-staking-accounts-v1"; // { [accountKey]: { positions: StakingPosition[] } }
 
 function seedPositions(): StakingPosition[] {
   const now = Date.now();
@@ -73,27 +76,26 @@ function seedPositions(): StakingPosition[] {
   ];
 }
 
-function hydrate(): StakingPosition[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { positions?: StakingPosition[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.positions)) {
-      return s.positions;
-    }
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): StakingPosition[] {
+  const row = readAccountRow<{ positions?: StakingPosition[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.positions)) return row.positions;
   return seedPositions();
 }
 
 export const useStaking = defineStore("staking", () => {
-  const positions = ref<StakingPosition[]>(hydrate());
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
+  // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const positions = ref<StakingPosition[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { positions: positions.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ positions: StakingPosition[] }>(ACCOUNTS_KEY, boundKey, { positions: positions.value });
+  }
+
+  /** 账号切换重绑:装载该账号的持仓行(变更处处即时 persist,旧账号无需先落盘)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    positions.value = hydrate(boundKey);
   }
 
   function totalLocked() {
@@ -194,5 +196,6 @@ export const useStaking = defineStore("staking", () => {
     earlyWithdraw,
     claim,
     markMatured,
+    bindAccount,
   };
 });

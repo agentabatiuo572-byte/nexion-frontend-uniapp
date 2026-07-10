@@ -17,6 +17,8 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 export type OrderStatus =
   | "placed"
@@ -64,7 +66,8 @@ export interface CreateOrderInput {
   tradeInDeviceId?: string;
 }
 
-const STORAGE_KEY = "nexion-orders-v4";
+// 旧设备级单键 "nexion-orders-v4" 废弃(存量无账号归属,mock 可重建);订单按账号分行。
+const ACCOUNTS_KEY = "nexion-orders-accounts-v1"; // { [accountKey]: { orders: Order[] } }
 
 function genOrderId(): string {
   const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -96,14 +99,9 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
   }
 }
 
-function hydrate(): Order[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { orders?: Order[] } | Order[] | "";
-    if (Array.isArray(s)) return s;
-    if (s && typeof s === "object" && Array.isArray(s.orders)) return s.orders;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): Order[] {
+  const row = readAccountRow<{ orders?: Order[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.orders)) return row.orders;
   return [];
 }
 
@@ -118,14 +116,19 @@ type DeviceSpawnApp = {
 };
 
 export const useOrders = defineStore("orders", () => {
-  const orders = ref<Order[]>(hydrate());
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
+  // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const orders = ref<Order[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { orders: orders.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ orders: Order[] }>(ACCOUNTS_KEY, boundKey, { orders: orders.value });
+  }
+
+  /** 账号切换重绑:装载该账号的订单行(变更处处即时 persist,旧账号无需先落盘)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    orders.value = hydrate(boundKey);
   }
 
   function createOrder(input: CreateOrderInput): Order {
@@ -253,7 +256,7 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, getById };
+  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, getById, bindAccount };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

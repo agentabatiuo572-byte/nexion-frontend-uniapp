@@ -119,6 +119,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession, type SessionListItem } from "@/store/session";
@@ -271,6 +272,9 @@ async function handleDeleteAccount() {
     app.interruptAllTasks("logged-out");
     session.signOutSession();
     auth.signOut();
+    // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
+    app.bindAccount("default");
+    rebindAccountScopedStores("default");
     uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
   }
 }

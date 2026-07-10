@@ -94,16 +94,16 @@ function teamEventMessage(): ChannelMsg {
 function stakingEventMessage(): ChannelMsg {
   const r = Math.random();
   if (r < 0.4) return { text: "⚡ 180-day vault APY just rose from 80% → 95% (24h window only).", ctaLabel: "Lock now", ctaHref: "/staking" };
-  if (r < 0.7) { const slot = 7 + Math.floor(Math.random() * 18); return { text: `🔥 Only ${slot} Genesis seats left · OG status + $NEX emission priority.`, ctaLabel: "Claim seat", ctaHref: "/genesis" }; }
+  // 不编具体余席数(与 live remaining 矛盾会自曝;数字可信铁律)。
+  if (r < 0.7) return { text: "🔥 Genesis seats running low · OG status + $NEX emission priority.", ctaLabel: "Claim seat", ctaHref: "/genesis" };
   if (r < 0.9) return { text: "Lock your $NEX now to boost your emission priority when it lists.", ctaLabel: "Lock 180d", ctaHref: "/staking" };
   return { text: "Your 90-day stake matures in 12 days · auto-claim or extend for 35% bonus APY.", ctaLabel: "Manage", ctaHref: "/staking" };
 }
 
 function marketEventMessage(): ChannelMsg {
   const r = Math.random();
-  if (r < 0.35) { const price = (0.16 + Math.random() * 0.04).toFixed(3); const change = (5 + Math.random() * 18).toFixed(1); return { text: `📈 $NEX just broke $${price} · +${change}% in 24h · new ATH this week.`, ctaLabel: "Buy NEX", ctaHref: "/me/wallet/exchange" }; }
-  if (r < 0.6) return { text: "🚨 $NEX cleared Binance tier-1 listing review — public announcement expected this quarter.", ctaLabel: "Read more", ctaHref: "/trust" };
-  if (r < 0.85) { const tvl = (840 + Math.random() * 60).toFixed(0); return { text: `🎉 Platform TVL crossed $${tvl}M overnight · your Leadership pool share grew.`, ctaLabel: "View pool", ctaHref: "/team/leadership-pool" }; }
+  if (r < 0.45) { const price = (0.16 + Math.random() * 0.04).toFixed(3); const change = (5 + Math.random() * 18).toFixed(1); return { text: `📈 $NEX just broke $${price} · +${change}% in 24h · new ATH this week.`, ctaLabel: "Buy NEX", ctaHref: "/me/wallet/exchange" }; }
+  if (r < 0.8) { const tvl = (840 + Math.random() * 60).toFixed(0); return { text: `🎉 Platform TVL crossed $${tvl}M overnight · your Leadership pool share grew.`, ctaLabel: "View pool", ctaHref: "/team/leadership-pool" }; }
   return { text: "🤝 Nexion × OPPO strategic partnership signed — NEX now usable across OPPO Wallet.", ctaLabel: "Trust Center", ctaHref: "/trust" };
 }
 

@@ -2,9 +2,9 @@
   Global Leadership Pool — ported from
   Nexion-prototype/app/(main)/team/leadership-pool/page.tsx.
   Week-pool hero de-carded (DECARD form c): $X K sits directly on the page floor
-  (card gradient/radial + accent border deleted, not tuned). My-status block also
-  on the floor, opened by a hairline (unlocked: projected dividend + votes/share
-  stats / locked: V3-gate + path CTA). V-rank vote-weight table = single surface
+  (card gradient/radial + accent border deleted, not tuned). My-status block =
+  frosted-glass card, zero border (owner 2026-07-09; unlocked: projected dividend
+  + votes/share stats / locked: V3-gate + path CTA). V-rank vote-weight table = single surface
   container (form b, no border, mine-row tinted). Past-pools history = transparent
   hairline group (form a). Sub-page → <AppChassis active="team"> w/ back → /team.
   Reuses leadership-pool + v-rank stores + VBadge/VBadgeIcon. useMemo → computed.
@@ -36,8 +36,8 @@
           <text class="block" :style="heroDescStyle">{{ weeklyDescText }}</text>
         </view>
 
-        <!-- My status — transparent block on the page floor, opened by a
-             hairline (was a bordered card in both unlocked/locked variants). -->
+        <!-- My status — frosted-glass card (owner 2026-07-09), fill only /
+             zero border; both unlocked & locked variants share the shell. -->
         <view :style="statusStyle">
           <template v-if="unlocked">
             <view class="flex items-center justify-between">
@@ -218,9 +218,14 @@ const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "10px", letterSpacin
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const heroDescStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)" };
 
-// Transparent status block — was a bordered card in both variants; a hairline
-// opens the zone and the 2px optical inset keeps content on the 16px gutter.
-const statusStyle: CSSProperties = { padding: "14px 2px 0", borderTop: "1px solid var(--v5-border)" };
+// Frosted-glass status card (owner 2026-07-09) — chassis glass-tile token,
+// fill only / zero border (bg-filled cards carry no border line).
+const statusStyle: CSSProperties = {
+  padding: "16px",
+  borderRadius: "16px",
+  background: "var(--v5-glass-bg)",
+  backdropFilter: "blur(18px) saturate(180%)",
+};
 function statusCapStyle(color: string): CSSProperties {
   return { fontSize: "10px", letterSpacing: "0.16em", color };
 }

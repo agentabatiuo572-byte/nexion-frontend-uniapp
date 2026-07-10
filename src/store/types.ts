@@ -185,6 +185,11 @@ export interface UserState {
    *  GET /api/users/me.cumulativeDepositUsdt
    *  (TBD; candidate, not in PRD §9.11 — read endpoint name pending). */
   cumulativeDepositUsdt: number;
+  /** 已核销的创世邀请码(FEAT-GEN08 资格通道4)。per-user 凭证,必须随
+   *  account-cloud 快照按账号走(设备级存储会跨账号继承 → 资格门旁路)。
+   *  null = 未核销。仅由 setGenesisInviteCode action 写入(格式校验)。
+   *  ⚠️ MOCK-ONLY: production = POST /api/genesis/invite/redeem server 核销。 */
+  genesisInviteCode: string | null;
 }
 
 export interface EarningsState {
@@ -289,6 +294,8 @@ export interface AppState {
    *  Topup page calls this instead of bare creditBalance so eligibility rules
    *  (`cumulative-deposit-usdt`) stay in sync with actual deposit flow. */
   recordDeposit: (amount: number) => boolean;
+  /** 核销创世邀请码(格式校验,合法即写入 user.genesisInviteCode 并随快照持久)。 */
+  setGenesisInviteCode: (raw: string) => boolean;
   // Sprint 2 third phase — prototype demo helpers (PM-facing, not user-facing)
   _devSeedLegacyDevice: (kind: DeviceKind, monthsAgo: number) => void;
   _devFastForwardAll: (months: number) => void;

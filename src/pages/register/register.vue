@@ -156,6 +156,7 @@ import { useSession } from "@/store/session";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { fmt } from "@/i18n/format";
 import { evaluateRegistration, commitRegistration, type RegistrationAssessment } from "@/store/risk-cluster";
@@ -375,6 +376,7 @@ function finish() {
   }
   auth.signUp(identity);
   app.bindAccount(identity);
+  rebindAccountScopedStores(identity);
   commitRegistration(identity, { sponsorId: sponsorCode });
   // New account claims this carrier's session; first-time calibration runs as
   // part of onboarding (connect.vue) which then marks this device calibrated.

@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Ported from Nexion-prototype/lib/v3/commission.ts (zustand persist → Pinia + uni storage).
@@ -134,36 +136,38 @@ function seedEvents(): CommissionEvent[] {
   ];
 }
 
-const STORAGE_KEY = "nexion-commission-v1";
+// 旧设备级单键 "nexion-commission-v1" 废弃(存量无账号归属,mock 可重建);佣金事件按账号分行。
+const ACCOUNTS_KEY = "nexion-commission-accounts-v1"; // { [accountKey]: { events: CommissionEvent[] } }
 
-function hydrate(): CommissionEvent[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { events?: CommissionEvent[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.events)) {
-      const existing = s.events;
-      // Keep mock "today" events actually inside the current local day. Persisted
-      // demos otherwise go stale across midnight and Home collapses back to device-only.
-      const dayStart = localDayStart();
-      const todayDemo = existing.filter((e) => e.id.startsWith("c-today-"));
-      const hasFreshTodaySeed = todayDemo.some((e) => e.ts >= dayStart);
-      if (hasFreshTodaySeed) return existing;
-      return [...buildTodayDemoEvents(), ...existing.filter((e) => !e.id.startsWith("c-today-"))];
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): CommissionEvent[] {
+  const row = readAccountRow<{ events?: CommissionEvent[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.events)) {
+    const existing = row.events;
+    // Keep mock "today" events actually inside the current local day. Persisted
+    // demos otherwise go stale across midnight and Home collapses back to device-only.
+    const dayStart = localDayStart();
+    const todayDemo = existing.filter((e) => e.id.startsWith("c-today-"));
+    const hasFreshTodaySeed = todayDemo.some((e) => e.ts >= dayStart);
+    if (hasFreshTodaySeed) return existing;
+    return [...buildTodayDemoEvents(), ...existing.filter((e) => !e.id.startsWith("c-today-"))];
   }
   return seedEvents();
 }
 
 export const useCommission = defineStore("commission", () => {
-  const events = ref<CommissionEvent[]>(hydrate());
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
+  // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const events = ref<CommissionEvent[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { events: events.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ events: CommissionEvent[] }>(ACCOUNTS_KEY, boundKey, { events: events.value });
+  }
+
+  /** 账号切换重绑:装载该账号的佣金事件行(变更处处即时 persist,旧账号无需先落盘)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    events.value = hydrate(boundKey);
   }
 
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {
@@ -238,7 +242,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events,
+    events, bindAccount,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

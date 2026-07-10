@@ -31,6 +31,14 @@
       <SectionHeader :title="t.store.secMoreTiers" />
       <ProductCard v-for="p in restProducts" :key="p.id" :product="p" />
 
+      <!-- 尊享席位 — Genesis 独立金融 SKU 入口(升级阶梯压轴;规格 FEAT-GEN07,
+           非设备目录成员,经济模型在 store/genesis.ts,资格门 FEAT-GEN08)。
+           showcaseEnabled 运营开关(FEAT-GEN09):关=整区隐藏,预售页/二级不受影响。-->
+      <view v-if="genesisCfg.config.showcaseEnabled">
+        <SectionHeader :title="t.store.secGenesis" />
+        <GenesisShowcaseCard />
+      </view>
+
       <!-- "Coming soon" — gen-2 phase-locked -->
       <view v-if="lockedProducts.length > 0">
         <SectionHeader :title="t.store.secComingSoon">
@@ -60,12 +68,15 @@ import TradeinWindowBanner from "@/components/store/tradein-window-banner.vue";
 import ProductCard from "@/components/store/product-card.vue";
 import PurchaseTicker from "@/components/store/purchase-ticker.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
+import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
+import { useGenesisConfig } from "@/store/genesis-config";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isPhaseReached } from "@/store/product-phase";
 
 const t = useT();
+const genesisCfg = useGenesisConfig();
 const phase = useProductPhase();
 
 // mounted guard: phase override persists in storage, rehydrates client-only —

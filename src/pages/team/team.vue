@@ -1,7 +1,7 @@
 <!--
   Team — invitation network hub: InviteEarnCard → royalty hero (V3+) → V-rank summary
-  → unified quick-nav (leaderboard / royalty network / binary / leadership pool / genesis) →
-  TeamLedgerCard → network composition → Genesis node → tool grid.
+  → unified quick-nav (leaderboard / royalty network / binary / leadership pool) →
+  TeamLedgerCard → network composition → tool grid.
   Tab page → <AppChassis active="team">.
   Reuses v-rank / network / commission / leadership-pool stores (all ported).
   zustand selectors → computed off Pinia store; mount-effect unlockMatured @60s →
@@ -128,24 +128,6 @@
             </view>
           </view>
 
-          <view :style="quickDividerStyle" />
-
-          <!-- Genesis node -->
-          <view class="nx-team-genesis-link active:opacity-95" :style="quickGenesisRowStyle" @click="go('/pages/genesis/genesis')">
-            <view :style="quickGenesisMainStyle">
-              <view :style="quickIconStyle('var(--v5-brand-2)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
-              </view>
-              <view class="flex-1 min-w-0">
-                <text class="block font-display" :style="quickGenesisTitleStyle">{{ t.teamV3.genesis.headline }}</text>
-                <text class="block font-mono-tabular" :style="quickGenesisMetaStyle">{{ t.teamV3.genesis.remaining }}</text>
-              </view>
-            </view>
-            <view :style="quickGenesisActionStyle">
-              <text class="font-mono-tabular" :style="quickGenesisLabelStyle">{{ t.teamV3.genesis.label }}</text>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-            </view>
-          </view>
         </view>
 
         <!-- This month ledger -->
@@ -443,24 +425,6 @@ const quickDividerStyle: CSSProperties = {
   marginLeft: "62px",
   background: "var(--v5-border)",
 };
-const quickGenesisRowStyle: CSSProperties = {
-  ...quickRowStyle,
-  minHeight: "96px",
-};
-const quickGenesisMainStyle: CSSProperties = {
-  ...quickRowMainStyle,
-  alignItems: "center",
-};
-const quickGenesisActionStyle: CSSProperties = {
-  flexShrink: 0,
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-};
-const quickGenesisLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.2, whiteSpace: "nowrap" };
-const quickGenesisTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, lineHeight: 1.2, color: "var(--v5-ink)" };
-const quickGenesisMetaStyle: CSSProperties = { marginTop: "5px", fontSize: "11px", color: "var(--v5-warning)", lineHeight: 1.2 };
-
 const toolGridStyle: CSSProperties = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",

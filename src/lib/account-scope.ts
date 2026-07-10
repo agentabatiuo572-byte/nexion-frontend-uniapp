@@ -1,0 +1,76 @@
+import { useGenesis } from "@/store/genesis";
+import { useVRank } from "@/store/v-rank";
+import { useOrders } from "@/store/orders";
+import { useBills } from "@/store/bills";
+import { useStaking } from "@/store/staking";
+import { useCommission } from "@/store/commission";
+import { useVoucher } from "@/store/voucher";
+import { useFreeTrial } from "@/store/free-trial";
+import { useExchange } from "@/store/exchange";
+import { useExchangeV3 } from "@/store/exchange-v3";
+import { useCards } from "@/store/cards";
+import { useNexFaucet } from "@/store/nex-faucet";
+import { useWalletPairing } from "@/store/wallet-pairing";
+import { useQuest } from "@/store/quest";
+import { useWeeklyQuest } from "@/store/weekly-quest";
+import { useEventQuest } from "@/store/event-quest";
+import { useMilestones } from "@/store/milestones";
+import { useAchievements } from "@/store/achievements";
+import { useGoals } from "@/store/goals";
+import { useLuckySpin } from "@/store/lucky-spin";
+import { useDailyPowerUp } from "@/store/daily-powerup";
+import { useNotifications } from "@/store/notifications";
+import { useReceipts } from "@/store/receipts";
+import { useTickets } from "@/store/tickets";
+import { useCart } from "@/store/cart";
+import { useProfile } from "@/store/profile";
+import { useSecurity } from "@/store/security";
+import { useRewardsSeen } from "@/store/rewards-seen";
+
+/**
+ * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
+ * 作用域债修复)。`app.bindAccount` 的三个调用点(App.vue 启动恢复 / login / register)
+ * 紧随其后调用本函数;编排放 lib 层不进 app store(P-031/032: stores never import each other)。
+ * 再把设备级 store 改成按账号隔离时,在此挂接一行即可,三个调用点自动继承。
+ *
+ * 已收口(用户资产,随账号走):
+ *  批1 钱类:创世持仓 · V 等级 · 订单 · 账单 · 质押持仓 · 佣金事件
+ *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(KYC/日限/终身额) · 绑卡 · 签到状态机 · 钱包配对(KYC 源头)
+ *  批3 任务/成就/游戏化:任务完成 · 周任务 · 活动任务 · 里程碑 fired · 成就 · 目标 · 幸运转盘票据 · 每日增益
+ *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
+ * 顺带保留设备级(平台态/设备偏好,不迁):主题 · 语言 · preferences · auth 登录态 ·
+ * session · risk-cluster · risk-identity · earning-release(以 accountKey 为参的注册表,已按账号)·
+ * sponsorship(礼包资格按账号:giftClaimedByAccount + register 取本次邀请码;sponsorCode 仅展示归因,设备留存)·
+ * product-phase · trial-config · genesis-config(运营镜像)。
+ */
+export function rebindAccountScopedStores(accountKey: string): void {
+  useGenesis().bindAccount(accountKey);
+  useVRank().bindAccount(accountKey);
+  useOrders().bindAccount(accountKey);
+  useBills().bindAccount(accountKey);
+  useStaking().bindAccount(accountKey);
+  useCommission().bindAccount(accountKey);
+  useVoucher().bindAccount(accountKey);
+  useFreeTrial().bindAccount(accountKey);
+  useExchange().bindAccount(accountKey);
+  useExchangeV3().bindAccount(accountKey);
+  useCards().bindAccount(accountKey);
+  useNexFaucet().bindAccount(accountKey);
+  useWalletPairing().bindAccount(accountKey);
+  useQuest().bindAccount(accountKey);
+  useWeeklyQuest().bindAccount(accountKey);
+  useEventQuest().bindAccount(accountKey);
+  useMilestones().bindAccount(accountKey);
+  useAchievements().bindAccount(accountKey);
+  useGoals().bindAccount(accountKey);
+  useLuckySpin().bindAccount(accountKey);
+  useDailyPowerUp().bindAccount(accountKey);
+  useNotifications().bindAccount(accountKey);
+  useReceipts().bindAccount(accountKey);
+  useTickets().bindAccount(accountKey);
+  useCart().bindAccount(accountKey);
+  useProfile().bindAccount(accountKey);
+  useSecurity().bindAccount(accountKey);
+  // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
+  useRewardsSeen().bindAccount(accountKey);
+}

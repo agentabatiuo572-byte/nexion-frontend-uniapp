@@ -215,7 +215,8 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/trial                        免费试用(绑卡式 3 天 + 7 grace + 3 extension)
 /me/wallet/nex                   NEX 资产详情页(持仓 / P&L / 用途 / 活动)
 /me/receipts                     推理收据
-/me/rewards                      我的奖励(代金券 + 系统奖励聚合)
+/me/rewards                      我的奖励(类别汇总:优惠券 / USDT / NEX 奖励)
+/me/rewards/list                 奖励分类记录(cat=voucher|usdt|nex,10 条/批分页)
 /me/risk-disclosure              平台风险提示书(scroll-to-bottom + 强制确认)
 /me/achievements                 成就墙
 /me/goals                        收益目标设置(target + deadline + 推荐路径)
@@ -601,7 +602,7 @@ Rotation 防 refresh token 被截获后长期复用:被盗后用一次就失效,
 | Revoke all others | `POST /api/auth/sessions/revoke-others` | revoke 除当前外所有 session |
 | 密码修改成功后联动 | (server side-effect) | 等效 revoke all others,参 §4.6.4 |
 
-logout client 副作用:清 access + refresh cookie + clear 所有 user-scope Zustand store + `router.replace("/login")`。
+logout client 副作用:清 access + refresh cookie + 调 `rebindAccountScopedStores("default")` 清空全部账号级 store 的内存残留(见 §4.8)+ `router.replace("/login")`。
 
 **安全约束**
 
@@ -933,6 +934,33 @@ stateDiagram-v2
 
 运营后台「指定会话下线 / 吊销会话」置 `killedAt`(后台 C5 会话域)→ 对应端轮询检测登录失效。不得因另一个 deviceId 登录而自动覆盖当前会话。
 
+### 4.8 账号数据作用域与隔离(per-account 存储)
+
+**目的**:同一台设备 / 浏览器可先后登录多个账号,每个账号的资产、记录、进度必须互不可见——换账号只见自己的数据。持久层据此三分:
+
+| 作用域 | 归属 | 例 |
+|---|---|---|
+| **用户资产**(随账号走) | 按账号分行:`{[accountKey]: row}` 表(`accountKey` 即用户主键),换账号即换行 | 订单 · 账单 · 质押持仓 · 佣金 · 券包 · 试用状态 · 兑换记录与风控计数(KYC/日限/终身额)· 绑卡 · 钱包配对 · 签到 · 任务/周任务/活动/里程碑/成就/目标/转盘票据/每日增益 · 通知 · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置(2FA)· 奖励已读水位线 · 创世持仓 · V 等级 |
+| **平台态**(设备共享,账号无关) | 全局键 | 创世售出进度与上所信号 · 兑换市场汇率 · 转盘真实奖降级 flag · 运营配置镜像 |
+| **设备偏好** | 全局键 | 主题 · 语言 · 通用偏好 · `deviceId` |
+
+**重绑收口**:账号确定的四个时点——登录 / 注册 / 冷启动会话恢复 / 登出——统一调 `rebindAccountScopedStores(accountKey)`(登出与被踢传 `"default"` 清空内存残留),把全部用户资产 store 重绑到目标账号行。业务写入处处即时落本账号行,换账号无需先落盘。
+
+**资格与凭证按账号**:任何资格判定所依赖的凭证 / 计数(创世邀请码、KYC-Express 已验证、兑换终身额、单人限购持有数)必须按账号——设备级继承会造成资格旁路(账号 B 白继承 A 的 KYC / 邀请资格)。跨 store 派生须确认上游源也按账号,不得由设备级源经页面 mount 镜像回灌账号字段。
+
+**真后台对接**(mock-first,可零重写):行数据即 per-user 服务端资源,`accountKey` 即用户主键;`GET /api/me/*` 拉本账号数据,`rebindAccountScopedStores` 对应「切账号 → 重新拉取该用户资源」。
+
+```mermaid
+flowchart TD
+    A[登录 / 注册 / 冷启动恢复] -->|accountKey| R[rebindAccountScopedStores]
+    S[登出 / 被踢下线] -->|default| R
+    R --> U[全部用户资产 store<br/>按 accountKey 装载各自行]
+    R --> P[平台态 / 设备偏好 store<br/>不重绑,保持全局]
+    U --> V{换账号}
+    V -->|A→B| B[B 只见 B 的行<br/>零继承 A 的资产]
+    V -->|B→A| C[A 的行原样还原]
+```
+
 ---
 
 ## 5. Home Dashboard
@@ -995,12 +1023,13 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 仍需条件文字描述
 - 等级奖励 chip(培育奖 NEX)
 
-### 5.7 $NEX 代币行情
+### 5.7 $NEX 代币行情(当前阶段隐藏)
 
-链接 `/trust`:
+当前阶段首页不展示此卡(组件保留未渲染)。恢复渲染时规格:
+
+链接 `/market`:
 - 当前价 + 24h 涨幅(`$0.171 +20.4%`)
 - 24h sparkline(从 useMarket.klineHourly)
-- "🚨 Binance tier-1 review · cleared" chip
 
 ### 5.8 全球领导池快照
 
@@ -1978,7 +2007,7 @@ flowchart TD
 
 #### 7.7.5 个人中心入口
 
-「我的奖励」页(`/me/rewards`,见 §11.5a)聚合展示用户的可用券、已过期券与系统奖励;个人中心(`/me`)「赚取」分组提供入口行。
+「我的奖励」(`/me/rewards`,见 §11.5a)是代金券的用户侧查看入口:类别汇总页显示可用张数,分类记录页列出可用券(带「去使用」)与已过期券;个人中心(`/me`)「账户」分组提供带未读红点的入口项。
 
 #### 7.7.6 业务流程
 
@@ -3472,7 +3501,8 @@ interface TrialConfig {
 | Task pricing 表(6 类 min/maxReward + QUEUE_SATURATION)| `lib/mock/tasks.ts:31-193` | `GET /api/config/task-pricing` | 每周市场行情 |
 | Device specs(baseRate / baseRateNEX / price 全表) | `lib/store/index.ts:33-86` | `GET /api/products/specs` | 产品上下架 / 定价 |
 | 任务产能节奏(3 段月界+递减幅度 + 产能下限 + 豁免 SKU + 新机补贴天数) | `src/store/device-lifecycle.ts`(TASK_CAPACITY_BANDS 等) | `GET /api/config/task-capacity`(TBD) | 产能节奏决定终身收益;运营可调段界/幅度/补贴 |
-| Sponsorship welcome gift(金额 + 发放模式)| `platform-config.rewards.welcomeGift` | `GET /api/config/platform` | 后台调额度 / 发放模式 |
+| Sponsorship welcome gift(金额 + 发放模式)| `platform-config.rewards.welcomeGift` | `GET /api/config/platform` | 后台调额度 / 发放模式(H8)|
+| Inviter reward(邀请人奖励 NEX)| `platform-config.rewards.inviterReward` | `GET /api/config/platform` | 后台调邀请人奖励额度(H8)|
 | Earnings milestones(5 档阈值 + NEX 奖励) | `lib/store/milestones.ts:28-34` | `GET /api/config/milestones` | 阶段调整 |
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x / 7d streak,作用于签到 NEX 发放)| `lib/v3/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier | A/B 实验值 |
 | 升级置换全配置(抵扣阶梯 5 档界点/比例 + `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult` / `applyTo` / `enabled` + `eligibility[kind].rules[]` + promo 预留组 + `inventory.softMax`)| `src/mock/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 抵扣定价 + 资格门槛;阶梯结构由哨兵锁(连续/递减) |
@@ -4141,7 +4171,7 @@ sequenceDiagram
 
 ### 11.4a 风险提示书 `/me/risk-disclosure`(Sprint A-1 / A.3)
 
-合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截。
+合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截;常驻入口在个人中心「帮助与支持」分组。
 
 **Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexion-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
 
@@ -4221,13 +4251,26 @@ i18n keys 在 `proof.*` namespace,~50 keys。
 
 ### 11.5a 我的奖励 `/me/rewards`
 
-个人中心的奖励聚合页,把用户的代金券与系统奖励集中在一处。三类分区:
+个人中心的奖励聚合入口,两级结构。
 
-1. **可用优惠券** — 用户已领、未使用、在有效期的代金券(名称 / 面值 / 适用范围 / 有效期);每张提供「去使用」操作,按券的适用范围跳转(单一 SKU → 该设备详情页,多 / 全设备 → 商城,见 §7.7.2)。
-2. **已过期优惠券** — 已领未用但已过有效期的券,置灰并标「已过期」;不可再使用。
-3. **系统奖励** — 来自活动 / 推荐 / 成就 / 客服补偿的 USDT·NEX 入账(由账单流水中奖励类条目派生),按类型分类展示金额与时间。
+**入口与红点**:`/me`「账户」分组「我的奖励」项,带未读红点,条件(满足其一):
+- 存在已领、未使用、在有效期的代金券 — 持续显示,直到券被使用或过期;
+- 存在入账时间 > `rewardsSeenAt` 的奖励类账单条目 — 打开 L1 即更新 `rewardsSeenAt`(服务端权威:用户档案字段,`PATCH /api/me/rewards/seen` 由服务端盖时间戳,客户端仅缓存);首装 `rewardsSeenAt=0`,历史入账视为未读。
 
-**入口**:`/me`「赚取」分组中的「我的奖励」行。**数据源**:代金券钱包(useVoucher,§12.20)+ 账单流水(useBills,奖励类型条目)。
+**L1 类别汇总**(`/me/rewards`):三个分类入口——优惠券(可用张数;有过期券时提示过期张数)、USDT 奖励(累计入账总额)、NEX 奖励(累计入账总额)。零值时三分类仍显示并附引导文案。
+
+**L2 分类记录**(`/me/rewards/list?cat=voucher|usdt|nex`,cat 非法或缺失回退 voucher):
+1. **优惠券**(voucher)— 已领、未使用、在有效期的券(面值 / 名称 / 适用范围 / 有效期),每张提供「去使用」:单一 SKU 券 → 该设备详情页,多 / 全设备券 → 商城(§7.7.2);已领未用但已过期的券置灰标「已过期」,不可使用。
+2. **奖励记录**(usdt / nex)— 该币种的奖励类入账(活动 / 推荐 / 成就 / 客服补偿,账单类型 ∈ {活动奖励, 推荐佣金, 成就奖励} 且金额 > 0),按时间倒序,每批 10 条,滚动到底自动续载;真后台 `GET /api/me/bills?type=reward&symbol=USDT|NEX&cursor=&limit=10`(游标分页)。
+
+**数据源与口径**:代金券钱包(useVoucher,§12.20)+ 账单流水(useBills,§9)。红点、L1 汇总、L2 记录共用同一奖励条目判定(单源派生);客服补偿以奖励类账单入账后自动计入本页与红点,无额外接口。
+
+```mermaid
+flowchart LR
+  A["/me「账户」分组入口(未读红点)"] --> B["L1 类别汇总(打开即记 rewardsSeenAt)"]
+  B -->|优惠券| C["券列表:去使用 → 设备详情 / 商城;过期置灰"]
+  B -->|USDT / NEX| D["奖励入账记录:10 条/批,滚动续载"]
+```
 
 ### 11.6 全球节点地图 `/globe`
 
@@ -4320,7 +4363,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 #### 11.9.1 目的
 
 提供 NEX 与同类 AI / DePIN tokens 的横向对标视图,锚定 NEX 处于"主流赛道",
-强化交易所上线预期(`Binance / Coinbase 审核中`),驱动用户从 Home `$NEX ticker` 卡进入 → 买入 NEX。
+强化交易所上线预期(`Binance / Coinbase 审核中`),驱动用户进入后买入 NEX。Home `$NEX ticker` 卡当前阶段隐藏(参 §5.7),Home 侧入口走算力市场卡「打开」。
 
 #### 11.9.2 页面结构(自上而下 7 段)
 
@@ -4731,6 +4774,8 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 ---
 
 ## 12. 数据模型
+
+> **持久化作用域**:用户资产类 store 按账号分行持久化——`{[accountKey]: row}` 表(键 `nexion-<entity>-accounts-v1`),换账号即换行、互不继承,详见 §4.8。下文各实体注明的旧设备级 `nexion-*-v1` 持久 key 已废弃,实体字段结构不变;平台态 / 设备偏好类仍用全局键。
 
 ### 12.1 User(useApp.user)
 
@@ -5379,8 +5424,9 @@ progressPct = avg(checks);
 | `USER_DAILY_CAP_USD` | 50 | 每用户日 NEX 兑 USDT 上限 |
 | `PLATFORM_DAILY_CAP_USD` | 20,000 | 全平台日兑换池 |
 | `KYC_LIFETIME_THRESHOLD_USD` | 100 | 累计兑换触发 KYC 线 |
-| `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
+| `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台 H8 可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
 | `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
+| `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给被邀请人、此项给邀请人 |
 | `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexion.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
 | `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
 | `share.appDownload.{iosUrl,androidUrl,apkUrl}` | 全空 | 注册成功页下载引导链接(§4.1.1);全空 = 「APP 即将上线」降级态;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |

@@ -84,6 +84,10 @@ export interface RewardsConfig {
     usdtAmount: number;
     nexAmount: number;
   };
+  // 邀请人奖励:邀请人每邀请一名新用户自身获得的 NEX(运营可调;admin K.rewards.inviterReward.* 同键)。
+  inviterReward: {
+    nexAmount: number;
+  };
 }
 
 // ── SPEC-7 §5b K1 聚簇维度权重(K4 可配)──────────────────────────────

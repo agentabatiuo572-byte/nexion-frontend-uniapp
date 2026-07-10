@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/cards.ts (zustand → Pinia).
 // Bank/credit card binding — saved-cards repository for the Card payment
@@ -24,7 +26,8 @@ export interface SavedCard {
   boundAt: number;
 }
 
-const STORAGE_KEY = "nexion-cards-v1";
+// 旧设备级单键 "nexion-cards-v1" 废弃(存量无账号归属,mock 可重建);绑卡按账号分行。
+const ACCOUNTS_KEY = "nexion-cards-accounts-v1"; // { [accountKey]: PersistShape }
 
 function uuid(): string {
   if (typeof crypto !== "undefined" && (crypto as Crypto).randomUUID) {
@@ -57,29 +60,31 @@ interface PersistShape {
   defaultTokenId: string | null;
 }
 
-function hydrate(): PersistShape {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<PersistShape> | "";
-    if (s && typeof s === "object" && Array.isArray(s.cards)) {
-      return { cards: s.cards, defaultTokenId: s.defaultTokenId ?? null };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): PersistShape {
+  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.cards)) {
+    return { cards: row.cards, defaultTokenId: row.defaultTokenId ?? null };
   }
   return { cards: [], defaultTokenId: null };
 }
 
 export const useCards = defineStore("cards", () => {
-  const init = hydrate();
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const cards = ref<SavedCard[]>(init.cards);
   const defaultTokenId = ref<string | null>(init.defaultTokenId);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { cards: cards.value, defaultTokenId: defaultTokenId.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, { cards: cards.value, defaultTokenId: defaultTokenId.value });
+  }
+
+  /** 账号切换重绑:装载该账号绑定的银行卡(P2-8 设备级泄漏修复;绑卡=金融凭证,必按账号)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    cards.value = next.cards;
+    defaultTokenId.value = next.defaultTokenId;
   }
 
   function add(input: Omit<SavedCard, "tokenId" | "boundAt">, opts: { makeDefault?: boolean } = {}): string {
@@ -114,5 +119,5 @@ export const useCards = defineStore("cards", () => {
     return cards.value.find((c) => c.tokenId === tokenId) ?? null;
   }
 
-  return { cards, defaultTokenId, add, remove, setDefault, getCard };
+  return { cards, defaultTokenId, add, remove, setDefault, getCard, bindAccount };
 });

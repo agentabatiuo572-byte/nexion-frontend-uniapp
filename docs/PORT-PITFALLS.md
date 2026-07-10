@@ -441,6 +441,22 @@
 - **已转**:`verify.sh` 哨兵「no @tap binding」——grep 绑定形态 `@tap(\.[a-z]+)*=`,命中即 fail;注释里**提及** "@tap"(如本条与 earn.vue 迁移注释)不带绑定等号,不误伤。负向探针验真:临时造 `@tap="x"`/`@tap.stop="x"` 均 CAUGHT,注释提及放行。
 - **元教训**:「两端都绑更保险」类**冗余防御**在编译器已做端间映射的体系里=自我攻击;跨端事件这类「框架承诺」要用**真实事件链路**(触摸序列/合成 click)实测验证,不能靠肉眼「渲染了、能点」——双触发的开关类症状(开了又关)恰恰伪装成「没反应」,极易误判为"点击不灵"再叠一层错误修补。
 
+## P-060 · 把 store 存储改按账号「还不够」——消费者把设备级源镜像进账号字段=隔离被击穿(P2-8 第二批 audit 抓)
+
+- **现象**:P2-8 把 `exchange-v3.kycVerified` 改成按账号分行(存储层已隔离、机器门 + 首轮 A/B/A 都过)。对抗审计仍抓出真跨账号泄漏:`wallet-exchange.vue` onMounted 无条件 `v3.setKycVerified(walletPairing.walletPaired)`,而 `walletPairing` 当时**仍是设备级单键**。账号 A 配对钱包(walletPaired=true 设备全局)→ 换 B → B 打开兑换页 → 镜像把 true 写进 B 的账号级 KYC 字段 → **B 绕过 >$100 KYC 闸**。存储改对了,值被设备级源经镜像重新灌回。
+- **根因**:账号隔离是**数据流全链路**属性,不只是「这个 store 的持久化按账号」。只要有任一消费者在 mount/watch 里 `账号级store.setX(设备级store.y)`,设备级源就会在换账号后把 X 重新污染成上一账号的值——存储层的隔离形同虚设。
+- **对策**:**修源头,不修镜像**——把被镜像的设备级 store(walletPairing)也按账号隔离,镜像自然变成 per-account 一致(B 的 walletPaired=false → 镜像置 B 的 KYC=false)。镜像代码本身不动(它拿本账号态镜像本账号字段是对的)。反面:去 gate 镜像=治标,源头仍是设备级泄漏面。
+- **已转**:本台账 + `nexion-audit` 跨-store 镜像镜头(每批 P2-8 audit 专查「有没有设备级源经 onMounted/watch 灌进账号字段」);account-scope 收口哨兵保证**源头 store 已按账号**(walletPairing 已补入 rebind + 哨兵)。运行时复验:跑 `wallet-exchange.vue:225` 原样镜像那行,断言 B 的 KYC 仍 false。
+- **元教训**:改「按账号隔离」时,`grep` 该字段的**所有 setter 调用点**,凡是入参来自另一个 store 的,追那个 store 是否也按账号——**account-scope 一个 store 时要顺带审它的上游镜像源**。存储层测试(机器门 + 存储 A/B/A)会「假绿」,只有把**真实消费链路**(页面 mount 的镜像)纳入运行时验收才抓得到。同 P-058「存储改对 ≠ 数据流对」族。
+
+## P-061 · 账号隔离改动的验证方法论——纯 hash 导航留 HMR 陈旧假红 + 迁 persist key 必同步所有护栏
+
+- **现象 A(HMR 陈旧假红)**:改完 store 后,Playwright `page.goto` 只改 hash(`#/a`→`#/b`)**不触发整页重载**,app 仍是改动前那个实例;HMR 只补了 `account-scope.ts`(调 12 个 bindAccount),但改动前已实例化的旧 Pinia store 实例**没有新加的 bindAccount 方法**(setup store 定义变更 HMR 不干净重注册)→ bootstrap 报 `useVoucher(...).bindAccount is not a function`,看似真 bug 实为 HMR 陈旧。
+- **现象 B(迁 key 漏改护栏)**:把 `nexion-bills-v1` / `nexion-milestones-v1` 迁成 `*-accounts-v1` 后,`spec6-entry-surface-runtime.mjs` 反泄漏护栏仍盯旧死键 → 未来真泄漏它读到空串**静默失明不报红**(修一处漏改哨兵)。
+- **对策**:**A**:改 store 后验证必**换 query**(`?b2=1#/...`,query 变=整页重载)拿 fresh app 实例,纯 hash 导航只用于同 app 内累积实例化;reach Pinia 走 `document.querySelector('#app').__vue_app__` → provides 里找 `._s instanceof Map` 的 pinia,`_s.get(id)` 取真 store 实例,对真实例调 `bindAccount` + 真 action 造数据(跑的是产品确切代码)。**B**:迁任一 persist key,`grep` 全站(尤其 `scripts/*.mjs` 护栏 + verify.sh)该旧键,同步改到新键;把清单 DRY 成单源防再漂移;加哨兵机器化断言护栏跟踪迁移键(`spec6 guard tracks new key`)。
+- **已转**:B 半已机器化(verify.sh「spec6 guard tracks new key」哨兵);A 是验证程序,记本台账 + nexion-workflow P4 实景门(store 改动实景验必换 query 重载)。voucher/cart 的 `watch` 异步持久化:A/B/A 测须在切号前 `await` 一拍让 watcher flush(模拟真实使用的事件循环分 turn,否则同步测造人造 race 假红)。
+- **元教训**:store 结构变更的实景验证有两个**测试侧**陷阱(非产品 bug):HMR 陈旧(纯 hash 不重载,同 P-052 hash-nav 族)与异步 watcher 未 flush;判「假 bug」先**换 query 整页重载复现**再定责。护栏键与被守数据同生死——**迁数据键=迁所有引用该键的护栏键**,否则守卫静默失明比没有还危险(给「已守」的假象)。
+
 ## P-060 · uni scroll-view 有两层 `.uni-scroll-view`(外 wrapper overflow=0 + 内真滚层)+ 声明式滚不到底 → 聊天「自动到底」查错元素假通过、实际差一截
 
 - **现象**:会话中心聊天页「发消息/收回复自动滚到最新」实测**没到底**(差 ~75-177px);更隐蔽的是**验证一直假通过**——脚本查 `.nx-conv-list`(uni-scroll-view 标签外壳)的 `scrollHeight-clientHeight` 恒 =0,`atBottom`(差值<8)恒真,导致「没到底」这个真 bug 被绿灯放过多轮。
@@ -489,3 +505,11 @@
 - **对策**:bottom sheet 一律 `padding-bottom: calc(env(safe-area-inset-bottom) + 38px)`;非 sheet 的贴底条(聊天输入条等)最低 22px。新做任何贴底组件前先 grep `safe-area-inset-bottom` 对齐既有基准。
 - **已转**:verify.sh 哨兵 `safe-area-inset-bottom base padding >=22px (P-065)`(node 解析两种词序 + env fallback 形态,基础值 <22px 即 FAIL;已探针验证真抓 0px/16px 反例)。
 - **元教训**:safe-area 类 env 变量是「条件性系统补偿」,永远要叠加设计留白而不是替代它;新组件的间距基准先问「工程里同类怎么写」,不是拍脑袋给个小值。
+
+## P-066 · 试用提前购买扣款失败仍记「已购买」账单——裸 `app.debitBalance()` 丢弃 false 返回值
+
+- **现象**:试用期点「立即购买」提前兑换,余额预检查(确认框前)通过后、确认框停留期间余额被别端(多端/其它购买)消耗光;确认后 `app.debitBalance()` 返回 false(不扣款),但代码照常 `bills.add({type:"purchase"})` + creditBalance + addDevice → 账本记一笔「已购买」但钱没动、白发设备(账单与实际扣款不一致,非偿付性,审计相邻发现)。
+- **根因**:裸语句 `app.debitBalance(chargeAmount);` 丢弃 boolean 返回值;第 206 行余额预检查在 `await confirm()` 的并发窗口下已 stale。且 `redeemEarly()` 在 debit 之前已把试用状态推进到 `redeemed` 终态——只 return 会留下「显示已兑换、实则没钱没设备」的死状态 + 冷却锁死。
+- **对策**:检查返回值,false 时 `freeTrial.markChargeFailed("insufficient_funds")`(翻 failed 保留 finishedAt 起冷却) + toast + return,后续记账/加余额/发设备全不执行。对齐 App.vue handleAutoRedeem / checkout.vue 既有正确写法;全站 12 处 debit 调用同形排查,trial 是唯一漏点。
+- **已转**:verify.sh 哨兵 `debit_return_checked`(grep 行首裸 `app.debit(Balance|Nex)(...);` = bug 形态;现有 12 调用点零误报、原 bug 形态真抓,5 形态自测过)。
+- **元教训**:返回 boolean 的资金原语(debit/扣款/校验)裸语句调用 = 静默吞掉失败信号;凡「先检查后执行」跨 await/用户确认,检查必在真正动钱那步复核(预检查只是前置过滤,不是授权)。

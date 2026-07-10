@@ -8,6 +8,7 @@ import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle"
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor } from "@/lib/hashpower";
 import { getCarrier, type Carrier } from "@/lib/carrier";
+import { GENESIS_INVITE_PATTERN } from "./genesis";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { useConfig } from "@/store/config";
@@ -117,6 +118,7 @@ function createInitialUser(email = "alex@nexion.ai"): UserState {
     tier: "L2",
     joinedAt: Date.now() - 30 * ONE_DAY,
     cumulativeDepositUsdt: 0,
+    genesisInviteCode: null,
     referralCode: "NEXION-8K9X",
     usdtBalance,
     nexBalance: 1240,
@@ -718,12 +720,25 @@ export const useApp = defineStore("app", () => {
 
   // ── Balance primitives (register/login/wallet use these) ──
   function creditBalance(amount: number) {
+    // NaN/Infinity/负数守卫(对齐 recordDeposit):脏 amount 会把余额污染成 NaN,
+    // 此后一切 debit 检查恒过 = 无限钱(审计 P2-5)。
+    if (!Number.isFinite(amount) || amount < 0) return;
     user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(2) };
     persistAccountSnapshot();
   }
   function debitBalance(amount: number): boolean {
+    if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.usdtBalance < amount) return false;
-    user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance - amount).toFixed(2) };
+    const nextUsdt = +(user.value.usdtBalance - amount).toFixed(2);
+    // 维护不变量 withdrawableUsdt ≤ usdtBalance:花钱先消耗不可提部分(如充值本金),
+    // 花穿后才吃可提收益,可提额度随之收敛到剩余总余额。缺此 clamp,提现门(submitWithdrawal
+    // 只看 withdrawableUsdt)会放行超过总余额的提现 → usdtBalance 变负(凭空取钱,原 P0)。
+    const buckets = withDefaultEarningBuckets(user.value).earningBuckets;
+    user.value = {
+      ...user.value,
+      usdtBalance: nextUsdt,
+      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
+    };
     persistAccountSnapshot();
     return true;
   }
@@ -737,6 +752,17 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
     return true;
   }
+  /** 核销创世邀请码(FEAT-GEN08 通道4)。per-account:随 account-cloud 快照走,
+   *  切号/新注册不继承(设备级存储会造成资格门跨账号旁路,审计 P1)。
+   *  mock 端格式校验;真后台 = POST /api/genesis/invite/redeem(server 核销)。 */
+  function setGenesisInviteCode(raw: string): boolean {
+    const code = raw.trim().toUpperCase();
+    if (!GENESIS_INVITE_PATTERN.test(code)) return false;
+    user.value = { ...user.value, genesisInviteCode: code };
+    persistAccountSnapshot();
+    return true;
+  }
+
   function recordDeposit(amount: number): boolean {
     // Input validation mirrors source: reject NaN/±Infinity/≤0/absurd (>1e9).
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) return false;
@@ -793,8 +819,16 @@ export const useApp = defineStore("app", () => {
     // SPEC-7 FEAT-RISK03: reject 路由禁止扣款建单;freeze/manual/delay 建单进
     // 对应队列(资金占用),状态由服务端/人工推进,client 不推进。
     if (riskRoute === "reject") return null;
+    // 金额有效性守卫(对齐 debitBalance):NaN/±Infinity/≤0 一律拒 —— 负数会让下方
+    // usdtBalance - amount 反向加钱,NaN 污染余额为 NaN 后一切校验恒过(无限钱)。
+    if (!Number.isFinite(amount) || amount <= 0) return null;
     const currentUser = withDefaultEarningBuckets(user.value);
+    // 双门:可提额度门 + 总余额门。正常态 debitBalance 的 clamp 保证 withdrawableUsdt ≤
+    // usdtBalance,后者恒不触发;但作为纵深兜底 —— 万一多端快照 merge(两字段独立
+    // last-write-wins)或未来新增扣款路径漏 clamp 让可提额度 > 总余额,也绝不放行超过
+    // 总余额的提现(negative-balance 最后防线)。
     if (currentUser.earningBuckets.withdrawableUsdt < amount) return null;
+    if (currentUser.usdtBalance < amount) return null;
     const now = Date.now();
     const yyyymmdd = new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
     const seq = Math.floor(1000 + Math.random() * 9000);
@@ -855,7 +889,7 @@ export const useApp = defineStore("app", () => {
     user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global, latestWithdrawal, miningPaused,
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
-    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, creditRewardBucket,
+    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, setGenesisInviteCode, creditRewardBucket,
     submitWithdrawal, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };

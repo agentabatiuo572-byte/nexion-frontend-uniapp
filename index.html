@@ -62,6 +62,10 @@
         box-sizing: border-box;
       }
 
+      html.nx-device-host #app {
+        display: none;
+      }
+
       .nx-device-fit {
         position: relative;
         width: var(--nx-device-fit-w, 472px);
@@ -125,11 +129,10 @@
         var shouldUseShell = !isInner && !shellOff && (isLocal || shellOn)
 
         if (!shouldUseShell) {
-          document.write('<div id="app"><!--app-html--></div>')
-          document.write('<script type="module" src="/src/main.ts"><\/script>')
           return
         }
 
+        window.__NX_DEVICE_SHELL__ = true
         document.documentElement.classList.add('nx-device-host')
         document.documentElement.setAttribute('data-nx-app-theme', 'dark')
         var innerUrl = new URL(window.location.href)
@@ -225,5 +228,7 @@
         window.addEventListener('resize', fitDevice)
       })()
     </script>
+    <div id="app"><!--app-html--></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

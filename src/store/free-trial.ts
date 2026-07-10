@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "./trial-config";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Free trial — classic SaaS free-trial → auto-billing model.
@@ -65,22 +67,19 @@ const INITIAL: FreeTrialState = {
   shadowFrozenAtNEX: 0,
 };
 
-const STORAGE_KEY = "nexion-trial-v1";
+// 旧设备级单键 "nexion-trial-v1" 废弃(存量无账号归属,mock 可重建);试用状态机按账号分行。
+const ACCOUNTS_KEY = "nexion-trial-accounts-v1"; // { [accountKey]: FreeTrialState }
 
-function hydrate(): FreeTrialState {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<FreeTrialState> | "";
-    if (s && typeof s === "object" && typeof s.status === "string") {
-      return { ...INITIAL, ...s };
-    }
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): FreeTrialState {
+  const row = readAccountRow<Partial<FreeTrialState>>(ACCOUNTS_KEY, accountKey);
+  if (row && typeof row.status === "string") return { ...INITIAL, ...row };
   return { ...INITIAL };
 }
 
 export const useFreeTrial = defineStore("freeTrial", () => {
-  const init = hydrate();
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const status = ref<TrialStatus>(init.status);
   const cardTokenId = ref<string | null>(init.cardTokenId);
   const startedAt = ref<number | null>(init.startedAt);
@@ -95,24 +94,38 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const shadowFrozenAtNEX = ref<number>(init.shadowFrozenAtNEX);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        status: status.value,
-        cardTokenId: cardTokenId.value,
-        startedAt: startedAt.value,
-        activeEndsAt: activeEndsAt.value,
-        graceEndsAt: graceEndsAt.value,
-        extendedEndsAt: extendedEndsAt.value,
-        scheduledChargeAt: scheduledChargeAt.value,
-        finishedAt: finishedAt.value,
-        failReason: failReason.value,
-        extensionGranted: extensionGranted.value,
-        shadowFrozenAtUSD: shadowFrozenAtUSD.value,
-        shadowFrozenAtNEX: shadowFrozenAtNEX.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, {
+      status: status.value,
+      cardTokenId: cardTokenId.value,
+      startedAt: startedAt.value,
+      activeEndsAt: activeEndsAt.value,
+      graceEndsAt: graceEndsAt.value,
+      extendedEndsAt: extendedEndsAt.value,
+      scheduledChargeAt: scheduledChargeAt.value,
+      finishedAt: finishedAt.value,
+      failReason: failReason.value,
+      extensionGranted: extensionGranted.value,
+      shadowFrozenAtUSD: shadowFrozenAtUSD.value,
+      shadowFrozenAtNEX: shadowFrozenAtNEX.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的试用状态机(防跨账号继承试用资格/冷却/影子收益)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    status.value = next.status;
+    cardTokenId.value = next.cardTokenId;
+    startedAt.value = next.startedAt;
+    activeEndsAt.value = next.activeEndsAt;
+    graceEndsAt.value = next.graceEndsAt;
+    extendedEndsAt.value = next.extendedEndsAt;
+    scheduledChargeAt.value = next.scheduledChargeAt;
+    finishedAt.value = next.finishedAt;
+    failReason.value = next.failReason;
+    extensionGranted.value = next.extensionGranted;
+    shadowFrozenAtUSD.value = next.shadowFrozenAtUSD;
+    shadowFrozenAtNEX.value = next.shadowFrozenAtNEX;
   }
 
   // PRODUCTION: GET /api/trial/eligibility → { canStart, reason? }
@@ -279,7 +292,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     scheduledChargeAt, finishedAt, failReason, extensionGranted,
     shadowFrozenAtUSD, shadowFrozenAtNEX,
     canStart, startWithCard, redeemEarly, cancel, acceptExtension,
-    declineExtension, poll, reset, markChargeFailed,
+    declineExtension, poll, reset, markChargeFailed, bindAccount,
   };
 });
 

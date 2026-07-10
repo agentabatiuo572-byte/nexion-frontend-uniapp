@@ -149,6 +149,10 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/me/rewards-list",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/me/proof",
       "style": { "navigationStyle": "custom" }
     },
@@ -306,10 +310,6 @@
     },
     {
       "path": "pages/me/preferences",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
-      "path": "pages/me/replay-tour",
       "style": { "navigationStyle": "custom" }
     },
     {

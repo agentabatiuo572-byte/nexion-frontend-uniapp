@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "@/store/account-cloud";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
 /**
  * Ported from Nexion-prototype/lib/v3/v-rank.ts (zustand persist → Pinia + uni storage).
@@ -142,10 +144,13 @@ export interface VRankData {
 
 export type VRankProgressPatch = Partial<Omit<VRankData, "myRank">>;
 
-const STORAGE_KEY = "nexion-v-rank-v1";
+// 等级是账号资产:per-account 行表(P2-8 设备级泄漏修复)。旧设备级单键
+// "nexion-v-rank-v1" 不迁移 —— 存量无账号归属,迁给任何账号都是臆断,就地废弃。
+const ACCOUNTS_KEY = "nexion-v-rank-accounts-v1"; // { [accountKey]: VRankData }
 
 const DEFAULT_V_RANK: VRankData = {
-  // 当前用户:V2 Operator(刚到,正冲 V3)
+  // 新账号 seed 人设:V2 Operator(刚到,正冲 V3)—— 与 account-cloud
+  // createSeedSnapshot 的统一 seed 口径一致。
   myRank: 2,
   selfBuyUSD: 1198,        // S1 + Pro 已买
   directRefs: 5,
@@ -153,20 +158,19 @@ const DEFAULT_V_RANK: VRankData = {
   vDownlineCounts: { 1: 3 }, // 下面有 3 个 V1
 };
 
-function hydrate(): VRankData {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<VRankData> | "";
-    if (s && typeof s === "object" && typeof s.myRank === "number") {
-      return { ...DEFAULT_V_RANK, ...s };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): VRankData {
+  const row = readAccountRow<Partial<VRankData>>(ACCOUNTS_KEY, accountKey);
+  if (row && typeof row.myRank === "number") {
+    return { ...DEFAULT_V_RANK, ...row };
   }
   return { ...DEFAULT_V_RANK };
 }
 
 export const useVRank = defineStore("vRank", () => {
-  const init = hydrate();
+  // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
+  // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const myRank = ref<VRank>(init.myRank);
   const selfBuyUSD = ref(init.selfBuyUSD);
   const directRefs = ref(init.directRefs);
@@ -174,17 +178,24 @@ export const useVRank = defineStore("vRank", () => {
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        myRank: myRank.value,
-        selfBuyUSD: selfBuyUSD.value,
-        directRefs: directRefs.value,
-        teamVolumeUSD: teamVolumeUSD.value,
-        vDownlineCounts: vDownlineCounts.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<VRankData>(ACCOUNTS_KEY, boundKey, {
+      myRank: myRank.value,
+      selfBuyUSD: selfBuyUSD.value,
+      directRefs: directRefs.value,
+      teamVolumeUSD: teamVolumeUSD.value,
+      vDownlineCounts: vDownlineCounts.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的等级行(变更处处即时 persist,旧账号无需先落盘)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    myRank.value = next.myRank;
+    selfBuyUSD.value = next.selfBuyUSD;
+    directRefs.value = next.directRefs;
+    teamVolumeUSD.value = next.teamVolumeUSD;
+    vDownlineCounts.value = next.vDownlineCounts;
   }
 
   function setMyRank(v: VRank) {
@@ -199,7 +210,7 @@ export const useVRank = defineStore("vRank", () => {
     persist();
   }
 
-  return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, setMyRank, setProgress };
+  return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, setMyRank, setProgress, bindAccount };
 });
 
 /** 计算到下一阶的进度(0-1) */

@@ -40,6 +40,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   rewards: {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。
     welcomeGift: { lockMode: "risk_bucket", usdtAmount: 5, nexAmount: 20 },
+    // 邀请人奖励:邀请人每邀请一名新用户得的 NEX;此处仅 mock seed,运营在 K 域调。
+    inviterReward: { nexAmount: 200 },
   },
   // FEAT-AUTH01 OTP 闸门 mock seed(PRD §4.6.2/§16.2.1;运营在 K 域调)。
   otpGate: {

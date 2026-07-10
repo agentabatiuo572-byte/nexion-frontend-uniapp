@@ -64,7 +64,8 @@
           </view>
         </view>
 
-        <!-- strong / weak gap — transparent block on the page floor -->
+        <!-- strong / weak gap — frosted-glass block (owner 2026-07-09), fill
+             only, zero border (bg-filled cards carry no border line). -->
         <view :style="gapBlockStyle">
           <text class="block font-mono-tabular" :style="gapCapStyle">{{ t.binary.strongWeakGap }}</text>
           <view style="display: flex; flex-direction: column; gap: 8px">
@@ -294,8 +295,15 @@ const topMemberStyle: CSSProperties = {
   gap: "6px",
 };
 
-// Transparent gap block — 2px optical inset, +12px top margin for 24px section rhythm.
-const gapBlockStyle: CSSProperties = { marginTop: "12px", padding: "0 2px" };
+// Frosted-glass gap block (owner 2026-07-09) — chassis glass-tile token,
+// fill only / zero border; +12px top margin keeps the 24px section rhythm.
+const gapBlockStyle: CSSProperties = {
+  marginTop: "12px",
+  padding: "16px",
+  borderRadius: "16px",
+  background: "var(--v5-glass-bg)",
+  backdropFilter: "blur(18px) saturate(180%)",
+};
 const gapCapStyle: CSSProperties = {
   fontSize: "11px",
   fontWeight: 500,

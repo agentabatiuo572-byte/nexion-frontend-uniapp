@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Notification Center store. Ported from Nexion-prototype/lib/v3/notifications.ts
@@ -47,19 +49,16 @@ function applyPriorityRetention(items: Notification[]): Notification[] {
   return trimmed.sort((a, b) => b.ts - a.ts);
 }
 
-const STORAGE_KEY = "nexion-notifications-v1";
+// 旧设备级单键 "nexion-notifications-v1" 废弃(存量无账号归属,mock 可重建);通知 feed 按账号分行。
+const ACCOUNTS_KEY = "nexion-notifications-accounts-v1"; // { [accountKey]: { items, unread } }
 
-function hydrate(): { items: Notification[]; unread: number } {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { items?: Notification[]; unread?: number } | "";
-    if (s && typeof s === "object" && Array.isArray(s.items)) {
-      const items = s.items.map((it) =>
-        it.priority ? it : { ...it, priority: "normal" as NotifPriority },
-      );
-      return { items, unread: typeof s.unread === "number" ? s.unread : items.filter((i) => !i.readAt).length };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): { items: Notification[]; unread: number } {
+  const row = readAccountRow<{ items?: Notification[]; unread?: number }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.items)) {
+    const items = row.items.map((it) =>
+      it.priority ? it : { ...it, priority: "normal" as NotifPriority },
+    );
+    return { items, unread: typeof row.unread === "number" ? row.unread : items.filter((i) => !i.readAt).length };
   }
   return { items: [], unread: 0 };
 }
@@ -81,16 +80,22 @@ export interface PushInput {
 }
 
 export const useNotifications = defineStore("notifications", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const items = ref<Notification[]>(init.items);
   const unread = ref<number>(init.unread);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { items: items.value, unread: unread.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ items: Notification[]; unread: number }>(ACCOUNTS_KEY, boundKey, { items: items.value, unread: unread.value });
+  }
+
+  /** 账号切换重绑:装载该账号的通知 feed + 未读数(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    items.value = next.items;
+    unread.value = next.unread;
   }
 
   function push(n: PushInput) {
@@ -171,5 +176,5 @@ export const useNotifications = defineStore("notifications", () => {
     persist();
   }
 
-  return { items, unread, push, markRead, markAllRead, clearRead, clearAll, removeOne };
+  return { items, unread, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount };
 });

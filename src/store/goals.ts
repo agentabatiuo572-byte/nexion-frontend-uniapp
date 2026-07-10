@@ -1,10 +1,13 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/goals.ts (zustand+persist → Pinia).
 // User-defined earning goals (Sprint A-3 / F.3). Stored locally so a target +
 // deadline survives a refresh and the page can surface "X days to goal".
-const STORAGE_KEY = "nexion-goals-v1";
+// 旧设备级单键 "nexion-goals-v1" 废弃(存量无账号归属,mock 可重建);目标按账号分行。
+const ACCOUNTS_KEY = "nexion-goals-accounts-v1"; // { [accountKey]: { goals: Goal[] } }
 
 export interface Goal {
   id: string;
@@ -14,25 +17,25 @@ export interface Goal {
   achieved: boolean;
 }
 
-function hydrate(): Goal[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { goals?: Goal[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.goals)) return s.goals;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): Goal[] {
+  const row = readAccountRow<{ goals?: Goal[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.goals)) return row.goals;
   return [];
 }
 
 export const useGoals = defineStore("goals", () => {
-  const goals = ref<Goal[]>(hydrate());
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const goals = ref<Goal[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { goals: goals.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ goals: Goal[] }>(ACCOUNTS_KEY, boundKey, { goals: goals.value });
+  }
+
+  /** 账号切换重绑:装载该账号的目标(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    goals.value = hydrate(boundKey);
   }
 
   function setGoal(g: Pick<Goal, "targetUSDT" | "deadlineMs">) {
@@ -58,5 +61,5 @@ export const useGoals = defineStore("goals", () => {
     persist();
   }
 
-  return { goals, setGoal, markAchieved, remove, clear };
+  return { goals, setGoal, markAchieved, remove, clear, bindAccount };
 });

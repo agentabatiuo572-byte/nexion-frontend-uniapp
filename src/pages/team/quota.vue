@@ -73,7 +73,7 @@ const network = useNetwork();
 const vRank = useVRank();
 const cfg = useConfig();
 // 礼包 NEX 数量单源派生自 platform config。
-const inviteHint = computed(() => fmt(t.value.quota.inviteFriendsHint, { nex: cfg.config.rewards.welcomeGift.nexAmount }));
+const inviteHint = computed(() => fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const members = computed(() => network.members);
 const directInvites = computed(() => members.value.filter((m) => m.layer === 1).length);

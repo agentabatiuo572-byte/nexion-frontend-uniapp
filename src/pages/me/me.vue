@@ -2,8 +2,13 @@
   Me — ported from Nexion-prototype/app/(main)/me/page.tsx (13 sections).
   Top→bottom: ProfileRow → WalletCard → WithdrawalLockedWarning (if balance < $20)
   → TrialEntry (hero, if eligible) → OKX-style quick sections (network / devices
-  / earn extras / account / preferences / help) → TrialEntry (active row, if
+  / account / preferences / help) → TrialEntry (active row, if
   trial running) → OrdersCard (if any orders) → Sign out → version footer.
+
+  Account section carries the "My rewards" entry (/me/rewards) with an unread
+  dot: unused valid vouchers OR reward credits newer than the seen-watermark
+  (rewards-seen store). Risk disclosure lives in Help & Support (moved from
+  account, 2026-07-09).
 
   Wrapped in <AppChassis active="me">; entrance via <CardStagger>.
 
@@ -48,6 +53,7 @@
                   <path v-for="path in iconPaths[item.icon]" :key="path" :d="path" />
                 </svg>
                 <text v-if="item.badge" :style="quickBadgeStyle">{{ item.badge }}</text>
+                <view v-else-if="item.dot" :style="quickDotStyle" />
               </view>
               <text :style="quickLabelStyle">{{ item.label }}</text>
               <text v-if="item.meta" class="truncate" :style="quickMetaStyle(item.tone)">{{ item.meta }}</text>
@@ -99,9 +105,13 @@ import { useWalletPairing } from "@/store/wallet-pairing";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
+import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useNotifications } from "@/store/notifications";
 import { useGenesis } from "@/store/genesis";
+import { useConfig } from "@/store/config";
 import { useAchievements } from "@/store/achievements";
+import { useVoucher } from "@/store/voucher";
+import { useRewardsSeen } from "@/store/rewards-seen";
 import { MAX_DEVICES } from "@/store/device-types";
 import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
@@ -124,6 +134,8 @@ const trial = useFreeTrial();
 const security = useSecurity();
 const notifications = useNotifications();
 const achievements = useAchievements();
+const voucher = useVoucher();
+const rewardsSeen = useRewardsSeen();
 const vrank = useVRank();
 const theme = useTheme();
 const themePickerOpen = ref(false);
@@ -175,6 +187,8 @@ interface QuickItem {
   icon: QuickIcon;
   meta?: string;
   badge?: string;
+  /** Plain unread dot (no count) on the icon tile — distinct from `badge`. */
+  dot?: boolean;
   tone?: QuickTone;
 }
 
@@ -223,6 +237,7 @@ const trialIsHero = computed(() => !trialIsActive.value && trial.canStart());
 // Genesis row surfaces once the user actually owns a Genesis node →
 // links to the holder (holdings/dividends) page.
 const genesis = useGenesis();
+const config = useConfig();
 const ownsGenesis = computed(() => genesis.myOwned > 0);
 const myGenesisValue = computed(() => fmt(t.value.me.myGenesisNodeValue, { n: String(genesis.myOwned) }));
 
@@ -238,15 +253,19 @@ const achievementsValue = computed(() =>
 );
 // Mock urgency — source hardcodes 9 live events (server-driven in the full app).
 const eventsLiveLabel = computed(() => fmt(t.value.me.nLive, { n: "9" }));
+
+// My Rewards unread dot — unused valid vouchers keep it lit (state-based)
+// OR reward credits newer than the seen-watermark (cleared on page open).
+const rewardsDot = computed(() => voucher.claimedUnused.length > 0 || rewardsSeen.hasUnseen);
 const quickSections = computed<QuickSection[]>(() => [
   {
     key: "network",
     title: t.value.me.myNetwork,
     items: [
       { key: "team", label: t.value.me.team, href: "/team", icon: "network", meta: t.value.me.networkOverviewMeta, tone: "brand" },
-      { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
-      { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: t.value.me.networkInviteMeta, tone: "orange" },
+      { key: "invite", label: t.value.me.networkInviteLabel, href: "/team", icon: "invite", meta: fmt(t.value.me.networkInviteMeta, { nex: config.config.rewards.inviterReward.nexAmount }), tone: "orange" },
       { key: "commissions", label: t.value.me.networkCommissionsLabel, href: "/team/commissions", icon: "commission", meta: t.value.me.networkCommissionsMeta, tone: "success" },
+      { key: "rank", label: t.value.me.currentRank, href: "/team/rank", icon: "rank", meta: rankValue.value, tone: "purple" },
     ],
   },
   {
@@ -264,14 +283,14 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "account",
     title: t.value.me.secAccount,
     items: [
-      { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
-      { key: "kyc", label: t.value.me.identityKyc, href: "/me/security", icon: "shield", meta: kycVerified.value ? t.value.me.kycVerified : t.value.me.kycPending, tone: kycVerified.value ? "success" : "orange" },
-      { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
-      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+      { key: "rewards", label: t.value.rewards.entry, href: "/me/rewards", icon: "gift", dot: rewardsDot.value, tone: "brand" },
       { key: "receipts", label: t.value.me.receiptsRow, href: "/me/receipts", icon: "receipt", meta: String(receiptCount.value), tone: "brand" },
+      { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
+      { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
-      { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
-      { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
+      { key: "kyc", label: t.value.me.identityKyc, href: "/me/security", icon: "shield", meta: kycVerified.value ? t.value.me.kycVerified : t.value.me.kycPending, tone: kycVerified.value ? "success" : "orange" },
+      { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
+      { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
     ],
   },
   {
@@ -287,11 +306,12 @@ const quickSections = computed<QuickSection[]>(() => [
     key: "help",
     title: t.value.me.secHelp,
     items: [
-      { key: "replay", label: t.value.me.replayTour, href: "/me/replay-tour", icon: "rewind", tone: "muted" },
-      { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
-      { key: "support", label: t.value.me.liveSupportRow, href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
-      { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
       { key: "messages", label: t.value.me.supportMessagesRow, href: "/support/messages", icon: "messages", badge: unreadNotifs.value > 0 ? String(unreadNotifs.value) : undefined, tone: "purple" },
+      { key: "support", label: t.value.me.liveSupportRow, href: "/me/support", icon: "chat", meta: t.value.me.onlineChip, tone: "success" },
+      { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
+      { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
+      { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
+      { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
     ],
   },
@@ -357,6 +377,16 @@ function quickIconStyle(tone: QuickTone = "muted"): CSSProperties {
     color,
   };
 }
+// Plain unread dot — same accent family as the numeric badge, no count.
+const quickDotStyle: CSSProperties = {
+  position: "absolute",
+  top: "-2px",
+  right: "-2px",
+  width: "9px",
+  height: "9px",
+  borderRadius: "999px",
+  background: "var(--v5-brand-2)",
+};
 const quickBadgeStyle: CSSProperties = {
   position: "absolute",
   top: "-4px",
@@ -412,6 +442,10 @@ async function handleSignOut() {
     app.interruptAllTasks("logged-out");
     session.signOutSession();
     auth.signOut();
+    // 登出兜底:清全部账号级数据的内存残留(P2-8 纵深防御;下次登录会重绑真账号)。
+    // app(余额/设备/收益,account-cloud 快照)+ 其余 28 个账号级 store 一并归 default。
+    app.bindAccount("default");
+    rebindAccountScopedStores("default");
     uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
   }
 }

@@ -14,17 +14,24 @@ const forbiddenText = [
   "+3,000 NEX",
   "Milestone",
 ];
+// 业务存储表:未登录入口面(unsigned/h5/white)一律不得写入(反泄漏护栏)。
+// 🔴 P2-8:账户资产表(bills/orders/staking/commission)改成按账号分行后,护栏键必须跟着
+// 换成 *-accounts-v1;盯旧死键会让本护栏静默失明(真泄漏不再报红)。单一来源,清理与
+// 快照共用,防止清单重复漂移(旧版三处硬编码清单正因此朽坏)。
 const businessStorageKeys = [
-  "nexion-milestones-v1",
-  "nexion-bills-v1",
+  "nexion-milestones-accounts-v1",
+  "nexion-bills-accounts-v1",
+  "nexion-orders-accounts-v1",
+  "nexion-v3-staking-accounts-v1",
+  "nexion-commission-accounts-v1",
   "nexion-account-cloud-v1",
   "nexion-account-sessions-v1",
   "nexion-device-id-v1",
 ];
 
 function assertNoBusinessStorage(snapshot, route) {
-  const milestone = snapshot["nexion-milestones-v1"] || "";
-  const bills = snapshot["nexion-bills-v1"] || "";
+  const milestone = snapshot["nexion-milestones-accounts-v1"] || "";
+  const bills = snapshot["nexion-bills-accounts-v1"] || "";
   if (/earn-\d+/.test(milestone)) {
     throw new Error(`${route} wrote milestone fired state: ${milestone}`);
   }
@@ -51,17 +58,11 @@ async function main() {
     const text = await page.locator("body").innerText({ timeout: 5000 });
     const leaked = forbiddenText.filter((token) => text.includes(token));
     if (leaked.length) throw new Error(`${route} leaked business overlay text: ${leaked.join(", ")}`);
-    const storage = await page.evaluate(() => {
+    const storage = await page.evaluate((keys) => {
       const out = {};
-      for (const key of [
-        "nexion-milestones-v1",
-        "nexion-bills-v1",
-        "nexion-account-cloud-v1",
-        "nexion-account-sessions-v1",
-        "nexion-device-id-v1",
-      ]) out[key] = localStorage.getItem(key) || "";
+      for (const key of keys) out[key] = localStorage.getItem(key) || "";
       return out;
-    });
+    }, businessStorageKeys);
     assertNoBusinessStorage(storage, route);
     await page.close();
   }

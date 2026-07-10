@@ -147,7 +147,6 @@
       <TrialExtensionSheet />
       <TrialUnbindRetentionSheet />
       <StickyCtaBar />
-      <GenesisDockHost />
       <MessageDrawer />
     </template>
 
@@ -167,7 +166,6 @@ import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
 import TrialExtensionSheet from "@/components/trial-extension-sheet.vue";
 import TrialUnbindRetentionSheet from "@/components/trial-unbind-retention-sheet.vue";
-import GenesisDockHost from "@/components/genesis-dock-host.vue";
 import MessageDrawer from "@/components/message-drawer.vue";
 import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
 import VoucherBanner from "@/components/voucher-banner.vue";

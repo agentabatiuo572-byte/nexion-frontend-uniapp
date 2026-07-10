@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Ported from Nexion-prototype/lib/store/daily-powerup.ts (zustand persist →
@@ -20,34 +22,37 @@ interface DailyPowerUpData {
   claimedAt: Record<string, number>;
 }
 
-const STORAGE_KEY = "nexion-daily-powerup-v1";
+// 旧设备级单键 "nexion-daily-powerup-v1" 废弃(存量无账号归属,mock 可重建);增益领取态按账号分行。
+const ACCOUNTS_KEY = "nexion-daily-powerup-accounts-v1"; // { [accountKey]: DailyPowerUpData }
 
-function hydrate(): DailyPowerUpData {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Partial<DailyPowerUpData> | "";
-    if (s && typeof s === "object" && Array.isArray(s.claimed)) {
-      return {
-        claimed: s.claimed,
-        claimedAt: s.claimedAt && typeof s.claimedAt === "object" ? s.claimedAt : {},
-      };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): DailyPowerUpData {
+  const row = readAccountRow<Partial<DailyPowerUpData>>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.claimed)) {
+    return {
+      claimed: row.claimed,
+      claimedAt: row.claimedAt && typeof row.claimedAt === "object" ? row.claimedAt : {},
+    };
   }
   return { claimed: [], claimedAt: {} };
 }
 
 export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const claimed = ref<StreakPowerUpId[]>(init.claimed);
   const claimedAt = ref<Record<string, number>>(init.claimedAt);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { claimed: claimed.value, claimedAt: claimedAt.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<DailyPowerUpData>(ACCOUNTS_KEY, boundKey, { claimed: claimed.value, claimedAt: claimedAt.value });
+  }
+
+  /** 账号切换重绑:装载该账号的增益领取态(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    claimed.value = next.claimed;
+    claimedAt.value = next.claimedAt;
   }
 
   function claim(id: StreakPowerUpId): boolean {
@@ -68,5 +73,5 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
     persist();
   }
 
-  return { claimed, claimedAt, claim, hasClaimed, reset };
+  return { claimed, claimedAt, claim, hasClaimed, reset, bindAccount };
 });

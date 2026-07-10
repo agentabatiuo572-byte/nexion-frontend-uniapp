@@ -1,8 +1,11 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { TICKETS, type Ticket, type TicketCategory } from "@/mock/tickets";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
-const STORAGE_KEY = "nexion-support-tickets-v1";
+// 旧设备级单键 "nexion-support-tickets-v1" 废弃(存量无账号归属,mock 可重建);工单按账号分行。
+const ACCOUNTS_KEY = "nexion-support-tickets-accounts-v1"; // { [accountKey]: { tickets: Ticket[] } }
 
 function cloneTicket(ticket: Ticket): Ticket {
   const raw = ticket as Partial<Ticket>;
@@ -18,15 +21,9 @@ function seedTickets(): Ticket[] {
   return TICKETS.map(cloneTicket);
 }
 
-function hydrate(): Ticket[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { tickets?: Ticket[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.tickets)) {
-      return s.tickets.map(cloneTicket);
-    }
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): Ticket[] {
+  const row = readAccountRow<{ tickets?: Ticket[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.tickets)) return row.tickets.map(cloneTicket);
   return seedTickets();
 }
 
@@ -39,14 +36,18 @@ function nextTicketId(tickets: Ticket[]): string {
 }
 
 export const useTickets = defineStore("tickets", () => {
-  const tickets = ref<Ticket[]>(hydrate());
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const tickets = ref<Ticket[]>(hydrate(boundKey));
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { tickets: tickets.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ tickets: Ticket[] }>(ACCOUNTS_KEY, boundKey, { tickets: tickets.value });
+  }
+
+  /** 账号切换重绑:装载该账号的工单(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    tickets.value = hydrate(boundKey);
   }
 
   function createTicket(input: { category: TicketCategory; subject: string; body: string }): string {
@@ -107,5 +108,5 @@ export const useTickets = defineStore("tickets", () => {
     persist();
   }
 
-  return { tickets, createTicket, reply, close, reset };
+  return { tickets, createTicket, reply, close, reset, bindAccount };
 });

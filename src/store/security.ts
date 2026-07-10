@@ -1,93 +1,56 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/security.ts (zustand+persist → Pinia).
-// MOCK-ONLY: password hash never lives client-side; 2FA + sessions are local
-// mock state. Production reads/writes via /api/me/* (see action JSDocs at the
-// source). Persisted to uni storage so toggles/revocations survive a refresh.
-const STORAGE_KEY = "nexion-security-v1";
-
-export interface Session {
-  id: string;
-  device: string; // e.g. "iPhone 15 Pro · Safari"
-  location: string; // e.g. "Singapore, SG"
-  ip: string; // e.g. "203.116.x.x"
-  lastActiveMs: number; // epoch ms
-  current: boolean;
-}
+// MOCK-ONLY: password hash never lives client-side; 2FA is local mock state.
+// Production reads/writes via /api/me/* (see action JSDocs). Persisted to uni
+// storage so toggles survive a refresh.
+// 会话/设备列表不在此 store:安全页渲染 session.ts 的账号级 activeSessions(单源真列表);
+// 本 store 原有的 mock sessions + revokeSession/revokeAllOthers 全站零消费者,已删(2026-07-10)。
+// 旧设备级单键 "nexion-security-v1" 废弃(存量无账号归属,mock 可重建);安全设置按账号分行。
+const ACCOUNTS_KEY = "nexion-security-accounts-v1"; // { [accountKey]: Persisted }
 
 interface Persisted {
   passwordChangedAt: number;
   twoFactorEnabled: boolean;
-  sessions: Session[];
 }
 
-function mockSessions(): Session[] {
-  const now = Date.now();
-  return [
-    {
-      id: "sess-cur",
-      device: "iPhone 15 Pro · Safari",
-      location: "Singapore, SG",
-      ip: "203.116.42.18",
-      lastActiveMs: now,
-      current: true,
-    },
-    {
-      id: "sess-mbp",
-      device: "MacBook Pro · Chrome",
-      location: "Singapore, SG",
-      ip: "203.116.42.18",
-      lastActiveMs: now - 3 * 3600 * 1000,
-      current: false,
-    },
-    {
-      id: "sess-ipad",
-      device: "iPad Air · Safari",
-      location: "Bangkok, TH",
-      ip: "171.96.x.x",
-      lastActiveMs: now - 28 * 3600 * 1000,
-      current: false,
-    },
-  ];
-}
-
-function hydrate(): Persisted {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
-    if (s && typeof s === "object" && typeof s.twoFactorEnabled === "boolean") {
-      return {
-        passwordChangedAt: s.passwordChangedAt,
-        twoFactorEnabled: s.twoFactorEnabled,
-        sessions: Array.isArray(s.sessions) ? s.sessions : mockSessions(),
-      };
-    }
-  } catch {
-    // first run
+function hydrate(accountKey: string): Persisted {
+  const row = readAccountRow<Persisted>(ACCOUNTS_KEY, accountKey);
+  if (row && typeof row.twoFactorEnabled === "boolean") {
+    return {
+      passwordChangedAt: row.passwordChangedAt,
+      twoFactorEnabled: row.twoFactorEnabled,
+    };
   }
   return {
     passwordChangedAt: Date.now() - 21 * 24 * 3600 * 1000,
     twoFactorEnabled: false,
-    sessions: mockSessions(),
   };
 }
 
 export const useSecurity = defineStore("security", () => {
-  const init = hydrate();
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
+  const init = hydrate(boundKey);
   const passwordChangedAt = ref(init.passwordChangedAt);
   const twoFactorEnabled = ref(init.twoFactorEnabled);
-  const sessions = ref<Session[]>(init.sessions);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, {
-        passwordChangedAt: passwordChangedAt.value,
-        twoFactorEnabled: twoFactorEnabled.value,
-        sessions: sessions.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
+      passwordChangedAt: passwordChangedAt.value,
+      twoFactorEnabled: twoFactorEnabled.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的安全设置(2FA / 改密时间)(P2-8 设备级泄漏修复)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    passwordChangedAt.value = next.passwordChangedAt;
+    twoFactorEnabled.value = next.twoFactorEnabled;
   }
 
   // ⚠️ MOCK-ONLY: production POST /api/me/password { oldPassword, newPassword }
@@ -104,23 +67,11 @@ export const useSecurity = defineStore("security", () => {
     persist();
   }
 
-  function revokeSession(id: string) {
-    sessions.value = sessions.value.filter((s) => s.id !== id);
-    persist();
-  }
-
-  function revokeAllOthers() {
-    sessions.value = sessions.value.filter((s) => s.current);
-    persist();
-  }
-
   return {
     passwordChangedAt,
     twoFactorEnabled,
-    sessions,
     changePassword,
     setTwoFactor,
-    revokeSession,
-    revokeAllOthers,
+    bindAccount,
   };
 });

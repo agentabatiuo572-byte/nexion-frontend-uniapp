@@ -5,8 +5,24 @@ import { mountSpec7DevBridge } from "@/lib/spec7-dev-bridge";
 import { mountAuthOtpDevBridge } from "@/store/auth-otp";
 import "./styles/tokens.css";
 import "uno.css";
+
+declare global {
+  interface Window {
+    __NX_DEVICE_SHELL__?: boolean;
+  }
+}
+
+const ShellHost = { render: () => null };
+
 export function createApp() {
-  const app = createSSRApp(App);
+  const isDeviceShellHost = typeof window !== "undefined" && window.__NX_DEVICE_SHELL__;
+  const app = createSSRApp(isDeviceShellHost ? ShellHost : App);
+  if (isDeviceShellHost) {
+    return {
+      app,
+    };
+  }
+
   app.use(createPinia());
   // DEV-only: SPEC-7 演示桥(模拟后台处置下发;PROD 构建内部直接 return)。
   mountSpec7DevBridge();

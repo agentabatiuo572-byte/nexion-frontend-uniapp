@@ -298,13 +298,42 @@ export function mergeAccountSnapshots(
   };
 }
 
+/** 资金不变量收口:余额类字段 clamp ≥0,且 withdrawableUsdt ≤ usdtBalance(可提额度 ⊆
+ *  总余额)。ADDITIVE_NUMBER_KEYS 把余额字段当独立计数器做三路累加,多端并发扣款(各自
+ *  本地合法)合并时两笔扣款都累加 → 总余额被扣穿为负 / 可提额度虚高于总余额(超卖)。真后端
+ *  单事务天然不会;mock 层在写盘前统一收口,storage 与内存都不落负余额/虚高可提额度
+ *  (与单会话 debitBalance clamp 同一不变量,补住 merge 层这条旁路)。 */
+function clampAccountFundInvariants(snapshot: AccountCloudSnapshot): AccountCloudSnapshot {
+  const u = snapshot.user;
+  const usdtBalance = Math.max(0, u.usdtBalance);
+  const nexBalance = Math.max(0, u.nexBalance);
+  const b = u.earningBuckets;
+  if (!b) return { ...snapshot, user: { ...u, usdtBalance, nexBalance } };
+  return {
+    ...snapshot,
+    user: {
+      ...u,
+      usdtBalance,
+      nexBalance,
+      earningBuckets: {
+        ...b,
+        withdrawableUsdt: Math.min(Math.max(0, b.withdrawableUsdt), usdtBalance),
+        pendingReviewUsdt: Math.max(0, b.pendingReviewUsdt),
+        bonusLockedUsdt: Math.max(0, b.bonusLockedUsdt),
+        lockedNex: Math.max(0, b.lockedNex),
+      },
+    },
+  };
+}
+
 export function mergeAndWriteAccountSnapshot(
   base: AccountCloudSnapshot | null,
   next: AccountCloudSnapshot,
 ): AccountCloudSnapshot {
   const key = normalizeAccountKey(next.accountKey);
   const latest = readAccountSnapshot(key);
-  const merged = base && latest ? mergeAccountSnapshots(base, next, latest) : { ...next, accountKey: key, updatedAt: Date.now() };
+  const rawMerged = base && latest ? mergeAccountSnapshots(base, next, latest) : { ...next, accountKey: key, updatedAt: Date.now() };
+  const merged = clampAccountFundInvariants(rawMerged);
   writeAccountSnapshot(merged);
   return readAccountSnapshot(key) ?? merged;
 }

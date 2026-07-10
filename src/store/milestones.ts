@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Earnings milestone store. Ported from
@@ -44,15 +46,13 @@ export interface ActiveMilestone {
   label: string;
 }
 
-const STORAGE_KEY = "nexion-milestones-v1";
+// 旧设备级单键 "nexion-milestones-v1" 废弃(存量无账号归属,mock 可重建);里程碑 fired 态按账号分行。
+// 🔴 spec6-entry-surface-runtime.mjs 的反泄漏护栏键同步改为 nexion-milestones-accounts-v1。
+const ACCOUNTS_KEY = "nexion-milestones-accounts-v1"; // { [accountKey]: { firedIds: string[] } }
 
-function hydrate(): string[] {
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { firedIds?: string[] } | "";
-    if (s && typeof s === "object" && Array.isArray(s.firedIds)) return s.firedIds;
-  } catch {
-    // first run
-  }
+function hydrate(accountKey: string): string[] {
+  const row = readAccountRow<{ firedIds?: string[] }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.firedIds)) return row.firedIds;
   return [];
 }
 
@@ -76,18 +76,23 @@ export function nextUnfired(
 }
 
 export const useMilestones = defineStore("milestones", () => {
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  let boundKey = "default";
   // ── persisted (cross-session) ──
-  const firedIds = ref<string[]>(hydrate());
+  const firedIds = ref<string[]>(hydrate(boundKey));
 
   // ── session-only (drives the celebration overlay) ──
   const active = ref<ActiveMilestone | null>(null);
 
   function persist() {
-    try {
-      uni.setStorageSync(STORAGE_KEY, { firedIds: firedIds.value });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow<{ firedIds: string[] }>(ACCOUNTS_KEY, boundKey, { firedIds: firedIds.value });
+  }
+
+  /** 账号切换重绑:装载该账号的里程碑 fired 态;清掉会话庆祝弹窗(别把 A 的庆祝弹给 B)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    firedIds.value = hydrate(boundKey);
+    active.value = null;
   }
 
   function isFired(id: string): boolean {
@@ -124,5 +129,6 @@ export const useMilestones = defineStore("milestones", () => {
     reset,
     show,
     dismiss,
+    bindAccount,
   };
 });

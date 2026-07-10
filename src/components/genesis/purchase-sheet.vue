@@ -84,7 +84,8 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
-import { useGenesis } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
 
 const props = defineProps<{ open: boolean }>();
@@ -94,6 +95,7 @@ const t = useT();
 const app = useApp();
 const bills = useBills();
 const genesis = useGenesis();
+const { gate } = useGenesisEligibility();
 
 const qty = ref(1);
 
@@ -115,13 +117,28 @@ function dec() {
   qty.value = Math.max(1, qty.value - 1);
 }
 function inc() {
-  qty.value = Math.min(remaining.value, qty.value + 1);
+  // 步进上限 = min(余量, 单人限购余量),防拨超到确认才报错。
+  const maxQty = Math.max(1, Math.min(remaining.value, gate.value.capRemaining));
+  qty.value = Math.min(maxQty, qty.value + 1);
 }
 function emitClose() {
   emit("update:open", false);
 }
 
 function handlePurchase() {
+  // L3 复验(照 checkout F4b:防深链/时序绕过 UI 门)。顺序固定
+  // eligibility → cap → balance → mint,资格/限购失败时零资金动作。
+  if (!gate.value.eligible) {
+    toast.error(t.value.genesisEligibility.toastIneligible, t.value.genesisEligibility.toastIneligibleSub);
+    return;
+  }
+  if (qty.value > gate.value.capRemaining) {
+    toast.error(
+      t.value.genesisEligibility.toastCapReached,
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+    );
+    return;
+  }
   const cost = qty.value * price.value;
   if (!app.debitBalance(cost)) {
     toast.error(
@@ -152,9 +169,16 @@ function handlePurchase() {
     );
     emitClose();
   } else {
-    // 铸造失败(下单与确认间被 tickSales 打到售罄)→ 退款,不留「扣钱无货」。
+    // 铸造失败 → 退款,不留「扣钱无货」;按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
     app.creditBalance(cost);
-    toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
+    if (r.reason === "cap") {
+      toast.error(
+        t.value.genesisEligibility.toastCapReached,
+        fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+      );
+    } else {
+      toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
+    }
   }
 }
 

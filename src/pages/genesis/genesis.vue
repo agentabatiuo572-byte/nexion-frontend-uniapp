@@ -145,18 +145,24 @@
         </template>
         <view class="relative inline-flex items-center" style="z-index: 1; gap: 6px; color: #D4AF5A">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
-          <text :style="dockLabelStyle">{{ remaining > 0 ? t.genesis.ctaReserve : t.genesis.ctaSoldOut }}</text>
-          <template v-if="remaining > 0">
+          <text :style="dockLabelStyle">{{ dockCtaText }}</text>
+          <template v-if="preSale && showTime">
+            <view :style="dockDividerStyle" />
+            <text class="tabular-nums">{{ countdownDisplay }}</text>
+          </template>
+          <template v-else-if="remaining > 0 && eligible">
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">${{ priceText }}</text>
           </template>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          <svg v-if="!preSale" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
       </view>
     </view>
 
     <!-- Confirm sheet -->
     <GenesisPurchaseSheet v-model:open="sheetOpen" />
+    <!-- Eligibility sheet(资格门 L2,FEAT-GEN08)-->
+    <GenesisEligibilitySheet v-model:open="eligSheetOpen" @subscribe="onEligSubscribe" />
   </AppChassis>
 </template>
 
@@ -167,23 +173,46 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import PerkRow from "@/components/genesis/perk-row.vue";
 import NftCard from "@/components/genesis/nft-card.vue";
 import GenesisPurchaseSheet from "@/components/genesis/purchase-sheet.vue";
+import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useGenesis, GENESIS_TIERS } from "@/store/genesis";
+import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
+import { useGenesisConfig } from "@/store/genesis-config";
+import { useLocaleStore } from "@/store/locale";
+import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { toast } from "@/store/ui";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
 const genesis = useGenesis();
+const cfg = useGenesisConfig();
+const locale = useLocaleStore();
+const { eligible, gate } = useGenesisEligibility();
+const { preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
 
 const sheetOpen = ref(false);
+const eligSheetOpen = ref(false);
 
-// Value props — i18n-driven（迁离硬编码英文，去日分红/$25K 地板雷）。
-const PERKS = computed(() => [
-  { ico: "🪙", name: t.value.genesis.value.emissionName, desc: t.value.genesis.value.emissionDesc },
-  { ico: "🌐", name: t.value.genesis.value.poolName, desc: t.value.genesis.value.poolDesc },
-  { ico: "🗳", name: t.value.genesis.value.daoName, desc: t.value.genesis.value.daoDesc },
-  { ico: "🎁", name: t.value.genesis.value.airdropName, desc: t.value.genesis.value.airdropDesc },
-]);
+// Value props — 运营可配（admin G4 权益配置）覆盖优先，未配置回退现 i18n 文案。
+// config.perks[i] 空字段 → 用 i18n 缺省；四项图标固定。
+const PERKS = computed(() => {
+  const isZh = locale.code === "zh";
+  const cp = cfg.config.perks;
+  const fb = t.value.genesis.value;
+  const pick = (i: number, name: string, desc: string) => {
+    const p = cp[i];
+    const cName = p ? (isZh ? p.nameZh : p.nameEn) : "";
+    const cDesc = p ? (isZh ? p.descZh : p.descEn) : "";
+    return { name: cName || name, desc: cDesc || desc };
+  };
+  return [
+    { ico: "🪙", ...pick(0, fb.emissionName, fb.emissionDesc) },
+    { ico: "🌐", ...pick(1, fb.poolName, fb.poolDesc) },
+    { ico: "🗳", ...pick(2, fb.daoName, fb.daoDesc) },
+    { ico: "🎁", ...pick(3, fb.airdropName, fb.airdropDesc) },
+  ];
+});
 
 // Secondary-market recent fills（价格随尾盘档溢价，非旧 $25K 地板叙事）。
 const LIVE_MARKET = [
@@ -207,18 +236,34 @@ const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const soldPct = computed(() => (sold.value / total.value) * 100);
 
+// Dock 四态文案:预售未开(最外层)/ 售罄 / 未达资格(→ 资格 sheet)/ 达标认购。
+const dockCtaText = computed(() => {
+  if (preSale.value) return t.value.genesisEligibility.comingSoon;
+  if (remaining.value === 0) return t.value.genesis.ctaSoldOut;
+  if (!eligible.value) return t.value.genesisEligibility.dockLocked;
+  return t.value.genesis.ctaReserve;
+});
+// 倒计时副文本(showTime 时):「开售倒计时 {d天} HH:MM:SS」/「Opens in {d}d HH:MM:SS」。
+const countdownDisplay = computed(() => {
+  if (!showTime.value) return "";
+  const dayPart = countdownDays.value > 0 ? fmt(t.value.genesisEligibility.countdownDay, { n: countdownDays.value }) + " " : "";
+  return `${t.value.genesisEligibility.countdownLabel} ${dayPart}${countdownClock.value}`;
+});
+
 const totalText = computed(() => total.value.toLocaleString());
 const soldText = computed(() => sold.value.toLocaleString());
 const priceText = computed(() => price.value.toLocaleString());
 
-// 阶梯档展示：累计售出决定各档 售罄/当前 态（wl/t1 售罄、t2 尾盘当前）。
+// 阶梯档展示：累计售出决定各档 售罄/当前 态。档位读 live config(运营 G4 可配、可增删)。
+// labelKey 按位置派生(不按 id 硬编码):首档=wl / 末档=Final tier / 中间=Public Tier —
+// 运营增删档(t3/t4…)标签不错位、末档恒为 Final(修 id 硬编码致 label 错位)。
 type TierLabelKey = "wl" | "t1" | "tail";
 const tiers = computed(() =>
-  GENESIS_TIERS.map((tier) => {
+  cfg.config.tiers.map((tier, i, arr) => {
     const s = sold.value;
     const isCurrent = s >= tier.from && s < tier.to;
     const left = Math.max(0, tier.to - Math.max(tier.from, s));
-    const labelKey: TierLabelKey = tier.id === "t2" ? "tail" : (tier.id as "wl" | "t1");
+    const labelKey: TierLabelKey = i === 0 ? "wl" : i === arr.length - 1 ? "tail" : "t1";
     return {
       id: tier.id,
       labelKey,
@@ -245,8 +290,35 @@ function emitSocial() {
 }
 
 function openSheet() {
-  if (remaining.value === 0) return;
+  // 预售未开(最外层门,FEAT-GEN09):不开任何 sheet,倒计时中。
+  if (preSale.value) return;
+  // 售罄 → 二级市场承接(GEN01 异常4;原 no-op 死按钮顺手修正)。
+  if (remaining.value === 0) {
+    goMarketplace();
+    return;
+  }
+  // 资格门 L2:未达标 → 资格 sheet,不开购买 sheet(FEAT-GEN08)。
+  if (!eligible.value) {
+    eligSheetOpen.value = true;
+    return;
+  }
+  // 单人限购:已达上限不进购买 sheet(sheet 内 L3 + store L4 仍兜底)。
+  if (gate.value.capReached) {
+    toast.error(
+      t.value.genesisEligibility.toastCapReached,
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+    );
+    return;
+  }
   sheetOpen.value = true;
+}
+
+/** 资格 sheet 达标态「立即认购」→ 关资格 sheet、错开转场后开购买 sheet。 */
+function onEligSubscribe() {
+  eligSheetOpen.value = false;
+  setTimeout(() => {
+    sheetOpen.value = true;
+  }, 260);
 }
 function goHowItWorks() {
   uni.navigateTo({ url: "/pages/genesis/how-it-works", fail: () => {} });
@@ -362,7 +434,7 @@ const titleStyle: CSSProperties = {
 };
 const heroSubStyle: CSSProperties = {
   marginTop: "12px",
-  fontSize: "13px",
+  fontSize: "13.5px",
   color: "rgba(244,229,194,0.72)",
   lineHeight: 1.55,
 };
@@ -525,7 +597,7 @@ const faqQStyle: CSSProperties = {
 };
 const faqAStyle: CSSProperties = {
   marginTop: "5px",
-  fontSize: "13px",
+  fontSize: "13.5px",
   color: "var(--v5-ink-2)",
   lineHeight: 1.62,
 };

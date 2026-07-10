@@ -1,6 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { mockServerNow } from "./server-time";
+import { normalizeAccountKey } from "./account-cloud";
+import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
  * Lucky Spin 转盘 — daily free spin + Day-30 streak milestone bonus spins.
@@ -90,9 +92,17 @@ function targetAngleFor(prizeId: string, prevAngle: number): number {
   return base + turns * 360 + (360 - segCenter);
 }
 
+// 旧设备级单键 "nexion-lucky-spin-v1" 废弃(存量无账号归属,mock 可重建);转盘持久态按账号分行。
+const ACCOUNTS_KEY = "nexion-lucky-spin-accounts-v1"; // { [accountKey]: persisted spin state }
+
 export const useLuckySpin = defineStore("luckySpin", () => {
+  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
+  // ponytail: realPrizeSoldOut/coverageDegraded 名义是平台降级 flag,整块落 per-account 行——
+  // 两者是 dev 演示开关(默认 false),真后台 server 全局裁决;真正需隔离的用户资产是
+  // bonusTickets/lastFreeSpinDate/history(免费票/每日抽记录,换账号不得继承)。
+  let boundKey = "default";
   // ── persisted (cross-session) ──
-  function hydrate(): {
+  function hydrate(accountKey: string): {
     bonusTickets: number;
     lastFreeSpinDate: string;
     history: SpinWin[];
@@ -106,24 +116,20 @@ export const useLuckySpin = defineStore("luckySpin", () => {
       realPrizeSoldOut: false,
       coverageDegraded: false,
     };
-    try {
-      const s = uni.getStorageSync("nexion-lucky-spin-v1") as Partial<typeof fallback> | "";
-      if (s && typeof s === "object") {
-        return {
-          bonusTickets: typeof s.bonusTickets === "number" ? s.bonusTickets : 0,
-          lastFreeSpinDate: typeof s.lastFreeSpinDate === "string" ? s.lastFreeSpinDate : "",
-          history: Array.isArray(s.history) ? s.history : [],
-          realPrizeSoldOut: s.realPrizeSoldOut === true,
-          coverageDegraded: s.coverageDegraded === true,
-        };
-      }
-    } catch {
-      // first run
+    const s = readAccountRow<Partial<typeof fallback>>(ACCOUNTS_KEY, accountKey);
+    if (s) {
+      return {
+        bonusTickets: typeof s.bonusTickets === "number" ? s.bonusTickets : 0,
+        lastFreeSpinDate: typeof s.lastFreeSpinDate === "string" ? s.lastFreeSpinDate : "",
+        history: Array.isArray(s.history) ? s.history : [],
+        realPrizeSoldOut: s.realPrizeSoldOut === true,
+        coverageDegraded: s.coverageDegraded === true,
+      };
     }
     return fallback;
   }
 
-  const init = hydrate();
+  const init = hydrate(boundKey);
 
   // ── session-only (not persisted) ──
   const open = ref(false);
@@ -139,17 +145,29 @@ export const useLuckySpin = defineStore("luckySpin", () => {
   const coverageDegraded = ref(init.coverageDegraded);
 
   function persist() {
-    try {
-      uni.setStorageSync("nexion-lucky-spin-v1", {
-        bonusTickets: bonusTickets.value,
-        lastFreeSpinDate: lastFreeSpinDate.value,
-        history: history.value,
-        realPrizeSoldOut: realPrizeSoldOut.value,
-        coverageDegraded: coverageDegraded.value,
-      });
-    } catch {
-      // storage unavailable
-    }
+    writeAccountRow(ACCOUNTS_KEY, boundKey, {
+      bonusTickets: bonusTickets.value,
+      lastFreeSpinDate: lastFreeSpinDate.value,
+      history: history.value,
+      realPrizeSoldOut: realPrizeSoldOut.value,
+      coverageDegraded: coverageDegraded.value,
+    });
+  }
+
+  /** 账号切换重绑:装载该账号的转盘持久态(票/记录),并重置本地会话态(转盘动画/弹层)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    const next = hydrate(boundKey);
+    bonusTickets.value = next.bonusTickets;
+    lastFreeSpinDate.value = next.lastFreeSpinDate;
+    history.value = next.history;
+    realPrizeSoldOut.value = next.realPrizeSoldOut;
+    coverageDegraded.value = next.coverageDegraded;
+    // 会话态清零:别把 A 的转盘动画/中奖弹层带到 B。
+    open.value = false;
+    phase.value = "idle";
+    lastWonPrizeId.value = null;
+    wheelAngle.value = 0;
   }
 
   // ── derived (call as functions, like the source's selectors) ──
@@ -241,7 +259,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     persist();
   }
 
-  // ── mock 演示开关(replay-tour / dev / 用于演示边界态)──
+  // ── mock 演示开关(dev / 用于演示边界态)──
   function setRealPrizeSoldOut(v: boolean) {
     realPrizeSoldOut.value = v;
     persist();
@@ -282,5 +300,6 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     setRealPrizeSoldOut,
     setCoverageDegraded,
     resetDailyFree,
+    bindAccount,
   };
 });
