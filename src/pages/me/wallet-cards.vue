@@ -81,9 +81,12 @@ import { confirm, toast } from "@/store/ui";
 import { useCards, brandLabel, type SavedCard } from "@/store/cards";
 import { useFreeTrial } from "@/store/free-trial";
 import { useTrialUnbindSheet } from "@/store/trial-unbind-retention-sheet";
+import { useNotifications } from "@/store/notifications";
+import { cardUnboundNotification } from "@/mock/card-notifications";
 
 const t = useT();
 const cardsStore = useCards();
+const notifs = useNotifications();
 const freeTrial = useFreeTrial();
 const unbindSheet = useTrialUnbindSheet();
 
@@ -121,6 +124,8 @@ async function handleRemove(card: SavedCard) {
   });
   if (ok) {
     cardsStore.remove(card.tokenId);
+    // card.unbound → 通知中心(FEAT-CARDS02 模板;PRODUCTION 由后端事件触发推送,mock 在事件源同步入 feed)
+    notifs.push(cardUnboundNotification(t.value.notifs, card));
     toast.success(t.value.cards.unbindToast);
   }
 }

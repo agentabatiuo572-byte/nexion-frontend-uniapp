@@ -15,9 +15,10 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  *   - markComplete(id) → tells the caller whether this was a first completion
  *     and how much to credit. It does NOT touch balances or bills — by
  *     architecture rule, stores don't import each other; cross-store
- *     orchestration (creditNex + bills + toast) is composed at the App.vue
- *     layer when a route changes. App.vue calls markComplete here, then
- *     credits + toasts on { firstTime: true }.
+ *     orchestration (creditNex + bills + toast) is composed at the call site:
+ *     App.vue route watcher (visit tasks), lib/share.ts (invite_friend), or
+ *     the acting page (bind_bank_card in wallet-cards-new.vue). Each calls
+ *     markComplete here, then credits + toasts on { firstTime: true }.
  *
  * The card display side (day-one-quest-card.vue on the protected home page)
  * currently renders a HARD-CODED `done` set and is intentionally NOT wired to
@@ -32,7 +33,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  */
 
 export type QuestTaskId =
-  | "connect_wallet"
+  | "bind_bank_card"
   | "visit_earn"
   | "visit_store"
   | "view_product_roi"
@@ -56,7 +57,7 @@ export interface QuestTaskDef {
  * (same ids / rewards / order). Frozen so callers can't mutate the seed.
  */
 export const QUEST_TASKS: readonly QuestTaskDef[] = [
-  { id: "connect_wallet", i18nKey: "connect_wallet", href: "/me/wallet/topup", nexReward: 50, order: 1 },
+  { id: "bind_bank_card", i18nKey: "bind_bank_card", href: "/me/wallet/cards/new", nexReward: 50, order: 1 },
   { id: "visit_earn", i18nKey: "visit_earn", href: "/earn", nexReward: 30, order: 2 },
   { id: "visit_store", i18nKey: "visit_store", href: "/store", nexReward: 50, order: 3 },
   { id: "view_product_roi", i18nKey: "view_product_roi", href: "/store/stellarbox-s1", nexReward: 100, order: 4 },

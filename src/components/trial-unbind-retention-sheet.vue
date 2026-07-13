@@ -88,11 +88,14 @@ import { useTrialUnbindSheet } from "@/store/trial-unbind-retention-sheet";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useCards } from "@/store/cards";
+import { useNotifications } from "@/store/notifications";
+import { cardUnboundNotification } from "@/mock/card-notifications";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
 const sheet = useTrialUnbindSheet();
+const notifs = useNotifications();
 const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
 const cards = useCards();
@@ -162,8 +165,11 @@ function onConfirmUnbind() {
   // store writes (composed at the component layer, stores never import each
   // other). Real backend: atomic POST /api/trial/cancel { reason:"unbind" }
   // + DELETE /api/cards/:tokenId in one tx, server enforces ordering.
+  const card = cards.getCard(tokenId); // remove 前取卡引用,推送要用 brand/last4
   freeTrial.cancel("unbind");
   cards.remove(tokenId);
+  // card.unbound(担保卡经挽留仍解绑同一事件,payload.unboundBy=user)→ 通知中心(FEAT-CARDS02;PRODUCTION 后端事件触发)
+  if (card) notifs.push(cardUnboundNotification(t.value.notifs, card));
   toast.info(t.value.trialUnbind.toastUnbound);
   sheet.hide();
 }

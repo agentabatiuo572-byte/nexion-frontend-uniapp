@@ -101,7 +101,7 @@ const expanded = ref(true);
 const reward = 500;
 
 const tasks = computed<QuestTask[]>(() => [
-  { id: "connect_wallet", order: 1, label: t.value.home.dayOneTaskConnectWallet, nex: 50, href: "/pages/me/wallet-topup", cat: t.value.home.dayOneCatWallet, color: "#9B89E0" },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "#9B89E0" },
   { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
   { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
   { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "#C6FF3A" },

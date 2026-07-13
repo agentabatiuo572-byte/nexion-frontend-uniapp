@@ -1,6 +1,6 @@
 <template>
-  <view class="rg-root">
-    <view class="rg-wrap">
+  <view class="rg-root" @keydown.esc="showCountries = false">
+    <view class="rg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="rg-top">
         <view v-if="step > 1" class="rg-iconbtn" @click="back">
@@ -43,17 +43,11 @@
       <view class="rg-body">
         <!-- Step 1: phone -->
         <view v-if="step === 1" class="rg-phone">
-          <view class="rg-phone__cc" @click="showCountries = !showCountries">
+          <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter="showCountries = true" @keydown.space.prevent="showCountries = true">
             <text class="rg-phone__cc-t">{{ country }}</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
           </view>
           <input class="rg-phone__in" type="number" :placeholder="t.register.phonePlaceholder" :value="phone" @input="onPhone" />
-          <view v-if="showCountries" class="rg-cc-list">
-            <view v-for="c in COUNTRIES" :key="c.code" class="rg-cc-item" :class="{ 'rg-cc-item--on': c.code === country }" @click="pickCountry(c.code)">
-              <text class="rg-cc-item__name">{{ c.name }}</text>
-              <text class="rg-cc-item__code">{{ c.code }}</text>
-            </view>
-          </view>
         </view>
 
         <!-- Step 2: OTP + invite -->
@@ -139,6 +133,7 @@
       </view>
     </view>
 
+    <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </view>
@@ -149,6 +144,7 @@ import { ref, computed, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
+import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { otpSend, otpVerify } from "@/store/auth-otp";
 import { useAuth } from "@/store/auth";
@@ -174,13 +170,6 @@ const cfg = useConfig();
 // 礼包金额单源派生自 platform config(禁本地常量镜像)。
 const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
 const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
-
-const COUNTRIES = [
-  { code: "+1", name: "US / Canada" }, { code: "+44", name: "United Kingdom" }, { code: "+49", name: "Germany" },
-  { code: "+33", name: "France" }, { code: "+34", name: "Spain" }, { code: "+81", name: "Japan" },
-  { code: "+82", name: "South Korea" }, { code: "+55", name: "Brazil" }, { code: "+62", name: "Indonesia" },
-  { code: "+63", name: "Philippines" }, { code: "+66", name: "Thailand" }, { code: "+971", name: "UAE" }, { code: "+7", name: "Russia" },
-];
 
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
@@ -467,11 +456,6 @@ onUnmounted(() => cleanup());
 .rg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); }
 .rg-phone__cc-t { font-size: 14px; color: #fff; }
 .rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 14px; color: #fff; }
-.rg-cc-list { position: absolute; top: 100%; left: 0; margin-top: 8px; width: 260px; max-height: 300px; overflow-y: auto; border-radius: 16px; background: #0B0B0B; border: 1px solid var(--v5-surface-3); padding: 6px; z-index: 20; }
-.rg-cc-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 12px; }
-.rg-cc-item--on { background: color-mix(in srgb, var(--v5-brand) 8%, transparent); }
-.rg-cc-item__name { font-size: 13.5px; color: #C8D0DC; }
-.rg-cc-item__code { font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--v5-ink-4); }
 .rg-step2 { display: flex; flex-direction: column; gap: 20px; }
 .rg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: #0F0F0F; border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }

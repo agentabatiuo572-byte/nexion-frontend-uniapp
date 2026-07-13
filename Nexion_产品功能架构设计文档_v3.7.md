@@ -112,7 +112,7 @@ Nexion 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中
 | 邀请好友 | 推广用户 | 分享 referral link | 朋友通过链接注册 → 双方获得礼包 + 邀请人后续拿团队分润 |
 | 提现 | 活跃用户 | 收益达 $20+ | 选网络 + 输地址 → KYC 通过 → 48h 内到账 |
 | 质押增益 | 设备持有者 | 想锁仓获更高 APY | 选 30/90/180/365 天档位 + 金额 → 锁仓 |
-| 升等级冲奖 | 推广大使 | 想拿实物奖品 | 达成升 V 条件 → 获得头衔 + 实物奖品配送 |
+| 升等级冲奖 | 推广大使 | 想拿等级奖励 | 达成升 V 条件 → 获得头衔 + 等级奖励 / 培育奖 NEX |
 
 ### 2.4 30 天用户旅程
 
@@ -147,6 +147,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 
 **框架规则**:
 - Header / TabBar 锁定在 chassis 边界,内容独立滚动
+- **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
 - **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexion-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
@@ -169,7 +170,6 @@ TabBar:active tab 显示背景 chip 高亮。
 /                                Home Dashboard
 /market                          NEX 行情详情页(对标 AI/DePIN tokens)
 /events                          活动中心(限时优惠 / 挑战 / 季节福利)
-/learn                           教程中心(Learn-to-Earn)
 /earn                            Earn(算力赚取)
 /store                           Store list
 /store/[productId]               商品详情
@@ -214,11 +214,11 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/trial                        免费试用(绑卡式 3 天 + 7 grace + 3 extension)
 /me/wallet/nex                   NEX 资产详情页(持仓 / P&L / 用途 / 活动)
 /me/receipts                     推理收据
-/me/rewards                      我的奖励(代金券 + 系统奖励聚合)
+/me/rewards                      我的奖励(类别汇总:优惠券 / USDT / NEX 奖励)
+/me/rewards/list                 奖励分类记录(cat=voucher|usdt|nex,10 条/批分页)
 /me/risk-disclosure              平台风险提示书(scroll-to-bottom + 强制确认)
 /me/achievements                 成就墙
 /me/goals                        收益目标设置(target + deadline + 推荐路径)
-/me/wrapped                      年度 Wrapped(Spotify 风全屏 6 卡片)
 /me/preferences                  偏好设置(音效 / 触感 / 通知 6 类偏好)
 /missions                        Mission Center(任务中心,聚合所有任务体系的统一入口)
 /me/proof                        Proof of Compute
@@ -235,7 +235,7 @@ TabBar:active tab 显示背景 chip 高亮。
 /genesis                         创世节点预售
 /genesis/how-it-works            Genesis 创世节点说明页
 /genesis/marketplace             二级市场
-/genesis/holder                  持有人 dashboard(分红 / 权益 / 持仓)
+/genesis/holder                  持有人 dashboard(排放 / 权益 / 持仓)
 /trust                           信任中心
 /trust/nex                       NEX 平台代币说明页
 /daily                           每日签到
@@ -246,11 +246,12 @@ TabBar:active tab 显示背景 chip 高亮。
 /search                          全局搜索(routes / 设备 / 商品 / 网络成员 / FAQ)
 /login                           登录(支持 ?ref=CODE)
 /register                        注册(支持 ?ref=CODE)
+/register/success                注册成功页(礼包确认 + 引导下载 APP,仅 H5,§4.1.1)
 /onboarding/intro                启动语
 /onboarding/estimator            收益估算
 /onboarding/connect              算力校准 + 接单规则告知(新设备登录复用此页 ?mode=recalibrate 重新校准)
 /onboarding/terms                服务条款(从 intro 脚注 / register 注册脚注进入)
-/session/kicked                  登录失效阻断屏(账号在他端登录 / 退出 / 被吊销 → 在途任务回退 + 重新登录)
+/session/kicked                  登录失效阻断屏(退出 / 指定会话下线 / 被吊销 → 在途任务回退 + 重新登录)
 ```
 
 ---
@@ -280,11 +281,28 @@ TabBar:active tab 显示背景 chip 高亮。
 **注册成功后行为**:
 1. 自动创建 user(persist 到 localStorage)
 2. 自动 `addDevice("phone")` 接入手机算力(进入 Phase 0 多阶段揭示)
-3. 跳转 `/onboarding/estimator`(L0 → L1)
+3. H5 端跳转 `/register/success`(注册成功页,§4.1.1);App 壳内注册直接跳转 `/onboarding/estimator`(L0 → L1)
 
-支持 `?ref=CODE` URL 参数携带推荐码(详见 §4.3)。
+**邀请码携带与锁定**(绑定规则详见 §4.3):
+- 第 2 步含邀请码输入框(选填)。码来源优先级:`?ref` URL 参数 > 落地页暂存码 pendingRefCode(§4.3.1)> 用户手输。
+- 链接来源码(`?ref` / pendingRefCode)通过格式预检(`NEXION-XXXX`,大小写不敏感,统一大写)后**锁定置灰展示——不可修改、不可清除**,框内锁形图示 + 「邀请码来自邀请链接 · 不可修改」提示;注册前换码的唯一途径是打开新的邀请链接。
+- 缺失 / 非法码视同无码,输入框保持可手输;登录页 `?ref` 同一预检,非法码不入绑定链。
 
 注册页底部含合规脚注「创建账号即表示同意服务条款和隐私政策」,其中「服务条款」下划线可点,进入 §4.7.5 服务条款页;「隐私政策」当前为占位文本(无独立页)。
+
+#### 4.1.1 注册成功页 `/register/success`(仅 H5)
+
+**目的**:确认新人礼到账状态,并把 H5 注册的转化终点导向 APP 安装(APP 在线时长驱动礼包与收益释放,§4.3.5)。App 壳内注册不经过本页。
+
+| 元素 | 内容 |
+|---|---|
+| 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 Nexion,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
+| 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);未带码注册整卡隐藏 |
+| 装 APP 权益 3 行 | 在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度 |
+| 下载 CTA | 按 UA 选链接:iOS → `share.appDownload.iosUrl`;Android → `androidUrl`(缺省回退 `apkUrl`);系统未知或对应链接缺失 → 双按钮并列(仅渲染有链接的按钮);三链接全空 → 替换为「APP 即将上线」说明卡,主 CTA 变「继续」,无死按钮 |
+| 次级出口 | 「先用网页版继续」→ `/onboarding/estimator`(既有 onboarding 链) |
+
+**规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;下载链接打开被拦截时自动复制链接并 toast 提示;返回键视同「继续」,不可返回注册流。
 
 ### 4.2 登录流程
 
@@ -355,16 +373,24 @@ TabBar:active tab 显示背景 chip 高亮。
 | CTA(主) | "Claim my $5 + 20 NEX" → `/register?ref=CODE` |
 | CTA(次) | "Sign in" → `/login?ref=CODE` |
 
+**状态变体与归因暂存**:
+- 码格式预检:`NEXION-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
+- 本机已登录 → 顶部提示条「你已注册,邀请链接对新用户有效,新人礼每账号仅一次」,隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 Nexion」(不重复发礼)。
+- **pendingRefCode(归因暂存)**:合法码到达落地页即写入本地暂存;访客当场不注册、此后从任意入口进注册页仍自动带码并锁定(§4.1)。注册前新码 last-touch 覆盖;绑定发生即清除;已绑定设备忽略新码(first-wins,§4.3.2)。
+- 生产短链 `{share.baseUrl}CODE`(§13.3)由服务端 302 至本页;`share.baseUrl` 未配置(开发 / 演示)时分享链接回退当前站点地址直连本页,扫码当场可达。
+
 #### 4.3.2 注册时绑定 sponsor
 
 `/register?ref=CODE` 顶部显示 sponsor 确认卡(头像 + sponsor 名 + V chip + 礼包预告)。
 
 **业务规则**:
 - 注册完成时:`sponsorship.bind(code)` 写入 sponsorCode + sponsor 信息
-- 立即 `claimGift()` → 钱包 +$5 USDT + 20 NEX
-- 显示庆祝 toast:`+$5 + 20 NEX welcome gift · Sponsored by Sarah K.`
+- 立即 `claimGift()` → 礼包按账户注册风险评估**分桶入账**:风险簇 clear 直入可提余额;命中多账户风险簇(watch/frozen)则进「审核中 / 锁定」桶,不直入可提(详见 §4.3.5)
+- 直入可提时显示庆祝 toast(`+$5 + 20 NEX welcome gift · Sponsored by …`);进审核桶时显示「新人奖励待审核」提示
+- 礼包金额由平台配置 `rewards.welcomeGift.{usdtAmount,nexAmount}` 决定(默认 $5 + 20 NEX,后台可调),前端展示与入账同源派生
 - **首次绑定生效,后续 URL ?ref 不可覆盖**
 - 每个账号 welcome gift **仅一次**
+- 绑定成功即清除 pendingRefCode(§4.3.1),注册 / 登录两路共用同一清除点
 
 #### 4.3.3 登录时绑定
 
@@ -373,6 +399,38 @@ TabBar:active tab 显示背景 chip 高亮。
 #### 4.3.4 推荐人收益
 
 被推荐人完成订单时,推荐人按固定 10% 费率获得直接版税(Direct Royalty),其上线网络按 Network Yield Bonus 算法分得扩展版税(详见 §8.3)。
+
+#### 4.3.5 新人礼与 H5 收益的风险分桶
+
+H5 手机算力用「登记 + 服务端结算」解耦页面运行(关掉 H5 也按 `lastSettledAt` 补算收益),由此带来多手机号 / 多设备重复注册套利面。为堵套利,新人礼与 H5 托管收益不再直入可提余额,而是按账户实时风险评估分入**收益三桶**:
+
+| 桶 | 字段 | 入桶条件 | 可提现 |
+|---|---|---|---|
+| 可提现 | `withdrawableUsdt` | 风险簇 clear | 是 |
+| 审核中 | `pendingReviewUsdt` | 命中多账户风险簇(同设备 / 同 IP / 同收款 / 同推荐链聚簇) | 否,待释放 |
+| 锁定奖励 | `bonusLockedUsdt` | 冻结簇收益 / 熔断升格 | 否,待释放 |
+
+**释放规则**:审核中 / 锁定收益**不随观察窗口到达自动释放**,释放来源只有两个——① App 在线证明累计达标(`appAttestationReleaseHours`);② 运营人工放行。同一风险簇在观察窗口内批量释放有熔断:超出免费槽位数的待审收益自动升为锁定。
+
+**提现前置路由**:提现只认可提现桶;新账户首笔提现无条件人工审核;新绑定收款地址延迟放行;同收款地址被多账号复用按配置进人工 / 冻结。
+
+所有阈值 / 天数 / 权重为平台配置(后台可调),完整参数表、聚簇维度表与状态机见 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md`。
+
+```mermaid
+flowchart TD
+  R[注册完成 claimGift / H5 结算] --> E{账户实时风险评估}
+  E -->|clear| W[可提现桶 withdrawableUsdt]
+  E -->|watch 多账户聚簇| P[审核中桶 pendingReviewUsdt]
+  E -->|frozen 冻结簇| L[锁定奖励桶 bonusLockedUsdt]
+  P --> Rel{释放来源}
+  L --> Rel
+  Rel -->|App 在线证明达标| W
+  Rel -->|运营人工放行| W
+  Rel -.观察窗到达.-x|不自动释放| P
+  W --> WD{提现前置路由}
+  WD -->|首提 / 新地址 / 同地址多号| M[人工审核 / 延迟 / 冻结]
+  WD -->|通过| OUT[提现放行]
+```
 
 ### 4.4 KYC-Express 验证
 
@@ -543,7 +601,7 @@ Rotation 防 refresh token 被截获后长期复用:被盗后用一次就失效,
 | Revoke all others | `POST /api/auth/sessions/revoke-others` | revoke 除当前外所有 session |
 | 密码修改成功后联动 | (server side-effect) | 等效 revoke all others,参 §4.6.4 |
 
-logout client 副作用:清 access + refresh cookie + clear 所有 user-scope Zustand store + `router.replace("/login")`。
+logout client 副作用:清 access + refresh cookie + 调 `rebindAccountScopedStores("default")` 清空全部账号级 store 的内存残留(见 §4.8)+ `router.replace("/login")`。
 
 **安全约束**
 
@@ -594,10 +652,32 @@ server 持有锁定计数器(IP + userId 维度),client 仅显示倒计时(`erro
 
 **OTP code 有效期**:
 
-- 6 位 OTP 在 server-side 有效 **5 分钟**
+- 6 位 OTP 在 server-side 有效 **5 分钟**(`otpGate.otpTtlSeconds`)
 - 同一手机号同时仅 1 个 active code,新 `send` 自动失效旧 code
+- 单个 code 允许连续输错 5 次(`otpGate.maxVerifyAttempts`),用尽即作废,client 清空输入格并引导重新 send
 - 过期后 verify 返 `errors.otpExpired`,client 引导重新 send
-- Resend 60 秒倒计时(client `RESEND_SECONDS = 60`)防短信轰炸,server-side 同步限频:同一手机号 24h 内 ≥ 3 次 send 触发 CAPTCHA(参 §16.2.1)
+- Resend 冷却 60 秒(`otpGate.resendSeconds`):client 倒计时以 `send` 响应的 `resendAfterSec` 为准(不持有本地常量);冷却内重复请求 server 返 `rate_limited`(附剩余秒数),不生成新码、不失效现有码、不计入发送次数
+
+**人机验证闸门(防短信轰炸)**:
+
+同一手机号 24h 滑动窗内成功 send 达 `otpGate.captchaAfterSends`(默认 2)次后,下一次 send 前必须通过滑块拼图验证——即「24h 内 ≥3 次触发 CAPTCHA」(阈值口径 §16.2.1,参数 §13.3):
+
+- server 出题(目标缺口位置随机),用户拖动拼图块入缺口。位置不符 → 复位换题可立即重试并累计失败;连续 5 次失败 → 验证暂时关闭、本次发送中止(发送计数不增加),可重新点发送再次拉起。弹层可刷新换题(失败计数不清零)、可取消(取消即中止本次发送)。
+- 验证通过签发一次性 `captchaTicket`(有效 `otpGate.captchaTicketTtlSeconds` = 120s):**必须显式随 send 提交且与签发值一致**才放行,放行即消费;未出示、已消费或已过期一律返 `captcha_required` 要求重新验证,禁止复用。
+- send 判定顺序:① 冷却检查 → `rate_limited`;② 24h 限频 + ticket 校验 → `captcha_required`;③ 放行(生成新码、旧码作废、计入发送记录)。锁定期间 send 一律拒绝不签发(见上文锁定规则)。
+- 登录 OTP、注册、重置密码三场景共用本闸门与滑块验证,发送计数按手机号维度跨场景共享。
+
+```mermaid
+stateDiagram-v2
+    [*] --> active : send 放行(生成码 · 5 次尝试额度 · TTL 5min)
+    active --> consumed : verify 正确(签发 verifyToken · 终态)
+    active --> active : verify 错误(尝试额度 −1 仍 >0)
+    active --> exhausted : 第 5 次错误(作废 · 终态)
+    active --> expired : TTL 到期(终态)
+    active --> active : 新 send 覆盖(旧码即刻作废)
+```
+
+verify 业务错误:`otp_invalid`(附剩余次数)/ `otp_expired` / `otp_attempts_exceeded` / `otp_not_found`(终态或无记录时提交);成功签发一次性 `verifyToken`,由后续会话创建 / 注册提交 / 重置密码端点重新出示校验,不得仅凭 verify 成功响应放行敏感操作
 
 #### 4.6.3 服务端存储与传输
 
@@ -813,18 +893,18 @@ sequenceDiagram
 
 **真后台对接**:把本地 `useAuth` 替换为真实会话(`GET /api/auth/session` 提供 `isAuthenticated` / `onboardingComplete`),守卫判定逻辑完全不变。`signUp` / `signIn` → `POST /api/auth/{register,login}` 返回 token + canonical user;`completeOnboarding` → `POST /api/onboarding/complete`。
 
-### 4.7 单设备登录、会话与新设备校准
+### 4.7 多载体会话、会话下线与新设备校准
 
-**目的**:账号在同一时间只能在一台设备运行挖矿,使算力与收益绑定到当前实测的本机(参 §6.10),并防止多端薅取免费算力。包含三项强相关能力:① 单设备登录(单点会话);② 会话失效时在途任务中断回退;③ 新设备登录触发算力重新校准。
+**目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项强相关能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 新物理设备登录触发算力重新校准。
 
 **设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexion-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
 
-**会话模型**:一条共享「活跃会话」记录(`nexion-active-session-v1` = `{sessionId, deviceId, deviceName, loginAt, killedAt?}`)代表服务端记录的「账号当前归属会话」。每次登录铸新 `sessionId` 并**覆盖**该记录 → 新登录使旧会话主张失效(单设备)。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)对比内存与共享记录:
+**会话模型**:账户级 session registry (`nexion-account-sessions-v1` = `{schema, sessions:{[sessionId]:{accountKey, deviceId, deviceName, entrySurface, loginAt, lastSeenAt, killedAt?, endedAt?}}}`)代表服务端会话表的 mock。每次登录新增一条会话,不覆盖其他设备 / 载体。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)读取自己的会话记录:
 
-- **本机自我接管**(记录 `deviceId` 与本机相同、仅 `sessionId` 不同)→ 良性,采纳新 sessionId 保持在线(同一物理设备多标签 / 重启不互踢);
-- **他端接管**(记录 `deviceId` 不同)/ **退出**(记录被清)/ **吊销**(记录置 `killedAt`)→ 判定为踢出。
+- **同账号其他会话**(不同 `deviceId` / `entrySurface`)→ 并存,不触发强踢;
+- **当前会话退出**(`endedAt`) / **记录被删** / **吊销**(`killedAt`)→ 当前端判定为登录失效。
 
-**踢出处置(任务中断回退)**:判定踢出 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[他端登录 / 已退出]+ 任务已回退提示 +「重新登录」)。重新登录铸新会话认领本账号 → 守卫恢复挖矿(`resumeMining`)。
+**失效处置(任务中断回退)**:当前会话失效 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[已退出 / 会话已停用]+ 任务已回退提示 +「重新登录」)。重新登录新增当前载体会话 → 守卫恢复挖矿(`resumeMining`)。
 
 **新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexion-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
 
@@ -832,24 +912,53 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active: 登录铸 sessionId + 认领记录
-    Active --> Active: 本机重认领(同 deviceId,采纳新 sessionId)
-    Active --> Kicked: 他端登录 / 吊销(killedAt)
-    Active --> LoggedOut: 退出(清记录)
-    Kicked --> Active: 重新登录(认领 + resumeMining)
+    [*] --> Active: 登录新增 sessionId
+    Active --> Active: 同账号其他载体登录(并存)
+    Active --> Kicked: 指定会话下线 / 吊销(killedAt)
+    Active --> LoggedOut: 当前会话退出(endedAt)
+    Kicked --> Active: 重新登录(新增会话 + resumeMining)
     LoggedOut --> Active: 重新登录
-    note right of Kicked: 在途任务无宽限作废 + 冻结挖矿 + /session/kicked
+    note right of Kicked: 当前会话在途任务无宽限作废 + 冻结挖矿 + /session/kicked
 ```
 
 **真后台对接**(mock-first,可零重写):
 
 | Endpoint | Method | 返回 / 作用 |
 |---|---|---|
-| `/api/auth/signin` | POST | `{token, sessionId, deviceId, requiresRecalibration}`;服务端发新 sessionId 即作废旧会话(单设备)|
-| `/api/auth/session` | GET | `{sessionId, status, killedAt}`,客户端轮询 / 心跳镜像 |
-| `/api/auth/logout` | POST | 清服务端会话 |
+| `/api/auth/signin` | POST | `{token, sessionId, deviceId, entrySurface, requiresRecalibration}`;服务端新增当前载体会话 |
+| `/api/auth/session` | GET | `{sessionId, status, killedAt, endedAt, entrySurface}`,客户端轮询 / 心跳镜像 |
+| `/api/auth/logout` | POST | 标记当前会话 `endedAt` |
+| `/api/account/sessions` | GET | 当前账号多载体会话列表 |
+| `/api/account/sessions/:id/revoke` | POST | 指定会话置 `killedAt` |
 
-运营后台「强制登出 / 吊销会话」置 `killedAt`(后台会话域)→ 前端轮询检测踢出。
+运营后台「指定会话下线 / 吊销会话」置 `killedAt`(后台 C5 会话域)→ 对应端轮询检测登录失效。不得因另一个 deviceId 登录而自动覆盖当前会话。
+
+### 4.8 账号数据作用域与隔离(per-account 存储)
+
+**目的**:同一台设备 / 浏览器可先后登录多个账号,每个账号的资产、记录、进度必须互不可见——换账号只见自己的数据。持久层据此三分:
+
+| 作用域 | 归属 | 例 |
+|---|---|---|
+| **用户资产**(随账号走) | 按账号分行:`{[accountKey]: row}` 表(`accountKey` 即用户主键),换账号即换行 | 订单 · 账单 · 质押持仓 · 佣金 · 券包 · 试用状态 · 兑换记录与风控计数(KYC/日限/终身额)· 绑卡 · 钱包配对 · 签到 · 任务/周任务/活动/里程碑/成就/目标/转盘票据/每日增益 · 通知 · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置(2FA)· 奖励已读水位线 · 创世持仓 · V 等级 |
+| **平台态**(设备共享,账号无关) | 全局键 | 创世售出进度与上所信号 · 兑换市场汇率 · 转盘真实奖降级 flag · 运营配置镜像 |
+| **设备偏好** | 全局键 | 主题 · 语言 · 通用偏好 · `deviceId` |
+
+**重绑收口**:账号确定的四个时点——登录 / 注册 / 冷启动会话恢复 / 登出——统一调 `rebindAccountScopedStores(accountKey)`(登出与被踢传 `"default"` 清空内存残留),把全部用户资产 store 重绑到目标账号行。业务写入处处即时落本账号行,换账号无需先落盘。
+
+**资格与凭证按账号**:任何资格判定所依赖的凭证 / 计数(创世邀请码、KYC-Express 已验证、兑换终身额、单人限购持有数)必须按账号——设备级继承会造成资格旁路(账号 B 白继承 A 的 KYC / 邀请资格)。跨 store 派生须确认上游源也按账号,不得由设备级源经页面 mount 镜像回灌账号字段。
+
+**真后台对接**(mock-first,可零重写):行数据即 per-user 服务端资源,`accountKey` 即用户主键;`GET /api/me/*` 拉本账号数据,`rebindAccountScopedStores` 对应「切账号 → 重新拉取该用户资源」。
+
+```mermaid
+flowchart TD
+    A[登录 / 注册 / 冷启动恢复] -->|accountKey| R[rebindAccountScopedStores]
+    S[登出 / 被踢下线] -->|default| R
+    R --> U[全部用户资产 store<br/>按 accountKey 装载各自行]
+    R --> P[平台态 / 设备偏好 store<br/>不重绑,保持全局]
+    U --> V{换账号}
+    V -->|A→B| B[B 只见 B 的行<br/>零继承 A 的资产]
+    V -->|B→A| C[A 的行原样还原]
+```
 
 ---
 
@@ -911,14 +1020,15 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 当前 V 级 + 头衔
 - 距下一阶 进度条
 - 仍需条件文字描述
-- 实物奖品 chip(如 Apple Watch SE)
+- 等级奖励 chip(培育奖 NEX)
 
-### 5.7 $NEX 代币行情
+### 5.7 $NEX 代币行情(当前阶段隐藏)
 
-链接 `/trust`:
+当前阶段首页不展示此卡(组件保留未渲染)。恢复渲染时规格:
+
+链接 `/market`:
 - 当前价 + 24h 涨幅(`$0.171 +20.4%`)
 - 24h sparkline(从 useMarket.klineHourly)
-- "🚨 Binance tier-1 review · cleared" chip
 
 ### 5.8 全球领导池快照
 
@@ -1038,7 +1148,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 | # | id | 标题 i18n | 跳转 | 完成触发 | 奖励 |
 |---|---|---|---|---|---|
-| 1 | connect_wallet | Connect a wallet | `/me/wallet/topup?kyc=1` | KYC-Express phase=complete 时 markComplete | +50 NEX |
+| 1 | bind_bank_card | Link a bank card | `/me/wallet/cards/new` | 绑卡页绑卡成功(server-canonical `card.bound`)时 markComplete | +50 NEX |
 | 2 | visit_earn | Open Earn tab | `/earn` | QuestRouteWatcher 监听 pathname | +30 NEX |
 | 3 | visit_store | Browse the store | `/store` | QuestRouteWatcher 监听 pathname | +50 NEX |
 | 4 | view_product_roi | View a NexionBox ROI | `/store/stellarbox-s1` | QuestRouteWatcher 监听 `/store/{id}`(排除 `/store/orders` 和 `/store/checkout`)| +100 NEX |
@@ -1091,7 +1201,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - **i18n**:`quest.*` namespace
   - phase / 状态 keys:`title / titleGrace / completeTitle / progress / completed / finalBonusHint / claimBonus / claimLatecomer / bonusClaimed / latecomerClaimed`
   - 交互 keys:`buyCta`(主 CTA 文案)/ `expand`(展开任务列表,带 `{n}` 任务数 placeholder)/ `collapse`(收起任务列表)
-  - 6 task titles:`t_connect_wallet / t_visit_earn / t_visit_store / t_view_product_roi / t_setup_profile / t_invite_friend`
+  - 6 task titles:`t_bind_bank_card / t_visit_earn / t_visit_store / t_view_product_roi / t_setup_profile / t_invite_friend`
   - grace phase 不再渲染独立警示 banner — 窗口紧迫感由 §5.15.2 的 phase styling + 顶部倒计时 chip + L1 hint + L2 主 CTA 四点共同暗示
   - expired phase 整张卡 return null,无相关文案 keys
 
@@ -1102,7 +1212,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 平台以固定节奏(每 1 秒一拍)读取当前页面,页面变化时映射到对应任务:`/earn` → `visit_earn`、`/store` → `visit_store`、商品详情页 `/store/{id}` → `view_product_roi`(排除 `/store/orders`、`/store/checkout`)。
 - 首次落在匹配页 → `markComplete(id)` 返回该任务的奖励(NEX,部分含 USDT);仅在**首次完成**时入账 NEX / USDT 并弹 `+N NEX` toast。
 - 幂等:已完成任务重复访问返回 `firstTime:false`,不重复派奖(完成态持久化于 `nexion-quest-v1`,刷新后不再触发)。
-- 非路由型任务(connect_wallet / setup_profile / invite_friend)在对应动作处(KYC 完成 / Profile 保存 / 复制邀请码)手动调 `markComplete` 派奖,不由本监听覆盖。
+- 非路由型任务(bind_bank_card / setup_profile / invite_friend)在对应动作处(绑卡成功 / Profile 保存 / 分享邀请)手动调 `markComplete` 派奖,不由本监听覆盖;首次派奖同步写账单 bonus 行。
 
 ```mermaid
 sequenceDiagram
@@ -1208,13 +1318,13 @@ sequenceDiagram
 
 位置:MissedIncomeBanner 与 DeviceLifecycleBanner 之间。**无条件渲染**(任何用户都被锁定在某个 task tier 之外,banner 永远有数字)。
 
-**目的**:在"设备 baseline 差额"(§6.6)与"硬件效率衰减"(§6.8)之外补第三层语义 — **任务 tier 锁定** — 把"高价 AI 任务无法承接,本月被锁掉的潜在收益"以累计数字呈现。三 banner narrative:
+**目的**:在"设备 baseline 差额"(§6.6)与"任务产能递减"(§6.8)之外补第三层语义 — **任务 tier 锁定** — 把"高价 AI 任务无法承接,本月被锁掉的潜在收益"以累计数字呈现。三 banner narrative:
 
 | Banner | 损失类型 | 触发条件 |
 |---|---|---|
 | §6.6 MissedIncomeBanner | 与 S1 baseline 的日产差额 | 所有用户(对比锚 = S1)|
 | §6.7 TaskLockCumulativeBanner | 高价任务 tier 锁定的月度累计 | 所有用户(每用户都被锁某 tier)|
-| §6.8 DeviceLifecycleBanner | 已购设备的衰减损失 | 仅持有 degradable 硬件用户 |
+| §6.8 DeviceCapacityBanner(车队任务产能) | 已购设备接单量递减的损失 | 仅持有参与递减硬件的用户 |
 
 **UI 规格**:
 
@@ -1225,7 +1335,7 @@ sequenceDiagram
   - 左:`since signup` + 大字 `−$X,XXX`(累计)
   - 右:pill CTA(44pt tap target)
     - **P1-P2** 文案:`See higher tiers →` → `/store`(新用户引导到主商城)
-    - **P3+** 文案:`Trade in for new gen →` → `/me/devices`(老用户引导到设备仓库 + promo banner,Batch E 已迁)
+    - **P3+** 文案:`升级更高算力设备 →` → `/me/devices`(老用户引导到设备仓库的升级置换入口,§7.5)
 - 整张卡 `<Link>` 包裹
 
 **计算公式**(`lib/store/task-lock.ts`):
@@ -1249,52 +1359,55 @@ cumulativeUSD     = Σ MONTHLY_LOCKED_TASK_USD[getPhaseForMonth(m).id]  // m ∈
 
 **铁律**:文案不暴露 `phase id / phase name / "P3-P4" / "subscription push"` 等 PM 内部术语,只显示具体 model 名 + 美元数字(参 [[feedback-no-meta-in-product]])。
 
-### 6.8 设备生命周期 Banner(DeviceLifecycleBanner)
+### 6.8 车队任务产能 Banner(DeviceCapacityBanner)
 
-位置:**My Devices 列表 + EmptySlotsHint 之后**(仅在用户至少持有 1 台 degradable 硬件时渲染,phone-only 用户零显示)。语义上"刚扫完自己具体设备 → 立刻看到舰队衰减提示"比单看一个抽象数字更有共鸣,转化力更强。
+位置:**My Devices 列表 + EmptySlotsHint 之后**(仅在用户至少持有 1 台参与产能递减的硬件时渲染,phone-only 用户零显示)。语义上"刚扫完自己具体设备 → 立刻看到车队接单量递减提示"比单看一个抽象数字更有共鸣,转化力更强。
 
-**目的**:把"硬件随月份衰减 + 累计月度损失"实时呈现,持续推动用户走 trade-in / 升级路径。
+**机制叙事(权威口径)**:平台 AI 任务池的算力要求随时间演进 — 高阶任务(大模型推理/训练)占比增大、低阶任务减少;设备算力固定,随持有月数可承接的任务份额逐步下降。**不使用"硬件衰减/损耗/老化"叙事**(硬件性能相关文案统一走"随使用逐步损耗"的定性表达,禁止具体数值,参 memory 硬件衰减文案规约);正向出口 = 升级更高算力设备承接高阶任务(§7.5 升级置换)。
 
-**衰减曲线**(per-device,基于 `purchasedAt` 计算):
+**任务产能节奏**(per-device,基于 `purchasedAt` 计算;数值与旧效率曲线**逐点等效**,机器门 `check-capacity-curve-parity.mjs` 以 golden 表锁定 diff<1e-9):
 
-| 月段 | 月度衰减率 | 累计效率(段末) |
+| 月段 | 月度产能递减 | 累计产能(段末) |
 |---|---|---|
 | 月 1-3 | −4% / 月 | 100% → 88.5% |
 | 月 4-8 | −6% / 月 | 88.5% → 65.1% |
 | 月 9-12+ | −23.7% / 月 | 65.1% → ~22%(floor) |
 
-**豁免设备**:phone(产能本就 trivial)、cloud-share(平台租赁算力,云端自维护)。
+**豁免设备**(不参与递减,产能恒 100%):phone(产能本就 trivial)、cloud-share(平台托管算力池)、pc-gpu(共享算力按实时贡献计)。后台可按 SKU 配置豁免开关(后台 PRD E 域「任务产能节奏」面板)。
 
-**核心 utility**(`lib/store/device-lifecycle.ts`):
+**新机任务补贴**:新购设备 30 天内展示「新机任务补贴」标识 — 解释"新买的低阶设备为何满产"(平台对新购设备定向倾斜任务分配)。**纯展示派生**(`now − purchasedAt ≤ subsidyDays`),不改任何结算数学(曲线首月本就 100%,补贴期恰与其重合,经济零变化);补贴天数后台可配。
+
+**核心 utility**(`src/store/device-lifecycle.ts`,API 形状冻结、内部读产能阶梯配置):
 
 ```
-DEGRADATION_PER_MONTH = { early: -0.04, middle: -0.06, late: -0.237 }
-MIN_EFFICIENCY = 0.22   // late 率使月 9-12 实际累计落到 22% floor(−10% 时只到 ~43%,与 floor 矛盾)
-ONE_MONTH_MS = 30 * ONE_DAY_MS
+TASK_CAPACITY_BANDS = [ {throughMonth:3, monthlyDeltaPct:-4},
+                        {throughMonth:8, monthlyDeltaPct:-6},
+                        {throughMonth:null, monthlyDeltaPct:-23.7} ]   // 服务端可配(GET /api/config/task-capacity, TBD)
+CAPACITY_FLOOR = 0.22
+SUBSIDY_DAYS   = 30
+CAPACITY_EXEMPT_KINDS = ["phone", "cloud-share", "pc-gpu"]
 
-isDegradable(kind)                  → kind ∉ {phone, cloud-share}
+isDegradable(kind)                  → kind ∉ CAPACITY_EXEMPT_KINDS
 getMonthsOwned(purchasedAt, now)    → 浮点月数(平滑曲线)
-getEfficiency(monthsOwned)          → 累计效率 ∏(1+rate)(跨 stage 边界积分)
+getEfficiency(monthsOwned)          → 累计产能系数 ∏(1+rate)(跨段边界积分,floor 封底)
 getLifecycleSummary(device)         → { isDegradable, monthsOwned, efficiency,
                                         dailyRateAtFull, dailyRateNow,
                                         dailyLossUSD, monthlyLossUSD }
 getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 ```
 
-**UI 规格**:
+**展示派生(永不落库)**:设备卡"今日接单 ≈ N 单"由 `dailyRateNow ÷ 单任务均价`(`src/mock/tasks.ts` 价格表)实时派生;产能百分比、接单数、补贴标识均为展示层派生值,存储中不新增任何任务计数字段。
 
-- 边框按平均效率分档:≥85% / 65-85% / <65%
-- 顶部 `FLEET EFFICIENCY` 标签(Activity icon)
-- 大字 `XX.X%`(`<TickerNumber>` 0.8s 动画)+ 副字 `average across N hardware devices`
-- 单条 progress bar:宽度 = avgEfficiency
-- 底部 row:
-  - 左:`Monthly loss vs day-1 yield` + 大字 `−$X.XX` + 小字 `oldest · Nd` 或 `oldest · N.N mo`
-  - 右:pill CTA `Trade-in options →` → /me/devices(Batch E:trade-in surface 已迁;见 §7.5)
-- 整张卡 `<Link>` 包裹
+**行为要点**:
 
-**SSR 处理**:沿用 §16.5 mounted 守卫,server 输出 `<Skeleton.Hero accent="purple">` + 2 条 `<Skeleton.Line>`,client mount 后填入派生数字。
+- 边框按车队平均产能分档:≥85% / 65-85% / <65%
+- 主数字 = 车队平均产能 `XX.X%`;辅行 = 相对满产的月度差额 `−$X.XX` + 最老设备月龄
+- CTA `升级更高算力设备 →` → /me/devices(§7.5 升级置换入口);整卡可点
+- 配套:/earn 任务池区顶部有"AI 任务算力需求升级中"提示线(W-CAP1 产能规则说明弹层三入口之一)
 
-**刷新节奏**:client mount 后 setInterval(60s)重计算,monthsOwned / efficiency 在用户停留期间持续平滑变化。
+**SSR 处理**:沿用 §16.5 mounted 守卫,server 输出骨架,client mount 后填入派生数字。
+
+**刷新节奏**:client mount 后 setInterval(60s)重计算,monthsOwned / 产能系数在用户停留期间持续平滑变化。
 
 ### 6.9 设备槽位卡(EmptySlotsHint)
 
@@ -1332,7 +1445,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
    - `${networkAvg}`(网络平均日产)
    - `top {N}%`(填满后排名估算 = potentialDaily / NETWORK_AVG_DAILY × 70%)
 
-6. **CTA**:brand pill + Zap icon + Fill slots + ArrowRight。无 halo(per user feedback)。
+6. **CTA**:brand pill + Zap icon + Fill slots + ArrowRight。无 halo(per user feedback)。点击 CTA(或点任一空 slot)触发**槽位操作弹窗**(见本节末「槽位操作弹窗」)。
 
 7. **Footer note**:`current fleet ${current}/d · upgrade to multiply`(对比当前 baseline,放大转化诱因)。
 
@@ -1351,9 +1464,16 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 - `empty ≤ 0` → 渲染 Capped 状态
 - 6-col slot grid 显示 **active devices**(非 inventory)
 
+**槽位操作弹窗(Slot Action Sheet)** — 点击 Fill slots CTA(或任一空 slot)触发,两个并存入口引导填满空槽位:
+
+1. **购买新设备**(主入口):跳转 `/store`。**始终呈现**。
+2. **激活已有设备**(次入口):仅当存在未激活设备(`activatedAt === null` 的库存设备)时出现,**默认折叠**;展开后列出全部未激活设备,点选即调 `activateDevice` 激活进槽。激活受 `MAX_DEVICES`(6)上限约束 —— 槽位已满(`activeCount + trial 预留槽 ≥ MAX_DEVICES`)则提示槽位已满、不激活。
+
+仓库无未激活设备时,弹窗仅呈现「购买新设备」入口;每次打开弹窗,次入口默认折叠。
+
 ### 6.10 手机算力显示规则与校准
 
-**目的**:手机的「算力」是平台呈现的能力指标(产品仿真,不真在手机跑 AI 推理)。显示规则核心要求:数值让用户觉得**合理可信**、**排序永不翻车**(低配机不可能显示出比高配机更高的算力)、可复现,并支撑单设备登录与换机重校准的叙事(参 §4.7)。
+**目的**:手机的「算力」是平台呈现的能力指标(产品仿真,不真在手机跑 AI 推理)。显示规则核心要求:数值让使用者觉得**合理可信**、**排序永不翻车**(低配机不可能显示出比高配机更高的算力)、可复现,并支撑多载体会话下的新设备校准叙事(参 §4.7)。
 
 **能力基线确定性派生**(`lib/device-capability.ts` · `measureDeviceCapability`):基线**不是随机数**,而是从真实、可廉价读取、与机型档位强相关的设备信号确定性派生 —— `uni.getSystemInfo`(机型 / 品牌 / 平台)+ `navigator.deviceMemory`(RAM)/ `hardwareConcurrency`(核数)+ WebGL renderer(GPU)+ `devicePixelRatio`×分辨率。三条保证:
 
@@ -1375,47 +1495,86 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 **校准仪式**(`/onboarding/connect`,首次 onboarding + 新设备 `?mode=recalibrate` 复用):12 秒三测(NPU 基准 / 网络延迟 / 供电散热)动画,结果(评分 / TOPS / Tier / 预估日产)由 `measureDeviceCapability` 真实派生(非写死),完成后写回手机设备(`applyPhoneCalibration`:更新 baseRate / NPU 文案 / 能力字段 + 重置连续在线加成)。
 
+### 6.11 载体分层与收益服务端结算
+
+**目的**:让手机算力收益与「页面是否开着」解耦——收益按账户登记的算力档位 + 真实在线时长结算,关页面 / 切后台的时段在重开 / 回前台时一次补算;同时按**设备真实在线信号(App 后台心跳)**分层计产:设备真在线获得完整在线加成,无心跳(网页查看 / App 未常驻 / 离线)只走基础托管基线,形成「升级 App 拿在线加成」的真实差。**查看方式(App / 网页)本身不改变收益,只有设备真在线才吃加成**——常驻 App 是唯一能持续上报设备心跳的载体。
+
+**登记 + 服务端结算**:
+- **激活 = 登记**:设备激活(进槽位)即记结算锚点 `lastSettledAt = now`,作为收益的起算点。
+- **结算口径(单一来源)**:`settle()` 按墙钟增量 Δ = now − lastSettledAt 累计「收益 += 登记档位 baseRate × 在线因子 × 实时状态因子 × (Δ / 一天)」,并把锚点前移到 now;所有收益累积只走此一处,无第二条旁路。
+- **触发**:进前台 / 客户端 tick 调 `settle()`;关页面或切后台期间的 Δ 在重开 / 回前台时一次补算(原型为客户端 mock 服务端 tick,正式环境由服务端按同一 `lastSettledAt` 结算下推)。
+- **冻结不回溯**:设备未激活 / 会话失效冻结时锚点清空,恢复时按当前时刻重锚,冻结期不计产、不补发。
+
+**在线分层(算力显示与收益同口径)**:
+
+| 设备在线态 | 判定 | 计产口径 |
+|---|---|---|
+| 真在线(有新鲜心跳)| 设备 `onlineHeartbeatAt` 在超时窗口内(常驻 App 后台持续上报心跳)| 基线 × 充电 × 散热 × 连续在线 × 抖动(完整在线加成;连续在线达满额时长后稳定加成至 1.0)|
+| 离线(无 / 陈旧心跳)| 无心跳:网页查看、App 未常驻 / 被杀、心跳超时、离线 | 基线 × `h5BaseFactor`(基础托管,默认 0.6)× 在线 × 抖动(无常驻上报,不可测充电 / 散热、不可累计连续在线,故走基础托管基线)|
+
+在线态只看是否收到设备心跳,与「用 App 还是网页查看」无关——只有常驻 App 能持续产生心跳,故拿加成的实质是「设备真在后台在线」。非手机设备(S1 / Pro / Rack / Cloud)在线因子恒为 1,不受影响。
+
+**叙事**:无心跳(离线)设备的手机算力卡标「基础托管模式 · 登记算力网络」,并给「升级 App 拿在线加成」弱引导(仅常驻 App 能上报设备心跳);不出现「模拟 / 网页挖矿」等字眼(真平台口径)。
+
+**运营可配**:在线因子由在线加成系数配置驱动(`onlineBonus`:`h5BaseFactor` / `continuityFullHours`),运营在后台「算力与设备配置」调整,与后台 compute-config 同 key;改后对全网生效、不回溯已结算收益、以服务端为准。
+
+```mermaid
+flowchart TD
+  A[激活设备] -->|登记| B[记锚点 lastSettledAt = now]
+  B --> C{触发结算}
+  C -->|tick / 回前台 onShow| D["settle:Δ = now − lastSettledAt"]
+  D --> E{设备在线态}
+  E -->|有心跳·真在线| F["收益 += 档位baseRate × 充电×散热×连续在线×抖动 × Δ/天"]
+  E -->|无心跳·离线/网页| G["收益 += 档位baseRate × 基础托管0.6 × 在线×抖动 × Δ/天"]
+  F --> H[重锚 lastSettledAt = now]
+  G --> H
+  H -. 关页面期间累积 .-> C
+```
+
+**数据**:Device 有 `lastSettledAt`(登记 / 结算锚点)+ `onlineHeartbeatAt`(设备在线心跳戳,决定在线因子档)(§12.2);在线加成系数读自平台配置 `onlineBonus`(§13.3)。设备心跳经 `/api/device/:id/heartbeat` 上报,服务端持 `lastHeartbeatAt` + 超时判定下推在线态(客户端只读结论,永不用查看载体定因子)。
+
 ---
 
 ## 7. Store(设备商城)
 
 ### 7.1 商品列表 `/store`
 
-6 种产品卡片(含双代际),代际淘汰由 §6.8 设备生命周期衰减曲线驱动:
+6 种产品卡片,固定 SKU 算力/价格阶梯;升级动力由 §6.8 任务产能递减 + §7.5 升级置换驱动(**代际概念已取消**,无代际字段/无固定升级映射):
 
-| 产品 | 代际 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
-|---|---|---|---|---|---|---|
-| Phone(基准) | — | — | $0 | $0.06 | 10 | 1× |
-| NexionBox S1 | Gen 1 | **legacy** | $649 | $7.00 | 40 | 117× |
-| NexionBox Pro | Gen 1 | **legacy** | $1,199 | $13.00 | 80 | 217× |
-| NexionBox Pro v2 | Gen 2 | active | $1,319 | $14.00 | 90 | 233× |
-| NexionRack P1 | Gen 1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
-| NexionRack P2 | Gen 2 | active | $7,499 | $75.00 | 500 | 1,250× |
-| Cloud Share | Gen 1 | active | $19.9 | $0.19 | 3 | 3× |
+| 产品 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
+|---|---|---|---|---|---|
+| Phone(基准) | — | $0 | $0.06 | 10 | 1× |
+| NexionBox S1 | **legacy** | $649 | $7.00 | 40 | 117× |
+| NexionBox Pro | **legacy** | $1,199 | $13.00 | 80 | 217× |
+| NexionBox Pro v2 | active | $1,319 | $14.00 | 90 | 233× |
+| NexionRack P1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
+| NexionRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
+| Cloud Share | active | $19.9 | $0.19 | 3 | 3× |
 
-**Legacy 代际**:S1 / Pro / Rack P1 标 status="legacy",ProductCard 左下角显示 `LEGACY` chip(i18n `store.legacyBadge`)。Legacy 仍可购买,但伴随 §6.8 衰减曲线在 12 个月内退化到 ~22%,引导用户走 §7.5 Trade-in 升级。
+**经典款(市场售卖状态)**:S1 / Pro / Rack P1 标 `status="legacy"`(目录较早上架的型号,与置换资格**正交**),ProductCard 左下角显示「经典款 / Classic」chip(i18n `store.cardLegacyBadge`)。仍正常售卖;§6.8 产能递减 + §7.5 阶梯抵扣共同引导升级更高算力。
 
-**代际映射**(`TRADEIN_UPGRADE_MAP`):
-- S1 → Pro v2(Trade-in 抵扣 $300)
-- Pro → Pro v2(Trade-in 抵扣 $300)
-- Rack P1 → Rack P2(Trade-in 抵扣 $800)
+**升级置换(设备级,无固定映射)**:任何已购付费设备可随时下架,按其累计产出落阶梯折抵购买**任何更高价 SKU**(默认规则;详见 §7.5)。
 
-**Gen-2 代际发布门**(`Product.unlocksAtPhase`):
+**上架节奏门**(`Product.unlocksAtPhase`,控市场投放节奏):
 
 | 产品 | unlocksAtPhase | 时点(参 §13.4 phase 月段)|
 |---|---|---|
-| NexionBox Pro v2 | `P3` | 月 ≥ 4(首波代际升级窗口)|
-| NexionRack P2 | `P5` | 月 ≥ 8(最后升级窗口)|
+| NexionBox Pro v2 | `P3` | 月 ≥ 4 |
+| NexionRack P2 | `P5` | 月 ≥ 8 |
+
+上架门对**置换路径同样生效**(未正式上架的 SKU 不可作置换目标,结算深链同拦)——例外为「置换侧抢先购」开关(`tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项,**默认关闭**,后台 E1 面板可配):开启后**仅置换路径**可在正式上架前 `leadDays` 天(运营档位 7/14/30/60/90)内购买该 SKU,置换目标行带「抢先升级」标;商城正门(列表 Locked 卡/详情/非置换深链)始终不受抢先购影响。与运营「强制解锁」动作的优先级:强制解锁=全面正式上架,抢先购开关随之无作用面,两者不冲突。
+
+**两层口径(预热 vs 购买)**:**转化预热面**(首页/收益页升级推广位等纯营销入口)允许预告未上架机型——点击落"即将上架"卡(带上线通知订阅),为发售蓄水;**购买面**(商城列表/详情购买、组合建议、置换目标、结算)严格按上架门(置换侧叠抢先购窗口)拦截,且支付时刻二次复验。
 
 **列表渲染**(`/store`):
 
-- 已发布产品(`unlocksAtPhase` 未设 / 已 reached)→ 渲染常规 `<ProductCard>`
-- 未发布产品 → 过滤出主列表,聚合到底部 **"Next generation" coming-soon section**,每张以 `<LockedProductCard inline>` 渲染(横向卡 + lock icon + 名称 + tagline + ETA + "Notify me when live" pill)
+- 已上架产品(`unlocksAtPhase` 未设 / 已 reached)→ 渲染常规 `<ProductCard>`
+- 未上架产品 → 过滤出主列表,聚合到底部 **"Coming soon"(即将上架)section**,每张以 `<LockedProductCard inline>` 渲染(名称 + tagline + ETA + "上线时通知我" pill)
 - SSR 阶段(mounted=false)默认把 `unlocksAtPhase` 产品视为锁定,与 first paint hydration 对齐(参 §16.5);client mount 后按真实 phase 重算
 
 **购买门(等级门 + 锁额门)**(`Product.purchaseGate`):
 
-代际发布门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
+上架节奏门(`unlocksAtPhase`,阶段门)之外,高客单设备可挂第二类 per-product 购买门 —— **等级/条件门**(谁有资格买)+ **锁额门**(本期限量多少)。两者正交,任一可单独设。目的:高价机型挂资格条件 + 限量,制造稀缺感并把"达成团队条件"作为购买前提,驱动用户冲直推数 / 团队业绩。门为**后台可配**(运营在后台 SKU「购买限制」配置组设定,server-canonical,见后台 PRD E 域),前端只读、服务端二次校验为权威。
 
 数据结构 `PurchaseGate`(全字段可选,任一条件省略=不校验该项;`purchaseGate` 整体未设=自由购买无门):
 
@@ -1460,7 +1619,7 @@ flowchart TD
 
 **列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexionBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
-**Promo strip 互斥**:VsPhoneHero 之下若 `<TradeinWindowBanner>`(§7.6)正在显示,则 S1 promo `$200 off NexionBox S1` strip **隐藏**(S1 是 legacy,window 开放时推销 S1 与"换到新一代"叙事冲突)。其它情况(无 legacy fleet / 未到 P3)S1 promo 正常显示。
+**Promo 并存**:升级置换横幅(§7.6)已改为按「用户是否持有可置换设备」动态显隐(无 phase 窗口),与 S1 促销条各自独立渲染;旧「window 开放时隐藏 S1 promo」互斥规则随 phase 窗口机制一并退役。
 
 **卡片 ROI-first hero metric**(自上而下):
 
@@ -1659,140 +1818,157 @@ stateDiagram-v2
 - **Deployment #**(原"运单号")+ **Datacenter**(原"承运商",显示 SG / FRA / VA 机房 ID)+ 数据中心 API 模拟说明
 - 到 `activated` 阶段自动 `addDevice(productId)` 添加设备到 fleet
 
-**文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:V 级 / 奖品系统的实物 prize(iPhone 16 Pro 等)保留 shipping 语义。
+**文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:排行榜 Podium 实物奖品(Genesis Node / NexionBox 等,见 §8.11.5)保留 shipping 语义。
 
-### 7.5 Trade-in & Upgrade — Checkout Intercept + Inventory Surface
+### 7.5 升级置换(Trade-in)— 随时下架 + 产出阶梯抵扣
 
-旧代际硬件残值置换 + 代际升级路径。**独立 `/store/tradein` 页已下线**,功能拆解为两个表面:
+**代际概念已取消**。任何已购付费设备可**随时下架**,按其累计产出落阶梯折算抵扣金额,用于购买**任何更高价 SKU**(默认规则,后台可配)。三个入口表面:
 
-1. **Checkout intercept**(`/store/checkout` mount-time)— 用户从 `/store/[productId]` 点 Buy now 进入 checkout 时,自动评估资格 + 槽位,优先弹三件 sheet 之一;
-2. **Inventory surface**(`/me/devices` 设备仓库)— 持久 `<TradeInPromoBanner>` 推送升级机会,点 CTA 跳到目标商品详情触发上述 intercept。
+1. **设备仓库置换条**(`/me/devices`,主动入口)— 每台合规设备行内「可抵 $X」chip(→阶梯规则说明弹层)+「升级置换」CTA(→选目标 → 确认 → 去结算);
+2. **Checkout intercept**(`/store/checkout` mount-time)— 买任一设备 SKU 时,若持有可置换设备自动弹分叉 sheet(置换抵扣 / 全价购买);
+3. **商城横幅**(`/store` 顶部,§7.6)— 按用户最优可置换设备动态报价,CTA 跳设备仓库。
 
-#### 7.5.1 Eligibility 评估 + 残值公式
+**总不变量**:抵扣**仅在结算时抵减应付款,永不写入余额**、不可提现、不可拆分;真值 server-authoritative(`POST /api/orders` 携 `tradeInDeviceId`,服务端同事务复算抵扣 + 下架旧机)。
 
-每个商品的购买资格由 `lib/v3/_config/tradein-config.ts` 的 `eligibility[kind]` 定义,模式 `open / any-of / all-of`,9 种规则类型:`open / own-kind / own-prev-tier / v-rank-min / cumulative-deposit-usdt / kyc-tier / days-active / referral-count / trade-in`。
+#### 7.5.1 Eligibility 评估 + 产出阶梯抵扣
+
+**购买资格**(与旧版一致,仅 trade-in 规则去定向):`eligibility[kind]` 定义,模式 `open / any-of / all-of`,9 种规则类型:`open / own-kind / own-prev-tier / v-rank-min / cumulative-deposit-usdt / kyc-tier / days-active / referral-count / trade-in`。`trade-in` 规则**不再限定来源型号**(fromKind 可省,任意合格设备的置换即满足该通道)。
 
 **默认 eligibility**:
 - **S1**:`open`(任何用户可购)
-- **Pro**:`any-of`〔own ≥1 S1 / V-Rank ≥2 / 累计入金 ≥$1000 / trade-in from S1〕
-- **P1**:`any-of`〔own ≥1 Pro / V-Rank ≥4 / 累计入金 ≥$5000 / trade-in from Pro〕
+- **Pro / Pro v2**:`any-of`〔own ≥1 S1 / V-Rank ≥2 / 累计入金 ≥$1000 / trade-in〕
+- **Rack P1 / P2**:`any-of`〔own ≥1 上一档 / V-Rank ≥4 / 累计入金 ≥$5000 / trade-in〕
 
-**残值公式**(`computeSalvageRate` + `computeSalvageCredit`):
+**设备置换资格**(计算候选清单 `eligibleTradeInDevices(targetKind)`):实付价 > 0(赠送/免费设备排除,前端零痕迹)∧ kind ∈ `applyTo` 白名单 ∧ 目标目录价严格更高(`requireHigherPrice`,可配)∧ 非「激活中且任务运行」(阻断判定单源 `isDeviceTaskBlocked`:**库存设备上的出厂任务不在跑、不阻断**;激活设备走「先停用(自带等任务/强停保护)→ 库存态再置换」既有链路)。活跃与库存设备均可置换;候选按可抵额降序。
+
+**置换目标合规**(三个目标面——retire 目标列表 / 设备行 strip / 商城横幅——统一判定 `isTradeInTargetAvailable`):目标 SKU **已正式上架(unlocksAtPhase 已达,与商城正门同源)∨ 处于抢先购窗口**(§7.1 `tradeInEarlyAccess` 开关,默认关);未上架且不在窗口的 SKU 不出现在任何置换目标面。
+
+**产出阶梯抵扣公式**(`computeTradeInCredit`,唯一抵扣引擎;无持有时长门槛——套利防护由阶梯本身承担:刚买产出≈0 → 落最高档,抵扣 ≤75% 实付,立即置换必亏 25%):
 
 ```
-rate(t_months) = max(floor, baseline − monthlyDecay × t_months)  // baseline=0.30, monthlyDecay=0.025, floor=0
-credit          = price × rate(ageMonths)                          // floor 触底后为 $0
+ratio  = cumulativeEarningsUsdt ÷ paidPriceUsdt        // 产出比(分子=该设备累计 USD 产出,分母=实付净额)
+credit = paidPriceUsdt × creditPct(band(ratio)) × promoMult,  clamp 到 [0, 目标价]
 ```
 
-**守卫**:`if (ageMonths < minHoldingMonths) return 0`(默认 minHoldingMonths=1 月,防"买入立即 trade-in 套利")。所有参数 server-canonical via `GET /api/config/tradein`,运营可热改无需 client redeploy。
+| 档 | 产出比区间(左闭右开) | 抵扣比例(默认) |
+|---|---|---|
+| 1 | 0% – <25% | 75% |
+| 2 | 25% – <50% | 60% |
+| 3 | 50% – <75% | 45% |
+| 4 | 75% – <100% | 30% |
+| 5 | ≥100% | 15% |
 
-**铁律**:salvage credit **永不写余额** — 仅在置换 checkout 中作为扣减项使用(`debitBalance(price − credit)`),不可提现、不可累加。
+- **实付基数**:`paidPriceUsdt` = 实付净额(订单 total,已扣券与置换抵扣;trial 转正 = 促销价 − 收益抵扣),非目录价 — 防券/试用低价买入套利。
+- **paidPrice = 0(赠送)⇒ 不可置换**(资格排除,非"∞ 产出比落档 5")。
+- **规则参数**(后台「升级置换阶梯」面板可配,详见后台 PRD E 域):阶梯 5 档界点与比例(区间连续、比例严格递减,结构由机器哨兵锁)/ `requireHigherPrice`(默认 true)/ `maxDevicesPerOrder`(默认 1)/ `promoMult`(默认 1.0;>≈1.47 时 clamp 可能绑定)/ `applyTo` SKU 白名单 / `enabled` 总开关(关闭 = 全部置换入口隐藏)。
+- 所有参数 server-canonical via `GET /api/config/tradein`,运营可热改无需 client redeploy。
+
+**铁律**:抵扣 **永不写余额** — 仅在结算中作为扣减项(`debitBalance(price − discount − credit)`),不可提现、不可累加;累计产出越多抵扣越低(合规口径向用户明示,引导尽早置换)。
 
 #### 7.5.2 Checkout intercept 触发条件
 
-结账页 mount 时按序评估:
+结账页 mount 时按序评估(**全部设备 SKU 均可触发**,旧 v2/P2 白名单排除已取消):
 
-0. **购买门硬拦截**(置于 trade-in / MAX_DEVICES intercept 之前):对挂 `purchaseGate` 的商品跑 `evaluatePurchaseGate`(§7.1),若 `blocked`(资格未达成或锁额售罄)→ 阻断支付 + 中性提示 + CTA 跳 `/team/quota`。服务端在下单时二次校验为权威(`POST /api/orders` 对未达成资格 reject),前端拦截仅为体验前置。
-1. 若 `useDeviceEligibility(productKind).canTradeIn === true` → 显示 `<TradeInOrFullChoiceSheet>`(分叉:trade-in 哪台旧设备 / 全价购买)
-2. 否则若 `activeCount >= MAX_DEVICES` → 显示 `<ReplaceLowestSheet>`(让出最低产出设备)
-3. 否则正常 checkout 流程(支付方式选择 → 确认 → 扣款)
+-1. **上架节奏门**(先于购买门——没上架谈不上资格):`unlocksAtPhase` 未达的 SKU,仅当「携置换上下文 ∧ 抢先购窗口内(开关默认关)」放行;否则提示「即将上架」+ 跳回 `/store`(深链防线,与商城正门口径同源)。
+0. **购买门硬拦截**:对挂 `purchaseGate` 的商品跑 `evaluatePurchaseGate`(§7.1),若 `blocked` → 阻断支付 + 跳 `/team/quota`。**门优先级高于置换**——向被锁 SKU 置换同样被拦(retire 流选中被锁目标时在此兜底)。服务端下单二次校验为权威。
+1. **已带置换上下文**(用户从设备仓库 retire 流确认后到达,`appliedTradein.targetKind` = 本单 SKU)→ 不再弹分叉,直接渲染抵扣行。
+2. 若持有 ≥1 台可置换候选 → 弹**分叉 sheet**(选哪台设备置换(设备级,含各台实时可抵额)/ 全价购买)。
+3. 否则若 `activeCount ≥ MAX_DEVICES` → 弹**让位 sheet**(让出最低产出设备)。
+4. 否则正常 checkout 流程。
 
-`KNOWN_KINDS` 白名单仅包括基础 DeviceKind(s1/pro/p1/cloud-share/phone)。v2/P2 catalog 不触发 intercept(走正常 checkout)。
+#### 7.5.3 Sheet 状态机 + 结算原子块
 
-#### 7.5.3 三件 sheet 组件 + 状态机
+`useTradeinSheet` 单一 discriminated union 防双开:`{ kind: "none" | "choice" | "retire" | "tradein" | "replace" | "block" }`,block 态按来源分裂(`origin: "replace" | "retire"`)。
 
-`useTradeinSheet` 单一 discriminated union 防双开:`{ kind: "none" | "choice" | "tradein" | "replace" | "block" }`。
+| Sheet 态 | 触发 | 主流程 |
+|---|---|---|
+| `choice` | Checkout intercept 分叉 | 列全部可置换设备(每台带实时抵扣额),选设备 → tradein;或全价购买(槽满 fallback replace) |
+| `retire` | 设备仓库「升级置换」CTA | 选升级目标(**点选列表**,仅列合规目标 SKU,每行带抵后价;无自由输入)→ tradein |
+| `tradein` | 置换确认 | 确认卡:旧机 / 累计产出 / 抵扣档位 / 本次抵扣 / 预计应付 + 合规披露 → 确认写入结算抵扣上下文(`appliedTradein`,仅内存态,离开结算页即弃)→ 去结算 |
+| `replace` | Path B 槽满 | 让出最低产出设备 / 保留全部槽位入库 / 取消(原有流程不变) |
+| `block(origin=retire)` | 目标设备激活中且任务运行 | 「任务完成后即可下架」+ 查看任务进度 / 知道了(**无强拆选项**) |
+| `block(origin=replace)` | 让位目标 mid-task | Wait / Force-replace(放弃任务,原有流程不变) |
 
-| Sheet | 触发 | 主流程 | Composer 关键 |
-|---|---|---|---|
-| `<TradeInOrFullChoiceSheet>` | Intercept Path A 入口 | 列出 tradeInSources[],用户选某 fromKind 或 "Pay full" | choose tradein → showTradein;choose full → 槽满 fallback showReplace 或 hide |
-| `<TradeInSheet>` | Path A confirm | 旧设备摘要 + salvage 抵扣 + 净付 + 法务披露 | `replaceDevice → debitBalance → 失败 rollback (re-insert removedDevice snapshot, remove new) → addBill → router.replace` |
-| `<ReplaceLowestSheet>` | Path B 槽满 | 列最低产出 active device,提供 Replace / Keep & buy / Cancel | Pending-task gate → `moveToInventory → addDevice → activateDevice → debitBalance → bill` |
-| `<PendingTaskBlockSheet>` | Replace 时 lowest 有 in-flight task | Wait / Force-replace(放弃任务) | 任务快照 → `addDevice → moveToInventory → activateDevice → debitBalance → 清 currentTask (LAST,success-only)`,失败分支均 restore taskSnapshot |
+**结算原子块**(钱与设备的唯一变更点,checkout 持久块同步执行、无 await 无半执行窗口):
+
+```
+支付确认 → 复检抵扣上下文(设备仍在 ∧ 非任务阻断 ∧ 开关开;失效 → 拒单重报价,绝不静默按全价扣)
+        → debitBalance(净额 = 价 − 券 − 抵扣, ≥0)      // 失败 → 退回支付步,零状态变更
+        → 移除旧设备(下架) + 持久化
+        → createOrder{ tradeInCredit, tradeInDeviceId }   // order.total = 价 − 券 − 抵扣
+        → 账单(i18n memo 含置换明细) → 清抵扣上下文
+```
+
+新设备由订单履约管线生成(**未激活入库**,`paidPriceUsdt = order.total`),不在本块内。
 
 **关键不变量**:
-- M1(原子):每个 composer 任一步失败,所有先前步骤 rollback,设备数组 + 余额 + bill 回到调用前状态
-- M2(salvage 不入余额):`debitBalance(price − salvage)` 是唯一接触余额的调用,salvage 不通过 `creditBalance` 路径
-- M3(双击防御):每个 composer 入口 `confirmingRef` 守卫;成功路径不 reset(避 unmount 前再触发)
-- M4(generation lineage):新设备 `generation = (oldDevice.generation ?? 1) + 1`(不写死 2)
+- M1(原子):扣款成功前零状态变更;扣款后同步序列无失败分支(移除为幂等 filter)
+- M2(抵扣不入余额):`debitBalance(净额)` 是唯一接触余额的调用,抵扣不经 `creditBalance` 路径
+- M3(双击防御):每个 composer 入口 confirming 守卫,成功/失败路径均复位
+- M4(判定单源):任务阻断 `isDeviceTaskBlocked` 与抵扣引擎 `computeTradeInCredit` 各自单源,全部消费面(候选/入口/确认/结算复检 × 七个抵扣展示面)禁止旁路自算
 
-#### 7.5.4 `/me/devices` 设备仓库 + 推送 Banner
+**业务流程图(retire 主链)**:
 
-`<TradeInPromoBanner>` 配置门控,挂在 `/me/devices` 顶部。配置参数全部 server-canonical:
+```mermaid
+flowchart TD
+  A["/me/devices 设备行<br/>「可抵 $X」+「升级置换」"] -->|点升级置换| B{激活中且任务运行?}
+  B -- 是 --> C["阻断层:任务完成后可下架<br/>查看任务进度 / 知道了(无强拆)"]
+  C -->|查看任务| C2[/earn 任务区/]
+  B -- 否 --> D["选升级目标(点选列表,<br/>仅更高价 SKU,每行带抵后价)"]
+  D --> E["置换确认卡:累计产出 / 档位 /<br/>抵扣额 / 预计应付 + 合规披露"]
+  E -->|确认| F[写入结算抵扣上下文 → 去结算]
+  F --> G{结算页:购买门 blocked?}
+  G -- 是 --> H[/team/quota 解锁引导/]
+  G -- 否 --> I["结算页:抵扣行(−$X)+ 移除出口<br/>移除 → 恢复原价可全价购买"]
+  I -->|支付| J{支付时复检:设备在 ∧<br/>非阻断 ∧ 开关开?}
+  J -- 失效 --> K[拒单重报价:回支付步 + 提示]
+  J -- 通过 --> L["原子块:扣净额 → 旧机下架移除<br/>→ 订单(含抵扣明细) → 账单"]
+  L --> M["新机经履约管线未激活入库<br/>(实付=订单净额,作为下一跳抵扣基数)"]
+```
 
-| 参数 | 默认 | 用途 |
-|---|---|---|
-| `enabled` | true | kill switch |
-| `cooldownHours` | 24 | 用户 dismiss 后多久不再弹(localStorage cache,server reconciles)|
-| `maxPerSession` | 1 | 单会话最多弹几次(sessionStorage)|
-| `delayMs` | 1500 | 进页后延迟弹出(让首屏 content 先渲染)|
-| `routes` | `["/me/devices"]` | 路由白名单(`cfg.routes.includes(pathname)` 检查)|
-| `triggerWhen.hasEligibleDeviceInInventoryOrSlot` | true | 粗 kill switch |
-| `triggerWhen.minDeviceAgeDays` | 30 | 不为太新设备弹 promo |
+#### 7.5.4 `/me/devices` 设备仓库置换条 + 阶梯说明弹层
 
-**评估**:`nextUpgradeTier(ctx)` 返回当前用户可升级的下一档(S1→Pro / Pro→P1);`pickPromoSource(devices, targetKind, minAgeDays)` 选最老 active device(EOL 优先)。`credit ≤ 0` 时不弹(防"save $0" 尴尬)。
+**常驻置换条**(取代旧 `<TradeInPromoBanner>` 弹出式推送,入口从"节奏推送"升级为"行内常驻"):每台设备行底部按资格渲染:
 
-CTA 行为:`router.push(/store/{nextTierKind})` → 用户在目标商品页 Buy now → checkout intercept 自动开 ChoiceSheet。
+- 合规设备:「可抵 $X ›」chip(点开**阶梯规则说明弹层**:5 档表 + 当前档高亮 + 该设备产出比/落档描述 + 合规脚注,数据全派生自阶梯单源)+「升级置换」CTA(→ §7.5.3 retire 流)
+- 免费设备(paidPrice=0)/ 不在 applyTo:**零痕迹**(不渲染置换条)
+- 无更高价目标(已持最高档):显示禁用原因「当前已是最高算力档位」
+- 激活中且任务运行:CTA 可点,进阻断层(业务链必有下一步)
+
+旧 promo 推送配置组(`cooldownHours / maxPerSession / delayMs / routes / triggerWhen`)保留为后台预留参数(server-canonical),当前版本无弹出式推送消费者。
 
 #### 7.5.5 i18n
 
-`tradein.*` namespace 共 35 keys(旧 11 keys + Batch B/C/D 24 新 keys):
-- 旧入口(保留兼容老 caller):heroLabel / rowSalvageLabel / rowUpgradePrice 等 11
-- Eligibility hint 9 keys(`eligibilityHint{Open|OwnKind|...|TradeIn}`)
-- Sheet 文案 25 keys(sheet*/replace*/block*/choice*)
-- 错误文案 6 keys(errReplaceUnavailable / errPleaseRetry 等)
-- Memo template 5 keys(sheetBillMemo / replaceBillMemo / keepBuyBillMemo / forceReplaceBillMemo / etc.)
-
-`myDevices.inventory*` namespace 24 keys(/me/devices 仓库页全文 + promo banner)。
+`tradein.*` namespace 按面组织(en/zh 全镜像):eligibility hint 组(9)/ choice 分叉组 / retire 目标选择组 / tradein 确认卡组(含档位行)/ checkout 抵扣行组(含移除)/ 设备行置换条组(strip*)/ 阶梯说明弹层组(ladder*)/ replace & block 组(含 retire 阻断专用文案)/ 错误组。结算账单 memo 走 `store.coBillMemo*` 模板(账单页直接渲染,禁硬编码英文)。
 
 #### 7.5.6 Demo 演示工具(PM-facing)
 
-`/me/replay-tour` 顶部新手引导回放后,挂"Lifecycle demo"section,4 个 PM-facing 演示 action,让 prototype 演示者绕过"购买 → 等月份"的真时间延迟,立即呈现衰减曲线 + Trade-in 流程效果。
+`/me/replay-tour` 顶部新手引导回放后,挂"Lifecycle demo"section,PM-facing 演示 action,让 prototype 演示者绕过"购买 → 等月份"的真时间延迟,立即呈现任务产能递减 + 升级置换流程效果。
 
 | Action | Store call | 效果 | i18n key |
 |---|---|---|---|
-| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexionBox-S1(落地效率 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
-| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexionRack-P1(落地效率 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
-| Fast-forward | `_devFastForwardAll(3)` | 全部 degradable 设备 purchasedAt 拨回 3 个月 | `replay.demoFastForwardTitle/Hint/Cta` |
+| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexionBox-S1(落地产能 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
+| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexionRack-P1(落地产能 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
+| Fast-forward | `_devFastForwardAll(3)` | 全部参与递减设备 purchasedAt 拨回 3 个月 | `replay.demoFastForwardTitle/Hint/Cta` |
 | Reset | `_devResetDevices()` | 重置回 phone-only(purchasedAt = user.joinedAt) | `replay.demoResetTitle/Hint/Cta` |
 | Trigger milestone | `useMilestones.reset() + _devBumpEarningsTotal(150)` | 重置已触发的里程碑 + 拨高 earnings 跨过 $100 阈值,§11.3a watcher 下次 poll 时 fire celebration overlay | `replay.demoMilestoneTitle/Hint/Cta` |
 | Trigger Nova push | `useStella.push(monthlyTaskLockPush + tradeinNudge)` 走唯一 cooldownKey 绕过节流 | Sprint 2 收尾(Gap D)— 立即 force-fire 月度任务锁定推送 + Trade-in nudge(若条件满足),文案随当前 phase 切换,PM 演示无需等真 cadence | `replay.demoStellaTitle/Hint/Cta` |
 
 每个 action 触发 toast 反馈(模板 `replay.demoToastSeeded/FastForwarded/Reset/Full`),容量校验 MAX_DEVICES。
 
-**设计意图**:快速展示"用户买了 NexionBox 4-5 个月后看到效率衰减 + Trade-in 引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
+**设计意图**:快速展示"用户买了 NexionBox 4-5 个月后看到接单量递减 + 升级置换引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
 
-### 7.6 Trade-in Window Banner(TradeinWindowBanner)
+### 7.6 升级置换横幅(TradeinWindowBanner)
 
-位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 平台 phase × 用户 legacy fleet 双门控,其中任一不满足即整 banner 隐藏。开放时同步抑制 §7.1 末段提到的 S1 promo strip(防止"换到新一代"叙事与"$200 off S1"促销并存)。
+位置:`/store` 顶部,VsPhoneHero 之下、商品列表之上。**条件渲染** — 用户持有 ≥1 台可置换设备(§7.5.1 资格:实付>0 ∧ applyTo ∧ 存在合规目标 ∧ 抵扣>0 ∧ 总开关开)即显示;无合格设备整横幅隐藏,无 phase 窗口概念。
 
-**目的**:把 §13.4 phase 推进引发的"新一代上市 · trade-in 窗口开放"事件以高紧迫感入口固化在 `/store` 顶部。与 §6.8 DeviceLifecycleBanner(/earn 入口)互补 — 用户从 Earn 或 Store 任一侧进入 §7.5 trade-in 流程都有 1-tap 路径。CTA target 为 `/me/devices`(Batch E:trade-in surface 已从独立页迁到设备仓库 + checkout intercept)。
+**目的**:把用户手上"最划算的一台置换机会"以动态报价固化在 `/store` 顶部,与 §6.8 车队产能 Banner(/earn 入口)、设备仓库置换条(§7.5.4)互补 — 三侧任一进入 §7.5 置换流程都有 1-tap 路径。CTA target 为 `/me/devices`。
 
-**显示矩阵**(phase × ownership):
+**报价派生**(全实时,无写死金额):遍历用户可置换设备,每台按其**最低升级价目标**计算阶梯抵扣,取**抵扣额最高**的一台展示 —— `你的 {name} 可抵 ${credit}` + `升级 {target} 只需再付约 ${net}`(net = 目标价 − 抵扣)。
 
-| phase | 用户持 legacy box | 用户持 legacy rack | banner variant | 文案 |
-|---|---|---|---|---|
-| P1-P2 | 任意 | 任意 | hidden | gen-2 未发布 |
-| P3-P4 | ✓ | — | `box` | `Pro v2 trade-in open — $300 off` |
-| P3-P4 | — | ✓ | hidden | rack window 待 P5 开 |
-| P3-P4 | — | — | hidden | 无 legacy 可换 |
-| P5-P6 | ✓ | — | `box`(final 升级)| `Pro v2 trade-in open — $300 off` |
-| P5-P6 | — | ✓ | `rack` | `Final rack upgrade — $800 off` |
-| P5-P6 | ✓ | ✓ | `combined` | `Final fleet upgrade — $1,100 off` |
-| P5-P6 | — | — | hidden | 无 legacy 可换 |
+**i18n**(`store.tradeinUpgrade.*`):`label` / `title{name,credit}` / `body{target,net}` / `cta`。旧 `store.tradeinWindow.*` 窗口键组已删除。
 
-**Legacy 设备识别**:
-- legacy box = 用户拥有 `kind ∈ {stellarbox-s1, stellarbox-pro}` 任一
-- legacy rack = 用户拥有 `kind = stellarrack-p1`
-
-**Hook**:`useTradeinWindowState()` 暴露 `{ visible, variant, isFinal }`,供 `/store/page.tsx` 同时控制 banner 渲染 + S1 promo strip 互斥。SSR mounted=false 时返回 `visible=false`,与 first paint hydration 对齐(参 §16.5)。
-
-**i18n**(`store.tradeinWindow.*` 8 keys):
-- `label`(`LIMITED WINDOW`)
-- `titleBox` / `bodyBox` / `titleRack` / `bodyRack` / `titleCombined` / `bodyCombined`
-- `cta`(`Open trade-in`)
-
-**铁律**:文案永不暴露 `phase id / "P3" / "final phase" / "deposit lock-in"` 等 PM 术语;只用"trade-in open / final upgrade window / new silicon now available"等真实平台话术。
+**铁律**:文案永不暴露 phase / 内部参数名等 PM 术语;抵扣口径向用户明示"按累计产出计算、越早置换抵得越多"(合规透明,同时构成紧迫感)。
 
 ### 7.7 代金券(Voucher · 领券促销)
 
@@ -1830,7 +2006,7 @@ CTA 行为:`router.push(/store/{nextTierKind})` → 用户在目标商品页 Buy
 
 #### 7.7.5 个人中心入口
 
-「我的奖励」页(`/me/rewards`,见 §11.5a)聚合展示用户的可用券、已过期券与系统奖励;个人中心(`/me`)「赚取」分组提供入口行。
+「我的奖励」(`/me/rewards`,见 §11.5a)是代金券的用户侧查看入口:类别汇总页显示可用张数,分类记录页列出可用券(带「去使用」)与已过期券;个人中心(`/me`)「账户」分组提供带未读红点的入口项。
 
 #### 7.7.6 业务流程
 
@@ -1866,7 +2042,7 @@ flowchart TD
 汇总枢纽,显示:
 - 邀请 hero(ReferralHero,见 §8.1.1)
 - 3-stat 行:Direct(自直推人数)/ Network(直推+扩展总数)/ Today(今日团队收益)
-- V 级 hero + 升阶进度条 + 实物奖品 chip
+- V 级 hero + 升阶进度条 + 等级奖励 chip(培育奖 NEX)
 - 5-track Team programs 卡(V-Rank ladder / Influence Royalty / Dual-Track Binary / Leadership Pool / Regional Ambassador)— 每行 icon + label + sub + 右侧 value;value 按 §8.1.0 规则分类显示
 - 团队收益卡(TeamLedgerCard,见 §8.1.2)— 本月 + 累计 + Direct/Extended 拆分 + 可提现/冷却 + 提现入口(单一聚合卡,替代原"团队 lifetime 卡 + 月份佣金卡"的拆分布局,消除 lifetime $195.09 与本月数据重复显示)
 - Influence Network 入口(链 §8.7 orbit live map)/ Genealogy 入口(链 §8.8)
@@ -1894,19 +2070,31 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 1. **邀请码展示 + 复制**:展示 `user.referralCode`(如 `NEXION-8K9X`),配复制按钮 · 点击调 `navigator.clipboard.writeText(code)` + toast `Copied {code}` + 1.6s 内反馈 Check
 
 2. **双向奖励**:
-   - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 5% lifetime commission`
-   - They get(被邀人):`20 NEX welcome` / `instant credit on first device pairing`
+   - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 10% direct royalty`(佣金费率单一来源 §4.3.4 / §8.3.1)
+   - They get(被邀人):welcome gift 同源 `rewards.welcomeGift`(默认 `$5 + 20 NEX`,§4.3.2),不另设常量
 
 3. **Social proof**:`247 inviters earned today · 30-day cooldown per friend`(mock 实时社会证明,无需对接后端)
 
-4. **分享动作**:
-   - Share link 主入口:跳 `/team/leaderboard`(查邀请排行)
-   - Poster:打开海报功能(P-mini phase 占位 toast `Poster ready`,Sprint 3 接入真实 canvas 渲染)
+4. **分享动作(四入口,链接单源构造)**:
+   - 分享链接 = `share.baseUrl + referralCode`(§13.3;未配置时回退当前站点地址直连落地页,扫码可达);四入口产出的码 / 链接 / 二维码同源一致;邀请码为空时四入口置灰并 toast 提示。
+   - **海报**:打开分享海报面板——canvas 生成 750×1000 海报,含**可扫二维码**(payload = 分享链接)、邀请码、可开关的用户名;模板轮播:新人礼(恒可用)/ 我的产出(取用户设备今日实际产出,无设备自动隐藏)/ 我的网络;海报仅承载被邀方向价值(新人礼 + 产品故事),**不出现邀请人向金额**;面板含被邀方奖励说明行、底部渠道行、保存图片(受限浏览器降级为长按保存引导)、复制链接;生成中 / 失败态禁分享与保存,失败可重试。
+   - **邀请码 / 链接**:复制到剪贴板;复制失败不展示成功态、不计分享事件。
+   - **立即分享**:打开渠道面板——顶部邀请人奖励说明行(数额随 §8.1.1.1 阶段倍率)+ 渠道 grid(`share.channels` 配置驱动,顺序即展示序,§13.3)+ 弱化「取消」。渠道行为:web intent 型直接唤起并预填文案 + 链接(被拦截自动复制降级);无网页直发口的渠道(Zalo / Messenger)在 H5 走「复制文案 + 引导到该 App 粘贴」;系统分享项仅在浏览器支持时显示;渠道配置为空时兜底「复制 + 海报」两项,面板永不空。分享文案模板含礼包金额占位,与 `rewards.welcomeGift` 同源。
+   - **分享事件与任务接线**:任一入口的成功分享动作(复制成功 / 唤起渠道 / 保存海报)记录分享事件(server-canonical `share.performed`),并幂等触发首日任务 `invite_friend` 完成(§5.15.3,仅首次发奖,重复分享不重复计酬)。
 
-**关键参数**(`INVITE_REWARDS` 常量,Sprint 3 第三阶段接 phase multiplier):
-- `REWARD_USDT_LIFETIME_ESTIMATE` = 200(`You get` 数额,代表被邀人 lifetime 平均贡献 ≈ unilevel + binary + 平级奖之和)
+```mermaid
+flowchart LR
+  A[邀请卡四入口<br/>海报 / 码 / 链接 / 渠道] -->|扫码 · 点链| R[落地页 /ref/CODE<br/>§4.3.1]
+  R -->|领取 CTA 自动带码| G[注册 ?ref 锁定<br/>§4.1]
+  R -.中途离开.-> P[pendingRefCode 暂存] -.此后任意入口注册.-> G
+  G -->|bind first-wins + 礼包分桶 §4.3.2/4.3.5| S[注册成功页 · 仅 H5<br/>§4.1.1]
+  S -->|下载 APP / 继续网页版| O[onboarding]
+```
+
+**关键参数**:
+- `REWARD_USDT_LIFETIME_ESTIMATE` = 200(`You get` 数额,代表被邀人 lifetime 平均贡献 ≈ unilevel + binary + 平级奖之和;× §8.1.1.1 阶段倍率展示)
 - `REWARD_NEX_INVITER` = 200(邀请人 NEX 一次性 bonus)
-- `REWARD_NEX_INVITEE` = 200(被邀人 welcome NEX,首次设备配对触发)
+- 被邀人礼包:同源 `rewards.welcomeGift`(§13.3),不另设常量
 
 #### 8.1.2 团队收益卡(TeamLedgerCard)
 
@@ -1962,7 +2150,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 ### 8.1.3 Team finance controls
 
 - Commissions:展示 5 类佣金事件明细,入口必须可从 Team 主页到达。
-- V Rank:展示 V0-V12 进度、晋升条件、维持期与奖品/培育奖。
+- V Rank:展示 V0-V12 进度、晋升条件、维持期与等级奖励/培育奖。
 - Balance Match:展示双轨 balance、弱区/强区、日封顶与 spillover 逻辑。
 - Leadership Pool:展示全球领导奖池、参与资格、分配周期与说明页。
 
@@ -1972,21 +2160,21 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 
 #### 8.2.1 13 阶完整表
 
-| V | 头衔 | 升级条件 | 扩展版税覆盖(数学层 `unilevelDepth`) | 平级奖 | 领导池票数 | 实物奖品 |
-|---|---|---|---|---|---|---|
-| V0 | Cadet 学员 | 注册即得 | 仅直推 | — | — | — |
-| V1 | Pilot 飞行员 | 自买 ≥ $299 + 直推 3 | 直推 + 1 度扩展 | — | — | Pilot 徽章 |
-| V2 | Operator 操作员 | 团队 $5K | 直推 + 2 度扩展 | — | — | 操作员勋章 |
-| V3 | Captain 舰长 | $20K + 2×V1 | 直推 + 3 度扩展 | 5% | 1 | Apple Watch SE |
-| V4 | Commander 指挥官 | $50K + 3×V2 | 直推 + 4 度扩展 | 5% | 2 | iPhone 16 Pro |
-| V5 | Wing Leader 翼领 | $150K + 4×V3 | 直推 + 5 度扩展 | 5% | 4 | Apple Vision Pro |
-| V6 | Squadron 中队长 | $500K + 5×V4 | 直推 + 6 度扩展 | 5% | 8 | Rolex Submariner |
-| V7 | Fleet Cmdr 舰队司令 | $1M + 6×V5 | 直推 + 7 度扩展 | 5% | 16 | Tesla Model Y |
-| V8 | Star Admiral 星上将 | $3M + 7×V6 | 直推 + 8 度扩展 | 5% | 32 | Porsche 911 |
-| V9 | Galaxy Lord 星河领主 | $10M | 直推 + 9 度扩展 | 5% | 64 | Lamborghini Urus |
-| V10 | Nexion Founder 联合创始 | $30M | 无限扩展 0.5% | 5% | 128 | 私人飞机包月 |
-| V11 | Cosmic Sovereign 宇宙至尊 | $100M | 无限扩展 1% | 5% | 256 | 加勒比游艇 |
-| V12 | Singularity 奇点 | $500M | 无限扩展 1.5% | 5% | 512 | 全网交易 1% 永久分红 |
+| V | 头衔 | 升级条件 | 扩展版税覆盖(数学层 `unilevelDepth`) | 平级奖 | 领导池票数 |
+|---|---|---|---|---|---|
+| V0 | Cadet 学员 | 注册即得 | 仅直推 | — | — |
+| V1 | Pilot 飞行员 | 自买 ≥ $299 + 直推 3 | 直推 + 1 度扩展 | — | — |
+| V2 | Operator 操作员 | 团队 $5K | 直推 + 2 度扩展 | — | — |
+| V3 | Captain 舰长 | $20K + 2×V1 | 直推 + 3 度扩展 | 5% | 1 |
+| V4 | Commander 指挥官 | $50K + 3×V2 | 直推 + 4 度扩展 | 5% | 2 |
+| V5 | Wing Leader 翼领 | $150K + 4×V3 | 直推 + 5 度扩展 | 5% | 4 |
+| V6 | Squadron 中队长 | $500K + 5×V4 | 直推 + 6 度扩展 | 5% | 8 |
+| V7 | Fleet Cmdr 舰队司令 | $1M + 6×V5 | 直推 + 7 度扩展 | 5% | 16 |
+| V8 | Star Admiral 星上将 | $3M + 7×V6 | 直推 + 8 度扩展 | 5% | 32 |
+| V9 | Galaxy Lord 星河领主 | $10M | 直推 + 9 度扩展 | 5% | 64 |
+| V10 | Nexion Founder 联合创始 | $30M | 无限扩展 0.5% | 5% | 128 |
+| V11 | Cosmic Sovereign 宇宙至尊 | $100M | 无限扩展 1% | 5% | 256 |
+| V12 | Singularity 奇点 | $500M | 无限扩展 1.5% | 5% | 512 |
 
 > "扩展度"= 数学层 unilevelDepth 字段值,内部按 `UNILEVEL_USDT` 数组结算;UI 层只展示"直推 / 扩展版税"二态,不暴露具体度数。
 
@@ -2018,7 +2206,6 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
   - 扩展版税覆盖范围加宽(下一笔订单按新覆盖度结算)
   - 解锁平级奖(若 V≥3)
   - 解锁领导池票数(下次周结自动并入)
-  - 实物奖品入库(见 §8.2.5)
   - 上线触发 cultivationBonus NEX(见 §8.2.5)
 - **晋升通知**:推送至 useNotifications(`kind: team`)+ Nova 推一条 `🎉 Congratulations! You're now V{n} {Title}.` + Home BoostUpsell 轮换插入 5s 庆祝条幅
 
@@ -2029,13 +2216,9 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 - **唯一例外**:账户注销 → V 级清零(账户重新注册视为 V0)。
 - **保留机制目的**:晋升后用户视角是"已锁定身份和未来收益"(包括 unilevel 深度 / 平级奖 / 领导池票数),减少持续投入压力。
 
-#### 8.2.5 奖品发放 & 培育奖
+#### 8.2.5 等级奖励 & 培育奖
 
-**实物奖品(prizeName)**:
-
-- 晋升到 V≥1 时,后台进入"实物奖品待发"队列(`useAchievements` 或独立实物 queue)。
-- 用户在 `/team/rank` 详情页点击对应 V 级卡的"Claim prize"按钮 → 跳出 KYC-Express 地址确认(若未完成则强制完成)→ 提交后状态变 "Shipping in 14d"。
-- **仅首次到达**该阶发放 1 次;不会因为多次满足重新触发。
+**等级奖励(运营可配)**:每个 V 级的晋升奖励由运营后台(F1 V-Rank)配置,支持 **USDT / NEX / 代金券 / 系统 SKU / 自定义** 多种类型,可一阶多项。原「实物奖品 + 发货队列」机制已下线。下方「培育奖 NEX」是默认随阶发放的代币奖励(发给上线 sponsor)。
 
 **培育奖(cultivationBonus,NEX)**:
 
@@ -2060,10 +2243,10 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 
 | 阶段 | V 范围 | 用户体验目标 |
 |---|---|---|
-| 入门 | V0 → V3 | 低门槛快速上手 — 3 个直推 + $20K 团队业绩可达,平均 2-4 周内 90% 活跃用户能升 V3,解锁第一个高单价奖品(Apple Watch SE)+ 平级奖 + 领导池 1 票 |
+| 入门 | V0 → V3 | 低门槛快速上手 — 3 个直推 + $20K 团队业绩可达,平均 2-4 周内 90% 活跃用户能升 V3,解锁平级奖 + 领导池 1 票 + 培育奖 NEX |
 | 攀升 | V4 → V6 | 业绩门槛指数级跳跃($50K → $500K),需稳定下线团队 + V 级下属;典型 MLM "中坚干部"区间 |
 | 高阶 | V7 → V9 | $1M-$10M 团队业绩,需 6+ V5 / 7+ V6 下属;少数顶尖大区领袖区间 |
-| 远期 | V10 → V12 | $30M-$500M 远期天花板;实物奖品升级到飞机 / 游艇 / 股权,作为长期 aspirational 锚 |
+| 远期 | V10 → V12 | $30M-$500M 远期天花板;高阶领导池权重 + 全网分红作为长期 aspirational 锚 |
 
 #### 8.2.7 UI 规格
 
@@ -2071,8 +2254,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 - 升至下一阶进度条(`Math.round(progressPct × 100)%`)
 - Missing 条件清单(`nextRankProgress().missing` 数组逐条列出)
 - 13 阶完整列表(已达成 / CURRENT / 锁定 3 状态)
-- 每阶展示:升级条件 + 直推奖 + unilevel 深度 + 平级 + 领导池票数 + 实物奖品 + 培育奖
-- 已达成阶可点击"Claim prize"领取实物奖品
+- 每阶展示:升级条件 + 直推奖 + unilevel 深度 + 平级 + 领导池票数 + 培育奖
 
 ### 8.3 影响力网络版税 `/team/unilevel`
 
@@ -2171,7 +2353,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 
 | # | 机制 | 业务效果 |
 |---|---|---|
-| 1 | 较小轨匹配公式 | Balance Match = `min(A, B) × 10%`,日上限 $5,000。仅按较小一轨体量发放,鼓励两轨均衡发展;较大一轨未匹配的体量累积到下个结算周期或作为平台运营备付金。 |
+| 1 | 较小轨匹配公式 | Balance Match = `min(A, B) × 10%`,日上限随平台 Phase 收紧(P1–P3 $5,000 / P4+ $2,000,详见 §11 Phase 参数表)。仅按较小一轨体量发放,鼓励两轨均衡发展。**结算周期**(每日 / 每周 / 每月)与**沉淀处置策略**(较大一轨未匹配体量如何处理:每月清零 / 每次对碰清零 / 转结)均由运营后台配置(默认每月结算 + 每月清零),详见 §8.4.1.2。 |
 | 2 | 最低业绩门槛 | 强制两轨各 ≥ $1,000 才进入结算队列。未达门槛的业绩计为 pending,达标后批量结算 → 自然形成业绩沉淀缓冲池,稳定平台日结资金流。 |
 | 3 | 自动分配机制(内部 spillover) | 网络伙伴在某轨业绩饱和时,新邀请自动分配到下游轨道,形成"网络伙伴主动帮你扩展轨道"的体验。增强网络绑定关系,降低用户主动退出意愿。 |
 | 4 | LTV 延长 | 两轨无封顶 + 强制平衡,提供"持续投入还能再增长"的长期激励路径,把用户活跃生命周期从单一网络版税的 ~6 个月延长到 ~18-24 个月(基于行业基准数据)。 |
@@ -2188,7 +2370,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 
 每个用户开两条独立轨道 Track A + Track B(内部存储 `binary: "left" | "right"`)。
 
-**Balance Match** = `min(A, B) × 10%`,日上限 $5,000
+**Balance Match** = `min(A, B) × 10%`,日上限随平台 Phase(P1–P3 $5,000 / P4+ $2,000,详见 §11)
 
 **强制平衡**:必须 Track A ≥ $1,000 且 Track B ≥ $1,000 才能领奖,否则当月归零
 
@@ -2218,13 +2400,36 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 - `useNetwork.leftVolumeMonth()` / `rightVolumeMonth()` — 遍历 `members[]` 按 `binary === "left" | "right"` 筛选,累加 `monthVolumeUSD` 字段
 - `monthVolumeUSD` 字段在每笔合格交易完成时增量更新
 
+##### 8.4.1.2 结算周期与沉淀处置(运营可配置)
+
+平衡匹配的**结算周期**与**沉淀处置策略**为平台级可配置参数,由运营后台 F3 双轨结算引擎设定(server-canonical),前端读取后联动渲染。
+
+**结算周期 `settlePeriod`**:对碰奖金的派发节奏,枚举 `每日 | 每周 | 每月`,默认 `每月`。
+
+- 每条轨道的活跃业绩(GV)始终按自然月累计(§8.4.1.1);结算周期决定按何种节奏计算并派发 Balance Match Bonus。
+- **预计金额口径**:hero 显示的预计奖金随结算周期联动 = 较小轨「该周期业绩」× 10%,封顶 = 日封顶 × 周期天数。其中「周期业绩」= 月业绩 ×(周期天数 / 30),周期天数 `每日=1 / 每周=7 / 每月=30`。
+  - 默认每月:hero 显示「本月平衡匹配奖估算」= `min(月 Track A, 月 Track B) × 10%`,与双轨卡可见的月业绩、玩法说明页 `$2,000 × 10% = $200` 示例同口径,用户可自行验算。
+  - 每周 / 每日:hero 标签与金额随之切换为「本周 / 今日 …估算」并按周期天数折算。
+
+**沉淀处置策略 `residualPolicy`**:较大一轨未被匹配的剩余业绩(沉淀池)在周期边界如何处理,枚举三档,默认 `每月清零`:
+
+| 策略 | 语义 | 平台资金影响 |
+|---|---|---|
+| 每月清零 | 每自然月边界,较大轨未匹配体量重置归零 | 沉淀不累积,负债口径最紧 |
+| 每次对碰清零 | 每次结算事件后较大轨未匹配体量即清零(清零频率 = 结算周期) | 与每月清零在周期=每月时重合,但概念为「结算事件驱动」而非「日历驱动」 |
+| 转结 | 较大轨未匹配体量结转到下一周期继续累计,不清零 | 沉淀持续累积、最终可被匹配派发 → 拉大利息负债(科目 #3)与佣金应付,改前须过 B1 兑付覆盖率核验 |
+
+**最低业绩门槛**(独立于结算周期):必须 Track A ≥ $1,000/月 且 Track B ≥ $1,000/月 才进入结算队列,未达门槛该周期匹配归零;此门槛恒按月口径,与结算周期正交。
+
+**前后端联动**:运营在后台改 `settlePeriod` / `residualPolicy` → server-canonical 配置经平台配置接口下发 → 前端读取并联动:① 预计金额数字与「本周期…估算」标签;② 公式行「{周期}结算」节奏文案;③ 玩法说明页结算频率 FAQ 与沉淀处置 FAQ。前端以 backend-replaceable 单源(`lib/binary-settlement.ts`,枚举 `settlePeriod` / `residualPolicy` + i18n label map)承接,接真后台时把常量换成配置接口拉取即可,渲染层零重写。
+
 #### 8.4.2 自动分配机制
 
 当网络伙伴某节点已满后,新发展的成员自动分配到下游用户的轨道下面(内部 `isSpillover: true` 标记)。系统推送:`↳ Network partner V5 Sarah K. auto-placed 3 new members into your Track B`。
 
 #### 8.4.3 UI 规格
 
-- 今日 Balance Match 估算 hero(大字)+ 公式(min(A,B) × 10%)
+- 本周期(默认本月)Balance Match 预计 hero(大字,金额随结算周期联动,见 §8.4.1.2)+ 公式(min(Track A, Track B) × 10% · 日上限 · {周期}结算)
 - 阻塞警告(若任一轨 < $1,000)
 - Track A / Track B 双轨卡(月业绩 + 成员数 + Top member)
 - 较大 vs 较小差距比较条
@@ -2286,28 +2491,45 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
    - Month 3(高亮卡):A $4,500 / B $2,400 → bonus $240(按较小一轨)
    - 💡 takeaway 卡:`The slower track sets your reward. Invest in both.`
 
-8. **§6 Common questions**(4 FAQ 行,纯展开列表)
+8. **§6 Common questions**(5 FAQ 行,纯展开列表)
    - Q1 能否选 track?A1 可以,首次签约时选,placement 之后锁定
    - Q2 一轨没人怎么办?A2 继续邀请该轨或等网络伙伴自动分配;两轨 < $1,000 无 bonus
-   - Q3 多久结算?A3 每月,自然月末统计、月初支付
+   - Q3 多久结算?A3 按平台配置的结算周期(默认每月),按周期统计两轨累计业绩、于下一周期初支付(§8.4.1.2)
    - Q4 不邀请也赚吗?A4 可以,Balance Match Bonus 只是 channel 之一,设备产出 / 直推奖照常
+   - Q5 未匹配的业绩会保留吗?A5 取决于沉淀处置策略(§8.4.1.2):每月清零 / 每次对碰清零 → 不结转;转结 → 累积到下一周期
 
 9. **底部 footer**:全宽 CTA `Got it · see my Dual-Track →` 链 `/team/binary`
 
 **实现约束**:
 - "use client" + useT(),完全静态展示,无 store 订阅(零状态)
 - SVG 树状图:程序生成,viewBox 自适应,不依赖外部图片
-- i18n keys:`binaryHowItWorks.*` namespace(en + zh 双语镜像),~30 keys
+- i18n keys:`binaryHowItWorks.*` namespace(en + zh 双语镜像),含结算频率 FAQ 与沉淀处置 FAQ(`residualFaq` 按策略派生);结算周期 / 周期标签 label map 在 `binary.*` namespace(`settlePeriodLabel` / `periodEstimateLabel` / `periodUnitLabel`)
 
 ### 8.5 全球领导奖池 `/team/leadership-pool`
 
 #### 8.5.1 规则
 
-- 池子来源:平台每周总交易额 5%
-- 分配:按 V 级权重票数(V3=1, V4=2, V5=4 ... V12=512,每升一级翻倍)
-- 结算:每周一次
+- 池子来源:平台每周总交易额(GMV)的 5% 注入;池额 = 周 GMV × 比例派生,当前周池约 $487.3K(GMV ~$9.75M)
+- 参与门槛:V3(Captain)解锁——票权首个非零等级;V3 以下可查看池子但不参与分配
+- 分配:V3+ 领袖按指数票权(V3=1, V4=2, V5=4 ... V12=512,每升一级翻倍)分配,个人份额 = 个人票数 ÷ 全网总票
+- 结算:每周一次——周日 23:59 UTC 票权快照 → 周一 00:00 UTC 自动派发入钱包(无需 claim)
+- **头部集中(派生)**:高阶领袖稀少但指数票权碾压,池子向 V-Rank 顶层集中。顶部 N 名领袖(当前全网分布下 ≈ V8 星上将及以上约 10 人)凭票权分走约六成奖池。集中度按真实全网 V 级分布 × 票权运行时派生展示,不写死固定百分比;调整全网分布或票权,集中度同步变化
 
-**示例**:V6 一人占全网总票约 1%。平台周交易 $10M → 池子 $500K → V6 单人周入 $5,000。
+**示例**(当前全网分布,周池 $487.3K,全网总票约 2,100):V3 入门单人约占 0.05% → 周入约 $232(尝鲜);V8 约占 1.5% → 约 $7.4K;V12 顶阶单人约占 24% → 约 $119K。
+
+**业务流程(周结算循环)**:
+
+```mermaid
+flowchart TD
+  A["周一 00:00 开新池 · 上周池已派发"] --> B["整周 · 注入 5% GMV · 池额 = 周GMV×5%"]
+  B --> C["周日 23:59 票权快照 · 票权定格"]
+  C --> D["周一 00:00 自动派发 · 入钱包,无需 claim"]
+  D -. 每周循环 .-> A
+  C --> E{"V3 解锁判定"}
+  E -- 未达 V3 --> F["候选 · 显示升级路径,不参与分配"]
+  E -- V3 及以上 --> G["按指数票权分配 · 份额 = 票数 ÷ 全网总票"]
+  G --> H["头部集中(派生) · 顶部 10 名约 V8+ ≈ 61%"]
+```
 
 #### 8.5.2 UI 规格
 
@@ -2316,7 +2538,8 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 - 距结算倒计时
 - 你的预估分红 + 票数 + 全网票数 + 占比
 - V<3 时显示"V3+ to unlock" + 升级路径 CTA
-- V 级 → 票数权重完整表(显示全网 V3-V12 分布)
+- 顶部集中度提示条(派生):顶部 N 名领袖分走约 X% 池子,X 按当前全网分布与票权派生
+- V 级 → 票数权重完整表(显示全网 V3-V12 分布 + 各档占池比与人均派发,派生)
 - 历史周池列表
 
 #### 8.5.3 玩法说明页 `/team/leadership-pool/how-it-works`
@@ -2327,7 +2550,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 1. iOS nav back + 标题 `How the Leadership Pool works`
 2. Hero + 标签 `GLOBAL LEADERSHIP POOL` + 大标题 `5% of all platform volume, split among V3+ leaders every week.`
 3. §1 What is the Leadership Pool?(2 段:周度 5% 注入 + 利润分享类比)
-4. §2 V 级票数对照表(V3=1 / V4=2 / V5=4 / V6=8 / V7=16 / V8=32 / V9=64 / V10=128)+ 周分红占比估算
+4. §2 V 级票数对照表(V3=1 / V4=2 / V5=4 / V6=8 / V7=16 / V8=32 / V9=64 / V10=128 / V11=256 / V12=512)+ 各档周分红占比(单人份额 = 票数 ÷ 全网总票,从全网分布派生,非写死)
 5. §3 结算时间表 3 步:周一 00:00 UTC 开新池 / 整周 5% 业绩流入 / 周日 23:59 UTC 快照 + CalloutBox `💡 When you reach V3 mid-week`(部分周按比例计入)
 6. §4 提升池子分成 3 种途径 IconRow(🚀 升 V 级 / 💎 持有不衰减 / 🤝 帮团队成长)
 7. §5 FAQ 4 问(V0-V2 能看吗 / 何时收到 / 票数会丢吗 / 总票数翻倍怎么办)
@@ -2344,7 +2567,7 @@ i18n keys 在 `poolHowItWorks.*` namespace(en + zh 双语镜像)~40 keys。
 | Peer | 同 V 级团员业绩 5% | 每月 | USDT |
 | Cultivation | 下属升 V 一次性 NEX | 实时 | V1 500 / V2 2K / V3 10K / V4 50K / V5 200K NEX |
 | Leadership | 领导池周分红 | 每周 | USDT(V3+ 解锁) |
-| Genesis | 创世节点持有人分红 | 每日 | USDT(创世持有人) |
+| Genesis | 创世节点持有人排放 | 上所后 | $NEX(创世持有人,vesting 释放) |
 
 UI:返回按钮同行 `📖 新手?了解 6 类佣金 →` chip 链 `/team/commissions/how-it-works` + 6 类汇总 grid + filter pills(全部 / 网络版税 / 平衡匹配 / 平级 / 培育 / 领导池 / 创世)+ 时间线 + 每条状态(冷却 N 天 / Ready / Withdrawn)+ tap 详情。
 
@@ -2678,9 +2901,9 @@ future = amount × (1 + APY × days / 365)
 
 | Tier | APY | 30d → | 90d → | 180d → |
 |---|---|---|---|---|
-| 30d | 5% | $X × 1.00411 |  |  |
-| 90d | 12% |  | $X × 1.02959 |  |
-| 180d | 20% |  |  | $X × 1.09863 |
+| 30d | 12% | $X × 1.00986 |  |  |
+| 90d | 35% |  | $X × 1.08630 |  |
+| 180d | 80% |  |  | $X × 1.39452 |
 
 示例:$500 → 30d $502 / 90d $515 / 180d $549
 
@@ -3269,18 +3492,19 @@ interface TrialConfig {
 | V-Rank ladder(13 级 selfBuyUSD / directRefs / teamVolumeUSD / votes / prize) | `lib/v3/v-rank.ts:49-140` | `GET /api/config/v-ranks` | 阶段调整门槛 |
 | V_VOTES + GLOBAL_V_DISTRIBUTION | `lib/v3/leadership-pool.ts:27-43` | `GET /api/config/leadership-pool` | 周池金额 + vote weight |
 | Staking pools 统一(USDT 锁仓 + NEX 池)| `lib/v3/staking.ts:28-40` + `lib/mock/staking-pools.ts:13-46` | `GET /api/config/staking/pools` | APY / penalty / enabled / minStake |
-| Genesis 节点经济(TOTAL_SLOTS / unitPriceUSDT / dailyDividendShare) | `lib/v3/genesis.ts:25,76,82` | `GET /api/genesis/state` | 供应 / 单价 / 分红比例 |
+| Genesis 节点经济(TOTAL_SLOTS / unitPriceUSDT / dailyDividendShare) | `lib/v3/genesis.ts:25,76,82` | `GET /api/genesis/state` | 供应 / 单价 / 排放比例 |
 | Genesis 二级市场 stats(floor / vol_24h / sales_24h / listed / owners) | `app/(main)/genesis/marketplace/page.tsx:48-52` | SSE `/api/genesis/marketplace/stats` | 实时市场数据 |
 | NEX 市场参数 + 拉盘曲线(price / pump 概率 / 幅度) | `lib/v3/market.ts:50-76` | WebSocket `/api/market/nex` | server canonical |
 | Exchange 三阈值(USER_DAILY_CAP / PLATFORM_DAILY_CAP / KYC_LIFETIME) | `lib/v3/exchange.ts:20-22` | `GET /api/config/exchange/caps` | 合规调阈值 |
 | Phase engine 全表(每 phase 多个时变 dial × 6 phases,含 `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`)| `lib/store/product-phase.ts` | `GET /api/admin/platform/phase-config` | 12 月节奏 dial 调优 |
 | Task pricing 表(6 类 min/maxReward + QUEUE_SATURATION)| `lib/mock/tasks.ts:31-193` | `GET /api/config/task-pricing` | 每周市场行情 |
 | Device specs(baseRate / baseRateNEX / price 全表) | `lib/store/index.ts:33-86` | `GET /api/products/specs` | 产品上下架 / 定价 |
-| Device degradation 曲线(-4% / -6% / -23.7% + MIN_EFFICIENCY) | `lib/store/device-lifecycle.ts:31-39` | `GET /api/config/lifecycle` | 衰减曲线决定终身收益 |
-| Sponsorship welcome gift(USDT + NEX)| `lib/v3/sponsorship.ts:34-35` | `GET /api/config/sponsorship` | 周季节性礼包变化 |
+| 任务产能节奏(3 段月界+递减幅度 + 产能下限 + 豁免 SKU + 新机补贴天数) | `src/store/device-lifecycle.ts`(TASK_CAPACITY_BANDS 等) | `GET /api/config/task-capacity`(TBD) | 产能节奏决定终身收益;运营可调段界/幅度/补贴 |
+| Sponsorship welcome gift(金额 + 发放模式)| `platform-config.rewards.welcomeGift` | `GET /api/config/platform` | 后台调额度 / 发放模式(H8)|
+| Inviter reward(邀请人奖励 NEX)| `platform-config.rewards.inviterReward` | `GET /api/config/platform` | 后台调邀请人奖励额度(H8)|
 | Earnings milestones(5 档阈值 + NEX 奖励) | `lib/store/milestones.ts:28-34` | `GET /api/config/milestones` | 阶段调整 |
 | Sign-in lucky multiplier(5% 2x / 15% 1.5x / 7d streak,作用于签到 NEX 发放)| `lib/v3/nex-faucet.ts` | `POST /api/faucet/sign-in` 返 multiplier | A/B 实验值 |
-| Trade-in 全配置(`salvage.rate=0.30` / `monthlyDecay=0.025` / `minHoldingMonths=1` + `eligibility[kind].rules[]` + `promo.{enabled,cooldownHours,maxPerSession,delayMs,routes,triggerWhen}` + `inventory.softMax`)| `lib/v3/_config/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 折旧定价 + 资格门槛 + promo 节奏 |
+| 升级置换全配置(抵扣阶梯 5 档界点/比例 + `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult` / `applyTo` / `enabled` + `eligibility[kind].rules[]` + promo 预留组 + `inventory.softMax`)| `src/mock/tradein-config.ts` | `GET /api/config/tradein` (TBD; candidate) | 抵扣定价 + 资格门槛;阶梯结构由哨兵锁(连续/递减) |
 | Tradein composer endpoints | `lib/store/index.ts:recycleDevice / replaceDevice / moveToInventory` | `POST /api/devices/recycle` / `POST /api/devices/replace` / `POST /api/devices/deactivate` (TBD; candidates) | 服务端原子 tx 替代 client composer |
 | Trade-in promo dismissal log | `app/components/tradein-promo-banner.tsx` localStorage | `GET/POST /api/users/me/promo-dismissals` (TBD; candidate) | 跨设备 cooldown 一致性 |
 | User cumulativeDepositUsdt | `recordDeposit` action | `GET /api/users/me.cumulativeDepositUsdt` (TBD; candidate) | trade-in 资格门槛源 |
@@ -3313,7 +3537,7 @@ interface TrialConfig {
 
 - staking:APY / penalty / minStake / lockDays。
 - Genesis:slot price $24.08、年化 87.9%、royalty/dividend、一级/二级市场开关。
-- 设备生命周期:decay -4% / -6% / -23.7%, floor 22%, salvage formula。
+- 设备任务产能:递减 -4% / -6% / -23.7%, floor 22%, 产出阶梯抵扣公式。
 - 商品与收益:SKU price、daily earning、route threshold、trial price。
 - Team:unilevel 7 层、V Rank 条件、binary cap、leadership pool rule。
 - Wallet:withdraw min / fee / cap / KYC gate。
@@ -3346,7 +3570,7 @@ interface TrialConfig {
 | `useProductPhaseOverride.pinned`(localStorage)+ URL `?dev=1` | 跳 phase 解锁高 invite multiplier / 短 cooldown | `?dev=1` 移除生产支持 + phase 完全 server 决策 |
 | `MAX_DEVICES=6` 改常量 | 多设备 yield | server `POST /api/devices/activate` enforce slot cap,client 限制纯 UI |
 | `_devSeedLegacyDevice` / `_devFastForwardAll` / `_devBumpEarningsTotal` 生产 bundle 仍在 | 伪造老化设备 / 改 lifetime USD 领里程奖 | build-time strip(`process.env.NODE_ENV === "production"` 块剥离)+ tree-shake |
-| OTP `verifyCode()` client 仅做正则 | 任意 6 位数字过 → 批量开号 | `POST /api/auth/otp/verify` 必调 |
+| OTP 闸门状态(`nx_otp_*` storage)篡改 | 清发送计数绕滑块 / 伪造 active code → 批量开号 | client 已按 server 同构接口消费(send 闸门 / TTL / 尝试次数 / 一码一 / 一次性 ticket,规则 §4.6.2);PROD 状态全 server 持有,`POST /api/auth/otp/{send,verify}` + captcha 接口整体替换,`verifyToken` 由后续端点二次校验 |
 | Bills 客户端 push 无 server 二次入账 | 伪造账单 | server 是唯一账本,client 拉 `GET /api/bills?cursor=` 不写 |
 | Order ID + Withdrawal ID + Bill ID + Card tokenId 客户端 mint | 可枚举 / 撞 ID / 伪造 PSP token | server 单源 ID,响应携带 |
 
@@ -3422,41 +3646,48 @@ interface TrialConfig {
 
 #### 10.1.1 规则
 
-- 限量 1,000 张
-- 单价 $9,999
-- 持有特权:
-  - 全网每日交易 0.1% 池子均分(单张日产约 $24)
-  - V5 Wing Leader 资格直通(跳过 $150K 业绩门槛)
-  - 闭门 AMA + 年度峰会(Lisbon 2026)
-  - 持有人专属 Discord 通道
+- 限量 1,000 张;一级预售按累计售出分 3 档阶梯定价,售罄硬跳价:
+
+  | 档 | 累计售出区间 | 席位 | 单价 |
+  |---|---|---|---|
+  | 白名单 / OG | 0–99 | 100 | $7,999 |
+  | 公售 Tier 1 | 100–549 | 450 | $9,999 |
+  | 尾盘档 | 550–999 | 450 | $11,999 |
+
+- 席位 = 创世 OG 身份 + $NEX 协议排放优先权;持有特权:
+  - **$NEX 排放优先额度**:上所后按 vesting 曲线释放的优先排放份额(以 $NEX 计价,非每日现金分红)
+  - 生态奖励池份额
+  - DAO 治理(1 席 = 1 票)
+  - 年度忠诚空投
+  - 二级流动性(可转让,2.5% 网络版税)
+- **分红延期**:排放**上所(运营中期)后才开阀**——上所前只持有预留额度、赚积分冲排行榜,无每日收益、无可领余额。开阀由全局信号 `nexListed`(server-canonical,fail-closed:脏 / 未知数据默认不开)控制,后台 H1 `genesisDivOpen` 逐月旋钮据平台生命周期第 7 月(上所窗口)翻开。
 
 #### 10.1.2 UI
 
-- header 之下 entry chip `📖 New here? Learn how Genesis Nodes work →` 链 `/genesis/how-it-works`
-- Hero:销售进度条(`847/1,000 sold` + 倒计时)+ `~150 left`
-- 单价 + 日预估收益 hero
-- 4 项 perks 卡片
-- Live social proof(每 8-14s 滚动 `Tom from SF just bought 2 Genesis Nodes`)
-- 销售 ticker(每 30s 销售数自动 +1-3)
-- Sticky 底部 CTA `Reserve a Genesis Node · $9,999`
-- Confirm sheet:数量调节 ± + 小计 / 网络费 / 日分红预估 / 合计
+- header 之下 entry chip 链 `/genesis/how-it-works`
+- Hero:极简吊钩(标题「优先领 $NEX」+ 副标「限量 1000 · 售完即止」+ 免责「上所后释放 · 参考非保证」)+ 销售进度条(`847/1,000` + 剩余)
+- 阶梯档卡:3 档(已售档打钩灰显 / 当前档高亮 / 未来档预告更高价)+ 当前档价 + 「较白名单 +50%」溢价说明
+- 权益卡 4 层(优先领 $NEX / 生态奖励池份额 / DAO 治理权 / 年度空投)+ 「玩法详情 →」链 `/genesis/how-it-works`
+- Live social proof(每 8-14s 滚动)+ 销售 ticker(每 30s 销售数自动 +1-3)
+- Sticky 底部 CTA `认购 · $<当前档价>`(售罄→「去二级市场」)
+- Confirm sheet:数量调节 ± + 小计 / 网络费 / 到手(创世 OG 席位 · 上所优先权)/ 合计
 
 #### 10.1.3 玩法说明页 `/genesis/how-it-works`
 
-零基础说明页,文风对标传统 founder 股权 + 永续分红类比,降低 NFT 概念门槛。
+零基础说明页,文风对标传统 founder 股权 + 协议排放权益类比,降低 NFT 概念门槛。
 
 **页面结构**:
 1. iOS nav back to `/genesis` + 标题 `About Genesis Nodes`
 2. Hero + 标签 `GENESIS NODES` + 大标题 `1,000 founder NFTs. Each a permanent share of the network.`
 3. §1 What is a Genesis Node?(2 段:类比 founder 股权 + 限量 1,000 张永不增发)
 4. §2 持有 1 张的 4 项权益 IconRow:
-   - 🪙 全网每日成交 0.1%(永久,当前约 $24/day)
+   - 🪙 $NEX 协议排放优先额度(上所后按 vesting 曲线释放,$NEX 计价)
    - 🎟 每月 Genesis 抽奖券(中奖额外 ~$5,000 NFT)
    - 📜 创始成员证书(链上验证)
    - 🗳 DAO 投票权(每张 1 票)
-5. §3 获取途径 3 步 StepRow:预售 $9,999 固定价 / 二级 OpenSea 竞价 / 持有自动收分红 + CalloutBox `💡 Why pre-sale beats secondary`(地板价通常 1.5-3× 创始价)
-6. §4 二级市场交易 4 步流程(打开 marketplace → 挂单 → 设价上 OpenSea → 卖出后分红跟随 NFT)+ CalloutBox `⚠️ Once sold, dividends move with the NFT`
-7. §5 FAQ 5 问(为什么只有 1,000 张 / 分红比例会变吗 / $9,999 是不是太贵 / 平台关停怎么办 / 能持多张吗)
+5. §3 获取途径 3 步 StepRow:预售阶梯价认购 / 二级 OpenSea 竞价 / 持有获排放优先权(上所后开阀)+ CalloutBox `💡 Why pre-sale beats secondary`(尾盘档价通常高于早期档价)
+6. §4 二级市场交易 4 步流程(打开 marketplace → 挂单 → 设价上 OpenSea → 卖出后排放权跟随 NFT)+ CalloutBox `⚠️ Once sold, emission moves with the NFT`
+7. §5 FAQ 5 问(为什么只有 1,000 张 / 排放什么时候开始、怎么算 / 阶梯价怎么定 / 平台关停怎么办 / 能持多张吗)
 8. 双 CTA:`Got it · go to pre-sale` 链 `/genesis` + `Browse secondary market` 链 `/genesis/marketplace`
 
 i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
@@ -3494,7 +3725,7 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
 |---|---|---|---|
 | **未挂单** | tokenId ∉ `myListings` | Crown,`你的 · 2.5×`,价格 input(一眼可编辑)+ "地板 $X K" + "挂单"按钮 | 输入价格 → 点"挂单" → confirm dialog |
 | **挂单中** | tokenId ∈ `myListings` | Crown,右上角 `挂单中` chip + pulse 圆点,显示 `标价 $X` + `<1m 挂单` 时间,`✕ 取消挂单` 按钮 | 点"取消挂单" → confirm dialog(danger) |
-| **已售出** | tokenId 从 `ownedTokenIds` 移除(`fulfillSale` 触发) | 卡片消失 | 自动触发 toast `Genesis #N 已售出 · 买家支付 $X · 到账 $Y(扣 2.5% 版税)` |
+| **已售出** | 买家承接挂单后服务端回写(tokenId 从 `ownedTokenIds` 移除) | 卡片消失 | 成交 toast `Genesis #N 已售出 · 买家支付 $X · 到账 $Y(扣 2.5% 版税)`,由 canonical 成交结果驱动(客户端不自动撮合) |
 
 **二次确认 confirm dialog**:
 - **挂单**:`确认以标价挂单 Genesis #N? · 标价 $X · 地板 $Y K · 成交时扣 2.5% 版税 · 买家成交前你可随时取消` → "确认挂单" / "取消"
@@ -3522,87 +3753,74 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
 
 所有 marketplace 文案 i18n key 在 `marketplace.*` namespace(~70 keys,en + zh)。
 
-#### 10.2.4 挂单自动成交(二级市场流动性)
+#### 10.2.4 挂单管理与二级承接
 
-持有人在 Mine tab 把某节点挂单(`listNode(tokenId, askPriceUSDT)`,校验:持有该 token、未重复挂单、价 > 0)后,该挂单会在二级市场自动撮合成交,模拟真实买家接盘:
+持有人在 Mine tab 把某节点挂单(`listNode(tokenId, askPriceUSDT)`,校验:持有该 token、未重复挂单、价 > 0)或撤单(`cancelListing`,节点回到钱包、可重新设价上架)。挂单进入二级市场挂单池,由其他用户主动承接:
 
-- 用户有 ≥1 个活跃挂单时,平台以固定节奏(每 6 秒一拍)、约 18% 概率成交其**最早的一个**挂单(`fulfillSale`)。
-- 成交时:节点从 `ownedTokenIds` / `myListings` 移除、`myOwned` − 1;卖家净入账 `售价 ×(1 − 2.5% 网络版税)` 进可用余额,并写一条 `bonus` 账单;弹出成交 toast(`Genesis #N 已售出 · 到账 $Y`)。
+- **主动承接**:买家在二级市场列表点「Buy」承接某挂单(`acquireSecondary(tokenId)`),受资格门(FEAT-GEN08,appliesTo=both)+ 单人限购(`perUserCap`)约束;承接为**转让**(不动一级 `soldSlots` / 档价、不走售罄门),扣买家、转 token。
+- **卖家侧成交为服务端事件**:真后台在真实买家承接挂单时触发结算(扣 2.5% 网络版税后贷卖家)。客户端**不模拟自动撮合、不持有任何成交赌注**,只反映 canonical 成交结果;卖家挂单在无买家承接时保持挂出、可随时撤单。
 - 2.5% 网络版税(§13.3 `Genesis 二级版税`)在成交时扣除并进入网络金库,卖家实得为净额。
 
 ```mermaid
 sequenceDiagram
-    participant U as 持有人(Mine tab)
+    participant S as 卖家(Mine tab)
     participant G as useGenesis
-    participant Market as 二级市场撮合(每 6s)
+    participant B as 买家(二级市场)
     participant Wallet as 钱包余额
-    participant Bills as 账单
 
-    U->>G: listNode(tokenId, askPriceUSDT)
-    Note over G: 校验持有 + 未重复 + 价格为正 → 写入 myListings
-    loop 每 6 秒
-        Market->>G: 有活跃挂单 且 命中成交概率(~18%)?
-        alt 命中
-            Market->>G: fulfillSale(最早挂单.tokenId)
-            Note over G: 从 ownedTokenIds / myListings 移除 · myOwned − 1
-            Market->>Wallet: creditBalance(净额)
-            Note over Market: 净额 = 售价 ×(1 − 2.5% 版税)
-            Market->>Bills: 写 bonus 账单(GENESIS-SOLD-…)
-            Market-->>U: toast "Genesis #N 已售出 · 到账 $Y"
-        end
-    end
+    S->>G: listNode(tokenId, askPriceUSDT)
+    Note over G: 校验持有 + 未重复 + 价 > 0 → 写入 myListings
+    S-->>G: cancelListing(tokenId)(可选撤单 → 节点回钱包)
+    B->>G: 点 Buy → acquireSecondary(tokenId)
+    Note over G: 资格门 + 单人限购校验 → 扣买家、转 token(不动一级 soldSlots)
+    Note over G,Wallet: 卖家侧成交由服务端结算(扣 2.5% 版税贷卖家),客户端不自动撮合
 ```
 
-> 当前成交由客户端模拟撮合(`SimulationProvider` 与订单共用的 6s 循环);真后台对接时由服务端在真实买家成交挂单时触发(`POST /api/genesis/{list,unlist}` + 服务端撮合),客户端不持有任何成交赌注,只反映 canonical 成交结果。
+> 真后台对接:`POST /api/genesis/secondary/fulfill`(原子:校验挂单+资格 → 扣买家 → 贷卖家扣版税 → 转 token);挂单/撤单走 `POST /api/genesis/{list,unlist}`。客户端只发起主动承接、反映 canonical 结果,不含任何客户端撮合逻辑。
 
 ### 10.3 持有人 Dashboard `/genesis/holder`
 
 #### 10.3.1 目的
 
-为 Genesis Node 持有人提供完整的 holder portal,集中展示分红 / 权益 / 持仓 / 二级流动性,
-对标 BNB Holder Dashboard / Bybit VIP / BlockFi Tier benefits。
-当 `useGenesis.myOwned === 0` 时**显示真实空状态**(0 nodes / $0.00 lifetime / 0 pending)+ 引导购买,
-不伪造数据。Perks / Live feed / Footer 保留作为"购买能得到什么"的预览。
+为 Genesis Node 持有人提供完整的 holder portal,集中展示排放 / 权益 / 持仓 / 二级流动性。
+看板由全局上所信号 `dividendsOpen`(= 服务端 `nexListed`,fail-closed)分**两态**渲染:上所前作战舱(排放优先额度 + 上所进度 + 积分榜)/ 上所后排放态(NEX 排放 vesting)。
+当 `useGenesis.myOwned === 0` 时**显示真实空状态**(0 节点 / 无排放数字)+ 引导购买,不伪造数据。Perks / Footer 保留作为"购买能得到什么"的预览。
 
 DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列表显示"1 节点 = 1 票")**不提供 active 投票 UI**,未来如开放可重新加 Active Governance section。
 
-#### 10.3.2 页面结构(自上而下 8-10 段,按持有状态分支)
+#### 10.3.2 页面结构(按 `dividendsOpen` 两态 × 持有状态分支)
 
-**当 `myOwned > 0`(完整状态)**:
+**A. 上所前(`dividendsOpen === false`)· 排放优先额度作战舱**
 
-1. **Hero** — 👑 大字 N Nodes + `Lifetime dividends $X` + 3 cell:Today / Pending payout / Next payout HH:MM:SS 倒计时(每日 00:00 UTC 刷新)
-2. **30-DAY EARNINGS bar chart**(30 根条带)+ 顶部 `Total this month $X` chip
-3. **YOUR NODES 列表** — N 个 NFT 卡(`NEX-GEN-XXXX` serial / 铸造日期 / Lifetime / 30d 统计 / ExternalLink → 二级市场)
-4-7. Live feed / Perks / Quick Actions / Footer(同下方)
+`myOwned > 0`:
+1. **Hero** — 排放优先额度卡:优先级 + 区间表述(非保证死数)+ 免责「上所后按排放与参与度确定」;**无每日收益数字、无可领余额**
+2. **上所进度条 / 倒计时** — 真实话术「上所后开放」,不渲染 P1–P6 阶段字面
+3. **积分排行榜名次卡** + 锁仓加倍 CTA(升 OG 排放优先倍率)+ 里程碑追溯奖励条
+4. **动态条**(替代旧 live feed)— 「额度锁定 / 积分入账 / 里程碑达成」滚动;原 30 天柱图改标「积分趋势」
 
-**当 `myOwned === 0`(空状态)**:
+`myOwned === 0`:单一引导卡「你还没有创世节点」+ 认购 CTA(跳 `/genesis`),不显任何虚假持有 / 额度数字。
 
-1. **Hero** — 显示 `0 Nodes` + 所有金额 `$0.00`(真实空状态,不骗用户)
-2. **Not-holder CTA 大卡** — "You don't hold any Genesis Nodes yet" + 剩余张数 + ChevronRight → `/genesis` 购买
-3. **预览提示 banner** — "Preview · perks, dividend feed below show what holders actually receive. Buy a node to activate your dashboard."
-4. **30-day chart 隐藏 / Holdings 列表隐藏**(避免渲染假数据)
-5-7. Live feed / Perks 保留(全网公开信息,可作为"购买能得到什么"预览)
+**B. 上所后(`dividendsOpen === true`)· NEX 排放态**
 
-**共享后续段**(自上而下):
-5. **LIVE DIVIDEND FEED**(5 行实时滚动)— `Anon #XXXX · 来源 · +$X.XX · Ns ago`,ping 脉冲 + 派发规则 footer `Every transaction drips · paid daily 00:00 UTC`
-6. **YOUR NODES 列表**(N 个 NFT 卡,最多 6)— Crown icon + `NEX-GEN-XXXX` serial + 铸造日期 + Lifetime / 30d 统计 + 二级市场 ExternalLink
-7. **HOLDER PERKS 6 项**(描述性权益,无交互入口):
-   - 💎 0.1% 平台分润(永久,每日 USDT 到账)
-   - 🚀 V5 直通(跳过 $150K 团队业绩门槛)
-   - 🎟 Founders Circle(闭门 TG 群 + AMA + alpha)
-   - 🗳 DAO 治理(1 节点 = 1 票,文字承诺,投票 UI 未开放)
-   - 🎁 年度忠诚空投(限量 NFT + 周边)
-   - 💰 二级流动性(OpenSea / 站内市场,floor $25K+)
-8. **QUICK ACTIONS 3 cell**:Buy another node $10K / Sell on market floor $25K / Claim pending $X.XX
-9. **Footer note** — `Genesis Nodes are ERC-721 on Ethereum mainnet · Smart contract 0xNX...A98F · Audited by CertiK and Halborn`
+`myOwned > 0`:
+1. **Hero** — NEX 排放收益:已释放 NEX 大数 + 参考 USDT 等值(「≈$X 参考 · 非保证」)+ vesting 环形进度(已释放 / 锁定中)
+2. **排放明细 feed** — 复用原 feed 组件,数字换 NEX;下次释放倒计时
+3. **YOUR NODES 列表** — N 个 NFT 卡(`NEX-GEN-XXXX` serial / 铸造日 / 二级市场 ExternalLink)
+
+`myOwned === 0`:同上所前空状态引导。
+
+**共享 Perks**(描述性权益,无交互入口):$NEX 协议排放优先额度 / 生态奖励池份额 / V5 直通 / Founders Circle(闭门 TG + AMA + alpha)/ DAO 治理(1 节点 = 1 票,文字承诺)/ 年度忠诚空投 + 二级流动性(OpenSea / 站内市场)。
+
+**Footer note** — `Genesis Nodes are ERC-721 on Ethereum mainnet · Smart contract 0xNX...A98F · Audited by CertiK and Halborn`
 
 #### 10.3.3 业务规则
 
-- **持仓数据**:用真实 `myOwned`,0 时显示 0 nodes / $0.00,不伪造预览数据
-- **每日分红**:`dailyDividendPerNode = platformDailyVolumeUSD × 0.1% / 1000`(全平台单一来源 `useGenesis.currentDailyDividendPerNodeUSDT()`:0.1% × 当前平台日交易量 ÷ 1,000 张;`/genesis`、购买 sheet、holder 三处统一调用此函数。平台日交易量基数 ~$24M → 当前约 $24/node/日,$9,999 一张约 14 个月回本——可信卖点,不暴露话术)
-- **Lifetime 累计**(mock):`todayShare × 142` 假设持有 142 天(仅当 hasNodes 时计算)
-- **Pending payout**:`todayShare × 0.8`(尚未到 00:00 UTC 派发的部分)
-- **Next payout 倒计时**:每秒 tick(`setInterval(setTick, 1000)`)
+- **持仓数据**:用真实 `myOwned`,0 时显示空状态,不伪造预览数据。
+- **上所门(核心)**:`dividendsOpen = (nexListed === true)`,服务端权威 + fail-closed(脏 / 未知默认 false,绝不误显 live 排放);client **禁**本地由 false 推 true。后台 H1 `genesisDivOpen` 逐月旋钮据平台生命周期第 7 月(上所窗口)翻开。
+- **上所前**:只持有排放优先额度(区间 / 优先级表述,派生自持有量 × `airdropPct`,默认 8%)+ 积分名次;**零累积可领余额**(推迟期不攒数,TGE 从 0 起按排放浮动发)。
+- **上所后排放**:`emittedNEX`(累计已释放)/ `lockedNEX`(锁定中)/ `nextReleaseAt`(下次释放锚)均 server-canonical,按 vesting 曲线(TGE 10% + 18 月线性 + 每 6 月减半,后台 G4 `G.genesis.emissionCurve` 可配)派发,client 不本地推进。
+- **参考等值**:`refUSDTValue ≈ emittedNEX × 平台参考价`,标「参考非保证」;取不到 = 隐藏(不显 $0 / NaN)。承接双口径设计——保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4,展示口径改 NEX 计价参考。
+- **熔断**:`J.killswitch.genesis` 触发 → 排放区显「维护中,暂停派发」态,不报错白屏。
 
 #### 10.3.4 入口
 
@@ -3646,7 +3864,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 定位:升级引导卡 — 展示距下一阶 V 级的具体动作 + 升级解锁的核心权益,引导用户进 `/team` 操作。**不展示状态信息**(可提现 / cooling 已在钱包卡覆盖),保持单一主题。
 
 **进行中状态**(`gap.next` 不为空):
-- Prize 锚点:下一阶解锁的实物奖品(如 V3 = Apple Watch SE)
+- 奖励锚点:下一阶解锁的培育奖 NEX(如 V3 = 10,000 NEX)
 - 主标:`距 V{N+1} {title}` + 主缺口文案(取 `nextRankGap(state).primaryGap`,按 `progress = have/required` 比例选离完成最远的条件)
 - 升级权益:`topUnlocks` 取前 2 项(emotional weight 排序见 §13.2)
 - 进度条 + 百分比;`progressPct ≥ 0.8` 时进度条切 warning(冲刺暗示)
@@ -3709,7 +3927,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 
 | Channel | 默认频率 | 触发条件 / 内容 |
 |---|---|---|
-| tradein-nudge | 15 min tick / 60 min cd(P3-P4)/ 24 h cd(P5-P6 final window)| Sprint 2 第三阶段 + 收尾 — `isPhaseReached(P3)` 才 fire(P1-P2 无 gen-2 可换 → skip);degradable fleet 平均效率 < 65% 时触发;文案两 variant:正常档钩子 `efficiency / month loss` + CTA `See trade-in options →`;P5+ final 档切换为 `**Final upgrade window** — your X is at Y% and bleeding −$Z/month. New-gen trade-in credit closes when this window does.` + CTA `Open trade-in →`,cooldown 收紧推紧迫感 |
+| tradein-nudge | 15 min tick / 60 min cooldown | 车队(参与递减设备)平均产能 < 65% 且持有可置换设备时触发;文案钩子 = 当前产能 / 月度差额 + 该设备实时可抵额,CTA `查看置换选项 →` 跳 /me/devices 置换入口;无 phase 分档(代际窗口叙事已删) |
 | monthly-task-lock | 30 min tick / 30 d cd(P1-P2)/ 7 d cd(P3-P4)/ 3.5 d cd(P5-P6) | Sprint 2 收尾(Gap D)— 月度任务锁定累计推送,phase-keyed 节奏。读 `getTaskLockSummary(joinedAt)` 取 thisMonthUSD,`getLockedTeasers(maxVram, 1)[0]` 取最佳 model 名。文案三 variant(early/mid/late phase bucket):early `Heads up — $N premium tasks (model) unaccepted this month. NexionBox would clear most.` → /store;mid `Premium queue's running hot — missed $N this month (model pool). Pro v2 catches 2.5× throughput.` → /me/devices;late `**Final upgrade window.** Lost ~$N this month on model alone, plus fleet degrading. Rack P2 trade-in closes when this window does.` → /me/devices(Batch E 迁移)|
 | social-event | 20 min tick / 30 min cd | Sprint A-2 / A.5 — 5 类全网"真实事件"等概率派发:大额提现走推荐网络 30% / V 级升级 25% / Genesis 二级成交 20% / AI 客户月 NEX 消费 +18-50% 15% / 网络小时新增 10%。文案严守真实平台叙事风,无 PM 内部术语 |
 | quest-grace-reminder | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务进 grace 窗口(24-72h)且未 claim 时 push,CTA → `/` 回 Home 继续。详 §5.15.5 |
@@ -3827,6 +4045,18 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 - SSE `/api/notifications/stream`(候选)— server 主动推 priority 升级 / 新通知
 - `client.useNotifications` 改为 cursor-based fetch,LIFO cap 仅作为 UI 显示窗口,**不再是权威数据源**
 
+#### 11.2.5 支付方式生命周期推送模板(银行卡解绑 / 换绑引导)
+
+后台「用户银行卡查询与解绑」能力(运营控制后台 PRD v1 Ch5 [C1·deepening] 支付方式)的用户端配套推送,两条模板,均由 **server 在事件流上触发**(client 仅收 feed,不本地判定触发时机):
+
+| 模板 | 触发事件(server) | Kind | Priority | CTA 深链 | 文案要点 |
+|---|---|---|---|---|---|
+| 银行卡已解绑 | `card.unbound`(后台解绑 / 用户自解绑同一事件) | system | normal(风控发起的解绑,server 可按 §11.2.4 升级 critical「资金账户异动」档) | `/pages/me/wallet-cards`(§9.10 我的银行卡) | 告知「{brand} •••• {last4} 已解除绑定」;自动扣款随之失效;引导需要时重新绑卡 |
+| 请更换试用担保卡 | `card.rebind_notified`(后台 C1 发送换绑通知动作) | system | high(试用担保连带,对齐 §11.2.4 high 档) | `/pages/me/wallet-cards` | 告知当前担保卡不再适用,引导绑定新卡以保障试用结束时顺利完成购买;担保卡换绑成功前旧卡保持生效 |
+
+- 触发时机与担保规则权威在后台侧(担保中的卡不可被后台静默解绑,仅可收到本换绑引导;用户自解绑担保卡经挽留流程仍可达,见 §9.11 试用担保)。
+- 文案双语走 i18n(`notifs.cardUnbound* / notifs.cardRebind*` 六键镜像);模板实现为 builder 形态(`src/mock/card-notifications.ts`),PRODUCTION 由后端事件桥调用,mock 期不自动注入静态样例(避免与实时卡状态矛盾)。
+
 ### 11.3 信任中心 `/trust`
 
 14 个 section 集中展示合规与信任标识。
@@ -3934,7 +4164,7 @@ sequenceDiagram
 
 **Persist**:`useMilestones` zustand persist(key `nexion-milestones-v1`)记录 firedIds,刷新不重触发。
 
-**Demo 触发入口**(`/me/replay-tour` Lifecycle demo section,Sprint 2 第三阶段 §7.5.7 同位置):"Trigger earnings milestone" 按钮 → `resetMilestones() + _devBumpEarningsTotal(150)` → 下一次 poll 时 fire $100 阈值。
+**Demo 触发入口**(`/me/replay-tour` Lifecycle demo section,Sprint 2 第三阶段 §7.5.6 同位置):"Trigger earnings milestone" 按钮 → `resetMilestones() + _devBumpEarningsTotal(150)` → 下一次 poll 时 fire $100 阈值。
 
 **i18n**:`milestones.*` 7 keys(title 模板 + 5 阈值业务文案 + genericBody fallback)。
 
@@ -3944,7 +4174,7 @@ sequenceDiagram
 
 ### 11.4a 风险提示书 `/me/risk-disclosure`(Sprint A-1 / A.3)
 
-合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截。
+合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截;常驻入口在个人中心「帮助与支持」分组。
 
 **Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexion-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
 
@@ -3953,7 +4183,7 @@ sequenceDiagram
 2. **Hero**(AlertTriangle):`REQUIRED READING` 标签 + `Read this before staking, locking, or withdrawing.` + 副文
 3. **7 章节**(每章 mono 编号 01-07 + 标题 + body):
    - 01 收益预估只是预测,不是承诺(±15% 周波动)
-   - 02 硬件衰减曲线(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
+   - 02 任务产能节奏(月 1-3 −4% / 4-8 −6% / 9-12 −23.7% / floor 22%)
    - 03 NEX 代币市场风险(±20% 日 / 非 FDIC 保险)
    - 04 提现窗口 + 合规审查(30d / 45d enhanced / 无 NEX 抵扣时按惩罚费率收手续费)
    - 05 Staking 锁仓不可撤销(提前赎回扣全息 + 5-15% 本金)
@@ -3981,6 +4211,7 @@ sequenceDiagram
 每完成一笔 AI 推理任务生成"推理收据":
 - 任务 ID + 客户名 + AI 模型 + 设备/GPU + 时长 + 能耗 + 单价 + 收益明细(gross / network fee / net paid)
 - 客户地址 + 签名(rsa-sha256)+ attestation tx_hash + 区块号
+- 列表按分类 tab(全部 / 图像 / 视频 / LLM / 微调 / Embedding / 语音 / KYC)分屏加载:每个 tab 首次载入只渲染一屏,下滑接近列表底部时加载下一屏;切换 tab 重置回第一屏
 - 列表行点击打开 Proof-of-Compute 详情 sheet;**详情为纯信息展示**,所有字段只读,不提供复制 / 分享 / 在 explorer 查看等操作
 
 #### 11.5.2 Proof of Contribution 分享卡 `/me/proof`
@@ -4023,13 +4254,26 @@ i18n keys 在 `proof.*` namespace,~50 keys。
 
 ### 11.5a 我的奖励 `/me/rewards`
 
-个人中心的奖励聚合页,把用户的代金券与系统奖励集中在一处。三类分区:
+个人中心的奖励聚合入口,两级结构。
 
-1. **可用优惠券** — 用户已领、未使用、在有效期的代金券(名称 / 面值 / 适用范围 / 有效期);每张提供「去使用」操作,按券的适用范围跳转(单一 SKU → 该设备详情页,多 / 全设备 → 商城,见 §7.7.2)。
-2. **已过期优惠券** — 已领未用但已过有效期的券,置灰并标「已过期」;不可再使用。
-3. **系统奖励** — 来自活动 / 推荐 / 成就 / 客服补偿的 USDT·NEX 入账(由账单流水中奖励类条目派生),按类型分类展示金额与时间。
+**入口与红点**:`/me`「账户」分组「我的奖励」项,带未读红点,条件(满足其一):
+- 存在已领、未使用、在有效期的代金券 — 持续显示,直到券被使用或过期;
+- 存在入账时间 > `rewardsSeenAt` 的奖励类账单条目 — 打开 L1 即更新 `rewardsSeenAt`(服务端权威:用户档案字段,`PATCH /api/me/rewards/seen` 由服务端盖时间戳,客户端仅缓存);首装 `rewardsSeenAt=0`,历史入账视为未读。
 
-**入口**:`/me`「赚取」分组中的「我的奖励」行。**数据源**:代金券钱包(useVoucher,§12.20)+ 账单流水(useBills,奖励类型条目)。
+**L1 类别汇总**(`/me/rewards`):三个分类入口——优惠券(可用张数;有过期券时提示过期张数)、USDT 奖励(累计入账总额)、NEX 奖励(累计入账总额)。零值时三分类仍显示并附引导文案。
+
+**L2 分类记录**(`/me/rewards/list?cat=voucher|usdt|nex`,cat 非法或缺失回退 voucher):
+1. **优惠券**(voucher)— 已领、未使用、在有效期的券(面值 / 名称 / 适用范围 / 有效期),每张提供「去使用」:单一 SKU 券 → 该设备详情页,多 / 全设备券 → 商城(§7.7.2);已领未用但已过期的券置灰标「已过期」,不可使用。
+2. **奖励记录**(usdt / nex)— 该币种的奖励类入账(活动 / 推荐 / 成就 / 客服补偿,账单类型 ∈ {活动奖励, 推荐佣金, 成就奖励} 且金额 > 0),按时间倒序,每批 10 条,滚动到底自动续载;真后台 `GET /api/me/bills?type=reward&symbol=USDT|NEX&cursor=&limit=10`(游标分页)。
+
+**数据源与口径**:代金券钱包(useVoucher,§12.20)+ 账单流水(useBills,§9)。红点、L1 汇总、L2 记录共用同一奖励条目判定(单源派生);客服补偿以奖励类账单入账后自动计入本页与红点,无额外接口。
+
+```mermaid
+flowchart LR
+  A["/me「账户」分组入口(未读红点)"] --> B["L1 类别汇总(打开即记 rewardsSeenAt)"]
+  B -->|优惠券| C["券列表:去使用 → 设备详情 / 商城;过期置灰"]
+  B -->|USDT / NEX| D["奖励入账记录:10 条/批,滚动续载"]
+```
 
 ### 11.6 全球节点地图 `/globe`
 
@@ -4111,6 +4355,9 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 - `support` 为用户发起线程,用户发送后由真人客服按类别模板回复。
 - `ai`(Nova)承载所有自动 push;Nova bubble 未读徽标聚合**全部类别**未读(AI + 人工)。
 - 人工 / 顾问回复为按类别循环模板(真后台接入后替换为真实坐席消息流)。
+- **发送频控**:单会话发送限流,每 15 秒最多 5 条(滚动窗口);超限时提示稍后再试,防刷屏。
+- **消息回执与状态**:用户发出的消息显示「已送达 / 已读」回执;坐席回复前依「已读 → 正在输入…(气泡)→ 回复」节奏推进(约 2 秒),使接待过程可感知。真后台接入后由消息已读事件与 typing 事件驱动。
+- **消息定位**:进入会话、发送或收到新消息后,线程自动滚动定位到最新一条。
 
 **数据模型**:§12.9a Conversation。**i18n**:`conversations.*` 命名空间 + `support.chLiveChat` 渠道键。
 
@@ -4119,7 +4366,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 #### 11.9.1 目的
 
 提供 NEX 与同类 AI / DePIN tokens 的横向对标视图,锚定 NEX 处于"主流赛道",
-强化交易所上线预期(`Binance / Coinbase 审核中`),驱动用户从 Home `$NEX ticker` 卡进入 → 买入 NEX。
+强化交易所上线预期(`Binance / Coinbase 审核中`),驱动用户进入后买入 NEX。Home `$NEX ticker` 卡当前阶段隐藏(参 §5.7),Home 侧入口走算力市场卡「打开」。
 
 #### 11.9.2 页面结构(自上而下 7 段)
 
@@ -4285,44 +4532,6 @@ Events 分两大类:
 
 **i18n**:`luckySpin.*` namespace(en + zh 双语镜像)。数据模型见 §12.19。
 
-### 11.11 教程中心 `/learn`
-
-#### 11.11.1 目的
-
-Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口,降低新用户学习成本,
-同时通过"完成课程领 NEX 奖励"的机制(对标 Binance Academy / Coinbase Earn / OKX Learn)提升用户对产品的认知 + 参与深度。
-
-#### 11.11.2 页面结构(自上而下 5 段)
-
-1. **Featured Lesson Hero** — 显示主推课程("What is Nexion · 5-minute crash course")emoji + 标题 + 副标 + `🎁 Earn +20 NEX` chip + 时长 chip + progress bar(部分进度)+ Start / Resume / Review 主 CTA
-2. **YOUR LEARNING 进度卡** — GraduationCap icon + `N of Total completed` + `+XXX NEX earned` + progress bar
-3. **6 个分类 Tabs**(横滑)— All / Basics 🚀 / Earn ⚡ / Team 🧬 / Wealth 💎 / Security 🛡
-4. **课程卡列表** — 每卡:emoji icon + 分类 chip + Article/Video/Hands-on format + Beginner/Intermediate/Advanced level + ✓ Completed chip(已完成的)+ 标题 + 副标 + 🎁 reward chip(+10 ~ +50 NEX)+ 时长 + Start/Resume/Review 按钮 + progress bar(进度中的)
-5. **Footer note** — `Lessons are independent · finish any to earn the reward. Quizzes appear at the end; pass once to unlock the reward.`
-
-#### 11.11.3 分类与课程
-
-| 分类 | 课程数 | 关键课程 |
-|---|---|---|
-| Basics 🚀 | 3 | What is Nexion · 5-min crash course / Your first device · Phone vs Box vs Rack / ROI Calculator walkthrough |
-| Earn ⚡ | 3 | Maximize daily yield · Peak hours + AI Drop / Workload pricing 101 · SDXL→LLM 70B / Why your fleet sometimes earns NEX instead of USDT |
-| Team 🧬 | 3 | Inviting friends · Direct + extended network / Dual-Track Binary in 7 minutes / V-Rank ladder · V0 → V12 |
-| Wealth 💎 | 3 | Staking 4-tier · when to lock / Genesis Node deep-dive · 1,000-seat permanent share / Re-invest Boost · 4 layered rewards |
-| Security 🛡 | 3 | KYC-Express triggers and how to clear / 2FA + hardware wallet + anti-phishing / How Nexion proves compute · TEE + receipts |
-
-总 15 课,每课 4-10 分钟,奖励 10-50 NEX。
-
-#### 11.11.4 业务规则
-
-- 课程数据静态 mock(`lib/mock/learn.ts`),无持久化进度同步(本期);progress / 已完成状态硬编码示意
-- Featured 由 `featured: true` 字段标记(目前固定第 1 课)
-- Learn-to-Earn 奖励本期仅显示 chip,未来扩展为完成 quiz → `useApp.creditNex()` NEX 余额增加
-- 课程页(`/learn/[slug]`)未实装(本期 href = `#`)
-
-#### 11.11.5 入口
-
-- `/me` 设置列表加 SettingRow `Learn · Earn NEX`(BookOpen icon)
-
 ### 11.12 Sprint A-2 / A-3 / P-full 新页与组件汇总
 
 按主题分组,本节为 2026-05-21 一日推进新增功能的索引页。每项简述目的 + 关键设计 + 引用其他章节做详细规格。
@@ -4331,6 +4540,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 - **目的**:多商品组合下单 + 阶梯折扣,补充单商品 checkout 的转化路径
 - **折扣 tier**:2 件 5% / 3 件 8% / 4+ 件 12%(`BUNDLE_DISCOUNT_TIERS`)
+- **结算**:点「结算」余额直付——复用单品 checkout 下单内核,一次为组合内每个商品建单(`orders.createOrder`,组合折扣按单价比例分摊)、按组合总价扣平台余额(`app.debitBalance`,余额不足则拦截报错)、写一条组合购买账单、清空组合车、跳 `/store/orders`。账本单源 = 扣款 = 账单 = 组合总价
 - **UI**:Hero 折扣 tier grid + In-bundle 列表 + Suggestions(剩余产品)+ 底部 Subtotal/Discount/Total 卡 + 合并日产能
 - **Store**:`useCart` zustand persist(`nexion-cart-v1`)— `items: string[]` + add/remove/clear/has
 - **i18n**:`bundle.*` namespace ~14 keys
@@ -4350,85 +4560,76 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 - **Store**:`useGoals` zustand persist(`nexion-goals-v1`)— `Goal[]` + setGoal/markAchieved/remove
 - **i18n**:`goals.*` namespace ~17 keys
 
-#### 11.12.4 年度 Wrapped `/me/wrapped`(Sprint A-3 / E.5 + F.4)
-
-- **目的**:Spotify Wrapped 风全屏故事卡片,年度数据回顾 + 社交分享驱动 referral
-- **6 卡片**:hero / total earned / devices owned / network grew / V-rank reached / share & done
-- **导航**:tap 左侧 1/4 区 prev / 右侧 1/4 区 next,底部 prev/next 按钮
-- **z-index**:`z-[80]`(IOSFrame 内全屏 overlay,非 portal)
-- **数据源**:`useApp.earnings.total` + `useCommission.totalUSDTLifetime` + `useNetwork.totalMembers` + `useVRank.myRank`
-- **i18n**:`wrapped.*` namespace ~13 keys
-
-#### 11.12.5 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
+#### 11.12.4 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
 
 - **目的**:音效 / 触感 / 通知 6 类偏好的统一切换中心
 - **2 组 toggle**:Feedback(sound + haptics)+ Notifications(6 种 NotifKind 各自 mute)
 - **Store**:`usePreferences` zustand persist(`nexion-preferences-v1`)
 - **i18n**:`preferences.*` namespace ~14 keys
 
-#### 11.12.6 全局搜索 `/search`(Sprint P-full / P6)
+#### 11.12.5 全局搜索 `/search`(Sprint P-full / P6)
 
 - **入口**:IOSFrame Header 右上角 Search icon,所有 tab 路由可见
 - **索引**:20+ 静态路由 + Store products + 用户设备 + 网络成员 + FAQ 条目
 - **结果**:实时过滤(input change)+ 5 组分类(route / product / device / member / faq)+ 跳转 ChevronUpRight 图标
 - **i18n**:`search.*` namespace ~10 keys
 
-#### 11.12.7 长按设备菜单(Sprint P-full / P4)
+#### 11.12.6 长按设备菜单(Sprint P-full / P4)
 
 - **位置**:`<DeviceCardPC>` 内嵌(`app/components/device-card-pc.tsx`)
 - **触发**:`onPointerDown` 480ms 长按 → `DeviceQuickMenu` bottom sheet
 - **2 actions**:Detailed stats(跳 /earn)+ Trade-in(degradable only,跳 /me/devices)。**无手动暂停/恢复** — 真实平台节点要么运行、要么被动中断,用户不持有暂停任务或设备的能力
 - **i18n**:`earn.quickMenu.*`(stats / tradein / cancel)
 
-#### 11.12.8 Compliance Re-verification banner(Sprint A-3 / A.7)
+#### 11.12.7 Compliance Re-verification banner(Sprint A-3 / A.7)
 
 - **位置**:`(main)/layout.tsx` 内挂载,phase P5+(`complianceHoldEnabled`)触发
 - **24h dismiss cooldown**:localStorage `nexion-compliance-banner-dismissed-at`
 - **文案**:`Compliance re-verification window` + `Random KYC + KYT spot checks are active`(用户视角真实庞氏话术)
 - **i18n**:`complianceBanner.*` 3 keys
 
-#### 11.12.9 404 mascot(Sprint A-3 / E.4)
+#### 11.12.8 404 mascot(Sprint A-3 / E.4)
 
 - `app/not-found.tsx` 重做,加 Nova vocabulary 风 SVG mascot(helmet + visor + 双 ? LED + antenna LED + Sparkle)
 - spring 入场 + LED 脉冲 + 文案 `Nova checked every corner of the network`
 
-#### 11.12.10 重投奖励 3 重动画(Sprint A-2 / B.5)
+#### 11.12.9 重投奖励 3 重动画(Sprint A-2 / B.5)
 
 - `<motion.div>` stagger 入场 + `key={amount}` 让金额变化时 re-trigger
 - 3 个 Benefit pills(Zap / Check / Diamond)依次 spring scale 入场(stagger 0.12s,delay 0.05s)
 
-#### 11.12.11 Staking 复利计算器(Sprint A-2 / B.4)
+#### 11.12.10 Staking 复利计算器(Sprint A-2 / B.4)
 
 - `<CompoundCalculator>` 嵌在 `/staking` 4 plan cards 后 + Positions 前
 - 输入金额 + 4 档 term 切换(30/90/180/365d)+ 双卡 projection(单次 vs N× 复投 1 年终值)
 - 公式:`compound = principal × ∏(1 + apy × term/365) for cycles = floor(365/term)`
 - i18n `stakingV3.calc.*` 5 keys
 
-#### 11.12.12 半年 Wrapped Mini(Sprint A-2 / F.1)
+#### 11.12.11 半年 Wrapped Mini(Sprint A-2 / F.1)
 
 - Nova push trigger,`elapsed >= 14 days`(原型压缩自 6 月)时 fire 一次,30 天 cooldown 几乎一次性
 - 文案钩子总收益 + 推荐人数 + V 级,CTA → /me/proof
 - 模板 `wrappedMiniPush()` in `stella-templates.ts`
 
-#### 11.12.13 Team royalty hero 置顶(Sprint A-2 / D.1)
+#### 11.12.12 Team royalty hero 置顶(Sprint A-2 / D.1)
 
 - `/team` 主页 V3+ 用户 InviteEarnCard 之前置顶 Royalty card
 - 显示本月总版税(`monthUSDT`)+ Network Yield Bonus NEX 计数,跳 `/team/unilevel`
 - i18n `teamV3.royaltyHeroLabel/Subtitle`
 
-#### 11.12.14 Genesis 卡 3D 倾斜(Sprint A-2 / E.3)
+#### 11.12.13 Genesis 卡 3D 倾斜(Sprint A-2 / E.3)
 
 - 新通用组件 `<TiltCard>`(`app/components/ui/tilt-card.tsx`)
 - mouse pointer 跟踪 perspective + rotateX/Y(±9°)+ scale 1.02 hover
 - Reset on leave(240ms cubic-bezier 弹回)
 - 接入:`<ListingCard>` 在 `/genesis/marketplace`
 
-#### 11.12.15 Home 行情入口(Sprint A-2 / D.2)
+#### 11.12.14 Home 行情入口(Sprint A-2 / D.2)
 
 - `<MarketBoard>` 主体在 `/earn`(操作时的决策辅助)+ `/market` 专用路由
 - 不在 Home `<MissionControl>` 渲染:Home 16 sections 已聚焦"状态总览 + 转化触发",再嵌 MarketBoard 会重复 4 子卡内容并稀释主转化注意力(Earnings hero → Quest → Buy)
 
-#### 11.12.16 邀请 promo chip(Sprint 3 第三阶段 / inviteBonusMultiplier)
+#### 11.12.15 邀请 promo chip(Sprint 3 第三阶段 / inviteBonusMultiplier)
 
 - 见 §8.1.1.1
 
@@ -4440,21 +4641,20 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 |---|---|---|---|---|
 | **L1 Daily Streak** | 每日 | 1 签到 + 1 micro | 100 NEX(streak 加成 +500) | `/daily`(streak + milestone + saver + leaderboard) |
 | **L2 Weekly Quests** | 每周一 reset | 1 Tier 1 + 4 Tier 2 | 3,000 NEX(buy Genesis + P6 ×1.5) | `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| **L3 Monthly Challenge** | 每月 1 reset | 1 big | 10,000 NEX + 月度勋章 | `<MonthlyChallengeCard>`(5 主题派发) |
+| **L3 Monthly Challenge** | 每月 1 reset | 1 big | 10,000 NEX + 月度勋章 | Q-2 待做(规格见 §11.14 / §12.14;Missions 页暂无 This Month section) |
 | **L4 Event/Seasonal** | 不定期 | 临时集 | 5,000 NEX(refer-5) | `/events`(4 trackable + 6 decorative)— 参 §11.10.6 |
 
 **统一入口**:`/missions` Mission Center,聚合 5 处分散的任务体系。Home 顶部仍展示当前最高优先级(`<QuestHero>` + `<WeeklyQuestHero>`),用户主动看完整任务则跳 `/missions`。Me 页 Earn extras 顶置 `<SettingRow href="/missions">`。
 
 #### 11.13.2 Mission Center `/missions`
 
-6 个 section(自上而下):
+5 个 section(自上而下):
 
 | Section | 内容 |
 |---|---|
 | Hero | Trophy + `ALL MISSIONS` 标签 + 标题 + 副文 |
 | **Today** | 链 `/daily` — 每日签到 + streak |
 | **This Week** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| **This Month** | 内嵌 `<MonthlyChallengeCard>`(参 §11.14) |
 | Day-One Quest | 链 `/`(回 Home 顶部继续 quest)— **仅当 phase ∈ {active, grace} 时显示**(参 §5.15) |
 | Events | 链 `/events` — 显示 `{N} ongoing · {M} joined · {K} claimable` 动态 stat,K > 0 时显示圆 badge(参 §11.10.6)|
 | Achievements | 链 `/me/achievements` — 勋章 closure |
@@ -4469,7 +4669,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 |---|---|---|---|---|---|
 | 1 | `myRank ≥ 6 + 无 Genesis` | `buy_genesis` | +2,500 NEX | A 直接 | Genesis-Believer |
 | 2 | 有 Rack + `balanceUSDT ≥ 2,000` | `buy_additional_hw` | +2,000 NEX | A 直接 | — |
-| 3 | 有 Pro/Rack 老代际(generation 1) | `tradein_upgrade` | +1,800 NEX | A 直接 | — |
+| 3 | 有 Pro/Rack(存在更高价升级目标) | `tradein_upgrade` | +1,800 NEX | A 直接 | — |
 | 4 | 仅有 S1 | `upgrade_s1_to_pro_v2` | +1,500 NEX | A 直接 | — |
 | 5 | 无 hardware + `balanceUSDT ≥ 200` | `buy_first_box` | +1,000 NEX + $10 | A 直接 | — |
 | 6 | 无 hardware + `balanceUSDT < 200` | `topup_balance` | +100 NEX | A 充值 | — |
@@ -4540,6 +4740,8 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 ## 12. 数据模型
 
+> **持久化作用域**:用户资产类 store 按账号分行持久化——`{[accountKey]: row}` 表(键 `nexion-<entity>-accounts-v1`),换账号即换行、互不继承,详见 §4.8。下文各实体注明的旧设备级 `nexion-*-v1` 持久 key 已废弃,实体字段结构不变;平台态 / 设备偏好类仍用全局键。
+
 ### 12.1 User(useApp.user)
 
 ```
@@ -4552,7 +4754,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   nexBalance: number;
   pendingEarnings: number;
   cumulativeDepositUsdt: number; // 终身已确认 USDT 入金累计,仅由 recordDeposit 写入;
-                                 // 非 earnings / exchange / salvage refund / KYC bonus 增长。
+                                 // 非 earnings / exchange / 置换抵扣 / KYC bonus 增长。
                                  // 驱动 §7.5 trade-in `cumulative-deposit-usdt` 资格规则
                                  // (Pro $1000 / Rack P1 $5000)。server-canonical via
                                  // GET /api/users/me。
@@ -4571,10 +4773,14 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
   basePower: number;            // W
   baseRate: number;             // daily USDT 基准(满效率,参 §6.8 设备生命周期)
   baseRateNEX: number;          // daily NEX 基准(平台代币,spec §8.1 静态收益 80%)
-  purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 衰减曲线
+  purchasedAt: number;          // epoch ms,购买/入网时间。驱动 §6.8 任务产能节奏 + 新机补贴期
   activatedAt: number | null;   // epoch ms 激活进槽位的时刻;null = 已购未激活(库存中)
+  lastSettledAt?: number | null; // epoch ms 收益结算锚点(= 登记时刻);收益按 now−lastSettledAt 墙钟结算(§6.11);null = 当前不计产(未激活 / 冻结),恢复时重锚不回溯
+  onlineHeartbeatAt?: number | null; // epoch ms 设备最近一次在线心跳(常驻 App 后台上报);在超时窗口内 = 设备真在线 → 吃在线加成,否则基础托管基线(§6.11);决定在线因子档,与查看载体无关;PROD 服务端持 lastHeartbeatAt + timeout 下推在线结论
   pendingDeactivate?: boolean;  // true = 等当前任务完成后自动取消激活(graceful deactivation)
-  generation: number;           // 1 = 原型规格;2 = trade-in 升级(Pro v2 / Rack P2)
+  cumulativeEarningsUsdt: number; // 该设备终身 USD 产出(settle 与今日收益同步累加;停用/清零今日不回退);
+                                  // §7.5 抵扣阶梯分子。多端合并走 additive 语义(不双计)
+  paidPriceUsdt: number;        // 实付净额(订单 total / trial 转正实付;赠送=0 ⇒ 不可置换);§7.5 阶梯分母
   status: "online" | "offline";   // 无 "paused":用户无手动暂停;被动中断由 pausedReason + interruptedAt 表达
   gpuUsage: number;             // 0-100
   gpuTemp: number;              // °C
@@ -4614,7 +4820,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 宽限期内任务**挂起**:不计 earnings、不轮换新任务、设备卡显示「重连中 · 第 n/5 次重连 · Xs 后超时取消」。阈值常量集中于 `lib/store/interrupt.ts`(见 §13.3),tick 取消判定与 UI 倒计时共用同一纯函数 `interruptInfo()`。
 
-**会话失效中断(单设备登录)**:区别于掉电 / 掉网的宽限窗口 —— 当账号被他端登录接管、用户退出、或运营吊销会话时(见 §4.7),设备已非授权节点 → 在途任务**无宽限立即作废**(`interruptAllTasks`:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」),并冻结挖矿(`miningPaused=true`)直至重新登录建立新会话(`resumeMining`)。
+**会话失效中断(多载体 session registry)**:区别于掉电 / 掉网的宽限窗口 —— 当当前会话主动退出、被指定下线、或运营吊销时(见 §4.7),本端已非授权节点 → 在途任务**无宽限立即作废**(`interruptAllTasks`:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」),并冻结挖矿(`miningPaused=true`)直至重新登录建立新会话(`resumeMining`)。
 
 **真后台对接**(endpoint TBD,候选名):
 
@@ -4634,7 +4840,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 **Store actions**:
 - `addDevice(kind)` — 新购入库存,**无上限**(`activatedAt=null`)
 - `activateDevice(id) → boolean` — 进槽位,**返回 false 当且仅当**:设备不存在 / 已激活 / **(当前激活数 + 试用预留槽 `trialReservesSlotNow() ? 1 : 0`)≥ `MAX_DEVICES`(6)**;成功时清零 `pendingDeactivate`(恢复激活时清除遗留挂起标记)
-- `deactivateDevice(id)` — **立即**出槽位:清零运行态遥测 + `currentTask=null`(放弃任务奖励)+ `pendingDeactivate=false`,保留 `purchasedAt` / `generation` / 其他元数据
+- `deactivateDevice(id)` — **立即**出槽位:清零运行态遥测 + `currentTask=null`(放弃任务奖励)+ `pendingDeactivate=false`,保留 `purchasedAt` / `cumulativeEarningsUsdt` / `paidPriceUsdt` / 其他元数据
 - `scheduleDeactivation(id)` — **优雅出槽位**:若 `currentTask !== null` 则只设 `pendingDeactivate=true`(等任务完成);若 `currentTask === null` 则立即执行 `deactivateDevice` 等效行为
 - `tick()` 守卫:`activatedAt === null` 的设备不参与 earnings / task 累计;任务完成处理时检查 `pendingDeactivate=true` → 自动执行 deactivate(清零 telemetry + `activatedAt=null`,不再 pickRandomTask)
 
@@ -4733,7 +4939,7 @@ OrderTimelineEvent = { status: OrderStatus; ts: number; note?: string }
   purchase(n, tokenIds?): { ok, cost }   // 一级用递增 ID,二级传 listing 真实 ID
   listNode(tokenId, ask): boolean
   cancelListing(tokenId): boolean
-  fulfillSale(tokenId): MyListing | null  // 成交模拟:从 ownedTokenIds + myListings 移除,decrement myOwned
+  acquireSecondary(tokenId): boolean     // 二级承接:主动买入已存在 token(转让,不动 soldSlots / 一级档价),资格门 + 单人限购校验
 }
 
 MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
@@ -4749,7 +4955,15 @@ MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
   sponsor: { name, vRank, title, city, downlines } | null;
   giftClaimed: boolean;
   boundAt: number | null;
+  pendingCode: string | null;   // 落地页归因暂存码(§4.3.1):注册前 last-touch 覆盖,绑定即清,已绑定忽略
+  pendingAt: number | null;
 }
+```
+
+分享事件(client 记录,server-canonical `POST /api/share/event`,§8.1.1):
+
+```
+{ channel: "poster"|"code"|"link"|渠道 key; surface: "team_hero"|"poster_sheet"|"share_sheet"|"proof"; sharedAt: number }
 ```
 
 ### 12.9 Notification(useNotifications.items[])
@@ -4784,6 +4998,7 @@ ConvMessage:
   ctaKey?: string;      // 预置消息 CTA 文案 i18n key
   ctaHref?: string;     // CTA 目标(逻辑路由,经路由映射层跳转)
   ts: number;
+  status?: "sent" | "read";  // 送达回执:用户消息用;坐席已读后置 read(坐席端同源镜像)
 }
 ```
 
@@ -4801,7 +5016,7 @@ Conversation:
 }
 ```
 
-派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计(Nova 未读由 `useStella.unread` 提供,bubble 在页面层合并)。
+派生:`byType(type)` 按类别取会话、`totalUnread` 人工侧未读合计(Nova 未读由 `useStella.unread` 提供,bubble 在页面层合并)。`typingIds` 记录各会话「坐席正在输入」瞬态(非持久,真后台由 typing 事件驱动)。
 
 ### 12.10 Exchange Cap(useExchangeV3)
 
@@ -4833,7 +5048,7 @@ Conversation:
 QuestCompleteResult = { firstTime: boolean; rewardNex: number; rewardUsdt: number }
 
 QuestTaskId =
-  "connect_wallet" | "visit_earn" | "visit_store" |
+  "bind_bank_card" | "visit_earn" | "visit_store" |
   "view_product_roi" | "setup_profile" | "invite_friend"
 ```
 
@@ -4886,7 +5101,7 @@ computeWithdrawFee(amount, userNex, penaltyFeeRate, nexFeeOffsetRate): WithdrawF
 }
 ```
 
-### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexion-monthly-challenge-v1`)
+### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexion-monthly-challenge-v1`;**Q-2 待实装**,i18n 命名空间已预留、store 未建)
 
 ```
 {
@@ -5087,7 +5302,7 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 ```
 marketMult  = 0.95 + Math.random() × 0.1    // 0.95-1.05
 variation   = 0.85 + Math.random() × 0.3    // 0.85-1.15
-lifeEff     = isDegradable(kind) ? getEfficiency(getMonthsOwned(purchasedAt)) : 1   // §6.8 生命周期衰减系数
+lifeEff     = isDegradable(kind) ? getEfficiency(getMonthsOwned(purchasedAt)) : 1   // §6.8 任务产能系数
 incUSDT     = baseRate    × lifeEff × marketMult × variation × tickMs / ONE_DAY_MS
 incNEX      = baseRateNEX × lifeEff × marketMult × variation × tickMs / ONE_DAY_MS
 todayEarnings     += incUSDT
@@ -5095,7 +5310,7 @@ todayEarningsNEX  += incNEX
 user.nexBalance   += incNEX       // 每 tick NEX 自动滴灌入用户钱包持仓
 ```
 
-每 1.8s 触发一次 tick,USDT 跟 NEX 同步跳动。USDT 用于提现 / 出金,NEX 用于团队佣金结算 / 二级市场拉盘叙事 / 用户囤币 FOMO。`lifeEff` 使 degradable 硬件的实时收益随持有月数衰减(§6.8 曲线),phone / cloud-share 恒为 1。
+每 1.8s 触发一次 tick,USDT 跟 NEX 同步跳动。USDT 用于提现 / 出金,NEX 用于团队佣金结算 / 二级市场拉盘叙事 / 用户囤币 FOMO。`lifeEff` 使参与递减的硬件实时收益随持有月数下降(§6.8 任务产能节奏),豁免 SKU(phone / cloud-share / pc-gpu)恒为 1。设备终身产出 `cumulativeEarningsUsdt` 与今日收益同增量累加(§7.5 抵扣阶梯分子;午夜清零今日、停用清零遥测均不回退它)。
 
 **年化 ROI(展示值)**:`annualRoiPct = round(dailyEarn × 365 / price × 100)`,从日产与售价单一派生(不单独存储),与回本天数 `price / dailyEarn` 同源,避免两数互相矛盾;商品卡 / 详情 / 结账三处统一调用此派生函数。
 
@@ -5120,7 +5335,7 @@ progressPct = avg(checks);
 | Helper | 输出 | 用途 |
 |---|---|---|
 | `nextRankProgress(state)` | `{next, progressPct, missing: string[]}` | `/team` / `/team/rank` / home mission-control — 把 `missing` 字符串数组直接 join 渲染。**字符串是英文 hardcoded,locale 不友好**,适合既有 caller。|
-| `nextRankGap(state)` | `{next, progressPct, primaryGap, unmetCount, topUnlocks, newPrize}` | `/me` NetworkCard — 结构化输出,caller 端用 i18n fmt 渲染,跨 locale 安全 |
+| `nextRankGap(state)` | `{next, progressPct, primaryGap, unmetCount, topUnlocks}` | `/me` NetworkCard — 结构化输出,caller 端用 i18n fmt 渲染,跨 locale 安全 |
 
 #### `nextRankGap` 业务规则
 
@@ -5134,8 +5349,6 @@ progressPct = avg(checks);
 | `cultivationJump` | 70 | 新解锁(0→X)或 `> 2×` 跳点 |
 | `directBonusUp` | 60 | `next.directBonus > current.directBonus`(仅 V0→V1 触发,5%→10%)|
 | `unilevelDepthUp` | 30 | `next.unilevelDepth > current.unilevelDepth && next.unilevelDepth < 90`(排除 99 = 全网穿透,避免 "+89 layers" 反 design intent)|
-
-- **newPrize** 检测:`next.prizeName !== current.prizeName`(V_RANKS 表中 prizeName 全局唯一,icon 可能重复如 V8/V9 都 🏎)
 
 #### Server canonical(强约束)
 
@@ -5176,8 +5389,14 @@ progressPct = avg(checks);
 | `USER_DAILY_CAP_USD` | 50 | 每用户日 NEX 兑 USDT 上限 |
 | `PLATFORM_DAILY_CAP_USD` | 20,000 | 全平台日兑换池 |
 | `KYC_LIFETIME_THRESHOLD_USD` | 100 | 累计兑换触发 KYC 线 |
-| `WELCOME_GIFT_USDT` | 5 | 注册礼包 USDT |
-| `WELCOME_GIFT_NEX` | 20 | 注册礼包 NEX(零散白嫖收缩,主 NEX 产出归设备挖矿)|
+| `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台 H8 可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
+| `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
+| `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给被邀请人、此项给邀请人 |
+| `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexion.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
+| `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
+| `share.appDownload.{iosUrl,androidUrl,apkUrl}` | 全空 | 注册成功页下载引导链接(§4.1.1);全空 = 「APP 即将上线」降级态;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
+| 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
+| OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
 | `Notification CAP` | 200 | 通知中心最多 |
 | `MAX_DEVICES` | 6 | **激活槽位上限**(不限购,激活进槽时 `activateDevice()` 守卫,Sprint #146-1)|
 | `INTERRUPT_GRACE_MS` | 30,000(30s) | phone 掉电/掉网后任务重连宽限窗口;窗口内恢复则续跑原任务,超时则取消(`lib/store/interrupt.ts`)|
@@ -5188,7 +5407,8 @@ progressPct = avg(checks);
 | phone→S1 倍数 | 117× | round(7 / 0.06);营销文案与计算徽章统一此单一派生值(§7.1 / §13.2a),不另行圆整 |
 | 手机算力档位收益 | T1 $0.04 / 6 NEX · T2 $0.05 / 8 · T3 $0.06 / 10 · T4 $0.08 / 13 · T5 $0.095 / 16 | 手机按校准能力 Tier 的日产(USDT / NEX),单调;运营可配(`mock/phone-tiers.ts` → `GET /api/config/phone-tiers`,后台 E2),见 §6.10 |
 | 手机算力典型锚点 | 评分 87 · 28.3 TOPS · Tier 3 · $0.06 | 未校准 / 典型机的呈现锚点(`fallbackCapability`,§6.10)|
-| `CONTINUITY_FULL_MS` | 7,200,000(2h) | 连续在线稳定加成达满所需时长(`lib/hashpower.ts`,§6.10);会话踢出 / 换机重校准清零 |
+| 在线加成系数 · `h5BaseFactor` | 0.6 | H5 非常驻载体基础托管系数:H5 手机算力 = 基线 × 此值 × 在线 × 抖动,不叠充电 / 散热 / 连续在线(§6.11);运营可配(`onlineBonus`,后台「算力与设备配置」),与后台 compute-config 同 key |
+| 在线加成系数 · `continuityFullHours`(`CONTINUITY_FULL_MS`)| 2h(7,200,000ms) | App 连续在线稳定加成达满所需时长(0.85→1.0 线性,`lib/hashpower.ts`,§6.10 / §6.11);会话踢出 / 换机重校准清零;运营可配(`onlineBonus`) |
 | 提现冷却 | 30 天 | unilevel + binary 佣金 |
 | Direct Royalty 费率 | 固定 10% | 单一来源 `UNILEVEL_USDT[1]`,不随 Partner Status 变动 |
 | Partner Status Standard | $0+ | 基础权益(月度网络活跃度起步档)|
@@ -5196,18 +5416,19 @@ progressPct = avg(checks);
 | Partner Status Premium | $50,000+ | 新品优先购 |
 | Partner Status Diamond | $500,000+ | 创始人 AMA + VIP(顶档)|
 | Influence Score 公式 | clamp(1 + log10(networkVolume / 100), 1.0, 5.0) | Network Yield Bonus 算法倍率 |
-| 设备衰减率(月 1-3) | −4% / 月 | 累计 100% → 88.5% |
-| 设备衰减率(月 4-8) | −6% / 月 | 累计 88.5% → 65.1% |
-| 设备衰减率(月 9-12+) | −23.7% / 月 | 累计 65.1% → ~22%(floor) |
-| 设备衰减 floor | 22% | 月 12 后效率不再下降,用户必须 trade-in / 锁仓 / 退场 |
-| 衰减豁免 | phone / cloud-share | phone 产能 trivial / cloud 平台维护 |
-| 代际淘汰节点 | Pro v2 / Rack P2 | Trade-in 抵扣 $300 / $800(详见 §7.5) |
-| 代际发布门 | Pro v2 P3 / Rack P2 P5 | `Product.unlocksAtPhase` 字段,未 reached 时 /store 列表过滤 + 详情页 swap LockedProductCard + /tradein new gen grid 隐藏(详见 §7.1 / §7.2 / §7.5) |
-| Trade-in 残值回收率 | 30% | 平台保留 70% 用于翻新转售 |
-| 升级映射 | S1/Pro → Pro v2 / Rack P1 → Rack P2 | `TRADEIN_UPGRADE_MAP` 常量 |
+| 任务产能递减(月 1-3) | −4% / 月 | 累计 100% → 88.5%(段界与幅度后台可配) |
+| 任务产能递减(月 4-8) | −6% / 月 | 累计 88.5% → 65.1% |
+| 任务产能递减(月 9-12+) | −23.7% / 月 | 累计 65.1% → ~22%(floor) |
+| 任务产能下限 floor | 22% | 月 12 后产能不再下降,引导升级置换 |
+| 产能递减豁免 | phone / cloud-share / pc-gpu | phone 产能 trivial / cloud 平台托管 / pc-gpu 按实时贡献;后台可按 SKU 配开关 |
+| 新机任务补贴 | 30 天 | 纯展示标识(曲线首月本就 100%,零经济变化);天数后台可配 |
+| 上架节奏门 | Pro v2 P3 / Rack P2 P5 | `Product.unlocksAtPhase` 字段,未 reached 时 /store 列表过滤 + 详情页 swap LockedProductCard + **置换目标面同拦**(详见 §7.1 / §7.2 / §7.5.1) |
+| 置换侧抢先购 | 关闭(leadDays 30) | `tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项;开启后仅置换路径可在正式上架前 leadDays 天购买,目标行带「抢先升级」标;正门不受影响(§7.1) |
+| 置换抵扣阶梯 | 75% / 60% / 45% / 30% / 15% | 按产出比(累计产出÷实付)落档:<25% / <50% / <75% / <100% / ≥100%,左闭右开;仅结算抵减,永不入余额(§7.5.1) |
+| 置换阶梯规则 | 仅限更高价 · 单笔 1 台 · promoMult 1.0 | `requireHigherPrice` / `maxDevicesPerOrder` / `promoMult`,连同 `applyTo` 白名单与总开关均后台可配 |
 | 任务锁定月度阈值 | P1-P2 $40 / P3-P4 $140 / P5-P6 $450 | `MONTHLY_LOCKED_TASK_USD` 常量,§6.7 TaskLockCumulativeBanner 主数字基准,日历月 partial accrual + 累计 |
 | Nova task-lock 推送节奏 | P1-P2 30 d / P3-P4 7 d / P5-P6 3.5 d | `monthly-task-lock` cooldownKey,30 min tick / phase-keyed cadence(§11.0A.2a),与 §6.7 banner 形成"屏内 + 召回"双层 funnel |
-| Nova tradein 推送节奏 | P3-P4 60 min / P5-P6 24 h | `tradein-nudge` cooldownKey,P1-P2 直接 skip(无 gen-2 可换),P5+ 切 final-window 文案 + 收紧 cooldown(§11.0A.2a)|
+| Nova tradein 推送节奏 | 60 min cooldown | `tradein-nudge` cooldownKey;触发条件 = 车队平均产能 < 65% 且持有可置换设备;文案钩子 = 产能/月损 + CTA 跳设备仓库置换入口(§11.0A.2a)|
 | 提现惩罚费率 / NEX 抵扣率 | 费率 P1-P4 20% · P5 25% · P6 30%;抵扣率 $0.40 / NEX(恒定) | `withdrawPenaltyFeeRate` / `nexFeeOffsetRate`,`computeWithdrawFee()`,phase 派发(§9.3.2 / §13.4.1)|
 | Nova ambient 总频率 | 30-60 min cooldown(per channel,§11.0A.1 / §11.0A.2a 表)| v3 收敛后 30 分钟主动浏览 1-3 次,事件触发类(quest / weekly refresh / wrapped)按日历滚动不入此口径 |
 | `QUEST_WINDOW_MS` | 86,400,000(24h) | 首日任务活动窗口 |
@@ -5225,9 +5446,8 @@ progressPct = avg(checks);
 | Genesis 二级版税 | 2.5% | 卖家成交时扣,进入网络金库;卖家净得 `售价 ×(1 − 2.5%)`(§10.2.4)|
 | Genesis 一级价 | $9,999 | 一级预售单价 |
 | Genesis 二级地板 | $25,000 | 二级市场 floor(mock,模拟 +18% 7d 涨)|
-| Genesis 挂单成交概率 | ~18% / 6s | 用户有活跃挂单时,每 6 秒一拍以此概率成交其最早挂单(§10.2.4,客户端模拟撮合,真后台改服务端撮合)|
 | Genesis 销售进度 ticker | +1~3 张 / 30s | 销售进度条 FOMO 抖动(独立于真实成交)|
-| Genesis 单节点日分红口径 | 平台日交易额 × 0.1% ÷ 1000 | 三处入口(`/genesis` / 购买 sheet / 持有人看板)共用,调到 ~$24/节点/日(≈14 月回本)|
+| Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
 | 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexion-milestones-v1` 持久化已触发档 |
 | 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(§5.15.7),`nexion-quest-v1` 持久化幂等 |
@@ -5313,7 +5533,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 ### 14.3 命名空间
 
-`tabs / headerTitles / headerSubtitles / intro / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / wrapped / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
+`tabs / headerTitles / headerSubtitles / intro / authOtp / login / register / home / earn / store / team / wallet / onboarding / me / profile / security / help / support / replay / achievements / proof / globe / staking / developer / language / receipts / orders / errors / teamV3 / stakingV3 / trust / genesis / walletV3 / rank / unilevel / binary / pool / commissions / repurchase / network / tree / quota / agent / daily / marketplace / ref / upsell / leaderboard / market / marketPage / events / nexWallet / learn / kycExpress / tickets / genesisHolder / tradein / milestones / productPhase / riskDisclosure / terms / bundle / tx / goals / preferences / search / complianceBanner / missions / weeklyQuest / monthlyChallenge / daily.powerUps`
 
 **关键 namespace 说明**:
 - `headerTitles` — 60+ 路由的 header 显示标题映射。包含 tab roots(earn / store / team / me / 等)+ Me 子树(meWallet / meProfile / meSecurity / meWalletBills / ...)+ Team 子树(teamRank / teamUnilevel / teamBinary / ...)+ Store 子树 + Genesis / Trust / 动态路由(storeProduct / tx / ...)+ `howItWorksSuffix`(EN: ` · How it works` / ZH: ` · 玩法说明`)拼接 how-it-works 子路由。
@@ -5354,7 +5574,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 - 密码存储与传输遵循 §4.6.3:服务端 argon2id + 随机 salt,客户端永不存密码或 hash
 - 密码强度、错误尝试锁定、修改流程见 §4.6
 - KYC-Express 验证地址记录后,提现地址必须匹配
-- 触发 CAPTCHA 阈值:同一手机号 24h 内 3+ 次验证码请求
+- 触发 CAPTCHA 阈值:同一手机号 24h 内 3+ 次验证码请求(`otpGate.captchaAfterSends`,平台配置后台可调;滑块验证流程 / 一次性 ticket 规则 / send 判定顺序见 §4.6.2)
 
 #### 16.2.2 Web baseline(浏览器安全头 + 路由防护)
 
@@ -5449,7 +5669,7 @@ app/
 - auth / profile / security / wallet-pairing / bills / orders / staking / achievements / receipts / stella / ui / refresh / locale / exchange / **nex-faucet**(§12.12 签到水龙头 + 提现销毁闸纯函数)/ **milestones**(§11.3a)/ **risk-disclosure**(§11.4a)/ product-phase + product-phase-override(§13.4)/ **cart**(套餐 cart)/ **goals**(目标设置)/ **preferences**(P8 + P9 偏好)/ **weekly-quest**(§11.13)/ **monthly-challenge**(§11.14)/ **event-quest**(§11.10.6)/ **daily-powerup**(§9.8.6)
 
 **通用 utility**(`lib/store/` 和 `lib/hooks/`,无独立 store 状态):
-- `device-lifecycle.ts` — Device 衰减曲线引擎(§6.8 / §13.3 衰减参数)
+- `device-lifecycle.ts` — Device 任务产能引擎(§6.8 / §13.3 产能节奏参数)
 - `lib/hooks/use-tween-number.ts` — 数字 tick 平滑过渡
 - `lib/hooks/use-haptic.ts` — 触感反馈
 - `lib/hooks/use-long-press.ts` — 长按检测
@@ -5458,7 +5678,7 @@ app/
 **Mobile-native 通用组件**(`app/components/mobile/`):
 - StickyBottomCTA / SegmentedControl / SettingsRow / BottomSheetPicker / SwipeRow — barrel export `app/components/mobile/index.ts`。
 
-**PM-facing demo actions**(`useApp` 上的 `_dev` 前缀方法,只在 `/me/replay-tour` 的 Lifecycle demo section 暴露,详见 §7.5.7):
+**PM-facing demo actions**(`useApp` 上的 `_dev` 前缀方法,只在 `/me/replay-tour` 的 Lifecycle demo section 暴露,详见 §7.5.6):
 - `_devSeedLegacyDevice(kind, monthsAgo)` — 加一台已使用 N 个月的 degradable 设备
 - `_devFastForwardAll(months)` — 全部 degradable 设备 purchasedAt 拨回 N 个月
 - `_devResetDevices()` — 重置 fleet 回 phone-only 初始状态
@@ -5561,8 +5781,6 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 | 活动中心页 | `app/(main)/events/page.tsx` |
 | 活动 mock | `lib/mock/events.ts` |
 | NEX 资产详情页 | `app/(main)/me/wallet/nex/page.tsx` |
-| 教程中心页 | `app/(main)/learn/page.tsx` |
-| 课程 mock | `lib/mock/learn.ts` |
 | KYC-Express 说明页 | `app/(main)/me/security/kyc-express/page.tsx` |
 | 工单系统页 | `app/(main)/me/support/tickets/page.tsx` |
 | 工单 mock | `lib/mock/tickets.ts` |

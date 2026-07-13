@@ -170,7 +170,6 @@ TabBar:active tab 显示背景 chip 高亮。
 /                                Home Dashboard
 /market                          NEX 行情详情页(对标 AI/DePIN tokens)
 /events                          活动中心(限时优惠 / 挑战 / 季节福利)
-/learn                           教程中心(Learn-to-Earn)
 /earn                            Earn(算力赚取)
 /store                           Store list
 /store/[productId]               商品详情
@@ -1149,7 +1148,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 | # | id | 标题 i18n | 跳转 | 完成触发 | 奖励 |
 |---|---|---|---|---|---|
-| 1 | connect_wallet | Connect a wallet | `/me/wallet/topup?kyc=1` | KYC-Express phase=complete 时 markComplete | +50 NEX |
+| 1 | bind_bank_card | Link a bank card | `/me/wallet/cards/new` | 绑卡页绑卡成功(server-canonical `card.bound`)时 markComplete | +50 NEX |
 | 2 | visit_earn | Open Earn tab | `/earn` | QuestRouteWatcher 监听 pathname | +30 NEX |
 | 3 | visit_store | Browse the store | `/store` | QuestRouteWatcher 监听 pathname | +50 NEX |
 | 4 | view_product_roi | View a NexionBox ROI | `/store/stellarbox-s1` | QuestRouteWatcher 监听 `/store/{id}`(排除 `/store/orders` 和 `/store/checkout`)| +100 NEX |
@@ -1202,7 +1201,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - **i18n**:`quest.*` namespace
   - phase / 状态 keys:`title / titleGrace / completeTitle / progress / completed / finalBonusHint / claimBonus / claimLatecomer / bonusClaimed / latecomerClaimed`
   - 交互 keys:`buyCta`(主 CTA 文案)/ `expand`(展开任务列表,带 `{n}` 任务数 placeholder)/ `collapse`(收起任务列表)
-  - 6 task titles:`t_connect_wallet / t_visit_earn / t_visit_store / t_view_product_roi / t_setup_profile / t_invite_friend`
+  - 6 task titles:`t_bind_bank_card / t_visit_earn / t_visit_store / t_view_product_roi / t_setup_profile / t_invite_friend`
   - grace phase 不再渲染独立警示 banner — 窗口紧迫感由 §5.15.2 的 phase styling + 顶部倒计时 chip + L1 hint + L2 主 CTA 四点共同暗示
   - expired phase 整张卡 return null,无相关文案 keys
 
@@ -1213,7 +1212,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 平台以固定节奏(每 1 秒一拍)读取当前页面,页面变化时映射到对应任务:`/earn` → `visit_earn`、`/store` → `visit_store`、商品详情页 `/store/{id}` → `view_product_roi`(排除 `/store/orders`、`/store/checkout`)。
 - 首次落在匹配页 → `markComplete(id)` 返回该任务的奖励(NEX,部分含 USDT);仅在**首次完成**时入账 NEX / USDT 并弹 `+N NEX` toast。
 - 幂等:已完成任务重复访问返回 `firstTime:false`,不重复派奖(完成态持久化于 `nexion-quest-v1`,刷新后不再触发)。
-- 非路由型任务(connect_wallet / setup_profile / invite_friend)在对应动作处(KYC 完成 / Profile 保存 / 复制邀请码)手动调 `markComplete` 派奖,不由本监听覆盖。
+- 非路由型任务(bind_bank_card / setup_profile / invite_friend)在对应动作处(绑卡成功 / Profile 保存 / 分享邀请)手动调 `markComplete` 派奖,不由本监听覆盖;首次派奖同步写账单 bonus 行。
 
 ```mermaid
 sequenceDiagram
@@ -2902,9 +2901,9 @@ future = amount × (1 + APY × days / 365)
 
 | Tier | APY | 30d → | 90d → | 180d → |
 |---|---|---|---|---|
-| 30d | 5% | $X × 1.00411 |  |  |
-| 90d | 12% |  | $X × 1.02959 |  |
-| 180d | 20% |  |  | $X × 1.09863 |
+| 30d | 12% | $X × 1.00986 |  |  |
+| 90d | 35% |  | $X × 1.08630 |  |
+| 180d | 80% |  |  | $X × 1.39452 |
 
 示例:$500 → 30d $502 / 90d $515 / 180d $549
 
@@ -3726,7 +3725,7 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
 |---|---|---|---|
 | **未挂单** | tokenId ∉ `myListings` | Crown,`你的 · 2.5×`,价格 input(一眼可编辑)+ "地板 $X K" + "挂单"按钮 | 输入价格 → 点"挂单" → confirm dialog |
 | **挂单中** | tokenId ∈ `myListings` | Crown,右上角 `挂单中` chip + pulse 圆点,显示 `标价 $X` + `<1m 挂单` 时间,`✕ 取消挂单` 按钮 | 点"取消挂单" → confirm dialog(danger) |
-| **已售出** | tokenId 从 `ownedTokenIds` 移除(`fulfillSale` 触发) | 卡片消失 | 自动触发 toast `Genesis #N 已售出 · 买家支付 $X · 到账 $Y(扣 2.5% 版税)` |
+| **已售出** | 买家承接挂单后服务端回写(tokenId 从 `ownedTokenIds` 移除) | 卡片消失 | 成交 toast `Genesis #N 已售出 · 买家支付 $X · 到账 $Y(扣 2.5% 版税)`,由 canonical 成交结果驱动(客户端不自动撮合) |
 
 **二次确认 confirm dialog**:
 - **挂单**:`确认以标价挂单 Genesis #N? · 标价 $X · 地板 $Y K · 成交时扣 2.5% 版税 · 买家成交前你可随时取消` → "确认挂单" / "取消"
@@ -3754,38 +3753,30 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
 
 所有 marketplace 文案 i18n key 在 `marketplace.*` namespace(~70 keys,en + zh)。
 
-#### 10.2.4 挂单自动成交(二级市场流动性)
+#### 10.2.4 挂单管理与二级承接
 
-持有人在 Mine tab 把某节点挂单(`listNode(tokenId, askPriceUSDT)`,校验:持有该 token、未重复挂单、价 > 0)后,该挂单会在二级市场自动撮合成交,模拟真实买家接盘:
+持有人在 Mine tab 把某节点挂单(`listNode(tokenId, askPriceUSDT)`,校验:持有该 token、未重复挂单、价 > 0)或撤单(`cancelListing`,节点回到钱包、可重新设价上架)。挂单进入二级市场挂单池,由其他用户主动承接:
 
-- 用户有 ≥1 个活跃挂单时,平台以固定节奏(每 6 秒一拍)、约 18% 概率成交其**最早的一个**挂单(`fulfillSale`)。
-- 成交时:节点从 `ownedTokenIds` / `myListings` 移除、`myOwned` − 1;卖家净入账 `售价 ×(1 − 2.5% 网络版税)` 进可用余额,并写一条 `bonus` 账单;弹出成交 toast(`Genesis #N 已售出 · 到账 $Y`)。
+- **主动承接**:买家在二级市场列表点「Buy」承接某挂单(`acquireSecondary(tokenId)`),受资格门(FEAT-GEN08,appliesTo=both)+ 单人限购(`perUserCap`)约束;承接为**转让**(不动一级 `soldSlots` / 档价、不走售罄门),扣买家、转 token。
+- **卖家侧成交为服务端事件**:真后台在真实买家承接挂单时触发结算(扣 2.5% 网络版税后贷卖家)。客户端**不模拟自动撮合、不持有任何成交赌注**,只反映 canonical 成交结果;卖家挂单在无买家承接时保持挂出、可随时撤单。
 - 2.5% 网络版税(§13.3 `Genesis 二级版税`)在成交时扣除并进入网络金库,卖家实得为净额。
 
 ```mermaid
 sequenceDiagram
-    participant U as 持有人(Mine tab)
+    participant S as 卖家(Mine tab)
     participant G as useGenesis
-    participant Market as 二级市场撮合(每 6s)
+    participant B as 买家(二级市场)
     participant Wallet as 钱包余额
-    participant Bills as 账单
 
-    U->>G: listNode(tokenId, askPriceUSDT)
-    Note over G: 校验持有 + 未重复 + 价格为正 → 写入 myListings
-    loop 每 6 秒
-        Market->>G: 有活跃挂单 且 命中成交概率(~18%)?
-        alt 命中
-            Market->>G: fulfillSale(最早挂单.tokenId)
-            Note over G: 从 ownedTokenIds / myListings 移除 · myOwned − 1
-            Market->>Wallet: creditBalance(净额)
-            Note over Market: 净额 = 售价 ×(1 − 2.5% 版税)
-            Market->>Bills: 写 bonus 账单(GENESIS-SOLD-…)
-            Market-->>U: toast "Genesis #N 已售出 · 到账 $Y"
-        end
-    end
+    S->>G: listNode(tokenId, askPriceUSDT)
+    Note over G: 校验持有 + 未重复 + 价 > 0 → 写入 myListings
+    S-->>G: cancelListing(tokenId)(可选撤单 → 节点回钱包)
+    B->>G: 点 Buy → acquireSecondary(tokenId)
+    Note over G: 资格门 + 单人限购校验 → 扣买家、转 token(不动一级 soldSlots)
+    Note over G,Wallet: 卖家侧成交由服务端结算(扣 2.5% 版税贷卖家),客户端不自动撮合
 ```
 
-> 当前成交由客户端模拟撮合(`SimulationProvider` 与订单共用的 6s 循环);真后台对接时由服务端在真实买家成交挂单时触发(`POST /api/genesis/{list,unlist}` + 服务端撮合),客户端不持有任何成交赌注,只反映 canonical 成交结果。
+> 真后台对接:`POST /api/genesis/secondary/fulfill`(原子:校验挂单+资格 → 扣买家 → 贷卖家扣版税 → 转 token);挂单/撤单走 `POST /api/genesis/{list,unlist}`。客户端只发起主动承接、反映 canonical 结果,不含任何客户端撮合逻辑。
 
 ### 10.3 持有人 Dashboard `/genesis/holder`
 
@@ -4053,6 +4044,18 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 - `POST /api/notifications/:id/read` — server-side 标读
 - SSE `/api/notifications/stream`(候选)— server 主动推 priority 升级 / 新通知
 - `client.useNotifications` 改为 cursor-based fetch,LIFO cap 仅作为 UI 显示窗口,**不再是权威数据源**
+
+#### 11.2.5 支付方式生命周期推送模板(银行卡解绑 / 换绑引导)
+
+后台「用户银行卡查询与解绑」能力(运营控制后台 PRD v1 Ch5 [C1·deepening] 支付方式)的用户端配套推送,两条模板,均由 **server 在事件流上触发**(client 仅收 feed,不本地判定触发时机):
+
+| 模板 | 触发事件(server) | Kind | Priority | CTA 深链 | 文案要点 |
+|---|---|---|---|---|---|
+| 银行卡已解绑 | `card.unbound`(后台解绑 / 用户自解绑同一事件) | system | normal(风控发起的解绑,server 可按 §11.2.4 升级 critical「资金账户异动」档) | `/pages/me/wallet-cards`(§9.10 我的银行卡) | 告知「{brand} •••• {last4} 已解除绑定」;自动扣款随之失效;引导需要时重新绑卡 |
+| 请更换试用担保卡 | `card.rebind_notified`(后台 C1 发送换绑通知动作) | system | high(试用担保连带,对齐 §11.2.4 high 档) | `/pages/me/wallet-cards` | 告知当前担保卡不再适用,引导绑定新卡以保障试用结束时顺利完成购买;担保卡换绑成功前旧卡保持生效 |
+
+- 触发时机与担保规则权威在后台侧(担保中的卡不可被后台静默解绑,仅可收到本换绑引导;用户自解绑担保卡经挽留流程仍可达,见 §9.11 试用担保)。
+- 文案双语走 i18n(`notifs.cardUnbound* / notifs.cardRebind*` 六键镜像);模板实现为 builder 形态(`src/mock/card-notifications.ts`),PRODUCTION 由后端事件桥调用,mock 期不自动注入静态样例(避免与实时卡状态矛盾)。
 
 ### 11.3 信任中心 `/trust`
 
@@ -4529,44 +4532,6 @@ Events 分两大类:
 
 **i18n**:`luckySpin.*` namespace(en + zh 双语镜像)。数据模型见 §12.19。
 
-### 11.11 教程中心 `/learn`
-
-#### 11.11.1 目的
-
-Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口,降低新用户学习成本,
-同时通过"完成课程领 NEX 奖励"的机制(对标 Binance Academy / Coinbase Earn / OKX Learn)提升用户对产品的认知 + 参与深度。
-
-#### 11.11.2 页面结构(自上而下 5 段)
-
-1. **Featured Lesson Hero** — 显示主推课程("What is Nexion · 5-minute crash course")emoji + 标题 + 副标 + `🎁 Earn +20 NEX` chip + 时长 chip + progress bar(部分进度)+ Start / Resume / Review 主 CTA
-2. **YOUR LEARNING 进度卡** — GraduationCap icon + `N of Total completed` + `+XXX NEX earned` + progress bar
-3. **6 个分类 Tabs**(横滑)— All / Basics 🚀 / Earn ⚡ / Team 🧬 / Wealth 💎 / Security 🛡
-4. **课程卡列表** — 每卡:emoji icon + 分类 chip + Article/Video/Hands-on format + Beginner/Intermediate/Advanced level + ✓ Completed chip(已完成的)+ 标题 + 副标 + 🎁 reward chip(+10 ~ +50 NEX)+ 时长 + Start/Resume/Review 按钮 + progress bar(进度中的)
-5. **Footer note** — `Lessons are independent · finish any to earn the reward. Quizzes appear at the end; pass once to unlock the reward.`
-
-#### 11.11.3 分类与课程
-
-| 分类 | 课程数 | 关键课程 |
-|---|---|---|
-| Basics 🚀 | 3 | What is Nexion · 5-min crash course / Your first device · Phone vs Box vs Rack / ROI Calculator walkthrough |
-| Earn ⚡ | 3 | Maximize daily yield · Peak hours + AI Drop / Workload pricing 101 · SDXL→LLM 70B / Why your fleet sometimes earns NEX instead of USDT |
-| Team 🧬 | 3 | Inviting friends · Direct + extended network / Dual-Track Binary in 7 minutes / V-Rank ladder · V0 → V12 |
-| Wealth 💎 | 3 | Staking 4-tier · when to lock / Genesis Node deep-dive · 1,000-seat permanent share / Re-invest Boost · 4 layered rewards |
-| Security 🛡 | 3 | KYC-Express triggers and how to clear / 2FA + hardware wallet + anti-phishing / How Nexion proves compute · TEE + receipts |
-
-总 15 课,每课 4-10 分钟,奖励 10-50 NEX。
-
-#### 11.11.4 业务规则
-
-- 课程数据静态 mock(`lib/mock/learn.ts`),无持久化进度同步(本期);progress / 已完成状态硬编码示意
-- Featured 由 `featured: true` 字段标记(目前固定第 1 课)
-- Learn-to-Earn 奖励本期仅显示 chip,未来扩展为完成 quiz → `useApp.creditNex()` NEX 余额增加
-- 课程页(`/learn/[slug]`)未实装(本期 href = `#`)
-
-#### 11.11.5 入口
-
-- `/me` 设置列表加 SettingRow `Learn · Earn NEX`(BookOpen icon)
-
 ### 11.12 Sprint A-2 / A-3 / P-full 新页与组件汇总
 
 按主题分组,本节为 2026-05-21 一日推进新增功能的索引页。每项简述目的 + 关键设计 + 引用其他章节做详细规格。
@@ -4575,6 +4540,7 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 
 - **目的**:多商品组合下单 + 阶梯折扣,补充单商品 checkout 的转化路径
 - **折扣 tier**:2 件 5% / 3 件 8% / 4+ 件 12%(`BUNDLE_DISCOUNT_TIERS`)
+- **结算**:点「结算」余额直付——复用单品 checkout 下单内核,一次为组合内每个商品建单(`orders.createOrder`,组合折扣按单价比例分摊)、按组合总价扣平台余额(`app.debitBalance`,余额不足则拦截报错)、写一条组合购买账单、清空组合车、跳 `/store/orders`。账本单源 = 扣款 = 账单 = 组合总价
 - **UI**:Hero 折扣 tier grid + In-bundle 列表 + Suggestions(剩余产品)+ 底部 Subtotal/Discount/Total 卡 + 合并日产能
 - **Store**:`useCart` zustand persist(`nexion-cart-v1`)— `items: string[]` + add/remove/clear/has
 - **i18n**:`bundle.*` namespace ~14 keys
@@ -4675,21 +4641,20 @@ Learn-to-Earn 教育中心 — 集中沉淀产品 / 玩法 / 安全 知识入口
 |---|---|---|---|---|
 | **L1 Daily Streak** | 每日 | 1 签到 + 1 micro | 100 NEX(streak 加成 +500) | `/daily`(streak + milestone + saver + leaderboard) |
 | **L2 Weekly Quests** | 每周一 reset | 1 Tier 1 + 4 Tier 2 | 3,000 NEX(buy Genesis + P6 ×1.5) | `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| **L3 Monthly Challenge** | 每月 1 reset | 1 big | 10,000 NEX + 月度勋章 | `<MonthlyChallengeCard>`(5 主题派发) |
+| **L3 Monthly Challenge** | 每月 1 reset | 1 big | 10,000 NEX + 月度勋章 | Q-2 待做(规格见 §11.14 / §12.14;Missions 页暂无 This Month section) |
 | **L4 Event/Seasonal** | 不定期 | 临时集 | 5,000 NEX(refer-5) | `/events`(4 trackable + 6 decorative)— 参 §11.10.6 |
 
 **统一入口**:`/missions` Mission Center,聚合 5 处分散的任务体系。Home 顶部仍展示当前最高优先级(`<QuestHero>` + `<WeeklyQuestHero>`),用户主动看完整任务则跳 `/missions`。Me 页 Earn extras 顶置 `<SettingRow href="/missions">`。
 
 #### 11.13.2 Mission Center `/missions`
 
-6 个 section(自上而下):
+5 个 section(自上而下):
 
 | Section | 内容 |
 |---|---|
 | Hero | Trophy + `ALL MISSIONS` 标签 + 标题 + 副文 |
 | **Today** | 链 `/daily` — 每日签到 + streak |
 | **This Week** | 内嵌 `<WeeklyQuestHero>` + `<WeeklyQuestList>` |
-| **This Month** | 内嵌 `<MonthlyChallengeCard>`(参 §11.14) |
 | Day-One Quest | 链 `/`(回 Home 顶部继续 quest)— **仅当 phase ∈ {active, grace} 时显示**(参 §5.15) |
 | Events | 链 `/events` — 显示 `{N} ongoing · {M} joined · {K} claimable` 动态 stat,K > 0 时显示圆 badge(参 §11.10.6)|
 | Achievements | 链 `/me/achievements` — 勋章 closure |
@@ -4974,7 +4939,7 @@ OrderTimelineEvent = { status: OrderStatus; ts: number; note?: string }
   purchase(n, tokenIds?): { ok, cost }   // 一级用递增 ID,二级传 listing 真实 ID
   listNode(tokenId, ask): boolean
   cancelListing(tokenId): boolean
-  fulfillSale(tokenId): MyListing | null  // 成交模拟:从 ownedTokenIds + myListings 移除,decrement myOwned
+  acquireSecondary(tokenId): boolean     // 二级承接:主动买入已存在 token(转让,不动 soldSlots / 一级档价),资格门 + 单人限购校验
 }
 
 MyListing = { tokenId: number, askPriceUSDT: number, listedAt: number }
@@ -5083,7 +5048,7 @@ Conversation:
 QuestCompleteResult = { firstTime: boolean; rewardNex: number; rewardUsdt: number }
 
 QuestTaskId =
-  "connect_wallet" | "visit_earn" | "visit_store" |
+  "bind_bank_card" | "visit_earn" | "visit_store" |
   "view_product_roi" | "setup_profile" | "invite_friend"
 ```
 
@@ -5136,7 +5101,7 @@ computeWithdrawFee(amount, userNex, penaltyFeeRate, nexFeeOffsetRate): WithdrawF
 }
 ```
 
-### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexion-monthly-challenge-v1`)
+### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexion-monthly-challenge-v1`;**Q-2 待实装**,i18n 命名空间已预留、store 未建)
 
 ```
 {
@@ -5481,7 +5446,6 @@ progressPct = avg(checks);
 | Genesis 二级版税 | 2.5% | 卖家成交时扣,进入网络金库;卖家净得 `售价 ×(1 − 2.5%)`(§10.2.4)|
 | Genesis 一级价 | $9,999 | 一级预售单价 |
 | Genesis 二级地板 | $25,000 | 二级市场 floor(mock,模拟 +18% 7d 涨)|
-| Genesis 挂单成交概率 | ~18% / 6s | 用户有活跃挂单时,每 6 秒一拍以此概率成交其最早挂单(§10.2.4,客户端模拟撮合,真后台改服务端撮合)|
 | Genesis 销售进度 ticker | +1~3 张 / 30s | 销售进度条 FOMO 抖动(独立于真实成交)|
 | Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
@@ -5817,8 +5781,6 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 | 活动中心页 | `app/(main)/events/page.tsx` |
 | 活动 mock | `lib/mock/events.ts` |
 | NEX 资产详情页 | `app/(main)/me/wallet/nex/page.tsx` |
-| 教程中心页 | `app/(main)/learn/page.tsx` |
-| 课程 mock | `lib/mock/learn.ts` |
 | KYC-Express 说明页 | `app/(main)/me/security/kyc-express/page.tsx` |
 | 工单系统页 | `app/(main)/me/support/tickets/page.tsx` |
 | 工单 mock | `lib/mock/tickets.ts` |

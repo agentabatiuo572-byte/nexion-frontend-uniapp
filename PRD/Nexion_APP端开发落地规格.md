@@ -360,7 +360,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **锁定任务日潜在** = `(86400/avgSec) × QUEUE_SATURATION × avgReward`;`QUEUE_SATURATION=0.35`。
 - **月度任务锁定** = `MONTHLY_LOCKED_TASK_USD[phase] × monthProgress` + 历史累加;`MONTHLY_LOCKED_TASK_USD`:P1-2 $40/P3-4 $140/P5-6 $450。
 - **首日任务最终奖**:全 6 任务 → +500 NEX(`QUEST_FINAL_BONUS_NEX`)+`day_one_hero` badge;`QUEST_WINDOW_MS=86,400,000`(24h)/grace 至 72h。
-- **首日 6 任务单项**:connect_wallet +50/visit_earn +30/visit_store +50/...(§5.15.4)。
+- **首日 6 任务单项**:bind_bank_card +50/visit_earn +30/visit_store +50/...(§5.15.4)。
 - **Quest 层最大奖**:L1 Daily 100 NEX(streak +500)/L2 Weekly 3,000/L3 Monthly 10,000+勋章。
 - **Lucky Spin**:每日免费 1 次(UTC 日桶,`eventId×userId×spinDate` 计次)+Day-30 里程碑券;8 档 server RNG,概率和 100%;真实奖三护栏+兑付红线自动降级。
 - **设备激活槽位守卫**:`activateDevice()` 守卫 `激活数 < MAX_DEVICES=6`(试用预留计入)。

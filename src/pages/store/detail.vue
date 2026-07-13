@@ -5,13 +5,12 @@
   Wrapped in <AppChassis active="store">. Top→bottom:
     in-page header (back + title/tier) → Hero (ProductRender + ribbon +
     LiveSocialProof + name/tagline/mult + trust chips) → Vs-phone strip →
-    ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec → Reviews
-    (rating summary + bars + 3 rows) → Trust badges → FAQ accordion →
-    sticky bottom Buy CTA.
+    ROI (qty stepper + 4-cell grid) → Hardware spec → AI perf spec →
+    Trust badges → FAQ accordion → sticky bottom Buy CTA.
 
   Phase-gated products (unlocksAtPhase not yet reached) render the shared
   <LockedProductCard> in place of the full page (mirrors ProductDetailGate).
-  Dense mock strings (reviews / FAQ / compliance / media) are kept as faithful
+  Dense mock strings (FAQ / compliance / media) are kept as faithful
   English data, not i18n (matches the source's inline arrays).
 -->
 <template>
@@ -149,49 +148,7 @@
           <SpecTable :rows="aiPerfRows" brand-value />
         </template>
 
-        <!-- === Section 7: Reviews === -->
-        <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detReviews" :count="verifiedText" /></view>
-        <view class="mx-4 rounded-2xl" :style="reviewsCardStyle">
-          <!-- rating summary: big rating + 5 bars -->
-          <view class="flex items-start" style="gap: 16px; padding-top: 16px; padding-bottom: 12px">
-            <view class="text-center" style="min-width: 50px">
-              <text class="block tabular-nums" :style="ratingBigStyle">{{ ratingText }}</text>
-              <view class="flex justify-center" style="gap: 1px; margin-top: 4px; color: var(--v5-warning)">
-                <svg v-for="i in 5" :key="i" width="10" height="10" viewBox="0 0 24 24" :fill="i <= ratingRounded ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5 14 8l6 .5-4.5 4 1.4 6L11.5 15l-5.4 3.5L7.5 12.5 3 8.5l6-.5z" /></svg>
-              </view>
-            </view>
-            <view class="flex-1 min-w-0" style="display: flex; flex-direction: column; gap: 4px">
-              <view v-for="b in ratingBars" :key="b.star" class="flex items-center" style="gap: 8px">
-                <text class="tabular-nums" style="width: 10px; font-size: 11px; color: var(--v5-ink-3)">{{ b.star }}</text>
-                <RatingBar :pct="b.pct" />
-                <text class="tabular-nums text-right" style="width: 30px; font-size: 10.5px; color: var(--v5-ink-3)">{{ b.pct }}%</text>
-              </view>
-            </view>
-          </view>
-
-          <view style="height: 1px; background: var(--v5-border)" />
-
-          <!-- 3 review rows -->
-          <view v-for="(r, i) in reviews" :key="i" class="flex items-start" :style="reviewRowStyle(i)">
-            <view class="grid place-items-center shrink-0" :style="avatarStyle(r.color)">
-              <text :style="avatarTextStyle">{{ r.name.charAt(0) }}</text>
-            </view>
-            <view class="min-w-0 flex-1">
-              <view class="flex items-center" style="gap: 8px">
-                <text :style="reviewNameStyle">{{ r.name }}</text>
-                <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-warning)">{{ starStr(r.stars) }}<text style="color: var(--v5-ink-4)">{{ starStr(5 - r.stars) }}</text></text>
-              </view>
-              <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-2); line-height: 1.625">{{ r.text }}</text>
-              <text class="block font-mono-tabular" style="margin-top: 4px; font-size: 11px; color: var(--v5-ink-4)">{{ r.time }}</text>
-            </view>
-          </view>
-
-          <view class="text-center" style="padding: 12px 0">
-            <text :style="readAllStyle">{{ readAllText }}</text>
-          </view>
-        </view>
-
-        <!-- === Section 8: Trust badges === -->
+        <!-- === Section 7: Trust badges === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
         <view class="mx-4 rounded-2xl" :style="trustCardStyle">
           <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detFeaturedIn }}</text>
@@ -207,7 +164,7 @@
           </view>
         </view>
 
-        <!-- === Section 9: FAQ accordion === -->
+        <!-- === Section 8: FAQ accordion === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detFaq" /></view>
         <view class="mx-4" :style="faqCardStyle">
           <view v-for="(f, i) in faqs" :key="i" :style="faqItemStyle(i)">
@@ -237,7 +194,6 @@ import SectionHeader from "@/components/store/section-header.vue";
 import ProductRender from "@/components/store/product-render.vue";
 import LiveSocialProof from "@/components/store/live-social-proof.vue";
 import SpecTable from "@/components/store/spec-table.vue";
-import RatingBar from "@/components/store/rating-bar.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -331,19 +287,7 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
   return rows;
 });
 
-// Mock reviews / FAQ / trust — faithful English data (not i18n; matches source)
-const reviews = [
-  { name: "Maya · ID", stars: 5, time: "2 days ago", text: "Paid back in about 3 months. Withdrew $186 first month no questions.", color: "#C68316" },
-  { name: "cypher.eth", stars: 5, time: "1 week ago", text: "Tax-deductible business expense, AI workloads are legitimate. Best ROI in my portfolio.", color: "#7250C8" },
-  { name: "Hideo · JP", stars: 4, time: "2 weeks ago", text: "Stable yields. Customer service slow on the first activation. Now running fine.", color: "#0E8E4A" },
-];
-const ratingBars = [
-  { star: 5, pct: 78 },
-  { star: 4, pct: 15 },
-  { star: 3, pct: 4 },
-  { star: 2, pct: 2 },
-  { star: 1, pct: 1 },
-];
+// Mock FAQ / trust — faithful English data (not i18n; matches source)
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
 const compliance = ["SOC 2 Type II", "ISO 27001", "Chainalysis KYT"];
 const faqs = [
@@ -369,17 +313,6 @@ const annualPctText = computed(() =>
   totalPrice.value > 0 ? ((annualYield.value / totalPrice.value) * 100).toFixed(0) : "0",
 );
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
-const ratingText = computed(() => (product.value?.rating ?? 0).toFixed(1));
-const ratingRounded = computed(() => Math.round(product.value?.rating ?? 0));
-const verifiedText = computed(() =>
-  fmt(t.value.store.detVerified, { n: (product.value?.reviews ?? 0).toLocaleString() }),
-);
-const readAllText = computed(() =>
-  fmt(t.value.store.detReadAll, { n: (product.value?.reviews ?? 0).toLocaleString() }),
-);
-function starStr(n: number): string {
-  return "★".repeat(Math.max(0, n));
-}
 
 function dec() {
   if (qty.value > 1) qty.value -= 1;
@@ -562,46 +495,6 @@ function roiValStyle(tone: "success" | "brand" | "ink"): CSSProperties {
   };
 }
 const roiSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
-const reviewsCardStyle: CSSProperties = {
-  background: "var(--v5-surface)",
-  padding: "4px 14px",
-};
-const ratingBigStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "26px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-  letterSpacing: "-0.022em",
-  lineHeight: 1,
-};
-function reviewRowStyle(i: number): CSSProperties {
-  return {
-    gap: "12px",
-    padding: "12px 0",
-    borderBottom: i < reviews.length - 1 ? "1px solid var(--v5-border)" : "none",
-  };
-}
-function avatarStyle(color: string): CSSProperties {
-  return { width: "32px", height: "32px", borderRadius: "50%", background: color };
-}
-const avatarTextStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "13.5px",
-  color: "var(--v5-ink)",
-};
-const reviewNameStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
-  fontWeight: 500,
-  color: "var(--v5-ink)",
-};
-const readAllStyle: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
-  fontWeight: 500,
-  color: "var(--v5-brand)",
-};
 const trustCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   padding: "16px",

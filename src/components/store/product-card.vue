@@ -6,8 +6,8 @@
   Top→bottom:
     · ProductRender hero photo (S1/Pro/Rack) or cyan Cloud-Share schematic,
       with folded-corner badge ribbon + tier-code chip + Legacy chip overlay.
-    · Body: name, ROI hero (daily earn / trade-in). Specs, ratings, and
-      AI throughput stay on the detail page.
+    · Body: name, ROI hero (daily earn / trade-in). Specs and AI throughput
+      stay on the detail page.
     · Footer: price + frosted Buy CTA.
 -->
 <template>

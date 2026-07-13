@@ -1,6 +1,6 @@
 <template>
-  <view class="lg-root">
-    <view class="lg-wrap">
+  <view class="lg-root" @keydown.esc="showCountries = false">
+    <view class="lg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="lg-top">
         <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" @click="back">
@@ -32,17 +32,11 @@
         <!-- Step 1: phone (+ password for password mode) -->
         <view v-if="step === 1" class="lg-col">
           <view class="lg-phone">
-            <view class="lg-phone__cc" @click="showCountries = !showCountries">
+            <view class="lg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter="showCountries = true" @keydown.space.prevent="showCountries = true">
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
             <input class="lg-phone__in" type="number" :placeholder="t.login.phonePlaceholder" :value="phone" @input="onPhone" />
-            <view v-if="showCountries" class="lg-cc-list">
-              <view v-for="c in COUNTRIES" :key="c.code" class="lg-cc-item" :class="{ 'lg-cc-item--on': c.code === country }" @click="pickCountry(c.code)">
-                <text class="lg-cc-item__name">{{ c.name }}</text>
-                <text class="lg-cc-item__code">{{ c.code }}</text>
-              </view>
-            </view>
           </view>
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
@@ -119,6 +113,7 @@
       </view>
     </view>
 
+    <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
   </view>
@@ -129,6 +124,7 @@ import { ref, computed, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
+import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
@@ -147,12 +143,6 @@ const app = useApp();
 const session = useSession();
 const sponsorship = useSponsorship();
 
-const COUNTRIES = [
-  { code: "+1", name: "US / Canada" }, { code: "+44", name: "United Kingdom" }, { code: "+49", name: "Germany" },
-  { code: "+33", name: "France" }, { code: "+34", name: "Spain" }, { code: "+81", name: "Japan" },
-  { code: "+82", name: "South Korea" }, { code: "+55", name: "Brazil" }, { code: "+62", name: "Indonesia" },
-  { code: "+63", name: "Philippines" }, { code: "+66", name: "Thailand" }, { code: "+971", name: "UAE" }, { code: "+7", name: "Russia" },
-];
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
   { label: "Google", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.5 3.6-5.5 3.6-3.3 0-6-2.7-6-6.1S8.7 5.5 12 5.5c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3 14.6 2 12 2 6.9 2 2.7 6.1 2.7 11.6S6.9 21.3 12 21.3c6.9 0 9.4-4.9 9.4-7.4 0-.5 0-.9-.1-1.3L12 10.2z"/></svg>' },
@@ -433,11 +423,6 @@ onUnmounted(() => cleanup());
 .lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); }
 .lg-phone__cc-t { font-size: 14px; color: #fff; }
 .lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 14px; color: #fff; }
-.lg-cc-list { position: absolute; top: 100%; left: 0; margin-top: 8px; width: 260px; max-height: 300px; overflow-y: auto; border-radius: 16px; background: #0B0B0B; border: 1px solid var(--v5-surface-3); padding: 6px; z-index: 20; }
-.lg-cc-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: 12px; }
-.lg-cc-item--on { background: color-mix(in srgb, var(--v5-brand) 8%, transparent); }
-.lg-cc-item__name { font-size: 13.5px; color: #C8D0DC; }
-.lg-cc-item__code { font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--v5-ink-4); }
 .lg-field-wrap { display: flex; align-items: center; background: #0F0F0F; border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
 .lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
 .lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: 14px; color: #fff; }

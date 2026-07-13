@@ -107,6 +107,9 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useCards, detectBrand, brandLabel } from "@/store/cards";
 import { useTrialConfig } from "@/store/trial-config";
+import { useQuest } from "@/store/quest";
+import { useApp } from "@/store/app";
+import { useBills } from "@/store/bills";
 
 const t = useT();
 const cardsStore = useCards();
@@ -208,7 +211,22 @@ function handleBind() {
     holder: holder.value.trim().toUpperCase(),
   }, { makeDefault: setAsDefault.value });
   if (setAsDefault.value) cardsStore.setDefault(tokenId);
-  toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(brand.value), last4: digits.value.slice(-4) }));
+  // 首日任务 bind_bank_card(server-canonical `card.bound`):quest 只记完成,
+  // 入账 + 账单 + toast 在调用层组合(对齐 quest.ts 头注约定,模式同 lib/share.ts)。
+  // 幂等 — 非首次绑卡 firstTime=false,只出常规绑卡 toast,不重复发奖。
+  const quest = useQuest().markComplete("bind_bank_card");
+  if (quest.firstTime) {
+    const app = useApp();
+    const bills = useBills();
+    const billRef = `QST-${Date.now().toString(36).toUpperCase()}`;
+    if (quest.rewardNex > 0) app.creditNex(quest.rewardNex);
+    if (quest.rewardUsdt > 0) app.creditBalance(quest.rewardUsdt);
+    if (quest.rewardUsdt > 0) bills.add({ type: "bonus", symbol: "USDT", amount: quest.rewardUsdt, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (quest.rewardNex > 0) bills.add({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
+  } else {
+    toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(brand.value), last4: digits.value.slice(-4) }));
+  }
   uni.redirectTo({
     url: returnTo.value,
     fail: () => { isBinding.value = false; navBack(returnTo.value); },

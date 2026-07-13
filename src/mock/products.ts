@@ -51,8 +51,6 @@ export interface Product {
   installMonths?: number;
   sold: number;
   stock?: number;
-  rating: number;
-  reviews: number;
   features: string[];
   // v3.1 AI workload throughput specs (§5.3.1)
   ai?: AIPerformance;
@@ -85,8 +83,6 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 4821,
     stock: 47,
-    rating: 4.8,
-    reviews: 2847,
     features: [
       "Fully managed by Nexion",
       "99.9% uptime SLA",
@@ -122,8 +118,6 @@ export const PRODUCTS: Product[] = [
     stock: 23,
     // 购买门(后台可改):单活跃直推 ≥5 + 硬锁额(remaining = cap−sold = 23,对齐 stock)。
     purchaseGate: { activeDirectMin: 5, mode: "all", quotaCap: 1000, quotaSold: 977, quotaPeriod: "month", enforce: true },
-    rating: 4.9,
-    reviews: 1124,
     features: [
       "8× RTX 4090 GPUs",
       "Priority task allocation",
@@ -157,8 +151,6 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 412,
     stock: 38,
-    rating: 4.9,
-    reviews: 187,
     features: [
       "8× RTX 5090 — top-bin silicon",
       "2.5× S1 throughput on AI workloads",
@@ -195,8 +187,6 @@ export const PRODUCTS: Product[] = [
     stock: 8,
     // 购买门(后台可改):组合 either —— V≥3 或 ≥15 活跃直推 或 ≥$20K 团队业绩 + 硬锁额(remaining=8)。
     purchaseGate: { rankMin: 3, activeDirectMin: 15, teamVolumeMin: 20000, mode: "either", quotaCap: 100, quotaSold: 92, quotaPeriod: "month", enforce: true },
-    rating: 4.9,
-    reviews: 154,
     features: [
       "Enterprise A100 GPUs",
       "Dedicated tier-3 datacenter slot",
@@ -230,8 +220,6 @@ export const PRODUCTS: Product[] = [
     installMonths: 12,
     sold: 64,
     stock: 4,
-    rating: 5.0,
-    reviews: 41,
     features: [
       "8× H100 SXM5 — datacenter-grade Hopper",
       "Upgrade trade-in: retire an owned device for checkout credit",
@@ -261,8 +249,6 @@ export const PRODUCTS: Product[] = [
     dailyEarnNEX: 3,
     price: 19.9,
     sold: 12483,
-    rating: 4.6,
-    reviews: 3812,
     features: [
       "Instant activation",
       "Buy as little as $19.9",
