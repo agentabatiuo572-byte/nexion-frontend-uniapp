@@ -4404,6 +4404,14 @@ export const zh: Messages = {
     unreadCount: "{n} 条未读",
     allCaughtUp: "全部已读",
     prefsFooter: "通知偏好设置在「设置」中 →",
+    // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
+    // production: backend events card.unbound / card.rebind_notified).
+    cardUnboundTitle: "银行卡已解绑",
+    cardUnboundBody: "你的 {brand} •••• {last4} 已解除绑定,后续不再用于支付。可随时绑定新卡。",
+    cardUnboundCta: "我的银行卡",
+    cardRebindTitle: "请更换试用担保卡",
+    cardRebindBody: "你的 {brand} •••• {last4} 已无法继续为免费试用担保,请尽快绑定新卡,以保障试用结束时顺利完成购买。",
+    cardRebindCta: "绑定新卡",
   },
 
   // FEAT-SHARE01 邀请分享全链路(海报面板/渠道面板/入口)。

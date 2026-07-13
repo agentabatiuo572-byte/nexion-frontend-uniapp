@@ -4498,6 +4498,14 @@ export const en = {
     unreadCount: "{n} unread",
     allCaughtUp: "All caught up",
     prefsFooter: "Notification preferences in Settings →",
+    // Card-binding push templates (FEAT-CARDS02; built by mock/card-notifications.ts —
+    // production: backend events card.unbound / card.rebind_notified).
+    cardUnboundTitle: "Bank card unbound",
+    cardUnboundBody: "Your {brand} •••• {last4} has been unbound and will no longer be used for payments. You can bind a new card any time.",
+    cardUnboundCta: "My bank cards",
+    cardRebindTitle: "Replace your trial card",
+    cardRebindBody: "Your {brand} •••• {last4} can no longer secure your free trial. Bind a new card soon so your end-of-trial purchase completes smoothly.",
+    cardRebindCta: "Bind a new card",
   },
 
   // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).
