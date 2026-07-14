@@ -326,6 +326,37 @@ else
   else
     bad "SPEC-7 param key parity missing: $parity_miss"
   fi
+  # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
+  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 5 键逐一比对字面值;
+  # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
+  value_mismatch=""
+  for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
+           pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
+           maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding \
+           resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds; do
+    uni_v=$(grep -oE "\b$k: [^,]+" src/mock/platform-config.ts | head -1 | sed "s/^$k: //" | tr -d '\r')
+    # 尾逗号锚定对象字面量条目;类型声明的 union 行(key: "X" | ...)无逗号,天然排除(红测抓过 resendSeconds 撞 union 首键)
+    adm_v=$(grep -A6 "key: \"$k\"," "$ADMIN_CFG" | grep -m1 -oE "defaultVal: [^,]+" | sed "s/^defaultVal: //" | tr -d '\r')
+    if [ -z "$uni_v" ] || [ -z "$adm_v" ]; then
+      value_mismatch="${value_mismatch}${k}(extract-fail:uni=${uni_v:-none} admin=${adm_v:-none}) "
+    elif [ "$uni_v" != "$adm_v" ]; then
+      value_mismatch="${value_mismatch}${k}(uni=$uni_v!=admin=$adm_v) "
+    fi
+  done
+  if [ -z "$value_mismatch" ]; then
+    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 5)"
+  else
+    bad "SPEC-7 param value parity drift: $value_mismatch"
+  fi
+  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 5。两端同时
+  # 新增键时键 parity 仍绿、值 parity 循环静默漏检,此处变红逼同步扩循环(2026-07-14 对抗审查 D 项缺口)
+  seed_key_count=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
+  og_key_count=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
+  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 5 ]; then
+    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=5, 与循环清单同步)"
+  else
+    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 5) —— 新增/删除键须同步改值 parity 循环"
+  fi
 fi
 # ── SPEC-2 电脑算力 sentinels ──
 spec2_pc_gpu_kind_coverage() {

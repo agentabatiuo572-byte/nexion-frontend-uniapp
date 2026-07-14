@@ -26,8 +26,11 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     appAttestationReleaseHours: 2,
     maxSignupPerIp24h: 3,
     maxAccountsPerDevice: 2,
-    maxAccountsPerPaymentInstrument: 1,
-    clusterFreezeSuggestThreshold: 0.82,
+    // ↓ 口径 = 后台 PRD K1③(同支付工具 ≤2 / 冻结建议线 0.7),与 admin RISK_CLUSTER_PARAMS
+    //   defaultVal 同源;值漂移由 verify.sh「SPEC-7 param value parity」哨兵拦。
+    //   (2026-07-14 修正镜像抄错的 1/0.82;07-15 因整树 reset 丢失后重放,详见 memory feedback_cross_repo_value_parity)
+    maxAccountsPerPaymentInstrument: 2,
+    clusterFreezeSuggestThreshold: 0.7,
     releaseMode: "attest_or_manual",
     freeSlotRequiresBinding: true,
   },
