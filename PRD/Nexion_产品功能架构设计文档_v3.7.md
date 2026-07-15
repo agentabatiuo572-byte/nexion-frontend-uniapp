@@ -290,19 +290,19 @@ TabBar:active tab 显示背景 chip 高亮。
 
 注册页底部含合规脚注「创建账号即表示同意服务条款和隐私政策」,其中「服务条款」下划线可点,进入 §4.7.5 服务条款页;「隐私政策」当前为占位文本(无独立页)。
 
-#### 4.1.1 注册成功页 `/register/success`(仅 H5)
+#### 4.1.1 注册成功页 `/register/success`(浏览器 H5)
 
-**目的**:确认新人礼到账状态,并把 H5 注册的转化终点导向 APP 安装(APP 在线时长驱动礼包与收益释放,§4.3.5)。App 壳内注册不经过本页。
+**目的**:确认新人礼到账状态,并在浏览器 H5 提供 Nexion 官网 APP 下载入口。App 壳内注册不经过本页,直接进入 onboarding。
 
 | 元素 | 内容 |
 |---|---|
 | 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 Nexion,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
 | 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);未带码注册整卡隐藏 |
-| 装 APP 权益 3 行 | 在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度 |
-| 下载 CTA | 按 UA 选链接:iOS → `share.appDownload.iosUrl`;Android → `androidUrl`(缺省回退 `apkUrl`);系统未知或对应链接缺失 → 双按钮并列(仅渲染有链接的按钮);三链接全空 → 替换为「APP 即将上线」说明卡,主 CTA 变「继续」,无死按钮 |
-| 次级出口 | 「先用网页版继续」→ `/onboarding/estimator`(既有 onboarding 链) |
+| H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度;App 不渲染此提醒区 |
+| H5 官网下载引导 | 提示可通过 Nexion 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
+| 继续出口 | 「继续」→ `/onboarding/estimator`(既有 onboarding 链),始终可用 |
 
-**规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;下载链接打开被拦截时自动复制链接并 toast 提示;返回键视同「继续」,不可返回注册流。
+**规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;`officialUrl` 仅接受 HTTPS,优先在新窗口打开,弹窗被拦时改为当前页跳转;返回键视同「继续」,不可返回注册流。App 正常注册直接进入 onboarding;即使直接访问本页,也不显示 H5 安装权益与官网下载提醒。
 
 ### 4.2 登录流程
 
@@ -2072,6 +2072,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 2. **双向奖励**:
    - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 10% direct royalty`(佣金费率单一来源 §4.3.4 / §8.3.1)
    - They get(被邀人):welcome gift 同源 `rewards.welcomeGift`(默认 `$5 + 20 NEX`,§4.3.2),不另设常量
+   - **发放规则**:邀请人奖励不直入余额——被邀人注册成功计一笔,入账按邀请人**当时风险评估分桶**(与新人礼同口径,§4.3.5 三桶);被邀新号与邀请人命中同一多账户风险簇(自推链)时,该笔奖励进锁定桶或停发(SPEC-7 §4 反自推链口径,阈值后台可配)
 
 3. **Social proof**:`247 inviters earned today · 30-day cooldown per friend`(mock 实时社会证明,无需对接后端)
 
@@ -2093,7 +2094,7 @@ flowchart LR
 
 **关键参数**:
 - `REWARD_USDT_LIFETIME_ESTIMATE` = 200(`You get` 数额,代表被邀人 lifetime 平均贡献 ≈ unilevel + binary + 平级奖之和;× §8.1.1.1 阶段倍率展示)
-- `REWARD_NEX_INVITER` = 200(邀请人 NEX 一次性 bonus)
+- `REWARD_NEX_INVITER`:同源 `rewards.inviterReward.nexAmount`(默认 200,后台可调,§13.3 配置映射),不另设常量;发放过风险分桶见 §8.1.1「发放规则」
 - 被邀人礼包:同源 `rewards.welcomeGift`(§13.3),不另设常量
 
 #### 8.1.2 团队收益卡(TeamLedgerCard)
@@ -3945,6 +3946,31 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 - **人工客服语义**:发送 / 回复、坐席身份、回复模板见 §11.8.4。
 - **AI auto-push 与人工对话互不干扰**:team / staking / market 等自动 push 始终注入 Nova(AI)会话;人工客服是独立会话类型,无需静默 AI 通道,Nova 自身不再有「live-agent 就地模式」与无响应自动切回逻辑。
 
+### 11.0B 个人资料 `/me/profile`
+
+账户公开资料页。**整页无自由文本输入、无手动配置项**(内容治理设计:平台不产生对其他用户可见的 UGC 自由文本,昵称违规在结构上不可能发生,无需事后内容审核机制;工单/客服输入属「用户→客服」私信通道,由客服人工在环,不在本命题内)。页面仅含:昵称(候选挑选)、头像(种子重掷)、加入时间/等级/钱包绑定(只读或跳转);地区、时区、个人简介均已从产品中移除。
+
+**昵称(displayName)** — 预置词库构造器,唯一改名路径为候选挑选:
+- 生成规则:`{形容词} {名词} {10-99 两位数}`,策展词库形容词/名词各 16 词(约 2.2 万组合;词库刻意避开 Node 等产品业务词,防与设备/节点术语同屏混淆),示例 `Nova Pilot 27`
+- 改名流:点击昵称行 → 候选面板(一批 6 个不重复候选,可整批换新)→ 选定 → 回填编辑缓冲 → 「保存修改」持久生效;未选中时确认不可用
+- 新账号默认昵称按账号标识确定性派生(同账号恒定,不同账号大概率不同)
+- 露出面:团队成员可见 · 收益证明分享卡(§11.5)· 邀请海报(海报侧按最长词库组合 18 字符适配);参与支付密码等价黑名单比对(提现安全章节)
+- 数据接口:`GET /profile/nickname-candidates` 返回候选数组(mock 以 `lib/nickname.ts` 等价实现,backend-replaceable)
+
+**头像** — 账号信息派生首字母头像,可重掷随机种子。
+**保存语义** — 页内编辑缓冲,统一「保存修改」提交(仅昵称可产生变更);无变更时提交给出无变更提示。
+
+**运营配套** — 后台 C2「重置昵称」处置动作(操作确认 + 审计留痕,重置为系统生成默认,用户可重新挑选),处置存量违规/历史昵称;规格见运营后台 PRD C2 章。
+
+```mermaid
+flowchart LR
+  A[个人资料页] -->|点击昵称行| B[候选面板<br/>6 个词库候选]
+  B -->|换一批| B
+  B -->|选定| C[回填编辑缓冲]
+  C -->|保存修改| D[持久生效<br/>团队/分享面同步显示]
+  E[运营后台 C2<br/>重置昵称·确认+审计] -->|覆盖为系统默认| D
+```
+
 ### 11.1 我的设备 `/me/devices`
 
 **目的**:全 inventory 管理入口 — 购买 ≠ 激活,用户在这里决定哪些设备占用 6 个算力槽位中的一个。
@@ -5394,7 +5420,7 @@ progressPct = avg(checks);
 | `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给被邀请人、此项给邀请人 |
 | `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexion.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
 | `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
-| `share.appDownload.{iosUrl,androidUrl,apkUrl}` | 全空 | 注册成功页下载引导链接(§4.1.1);全空 = 「APP 即将上线」降级态;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
+| `share.appDownload.officialUrl` | 空 | 浏览器 H5 注册成功页的 Nexion 官网 APP 下载地址(§4.1.1);仅接受 HTTPS,空值或非法地址显示不可点击占位,App 不消费;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
 | 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
 | OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
 | `Notification CAP` | 200 | 通知中心最多 |

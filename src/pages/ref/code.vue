@@ -7,7 +7,7 @@
   source mapped to v5 tokens.
 -->
 <template>
-  <view :style="rootStyle">
+  <StandalonePageShell class="ref-root" :style="rootStyle">
     <view :style="cornerGlowStyle" />
 
     <view class="relative" style="padding: 16px">
@@ -67,12 +67,12 @@
       </view>
 
       <!-- CTA(已登录 → 进入 Nexion,隐藏注册入口;异常2) -->
-      <view v-if="!authed" class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="goRegister">
+      <view v-if="!authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-else class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" @click="enterApp">
+      <view v-else class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp" @keydown.enter="enterApp" @keydown.space.prevent="enterApp">
         <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -122,12 +122,13 @@
         <text :style="footerLinkStyle" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
@@ -195,7 +196,7 @@ function goTerms() {
   uni.navigateTo({ url: "/pages/onboarding/terms", fail: () => {} });
 }
 
-const rootStyle: CSSProperties = { position: "relative", minHeight: "100vh", background: "var(--v5-bg)", paddingBottom: "24px" };
+const rootStyle: CSSProperties = { position: "relative", minHeight: "100vh", background: "var(--v5-bg)" };
 const cornerGlowStyle: CSSProperties = {
   position: "absolute",
   left: 0,

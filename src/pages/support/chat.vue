@@ -74,6 +74,7 @@ import { fmt } from "@/i18n/format";
 import { navTo, navBack } from "@/lib/route";
 import { createSendLimiter } from "@/lib/send-limiter";
 import { h5DevicePreviewStatusBarHeight } from "@/lib/device-preview";
+import { isDeviceOnline } from "@/lib/hashpower";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
@@ -292,7 +293,7 @@ function onSend(text: string) {
 function onChip(key: string) {
   if (!acquireSendSlot()) return;
   const k = key as QuickPromptKey;
-  const onlineCount = app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length;
+  const onlineCount = app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length;
   nova.sendUser(quickLabel(k), "user-quick");
   nova.markUserRead();
   schedule(() => nova.setTyping(true), AI_TYPING_ON_MS);

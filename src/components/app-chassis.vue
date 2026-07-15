@@ -129,7 +129,7 @@
           <text class="nx-tab__label" :style="{ color: tab.key === activeTab ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ tab.label }}</text>
         </view>
       </view>
-      <view class="nx-home-indicator" />
+      <DeviceHomeIndicator />
     </view>
 
     <!-- Nova 浮标 — floating Nova advisor entry + its drawer + push triggers.
@@ -169,6 +169,7 @@ import TrialUnbindRetentionSheet from "@/components/trial-unbind-retention-sheet
 import MessageDrawer from "@/components/message-drawer.vue";
 import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
 import VoucherBanner from "@/components/voucher-banner.vue";
+import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
 import DeviceStatusBar from "@/components/device/device-status-bar.vue";
 import { useT } from "@/i18n/use-t";
 import { useNotifications } from "@/store/notifications";
@@ -800,19 +801,5 @@ html[data-theme="dark"] .nx-logo-img--dark {
   font-weight: 500;
   font-family: var(--font-v5);
   letter-spacing: -0.005em;
-}
-.nx-home-indicator {
-  height: 22px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 8px;
-}
-.nx-home-indicator::after {
-  content: "";
-  width: 134px;
-  height: 5px;
-  border-radius: 3px;
-  background: var(--v5-home-indicator);
 }
 </style>

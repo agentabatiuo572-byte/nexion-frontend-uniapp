@@ -49,6 +49,9 @@ const TIME_ANCHOR_KEYS = new Set([
   "activatedAt",
   "lastSettledAt",
   "miningSince",
+  // R7 heartbeat is a time anchor: concurrent carrier snapshots keep the
+  // freshest beat so an older write cannot incorrectly mark a device stale.
+  "onlineHeartbeatAt",
   "interruptedAt",
   "startedAt",
   "completedAt",
@@ -204,11 +207,25 @@ function mergeFieldByDiff<T extends JsonRecord>(base: T, next: T, latest: T): T 
       merged[key] = mergeFieldByDiff(before, after, current);
       return;
     }
+    // A future heartbeat is invalid (clock rollback/skew poison). If one carrier
+    // writes a valid beat while another snapshot still holds a future value, the
+    // valid beat must recover the account instead of losing to Math.max forever.
+    if (key === "onlineHeartbeatAt" && typeof after === "number") {
+      const mergeNow = Date.now();
+      const valid = [after, current].filter(
+        (value): value is number => typeof value === "number" && value <= mergeNow,
+      );
+      merged[key] = valid.length > 0 ? Math.max(...valid) : null;
+      return;
+    }
+    // A newly introduced anchor often transitions from undefined/null to a
+    // number on two carriers at once. Freshest-wins must also cover that first
+    // write, not only the number→number case below.
+    if (TIME_ANCHOR_KEYS.has(key) && typeof after === "number") {
+      merged[key] = typeof current === "number" ? Math.max(current, after) : after;
+      return;
+    }
     if (typeof before === "number" && typeof after === "number" && typeof current === "number") {
-      if (TIME_ANCHOR_KEYS.has(key)) {
-        merged[key] = Math.max(current, after);
-        return;
-      }
       if (!ADDITIVE_NUMBER_KEYS.has(key)) {
         merged[key] = after;
         return;

@@ -15,30 +15,51 @@
   pointer events). onPressStart/End also clear on touchcancel.
 -->
 <template>
-  <view class="select-none" :style="rowStyle" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
+  <view class="nx-device-card select-none" :style="rowStyle" :data-device-id="device.id" :data-online="deviceOnline ? 'true' : 'false'" @touchstart="onPressStart" @touchend="onPressEnd" @touchcancel="onPressEnd">
     <!-- Long-press quick menu (full-viewport bottom sheet) -->
-    <view v-if="menuOpen" class="flex items-end" style="position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55)" @click="menuOpen = false">
+    <view
+      v-if="menuOpen"
+      class="nx-device-quick-menu flex items-end"
+      style="position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55)"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="device.name"
+      @click="closeMenu"
+      @keydown="onMenuKeydown"
+    >
       <view class="w-full rounded-t-2xl p-3" style="background: var(--v5-surface); border-top: 1px solid var(--v5-border)" @click.stop>
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
         <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.name }}</text>
         <view class="space-y-1">
-          <view class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" @click="goStatsMenu">
+          <view class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
             <text style="font-size: 13.5px; color: var(--v5-ink)">{{ t.earn.quickMenu.stats }}</text>
           </view>
-          <view v-if="degradable" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" @click="goTradeinMenu">
+          <view v-if="degradable" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goTradeinMenu" @keydown.enter.stop.prevent="goTradeinMenu" @keydown.space.stop.prevent="goTradeinMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
             <text style="font-size: 13.5px; color: var(--v5-ink)">{{ t.earn.quickMenu.tradein }}</text>
           </view>
         </view>
-        <view class="mt-2 w-full grid place-items-center" style="height: 40px; border-radius: 999px; background: var(--v5-surface-2)" @click="menuOpen = false">
+        <view class="mt-2 w-full grid place-items-center" style="height: 40px; border-radius: 999px; background: var(--v5-surface-2)" role="button" tabindex="0" @click="closeMenu" @keydown.enter.stop.prevent="closeMenu" @keydown.space.stop.prevent="closeMenu">
           <text style="font-size: 12.5px; color: var(--v5-ink-2)">{{ t.earn.quickMenu.cancel }}</text>
         </view>
       </view>
     </view>
 
     <!-- Collapsed row header (always visible; tap toggles detail) -->
-    <view class="flex items-center justify-between" style="padding: 14px 20px; min-height: 58px" @click="onRowTap">
+    <view
+      class="nx-device-card__header flex items-center justify-between"
+      style="padding: 14px 20px; min-height: 58px"
+      role="button"
+      tabindex="0"
+      :aria-expanded="expanded"
+      aria-haspopup="dialog"
+      @click="onRowTap"
+      @keydown.enter.prevent="onRowTap"
+      @keydown.space.prevent="onRowTap"
+      @keydown.shift.f10.stop.prevent="openMenu"
+      @contextmenu.stop.prevent="openMenu"
+    >
       <view class="flex items-center gap-2.5 min-w-0" style="flex: 1">
         <view class="rounded-lg grid place-items-center shrink-0" style="width: 36px; height: 36px; background: var(--v5-surface-2)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
@@ -47,7 +68,7 @@
           <text class="block truncate" style="font-size: 14px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
           <view class="flex items-center gap-1.5" style="margin-top: 3px">
             <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
-            <text style="font-size: 11.5px" :style="{ color: statusColor }">{{ statusLabel }}</text>
+            <text class="nx-device-status-label" style="font-size: 11.5px" :style="{ color: statusColor }">{{ statusLabel }}</text>
           </view>
         </view>
       </view>
@@ -63,14 +84,14 @@
     </view>
 
     <!-- Detail body (expanded; accordion) -->
-    <view v-if="expanded">
+    <view v-if="expanded" class="nx-device-card__details">
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
         <text class="min-w-0 truncate" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
-        <view v-if="degradable && inSubsidy" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" @click.stop="openExplainer">
+        <view v-if="degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
         </view>
-        <view v-else-if="degradable && lifecycle" class="inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" @click.stop="openExplainer">
+        <view v-else-if="degradable && lifecycle" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="chipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text style="opacity: 0.9">{{ t.earn.capacityChipLabel }}</text>
           <text>{{ (lifecycle.efficiency * 100).toFixed(0) }}%</text>
           <text style="opacity: 0.65">·</text>
@@ -79,7 +100,7 @@
       </view>
 
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
-      <view v-if="degradable && !inSubsidy && lifecycle" class="flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" @click.stop="openExplainer">
+      <view v-if="degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
         <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
         <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
       </view>
@@ -87,7 +108,7 @@
       <!-- FEAT-DEV01 异常1:产能触底 → 独立升级主 CTA(直达商城,权重提升;规格 ⑥ 矩阵第 6 行)。
            触底且有锁定任务清单时由下方 loss-ad 承载主 CTA(其样式随 floored 升权),此处不重复渲染 -->
       <view v-if="capacityFloored && !hwTeasers.length" style="padding: 0 20px 12px">
-        <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" @click.stop="goUnlockHw">
+        <view class="w-full grid place-items-center active:scale-[0.98]" :style="flooredCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
           <text :style="flooredCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
         </view>
       </view>
@@ -119,8 +140,8 @@
         </view>
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashOutput, { n: live.effectivePct }) }}</text>
       </view>
-      <!-- SPEC-1 §4.3 载体分层叙事: H5 非常驻 → 基础托管档,弱引导升级 App 拿在线加成(转化钩子,信息态非死按钮) -->
-      <view v-if="isH5" class="flex items-center" style="gap: 6px; margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)">
+      <!-- R7: no fresh device heartbeat → hosted baseline; the viewing shell is irrelevant. -->
+      <view v-if="!deviceOnline" class="flex items-center" style="gap: 6px; margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
         <text style="font-size: 11px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
       </view>
@@ -194,17 +215,17 @@
     <view v-if="device.kind === 'phone'" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
         <text style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
-        <view class="grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" @click="showHelp = !showHelp">
+        <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp" @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
         </view>
       </view>
       <view v-if="showHelp" class="mb-2.5 rounded-lg px-3 py-2" style="background: var(--v5-surface-2)"><text style="font-size: 11px; color: var(--v5-ink-2); line-height: 1.35">{{ t.earn.phoneRequirementsHint }}</text></view>
       <view class="flex items-center gap-1.5 mb-2.5">
-        <view class="flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isCharging)" @click="toggleCharger">
+        <view class="nx-device-charger-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isCharging)" role="switch" tabindex="0" :aria-checked="isCharging" :aria-label="isCharging ? t.earn.phoneCharging : t.earn.phoneOnBattery" @click="toggleCharger" @keydown.enter.stop.prevent="toggleCharger" @keydown.space.stop.prevent="toggleCharger">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="isCharging ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-if="isCharging" d="m11 7-3 5h4l-3 5" /><rect x="1" y="6" width="16" height="12" rx="2" /><path d="M22 11v2" /></svg>
           <text class="font-mono-tabular tabular-nums" :style="{ color: isCharging ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ device.batteryLevel ?? 0 }}%</text>
         </view>
-        <view class="flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isOnline)" @click="toggleNetwork">
+        <view class="nx-device-network-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isOnline)" role="switch" tabindex="0" :aria-checked="isOnline" :aria-label="isOnline ? t.earn.phoneNetOnline : t.earn.phoneNetOffline" @click="toggleNetwork" @keydown.enter.stop.prevent="toggleNetwork" @keydown.space.stop.prevent="toggleNetwork">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="isOnline ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-if="isOnline" d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01" /><path v-else d="M12 20h.01M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 4.17-2.65M10.66 5c4.01-.36 8.14.9 11.34 3.76M16.85 11.25a10 10 0 0 1 2.22 1.68M5 13a10 10 0 0 1 5.24-2.76M1.42 1.42l21.16 21.16" /></svg>
           <text :style="{ color: isOnline ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ isOnline ? t.earn.phoneNetOnline : t.earn.phoneNetOffline }}</text>
         </view>
@@ -233,7 +254,7 @@
           </view>
         </view>
       </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" @click="goUnlock">
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="unlockCtaStyle" role="button" tabindex="0" @click="goUnlock" @keydown.enter.stop.prevent="goUnlock" @keydown.space.stop.prevent="goUnlock">
         <text :style="unlockCtaLabelStyle">{{ unlockText }}</text>
       </view>
     </view>
@@ -260,7 +281,7 @@
           </view>
         </view>
       </view>
-      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" @click.stop="goUnlockHw">
+      <view class="mt-3 w-full grid place-items-center active:scale-[0.98]" :style="capacityFloored ? flooredCtaStyle : unlockCtaStyle" role="button" tabindex="0" @click.stop="goUnlockHw" @keydown.enter.stop.prevent="goUnlockHw" @keydown.space.stop.prevent="goUnlockHw">
         <text :style="capacityFloored ? flooredCtaLabelStyle : unlockCtaLabelStyle">{{ t.earn.capExplainCta }}</text>
       </view>
     </view>
@@ -281,7 +302,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
@@ -291,8 +312,7 @@ import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/t
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
-import { computeLiveHashpower } from "@/lib/hashpower";
-import { getCarrier } from "@/lib/carrier";
+import { computeLiveHashpower, isDeviceOnline } from "@/lib/hashpower";
 import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -312,6 +332,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
+  if (typeof document !== "undefined") document.removeEventListener("keydown", onDocumentMenuKeydown, true);
 });
 
 const KIND_ICON_PATHS: Record<DeviceKind, string> = {
@@ -342,14 +363,17 @@ const idleGated = computed(
 const statusLabel = computed(() => {
   if (reconnecting.value) return t.value.earn.reconnecting;
   if (idleGated.value) return t.value.earn.idle;
+  if (!deviceOnline.value) {
+    return props.device.kind === "phone" ? t.value.earn.hashCarrierH5Mode : t.value.earn.offline;
+  }
   return t.value.earn.online;
 });
 const statusColor = computed(() => {
   if (reconnecting.value) return "var(--v5-warning)";
-  if (idleGated.value) return "var(--v5-ink-3)";
+  if (idleGated.value || !deviceOnline.value) return "var(--v5-ink-3)";
   return "var(--v5-brand)";
 });
-const statusGlow = computed(() => !reconnecting.value && !idleGated.value);
+const statusGlow = computed(() => !reconnecting.value && !idleGated.value && deviceOnline.value);
 
 const elapsedRemaining = computed(() => {
   const tk = task.value;
@@ -408,10 +432,11 @@ const FALLBACK_CAP = fallbackCapability();
 const baselineTops = computed(() => props.device.capabilityTops ?? FALLBACK_CAP.tops);
 const cfg = useConfig();
 const capTier = computed(() => props.device.capabilityTier ?? FALLBACK_CAP.tier);
+const deviceOnline = computed(() => isDeviceOnline(props.device, now.value));
 const live = computed(() =>
   computeLiveHashpower({
     baselineTops: baselineTops.value,
-    carrier: getCarrier(),
+    online: deviceOnline.value,
     isCharging: isCharging.value,
     isOnline: isOnline.value,
     thermalState: props.device.thermalState,
@@ -420,12 +445,8 @@ const live = computed(() =>
     onlineBonus: cfg.config.onlineBonus,
   }),
 );
-// SPEC-1 载体分层: build-time fixed (H5 browser tab vs signed App). H5 = 非常驻
-// 基础托管档; App = 全因子在线加成. Mirrors lib/carrier.ts + lib/hashpower.ts.
-const isH5 = getCarrier() === "h5";
 const factorLabel = computed(() => {
-  // SPEC-1 §4.3: H5 走基础托管档 → 标「基础托管模式」而非在线因子标签.
-  if (isH5) return t.value.earn.hashCarrierH5Mode;
+  if (!deviceOnline.value) return t.value.earn.hashCarrierH5Mode;
   switch (live.value.dominant) {
     case "continuity":
       return t.value.earn.hashFactorContinuity;
@@ -567,11 +588,63 @@ const flooredCtaLabelStyle: CSSProperties = {
 const menuOpen = ref(false);
 const pressFiredMenu = ref(false);
 let longPress: ReturnType<typeof setTimeout> | null = null;
+function cardRoot(): HTMLElement | undefined {
+  if (typeof document === "undefined") return undefined;
+  return Array.from(document.querySelectorAll<HTMLElement>(".nx-device-card"))
+    .find((element) => element.dataset.deviceId === props.device.id);
+}
+function openMenu() {
+  menuOpen.value = true;
+}
+function closeMenu() {
+  menuOpen.value = false;
+}
+function onMenuKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeMenu();
+    return;
+  }
+  trapMenuFocus(event);
+}
+function onDocumentMenuKeydown(event: KeyboardEvent) {
+  if (menuOpen.value) onMenuKeydown(event);
+}
+function trapMenuFocus(event: KeyboardEvent) {
+  if (event.key !== "Tab") return;
+  const items = Array.from(cardRoot()?.querySelectorAll<HTMLElement>(".nx-device-quick-menu [tabindex='0']") ?? [])
+    .filter((element) => element.offsetParent !== null);
+  if (!items.length || typeof document === "undefined") return;
+  const current = items.indexOf(document.activeElement as HTMLElement);
+  if (event.shiftKey && current <= 0) {
+    event.preventDefault();
+    event.stopPropagation();
+    items[items.length - 1].focus();
+  } else if (!event.shiftKey && (current < 0 || current === items.length - 1)) {
+    event.preventDefault();
+    event.stopPropagation();
+    items[0].focus();
+  }
+}
+watch(menuOpen, async (open) => {
+  if (typeof document !== "undefined") {
+    document.removeEventListener("keydown", onDocumentMenuKeydown, true);
+    if (open) document.addEventListener("keydown", onDocumentMenuKeydown, true);
+  }
+  await nextTick();
+  const root = cardRoot();
+  if (!root) return;
+  const target = open
+    ? root.querySelector<HTMLElement>(".nx-device-quick-menu [tabindex='0']")
+    : root.querySelector<HTMLElement>(".nx-device-card__header");
+  target?.focus();
+});
 function onPressStart() {
   if (longPress) clearTimeout(longPress);
   pressFiredMenu.value = false;
   longPress = setTimeout(() => {
-    menuOpen.value = true;
+    openMenu();
     pressFiredMenu.value = true;
   }, 480);
 }
@@ -591,12 +664,12 @@ function onRowTap() {
   emit("toggle");
 }
 function goStatsMenu() {
-  menuOpen.value = false;
+  closeMenu();
   // Source routes to /earn (a detailed-stats view); we're already on earn, so
   // close the menu (the dedicated stats page isn't a separate route in uni yet).
 }
 function goTradeinMenu() {
-  menuOpen.value = false;
+  closeMenu();
   uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
 }
 function goDevices() {

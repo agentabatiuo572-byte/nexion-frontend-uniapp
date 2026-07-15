@@ -8,6 +8,7 @@
 
 import type { NovaMessage } from "@/store/nova";
 import type { Device } from "@/store/types";
+import { isDeviceOnline } from "@/lib/hashpower";
 import { getLockedTeasers } from "./tasks";
 
 export type QuickPromptKey =
@@ -121,7 +122,8 @@ export function replyToQuickPrompt(
 }
 
 function topDevice(devices: Device[]): Device | undefined {
-  const online = devices.filter((d) => d.status === "online");
+  const now = Date.now();
+  const online = devices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, now));
   if (online.length === 0) return undefined;
   return online.reduce((best, d) => (d.todayEarnings > best.todayEarnings ? d : best));
 }

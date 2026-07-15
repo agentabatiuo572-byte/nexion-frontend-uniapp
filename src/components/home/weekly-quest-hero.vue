@@ -156,6 +156,8 @@ function onClaim() {
   const q = quest.value;
   if (!completed.value || !q) return;
   if (wq.claimTier1()) {
+    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier1}
+    // claims, credits, and bills in one idempotent transaction.
     const r = reward.value;
     const refId = `WQUEST-${q.id}-${Date.now().toString(36).toUpperCase()}`;
     app.creditNex(r);

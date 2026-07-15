@@ -100,6 +100,7 @@ import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { MAX_DEVICES, derivePromoUpgrade } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
+import { isDeviceOnline } from "@/lib/hashpower";
 import SectionHeader from "@/components/me/section-header.vue";
 import WalletActionBtn from "@/components/me/wallet-action-btn.vue";
 
@@ -126,7 +127,7 @@ const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const emptySlots = computed(() => Math.max(0, MAX_DEVICES - activeCount.value - trialSlot.value));
 const onlineCount = computed(
-  () => app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length + trialSlot.value,
+  () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length + trialSlot.value,
 );
 const slotPotential = computed(() => Math.round(emptySlots.value * derivePromoUpgrade(app.visibleDevices).targetDaily));
 

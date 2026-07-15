@@ -309,7 +309,8 @@ function handleCheckIn() {
     return;
   }
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
-  // (store never imports app). Production: server grants NEX on /api/nex/sign-in.
+  // (store never imports app). MOCK-ONLY NON-ATOMIC: PROD POST /api/faucet/sign-in
+  // atomically grants NEX and emits the matching bill in one idempotent transaction.
   app.creditNex(r.gained);
   bills.add({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` });
   try {
@@ -340,6 +341,8 @@ function handleClaimMilestone(m: Milestone) {
   faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
   // USDT / NEX milestone rewards actually credit the wallet + write a bill.
   if (m.reward.type === "usdt" || m.reward.type === "nex") {
+    // MOCK-ONLY NON-ATOMIC: PROD milestone-claim endpoint TBD must atomically
+    // grant the reward and emit the matching bill in one idempotent transaction.
     const ref = `STREAK-D${m.day}-${Date.now().toString(36).toUpperCase()}`;
     if (m.reward.type === "usdt") {
       app.creditBalance(m.reward.amount);

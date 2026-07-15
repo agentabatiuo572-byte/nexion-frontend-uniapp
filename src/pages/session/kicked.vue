@@ -5,7 +5,7 @@
   App.vue's checkSession() before routing here.
 -->
 <template>
-  <view class="ks-root">
+  <StandalonePageShell class="ks-root">
     <view class="ks-card">
       <view class="ks-ic">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -26,15 +26,16 @@
       </view>
     </view>
 
-    <view class="ks-cta active:scale-[0.98]" @click="reLogin">
+    <view class="ks-cta active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="reLogin" @keydown.enter="reLogin" @keydown.space.prevent="reLogin">
       <text class="ks-cta__t">{{ t.session.kickedCta }}</text>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { useSession } from "@/store/session";
 
@@ -61,7 +62,7 @@ function reLogin() {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+  padding: 24px;
   background: var(--v5-bg);
 }
 .ks-card {

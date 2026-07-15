@@ -89,6 +89,7 @@ export const useWalletPairing = defineStore("walletPairing", () => {
   }
 
   function reset() {
+    if (import.meta.env.PROD) return; // dev-only KYC reset, store-layer second guard
     walletPaired.value = false;
     pairedWalletAddress.value = undefined;
     pairedNetwork.value = undefined;

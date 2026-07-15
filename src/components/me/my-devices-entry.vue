@@ -1,6 +1,6 @@
 <!--
   MyDevicesEntry — ported from me/page.tsx MyDevicesEntry (Sprint #146-1).
-  Compact fleet summary: phone icon (success-soft + pulse dot when slots used) +
+  Compact fleet summary: phone icon (success-soft + pulse dot when a device is online) +
   fleet title + "{n} online · {n} empty slots" + 6 slot pills (filled-from-left).
   Trial reserves a slot too. Taps through to /me/devices (not yet ported → nav
   fail:()=>{}).
@@ -17,7 +17,7 @@
       <!-- Active device icon -->
       <view class="relative" :style="iconBoxStyle">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
-        <view v-if="slotsUsed > 0" aria-hidden :style="pulseDotStyle" />
+        <view v-if="onlineCount > 0" aria-hidden :style="pulseDotStyle" />
       </view>
 
       <!-- Center text stack -->
@@ -48,6 +48,7 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
+import { isDeviceOnline } from "@/lib/hashpower";
 
 const t = useT();
 const app = useApp();
@@ -56,9 +57,12 @@ const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);
+const onlineCount = computed(
+  () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
+);
 
 const sectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: MAX_DEVICES }));
-const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: slotsUsed.value }));
+const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 
 function goDevices() {

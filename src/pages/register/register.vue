@@ -1,5 +1,5 @@
 <template>
-  <view class="rg-root" @keydown.esc="showCountries = false">
+  <StandalonePageShell class="rg-root" @keydown.esc="showCountries = false">
     <view class="rg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="rg-top">
@@ -97,12 +97,6 @@
         <text class="rg-review__title">{{ t.register.rewardReviewTitle }}</text>
         <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
-      <!-- Welcome bonus chip (step 1) -->
-      <view v-if="step === 1" class="rg-bonus">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
-        <text class="rg-bonus__t"><text class="rg-bonus__b">{{ fmt(t.register.bonusTitle, { usd: giftUsdt }) }}</text>{{ t.register.bonusHint }}</text>
-      </view>
-
       <!-- Error -->
       <view v-if="error" class="rg-error">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
@@ -112,6 +106,7 @@
       <!-- Primary CTA -->
       <view
         class="rg-cta"
+        data-system-chrome-primary
         :class="[ctaEnabled && !busy ? 'rg-cta--on' : '', busy ? 'rg-cta--busy' : '']"
         role="button"
         tabindex="0"
@@ -131,7 +126,7 @@
       <view v-if="step === 1" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
         <view class="rg-social">
-          <view v-for="o in oauth" :key="o.label" class="rg-social__btn">
+          <view v-for="o in oauth" :key="o.label" class="rg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter.prevent="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
             <view class="rg-social__ic" v-html="o.svg" />
             <text class="rg-social__lbl">{{ o.label }}</text>
           </view>
@@ -148,12 +143,13 @@
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
@@ -260,6 +256,9 @@ const ctaDisabledReason = computed(() => {
   return t.value.register.ctaDisabledPassword;
 });
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
+function showOauthUnavailable(provider: string) {
+  toast.info(fmt(t.value.register.oauthUnavailableTitle, { provider }), t.value.register.oauthUnavailableBody);
+}
 const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.cluster.status !== "clear");
 // 分因提示: 同簇重复账号用「设备已有账号活动」口径;裸号/未绑定用「先审核,绑定后释放」口径。
 const reviewNoticeBody = computed(() => {
@@ -621,7 +620,7 @@ onUnmounted(() => cleanup());
 
 <style scoped>
 .rg-root { position: fixed; inset: 0; background: #000; overflow-y: auto; }
-.rg-wrap { display: flex; flex-direction: column; padding: 16px 24px 24px; min-height: 100%; box-sizing: border-box; }
+.rg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .rg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .rg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; }
 .rg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
@@ -671,13 +670,10 @@ onUnmounted(() => cleanup());
 .rg-field--flex { flex: 1; background: transparent; border: none; height: 100%; padding: 0; }
 .rg-eye { padding: 4px; }
 .rg-check { display: flex; }
-.rg-bonus { margin-top: 24px; background: color-mix(in srgb, var(--v5-brand) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
-.rg-bonus__t { flex: 1; font-size: 12.5px; }
-.rg-bonus__b { color: var(--v5-brand); font-weight: 600; }
-.rg-review { margin-top: 16px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent); background: color-mix(in srgb, var(--v5-warning) 10%, transparent); padding: 10px 12px; }
+.rg-review { margin-top: 16px; border-radius: 12px; background: color-mix(in srgb, var(--v5-warning) 10%, transparent); padding: 10px 12px; }
 .rg-review__title { display: block; font-size: 12.5px; font-weight: 600; color: var(--v5-warning); }
 .rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
-.rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent); border-radius: 8px; padding: 8px 12px; }
+.rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
 .rg-error__t { flex: 1; }
 .rg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }

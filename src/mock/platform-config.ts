@@ -81,7 +81,7 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   },
   // FEAT-SHARE01 分享链路 mock seed(§13.3 share.*;运营在 admin 调)。
   // baseUrl 留空 = dev 回退运行时 origin(扫码可达本机);PROD/admin 配
-  // https://nexion.ai/ref/(F1 域名单源)。appDownload 全空 = APP 未上架态。
+  // https://nexion.ai/ref/(F1 域名单源)。officialUrl 留空 = 官网地址占位态。
   share: {
     baseUrl: "",
     channels: [
@@ -95,6 +95,6 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
       { key: "poster", intentType: "poster", enabled: true },
       { key: "system", intentType: "system", enabled: true },
     ],
-    appDownload: { iosUrl: "", androidUrl: "", apkUrl: "" },
+    appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" },
   },
 };

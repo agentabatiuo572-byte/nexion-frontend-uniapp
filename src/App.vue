@@ -556,7 +556,7 @@ onLaunch(() => {
 onShow(() => {
   attachSessionWatch();
   if (!ensureBusinessLoopsAllowed()) return; // no business writes on auth/session flow pages
-  useApp().settle(); // SPEC-1 §4.2: settle the backgrounded gap in one shot on foreground
+  useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
   startTick();
   startTrialPoll();
   startOrderPoll();

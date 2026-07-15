@@ -1,12 +1,12 @@
 <template>
-  <view class="lg-root" @keydown.esc="showCountries = false">
+  <StandalonePageShell class="lg-root" @keydown.esc="showCountries = false">
     <view class="lg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="lg-top">
-        <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" @click="back">
+        <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter="back" @keydown.space.prevent="back">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
-        <view v-else class="lg-iconbtn" @click="close">
+        <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter="close" @keydown.space.prevent="close">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="lg-brand">
@@ -41,13 +41,13 @@
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
               <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" @input="onPwd" />
-              <view class="lg-eye" @click="showPwd = !showPwd">
+              <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
                 <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
               </view>
             </view>
             <view class="lg-forgot-row">
-              <text class="lg-forgot" @click="goReset">{{ t.login.forgotPassword }}</text>
+              <text class="lg-forgot" role="link" tabindex="0" @click="goReset" @keydown.enter="goReset" @keydown.space.prevent="goReset">{{ t.login.forgotPassword }}</text>
             </view>
           </template>
         </view>
@@ -58,9 +58,9 @@
             <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
           </view>
           <view class="lg-resend">
-            <text class="lg-resend__change" @click="back">{{ t.login.changeNumber }}</text>
+            <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
             <text v-if="resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
-            <text v-else class="lg-resend__btn" @click="resend">{{ t.login.resend }}</text>
+            <text v-else class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
           </view>
         </view>
 
@@ -68,7 +68,7 @@
         <view v-else class="lg-col">
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
             <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" @input="onNewPwd" />
-            <view class="lg-eye" @click="showPwd = !showPwd">
+            <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
@@ -86,13 +86,14 @@
       </view>
 
       <!-- Primary CTA -->
-      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" @click="onPrimary">
+      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter="onPrimary" @keydown.space.prevent="onPrimary">
         <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
         <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
       </view>
+      <text v-if="!canPrimary && !loading" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
-      <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" @click="toggleMode">
+      <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter="toggleMode" @keydown.space.prevent="toggleMode">
         <text class="lg-switch__t">{{ mode === 'password' ? t.login.useCodeInstead : t.login.usePasswordInstead }}</text>
       </view>
 
@@ -100,7 +101,7 @@
       <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
         <view class="lg-social">
-          <view v-for="o in oauth" :key="o.label" class="lg-social__btn">
+          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
             <view class="lg-social__ic" v-html="o.svg" />
             <text class="lg-social__lbl">{{ o.label }}</text>
           </view>
@@ -109,19 +110,20 @@
 
       <!-- Footer -->
       <view class="lg-footer">
-        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" @click="goRegister">{{ t.login.signUp }}</text></text>
+        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
     </view>
 
     <CountryCodeSheet :open="showCountries" :model-value="country" @select="pickCountry" @close="showCountries = false" />
     <CaptchaSlider v-if="showCaptcha" :phone="fullPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
     <GlobalUi />
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
@@ -214,7 +216,20 @@ const canPrimary = computed(() => {
   if (step.value === 2) return codeOk.value && !loading.value;
   return pwdMatch.value && !loading.value;
 });
+const primaryDisabledReason = computed(() => {
+  if (step.value === 1) {
+    if (!phoneOk.value) return t.value.login.errorInvalidPhone;
+    if (mode.value === "password" && !pwdOk.value) return t.value.login.errorInvalidPassword;
+  }
+  if (step.value === 2 && !codeOk.value) return t.value.login.errorInvalidCode;
+  if (step.value === 3 && !newPwdOk.value) return t.value.login.errorWeakPassword;
+  if (step.value === 3 && !pwdMatch.value) return t.value.login.passwordMismatch;
+  return "";
+});
 const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
+function showOauthUnavailable(provider: string) {
+  toast.info(fmt(t.value.login.oauthUnavailableTitle, { provider }), t.value.login.oauthUnavailableBody);
+}
 
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -493,7 +508,7 @@ onUnmounted(() => cleanup());
 
 <style scoped>
 .lg-root { position: fixed; inset: 0; background: #000; overflow-y: auto; }
-.lg-wrap { display: flex; flex-direction: column; padding: 16px 24px 24px; min-height: 100%; box-sizing: border-box; }
+.lg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .lg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .lg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; }
 .lg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
@@ -526,12 +541,13 @@ onUnmounted(() => cleanup());
 .lg-resend__change { color: var(--v5-ink-3); }
 .lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
 .lg-resend__btn { color: var(--v5-brand); font-weight: 500; }
-.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent); border-radius: 8px; padding: 8px 12px; }
+.lg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
 .lg-error__t { flex: 1; }
 .lg-cta { margin-top: 24px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
 .lg-cta--on { background: var(--v5-brand); }
 .lg-cta__t { font-size: 15px; font-weight: 600; color: var(--v5-ink-4); }
 .lg-cta__t--on { color: var(--v5-on-brand); }
+.lg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .lg-switch { margin-top: 12px; display: flex; align-items: center; justify-content: center; }
 .lg-switch__t { font-size: 13px; color: var(--v5-brand); font-weight: 500; }
 .lg-divider { display: flex; align-items: center; margin: 28px 0; }

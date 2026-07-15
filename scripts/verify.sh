@@ -138,11 +138,132 @@ const base=m?parseFloat(m[1]):0;
 if(base<22)bad.push(p.split(path.sep).join("/")+":"+(i+1)+" base="+base+"px");});}}})("src");
 if(bad.length){console.log(bad.join("\n"));process.exit(1)}' 2>&1)
 if [ -z "$sa_bad" ]; then ok "safe-area-inset-bottom base padding >=22px (P-065)"; else bad "safe-area base padding <22px (iOS home-indicator hug)"; echo "$sa_bad" | sed 's/^/        /'; fi
-# ── SPEC-1 载体分层 + 服务端结算解耦 sentinels ──
-# carrier-tiering: hashpower MUST keep the H5 base-hosting branch (防回退到 App/H5 同口径)
-sentinel_present "SPEC-1 carrier-tiering: H5 base-hosting branch" src/lib/hashpower.ts 'carrier === "h5"'
-sentinel_present "SPEC-1 carrier-tiering: H5_BASE_FACTOR present" src/lib/hashpower.ts 'H5_BASE_FACTOR'
-sentinel_present "SPEC-1 carrier single-source: #ifdef APP-PLUS" src/lib/carrier.ts '#ifdef APP-PLUS'
+# Auth/onboarding bare pages must use one system-chrome owner. This catches the
+# orthogonal failure where a new flow page looks fine but forgets the status bar,
+# Home Indicator, or bottom safe-area reserve (P-069).
+if "$NODE_BIN" <<'NODE' >/tmp/uni-auth-system-chrome.log 2>&1
+const fs = require("fs");
+const path = require("path");
+const flowDirs = ["onboarding", "login", "register", "ref", "session"];
+const pages = [];
+for (const dir of flowDirs) {
+  const root = path.join("src/pages", dir);
+  const walk = (current) => {
+    for (const name of fs.readdirSync(current)) {
+      const file = path.join(current, name);
+      if (fs.statSync(file).isDirectory()) walk(file);
+      else if (name.endsWith(".vue")) pages.push(file.split(path.sep).join("/"));
+    }
+  };
+  walk(root);
+}
+for (const file of pages) {
+  const source = fs.readFileSync(file, "utf8");
+  if (!/<StandalonePageShell\b/.test(source) || !/import StandalonePageShell from "@\/components\/device\/standalone-page-shell\.vue"/.test(source)) {
+    throw new Error(`${file}: missing StandalonePageShell`);
+  }
+  if (!/data-system-chrome-primary/.test(source)) throw new Error(`${file}: missing runtime primary-control marker`);
+}
+const shell = fs.readFileSync("src/components/device/standalone-page-shell.vue", "utf8");
+if (!/DeviceStatusBar/.test(shell) || !/DeviceHomeIndicator/.test(shell)) throw new Error("standalone shell chrome incomplete");
+if (!/BOTTOM_SAFE_PADDING\s*=\s*"calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)"/.test(shell)) throw new Error("standalone shell lost 38px bottom safe-area baseline");
+if (!/paddingBottom:\s*props\.reserveBottom\s*\?\s*BOTTOM_SAFE_PADDING\s*:\s*"0px"/.test(shell)) throw new Error("standalone shell no longer applies its bottom safe-area baseline");
+const chassis = fs.readFileSync("src/components/app-chassis.vue", "utf8");
+if (!/<DeviceHomeIndicator\s*\/>/.test(chassis)) throw new Error("AppChassis no longer shares DeviceHomeIndicator");
+const estimator = fs.readFileSync("src/pages/onboarding/estimator.vue", "utf8");
+if (!/:top-inset="24"/.test(estimator) || !/\.est-cta\s*\{[\s\S]*?margin-right:\s*4px;[\s\S]*?margin-left:\s*4px;/.test(estimator)) {
+  throw new Error("estimator CTA no longer aligns to register-success 24px side inset");
+}
+const success = fs.readFileSync("src/pages/register/success.vue", "utf8");
+if (!/\.rs-footer\s*\{[^}]*padding-bottom:\s*calc\(env\(safe-area-inset-bottom, 0px\) \+ 38px\)/.test(success)) {
+  throw new Error("register-success CTA lost 38px bottom baseline");
+}
+NODE
+then
+  ok "all bare login-entry pages share status bar + Home Indicator shell (P-069)"
+else
+  bad "bare login-entry system chrome contract"; sed 's/^/        /' /tmp/uni-auth-system-chrome.log
+fi
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs >/tmp/uni-auth-system-chrome-runtime.log 2>&1; then
+    ok "bare login-entry system chrome runtime geometry (P-069)"
+  else
+    bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
+  fi
+else
+  printf "  ${Y}SKIP${N}  bare login-entry system chrome runtime geometry (dev server not running at %s)\n" "$BASE_URL"
+fi
+# ── SPEC-1 R7: factor reads device truth, never the viewing carrier ──
+sentinel_present "SPEC-1 R7 online seam exported" src/lib/hashpower.ts 'export function isDeviceOnline'
+sentinel_present "SPEC-1 R7 display/settle offline branch" src/lib/hashpower.ts '!input\.online'
+sentinel_present "SPEC-1 R7 heartbeat typed" src/store/types.ts 'onlineHeartbeatAt'
+sentinel_present "SPEC-1 R7 heartbeat freshest-wins merge" src/store/account-cloud.ts '"onlineHeartbeatAt"'
+sentinel_present "SPEC-1 R7 settle reads device online" src/store/app.ts 'isDeviceOnline\(d, now\)'
+sentinel_present "SPEC-1 R7 App stamps heartbeat" src/store/app.ts 'onlineHeartbeatAt: now'
+sentinel_present "SPEC-1 R7 home row uses true-online seam" src/components/home/device-row.vue 'isDeviceOnline\(props\.device, Date\.now\(\)\)'
+sentinel_present "SPEC-1 R7 home slot uses true-online seam" src/components/home/device-slot.vue 'isDeviceOnline\(props\.device, Date\.now\(\)\)'
+sentinel_present "SPEC-1 R7 me summary uses true-online seam" src/pages/me/me.vue 'isDeviceOnline\(device, Date\.now\(\)\)'
+sentinel_present "SPEC-1 R7 legacy me card uses true-online seam" src/components/me/my-devices-entry.vue 'isDeviceOnline\(device, Date\.now\(\)\)'
+sentinel_present "SPEC-1 R7 me summary binds label to true-online count" src/pages/me/me.vue 'onlineLabel.*n: onlineCount\.value'
+sentinel_present "SPEC-1 R7 legacy me card binds label to true-online count" src/components/me/my-devices-entry.vue 'onlineLabel.*n: onlineCount\.value'
+if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
+  src/components/home/device-row.vue \
+  src/components/home/device-slot.vue \
+  src/components/earn/device-card-pc.vue \
+  src/components/me/wallet-card.vue \
+  src/components/me/my-devices-entry.vue \
+  src/pages/me/me.vue \
+  src/pages/me/proof.vue \
+  src/pages/support/chat.vue \
+  src/mock/nova-templates.ts >/tmp/uni-r7-ui-status.log 2>&1; then
+  bad "SPEC-1 R7 user-facing online state bypasses heartbeat seam"; sed 's/^/        /' /tmp/uni-r7-ui-status.log
+else
+  ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
+fi
+sentinel_present "wallet KYC reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
+sentinel_present "wallet KYC reset store has PROD guard" src/store/wallet-pairing.ts 'if \(import\.meta\.env\.PROD\) return'
+if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
+  bad "staking disclosure understates 180d/365d principal penalties"
+else
+  ok "staking disclosure includes canonical high-tier penalties"
+fi
+sentinel_present "staking risk disclosure EN names all four penalties" src/i18n/messages/en.ts '5% / 15% / 30% / 50% of principal'
+sentinel_present "staking how-it-works EN maps all four penalties" src/i18n/messages/en.ts '5% \(30d\).*15% \(90d\).*30% \(180d\).*50% \(365d\)'
+sentinel_present "staking risk disclosure ZH names all four penalties" src/i18n/messages/zh.ts '5% / 15% / 30% / 50% 本金'
+sentinel_present "staking how-it-works ZH maps all four penalties" src/i18n/messages/zh.ts '30 天扣 5%.*90 天扣 15%.*180 天扣 30%.*365 天扣 50%'
+if grep -qE 'simulation engine|simulated\. Real deployments|DEMO CONNECTION|Simulate linking|Simulate connection|模拟引擎|模拟生成|演示连接|模拟连接' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
+  bad "user-facing copy exposes mock/simulation internals"
+else
+  ok "user-facing copy hides mock/simulation internals"
+fi
+if grep -qE 'mid-operation|运营中期' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
+  bad "user-facing copy exposes internal product-phase labels"
+else
+  ok "user-facing copy hides internal product-phase labels"
+fi
+sentinel_present "daily sign-in atomic seam names canonical endpoint" src/pages/daily/daily.vue 'POST /api/faucet/sign-in'
+sentinel_present "daily milestone atomic seam is honest TBD" src/pages/daily/daily.vue 'milestone-claim endpoint TBD'
+sentinel_present "weekly quest atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{tier2/:id\}'
+sentinel_present "weekly tier1 atomic seam names canonical endpoint" src/components/home/weekly-quest-hero.vue 'POST /api/quests/weekly/\{tier1\}'
+sentinel_present "weekly bonus atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{bonus\}'
+sentinel_present "event claim atomic seam is honest TBD" src/pages/events/events.vue 'event-claim endpoint TBD'
+if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
+  bad "SPEC-1 R7 hashpower must not read/import view carrier"
+else
+  ok "SPEC-1 R7 hashpower reads device online, never view carrier"
+fi
+if grep -qE 'function settleDevice\([^)]*carrier' src/store/app.ts 2>/dev/null; then
+  bad "SPEC-1 R7 settleDevice must not take carrier"
+else
+  ok "SPEC-1 R7 settleDevice factor is carrier-independent"
+fi
+if "$NODE_BIN" -e 'const s=require("fs").readFileSync("src/store/app.ts","utf8");const a=s.indexOf("export function settleDeviceBatch");const b=s.indexOf("const settled =",a);const c=s.indexOf("onlineHeartbeatAt: now",a);if(a<0||b<0||c<0||b>c)process.exit(1)' 2>/dev/null; then
+  ok "SPEC-1 R7 stale gap settles before heartbeat refresh"
+else
+  bad "SPEC-1 R7 heartbeat refresh must happen after stale-gap settlement"
+fi
+sentinel_present "SPEC-1 hosted baseline present" src/lib/hashpower.ts 'H5_BASE_FACTOR'
+sentinel_present "SPEC-1 carrier retained only as App heartbeat source" src/lib/carrier.ts '#ifdef APP-PLUS'
 # settle-single-source: earnings accrue by WALL-CLOCK Δ via settleDevice (not tick-time / fixed window)
 sentinel_present "SPEC-1 settle: settleDevice exists" src/store/app.ts 'function settleDevice'
 sentinel_present "SPEC-1 settle: wall-clock lastSettledAt anchor" src/store/app.ts 'now - d\.lastSettledAt'
@@ -150,6 +271,20 @@ sentinel_present "SPEC-1 settle: Device.lastSettledAt typed" src/store/types.ts 
 # single accrual source: the baseRate accrual must appear EXACTLY once (no 2nd bypass)
 SPEC1_ACC=$(grep -cE 'd\.baseRate \* lifeEff \* phoneFactor' src/store/app.ts 2>/dev/null)
 if [ "$SPEC1_ACC" = "1" ]; then ok "SPEC-1 settle single-source: 1 accrual site"; else bad "SPEC-1 settle: expected 1 accrual site, found $SPEC1_ACC"; fi
+# Device detail chain: owned-device instance id, registered route, expanded body.
+sentinel_present "device detail page exists" src/pages/earn/device-detail.vue 'class="nx-device-detail'
+sentinel_present "device detail route registered" src/pages.json 'pages/earn/device-detail'
+sentinel_present "device detail defaults expanded" src/pages/earn/device-detail.vue 'const expanded = ref\(true\)'
+sentinel_present "device detail rejects inactive inventory" src/pages/earn/device-detail.vue 'item\.activatedAt !== null'
+sentinel_present "device card secondary controls are keyboard-accessible" src/components/earn/device-card-pc.vue '@keydown\.space\.stop\.prevent="toggleNetwork"'
+sentinel_present "device quick menu is a modal dialog" src/components/earn/device-card-pc.vue 'aria-modal="true"'
+sentinel_present "device quick menu traps focus" src/components/earn/device-card-pc.vue 'function trapMenuFocus'
+sentinel_present "device quick menu traps native H5 keydown in capture phase" src/components/earn/device-card-pc.vue 'addEventListener\("keydown", onDocumentMenuKeydown, true\)'
+sentinel_present "home slot opens owned device id" src/components/home/device-slot.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
+sentinel_present "home row opens owned device id" src/components/home/device-row.vue 'device-detail\?id=\$\{encodeURIComponent\(props\.device\.id\)\}'
+sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-slot.vue '@keydown\.enter\.prevent="go"'
+sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
+sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="goBack"'
 # ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
 # 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
 sentinel_present "SPEC-7 risk cluster config typed" src/store/config-types.ts 'interface RiskClusterConfig'
@@ -562,6 +697,213 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
 else
   printf "  ${Y}SKIP${N}  SPEC-6 entry-surface runtime isolation (dev server not running at %s)\n" "$BASE_URL"
 fi
+# R7 pricing order and the device-detail route are runtime contracts: static
+# sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs >/tmp/uni-r7-device-detail-runtime.log 2>&1; then
+    ok "$(cat /tmp/uni-r7-device-detail-runtime.log)"
+  else
+    bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
+  fi
+else
+  printf "  ${Y}SKIP${N}  R7 + device detail runtime (dev server not running at %s)\n" "$BASE_URL"
+fi
+# 注册成功页的平台边界是编译条件,UA 伪造无法证明 App 分支。锁住 H5
+# 提醒块、App 无提醒、底部继续入口和官网配置字段这四个不变量。
+if "$NODE_BIN" -e '
+  const fs=require("fs");
+  const ts=require("typescript");
+  const postcss=require("postcss");
+  const selectorParser=require("postcss-selector-parser");
+  const {initPreContext,preHtml,preJs}=require("@dcloudio/uni-cli-shared");
+  const {parse}=require("@vue/compiler-sfc");
+  const {baseParse}=require("@vue/compiler-dom");
+  const successFile="src/pages/register/success.vue";
+  const registerFile="src/pages/register/register.vue";
+  const success=fs.readFileSync(successFile,"utf8");
+  const register=fs.readFileSync(registerFile,"utf8");
+  const config=fs.readFileSync("src/store/config-types.ts","utf8");
+  function compile(source,file,platform){
+    initPreContext(platform);
+    return preJs(preHtml(source,file),file);
+  }
+  function inspect(source,file){
+    const {descriptor,errors}=parse(source,{filename:file});
+    if(errors.length) throw errors[0];
+    const elements=[],templateExpressions=[];
+    const template=baseParse(descriptor.template?.content||"");
+    (function walk(node,ancestorHidden=false,ancestorClassNames=[],ancestorElements=[]){
+      let hidden=ancestorHidden;
+      let descendantClassNames=ancestorClassNames;
+      let descendantElements=ancestorElements;
+      if(node.type===1){
+        const staticValue=(name)=>node.props.find((prop)=>prop.type===6&&prop.name===name)?.value?.content||"";
+        const constantIf=node.props.find((prop)=>prop.type===7&&prop.name==="if")?.exp?.content?.trim();
+        const style=staticValue("style").replace(/\s+/g,"").toLowerCase();
+        const classNames=staticValue("class").split(/\s+/).filter(Boolean);
+        const attributes=Object.fromEntries(node.props.filter((prop)=>prop.type===6).map((prop)=>[prop.name,prop.value?.content||""]));
+        hidden=hidden||constantIf==="false"||node.props.some((prop)=>prop.type===6&&prop.name==="hidden")||/(display:none|visibility:hidden|opacity:0(?:;|$))/.test(style);
+        node.__staticallyHidden=hidden;
+        node.__ancestorClassNames=ancestorClassNames;
+        node.__ancestorElements=ancestorElements;
+        descendantClassNames=ancestorClassNames.concat(classNames);
+        descendantElements=ancestorElements.concat({tag:String(node.tag||"").toLowerCase(),classNames,attributes});
+        elements.push(node);
+        for(const prop of node.props){ if(prop.type===7&&prop.exp?.content) templateExpressions.push(prop.exp.content); }
+      }
+      if(node.type===5&&node.content?.content) templateExpressions.push(node.content.content);
+      for(const child of node.children||[]) walk(child,hidden,descendantClassNames,descendantElements);
+    })(template,false,[],[]);
+    const script=descriptor.scriptSetup?.content||descriptor.script?.content||"";
+    const sourceFile=ts.createSourceFile(file,script,ts.ScriptTarget.Latest,true,ts.ScriptKind.TS);
+    const registrationLaunchUrls=[];
+    let hasOfficialIdentifier=false,hasWindowOpenCall=false;
+    (function walk(node){
+      if(ts.isIdentifier(node)&&node.text==="officialDownloadUrl") hasOfficialIdentifier=true;
+      if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&ts.isIdentifier(node.expression.expression)&&node.expression.expression.text==="window"&&node.expression.name.text==="open") hasWindowOpenCall=true;
+      ts.forEachChild(node,walk);
+    })(sourceFile);
+    const launchFunction=sourceFile.statements.find((node)=>ts.isFunctionDeclaration(node)&&node.name?.text==="launchRegistrationSuccess");
+    if(launchFunction){
+      (function collect(node){
+        if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&ts.isIdentifier(node.expression.expression)&&node.expression.expression.text==="uni"&&node.expression.name.text==="reLaunch"){
+          const options=node.arguments[0];
+          if(options&&ts.isObjectLiteralExpression(options)){
+            const url=options.properties.find((prop)=>ts.isPropertyAssignment(prop)&&((ts.isIdentifier(prop.name)&&prop.name.text==="url")||(ts.isStringLiteral(prop.name)&&prop.name.text==="url")));
+            if(url&&ts.isStringLiteral(url.initializer)) registrationLaunchUrls.push(url.initializer.text);
+          }
+        }
+        ts.forEachChild(node,collect);
+      })(launchFunction);
+    }
+    const styles=descriptor.styles.map((style)=>style.content).join("\n");
+    return {elements,templateExpressions,registrationLaunchUrls,hasOfficialIdentifier,hasWindowOpenCall,styles};
+  }
+  function staticAttr(element,name){
+    return element?.props.find((prop)=>prop.type===6&&prop.name===name)?.value?.content||"";
+  }
+  function hasClass(element,name){
+    return staticAttr(element,"class").split(/\s+/).includes(name);
+  }
+  function elementByClass(output,name){
+    return output.elements.find((element)=>hasClass(element,name));
+  }
+  function appCssBlocker(styles,element){
+    const elementClasses=staticAttr(element,"class").split(/\s+/).filter(Boolean);
+    const elementAttributes=Object.fromEntries(element.props.filter((prop)=>prop.type===6).map((prop)=>[prop.name,prop.value?.content||""]));
+    const elementChain=[...(element.__ancestorElements||[]),{tag:String(element.tag||"").toLowerCase(),classNames:elementClasses,attributes:elementAttributes}];
+    let blocker="";
+    function isPrintOnly(rule){
+      for(let parent=rule.parent;parent;parent=parent.parent){
+        if(parent.type!=="atrule"||parent.name.toLowerCase()!=="media") continue;
+        const branches=parent.params.toLowerCase().split(",").map((branch)=>branch.trim()).filter(Boolean);
+        if(branches.length&&branches.every((branch)=>/^(?:only\s+)?print(?:\s+and\b|$)/.test(branch))) return true;
+      }
+      return false;
+    }
+    function splitSelector(selector){
+      const compounds=[[]],combinators=[];
+      for(const node of selector.nodes||[]){
+        if(node.type==="combinator"){
+          combinators.push(node.value.trim()||" ");
+          compounds.push([]);
+        }else compounds[compounds.length-1].push(node);
+      }
+      return {compounds,combinators};
+    }
+    function selectorMatches(selector,elementIndex){
+      const {compounds,combinators}=splitSelector(selector);
+      function compoundMatches(nodes,index){
+        const candidate=elementChain[index];
+        if(!candidate) return false;
+        for(const node of nodes){
+          if(node.type==="class"&&!candidate.classNames.includes(node.value)) return false;
+          if(node.type==="tag"&&node.value!=="*"&&candidate.tag!==node.value.toLowerCase()) return false;
+          if(node.type==="id"&&candidate.attributes.id!==node.value) return false;
+          if(node.type==="pseudo"){
+            const name=node.value.toLowerCase();
+            const alternatives=node.nodes||[];
+            if((name===":is"||name===":where"||name===":matches")&&!alternatives.some((alternative)=>selectorMatchesAt(alternative,index))) return false;
+            if(name===":not"&&alternatives.some((alternative)=>selectorMatchesAt(alternative,index))) return false;
+          }
+        }
+        return true;
+      }
+      function selectorMatchesAt(candidateSelector,index){
+        const parsed=splitSelector(candidateSelector);
+        return matchFrom(parsed.compounds,parsed.combinators,parsed.compounds.length-1,index);
+      }
+      function matchFrom(compoundsToMatch,combinatorsToMatch,compoundIndex,elementIndex){
+        if(elementIndex<0||!compoundMatches(compoundsToMatch[compoundIndex],elementIndex)) return false;
+        if(compoundIndex===0) return true;
+        const combinator=combinatorsToMatch[compoundIndex-1];
+        if(combinator===">") return matchFrom(compoundsToMatch,combinatorsToMatch,compoundIndex-1,elementIndex-1);
+        if(combinator===" "){
+          for(let parentIndex=elementIndex-1;parentIndex>=0;parentIndex--){
+            if(matchFrom(compoundsToMatch,combinatorsToMatch,compoundIndex-1,parentIndex)) return true;
+          }
+          return false;
+        }
+        return true;
+      }
+      return matchFrom(compounds,combinators,compounds.length-1,elementIndex);
+    }
+    function selectorCanReachChain(selectorText){
+      let reaches=false;
+      selectorParser((selectors)=>{
+        selectors.each((selector)=>{
+          for(let index=0;index<elementChain.length&&!reaches;index++) reaches=selectorMatches(selector,index);
+        });
+      }).processSync(selectorText);
+      return reaches;
+    }
+    function isZeroOpacity(value){
+      let normalized=value.toLowerCase().replace(/\s+/g,"");
+      while(/^calc\([^()]+\)$/.test(normalized)) normalized=normalized.slice(5,-1);
+      return /^(?:0+(?:\.0*)?|\.0+)(?:%)?$/.test(normalized);
+    }
+    postcss.parse(styles).walkRules((rule)=>{
+      if(blocker||isPrintOnly(rule)||!selectorCanReachChain(rule.selector)) return;
+      rule.walkDecls((declaration)=>{
+        const property=declaration.prop.toLowerCase();
+        const value=declaration.value.toLowerCase().trim();
+        const blocks=(property==="display"&&value==="none")||(property==="visibility"&&value==="hidden")||(property==="pointer-events"&&value==="none")||(property==="opacity"&&isZeroOpacity(value));
+        if(blocks) blocker=`${rule.selector} { ${property}: ${declaration.value} }`;
+      });
+    });
+    return blocker;
+  }
+  function hasHandler(element,event,modifiers=[]){
+    return !!element?.props.find((prop)=>prop.type===7&&prop.name==="on"&&prop.arg?.content===event&&prop.exp?.content==="continueWeb"&&modifiers.every((modifier)=>prop.modifiers.includes(modifier)));
+  }
+  const h5Success=inspect(compile(success,successFile,"h5"),successFile);
+  const appSuccess=inspect(compile(success,successFile,"app-plus"),successFile);
+  const h5Register=inspect(compile(register,registerFile,"h5"),registerFile);
+  const appRegister=inspect(compile(register,registerFile,"app-plus"),registerFile);
+  for(const token of ["class=\"rs-why\"","class=\"rs-h5-download\""]){
+    const className=token.match(/rs-[a-z0-9-]+/)[0];
+    if(!elementByClass(h5Success,className)) throw new Error(`H5 output lost real ${className} element`);
+    if(elementByClass(appSuccess,className)) throw new Error(`App output retained real ${className} element`);
+  }
+  const appContinue=elementByClass(appSuccess,"rs-continue");
+  if(!appContinue) throw new Error("App output lost the real continue CTA element");
+  if(appContinue.__staticallyHidden) throw new Error("App continue CTA is statically unreachable or hidden");
+  const appContinueCssBlocker=appCssBlocker(appSuccess.styles,appContinue);
+  if(appContinueCssBlocker) throw new Error(`App continue CTA is blocked by platform CSS: ${appContinueCssBlocker}`);
+  if(staticAttr(appContinue,"role")!=="button"||staticAttr(appContinue,"tabindex")!=="0") throw new Error("App continue CTA lost button semantics");
+  if(!hasHandler(appContinue,"click")||!hasHandler(appContinue,"keydown",["enter","prevent"])||!hasHandler(appContinue,"keydown",["space","prevent"])) throw new Error("App continue CTA lost click/Enter/Space.prevent handlers");
+  if(appSuccess.hasOfficialIdentifier||appSuccess.hasWindowOpenCall) throw new Error("App output retained H5 download behavior");
+  if(appSuccess.templateExpressions.some((expression)=>/doneWhyApp|doneOfficialDownload/.test(expression))) throw new Error("App output retained H5 reminder copy bindings");
+  if(/doneComingSoon|APP 即将上线|APP launching soon/.test(success)) throw new Error("obsolete success-page coming-soon contract remains");
+  if(!/appDownload:\s*\{[\s\S]*officialUrl:\s*string/.test(config)) throw new Error("official download URL is not typed in platform config");
+  if(!h5Register.registrationLaunchUrls.includes("/pages/register/success")) throw new Error("H5 registration function lost the success reLaunch call");
+  if(appRegister.registrationLaunchUrls.includes("/pages/register/success")) throw new Error("App registration function retained the H5 success reLaunch call");
+  if(!appRegister.registrationLaunchUrls.includes("/pages/onboarding/estimator")) throw new Error("App registration function lost the onboarding reLaunch call");
+  ' >/tmp/uni-register-success-platform.log 2>&1; then
+  ok "register success H5/App platform contract"
+else
+  bad "register success H5/App platform contract"; sed 's/^/        /' /tmp/uni-register-success-platform.log
+fi
 # FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
 # “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
@@ -578,8 +920,8 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     fi
   done
 else
-  printf "  ${Y}SKIP${N}  SPEC-7 K1 device/payment registration gates (dev server not running at %s)\n" "$BASE_URL"
-  printf "  ${Y}SKIP${N}  AUTH02 registered-number runtime handoff (EN/ZH; dev server not running at %s)\n" "$BASE_URL"
+  bad "SPEC-7 K1 device/payment registration gates (dev server not running at $BASE_URL)"
+  bad "AUTH02 registered-number + success-page runtime (EN/ZH; dev server not running at $BASE_URL)"
 fi
 # ── SPEC-4 account-cloud + multi-carrier session sentinels ──
 sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexion-account-cloud-v1'

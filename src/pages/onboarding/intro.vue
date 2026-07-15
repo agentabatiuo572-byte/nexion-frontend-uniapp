@@ -1,5 +1,5 @@
 <template>
-  <view class="intro-root">
+  <StandalonePageShell class="intro-root">
     <!-- Backdrop: radial brand glow (center above page top) -->
     <view class="intro-glow" />
     <!-- Top-blend vignette under header edge -->
@@ -118,26 +118,27 @@
       </view>
 
       <view class="intro-cta anim-cta">
-        <view class="cta-primary active:scale-[0.98]" @click="goRegister">
+        <view class="cta-primary active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">
           <text class="cta-primary__t">{{ t.intro.getStarted }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
           </svg>
         </view>
-        <view class="cta-secondary active:scale-[0.98]" @click="goLogin">
+        <view class="cta-secondary active:scale-[0.98]" role="button" tabindex="0" @click="goLogin" @keydown.enter="goLogin" @keydown.space.prevent="goLogin">
           <text class="cta-secondary__t">{{ t.intro.signIn }}</text>
         </view>
         <view class="intro-terms">
           <text class="terms-left">{{ t.intro.termsLeft }} </text>
-          <text class="terms-link active:opacity-70" @click="goTerms">{{ t.intro.termsLink }}</text>
+          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter="goTerms" @keydown.space.prevent="goTerms">{{ t.intro.termsLink }}</text>
         </view>
       </view>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 
 const t = useT();
@@ -204,7 +205,8 @@ function goTerms() {
 .intro-root {
   position: fixed;
   inset: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: var(--v5-bg);
 }
 .intro-glow {
@@ -236,7 +238,7 @@ function goTerms() {
 
 .intro-content {
   position: relative;
-  height: 100%;
+  min-height: 100%;
   padding: 0 24px;
   display: flex;
   flex-direction: column;
@@ -337,7 +339,7 @@ function goTerms() {
 
 .intro-cta {
   padding-top: 40px;
-  padding-bottom: 40px;
+  padding-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;

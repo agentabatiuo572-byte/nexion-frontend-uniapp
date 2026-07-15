@@ -34,6 +34,7 @@
 | Pinia + 全局原语（toast/confirm/netError） | `src/store/ui.ts` | verified |
 | 全局 Host（GlobalUi） | `src/components/global-ui.vue` | verified |
 | chassis（路由感知:tab pill+brand/title header+search+bell badge / 子页 back-mode 隐 tabbar） | `src/components/app-chassis.vue` | **verified ✅ 字段级重修**(P-036:Batch0 简化版→忠实原型 tab-bar.tsx/header.tsx,浮动磨砂 pill+active 渐变 brand pill+子页隐 5-tab,零页面改动) |
+| bare 登录注册系统壳（状态栏 + Home Indicator + 双端安全区） | `src/components/device/standalone-page-shell.vue` `device-home-indicator.vue` | **verified**（9 个登录入口/auth/onboarding 页面自动发现全覆盖；estimator / register-success CTA 24px 左右 + 38px 底部基线在 430×940、320×568 实景同坐标；P-069 静态 + 运行时门） |
 | 机制（verify/skill/台账/hooks） | `scripts/verify.sh` `docs/*` SKILL | verified |
 
 ## 页面迁移矩阵（80 页）
@@ -320,3 +321,11 @@ me 子页（**devices/goals/profile/security/kyc ✅** · wallet-bills/wallet-ex
 - **新坑**：无（audit 0 CRITICAL，所有已知 pitfall 已避开）。**经验**：源原型「待接归因」未完成态（mark* 无调用）port 时，按 PRD 意图补触发让功能可达，胜过照抄不可达的半成品。meta 哨兵 case-sensitive 抓小写 `conversion`（注释命中）——port 源术语时注释也走中性词。
 
 <!-- 每页迁移后：改状态 + 跑 verify.sh + 更新此表 -->
+
+### R7 真在线因子 + 设备实例详情恢复 ✅ verified（2026-07-15）
+
+- **功能面**:手机在线加成改为设备新鲜心跳单源；结算采用旧心跳封账、下一拍再启用新心跳，生命周期清理与多端 freshest-valid 合并齐全。Home 槽位 / 行按实例 ID 打开 `pages/earn/device-detail`,仅展示已激活设备，失效 ID 走空态。
+- **交互面**:设备详情默认展开，pointer + Enter / Space 全链；长按快捷菜单补 Shift+F10、Escape、Tab / Shift+Tab 首尾循环和焦点返回。Home、Me、钱包、Proof、Nova 的在线数量与标识统一走 `isDeviceOnline`。
+- **恢复取舍**:`.trash/20260715-000945-revert-codex-untracked` 的 53 项中，24 项为已废弃 / 已替代旧文件；2 项产品功能恢复到正本；27 项半成品不移植（0 项进入正本），其中 11 项只在 Git 快照 `fa1a5ee` 留作设计参考、16 项淘汰。R7 原提交仍由 `d63c813` 保留，`.trash` 到期不造成源码丢失。
+- **邻接审计**:质押罚金披露对齐 5% / 15% / 30% / 50%；钱包 KYC reset 补页面 DEV + store PROD 双 guard；用户可见 mock / 内部阶段文案清理；跨 store 领奖写明 canonical endpoint 或诚实 TBD。
+- **验证**:`npm run type-check`、i18n 4040-key mirror、`scripts/r7-device-detail-runtime.mjs`、`bash scripts/verify.sh` 与多轮 `nexion-audit` 全绿；最终计数以本批收尾报告为准。

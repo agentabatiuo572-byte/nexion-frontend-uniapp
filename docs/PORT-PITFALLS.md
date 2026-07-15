@@ -513,3 +513,27 @@
 - **对策**:检查返回值,false 时 `freeTrial.markChargeFailed("insufficient_funds")`(翻 failed 保留 finishedAt 起冷却) + toast + return,后续记账/加余额/发设备全不执行。对齐 App.vue handleAutoRedeem / checkout.vue 既有正确写法;全站 12 处 debit 调用同形排查,trial 是唯一漏点。
 - **已转**:verify.sh 哨兵 `debit_return_checked`(grep 行首裸 `app.debit(Balance|Nex)(...);` = bug 形态;现有 12 调用点零误报、原 bug 形态真抓,5 形态自测过)。
 - **元教训**:返回 boolean 的资金原语(debit/扣款/校验)裸语句调用 = 静默吞掉失败信号;凡「先检查后执行」跨 await/用户确认,检查必在真正动钱那步复核(预检查只是前置过滤,不是授权)。
+
+## P-067 · 重开先刷新心跳再结算 → 被杀 App 的离线墙钟差按在线档倒补
+
+- **现象**:手机曾在线后杀掉 App 数小时，重开第一拍直接拿到完整在线加成；同一段离线时间从 H5 看是基础托管，从 App 重开看却被倒补在线收益。
+- **根因**:tick 先把 `onlineHeartbeatAt` 写成当前时间，再用这个新心跳给 `now - lastSettledAt` 的历史墙钟差定价，把“现在重新上线”错误外推成“整个离线区间都在线”。
+- **对策**:结算顺序固定为“读取旧心跳 → 给本次墙钟差定价 / 累计 attestation → 刷新新心跳供下一拍使用”；暂停、退役、重校准、会话失效同步清理心跳和结算锚点，多端合并忽略未来时间戳。
+- **已转**:`scripts/r7-device-detail-runtime.mjs` 覆盖 null / 新鲜 / 超时边界 / 未来心跳、6 小时陈旧重开、生命周期清理与多端合并；`verify.sh` 锁先结算后刷新顺序和全站在线判定单一入口。
+- **元教训**:心跳是区间末端的观测，不是对上一整段时间的证明。任何“刷新状态 + 按时间差结算”链都必须先用旧状态封账，再让新状态影响未来。
+
+## P-068 · uni H5 弹层靠 `@keydown.tab` 困焦点 → Shift+Tab 仍逃到背景
+
+- **现象**:设备快捷菜单能由 Shift+F10 打开并把焦点送入，但首项按 Shift+Tab 会跳到页面背景按钮；只测“打开 / Escape / 回焦”的脚本仍全绿。
+- **根因**:uni H5 的 `<view>` 事件包装下，弹层容器的 `.tab` 键修饰和并列 keydown handler 没有稳定拦截原生 Tab 默认行为；Vue 状态和 ARIA 看起来正确，但浏览器焦点已越界。
+- **对策**:H5 在菜单打开期间用 `document.addEventListener('keydown', handler, true)` 捕获原生键盘事件，关闭 / 卸载时对称解绑；边界 Tab 明确 `preventDefault + stopPropagation` 并手动首尾循环，Escape 走同一 handler。
+- **已转**:runtime 新增“首项 Shift+Tab → 末项、末项 Tab → 首项”双向断言，再验证 Escape 关闭与焦点回到设备卡；verify 锁 capture listener、focus trap 和 modal 语义。
+- **元教训**:无障碍弹层不能只证明“焦点进得去、关得掉”，还必须对抗性证明两个边界都出不去；框架键修饰不是原生默认行为已被阻止的证据。
+
+## P-069 · bare 登录注册页未继承 chassis 系统栏 → 顶部状态栏、Home Indicator 与底部安全区成了逐页漏项
+
+- **现象**:主应用页面由 `AppChassis` 提供 iOS 状态栏和 Home Indicator，但 onboarding / login / register 是 bare 全屏页，各自只画业务内容；estimator CTA 仅留 24px 底距，既和注册成功页的 38px 基线不齐，也会贴近 Home Indicator。
+- **根因**:系统 chrome 的所有权只落在 `AppChassis`，bare 页面没有等价共享壳；页面作者只能逐页记 `env(safe-area-inset-*)`，导致“内容渲染正确”掩盖“该有的系统层不存在”这个完整性盲区。
+- **对策**:新增 `standalone-page-shell.vue`，复用 `DeviceStatusBar` + `DeviceHomeIndicator`，统一计算 App 真状态栏 / H5 设备预览 54px 状态栏与 `env(safe-area-inset-bottom) + 38px` 底部基线；9 个登录入口/auth/onboarding 页面全部接入。可滚动 bare 页的系统栏用 viewport-fixed，避免随内容滚走；系统 chrome 层级高于页面弹层。
+- **已转**:`verify.sh` 自动扫描 onboarding/login/register/ref/session 目录，任一新增页漏接共享壳、主操作标记、Home Indicator 抽取回退或 38px 基线未实际应用即失败；总门禁直接运行 `scripts/auth-system-chrome-runtime.mjs`，在 430×940 与 320×568 逐页记录滚动前几何，再用真实滚轮验证可达性、状态栏 / Home Indicator / 控件安全距离与弹层层级，并锁 estimator 与 register-success 首屏 CTA 同坐标；AUTH02 真实 referral 礼包成功态另锁 `scrollTop=0` + 16px 安全距。
+- **元教训**:系统状态栏和 Home Indicator 不是页面装饰，是页面壳不变量。以后设计任何 full-screen 页面先选 `AppChassis` 或 `StandalonePageShell`，不能从零开始猜上下留白。

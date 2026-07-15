@@ -13,7 +13,15 @@
 -->
 <template>
   <view class="spv" :style="{ top: statusBarHeight + 'px', height: rowH + 'px' }">
-    <view class="spv-side" role="button" tabindex="0" aria-label="Back" @click="goBack">
+    <view
+      class="spv-side spv-back"
+      role="button"
+      tabindex="0"
+      :aria-label="t.profile.back"
+      @click="goBack"
+      @keydown.enter.prevent="goBack"
+      @keydown.space.prevent="goBack"
+    >
       <view class="spv-glass">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
@@ -22,7 +30,15 @@
       <text v-if="displayTitle" class="spv-title">{{ displayTitle }}</text>
       <text v-if="subtitle" class="spv-sub">{{ subtitle }}</text>
     </view>
-    <view class="spv-side relative" role="button" tabindex="0" aria-label="Notifications" @click="goBell">
+    <view
+      class="spv-side spv-bell relative"
+      role="button"
+      tabindex="0"
+      :aria-label="t.me.notifications"
+      @click="goBell"
+      @keydown.enter.prevent="goBell"
+      @keydown.space.prevent="goBell"
+    >
       <view class="spv-glass">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
         <view v-if="unread > 0" class="spv-belldot" />

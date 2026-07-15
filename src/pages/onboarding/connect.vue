@@ -1,7 +1,10 @@
 <template>
-  <view class="cn-root">
+  <StandalonePageShell class="cn-root" :top-inset="24">
     <!-- Progress (3/3 full) -->
     <view class="cn-bars">
+      <view class="cn-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="leaveConnect" @keydown.enter="leaveConnect" @keydown.space.prevent="leaveConnect">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+      </view>
       <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
       <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
       <view class="cn-bar"><view class="cn-bar__fill cn-bar__fill--full" /></view>
@@ -27,7 +30,7 @@
             </view>
           </view>
         </view>
-        <view class="cn-go cn-go--glow active:scale-[0.98]" @click="phase = 'calibrating'">
+        <view class="cn-go cn-go--glow active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="phase = 'calibrating'" @keydown.enter="phase = 'calibrating'" @keydown.space.prevent="phase = 'calibrating'">
           <text class="cn-go__t">{{ t.onboarding.calibrationStart }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
@@ -100,17 +103,18 @@
     </transition>
 
     <view class="cn-cta">
-      <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" @click="activate">
+      <view v-if="phase === 'result'" class="cn-go cn-go--on active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="activate" @keydown.enter="activate" @keydown.space.prevent="activate">
         <text class="cn-go__t cn-go__t--on">{{ activateText }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useAuth } from "@/store/auth";
@@ -211,7 +215,7 @@ const testCards = computed(() => {
   const netP = Math.min(1, Math.max(0, (progress.value - 0.3) / 0.5));
   const pwP = Math.min(1, Math.max(0, (progress.value - 0.55) / 0.3));
   return [
-    { icon: ICON.cpu, title: t.value.onboarding.testNpu, metric: `${tops.value.toFixed(1)} TOPS · matmul-mobile.fp16`, progress: npuP, accent: "var(--v5-brand)" },
+    { icon: ICON.cpu, title: t.value.onboarding.testNpu, metric: fmt(t.value.onboarding.testComputeMetric, { n: tops.value.toFixed(1) }), progress: npuP, accent: "var(--v5-brand)" },
     { icon: ICON.globe2, icon2: ICON.globe, title: t.value.onboarding.testNetwork, metric: fmt(t.value.onboarding.testNetworkPing, ping.value), progress: netP, accent: "var(--v5-tech-cyan)" },
     { icon: ICON.battery, title: t.value.onboarding.testPower, metric: fmt(t.value.onboarding.testPowerOK, { n: battery.value }), progress: pwP, accent: "var(--v5-warning)" },
   ];
@@ -232,7 +236,7 @@ function startResult() {
 
 const tierLabel = computed(() => fmt(t.value.onboarding.resultTier, { n: FINAL_TIER }));
 const resultRows = computed(() => [
-  { label: t.value.onboarding.testNpu, value: `${FINAL_TOPS} TOPS` },
+  { label: t.value.onboarding.testNpu, value: fmt(t.value.onboarding.resultComputeMetric, { n: FINAL_TOPS }) },
   { label: t.value.onboarding.testNetwork, value: `${FINAL_PING.sg}ms · ${t.value.onboarding.resultLatencyGood}` },
   { label: t.value.onboarding.testPower, value: fmt(t.value.onboarding.resultPowerReady, { n: FINAL_BATTERY }) },
 ]);
@@ -274,6 +278,11 @@ function activate() {
   }
   uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
 }
+function leaveConnect() {
+  if (calInterval) clearInterval(calInterval);
+  if (calTimeout) clearTimeout(calTimeout);
+  uni.reLaunch({ url: isRecal.value ? "/pages/me/devices" : "/pages/onboarding/estimator", fail: () => {} });
+}
 
 onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
@@ -296,7 +305,8 @@ onUnmounted(() => {
   background: var(--v5-bg);
   overflow-y: auto;
 }
-.cn-bars { display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+.cn-bars { min-height: 44px; display: flex; align-items: center; gap: 6px; margin-bottom: 20px; }
+.cn-back { width: 44px; height: 44px; margin-left: -12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 9999px; }
 .cn-bar { flex: 1; height: 4px; border-radius: 9999px; background: var(--v5-surface); overflow: hidden; }
 .cn-bar__fill { height: 100%; width: 0; background: var(--v5-brand); }
 .cn-bar__fill--full { width: 100%; }

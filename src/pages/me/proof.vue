@@ -191,6 +191,7 @@ import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
 import { buildShareLink } from "@/lib/share";
+import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
@@ -209,7 +210,7 @@ const variant = ref<Variant>("earnings");
 
 const earningsTotal = computed(() => app.earnings.total);
 const onlineDevices = computed(
-  () => app.visibleDevices.filter((d) => d.status === "online" && d.activatedAt !== null).length,
+  () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
 const profileName = computed(() => profile.displayName);
 const myRank = computed(() => vRank.myRank);

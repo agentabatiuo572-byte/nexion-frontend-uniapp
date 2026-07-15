@@ -1,14 +1,16 @@
 <!--
   Profile — ported from Nexion-prototype/app/(main)/me/profile/page.tsx.
-  Edit display name / bio / region / timezone (profile store) + avatar reroll,
-  tier progress bar, wallet-binding link, save bar (disabled until dirty).
+  Display name is picked from curated pool candidates via NicknameSheet
+  (free-text input + bio + region/timezone all removed 2026-07-15, content
+  governance — the page has zero manual input); avatar reroll, tier
+  progress bar, wallet-binding link, save bar (disabled until dirty).
 
   Wrapped in <AppChassis active="me">; SubPageHeader (back chevron) scrolls
   with content. The source MechAvatar is replaced with the initial-letter
   avatar used elsewhere in this me domain (profile-row.vue) — uni has no SVG
   avatar generator and the letter avatar is the established convention here.
-  <select> → uni <picker mode="selector"> (cross-end). The first-day quest
-  (markComplete) is omitted — no quest store is ported in this batch.
+  The first-day quest (markComplete) is omitted — no quest store is ported
+  in this batch.
 -->
 <template>
   <AppChassis active="me">
@@ -45,39 +47,13 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
             <text :style="fieldLabelStyle">{{ t.profile.displayName }}</text>
           </view>
-          <input class="w-full" :style="inputStyle" type="text" :value="name" :placeholder="t.profile.namePlaceholder" maxlength="32" @input="onName" />
+          <view class="flex items-center active:opacity-80" :style="nameRowStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameChange" @click="nicknameSheetOpen = true">
+            <text class="flex-1 truncate" :style="nameValueStyle">{{ name }}</text>
+            <text class="shrink-0" :style="nameChangeStyle">{{ t.profile.nicknameChange }}</text>
+          </view>
           <text class="block" :style="fieldHintStyle">{{ t.profile.displayNameHint }}</text>
         </view>
 
-        <view>
-          <text class="block" :style="fieldLabelStyle">{{ t.profile.bio }}</text>
-          <textarea class="w-full" :style="textareaStyle" :value="bio" :placeholder="t.profile.bioPlaceholder" :maxlength="140" auto-height @input="onBio" />
-          <view class="flex justify-between" style="margin-top: 4px">
-            <text :style="fieldHintStyle">{{ t.profile.bioHint }}</text>
-            <text class="font-mono-tabular" :style="fieldHintStyle">{{ bio.length }}/140</text>
-          </view>
-        </view>
-
-        <view class="grid" :style="{ gridTemplateColumns: '1fr 1fr', gap: '12px' }">
-          <view>
-            <view class="flex items-center" style="gap: 6px">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>
-              <text :style="fieldLabelStyle">{{ t.profile.region }}</text>
-            </view>
-            <picker mode="selector" :range="REGIONS" :value="regionIdx" @change="onRegion">
-              <text class="block" :style="pickerStyle">{{ region }}</text>
-            </picker>
-          </view>
-          <view>
-            <view class="flex items-center" style="gap: 6px">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-              <text :style="fieldLabelStyle">{{ t.profile.timezone }}</text>
-            </view>
-            <picker mode="selector" :range="TIMEZONES" :value="timezoneIdx" @change="onTimezone">
-              <text class="block truncate" :style="pickerStyle">{{ timezone }}</text>
-            </picker>
-          </view>
-        </view>
       </view>
 
       <!-- Tier — de-carded: section label + progress on the floor. -->
@@ -114,6 +90,8 @@
         </view>
         <text v-if="saveFeedback" class="block text-center" :style="saveFeedbackStyle">{{ saveFeedback }}</text>
       </view>
+
+      <NicknameSheet :open="nicknameSheetOpen" @close="nicknameSheetOpen = false" @pick="onNicknamePick" />
     </view>
   </AppChassis>
 </template>
@@ -121,6 +99,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import NicknameSheet from "@/components/me/nickname-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
@@ -129,25 +108,6 @@ import { useProfile } from "@/store/profile";
 import { useWalletPairing } from "@/store/wallet-pairing";
 import { toast } from "@/store/ui";
 
-const REGIONS = [
-  "Singapore",
-  "Hong Kong",
-  "Tokyo, JP",
-  "Seoul, KR",
-  "Berlin, DE",
-  "London, UK",
-  "Dubai, AE",
-  "New York, US",
-];
-const TIMEZONES = [
-  "Asia/Singapore (UTC+8)",
-  "Asia/Tokyo (UTC+9)",
-  "Asia/Hong_Kong (UTC+8)",
-  "Europe/Berlin (UTC+1)",
-  "Europe/London (UTC+0)",
-  "Asia/Dubai (UTC+4)",
-  "America/New_York (UTC-5)",
-];
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
 type Tier = (typeof TIERS)[number];
 
@@ -159,11 +119,9 @@ const pairing = useWalletPairing();
 
 // Local edit buffer (committed on Save), mirroring the source useState.
 const name = ref(profile.displayName);
-const bio = ref(profile.bio);
-const region = ref(profile.region);
-const timezone = ref(profile.timezone);
 const saveFeedback = ref("");
 const isSaving = ref(false);
+const nicknameSheetOpen = ref(false);
 
 const displayName = computed(() => profile.displayName);
 const email = computed(() => auth.email || app.user.email);
@@ -194,32 +152,11 @@ const joinedDate = computed(() =>
   }),
 );
 
-const regionIdx = computed(() => Math.max(0, REGIONS.indexOf(region.value)));
-const timezoneIdx = computed(() => Math.max(0, TIMEZONES.indexOf(timezone.value)));
+const dirty = computed(() => name.value !== profile.displayName);
 
-const dirty = computed(
-  () =>
-    name.value !== profile.displayName ||
-    bio.value !== profile.bio ||
-    region.value !== profile.region ||
-    timezone.value !== profile.timezone,
-);
-
-// uni input/picker event → e.detail.value (string for input, index for picker)
-function detailVal(e: Event): string {
-  return (e as unknown as { detail: { value: string } }).detail.value;
-}
-function onName(e: Event) {
-  name.value = detailVal(e);
-}
-function onBio(e: Event) {
-  bio.value = detailVal(e).slice(0, 140);
-}
-function onRegion(e: Event) {
-  region.value = REGIONS[Number(detailVal(e))] ?? region.value;
-}
-function onTimezone(e: Event) {
-  timezone.value = TIMEZONES[Number(detailVal(e))] ?? timezone.value;
+function onNicknamePick(v: string) {
+  name.value = v;
+  nicknameSheetOpen.value = false;
 }
 
 function handleSave() {
@@ -230,10 +167,7 @@ function handleSave() {
     return;
   }
   isSaving.value = true;
-  profile.setDisplayName(name.value.trim() || "Anonymous");
-  profile.setBio(bio.value.trim());
-  profile.setRegion(region.value);
-  profile.setTimezone(timezone.value);
+  profile.setDisplayName(name.value);
   saveFeedback.value = t.value.profile.savedToast;
   toast.success(t.value.profile.savedToast);
   setTimeout(() => {
@@ -317,38 +251,25 @@ const fieldLabelStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
-const inputStyle: CSSProperties = {
+// 昵称行:只读可点(唯一改名路径=候选 sheet),44pt tap target。
+const nameRowStyle: CSSProperties = {
   marginTop: "4px",
-  height: "38px",
+  minHeight: "44px",
   background: "var(--v5-surface-2)",
   borderRadius: "8px",
   padding: "0 12px",
+  gap: "10px",
+};
+const nameValueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "13.5px",
   color: "var(--v5-ink)",
 };
-const textareaStyle: CSSProperties = {
-  marginTop: "4px",
-  minHeight: "64px",
-  width: "100%",
-  background: "var(--v5-surface-2)",
-  borderRadius: "8px",
-  padding: "8px 12px",
+const nameChangeStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
-  color: "var(--v5-ink)",
-  boxSizing: "border-box",
-};
-const pickerStyle: CSSProperties = {
-  marginTop: "4px",
-  height: "38px",
-  lineHeight: "38px",
-  background: "var(--v5-surface-2)",
-  borderRadius: "8px",
-  padding: "0 10px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
-  color: "var(--v5-ink)",
+  fontSize: "11.5px",
+  fontWeight: 500,
+  color: "var(--v5-brand)",
 };
 const fieldHintStyle: CSSProperties = {
   marginTop: "4px",

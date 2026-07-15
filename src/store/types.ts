@@ -78,13 +78,18 @@ export interface Device {
   // number = epoch ms when user activated this device into one of the 6 slots.
   // Phone is auto-activated on signup; other devices start inactive and require user opt-in.
   activatedAt: number | null;
-  // SPEC-1 §4.2 登记锚点: epoch ms of the last earnings settlement. Set on
+  // PRD §6.11 登记锚点: epoch ms of the last earnings settlement. Set on
   // activation (= registration), advanced by app.ts settle() on each accrual.
   // Earnings accrue by wall-clock (now - lastSettledAt), NOT by accumulated tick
   // time — so a closed/backgrounded gap is settled in one shot on reopen (mock;
   // PROD: the server holds this anchor and settles on the foreground call).
   // null = not currently earning (inactive / frozen); re-anchored on resume.
   lastSettledAt?: number | null;
+  // SPEC-1 R7: last resident device-agent heartbeat. This drives the online
+  // factor tier; the shell used to view the account never does. PROD replaces
+  // the mock timestamp with the server-canonical conclusion produced from the
+  // candidate POST /api/device/:id/heartbeat contract (PRD §6.11/§12.2).
+  onlineHeartbeatAt?: number | null;
   // Sprint #146-1 supplement: when user requests "deactivate after current task
   // completes" (instead of forfeit-and-deactivate-now), this flag stays true
   // until tick() sees currentTask transition complete → triggers deactivation.

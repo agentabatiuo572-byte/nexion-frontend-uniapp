@@ -20,6 +20,7 @@ dist
 # tooling / temp artifacts
 .trash/
 .playwright-mcp/
+.playwright-cli/
 .claude/
 .vscode/*
 

@@ -155,8 +155,9 @@ function handleClaim(ev: EnrichedEvent) {
   const reward = rewardNexOf(ev);
   if (eventQuest.claim(ev.id)) {
     if (reward > 0) {
+      // MOCK-ONLY NON-ATOMIC: PROD event-claim endpoint TBD must claim, credit,
+      // and emit the matching bill in one idempotent transaction.
       app.creditNex(reward);
-      // Real backend: claim follows PRD §9.11e atomic pattern (credit + bill).
       bills.add({
         type: "achievement",
         symbol: "NEX",

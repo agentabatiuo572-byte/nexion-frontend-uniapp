@@ -1,18 +1,18 @@
-// Front-end carrier (shell) detection — single source for SPEC-1 载体分层.
+// Front-end carrier (shell) detection — device registration metadata and the
+// mock resident-heartbeat source.
 //
-// The signed APP runs resident (background mining → online 加成, full live
-// factors); H5 runs in a browser tab and mp-* are likewise non-resident →
-// 基础托管 baseline (H5_BASE_FACTOR). The carrier is fixed at build time via
-// uni-app conditional compilation, so this is a constant per build target.
+// SPEC-1 R7: carrier is not an earnings/display factor. The signed App may stamp
+// onlineHeartbeatAt; H5 never does. Both shells then read the same device online
+// state through isDeviceOnline().
 //
-// Drives `carrier` in lib/hashpower.ts and the carrier factor in earnings
-// settlement (store/app.ts). PROD keeps the same shape (server doesn't override
-// carrier — it's an intrinsic of the client build).
+// PROD keeps carrier only as intrinsic client metadata. The candidate contract
+// `POST /api/device/:id/heartbeat` (PRD §6.11/§12.2) produces the server-canonical
+// device state used by the online factor.
 
 export type Carrier = "app" | "h5";
 
 export function getCarrier(): Carrier {
-  let carrier: Carrier = "h5"; // default: non-resident tier (H5 / mp-*)
+  let carrier: Carrier = "h5"; // H5 / mp-* do not produce resident heartbeats
   // #ifdef APP-PLUS
   carrier = "app";
   // #endif

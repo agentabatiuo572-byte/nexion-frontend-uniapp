@@ -43,6 +43,7 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 - **i18n**：`src/i18n/messages/{en,zh}.ts` 镜像 key 树（94 namespace）；`use-t.ts` 的 `useT()` + `format.ts` 的 `fmt()`。**加 key 必两文件同序**；硬编码英文 = regression。
 - **路由**：`pages.json`（navigationStyle custom）+ `src/lib/route.ts` 把原型嵌套逻辑路径映射成 uni 扁平物理路由。导航一律走 `navTo()`，不直接 `navigateTo()`。
 - **外壳**：`components/app-chassis.vue`（路由感知 header + tabbar pill + nova 浮标 + 下拉刷新 + 进场动画）；`global-ui.vue`（toast/confirm/netError）。
+- **独立全屏页系统壳**：登录 / 注册 / onboarding 等不套 `AppChassis` 的页面必须用 `components/device/standalone-page-shell.vue`，统一提供顶部状态栏、底部 Home Indicator 和 `env(safe-area-inset-bottom) + 38px` 安全区；禁止各页自行猜系统留白。
 - **设计 token**：`src/styles/tokens.css`（108 个双主题 CSS 变量 `--v5-*`）。颜色用 token 不写 hex；亮底文字用 `--v5-on-brand`。
 - **行尾**：源文件 CRLF（Windows），verify/grep 正则用 `\r?`；`<text>` 必须裹在 `<view>` 内。
 

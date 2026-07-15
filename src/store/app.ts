@@ -6,7 +6,7 @@ import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, 
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
-import { continuityFactor, thermalFactor } from "@/lib/hashpower";
+import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { getCarrier, type Carrier } from "@/lib/carrier";
 import { GENESIS_INVITE_PATTERN } from "./genesis";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
@@ -34,7 +34,8 @@ import {
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
-// tick() with an SSE/WebSocket subscription to server-pushed per-device yield.
+// tick() with the candidate aggregate read + stream contract documented in PRD
+// §9.11c.1 (`GET /api/me/earnings?range=…` + SSE `/api/me/earnings/stream`).
 // SPEC-4: user/devices/earnings now persist through the account-cloud mock, so
 // the same accountKey can be rebound by H5 / signed app / white-app carriers.
 
@@ -176,25 +177,25 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
   };
 }
 
-/** SPEC-1 §4.2 — the single earnings-accrual path (settle-single-source).
+/** PRD §6.11 — the single earnings-accrual path (settle-single-source).
  *  Accrues a device by the WALL-CLOCK Δ since its `lastSettledAt` anchor (NOT by
  *  accumulated tick time), then re-anchors to `now`. Driving accrual off the
  *  registration anchor is what decouples earnings from the page being open: a
- *  BACKGROUNDED gap (the in-memory anchor survives onHide→onShow) is settled in one
- *  shot on the next settle(). The mock store is NOT persisted, so a full page reload
- *  resets state — true closed-tab catch-up is the PROD server's job (it holds
- *  lastSettledAt and settles on the foreground call).
- *  载体分层: phone App accrues continuity×thermal (online 加成); phone H5 = flat
- *  基础托管 (h5BaseFactor); non-phone = 1 — same carrier 口径 as lib/hashpower.ts
- *  (display uses the full live factor set; accrual uses this bounded subset). */
-function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: OnlineBonus): Device {
+ *  BACKGROUNDED gap is settled in one shot on the next settle(). The account-cloud
+ *  mock persists and reloads this anchor across refreshes; PROD makes the server
+ *  canonical for lastSettledAt and the resulting aggregate.
+ *  R7 在线分层: a phone with a fresh device heartbeat accrues continuity×thermal;
+ *  a missing/stale beat accrues the hosted baseline. The view carrier is never
+ *  a factor source (display uses the same isDeviceOnline seam). */
+function settleDevice(d: Device, now: number, onlineBonus: OnlineBonus): Device {
   // Not earning right now (idle / offline / cloud-share / phone gated) → drop a
   // stale anchor so the idle gap is never back-paid when the device resumes.
   if (
     d.activatedAt === null ||
     d.status !== "online" ||
     d.kind === "cloud-share" ||
-    d.pausedReason != null
+    d.pausedReason != null ||
+    (d.kind === "phone" && (d.isCharging === false || d.isWifiConnected === false))
   ) {
     return d.lastSettledAt == null ? d : { ...d, lastSettledAt: null };
   }
@@ -209,9 +210,9 @@ function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: Onl
   const lifeEff = isDegradable(d.kind) ? getEfficiency(getMonthsOwned(d.purchasedAt)) : 1;
   const phoneFactor =
     d.kind === "phone"
-      ? carrier === "h5"
-        ? onlineBonus.h5BaseFactor
-        : continuityFactor(now - (d.miningSince ?? now), onlineBonus.continuityFullHours * 60 * 60 * 1000) * thermalFactor(d.thermalState)
+      ? isDeviceOnline(d, now)
+        ? continuityFactor(now - (d.miningSince ?? now), onlineBonus.continuityFullHours * 60 * 60 * 1000) * thermalFactor(d.thermalState)
+        : onlineBonus.h5BaseFactor
       : 1;
   const inc = (d.baseRate * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
   const incNEX = (d.baseRateNEX * lifeEff * phoneFactor * marketMult * variation * deltaMs) / ONE_DAY;
@@ -224,6 +225,37 @@ function settleDevice(d: Device, carrier: Carrier, now: number, onlineBonus: Onl
     cumulativeEarningsUsdt: +((d.cumulativeEarningsUsdt ?? 0) + inc).toFixed(3),
     lastSettledAt: now,
   };
+}
+
+/** Pure R7 batch transition. Settlement deliberately reads the OLD heartbeat;
+ * only after that wall-clock delta is priced may the resident App stamp a new
+ * beat for the next tick. This prevents a killed App from reopening and
+ * back-paying the entire offline gap at the online rate. */
+export function settleDeviceBatch(
+  current: Device[],
+  carrier: Carrier,
+  now: number,
+  onlineBonus: OnlineBonus,
+  computeShareEnabled: boolean,
+): { settled: Device[]; nextDevices: Device[] } {
+  const settled = current.map((device) =>
+    device.kind === "pc-gpu" && !computeShareEnabled
+      ? freezeComputeShareDevice(device)
+      : settleDevice(device, now, onlineBonus),
+  );
+  const nextDevices = carrier === "app"
+    ? settled.map((device) =>
+        device.kind === "phone" &&
+        device.status === "online" &&
+        device.pausedReason == null &&
+        device.isCharging !== false &&
+        device.isWifiConnected !== false &&
+        device.activatedAt !== null
+          ? { ...device, onlineHeartbeatAt: now }
+          : device,
+      )
+    : settled;
+  return { settled, nextDevices };
 }
 
 function freezeComputeShareDevice(d: Device): Device {
@@ -400,7 +432,7 @@ export const useApp = defineStore("app", () => {
         next.vramUsed = +(d.vramTotal * (0.7 + Math.random() * 0.2)).toFixed(1);
       }
 
-      // Earnings accrual moved to settle() (SPEC-1 §4.2): yield is settled by
+      // Earnings accrual moved to settle() (PRD §6.11): yield is settled by
       // wall-clock Δ since lastSettledAt — not accumulated tick time — so a
       // closed/backgrounded gap catches up on reopen. Telemetry stays per-tick
       // here; settle() runs once below after this telemetry pass commits.
@@ -415,6 +447,8 @@ export const useApp = defineStore("app", () => {
           if (next.pendingDeactivate) {
             next.activatedAt = null;
             next.pendingDeactivate = false;
+            next.lastSettledAt = null;
+            next.onlineHeartbeatAt = null;
             next.gpuUsage = 0;
             next.gpuTemp = 0;
             next.gpuPower = 0;
@@ -439,12 +473,12 @@ export const useApp = defineStore("app", () => {
     settle();
   }
 
-  /** SPEC-1 §4.2 — settle every device by wall-clock Δ (settleDevice), then roll
+  /** PRD §6.11 — settle every device by wall-clock Δ (settleDevice), then roll
    *  the aggregate today/week/month/total + NEX balance forward by the positive
    *  delta. Called by tick() (steady state) and on app foreground (App.vue onShow)
    *  so a backgrounded / reopened session catches its offline gap up in one shot.
-   *  The SINGLE earnings-accrual path — PROD swaps it for the server's settle
-   *  endpoint (same lastSettledAt anchor), zero shape change. */
+   *  The SINGLE mock accrual path — PROD replaces it with the candidate aggregate
+   *  GET/SSE contract in PRD §9.11c.1; no settle mutation endpoint is frozen. */
   function settle() {
     if (miningPaused.value) return;
     const cfgStore = useConfig();
@@ -456,21 +490,29 @@ export const useApp = defineStore("app", () => {
     const onlineBonus = cfgStore.config.onlineBonus;
     // R5 簇状态实时性: 每轮结算现算当前簇,禁用注册时缓存的状态。
     const clusterEval = evaluateAccountCluster(accountKey.value);
-    // 结算前锚点快照(用于下方 attest 累计的墙钟差,避免复用会跳跃重锚的锚点重复计)。
-    const anchorBefore = new Map(devices.value.map((d) => [d.id, d.lastSettledAt ?? null]));
-    const settled = devices.value.map((d) =>
-      d.kind === "pc-gpu" && !computeShareEnabled.value
-        ? freezeComputeShareDevice(d)
-        : settleDevice(d, carrier, now, onlineBonus),
+    // R7: settle from the pre-existing heartbeat first, then stamp the App
+    // heartbeat for the next tick. Reversing these two steps overpays a stale
+    // offline gap after the App is reopened.
+    const sourceDevices = devices.value;
+    const anchorBefore = new Map(sourceDevices.map((d) => [d.id, d.lastSettledAt ?? null]));
+    const onlineBefore = new Map(sourceDevices.map((d) => [d.id, isDeviceOnline(d, now)]));
+    const { settled, nextDevices } = settleDeviceBatch(
+      sourceDevices,
+      carrier,
+      now,
+      onlineBonus,
+      computeShareEnabled.value,
     );
-    // App 载体 + 手机设备真在跑 → 累计「App 在线证明」(R1 attest 释放源)。
+    // Only a delta that was already backed by a fresh device heartbeat counts
+    // as App online attestation. A stale reopen tick is baseline and attests 0.
     // 用 settleDevice 实际推进的锚点差(after > before 才是真结算的墙钟那一拍),
     // 与收益累计同源;首次登记(before=null)/未达结算间隔(锚点未动)都不计,
     // 修 audit U1「复用外层旧锚点每 tick 重算全量差 → 系统性多计 ~1.5x」。
-    // R7 落地后此处信号源换成设备真在线心跳。
+    // R7: onlineBefore is the device-heartbeat signal; carrier only proves this
+    // mock tick originated from the resident App.
     if (carrier === "app") {
       for (const d of settled) {
-        if (d.kind !== "phone" || d.pausedReason != null) continue;
+        if (d.kind !== "phone" || d.pausedReason != null || !onlineBefore.get(d.id)) continue;
         const before = anchorBefore.get(d.id) ?? null;
         const after = d.lastSettledAt ?? null;
         if (before != null && after != null && after > before) {
@@ -489,7 +531,7 @@ export const useApp = defineStore("app", () => {
     const nextTodayUSD = +(earnings.value.today + positiveUsdDelta).toFixed(2);
     const nextTodayNEX = +(earnings.value.todayNEX + positiveNexDelta).toFixed(2);
 
-    devices.value = settled;
+    devices.value = nextDevices;
     earnings.value = {
       ...earnings.value,
       today: nextTodayUSD,
@@ -557,23 +599,35 @@ export const useApp = defineStore("app", () => {
   // ⚠️ MOCK-ONLY demo helper (ported from index.ts setPhoneRuntime). Lets the
   // device card toggle isCharging / isWifiConnected / batteryLevel on a phone so
   // reviewers can simulate unplugging / losing network and watch the gating fire.
-  // Real backend pulls these from the device-agent heartbeat — client must NOT
-  // mutate. Only patches phone-kind devices.
+  // Real backend pulls these from candidate POST /api/device/:id/heartbeat
+  // (PRD §6.11/§12.2) — client must NOT mutate. Only patches phone-kind devices.
   function setPhoneRuntime(
     id: string,
     patch: Partial<Pick<Device, "isCharging" | "isWifiConnected" | "batteryLevel">>,
   ) {
-    devices.value = devices.value.map((d) =>
-      d.id === id && d.kind === "phone" ? { ...d, ...patch } : d,
-    );
+    devices.value = devices.value.map((d) => {
+      if (d.id !== id || d.kind !== "phone") return d;
+      const next = { ...d, ...patch };
+      const pausedReason: Device["pausedReason"] =
+        next.isCharging === false ? "no-charger" : next.isWifiConnected === false ? "no-network" : null;
+      return pausedReason == null
+        ? { ...next, pausedReason }
+        : {
+            ...next,
+            pausedReason,
+            miningSince: null,
+            lastSettledAt: null,
+            onlineHeartbeatAt: null,
+          };
+    });
     persistAccountSnapshot();
   }
 
   // Apply a calibration result to the phone device: refreshes its yield baseline
   // + displayed NPU spec from the (deterministic, per-device) capability, and
   // starts a fresh continuity run. Called by the onboarding/recalibration ritual
-  // after measureDeviceCapability(). PROD: server returns the device's tier on
-  // POST /api/auth/signin; client applies the same shape.
+  // after measureDeviceCapability(). PROD: GET /api/onboarding/calibrate/result
+  // returns score/tier/yield baseline; the client applies that result here.
   function applyPhoneCalibration(cap: DeviceCapability) {
     devices.value = devices.value.map((d) =>
       d.kind === "phone"
@@ -586,6 +640,7 @@ export const useApp = defineStore("app", () => {
             capabilityTops: cap.tops,
             capabilityTier: cap.tier,
             miningSince: Date.now(),
+            onlineHeartbeatAt: null,
           }
         : d,
     );
@@ -601,7 +656,7 @@ export const useApp = defineStore("app", () => {
     miningPaused.value = true;
     devices.value = devices.value.map((d) =>
       d.activatedAt !== null
-        ? { ...d, currentTask: null, interruptedAt: null, miningSince: null, lastSettledAt: null }
+        ? { ...d, currentTask: null, interruptedAt: null, miningSince: null, lastSettledAt: null, onlineHeartbeatAt: null }
         : d,
     );
     persistAccountSnapshot();
@@ -666,7 +721,9 @@ export const useApp = defineStore("app", () => {
     if (device.kind === "pc-gpu" && !computeShareEnabled.value) return false;
     if (activeSlotCount.value + reservedSlots >= MAX_DEVICES) return false;
     devices.value = devices.value.map((d) =>
-      d.id === id ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), pendingDeactivate: false } : d,
+      d.id === id
+        ? { ...d, activatedAt: Date.now(), lastSettledAt: Date.now(), onlineHeartbeatAt: null, pendingDeactivate: false }
+        : d,
     );
     persistAccountSnapshot();
     return true;
@@ -682,6 +739,8 @@ export const useApp = defineStore("app", () => {
             ...d,
             activatedAt: null,
             pendingDeactivate: false,
+            lastSettledAt: null,
+            onlineHeartbeatAt: null,
             gpuUsage: 0,
             gpuTemp: 0,
             gpuPower: 0,
@@ -707,6 +766,8 @@ export const useApp = defineStore("app", () => {
               ...d,
               activatedAt: null,
               pendingDeactivate: false,
+              lastSettledAt: null,
+              onlineHeartbeatAt: null,
               gpuUsage: 0,
               gpuTemp: 0,
               gpuPower: 0,

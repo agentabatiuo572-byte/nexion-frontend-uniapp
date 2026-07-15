@@ -11,6 +11,22 @@ const referralCode = "NEXION-AB12";
 const locale = process.argv[2] === "zh" || (process.argv[2] !== "en" && process.env.AUTH02_LOCALE === "zh") ? "zh" : "en";
 const registeredTitle = locale === "zh" ? "该手机号已注册" : "This number is already registered";
 const registeredBody = locale === "zh" ? "验证通过,正在登录…" : "Verification complete. Signing you in…";
+const successDownloadHint = locale === "zh"
+  ? "浏览器版可通过 Nexion 官网下载 APP"
+  : "Download the APP from Nexion's website in your browser";
+const successDownloadPending = locale === "zh"
+  ? "官网下载 APP 地址暂未开放"
+  : "APP download link unavailable";
+const successDownloadLink = locale === "zh"
+  ? "前往官网下载 APP"
+  : "Download the APP from Nexion";
+const successTitle = locale === "zh" ? "注册成功" : "You're in";
+const successSub = locale === "zh" ? "欢迎加入 Nexion" : "Welcome to Nexion";
+const successTeamPrefix = locale === "zh" ? "欢迎加入 Nexion," : "Welcome to Nexion — you joined ";
+const successBenefits = locale === "zh"
+  ? ["APP 在线时长可加速礼包与收益解锁", "设备收益实时推送,睡醒先看进账", "更稳的连接与算力调度"]
+  : ["APP online hours speed up gift & yield release", "Real-time yield alerts — wake up to earnings", "Steadier connection & compute scheduling"];
+const successContinue = locale === "zh" ? "继续" : "Continue";
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -121,6 +137,243 @@ async function snapshot(frame, expectedPhone = fullPhone, expectedAccount = acco
       },
     };
   }, { expectedPhone, expectedAccount });
+}
+
+async function assertRegistrationSuccessUi(frame, expectGift, expectRouteEntryFocus = false) {
+  await frame.locator(".rs-badge").waitFor({ state: "visible" });
+  const themeStyles = await frame.evaluate(() => {
+    const html = document.documentElement;
+    const originalTheme = html.getAttribute("data-theme");
+    const rgba = (value) => {
+      const channels = (value.match(/[\d.]+/g) || []).map(Number);
+      if (value.startsWith("color(srgb")) return [channels[0] * 255, channels[1] * 255, channels[2] * 255, channels[3] ?? 1];
+      return [channels[0], channels[1], channels[2], channels[3] ?? 1];
+    };
+    const composite = (foreground, background) => [
+      foreground[0] * foreground[3] + background[0] * (1 - foreground[3]),
+      foreground[1] * foreground[3] + background[1] * (1 - foreground[3]),
+      foreground[2] * foreground[3] + background[2] * (1 - foreground[3]),
+      1,
+    ];
+    const luminance = (color) => {
+      const [r, g, b] = color.slice(0, 3).map((channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (foregroundValue, backgroundValue, underlayValue = backgroundValue) => {
+      const underlay = rgba(underlayValue);
+      const background = composite(rgba(backgroundValue), underlay);
+      const foreground = composite(rgba(foregroundValue), background);
+      const [light, dark] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+      return (light + 0.05) / (dark + 0.05);
+    };
+    const rows = [];
+    for (const theme of ["light", "dark"]) {
+      html.setAttribute("data-theme", theme);
+      const root = getComputedStyle(document.querySelector(".rs-root"));
+      const title = getComputedStyle(document.querySelector(".rs-title"));
+      const sub = getComputedStyle(document.querySelector(".rs-sub"));
+      const benefits = getComputedStyle(document.querySelector(".rs-why"));
+      const pending = getComputedStyle(document.querySelector(".rs-h5-download__action--disabled"));
+      const chip = document.querySelector(".rs-chip");
+      const chipText = document.querySelector(".rs-chip__t");
+      const gift = document.querySelector(".rs-gift");
+      const originalChipClass = chip?.getAttribute("class") || "";
+      const originalTextClass = chipText?.getAttribute("class") || "";
+      const sampleChip = (variant) => {
+        if (!chip || !chipText || !gift) return null;
+        chip.classList.remove("rs-chip--ok", "rs-chip--pd");
+        chip.classList.add(variant === "posted" ? "rs-chip--ok" : "rs-chip--pd");
+        chipText.classList.remove("rs-chip__t--ok", "rs-chip__t--pd");
+        chipText.classList.add(variant === "posted" ? "rs-chip__t--ok" : "rs-chip__t--pd");
+        return contrast(getComputedStyle(chipText).color, getComputedStyle(chip).backgroundColor, getComputedStyle(gift).backgroundColor);
+      };
+      const postedChipContrast = sampleChip("posted");
+      const pendingChipContrast = sampleChip("pending");
+      if (chip) chip.setAttribute("class", originalChipClass);
+      if (chipText) chipText.setAttribute("class", originalTextClass);
+      rows.push({
+        theme,
+        titleContrast: contrast(title.color, root.backgroundColor),
+        subContrast: contrast(sub.color, root.backgroundColor),
+        rootBackground: root.backgroundColor,
+        benefitBackground: benefits.backgroundColor,
+        pendingBackground: pending.backgroundColor,
+        postedChipContrast,
+        pendingChipContrast,
+      });
+    }
+    if (originalTheme) html.setAttribute("data-theme", originalTheme);
+    else html.removeAttribute("data-theme");
+    return rows;
+  });
+  for (const row of themeStyles) {
+    assert(row.titleContrast >= 4.5, `${row.theme} success title contrast=${row.titleContrast}`);
+    assert(row.subContrast >= 4.5, `${row.theme} success subtitle contrast=${row.subContrast}`);
+    assert(row.benefitBackground !== row.rootBackground, `${row.theme} benefit card lost its surface layer`);
+    assert(row.pendingBackground !== row.rootBackground, `${row.theme} disabled download placeholder lost its surface layer`);
+    if (row.postedChipContrast !== null) assert(row.postedChipContrast >= 4.5, `${row.theme} posted-gift chip contrast=${row.postedChipContrast}`);
+    if (row.pendingChipContrast !== null) assert(row.pendingChipContrast >= 4.5, `${row.theme} pending-gift chip contrast=${row.pendingChipContrast}`);
+  }
+  const metrics = await frame.evaluate(() => {
+    const rect = (selector) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`missing ${selector}`);
+      const bounds = element.getBoundingClientRect();
+      return { top: bounds.top, right: bounds.right, bottom: bounds.bottom, left: bounds.left, height: bounds.height };
+    };
+    const placeholder = document.querySelector(".rs-h5-download__action--disabled");
+    const criticalStyles = [".rs-root", ".rs-content", ".rs-h5-download", ".rs-footer", ".rs-continue"].map((selector) => {
+      const style = getComputedStyle(document.querySelector(selector));
+      return {
+        selector,
+        display: style.display,
+        visibility: style.visibility,
+        opacity: Number(style.opacity),
+        pointerEvents: style.pointerEvents,
+      };
+    });
+    return {
+      viewportHeight: innerHeight,
+      badge: rect(".rs-badge"),
+      benefits: rect(".rs-why"),
+      prompt: rect(".rs-h5-download"),
+      continueCta: rect(".rs-continue"),
+      benefitRows: document.querySelectorAll(".rs-why__r").length,
+      giftCount: document.querySelectorAll(".rs-gift").length,
+      body: document.body.innerText,
+      badgeHasCheck: !!document.querySelector(".rs-badge__in svg path"),
+      title: document.querySelector(".rs-title")?.textContent?.trim() || "",
+      titleRole: document.querySelector(".rs-title")?.getAttribute("role"),
+      titleLevel: document.querySelector(".rs-title")?.getAttribute("aria-level"),
+      titleFocused: document.activeElement?.classList.contains("rs-title") === true,
+      sub: document.querySelector(".rs-sub")?.textContent?.trim() || "",
+      benefitsText: [...document.querySelectorAll(".rs-why__t")].map((element) => element.textContent?.trim() || ""),
+      continueText: document.querySelector(".rs-continue")?.textContent?.trim() || "",
+      visibleDecorativeSvgs: [...document.querySelectorAll("svg")].filter((element) => element.getAttribute("aria-hidden") !== "true" || element.getAttribute("focusable") !== "false").length,
+      criticalStyles,
+      placeholder: placeholder && {
+        role: placeholder.getAttribute("role"),
+        ariaDisabled: placeholder.getAttribute("aria-disabled"),
+        href: placeholder.getAttribute("href"),
+      },
+    };
+  });
+
+  const visualCenter = (metrics.badge.top + metrics.benefits.bottom) / 2;
+  assert(
+    Math.abs(visualCenter - metrics.viewportHeight / 2) <= metrics.viewportHeight * 0.10,
+    `success content is not vertically centered: ${visualCenter}/${metrics.viewportHeight / 2}`,
+  );
+  const bottomGap = metrics.viewportHeight - metrics.continueCta.bottom;
+  assert(bottomGap >= 22 && bottomGap <= 48, `success continue CTA bottom gap=${bottomGap}`);
+  assert(metrics.benefitRows === 3, "success benefit rows are not exactly three");
+  assert(metrics.giftCount === (expectGift ? 1 : 0), `success gift-state mismatch: ${metrics.giftCount}/${expectGift}`);
+  assert(metrics.badgeHasCheck, "success badge lost its check icon");
+  assert(metrics.title === successTitle && metrics.titleRole === "heading" && metrics.titleLevel === "1", "success heading semantics or copy drifted");
+  if (expectRouteEntryFocus) assert(metrics.titleFocused, "success heading did not receive route-entry focus");
+  assert(metrics.visibleDecorativeSvgs === 0, "success page exposed decorative SVGs to assistive technology");
+  assert(
+    expectGift ? metrics.sub.startsWith(successTeamPrefix) && metrics.sub.length > successTeamPrefix.length : metrics.sub === successSub,
+    `success subtitle copy drifted: ${metrics.sub}`,
+  );
+  assert(JSON.stringify(metrics.benefitsText) === JSON.stringify(successBenefits), `success benefit copy drifted: ${JSON.stringify(metrics.benefitsText)}`);
+  assert(metrics.continueText === successContinue, "success Continue copy drifted");
+  for (const style of metrics.criticalStyles) {
+    assert(style.display !== "none" && style.visibility !== "hidden" && style.opacity > 0, `success critical block is visually hidden: ${JSON.stringify(style)}`);
+    if (style.selector === ".rs-continue") assert(style.pointerEvents !== "none", "success Continue CTA ignores pointer input");
+  }
+  assert(metrics.benefits.bottom <= metrics.prompt.top, "success content overlaps the H5 download prompt");
+  assert(metrics.prompt.bottom <= metrics.continueCta.top, "H5 download prompt overlaps the continue CTA");
+  if (metrics.viewportHeight > 720) assert(metrics.body.includes(successDownloadHint), "H5 official-download hint is missing");
+  assert(metrics.body.includes(successDownloadPending), "blank official URL does not expose an unavailable reason");
+  assert(!/APP 即将上线|APP launching soon/.test(metrics.body), "obsolete coming-soon copy remains");
+  assert(
+    metrics.placeholder?.role === "status" && metrics.placeholder.ariaDisabled === "true" && !metrics.placeholder.href,
+    `blank official URL rendered a dead link: ${JSON.stringify(metrics.placeholder)}`,
+  );
+
+  const officialUrl = "https://download.example.invalid/nexion";
+  for (const invalidUrl of ["http://download.example.invalid/nexion", "javascript:alert(1)", "not-a-url"]) {
+    await frame.evaluate(async (url) => {
+      const { useConfig } = await import("/src/store/config.ts");
+      useConfig().config.share.appDownload.officialUrl = url;
+    }, invalidUrl);
+    await frame.locator(".rs-h5-download__action--disabled").waitFor({ state: "visible" });
+    assert(await frame.locator(".rs-h5-download__action:not(.rs-h5-download__action--disabled)").count() === 0, `unsafe official URL became clickable: ${invalidUrl}`);
+  }
+  await page.context().route(officialUrl, (route) => route.fulfill({
+    status: 200,
+    contentType: "text/html",
+    body: "<!doctype html><title>Nexion download</title><p>official download test</p>",
+  }));
+  await frame.evaluate(async (url) => {
+    const { useConfig } = await import("/src/store/config.ts");
+    useConfig().config.share.appDownload.officialUrl = url;
+  }, officialUrl);
+  const officialLink = frame.locator(".rs-h5-download__action:not(.rs-h5-download__action--disabled)");
+  await officialLink.waitFor({ state: "visible" });
+  assert((await officialLink.innerText()).includes(successDownloadLink), "configured official-download link has the wrong label");
+  const linkA11y = await officialLink.evaluate((element) => ({
+    role: element.getAttribute("role"),
+    tabindex: element.getAttribute("tabindex"),
+  }));
+  assert(linkA11y.role === "link" && linkA11y.tabindex === "0", "official-download link is not keyboard reachable");
+  async function assertOfficialActivation(label, activate) {
+    const mainUrlBeforeDownload = page.url();
+    const popupPromise = page.context().waitForEvent("page");
+    await activate();
+    const popup = await popupPromise;
+    await popup.waitForLoadState("domcontentloaded");
+    assert(popup.url() === officialUrl, `${label} opened the wrong official page: ${popup.url()}`);
+    assert(await popup.evaluate(() => window.opener === null), `${label} retained a window.opener handle`);
+    assert(page.url() === mainUrlBeforeDownload, `${label} also navigated the registration page`);
+    await popup.close();
+  }
+  await assertOfficialActivation("official download click", () => officialLink.click());
+  await officialLink.focus();
+  await assertOfficialActivation("official download Enter", () => officialLink.press("Enter"));
+  await assertOfficialActivation("official download Space", () => officialLink.press("Space"));
+  await page.context().unroute(officialUrl);
+  await frame.evaluate(async () => {
+    const { useConfig } = await import("/src/store/config.ts");
+    useConfig().config.share.appDownload.officialUrl = "";
+  });
+  await frame.locator(".rs-h5-download__action--disabled").waitFor({ state: "visible" });
+
+  await frame.evaluate(() => {
+    window.__successOriginalReLaunch = uni.reLaunch;
+    window.__successReLaunchUrl = "";
+    uni.reLaunch = (options) => {
+      window.__successReLaunchUrl = options?.url || "";
+    };
+  });
+  const continueCta = frame.locator(".rs-continue");
+  await continueCta.click();
+  assert(
+    await frame.evaluate(() => window.__successReLaunchUrl) === "/pages/onboarding/estimator",
+    "success continue click did not enter onboarding",
+  );
+  await frame.evaluate(() => { window.__successReLaunchUrl = ""; });
+  await continueCta.focus();
+  await continueCta.press("Enter");
+  assert(
+    await frame.evaluate(() => window.__successReLaunchUrl) === "/pages/onboarding/estimator",
+    "success continue Enter key did not enter onboarding",
+  );
+  await frame.evaluate(() => { window.__successReLaunchUrl = ""; });
+  await continueCta.press("Space");
+  assert(
+    await frame.evaluate(() => window.__successReLaunchUrl) === "/pages/onboarding/estimator",
+    "success continue Space key did not enter onboarding",
+  );
+  await frame.evaluate(() => {
+    uni.reLaunch = window.__successOriginalReLaunch;
+    delete window.__successOriginalReLaunch;
+    delete window.__successReLaunchUrl;
+  });
 }
 
 async function assertAuthDirectorySchemaBarrier(frame) {
@@ -341,6 +594,7 @@ try {
   await frame.locator(".rg-cta").click();
   await waitUntil(() => Promise.resolve(page.url().includes("#/pages/register/success")), "new-number registration did not reach success page");
   frame = await resolveAppFrame(".rs-root");
+  await assertRegistrationSuccessUi(frame, true, true);
   const afterCreate = await snapshot(frame);
   assert(afterCreate.accountsForPhone.length === 1 && afterCreate.accountCount === 1, "new registration did not create exactly one account");
   assert(afterCreate.riskCount === 1, "new registration did not create exactly one risk record");
@@ -348,6 +602,39 @@ try {
   assert(afterCreate.giftClaimed && afterCreate.giftMirror, "welcome gift was not safely bound to this account");
   assert(afterCreate.auth.isAuthenticated && afterCreate.auth.accountId === accountId, "new registration did not establish the expected session");
   assert(!afterCreate.auth.onboardingComplete, "new registration skipped onboarding");
+
+  // 真实礼包态也必须在紧凑 iPhone 视口首屏落到 Home Indicator 安全线上方；
+  // 不能靠脚本先滚到底再把贴底错位洗成绿灯。
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto(
+    `${baseUrl}/?nx_device=off&nx_device_inner=1&auth02=${runId}-gift-compact#/pages/register/success`,
+    { waitUntil: "domcontentloaded" },
+  );
+  frame = await resolveAppFrame(".rs-root");
+  await frame.locator(".rs-gift").waitFor({ state: "visible" });
+  const compactGiftGeometry = await frame.evaluate(() => {
+    const cta = document.querySelector(".rs-cta")?.getBoundingClientRect();
+    const home = document.querySelector(".nx-home-indicator")?.getBoundingClientRect();
+    const prompt = document.querySelector(".rs-h5-download")?.getBoundingClientRect();
+    const root = document.querySelector(".rs-root");
+    return cta && home && prompt && root ? {
+      ctaTop: cta.top,
+      ctaBottom: cta.bottom,
+      promptBottom: prompt.bottom,
+      homeTop: home.top,
+      scrollTop: root.scrollTop,
+    } : null;
+  });
+  assert(compactGiftGeometry?.scrollTop === 0, `compact gift success was pre-scrolled: ${JSON.stringify(compactGiftGeometry)}`);
+  assert(
+    compactGiftGeometry && compactGiftGeometry.ctaBottom <= compactGiftGeometry.homeTop - 16,
+    `compact gift CTA enters Home Indicator reserve: ${JSON.stringify(compactGiftGeometry)}`,
+  );
+  assert(
+    compactGiftGeometry && compactGiftGeometry.promptBottom <= compactGiftGeometry.ctaTop - 12,
+    `compact gift prompt overlaps CTA: ${JSON.stringify(compactGiftGeometry)}`,
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // 将该账号完成 onboarding 后按真实登出链退出，证明回访入口恢复的是同一账号而非
   // 再走注册副作用。
@@ -526,6 +813,22 @@ try {
   assert(await frame.locator(".rg-step3").count() === 0, "stale OTP response entered the password step");
   const staleAccount = await frame.evaluate((phone) => window.__nexionAuthDev.inspect(phone), stalePhone);
   assert(staleAccount.account?.ok && staleAccount.account.account === null, "stale OTP response created an account");
+
+  // 截图对应的无礼包直达态也必须保持主体居中、H5 提醒完整、Continue 贴底。
+  await page.goto(`${baseUrl}/?nx_device=off&auth02=${runId}-success-no-gift-clear`, { waitUntil: "domcontentloaded" });
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(
+    `${baseUrl}/?nx_device=off&auth02=${runId}-success-no-gift#/pages/register/success`,
+    { waitUntil: "domcontentloaded" },
+  );
+  frame = await resolveAppFrame(".rs-root");
+  await frame.evaluate(async (nextLocale) => {
+    const { useLocaleStore } = await import("/src/store/locale.ts");
+    useLocaleStore().setLocale(nextLocale);
+  }, locale);
+  await assertRegistrationSuccessUi(frame, false, true);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await assertRegistrationSuccessUi(frame, false);
 
   assert(errors.length === 0, `browser console/page errors: ${errors.join(" | ")}`);
   console.log(`FEAT-AUTH02 runtime PASS (${locale}): new registration + readable existing-number handoff + no duplicate side effects`);

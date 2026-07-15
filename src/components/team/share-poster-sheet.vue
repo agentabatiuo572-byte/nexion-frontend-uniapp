@@ -381,7 +381,8 @@ function paint(link: string, myToken: number) {
   if (showUsername.value && profile.displayName) {
     ctx.setFillStyle(INK_ON_DARK);
     ctx.setFontSize(12);
-    const name = profile.displayName.length > 12 ? `${profile.displayName.slice(0, 12)}…` : profile.displayName;
+    // 18 = 词库昵称最长组合("Quantum Circuit 99");QR 前可用宽 ~250px,12 号字放得下,仅防异常超长。
+    const name = profile.displayName.length > 18 ? `${profile.displayName.slice(0, 18)}…` : profile.displayName;
     ctx.fillText(name, 20, footY + 18);
   }
   ctx.setFillStyle(BRAND_ON_DARK);

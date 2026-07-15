@@ -8,10 +8,10 @@
   pops real history, else reLaunch→intro on cold load).
 -->
 <template>
-  <view class="tos-root">
+  <StandalonePageShell class="tos-root" :reserve-bottom="false">
     <!-- Sticky back header + brand -->
     <view class="tos-top">
-      <view class="tos-back active:opacity-60" @click="goBack">
+      <view class="tos-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="goBack" @keydown.enter="goBack" @keydown.space.prevent="goBack">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
       </view>
       <view class="tos-brand">
@@ -41,7 +41,7 @@
       </view>
 
       <!-- Risk disclosure cross-link -->
-      <view class="tos-risk active:opacity-80" @click="goRisk">
+      <view class="tos-risk active:opacity-80" role="link" tabindex="0" @click="goRisk" @keydown.enter="goRisk" @keydown.space.prevent="goRisk">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text class="tos-risk__t">{{ t.terms.riskLink }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -51,15 +51,16 @@
       <text class="tos-footer">{{ t.terms.footer }}</text>
 
       <!-- Acknowledge & return -->
-      <view class="tos-cta active:opacity-90 active:scale-[0.98]" @click="goBack">
+      <view class="tos-cta active:opacity-90 active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goBack" @keydown.enter="goBack" @keydown.space.prevent="goBack">
         <text class="tos-cta__t">{{ t.terms.gotIt }}</text>
       </view>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
 
@@ -112,7 +113,7 @@ function goRisk() {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+  padding: 10px 16px;
   background: color-mix(in srgb, var(--v5-bg) 86%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--v5-border);

@@ -94,6 +94,7 @@ import ThemePickerSheet from "@/components/me/theme-picker-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { isDeviceOnline } from "@/lib/hashpower";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
@@ -211,8 +212,11 @@ const activeCount = computed(() => app.activeSlotCount);
 const trialSlot = computed(() => (trialReservesSlotNow() ? 1 : 0));
 const slotsUsed = computed(() => activeCount.value + trialSlot.value);
 const emptySlots = computed(() => MAX_DEVICES - slotsUsed.value);
+const onlineCount = computed(
+  () => app.visibleDevices.filter((device) => device.activatedAt !== null && isDeviceOnline(device, Date.now())).length + trialSlot.value,
+);
 const deviceSectionCount = computed(() => fmt(t.value.myDevices.sectionCount, { n: slotsUsed.value, total: MAX_DEVICES }));
-const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: slotsUsed.value }));
+const onlineLabel = computed(() => fmt(t.value.myDevices.onlineLabel, { n: onlineCount.value }));
 const emptySlotsLabel = computed(() => fmt(t.value.myDevices.emptySlots, { n: emptySlots.value }));
 const deviceOrdersMeta = computed(() => fmt(t.value.me.deviceOrdersMeta, { n: orderCount.value }));
 const rankValue = computed(() => `V${vrank.myRank}`);

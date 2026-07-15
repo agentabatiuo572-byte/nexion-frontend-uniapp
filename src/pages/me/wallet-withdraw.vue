@@ -278,7 +278,7 @@ const pairedNetwork = computed(() => pairing.pairedNetwork);
 
 const devMode = ref(false);
 onLoad((options) => {
-  devMode.value = options?.dev === "1";
+  devMode.value = import.meta.env.DEV && options?.dev === "1";
 });
 
 const amount = ref("");

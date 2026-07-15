@@ -2,16 +2,15 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { defaultNickname } from "@/lib/nickname";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexion-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
 const ACCOUNTS_KEY = "nexion-profile-accounts-v1"; // { [accountKey]: Persisted }
 
+// region/timezone 不再持久:2026-07-15 起由设备派生(lib/device-region.ts),资料页只读展示。
 interface Persisted {
   displayName: string;
-  bio: string;
-  region: string;
-  timezone: string;
   avatarSeed: string;
 }
 
@@ -22,11 +21,9 @@ function defaultSeed(): string {
 function hydrate(accountKey: string): Persisted {
   const row = readAccountRow<Persisted>(ACCOUNTS_KEY, accountKey);
   if (row && row.displayName) return row;
+  // 默认昵称按账号 key 确定性派生(词库构造,2026-07-15 昵称治理:无自由文本)。
   return {
-    displayName: "Alex T.",
-    bio: "Running an AI-friendly node from my phone. Always up for swapping notes on yield strategies.",
-    region: "Singapore",
-    timezone: "Asia/Singapore (UTC+8)",
+    displayName: defaultNickname(accountKey),
     avatarSeed: "alex-seed",
   };
 }
@@ -36,17 +33,11 @@ export const useProfile = defineStore("profile", () => {
   let boundKey = "default";
   const init = hydrate(boundKey);
   const displayName = ref(init.displayName);
-  const bio = ref(init.bio);
-  const region = ref(init.region);
-  const timezone = ref(init.timezone);
   const avatarSeed = ref(init.avatarSeed);
 
   function persist() {
     writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
       displayName: displayName.value,
-      bio: bio.value,
-      region: region.value,
-      timezone: timezone.value,
       avatarSeed: avatarSeed.value,
     });
   }
@@ -56,17 +47,11 @@ export const useProfile = defineStore("profile", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     const next = hydrate(boundKey);
     displayName.value = next.displayName;
-    bio.value = next.bio;
-    region.value = next.region;
-    timezone.value = next.timezone;
     avatarSeed.value = next.avatarSeed;
   }
 
   function setDisplayName(v: string) { displayName.value = v; persist(); }
-  function setBio(v: string) { bio.value = v; persist(); }
-  function setRegion(v: string) { region.value = v; persist(); }
-  function setTimezone(v: string) { timezone.value = v; persist(); }
   function regenerateAvatar() { avatarSeed.value = defaultSeed(); persist(); }
 
-  return { displayName, bio, region, timezone, avatarSeed, setDisplayName, setBio, setRegion, setTimezone, regenerateAvatar, bindAccount };
+  return { displayName, avatarSeed, setDisplayName, regenerateAvatar, bindAccount };
 });

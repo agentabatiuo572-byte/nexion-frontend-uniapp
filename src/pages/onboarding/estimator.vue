@@ -1,7 +1,10 @@
 <template>
-  <view class="est-root">
+  <StandalonePageShell class="est-root" :top-inset="24">
     <!-- Progress -->
     <view class="est-bars">
+      <view class="est-back active:opacity-60" role="button" tabindex="0" :aria-label="t.login.back" @click="leaveEstimator" @keydown.enter="leaveEstimator" @keydown.space.prevent="leaveEstimator">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
+      </view>
       <view class="est-bar"><view class="est-bar__fill est-bar__fill--full" /></view>
       <view class="est-bar"><view class="est-bar__fill est-bar__fill--full" /></view>
       <view class="est-bar"><view class="est-bar__fill" /></view>
@@ -25,7 +28,7 @@
         <view v-else key="reveal" class="est-phone anim-up">
           <view class="est-phone__pill">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text class="est-phone__pill-t">Detected</text>
+            <text class="est-phone__pill-t">{{ t.onboarding.detected }}</text>
           </view>
           <view class="est-phone__icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -38,7 +41,7 @@
           </view>
           <view class="est-phone__rate">
             <text class="est-phone__rate-v">~$0.06</text>
-            <text class="est-phone__rate-u">/day</text>
+            <text class="est-phone__rate-u">{{ t.onboarding.perDay }}</text>
           </view>
         </view>
       </transition>
@@ -55,7 +58,7 @@
           <text class="cmp__label">{{ t.onboarding.withS1 }}</text>
           <text class="cmp__sub">{{ multS1 }}× {{ t.onboarding.yourCurrentRate }}</text>
         </view>
-        <text class="cmp__val">${{ s1.toFixed(2) }}/day</text>
+        <text class="cmp__val">${{ s1.toFixed(2) }}{{ t.onboarding.perDay }}</text>
       </view>
       <view class="cmp">
         <view class="cmp__icon">
@@ -63,24 +66,25 @@
         </view>
         <view class="cmp__body">
           <text class="cmp__label">{{ t.onboarding.withPro }}</text>
-          <text class="cmp__sub">~${{ (pro * 30).toFixed(0) }}/mo</text>
+          <text class="cmp__sub">~${{ (pro * 30).toFixed(0) }}{{ t.onboarding.perMonth }}</text>
         </view>
-        <text class="cmp__val">${{ pro.toFixed(2) }}/day</text>
+        <text class="cmp__val">${{ pro.toFixed(2) }}{{ t.onboarding.perDay }}</text>
       </view>
     </view>
 
     <!-- CTA -->
     <view class="est-cta">
-      <view class="est-go" :class="{ 'est-go--on': detected, 'active:scale-[0.98]': detected }" @click="goConnect">
+      <view class="est-go" :class="{ 'est-go--on': detected, 'active:scale-[0.98]': detected }" role="button" :tabindex="detected ? 0 : -1" :aria-disabled="!detected" data-system-chrome-primary @click="goConnect" @keydown.enter="goConnect" @keydown.space.prevent="goConnect">
         <text class="est-go__t">{{ t.onboarding.startEarning }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="detected ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
-  </view>
+  </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 
 const t = useT();
@@ -105,6 +109,9 @@ function goConnect() {
   if (!detected.value) return;
   uni.reLaunch({ url: "/pages/onboarding/connect", fail: () => {} });
 }
+function leaveEstimator() {
+  uni.reLaunch({ url: "/pages/register/success", fail: () => uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }) });
+}
 </script>
 
 <style scoped>
@@ -122,7 +129,9 @@ function goConnect() {
   align-items: center;
   gap: 6px;
   margin-bottom: 20px;
+  min-height: 44px;
 }
+.est-back { width: 44px; height: 44px; margin-left: -12px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; border-radius: 9999px; }
 .est-bar {
   flex: 1;
   height: 4px;
@@ -315,8 +324,14 @@ function goConnect() {
   color: var(--v5-ink);
 }
 .est-cta {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
   margin-top: auto;
   padding-top: 24px;
+  margin-right: 4px;
+  margin-left: 4px;
+  background: linear-gradient(to bottom, transparent, var(--v5-bg) 24px);
 }
 .est-go {
   width: 100%;

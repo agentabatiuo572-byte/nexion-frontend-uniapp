@@ -32,7 +32,8 @@ export interface ComputeShareContent {
 // shape is mirrored 1:1 in admin lib/mock/admin/compute-config.ts (COMPUTE_COEFFICIENTS).
 // DR-7: each side mocks its own; structure/keys must match so PROD wires server→client.
 export interface OnlineBonus {
-  // H5 非常驻载体基础托管系数 ∈ (0,1]: effectiveTops = baseline × h5BaseFactor × network × jitter.
+  // 无新鲜设备心跳时的基础托管系数(沿用 h5BaseFactor 配置键)∈(0,1]:
+  // effectiveTops = baseline × h5BaseFactor × network × jitter.
   h5BaseFactor: number;
   // App 连续在线满额时长(小时): continuity 因子在此时长达到满额 1.0(此前自 0.85 线性爬升)。
   continuityFullHours: number;
@@ -156,8 +157,10 @@ export interface ShareConfig {
   baseUrl: string;
   // 顺序即渠道面板展示序(越南盘默认 Zalo 首位)。
   channels: ShareChannelDef[];
-  // 注册成功页下载引导;全空 = 未上架态(隐藏下载 CTA)。
+  // 注册成功页 H5 官网下载引导;officialUrl 为空 = 显示不可用占位。
+  // 旧平台直链字段保留兼容历史配置,成功页不再直接消费。
   appDownload: {
+    officialUrl: string;
     iosUrl: string;
     androidUrl: string;
     apkUrl: string;

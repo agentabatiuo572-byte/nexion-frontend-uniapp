@@ -146,6 +146,8 @@ function onRowCta(q: Tier2QuestDef) {
 
 function onClaimRow(q: Tier2QuestDef) {
   if (wq.claimTier2(q.id)) {
+    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier2/:id}
+    // claims, credits, and bills in one idempotent transaction.
     const amount = rewardOf(q);
     app.creditNex(amount);
     bills.add({
@@ -161,6 +163,8 @@ function onClaimRow(q: Tier2QuestDef) {
 
 function onClaimBonus() {
   if (wq.claimBonus()) {
+    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{bonus}
+    // claims, credits, and bills in one idempotent transaction.
     const amount = Math.round(WEEKLY_BONUS_NEX * mult.value);
     app.creditNex(amount);
     bills.add({
