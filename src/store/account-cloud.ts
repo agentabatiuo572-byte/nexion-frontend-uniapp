@@ -14,6 +14,11 @@ export interface AccountCloudSnapshot {
   latestWithdrawal: Withdrawal | null;
 }
 
+export interface AccountSnapshotWriteResult {
+  snapshot: AccountCloudSnapshot;
+  persisted: boolean;
+}
+
 type AccountCloudTable = Record<string, AccountCloudSnapshot>;
 type JsonRecord = Record<string, unknown>;
 
@@ -82,11 +87,13 @@ function readTable(): AccountCloudTable {
   return {};
 }
 
-function writeTable(table: AccountCloudTable): void {
+function writeTable(table: AccountCloudTable): boolean {
   try {
     uni.setStorageSync(STORAGE_KEY, table);
+    return true;
   } catch {
     // storage unavailable
+    return false;
   }
 }
 
@@ -103,11 +110,11 @@ export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | 
   return row && row.schema === 1 ? row : null;
 }
 
-export function writeAccountSnapshot(snapshot: AccountCloudSnapshot): void {
+export function writeAccountSnapshot(snapshot: AccountCloudSnapshot): boolean {
   const key = normalizeAccountKey(snapshot.accountKey);
   const table = readTable();
   table[key] = { ...snapshot, accountKey: key, updatedAt: Date.now() };
-  writeTable(table);
+  return writeTable(table);
 }
 
 function sameValue(a: unknown, b: unknown): boolean {
@@ -330,10 +337,22 @@ export function mergeAndWriteAccountSnapshot(
   base: AccountCloudSnapshot | null,
   next: AccountCloudSnapshot,
 ): AccountCloudSnapshot {
+  return mergeAndWriteAccountSnapshotResult(base, next).snapshot;
+}
+
+/** Fail-aware variant used by money/reward flows that may not acknowledge a lost write. */
+export function mergeAndWriteAccountSnapshotResult(
+  base: AccountCloudSnapshot | null,
+  next: AccountCloudSnapshot,
+): AccountSnapshotWriteResult {
   const key = normalizeAccountKey(next.accountKey);
   const latest = readAccountSnapshot(key);
   const rawMerged = base && latest ? mergeAccountSnapshots(base, next, latest) : { ...next, accountKey: key, updatedAt: Date.now() };
   const merged = clampAccountFundInvariants(rawMerged);
-  writeAccountSnapshot(merged);
-  return readAccountSnapshot(key) ?? merged;
+  const writeSucceeded = writeAccountSnapshot(merged);
+  const stored = readAccountSnapshot(key);
+  return {
+    snapshot: stored ?? merged,
+    persisted: writeSucceeded && stored !== null,
+  };
 }

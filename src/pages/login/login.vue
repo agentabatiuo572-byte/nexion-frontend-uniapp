@@ -128,21 +128,13 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
-import { useAuth } from "@/store/auth";
-import { useApp } from "@/store/app";
-import { useSession } from "@/store/session";
-import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
-import { rebindAccountScopedStores } from "@/lib/account-scope";
+import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
-import { safeReturnTo } from "@/routing/safe-return-to";
+import { completeSignIn } from "@/auth/complete-sign-in";
+import { exchangeVerifiedLogin } from "@/store/auth-otp";
 
 const t = useT();
-const auth = useAuth();
-const app = useApp();
-const session = useSession();
-const sponsorship = useSponsorship();
-
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
   { label: "Google", svg: '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-1.5 3.6-5.5 3.6-3.3 0-6-2.7-6-6.1S8.7 5.5 12 5.5c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3 14.6 2 12 2 6.9 2 2.7 6.1 2.7 11.6S6.9 21.3 12 21.3c6.9 0 9.4-4.9 9.4-7.4 0-.5 0-.9-.1-1.3L12 10.2z"/></svg>' },
@@ -152,6 +144,13 @@ const oauth = [
 
 type Step = 1 | 2 | 3;
 type LoginMode = "password" | "otp" | "reset";
+
+interface OtpFlowContext {
+  version: number;
+  phone: string;
+  scene: OtpScene;
+  requestId: string;
+}
 
 const mode = ref<LoginMode>("password");
 const step = ref<Step>(1);
@@ -169,9 +168,12 @@ const resendLeft = ref(0);
 const loading = ref(false);
 const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
+const otpRequestId = ref<string | null>(null);
+const otpVerifyToken = ref<string | null>(null);
 
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 let signInTimer: ReturnType<typeof setTimeout> | undefined;
+let otpFlowVersion = 0;
 let mounted = true;
 
 onLoad((options) => {
@@ -217,7 +219,11 @@ const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
-function onPhone(e: Event) { phone.value = inputVal(e); error.value = null; }
+function onPhone(e: Event) {
+  invalidateOtpFlow();
+  phone.value = inputVal(e);
+  error.value = null;
+}
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
 function onNewPwd(e: Event) { newPassword.value = inputVal(e); error.value = null; }
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
@@ -230,30 +236,75 @@ function onCode(i: number, e: Event) {
   if (next[i] && i < 5) focusIdx.value = i + 1;
   if (next.every(Boolean)) verifyCode();
 }
-function pickCountry(c: string) { country.value = c; showCountries.value = false; }
+function pickCountry(c: string) {
+  invalidateOtpFlow();
+  country.value = c;
+  showCountries.value = false;
+}
 
 function clearSignIn() {
   if (signInTimer) { clearTimeout(signInTimer); signInTimer = undefined; }
   loading.value = false;
 }
 
+/** 换号、返回或切换认证方式后，旧发码/验码/登录回包不得写回当前页面。 */
+function invalidateOtpFlow() {
+  otpFlowVersion += 1;
+  clearSignIn();
+  otpRequestId.value = null;
+  otpVerifyToken.value = null;
+}
+
+function isCurrentOtpFlow(context: OtpFlowContext): boolean {
+  return (
+    mounted
+    && context.version === otpFlowVersion
+    && fullPhone.value === context.phone
+    && otpScene.value === context.scene
+    && step.value === 2
+    && otpRequestId.value === context.requestId
+  );
+}
+
 // Sign-in completion (shared by password + OTP). Binds the account-cloud
 // snapshot, claims this carrier's session, and routes a changed physical device
 // through recalibration before the main app.
-function finishSignIn() {
-  if (!mounted) return;
-  const identity = `${country.value}${phoneClean.value}@demo.nexion.ai`;
-  auth.signIn(identity);
-  app.bindAccount(identity);
-  rebindAccountScopedStores(identity);
-  const { requiresRecalibration } = session.claim(identity);
-  if (refOnLogin.value) sponsorship.bind(refOnLogin.value);
-  if (requiresRecalibration) {
-    uni.reLaunch({ url: "/pages/onboarding/connect?mode=recalibrate", fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+function finishSignIn(
+  otp: { accountId: string; signInIdempotencyKey: string; onboardingComplete: boolean } | null = null,
+  context: OtpFlowContext | null = null,
+) {
+  signInTimer = undefined;
+  if (!mounted || (context && !isCurrentOtpFlow(context))) return;
+  const identity = otp?.accountId ?? `${country.value}${phoneClean.value}@demo.nexion.ai`;
+  const result = completeSignIn({
+    identity,
+    returnTo: returnParam.value,
+    sponsorCode: refOnLogin.value,
+    idempotencyKey: otp?.signInIdempotencyKey,
+    onboardingComplete: otp?.onboardingComplete,
+  });
+  if (!result.ok) {
+    loading.value = false;
+    error.value = result.error === "account_pending"
+      ? t.value.login.errorRegistrationIncomplete
+      : result.error === "account_not_found"
+        ? t.value.login.errorAccountNotRegistered
+      : t.value.authOtp.errorServiceUnavailable;
+  }
+}
+
+function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
+  if (!isCurrentOtpFlow(context)) return;
+  const exchange = exchangeVerifiedLogin(context.phone, verifyToken);
+  if (!exchange.ok) {
+    if (!isCurrentOtpFlow(context)) return;
+    loading.value = false;
+    error.value = exchange.error === "verify_token_invalid"
+      ? t.value.authOtp.errorOtpExpired
+      : t.value.authOtp.errorServiceUnavailable;
     return;
   }
-  const dest = safeReturnTo(returnParam.value, "/pages/index/index");
-  uni.reLaunch({ url: dest, fail: () => uni.reLaunch({ url: "/pages/index/index", fail: () => {} }) });
+  finishSignIn(exchange, context);
 }
 
 function startResend(sec: number) {
@@ -268,11 +319,23 @@ function startResend(sec: number) {
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
+  const phoneAtRequest = fullPhone.value;
+  const sceneAtRequest = otpScene.value;
+  const stepAtRequest = step.value;
+  const flowVersion = ++otpFlowVersion;
   loading.value = true;
-  const res = await otpSend(fullPhone.value, otpScene.value, captchaTicket);
+  const res = await otpSend(phoneAtRequest, sceneAtRequest, captchaTicket);
+  if (
+    !mounted
+    || flowVersion !== otpFlowVersion
+    || fullPhone.value !== phoneAtRequest
+    || otpScene.value !== sceneAtRequest
+    || step.value !== stepAtRequest
+  ) return;
   loading.value = false;
-  if (!mounted) return;
   if (res.ok) {
+    otpRequestId.value = res.requestId;
+    otpVerifyToken.value = null;
     code.value = ["", "", "", "", "", ""];
     focusIdx.value = 0;
     step.value = 2;
@@ -304,8 +367,11 @@ function signInWithPassword() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!phoneOk.value || !pwdOk.value) { error.value = t.value.login.errorInvalidPassword; return; }
+  const phoneAtSignIn = fullPhone.value;
+  const flowVersion = ++otpFlowVersion;
   loading.value = true;
   signInTimer = setTimeout(() => {
+    if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtSignIn || step.value !== 1 || mode.value !== "password") return;
     finishSignIn();
   }, 700);
 }
@@ -313,11 +379,23 @@ async function verifyCode() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
+  const requestId = otpRequestId.value;
+  if (!requestId) { loading.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
+  const context: OtpFlowContext = {
+    version: otpFlowVersion,
+    phone: fullPhone.value,
+    scene: otpScene.value,
+    requestId,
+  };
   loading.value = true;
+  if (mode.value !== "reset" && otpVerifyToken.value) {
+    finishVerifiedOtpSignIn(otpVerifyToken.value, context);
+    return;
+  }
   // FEAT-AUTH01: server 同构校验(TTL/attemptsLeft/一码一)。PROD: 用返回的
-  // verifyToken 换 session;mock 下通过即视为凭证有效。
-  const res = await otpVerify(fullPhone.value, otpScene.value, code.value.join(""));
-  if (!mounted) return;
+  // verifyToken 换 session；mock 同样必须由本地 exchange 消费该凭证。
+  const res = await otpVerify(context.phone, context.scene, context.requestId, code.value.join(""));
+  if (!isCurrentOtpFlow(context)) return;
   if (!res.ok) {
     loading.value = false;
     if (res.error === "otp_invalid") {
@@ -334,7 +412,8 @@ async function verifyCode() {
     return;
   }
   if (mode.value === "reset") { loading.value = false; step.value = 3; return; }
-  finishSignIn();
+  otpVerifyToken.value = res.verifyToken;
+  finishVerifiedOtpSignIn(res.verifyToken, context);
 }
 function finishReset() {
   if (loading.value || signInTimer) return;
@@ -343,6 +422,7 @@ function finishReset() {
   if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
   // MOCK: no real password persistence; treat as success → back to password login.
   toast.success(t.value.login.resetSuccess, "");
+  invalidateOtpFlow();
   mode.value = "password";
   step.value = 1;
   newPassword.value = "";
@@ -355,47 +435,57 @@ function onPrimary() {
   else finishReset();
 }
 function toggleMode() {
-  clearSignIn();
+  invalidateOtpFlow();
   error.value = null;
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
+  otpRequestId.value = null;
+  otpVerifyToken.value = null;
   resendLeft.value = 0;
   step.value = 1;
   mode.value = mode.value === "password" ? "otp" : "password";
 }
 function goReset() {
-  clearSignIn();
+  invalidateOtpFlow();
   error.value = null;
   password.value = ""; newPassword.value = ""; confirmPwd.value = "";
   showPwd.value = false; showCountries.value = false;
   code.value = ["", "", "", "", "", ""];
+  otpRequestId.value = null;
+  otpVerifyToken.value = null;
   resendLeft.value = 0;
   step.value = 1;
   mode.value = "reset";
 }
 function back() {
-  clearSignIn();
+  invalidateOtpFlow();
   error.value = null;
   if (mode.value === "reset" && step.value === 1) {
-    code.value = ["", "", "", "", "", ""]; resendLeft.value = 0;
+    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
     mode.value = "password"; return;
   }
   if (mode.value === "reset" && step.value === 3) {
     newPassword.value = ""; confirmPwd.value = ""; showPwd.value = false;
-    code.value = ["", "", "", "", "", ""]; resendLeft.value = 0;
+    code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0;
     step.value = 2; return;
   }
-  code.value = ["", "", "", "", "", ""]; resendLeft.value = 0; focusIdx.value = 0;
+  code.value = ["", "", "", "", "", ""]; otpRequestId.value = null; otpVerifyToken.value = null; resendLeft.value = 0; focusIdx.value = 0;
   step.value = 1;
 }
-function close() { uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} }); }
-function goRegister() { uni.reLaunch({ url: "/pages/register/register", fail: () => {} }); }
+function close() {
+  invalidateOtpFlow();
+  uni.reLaunch({ url: "/pages/onboarding/intro", fail: () => {} });
+}
+function goRegister() {
+  invalidateOtpFlow();
+  uni.reLaunch({ url: "/pages/register/register", fail: () => {} });
+}
 
 function cleanup() {
   mounted = false;
+  invalidateOtpFlow();
   if (resendTimer) clearInterval(resendTimer);
-  if (signInTimer) clearTimeout(signInTimer);
 }
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());

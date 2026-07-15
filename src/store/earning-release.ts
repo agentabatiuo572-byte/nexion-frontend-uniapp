@@ -63,11 +63,12 @@ function readLedger(): LedgerTable {
   return { schema: 1, entries: [] };
 }
 
-function writeLedger(table: LedgerTable): void {
+function writeLedger(table: LedgerTable): boolean {
   try {
     uni.setStorageSync(LEDGER_KEY, table);
+    return true;
   } catch {
-    // storage unavailable
+    return false;
   }
 }
 
@@ -108,11 +109,14 @@ export function appendLedgerEntry(
   route: LedgerRoute,
   usdt: number,
   nex: number,
-): void {
-  if (usdt <= 0 && nex <= 0) return;
+  idempotencyKey?: string,
+): boolean {
+  if (usdt <= 0 && nex <= 0) return true;
   const table = readLedger();
+  const stableId = idempotencyKey?.trim() ? `EL-${idempotencyKey.trim()}` : null;
+  if (stableId && table.entries.some((entry) => entry.id === stableId)) return true;
   const entry: EarningLedgerEntry = {
-    id: `EL-${Date.now().toString(36)}-${Math.floor(Math.random() * 46656).toString(36)}`,
+    id: stableId ?? `EL-${Date.now().toString(36)}-${Math.floor(Math.random() * 46656).toString(36)}`,
     accountKey: normalizeAccountKey(accountKey),
     clusterId,
     route,
@@ -120,7 +124,7 @@ export function appendLedgerEntry(
     nex: +nex.toFixed(2),
     bucketedAt: Date.now(),
   };
-  writeLedger({ schema: 1, entries: [...table.entries, entry] });
+  return writeLedger({ schema: 1, entries: [...table.entries, entry] });
 }
 
 export function listLedgerEntries(accountKey: string): EarningLedgerEntry[] {

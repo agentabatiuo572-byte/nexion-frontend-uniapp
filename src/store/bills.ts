@@ -108,8 +108,8 @@ export const useBills = defineStore("bills", () => {
   let boundKey = "default";
   const bills = ref<Bill[]>(hydrate(boundKey));
 
-  function persist() {
-    writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
+  function persist(): boolean {
+    return writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
   }
 
   /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
@@ -118,13 +118,25 @@ export const useBills = defineStore("bills", () => {
     bills.value = hydrate(boundKey);
   }
 
-  function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill {
+  function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
     const next: Bill = { ...b, id: mockServerId("BL"), ts: mockServerNow() };
-    bills.value = recomputeBalance([next, ...bills.value]);
-    persist();
+    const previous = bills.value;
+    bills.value = recomputeBalance([next, ...previous]);
+    if (!persist()) {
+      bills.value = previous;
+      return null;
+    }
     return next;
+  }
+
+  /** Stable ref + type + symbol is the mock server idempotency key. */
+  function addOnce(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+    const existing = b.ref
+      ? bills.value.find((bill) => bill.ref === b.ref && bill.type === b.type && bill.symbol === b.symbol)
+      : null;
+    return existing ?? add(b);
   }
 
   function seed() {
@@ -132,5 +144,5 @@ export const useBills = defineStore("bills", () => {
     persist();
   }
 
-  return { bills, add, seed, bindAccount };
+  return { bills, add, addOnce, seed, bindAccount };
 });

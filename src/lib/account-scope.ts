@@ -26,6 +26,7 @@ import { useCart } from "@/store/cart";
 import { useProfile } from "@/store/profile";
 import { useSecurity } from "@/store/security";
 import { useRewardsSeen } from "@/store/rewards-seen";
+import { useSponsorship } from "@/store/sponsorship";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -40,8 +41,8 @@ import { useRewardsSeen } from "@/store/rewards-seen";
  *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
  * 顺带保留设备级(平台态/设备偏好,不迁):主题 · 语言 · preferences · auth 登录态 ·
  * session · risk-cluster · risk-identity · earning-release(以 accountKey 为参的注册表,已按账号)·
- * sponsorship(礼包资格按账号:giftClaimedByAccount + register 取本次邀请码;sponsorCode 仅展示归因,设备留存)·
  * product-phase · trial-config · genesis-config(运营镜像)。
+ * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
   useGenesis().bindAccount(accountKey);
@@ -71,6 +72,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useCart().bindAccount(accountKey);
   useProfile().bindAccount(accountKey);
   useSecurity().bindAccount(accountKey);
+  useSponsorship().bindAccount(accountKey);
   // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
   useRewardsSeen().bindAccount(accountKey);
 }

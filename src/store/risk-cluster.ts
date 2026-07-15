@@ -1,6 +1,7 @@
 import type { EarningBucketRoute } from "@/store/types";
 import { useConfig } from "@/store/config";
 import { normalizeAccountKey } from "@/store/account-cloud";
+import { normalizeRefCode } from "@/store/sponsorship";
 import {
   buildCandidateRecord,
   getRiskRecord,
@@ -96,6 +97,8 @@ const SIGNUP_BURST_WINDOW_MS = 3600 * 1000;
 interface DimensionHit {
   dimension: keyof ReturnType<typeof weights>;
   strong: boolean;
+  /** 稳定的额外风险原因；页面必须经 i18n 映射后再展示。 */
+  reason?: string;
 }
 
 function weights() {
@@ -108,14 +111,52 @@ function shareHash(a: { hash: string }[], b: { hash: string }[]): boolean {
   return b.some((x) => set.has(x.hash));
 }
 
+/** 两账户共用的工具 hash；空值不形成风险维度。 */
+function sharedHashes(a: { hash: string }[], b: { hash: string }[]): string[] {
+  if (!a.length || !b.length) return [];
+  const right = new Set(b.map((x) => x.hash));
+  return [...new Set(a.map((x) => x.hash).filter((hash) => right.has(hash)))];
+}
+
+/**
+ * 支付工具默认是中维；只有同一 hash 的不同账号数严格超过后台上限，才升为强维。
+ * 计数必须基于完整风险表，而不能只看 BFS 尚未弹出的 pool，否则连边顺序会改变结论。
+ */
+function hasOverusedPaymentInstrument(
+  a: RiskIdentityRecord,
+  b: RiskIdentityRecord,
+  allRecords: RiskIdentityRecord[],
+): boolean {
+  const limit = useConfig().config.riskCluster.maxAccountsPerPaymentInstrument;
+  return sharedHashes(a.paymentInstruments, b.paymentInstruments).some((hash) => {
+    const accounts = new Set(
+      allRecords
+        .filter((record) => record.paymentInstruments.some((instrument) => instrument.hash === hash))
+        .map((record) => record.accountKey),
+    );
+    return accounts.size > limit;
+  });
+}
+
 /** 两账户间的维度命中(空维度自然不命中 = 空值降权)。 */
-function dimensionHits(a: RiskIdentityRecord, b: RiskIdentityRecord): DimensionHit[] {
+function dimensionHits(
+  a: RiskIdentityRecord,
+  b: RiskIdentityRecord,
+  allRecords: RiskIdentityRecord[],
+): DimensionHit[] {
   const hits: DimensionHit[] = [];
   if (a.deviceHint && a.deviceHint === b.deviceHint) hits.push({ dimension: "serverDeviceId", strong: true });
   if (a.ipBucket === b.ipBucket && Math.abs(a.registeredAt - b.registeredAt) < SIGNUP_IP_WINDOW_MS)
     hits.push({ dimension: "ipBucket", strong: true });
   if (shareHash(a.withdrawAddresses, b.withdrawAddresses)) hits.push({ dimension: "withdrawAddress", strong: true });
-  if (shareHash(a.paymentInstruments, b.paymentInstruments)) hits.push({ dimension: "paymentInstrument", strong: false });
+  if (shareHash(a.paymentInstruments, b.paymentInstruments)) {
+    const overused = hasOverusedPaymentInstrument(a, b, allRecords);
+    hits.push({
+      dimension: "paymentInstrument",
+      strong: overused,
+      reason: overused ? "payment-instrument-overuse" : undefined,
+    });
+  }
   if (a.sponsorId && a.sponsorId === b.sponsorId) hits.push({ dimension: "sponsor", strong: false });
   if (a.uaFingerprint && a.uaFingerprint === b.uaFingerprint) hits.push({ dimension: "uaFingerprint", strong: false });
   if (a.ipBucket === b.ipBucket && Math.abs(a.registeredAt - b.registeredAt) < SIGNUP_BURST_WINDOW_MS)
@@ -124,8 +165,8 @@ function dimensionHits(a: RiskIdentityRecord, b: RiskIdentityRecord): DimensionH
 }
 
 /** 连边判定: 任一强维 OR 中弱维权重和达阈。 */
-function linked(a: RiskIdentityRecord, b: RiskIdentityRecord): boolean {
-  const hits = dimensionHits(a, b);
+function linked(a: RiskIdentityRecord, b: RiskIdentityRecord, allRecords: RiskIdentityRecord[]): boolean {
+  const hits = dimensionHits(a, b, allRecords);
   if (hits.some((h) => h.strong)) return true;
   const w = weights();
   const weak = hits.filter((h) => !h.strong).reduce((sum, h) => sum + (w[h.dimension] ?? 0), 0);
@@ -140,7 +181,7 @@ function isBareIdentity(record: RiskIdentityRecord): boolean {
 function hasValidBinding(record: RiskIdentityRecord): boolean {
   const cfg = useConfig().config.riskCluster;
   return (
-    !!record.sponsorId ||
+    !!normalizeRefCode(record.sponsorId) ||
     record.paymentInstruments.length > 0 ||
     record.attestedOnlineMs >= cfg.appAttestationReleaseHours * 3600 * 1000
   );
@@ -148,11 +189,12 @@ function hasValidBinding(record: RiskIdentityRecord): boolean {
 
 function configVersion(): string {
   const rc = useConfig().config.riskCluster;
-  return `rc:${rc.freePhoneSlotsPerCluster}/${rc.duplicateAccountPendingFrom}/${rc.duplicateAccountFreezeFrom}/${rc.releaseMode}/${rc.freeSlotRequiresBinding ? "bind" : "nobind"}`;
+  return `rc:${rc.freePhoneSlotsPerCluster}/${rc.duplicateAccountPendingFrom}/${rc.duplicateAccountFreezeFrom}/${rc.maxSignupPerIp24h}/${rc.maxAccountsPerDevice}/${rc.maxAccountsPerPaymentInstrument}/${rc.releaseMode}/${rc.freeSlotRequiresBinding ? "bind" : "nobind"}`;
 }
 
 function evaluate(records: RiskIdentityRecord[], self: RiskIdentityRecord): RiskClusterSummary {
   const cfg = useConfig().config.riskCluster;
+  const allRecords = [...records.filter((record) => record.accountKey !== self.accountKey), self];
   // 连通分量(含 self;表规模 = mock 演示量级,O(n²) 扫描足够)。
   // ponytail: O(n²) BFS, swap in union-find if the registry ever grows past demo scale.
   const pool = records.filter((r) => r.accountKey !== self.accountKey);
@@ -161,7 +203,7 @@ function evaluate(records: RiskIdentityRecord[], self: RiskIdentityRecord): Risk
   while (queue.length) {
     const current = queue.pop()!;
     for (let i = pool.length - 1; i >= 0; i--) {
-      if (linked(current, pool[i])) {
+      if (linked(current, pool[i], allRecords)) {
         const [hit] = pool.splice(i, 1);
         members.push(hit);
         queue.push(hit);
@@ -175,9 +217,13 @@ function evaluate(records: RiskIdentityRecord[], self: RiskIdentityRecord): Risk
   // 分数: self 对簇内任一其他成员命中过的维度,权重求和 cap 1。
   const w = weights();
   const hitDims = new Set<string>();
+  const hitReasons = new Set<string>();
   for (const other of members) {
     if (other.accountKey === self.accountKey) continue;
-    for (const hit of dimensionHits(self, other)) hitDims.add(hit.dimension);
+    for (const hit of dimensionHits(self, other, allRecords)) {
+      hitDims.add(hit.dimension);
+      if (hit.reason) hitReasons.add(hit.reason);
+    }
   }
   const reasons: string[] = [];
   let score = 0;
@@ -185,6 +231,7 @@ function evaluate(records: RiskIdentityRecord[], self: RiskIdentityRecord): Risk
     score += w[dim as keyof typeof w] ?? 0;
     reasons.push(`dim-${dim}`);
   });
+  reasons.push(...hitReasons);
   score = Math.min(1, +score.toFixed(2));
 
   // 人工处置聚合(修 audit U2「released 传染全簇 = 解除一个误判后全簇永久免疫」):
@@ -257,24 +304,30 @@ export function evaluateAccountCluster(accountKey: string): RiskClusterSummary {
   return evaluate(records, self);
 }
 
-/** 注册前评估(FEAT-RISK01): 候选身份参与聚簇 + IP 24h 注册闸。 */
+/** 注册前评估(FEAT-RISK01): 候选身份参与聚簇 + IP/设备双注册闸。 */
 export function evaluateRegistration(
   candidateAccountKey: string,
   opts: { sponsorId?: string | null } = {},
 ): RegistrationAssessment {
   const cfg = useConfig().config;
-  const candidate = buildCandidateRecord(candidateAccountKey, opts.sponsorId ?? null);
+  const candidate = buildCandidateRecord(candidateAccountKey, normalizeRefCode(opts.sponsorId));
   const records = listRiskRecords().filter((r) => r.accountKey !== candidate.accountKey);
 
   const cluster = evaluate(records, candidate);
 
-  // 注册闸(异常2): 同 IP 桶 24h 内注册数达上限 → 人工或拒绝,不建号。
+  // 注册闸: 同 IP 桶 24h 或同设备既有账号数达上限 → 人工或拒绝,不建号。
+  // 两条上限皆来自 K1 参数，任何一条命中即阻断后续 reserve / 风控落表。
   const now = Date.now();
   const ipSignups = records.filter(
     (r) => r.ipBucket === candidate.ipBucket && now - r.registeredAt < SIGNUP_IP_WINDOW_MS,
   ).length;
+  const deviceAccounts = records.filter(
+    (r) => !!candidate.deviceHint && r.deviceHint === candidate.deviceHint,
+  ).length;
   const gateRoute: RegistrationGateRoute =
-    ipSignups >= cfg.riskCluster.maxSignupPerIp24h ? "manual_or_reject" : "proceed";
+    ipSignups >= cfg.riskCluster.maxSignupPerIp24h || deviceAccounts >= cfg.riskCluster.maxAccountsPerDevice
+      ? "manual_or_reject"
+      : "proceed";
 
   const giftRoute: EarningBucketRoute =
     cfg.rewards.welcomeGift.lockMode === "direct" ? "withdrawable" : cluster.bucketRoute;
@@ -282,7 +335,7 @@ export function evaluateRegistration(
   return { gateRoute, cluster, giftRoute };
 }
 
-/** 注册成功后落表(失败/被闸不落 = 不产生半成品身份)。 */
-export function commitRegistration(accountKey: string, opts: { sponsorId?: string | null } = {}): void {
-  recordRegistration(accountKey, opts.sponsorId ?? null);
+/** 注册事务的风险落表步骤；账号目录保持 pending，直到其余副作用完成后才 active。 */
+export function commitRegistration(accountKey: string, opts: { sponsorId?: string | null } = {}): boolean {
+  return recordRegistration(accountKey, normalizeRefCode(opts.sponsorId));
 }

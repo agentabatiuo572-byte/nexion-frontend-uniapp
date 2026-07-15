@@ -6,6 +6,9 @@
       :key="t.id"
       class="nx-toast"
       :class="`nx-toast--${t.kind}`"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
       @click="ui.dismissToast(t.id)"
     >
       <view class="nx-toast__bar" />

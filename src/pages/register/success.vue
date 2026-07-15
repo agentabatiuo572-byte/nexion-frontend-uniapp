@@ -91,13 +91,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { onBackPress, onLoad } from "@dcloudio/uni-app";
+import { computed } from "vue";
+import { onBackPress } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
-import { useSponsorship } from "@/store/sponsorship";
+import { pickSponsor } from "@/mock/sponsors";
+import { useAuth } from "@/store/auth";
+import { resolveAuthAccountById } from "@/store/auth-account";
 import { copyText } from "@/lib/share";
 import { toast } from "@/store/ui";
 
@@ -105,19 +107,27 @@ type GiftState = "posted" | "pending" | "none";
 
 const t = useT();
 const cfg = useConfig();
-const sponsorship = useSponsorship();
+const auth = useAuth();
 
-const giftState = ref<GiftState>("none");
-onLoad((options) => {
-  const g = options && (options as Record<string, string>).gift;
-  giftState.value = g === "posted" || g === "pending" ? g : "none";
+// ⚠️ MOCK-ONLY: 成功页只读 active 账号目录中冻结的注册回执，绝不信任 URL。
+// 无回执时 giftState 为 none、礼包卡不渲染；live config 仅保留给旧页降级的
+// 非可见 fallback。PROD 注册 endpoint/回执契约 TBD，由服务端回执提供业务事实。
+const registration = computed(() => {
+  const resolved = resolveAuthAccountById(auth.accountId);
+  return resolved.ok && resolved.account?.status === "active" ? resolved.account.registration : null;
+});
+const giftState = computed<GiftState>(() => {
+  const receipt = registration.value;
+  if (!receipt?.sponsorCode) return "none";
+  return receipt.giftRoute === "withdrawable" ? "posted" : "pending";
 });
 
-// 礼包金额单源派生 platform config(禁写死镜像)。
-const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
-const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
+// active 注册回执的金额是本次业务事实；无回执时仅为旧页降级保留 live config。
+const giftUsdt = computed(() => registration.value?.giftUsdt ?? cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => registration.value?.giftNex ?? cfg.config.rewards.welcomeGift.nexAmount);
+const sponsor = computed(() => registration.value?.sponsorCode ? pickSponsor(registration.value.sponsorCode) : null);
 const subLine = computed(() =>
-  sponsorship.sponsor ? fmt(t.value.register.doneSubTeam, { name: sponsorship.sponsor.name }) : t.value.register.doneSubSolo,
+  sponsor.value ? fmt(t.value.register.doneSubTeam, { name: sponsor.value.name }) : t.value.register.doneSubSolo,
 );
 
 const dl = computed(() => cfg.config.share.appDownload);

@@ -27,7 +27,7 @@ import { useReceipts } from "./receipts";
 import { generateReceipt } from "@/mock/receipt";
 import {
   normalizeAccountKey,
-  mergeAndWriteAccountSnapshot,
+  mergeAndWriteAccountSnapshotResult,
   readAccountSnapshot,
   type AccountCloudSnapshot,
 } from "./account-cloud";
@@ -78,6 +78,7 @@ function createEarningBuckets(withdrawableUsdt: number, now = Date.now()): UserS
 function withDefaultEarningBuckets(user: UserState): UserState {
   return {
     ...user,
+    appliedRewardKeys: user.appliedRewardKeys ?? {},
     earningBuckets: {
       ...createEarningBuckets(user.usdtBalance, user.joinedAt),
       ...(user.earningBuckets ?? {}),
@@ -303,7 +304,7 @@ export const useApp = defineStore("app", () => {
 
   reseedDeviceRuntime(devices.value);
 
-  function persistAccountSnapshot() {
+  function persistAccountSnapshot(): boolean {
     const snapshot: AccountCloudSnapshot = {
       schema: 1,
       accountKey: accountKey.value,
@@ -314,8 +315,9 @@ export const useApp = defineStore("app", () => {
       earnings: earnings.value,
       latestWithdrawal: latestWithdrawal.value,
     };
-    const merged = mergeAndWriteAccountSnapshot(lastCloudSnapshot, snapshot);
-    adoptAccountSnapshot(merged);
+    const result = mergeAndWriteAccountSnapshotResult(lastCloudSnapshot, snapshot);
+    adoptAccountSnapshot(result.snapshot);
+    return result.persisted;
   }
 
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
@@ -780,11 +782,46 @@ export const useApp = defineStore("app", () => {
     return true;
   }
   function creditRewardBucket(route: EarningBucketRoute, usdt: number, nex = 0): boolean {
+    return creditRewardBucketInternal(route, usdt, nex, null);
+  }
+
+  /**
+   * Registration/reward recovery path. The receipt key and balance delta live
+   * in the same account-cloud snapshot, so replay after a crash is a no-op.
+   */
+  function creditRewardBucketOnce(idempotencyKey: string, route: EarningBucketRoute, usdt: number, nex = 0): boolean {
+    const key = idempotencyKey.trim();
+    if (!key) return false;
+    return creditRewardBucketInternal(route, usdt, nex, key);
+  }
+
+  function creditRewardBucketInternal(
+    route: EarningBucketRoute,
+    usdt: number,
+    nex: number,
+    idempotencyKey: string | null,
+  ): boolean {
     if (!Number.isFinite(usdt) || !Number.isFinite(nex) || usdt < 0 || nex < 0) return false;
     if (route === "no_issue") return true;
-    const buckets = withDefaultEarningBuckets(user.value).earningBuckets;
+    if (idempotencyKey) {
+      const stored = readAccountSnapshot(accountKey.value);
+      if (stored?.user.appliedRewardKeys?.[idempotencyKey]) {
+        adoptAccountSnapshot(stored);
+        return true;
+      }
+    }
+    const previousSnapshot = lastCloudSnapshot;
+    const currentUser = withDefaultEarningBuckets(user.value);
+    if (idempotencyKey && currentUser.appliedRewardKeys?.[idempotencyKey]) return true;
+    const buckets = currentUser.earningBuckets;
     const nextBuckets = { ...buckets, lastBucketedAt: Date.now() };
-    const nextUser: UserState = { ...user.value, earningBuckets: nextBuckets };
+    const nextUser: UserState = {
+      ...currentUser,
+      earningBuckets: nextBuckets,
+      appliedRewardKeys: idempotencyKey
+        ? { ...currentUser.appliedRewardKeys, [idempotencyKey]: true }
+        : currentUser.appliedRewardKeys,
+    };
     if (route === "withdrawable") {
       nextBuckets.withdrawableUsdt = +(nextBuckets.withdrawableUsdt + usdt).toFixed(2);
       nextUser.usdtBalance = +(nextUser.usdtBalance + usdt).toFixed(2);
@@ -798,10 +835,20 @@ export const useApp = defineStore("app", () => {
     }
     // R1: 非可提的赠金也必须记台账分录,否则释放引擎(attest/manual)永远放不出它。
     if (route === "pending_review" || route === "bonus_locked") {
-      appendLedgerEntry(accountKey.value, evaluateAccountCluster(accountKey.value).clusterId, route, usdt, nex);
+      const ledgerWritten = appendLedgerEntry(accountKey.value,
+        evaluateAccountCluster(accountKey.value).clusterId,
+        route,
+        usdt,
+        nex,
+        idempotencyKey ?? undefined,
+      );
+      if (!ledgerWritten) return false;
     }
     user.value = nextUser;
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
     return true;
   }
 
@@ -894,7 +941,7 @@ export const useApp = defineStore("app", () => {
     user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global, latestWithdrawal, miningPaused,
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
-    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, setGenesisInviteCode, creditRewardBucket,
+    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
     submitWithdrawal, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };

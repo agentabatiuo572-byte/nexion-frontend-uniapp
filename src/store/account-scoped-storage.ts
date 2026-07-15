@@ -19,13 +19,15 @@ export function readAccountRow<T>(tableKey: string, accountKey: string): T | nul
   return null;
 }
 
-export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T): void {
+export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T): boolean {
   try {
     const raw = uni.getStorageSync(tableKey) as Record<string, T> | "";
     const table = raw && typeof raw === "object" ? { ...raw } : ({} as Record<string, T>);
     table[normalizeAccountKey(accountKey)] = row;
     uni.setStorageSync(tableKey, table);
+    return true;
   } catch {
     // storage unavailable
+    return false;
   }
 }

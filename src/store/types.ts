@@ -177,6 +177,10 @@ export interface UserState {
   nexBalance: number;
   pendingEarnings: number;
   earningBuckets: EarningBuckets;
+  /** MOCK registration/reward idempotency receipts, merged with the same
+   * account snapshot as the credited balances. PROD owns these on the
+   * canonical reward transaction instead of client state. */
+  appliedRewardKeys?: Record<string, true>;
   /** Lifetime sum of completed USDT deposits/topups. Used by tradein eligibility
    *  `cumulative-deposit-usdt` rule. Seeded 0; incremented ONLY by recordDeposit
    *  action (NOT earnings, NOT exchange, NOT trade-in credit, NOT KYC bonus,

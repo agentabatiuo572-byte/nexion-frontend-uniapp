@@ -116,6 +116,7 @@ import { fmt } from "@/i18n/format";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 import { useSession } from "@/store/session";
+import { markAuthAccountOnboardingComplete } from "@/store/auth-account";
 import { measureDeviceCapability } from "@/lib/device-capability";
 import { getDeviceId } from "@/lib/device-id";
 
@@ -261,7 +262,15 @@ function activate() {
   if (isRecal.value) {
     app.resumeMining();
   } else {
-    auth.completeOnboarding();
+    if (!auth.completeOnboarding()) {
+      uni.showToast({ title: t.value.authOtp.errorServiceUnavailable, icon: "none" });
+      return;
+    }
+    if (!markAuthAccountOnboardingComplete(auth.email || auth.accountId || "default")) {
+      if (!auth.requireOnboarding()) auth.signOut();
+      uni.showToast({ title: t.value.authOtp.errorServiceUnavailable, icon: "none" });
+      return;
+    }
   }
   uni.reLaunch({ url: "/pages/index/index", fail: () => {} });
 }

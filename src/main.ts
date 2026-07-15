@@ -24,10 +24,12 @@ export function createApp() {
   }
 
   app.use(createPinia());
-  // DEV-only: SPEC-7 演示桥(模拟后台处置下发;PROD 构建内部直接 return)。
-  mountSpec7DevBridge();
-  // DEV-only: FEAT-AUTH01 OTP 闸门演示桥(seedSendLog/reset/inspect)。
-  mountAuthOtpDevBridge();
+  if (import.meta.env.DEV) {
+    // DEV-only: SPEC-7 演示桥(模拟后台处置下发)。
+    mountSpec7DevBridge();
+    // DEV-only: FEAT-AUTH01 OTP 闸门演示桥(seedSendLog/reset/inspect)。
+    mountAuthOtpDevBridge();
+  }
   return {
     app,
   };

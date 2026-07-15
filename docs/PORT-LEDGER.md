@@ -45,8 +45,8 @@
 | 1 | onboarding/intro | pages/onboarding/intro.vue | H5 ✓ | **verified** |
 | 2 | onboarding/estimator | pages/onboarding/estimator.vue | H5 ✓ | **verified** |
 | 3 | onboarding/connect | pages/onboarding/connect.vue | H5 ✓(tsc+intro渲染;calib/result逻辑同源待视觉补) | **verified** |
-| 4 | register | pages/register/register.vue | H5 ✓(step1+sponsor确定性;step2/3逻辑同源tsc过) | **verified** |
-| 5 | login | pages/login/login.vue | H5 ✓(password+otp mode 渲染+切换;reset+signIn timer+safeReturnTo 逻辑同源tsc过) | **verified** |
+| 4 | register | pages/register/register.vue | H5 ✓(step1+sponsor确定性;step2/3+已注册手机号验码后自动登录、账号枚举防护、legacy 迁移续跑/失败关闭、K1 IP/设备双闸实测) | **verified** |
+| 5 | login | pages/login/login.vue | H5 ✓(password+otp mode 渲染+切换;reset+signIn timer+safeReturnTo、OTP 回退竞态保护实测) | **verified** |
 | 6 | (main) `/` home | pages/index/index | H5 ✓ | **✅ 完整 verified**(全 19 section,21 home 组件,Playwright 0 err 双语,11 sparkline 渲染。整个 mission-control.tsx 3157 行已拆迁) |
 | 7 | store | pages/store/store | H5 ✓ | **✅ verified**(Playwright 0 err 双语,3 product 图 + Hero 640× + 算力阶梯 5 档 + vsPhone + 产品卡 Best Seller + locked gen2 全渲染) |
 | 8 | store/[productId] | pages/store/detail?id= | H5 ✓ | **✅ verified**(Playwright 0 err 双语;ProductRender+live social proof+vsPhone+ROI stepper+specs+reviews+FAQ+sticky CTA,?id= 路由生效) |

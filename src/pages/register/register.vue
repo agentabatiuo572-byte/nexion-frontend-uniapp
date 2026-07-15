@@ -3,10 +3,10 @@
     <view class="rg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="rg-top">
-        <view v-if="step > 1" class="rg-iconbtn" @click="back">
+        <view v-if="step > 1" class="rg-iconbtn" role="button" tabindex="0" :aria-label="t.register.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
-        <view v-else class="rg-iconbtn" @click="close">
+        <view v-else class="rg-iconbtn" role="button" tabindex="0" :aria-label="t.register.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="rg-brand">
@@ -56,9 +56,9 @@
             <input v-for="(d, i) in code" :key="i" class="rg-otp__in" :class="{ 'rg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
           </view>
           <view class="rg-resend">
-            <text class="rg-resend__change" @click="back">{{ t.register.changeNumber }}</text>
+            <text class="rg-resend__change" role="button" tabindex="0" :aria-label="t.register.changeNumber" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.register.changeNumber }}</text>
             <text v-if="resendLeft > 0" class="rg-resend__count">{{ resendInText }}</text>
-            <text v-else class="rg-resend__btn" @click="resend">{{ t.register.resend }}</text>
+            <text v-else class="rg-resend__btn" role="button" tabindex="0" :aria-label="t.register.resend" @click="resend" @keydown.enter.prevent="resend" @keydown.space.prevent="resend">{{ t.register.resend }}</text>
           </view>
           <view class="rg-invite">
             <text class="rg-invite__lbl">{{ t.register.inviteLabel }} <text class="rg-invite__opt">{{ lockedRef ? t.register.inviteLockedLabel : t.register.inviteOptional }}</text></text>
@@ -79,7 +79,7 @@
         <view v-else class="rg-step3">
           <view class="rg-field-wrap" :class="{ 'rg-field-wrap--err': password && !pwdOk }">
             <input class="rg-field rg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.register.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" @input="onPwd" />
-            <view class="rg-eye" @click="showPwd = !showPwd">
+            <view class="rg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.register.hidePassword : t.register.showPassword" :aria-pressed="showPwd" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
@@ -97,7 +97,6 @@
         <text class="rg-review__title">{{ t.register.rewardReviewTitle }}</text>
         <text class="rg-review__body">{{ reviewNoticeBody }}</text>
       </view>
-
       <!-- Welcome bonus chip (step 1) -->
       <view v-if="step === 1" class="rg-bonus">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z" /></svg>
@@ -111,9 +110,22 @@
       </view>
 
       <!-- Primary CTA -->
-      <view class="rg-cta" :class="[ctaEnabled && !verifying ? 'rg-cta--on' : '', verifying ? 'rg-cta--busy' : '']" @click="onCta">
-        <text class="rg-cta__t" :class="ctaEnabled && !verifying ? 'rg-cta__t--on' : ''">{{ ctaLabel }}</text>
+      <view
+        class="rg-cta"
+        :class="[ctaEnabled && !busy ? 'rg-cta--on' : '', busy ? 'rg-cta--busy' : '']"
+        role="button"
+        tabindex="0"
+        :aria-label="ctaLabel"
+        :aria-disabled="!ctaEnabled || busy"
+        :aria-busy="busy"
+        :aria-describedby="!ctaEnabled && !busy ? 'rg-cta-reason' : undefined"
+        @click="onCta"
+        @keydown.enter.prevent="onCta"
+        @keydown.space.prevent="onCta"
+      >
+        <text class="rg-cta__t" :class="ctaEnabled && !busy ? 'rg-cta__t--on' : ''">{{ ctaLabel }}</text>
       </view>
+      <text v-if="!ctaEnabled && !busy" id="rg-cta-reason" class="rg-sr-only">{{ ctaDisabledReason }}</text>
 
       <!-- OAuth (step 1) -->
       <view v-if="step === 1" class="rg-oauth">
@@ -128,8 +140,8 @@
 
       <!-- Footer -->
       <view class="rg-footer">
-        <text v-if="step === 1" class="rg-footer__acc">{{ t.register.haveAccount }} <text class="rg-footer__link" @click="goLogin">{{ t.register.signIn }}</text></text>
-        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" @click="goTerms">{{ t.register.termsServiceLink }}</text>{{ t.register.termsAndPrivacy }}</text>
+        <text v-if="step === 1" class="rg-footer__acc">{{ t.register.haveAccount }} <text class="rg-footer__link" role="link" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">{{ t.register.signIn }}</text></text>
+        <text class="rg-footer__terms">{{ t.register.termsPrefix }}<text class="rg-footer__terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.register.termsServiceLink }}</text>{{ t.register.termsAndPrivacy }}</text>
       </view>
     </view>
 
@@ -140,15 +152,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed, nextTick, onUnmounted } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
-import { otpSend, otpVerify } from "@/store/auth-otp";
-import { useAuth } from "@/store/auth";
-import { useSession } from "@/store/session";
+import {
+  exchangeVerifiedSignIn,
+  finalizeVerifiedRegistration,
+  otpSend,
+  otpVerify,
+  registerVerifiedPhone,
+} from "@/store/auth-otp";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
@@ -159,10 +175,10 @@ import { evaluateRegistration, commitRegistration, type RegistrationAssessment }
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
+import { completeSignIn } from "@/auth/complete-sign-in";
+import { restoreActivatedRegistrationSession } from "@/auth/complete-registration";
 
 const t = useT();
-const auth = useAuth();
-const session = useSession();
 const app = useApp();
 const bills = useBills();
 const sponsorship = useSponsorship();
@@ -194,8 +210,12 @@ const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
 // OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
 const verifying = ref(false);
+const completing = ref(false);
+const otpRequestId = ref<string | null>(null);
+const verifiedToken = ref<string | null>(null);
 const resendLeft = ref(0);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
+let otpFlowVersion = 0;
 let mounted = true;
 
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
@@ -219,16 +239,26 @@ const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
 const pwdOk = computed(() => isPasswordOk(password.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => password.value === confirmPwd.value && pwdOk.value);
+const busy = computed(() => verifying.value || completing.value);
 const ctaEnabled = computed(() => (step.value === 1 ? phoneOk.value : step.value === 2 ? codeOk.value : pwdMatch.value));
 const ctaLabel = computed(() =>
-  step.value === 2 && verifying.value
-    ? t.value.register.verifying
+  step.value === 2 && verifiedToken.value
+    ? verifying.value ? t.value.register.signingIn : t.value.register.retrySignIn
+    : step.value === 2 && verifying.value
+      ? t.value.register.verifying
+    : step.value === 3 && completing.value
+      ? t.value.register.creating
     : step.value === 1
       ? t.value.register.sendCode
       : step.value === 2
         ? t.value.register.verify
         : t.value.register.finish,
 );
+const ctaDisabledReason = computed(() => {
+  if (step.value === 1) return t.value.register.ctaDisabledPhone;
+  if (step.value === 2) return t.value.register.ctaDisabledCode;
+  return t.value.register.ctaDisabledPassword;
+});
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.cluster.status !== "clear");
 // 分因提示: 同簇重复账号用「设备已有账号活动」口径;裸号/未绑定用「先审核,绑定后释放」口径。
@@ -240,12 +270,24 @@ const reviewNoticeBody = computed(() => {
   return !dup && bare ? t.value.register.rewardReviewBodyUnbound : t.value.register.rewardReviewBody;
 });
 
+function invalidateOtpFlow() {
+  otpFlowVersion += 1;
+  verifying.value = false;
+}
+
 // uni <input> delivers the value on e.detail.value at runtime; vue-tsc types
 // the payload as a DOM Event, so we read detail through a narrow cast helper.
 function inputVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
-function onPhone(e: Event) { phone.value = inputVal(e); error.value = null; registrationRisk.value = null; }
+function onPhone(e: Event) {
+  invalidateOtpFlow();
+  phone.value = inputVal(e);
+  error.value = null;
+  registrationRisk.value = null;
+  otpRequestId.value = null;
+  verifiedToken.value = null;
+}
 function onInvite(e: Event) { invite.value = inputVal(e); registrationRisk.value = null; }
 function onCode(i: number, e: Event) {
   const digits = inputVal(e).replace(/\D/g, "");
@@ -259,10 +301,18 @@ function onCode(i: number, e: Event) {
 function onPwd(e: Event) { password.value = inputVal(e); error.value = null; }
 function onConfirm(e: Event) { confirmPwd.value = inputVal(e); error.value = null; }
 
-function pickCountry(c: string) { country.value = c; showCountries.value = false; }
+function pickCountry(c: string) {
+  invalidateOtpFlow();
+  country.value = c;
+  showCountries.value = false;
+}
 
 function onCta() {
-  if (verifying.value) return;
+  if (busy.value) return;
+  if (!ctaEnabled.value) {
+    error.value = ctaDisabledReason.value;
+    return;
+  }
   if (step.value === 1) goSendCode();
   else if (step.value === 2) verifyCode();
   else finish();
@@ -275,11 +325,15 @@ function goSendCode() {
 // FEAT-AUTH01: 发码统一走闸门(冷却/24h 限频/滑块);倒计时以 server 返回值为准。
 async function requestCode(captchaTicket?: string) {
   if (verifying.value) return;
+  const phoneAtRequest = fullPhone.value;
+  const flowVersion = ++otpFlowVersion;
   verifying.value = true;
-  const res = await otpSend(fullPhone.value, "register", captchaTicket);
-  if (!mounted) return;
+  const res = await otpSend(phoneAtRequest, "register", captchaTicket);
+  if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
   verifying.value = false;
   if (res.ok) {
+    otpRequestId.value = res.requestId;
+    verifiedToken.value = null;
     code.value = ["", "", "", "", "", ""];
     focusIdx.value = 0;
     step.value = 2;
@@ -311,20 +365,34 @@ function resend() {
 }
 function currentSponsorCode(): string | null {
   // 锁定码优先(?ref / pendingRefCode);仅无锁定时才取手输([FEAT-SHARE4] ③)。
-  return lockedRef.value || invite.value.trim() || null;
+  return lockedRef.value || normalizeRefCode(invite.value);
 }
 async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
+  if (verifiedToken.value) {
+    verifying.value = true;
+    exchangeVerifiedAccount(verifiedToken.value, fullPhone.value, otpFlowVersion);
+    return;
+  }
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
-  // ⚠️ MOCK-ONLY: server 同构 OTP 校验(FEAT-AUTH01,TTL/attemptsLeft/一码一)
-  // + K1 注册前评估的接口形态。PROD: POST /api/auth/otp/verify → 服务端验码 +
-  // K1 评估,返回 { gateRoute, cluster, giftRoute } 同构结论;client 只消费,
-  // 不本地判定。返回的 verifyToken 在 PROD 必须由后续注册提交端点
-  // (POST /api/auth/register)重新出示校验;mock 下通过即视为凭证有效。
+  // ⚠️ MOCK-ONLY: PRD 已列的 OTP verify 的 TTL/attempts/一码一与验后账号分流
+  // 在 auth-otp mock；K1 注册评估仍在下方 client mock 执行，不能声称由本次 OTP
+  // 响应返回。PROD 应由注册事务（endpoint/回执契约 TBD）原子重校验 verifyToken、
+  // K1 与唯一性，并只返回服务端结论。
   verifying.value = true;
-  const res = await otpVerify(fullPhone.value, "register", codeStr.value);
-  if (!mounted) return;
+  const requestId = otpRequestId.value;
+  if (!requestId) { verifying.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
+  const phoneAtVerify = fullPhone.value;
+  const flowVersion = otpFlowVersion;
+  const res = await otpVerify(phoneAtVerify, "register", requestId, codeStr.value);
+  if (
+    !mounted
+    || flowVersion !== otpFlowVersion
+    || step.value !== 2
+    || otpRequestId.value !== requestId
+    || fullPhone.value !== phoneAtVerify
+  ) return;
   if (!res.ok) {
     verifying.value = false;
     if (res.error === "otp_invalid") {
@@ -335,22 +403,62 @@ async function verifyCode() {
       error.value = t.value.authOtp.errorOtpExhausted;
       code.value = ["", "", "", "", "", ""];
       focusIdx.value = 0;
+    } else if (res.error === "account_lookup_failed") {
+      error.value = t.value.authOtp.errorServiceUnavailable;
     } else {
       error.value = t.value.authOtp.errorOtpNotFound;
     }
     return;
   }
+  verifiedToken.value = res.verifyToken;
+  if (res.nextAction === "sign_in") {
+    exchangeVerifiedAccount(res.verifyToken, phoneAtVerify, flowVersion);
+    return;
+  }
+  if (res.nextAction !== "continue_registration") {
+    verifying.value = false;
+    verifiedToken.value = null;
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
+  }
   const assessment = evaluateRegistration(prospectiveIdentity(), { sponsorId: currentSponsorCode() });
   registrationRisk.value = assessment;
   verifying.value = false;
-  // FEAT-RISK01 异常2: IP 24h 超限 → 停留注册页,可重试,不创建本地账号。
-  if (assessment.gateRoute === "manual_or_reject") {
-    error.value = t.value.register.errorSignupLimited;
-    return;
-  }
+  // 只在最终 reserve 时执行 signup gate：验码后的 pending 恢复必须先由
+  // 账号目录识别并沿用冻结上下文，不能被此刻变化的页面/K1 临时态拦断。
   step.value = 3;
 }
+async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flowVersion: number) {
+  if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtVerify) return;
+  const exchange = exchangeVerifiedSignIn(phoneAtVerify, token);
+  if (!exchange.ok) {
+    verifying.value = false;
+    if (exchange.error !== "account_directory_unavailable") verifiedToken.value = null;
+    error.value = exchange.error === "account_directory_unavailable"
+      ? t.value.authOtp.errorServiceUnavailable
+      : t.value.authOtp.errorOtpExpired;
+    return;
+  }
+  // 立即进入既有登录完成链，不以人为计时器阻塞；toast 会随目标页面的 GlobalUi
+  // 保留“已注册 / 正在登录”的可读反馈。
+  toast.info(t.value.register.accountExistsTitle, t.value.register.accountExistsSigningIn);
+  await nextTick();
+  if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtVerify) return;
+  const completed = completeSignIn({
+    identity: exchange.accountId,
+    sponsorCode: currentSponsorCode(),
+    idempotencyKey: exchange.signInIdempotencyKey,
+    onboardingComplete: exchange.onboardingComplete,
+  });
+  if (!completed.ok) {
+    verifying.value = false;
+    error.value = completed.error === "account_pending"
+      ? t.value.login.errorRegistrationIncomplete
+      : t.value.authOtp.errorServiceUnavailable;
+  }
+}
 function finish() {
+  if (completing.value) return;
   error.value = null;
   if (!pwdOk.value) { error.value = t.value.register.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.register.passwordMismatch; return; }
@@ -359,41 +467,121 @@ function finish() {
   // 完成时点重评(含最新邀请码): R5 口径下评估随调随算,不留步骤间缓存。
   const assessment = evaluateRegistration(identity, { sponsorId: sponsorCode });
   registrationRisk.value = assessment;
-  if (assessment.gateRoute === "manual_or_reject") {
-    error.value = t.value.register.errorSignupLimited;
+  const token = verifiedToken.value;
+  if (!token) {
+    error.value = t.value.authOtp.errorOtpExpired;
+    step.value = 2;
+    code.value = ["", "", "", "", "", ""];
+    otpRequestId.value = null;
+    resendLeft.value = 0;
     return;
   }
-  auth.signUp(identity);
-  app.bindAccount(identity);
-  rebindAccountScopedStores(identity);
-  commitRegistration(identity, { sponsorId: sponsorCode });
-  // New account claims this carrier's session; first-time calibration runs as
-  // part of onboarding (connect.vue) which then marks this device calibrated.
-  session.claim(identity);
-  let giftParam: "posted" | "pending" | "none" = "none";
-  if (sponsorCode) {
-    sponsorship.bind(sponsorCode);
-    const gift = sponsorship.claimGift(identity);
-    if (gift) {
-      const posted = app.creditRewardBucket(assessment.giftRoute, gift.usdt, gift.nex);
-      const giftRef = `GIFT-${Date.now().toString(36).toUpperCase()}`;
-      const giftPosted = assessment.giftRoute === "withdrawable";
-      giftParam = giftPosted ? "posted" : "pending";
-      const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
-      bills.add({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
-      bills.add({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
-      if (posted && giftPosted) {
-        toast.success(`+$${gift.usdt} + ${gift.nex} NEX`, sponsorPreview.value ? `Sponsored by ${sponsorPreview.value.name}` : t.value.register.giftCreditedToastSub);
-      } else {
-        toast.info(t.value.register.giftPendingToast, t.value.register.giftPendingToastSub);
+  completing.value = true;
+  const accountResult = registerVerifiedPhone(fullPhone.value, token, {
+    sponsorCode,
+    giftRoute: assessment.giftRoute,
+    allowCreate: assessment.gateRoute !== "manual_or_reject",
+  });
+  if (!accountResult.ok) {
+    if (accountResult.error === "account_exists") {
+      completing.value = false;
+      step.value = 2;
+      verifying.value = true;
+      exchangeVerifiedAccount(token, fullPhone.value, otpFlowVersion);
+      return;
+    } else if (accountResult.error === "registration_blocked") {
+      error.value = t.value.register.errorSignupLimited;
+    } else {
+      error.value = accountResult.error === "account_directory_unavailable"
+        ? t.value.authOtp.errorServiceUnavailable
+        : t.value.authOtp.errorOtpExpired;
+    }
+    completing.value = false;
+    return;
+  }
+  const previousAccountKey = app.accountKey || "default";
+  const restorePreviousAccountScope = () => {
+    app.bindAccount(previousAccountKey);
+    rebindAccountScopedStores(previousAccountKey);
+  };
+  if (accountResult.alreadyCommitted) {
+    completeActivatedRegistration(accountResult.accountId, restorePreviousAccountScope);
+    return;
+  }
+  const createdIdentity = accountResult.accountId;
+  const registration = accountResult.registration;
+  if (!registration) {
+    completing.value = false;
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
+  }
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION：注册提交依次写账号目录 pending → 当前
+  // account-cloud 作用域 → K1 风险身份 → 推荐绑定/礼包领取 → 奖励余额回执 → 两条
+  // 账单 → active finalize。任一步失败不把半成品账号留作当前作用域；已落的业务
+  // 副作用由冻结 giftRef + 幂等补齐链在同号重试时收敛。PROD 应由服务端单事务完成
+  // （注册提交 endpoint TBD; candidate: `POST /api/auth/register`）。
+  try {
+    app.bindAccount(createdIdentity);
+    rebindAccountScopedStores(createdIdentity);
+    if (!commitRegistration(createdIdentity, { sponsorId: registration.sponsorCode })) {
+      throw new Error("risk_registration_unavailable");
+    }
+    if (registration.sponsorCode) {
+      if (!sponsorship.bind(registration.sponsorCode)) throw new Error("sponsor_bind_unavailable");
+      const gift = sponsorship.ensureGiftClaim(createdIdentity, {
+        usdt: registration.giftUsdt,
+        nex: registration.giftNex,
+      });
+      if (!gift) throw new Error("gift_claim_unavailable");
+      {
+        const posted = app.creditRewardBucketOnce(registration.giftRef, registration.giftRoute, gift.usdt, gift.nex);
+        if (!posted) throw new Error("gift_credit_unavailable");
+        const giftRef = registration.giftRef;
+        const giftPosted = registration.giftRoute === "withdrawable";
+        const giftMemo = giftPosted ? t.value.register.giftBillMemo : t.value.register.giftPendingBillMemo;
+        const usdtBill = bills.addOnce({ type: "bonus", symbol: "USDT", amount: gift.usdt, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
+        const nexBill = bills.addOnce({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
+        if (!usdtBill || !nexBill) throw new Error("gift_bill_unavailable");
+        if (posted && giftPosted) {
+          toast.success(`+$${gift.usdt} + ${gift.nex} NEX`, sponsorPreview.value ? `Sponsored by ${sponsorPreview.value.name}` : t.value.register.giftCreditedToastSub);
+        } else {
+          toast.info(t.value.register.giftPendingToast, t.value.register.giftPendingToastSub);
+        }
       }
     }
+  } catch {
+    restorePreviousAccountScope();
+    completing.value = false;
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
   }
+  const finalized = finalizeVerifiedRegistration(fullPhone.value, token);
+  if (!finalized.ok) {
+    restorePreviousAccountScope();
+    completing.value = false;
+    error.value = finalized.error === "account_directory_unavailable"
+      ? t.value.authOtp.errorServiceUnavailable
+      : t.value.authOtp.errorOtpExpired;
+    return;
+  }
+  completeActivatedRegistration(finalized.accountId, restorePreviousAccountScope);
+}
+function completeActivatedRegistration(accountId: string, restorePreviousAccountScope: (() => void) | null = null) {
+  // finalize→auth/session 之间中断时，同一注册结果会再次走这里补齐登录态。
+  if (!restoreActivatedRegistrationSession(accountId)) {
+    restorePreviousAccountScope?.();
+    completing.value = false;
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
+  }
+  launchRegistrationSuccess();
+}
+function launchRegistrationSuccess() {
   // [FEAT-SHARE5] H5 注册完成 → 成功页(礼包确认 + 引导下载 APP);
   // APP 壳内注册装 APP 引导无意义,直进 onboarding(异常2)。
   // #ifdef H5
   uni.reLaunch({
-    url: `/pages/register/success?gift=${giftParam}`,
+    url: "/pages/register/success",
     fail: () => uni.reLaunch({ url: "/pages/onboarding/estimator", fail: () => {} }),
   });
   // #endif
@@ -405,8 +593,13 @@ function prospectiveIdentity() {
   return `${country.value}${phoneClean.value}@demo.nexion.ai`;
 }
 function back() {
+  invalidateOtpFlow();
   error.value = null;
   registrationRisk.value = null;
+  verifying.value = false;
+  completing.value = false;
+  otpRequestId.value = null;
+  verifiedToken.value = null;
   code.value = ["", "", "", "", "", ""];
   focusIdx.value = 0;
   if (resendTimer) clearInterval(resendTimer);
@@ -419,6 +612,7 @@ function goTerms() { uni.navigateTo({ url: "/pages/onboarding/terms", fail: () =
 
 function cleanup() {
   mounted = false;
+  invalidateOtpFlow();
   if (resendTimer) clearInterval(resendTimer);
 }
 onUnload(() => cleanup());
@@ -485,6 +679,7 @@ onUnmounted(() => cleanup());
 .rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
 .rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent); border-radius: 8px; padding: 8px 12px; }
 .rg-error__t { flex: 1; }
+.rg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
 .rg-cta--on { background: var(--v5-brand); }
 .rg-cta--busy { opacity: 0.7; }

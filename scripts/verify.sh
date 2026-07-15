@@ -184,12 +184,12 @@ sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-el
 sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility.ts 'new-address-hold'
 # 消费层: 注册 / 结算 / 钱包 / 提现
 sentinel_present "SPEC-7 register evaluates via engine" src/pages/register/register.vue 'evaluateRegistration\(prospectiveIdentity\(\)'
-sentinel_present "SPEC-7 register honors signup gate" src/pages/register/register.vue 'gateRoute === "manual_or_reject"'
+sentinel_present "SPEC-7 register honors signup gate" src/pages/register/register.vue 'assessment\.gateRoute !== "manual_or_reject"'
 sentinel_present "SPEC-7 register OTP verify is async with loading state" src/pages/register/register.vue 'verifying\.value = true'
 sentinel_present "SPEC-7 register review copy is reason-aware" src/pages/register/register.vue 'rewardReviewBodyUnbound'
-sentinel_present "SPEC-7 register commits identity" src/pages/register/register.vue 'commitRegistration\(identity'
-sentinel_present "SPEC-7 welcome gift routes through buckets (R6)" src/pages/register/register.vue 'creditRewardBucket\(assessment\.giftRoute'
-sentinel_present "SPEC-7 welcome gift claimed per account" src/pages/register/register.vue 'claimGift\(identity\)'
+sentinel_present "SPEC-7 register commits canonical account identity" src/pages/register/register.vue 'commitRegistration\(createdIdentity'
+sentinel_present "SPEC-7 welcome gift routes through idempotent buckets (R6)" src/pages/register/register.vue 'creditRewardBucketOnce\(registration\.giftRef, registration\.giftRoute'
+sentinel_present "SPEC-7 welcome gift claimed per canonical account" src/pages/register/register.vue 'ensureGiftClaim\(createdIdentity'
 sentinel_present "SPEC-7 sponsorship tracks claimed accounts" src/store/sponsorship.ts 'giftClaimedByAccount'
 # 新人礼金额可配(2026-07-03 主人批): 金额只从 platform config 读,本地常量禁存(CGM-F-020)
 sentinel_present "SPEC-7 gift amounts read from config" src/store/sponsorship.ts 'rewards\.welcomeGift'
@@ -232,8 +232,22 @@ if grep -qE 'const RESEND_SECONDS' src/pages/login/login.vue src/pages/register/
 else
   ok "AUTH01 no local resend-seconds constants (config-derived)"
 fi
+# FEAT-AUTH02 已注册手机号分流：账号目录是唯一事实源；验证码通过后才可发现
+# 老号进入既有登录链后，目标页 toast 必须持续展示可读提示。运行时链放在下方 H5
+# browser gate。
+sentinel_present "AUTH02 phone account directory exists" src/store/auth-account.ts 'AUTH_ACCOUNT_STORAGE_KEY'
+sentinel_present "AUTH02 OTP exchanges verified old number" src/store/auth-otp.ts 'exchangeVerifiedSignIn'
+sentinel_present "AUTH02 registered-number handoff uses destination toast" src/pages/register/register.vue 'toast\.info\(t\.value\.register\.accountExistsTitle'
+sentinel_present "AUTH02 handoff toast is assistive-technology announced" src/components/global-ui.vue 'aria-live="polite"'
+sentinel_present "AUTH02 sign-in rejects an unregistered phone identity" src/auth/complete-sign-in.ts '"account_not_found"'
+sentinel_present "AUTH02 legacy risk migration seals schema2 barrier" src/store/risk-identity.ts 'sealLegacyRiskRegistryForAuthDirectory'
+sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-scope.ts 'useSponsorship\(\)\.bindAccount\(accountKey\)'
+sentinel_present "AUTH02 sponsorship stores bindings per account" src/store/sponsorship.ts 'bindingsByAccount'
+sentinel_present "AUTH02 dev bridge is entrypoint DEV-gated" src/main.ts 'if \(import\.meta\.env\.DEV\)'
 sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
 sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 't\.value\.wallet\.riskReasons'
+sentinel_present "SPEC-7 payment-instrument overuse mapped (en)" src/i18n/messages/en.ts '"payment-instrument-overuse"'
+sentinel_present "SPEC-7 payment-instrument overuse mapped (zh)" src/i18n/messages/zh.ts '"payment-instrument-overuse"'
 sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'if \(!import\.meta\.env\.DEV\) return'
 sentinel_present "SPEC-7 earning buckets typed" src/store/types.ts 'interface EarningBuckets'
 sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earningBuckets: EarningBuckets'
@@ -548,12 +562,32 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
 else
   printf "  ${Y}SKIP${N}  SPEC-6 entry-surface runtime isolation (dev server not running at %s)\n" "$BASE_URL"
 fi
+# FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
+# “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs >/tmp/uni-spec7-risk-gate-runtime.log 2>&1; then
+    ok "$(cat /tmp/uni-spec7-risk-gate-runtime.log)"
+  else
+    bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' /tmp/uni-spec7-risk-gate-runtime.log
+  fi
+  for AUTH02_LOCALE in en zh; do
+    if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE" >/tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log 2>&1; then
+      ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
+    else
+      bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
+    fi
+  done
+else
+  printf "  ${Y}SKIP${N}  SPEC-7 K1 device/payment registration gates (dev server not running at %s)\n" "$BASE_URL"
+  printf "  ${Y}SKIP${N}  AUTH02 registered-number runtime handoff (EN/ZH; dev server not running at %s)\n" "$BASE_URL"
+fi
 # ── SPEC-4 account-cloud + multi-carrier session sentinels ──
 sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexion-account-cloud-v1'
 sentinel_present "SPEC-4 app binds account snapshot" src/store/app.ts 'function bindAccount'
 sentinel_present "SPEC-4 app persists account snapshot" src/store/app.ts 'function persistAccountSnapshot'
-sentinel_present "SPEC-4 login binds account before session claim" src/pages/login/login.vue 'app\.bindAccount\(identity\)'
-sentinel_present "SPEC-4 register binds account before rewards" src/pages/register/register.vue 'app\.bindAccount\(identity\)'
+sentinel_present "SPEC-4 login uses canonical sign-in completion" src/pages/login/login.vue 'completeSignIn\('
+sentinel_present "SPEC-4 canonical sign-in binds account before session claim" src/auth/complete-sign-in.ts 'app\.bindAccount\(options\.identity\)'
+sentinel_present "SPEC-4 register binds canonical account before rewards" src/pages/register/register.vue 'app\.bindAccount\(createdIdentity\)'
 sentinel_present "SPEC-4 entry surface supports white-app carrier" src/lib/entry-surface.ts '"white-app"'
 sentinel_present "SPEC-4 session registry storage exists" src/store/session.ts 'nexion-account-sessions-v1'
 sentinel_present "SPEC-4 security page uses live session registry" src/pages/me/security.vue 'session\.activeSessions'
@@ -629,6 +663,7 @@ spec4_account_session_semantics() {
     const appVue=fs.readFileSync("src/App.vue","utf8");
     const login=fs.readFileSync("src/pages/login/login.vue","utf8");
     const register=fs.readFileSync("src/pages/register/register.vue","utf8");
+    const signIn=fs.readFileSync("src/auth/complete-sign-in.ts","utf8");
     const entry=fs.readFileSync("src/lib/entry-surface.ts","utf8");
     const wallet=fs.readFileSync("src/pages/me/wallet.vue","utf8");
     const withdrawalTracking=fs.readFileSync("src/pages/me/wallet-withdraw-tracking.vue","utf8");
@@ -640,14 +675,15 @@ spec4_account_session_semantics() {
     if(!/restored\.status === "kicked"[\s\S]*uni\.reLaunch\(\{ url: "\/pages\/session\/kicked" \}\)/.test(appVue)) throw new Error("app startup must route restored revoked sessions to kicked page");
     if(/useSession\(\)\.claim\(key\)/.test(appVue)) throw new Error("app startup still blindly claims a new session");
     if(!/revokeAllOtherSessions/.test(session)) throw new Error("session revoke-all action missing");
-    if(!/mergeAndWriteAccountSnapshot\(lastCloudSnapshot, snapshot\)/.test(app)) throw new Error("account snapshot is not merged through app store");
-    if(!/adoptAccountSnapshot\(merged\)/.test(app)) throw new Error("merged account snapshot is not adopted back into app state");
+    if(!/mergeAndWriteAccountSnapshotResult\(lastCloudSnapshot, snapshot\)/.test(app)) throw new Error("account snapshot is not merged through app store");
+    if(!/adoptAccountSnapshot\(result\.snapshot\)/.test(app)) throw new Error("merged account snapshot is not adopted back into app state");
     if(!/accountKey,\s*entrySurface,\s*accountCloudUpdatedAt/.test(app)) throw new Error("account cloud state is not returned to consumers");
-    if(!/auth\.signIn\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(login)) throw new Error("login must bind account before session claim");
-    if(!/auth\.signUp\(identity\)[\s\S]*app\.bindAccount\(identity\)[\s\S]*session\.claim\(identity\)/.test(register)) throw new Error("register must bind account before rewards/session flow");
+    if(!/completeSignIn\(\{[\s\S]*identity/.test(login)) throw new Error("login does not use the canonical sign-in completion");
+    if(!/auth\.signIn\(options\.identity, onboardingComplete\)[\s\S]*app\.bindAccount\(options\.identity\)[\s\S]*session\.(resumeOrClaim|claim)\(options\.identity\)/.test(signIn)) throw new Error("canonical sign-in must bind account before session claim");
+    if(!/app\.bindAccount\(createdIdentity\)[\s\S]*rebindAccountScopedStores\(createdIdentity\)[\s\S]*commitRegistration\(createdIdentity/.test(register)) throw new Error("register must bind/rebind canonical account before rewards/session flow");
     if(!/app\.bindAccount\(key\);\s*[\r\n]+\s*rebindAccountScopedStores\(key\)/.test(appVue)) throw new Error("P2-8: app startup must rebind account-scoped stores (genesis/v-rank) right after bindAccount");
-    if(!/app\.bindAccount\(identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(identity\)/.test(login)) throw new Error("P2-8: login must rebind account-scoped stores right after bindAccount");
-    if(!/app\.bindAccount\(identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(identity\)/.test(register)) throw new Error("P2-8: register must rebind account-scoped stores right after bindAccount");
+    if(!/app\.bindAccount\(options\.identity\);\s*[\r\n]+\s*rebindAccountScopedStores\(options\.identity\)/.test(signIn)) throw new Error("P2-8: canonical sign-in must rebind account-scoped stores right after bindAccount");
+    if(!/app\.bindAccount\(createdIdentity\);\s*[\r\n]+\s*rebindAccountScopedStores\(createdIdentity\)/.test(register)) throw new Error("P2-8: register must rebind account-scoped stores right after bindAccount");
     if(!/entry === "white-app" \|\| entry === "white" \|\| entry === "cloak" \|\| entry === "janus"/.test(entry)) throw new Error("white-app entry aliases missing");
     const messages=fs.readFileSync("src/i18n/messages/zh.ts","utf8")+fs.readFileSync("src/i18n/messages/en.ts","utf8");
     if(/同一时间只能有一台设备运行挖矿|only one device runs mining at a time/.test(messages)) throw new Error("old strong single-device copy leaked");
