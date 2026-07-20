@@ -9,9 +9,9 @@ const IS_PRODUCTION = import.meta.env.PROD;
 // flags + tunable platform config across all carriers (signed APP / H5 /
 // janus-loaded real-disc).
 //
-// MOCK-ONLY: seeded from mock/platform-config.ts. PROD: replace the seed with
-// `GET /api/config/platform` on app boot; the admin console pushes updates and
-// the client treats config as READ-ONLY (no client mutation in production).
+// MOCK-ONLY: seeded from mock/platform-config.ts. Future PROD wiring replaces
+// the seed with `GET /api/config/platform` on app boot; the client treats the
+// fetched response as READ-ONLY (no current admin push channel in this repo).
 export const useConfig = defineStore("config", () => {
   // PROD: hydrate from GET /api/config/platform instead of the mock seed.
   const config = ref<PlatformConfig>({

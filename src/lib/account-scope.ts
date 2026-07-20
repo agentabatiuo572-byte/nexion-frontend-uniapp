@@ -27,6 +27,8 @@ import { useProfile } from "@/store/profile";
 import { useSecurity } from "@/store/security";
 import { useRewardsSeen } from "@/store/rewards-seen";
 import { useSponsorship } from "@/store/sponsorship";
+import { useConversations } from "@/store/conversations";
+import { useNova } from "@/store/nova";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -39,6 +41,7 @@ import { useSponsorship } from "@/store/sponsorship";
  *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(KYC/日限/终身额) · 绑卡 · 签到状态机 · 钱包配对(KYC 源头)
  *  批3 任务/成就/游戏化:任务完成 · 周任务 · 活动任务 · 里程碑 fired · 成就 · 目标 · 幸运转盘票据 · 每日增益
  *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
+ *  批5 会话记录:会话中心(advisor/support) · Nova 记录 — 非持久,换号 = reset 重播种
  * 顺带保留设备级(平台态/设备偏好,不迁):主题 · 语言 · preferences · auth 登录态 ·
  * session · risk-cluster · risk-identity · earning-release(以 accountKey 为参的注册表,已按账号)·
  * product-phase · trial-config · genesis-config(运营镜像)。
@@ -73,6 +76,10 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useProfile().bindAccount(accountKey);
   useSecurity().bindAccount(accountKey);
   useSponsorship().bindAccount(accountKey);
+  // 会话中心 + Nova 是非持久会话记录(无按账号存储),换号语义 = 清空重播种——
+  // 防上一账号的客服对话/Nova 推送在 SPA 内切号(reLaunch 不重载文档)后被下一账号看到。
+  useConversations().reset();
+  useNova().reset();
   // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
   useRewardsSeen().bindAccount(accountKey);
 }

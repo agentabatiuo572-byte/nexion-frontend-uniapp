@@ -425,11 +425,14 @@ export const en = {
     techStreaming: "streaming",
     techVsYesterday: "↑ +5.2% vs yesterday · 142 jobs settled",
     // DayOneQuestCard
-    dayOneFirstDayReward: "first-day reward",
+    taskCarouselLabel: "New user and weekly tasks",
+    taskCarouselPosition: "Slide {current} of {total}: {title}",
+    dayOneFirstDayReward: "New user tasks",
     dayOneEndsIn: "ends in",
     dayOneDoneSuffix: "done",
     dayOneEarnedSuffix: "earned",
     dayOneViewTasks: "View {n} tasks",
+    dayOneTaskCount: "{n} tasks",
     dayOneHideTasks: "Hide tasks",
     dayOneTaskBindCard: "Link bank card",
     dayOneTaskVisitEarn: "Visit Earn tab",
@@ -443,7 +446,7 @@ export const en = {
     dayOneCatIdentity: "identity",
     dayOneCatSocial: "social",
     // ConversionBanner (weekly quest)
-    weeklyQuestEyebrow: "☄ This week's quest",
+    weeklyQuestEyebrow: "This week's quest",
     weeklyQuestEndsIn: "ends in",
     weeklyQuestActivateToClaim: "Activate {device} to claim",
     weeklyQuestAddCapacity: "Add capacity to claim",
@@ -2167,7 +2170,8 @@ export const en = {
     qHowToBoost: "How to boost?",
     qWhatsHot: "What's hot now?",
     qShowTopJobs: "Show me top jobs",
-    // Live human-agent handoff
+    // Live human-agent handoff — retired 2026-07-16 (in-chat pill removed; human
+    // support now lives in the conversation center). Keys kept per dead-key policy.
     liveAgent: "Human support",
     backToAi: "Back to AI",
     agentRole: "Tier 2 Compliance Support · online",
@@ -2374,10 +2378,13 @@ export const en = {
     // List empty states
     listEmptyAdvisor: "Your advisor will reach out with opportunities that fit you.",
     listEmptySupport: "No conversations yet — start one anytime.",
+    contactSupport: "Contact support",
     newBadge: "New",
     // Chat
     inputPlaceholder: "Type a message…",
     agentTyping: "typing…",
+    sessionEnded: "Session ended",
+    restartSession: "Start a new session",
     receiptSent: "Delivered",
     receiptRead: "Read",
     rateLimited: "Sending too fast",
@@ -2400,6 +2407,12 @@ export const en = {
         "Glad that's sorted! I've closed this one — reopen anytime if anything else comes up. 🙌",
       supportUserQ:
         "Hi, my withdrawal has shown 'pending' for over a day — can you check the status?",
+      supportGreeting:
+        "You're connected — I'm {name} from Nexion support 👋 How can I help today?",
+      sessionIdleWarn:
+        "You've been quiet for a while — without a reply, this session will close automatically in about {n} min. If you still need help afterwards, you can start a new session anytime.",
+      sessionTimeoutClosed:
+        "Session ended due to inactivity — start a new one anytime and we'll connect you with an agent.",
     },
     // CTA labels for seed messages
     cta: {

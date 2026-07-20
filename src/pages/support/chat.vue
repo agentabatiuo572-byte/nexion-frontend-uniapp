@@ -2,9 +2,13 @@
   Conversation chat — full-screen thread for one conversation. Bare full-screen
   (own header + ConversationThread), NOT wrapped in AppChassis: a focused chat wants
   no tabbar / nova bubble, and its own flex column (header + scrolling messages +
-  pinned input) would fight the chassis scroll container.
+  pinned input) would fight the chassis scroll container. Not standalone-page-shell
+  either: the pinned input row owns the bottom safe-area itself (P-040), which the
+  shell's reserved band would double — so this page draws its own status bar and
+  home indicator.
 
-  query ?type=ai     → backed by the nova store (Nova): quick chips + handoff pill.
+  query ?type=ai     → backed by the nova store (Nova): quick prompt chips (human
+                       support lives in the conversation center's support tab).
   query ?cid=<id>    → backed by the conversations store (advisor / support).
 
   A separate route (vs in-page state) means each open gets a fresh onLoad, sidestepping
@@ -29,14 +33,9 @@
       <view class="cp-meta">
         <text class="cp-name">{{ headerName }}</text>
         <view class="cp-role">
-          <view class="cp-dot" :style="{ background: headerTint }" />
+          <view class="cp-dot" :style="dotStyle" />
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
-      </view>
-
-      <view v-if="isAi && supportConvId" class="cp-pill active:opacity-80" role="button" tabindex="0" :aria-label="t.nova.liveAgent" @click="toSupport">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>
-        <text class="cp-pill-t">{{ t.nova.liveAgent }}</text>
       </view>
     </view>
 
@@ -49,10 +48,19 @@
       :typing="agentTyping"
       :typing-label="t.conversations.agentTyping"
       :reveal-tick="revealTick"
+      :closed="isClosedSession"
+      :restart-label="t.conversations.restartSession"
       @send="onSend"
       @chip="onChip"
       @cta="onCta"
+      @restart="onRestart"
     />
+
+    <!-- Home Indicator — bare page (no AppChassis) draws its own. Sits over the input
+         row's bottom safe-area padding; pointer-events:none so it never blocks the input. -->
+    <view class="cp-home">
+      <DeviceHomeIndicator />
+    </view>
 
     <!-- Overlay host — this is a bare full-screen page (no AppChassis), so it must
          carry its own GlobalUi or toast/confirm/netError raised here (e.g. the send
@@ -68,6 +76,7 @@ import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import ConversationThread from "@/components/support/conversation-thread.vue";
 import GlobalUi from "@/components/global-ui.vue";
 import DeviceStatusBar from "@/components/device/device-status-bar.vue";
+import DeviceHomeIndicator from "@/components/device/device-home-indicator.vue";
 import type { ThreadMsg, QuickChip } from "@/components/support/thread-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -122,19 +131,53 @@ onLoad((q) => {
 // forward navigateTo hides this page. Managing Nova's open flag here (not only in
 // cleanup) fixes the unread-suppression bug: leaving the AI chat forward used to
 // leave isOpen=true forever, so every later proactive push silently zeroed unread.
+// While a human-support thread is on screen the idle state machine must advance
+// LIVE (quiet 1 min → in-thread countdown warning; quiet 5 min → auto-close), so a
+// coarse interval keeps calling the sweep. Store-side idempotence (idleWarnedAt /
+// sessionStatus guards) makes redundant ticks free. A real backend pushes these
+// events — the interval then becomes a harmless no-op.
+let idleTicker: ReturnType<typeof setInterval> | undefined;
+function startIdleTicker() {
+  if (idleTicker || isAi.value || !cid.value) return;
+  idleTicker = setInterval(() => convStore.sweepSupportTimeouts(), 10_000);
+}
+function stopIdleTicker() {
+  if (idleTicker) {
+    clearInterval(idleTicker);
+    idleTicker = undefined;
+  }
+}
+
 onShow(() => {
   revealTick.value += 1;
   if (isAi.value) nova.open(); // mark Nova as being viewed → clears + tracks unread
-  else if (cid.value) convStore.open(cid.value);
+  else if (cid.value) {
+    // Sweep before open: entering a stale support thread lands the timeout closure
+    // (system notice + closed state) before unread is cleared.
+    convStore.sweepSupportTimeouts();
+    // Dangling cid — e.g. an H5 refresh re-seeded the non-persisted store while the
+    // URL still carries a runtime session id. Bail to the inbox instead of rendering
+    // a blank chat whose sends would be silently dropped.
+    if (!convStore.get(cid.value)) {
+      navBack("/pages/support/messages");
+      return;
+    }
+    convStore.open(cid.value);
+    startIdleTicker();
+  }
 });
 onHide(() => {
   if (isAi.value) nova.close(); // no longer viewing Nova → later pushes accrue unread
+  stopIdleTicker();
 });
 
 const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
 const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>`;
 
 const conv = computed(() => (cid.value ? convStore.get(cid.value) : undefined));
+
+// Timed-out support session → thread is read-only history with a restart CTA.
+const isClosedSession = computed(() => conv.value?.sessionStatus === "closed");
 
 const headerName = computed(() => (isAi.value ? t.value.nova.name : conv.value?.agentName ?? ""));
 const agentTyping = computed(() =>
@@ -143,10 +186,18 @@ const agentTyping = computed(() =>
 const headerRole = computed(() => {
   if (agentTyping.value) return t.value.conversations.agentTyping;
   if (isAi.value) return t.value.conversations.roleAi;
-  return conv.value ? t.value.conversations[conv.value.roleKey] : "";
+  if (!conv.value) return "";
+  if (isClosedSession.value) return t.value.conversations.sessionEnded;
+  return t.value.conversations[conv.value.roleKey];
 });
 const headerTint = computed(() =>
   isAi.value ? "var(--v5-brand-2)" : conv.value?.avatarTint ?? "var(--v5-tech-cyan)",
+);
+// Presence dot: closed session must not claim "online" — grey it and stop the pulse.
+const dotStyle = computed<CSSProperties>(() =>
+  isClosedSession.value
+    ? { background: "var(--v5-ink-4)", animation: "none" }
+    : { background: headerTint.value },
 );
 const headerIcon = computed(() => (conv.value?.type === "advisor" ? ADVISOR_ICON : SUPPORT_ICON));
 const avaStyle = computed<CSSProperties>(() => ({
@@ -197,18 +248,22 @@ const threadMessages = computed<ThreadMsg[]>(() => {
   return c.messages.map((m, i) => ({
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
-    tone: m.sender === "user" ? "user" : "agent",
-    text: m.textKey ? fmt(t.value.conversations.seed[m.textKey], { name: c.agentName }) : m.text ?? "",
+    tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
+    text: m.textKey ? fmt(t.value.conversations.seed[m.textKey], { name: c.agentName, ...(m.textArgs ?? {}) }) : m.text ?? "",
     receipt: receiptFor(m.status, i === lastUser),
     ctaLabel: m.ctaKey ? t.value.conversations.cta[m.ctaKey] : undefined,
     ctaHref: m.ctaHref,
   }));
 });
 
-// Handoff target: first support conversation (Nova "Human support" pill).
-const supportConvId = computed(() => convStore.byType("support")[0]?.id ?? "");
-function toSupport() {
-  navTo(supportConvId.value ? "/pages/support/chat?cid=" + supportConvId.value : "/pages/support/messages");
+// Restart a timed-out support session: a fresh agent is assigned (rotation — never
+// the same one) and THIS chat surface swaps to the new conversation in place. No
+// route hop → no H5 same-page hash-query staleness (P-044/P-049).
+function onRestart() {
+  const id = convStore.startSupportSession();
+  cid.value = id;
+  convStore.open(id);
+  revealTick.value += 1; // re-pin the thread to the new greeting
 }
 
 function quickLabel(k: QuickPromptKey): string {
@@ -228,6 +283,7 @@ function schedule(fn: () => void, ms: number) {
   pendingTimers.push(setTimeout(fn, ms));
 }
 function cleanup() {
+  stopIdleTicker();
   pendingTimers.forEach(clearTimeout);
   pendingTimers.length = 0;
   // Cancelled timers would otherwise leave a ghost "typing…" flag on the store
@@ -247,7 +303,8 @@ onUnmounted(cleanup);
 // 429 + Retry-After with the same policy; the limiter mirrors that contract.
 const SEND_MAX = 5; // max sends…
 const SEND_WINDOW_MS = 15_000; // …per rolling window
-const sendLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS);
+const SEND_MIN_GAP_MS = 1000; // min gap between two consecutive sends
+const sendLimiter = createSendLimiter(SEND_MAX, SEND_WINDOW_MS, SEND_MIN_GAP_MS);
 
 function acquireSendSlot(): boolean {
   const verdict = sendLimiter.tryAcquire();
@@ -267,8 +324,11 @@ const REPLY_MS = 2000;
 const AI_TYPING_ON_MS = 300;
 const AI_REPLY_MS = 1100;
 
-function onSend(text: string) {
-  if (!acquireSendSlot()) return;
+function onSend(text: string, restore?: () => void) {
+  if (!acquireSendSlot()) {
+    restore?.(); // rejected send must not swallow the typed message
+    return;
+  }
   if (isAi.value) {
     nova.sendUser(text);
     nova.markUserRead(); // Nova reads instantly
@@ -372,20 +432,14 @@ function goBack() {
   font-size: 11.5px;
   color: var(--v5-ink-3);
 }
-.cp-pill {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 999px;
-  flex-shrink: 0;
-  background: var(--v5-brand-2-soft);
-}
-.cp-pill-t {
-  font-family: var(--font-v5);
-  font-weight: 500;
-  font-size: 12.5px;
-  color: var(--v5-brand-2);
+/* Home Indicator overlay — pinned to the bottom safe area over the input row's
+   padding (.cp-root is position:fixed, so absolute anchors to it). */
+.cp-home {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 110;
+  pointer-events: none;
 }
 </style>

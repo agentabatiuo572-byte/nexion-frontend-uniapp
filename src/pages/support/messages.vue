@@ -36,6 +36,20 @@
 
         <!-- Right conversation list -->
         <view class="nx-conv-listcol">
+          <!-- Support entry: visible whenever no ACTIVE support session exists (none
+               yet, or every previous one timed out) — tapping assigns an agent. -->
+          <view
+            v-if="selectedType === 'support' && !hasActiveSupport"
+            class="nx-conv-contact active:opacity-80"
+            role="button"
+            tabindex="0"
+            :aria-label="t.conversations.contactSupport"
+            @click="onContactSupport"
+          >
+            <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="SUPPORT_ICON" /></view>
+            <text class="nx-conv-contact-t">{{ t.conversations.contactSupport }}</text>
+          </view>
+
           <view v-if="rows.length === 0" class="nx-conv-listempty">
             <text class="nx-conv-listempty-t">{{ emptyHint }}</text>
           </view>
@@ -71,6 +85,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
@@ -86,6 +101,23 @@ const convStore = useConversations();
 const nova = useNova();
 
 const selectedType = ref<ConversationType>("advisor");
+
+// Entering the inbox is a lazy timeout checkpoint (chat entry and session start
+// sweep too): stale-active support sessions flip to closed here (real backend
+// closes server-side and pushes the status).
+onShow(() => {
+  convStore.sweepSupportTimeouts();
+});
+
+// Contact-support entry shows only when no live session exists.
+const hasActiveSupport = computed(() =>
+  convStore.byType("support").some((c) => c.sessionStatus === "active"),
+);
+
+function onContactSupport() {
+  const id = convStore.startSupportSession();
+  navTo("/pages/support/chat?cid=" + id);
+}
 
 // Inline category icons (stroke=currentColor → tinted via container `color`).
 const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
@@ -127,7 +159,7 @@ function cleanPreview(s: string): string {
 
 function msgText(m: ConvMessage, name: string): string {
   const raw = m.textKey ? t.value.conversations.seed[m.textKey] : (m.text ?? "");
-  return fmt(raw, { name });
+  return fmt(raw, { name, ...(m.textArgs ?? {}) });
 }
 
 function relTime(ts: number): string {
@@ -264,6 +296,27 @@ function avaStyle(tint: string): CSSProperties {
   flex: 1;
   min-width: 0;
   padding: 4px 0;
+}
+.nx-conv-contact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  margin: 10px 16px 4px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent);
+  color: var(--v5-tech-cyan);
+}
+.nx-conv-contact-ico {
+  display: grid;
+  place-items: center;
+}
+.nx-conv-contact-t {
+  font-family: var(--font-v5);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--v5-tech-cyan);
 }
 .nx-conv-listempty {
   padding: 40px 20px;

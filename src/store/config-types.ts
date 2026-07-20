@@ -1,11 +1,18 @@
 // Platform config / feature-flag types. Shared by the config store and its
-// mock seed. PROD: this is the `GET /api/config/platform` response shape —
-// the admin console (E 域「算力与设备配置」) is the authoring surface.
+// mock seed. Future PROD wiring uses this as the `GET /api/config/platform`
+// response shape. Values have domain-specific authoring sources (E/K/H3);
+// the homepage task flags below are read-only projections of existing H3 data.
 
 export interface FeatureFlags {
   // DR-1: 电脑算力(PC 共享)总开关。默认 false → 前端零入口零推送；
   // 后台一键开启后前端才长出弱入口。
   computeShareEnabled: boolean;
+  // FEAT-HOME02: read-only server projections from the existing H3 authoring
+  // surfaces. They are not a second pair of admin switches:
+  // newcomer = H3.dayOne.tasks has at least one active task;
+  // weekly promo = H3.promoBanner.config.status === "active".
+  homeNewcomerTasksEnabled: boolean;
+  homeWeeklyPromoEnabled: boolean;
 }
 
 // Single source: derived from FeatureFlags keys — adding a flag to the

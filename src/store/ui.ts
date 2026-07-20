@@ -59,6 +59,11 @@ export const useUI = defineStore("ui", () => {
   const messageDrawerOpen = ref(false);
 
   function pushToast(t: Omit<Toast, "id" | "durationMs"> & { durationMs?: number }) {
+    // Same kind+title already on screen → replace it (fresh id + timer) instead of
+    // stacking duplicates — rapid repeats (e.g. send rate-limit warning) must show
+    // as ONE refreshed toast. The old timer's dismiss becomes a harmless no-op.
+    const dup = toasts.value.find((x) => x.kind === t.kind && x.title === t.title);
+    if (dup) dismissToast(dup.id);
     const id = `tst-${++toastSeq}`;
     const durationMs = t.durationMs ?? 3200;
     toasts.value = [...toasts.value, { ...t, id, durationMs }];

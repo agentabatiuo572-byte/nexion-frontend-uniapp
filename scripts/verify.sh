@@ -997,6 +997,13 @@ sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAcc
 sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
 sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
 sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
+# P2-8 batch-5 会话记录:会话中心/Nova 非持久,换号收口点必须 reset 重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
+sentinel_present "P2-8 account-scope helper resets conversations" src/lib/account-scope.ts 'useConversations\(\)\.reset\(\)'
+sentinel_present "P2-8 account-scope helper resets nova" src/lib/account-scope.ts 'useNova\(\)\.reset\(\)'
+# 客服会话闲置策略双端 parity(本仓侧 tripwire;admin 侧 canon-sentinel 逐键比 canon-numbers.json):
+# 改这两个默认值必须三处同步(uniapp 常量 + admin m-tabs/data.ts + canon json),单独改本仓即红。
+sentinel_present "support idle policy warn default pinned (1min · canon parity)" src/mock/conversations.ts 'SUPPORT_IDLE_WARN_MINS = 1'
+sentinel_present "support idle policy close default pinned (5min · canon parity)" src/mock/conversations.ts 'SUPPORT_IDLE_CLOSE_MINS = 5'
 spec4_account_session_semantics() {
   if "$NODE_BIN" -e '
     const fs=require("fs");
@@ -1327,6 +1334,254 @@ capacity_curve_parity() {
   fi
 }
 capacity_curve_parity
+
+# 首页任务轮播契约(2026-07-16):0/1/2 张后台投影、5s 自动轮播、展开暂停，
+# 两卡等高、奖励色复用算力队列 token、卡面无外边框；独立审计板块不得重新挂回首页。
+home_task_carousel_contract() {
+  local page="src/pages/index/index.vue"
+  local newcomer="src/components/home/day-one-quest-card.vue"
+  local weekly="src/components/home/conversion-banner.vue"
+  local flags="src/store/config-types.ts"
+  local seed="src/mock/platform-config.ts"
+  local zh="src/i18n/messages/zh.ts"
+  local miss=""
+  grep -q '<swiper' "$page" || miss="${miss}swiper "
+  grep -q 'v-if="visibleTaskCards.length"' "$page" || miss="${miss}zero-card-hide "
+  grep -q ':autoplay="shouldAutoplay"' "$page" || miss="${miss}autoplay-state "
+  grep -q ':interval="TASK_CAROUSEL_INTERVAL_MS"' "$page" || miss="${miss}autoplay-interval-bind "
+  grep -q 'TASK_CAROUSEL_INTERVAL_MS = 5000' "$page" || miss="${miss}five-second-interval "
+  grep -q ':disable-touch="!hasTaskCarousel"' "$page" || miss="${miss}single-card-static "
+  grep -q 'onTaskTouchMove' "$page" || miss="${miss}expanded-swipe-collapse "
+  grep -q 'taskCarouselAnnouncement' "$page" || miss="${miss}manual-announcement "
+  grep -q 'next-margin="0px"' "$page" || miss="${miss}full-width-slide "
+  grep -q 'home-task-carousel__meta' "$page" && miss="${miss}page-number-overlay "
+  grep -q 'taskSlide + 1' "$page" && miss="${miss}visible-page-number "
+  grep -q '<TrustChipWall' "$page" && miss="${miss}independent-audit-still-mounted "
+  grep -q 'event: "update:expanded"' "$newcomer" || miss="${miss}controlled-newcomer-expand "
+  grep -q 'expanded: false' "$newcomer" || miss="${miss}newcomer-default-collapse "
+  grep -q 'height: "var(--home-task-card-height, 184px)"' "$weekly" || miss="${miss}weekly-equal-height "
+  grep -q '/static/img/marketing/trial-hero.png' "$weekly" || miss="${miss}weekly-project-machine-asset "
+  grep -q 'PRODUCT_MASK' "$weekly" || miss="${miss}weekly-machine-mask "
+  grep -q 'radial-gradient(50% 60% at 100% 0%, var(--v5-brand-soft), transparent 70%)' "$weekly" || miss="${miss}weekly-original-background-glow "
+  grep -q 'ellipse 200px 250px at 95% 50%' "$weekly" || miss="${miss}weekly-original-machine-fade "
+  grep -q 'top: "-36px"' "$weekly" || miss="${miss}weekly-original-machine-top "
+  grep -q 'right: "-50px"' "$weekly" || miss="${miss}weekly-original-machine-right "
+  grep -q 'width: "220px"' "$weekly" || miss="${miss}weekly-original-machine-width "
+  grep -q 'height: "220px"' "$weekly" || miss="${miss}weekly-original-machine-height "
+  grep -q 'class="weekly-quest__header"' "$weekly" || miss="${miss}weekly-redesign-header "
+  grep -q 'class="weekly-quest__mark"' "$weekly" || miss="${miss}weekly-redesign-icon "
+  grep -q 'class="weekly-quest__body"' "$weekly" || miss="${miss}weekly-redesign-body "
+  grep -q 'class="weekly-quest__product"' "$weekly" || miss="${miss}weekly-redesign-product-zone "
+  grep -q 'weekly-quest__reward-value' "$weekly" || miss="${miss}weekly-reward-style "
+  grep -q 'font-size: 30px' "$weekly" || miss="${miss}weekly-reward-size-drift "
+  grep -q 'color: var(--v5-warning)' "$weekly" || miss="${miss}weekly-reward-color-drift "
+  grep -q 'font-weight: 500' "$weekly" || miss="${miss}weekly-reward-weight-drift "
+  grep -q 'color: #9B89E0' "$weekly" || miss="${miss}weekly-countdown-color-drift "
+  grep -q 'class="weekly-quest__cta"' "$weekly" || miss="${miss}weekly-cta "
+  grep -q 'bottom: 14px' "$weekly" || miss="${miss}weekly-cta-bottom-spacing "
+  grep -q 'left: 16px' "$weekly" || miss="${miss}weekly-cta-full-width "
+  grep -q 'min-height: 44px' "$weekly" || miss="${miss}weekly-cta-tap-height "
+  grep -q 'background: var(--v5-brand-soft)' "$weekly" || miss="${miss}weekly-cta-tone "
+  grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$weekly" && miss="${miss}weekly-card-edge-returned "
+  grep -q 'padding-right: 56px' "$weekly" && miss="${miss}weekly-header-padding-drift "
+  grep -q 'font-size: 16px; color: #9B89E0' "$newcomer" || miss="${miss}newcomer-countdown-style-drift "
+  grep -q 'newcomer-task__reward-value' "$newcomer" || miss="${miss}newcomer-reward-style "
+  grep -q 'color: var(--v5-warning)' "$newcomer" || miss="${miss}newcomer-reward-color-drift "
+  grep -q 'minHeight: "44px"' "$newcomer" || miss="${miss}newcomer-toggle-height-drift "
+  grep -q 'margin: "14px 16px"' "$newcomer" || miss="${miss}newcomer-toggle-spacing-drift "
+  grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$newcomer" && miss="${miss}newcomer-card-edge-returned "
+  grep -q 'padding-right: 56px' "$newcomer" && miss="${miss}newcomer-header-padding-drift "
+  grep -q 'homeNewcomerTasksEnabled: boolean' "$flags" || miss="${miss}newcomer-config-flag "
+  grep -q 'homeWeeklyPromoEnabled: boolean' "$flags" || miss="${miss}weekly-config-flag "
+  grep -q 'homeNewcomerTasksEnabled: true' "$seed" || miss="${miss}newcomer-mock-projection "
+  grep -q 'homeWeeklyPromoEnabled: true' "$seed" || miss="${miss}weekly-mock-projection "
+  grep -q 'dayOneFirstDayReward: "新手任务"' "$zh" || miss="${miss}newcomer-copy "
+  if "$NODE_BIN" <<'NODE' >/tmp/home-task-carousel-relations.log 2>&1; then
+const fs = require("fs");
+const ts = require("typescript");
+const { baseParse, NodeTypes } = require("@vue/compiler-dom");
+const page = fs.readFileSync("src/pages/index/index.vue", "utf8");
+const script = page.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1];
+if (!script) throw new Error("index.vue script setup not found");
+const source = ts.createSourceFile("index.ts", script, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+const compact = (value) => value.replace(/\s+/g, "");
+const need = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
+function variable(name) {
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) return declaration;
+    }
+  }
+  throw new Error(`variable not found: ${name}`);
+}
+function functionBody(name) {
+  const declaration = source.statements.find(
+    (statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === name,
+  );
+  if (!declaration?.body) throw new Error(`function not found: ${name}`);
+  return declaration.body;
+}
+function computedCallback(name) {
+  const initializer = variable(name).initializer;
+  need(ts.isCallExpression(initializer), `${name} must remain a computed call`);
+  need(initializer.expression.getText(source) === "computed", `${name} must use computed`);
+  const callback = initializer.arguments[0];
+  need(ts.isArrowFunction(callback), `${name} computed must use an arrow callback`);
+  return callback;
+}
+function unwrap(expression) {
+  while (ts.isParenthesizedExpression(expression)) expression = expression.expression;
+  return expression;
+}
+function flattenAnd(expression) {
+  expression = unwrap(expression);
+  if (ts.isBinaryExpression(expression) && expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+    return [...flattenAnd(expression.left), ...flattenAnd(expression.right)];
+  }
+  return [compact(expression.getText(source))];
+}
+
+const visible = computedCallback("visibleTaskCards");
+need(ts.isBlock(visible.body), "visibleTaskCards must keep an explicit derivation block");
+need(compact(visible.body.getText(source)) === compact(`{
+  if (platformConfig.syncFailed) return [];
+  const cards: TaskCardId[] = [];
+  if (platformConfig.isEnabled("homeNewcomerTasksEnabled")) cards.push("newcomer");
+  if (platformConfig.isEnabled("homeWeeklyPromoEnabled")) cards.push("weekly");
+  return cards;
+}`), "visibleTaskCards no longer derives exact 0/1/2 state from sync failure + both flags");
+
+const cardinality = computedCallback("hasTaskCarousel");
+need(
+  !ts.isBlock(cardinality.body) && compact(cardinality.body.getText(source)) === "visibleTaskCards.value.length>1",
+  "carousel mode must require more than one visible card",
+);
+
+const autoplay = computedCallback("shouldAutoplay");
+need(!ts.isBlock(autoplay.body), "shouldAutoplay must remain a direct boolean expression");
+const autoplayTerms = flattenAnd(autoplay.body);
+need(
+  JSON.stringify(autoplayTerms) === JSON.stringify([
+    "hasTaskCarousel.value",
+    "!newcomerExpanded.value",
+    "!prefersReducedMotion.value",
+    "!taskFocusWithin.value",
+  ]),
+  `autoplay guards/operators changed: ${autoplayTerms.join(" | ")}`,
+);
+
+const touchStatements = functionBody("onTaskTouchMove").statements.map((statement) => compact(statement.getText(source)));
+need(JSON.stringify(touchStatements) === JSON.stringify([
+  "if(!taskTouchStart||touchCollapsedExpandedCard)return;",
+  "constpoint=readFirstTouch(event);",
+  "if(!point)return;",
+  "constdx=point.clientX-taskTouchStart.clientX;",
+  "constdy=point.clientY-taskTouchStart.clientY;",
+  "if(Math.abs(dx)<18||Math.abs(dx)<=Math.abs(dy)*1.15)return;",
+  "touchCollapsedExpandedCard=true;",
+  "setNewcomerExpanded(false);",
+  "blurTaskCarouselFocus();",
+]), "touch continuation no longer performs guarded collapse + focus release in reachable order");
+
+const manualCollapseStatements = functionBody("onNewcomerExpandedChange").statements.map((statement) => compact(statement.getText(source)));
+need(JSON.stringify(manualCollapseStatements) === JSON.stringify([
+  "setNewcomerExpanded(value);",
+  "if(!value)blurTaskCarouselFocus();",
+]), "manual newcomer collapse no longer releases carousel focus to resume autoplay");
+
+const watcher = source.statements.find((statement) =>
+  ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression) &&
+  statement.expression.expression.getText(source) === "watch" &&
+  statement.expression.arguments[0]?.getText(source) === "taskCardSignature"
+);
+need(watcher, "task-card signature watcher missing");
+const watcherCallback = watcher.expression.arguments[1];
+need(ts.isArrowFunction(watcherCallback) && ts.isBlock(watcherCallback.body), "task-card signature watcher must use a block callback");
+const watcherStatements = watcherCallback.body.statements.map((statement) => compact(statement.getText(source)));
+need(JSON.stringify(watcherStatements) === JSON.stringify([
+  "taskSlide.value=0;",
+  "setNewcomerExpanded(false);",
+  "resetTaskTouch();",
+  'taskCarouselAnnouncement.value="";',
+]), "0/1/2 hot change no longer performs reachable reset in canonical order");
+
+const template = page.match(/<template>([\s\S]*?)<\/template>/)?.[1] || "";
+const templateAst = baseParse(template);
+function findElement(node, predicate) {
+  if (node.type === NodeTypes.ELEMENT && predicate(node)) return node;
+  for (const child of node.children || []) {
+    const found = findElement(child, predicate);
+    if (found) return found;
+  }
+  return null;
+}
+function attr(node, name) {
+  return node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === name)?.value?.content;
+}
+function meaningfulChildren(node) {
+  return node.children.filter((child) =>
+    child.type !== NodeTypes.COMMENT && !(child.type === NodeTypes.TEXT && child.content.trim() === "")
+  );
+}
+const carouselNode = findElement(templateAst, (node) => attr(node, "id") === "home-task-carousel");
+need(carouselNode, "task carousel template region missing");
+const carouselChildren = meaningfulChildren(carouselNode);
+need(carouselChildren.length === 2 && carouselChildren[0].tag === "swiper" && carouselChildren[1].tag === "text", "carousel gained an extra visible sibling (page/control overlay)");
+const swiperChildren = meaningfulChildren(carouselChildren[0]);
+need(swiperChildren.length === 1 && swiperChildren[0].tag === "swiper-item", "swiper content structure changed or gained overlay content");
+const itemChildren = meaningfulChildren(swiperChildren[0]);
+need(itemChildren.length === 1 && itemChildren[0].tag === "view", "swiper item must contain only the task slide wrapper");
+const slideChildren = meaningfulChildren(itemChildren[0]);
+need(
+  slideChildren.length === 2 && slideChildren[0].tag === "DayOneQuestCard" && slideChildren[1].tag === "ConversionBanner",
+  "task slide gained visible content outside the two original cards",
+);
+const statusNode = carouselChildren[1];
+need(attr(statusNode, "class") === "home-task-carousel__status" && attr(statusNode, "aria-live") === "polite", "only the hidden screen-reader status may follow swiper");
+const statusChildren = meaningfulChildren(statusNode);
+need(
+  statusChildren.length === 1 && statusChildren[0].type === NodeTypes.INTERPOLATION && statusChildren[0].content.content === "taskCarouselAnnouncement",
+  "carousel status must remain the hidden manual-change announcement only",
+);
+need(!/home-task-carousel__(meta|count|autoplay)/.test(page), "visible page-number or playback overlay returned");
+NODE
+    :
+  else
+    miss="${miss}relationship-gate "
+    sed 's/^/        /' /tmp/home-task-carousel-relations.log
+  fi
+  if [ -z "$miss" ]; then ok "home task carousel contract (0/1/2 + 5s + expand pause + equal crop)";
+  else bad "home task carousel contract incomplete — $miss"; fi
+}
+home_task_carousel_contract
+
+# ── 跨仓采样证据门:pages.json 每个页面必须在 admin 仓有 runtime 采样证据 ──
+# 单源 = ../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs(直接调用,
+# 不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
+# 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
+cross_repo_sampling_gate() {
+  local audit_js="$PROJECT_DIR/../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs"
+  local audit_arg="$audit_js"
+  if [ ! -f "$audit_js" ]; then
+    ok "cross-repo sampling evidence gate skipped (admin repo absent)"
+    return
+  fi
+  # WSL can resolve `node` to Windows node.exe; translate /mnt/* before passing
+  # the script path or Node misreads it as D:\mnt\d\... (MODULE_NOT_FOUND).
+  if [ "$("$NODE_BIN" -p 'process.platform' 2>/dev/null)" = "win32" ] && command -v wslpath >/dev/null 2>&1; then
+    audit_arg=$(wslpath -w "$audit_js")
+  fi
+  if "$NODE_BIN" "$audit_arg" > /tmp/uniapp-port-coverage-audit.log 2>&1; then
+    ok "cross-repo sampling evidence (admin uniapp-port-coverage-audit findings=0)"
+  else
+    bad "page(s) lack admin-side sampling evidence — 去 ../Nexion-admin-prototype 把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
+    tail -25 /tmp/uniapp-port-coverage-audit.log | sed 's/^/        /'
+  fi
+}
+cross_repo_sampling_gate
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

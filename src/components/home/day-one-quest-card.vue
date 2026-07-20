@@ -1,19 +1,26 @@
-<!--
-  DayOneQuestCard — ZONE 1 first-day onboarding quest ("100% faithful v5 design
-  draft", exact per-task hex). Ported from mission-control.tsx DayOneQuestCard.
-  Reward + countdown header · scroll-grow progress bar · collapsible 6-task list
-  (each task taps to its route) · expand/collapse toggle.
--->
+<!-- DayOneQuestCard — homepage newcomer task card. -->
 <template>
-  <view :style="rootStyle">
-    <view style="padding: 16px 18px 4px">
-      <!-- Reward + countdown -->
+  <view
+    id="home-newcomer-task-card"
+    class="newcomer-task"
+    :class="{ 'newcomer-task--expanded': expanded }"
+    :style="rootStyle"
+    :aria-hidden="!props.active"
+  >
+    <view class="newcomer-task__summary">
       <view style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px">
-        <view>
-          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneFirstDayReward }}</text>
-          <view style="margin-top: 4px; display: flex; align-items: baseline; gap: 4px; font-family: var(--font-v5); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.022em; color: var(--v5-ink); line-height: 1">
-            <text style="font-size: 14px; color: var(--v5-ink-4); font-weight: 500">+</text>
-            <text style="font-size: 30px">{{ reward }}</text>
+        <view style="min-width: 0">
+          <view style="display: flex; align-items: center; gap: 7px">
+            <view class="newcomer-task__mark" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m13 2-9 12h8l-1 8 9-12h-8z" />
+              </svg>
+            </view>
+            <text class="newcomer-task__eyebrow">{{ t.home.dayOneFirstDayReward }}</text>
+            <text class="newcomer-task__count">{{ taskCountText }}</text>
+          </view>
+          <view class="newcomer-task__reward">
+            <text class="newcomer-task__reward-value">+{{ reward }}</text>
             <text style="font-size: 13px; color: var(--v5-brand); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
           </view>
         </view>
@@ -23,25 +30,28 @@
         </view>
       </view>
 
-      <!-- Progress -->
-      <view style="margin-top: 16px">
-        <view ref="elRef" style="height: 8px; border-radius: 4px; overflow: hidden; background: var(--v5-surface-2); position: relative">
+      <view style="margin-top: 10px">
+        <view ref="elRef" style="height: 6px; border-radius: 999px; overflow: hidden; background: var(--v5-surface-2); position: relative">
           <view :style="barStyle" />
         </view>
-        <view style="margin-top: 6px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
+        <view style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
           <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
           <text style="color: var(--v5-brand); font-variant-numeric: tabular-nums">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
         </view>
       </view>
 
-      <!-- Tasks list (collapsible) -->
       <view v-if="expanded" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px dashed var(--v5-border)">
         <view
           v-for="task in tasks"
           :key="task.id"
           :class="isDone(task) ? '' : 'active:scale-[0.98] active:opacity-80 transition-transform'"
           :style="rowStyle(task)"
+          role="button"
+          :tabindex="props.active && !isDone(task) ? 0 : -1"
+          :aria-disabled="isDone(task)"
           @click="onRowTap(task)"
+          @keydown.enter.prevent="onRowTap(task)"
+          @keydown.space.prevent="onRowTap(task)"
         >
           <view :style="circleStyle(task)">
             <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0F0F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
@@ -63,10 +73,19 @@
       </view>
     </view>
 
-    <!-- Expand toggle -->
-    <view :style="toggleStyle" @click="expanded = !expanded">
-      <text style="font-family: var(--font-v5); font-size: 11.5px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
-      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <view
+      class="newcomer-task__toggle"
+      :style="toggleStyle"
+      role="button"
+      :tabindex="props.active ? 0 : -1"
+      :aria-expanded="expanded"
+      :aria-label="expanded ? t.home.dayOneHideTasks : viewTasksText"
+      @click="toggleExpanded"
+      @keydown.enter.prevent="toggleExpanded"
+      @keydown.space.prevent="toggleExpanded"
+    >
+      <text style="font-family: var(--font-v5); font-size: 12.5px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path :d="expanded ? 'M19 15l-7-7-7 7' : 'M5 9l7 7 7-7'" />
       </svg>
     </view>
@@ -74,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNow } from "@/composables/use-now";
@@ -92,12 +111,22 @@ interface QuestTask {
   color: string;
 }
 
+const props = withDefaults(defineProps<{ active?: boolean; expanded?: boolean }>(), {
+  active: true,
+  expanded: false,
+});
+const emit = defineEmits<{
+  (event: "update:expanded", value: boolean): void;
+}>();
+const expanded = computed({
+  get: () => props.expanded,
+  set: (value: boolean) => emit("update:expanded", value),
+});
+
 const t = useT();
 const nowTick = useNow();
 const { elRef, inView } = useScrollGrowProgress();
 const quest = useQuest();
-
-const expanded = ref(true);
 const reward = 500;
 
 const tasks = computed<QuestTask[]>(() => [
@@ -110,28 +139,31 @@ const tasks = computed<QuestTask[]>(() => [
 ]);
 
 const total = computed(() => tasks.value.length);
-// Real completion state from the quest store. App.vue's route watcher marks
-// visit_earn/visit_store/view_product_roi on navigation; action tasks complete
-// at their own action points. Reactive — the card fills in as quests complete.
-const completedCount = computed(() => tasks.value.filter((x) => quest.isComplete(x.id)).length);
+const completedCount = computed(() => tasks.value.filter((task) => quest.isComplete(task.id)).length);
 const progressPct = computed(() => (completedCount.value / total.value) * 100);
-const nexEarned = computed(() => tasks.value.filter((x) => quest.isComplete(x.id)).reduce((a, x) => a + x.nex, 0));
+const nexEarned = computed(() => tasks.value.filter((task) => quest.isComplete(task.id)).reduce((sum, task) => sum + task.nex, 0));
 const viewTasksText = computed(() => fmt(t.value.home.dayOneViewTasks, { n: total.value }));
+const taskCountText = computed(() => fmt(t.value.home.dayOneTaskCount, { n: total.value }));
 
 const remainingLabel = computed(() => {
   const remainingMs = 18 * 3600_000 + 24 * 60_000 - ((nowTick.value * 1000) % 60_000);
-  const h = Math.floor(remainingMs / 3600_000);
-  const m = Math.floor((remainingMs % 3600_000) / 60_000);
-  const s = Math.floor((remainingMs % 60_000) / 1000);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const hours = Math.floor(remainingMs / 3600_000);
+  const minutes = Math.floor((remainingMs % 3600_000) / 60_000);
+  const seconds = Math.floor((remainingMs % 60_000) / 1000);
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 });
 
 function isDone(task: QuestTask) {
   return quest.isComplete(task.id);
 }
+
 function onRowTap(task: QuestTask) {
   if (isDone(task)) return;
   uni.navigateTo({ url: task.href, fail: () => {} });
+}
+
+function toggleExpanded() {
+  expanded.value = !expanded.value;
 }
 
 const barStyle = computed<CSSProperties>(() => ({
@@ -154,66 +186,138 @@ function rowStyle(task: QuestTask): CSSProperties {
     cursor: isDone(task) ? "default" : "pointer",
   };
 }
+
 function circleStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
+  const done = isDone(task);
   return {
     width: "18px",
     height: "18px",
     borderRadius: "50%",
-    background: d ? task.color : "transparent",
-    border: d ? "none" : `1px solid ${task.color}55`,
+    background: done ? task.color : "transparent",
+    border: done ? "none" : `1px solid ${task.color}55`,
     display: "grid",
     placeItems: "center",
   };
 }
+
 function labelStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
+  const done = isDone(task);
   return {
     fontFamily: "var(--font-v5)",
     fontSize: "13px",
-    color: d ? "var(--v5-ink-4)" : "var(--v5-ink)",
+    color: done ? "var(--v5-ink-4)" : "var(--v5-ink)",
     fontWeight: 500,
-    textDecoration: d ? "line-through" : "none",
+    textDecoration: done ? "line-through" : "none",
   };
 }
+
 function catStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
+  const done = isDone(task);
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "10.5px",
-    color: d ? "var(--v5-ink-4)" : task.color,
-    opacity: d ? 0.5 : 0.8,
+    color: done ? "var(--v5-ink-4)" : task.color,
+    opacity: done ? 0.5 : 0.8,
     letterSpacing: "0.04em",
   };
 }
+
 function rewardStyle(task: QuestTask): CSSProperties {
-  const d = isDone(task);
+  const done = isDone(task);
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
-    color: d ? "var(--v5-ink-4)" : task.color,
+    color: done ? "var(--v5-ink-4)" : task.color,
     fontVariantNumeric: "tabular-nums",
     fontWeight: 500,
   };
 }
 
-const rootStyle: CSSProperties = {
+const rootStyle = computed<CSSProperties>(() => ({
   position: "relative",
+  boxSizing: "border-box",
+  height: expanded.value ? "auto" : "var(--home-task-card-height, 184px)",
+  minHeight: "var(--home-task-card-height, 184px)",
   borderRadius: "16px",
-  background:
-    "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
+  background: "radial-gradient(50% 60% at 0% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
   overflow: "hidden",
   color: "var(--v5-ink)",
-  boxShadow: "var(--v5-card-shadow-lift)",
-};
+  display: "flex",
+  flexDirection: "column",
+}));
+
 const toggleStyle: CSSProperties = {
-  marginTop: "14px",
-  width: "100%",
-  height: "32px",
-  borderTop: "1px solid var(--v5-border)",
+  margin: "14px 16px",
+  width: "auto",
+  minHeight: "44px",
+  borderRadius: "12px",
+  background: "var(--v5-surface-2)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "5px",
 };
 </script>
+
+<style scoped>
+.newcomer-task__summary {
+  box-sizing: border-box;
+  min-height: 112px;
+  padding: 14px 16px 0;
+}
+
+.newcomer-task__mark {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--v5-brand-soft);
+}
+
+.newcomer-task__eyebrow {
+  font-family: var(--font-v5);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v5-ink-2);
+  letter-spacing: 0.01em;
+}
+
+.newcomer-task__count {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--v5-surface-2);
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 9.5px;
+  color: var(--v5-ink-4);
+  white-space: nowrap;
+}
+
+.newcomer-task__reward {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.newcomer-task__reward-value {
+  font-family: var(--font-v5);
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--v5-warning);
+  letter-spacing: -0.022em;
+}
+
+.newcomer-task__toggle {
+  flex: 0 0 44px;
+  cursor: pointer;
+}
+
+.newcomer-task--expanded .newcomer-task__toggle {
+  margin-top: 14px;
+}
+</style>

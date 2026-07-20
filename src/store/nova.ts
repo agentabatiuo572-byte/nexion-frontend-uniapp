@@ -11,8 +11,8 @@ import { ref } from "vue";
  *
  * Live human-agent handoff USED to morph this store in-place (mode/agentName). That
  * is now superseded by the conversation center's dedicated "support" category
- * (store/conversations.ts) — Nova's "Human support" pill routes to a real support
- * conversation instead of mutating Nova. This store is AI-only again.
+ * (store/conversations.ts) — human support is reached from the conversation center
+ * (the AI chat's in-header handoff pill is retired). This store is AI-only again.
  */
 
 export type NovaSender = "nova" | "user";

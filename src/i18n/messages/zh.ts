@@ -414,11 +414,14 @@ export const zh: Messages = {
     techStreaming: "实时",
     techVsYesterday: "↑ 较昨日 +5.2% · 已结算 142 单",
     // DayOneQuestCard
-    dayOneFirstDayReward: "首日奖励",
+    taskCarouselLabel: "新手任务与每周任务",
+    taskCarouselPosition: "第 {current} 张，共 {total} 张：{title}",
+    dayOneFirstDayReward: "新手任务",
     dayOneEndsIn: "倒计时",
     dayOneDoneSuffix: "已完成",
     dayOneEarnedSuffix: "已获得",
     dayOneViewTasks: "查看 {n} 个任务",
+    dayOneTaskCount: "{n} 项",
     dayOneHideTasks: "收起任务",
     dayOneTaskBindCard: "绑定银行卡",
     dayOneTaskVisitEarn: "访问收益页",
@@ -432,7 +435,7 @@ export const zh: Messages = {
     dayOneCatIdentity: "身份",
     dayOneCatSocial: "社交",
     // ConversionBanner (weekly quest)
-    weeklyQuestEyebrow: "☄ 本周任务",
+    weeklyQuestEyebrow: "本周任务",
     weeklyQuestEndsIn: "倒计时",
     weeklyQuestActivateToClaim: "激活 {device} 即可领取",
     weeklyQuestAddCapacity: "扩容即可领取",
@@ -2143,7 +2146,8 @@ export const zh: Messages = {
     qHowToBoost: "怎么提升?",
     qWhatsHot: "现在哪个最热?",
     qShowTopJobs: "看看高价任务",
-    // 真人客服切换
+    // 真人客服切换 — 已下线 2026-07-16(聊天页 pill 已删;人工客服入口移至会话中心)。
+    // key 按死 key 政策保留不删。
     liveAgent: "人工客服",
     backToAi: "返回 AI 助手",
     agentRole: "二级合规客服 · 在线",
@@ -2340,10 +2344,13 @@ export const zh: Messages = {
     // 清单空态
     listEmptyAdvisor: "你的专属顾问会主动带来适合你的机会。",
     listEmptySupport: "还没有会话 — 随时可以发起。",
+    contactSupport: "联系人工客服",
     newBadge: "新",
     // 聊天
     inputPlaceholder: "输入消息…",
     agentTyping: "正在输入…",
+    sessionEnded: "会话已结束",
+    restartSession: "重新发起会话",
     receiptSent: "未读",
     receiptRead: "已读",
     rateLimited: "发送太频繁了",
@@ -2366,6 +2373,12 @@ export const zh: Messages = {
         "搞定就好!这条我先关掉了 — 之后有任何问题随时再开。🙌",
       supportUserQ:
         "你好,我的提现显示「待处理」超过一天了 — 能帮我查下状态吗?",
+      supportGreeting:
+        "已为你接通 — 我是 Nexion 客服 {name} 👋 有什么可以帮你?",
+      sessionIdleWarn:
+        "您已有一段时间未回复,若持续无回复,本会话将在约 {n} 分钟后自动关闭;如需帮助,您可以重新发起会话。",
+      sessionTimeoutClosed:
+        "由于您长时间未回复,本次会话已自动结束 — 需要帮助可随时重新发起,我们会为您接通客服。",
     },
     // 预置消息的 CTA 文案
     cta: {

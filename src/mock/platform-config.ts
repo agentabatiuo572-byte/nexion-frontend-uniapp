@@ -2,13 +2,17 @@ import type { PlatformConfig } from "@/store/config-types";
 import { GPU_TIERS } from "@/lib/gpu-tiers";
 
 // MOCK-ONLY seed for platform config / feature flags (backend-replaceable).
-// PROD: `GET /api/config/platform` returns this exact shape; the admin console
-// (E 域「算力与设备配置」+ K 域风控参数) is the single authoring surface. Client
-// treats the fetched config as read-only.
+// Future PROD `GET /api/config/platform` returns this shape by projecting each
+// domain's existing source (E/K/H3). The client treats the response as read-only;
+// this repo currently has no admin-to-client transport.
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   featureFlags: {
     // DR-1: 电脑算力默认 OFF。
     computeShareEnabled: false,
+    // FEAT-HOME02 mock projections. PROD derives these from the existing H3
+    // day-one task statuses and promo-banner status; client remains read-only.
+    homeNewcomerTasksEnabled: true,
+    homeWeeklyPromoEnabled: true,
   },
   // SPEC-1 在线加成系数(单一来源:lib/hashpower.ts 派生 H5_BASE_FACTOR / CONTINUITY_FULL_MS)。
   // 与 admin compute-config COMPUTE_COEFFICIENTS 同 key,运营在 E6 调,PROD 由服务端下发。

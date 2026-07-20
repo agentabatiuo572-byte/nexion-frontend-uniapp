@@ -1,50 +1,57 @@
-<!--
-  ConversionBanner — ZONE 1 upsell ("100% faithful v5 design draft", exact hex).
-  Ported from mission-control.tsx ConversionBanner. Hero reward protagonist +
-  72×72 product render (trial-hero.png, masked) + micro-stats + soft-tint CTA.
-  Promo target follows the user's highest active device (derivePromoUpgrade).
-  Whole card taps through to the upgrade target's store page.
--->
+<!-- ConversionBanner — homepage weekly task card. -->
 <template>
-  <view class="block" :style="rootStyle" @click="goStore">
-    <!-- Product render — sibling of content (z-index wins clean), masked fade -->
+  <view
+    class="weekly-quest block active:scale-[0.995] active:opacity-90 transition-transform"
+    :style="rootStyle"
+    role="button"
+    :tabindex="props.active ? 0 : -1"
+    :aria-hidden="!props.active"
+    @click="goStore"
+    @keydown.enter.prevent="goStore"
+    @keydown.space.prevent="goStore"
+  >
     <image
+      class="weekly-quest__product"
       src="/static/img/marketing/trial-hero.png"
       mode="aspectFit"
       :style="productStyle"
+      aria-hidden="true"
     />
 
-    <!-- Content wrapper (z-index 1 above the image) -->
-    <view style="padding: 14px 16px 16px; position: relative; z-index: 1">
-      <!-- Meta line: quest tag + countdown -->
-      <view style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
-        <view class="inline-flex items-center" style="gap: 6px; color: var(--v5-brand); font-weight: 500">
-          <text style="color: var(--v5-brand)">{{ t.home.weeklyQuestEyebrow }}</text>
-          <text style="padding: 1px 6px; border-radius: 4px; background: var(--v5-brand-soft); font-size: 11px; color: var(--v5-brand)">{{ promoMult }}×</text>
+    <view class="weekly-quest__content">
+      <view class="weekly-quest__header">
+        <view class="weekly-quest__identity">
+          <view class="weekly-quest__mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="16" rx="2" />
+              <path d="M16 3v4M8 3v4M3 10h18" />
+              <path d="m12 13 .9 1.8 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2-1.45-1.4 2-.3z" />
+            </svg>
+          </view>
+          <text class="weekly-quest__title">{{ t.home.weeklyQuestEyebrow }}</text>
+          <text class="weekly-quest__multiplier">{{ promoMult }}×</text>
         </view>
-        <text style="color: var(--v5-ink-4); font-weight: 400">{{ t.home.weeklyQuestEndsIn }} <text style="color: #9B89E0; font-weight: 500; font-variant-numeric: tabular-nums">{{ remainingLabel }}</text></text>
+        <view class="weekly-quest__countdown">
+          <text class="weekly-quest__countdown-label">{{ t.home.weeklyQuestEndsIn }}</text>
+          <text class="weekly-quest__countdown-value">{{ remainingLabel }}</text>
+        </view>
       </view>
 
-      <!-- Hero row: reward protagonist -->
-      <view style="margin-top: 10px; padding-right: 96px">
-        <view style="display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; white-space: nowrap">
-          <text style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink); letter-spacing: -0.024em; line-height: 1; font-size: 34px">+{{ finalRewardText }}</text>
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; color: var(--v5-brand); font-size: 13px; font-weight: 500">NEX</text>
+      <view class="weekly-quest__body">
+        <view class="weekly-quest__reward">
+          <text class="weekly-quest__reward-value">+{{ finalRewardText }}</text>
+          <text class="weekly-quest__reward-unit">NEX</text>
         </view>
-        <text class="block" style="margin-top: 7px; font-family: var(--font-v5); font-weight: 500; font-size: 13.5px; color: var(--v5-ink-3); letter-spacing: -0.008em">{{ subtitleText }}</text>
+        <text class="weekly-quest__subtitle">{{ subtitleText }}</text>
+        <view class="weekly-quest__rate">
+          <text class="weekly-quest__rate-value">${{ targetDailyText }}</text>
+          <text class="weekly-quest__rate-unit">/d</text>
+        </view>
       </view>
 
-      <!-- Supporting micro-stats -->
-      <view style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">
-        <text><text style="color: var(--v5-brand); font-weight: 500">${{ targetDailyText }}</text><text style="color: var(--v5-ink-4)">/d</text></text>
-      </view>
-
-      <!-- CTA — de-emphasized soft-tint pill, bottom-right -->
-      <view style="margin-top: 14px; display: flex; justify-content: flex-end">
-        <view class="inline-flex items-center" style="padding: 7px 14px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 13px; gap: 5px; letter-spacing: -0.005em">
-          <text style="color: var(--v5-brand)">{{ t.home.weeklyQuestGetNexionBox }}</text>
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.7; font-size: 12px; color: var(--v5-brand)">→</text>
-        </view>
+      <view class="weekly-quest__cta">
+        <text>{{ t.home.weeklyQuestGetNexionBox }}</text>
+        <text class="weekly-quest__cta-arrow" aria-hidden="true">→</text>
       </view>
     </view>
   </view>
@@ -58,6 +65,9 @@ import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
 import { useNow } from "@/composables/use-now";
 
+const props = withDefaults(defineProps<{ active?: boolean }>(), {
+  active: true,
+});
 const t = useT();
 const app = useApp();
 const nowTick = useNow();
@@ -76,7 +86,6 @@ const remainingLabel = computed(() => {
 
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => promo.value.targetDaily.toFixed(2));
-
 const subtitleText = computed(() =>
   promo.value.multiplier > 0
     ? fmt(t.value.home.weeklyQuestActivateToClaim, { device: promo.value.targetName })
@@ -85,12 +94,15 @@ const subtitleText = computed(() =>
 
 const rootStyle: CSSProperties = {
   position: "relative",
+  boxSizing: "border-box",
+  width: "100%",
+  height: "var(--home-task-card-height, 184px)",
+  minHeight: "var(--home-task-card-height, 184px)",
   borderRadius: "16px",
   background:
     "radial-gradient(50% 60% at 100% 0%, var(--v5-brand-soft), transparent 70%), var(--v5-surface)",
   overflow: "hidden",
   color: "var(--v5-ink)",
-  boxShadow: "var(--v5-card-shadow-lift)",
 };
 
 const PRODUCT_MASK =
@@ -111,3 +123,179 @@ function goStore() {
   uni.navigateTo({ url: `/pages/store/detail?id=${promo.value.targetKind}`, fail: () => {} });
 }
 </script>
+
+<style scoped>
+.weekly-quest__content {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  height: 100%;
+  padding: 14px 16px;
+}
+
+.weekly-quest__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.weekly-quest__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.weekly-quest__mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--v5-brand-soft);
+}
+
+.weekly-quest__title {
+  font-family: var(--font-v5);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v5-ink);
+  white-space: nowrap;
+}
+
+.weekly-quest__multiplier {
+  display: inline-flex;
+  height: 22px;
+  padding: 0 8px;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--v5-brand);
+  background: transparent;
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--v5-brand);
+  white-space: nowrap;
+}
+
+.weekly-quest__countdown {
+  display: flex;
+  min-width: 72px;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.weekly-quest__countdown-label {
+  font-family: var(--font-v5);
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--v5-ink-4);
+}
+
+.weekly-quest__countdown-value {
+  margin-top: 5px;
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #9B89E0;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-quest__body {
+  position: relative;
+  z-index: 2;
+  width: 62%;
+  margin-top: 6px;
+}
+
+.weekly-quest__reward {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.weekly-quest__reward-value {
+  font-family: var(--font-v5);
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--v5-warning);
+  letter-spacing: -0.024em;
+}
+
+.weekly-quest__reward-unit {
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v5-brand);
+}
+
+.weekly-quest__subtitle {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  font-family: var(--font-v5);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--v5-ink-3);
+  letter-spacing: -0.008em;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekly-quest__rate {
+  display: flex;
+  align-items: baseline;
+  margin-top: 3px;
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.weekly-quest__rate-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v5-brand);
+}
+
+.weekly-quest__rate-unit {
+  font-size: 11px;
+  color: var(--v5-ink-4);
+}
+
+.weekly-quest__cta {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  display: inline-flex;
+  min-height: 44px;
+  padding: 0 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: var(--v5-brand-soft);
+  font-family: var(--font-v5);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--v5-brand) 82%, var(--v5-ink-3));
+  letter-spacing: -0.005em;
+}
+
+.weekly-quest__cta-arrow {
+  font-family: var(--font-jet-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: currentColor;
+  opacity: 0.58;
+}
+</style>
