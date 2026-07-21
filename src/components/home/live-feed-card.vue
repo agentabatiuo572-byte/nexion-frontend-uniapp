@@ -37,9 +37,9 @@
         :style="{ gridTemplateColumns: '44px 38px 1fr auto', borderBottom: i < activityRows.length - 1 ? '1px solid var(--v5-border)' : 'none', animation: i === 0 ? 'v5-ledger-fade 0.5s ease' : 'none' }"
       >
         <text class="tabular-nums" style="font-size: 10.5px; color: var(--v5-ink-4)">{{ r.ts }}</text>
-        <text class="text-center" :style="whoBadgeStyle(r)">{{ r.who }}</text>
+        <text class="text-center" :style="whoBadgeStyle(r)">{{ whoLabel(r.who) }}</text>
         <text class="truncate" style="font-family: var(--font-v5); font-weight: 400; font-size: 12.5px; color: var(--v5-ink-2)">{{ r.msg }}</text>
-        <text class="tabular-nums text-right" style="font-weight: 500" :style="{ color: valColor(r) }">{{ r.val }}</text>
+        <text class="tabular-nums text-right" style="font-weight: 500" :style="{ color: valColor(r) }">{{ r.val === 'locked' ? t.home.feedValLocked : r.val }}</text>
       </view>
     </view>
 
@@ -161,6 +161,7 @@ function whoBadgeStyle(r: FeedRow): CSSProperties {
 function valColor(r: FeedRow): string {
   return r.val === "locked" ? "var(--v5-ink-4)" : r.who === "You" ? "var(--v5-ink-3)" : "var(--v5-success)";
 }
+function whoLabel(who: string): string { return who === "You" ? t.value.home.feedWhoYou : who === "Peer" ? t.value.home.feedWhoPeer : who === "Lock" ? t.value.home.feedWhoLock : who; }
 function boughtText(it: CommissionItem): string {
   return fmt(t.value.home.liveFeedBought, { product: it.product });
 }

@@ -31,7 +31,7 @@
       <view class="mx-4">
         <view class="flex gap-0.5" style="background: var(--v5-surface-2); border-radius: 12px; padding: 3px">
           <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" @click="range = r">
-            <text :style="pillLabelStyle(r)">{{ r }}</text>
+            <text :style="pillLabelStyle(r)">{{ rangeLabel(r) }}</text>
           </view>
         </view>
       </view>
@@ -46,7 +46,7 @@
 
           <view class="relative" style="z-index: 1">
             <view class="flex justify-between items-center gap-2">
-              <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">Compute earned · {{ rangeKey }}</text>
+              <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.earn.computeEarned }} · {{ rangeLabel(range) }}</text>
               <text class="font-mono-tabular" :style="usdtTagStyle">USDT</text>
             </view>
 
@@ -120,6 +120,7 @@ const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 const app = useApp();
 const t = useT();
 const range = ref<Range>("Today");
+function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
 
 // FEAT-DEV01: 任务池提示线展开态 + W-CAP1 弹层入口。
 const taskPoolOpen = ref(false);
@@ -146,7 +147,6 @@ const total = computed(() => {
       : range.value === "Month" ? e.thisMonth
         : e.total;
 });
-const rangeKey = computed(() => range.value.toLowerCase());
 const totalInt = computed(() => Math.floor(total.value).toLocaleString());
 const totalCents = computed(() => String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
 // NEX earned for the range — backend gives per-range NEX; mock scales today's NEX by the USDT ratio.
@@ -156,12 +156,8 @@ const nexTotal = computed(() => {
   return total.value * ratio;
 });
 const nexFmt = computed(() => nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
-const jobsText = computed(() =>
-  range.value === "Today" ? "14 jobs"
-    : range.value === "Week" ? "98 jobs"
-      : range.value === "Month" ? "412 jobs"
-        : "1,247 jobs",
-);
+const jobsCount = computed(() => (range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247));
+const jobsText = computed(() => fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
 
 // drifting hero dots
 const HERO_DOTS = [

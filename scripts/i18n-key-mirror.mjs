@@ -48,17 +48,28 @@ function readExportedObject(file, exportName) {
   return found;
 }
 
+// en is the source of truth; every other locale dictionary must mirror its key
+// tree exactly (no missing, no extra). Added vi 2026-07-21 — a two-way en/zh
+// check would let vi drift silently, so all locales are gated against en here.
 const enKeys = new Set(collectObjectKeys(readExportedObject("src/i18n/messages/en.ts", "en")));
-const zhKeys = new Set(collectObjectKeys(readExportedObject("src/i18n/messages/zh.ts", "zh")));
+const LOCALES = [
+  ["zh", "src/i18n/messages/zh.ts"],
+  ["vi", "src/i18n/messages/vi.ts"],
+];
 
-const missingInZh = [...enKeys].filter((key) => !zhKeys.has(key));
-const extraInZh = [...zhKeys].filter((key) => !enKeys.has(key));
-
-if (missingInZh.length || extraInZh.length) {
-  console.error("uniapp i18n mirror FAIL");
-  if (missingInZh.length) console.error(`missing in zh:\n${missingInZh.join("\n")}`);
-  if (extraInZh.length) console.error(`extra in zh:\n${extraInZh.join("\n")}`);
-  process.exit(1);
+let failed = false;
+for (const [name, file] of LOCALES) {
+  const keys = new Set(collectObjectKeys(readExportedObject(file, name)));
+  const missing = [...enKeys].filter((key) => !keys.has(key));
+  const extra = [...keys].filter((key) => !enKeys.has(key));
+  if (missing.length || extra.length) {
+    failed = true;
+    console.error(`uniapp i18n mirror FAIL (${name} vs en)`);
+    if (missing.length) console.error(`missing in ${name}:\n${missing.join("\n")}`);
+    if (extra.length) console.error(`extra in ${name}:\n${extra.join("\n")}`);
+  }
 }
 
-console.log(`uniapp i18n mirror PASS: ${enKeys.size} keys`);
+if (failed) process.exit(1);
+
+console.log(`uniapp i18n mirror PASS: en/zh/vi ${enKeys.size} keys`);

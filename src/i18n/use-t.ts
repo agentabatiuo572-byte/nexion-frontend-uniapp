@@ -1,5 +1,6 @@
 import { computed } from "vue";
 import { en, type Messages } from "./messages/en";
+import { vi } from "./messages/vi";
 import { zh } from "./messages/zh";
 import type { LocaleCode } from "./index";
 import { useLocaleStore } from "@/store/locale";
@@ -9,6 +10,7 @@ import { useLocaleStore } from "@/store/locale";
 // to English (the source-of-truth).
 const DICTS: Partial<Record<LocaleCode, Messages>> = {
   en,
+  vi,
   zh,
 };
 
