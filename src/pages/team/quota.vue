@@ -48,7 +48,7 @@
               <text class="block" :style="inviteTitleStyle">{{ t.quota.inviteFriendsTitle }}</text>
               <text class="block" :style="inviteHintStyle">{{ inviteHint }}</text>
             </view>
-            <text class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-brand)' }">{{ t.quota.shareTag }}</text>
+            <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ t.quota.shareTag }}</text>
           </view>
         </view>
       </view>
@@ -127,8 +127,8 @@ function go(url: string) {
 // floor (leaderboard prize-hero idiom, 2px optical inset).
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 const heroIconStyle: CSSProperties = { width: "48px", height: "48px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, color: "var(--v5-brand-2)", letterSpacing: "0.06em" };
-const heroBigStyle: CSSProperties = { fontSize: "30px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
+const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand-2)", letterSpacing: "0.06em" };
+const heroBigStyle: CSSProperties = { fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroSuffixStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 // -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
 const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)" };
@@ -146,6 +146,6 @@ const inviteCtaStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
 };
 const inviteIconStyle: CSSProperties = { width: "40px", height: "40px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
-const inviteTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const inviteHintStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const inviteTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const inviteHintStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 </script>

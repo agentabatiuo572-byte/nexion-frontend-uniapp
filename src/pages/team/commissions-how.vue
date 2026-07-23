@@ -152,8 +152,8 @@ function goBack() {
 }
 
 // ─── styles ───
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
 const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 
 const statusBoxStyle: CSSProperties = {
@@ -173,7 +173,7 @@ function statusChipStyle(color: string): CSSProperties {
     borderRadius: "6px",
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
     color,
-    fontSize: "10.5px",
+    fontSize: "12px",
   };
 }
 const statusDescStyle: CSSProperties = { color: "var(--v5-ink-3)", lineHeight: 1.5 };
@@ -187,14 +187,14 @@ const exampleBoxStyle: CSSProperties = {
 const exampleDayStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const exampleLabelStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)" };
+const exampleLabelStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
 function exampleAmtStyle(color: string): CSSProperties {
-  return { fontSize: "12.5px", fontWeight: 600, color };
+  return { fontSize: "13px", fontWeight: 600, color };
 }
 const exampleTotalRowStyle: CSSProperties = {
   paddingTop: "12px",
@@ -203,7 +203,7 @@ const exampleTotalRowStyle: CSSProperties = {
 };
 const exampleTotalLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -211,7 +211,7 @@ const exampleTotalLabelStyle: CSSProperties = {
 const exampleTotalValueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-brand)",
 };
@@ -227,7 +227,7 @@ const ctaTextStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
 };
 </script>

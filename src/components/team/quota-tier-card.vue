@@ -43,7 +43,7 @@
     <view style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px">
       <text class="block font-mono-tabular" :style="unlockHeadStyle">{{ tier.unlockKind === "either" ? t.quota.unlockEither : t.quota.unlockAll }}</text>
       <view v-for="(c, i) in tier.conditions" :key="i">
-        <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 4px">
+        <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 4px">
           <view class="flex items-center" style="gap: 4px">
             <svg v-if="c.current >= c.required" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
@@ -62,7 +62,7 @@
     <view :style="perksWrapStyle">
       <view v-for="(p, i) in tier.perks" :key="i" class="flex items-start" style="gap: 8px">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="tier.tint" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><polyline points="20 6 9 17 4 12" /></svg>
-        <text :style="{ fontSize: '11px', color: 'var(--v5-ink-2)' }">{{ p }}</text>
+        <text :style="{ fontSize: '12px', color: 'var(--v5-ink-2)' }">{{ p }}</text>
       </view>
     </view>
 
@@ -136,9 +136,9 @@ const iconBoxStyle = computed<CSSProperties>(() => ({
   background: unlocked.value ? `color-mix(in srgb, ${props.tier.tint} 25%, transparent)` : "var(--v5-surface-2)",
 }));
 const nameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1.1, color: "var(--v5-ink)" };
-const stockLineStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const stockLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const badgeStyle = computed<CSSProperties>(() => ({
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.04em",
   padding: "1px 6px",
   borderRadius: "4px",
@@ -155,9 +155,9 @@ const stockFillStyle = computed<CSSProperties>(() => ({
   willChange: "width",
   background: props.tier.tint,
 }));
-const stockStatsStyle: CSSProperties = { marginTop: "4px", fontSize: "10px", color: "var(--v5-ink-3)" };
+const stockStatsStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 
-const unlockHeadStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.04em", color: "var(--v5-ink-3)" };
+const unlockHeadStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.04em", color: "var(--v5-ink-3)" };
 const perksWrapStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
@@ -171,7 +171,7 @@ const buyCtaStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "44px",
   borderRadius: "999px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   gap: "6px",
   background: props.tier.tint,
@@ -180,7 +180,7 @@ const lockedCtaStyle: CSSProperties = {
   width: "100%",
   height: "44px",
   borderRadius: "999px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   gap: "6px",
   background: "var(--v5-surface-2)",

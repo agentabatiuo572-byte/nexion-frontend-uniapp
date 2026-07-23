@@ -32,21 +32,21 @@
           :style="rowStyle(i === sortedMembers.length - 1)"
         >
           <view class="rounded-full grid place-items-center shrink-0" :style="avatarStyle">
-            <text style="font-size: 18px; line-height: 1">{{ m.avatar }}</text>
+            <text style="font-size: 20px; line-height: 1">{{ m.avatar }}</text>
           </view>
           <view class="flex-1 min-w-0">
             <view class="flex items-center" style="gap: 6px">
-              <text class="truncate" :style="{ fontSize: '12.5px', color: 'var(--v5-ink)' }">{{ m.name }}</text>
+              <text class="truncate" :style="{ fontSize: '13px', color: 'var(--v5-ink)' }">{{ m.name }}</text>
               <VBadge :v="m.vRank" size="sm" :show-title="false" />
             </view>
             <view class="flex items-center" style="margin-top: 2px; gap: 6px">
               <view class="rounded-full" :style="statusDotStyle(m.status)" />
-              <text :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ daysAgo(m.joinedAt) }}d ago</text>
+              <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m.city }} · {{ daysAgo(m.joinedAt) }}d ago</text>
             </view>
           </view>
           <view class="text-right shrink-0">
             <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
+            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
           </view>
         </view>
       </view>
@@ -101,8 +101,8 @@ const badgeStyle = computed<CSSProperties>(() => ({
   color: props.accentText,
   letterSpacing: "0.06em",
 }));
-const titleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const titleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const subtitleStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const emptyStyle: CSSProperties = { padding: "24px 16px", fontSize: "12px", color: "var(--v5-ink-3)", borderTop: "1px solid var(--v5-border)" };
 function rowStyle(isLast: boolean): CSSProperties {
   return { padding: "10px 16px", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };

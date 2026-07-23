@@ -69,11 +69,11 @@
           </svg>
           <view class="grid grid-cols-2" style="margin-top: 12px; gap: 8px">
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand)')">
-              <text class="block" :style="{ color: 'var(--v5-brand)', fontWeight: 500, fontSize: '10.5px' }">{{ w.diagLeftLabel }}</text>
+              <text class="block" :style="{ color: 'var(--v5-brand)', fontWeight: 500, fontSize: '12px' }">{{ w.diagLeftLabel }}</text>
               <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$3,000/mo</text>
             </view>
             <view class="rounded-md text-center" :style="trackTotalStyle('var(--v5-brand-2)')">
-              <text class="block" :style="{ color: 'var(--v5-brand-2)', fontWeight: 500, fontSize: '10.5px' }">{{ w.diagRightLabel }}</text>
+              <text class="block" :style="{ color: 'var(--v5-brand-2)', fontWeight: 500, fontSize: '12px' }">{{ w.diagRightLabel }}</text>
               <text class="block font-display tabular-nums" :style="trackTotalAmtStyle">$2,000/mo</text>
             </view>
           </view>
@@ -95,22 +95,22 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="20" x="4" y="2" rx="2" /><line x1="8" x2="16" y1="6" y2="6" /><line x1="16" x2="16" y1="14" y2="18" /><path d="M16 10h.01" /><path d="M12 10h.01" /><path d="M8 10h.01" /><path d="M12 14h.01" /><path d="M8 14h.01" /><path d="M12 18h.01" /><path d="M8 18h.01" /></svg>
         </template>
-        <text class="block" :style="{ fontSize: '12.5px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ s4IntroText }}</text>
+        <text class="block" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ s4IntroText }}</text>
         <view class="rounded-xl" :style="mathTileStyle">
           <view class="grid grid-cols-2" style="gap: 12px">
             <view>
-              <text class="block" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagLeftLabel }}</text>
-              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)', marginTop: '2px' }">$3,000</text>
+              <text class="block" :style="{ fontSize: '12px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagLeftLabel }}</text>
+              <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand)', marginTop: '2px' }">$3,000</text>
             </view>
             <view>
-              <text class="block" :style="{ fontSize: '10px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagRightLabel }}</text>
-              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)', marginTop: '2px' }">$2,000</text>
+              <text class="block" :style="{ fontSize: '12px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ w.diagRightLabel }}</text>
+              <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand-2)', marginTop: '2px' }">$2,000</text>
             </view>
           </view>
           <view class="flex items-center justify-between" :style="mathTotalRowStyle">
             <view class="flex items-center" style="gap: 6px">
               <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ w.s4SmallerLabel }}</text>
-              <text class="font-display tabular-nums" :style="{ fontSize: '13.5px', color: 'color-mix(in srgb, var(--v5-ink) 90%, transparent)' }">$2,000</text>
+              <text class="font-display tabular-nums" :style="{ fontSize: '13px', color: 'color-mix(in srgb, var(--v5-ink) 90%, transparent)' }">$2,000</text>
               <text :style="{ fontSize: '12px', color: 'var(--v5-ink-4)' }">× 10% =</text>
             </view>
             <text class="font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand)' }">$200</text>
@@ -128,15 +128,15 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
         </template>
-        <text class="block" :style="{ fontSize: '12.5px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
+        <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
         <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
           <view v-for="tl in timeline" :key="tl.month" class="rounded-lg" :style="timelineRowStyle(tl.highlight)">
             <view class="flex items-center justify-between">
-              <text :style="{ fontSize: '11px', letterSpacing: '0.14em', color: 'var(--v5-brand)', fontWeight: 500 }">{{ tl.month }}</text>
-              <text class="font-display tabular-nums" :style="{ fontSize: '14px', fontWeight: 600, color: tl.blocked ? 'var(--v5-brand-2)' : 'var(--v5-brand)' }">{{ tl.bonusVal }}</text>
+              <text :style="{ fontSize: '12px', letterSpacing: '0.14em', color: 'var(--v5-brand)', fontWeight: 500 }">{{ tl.month }}</text>
+              <text class="font-display tabular-nums" :style="{ fontSize: '15px', fontWeight: 600, color: tl.blocked ? 'var(--v5-brand-2)' : 'var(--v5-brand)' }">{{ tl.bonusVal }}</text>
             </view>
             <text class="block" :style="{ marginTop: '4px', fontSize: '12px', color: 'var(--v5-ink-2)', lineHeight: 1.5 }">{{ tl.text }}</text>
-            <view class="flex items-center font-mono-tabular" :style="{ marginTop: '6px', gap: '12px', fontSize: '10.5px', color: 'var(--v5-ink-4)' }">
+            <view class="flex items-center font-mono-tabular" :style="{ marginTop: '6px', gap: '12px', fontSize: '12px', color: 'var(--v5-ink-4)' }">
               <text>L {{ tl.leftVal }}</text>
               <text>·</text>
               <text>R {{ tl.rightVal }}</text>
@@ -218,15 +218,15 @@ function goBack() {
 // ─── styles ───
 // Hero / section shells / step rows / FAQ rows now come from the how/*
 // components; only page-local content + tile styles remain.
-const bodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
 
 // Tree-diagram tile — de-carded: surface-2 fill, no border (single visual difference).
 const diagramTileStyle: CSSProperties = { marginTop: "14px", background: "var(--v5-surface-2)", padding: "16px" };
 function trackTotalStyle(color: string): CSSProperties {
   return { background: `color-mix(in srgb, ${color} 8%, transparent)`, padding: "6px 8px" };
 }
-const trackTotalAmtStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, marginTop: "2px", color: "var(--v5-ink)" };
+const trackTotalAmtStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, marginTop: "2px", color: "var(--v5-ink)" };
 
 // Reward-math tile — de-carded: surface-2 fill, no border (was gradient + border);
 // internal total row keeps its hairline.
@@ -237,7 +237,7 @@ const qualifyChipStyle: CSSProperties = {
   gap: "6px",
   padding: "4px 10px",
   background: "color-mix(in srgb, var(--v5-warning) 12%, transparent)",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-warning)",
 };
 
@@ -258,5 +258,5 @@ const takeawayStyle: CSSProperties = {
 };
 
 const ctaStyle: CSSProperties = { gap: "8px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
-const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "14px", fontWeight: 600 };
+const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
 </script>

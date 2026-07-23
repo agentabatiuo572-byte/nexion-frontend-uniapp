@@ -45,11 +45,11 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
             <text class="block" :style="compSubStyle">{{ t.unilevel.directSub }}</text>
-            <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
+            <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)', marginTop: '6px' }">{{ directRateText }}</text>
           </view>
           <view class="text-right shrink-0">
-            <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
-            <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
+            <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ directRoyalty.toFixed(2) }}</text>
+            <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
           </view>
         </view>
         <view :style="glassCardStyle">
@@ -58,7 +58,7 @@
             <view class="flex-1 min-w-0">
               <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
               <text class="block" :style="compSubStyle">{{ t.unilevel.networkSub }}</text>
-              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 10.5px">
+              <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px; font-size: 12px">
                 <view>
                   <text class="block" :style="{ color: 'var(--v5-ink-3)' }">{{ t.unilevel.networkScoreLabel }}</text>
                   <text class="block font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-brand-2)', fontWeight: 600, marginTop: '2px' }">{{ influenceScore.toFixed(2) }}</text>
@@ -70,12 +70,12 @@
               </view>
             </view>
             <view class="text-right shrink-0">
-              <text class="block font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
+              <text class="block font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-brand-2)' }">${{ networkBonus.toFixed(2) }}</text>
             </view>
           </view>
           <view class="flex items-start" :style="algoNoteStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4" /><path d="M12 8h.01" /></svg>
-            <text :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
+            <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.625 }">{{ t.unilevel.networkAlgoNote }}</text> <!-- SKILL: leading-relaxed=1.625 -->
           </view>
         </view>
 
@@ -84,26 +84,26 @@
              dropped (selection/comparison whitelist, podium idiom: current
              cell tinted, rest dimmed surface-2). -->
         <view :style="glassCardStyle">
-          <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
+          <text class="block font-mono-tabular" :style="{ fontSize: '12px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
           <text class="block" :style="{ marginTop: '8px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ t.unilevel.rateTierNote }}</text>
 
           <view class="grid grid-cols-4" style="margin-top: 16px; gap: 6px">
             <view v-for="tier in RATE_TIERS" :key="tier.id" class="rounded-lg text-center" :style="tierCardStyle(tier)">
-              <text class="block font-display" :style="{ fontSize: '11px', fontWeight: 600, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-3)' }">{{ t.unilevel.rateTiers[tier.id].name }}</text>
-              <text class="block" :style="{ fontSize: '10px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25; 10px = scale floor (was off-scale 8.5) -->
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
+              <text class="block font-display" :style="{ fontSize: '12px', fontWeight: 600, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-3)' }">{{ t.unilevel.rateTiers[tier.id].name }}</text>
+              <text class="block" :style="{ fontSize: '12px', marginTop: '2px', lineHeight: 1.25, color: tier.id === currentTier.id ? tier.color : 'var(--v5-ink-4)' }">{{ t.unilevel.rateTiers[tier.id].perk }}</text> <!-- SKILL: leading-tight=1.25; 10px = scale floor (was off-scale 8.5) -->
+              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)', marginTop: '2px' }">{{ tierVolLabel(tier.minVolume) }}</text>
             </view>
           </view>
 
           <view v-if="next" style="margin-top: 18px">
-            <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 8px">
+            <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 8px">
               <text :style="{ color: 'var(--v5-ink-3)' }">{{ rateTierCurrentText }}</text>
               <text class="font-mono-tabular" :style="{ color: 'var(--v5-brand)' }">${{ monthlyNetworkVolume.toLocaleString() }} / ${{ next.minVolume.toLocaleString() }}</text>
             </view>
             <view class="rounded-full overflow-hidden" :style="{ height: '8px', background: 'color-mix(in srgb, var(--v5-surface-2) 60%, transparent)' }">
               <view class="rounded-full" :style="tierProgressFillStyle" />
             </view>
-            <text class="block" :style="{ marginTop: '10px', fontSize: '11.5px', color: 'var(--v5-ink-3)', lineHeight: 1.5 }">{{ rateTierProgressText }}</text>
+            <text class="block" :style="{ marginTop: '10px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.5 }">{{ rateTierProgressText }}</text>
           </view>
           <view v-else class="inline-flex items-center" :style="maxedChipStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" /><path d="M5 21h14" /></svg>
@@ -144,17 +144,17 @@
               :style="memberRowStyle(i === visibleMembers.length - 1)"
             >
               <view class="rounded-full grid place-items-center shrink-0" :style="memberAvatarStyle">
-                <text style="font-size: 18px; line-height: 1">{{ m.avatar }}</text>
+                <text style="font-size: 20px; line-height: 1">{{ m.avatar }}</text>
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontSize: '13.5px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ m.name }}</text>
+                  <text class="truncate" :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ m.name }}</text>
                   <text v-if="m.isSpillover" class="font-mono-tabular" :style="spillTagStyle">{{ t.unilevel.spillTag }}</text>
                   <VBadge :v="m.vRank" size="sm" :show-title="false" />
                 </view>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <view class="rounded-full" :style="{ width: '6px', height: '6px', background: statusColor(m.status) }" />
-                  <text :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ m.status }} · {{ m.city }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m.status }} · {{ m.city }}</text>
                   <text class="font-mono-tabular" :style="memberBadgeStyle(m.kind)">{{ m.kind === "direct" ? t.unilevel.memberBadgeDirect : t.unilevel.memberBadgeExtended }}</text>
                 </view>
               </view>
@@ -312,13 +312,13 @@ const howEntryStyle: CSSProperties = {
 // De-carded hero: no surface/border/glow — content sits directly on the page
 // floor (page-floor auras are deleted outright per owner call, not re-tuned).
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
-const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
-const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "30px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
+const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
+const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroTierChipStyle = computed<CSSProperties>(() => ({
   marginTop: "12px",
   padding: "4px 10px",
   borderRadius: "6px",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
   background: `color-mix(in srgb, ${currentTier.value.color} 15%, transparent)`,
   color: currentTier.value.color,
@@ -341,12 +341,12 @@ function compBadgeStyle(color: string): CSSProperties {
     height: "40px",
     background: `color-mix(in srgb, ${color} 22%, transparent)`,
     color,
-    fontSize: "18px",
+    fontSize: "20px",
     fontWeight: 600,
   };
 }
-const compTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
+const compTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const compSubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 }; // SKILL: leading-snug=1.375 (was 1.45)
 // Inner note row under the N metrics.
 const algoNoteStyle: CSSProperties = {
   marginTop: "10px",
@@ -375,7 +375,7 @@ const maxedChipStyle: CSSProperties = {
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
   color: "var(--v5-brand-2)",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
 };
 
@@ -404,9 +404,9 @@ function memberRowStyle(isLast: boolean): CSSProperties {
 const memberAvatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface-2)" };
 // Ghost "View more" affordance — 44px tap target, boxed chrome dropped.
 const loadMoreBtnStyle: CSSProperties = { gap: "6px", height: "44px", marginTop: "2px" };
-const loadMoreLabelStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 500, color: "var(--v5-ink-3)" };
+const loadMoreLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink-3)" };
 const spillTagStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
   padding: "0 4px",
@@ -418,7 +418,7 @@ function memberBadgeStyle(kind: "direct" | "extended"): CSSProperties {
     marginLeft: "auto",
     padding: "0 4px",
     borderRadius: "4px",
-    fontSize: "10px",
+    fontSize: "12px",
     letterSpacing: "0.04em",
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
     color,

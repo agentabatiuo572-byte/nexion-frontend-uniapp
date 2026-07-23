@@ -17,7 +17,7 @@
     {
       "route": "/pages/team/network",
       "cls": "relative overflow-hidden rounded-2xl",
-      "size": "358x388",
+      "size": "358x391",
       "reason": "📐 规范本体豁免,非人情例外(C2 第二轮 2026-07-23 回源 + 运行时实测)。network orb 可视化卡的**平底层就是页面地板色**——两主题逐值实测:dark 卡底 rgb(0,0,0) = 祖先 rgb(0,0,0);light 卡底 rgb(244,241,233) = 祖先 rgb(244,241,233),色差为 0。因此《03》§3「零 border,层级靠 surface 微差色分层」的**前提在这里不成立**(不存在可用的 surface 微差)。按 §3 本体判,它属「**透明容器**」形态(可见的只有装饰性 radial wash + overflow-hidden 裁剪),而 border **正是**规范允许透明容器使用的边界。门之所以仍报违例,是 hasFill() 把「任何 gradient」一律当填充,分不出「装饰性 wash」与「卡片实底」——**这是门的判据粒度问题,我没有去改门迁就它**(纪律:门是用来量的)。⚠️ C2 第二轮曾误删此边(脚本按行号批量删,没读上面两行保护性注释),audit ②层抓出后已回滚。源码 `src/pages/team/network.vue` 注释已写明,别再删。"
     }
   ]

@@ -240,7 +240,7 @@ export type WithdrawalStatus =
 export interface Withdrawal {
   id: string;
   amount: number;
-  network: "USDT-TRC20" | "USDT-ERC20" | "BTC" | "ETH";
+  network: "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
   address: string;
   fee: number;
   status: WithdrawalStatus;

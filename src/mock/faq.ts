@@ -79,7 +79,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "py-2",
     category: "payments",
     q: "What networks can I withdraw on?",
-    a: "USDT-TRC20 (fastest, $1 fee), USDT-ERC20 ($8–18 fee depending on gas), BTC, ETH. Min withdrawal: $20.",
+    a: "USDT-TRC20 (fastest, lowest fee), USDT-BEP20 (low fee), or USDT-ERC20 (best for large amounts). Min withdrawal: $20.",
   },
   {
     id: "py-3",

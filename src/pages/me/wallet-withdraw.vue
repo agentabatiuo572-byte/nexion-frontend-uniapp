@@ -252,11 +252,11 @@ import { useConfig } from "@/store/config";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal } from "@/store/types";
 
+// 提现网络收窄裁决:仅 USDT 三网络(TRC20 推荐),与充值通道同序。
 const NETWORKS: { id: Withdrawal["network"]; label: string; recommended?: boolean }[] = [
   { id: "USDT-TRC20", label: "USDT (TRC20)", recommended: true },
+  { id: "USDT-BEP20", label: "USDT (BEP20)" },
   { id: "USDT-ERC20", label: "USDT (ERC20)" },
-  { id: "BTC", label: "Bitcoin" },
-  { id: "ETH", label: "Ethereum" },
 ];
 
 const t = useT();
@@ -287,9 +287,8 @@ const network = ref<Withdrawal["network"]>("USDT-TRC20");
 const address = ref("");
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
-const addressPlaceholder = computed(() =>
-  network.value === "BTC" ? "bc1q..." : network.value === "ETH" ? "0x..." : "TR7NHq...",
-);
+// TRC20 = TRON 形态;ERC20/BEP20 共用 EVM 0x 形态。
+const addressPlaceholder = computed(() => (network.value === "USDT-TRC20" ? "TR7NHq..." : "0x..."));
 
 const complianceHoldEnabled = computed(() => phase.value.complianceHoldEnabled);
 const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: phase.value.withdrawalCooldownDays }));
@@ -370,12 +369,10 @@ function networkHint(id: Withdrawal["network"]): string {
   switch (id) {
     case "USDT-TRC20":
       return t.value.wallet.networkHintTrc20;
+    case "USDT-BEP20":
+      return t.value.wallet.networkHintBep20;
     case "USDT-ERC20":
       return t.value.wallet.networkHintErc20;
-    case "BTC":
-      return t.value.wallet.networkHintBtc;
-    case "ETH":
-      return t.value.wallet.networkHintEth;
   }
   return "";
 }

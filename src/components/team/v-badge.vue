@@ -51,9 +51,9 @@ const COLORS: Record<number, ColorSpec> = {
 };
 
 const SIZES = {
-  sm: { padding: "2px 6px", fontSize: "10px", gap: "4px" },
-  md: { padding: "3px 8px", fontSize: "11px", gap: "4px" },
-  lg: { padding: "4px 10px", fontSize: "13.5px", gap: "6px" },
+  sm: { padding: "2px 6px", fontSize: "12px", gap: "4px" },
+  md: { padding: "3px 8px", fontSize: "12px", gap: "4px" },
+  lg: { padding: "4px 10px", fontSize: "13px", gap: "6px" },
 } as const;
 
 const def = computed(() => V_RANKS[props.v]);

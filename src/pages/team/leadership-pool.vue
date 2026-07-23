@@ -96,14 +96,14 @@
             <VBadgeIcon :v="row.v" :size="32" />
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
-                <text :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--v5-ink)' }">V{{ row.v }} {{ row.title }}</text>
-                <text v-if="row.isMine" class="font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-brand)' }">{{ t.pool.youTag }}</text>
+                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">V{{ row.v }} {{ row.title }}</text>
+                <text v-if="row.isMine" class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ t.pool.youTag }}</text>
               </view>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">{{ row.peopleVotes }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ row.peopleVotes }}</text>
             </view>
             <view class="text-right">
-              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '11.5px', color: 'var(--v5-ink)' }">{{ (row.shareOfPool * 100).toFixed(2) }}%</text>
-              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
+              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ (row.shareOfPool * 100).toFixed(2) }}%</text>
+              <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ row.perPerson }} {{ t.pool.eaShort }}</text>
             </view>
           </view>
         </view>
@@ -119,9 +119,9 @@
           >
             <view>
               <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink)' }">{{ h.weekId }}</text>
-              <text class="block font-mono-tabular" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
+              <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ poolTotalText(h) }}</text>
             </view>
-            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '11.5px', color: h.payoutUSDT > 0 ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ h.payoutUSDT > 0 ? `+$${h.payoutUSDT.toFixed(2)}` : "—" }}</text>
+            <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: h.payoutUSDT > 0 ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ h.payoutUSDT > 0 ? `+$${h.payoutUSDT.toFixed(2)}` : "—" }}</text>
           </view>
         </view>
       </view>
@@ -214,9 +214,9 @@ const howEntryStyle: CSSProperties = {
 // De-carded hero: no surface/border/glow — the big number sits directly on the
 // page floor with a 2px optical inset (leaderboard.vue prize-hero idiom).
 const heroStyle: CSSProperties = { padding: "10px 2px 0" };
-const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
-const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
-const heroDescStyle: CSSProperties = { marginTop: "8px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const heroCapStyle: CSSProperties = { gap: "6px", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "56px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+const heroDescStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)" };
 
 // Frosted-glass status card (owner 2026-07-09) — chassis glass-tile token,
 // fill only / zero border (bg-filled cards carry no border line).
@@ -227,14 +227,14 @@ const statusStyle: CSSProperties = {
   backdropFilter: "blur(18px) saturate(180%)",
 };
 function statusCapStyle(color: string): CSSProperties {
-  return { fontSize: "10px", letterSpacing: "0.16em", color };
+  return { fontSize: "12px", letterSpacing: "0.16em", color };
 }
-const projectedStyle: CSSProperties = { marginTop: "8px", fontSize: "30px", fontWeight: 600, lineHeight: 1, color: "var(--v5-brand)" };
-const statLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const projectedStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, color: "var(--v5-brand)" };
+const statLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const statValueStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "2px" };
-const lockedHeadStyle: CSSProperties = { marginTop: "8px", fontSize: "14px", color: "var(--v5-ink)" };
-// SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[11px] leading-snug; was 1.45)
-const lockedSubStyle: CSSProperties = { marginTop: "6px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
+const lockedHeadStyle: CSSProperties = { marginTop: "8px", fontSize: "15px", color: "var(--v5-ink)" };
+// SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[12px] leading-snug; was 1.45)
+const lockedSubStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 const pathCtaStyle: CSSProperties = {
   marginTop: "12px",
   gap: "6px",
@@ -243,7 +243,7 @@ const pathCtaStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 
@@ -252,13 +252,13 @@ const concentrationStripStyle: CSSProperties = {
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-brand-2) 9%, transparent)",
 };
-const concentrationTextStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand-2)", lineHeight: 1.45 };
+const concentrationTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand-2)", lineHeight: 1.45 };
 
 // Form b container — no border (fill is the single visual difference);
 // overflow-hidden stays: the tinted mine-row must clip to the radius.
 const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px" };
 const tableHeadStyle: CSSProperties = { padding: "14px 16px 8px" };
-const tableHeadCapStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const tableHeadCapStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function voteRowStyle(isMine: boolean, isLast: boolean): CSSProperties {
   return {
     padding: "10px 16px",
@@ -270,7 +270,7 @@ function voteRowStyle(isMine: boolean, isLast: boolean): CSSProperties {
 // Transparent hairline group (form a) — border-top opens the group, rows keep
 // their hairlines, content sits on the 2px optical inset.
 const pastGroupStyle: CSSProperties = { marginTop: "12px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
-const pastHeadStyle: CSSProperties = { padding: "12px 0 8px", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const pastHeadStyle: CSSProperties = { padding: "12px 0 8px", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
   return { padding: "12px 0", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }

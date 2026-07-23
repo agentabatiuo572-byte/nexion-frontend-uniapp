@@ -123,9 +123,8 @@ export function mockExternalAddress(network: Withdrawal["network"]): string {
       // TRON addresses: T + 33 base58 chars (approximate with mixed case)
       return "T" + hex(33).toUpperCase().slice(0, 33);
     case "USDT-ERC20":
-    case "ETH":
+    case "USDT-BEP20":
+      // shared EVM-style 0x address form for ERC20 / BEP20
       return "0x" + hex(40);
-    case "BTC":
-      return "bc1q" + hex(38);
   }
 }

@@ -1,7 +1,7 @@
 <!--
   ChainPaymentInstructions — ported from Nexion-prototype/app/(main)/store/
-  checkout/page.tsx (ChainPaymentInstructions + FauxQR). USDT-TRC20 / USDT-ERC20
-  / BTC deposit screen: faux-QR + copyable address + 30-min countdown +
+  checkout/page.tsx (ChainPaymentInstructions + FauxQR). USDT-TRC20 / USDT-BEP20
+  / USDT-ERC20 deposit screen: faux-QR + copyable address + 30-min countdown +
   12s auto-detect that fires `complete`. wallet-pairing.ts isn't ported yet, so
   mockExternalAddress is inlined here (mock-only, self-contained).
 -->
@@ -71,7 +71,7 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 
 const props = defineProps<{
-  method: "usdt-trc20" | "usdt-erc20" | "btc";
+  method: "usdt-trc20" | "usdt-bep20" | "usdt-erc20";
   amount: number;
 }>();
 const emit = defineEmits<{ complete: []; cancel: [] }>();
@@ -81,13 +81,13 @@ const t = useT();
 const network = computed(() =>
   props.method === "usdt-trc20"
     ? "USDT-TRC20"
-    : props.method === "usdt-erc20"
-      ? "USDT-ERC20"
-      : "BTC",
+    : props.method === "usdt-bep20"
+      ? "USDT-BEP20"
+      : "USDT-ERC20",
 );
 
 // Generate a network-appropriate mock address (looks real, fully simulated).
-// Inlined from wallet-pairing.ts mockExternalAddress (that store isn't ported).
+// TRC20 = TRON form; ERC20/BEP20 share the EVM 0x form.
 function mockExternalAddress(net: string): string {
   const hex = (n: number) => {
     const chars = "0123456789abcdef";
@@ -96,18 +96,13 @@ function mockExternalAddress(net: string): string {
     return s;
   };
   if (net === "USDT-TRC20") return "T" + hex(33).toUpperCase().slice(0, 33);
-  if (net === "BTC") return "bc1q" + hex(38);
   return "0x" + hex(40);
 }
 const address = ref(mockExternalAddress(network.value));
 
 const sendLabel = computed(() => fmt(t.value.store.coSendNetwork, { network: network.value }));
 const sendExactLabel = computed(() => fmt(t.value.store.coSendExact, { network: network.value }));
-const amountLabel = computed(() =>
-  network.value === "BTC"
-    ? `${(props.amount / 65000).toFixed(6)} BTC ≈ $${props.amount.toLocaleString()}`
-    : `${props.amount.toLocaleString()} USDT`,
-);
+const amountLabel = computed(() => `${props.amount.toLocaleString()} USDT`);
 
 // ── 30-min countdown ──
 const secLeft = ref(30 * 60);

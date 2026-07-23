@@ -72,7 +72,7 @@
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
         </template>
-        <text class="block" :style="{ fontSize: '12.5px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
+        <text class="block" :style="{ fontSize: '13px', lineHeight: 1.6, color: 'var(--v5-ink-3)' }">{{ w.s5Intro }}</text>
 
         <view class="rounded-xl" :style="startCardStyle">
           <text class="block" :style="startLabelStyle">{{ w.s5StartLabel }}</text>
@@ -165,21 +165,21 @@ function goBack() {
 // ─── styles ───
 // Section shells / hero / callouts now come from the how/* components; only
 // page-local content styles remain.
-const bodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const bodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
 
-const ladderVStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", width: "28px" };
+const ladderVStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", width: "28px" };
 const ladderTitleStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", fontWeight: 500 };
 const ladderCnStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
 
 // Requirement tiles — filled, no border (single visual difference).
 const reqCardStyle: CSSProperties = { background: "var(--v5-surface-2)", padding: "10px 12px" };
-const reqLabelStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-brand)" };
+const reqLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-brand)" };
 const reqBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 }; // how-row scale: body 13/1.62 ink-2
 
 // Worked-example start tile — filled, no border.
 const startCardStyle: CSSProperties = { marginTop: "14px", background: "var(--v5-surface-2)", padding: "12px 14px" };
-const startLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "4px" };
+const startLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "4px" };
 
 const unlockResultCardStyle: CSSProperties = {
   marginTop: "8px",
@@ -188,10 +188,10 @@ const unlockResultCardStyle: CSSProperties = {
   borderColor: "color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
   padding: "12px",
 };
-const unlockResultLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "6px" };
+const unlockResultLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "6px" };
 const unlockResultItemStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
 
 
 const ctaStyle: CSSProperties = { gap: "8px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
-const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "14px", fontWeight: 600 };
+const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
 </script>

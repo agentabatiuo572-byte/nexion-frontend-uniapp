@@ -188,7 +188,7 @@
           <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
           <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text>
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
-            <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ DEMO_ADDRESS }}</text>
+            <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ demoAddress }}</text>
             <view class="nx-topup-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyDemoAddress">
               <svg v-if="copiedDemo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
@@ -227,12 +227,12 @@ interface Channel {
   time: string;
   min: string;
 }
+// 平台支付收窄裁决:充值通道 = USDT 三网络 + 国际卡(TRC20 主推排首位)。
 const ALL_CHANNELS: Channel[] = [
   { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5 min", min: "$10" },
+  { id: "USDT-BEP20", label: "USDT (BEP20)", fee: "1 USDT", time: "5 min", min: "$10" },
   { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15 min", min: "$10" },
-  { id: "BTC", label: "Bitcoin", fee: "0.5%", time: "30 min", min: "$20" },
-  { id: "ETH", label: "Ethereum", fee: "0.5%", time: "15 min", min: "$20" },
-  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "Instant", min: "$10" },
+  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "Instant", min: "$30" },
 ];
 const KYC_CHANNELS = ALL_CHANNELS.filter((c) => c.id === "USDT-TRC20" || c.id === "USDT-ERC20");
 
@@ -250,7 +250,8 @@ function channelClass(id: Channel["id"]): string {
 const KYC_DETECT_MS = 12_000;
 const KYC_PHASE_1_MS = 2_500;
 const KYC_PHASE_2_MS = 4_000;
-const DEMO_ADDRESS = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+const DEMO_TRON_ADDRESS = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+const DEMO_EVM_ADDRESS = "0x4f7a2c8e9b1d3f5a6c8e0b2d4f6a8c0e21abcdef";
 
 const t = useT();
 const app = useApp();
@@ -279,10 +280,12 @@ onLoad((options) => {
 
 // ── Regular flow state ──
 const selected = ref<string | null>(null);
+// 地址占位按网络切换:TRC20 用 TRON 形态,ERC20/BEP20 共用 EVM 0x 形态。
+const demoAddress = computed(() => (selected.value === "USDT-TRC20" ? DEMO_TRON_ADDRESS : DEMO_EVM_ADDRESS));
 const copiedDemo = ref(false);
 function copyDemoAddress() {
   uni.setClipboardData({
-    data: DEMO_ADDRESS,
+    data: demoAddress.value,
     success: () => {
       copiedDemo.value = true;
       setTimeout(() => (copiedDemo.value = false), 1500);

@@ -161,9 +161,10 @@ const brand = computed<"visa" | "mc" | "amex" | "unknown">(() => {
   return "unknown";
 });
 
+// 卡通道最低充值 $30(通道收窄裁决;链上 USDT 通道 min 仍为 $10)。
 const isValid = computed(
   () =>
-    usdtAmount.value >= 10 &&
+    usdtAmount.value >= 30 &&
     cardNum.value.replace(/\s/g, "").length >= 13 &&
     /^\d{2}\/\d{2}$/.test(expiry.value) &&
     /^\d{3,4}$/.test(cvv.value) &&

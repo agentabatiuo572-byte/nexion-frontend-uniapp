@@ -136,7 +136,7 @@
         <!-- === pay-instructions === -->
         <view v-else-if="step === 'pay-instructions'" class="mx-4 nx-step-in">
           <CardPayment v-if="isCard" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
-          <ChainPayment v-else :method="(payment as 'usdt-trc20' | 'usdt-erc20' | 'btc')" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
+          <ChainPayment v-else :method="(payment as 'usdt-trc20' | 'usdt-bep20' | 'usdt-erc20')" :amount="netPrice" @complete="goAwaiting" @cancel="goConfirm" />
         </view>
 
         <!-- === awaiting === -->
@@ -260,13 +260,14 @@ const orders = useOrders();
 const bills = useBills();
 const voucher = useVoucher();
 
-// wallet icon path (lucide Wallet), bitcoin path, credit-card path
+// wallet icon path (lucide Wallet), credit-card path
+// 平台支付收窄裁决:USDT 三网络 + 卡。
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => [
   { id: "usdt-trc20", label: "USDT (TRC20)", hint: "Lowest fee · 5 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  { id: "usdt-bep20", label: "USDT (BEP20)", hint: "Low fee · 5 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
   { id: "usdt-erc20", label: "USDT (ERC20)", hint: "15 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "btc", label: "Bitcoin", hint: "30 min", iconPath: "M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727" },
   { id: "card", label: "Card", hint: "Instant · +3.5% fee", iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
 ]);
 

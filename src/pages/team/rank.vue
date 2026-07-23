@@ -37,7 +37,7 @@
             </view>
 
             <view v-if="prog.next" :style="progressWrapStyle">
-              <view class="flex items-center justify-between" style="font-size: 11px; margin-bottom: 6px">
+              <view class="flex items-center justify-between" style="font-size: 12px; margin-bottom: 6px">
                 <text :style="{ color: 'var(--v5-ink-3)' }">
                   <text>{{ t.rank.next }} </text>
                   <text :style="{ color: 'var(--v5-brand)', fontWeight: 600 }">V{{ prog.next.v }} {{ prog.next.title }}</text>
@@ -50,7 +50,7 @@
               <view v-if="prog.missing.length > 0" style="margin-top: 12px; display: flex; flex-direction: column; gap: 4px">
                 <view v-for="(m, i) in prog.missing" :key="i" class="flex items-center" style="gap: 6px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-                  <text :style="{ fontSize: '11.5px', color: 'var(--v5-ink-3)' }">{{ m }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ m }}</text>
                 </view>
               </view>
               <view class="inline-flex items-center active:scale-[0.97] transition-transform" :style="upgradeCtaStyle" @click="go('/pages/store/store')">
@@ -76,7 +76,7 @@
                 <text class="font-display" :style="rowTitleStyle">V{{ r.v }} {{ r.title }}</text>
                 <view v-if="rowStatus(r.v) === 'done'" class="flex items-center" style="gap: 2px">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                  <text :style="{ fontSize: '10px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-brand)', fontWeight: 500 }">{{ t.rank.done }}</text>
                 </view>
                 <text v-else-if="rowStatus(r.v) === 'current'" class="font-mono-tabular" :style="currentTagStyle">{{ t.rank.current }}</text>
               </view>
@@ -170,7 +170,7 @@ const heroStyle: CSSProperties = { padding: "10px 2px 0" };
 const progressWrapStyle: CSSProperties = { margin: "16px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const heroCapStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
@@ -220,17 +220,17 @@ function rowStyle(status: "done" | "current" | "locked", isLast: boolean): CSSPr
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
-// SKILL leading-tight = 1.25 (原版 .font-display text-[14px] leading-tight; was 1.1)
-const rowTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, lineHeight: 1.25, color: "var(--v5-ink)" };
+// SKILL leading-tight = 1.25 (原版 .font-display text-[15px] leading-tight; was 1.1)
+const rowTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1.25, color: "var(--v5-ink)" };
 const currentTagStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-brand)",
   letterSpacing: "0.06em",
 };
-// SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[11px] leading-snug; was 1.45)
-const condStyle: CSSProperties = { marginTop: "6px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
+// SKILL leading-snug = 1.375 (原版 .mt-1.5 text-[12px] leading-snug; was 1.45)
+const condStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 
 function chipStyle(kind: "default" | "purple" | "lemon"): CSSProperties {
   const map = {
@@ -244,7 +244,7 @@ function chipStyle(kind: "default" | "purple" | "lemon"): CSSProperties {
     padding: "1px 6px",
     borderRadius: "4px",
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontSize: "12px",
     letterSpacing: "0.02em",
     ...map[kind],
   };

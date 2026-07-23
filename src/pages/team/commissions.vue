@@ -62,7 +62,7 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="KIND[k].color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(p, pi) in KIND[k].paths" :key="pi" :d="p" /></svg>
             </text>
             <text class="block tabular-nums" :style="kindAmtStyle">${{ byKind[k].usdt.toFixed(0) }}</text>
-            <text class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.kind[k] }}</text>
+            <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.kind[k] }}</text>
             <text class="block font-mono-tabular" :style="kindCountStyle">{{ byKind[k].count }} {{ t.commissions.events }}</text>
           </view>
         </view>
@@ -99,17 +99,17 @@
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontSize: '12.5px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
+                  <text class="truncate" :style="{ fontSize: '13px', color: 'var(--v5-ink)' }">{{ e.sourceUserName }}</text>
                   <text v-if="e.layer" class="font-mono-tabular" :style="e.layer === 1 ? directBadgeStyle : extendedBadgeStyle">{{ e.layer === 1 ? t.commissions.directBadge : t.commissions.extendedBadge }}</text>
                 </view>
                 <text class="block font-mono-tabular" :style="eventMetaStyle">{{ eventMeta(e) }}</text>
               </view>
               <view class="text-right">
-                <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12.5px', fontWeight: 600, color: 'var(--v5-brand)' }">+${{ e.amountUSDT.toFixed(2) }}</text>
-                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-warning)' }">+{{ e.amountNEX.toLocaleString() }} NEX</text>
-                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
-                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
-                <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '10px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
+                <text v-if="e.amountUSDT > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-brand)' }">+${{ e.amountUSDT.toFixed(2) }}</text>
+                <text v-if="e.amountNEX > 0" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-warning)' }">+{{ e.amountNEX.toLocaleString() }} NEX</text>
+                <text v-if="e.status === 'cooling'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-warning)', marginTop: '2px' }">{{ coolingTag(e) }}</text>
+                <text v-else-if="e.status === 'unlocked'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-success)', marginTop: '2px' }">{{ t.commissions.readyTag }}</text>
+                <text v-else-if="e.status === 'withdrawn'" class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.commissions.withdrawnTag }}</text>
               </view>
             </view>
         </view>
@@ -201,10 +201,10 @@ const heroFooterStyle: CSSProperties = {
   padding: "12px 2px 0",
   borderTop: "1px solid var(--v5-border)",
   gap: "8px",
-  fontSize: "11px",
+  fontSize: "12px",
 };
 const overviewCapStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -219,7 +219,7 @@ function overviewBigStyle(color: string): CSSProperties {
     color,
   };
 }
-const overviewSmallStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const overviewSmallStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 
 // Selection tiles — filled, no border/ring; active = soft kind tint (single difference).
 function kindCardStyle(k: CommissionKind): CSSProperties {
@@ -241,7 +241,7 @@ const kindAmtStyle: CSSProperties = {
 };
 const kindCountStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 
@@ -255,7 +255,7 @@ function pillStyle(active: boolean, color: string): CSSProperties {
 // Bright active fill → on-brand text (brand-2 fill takes on-brand-2), incl. inactive fallback.
 function pillTextStyle(active: boolean, color: string): CSSProperties {
   return {
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 600,
     color: active
       ? color === "var(--v5-brand-2)"
@@ -285,7 +285,7 @@ function eventIconStyle(kind: CommissionKind): CSSProperties {
   };
 }
 const directBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand)",
   background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
@@ -293,12 +293,12 @@ const directBadgeStyle: CSSProperties = {
   borderRadius: "4px",
 };
 const extendedBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
   padding: "0 4px",
   borderRadius: "4px",
 };
-const eventMetaStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const eventMetaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 </script>

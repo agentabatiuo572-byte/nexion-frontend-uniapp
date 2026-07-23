@@ -100,9 +100,9 @@ const expanded = reactive<Record<"direct" | "extended", boolean>>({ direct: true
 // ─── styles ───
 // Stat tile: fill only, no border (radius via rounded-2xl class).
 const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", padding: "14px" };
-const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const metricLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", lineHeight: 1, color };
 }
-const metricSuffixStyle: CSSProperties = { marginTop: "4px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const metricSuffixStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 </script>

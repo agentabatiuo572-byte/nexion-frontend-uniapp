@@ -94,7 +94,7 @@
           </view>
           <view class="flex items-center justify-between" :style="mathTotalRowStyle">
             <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ w.totalYouEarn }}</text>
-            <text class="font-display tabular-nums" :style="{ fontSize: '18px', fontWeight: 600, color: 'var(--v5-ink)' }">$182.40</text>
+            <text class="font-display tabular-nums" :style="{ fontSize: '20px', fontWeight: 600, color: 'var(--v5-ink)' }">$182.40</text>
           </view>
         </view>
         <text class="block" :style="noteStyle">{{ w.s4Note }}</text>
@@ -161,15 +161,15 @@ function goBack() {
 }
 
 // ─── styles ───
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const captionStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "14px", lineHeight: 1.6 }; // how-page scale: caption 12.5/1.6 ink-3
 const footnoteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const noteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 }; // readability: body note 12/1.5 (was 11.5/1.375)
 
 const tableCardStyle: CSSProperties = { background: "var(--v5-surface)", borderColor: "var(--v5-border)", borderRadius: "12px" };
 const tableHeadStyle: CSSProperties = {
   padding: "8px 12px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.14em", // SKILL: prototype thead tracking-[0.14em] (was 0.06em)
@@ -196,10 +196,10 @@ const signalBadgeStyle: CSSProperties = {
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
   color: "var(--v5-brand-2)",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
 };
-const signalNameStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
+const signalNameStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const signalBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 }; // how-row scale: body 13/1.62 ink-2
 
 const mathCardStyle: CSSProperties = {
@@ -209,7 +209,7 @@ const mathCardStyle: CSSProperties = {
   padding: "16px",
 };
 const scenarioStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "4px" };
-const setupStyle: CSSProperties = { fontSize: "13.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625, marginBottom: "12px" }; // SKILL: leading-relaxed=1.625 (was 1.5)
+const setupStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625, marginBottom: "12px" }; // SKILL: leading-relaxed=1.625 (was 1.5)
 const mathTotalRowStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)" };
 
 const ctaStyle: CSSProperties = {
@@ -218,5 +218,5 @@ const ctaStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
 };
-const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "14px", fontWeight: 600 };
+const ctaTextStyle: CSSProperties = { color: "var(--v5-on-brand)", fontSize: "15px", fontWeight: 600 };
 </script>

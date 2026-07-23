@@ -120,14 +120,14 @@
           <view class="flex items-start justify-between">
             <view class="flex items-center" style="gap: 12px">
               <view class="rounded-full grid place-items-center" :style="sheetAvatarStyle">
-                <text style="font-size: 24px; line-height: 1">{{ selected.avatar }}</text>
+                <text style="font-size: 26px; line-height: 1">{{ selected.avatar }}</text>
               </view>
               <view>
                 <text class="block" :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ selected.name }}</text>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <VBadge :v="selected.vRank" size="sm" :show-title="false" />
                   <text class="font-mono-tabular" :style="sheetBadgeStyle(selected)">{{ selected.layer === 1 ? t.network.badgeDirect : t.network.badgeExtended }}</text>
-                  <text :style="{ fontSize: '11.5px', color: 'var(--v5-ink-3)' }">· {{ selected.city }}</text>
+                  <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">· {{ selected.city }}</text>
                 </view>
               </view>
             </view>
@@ -149,7 +149,7 @@
               <text class="block font-display tabular-nums" :style="sheetStatValStyle('var(--v5-ink)')">{{ daysJoined(selected) }}d</text>
             </view>
           </view>
-          <view :style="{ marginTop: '12px', fontSize: '11px', color: 'var(--v5-ink-3)' }">
+          <view :style="{ marginTop: '12px', fontSize: '12px', color: 'var(--v5-ink-3)' }">
             <text>{{ t.network.title }}: </text>
             <text :style="{ color: 'var(--v5-ink)' }">{{ rankTitle(selected) }}</text>
             <text> · {{ t.network.status }}: </text>
@@ -250,7 +250,7 @@ function statusColor(status: MemberStatus): string {
 // ─── styles ───
 // Filled stat tile, no border (single visual difference).
 const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px", padding: "12px" };
-const metricLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const metricLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", color };
 }
@@ -269,9 +269,9 @@ const orbCardStyle: CSSProperties = {
   background: "radial-gradient(60% 50% at 50% 50%, rgba(124,92,255,0.18) 0%, transparent 65%), var(--v5-bg)",
   border: "1px solid var(--v5-border)",
 };
-const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "10px", color: "var(--v5-ink-3)" };
-// SKILL leading-relaxed = 1.625 (原版 .text-[11px] leading-relaxed; was 1.6)
-const footerStyle: CSSProperties = { padding: "0 4px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const legendWrapStyle: CSSProperties = { padding: "4px 12px 12px", gap: "16px", fontSize: "12px", color: "var(--v5-ink-3)" };
+// SKILL leading-relaxed = 1.625 (原版 .text-[12px] leading-relaxed; was 1.6)
+const footerStyle: CSSProperties = { padding: "0 4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 const sheetStyle: CSSProperties = {
   width: "100%",
@@ -285,7 +285,7 @@ function sheetBadgeStyle(m: NetworkMember): CSSProperties {
   const isDirect = m.layer === 1;
   const color = isDirect ? "var(--v5-brand)" : "var(--v5-tech-cyan)";
   return {
-    fontSize: "10px",
+    fontSize: "12px",
     letterSpacing: "0.12em",
     padding: "1px 4px",
     borderRadius: "4px",
@@ -294,7 +294,7 @@ function sheetBadgeStyle(m: NetworkMember): CSSProperties {
   };
 }
 const sheetCloseStyle: CSSProperties = { width: "32px", height: "32px" };
-const sheetStatLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const sheetStatLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function sheetStatValStyle(color: string): CSSProperties {
   return { fontSize: "15px", fontWeight: 600, marginTop: "2px", color };
 }

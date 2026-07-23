@@ -77,18 +77,18 @@
         <view :style="podiumCardStyle">
           <view class="grid grid-cols-3" style="gap: 8px; align-items: flex-end">
             <view v-for="(p, displayIdx) in podiumDisplay" :key="p.row.rank" class="rounded-xl text-center" :style="podiumColStyle(p.isFirst)">
-              <text class="block" style="font-size: 24px; line-height: 1">{{ p.prize.medal }}</text>
+              <text class="block" style="font-size: 26px; line-height: 1">{{ p.prize.medal }}</text>
               <view class="rounded-full grid place-items-center" :style="podiumAvatarStyle(p.prize.color)">
                 <text :style="{ color: 'var(--v5-ink)', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '13px' }">{{ p.row.handle.charAt(0) }}</text>
               </view>
               <text class="block truncate" :style="podiumHandleStyle">{{ p.row.handle }}</text>
-              <text class="block" :style="{ fontSize: '11px' }">{{ p.row.flag }}</text>
+              <text class="block" :style="{ fontSize: '12px' }">{{ p.row.flag }}</text>
               <text class="block font-mono-tabular tabular-nums" :style="podiumEarnStyle(p.prize.color)">{{ fmtCompactUSD(p.row.earnedUSDT) }}</text>
-              <text class="block" :style="{ marginTop: '2px', fontSize: '10.5px', color: 'var(--v5-ink-3)' }">{{ p.row.directs }} directs</text>
+              <text class="block" :style="{ marginTop: '2px', fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ p.row.directs }} directs</text>
             </view>
           </view>
           <view style="margin-top: 14px; padding: 10px 2px 0; border-top: 1px solid var(--v5-border); display: flex; flex-direction: column; gap: 6px">
-            <view v-for="(p, i) in PODIUM_PRIZE" :key="i" class="flex items-center justify-between" style="font-size: 11px">
+            <view v-for="(p, i) in PODIUM_PRIZE" :key="i" class="flex items-center justify-between" style="font-size: 12px">
               <view class="flex items-center" style="gap: 6px">
                 <text>{{ p.medal }}</text>
                 <text :style="{ color: 'var(--v5-ink-3)' }">#{{ i + 1 }}</text>
@@ -113,21 +113,21 @@
             class="grid items-center"
             :style="listRowStyle(i === visibleRest.length - 1)"
           >
-            <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-3)', fontSize: '11px' }">{{ row.rank }}</text>
+            <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-3)', fontSize: '12px' }">{{ row.rank }}</text>
             <view class="flex items-center min-w-0" style="gap: 8px">
               <view class="rounded-full grid place-items-center shrink-0" :style="rowAvatarStyle">
-                <text :style="{ color: 'var(--v5-ink)', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '11.5px' }">{{ row.handle.charAt(0) }}</text>
+                <text :style="{ color: 'var(--v5-ink)', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '12px' }">{{ row.handle.charAt(0) }}</text>
               </view>
               <view class="min-w-0">
                 <view class="flex items-center" style="gap: 6px">
-                  <text class="truncate" :style="{ fontWeight: 600, color: 'var(--v5-ink)', fontSize: '12.5px' }">{{ row.handle }}</text>
-                  <text :style="{ fontSize: '10px' }">{{ row.flag }}</text>
+                  <text class="truncate" :style="{ fontWeight: 600, color: 'var(--v5-ink)', fontSize: '13px' }">{{ row.handle }}</text>
+                  <text :style="{ fontSize: '12px' }">{{ row.flag }}</text>
                   <svg v-if="row.hasDevice" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
                 </view>
                 <view class="flex items-center" style="margin-top: 2px; gap: 6px">
                   <text class="font-mono-tabular" :style="vRankChipStyle">V{{ row.vRank }}</text>
-                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: 'var(--v5-ink-4)' }">{{ row.teamSize.toLocaleString() }} team</text>
-                  <text v-if="row.delta !== 0" class="font-mono-tabular tabular-nums" :style="{ fontSize: '10px', color: row.delta > 0 ? 'var(--v5-brand)' : 'var(--v5-brand-2)' }">{{ row.delta > 0 ? "↑" : "↓" }}{{ Math.abs(row.delta) }}</text>
+                  <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-4)' }">{{ row.teamSize.toLocaleString() }} team</text>
+                  <text v-if="row.delta !== 0" class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: row.delta > 0 ? 'var(--v5-brand)' : 'var(--v5-brand-2)' }">{{ row.delta > 0 ? "↑" : "↓" }}{{ Math.abs(row.delta) }}</text>
                 </view>
               </view>
             </view>
@@ -220,12 +220,12 @@ function go(url: string) {
 // floor (page-floor auras are deleted outright per owner call, not re-tuned).
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 function heroCapStyle(color: string): CSSProperties {
-  return { fontSize: "11px", fontWeight: 500, color, letterSpacing: "0.06em" };
+  return { fontSize: "12px", fontWeight: 500, color, letterSpacing: "0.06em" };
 }
-const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "30px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-warning)" };
+const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-warning)" };
 const heroIconStyle: CSSProperties = { width: "48px", height: "48px", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
 // -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
-const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)", fontSize: "11px" };
+const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)", fontSize: "12px" };
 
 const segWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "12px", padding: "3px", gap: "2px" };
 function pillStyle(p: LeaderPeriod): CSSProperties {
@@ -235,7 +235,7 @@ function pillStyle(p: LeaderPeriod): CSSProperties {
 }
 function pillLabelStyle(p: LeaderPeriod): CSSProperties {
   const on = period.value === p;
-  return { fontSize: "11.5px", fontWeight: on ? 600 : 500, color: on ? "var(--v5-ink)" : "var(--v5-ink-3)" };
+  return { fontSize: "12px", fontWeight: on ? 600 : 500, color: on ? "var(--v5-ink)" : "var(--v5-ink-3)" };
 }
 
 // Transparent stat row — was a second glowing surface card under the hero.
@@ -249,7 +249,7 @@ const climbCtaStyle: CSSProperties = {
   background: "var(--v5-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "12.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
 };
 
@@ -265,9 +265,9 @@ function podiumColStyle(isFirst: boolean): CSSProperties {
 function podiumAvatarStyle(color: string): CSSProperties {
   return { width: "36px", height: "36px", margin: "6px auto 0", background: color };
 }
-const podiumHandleStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "11.5px", color: "var(--v5-ink)" };
+const podiumHandleStyle: CSSProperties = { marginTop: "6px", fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "12px", color: "var(--v5-ink)" };
 function podiumEarnStyle(color: string): CSSProperties {
-  return { marginTop: "4px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12.5px", fontWeight: 600, color };
+  return { marginTop: "4px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "13px", fontWeight: 600, color };
 }
 
 // Transparent hairline group — rows were already hairline-separated; the
@@ -277,7 +277,7 @@ const listHeadStyle: CSSProperties = {
   gridTemplateColumns: "32px 1fr 56px 84px",
   padding: "10px 0",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -296,7 +296,7 @@ const vRankChipStyle: CSSProperties = {
   padding: "0 4px",
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 
@@ -307,7 +307,7 @@ const loadMoreBtnStyle: CSSProperties = {
   marginTop: "-4px",
 };
 const loadMoreLabelStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
@@ -331,8 +331,8 @@ const shareCtaStyle: CSSProperties = {
   boxShadow: "var(--v5-spotlight-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
 };
-const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const footerNoteStyle: CSSProperties = { paddingTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 </script>

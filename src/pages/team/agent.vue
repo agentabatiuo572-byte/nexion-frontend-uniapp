@@ -35,10 +35,10 @@
             </view>
             <view class="flex-1">
               <view class="flex items-center" style="gap: 6px">
-                <text :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.eligible }}</text>
+                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.eligible }}</text>
                 <VBadge :v="myRank" size="sm" :show-title="false" />
               </view>
-              <text class="block" :style="{ fontSize: '11.5px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.agent.annualBudget }}</text>
+              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ t.agent.annualBudget }}</text>
             </view>
           </view>
         </view>
@@ -48,8 +48,8 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             </view>
             <view class="flex-1">
-              <text class="block" :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.lockedReq }}</text>
-              <text class="block" :style="{ fontSize: '11.5px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ lockedSubText }}</text>
+              <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ t.agent.lockedReq }}</text>
+              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ lockedSubText }}</text>
             </view>
             <view class="shrink-0 rounded-full flex items-center active:scale-95" :style="pathCtaStyle" @click="go('/pages/team/rank')">
               <text>{{ t.agent.pathCta }}</text>
@@ -77,10 +77,10 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between">
-                <text :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ b.title }}</text>
-                <text class="font-display tabular-nums" :style="{ fontSize: '13.5px', fontWeight: 600, color: b.tint }">{{ b.range }}</text>
+                <text :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ b.title }}</text>
+                <text class="font-display tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: b.tint }">{{ b.range }}</text>
               </view>
-              <text class="block" :style="{ fontSize: '11px', color: 'var(--v5-ink-3)', marginTop: '2px', lineHeight: 1.375 }">{{ b.rule }}</text> <!-- SKILL: leading-snug=1.375 (was 1.4) -->
+              <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px', lineHeight: 1.375 }">{{ b.rule }}</text> <!-- SKILL: leading-snug=1.375 (was 1.4) -->
             </view>
           </view>
         </view>
@@ -124,7 +124,7 @@
                 <text class="font-mono-tabular" :style="fieldLabelStyle">{{ t.agent.fieldBudget }}</text>
               </view>
               <view class="flex items-center">
-                <text class="font-display" :style="{ fontSize: '12.5px', color: 'var(--v5-ink-3)', marginRight: '4px' }">$</text>
+                <text class="font-display" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', marginRight: '4px' }">$</text>
                 <input
                   v-model="budgetText"
                   type="number"
@@ -151,10 +151,10 @@
             <view v-for="(c, i) in APPROVED_CASES" :key="i" :style="caseRowStyle(i === APPROVED_CASES.length - 1)">
               <view class="flex items-start justify-between">
                 <view>
-                  <text class="block" :style="{ fontSize: '13.5px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ c.name }}</text>
-                  <text class="block font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ hostedByText(c) }}</text>
+                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ c.name }}</text>
+                  <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ hostedByText(c) }}</text>
                 </view>
-                <text class="font-display tabular-nums" :style="{ fontSize: '14px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ c.amount.toLocaleString() }}</text>
+                <text class="font-display tabular-nums" :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-brand)' }">${{ c.amount.toLocaleString() }}</text>
               </view>
             </view>
           </view>
@@ -289,10 +289,10 @@ const heroIconStyle: CSSProperties = {
   height: "40px",
   background: "color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
-const heroCapStyle: CSSProperties = { fontSize: "11px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
-const heroHeadlineStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, lineHeight: 1.25, marginTop: "2px" }; // SKILL: leading-tight=1.25 (was 1.2)
+const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, letterSpacing: "0.06em", color: "var(--v5-warning)" };
+const heroHeadlineStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, lineHeight: 1.25, marginTop: "2px" }; // SKILL: leading-tight=1.25 (was 1.2)
 // Paragraph tier: 13.5 / 1.65 / ink-2 (body copy must not sit in ink-3).
-const heroBodyStyle: CSSProperties = { marginTop: "10px", fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+const heroBodyStyle: CSSProperties = { marginTop: "10px", fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
 
 // Status banners — tint fill only, border chrome dropped (single difference).
 const eligibleStyle: CSSProperties = {
@@ -319,7 +319,7 @@ const pathCtaStyle: CSSProperties = {
   gap: "4px",
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand-2)", // bright brand-2 fill → on-brand-2 text (incl. svg stroke)
-  fontSize: "11.5px",
+  fontSize: "12px",
   fontWeight: 600,
 };
 
@@ -337,7 +337,7 @@ function bucketRowStyle(isLast: boolean): CSSProperties {
 const selectedBucketStyle: CSSProperties = {
   marginTop: "-4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
 };
 function bucketIconStyle(tint: string): CSSProperties {
@@ -352,7 +352,7 @@ function bucketIconStyle(tint: string): CSSProperties {
 // Transparent form block — 2px optical inset, +12px top margin (24px rhythm).
 const formBlockStyle: CSSProperties = { marginTop: "12px", padding: "0 2px" };
 const formCapStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -364,17 +364,17 @@ const fieldStyle: CSSProperties = {
   borderRadius: "12px",
   padding: "10px 12px",
 };
-const fieldLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
+const fieldLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.05em", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
   width: "100%",
   background: "transparent",
-  fontSize: "12.5px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
 };
 const budgetInputStyle: CSSProperties = {
   flex: "1",
   background: "transparent",
-  fontSize: "12.5px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   fontFamily: "var(--font-v5)",
 };
@@ -382,14 +382,14 @@ const submitStyle = computed<CSSProperties>(() => ({
   marginTop: "12px",
   height: "48px",
   gap: "6px",
-  fontSize: "12.5px",
+  fontSize: "15px",
   fontWeight: 600,
   background: unlocked.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: unlocked.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
 const previewOnlyStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 
@@ -398,7 +398,7 @@ const casesBlockStyle: CSSProperties = { marginTop: "12px" };
 const approvedCapStyle: CSSProperties = {
   padding: "0 2px",
   marginBottom: "8px",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
