@@ -27,7 +27,7 @@
           </view>
           <view class="grid grid-cols-2" style="gap: 12px">
             <view>
-              <text class="block font-mono-tabular" :style="overviewCapStyle">Withdrawable</text>
+              <text class="block font-mono-tabular" :style="overviewCapStyle">{{ t.uiChrome.withdrawable }}</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-brand)')">${{ commission.unlockedUSDT().toFixed(2) }}</text>
               <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ commission.unlockedNEX().toLocaleString() }} NEX</text>
             </view>

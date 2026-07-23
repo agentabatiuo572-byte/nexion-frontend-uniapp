@@ -27,7 +27,7 @@
       <!-- 3-cell grid -->
       <view class="grid grid-cols-3" :style="cellGridStyle">
         <view>
-          <text class="block" :style="cellKStyle">Days in</text>
+          <text class="block" :style="cellKStyle">{{ t.uiChrome.daysIn }}</text>
           <text class="block tabular-nums" :style="cellVStyle(false)">{{ daysIn }} / {{ p.termDays }}</text>
         </view>
         <view>

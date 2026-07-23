@@ -59,8 +59,8 @@
               <text class="block" style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ activatedHint }}</text>
             </view>
           </view>
-          <view class="block text-center active:opacity-85" :style="earnBtnStyle" role="button" tabindex="0" aria-label="View on Earn" @click.stop="goEarn">
-            <text>View on Earn →</text>
+          <view class="block text-center active:opacity-85" :style="earnBtnStyle" role="button" tabindex="0" :aria-label="t.uiChrome.viewOnEarn" @click.stop="goEarn">
+            <text>{{ t.uiChrome.viewOnEarn }} →</text>
           </view>
         </view>
 

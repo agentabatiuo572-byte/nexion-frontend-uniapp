@@ -102,11 +102,11 @@
             <view class="flex items-center justify-between">
               <text style="font-size: 13.5px; color: var(--v5-ink-3)">{{ t.store.detQuantity }}</text>
               <view class="flex items-center" :style="stepperStyle">
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty <= 1)" role="button" tabindex="0" aria-label="Decrease quantity" @click.stop="dec">
+                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty <= 1)" role="button" tabindex="0" :aria-label="t.uiChrome.decreaseQty" @click.stop="dec">
                   <text>−</text>
                 </view>
                 <text class="tabular-nums text-center" :style="qtyNumStyle">{{ qty }}</text>
-                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty >= 6)" role="button" tabindex="0" aria-label="Increase quantity" @click.stop="inc">
+                <view class="grid place-items-center active:scale-[0.95] transition-transform" :style="qtyBtnStyle(qty >= 6)" role="button" tabindex="0" :aria-label="t.uiChrome.increaseQty" @click.stop="inc">
                   <text>+</text>
                 </view>
               </view>

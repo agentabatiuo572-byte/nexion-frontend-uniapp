@@ -38,7 +38,7 @@
         <!-- NEX hero — equal weight below dashed divider -->
         <view :style="nexBlockStyle">
           <view class="flex items-center justify-between" style="margin-bottom: 8px">
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">NEX balance</text>
+            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.uiChrome.nexBalance }}</text>
             <text :style="nexBadgeStyle">+20.4%</text>
           </view>
           <view class="flex items-baseline" style="gap: 8px">

@@ -53,7 +53,7 @@
           <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" @click="setMax">
             <text style="color: var(--v5-brand)">{{ fromSym }} </text>
             <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
-            <text style="color: var(--v5-brand)"> · MAX</text>
+            <text style="color: var(--v5-brand)"> · {{ t.uiChrome.max }}</text>
           </view>
         </view>
       </view>

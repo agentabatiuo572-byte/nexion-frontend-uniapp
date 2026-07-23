@@ -61,7 +61,7 @@
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
-            <text style="margin-left: auto; font-size: 12px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
+            <text style="margin-left: auto; font-size: 12px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">{{ t.uiChrome.passed }}</text>
           </view>
         </view>
       </view>

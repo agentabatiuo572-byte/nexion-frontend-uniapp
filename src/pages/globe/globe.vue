@@ -164,7 +164,7 @@
             <view class="rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M12 20h.01" /><path d="M2 8.82a15 15 0 0 1 20 0" /><path d="M5 12.859a10 10 0 0 1 14 0" /><path d="M8.5 16.429a5 5 0 0 1 7 0" /></svg>
               <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.avgLatencyMs }}ms</text>
-              <text class="block" :style="drawerStatLabelStyle">Latency</text>
+              <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
           <text class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>

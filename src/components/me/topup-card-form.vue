@@ -11,7 +11,7 @@
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
       <text class="font-mono-tabular" style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
-      <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">Change</text>
+      <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">{{ t.topupChrome.change }}</text>
     </view>
 
     <!-- Processing / 3DS -->
@@ -30,7 +30,7 @@
       <view :style="successIconStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
       </view>
-      <text class="block" :style="successTitleStyle">Payment successful</text>
+      <text class="block" :style="successTitleStyle">{{ t.topupChrome.paySuccess }}</text>
       <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">${{ usdtAmount.toFixed(2) }} USDT credited to your wallet</text>
       <text class="block font-mono-tabular" style="margin-top: 12px; font-size: 11px; color: var(--v5-ink-4)">{{ receiptLine }}</text>
       <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet">Back to wallet</view>
@@ -39,8 +39,8 @@
     <!-- Fail -->
     <view v-else-if="phase === 'fail'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
-      <text class="block" :style="failTitleStyle">Card declined</text>
-      <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">Reason: do_not_honor (issuer)</text>
+      <text class="block" :style="failTitleStyle">{{ t.topupChrome.payDeclined }}</text>
+      <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ t.topupChrome.payDeclinedReason }}</text>
       <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">Contact your card issuer or try a different card. No charge was made.</text>
       <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'">Try again</view>
     </view>
@@ -49,7 +49,7 @@
     <template v-else>
       <!-- Amount preview — keeps its surface (input zone), border dropped -->
       <view class="rounded-2xl" :style="amountCardStyle">
-        <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">You receive</text>
+        <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ t.topupChrome.youReceive }}</text>
         <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
           <text style="font-family: var(--font-v5); font-size: 14px; color: var(--v5-ink-3)">$</text>
           <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" @input="onAmount" />
@@ -57,7 +57,7 @@
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
           <text style="font-size: 11px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
-          <text class="text-right" style="font-size: 11px"><text style="color: var(--v5-ink-3)">Card charged </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
+          <text class="text-right" style="font-size: 11px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }} </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
         </view>
       </view>
 

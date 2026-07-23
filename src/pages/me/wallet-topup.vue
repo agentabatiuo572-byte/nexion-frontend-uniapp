@@ -29,7 +29,7 @@
         <view class="mx-4 mb-3 flex items-center" :style="complianceBannerStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <view class="flex-1 min-w-0" style="margin-left: 10px; font-size: 11.5px; line-height: 1.375">
-            <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">Compliance check</text>
+            <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">{{ t.topupChrome.complianceCheck }}</text>
             <text style="color: var(--v5-ink-3); margin-left: 6px">· Powered by Chainalysis KYT · MiCA-aligned</text>
           </view>
         </view>
@@ -41,14 +41,14 @@
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.kycExpress.flow.verificationDeposit }}</text>
             <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
               <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
-              <text style="font-size: 12px; color: var(--v5-ink-3)">USDT · locked</text>
+              <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.usdtLocked }}</text>
             </view>
             <text class="block" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
           </view>
 
           <!-- Network picker — control rows keep their tint; card shell dropped. -->
           <view class="mx-4 mt-4" style="padding: 0 2px; display: flex; flex-direction: column; gap: 4px">
-            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">Network</text>
+            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">{{ t.topupChrome.network }}</text>
             <view
               v-for="c in KYC_CHANNELS"
               :key="c.id"
@@ -88,7 +88,7 @@
           <view :style="qrBoxStyle">
             <view :style="qrInnerStyle" />
           </view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">Scan with your wallet · or copy address below</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">{{ t.topupChrome.scanWithWallet }}</text>
 
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); word-break: break-all">{{ depositAddress }}</text>
@@ -99,14 +99,14 @@
           </view>
 
           <view class="flex items-center justify-between" style="margin-top: 12px; font-size: 12.5px">
-            <text style="color: var(--v5-ink-3)">Send exactly</text>
+            <text style="color: var(--v5-ink-3)">{{ t.topupChrome.sendExactly }}</text>
             <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-brand)">1.00 USDT</text>
           </view>
 
           <view class="flex items-center rounded-xl" :style="awaitingBarStyle">
             <view :style="miniSpinnerStyle" />
-            <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">Awaiting on-chain confirmation…</text>
-            <text style="font-size: 10.5px; color: var(--v5-ink-4)">auto-detect</text>
+            <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">{{ t.topupChrome.awaitingOnChain }}</text>
+            <text style="font-size: 10.5px; color: var(--v5-ink-4)">{{ t.topupChrome.autoDetect }}</text>
           </view>
 
           <view class="nx-kyc-payment-sent-cta w-full grid place-items-center active:opacity-80" :style="markSentBtnStyle" @click="kycPhase = 'verifying'">
@@ -139,7 +139,7 @@
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             </view>
             <text class="block text-center" :style="completeTitleStyle">{{ t.kycExpress.flow.verificationComplete }}</text>
-            <text class="block text-center" style="margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.45">Wallet paired · $1.00 credited to your balance</text>
+            <text class="block text-center" style="margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.walletPairedCredited }}</text>
 
             <view style="margin-top: 16px" class="space-y-2">
               <CompleteRow k="Paired wallet" :v="senderShort" mono />
@@ -160,7 +160,7 @@
       <template v-else>
         <!-- channel list — transparent hairline group (earnings-ledger idiom) -->
         <view v-if="!selected" class="mx-4" style="padding: 0 2px">
-          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 10px' }]">Select Channel</text>
+          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 10px' }]">{{ t.topupChrome.selectChannel }}</text>
           <view
             v-for="c in ALL_CHANNELS"
             :key="c.id"
@@ -172,7 +172,7 @@
               <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }} · Min {{ c.min }}</text>
             </view>
-            <text style="color: var(--v5-brand); font-size: 12px">Use →</text>
+            <text style="color: var(--v5-brand); font-size: 12px">{{ t.topupChrome.use }} →</text>
           </view>
         </view>
 
@@ -183,10 +183,10 @@
         <view v-else class="mx-4" :style="openBlockStyle">
           <view class="flex items-center justify-between">
             <text class="font-mono-tabular" :style="metaLabelStyle">Send via {{ selected }}</text>
-            <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">Change</text>
+            <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">{{ t.topupChrome.change }}</text>
           </view>
           <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">Scan QR or copy the address below</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text>
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ DEMO_ADDRESS }}</text>
             <view class="nx-topup-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyDemoAddress">
@@ -196,7 +196,7 @@
           </view>
           <view class="flex items-center" style="margin-top: 16px; gap: 8px; font-size: 12.5px; color: var(--v5-ink-3)">
             <view :style="miniSpinnerStyle" />
-            <text>Awaiting confirmation… (auto-detects within 5 minutes)</text>
+            <text>{{ t.topupChrome.awaitingConfirm }}</text>
           </view>
           <text class="block" style="margin-top: 16px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.4">Address expires in 30:00 minutes. Send only the selected asset to this address — wrong-asset transfers cannot be recovered.</text>
         </view>

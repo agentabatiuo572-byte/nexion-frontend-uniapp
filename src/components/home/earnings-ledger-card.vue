@@ -8,7 +8,7 @@
   <view>
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}</text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
     </view>
 
     <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">

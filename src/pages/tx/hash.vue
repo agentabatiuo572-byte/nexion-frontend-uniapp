@@ -45,11 +45,11 @@
         </view>
         <text class="block" :style="extBodyStyle">{{ w.externalBody }}</text>
         <view class="grid grid-cols-2" style="gap: 8px; margin-top: 12px">
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for Etherscan" @click.stop="copyHash">
+          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.copyHashFor, { target: 'Etherscan' })" @click.stop="copyHash">
             <text>Etherscan</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </view>
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" aria-label="Copy hash for TRONScan" @click.stop="copyHash">
+          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.copyHashFor, { target: 'TRONScan' })" @click.stop="copyHash">
             <text>TRONScan</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </view>

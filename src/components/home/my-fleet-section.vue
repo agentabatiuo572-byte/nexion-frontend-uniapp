@@ -8,7 +8,7 @@
   <view>
     <view class="flex items-center justify-between" style="margin: 0 2px 12px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ fleetCountText }}</text></text>
-      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goManage">{{ t.home.fleetManage }} →</text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goManage">{{ t.home.fleetManage }} →</text>
     </view>
 
     <!-- Slot rack: icon bays -->

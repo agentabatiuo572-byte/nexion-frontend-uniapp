@@ -56,7 +56,7 @@
         v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
       >
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">Best</text></text>
+          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.uiChrome.best }}</text></text>
           <text v-if="d.bestFor" class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
         </view>
         <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>

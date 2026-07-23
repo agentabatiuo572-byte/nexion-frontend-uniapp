@@ -35,7 +35,7 @@
       </view>
 
       <template v-if="amountNum > 0">
-        <text class="block" :style="periodLabelStyle">After 365 days</text>
+        <text class="block" :style="periodLabelStyle">{{ fmt(t.uiChrome.afterDays, { n: 365 }) }}</text>
 
         <!-- Single bar -->
         <view class="flex items-center" style="margin-top: 8px; gap: 10px">
