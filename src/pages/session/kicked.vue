@@ -70,7 +70,6 @@ function reLogin() {
   padding: 28px 22px;
   text-align: center;
   background: var(--v5-surface);
-  border: 1px solid var(--v5-border);
   box-shadow: var(--v5-card-shadow-lift-strong);
 }
 .ks-ic {

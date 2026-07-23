@@ -161,14 +161,13 @@ function onAccept() {
   uni.navigateTo({ url: returnTo.value, fail: () => uni.reLaunch({ url: returnTo.value, fail: () => {} }) });
 }
 
-// Spotlight hero (whitelist ≤1): neutral border per the big-card rule (accent
-// border dropped); the brand-2 mood lives in the icon + label. Header provides
-// the 24px top breathing, so no top margin here.
+// Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——
+// 边界靠 surface 与页面地板的微差色;the brand-2 mood lives in the icon + label.
+// Header provides the 24px top breathing, so no top margin here.
 const heroStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = {
   width: "36px",
@@ -222,7 +221,6 @@ const hintStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   padding: "12px",
 };
 const hintTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warning)" };

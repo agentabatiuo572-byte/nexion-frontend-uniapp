@@ -176,7 +176,6 @@ const cardStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-warning-soft)",
 };
 const accentLineStyle: CSSProperties = {
   position: "absolute",

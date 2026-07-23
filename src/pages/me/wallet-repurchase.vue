@@ -171,13 +171,12 @@ const howLinkStyle: CSSProperties = {
   color: "var(--v5-brand-2)",
 };
 // Spotlight hero kept (single per screen) but neutralised: the accent floor-adjacent
-// glow is dropped and the accent border → neutral (big-card rule). The colourful
+// glow is dropped;描边已整条删除(《03》§3 零 border,C2 第二轮)。The colourful
 // benefit tiles inside carry the visual interest.
 const heroStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
 const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "18px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };

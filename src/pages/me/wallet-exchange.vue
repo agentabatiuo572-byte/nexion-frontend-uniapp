@@ -474,7 +474,6 @@ const flipBtnStyle: CSSProperties = {
   height: "44px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)",
 };
 const feeRowStyle: CSSProperties = { margin: "8px 16px 0" };
 const errorStyle: CSSProperties = {
@@ -482,7 +481,6 @@ const errorStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
   fontSize: "11.5px",
   color: "var(--v5-brand-2)",
 };
@@ -501,7 +499,6 @@ const infoStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
   fontSize: "11.5px",
   color: "color-mix(in srgb, var(--v5-brand-2) 90%, transparent)",
   lineHeight: 1.625,

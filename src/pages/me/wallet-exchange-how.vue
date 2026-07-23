@@ -111,7 +111,6 @@ const stepsBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   padding: "12px",
   display: "flex",
   flexDirection: "column",

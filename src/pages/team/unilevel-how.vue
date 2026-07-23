@@ -205,7 +205,6 @@ const signalBodyStyle: CSSProperties = { marginTop: "5px", fontSize: "13px", col
 const mathCardStyle: CSSProperties = {
   marginTop: "12px",
   background: "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 8%, transparent) 0%, var(--v5-on-brand) 50%, color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent) 100%)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "12px",
   padding: "16px",
 };

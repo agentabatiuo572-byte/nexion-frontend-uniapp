@@ -524,7 +524,6 @@ const ctaBodyStyle: CSSProperties = { marginTop: "3px", fontSize: "12.5px", colo
 const previewStyle: CSSProperties = {
   borderRadius: "16px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   padding: "12px",
   display: "flex",
   alignItems: "flex-start",
@@ -554,7 +553,6 @@ const holdingArtStyle: CSSProperties = {
   height: "48px",
   borderRadius: "12px",
   background: "radial-gradient(60% 60% at 30% 30%, rgba(114,80,200,0.40), rgba(114,80,200,0.10) 80%)",
-  border: "1px solid rgba(114,80,200,0.40)",
 };
 const holdingIdStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

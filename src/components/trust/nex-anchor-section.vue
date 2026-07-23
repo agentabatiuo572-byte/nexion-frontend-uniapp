@@ -76,7 +76,6 @@ const cardStyle: CSSProperties = {
   padding: "16px",
   background:
     "radial-gradient(70% 70% at 100% 0%, color-mix(in srgb, var(--v5-brand-2) 12%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 24%, transparent)",
 };
 const heroStyle: CSSProperties = { fontSize: "12.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.375 };
 const subStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
@@ -87,7 +86,6 @@ const howStyle: CSSProperties = {
   minHeight: "44px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
   fontSize: "11px",
   color: "var(--v5-brand-2)",
 };

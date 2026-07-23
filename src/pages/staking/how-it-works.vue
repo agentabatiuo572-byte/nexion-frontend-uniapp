@@ -126,7 +126,6 @@ const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)"
 const tableStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
 const tableHeadStyle: CSSProperties = {

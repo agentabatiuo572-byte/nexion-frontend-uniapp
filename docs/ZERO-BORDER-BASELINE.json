@@ -1,137 +1,7 @@
 {
- "_doc": "零-border 铁律棘轮基线。门只拦**新增** full 违例(有填充 + 四边描边 / box-shadow 环 / outline);partial(1-2 边 = 行分隔线)只列不拦。基线只许缩不许涨。",
- "_updated": "2026-07-23 · C2 第一轮后重建(射程由 10 路由扩到 pages.json 全量 88 条)",
+ "_doc": "零-border 铁律棘轮基线。门只拦新增 full 违例(≥3 边描边 + 有填充);partial(1-2 边,多为行分隔线)只列不拦。基线只许缩不许涨,每条 note 写为什么还在(重建时按 route|kind|cls|size 继承,不会被冲掉)。",
+ "_updated": "2026-07-23 · C2 第二轮收官重建(78→4;note 按 key 继承)",
  "entries": [
-  {
-   "route": "/pages/entry-surfaces/h5",
-   "kind": "full",
-   "cls": "entry-action entry-action--ghost",
-   "size": "358x48",
-   "radius": "8px",
-   "sample": "Manage device slots",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/entry-surfaces/signed",
-   "kind": "full",
-   "cls": "entry-action entry-action--ghost",
-   "size": "358x48",
-   "radius": "8px",
-   "sample": "Manage devices",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/entry-surfaces/white",
-   "kind": "full",
-   "cls": "entry-action entry-action--ghost",
-   "size": "358x48",
-   "radius": "8px",
-   "sample": "Security sessions",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/events/events",
-   "kind": "full",
-   "cls": "mt-3 w-full rounded-full flex items-center justify-center ac",
-   "size": "330x44",
-   "radius": "9999px",
-   "sample": "View progress",
-   "count": 12,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/events/events",
-   "kind": "full",
-   "cls": "relative overflow-hidden rounded-2xl",
-   "size": "358x321",
-   "radius": "16px",
-   "sample": "FEATURED3d 12h 04mNexGridB",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/genesis",
-   "kind": "full",
-   "cls": "relative overflow-hidden",
-   "size": "358x232",
-   "radius": "16px",
-   "sample": "GENESIS OG SEATRulesFirst ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/genesis",
-   "kind": "full",
-   "cls": "relative w-full overflow-hidden active:scale-[0.99]",
-   "size": "358x54",
-   "radius": "999px",
-   "sample": "Claim seat$11,999",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/holder",
-   "kind": "full",
-   "cls": "",
-   "size": "358x63",
-   "radius": "16px",
-   "sample": "Preview · what holders see",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/how-it-works",
-   "kind": "full",
-   "cls": "",
-   "size": "354x77",
-   "radius": "12px",
-   "sample": "💡 Why earlier is betterEa",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/how-it-works",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "⚠️ Emissions move with the",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/how-it-works",
-   "kind": "full",
-   "cls": "flex items-center justify-center active:opacity-80",
-   "size": "358x44",
-   "radius": "999px",
-   "sample": "Browse secondary market",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/how-it-works",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x239",
-   "radius": "16px",
-   "sample": "GENESIS OG SEATS1,000 OG s",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/genesis/marketplace",
-   "kind": "full",
-   "cls": "",
-   "size": "138x32",
-   "radius": "999px",
-   "sample": "Price low → high",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
   {
    "route": "/pages/login/login",
    "kind": "full",
@@ -140,7 +10,7 @@
    "radius": "16px",
    "sample": "Password",
    "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/login/login",
@@ -150,177 +20,7 @@
    "radius": "16px",
    "sample": "+1Mobile number",
    "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/login/login",
-   "kind": "full",
-   "cls": "lg-social__btn",
-   "size": "78x64",
-   "radius": "16px",
-   "sample": "Passkey",
-   "count": 8,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/goals",
-   "kind": "full",
-   "cls": "mx-4",
-   "size": "358x195",
-   "radius": "16px",
-   "sample": "Recommended pathReach $1,0",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/kyc",
-   "kind": "full",
-   "cls": "",
-   "size": "354x77",
-   "radius": "12px",
-   "sample": "Lifetime exchange > $100Cu",
-   "count": 12,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/kyc",
-   "kind": "full",
-   "cls": "",
-   "size": "354x59",
-   "radius": "12px",
-   "sample": "Single withdrawal > $100An",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/kyc",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x249",
-   "radius": "16px",
-   "sample": "IDENTITY VERIFICATIONKYC-E",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/proof",
-   "kind": "full",
-   "cls": "flex items-start",
-   "size": "358x82",
-   "radius": "12px",
-   "sample": "TipReal users post these c",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/proof",
-   "kind": "full",
-   "cls": "nx-vbadge font-mono-tabular",
-   "size": "77x21",
-   "radius": "6px",
-   "sample": "V2Operator",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/risk-disclosure",
-   "kind": "full",
-   "cls": "mx-4",
-   "size": "358x205",
-   "radius": "16px",
-   "sample": "REQUIRED READINGRead this ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x113",
-   "radius": "12px",
-   "sample": "💡 Why daily limits?Caps p",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x168",
-   "radius": "12px",
-   "sample": "1.Your swap request enters",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "✓ Your funds are never loc",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x218",
-   "radius": "16px",
-   "sample": "NEX ↔ USDT EXCHANGEConvert",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange",
-   "kind": "full",
-   "cls": "flex items-start",
-   "size": "358x59",
-   "radius": "12px",
-   "sample": "NEX is the NexGrid platfor",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-exchange",
-   "kind": "full",
-   "cls": "grid place-items-center active:opacity-80",
-   "size": "44x44",
-   "radius": "999px",
-   "sample": "",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-repurchase",
-   "kind": "full",
-   "cls": "",
-   "size": "358x171",
-   "radius": "16px",
-   "sample": "Faster withdrawals35% APY ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-repurchase-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "💡 Early withdrawal costYo",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-repurchase-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x239",
-   "radius": "16px",
-   "sample": "RE-INVEST BOOSTLock USDT f",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-withdraw",
@@ -330,97 +30,7 @@
    "radius": "50%",
    "sample": "",
    "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-withdraw",
-   "kind": "full",
-   "cls": "mx-4 mb-3",
-   "size": "358x203",
-   "radius": "16px",
-   "sample": "Compliance check requiredP",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/me/wallet-withdraw",
-   "kind": "full",
-   "cls": "mx-4 mt-3 rounded-2xl",
-   "size": "358x109",
-   "radius": "16px",
-   "sample": "First-time review: within ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/missions/missions",
-   "kind": "full",
-   "cls": "relative overflow-hidden",
-   "size": "358x193",
-   "radius": "16px",
-   "sample": "THIS WEEK'S BONUSExpand yo",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/onboarding/estimator",
-   "kind": "full",
-   "cls": "cmp",
-   "size": "350x62",
-   "radius": "12px",
-   "sample": "With NexGridBox S1117× you",
-   "count": 4,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/onboarding/estimator",
-   "kind": "full",
-   "cls": "est-loading est-fade-leave-active est-fade-leave-to",
-   "size": "350x88",
-   "radius": "12px",
-   "sample": "Reading your NPU specs…",
-   "count": 1,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/onboarding/estimator",
-   "kind": "full",
-   "cls": "est-phone anim-up",
-   "size": "350x72",
-   "radius": "12px",
-   "sample": "DetectedYour phoneMobile N",
-   "count": 1,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/onboarding/intro",
-   "kind": "full",
-   "cls": "cta-secondary active:scale-[0.98]",
-   "size": "342x54",
-   "radius": "9999px",
-   "sample": "Sign in",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/onboarding/terms",
-   "kind": "full",
-   "cls": "tos-risk active:opacity-80",
-   "size": "350x47",
-   "radius": "14px",
-   "sample": "See also: Platform Risk Di",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/ref/code",
-   "kind": "full",
-   "cls": "text-center relative overflow-hidden",
-   "size": "358x158",
-   "radius": "16px",
-   "sample": "One-time welcome gift$5+ 2",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/register/register",
@@ -430,357 +40,7 @@
    "radius": "16px",
    "sample": "+1Mobile number",
    "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/register/register",
-   "kind": "full",
-   "cls": "rg-social__btn",
-   "size": "78x64",
-   "radius": "16px",
-   "sample": "Passkey",
-   "count": 8,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/session/kicked",
-   "kind": "full",
-   "cls": "ks-card",
-   "size": "342x281",
-   "radius": "20px",
-   "sample": "Session endedThis session ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/staking/how-it-works",
-   "kind": "full",
-   "cls": "",
-   "size": "354x181",
-   "radius": "12px",
-   "sample": "TermAPYInterest earned30d1",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/staking/how-it-works",
-   "kind": "full",
-   "cls": "",
-   "size": "354x113",
-   "radius": "12px",
-   "sample": "✓ Why it's safe to stake h",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/staking/how-it-works",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x249",
-   "radius": "16px",
-   "sample": "STAKING VAULTLock USDT, ea",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/binary-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x249",
-   "radius": "16px",
-   "sample": "DUAL-TRACK GROWTH PROGRAMY",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/binary",
-   "kind": "full",
-   "cls": "nx-vbadge font-mono-tabular",
-   "size": "25x17",
-   "radius": "6px",
-   "sample": "V1",
-   "count": 4,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/commissions-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "💡 Why a cooling period?If",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/commissions-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x218",
-   "radius": "16px",
-   "sample": "ALL 6 COMMISSION TYPESSix ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/commissions-how",
-   "kind": "full",
-   "cls": "shrink-0 font-mono-tabular",
-   "size": "62x18",
-   "radius": "6px",
-   "sample": "COOLING",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/commissions-how",
-   "kind": "full",
-   "cls": "shrink-0 font-mono-tabular",
-   "size": "68x18",
-   "radius": "6px",
-   "sample": "UNLOCKED",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/commissions-how",
-   "kind": "full",
-   "cls": "shrink-0 font-mono-tabular",
-   "size": "75x18",
-   "radius": "6px",
-   "sample": "WITHDRAWN",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/leadership-pool-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "💡 When you reach V3 mid-w",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/leadership-pool-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x270",
-   "radius": "16px",
-   "sample": "GLOBAL LEADERSHIP POOL5% o",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/leadership-pool",
-   "kind": "full",
-   "cls": "rounded-xl grid place-items-center font-display tabular-nums",
-   "size": "32x32",
-   "radius": "12px",
-   "sample": "3",
-   "count": 20,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/network",
-   "kind": "full",
-   "cls": "relative overflow-hidden rounded-2xl",
-   "size": "358x388",
-   "radius": "16px",
-   "sample": "YOUV2DIRECTEXTENDEDDirect ",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/rank-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x113",
-   "radius": "12px",
-   "sample": "⚠️ No skipping ranksYou al",
-   "count": 6,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/rank-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x218",
-   "radius": "16px",
-   "sample": "RANK PROGRESSION SYSTEMCli",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/rank-how",
-   "kind": "full",
-   "cls": "rounded-xl grid place-items-center font-display tabular-nums",
-   "size": "22x22",
-   "radius": "12px",
-   "sample": "0",
-   "count": 26,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/rank",
-   "kind": "full",
-   "cls": "rounded-xl grid place-items-center font-display tabular-nums",
-   "size": "48x48",
-   "radius": "12px",
-   "sample": "2",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/rank",
-   "kind": "full",
-   "cls": "rounded-xl grid place-items-center font-display tabular-nums",
-   "size": "36x36",
-   "radius": "12px",
-   "sample": "0",
-   "count": 26,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/tree",
-   "kind": "full",
-   "cls": "nx-vbadge font-mono-tabular",
-   "size": "25x17",
-   "radius": "6px",
-   "sample": "V1",
-   "count": 100,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/unilevel-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x95",
-   "radius": "12px",
-   "sample": "💡 Network Yield Bonus for",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/unilevel-how",
-   "kind": "full",
-   "cls": "",
-   "size": "354x236",
-   "radius": "12px",
-   "sample": "ScenarioYou're at Verified",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/unilevel-how",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x270",
-   "radius": "16px",
-   "sample": "ROYALTY PROGRAMEarn royalt",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/team/unilevel",
-   "kind": "full",
-   "cls": "nx-vbadge font-mono-tabular",
-   "size": "25x17",
-   "radius": "6px",
-   "sample": "V1",
-   "count": 40,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/nex",
-   "kind": "full",
-   "cls": "",
-   "size": "354x252",
-   "radius": "12px",
-   "sample": "PropertyUSDTNEXToken typeS",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/nex",
-   "kind": "full",
-   "cls": "",
-   "size": "354x135",
-   "radius": "12px",
-   "sample": "Demand sideEvery AI client",
-   "count": 4,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/nex",
-   "kind": "full",
-   "cls": "",
-   "size": "354x113",
-   "radius": "12px",
-   "sample": "💡 Track NEX in real timeT",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/nex",
-   "kind": "full",
-   "cls": "mx-4 relative overflow-hidden",
-   "size": "358x270",
-   "radius": "16px",
-   "sample": "PLATFORM TOKENNEX — the to",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/trust",
-   "kind": "full",
-   "cls": "",
-   "size": "358x155",
-   "radius": "16px",
-   "sample": "Independently auditedHardw",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/trust",
-   "kind": "full",
-   "cls": "",
-   "size": "358x320",
-   "radius": "16px",
-   "sample": "Every NEX is minted only w",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/trust",
-   "kind": "full",
-   "cls": "",
-   "size": "358x140",
-   "radius": "16px",
-   "sample": "Up to $50,000 per critical",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/trust",
-   "kind": "full",
-   "cls": "flex items-center active:opacity-80",
-   "size": "187x44",
-   "radius": "999px",
-   "sample": "What is NEX? Learn more",
-   "count": 2,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
-  },
-  {
-   "route": "/pages/trust/trust",
-   "kind": "full",
-   "cls": "grid place-items-center shrink-0",
-   "size": "40x40",
-   "radius": "999px",
-   "sample": "JC",
-   "count": 10,
-   "note": "存量,C2 第二轮消化(门只拦新增,防扩散)"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/compute-share/download",
@@ -790,7 +50,7 @@
    "radius": "0px",
    "sample": "Device inventory",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/compute-share/download",
@@ -800,7 +60,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/compute-share/download",
@@ -810,7 +70,7 @@
    "radius": "0px",
    "sample": "Credit $14.92 ›Upgrade tra",
    "count": 6,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/compute-share/download",
@@ -820,7 +80,7 @@
    "radius": "0px",
    "sample": "No upgrade targets availab",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/daily/daily",
@@ -830,7 +90,7 @@
    "radius": "0px",
    "sample": "Daily check-in",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/daily/daily",
@@ -840,7 +100,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/developer/developer",
@@ -850,7 +110,7 @@
    "radius": "0px",
    "sample": "Developer",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/developer/developer",
@@ -860,7 +120,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/earn/device-detail",
@@ -870,7 +130,7 @@
    "radius": "0px",
    "sample": "Device details",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/earn/device-detail",
@@ -880,7 +140,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/earn/earn",
@@ -890,7 +150,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/events/events",
@@ -900,7 +160,7 @@
    "radius": "0px",
    "sample": "Events",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/events/events",
@@ -910,7 +170,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/genesis",
@@ -920,7 +180,7 @@
    "radius": "0px",
    "sample": "Claim seat$11,999",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/genesis",
@@ -930,7 +190,7 @@
    "radius": "0px",
    "sample": "Genesis",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/genesis",
@@ -940,7 +200,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/holder",
@@ -950,7 +210,7 @@
    "radius": "0px",
    "sample": "Genesis Holder",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/holder",
@@ -960,7 +220,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/how-it-works",
@@ -970,7 +230,7 @@
    "radius": "0px",
    "sample": "Genesis · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/how-it-works",
@@ -980,7 +240,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/marketplace",
@@ -990,7 +250,7 @@
    "radius": "0px",
    "sample": "Marketplace",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/genesis/marketplace",
@@ -1000,7 +260,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/globe/globe",
@@ -1010,7 +270,7 @@
    "radius": "0px",
    "sample": "Global network",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/globe/globe",
@@ -1020,7 +280,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/index/index",
@@ -1030,7 +290,17 @@
    "radius": "0px",
    "sample": "tagmodel1hprice24h",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
+  },
+  {
+   "route": "/pages/index/index",
+   "kind": "partial",
+   "cls": "grid items-center gap-2.5 py-2 whitespace-nowrap",
+   "size": "354x35",
+   "radius": "0px",
+   "sample": "+0:00LockLlama 70B LoRA @ ",
+   "count": 1,
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/index/index",
@@ -1040,7 +310,7 @@
    "radius": "0px",
    "sample": "Global grid · live+$216/se",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/index/index",
@@ -1050,7 +320,7 @@
    "radius": "0px",
    "sample": "28,432 online+$215/sec",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/index/index",
@@ -1060,7 +330,7 @@
    "radius": "16px",
    "sample": "Limited offerClaim your vo",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/market/market",
@@ -1070,7 +340,7 @@
    "radius": "0px",
    "sample": "NNEXOURSNexGrid · $487.4M$",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/market/market",
@@ -1080,7 +350,7 @@
    "radius": "0px",
    "sample": "MarketLive prices & token ",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/market/market",
@@ -1090,7 +360,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/achievements",
@@ -1100,7 +370,7 @@
    "radius": "0px",
    "sample": "Achievements",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/achievements",
@@ -1110,7 +380,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/devices",
@@ -1120,7 +390,7 @@
    "radius": "0px",
    "sample": "Device inventory",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/devices",
@@ -1130,7 +400,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/devices",
@@ -1140,7 +410,7 @@
    "radius": "0px",
    "sample": "Credit $14.92 ›Upgrade tra",
    "count": 6,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/devices",
@@ -1150,7 +420,7 @@
    "radius": "0px",
    "sample": "No upgrade targets availab",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/goals",
@@ -1160,7 +430,7 @@
    "radius": "0px",
    "sample": "Earning goals",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/goals",
@@ -1170,7 +440,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/help",
@@ -1180,7 +450,7 @@
    "radius": "0px",
    "sample": "Help center",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/help",
@@ -1190,7 +460,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/kyc",
@@ -1200,7 +470,7 @@
    "radius": "0px",
    "sample": "About KYC-Express",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/kyc",
@@ -1210,7 +480,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/language",
@@ -1220,7 +490,7 @@
    "radius": "0px",
    "sample": "Language",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/language",
@@ -1230,7 +500,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/me",
@@ -1240,7 +510,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/notifications",
@@ -1248,9 +518,9 @@
    "cls": "flex items-start active:opacity-90",
    "size": "354x62",
    "radius": "0px",
-   "sample": "Network partner V5 Sarah K",
-   "count": 14,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "sample": "Same-rank peer Mila V. ear",
+   "count": 12,
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/notifications",
@@ -1260,7 +530,7 @@
    "radius": "0px",
    "sample": "Notifications",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/notifications",
@@ -1270,7 +540,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/preferences",
@@ -1280,7 +550,7 @@
    "radius": "0px",
    "sample": "Preferences",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/preferences",
@@ -1290,7 +560,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/profile",
@@ -1300,7 +570,7 @@
    "radius": "0px",
    "sample": "Profile",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/profile",
@@ -1310,7 +580,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/proof",
@@ -1320,7 +590,7 @@
    "radius": "0px",
    "sample": "Earnings Proof",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/proof",
@@ -1330,7 +600,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/receipts",
@@ -1340,7 +610,7 @@
    "radius": "0px",
    "sample": "Receipts",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/receipts",
@@ -1350,7 +620,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/rewards-list",
@@ -1360,7 +630,7 @@
    "radius": "0px",
    "sample": "Vouchers",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/rewards-list",
@@ -1370,7 +640,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/rewards",
@@ -1380,7 +650,7 @@
    "radius": "0px",
    "sample": "My Rewards",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/rewards",
@@ -1390,7 +660,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/risk-disclosure",
@@ -1400,7 +670,7 @@
    "radius": "0px",
    "sample": "Risk disclosure",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/risk-disclosure",
@@ -1410,7 +680,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/security",
@@ -1420,7 +690,7 @@
    "radius": "0px",
    "sample": "Security",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/security",
@@ -1430,7 +700,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/support-tickets",
@@ -1440,7 +710,7 @@
    "radius": "0px",
    "sample": "Tickets",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/support-tickets",
@@ -1450,7 +720,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/support",
@@ -1460,7 +730,7 @@
    "radius": "0px",
    "sample": "Support",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/support",
@@ -1470,7 +740,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/trial",
@@ -1480,7 +750,7 @@
    "radius": "0px",
    "sample": "Free trialNexGridBox S1",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/trial",
@@ -1490,7 +760,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-bills",
@@ -1500,7 +770,7 @@
    "radius": "0px",
    "sample": "Bills",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-bills",
@@ -1510,7 +780,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-cards-new",
@@ -1520,7 +790,7 @@
    "radius": "0px",
    "sample": "Bind a bank card",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-cards-new",
@@ -1530,7 +800,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-cards",
@@ -1540,7 +810,7 @@
    "radius": "0px",
    "sample": "My bank cardsReused at che",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-cards",
@@ -1550,7 +820,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-exchange-how",
@@ -1560,7 +830,7 @@
    "radius": "0px",
    "sample": "Exchange · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-exchange-how",
@@ -1570,7 +840,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-exchange",
@@ -1580,7 +850,7 @@
    "radius": "0px",
    "sample": "Exchange",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-exchange",
@@ -1590,7 +860,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-nex",
@@ -1600,7 +870,7 @@
    "radius": "0px",
    "sample": "NEX wallet",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-nex",
@@ -1610,7 +880,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-repurchase-how",
@@ -1620,7 +890,7 @@
    "radius": "0px",
    "sample": "Re-invest · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-repurchase-how",
@@ -1630,7 +900,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-repurchase",
@@ -1640,7 +910,7 @@
    "radius": "0px",
    "sample": "Re-invest",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-repurchase",
@@ -1650,7 +920,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-topup",
@@ -1660,7 +930,7 @@
    "radius": "0px",
    "sample": "Add fundsTop-up",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-topup",
@@ -1670,7 +940,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-withdraw-tracking",
@@ -1680,7 +950,7 @@
    "radius": "0px",
    "sample": "Withdrawal Status",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-withdraw-tracking",
@@ -1690,7 +960,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-withdraw",
@@ -1700,7 +970,7 @@
    "radius": "0px",
    "sample": "USDTWithdraw",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet-withdraw",
@@ -1710,7 +980,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet",
@@ -1720,7 +990,7 @@
    "radius": "0px",
    "sample": "WalletBalances · transfers",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/me/wallet",
@@ -1730,7 +1000,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/missions/missions",
@@ -1740,7 +1010,7 @@
    "radius": "0px",
    "sample": "Missions",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/missions/missions",
@@ -1750,7 +1020,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/onboarding/terms",
@@ -1760,7 +1030,7 @@
    "radius": "0px",
    "sample": "NTerms of Service",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/search/search",
@@ -1770,7 +1040,7 @@
    "radius": "0px",
    "sample": "Search",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/search/search",
@@ -1780,7 +1050,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/staking/how-it-works",
@@ -1790,7 +1060,7 @@
    "radius": "0px",
    "sample": "Staking · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/staking/how-it-works",
@@ -1800,7 +1070,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/staking/staking",
@@ -1810,7 +1080,7 @@
    "radius": "0px",
    "sample": "Staking",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/staking/staking",
@@ -1820,7 +1090,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/store/bundle",
@@ -1830,7 +1100,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/store/checkout",
@@ -1840,7 +1110,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/store/order-detail",
@@ -1850,7 +1120,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/store/orders",
@@ -1860,7 +1130,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/store/store",
@@ -1870,7 +1140,7 @@
    "radius": "0px",
    "sample": "Price$649Buy now",
    "count": 8,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/support/messages",
@@ -1880,7 +1150,7 @@
    "radius": "0px",
    "sample": "Messages",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/support/messages",
@@ -1890,7 +1160,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/agent",
@@ -1900,7 +1170,7 @@
    "radius": "0px",
    "sample": "Agent",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/agent",
@@ -1910,7 +1180,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/binary-how",
@@ -1920,7 +1190,7 @@
    "radius": "0px",
    "sample": "Balance Match · How it wor",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/binary-how",
@@ -1930,7 +1200,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/binary",
@@ -1940,7 +1210,7 @@
    "radius": "0px",
    "sample": "Balance MatchTrack A & B ·",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/binary",
@@ -1950,7 +1220,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/commissions-how",
@@ -1960,7 +1230,7 @@
    "radius": "0px",
    "sample": "Commissions · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/commissions-how",
@@ -1970,7 +1240,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/commissions",
@@ -1980,7 +1250,7 @@
    "radius": "0px",
    "sample": "CommissionsAll commission ",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/commissions",
@@ -1990,7 +1260,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leaderboard",
@@ -2000,7 +1270,7 @@
    "radius": "0px",
    "sample": "Share my invite link",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leaderboard",
@@ -2010,7 +1280,7 @@
    "radius": "0px",
    "sample": "Top Inviters",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leaderboard",
@@ -2020,7 +1290,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leadership-pool-how",
@@ -2030,7 +1300,7 @@
    "radius": "0px",
    "sample": "Leadership Pool · How it w",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leadership-pool-how",
@@ -2040,7 +1310,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leadership-pool",
@@ -2050,7 +1320,7 @@
    "radius": "0px",
    "sample": "Global Leadership Pool",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/leadership-pool",
@@ -2060,7 +1330,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/network",
@@ -2070,7 +1340,7 @@
    "radius": "0px",
    "sample": "Influence Network",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/network",
@@ -2080,7 +1350,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/quota",
@@ -2090,7 +1360,7 @@
    "radius": "0px",
    "sample": "Hardware Quota",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/quota",
@@ -2100,7 +1370,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/rank-how",
@@ -2110,7 +1380,7 @@
    "radius": "0px",
    "sample": "Rank · How it works",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/rank-how",
@@ -2120,7 +1390,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/rank",
@@ -2130,7 +1400,7 @@
    "radius": "0px",
    "sample": "2V2 OperatorCURRENTTeam $5",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/rank",
@@ -2140,7 +1410,7 @@
    "radius": "0px",
    "sample": "V Rank",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/rank",
@@ -2150,7 +1420,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/team",
@@ -2160,7 +1430,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/tree",
@@ -2170,7 +1440,7 @@
    "radius": "0px",
    "sample": "Genealogy",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/tree",
@@ -2180,7 +1450,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/unilevel-how",
@@ -2190,7 +1460,7 @@
    "radius": "0px",
    "sample": "Network Royalty · How it w",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/unilevel-how",
@@ -2200,7 +1470,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/unilevel",
@@ -2210,7 +1480,7 @@
    "radius": "0px",
    "sample": "Influence Network Royalty",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/team/unilevel",
@@ -2220,7 +1490,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/trust/nex",
@@ -2230,7 +1500,7 @@
    "radius": "0px",
    "sample": "NEX Trust",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/trust/nex",
@@ -2240,7 +1510,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/trust/trust",
@@ -2250,7 +1520,7 @@
    "radius": "0px",
    "sample": "Q3 2026 Earnings ReportDow",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/trust/trust",
@@ -2260,7 +1530,7 @@
    "radius": "0px",
    "sample": "Trust center",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/trust/trust",
@@ -2270,7 +1540,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/tx/hash",
@@ -2280,7 +1550,7 @@
    "radius": "0px",
    "sample": "Transaction",
    "count": 1,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   },
   {
    "route": "/pages/tx/hash",
@@ -2290,8 +1560,7 @@
    "radius": "16px",
    "sample": "How would you like to pay?",
    "count": 2,
-   "note": "partial = 行分隔线/子页头底边;⚠️ 首版 note 曾称其为「透明 hairline」,验收实测部分并非透明底(如 .spv 底 rgba(0,0,0,0.55)),已更正措辞:partial 只做记录,不做合规性断言。"
+   "note": "存量,C2 批次待判"
   }
- ],
- "_origin": "C2 独立验收指出首版门只覆盖 10/88 路由(11%),漏 65 处。扩全量后 full 78 · partial 152。第一轮已修的 13 处不在其中。这 78 条 = C2 第二轮的工作清单,不是「批准保留」。"
+ ]
 }

@@ -7,8 +7,12 @@
   sheet) are folded into the page: the dock is a fixed bottom bar inside the
   chassis, the sheet is <GenesisPurchaseSheet v-model:open>.
 
-  Decorative gold-obsidian hero (rgba gold values are decorative, not v5 light
-  hex tokens — kept faithful to the .genesis-hero design exception); shared
+  🏛 金-曜石 hero 与吸底 CTA 的**金色描边**是「创世域」域级例外,**主人 2026-07-23 正式拍板**
+  (此前文件头自称「设计例外」写于 2026-07-09「原有条件例外一律收回」终裁之前,已失效;
+  C2 独立验收指出该措辞过期,故改为正式登记)。理由:金-曜石是 $11,999 旗舰 SKU 的视觉身份,
+  靠「暗底 + 金边」成立,删边后与普通暗卡不可区分。登记位置 `docs/ZERO-BORDER-ALLOWLIST.json`
+  (route+cls+size 精确匹配,只覆盖这两个元素);金色本体已于 C2 收敛为
+  `--v5-genesis-gold-on-dark` token,不再是散落 hex。**本页其它容器不享此例外**;shared
   gen-* keyframes live in tokens.css (P-023). Holder perks + live-market cards
   are faithful English data arrays (matching the source's inline PERKS /
   LIVE_MARKET), not i18n.
@@ -470,7 +474,7 @@ const barMetaStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
-  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 55.00000000000001%, transparent)",
+  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 55%, transparent)",
   letterSpacing: "0.04em",
 };
 const urgentStyle: CSSProperties = {
@@ -624,7 +628,7 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
       // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
       ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
       : "var(--v5-surface-2)",
-  border: remaining.value > 0 ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55.00000000000001%, transparent)" : "1px solid var(--v5-border)",
+  border: remaining.value > 0 ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
   color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
@@ -657,7 +661,7 @@ const dockRimStyle: CSSProperties = {
   right: "14%",
   bottom: "1px",
   height: "1px",
-  background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55.00000000000001%, transparent) 50%, transparent 100%)",
+  background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent) 50%, transparent 100%)",
   pointerEvents: "none",
 };
 const dockSheenStyle: CSSProperties = {

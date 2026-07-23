@@ -258,7 +258,6 @@ function go(href: string) {
 }
 
 .entry-action--ghost {
-  border: 1px solid var(--v5-border-strong);
   background: var(--v5-surface);
   color: var(--v5-ink);
 }

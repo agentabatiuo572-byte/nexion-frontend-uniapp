@@ -365,7 +365,6 @@ function goTerms() {
   height: 54px;
   border-radius: 9999px;
   background: var(--v5-surface);
-  border: 1px solid var(--v5-surface-2);
   display: flex;
   align-items: center;
   justify-content: center;

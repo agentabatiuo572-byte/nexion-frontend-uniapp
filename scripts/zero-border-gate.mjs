@@ -163,10 +163,14 @@ async function sweep() {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "en-US" });
   const page = await ctx.newPage();
   const found = new Map();
+  // 🔴 导航失败必须记账,不能静默跳过(2026-07-23 独立验收 v2 抓出):
+  // 少扫的路由在下游会被当成「违例已修好」→ 触发棘轮哨兵假红 → 照提示重建基线
+  // 就把**真违例从基线里删掉**。漏扫必须让整个门失败,而不是产出一份残缺结果。
+  const failed = [];
   for (const route of ROUTES) {
     try {
       await page.goto(`${BASE}/?nx_device=off#${route}`, { waitUntil: "networkidle", timeout: 20000 });
-    } catch { continue; }
+    } catch { failed.push(route); continue; }
     await page.waitForTimeout(700);
     for (const theme of ["dark", "light"]) {
       await page.evaluate((m) => document.querySelector("#app")?.__vue_app__?.config?.globalProperties?.$pinia?._s?.get("theme")?.setMode(m), theme);
@@ -184,7 +188,10 @@ async function sweep() {
     }
   }
   await browser.close();
-  return [...found.values()].sort((a, b) => (a.kind + a.route + a.cls).localeCompare(b.kind + b.route + b.cls));
+  return {
+    hits: [...found.values()].sort((a, b) => (a.kind + a.route + a.cls).localeCompare(b.kind + b.route + b.cls)),
+    failed,
+  };
 }
 
 /* ── selftest:双向红测(纯函数,不需浏览器) ── */
@@ -247,16 +254,33 @@ function selftest() {
 }
 if (process.argv.includes("--selftest")) selftest();
 
-const hits = await sweep();
+const { hits, failed } = await sweep();
+// 🔴 覆盖率断言排在所有下游逻辑之前:漏扫过的结果**一律不许**用来判违例、更不许写基线。
+if (failed.length) {
+  console.error(`零-border:${failed.length}/${ROUTES.length} 条路由导航失败,结果不完整,拒绝据此判定或写基线\n`);
+  for (const r of failed) console.error(`  ${r}`);
+  console.error(`\n先确认 dev server(${BASE})健康再重跑。`);
+  process.exit(2);
+}
 const key = (h) => `${h.route}|${h.kind}|${h.cls}|${h.size}`;
 const ex = fs.existsSync(ALLOWLIST) ? JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).exemptions ?? [] : [];
-const allowed = (h) => ex.some((e) => (!e.route || e.route === h.route) && (!e.cls || e.cls === h.cls));
+// 豁免必须 route + cls + size 三者都对上才放行 —— cls 常是泛用工具类(如 "relative overflow-hidden"),
+// 只比 route+cls 会把同页所有同类名元素一起放走(C1 验收批评过整文件级豁免过宽,同一个病)。
+const allowed = (h) =>
+  ex.some((e) => (!e.route || e.route === h.route) && (!e.cls || e.cls === h.cls) && (!e.size || e.size === h.size));
 const live = hits.filter((h) => !allowed(h));
 
 if (process.argv.includes("--update-baseline")) {
+  // 🔴 note 必须按 key 继承(2026-07-23 C2 第二轮 audit 抓出):原实现把每条 note 硬编码冲成
+  // "存量,C2 批次待判",与本文件 _doc 自称的「每条 note 写为什么还在」自相矛盾 ——
+  // 重建一次就把历轮的裁决理由(为什么留 / 谁拍的板)全抹了,下一轮只能从无理由的清单重判。
+  const prevRaw = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")) : {};
+  const prevNote = new Map((prevRaw.entries ?? []).map((e) => [key(e), e.note]));
+  const stampArg = process.argv.find((a) => a.startsWith("--stamp="));
   fs.writeFileSync(BASELINE, JSON.stringify({
-    _doc: "零-border 铁律棘轮基线。门只拦新增 full 违例(≥3 边描边 + 有填充);partial(1-2 边,多为行分隔线)只列不拦。基线只许缩不许涨,每条 note 写为什么还在。",
-    _updated: "2026-07-23", entries: live.map((h) => ({ ...h, note: "存量,C2 批次待判" })),
+    _doc: "零-border 铁律棘轮基线。门只拦新增 full 违例(≥3 边描边 + 有填充);partial(1-2 边,多为行分隔线)只列不拦。基线只许缩不许涨,每条 note 写为什么还在(重建时按 route|kind|cls|size 继承,不会被冲掉)。",
+    _updated: stampArg ? stampArg.slice(8) : (prevRaw._updated ?? "") + " · regenerated",
+    entries: live.map((h) => ({ ...h, note: prevNote.get(key(h)) ?? "新登记,待判" })),
   }, null, 1));
   console.log(`baseline 已更新:${live.length} 条(full ${live.filter(h=>h.kind==="full").length} · partial ${live.filter(h=>h.kind==="partial").length})`);
   process.exit(0);
@@ -273,11 +297,29 @@ const known = new Set(baseline.map(key));
 const added = live.filter((h) => h.kind === "full" && !known.has(key(h)));
 const gone = baseline.filter((b) => !live.some((h) => key(h) === key(b)));
 
+// 🔴 顺序不可调换(2026-07-23 独立验收 v2 抓出的洞 A):
+// 「新增违例」必须**先于**「棘轮该缩了」报出。反过来的话,当一次改动同时
+// 「修好 3 条旧的 + 带进 1 条新的」时,门只会说「重建基线」,而它给的处置命令
+// --update-baseline 会把 live 整批写盘 —— 照做就把那条新违例**洗进基线**合法化了。
+// 先报 added 并退出,就永远不会走到那条会洗白的指令。
 if (added.length) {
   console.error(`零-border:新增 ${added.length} 处「有填充 + 四边描边」(基线 ${baseline.length},消失 ${gone.length})\n`);
   for (const h of added) console.error(`  ${h.route}  ${h.size}  .${h.cls}  « ${h.sample}`);
   console.error(`\n《03》§3:带 bg 填充的卡片/板块一律零 border,层级靠 surface 微差色。删 border 即可。`);
   console.error(`确属 chrome / 透明容器 / 隔离环 → docs/ZERO-BORDER-ALLOWLIST.json 加一条并写 reason。`);
+  console.error(`🔴 此时**不要**跑 --update-baseline —— 那会把上面这些新违例收编成「存量」。先修掉它们。`);
+  process.exit(1);
+}
+
+// 棘轮必须跟着缩:违例修好后若不重建基线,那些**陈旧 key 仍留在 known 集合里** ——
+// 同款违例原样改回来,门查 known 命中、判为「存量」直接放行,等于修过的地方从此不设防。
+// 只对 full 生效:partial 多是极小 hairline,受滚动深度/浮层时机影响会抖,拿它当硬门会假红。
+const goneFull = baseline.filter((b) => b.kind === "full" && !live.some((h) => key(h) === key(b)));
+if (goneFull.length) {
+  console.error(`零-border:基线有 ${goneFull.length} 条 full 已修好但基线没跟着缩 —— 棘轮必须收紧,否则这些位置改回来门抓不到\n`);
+  for (const b of goneFull) console.error(`  ${b.route}  ${b.size}  .${b.cls}`);
+  console.error(`\n跑 node scripts/zero-border-gate.mjs --update-baseline --stamp="<说明>" 重建(note 会按 key 继承,不会丢裁决理由)。`);
+  console.error(`(此处已确保 added=0 —— 不存在被一并洗白的新违例。)`);
   process.exit(1);
 }
 console.log(`零-border:无新增 full 违例(基线 ${baseline.length} 条,本次消失 ${gone.length} 条)`);

@@ -204,6 +204,9 @@ onUnmounted(() => {
 .cs-refresh { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .cs-refresh:active { opacity: 0.7; }
 
+/* 🔴 零-border 扫荡请勿删这条 border:它是**状态通道**,不是卡片描边 ——
+   下面 .cs-track--err / --ok 靠改 border-color 传达验证成功/失败反馈,
+   删掉等于删掉验证码的结果反馈(P0 可用性)。《03》§3 末条:交互控件边界归《无障碍规范》。 */
 .cs-track { position: relative; margin-top: 12px; height: 48px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-surface-2) 55%, transparent); border: 1px solid var(--v5-surface-2); overflow: hidden; }
 .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--v5-brand) 18%, transparent); }
 .cs-hintwrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }

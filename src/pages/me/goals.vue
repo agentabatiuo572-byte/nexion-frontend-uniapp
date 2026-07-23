@@ -271,7 +271,6 @@ const recCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
   background: "color-mix(in srgb, var(--v5-brand) 6%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)",
 };
 const recHeaderStyle: CSSProperties = {
   marginBottom: "6px",

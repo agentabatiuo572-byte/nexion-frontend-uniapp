@@ -450,7 +450,6 @@ const tipStyle: CSSProperties = {
   padding: "12px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 20%, transparent)",
 };
 const tipTitleStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-warning)" };
 const tipBodyStyle: CSSProperties = {

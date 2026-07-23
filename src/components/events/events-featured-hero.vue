@@ -126,7 +126,6 @@ const cardStyle = computed<CSSProperties>(() => ({
     `radial-gradient(70% 80% at 100% 0%, color-mix(in srgb, ${props.ev.tint} 20%, transparent) 0%, transparent 55%),` +
     `radial-gradient(120% 60% at 50% 130%, color-mix(in srgb, ${props.ev.tint} 8%, transparent) 0%, transparent 70%),` +
     `var(--v5-surface)`,
-  border: "1px solid var(--v5-border)",
   boxShadow: "var(--v5-card-shadow-lift-strong)",
 }));
 const hairlineStyle = computed<CSSProperties>(() => ({
@@ -182,7 +181,6 @@ const claimBtnStyle = computed<CSSProperties>(() => ({
 const claimedPillStyle = computed<CSSProperties>(() => ({
   height: "48px",
   background: `color-mix(in srgb, ${props.ev.tint} 6%, transparent)`,
-  border: `1px solid color-mix(in srgb, ${props.ev.tint} 19%, transparent)`,
 }));
 const joinBtnStyle = computed<CSSProperties>(() => ({
   height: "48px",

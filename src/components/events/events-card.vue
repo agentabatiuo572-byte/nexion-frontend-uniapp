@@ -220,7 +220,6 @@ const softTintBtnStyle = computed<CSSProperties>(() => ({
   height: "44px",
   background: `color-mix(in srgb, ${props.ev.tint} 10%, transparent)`,
   color: props.ev.tint,
-  border: `1px solid color-mix(in srgb, ${props.ev.tint} 25%, transparent)`,
 }));
 const neutralBtnStyle: CSSProperties = {
   height: "44px",
@@ -229,6 +228,5 @@ const neutralBtnStyle: CSSProperties = {
 const claimedUseBtnStyle = computed<CSSProperties>(() => ({
   height: "44px",
   background: `color-mix(in srgb, ${props.ev.tint} 6%, transparent)`,
-  border: `1px solid color-mix(in srgb, ${props.ev.tint} 19%, transparent)`,
 }));
 </script>

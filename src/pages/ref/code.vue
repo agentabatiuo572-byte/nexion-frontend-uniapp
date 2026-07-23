@@ -259,7 +259,6 @@ const giftCardStyle: CSSProperties = {
   marginBottom: "12px",
   background:
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand) 22%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 40%, transparent)",
 };
 const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
 const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };

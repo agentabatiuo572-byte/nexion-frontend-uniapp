@@ -172,7 +172,6 @@ function statusChipStyle(color: string): CSSProperties {
     padding: "1px 8px",
     borderRadius: "6px",
     background: `color-mix(in srgb, ${color} 15%, transparent)`,
-    border: `1px solid color-mix(in srgb, ${color} 35%, transparent)`,
     color,
     fontSize: "10.5px",
   };

@@ -258,6 +258,13 @@ function metricValueStyle(color: string): CSSProperties {
 // Visualization card (whitelist): flat part of the bg equals the page floor, so
 // the neutral border IS the card boundary — dropping it would turn the radial
 // wash into a floor aura (which must then be deleted, degrading the orb).
+//
+// 🔴 C2 第二轮实测复核(2026-07-23):上面这句是对的,别再删。运行时两主题实测
+// 卡片自身底色与第一个不透明祖先**逐值相同**(dark 都是 rgb(0,0,0)、light 都是
+// rgb(244,241,233))→ 平底层与页面地板零色差,《03》§3「零 border 靠 surface 微差色
+// 分层」的前提(存在可用的 surface 微差)在这里**不成立**。按 §3 本体,这是
+// 「**透明容器**」形态(平底=地板,可见的只有装饰性 radial wash),而 border
+// **正是**规范允许透明容器使用的边界。已登记 ZERO-BORDER-ALLOWLIST。
 const orbCardStyle: CSSProperties = {
   background: "radial-gradient(60% 50% at 50% 50%, rgba(124,92,255,0.18) 0%, transparent 65%), var(--v5-bg)",
   border: "1px solid var(--v5-border)",

@@ -138,7 +138,6 @@ const tableStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   overflow: "hidden",
 };
 const tableHeadStyle: CSSProperties = { fontSize: "10.5px", letterSpacing: "0.14em", color: "var(--v5-ink-3)" };
@@ -157,7 +156,6 @@ const demandBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-tech-cyan) 10%, var(--v5-surface))",
-  border: "1px solid var(--v5-border)",
   padding: "16px",
 };
 const demandLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "8px" };
@@ -166,7 +164,6 @@ const burnBoxStyle: CSSProperties = {
   marginTop: "8px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   padding: "16px",
 };
 const burnLabelRowStyle: CSSProperties = { marginBottom: "8px" };

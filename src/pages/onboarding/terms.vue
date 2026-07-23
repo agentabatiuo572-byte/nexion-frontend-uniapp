@@ -239,7 +239,6 @@ function goRisk() {
   padding: 14px 16px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--v5-brand-2) 28%, transparent);
 }
 .tos-risk__t {
   flex: 1;

@@ -457,7 +457,8 @@ function sortPillStyle(active: boolean): CSSProperties {
     letterSpacing: "0.04em",
     background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
-    border: active ? "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)" : "1px solid transparent",
+    // 零-border(《03》§6):选中态靠 brand-soft 底 + brand 文字表达,不描边。
+    // 两态都不带 border,状态切换无 1px 位移。
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

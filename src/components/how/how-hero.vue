@@ -65,11 +65,12 @@ const AURORA: Record<Accent, string> = {
     "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.20) 0%, transparent 60%)",
 };
 
+// 零-border(《03》§3):带 surface 填充的卡片不描边,层级靠 surface 微差色 +
+// 内部 aurora/grid 表达(参照 Today's earnings card)。
 const cardStyle: CSSProperties = {
   padding: "22px",
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const auroraStyle = computed<CSSProperties>(() => ({
   position: "absolute",

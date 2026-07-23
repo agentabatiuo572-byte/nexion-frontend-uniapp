@@ -508,7 +508,6 @@ function goKyc() {
 // ── styles ──
 const kycGateStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
   padding: "16px",
 };
@@ -528,9 +527,9 @@ const kycGateCtaStyle: CSSProperties = {
   fontWeight: 600,
 };
 const kycPillStyle: CSSProperties = {
+  // 原型曾用 border-[var(--v5-brand)]/30;C2 第二轮按《03》§6(内嵌 pill 用
+  // soft tint 禁 border)整条删除,边界靠 brand 8% tint 与卡面的差表达。
   background: "color-mix(in srgb, var(--v5-brand) 8%, transparent)",
-  // Prototype: border-[var(--v5-brand)]/30 (30%), not the 45% *-border token.
-  border: "1px solid color-mix(in srgb, var(--v5-brand) 30%, transparent)",
   borderRadius: "12px",
   padding: "10px 12px",
 };
@@ -550,7 +549,6 @@ const resetBtnStyle: CSSProperties = {
 };
 const holdBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   borderRadius: "12px",
   padding: "10px 12px",
 };
@@ -616,7 +614,6 @@ const addressInputStyle: CSSProperties = {
 };
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   padding: "16px",
 };
 const nexGateStyle = computed<CSSProperties>(() => ({

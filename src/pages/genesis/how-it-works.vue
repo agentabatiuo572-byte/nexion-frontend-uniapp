@@ -156,7 +156,6 @@ const ctaSecondaryStyle: CSSProperties = {
   height: "44px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
-  border: "1px solid var(--v5-border-strong)",
   color: "var(--v5-ink-2)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,

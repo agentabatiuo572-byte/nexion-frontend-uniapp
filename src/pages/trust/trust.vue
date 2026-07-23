@@ -278,7 +278,6 @@ const heroStyle: CSSProperties = {
   padding: "16px",
   background:
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand-2) 18%, transparent) 0%, transparent 65%), var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
@@ -310,7 +309,6 @@ function leaderAvatarStyle(tint: string): CSSProperties {
     height: "40px",
     borderRadius: "999px",
     background: `linear-gradient(135deg, color-mix(in srgb, ${tint} 19%, transparent), color-mix(in srgb, ${tint} 6%, transparent))`,
-    border: `1px solid color-mix(in srgb, ${tint} 25%, transparent)`,
   };
 }
 function leaderInitialStyle(tint: string): CSSProperties {
@@ -365,7 +363,7 @@ function listingStateStyle(tint: string): CSSProperties {
     color: tint,
   };
 }
-const bugCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)", border: "1px solid var(--v5-border)" };
+const bugCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)" };
 const bugIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)" };
 const bugAmountStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const bugHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };

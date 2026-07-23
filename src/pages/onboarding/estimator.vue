@@ -175,8 +175,7 @@ function leaveEstimator() {
 }
 .est-loading {
   height: 88px;
-  background: #0f0f0f;
-  border: 1px solid var(--v5-surface-2);
+  background: var(--v5-surface);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -195,8 +194,7 @@ function leaveEstimator() {
 }
 .est-phone {
   position: relative;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--v5-brand) 12%, transparent), #0f0f0f 60%);
-  border: 2px solid var(--v5-brand);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--v5-brand) 12%, transparent), var(--v5-surface) 60%);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
@@ -287,8 +285,7 @@ function leaveEstimator() {
   gap: 12px;
   border-radius: 12px;
   padding: 12px 16px;
-  border: 1px solid var(--v5-surface-2);
-  background: #0f0f0f;
+  background: var(--v5-surface);
 }
 .cmp__icon {
   width: 36px;
