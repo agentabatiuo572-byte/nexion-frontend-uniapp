@@ -108,7 +108,7 @@
               <text class="block grid place-items-center" :style="avatarStyle">{{ s.name.charAt(0) }}</text>
               <view class="flex-1 min-w-0 flex items-center" style="gap: 6px">
                 <text class="truncate" :style="streakerNameStyle">{{ s.name }}</text>
-                <text style="font-size: 11px">{{ s.flag }}</text>
+                <text style="font-size: 12px">{{ s.flag }}</text>
               </view>
               <text class="tabular-nums" :style="streakerCountStyle">🔥 {{ s.streak }}</text>
             </view>
@@ -400,7 +400,7 @@ const streakNumStyle: CSSProperties = {
 const streakLblStyle: CSSProperties = {
   marginTop: "6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "rgba(255,255,255,0.82)",
   letterSpacing: "0.06em",
 };
@@ -418,13 +418,13 @@ const signInBtnStyle = computed<CSSProperties>(() => ({
 const nextClaimStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "rgba(255,255,255,0.85)",
 };
 const luckyHintStyle: CSSProperties = {
   marginTop: "-4px",
   display: "block",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
 };
@@ -435,7 +435,7 @@ const milestoneCardStyle: CSSProperties = {
 };
 const milestoneLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-warning)",
   letterSpacing: "0.06em",
@@ -463,7 +463,7 @@ function milestoneIconStyle(m: Milestone): CSSProperties {
 }
 const milestoneDayStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const milestoneRewardStyle: CSSProperties = {
@@ -473,7 +473,7 @@ const milestoneRewardStyle: CSSProperties = {
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
-const milestoneLeftStyle: CSSProperties = { marginTop: "3px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const milestoneLeftStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function milestoneBtnStyle(m: Milestone): CSSProperties {
   const claimed = claimedSet.value.has(m.day);
   const canClaim = streak.value >= m.day && !claimed;
@@ -503,7 +503,7 @@ const saverIconStyle: CSSProperties = {
 };
 const saverLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
@@ -517,7 +517,7 @@ const saverHeadlineStyle: CSSProperties = {
   lineHeight: 1.4,
   letterSpacing: "-0.008em",
 };
-const saverCountStyle: CSSProperties = { marginTop: "3px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const saverCountStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const saverBtnStyle = computed<CSSProperties>(() => ({
   height: "44px",
   padding: "0 16px",
@@ -540,20 +540,20 @@ const leaderCardStyle: CSSProperties = {
 };
 const leaderLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const leaderBestStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const rankStyle: CSSProperties = {
   width: "20px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const avatarStyle: CSSProperties = {
@@ -564,12 +564,12 @@ const avatarStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "11px",
+  fontSize: "12px",
 };
 const streakerNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.005em",
 };
@@ -579,7 +579,7 @@ const streakerCountStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand-2)",
 };
-const leaderSubStyle: CSSProperties = { paddingBottom: "12px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
+const leaderSubStyle: CSSProperties = { paddingBottom: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 // Filled stat tiles, no border (single visual difference).
 const statStyle: CSSProperties = {
   padding: "12px",
@@ -588,7 +588,7 @@ const statStyle: CSSProperties = {
 };
 const statLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.02em",
 };
@@ -603,7 +603,7 @@ function statValStyle(tint: string): CSSProperties {
     lineHeight: 1,
   };
 }
-const statSubStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const statSubStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Soft brand-2-tinted clickable callout, no border (tap affordance = tint + active-scale).
 const withdrawCardStyle: CSSProperties = {
   borderRadius: "16px",
@@ -616,12 +616,12 @@ const withdrawIconStyle: CSSProperties = {
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
 };
-const withdrawTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const withdrawRuleStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const withdrawTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const withdrawRuleStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const historyLabelStyle: CSSProperties = {
   marginBottom: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -631,15 +631,15 @@ const historyCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "16px",
 };
-const historyEmptyStyle: CSSProperties = { padding: "24px", fontSize: "12.5px", color: "var(--v5-ink-3)" };
+const historyEmptyStyle: CSSProperties = { padding: "24px", fontSize: "13px", color: "var(--v5-ink-3)" };
 function historyRowStyle(isLast: boolean): CSSProperties {
   return { padding: "10px 16px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
-const historyReasonStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", color: "var(--v5-ink)" };
+const historyReasonStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", color: "var(--v5-ink)" };
 const historyTimeStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 function historyDeltaStyle(delta: number): CSSProperties {

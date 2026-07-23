@@ -189,27 +189,27 @@ const cardStyle: CSSProperties = {
 const headerStyle: CSSProperties = { borderBottom: "1px solid var(--v5-border)" };
 const tier2LabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
 const countStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-2)",
 };
 const claimedRowStyle: CSSProperties = { gap: "12px", opacity: 0.65 };
 const checkBoxStyle: CSSProperties = { width: "22px", height: "22px", borderRadius: "999px", background: "var(--v5-success)" };
 const claimedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-4)",
   textDecoration: "line-through",
 };
 const claimedRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-nex)",
 };
 const completedRowStyle: CSSProperties = { gap: "12px", minHeight: "48px", background: "var(--v5-warning-soft)" };
@@ -217,14 +217,14 @@ const sparkBoxStyle: CSSProperties = { width: "22px", height: "22px", borderRadi
 const claimLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-warning)",
   letterSpacing: "-0.005em",
 };
 const claimRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontWeight: 500,
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-nex)",
 };
 const pendingRowStyle: CSSProperties = { gap: "12px", minHeight: "48px" };
@@ -236,22 +236,22 @@ const numberBoxStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "11px",
+  fontSize: "12px",
 };
 const pendingLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
 };
 const pendingRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontWeight: 500,
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-nex)",
 };
 const pendingUsdtStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-success)",
 };
 const bonusRowStyle: CSSProperties = {

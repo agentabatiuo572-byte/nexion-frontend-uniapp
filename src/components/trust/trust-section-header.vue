@@ -19,13 +19,13 @@ defineProps<{ label: string; suffix?: string }>();
 
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
 const suffixStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 </script>

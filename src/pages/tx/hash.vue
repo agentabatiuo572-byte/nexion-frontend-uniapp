@@ -191,8 +191,8 @@ const heroStyle: CSSProperties = {
   padding: "16px",
   background: "var(--v5-surface)",
 };
-const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-success)" };
-const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
+const confirmedStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-success)" };
+const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", wordBreak: "break-all" };
 // Nested copy chip — soft surface-2 fill lifts it off the surface hero, no border.
 const copyBtnStyle: CSSProperties = {
   marginTop: "8px",
@@ -204,7 +204,7 @@ const copyBtnStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 // Tx fields — single-record container (form b: surface fill, no border); the
@@ -214,14 +214,14 @@ const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px
 // not part of the receipt); content aligns to the mx-4 gutter, buttons keep their
 // surface-2 fill.
 const extCardStyle: CSSProperties = { marginTop: "12px" };
-const extTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const extBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const extTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const extBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const extBtnStyle: CSSProperties = {
   height: "44px",
   borderRadius: "8px",
   background: "var(--v5-surface-2)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-2)",
 };
-const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "10px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
+const footerStyle: CSSProperties = { marginTop: "16px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
 </script>

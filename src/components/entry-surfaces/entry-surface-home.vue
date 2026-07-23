@@ -213,7 +213,7 @@ function go(href: string) {
   display: block;
   margin-top: 18px;
   color: var(--v5-ink);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1.04;
   overflow-wrap: anywhere;
@@ -224,7 +224,7 @@ function go(href: string) {
   margin-top: 14px;
   max-width: 560px;
   color: var(--v5-ink-2);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
@@ -243,7 +243,7 @@ function go(href: string) {
   min-height: 48px;
   padding: 0 16px;
   border-radius: 8px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   text-align: center;
 }
@@ -320,7 +320,7 @@ function go(href: string) {
 .entry-metric-value {
   display: block;
   color: var(--v5-ink);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -329,7 +329,7 @@ function go(href: string) {
   display: block;
   margin-top: 6px;
   color: var(--v5-ink-3);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -367,7 +367,7 @@ function go(href: string) {
 .entry-step-title {
   display: block;
   color: var(--v5-ink);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -390,7 +390,7 @@ function go(href: string) {
   border-radius: 8px;
   background: var(--v5-surface-2);
   color: var(--v5-ink-2);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -415,7 +415,7 @@ function go(href: string) {
   }
 
   .entry-title {
-    font-size: 48px;
+    font-size: 56px;
   }
 }
 </style>

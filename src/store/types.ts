@@ -250,6 +250,83 @@ export interface Withdrawal {
   estimatedCompletion: number;
 }
 
+// ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────
+// 全站唯一通道枚举,前后台单源(后台 D1 渠道配置 / C1 投入卡 channel 同源单写)。
+export type DepositChannel =
+  | "usdt-trc20"
+  | "usdt-erc20"
+  | "usdt-bep20"
+  | "bank-vietqr"
+  | "card-intl";
+
+/** 链上三网络子集(专属地址 / txHash / 确认数仅链上通道适用)。 */
+export type ChainDepositChannel = Extract<
+  DepositChannel,
+  "usdt-trc20" | "usdt-erc20" | "usdt-bep20"
+>;
+
+// [FEAT-PAY01] ④ 链上入金状态机:detected → confirming → credited(终态);
+// 金额 < 最低额 → dust_hold → (credited | returned,后台人工处置)。
+// credited/returned 终态禁任何再处置;status server-canonical,client 绝不本地推进。
+export type DepositStatus = "detected" | "confirming" | "credited" | "dust_hold" | "returned";
+
+/** 入金记录(三类通道共用;银行轨由意向单入账时生成并互相关联)。 */
+export interface DepositRecord {
+  /** server mint `DP-YYYYMMDD-NNNN`(与提现 WD- 同族),禁客户端造。 */
+  depositId: string;
+  channel: DepositChannel;
+  /** 实收金额(链上按实际到账);两位小数。 */
+  grossAmountUsdt: number;
+  /** 按通道费率表(后台 D1 配置)server 计算;client 仅展示。 */
+  feeUsdt: number;
+  /** = gross − fee;入账额。 */
+  creditedUsdt: number;
+  /** 链上必:每用户 × 每网络专属充值地址(server 派发,恒定不轮换)。 */
+  address?: string;
+  /** 链上必:链上交易哈希 = 幂等键(同 txHash 重复上报 no-op)。 */
+  txHash?: string;
+  /** 链上必:当前确认数;server 推进。 */
+  confirmations?: number;
+  /** 链上必:默认 TRC20 20 · ERC20 12 · BEP20 15(后台 D1 可配)。 */
+  requiredConfirmations?: number;
+  status: DepositStatus;
+  /** ms epoch,服务端时间戳。 */
+  createdAt: number;
+  creditedAt?: number;
+}
+
+// [FEAT-PAY02] ④ 银行轨意向单状态机(本文件只定形状;意向单生命周期动作归 A4)。
+export type DepositIntentStatus =
+  | "awaiting_payment"
+  | "credited"
+  | "expired"
+  | "mismatch_review"
+  | "cancelled"
+  | "return_pending";
+
+/** 入金意向单(VietQR 银行轨专用;入账时生成 DepositRecord 并互相关联)。 */
+export interface DepositIntent {
+  /** server mint `DP-YYYYMMDD-NNNN`(与链上同号段)。 */
+  intentId: string;
+  /** 用户输入;≥ $10 等值,≤ 单笔上限 $5,000(D1 可配)。 */
+  usdtAmount: number;
+  /** 下单锁定牌价([FEAT-PAY03] quoteRate);单上恒定,后续调价不影响在途单。 */
+  fxRate: number;
+  /** = round(usdtAmount × fxRate),精确到盾不凑整千;server 计算。 */
+  vndAmount: number;
+  /** server mint `NX-` + 6 位大写字母数字;在途期内全局唯一。 */
+  memoCode: string;
+  /** 收款账户池按轮换策略分配;server 派发(用户需完整账号转账,不脱敏)。 */
+  bankAccount: { accountName: string; accountNumber: string; bankName: string };
+  status: DepositIntentStatus;
+  /** ms epoch;创建 + 30min 锁价窗(宽限 10min,D1 可配)。 */
+  expireAt: number;
+  /** 回单实收金额(VND)。 */
+  receivedVnd?: number;
+  /** 回单匹配时间(ms epoch)。 */
+  matchedAt?: number;
+}
+
 export interface AppState {
   accountKey: string;
   entrySurface: EntrySurface;

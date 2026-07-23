@@ -32,8 +32,8 @@
       <!-- Empty state -->
       <view v-if="!q.trim()" class="mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
-        <text class="block" style="font-size: 13.5px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
-        <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
+        <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
+        <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
       </view>
 
       <!-- 无搜索结果 —— 《06》no-search-results:插画 + 引导 + 清除搜索 -->
@@ -59,8 +59,8 @@
               @click="openHit(h)"
             >
               <view class="flex-1 min-w-0">
-                <text class="block truncate" style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
-                <text v-if="h.sublabel" class="block truncate" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
+                <text class="block truncate" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ h.label }}</text>
+                <text v-if="h.sublabel" class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ h.sublabel }}</text>
               </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M7 7h10v10" /><path d="M7 17 17 7" /></svg>
             </view>
@@ -207,7 +207,7 @@ const inputWrapStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   flex: "1",
   background: "transparent",
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   height: "100%",
 };
@@ -225,7 +225,7 @@ const noResultsStyle: CSSProperties = {
 const groupLabelStyle: CSSProperties = {
   marginBottom: "6px",
   paddingLeft: "2px",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };

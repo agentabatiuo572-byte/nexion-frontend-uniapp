@@ -20,7 +20,7 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
           {{ t.events.heroLabel }}
         </view>
-        <view v-if="ev.countdown" class="inline-flex items-center font-mono-tabular tabular-nums" style="font-size: 11px; color: var(--v5-ink-2)">
+        <view v-if="ev.countdown" class="inline-flex items-center font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
           <text>{{ ev.countdown }}</text>
         </view>
@@ -30,7 +30,7 @@
       <view class="mt-4 flex items-start justify-between" style="gap: 12px">
         <view class="flex-1 min-w-0">
           <text class="block" :style="titleStyle">{{ ev.title }}</text>
-          <text class="block" style="font-size: 12.5px; color: var(--v5-ink-3); margin-top: 6px; line-height: 1.375">{{ ev.subtitle }}</text>
+          <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-top: 6px; line-height: 1.375">{{ ev.subtitle }}</text>
         </view>
         <text aria-hidden class="shrink-0" :style="emojiStyle">{{ ev.emoji }}</text>
       </view>
@@ -43,7 +43,7 @@
 
       <!-- PROGRESS -->
       <view v-if="ev.progress" class="mt-4">
-        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 10.5px; margin-bottom: 6px">
+        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 12px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3); text-transform: uppercase; letter-spacing: 0.08em">{{ ev.progress.label }}</text>
           <text class="tabular-nums" style="color: var(--v5-ink)">
             <text :style="{ color: ev.tint, fontWeight: 600 }">{{ ev.progress.current.toLocaleString() }}</text>
@@ -58,24 +58,24 @@
       <!-- CTA -->
       <view v-if="showClaim" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" tabindex="0" :aria-label="claimLabel" @click="emit('claim')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
-        <text style="font-size: 14px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="emit('claim')">{{ claimLabel }}</text>
+        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="emit('claim')">{{ claimLabel }}</text>
       </view>
       <view v-else-if="ev._claimed" class="mt-5 w-full rounded-full flex items-center justify-center" :class="{ 'active:opacity-90': !!ev.useHref }" :style="claimedPillStyle" :role="ev.useHref ? 'button' : undefined" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
-        <text style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
+        <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
         <template v-if="ev.useHref">
-          <text style="font-size: 13.5px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
-          <text :style="{ fontSize: '13.5px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
+          <text style="font-size: 13px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
+          <text :style="{ fontSize: '13px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
         </template>
       </view>
       <view v-else-if="showJoinAction" class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.ctaLabel ?? t.events.joinCta" @click="emit('join')">
-        <text style="font-size: 14px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
+        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-else class="mt-5 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="joinBtnStyle" role="button" tabindex="0" :aria-label="ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta)" @click="openHref">
         <svg v-if="ev.joined" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
-        <text style="font-size: 14px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="openHref">{{ ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta) }}</text>
+        <text style="font-size: 15px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none" @click.stop="openHref">{{ ev.joined ? t.events.viewProgress : (ev.ctaLabel ?? t.events.joinCta) }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
     </view>
@@ -138,7 +138,7 @@ const hairlineStyle = computed<CSSProperties>(() => ({
   opacity: 0.6,
 }));
 const capLabelStyle = computed<CSSProperties>(() => ({
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.18em",
   color: props.ev.tint,
 }));
@@ -161,7 +161,7 @@ const rewardPillStyle = computed<CSSProperties>(() => ({
   paddingTop: "6px",
   paddingBottom: "6px",
   borderRadius: "999px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   background: `color-mix(in srgb, ${props.ev.tint} 10%, transparent)`,
   color: props.ev.tint,

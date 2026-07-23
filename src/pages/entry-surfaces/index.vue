@@ -88,7 +88,7 @@ function open(route: string) {
   display: block;
   margin-top: 18px;
   color: var(--v5-ink);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1.08;
 }
@@ -97,7 +97,7 @@ function open(route: string) {
   display: block;
   margin-top: 12px;
   color: var(--v5-ink-2);
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
@@ -131,7 +131,7 @@ function open(route: string) {
 .entry-index__row-label {
   display: block;
   color: var(--v5-ink);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -140,7 +140,7 @@ function open(route: string) {
   margin-top: 7px;
   color: var(--v5-ink-3);
   font-family: var(--font-jet-mono);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -151,7 +151,7 @@ function open(route: string) {
   }
 
   .entry-index__title {
-    font-size: 48px;
+    font-size: 56px;
   }
 }
 </style>

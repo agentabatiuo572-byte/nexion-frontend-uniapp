@@ -21,8 +21,8 @@
         <text class="block mt-1.5" style="font-size: 12px; color: var(--v5-ink-3); font-family: var(--font-v5)">{{ t.home.poolThisWeek }}</text>
       </view>
       <view v-if="unlocked" class="text-right whitespace-nowrap">
-        <text class="block tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 18px; color: var(--v5-success); letter-spacing: -0.014em; line-height: 1">+${{ payoutText }}</text>
-        <text class="block mt-1 font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ shareText }}</text>
+        <text class="block tabular-nums" style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-success); letter-spacing: -0.014em; line-height: 1">+${{ payoutText }}</text>
+        <text class="block mt-1 font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ shareText }}</text>
       </view>
       <text v-else class="font-mono-tabular whitespace-nowrap" style="padding: 5px 10px; background: var(--v5-brand-2-soft); border-radius: 999px; font-size: 12px; color: var(--v5-brand-2); font-weight: 500">{{ t.home.poolV3Unlock }}</text>
     </view>

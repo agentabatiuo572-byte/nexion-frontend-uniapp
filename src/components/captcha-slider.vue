@@ -187,7 +187,7 @@ onUnmounted(() => {
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; }
 .cs-head__txt { display: flex; flex-direction: column; gap: 3px; }
 .cs-title { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); }
-.cs-sub { font-size: 12.5px; color: var(--v5-ink-3); text-wrap: pretty; }
+.cs-sub { font-size: 13px; color: var(--v5-ink-3); text-wrap: pretty; }
 .cs-x { width: 44px; height: 44px; margin: -12px -12px 0 0; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
 .cs-x:active { opacity: 0.7; }
 
@@ -210,7 +210,7 @@ onUnmounted(() => {
 .cs-track { position: relative; margin-top: 12px; height: 48px; border-radius: 9999px; background: color-mix(in srgb, var(--v5-surface-2) 55%, transparent); border: 1px solid var(--v5-surface-2); overflow: hidden; }
 .cs-fill { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--v5-brand) 18%, transparent); }
 .cs-hintwrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.cs-hint { font-size: 12.5px; color: var(--v5-ink-4); }
+.cs-hint { font-size: 13px; color: var(--v5-ink-4); }
 .cs-handle { position: absolute; top: 2px; width: 44px; height: 44px; border-radius: 9999px; background: var(--v5-brand); display: flex; align-items: center; justify-content: center; touch-action: none; }
 .cs-handle:active { transform: scale(0.98); }
 .cs-handle__t { font-size: 15px; font-weight: 600; color: var(--v5-on-brand); }
@@ -223,7 +223,7 @@ onUnmounted(() => {
 @keyframes cs-rot { to { transform: rotate(360deg); } }
 
 .cs-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; min-height: 16px; }
-.cs-meta__fail { font-size: 11.5px; color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
-.cs-meta__hint { font-size: 11.5px; color: var(--v5-ink-3); }
+.cs-meta__fail { font-size: 12px; color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
+.cs-meta__hint { font-size: 12px; color: var(--v5-ink-3); }
 .cs-meta__hint--err { color: var(--v5-brand-2); }
 </style>

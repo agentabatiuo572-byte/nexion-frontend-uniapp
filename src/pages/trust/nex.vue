@@ -132,15 +132,15 @@ function goBack() {
   uni.navigateTo({ url: "/pages/trust/trust", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const tableStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
   background: "var(--v5-surface)",
   overflow: "hidden",
 };
-const tableHeadStyle: CSSProperties = { fontSize: "10.5px", letterSpacing: "0.14em", color: "var(--v5-ink-3)" };
+const tableHeadStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-ink-3)" };
 const thWhat: CSSProperties = { flex: "1.2", padding: "8px 12px", fontWeight: 500 };
 const thCell: CSSProperties = { flex: "1", padding: "8px 12px", fontWeight: 500 };
 function tableRowStyle(isFirst: boolean): CSSProperties {
@@ -158,7 +158,7 @@ const demandBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-tech-cyan) 10%, var(--v5-surface))",
   padding: "16px",
 };
-const demandLabelStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "8px" };
+const demandLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-brand-2)", marginBottom: "8px" };
 const demandBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
 const burnBoxStyle: CSSProperties = {
   marginTop: "8px",
@@ -167,7 +167,7 @@ const burnBoxStyle: CSSProperties = {
   padding: "16px",
 };
 const burnLabelRowStyle: CSSProperties = { marginBottom: "8px" };
-const burnLabelTextStyle: CSSProperties = { fontSize: "11px", letterSpacing: "0.14em", color: "var(--v5-warning)" };
+const burnLabelTextStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.14em", color: "var(--v5-warning)" };
 const burnBodyStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)", lineHeight: 1.625 };
 const ctaExchangeStyle: CSSProperties = {
   gap: "8px",
@@ -176,7 +176,7 @@ const ctaExchangeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "linear-gradient(90deg, var(--v5-tech-cyan), var(--v5-brand-2))",
   color: "var(--v5-on-brand)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const ctaBackStyle: CSSProperties = {
@@ -185,7 +185,7 @@ const ctaBackStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
 };
 </script>

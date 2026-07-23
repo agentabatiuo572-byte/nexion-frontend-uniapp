@@ -57,7 +57,7 @@ const boxStyle = computed<CSSProperties>(() => ({
 const titleStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: ACCENT_TEXT[props.tone],
 }));
 const bodyStyle: CSSProperties = {

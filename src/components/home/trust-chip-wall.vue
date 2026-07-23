@@ -18,11 +18,11 @@
         v-for="n in CHIPS"
         :key="n"
         class="font-mono-tabular"
-        style="padding: 3px 9px; border-radius: 999px; font-size: 11px; background: var(--v5-surface-2); color: var(--v5-ink-2); font-weight: 500"
+        style="padding: 3px 9px; border-radius: 999px; font-size: 12px; background: var(--v5-surface-2); color: var(--v5-ink-2); font-weight: 500"
       >{{ n }}</text>
     </view>
 
-    <text class="block mt-2.5 font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.home.trustReserve }}</text>
+    <text class="block mt-2.5 font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.home.trustReserve }}</text>
   </view>
 </template>
 

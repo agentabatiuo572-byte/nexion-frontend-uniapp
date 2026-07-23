@@ -22,7 +22,7 @@
           <view class="flex items-end justify-between" style="margin-top: 8px">
             <view class="flex items-center" style="gap: 8px">
               <view class="rounded-full grid place-items-center" :style="nexIconStyle">
-                <text :style="{ fontSize: '14px', fontWeight: 600, color: 'var(--v5-ink)' }">N</text>
+                <text :style="{ fontSize: '15px', fontWeight: 600, color: 'var(--v5-ink)' }">N</text>
               </view>
               <view>
                 <text class="block font-display" :style="nexPairStyle">NEX / USDT</text>
@@ -104,7 +104,7 @@
             :style="catItemStyle(activeCat === cat.id)"
             @click="activeCat = cat.id"
           >
-            <text :style="{ fontSize: '11.5px', fontWeight: 600, color: activeCat === cat.id ? 'var(--v5-on-brand)' : 'var(--v5-ink-3)' }">{{ cat.label }}</text>
+            <text :style="{ fontSize: '12px', fontWeight: 600, color: activeCat === cat.id ? 'var(--v5-on-brand)' : 'var(--v5-ink-3)' }">{{ cat.label }}</text>
           </view>
         </view>
 
@@ -228,14 +228,14 @@ const heroStyle: CSSProperties = {
 };
 const heroCapStyle: CSSProperties = {
   gap: "8px",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-brand)",
 };
 const nexIconStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-brand)" };
-const nexPairStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
-const nexSubStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const nexPriceStyle: CSSProperties = { fontSize: "28px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+const nexPairStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+const nexSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const nexPriceStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const nexChangeStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
   fontSize: "12px",
@@ -260,7 +260,7 @@ function segItemStyle(active: boolean): CSSProperties {
 function segLabelStyle(active: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -277,13 +277,13 @@ const buyBtnStyle: CSSProperties = {
   gap: "6px",
   background: "var(--v5-brand)",
 };
-const buyTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-on-brand)" };
+const buyTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-on-brand)" };
 const sellBtnStyle: CSSProperties = {
   height: "44px",
   gap: "6px",
   background: "var(--v5-surface-2)",
 };
-const sellTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
+const sellTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 
 // De-carded form-b containers (single surface, no border): stats grid, exchange
 // listings, and the token table keep their radius + internal hairline dividers.
@@ -296,10 +296,10 @@ const cardFlushStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderRadius: "16px",
 };
-const statLabelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const statLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const statValueStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -307,22 +307,22 @@ const athRowStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
   borderColor: "var(--v5-border)",
-  fontSize: "11px",
+  fontSize: "12px",
 };
 const listLabelStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
-const listExStyle: CSSProperties = { marginTop: "8px", fontSize: "12.5px", color: "var(--v5-ink)" };
+const listExStyle: CSSProperties = { marginTop: "8px", fontSize: "13px", color: "var(--v5-ink)" };
 const pendingChipStyle: CSSProperties = {
   marginTop: "6px",
   gap: "6px",
   padding: "4px 8px",
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 600,
 };
 const catGridStyle: CSSProperties = {
@@ -342,18 +342,18 @@ function catItemStyle(active: boolean): CSSProperties {
 const tableHeadStyle: CSSProperties = {
   gridTemplateColumns: "32px 1fr 76px 72px",
   padding: "10px 12px",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   borderColor: "var(--v5-border)",
 };
 const emptyStyle: CSSProperties = {
   padding: "24px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
 };
 const noteStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   paddingTop: "4px",

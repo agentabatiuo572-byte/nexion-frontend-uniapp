@@ -280,8 +280,8 @@ const heroStyle: CSSProperties = {
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand-2) 18%, transparent) 0%, transparent 65%), var(--v5-surface)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
-const heroHeadlineStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25, marginTop: "2px" };
+const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroHeadlineStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25, marginTop: "2px" };
 const heroStatsStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", borderTop: "1px solid var(--v5-border)", gap: "8px" };
 // De-carded form-b container (single surface, no border): rows carry their own
 // hairline dividers. Used by Audits / Investors / Leadership / Press / Q3 / Listings.
@@ -291,15 +291,15 @@ function dotStyle(tint: string): CSSProperties {
   return { width: "6px", height: "6px", borderRadius: "999px", background: tint };
 }
 const complianceLabelStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-ink)" };
-const complianceBodyStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
+const complianceBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 const partnerCardStyle: CSSProperties = { borderRadius: "12px", padding: "12px", background: "var(--v5-surface)" };
-const partnerNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, letterSpacing: "-0.025em" };
-const partnerTagStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "4px" };
+const partnerNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600, letterSpacing: "-0.025em" };
+const partnerTagStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
 function investorRowStyle(last: boolean): CSSProperties {
   return { padding: "10px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
-const investorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600 };
-const investorStageStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const investorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600 };
+const investorStageStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 function leaderRowStyle(last: boolean): CSSProperties {
   return { gap: "12px", padding: "10px 12px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
@@ -312,32 +312,32 @@ function leaderAvatarStyle(tint: string): CSSProperties {
   };
 }
 function leaderInitialStyle(tint: string): CSSProperties {
-  return { fontFamily: "var(--font-v5)", fontSize: "14px", fontWeight: 600, color: tint };
+  return { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, color: tint };
 }
-const leaderNameStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const leaderRoleStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)" };
-const leaderPrevStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const leaderNameStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const leaderRoleStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
+const leaderPrevStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const inBadgeStyle: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   background: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)",
   color: "var(--v5-tech-cyan)",
 };
 function pressRowStyle(last: boolean): CSSProperties {
   return { padding: "12px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
-const pressOutletStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.05em", color: "var(--v5-brand)" };
-const pressDateStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
-const pressTitleStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink)", lineHeight: 1.375 };
+const pressOutletStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.05em", color: "var(--v5-brand)" };
+const pressDateStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
+const pressTitleStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink)", lineHeight: 1.375 };
 const q3HeadStyle: CSSProperties = {
   padding: "10px 16px",
   borderBottom: "1px solid var(--v5-border)",
   background: "linear-gradient(90deg, color-mix(in srgb, var(--v5-brand) 8%, transparent), transparent, color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent))",
 };
-const q3TitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const q3DownloadStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-brand)" };
+const q3TitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const q3DownloadStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-brand)" };
 function q3CellStyle(i: number): CSSProperties {
   return {
     padding: "12px 16px",
@@ -345,18 +345,18 @@ function q3CellStyle(i: number): CSSProperties {
     borderRight: i % 2 === 0 ? "1px solid var(--v5-border)" : "none",
   };
 }
-const q3MetricStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
-const q3ValueStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
-const q3DeltaStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-success)" };
-const q3FootStyle: CSSProperties = { padding: "8px 16px", borderTop: "1px solid var(--v5-border)", fontSize: "10px", color: "var(--v5-ink-4)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
+const q3MetricStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const q3ValueStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
+const q3DeltaStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-success)" };
+const q3FootStyle: CSSProperties = { padding: "8px 16px", borderTop: "1px solid var(--v5-border)", fontSize: "12px", color: "var(--v5-ink-4)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
 function listingRowStyle(last: boolean): CSSProperties {
   return { padding: "10px 16px", borderBottom: last ? "none" : "1px solid var(--v5-border)" };
 }
-const listingNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600 };
+const listingNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600 };
 function listingStateStyle(tint: string): CSSProperties {
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontSize: "12px",
     padding: "2px 8px",
     borderRadius: "999px",
     background: `color-mix(in srgb, ${tint} 12.5%, transparent)`,
@@ -365,19 +365,19 @@ function listingStateStyle(tint: string): CSSProperties {
 }
 const bugCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)" };
 const bugIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)" };
-const bugAmountStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const bugHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
-const bugCtaStyle: CSSProperties = { marginTop: "8px", display: "inline-flex", minHeight: "44px", fontSize: "11.5px", color: "var(--v5-brand-2)", fontWeight: 600 };
+const bugAmountStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const bugHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
+const bugCtaStyle: CSSProperties = { marginTop: "8px", display: "inline-flex", minHeight: "44px", fontSize: "12px", color: "var(--v5-brand-2)", fontWeight: 600 };
 const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
-const kycBodyStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const kycBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const kycChipStyle: CSSProperties = {
   padding: "2px 8px",
   borderRadius: "999px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
   color: "var(--v5-ink-2)",
 };
-const footerStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
-const footerEmailStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand)" };
+const footerStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const footerEmailStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
 </script>

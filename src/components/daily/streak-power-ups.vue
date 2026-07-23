@@ -150,14 +150,14 @@ const cardStyle: CSSProperties = {
 };
 const headLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-success)",
   letterSpacing: "0.06em",
 };
 const streakStatStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 function liStyle(isLast: boolean): CSSProperties {
@@ -181,7 +181,7 @@ function thresholdChipStyle(p: PowerUp): CSSProperties {
     background: unlocked ? `color-mix(in srgb, ${p.tint} 10%, transparent)` : "var(--v5-surface-2)",
     color: unlocked ? p.tint : "var(--v5-ink-4)",
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontSize: "12px",
     fontWeight: 500,
   };
 }
@@ -197,13 +197,13 @@ function labelStyle(p: PowerUp): CSSProperties {
     letterSpacing: "-0.008em",
   };
 }
-const descStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
+const descStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
 const activatedBadgeStyle: CSSProperties = {
   padding: "3px 8px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 function activateBtnStyle(p: PowerUp): CSSProperties {
@@ -216,21 +216,21 @@ function activateBtnStyle(p: PowerUp): CSSProperties {
     color: "var(--v5-on-brand)",
     fontFamily: "var(--font-v5)",
     fontWeight: 600,
-    fontSize: "11.5px",
+    fontSize: "12px",
     letterSpacing: "-0.005em",
   };
 }
 const lockedLabelStyle: CSSProperties = {
   padding: "3px 8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const footerReadyStyle = computed<CSSProperties>(() => ({
   padding: "8px 12px",
   borderRadius: "10px",
   gap: "6px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   background: nextUnclaimedUnlocked.value
     ? `color-mix(in srgb, ${nextUnclaimedUnlocked.value.tint} 8%, transparent)`
     : "transparent",
@@ -241,7 +241,7 @@ const footerNextStyle: CSSProperties = {
   borderRadius: "10px",
   gap: "6px",
   background: "var(--v5-surface-2)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   marginBottom: "8px",
 };
 const footerAllStyle: CSSProperties = {
@@ -249,12 +249,12 @@ const footerAllStyle: CSSProperties = {
   borderRadius: "10px",
   gap: "6px",
   background: "var(--v5-success-soft)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   marginBottom: "8px",
 };
 const footerNoteStyle: CSSProperties = {
   paddingBottom: "12px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.5,
 };

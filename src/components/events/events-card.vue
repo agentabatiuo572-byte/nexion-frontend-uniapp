@@ -18,7 +18,7 @@
       <!-- HEADER row -->
       <view class="flex items-start" style="gap: 12px">
         <view class="grid place-items-center shrink-0" :style="emojiChipStyle">
-          <text style="font-size: 22px">{{ ev.emoji }}</text>
+          <text style="font-size: 20px">{{ ev.emoji }}</text>
         </view>
         <view class="flex-1 min-w-0">
           <text class="block font-mono-tabular" :style="kindLineStyle">{{ kindLabel }}<text v-if="ev.ribbon" style="color: var(--v5-ink-4)"> · {{ ev.ribbon }}</text></text>
@@ -43,32 +43,32 @@
           <view ref="barEl" class="flex-1 rounded-full overflow-hidden" style="height: 4px; background: var(--v5-surface-2)">
             <view class="h-full rounded-full" :style="barFillStyle" />
           </view>
-          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 10px; color: var(--v5-ink-3)">{{ ev.progress.current.toLocaleString() }}/{{ ev.progress.total.toLocaleString() }}</text>
+          <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">{{ ev.progress.current.toLocaleString() }}/{{ ev.progress.total.toLocaleString() }}</text>
         </view>
       </view>
 
       <!-- ACTION row -->
       <view v-if="showClaim" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimBtnStyle" role="button" tabindex="0" :aria-label="claimLabel" @click="emit('claim')">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z" /></svg>
-        <text style="font-size: 12.5px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
+        <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand); pointer-events: none">{{ claimLabel }}</text>
       </view>
       <view v-else-if="showJoinAction" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="emit('join')">
-        <text style="font-size: 12.5px; font-weight: 600">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
+        <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel ?? t.events.joinCta }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-else-if="ev._claimed && ev.useHref" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="claimedUseBtnStyle" role="button" :aria-label="claimedAriaLabel" @click="onClaimedUse">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; pointer-events: none"><path d="M20 6 9 17l-5-5" /></svg>
-        <text style="font-size: 12.5px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
-        <text style="font-size: 12.5px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
-        <text :style="{ fontSize: '12.5px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
+        <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-3); pointer-events: none">{{ t.events.claimedLabel }}</text>
+        <text style="font-size: 13px; color: var(--v5-ink-4); margin: 0 8px; pointer-events: none">·</text>
+        <text :style="{ fontSize: '13px', fontWeight: 600, color: ev.tint, pointerEvents: 'none' }">{{ t.events.useCta }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" :stroke="ev.tint" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px; pointer-events: none"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-else-if="ev._trackable && ev.joined && !ev._done" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="neutralBtnStyle" @click="openHref">
-        <text style="font-size: 12.5px; font-weight: 500; color: var(--v5-ink-2)">{{ t.events.viewProgress }}</text>
+        <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ t.events.viewProgress }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-else-if="!ev._trackable && ev.status === 'ongoing' && ev.ctaLabel" class="mt-3 w-full rounded-full flex items-center justify-center active:scale-[0.98] transition-transform" :style="softTintBtnStyle" @click="onDecorativeCta">
-        <text style="font-size: 12.5px; font-weight: 600">{{ ev.ctaLabel }}</text>
+        <text style="font-size: 13px; font-weight: 600">{{ ev.ctaLabel }}</text>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="m9 18 6-6-6-6" /></svg>
       </view>
     </view>
@@ -171,7 +171,7 @@ const emojiChipStyle = computed<CSSProperties>(() => ({
   background: `color-mix(in srgb, ${props.ev.tint} 8%, transparent)`,
 }));
 const kindLineStyle = computed<CSSProperties>(() => ({
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.12em",
   textTransform: "uppercase",
   color: props.ev.tint,
@@ -179,13 +179,13 @@ const kindLineStyle = computed<CSSProperties>(() => ({
 }));
 const titleStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1.25,
 };
 const subtitleStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   marginTop: "2px",
   lineHeight: 1.375,
@@ -193,7 +193,7 @@ const subtitleStyle: CSSProperties = {
 const chipStyle = computed<CSSProperties>(() => ({
   padding: "4px 8px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   whiteSpace: "nowrap",
   background: statusChip.value!.bg,

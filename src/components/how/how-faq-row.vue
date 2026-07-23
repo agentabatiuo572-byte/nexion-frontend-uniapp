@@ -20,7 +20,7 @@ const boxStyle: CSSProperties = {
 const qStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "13.5px",
+  fontSize: "13px",
   lineHeight: 1.4,
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",

@@ -24,14 +24,14 @@
         <view class="rounded-2xl" :style="statTileStyle">
           <view class="flex items-center" style="gap: 6px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
-            <text style="font-size: 11px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeNodes }}</text>
+            <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeNodes }}</text>
           </view>
           <text class="block tabular-nums" :style="statValStyle">{{ activeNodesText }}</text>
         </view>
         <view class="rounded-2xl" :style="statTileStyle">
           <view class="flex items-center" style="gap: 6px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
-            <text style="font-size: 11px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeJobs }}</text>
+            <text style="font-size: 12px; letter-spacing: 0.16em; color: var(--v5-ink-3)">{{ t.globe.activeJobs }}</text>
           </view>
           <text class="block tabular-nums" :style="statValStyle">{{ activeJobsText }}</text>
         </view>
@@ -107,7 +107,7 @@
             >{{ t.globe.yourNodeBadge }}</text>
           </g>
         </svg>
-        <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
+        <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ t.globe.tapHint }} · {{ t.globe.legend }}</text>
       </view>
 
       <!-- Region list — de-carded: transparent hairline group (earnings-ledger
@@ -125,10 +125,10 @@
           </view>
           <view class="flex-1 min-w-0">
             <view class="flex items-center" style="gap: 8px">
-              <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ regionName(r) }}</text>
+              <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ regionName(r) }}</text>
               <text v-if="r.isYou" :style="youChipStyle">{{ t.globe.youAre }}</text>
             </view>
-            <text class="block tabular-nums" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px">{{ regionDevicesText(r) }} · {{ regionLatencyText(r) }}</text>
+            <text class="block tabular-nums" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ regionDevicesText(r) }} · {{ regionLatencyText(r) }}</text>
           </view>
           <text class="shrink-0 tabular-nums" :style="regionRateStyle">{{ (r.jobsPerHour / 1000).toFixed(1) }}k/h</text>
         </view>
@@ -146,8 +146,8 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" :stroke="selected.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /><circle cx="12" cy="10" r="3" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block" style="font-size: 18px; font-weight: 600; color: var(--v5-ink)">{{ regionName(selected) }}</text>
-              <text v-if="selected.isYou" class="block" style="font-size: 11px; color: var(--v5-brand-2); margin-top: 2px">{{ t.globe.youAre }}</text>
+              <text class="block" style="font-size: 20px; font-weight: 600; color: var(--v5-ink)">{{ regionName(selected) }}</text>
+              <text v-if="selected.isYou" class="block" style="font-size: 12px; color: var(--v5-brand-2); margin-top: 2px">{{ t.globe.youAre }}</text>
             </view>
           </view>
           <view class="grid grid-cols-3 gap-2 mt-4">
@@ -167,7 +167,7 @@
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
-          <text class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>
         </view>
       </view>
     </view>
@@ -333,7 +333,7 @@ function regionIconBox(isYou?: boolean): CSSProperties {
   };
 }
 const youChipStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   padding: "2px 6px",
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
@@ -341,7 +341,7 @@ const youChipStyle: CSSProperties = {
 };
 const regionRateStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
@@ -376,13 +376,13 @@ const drawerStatStyle: CSSProperties = {
 };
 const drawerStatValStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   marginTop: "4px",
   color: "var(--v5-ink)",
 };
 const drawerStatLabelStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   marginTop: "2px",
 };

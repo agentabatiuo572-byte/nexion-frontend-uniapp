@@ -99,7 +99,7 @@ const chipStyle = computed<CSSProperties>(() => ({
   background: ACCENT_SOFT[props.accent],
   color: ACCENT_TEXT[props.accent],
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 }));
@@ -115,7 +115,7 @@ const titleStyle: CSSProperties = {
 const subStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-2)",
   lineHeight: 1.55,
 };

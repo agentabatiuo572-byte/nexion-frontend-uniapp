@@ -56,7 +56,7 @@
         </view>
 
         <!-- footer -->
-        <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625; padding-top: 4px">{{ t.events.note }}</text>
+        <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; padding-top: 4px">{{ t.events.note }}</text>
       </view>
     </CardStagger>
   </AppChassis>
@@ -205,7 +205,7 @@ function pillLabelStyle(id: TabId): CSSProperties {
   const on = tab.value === id;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

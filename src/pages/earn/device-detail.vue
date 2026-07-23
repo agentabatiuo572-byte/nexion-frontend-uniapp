@@ -84,7 +84,7 @@ const emptyStyle: CSSProperties = {
   background: "var(--v5-surface)",
 };
 const emptyTitleStyle: CSSProperties = {
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 500,
   color: "var(--v5-ink)",
 };
@@ -95,7 +95,7 @@ const backButtonStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 500,
 };
 </script>

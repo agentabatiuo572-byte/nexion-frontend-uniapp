@@ -413,7 +413,7 @@ function goBack() {
   display: block;
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: -0.008em;
   color: var(--v5-ink);
 }
@@ -430,7 +430,7 @@ function goBack() {
   animation: mc-pulse 1.6s ease-in-out infinite;
 }
 .cp-role-t {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
 }
 /* Home Indicator overlay — pinned to the bottom safe area over the input row's

@@ -287,7 +287,7 @@ function avaStyle(tint: string): CSSProperties {
 }
 .nx-conv-rail-label {
   font-family: var(--font-v5);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: -0.005em;
 }
@@ -313,7 +313,7 @@ function avaStyle(tint: string): CSSProperties {
 }
 .nx-conv-contact-t {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-tech-cyan);
 }
@@ -322,7 +322,7 @@ function avaStyle(tint: string): CSSProperties {
   text-align: center;
 }
 .nx-conv-listempty-t {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   line-height: 1.6;
 }
@@ -349,7 +349,7 @@ function avaStyle(tint: string): CSSProperties {
 }
 .nx-conv-rowname {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.008em;
   color: var(--v5-ink);
@@ -360,7 +360,7 @@ function avaStyle(tint: string): CSSProperties {
 }
 .nx-conv-rowtime {
   flex-shrink: 0;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
 }
 .nx-conv-rowbot {
@@ -391,7 +391,7 @@ function avaStyle(tint: string): CSSProperties {
   place-items: center;
 }
 .nx-conv-unread-t {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   font-family: var(--font-v5);
   color: var(--v5-on-brand-2);

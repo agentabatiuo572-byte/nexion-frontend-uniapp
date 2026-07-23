@@ -113,8 +113,8 @@ function select(code: string) {
 .cc-row + .cc-row { border-top: 1px solid var(--v5-border); }
 .cc-row--selected { background: color-mix(in srgb, var(--v5-brand) 10%, transparent); }
 .cc-row--selected + .cc-row { border-top-color: transparent; }
-.cc-row__name { font-size: 14px; font-weight: 500; color: var(--v5-ink-2); }
+.cc-row__name { font-size: 15px; font-weight: 500; color: var(--v5-ink-2); }
 .cc-row__end { display: flex; align-items: center; gap: 10px; }
-.cc-row__code { min-width: 42px; text-align: right; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--v5-ink-3); }
+.cc-row__code { min-width: 42px; text-align: right; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--v5-ink-3); }
 .cc-row__check { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
 </style>

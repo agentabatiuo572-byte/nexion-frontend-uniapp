@@ -155,7 +155,7 @@ const heroChipStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-success-soft)",
   color: "var(--v5-success)",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 };
@@ -171,7 +171,7 @@ const heroTitleStyle: CSSProperties = {
 const heroSubtitleStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-2)",
   lineHeight: 1.55,
 };
@@ -208,7 +208,7 @@ const rowLabelStyle: CSSProperties = {
 };
 const rowValueStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const badgeStyle: CSSProperties = {
@@ -218,7 +218,7 @@ const badgeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-warning)",
   color: "var(--v5-on-brand)",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 </script>

@@ -21,7 +21,7 @@
         <view class="absolute grid place-items-center" :style="heroIconBoxStyle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 18 6-6-6-6" /><path d="m8 6-6 6 6 6" /></svg>
         </view>
-        <text class="block" style="font-size: 11px; letter-spacing: 0.18em; color: var(--v5-tech-cyan)">{{ t.developer.headline }}</text>
+        <text class="block" style="font-size: 12px; letter-spacing: 0.18em; color: var(--v5-tech-cyan)">{{ t.developer.headline }}</text>
         <text class="block" :style="heroTaglineStyle">{{ t.developer.tagline }}</text>
         <view class="mt-4 flex flex-wrap" style="gap: 6px">
           <text class="block" :style="badgeStyle">{{ t.developer.badgeEnterprise }}</text>
@@ -47,8 +47,8 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="c.color" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in c.icon" :key="di" :d="d" /><template v-for="(r, ri) in (c.rects || [])" :key="`r${ri}`"><rect :x="r.x" :y="r.y" :width="r.w" :height="r.h" :rx="r.rx" /></template><template v-for="(e, ei) in (c.ellipses || [])" :key="`e${ei}`"><ellipse :cx="e.cx" :cy="e.cy" :rx="e.rx" :ry="e.ry" /></template><template v-for="(ln, li) in (c.lines || [])" :key="`l${li}`"><line :x1="ln.x1" :y1="ln.y1" :x2="ln.x2" :y2="ln.y2" /></template></svg>
             </view>
             <view class="flex-1">
-              <text class="block" style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ c.title }}</text>
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.625">{{ c.desc }}</text>
+              <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ c.title }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px; line-height: 1.625">{{ c.desc }}</text>
             </view>
           </view>
         </view>
@@ -58,7 +58,7 @@
           <text class="block" :style="partnerTitleStyle">{{ t.developer.partners }}</text>
           <view class="rounded-2xl grid" :style="partnerGridStyle">
             <view v-for="p in PARTNERS" :key="p.id" class="grid place-items-center" :style="partnerCellStyle">
-              <text style="font-size: 11px; color: var(--v5-ink-3); font-weight: 500">{{ p.label }}</text>
+              <text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 500">{{ p.label }}</text>
             </view>
           </view>
         </view>
@@ -67,9 +67,9 @@
         <view class="mx-4 mt-4 mb-6 rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 4px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-            <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
           </view>
-          <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
           <view class="space-y-2">
             <input v-model="company" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="email" type="email" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
@@ -77,7 +77,7 @@
           </view>
           <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-            <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.formSubmit }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.formSubmit }}</text>
           </view>
         </view>
       </template>
@@ -87,13 +87,13 @@
         <view class="rounded-2xl" :style="formCardStyle">
           <view class="flex items-center" style="gap: 8px; margin-bottom: 8px">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
-            <text style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.docsPreview }}</text>
           </view>
           <scroll-view scroll-x :style="snippetWrapStyle">
             <text class="font-mono-tabular" :style="snippetTextStyle">{{ API_SNIPPET }}</text>
           </scroll-view>
           <view class="mt-3 rounded-lg" :style="docsComingStyle">
-            <text style="font-size: 11px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text>
+            <text style="font-size: 12px; color: color-mix(in srgb, var(--v5-warning) 90%, transparent)">{{ t.developer.docsTabComing }}</text>
           </view>
         </view>
       </view>
@@ -102,10 +102,10 @@
       <view v-else-if="tab === 'keys'" class="mx-4 mt-3 mb-6">
         <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
-          <text class="block" style="font-size: 13.5px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.keysEmpty }}</text>
+          <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.keysEmpty }}</text>
           <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
-            <text style="font-size: 12.5px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text>
           </view>
         </view>
       </view>
@@ -114,10 +114,10 @@
       <view v-else class="mx-4 mt-3 mb-6">
         <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          <text class="block" style="font-size: 13.5px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.webhooksEmpty }}</text>
+          <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.webhooksEmpty }}</text>
           <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18" /><path d="m21 12-3-3 3-3" /><path d="M3 12a9 9 0 0 0 9 9" /></svg>
-            <text style="font-size: 12.5px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text>
           </view>
         </view>
       </view>
@@ -250,7 +250,7 @@ const heroIconBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-tech-cyan) 15%, transparent)",
 };
 const heroTaglineStyle: CSSProperties = {
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   marginTop: "4px",
@@ -258,7 +258,7 @@ const heroTaglineStyle: CSSProperties = {
   lineHeight: 1.375,
 };
 const badgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   padding: "2px 8px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-ink) 5%, transparent)",
@@ -283,7 +283,7 @@ function pillLabelStyle(v: Tab): CSSProperties {
   const on = tab.value === v;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -312,7 +312,7 @@ function apiIconBoxStyle(color: string): CSSProperties {
   };
 }
 const partnerTitleStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink-3)",
   letterSpacing: "-0.025em",
@@ -338,7 +338,7 @@ const formInputStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "8px",
   padding: "8px 12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   boxSizing: "border-box",
 };
@@ -348,7 +348,7 @@ const formTextareaStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "8px",
   padding: "8px 12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   boxSizing: "border-box",
 };
@@ -363,7 +363,7 @@ const snippetWrapStyle: CSSProperties = {
   whiteSpace: "nowrap",
 };
 const snippetTextStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-success)",
   lineHeight: 1.625,
   whiteSpace: "pre",

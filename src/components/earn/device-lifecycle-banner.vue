@@ -23,8 +23,8 @@
       </view>
 
       <view class="relative mt-2 flex items-baseline gap-2">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ (avgEfficiency * 100).toFixed(1) }}%</text>
-        <text class="text-[11px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ subtitleText }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; letter-spacing: -0.014em" :style="{ color: accent }">{{ (avgEfficiency * 100).toFixed(1) }}%</text>
+        <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ subtitleText }}</text>
       </view>
 
       <view class="relative mt-3 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
@@ -32,9 +32,9 @@
       </view>
 
       <view class="relative mt-4 flex items-center justify-between gap-3">
-        <view class="min-w-0" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.35">
+        <view class="min-w-0" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.lifecycleMonthlyLoss }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ totalMonthlyLossUSD.toFixed(2) }}<text style="font-size: 10.5px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; margin-top: 2px" :style="{ color: accent }">−${{ totalMonthlyLossUSD.toFixed(2) }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ monthsLabel }}</text></text>
         </view>
         <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.lifecycleCta }}</text>
@@ -109,7 +109,7 @@ const glowStyle = computed<CSSProperties>(() => ({
   background: `radial-gradient(60% 80% at 95% 50%, color-mix(in srgb, ${accent.value} 14%, transparent), transparent 70%)`,
 }));
 const labelStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   fontWeight: 500,
@@ -127,7 +127,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
 }));
 const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
-  fontSize: "12.5px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 

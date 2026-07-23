@@ -2,6 +2,7 @@ import { useGenesis } from "@/store/genesis";
 import { useVRank } from "@/store/v-rank";
 import { useOrders } from "@/store/orders";
 import { useBills } from "@/store/bills";
+import { useDeposits } from "@/store/deposits";
 import { useStaking } from "@/store/staking";
 import { useCommission } from "@/store/commission";
 import { useVoucher } from "@/store/voucher";
@@ -37,7 +38,7 @@ import { useNova } from "@/store/nova";
  * 再把设备级 store 改成按账号隔离时,在此挂接一行即可,三个调用点自动继承。
  *
  * 已收口(用户资产,随账号走):
- *  批1 钱类:创世持仓 · V 等级 · 订单 · 账单 · 质押持仓 · 佣金事件
+ *  批1 钱类:创世持仓 · V 等级 · 订单 · 账单 · 入金记录/意向单 · 质押持仓 · 佣金事件
  *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(KYC/日限/终身额) · 绑卡 · 签到状态机 · 钱包配对(KYC 源头)
  *  批3 任务/成就/游戏化:任务完成 · 周任务 · 活动任务 · 里程碑 fired · 成就 · 目标 · 幸运转盘票据 · 每日增益
  *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
@@ -52,6 +53,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useVRank().bindAccount(accountKey);
   useOrders().bindAccount(accountKey);
   useBills().bindAccount(accountKey);
+  useDeposits().bindAccount(accountKey);
   useStaking().bindAccount(accountKey);
   useCommission().bindAccount(accountKey);
   useVoucher().bindAccount(accountKey);

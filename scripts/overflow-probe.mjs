@@ -62,7 +62,12 @@ const PROBE = () => {
     const overflowX = el.scrollWidth - el.clientWidth;
     // 只记有意义的溢出(>1px 容差,排除亚像素噪声);排除声明为可滚动的容器
     const scrollable = /auto|scroll/.test(cs.overflowX + cs.overflow);
-    if (overflowX > 1 && !scrollable) {
+    // 🔴 也排除「刻意截断」:overflow:hidden + text-overflow:ellipsis + nowrap 的元素,
+    //    scrollWidth > clientWidth **正是省略号存在的意义** —— 那是设计生效,不是布局破损。
+    //    B8 实测:market 代币行副标题被判溢出 +23px,但页面 docW=viewW=390 根本不横向滚动、
+    //    省略号也正常显示。真撑破容器的元素没有 ellipsis(B7 的统计磁贴就是那种,已修)。
+    const ellipsized = cs.textOverflow === "ellipsis" && cs.overflow.includes("hidden") && cs.whiteSpace === "nowrap";
+    if (overflowX > 1 && !scrollable && !ellipsized) {
       out.push({
         sel: sel(el),
         fs: cs.fontSize,

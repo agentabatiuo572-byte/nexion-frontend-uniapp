@@ -3,7 +3,7 @@
   <view :style="outerStyle">
     <view :style="gridStyle">
       <view class="flex items-center justify-center" :style="emojiBoxStyle">
-        <text style="font-size: 18px; line-height: 1">{{ emoji }}</text>
+        <text style="font-size: 20px; line-height: 1">{{ emoji }}</text>
       </view>
       <view class="min-w-0">
         <text class="block" :style="labelStyle">{{ label }}</text>
@@ -39,7 +39,7 @@ const emojiBoxStyle: CSSProperties = {
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "13.5px",
+  fontSize: "13px",
   lineHeight: 1.4,
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",

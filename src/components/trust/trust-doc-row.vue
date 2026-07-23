@@ -31,7 +31,7 @@ const rowStyle = computed<CSSProperties>(() => ({
   padding: "12px 16px",
   borderBottom: props.last ? "none" : "1px solid var(--v5-border)",
 }));
-const primaryStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const secondaryStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
-const ctaStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-brand)" };
+const primaryStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const secondaryStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
+const ctaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
 </script>

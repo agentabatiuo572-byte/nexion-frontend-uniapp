@@ -21,10 +21,10 @@ const boxStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   padding: "8px 0",
 };
-const labelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const labelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const valueStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   marginTop: "2px",
   color: props.tint ?? "var(--v5-ink)",

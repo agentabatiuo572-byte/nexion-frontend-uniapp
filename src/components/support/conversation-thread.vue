@@ -253,7 +253,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   padding: 32px 16px;
 }
 .nx-conv-empty-t {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   line-height: 1.55;
 }
@@ -265,7 +265,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   padding: 4px 0;
 }
 .nx-conv-sys-t {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--v5-ink-4);
 }
 .nx-conv-bubble-row {
@@ -291,7 +291,7 @@ const sendStyle = computed<CSSProperties>(() => ({
 }
 .nx-conv-seg {
   font-family: var(--font-v5);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.55;
 }
 .nx-conv-seg--b {
@@ -308,7 +308,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   color: var(--v5-brand);
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 13px;
   letter-spacing: -0.005em;
 }
 .nx-conv-bottom-anchor {
@@ -320,7 +320,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   padding: 3px 4px 0;
 }
 .nx-conv-receipt-t {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
 }
 .nx-conv-typing {
@@ -409,7 +409,7 @@ const sendStyle = computed<CSSProperties>(() => ({
 .nx-conv-restart-t {
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-tech-cyan);
 }
 .nx-conv-input {
@@ -422,7 +422,7 @@ const sendStyle = computed<CSSProperties>(() => ({
   border: 1px solid var(--v5-border);
   color: var(--v5-ink);
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
 }
 /* P-048: pin the inner native input height so the visible host == the real target. */
 .nx-conv-input :deep(.uni-input-input) {

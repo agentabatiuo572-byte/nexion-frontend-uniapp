@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<{ label: string; value: string; tint?: st
   tint: "var(--v5-ink)",
 });
 
-const labelStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
+const labelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const valueStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontSize: "20px",

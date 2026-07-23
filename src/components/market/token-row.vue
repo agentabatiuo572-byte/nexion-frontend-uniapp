@@ -93,7 +93,10 @@ const sparkPoints = computed(() => {
 });
 
 const rowStyle = computed<CSSProperties>(() => ({
-  gridTemplateColumns: "32px 1fr 76px 72px",
+  // 🔴 minmax(0,1fr) 而不是 1fr:CSS Grid 里 1fr 等价 minmax(auto,1fr),而 auto 的最小值
+  // 不会小于内容宽 —— 列被内容撑开,里面的 .truncate 再多 min-w-0 也没用。
+  // B8 字号迁移后 "Ocean Protocol · :.0M" 这类长副标题实测溢出 +23px。
+  gridTemplateColumns: "32px minmax(0, 1fr) 76px 72px",
   padding: "10px 12px",
   fontSize: "12px",
   borderBottom: "1px solid var(--v5-border)",
@@ -108,7 +111,7 @@ const iconTextStyle = computed<CSSProperties>(() => {
   const dark =
     props.token.color === "#000000" || props.token.color === "#222326" || props.token.color === "#181EA9";
   return {
-    fontSize: "10px",
+    fontSize: "12px",
     fontWeight: 600,
     color: dark ? "var(--v5-ink)" : "var(--v5-on-brand)",
   };
@@ -116,17 +119,17 @@ const iconTextStyle = computed<CSSProperties>(() => {
 const symbolStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const oursStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   padding: "0 4px",
   borderRadius: "4px",
   background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)",
   color: "var(--v5-brand)",
 };
 const subStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   marginTop: "2px",
 };
