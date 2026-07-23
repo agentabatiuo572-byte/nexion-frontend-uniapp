@@ -37,8 +37,8 @@ export function isRewardBill(b: Bill): boolean {
   return REWARD_BILL_TYPES.includes(b.type) && b.amount > 0;
 }
 
-// 旧设备级单键 "nexion-bills-v1" 废弃(存量无账号归属,mock 可重建);账单按账号分行。
-const ACCOUNTS_KEY = "nexion-bills-accounts-v1"; // { [accountKey]: { bills: Bill[] } }
+// 旧设备级单键 "nexgrid-bills-v1" 废弃(存量无账号归属,mock 可重建);账单按账号分行。
+const ACCOUNTS_KEY = "nexgrid-bills-accounts-v1"; // { [accountKey]: { bills: Bill[] } }
 
 function mulberry32(seed: number) {
   return function () {

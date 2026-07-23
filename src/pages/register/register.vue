@@ -11,7 +11,7 @@
         </view>
         <view class="rg-brand">
           <view class="rg-brand__n"><text class="rg-brand__n-t">N</text></view>
-          <text class="rg-brand__name">Nexion</text>
+          <text class="rg-brand__name">NexGrid</text>
         </view>
         <view class="rg-top__sp" />
       </view>
@@ -589,7 +589,7 @@ function launchRegistrationSuccess() {
   // #endif
 }
 function prospectiveIdentity() {
-  return `${country.value}${phoneClean.value}@demo.nexion.ai`;
+  return `${country.value}${phoneClean.value}@demo.nexgrid.ai`;
 }
 function back() {
   invalidateOtpFlow();

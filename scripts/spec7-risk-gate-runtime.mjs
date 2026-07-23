@@ -26,7 +26,7 @@ try {
   );
 
   const result = await page.evaluate(async () => {
-    const REGISTRY_KEY = "nexion-risk-registry-v1";
+    const REGISTRY_KEY = "nexgrid-risk-registry-v1";
     const failures = [];
     const assert = (condition, message) => {
       if (!condition) failures.push(message);

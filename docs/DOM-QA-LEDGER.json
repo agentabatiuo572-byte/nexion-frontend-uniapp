@@ -1,0 +1,6 @@
+{
+  "generatedAt": "2026-07-22T10:34:50.592Z",
+  "note": "DOM-QA 存量黄灯台账(vibe-playbook P1-A)。entry 加 qaOk:'理由' = 人工豁免;删 entry = 要求修复。gate 只拦 ledger 外新指纹。",
+  "smallTextCensus": 5,
+  "entries": []
+}

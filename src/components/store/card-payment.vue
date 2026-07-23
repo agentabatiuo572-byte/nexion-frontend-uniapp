@@ -119,7 +119,7 @@ interface MockCard {
   holder: string;
 }
 const cards: MockCard[] = [
-  { tokenId: "tok_mock_1", brand: "visa", last4: "4242", expiry: "08/27", holder: "ALEX NEXION" },
+  { tokenId: "tok_mock_1", brand: "visa", last4: "4242", expiry: "08/27", holder: "ALEX NEXGRID" },
 ];
 function brandLabel(brand: MockCard["brand"]): string {
   switch (brand) {

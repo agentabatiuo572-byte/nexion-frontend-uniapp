@@ -26,10 +26,10 @@ const base = {
   entrySurface: "h5",
   updatedAt: 1000,
   user: {
-    email: "demo@nexion.ai",
+    email: "demo@nexgrid.ai",
     tier: "L2",
     joinedAt: 1,
-    referralCode: "NEXION",
+    referralCode: "NEXGRID",
     usdtBalance: 100,
     nexBalance: 10,
     pendingEarnings: 1,

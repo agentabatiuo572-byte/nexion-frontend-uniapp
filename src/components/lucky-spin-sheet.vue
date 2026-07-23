@@ -233,7 +233,7 @@ const slicesSvg = computed(() =>
         `<g opacity="${s.dim ? 0.32 : 1}">` +
         `<path d="${s.path}" fill="${s.fill}" stroke="var(--v5-bg)" stroke-width="1.5" />` +
         `<text x="${s.mid.x}" y="${s.mid.y}" text-anchor="middle" dominant-baseline="middle" ` +
-        `style="font-size:9px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${lsShort(s.sp)}</text>` +
+        `style="font-size:12px;font-weight:600;fill:var(--v5-ink);font-family:var(--font-v5);">${lsShort(s.sp)}</text>` +
         `</g>`,
     )
     .join(""),
@@ -407,7 +407,7 @@ onUnmounted(() => clearSettleTimer());
 .lss-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(7, 9, 15, 0.62);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(10px) saturate(150%);
   -webkit-backdrop-filter: blur(10px) saturate(150%);
 }
@@ -452,7 +452,7 @@ onUnmounted(() => clearSettleTimer());
   flex-direction: column;
 }
 .lss-cap {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -525,7 +525,7 @@ onUnmounted(() => clearSettleTimer());
   background: var(--v5-surface-2);
 }
 .lss-chip-t {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
 }
 .lss-chip-t-free {
@@ -535,7 +535,7 @@ onUnmounted(() => clearSettleTimer());
   color: var(--v5-ink-2);
 }
 .lss-social {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--v5-ink-3);
 }
 
@@ -622,7 +622,7 @@ onUnmounted(() => clearSettleTimer());
   opacity: 0.8;
 }
 .lss-btn-collect-sm-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--v5-ink-2);
 }
@@ -634,7 +634,7 @@ onUnmounted(() => clearSettleTimer());
   transform: scale(0.98);
 }
 .lss-btn-again-t {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -642,7 +642,7 @@ onUnmounted(() => clearSettleTimer());
   background: var(--v5-brand);
 }
 .lss-btn-collect-t {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -687,7 +687,7 @@ onUnmounted(() => clearSettleTimer());
 }
 .lss-nospin-hint {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   margin-top: 4px;
 }
@@ -706,7 +706,7 @@ onUnmounted(() => clearSettleTimer());
   transform: scale(0.98);
 }
 .lss-earn-cta-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-brand);
 }
@@ -724,7 +724,7 @@ onUnmounted(() => clearSettleTimer());
   opacity: 0.7;
 }
 .lss-pool-toggle-t {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-2);
 }
@@ -754,7 +754,7 @@ onUnmounted(() => clearSettleTimer());
   flex-shrink: 0;
 }
 .lss-pool-name {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--v5-ink);
   white-space: nowrap;
@@ -791,7 +791,7 @@ onUnmounted(() => clearSettleTimer());
   color: var(--v5-ink-2);
 }
 .lss-hist-time {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
   font-family: var(--font-jet-mono), monospace;
 }

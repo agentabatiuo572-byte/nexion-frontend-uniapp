@@ -21,17 +21,19 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 
-type Accent = "lemon" | "purple" | "amber" | "violet";
+type Accent = "lemon" | "purple" | "amber" | "violet" | "nex";
 
 const props = withDefaults(defineProps<{ title: string; accent?: Accent }>(), { accent: "lemon" });
 
 const ACCENT_TEXT: Record<Accent, string> = {
+  nex: "var(--v5-nex)",
   lemon: "var(--v5-success)",
   purple: "var(--v5-brand)",
   amber: "var(--v5-warning)",
   violet: "var(--v5-brand-2)",
 };
 const ACCENT_SOFT: Record<Accent, string> = {
+  nex: "var(--v5-nex-soft)",
   lemon: "var(--v5-success-soft)",
   purple: "var(--v5-brand-soft)",
   amber: "var(--v5-warning-soft)",

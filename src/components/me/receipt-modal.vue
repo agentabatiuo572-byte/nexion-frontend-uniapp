@@ -27,7 +27,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="margin-left: 4px">{{ isKyc ? "KYC VERIFIED" : "VERIFIED" }}</text>
           </text>
-          <text style="font-size: 11px; color: var(--v5-ink-3)">{{ isKyc ? "Paired" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isKyc ? "Paired" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
       </view>
 
@@ -49,7 +49,7 @@
             @click="copyRow(row.copyKey ?? row.k, row.copyValue ?? '')"
           >
             <text class="truncate" style="color: var(--v5-brand)">{{ row.v }}</text>
-            <text v-if="row.hint" style="color: var(--v5-ink-4); font-size: 10px">({{ row.hint }})</text>
+            <text v-if="row.hint" style="color: var(--v5-ink-4); font-size: 12px">({{ row.hint }})</text>
             <!-- Check when just-copied, else Copy affordance (mirrors prototype RowCopy) -->
             <svg v-if="copiedField === (row.copyKey ?? row.k)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
@@ -60,8 +60,8 @@
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="font-size: 11.5px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
-            <text style="margin-left: auto; font-size: 10px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
+            <text style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
+            <text style="margin-left: auto; font-size: 12px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
           </view>
         </view>
       </view>
@@ -327,7 +327,7 @@ const headerStyle: CSSProperties = {
   borderBottom: "1px solid color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
 };
 const headerKickerStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.18em",
   textTransform: "uppercase",
   color: "var(--v5-ink-4)",
@@ -337,7 +337,7 @@ const stampStyle = computed<CSSProperties>(() => ({
   // Prototype: px-1.5 py-0.5 = 2px 6px, rounded-md = 6px, rotate(-4deg).
   padding: "2px 6px",
   borderRadius: "6px",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 600,
   letterSpacing: "0.08em",
   color: stampColor.value,
@@ -352,14 +352,14 @@ function sectionStyle(si: number): CSSProperties {
 }
 const sectionHeadStyle: CSSProperties = {
   marginBottom: "6px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-tech-cyan)",
 };
 // Prototype Section uses `space-y-1` = 4px gap between rows. `padding: 2px 0`
 // on every row yields the same 4px inter-row spacing.
-const rowStyle: CSSProperties = { gap: "12px", fontSize: "11.5px", padding: "2px 0" };
+const rowStyle: CSSProperties = { gap: "12px", fontSize: "12px", padding: "2px 0" };
 const dividerStyle: CSSProperties = {
   flex: "1",
   height: "1px",

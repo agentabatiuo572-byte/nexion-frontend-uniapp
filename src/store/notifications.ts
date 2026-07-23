@@ -49,8 +49,8 @@ function applyPriorityRetention(items: Notification[]): Notification[] {
   return trimmed.sort((a, b) => b.ts - a.ts);
 }
 
-// 旧设备级单键 "nexion-notifications-v1" 废弃(存量无账号归属,mock 可重建);通知 feed 按账号分行。
-const ACCOUNTS_KEY = "nexion-notifications-accounts-v1"; // { [accountKey]: { items, unread } }
+// 旧设备级单键 "nexgrid-notifications-v1" 废弃(存量无账号归属,mock 可重建);通知 feed 按账号分行。
+const ACCOUNTS_KEY = "nexgrid-notifications-accounts-v1"; // { [accountKey]: { items, unread } }
 
 function hydrate(accountKey: string): { items: Notification[]; unread: number } {
   const row = readAccountRow<{ items?: Notification[]; unread?: number }>(ACCOUNTS_KEY, accountKey);

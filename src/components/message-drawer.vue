@@ -82,14 +82,14 @@
             </view>
             <view class="md-row-body">
               <view class="md-row-titlewrap">
-                <text class="md-row-title" :style="{ color: n.readAt ? 'rgba(255,255,255,0.45)' : 'var(--v5-ink)' }">{{ n.title }}</text>
+                <text class="md-row-title" :style="{ color: n.readAt ? 'var(--v5-ink-3)' : 'var(--v5-ink)' }">{{ n.title }}</text>
                 <view v-if="!n.readAt" class="md-unread-dot" />
                 <view class="md-chevron" :class="{ 'md-chevron--open': expandedId === n.id }">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="n.readAt ? '#3F4754' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
                 </view>
               </view>
-              <text v-if="n.body" class="md-row-preview" :style="{ color: n.readAt ? 'rgba(255,255,255,0.30)' : 'var(--v5-ink-3)' }">{{ n.body }}</text>
-              <text class="md-row-time" :style="{ color: n.readAt ? 'rgba(255,255,255,0.25)' : 'var(--v5-ink-4)' }">{{ timeAgo(n.ts) }}</text>
+              <text v-if="n.body" class="md-row-preview" :style="{ color: n.readAt ? 'var(--v5-ink-4)' : 'var(--v5-ink-3)' }">{{ n.body }}</text>
+              <text class="md-row-time" :style="{ color: 'var(--v5-ink-4)' }">{{ timeAgo(n.ts) }}</text>
             </view>
           </view>
 
@@ -229,7 +229,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   animation: md-fade 0.18s ease-out;
@@ -243,7 +243,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   width: 88%;
   display: flex;
   flex-direction: column;
-  background: #0f0f0f;
+  background: var(--v5-surface);
   border-left: 1px solid var(--v5-surface-3);
   animation: md-slide-in 0.28s ease-out;
 }
@@ -288,7 +288,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: #0f0f0f;
+  background: var(--v5-surface-2);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -341,9 +341,10 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   background: var(--v5-brand);
 }
 .md-tab-badge-t {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  /* badge 底是 --v5-brand-2(暖橙);白字在其上 WCAG 不过(见 tokens.css on-brand-2 注释) */
+  color: var(--v5-on-brand-2);
   line-height: 1;
 }
 .md-tab-badge-t--on {
@@ -375,7 +376,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
   text-align: center;
 }
 .md-empty-t {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
 }
 .md-item {
@@ -409,7 +410,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-row-title {
   flex: 1;
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.25;
 }
@@ -431,13 +432,13 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 }
 .md-row-preview {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   margin-top: 4px;
   line-height: 1.375;
 }
 .md-row-time {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   margin-top: 6px;
 }
 /* ── accordion detail ── */
@@ -457,12 +458,12 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 .md-detail-body {
   display: block;
   font-size: 12px;
-  color: #c8d0dc;
+  color: var(--v5-ink-2);
   line-height: 1.625;
 }
 .md-detail-abs {
   display: block;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
   margin-top: 10px;
 }
@@ -478,7 +479,7 @@ function iconBoxStyle(k: NotifKind, unreadRow: boolean): CSSProperties {
 }
 .md-detail-cta-t {
   font-family: var(--font-v5);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }

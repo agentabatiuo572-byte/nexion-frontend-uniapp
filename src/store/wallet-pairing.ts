@@ -21,8 +21,8 @@ export interface WalletPairingState {
   pairedAt?: number; // epoch ms
 }
 
-// 旧设备级单键 "nexion-wallet-pairing-v1" 废弃(存量无账号归属,mock 可重建);KYC 配对按账号分行。
-const ACCOUNTS_KEY = "nexion-wallet-pairing-accounts-v1"; // { [accountKey]: WalletPairingState }
+// 旧设备级单键 "nexgrid-wallet-pairing-v1" 废弃(存量无账号归属,mock 可重建);KYC 配对按账号分行。
+const ACCOUNTS_KEY = "nexgrid-wallet-pairing-accounts-v1"; // { [accountKey]: WalletPairingState }
 
 // Stable id format mirroring §6.9 receipts: KYC-{YYYY}-A{seq}
 let kycSeq = 78234;

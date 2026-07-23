@@ -68,7 +68,7 @@ export interface Product {
 export const PRODUCTS: Product[] = [
   {
     id: "stellarbox-s1",
-    name: "NexionBox S1",
+    name: "NexGridBox S1",
     tier: "Entry",
     tagline: "Personal AI inference box · fully managed",
     badge: "Best Seller",
@@ -84,7 +84,7 @@ export const PRODUCTS: Product[] = [
     sold: 4821,
     stock: 47,
     features: [
-      "Fully managed by Nexion",
+      "Fully managed by NexGrid",
       "99.9% uptime SLA",
       "Real-time remote monitoring",
       "Free shipping & installation",
@@ -101,7 +101,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro",
-    name: "NexionBox Pro",
+    name: "NexGridBox Pro",
     tier: "Pro",
     tagline: "Double the GPUs, double the earning power.",
     badge: "Trending",
@@ -136,7 +136,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarbox-pro-v2",
-    name: "NexionBox Pro v2",
+    name: "NexGridBox Pro v2",
     tier: "Pro",
     tagline: "2.5× S1 throughput — built for higher-tier task pools.",
     badge: "Upgrade Pick",
@@ -170,7 +170,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p1",
-    name: "NexionRack P1",
+    name: "NexGridRack P1",
     tier: "Flagship",
     tagline: "Datacenter-grade A100 rack for serious operators.",
     badge: "Flagship",
@@ -205,7 +205,7 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: "stellarrack-p2",
-    name: "NexionRack P2",
+    name: "NexGridRack P2",
     tier: "Flagship",
     tagline: "Datacenter H100 rack — the top compute tier.",
     badge: "Flagship",

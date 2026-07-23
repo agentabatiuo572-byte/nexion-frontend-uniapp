@@ -13,8 +13,8 @@ import { mockServerUuid } from "@/store/mock-id";
 // 但清空整个 localStorage 会同时清掉本 mock 的风险证据，不能冒充持久反作弊；
 // PROD 必须由服务端 RiskIdentity 表跨设备/网络保留并回溯关联维度。
 
-const REGISTRY_KEY = "nexion-risk-registry-v1";
-const IP_BUCKET_KEY = "nexion-ip-bucket-v1";
+const REGISTRY_KEY = "nexgrid-risk-registry-v1";
+const IP_BUCKET_KEY = "nexgrid-ip-bucket-v1";
 
 export interface RiskHashUse {
   hash: string;

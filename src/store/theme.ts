@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 
 // Theme store — appearance preference: light / dark / system.
-// Nexion is a dark-default design system. The H5 root (<html data-theme>) is
+// NexGrid is a dark-default design system. The H5 root (<html data-theme>) is
 // driven from here; App.vue applies the resolved theme on launch. The /me page
 // opens a picker sheet that calls setMode() with one of the three modes.
 //
@@ -15,7 +15,7 @@ import { computed, ref } from "vue";
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-const STORAGE_KEY = "nexion-theme-v1";
+const STORAGE_KEY = "nexgrid-theme-v1";
 
 function hydrate(): ThemeMode {
   try {

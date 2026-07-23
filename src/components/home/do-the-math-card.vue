@@ -15,7 +15,7 @@
     <view class="relative overflow-hidden" style="background: var(--v5-surface); border-radius: 16px; padding: 16px">
       <view :style="gridBgStyle" />
       <view class="relative">
-        <view style="font-family: var(--font-v5); font-weight: 600; font-size: 18px; color: var(--v5-ink); letter-spacing: -0.018em; line-height: 1.35">
+        <view style="font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.018em; line-height: 1.35">
           <text v-for="(s, i) in headlineSegs" :key="i" :style="s.color ? { color: s.color } : {}">{{ s.text }}</text>
         </view>
 
@@ -45,11 +45,11 @@
         <view class="mt-4 pt-3 grid grid-cols-3" style="border-top: 1px dashed var(--v5-border-strong)">
           <view v-for="s in stats" :key="s.k">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4)">{{ s.k }}</text>
-            <text class="block tabular-nums" :style="{ marginTop: '3px', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '18px', color: s.tone, letterSpacing: '-0.014em' }">{{ s.v }}</text>
+            <text class="block tabular-nums" :style="{ marginTop: '3px', fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: s.tone, letterSpacing: '-0.014em' }">{{ s.v }}</text>
           </view>
         </view>
 
-        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity" style="padding: 11px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); border: 1px solid var(--v5-brand-border); font-family: var(--font-v5); font-weight: 600; font-size: 13.5px; letter-spacing: -0.005em" @click="goStore">
+        <view class="mt-3.5 w-full flex items-center justify-center gap-1.5 active:opacity-80 transition-opacity" style="padding: 12px 16px; border-radius: 999px; background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 15px; line-height: 20px; letter-spacing: -0.005em" @click="goStore">
           <text style="color: var(--v5-brand)">{{ t.home.doMathSeeCta }}</text>
           <text class="font-mono-tabular" style="opacity: 0.8; font-size: 12px; color: var(--v5-brand)">→</text>
         </view>

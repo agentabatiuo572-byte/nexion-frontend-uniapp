@@ -107,7 +107,7 @@ export const V_RANKS: VRankDef[] = [
     cultivationBonus: 0,
   },
   {
-    v: 10, title: "Nexion Founder", cnTitle: "联合创始",
+    v: 10, title: "NexGrid Founder", cnTitle: "联合创始",
     conditions: { teamVolumeUSD: 30_000_000 },
     directBonus: 0.10, unilevelDepth: 99,
     peerBonus: 0.05, leadershipVotes: 128,
@@ -145,8 +145,8 @@ export interface VRankData {
 export type VRankProgressPatch = Partial<Omit<VRankData, "myRank">>;
 
 // 等级是账号资产:per-account 行表(P2-8 设备级泄漏修复)。旧设备级单键
-// "nexion-v-rank-v1" 不迁移 —— 存量无账号归属,迁给任何账号都是臆断,就地废弃。
-const ACCOUNTS_KEY = "nexion-v-rank-accounts-v1"; // { [accountKey]: VRankData }
+// "nexgrid-v-rank-v1" 不迁移 —— 存量无账号归属,迁给任何账号都是臆断,就地废弃。
+const ACCOUNTS_KEY = "nexgrid-v-rank-accounts-v1"; // { [accountKey]: VRankData }
 
 const DEFAULT_V_RANK: VRankData = {
   // 新账号 seed 人设:V2 Operator(刚到,正冲 V3)—— 与 account-cloud

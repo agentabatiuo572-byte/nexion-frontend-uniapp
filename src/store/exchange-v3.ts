@@ -33,8 +33,8 @@ export type Gate =
   | { ok: false; reason: "platform-cap"; usedToday: number; cap: number }
   | { ok: false; reason: "kyc-required"; lifetime: number; threshold: number };
 
-// 旧设备级单键 "nexion-exchange-v3" 废弃(存量无账号归属,mock 可重建);兑换风控计数按账号分行。
-const ACCOUNTS_KEY = "nexion-exchange-v3-accounts-v1"; // { [accountKey]: PersistShape }
+// 旧设备级单键 "nexgrid-exchange-v3" 废弃(存量无账号归属,mock 可重建);兑换风控计数按账号分行。
+const ACCOUNTS_KEY = "nexgrid-exchange-v3-accounts-v1"; // { [accountKey]: PersistShape }
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);

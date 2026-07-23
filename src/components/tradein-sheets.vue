@@ -632,7 +632,7 @@ function onForce() {
 .tis-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: tradein-fade 0.24s ease-out;
@@ -688,7 +688,7 @@ function onForce() {
 }
 .tis-subtitle {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.5;
@@ -718,7 +718,7 @@ function onForce() {
 .tis-opt-text {
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-ink);
   line-height: 1.4;
 }
@@ -738,12 +738,12 @@ function onForce() {
 }
 .tis-card-cap {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
 }
 .tis-card-line {
   display: block;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-ink);
 }
 .tis-row {
@@ -752,11 +752,11 @@ function onForce() {
   justify-content: space-between;
 }
 .tis-row-label {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
 }
 .tis-row-value {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-2);
 }
@@ -777,7 +777,7 @@ function onForce() {
 }
 .tis-disclaimer {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   line-height: 1.625;
   margin-bottom: 16px;
@@ -819,7 +819,7 @@ function onForce() {
   opacity: 0.7;
 }
 .tis-secondary-text {
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-ink-2);
 }
 .tis-ghost {
@@ -834,7 +834,7 @@ function onForce() {
   opacity: 0.7;
 }
 .tis-ghost-text {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--v5-ink-3);
 }
@@ -851,7 +851,7 @@ function onForce() {
   opacity: 0.7;
 }
 .tis-warn-ghost-text {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--v5-warning);
 }
@@ -872,7 +872,7 @@ function onForce() {
 }
 .tis-block-warn {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Nexion uni-app port verifier — the "自测" stage of the nexion-uniapp-port loop.
+# NexGrid uni-app port verifier — the "自测" stage of the nexgrid-uniapp-port loop.
 #
 # Usage: bash scripts/verify.sh [module]     # default: all
 #   BASE_URL overrides the H5 dev origin (default http://localhost:5173).
@@ -57,7 +57,7 @@ sentinel_present() {
   if grep -qE "$pattern" "$file" 2>/dev/null; then ok "$label"; else bad "$label (missing /$pattern/ in $file)"; fi
 }
 
-echo -e "${C}━━ Nexion uni-app verify · module=$MODULE ━━${N}"
+echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE ━━${N}"
 
 # ── (1) type-check ──
 echo -e "${C}[1] vue-tsc type-check${N}"
@@ -118,6 +118,8 @@ if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad
 i18n_md=$(grep -rEnI '\*\*[^*]+\*\*|`/[a-z]' src/i18n/messages 2>/dev/null | head -5)
 if [ -z "$i18n_md" ]; then ok "no markdown residue in i18n copy (0 hits)"; else bad "markdown residue in i18n copy (** or \`/path\`)"; echo "$i18n_md" | sed 's/^/        /'; fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
+# 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
+# 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
 sentinel_absent "no hardcoded #0E48E6/#F4F1E9 hex"  '#0E48E6|#F4F1E9|#FF5A1F|#13141A'
 # safe-area base padding (PITFALLS P-065): any padding that references
 # env(safe-area-inset-bottom) must carry a base offset ≥22px — a bare env()
@@ -299,14 +301,14 @@ sentinel_present "SPEC-7 withdraw rules seeded" src/mock/platform-config.ts 'fir
 sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode: "risk_bucket"'
 sentinel_present "SPEC-7 riskScore cloned into config store" src/store/config.ts 'dimensionWeights: \{ \.\.\.DEFAULT_PLATFORM_CONFIG\.riskScore\.dimensionWeights \}'
 # 引擎层: 身份注册表(独立于会话存储)+ 实时聚簇 + 释放 + 提现前置
-sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexion-risk-registry-v1'
+sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexgrid-risk-registry-v1'
 sentinel_present "SPEC-7 registry tracks first withdrawal (R2)" src/store/risk-identity.ts 'hasWithdrawn'
 sentinel_present "SPEC-7 registry tracks attestation" src/store/risk-identity.ts 'attestedOnlineMs'
 sentinel_present "SPEC-7 realtime cluster evaluator (R5)" src/store/risk-cluster.ts 'export function evaluateAccountCluster'
 sentinel_present "SPEC-7 multi-dimension clustering (R3)" src/store/risk-cluster.ts 'function dimensionHits'
 sentinel_present "SPEC-7 bare identity enters watch (R3)" src/store/risk-cluster.ts 'bare-identity'
 sentinel_present "SPEC-7 unbound free slot pends (R4)" src/store/risk-cluster.ts 'unbound-free-slot'
-sentinel_present "SPEC-7 release ledger exists (R1)" src/store/earning-release.ts 'nexion-earning-ledger-v1'
+sentinel_present "SPEC-7 release ledger exists (R1)" src/store/earning-release.ts 'nexgrid-earning-ledger-v1'
 sentinel_present "SPEC-7 release sources limited to attest|manual (R1)" src/store/earning-release.ts 'type ReleaseSource = "attest" \| "manual"'
 sentinel_present "SPEC-7 cluster circuit breaker (R1)" src/store/earning-release.ts 'clusterBreakerTripped'
 if grep -qE 'releasedBy: *"(timer|auto)"' src/store/earning-release.ts 2>/dev/null; then
@@ -924,14 +926,14 @@ else
   bad "AUTH02 registered-number + success-page runtime (EN/ZH; dev server not running at $BASE_URL)"
 fi
 # ── SPEC-4 account-cloud + multi-carrier session sentinels ──
-sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexion-account-cloud-v1'
+sentinel_present "SPEC-4 account-cloud storage exists" src/store/account-cloud.ts 'nexgrid-account-cloud-v1'
 sentinel_present "SPEC-4 app binds account snapshot" src/store/app.ts 'function bindAccount'
 sentinel_present "SPEC-4 app persists account snapshot" src/store/app.ts 'function persistAccountSnapshot'
 sentinel_present "SPEC-4 login uses canonical sign-in completion" src/pages/login/login.vue 'completeSignIn\('
 sentinel_present "SPEC-4 canonical sign-in binds account before session claim" src/auth/complete-sign-in.ts 'app\.bindAccount\(options\.identity\)'
 sentinel_present "SPEC-4 register binds canonical account before rewards" src/pages/register/register.vue 'app\.bindAccount\(createdIdentity\)'
 sentinel_present "SPEC-4 entry surface supports white-app carrier" src/lib/entry-surface.ts '"white-app"'
-sentinel_present "SPEC-4 session registry storage exists" src/store/session.ts 'nexion-account-sessions-v1'
+sentinel_present "SPEC-4 session registry storage exists" src/store/session.ts 'nexgrid-account-sessions-v1'
 sentinel_present "SPEC-4 security page uses live session registry" src/pages/me/security.vue 'session\.activeSessions'
 # P2-8 存储作用域:创世持仓/V 等级按账号隔离,账号切换收口必须重绑(防跨账号继承复发)
 sentinel_present "P2-8 account-scope helper rebinds genesis" src/lib/account-scope.ts 'useGenesis\(\)\.bindAccount\(accountKey\)'
@@ -977,7 +979,7 @@ sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeA
 sentinel_present "P2-8 weekly-quest store is account-scoped" src/store/weekly-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
-sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexion-milestones-accounts-v1'
+sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
 sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
 sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow'
@@ -1242,6 +1244,21 @@ no_userfacing_stella() {
   else bad "user-facing 'Stella' leaked (brand must be NOVA)"; echo "$hits" | sed 's/^/        /'; fi
 }
 no_userfacing_stella
+# Brand rebrand guard (2026-07-22 → NexGrid): 旧品牌词不得回流用户可见/运行时层。
+# 白名单:<旧词>-prototype/-uniapp/-admin 溯源引用(注释/路径级工程名)、static/img 旧图文件名。
+# i18n messages/tokens.css 也在守备范围(sentinel_absent 的默认排除不适用),故独立实现。
+# 旧词用拆词构造,防本文件自指命中(哨兵红测:见 docs/changes/2026-07-22-nexgrid-rebrand.plan.md 总回测)。
+no_oldbrand_check() {
+  local tok='Nexi'; tok="${tok}on"
+  local hits
+  # 白名单三类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
+  # ③静态图文件名。除此之外的旧品牌词一律拦。
+  hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
+    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}" | head -8)
+  if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
+  else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
+}
+no_oldbrand_check
 # Pass A architecture (ALIGNMENT): chassis must keep the sub-page nav-row branch
 # (sticky page-header registration) + the store + composable. Losing the nav row
 # would silently revert converted sub-pages to scrolling in-page headers.
@@ -1336,7 +1353,7 @@ capacity_curve_parity() {
 capacity_curve_parity
 
 # 首页任务轮播契约(2026-07-16):0/1/2 张后台投影、5s 自动轮播、展开暂停，
-# 两卡等高、奖励色复用算力队列 token、卡面无外边框；独立审计板块不得重新挂回首页。
+# 两卡等高、奖励色统一 NEX 身份紫(--v5-nex, 2026-07-22)、卡面无外边框；独立审计板块不得重新挂回首页。
 home_task_carousel_contract() {
   local page="src/pages/index/index.vue"
   local newcomer="src/components/home/day-one-quest-card.vue"
@@ -1373,10 +1390,15 @@ home_task_carousel_contract() {
   grep -q 'class="weekly-quest__body"' "$weekly" || miss="${miss}weekly-redesign-body "
   grep -q 'class="weekly-quest__product"' "$weekly" || miss="${miss}weekly-redesign-product-zone "
   grep -q 'weekly-quest__reward-value' "$weekly" || miss="${miss}weekly-reward-style "
-  grep -q 'font-size: 30px' "$weekly" || miss="${miss}weekly-reward-size-drift "
-  grep -q 'color: var(--v5-warning)' "$weekly" || miss="${miss}weekly-reward-color-drift "
+  # 2026-07-23 B1:随《02》14 档迁移由 30px 升 h1 34px(主人已批映射表)。
+  grep -q 'font-size: 34px' "$weekly" || miss="${miss}weekly-reward-size-drift "
+  grep -q 'color: var(--v5-nex)' "$weekly" || miss="${miss}weekly-reward-color-drift "
   grep -q 'font-weight: 500' "$weekly" || miss="${miss}weekly-reward-weight-drift "
-  grep -q 'color: #9B89E0' "$weekly" || miss="${miss}weekly-countdown-color-drift "
+  # 2026-07-23 B1:原 pin 硬编码 hex #9B89E0(哨兵把 token 违规固化了);主人批准
+  # 补 --v5-quest-violet token 后改 pin token 名 —— 断言强度不变,且不再锁死违规。
+  # 2026-07-23 C1:倒计时是**前景文字**,quest 填充档当文字用时亮主题实测 2.98:1 不达 AA
+  # → 改走文字档 --v5-quest-violet-ink(亮主题 5.47,暗主题沿用原色不变)。哨兵同步 pin 文字档。
+  grep -q 'color: var(--v5-quest-violet-ink)' "$weekly" || miss="${miss}weekly-countdown-color-drift "
   grep -q 'class="weekly-quest__cta"' "$weekly" || miss="${miss}weekly-cta "
   grep -q 'bottom: 14px' "$weekly" || miss="${miss}weekly-cta-bottom-spacing "
   grep -q 'left: 16px' "$weekly" || miss="${miss}weekly-cta-full-width "
@@ -1384,9 +1406,11 @@ home_task_carousel_contract() {
   grep -q 'background: var(--v5-brand-soft)' "$weekly" || miss="${miss}weekly-cta-tone "
   grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$weekly" && miss="${miss}weekly-card-edge-returned "
   grep -q 'padding-right: 56px' "$weekly" && miss="${miss}weekly-header-padding-drift "
-  grep -q 'font-size: 16px; color: #9B89E0' "$newcomer" || miss="${miss}newcomer-countdown-style-drift "
+  # 2026-07-23 B1:16px 随《02》14 档迁移降 body.m/number.mono 15px(主人已批映射表)。
+  # 色值原为设计稿钦定 hex,2026-07-23 主人批准收敛为 --v5-quest-violet token。
+  grep -q 'font-size: 15px; color: var(--v5-quest-violet-ink)' "$newcomer" || miss="${miss}newcomer-countdown-style-drift "
   grep -q 'newcomer-task__reward-value' "$newcomer" || miss="${miss}newcomer-reward-style "
-  grep -q 'color: var(--v5-warning)' "$newcomer" || miss="${miss}newcomer-reward-color-drift "
+  grep -q 'color: var(--v5-nex)' "$newcomer" || miss="${miss}newcomer-reward-color-drift "
   grep -q 'minHeight: "44px"' "$newcomer" || miss="${miss}newcomer-toggle-height-drift "
   grep -q 'margin: "14px 16px"' "$newcomer" || miss="${miss}newcomer-toggle-spacing-drift "
   grep -q 'boxShadow: "var(--v5-card-shadow-lift)"' "$newcomer" && miss="${miss}newcomer-card-edge-returned "
@@ -1582,6 +1606,110 @@ cross_repo_sampling_gate() {
   fi
 }
 cross_repo_sampling_gate
+
+# ── 值域棘轮哨兵(vibe-playbook P2-F 2026-07-22 主人批):档间字号+圆角值集,只拦增量 ──
+# 基线 docs/VALUE-LADDER-BASELINE.json;新代码上阶梯(--v5-radius-* / 9 档字号),存量随尺寸迁移工程消化。
+value_ladder_gate() {
+  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs --selftest > /tmp/uniapp-value-ladder-selftest.log 2>&1; then
+    ok "value-ladder selftest(matcher 精度+棘轮方向红测)"
+  else
+    bad "value-ladder selftest 失败(node scripts/value-ladder-sentinel.mjs --selftest 看明细)"
+    tail -4 /tmp/uniapp-value-ladder-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/value-ladder-sentinel.mjs > /tmp/uniapp-value-ladder.log 2>&1; then
+    ok "value-ladder 档间字号/离散圆角 无增量(基线 docs/VALUE-LADDER-BASELINE.json)"
+  else
+    bad "value-ladder 增量违例 — node scripts/value-ladder-sentinel.mjs 看明细;新代码用 9 档字号 + var(--v5-radius-*)/阶梯值"
+    tail -8 /tmp/uniapp-value-ladder.log | sed 's/^/        /'
+  fi
+}
+value_ladder_gate
+
+# ── token-copy 哨兵(C1 批次 2026-07-23):token 色值被抄成字面量 = 另一主题必失配 ──
+# 旧的 hex 哨兵只钉 4 个色号且只认 #RRGGBB,rgba() 形式与变 alpha 副本全在盲区
+# (purchase-ticker 注释曾自陈「特意挪值以免触发哨兵」= 被绕过的实证)。
+# 本门:亮暗异值 token 全量 × hex 3/6/8 位 + rgb()/rgba() × 忽略 alpha 比 RGB。
+# 豁免走 docs/TOKEN-COPY-ALLOWLIST.json(reason 必填,selftest 校验)。
+token_copy_gate() {
+  if "$NODE_BIN" scripts/token-copy-sentinel.mjs --selftest > /tmp/uniapp-token-copy-selftest.log 2>&1; then
+    ok "token-copy selftest(双向红测:hex/rgb/rgba/变alpha 阳性全中 + 真灰/注释/color-mix 全 0)"
+  else
+    bad "token-copy selftest 失败(哨兵失效即门失效;node scripts/token-copy-sentinel.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-token-copy-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/token-copy-sentinel.mjs > /tmp/uniapp-token-copy.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-token-copy.log)"
+  else
+    bad "token 色值字面副本 — 改 var(--token) 或 color-mix(in srgb, var(--token) N%, transparent)"
+    tail -12 /tmp/uniapp-token-copy.log | sed 's/^/        /'
+  fi
+}
+token_copy_gate
+
+# ── 遮罩单源哨兵(C1 批次 2026-07-23):弹层遮罩底色必须走 var(--v5-bg-color-mask) ──
+# 起因:清遮罩时用「值」匹配(grep 特定 rgba)只捞到 9/20,漏的 11 个写的是别的值。
+# 用值找「扮演某角色的东西」必漏 —— 本门改按角色判(选择器 *-backdrop/*-mask + 内联铺满覆盖层)。
+scrim_gate() {
+  if "$NODE_BIN" scripts/scrim-single-source.mjs --selftest > /tmp/uniapp-scrim-selftest.log 2>&1; then
+    ok "scrim selftest(双向红测:5 种字面值形态阳性全中 + token/非遮罩/注释/渐变全 0)"
+  else
+    bad "scrim selftest 失败(node scripts/scrim-single-source.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-scrim-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/scrim-single-source.mjs > /tmp/uniapp-scrim.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-scrim.log)"
+  else
+    bad "弹层遮罩底色未走单源 token"
+    tail -10 /tmp/uniapp-scrim.log | sed 's/^/        /'
+  fi
+}
+scrim_gate
+
+# ── 双主题恒定着色 · 运行时正交门(C1 批次 2026-07-23) ──
+# 上面两道是静态门,只能钉「我已经想到的写法」。本批同一个坑连踩三次(按值比 token 漏变
+# alpha 副本 / 按值 grep 遮罩漏 11 个 / 按值 grep 网格线漏 2 个),根因都是「用值找角色」。
+# 本门换正交维度:不问源码怎么写,只问渲染出来跟不跟主题 —— 双主题 computed 完全相同
+# 的有色元素即嫌疑。存量走棘轮 docs/THEME-CONSTANT-BASELINE.json,只拦新增。
+theme_constant_gate() {
+  if "$NODE_BIN" scripts/theme-constant-gate.mjs --selftest > /tmp/uniapp-theme-const-selftest.log 2>&1; then
+    ok "theme-constant selftest(判定纯函数双向红测 + 恒定 token 放行)"
+  else
+    bad "theme-constant selftest 失败(node scripts/theme-constant-gate.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-theme-const-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/theme-constant-gate.mjs > /tmp/uniapp-theme-const.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-theme-const.log)"
+  else
+    bad "新增「双主题恒定」着色元素 — 该元素亮/暗渲染出来一个色 = 没跟主题"
+    tail -10 /tmp/uniapp-theme-const.log | sed 's/^/        /'
+  fi
+}
+theme_constant_gate
+
+# ── DOM-QA 体检哨兵(vibe-playbook P1-A 2026-07-22 主人批):5 探针事实层 ──
+# ① 横向溢出 ② 文字<10px(10-12 普查不 gate) ③ tap<44pt ④ img broken ⑤ 按钮无可达名。
+# 存量黄灯 = docs/DOM-QA-LEDGER.json;gate 只拦 ledger 外新指纹(新页/改动页硬门)。
+# 豁免 = 人工审阅后 --update-ledger 收编 + entry 写 qaOk 理由。selftest = 哨兵自身双向红测。
+dom_qa_gate() {
+  if "$NODE_BIN" scripts/dom-qa.mjs --selftest > /tmp/uniapp-dom-qa-selftest.log 2>&1; then
+    ok "dom-qa selftest(双向红测:5 类阳性全中 + 干净 fixture 0)"
+  else
+    bad "dom-qa selftest 失败(探针失效即门失效;node scripts/dom-qa.mjs --selftest 看明细)"
+    tail -5 /tmp/uniapp-dom-qa-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/dom-qa.mjs --sweep core > /tmp/uniapp-dom-qa.log 2>&1; then
+    ok "dom-qa core(5 tab)无新 DOM 违例(存量黄灯见 docs/DOM-QA-LEDGER.json)"
+  else
+    bad "dom-qa 新 DOM 违例 — node scripts/dom-qa.mjs --sweep core 看明细;确属合法例外 → --update-ledger 收编并写 qaOk 理由"
+    tail -12 /tmp/uniapp-dom-qa.log | sed 's/^/        /'
+  fi
+}
+dom_qa_gate
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

@@ -141,8 +141,8 @@ const gridStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
   backgroundImage:
-    "linear-gradient(to right, rgba(19,20,26,0.04) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, rgba(19,20,26,0.04) 1px, transparent 1px)",
+    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)," +
+    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)",
   backgroundSize: "24px 24px",
   pointerEvents: "none",
 };

@@ -296,8 +296,8 @@ const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
   borderRadius: "16px",
-  background: "linear-gradient(135deg, #D4AF5A 0%, #E2C97C 100%)",
-  boxShadow: "0 4px 12px rgba(212,175,90,0.25)",
+  background: "linear-gradient(135deg, var(--v5-genesis-gold-on-dark) 0%, #E2C97C 100%)",
+  boxShadow: "0 4px 12px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 25%, transparent)",
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

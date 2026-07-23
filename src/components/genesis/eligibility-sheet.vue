@@ -211,7 +211,7 @@ const titleStyle: CSSProperties = {
 const subtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   textWrap: "pretty" as CSSProperties["textWrap"],
 };
@@ -224,7 +224,7 @@ const unlockedBannerStyle: CSSProperties = {
 };
 const unlockedTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1.25,
@@ -238,7 +238,7 @@ const condRowStyle: CSSProperties = {
 };
 const condLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-ink)",
   lineHeight: 1.3,
@@ -246,7 +246,7 @@ const condLabelStyle: CSSProperties = {
 const metTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-success)", whiteSpace: "nowrap" };
 const fixLinkStyle: CSSProperties = {
   flexShrink: 0,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-brand)",
   fontWeight: 500,
   whiteSpace: "nowrap",
@@ -270,7 +270,7 @@ function fillStyle(pct: number): CSSProperties {
     transition: "width 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
   };
 }
-const progressTextStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", color: "var(--v5-ink-4)" };
+const progressTextStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-4)" };
 const inviteInputStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
@@ -280,7 +280,7 @@ const inviteInputStyle: CSSProperties = {
   background: "var(--v5-surface)",
   border: "1px solid var(--v5-border)",
   color: "var(--v5-ink)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontFamily: "var(--font-v5)",
   textTransform: "uppercase", // 纯视觉规范化(applyInviteCode 已做值层 toUpperCase)
 };
@@ -292,10 +292,10 @@ const verifyBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
 };
-const inviteErrStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", color: "var(--v5-danger)" };
+const inviteErrStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-danger)" };
 const capNoteStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "12px",
@@ -324,7 +324,7 @@ const subscribeStyle: CSSProperties = {
   position: fixed;
   inset: 0;
   z-index: 79;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px);
 }
 .nx-elig-panel {

@@ -12,7 +12,7 @@
  */
 import { mockServerUuid } from "@/store/mock-id";
 
-const STORAGE_KEY = "nexion-device-id-v1";
+const STORAGE_KEY = "nexgrid-device-id-v1";
 
 export interface DeviceIdentity {
   /** Stable opaque id for this install/device. */

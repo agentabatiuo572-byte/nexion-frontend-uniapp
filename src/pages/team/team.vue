@@ -24,7 +24,7 @@
           <text class="block font-display tabular-nums" :style="royaltyAmtStyle">${{ monthUSDT.toFixed(2) }}</text>
           <text class="block" :style="royaltySubStyle">{{ t.teamV3.royaltyHeroSubtitle }}</text>
           <view class="flex items-center justify-between" style="margin-top: 8px">
-            <text class="font-mono-tabular" :style="{ fontSize: '10.5px', color: 'var(--v5-tech-cyan)' }">+{{ monthNEX.toFixed(0) }} NEX</text>
+            <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-tech-cyan)' }">+{{ monthNEX.toFixed(0) }} NEX</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
@@ -304,9 +304,9 @@ const royaltyHeroStyle: CSSProperties = {
   background: "radial-gradient(80% 60% at 100% 0%, var(--v5-brand-soft) 0%, transparent 60%), var(--v5-surface)",
   border: "1px solid var(--v5-brand-border)",
 };
-const royaltyCapStyle: CSSProperties = { gap: "6px", fontSize: "11px", color: "var(--v5-brand)", marginBottom: "8px" };
-const royaltyAmtStyle: CSSProperties = { fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
-const royaltySubStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)" };
+const royaltyCapStyle: CSSProperties = { gap: "6px", fontSize: "12px", color: "var(--v5-brand)", marginBottom: "8px" };
+const royaltyAmtStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
+const royaltySubStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 
 const rankCardStyle: CSSProperties = {
   padding: "16px",
@@ -324,7 +324,7 @@ const rankHeaderStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
 };
-const rankTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
+const rankTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
 const rankArrowStyle: CSSProperties = {
   width: "28px",
   height: "28px",
@@ -346,7 +346,7 @@ const rankLevelWrapStyle: CSSProperties = {
   justifyContent: "flex-start",
 };
 const rankLevelTextStyle: CSSProperties = {
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   lineHeight: 1,
   color: "var(--v5-ink)",
@@ -364,10 +364,10 @@ const rankPrizeWrapStyle: CSSProperties = {
   alignItems: "flex-end",
   justifyContent: "center",
 };
-const rankPrizeLabelStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)", lineHeight: 1.1 };
+const rankPrizeLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", lineHeight: 1.1 };
 const rankPrizeValueStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   lineHeight: 1,
   color: "var(--v5-ink)",
@@ -375,8 +375,8 @@ const rankPrizeValueStyle: CSSProperties = {
 };
 
 const quickPanelStyle: CSSProperties = {
+  // 《03》§6:带 bg 填充零 border
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const quickRowStyle: CSSProperties = {
   minHeight: "74px",
@@ -404,10 +404,10 @@ function quickIconStyle(color: string): CSSProperties {
     background: `color-mix(in srgb, ${color} 14%, transparent)`,
   };
 }
-const quickRowTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, lineHeight: 1.2, color: "var(--v5-ink)" };
+const quickRowTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, lineHeight: 1.2, color: "var(--v5-ink)" };
 const quickRowMetaStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "11px",
+  fontSize: "12px",
   lineHeight: 1.35,
   color: "var(--v5-ink-3)",
   whiteSpace: "normal",
@@ -418,7 +418,7 @@ const quickRowValueWrapStyle: CSSProperties = {
   alignItems: "center",
   gap: "8px",
 };
-const quickRowValueStyle: CSSProperties = { fontSize: "17px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)", whiteSpace: "nowrap" };
+const quickRowValueStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)", whiteSpace: "nowrap" };
 const quickRowValueWarnStyle: CSSProperties = { ...quickRowValueStyle, color: "var(--v5-warning)" };
 const quickDividerStyle: CSSProperties = {
   height: "1px",
@@ -450,8 +450,8 @@ function toolIconStyle(bg: string): CSSProperties {
     background: `color-mix(in srgb, ${bg} 58%, transparent)`,
   };
 }
-const toolTitleStyle: CSSProperties = { marginTop: "10px", fontSize: "13.5px", fontWeight: 600, lineHeight: 1.2 };
-const toolSubStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.35 };
+const toolTitleStyle: CSSProperties = { marginTop: "10px", fontSize: "13px", fontWeight: 600, lineHeight: 1.2 };
+const toolSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.35 };
 const orbDotStyle: CSSProperties = {
   width: "18px",
   height: "18px",

@@ -34,8 +34,11 @@ import { useConversations } from "@/store/conversations";
 import { useNotifications, type NotifKind } from "@/store/notifications";
 import { welcomeMessage } from "@/mock/nova-templates";
 import { navTo } from "@/lib/route";
+import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import NovaAvatar from "./nova-avatar.vue";
 
+const t = useT();
 const nova = useNova();
 const conversations = useConversations();
 const notifications = useNotifications();
@@ -64,47 +67,55 @@ const WELCOME_DELAY = 1_200, WELCOME_COOLDOWN = 24 * 60 * 60 * 1000;
 
 const TEAM_NAMES = ["Sarah K.", "Tom Wang", "Lisa Park", "Carlos R.", "Yuki H.", "Mehmet A.", "Diego P.", "Mila V."];
 const TEAM_ORDERS = [
-  { product: "NexionBox S1", price: 299, l1: 29.9 },
-  { product: "NexionBox Pro", price: 899, l1: 89.9 },
-  { product: "NexionRack P1", price: 3499, l1: 349.9 },
+  { product: "NexGridBox S1", price: 299, l1: 29.9 },
+  { product: "NexGridBox Pro", price: 899, l1: 89.9 },
+  { product: "NexGridRack P1", price: 3499, l1: 349.9 },
 ];
 
 interface ChannelMsg { text: string; ctaLabel: string; ctaHref: string; }
 
-function teamEventMessage(): ChannelMsg {
+// 推送文案全部走 i18n(nova.push.*)。此前这三个函数内联英文串,zh/vi 用户
+// 也只看到英文;插值用 fmt,复数走 One/Many 两个 key(不在代码里拼英文词尾)。
+type NovaPush = ReturnType<typeof useT>["value"]["nova"]["push"];
+
+function teamEventMessage(p: NovaPush): ChannelMsg {
   const r = Math.random();
   const buyer = TEAM_NAMES[Math.floor(Math.random() * TEAM_NAMES.length)];
   if (r < 0.5) {
     const order = TEAM_ORDERS[Math.floor(Math.random() * TEAM_ORDERS.length)];
     const nexPart = Math.floor(order.price * 50).toLocaleString();
-    return { text: `${buyer} just bought ${order.product} · +$${order.l1.toFixed(2)} USDT + ${nexPart} NEX credited (30d cooling)`, ctaLabel: "View commission", ctaHref: "/team/commissions" };
+    return { text: fmt(p.teamBought, { buyer, product: order.product, l1: order.l1.toFixed(2), nex: nexPart }), ctaLabel: p.teamBoughtCta, ctaHref: "/team/commissions" };
   }
   if (r < 0.75) {
     const n = 1 + Math.floor(Math.random() * 3);
-    return { text: `Network partner V5 Sarah K. auto-placed ${n} new member${n > 1 ? "s" : ""} into your Track B.`, ctaLabel: "See Balance Match", ctaHref: "/team/binary" };
+    const sponsor = TEAM_NAMES[0];
+    return { text: n > 1 ? fmt(p.teamPlacedMany, { sponsor, n }) : fmt(p.teamPlacedOne, { sponsor }), ctaLabel: p.teamPlacedCta, ctaHref: "/team/binary" };
   }
   if (r < 0.9) {
     const remain = 200 + Math.floor(Math.random() * 1800);
-    return { text: `You're $${remain.toLocaleString()} away from V3 Captain — Apple Watch SE waiting.`, ctaLabel: "Boost team", ctaHref: "/team/rank" };
+    return { text: fmt(p.teamRankGap, { remain: remain.toLocaleString() }), ctaLabel: p.teamRankGapCta, ctaHref: "/team/rank" };
   }
   const peerAmt = 50 + Math.floor(Math.random() * 350);
-  return { text: `Same-rank peer ${buyer} earned $${(peerAmt * 20).toLocaleString()} this week → your 5% peer bonus +$${peerAmt}.`, ctaLabel: "Open", ctaHref: "/team/commissions" };
+  return { text: fmt(p.teamPeerBonus, { buyer, peer: (peerAmt * 20).toLocaleString(), amt: peerAmt }), ctaLabel: p.teamPeerBonusCta, ctaHref: "/team/commissions" };
 }
 
-function stakingEventMessage(): ChannelMsg {
+function stakingEventMessage(p: NovaPush): ChannelMsg {
   const r = Math.random();
-  if (r < 0.4) return { text: "⚡ 180-day vault APY just rose from 80% → 95% (24h window only).", ctaLabel: "Lock now", ctaHref: "/staking" };
+  if (r < 0.4) return { text: p.stakingApyUp, ctaLabel: p.stakingApyUpCta, ctaHref: "/staking" };
   // 不编具体余席数(与 live remaining 矛盾会自曝;数字可信铁律)。
-  if (r < 0.7) return { text: "🔥 Genesis seats running low · OG status + $NEX emission priority.", ctaLabel: "Claim seat", ctaHref: "/genesis" };
-  if (r < 0.9) return { text: "Lock your $NEX now to boost your emission priority when it lists.", ctaLabel: "Lock 180d", ctaHref: "/staking" };
-  return { text: "Your 90-day stake matures in 12 days · auto-claim or extend for 35% bonus APY.", ctaLabel: "Manage", ctaHref: "/staking" };
+  if (r < 0.7) return { text: p.stakingGenesisLow, ctaLabel: p.stakingGenesisLowCta, ctaHref: "/genesis" };
+  if (r < 0.9) return { text: p.stakingLockNow, ctaLabel: p.stakingLockNowCta, ctaHref: "/staking" };
+  return { text: p.stakingMatures, ctaLabel: p.stakingMaturesCta, ctaHref: "/staking" };
 }
 
-function marketEventMessage(): ChannelMsg {
+function marketEventMessage(p: NovaPush): ChannelMsg {
   const r = Math.random();
-  if (r < 0.45) { const price = (0.16 + Math.random() * 0.04).toFixed(3); const change = (5 + Math.random() * 18).toFixed(1); return { text: `📈 $NEX just broke $${price} · +${change}% in 24h · new ATH this week.`, ctaLabel: "Buy NEX", ctaHref: "/me/wallet/exchange" }; }
-  if (r < 0.8) { const tvl = (840 + Math.random() * 60).toFixed(0); return { text: `🎉 Platform TVL crossed $${tvl}M overnight · your Leadership pool share grew.`, ctaLabel: "View pool", ctaHref: "/team/leadership-pool" }; }
-  return { text: "🤝 Nexion × OPPO strategic partnership signed — NEX now usable across OPPO Wallet.", ctaLabel: "Trust Center", ctaHref: "/trust" };
+  if (r < 0.45) { const price = (0.16 + Math.random() * 0.04).toFixed(3); const change = (5 + Math.random() * 18).toFixed(1); return { text: fmt(p.marketPriceBreak, { price, change }), ctaLabel: p.marketPriceBreakCta, ctaHref: "/me/wallet/exchange" }; }
+  if (r < 0.8) { const tvl = (840 + Math.random() * 60).toFixed(0); return { text: fmt(p.marketTvl, { tvl }), ctaLabel: p.marketTvlCta, ctaHref: "/team/leadership-pool" }; }
+  // 具名第三方战略合作声明(旧文案「× OPPO ... signed」)已移除:对真实公司作
+  // 完成时合作断言 = 法务高危虚假宣传(nexion-design 踩坑表点名项)。换成不
+  // 具名的市场流动性事件,同样服务市场频道且无第三方主体。
+  return { text: p.marketLiquidity, ctaLabel: p.marketLiquidityCta, ctaHref: "/trust" };
 }
 
 function fireChannel(prefix: "team" | "staking" | "market", kind: NotifKind, m: ChannelMsg, cooldownMs: number) {
@@ -126,15 +137,16 @@ onMounted(() => {
     nova.push(welcomeMessage(), { cooldownKey: "welcome", cooldownMs: WELCOME_COOLDOWN });
   }, WELCOME_DELAY));
 
-  const teamFire = () => fireChannel("team", "team", teamEventMessage(), TEAM_COOLDOWN_MS);
+  // 在回调内部读 t.value(而非外层捕获快照)→ 切语言后新推送即用新语言。
+  const teamFire = () => fireChannel("team", "team", teamEventMessage(t.value.nova.push), TEAM_COOLDOWN_MS);
   timers.push(setTimeout(teamFire, FIRST_TEAM));
   intervals.push(setInterval(teamFire, TEAM_TICK_MS));
 
-  const stakingFire = () => fireChannel("staking", "staking", stakingEventMessage(), STAKING_COOLDOWN_MS);
+  const stakingFire = () => fireChannel("staking", "staking", stakingEventMessage(t.value.nova.push), STAKING_COOLDOWN_MS);
   timers.push(setTimeout(stakingFire, FIRST_STAKING));
   intervals.push(setInterval(stakingFire, STAKING_TICK_MS));
 
-  const marketFire = () => fireChannel("market", "market", marketEventMessage(), MARKET_COOLDOWN_MS);
+  const marketFire = () => fireChannel("market", "market", marketEventMessage(t.value.nova.push), MARKET_COOLDOWN_MS);
   timers.push(setTimeout(marketFire, FIRST_MARKET));
   intervals.push(setInterval(marketFire, MARKET_TICK_MS));
 });
@@ -176,7 +188,7 @@ onUnmounted(() => {
   border: 1px solid var(--v5-bg);
 }
 .nx-nova-badge-t {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   font-family: var(--font-v5);
   color: var(--v5-on-brand-2);

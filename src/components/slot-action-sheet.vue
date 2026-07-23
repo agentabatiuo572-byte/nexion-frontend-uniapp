@@ -131,7 +131,7 @@ function onGoStore() {
 .sas-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   animation: sas-fade 0.24s ease-out;
 }
@@ -210,7 +210,7 @@ function onGoStore() {
   transform: scale(0.98);
 }
 .sas-store-cta-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-on-brand);
   font-family: var(--font-v5);
@@ -235,7 +235,7 @@ function onGoStore() {
   transform: scale(0.99);
 }
 .sas-activate-toggle-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-3);
   font-family: var(--font-v5);
@@ -283,7 +283,7 @@ function onGoStore() {
 }
 .sas-device-name {
   display: block;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.3;
@@ -293,7 +293,7 @@ function onGoStore() {
 }
 .sas-device-rate {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 2px;
   font-family: var(--font-jet-mono), monospace;

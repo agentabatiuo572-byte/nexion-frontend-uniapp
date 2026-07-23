@@ -16,7 +16,7 @@ const ALL_NOTIF_KINDS: NotifKind[] = ["commission", "team", "staking", "market",
 
 type NotifPrefs = Record<NotifKind, boolean>;
 
-const STORAGE_KEY = "nexion-preferences-v1";
+const STORAGE_KEY = "nexgrid-preferences-v1";
 
 function defaultNotifPrefs(): NotifPrefs {
   return ALL_NOTIF_KINDS.reduce((acc, k) => {

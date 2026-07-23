@@ -1,5 +1,5 @@
 <!--
-  TrialGhostSlot — the user's NexionBox S1 on free trial, surfaced on Home + Earn
+  TrialGhostSlot — the user's NexGridBox S1 on free trial, surfaced on Home + Earn
   (ported from Nexion-prototype/app/components/trial-ghost-slot.tsx).
 
   Reads as a high-tier device under test-drive: device identity + live shadow
@@ -50,16 +50,16 @@
         </view>
         <view class="flex-1 min-w-0">
           <view class="flex items-center gap-1.5">
-            <text class="text-[13.5px] font-semibold text-[var(--v5-ink)] truncate">NexionBox S1</text>
+            <text class="text-[13px] font-semibold text-[var(--v5-ink)] truncate">NexGridBox S1</text>
             <text
-              class="shrink-0 text-[10px] font-mono-tabular rounded px-1.5 py-0.5"
+              class="shrink-0 text-[12px] font-mono-tabular rounded px-1.5 py-0.5"
               style="background: color-mix(in oklab, var(--v5-brand-2) 16%, transparent); color: var(--v5-brand-2)"
             >{{ t.trial.ghostBadge }}</text>
           </view>
-          <text class="block text-[11px] mt-0.5" :style="{ color: tint }">{{ ribbon }}</text>
+          <text class="block text-[12px] mt-0.5" :style="{ color: tint }">{{ ribbon }}</text>
         </view>
         <text
-          class="shrink-0 text-[11px] font-mono-tabular rounded-full px-2 py-1"
+          class="shrink-0 text-[12px] font-mono-tabular rounded-full px-2 py-1"
           style="background: var(--v5-surface-2); color: var(--v5-ink-3)"
         >{{ etaText }}</text>
       </view>
@@ -67,14 +67,14 @@
       <!-- Shadow earnings hero — the conversion hook -->
       <view class="mt-3">
         <text
-          class="block text-[10.5px] font-mono-tabular"
+          class="block text-[12px] font-mono-tabular"
           style="color: var(--v5-ink-4); letter-spacing: 0.04em"
         >{{ t.trial.ghostSubtitle }}</text>
         <view class="mt-1 flex items-baseline gap-1.5">
           <text class="font-display tabular-nums" style="font-size: 15px; font-weight: 500; color: var(--v5-ink-3)">$</text>
           <text
             class="font-mono-tabular tabular-nums"
-            style="font-size: 30px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.02em; line-height: 1"
+            style="font-size: 34px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.02em; line-height: 1"
           >{{ shadowUSD.toFixed(2) }}</text>
           <text class="font-mono-tabular text-[12px] ml-1" style="color: var(--v5-tech-cyan)">{{ shadowNexText }}</text>
         </view>
@@ -87,7 +87,7 @@
 
       <!-- Bottom row — early-buy savings (left) + de-emphasized buy pill (right) -->
       <view class="mt-3 flex items-center justify-between gap-2">
-        <text class="text-[11px] font-medium min-w-0 truncate" style="color: var(--v5-brand-2)">{{ discountText }}</text>
+        <text class="text-[12px] font-medium min-w-0 truncate" style="color: var(--v5-brand-2)">{{ discountText }}</text>
         <view
           class="shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 h-9 active:scale-[0.97] transition-transform"
           style="background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 13px"

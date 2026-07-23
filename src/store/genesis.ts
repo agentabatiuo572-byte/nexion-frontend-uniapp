@@ -93,7 +93,7 @@ export const GENESIS_ELIGIBILITY: GenesisEligibilityConfig = Object.freeze({
 });
 
 /** 创世邀请码格式(mock 端格式校验;真后台 = server 核销接口,格式仅兜底)。 */
-export const GENESIS_INVITE_PATTERN = /^NEXION-OG-[A-Z0-9]{4}$/;
+export const GENESIS_INVITE_PATTERN = /^NEXGRID-OG-[A-Z0-9]{4}$/;
 
 /** 资格求值输入。composable 层从 app / v-rank / genesis 组合(store 不互 import)。 */
 export interface GenesisEligibilityCtx {
@@ -201,8 +201,8 @@ interface GenesisUserData {
   myListings: MyListing[];
 }
 
-const STORAGE_KEY = "nexion-genesis"; // 仅全平台片
-const ACCOUNTS_KEY = "nexion-genesis-accounts-v1"; // { [accountKey]: GenesisUserData }
+const STORAGE_KEY = "nexgrid-genesis"; // 仅全平台片
+const ACCOUNTS_KEY = "nexgrid-genesis-accounts-v1"; // { [accountKey]: GenesisUserData }
 
 function globalDefaults(): GenesisGlobalData {
   return {

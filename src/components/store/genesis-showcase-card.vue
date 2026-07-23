@@ -21,7 +21,7 @@
       <view class="relative" style="z-index: 1">
         <!-- Eyebrow -->
         <view class="flex items-center justify-between" style="gap: 10px">
-          <view class="inline-flex items-center" style="gap: 6px; color: #D4AF5A">
+          <view class="inline-flex items-center" style="gap: 6px; color: var(--v5-genesis-gold)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
             <text class="font-mono-tabular" :style="eyebrowStyle">{{ eyebrowText }}</text>
           </view>
@@ -136,17 +136,17 @@ const auroraStyle: CSSProperties = {
   right: "-36px",
   width: "220px",
   height: "170px",
-  background: "radial-gradient(closest-side, rgba(212,175,90,0.16), transparent 72%)",
+  background: "radial-gradient(closest-side, color-mix(in srgb, var(--v5-genesis-gold) 16%, transparent), transparent 72%)",
   pointerEvents: "none",
 };
 const eyebrowStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.08em",
   whiteSpace: "nowrap",
 };
 const leftChipStyle: CSSProperties = {
   flexShrink: 0,
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-warning)",
   padding: "3px 9px",
   borderRadius: "999px",
@@ -163,22 +163,22 @@ const titleStyle: CSSProperties = {
 };
 const perksStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.45,
   textWrap: "pretty" as CSSProperties["textWrap"],
 };
-const tierLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", lineHeight: 1.2 };
+const tierLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.2 };
 const priceStyle: CSSProperties = {
   marginTop: "3px",
   fontSize: "26px",
   fontWeight: 600,
   letterSpacing: "-0.024em",
-  color: "#D4AF5A",
+  color: "var(--v5-genesis-gold)",
   lineHeight: 1.05,
 };
 const soldOutStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
   textWrap: "pretty" as CSSProperties["textWrap"],
@@ -189,12 +189,12 @@ const ctaStyle: CSSProperties = {
   padding: "0 16px",
   borderRadius: "999px",
   gap: "5px",
-  background: "linear-gradient(135deg, rgba(212,175,90,0.22), rgba(212,175,90,0.1))",
-  color: "#D4AF5A",
+  background: "linear-gradient(135deg, color-mix(in srgb, var(--v5-genesis-gold) 22%, transparent), color-mix(in srgb, var(--v5-genesis-gold) 10%, transparent))",
+  color: "var(--v5-genesis-gold)",
 };
 const ctaTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
@@ -211,10 +211,10 @@ const lockRowStyle: CSSProperties = {
 const lockTextStyle: CSSProperties = {
   flex: 1,
   minWidth: 0,
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
   textWrap: "pretty" as CSSProperties["textWrap"],
 };
-const lockMetStyle: CSSProperties = { flexShrink: 0, fontSize: "11px", color: "#D4AF5A" };
+const lockMetStyle: CSSProperties = { flexShrink: 0, fontSize: "12px", color: "var(--v5-genesis-gold)" };
 </script>

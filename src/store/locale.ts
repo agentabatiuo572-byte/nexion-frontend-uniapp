@@ -4,7 +4,7 @@ import { DEFAULT_LOCALE, LOCALES, type LocaleCode } from "@/i18n";
 
 // Ported from Nexion-prototype/lib/store/locale.ts (zustand → Pinia).
 // Persistence uses uni.* storage so it works on both H5 (localStorage) and App.
-const STORAGE_KEY = "nexion-locale-v1";
+const STORAGE_KEY = "nexgrid-locale-v1";
 
 interface Persisted {
   code: LocaleCode;

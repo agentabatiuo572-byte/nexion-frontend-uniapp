@@ -43,7 +43,7 @@
 
         <ComputeShareEntry context="devices" />
 
-        <!-- Trial device — NexionBox S1 on free trial (shadow, not a real device).
+        <!-- Trial device — NexGridBox S1 on free trial (shadow, not a real device).
              Cancel-trial lives here in device management. -->
         <view v-if="trialActive" class="overflow-hidden" :style="trialCardStyle">
           <view class="flex items-center" style="gap: 12px; padding: 12px 16px">
@@ -52,7 +52,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
-                <text class="truncate" :style="trialNameStyle">NexionBox S1</text>
+                <text class="truncate" :style="trialNameStyle">NexGridBox S1</text>
                 <text :style="trialBadgeStyle">{{ t.trial.ghostBadge }}</text>
               </view>
               <text class="block" :style="trialSubStyle">{{ t.trial.deviceRowSub }}</text>

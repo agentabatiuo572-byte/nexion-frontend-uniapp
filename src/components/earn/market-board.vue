@@ -12,7 +12,7 @@
   <view class="mx-4">
     <view class="flex items-center justify-between mb-2 px-0">
       <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.market.title }}</text>
-      <view class="flex items-center gap-1" style="font-size: 11.5px; color: var(--v5-ink-3)">
+      <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
         <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-brand) 70%, transparent)" />
         <text>{{ t.market.liveLabel }}</text>
       </view>
@@ -30,13 +30,13 @@
         <view class="flex items-center gap-2.5">
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
-              <text class="truncate" style="font-size: 12.5px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
-              <text class="truncate" style="font-size: 10.5px; color: var(--v5-ink-4)">{{ w.unit }}</text>
+              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
+              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ w.unit }}</text>
             </view>
-            <text v-if="w.flagship" class="block truncate" style="font-size: 10.5px; color: var(--v5-warning); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
+            <text v-if="w.flagship" class="block truncate" style="font-size: 12px; color: var(--v5-warning); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
           </view>
-          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-2); width: 64px">${{ formatPrice(w.price) }}</text>
-          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 11px; width: 48px" :style="{ color: arrowColor(w) }">{{ arrow(w) }} {{ Math.abs(w.delta).toFixed(1) }}%</text>
+          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">${{ formatPrice(w.price) }}</text>
+          <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ arrow(w) }} {{ Math.abs(w.delta).toFixed(1) }}%</text>
           <svg class="shrink-0" width="48" height="16" viewBox="0 0 48 16">
             <polyline :points="sparkPoints(w.spark)" fill="none" :stroke="w.delta < -0.05 ? 'var(--v5-brand-2)' : 'var(--v5-brand)'" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
           </svg>
@@ -55,8 +55,8 @@
         @click="d.kind ? goDetail(d.kind) : undefined"
       >
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '14px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 10.5px; color: var(--v5-warning)">Best</text></text>
-          <text v-if="d.bestFor" class="block truncate" style="font-size: 10.5px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
+          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning)">Best</text></text>
+          <text v-if="d.bestFor" class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
         </view>
         <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
         <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -101,9 +101,9 @@ const PRICE_INDEX: WorkloadPrice[] = [
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [
-  { rank: 1, name: "NexionRack P1", dailyEarn: 45, bestFor: "Training + 405B LLM", kind: "stellarrack-p1" },
-  { rank: 2, name: "NexionBox Pro", dailyEarn: 13, bestFor: "Flagship compute", kind: "stellarbox-pro" },
-  { rank: 3, name: "NexionBox S1", dailyEarn: 7, bestFor: "LLM 70B", kind: "stellarbox-s1" },
+  { rank: 1, name: "NexGridRack P1", dailyEarn: 45, bestFor: "Training + 405B LLM", kind: "stellarrack-p1" },
+  { rank: 2, name: "NexGridBox Pro", dailyEarn: 13, bestFor: "Flagship compute", kind: "stellarbox-pro" },
+  { rank: 3, name: "NexGridBox S1", dailyEarn: 7, bestFor: "LLM 70B", kind: "stellarbox-s1" },
   { rank: 4, name: "Inference Share", dailyEarn: 0.19, bestFor: "Low barrier entry", kind: "cloud-share" },
   { rank: 5, name: "Your phone", dailyEarn: 0.06, bestFor: "Mobile NPU tier", isPhone: true },
 ];
@@ -137,7 +137,7 @@ function goDetail(kind: Exclude<DeviceKind, "phone">) {
 
 const sectionLabelStyle: CSSProperties = {
   padding: "0 0 8px",
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-ink-3)",

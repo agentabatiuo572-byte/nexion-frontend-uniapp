@@ -80,7 +80,7 @@ export const TICKETS: Ticket[] = [
   },
   {
     id: "TK-1019",
-    subject: "NexionBox Pro disconnected after firmware v3.4",
+    subject: "NexGridBox Pro disconnected after firmware v3.4",
     category: "hardware",
     status: "in_progress",
     priority: "high",
@@ -90,7 +90,7 @@ export const TICKETS: Ticket[] = [
     unread: 0,
     owner: "Hiro T.",
     messages: [
-      { ts: NOW - 3 * DAY, author: "user", body: "After the v3.4 firmware push my NexionBox Pro went offline and won't reconnect. LEDs flash amber-amber-red repeatedly." },
+      { ts: NOW - 3 * DAY, author: "user", body: "After the v3.4 firmware push my NexGridBox Pro went offline and won't reconnect. LEDs flash amber-amber-red repeatedly." },
       { ts: NOW - 2.9 * DAY, author: "agent", agentName: "Hiro T.", body: "Amber-amber-red = WiFi auth failure post-update. Common after 3.4. Quick fix: hold power button 10s to reset, then re-pair via app. If that fails, we'll ship a replacement free of charge." },
       { ts: NOW - 2 * DAY, author: "user", body: "Reset worked but it's only earning 60% of normal rate now." },
       { ts: NOW - 1 * DAY, author: "agent", agentName: "Hiro T.", body: "Detected a thermal throttle — your unit is 12°C above baseline. Could be dust in the intake. We're shipping you a free cleaning kit (ETA 4d). Should restore full rate." },

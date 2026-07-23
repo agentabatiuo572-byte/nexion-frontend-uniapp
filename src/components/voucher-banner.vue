@@ -7,8 +7,8 @@
   soft brand tint — token-only colors, on-brand text on the CTA pill.
 -->
 <template>
-  <view v-if="visible" class="vb-wrap" role="button" tabindex="0" :aria-label="t.voucher.bannerTitle" @click="open">
-    <view class="vb-card active:opacity-90">
+  <view v-if="visible" class="vb-wrap active:opacity-90" role="button" tabindex="0" :aria-label="t.voucher.bannerTitle" @click="open">
+    <view class="vb-card">
       <view class="vb-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v2" /><path d="M13 17v2" /><path d="M13 11v2" /></svg>
       </view>
@@ -52,10 +52,12 @@ function open() {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-radius: 14px;
+  /* 《03》§2 圆角上阶梯(14 → radius-m 16);§6 带 bg 填充零 border ——
+     本卡在 home/earn/store/me 四个 tab 都渲染,是零-border 铁律的最大破口。
+     视觉焦点改由内部 brand 径向渐变承担(原就有),不靠 accent 描边抢眼。 */
+  border-radius: 16px;
   padding: 12px 14px;
-  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--v5-brand) 12%, transparent), transparent 70%), var(--v5-surface-2);
-  border: 1px solid color-mix(in srgb, var(--v5-brand) 24%, transparent);
+  background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--v5-brand) 16%, transparent), transparent 70%), var(--v5-surface-2);
 }
 .vb-icon {
   width: 34px;
@@ -82,7 +84,7 @@ function open() {
 .vb-sub {
   display: block;
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   line-height: 1.3;
 }

@@ -46,9 +46,9 @@ export interface ActiveMilestone {
   label: string;
 }
 
-// 旧设备级单键 "nexion-milestones-v1" 废弃(存量无账号归属,mock 可重建);里程碑 fired 态按账号分行。
-// 🔴 spec6-entry-surface-runtime.mjs 的反泄漏护栏键同步改为 nexion-milestones-accounts-v1。
-const ACCOUNTS_KEY = "nexion-milestones-accounts-v1"; // { [accountKey]: { firedIds: string[] } }
+// 旧设备级单键 "nexgrid-milestones-v1" 废弃(存量无账号归属,mock 可重建);里程碑 fired 态按账号分行。
+// 🔴 spec6-entry-surface-runtime.mjs 的反泄漏护栏键同步改为 nexgrid-milestones-accounts-v1。
+const ACCOUNTS_KEY = "nexgrid-milestones-accounts-v1"; // { [accountKey]: { firedIds: string[] } }
 
 function hydrate(accountKey: string): string[] {
   const row = readAccountRow<{ firedIds?: string[] }>(ACCOUNTS_KEY, accountKey);

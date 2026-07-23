@@ -14,7 +14,7 @@ import { _devSetEligibilityTimeout } from "@/store/withdrawal-eligibility";
 export function mountSpec7DevBridge(): void {
   if (!import.meta.env.DEV) return;
   if (typeof window === "undefined") return;
-  (window as unknown as Record<string, unknown>).__nexionSpec7Dev = {
+  (window as unknown as Record<string, unknown>).__nexgridSpec7Dev = {
     /** 模拟 K1 处置下发: status=frozen/released/flagged,null 清除。 */
     setClusterStatus(accountKey: string, status: ClusterStatus | null) {
       _devSetClusterStatus(accountKey, status);

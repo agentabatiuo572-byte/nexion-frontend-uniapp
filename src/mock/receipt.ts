@@ -322,7 +322,7 @@ export function generateKycReceipt(input: {
     model: "KYC-Express",
 
     // Authority "signer" — virtual compliance org
-    client: "Nexion Compliance Authority",
+    client: "NexGrid Compliance Authority",
     clientAddress: "0x" + randomHex(40),
 
     signature: "0x" + randomHex(64),

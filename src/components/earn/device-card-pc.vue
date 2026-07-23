@@ -20,7 +20,7 @@
     <view
       v-if="menuOpen"
       class="nx-device-quick-menu flex items-end"
-      style="position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.55)"
+      style="position: fixed; inset: 0; z-index: 200; background: var(--v5-bg-color-mask)"
       role="dialog"
       aria-modal="true"
       :aria-label="device.name"
@@ -29,19 +29,19 @@
     >
       <view class="w-full rounded-t-2xl p-3" style="background: var(--v5-surface); border-top: 1px solid var(--v5-border)" @click.stop>
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
-        <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.name }}</text>
+        <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ device.name }}</text>
         <view class="space-y-1">
           <view class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
-            <text style="font-size: 13.5px; color: var(--v5-ink)">{{ t.earn.quickMenu.stats }}</text>
+            <text style="font-size: 13px; color: var(--v5-ink)">{{ t.earn.quickMenu.stats }}</text>
           </view>
           <view v-if="degradable" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goTradeinMenu" @keydown.enter.stop.prevent="goTradeinMenu" @keydown.space.stop.prevent="goTradeinMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-            <text style="font-size: 13.5px; color: var(--v5-ink)">{{ t.earn.quickMenu.tradein }}</text>
+            <text style="font-size: 13px; color: var(--v5-ink)">{{ t.earn.quickMenu.tradein }}</text>
           </view>
         </view>
         <view class="mt-2 w-full grid place-items-center" style="height: 40px; border-radius: 999px; background: var(--v5-surface-2)" role="button" tabindex="0" @click="closeMenu" @keydown.enter.stop.prevent="closeMenu" @keydown.space.stop.prevent="closeMenu">
-          <text style="font-size: 12.5px; color: var(--v5-ink-2)">{{ t.earn.quickMenu.cancel }}</text>
+          <text style="font-size: 13px; color: var(--v5-ink-2)">{{ t.earn.quickMenu.cancel }}</text>
         </view>
       </view>
     </view>
@@ -65,17 +65,20 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
         </view>
         <view class="min-w-0" style="flex: 1">
-          <text class="block truncate" style="font-size: 14px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
+          <text class="block truncate" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
           <view class="flex items-center gap-1.5" style="margin-top: 3px">
             <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
-            <text class="nx-device-status-label" style="font-size: 11.5px" :style="{ color: statusColor }">{{ statusLabel }}</text>
+            <text class="nx-device-status-label" style="font-size: 12px" :style="{ color: statusColor }">{{ statusLabel }}</text>
           </view>
         </view>
       </view>
       <view class="flex items-center gap-2.5 shrink-0">
         <view class="text-right">
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 18px; line-height: 1; font-weight: 600; color: var(--v5-warning); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
-          <text class="block" style="font-size: 10px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
+          <!-- 《09》§3:正收益=success(warning 专属 Pending/Cooling)。本行是设备
+               今日**已实现**收益,非待结算 → success;同卡的 −$锁定日产 / 未解锁潜在
+               收益仍用 warning(语义正确,不批量改)。 -->
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 20px; line-height: 1; font-weight: 600; color: var(--v5-success); letter-spacing: -0.012em">${{ device.todayEarnings.toFixed(2) }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 3px; letter-spacing: 0.04em">{{ t.earn.todayEarnings }}</text>
         </view>
         <view class="grid place-items-center shrink-0 active:opacity-60" :style="chevronBtnStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease' }"><path d="m6 9 6 6 6-6" /></svg>
@@ -87,7 +90,7 @@
     <view v-if="expanded" class="nx-device-card__details">
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
-        <text class="min-w-0 truncate" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
+        <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
         <view v-if="degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
         </view>
@@ -126,8 +129,8 @@
       </view>
       <view class="flex items-end justify-between">
         <view class="flex items-baseline" style="gap: 4px">
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ live.effectiveTops.toFixed(1) }}</text>
-          <text style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink-3)">TOPS</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-brand); letter-spacing: -0.014em">{{ live.effectiveTops.toFixed(1) }}</text>
+          <text style="font-size: 12px; font-weight: 600; color: var(--v5-ink-3)">TOPS</text>
         </view>
         <svg width="110" height="28" viewBox="0 0 110 28" preserveAspectRatio="none" fill="none">
           <polyline :points="sparkPoints" fill="none" stroke="var(--v5-brand)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -136,14 +139,14 @@
       <view class="flex items-center justify-between" style="margin-top: 6px">
         <view class="flex items-center gap-1.5">
           <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); box-shadow: 0 0 6px var(--v5-brand)" />
-          <text style="font-size: 11.5px; color: var(--v5-ink-2)">{{ factorLabel }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-2)">{{ factorLabel }}</text>
         </view>
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashOutput, { n: live.effectivePct }) }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.earn.hashOutput, { n: live.effectivePct }) }}</text>
       </view>
       <!-- R7: no fresh device heartbeat → hosted baseline; the viewing shell is irrelevant. -->
       <view v-if="!deviceOnline" class="flex items-center" style="gap: 6px; margin-top: 8px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--v5-tech-cyan) 10%, transparent)">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></svg>
-        <text style="font-size: 11px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
+        <text style="font-size: 12px; line-height: 1.35; color: var(--v5-ink-2); text-wrap: pretty">{{ t.earn.hashCarrierH5Network }} · {{ t.earn.hashCarrierUpgradeHook }}</text>
       </view>
     </view>
 
@@ -156,11 +159,11 @@
             <svg class="nx-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
           <view class="flex-1 min-w-0">
-            <text class="block" style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ t.earn.reconnecting }}</text>
-            <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.35">{{ reconnectHoldText }}</text>
+            <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ t.earn.reconnecting }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.35">{{ reconnectHoldText }}</text>
           </view>
         </view>
-        <text v-if="device.currentTask" class="block truncate tabular-nums" style="margin-top: 8px; padding-left: 42px; font-size: 11px; color: var(--v5-ink-4); font-family: var(--font-v5)">#{{ device.currentTask.id }} · {{ device.currentTask.model }}</text>
+        <text v-if="device.currentTask" class="block truncate tabular-nums" style="margin-top: 8px; padding-left: 42px; font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5)">#{{ device.currentTask.id }} · {{ device.currentTask.model }}</text>
       </view>
     </view>
 
@@ -172,8 +175,8 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="pausedIconPath" /></svg>
         </view>
         <view class="flex-1 min-w-0">
-          <text class="block" style="font-size: 12.5px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ pausedTitle }}</text>
-          <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.35">{{ pausedHint }}</text>
+          <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ pausedTitle }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.35">{{ pausedHint }}</text>
         </view>
       </view>
     </view>
@@ -181,18 +184,18 @@
     <!-- Phone: waiting placeholder -->
     <view v-else-if="!task && device.kind === 'phone' && !device.pausedReason" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <view class="flex items-center gap-2" style="font-size: 12.5px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
+      <view class="flex items-center gap-2" style="font-size: 13px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">
         <svg class="nx-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
         <text>{{ t.earn.phoneWaitingTask }}</text>
       </view>
-      <text class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 4px">{{ t.earn.phoneWaitingHint }}</text>
+      <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 4px">{{ t.earn.phoneWaitingHint }}</text>
     </view>
 
     <!-- Current task (non-reconnecting) -->
     <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <text class="block" style="font-size: 13.5px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ task.type }}</text>
-      <view class="mt-0.5 flex items-center gap-1.5 flex-wrap" style="font-size: 11.5px; color: var(--v5-ink-3)">
+      <text class="block" style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ task.type }}</text>
+      <view class="mt-0.5 flex items-center gap-1.5 flex-wrap" style="font-size: 12px; color: var(--v5-ink-3)">
         <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">#{{ task.id }}</text>
         <text style="color: var(--v5-ink-4)">·</text>
         <text style="color: color-mix(in srgb, var(--v5-ink) 80%, transparent)">{{ task.client }}</text>
@@ -203,7 +206,7 @@
         <view class="flex-1 h-1 rounded-full overflow-hidden" style="background: var(--v5-surface-2)">
           <view class="h-full" :style="progressBarStyle" />
         </view>
-        <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 11.5px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct }}%</text>
+        <text class="tabular-nums text-right" style="font-family: var(--font-v5); font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 80%, transparent); width: 48px">{{ progressPct }}%</text>
       </view>
       <view class="mt-1.5 flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-3)">
         <text>~{{ elapsedRemaining }} {{ t.earn.remaining }}</text>
@@ -214,12 +217,12 @@
     <!-- Phone: background mode toggles -->
     <view v-if="device.kind === 'phone'" style="padding: 0 20px 12px">
       <view class="flex items-center gap-1.5 mb-2">
-        <text style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
+        <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.earn.phoneSettingsTitle }}</text>
         <view class="nx-device-help grid place-items-center rounded-full active:opacity-60" style="width: 20px; height: 20px" role="button" tabindex="0" :aria-label="t.earn.phoneRequirementsHelpAria" :aria-expanded="showHelp" @click="showHelp = !showHelp" @keydown.enter.stop.prevent="showHelp = !showHelp" @keydown.space.stop.prevent="showHelp = !showHelp">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
         </view>
       </view>
-      <view v-if="showHelp" class="mb-2.5 rounded-lg px-3 py-2" style="background: var(--v5-surface-2)"><text style="font-size: 11px; color: var(--v5-ink-2); line-height: 1.35">{{ t.earn.phoneRequirementsHint }}</text></view>
+      <view v-if="showHelp" class="mb-2.5 rounded-lg px-3 py-2" style="background: var(--v5-surface-2)"><text style="font-size: 12px; color: var(--v5-ink-2); line-height: 1.35">{{ t.earn.phoneRequirementsHint }}</text></view>
       <view class="flex items-center gap-1.5 mb-2.5">
         <view class="nx-device-charger-toggle flex items-center gap-1 active:opacity-80" :style="togglePillStyle(isCharging)" role="switch" tabindex="0" :aria-checked="isCharging" :aria-label="isCharging ? t.earn.phoneCharging : t.earn.phoneOnBattery" @click="toggleCharger" @keydown.enter.stop.prevent="toggleCharger" @keydown.space.stop.prevent="toggleCharger">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="isCharging ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-if="isCharging" d="m11 7-3 5h4l-3 5" /><rect x="1" y="6" width="16" height="12" rx="2" /><path d="M22 11v2" /></svg>
@@ -234,23 +237,23 @@
 
     <!-- Phone: locked-tasks loss-ad -->
     <view v-if="device.kind === 'phone' && phoneLockedVisible" style="padding: 12px 20px 4px">
-      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
+      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning); line-height: 1">−${{ lockedTotalDaily }}</text>
-        <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
+        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
       <view class="space-y-1.5">
-        <view v-for="(it, i) in LOCKED_ITEMS" :key="i" class="flex items-center justify-between" style="font-size: 11.5px; color: var(--v5-ink-2)">
+        <view v-for="(it, i) in LOCKED_ITEMS" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <text class="truncate">{{ it.model }}</text>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
-            <text class="tabular-nums text-right" style="font-size: 10.5px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 40px">{{ it.vram }}</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.daily }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 40px">{{ it.vram }}</text>
           </view>
         </view>
       </view>
@@ -261,23 +264,23 @@
 
     <!-- FEAT-DEV01: hardware locked-tasks loss-ad(从 VRAM 门控任务池真派生;顶配设备无锁定项自动隐藏) -->
     <view v-if="hwTeasers.length" style="padding: 12px 20px 4px">
-      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
+      <view class="flex items-center gap-1.5 mb-1.5" style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-4)">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text>{{ t.earn.lockedTasksTitle }}</text>
       </view>
       <view class="flex items-baseline gap-1.5 mb-2.5">
         <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; font-weight: 600; color: var(--v5-warning); line-height: 1">−${{ hwLockedDaily }}</text>
-        <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
+        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.earn.lockedMissedDaily }}</text>
       </view>
       <view class="space-y-1.5">
-        <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 11.5px; color: var(--v5-ink-2)">
+        <view v-for="(it, i) in hwTeasers" :key="i" class="flex items-center justify-between" style="font-size: 12px; color: var(--v5-ink-2)">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <text class="truncate">{{ it.model }}</text>
           </view>
           <view class="flex items-center gap-2 shrink-0 ml-2">
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 10.5px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
-            <text class="tabular-nums text-right" style="font-size: 10.5px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-warning); font-weight: 600; line-height: 1">+${{ it.dailyPotentialUSD }}<text style="font-size: 12px; color: var(--v5-ink-3); font-weight: 400; margin-left: 2px">/d</text></text>
+            <text class="tabular-nums text-right" style="font-size: 12px; color: var(--v5-ink-4); font-family: var(--font-v5); width: 44px">{{ it.minVRAM }} GB</text>
           </view>
         </view>
       </view>
@@ -290,9 +293,11 @@
     <view style="padding: 16px 20px 20px; border-top: 1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)">
       <text class="block" :style="sectionLabelStyle">{{ t.earn.todayEarnings }}</text>
       <view class="flex items-baseline gap-2.5" style="margin-top: 4px">
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; line-height: 1; font-weight: 600; color: var(--v5-warning); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
-        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-warning); font-weight: 600">
-          <text style="font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-warning) 75%, transparent)">+</text>
+        <!-- 《09》§3 正收益=success:本组是「今日已实现收益」(USDT 主数 + NEX 增量),
+             与卡内 −$锁定日产 / 未解锁潜在收益(仍 warning=Pending)语义不同,不可混用。 -->
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; line-height: 1; font-weight: 600; color: var(--v5-success); letter-spacing: -0.014em">${{ device.todayEarnings.toFixed(3) }}</text>
+        <view class="font-mono-tabular flex items-center gap-1 tabular-nums" style="font-size: 12px; color: var(--v5-success); font-weight: 600">
+          <text style="font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: color-mix(in srgb, var(--v5-success) 75%, transparent)">+</text>
           <text>{{ device.todayEarningsNEX.toFixed(1) }} NEX</text>
         </view>
       </view>
@@ -540,7 +545,7 @@ const subsidyText = computed(() => {
 const subsidyChipStyle: CSSProperties = {
   padding: "3px 9px",
   borderRadius: "999px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 600,
   fontFamily: "var(--font-v5)",
   background: "var(--v5-brand-soft)",
@@ -560,7 +565,7 @@ const capacityRowText = computed(() =>
     : fmt(t.value.earn.capacityRow, { pct: capacityPct.value, n: tasksToday.value }),
 );
 const capacityRowStyle = computed<CSSProperties>(() => ({
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: capacityFloored.value ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
   fontWeight: capacityFloored.value ? 600 : 400,
 }));
@@ -688,7 +693,7 @@ const chevronBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
 };
 const sectionLabelStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-ink-3)",
@@ -696,7 +701,7 @@ const sectionLabelStyle: CSSProperties = {
 const capChipStyle: CSSProperties = {
   padding: "3px 8px",
   borderRadius: "9999px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   background: "var(--v5-surface-2)",
 };
 const warnBoxStyle: CSSProperties = {
@@ -712,7 +717,7 @@ const warnIconStyle: CSSProperties = {
 const chipStyle = computed<CSSProperties>(() => ({
   padding: "2px 6px",
   borderRadius: "4px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontFamily: "var(--font-v5)",
   background: `color-mix(in srgb, ${chipColor.value} 12%, transparent)`,
   color: chipColor.value,
@@ -727,7 +732,7 @@ function togglePillStyle(on: boolean): CSSProperties {
     height: "28px",
     padding: "0 8px",
     borderRadius: "999px",
-    fontSize: "10.5px",
+    fontSize: "12px",
     fontWeight: 500,
     background: on ? "color-mix(in oklab, var(--v5-brand) 14%, transparent)" : "var(--v5-surface-2)",
   };
@@ -739,7 +744,7 @@ const unlockCtaStyle: CSSProperties = {
 };
 const unlockCtaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 </script>

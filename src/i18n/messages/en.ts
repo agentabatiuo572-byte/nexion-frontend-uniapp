@@ -104,7 +104,7 @@ export const en = {
     teamNetwork: "Your node influence map",
   },
   intro: {
-    title1: "Nexion. Compute flows.",
+    title1: "NexGrid. Compute flows.",
     subtitleLine1: "Connecting the world's compute to power AI.",
     statsDevices: "devices",
     statsPaidToday: "paid today",
@@ -119,19 +119,19 @@ export const en = {
     effectiveLabel: "EFFECTIVE JUNE 1, 2026",
     heroTitle: "Terms of Service",
     heroSubtitle:
-      "These terms form a binding agreement between you and Nexion Compliance Authority governing your use of the Nexion compute marketplace, hardware, wallet, and NEX token rewards. By creating an account or tapping “Get started,” you accept them in full.",
+      "These terms form a binding agreement between you and NexGrid Compliance Authority governing your use of the NexGrid compute marketplace, hardware, wallet, and NEX token rewards. By creating an account or tapping “Get started,” you accept them in full.",
     s1Title: "Acceptance & eligibility",
     s1Body:
-      "You must be at least 18 years old and legally able to enter contracts to use Nexion. The service is not offered to residents of OFAC-sanctioned jurisdictions or anywhere our compute marketplace is prohibited by law. By using Nexion you confirm you meet these requirements and that the information you provide is accurate.",
-    s2Title: "The Nexion service",
+      "You must be at least 18 years old and legally able to enter contracts to use NexGrid. The service is not offered to residents of OFAC-sanctioned jurisdictions or anywhere our compute marketplace is prohibited by law. By using NexGrid you confirm you meet these requirements and that the information you provide is accurate.",
+    s2Title: "The NexGrid service",
     s2Body:
-      "Nexion operates a smart-contract-based marketplace that routes AI-inference and rendering workloads to participant-owned NexionBox and NexionRack hardware. We provide the matchmaking, settlement, and wallet layers; we do not guarantee continuous job availability, fixed pricing, or any specific level of compute demand.",
+      "NexGrid operates a smart-contract-based marketplace that routes AI-inference and rendering workloads to participant-owned NexGridBox and NexGridRack hardware. We provide the matchmaking, settlement, and wallet layers; we do not guarantee continuous job availability, fixed pricing, or any specific level of compute demand.",
     s3Title: "Your account & security",
     s3Body:
       "You are responsible for safeguarding your login credentials, two-factor authentication, and wallet keys. Activity under your account is your responsibility. Notify us immediately of any unauthorized access. We may suspend accounts showing signs of fraud, multi-accounting, or credential compromise.",
     s4Title: "Hardware purchase & operation",
     s4Body:
-      "NexionBox / NexionRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume declines with device age, so the tasks a device can book — and its earnings — taper accordingly; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
+      "NexGridBox / NexGridRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume declines with device age, so the tasks a device can book — and its earnings — taper accordingly; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
     s5Title: "Earnings, rewards & the NEX token",
     s5Body:
       "All yield figures shown in the app are projections based on current network parameters and recent demand, not guarantees. Earnings fluctuate and may decline over time. NEX is a platform reward token whose value can move sharply and is not deposit-insured. Never commit more than you can afford to lose.",
@@ -143,16 +143,16 @@ export const en = {
       "Direct Royalty and Network Yield Bonus are paid from platform margin, never from a friend's deposit. Rewards depend on referred users completing qualifying actions. Spam, fake accounts, or mass-recruitment schemes are prohibited, will be voided, and may result in suspension and forfeiture of pending rewards.",
     s8Title: "Prohibited conduct",
     s8Body:
-      "You may not use Nexion to launder funds, manipulate token markets, bypass KYC, operate multiple accounts to farm rewards, decompile or tamper with the network, or interfere with other participants' devices. Violations may lead to immediate termination and reporting to relevant authorities.",
+      "You may not use NexGrid to launder funds, manipulate token markets, bypass KYC, operate multiple accounts to farm rewards, decompile or tamper with the network, or interfere with other participants' devices. Violations may lead to immediate termination and reporting to relevant authorities.",
     s9Title: "Fees, taxes & changes",
     s9Body:
       "Network, withdrawal, and card-processing fees are disclosed at the point of each transaction. You are solely responsible for any taxes on your earnings. We may update these terms; material changes will be notified in-app, and continued use after the effective date constitutes acceptance.",
     s10Title: "Disclaimers, liability & governing law",
     s10Body:
-      "Nexion is provided “as is” without any warranty of guaranteed return. To the fullest extent permitted by law, our aggregate liability is limited to the fees you paid in the prior three months. These terms are governed by the laws of the jurisdiction of Nexion Compliance Authority, and disputes are resolved by binding arbitration where permitted.",
+      "NexGrid is provided “as is” without any warranty of guaranteed return. To the fullest extent permitted by law, our aggregate liability is limited to the fees you paid in the prior three months. These terms are governed by the laws of the jurisdiction of NexGrid Compliance Authority, and disputes are resolved by binding arbitration where permitted.",
     riskLink: "See also: Platform Risk Disclosure",
     footer:
-      "Nexion Compliance Authority · FinCEN MSB #MSB1234567 · MiCA-aligned · Questions: legal@nexion.io",
+      "NexGrid Compliance Authority · FinCEN MSB #MSB1234567 · MiCA-aligned · Questions: legal@nexgrid.io",
     gotIt: "Got it",
   },
   authOtp: {
@@ -283,16 +283,16 @@ export const en = {
     giftPendingToast: "Welcome gift pending review",
     giftPendingToastSub: "Signup is complete. The reward is held until account review is complete.",
     doneTitle: "You're in",
-    doneSubTeam: "Welcome to Nexion — you joined {name}'s team",
-    doneSubSolo: "Welcome to Nexion",
+    doneSubTeam: "Welcome to NexGrid — you joined {name}'s team",
+    doneSubSolo: "Welcome to NexGrid",
     doneGiftPosted: "Credited — visible in your balance",
     doneGiftPending: "Locked · releases after review",
     doneGiftPendingNote: "Staying online in the APP speeds up the release.",
     doneWhyApp1: "APP online hours speed up gift & yield release",
     doneWhyApp2: "Real-time yield alerts — wake up to earnings",
     doneWhyApp3: "Steadier connection & compute scheduling",
-    doneOfficialDownloadHint: "Download the APP from Nexion's website in your browser",
-    doneOfficialDownloadLink: "Download the APP from Nexion",
+    doneOfficialDownloadHint: "Download the APP from NexGrid's website in your browser",
+    doneOfficialDownloadLink: "Download the APP from NexGrid",
     doneOfficialDownloadPending: "APP download link unavailable",
     doneContinue: "Continue",
     giftBillMemo: "Welcome gift - referral bonus",
@@ -317,12 +317,12 @@ export const en = {
     deviceEarning: "earning",
     deviceOffline: "Offline",
     deviceToday: "today",
-    addNexionBox: "Add a NexionBox",
+    addNexGridBox: "Add a NexGridBox",
     fleetAddSlot: "Add device",
     addBoxPayback: "Pays back in ~{n} days",
     estPerDay: "est. /d",
     // OnGridSection + NetworkPulseCard (structural labels keyed; dense mock stat subs kept faithful)
-    onGridTitle: "On Nexion grid",
+    onGridTitle: "On NexGrid grid",
     onGridNow: "now",
     onGridMap: "Map",
     onGridGpus: "{n} GPUs",
@@ -373,7 +373,7 @@ export const en = {
     liveActivityLabel: "Live platform activity",
     liveActivityNowSec: "{n}s ago",
     liveActivityMinAgo: "{n}m ago",
-    globalNetwork: "Nexion AI Network",
+    globalNetwork: "NexGrid AI Network",
     activeDevices: "Active Devices",
     paidToday: "Paid Today",
     nodes: "Nodes",
@@ -397,7 +397,7 @@ export const en = {
     liveStreaming: "Live · streaming every minute",
     manage: "Manage",
     boostEarnings: "Boost your earnings",
-    upgradeHint: "Upgrade to NexionBox to earn 16× more",
+    upgradeHint: "Upgrade to NexGridBox to earn 16× more",
     upgradeCTA: "Explore Store",
     news: "News",
     deviceOnline: "device online",
@@ -437,7 +437,7 @@ export const en = {
     dayOneTaskBindCard: "Link bank card",
     dayOneTaskVisitEarn: "Visit Earn tab",
     dayOneTaskVisitStore: "Visit Store",
-    dayOneTaskSeeRoi: "See NexionBox S1 ROI",
+    dayOneTaskSeeRoi: "See NexGridBox S1 ROI",
     dayOneTaskSetupProfile: "Set up profile",
     dayOneTaskInviteFriend: "Invite a friend",
     dayOneCatWallet: "wallet",
@@ -450,7 +450,7 @@ export const en = {
     weeklyQuestEndsIn: "ends in",
     weeklyQuestActivateToClaim: "Activate {device} to claim",
     weeklyQuestAddCapacity: "Add capacity to claim",
-    weeklyQuestGetNexionBox: "Get NexionBox",
+    weeklyQuestGetNexGridBox: "Get NexGridBox",
     // ConversionBanner micro-stats (source hardcoded; keyed for bilingual parity)
     // LiveFeedCard (tabs + chrome)
     liveFeedTabActivity: "Activity",
@@ -509,13 +509,13 @@ export const en = {
     txLabel: "Earnings",
     jobsLive: "jobs live globally",
     addAnother: "Add another device",
-    addAnotherHint: "Browse NexionBox hardware to unlock higher-paying jobs",
+    addAnotherHint: "Browse NexGridBox hardware to unlock higher-paying jobs",
     downloadAgent: "Download Agent",
-    browseStore: "Browse NexionBox",
+    browseStore: "Browse NexGridBox",
     boostEarnings: "Boost earnings",
     boostMoreDaily: "more daily revenue",
     boostPhoneLabel: "Phone",
-    boostS1Label: "NexionBox S1",
+    boostS1Label: "NexGridBox S1",
     boostLimitedOffer: "$200 off · ends in 2d 14h",
     boostUpgradeCta: "Upgrade Now",
     slotsUsed: "slots used",
@@ -529,7 +529,7 @@ export const en = {
     requires: "Requires",
     upgradeNow: "Upgrade",
     phoneWaitingTask: "Waiting to pick up a task…",
-    phoneWaitingHint: "Nexion is matching your phone with an available AI workload.",
+    phoneWaitingHint: "NexGrid is matching your phone with an available AI workload.",
     phonePausedNoCharger: "Idle · waiting for charger",
     phonePausedNoChargerHint: "Plug in to start earning. Battery-only mode is off by default to protect your device.",
     phonePausedNoNetwork: "Idle · network unreachable",
@@ -707,7 +707,7 @@ export const en = {
   search: {
     navTitle: "Search",
     placeholder: "Search devices, members, FAQ, pages…",
-    emptyTitle: "Search Nexion",
+    emptyTitle: "Search NexGrid",
     emptyBody: "Type to find routes, devices, products, network members, or FAQ entries.",
     noResults: "No results — try different keywords.",
     groupLabels: {
@@ -790,20 +790,20 @@ export const en = {
     network: "Network",
     externalTitle: "View on external explorer",
     externalBody: "This transaction is also indexed on public blockchain explorers. Click below to verify independently.",
-    footer: "All Nexion transactions settle on Ethereum Mainnet with Layer-2 aggregation for batch finality. Inquiries: compliance@nexion.ai",
+    footer: "All NexGrid transactions settle on Ethereum Mainnet with Layer-2 aggregation for batch finality. Inquiries: compliance@nexgrid.ai",
   },
 
   riskDisclosure: {
     navTitle: "Platform risk disclosure",
     heroLabel: "REQUIRED READING",
     heroTitle: "Read this before staking, locking, or withdrawing.",
-    heroSubtitle: "Nexion is a smart-contract-based compute marketplace with token rewards. Returns are projections, not guarantees. Read the 7 sections below and acknowledge to continue.",
+    heroSubtitle: "NexGrid is a smart-contract-based compute marketplace with token rewards. Returns are projections, not guarantees. Read the 7 sections below and acknowledge to continue.",
     alreadyAccepted: "Already acknowledged",
     alreadyAcceptedCta: "Acknowledged",
     s1Title: "Earnings projections are forecasts, not promises",
-    s1Body: "All daily / monthly / annual yield estimates shown on Nexion are based on current network parameters and recent client demand. Actual earnings will fluctuate ±15% week-to-week and may decline as more devices join the network or as compute prices fall. Past performance is not indicative of future results.",
+    s1Body: "All daily / monthly / annual yield estimates shown on NexGrid are based on current network parameters and recent client demand. Actual earnings will fluctuate ±15% week-to-week and may decline as more devices join the network or as compute prices fall. Past performance is not indicative of future results.",
     s2Title: "The task pool keeps upgrading — bookable tasks decline with device age",
-    s2Body: "Nexion's AI task pool keeps upgrading: newer tasks demand more compute (VRAM), so higher-tier tasks grow while lower-tier task volume shrinks. The tasks a given device can book narrow month over month through its first year — faster in later months — until only the capacity-floor share of earnings remains. Newly activated devices receive a task-priority subsidy that keeps them booked at full capacity. Trade-in credit is set by the tier your device's lifetime output falls into — the more it has produced, the smaller the credit.",
+    s2Body: "NexGrid's AI task pool keeps upgrading: newer tasks demand more compute (VRAM), so higher-tier tasks grow while lower-tier task volume shrinks. The tasks a given device can book narrow month over month through its first year — faster in later months — until only the capacity-floor share of earnings remains. Newly activated devices receive a task-priority subsidy that keeps them booked at full capacity. Trade-in credit is set by the tier your device's lifetime output falls into — the more it has produced, the smaller the credit.",
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal windows + compliance review",
@@ -813,7 +813,7 @@ export const en = {
     s6Title: "Network economics + referral compensation",
     s6Body: "Direct Royalty (10% of qualifying friend orders at base rate, scaled by Rate Tier) and Network Yield Bonus (algorithmic extended-network yield) are paid from platform margin, not from the friend's pocket. Referral rewards depend on referred users completing qualifying actions. Mass-recruitment or spam referrals will be voided and may result in account suspension.",
     s7Title: "Custody, KYC, and regulatory jurisdiction",
-    s7Body: "Nexion is operated by Nexion Compliance Authority under FinCEN MSB registration #MSB1234567, with MiCA-aligned compliance procedures and Chainalysis KYT integration. Funds are held in segregated reserve accounts audited quarterly by PwC. KYC is required for withdrawals exceeding lifetime $100. Nexion is not available in OFAC-sanctioned jurisdictions.",
+    s7Body: "NexGrid is operated by NexGrid Compliance Authority under FinCEN MSB registration #MSB1234567, with MiCA-aligned compliance procedures and Chainalysis KYT integration. Funds are held in segregated reserve accounts audited quarterly by PwC. KYC is required for withdrawals exceeding lifetime $100. NexGrid is not available in OFAC-sanctioned jurisdictions.",
     scrollHint: "Please scroll through all sections before acknowledging.",
     checkboxLabel: "I have read the 7 sections above and understand that earnings are projections, bookable task volume declines as the task pool upgrades, tokens carry market risk, and withdrawals may be subject to compliance review.",
     acceptCta: "I acknowledge — continue",
@@ -835,9 +835,9 @@ export const en = {
     title: "Lifetime earnings · ${amount} milestone",
     earn100: "First $100 earned — your phone has officially paid back its activation overhead.",
     earn500: "Half-grand reached. Hardware tier upgrades start unlocking measurable ROI from here.",
-    earn1000: "Four-figure earner. You're outpacing 88% of solo-phone accounts on Nexion.",
-    earn5000: "Mid five-figure operator. Most users at this stage already own a NexionBox Pro.",
-    earn10000: "Top 2% of Nexion earners. Founders Tier consideration unlocks at $25K.",
+    earn1000: "Four-figure earner. You're outpacing 88% of solo-phone accounts on NexGrid.",
+    earn5000: "Mid five-figure operator. Most users at this stage already own a NexGridBox Pro.",
+    earn10000: "Top 2% of NexGrid earners. Founders Tier consideration unlocks at $25K.",
     genericBody: "A new earnings milestone has been reached.",
     nexChip: "+{amount} NEX",
   },
@@ -1007,7 +1007,7 @@ export const en = {
     trust: {
       a: { label: "Sumsub", body: "Tier-1 KYC provider used by Binance, Bybit, Crypto.com. SOC 2 Type II audited." },
       b: { label: "GDPR + MiCA", body: "Data stored in EU region; right-to-erasure honored on request." },
-      c: { label: "Encrypted at rest", body: "Document images held in zero-knowledge encrypted blob storage. Nexion staff cannot decrypt." },
+      c: { label: "Encrypted at rest", body: "Document images held in zero-knowledge encrypted blob storage. NexGrid staff cannot decrypt." },
     },
     faqTitle: "FAQ",
     faqs: {
@@ -1020,7 +1020,7 @@ export const en = {
     ctaNote: "Free · ~90 seconds · powered by Sumsub",
     flow: {
       verificationDeposit: "Verification deposit",
-      depositCreditHint: "Fully credited to your Nexion balance. Counts toward your $20 first withdrawal threshold.",
+      depositCreditHint: "Fully credited to your NexGrid balance. Counts toward your $20 first withdrawal threshold.",
       generateAddressCta: "Generate deposit address",
       paymentSentCta: "I've completed the payment",
       verificationComplete: "Verification complete",
@@ -1062,7 +1062,7 @@ export const en = {
       viewAll: "View all",
       empty: "No NEX activity yet",
     },
-    note: "NEX is the Nexion platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
+    note: "NEX is the NexGrid platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
   },
 
   events: {
@@ -1204,13 +1204,13 @@ export const en = {
     // Home TrialHeroBanner — coupon ticket form (100% v5 BzBtJ design port).
     // Paired with SVG star icon; CSS handles uppercase + letter-spacing.
     heroBadge: "Free trial",
-    heroDeviceName: "NexionBox S1",
+    heroDeviceName: "NexGridBox S1",
     heroTagline: "Try free for {days} days, cancel anytime.",
     heroEarnLabel: "EST. {days}-DAY EARN",
     heroTrialsLeft: "{n} trials left today",
     heroClaimCta: "Claim trial",
     // /me TrialEntry — ticket form (lemon-themed, design IUVoAAI port)
-    entryDeviceName: "NexionBox S1",
+    entryDeviceName: "NexGridBox S1",
     entryDescription: "Free for {days} days · cancel anytime",
     entryBenefitTitle: "You have a free trial device waiting to claim",
     entryClaimCta: "Claim now",
@@ -1221,7 +1221,7 @@ export const en = {
     activeStateExtended: "Extended",
     // claim sheet (chassis popup — zero-friction entry copy)
     sheetCapLabel: "Limited free",
-    sheetTitle: "NexionBox S1 free trial",
+    sheetTitle: "NexGridBox S1 free trial",
     sheetCloseAria: "Close",
     sheetPotentialLabel: "What you'll pocket",
     sheetPerDay: "${amount}/day",
@@ -1236,8 +1236,8 @@ export const en = {
     sheetDismissCta: "Maybe later",
     // /me/trial full page — header / toasts / hero / actions
     pageTitle: "Free trial",
-    pageHeaderSubtitle: "NexionBox S1",
-    toastActivated: "Free trial activated · NexionBox S1",
+    pageHeaderSubtitle: "NexGridBox S1",
+    toastActivated: "Free trial activated · NexGridBox S1",
     toastDebitFailedNoBalance: "Payment failed · Insufficient balance",
     toastDebitFailedTrialEnded: "Payment failed · Trial has ended",
     toastPurchaseComplete: "Purchase complete · paid ${amount}",
@@ -1253,7 +1253,7 @@ export const en = {
     rowTotal: "Pay now",
     rowEarningsOffset: "Trial earnings applied",
     offsetRemainderNote: "${remainder} credited to your balance after purchase",
-    buyCta: "Buy NexionBox S1 now",
+    buyCta: "Buy NexGridBox S1 now",
     cancelCta: "Cancel trial",
     goEarnCta: "See your earnings",
     ghostBadge: "On trial",
@@ -1262,7 +1262,7 @@ export const en = {
     ghostRibbonGrace: "Grace period",
     ghostRibbonExtended: "Extended access",
     ghostEta: "{eta} left",
-    ghostSubtitle: "NexionBox S1 trial earnings",
+    ghostSubtitle: "NexGridBox S1 trial earnings",
     deviceRowSub: "On free trial",
     cancelConfirmTitle: "Cancel free trial?",
     cancelConfirmMsg: "Cancelling stops your trial earnings and blocks a new trial for {n} days. Cancel anyway?",
@@ -1270,8 +1270,8 @@ export const en = {
     cancelConfirmKeep: "Keep trial",
     ghostDiscount: "Buy early: save {amount} + earnings credit",
     slotTag: "Trial",
-    confirmPurchaseTitle: "Confirm purchase · NexionBox S1",
-    confirmPurchaseMessage: "${amount} will be charged from your balance to complete the NexionBox S1 purchase. Trial earnings have been applied toward the device price; any remaining earnings are credited to your balance after purchase.",
+    confirmPurchaseTitle: "Confirm purchase · NexGridBox S1",
+    confirmPurchaseMessage: "${amount} will be charged from your balance to complete the NexGridBox S1 purchase. Trial earnings have been applied toward the device price; any remaining earnings are credited to your balance after purchase.",
     confirmPurchaseConfirm: "Confirm purchase",
     confirmPurchaseCancel: "Not now",
     fineprint: "Before purchase, trial earnings can only be applied toward your device price (up to a cap); any remaining earnings are credited to your balance after you complete the purchase. Cancel the trial midway and earnings reset to zero with no charge.",
@@ -1284,12 +1284,12 @@ export const en = {
     countdownStart: "Start {date}",
     countdownEnd: "Purchase by {date}",
     countdownDateEmpty: "—",
-    idleTitleNew: "Try NexionBox S1 free",
-    idleTitleAgain: "Try NexionBox S1 again",
+    idleTitleNew: "Try NexGridBox S1 free",
+    idleTitleAgain: "Try NexGridBox S1 again",
     idleBody: "{n} days free · cancel anytime",
     idleCta: "Claim trial",
     terminalRedeemedTitle: "Trial purchase complete",
-    terminalRedeemedDesc: "NexionBox S1 joined your compute fleet. Open Earn for live yield.",
+    terminalRedeemedDesc: "NexGridBox S1 joined your compute fleet. Open Earn for live yield.",
     terminalFailedTitle: "Payment failed",
     terminalFailedDesc: "Trial ended. You can bind a card and apply again after cooldown.",
     terminalCancelledTitle: "Trial cancelled",
@@ -1297,7 +1297,7 @@ export const en = {
     terminalCooldownLink: "Cooling down ({n} days until you can apply again)",
     // SimulationProvider trial-lifecycle toasts (auto-redeem + urgency pushes)
     toastAutoDebitFailed: "Payment failed · insufficient balance, trial ended",
-    toastConverted: "Trial complete · NexionBox S1 joined the compute network{note}",
+    toastConverted: "Trial complete · NexGridBox S1 joined the compute network{note}",
     toastConvertedNoteRemainder: " · trial earnings applied to your device, ${remainder} credited to balance",
     toastConvertedNoteOffset: " · trial earnings applied to your device",
     toastConvertedNoDevice: "Purchase complete, but the device couldn't be added · please contact support",
@@ -1339,7 +1339,7 @@ export const en = {
     inventoryConfirmDeactivateCancel: "Back",
     inventorySlotsFullWarning: "Slots full — deactivate a device to activate another.",
     inventoryEmptyTitle: "No devices yet",
-    inventoryEmptyBody: "Buy a NexionBox from the store. Activate it to start earning.",
+    inventoryEmptyBody: "Buy a NexGridBox from the store. Activate it to start earning.",
     inventoryCtaGoStore: "Go to store",
     inventoryPendingDeactivateChip: "Auto-deactivate after task ends",
     inventoryRowActivate: "Activate",
@@ -1486,10 +1486,10 @@ export const en = {
   },
   store: {
     title: "Store",
-    subtitle: "Dedicated compute devices, fully managed by Nexion.",
+    subtitle: "Dedicated compute devices, fully managed by NexGrid.",
     allProducts: "Devices",
     promoLine1: "🎁 LIMITED TIME · This week only",
-    promoLine2: "$200 off NexionBox S1 — ends in 2d 14h",
+    promoLine2: "$200 off NexGridBox S1 — ends in 2d 14h",
     promoLine3: "Use code",
     promoAtCheckout: "at checkout",
     estDaily: "Est. Daily",
@@ -1628,7 +1628,7 @@ export const en = {
     coBillTradeinPart: "trade-in {name} −${amount}",
     coBillCardFeePart: "incl. 3.5% card fee ${amount}",
     // Sprint A-1 / E.1: first-order celebration
-    firstOrderTitle: "🎉 Your first NexionBox is on its way",
+    firstOrderTitle: "🎉 Your first NexGridBox is on its way",
     firstOrderBody: "We'll provision your slot in the data center within minutes.",
     firstOrderAchievement: "Achievement unlocked · First Hardware Owner · +50 NEX",
     // Sprint A-1 / B.1: LiveSocialProof
@@ -1648,7 +1648,7 @@ export const en = {
     roiCalculator: "ROI Calculator",
     vsPhoneTitle: "VS YOUR PHONE",
     vsPhoneYourPhone: "Your phone",
-    vsPhoneS1: "NexionBox S1",
+    vsPhoneS1: "NexGridBox S1",
     vsPhoneMore: "more",
     // v3.6 ROI-first conversion copy
     paysBackIn: "Pays back in",
@@ -1762,7 +1762,7 @@ export const en = {
     beTheFirst: "Be the first one to earn from your network",
     shareAndEarn: "Share & Earn {n}",
     inviteShareText:
-      "I'm earning passive income on Nexion — turn your phone into an AI cluster. Sign up with my link and we both get $200: {url}",
+      "I'm earning passive income on NexGrid — turn your phone into an AI cluster. Sign up with my link and we both get $200: {url}",
     inviteLinkCopied: "Link copied — share anywhere",
     inviteShareCode: "Code",
     inviteShareLink: "Link",
@@ -1934,7 +1934,7 @@ export const en = {
     newTitle: "Bind a bank card",
     trialDiscloseTitle: "Auto-charge when the trial ends",
     trialDiscloseBody:
-      "When your {days}-day free trial ends, this card will be used to complete the NexionBox S1 purchase",
+      "When your {days}-day free trial ends, this card will be used to complete the NexGridBox S1 purchase",
     trialDiscloseAmount: " {amount}",
     trialDiscloseSuffix:
       ". Trial earnings go toward your device price (up to ${cap} off); any remaining earnings are credited to your balance after purchase;",
@@ -1965,8 +1965,8 @@ export const en = {
     estimatorTitleH: "Your phone earns from day one",
     estimatorSubtitle: "Reading your NPU specs to estimate earnings…",
     yourPrefix: "Your",
-    withS1: "With NexionBox S1",
-    withPro: "With NexionBox Pro",
+    withS1: "With NexGridBox S1",
+    withPro: "With NexGridBox Pro",
     estimatorHint:
       "Estimates based on current network parameters. Actual earnings vary ±15%.",
     yourCurrentRate: "your current rate",
@@ -2010,13 +2010,13 @@ export const en = {
     recalSubtitle: "New device detected — re-measuring this phone's compute.",
     recalActivate: "Finish recalibration",
     bgIntro: "Background mode lets your phone earn while you're not using it.",
-    activateCta: "Activate Nexion Compute",
+    activateCta: "Activate NexGrid Compute",
     seeProducts: "See products",
     completedAll: "I've completed all 3 steps",
-    enterNexion: "Enter Nexion",
+    enterNexGrid: "Enter NexGrid",
     // Legacy keys retained for fallback only (no longer rendered)
     downloadFor: "Download for",
-    downloadAgent: "Download Nexion Agent",
+    downloadAgent: "Download NexGrid Agent",
     downloadHint: "Lightweight, signed installer · ~24 MB",
     installLaunch: "Install & Launch",
     installHint: "One-click install · runs silently in background",
@@ -2114,7 +2114,7 @@ export const en = {
     walletSlotUnlock: "Unlock",
     walletSlotMore: "more",
     withdrawalLocked: "Withdrawal locked",
-    withdrawalLockedBody: "You need ${min} minimum (need ${short} more). At phone-tier earnings of $0.06/d, that's ~325 days. A NexionBox S1 hits $20 in under 3 days.",
+    withdrawalLockedBody: "You need ${min} minimum (need ${short} more). At phone-tier earnings of $0.06/d, that's ~325 days. A NexGridBox S1 hits $20 in under 3 days.",
     withdrawalLockedBrowse: "Browse hardware",
     secWithPasskey: "Passkey · 2FA",
     secNoTwoFa: "2FA off",
@@ -2187,6 +2187,33 @@ export const en = {
     agentInputPlaceholder: "Type your question to {name}…",
     sysConnectedHuman: "Connected to human support",
     sysBackToAi: "Back to Nova · AI",
+    // Channel push templates (team / staking / market). Previously hardcoded
+    // English in nova-bubble.vue — every locale saw English copy.
+    push: {
+      teamBought: "{buyer} just bought {product} · +${l1} USDT + {nex} NEX credited (30d cooling)",
+      teamBoughtCta: "View commission",
+      teamPlacedOne: "Network partner V5 {sponsor} auto-placed 1 new member into your Track B.",
+      teamPlacedMany: "Network partner V5 {sponsor} auto-placed {n} new members into your Track B.",
+      teamPlacedCta: "See Balance Match",
+      teamRankGap: "You're ${remain} away from V3 Captain — Apple Watch SE waiting.",
+      teamRankGapCta: "Boost team",
+      teamPeerBonus: "Same-rank peer {buyer} earned ${peer} this week → your 5% peer bonus +${amt}.",
+      teamPeerBonusCta: "Open",
+      stakingApyUp: "⚡ 180-day vault APY just rose from 80% → 95% (24h window only).",
+      stakingApyUpCta: "Lock now",
+      stakingGenesisLow: "🔥 Genesis seats running low · OG status + $NEX emission priority.",
+      stakingGenesisLowCta: "Claim seat",
+      stakingLockNow: "Lock your $NEX now to boost your emission priority when it lists.",
+      stakingLockNowCta: "Lock 180d",
+      stakingMatures: "Your 90-day stake matures in 12 days · auto-claim or extend for 35% bonus APY.",
+      stakingMaturesCta: "Manage",
+      marketPriceBreak: "📈 $NEX just broke ${price} · +{change}% in 24h · new ATH this week.",
+      marketPriceBreakCta: "Buy NEX",
+      marketTvl: "🎉 Platform TVL crossed ${tvl}M overnight · your Leadership pool share grew.",
+      marketTvlCta: "View pool",
+      marketLiquidity: "📊 $NEX 24h volume hit a new high · pool liquidity deepened across venues.",
+      marketLiquidityCta: "Trust Center",
+    },
   },
   receipt: {
     title: "Receipts",
@@ -2302,7 +2329,7 @@ export const en = {
     sessionSurfaceSigned: "App",
     sessionSurfaceWhite: "App",
     sessionSurfaceH5: "Web",
-    sessionLocation: "Nexion Cloud",
+    sessionLocation: "NexGrid Cloud",
     sessionRevoke: "Revoke",
     sessionRevoked: "Session revoked",
     sessionRevokeConfirm: "Sign this device out of your account?",
@@ -2322,7 +2349,7 @@ export const en = {
     deleteAccountHint:
       "Permanently delete your account, devices, and earnings history.",
     deleteAccountConfirm:
-      "Permanently delete your Nexion account?\n\nAll devices, earnings, receipts and team data will be lost. This cannot be undone.",
+      "Permanently delete your NexGrid account?\n\nAll devices, earnings, receipts and team data will be lost. This cannot be undone.",
     deleteAccountToast: "Account deleted — you've been signed out",
   },
   help: {
@@ -2334,11 +2361,11 @@ export const en = {
     catDevices: "Devices",
     catPayments: "Payments",
     catTechnical: "Technical",
-    askBot: "Ask NexionBot",
+    askBot: "Ask NexGridBot",
     botGreeting:
-      "Hi, I'm NexionBot — I can answer most common questions in seconds. Tap a topic above or type below.",
+      "Hi, I'm NexGridBot — I can answer most common questions in seconds. Tap a topic above or type below.",
     botPlaceholder: "Type your question…",
-    botThinking: "NexionBot is thinking…",
+    botThinking: "NexGridBot is thinking…",
     contactSupport: "Contact support",
     contactHint: "Average response time · 24h via email",
     contactCta: "Open ticket",
@@ -2352,13 +2379,13 @@ export const en = {
     onlineNow: "Online now",
     avgResponse: "Avg. response {n}m",
     chTelegram: "Telegram",
-    chTelegramHint: "@nexion_official · 24/7 community",
+    chTelegramHint: "@nexgrid_official · 24/7 community",
     chDiscord: "Discord",
-    chDiscordHint: "discord.gg/nexion · #ask-an-engineer",
+    chDiscordHint: "discord.gg/nexgrid · #ask-an-engineer",
     chTicket: "Open a ticket",
     chTicketHint: "For account / KYC / payout escalations",
     chEmail: "Email",
-    chEmailHint: "support@nexion.ai · within 24h",
+    chEmailHint: "support@nexgrid.ai · within 24h",
     pinnedTitle: "Pinned by support",
     pinnedItem1:
       "Withdrawals processed Mon-Fri 09:00-21:00 UTC. Weekend queue clears Monday.",
@@ -2367,7 +2394,7 @@ export const en = {
     pinnedItem3:
       "Devices that go offline for 24h reset their compounding streak — keep them charging.",
     pinnedItem4:
-      "Beware of fake Nexion DMs — official accounts never DM you first.",
+      "Beware of fake NexGrid DMs — official accounts never DM you first.",
     openChannel: "Open",
     chLiveChat: "Live messages",
     chLiveChatHint: "Chat with your advisor & support team",
@@ -2409,7 +2436,7 @@ export const en = {
       advisorWelcome:
         "Hi, I'm {name}, your growth advisor 👋 I keep an eye on your rigs and ping you when there's a clear win.",
       advisorIdleGpu:
-        "Heads up — your devices have been idling ~30% the last few days. Upgrading to NexionBox Pro earns noticeably more on the same plug. Want me to show you?",
+        "Heads up — your devices have been idling ~30% the last few days. Upgrading to NexGridBox Pro earns noticeably more on the same plug. Want me to show you?",
       advisorStaking:
         "The 180-day vault is at 95% APY, today only. Locking even part of your balance now compounds fast — quick to set up 👇",
       supportResolved:
@@ -2417,7 +2444,7 @@ export const en = {
       supportUserQ:
         "Hi, my withdrawal has shown 'pending' for over a day — can you check the status?",
       supportGreeting:
-        "You're connected — I'm {name} from Nexion support 👋 How can I help today?",
+        "You're connected — I'm {name} from NexGrid support 👋 How can I help today?",
       sessionIdleWarn:
         "You've been quiet for a while — without a reply, this session will close automatically in about {n} min. If you still need help afterwards, you can start a new session anytime.",
       sessionTimeoutClosed:
@@ -2425,7 +2452,7 @@ export const en = {
     },
     // CTA labels for seed messages
     cta: {
-      browseStore: "See NexionBox Pro →",
+      browseStore: "See NexGridBox Pro →",
       lockStaking: "Lock 180-day →",
     },
     // Runtime agent reply templates (cycled in order)
@@ -2457,7 +2484,7 @@ export const en = {
     insufficientMessage: "You don't have enough {sym} for this swap.",
     minAmount: "Min: {n} {sym}",
     nexInfo:
-      "NEX is the Nexion platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
+      "NEX is the NexGrid platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
     historyTitle: "Recent swaps",
     historyEmpty: "Your first swap will appear here.",
     howItWorksEntry: "Rules",
@@ -2489,7 +2516,7 @@ export const en = {
     heroLabel: "NEX ↔ USDT EXCHANGE",
     heroTitle: "Convert NEX to USDT (or back) at live market rate.",
     heroSub:
-      "Move between Nexion's platform token and the dollar-pegged stablecoin in your wallet. Daily caps and KYC tiers protect both you and the platform.",
+      "Move between NexGrid's platform token and the dollar-pegged stablecoin in your wallet. Daily caps and KYC tiers protect both you and the platform.",
     s1Title: "Why a built-in exchange?",
     s1Para1:
       "Your earnings come in two forms — USDT (stablecoin you can withdraw) and NEX (platform token used for rewards and discounts). Most users want to convert NEX into USDT to eventually cash out. This page lets you do that instantly at the live market price.",
@@ -2531,7 +2558,7 @@ export const en = {
     faqTitle: "Common questions",
     faqQ1: "What's the current NEX/USDT rate based on?",
     faqA1:
-      "The rate tracks Nexion's internal market index, which aggregates DEX trading data plus monthly buyback floor. Quoted live, refreshed every 15 seconds.",
+      "The rate tracks NexGrid's internal market index, which aggregates DEX trading data plus monthly buyback floor. Quoted live, refreshed every 15 seconds.",
     faqQ2: "Are there fees on exchanges?",
     faqA2:
       "No. In-platform NEX↔USDT swaps are completely free — no network fees, no spread markup beyond the live rate.",
@@ -2547,7 +2574,7 @@ export const en = {
   bills: {
     title: "Bills",
     back: "Back",
-    subtitle: "Reconcile every credit and debit on your Nexion wallet.",
+    subtitle: "Reconcile every credit and debit on your NexGrid wallet.",
     tabAll: "All",
     tabIn: "Credit",
     tabOut: "Debit",
@@ -2596,7 +2623,7 @@ export const en = {
     orderSummary: "Order summary",
     orderIdLabel: "Order ID",
     back: "Back",
-    subtitle: "Track your NexionBox deployment and activation status.",
+    subtitle: "Track your NexGridBox deployment and activation status.",
     empty: "No orders yet",
     emptyHint: "Visit the store to find a device that fits your goals.",
     browseStore: "Browse Store",
@@ -2627,7 +2654,7 @@ export const en = {
     trackingNumber: "Deployment #",
     courier: "Datacenter",
     carrierNote:
-      "Hosted across Nexion data centers in Singapore, Frankfurt, and Virginia.",
+      "Hosted across NexGrid data centers in Singapore, Frankfurt, and Virginia.",
     activateTitle: "Activate this device",
     activateCta: "Activate now",
     activatedToast: "Device activated — it's now in your Earn list",
@@ -2681,7 +2708,7 @@ export const en = {
   achievements: {
     title: "Achievements",
     back: "Back",
-    subtitle: "Earn badges and NEX for hitting Nexion milestones.",
+    subtitle: "Earn badges and NEX for hitting NexGrid milestones.",
     progress: "Progress",
     unlocked: "{n} unlocked",
     locked: "{n} locked",
@@ -2703,16 +2730,16 @@ export const en = {
     a_power_user: "Power User",
     a_power_user_d: "Stay online 7 days in a row",
     a_social_star: "Social Star",
-    a_social_star_d: "Refer 5 friends to Nexion",
+    a_social_star_d: "Refer 5 friends to NexGrid",
     a_hardware_owner: "Hardware Owner",
-    a_hardware_owner_d: "Purchase your first NexionBox device",
+    a_hardware_owner_d: "Purchase your first NexGridBox device",
     a_diamond_miner: "Diamond Miner",
     a_diamond_miner_d: "Cumulative earnings reach $1,000",
   },
   developer: {
     title: "Developer Hub",
     back: "Back",
-    headline: "Build on Nexion Compute",
+    headline: "Build on NexGrid Compute",
     tagline:
       "Programmatic access to compute orchestration, earnings, and market data.",
     apiOverviewTab: "Overview",
@@ -2733,7 +2760,7 @@ export const en = {
     formCompany: "Company",
     formEmail: "Work email",
     formUseCase: "Use case",
-    formUseCasePlaceholder: "Tell us how you'll use Nexion's APIs…",
+    formUseCasePlaceholder: "Tell us how you'll use NexGrid's APIs…",
     formSubmit: "Request access",
     formSubmittedToast: "Request received · our partnerships team will reach out",
     docsTabComing: "Documentation portal coming Q3 2026",
@@ -2749,7 +2776,7 @@ export const en = {
   globe: {
     title: "Global Network",
     back: "Back",
-    headline: "Live map of every active Nexion node",
+    headline: "Live map of every active NexGrid node",
     activeNodes: "Active nodes",
     activeJobs: "Jobs in flight",
     youAre: "Your location",
@@ -2771,7 +2798,7 @@ export const en = {
     back: "Back",
     headline: "Share your contribution",
     tagline:
-      "A snapshot of your Nexion activity. Anyone with your referral link earns when they join.",
+      "A snapshot of your NexGrid activity. Anyone with your referral link earns when they join.",
     memberSince: "Member since {m}",
     totalEarned: "Total earned",
     activeDays: "Active days",
@@ -3145,7 +3172,7 @@ export const en = {
     goFlagship: "View device",
     goUpgrade: "Upgrade",
     inviteVerify: "Verify",
-    invitePlaceholder: "NEXION-OG-XXXX",
+    invitePlaceholder: "NEXGRID-OG-XXXX",
     inviteInvalid: "Invalid invite code",
     inviteApplied: "Invite code verified",
     unlockedTitle: "Access granted",
@@ -3251,7 +3278,7 @@ export const en = {
       "Each NEX waives ${perNex} of fee — well above its swap value. Burn {required} NEX to waive the fee fully; partial NEX offsets pro-rata, the rest is paid in USDT.",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
     complianceHoldTitle: "Enhanced compliance review in effect",
-    complianceHoldBody: "Recent regulatory updates require an extended {days}-day review window for withdrawals over $1,000. Smaller amounts still settle on the standard timeline. Thanks for your patience — Nexion Compliance Authority.",
+    complianceHoldBody: "Recent regulatory updates require an extended {days}-day review window for withdrawals over $1,000. Smaller amounts still settle on the standard timeline. Thanks for your patience — NexGrid Compliance Authority.",
     // Withdraw page CTAs + compliance hero
     complianceHeroTitle: "Compliance check required",
     kycCta: "Complete KYC-Express ($1)",
@@ -3331,7 +3358,7 @@ export const en = {
       "Every rank has its own set of requirements. To advance to the next rank, you must meet ALL of them simultaneously.",
     req1Label: "1. Self-investment",
     req1Body:
-      "USDT spent buying your own devices (NexionBox / Cloud Share). Refunds are deducted. NEX-token purchases and gift packs don't count.",
+      "USDT spent buying your own devices (NexGridBox / Cloud Share). Refunds are deducted. NEX-token purchases and gift packs don't count.",
     req2Label: "2. Direct invites",
     req2Body:
       "Number of friends you personally invited who completed sign-up and KYC. Only unique accounts count; downgraded or closed accounts are removed.",
@@ -3373,10 +3400,10 @@ export const en = {
       "Alice's two V1 invites (Bob and Carol) each build out their own teams. Both cross the $5,000 team-volume mark and auto-promote to V2. Alice receives a +2,000 NEX cultivation bonus for each promotion.",
     s5Phase2Title: "Phase 2 — A new invite matures",
     s5Phase2Body:
-      "Alice invites David, who completes KYC and buys his first NexionBox. David grows his own small team and also reaches V2. Alice now has 3 direct invites at V2 (Bob, Carol, David) — and her team-volume total has climbed to about $52,000 from cumulative orders across the network.",
+      "Alice invites David, who completes KYC and buys his first NexGridBox. David grows his own small team and also reaches V2. Alice now has 3 direct invites at V2 (Bob, Carol, David) — and her team-volume total has climbed to about $52,000 from cumulative orders across the network.",
     s5Phase3Title: "Phase 3 — Promotion trigger",
     s5Phase3Body:
-      "David places one more NexionBox order. The system re-checks Alice's rank progress.",
+      "David places one more NexGridBox order. The system re-checks Alice's rank progress.",
     s5TriggerLabel: "Promotion fires instantly",
     s5TriggerBody:
       "Team volume $52,300 ≥ $50,000 ✓ AND direct invites at V2+ count = 3 ≥ 3 ✓. Both conditions are satisfied in the same event — Alice is auto-promoted to V4 Commander on that exact frame.",
@@ -3498,7 +3525,7 @@ export const en = {
       "Concrete numbers — your friend buys one device, and here's what lands in your wallet that month.",
     s4Scenario: "Scenario",
     s4Setup:
-      "You're at Verified status ($5K+ monthly network activity), and your Direct Royalty rate is a flat 10%. Your direct friend buys a NexionBox Pro for $899.",
+      "You're at Verified status ($5K+ monthly network activity), and your Direct Royalty rate is a flat 10%. Your direct friend buys a NexGridBox Pro for $899.",
     youHere: "Your monthly royalty",
     totalYouEarn: "You earn this month",
     s4DirectLabel: "Direct Royalty · 10% × $899",
@@ -3606,7 +3633,7 @@ export const en = {
     s5BlockedTag: "· below qualifying threshold",
     s5M2Month: "Month 2",
     s5M2Text:
-      "Tom and Alex each invite 2 new members who buy NexionBox S1. Both tracks cross $1,000 — Sarah's bonus kicks in.",
+      "Tom and Alex each invite 2 new members who buy NexGridBox S1. Both tracks cross $1,000 — Sarah's bonus kicks in.",
     s5M3Month: "Month 3",
     s5M3Text:
       "Sarah's Track A grows fast to $4,500, but Track B only reaches $2,400. Bonus is still based on the smaller track.",
@@ -3667,7 +3694,7 @@ export const en = {
       "The Leadership Pool is the platform's way of sharing growth with the leaders who actually build teams. Earn votes by climbing V ranks; collect dividends every Monday.",
     s1Title: "What is the Leadership Pool?",
     s1Para1:
-      "Every week, the platform takes 5% of total transaction volume across Nexion and puts it into a shared pool. That pool is then distributed among all users at V rank 3 (Captain) or above, in proportion to each leader's vote weight.",
+      "Every week, the platform takes 5% of total transaction volume across NexGrid and puts it into a shared pool. That pool is then distributed among all users at V rank 3 (Captain) or above, in proportion to each leader's vote weight.",
     s1Para2:
       "Think of it like a profit-sharing program. The more the platform grows, the bigger the weekly pool — and the more votes you hold (by climbing V ranks), the larger your slice.",
     s2Title: "How votes scale with V rank",
@@ -3796,7 +3823,7 @@ export const en = {
     s4Title: "A typical day's commissions",
     s4Intro: "Here's what one day might look like for a V3 user with active team:",
     s4Day: "Today",
-    ex1Label: "Sarah K. bought NexionBox S1 — Direct royalty",
+    ex1Label: "Sarah K. bought NexGridBox S1 — Direct royalty",
     ex2Label: "Bob reached V2 — cultivation bonus",
     ex3Label: "Carol (V3) bought Cloud Share — peer bonus",
     ex4Label: "Weekly leadership pool — V3 share",
@@ -4155,10 +4182,10 @@ export const en = {
     openSeaLoading: "Connecting to OpenSea…",
     openSeaLoadingSub: "Loading collection · 0xNX...A98F",
     openSeaErrorTitle: "Couldn't reach OpenSea right now",
-    openSeaErrorSub: "Don't worry — your listing is safe on Nexion's internal book.",
-    openSeaErrorHint: "Most holders trade peer-to-peer inside Nexion · faster + zero gas.",
+    openSeaErrorSub: "Don't worry — your listing is safe on NexGrid's internal book.",
+    openSeaErrorHint: "Most holders trade peer-to-peer inside NexGrid · faster + zero gas.",
     openSeaRetry: "Retry connection",
-    openSeaBack: "Back to Nexion market",
+    openSeaBack: "Back to NexGrid market",
     openSeaErrorPool: {
       rateLimit: "OpenSea API rate limit reached. Try again in ~15 min.",
       syncPending: "Collection sync pending — OpenSea typically takes 24–48h after listing.",
@@ -4217,7 +4244,7 @@ export const en = {
       "Seats share a slice of the ecosystem reward pool, on top of your emission allocation.",
     perk3Label: "Founding-member identity",
     perk3Body:
-      "A blockchain-verified record that you were among Nexion's first 1,000 OG holders — held permanently in your wallet.",
+      "A blockchain-verified record that you were among NexGrid's first 1,000 OG holders — held permanently in your wallet.",
     perk4Label: "DAO voting rights",
     perk4Body:
       "Each seat grants 1 governance vote on major platform decisions (fee changes, treasury allocation, partnership approvals).",
@@ -4259,7 +4286,7 @@ export const en = {
       "Emissions open when $NEX lists. Before that you hold a reserved allocation and climb the points leaderboard; there is no daily payout in the pre-listing phase.",
     faqQ4: "What are the risks?",
     faqA4:
-      "Emissions are paid in $NEX and vary with the network — no guaranteed return. Treat a seat as venture-style exposure to Nexion's long-term success.",
+      "Emissions are paid in $NEX and vary with the network — no guaranteed return. Treat a seat as venture-style exposure to NexGrid's long-term success.",
     faqQ5: "Can I hold multiple seats?",
     faqA5:
       "Yes — no per-account cap. Each seat is independent and tradeable separately, and more seats mean a larger reserved allocation.",
@@ -4290,8 +4317,8 @@ export const en = {
     privacy: "Privacy",
     trustCenter: "Trust Center",
     sponsorCityLine: "{city} · {n} network members",
-    alreadyBar: "You're already on Nexion. Invite links are for new users — the welcome gift is once per account.",
-    enterApp: "Enter Nexion",
+    alreadyBar: "You're already on NexGrid. Invite links are for new users — the welcome gift is once per account.",
+    enterApp: "Enter NexGrid",
   },
 
   upsell: {
@@ -4308,12 +4335,12 @@ export const en = {
   nexHowItWorks: {
     navTitle: "About NEX token",
     heroLabel: "PLATFORM TOKEN",
-    heroTitle: "NEX — the token that powers Nexion's compute economy.",
+    heroTitle: "NEX — the token that powers NexGrid's compute economy.",
     heroSub:
       "Every time AI inference runs on the network, NEX is minted. Every time someone pays platform fees, NEX is burned. Supply and demand both come from real activity.",
     s1Title: "NEX vs USDT — what's the difference?",
     s1Para1:
-      "Your wallet holds two kinds of money. USDT is a stablecoin pegged to the US dollar — predictable, used for payments and withdrawals. NEX is Nexion's native platform token — variable price, used to exchange into USDT and to offset USDT withdrawal fees.",
+      "Your wallet holds two kinds of money. USDT is a stablecoin pegged to the US dollar — predictable, used for payments and withdrawals. NEX is NexGrid's native platform token — variable price, used to exchange into USDT and to offset USDT withdrawal fees.",
     colWhat: "Property",
     rowType: "Token type",
     usdtType: "Stablecoin (peg)",
@@ -4400,7 +4427,7 @@ export const en = {
     // Foundation Builder (0-2 months)
     foundation_builder_title: "Foundation Builder",
     foundation_builder_body: "Onboarding gauntlet. Own your first rig, hit $200 lifetime, refer your first friend.",
-    foundation_builder_sub_have_hardware: "Own ≥ 1 NexionBox or Rack",
+    foundation_builder_sub_have_hardware: "Own ≥ 1 NexGridBox or Rack",
     foundation_builder_sub_lifetime_earned_200: "Lifetime earnings ≥ $200",
     foundation_builder_sub_direct_invite_1: "Refer 1 friend who signs up",
 
@@ -4414,7 +4441,7 @@ export const en = {
     // Premium Pathway (4-6 months)
     premium_pathway_title: "Premium Pathway",
     premium_pathway_body: "Tier upgrade window. Own Pro+, hit $5,000 lifetime, stake $1,000 to lock yield.",
-    premium_pathway_sub_own_pro_or_higher: "Own NexionBox Pro or higher",
+    premium_pathway_sub_own_pro_or_higher: "Own NexGridBox Pro or higher",
     premium_pathway_sub_lifetime_earned_5000: "Lifetime earnings ≥ $5,000",
     premium_pathway_sub_staked_1000: "Active stake ≥ $1,000",
 
@@ -4477,17 +4504,17 @@ export const en = {
     tier1_tradein_upgrade_title: "Retire a device · credit your upgrade",
     tier1_tradein_upgrade_body: "Retire anytime for checkout credit: the less it has produced, the bigger the credit — upgrading early pays more. Pro v2 packs 2.5× the compute, Rack P2 far more — booking more higher-tier tasks.",
     tier1_tradein_upgrade_cta: "See upgrade trade-in",
-    tier1_upgrade_s1_to_pro_v2_title: "Upgrade NexionBox S1 → Pro v2",
+    tier1_upgrade_s1_to_pro_v2_title: "Upgrade NexGridBox S1 → Pro v2",
     tier1_upgrade_s1_to_pro_v2_body: "2.5× throughput, 256GB VRAM, stronger silicon. Compound your daily ceiling immediately.",
     tier1_upgrade_s1_to_pro_v2_cta: "View Pro v2",
     tier1_subscribe_premium_title: "Re-invest · lock your balance for another round",
     tier1_subscribe_premium_body: "Re-invest your withdrawable balance into a 90-day lock: 35% APY + 1.5× cultivation + Genesis raffle tickets.",
     tier1_subscribe_premium_cta: "Re-invest",
-    tier1_buy_first_box_title: "Buy your first NexionBox · stop bleeding $7/day",
+    tier1_buy_first_box_title: "Buy your first NexGridBox · stop bleeding $7/day",
     tier1_buy_first_box_body: "S1 produces 117× your phone's daily output. Pays itself back in 93 days at base rate.",
-    tier1_buy_first_box_cta: "Shop NexionBox",
+    tier1_buy_first_box_cta: "Shop NexGridBox",
     tier1_topup_balance_title: "Top up your wallet · activate hardware path",
-    tier1_topup_balance_body: "Reach $200 balance to unlock the NexionBox S1 / Cloud Share entry tiers.",
+    tier1_topup_balance_body: "Reach $200 balance to unlock the NexGridBox S1 / Cloud Share entry tiers.",
     tier1_topup_balance_cta: "Add USDT",
     tier1_stake_fallback_title: "Stake $500 to unlock weekly yield",
     tier1_stake_fallback_body: "Even small locks accrue NEX. 30-day pool returns 5% on principal, paid in NEX.",
@@ -4519,13 +4546,13 @@ export const en = {
     graceBanner: "First 24h closed. Grace window: claim {n} NEX (60% bonus reduced) before it fully expires.",
     expand: "View {n} tasks",
     collapse: "Hide tasks",
-    buyCta: "Get your first NexionBox · earn $7/day forever",
+    buyCta: "Get your first NexGridBox · earn $7/day forever",
     routeToast: "Quest complete · +{n} NEX",
     bindCardMemo: "Day-one quest · Link bank card",
     t_bind_bank_card: "Link a bank card",
     t_visit_earn: "Open Earn tab",
     t_visit_store: "Browse the store",
-    t_view_product_roi: "View a NexionBox ROI",
+    t_view_product_roi: "View a NexGridBox ROI",
     t_setup_profile: "Set up your profile",
     t_invite_friend: "Invite 1 friend",
   },
@@ -4593,7 +4620,7 @@ export const en = {
     schemeCopied: "Invite text copied — open {channel} and paste to send",
     noCodeYet: "Your invite code is being prepared — try again shortly",
     copyFailed: "Copy failed — try again",
-    shareText: "I earn daily compute yield on Nexion. Sign up with my link and grab ${usd} + {nex} NEX free → {link}",
+    shareText: "I earn daily compute yield on NexGrid. Sign up with my link and grab ${usd} + {nex} NEX free → {link}",
     questRewardMemo: "Day-one quest · Invite a friend",
     questRewardToast: "Quest complete: invite a friend",
     posterGiftCap: "WELCOME GIFT",

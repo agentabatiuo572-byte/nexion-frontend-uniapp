@@ -13,7 +13,7 @@
 -->
 <template>
   <view v-if="show" class="mx-4">
-    <view class="block relative overflow-hidden rounded-2xl" :style="rootStyle" @click="goStore">
+    <view class="block relative overflow-hidden rounded-2xl active:opacity-90" :style="rootStyle" @click="goStore">
       <!-- Subtle background glow on the right -->
       <view class="absolute inset-0 pointer-events-none" :style="glowStyle" />
 
@@ -26,17 +26,17 @@
       <!-- Big missed-today number -->
       <view class="relative mt-2 flex items-baseline gap-2">
         <view class="flex items-baseline">
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em; font-size: 30px; font-weight: 600">−</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em; font-size: 34px; font-weight: 600">−</text>
           <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2); opacity: 0.75">$</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 30px; font-weight: 600; line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
         </view>
-        <text class="text-[11px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
+        <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
       </view>
 
       <!-- Dual progress bars -->
       <view class="relative mt-3 space-y-2">
         <view>
-          <view class="flex items-center justify-between mb-1" style="font-size: 10.5px">
+          <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-ink-3)">{{ baseLabel }}</text>
             <text class="tabular-nums" style="color: var(--v5-ink-2)">${{ promo.baseDaily.toFixed(2) }}/d</text>
           </view>
@@ -45,7 +45,7 @@
           </view>
         </view>
         <view>
-          <view class="flex items-center justify-between mb-1" style="font-size: 10.5px">
+          <view class="flex items-center justify-between mb-1" style="font-size: 12px">
             <text style="color: var(--v5-brand)">{{ ceilingText }}</text>
             <text class="tabular-nums" style="color: var(--v5-brand)">${{ promo.targetDaily.toFixed(2) }}/d</text>
           </view>
@@ -57,9 +57,9 @@
 
       <!-- Cumulative miss + CTA -->
       <view class="relative mt-4 flex items-center justify-between gap-3">
-        <view class="min-w-0" style="font-size: 11px; color: var(--v5-ink-3); line-height: 1.35">
+        <view class="min-w-0" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.cumulativeMissed }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 10.5px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
         </view>
         <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.stopBleeding }}</text>
@@ -146,7 +146,7 @@ const glowStyle: CSSProperties = {
   background: "radial-gradient(60% 80% at 92% 50%, color-mix(in srgb, var(--v5-brand-2) 16%, transparent), transparent 70%)",
 };
 const labelStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   color: "var(--v5-brand-2)",
@@ -160,7 +160,7 @@ const ctaStyle: CSSProperties = {
 };
 const ctaLabelStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 </script>

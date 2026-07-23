@@ -1,14 +1,14 @@
 <!--
   OnGridSection — ZONE 2 "what the network is computing now" (ported from
-  mission-control.tsx OnGridSection). Header (On Nexion grid · now · Map) + 3
+  mission-control.tsx OnGridSection). Header (On NexGrid grid · now · Map) + 3
   client rows (id badge · model · client·city · GPUs) + live footer. Client list
   is mock data (proper nouns, untranslated).
 -->
 <template>
   <view>
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="font-mono-tabular" style="font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.onGridNow }}</text></text>
-      <text class="font-mono-tabular" style="font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goGlobe">{{ t.home.onGridMap }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.onGridTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.onGridNow }}</text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goGlobe">{{ t.home.onGridMap }} →</text>
     </view>
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
@@ -22,12 +22,12 @@
           <text :style="{ color: c.color, fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '12px' }">{{ c.id }}</text>
         </view>
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13.5px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.model }}</text>
-          <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ c.name }} <text style="color: var(--v5-ink-4)">· {{ c.city }}</text></text>
+          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.model }}</text>
+          <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.name }} <text style="color: var(--v5-ink-4)">· {{ c.city }}</text></text>
         </view>
         <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
-      <view class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 11px; color: var(--v5-ink-3)">
+      <view class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <text><text style="color: var(--v5-ink); font-weight: 500">28,432</text> {{ t.home.onGridOnline }}</text>
         <text style="color: var(--v5-success); font-weight: 500">+$215/sec</text>
       </view>

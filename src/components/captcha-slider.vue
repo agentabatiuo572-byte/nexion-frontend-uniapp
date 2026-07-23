@@ -182,7 +182,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.cs-mask { position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cs-mask { position: fixed; inset: 0; z-index: 90; background: var(--v5-bg-color-mask); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .cs-card { width: 100%; max-width: 340px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 20px; padding: 18px; }
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; }
 .cs-head__txt { display: flex; flex-direction: column; gap: 3px; }

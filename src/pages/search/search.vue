@@ -98,7 +98,7 @@ const members = computed(() => network.members);
 const ROUTES: ReadonlyArray<{ label: string; href: string; sub: string }> = [
   { label: "Home / Mission Control", href: "/pages/index/index", sub: "Live earnings · ticker · dashboard" },
   { label: "Earn / Fleet", href: "/pages/earn/earn", sub: "Device cards · task center · efficiency" },
-  { label: "Store", href: "/pages/store/store", sub: "NexionBox / Rack / Cloud Share" },
+  { label: "Store", href: "/pages/store/store", sub: "NexGridBox / Rack / Cloud Share" },
   { label: "Trade-in", href: "/pages/me/devices", sub: "Retire & credit toward an upgrade" },
   { label: "Team hub", href: "/pages/team/team", sub: "Royalty / V-rank / network" },
   { label: "Influence Network Royalty", href: "/pages/team/unilevel", sub: "Direct + Network Yield Bonus" },

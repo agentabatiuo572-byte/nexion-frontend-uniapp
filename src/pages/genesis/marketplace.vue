@@ -22,7 +22,7 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center" style="gap: 6px">
-                <text class="truncate" :style="collTitleStyle">Nexion Genesis Node</text>
+                <text class="truncate" :style="collTitleStyle">NexGrid Genesis Node</text>
                 <text class="shrink-0" :style="verifiedStyle">✓</text>
               </view>
               <text class="block" :style="ercLineStyle">{{ t.marketplace.erc721Line }}</text>
@@ -359,8 +359,8 @@ const avatarStyle: CSSProperties = {
   width: "56px",
   height: "56px",
   borderRadius: "16px",
-  background: "linear-gradient(135deg, #D4AF5A 0%, #E2C97C 100%)",
-  boxShadow: "0 4px 12px rgba(212,175,90,0.25)",
+  background: "linear-gradient(135deg, var(--v5-genesis-gold-on-dark) 0%, #E2C97C 100%)",
+  boxShadow: "0 4px 12px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 25%, transparent)",
 };
 const collTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

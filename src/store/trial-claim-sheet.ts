@@ -15,7 +15,7 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
   // Only lastClosedAt is persisted; sessionShownCount is session-scoped.
   function hydrateLastClosedAt(): number {
     try {
-      const s = uni.getStorageSync("nexion-trial-claim-sheet-v1") as { lastClosedAt?: number } | "";
+      const s = uni.getStorageSync("nexgrid-trial-claim-sheet-v1") as { lastClosedAt?: number } | "";
       if (s && typeof s === "object" && typeof s.lastClosedAt === "number") return s.lastClosedAt;
     } catch {
       // first run
@@ -29,7 +29,7 @@ export const useTrialClaimSheet = defineStore("trialClaimSheet", () => {
 
   function persist() {
     try {
-      uni.setStorageSync("nexion-trial-claim-sheet-v1", { lastClosedAt: lastClosedAt.value });
+      uni.setStorageSync("nexgrid-trial-claim-sheet-v1", { lastClosedAt: lastClosedAt.value });
     } catch {
       // storage unavailable
     }

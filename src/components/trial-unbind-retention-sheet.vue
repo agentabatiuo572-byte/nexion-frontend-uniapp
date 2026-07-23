@@ -184,7 +184,7 @@ function onConfirmUnbind() {
 .tur-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: tur-fade 0.24s ease-out;
@@ -243,7 +243,7 @@ function onConfirmUnbind() {
   flex-direction: column;
 }
 .tur-cap {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -281,7 +281,7 @@ function onConfirmUnbind() {
 }
 .tur-loss-label {
   display: block;
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -303,14 +303,14 @@ function onConfirmUnbind() {
   font-variant-numeric: tabular-nums;
 }
 .tur-loss-nex {
-  font-size: 12.5px;
+  font-size: 13px;
   font-family: var(--font-jet-mono), monospace;
   color: var(--v5-ink-3);
   font-variant-numeric: tabular-nums;
 }
 .tur-loss-note {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;
@@ -332,7 +332,7 @@ function onConfirmUnbind() {
   flex-shrink: 0;
 }
 .tur-loss-row-t {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-2);
   line-height: 1.375;
 }
@@ -358,14 +358,14 @@ function onConfirmUnbind() {
 }
 .tur-retain-title {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.375;
 }
 .tur-retain-sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;
@@ -392,7 +392,7 @@ function onConfirmUnbind() {
   transform: scale(0.98);
 }
 .tur-keep-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-on-brand);
   font-family: var(--font-v5);
@@ -405,7 +405,7 @@ function onConfirmUnbind() {
   justify-content: center;
 }
 .tur-unbind-t {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 400;
   color: color-mix(in srgb, var(--v5-warning) 80%, transparent);
   transition: color 0.12s ease;

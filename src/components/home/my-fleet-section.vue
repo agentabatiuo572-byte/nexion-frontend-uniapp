@@ -7,8 +7,8 @@
 <template>
   <view>
     <view class="flex items-center justify-between" style="margin: 0 2px 12px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }} <text class="font-mono-tabular" style="font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)">{{ fleetCountText }}</text></text>
-      <text class="font-mono-tabular active:opacity-70" style="font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goManage">{{ t.home.fleetManage }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ fleetCountText }}</text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goManage">{{ t.home.fleetManage }} →</text>
     </view>
 
     <!-- Slot rack: icon bays -->
@@ -18,7 +18,10 @@
     </view>
 
     <!-- Device list: status dot · name · today earnings -->
-    <view class="rounded-2xl overflow-hidden" style="border: 1px solid var(--v5-border); background: var(--v5-surface)">
+    <!-- 《03》§6:带 bg 填充的卡片零 border,层级靠 surface 微差 -->
+    <!-- v-if:零设备时不渲染空壳(此前渲染成一条 2px 高的空卡,占着转化位);
+         零设备的引导由上方 slot rack 的 AddDeviceRow 承担。 -->
+    <view v-if="devices.length > 0" class="rounded-2xl overflow-hidden" style="background: var(--v5-surface)">
       <DeviceRow v-for="(d, i) in devices" :key="d.id" :device="d" :divider="i < devices.length - 1" />
     </view>
   </view>

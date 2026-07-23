@@ -113,7 +113,7 @@ function bucketUserEarnings(
   return nextUser;
 }
 
-function createInitialUser(email = "alex@nexion.ai"): UserState {
+function createInitialUser(email = "alex@nexgrid.ai"): UserState {
   const usdtBalance = 24856.56;
   return {
     email,
@@ -121,7 +121,7 @@ function createInitialUser(email = "alex@nexion.ai"): UserState {
     joinedAt: Date.now() - 30 * ONE_DAY,
     cumulativeDepositUsdt: 0,
     genesisInviteCode: null,
-    referralCode: "NEXION-8K9X",
+    referralCode: "NEXGRID-8K9X",
     usdtBalance,
     nexBalance: 1240,
     pendingEarnings: 2.31,
@@ -170,7 +170,7 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
     accountKey: normalizeAccountKey(accountKey),
     entrySurface,
     updatedAt: Date.now(),
-    user: createInitialUser(email || accountKey || "alex@nexion.ai"),
+    user: createInitialUser(email || accountKey || "alex@nexgrid.ai"),
     devices: makeInitialDevices(),
     earnings: createInitialEarnings(),
     latestWithdrawal: null,
@@ -273,7 +273,7 @@ function freezeComputeShareDevice(d: Device): Device {
 
 export const useApp = defineStore("app", () => {
   const bootSurface = getEntrySurface();
-  const bootSnapshot = hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexion.ai", bootSurface);
+  const bootSnapshot = hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexgrid.ai", bootSurface);
   const accountKey = ref(bootSnapshot.accountKey);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
@@ -360,7 +360,7 @@ export const useApp = defineStore("app", () => {
     const boundSnapshot: AccountCloudSnapshot = {
       ...snapshot,
       entrySurface: surface,
-      user: { ...snapshot.user, email: snapshot.user.email || rawAccountKey || "alex@nexion.ai" },
+      user: { ...snapshot.user, email: snapshot.user.email || rawAccountKey || "alex@nexgrid.ai" },
     };
     miningPaused.value = false;
     adoptAccountSnapshot(boundSnapshot, true);

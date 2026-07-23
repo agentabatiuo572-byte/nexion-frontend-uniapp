@@ -9,9 +9,9 @@
     <view style="padding-bottom: 32px">
       <SubPageHeader back="/pages/trust/trust" />
 
-      <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="purple" />
+      <HowHero :label="w.heroLabel" :title="w.heroTitle" :sub="w.heroSub" accent="nex" />
 
-      <HowSection :title="w.s1Title" accent="purple">
+      <HowSection :title="w.s1Title" accent="nex">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
         </template>
@@ -30,7 +30,7 @@
         </view>
       </HowSection>
 
-      <HowSection :title="w.s2Title" accent="purple">
+      <HowSection :title="w.s2Title" accent="nex">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
         </template>
@@ -43,7 +43,7 @@
         </view>
       </HowSection>
 
-      <HowSection :title="w.s3Title" accent="purple">
+      <HowSection :title="w.s3Title" accent="nex">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></svg>
         </template>
@@ -54,7 +54,7 @@
         </view>
       </HowSection>
 
-      <HowSection :title="w.s4Title" accent="purple">
+      <HowSection :title="w.s4Title" accent="nex">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
         </template>
@@ -70,10 +70,10 @@
           </view>
           <text class="block" :style="burnBodyStyle">{{ w.s4BurnBody }}</text>
         </view>
-        <CalloutBox :title="`💡 ${w.s4HintTitle}`" :body="w.s4HintBody" tone="purple" />
+        <CalloutBox :title="`💡 ${w.s4HintTitle}`" :body="w.s4HintBody" tone="nex" />
       </HowSection>
 
-      <HowSection :title="w.faqTitle">
+      <HowSection :title="w.faqTitle" accent="nex">
         <template #icon>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
         </template>
@@ -152,7 +152,7 @@ function tableRowStyle(isFirst: boolean): CSSProperties {
 }
 const tdWhat: CSSProperties = { flex: "1.2", padding: "8px 12px", color: "var(--v5-ink-3)" };
 const tdUsdt: CSSProperties = { flex: "1", padding: "8px 12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
-const tdNex: CSSProperties = { flex: "1", padding: "8px 12px", color: "var(--v5-brand-2)" };
+const tdNex: CSSProperties = { flex: "1", padding: "8px 12px", color: "var(--v5-nex)" };
 const demandBoxStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",

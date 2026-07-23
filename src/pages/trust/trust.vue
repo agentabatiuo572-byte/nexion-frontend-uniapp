@@ -187,7 +187,7 @@
         <!-- Footer -->
         <view class="text-center" style="padding-top: 12px; padding-bottom: 4px">
           <text :style="footerStyle">{{ tr.footer }} </text>
-          <text :style="footerEmailStyle">compliance@nexion.ai</text>
+          <text :style="footerEmailStyle">compliance@nexgrid.ai</text>
         </view>
       </view>
     </CardStagger>
@@ -245,10 +245,10 @@ const LEADERSHIP = [
   { name: "Aisha Tariq", role: "VP Engineering", prev: "ex-Stripe · ex-AWS", tint: "var(--v5-brand)" },
 ];
 const PRESS = [
-  { outlet: "TechCrunch", title: "Nexion raises $80M to decentralize AI compute", date: "2026-03" },
-  { outlet: "CoinDesk", title: "How Nexion is powering the next wave of DePIN", date: "2026-02" },
-  { outlet: "Forbes", title: "The grid is shifting — and Nexion is leading", date: "2026-01" },
-  { outlet: "The Block", title: "Inside the $487M Nexion network", date: "2025-12" },
+  { outlet: "TechCrunch", title: "NexGrid raises $80M to decentralize AI compute", date: "2026-03" },
+  { outlet: "CoinDesk", title: "How NexGrid is powering the next wave of DePIN", date: "2026-02" },
+  { outlet: "Forbes", title: "The grid is shifting — and NexGrid is leading", date: "2026-01" },
+  { outlet: "The Block", title: "Inside the $487M NexGrid network", date: "2025-12" },
 ];
 const Q3_FINANCIALS = [
   { metric: "MRR", value: "$4.87M", delta: "+22%" },

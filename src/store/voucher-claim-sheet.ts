@@ -16,7 +16,7 @@ import { mockServerNow } from "./server-time";
 export const useVoucherClaimSheet = defineStore("voucherClaimSheet", () => {
   function hydrateLastClosedAt(): number {
     try {
-      const s = uni.getStorageSync("nexion-voucher-claim-sheet-v1") as { lastClosedAt?: number } | "";
+      const s = uni.getStorageSync("nexgrid-voucher-claim-sheet-v1") as { lastClosedAt?: number } | "";
       if (s && typeof s === "object" && typeof s.lastClosedAt === "number") return s.lastClosedAt;
     } catch {
       // first run
@@ -30,7 +30,7 @@ export const useVoucherClaimSheet = defineStore("voucherClaimSheet", () => {
 
   function persist() {
     try {
-      uni.setStorageSync("nexion-voucher-claim-sheet-v1", { lastClosedAt: lastClosedAt.value });
+      uni.setStorageSync("nexgrid-voucher-claim-sheet-v1", { lastClosedAt: lastClosedAt.value });
     } catch {
       // storage unavailable
     }

@@ -16,7 +16,7 @@ import type { RiskClusterSummary } from "@/store/risk-cluster";
 // 分录辅助账。⚠️ MOCK 简化: 跨端快照合并只合并聚合桶,本台账 per-origin 不合并,
 // 释放金额一律 clamp 到当前桶余额,漂移在演示口径内容忍(PROD: 服务端单账本,无此层)。
 
-const LEDGER_KEY = "nexion-earning-ledger-v1";
+const LEDGER_KEY = "nexgrid-earning-ledger-v1";
 
 export type LedgerRoute = "pending_review" | "bonus_locked";
 export type ReleaseSource = "attest" | "manual";

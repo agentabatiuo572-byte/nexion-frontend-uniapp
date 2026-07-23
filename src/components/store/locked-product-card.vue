@@ -18,9 +18,9 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <view aria-hidden :style="lockDotStyle" />
         </view>
-        <view class="flex-1 min-w-0">
-          <view class="flex items-center justify-between" style="gap: 8px" role="button" tabindex="0" @click.stop="toggleDetails">
-            <text class="font-mono-tabular" style="font-size: 10.5px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+        <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" @click.stop="toggleDetails">
+          <view class="flex items-center justify-between" style="gap: 8px">
+            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ stageText }}</text>
               <view class="grid place-items-center" :style="toggleStyle">
@@ -31,7 +31,7 @@
           <text class="block mt-1" :style="titleStyle">{{ product.name }}</text>
           <view v-if="detailsOpen">
             <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ product.tagline }}</text>
-            <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 11.5px; color: var(--v5-ink-3)">
+            <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ product.gpu }}</text>
               <text style="color: var(--v5-ink-4)">·</text>
               <text style="color: var(--v5-ink-2)">{{ product.vram }}</text>
@@ -42,7 +42,7 @@
 
       <!-- Phase progress bar -->
       <view v-if="detailsOpen && progress" class="mt-3.5 pt-3.5" style="border-top: 1px dashed var(--v5-border-strong)">
-        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 11px; margin-bottom: 6px">
+        <view class="flex items-center justify-between font-mono-tabular" style="font-size: 12px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3)">{{ t.store.lockedPhase }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-weight: 600">{{ progress.current }}/{{ progress.total }}</text> · {{ t.store.lockedUnlockProgress }}</text>
           <text class="tabular-nums" style="color: var(--v5-brand-2); font-weight: 600">{{ progress.pct }}%</text>
         </view>
@@ -57,7 +57,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text>{{ t.store.lockedNotifyMe }}</text>
         </view>
-        <view v-if="queue" class="shrink-0 text-right font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.3">
+        <view v-if="queue" class="shrink-0 text-right font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.3">
           <text class="block tabular-nums" style="color: var(--v5-brand-2); font-weight: 600; font-size: 12px">{{ queueText }}</text>
           <text class="block">{{ t.store.lockedInQueue }}</text>
         </view>
@@ -137,8 +137,9 @@ const gridStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
   backgroundImage:
-    "linear-gradient(to right, rgba(15,21,42,0.035) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, rgba(15,21,42,0.035) 1px, transparent 1px)",
+    // 网格线跟随 ink:写死的深色网格在暗主题下落在近黑卡面上 = 纹理消失(卡底是 var(--v5-surface),跟主题)
+    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px)," +
+    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3.5%, transparent) 1px, transparent 1px)",
   backgroundSize: "24px 24px",
   pointerEvents: "none",
 };
@@ -147,7 +148,8 @@ const lockBoxStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   borderRadius: "12px",
-  background: "linear-gradient(135deg, rgba(255,90,31,0.10), rgba(12,196,214,0.08))",
+  background:
+    "linear-gradient(135deg, color-mix(in srgb, var(--v5-brand-2) 10%, transparent), color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent))",
 };
 
 const lockDotStyle: CSSProperties = {
@@ -167,7 +169,7 @@ const stageChipStyle: CSSProperties = {
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
   color: "var(--v5-brand-2)",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
 };
 const toggleBaseStyle: CSSProperties = {
@@ -185,7 +187,7 @@ const toggleStyle = computed<CSSProperties>(() => ({
 
 const titleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   letterSpacing: "-0.018em",

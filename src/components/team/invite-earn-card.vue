@@ -17,7 +17,7 @@
     <view aria-hidden="true" :style="gridStyle" />
 
     <!-- Top label row -->
-    <view class="relative flex items-center justify-between" style="z-index: 1; font-size: 11.5px">
+    <view class="relative flex items-center justify-between" style="z-index: 1; font-size: 12px">
       <text :style="{ color: 'var(--v5-brand)', fontWeight: 500 }">💰 {{ t.team.earnForEachFriend }}</text>
       <view class="flex items-center" style="gap: 4px">
         <PulseDot color="var(--v5-success)" :size="6" />
@@ -26,7 +26,8 @@
     </view>
 
     <!-- Limited-time promo chip -->
-    <view v-if="hasPromo" class="relative inline-flex items-center font-mono-tabular" :style="promoChipStyle">
+    <!-- 《02》§7:促销 callout 整句(6-7 词)禁 Mono,chip 限 <5 词 -->
+    <view v-if="hasPromo" class="relative inline-flex items-center" :style="promoChipStyle">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
       <text>{{ promoChipText }}</text>
     </view>
@@ -77,7 +78,7 @@
 
     <!-- Live commission ticker -->
     <view class="relative flex items-center overflow-hidden border-t" :style="tickerWrapStyle">
-      <view :key="tickerIdx" class="flex items-center w-full min-w-0 nx-step-in" style="gap: 6px; font-size: 11.5px">
+      <view :key="tickerIdx" class="flex items-center w-full min-w-0 nx-step-in" style="gap: 6px; font-size: 12px">
         <text class="shrink-0">⚡</text>
         <text class="shrink-0" :style="{ color: 'var(--v5-ink)', fontWeight: 500 }">{{ tickerItem.name }}</text>
         <text class="truncate" :style="{ color: 'var(--v5-ink-3)' }">{{ tickerItem.action }}</text>
@@ -128,7 +129,7 @@ interface TickerItem {
 }
 const TICKER_ITEMS: TickerItem[] = [
   { name: "Sarah K.", action: "just joined your network", amount: "+$45.20" },
-  { name: "Tom W.", action: "bought NexionBox S1", amount: "+$130.00" },
+  { name: "Tom W.", action: "bought NexGridBox S1", amount: "+$130.00" },
   { name: "Carlos R.", action: "upgraded to V3 Captain", amount: "+$28.40" },
   { name: "Mei L.", action: "added a second device", amount: "+$76.00" },
   { name: "Akira S.", action: "staked $5K · 180d", amount: "+$54.00" },
@@ -142,7 +143,7 @@ const nexReward = computed(() => Math.round(BASE_REWARD_NEX * multiplier.value))
 const lifetimeEarned = computed(() => commission.totalUSDTLifetime());
 
 const referralCode = computed(() => app.user.referralCode);
-// 展示用短链标签从真实链接派生(禁写死 nexion.ai 与实际复制内容脱节,审计 P2)。
+// 展示用短链标签从真实链接派生(禁写死 nexgrid.ai 与实际复制内容脱节,审计 P2)。
 const linkLabel = computed(() => {
   const bare = buildShareLink().replace(/^https?:\/\//, "");
   if (!bare) return "—";
@@ -222,7 +223,8 @@ const gridStyle: CSSProperties = {
   position: "absolute",
   inset: "0",
   backgroundImage:
-    "linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px)",
+    // 网格线跟随 ink:写死的白网格在亮主题下落在白卡面上 = 纹理消失(卡底是 var(--v5-surface),跟主题)
+    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 3%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 3%, transparent) 1px, transparent 1px)",
   backgroundSize: "24px 24px",
   pointerEvents: "none",
   zIndex: 0,
@@ -234,7 +236,7 @@ const promoChipStyle: CSSProperties = {
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
   color: "var(--v5-brand-2)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   zIndex: 1,
 };
 const bodyGridStyle: CSSProperties = {
@@ -246,24 +248,24 @@ const bodyGridStyle: CSSProperties = {
 };
 const leftDollarSignStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, opacity: 0.75, color: "var(--v5-ink-3)" };
 const leftDollarStyle: CSSProperties = {
-  fontSize: "30px",
+  fontSize: "34px",
   fontWeight: 600,
   letterSpacing: "-0.024em",
   color: "var(--v5-ink)",
 };
 const strikeStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   textDecoration: "line-through",
   marginTop: "-4px",
 };
-const nexLineStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 500, color: "var(--v5-tech-cyan)" };
+const nexLineStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-tech-cyan)" };
 const cooldownStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.3 };
 const earnedPillStyle: CSSProperties = {
   marginTop: "auto",
   alignSelf: "flex-start",
   gap: "6px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   padding: "4px 8px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-tech-cyan) 12%, transparent)",
@@ -280,7 +282,7 @@ function shareBtnStyle(highlight: boolean): CSSProperties {
 }
 const shareLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-2)", fontWeight: 500 };
 function shareValStyle(_highlight: boolean): CSSProperties {
-  return { marginLeft: "auto", fontSize: "11.5px", color: "var(--v5-ink-4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  return { marginLeft: "auto", fontSize: "12px", color: "var(--v5-ink-4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 }
 const primaryCtaStyle: CSSProperties = {
   height: "44px",
@@ -291,7 +293,7 @@ const primaryCtaStyle: CSSProperties = {
 };
 const primaryCtaTextStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   letterSpacing: "-0.005em",
 };

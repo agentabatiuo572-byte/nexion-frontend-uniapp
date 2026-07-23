@@ -50,7 +50,7 @@
       </view>
 
       <view class="weekly-quest__cta">
-        <text>{{ t.home.weeklyQuestGetNexionBox }}</text>
+        <text>{{ t.home.weeklyQuestGetNexGridBox }}</text>
         <text class="weekly-quest__cta-arrow" aria-hidden="true">→</text>
       </view>
     </view>
@@ -176,7 +176,7 @@ function goStore() {
   border: 1px solid var(--v5-brand);
   background: transparent;
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--v5-brand);
   white-space: nowrap;
@@ -193,7 +193,7 @@ function goStore() {
 
 .weekly-quest__countdown-label {
   font-family: var(--font-v5);
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 400;
   color: var(--v5-ink-4);
 }
@@ -201,9 +201,9 @@ function goStore() {
 .weekly-quest__countdown-value {
   margin-top: 5px;
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
-  color: #9B89E0;
+  color: var(--v5-quest-violet-ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -224,18 +224,18 @@ function goStore() {
 
 .weekly-quest__reward-value {
   font-family: var(--font-v5);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 500;
   line-height: 1;
-  color: var(--v5-warning);
+  color: var(--v5-nex);
   letter-spacing: -0.024em;
 }
 
 .weekly-quest__reward-unit {
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--v5-brand);
+  color: var(--v5-nex);
 }
 
 .weekly-quest__subtitle {
@@ -243,7 +243,7 @@ function goStore() {
   margin-top: 4px;
   overflow: hidden;
   font-family: var(--font-v5);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-3);
   letter-spacing: -0.008em;
@@ -268,7 +268,7 @@ function goStore() {
 }
 
 .weekly-quest__rate-unit {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--v5-ink-4);
 }
 
@@ -286,7 +286,7 @@ function goStore() {
   border-radius: 999px;
   background: var(--v5-brand-soft);
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: color-mix(in srgb, var(--v5-brand) 82%, var(--v5-ink-3));
   letter-spacing: -0.005em;

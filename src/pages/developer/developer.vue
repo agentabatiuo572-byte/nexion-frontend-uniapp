@@ -159,10 +159,10 @@ const PARTNERS = [
 ];
 
 const API_SNIPPET = `POST /v1/inference/dispatch HTTP/1.1
-Host: api.nexion.ai
+Host: api.nexgrid.ai
 Authorization: Bearer sk_live_xxxxxxxxxxxxxxxx
 Content-Type: application/json
-X-Nexion-Signature: t=1747432411,v1=2fae...
+X-NexGrid-Signature: t=1747432411,v1=2fae...
 
 {
   "model": "flux-1.dev",

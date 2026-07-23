@@ -21,9 +21,9 @@ import { mockServerUuid } from "./mock-id";
  *   POST /api/account/sessions/:id/revoke → kills the selected session
  */
 
-const SESSION_REGISTRY_KEY = "nexion-account-sessions-v1";
-const LEGACY_ACTIVE_KEY = "nexion-active-session-v1";
-const CALIBRATED_KEY = "nexion-calibrated-device-v1"; // { [accountKey]: deviceId }
+const SESSION_REGISTRY_KEY = "nexgrid-account-sessions-v1";
+const LEGACY_ACTIVE_KEY = "nexgrid-active-session-v1";
+const CALIBRATED_KEY = "nexgrid-calibrated-device-v1"; // { [accountKey]: deviceId }
 
 export type SessionStatus = "active" | "kicked" | "logged-out";
 export type KickReason = "kicked" | "logged-out" | null;

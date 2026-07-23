@@ -26,8 +26,8 @@ export interface SavedCard {
   boundAt: number;
 }
 
-// 旧设备级单键 "nexion-cards-v1" 废弃(存量无账号归属,mock 可重建);绑卡按账号分行。
-const ACCOUNTS_KEY = "nexion-cards-accounts-v1"; // { [accountKey]: PersistShape }
+// 旧设备级单键 "nexgrid-cards-v1" 废弃(存量无账号归属,mock 可重建);绑卡按账号分行。
+const ACCOUNTS_KEY = "nexgrid-cards-accounts-v1"; // { [accountKey]: PersistShape }
 
 function uuid(): string {
   if (typeof crypto !== "undefined" && (crypto as Crypto).randomUUID) {

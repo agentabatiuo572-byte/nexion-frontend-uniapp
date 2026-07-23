@@ -22,25 +22,31 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 
-type Accent = "lemon" | "purple" | "amber" | "violet";
+type Accent = "lemon" | "purple" | "amber" | "violet" | "nex";
 
 const props = withDefaults(defineProps<{ label: string; title: string; sub: string; accent?: Accent }>(), {
   accent: "lemon",
 });
 
 const ACCENT_TEXT: Record<Accent, string> = {
+  nex: "var(--v5-nex)",
   lemon: "var(--v5-success)",
   purple: "var(--v5-brand)",
   amber: "var(--v5-warning)",
   violet: "var(--v5-brand-2)",
 };
 const ACCENT_SOFT: Record<Accent, string> = {
+  nex: "var(--v5-nex-soft)",
   lemon: "var(--v5-success-soft)",
   purple: "var(--v5-brand-soft)",
   amber: "var(--v5-warning-soft)",
   violet: "var(--v5-brand-2-soft)",
 };
 const AURORA: Record<Accent, string> = {
+  nex:
+    "radial-gradient(40% 50% at 80% 20%, var(--v5-nex-soft) 0%, transparent 60%)," +
+    "radial-gradient(40% 50% at 10% 80%, var(--v5-brand-soft) 0%, transparent 60%)," +
+    "radial-gradient(35% 45% at 70% 90%, rgba(255,203,148,0.20) 0%, transparent 60%)",
   lemon:
     "radial-gradient(40% 50% at 80% 20%, var(--v5-success-soft) 0%, transparent 60%)," +
     "radial-gradient(40% 50% at 10% 80%, var(--v5-tech-cyan-soft) 0%, transparent 60%)," +
@@ -78,8 +84,9 @@ const gridStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
   backgroundImage:
-    "linear-gradient(to right, rgba(19,20,26,0.04) 1px, transparent 1px)," +
-    "linear-gradient(to bottom, rgba(19,20,26,0.04) 1px, transparent 1px)",
+    // 网格线跟随 ink:抄亮主题字面值时暗主题下 4% 近黑落在近黑卡面上 = 纹理消失
+    "linear-gradient(to right, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)," +
+    "linear-gradient(to bottom, color-mix(in srgb, var(--v5-ink) 4%, transparent) 1px, transparent 1px)",
   backgroundSize: "24px 24px",
   pointerEvents: "none",
 };

@@ -27,10 +27,10 @@
 
     <view class="relative" style="z-index: 1">
       <view class="flex justify-between items-center gap-2">
-        <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
+        <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
         <text
           class="inline-flex items-center gap-1 font-mono-tabular"
-          style="font-size: 10.5px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
+          style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
         >{{ t.home.techStreaming }}</text>
       </view>
 
@@ -39,10 +39,11 @@
         style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
       >
         <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-        <text class="tabular-nums" style="font-size: 48px">{{ intPart }}<text style="font-size: 32px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
+        <text class="tabular-nums" style="font-size: 56px">{{ intPart }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
       </view>
 
-      <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success)">{{ t.home.techVsYesterday }}</text>
+      <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
+      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success)">{{ t.home.techVsYesterday }}</text>
     </view>
   </view>
 </template>

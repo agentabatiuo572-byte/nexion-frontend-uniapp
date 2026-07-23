@@ -5,8 +5,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
-// 旧设备级单键 "nexion-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
-const ACCOUNTS_KEY = "nexion-profile-accounts-v1"; // { [accountKey]: Persisted }
+// 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
+const ACCOUNTS_KEY = "nexgrid-profile-accounts-v1"; // { [accountKey]: Persisted }
 
 // region/timezone 不再持久:2026-07-15 起由设备派生(lib/device-region.ts),资料页只读展示。
 interface Persisted {

@@ -11,7 +11,7 @@
         </view>
         <view class="lg-brand">
           <view class="lg-brand__n"><text class="lg-brand__n-t">N</text></view>
-          <text class="lg-brand__name">Nexion</text>
+          <text class="lg-brand__name">NexGrid</text>
         </view>
         <view class="lg-top__sp" />
       </view>
@@ -290,7 +290,7 @@ function finishSignIn(
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
-  const identity = otp?.accountId ?? `${country.value}${phoneClean.value}@demo.nexion.ai`;
+  const identity = otp?.accountId ?? `${country.value}${phoneClean.value}@demo.nexgrid.ai`;
   const result = completeSignIn({
     identity,
     returnTo: returnParam.value,

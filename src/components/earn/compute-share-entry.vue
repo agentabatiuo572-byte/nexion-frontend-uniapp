@@ -13,7 +13,7 @@
       <text class="block" :style="titleStyle">{{ t.computeShare.entryTitle }}</text>
       <text class="block" :style="bodyStyle">{{ slotsFull ? t.computeShare.entryFull : t.computeShare.entryBody }}</text>
     </view>
-    <view :style="ctaStyle" @click="goDownload">
+    <view class="active:opacity-85" :style="ctaStyle" @click="goDownload">
       <text>{{ t.computeShare.entryCta }}</text>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 12h14" />
@@ -66,20 +66,20 @@ const iconStyle: CSSProperties = {
 };
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-tech-cyan)",
   letterSpacing: "0.06em",
 };
 const titleStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const bodyStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   lineHeight: 1.35,
   color: "var(--v5-ink-3)",
 };

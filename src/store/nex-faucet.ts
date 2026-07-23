@@ -14,8 +14,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  *     本 store 只管「签到状态机」(连胜/里程碑/saver)+ 一份展示用 history;真正把 NEX 计入钱包,
  *     由 daily 页 compose `app.creditNex(gained)` 完成,这里不持有余额(余额单源 = app.user.nexBalance)。
  *
- * 老数据迁移:一次性从旧 key `nexion-points-v1` 搬 streak/lastSignedInAt/longestStreak/
- * streakSavers/claimedMilestones/history,**丢弃旧 points 余额**(语义已并入钱包 NEX,迁了会凭空多发)。
+ * 旧 key(points-v1 时代)已废弃,不做迁移——存量无账号归属,mock 可重建;hydrate() 只读
+ * ACCOUNTS_KEY(与下方注释同口径;旧「一次性搬数据」逻辑已移除,勿按本段臆想它存在)。
  *
  * ⚠️ MOCK-ONLY: lucky multiplier + day-boundary check are client-side.
  * PRODUCTION: POST /api/nex/sign-in → server returns {gained, streak, multiplier} and credits NEX server-side;
@@ -39,9 +39,9 @@ interface FaucetData {
   claimedMilestones: number[];
 }
 
-// 旧设备级单键 "nexion-nex-faucet-v1" + 旧积分键 "nexion-points-v1" 均废弃(存量无账号归属,
+// 旧设备级单键 "nexgrid-nex-faucet-v1" + 旧积分键 "nexgrid-points-v1" 均废弃(存量无账号归属,
 // 不臆断迁移,mock 可重建);签到状态机按账号分行。
-const ACCOUNTS_KEY = "nexion-nex-faucet-accounts-v1"; // { [accountKey]: FaucetData }
+const ACCOUNTS_KEY = "nexgrid-nex-faucet-accounts-v1"; // { [accountKey]: FaucetData }
 
 // 签到奖励档(小额 NEX,水龙头定位):基础 +2 NEX / 7 连胜额外 +5 NEX。
 const SIGNIN_BASE_NEX = 2;

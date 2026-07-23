@@ -124,7 +124,7 @@ export const DEFAULT_GENESIS_CONFIG: GenesisConfig = {
   },
 };
 
-const STORAGE_KEY = "nexion-genesis-config-v1";
+const STORAGE_KEY = "nexgrid-genesis-config-v1";
 
 /** 档位健全性校验(fail-closed):非空、from 升序连续、末档 to≥minTotal(已售数)、价>0。
  *  任一违反 → 回退默认,避免运营误配导致前端派生越界。 */

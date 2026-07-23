@@ -11,7 +11,7 @@
     :data-online="isOnline ? 'true' : 'false'"
     role="button"
     tabindex="0"
-    :aria-label="`${t.earn.deviceDetailTitle}: ${device.name}`"
+    :aria-label="`${t.earn.deviceDetailTitle}: ${device.name} · ${isOnline ? t.earn.online : t.earn.offline}`"
     @click="go"
     @keydown.enter.prevent="go"
     @keydown.space.prevent="go"

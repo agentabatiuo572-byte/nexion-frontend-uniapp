@@ -8,7 +8,7 @@
   <view>
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.earningsLedgerTitle }}</text>
-      <text class="font-mono-tabular active:opacity-70" style="font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goAll">{{ t.home.earningsLedgerViewAll }} →</text>
     </view>
 
     <view style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
@@ -21,8 +21,8 @@
         <view class="min-w-0">
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
         </view>
-        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-warning); font-weight: 500">{{ r.amt }}</text>
-        <text class="font-mono-tabular text-right" style="font-size: 11px; color: var(--v5-ink-4)">{{ r.t }}</text>
+        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success); font-weight: 500">{{ r.amt }}</text>
+        <text class="font-mono-tabular text-right" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
       </view>
     </view>
   </view>

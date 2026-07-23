@@ -19,8 +19,8 @@ export interface SwapEvent {
 
 // 三分:rate 是平台市场态(账号无关,设备共享)→ 仍存旧全局键;history 是用户 swap
 // 记录 → 改按账号分行(P2-8 设备级泄漏修复)。旧键里的 history 存量废弃、不迁移。
-const GLOBAL_KEY = "nexion-exchange-v1"; // { rate } —— 平台市场汇率,设备共享
-const ACCOUNTS_KEY = "nexion-exchange-accounts-v1"; // { [accountKey]: { history: SwapEvent[] } }
+const GLOBAL_KEY = "nexgrid-exchange-v1"; // { rate } —— 平台市场汇率,设备共享
+const ACCOUNTS_KEY = "nexgrid-exchange-accounts-v1"; // { [accountKey]: { history: SwapEvent[] } }
 
 function jitterRate(base = 0.085): number {
   // 1 NEX ≈ $0.07–0.10 with light jitter

@@ -63,7 +63,7 @@ const cardStyle: CSSProperties = {
 const artStyle: CSSProperties = {
   aspectRatio: "1 / 1",
   background:
-    "radial-gradient(80% 80% at 50% 30%, rgba(255,107,53,0.18) 0%, transparent 65%), linear-gradient(135deg, #1F1408 0%, var(--v5-on-brand) 100%)",
+    "radial-gradient(80% 80% at 50% 30%, color-mix(in srgb, var(--v5-quest-ember) 18%, transparent) 0%, transparent 65%), linear-gradient(135deg, #1F1408 0%, var(--v5-on-brand) 100%)",
 };
 const tokenIdStyle: CSSProperties = {
   marginTop: "4px",

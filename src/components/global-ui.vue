@@ -31,17 +31,17 @@
       <view class="nx-modal__actions">
         <view
           v-if="!topConfirm.hideCancel"
-          class="nx-btn nx-btn--ghost"
+          class="nx-btn nx-btn--ghost active:opacity-70"
           @click="ui.resolveConfirm(topConfirm.id, false)"
         >
-          <text class="nx-btn__label nx-btn__label--ghost">{{ topConfirm.cancelLabel || "取消" }}</text>
+          <text class="nx-btn__label nx-btn__label--ghost">{{ topConfirm.cancelLabel || t.ui.cancel }}</text>
         </view>
         <view
-          class="nx-btn"
+          class="nx-btn active:opacity-85"
           :class="topConfirm.danger ? 'nx-btn--danger' : 'nx-btn--primary'"
           @click="ui.resolveConfirm(topConfirm.id, true)"
         >
-          <text class="nx-btn__label">{{ topConfirm.confirmLabel || "确认" }}</text>
+          <text class="nx-btn__label">{{ topConfirm.confirmLabel || t.ui.confirm }}</text>
         </view>
       </view>
     </view>
@@ -53,8 +53,8 @@
       <text class="nx-modal__title">{{ ui.netError.title }}</text>
       <text class="nx-modal__msg">{{ ui.netError.message }}</text>
       <view class="nx-modal__actions">
-        <view class="nx-btn nx-btn--primary" @click="onRetry">
-          <text class="nx-btn__label">重试</text>
+        <view class="nx-btn nx-btn--primary active:opacity-85" @click="onRetry">
+          <text class="nx-btn__label">{{ t.ui.retry }}</text>
         </view>
       </view>
     </view>
@@ -68,10 +68,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useUI } from "@/store/ui";
+import { useT } from "@/i18n/use-t";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
 
 const ui = useUI();
+const t = useT();
 // Last enqueued confirm renders on top (LIFO), matching the original.
 const topConfirm = computed(() => ui.confirmQueue[ui.confirmQueue.length - 1] || null);
 const route = ref(readRoute());
@@ -156,7 +158,7 @@ function onRetry() {
   gap: 2px;
 }
 .nx-toast__title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
 }
@@ -170,7 +172,7 @@ function onRetry() {
   position: fixed;
   inset: 0;
   z-index: 9100;
-  background: var(--v5-bg-color-mask, rgba(0, 0, 0, 0.45));
+  background: var(--v5-bg-color-mask);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,12 +191,12 @@ function onRetry() {
   gap: 8px;
 }
 .nx-modal__title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
 }
 .nx-modal__msg {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--v5-ink-3);
 }
@@ -219,7 +221,7 @@ function onRetry() {
   font-weight: 600;
   color: var(--v5-on-brand);
 }
-/* Cancel is visually subordinate to the primary CTA (Nexion conversion rule). */
+/* Cancel is visually subordinate to the primary CTA (NexGrid conversion rule). */
 .nx-btn__label--ghost {
   font-weight: 400;
   color: var(--v5-ink-3);

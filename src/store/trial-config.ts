@@ -67,7 +67,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   autoPushMaxPerSession: 1,
 };
 
-const STORAGE_KEY = "nexion-trial-config-v1";
+const STORAGE_KEY = "nexgrid-trial-config-v1";
 
 function hydrate(): TrialConfig {
   try {

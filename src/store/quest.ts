@@ -68,8 +68,8 @@ export const QUEST_TASKS: readonly QuestTaskDef[] = [
 /** Final bonus when all tasks are complete (display side; mirrors source). */
 export const QUEST_FINAL_BONUS_NEX = 500;
 
-// 旧设备级单键 "nexion-quest-v1" 废弃(存量无账号归属,mock 可重建);任务完成态按账号分行。
-const ACCOUNTS_KEY = "nexion-quest-accounts-v1"; // { [accountKey]: PersistShape }
+// 旧设备级单键 "nexgrid-quest-v1" 废弃(存量无账号归属,mock 可重建);任务完成态按账号分行。
+const ACCOUNTS_KEY = "nexgrid-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 /** Result of a markComplete call — App.vue uses this to compose creditNex + toast. */
 export interface QuestCompleteResult {

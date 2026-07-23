@@ -306,7 +306,7 @@ const noticeStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color:
   position: fixed;
   inset: 0;
   z-index: 79;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px);
 }
 .nx-sheet-panel {

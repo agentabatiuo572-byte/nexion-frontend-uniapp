@@ -1,7 +1,7 @@
 import type { Device, EarningsState, UserState, Withdrawal } from "@/store/types";
 import type { EntrySurface } from "@/lib/entry-surface";
 
-const STORAGE_KEY = "nexion-account-cloud-v1";
+const STORAGE_KEY = "nexgrid-account-cloud-v1";
 
 export interface AccountCloudSnapshot {
   schema: 1;

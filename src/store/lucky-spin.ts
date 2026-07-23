@@ -92,8 +92,8 @@ function targetAngleFor(prizeId: string, prevAngle: number): number {
   return base + turns * 360 + (360 - segCenter);
 }
 
-// 旧设备级单键 "nexion-lucky-spin-v1" 废弃(存量无账号归属,mock 可重建);转盘持久态按账号分行。
-const ACCOUNTS_KEY = "nexion-lucky-spin-accounts-v1"; // { [accountKey]: persisted spin state }
+// 旧设备级单键 "nexgrid-lucky-spin-v1" 废弃(存量无账号归属,mock 可重建);转盘持久态按账号分行。
+const ACCOUNTS_KEY = "nexgrid-lucky-spin-accounts-v1"; // { [accountKey]: persisted spin state }
 
 export const useLuckySpin = defineStore("luckySpin", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。

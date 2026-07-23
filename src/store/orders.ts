@@ -2,7 +2,7 @@
  * Ported from Nexion-prototype/lib/store/orders.ts
  * (zustand persist → Pinia + uni storage).
  *
- * Unified 4-stage flow for every product (NexionBox tiers + Cloud Share).
+ * Unified 4-stage flow for every product (NexGridBox tiers + Cloud Share).
  * No shipping fiction — every device is platform-hosted in our DC, so the
  * only meaningful states are: order placed → paid → DC provisioning → live.
  *
@@ -66,8 +66,8 @@ export interface CreateOrderInput {
   tradeInDeviceId?: string;
 }
 
-// 旧设备级单键 "nexion-orders-v4" 废弃(存量无账号归属,mock 可重建);订单按账号分行。
-const ACCOUNTS_KEY = "nexion-orders-accounts-v1"; // { [accountKey]: { orders: Order[] } }
+// 旧设备级单键 "nexgrid-orders-v4" 废弃(存量无账号归属,mock 可重建);订单按账号分行。
+const ACCOUNTS_KEY = "nexgrid-orders-accounts-v1"; // { [accountKey]: { orders: Order[] } }
 
 function genOrderId(): string {
   const yyyymmdd = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -82,7 +82,7 @@ export function timelineFor(_productId: Order["productId"]): OrderStatus[] {
 }
 
 function pickDataCenter(productId: Order["productId"]): Order["dataCenter"] {
-  // NexionRack (P1/P2) lives in Frankfurt, everything else in Singapore.
+  // NexGridRack (P1/P2) lives in Frankfurt, everything else in Singapore.
   return productId === "stellarrack-p1" || productId === "stellarrack-p2"
     ? "Frankfurt DC"
     : "Singapore DC";
@@ -93,7 +93,7 @@ function statusNote(next: OrderStatus, dc: Order["dataCenter"]): string | undefi
     case "provisioning":
       return `Allocating rack slot in ${dc}…`;
     case "activated":
-      return "Device live · joined Nexion network";
+      return "Device live · joined NexGrid network";
     default:
       return undefined;
   }
@@ -220,7 +220,7 @@ export const useOrders = defineStore("orders", () => {
               {
                 status: "activated",
                 ts: Date.now(),
-                note: "Device live · joined Nexion network",
+                note: "Device live · joined NexGrid network",
               },
             ],
           }

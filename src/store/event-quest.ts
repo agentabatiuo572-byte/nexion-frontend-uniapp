@@ -17,8 +17,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  * a version suffix for forward migration.
  */
 
-// 旧设备级单键 "nexion-event-quest-v1" 废弃(存量无账号归属,mock 可重建);活动参与态按账号分行。
-const ACCOUNTS_KEY = "nexion-event-quest-accounts-v1"; // { [accountKey]: PersistShape }
+// 旧设备级单键 "nexgrid-event-quest-v1" 废弃(存量无账号归属,mock 可重建);活动参与态按账号分行。
+const ACCOUNTS_KEY = "nexgrid-event-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 interface PersistShape {
   joined: string[];

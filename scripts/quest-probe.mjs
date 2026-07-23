@@ -6,7 +6,7 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, colorSch
 const p = await ctx.newPage();
 await p.goto("http://localhost:5173/#/pages/index/index", { waitUntil: "networkidle", timeout: 30000 });
 await new Promise((r) => setTimeout(r, 2500));
-const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexion-quest-v1"));
+const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexgrid-quest-v1"));
 const completedCounterText = await p.evaluate(() => {
   const el = [...document.querySelectorAll("text,view,span")].find((e) => /\/6/.test(e.textContent || "") && (e.textContent || "").length < 12);
   return el ? el.textContent.trim() : "(not found)";

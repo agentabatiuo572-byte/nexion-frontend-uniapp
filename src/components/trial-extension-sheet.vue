@@ -171,7 +171,7 @@ function onDecline() {
 .tes-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: tes-fade 0.24s ease-out;
@@ -242,7 +242,7 @@ function onDecline() {
   flex-direction: column;
 }
 .tes-cap {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -291,7 +291,7 @@ function onDecline() {
 .tes-hero-label {
   position: relative;
   display: block;
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -306,14 +306,14 @@ function onDecline() {
 }
 .tes-hero-sign {
   font-family: var(--font-v5);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 500;
   color: var(--v5-ink-3);
   line-height: 1;
 }
 .tes-hero-num {
   font-family: var(--font-v5);
-  font-size: 38px;
+  font-size: 44px;
   font-weight: 600;
   letter-spacing: -0.024em;
   line-height: 1;
@@ -323,7 +323,7 @@ function onDecline() {
 .tes-hero-nex {
   margin-left: 8px;
   font-family: var(--font-jet-mono), monospace;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-3);
   font-variant-numeric: tabular-nums;
@@ -355,14 +355,14 @@ function onDecline() {
 }
 .tes-prop-title {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.375;
 }
 .tes-prop-sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;
@@ -389,7 +389,7 @@ function onDecline() {
   transform: scale(0.98);
 }
 .tes-accept-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-on-brand);
   font-family: var(--font-v5);
@@ -406,7 +406,7 @@ function onDecline() {
   opacity: 0.7;
 }
 .tes-decline-t {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--v5-ink-3);
 }

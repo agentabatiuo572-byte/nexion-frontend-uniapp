@@ -61,7 +61,7 @@ export function replyToQuickPrompt(
         kind: "nova-reply",
         text:
           `You already run the highest tier — nice. Two ways to scale further:\n\n` +
-          `1. Add a second NexionBox to handle parallel fine-tune jobs.\n` +
+          `1. Add a second NexGridBox to handle parallel fine-tune jobs.\n` +
           `2. Push referrals via /team — your tier earns 8% lifetime split on each referral.`,
         ctaLabel: "Open Team →",
         ctaHref: "/team",

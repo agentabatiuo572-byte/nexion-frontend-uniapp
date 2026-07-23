@@ -4,8 +4,8 @@ import { TICKETS, type Ticket, type TicketCategory } from "@/mock/tickets";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
-// 旧设备级单键 "nexion-support-tickets-v1" 废弃(存量无账号归属,mock 可重建);工单按账号分行。
-const ACCOUNTS_KEY = "nexion-support-tickets-accounts-v1"; // { [accountKey]: { tickets: Ticket[] } }
+// 旧设备级单键 "nexgrid-support-tickets-v1" 废弃(存量无账号归属,mock 可重建);工单按账号分行。
+const ACCOUNTS_KEY = "nexgrid-support-tickets-accounts-v1"; // { [accountKey]: { tickets: Ticket[] } }
 
 function cloneTicket(ticket: Ticket): Ticket {
   const raw = ticket as Partial<Ticket>;

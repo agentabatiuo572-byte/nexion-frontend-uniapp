@@ -10,12 +10,12 @@ import type { EarningBucketRoute } from "@/store/types";
 // 目录。PRD 只高层列出注册能力，具体注册 endpoint/回执契约仍 TBD；PROD 应由
 // 认证服务/数据库原子替换（candidate: `POST /api/auth/register`）。client session、
 // account-cloud、risk registry 都不是账号是否存在的长期事实源。
-export const AUTH_ACCOUNT_STORAGE_KEY = "nexion-auth-accounts-v1";
+export const AUTH_ACCOUNT_STORAGE_KEY = "nexgrid-auth-accounts-v1";
 /**
  * 旧风险表(schema1)迁目录时的短期事务日志。它只允许补完一个已确认的 legacy
  * 迁移，不能用于重建 schema2 正常运行期被删掉的手机号目录。
  */
-export const AUTH_ACCOUNT_LEGACY_MIGRATION_KEY = "nexion-auth-accounts-legacy-migration-v1";
+export const AUTH_ACCOUNT_LEGACY_MIGRATION_KEY = "nexgrid-auth-accounts-legacy-migration-v1";
 
 export interface AuthAccountRecord {
   accountId: string;
@@ -61,7 +61,7 @@ export type AuthAccountActivation =
   | { ok: false; error: "reservation_missing" | "account_directory_unavailable" };
 
 const PHONE_RE = /^\+\d{6,15}$/;
-const LEGACY_ACCOUNT_RE = /^(\+\d{6,15})@demo\.nexion\.ai$/;
+const LEGACY_ACCOUNT_RE = /^(\+\d{6,15})@demo\.nexgrid\.ai$/;
 
 /** 手机号目录身份的判别只在认证边界使用，避免残留 auth snapshot 绕过目录。 */
 export function isPhoneAuthAccountId(raw: string): boolean {
@@ -75,7 +75,7 @@ export function normalizeAuthPhone(raw: string): string | null {
 
 export function authAccountKeyForPhone(raw: string): string | null {
   const phone = normalizeAuthPhone(raw);
-  return phone ? normalizeAccountKey(`${phone}@demo.nexion.ai`) : null;
+  return phone ? normalizeAccountKey(`${phone}@demo.nexgrid.ai`) : null;
 }
 
 function writeRegistry(registry: AuthAccountRegistry): boolean {

@@ -35,8 +35,8 @@ export function bundleDiscountForCount(count: number): number {
   return 0;
 }
 
-// 旧设备级单键 "nexion-cart-v1" 废弃(存量无账号归属,mock 可重建);购物车按账号分行。
-const ACCOUNTS_KEY = "nexion-cart-accounts-v1"; // { [accountKey]: { items: string[] } }
+// 旧设备级单键 "nexgrid-cart-v1" 废弃(存量无账号归属,mock 可重建);购物车按账号分行。
+const ACCOUNTS_KEY = "nexgrid-cart-accounts-v1"; // { [accountKey]: { items: string[] } }
 
 function hydrate(accountKey: string): string[] {
   const row = readAccountRow<{ items?: string[] }>(ACCOUNTS_KEY, accountKey);

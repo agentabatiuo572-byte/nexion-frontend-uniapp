@@ -240,12 +240,12 @@ async function handleRedeem() {
     symbol: "USDT",
     amount: -chargeAmount,
     status: "posted",
-    memo: `Trial early-redeem · NexionBox S1 (promo -$${discountInfo.value.discount}, earnings -$${offsetUSD})`,
+    memo: `Trial early-redeem · NexGridBox S1 (promo -$${discountInfo.value.discount}, earnings -$${offsetUSD})`,
     ref: purchaseRef,
   });
   if (remainderUSD > 0) {
     app.creditBalance(remainderUSD);
-    bills.add({ type: "bonus", symbol: "USDT", amount: remainderUSD, status: "posted", memo: "Trial earnings remainder → balance · NexionBox S1", ref: `${purchaseRef}-EARN-USDT` });
+    bills.add({ type: "bonus", symbol: "USDT", amount: remainderUSD, status: "posted", memo: "Trial earnings remainder → balance · NexGridBox S1", ref: `${purchaseRef}-EARN-USDT` });
   }
   if (shadowNEXBeforeRedeem > 0) {
     app.creditNex(shadowNEXBeforeRedeem);

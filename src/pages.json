@@ -355,6 +355,7 @@
   ],
   "globalStyle": {
     "navigationStyle": "custom",
+    "navigationBarTitleText": "NexGrid",
     "backgroundColor": "#000000",
     "backgroundColorContent": "#000000"
   }

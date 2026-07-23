@@ -35,14 +35,15 @@ const iconStyle = computed<CSSProperties>(() => ({
   height: "44px",
   borderRadius: "999px",
   background: props.primary ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  border: props.primary ? "none" : "1px solid var(--v5-border)",
-  color: props.primary ? "var(--v5-bg)" : "var(--v5-brand)",
+  // 《03》§6:内嵌 icon 容器用 soft bg tint,禁 border;
+  // 亮底文字/图标必须 --v5-on-brand(原用 --v5-bg 取巧,两主题语义不等价)
+  color: props.primary ? "var(--v5-on-brand)" : "var(--v5-brand)",
   boxShadow: props.primary ? "var(--v5-spotlight-brand)" : "none",
 }));
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
@@ -50,7 +51,7 @@ const labelStyle: CSSProperties = {
 };
 const subStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.04em",
   color: "var(--v5-ink-4)",

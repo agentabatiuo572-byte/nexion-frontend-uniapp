@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-**这是 Nexion 前端的唯一实现面**（主人 2026-06-14 拍板：前端新功能/改动都在这里做。H5 `Nexion-prototype` 已于 2026-06-26 退役删除）。任意 Nexion 任务先读 `D:\WORKS\PLAN\WORKFLOW.md` 判工作线 + 加载 `nexion-workflow` skill；本工程（uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
+**这是 NexGrid 前端的唯一实现面**（产品品牌 2026-07-22 由 Nexion 全局改名 NexGrid；工程目录 / skill 名 / PRD 文件名 / 内部存量标识沿用 Nexion 前缀，属白名单）（主人 2026-06-14 拍板：前端新功能/改动都在这里做。H5 `Nexion-prototype` 已于 2026-06-26 退役删除）。任意 Nexion 任务先读 `D:\WORKS\PLAN\WORKFLOW.md` 判工作线 + 加载 `nexion-workflow` skill；本工程（uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
 
 ## Heads-up: uni-app (Vue3)，不是 React/Next
 

@@ -193,7 +193,7 @@ onBackPress(() => {
 .rs-gift__cap { display: block; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10px; letter-spacing: 0.16em; color: var(--v5-brand); }
 .rs-gift__amt { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 8px; }
 .rs-gift__usd { font-family: var(--font-v5); font-size: 30px; font-weight: 600; line-height: 1; color: var(--v5-ink); }
-.rs-gift__nex { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand); }
+.rs-gift__nex { font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-nex); }
 .rs-chip { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; border-radius: 9999px; padding: 4px 10px; }
 .rs-chip--ok { background: color-mix(in srgb, var(--v5-success) 12%, transparent); }
 .rs-chip--pd { background: color-mix(in srgb, var(--v5-warning) 12%, transparent); }

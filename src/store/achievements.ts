@@ -15,8 +15,8 @@ export interface AchievementRecord {
   claimed: boolean;
 }
 
-// 旧设备级单键 "nexion-achievements-v1" 废弃(存量无账号归属,mock 可重建);成就记录按账号分行。
-const ACCOUNTS_KEY = "nexion-achievements-accounts-v1"; // { [accountKey]: { records: AchievementRecord[] } }
+// 旧设备级单键 "nexgrid-achievements-v1" 废弃(存量无账号归属,mock 可重建);成就记录按账号分行。
+const ACCOUNTS_KEY = "nexgrid-achievements-accounts-v1"; // { [accountKey]: { records: AchievementRecord[] } }
 
 function hydrate(accountKey: string): AchievementRecord[] {
   const row = readAccountRow<{ records?: AchievementRecord[] }>(ACCOUNTS_KEY, accountKey);

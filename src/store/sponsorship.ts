@@ -7,10 +7,10 @@ import { useConfig } from "@/store/config";
 // ⚠️ MOCK-ONLY: 本地保存推荐展示态与礼包领取标记。PROD 由既有
 // `POST /api/sponsorship/bind` 及其服务端账本回执原子裁决，客户端不能把此表
 // 当作推荐关系或礼包资格的权威来源。
-const STORAGE_KEY = "nexion-sponsorship-v1";
+const STORAGE_KEY = "nexgrid-sponsorship-v1";
 
 // 邀请码 client 预检(服务端权威校验另行);大小写不敏感,统一大写。
-export const REF_CODE_RE = /^NEXION-[A-Z0-9]{4}$/;
+export const REF_CODE_RE = /^NEXGRID-[A-Z0-9]{4}$/;
 
 export function normalizeRefCode(raw: string | null | undefined): string | null {
   const v = (raw || "").trim().toUpperCase();

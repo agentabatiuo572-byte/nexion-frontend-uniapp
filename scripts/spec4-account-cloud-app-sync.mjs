@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
-const accountKey = "spec4-sync@nexion.ai";
+const accountKey = "spec4-sync@nexgrid.ai";
 
 function unwrap(raw, fallback) {
   if (!raw) return fallback;
@@ -48,7 +48,7 @@ const result = await appFrame.evaluate(
     const app = useApp();
 
     app.bindAccount(accountKey);
-    const cloudBefore = unwrap(localStorage.getItem("nexion-account-cloud-v1"), {});
+    const cloudBefore = unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {});
     const row = cloudBefore[accountKey];
     if (!row) throw new Error("account cloud row missing after bindAccount");
     if (!row.devices.length) throw new Error("seed devices missing after bindAccount");
@@ -59,17 +59,17 @@ const result = await appFrame.evaluate(
       updatedAt: Date.now(),
       user: { ...row.user, usdtBalance: externalBalance },
     };
-    localStorage.setItem("nexion-account-cloud-v1", wrap(cloudBefore));
+    localStorage.setItem("nexgrid-account-cloud-v1", wrap(cloudBefore));
 
     app.creditBalance(1);
-    const afterFirst = unwrap(localStorage.getItem("nexion-account-cloud-v1"), {})[accountKey];
+    const afterFirst = unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {})[accountKey];
     app.creditBalance(1);
-    const afterSecond = unwrap(localStorage.getItem("nexion-account-cloud-v1"), {})[accountKey];
+    const afterSecond = unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {})[accountKey];
 
     const deleteId = afterSecond.devices[0].id;
     app.devices = app.devices.filter((device) => device.id !== deleteId);
     app.persistAccountSnapshot();
-    const afterDelete = unwrap(localStorage.getItem("nexion-account-cloud-v1"), {})[accountKey];
+    const afterDelete = unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {})[accountKey];
 
     return {
       firstBalance: afterFirst.user.usdtBalance,

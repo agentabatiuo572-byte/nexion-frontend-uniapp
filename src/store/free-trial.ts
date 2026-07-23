@@ -67,8 +67,8 @@ const INITIAL: FreeTrialState = {
   shadowFrozenAtNEX: 0,
 };
 
-// 旧设备级单键 "nexion-trial-v1" 废弃(存量无账号归属,mock 可重建);试用状态机按账号分行。
-const ACCOUNTS_KEY = "nexion-trial-accounts-v1"; // { [accountKey]: FreeTrialState }
+// 旧设备级单键 "nexgrid-trial-v1" 废弃(存量无账号归属,mock 可重建);试用状态机按账号分行。
+const ACCOUNTS_KEY = "nexgrid-trial-accounts-v1"; // { [accountKey]: FreeTrialState }
 
 function hydrate(accountKey: string): FreeTrialState {
   const row = readAccountRow<Partial<FreeTrialState>>(ACCOUNTS_KEY, accountKey);

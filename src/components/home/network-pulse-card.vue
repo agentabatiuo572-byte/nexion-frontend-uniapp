@@ -8,7 +8,7 @@
   <view>
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.networkPulseTitle }}</text>
-      <text class="font-mono-tabular" style="font-size: 11.5px; color: var(--v5-tech-cyan)">{{ t.home.networkLive }}</text>
+      <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.home.networkLive }}</text>
     </view>
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
@@ -25,12 +25,14 @@
           v-for="(m, i) in metrics"
           :key="m.k"
           class="grid items-center gap-2"
-          :style="{ gridTemplateColumns: '1fr 60px', padding: '12px 14px', borderRight: i % 2 === 0 ? '1px solid var(--v5-border)' : 'none', borderBottom: i < 2 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
+          <!-- 横向 padding 14 → 12:①《03》§1 8pt grid(14 不在阶梯,12=space-3)
+               ②腾出 4px,修 h3 20px 指标值(如 #18,742)撑破容器 2px 的溢出 -->
+          :style="{ gridTemplateColumns: '1fr 60px', padding: '12px', borderRight: i % 2 === 0 ? '1px solid var(--v5-border)' : 'none', borderBottom: i < 2 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         >
           <view class="min-w-0">
-            <text class="block font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ m.k }}</text>
-            <text class="block mt-0.5 tabular-nums" :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '18px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }">{{ m.v }}</text>
-            <text class="block mt-1 font-mono-tabular truncate" style="font-size: 11.5px; color: var(--v5-ink-4)">{{ m.sub }}</text>
+            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.k }}</text>
+            <text class="block mt-0.5 tabular-nums" :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }">{{ m.v }}</text>
+            <text class="block mt-1 font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ m.sub }}</text>
           </view>
           <view style="height: 32px">
             <HomeSparkline :data="m.data" :color="m.color" :height="32" />

@@ -59,7 +59,7 @@ export interface DeviceCapability {
   signals: CapabilitySignals;
 }
 
-const BASELINE_KEY = "nexion-device-baseline-v1";
+const BASELINE_KEY = "nexgrid-device-baseline-v1";
 
 // Tier → daily yield is an OPERATOR-CONFIGURABLE business value, not an
 // engineering constant: it lives in the backend-replaceable config

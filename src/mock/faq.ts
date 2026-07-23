@@ -15,20 +15,20 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     id: "gs-1",
     category: "getting-started",
-    q: "What exactly does Nexion do?",
-    a: "Nexion routes idle AI workloads (image gen, LLM inference, embedding, etc.) from enterprise clients to a global mesh of consumer devices — your phone or a NexionBox. Clients pay per inference; we settle to your wallet in USDT.",
+    q: "What exactly does NexGrid do?",
+    a: "NexGrid routes idle AI workloads (image gen, LLM inference, embedding, etc.) from enterprise clients to a global mesh of consumer devices — your phone or a NexGridBox. Clients pay per inference; we settle to your wallet in USDT.",
   },
   {
     id: "gs-2",
     category: "getting-started",
     q: "Is my phone really doing AI work?",
-    a: "Your phone's NPU (Apple Neural Engine, Snapdragon Hexagon, etc.) handles small inference jobs in the background — only when charging, on Wi-Fi, and above your battery threshold. Heavier jobs stream to NexionBox tiers.",
+    a: "Your phone's NPU (Apple Neural Engine, Snapdragon Hexagon, etc.) handles small inference jobs in the background — only when charging, on Wi-Fi, and above your battery threshold. Heavier jobs stream to NexGridBox tiers.",
   },
   {
     id: "gs-3",
     category: "getting-started",
     q: "How do I activate my phone?",
-    a: "Open Onboarding · Step 3 and toggle Activate Nexion Compute. Nova will push your first job within ~10 seconds.",
+    a: "Open Onboarding · Step 3 and toggle Activate NexGrid Compute. Nova will push your first job within ~10 seconds.",
   },
   // Earnings
   {
@@ -41,7 +41,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "er-2",
     category: "earnings",
     q: "Why are my earnings so low?",
-    a: "Mobile NPU yields are intentionally modest (~$0.06/day). Hardware tiers (NexionBox S1, Pro, Rack P1) yield 117×–750× more per day because they can take heavier workloads like fine-tunes and 405B LLM inference.",
+    a: "Mobile NPU yields are intentionally modest (~$0.06/day). Hardware tiers (NexGridBox S1, Pro, Rack P1) yield 117×–750× more per day because they can take heavier workloads like fine-tunes and 405B LLM inference.",
   },
   {
     id: "er-3",
@@ -54,7 +54,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "dv-1",
     category: "devices",
     q: "Can I add multiple devices?",
-    a: "Up to 6 devices per account. Mix and match phone + NexionBox tiers. Devices that go offline 24h+ reset their streak bonus.",
+    a: "Up to 6 devices per account. Mix and match phone + NexGridBox tiers. Devices that go offline 24h+ reset their streak bonus.",
   },
   {
     id: "dv-2",
@@ -65,7 +65,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     id: "dv-3",
     category: "devices",
-    q: "Where are NexionBox units hosted?",
+    q: "Where are NexGridBox units hosted?",
     a: "Singapore Data Center (Asia/PAC clients), Frankfurt DC (EMEA). You don't ship them anywhere — we operate them for you.",
   },
   // Payments
@@ -103,7 +103,7 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     id: "tc-3",
     category: "technical",
-    q: "Does Nexion have an API?",
+    q: "Does NexGrid have an API?",
     a: "Enterprise partners can request API access via /developer. Consumer accounts use the H5 app only.",
   },
 ];

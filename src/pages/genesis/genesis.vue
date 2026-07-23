@@ -64,7 +64,7 @@
               <view class="flex items-center justify-between tabular-nums" :style="barMetaStyle">
                 <text>
                   <text>{{ soldText }}</text>
-                  <text style="color: #D4AF5A; font-weight: 500"> / {{ totalText }} {{ t.genesis.soldOf }}</text>
+                  <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> / {{ totalText }} {{ t.genesis.soldOf }}</text>
                 </text>
                 <text class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
               </view>
@@ -143,7 +143,7 @@
           <view aria-hidden :style="dockRimStyle" />
           <view aria-hidden class="gen-anim" :style="dockSheenStyle" />
         </template>
-        <view class="relative inline-flex items-center" style="z-index: 1; gap: 6px; color: #D4AF5A">
+        <view class="relative inline-flex items-center" style="z-index: 1; gap: 6px; color: var(--v5-genesis-gold-on-dark)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
           <text :style="dockLabelStyle">{{ dockCtaText }}</text>
           <template v-if="preSale && showTime">
@@ -344,11 +344,11 @@ const howPillStyle: CSSProperties = {
   height: "34px",
   padding: "0 12px",
   borderRadius: "999px",
-  background: "rgba(212,175,90,0.14)",
+  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 14.000000000000002%, transparent)",
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 500,
-  color: "#D4AF5A",
+  color: "var(--v5-genesis-gold-on-dark)",
   letterSpacing: "-0.005em",
   whiteSpace: "nowrap",
 };
@@ -356,15 +356,15 @@ const heroStyle: CSSProperties = {
   padding: "24px 22px 22px",
   borderRadius: "16px",
   background:
-    "radial-gradient(circle at 90% 0%, rgba(212,175,90,0.20) 0%, transparent 55%)," +
+    "radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 20%, transparent) 0%, transparent 55%)," +
     "radial-gradient(circle at 0% 100%, rgba(132,90,42,0.30) 0%, transparent 60%)," +
     "linear-gradient(160deg, #1B140A 0%, #0E0A05 60%, #1A1208 100%)",
-  border: "1px solid rgba(212,175,90,0.35)",
+  border: "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 35%, transparent)",
   boxShadow:
-    "inset 0 1px 0 rgba(212,175,90,0.22)," +
+    "inset 0 1px 0 color-mix(in srgb, var(--v5-genesis-gold-on-dark) 22%, transparent)," +
     "inset 0 -1px 0 rgba(0,0,0,0.45)," +
     "0 12px 32px rgba(0,0,0,0.20)",
-  color: "#F4E5C2",
+  color: "var(--v5-genesis-gold-pale-on-dark)",
 };
 const dustPos = ["12%", "32%", "54%", "72%", "86%"];
 const dustDur = [7, 8, 6.5, 9, 7.5];
@@ -387,7 +387,7 @@ const dust = computed<CSSProperties[]>(() =>
 const engraveStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
-  backgroundImage: "repeating-linear-gradient(135deg, rgba(212,175,90,0.05) 0 1px, transparent 1px 14px)",
+  backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 5%, transparent) 0 1px, transparent 1px 14px)",
   mixBlendMode: "screen",
   opacity: 0.6,
   pointerEvents: "none",
@@ -399,7 +399,7 @@ const glowStyle: CSSProperties = {
   right: "-60px",
   width: "200px",
   height: "200px",
-  background: "radial-gradient(circle, rgba(212,175,90,0.28), transparent 70%)",
+  background: "radial-gradient(circle, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 28.000000000000004%, transparent), transparent 70%)",
   filter: "blur(4px)",
   pointerEvents: "none",
   animation: "gen-glow-drift 9s ease-in-out infinite",
@@ -407,7 +407,7 @@ const glowStyle: CSSProperties = {
 const sheenStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
-  background: "linear-gradient(110deg, transparent 30%, rgba(212,175,90,0.18) 50%, transparent 70%)",
+  background: "linear-gradient(110deg, transparent 30%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 18%, transparent) 50%, transparent 70%)",
   transform: "translateX(-100%)",
   animation: "gen-sheen 5.5s ease-in-out infinite",
   pointerEvents: "none",
@@ -416,8 +416,8 @@ const sheenStyle: CSSProperties = {
 const crownChipStyle: CSSProperties = {
   padding: "4px 10px",
   borderRadius: "999px",
-  background: "rgba(212,175,90,0.10)",
-  color: "#D4AF5A",
+  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 10%, transparent)",
+  color: "var(--v5-genesis-gold-on-dark)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "10.5px",
   fontWeight: 500,
@@ -430,32 +430,32 @@ const titleStyle: CSSProperties = {
   fontSize: "28px",
   letterSpacing: "-0.024em",
   lineHeight: 1.18,
-  color: "#F4E5C2",
+  color: "var(--v5-genesis-gold-pale-on-dark)",
 };
 const heroSubStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "13.5px",
-  color: "rgba(244,229,194,0.72)",
+  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 72%, transparent)",
   lineHeight: 1.55,
 };
 const heroDiscStyle: CSSProperties = {
   marginTop: "6px",
   fontSize: "11px",
-  color: "rgba(244,229,194,0.5)",
+  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 50%, transparent)",
   lineHeight: 1.5,
 };
 const barTrackStyle: CSSProperties = {
   height: "4px",
   borderRadius: "2px",
-  background: "rgba(212,175,90,0.14)",
+  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 14.000000000000002%, transparent)",
   overflow: "hidden",
 };
 const barFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
   width: `${salesBarInView.value ? soldPct.value : 0}%`,
-  background: "linear-gradient(90deg, #B5894A 0%, #E2C97C 50%, #D4AF5A 100%)",
+  background: "linear-gradient(90deg, #B5894A 0%, #E2C97C 50%, var(--v5-genesis-gold-on-dark) 100%)",
   borderRadius: "2px",
-  boxShadow: "0 0 8px rgba(212,175,90,0.5)",
+  boxShadow: "0 0 8px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 50%, transparent)",
   transition: salesBarInView.value ? PROGRESS_GROW_TRANSITION : "none",
   willChange: "width",
 }));
@@ -470,11 +470,11 @@ const barMetaStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
-  color: "rgba(244,229,194,0.55)",
+  color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 55.00000000000001%, transparent)",
   letterSpacing: "0.04em",
 };
 const urgentStyle: CSSProperties = {
-  color: "#D4AF5A",
+  color: "var(--v5-genesis-gold-on-dark)",
   fontWeight: 500,
   animation: "gen-urgent 1.8s ease-in-out infinite",
 };
@@ -570,7 +570,8 @@ const tierCurrentStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "10px",
-  color: "#D4AF5A",
+  // 这行落在**跟主题的页面底**上(不是曜石 hero):原金亮主题实测 1.85 → 走跟主题的深金档
+  color: "var(--v5-genesis-gold)",
   letterSpacing: "0.02em",
 };
 const tierPremiumStyle: CSSProperties = {
@@ -617,10 +618,14 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
   justifyContent: "center",
   background:
     remaining.value > 0
-      ? "linear-gradient(180deg, rgba(50,38,20,0.55) 0%, rgba(20,14,8,0.72) 100%)"
+      // 吸底条按设计是**暗色金属面**,但原 alpha 0.55/0.72 在亮主题下被奶油页底冲淡,
+      // 合成底只到 rgb(83,78,71) → 金色价格实测 3.95 不达 AA(暗主题 8.95 正常)。
+      // 提到 0.88/0.92 让它在两个主题下都真的是暗面:亮主题合成底 rgb(38,32,26) → 7.73;
+      // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
+      ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
       : "var(--v5-surface-2)",
-  border: remaining.value > 0 ? "1px solid rgba(212,175,90,0.55)" : "1px solid var(--v5-border)",
-  color: remaining.value > 0 ? "#F4E5C2" : "var(--v5-ink-4)",
+  border: remaining.value > 0 ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55.00000000000001%, transparent)" : "1px solid var(--v5-border)",
+  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "14px",
@@ -630,8 +635,8 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
       ? [
           "inset 0 1px 0 rgba(255,255,255,0.40)",
           "inset 0 -1px 0 rgba(0,0,0,0.50)",
-          "inset 0 0 0 1px rgba(212,175,90,0.18)",
-          "0 0 24px rgba(212,175,90,0.20)",
+          "inset 0 0 0 1px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 18%, transparent)",
+          "0 0 24px color-mix(in srgb, var(--v5-genesis-gold-on-dark) 20%, transparent)",
           "0 14px 30px rgba(0,0,0,0.45)",
         ].join(", ")
       : "none",
@@ -652,7 +657,7 @@ const dockRimStyle: CSSProperties = {
   right: "14%",
   bottom: "1px",
   height: "1px",
-  background: "linear-gradient(90deg, transparent 0%, rgba(212,175,90,0.55) 50%, transparent 100%)",
+  background: "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55.00000000000001%, transparent) 50%, transparent 100%)",
   pointerEvents: "none",
 };
 const dockSheenStyle: CSSProperties = {
@@ -664,13 +669,13 @@ const dockSheenStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const dockLabelStyle = computed<CSSProperties>(() => ({
-  color: remaining.value > 0 ? "#F4E5C2" : "var(--v5-ink-4)",
+  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontWeight: 600,
 }));
 const dockDividerStyle: CSSProperties = {
   width: "1px",
   height: "14px",
-  background: "rgba(212,175,90,0.40)",
+  background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 40%, transparent)",
   margin: "0 4px",
 };
 </script>

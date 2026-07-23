@@ -320,7 +320,7 @@ function paint(link: string, myToken: number) {
   ctx.setTextAlign("left");
   ctx.setFillStyle(INK_ON_DARK);
   ctx.setFontSize(13);
-  ctx.fillText("Nexion", 42, 28);
+  ctx.fillText("NexGrid", 42, 28);
   ctx.setFillStyle(FAINT_ON_DARK);
   ctx.setFontSize(9);
   ctx.setTextAlign("right");
@@ -470,7 +470,7 @@ function saveImage() {
       const u = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = u;
-      a.download = `nexion-invite-${Date.now()}.png`;
+      a.download = `nexgrid-invite-${Date.now()}.png`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -513,7 +513,7 @@ async function onChannel(c: ShareChannelDef) {
 </script>
 
 <style scoped>
-.ps-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(3px); z-index: 8000; }
+.ps-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
 .ps-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--v5-surface); border-top: 1px solid var(--v5-border-strong); border-radius: 22px 22px 0 0; max-height: 92vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ps-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ps-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .ps-grab { width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: 10px auto 0; }
@@ -530,20 +530,20 @@ async function onChannel(c: ShareChannelDef) {
 .ps-skeleton { aspect-ratio: 3 / 4; border-radius: 16px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
 .ps-skeleton::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--v5-ink) 5%, transparent), transparent); animation: ps-shim 1.1s infinite; }
 @keyframes ps-shim { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
-.ps-skeleton__t { font-size: 11.5px; color: var(--v5-ink-4); }
+.ps-skeleton__t { font-size: 12px; color: var(--v5-ink-4); }
 .ps-fail { aspect-ratio: 3 / 4; border-radius: 16px; background: var(--v5-surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
-.ps-fail__t { font-size: 12.5px; color: var(--v5-ink-3); }
+.ps-fail__t { font-size: 13px; color: var(--v5-ink-3); }
 .ps-fail__btn { min-height: 36px; padding: 0 18px; border-radius: 9999px; background: var(--v5-surface-3); display: flex; align-items: center; }
-.ps-fail__btn-t { font-size: 12.5px; color: var(--v5-ink); }
+.ps-fail__btn-t { font-size: 13px; color: var(--v5-ink); }
 .ps-thumbs { display: flex; justify-content: center; gap: 8px; margin-top: 12px; padding: 0 16px; }
 .ps-thumb { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 6px 12px; border-radius: 9999px; background: var(--v5-surface-2); opacity: 0.6; }
 .ps-thumb--on { opacity: 1; outline: 2px solid var(--v5-brand); outline-offset: 1px; }
 .ps-thumb__dot { width: 8px; height: 8px; border-radius: 9999px; }
-.ps-thumb__t { font-size: 11px; color: var(--v5-ink-2); }
+.ps-thumb__t { font-size: 12px; color: var(--v5-ink-2); }
 .ps-reward { margin-top: 10px; text-align: center; padding: 0 16px; }
-.ps-reward__t { font-size: 11.5px; color: var(--v5-ink-3); text-wrap: pretty; }
+.ps-reward__t { font-size: 12px; color: var(--v5-ink-3); text-wrap: pretty; }
 .ps-toggle { display: flex; align-items: center; justify-content: space-between; margin: 10px 18px 0; min-height: 32px; }
-.ps-toggle__lb { font-size: 12.5px; color: var(--v5-ink-2); }
+.ps-toggle__lb { font-size: 13px; color: var(--v5-ink-2); }
 .ps-sw { width: 44px; height: 26px; border-radius: 9999px; background: var(--v5-surface-3); position: relative; transition: background 0.18s; }
 .ps-sw--on { background: var(--v5-brand); }
 .ps-sw__knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 9999px; background: var(--v5-surface); transition: left 0.18s; }
@@ -553,5 +553,5 @@ async function onChannel(c: ShareChannelDef) {
 .ps-ch--off { opacity: 0.4; pointer-events: none; }
 .ps-ch__ic { width: 48px; height: 48px; border-radius: 9999px; background: var(--v5-surface-2); color: var(--v5-ink-2); display: flex; align-items: center; justify-content: center; }
 .ps-ch__ic--hl { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); }
-.ps-ch__lb { font-size: 10px; color: var(--v5-ink-3); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-ch__lb { font-size: 12px; color: var(--v5-ink-3); max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

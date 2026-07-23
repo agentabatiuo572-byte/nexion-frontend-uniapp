@@ -26,7 +26,7 @@
               </view>
               <view>
                 <text class="block font-display" :style="nexPairStyle">NEX / USDT</text>
-                <text class="block" :style="nexSubStyle">Nexion · #{{ NEX.rank }}</text>
+                <text class="block" :style="nexSubStyle">NexGrid · #{{ NEX.rank }}</text>
               </view>
             </view>
             <view class="text-right">

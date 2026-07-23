@@ -110,7 +110,7 @@
       <!-- Trust footer -->
       <view class="flex items-start" :style="trustFootStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 8px; font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). Nexion never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
+        <text style="margin-left: 8px; font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). NexGrid never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
       </view>
     </template>
   </view>

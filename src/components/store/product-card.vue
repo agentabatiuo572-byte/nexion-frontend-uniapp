@@ -11,7 +11,8 @@
     · Footer: price + frosted Buy CTA.
 -->
 <template>
-  <view class="relative overflow-hidden block" :style="cardStyle" role="button" tabindex="0" @click="goDetail">
+  <!-- 《08》§2:tap 反馈 active:scale+opacity(禁 hover 做移动端反馈) -->
+  <view class="relative overflow-hidden block active:scale-[0.98] active:opacity-80" :style="cardStyle" role="button" tabindex="0" @click="goDetail">
     <view v-if="featured" aria-hidden :style="featuredGlowStyle" />
 
     <!-- ───── Hero photo banner ───── -->
@@ -65,20 +66,20 @@
 
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
-          <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 14px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
-          <text class="font-mono-tabular tabular-nums" style="font-size: 13.5px; color: var(--v5-warning); font-weight: 500">{{ nexPerDayText }}</text>
+          <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
+          <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-warning); font-weight: 500">{{ nexPerDayText }}</text>
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
 
         <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
         <view v-if="product.ai?.unlocks" class="mt-1.5 flex items-center gap-1.5">
           <svg class="shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text class="min-w-0 truncate" style="font-size: 11px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: product.ai.unlocks }) }}</text>
+          <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: product.ai.unlocks }) }}</text>
         </view>
 
         <!-- Purchase gate — locked state (等级门/锁额) -->
-        <view v-if="gateLockedView" class="mt-2.5" :style="gateBoxStyle">
-          <view class="flex items-center justify-between" role="button" tabindex="0" @click.stop="toggleGateDetails">
+        <view v-if="gateLockedView" class="mt-2.5 active:opacity-70" :style="gateBoxStyle" role="button" tabindex="0" @click.stop="toggleGateDetails">
+          <view class="flex items-center justify-between">
             <view class="flex items-center gap-1.5" :style="gateEyebrowStyle">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
               <text>{{ gate.soldOut ? t.store.gateSoldOut : t.store.gateLockedEyebrow }}</text>
@@ -96,7 +97,7 @@
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
     </view>
@@ -110,7 +111,8 @@
           <text style="font-size: 26px; font-weight: 600">{{ priceText }}</text>
         </view>
       </view>
-      <view class="inline-flex items-center justify-center whitespace-nowrap" :style="buyBtnDynStyle" @click.stop="onBuy">
+      <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" @click.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
         <text @click.stop="onBuy">{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -240,7 +242,7 @@ const renderWrapStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "180px",
   background: isShare.value
-    ? "repeating-linear-gradient(135deg, rgba(12,196,214,0.08) 0 8px, transparent 8px 18px)," +
+    ? "repeating-linear-gradient(135deg, color-mix(in srgb, var(--v5-tech-cyan) 8%, transparent) 0 8px, transparent 8px 18px)," +
       "linear-gradient(135deg, var(--v5-tech-cyan-soft) 0%, var(--v5-surface-2) 100%)"
     : photo.value
       ? "linear-gradient(135deg, #101216 0%, #0A0B0E 60%, #000000 100%)"
@@ -267,7 +269,7 @@ const ribbonStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontVariantNumeric: "tabular-nums",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   borderRadius: "0 0 6px 6px",
   letterSpacing: "-0.005em",
@@ -275,7 +277,7 @@ const ribbonStyle: CSSProperties = {
   pointerEvents: "none",
 };
 const tierChipStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.22em",
   color: "rgba(255,255,255,0.88)",
   lineHeight: 1,
@@ -284,7 +286,7 @@ const tierChipStyle: CSSProperties = {
   borderRadius: "4px",
 };
 const legacyChipStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-warning)",
   lineHeight: 1.4,
@@ -293,7 +295,7 @@ const legacyChipStyle: CSSProperties = {
   borderRadius: "4px",
 };
 const cloudChipStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.22em",
   color: "var(--v5-tech-cyan)",
   lineHeight: 1,
@@ -311,7 +313,7 @@ const nameStyle: CSSProperties = {
   lineHeight: 1.15,
 };
 const earnEyebrowStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.08em",
   color: "var(--v5-warning)",
@@ -327,7 +329,7 @@ const bigEarnStyle: CSSProperties = {
 const stockHintStyle: CSSProperties = {
   marginLeft: "auto",
   fontFamily: "var(--font-v5)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-4)",
   letterSpacing: "-0.005em",
@@ -348,7 +350,7 @@ const footerStyle: CSSProperties = {
   gridTemplateColumns: "1fr auto",
 };
 const priceEyebrowStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.08em",
   color: "var(--v5-ink-3)",
@@ -370,7 +372,7 @@ const buyBtnStyle: CSSProperties = {
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "13.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
 };
 // Locked Buy CTA = muted (soft surface, no brand) when gate blocks purchase.
@@ -397,14 +399,14 @@ const gateToggleStyle = computed<CSSProperties>(() => ({
   transform: gateDetailsOpen.value ? "rotate(180deg)" : "rotate(0deg)",
 }));
 const gateEyebrowStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-warning)",
   letterSpacing: "0.02em",
 };
 const gateCondStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   background: "var(--v5-surface-2)",
   padding: "2px 8px",
@@ -412,7 +414,7 @@ const gateCondStyle: CSSProperties = {
 };
 const gateMetaStyle: CSSProperties = {
   marginTop: "6px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 </script>

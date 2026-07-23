@@ -6,10 +6,10 @@
 <template>
   <view v-if="visible" class="fixed inset-0" style="z-index: 900">
     <!-- 仅 @click(uni 编译器小程序端自动映射 tap;H5 双绑会双触发) -->
-    <view class="absolute inset-0" style="background: rgba(19, 20, 26, 0.44)" @click="close" />
+    <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="close" />
     <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 16px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
+        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.earn.capExplainTitle }}</text>
         <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" @click.stop="close">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
@@ -72,7 +72,7 @@ const secTitleStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
 };
 const secBodyStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   lineHeight: 1.65,
   color: "var(--v5-ink-3)",
 };
@@ -82,7 +82,7 @@ const ctaStyle: CSSProperties = {
   background: "var(--v5-brand)",
 };
 const ctaLabelStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };

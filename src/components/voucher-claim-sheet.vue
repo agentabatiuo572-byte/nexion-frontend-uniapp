@@ -146,7 +146,7 @@ function onUse(v: VoucherDef) {
 .vcs-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: vcs-fade 0.24s ease-out;
@@ -197,7 +197,7 @@ function onUse(v: VoucherDef) {
   flex-direction: column;
 }
 .vcs-cap {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -212,8 +212,9 @@ function onUse(v: VoucherDef) {
   line-height: 1.25;
 }
 .vcs-close {
-  width: 36px;
-  height: 36px;
+  /* 《07》tap≥44 —— 与本弹层主/次 CTA 同批修(原 36 漏改) */
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   background: var(--v5-surface-2);
   display: grid;
@@ -227,7 +228,7 @@ function onUse(v: VoucherDef) {
 .vcs-sub {
   display: block;
   margin-top: 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
   line-height: 1.5;
 }
@@ -259,7 +260,7 @@ function onUse(v: VoucherDef) {
 }
 .vcs-val {
   font-family: var(--font-v5);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -268,7 +269,7 @@ function onUse(v: VoucherDef) {
   font-variant-numeric: tabular-nums;
 }
 .vcs-cond {
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
   text-align: center;
   line-height: 1.3;
@@ -281,19 +282,19 @@ function onUse(v: VoucherDef) {
 }
 .vcs-name {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.3;
 }
 .vcs-scope {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 3px;
   line-height: 1.35;
 }
 .vcs-expiry {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   color: var(--v5-ink-4);
   margin-top: 2px;
@@ -301,7 +302,9 @@ function onUse(v: VoucherDef) {
 .vcs-cta {
   margin-top: 10px;
   align-self: flex-start;
-  min-height: 34px;
+  /* 《07》tap≥44 + 转化场景主 CTA 权重必须压过 dismiss(原 34px 比满宽 40px
+     的 dismiss 还矮,视觉权重倒挂) */
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
   display: inline-flex;
@@ -322,14 +325,17 @@ function onUse(v: VoucherDef) {
 }
 .vcs-cta-t {
   font-family: var(--font-v5);
-  font-size: 12.5px;
+  /* 《02》§2 button.m 15/20/600 */
+  font-size: 15px;
+  line-height: 20px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }
 .vcs-dismiss {
   margin-top: 16px;
   width: 100%;
-  height: 40px;
+  /* tap≥44;弱化靠 ghost 文字(无填充 + 400 + ink-3),不靠缩小热区 */
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -339,7 +345,9 @@ function onUse(v: VoucherDef) {
   opacity: 0.7;
 }
 .vcs-dismiss-t {
-  font-size: 12.5px;
+  /* 《02》§4:用户需读懂才能决策 → body.s 13 而非 caption 12 */
+  font-size: 13px;
+  line-height: 18px;
   font-weight: 400;
   color: var(--v5-ink-3);
 }

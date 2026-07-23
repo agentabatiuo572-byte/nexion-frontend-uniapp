@@ -19,7 +19,7 @@
           <text
             v-if="tier.you"
             class="font-mono-tabular"
-            style="font-size: 10px; color: var(--v5-brand-2); margin-left: 4px; opacity: 0.7"
+            style="font-size: 12px; color: var(--v5-brand-2); margin-left: 4px; opacity: 0.7"
           >{{ t.store.ladderYou }}</text>
         </view>
         <view class="relative overflow-hidden" style="height: 5px; background: var(--v5-surface-3); border-radius: 2.5px">
@@ -27,7 +27,7 @@
         </view>
         <view class="text-right tabular-nums whitespace-nowrap" :style="yieldStyle(tier)">
           <text>{{ tier.y }}</text>
-          <text style="font-size: 10.5px; color: var(--v5-ink-4); font-weight: 400">{{ t.store.perDay }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-4); font-weight: 400">{{ t.store.perDay }}</text>
         </view>
       </view>
     </view>

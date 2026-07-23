@@ -116,7 +116,7 @@ const detailsLinkStyle: CSSProperties = {
 };
 const dollarSignStyle: CSSProperties = {
   fontWeight: 500,
-  fontSize: "18px",
+  fontSize: "20px",
   color: "var(--v5-ink-2)",
   opacity: 0.75,
 };
@@ -128,11 +128,11 @@ const bigNumStyle: CSSProperties = {
   color: "var(--v5-brand)",
   whiteSpace: "nowrap",
 };
-const fracStyle: CSSProperties = { color: "var(--v5-ink-2)", fontSize: "28px", fontWeight: 500 };
-const nexStyle: CSSProperties = { marginTop: "8px", fontSize: "14px", color: "var(--v5-brand)" };
+const fracStyle: CSSProperties = { color: "var(--v5-ink-2)", fontSize: "26px", fontWeight: 500 };
+const nexStyle: CSSProperties = { marginTop: "8px", fontSize: "15px", color: "var(--v5-brand)" };
 const lifetimeStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.4,
 };
@@ -146,7 +146,7 @@ const amountRowStyle: CSSProperties = {
 const growthStyle: CSSProperties = {
   paddingBottom: "8px",
   color: "var(--v5-success)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const metricGridStyle: CSSProperties = {
@@ -178,7 +178,7 @@ function metricLabelStyle(color: string): CSSProperties {
 const metricValueStyle: CSSProperties = {
   marginTop: "9px",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.016em",
   color: "var(--v5-ink)",
   lineHeight: 1.2,

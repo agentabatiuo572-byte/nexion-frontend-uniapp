@@ -21,12 +21,12 @@
           </view>
           <view class="newcomer-task__reward">
             <text class="newcomer-task__reward-value">+{{ reward }}</text>
-            <text style="font-size: 13px; color: var(--v5-brand); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
+            <text style="font-size: 13px; color: var(--v5-nex); font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; margin-left: 2px">NEX</text>
           </view>
         </view>
         <view style="text-align: right">
           <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.dayOneEndsIn }}</text>
-          <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 16px; color: #9B89E0; font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
+          <text class="block" style="margin-top: 4px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-weight: 500; font-size: 15px; color: var(--v5-quest-violet-ink); font-variant-numeric: tabular-nums; line-height: 1">{{ remainingLabel }}</text>
         </view>
       </view>
 
@@ -36,7 +36,7 @@
         </view>
         <view style="margin-top: 5px; display: flex; justify-content: space-between; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px">
           <text style="color: var(--v5-ink-4)"><text style="color: var(--v5-ink); font-weight: 500">{{ completedCount }}</text>/{{ total }} {{ t.home.dayOneDoneSuffix }}</text>
-          <text style="color: var(--v5-brand); font-variant-numeric: tabular-nums">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
+          <text style="color: var(--v5-nex); font-variant-numeric: tabular-nums">+{{ nexEarned }} {{ t.home.dayOneEarnedSuffix }}</text>
         </view>
       </view>
 
@@ -54,10 +54,14 @@
           @keydown.space.prevent="onRowTap(task)"
         >
           <view :style="circleStyle(task)">
-            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#0F0F0F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+            <!-- 勾色按填充色配对(task.onColor),不能一刀切:quest 两色双主题恒浅
+                 → on-quest 恒深墨(6.32/6.64);brand 随主题翻转 → on-brand。
+                 两次实测教训:一刀切 on-brand 亮色白勾压浅紫=2.98;一刀切 on-quest
+                 深墨压亮色品牌蓝=2.77。 -->
+            <svg v-if="isDone(task)" width="10" height="10" viewBox="0 0 24 24" fill="none" :stroke="task.onColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 12l5 5L20 7" />
             </svg>
-            <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; font-weight: 500" :style="{ color: task.color }">{{ task.order }}</text>
+            <text v-else style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; font-weight: 500" :style="{ color: task.color }">{{ task.order }}</text>
           </view>
           <view style="display: flex; align-items: baseline; gap: 6px; min-width: 0">
             <text class="truncate" :style="labelStyle(task)">{{ task.label }}</text>
@@ -84,7 +88,7 @@
       @keydown.enter.prevent="toggleExpanded"
       @keydown.space.prevent="toggleExpanded"
     >
-      <text style="font-family: var(--font-v5); font-size: 12.5px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
+      <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink-3)">{{ expanded ? t.home.dayOneHideTasks : viewTasksText }}</text>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path :d="expanded ? 'M19 15l-7-7-7 7' : 'M5 9l7 7 7-7'" />
       </svg>
@@ -109,6 +113,9 @@ interface QuestTask {
   href: string;
   cat: string;
   color: string;
+  /** 该填充色之上的前景色(勾/序号)。quest 两色恒浅 → on-quest 恒深墨;
+   *  brand 随主题翻转 → 必须配同样翻转的 on-brand。用错会在某一主题糊掉。 */
+  onColor: string;
 }
 
 const props = withDefaults(defineProps<{ active?: boolean; expanded?: boolean }>(), {
@@ -130,12 +137,12 @@ const quest = useQuest();
 const reward = 500;
 
 const tasks = computed<QuestTask[]>(() => [
-  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "#9B89E0" },
-  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
-  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "#FF6B35" },
-  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "#C6FF3A" },
-  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "#9B89E0" },
-  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "#FF6B35" },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
 ]);
 
 const total = computed(() => tasks.value.length);
@@ -215,7 +222,7 @@ function catStyle(task: QuestTask): CSSProperties {
   const done = isDone(task);
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontSize: "12px",
     color: done ? "var(--v5-ink-4)" : task.color,
     opacity: done ? 0.5 : 0.8,
     letterSpacing: "0.04em",
@@ -227,7 +234,7 @@ function rewardStyle(task: QuestTask): CSSProperties {
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     fontSize: "12px",
-    color: done ? "var(--v5-ink-4)" : task.color,
+    color: done ? "var(--v5-ink-4)" : "var(--v5-nex)",
     fontVariantNumeric: "tabular-nums",
     fontWeight: 500,
   };
@@ -278,7 +285,7 @@ const toggleStyle: CSSProperties = {
 
 .newcomer-task__eyebrow {
   font-family: var(--font-v5);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink-2);
   letter-spacing: 0.01em;
@@ -289,7 +296,7 @@ const toggleStyle: CSSProperties = {
   border-radius: 999px;
   background: var(--v5-surface-2);
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 9.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
   white-space: nowrap;
 }
@@ -306,9 +313,9 @@ const toggleStyle: CSSProperties = {
 
 .newcomer-task__reward-value {
   font-family: var(--font-v5);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 500;
-  color: var(--v5-warning);
+  color: var(--v5-nex);
   letter-spacing: -0.022em;
 }
 

@@ -42,7 +42,7 @@
             <view class="grid place-items-center" :style="brandMarkStyle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--v5-on-brand)" stroke="var(--v5-on-brand)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
             </view>
-            <text class="font-display" :style="brandNameStyle">Nexion</text>
+            <text class="font-display" :style="brandNameStyle">NexGrid</text>
             <text style="margin-left: auto; font-size: 10px; letter-spacing: 0.18em; color: var(--v5-ink-3)">Proof of contribution</text>
           </view>
 
@@ -224,7 +224,7 @@ const joined = computed(() =>
 );
 const activeDays = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
 
-// [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexion.ai/ref/)。
+// [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexgrid.ai/ref/)。
 const referralLink = computed(() => buildShareLink());
 const refCode = computed(() => app.user.referralCode);
 
@@ -239,10 +239,10 @@ const topPct = computed(() => {
 
 const shareText = computed(() => {
   if (variant.value === "streak")
-    return `🔥 ${longestOrCurrent.value}-day streak on Nexion. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
+    return `🔥 ${longestOrCurrent.value}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
-    return `🌐 My Nexion network is ${totalMembers.value} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotal.value.toFixed(2)} on Nexion in ${activeDays.value} days. Join my network: ${referralLink.value}`;
+    return `🌐 My NexGrid network is ${totalMembers.value} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
+  return `💸 Earned $${earningsTotal.value.toFixed(2)} on NexGrid in ${activeDays.value} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
@@ -261,7 +261,7 @@ function nativeShare() {
       provider: "weixin",
       type: 0,
       href: referralLink.value,
-      title: "Nexion · Proof of Contribution",
+      title: "NexGrid · Proof of Contribution",
       summary: shareText.value,
       success: () => {},
       fail: () => copyText(shareText.value, t.value.proof.sharedToast),

@@ -19,8 +19,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  * (admin H3 WEEKLY_T1/T2). Persist key carries a version suffix for migration.
  */
 
-// 旧设备级单键 "nexion-weekly-quest-v1" 废弃(存量无账号归属,mock 可重建);周任务进度按账号分行。
-const ACCOUNTS_KEY = "nexion-weekly-quest-accounts-v1"; // { [accountKey]: PersistShape }
+// 旧设备级单键 "nexgrid-weekly-quest-v1" 废弃(存量无账号归属,mock 可重建);周任务进度按账号分行。
+const ACCOUNTS_KEY = "nexgrid-weekly-quest-accounts-v1"; // { [accountKey]: PersistShape }
 
 interface PersistShape {
   weekKey: string;

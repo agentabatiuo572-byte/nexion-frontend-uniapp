@@ -65,12 +65,12 @@ const avatarStyle: CSSProperties = {
 const avatarTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "22px",
+  fontSize: "20px",
   color: "var(--v5-on-brand)",
 };
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   letterSpacing: "-0.018em",
   color: "var(--v5-ink)",
@@ -79,7 +79,7 @@ const nameStyle: CSSProperties = {
 const metaStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const codeTagBase: CSSProperties = {
@@ -87,7 +87,7 @@ const codeTagBase: CSSProperties = {
   padding: "2px 8px",
   borderRadius: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   lineHeight: 1.5,
 };

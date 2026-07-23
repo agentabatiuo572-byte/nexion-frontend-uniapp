@@ -7,12 +7,12 @@
 <template>
   <view>
     <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
-      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
-      <text class="font-mono-tabular" style="font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goMarket">{{ t.home.marketBoardOpen }} →</text>
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
+      <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goMarket">{{ t.home.marketBoardOpen }} →</text>
     </view>
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
-      <view class="grid gap-2 font-mono-tabular" style="grid-template-columns: 36px 1fr 60px 76px 58px; padding: 9px 14px; background: var(--v5-surface-2); border-bottom: 1px solid var(--v5-border); font-size: 11px; color: var(--v5-ink-4)">
+      <view class="grid gap-2 font-mono-tabular" style="grid-template-columns: 36px 1fr 60px 76px 58px; padding: 9px 14px; background: var(--v5-surface-2); border-bottom: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-4)">
         <text>{{ t.home.mbColTag }}</text>
         <text>{{ t.home.mbColModel }}</text>
         <text class="text-right">{{ t.home.mbCol1h }}</text>
@@ -27,19 +27,19 @@
         :style="{ gridTemplateColumns: '36px 1fr 60px 76px 58px', padding: '10px 14px', borderBottom: i < ROWS.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         @click="goEarn"
       >
-        <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-brand); background: var(--v5-brand-soft); border-radius: 4px; padding: 2px 4px; text-align: center; justify-self: start; font-weight: 500">{{ r.tag }}</text>
+        <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand); background: var(--v5-brand-soft); border-radius: 4px; padding: 2px 4px; text-align: center; justify-self: start; font-weight: 500">{{ r.tag }}</text>
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13.5px; color: var(--v5-ink); letter-spacing: -0.008em">{{ r.name }}</text>
-          <text class="block font-mono-tabular mt-0.5" style="font-size: 11px; color: var(--v5-ink-4)">{{ volText(r) }}</text>
+          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ r.name }}</text>
+          <text class="block font-mono-tabular mt-0.5" style="font-size: 12px; color: var(--v5-ink-4)">{{ volText(r) }}</text>
         </view>
         <view class="min-w-0">
-          <HomeSparkline :data="r.spark" :color="r.d >= 0 ? 'var(--v5-success)' : '#C26658'" :height="18" :fill="false" />
+          <HomeSparkline :data="r.spark" :color="r.d >= 0 ? 'var(--v5-success)' : 'var(--v5-danger)'" :height="18" :fill="false" />
         </view>
         <view class="text-right whitespace-nowrap tabular-nums">
           <text style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink)">{{ fmtPrice(livePrice(r, i)) }}</text>
-          <text class="block font-mono-tabular mt-0.5" style="font-size: 11px; color: var(--v5-ink-4)">/{{ r.unit }}</text>
+          <text class="block font-mono-tabular mt-0.5" style="font-size: 12px; color: var(--v5-ink-4)">/{{ r.unit }}</text>
         </view>
-        <text class="text-right tabular-nums font-mono-tabular" :style="{ fontSize: '12.5px', color: r.d >= 0 ? 'var(--v5-success)' : '#C26658', fontWeight: 500 }">{{ changeText(r) }}</text>
+        <text class="text-right tabular-nums font-mono-tabular" :style="{ fontSize: '13px', color: r.d >= 0 ? 'var(--v5-success)' : 'var(--v5-danger)', fontWeight: 500 }">{{ changeText(r) }}</text>
       </view>
     </view>
   </view>

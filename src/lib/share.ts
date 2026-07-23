@@ -1,6 +1,6 @@
 // FEAT-SHARE01 分享底座 — 单源分享链接 + 渠道 intent 解析 + 分享事件与任务接线。
 // 规格: PRD/specs/FEAT-SHARE01-invite-chain.md [FEAT-SHARE1]。
-// 链接构造全站唯一入口(禁页面自拼 nexion.ai/ref/);渠道表来自 platform
+// 链接构造全站唯一入口(禁页面自拼 nexgrid.ai/ref/);渠道表来自 platform
 // config(运营可调);分享事件 client 记录(server-canonical `share.performed`)。
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
@@ -24,7 +24,7 @@ export interface ShareEventRecord {
   sharedAt: number; // ms epoch
 }
 
-const EVENTS_KEY = "nexion-share-events-v1";
+const EVENTS_KEY = "nexgrid-share-events-v1";
 const EVENTS_CAP = 50;
 
 // 单源分享链接:配置了 baseUrl 用短链;空(mock/dev)回退运行时 origin 直连
@@ -40,7 +40,7 @@ export function buildShareLink(): string {
   }
   // #endif
   // 非 H5 且未配置 → canonical 域名兜底(F1 域名单源)。
-  return `https://nexion.ai/ref/${code}`;
+  return `https://nexgrid.ai/ref/${code}`;
 }
 
 // 邀请文案(渠道预填):礼包金额 config 派生,en/zh 镜像模板。
@@ -149,7 +149,7 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
     case "system": {
       // #ifdef H5
       try {
-        await navigator.share({ title: "Nexion", text, url: link });
+        await navigator.share({ title: "NexGrid", text, url: link });
         recordShareEvent(def.key, surface);
       } catch {
         // 取消与真实失败在此均静默不计事件:取消不该报错;AbortError 与其它

@@ -98,7 +98,7 @@ function onTap() {
 .scb-eyebrow {
   display: block;
   font-family: var(--font-jet-mono), monospace;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--v5-ink-3);
@@ -148,7 +148,7 @@ function onTap() {
 .scb-cta-t {
   font-family: var(--font-v5);
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 13px;
   letter-spacing: -0.005em;
   color: var(--v5-on-brand);
   white-space: nowrap;

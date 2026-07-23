@@ -11,7 +11,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  * posted after this watermark (the voucher half of the dot is state-based
  * and lives in the voucher store, not here).
  *
- * Persistence: MOCK-ONLY local mirror (nexion-rewards-seen-v1). Real backend
+ * Persistence: MOCK-ONLY local mirror (nexgrid-rewards-seen-v1). Real backend
  * owns the watermark on the user profile (`rewardsSeenAt`): the page open
  * fires PATCH /api/me/rewards/seen (server stamps the time — client clocks
  * are not trusted) and GET /api/me returns it. This store mirrors that exact
@@ -19,9 +19,9 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  * the correct first-run behavior (seeded credits surface the page).
  */
 
-// 旧设备级单键 "nexion-rewards-seen-v1" 废弃(存量无账号归属,mock 可重建);已读水位线按账号分行。
+// 旧设备级单键 "nexgrid-rewards-seen-v1" 废弃(存量无账号归属,mock 可重建);已读水位线按账号分行。
 // 🔴 必按账号:hasUnseen 拿本水位线 vs 本账号 bills(已按账号)比;水位线跨账号继承会让红点错判。
-const ACCOUNTS_KEY = "nexion-rewards-seen-accounts-v1"; // { [accountKey]: { seenAt: number } }
+const ACCOUNTS_KEY = "nexgrid-rewards-seen-accounts-v1"; // { [accountKey]: { seenAt: number } }
 
 function hydrate(accountKey: string): number {
   const row = readAccountRow<{ seenAt?: number }>(ACCOUNTS_KEY, accountKey);

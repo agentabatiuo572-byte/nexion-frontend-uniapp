@@ -37,7 +37,7 @@ await page.waitForTimeout(2500);
 
 let registry = await page.evaluate((unwrapText) => {
   const unwrap = eval(`(${unwrapText})`);
-  return unwrap(localStorage.getItem("nexion-account-sessions-v1"), { schema: 1, sessions: {} });
+  return unwrap(localStorage.getItem("nexgrid-account-sessions-v1"), { schema: 1, sessions: {} });
 }, unwrap.toString());
 let current = Object.values(registry.sessions).find((s) => !s.endedAt && !s.killedAt);
 if (!current) throw new Error("active session missing before revoke");
@@ -46,7 +46,7 @@ await page.goto(`${baseUrl}/#/pages/me/security`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1800);
 registry = await page.evaluate((unwrapText) => {
   const unwrap = eval(`(${unwrapText})`);
-  return unwrap(localStorage.getItem("nexion-account-sessions-v1"), { schema: 1, sessions: {} });
+  return unwrap(localStorage.getItem("nexgrid-account-sessions-v1"), { schema: 1, sessions: {} });
 }, unwrap.toString());
 const sameDeviceActive = Object.values(registry.sessions).filter(
   (s) =>
@@ -64,7 +64,7 @@ registry.sessions[current.sessionId] = { ...current, killedAt: Date.now() };
 
 await page.evaluate(({ next, wrapText }) => {
   const wrap = eval(`(${wrapText})`);
-  localStorage.setItem("nexion-account-sessions-v1", wrap(next));
+  localStorage.setItem("nexgrid-account-sessions-v1", wrap(next));
 }, { next: registry, wrapText: wrap.toString() });
 
 await page.waitForTimeout(1800);
@@ -86,7 +86,7 @@ if (!hashAfterColdStart.includes("/pages/session/kicked")) {
 }
 const registryAfterColdStart = await coldPage.evaluate((unwrapText) => {
   const unwrap = eval(`(${unwrapText})`);
-  return unwrap(localStorage.getItem("nexion-account-sessions-v1"), { schema: 1, sessions: {} });
+  return unwrap(localStorage.getItem("nexgrid-account-sessions-v1"), { schema: 1, sessions: {} });
 }, unwrap.toString());
 const activeAfterColdStart = Object.values(registryAfterColdStart.sessions).filter(
   (s) => s.accountKey === current.accountKey && !s.endedAt && !s.killedAt,
@@ -98,14 +98,14 @@ await coldPage.close();
 
 const afterKick = await page.evaluate((unwrapText) => {
   const unwrap = eval(`(${unwrapText})`);
-  return unwrap(localStorage.getItem("nexion-account-cloud-v1"), {});
+  return unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {});
 }, unwrap.toString());
 const stableAfterKick = stableAccountView(afterKick);
 
 await page.waitForTimeout(7500);
 const finalSnapshot = await page.evaluate((unwrapText) => {
   const unwrap = eval(`(${unwrapText})`);
-  return unwrap(localStorage.getItem("nexion-account-cloud-v1"), {});
+  return unwrap(localStorage.getItem("nexgrid-account-cloud-v1"), {});
 }, unwrap.toString());
 const stableFinal = stableAccountView(finalSnapshot);
 

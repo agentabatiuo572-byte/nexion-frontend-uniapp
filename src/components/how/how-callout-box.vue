@@ -9,17 +9,19 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 
-type Accent = "lemon" | "purple" | "amber" | "violet";
+type Accent = "lemon" | "purple" | "amber" | "violet" | "nex";
 
 const props = withDefaults(defineProps<{ title: string; body: string; tone?: Accent }>(), { tone: "amber" });
 
 const ACCENT_TEXT: Record<Accent, string> = {
+  nex: "var(--v5-nex)",
   lemon: "var(--v5-success)",
   purple: "var(--v5-brand)",
   amber: "var(--v5-warning)",
   violet: "var(--v5-brand-2)",
 };
 const ACCENT_SOFT: Record<Accent, string> = {
+  nex: "var(--v5-nex-soft)",
   lemon: "var(--v5-success-soft)",
   purple: "var(--v5-brand-soft)",
   amber: "var(--v5-warning-soft)",
@@ -27,9 +29,10 @@ const ACCENT_SOFT: Record<Accent, string> = {
 };
 // Callout boxes are the one sanctioned bg+border pairing (accent-callout exception).
 const ACCENT_BORDER: Record<Accent, string> = {
-  lemon: "rgba(14,142,74,0.30)",
+  nex: "var(--v5-nex-border)",
+  lemon: "color-mix(in srgb, var(--v5-success) 30%, transparent)",
   purple: "var(--v5-brand-border)",
-  amber: "rgba(198,131,22,0.30)",
+  amber: "color-mix(in srgb, var(--v5-warning) 30%, transparent)",
   violet: "var(--v5-brand-2-border)",
 };
 

@@ -1,7 +1,7 @@
 <!--
   TrialHeroBanner — idle free-trial coupon entry (ported from
   Nexion-prototype/app/components/trial-hero-banner.tsx; "100% faithful v5 design
-  draft" → uses exact design hex #9B89E0 / #FF6B35, NOT the V5 token map).
+  draft" → uses exact design hex var(--v5-quest-violet) / var(--v5-quest-ember), NOT the V5 token map).
 
   Coupon/ticket silhouette: circular notches at 62% (top + bottom via mask-image),
   3D Y-flip entrance gated on scroll-into-view (useScrollGrowProgress → `played`),
@@ -28,16 +28,16 @@
         <view style="padding: 16px 4px 14px 16px; min-width: 0">
           <view
             class="inline-flex items-center"
-            style="gap: 5px; padding: 3px 9px; border-radius: 999px; background: rgba(155,137,224,0.12)"
+            style="gap: 5px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--v5-quest-violet) 12%, transparent)"
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="#9B89E0">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--v5-quest-violet-ink)">
               <path d="M12 2l2.6 7.2L22 10l-5.6 4.6L18 22l-6-4-6 4 1.6-7.4L2 10l7.4-.8z" />
             </svg>
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: #9B89E0; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase">{{ t.trial.heroBadge }}</text>
+            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-quest-violet-ink); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase">{{ t.trial.heroBadge }}</text>
           </view>
           <text
             class="block"
-            style="margin-top: 9px; font-family: var(--font-v5); font-weight: 600; font-size: 19px; color: var(--v5-ink); letter-spacing: -0.014em; line-height: 1.15"
+            style="margin-top: 9px; font-family: var(--font-v5); font-weight: 600; font-size: 20px; color: var(--v5-ink); letter-spacing: -0.014em; line-height: 1.15"
           >{{ t.trial.heroDeviceName }}</text>
           <text
             class="block"
@@ -52,15 +52,15 @@
 
         <!-- RIGHT stub -->
         <view style="padding: 16px 16px 14px 4px; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; min-width: 116px">
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 10.5px; color: var(--v5-ink-4); letter-spacing: 0.06em">{{ earnLabelText }}</text>
+          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.06em">{{ earnLabelText }}</text>
           <view
             class="inline-flex items-baseline"
             style="margin-top: 6px; gap: 1px; font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink); font-variant-numeric: tabular-nums; letter-spacing: -0.024em; line-height: 1"
           >
-            <text style="font-size: 20px; font-weight: 500; color: #9B89E0">$</text>
+            <text style="font-size: 20px; font-weight: 500; color: var(--v5-quest-violet-ink)">$</text>
             <text style="font-size: 36px">{{ est }}</text>
           </view>
-          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-4)">{{ dailyEarnText }}</text>
+          <text style="margin-top: 5px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ dailyEarnText }}</text>
         </view>
       </view>
 
@@ -69,16 +69,16 @@
 
       <!-- Bottom strip: scarcity + Claim CTA -->
       <view style="position: relative; z-index: 1; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px">
-        <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12.5px; color: #FF6B35; font-weight: 500">
-          <view style="width: 6px; height: 6px; border-radius: 50%; background: #FF6B35; box-shadow: 0 0 6px rgba(255,107,53,0.70); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
-          <text style="color: #FF6B35">{{ trialsLeftText }}</text>
+        <view class="inline-flex items-center" style="gap: 6px; font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-quest-ember-ink); font-weight: 500">
+          <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-quest-ember); box-shadow: 0 0 6px color-mix(in srgb, var(--v5-quest-ember) 70%, transparent); animation: v5-hb-pulse 1.6s ease-in-out infinite" />
+          <text style="color: var(--v5-quest-ember-ink)">{{ trialsLeftText }}</text>
         </view>
         <view
           class="inline-flex items-center"
-          style="padding: 8px 14px; border-radius: 999px; background: transparent; color: #9B89E0; font-family: var(--font-v5); font-weight: 600; font-size: 13.5px; border: 1px solid rgba(155,137,224,0.45); gap: 5px; letter-spacing: -0.005em; white-space: nowrap"
+          style="padding: 8px 14px; border-radius: 999px; background: transparent; color: var(--v5-quest-violet-ink); font-family: var(--font-v5); font-weight: 600; font-size: 13px; border: 1px solid color-mix(in srgb, var(--v5-quest-violet-ink) 45%, transparent); gap: 5px; letter-spacing: -0.005em; white-space: nowrap"
         >
-          <text style="color: #9B89E0">{{ t.trial.heroClaimCta }}</text>
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px; color: #9B89E0">→</text>
+          <text style="color: var(--v5-quest-violet-ink)">{{ t.trial.heroClaimCta }}</text>
+          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; opacity: 0.8; font-size: 12px; color: var(--v5-quest-violet-ink)">→</text>
         </view>
       </view>
     </view>
@@ -142,8 +142,8 @@ const rootStyle = computed<CSSProperties>(() => ({
 const bodyStyle: CSSProperties = {
   borderRadius: "16px",
   background:
-    "radial-gradient(70% 60% at 0% 0%, rgba(155,137,224,0.18), transparent 60%), " +
-    "radial-gradient(80% 100% at 100% 100%, rgba(155,137,224,0.12), transparent 65%), " +
+    "radial-gradient(70% 60% at 0% 0%, color-mix(in srgb, var(--v5-quest-violet) 18%, transparent), transparent 60%), " +
+    "radial-gradient(80% 100% at 100% 100%, color-mix(in srgb, var(--v5-quest-violet) 12%, transparent), transparent 65%), " +
     "var(--v5-surface)",
   overflow: "hidden",
   position: "relative",

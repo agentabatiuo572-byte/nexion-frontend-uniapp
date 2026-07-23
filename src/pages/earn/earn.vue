@@ -46,15 +46,15 @@
 
           <view class="relative" style="z-index: 1">
             <view class="flex justify-between items-center gap-2">
-              <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.earn.computeEarned }} · {{ rangeLabel(range) }}</text>
+              <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.earn.computeEarned }} · {{ rangeLabel(range) }}</text>
               <text class="font-mono-tabular" :style="usdtTagStyle">USDT</text>
             </view>
 
             <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)">
               <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-              <text class="tabular-nums" style="font-size: 48px">{{ totalInt }}<text style="font-size: 32px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
+              <text class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
             </view>
-            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-brand); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">NEX</text></text>
+            <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">NEX</text></text>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
           </view>
         </view>
@@ -63,7 +63,7 @@
       <!-- My devices header -->
       <view class="mx-4 mt-2 mb-1 px-1 flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.myFleet }}</text>
-        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 11.5px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-4)">{{ fleetCountText }}</text>
       </view>
       <!-- FEAT-DEV01: 任务池升级提示线(信息态 · 行内展开;详情入口 → W-CAP1 说明弹层) -->
       <!-- 仅 @click:uni 编译器在小程序端将 click 映射为 tap;H5 下 @tap+@click 双绑会双触发(本页实测,开关类必单绑) -->
@@ -71,13 +71,13 @@
         <view class="flex items-center justify-between gap-2">
           <view class="flex items-center gap-1.5 min-w-0">
             <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-            <text class="truncate" style="font-size: 11.5px; font-weight: 600; color: var(--v5-ink-2)">{{ t.earn.taskPoolLineTitle }}</text>
+            <text class="truncate" style="font-size: 12px; font-weight: 600; color: var(--v5-ink-2)">{{ t.earn.taskPoolLineTitle }}</text>
           </view>
           <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: taskPoolOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }"><path d="m6 9 6 6 6-6" /></svg>
         </view>
         <view v-if="taskPoolOpen" style="margin-top: 6px">
-          <text style="font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
-          <text class="block" style="margin-top: 6px; font-size: 11px; color: var(--v5-brand); font-weight: 600" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
+          <text style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.55">{{ t.earn.taskPoolLineBody }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand); font-weight: 600" @click.stop="openExplainer">{{ t.earn.capExplainTitle }} →</text>
         </view>
       </view>
       <!-- Device pool — one card, accordion rows (one detail open at a time) -->
@@ -172,10 +172,10 @@ const HERO_DOTS = [
 function pillStyle(r: Range): CSSProperties {
   const on = range.value === r;
   return {
-    height: "32px",
+    // 《07》tap≥44(原 32);《03》§2 圆角上阶梯 9→12;透明 border 无视觉作用,删。
+    height: "44px",
     background: on ? "var(--v5-brand-soft)" : "transparent",
-    border: "1px solid transparent",
-    borderRadius: "9px",
+    borderRadius: "12px",
   };
 }
 function pillLabelStyle(r: Range): CSSProperties {
@@ -205,7 +205,7 @@ function heroDotStyle(d: { left: string; delay: number; color: string }): CSSPro
   };
 }
 const usdtTagStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-soft)",

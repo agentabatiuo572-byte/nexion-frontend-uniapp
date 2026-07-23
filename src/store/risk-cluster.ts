@@ -23,7 +23,7 @@ import {
 //
 // PROD: 整个引擎被 K1 服务端替换,client 只消费 RiskClusterSummary。
 
-const OVERRIDE_KEY = "nexion-cluster-override-v1";
+const OVERRIDE_KEY = "nexgrid-cluster-override-v1";
 
 export type ClusterStatus = "clear" | "watch" | "flagged" | "frozen" | "released";
 

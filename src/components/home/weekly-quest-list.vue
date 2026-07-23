@@ -210,7 +210,7 @@ const claimedLabelStyle: CSSProperties = {
 const claimedRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
-  color: "var(--v5-success)",
+  color: "var(--v5-nex)",
 };
 const completedRowStyle: CSSProperties = { gap: "12px", minHeight: "48px", background: "var(--v5-warning-soft)" };
 const sparkBoxStyle: CSSProperties = { width: "22px", height: "22px", borderRadius: "999px", background: "var(--v5-warning)" };
@@ -225,7 +225,7 @@ const claimRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontWeight: 500,
   fontSize: "11px",
-  color: "var(--v5-warning)",
+  color: "var(--v5-nex)",
 };
 const pendingRowStyle: CSSProperties = { gap: "12px", minHeight: "48px" };
 const numberBoxStyle: CSSProperties = {
@@ -247,7 +247,7 @@ const pendingRewardStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontWeight: 500,
   fontSize: "11px",
-  color: "var(--v5-brand)",
+  color: "var(--v5-nex)",
 };
 const pendingUsdtStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",

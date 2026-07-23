@@ -5,7 +5,7 @@
 -->
 <template>
   <view v-if="device" class="fixed inset-0" style="z-index: 900">
-    <view class="absolute inset-0" style="background: rgba(19, 20, 26, 0.44)" @click="emit('close')" />
+    <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="emit('close')" />
     <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
         <text style="font-family: var(--font-v5); font-size: 16px; font-weight: 650; color: var(--v5-ink)">{{ t.tradein.ladderTitle }}</text>

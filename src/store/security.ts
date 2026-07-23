@@ -9,8 +9,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // storage so toggles survive a refresh.
 // 会话/设备列表不在此 store:安全页渲染 session.ts 的账号级 activeSessions(单源真列表);
 // 本 store 原有的 mock sessions + revokeSession/revokeAllOthers 全站零消费者,已删(2026-07-10)。
-// 旧设备级单键 "nexion-security-v1" 废弃(存量无账号归属,mock 可重建);安全设置按账号分行。
-const ACCOUNTS_KEY = "nexion-security-accounts-v1"; // { [accountKey]: Persisted }
+// 旧设备级单键 "nexgrid-security-v1" 废弃(存量无账号归属,mock 可重建);安全设置按账号分行。
+const ACCOUNTS_KEY = "nexgrid-security-accounts-v1"; // { [accountKey]: Persisted }
 
 interface Persisted {
   passwordChangedAt: number;

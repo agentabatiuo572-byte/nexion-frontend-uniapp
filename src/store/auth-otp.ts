@@ -457,7 +457,7 @@ export function exchangeVerifiedLogin(phone: string, verifyToken: string): Verif
 export function mountAuthOtpDevBridge(): void {
   if (!import.meta.env.DEV) return;
   if (typeof window === "undefined") return;
-  (window as unknown as Record<string, unknown>).__nexionAuthDev = {
+  (window as unknown as Record<string, unknown>).__nexgridAuthDev = {
     /** 预填 n 条 24h 内 send 记录:免等 2 轮冷却即可演示滑块闸门。 */
     seedSendLog(phone: string, n: number) {
       const now = Date.now();

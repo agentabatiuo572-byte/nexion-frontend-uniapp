@@ -6,8 +6,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // Ported from Nexion-prototype/lib/store/goals.ts (zustand+persist → Pinia).
 // User-defined earning goals (Sprint A-3 / F.3). Stored locally so a target +
 // deadline survives a refresh and the page can surface "X days to goal".
-// 旧设备级单键 "nexion-goals-v1" 废弃(存量无账号归属,mock 可重建);目标按账号分行。
-const ACCOUNTS_KEY = "nexion-goals-accounts-v1"; // { [accountKey]: { goals: Goal[] } }
+// 旧设备级单键 "nexgrid-goals-v1" 废弃(存量无账号归属,mock 可重建);目标按账号分行。
+const ACCOUNTS_KEY = "nexgrid-goals-accounts-v1"; // { [accountKey]: { goals: Goal[] } }
 
 export interface Goal {
   id: string;

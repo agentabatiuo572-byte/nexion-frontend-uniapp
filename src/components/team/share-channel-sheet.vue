@@ -4,7 +4,7 @@
   渠道表来自 platform config(share.channels,顺序即展示序);intent 分派走
   lib/share.activateChannel(web 直开 / scheme 复制降级 / copy / system),poster
   项切到海报面板(emit)。配置为空时兜底「复制+海报」两项,面板永不空(异常1)。
-  cancel 为 ghost 弱权重(转化场景 cancel 必弱于渠道,nexion-design)。
+  cancel 为 ghost 弱权重(转化场景 cancel 必弱于渠道,nexgrid-design)。
 -->
 <template>
   <view v-if="open">
@@ -108,7 +108,7 @@ async function onChannel(c: ShareChannelDef) {
 </script>
 
 <style scoped>
-.ss-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(3px); z-index: 8000; }
+.ss-mask { position: fixed; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); z-index: 8000; }
 .ss-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8001; background: var(--v5-surface); border-top: 1px solid var(--v5-border-strong); border-radius: 22px 22px 0 0; max-height: 80vh; overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 38px); animation: ss-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ss-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .ss-grab { width: 40px; height: 4px; border-radius: 9999px; background: var(--v5-surface-3); margin: 10px auto 0; }
@@ -117,13 +117,13 @@ async function onChannel(c: ShareChannelDef) {
 /* 44×44 点按区(移动端最小触控标准,对齐 tradein-ladder-sheet 既有修法)。 */
 .ss-head__x { width: 44px; height: 44px; border-radius: 9999px; background: var(--v5-surface-2); display: flex; align-items: center; justify-content: center; }
 .ss-reward { margin: 10px 16px 0; border-radius: 12px; background: color-mix(in srgb, var(--v5-brand) 8%, transparent); padding: 10px 12px; }
-.ss-reward__t { font-size: 11.5px; color: var(--v5-ink-2); line-height: 1.55; text-wrap: pretty; }
+.ss-reward__t { font-size: 12px; color: var(--v5-ink-2); line-height: 1.55; text-wrap: pretty; }
 .ss-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 6px; padding: 14px 16px 4px; }
 .ss-ch { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 44px; }
 .ss-ch__ic { width: 48px; height: 48px; border-radius: 9999px; background: var(--v5-surface-2); color: var(--v5-ink-2); display: flex; align-items: center; justify-content: center; }
 .ss-ch__ic--hl { background: color-mix(in srgb, var(--v5-brand) 14%, transparent); color: var(--v5-brand); }
-.ss-ch__lb { font-size: 10px; color: var(--v5-ink-3); max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ss-ch__lb { font-size: 12px; color: var(--v5-ink-3); max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 转化场景 cancel 必须弱于主操作:ghost、font-normal、ink-3。 */
 .ss-cancel { margin: 8px 16px 16px; min-height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; }
-.ss-cancel__t { font-size: 13.5px; font-weight: 400; color: var(--v5-ink-3); }
+.ss-cancel__t { font-size: 13px; font-weight: 400; color: var(--v5-ink-3); }
 </style>

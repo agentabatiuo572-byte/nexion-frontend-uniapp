@@ -12,7 +12,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 await page.goto(`${BASE}/#/pages/index/index`, { waitUntil: "networkidle", timeout: 30000 });
 // Fresh start: wipe milestone+quest persisted state, then reload so stores re-hydrate empty.
-await page.evaluate(() => { localStorage.removeItem("nexion-milestones-v1"); localStorage.removeItem("nexion-quest-v1"); });
+await page.evaluate(() => { localStorage.removeItem("nexgrid-milestones-v1"); localStorage.removeItem("nexgrid-quest-v1"); });
 await page.reload({ waitUntil: "networkidle" });
 await wait(5200); // first milestone poll @4s → overlay shows 5.2s
 
@@ -22,7 +22,7 @@ const overlayVisible = await page.evaluate(() => {
   const r = el.getBoundingClientRect();
   return { present: true, w: Math.round(r.width), h: Math.round(r.height), text: (el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 100) };
 });
-const fired = await page.evaluate(() => localStorage.getItem("nexion-milestones-v1"));
+const fired = await page.evaluate(() => localStorage.getItem("nexgrid-milestones-v1"));
 
 console.log(JSON.stringify({ overlayVisible, firedIdsPersisted: fired, consoleErrors: errs }, null, 2));
 await browser.close();

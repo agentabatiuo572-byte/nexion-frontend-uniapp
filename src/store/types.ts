@@ -115,7 +115,7 @@ export interface Device {
   // purchase today; promo pricing would write the actual paid amount). 0 =
   // free/gifted (phone, pc-gpu) → never trade-in eligible. Immutable once set.
   paidPriceUsdt: number;
-  // For NexionBox cards
+  // For NexGridBox cards
   location?: string;
   hashRate?: number;
   dayCount?: number;

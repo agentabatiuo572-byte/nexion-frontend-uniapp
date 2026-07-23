@@ -8,7 +8,7 @@
     <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ title }}<text
         v-if="count"
         class="font-mono-tabular ml-1"
-        style="font-size: 11.5px; font-weight: 400; color: var(--v5-ink-3)"
+        style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)"
       >{{ count }}</text></text>
     <slot name="right" />
   </view>

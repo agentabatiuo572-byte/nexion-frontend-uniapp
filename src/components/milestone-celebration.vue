@@ -178,7 +178,7 @@ onUnmounted(clearTimer);
 .ms-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(120%);
   -webkit-backdrop-filter: blur(8px) saturate(120%);
 }
@@ -281,13 +281,13 @@ onUnmounted(clearTimer);
 }
 .ms-title {
   margin-top: 6px;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
 }
 .ms-body {
   margin-top: 4px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--v5-ink-3);
 }
@@ -300,7 +300,7 @@ onUnmounted(clearTimer);
   background: var(--v5-tech-cyan-soft);
 }
 .ms-chip__label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--v5-tech-cyan);
   font-variant-numeric: tabular-nums;

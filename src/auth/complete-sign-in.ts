@@ -25,7 +25,7 @@ export type CompleteSignInResult =
   | { ok: false; error: "account_directory_unavailable" | "account_not_found" | "account_pending" | "sign_in_conflict" | "sign_in_storage_unavailable" };
 
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
-const COMPLETED_SIGN_INS_KEY = "__nexionAuthCompletedSignIns";
+const COMPLETED_SIGN_INS_KEY = "__nexgridAuthCompletedSignIns";
 const runtimeScope = globalThis as unknown as Record<string, unknown>;
 const completedSignIns = runtimeScope[COMPLETED_SIGN_INS_KEY] instanceof Map
   ? runtimeScope[COMPLETED_SIGN_INS_KEY] as Map<string, CompletedSignIn>

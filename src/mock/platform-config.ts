@@ -85,7 +85,7 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
   },
   // FEAT-SHARE01 分享链路 mock seed(§13.3 share.*;运营在 admin 调)。
   // baseUrl 留空 = dev 回退运行时 origin(扫码可达本机);PROD/admin 配
-  // https://nexion.ai/ref/(F1 域名单源)。officialUrl 留空 = 官网地址占位态。
+  // https://nexgrid.ai/ref/(F1 域名单源)。officialUrl 留空 = 官网地址占位态。
   share: {
     baseUrl: "",
     channels: [

@@ -145,7 +145,7 @@ export function isPhaseReached(current: PhaseParams, target: PhaseId): boolean {
 // months of ramp and unlock a higher invite multiplier / shorter cooldown.
 // The setter no-ops in production. Real phase decision is server canonical;
 // client only mirrors server-issued phase.
-const OVERRIDE_STORAGE_KEY = "nexion-product-phase-override-v1";
+const OVERRIDE_STORAGE_KEY = "nexgrid-product-phase-override-v1";
 
 function hydratePinned(): PhaseId | null {
   // 产线读守卫:setPinned 在 production no-op 只拦「写」,不拦手写 localStorage 的

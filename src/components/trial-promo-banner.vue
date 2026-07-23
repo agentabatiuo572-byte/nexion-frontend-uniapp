@@ -61,14 +61,14 @@ const bannerBodyStyle: CSSProperties = {
 const headlineStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.01em",
   lineHeight: 1.35,
 };
 const subStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.35,
 };
@@ -80,7 +80,7 @@ const claimBtnStyle: CSSProperties = {
   color: "var(--v5-success)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
 };
 </script>

@@ -43,7 +43,7 @@
       <view v-if="lockedProducts.length > 0">
         <SectionHeader :title="t.store.secComingSoon">
           <template #right>
-            <text class="font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.store.comingSoonNote }}</text>
+            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.comingSoonNote }}</text>
           </template>
         </SectionHeader>
         <view class="space-y-2.5">
@@ -51,7 +51,8 @@
         </view>
       </view>
 
-      <text class="block text-center font-mono-tabular" style="margin-top: 20px; padding-bottom: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.store.pageFooter }}</text>
+      <!-- 《02》§7:Mono 仅限 <5 词短标签/数字;这是 8 词促销 callout 整句,改正文字体 -->
+      <text class="block text-center" style="margin-top: 20px; padding-bottom: 8px; font-size: 12px; line-height: 16px; color: var(--v5-ink-3)">{{ t.store.pageFooter }}</text>
     </CardStagger>
   </AppChassis>
 </template>
@@ -112,7 +113,7 @@ const restProducts = computed(() =>
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
 // soft bg tint + content color, no border).
 const amberTagStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",

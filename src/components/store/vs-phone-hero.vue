@@ -58,7 +58,7 @@ const auroraStyle: CSSProperties = {
 const phoneNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "22px",
+  fontSize: "20px",
   color: "var(--v5-ink-2)",
   letterSpacing: "-0.020em",
   lineHeight: 1,
@@ -67,7 +67,7 @@ const phoneNumStyle: CSSProperties = {
 const s1NumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "22px",
+  fontSize: "20px",
   color: "var(--v5-success)",
   letterSpacing: "-0.020em",
   lineHeight: 1,

@@ -4,7 +4,7 @@
  * Real distributed-compute schedulers do NOT drop a node's in-flight job the
  * instant its heartbeat misses. They retry the node for a short window; if it
  * recovers, the job continues, otherwise the job is cancelled and reassigned
- * to another node. Nexion mirrors that: when a phone loses power or network
+ * to another node. NexGrid mirrors that: when a phone loses power or network
  * while running a task, it enters a grace window (INTERRUPT_GRACE_MS) during
  * which the scheduler retries up to INTERRUPT_MAX_RETRIES times.
  *   - Recover within the window → the SAME task resumes (its progress clock is

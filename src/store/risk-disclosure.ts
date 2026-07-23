@@ -8,7 +8,7 @@ import { ref } from "vue";
 // Required before first withdrawal / first staking lock. Once accepted, no
 // re-prompt (persisted across sessions).
 
-const STORAGE_KEY = "nexion-risk-disclosure-v1";
+const STORAGE_KEY = "nexgrid-risk-disclosure-v1";
 
 function hydrate(): { accepted: boolean; acceptedAt: number | null } {
   try {

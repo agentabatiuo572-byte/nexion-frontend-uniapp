@@ -58,8 +58,8 @@ export interface StakingPosition {
   status: "active" | "matured" | "early-withdrawn" | "claimed";
 }
 
-// 旧设备级单键 "nexion-v3-staking-v1" 废弃(存量无账号归属,mock 可重建);持仓按账号分行。
-const ACCOUNTS_KEY = "nexion-v3-staking-accounts-v1"; // { [accountKey]: { positions: StakingPosition[] } }
+// 旧设备级单键 "nexgrid-v3-staking-v1" 废弃(存量无账号归属,mock 可重建);持仓按账号分行。
+const ACCOUNTS_KEY = "nexgrid-v3-staking-accounts-v1"; // { [accountKey]: { positions: StakingPosition[] } }
 
 function seedPositions(): StakingPosition[] {
   const now = Date.now();

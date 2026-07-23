@@ -26,28 +26,28 @@
       <view class="relative" style="z-index: 1">
         <!-- USDT balance label -->
         <view style="margin-bottom: 8px">
-          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-4)">{{ t.me.usdtBalance }}</text>
+          <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">{{ t.me.usdtBalance }}</text>
         </view>
         <!-- USDT hero -->
         <view class="flex items-baseline" style="gap: 8px">
           <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-          <text class="tabular-nums" :style="usdtNumStyle">{{ intPart }}<text style="color: var(--v5-ink-3); font-size: 32px">.{{ fracPart }}</text></text>
+          <text class="tabular-nums" :style="usdtNumStyle">{{ intPart }}<text style="color: var(--v5-ink-3); font-size: 36px">.{{ fracPart }}</text></text>
         </view>
         <text class="block tabular-nums" :style="pendingStyle">{{ pendingLine }}</text>
 
         <!-- NEX hero — equal weight below dashed divider -->
         <view :style="nexBlockStyle">
           <view class="flex items-center justify-between" style="margin-bottom: 8px">
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-4)">NEX balance</text>
+            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4)">NEX balance</text>
             <text :style="nexBadgeStyle">+20.4%</text>
           </view>
           <view class="flex items-baseline" style="gap: 8px">
             <text class="tabular-nums" :style="nexNumStyle">{{ nexLabel }}</text>
-            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 13px; color: var(--v5-brand); font-weight: 600; letter-spacing: 0.06em">NEX</text>
+            <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 13px; color: var(--v5-nex); font-weight: 600; letter-spacing: 0.06em">NEX</text>
           </view>
           <view class="flex items-center justify-between" :style="nexSubRowStyle">
             <text style="color: var(--v5-ink-3)">≈ ${{ nexUsd }} · 1 NEX = $0.171</text>
-            <view class="inline-flex items-center shrink-0" style="gap: 4px; font-size: 11.5px; color: var(--v5-ink-3)" @click="goBills">
+            <view class="inline-flex items-center shrink-0" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3)" @click="goBills">
               <text>{{ billsThisMonth }} {{ t.me.billsThisMonth }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
@@ -56,7 +56,7 @@
 
         <!-- Quick actions strip -->
         <view :style="actionsBlockStyle">
-          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-4); margin-bottom: 8px">{{ t.me.quickActions }}</text>
+          <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px">{{ t.me.quickActions }}</text>
           <view class="grid grid-cols-3" style="gap: 8px">
             <WalletActionBtn href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT" primary>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
@@ -75,7 +75,7 @@
           <view style="min-width: 0">
             <view class="flex items-center" style="gap: 6px">
               <view aria-hidden :style="pulseDotStyle" />
-              <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 11px; color: var(--v5-ink-3)">{{ onlineCount }} live · {{ emptySlots }} slots open</text>
+              <text style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-3)">{{ onlineCount }} live · {{ emptySlots }} slots open</text>
             </view>
             <view class="flex items-baseline" style="gap: 4px; margin-top: 4px">
               <text style="font-family: var(--font-v5); font-size: 13px; color: var(--v5-ink-2)">{{ t.me.walletSlotUnlock }}</text>
@@ -195,7 +195,7 @@ function dotStyle(d: { left: string; top: string; delay: string; bg: string }): 
 }
 const usdtNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "48px",
+  fontSize: "56px",
   fontWeight: 600,
   letterSpacing: "-0.034em",
   lineHeight: 1,
@@ -220,12 +220,12 @@ const nexBadgeStyle: CSSProperties = {
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 const nexNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "32px",
+  fontSize: "36px",
   fontWeight: 600,
   letterSpacing: "-0.028em",
   lineHeight: 1,

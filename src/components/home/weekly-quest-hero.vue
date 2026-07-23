@@ -227,13 +227,13 @@ const rewardStyle: CSSProperties = {
   fontWeight: 600,
   fontSize: "24px",
   letterSpacing: "-0.018em",
-  color: "var(--v5-warning)",
+  color: "var(--v5-nex)",
   lineHeight: 1,
 };
 const nexUnitStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
-  color: "var(--v5-warning)",
+  color: "var(--v5-nex)",
   marginLeft: "2px",
 };
 const usdtStyle: CSSProperties = {

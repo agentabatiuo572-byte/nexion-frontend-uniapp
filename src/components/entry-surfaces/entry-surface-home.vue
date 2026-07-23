@@ -143,11 +143,11 @@ const SURFACES: Record<SurfaceKey, EntrySurfaceData> = {
   },
   white: {
     kicker: "白 APP 接管",
-    title: "Health scan into Nexion home",
+    title: "Health scan into NexGrid home",
     body: "Hardware score, account balance and fleet status stay on one takeover screen before moving into the live tabs.",
     modeLabel: "入口状态",
     modeValue: "体检融合",
-    primary: { label: "Continue to Nexion", href: "/" },
+    primary: { label: "Continue to NexGrid", href: "/" },
     secondary: { label: "Security sessions", href: "/pages/me/security" },
     metrics: [
       { label: "Health score", value: "Visible" },

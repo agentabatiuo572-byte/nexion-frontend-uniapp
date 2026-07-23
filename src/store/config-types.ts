@@ -160,7 +160,7 @@ export interface ShareChannelDef {
 }
 
 export interface ShareConfig {
-  // 短链前缀(如 https://nexion.ai/ref/)。空串 = dev 回退运行时 origin。
+  // 短链前缀(如 https://nexgrid.ai/ref/)。空串 = dev 回退运行时 origin。
   baseUrl: string;
   // 顺序即渠道面板展示序(越南盘默认 Zalo 首位)。
   channels: ShareChannelDef[];

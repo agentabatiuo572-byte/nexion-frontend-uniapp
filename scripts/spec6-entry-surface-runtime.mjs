@@ -19,19 +19,19 @@ const forbiddenText = [
 // 换成 *-accounts-v1;盯旧死键会让本护栏静默失明(真泄漏不再报红)。单一来源,清理与
 // 快照共用,防止清单重复漂移(旧版三处硬编码清单正因此朽坏)。
 const businessStorageKeys = [
-  "nexion-milestones-accounts-v1",
-  "nexion-bills-accounts-v1",
-  "nexion-orders-accounts-v1",
-  "nexion-v3-staking-accounts-v1",
-  "nexion-commission-accounts-v1",
-  "nexion-account-cloud-v1",
-  "nexion-account-sessions-v1",
-  "nexion-device-id-v1",
+  "nexgrid-milestones-accounts-v1",
+  "nexgrid-bills-accounts-v1",
+  "nexgrid-orders-accounts-v1",
+  "nexgrid-v3-staking-accounts-v1",
+  "nexgrid-commission-accounts-v1",
+  "nexgrid-account-cloud-v1",
+  "nexgrid-account-sessions-v1",
+  "nexgrid-device-id-v1",
 ];
 
 function assertNoBusinessStorage(snapshot, route) {
-  const milestone = snapshot["nexion-milestones-accounts-v1"] || "";
-  const bills = snapshot["nexion-bills-accounts-v1"] || "";
+  const milestone = snapshot["nexgrid-milestones-accounts-v1"] || "";
+  const bills = snapshot["nexgrid-bills-accounts-v1"] || "";
   if (/earn-\d+/.test(milestone)) {
     throw new Error(`${route} wrote milestone fired state: ${milestone}`);
   }

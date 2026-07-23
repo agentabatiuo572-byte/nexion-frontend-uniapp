@@ -4,25 +4,25 @@ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const phoneDigits = `650${String(Date.now()).slice(-7)}`;
 const fullPhone = `+1${phoneDigits}`;
-const accountId = `${fullPhone}@demo.nexion.ai`;
-const referralCode = "NEXION-AB12";
+const accountId = `${fullPhone}@demo.nexgrid.ai`;
+const referralCode = "NEXGRID-AB12";
 // argv 优先于环境变量：WSL 调用 node.exe 时临时环境变量可能不会跨进 Windows
 // 进程，而 argv 能稳定保留 EN/ZH 两轮运行时回归的目标语言。
 const locale = process.argv[2] === "zh" || (process.argv[2] !== "en" && process.env.AUTH02_LOCALE === "zh") ? "zh" : "en";
 const registeredTitle = locale === "zh" ? "该手机号已注册" : "This number is already registered";
 const registeredBody = locale === "zh" ? "验证通过,正在登录…" : "Verification complete. Signing you in…";
 const successDownloadHint = locale === "zh"
-  ? "浏览器版可通过 Nexion 官网下载 APP"
-  : "Download the APP from Nexion's website in your browser";
+  ? "浏览器版可通过 NexGrid 官网下载 APP"
+  : "Download the APP from NexGrid's website in your browser";
 const successDownloadPending = locale === "zh"
   ? "官网下载 APP 地址暂未开放"
   : "APP download link unavailable";
 const successDownloadLink = locale === "zh"
   ? "前往官网下载 APP"
-  : "Download the APP from Nexion";
+  : "Download the APP from NexGrid";
 const successTitle = locale === "zh" ? "注册成功" : "You're in";
-const successSub = locale === "zh" ? "欢迎加入 Nexion" : "Welcome to Nexion";
-const successTeamPrefix = locale === "zh" ? "欢迎加入 Nexion," : "Welcome to Nexion — you joined ";
+const successSub = locale === "zh" ? "欢迎加入 NexGrid" : "Welcome to NexGrid";
+const successTeamPrefix = locale === "zh" ? "欢迎加入 NexGrid," : "Welcome to NexGrid — you joined ";
 const successBenefits = locale === "zh"
   ? ["APP 在线时长可加速礼包与收益解锁", "设备收益实时推送,睡醒先看进账", "更稳的连接与算力调度"]
   : ["APP online hours speed up gift & yield release", "Real-time yield alerts — wake up to earnings", "Steadier connection & compute scheduling"];
@@ -98,7 +98,7 @@ async function signOutToDefault(frame, phone) {
     auth.signOut();
     useApp().bindAccount("default");
     rebindAccountScopedStores("default");
-    window.__nexionAuthDev.reset(phoneToReset);
+    window.__nexgridAuthDev.reset(phoneToReset);
   }, phone);
 }
 
@@ -121,8 +121,8 @@ async function snapshot(frame, expectedPhone = fullPhone, expectedAccount = acco
     const { useAuth } = await import("/src/store/auth.ts");
     const accounts = inspectAuthAccounts();
     const risks = listRiskRecords();
-    const bills = (uni.getStorageSync("nexion-bills-accounts-v1") || {})[expectedAccount]?.bills || [];
-    const sponsorship = uni.getStorageSync("nexion-sponsorship-v1") || {};
+    const bills = (uni.getStorageSync("nexgrid-bills-accounts-v1") || {})[expectedAccount]?.bills || [];
+    const sponsorship = uni.getStorageSync("nexgrid-sponsorship-v1") || {};
     return {
       accountsForPhone: accounts.filter((account) => account.phoneE164 === expectedPhone),
       accountCount: accounts.length,
@@ -295,8 +295,8 @@ async function assertRegistrationSuccessUi(frame, expectGift, expectRouteEntryFo
     `blank official URL rendered a dead link: ${JSON.stringify(metrics.placeholder)}`,
   );
 
-  const officialUrl = "https://download.example.invalid/nexion";
-  for (const invalidUrl of ["http://download.example.invalid/nexion", "javascript:alert(1)", "not-a-url"]) {
+  const officialUrl = "https://download.example.invalid/nexgrid";
+  for (const invalidUrl of ["http://download.example.invalid/nexgrid", "javascript:alert(1)", "not-a-url"]) {
     await frame.evaluate(async (url) => {
       const { useConfig } = await import("/src/store/config.ts");
       useConfig().config.share.appDownload.officialUrl = url;
@@ -307,7 +307,7 @@ async function assertRegistrationSuccessUi(frame, expectGift, expectRouteEntryFo
   await page.context().route(officialUrl, (route) => route.fulfill({
     status: 200,
     contentType: "text/html",
-    body: "<!doctype html><title>Nexion download</title><p>official download test</p>",
+    body: "<!doctype html><title>NexGrid download</title><p>official download test</p>",
   }));
   await frame.evaluate(async (url) => {
     const { useConfig } = await import("/src/store/config.ts");
@@ -379,13 +379,13 @@ async function assertRegistrationSuccessUi(frame, expectGift, expectRouteEntryFo
 async function assertAuthDirectorySchemaBarrier(frame) {
   const suffix = String(Date.now()).slice(-7);
   const legacyPhone = `+1655${suffix}`;
-  const legacyAccount = `${legacyPhone}@demo.nexion.ai`;
+  const legacyAccount = `${legacyPhone}@demo.nexgrid.ai`;
   const recoveryPhone = `+1658${suffix}`;
-  const recoveryAccount = `${recoveryPhone}@demo.nexion.ai`;
+  const recoveryAccount = `${recoveryPhone}@demo.nexgrid.ai`;
   const cleanupPhone = `+1659${suffix}`;
-  const cleanupAccount = `${cleanupPhone}@demo.nexion.ai`;
+  const cleanupAccount = `${cleanupPhone}@demo.nexgrid.ai`;
   const pendingPhone = `+1656${suffix}`;
-  const pendingAccount = `${pendingPhone}@demo.nexion.ai`;
+  const pendingAccount = `${pendingPhone}@demo.nexgrid.ai`;
   const freshPhone = `+1657${suffix}`;
   const result = await frame.evaluate(async ({ legacyPhone, legacyAccount, recoveryPhone, recoveryAccount, cleanupPhone, cleanupAccount, pendingPhone, pendingAccount, freshPhone }) => {
     const { buildCandidateRecord, readRiskRecordsStrict } = await import("/src/store/risk-identity.ts");
@@ -398,7 +398,7 @@ async function assertAuthDirectorySchemaBarrier(frame) {
     const { otpSend, otpVerify, registerVerifiedPhone } = await import("/src/store/auth-otp.ts");
     const { commitRegistration } = await import("/src/store/risk-cluster.ts");
     const { completeSignIn } = await import("/src/auth/complete-sign-in.ts");
-    const riskKey = "nexion-risk-registry-v1";
+    const riskKey = "nexgrid-risk-registry-v1";
     const reset = () => localStorage.clear();
     const reserve = async (phone) => {
       const sent = await otpSend(phone, "register");
@@ -498,7 +498,7 @@ async function assertAuthDirectorySchemaBarrier(frame) {
     // F: an empty store still permits a genuine pending reservation for a new phone.
     reset();
     const freshReserve = await reserve(freshPhone);
-    const freshById = resolveAuthAccountById(`${freshPhone}@demo.nexion.ai`);
+    const freshById = resolveAuthAccountById(`${freshPhone}@demo.nexgrid.ai`);
     const freshDirectory = uni.getStorageSync(AUTH_ACCOUNT_STORAGE_KEY);
     return {
       legacyFirst,
@@ -584,7 +584,7 @@ try {
   await enterOtp(frame);
   await frame.locator(".rg-step3").waitFor({ state: "visible", timeout: 10_000 });
 
-  const beforeCreate = await frame.evaluate((phone) => window.__nexionAuthDev.inspect(phone), fullPhone);
+  const beforeCreate = await frame.evaluate((phone) => window.__nexgridAuthDev.inspect(phone), fullPhone);
   assert(beforeCreate.account?.ok && beforeCreate.account.account === null, "new phone became active before password submit");
   assert(beforeCreate.verifyTokens?.[0]?.nextAction === "continue_registration", "new-number OTP did not continue registration");
 
@@ -652,7 +652,7 @@ try {
     auth.signOut();
     useApp().bindAccount("default");
     rebindAccountScopedStores("default");
-    window.__nexionAuthDev.reset(phone);
+    window.__nexgridAuthDev.reset(phone);
   }, fullPhone);
 
   // 已注册号同样不在发码前泄露状态；验码后立即进入既有登录链，目标页 toast
@@ -699,7 +699,7 @@ try {
   const unregisteredGuard = await frame.evaluate(async ({ expectedAccount, phone }) => {
     const { completeSignIn } = await import("/src/auth/complete-sign-in.ts");
     const { useAuth } = await import("/src/store/auth.ts");
-    const result = completeSignIn({ identity: `${phone}@demo.nexion.ai` });
+    const result = completeSignIn({ identity: `${phone}@demo.nexgrid.ai` });
     return { result, accountId: useAuth().accountId, expectedAccount };
   }, { expectedAccount: accountId, phone: `+1651${String(Date.now()).slice(-7)}` });
   assert(unregisteredGuard.result?.ok === false && unregisteredGuard.result.error === "account_not_found", "unregistered phone bypassed the account directory");
@@ -745,7 +745,7 @@ try {
   assert(resumeOldForRollback?.ok, "could not restore the existing account before rollback test");
   const rollbackDigits = `653${String(Date.now()).slice(-7)}`;
   const rollbackPhone = `+1${rollbackDigits}`;
-  const rollbackAccount = `${rollbackPhone}@demo.nexion.ai`;
+  const rollbackAccount = `${rollbackPhone}@demo.nexgrid.ai`;
   frame = await gotoRegister("risk-rollback");
   await enterPhoneAndSend(frame, rollbackDigits);
   await enterOtp(frame);
@@ -757,7 +757,7 @@ try {
     const original = Storage.prototype.setItem;
     let consumed = false;
     Storage.prototype.setItem = function setItemWithRiskFailure(key, value) {
-      if (!consumed && String(key).includes("nexion-risk-registry-v1")) {
+      if (!consumed && String(key).includes("nexgrid-risk-registry-v1")) {
         consumed = true;
         throw new Error("runtime_auth02_injected_risk_storage_failure");
       }
@@ -811,7 +811,7 @@ try {
   await page.waitForTimeout(800);
   assert(await frame.locator(".rg-phone").count() === 1, "stale OTP response did not return to the changed-number step");
   assert(await frame.locator(".rg-step3").count() === 0, "stale OTP response entered the password step");
-  const staleAccount = await frame.evaluate((phone) => window.__nexionAuthDev.inspect(phone), stalePhone);
+  const staleAccount = await frame.evaluate((phone) => window.__nexgridAuthDev.inspect(phone), stalePhone);
   assert(staleAccount.account?.ok && staleAccount.account.account === null, "stale OTP response created an account");
 
   // 截图对应的无礼包直达态也必须保持主体居中、H5 提醒完整、Continue 贴底。

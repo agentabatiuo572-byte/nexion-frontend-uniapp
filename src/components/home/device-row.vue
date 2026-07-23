@@ -11,16 +11,19 @@
     :data-online="isOnline ? 'true' : 'false'"
     role="button"
     tabindex="0"
-    :aria-label="`${t.earn.deviceDetailTitle}: ${device.name}`"
+    :aria-label="`${t.earn.deviceDetailTitle}: ${device.name} · ${isOnline ? t.earn.online : t.earn.offline}`"
     @click="go"
     @keydown.enter.prevent="go"
     @keydown.space.prevent="go"
   >
     <view class="flex items-center min-w-0" style="gap: 9px; flex: 1 1 auto">
       <view :style="dotStyle" />
-      <text class="block" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-ink); letter-spacing: -0.01em">{{ device.name }}</text>
+      <text class="block" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.01em">{{ device.name }}</text>
+      <!-- WCAG 1.4.1 状态不只靠色:离线(异常态)显式带文字;在线为默认态,
+           两态的状态词都进 aria-label。紧凑行里只标异常,不挤占设备名空间。 -->
+      <text v-if="!isOnline" class="shrink-0" style="font-size: 12px; line-height: 16px; color: var(--v5-ink-3)">{{ t.earn.offline }}</text>
     </view>
-    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 14px; color: var(--v5-warning); margin-left: 12px">+${{ todayText }}</text>
+    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-success); margin-left: 12px">+${{ todayText }}</text>
   </view>
 </template>
 

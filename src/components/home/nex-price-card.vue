@@ -37,7 +37,7 @@ const change = computed(() => market.change24hPct);
 const kline = computed(() => market.klineHourly);
 const livePrice = computed(() => market.nexPriceUSDT);
 const isUp = computed(() => change.value >= 0);
-const tint = computed(() => (isUp.value ? "var(--v5-success)" : "#C26658"));
+const tint = computed(() => (isUp.value ? "var(--v5-success)" : "var(--v5-danger)"));
 
 const priceText = computed(() => livePrice.value.toFixed(3));
 const changeText = computed(() => `${isUp.value ? "+" : ""}${change.value.toFixed(1)}%`);

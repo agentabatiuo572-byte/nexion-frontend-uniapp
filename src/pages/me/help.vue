@@ -1,6 +1,6 @@
 <!--
   Help Center (ported from Nexion-prototype/app/(main)/me/help/page.tsx).
-  FAQ search + category chips + accordion, an inline NexionBot chat (keyword
+  FAQ search + category chips + accordion, an inline NexGridBot chat (keyword
   match over the FAQ corpus), and a contact card. Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -71,7 +71,7 @@
         </template>
       </view>
 
-      <!-- NexionBot -->
+      <!-- NexGridBot -->
       <view class="mx-4" :style="botCardStyle">
         <view class="flex items-center" :style="botHeadStyle">
           <view class="grid place-items-center" :style="botIconBoxStyle">
@@ -263,7 +263,7 @@ function chevStyle(open: boolean): CSSProperties {
 }
 const faqBodyStyle: CSSProperties = { padding: "0 0 14px" };
 const faqAStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.62 };
-// NexionBot — a contained chat widget (single surface container, no border).
+// NexGridBot — a contained chat widget (single surface container, no border).
 const botCardStyle: CSSProperties = {
   marginBottom: "12px",
   background: "var(--v5-surface)",

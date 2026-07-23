@@ -6,7 +6,7 @@ import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-accou
 // Ported from Nexion-prototype/lib/store/auth.ts (zustand → Pinia).
 // Gates main-app access: new sign-ups must finish onboarding
 // (intro → estimator → connect) before onboardingComplete flips true.
-const STORAGE_KEY = "nexion-auth-v1";
+const STORAGE_KEY = "nexgrid-auth-v1";
 
 interface Persisted {
   isAuthenticated: boolean;

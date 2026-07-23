@@ -7,8 +7,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // Ported from Nexion-prototype/lib/store/receipts.ts (zustand → Pinia).
 // Proof-of-Compute receipts (design doc §6.9), newest-first, capped + persisted.
 const MAX_RECEIPTS = 200;
-// 旧设备级单键 "nexion-receipts-v1" 废弃(存量无账号归属,mock 可重建);算力凭证按账号分行。
-const ACCOUNTS_KEY = "nexion-receipts-accounts-v1"; // { [accountKey]: { receipts: Receipt[] } }
+// 旧设备级单键 "nexgrid-receipts-v1" 废弃(存量无账号归属,mock 可重建);算力凭证按账号分行。
+const ACCOUNTS_KEY = "nexgrid-receipts-accounts-v1"; // { [accountKey]: { receipts: Receipt[] } }
 
 function hydrate(accountKey: string): Receipt[] {
   const row = readAccountRow<{ receipts?: Receipt[] }>(ACCOUNTS_KEY, accountKey);

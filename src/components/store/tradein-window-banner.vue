@@ -6,7 +6,7 @@
 -->
 <template>
   <view v-if="best" class="mb-3">
-    <view class="block relative overflow-hidden" :style="rootStyle" role="button" tabindex="0" :aria-label="w.cta" @click.stop="go">
+    <view class="block relative overflow-hidden active:opacity-90" :style="rootStyle" role="button" tabindex="0" :aria-label="w.cta" @click.stop="go">
       <view class="absolute inset-0 pointer-events-none" :style="radialStyle" />
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
@@ -14,7 +14,7 @@
         <text>{{ w.label }}</text>
       </view>
 
-      <text class="block relative mt-2" style="font-size: 18px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ title }}</text>
+      <text class="block relative mt-2" style="font-size: 20px; font-weight: 600; color: var(--v5-ink); line-height: 1.2">{{ title }}</text>
       <text class="block relative mt-1.5" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ body }}</text>
 
       <view class="relative mt-3 flex items-center justify-end">
@@ -102,7 +102,7 @@ const radialStyle: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   fontWeight: 500,
@@ -115,7 +115,7 @@ const ctaStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 

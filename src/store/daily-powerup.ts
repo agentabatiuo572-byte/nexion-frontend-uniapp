@@ -22,8 +22,8 @@ interface DailyPowerUpData {
   claimedAt: Record<string, number>;
 }
 
-// 旧设备级单键 "nexion-daily-powerup-v1" 废弃(存量无账号归属,mock 可重建);增益领取态按账号分行。
-const ACCOUNTS_KEY = "nexion-daily-powerup-accounts-v1"; // { [accountKey]: DailyPowerUpData }
+// 旧设备级单键 "nexgrid-daily-powerup-v1" 废弃(存量无账号归属,mock 可重建);增益领取态按账号分行。
+const ACCOUNTS_KEY = "nexgrid-daily-powerup-accounts-v1"; // { [accountKey]: DailyPowerUpData }
 
 function hydrate(accountKey: string): DailyPowerUpData {
   const row = readAccountRow<Partial<DailyPowerUpData>>(ACCOUNTS_KEY, accountKey);

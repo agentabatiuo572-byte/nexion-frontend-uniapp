@@ -10,12 +10,12 @@
     <view class="grid place-items-center" :style="avatarStyle">
       <text>{{ initial }}</text>
     </view>
-    <view class="flex-1 min-w-0 overflow-hidden" style="font-size: 12.5px">
+    <view class="flex-1 min-w-0 overflow-hidden" style="font-size: 13px">
       <text style="color: var(--v5-ink); font-weight: 500">{{ cur.who }} · {{ cur.co }}</text>
       <text style="color: var(--v5-ink-3)"> {{ t.store.tickerBought }} </text>
       <text style="color: var(--v5-brand); font-weight: 500">{{ cur.prod }}</text>
     </view>
-    <text class="font-mono-tabular whitespace-nowrap" style="font-size: 11px; color: var(--v5-ink-4)">{{ cur.t }} {{ t.store.tickerAgo }}</text>
+    <text class="font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-ink-4)">{{ cur.t }} {{ t.store.tickerAgo }}</text>
   </view>
 </template>
 
@@ -27,14 +27,16 @@ const t = useT();
 
 interface Purchase { who: string; co: string; prod: string; t: string; color: string }
 
-// Decorative avatar accents only (not design tokens). Alex's blue was nudged to
-// #1A4FD0 so no value trips the verify hardcoded-light-hex sentinel.
+// 头像底色走 token(2026-07-23 B1 修)。原为硬编码 hex,且是**亮色主题 token 值的
+// 字面副本** → 暗色主题下底色不跟随、而文字用 var(--v5-ink) 跟随,双主题必失配。
+// ⚠️ 原注释自陈「Alex 的蓝特意挪到 #1A4FD0,使其不触发 verify 的硬编码色哨兵」——
+// 这是绕哨兵而非解决问题的先例;哨兵覆盖面待横切批次补全(见 B1 verdicts 未闭合项)。
 const purchases: Purchase[] = [
-  { who: "Maya", co: "ID", prod: "NexionBox S1", t: "3m", color: "#C68316" },
-  { who: "cypher.eth", co: "US", prod: "NexionRack P1", t: "7m", color: "#0833B8" },
-  { who: "Hideo", co: "JP", prod: "NexionBox Pro", t: "12m", color: "#0E8E4A" },
-  { who: "Alex", co: "DE", prod: "NexionBox S1", t: "14m", color: "#1A4FD0" },
-  { who: "Layla", co: "AE", prod: "NexionBox S1 ×2", t: "21m", color: "#B9554A" },
+  { who: "Maya", co: "ID", prod: "NexGridBox S1", t: "3m", color: "var(--v5-warning)" },
+  { who: "cypher.eth", co: "US", prod: "NexGridRack P1", t: "7m", color: "var(--v5-brand-deep)" },
+  { who: "Hideo", co: "JP", prod: "NexGridBox Pro", t: "12m", color: "var(--v5-success)" },
+  { who: "Alex", co: "DE", prod: "NexGridBox S1", t: "14m", color: "var(--v5-brand)" },
+  { who: "Layla", co: "AE", prod: "NexGridBox S1 ×2", t: "21m", color: "var(--v5-danger)" },
 ];
 
 const i = ref(0);
@@ -63,7 +65,9 @@ const avatarStyle = computed<CSSProperties>(() => ({
   height: "28px",
   borderRadius: "50%",
   background: cur.value.color,
-  color: "var(--v5-ink)",
+  // 底色是随主题翻转的语义 token(亮色深/暗色浅)→ 首字母必须用同样翻转的
+  // --v5-on-brand;此前留着 --v5-ink 与底色同向变化,暗主题实测 1.41:1(独立验收)。
+  color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "13px",

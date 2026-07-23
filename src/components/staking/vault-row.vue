@@ -51,10 +51,10 @@ const props = defineProps<{
 const emit = defineEmits<{ open: [] }>();
 
 const TIER_TONES: Record<StakingTerm, TierTone> = {
-  30: { softBg: "var(--v5-success-soft)", borderColor: "rgba(14,142,74,0.30)", text: "var(--v5-success)" },
+  30: { softBg: "var(--v5-success-soft)", borderColor: "color-mix(in srgb, var(--v5-success) 30%, transparent)", text: "var(--v5-success)" },
   90: { softBg: "var(--v5-brand-soft)", borderColor: "var(--v5-brand-border)", text: "var(--v5-brand)" },
   180: { softBg: "var(--v5-tech-cyan-soft)", borderColor: "var(--v5-tech-cyan-border)", text: "var(--v5-tech-cyan)" },
-  365: { softBg: "var(--v5-warning-soft)", borderColor: "rgba(198,131,22,0.30)", text: "var(--v5-warning)" },
+  365: { softBg: "var(--v5-warning-soft)", borderColor: "color-mix(in srgb, var(--v5-warning) 30%, transparent)", text: "var(--v5-warning)" },
 };
 
 const tone = computed(() => TIER_TONES[props.term]);
@@ -100,7 +100,7 @@ const ribbonStyle = computed<CSSProperties>(() => ({
   padding: "2px 7px",
   borderRadius: "999px",
   background: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-soft)" : "var(--v5-warning-soft)",
-  border: `1px solid ${props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-border)" : "rgba(198,131,22,0.30)"}`,
+  border: `1px solid ${props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-border)" : "color-mix(in srgb, var(--v5-warning) 30%, transparent)"}`,
   color: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan)" : "var(--v5-warning)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "10.5px",

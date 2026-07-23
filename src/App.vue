@@ -154,7 +154,7 @@ function handleAutoRedeem(shadowUSDBeforeRedeem: number, shadowNEXBeforeRedeem: 
     symbol: "USDT",
     amount: -chargeAmount,
     status: "posted",
-    memo: `Trial converted · NexionBox S1 (auto-charge, earnings -$${offsetUSD})`,
+    memo: `Trial converted · NexGridBox S1 (auto-charge, earnings -$${offsetUSD})`,
     ref: purchaseRef,
   });
   if (remainderUSD > 0) {
@@ -164,7 +164,7 @@ function handleAutoRedeem(shadowUSDBeforeRedeem: number, shadowNEXBeforeRedeem: 
       symbol: "USDT",
       amount: remainderUSD,
       status: "posted",
-      memo: "Trial earnings remainder → balance · NexionBox S1",
+      memo: "Trial earnings remainder → balance · NexGridBox S1",
       ref: `${purchaseRef}-EARN-USDT`,
     });
   }
@@ -373,7 +373,7 @@ function attachSessionWatch() {
   // #ifdef H5
   if (storageHandler) return;
   storageHandler = (e: StorageEvent) => {
-    if (e.key && (e.key.indexOf("nexion-account-sessions") >= 0 || e.key.indexOf("nexion-active-session") >= 0)) {
+    if (e.key && (e.key.indexOf("nexgrid-account-sessions") >= 0 || e.key.indexOf("nexgrid-active-session") >= 0)) {
       checkSession();
     }
   };
@@ -540,7 +540,7 @@ function ensureBusinessLoopsAllowed(): boolean {
 }
 
 onLaunch(() => {
-  // Nexion defaults dark, but the persisted user choice drives H5 after launch.
+  // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
   // (system → OS scheme). Instantiating the store here also registers its live
   // OS-scheme listener for "system" mode.

@@ -11,8 +11,8 @@
     <view class="relative overflow-hidden" :style="cardStyle">
       <view v-if="latestOrder" class="flex items-center justify-between" style="gap: 8px">
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ latestOrder.productName }}</text>
-          <text class="block font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px">${{ latestOrder.total.toFixed(0) }} · {{ latestOrder.dataCenter }}</text>
+          <text class="block truncate" style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ latestOrder.productName }}</text>
+          <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">${{ latestOrder.total.toFixed(0) }} · {{ latestOrder.dataCenter }}</text>
         </view>
         <text class="shrink-0 font-mono-tabular" :style="statusPillStyle(latestOrder.status)">{{ latestOrder.status }}</text>
       </view>
@@ -23,7 +23,7 @@
         </view>
       </view>
 
-      <view class="flex items-center justify-between" :style="footerStyle" @click="goOrders">
+      <view class="flex items-center justify-between active:opacity-70" :style="footerStyle" @click="goOrders">
         <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.me.viewAllOrders }}</text>
         <view class="inline-flex items-center gap-0.5">
           <text v-if="orderCount > 0" class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ orderCount }}</text>
@@ -68,7 +68,7 @@ function statusPillStyle(status: string): CSSProperties {
     border: `1px solid ${s.border}`,
     padding: "3px 8px",
     borderRadius: "999px",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 500,
   };
 }
@@ -86,7 +86,7 @@ const browseBtnStyle: CSSProperties = {
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const footerStyle: CSSProperties = {
   marginTop: "12px",

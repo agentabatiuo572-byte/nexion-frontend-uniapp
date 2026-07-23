@@ -131,7 +131,7 @@ function labelStyle(m: ThemeMode): CSSProperties {
   const on = isActive(m);
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "14px",
+    fontSize: "15px",
     fontWeight: on ? 600 : 500,
     color: on ? "var(--v5-ink)" : "var(--v5-ink-2)",
   };

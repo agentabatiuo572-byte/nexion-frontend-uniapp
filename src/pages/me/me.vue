@@ -73,7 +73,7 @@
         <text style="margin-left: 6px">{{ t.me.signOut }}</text>
       </view>
 
-      <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 11px; color: var(--v5-ink-4)">Nexion · v3.2.0 · build 6824</text>
+      <text class="block text-center font-mono-tabular" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4)">NexGrid · v3.2.0 · build 6824</text>
     </CardStagger>
   </AppChassis>
 
@@ -402,7 +402,7 @@ const quickBadgeStyle: CSSProperties = {
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 600,
   lineHeight: "17px",
   textAlign: "center",
@@ -410,7 +410,7 @@ const quickBadgeStyle: CSSProperties = {
 const quickLabelStyle: CSSProperties = {
   maxWidth: "78px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   lineHeight: 1.2,
   color: "var(--v5-ink)",
@@ -423,7 +423,7 @@ function quickMetaStyle(tone: QuickTone = "muted"): CSSProperties {
     maxWidth: "76px",
     marginTop: "-3px",
     fontFamily: "var(--font-v5)",
-    fontSize: "10.5px",
+    fontSize: "12px",
     lineHeight: 1.2,
     color: toneColor(tone),
     textAlign: "center",
@@ -468,7 +468,7 @@ const signOutStyle: CSSProperties = {
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
 };
 </script>

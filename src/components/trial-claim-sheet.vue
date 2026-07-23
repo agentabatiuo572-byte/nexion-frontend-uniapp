@@ -140,7 +140,7 @@ function onClaim() {
 .tcs-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 8, 12, 0.45);
+  background: var(--v5-bg-color-mask);
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
   animation: tcs-fade 0.24s ease-out;
@@ -191,7 +191,7 @@ function onClaim() {
   flex-direction: column;
 }
 .tcs-cap {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -244,14 +244,14 @@ function onClaim() {
   justify-content: space-between;
 }
 .tcs-hero-label {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-brand);
 }
 .tcs-hero-perday {
-  font-size: 10.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   color: var(--v5-ink-4);
   font-variant-numeric: tabular-nums;
@@ -265,7 +265,7 @@ function onClaim() {
 }
 .tcs-hero-num {
   font-family: var(--font-v5);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1;
@@ -273,7 +273,7 @@ function onClaim() {
   font-variant-numeric: tabular-nums;
 }
 .tcs-hero-suffix {
-  font-size: 11.5px;
+  font-size: 12px;
   font-family: var(--font-jet-mono), monospace;
   color: var(--v5-ink-3);
 }
@@ -309,14 +309,14 @@ function onClaim() {
 }
 .tcs-prop-title {
   font-family: var(--font-v5);
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-ink);
   line-height: 1.375;
 }
 .tcs-prop-sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 4px;
   line-height: 1.625;
@@ -343,7 +343,7 @@ function onClaim() {
   transform: scale(0.98);
 }
 .tcs-claim-t {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-on-brand);
   font-family: var(--font-v5);
@@ -360,7 +360,7 @@ function onClaim() {
   opacity: 0.7;
 }
 .tcs-dismiss-t {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 400;
   color: var(--v5-ink-3);
 }

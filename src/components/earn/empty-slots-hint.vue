@@ -26,7 +26,7 @@
               </svg>
             </view>
             <view aria-hidden class="absolute" :style="liveDotStyle('var(--v5-brand-2)')" />
-            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 10px; line-height: 13px; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2)">{{ t.trial.slotTag }}</text>
+            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 12px; line-height: 13px; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2)">{{ t.trial.slotTag }}</text>
           </template>
 
           <template v-else>
@@ -159,7 +159,7 @@ const ctaStyle: CSSProperties = {
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
   color: "var(--v5-on-brand)",
 };

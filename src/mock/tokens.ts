@@ -50,7 +50,7 @@ function s(seed: number, length: number, vol: number): number[] {
 export const TOKENS: Token[] = [
   {
     symbol: "NEX",
-    name: "Nexion",
+    name: "NexGrid",
     category: "self",
     color: "#C6FF3A",
     priceUSD: 0.171,

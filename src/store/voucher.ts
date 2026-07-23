@@ -17,7 +17,7 @@ import {
  * whether each has been redeemed). The voucher CATALOG (operator config) lives
  * in src/mock/vouchers.ts; this store only tracks the user's relationship to it.
  *
- * Persistence: `claimed` survives across sessions (nexion-voucher-v1), mirroring
+ * Persistence: `claimed` survives across sessions (nexgrid-voucher-v1), mirroring
  * cart.ts hydrate→ref→watch→persist. MOCK-ONLY — real backend contract (vouchers
  * are a NEW feature; these endpoints are the canonical proposal, to be added to
  * PRD §9.11 on sync):
@@ -46,8 +46,8 @@ interface ClaimRecord {
   usedAt: number | null;
 }
 
-// 旧设备级单键 "nexion-voucher-v1" 废弃(存量无账号归属,mock 可重建);券包账本按账号分行。
-const ACCOUNTS_KEY = "nexion-voucher-accounts-v1"; // { [accountKey]: { claimed: ClaimRecord[] } }
+// 旧设备级单键 "nexgrid-voucher-v1" 废弃(存量无账号归属,mock 可重建);券包账本按账号分行。
+const ACCOUNTS_KEY = "nexgrid-voucher-accounts-v1"; // { [accountKey]: { claimed: ClaimRecord[] } }
 
 function hydrate(accountKey: string): ClaimRecord[] {
   const row = readAccountRow<{ claimed?: ClaimRecord[] }>(ACCOUNTS_KEY, accountKey);

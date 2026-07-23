@@ -100,7 +100,7 @@ function select(code: string) {
 </script>
 
 <style scoped>
-.cc-mask { position: fixed; inset: 0; z-index: 9000; background: rgba(0, 0, 0, 0.58); backdrop-filter: blur(3px); }
+.cc-mask { position: fixed; inset: 0; z-index: 9000; background: var(--v5-bg-color-mask); backdrop-filter: blur(3px); }
 .cc-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9001; display: flex; flex-direction: column; max-height: min(74vh, 620px); background: var(--v5-surface); border-top: 1px solid var(--v5-border-strong); border-radius: 22px 22px 0 0; padding-bottom: calc(env(safe-area-inset-bottom) + 24px); animation: cc-up 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes cc-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .cc-grab { flex: 0 0 auto; width: 40px; height: 4px; margin: 10px auto 0; border-radius: 9999px; background: var(--v5-surface-3); }

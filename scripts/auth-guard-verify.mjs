@@ -13,7 +13,7 @@ async function routeAfter(seedUnauth, target) {
   await page.goto(`${BASE}/#/pages/index/index`, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.evaluate((u) => {
     localStorage.clear();
-    if (u) localStorage.setItem("nexion-auth-v1", u);
+    if (u) localStorage.setItem("nexgrid-auth-v1", u);
   }, seedUnauth ? unauth : null);
   await page.goto(`${BASE}/#${target}`, { waitUntil: "networkidle", timeout: 30000 });
   await wait(1800); // onShow guard + one 1s tick

@@ -72,7 +72,7 @@ const emptyStyle: CSSProperties = {
   marginTop: "12px",
   padding: "18px",
   borderRadius: "16px",
-  background: "var(--v5-surface-bg)",
+  background: "var(--v5-surface)",
 };
 const emptyTitleStyle: CSSProperties = {
   fontSize: "14px",

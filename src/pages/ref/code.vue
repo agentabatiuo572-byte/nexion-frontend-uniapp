@@ -16,7 +16,7 @@
         <view class="grid place-items-center" :style="brandMarkStyle">
           <text :style="brandMarkTextStyle">N</text>
         </view>
-        <text :style="brandNameStyle">Nexion</text>
+        <text :style="brandNameStyle">NexGrid</text>
         <text v-if="hasCode" :style="refChipStyle">REF/{{ codeUpper }}</text>
       </view>
 
@@ -66,7 +66,7 @@
         </view>
       </view>
 
-      <!-- CTA(已登录 → 进入 Nexion,隐藏注册入口;异常2) -->
+      <!-- CTA(已登录 → 进入 NexGrid,隐藏注册入口;异常2) -->
       <view v-if="!authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
@@ -263,7 +263,7 @@ const giftCardStyle: CSSProperties = {
 };
 const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
 const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
-const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-brand)", fontWeight: 600, lineHeight: 1 };
+const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-nex)", fontWeight: 600, lineHeight: 1 };
 const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
 const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface)" };
 function perkRowStyle(divider: boolean): CSSProperties {

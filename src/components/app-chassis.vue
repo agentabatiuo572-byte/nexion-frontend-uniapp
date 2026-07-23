@@ -1,7 +1,7 @@
 <!--
   AppChassis — page shell (uni has no root layout / App.vue renders no template,
   P-004). Route-aware like the prototype's root layout (header.tsx + tab-bar.tsx):
-    · TAB routes (home/earn/store/team/me): brand row (N badge + Nexion/title +
+    · TAB routes (home/earn/store/team/me): brand row (N badge + NexGrid/title +
       search + bell-badge) + FLOATING frosted-glass pill TabBar (5 tabs, active =
       gradient brand pill) + home indicator. Liquid-Glass faithful to v5.
     · SUB routes (everything else): NO brand row + NO 5-tab pill (the page carries
@@ -27,10 +27,10 @@
       </view>
       <view class="nx-header__center" />
       <view class="nx-header__r">
-        <view class="nx-icon-btn" @click="goSearch">
+        <view class="nx-icon-btn active:opacity-60" role="button" tabindex="0" :aria-label="t.headerTitles.search" @click="goSearch" @keydown.enter.prevent="goSearch" @keydown.space.prevent="goSearch">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         </view>
-        <view class="nx-icon-btn nx-bell" @click="goNotifications">
+        <view class="nx-icon-btn nx-bell active:opacity-60" role="button" tabindex="0" :aria-label="t.notifs.drawerTitle" @click="goNotifications" @keydown.enter.prevent="goNotifications" @keydown.space.prevent="goNotifications">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <view v-if="unread > 0" class="nx-badge"><text class="nx-badge__t">{{ unreadLabel }}</text></view>
         </view>
@@ -116,9 +116,15 @@
         <view
           v-for="tab in tabs"
           :key="tab.key"
-          class="nx-tab"
+          class="nx-tab active:opacity-70"
           :style="tab.key === activeTab ? activeTabStyle : { color: 'var(--v5-ink-3)' }"
+          role="tab"
+          tabindex="0"
+          :aria-selected="tab.key === activeTab ? 'true' : 'false'"
+          :aria-label="tab.label"
           @click="go(tab)"
+          @keydown.enter.prevent="go(tab)"
+          @keydown.space.prevent="go(tab)"
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
             :stroke="tab.key === activeTab ? 'var(--v5-brand)' : 'var(--v5-ink-3)'"
@@ -472,7 +478,18 @@ const activeTabStyle: CSSProperties = {
 };
 
 function go(tab: { key: string; route: string }) {
-  if (tab.key === activeTab.value) return;
+  // 再点当前 tab = 回到顶部(《05》§5.3);原实现直接 return,实测 scrollTop
+  // 900→900 零位移,是全站唯一「点了没反应」的控件。
+  // behavior 显式跟随系统「减少动态」偏好——CSS 的 scroll-behavior 兜底管不到
+  // JS scrollTo 的显式 behavior 参数。App 端无 matchMedia,try 兜住即可。
+  if (tab.key === activeTab.value) {
+    const dom = chassisScrollDom();
+    if (!dom) return;
+    let reduce = false;
+    try { reduce = !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; } catch { /* App 端无 matchMedia */ }
+    dom.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    return;
+  }
   uni.reLaunch({ url: tab.route, fail: () => {} });
 }
 function goSearch() {
@@ -562,7 +579,7 @@ function goNotifications() {
 .nx-nav-title {
   max-width: 100%;
   font-family: var(--font-v5);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.014em;
   color: var(--v5-ink);
@@ -635,14 +652,14 @@ html[data-theme="dark"] .nx-logo-img--dark {
   display: block;
 }
 .nx-brand {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--v5-ink);
   white-space: nowrap;
 }
 .nx-ver {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--v5-ink-4);
   white-space: nowrap;
@@ -654,8 +671,9 @@ html[data-theme="dark"] .nx-logo-img--dark {
   flex-shrink: 0;
 }
 .nx-icon-btn {
-  width: 38px;
-  height: 38px;
+  /* 《07》tap ≥44pt — 原 38×38 不足;图标视觉尺寸不变,只扩热区 */
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -675,8 +693,8 @@ html[data-theme="dark"] .nx-logo-img--dark {
   justify-content: center;
 }
 .nx-badge__t {
-  font-size: 9.5px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--v5-on-brand-2);
   font-family: var(--font-v5);
   line-height: 1;
@@ -798,7 +816,8 @@ html[data-theme="dark"] .nx-logo-img--dark {
 }
 .nx-tab__label {
   font-size: 12px;
-  font-weight: 500;
+  line-height: 14px; /* 《02》§2 tab.label 12/14/600 */
+  font-weight: 600;
   font-family: var(--font-v5);
   letter-spacing: -0.005em;
 }

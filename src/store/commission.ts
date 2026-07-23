@@ -136,8 +136,8 @@ function seedEvents(): CommissionEvent[] {
   ];
 }
 
-// 旧设备级单键 "nexion-commission-v1" 废弃(存量无账号归属,mock 可重建);佣金事件按账号分行。
-const ACCOUNTS_KEY = "nexion-commission-accounts-v1"; // { [accountKey]: { events: CommissionEvent[] } }
+// 旧设备级单键 "nexgrid-commission-v1" 废弃(存量无账号归属,mock 可重建);佣金事件按账号分行。
+const ACCOUNTS_KEY = "nexgrid-commission-accounts-v1"; // { [accountKey]: { events: CommissionEvent[] } }
 
 function hydrate(accountKey: string): CommissionEvent[] {
   const row = readAccountRow<{ events?: CommissionEvent[] }>(ACCOUNTS_KEY, accountKey);
