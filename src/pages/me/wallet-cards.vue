@@ -162,13 +162,13 @@ const cardRowHeadStyle: CSSProperties = { padding: "16px 20px", gap: "12px" };
 const cardIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)" };
 const cardNameStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
 const defaultBadgeStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-brand)",
   background: "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
   borderRadius: "6px",
   padding: "1px 6px",
 };
-const cardMetaStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const cardMetaStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const cardActionsStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
 const actionBtnStyle: CSSProperties = { height: "44px", fontSize: "12.5px" };
 const actionDefaultTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)" };
@@ -179,11 +179,11 @@ const addBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
 };
-const addBtnTextStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 500, color: "var(--v5-on-brand)" };
+const addBtnTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-on-brand)" };
 const disclaimerStyle: CSSProperties = {
   marginTop: "16px",
   padding: "0 4px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };

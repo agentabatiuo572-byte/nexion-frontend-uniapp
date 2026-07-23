@@ -204,9 +204,9 @@ function tabPillStyle(c: Tab): CSSProperties {
 }
 function tabLabelStyle(c: Tab): CSSProperties {
   const on = tab.value === c;
-  return { fontSize: "11.5px", fontWeight: 500, color: on ? "var(--v5-brand)" : "var(--v5-ink-3)" };
+  return { fontSize: "12px", fontWeight: 500, color: on ? "var(--v5-brand)" : "var(--v5-ink-3)" };
 }
-const tabCountStyle: CSSProperties = { fontSize: "11.5px", opacity: 0.7 };
+const tabCountStyle: CSSProperties = { fontSize: "12px", opacity: 0.7 };
 const clearBtnStyle: CSSProperties = { width: "44px", height: "44px", borderRadius: "999px" };
 
 // Empty state — dashed outline hint, no fill (V5 empty-state idiom).
@@ -217,8 +217,8 @@ const emptyStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13.5px", color: "var(--v5-ink-2)" };
-const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded: transparent hairline group (earnings-ledger idiom). The surface +
 // outer border was redundant boundary weight — rows are already hairline-split.
@@ -247,24 +247,24 @@ function rowIconStyle(r: Receipt): CSSProperties {
   };
 }
 const rowTitleStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
-const rowSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const rowSubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function rowAmountStyle(r: Receipt): CSSProperties {
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "13.5px",
+    fontSize: "13px",
     fontWeight: 600,
     color: r.category === "KY" ? "var(--v5-brand-2)" : "var(--v5-brand)",
   };
 }
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
+const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 const footerStyle: CSSProperties = {
   margin: "16px 24px 24px",
   textAlign: "center",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };

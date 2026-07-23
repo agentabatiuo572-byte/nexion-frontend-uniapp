@@ -180,8 +180,8 @@ const heroStyle: CSSProperties = {
   background: "var(--v5-surface)",
 };
 const heroIconBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
-const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "18px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };
-const heroPtsStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "20px", letterSpacing: "-0.014em", color: "var(--v5-ink)" };
+const heroPtsStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const benefitsGridStyle: CSSProperties = { marginTop: "12px", gap: "8px" };
 function benefitStyle(tint: string, i: number): CSSProperties {
   return {
@@ -192,11 +192,11 @@ function benefitStyle(tint: string, i: number): CSSProperties {
     animationDelay: `${i * 0.08}s`,
   };
 }
-const benefitTextStyle: CSSProperties = { fontSize: "11px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
+const benefitTextStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
 // De-carded data sections (amount input, projection) on the page floor, 2px inset.
 const cardStyle: CSSProperties = { padding: "0 2px" };
-const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "24px", color: "var(--v5-ink-3)" };
+const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
+const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", color: "var(--v5-ink-3)" };
 const amountInputStyle: CSSProperties = { fontFamily: "var(--font-v5)", flex: "1", minWidth: "0", background: "transparent", fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)" };
 const usdtStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function presetStyle(active: boolean): CSSProperties {
@@ -212,8 +212,8 @@ function presetStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-2)",
   };
 }
-const balanceLabelStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)" };
-const balanceValueStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "11px", color: "var(--v5-ink-2)", marginLeft: "4px" };
+const balanceLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const balanceValueStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-2)", marginLeft: "4px" };
 const dividerStyle: CSSProperties = { height: "1px", background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)", margin: "8px 0" };
 const ctaStyle = computed<CSSProperties>(() => ({
   width: "100%",
@@ -225,5 +225,5 @@ const ctaStyle = computed<CSSProperties>(() => ({
   color: canSubmit.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
   boxShadow: canSubmit.value ? "var(--v5-spotlight-brand)" : "none",
 }));
-const lockedNoticeStyle: CSSProperties = { padding: "0 8px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const lockedNoticeStyle: CSSProperties = { padding: "0 8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 </script>

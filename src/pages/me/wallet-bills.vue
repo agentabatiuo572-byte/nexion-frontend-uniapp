@@ -64,7 +64,7 @@
             <view class="text-right shrink-0" style="margin-left: 8px">
               <view :style="amountStyle(b.amount)">
                 <text>{{ b.amount >= 0 ? "+" : "-" }}{{ fmtAmount(b) }}</text>
-                <text style="font-size: 10px; color: var(--v5-ink-4); margin-left: 4px">{{ b.symbol }}</text>
+                <text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 4px">{{ b.symbol }}</text>
               </view>
               <text
                 v-if="b.balanceAfter !== undefined && b.symbol === 'USDT'"
@@ -217,7 +217,7 @@ const emptyStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTextStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)" };
+const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
 
 const listWrapStyle: CSSProperties = { margin: "0 16px 12px" };
 // Transparent hairline group per month: container border-top opens it, the mono
@@ -230,7 +230,7 @@ const sectionStyle: CSSProperties = {
 const monthHeaderStyle: CSSProperties = {
   padding: "8px 0",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -252,13 +252,13 @@ function iconChipStyle(type: BillType): CSSProperties {
   };
 }
 const typeLabelStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
 function statusBadgeStyle(s: BillStatus): CSSProperties {
   const base: CSSProperties = {
-    fontSize: "10px",
+    fontSize: "12px",
     padding: "1px 6px",
     borderRadius: "4px",
   };
@@ -267,22 +267,22 @@ function statusBadgeStyle(s: BillStatus): CSSProperties {
     return { ...base, background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)", color: "var(--v5-warning)" };
   return { ...base, background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)", color: "var(--v5-brand-2)" };
 }
-const memoStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)" };
-const timeStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-4)" };
+const memoStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const timeStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 function amountStyle(amount: number): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13.5px",
+    fontSize: "13px",
     fontWeight: 600,
     color: amount >= 0 ? "var(--v5-brand)" : "var(--v5-brand-2)",
     fontVariantNumeric: "tabular-nums",
   };
 }
-const balanceAfterStyle: CSSProperties = { marginTop: "2px", fontSize: "10px", color: "var(--v5-ink-4)" };
+const balanceAfterStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 const footerStyle: CSSProperties = {
   margin: "12px 24px 24px",
   textAlign: "center",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };

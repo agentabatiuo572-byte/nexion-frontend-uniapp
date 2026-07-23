@@ -28,7 +28,7 @@
         <!-- Persistent compliance banner -->
         <view class="mx-4 mb-3 flex items-center" :style="complianceBannerStyle">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          <view class="flex-1 min-w-0" style="margin-left: 10px; font-size: 11.5px; line-height: 1.375">
+          <view class="flex-1 min-w-0" style="margin-left: 10px; font-size: 12px; line-height: 1.375">
             <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">{{ t.topupChrome.complianceCheck }}</text>
             <text style="color: var(--v5-ink-3); margin-left: 6px">· Powered by Chainalysis KYT · MiCA-aligned</text>
           </view>
@@ -43,7 +43,7 @@
               <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
               <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.usdtLocked }}</text>
             </view>
-            <text class="block" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
+            <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
           </view>
 
           <!-- Network picker — control rows keep their tint; card shell dropped. -->
@@ -60,7 +60,7 @@
                 <view v-if="network === c.id" style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand)" />
               </view>
               <view class="flex-1" style="margin-left: 12px">
-                <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
+                <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
                 <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }}</text>
               </view>
             </view>
@@ -73,7 +73,7 @@
                 <text>{{ t.kycExpress.flow.generateAddressCta }}</text>
               </view>
             </view>
-            <text class="block text-center" style="margin-top: 8px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">Per MiCA Art. 22 · FATF Travel Rule · US FinCEN Rule 314(b)</text>
+            <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Per MiCA Art. 22 · FATF Travel Rule · US FinCEN Rule 314(b)</text>
           </view>
         </view>
 
@@ -81,14 +81,14 @@
         <view v-else-if="kycPhase === 'awaiting'" class="mx-4 nx-step-in" :style="openBlockStyle">
           <view class="flex items-center justify-between">
             <text class="font-mono-tabular" :style="metaLabelStyle">Send $1.00 via {{ network }}</text>
-            <text class="tabular-nums" style="font-size: 11px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
+            <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
           </view>
 
           <!-- QR placeholder -->
           <view :style="qrBoxStyle">
             <view :style="qrInnerStyle" />
           </view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">{{ t.topupChrome.scanWithWallet }}</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanWithWallet }}</text>
 
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); word-break: break-all">{{ depositAddress }}</text>
@@ -106,14 +106,14 @@
           <view class="flex items-center rounded-xl" :style="awaitingBarStyle">
             <view :style="miniSpinnerStyle" />
             <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">{{ t.topupChrome.awaitingOnChain }}</text>
-            <text style="font-size: 10.5px; color: var(--v5-ink-4)">{{ t.topupChrome.autoDetect }}</text>
+            <text style="font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.autoDetect }}</text>
           </view>
 
           <view class="nx-kyc-payment-sent-cta w-full grid place-items-center active:opacity-80" :style="markSentBtnStyle" @click="kycPhase = 'verifying'">
             <text>{{ t.kycExpress.flow.paymentSentCta }}</text>
           </view>
 
-          <text class="block" style="margin-top: 12px; font-size: 10.5px; color: var(--v5-ink-4); line-height: 1.4">Address valid for 30 minutes. Only send {{ network }} to this address — cross-chain transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Address valid for 30 minutes. Only send {{ network }} to this address — cross-chain transfers cannot be recovered.</text>
         </view>
 
         <!-- verifying -->
@@ -122,7 +122,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             <text>Payment received from <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
           </view>
-          <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · sender wallet</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · sender wallet</text>
 
           <view style="margin-top: 20px" class="space-y-3">
             <VerifyRow :step="1" :label="t.wallet.verifyReceiving" :done="step1Done" />
@@ -169,7 +169,7 @@
             @click="selected = c.id"
           >
             <view class="flex-1">
-              <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
+              <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }} · Min {{ c.min }}</text>
             </view>
             <text style="color: var(--v5-brand); font-size: 12px">{{ t.topupChrome.use }} →</text>
@@ -186,7 +186,7 @@
             <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">{{ t.topupChrome.change }}</text>
           </view>
           <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text>
+          <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text>
           <view class="flex items-center rounded-xl" :style="addressRowStyle">
             <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ DEMO_ADDRESS }}</text>
             <view class="nx-topup-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyDemoAddress">
@@ -198,7 +198,7 @@
             <view :style="miniSpinnerStyle" />
             <text>{{ t.topupChrome.awaitingConfirm }}</text>
           </view>
-          <text class="block" style="margin-top: 16px; font-size: 11.5px; color: var(--v5-ink-4); line-height: 1.4">Address expires in 30:00 minutes. Send only the selected asset to this address — wrong-asset transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Address expires in 30:00 minutes. Send only the selected asset to this address — wrong-asset transfers cannot be recovered.</text>
         </view>
       </template>
     </view>
@@ -420,7 +420,7 @@ const openBlockStyle: CSSProperties = {
 };
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",

@@ -113,7 +113,7 @@ function goBack() {
 }
 
 const monoFamily = "var(--font-jet-mono), ui-monospace, monospace";
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
 const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const introMuted: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
@@ -127,7 +127,7 @@ const exampleBoxStyle: CSSProperties = {
 };
 const scenarioStyle: CSSProperties = {
   fontFamily: monoFamily,
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -154,7 +154,7 @@ const exUnlockRowStyle: CSSProperties = {
 };
 const exUnlockLabelStyle: CSSProperties = {
   fontFamily: monoFamily,
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",

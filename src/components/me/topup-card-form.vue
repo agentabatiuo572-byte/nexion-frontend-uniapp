@@ -10,7 +10,7 @@
   <view class="mx-4 space-y-3">
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
-      <text class="font-mono-tabular" style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
+      <text class="font-mono-tabular" style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
       <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">{{ t.topupChrome.change }}</text>
     </view>
 
@@ -32,7 +32,7 @@
       </view>
       <text class="block" :style="successTitleStyle">{{ t.topupChrome.paySuccess }}</text>
       <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">${{ usdtAmount.toFixed(2) }} USDT credited to your wallet</text>
-      <text class="block font-mono-tabular" style="margin-top: 12px; font-size: 11px; color: var(--v5-ink-4)">{{ receiptLine }}</text>
+      <text class="block font-mono-tabular" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4)">{{ receiptLine }}</text>
       <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet">Back to wallet</view>
     </view>
 
@@ -41,7 +41,7 @@
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
       <text class="block" :style="failTitleStyle">{{ t.topupChrome.payDeclined }}</text>
       <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ t.topupChrome.payDeclinedReason }}</text>
-      <text class="block" style="margin-top: 4px; font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">Contact your card issuer or try a different card. No charge was made.</text>
+      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">Contact your card issuer or try a different card. No charge was made.</text>
       <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'">Try again</view>
     </view>
 
@@ -49,15 +49,15 @@
     <template v-else>
       <!-- Amount preview — keeps its surface (input zone), border dropped -->
       <view class="rounded-2xl" :style="amountCardStyle">
-        <text class="block font-mono-tabular" style="font-size: 11px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ t.topupChrome.youReceive }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ t.topupChrome.youReceive }}</text>
         <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
           <text style="font-family: var(--font-v5); font-size: 14px; color: var(--v5-ink-3)">$</text>
           <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" @input="onAmount" />
           <text class="font-mono-tabular" style="font-size: 14px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
-          <text style="font-size: 11px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
-          <text class="text-right" style="font-size: 11px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }} </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
+          <text class="text-right" style="font-size: 12px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }} </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
         </view>
       </view>
 
@@ -110,7 +110,7 @@
       <!-- Trust footer -->
       <view class="flex items-start" :style="trustFootStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 8px; font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). NexGrid never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
+        <text style="margin-left: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). NexGrid never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
       </view>
     </template>
   </view>
@@ -258,7 +258,7 @@ const centerTitleStyle: CSSProperties = {
 };
 const centerBodyStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   maxWidth: "280px",
@@ -270,7 +270,7 @@ const pciChipStyle: CSSProperties = {
   padding: "4px 10px",
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const successIconStyle: CSSProperties = {
@@ -286,7 +286,7 @@ const successTitleStyle: CSSProperties = {
   marginTop: "14px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
@@ -336,7 +336,7 @@ const amountInputStyle: CSSProperties = {
   background: "transparent",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "30px",
+  fontSize: "34px",
   letterSpacing: "-0.022em",
   color: "var(--v5-ink)",
 };
@@ -356,7 +356,7 @@ const fieldStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
 };
 const fieldLabelStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",

@@ -250,7 +250,7 @@ const trialIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 18%, transparent)",
 };
 const trialTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
-const trialBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
+const trialBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
 // floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the
@@ -269,17 +269,17 @@ const formHeadIconStyle: CSSProperties = {
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)",
 };
-const formHeadTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const formHeadNoteStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const formHeadTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const formHeadNoteStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const brandChipStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-2)",
   background: "var(--v5-surface-2)",
   borderRadius: "6px",
   padding: "4px 8px",
 };
 const formFieldsStyle: CSSProperties = { padding: "16px 2px 0" };
-const labelStyle: CSSProperties = { marginBottom: "4px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const labelStyle: CSSProperties = { marginBottom: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const inputStyle: CSSProperties = {
   // uni <input> renders taller than a native one — pin a fixed 40px box (=
   // prototype px-3 py-2.5 ≈ 40px) with horizontal-only padding + vertical
@@ -291,13 +291,13 @@ const inputStyle: CSSProperties = {
   borderRadius: "8px",
   padding: "0 12px",
   marginBottom: "12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
 };
 const checkboxLabelStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)" };
 const checkboxStateStyle = computed<CSSProperties>(() => ({
   marginLeft: "auto",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
   color: setAsDefault.value ? "var(--v5-brand)" : "var(--v5-ink-4)",
 }));
@@ -308,9 +308,9 @@ const submitStyle = computed<CSSProperties>(() => ({
   background: canSubmit.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
 }));
 const submitTextStyle = computed<CSSProperties>(() => ({
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: canSubmit.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
-const disclaimerStyle: CSSProperties = { marginTop: "12px", padding: "0 4px", fontSize: "11.5px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
+const disclaimerStyle: CSSProperties = { marginTop: "12px", padding: "0 4px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625 };
 </script>

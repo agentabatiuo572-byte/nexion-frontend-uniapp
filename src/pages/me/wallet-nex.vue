@@ -270,7 +270,7 @@ const heroStyle: CSSProperties = {
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-brand-2)",
@@ -278,7 +278,7 @@ const heroLabelStyle: CSSProperties = {
 const heroNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "30px",
+  fontSize: "34px",
   letterSpacing: "-0.022em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -286,7 +286,7 @@ const heroNumStyle: CSSProperties = {
 const heroUnitStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
@@ -299,7 +299,7 @@ const heroUsdStyle: CSSProperties = {
 const heroChangeStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
@@ -316,7 +316,7 @@ const viewMarketStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.04em",
   color: "var(--v5-brand-2)",
@@ -341,7 +341,7 @@ function quickIconStyle(tint: string): CSSProperties {
 }
 const quickLabelStyle: CSSProperties = {
   marginTop: "6px",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
   color: "var(--v5-ink-2)",
 };
@@ -352,7 +352,7 @@ const cardStyle: CSSProperties = {
 };
 const cardLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -375,7 +375,7 @@ function breakdownIconStyle(tint: string): CSSProperties {
   };
 }
 const breakdownLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
-const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const breakdownValueStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const pnlValueStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -385,7 +385,7 @@ const pnlValueStyle = computed<CSSProperties>(() => ({
 }));
 const pnlCellLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.04em",
   color: "var(--v5-ink-4)",
@@ -405,7 +405,7 @@ const useTileLabelStyle: CSSProperties = {
   letterSpacing: "-0.008em",
   color: "var(--v5-ink)",
 };
-const useTileSubStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
+const useTileSubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
 // De-carded activity — header + hairline row group on the page floor.
 const activityWrapStyle: CSSProperties = { marginTop: "12px" };
 const activityHeadStyle: CSSProperties = { padding: "0 2px 8px" };
@@ -415,7 +415,7 @@ const viewAllStyle: CSSProperties = {
   margin: "-12px -2px -12px 0",
   padding: "0 10px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
   gap: "2px",
 };
@@ -439,7 +439,7 @@ const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSi
 const activityTimeStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const activityNexStyle: CSSProperties = {
@@ -450,12 +450,12 @@ const activityNexStyle: CSSProperties = {
 };
 const activityUsdStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const noteStyle: CSSProperties = {
   paddingTop: "4px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   textAlign: "center",

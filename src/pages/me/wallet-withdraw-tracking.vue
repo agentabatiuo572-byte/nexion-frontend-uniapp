@@ -157,14 +157,14 @@ const emptyLinkStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-bra
 // De-carded amount hero — left-aligned on the page floor (2px optical inset);
 // no surface/border, and the floor glow + dot-grid element are deleted outright.
 const heroStyle: CSSProperties = { padding: "0 2px" };
-const amountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
-const amountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "30px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "4px", fontVariantNumeric: "tabular-nums" };
+const amountLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
+const amountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "34px", fontWeight: 600, color: "var(--v5-ink)", marginTop: "4px", fontVariantNumeric: "tabular-nums" };
 const viaStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px" };
-const addrStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)", marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", wordBreak: "break-all" };
+const addrStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", wordBreak: "break-all" };
 // De-carded — the stepper structure is kept; a hairline opens the group and
 // content sits at the 2px optical inset (no surface/border).
 const stepperStyle: CSSProperties = { padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
-const progressLabelStyle: CSSProperties = { marginBottom: "14px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
+const progressLabelStyle: CSSProperties = { marginBottom: "14px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
 function stepLiStyle(last: boolean): CSSProperties {
   return { gap: "12px", paddingBottom: last ? "0" : "20px" };
 }
@@ -181,10 +181,10 @@ function connectorStyle(done: boolean): CSSProperties {
 const doneIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
 const currentIconStyle: CSSProperties = { width: "24px", height: "24px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
 function stepLabelStyle(pending: boolean): CSSProperties {
-  return { fontSize: "13.5px", fontWeight: 500, color: pending ? "var(--v5-ink-4)" : "var(--v5-ink)" };
+  return { fontSize: "13px", fontWeight: 500, color: pending ? "var(--v5-ink-4)" : "var(--v5-ink)" };
 }
 const stepHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const stepTimeStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "11.5px", color: "var(--v5-ink-4)", marginTop: "2px", fontVariantNumeric: "tabular-nums" };
+const stepTimeStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px", fontVariantNumeric: "tabular-nums" };
 // Normal ETA — floor note; a hairline opens it (no surface/border).
 const etaCardStyle: CSSProperties = { gap: "12px", padding: "8px 2px 0", borderTop: "1px solid var(--v5-border)" };
 // Frozen/held ETA — danger accent callout (tint + border: the whitelisted
@@ -198,13 +198,13 @@ const etaFrozenCardStyle: CSSProperties = {
 };
 const etaTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const reasonLineStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
+const reasonLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const backBtnStyle: CSSProperties = {
   width: "100%",
   height: "44px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-ink)",
   transition: "opacity 150ms ease",

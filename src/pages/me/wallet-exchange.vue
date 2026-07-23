@@ -49,7 +49,7 @@
           <text class="shrink-0" style="font-size: 14px; color: var(--v5-ink-3)">{{ fromSym }}</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
-          <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ minLabel }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
           <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" @click="setMax">
             <text style="color: var(--v5-brand)">{{ fromSym }} </text>
             <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
@@ -73,15 +73,15 @@
           <text class="shrink-0" style="font-size: 14px; color: var(--v5-ink-3)">{{ toSym }}</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
-          <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ rateLabel }}</text>
-          <text class="tabular-nums" style="font-size: 11.5px; color: var(--v5-ink-4)">{{ updatedLabel }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-4)">{{ rateLabel }}</text>
+          <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ updatedLabel }}</text>
         </view>
       </view>
 
       <!-- Fee -->
       <view class="flex items-center justify-between" :style="feeRowStyle">
-        <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.exchange.feeLabel }}</text>
-        <text style="font-size: 11.5px; color: var(--v5-brand)">{{ t.exchange.feeFree }}</text>
+        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.feeLabel }}</text>
+        <text style="font-size: 12px; color: var(--v5-brand)">{{ t.exchange.feeFree }}</text>
       </view>
 
       <!-- Error -->
@@ -107,14 +107,14 @@
       <view :style="dashStyle">
         <view class="flex items-center justify-between" style="margin-bottom: 12px">
           <text :style="dashTitleStyle">{{ t.exchange.capsLabel }}</text>
-          <text class="font-mono-tabular" style="font-size: 10px; color: var(--v5-ink-3)">{{ t.exchange.capsReset }}</text>
+          <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.exchange.capsReset }}</text>
         </view>
 
         <!-- Per-user cap -->
         <view style="margin-bottom: 12px">
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
-            <text style="font-size: 11.5px; color: var(--v5-ink-2)">{{ t.exchange.yourDaily }}</text>
-            <view class="font-mono-tabular tabular-nums" style="font-size: 11.5px; color: var(--v5-ink)">
+            <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.exchange.yourDaily }}</text>
+            <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
               <text>${{ v3.todayUserUsedUSD.toFixed(2) }} </text>
               <text style="color: var(--v5-ink-3)">/ ${{ USER_DAILY_CAP_USD }}</text>
             </view>
@@ -127,8 +127,8 @@
         <!-- Platform cap -->
         <view style="margin-bottom: 12px">
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
-            <text style="font-size: 11.5px; color: var(--v5-ink-2)">{{ t.walletV3.exchangePoolToday }}</text>
-            <view class="font-mono-tabular tabular-nums" style="font-size: 11.5px; color: var(--v5-ink)">
+            <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.exchangePoolToday }}</text>
+            <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
               <text>${{ (v3.todayPlatformUsedUSD / 1000).toFixed(1) }}K </text>
               <text style="color: var(--v5-ink-3)">/ ${{ (PLATFORM_DAILY_CAP_USD / 1000).toFixed(0) }}K</text>
             </view>
@@ -142,13 +142,13 @@
         <view class="flex items-center" :style="kycRowStyle">
           <template v-if="v3.kycVerified">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-            <text style="margin-left: 8px; font-size: 11px; color: var(--v5-success); font-weight: 500">{{ t.exchange.kycVerified }}</text>
+            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-success); font-weight: 500">{{ t.exchange.kycVerified }}</text>
           </template>
           <template v-else>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-            <text style="margin-left: 8px; font-size: 11px; color: var(--v5-warning)">{{ kycUnverifiedLabel }}</text>
+            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-warning)">{{ kycUnverifiedLabel }}</text>
           </template>
-          <text class="font-mono-tabular" style="margin-left: auto; font-size: 10px; color: var(--v5-ink-3)">{{ lifetimeLabel }}</text>
+          <text class="font-mono-tabular" style="margin-left: auto; font-size: 12px; color: var(--v5-ink-3)">{{ lifetimeLabel }}</text>
         </view>
 
         <!-- Queue -->
@@ -158,8 +158,8 @@
             <text style="margin-left: 6px">{{ queuedLabel }}</text>
           </view>
           <view v-for="q in v3.queue.slice(0, 3)" :key="q.id" class="flex items-center justify-between" style="padding: 4px 0">
-            <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
-            <text class="font-mono-tabular tabular-nums" style="font-size: 11px; color: var(--v5-ink)">${{ q.amountUSD.toFixed(2) }}</text>
+            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
+            <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">${{ q.amountUSD.toFixed(2) }}</text>
           </view>
         </view>
       </view>
@@ -444,7 +444,7 @@ const swapCardStyle: CSSProperties = {
 };
 const cardLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -467,7 +467,7 @@ const maxBtnStyle: CSSProperties = {
   margin: "-12px -8px -12px 0",
   padding: "0 10px",
   borderRadius: "6px",
-  fontSize: "11.5px",
+  fontSize: "12px",
 };
 const flipBtnStyle: CSSProperties = {
   width: "44px",
@@ -481,7 +481,7 @@ const errorStyle: CSSProperties = {
   padding: "8px 12px",
   borderRadius: "8px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
 };
 const confirmStyle = computed<CSSProperties>(() => ({
@@ -490,7 +490,7 @@ const confirmStyle = computed<CSSProperties>(() => ({
   background: valid.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
 }));
 const confirmTextStyle = computed<CSSProperties>(() => ({
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: valid.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
@@ -499,7 +499,7 @@ const infoStyle: CSSProperties = {
   padding: "10px 12px",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "color-mix(in srgb, var(--v5-brand-2) 90%, transparent)",
   lineHeight: 1.625,
 };
@@ -511,7 +511,7 @@ const dashStyle: CSSProperties = {
 };
 const dashTitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -551,7 +551,7 @@ const queueWrapStyle: CSSProperties = {
 const queueTitleStyle: CSSProperties = {
   marginBottom: "6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-warning)",
@@ -597,5 +597,5 @@ const historyMainStyle: CSSProperties = {
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
-const historySubStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
+const historySubStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 </script>
