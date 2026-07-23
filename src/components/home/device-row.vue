@@ -23,7 +23,7 @@
            两态的状态词都进 aria-label。紧凑行里只标异常,不挤占设备名空间。 -->
       <text v-if="!isOnline" class="shrink-0" style="font-size: 12px; line-height: 16px; color: var(--v5-ink-3)">{{ t.earn.offline }}</text>
     </view>
-    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-success); margin-left: 12px">+${{ todayText }}</text>
+    <text class="font-mono-tabular tabular-nums shrink-0" style="font-family: var(--font-v5); font-weight: 500; font-size: 15px; color: var(--v5-success-ink); margin-left: 12px">+${{ todayText }}</text>
   </view>
 </template>
 

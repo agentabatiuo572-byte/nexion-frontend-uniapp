@@ -147,7 +147,7 @@ const eyebrowStyle: CSSProperties = {
 const leftChipStyle: CSSProperties = {
   flexShrink: 0,
   fontSize: "12px",
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
   padding: "3px 9px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-warning) 12%, transparent)",

@@ -245,7 +245,6 @@ function onUse(v: VoucherDef) {
   border-radius: 16px;
   padding: 14px;
   background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2));
-  border: 1px solid color-mix(in srgb, var(--v5-brand) 26%, transparent);
 }
 .vcs-card-l {
   flex-shrink: 0;

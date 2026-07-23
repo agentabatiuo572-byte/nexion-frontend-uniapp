@@ -19,7 +19,7 @@
           <text
             v-if="tier.you"
             class="font-mono-tabular"
-            style="font-size: 12px; color: var(--v5-brand-2); margin-left: 4px; opacity: 0.7"
+            style="font-size: 12px; color: var(--v5-brand-2-ink); margin-left: 4px; opacity: 0.7"
           >{{ t.store.ladderYou }}</text>
         </view>
         <view class="relative overflow-hidden" style="height: 5px; background: var(--v5-surface-3); border-radius: 2.5px">

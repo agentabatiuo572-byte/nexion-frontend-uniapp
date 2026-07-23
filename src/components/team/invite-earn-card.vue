@@ -28,7 +28,7 @@
     <!-- Limited-time promo chip -->
     <!-- 《02》§7:促销 callout 整句(6-7 词)禁 Mono,chip 限 <5 词 -->
     <view v-if="hasPromo" class="relative inline-flex items-center" :style="promoChipStyle">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>
       <text>{{ promoChipText }}</text>
     </view>
 
@@ -46,15 +46,15 @@
         <!-- Cumulative earned pill -->
         <view class="inline-flex items-center" :style="earnedPillStyle">
           <text>💎</text>
-          <text v-if="lifetimeEarned > 0" class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan)', fontWeight: 600 }">+${{ lifetimeEarned.toFixed(2) }}</text>
-          <text v-else :style="{ color: 'var(--v5-tech-cyan)' }">{{ t.team.beTheFirst }}</text>
+          <text v-if="lifetimeEarned > 0" class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan-ink)', fontWeight: 600 }">+${{ lifetimeEarned.toFixed(2) }}</text>
+          <text v-else :style="{ color: 'var(--v5-tech-cyan-ink)' }">{{ t.team.beTheFirst }}</text>
         </view>
       </view>
 
       <!-- RIGHT — actions(码为空整列置灰,点击仍有 toast 反馈) -->
       <view class="flex flex-col shrink-0" :class="referralCode ? '' : 'opacity-50'" style="width: 158px; gap: 8px">
         <view class="rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(false)" @click="openPoster">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 14h3v3M21 21v.01M17 21h.01M21 17v.01" /></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ t.team.inviteSharePoster }}</text>
           <text :style="shareValStyle(false)">{{ t.team.inviteShareQR }}</text>
         </view>
@@ -64,7 +64,7 @@
           <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedCode)">{{ referralCode }}</text>
         </view>
         <view class="rounded-lg flex items-center active:opacity-90" :style="shareBtnStyle(copiedLink)" @click="copyLink">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><template v-if="copiedLink"><path d="M20 6 9 17l-5-5" /></template><template v-else><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" /></template></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><template v-if="copiedLink"><path d="M20 6 9 17l-5-5" /></template><template v-else><path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" /></template></svg>
           <text class="shrink-0" :style="shareLabelStyle">{{ copiedLink ? t.team.copied : t.team.inviteShareLink }}</text>
           <text class="font-mono-tabular tabular-nums" :style="shareValStyle(copiedLink)">{{ linkLabel }}</text>
         </view>
@@ -235,7 +235,7 @@ const promoChipStyle: CSSProperties = {
   padding: "2px 8px",
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   fontSize: "12px",
   zIndex: 1,
 };
@@ -259,7 +259,7 @@ const strikeStyle: CSSProperties = {
   textDecoration: "line-through",
   marginTop: "-4px",
 };
-const nexLineStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-tech-cyan)" };
+const nexLineStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-tech-cyan-ink)" };
 const cooldownStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.3 };
 const earnedPillStyle: CSSProperties = {
   marginTop: "auto",

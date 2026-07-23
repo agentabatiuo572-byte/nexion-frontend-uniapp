@@ -30,7 +30,7 @@
         <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-4); letter-spacing: 0.04em">{{ t.home.techTodaysEarnings }}</text>
         <text
           class="inline-flex items-center gap-1 font-mono-tabular"
-          style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
+          style="font-size: 12px; padding: 2px 7px; border-radius: 4px; background: var(--v5-tech-cyan-soft); color: var(--v5-tech-cyan-ink); font-weight: 500; letter-spacing: 0.04em; white-space: nowrap"
         >{{ t.home.techStreaming }}</text>
       </view>
 
@@ -43,7 +43,7 @@
       </view>
 
       <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
-      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success)">{{ t.home.techVsYesterday }}</text>
+      <text class="block mt-2 tabular-nums" style="font-size: 12px; line-height: 16px; color: var(--v5-success-ink)">{{ t.home.techVsYesterday }}</text>
     </view>
   </view>
 </template>
@@ -79,10 +79,10 @@ interface Dot {
   color: string;
 }
 const dots: Dot[] = [
-  { left: "12%", delay: 0, color: "var(--v5-tech-cyan)" },
+  { left: "12%", delay: 0, color: "var(--v5-tech-cyan-ink)" },
   { left: "32%", delay: 1.6, color: "var(--v5-brand)" },
-  { left: "54%", delay: 3.2, color: "var(--v5-brand-2)" },
-  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan)" },
+  { left: "54%", delay: 3.2, color: "var(--v5-brand-2-ink)" },
+  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan-ink)" },
   { left: "88%", delay: 6.4, color: "var(--v5-brand)" },
 ];
 function dotStyle(d: Dot): CSSProperties {

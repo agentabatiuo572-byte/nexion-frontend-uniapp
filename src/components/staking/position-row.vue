@@ -101,7 +101,6 @@ function onTrack() {
 
 const cardStyle: CSSProperties = {
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "14px",
   padding: "14px",
 };

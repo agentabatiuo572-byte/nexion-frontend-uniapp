@@ -32,9 +32,9 @@ interface Ribbon {
   label: string;
   tone: "cyan" | "gold";
 }
+// 《03》§4:内嵌 chip 用 soft bg tint,禁加 border → C2 删 borderColor(已无消费者)
 interface TierTone {
   softBg: string;
-  borderColor: string;
   text: string;
 }
 
@@ -51,10 +51,10 @@ const props = defineProps<{
 const emit = defineEmits<{ open: [] }>();
 
 const TIER_TONES: Record<StakingTerm, TierTone> = {
-  30: { softBg: "var(--v5-success-soft)", borderColor: "color-mix(in srgb, var(--v5-success) 30%, transparent)", text: "var(--v5-success)" },
-  90: { softBg: "var(--v5-brand-soft)", borderColor: "var(--v5-brand-border)", text: "var(--v5-brand)" },
-  180: { softBg: "var(--v5-tech-cyan-soft)", borderColor: "var(--v5-tech-cyan-border)", text: "var(--v5-tech-cyan)" },
-  365: { softBg: "var(--v5-warning-soft)", borderColor: "color-mix(in srgb, var(--v5-warning) 30%, transparent)", text: "var(--v5-warning)" },
+  30: { softBg: "var(--v5-success-soft)", text: "var(--v5-success)" },
+  90: { softBg: "var(--v5-brand-soft)", text: "var(--v5-brand)" },
+  180: { softBg: "var(--v5-tech-cyan-soft)", text: "var(--v5-tech-cyan)" },
+  365: { softBg: "var(--v5-warning-soft)", text: "var(--v5-warning)" },
 };
 
 const tone = computed(() => TIER_TONES[props.term]);
@@ -73,7 +73,6 @@ const rowStyle = computed<CSSProperties>(() => ({
 const tierChipStyle = computed<CSSProperties>(() => ({
   padding: "4px 10px",
   background: tone.value.softBg,
-  border: `1px solid ${tone.value.borderColor}`,
   borderRadius: "999px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
@@ -100,7 +99,6 @@ const ribbonStyle = computed<CSSProperties>(() => ({
   padding: "2px 7px",
   borderRadius: "999px",
   background: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-soft)" : "var(--v5-warning-soft)",
-  border: `1px solid ${props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-border)" : "color-mix(in srgb, var(--v5-warning) 30%, transparent)"}`,
   color: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan)" : "var(--v5-warning)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "10.5px",

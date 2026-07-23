@@ -41,7 +41,7 @@
         >
           <svg
             width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
           >
             <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
             <path d="m3.3 7 8.7 5 8.7-5" />
@@ -53,7 +53,7 @@
             <text class="text-[13px] font-semibold text-[var(--v5-ink)] truncate">NexGridBox S1</text>
             <text
               class="shrink-0 text-[12px] font-mono-tabular rounded px-1.5 py-0.5"
-              style="background: color-mix(in oklab, var(--v5-brand-2) 16%, transparent); color: var(--v5-brand-2)"
+              style="background: color-mix(in oklab, var(--v5-brand-2) 16%, transparent); color: var(--v5-brand-2-ink)"
             >{{ t.trial.ghostBadge }}</text>
           </view>
           <text class="block text-[12px] mt-0.5" :style="{ color: tint }">{{ ribbon }}</text>
@@ -76,7 +76,7 @@
             class="font-mono-tabular tabular-nums"
             style="font-size: 34px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.02em; line-height: 1"
           >{{ shadowUSD.toFixed(2) }}</text>
-          <text class="font-mono-tabular text-[12px] ml-1" style="color: var(--v5-tech-cyan)">{{ shadowNexText }}</text>
+          <text class="font-mono-tabular text-[12px] ml-1" style="color: var(--v5-tech-cyan-ink)">{{ shadowNexText }}</text>
         </view>
       </view>
 
@@ -87,7 +87,7 @@
 
       <!-- Bottom row — early-buy savings (left) + de-emphasized buy pill (right) -->
       <view class="mt-3 flex items-center justify-between gap-2">
-        <text class="text-[12px] font-medium min-w-0 truncate" style="color: var(--v5-brand-2)">{{ discountText }}</text>
+        <text class="text-[12px] font-medium min-w-0 truncate" style="color: var(--v5-brand-2-ink)">{{ discountText }}</text>
         <view
           class="shrink-0 inline-flex items-center gap-1.5 rounded-full px-4 h-9 active:scale-[0.97] transition-transform"
           style="background: var(--v5-brand-soft); color: var(--v5-brand); font-family: var(--font-v5); font-weight: 600; font-size: 13px"

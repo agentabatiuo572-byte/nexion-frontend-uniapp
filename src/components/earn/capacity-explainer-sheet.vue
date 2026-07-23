@@ -17,7 +17,7 @@
 
       <view class="mt-4">
         <view class="flex items-center gap-1.5" :style="secTitleStyle">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
           <text>{{ t.earn.capExplainS1Title }}</text>
         </view>
         <view style="margin-top: 6px"><text :style="secBodyStyle">{{ t.earn.capExplainS1Body }}</text></view>

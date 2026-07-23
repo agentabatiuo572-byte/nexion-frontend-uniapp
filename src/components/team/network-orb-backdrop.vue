@@ -27,7 +27,7 @@
       <animateTransform attributeName="transform" type="rotate"
         :from="`0 ${CENTER} ${CENTER}`" :to="`360 ${CENTER} ${CENTER}`"
         dur="42s" repeatCount="indefinite" />
-      <circle :cx="CENTER" :cy="CENTER" :r="EXTENDED_RADIUS" fill="none" stroke="var(--v5-tech-cyan)" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="2 6" />
+      <circle :cx="CENTER" :cy="CENTER" :r="EXTENDED_RADIUS" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-opacity="0.18" stroke-width="0.8" stroke-dasharray="2 6" />
       <circle v-for="(d, i) in extendedDots" :key="`outer-${i}`" :cx="d.x" :cy="d.y" :r="d.r" fill="var(--v5-tech-cyan)" fill-opacity="0.85" />
     </g>
 

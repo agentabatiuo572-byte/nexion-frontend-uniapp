@@ -15,12 +15,12 @@
       <!-- Top row — Lock badge + identity + ETA chip -->
       <view class="flex items-start" style="gap: 12px">
         <view class="shrink-0 grid place-items-center relative" :style="lockBoxStyle">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <view aria-hidden :style="lockDotStyle" />
         </view>
         <view class="flex-1 min-w-0 active:opacity-70" role="button" tabindex="0" @click.stop="toggleDetails">
           <view class="flex items-center justify-between" style="gap: 8px">
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
+            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-brand-2-ink); font-weight: 600; letter-spacing: 0.04em">{{ t.store.comingSoonHeading }}</text>
             <view class="flex items-center shrink-0" style="gap: 6px">
               <text class="font-mono-tabular tabular-nums" :style="stageChipStyle">{{ stageText }}</text>
               <view class="grid place-items-center" :style="toggleStyle">
@@ -44,7 +44,7 @@
       <view v-if="detailsOpen && progress" class="mt-3.5 pt-3.5" style="border-top: 1px dashed var(--v5-border-strong)">
         <view class="flex items-center justify-between font-mono-tabular" style="font-size: 12px; margin-bottom: 6px">
           <text style="color: var(--v5-ink-3)">{{ t.store.lockedPhase }} <text class="tabular-nums" style="color: var(--v5-ink-2); font-weight: 600">{{ progress.current }}/{{ progress.total }}</text> · {{ t.store.lockedUnlockProgress }}</text>
-          <text class="tabular-nums" style="color: var(--v5-brand-2); font-weight: 600">{{ progress.pct }}%</text>
+          <text class="tabular-nums" style="color: var(--v5-brand-2-ink); font-weight: 600">{{ progress.pct }}%</text>
         </view>
         <view ref="barRef" class="overflow-hidden" style="height: 5px; border-radius: 3px; background: var(--v5-surface-3)">
           <view :style="barFillStyle" />
@@ -58,7 +58,7 @@
           <text>{{ t.store.lockedNotifyMe }}</text>
         </view>
         <view v-if="queue" class="shrink-0 text-right font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.3">
-          <text class="block tabular-nums" style="color: var(--v5-brand-2); font-weight: 600; font-size: 12px">{{ queueText }}</text>
+          <text class="block tabular-nums" style="color: var(--v5-brand-2-ink); font-weight: 600; font-size: 12px">{{ queueText }}</text>
           <text class="block">{{ t.store.lockedInQueue }}</text>
         </view>
       </view>
@@ -168,7 +168,7 @@ const stageChipStyle: CSSProperties = {
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   fontSize: "12px",
   fontWeight: 600,
 };
@@ -176,7 +176,7 @@ const toggleBaseStyle: CSSProperties = {
   width: "28px",
   height: "28px",
   borderRadius: "999px",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   background: "var(--v5-brand-2-soft)",
   transition: "transform 160ms ease",
 };

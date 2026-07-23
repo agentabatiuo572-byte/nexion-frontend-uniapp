@@ -54,11 +54,11 @@ function goOrders() {
 }
 
 const ORDER_STATUS_STYLE: Record<string, { color: string; bg: string; border: string }> = {
-  placed: { color: "var(--v5-brand-2)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
+  placed: { color: "var(--v5-brand-2-ink)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
   paid: { color: "var(--v5-brand)", bg: "var(--v5-brand-soft)", border: "var(--v5-brand-border)" },
-  provisioning: { color: "var(--v5-success)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
-  activated: { color: "var(--v5-success)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
-  cancelled: { color: "var(--v5-brand-2)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
+  provisioning: { color: "var(--v5-success-ink)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
+  activated: { color: "var(--v5-success-ink)", bg: "var(--v5-success-soft)", border: "color-mix(in srgb, var(--v5-success) 30%, transparent)" },
+  cancelled: { color: "var(--v5-brand-2-ink)", bg: "var(--v5-brand-2-soft)", border: "var(--v5-brand-2-border)" },
 };
 function statusPillStyle(status: string): CSSProperties {
   const s = ORDER_STATUS_STYLE[status] ?? ORDER_STATUS_STYLE.placed;

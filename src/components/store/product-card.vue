@@ -18,7 +18,7 @@
     <!-- ───── Hero photo banner ───── -->
     <view class="relative overflow-hidden" :style="renderWrapStyle">
       <!-- Cloud Share schematic -->
-      <view v-if="isShare" class="absolute inset-0 grid place-items-center" style="color: var(--v5-tech-cyan)">
+      <view v-if="isShare" class="absolute inset-0 grid place-items-center" style="color: var(--v5-tech-cyan-ink)">
         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></svg>
       </view>
       <!-- Real product photo -->
@@ -67,13 +67,13 @@
         <!-- Line 1: daily earn -->
         <view class="mt-1 flex items-baseline gap-2 flex-wrap">
           <text class="tabular-nums" :style="bigEarnStyle">${{ dailyEarnText }}<text style="font-size: 15px; color: var(--v5-ink-3); font-weight: 500">{{ t.store.cardPerDaySuffix }}</text></text>
-          <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-warning); font-weight: 500">{{ nexPerDayText }}</text>
+          <text class="font-mono-tabular tabular-nums" style="font-size: 13px; color: var(--v5-warning-ink); font-weight: 500">{{ nexPerDayText }}</text>
           <text v-if="stockLow" class="font-mono-tabular tabular-nums" :style="stockHintStyle">{{ stockHintText }}</text>
         </view>
 
         <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
         <view v-if="product.ai?.unlocks" class="mt-1.5 flex items-center gap-1.5">
-          <svg class="shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
+          <svg class="shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
           <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: product.ai.unlocks }) }}</text>
         </view>
 
@@ -96,7 +96,7 @@
 
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
-          <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success); font-weight: 500">{{ tradeCreditText }}</text></text>
+          <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
           <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
@@ -288,7 +288,7 @@ const tierChipStyle: CSSProperties = {
 const legacyChipStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 500,
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
   lineHeight: 1.4,
   background: "rgba(0,0,0,0.55)",
   padding: "3px 8px",
@@ -297,7 +297,7 @@ const legacyChipStyle: CSSProperties = {
 const cloudChipStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.22em",
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
   lineHeight: 1,
   background: "rgba(255,255,255,0.85)",
   padding: "5px 9px",
@@ -316,13 +316,13 @@ const earnEyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.08em",
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
 };
 const bigEarnStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "26px",
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
   letterSpacing: "-0.022em",
   lineHeight: 1,
 };
@@ -390,7 +390,7 @@ const gateToggleBaseStyle: CSSProperties = {
   width: "28px",
   height: "28px",
   borderRadius: "999px",
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   transition: "transform 160ms ease",
 };
@@ -401,7 +401,7 @@ const gateToggleStyle = computed<CSSProperties>(() => ({
 const gateEyebrowStyle: CSSProperties = {
   fontSize: "12px",
   fontWeight: 600,
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
   letterSpacing: "0.02em",
 };
 const gateCondStyle: CSSProperties = {

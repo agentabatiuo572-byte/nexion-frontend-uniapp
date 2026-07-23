@@ -16,6 +16,9 @@
  *   本门只问渲染结果:**这个元素既有可见填充、又有可见描边** → 就是违例,不管源码怎么写。
  *
  * 分级:full(≥3 边,是「盒子描边」)进硬门;partial(1-2 边,多为行分隔线)只列不拦。
+ * 🔴 描边不只写在 border:C2 独立验收抓出 `box-shadow: 0 0 0 Npx <color>` 的「环」与
+ *   `outline` 同样是描边的另一种写法(线上真有一处 live-feed-card),已一并纳入判据。
+ * 🔴 路由射程 = pages.json 全量(首版只取 10 条 = 11% 覆盖,被验收判为主要缺口)。
  * 豁免走 docs/ZERO-BORDER-ALLOWLIST.json(reason 必填);存量走棘轮基线,只拦新增。
  */
 import fs from "node:fs";
@@ -29,12 +32,13 @@ const BASELINE = path.join(ROOT, "docs/ZERO-BORDER-BASELINE.json");
 const ALLOWLIST = path.join(ROOT, "docs/ZERO-BORDER-ALLOWLIST.json");
 const BASE = process.env.BASE_URL || "http://localhost:5173";
 
-const ROUTES = [
-  "/pages/index/index", "/pages/earn/earn", "/pages/store/store",
-  "/pages/team/team", "/pages/me/me",
-  "/pages/staking/staking", "/pages/genesis/genesis", "/pages/daily/daily",
-  "/pages/me/wallet", "/pages/team/rank",
-];
+const ROUTES = (() => {
+  // 射程 = pages.json 全量(C2 验收:首版 10 条 = 11% 覆盖,漏掉 65 处违例)
+  const pj = JSON.parse(fs.readFileSync(path.join(ROOT, "src/pages.json"), "utf8"));
+  const out = (pj.pages ?? []).map((p) => "/" + p.path);
+  for (const g of pj.subPackages ?? []) for (const p of g.pages ?? []) out.push("/" + g.root + "/" + p.path);
+  return out;
+})();
 
 /* ── 判定纯函数(可离线红测) ── */
 export function parseColor(s) {
@@ -56,6 +60,30 @@ export function hasFill(cs) {
   const bi = cs.backgroundImage;
   if (bi && bi !== "none" && /gradient|url\(/.test(bi)) return true;
   return false;
+}
+
+/** box-shadow 的「0 0 0 Npx <color>」环 = 描边的另一种写法(spread ring) */
+export function shadowRing(boxShadow) {
+  if (!boxShadow || boxShadow === "none") return false;
+  // 不靠单条大正则(易被转义坑):按层拆开,取每层的 px 数列,判
+  // 「offset-x=0 且 offset-y=0 且 blur=0 且 spread>0」= 四面等宽的环 = 描边的另一种写法。
+  // 先把 rgb()/rgba()/color() 里的逗号屏蔽掉,再按逗号拆层(比一条带前瞻的大正则稳)
+  const masked = String(boxShadow).replace(/\b(?:rgba?|color|hsla?)\([^)]*\)/g, "C");
+  for (const layer of masked.split(",")) {
+    const nums = (layer.match(/-?[\d.]+px/g) || []).map((x) => parseFloat(x));
+    if (nums.length < 4) continue;
+    const [ox, oy, blur, spread] = nums;
+    if (ox === 0 && oy === 0 && blur === 0 && spread > 0) return true;
+  }
+  return false;
+}
+/** outline 也是描边 */
+export function hasOutline(cs) {
+  const w = parseFloat(cs.outlineWidth || "0");
+  const st = cs.outlineStyle;
+  if (!(w >= 0.5) || !st || st === "none") return false;
+  const c = parseColor(cs.outlineColor);
+  return !c || c[3] >= 0.05;
 }
 
 /** 可见描边的边数 */
@@ -81,9 +109,12 @@ export function isChrome(className, borderColorRaw) {
   return false;
 }
 
-export function judge({ fill, sides, chrome }) {
+export function judge({ fill, sides, chrome, dashed, isoRing, ring, outline }) {
   if (!fill || chrome) return null;
-  if (sides >= 3) return "full";
+  // 《03》§3 明写 border 的两个合法归属,判据来自规范不是为放行调参:
+  if (dashed) return null;   // empty-state 虚线(dashed/dotted 是空态惯用法,填充卡不会用虚线)
+  if (isoRing) return null;  // 「隔离描边环」:≤16px 的圆形元素用底色描边做分隔,是技法不是卡片描边
+  if (sides >= 3 || ring || outline) return "full";   // ring/outline 是四面环,等同 full
   if (sides >= 1) return "partial";
   return null;
 }
@@ -101,6 +132,8 @@ const PROBE = () => {
       w: Math.round(r.width), h: Math.round(r.height),
       bg: cs.backgroundColor, bgImg: cs.backgroundImage === "none" ? "" : cs.backgroundImage.slice(0, 60),
       radius: cs.borderTopLeftRadius,
+      shadow: cs.boxShadow === "none" ? "" : cs.boxShadow.slice(0, 120),
+      ow: cs.outlineWidth, os: cs.outlineStyle, oc: cs.outlineColor,
       bw: [cs.borderTopWidth, cs.borderRightWidth, cs.borderBottomWidth, cs.borderLeftWidth],
       bs: [cs.borderTopStyle, cs.borderRightStyle, cs.borderBottomStyle, cs.borderLeftStyle],
       bc: [cs.borderTopColor, cs.borderRightColor, cs.borderBottomColor, cs.borderLeftColor],
@@ -117,7 +150,11 @@ function evaluate(raw) {
     borderTopStyle: raw.bs[0], borderRightStyle: raw.bs[1], borderBottomStyle: raw.bs[2], borderLeftStyle: raw.bs[3],
     borderTopColor: raw.bc[0], borderRightColor: raw.bc[1], borderBottomColor: raw.bc[2], borderLeftColor: raw.bc[3],
   };
-  return judge({ fill: hasFill(cs), sides: borderSides(cs), chrome: isChrome(raw.cls, "") });
+  const dashed = raw.bs.some((x) => x === "dashed" || x === "dotted");
+  const isoRing = Math.max(raw.w, raw.h) <= 16 && /^(50%|999px|9999px)$/.test(String(raw.radius || ""));
+  const ring = shadowRing(raw.shadow || "");
+  const outline = hasOutline({ outlineWidth: raw.ow, outlineStyle: raw.os, outlineColor: raw.oc });
+  return judge({ fill: hasFill(cs), sides: borderSides(cs), chrome: isChrome(raw.cls, ""), dashed, isoRing, ring, outline });
 }
 
 async function sweep() {
@@ -183,6 +220,20 @@ function selftest() {
   p("阴性 tabbar 玻璃砖", null, J(mk("rgba(255,255,255,0.2)", ["1px", "1px", "1px", "1px"]), "nx-tabbar-pill"));
   p("阴性 header chrome", null, J(mk("rgba(0,0,0,0.55)", ["1px", "1px", "1px", "1px"]), "nx-header-bar"));
   p("阳性 普通卡不被 chrome 豁免误放", "full", J(mk("rgb(20,20,20)", ["1px", "1px", "1px", "1px"]), "vb-card"));
+
+  // 🔴 描边的另外两种写法(C2 独立验收抓出的假阴性)
+  p("阳性 box-shadow 0 0 0 1px 环", true, shadowRing("rgb(1,2,3) 0px 0px 0px 1px"));
+  p("阳性 box-shadow 0 0 0 0.5px 环(线上真实写法)", true, shadowRing("rgba(0,0,0,0.1) 0px 1px 2px 0px, rgb(229,223,208) 0px 0px 0px 0.5px"));
+  p("阴性 普通投影不算环", false, shadowRing("rgba(0,0,0,0.5) 0px 8px 24px 0px"));
+  p("阴性 none", false, shadowRing("none"));
+  p("阳性 outline 也算描边", true, hasOutline({ outlineWidth: "2px", outlineStyle: "solid", outlineColor: "rgb(1,2,3)" }));
+  p("阴性 outline:none", false, hasOutline({ outlineWidth: "0px", outlineStyle: "none", outlineColor: "rgb(1,2,3)" }));
+  p("阳性 填充 + ring(无 border)判 full", "full", judge({ fill: true, sides: 0, chrome: false, ring: true }));
+
+  // 规范自带的两条豁免(判据来自《03》§3,不是为放行调参)
+  p("阴性 填充 + dashed(empty-state 虚线)", null, judge({ fill: true, sides: 4, chrome: false, dashed: true }));
+  p("阴性 ≤16px 圆形隔离描边环", null, judge({ fill: true, sides: 4, chrome: false, isoRing: true }));
+  p("阳性 大圆形填充带边不被隔离环误放", "full", judge({ fill: true, sides: 4, chrome: false, isoRing: false }));
 
   // allowlist reason 必填
   const ex = fs.existsSync(ALLOWLIST) ? JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).exemptions ?? [] : [];

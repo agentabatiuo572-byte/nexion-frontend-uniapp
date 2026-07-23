@@ -462,8 +462,9 @@ const signOutStyle: CSSProperties = {
   marginTop: "24px",
   height: "44px",
   padding: "0 18px",
+  // 《03》§4 零 border。⚠️ 不要换成 --v5-danger-soft 底:danger 文字压在 danger-soft 上
+  // 亮主题实测 3.73:1 反而不达 AA(surface 底是 4.71)。零 border 已达成,底色不必动。
   background: "var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-danger) 25%, transparent)",
   color: "var(--v5-danger)",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",

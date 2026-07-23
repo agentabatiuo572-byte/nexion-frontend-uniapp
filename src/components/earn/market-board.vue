@@ -33,7 +33,7 @@
               <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
               <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ w.unit }}</text>
             </view>
-            <text v-if="w.flagship" class="block truncate" style="font-size: 12px; color: var(--v5-warning); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
+            <text v-if="w.flagship" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
           </view>
           <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">${{ formatPrice(w.price) }}</text>
           <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ arrow(w) }} {{ Math.abs(w.delta).toFixed(1) }}%</text>
@@ -55,10 +55,10 @@
         @click="d.kind ? goDetail(d.kind) : undefined"
       >
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning)">Best</text></text>
+          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">Best</text></text>
           <text v-if="d.bestFor" class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
         </view>
-        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
+        <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
         <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>

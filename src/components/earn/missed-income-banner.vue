@@ -19,16 +19,16 @@
 
       <!-- Header label -->
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6" /><path d="m22 17-8.5-8.5-5 5L2 7" /></svg>
-        <text style="color: var(--v5-brand-2)">{{ t.earn.missedToday }}</text>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6" /><path d="m22 17-8.5-8.5-5 5L2 7" /></svg>
+        <text style="color: var(--v5-brand-2-ink)">{{ t.earn.missedToday }}</text>
       </view>
 
       <!-- Big missed-today number -->
       <view class="relative mt-2 flex items-baseline gap-2">
         <view class="flex items-baseline">
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em; font-size: 34px; font-weight: 600">−</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2); opacity: 0.75">$</text>
-          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em; font-size: 34px; font-weight: 600">−</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); line-height: 1; font-size: 15px; font-weight: 500; color: var(--v5-brand-2-ink); opacity: 0.75">$</text>
+          <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 34px; font-weight: 600; line-height: 1; color: var(--v5-brand-2-ink); letter-spacing: -0.014em">{{ missedToday.toFixed(2) }}</text>
         </view>
         <text class="text-[12px]" style="color: var(--v5-ink-3); line-height: 1.2">{{ vsCeilingText }}</text>
       </view>
@@ -59,7 +59,7 @@
       <view class="relative mt-4 flex items-center justify-between gap-3">
         <view class="min-w-0" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.35">
           <text class="block">{{ t.earn.cumulativeMissed }}</text>
-          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
+          <text class="block tabular-nums" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-brand-2-ink); margin-top: 2px">−${{ cumulativeMissedRounded }}<text style="font-size: 12px; color: var(--v5-ink-4); margin-left: 6px; font-weight: 400">· {{ daysSinceJoin }}d</text></text>
         </view>
         <view class="shrink-0 inline-flex items-center gap-1.5 active:scale-[0.97]" :style="ctaStyle">
           <text :style="ctaLabelStyle">{{ t.earn.stopBleeding }}</text>
@@ -149,7 +149,7 @@ const labelStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   fontWeight: 500,
 };
 const ctaStyle: CSSProperties = {

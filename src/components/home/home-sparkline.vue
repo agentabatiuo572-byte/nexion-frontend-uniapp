@@ -15,7 +15,7 @@
 import { computed } from "vue";
 
 const props = withDefaults(defineProps<{ data: number[]; color?: string; height?: number; fill?: boolean }>(), {
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
   height: 22,
   fill: true,
 });

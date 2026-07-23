@@ -1690,6 +1690,27 @@ theme_constant_gate() {
 }
 theme_constant_gate
 
+# ── 零-border 铁律 · 运行时门(C2 批次 2026-07-23) ──
+# 《03》§3:带 bg 填充的卡片/板块一律零 border,border 只属透明容器(分组 hairline /
+# empty-state 虚线);§4:玻璃 chrome(TabBar/Header/浮层)不在此约束内。
+# 同样走运行时判(C1 教训:静态 grep 只能钉想到的写法);门内建 3 条规范自带豁免。
+zero_border_gate() {
+  if "$NODE_BIN" scripts/zero-border-gate.mjs --selftest > /tmp/uniapp-zero-border-selftest.log 2>&1; then
+    ok "zero-border selftest(双向红测:实底/tint/渐变+四边框阳性全中 + 透明底/虚线/chrome/隔离环全 0)"
+  else
+    bad "zero-border selftest 失败(node scripts/zero-border-gate.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-zero-border-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/zero-border-gate.mjs > /tmp/uniapp-zero-border.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-zero-border.log)"
+  else
+    bad "新增「有填充 + 四边描边」容器 — 《03》§3 层级靠 surface 微差色,不靠描边"
+    tail -10 /tmp/uniapp-zero-border.log | sed 's/^/        /'
+  fi
+}
+zero_border_gate
+
 # ── DOM-QA 体检哨兵(vibe-playbook P1-A 2026-07-22 主人批):5 探针事实层 ──
 # ① 横向溢出 ② 文字<10px(10-12 普查不 gate) ③ tap<44pt ④ img broken ⑤ 按钮无可达名。
 # 存量黄灯 = docs/DOM-QA-LEDGER.json;gate 只拦 ledger 外新指纹(新页/改动页硬门)。

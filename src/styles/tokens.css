@@ -192,6 +192,18 @@
   --v5-quest-violet-ink: #6E54D0;
   --v5-quest-ember-ink: #C93400;
 
+  /* 语义色的「文字档」(2026-07-23 B1,主人批「按建议做」;沿用 C1 的填充/文字分档模式)。
+     问题:亮主题下这 4 个语义色被直接当文字色使时,对最差背景(页面底 #F4F1E9)实测
+     tech-cyan 1.88 · brand-2 2.76 · warning 2.79 · success 3.73 —— 全不达 AA 4.5;
+     其中 warning 承载「设备今日收益」等核心数字。
+     解法与 C1 一致:**base 填充档不动**(视觉零变化、其上 on-* 前景关系不变),
+     另立文字档取同色相深色变体(二分压 HSL 明度,锁死色相与饱和度,色相偏移 ≤0.3°)。
+     暗主题在 dark 块沿用 base(暗底本就达标),故风险只落在亮主题。 */
+  --v5-warning-ink: #966411;    /* AA 4.51(base #C68316 = 2.79) */
+  --v5-success-ink: #0D7F42;    /* AA 4.50(base #0E8E4A = 3.73) */
+  --v5-tech-cyan-ink: #077A85;  /* AA 4.50(base #0CC4D6 = 1.88) */
+  --v5-brand-2-ink: #CD3600;    /* AA 4.51(base #FF5A1F = 2.76) */
+
   /* 创世节点「奢华金」子调色板(2026-07-23 C1,主人批「修」)。
      原为散落的 #D4AF5A / #F4E5C2 字面量,双主题恒定。在**固定曜石底**(genesis hero)上
      实测 8.76 / 14.62 达标,但落到**跟主题的**卡面/页面底时,亮主题实测:
@@ -367,6 +379,11 @@ html[data-theme="dark"] {
      -on-dark 两个是固定曜石底专用,不在此覆写(它们本就该恒定)。 */
   --v5-quest-violet-ink: #9B89E0;
   --v5-quest-ember-ink: #FF6B35;
+  /* 语义色文字档:暗主题沿用 base(暗底实测本就达标),保持视觉零变化 */
+  --v5-warning-ink: #FFCB4D;
+  --v5-success-ink: #9EDC1D;
+  --v5-tech-cyan-ink: #8E72FF;
+  --v5-brand-2-ink: #FF7A3D;
   --v5-genesis-gold: #D4AF5A;
   --v5-genesis-gold-hi: #F4E5C2;
 }
@@ -876,4 +893,18 @@ body {
     animation-delay: -1ms !important;
     transition-delay: 0s !important;
   }
+}
+
+/* ── 根字号锁定 —— 修「间距/圆角随视口等比拉伸」(2026-07-23 B1,主人批「按建议做」)──
+   现象:uni-app H5 运行时在 <html> 注入 `font-size: 16 × 视口宽/375`,而 UnoCSS 预设
+   刻度类(rounded-* / mt-* / gap-* / px-* 等 ~550 处)输出 rem → 全站间距圆角随视口
+   线性拉伸。实测 rounded-2xl:375px→16px · 390px→16.64px · 414px→17.664px。
+   后果:①《03》的 8pt grid 与圆角阶梯**只在 375 视口成立**(414 下 8pt 变 8.83pt)
+        ②同屏两套单位打架 —— inline 写的 16px 与工具类算出的 16.64px 并存(既有缺陷)。
+   前提(已证实):该 rem 基准服务的是 rpx 单位,而本项目 **rpx 用量 = 0**,纯属副作用;
+   字号不受影响(UnoCSS 字号任意值输出 px 字面量,全站仅 14 处)。
+   代价:非 375 视口下间距圆角收紧约 10% —— 即回到规范定义的值。
+   ⚠️ 用 !important 是必需的:uni 注入的是 <html> 的 **inline style**,优先级高于普通规则。 */
+html {
+  font-size: 16px !important;
 }

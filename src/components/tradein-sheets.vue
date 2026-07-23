@@ -176,7 +176,7 @@
       <!-- ─────────── 4. block — pending-task block ─────────── -->
       <template v-else-if="state.kind === 'block'">
         <view class="tis-block-head">
-          <svg class="tis-block-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <svg class="tis-block-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <view class="tis-block-meta">
             <text class="tis-title">{{ blockTitle }}</text>
             <text class="tis-block-warn">{{ state.origin === 'retire' ? t.tradein.retireBlockWarning : t.tradein.blockWarning }}</text>
@@ -853,7 +853,7 @@ function onForce() {
 .tis-warn-ghost-text {
   font-size: 13px;
   font-weight: 400;
-  color: var(--v5-warning);
+  color: var(--v5-warning-ink);
 }
 /* block sheet header */
 .tis-block-head {

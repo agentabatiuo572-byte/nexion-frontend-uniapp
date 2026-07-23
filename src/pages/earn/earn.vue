@@ -70,7 +70,7 @@
       <view class="mx-4 mb-2 rounded-xl active:opacity-90" style="background: var(--v5-tech-cyan-soft); padding: 9px 12px" @click="taskPoolOpen = !taskPoolOpen">
         <view class="flex items-center justify-between gap-2">
           <view class="flex items-center gap-1.5 min-w-0">
-            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
+            <svg class="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
             <text class="truncate" style="font-size: 12px; font-weight: 600; color: var(--v5-ink-2)">{{ t.earn.taskPoolLineTitle }}</text>
           </view>
           <svg class="shrink-0" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: taskPoolOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }"><path d="m6 9 6 6 6-6" /></svg>
@@ -161,10 +161,10 @@ const jobsText = computed(() => fmt(t.value.earn.jobsCount, { n: jobsCount.value
 
 // drifting hero dots
 const HERO_DOTS = [
-  { left: "12%", delay: 0, color: "var(--v5-tech-cyan)" },
+  { left: "12%", delay: 0, color: "var(--v5-tech-cyan-ink)" },
   { left: "32%", delay: 1.6, color: "var(--v5-brand)" },
-  { left: "54%", delay: 3.2, color: "var(--v5-brand-2)" },
-  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan)" },
+  { left: "54%", delay: 3.2, color: "var(--v5-brand-2-ink)" },
+  { left: "72%", delay: 4.8, color: "var(--v5-tech-cyan-ink)" },
   { left: "88%", delay: 6.4, color: "var(--v5-brand)" },
 ];
 

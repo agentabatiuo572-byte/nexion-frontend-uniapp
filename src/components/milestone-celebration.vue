@@ -236,7 +236,6 @@ onUnmounted(clearTimer);
   position: relative;
   width: 88%;
   max-width: 300px;
-  border: 1px solid var(--v5-border-strong);
   border-radius: 18px;
   padding: 20px;
   overflow: hidden;
@@ -302,7 +301,7 @@ onUnmounted(clearTimer);
 .ms-chip__label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--v5-tech-cyan);
+  color: var(--v5-tech-cyan-ink);
   font-variant-numeric: tabular-nums;
 }
 </style>

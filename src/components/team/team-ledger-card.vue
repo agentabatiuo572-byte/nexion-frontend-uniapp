@@ -90,7 +90,6 @@ const rootStyle: CSSProperties = {
   padding: "24px 22px",
   background:
     "radial-gradient(80% 70% at 92% 2%, color-mix(in srgb, var(--v5-tech-cyan) 13%, transparent) 0%, transparent 60%), radial-gradient(70% 70% at 0% 100%, color-mix(in srgb, var(--v5-brand) 12%, transparent) 0%, transparent 62%), var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)",
   borderRadius: "18px",
 };
 const ambientStyle: CSSProperties = {
@@ -145,7 +144,7 @@ const amountRowStyle: CSSProperties = {
 };
 const growthStyle: CSSProperties = {
   paddingBottom: "8px",
-  color: "var(--v5-success)",
+  color: "var(--v5-success-ink)",
   fontSize: "15px",
   fontWeight: 600,
 };

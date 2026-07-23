@@ -117,7 +117,7 @@ const amberTagStyle: CSSProperties = {
   padding: "2px 7px",
   borderRadius: "4px",
   background: "var(--v5-brand-2-soft)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   fontWeight: 500,
   letterSpacing: "0.04em",
   whiteSpace: "nowrap",

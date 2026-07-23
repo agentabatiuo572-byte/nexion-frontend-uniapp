@@ -19,14 +19,14 @@
 
           <template v-else-if="slot.kind === 'trial'">
             <view class="absolute inset-x-0 top-0 grid place-items-center" style="bottom: 13px">
-              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
                 <path d="m3.3 7 8.7 5 8.7-5" />
                 <path d="M12 22V12" />
               </svg>
             </view>
             <view aria-hidden class="absolute" :style="liveDotStyle('var(--v5-brand-2)')" />
-            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 12px; line-height: 13px; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2)">{{ t.trial.slotTag }}</text>
+            <text class="absolute inset-x-0 bottom-0 text-center font-mono-tabular" style="font-size: 12px; line-height: 13px; background: color-mix(in oklab, var(--v5-brand-2) 26%, transparent); color: var(--v5-brand-2-ink)">{{ t.trial.slotTag }}</text>
           </template>
 
           <template v-else>

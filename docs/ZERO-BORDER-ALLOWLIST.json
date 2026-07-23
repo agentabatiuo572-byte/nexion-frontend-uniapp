@@ -1,0 +1,5 @@
+{
+  "_doc": "零-border 门(scripts/zero-border-gate.mjs)的人工裁决豁免。门本身已内建三条**规范自带**的豁免(chrome 身份 / empty-state 虚线 / ≤16px 圆形隔离描边环),那三条不需要在此登记。此处只放规范之外、经回源判定的例外,reason 必填(selftest 校验)。",
+  "_updated": "2026-07-23 · C2 批次",
+  "exemptions": []
+}

@@ -24,7 +24,7 @@
           <text class="block font-display tabular-nums" :style="royaltyAmtStyle">${{ monthUSDT.toFixed(2) }}</text>
           <text class="block" :style="royaltySubStyle">{{ t.teamV3.royaltyHeroSubtitle }}</text>
           <view class="flex items-center justify-between" style="margin-top: 8px">
-            <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-tech-cyan)' }">+{{ monthNEX.toFixed(0) }} NEX</text>
+            <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-tech-cyan-ink)' }">+{{ monthNEX.toFixed(0) }} NEX</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
@@ -59,7 +59,7 @@
           <view class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.leaderboardCard.title }}</text>
@@ -96,7 +96,7 @@
           <view class="nx-team-binary-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/binary')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.todayMatch }}</text>
@@ -115,7 +115,7 @@
           <view class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-tech-cyan)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.weeklyPool }}</text>
@@ -147,7 +147,7 @@
           <view class="active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-warning-soft)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13z" /></svg>
               </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
@@ -157,7 +157,7 @@
           <view class="active:opacity-95" :style="toolCellStyle(1)" @click="go('/pages/team/agent')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-brand-2-soft)')">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
               </view>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10M7 17 17 7" /></svg>
             </view>
@@ -302,7 +302,6 @@ onUnmounted(() => {
 const royaltyHeroStyle: CSSProperties = {
   padding: "16px",
   background: "radial-gradient(80% 60% at 100% 0%, var(--v5-brand-soft) 0%, transparent 60%), var(--v5-surface)",
-  border: "1px solid var(--v5-brand-border)",
 };
 const royaltyCapStyle: CSSProperties = { gap: "6px", fontSize: "12px", color: "var(--v5-brand)", marginBottom: "8px" };
 const royaltyAmtStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
@@ -324,7 +323,7 @@ const rankHeaderStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
 };
-const rankTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
+const rankTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-tech-cyan-ink)" };
 const rankArrowStyle: CSSProperties = {
   width: "28px",
   height: "28px",
@@ -419,7 +418,7 @@ const quickRowValueWrapStyle: CSSProperties = {
   gap: "8px",
 };
 const quickRowValueStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)", whiteSpace: "nowrap" };
-const quickRowValueWarnStyle: CSSProperties = { ...quickRowValueStyle, color: "var(--v5-warning)" };
+const quickRowValueWarnStyle: CSSProperties = { ...quickRowValueStyle, color: "var(--v5-warning-ink)" };
 const quickDividerStyle: CSSProperties = {
   height: "1px",
   marginLeft: "62px",

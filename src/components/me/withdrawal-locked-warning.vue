@@ -61,7 +61,7 @@ const titleStyle: CSSProperties = {
   fontSize: "15px",
   fontWeight: 500,
   letterSpacing: "-0.01em",
-  color: "var(--v5-warning)",
+  color: "var(--v5-warning-ink)",
 };
 const bodyStyle: CSSProperties = {
   marginTop: "4px",

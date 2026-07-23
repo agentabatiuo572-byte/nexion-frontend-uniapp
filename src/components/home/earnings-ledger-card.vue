@@ -21,7 +21,7 @@
         <view class="min-w-0">
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink)">{{ r.model }}<text style="color: var(--v5-ink-3)"> · {{ r.who }}</text></text>
         </view>
-        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success); font-weight: 500">{{ r.amt }}</text>
+        <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ r.amt }}</text>
         <text class="font-mono-tabular text-right" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.t }}</text>
       </view>
     </view>

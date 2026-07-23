@@ -10,7 +10,7 @@
       <view class="absolute inset-0 pointer-events-none" :style="radialStyle" />
 
       <view class="relative flex items-center gap-1.5" :style="labelStyle">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
         <text>{{ w.label }}</text>
       </view>
 
@@ -91,7 +91,6 @@ const body = computed(() =>
 const rootStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "16px",
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 40%, transparent)",
   background:
     "linear-gradient(160deg, color-mix(in srgb, var(--v5-brand-2) 14%, transparent) 0%, var(--v5-surface) 70%)",
 };
@@ -106,7 +105,7 @@ const labelStyle: CSSProperties = {
   letterSpacing: "0.16em",
   textTransform: "uppercase",
   fontWeight: 500,
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
 };
 
 const ctaStyle: CSSProperties = {

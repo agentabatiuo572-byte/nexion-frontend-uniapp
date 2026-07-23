@@ -729,7 +729,6 @@ html[data-theme="dark"] .nx-logo-img--dark {
   height: 36px;
   border-radius: 999px;
   background: var(--v5-surface);
-  border: 1px solid var(--v5-border);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   display: grid;
   place-items: center;

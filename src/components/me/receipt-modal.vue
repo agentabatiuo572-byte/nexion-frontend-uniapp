@@ -59,7 +59,7 @@
         <!-- KYC compliance checklist -->
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
             <text style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 85%, transparent)">{{ chk }}</text>
             <text style="margin-left: auto; font-size: 12px; color: color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)">passed</text>
           </view>
@@ -355,7 +355,7 @@ const sectionHeadStyle: CSSProperties = {
   fontSize: "12px",
   letterSpacing: "0.16em",
   textTransform: "uppercase",
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
 };
 // Prototype Section uses `space-y-1` = 4px gap between rows. `padding: 2px 0`
 // on every row yields the same 4px inter-row spacing.

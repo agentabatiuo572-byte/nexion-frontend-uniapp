@@ -25,11 +25,11 @@
           <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.model }}</text>
           <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.name }} <text style="color: var(--v5-ink-4)">· {{ c.city }}</text></text>
         </view>
-        <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success); font-weight: 500">{{ gpusText(i) }}</text>
+        <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
       <view class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <text><text style="color: var(--v5-ink); font-weight: 500">28,432</text> {{ t.home.onGridOnline }}</text>
-        <text style="color: var(--v5-success); font-weight: 500">+$215/sec</text>
+        <text style="color: var(--v5-success-ink); font-weight: 500">+$215/sec</text>
       </view>
     </view>
   </view>
@@ -43,8 +43,8 @@ const t = useT();
 
 const GRID_CLIENTS = [
   { id: "P", name: "Pocket Studios", model: "SDXL Turbo", color: "var(--v5-brand)", city: "Berlin" },
-  { id: "H", name: "Helix Labs", model: "Llama 3.2 3B", color: "var(--v5-success)", city: "SF" },
-  { id: "E", name: "Echo Earbuds", model: "Whisper tiny", color: "var(--v5-tech-cyan)", city: "Tokyo" },
+  { id: "H", name: "Helix Labs", model: "Llama 3.2 3B", color: "var(--v5-success-ink)", city: "SF" },
+  { id: "E", name: "Echo Earbuds", model: "Whisper tiny", color: "var(--v5-tech-cyan-ink)", city: "Tokyo" },
 ];
 
 function gpusText(i: number) {

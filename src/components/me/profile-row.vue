@@ -15,11 +15,11 @@
       <text class="block truncate" :style="metaStyle">{{ phoneMask }} · US</text>
       <view class="flex items-center" style="gap: 6px; margin-top: 6px">
         <view v-if="kycVerified" class="inline-flex items-center" :style="kycVerifiedChipStyle">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           <text>{{ t.me.profileKycVerifiedChip }}</text>
         </view>
         <view v-else class="inline-flex items-center" :style="kycPendingChipStyle">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
           <text>{{ t.me.profileKycPendingChip }}</text>
         </view>
         <view class="inline-flex items-center" :style="joinedChipStyle">
@@ -96,12 +96,12 @@ const codeTagBase: CSSProperties = {
 const kycVerifiedChipStyle: CSSProperties = {
   ...codeTagBase,
   background: "var(--v5-success-soft)",
-  color: "var(--v5-success)",
+  color: "var(--v5-success-ink)",
 };
 const kycPendingChipStyle: CSSProperties = {
   ...codeTagBase,
   background: "var(--v5-brand-2-soft)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
 };
 const joinedChipStyle: CSSProperties = {
   ...codeTagBase,

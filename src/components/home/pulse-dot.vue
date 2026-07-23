@@ -11,7 +11,7 @@
 import { computed, type CSSProperties } from "vue";
 
 const props = withDefaults(defineProps<{ color?: string; size?: number }>(), {
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
   size: 6,
 });
 

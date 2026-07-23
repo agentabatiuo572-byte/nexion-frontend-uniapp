@@ -122,7 +122,6 @@ function onAmountInput(e: Event) {
 const cardStyle: CSSProperties = {
   padding: "18px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
   borderRadius: "16px",
 };
 const auroraStyle: CSSProperties = {

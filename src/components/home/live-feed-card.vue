@@ -57,7 +57,7 @@
           <view style="width: 5px; height: 5px; border-radius: 50%; background: var(--v5-success); flex-shrink: 0" />
           <text style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink)">{{ it.name }}</text>
           <text class="truncate flex-1" style="color: var(--v5-ink-3)">{{ boughtText(it) }}</text>
-          <text class="font-mono-tabular tabular-nums whitespace-nowrap" style="color: var(--v5-success); font-weight: 500">+${{ it.amount.toFixed(2) }}</text>
+          <text class="font-mono-tabular tabular-nums whitespace-nowrap" style="color: var(--v5-success-ink); font-weight: 500">+${{ it.amount.toFixed(2) }}</text>
         </view>
       </view>
     </view>
@@ -157,7 +157,8 @@ function tabStyle(id: "activity" | "earnings"): CSSProperties {
     padding: "0 12px",
     borderRadius: "12px",
     background: on ? "var(--v5-surface)" : "transparent",
-    boxShadow: on ? "0 1px 2px rgba(0,0,0,0.10), 0 0 0 0.5px var(--v5-border)" : "none",
+    // 《03》§3:实底元素零 border ——「0 0 0 Npx」的 box-shadow 环就是描边的另一种写法,同受约束(C2 验收抓出)
+    boxShadow: on ? "0 1px 2px rgba(0,0,0,0.10)" : "none",
   };
 }
 function whoBadgeStyle(r: FeedRow): CSSProperties {

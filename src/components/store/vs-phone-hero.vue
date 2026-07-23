@@ -68,7 +68,7 @@ const s1NumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
   fontSize: "20px",
-  color: "var(--v5-success)",
+  color: "var(--v5-success-ink)",
   letterSpacing: "-0.020em",
   lineHeight: 1,
 };
@@ -76,7 +76,7 @@ const s1NumStyle: CSSProperties = {
 const chipStyle: CSSProperties = {
   padding: "4px 10px",
   background: "color-mix(in srgb, var(--v5-brand-2) 12%, transparent)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,

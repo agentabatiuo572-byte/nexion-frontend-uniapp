@@ -267,21 +267,21 @@
         "fs": "16px",
         "overflowX": 4,
         "w": 44,
-        "text": "2"
+        "text": "1"
       },
       {
         "sel": "uni-page-body[0]>uni-view.nx-chassis[0]>uni-view[5]>uni-view.nx-nova-bubble.nova-float[0]",
         "fs": "16px",
         "overflowX": 3,
         "w": 48,
-        "text": "5"
+        "text": "4"
       },
       {
         "sel": "uni-view.nx-chassis[0]>uni-view[5]>uni-view.nx-nova-bubble.nova-float[0]>uni-view.nx-nova-btn.nova-pulse[0]",
         "fs": "16px",
         "overflowX": 4,
         "w": 48,
-        "text": "5"
+        "text": "4"
       }
     ]
   }

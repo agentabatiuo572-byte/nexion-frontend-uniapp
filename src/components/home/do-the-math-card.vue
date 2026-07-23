@@ -80,8 +80,8 @@ const headlineSegs = computed(() => {
   const tpl = t.value.home.doMathHeadline;
   const vars: Record<string, { text: string; color: string }> = {
     target: { text: promo.value.targetName, color: "var(--v5-ink)" },
-    mult: { text: `${promo.value.multiplier}×`, color: "var(--v5-success)" },
-    base: { text: baseShort.value, color: "var(--v5-brand-2)" },
+    mult: { text: `${promo.value.multiplier}×`, color: "var(--v5-success-ink)" },
+    base: { text: baseShort.value, color: "var(--v5-brand-2-ink)" },
   };
   const segs: { text: string; color?: string }[] = [];
   const re = /\{(\w+)\}/g;

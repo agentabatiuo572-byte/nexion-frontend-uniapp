@@ -206,7 +206,7 @@ const pendingStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
-  color: "var(--v5-success)",
+  color: "var(--v5-success-ink)",
   fontVariantNumeric: "tabular-nums",
 };
 const nexBlockStyle: CSSProperties = {
@@ -262,14 +262,14 @@ const slotPotentialStyle: CSSProperties = {
   fontSize: "20px",
   fontWeight: 600,
   letterSpacing: "-0.022em",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   lineHeight: 1,
 };
 const addDeviceBtnStyle: CSSProperties = {
   minHeight: "44px",
   padding: "11px 16px",
   background: "color-mix(in srgb, var(--v5-brand-2) 16%, transparent)",
-  color: "var(--v5-brand-2)",
+  color: "var(--v5-brand-2-ink)",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,

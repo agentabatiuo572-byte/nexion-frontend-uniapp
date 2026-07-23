@@ -29,7 +29,7 @@
         <!-- Unlocked banner -->
         <view v-if="gate.eligible" :style="unlockedBannerStyle">
           <view class="flex items-center" style="gap: 8px">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <view class="flex-1 min-w-0">
               <text class="block" :style="unlockedTitleStyle">{{ t.genesisEligibility.unlockedTitle }}</text>
               <text class="block" :style="unlockedSubStyle">{{ t.genesisEligibility.unlockedSub }}</text>
@@ -43,7 +43,7 @@
             <view class="flex items-center justify-between" style="gap: 10px">
               <text :style="condLabelStyle">{{ condLabel(c) }}</text>
               <view v-if="c.met" class="inline-flex items-center" style="gap: 4px; flex-shrink: 0">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 <text :style="metTextStyle">{{ t.genesisEligibility.metBadge }}</text>
               </view>
               <text
@@ -243,7 +243,7 @@ const condLabelStyle: CSSProperties = {
   color: "var(--v5-ink)",
   lineHeight: 1.3,
 };
-const metTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-success)", whiteSpace: "nowrap" };
+const metTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-success-ink)", whiteSpace: "nowrap" };
 const fixLinkStyle: CSSProperties = {
   flexShrink: 0,
   fontSize: "13px",

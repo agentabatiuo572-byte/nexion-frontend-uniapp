@@ -1,7 +1,7 @@
 <template>
   <view v-if="enabled" class="mx-4" :style="rootStyle" data-proof="compute-share-entry">
     <view :style="iconStyle">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <rect x="3" y="4" width="18" height="12" rx="2" />
         <path d="M8 21h8" />
         <path d="m12 16 1 5" />
@@ -15,7 +15,7 @@
     </view>
     <view class="active:opacity-85" :style="ctaStyle" @click="goDownload">
       <text>{{ t.computeShare.entryCta }}</text>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M5 12h14" />
         <path d="m12 5 7 7-7 7" />
       </svg>
@@ -50,7 +50,6 @@ const rootStyle: CSSProperties = {
   alignItems: "center",
   gap: "12px",
   marginTop: "12px",
-  border: "1px solid color-mix(in srgb, var(--v5-tech-cyan) 25%, transparent)",
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-tech-cyan) 8%, var(--v5-surface))",
   padding: "12px",
@@ -67,7 +66,7 @@ const iconStyle: CSSProperties = {
 const eyebrowStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
   letterSpacing: "0.06em",
 };
 const titleStyle: CSSProperties = {
@@ -92,7 +91,7 @@ const ctaStyle: CSSProperties = {
   padding: "0 10px",
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
-  color: "var(--v5-tech-cyan)",
+  color: "var(--v5-tech-cyan-ink)",
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   fontWeight: 600,
