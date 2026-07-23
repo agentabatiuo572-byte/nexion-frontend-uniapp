@@ -132,15 +132,15 @@
       <view class="mx-4 mt-4 space-y-1.5" style="padding: 0 2px">
         <view v-if="nexBurned > 0" class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeGrossLabel }}</text>
-          <text class="tabular-nums" :style="{ fontSize: '12.5px', color: 'var(--v5-ink-3)', textDecoration: 'line-through' }">${{ grossFee.toFixed(2) }}</text>
+          <text class="tabular-nums" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', textDecoration: 'line-through' }">${{ grossFee.toFixed(2) }}</text>
         </view>
         <view v-if="nexBurned > 0" class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-brand)">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="tabular-nums" style="font-size: 12.5px; color: var(--v5-brand)">−${{ feeWaived.toFixed(2) }} · {{ fmtNex(nexBurned) }} NEX</text>
+          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-brand)">−${{ feeWaived.toFixed(2) }} · {{ fmtNex(nexBurned) }} NEX</text>
         </view>
         <view class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.feeCharged }}</text>
-          <text class="tabular-nums" :style="{ fontSize: '12.5px', fontWeight: 600, color: fee > 0 ? 'var(--v5-ink)' : 'var(--v5-brand)' }">${{ fee.toFixed(2) }}</text>
+          <text class="tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: fee > 0 ? 'var(--v5-ink)' : 'var(--v5-brand)' }">${{ fee.toFixed(2) }}</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--v5-border)">
           <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.wallet.receiveLabel }}</text>
@@ -569,7 +569,7 @@ const metaLabelStyle: CSSProperties = {
 const amountInputStyle: CSSProperties = {
   background: "transparent",
   fontFamily: "var(--font-v5)",
-  fontSize: "28px",
+  fontSize: "26px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -662,7 +662,7 @@ const submitBtnStyle = computed<CSSProperties>(() => ({
   background: canSubmit.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: canSubmit.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 }));
 </script>

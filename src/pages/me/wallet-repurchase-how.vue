@@ -115,8 +115,8 @@ function goBack() {
 const monoFamily = "var(--font-jet-mono), ui-monospace, monospace";
 const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
-const introMuted: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
+const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const introMuted: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
 const exampleBoxStyle: CSSProperties = {
   padding: "14px",
   borderRadius: "12px",
@@ -132,7 +132,7 @@ const scenarioStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-const setupStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.55 };
+const setupStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.55 };
 const exRowsStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
@@ -141,7 +141,7 @@ const exRowsStyle: CSSProperties = {
   marginTop: "4px",
   borderTop: "1px solid var(--v5-border)",
   fontFamily: monoFamily,
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const exLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const exValInk: CSSProperties = { color: "var(--v5-ink)" };
@@ -175,7 +175,7 @@ const ctaStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
 };
 </script>

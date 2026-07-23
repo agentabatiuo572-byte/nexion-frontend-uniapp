@@ -46,7 +46,7 @@
             placeholder-style="color: var(--v5-ink-2)"
             @input="onInput"
           />
-          <text class="shrink-0" style="font-size: 14px; color: var(--v5-ink-3)">{{ fromSym }}</text>
+          <text class="shrink-0" style="font-size: 15px; color: var(--v5-ink-3)">{{ fromSym }}</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
@@ -70,7 +70,7 @@
         <text class="block" :style="cardLabelStyle">{{ t.exchange.receive }}</text>
         <view class="flex items-baseline" style="margin-top: 6px; gap: 4px">
           <text class="flex-1 min-w-0 tabular-nums truncate" :style="receiveValueStyle">{{ toAmountLabel }}</text>
-          <text class="shrink-0" style="font-size: 14px; color: var(--v5-ink-3)">{{ toSym }}</text>
+          <text class="shrink-0" style="font-size: 15px; color: var(--v5-ink-3)">{{ toSym }}</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-4)">{{ rateLabel }}</text>
@@ -452,13 +452,13 @@ const cardLabelStyle: CSSProperties = {
 const amountInputStyle: CSSProperties = {
   background: "transparent",
   fontFamily: "var(--font-v5)",
-  fontSize: "28px",
+  fontSize: "26px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const receiveValueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "28px",
+  fontSize: "26px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -593,7 +593,7 @@ const historyIconStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
 };
 const historyMainStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };

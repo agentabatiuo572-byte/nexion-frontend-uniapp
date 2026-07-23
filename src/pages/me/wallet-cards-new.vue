@@ -249,7 +249,7 @@ const trialIconStyle: CSSProperties = {
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-warning) 18%, transparent)",
 };
-const trialTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
+const trialTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
 const trialBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
@@ -294,7 +294,7 @@ const inputStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink)",
 };
-const checkboxLabelStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)" };
+const checkboxLabelStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
 const checkboxStateStyle = computed<CSSProperties>(() => ({
   marginLeft: "auto",
   fontSize: "12px",

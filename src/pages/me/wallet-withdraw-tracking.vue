@@ -152,8 +152,8 @@ function goWallet() {
   navTo("/me/wallet");
 }
 
-const emptyTextStyle: CSSProperties = { fontSize: "14px", color: "var(--v5-ink-2)" };
-const emptyLinkStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-brand)" };
+const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyLinkStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-brand)" };
 // De-carded amount hero — left-aligned on the page floor (2px optical inset);
 // no surface/border, and the floor glow + dot-grid element are deleted outright.
 const heroStyle: CSSProperties = { padding: "0 2px" };
@@ -196,7 +196,7 @@ const etaFrozenCardStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
   border: "1px solid color-mix(in srgb, var(--v5-danger) 30%, transparent)",
 };
-const etaTitleStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 500, color: "var(--v5-ink)" };
+const etaTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const reasonLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const backBtnStyle: CSSProperties = {

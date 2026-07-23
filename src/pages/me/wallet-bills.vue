@@ -197,7 +197,7 @@ function pillLabelStyle(tb: Tab): CSSProperties {
   const on = tab.value === tb;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

@@ -12,7 +12,10 @@ const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
 const args = process.argv.slice(2);
-const outPath = args[args.indexOf("--out") + 1];
+// 🔴 必须先 includes 再取:没传 --out 时 indexOf 返回 -1,args[-1+1] = args[0],
+// 于是 `--diff docs/X.json` 会把快照写进一个**名叫 `--diff` 的文件**(本轮在仓库根目录
+// 捡到两次这个垃圾文件,还误提交过一次)。相邻的 diffPath 那行本来就有这层保护,这行漏了。
+const outPath = args.includes("--out") ? args[args.indexOf("--out") + 1] : null;
 const diffPath = args.includes("--diff") ? args[args.indexOf("--diff") + 1] : null;
 const BASE = process.env.BASE_URL || "http://localhost:5173";
 // 五 tab 主链路(B1 范围)。扩批时在此追加。

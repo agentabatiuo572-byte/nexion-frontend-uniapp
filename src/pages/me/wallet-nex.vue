@@ -376,10 +376,10 @@ function breakdownIconStyle(tint: string): CSSProperties {
 }
 const breakdownLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink)" };
 const breakdownHintStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
-const breakdownValueStyle: CSSProperties = { fontSize: "12.5px", fontWeight: 600, color: "var(--v5-ink)" };
+const breakdownValueStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const pnlValueStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: pnl.value >= 0 ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
@@ -393,7 +393,7 @@ const pnlCellLabelStyle: CSSProperties = {
 const pnlCellValueStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
 };
 const useTileStyle: CSSProperties = { padding: "12px", borderRadius: "12px", background: "var(--v5-surface-2)" };
@@ -435,7 +435,7 @@ function activityIconStyle(kind: string): CSSProperties {
     background: kind === "mining" ? "var(--v5-brand-soft)" : "var(--v5-success-soft)",
   };
 }
-const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "12.5px", color: "var(--v5-ink)" };
+const activityLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", color: "var(--v5-ink)" };
 const activityTimeStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -444,7 +444,7 @@ const activityTimeStyle: CSSProperties = {
 };
 const activityNexStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };

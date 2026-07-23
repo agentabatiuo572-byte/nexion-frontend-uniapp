@@ -71,7 +71,7 @@ const labelStyle: CSSProperties = {
 };
 const sublabelStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "12.5px",
+  fontSize: "12px",
   lineHeight: 1.375,
   color: "var(--v5-ink-3)",
 };

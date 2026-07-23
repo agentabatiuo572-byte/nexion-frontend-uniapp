@@ -142,14 +142,19 @@ function goBell() {
   align-items: center;
   text-align: center;
 }
+/* 《02》14 档里没有「顶栏标题」专档(有 tab.label 给底部 Tab,顶栏没有)。
+   17px 是 iOS 导航栏惯例值,但不在合法集。两个候选:
+   · heading.h3 20/28 —— 标题语义对,但顶栏高度固定,要验放不放得下
+   · body.m 15/22 —— 布局零风险,可它是「正文」档,顶栏标题会掉到与正文同级
+   取 20:顶栏标题的职责是「我在哪一页」,层级必须高于正文;实测顶栏高度与溢出后确认。 */
 .spv-title {
   max-width: 100%;
   font-family: var(--font-v5);
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.014em;
   color: var(--v5-ink);
-  line-height: 1.2;
+  line-height: 28px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

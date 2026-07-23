@@ -51,9 +51,9 @@
       <view class="rounded-2xl" :style="amountCardStyle">
         <text class="block font-mono-tabular" style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ t.topupChrome.youReceive }}</text>
         <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
-          <text style="font-family: var(--font-v5); font-size: 14px; color: var(--v5-ink-3)">$</text>
+          <text style="font-family: var(--font-v5); font-size: 15px; color: var(--v5-ink-3)">$</text>
           <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" @input="onAmount" />
-          <text class="font-mono-tabular" style="font-size: 14px; color: var(--v5-ink-3)">USDT</text>
+          <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
           <text style="font-size: 12px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
@@ -252,7 +252,7 @@ const centerTitleStyle: CSSProperties = {
   marginTop: "14px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
   color: "var(--v5-ink)",
 };
@@ -325,7 +325,7 @@ const tryAgainBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const amountCardStyle: CSSProperties = {
@@ -364,7 +364,7 @@ const fieldLabelStyle: CSSProperties = {
 const fieldInputStyle: CSSProperties = {
   marginTop: "2px",
   background: "transparent",
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
 };
 // on-brand: near-black on the brand fill — ink (near-white in dark) fails AA.
@@ -376,7 +376,7 @@ const submitBtnStyle = computed<CSSProperties>(() => ({
   color: isValid.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
 }));
 // Plain trust note on the page floor — the boxed chrome added nothing.

@@ -197,7 +197,7 @@ const benefitTextStyle: CSSProperties = { fontSize: "12px", color: "color-mix(in
 const cardStyle: CSSProperties = { padding: "0 2px" };
 const monoLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", fontWeight: 500, color: "var(--v5-ink-3)", letterSpacing: "0.06em" };
 const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", color: "var(--v5-ink-3)" };
-const amountInputStyle: CSSProperties = { fontFamily: "var(--font-v5)", flex: "1", minWidth: "0", background: "transparent", fontSize: "28px", fontWeight: 600, color: "var(--v5-ink)" };
+const amountInputStyle: CSSProperties = { fontFamily: "var(--font-v5)", flex: "1", minWidth: "0", background: "transparent", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
 const usdtStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function presetStyle(active: boolean): CSSProperties {
   return {
@@ -219,7 +219,7 @@ const ctaStyle = computed<CSSProperties>(() => ({
   width: "100%",
   height: "48px",
   borderRadius: "999px",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   background: canSubmit.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: canSubmit.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",

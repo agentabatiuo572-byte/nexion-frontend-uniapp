@@ -40,7 +40,7 @@
           <view class="mx-4" :style="openBlockStyle">
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.kycExpress.flow.verificationDeposit }}</text>
             <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
-              <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 28px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
+              <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
               <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.usdtLocked }}</text>
             </view>
             <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
@@ -98,14 +98,14 @@
             </view>
           </view>
 
-          <view class="flex items-center justify-between" style="margin-top: 12px; font-size: 12.5px">
+          <view class="flex items-center justify-between" style="margin-top: 12px; font-size: 13px">
             <text style="color: var(--v5-ink-3)">{{ t.topupChrome.sendExactly }}</text>
             <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-brand)">1.00 USDT</text>
           </view>
 
           <view class="flex items-center rounded-xl" :style="awaitingBarStyle">
             <view :style="miniSpinnerStyle" />
-            <text class="flex-1" style="margin-left: 8px; font-size: 12.5px; color: var(--v5-ink-3)">{{ t.topupChrome.awaitingOnChain }}</text>
+            <text class="flex-1" style="margin-left: 8px; font-size: 13px; color: var(--v5-ink-3)">{{ t.topupChrome.awaitingOnChain }}</text>
             <text style="font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.autoDetect }}</text>
           </view>
 
@@ -118,7 +118,7 @@
 
         <!-- verifying -->
         <view v-else-if="kycPhase === 'verifying'" class="mx-4 nx-step-in" :style="openBlockStyle">
-          <view class="flex items-center" style="gap: 6px; font-size: 12.5px; color: var(--v5-brand)">
+          <view class="flex items-center" style="gap: 6px; font-size: 13px; color: var(--v5-brand)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             <text>Payment received from <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
           </view>
@@ -139,7 +139,7 @@
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
             </view>
             <text class="block text-center" :style="completeTitleStyle">{{ t.kycExpress.flow.verificationComplete }}</text>
-            <text class="block text-center" style="margin-top: 4px; font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.walletPairedCredited }}</text>
+            <text class="block text-center" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.walletPairedCredited }}</text>
 
             <view style="margin-top: 16px" class="space-y-2">
               <CompleteRow k="Paired wallet" :v="senderShort" mono />
@@ -194,7 +194,7 @@
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
             </view>
           </view>
-          <view class="flex items-center" style="margin-top: 16px; gap: 8px; font-size: 12.5px; color: var(--v5-ink-3)">
+          <view class="flex items-center" style="margin-top: 16px; gap: 8px; font-size: 13px; color: var(--v5-ink-3)">
             <view :style="miniSpinnerStyle" />
             <text>{{ t.topupChrome.awaitingConfirm }}</text>
           </view>
@@ -456,7 +456,7 @@ const kycPrimaryBtnStyle: CSSProperties = {
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand-2)",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const qrBoxStyle: CSSProperties = {
@@ -504,7 +504,7 @@ const markSentBtnStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const miniSpinnerStyle: CSSProperties = {
   width: "16px",

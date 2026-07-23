@@ -314,7 +314,7 @@ const syncFailBoxStyle: CSSProperties = {
   background: "var(--v5-warning-soft)",
 };
 const syncFailTitleStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-warning)",
 };

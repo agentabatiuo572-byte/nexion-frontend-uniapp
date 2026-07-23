@@ -146,7 +146,7 @@ const emptyIconStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const emptyHintStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375 };
 
 // Each saved card keeps its card-face identity as a filled surface; the outer
@@ -160,7 +160,7 @@ const cardRowStyle: CSSProperties = {
 };
 const cardRowHeadStyle: CSSProperties = { padding: "16px 20px", gap: "12px" };
 const cardIconStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)" };
-const cardNameStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
+const cardNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const defaultBadgeStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand)",
@@ -170,9 +170,9 @@ const defaultBadgeStyle: CSSProperties = {
 };
 const cardMetaStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const cardActionsStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" };
-const actionBtnStyle: CSSProperties = { height: "44px", fontSize: "12.5px" };
-const actionDefaultTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)" };
-const actionUnbindTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-brand-2)" };
+const actionBtnStyle: CSSProperties = { height: "44px", fontSize: "13px" };
+const actionDefaultTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const actionUnbindTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-brand-2)" };
 
 const addBtnStyle: CSSProperties = {
   height: "48px",
