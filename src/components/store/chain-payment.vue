@@ -14,9 +14,9 @@
       </view>
       <view class="flex-1 min-w-0">
         <text class="block" :style="headerTitleStyle">{{ sendLabel }}</text>
-        <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px">{{ t.store.coNetworkConfirms }}</text>
+        <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.store.coNetworkConfirms }}</text>
       </view>
-      <view class="flex items-center tabular-nums" style="gap: 4px; font-size: 11.5px; color: var(--v5-warning)">
+      <view class="flex items-center tabular-nums" style="gap: 4px; font-size: 12px; color: var(--v5-warning)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
         <text>{{ mm }}:{{ ss }}</text>
       </view>
@@ -32,9 +32,9 @@
           <rect v-for="c in qrCells" :key="c.i" :x="c.x" :y="c.y" :width="cell" :height="cell" fill="#000000" />
         </svg>
       </view>
-      <text class="font-mono-tabular" style="font-size: 11px; color: var(--v5-ink-3)">{{ t.store.coOrPaste }}</text>
+      <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coOrPaste }}</text>
       <view class="w-full flex items-center rounded-xl border active:opacity-90" :style="addressBtnStyle" role="button" tabindex="0" :aria-label="t.store.coAddressCopied" @click.stop="copyAddress">
-        <text class="flex-1 font-mono" style="text-align: left; font-size: 11.5px; color: var(--v5-ink-2); word-break: break-all" @click.stop="copyAddress">{{ address }}</text>
+        <text class="flex-1 font-mono" style="text-align: left; font-size: 12px; color: var(--v5-ink-2); word-break: break-all" @click.stop="copyAddress">{{ address }}</text>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
       </view>
     </view>
@@ -42,11 +42,11 @@
     <!-- Amount / Network grid -->
     <view class="grid" style="padding: 0 20px 12px; grid-template-columns: 1fr 1fr; gap: 12px">
       <view>
-        <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ t.store.coAmount }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coAmount }}</text>
         <text class="block tabular-nums" :style="gridValStyle">{{ amountLabel }}</text>
       </view>
       <view>
-        <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3)">{{ t.store.coNetwork }}</text>
+        <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coNetwork }}</text>
         <text class="block" :style="gridValStyle">{{ network }}</text>
       </view>
     </view>
@@ -59,7 +59,7 @@
       <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="emitCancel">
         <text @click.stop="emitCancel">{{ t.store.coCancel }}</text>
       </view>
-      <text class="block text-center" style="font-size: 10.5px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5">{{ sendExactLabel }}</text>
+      <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); padding-top: 4px; line-height: 1.5">{{ sendExactLabel }}</text>
     </view>
   </view>
 </template>
@@ -187,7 +187,7 @@ const headerStyle: CSSProperties = { padding: "16px 20px", gap: "12px", borderCo
 const iconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)" };
 const headerTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -210,7 +210,7 @@ const confirmBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 const cancelBtnStyle: CSSProperties = {
@@ -219,6 +219,6 @@ const cancelBtnStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 </script>

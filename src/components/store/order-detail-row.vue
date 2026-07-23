@@ -5,7 +5,7 @@
 -->
 <template>
   <view class="flex items-center justify-between" style="padding: 6px 0">
-    <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ label }}</text>
+    <text style="font-size: 13px; color: var(--v5-ink-3)">{{ label }}</text>
     <text :class="mono ? 'font-mono-tabular tabular-nums' : 'tabular-nums'" :style="valueStyle">{{ value }}</text>
   </view>
 </template>
@@ -26,8 +26,8 @@ const valueStyle = computed<CSSProperties>(() => {
     return { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
   }
   if (props.mono) {
-    return { fontSize: "11.5px", color: "var(--v5-ink-2)" };
+    return { fontSize: "12px", color: "var(--v5-ink-2)" };
   }
-  return { fontSize: "12.5px", color: props.brand ? "var(--v5-brand)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
+  return { fontSize: "13px", color: props.brand ? "var(--v5-brand)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)" };
 });
 </script>

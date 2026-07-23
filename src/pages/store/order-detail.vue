@@ -20,7 +20,7 @@
     <view style="color: var(--v5-ink); padding-top: 24px">
       <!-- Order not found -->
       <view v-if="!order" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" :aria-label="t.orders.title" @click.stop="goOrders">
           <text>{{ t.orders.title }} →</text>
         </view>
@@ -41,11 +41,11 @@
           </view>
 
           <view v-if="order.status !== 'cancelled'" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--v5-border)">
-            <view class="flex items-center justify-between" style="font-size: 11.5px">
+            <view class="flex items-center justify-between" style="font-size: 12px">
               <text style="color: var(--v5-ink-3)">{{ t.orders.dataCenter }}</text>
               <text class="tabular-nums" style="color: var(--v5-ink)">{{ order.dataCenter }}</text>
             </view>
-            <text v-if="order.status === 'provisioning' || order.status === 'activated'" class="block" :style="{ fontSize: '11px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
+            <text v-if="order.status === 'provisioning' || order.status === 'activated'" class="block" :style="{ fontSize: '12px', marginTop: '8px', lineHeight: '1.5', color: statusColor }">{{ dynamicHint }}</text>
           </view>
         </view>
 
@@ -56,7 +56,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="16" height="16" x="4" y="4" rx="2" /><rect width="6" height="6" x="9" y="9" rx="1" /><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2" /></svg>
             </view>
             <view class="flex-1 min-w-0">
-              <text class="block" style="font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">{{ activatedHint }}</text>
+              <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ activatedHint }}</text>
             </view>
           </view>
           <view class="block text-center active:opacity-85" :style="earnBtnStyle" role="button" tabindex="0" :aria-label="t.uiChrome.viewOnEarn" @click.stop="goEarn">
@@ -75,16 +75,16 @@
           <DetailRow :label="t.orders.total" :value="`$${order.total.toLocaleString()}`" big />
           <view class="grid" :style="tsGridStyle">
             <view>
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.orders.placedAt }}</text>
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.placedAt) }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.placedAt }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.placedAt) }}</text>
             </view>
             <view v-if="order.paidAt">
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.orders.paidAt }}</text>
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.paidAt) }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.paidAt }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.paidAt) }}</text>
             </view>
             <view v-if="order.activatedAt">
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.orders.activatedAt }}</text>
-              <text class="block" style="font-size: 11.5px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.activatedAt) }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.activatedAt }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.activatedAt) }}</text>
             </view>
           </view>
         </view>
@@ -97,9 +97,9 @@
               <view class="absolute rounded-full" :style="dotStyle(i)" />
               <view class="flex items-center" style="gap: 8px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="i <= currentIdx && order.status !== 'cancelled' ? 'var(--v5-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path v-for="(d, di) in stageIcon(stage)" :key="di" :d="d" /></svg>
-                <text :style="{ fontSize: '12.5px', color: i <= currentIdx && order.status !== 'cancelled' ? 'var(--v5-ink)' : 'var(--v5-ink-4)' }">{{ statusLabel(stage) }}</text>
+                <text :style="{ fontSize: '12px', color: i <= currentIdx && order.status !== 'cancelled' ? 'var(--v5-ink)' : 'var(--v5-ink-4)' }">{{ statusLabel(stage) }}</text>
               </view>
-              <text v-if="eventFor(stage)" class="block" style="font-size: 11px; color: var(--v5-ink-4); margin-top: 2px; margin-left: 22px">{{ eventText(stage) }}</text>
+              <text v-if="eventFor(stage)" class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px; margin-left: 22px">{{ eventText(stage) }}</text>
             </view>
           </view>
         </view>
@@ -263,7 +263,7 @@ const notFoundBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 const heroStyle = computed<CSSProperties>(() => ({
@@ -277,7 +277,7 @@ const heroIconStyle = computed<CSSProperties>(() => ({
   background: tint(statusColor.value, 12),
 }));
 const heroLabelStyle = computed<CSSProperties>(() => ({
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   lineHeight: "1.2",
   color: statusColor.value,
@@ -310,7 +310,7 @@ const earnBtnStyle: CSSProperties = {
 const sectionLabelStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -344,7 +344,7 @@ const cancelBtnStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-brand-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 500,
 };
 </script>

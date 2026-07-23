@@ -131,7 +131,7 @@ const brandStyle: CSSProperties = {
 };
 const tierCodeStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.18em",
   color: "rgba(255,255,255,0.75)",
   textTransform: "uppercase",

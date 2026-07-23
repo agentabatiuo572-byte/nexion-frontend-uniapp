@@ -18,14 +18,27 @@ const args = process.argv.slice(2);
 const outPath = args.includes("--out") ? args[args.indexOf("--out") + 1] : null;
 const diffPath = args.includes("--diff") ? args[args.indexOf("--diff") + 1] : null;
 const BASE = process.env.BASE_URL || "http://localhost:5173";
-// 五 tab 主链路(B1 范围)。扩批时在此追加。
-const ROUTES = [
+// 🔴 默认只扫五 tab(B1 范围)。B2 迁移的是 wallet **子页**,拿这个默认档 diff 出来的
+//    「新增溢出 0」对那批改动**没有效力** —— 探针压根没走到改动页。子页批次必须 --all。
+//    (同一形状的坑本轮第三次:C3 的尺寸门对页面正文失效、B1 的字号哨兵与 codemod 共用瞎正则,
+//     都是「用一把量不到目标的尺子量出一个假的 0」。)
+const TABS = [
   "/pages/index/index",
   "/pages/earn/earn",
   "/pages/store/store",
   "/pages/team/team",
   "/pages/me/me",
 ];
+function allRoutes() {
+  const pj = JSON.parse(readFileSync("src/pages.json", "utf8").replace(/\/\/[^\n"]*$/gm, ""));
+  return [...new Set([...TABS, ...pj.pages.map((p) => "/" + p.path)])];
+}
+// --all 扫 pages.json 全站;--routes a,b,c 扫指定几条
+const ROUTES = args.includes("--all")
+  ? allRoutes()
+  : args.includes("--routes")
+    ? args[args.indexOf("--routes") + 1].split(",").map((r) => (r.startsWith("/") ? r : "/" + r))
+    : TABS;
 
 const PROBE = () => {
   const out = [];

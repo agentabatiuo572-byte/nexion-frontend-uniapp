@@ -47,7 +47,7 @@
       <view class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
         <view class="px-4 py-2.5 flex items-center justify-between" style="border-bottom: 1px solid var(--v5-border)">
           <text :style="itemsHeadingStyle">{{ t.bundle.itemsHeading }}</text>
-          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 11.5px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear">{{ t.bundle.clear }}</text>
+          <text v-if="products.length > 0" class="active:opacity-70" style="font-size: 12px; color: var(--v5-ink-3)" role="button" tabindex="0" :aria-label="t.bundle.clear" @click.stop="clear">{{ t.bundle.clear }}</text>
         </view>
 
         <!-- Empty state -->
@@ -296,7 +296,7 @@ const totalAuroraStyle: CSSProperties = {
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand)",
   letterSpacing: "0.06em",
@@ -304,7 +304,7 @@ const heroLabelStyle: CSSProperties = {
 const heroTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
   lineHeight: 1.3,
@@ -320,7 +320,7 @@ function tierCellStyle(tier: BundleDiscountTier): CSSProperties {
 function tierLabelStyle(_tier: BundleDiscountTier): CSSProperties {
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 500,
     color: "var(--v5-ink-3)",
     letterSpacing: "0.06em",
@@ -346,7 +346,7 @@ const cardStyle: CSSProperties = {
 };
 const itemsHeadingStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -368,7 +368,7 @@ const itemNameStyle: CSSProperties = {
 const itemMetaStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 
@@ -376,7 +376,7 @@ const suggestionsHeadingStyle: CSSProperties = {
   marginBottom: "10px",
   padding: "0 4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -391,7 +391,7 @@ function suggestionRowStyle(isLast: boolean): CSSProperties {
 const suggestionNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
@@ -399,7 +399,7 @@ const suggestionNameStyle: CSSProperties = {
 function rowLabelStyle(big: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: big ? 600 : 500,
     color: big ? "var(--v5-ink)" : "var(--v5-ink-3)",
   };
@@ -426,7 +426,7 @@ const ctaStyle: CSSProperties = {
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "-0.005em",
   color: "var(--v5-on-brand)",
 };

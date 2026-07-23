@@ -20,7 +20,7 @@
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
         <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
         <text class="truncate" :style="labelStyle">{{ r.label }}</text>
-        <text v-if="r.hot" class="shrink-0" style="color: var(--v5-brand-2); font-size: 11px; margin-left: 1px">⚡</text>
+        <text v-if="r.hot" class="shrink-0" style="color: var(--v5-brand-2); font-size: 12px; margin-left: 1px">⚡</text>
       </view>
     </view>
   </view>
@@ -134,7 +134,7 @@ function numStyle(color: string): CSSProperties {
 }
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 </script>

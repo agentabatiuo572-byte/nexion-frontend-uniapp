@@ -30,7 +30,7 @@
 
       <!-- Product not found -->
       <view v-if="!product" class="text-center" style="padding: 20px">
-        <text class="block" style="font-size: 13.5px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
           <text @click.stop="goStore">{{ t.store.coBackToStore }}</text>
         </view>
@@ -46,33 +46,33 @@
           </view>
         </view>
         <view class="flex justify-between" :style="stepLabelRowStyle">
-          <text v-for="(s, i) in stepLabels" :key="s.key" :style="{ color: i <= stepDisplay ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontSize: '11.5px' }">{{ s.label }}</text>
+          <text v-for="(s, i) in stepLabels" :key="s.key" :style="{ color: i <= stepDisplay ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontSize: '12px' }">{{ s.label }}</text>
         </view>
 
         <!-- === select-payment === -->
         <view v-if="step === 'select-payment'" class="mx-4 rounded-2xl overflow-hidden nx-step-in" :style="surfaceCardStyle">
           <view class="border-b" :style="payHeadStyle">
             <view class="flex items-center justify-between">
-              <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
+              <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
               <text class="tabular-nums" :style="payTotalStyle">${{ netPriceText }}</text>
             </view>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ paybackLine }}</text>
             <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
-              <text style="font-size: 11.5px; color: var(--v5-brand)">{{ t.voucher.checkoutRowLabel }} −${{ voucherDiscountText }}</text>
+              <text style="font-size: 12px; color: var(--v5-brand)">{{ t.voucher.checkoutRowLabel }} −${{ voucherDiscountText }}</text>
             </view>
             <view v-else-if="expiredVoucherForSku" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
-              <text style="font-size: 11.5px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
+              <text style="font-size: 12px; color: var(--v5-ink-4)">{{ t.voucher.expiredNote }}</text>
             </view>
             <!-- FEAT-DEV02:旧机抵扣行 + 移除出口(移除即恢复原价);移除后给找回入口 -->
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
-              <text class="flex-1" style="font-size: 11.5px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-              <text style="font-size: 11.5px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+              <text class="flex-1" style="font-size: 12px; color: var(--v5-success)">{{ tradeinChipText }}</text>
+              <text style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
             </view>
             <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <text style="font-size: 11.5px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
+              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -90,7 +90,7 @@
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="payment === m.id ? 'var(--v5-brand)' : 'var(--v5-ink-3)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="m.iconPath" /><template v-if="m.iconPath2"><path :d="m.iconPath2" /></template></svg>
               </view>
               <view class="flex-1 min-w-0">
-                <text class="block" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">{{ m.label }}</text>
+                <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ m.label }}</text>
                 <text class="block" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.hint }}</text>
               </view>
               <svg v-if="payment === m.id" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 6 9 17l-5-5" /></svg>
@@ -109,7 +109,7 @@
 
         <!-- === confirm === -->
         <view v-else-if="step === 'confirm'" class="mx-4 rounded-2xl nx-step-in" :style="confirmCardStyle">
-          <text class="block font-mono-tabular" style="font-size: 13.5px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
+          <text class="block font-mono-tabular" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coReviewOrder }}</text>
           <view style="margin-top: 12px">
             <CheckoutRow :label="t.store.coRowProduct" :value="product.name" />
             <CheckoutRow :label="t.store.coRowQuantity" value="1" />
@@ -158,7 +158,7 @@
               </view>
               <text class="block" :style="centerTitleStyle" style="margin-top: 12px">{{ t.store.firstOrderTitle }}</text>
               <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-2); line-height: 1.4">{{ t.store.firstOrderBody }}</text>
-              <view class="inline-flex items-center justify-center" style="margin-top: 8px; gap: 4px; font-size: 11.5px; color: var(--v5-brand)">
+              <view class="inline-flex items-center justify-center" style="margin-top: 8px; gap: 4px; font-size: 12px; color: var(--v5-brand)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.94 14.34 12 22l2.06-7.66L22 12l-7.94-2.34L12 2 9.94 9.66 2 12z" /></svg>
                 <text>{{ t.store.firstOrderAchievement }}</text>
               </view>
@@ -659,7 +659,7 @@ const notFoundBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 const stepperRowStyle: CSSProperties = { margin: "0 16px 12px", gap: "6px" };
@@ -708,7 +708,7 @@ const primaryBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const confirmCardStyle: CSSProperties = {
@@ -722,7 +722,7 @@ const confirmCtaStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const changePayBtnStyle: CSSProperties = {
@@ -731,7 +731,7 @@ const changePayBtnStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const centerCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
@@ -780,7 +780,7 @@ const liveCardStyle: CSSProperties = {
 const liveTitleStyle: CSSProperties = {
   marginTop: "16px",
   fontFamily: "var(--font-v5)",
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -790,7 +790,7 @@ const trackBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 const doneBtnStyle: CSSProperties = {
@@ -799,7 +799,7 @@ const doneBtnStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "13.5px",
+  fontSize: "13px",
 };
 </script>
 

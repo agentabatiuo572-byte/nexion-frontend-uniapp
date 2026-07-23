@@ -11,7 +11,7 @@
       class="flex items-center justify-between"
       :style="rowStyle(i)"
     >
-      <text style="font-size: 13.5px; color: var(--v5-ink-3)">{{ r.k }}</text>
+      <text style="font-size: 13px; color: var(--v5-ink-3)">{{ r.k }}</text>
       <text class="tabular-nums" :style="valueStyle">{{ r.v }}</text>
     </view>
   </view>
@@ -37,7 +37,7 @@ function rowStyle(i: number): CSSProperties {
 }
 const valueStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: props.brandValue ? "var(--v5-brand)" : "var(--v5-ink)",
 }));

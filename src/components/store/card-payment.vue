@@ -19,7 +19,7 @@
         <text class="block" :style="headerTitleStyle">{{ t.store.coCardSelect }}</text>
         <view class="flex items-center" style="gap: 6px; margin-top: 2px">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-          <text style="font-size: 11.5px; color: var(--v5-ink-3)">{{ t.store.coCardSecurity }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.coCardSecurity }}</text>
         </view>
       </view>
     </view>
@@ -40,7 +40,7 @@
         </view>
         <view class="flex-1 min-w-0">
           <text class="block font-mono-tabular" :style="cardBrandStyle">{{ brandLabel(card.brand) }} •••• {{ card.last4 }}</text>
-          <text class="block font-mono-tabular" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 2px">{{ expiryLabel(card) }}</text>
+          <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ expiryLabel(card) }}</text>
         </view>
         <svg v-if="card.tokenId === selectedTokenId" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 6 9 17l-5-5" /></svg>
       </view>
@@ -74,16 +74,16 @@
     <!-- Fee + total -->
     <view class="border-t" :style="totalsBoxStyle">
       <view class="flex items-center justify-between" style="padding: 3px 0">
-        <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coSubtotalLabel }}</text>
-        <text class="tabular-nums" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">${{ amountText }}</text>
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coSubtotalLabel }}</text>
+        <text class="tabular-nums" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">${{ amountText }}</text>
       </view>
       <view class="flex items-center justify-between" style="padding: 3px 0">
-        <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coCardFeeLabel }}</text>
-        <text class="tabular-nums" style="font-size: 13.5px; font-weight: 500; color: var(--v5-ink)">${{ feeText }}</text>
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coCardFeeLabel }}</text>
+        <text class="tabular-nums" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">${{ feeText }}</text>
       </view>
       <view class="flex items-center justify-between" style="padding: 3px 0">
-        <text style="font-size: 12.5px; color: var(--v5-ink-3)">{{ t.store.coPayTotalLabel }}</text>
-        <text class="tabular-nums" style="font-size: 18px; font-weight: 600; color: var(--v5-ink)">${{ totalText }}</text>
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coPayTotalLabel }}</text>
+        <text class="tabular-nums" style="font-size: 20px; font-weight: 600; color: var(--v5-ink)">${{ totalText }}</text>
       </view>
     </view>
 
@@ -174,7 +174,7 @@ const headerStyle: CSSProperties = { padding: "16px 20px", gap: "12px", borderCo
 const iconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "var(--v5-brand-2-soft)" };
 const headerTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -194,16 +194,16 @@ const cardRowIconStyle: CSSProperties = {
 };
 const cardBrandStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const cvvLabelStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const cvvCountStyle: CSSProperties = {
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const cvvInputStyle = computed<CSSProperties>(() => ({
@@ -215,7 +215,7 @@ const cvvInputStyle = computed<CSSProperties>(() => ({
   borderRadius: "12px",
   padding: "0 14px",
   fontFamily: "var(--font-v5)",
-  fontSize: "16px",
+  fontSize: "15px",
   lineHeight: "48px",
   fontWeight: 600,
   color: "var(--v5-ink)",
@@ -226,7 +226,7 @@ const cvvInputStyle = computed<CSSProperties>(() => ({
 }));
 const cvvHelpStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "11px",
+  fontSize: "12px",
   lineHeight: 1.45,
   color: "var(--v5-ink-4)",
 };
@@ -240,7 +240,7 @@ const payBtnStyle = computed<CSSProperties>(() => ({
   background: valid.value ? "var(--v5-brand-2)" : "var(--v5-surface-2)",
   color: valid.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 }));
 const cancelBtnStyle: CSSProperties = {
@@ -249,6 +249,6 @@ const cancelBtnStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 </script>

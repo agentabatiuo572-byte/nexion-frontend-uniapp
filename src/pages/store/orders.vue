@@ -34,13 +34,13 @@
             </view>
             <view class="flex-1 min-w-0">
               <view class="flex items-center justify-between" style="gap: 8px">
-                <text class="truncate" style="font-size: 13.5px; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">{{ o.productName }}</text>
+                <text class="truncate" style="font-size: 13px; font-weight: 600; color: color-mix(in srgb, var(--v5-ink) 95%, transparent)">{{ o.productName }}</text>
                 <text class="shrink-0" :style="statusChipStyle(o.status)">{{ badge(o.status).label }}</text>
               </view>
-              <text class="block truncate" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
+              <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ t.orders.orderId }} <text class="font-mono">{{ o.id }}</text></text>
               <view class="flex items-center justify-between" style="margin-top: 6px">
-                <text style="font-size: 11px; color: var(--v5-ink-4)">{{ dateText(o.placedAt) }}</text>
-                <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13.5px; font-weight: 600; color: var(--v5-ink)">${{ o.total.toLocaleString() }}</text>
+                <text style="font-size: 12px; color: var(--v5-ink-4)">{{ dateText(o.placedAt) }}</text>
+                <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 13px; font-weight: 600; color: var(--v5-ink)">${{ o.total.toLocaleString() }}</text>
               </view>
             </view>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 8px"><path d="m9 18 6-6-6-6" /></svg>
@@ -120,7 +120,7 @@ const browseBtnStyle: CSSProperties = {
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
 };
 function orderRowStyle(isLast: boolean): CSSProperties {
@@ -140,7 +140,7 @@ function iconBoxStyle(status: OrderStatus): CSSProperties {
 function statusChipStyle(status: OrderStatus): CSSProperties {
   const b = badge(status);
   return {
-    fontSize: "10px",
+    fontSize: "12px",
     padding: "2px 6px",
     borderRadius: "4px",
     background: b.bg,
