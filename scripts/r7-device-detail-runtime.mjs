@@ -7,7 +7,12 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-async function waitUntil(check, message, timeoutMs = 15_000) {
+// 🔴 超时 12s→30s(2026-07-23 C3):断言问的是「页面能不能渲染出来」,不是「能不能在
+// 12 秒内渲染出来」。12s 是个任意值,它把「机器负载」这个与产品无关的变量引进了判据 ——
+// 本轮并发跑多个 headless chromium 时这条稳定误报,回退代码后又「通过」,险些据此改错代码
+// (实为偶发:同一份代码连跑 2 次都过)。30s 仍能抓住「页面根本渲染不出来」的真故障,
+// 断言强度不变,只是不再把慢启动算成失败。
+async function waitUntil(check, message, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await check()) return;

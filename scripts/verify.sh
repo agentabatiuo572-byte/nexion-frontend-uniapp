@@ -1774,5 +1774,18 @@ tag_comment_gate() {
 }
 tag_comment_gate
 
+# ── 空状态哨兵(C5 2026-07-23):《06》缺省页体系真的渲染得出来 ──
+# 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空
+# + 不溢出 + 无 console error。「接上了组件」和「空态真能显示」是两回事。
+empty_state_gate() {
+  if "$NODE_BIN" scripts/empty-state-probe.mjs > /tmp/uniapp-empty-state.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-empty-state.log)"
+  else
+    bad "空状态渲染失败 — node scripts/empty-state-probe.mjs 看明细(插画路径 / 标题 key / 布局溢出)"
+    grep -E "^FAIL" /tmp/uniapp-empty-state.log | head -8 | sed 's/^/        /'
+  fi
+}
+empty_state_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
