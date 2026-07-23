@@ -129,7 +129,7 @@
             </view>
             <view :style="feedListStyle">
               <view v-for="(f, i) in emissionFeed" :key="i" class="flex items-center" :style="feedRowStyle(i === emissionFeed.length - 1)">
-                <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 11.5px">{{ f.label }}</text>
+                <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
               </view>
             </view>
@@ -148,8 +148,8 @@
                 </view>
                 <view class="flex-1 min-w-0">
                   <text class="block" :style="holdingIdStyle">{{ h.id }}</text>
-                  <text class="block font-mono-tabular" style="font-size: 10.5px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
-                  <text class="block font-mono-tabular" style="margin-top: 6px; font-size: 10.5px; color: var(--v5-brand)">{{ t.genesisHolder.holdingCard.allocation }} {{ h.allocText }}</text>
+                  <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
+                  <text class="block font-mono-tabular" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ t.genesisHolder.holdingCard.allocation }} {{ h.allocText }}</text>
                 </view>
                 <view class="grid place-items-center active:opacity-70" :style="holdingLinkStyle" @click="goMarketplace">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
@@ -164,7 +164,7 @@
             <view :style="perkListStyle">
               <view v-for="(k, i) in perkKeys" :key="k" class="grid items-start" :style="perkRowStyle(i)">
                 <view class="flex items-center justify-center" :style="perkIconStyle">
-                  <text style="font-size: 18px; line-height: 1">{{ t.genesisHolder.perks[k].icon }}</text>
+                  <text style="font-size: 20px; line-height: 1">{{ t.genesisHolder.perks[k].icon }}</text>
                 </view>
                 <view class="min-w-0">
                   <text class="block" :style="perkLabelStyle">{{ t.genesisHolder.perks[k].label }}</text>
@@ -301,21 +301,21 @@ const avatarStyle: CSSProperties = {
 };
 const heroLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.04em",
 };
 const heroNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "48px",
+  fontSize: "56px",
   letterSpacing: "-0.034em",
   color: "var(--v5-ink)",
   lineHeight: 1,
 };
 const heroNodesStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
@@ -333,7 +333,7 @@ const heroStatGridStyle: CSSProperties = {
 };
 const cellLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
 };
@@ -342,7 +342,7 @@ function cellValStyle(tint: string): CSSProperties {
     marginTop: "3px",
     fontFamily: "var(--font-v5)",
     fontWeight: 600,
-    fontSize: "18px",
+    fontSize: "20px",
     letterSpacing: "-0.014em",
     color: tint,
     lineHeight: 1.1,
@@ -350,7 +350,7 @@ function cellValStyle(tint: string): CSSProperties {
 }
 const discStyle: CSSProperties = {
   marginTop: "12px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.5,
 };
@@ -360,7 +360,7 @@ const cardStyle: CSSProperties = {
 };
 const cardTitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -382,7 +382,7 @@ const progFillStyle: CSSProperties = {
 const progMetaStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const howLinkStyle: CSSProperties = {
@@ -395,7 +395,7 @@ const howLinkStyle: CSSProperties = {
 // points leaderboard
 const poolChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   padding: "2px 8px",
   borderRadius: "999px",
@@ -417,7 +417,7 @@ const rankNumStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-brand)",
 };
-const rankWhoStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink)" };
+const rankWhoStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink)" };
 const rankPtsStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -425,7 +425,7 @@ const rankPtsStyle: CSSProperties = {
 };
 const pointsNoteStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 // emission ring (post-listing)
@@ -445,7 +445,7 @@ const ringInnerStyle: CSSProperties = {
 const ringPctStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   color: "var(--v5-ink)",
   lineHeight: 1,
 };
@@ -458,7 +458,7 @@ const emitValStyle: CSSProperties = {
   marginTop: "3px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-brand)",
   lineHeight: 1.1,
@@ -466,7 +466,7 @@ const emitValStyle: CSSProperties = {
 const refStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const lockValStyle: CSSProperties = {
@@ -483,7 +483,7 @@ const feedListStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid v
 const feedDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "999px", background: "var(--v5-brand)" };
 const feedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -493,7 +493,7 @@ function feedRowStyle(isLast: boolean): CSSProperties {
     paddingTop: "8px",
     paddingBottom: "8px",
     gap: "10px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     borderBottom: isLast ? "none" : "1px solid var(--v5-border)",
   };
 }
@@ -516,11 +516,11 @@ const ctaIconStyle: CSSProperties = {
 const ctaTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
-const ctaBodyStyle: CSSProperties = { marginTop: "3px", fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
+const ctaBodyStyle: CSSProperties = { marginTop: "3px", fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.4 };
 const previewStyle: CSSProperties = {
   borderRadius: "16px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
@@ -529,12 +529,12 @@ const previewStyle: CSSProperties = {
   alignItems: "flex-start",
   gap: "8px",
 };
-const previewTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warning)", lineHeight: 1.625 };
+const previewTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)", lineHeight: 1.625 };
 // holdings
 const sectionLabelStyle: CSSProperties = {
   marginBottom: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -573,7 +573,7 @@ const perkListStyle: CSSProperties = { borderTop: "1px solid var(--v5-border)" }
 const perksLabelStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
@@ -620,7 +620,7 @@ function actionIconStyle(tint: string): CSSProperties {
     color: tint,
   };
 }
-const actionLabelStyle: CSSProperties = { fontSize: "11px", fontWeight: 600, color: "var(--v5-ink-2)" };
+const actionLabelStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-ink-2)" };
 // boost cta
 const boostStyle: CSSProperties = {
   marginTop: "2px",
@@ -635,12 +635,12 @@ const boostStyle: CSSProperties = {
 const boostLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-on-brand)",
   letterSpacing: "-0.008em",
 };
 const noteStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
   paddingTop: "8px",

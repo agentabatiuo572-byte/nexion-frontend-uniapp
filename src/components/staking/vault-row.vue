@@ -75,7 +75,7 @@ const tierChipStyle = computed<CSSProperties>(() => ({
   background: tone.value.softBg,
   borderRadius: "999px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: tone.value.text,
   letterSpacing: "0.02em",
@@ -84,14 +84,14 @@ const tierChipStyle = computed<CSSProperties>(() => ({
 const apyStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-success)",
   lineHeight: 1.1,
 };
 const apyUnitStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   fontWeight: 500,
 };
@@ -101,20 +101,20 @@ const ribbonStyle = computed<CSSProperties>(() => ({
   background: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan-soft)" : "var(--v5-warning-soft)",
   color: props.ribbon?.tone === "cyan" ? "var(--v5-tech-cyan)" : "var(--v5-warning)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.02em",
 }));
 const blurbStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   marginTop: "3px",
   lineHeight: 1.4,
 };
 const metaStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   marginTop: "3px",
 };

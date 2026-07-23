@@ -158,18 +158,18 @@ const apyChipStyle: CSSProperties = {
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 const dollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "22px",
+  fontSize: "20px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const inputStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "30px",
+  fontSize: "34px",
   fontWeight: 600,
   letterSpacing: "-0.024em",
   lineHeight: 1.1,
@@ -190,7 +190,7 @@ function segPillStyle(active: boolean): CSSProperties {
     background: active ? "var(--v5-brand)" : "transparent",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     display: "flex",
     alignItems: "center",
@@ -200,7 +200,7 @@ function segPillStyle(active: boolean): CSSProperties {
 const periodLabelStyle: CSSProperties = {
   marginTop: "14px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
 };
@@ -230,7 +230,7 @@ const barLabelStyle: CSSProperties = {
   bottom: 0,
   left: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink)",
   fontWeight: 500,
   pointerEvents: "none",
@@ -238,7 +238,7 @@ const barLabelStyle: CSSProperties = {
 function barAmtStyle(tint: string): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "16px",
+    fontSize: "15px",
     fontWeight: 600,
     color: tint,
     lineHeight: 1.1,
@@ -246,7 +246,7 @@ function barAmtStyle(tint: string): CSSProperties {
 }
 const barDeltaStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-success)",
   marginTop: "1px",
 };
@@ -254,12 +254,12 @@ const footnoteStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
   borderTop: "1px dashed var(--v5-border-strong)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-2)",
 };
 const disclaimerStyle: CSSProperties = {
   marginTop: "12px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.45,
 };

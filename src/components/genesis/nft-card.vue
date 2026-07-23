@@ -46,19 +46,19 @@ const artStyle: CSSProperties = {
 const idLineStyle: CSSProperties = {
   marginTop: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const priceStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "17px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
   letterSpacing: "-0.014em",
 };
 const agoStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 </script>

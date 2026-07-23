@@ -198,14 +198,14 @@ const titleStyle: CSSProperties = {
 const subtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };
 const stepperWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "16px" };
 const stepperLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   fontWeight: 500,
 };
@@ -228,7 +228,7 @@ const plusBtnStyle: CSSProperties = {
 const qtyStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "48px",
+  fontSize: "56px",
   letterSpacing: "-0.034em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -238,7 +238,7 @@ const summaryStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "14px",
   padding: "16px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   display: "flex",
   flexDirection: "column",
   gap: "8px",
@@ -248,7 +248,7 @@ const rowLabelMutedStyle: CSSProperties = { color: "var(--v5-ink-4)" };
 const rowValStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
   color: "var(--v5-ink)",
 };
@@ -256,7 +256,7 @@ const rowValSuccessStyle: CSSProperties = { ...rowValStyle, color: "var(--v5-suc
 const rowValBoldStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };

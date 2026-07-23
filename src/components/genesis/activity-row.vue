@@ -97,14 +97,14 @@ const kindBadgeStyle = computed<CSSProperties>(() => ({
   background: `color-mix(in srgb, ${tint.value} 10%, transparent)`,
   color: tint.value,
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 }));
 const addrStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const priceStyle: CSSProperties = {
@@ -116,7 +116,7 @@ const priceStyle: CSSProperties = {
 };
 const timeStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 </script>

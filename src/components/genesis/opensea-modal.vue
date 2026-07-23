@@ -101,7 +101,7 @@ const brandDotStyle: CSSProperties = {
 const brandTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
@@ -124,7 +124,7 @@ const loadingTitleStyle: CSSProperties = {
 const loadingSubStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const errIconStyle: CSSProperties = {
@@ -149,18 +149,18 @@ const errMsgStyle: CSSProperties = {
   marginRight: "auto",
   maxWidth: "280px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
   lineHeight: 1.55,
 };
-const errSubStyle: CSSProperties = { marginTop: "12px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.55 };
+const errSubStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.55 };
 const errHintStyle: CSSProperties = {
   marginTop: "8px",
   padding: "3px 10px",
   borderRadius: "6px",
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 const retryBtnStyle: CSSProperties = {

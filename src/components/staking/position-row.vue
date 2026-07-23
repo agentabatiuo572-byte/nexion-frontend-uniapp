@@ -107,7 +107,7 @@ const cardStyle: CSSProperties = {
 const principalStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };
@@ -117,18 +117,18 @@ const termChipStyle: CSSProperties = {
   background: "var(--v5-brand-soft)",
   color: "var(--v5-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 function statusChipStyle(tint: string): CSSProperties {
   return {
-    fontSize: "10.5px",
+    fontSize: "12px",
     color: tint,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   };
 }
 const maturedChipStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-brand)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontWeight: 600,
@@ -155,14 +155,14 @@ const cellGridStyle: CSSProperties = {
 };
 const cellKStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 function cellVStyle(success: boolean): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
     fontWeight: 600,
-    fontSize: "14px",
+    fontSize: "15px",
     color: success ? "var(--v5-success)" : "var(--v5-ink)",
     marginTop: "3px",
   };
@@ -201,7 +201,7 @@ const trackBtnStyle: CSSProperties = {
 };
 const closedNoteStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
 };

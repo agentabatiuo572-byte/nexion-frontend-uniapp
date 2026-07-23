@@ -147,7 +147,7 @@ const listedBadgeStyle: CSSProperties = {
   background: "rgba(196,131,22,0.22)",
   color: "var(--v5-warning)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
 };
@@ -161,7 +161,7 @@ const tokenIdStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -169,14 +169,14 @@ const tokenIdStyle: CSSProperties = {
 const yoursStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: isListed.value ? "var(--v5-warning)" : "var(--v5-brand)",
 }));
 const askLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-warning)",
   letterSpacing: "0.04em",
@@ -185,7 +185,7 @@ const askPriceStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-warning)",
   lineHeight: 1,
@@ -193,7 +193,7 @@ const askPriceStyle: CSSProperties = {
 const listedAgoStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const cancelBtnStyle: CSSProperties = {
@@ -210,7 +210,7 @@ const cancelBtnStyle: CSSProperties = {
 };
 const listLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.04em",
@@ -224,7 +224,7 @@ const inputWrapStyle: CSSProperties = {
 };
 const dollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "20px",
   color: "var(--v5-ink-3)",
   flexShrink: 0,
 };
@@ -239,7 +239,7 @@ const inputStyle: CSSProperties = {
 const floorHintStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const listBtnStyle: CSSProperties = {

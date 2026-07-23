@@ -69,7 +69,7 @@ const tokenIdStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
   lineHeight: 1,
@@ -77,7 +77,7 @@ const tokenIdStyle: CSSProperties = {
 const founderStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-warning)",
@@ -93,7 +93,7 @@ const dotStyle: CSSProperties = {
 };
 const priceLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.04em",
@@ -108,13 +108,13 @@ const priceStyle: CSSProperties = {
 };
 const lastSaleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const deltaStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 600,
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
@@ -128,7 +128,7 @@ const buyBtnStyle: CSSProperties = {
   color: "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 550,
-  fontSize: "12.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
 };
 </script>

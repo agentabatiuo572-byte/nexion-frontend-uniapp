@@ -99,8 +99,8 @@
         <template v-else>
           <view v-if="ownedCount === 0" class="text-center" :style="emptyCardStyle">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>
-            <text class="block" style="font-size: 13.5px; color: var(--v5-ink)">{{ t.marketplace.noTokensTitle }}</text>
-            <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.375">{{ t.marketplace.noTokensSub }}</text>
+            <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.marketplace.noTokensTitle }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.375">{{ t.marketplace.noTokensSub }}</text>
             <view class="inline-block active:scale-95" :style="reserveBtnStyle" @click="goGenesis">
               <text>{{ t.marketplace.reservePrimary }}</text>
             </view>
@@ -110,7 +110,7 @@
           </view>
         </template>
 
-        <text class="block px-2" style="font-size: 10.5px; color: var(--v5-ink-3); line-height: 1.625">{{ t.marketplace.royaltyFooter }}</text>
+        <text class="block px-2" style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ t.marketplace.royaltyFooter }}</text>
       </view>
     </view>
 
@@ -364,7 +364,7 @@ const avatarStyle: CSSProperties = {
 };
 const collTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
@@ -375,13 +375,13 @@ const verifiedStyle: CSSProperties = {
   background: "var(--v5-success-soft)",
   color: "var(--v5-success)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 const ercLineStyle: CSSProperties = {
   marginTop: "3px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.02em",
 };
@@ -393,7 +393,7 @@ const statGridStyle: CSSProperties = {
 };
 const statLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.04em",
 };
@@ -401,7 +401,7 @@ function statValStyle(tint?: string): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
     fontWeight: 600,
-    fontSize: "14px",
+    fontSize: "15px",
     color: tint ?? "var(--v5-ink)",
     marginTop: "2px",
     lineHeight: 1.1,
@@ -417,7 +417,7 @@ const viewOpenSeaStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-brand)",
   fontWeight: 500,
 };
@@ -430,7 +430,7 @@ function tabPillStyle(active: boolean): CSSProperties {
     background: active ? "var(--v5-brand)" : "transparent",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
     fontFamily: "var(--font-v5)",
-    fontSize: "12.5px",
+    fontSize: "13px",
     fontWeight: 500,
     letterSpacing: "-0.005em",
     display: "flex",
@@ -440,7 +440,7 @@ function tabPillStyle(active: boolean): CSSProperties {
 }
 const sortLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
@@ -453,7 +453,7 @@ function sortPillStyle(active: boolean): CSSProperties {
     height: "32px",
     padding: "0 12px",
     borderRadius: "999px",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 500,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     letterSpacing: "0.04em",
@@ -486,7 +486,7 @@ const reserveBtnStyle: CSSProperties = {
   background: "var(--v5-brand-2)",
   color: "var(--v5-on-brand-2)",
   fontWeight: 600,
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 </script>
 

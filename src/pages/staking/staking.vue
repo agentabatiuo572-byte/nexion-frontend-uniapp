@@ -283,7 +283,7 @@ const heroStyle: CSSProperties = {
 };
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   letterSpacing: "0.02em",
 };
@@ -293,18 +293,18 @@ const earningChipStyle: CSSProperties = {
   background: "var(--v5-tech-cyan-soft)",
   color: "var(--v5-tech-cyan)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
 };
 const bigDollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "22px",
+  fontSize: "20px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const bigNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "48px",
+  fontSize: "56px",
   fontWeight: 600,
   letterSpacing: "-0.034em",
   lineHeight: 1,
@@ -325,14 +325,14 @@ const belowGridStyle: CSSProperties = {
 };
 const statKStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 function statVStyle(tint: string): CSSProperties {
   return {
     fontFamily: "var(--font-v5)",
     fontWeight: 500,
-    fontSize: "18px",
+    fontSize: "20px",
     letterSpacing: "-0.014em",
     color: tint,
     marginTop: "3px",
@@ -364,7 +364,7 @@ const emptyStyle: CSSProperties = {
   borderRadius: "16px",
   border: "1px dashed var(--v5-border-strong)",
   padding: "24px 16px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const noticeStyle: CSSProperties = {

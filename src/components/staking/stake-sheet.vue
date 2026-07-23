@@ -203,14 +203,14 @@ const titleStyle: CSSProperties = {
 const subtitleStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const closeBtnStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "999px", color: "var(--v5-ink-3)" };
 const amountWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "16px" };
 const amountLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   fontWeight: 500,
 };
@@ -223,7 +223,7 @@ const dollarStyle: CSSProperties = {
 };
 const inputStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "48px",
+  fontSize: "56px",
   fontWeight: 600,
   letterSpacing: "-0.034em",
   lineHeight: 1,
@@ -232,7 +232,7 @@ const inputStyle: CSSProperties = {
 };
 const usdtStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 function presetStyle(p: number): CSSProperties {
@@ -241,7 +241,7 @@ function presetStyle(p: number): CSSProperties {
     height: "40px",
     borderRadius: "999px",
     fontFamily: "var(--font-v5)",
-    fontSize: "13.5px",
+    fontSize: "13px",
     fontWeight: 500,
     background: active ? "var(--v5-brand)" : "var(--v5-surface)",
     color: active ? "var(--v5-ink)" : "var(--v5-ink-2)",
@@ -254,7 +254,7 @@ function presetStyle(p: number): CSSProperties {
 const balanceRowStyle: CSSProperties = {
   marginTop: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const maxStyle: CSSProperties = { color: "var(--v5-brand)", fontWeight: 600, fontSize: "13px" };
@@ -263,7 +263,7 @@ const projectionStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "14px",
   padding: "16px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   display: "flex",
   flexDirection: "column",
   gap: "8px",
@@ -272,7 +272,7 @@ const rowLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const rowValStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "13.5px",
+  fontSize: "13px",
   letterSpacing: "-0.005em",
   color: "var(--v5-ink)",
 };
@@ -280,7 +280,7 @@ const rowValSuccessStyle: CSSProperties = { ...rowValStyle, color: "var(--v5-suc
 const rowValBoldStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "18px",
+  fontSize: "20px",
   letterSpacing: "-0.014em",
   color: "var(--v5-ink)",
 };

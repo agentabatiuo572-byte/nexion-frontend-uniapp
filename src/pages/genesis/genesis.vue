@@ -423,7 +423,7 @@ const crownChipStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 10%, transparent)",
   color: "var(--v5-genesis-gold-on-dark)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.14em",
 };
@@ -431,20 +431,20 @@ const titleStyle: CSSProperties = {
   marginTop: "18px",
   fontFamily: "var(--font-v5)",
   fontWeight: 600,
-  fontSize: "28px",
+  fontSize: "34px",
   letterSpacing: "-0.024em",
   lineHeight: 1.18,
   color: "var(--v5-genesis-gold-pale-on-dark)",
 };
 const heroSubStyle: CSSProperties = {
   marginTop: "12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 72%, transparent)",
   lineHeight: 1.55,
 };
 const heroDiscStyle: CSSProperties = {
   marginTop: "6px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 50%, transparent)",
   lineHeight: 1.5,
 };
@@ -473,7 +473,7 @@ const barShimmerStyle: CSSProperties = {
 const barMetaStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "color-mix(in srgb, var(--v5-genesis-gold-pale-on-dark) 55%, transparent)",
   letterSpacing: "0.04em",
 };
@@ -488,12 +488,12 @@ const socialStyle: CSSProperties = {
   gap: "8px",
   background: "var(--v5-surface)",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
 };
 const socialDotStyle: CSSProperties = { width: "6px", height: "6px", borderRadius: "50%", background: "var(--v5-success)" };
 const socialTimeStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 // 《07》tap≥44:整行可点的 section header 实测 354×21。上下 margin 让出 10px 给热区,
@@ -532,14 +532,14 @@ function tierRowStyle(isCurrent: boolean): CSSProperties {
 }
 const tierNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   letterSpacing: "-0.008em",
 };
 const tierChipLiveStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   padding: "1px 7px",
   borderRadius: "999px",
@@ -550,7 +550,7 @@ const tierChipLiveStyle: CSSProperties = {
 };
 const tierChipSoldStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 500,
   padding: "1px 7px",
   borderRadius: "999px",
@@ -562,7 +562,7 @@ const tierChipSoldStyle: CSSProperties = {
 const tierMetaStyle: CSSProperties = {
   marginTop: "3px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const tierPriceStyle: CSSProperties = {
@@ -575,7 +575,7 @@ const tierPriceStyle: CSSProperties = {
 const tierCurrentStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   // 这行落在**跟主题的页面底**上(不是曜石 hero):原金亮主题实测 1.85 → 走跟主题的深金档
   color: "var(--v5-genesis-gold)",
   letterSpacing: "0.02em",
@@ -597,14 +597,14 @@ function faqRowStyle(i: number): CSSProperties {
   };
 }
 const faqQStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1.4,
 };
 const faqAStyle: CSSProperties = {
   marginTop: "5px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-2)",
   lineHeight: 1.62,
 };
@@ -634,7 +634,7 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
   color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
-  fontSize: "14px",
+  fontSize: "15px",
   letterSpacing: "0.02em",
   boxShadow:
     remaining.value > 0

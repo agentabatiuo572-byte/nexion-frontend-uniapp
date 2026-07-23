@@ -113,14 +113,14 @@ function goMarketplace() {
   uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
 const flowBoxStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   borderRadius: "12px",
   padding: "14px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   marginTop: "12px",
   display: "flex",
   flexDirection: "column",
@@ -128,18 +128,18 @@ const flowBoxStyle: CSSProperties = {
 };
 const flowLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-warning)",
   letterSpacing: "0.08em",
 };
 const flowNumStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-warning)",
   flexShrink: 0,
 };
-const flowTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
+const flowTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.5 };
 const ctaPrimaryStyle: CSSProperties = {
   gap: "6px",
   height: "50px",

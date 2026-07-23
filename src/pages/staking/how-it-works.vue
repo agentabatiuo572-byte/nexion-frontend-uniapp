@@ -119,17 +119,17 @@ function goStaking() {
   uni.navigateTo({ url: "/pages/staking/staking", fail: () => {} });
 }
 
-const paraStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
+const paraStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 }; // how-page scale: body 13.5/1.65 ink-2
 const paraStyle2: CSSProperties = { ...paraStyle, marginTop: "10px" };
-const captionStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
-const introStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
+const captionStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" }; // how-page scale: caption 12.5/1.6 ink-3
+const introStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-3)", lineHeight: 1.6, marginBottom: "14px" };
 const tableStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface)",
   overflow: "hidden",
 };
 const tableHeadStyle: CSSProperties = {
-  fontSize: "10.5px",
+  fontSize: "12px",
   letterSpacing: "0.14em",
   color: "var(--v5-ink-3)",
 };
@@ -163,7 +163,7 @@ const ctaStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 };
 </script>
