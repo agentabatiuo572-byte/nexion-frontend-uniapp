@@ -8,11 +8,11 @@
   <view class="flex items-center" :style="rowStyle">
     <view class="grid place-items-center tabular-nums" :style="badgeStyle">
       <svg v-if="done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-      <text v-else style="font-size: 11px; font-weight: 600">{{ step }}/3</text>
+      <text v-else style="font-size: 12px; font-weight: 600">{{ step }}/3</text>
     </view>
-    <view class="flex-1" style="margin-left: 12px; font-size: 12.5px">
+    <view class="flex-1" style="margin-left: 12px; font-size: 13px">
       <text :style="labelStyle">{{ label }}</text>
-      <text v-if="pendingHint && isActive" style="margin-left: 6px; font-size: 10.5px; color: var(--v5-ink-4)">({{ pendingHint }})</text>
+      <text v-if="pendingHint && isActive" style="margin-left: 6px; font-size: 12px; color: var(--v5-ink-4)">({{ pendingHint }})</text>
     </view>
     <view v-if="isActive" :style="spinnerStyle" />
   </view>

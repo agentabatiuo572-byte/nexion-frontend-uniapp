@@ -139,14 +139,14 @@ const ctaStyle: CSSProperties = {
 };
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
 const ctaNoteStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 </script>

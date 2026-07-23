@@ -149,7 +149,7 @@ function onTap(n: Notification) {
 }
 
 const unreadBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   background: "var(--v5-danger)",
   color: "var(--v5-on-brand)",
   padding: "2px 6px",
@@ -157,7 +157,7 @@ const unreadBadgeStyle: CSSProperties = {
   fontWeight: 600,
 };
 function actionBtnStyle(color: string): CSSProperties {
-  return { height: "36px", padding: "0 10px", borderRadius: "999px", fontSize: "11.5px", fontWeight: 600, color };
+  return { height: "36px", padding: "0 10px", borderRadius: "999px", fontSize: "12px", fontWeight: 600, color };
 }
 function pillStyle(active: boolean): CSSProperties {
   return {
@@ -167,7 +167,7 @@ function pillStyle(active: boolean): CSSProperties {
     padding: "0 16px",
     marginRight: "6px",
     borderRadius: "999px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     fontWeight: 600,
     background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -180,8 +180,8 @@ const emptyCardStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink)" };
-const emptyBodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
+const emptyTitleStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink)" };
+const emptyBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 // Transparent hairline group — border-top opens the timeline, rows carry dividers;
 // the unread row keeps its surface-2 highlight tint.
 const listStyle: CSSProperties = {
@@ -215,14 +215,14 @@ const unreadDotStyle: CSSProperties = {
 };
 function titleStyle(unread: boolean): CSSProperties {
   return {
-    fontSize: "12.5px",
+    fontSize: "13px",
     color: unread ? "var(--v5-ink)" : "var(--v5-ink-2)",
     fontWeight: unread ? 600 : 400,
   };
 }
-const timeStyle: CSSProperties = { fontSize: "10px", color: "var(--v5-ink-3)" };
-const bodyStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
+const timeStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const bodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
 function ctaStyle(k: NotifKind): CSSProperties {
-  return { fontSize: "10.5px", fontWeight: 600, color: KIND_META[k].tint, marginTop: "6px" };
+  return { fontSize: "12px", fontWeight: 600, color: KIND_META[k].tint, marginTop: "6px" };
 }
 </script>

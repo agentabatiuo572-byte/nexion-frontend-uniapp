@@ -13,10 +13,10 @@
     <!-- Max-rank end state -->
     <view v-if="!gap.next" class="block active:opacity-90" :style="maxCardStyle" @click="goTeam">
       <view :style="maxIconStyle" :aria-label="maxRankLine">
-        <text style="font-size: 22px">{{ maxPrizeIcon }}</text>
+        <text style="font-size: 20px">{{ maxPrizeIcon }}</text>
       </view>
       <view style="flex: 1; min-width: 0">
-        <text class="block" style="font-family: var(--font-v5); font-size: 14px; font-weight: 600; color: var(--v5-ink)">{{ maxRankLine }}</text>
+        <text class="block" style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ maxRankLine }}</text>
       </view>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="m9 18 6-6-6-6" /></svg>
     </view>
@@ -25,7 +25,7 @@
     <view v-else class="block active:opacity-90" :style="cardStyle" @click="goTeam">
       <!-- Aspiration hero anchor(实物奖已删) -->
       <view :style="prizeHeroStyle" :aria-label="towardLine">
-        <text style="font-size: 28px">{{ prizeHeroIcon }}</text>
+        <text style="font-size: 26px">{{ prizeHeroIcon }}</text>
       </view>
 
       <view style="flex: 1; min-width: 0">
@@ -35,7 +35,7 @@
           <template v-if="gapLine">
             <text style="color: var(--v5-ink-4); font-weight: 400"> · </text>
             <text :style="{ color: gap.primaryGap ? 'var(--v5-brand-2)' : 'var(--v5-success)' }">{{ gapLine }}</text>
-            <text v-if="moreCount > 0" style="color: var(--v5-ink-4); font-weight: 400; font-size: 12.5px"> {{ moreCountLabel }}</text>
+            <text v-if="moreCount > 0" style="color: var(--v5-ink-4); font-weight: 400; font-size: 13px"> {{ moreCountLabel }}</text>
           </template>
         </view>
 
@@ -184,7 +184,7 @@ const prizeHeroStyle: CSSProperties = {
 };
 const perkLineStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.3,
   whiteSpace: "nowrap",
@@ -199,7 +199,7 @@ const barFillStyle = computed<CSSProperties>(() => ({
   willChange: "width",
 }));
 const pctStyle = computed<CSSProperties>(() => ({
-  fontSize: "11px",
+  fontSize: "12px",
   color: isHot.value ? "var(--v5-warning)" : "var(--v5-brand)",
   minWidth: "30px",
   textAlign: "right",

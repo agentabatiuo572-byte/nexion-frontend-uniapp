@@ -205,7 +205,7 @@ const heroStyle: CSSProperties = { padding: "0 2px" };
 const heroIconBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "16px", background: "color-mix(in srgb, var(--v5-warning) 15%, transparent)" };
 const heroLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const heroCountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "26px", fontWeight: 600, color: "var(--v5-ink)" };
-const heroTotalStyle: CSSProperties = { fontSize: "14px", color: "var(--v5-ink-4)" };
+const heroTotalStyle: CSSProperties = { fontSize: "15px", color: "var(--v5-ink-4)" };
 const heroPctStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
 const barTrackStyle: CSSProperties = { marginTop: "12px", height: "8px", borderRadius: "999px", background: "var(--v5-surface-2)", overflow: "hidden" };
 const barFillStyle = computed<CSSProperties>(() => ({
@@ -248,14 +248,14 @@ function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSPropertie
   };
 }
 function aLabelStyle(ul: boolean): CSSProperties {
-  return { fontSize: "13.5px", fontWeight: 600, color: ul ? "color-mix(in srgb, var(--v5-ink) 95%, transparent)" : "var(--v5-ink-4)" };
+  return { fontSize: "13px", fontWeight: 600, color: ul ? "color-mix(in srgb, var(--v5-ink) 95%, transparent)" : "var(--v5-ink-4)" };
 }
 function aDescStyle(ul: boolean): CSSProperties {
-  return { fontSize: "11.5px", marginTop: "2px", lineHeight: 1.375, color: ul ? "var(--v5-ink-3)" : "var(--v5-ink-4)" };
+  return { fontSize: "12px", marginTop: "2px", lineHeight: 1.375, color: ul ? "var(--v5-ink-3)" : "var(--v5-ink-4)" };
 }
-const aWhenStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-4)", marginTop: "2px" };
+const aWhenStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "2px" };
 function rewardStyle(ul: boolean): CSSProperties {
-  return { fontSize: "11.5px", fontWeight: 500, color: ul ? "var(--v5-brand)" : "var(--v5-ink-4)" };
+  return { fontSize: "12px", fontWeight: 500, color: ul ? "var(--v5-brand)" : "var(--v5-ink-4)" };
 }
 function claimBtnStyle(claimed: boolean): CSSProperties {
   return {
@@ -267,7 +267,7 @@ function claimBtnStyle(claimed: boolean): CSSProperties {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "6px",
-    fontSize: "11px",
+    fontSize: "12px",
     fontWeight: 600,
     background: claimed ? "var(--v5-surface-2)" : "var(--v5-brand)",
     color: claimed ? "var(--v5-ink-4)" : "var(--v5-on-brand)",

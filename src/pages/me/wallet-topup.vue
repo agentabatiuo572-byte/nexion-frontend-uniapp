@@ -61,7 +61,7 @@
               </view>
               <view class="flex-1" style="margin-left: 12px">
                 <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }}</text>
+                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ c.fee }} · {{ chTime(c) }}</text>
               </view>
             </view>
           </view>
@@ -80,7 +80,7 @@
         <!-- awaiting -->
         <view v-else-if="kycPhase === 'awaiting'" class="mx-4 nx-step-in" :style="openBlockStyle">
           <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">Send $1.00 via {{ network }}</text>
+            <text class="font-mono-tabular" :style="metaLabelStyle">{{ fmt(t.topupChrome.sendOneVia, { network }) }}</text>
             <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
           </view>
 
@@ -113,16 +113,16 @@
             <text>{{ t.kycExpress.flow.paymentSentCta }}</text>
           </view>
 
-          <text class="block" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Address valid for 30 minutes. Only send {{ network }} to this address — cross-chain transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ fmt(t.topupChrome.addrValidWarn, { network }) }}</text>
         </view>
 
         <!-- verifying -->
         <view v-else-if="kycPhase === 'verifying'" class="mx-4 nx-step-in" :style="openBlockStyle">
           <view class="flex items-center" style="gap: 6px; font-size: 13px; color: var(--v5-brand)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-            <text>Payment received from <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
+            <text>{{ t.topupChrome.paymentReceivedFrom }} <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
           </view>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · sender wallet</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · {{ t.topupChrome.senderWallet }}</text>
 
           <view style="margin-top: 20px" class="space-y-3">
             <VerifyRow :step="1" :label="t.wallet.verifyReceiving" :done="step1Done" />
@@ -170,7 +170,7 @@
           >
             <view class="flex-1">
               <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">Fee {{ c.fee }} · {{ c.time }} · Min {{ c.min }}</text>
+              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ c.fee }} · {{ chTime(c) }} · {{ t.topupChrome.min }} {{ c.min }}</text>
             </view>
             <text style="color: var(--v5-brand); font-size: 12px">{{ t.topupChrome.use }} →</text>
           </view>
@@ -182,7 +182,7 @@
         <!-- chain deposit — de-carded, QR + address sit on the page floor -->
         <view v-else class="mx-4" :style="openBlockStyle">
           <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">Send via {{ selected }}</text>
+            <text class="font-mono-tabular" :style="metaLabelStyle">{{ fmt(t.topupChrome.sendVia, { network: selected }) }}</text>
             <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">{{ t.topupChrome.change }}</text>
           </view>
           <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
@@ -198,7 +198,7 @@
             <view :style="miniSpinnerStyle" />
             <text>{{ t.topupChrome.awaitingConfirm }}</text>
           </view>
-          <text class="block" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Address expires in 30:00 minutes. Send only the selected asset to this address — wrong-asset transfers cannot be recovered.</text>
+          <text class="block" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ t.topupChrome.addrExpireWarn }}</text>
         </view>
       </template>
     </view>
@@ -214,6 +214,7 @@ import TopupCardForm from "@/components/me/topup-card-form.vue";
 import VerifyRow from "@/components/me/verify-row.vue";
 import CompleteRow from "@/components/me/complete-row.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useWalletPairing, mockExternalAddress } from "@/store/wallet-pairing";
@@ -228,19 +229,26 @@ interface Channel {
   min: string;
 }
 // 平台支付收窄裁决:充值通道 = USDT 三网络 + 国际卡(TRC20 主推排首位)。
+// time 存机器键,显示文案经 chTime() 走 i18n。
 const ALL_CHANNELS: Channel[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5 min", min: "$10" },
-  { id: "USDT-BEP20", label: "USDT (BEP20)", fee: "1 USDT", time: "5 min", min: "$10" },
-  { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15 min", min: "$10" },
-  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "Instant", min: "$30" },
+  { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5min", min: "$10" },
+  { id: "USDT-BEP20", label: "USDT (BEP20)", fee: "1 USDT", time: "5min", min: "$10" },
+  { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15min", min: "$10" },
+  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "instant", min: "$30" },
 ];
-const KYC_CHANNELS = ALL_CHANNELS.filter((c) => c.id === "USDT-TRC20" || c.id === "USDT-ERC20");
+// 绑定地址允许 USDT 三网络(规格 PAY04 ③),$1 验证同步开放三网络。
+const KYC_CHANNELS = ALL_CHANNELS.filter((c) => c.id !== "CARD");
 
 // c.id is typed Withdrawal["network"] | "CARD"; KYC_CHANNELS only ever holds
 // USDT networks, so narrow back to Withdrawal["network"] for the `network` ref.
 function selectKycNetwork(id: Channel["id"]) {
   if (id === "CARD") return;
   network.value = id;
+}
+
+function chTime(c: Channel): string {
+  const tc = t.value.topupChrome;
+  return c.time === "instant" ? tc.timeInstant : c.time === "15min" ? tc.time15min : tc.time5min;
 }
 
 function channelClass(id: Channel["id"]): string {

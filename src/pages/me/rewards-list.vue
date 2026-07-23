@@ -248,7 +248,7 @@ function stubValueStyle(dim: boolean): CSSProperties {
 function stubLabelStyle(dim: boolean): CSSProperties {
   return {
     marginTop: "3px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     fontWeight: 500,
     color: dim ? "var(--v5-ink-4)" : "var(--v5-ink-2)",
   };
@@ -270,8 +270,8 @@ function notchStyle(top: boolean): CSSProperties {
     background: "var(--v5-bg)",
   } as CSSProperties;
 }
-const ticketNameStyle: CSSProperties = { fontSize: "14px", fontWeight: 550, color: "var(--v5-ink)" };
-const ticketNameExpiredStyle: CSSProperties = { fontSize: "14px", fontWeight: 550, color: "var(--v5-ink-3)" };
+const ticketNameStyle: CSSProperties = { fontSize: "15px", fontWeight: 550, color: "var(--v5-ink)" };
+const ticketNameExpiredStyle: CSSProperties = { fontSize: "15px", fontWeight: 550, color: "var(--v5-ink-3)" };
 const recordListStyle: CSSProperties = {
   margin: "2px 16px 0",
   padding: "0 2px",
@@ -294,13 +294,13 @@ function vIconStyle(dim: boolean): CSSProperties {
       : "color-mix(in srgb, var(--v5-brand) 12%, transparent)",
   };
 }
-const rowTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 500, color: "var(--v5-ink)" };
-const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
-const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
-const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "11px", color: "var(--v5-ink-4)" };
+const rowTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const rowSubStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const rowSubTightStyle: CSSProperties = { marginTop: "1px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
 const rewardAmountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
@@ -321,7 +321,7 @@ const expiredBadgeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-4)",
-  fontSize: "11px",
+  fontSize: "12px",
 };
 // Empty state — de-card white-list: dashed border-strong, no fill.
 const emptyStyle: CSSProperties = {
@@ -331,6 +331,6 @@ const emptyStyle: CSSProperties = {
   padding: "32px",
   textAlign: "center",
 };
-const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13.5px", color: "var(--v5-ink-2)" };
-const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "11.5px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
+const emptyTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const emptyHintStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.6 };
 </script>

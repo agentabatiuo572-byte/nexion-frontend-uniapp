@@ -80,7 +80,7 @@ function goAccount() {
 // Intro caption — header already provides the 24px breathing (no top margin).
 const introStyle: CSSProperties = {
   marginBottom: "14px",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
@@ -93,7 +93,7 @@ const sectionLabelStyle: CSSProperties = {
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
 };
-const priorityTagStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", color: "var(--v5-ink-4)" };
+const priorityTagStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-4)" };
 // Transparent hairline group — border-top opens the group, rows carry dividers
 // (first row = no top border); the active row keeps its brand selection tint.
 const groupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
@@ -108,14 +108,14 @@ function rowStyle(divider: boolean, active: boolean): CSSProperties {
 const flagStyle: CSSProperties = { fontSize: "20px", lineHeight: 1 };
 function nameStyle(active: boolean): CSSProperties {
   return {
-    fontSize: "13.5px",
+    fontSize: "13px",
     color: active ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
     fontWeight: active ? 600 : 400,
   };
 }
-const codeStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)" };
+const codeStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)" };
 const rtlBadgeStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-warning)",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   borderRadius: "4px",
@@ -128,7 +128,7 @@ const checkBadgeStyle: CSSProperties = {
   borderRadius: "999px",
   background: "var(--v5-brand)",
 };
-const footStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-4)", marginTop: "20px" };
+const footStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "20px" };
 const backLinkStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-brand)",

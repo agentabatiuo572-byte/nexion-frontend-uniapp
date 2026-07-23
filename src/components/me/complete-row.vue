@@ -4,7 +4,7 @@
   (mono when `mono`, brand-accent when `accent`).
 -->
 <template>
-  <view class="flex items-baseline justify-between" style="gap: 12px; font-size: 11.5px">
+  <view class="flex items-baseline justify-between" style="gap: 12px; font-size: 12px">
     <text style="color: var(--v5-ink-4)">{{ k }}</text>
     <text class="text-right truncate" :class="{ 'font-mono': mono }" :style="{ color: accent ? 'var(--v5-brand)' : 'color-mix(in srgb, var(--v5-ink) 90%, transparent)' }">{{ v }}</text>
   </view>

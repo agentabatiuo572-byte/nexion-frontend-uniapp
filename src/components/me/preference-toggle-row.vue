@@ -39,8 +39,8 @@ const iconBoxStyle: CSSProperties = {
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
 };
-const labelStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 500, color: "var(--v5-ink)" };
-const hintStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
+const labelStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
+const hintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px", lineHeight: 1.375 };
 const switchTrackStyle = computed<CSSProperties>(() => ({
   width: "36px",
   height: "20px",

@@ -115,7 +115,7 @@ const hintStyle: CSSProperties = {
   marginTop: "4px",
   marginBottom: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 function candidateStyle(c: string): CSSProperties {
@@ -133,7 +133,7 @@ function candidateTextStyle(c: string): CSSProperties {
   const on = picked.value === c;
   return {
     fontFamily: "var(--font-v5)",
-    fontSize: "13.5px",
+    fontSize: "13px",
     fontWeight: on ? 600 : 500,
     color: on ? "var(--v5-ink)" : "var(--v5-ink-2)",
   };
@@ -146,7 +146,7 @@ const rerollBtnStyle: CSSProperties = {
 };
 const rerollTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-ink-2)",
 };
@@ -158,7 +158,7 @@ const confirmBtnStyle = computed<CSSProperties>(() => ({
 }));
 const confirmTextStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: picked.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));

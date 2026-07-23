@@ -13,7 +13,7 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 3 1.9 4.6L16 9.5l-4.6 1.9L9.5 16l-1.9-4.6L3 9.5l4.6-1.9z" /></svg>
         <text style="margin-left: 6px">{{ w.label }}</text>
       </view>
-      <text class="block" style="font-size: 13.5px; color: var(--v5-ink); line-height: 1.55">{{ headlineText }}</text>
+      <text class="block" style="font-size: 13px; color: var(--v5-ink); line-height: 1.55">{{ headlineText }}</text>
 
       <view class="grid grid-cols-3" style="gap: 8px; margin-top: 14px">
         <view v-for="tier in tiers" :key="tier.days" class="text-center" :style="tierCellStyle(tier.tone)">
@@ -28,7 +28,7 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
-    <text class="block" style="margin-top: 8px; font-size: 10px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
+    <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ w.disclaimer }}</text>
   </view>
 </template>
 
@@ -99,7 +99,7 @@ const labelStyle: CSSProperties = {
   gap: "6px",
   marginBottom: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
   letterSpacing: "0.06em",
@@ -115,7 +115,7 @@ function tierCellStyle(tone: Tone): CSSProperties {
 }
 function tierLabelStyle(tone: Tone): CSSProperties {
   return {
-    fontSize: "10.5px",
+    fontSize: "12px",
     fontWeight: 500,
     color: toneColor(tone),
     letterSpacing: "0.06em",
@@ -134,7 +134,7 @@ function tierDeltaStyle(tone: Tone): CSSProperties {
   return {
     marginTop: "2px",
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "10.5px",
+    fontSize: "12px",
     color: toneColor(tone),
   };
 }

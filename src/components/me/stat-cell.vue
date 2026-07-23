@@ -25,7 +25,7 @@ const valueStyle = computed<CSSProperties>(() => ({
 }));
 const labelStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };

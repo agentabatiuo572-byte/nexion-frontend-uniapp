@@ -230,7 +230,7 @@ const emailStyle: CSSProperties = {
 };
 const joinedStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 // Section label (de-card spec): 15/600/ink at the 18px content edge.
@@ -266,19 +266,19 @@ const nameRowStyle: CSSProperties = {
 };
 const nameValueStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
 };
 const nameChangeStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: "var(--v5-brand)",
 };
 const fieldHintStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 // De-carded tier: section-label header (title + tier badge) then the bar +
@@ -300,7 +300,7 @@ const tierBarWrapStyle: CSSProperties = {
 };
 const tierLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
@@ -318,7 +318,7 @@ const tierFillStyle: CSSProperties = {
 const tierProgressStyle: CSSProperties = {
   margin: "8px 18px 0",
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 // Wallet-binding nav row keeps its surface (nav-list whitelist) — border dropped.
@@ -337,19 +337,19 @@ const walletIconStyle: CSSProperties = {
 };
 const walletTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
 const walletSubStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const walletActionStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   fontWeight: 500,
   color: paired.value ? "var(--v5-brand-2)" : "var(--v5-brand)",
 }));
@@ -360,14 +360,14 @@ const saveBtnStyle = computed<CSSProperties>(() => ({
 }));
 const saveLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: dirty.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
 const saveFeedbackStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 </script>

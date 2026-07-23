@@ -320,7 +320,7 @@ const rowLabelStyle: CSSProperties = {
 const rowSubStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 const chevronStyle: CSSProperties = { flexShrink: 0 };
@@ -359,7 +359,7 @@ const pwdInputStyle: CSSProperties = {
 };
 const errStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-danger)",
 };
 const pwdCancelStyle: CSSProperties = {
@@ -410,7 +410,7 @@ const toggleThumbStyle = computed<CSSProperties>(() => ({
 const currentBadgeStyle: CSSProperties = {
   flexShrink: 0,
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-success)",
 };

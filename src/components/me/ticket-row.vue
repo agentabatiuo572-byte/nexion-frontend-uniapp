@@ -65,23 +65,23 @@ const iconBoxStyle = computed<CSSProperties>(() => ({
 }));
 const statusStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.05em",
   fontWeight: 600,
   color: statusColor.value,
 }));
-const sepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "10px" };
-const metaStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
-const idStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const sepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "12px" };
+const metaStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
+const idStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 const unreadChipStyle: CSSProperties = {
   marginLeft: "auto",
   padding: "2px 6px",
   borderRadius: "999px",
-  fontSize: "10px",
+  fontSize: "12px",
   fontWeight: 600,
   background: "var(--v5-brand)",
   color: "var(--v5-on-brand)",
 };
-const subjectStyle: CSSProperties = { marginTop: "4px", fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
-const timeStyle: CSSProperties = { marginTop: "4px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const subjectStyle: CSSProperties = { marginTop: "4px", fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const timeStyle: CSSProperties = { marginTop: "4px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 </script>

@@ -93,7 +93,7 @@ const cardStyle: CSSProperties = {
 };
 const footerStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
 };

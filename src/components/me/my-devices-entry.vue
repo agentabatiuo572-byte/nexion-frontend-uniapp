@@ -111,7 +111,7 @@ const fleetTitleStyle: CSSProperties = {
 const fleetMetaStyle: CSSProperties = {
   marginTop: "3px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 function pillStyle(filled: boolean): CSSProperties {

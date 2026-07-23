@@ -43,7 +43,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--v5-on-brand)" stroke="var(--v5-on-brand)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
             </view>
             <text class="font-display" :style="brandNameStyle">NexGrid</text>
-            <text style="margin-left: auto; font-size: 10px; letter-spacing: 0.18em; color: var(--v5-ink-3)">{{ t.uiChrome.proofOfContribution }}</text>
+            <text style="margin-left: auto; font-size: 12px; letter-spacing: 0.18em; color: var(--v5-ink-3)">{{ t.uiChrome.proofOfContribution }}</text>
           </view>
 
           <!-- profile -->
@@ -321,7 +321,7 @@ function tint(svg: string, color: string): string {
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
 const variantLabelStyle: CSSProperties = {
   marginBottom: "6px",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -339,7 +339,7 @@ function variantPillStyle(v: Variant): CSSProperties {
 }
 function variantPillTextStyle(v: Variant): CSSProperties {
   const on = variant.value === v;
-  return { fontSize: "11.5px", fontWeight: 600, color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
+  return { fontSize: "12px", fontWeight: 600, color: on ? "var(--v5-on-brand)" : "var(--v5-ink-3)" };
 }
 const shareCardStyle = computed<CSSProperties>(() => {
   // Proof "certificate" — single container (form b): the gradient fill is the
@@ -357,21 +357,21 @@ const shareCardStyle = computed<CSSProperties>(() => {
   return { marginTop: "12px", borderRadius: "16px", padding: "20px", background: grad[variant.value] };
 });
 const brandMarkStyle: CSSProperties = { width: "28px", height: "28px", borderRadius: "6px", background: "var(--v5-brand)" };
-const brandNameStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--v5-ink)" };
-const profileNameStyle: CSSProperties = { fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)" };
-const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const brandNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, letterSpacing: "-0.01em", color: "var(--v5-ink)" };
+const profileNameStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)" };
+const memberSinceStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function heroKickerStyle(color: string): CSSProperties {
-  return { fontSize: "10px", letterSpacing: "0.16em", color };
+  return { fontSize: "12px", letterSpacing: "0.16em", color };
 }
 const heroBigStyle: CSSProperties = {
   marginTop: "4px",
-  fontSize: "30px",
+  fontSize: "34px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1,
 };
-const heroBigInlineStyle: CSSProperties = { fontSize: "30px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
-const heroUnitStyle: CSSProperties = { fontSize: "14px", fontWeight: 500, color: "var(--v5-ink-3)" };
+const heroBigInlineStyle: CSSProperties = { fontSize: "34px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1 };
+const heroUnitStyle: CSSProperties = { fontSize: "15px", fontWeight: 500, color: "var(--v5-ink-3)" };
 // Nested tint blocks inside the share card — soft surface-2 fill, no border.
 const miniStatStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 60%, transparent)",
@@ -379,12 +379,12 @@ const miniStatStyle: CSSProperties = {
   padding: "8px",
   textAlign: "center",
 };
-const miniLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
+const miniLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-ink-3)" };
 const miniValueStyle: CSSProperties = { marginTop: "2px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const miniValueSmallStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", fontWeight: 600, color: "var(--v5-ink)" };
 const chipsLabelStyle: CSSProperties = {
   marginBottom: "6px",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
@@ -396,7 +396,7 @@ function chipStyle(tintColor: string): CSSProperties {
   return {
     padding: "2px 8px",
     borderRadius: "6px",
-    fontSize: "10px",
+    fontSize: "12px",
     fontWeight: 600,
     background: `color-mix(in srgb, ${tintColor} 13%, transparent)`,
     color: tintColor,
@@ -409,7 +409,7 @@ const refBlockStyle: CSSProperties = {
   gap: "12px",
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
 };
-const refLabelStyle: CSSProperties = { fontSize: "10px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
+const refLabelStyle: CSSProperties = { fontSize: "12px", letterSpacing: "0.18em", color: "var(--v5-brand)" };
 const refCodeStyle: CSSProperties = {
   marginTop: "2px",
   fontSize: "20px",
@@ -423,7 +423,7 @@ const refLinkStyle: CSSProperties = {
   marginLeft: "-4px",
   padding: "0 4px",
   borderRadius: "6px",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const qrBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "8px", background: "#ffffff" };
@@ -432,8 +432,8 @@ function qrCellStyle(on: boolean): CSSProperties {
   return { width: "4px", height: "4px", background: on ? "var(--v5-on-brand)" : "transparent" };
 }
 const nativeBtnStyle: CSSProperties = { height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
-const nativeBtnTextStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-on-brand)" };
-const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "10.5px", color: "var(--v5-ink-3)" };
+const nativeBtnTextStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-on-brand)" };
+const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Share-destination icon grid (form b) — filled surface tiles, no border.
 const destBtnStyle: CSSProperties = {
   background: "var(--v5-surface)",
@@ -444,7 +444,7 @@ const destBtnStyle: CSSProperties = {
 function destIconStyle(color: string): CSSProperties {
   return { width: "36px", height: "36px", margin: "0 auto", borderRadius: "8px", background: `color-mix(in srgb, ${color} 12%, transparent)`, color };
 }
-const destLabelStyle: CSSProperties = { marginTop: "6px", fontSize: "10.5px", color: "var(--v5-ink-2)", lineHeight: 1.25 };
+const destLabelStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-2)", lineHeight: 1.25 };
 const tipStyle: CSSProperties = {
   margin: "16px 0 8px",
   padding: "12px",
@@ -454,7 +454,7 @@ const tipStyle: CSSProperties = {
 const tipTitleStyle: CSSProperties = { fontSize: "12px", fontWeight: 600, color: "var(--v5-warning)" };
 const tipBodyStyle: CSSProperties = {
   marginTop: "2px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "color-mix(in srgb, var(--v5-warning) 85%, transparent)",
   lineHeight: 1.625,
 };

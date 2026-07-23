@@ -95,14 +95,14 @@ const iconBoxStyle = computed<CSSProperties>(() => ({
 }));
 const nameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const specStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const pendingChipStyle: CSSProperties = {
@@ -113,7 +113,7 @@ const pendingChipStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 12%, transparent)",
   color: "var(--v5-warning)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
 };
 const actionStyle: CSSProperties = {
   gap: "6px",
@@ -141,18 +141,18 @@ const tradeinChipStyle: CSSProperties = {
 };
 const tradeinCtaStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-brand)",
 };
 const tradeinMutedStyle: CSSProperties = {
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
   padding: "14px 0",
 };
 const actionLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: actionColor.value,
 }));

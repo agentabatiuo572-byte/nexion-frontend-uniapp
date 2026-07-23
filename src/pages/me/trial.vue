@@ -283,17 +283,17 @@ function goDevices() {
 const boundCardStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const discountWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
 const cardIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const cardNumStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
-const cardFooterStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const cardNumStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
+const cardFooterStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const manageStyle: CSSProperties = { gap: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
 // Discount hook — savings accent kept prominent; de-uppercased (a full
 // sentence, not a mono cap kicker).
-const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13.5px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
+const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
 const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "6px 0" };
-const remainderNoteStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625 };
-const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13.5px", fontWeight: 600 };
-const goEarnStyle: CSSProperties = { width: "100%", height: "44px", borderRadius: "999px", background: "var(--v5-surface-2)", fontSize: "12.5px", color: "var(--v5-ink-2)" };
-const fineprintStyle: CSSProperties = { fontSize: "11px", color: "var(--v5-ink-4)", lineHeight: 1.625, paddingLeft: "4px" };
+const remainderNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625 };
+const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
+const goEarnStyle: CSSProperties = { width: "100%", height: "44px", borderRadius: "999px", background: "var(--v5-surface-2)", fontSize: "13px", color: "var(--v5-ink-2)" };
+const fineprintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625, paddingLeft: "4px" };
 const idleCardStyle: CSSProperties = {
   borderRadius: "16px",
   border: "1px dashed var(--v5-border-strong)",
@@ -302,10 +302,10 @@ const idleCardStyle: CSSProperties = {
   textAlign: "center",
 };
 const idleIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", margin: "0 auto" };
-const idleTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)" };
+const idleTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
 const idleBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375, padding: "0 8px" };
-const idleCtaStyle: CSSProperties = { marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13.5px", fontWeight: 600 };
+const idleCtaStyle: CSSProperties = { marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
 const terminalCardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "24px 20px", textAlign: "center" };
 const terminalIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "var(--v5-surface-2)", margin: "0 auto" };
-const cooldownLinkStyle: CSSProperties = { marginTop: "16px", fontSize: "12.5px", color: "var(--v5-ink-2)" };
+const cooldownLinkStyle: CSSProperties = { marginTop: "16px", fontSize: "13px", color: "var(--v5-ink-2)" };
 </script>

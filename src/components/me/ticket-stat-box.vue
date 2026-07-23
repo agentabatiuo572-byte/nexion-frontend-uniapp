@@ -4,10 +4,15 @@
   Icon is an inline SVG string with `stroke="currentColor"` so it inherits `tint`.
 -->
 <template>
-  <view class="active:opacity-70" :style="boxStyle" role="button" tabindex="0" :aria-label="label" @click="emit('select')">
-    <view class="flex items-center" :style="headStyle">
-      <view v-html="icon" />
-      <text class="truncate" style="margin-left: 4px">{{ label }}</text>
+  <!-- 🔴 三层都要 min-w-0:grid item 与 flex item 的 min-width 默认都是 auto,不肯收缩到
+       内容宽度以下 —— 只要链路上有一层没放开,里面的 .truncate 就永远触发不了,
+       长标签("Awaiting you")直接撑破三宫格(B7 字号迁移把它顶过阈值,探针实测 +14px)。
+       图标 shrink-0 保尺寸,文字 flex-1 min-w-0 才拿得到可截断的宽度。
+       改的是这个根因,不是回退字号。 -->
+  <view class="active:opacity-70" style="min-width: 0" :style="boxStyle" role="button" tabindex="0" :aria-label="label" @click="emit('select')">
+    <view class="flex items-center" style="min-width: 0" :style="headStyle">
+      <view style="flex-shrink: 0" v-html="icon" />
+      <text style="margin-left: 4px; flex: 1; min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ label }}</text>
     </view>
     <text class="block" :style="valueStyle">{{ value }}</text>
   </view>
@@ -27,7 +32,7 @@ const boxStyle = computed<CSSProperties>(() => ({
 }));
 const headStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: props.tint,
 }));
 const valueStyle: CSSProperties = {

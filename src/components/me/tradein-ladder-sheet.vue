@@ -8,7 +8,7 @@
     <view class="absolute inset-0" style="background: var(--v5-bg-color-mask)" @click="emit('close')" />
     <view class="absolute left-0 right-0 bottom-0" :style="sheetStyle">
       <view class="flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-size: 16px; font-weight: 650; color: var(--v5-ink)">{{ t.tradein.ladderTitle }}</text>
+        <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 650; color: var(--v5-ink)">{{ t.tradein.ladderTitle }}</text>
         <view class="grid place-items-center active:opacity-70" :style="closeBtnStyle" @click.stop="emit('close')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
@@ -26,8 +26,8 @@
         </view>
       </view>
 
-      <view style="margin-top: 12px"><text style="font-size: 11.5px; color: var(--v5-ink-3); line-height: 1.65">{{ deviceLine }}</text></view>
-      <view style="margin-top: 4px"><text style="font-size: 11px; color: var(--v5-ink-4); line-height: 1.6">{{ t.tradein.ladderFootnote }}</text></view>
+      <view style="margin-top: 12px"><text style="font-size: 12px; color: var(--v5-ink-3); line-height: 1.65">{{ deviceLine }}</text></view>
+      <view style="margin-top: 4px"><text style="font-size: 12px; color: var(--v5-ink-4); line-height: 1.6">{{ t.tradein.ladderFootnote }}</text></view>
     </view>
   </view>
 </template>
@@ -80,7 +80,7 @@ function rowStyle(current: boolean): CSSProperties {
   return {
     padding: "9px 10px",
     borderRadius: "10px",
-    fontSize: "12.5px",
+    fontSize: "13px",
     color: current ? "var(--v5-success)" : "var(--v5-ink-2)",
     background: current ? "var(--v5-success-soft)" : "transparent",
     fontWeight: current ? 600 : 400,
@@ -88,7 +88,7 @@ function rowStyle(current: boolean): CSSProperties {
 }
 const tableHeadStyle: CSSProperties = {
   padding: "0 10px 6px",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-4)",
 };
 const sheetStyle: CSSProperties = {

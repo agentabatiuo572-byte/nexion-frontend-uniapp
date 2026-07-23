@@ -324,7 +324,7 @@ const slotCaptionStyle: CSSProperties = {
 };
 const subtitleStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 // De-carded: slot meter sits on the page floor (2px optical inset).
@@ -333,18 +333,18 @@ const meterBlockStyle: CSSProperties = {
 };
 const meterLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const meterCountStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const meterMaxStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
 };
 // De-carded device card (form b): filled surface, no border.
@@ -361,7 +361,7 @@ const trialIconBoxStyle: CSSProperties = {
 };
 const trialNameStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -371,14 +371,14 @@ const trialBadgeStyle: CSSProperties = {
   background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)",
   color: "var(--v5-brand-2)",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.06em",
   textTransform: "uppercase",
 };
 const trialSubStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const trialCancelStyle: CSSProperties = {
@@ -388,25 +388,25 @@ const trialCancelStyle: CSSProperties = {
 };
 const trialCancelLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
 const sectionTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const sectionCountStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const slotsFullWarnStyle: CSSProperties = {
   gap: "6px",
   marginTop: "8px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-warning)",
 };
 // Empty state (de-card whitelist): dashed outline, no fill.
@@ -427,7 +427,7 @@ const emptyIconStyle: CSSProperties = {
 const emptyTitleStyle: CSSProperties = {
   marginTop: "12px",
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -446,7 +446,7 @@ const ctaStyle: CSSProperties = {
 };
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-on-brand)",
 };

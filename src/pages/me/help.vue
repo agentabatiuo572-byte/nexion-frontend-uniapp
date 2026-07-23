@@ -229,7 +229,7 @@ const searchInputStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
   borderRadius: "12px",
   padding: "10px 12px 10px 36px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
 };
 function chipStyle(active: boolean): CSSProperties {
@@ -240,7 +240,7 @@ function chipStyle(active: boolean): CSSProperties {
     padding: "0 16px",
     marginRight: "6px",
     borderRadius: "999px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     fontWeight: 500,
     background: active ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
@@ -254,10 +254,10 @@ const faqWrapStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const emptyStyle: CSSProperties = { padding: "24px", textAlign: "center" };
-const emptyTextStyle: CSSProperties = { fontSize: "13.5px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };
+const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 80%, transparent)" };
 const faqDividerStyle: CSSProperties = { borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const faqHeadStyle: CSSProperties = { gap: "12px", padding: "14px 0", minHeight: "48px" };
-const faqQStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const faqQStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
 function chevStyle(open: boolean): CSSProperties {
   return { transform: open ? "rotate(180deg)" : "rotate(0)", transition: "transform 150ms ease" };
 }
@@ -272,7 +272,7 @@ const botCardStyle: CSSProperties = {
 };
 const botHeadStyle: CSSProperties = { gap: "8px", padding: "12px 16px", borderBottom: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
 const botIconBoxStyle: CSSProperties = { width: "32px", height: "32px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const botTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
+const botTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const botScrollStyle: CSSProperties = { maxHeight: "280px" };
 function bubbleStyle(isUser: boolean): CSSProperties {
   return {
@@ -284,7 +284,7 @@ function bubbleStyle(isUser: boolean): CSSProperties {
 }
 function bubbleTextStyle(isUser: boolean): CSSProperties {
   return {
-    fontSize: "12.5px",
+    fontSize: "13px",
     color: isUser ? "var(--v5-ink)" : "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
     lineHeight: 1.375,
   };
@@ -292,7 +292,7 @@ function bubbleTextStyle(isUser: boolean): CSSProperties {
 const thinkingStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "16px", padding: "8px 12px" };
 const thinkingTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const botInputRowStyle: CSSProperties = { gap: "8px", padding: "10px 12px", borderTop: "1px solid color-mix(in srgb, var(--v5-border) 70%, transparent)" };
-const botInputStyle: CSSProperties = { flex: "1", background: "transparent", fontSize: "13.5px", color: "var(--v5-ink)" };
+const botInputStyle: CSSProperties = { flex: "1", background: "transparent", fontSize: "13px", color: "var(--v5-ink)" };
 function sendBtnStyle(active: boolean): CSSProperties {
   return { width: "32px", height: "32px", borderRadius: "8px", background: active ? "var(--v5-brand-2)" : "var(--v5-surface-2)" };
 }
@@ -302,8 +302,8 @@ const contactRowStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const mailBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-brand) 10%, transparent)" };
-const contactTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
-const contactHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const contactTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const contactHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const contactCtaStyle: CSSProperties = {
   // 《07》tap≥44:原 32px
   height: "44px",

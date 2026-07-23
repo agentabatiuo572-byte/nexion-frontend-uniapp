@@ -264,13 +264,13 @@ function closeTicket() {
   mode.value = { kind: "list" };
 }
 
-const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "12.5px", color: "var(--v5-brand)" };
-const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
+const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };
+const newBtnStyle: CSSProperties = { width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "15px" };
 // Plain info line on the page floor — the boxed chrome added nothing.
 const avgRowStyle: CSSProperties = {
   gap: "8px",
   padding: "0 6px",
-  fontSize: "11.5px",
+  fontSize: "12px",
 };
 const avgLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", color: "var(--v5-brand-2)", fontWeight: 600 };
@@ -283,7 +283,7 @@ function tabStyle(active: boolean): CSSProperties {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "12px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     fontWeight: 600,
     background: active ? "var(--v5-brand)" : "transparent",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -292,9 +292,9 @@ function tabStyle(active: boolean): CSSProperties {
 // Empty state — dashed outline hint, no fill (V5 empty-state idiom).
 const emptyStyle: CSSProperties = { borderRadius: "16px", border: "1px dashed var(--v5-border-strong)", padding: "32px", textAlign: "center" };
 const emptyTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
-const noteStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
-const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const formLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "11px", color: "var(--v5-ink-3)", marginBottom: "8px" };
+const noteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625, paddingTop: "4px" };
+const filterFeedbackStyle: CSSProperties = { marginTop: "-4px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const formLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)", marginBottom: "8px" };
 function catChipStyle(active: boolean): CSSProperties {
   return {
     height: "44px",
@@ -302,7 +302,7 @@ function catChipStyle(active: boolean): CSSProperties {
     alignItems: "center",
     padding: "0 16px",
     borderRadius: "999px",
-    fontSize: "11.5px",
+    fontSize: "12px",
     fontWeight: 600,
     background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
@@ -315,7 +315,7 @@ const inputStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-3)",
   padding: "0 12px",
-  fontSize: "14px",
+  fontSize: "15px",
   color: "var(--v5-ink)",
 };
 const textareaStyle: CSSProperties = {
@@ -324,22 +324,22 @@ const textareaStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-3)",
   padding: "10px 12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   lineHeight: 1.625,
 };
-const cancelBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontWeight: 600, fontSize: "14px" };
-const submitBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "14px" };
+const cancelBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontWeight: 600, fontSize: "15px" };
+const submitBtnStyle: CSSProperties = { height: "48px", borderRadius: "12px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontWeight: 600, fontSize: "15px" };
 // Ticket header — sits on the page floor, hairline closes the block.
 const detailMetaStyle: CSSProperties = { padding: "4px 2px 14px", borderBottom: "1px solid var(--v5-border)" };
 function statusTextStyle(s: TicketStatus): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
+  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", fontWeight: 600, color: STATUS_COLOR[s] };
 }
-const dotSepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "10px" };
-const catTextStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const dotSepStyle: CSSProperties = { color: "var(--v5-ink-4)", fontSize: "12px" };
+const catTextStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 const detailSubjectStyle: CSSProperties = { marginTop: "6px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
-const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
+const detailTimesStyle: CSSProperties = { marginTop: "8px", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
+const messagesLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", color: "var(--v5-ink-3)" };
 // Chat bubbles keep their fill (bubble semantics) — borders dropped,
 // the fill alone is the single visual difference.
 function msgBubbleStyle(isUser: boolean): CSSProperties {
@@ -353,10 +353,10 @@ function msgBubbleStyle(isUser: boolean): CSSProperties {
 }
 const msgHeadStyle: CSSProperties = { marginBottom: "4px" };
 function msgAuthorStyle(isUser: boolean): CSSProperties {
-  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.06em", fontWeight: 600, color: isUser ? "var(--v5-brand)" : "var(--v5-brand-2)" };
+  return { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.06em", fontWeight: 600, color: isUser ? "var(--v5-brand)" : "var(--v5-brand-2)" };
 }
-const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
-const msgBodyStyle: CSSProperties = { fontSize: "12.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
+const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
+const msgBodyStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
 // Reply zone — wrapper card dropped; the recessed textarea is the unit.
 const replyCardStyle: CSSProperties = { padding: "4px 2px 0" };
 const replyTextareaStyle: CSSProperties = {
@@ -365,11 +365,11 @@ const replyTextareaStyle: CSSProperties = {
   borderRadius: "12px",
   background: "var(--v5-surface-3)",
   padding: "8px 12px",
-  fontSize: "13.5px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   lineHeight: 1.625,
 };
-const closeBtnStyle: CSSProperties = { height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)", fontWeight: 600, fontSize: "12.5px" };
+const closeBtnStyle: CSSProperties = { height: "40px", borderRadius: "8px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)", fontWeight: 600, fontSize: "13px" };
 function sendReplyStyle(active: boolean): CSSProperties {
   return {
     height: "40px",
@@ -377,7 +377,7 @@ function sendReplyStyle(active: boolean): CSSProperties {
     background: active ? "var(--v5-brand)" : "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
     fontWeight: 600,
-    fontSize: "12.5px",
+    fontSize: "13px",
   };
 }
 </script>

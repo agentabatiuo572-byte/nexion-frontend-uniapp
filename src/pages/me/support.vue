@@ -123,7 +123,7 @@ const pingStyle: CSSProperties = {
 };
 const dotStyle: CSSProperties = { width: "8px", height: "8px", borderRadius: "999px", background: "var(--v5-brand)" };
 const onlineTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", fontWeight: 500 };
-const avgStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)" };
+const avgStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 // Channels — transparent hairline nav list on the floor (2px optical indent,
 // border-top opens the group; per-row hairlines below). No card chrome.
 const cardStyle: CSSProperties = {
@@ -142,18 +142,18 @@ function iconBoxStyle(bg: string): CSSProperties {
   return { width: "40px", height: "40px", borderRadius: "12px", background: bg };
 }
 const channelLabelStyle: CSSProperties = {
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
-const channelHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
+const channelHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 // Pinned notes — block on the page floor; the pin-icon header stands in for a
 // section label, whitespace above separates it from the channels group.
 const pinnedCardStyle: CSSProperties = {
   padding: "0 2px",
 };
 const pinnedTitleStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
 };
@@ -165,5 +165,5 @@ const pinDotStyle: CSSProperties = {
   background: "var(--v5-warning)",
   flexShrink: 0,
 };
-const pinTextStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
+const pinTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.6 };
 </script>

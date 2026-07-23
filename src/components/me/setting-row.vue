@@ -56,12 +56,12 @@ const iconChipStyle: CSSProperties = {
 };
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "13px",
   color: "var(--v5-ink)",
   whiteSpace: "nowrap",
 };
 const valueWrapStyle: CSSProperties = {
-  fontSize: "12.5px",
+  fontSize: "13px",
   whiteSpace: "nowrap",
   maxWidth: "170px",
   textAlign: "right",

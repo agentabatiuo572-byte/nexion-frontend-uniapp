@@ -155,14 +155,14 @@ const taskCardStyle: CSSProperties = {
 };
 const taskModelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
 const taskRewardStyle: CSSProperties = {
   marginTop: "2px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "11px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const pctStyle: CSSProperties = {
@@ -172,7 +172,7 @@ const pctStyle: CSSProperties = {
 };
 const etaStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const trackStyle: CSSProperties = {
@@ -196,7 +196,7 @@ const waitBtnStyle: CSSProperties = {
 };
 const waitLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
@@ -209,7 +209,7 @@ const forceBtnStyle: CSSProperties = {
 };
 const forceLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-brand-2)",
 };
@@ -221,7 +221,7 @@ const backBtnStyle: CSSProperties = {
 };
 const backLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-2)",
 };
 </script>

@@ -177,8 +177,8 @@ const heroIconBoxStyle: CSSProperties = {
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 22%, transparent)",
 };
-const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
-const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
+const heroLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand-2)" };
+const heroTitleStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const heroSubStyle: CSSProperties = { marginTop: "6px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const acceptedChipStyle: CSSProperties = {
   marginTop: "10px",
@@ -187,7 +187,7 @@ const acceptedChipStyle: CSSProperties = {
   borderRadius: "6px",
   background: "color-mix(in srgb, var(--v5-brand) 14%, transparent)",
   color: "var(--v5-brand)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   display: "inline-flex",
 };
 // De-carded: disclosure sections read on the page floor (legal page → clear,
@@ -198,11 +198,11 @@ const sectionsStyle: CSSProperties = {
   flexDirection: "column",
   gap: "18px",
 };
-const blockNumStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10.5px", color: "var(--v5-brand-2)" };
+const blockNumStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-brand-2)" };
 // Unit title + paragraph body per the de-card typography ladder (body = ink-2,
 // never ink-3, at a legible 13.5/1.65 for a legal disclosure).
-const blockTitleStyle: CSSProperties = { fontSize: "14px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
-const blockBodyStyle: CSSProperties = { fontSize: "13.5px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
+const blockTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.4 };
+const blockBodyStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.65 };
 // Selected section keeps a soft brand-2 read-tracking tint (no border — inner
 // blocks use soft fill, not a stroke); horizontal bleed reaches the gutter.
 function blockStyle(selected: boolean): CSSProperties {
@@ -216,7 +216,7 @@ function blockStyle(selected: boolean): CSSProperties {
 const selectedBlockStyle: CSSProperties = {
   marginBottom: "6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-brand-2)",
 };
 const hintStyle: CSSProperties = {
@@ -225,7 +225,7 @@ const hintStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
   padding: "12px",
 };
-const hintTextStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-warning)" };
+const hintTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)" };
 // Acknowledgment gate — de-carded onto the page floor; a hairline opens the
 // action group (checkbox control + brand CTA pill are whitelisted as-is).
 const ackCardStyle: CSSProperties = {
@@ -241,7 +241,7 @@ const checkboxStyle = computed<CSSProperties>(() => ({
   background: checked.value || accepted.value ? "var(--v5-brand)" : "transparent",
   border: checked.value || accepted.value ? "1px solid var(--v5-brand)" : "1px solid var(--v5-border-strong)",
 }));
-const checkLabelStyle: CSSProperties = { fontSize: "12.5px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
+const checkLabelStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)", lineHeight: 1.625 };
 const acceptBtnStyle = computed<CSSProperties>(() => ({
   marginTop: "16px",
   width: "100%",
@@ -249,8 +249,8 @@ const acceptBtnStyle = computed<CSSProperties>(() => ({
   borderRadius: "999px",
   background: canAccept.value || accepted.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
   color: canAccept.value || accepted.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
 }));
-const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "10px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
+const disclaimerStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.375 };
 </script>

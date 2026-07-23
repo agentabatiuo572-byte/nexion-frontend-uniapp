@@ -193,7 +193,7 @@ function presetTargetStyle(p: number): CSSProperties {
 function presetTargetLabelStyle(p: number): CSSProperties {
   return {
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-    fontSize: "11px",
+    fontSize: "12px",
     color: target.value === p ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
@@ -218,13 +218,13 @@ function presetDeadlineLabelStyle(d: number): CSSProperties {
 // 2px inset (mx-4 + this) aligns with the labels + groups below at 18px.
 const heroStyle: CSSProperties = { padding: "0 2px" };
 const heroLabelStyle: CSSProperties = {
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-warning)",
 };
 const heroTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "18px",
+  fontSize: "20px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1.25,
@@ -232,7 +232,7 @@ const heroTitleStyle: CSSProperties = {
 const heroSubStyle: CSSProperties = {
   marginTop: "6px",
   fontFamily: "var(--font-v5)",
-  fontSize: "12.5px",
+  fontSize: "13px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
@@ -262,7 +262,7 @@ const targetInputStyle: CSSProperties = {
   height: "40px",
   background: "transparent",
   fontFamily: "var(--font-v5)",
-  fontSize: "28px",
+  fontSize: "26px",
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
@@ -275,13 +275,13 @@ const recCardStyle: CSSProperties = {
 const recHeaderStyle: CSSProperties = {
   marginBottom: "6px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.14em",
   color: "var(--v5-brand)",
 };
 const recPathStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 600,
   color: "var(--v5-ink)",
   lineHeight: 1.375,
@@ -313,7 +313,7 @@ const saveBtnStyle: CSSProperties = {
 };
 const saveLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "14px",
+  fontSize: "15px",
   fontWeight: 600,
   color: "var(--v5-on-brand)",
 };
@@ -353,17 +353,17 @@ const goalRemoveStyle: CSSProperties = {
 const goalDeadlineStyle: CSSProperties = {
   marginTop: "4px",
   fontFamily: "var(--font-v5)",
-  fontSize: "10.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const goalFootMutedStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
 const goalFootPctStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-warning)",
 };
 const achievedBadgeStyle: CSSProperties = {
@@ -375,7 +375,7 @@ const achievedBadgeStyle: CSSProperties = {
 };
 const achievedLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-brand)",
 };
 </script>

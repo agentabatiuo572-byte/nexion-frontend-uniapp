@@ -147,13 +147,13 @@ const cardStyle: CSSProperties = {
 };
 const catTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 550,
   color: "var(--v5-ink)",
 };
 const bigNumStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "30px",
+  fontSize: "34px",
   fontWeight: 600,
   lineHeight: 1.1,
   letterSpacing: "-0.02em",
@@ -161,13 +161,13 @@ const bigNumStyle: CSSProperties = {
 };
 const unitStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
-  fontSize: "13.5px",
+  fontSize: "13px",
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
 const descStyle: CSSProperties = {
   marginTop: "8px",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   textWrap: "pretty",
 } as CSSProperties;
@@ -182,7 +182,7 @@ const circleStyle: CSSProperties = {
 const hintStyle: CSSProperties = {
   margin: "8px 24px 0",
   textAlign: "center",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
