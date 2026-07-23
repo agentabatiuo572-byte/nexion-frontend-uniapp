@@ -69,7 +69,7 @@
                 </view>
                 <text class="block" v-if="streak < m.day" :style="milestoneLeftStyle">{{ daysLeftText(m.day) }}</text>
               </view>
-              <view :style="milestoneBtnStyle(m)" @click="handleClaimMilestone(m)">
+              <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" @click="handleClaimMilestone(m)">
                 <text>{{ claimedSet.has(m.day) ? t.daily.milestones.claimed : t.daily.milestones.claim }}</text>
               </view>
             </view>
@@ -90,7 +90,7 @@
               <text class="block" :style="saverHeadlineStyle">{{ saverHeadlineText }}</text>
               <text class="block" :style="saverCountStyle">{{ saverCountText }}</text>
             </view>
-            <view :style="saverBtnStyle" @click="handleUseSaver">
+            <view class="active:opacity-80 transition-opacity" :style="saverBtnStyle" @click="handleUseSaver">
               <text>{{ t.daily.saver.use }}</text>
             </view>
           </view>
@@ -136,7 +136,7 @@
         </view>
 
         <!-- Withdrawal context -->
-        <view :style="withdrawCardStyle" class="active:scale-[0.99]" @click="goWithdraw">
+        <view :style="withdrawCardStyle" class="active:scale-[0.98]" @click="goWithdraw">
           <view class="flex items-center" style="gap: 12px">
             <view class="grid place-items-center" :style="withdrawIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
@@ -152,7 +152,7 @@
         <view>
           <text class="block px-1" :style="historyLabelStyle">{{ t.daily.recent }}</text>
           <view class="overflow-hidden" :style="historyCardStyle">
-            <text v-if="faucet.history.length === 0" class="block text-center" :style="historyEmptyStyle">{{ t.daily.noActivity }}</text>
+            <EmptyState v-if="faucet.history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
             <view
               v-for="(h, i) in historyRows"
               v-else
@@ -176,6 +176,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StreakPowerUps from "@/components/daily/streak-power-ups.vue";
@@ -477,7 +478,7 @@ function milestoneBtnStyle(m: Milestone): CSSProperties {
   const claimed = claimedSet.value.has(m.day);
   const canClaim = streak.value >= m.day && !claimed;
   return {
-    height: "36px",
+    minHeight: "44px",  // 《07》tap≥44(原 36)
     padding: "0 14px",
     borderRadius: "999px",
     background: canClaim ? "var(--v5-brand)" : "transparent",

@@ -49,9 +49,7 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <view v-if="filtered.length === 0" :style="emptyStyle">
-          <text :style="emptyTextStyle">{{ emptyResults }}</text>
-        </view>
+        <EmptyState v-if="filtered.length === 0" kind="no-search-results" :title="t.empty.searchTitle" :desc="t.empty.searchDesc" compact />
         <template v-else>
           <view
             v-for="(it, i) in filtered"
@@ -103,7 +101,8 @@
             @input="onBotInput"
             @confirm="sendToBot"
           />
-          <view class="grid place-items-center" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot">
+          <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
+          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>
@@ -119,7 +118,7 @@
             <text class="block" :style="contactTitleStyle">{{ w.contactSupport }}</text>
             <text class="block" :style="contactHintStyle">{{ w.contactHint }}</text>
           </view>
-          <view :style="contactCtaStyle" role="button" tabindex="0" :aria-label="w.contactCta" @click="goTicketCreate">
+          <view class="active:opacity-90 transition-opacity" :style="contactCtaStyle" role="button" tabindex="0" :aria-label="w.contactCta" @click="goTicketCreate">
             <text>{{ w.contactCta }}</text>
           </view>
         </view>
@@ -131,6 +130,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -305,7 +305,8 @@ const mailBoxStyle: CSSProperties = { width: "40px", height: "40px", borderRadiu
 const contactTitleStyle: CSSProperties = { fontSize: "13.5px", fontWeight: 600, color: "var(--v5-ink)" };
 const contactHintStyle: CSSProperties = { fontSize: "11.5px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const contactCtaStyle: CSSProperties = {
-  height: "32px",
+  // 《07》tap≥44:原 32px
+  height: "44px",
   padding: "0 12px",
   display: "flex",
   alignItems: "center",

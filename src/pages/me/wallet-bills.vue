@@ -30,9 +30,7 @@
       </view>
 
       <!-- Empty -->
-      <view v-if="filtered.length === 0" :style="emptyStyle">
-        <text class="block" :style="emptyTextStyle">{{ t.bills.empty }}</text>
-      </view>
+      <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
 
       <!-- Grouped list -->
       <view v-else :style="listWrapStyle">
@@ -86,6 +84,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";

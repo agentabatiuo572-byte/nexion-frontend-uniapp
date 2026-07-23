@@ -670,6 +670,11 @@ function onForce() {
   display: grid;
   place-items: center;
   z-index: 2;
+  transition: opacity 0.15s;
+}
+/* 《08》§2:尺寸早就补到 44 了,但按下反馈一直缺 */
+.tis-close:active {
+  opacity: 0.7;
 }
 .tis-head {
   margin-bottom: 12px;

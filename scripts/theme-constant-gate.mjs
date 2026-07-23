@@ -243,9 +243,23 @@ const known = new Set(baseline.map(key));
 const added = hits.filter((h) => !known.has(key(h)));
 const gone = baseline.filter((b) => !hits.some((h) => key(h) === key(b)));
 
+// 🔴 二次确认再 fail(2026-07-23 C3 加):首页任务卡/事件卡有轮播,亮暗两次渲染
+//    偶尔配对到不同的卡 → 报一条查无实据的「新增」。已两次踩到:上一轮连跑 3 次
+//    全绿、本轮 12 次定点采样也抓不到那个色值。稳定复现的真违例两次都在,
+//    偶发错位第二次就消失 —— 一次重扫就能把这类噪声挡在门外,代价只有疑似命中时多扫一遍。
+let confirmed = added;
 if (added.length) {
-  console.error(`双主题恒定着色:新增 ${added.length} 条(基线 ${baseline.length},消失 ${gone.length})\n`);
-  for (const h of added) console.error(`  ${h.route}  ${h.prop} = rgb(${h.value})  ×${h.count}  « ${h.sample}`);
+  console.error(`疑似新增 ${added.length} 条,重扫一次确认(轮播错位会在这一步消失)…`);
+  const second = await sweep();
+  const secondKeys = new Set(second.map(key));
+  const flaky = added.filter((h) => !secondKeys.has(key(h)));
+  confirmed = added.filter((h) => secondKeys.has(key(h)));
+  for (const h of flaky) console.error(`  [偶发·已忽略] ${h.route}  ${h.prop} = rgb(${h.value})  « ${h.sample}`);
+}
+
+if (confirmed.length) {
+  console.error(`双主题恒定着色:新增 ${confirmed.length} 条(基线 ${baseline.length},消失 ${gone.length})\n`);
+  for (const h of confirmed) console.error(`  ${h.route}  ${h.prop} = rgb(${h.value})  ×${h.count}  « ${h.sample}`);
   console.error(`\n这些元素在亮/暗两个主题下颜色完全一样 = 没跟主题。改走 var(--token) / color-mix(var(--token) N%)。`);
   console.error(`确属设计上就该恒定 → node scripts/theme-constant-gate.mjs --update-baseline 收编并写 note 理由。`);
   process.exit(1);

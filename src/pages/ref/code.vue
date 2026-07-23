@@ -115,11 +115,11 @@
       <!-- Footer -->
       <view class="text-center" :style="footerStyle">
         <text>{{ t.ref.legalLine }} </text>
-        <text :style="footerLinkStyle" @click="goTerms">{{ t.ref.terms }}</text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTerms">{{ t.ref.terms }}</text>
         <text> · </text>
         <text>{{ t.ref.privacy }}</text>
         <text> · </text>
-        <text :style="footerLinkStyle" @click="goTrust">{{ t.ref.trustCenter }}</text>
+        <text class="nx-ref-footer-link" :style="footerLinkStyle" @click="goTrust">{{ t.ref.trustCenter }}</text>
       </view>
     </view>
   </StandalonePageShell>
@@ -312,5 +312,17 @@ const partnerChipStyle: CSSProperties = {
 };
 const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
 const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "10.5px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
-const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)" };
+// inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 61×14)
+const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", padding: "15px 10px", margin: "0 -10px" };
 </script>
+
+<style scoped>
+/* 《08》§2:footer 的两个法务链接是 inline style 对象驱动的,加不了 :active,故走 class。
+   纵向 padding 已在 footerLinkStyle 里扩过热区(inline 元素纵向 padding 不撑行高)。 */
+.nx-ref-footer-link {
+  transition: opacity 0.15s;
+}
+.nx-ref-footer-link:active {
+  opacity: 0.6;
+}
+</style>

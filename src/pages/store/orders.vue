@@ -13,15 +13,7 @@
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
       <!-- Empty state -->
-      <view v-if="orderList.length === 0" class="mx-4 rounded-2xl text-center active:opacity-95" :style="emptyCardStyle" role="button" tabindex="0" :aria-label="t.orders.browseStore" @click.stop="goStore">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m7.5 4.27 9 5.15" /><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
-        <text class="block" style="font-size: 13.5px; color: var(--v5-ink-2); margin-top: 12px">{{ t.orders.empty }}</text>
-        <text class="block" style="font-size: 11.5px; color: var(--v5-ink-3); margin-top: 6px; line-height: 1.625">{{ t.orders.emptyHint }}</text>
-        <view class="inline-flex items-center justify-center active:opacity-85" :style="browseBtnStyle" @click.stop="goStore">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-          <text @click.stop="goStore">{{ t.orders.browseStore }}</text>
-        </view>
-      </view>
+      <EmptyState v-if="orderList.length === 0" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
@@ -62,6 +54,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { useOrders, type OrderStatus } from "@/store/orders";
 import { useSetPageHeader } from "@/composables/use-page-header";

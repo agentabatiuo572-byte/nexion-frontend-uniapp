@@ -163,6 +163,13 @@ onUnmounted(() => {
   right: 16px;
   bottom: 100px;
   z-index: 40;
+  transition: opacity 0.15s;
+}
+/* 《08》§2 按下反馈。全站五个 tab 都能看到这个球,原先按下去毫无变化。
+   只动 opacity 不动 transform —— .nova-float 的 animation 一直在写 transform,
+   普通声明压不过 animation,写了也不会生效。 */
+.nx-nova-bubble:active {
+  opacity: 0.7;
 }
 .nx-nova-btn {
   position: relative;

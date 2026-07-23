@@ -21,12 +21,12 @@
       </view>
 
       <view class="grid grid-cols-2">
+        <!-- 横向 padding 14 → 12:①《03》§1 8pt grid(14 不在阶梯,12=space-3)
+             ②腾出 4px,修 h3 20px 指标值(如 #18,742)撑破容器 2px 的溢出 -->
         <view
           v-for="(m, i) in metrics"
           :key="m.k"
           class="grid items-center gap-2"
-          <!-- 横向 padding 14 → 12:①《03》§1 8pt grid(14 不在阶梯,12=space-3)
-               ②腾出 4px,修 h3 20px 指标值(如 #18,742)撑破容器 2px 的溢出 -->
           :style="{ gridTemplateColumns: '1fr 60px', padding: '12px', borderRight: i % 2 === 0 ? '1px solid var(--v5-border)' : 'none', borderBottom: i < 2 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         >
           <view class="min-w-0">

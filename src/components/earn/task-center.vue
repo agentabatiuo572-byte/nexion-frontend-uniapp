@@ -59,7 +59,7 @@
     <view class="pt-3 pb-2" :style="historyHeadStyle">
       <view class="flex items-center justify-between">
         <text style="font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--v5-ink-3)">{{ t.taskHistory.tabHistory }}</text>
-        <view class="flex items-center active:opacity-60" style="gap: 2px; padding: 6px 0 6px 16px" @click="goReceipts">
+        <view class="flex items-center active:opacity-60" style="gap: 2px; padding: 0 0 0 16px; min-height: 44px" @click="goReceipts">
           <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.taskHistory.viewAll }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>

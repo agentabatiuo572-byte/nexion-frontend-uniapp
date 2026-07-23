@@ -51,11 +51,7 @@
         </view>
 
         <!-- Empty state -->
-        <view v-if="products.length === 0" class="px-4 py-8 text-center">
-          <text class="block" style="font-size: 36px; margin-bottom: 8px">🛒</text>
-          <text class="block" :style="emptyTitleStyle">{{ t.bundle.emptyTitle }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ t.bundle.emptyBody }}</text>
-        </view>
+        <EmptyState v-if="products.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
 
         <!-- Item rows -->
         <view
@@ -145,6 +141,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, BUNDLE_DISCOUNT_TIERS, type BundleDiscountTier } from "@/store/cart";

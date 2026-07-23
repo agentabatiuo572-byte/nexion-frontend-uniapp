@@ -56,6 +56,7 @@
                 <text class="block" :style="rewardStyle(isUnlocked(a.id))">{{ rewardLabel(a) }}</text>
                 <view
                   v-if="isUnlocked(a.id)"
+                  class="active:opacity-80 transition-opacity"
                   :style="claimBtnStyle(isClaimed(a.id))"
                   @click="handleClaim(a.id)"
                 >

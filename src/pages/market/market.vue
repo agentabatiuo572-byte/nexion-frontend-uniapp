@@ -96,11 +96,11 @@
 
         <!-- ───────── CATEGORY TABS ───────── -->
         <view class="grid grid-cols-5" :style="catGridStyle">
+          <!-- 《08》§2 nx-press-sm 恒定:选中态原先是空 class,按下零反馈 -->
           <view
             v-for="cat in CATEGORIES"
             :key="cat.id"
-            class="grid place-items-center"
-            :class="activeCat === cat.id ? '' : 'nx-press-sm'"
+            class="grid place-items-center nx-press-sm"
             :style="catItemStyle(activeCat === cat.id)"
             @click="activeCat = cat.id"
           >
@@ -116,9 +116,7 @@
             <text class="text-right">{{ t.marketPage.columns.price }}</text>
             <text class="text-right">{{ t.marketPage.columns.change }}</text>
           </view>
-          <view v-if="filtered.length === 0" class="text-center" :style="emptyStyle">
-            <text>{{ t.marketPage.empty.watchlist }}</text>
-          </view>
+          <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <template v-else>
             <TokenRow
               v-for="tk in filtered"
@@ -139,6 +137,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexChart from "@/components/market/nex-chart.vue";
 import TokenRow from "@/components/market/token-row.vue";

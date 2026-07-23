@@ -10,15 +10,20 @@
   canStart(). Tap opens the trial claim sheet. <button> → <view @click> (uni).
 -->
 <template>
+  <!-- 《08》§2:原 active:scale-[0.98] = 0.2% 缩放,肉眼与探针都测不出 —— 声明了等于没有。
+       但反馈也不能直接写在这一层:rootStyle 的入场动画是 `v5-ticket-enter ... both`,
+       它的 100% 帧同时锁着 opacity 和 transform,animation 优先级压过普通声明,
+       写在 root 上的 active:opacity / active:scale 一律无效(原作者那个 0.998 多半就是这么来的)。
+       所以反馈挂到内层 body —— 它不受 animation 约束。 -->
   <view
     v-if="visible"
     ref="elRef"
-    class="block w-full active:scale-[0.998] transition-transform"
+    class="block w-full nx-trial-hero"
     :style="rootStyle"
     @click="onClick"
   >
     <!-- Coupon body — frosted glass purple theme -->
-    <view :style="bodyStyle">
+    <view class="nx-trial-hero__body" :style="bodyStyle">
       <!-- Shimmer sweep (gated on played) -->
       <view :style="shimmerStyle" />
 
@@ -166,3 +171,14 @@ function onClick() {
   claimSheet.show();
 }
 </script>
+
+<style scoped>
+/* 《08》§2 按下反馈。挂在 body 而不是 root:root 被入场动画 v5-ticket-enter(fill-mode: both)
+   锁着 opacity 与 transform,animation 优先级压过普通声明,写在 root 上一律不生效。 */
+.nx-trial-hero__body {
+  transition: opacity 0.15s;
+}
+.nx-trial-hero:active .nx-trial-hero__body {
+  opacity: 0.85;
+}
+</style>

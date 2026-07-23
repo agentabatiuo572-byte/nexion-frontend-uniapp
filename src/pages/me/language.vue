@@ -46,7 +46,7 @@
 
         <text class="block text-center" :style="footStyle">{{ localeCount }} languages · {{ t.language.autoDetect }}</text>
 
-        <view class="flex items-center justify-center" :style="backLinkStyle" @click="goAccount">
+        <view class="flex items-center justify-center active:opacity-70 transition-opacity" :style="backLinkStyle" @click="goAccount">
           <text>{{ t.language.backToAccount }}</text>
         </view>
       </view>

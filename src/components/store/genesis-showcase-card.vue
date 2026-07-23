@@ -14,7 +14,7 @@
 -->
 <template>
   <view>
-    <view class="relative overflow-hidden active:scale-[0.99]" :style="cardStyle" @click="onCardTap">
+    <view class="relative overflow-hidden active:scale-[0.98]" :style="cardStyle" @click="onCardTap">
       <!-- Gold aurora wash（装饰,卡内合法光晕:bg+overflow-hidden）-->
       <view aria-hidden :style="auroraStyle" />
 

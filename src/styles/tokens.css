@@ -911,3 +911,13 @@ body {
 html {
   font-size: 16px !important;
 }
+
+/* ── 输入框触控地板(2026-07-23 C3)──
+   《07》tap≥44 / WCAG 2.5.8。输入框高度眼下由各页 inline 的 fontSize × line-height 决定,
+   实测 10 处落在 18–42px 之间 —— 最矮的 team/agent 三个字段只有 18px,连 AA 的 24px 都不到。
+   逐页改 inline style 治不了下一个新页,所以把地板焊在编译产物 uni-input 上:
+   已 ≥44 的不受影响(min-height 只抬不压),uni 自带的 .uni-input-wrapper 是
+   height:100% + align-items:center,元素长高后文字自动保持垂直居中。 */
+uni-input {
+  min-height: 44px;
+}

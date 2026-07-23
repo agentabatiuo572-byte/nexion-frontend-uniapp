@@ -92,7 +92,7 @@
         </view>
 
         <!-- auto-placement entry -->
-        <view class="rounded-2xl active:scale-[0.99]" :style="spilloverStyle" @click="go('/pages/team/unilevel')">
+        <view class="rounded-2xl active:scale-[0.98]" :style="spilloverStyle" @click="go('/pages/team/unilevel')">
           <view class="flex items-start" style="gap: 10px">
             <view class="rounded-lg grid place-items-center shrink-0" :style="spilloverIconStyle">
               <text :style="{ fontSize: '20px' }">↳</text>
@@ -237,7 +237,7 @@ function go(url: string) {
 const howItWorksStyle: CSSProperties = {
   gap: "6px",
   padding: "0 12px",
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
   fontSize: "12px",

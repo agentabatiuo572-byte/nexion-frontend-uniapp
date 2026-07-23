@@ -23,11 +23,7 @@
       <!-- ── Vouchers (ticket-style cards: value stub + perforation + body) ── -->
       <template v-if="cat === 'voucher'">
         <!-- Empty -->
-        <view v-if="available.length === 0 && expired.length === 0" :style="emptyStyle">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
-          <text class="block" :style="emptyTitleStyle">{{ t.rewards.empty }}</text>
-          <text class="block" :style="emptyHintStyle">{{ t.rewards.emptyHint }}</text>
-        </view>
+        <EmptyState v-if="available.length === 0 && expired.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
 
         <template v-else>
           <view v-if="available.length > 0">
@@ -84,11 +80,7 @@
 
       <!-- ── USDT / NEX reward records (paginated) ── -->
       <template v-else>
-        <view v-if="records.length === 0" :style="emptyStyle">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M20 12v10H4V12" /><path d="M2 7h20v5H2z" /><path d="M12 22V7" /><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" /><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" /></svg>
-          <text class="block" :style="emptyTitleStyle">{{ t.rewards.empty }}</text>
-          <text class="block" :style="emptyHintStyle">{{ t.rewards.emptyHint }}</text>
-        </view>
+        <EmptyState v-if="records.length === 0" kind="empty-list" :title="t.empty.rewardsTitle" :desc="t.empty.rewardsDesc" />
 
         <view v-else :style="recordListStyle">
           <view v-for="(b, i) in visibleRecords" :key="b.id" class="flex items-center" :style="recordRowStyle(i)">
@@ -117,6 +109,7 @@
 import { computed, ref, watchEffect, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

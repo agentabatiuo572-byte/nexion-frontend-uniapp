@@ -200,7 +200,8 @@
 
       <!-- Sticky submit -->
       <view class="mx-4 mt-4" style="padding-bottom: 12px">
-        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :style="submitBtnStyle" @click="handleSubmit">
+        <!-- 未绑钱包/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
+        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" :aria-disabled="canSubmit ? 'false' : 'true'" :style="submitBtnStyle" @click="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <template v-if="!walletPaired">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>

@@ -47,7 +47,9 @@
           </view>
           <view class="flex items-center justify-between" :style="nexSubRowStyle">
             <text style="color: var(--v5-ink-3)">≈ ${{ nexUsd }} · 1 NEX = $0.171</text>
-            <view class="inline-flex items-center shrink-0" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3)" @click="goBills">
+            <!-- 《07》tap≥44:上一轮只补了按下反馈、漏了热区(实测 109.6×16,独立验收 agent 抓出)。
+                 同 section-header 的处理 —— 只向左扩,右边缘不动,不越过父容器。 -->
+            <view class="inline-flex items-center shrink-0 active:opacity-70 transition-opacity" style="gap: 4px; font-size: 12px; color: var(--v5-ink-3); min-height: 44px; padding-left: 16px" @click="goBills">
               <text>{{ billsThisMonth }} {{ t.me.billsThisMonth }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>

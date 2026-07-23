@@ -48,7 +48,7 @@
 
     <!-- Collapsed row header (always visible; tap toggles detail) -->
     <view
-      class="nx-device-card__header flex items-center justify-between"
+      class="nx-device-card__header flex items-center justify-between active:opacity-70 transition-opacity"
       style="padding: 14px 20px; min-height: 58px"
       role="button"
       tabindex="0"

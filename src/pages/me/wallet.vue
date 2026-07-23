@@ -22,7 +22,7 @@
       <view :style="heroStyle">
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
-        <view class="inline-flex items-center" style="margin-top: 8px; gap: 6px" @click="goNex">
+        <view class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><path d="M7 6h1v4" /><path d="m16.71 13.88.7.71-2.82 2.82" /></svg>
           <text style="font-size: 13.5px; color: var(--v5-ink-3)">{{ nexLabel }} NEX</text>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>

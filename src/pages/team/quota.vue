@@ -39,7 +39,7 @@
         <QuotaTierCard v-for="tier in tiers" :key="tier.productId" :tier="tier" @navigate="go" />
 
         <!-- Invite CTA -->
-        <view class="rounded-2xl active:scale-[0.99] transition-transform" :style="inviteCtaStyle" @click="go('/pages/team/team')">
+        <view class="rounded-2xl active:scale-[0.98] transition-transform" :style="inviteCtaStyle" @click="go('/pages/team/team')">
           <view class="flex items-center" style="gap: 12px">
             <view class="rounded-xl grid place-items-center" :style="inviteIconStyle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>

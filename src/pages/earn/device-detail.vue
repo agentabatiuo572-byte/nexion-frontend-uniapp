@@ -10,20 +10,28 @@
         @toggle="expanded = !expanded"
       />
 
-      <view v-else-if="loaded" class="nx-device-detail__empty mx-4" :style="emptyStyle">
-        <text class="block" :style="emptyTitleStyle">{{ t.earn.deviceNotFound }}</text>
-        <view
-          class="nx-device-detail__back inline-flex items-center justify-center active:scale-[0.98]"
-          :style="backButtonStyle"
-          role="button"
-          tabindex="0"
-          :aria-label="t.earn.backToEarn"
-          @click="goEarn"
-          @keydown.enter.prevent="goEarn"
-          @keydown.space.prevent="goEarn"
-        >
-          <text>{{ t.earn.backToEarn }}</text>
-        </view>
+      <!-- 《06》recoverable-error:设备查不到是可恢复错误,给重试出口(回收益页)。
+           class 保留 nx-device-detail__empty —— 走查脚本按它定位这块。 -->
+      <EmptyState
+        v-else-if="loaded"
+        class="nx-device-detail__empty mx-4"
+        kind="recoverable-error"
+        :title="t.earn.deviceNotFound"
+        :desc="t.empty.errorDesc"
+      />
+      <!-- back 按钮独立保留:走查脚本 r7-device-detail-runtime.mjs 按 .nx-device-detail__back 定位它 -->
+      <view
+        v-if="loaded && !device"
+        class="nx-device-detail__back mx-4 inline-flex items-center justify-center active:scale-[0.98] transition-transform"
+        :style="backButtonStyle"
+        role="button"
+        tabindex="0"
+        :aria-label="t.earn.backToEarn"
+        @click="goEarn"
+        @keydown.enter.prevent="goEarn"
+        @keydown.space.prevent="goEarn"
+      >
+        <text>{{ t.earn.backToEarn }}</text>
       </view>
     </view>
   </AppChassis>
@@ -33,6 +41,7 @@
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import { navTo } from "@/lib/route";

@@ -322,6 +322,11 @@ const toggleStyle: CSSProperties = {
 .newcomer-task__toggle {
   flex: 0 0 44px;
   cursor: pointer;
+  transition: opacity 0.15s;
+}
+/* 《08》§2:展开/收起是这张卡的主要交互,按下去原先零反馈 */
+.newcomer-task__toggle:active {
+  opacity: 0.7;
 }
 
 .newcomer-task--expanded .newcomer-task__toggle {

@@ -50,9 +50,7 @@
             <text class="nx-conv-contact-t">{{ t.conversations.contactSupport }}</text>
           </view>
 
-          <view v-if="rows.length === 0" class="nx-conv-listempty">
-            <text class="nx-conv-listempty-t">{{ emptyHint }}</text>
-          </view>
+          <EmptyState v-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="t.empty.messagesDesc" compact />
           <view
             v-for="r in rows"
             :key="r.id"
@@ -87,6 +85,7 @@
 import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NovaAvatar from "@/components/nova/nova-avatar.vue";
 import { useT } from "@/i18n/use-t";

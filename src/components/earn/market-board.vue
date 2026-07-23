@@ -51,8 +51,9 @@
         v-for="(d, i) in DEVICE_RANKINGS"
         :key="d.rank"
         class="flex items-center gap-3 py-2.5"
+        :class="d.kind ? 'active:opacity-70 transition-opacity' : ''"
         :style="{ borderTop: i !== 0 ? '1px solid color-mix(in srgb, var(--v5-border) 60%, transparent)' : 'none' }"
-        @click="d.kind ? goDetail(d.kind) : undefined"
+        v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
       >
         <view class="flex-1 min-w-0">
           <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">Best</text></text>

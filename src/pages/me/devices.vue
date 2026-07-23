@@ -117,17 +117,20 @@
           </view>
         </view>
 
-        <!-- Empty inventory -->
-        <view v-if="activeDevices.length === 0 && inactiveDevices.length === 0" :style="emptyCardStyle">
-          <view class="grid place-items-center" :style="emptyIconStyle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
-          </view>
-          <text class="block" :style="emptyTitleStyle">{{ t.myDevices.inventoryEmptyTitle }}</text>
-          <text class="block" :style="emptyBodyStyle">{{ t.myDevices.inventoryEmptyBody }}</text>
-        </view>
+        <!-- 空库存 —— 《06》的转化型空态 no-owned-asset:插画 + 引导 + 明确 CTA。
+             空态自带 CTA,所以下面那个常驻「去商店」按钮此时收起,不重复两个同义按钮。 -->
+        <EmptyState
+          v-if="inventoryEmpty"
+          kind="no-owned-asset"
+          :title="t.empty.devicesTitle"
+          :desc="t.empty.devicesDesc"
+          :cta-label="t.empty.devicesCta"
+          emphasis
+          @cta="goStore"
+        />
 
         <!-- Add-device CTA -->
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" @click="goStore">
+        <view v-else class="flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" style="margin-top: 12px" @click="goStore">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text :style="ctaLabelStyle">{{ t.myDevices.inventoryCtaGoStore }}</text>
         </view>
@@ -149,6 +152,7 @@ import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import DeviceInventoryRow from "@/components/me/device-inventory-row.vue";
+import EmptyState from "@/components/empty-state.vue";
 import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
@@ -177,6 +181,7 @@ const trialActive = computed(() =>
 );
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
+const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
 
 // Trial reserves a slot too (shadow device, not in devices[]).
 const trialReserved = computed(() => (trialActive.value ? 1 : 0));

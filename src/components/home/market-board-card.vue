@@ -23,7 +23,7 @@
       <view
         v-for="(r, i) in ROWS"
         :key="r.name"
-        class="grid items-center gap-2"
+        class="grid items-center gap-2 active:opacity-70 transition-opacity"
         :style="{ gridTemplateColumns: '36px 1fr 60px 76px 58px', padding: '10px 14px', borderBottom: i < ROWS.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         @click="goEarn"
       >

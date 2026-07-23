@@ -230,7 +230,8 @@ const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2
 const segWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "12px", padding: "3px", gap: "2px" };
 function pillStyle(p: LeaderPeriod): CSSProperties {
   const on = period.value === p;
-  return { height: "34px", borderRadius: "9px", background: on ? "var(--v5-surface)" : "transparent", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.08)" : "none" };
+  // 《07》tap≥44(原 34);同型控件 earn 页已是 44,这里是漏掉的兄弟实例
+  return { height: "44px", borderRadius: "9px", background: on ? "var(--v5-surface)" : "transparent", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.08)" : "none" };
 }
 function pillLabelStyle(p: LeaderPeriod): CSSProperties {
   const on = period.value === p;

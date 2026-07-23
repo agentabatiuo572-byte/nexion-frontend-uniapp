@@ -29,7 +29,7 @@
 
       <!-- Term selector (inline segmented) -->
       <view class="grid grid-cols-4" :style="segWrapStyle">
-        <view v-for="(tm, i) in terms" :key="tm" :style="segPillStyle(i === termIdx)" @click="termIdx = i">
+        <view v-for="(tm, i) in terms" :key="tm" class="active:opacity-70 transition-opacity" :style="segPillStyle(i === termIdx)" @click="termIdx = i">
           <text>{{ tm }}d</text>
         </view>
       </view>

@@ -439,5 +439,10 @@ const sendStyle = computed<CSSProperties>(() => ({
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+/* 《08》§2:发送是这个界面的主动作,原先按下去零反馈 */
+.nx-conv-send:active {
+  opacity: 0.7;
 }
 </style>

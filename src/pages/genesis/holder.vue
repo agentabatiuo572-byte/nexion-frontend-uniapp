@@ -15,7 +15,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
         <template v-if="!hasNodes">
-          <view class="active:scale-[0.99]" :style="ctaCardStyle" @click="goGenesis">
+          <view class="active:scale-[0.98]" :style="ctaCardStyle" @click="goGenesis">
             <view class="flex items-center" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="ctaIconStyle">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>

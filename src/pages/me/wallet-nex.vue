@@ -94,7 +94,7 @@
         <view :style="cardStyle">
           <text class="block" :style="[cardLabelStyle, { marginBottom: '12px' }]">{{ t.nexWallet.useNex.label }}</text>
           <view class="grid grid-cols-2" style="gap: 8px">
-            <view v-for="tile in useTiles" :key="tile.label" class="active:scale-[0.99]" :style="useTileStyle" @click="navTo(tile.href)">
+            <view v-for="tile in useTiles" :key="tile.label" class="active:scale-[0.98]" :style="useTileStyle" @click="navTo(tile.href)">
               <view class="flex items-center justify-between">
                 <view v-html="tile.icon" />
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -114,9 +114,7 @@
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
-          <view v-if="activity.length === 0" :style="activityEmptyStyle">
-            <text>{{ t.nexWallet.activity.empty }}</text>
-          </view>
+          <EmptyState v-if="activity.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
           <view v-else :style="activityListStyle">
             <view v-for="(a, i) in activity" :key="a.id" class="flex items-center" :style="activityRowStyle(i)">
             <view class="grid place-items-center shrink-0" :style="activityIconStyle(a.kind)">
@@ -144,6 +142,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexSparkline from "@/components/me/nex-sparkline.vue";
 import { useT } from "@/i18n/use-t";

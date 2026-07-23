@@ -52,7 +52,8 @@
             <text class="shrink-0" :style="usdtStyle">USDT</text>
           </view>
           <view class="grid grid-cols-4" style="gap: 8px; margin-top: 12px">
-            <view v-for="p in presets" :key="p" :class="{ 'active:opacity-70': amount !== p }" :style="presetStyle(amount === p)" @click="amount = p">
+            <!-- 反馈恒定:选中档原是空 class,按下零反馈 -->
+            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" @click="amount = p">
               <text>${{ p }}</text>
             </view>
           </view>
@@ -163,7 +164,7 @@ const howLinkStyle: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
   padding: "0 12px",
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
   fontSize: "12px",

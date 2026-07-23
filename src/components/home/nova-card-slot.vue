@@ -7,7 +7,7 @@
 <template>
   <view
     v-if="unread === 0"
-    class="block w-full relative active:scale-[0.997] transition"
+    class="block w-full relative active:scale-[0.98] transition"
     style="margin-top: 6px; padding: 2px"
     @click="open"
   >

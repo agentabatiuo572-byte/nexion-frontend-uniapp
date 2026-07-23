@@ -1732,5 +1732,47 @@ dom_qa_gate() {
 }
 dom_qa_gate
 
+# ── tap 目标哨兵(C3 2026-07-23):热区 ≥44pt + 按下有可感知反馈 ──
+# 与 dom-qa 的 tap 探针**互补不重复**:dom-qa 靠「交互标签/role + cursor:pointer」找候选,
+# 而 uni-app 的 <view @click> 编译成 <uni-view> 且不带 cursor:pointer —— 那条路对本工程系统性漏检。
+# 本哨兵在页面脚本前 hook addEventListener,拿的是运行时真注册了 click 的元素;
+# 反馈判定走 CDP CSS.forcePseudoState 实测(不是 grep class,声明了但被 inline style 压掉的会被抓出来)。
+# 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
+tap_feedback_gate() {
+  if "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest > /tmp/uniapp-tap-selftest.log 2>&1; then
+    ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
+  else
+    bad "tap-feedback selftest 失败(探针失效即门失效;node scripts/tap-feedback-probe.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-tap-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/tap-feedback-probe.mjs > /tmp/uniapp-tap.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-tap.log)"
+  else
+    bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
+    tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
+  fi
+}
+tap_feedback_gate
+
+# ── 标签内注释哨兵(2026-07-23):HTML 注释卡在标签属性之间 = Vue 模板非法位置 ──
+# vue-tsc 不报(只看类型)、浏览器多数时候也照常渲染 → 人眼与既有门双双测不到,归机器层。
+tag_comment_gate() {
+  if "$NODE_BIN" scripts/tag-comment-gate.mjs --selftest > /tmp/uniapp-tagcomment-selftest.log 2>&1; then
+    ok "tag-comment selftest(标签内阳性中 + 标签外/子元素间假阳 0)"
+  else
+    bad "tag-comment selftest 失败(node scripts/tag-comment-gate.mjs --selftest 看明细)"
+    tail -4 /tmp/uniapp-tagcomment-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/tag-comment-gate.mjs > /tmp/uniapp-tagcomment.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-tagcomment.log)"
+  else
+    bad "注释卡在标签属性之间 — 挪到标签外那一行"
+    tail -8 /tmp/uniapp-tagcomment.log | sed 's/^/        /'
+  fi
+}
+tag_comment_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

@@ -48,7 +48,7 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="rowLabelStyle">{{ t.security.twoFactorTitle }}</text>
           </view>
-          <view class="shrink-0" :style="toggleTrackStyle" @click="toggleTwoFactor(!twoFactorEnabled)">
+          <view class="shrink-0 active:opacity-70 transition-opacity" :style="toggleTrackStyle" @click="toggleTwoFactor(!twoFactorEnabled)">
             <view :style="toggleThumbStyle" />
           </view>
         </view>
@@ -387,6 +387,10 @@ const toggleTrackStyle = computed<CSSProperties>(() => ({
   position: "relative",
   width: "51px",
   height: "31px",
+  // 《07》tap≥44:开关本体保持 iOS 标准的 51×31 视觉,热区靠上下 padding 撑到 44(box-sizing 已是 border-box 之外的场景用 min-height 兜)
+  boxSizing: "content-box",
+  padding: "6.5px 0",
+  margin: "-6.5px 0",
   borderRadius: "999px",
   background: twoFactorEnabled.value ? "var(--v5-success)" : "var(--v5-surface-3)",
   transition: "background 200ms ease",

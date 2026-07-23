@@ -90,7 +90,9 @@
           <text :style="secTitleStyle">{{ t.stakingV3.positions }}<text :style="countStyle">{{ positions.length }}</text></text>
         </view>
         <view style="display: flex; flex-direction: column; gap: 10px">
-          <text v-if="positions.length === 0" class="block text-center" :style="emptyStyle">{{ t.stakingV3.noPositions }}</text>
+          <!-- 《06》no-owned-asset:无持仓是转化型空态。不给 CTA —— 方案列表就在这块的正上方,
+               再放一个按钮等于让用户往回点,反而多余;文案直接指路。 -->
+          <EmptyState v-if="positions.length === 0" kind="no-owned-asset" :title="t.empty.stakingTitle" :desc="t.empty.stakingDesc" compact />
           <StakePositionRow
             v-for="p in positions"
             v-else
@@ -115,6 +117,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VaultRow from "@/components/staking/vault-row.vue";
@@ -262,7 +265,7 @@ function handleClaim(p: StakingPosition) {
 
 // ── styles ──
 const howPillStyle: CSSProperties = {
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   padding: "0 12px",
   borderRadius: "999px",
   background: "var(--v5-brand-soft)",

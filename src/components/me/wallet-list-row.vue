@@ -6,7 +6,10 @@
   `href` is set the whole row navigates (fail:()=>{} for not-yet-ported targets).
 -->
 <template>
-  <view class="flex items-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !!href }" :style="rowStyle" @click="go">
+  <!-- 可交互 = 自带 href(内部导航)**或**父层挂了 @click(如 wallet 的「锁定收益」开弹层)。
+       原先两个判定都只看 href:纯展示行照样绑 click(点了没反应 = 死控件),
+       而用 @click 的行有监听器却拿不到按下反馈。现在统一由 interactive 决定两件事。 -->
+  <view class="flex items-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': interactive }" :style="rowStyle" v-on="href ? { click: go } : {}">
     <view class="grid place-items-center shrink-0" :style="iconChipStyle">
       <slot name="icon" />
     </view>
@@ -22,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots, type CSSProperties } from "vue";
+import { computed, useAttrs, useSlots, type CSSProperties } from "vue";
 
 const props = withDefaults(
   defineProps<{
@@ -37,7 +40,10 @@ const props = withDefaults(
 );
 
 const slots = useSlots();
+const attrs = useAttrs();
 const hasValue = computed(() => !!slots.value);
+// 父层的 @click 会 fallthrough 到根元素上,所以它也算「这行可点」
+const interactive = computed(() => !!props.href || !!attrs.onClick);
 
 function go() {
   if (!props.href) return;

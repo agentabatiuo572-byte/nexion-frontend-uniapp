@@ -12,7 +12,8 @@
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ t.wallet.noActiveWithdrawal }}</text>
-        <view class="active:opacity-70" style="display: inline-block; margin-top: 12px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
+        <!-- 《07》tap≥44:空状态的行动链接独占一行,不吃 WCAG 2.5.8 的 inline 豁免 → 撑热区(原 88×22) -->
+        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
           <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
       </view>

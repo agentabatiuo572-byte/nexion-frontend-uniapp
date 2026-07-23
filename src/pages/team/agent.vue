@@ -60,10 +60,12 @@
 
         <!-- buckets — transparent hairline rows -->
         <view :style="bucketsGroupStyle">
+          <!-- 反馈用 scale 不用 opacity:bucketRowStyle 在 inline style 里写了 opacity(锁定态 0.7),
+               inline 优先级压过 class 生成的 .active\:opacity-70:active,写 opacity 反馈两种状态下都失效。 -->
           <view
             v-for="(b, i) in BUCKETS"
             :key="b.id"
-            class="flex items-start active:opacity-70"
+            class="flex items-start active:scale-[0.98] transition-transform"
             :style="bucketRowStyle(i === BUCKETS.length - 1)"
             role="button"
             tabindex="0"

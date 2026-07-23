@@ -47,13 +47,7 @@
 
       <!-- Timeline -->
       <view class="px-4">
-        <view v-if="filtered.length === 0" :style="emptyCardStyle">
-          <view class="grid place-items-center" style="margin: 0 auto 8px">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0" /><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></svg>
-          </view>
-          <text class="block" :style="emptyTitleStyle">{{ emptyTitle }}</text>
-          <text class="block" :style="emptyBodyStyle">{{ t.notifs.emptyBody }}</text>
-        </view>
+        <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
           <view
             v-for="(n, i) in filtered"
@@ -86,6 +80,7 @@
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

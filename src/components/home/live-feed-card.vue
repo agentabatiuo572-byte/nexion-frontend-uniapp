@@ -10,10 +10,12 @@
     <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
       <view class="flex gap-0.5" style="padding: 3px; background: var(--v5-surface-2); border-radius: 9px">
+        <!-- 《08》§2 反馈恒定:选中态原先是空 class,按下去零反馈。
+             切到自己虽然不改变什么,但用户仍需要「点到了」的确认。 -->
         <view
           v-for="tb in tabs"
           :key="tb.id"
-          :class="tab === tb.id ? '' : 'active:opacity-70 transition-opacity'"
+          class="active:opacity-70 transition-opacity"
           :style="tabStyle(tb.id)"
           @click="tab = tb.id"
         >

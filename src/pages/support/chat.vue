@@ -389,9 +389,10 @@ function goBack() {
   border-bottom: 1px solid var(--v5-border);
 }
 .cp-back {
-  width: 36px;
-  height: 36px;
-  margin-left: -6px;
+  /* 《07》tap≥44:原 36×36。负 margin 由 -6 调到 -10,图标视觉位置不动、只有热区变大 */
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
   display: grid;
   place-items: center;
   flex-shrink: 0;

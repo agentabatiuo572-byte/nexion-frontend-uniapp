@@ -18,13 +18,7 @@
 
       <view :style="bodyStyle">
         <!-- Empty -->
-        <view v-if="cards.length === 0" :style="emptyStyle">
-          <view class="grid place-items-center" :style="emptyIconStyle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
-          </view>
-          <text class="block" :style="emptyTitleStyle">{{ t.cards.emptyTitle }}</text>
-          <text class="block" :style="emptyHintStyle">{{ t.cards.emptyHint }}</text>
-        </view>
+        <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="t.empty.cardsCta" @cta="goNew" />
 
         <!-- Card rows -->
         <view v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
@@ -74,6 +68,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

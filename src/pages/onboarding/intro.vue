@@ -385,6 +385,8 @@ function goTerms() {
   color: var(--v5-ink-3);
   text-decoration: underline;
   text-underline-offset: 2px;
+  /* inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 34×17) */
+  padding: 14px 0;
 }
 
 /* framer-motion → CSS entrance animations */

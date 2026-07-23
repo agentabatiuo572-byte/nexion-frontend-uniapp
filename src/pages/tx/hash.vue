@@ -197,7 +197,11 @@ const hashStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospa
 const copyBtnStyle: CSSProperties = {
   marginTop: "8px",
   display: "inline-flex",
-  padding: "4px 8px",
+  // 《07》tap≥44:原 4px 上下 padding 实测 79×22。padding 归零改用 minHeight + 居中,
+  // chip 背景随之长高是预期的 —— 复制是主动作,值得一个正常大小的按钮。
+  alignItems: "center",
+  minHeight: "44px",
+  padding: "0 10px",
   borderRadius: "6px",
   background: "var(--v5-surface-2)",
   fontSize: "10.5px",

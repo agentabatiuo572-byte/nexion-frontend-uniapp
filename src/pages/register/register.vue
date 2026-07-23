@@ -622,7 +622,9 @@ onUnmounted(() => cleanup());
 .rg-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .rg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .rg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-.rg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; }
+.rg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; transition: opacity 0.15s; }
+/* 《08》§2 按下反馈(同 login) */
+.rg-iconbtn:active, .rg-phone__cc:active { opacity: 0.6; }
 .rg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .rg-brand__n { width: 24px; height: 24px; border-radius: 7px; background: var(--v5-ink); display: flex; align-items: center; justify-content: center; }
 .rg-brand__n-t { color: var(--v5-surface); font-family: var(--font-v5); font-weight: 600; font-size: 13px; }
@@ -646,7 +648,7 @@ onUnmounted(() => cleanup());
 .rg-subtitle__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .rg-body { margin-top: 28px; }
 .rg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
-.rg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); }
+.rg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .rg-phone__cc-t { font-size: 14px; color: var(--v5-ink); }
 .rg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 14px; color: var(--v5-ink); }
 .rg-step2 { display: flex; flex-direction: column; gap: 20px; }
@@ -692,7 +694,12 @@ onUnmounted(() => cleanup());
 .rg-social__lbl { font-size: 11px; font-weight: 500; color: var(--v5-ink-3); }
 .rg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .rg-footer__acc { display: block; font-size: 12.5px; color: var(--v5-ink-3); }
-.rg-footer__link { color: var(--v5-brand); font-weight: 500; }
+/* 同 login:inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 扩热区不撑行高 */
+/* 水平也补 10px:"Sign in" 只有 25px 宽,纵向撑够了横向还是不够。负 margin 抵消布局,
+   多出来的热区落在句子里的空白与标点上 —— 那本来就不可点,重叠反而符合 Fitts 定律。 */
+.rg-footer__link { color: var(--v5-brand); font-weight: 500; padding: 14px 10px; margin: 0 -10px; transition: opacity 0.15s; }
+.rg-footer__link:active { opacity: 0.6; }
 .rg-footer__terms { display: block; margin-top: 8px; font-size: 11.5px; color: var(--v5-ink-4); }
-.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; }
+/* padding 15 而非 14:这行字比 footer__link 小(11.5px),14 只能撑到 43 —— 差 1px 也是差 */
+.rg-footer__terms-link { color: var(--v5-ink-3); text-decoration: underline; text-underline-offset: 2px; padding: 15px 0; }
 </style>

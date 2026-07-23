@@ -31,6 +31,7 @@
         <view
           v-for="b in blocks"
           :key="b.n"
+          class="active:opacity-70 transition-opacity"
           :style="blockStyle(selectedBlock === b.n)"
           role="button"
           tabindex="0"
@@ -57,7 +58,8 @@
 
       <!-- Acknowledge -->
       <view class="mx-4" :style="ackCardStyle">
-        <view class="flex items-start" :style="{ gap: '10px', opacity: scrolledToBottom && !accepted ? 1 : 0.55 }" @click="toggleCheck">
+        <!-- 反馈走 scale:同 P-058,inline style 里已有 opacity(未读完时 0.55),写 opacity 反馈会被压掉 -->
+        <view class="flex items-start active:scale-[0.98] transition-transform" :style="{ gap: '10px', opacity: scrolledToBottom && !accepted ? 1 : 0.55 }" @click="toggleCheck">
           <view class="grid place-items-center shrink-0" :style="checkboxStyle">
             <svg v-if="checked || accepted" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           </view>

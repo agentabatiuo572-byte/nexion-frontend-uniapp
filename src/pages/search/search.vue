@@ -36,10 +36,15 @@
         <text class="block" style="font-size: 11px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
       </view>
 
-      <!-- No results -->
-      <view v-else-if="results.length === 0" class="mx-4 mt-4 rounded-2xl text-center" :style="noResultsStyle">
-        <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.search.noResults }}</text>
-      </view>
+      <!-- 无搜索结果 —— 《06》no-search-results:插画 + 引导 + 清除搜索 -->
+      <EmptyState
+        v-else-if="results.length === 0"
+        kind="no-search-results"
+        :title="t.empty.searchTitle"
+        :desc="t.empty.searchDesc"
+        :cta-label="t.empty.searchCta"
+        @cta="q = ''"
+      />
 
       <!-- Results -->
       <view v-else class="mx-4 mt-3 space-y-3">
@@ -71,6 +76,7 @@ import { ref, computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";

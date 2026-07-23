@@ -510,7 +510,9 @@ onUnmounted(() => cleanup());
 .lg-root { position: fixed; inset: 0; background: var(--v5-bg); overflow-y: auto; }
 .lg-wrap { display: flex; flex-direction: column; padding: 16px 24px 0; min-height: 100%; box-sizing: border-box; }
 .lg-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
-.lg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; }
+.lg-iconbtn { width: 44px; height: 44px; margin-left: -8px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; justify-self: start; transition: opacity 0.15s; }
+/* 《08》§2 按下反馈 —— 本页六个可点控件原先按下去零视觉变化(CDP forcePseudoState 实测) */
+.lg-iconbtn:active, .lg-phone__cc:active, .lg-eye:active, .lg-forgot:active, .lg-switch:active { opacity: 0.6; }
 .lg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .lg-brand__n { width: 24px; height: 24px; border-radius: 7px; background: var(--v5-ink); display: flex; align-items: center; justify-content: center; }
 .lg-brand__n-t { color: var(--v5-surface); font-family: var(--font-v5); font-weight: 600; font-size: 13px; }
@@ -525,15 +527,17 @@ onUnmounted(() => cleanup());
 .lg-body { margin-top: 28px; }
 .lg-col { display: flex; flex-direction: column; gap: 12px; }
 .lg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
-.lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); }
+.lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
 .lg-phone__cc-t { font-size: 14px; color: var(--v5-ink); }
 .lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 14px; color: var(--v5-ink); }
 .lg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
 .lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
 .lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: 14px; color: var(--v5-ink); }
-.lg-eye { padding: 4px; }
+/* 《07》tap≥44:三处热区实测 24×30 / 65×36 / 342×18。热区靠 min-* 撑开,
+   图标与文字靠 flex 居中 + 负 margin 抵消,视觉位置与原先一致(只有热区变大)。 */
+.lg-eye { min-width: 44px; min-height: 44px; margin-right: -10px; display: flex; align-items: center; justify-content: center; }
 .lg-forgot-row { display: flex; justify-content: flex-end; }
-.lg-forgot { font-size: 12.5px; color: var(--v5-ink-3); min-height: 36px; padding: 0 4px; line-height: 36px; }
+.lg-forgot { font-size: 12.5px; color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
 .lg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .lg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .lg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
@@ -548,7 +552,8 @@ onUnmounted(() => cleanup());
 .lg-cta__t { font-size: 15px; font-weight: 600; color: var(--v5-ink-4); }
 .lg-cta__t--on { color: var(--v5-on-brand); }
 .lg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.lg-switch { margin-top: 12px; display: flex; align-items: center; justify-content: center; }
+/* min-height 18→44 会多占 26px,margin-top 12→4 抵消一半,视觉间距 12→17px 基本不变 */
+.lg-switch { margin-top: 4px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
 .lg-switch__t { font-size: 13px; color: var(--v5-brand); font-weight: 500; }
 .lg-divider { display: flex; align-items: center; margin: 28px 0; }
 .lg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
@@ -560,5 +565,8 @@ onUnmounted(() => cleanup());
 .lg-social__lbl { font-size: 11px; font-weight: 500; color: var(--v5-ink-3); }
 .lg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
 .lg-footer__acc { display: block; font-size: 12.5px; color: var(--v5-ink-3); }
-.lg-footer__link { color: var(--v5-brand); font-weight: 500; }
+/* 句中行内链接:WCAG 2.5.8 对 inline 目标豁免 44pt(强撑高会拆掉整句行高),
+   但纵向 padding 对 inline 元素不撑行盒、只扩热区 —— 17px 高的热区就此变 45px,零布局代价。 */
+.lg-footer__link { color: var(--v5-brand); font-weight: 500; padding: 14px 10px; margin: 0 -10px; transition: opacity 0.15s; }
+.lg-footer__link:active { opacity: 0.6; }
 </style>

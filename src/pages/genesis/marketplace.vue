@@ -66,9 +66,9 @@
 
         <!-- Tabs -->
         <view class="grid grid-cols-3" :style="tabsStyle">
-          <view :style="tabPillStyle(tab === 'listings')" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
-          <view :style="tabPillStyle(tab === 'activity')" @click="tab = 'activity'"><text>{{ t.marketplace.activityTab }}</text></view>
-          <view :style="tabPillStyle(tab === 'mine')" @click="tab = 'mine'"><text>{{ mineTabText }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'activity')" @click="tab = 'activity'"><text>{{ t.marketplace.activityTab }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'mine')" @click="tab = 'mine'"><text>{{ mineTabText }}</text></view>
         </view>
 
         <!-- LISTINGS TAB -->
@@ -79,9 +79,9 @@
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
                 <text>{{ t.marketplace.sortLabel }}</text>
               </text>
-              <view :style="sortPillStyle(sortKey === 'floor')" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
-              <view :style="sortPillStyle(sortKey === 'recent')" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
-              <view :style="sortPillStyle(sortKey === 'lastSale')" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
             </view>
           </scroll-view>
 
@@ -413,7 +413,8 @@ const floorDeltaStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 const viewOpenSeaStyle: CSSProperties = {
-  minHeight: "32px",
+  // 《07》tap≥44:原 32px
+  minHeight: "44px",
   padding: "0 6px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "11px",
@@ -423,7 +424,8 @@ const viewOpenSeaStyle: CSSProperties = {
 const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface-2)" };
 function tabPillStyle(active: boolean): CSSProperties {
   return {
-    height: "40px",
+    // 《07》tap≥44:原 40px(同页 sortPill 已补,这条是同类)
+    minHeight: "44px",
     borderRadius: "8px",
     background: active ? "var(--v5-brand)" : "transparent",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",

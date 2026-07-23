@@ -141,7 +141,7 @@
 
     <!-- Sticky gold dock (folds source GenesisDockHost into the page) -->
     <view class="nx-genesis-dock" :style="dockWrapStyle">
-      <view class="relative w-full overflow-hidden active:scale-[0.99]" :style="dockBtnStyle" @click="openSheet">
+      <view class="relative w-full overflow-hidden active:scale-[0.98]" :style="dockBtnStyle" @click="openSheet">
         <template v-if="remaining > 0">
           <view aria-hidden :style="dockSpecularStyle" />
           <view aria-hidden :style="dockRimStyle" />
@@ -345,7 +345,7 @@ onUnmounted(() => {
 // brand-soft would clash on the gold). Hardcoded gold is the .genesis-hero
 // design exception (see file header), not a v5 token slip.
 const howPillStyle: CSSProperties = {
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   padding: "0 12px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-genesis-gold-on-dark) 14.000000000000002%, transparent)",
@@ -496,7 +496,9 @@ const socialTimeStyle: CSSProperties = {
   fontSize: "11px",
   color: "var(--v5-ink-3)",
 };
-const secHeaderStyle: CSSProperties = { margin: "22px 2px 12px" };
+// 《07》tap≥44:整行可点的 section header 实测 354×21。上下 margin 让出 10px 给热区,
+// 总占位 22+21+12=55 → 12+44+2=58,视觉节奏基本不变。
+const secHeaderStyle: CSSProperties = { margin: "12px 2px 2px", minHeight: "44px" };
 const secTitleStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",

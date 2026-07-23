@@ -91,7 +91,8 @@
 
       <!-- Confirm CTA -->
       <view style="margin: 16px 16px 0">
-        <view class="grid place-items-center" :class="{ 'active:opacity-90': valid }" :style="confirmStyle" @click="handleConfirm">
+        <!-- 金额无效时点了没用 → 显式 aria-disabled,而不是靠「没有按下反馈」暗示 -->
+        <view class="grid place-items-center" :class="{ 'active:opacity-90': valid }" role="button" :aria-disabled="valid ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
           <text :style="confirmTextStyle">{{ t.exchange.confirm }}</text>
         </view>
       </view>
@@ -166,9 +167,7 @@
       <!-- History -->
       <view style="margin: 20px 16px 24px">
         <text class="block" :style="historyTitleStyle">{{ t.exchange.historyTitle }}</text>
-        <view v-if="history.length === 0" :style="historyEmptyStyle">
-          <text>{{ t.exchange.historyEmpty }}</text>
-        </view>
+        <EmptyState v-if="history.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" compact />
         <view v-else :style="historyListStyle">
           <view v-for="(h, i) in history.slice(0, 6)" :key="h.id" class="flex items-center" :style="historyRowStyle(i)">
             <view class="grid place-items-center shrink-0" :style="historyIconStyle">
@@ -188,6 +187,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -419,7 +419,7 @@ function swapLine(h: SwapEvent): string {
 // ── styles ──
 const topRowStyle: CSSProperties = { padding: "0 16px 8px", gap: "8px" };
 const howStyle: CSSProperties = {
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   padding: "0 12px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",

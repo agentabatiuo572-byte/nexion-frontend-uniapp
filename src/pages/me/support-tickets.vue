@@ -36,15 +36,13 @@
         </view>
 
         <view class="grid grid-cols-4" :style="tabsStyle">
-          <view v-for="id in tabs" :key="id" :style="tabStyle(tab === id)" role="button" tabindex="0" :aria-label="tabLabel(id)" @click="selectTab(id)">
+          <view v-for="id in tabs" :key="id" class="active:opacity-70 transition-opacity" :style="tabStyle(tab === id)" role="button" tabindex="0" :aria-label="tabLabel(id)" @click="selectTab(id)">
             <text>{{ tabLabel(id) }}</text>
           </view>
         </view>
         <text v-if="filterFeedback" class="block text-center" :style="filterFeedbackStyle">{{ filterFeedback }}</text>
 
-        <view v-if="filtered.length === 0" :style="emptyStyle">
-          <text :style="emptyTextStyle">{{ t.tickets.emptyList }}</text>
-        </view>
+        <EmptyState v-if="filtered.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
           <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="mode = { kind: 'detail', id: tk.id }" />
         </view>
@@ -130,6 +128,7 @@
 import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StatBox from "@/components/me/ticket-stat-box.vue";
 import TicketRow from "@/components/me/ticket-row.vue";

@@ -1,7 +1,7 @@
 <!-- ConversionBanner — homepage weekly task card. -->
 <template>
   <view
-    class="weekly-quest block active:scale-[0.995] active:opacity-90 transition-transform"
+    class="weekly-quest block active:scale-[0.98] active:opacity-90 transition-transform"
     :style="rootStyle"
     role="button"
     :tabindex="props.active ? 0 : -1"

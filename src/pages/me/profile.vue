@@ -85,7 +85,9 @@
 
       <!-- Save bar -->
       <view style="padding: 0 16px; margin-top: 20px">
-        <view class="w-full flex items-center justify-center" :class="dirty ? 'active:opacity-90' : ''" :style="saveBtnStyle" role="button" tabindex="0" :aria-label="t.profile.saveChanges" @click="handleSave">
+        <!-- 未改动时这个按钮点了没用,原先只是「不给按下反馈」—— 那是把禁用态藏起来。
+             显式 aria-disabled 让读屏用户也知道现在按不动(《05》§6.1 disabled 公式)。 -->
+        <view class="w-full flex items-center justify-center" :class="dirty ? 'active:opacity-90' : ''" :style="saveBtnStyle" role="button" tabindex="0" :aria-disabled="dirty ? 'false' : 'true'" :aria-label="t.profile.saveChanges" @click="handleSave">
           <text :style="saveLabelStyle">{{ t.profile.saveChanges }}</text>
         </view>
         <text v-if="saveFeedback" class="block text-center" :style="saveFeedbackStyle">{{ saveFeedback }}</text>
@@ -208,6 +210,8 @@ const regenBtnStyle: CSSProperties = {
   bottom: "-6px",
   right: "-6px",
   width: "28px",
+  // 🔴 不抬到 44:这是叠在头像右下角的圆形角标,撑到 44 会盖住头像大半 ——
+  // 视觉形态是本质约束(WCAG 2.5.8 Essential)。28×28 ≥ AA 下限 24×24,已进 tap 台账豁免。
   height: "28px",
   borderRadius: "999px",
   background: "var(--v5-brand)",

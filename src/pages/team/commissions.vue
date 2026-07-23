@@ -86,9 +86,7 @@
         </scroll-view>
 
         <!-- event list — transparent hairline group on the page floor -->
-        <view v-if="filtered.length === 0" class="text-center" :style="emptyStyle">
-          <text>{{ filter === "all" ? t.commissions.noEvents : noKindText }}</text>
-        </view>
+        <EmptyState v-if="filtered.length === 0" :kind="filter === 'all' ? 'empty-list' : 'no-filter-results'" :title="filter === 'all' ? t.empty.commissionsTitle : t.empty.filterTitle" :desc="filter === 'all' ? t.empty.commissionsDesc : t.empty.filterDesc" />
         <view v-else :style="listGroupStyle">
             <view
               v-for="(e, i) in filtered"
@@ -123,6 +121,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -187,7 +186,7 @@ function go(url: string) {
 const howItWorksStyle: CSSProperties = {
   gap: "6px",
   padding: "0 12px",
-  height: "34px",
+  height: "44px",  // 《07》tap≥44(原 34)
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
   fontSize: "12px",

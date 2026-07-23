@@ -71,7 +71,7 @@
             <checkbox-group @change="onDefaultGroupChange">
               <label
                 class="flex items-center active:opacity-70"
-                style="margin-top: 4px; gap: 8px"
+                style="margin-top: 4px; gap: 8px; min-height: 44px"
                 role="switch"
                 tabindex="0"
                 :aria-label="t.cards.formDefaultCheckbox"
@@ -86,7 +86,8 @@
         </view>
 
         <!-- Submit -->
-        <view class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind">
+        <!-- 字段没填全时点了没用 → 显式 aria-disabled(《05》§6.1),别只靠「没有按下反馈」暗示 -->
+        <view class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind">
           <text :style="submitTextStyle">{{ canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled }}</text>
         </view>
 

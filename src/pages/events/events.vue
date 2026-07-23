@@ -42,9 +42,7 @@
         </view>
 
         <!-- Event list -->
-        <view v-if="filtered.length === 0 && emptyKey" class="rounded-2xl text-center" :style="emptyStyle">
-          <text style="font-size: 12.5px; color: var(--v5-ink-3); line-height: 1.625">{{ t.events.empty[emptyKey] }}</text>
-        </view>
+        <EmptyState v-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else class="space-y-2.5">
           <EventsCard
             v-for="ev in filtered"
@@ -67,6 +65,7 @@
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";

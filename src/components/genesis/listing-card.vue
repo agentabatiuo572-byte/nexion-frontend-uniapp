@@ -119,8 +119,9 @@ const deltaStyle = computed<CSSProperties>(() => ({
   color: isUp.value ? "var(--v5-success)" : "var(--v5-brand-2)",
 }));
 const buyBtnStyle: CSSProperties = {
-  // 右下角小按钮:实心柠檬绿保留(醒目),但缩面积——不再满宽横条,auto 宽 + 36px 高。
-  height: "36px",
+  // 右下角小按钮:实心柠檬绿保留(醒目),但缩面积——不再满宽横条,auto 宽。
+  // 《07》tap≥44:高度由 36 抬到 44(它是「买」这个不可撤销动作的入口,点错代价高)。
+  height: "44px",
   padding: "0 16px",
   borderRadius: "999px",
   background: "var(--v5-brand)",

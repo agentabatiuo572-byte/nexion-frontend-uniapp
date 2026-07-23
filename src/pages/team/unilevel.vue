@@ -135,9 +135,7 @@
              rest-list idiom); the surface + border shell was redundant
              boundary weight around already hairline-separated rows. -->
         <view :style="memberGroupStyle">
-          <view v-if="filteredMembers.length === 0" class="text-center" :style="{ padding: '24px 0', fontSize: '12px', color: 'var(--v5-ink-3)' }">
-            <text>{{ t.unilevel.noMembers }}</text>
-          </view>
+          <EmptyState v-if="filteredMembers.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" compact />
           <template v-else>
             <view
               v-for="(m, i) in visibleMembers"
@@ -179,6 +177,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
@@ -301,6 +300,7 @@ function go(url: string) {
 const howEntryStyle: CSSProperties = {
   gap: "6px",
   padding: "0 12px",
+  minHeight: "44px",  // 《07》tap≥44(原 34)
   height: "34px",
   borderRadius: "999px",
   background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
