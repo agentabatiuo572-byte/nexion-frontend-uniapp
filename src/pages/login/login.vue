@@ -516,32 +516,32 @@ onUnmounted(() => cleanup());
 .lg-brand { display: flex; align-items: center; gap: 6px; justify-self: center; }
 .lg-brand__n { width: 24px; height: 24px; border-radius: 7px; background: var(--v5-ink); display: flex; align-items: center; justify-content: center; }
 .lg-brand__n-t { color: var(--v5-surface); font-family: var(--font-v5); font-weight: 600; font-size: 13px; }
-.lg-brand__name { color: var(--v5-ink); font-weight: 600; font-family: var(--font-v5); font-size: 16px; letter-spacing: -0.02em; }
+.lg-brand__name { color: var(--v5-ink); font-weight: 600; font-family: var(--font-v5); font-size: 15px; letter-spacing: -0.02em; }
 .lg-dots { margin-top: 28px; display: flex; align-items: center; gap: 6px; }
 .lg-dot { height: 4px; width: 16px; border-radius: 9999px; background: var(--v5-surface-2); transition: all 0.3s; }
 .lg-dot--active { width: 32px; background: var(--v5-brand); }
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
-.lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 28px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
-.lg-sub { display: block; margin-top: 8px; font-size: 13.5px; color: var(--v5-ink-3); }
+.lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
+.lg-sub { display: block; margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); }
 .lg-sub__ph { font-family: var(--font-v5); color: var(--v5-ink); font-variant-numeric: tabular-nums; }
 .lg-body { margin-top: 28px; }
 .lg-col { display: flex; flex-direction: column; gap: 12px; }
 .lg-phone { position: relative; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; display: flex; align-items: center; }
 .lg-phone__cc { height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 4px; border-right: 1px solid var(--v5-surface-2); transition: opacity 0.15s; }
-.lg-phone__cc-t { font-size: 14px; color: var(--v5-ink); }
-.lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 14px; color: var(--v5-ink); }
+.lg-phone__cc-t { font-size: 15px; color: var(--v5-ink); }
+.lg-phone__in { flex: 1; height: 100%; background: transparent; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
 .lg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
 .lg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
-.lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: 14px; color: var(--v5-ink); }
+.lg-field--flex { flex: 1; background: transparent; border: none; height: 100%; font-size: 15px; color: var(--v5-ink); }
 /* 《07》tap≥44:三处热区实测 24×30 / 65×36 / 342×18。热区靠 min-* 撑开,
    图标与文字靠 flex 居中 + 负 margin 抵消,视觉位置与原先一致(只有热区变大)。 */
 .lg-eye { min-width: 44px; min-height: 44px; margin-right: -10px; display: flex; align-items: center; justify-content: center; }
 .lg-forgot-row { display: flex; justify-content: flex-end; }
-.lg-forgot { font-size: 12.5px; color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
+.lg-forgot { font-size: 13px; color: var(--v5-ink-3); min-height: 44px; padding: 0 4px; line-height: 44px; }
 .lg-otp { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .lg-otp__in { width: 48px; height: 56px; text-align: center; font-family: var(--font-v5); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; border-radius: 12px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); color: var(--v5-ink-4); }
 .lg-otp__in--filled { border-color: color-mix(in srgb, var(--v5-brand) 45%, transparent); color: var(--v5-ink); }
-.lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
+.lg-resend { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
 .lg-resend__change { color: var(--v5-ink-3); }
 .lg-resend__count { font-family: var(--font-v5); color: var(--v5-ink-4); font-variant-numeric: tabular-nums; }
 .lg-resend__btn { color: var(--v5-brand); font-weight: 500; }
@@ -557,14 +557,14 @@ onUnmounted(() => cleanup());
 .lg-switch__t { font-size: 13px; color: var(--v5-brand); font-weight: 500; }
 .lg-divider { display: flex; align-items: center; margin: 28px 0; }
 .lg-divider__line { flex: 1; height: 1px; background: var(--v5-surface-2); }
-.lg-divider__t { padding: 0 12px; font-size: 11.5px; color: var(--v5-ink-3); }
+.lg-divider__t { padding: 0 12px; font-size: 12px; color: var(--v5-ink-3); }
 .lg-social { display: flex; align-items: center; gap: 10px; }
 .lg-social__btn { flex: 1; min-width: 0; height: 64px; border-radius: 16px; background: var(--v5-surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; transition: transform 0.15s, opacity 0.15s; }
 .lg-social__btn:active { transform: scale(0.98); opacity: 0.8; }
 .lg-social__ic { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; }
-.lg-social__lbl { font-size: 11px; font-weight: 500; color: var(--v5-ink-3); }
+.lg-social__lbl { font-size: 12px; font-weight: 500; color: var(--v5-ink-3); }
 .lg-footer { margin-top: auto; padding-top: 32px; text-align: center; }
-.lg-footer__acc { display: block; font-size: 12.5px; color: var(--v5-ink-3); }
+.lg-footer__acc { display: block; font-size: 13px; color: var(--v5-ink-3); }
 /* 句中行内链接:WCAG 2.5.8 对 inline 目标豁免 44pt(强撑高会拆掉整句行高),
    但纵向 padding 对 inline 元素不撑行盒、只扩热区 —— 17px 高的热区就此变 45px,零布局代价。 */
 .lg-footer__link { color: var(--v5-brand); font-weight: 500; padding: 14px 10px; margin: 0 -10px; transition: opacity 0.15s; }

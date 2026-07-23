@@ -93,7 +93,7 @@ function reLogin() {
 .ks-body {
   display: block;
   margin-top: 10px;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.5;
   color: var(--v5-ink-2);
 }

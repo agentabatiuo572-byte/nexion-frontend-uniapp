@@ -280,7 +280,7 @@ function goTerms() {
 .intro-title {
   display: block;
   font-family: var(--font-v5);
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.025em;
@@ -289,7 +289,7 @@ function goTerms() {
 .intro-sub {
   display: block;
   margin-top: 12px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.625;
   color: var(--v5-ink-3);
   padding: 0 16px;
@@ -319,7 +319,7 @@ function goTerms() {
 .stat-num {
   font-family: var(--font-v5);
   font-variant-numeric: tabular-nums;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--v5-ink);
 }
@@ -327,7 +327,7 @@ function goTerms() {
   color: var(--v5-brand);
 }
 .stat-label {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
 }
 .stat-sep {
@@ -371,7 +371,7 @@ function goTerms() {
   transition: transform 0.15s ease;
 }
 .cta-secondary__t {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
 }

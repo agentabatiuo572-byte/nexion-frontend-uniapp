@@ -167,7 +167,7 @@ function leaveEstimator() {
 .est-hint {
   display: block;
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
 }
 .est-reveal {
@@ -189,7 +189,7 @@ function leaveEstimator() {
   to { transform: rotate(360deg); }
 }
 .est-loading__t {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--v5-ink-3);
 }
 .est-phone {
@@ -209,7 +209,7 @@ function leaveEstimator() {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -218,7 +218,7 @@ function leaveEstimator() {
   background: var(--v5-brand);
 }
 .est-phone__pill-t {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--v5-on-brand);
 }
@@ -239,13 +239,13 @@ function leaveEstimator() {
 }
 .est-phone__name {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
 }
 .est-phone__spec {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: color-mix(in oklab, var(--v5-brand) 90%, transparent);
   margin-top: 2px;
 }
@@ -257,13 +257,13 @@ function leaveEstimator() {
   display: block;
   font-family: var(--font-v5);
   font-variant-numeric: tabular-nums;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--v5-brand);
 }
 .est-phone__rate-u {
   display: block;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-ink-4);
 }
 .est-compare {
@@ -273,7 +273,7 @@ function leaveEstimator() {
   gap: 8px;
 }
 .est-compare__h {
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--v5-ink-3);
@@ -303,19 +303,19 @@ function leaveEstimator() {
 }
 .cmp__label {
   display: block;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--v5-ink);
 }
 .cmp__sub {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--v5-ink-3);
   margin-top: 2px;
 }
 .cmp__val {
   font-family: var(--font-v5);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--v5-ink);

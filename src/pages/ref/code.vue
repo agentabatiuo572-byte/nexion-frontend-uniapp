@@ -212,11 +212,11 @@ const cornerGlowStyle: CSSProperties = {
     "radial-gradient(60% 100% at 50% 0%, color-mix(in srgb, var(--v5-tech-cyan) 22%, transparent) 0%, transparent 70%), radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--v5-brand) 10%, transparent) 0%, transparent 70%)",
 };
 const brandMarkStyle: CSSProperties = { width: "28px", height: "28px", borderRadius: "8px", background: "var(--v5-brand)" };
-const brandMarkTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, color: "var(--v5-on-brand)", fontSize: "14px" };
+const brandMarkTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, color: "var(--v5-on-brand)", fontSize: "15px" };
 const brandNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "15px", letterSpacing: "-0.025em", color: "var(--v5-ink)" };
 const refChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   color: "var(--v5-ink-3)",
   letterSpacing: "0.05em",
   padding: "2px 6px",
@@ -229,7 +229,7 @@ const alreadyBarStyle: CSSProperties = {
   padding: "10px 12px",
   marginBottom: "12px",
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
-  fontSize: "11.5px",
+  fontSize: "12px",
   color: "var(--v5-ink-2)",
   lineHeight: 1.55,
 };
@@ -239,12 +239,12 @@ const avatarStyle: CSSProperties = {
   borderRadius: "999px",
   background: "linear-gradient(135deg, var(--v5-brand) 0%, var(--v5-tech-cyan) 100%)",
 };
-const avatarTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "24px", color: "var(--v5-on-brand)" };
-const sponsorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "18px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
+const avatarTextStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontWeight: 600, fontSize: "26px", color: "var(--v5-on-brand)" };
+const sponsorNameStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.25 };
 const sponsorTagStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const vRankChipStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.05em",
   padding: "2px 6px",
   borderRadius: "4px",
@@ -252,7 +252,7 @@ const vRankChipStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 600,
 };
-const cityLineStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", color: "var(--v5-ink-3)" };
+const cityLineStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 const giftCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "20px",
@@ -260,8 +260,8 @@ const giftCardStyle: CSSProperties = {
   background:
     "radial-gradient(80% 60% at 50% 0%, color-mix(in srgb, var(--v5-brand) 22%, transparent) 0%, transparent 65%), var(--v5-surface)",
 };
-const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "10px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
-const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "48px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
+const giftLabelStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", letterSpacing: "0.16em", color: "var(--v5-brand)" };
+const giftAmountStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "56px", fontWeight: 600, lineHeight: 1, color: "var(--v5-ink)" };
 const giftNexStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "20px", color: "var(--v5-nex)", fontWeight: 600, lineHeight: 1 };
 const giftSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "8px", lineHeight: 1.625 };
 const perksCardStyle: CSSProperties = { borderRadius: "16px", marginBottom: "12px", overflow: "hidden", background: "var(--v5-surface)" };
@@ -271,7 +271,7 @@ function perkRowStyle(divider: boolean): CSSProperties {
 function perkIconBoxStyle(tint: string): CSSProperties {
   return { width: "36px", height: "36px", borderRadius: "12px", background: `color-mix(in srgb, ${tint} 18%, transparent)` };
 }
-const perkTextStyle: CSSProperties = { fontSize: "12.5px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.375 };
+const perkTextStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.375 };
 const ctaStyle: CSSProperties = {
   width: "100%",
   height: "56px",
@@ -283,13 +283,13 @@ const ctaStyle: CSSProperties = {
   fontSize: "15px",
   boxShadow: "var(--v5-spotlight-brand)",
 };
-const signinStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const signinLinkStyle: CSSProperties = { fontSize: "10.5px", color: "var(--v5-brand)" };
+const signinStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
+const signinLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
 const proofCardStyle: CSSProperties = { marginTop: "20px", borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
 const proofHeadStyle: CSSProperties = {
   marginBottom: "12px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
@@ -297,7 +297,7 @@ const partnerCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px
 const partnerHeadStyle: CSSProperties = {
   marginBottom: "10px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "10px",
+  fontSize: "12px",
   letterSpacing: "0.16em",
   color: "var(--v5-ink-3)",
 };
@@ -305,13 +305,13 @@ const partnerChipStyle: CSSProperties = {
   padding: "4px 8px",
   borderRadius: "999px",
   fontFamily: "var(--font-v5)",
-  fontSize: "11px",
+  fontSize: "12px",
   fontWeight: 600,
   background: "color-mix(in srgb, var(--v5-ink) 4%, transparent)",
   color: "color-mix(in srgb, var(--v5-ink) 85%, transparent)",
 };
-const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "10.5px", color: "var(--v5-ink-3)" };
-const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "10.5px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
+const badgeRowStyle: CSSProperties = { marginTop: "12px", flexWrap: "wrap", gap: "4px 12px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const footerStyle: CSSProperties = { marginTop: "24px", fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625, padding: "0 16px" };
 // inline 目标吃 WCAG 2.5.8 豁免,纵向 padding 只扩热区不撑行高(原 61×14)
 const footerLinkStyle: CSSProperties = { color: "var(--v5-ink-3)", padding: "15px 10px", margin: "0 -10px" };
 </script>

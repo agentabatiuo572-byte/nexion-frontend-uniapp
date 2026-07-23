@@ -170,7 +170,7 @@ function goRisk() {
 .tos-eyebrow {
   display: block;
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.16em;
   color: var(--v5-brand);
 }
@@ -187,7 +187,7 @@ function goRisk() {
 .tos-sub {
   display: block;
   margin-top: 10px;
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.65;
   color: var(--v5-ink-3);
 }
@@ -214,18 +214,18 @@ function goRisk() {
 }
 .tos-block__num {
   font-family: var(--font-jet-mono), ui-monospace, monospace;
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--v5-brand);
 }
 .tos-block__title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--v5-ink);
   letter-spacing: -0.01em;
 }
 .tos-block__body {
   display: block;
-  font-size: 13.5px;
+  font-size: 13px;
   color: var(--v5-ink-2);
   line-height: 1.65;
 }
@@ -242,7 +242,7 @@ function goRisk() {
 }
 .tos-risk__t {
   flex: 1;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--v5-brand-2);
 }
@@ -251,7 +251,7 @@ function goRisk() {
 .tos-footer {
   display: block;
   margin-top: 18px;
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--v5-ink-4);
   text-align: center;
