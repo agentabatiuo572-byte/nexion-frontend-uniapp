@@ -1336,6 +1336,51 @@ device_yield_parity() {
   fi
 }
 device_yield_parity
+# 单源锚哨兵 (2026-07-24 platform-stats-single-anchor): every platform-level
+# money/fleet display figure derives from src/lib/platform-stats.ts. Four
+# mutually-exclusive daily-flow anchors coexisted before ($1.24M/day home card,
+# +$215/sec ⇒ $18.6M/day, ref $1.2M/month ⇒ $40k/day, store seed ⇒ $17.2M/day);
+# this pins the class shut: legacy literals dead, anchor confined to the lib,
+# consumers must import (derive-not-cache), 28,432 keeps exactly ONE role.
+platform_stats_anchor() {
+  local fails=0 stray n pat
+  # (1) legacy mutually-exclusive anchor literals must stay dead in src/
+  for pat in '1247893' '1,247,893' '1_247_893' '\$1\.24M' '\+\$215/sec' 'paidToday' 'todayIncrement' 'networkPhones' 'networkHubs' 'paidToCreators' 'leaderboardHint' '(^|[^0-9])8,432' 'jobs/s' '\bq3(Label|Suffix|ReportTitle)' 'Q3_FINANCIALS'; do
+    if grep -rqEI "$pat" src 2>/dev/null; then
+      bad "platform-anchor: legacy literal /$pat/ resurfaced in src/"; fails=1
+    fi
+  done
+  # (2) anchor literals (682,368 rate & 127,438,905 cumulative seed) only in the lib
+  stray=$(grep -rlEI '682368|682,368|682_368|127_438_905|127,438,905|127438905' src 2>/dev/null | grep -v 'lib/platform-stats.ts' || true)
+  if [ -n "$stray" ]; then bad "platform-anchor: anchor literal outside lib/platform-stats.ts: $stray"; fails=1; fi
+  # (3) 28,432 role-collision guard: allowed ONLY in the lib (fleet anchor)
+  stray=$(grep -rlEI '28,432|28432|28_432' src 2>/dev/null | grep -v 'lib/platform-stats\.ts' || true)
+  if [ -n "$stray" ]; then bad "platform-anchor: 28,432 outside the anchor lib (role collision): $stray"; fails=1; fi
+  # (4) consumers wired to the single source: import present AND anchor symbol consumed
+  #     (import-only would let a hardcoded near-value ride under a green light)
+  for pair in \
+    'src/components/home/network-pulse-card.vue|DAILY_PAYOUT_USD' \
+    'src/components/home/on-grid-section.vue|PAYOUT_PER_SEC_USD' \
+    'src/pages/onboarding/intro.vue|paidCumulativeNow' \
+    'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
+    'src/store/app.ts|FLEET_DEVICES'; do
+    f="${pair%%|*}"; sym="${pair##*|}"
+    if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
+    if [ "$(grep -c "$sym" "$f" 2>/dev/null)" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
+  done
+  # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
+  for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do
+    if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
+  done
+  # (6) trust Q2 print ↔ admin managed-content mirror value parity (键 parity ≠ 值 parity)
+  ADMIN_ITABS="../Nexion-admin-prototype/app/components/domain-views/i-tabs/data.ts"
+  for v in '27,150' '\$47\.0M'; do
+    if ! grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then bad "platform-anchor: trust.vue missing Q2 print /$v/"; fails=1; fi
+    if ! grep -qE "$v" "$ADMIN_ITABS" 2>/dev/null; then bad "platform-anchor: admin i-tabs mirror missing /$v/ (cross-repo drift)"; fails=1; fi
+  done
+  if [ "$fails" -eq 0 ]; then ok "platform-stats single anchor (legacy 0 · lib-confined · 5 consumers+symbols · joiners 1×3 · trust↔admin Q2 parity)"; fi
+}
+platform_stats_anchor
 # FEAT-DEV01 等效换皮 P0 (2026-07-06): the task-capacity band literals in
 # device-lifecycle.ts must reproduce the retired degradation curve EXACTLY
 # (0.25-month-step diff<1e-9, floor, exempt kinds, subsidy display-only) and the

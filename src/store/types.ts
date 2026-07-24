@@ -212,11 +212,10 @@ export interface EarningsState {
 
 export interface GlobalStats {
   activeDevices: number;
-  paidToday: number;
   nodes: number;
   countries: number;
   uptime: number;
-  todayIncrement: number;
+  activeJobs: number; // concurrent grid jobs (globe stat tile)
 }
 
 // SPEC-7 FEAT-RISK03 提现单状态机。主链 submitted → (review-pending →)

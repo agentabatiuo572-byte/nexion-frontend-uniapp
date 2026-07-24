@@ -11,6 +11,7 @@ import { getCarrier, type Carrier } from "@/lib/carrier";
 import { GENESIS_INVITE_PATTERN } from "./genesis";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
+import { FLEET_DEVICES } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
@@ -42,7 +43,6 @@ import {
 const ONE_DAY = ONE_DAY_MS;
 
 // ── module-level tick state (mirrors original module scope) ──
-let globalTimer = 0;
 const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
 
@@ -146,14 +146,17 @@ function createInitialEarnings(): EarningsState {
   };
 }
 
+// Concurrent grid jobs seed — coherent with the regional throughput sum
+// (51.2k jobs/hr global ⇒ ~5–6 min median job at this concurrency).
+const ACTIVE_JOBS_SEED = 4812;
+
 function createInitialGlobal(): GlobalStats {
   return {
-    activeDevices: 28432,
-    paidToday: 1247893,
+    activeDevices: FLEET_DEVICES,
     nodes: 156,
     countries: 47,
     uptime: 99.7,
-    todayIncrement: 1247,
+    activeJobs: ACTIVE_JOBS_SEED,
   };
 }
 
@@ -368,14 +371,22 @@ export const useApp = defineStore("app", () => {
   }
 
   function tick(deltaMs: number) {
-    if (miningPaused.value) return;
     // ── Global platform stats jitter ──
-    globalTimer += deltaMs;
-    const globalUpdate: Partial<GlobalStats> = {
-      activeDevices: global.value.activeDevices + Math.floor(Math.random() * 4),
-      paidToday: global.value.paidToday + Math.floor(Math.random() * 280) + 60,
-      todayIncrement: global.value.todayIncrement + Math.floor(Math.random() * 3),
+    // Runs even while the personal session is paused — platform-wide figures
+    // must not freeze on an individual's mining state. Symmetric BOUNDED
+    // wobble only: the fleet/jobs figures are anchors and must not
+    // extrapolate (the old always-add tick implied +130k devices/day; see
+    // docs/changes/2026-07-24-platform-stats-single-anchor.md). Bands clamp
+    // the O(√t) drift of an unbounded symmetric walk over long dwells.
+    const devDrift = Math.random();
+    const nextDevices = global.value.activeDevices + (devDrift > 0.8 ? 1 : devDrift < 0.2 ? -1 : 0);
+    const nextJobs = global.value.activeJobs + Math.floor(Math.random() * 5) - 2;
+    global.value = {
+      ...global.value,
+      activeDevices: Math.min(FLEET_DEVICES + 24, Math.max(FLEET_DEVICES - 24, nextDevices)),
+      activeJobs: Math.min(ACTIVE_JOBS_SEED + 36, Math.max(ACTIVE_JOBS_SEED - 36, nextJobs)),
     };
+    if (miningPaused.value) return;
 
     // ── Per-device updates ──
     const newDevices = devices.value.map((d) => {
@@ -469,7 +480,6 @@ export const useApp = defineStore("app", () => {
 
     // Telemetry committed; earnings settled separately via the single source.
     devices.value = newDevices;
-    global.value = { ...global.value, ...globalUpdate };
     settle();
   }
 

@@ -110,14 +110,14 @@
         </view>
 
         <!-- Q3 financials -->
-        <SectionHeader :label="tr.q3Label" :suffix="tr.q3Suffix">
+        <SectionHeader :label="tr.qtrLabel" :suffix="tr.qtrSuffix">
           <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg></template>
         </SectionHeader>
         <view :style="cardStyle">
           <view class="flex items-center justify-between" :style="q3HeadStyle">
             <view class="flex items-center" style="gap: 8px">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" /><path d="M14 2v4a2 2 0 0 0 2 2h4" /></svg>
-              <text :style="q3TitleStyle">{{ tr.q3ReportTitle }}</text>
+              <text :style="q3TitleStyle">{{ tr.qtrReportTitle }}</text>
             </view>
             <view class="flex items-center" :style="q3DownloadStyle">
               <text style="margin-right: 4px">{{ tr.q3DownloadCta }}</text>
@@ -125,7 +125,7 @@
             </view>
           </view>
           <view class="grid grid-cols-2">
-            <view v-for="(row, i) in Q3_FINANCIALS" :key="row.metric" :style="q3CellStyle(i)">
+            <view v-for="(row, i) in QTR_FINANCIALS" :key="row.metric" :style="q3CellStyle(i)">
               <text class="block" :style="q3MetricStyle">{{ row.metric }}</text>
               <view class="flex items-baseline" style="gap: 6px; margin-top: 2px">
                 <text :style="q3ValueStyle">{{ row.value }}</text>
@@ -250,11 +250,16 @@ const PRESS = [
   { outlet: "Forbes", title: "The grid is shifting — and NexGrid is leading", date: "2026-01" },
   { outlet: "The Block", title: "Inside the $487M NexGrid network", date: "2025-12" },
 ];
-const Q3_FINANCIALS = [
+// Q2 2026 (closed quarter — a mid-quarter "audited" print is provably fake).
+// Payouts $47.0M ≈ quarter integral of the growth curve that exits at the
+// platform daily anchor ($682K/day); devices 27,150 +12% is the quarter-close
+// snapshot, putting today's live fleet anchor +4.8% above it on-trajectory.
+// Values mirror admin i-tabs/data.ts FINANCIALS_FIELDS (sentinel check 6).
+const QTR_FINANCIALS = [
   { metric: "MRR", value: "$4.87M", delta: "+22%" },
   { metric: "Active accounts", value: "184,206", delta: "+38%" },
-  { metric: "Devices online", value: "28,432", delta: "+12%" },
-  { metric: "Payouts processed", value: "$31.2M", delta: "+27%" },
+  { metric: "Devices online", value: "27,150", delta: "+12%" },
+  { metric: "Payouts processed", value: "$47.0M", delta: "+27%" },
 ];
 const LISTINGS = [
   { exchange: "PancakeSwap", state: "Live", tint: "var(--v5-success)" },

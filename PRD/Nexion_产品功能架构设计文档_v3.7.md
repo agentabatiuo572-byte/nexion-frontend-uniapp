@@ -367,7 +367,7 @@ TabBar:active tab 显示背景 chip 高亮。
 | Sponsor 卡 | 从 code hash 映射的固定 sponsor(姓名 + 头像 + V 级 + 城市 + 下线数) |
 | Welcome Gift hero | `$5 USDT + 20 NEX` 大字 |
 | Perks 列表 | 4 项($5+20 gift / 第一天赚钱 / 24/7 active / sponsor mentorship) |
-| 社会证明 | 28,432 new joiners · 47 countries · $1.2M paid out |
+| 社会证明 | 41,286 new joiners · 47 countries · $20.5M paid out(月发放 = 平台日发放锚 $682,368 × 30;新增人数为用户口径,不复用设备锚数字) |
 | Partner wall | NVIDIA / Intel / AMD / OpenRouter / OPPO / TechCrunch |
 | Trust badges | SOC 2 Type II / ISO 27001 / GDPR · MSB / CertiK audited |
 | CTA(主) | "Claim my $5 + 20 NEX" → `/register?ref=CODE` |
@@ -722,7 +722,7 @@ Hero 信息层:
 | 标题 line 1 | "AI 时代,算力就是钱。" | 资本视角钩 — AI 缺算力,你刚好有 |
 | 标题 line 2 | "24 小时 替你打工。" | 第二人称 + 强动词 + 数字前置 |
 | 副标题 | "插上充电,就开始接 AI 任务。越多 · 越久 · 赚得越多。" | 隐性 phone hint + 增长承诺 |
-| 实时统计 chip | `28,xxx 台设备 · $1,2xx,xxx 今日已付` | 社会证明 + 紧迫感 |
+| 实时统计 chip | `28,xxx 台设备在线 · $1xx,xxx,xxx 累计已发放`;累计值按「设备总数 × 设备日产出公布档」速率随真实时间单调递增,跨访问不倒退;设备在线数小幅双向波动 | 社会证明 + 规模信任;累计口径不暴露日流水、不可反推单台收益 |
 | 中央 ComputeOrb | SVG 动画:旋转轨道 + 卫星节点 + 中央芯片标 "N" | 真平台仿真 — 算力网络可视化 |
 | 主 CTA | "立即开始 →"(brand 大按钮) | 零门槛字眼,无扣款 / 绑卡暴露 |
 | 副 CTA | "登录"(surface ghost) | 复访用户路径 |
@@ -1012,7 +1012,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 客户 logo + AI 模型(SDXL Turbo / Llama 3.2 / Whisper)+ 客户名 + 城市
 - 右侧:GPU 数 + 持续时长
 
-底部统计:`28,432 devices on 4,820 live jobs +$215/sec network`
+底部统计:`28,432 devices · +$7.9/sec network`(在线数绑平台实时统计;速率 = 日发放锚 ÷ 86,400)
 
 ### 5.6 V 级进度卡
 
@@ -1091,8 +1091,10 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 ### 5.12 网络脉搏(Network Pulse)
 
 2×2 grid metrics + 每格 sparkline:
-- Phones · Paid today · Hubs · Your rank
-- 右上角 `+$215/sec` ticker
+- Members(注册用户 1.42M,用户口径)· Paid today(= 日发放锚 $682K)· Devices(在线设备,与平台实时统计同源)· Your rank
+- 右上角 `+$7.9/sec` ticker(围绕 日发放锚 ÷ 86,400 波动,不单调累加)
+
+> 平台级展示数字单源规则:日发放锚 = 在线设备 28,432 × 公布档 $24/台/日 = $682,368;每秒、月度($20.5M)、累计(时间锚单调)均由此派生,任意两处展示换算同维度偏差 <5%;28,432 仅作设备口径使用。
 
 ### 5.13 设备对比卡(Math Card)
 
@@ -3513,7 +3515,7 @@ interface TrialConfig {
 | Wallet 提现限额 + fee 公式 + 日额度 | `app/(main)/me/wallet/withdraw/page.tsx:55,69,209,311` | `GET /api/config/wallet/withdraw-limits` | 监管 / 风控调阈值 |
 | Bundle 折扣 ladder(4 件 12% / 3 件 8% / 2 件 5%)| `lib/store/cart.ts:22-26` | `GET /api/config/cart/bundle-discount` | 促销活动 |
 | Day-One quest 时窗 + 奖励(24h / 72h grace / 500 NEX / 200 NEX)| `lib/mock/quest.ts:33-38` | `GET /api/config/quest/day-one` | 新人转化最核心钩子 |
-| 平台 marketing stats(activeDevices / paidToday / countries / uptime)| `lib/store/index.ts:182-187` | SSE `/api/platform/stats` | 首页信任 hero,server broadcast |
+| 平台 marketing stats(activeDevices / activeJobs / nodes / countries / uptime + 资金口径由日发放锚派生)| `src/store/app.ts:createInitialGlobal` + `src/lib/platform-stats.ts`(单源锚) | SSE `/api/platform/stats` | 首页/globe/trust 信任数字,server broadcast;服务端沿用同一恒等式(在线设备 × 公布档 = 日发放) |
 | Nova push cadence(10 channel × `{enabled, tickMs, cooldownMs, …}`,见 §11.0A.1)| `lib/v3/_config/stella-cadence.ts` | `GET/PUT /api/admin/stella/cadence-config` (TBD; candidate) + SSE `/api/stella/config-invalidate` 推变更 | 运营 throttle AI 推送频率(per cohort / phase / risk regime),每条 channel 独立 kill-switch |
 | 用户多 range 收益聚合(today / week / month / all)| `useApp.earnings.{today,thisWeek,thisMonth,total}` | `GET /api/me/earnings?range={today\|week\|month\|all}` (TBD; candidate) + SSE `/api/me/earnings/stream` 推 today 滚动 | 4 个 range 独立 server 计算,客户端只渲染;Earn hero 4-tab toggle 全部 streaming |
 
@@ -4096,7 +4098,7 @@ flowchart LR
 | Backed by | a16z crypto / Sequoia / Pantera / Polychain / Multicoin / Coinbase Ventures |
 | **Leadership team** | 5 行 C-suite,LinkedIn 风格(首字母头像 + 名 + 角色 + ex-公司 + `in` 外链 chip)。Section header suffix `verified on LinkedIn`。整行 `<a href="#">` 占位 |
 | In the press | TechCrunch / CoinDesk / Forbes / The Block 4 篇报道 |
-| **Q3 2026 financials** | 顶部 strip(文件图标 + 标题 + `Download PDF →` 占位链接)+ 2×2 KPI grid(MRR $4.87M +22% / Active 184,206 +38% / Devices 28,432 +12% / Payouts $31.2M +27%)+ footnote `Selected metrics · Full audited report ships to investors quarterly`。Section header suffix `audited by PwC` |
+| **Q2 2026 financials** | 顶部 strip(文件图标 + 标题 + `Download PDF →` 占位链接)+ 2×2 KPI grid(MRR $4.87M +22% / Active 184,206 +38% / Devices 27,150 +12% / Payouts $47.0M +27%)+ footnote `Selected metrics · Full audited report ships to investors quarterly`。Section header suffix `audited by PwC`。季度取**已收官季**(季中不得标 audited);Payouts 为按增长曲线积分、收口于日发放锚的季总量;Devices 为季末快照,低于当前在线锚形成延续增长轨迹 |
 | **NEX backed by AI demand** | hero(`Every NEX is minted only when AI inference completes` + `30% 平台手续费回购销毁`)+ 3 列 stats(`$X.XXM 24h volume` / `$XXXM FDV` / `X.XXB Circulating`)+ 3 行 top AI 客户 NEX 月度消费 ranking(Helix Labs / Mosaic Studios / Echo Earbuds)+ footer `View all 1,247 active AI clients →` |
 | $NEX listings | PancakeSwap / Uniswap / CoinGecko / CoinMarketCap "Live",Binance / Coinbase "审核中" |
 | Bug bounty | $50,000 per critical · HackerOne · 24h triage SLA |
@@ -4381,7 +4383,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 - `support` 为用户发起线程,用户发送后由真人客服按类别模板回复。
 - `ai`(Nova)承载所有自动 push;Nova bubble 未读徽标聚合**全部类别**未读(AI + 人工)。
 - 人工 / 顾问回复为按类别循环模板(真后台接入后替换为真实坐席消息流)。
-- **发送频控**:单会话发送限流,每 15 秒最多 5 条(滚动窗口);超限时提示稍后再试,防刷屏。
+- **发送频控**:单会话发送限流,两道独立闸——滚动窗口(每 15 秒最多 5 条)+ 相邻两条最小间隔(至少隔 1 秒),防连点刷屏;两闸都放行才发出,超限提示的重试秒数取两者较长值。超限提示同一时刻只显示一条,连续触发刷新该条不叠加;被拦下的这条消息文本回填输入框,不丢失。规则覆盖三类会话的自由输入与快捷提问(chip)。真后台以 HTTP 429 + Retry-After 镜像同一策略。
 - **消息回执与状态**:用户发出的消息显示「已送达 / 已读」回执;坐席回复前依「已读 → 正在输入…(气泡)→ 回复」节奏推进(约 2 秒),使接待过程可感知。真后台接入后由消息已读事件与 typing 事件驱动。
 - **消息定位**:进入会话、发送或收到新消息后,线程自动滚动定位到最新一条。
 

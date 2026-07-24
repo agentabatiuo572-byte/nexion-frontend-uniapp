@@ -28,8 +28,8 @@
         <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
       <view class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
-        <text><text style="color: var(--v5-ink); font-weight: 500">28,432</text> {{ t.home.onGridOnline }}</text>
-        <text style="color: var(--v5-success-ink); font-weight: 500">+$215/sec</text>
+        <text><text style="color: var(--v5-ink); font-weight: 500">{{ app.global.activeDevices.toLocaleString() }}</text> {{ t.home.onGridOnline }}</text>
+        <text style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
       </view>
     </view>
   </view>
@@ -38,8 +38,13 @@
 <script setup lang="ts">
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useApp } from "@/store/app";
+import { PAYOUT_PER_SEC_USD } from "@/lib/platform-stats";
 
 const t = useT();
+const app = useApp();
+// Static footer rate — same single anchor the pulse-card wobbles around.
+const perSecText = `+$${PAYOUT_PER_SEC_USD.toFixed(1)}/sec`;
 
 const GRID_CLIENTS = [
   { id: "P", name: "Pocket Studios", model: "SDXL Turbo", color: "var(--v5-brand)", city: "Berlin" },

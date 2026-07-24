@@ -112,7 +112,7 @@
           <view class="stat-sep" />
           <view class="stat-item">
             <text class="stat-num stat-num--brand">${{ fmtNum(paid) }}</text>
-            <text class="stat-label">{{ t.intro.statsPaidToday }}</text>
+            <text class="stat-label">{{ t.intro.statsPaidTotal }}</text>
           </view>
         </view>
       </view>
@@ -140,10 +140,15 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
+import { FLEET_DEVICES, paidCumulativeNow } from "@/lib/platform-stats";
 
 const t = useT();
-const paid = ref(1247893);
-const devices = ref(28432);
+// Cumulative payout + fleet count come from the platform single anchor
+// (src/lib/platform-stats.ts): cumulative is time-anchored derive-not-accumulate
+// so it never regresses across visits; daily-flow rationale in
+// docs/changes/2026-07-24-intro-stats-cumulative.md.
+const paid = ref(paidCumulativeNow());
+const devices = ref(FLEET_DEVICES);
 
 function fmtNum(n: number): string {
   return n.toLocaleString("en-US");
@@ -182,8 +187,13 @@ const orbitPath = "M 120 12 A 108 108 0 1 1 119.999 12 Z";
 let timer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   timer = setInterval(() => {
-    paid.value += Math.floor(Math.random() * 250) + 80;
-    devices.value += Math.floor(Math.random() * 3);
+    // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
+    // steps, so a reload can never show a smaller total than a longer session.
+    paid.value = paidCumulativeNow();
+    const drift = Math.random();
+    // ±24 band, same rationale as the store tick (bounded symmetric wobble).
+    if (drift > 0.75) devices.value = Math.min(FLEET_DEVICES + 24, devices.value + 1);
+    else if (drift < 0.25) devices.value = Math.max(FLEET_DEVICES - 24, devices.value - 1);
   }, 1800);
 });
 onUnmounted(() => {
@@ -276,6 +286,7 @@ function goTerms() {
 .intro-hero {
   text-align: center;
   padding-bottom: 8px;
+  text-wrap: pretty;
 }
 .intro-title {
   display: block;
@@ -298,7 +309,9 @@ function goTerms() {
   margin-top: 20px;
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
   padding: 6px 14px;
   border-radius: 9999px;
   background: rgba(15, 15, 15, 0.8);

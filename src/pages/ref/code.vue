@@ -89,9 +89,9 @@
           <text>{{ t.ref.thisMonth }}</text>
         </view>
         <view class="grid grid-cols-3 text-center" style="gap: 8px">
-          <Stat :label="t.ref.newJoiners" value="28,432" tint="var(--v5-brand)" />
+          <Stat :label="t.ref.newJoiners" :value="joinersText" tint="var(--v5-brand)" />
           <Stat :label="t.ref.countries" value="47" />
-          <Stat :label="t.ref.paidOut" value="$1.2M" tint="var(--v5-warning)" />
+          <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
         </view>
       </view>
 
@@ -136,8 +136,13 @@ import { pickSponsor } from "@/mock/sponsors";
 import { useConfig } from "@/store/config";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
+import { MONTHLY_PAYOUT_USD, MONTHLY_NEW_JOINERS } from "@/lib/platform-stats";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
+// This-month payout — anchor × 30 (single source); joiners is a people-metric
+// mock (the fleet-anchor figure is devices-only and must not play this role).
+const paidOutText = `$${(MONTHLY_PAYOUT_USD / 1_000_000).toFixed(1)}M`;
+const joinersText = MONTHLY_NEW_JOINERS.toLocaleString("en-US");
 
 const t = useT();
 const code = ref("");
