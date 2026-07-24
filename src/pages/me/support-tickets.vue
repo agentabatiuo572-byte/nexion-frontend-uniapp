@@ -163,6 +163,10 @@ const filterFeedback = ref("");
 
 onLoad((query) => {
   if (query?.mode === "create") mode.value = { kind: "create" };
+  // 入口可带 ?cat= 预选分类(如充值页「充值未到账?」→ deposit);白名单外忽略。
+  if (typeof query?.cat === "string" && (categoriesForNew as string[]).includes(query.cat)) {
+    newCat.value = query.cat as TicketCategory;
+  }
   if (typeof query?.ticket === "string") mode.value = { kind: "detail", id: query.ticket };
 });
 

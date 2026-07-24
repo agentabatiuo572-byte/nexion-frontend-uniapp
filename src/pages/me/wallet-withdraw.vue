@@ -1,13 +1,14 @@
 <!--
   WalletWithdraw — ported from Nexion-prototype/app/(main)/me/wallet/withdraw/page.tsx.
   Top→bottom: KYC-Express gate (banner until wallet paired / verified pill after,
-  with a dev-only ?dev=1 reset) → compliance-hold banner (P5+) → amount input
-  (Use Max) → network select → address input → fee/receive summary → warnings →
-  StakeAlternativeCard (configured minimum) → NEX burn gate (progress + daily-check-in /
-  earn-NEX CTAs) → sticky submit.
+  with a dev-only ?dev=1 reset) → rebind freeze banner (PAY04: 24h countdown) →
+  compliance-hold banner (P5+) → amount input (Use Max) → network select → bound
+  address row + 「更换」 rebind entry (PAY04: address = KYC binding, no manual input)
+  → fee/receive summary → warnings → StakeAlternativeCard (configured minimum) →
+  NEX burn gate (progress + daily-check-in / earn-NEX CTAs) → sticky submit.
 
-  Gates: wallet-pairing (must be paired), amount within configured withdrawable limits, address.len
-  > 10. NO hard NEX gate — NEX optionally OFFSETS the fee. Fee model:
+  Gates: wallet-pairing (must be paired), rebind freeze window (submit greyed),
+  amount within configured withdrawable limits. NO hard NEX gate — NEX optionally OFFSETS the fee. Fee model:
   grossFee = amount × penaltyFeeRate (the no-NEX fee); burning NEX waives
   nexFeeOffsetRate USDT per NEX (favorable vs market). requiredNex fully waives;
   partial NEX offsets pro-rata, remainder paid in USDT. Both rates backend-
@@ -57,6 +58,16 @@
         </view>
       </view>
 
+      <!-- 换绑后 24h 安全冻结横幅(PAY04 ⑤ 报错/极限态:盾牌 + hh:mm:ss 真倒计时) -->
+      <view v-if="frozenNow" class="nx-withdraw-freeze-banner mx-4 mb-3 flex items-start" :style="freezeBannerStyle">
+        <view class="grid place-items-center shrink-0" :style="freezeIconStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+        </view>
+        <view class="flex-1 min-w-0" style="margin-left: 10px">
+          <text class="block" style="font-size: 12px; color: var(--v5-danger); font-weight: 500; line-height: 1.4">{{ freezeBannerText }}</text>
+        </view>
+      </view>
+
       <!-- Compliance-hold banner (P5+) -->
       <view v-if="complianceHoldEnabled" class="mx-4 mb-3 flex items-start" :style="holdBannerStyle">
         <view class="grid place-items-center shrink-0" :style="holdIconStyle">
@@ -99,33 +110,37 @@
         </view>
       </view>
 
-      <!-- Network select — de-carded: radio rows sit on the floor (topup tone). -->
-      <view class="mx-4 mt-4" style="padding: 0 2px; display: flex; flex-direction: column; gap: 4px">
-        <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">{{ t.wallet.networkLabel }}</text>
-        <view
-          v-for="n in NETWORKS"
-          :key="n.id"
-          class="flex items-center active:opacity-90"
-          :style="networkRowStyle(network === n.id)"
-          @click="network = n.id"
-        >
-          <view class="grid place-items-center" :style="radioStyle(network === n.id)">
-            <view v-if="network === n.id" style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand)" />
-          </view>
-          <view class="flex-1" style="margin-left: 12px">
-            <view class="flex items-center" style="gap: 8px">
-              <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ n.label }}</text>
-              <text v-if="n.recommended" :style="recommendedChipStyle">{{ t.wallet.networkRecommended }}</text>
-            </view>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ networkHint(n.id) }}</text>
-          </view>
+      <!-- 提现网络 — 只读展示,派生自绑定(网络随绑定,换网络 = 换绑;规格 ⑤ 一致性微修正:
+           选择器职责归换绑页,防「选 ERC20 配 TRON 地址」自相矛盾) -->
+      <view class="mx-4 mt-4" style="padding: 0 2px">
+        <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.networkLabel }}</text>
+        <view class="mt-2" :style="networkReadonlyRowStyle">
+          <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ networkDisplayLabel }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ networkHint(network) }}</text>
         </view>
+        <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ t.addrRebind.networkFollowsBinding }}</text>
       </view>
 
-      <!-- Address input — de-carded: label on the floor, input recessed (surface-3). -->
+      <!-- 提现地址 = KYC 绑定地址(PAY04 ⑤:当前绑定中段省略 + 「更换」入口;§4.4.3 单地址原则) -->
       <view class="mx-4 mt-4" style="padding: 0 2px">
         <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.withdrawAddressLabel }}</text>
-        <input class="nx-withdraw-address-input mt-2 w-full font-mono" :style="addressInputStyle" type="text" :value="address" :placeholder="addressPlaceholder" @input="onAddress" />
+        <view class="mt-2 flex items-center" :style="boundAddrRowStyle">
+          <view class="flex-1 min-w-0">
+            <text class="font-mono" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ boundAddressShort }}</text>
+          </view>
+          <view
+            class="nx-withdraw-rebind-entry grid place-items-center shrink-0"
+            :class="{ 'active:opacity-80': !rebindEntryDisabled }"
+            role="button"
+            :aria-disabled="rebindEntryDisabled ? 'true' : 'false'"
+            :style="rebindEntryStyle"
+            @click="goRebind"
+          >
+            <text :style="rebindEntryTextStyle">{{ t.addrRebind.changeCta }}</text>
+          </view>
+        </view>
+        <!-- 异常1:在途提现单 → 入口置灰 + 原因 -->
+        <text v-if="rebindEntryDisabled" class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ t.addrRebind.inFlightBlocked }}</text>
       </view>
 
       <!-- Summary: gross fee → NEX offset → net fee → receive (de-carded to floor) -->
@@ -229,16 +244,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { navTo } from "@/lib/route";
+import { riskReasonLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { useWalletPairing } from "@/store/wallet-pairing";
+import { formatClock, freezeRemainingMs, isInFlightWithdrawal } from "@/store/wallet-pairing-core";
+import { mockServerNow } from "@/store/server-time";
 import {
   evaluateWithdrawal,
   commitWithdrawal,
@@ -252,9 +271,9 @@ import { useConfig } from "@/store/config";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal } from "@/store/types";
 
-// 提现网络收窄裁决:仅 USDT 三网络(TRC20 推荐),与充值通道同序。
-const NETWORKS: { id: Withdrawal["network"]; label: string; recommended?: boolean }[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", recommended: true },
+// 提现网络收窄裁决:仅 USDT 三网络。展示标签表(网络本身随绑定只读,不再选)。
+const NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
+  { id: "USDT-TRC20", label: "USDT (TRC20)" },
   { id: "USDT-BEP20", label: "USDT (BEP20)" },
   { id: "USDT-ERC20", label: "USDT (ERC20)" },
 ];
@@ -283,12 +302,42 @@ onLoad((options) => {
 });
 
 const amount = ref("");
-const network = ref<Withdrawal["network"]>("USDT-TRC20");
-const address = ref("");
+// 提现网络随绑定地址派生(只读;换网络 = 走换绑页重新验证,PAY04 一致性微修正)。
+const network = computed<Withdrawal["network"]>(() => pairing.pairedNetwork ?? "USDT-TRC20");
+const networkDisplayLabel = computed(() => NETWORKS.find((n) => n.id === network.value)?.label ?? network.value);
+// 提现地址 = KYC 绑定地址(PAY04 换绑单地址原则):不再手输,读当前 active 绑定。
+const boundAddress = computed(() => pairing.pairedWalletAddress ?? "");
+const boundAddressShort = computed(() => {
+  const a = boundAddress.value;
+  if (!a) return "—";
+  return a.length > 22 ? `${a.slice(0, 10)}…${a.slice(-6)}` : a;
+});
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
-// TRC20 = TRON 形态;ERC20/BEP20 共用 EVM 0x 形态。
-const addressPlaceholder = computed(() => (network.value === "USDT-TRC20" ? "TR7NHq..." : "0x..."));
+
+// ── 换绑入口 + 24h 冻结(PAY04 ②阳光2 + 异常1)──────────────────────
+const rebindEntryDisabled = computed(() => isInFlightWithdrawal(app.latestWithdrawal?.status ?? undefined));
+function goRebind() {
+  if (rebindEntryDisabled.value) {
+    toast.info(t.value.addrRebind.inFlightBlocked);
+    return;
+  }
+  navTo("/pages/me/wallet-address-rebind");
+}
+// 冻结倒计时(server 时钟 1s tick;归零自然放行)。
+const nowTick = ref(mockServerNow());
+let freezeTimer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
+});
+onUnmounted(() => {
+  if (freezeTimer) clearInterval(freezeTimer);
+});
+const freezeLeftMs = computed(() => freezeRemainingMs(pairing.freezeUntil, nowTick.value));
+const frozenNow = computed(() => freezeLeftMs.value > 0);
+const freezeBannerText = computed(() =>
+  fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
+);
 
 const complianceHoldEnabled = computed(() => phase.value.complianceHoldEnabled);
 const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: phase.value.withdrawalCooldownDays }));
@@ -311,10 +360,15 @@ const fee = computed(() => feeCalc.value.actualFee);
 const receive = computed(() => feeCalc.value.netReceive);
 const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
 const eligibility = computed(() =>
-  evaluateWithdrawal(app.accountKey, network.value, address.value, maxWithdrawable.value),
+  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, amountNum.value),
 );
-const withdrawalRiskNotice = computed(() =>
-  address.value.length > 10 && eligibility.value.route !== "pass" && eligibility.value.route !== "reject",
+// 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
+const withdrawalRiskNotice = computed(
+  () =>
+    !frozenNow.value &&
+    boundAddress.value.length > 10 &&
+    eligibility.value.route !== "pass" &&
+    eligibility.value.route !== "reject",
 );
 // SPEC-7: 提交进行中(风控校验加载态)。
 const submitting = ref(false);
@@ -327,14 +381,15 @@ const heldLine = computed(() => {
     l: b.bonusLockedUsdt.toFixed(2),
   });
 });
-// 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案)。
+// 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案;码表单源 lib/risk-reason-text)。
 const riskNoticeBody = computed(() => {
-  const dict = t.value.wallet.riskReasons as Record<string, string>;
-  const lines = eligibility.value.riskReasons.map((code) => dict[code]).filter(Boolean);
-  return lines.length ? lines.join(";") + "。" : t.value.wallet.withdrawRouteReviewBody;
+  const lines = riskReasonLines(t.value, eligibility.value.riskReasons);
+  return lines.length ? lines.join(" · ") : t.value.wallet.withdrawRouteReviewBody;
 });
 const submitDisabledReason = computed(() => {
   if (!walletPaired.value) return t.value.walletV3.submitReasonUnpaired;
+  // PAY04 换绑冻结:24h 内提交按钮置灰(横幅带真倒计时)。
+  if (frozenNow.value) return t.value.addrRebind.submitFrozenReason;
   if (amountNum.value <= 0) return t.value.walletV3.submitReasonAmountRequired;
   if (amountNum.value < minWithdrawable.value) {
     return fmt(t.value.walletV3.submitReasonMinAmount, { n: minWithdrawable.value.toFixed(0) });
@@ -342,7 +397,7 @@ const submitDisabledReason = computed(() => {
   if (amountNum.value > eligibility.value.maxWithdrawableUsdt) {
     return fmt(t.value.walletV3.submitReasonMaxAmount, { n: eligibility.value.maxWithdrawableUsdt.toFixed(2) });
   }
-  if (address.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
+  if (boundAddress.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
   if (!eligibility.value.canSubmit) return t.value.walletV3.submitReasonReviewBlocked;
   return "";
 });
@@ -382,9 +437,6 @@ function detailVal(e: Event): string {
 }
 function onAmount(e: Event) {
   amount.value = detailVal(e).replace(/[^0-9.]/g, "");
-}
-function onAddress(e: Event) {
-  address.value = detailVal(e);
 }
 function useMax() {
   amount.value = maxWithdrawable.value.toFixed(2);
@@ -429,7 +481,13 @@ async function handleSubmit() {
   submitting.value = true;
   let fresh: WithdrawalEligibility;
   try {
-    fresh = await requestWithdrawalEligibility(app.accountKey, network.value, address.value, maxWithdrawable.value);
+    fresh = await requestWithdrawalEligibility(
+      app.accountKey,
+      network.value,
+      boundAddress.value,
+      maxWithdrawable.value,
+      amountNum.value,
+    );
   } catch {
     submitting.value = false;
     toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
@@ -455,7 +513,7 @@ async function handleSubmit() {
   const withdrawalId = app.submitWithdrawal(
     amountNum.value,
     network.value,
-    address.value,
+    boundAddress.value,
     fee.value,
     fresh.route,
     fresh.riskReasons,
@@ -466,7 +524,7 @@ async function handleSubmit() {
     toast.error(t.value.wallet.withdrawInsufficient);
     return;
   }
-  commitWithdrawal(app.accountKey, network.value, address.value);
+  commitWithdrawal(app.accountKey, network.value, boundAddress.value);
   const charged = fee.value;
   const memo = fresh.route === "pass"
     ? fmt(t.value.wallet.withdrawBillMemoPass, { network: network.value, fee: charged.toFixed(2) })
@@ -570,45 +628,46 @@ const amountInputStyle: CSSProperties = {
   fontWeight: 600,
   color: "var(--v5-ink)",
 };
-// Radio rows on the page floor (topup tone): soft brand tint marks the active
-// one; -10px side margins let the tint bleed to the 2px-inset group edge.
-function networkRowStyle(active: boolean): CSSProperties {
-  return {
-    padding: "12px 10px",
-    margin: "0 -10px",
-    borderRadius: "12px",
-    background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
-  };
-}
-function radioStyle(active: boolean): CSSProperties {
-  return {
-    width: "20px",
-    height: "20px",
-    borderRadius: "50%",
-    border: `2px solid ${active ? "var(--v5-brand)" : "var(--v5-border)"}`,
-    background: active ? "color-mix(in srgb, var(--v5-brand) 20%, transparent)" : "transparent",
-  };
-}
-const recommendedChipStyle: CSSProperties = {
-  padding: "2px 7px",
-  borderRadius: "6px",
-  background: "var(--v5-brand-soft)",
-  color: "var(--v5-brand)",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  letterSpacing: "0.06em",
-};
-// Recessed input idiom (de-card white-list): surface-3 fill, no border.
-const addressInputStyle: CSSProperties = {
-  width: "100%",
+// 网络只读行(recessed 同款 surface-3 零描边)。
+const networkReadonlyRowStyle: CSSProperties = {
   minHeight: "48px",
   background: "var(--v5-surface-3)",
   borderRadius: "12px",
-  padding: "12px",
+  padding: "10px 12px",
   boxSizing: "border-box",
+};
+// 绑定地址行(recessed 同款 surface-3 零描边)+ 「更换」入口(tap ≥ 44)。
+const boundAddrRowStyle: CSSProperties = {
+  minHeight: "48px",
+  background: "var(--v5-surface-3)",
+  borderRadius: "12px",
+  padding: "2px 2px 2px 12px",
+  boxSizing: "border-box",
+  gap: "8px",
+};
+const rebindEntryStyle = computed<CSSProperties>(() => ({
+  minHeight: "44px", // tap ≥ 44
+  minWidth: "64px",
+  padding: "0 14px",
+  borderRadius: "999px",
+  background: rebindEntryDisabled.value ? "var(--v5-surface-2)" : "var(--v5-brand-soft)",
+}));
+const rebindEntryTextStyle = computed<CSSProperties>(() => ({
   fontSize: "13px",
-  color: "var(--v5-ink)",
+  fontWeight: 600,
+  color: rebindEntryDisabled.value ? "var(--v5-ink-4)" : "var(--v5-brand)",
+}));
+// 冻结横幅(danger soft tint;prototype wd-freeze 同款语汇)。
+const freezeBannerStyle: CSSProperties = {
+  background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
+  borderRadius: "12px",
+  padding: "10px 12px",
+};
+const freezeIconStyle: CSSProperties = {
+  width: "28px",
+  height: "28px",
+  borderRadius: "8px",
+  background: "color-mix(in srgb, var(--v5-danger) 16%, transparent)",
 };
 const warnBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
@@ -664,10 +723,3 @@ const submitBtnStyle = computed<CSSProperties>(() => ({
 }));
 </script>
 
-<style scoped>
-:deep(.nx-withdraw-address-input .uni-input-input) {
-  min-height: 22px;
-  height: 22px;
-  line-height: 22px;
-}
-</style>

@@ -33,8 +33,8 @@
         <Row :label="w.to" :value="trunc(toAddr)" mono />
         <Row :label="w.contract" :value="trunc(contract)" mono />
         <Row :label="w.value" :value="`${valueUSDT} USDT`" tint="var(--v5-brand)" bold />
-        <Row :label="w.gas" :value="`${gasUsedGwei} Gwei`" mono />
-        <Row :label="w.network" value="Ethereum Mainnet (chain id 1)" last />
+        <Row :label="w.gas" :value="gasLine" mono />
+        <Row :label="w.network" :value="networkLine" last />
       </view>
 
       <!-- External link explainer -->
@@ -44,13 +44,9 @@
           <text :style="extTitleStyle">{{ w.externalTitle }}</text>
         </view>
         <text class="block" :style="extBodyStyle">{{ w.externalBody }}</text>
-        <view class="grid grid-cols-2" style="gap: 8px; margin-top: 12px">
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.copyHashFor, { target: 'Etherscan' })" @click.stop="copyHash">
-            <text>Etherscan</text>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-          </view>
-          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.copyHashFor, { target: 'TRONScan' })" @click.stop="copyHash">
-            <text>TRONScan</text>
+        <view style="margin-top: 12px">
+          <view class="flex items-center justify-center active:opacity-70" :style="extBtnStyle" role="button" tabindex="0" :aria-label="fmt(t.uiChrome.copyHashFor, { target: explorerName })" @click.stop="copyHash">
+            <text>{{ explorerName }}</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
           </view>
         </view>
@@ -78,8 +74,29 @@ const hash = ref("");
 const copyState = ref<"idle" | "copied" | "failed">("idle");
 let copyResetTimer: ReturnType<typeof setTimeout> | null = null;
 
+// 调用方可带真实交易参数(充值记录行 → 金额/网络/确认数/收款地址/时间);
+// query 不可信,逐项校验后才用,无参/非法回退 hash 派生种子(既有行为)。
+const NET_LINES: Record<string, string> = {
+  TRC20: "Tron Network (TRC20)",
+  BEP20: "BNB Smart Chain (BEP20)",
+  ERC20: "Ethereum Mainnet (ERC20)",
+};
+const qAmount = ref<number | null>(null);
+const qConfs = ref<number | null>(null);
+const qNet = ref<string | null>(null);
+const qTo = ref<string | null>(null);
+const qAgeMin = ref<number | null>(null);
+
 onLoad((options) => {
   hash.value = options?.hash ?? "";
+  const amt = parseFloat(String(options?.amount ?? ""));
+  qAmount.value = Number.isFinite(amt) && amt > 0 && amt <= 1e9 ? amt : null;
+  const confs = parseInt(String(options?.confs ?? ""), 10);
+  qConfs.value = Number.isFinite(confs) && confs >= 0 && confs <= 10_000 ? confs : null;
+  qNet.value = typeof options?.net === "string" && options.net in NET_LINES ? options.net : null;
+  qTo.value = typeof options?.to === "string" && options.to.length >= 10 ? options.to : null;
+  const age = parseInt(String(options?.age ?? ""), 10);
+  qAgeMin.value = Number.isFinite(age) && age >= 0 ? Math.max(1, age) : null;
 });
 
 function hashSeed(h: string): number {
@@ -100,23 +117,31 @@ function makeRng(seed: number) {
     return ((x ^ (x >>> 14)) >>> 0) / 4_294_967_296;
   };
 }
-function makeAddress(rng: () => number): string {
+function makeAddress(rng: () => number, tron: boolean): string {
   const hex = "0123456789abcdef";
+  if (tron) {
+    // TRON 地址形态:T + 33 位(与充值专属地址同款近似 base58 大写)。
+    let s = "T";
+    for (let i = 0; i < 33; i++) s += hex[Math.floor(rng() * 16)].toUpperCase();
+    return s;
+  }
   let out = "0x";
   for (let i = 0; i < 40; i++) out += hex[Math.floor(rng() * 16)];
   return out;
 }
 
-// Deterministic mock values derived from the hash (recomputed when hash changes).
+// Deterministic mock values derived from the hash (recomputed when hash changes);
+// real params passed by the caller (deposit rows) take precedence per field.
 const derived = computed(() => {
   const rng = makeRng(hashSeed(hash.value));
+  const tron = qNet.value === "TRC20";
   return {
     blockNumber: 21_000_000 + Math.floor(rng() * 50_000),
     gasUsedGwei: (10 + rng() * 30).toFixed(2),
     valueUSDT: (50 + rng() * 9_950).toFixed(2),
-    fromAddr: makeAddress(rng),
-    toAddr: makeAddress(rng),
-    contract: makeAddress(rng),
+    fromAddr: makeAddress(rng, tron),
+    toAddr: makeAddress(rng, tron),
+    contract: makeAddress(rng, tron),
     confirmations: 1 + Math.floor(rng() * 145),
     minutesAgo: 1 + Math.floor(rng() * 1_440),
   };
@@ -124,12 +149,18 @@ const derived = computed(() => {
 
 const blockNumber = computed(() => derived.value.blockNumber);
 const gasUsedGwei = computed(() => derived.value.gasUsedGwei);
-const valueUSDT = computed(() => derived.value.valueUSDT);
+const valueUSDT = computed(() => (qAmount.value !== null ? qAmount.value.toFixed(2) : derived.value.valueUSDT));
 const fromAddr = computed(() => derived.value.fromAddr);
-const toAddr = computed(() => derived.value.toAddr);
+const toAddr = computed(() => qTo.value ?? derived.value.toAddr);
 const contract = computed(() => derived.value.contract);
-const confirmations = computed(() => derived.value.confirmations);
-const ageLabel = computed(() => fmt(w.value.minutesAgo, { n: derived.value.minutesAgo }));
+const confirmations = computed(() => qConfs.value ?? derived.value.confirmations);
+const networkLine = computed(() => (qNet.value ? NET_LINES[qNet.value] : "Ethereum Mainnet (chain id 1)"));
+// 浏览器与费用单位随网络(TRC20=TRONScan/Energy · BEP20=BscScan/Gwei · ERC20/无参=Etherscan/Gwei)。
+const explorerName = computed(() => (qNet.value === "TRC20" ? "TRONScan" : qNet.value === "BEP20" ? "BscScan" : "Etherscan"));
+const gasLine = computed(() =>
+  qNet.value === "TRC20" ? `${Math.round(parseFloat(gasUsedGwei.value) * 950)} Energy` : `${gasUsedGwei.value} Gwei`,
+);
+const ageLabel = computed(() => fmt(w.value.minutesAgo, { n: qAgeMin.value ?? derived.value.minutesAgo }));
 const copyButtonText = computed(() =>
   copyState.value === "copied" ? w.value.hashCopied :
   copyState.value === "failed" ? w.value.hashCopyFailed :

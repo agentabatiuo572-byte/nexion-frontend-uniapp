@@ -17,8 +17,8 @@
     <!-- Processing / 3DS -->
     <view v-if="phase === 'processing' || phase === '3ds'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="spinnerStyle" />
-      <text class="block" :style="centerTitleStyle">{{ phase === 'processing' ? 'Authorizing card…' : '3D Secure verification' }}</text>
-      <text class="block" :style="centerBodyStyle">{{ phase === 'processing' ? 'Submitting to issuing bank · do not close this window' : 'Your bank may text you a code · standing by for confirmation' }}</text>
+      <text class="block" :style="centerTitleStyle">{{ phase === 'processing' ? t.topupChrome.authorizingCard : t.topupChrome.secureVerification }}</text>
+      <text class="block" :style="centerBodyStyle">{{ phase === 'processing' ? t.topupChrome.submittingToBank : t.topupChrome.bankMayText }}</text>
       <view class="inline-flex items-center font-mono-tabular" :style="pciChipStyle">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text style="margin-left: 6px">PCI DSS Level 1 · 3DS 2.2</text>
@@ -31,9 +31,9 @@
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
       </view>
       <text class="block" :style="successTitleStyle">{{ t.topupChrome.paySuccess }}</text>
-      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">${{ usdtAmount.toFixed(2) }} USDT credited to your wallet</text>
+      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.topupChrome.creditedToWallet, { amount: usdtAmount.toFixed(2) }) }}</text>
       <text class="block font-mono-tabular" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4)">{{ receiptLine }}</text>
-      <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet">Back to wallet</view>
+      <view class="inline-block w-full text-center active:opacity-90" :style="successBtnStyle" @click="goWallet"><text>{{ t.topupChrome.backToWallet }}</text></view>
     </view>
 
     <!-- Fail -->
@@ -41,8 +41,8 @@
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
       <text class="block" :style="failTitleStyle">{{ t.topupChrome.payDeclined }}</text>
       <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ t.topupChrome.payDeclinedReason }}</text>
-      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">Contact your card issuer or try a different card. No charge was made.</text>
-      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'">Try again</view>
+      <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">{{ t.topupChrome.contactIssuer }}</text>
+      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'"><text>{{ t.ui.retry }}</text></view>
     </view>
 
     <!-- Form -->
@@ -56,8 +56,8 @@
           <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
-          <text style="font-size: 12px; color: var(--v5-ink-3)">Card fee 3.5% · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2)">${{ feeUSD.toFixed(2) }}</text></text>
-          <text class="text-right" style="font-size: 12px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }} </text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink)">${{ chargeUSD.toFixed(2) }}</text></text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.cardFeeLabel }} · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2); margin-left: 4px">${{ feeUSD.toFixed(2) }}</text></text>
+          <text class="text-right" style="font-size: 12px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }}</text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink); margin-left: 4px">${{ chargeUSD.toFixed(2) }}</text></text>
         </view>
       </view>
 
@@ -104,13 +104,13 @@
       <!-- Submit -->
       <view class="w-full flex items-center justify-center active:opacity-90" :style="submitBtnStyle" @click="handleSubmit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" :stroke="isValid ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 6px">Pay ${{ chargeUSD.toFixed(2) }}</text>
+        <text style="margin-left: 6px">{{ fmt(t.topupChrome.payCta, { amount: `$${chargeUSD.toFixed(2)}` }) }}</text>
       </view>
 
       <!-- Trust footer -->
       <view class="flex items-start" :style="trustFootStyle">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px; flex-shrink: 0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-        <text style="margin-left: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">Card processed by Checkout.com (PCI DSS Level 1). NexGrid never sees your full card number. 3D Secure 2.2 enforced for transactions over $50.</text>
+        <text style="margin-left: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ t.topupChrome.trustFootnote }}</text>
       </view>
     </template>
   </view>
@@ -119,6 +119,7 @@
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import CardBrandBadge from "@/components/me/card-brand-badge.vue";
@@ -175,7 +176,7 @@ const isValid = computed(
 const receiptLine = computed(() => {
   const receiptNo = Math.floor(Math.random() * 900000 + 100000);
   const last4 = cardNum.value.replace(/\s/g, "").slice(-4);
-  return `Receipt #CK-${receiptNo} · Charged $${chargeUSD.value.toFixed(2)} to ••••${last4}`;
+  return fmt(t.value.topupChrome.receiptLine, { no: `CK-${receiptNo}`, amount: chargeUSD.value.toFixed(2), last4 });
 });
 
 // ── input handlers (uni input event → e.detail.value) ──

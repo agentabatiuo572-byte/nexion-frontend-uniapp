@@ -354,6 +354,24 @@ sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
 sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
 
+# ── PAY-VN 越南支付架构(规格 PRD/specs/PAY-Nexion_越南支付架构规格_v1.0.md · 2026-07-24)──
+# 入金 = USDT(TRC20/ERC20/BEP20)+ VietQR 银行转账 + 卡;出金仅 USDT;BTC/ETH 充提已下线。
+if grep -rnE '\b(BTC|Bitcoin|bc1q)\b' src/store/deposits-core.ts src/store/deposits.ts src/store/fx.ts src/store/fx-core.ts src/pages/me/wallet-topup.vue src/pages/me/wallet-withdraw.vue src/pages/me/wallet-address-rebind.vue src/components/me/deposit-usdt-pane.vue src/components/me/deposit-bank-pane.vue src/components/store/chain-payment.vue src/pages/store/checkout.vue src/components/me/topup-card-form.vue >/dev/null 2>&1; then
+  bad "PAY-VN BTC/Bitcoin 通道残留(充提已收窄仅 USDT 三网络)"
+else
+  ok "PAY-VN 支付面无 BTC 通道残留(仅 USDT×3)"
+fi
+sentinel_present "PAY-VN 通道枚举单源含 VietQR" src/store/types.ts 'bank-vietqr'
+sentinel_present "PAY-VN 通道枚举单源含 BEP20" src/store/types.ts 'usdt-bep20'
+sentinel_present "PAY-VN 链上通道费表单源" src/store/deposits-core.ts 'export const CHAIN_DEPOSIT_FEE_USDT'
+sentinel_present "PAY-VN fx 牌价派生不缓存(computed)" src/store/fx.ts 'quoteRate = computed\(\(\) => computeQuoteRate'
+sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility.ts 'isRebindFrozen'
+if grep -rnE '26,?390' src/store/ src/components/me/ 2>/dev/null | grep -vqE 'fx-core|selfcheck'; then
+  bad "PAY-VN 硬编码牌价 26390(必须从 fx-core computeQuoteRate 派生)"
+else
+  ok "PAY-VN 无硬编码牌价(单源派生)"
+fi
+
 # FEAT-AUTH01 OTP 防轰炸闸门(PRD §4.6.2/§16.2.1;规格 PRD/specs/FEAT-AUTH01-otp-antibomb-gate.md)
 sentinel_present "AUTH01 captcha ticket must be explicit (audit P0 fix)" src/store/auth-otp.ts '!!captchaTicket &&'
 sentinel_present "AUTH01 cooldown rejects without minting new code" src/store/auth-otp.ts 'error: "rate_limited"'
@@ -382,7 +400,11 @@ sentinel_present "AUTH02 sponsorship is rebound per account" src/lib/account-sco
 sentinel_present "AUTH02 sponsorship stores bindings per account" src/store/sponsorship.ts 'bindingsByAccount'
 sentinel_present "AUTH02 dev bridge is entrypoint DEV-gated" src/main.ts 'if \(import\.meta\.env\.DEV\)'
 sentinel_present "SPEC-7 wallet pending bucket info sheet" src/pages/me/wallet.vue 'pendingSheetTitle'
-sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 't\.value\.wallet\.riskReasons'
+# 2026-07-24 A6:reason code → 话术码表收口进 lib/risk-reason-text.ts 单源(三渲染源共用,
+# 防散抄 dict 漏新增码被 filter(Boolean) 静默吞行);页面哨兵改钉共享函数消费。
+sentinel_present "SPEC-7 wallet reasons mapped via i18n (no raw codes)" src/pages/me/wallet.vue 'riskReasonLines\(t\.value'
+sentinel_present "SPEC-7 risk reason dict single-source in lib" src/lib/risk-reason-text.ts 't\.wallet\.riskReasons'
+sentinel_present "SPEC-7 risk reason dict carries PAY04 rebind codes" src/lib/risk-reason-text.ts '"new-address-large-amount"'
 sentinel_present "SPEC-7 payment-instrument overuse mapped (en)" src/i18n/messages/en.ts '"payment-instrument-overuse"'
 sentinel_present "SPEC-7 payment-instrument overuse mapped (zh)" src/i18n/messages/zh.ts '"payment-instrument-overuse"'
 sentinel_present "SPEC-7 dev bridge is DEV-gated" src/lib/spec7-dev-bridge.ts 'if \(!import\.meta\.env\.DEV\) return'
@@ -397,7 +419,7 @@ sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/
 sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
 sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-withdraw.vue 'riskCheckTimeoutTitle'
 sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
-sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 't\.value\.wallet\.riskReasons'
+sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
 sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wallet-topup.vue 'recordPaymentInstrument\(app\.accountKey'
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'

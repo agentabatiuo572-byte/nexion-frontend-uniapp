@@ -1,8 +1,9 @@
 <!--
-  WalletTopup — ported from Nexion-prototype/app/(main)/me/wallet/topup/page.tsx.
+  WalletTopup — 充值页(PAY-规格 [FEAT-PAY01] ⑤ 信息架构,参照 pay-vn-rails.html)。
   Two flows selected by ?kyc=1 (onLoad):
-   • Regular: channel list (transparent hairline group) → de-carded chain QR
-     deposit block OR Visa/MC card form.
+   • Regular: 顶部 segmented 通道切换 —「USDT 链上」= <DepositUsdtPane>(三网络
+     chip + 专属地址 QR + 最近入金);「银行转账」= <DepositBankPane>(VietQR
+     意向单流,[FEAT-PAY02]);「银行卡」= <TopupCardForm> 原样接入。
    • KYC-Express ($1 wallet-ownership verification): compliance banner +
      phase machine select → awaiting (QR + 30min countdown + 12s auto-detect) →
      verifying (3-step animation) → complete (pairs wallet via useWalletPairing,
@@ -10,11 +11,8 @@
      "Continue to withdrawal" → /me/wallet/withdraw.
 
   Wrapped in <AppChassis active="me">. Header is the shared sticky <SubPageHeader>
-  (back=/pages/me/wallet, mirroring the prototype's <SetPageHeader backHref="/me/wallet"/>).
-  Title/subtitle are dynamic to match the prototype's TopUpHeader: KYC-Express /
-  Compliance check in the $1 verification flow, Add funds / Top-up otherwise. framer
-  AnimatePresence → CSS nx-step-in keyframe (reused from checkout). Card form
-  extracted to topup-card-form.vue.
+  (back=/pages/me/wallet). Title/subtitle dynamic: KYC-Express / Compliance check
+  in the $1 verification flow, Add funds / Top-up otherwise.
 -->
 <template>
   <AppChassis active="me">
@@ -54,14 +52,14 @@
               :key="c.id"
               class="flex items-center active:opacity-90"
               :style="networkRowStyle(network === c.id)"
-              @click="selectKycNetwork(c.id)"
+              @click="network = c.id"
             >
               <view class="grid place-items-center" :style="radioStyle(network === c.id)">
                 <view v-if="network === c.id" style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand)" />
               </view>
               <view class="flex-1" style="margin-left: 12px">
                 <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ c.fee }} · {{ chTime(c) }}</text>
+                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ kycFee(c) }} · {{ chTime(c) }}</text>
               </view>
             </view>
           </view>
@@ -142,10 +140,10 @@
             <text class="block text-center" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.walletPairedCredited }}</text>
 
             <view style="margin-top: 16px" class="space-y-2">
-              <CompleteRow k="Paired wallet" :v="senderShort" mono />
-              <CompleteRow k="Network" :v="network" />
-              <CompleteRow k="Compliance ID" :v="complianceId" mono accent />
-              <CompleteRow k="Verified at" :v="verifiedAt" />
+              <CompleteRow :k="t.topupChrome.kycPairedWallet" :v="senderShort" mono />
+              <CompleteRow :k="t.topupChrome.network" :v="network" />
+              <CompleteRow :k="t.topupChrome.kycComplianceId" :v="complianceId" mono accent />
+              <CompleteRow :k="t.topupChrome.kycVerifiedAt" :v="verifiedAt" />
             </view>
 
             <view class="nx-kyc-continue-withdraw-cta w-full flex items-center justify-center active:opacity-85" :style="completeBtnStyle" @click="goWithdraw">
@@ -158,48 +156,29 @@
 
       <!-- ════════ Regular top-up flow ════════ -->
       <template v-else>
-        <!-- channel list — transparent hairline group (earnings-ledger idiom) -->
-        <view v-if="!selected" class="mx-4" style="padding: 0 2px">
-          <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 10px' }]">{{ t.topupChrome.selectChannel }}</text>
+        <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
+        <view class="flex" :style="segWrapStyle">
           <view
-            v-for="c in ALL_CHANNELS"
-            :key="c.id"
-            :class="['w-full flex items-center active:opacity-70', channelClass(c.id)]"
-            :style="channelRowStyle"
-            @click="selected = c.id"
+            v-for="s in SEGMENTS"
+            :key="s.id"
+            :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
+            :style="segPillStyle(s.id)"
+            role="tab"
+            :aria-selected="seg === s.id"
+            @click="seg = s.id"
           >
-            <view class="flex-1">
-              <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-              <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ c.fee }} · {{ chTime(c) }} · {{ t.topupChrome.min }} {{ c.min }}</text>
-            </view>
-            <text style="color: var(--v5-brand); font-size: 12px">{{ t.topupChrome.use }} →</text>
+            <text :style="segLabelStyle(s.id)">{{ segLabel(s.id) }}</text>
           </view>
         </view>
 
-        <!-- card pay form -->
-        <TopupCardForm v-else-if="selected === 'CARD'" @change-channel="selected = null" />
+        <!-- USDT 链上通道段 -->
+        <DepositUsdtPane v-if="seg === 'crypto'" />
 
-        <!-- chain deposit — de-carded, QR + address sit on the page floor -->
-        <view v-else class="mx-4" :style="openBlockStyle">
-          <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">{{ fmt(t.topupChrome.sendVia, { network: selected }) }}</text>
-            <text style="font-size: 12px; color: var(--v5-ink-3)" @click="selected = null">{{ t.topupChrome.change }}</text>
-          </view>
-          <view :style="qrBoxStyle"><view :style="qrInnerStyle" /></view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanOrCopy }}</text>
-          <view class="flex items-center rounded-xl" :style="addressRowStyle">
-            <text class="flex-1 font-mono" style="font-size: 12px; color: var(--v5-ink); word-break: break-all">{{ demoAddress }}</text>
-            <view class="nx-topup-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyDemoAddress">
-              <svg v-if="copiedDemo" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-            </view>
-          </view>
-          <view class="flex items-center" style="margin-top: 16px; gap: 8px; font-size: 13px; color: var(--v5-ink-3)">
-            <view :style="miniSpinnerStyle" />
-            <text>{{ t.topupChrome.awaitingConfirm }}</text>
-          </view>
-          <text class="block" style="margin-top: 16px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ t.topupChrome.addrExpireWarn }}</text>
-        </view>
+        <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
+        <DepositBankPane v-else-if="seg === 'bank'" />
+
+        <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
+        <TopupCardForm v-else @change-channel="seg = 'crypto'" />
       </template>
     </view>
   </AppChassis>
@@ -211,59 +190,61 @@ import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
+import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
+import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import VerifyRow from "@/components/me/verify-row.vue";
 import CompleteRow from "@/components/me/complete-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
+import { useDeposits } from "@/store/deposits";
 import { useWalletPairing, mockExternalAddress } from "@/store/wallet-pairing";
 import { recordPaymentInstrument } from "@/store/risk-identity";
-import type { Withdrawal } from "@/store/types";
+import { CHAIN_DEPOSIT_FEE_USDT } from "@/store/deposits-core";
+import type { ChainDepositChannel, Withdrawal } from "@/store/types";
 
-interface Channel {
-  id: Withdrawal["network"] | "CARD";
-  label: string;
-  fee: string;
-  time: string;
-  min: string;
+// ── Regular flow:通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
+type Seg = "crypto" | "bank" | "card";
+const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
+const seg = ref<Seg>("crypto");
+function segLabel(id: Seg): string {
+  const tc = t.value.topupChrome;
+  if (id === "crypto") return tc.segUsdt;
+  if (id === "bank") return t.value.bankPane.segBank;
+  return tc.segCard;
 }
-// 平台支付收窄裁决:充值通道 = USDT 三网络 + 国际卡(TRC20 主推排首位)。
-// time 存机器键,显示文案经 chTime() 走 i18n。
-const ALL_CHANNELS: Channel[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", fee: "1 USDT", time: "5min", min: "$10" },
-  { id: "USDT-BEP20", label: "USDT (BEP20)", fee: "1 USDT", time: "5min", min: "$10" },
-  { id: "USDT-ERC20", label: "USDT (ERC20)", fee: "5 USDT", time: "15min", min: "$10" },
-  { id: "CARD", label: "Visa / Mastercard", fee: "3.5%", time: "instant", min: "$30" },
-];
-// 绑定地址允许 USDT 三网络(规格 PAY04 ③),$1 验证同步开放三网络。
-const KYC_CHANNELS = ALL_CHANNELS.filter((c) => c.id !== "CARD");
 
-// c.id is typed Withdrawal["network"] | "CARD"; KYC_CHANNELS only ever holds
-// USDT networks, so narrow back to Withdrawal["network"] for the `network` ref.
-function selectKycNetwork(id: Channel["id"]) {
-  if (id === "CARD") return;
-  network.value = id;
+// ── KYC-Express 网络选择(绑定地址允许 USDT 三网络,规格 PAY04 ③)──
+interface Channel {
+  id: Withdrawal["network"];
+  label: string;
+  time: "5min" | "15min";
+}
+const KYC_CHANNELS: Channel[] = [
+  { id: "USDT-TRC20", label: "USDT (TRC20)", time: "5min" },
+  { id: "USDT-BEP20", label: "USDT (BEP20)", time: "5min" },
+  { id: "USDT-ERC20", label: "USDT (ERC20)", time: "15min" },
+];
+
+/** 费额单源 = deposits-core 通道费表("USDT-TRC20" → "usdt-trc20" 同名映射)。 */
+function kycFee(c: Channel): string {
+  return `${CHAIN_DEPOSIT_FEE_USDT[c.id.toLowerCase() as ChainDepositChannel]} USDT`;
 }
 
 function chTime(c: Channel): string {
   const tc = t.value.topupChrome;
-  return c.time === "instant" ? tc.timeInstant : c.time === "15min" ? tc.time15min : tc.time5min;
-}
-
-function channelClass(id: Channel["id"]): string {
-  return `nx-topup-channel-${String(id).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+  return c.time === "15min" ? tc.time15min : tc.time5min;
 }
 
 const KYC_DETECT_MS = 12_000;
 const KYC_PHASE_1_MS = 2_500;
 const KYC_PHASE_2_MS = 4_000;
-const DEMO_TRON_ADDRESS = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
-const DEMO_EVM_ADDRESS = "0x4f7a2c8e9b1d3f5a6c8e0b2d4f6a8c0e21abcdef";
 
 const t = useT();
 const app = useApp();
 const bills = useBills();
+const dep = useDeposits();
 const pairing = useWalletPairing();
 
 const isKyc = ref(false);
@@ -286,22 +267,6 @@ onLoad((options) => {
   syncKycRoute(options as Record<string, unknown> | undefined);
 });
 
-// ── Regular flow state ──
-const selected = ref<string | null>(null);
-// 地址占位按网络切换:TRC20 用 TRON 形态,ERC20/BEP20 共用 EVM 0x 形态。
-const demoAddress = computed(() => (selected.value === "USDT-TRC20" ? DEMO_TRON_ADDRESS : DEMO_EVM_ADDRESS));
-const copiedDemo = ref(false);
-function copyDemoAddress() {
-  uni.setClipboardData({
-    data: demoAddress.value,
-    success: () => {
-      copiedDemo.value = true;
-      setTimeout(() => (copiedDemo.value = false), 1500);
-    },
-    fail: () => {},
-  });
-}
-
 // ── KYC flow state ──
 type KycPhase = "select" | "awaiting" | "verifying" | "complete";
 const kycPhase = ref<KycPhase>("select");
@@ -322,7 +287,9 @@ const verifiedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
 function copyAddress() {
   uni.setClipboardData({
     data: depositAddress.value,
+    showToast: false, // 系统 toast 恒中文,关掉(与 deposit-usdt-pane 同款收敛)
     success: () => {
+      uni.hideToast();
       copied.value = true;
       setTimeout(() => (copied.value = false), 1500);
     },
@@ -445,12 +412,31 @@ function networkRowStyle(active: boolean): CSSProperties {
     background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
   };
 }
-// Hairline list rows — the first border-top doubles as the group opener.
-const channelRowStyle: CSSProperties = {
-  padding: "13px 0",
-  gap: "12px",
-  borderTop: "1px solid var(--v5-border)",
+// Segmented pill tabs — wallet-bills / SegmentedControl idiom.
+const segWrapStyle: CSSProperties = {
+  margin: "0 16px 16px",
+  background: "var(--v5-surface-2)",
+  borderRadius: "16px",
+  padding: "4px",
+  gap: "2px",
 };
+function segPillStyle(id: Seg): CSSProperties {
+  return {
+    height: "44px",
+    borderRadius: "10px",
+    background: seg.value === id ? "var(--v5-brand)" : "transparent",
+    // 收款账户池无可用账户 → 银行转账 chip 置灰([FEAT-PAY02] ⑤;可点进,pane 给维护说明)
+    opacity: id === "bank" && !dep.bankRailAvailable ? 0.45 : 1,
+  };
+}
+function segLabelStyle(id: Seg): CSSProperties {
+  return {
+    fontFamily: "var(--font-v5)",
+    fontSize: "13px",
+    fontWeight: seg.value === id ? 600 : 500,
+    color: seg.value === id ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
+  };
+}
 function radioStyle(active: boolean): CSSProperties {
   return {
     width: "20px",

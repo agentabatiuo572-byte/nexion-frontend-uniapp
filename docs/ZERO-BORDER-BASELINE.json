@@ -1,6 +1,6 @@
 {
  "_doc": "零-border 铁律棘轮基线。门只拦新增 full 违例(≥3 边描边 + 有填充);partial(1-2 边,多为行分隔线)只列不拦。基线只许缩不许涨,每条 note 写为什么还在(重建时按 route|kind|cls|size 继承,不会被冲掉)。",
- "_updated": "2026-07-23 · C2 第二轮收官重建(78→4;note 按 key 继承)",
+ "_updated": "A4 修复轮同批收紧:wallet-withdraw 20x20 full 违例已被 PAY04 修复,棘轮基线随之缩(gate 自证 added=0)",
  "entries": [
   {
    "route": "/pages/login/login",
@@ -19,16 +19,6 @@
    "size": "342x56",
    "radius": "16px",
    "sample": "+1Mobile number",
-   "count": 2,
-   "note": "存量,C2 批次待判"
-  },
-  {
-   "route": "/pages/me/wallet-withdraw",
-   "kind": "full",
-   "cls": "grid place-items-center",
-   "size": "20x20",
-   "radius": "50%",
-   "sample": "",
    "count": 2,
    "note": "存量,C2 批次待判"
   },
@@ -76,11 +66,11 @@
    "route": "/pages/compute-share/download",
    "kind": "partial",
    "cls": "w-full flex items-center justify-between",
-   "size": "358x44",
+   "size": "358x46",
    "radius": "0px",
    "sample": "No upgrade targets availab",
    "count": 2,
-   "note": "存量,C2 批次待判"
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/daily/daily",
@@ -308,7 +298,7 @@
    "cls": "px-3.5 py-2.5 flex justify-between items-center font-mono-ta",
    "size": "358x37",
    "radius": "0px",
-   "sample": "Global grid · live+$216/se",
+   "sample": "Global grid · live+$7.9/se",
    "count": 2,
    "note": "存量,C2 批次待判"
   },
@@ -318,7 +308,7 @@
    "cls": "px-4 py-2 flex items-center justify-between font-mono-tabula",
    "size": "358x33",
    "radius": "0px",
-   "sample": "28,432 online+$215/sec",
+   "sample": "28,431 online+$7.9/sec",
    "count": 2,
    "note": "存量,C2 批次待判"
   },
@@ -416,11 +406,11 @@
    "route": "/pages/me/devices",
    "kind": "partial",
    "cls": "w-full flex items-center justify-between",
-   "size": "358x44",
+   "size": "358x46",
    "radius": "0px",
    "sample": "No upgrade targets availab",
    "count": 2,
-   "note": "存量,C2 批次待判"
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/me/goals",
@@ -516,11 +506,11 @@
    "route": "/pages/me/notifications",
    "kind": "partial",
    "cls": "flex items-start active:opacity-90",
-   "size": "354x62",
+   "size": "354x66",
    "radius": "0px",
-   "sample": "Same-rank peer Mila V. ear",
-   "count": 12,
-   "note": "存量,C2 批次待判"
+   "sample": "You're $947 away from V3 C",
+   "count": 16,
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/me/notifications",
@@ -761,6 +751,46 @@
    "sample": "How would you like to pay?",
    "count": 2,
    "note": "存量,C2 批次待判"
+  },
+  {
+   "route": "/pages/me/usdt-guide",
+   "kind": "partial",
+   "cls": "spv",
+   "size": "390x56",
+   "radius": "0px",
+   "sample": "How to get USDTStep-by-ste",
+   "count": 1,
+   "note": "新登记,待判"
+  },
+  {
+   "route": "/pages/me/usdt-guide",
+   "kind": "partial",
+   "cls": "tis-panel",
+   "size": "390x209",
+   "radius": "16px",
+   "sample": "How would you like to pay?",
+   "count": 2,
+   "note": "新登记,待判"
+  },
+  {
+   "route": "/pages/me/wallet-address-rebind",
+   "kind": "partial",
+   "cls": "spv",
+   "size": "390x56",
+   "radius": "0px",
+   "sample": "Change withdrawal addressS",
+   "count": 1,
+   "note": "新登记,待判"
+  },
+  {
+   "route": "/pages/me/wallet-address-rebind",
+   "kind": "partial",
+   "cls": "tis-panel",
+   "size": "390x209",
+   "radius": "16px",
+   "sample": "How would you like to pay?",
+   "count": 2,
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/me/wallet-bills",
@@ -1396,11 +1426,11 @@
    "route": "/pages/team/rank",
    "kind": "partial",
    "cls": "flex items-start",
-   "size": "358x114",
+   "size": "358x121",
    "radius": "0px",
    "sample": "2V2 OperatorCURRENTTeam $5",
    "count": 2,
-   "note": "存量,C2 批次待判"
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/team/rank",
@@ -1516,11 +1546,11 @@
    "route": "/pages/trust/trust",
    "kind": "partial",
    "cls": "flex items-center justify-between",
-   "size": "358x38",
+   "size": "358x39",
    "radius": "0px",
-   "sample": "Q3 2026 Earnings ReportDow",
+   "sample": "Q2 2026 Earnings ReportDow",
    "count": 2,
-   "note": "存量,C2 批次待判"
+   "note": "新登记,待判"
   },
   {
    "route": "/pages/trust/trust",

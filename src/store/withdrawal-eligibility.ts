@@ -10,15 +10,23 @@ import {
 } from "@/store/risk-identity";
 import type { Withdrawal } from "@/store/types";
 import type { WithdrawalRiskRoute } from "@/store/config-types";
+import { useWalletPairing } from "@/store/wallet-pairing";
+import {
+  isRebindFrozen,
+  NEW_ADDRESS_AGE_DAYS,
+  NEW_ADDRESS_LARGE_AMOUNT_USDT,
+} from "@/store/wallet-pairing-core";
 
 // SPEC-7 提现前置风控(mock K3,推倒重写版)。
 //
-// 五输入(FEAT-RISK03 + 整改 R2/R5):
+// 六输入(FEAT-RISK03 + 整改 R2/R5 + PAY04 异常4):
 //   1. 账户当前簇状态(R5: 每次评估现算,禁用注册缓存)
 //   2. 同提现地址跨账户复用(强信号 → withdrawRules.sameAddressRoute)
 //   3. 首次提现标记(R2 冷启动保守: firstWithdrawalManual 时无条件 manual)
 //   4. 提现地址新绑定期(R2: 首见未满 newAddressHoldHours → delay)
 //   5. mock K4 分(簇评估附带;达冻结建议线 → manual 升级)
+//   6. 换绑地址账龄(PAY04 异常4: 绑定 verifiedAt 起账龄 < 7 天且请求金额
+//      ≥ $1,000 → 强制 manual;对齐 K3「新地址持有期」既有输入,不新造维度)
 // 路由优先级: reject > freeze > manual > delay > pass;reject 不建单不扣款,
 // freeze/manual/delay 建单进对应队列(资金占用),由服务端/人工推进。
 //
@@ -50,12 +58,23 @@ export function evaluateWithdrawal(
   network: Withdrawal["network"],
   address: string,
   withdrawableUsdt: number,
+  requestedUsdt?: number,
 ): WithdrawalEligibility {
   const cfg = useConfig().config;
   const rules = cfg.withdrawRules;
   const key = normalizeAccountKey(accountKey);
   const reasons: string[] = [];
   let route: WithdrawalRiskRoute = "pass";
+
+  // 0. 换绑 24h 冻结(PAY04):UI 置灰之外的评估层硬闸(console 直调不可绕),
+  // server-canonical 二层 guard 惯例。冻结期 route=freeze 且 canSubmit=false
+  // (不建单不占资金,区别于簇冻结的 freeze 建单进队列)。
+  const binding = useWalletPairing().activeBinding;
+  const rebindFrozen = isRebindFrozen(binding?.freezeUntil, Date.now());
+  if (rebindFrozen) {
+    route = worse(route, "freeze");
+    reasons.push("rebind-freeze");
+  }
 
   // 1. 簇状态实时输入(R5)——即使余额已在可提桶,提现仍以当前簇为准。
   const cluster = evaluateAccountCluster(key);
@@ -102,8 +121,18 @@ export function evaluateWithdrawal(
     reasons.push("first-withdrawal-review");
   }
 
+  // 6. 换绑地址账龄(PAY04 异常4):verifiedAt 起账龄 < 7 天 + 请求金额 ≥ $1,000
+  // → 强制 manual。绑定 store 已按账号重绑,与 accountKey 同源(mock 只评当前账号)。
+  if (requestedUsdt !== undefined && binding?.verifiedAt !== undefined) {
+    const ageMs = Date.now() - binding.verifiedAt;
+    if (ageMs < NEW_ADDRESS_AGE_DAYS * 24 * 3600 * 1000 && requestedUsdt >= NEW_ADDRESS_LARGE_AMOUNT_USDT) {
+      route = worse(route, "manual");
+      reasons.push("new-address-large-amount");
+    }
+  }
+
   return {
-    canSubmit: route !== "reject" && withdrawableUsdt >= rules.minWithdrawableUsdt,
+    canSubmit: route !== "reject" && !rebindFrozen && withdrawableUsdt >= rules.minWithdrawableUsdt,
     maxWithdrawableUsdt: withdrawableUsdt,
     route,
     riskReasons: reasons,
@@ -134,6 +163,7 @@ export function requestWithdrawalEligibility(
   network: Withdrawal["network"],
   address: string,
   withdrawableUsdt: number,
+  requestedUsdt?: number,
 ): Promise<WithdrawalEligibility> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -141,7 +171,7 @@ export function requestWithdrawalEligibility(
         reject(new Error("risk-check-timeout"));
         return;
       }
-      resolve(evaluateWithdrawal(accountKey, network, address, withdrawableUsdt));
+      resolve(evaluateWithdrawal(accountKey, network, address, withdrawableUsdt, requestedUsdt));
     }, 600);
   });
 }

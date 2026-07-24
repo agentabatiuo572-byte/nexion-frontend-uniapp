@@ -91,6 +91,7 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import type { WithdrawalStatus } from "@/store/types";
 import { navTo } from "@/lib/route";
+import { riskReasonLines } from "@/lib/risk-reason-text";
 
 const STEP_DELAY_MS = 3500;
 
@@ -113,8 +114,9 @@ const isFrozenHold = computed(() => wd.value?.riskRoute === "freeze" || wd.value
 // 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
 const heldReasonLines = computed(() => {
   if (!routeHeld.value) return [] as string[];
-  const dict = t.value.wallet.riskReasons as Record<string, string>;
-  return (wd.value?.riskReasons ?? []).map((code) => dict[code]).filter(Boolean);
+  // 码表单源 lib/risk-reason-text:含 PAY04 换绑扩展码(new-address-large-amount),
+  // 各页散抄 dict 会静默吞新增码(filter(Boolean) 无痕丢行)。
+  return riskReasonLines(t.value, wd.value?.riskReasons);
 });
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.toFixed(2) }) : "",

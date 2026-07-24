@@ -121,6 +121,7 @@ import { useCards } from "@/store/cards";
 import { useConfig } from "@/store/config";
 import { confirm as uiConfirm } from "@/store/ui";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
+import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
 
 const t = useT();
@@ -133,17 +134,16 @@ const configSyncFailed = computed(() => cfg.syncFailed);
 
 // SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要
 // (reason code → i18n 业务话术,工程码不直出;R5: 原因现算不读缓存)。
-function riskReasonLines(): string {
-  const dict = t.value.wallet.riskReasons as Record<string, string>;
-  const reasons = evaluateAccountCluster(app.accountKey).reasons;
-  const lines = reasons.map((code) => dict[code]).filter(Boolean);
+function riskReasonSummary(): string {
+  // 码表单源 lib/risk-reason-text(簇码 + 换绑扩展码同一 dict,防散抄漏码)。
+  const lines = riskReasonLines(t.value, evaluateAccountCluster(app.accountKey).reasons);
   return lines.length ? `\n· ${lines.join("\n· ")}` : "";
 }
 function showPendingSheet() {
   const hours = cfg.config.riskCluster.appAttestationReleaseHours;
   uiConfirm({
     title: t.value.wallet.pendingSheetTitle,
-    message: fmt(t.value.wallet.pendingSheetBody, { hours }) + riskReasonLines(),
+    message: fmt(t.value.wallet.pendingSheetBody, { hours }) + riskReasonSummary(),
     confirmLabel: t.value.wallet.sheetOk,
     hideCancel: true,
     icon: "info",
@@ -153,7 +153,7 @@ function showLockedSheet() {
   const hours = cfg.config.riskCluster.appAttestationReleaseHours;
   uiConfirm({
     title: t.value.wallet.lockedSheetTitle,
-    message: fmt(t.value.wallet.lockedSheetBody, { hours }) + riskReasonLines(),
+    message: fmt(t.value.wallet.lockedSheetBody, { hours }) + riskReasonSummary(),
     confirmLabel: t.value.wallet.sheetOk,
     hideCancel: true,
     icon: "info",

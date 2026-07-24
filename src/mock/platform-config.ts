@@ -43,6 +43,7 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     sameAddressRoute: "manual",
     firstWithdrawalManual: true,
     newAddressHoldHours: 24,
+    rebindCooldownDays: 7,
   },
   rewards: {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。

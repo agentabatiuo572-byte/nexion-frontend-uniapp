@@ -80,6 +80,8 @@ export interface WithdrawRulesConfig {
   firstWithdrawalManual: boolean;
   // R2: 提现地址首次绑定后 N 小时内提现走 delay/manual。
   newAddressHoldHours: number;
+  // PAY04 换绑频控: 每 N 天最多更换一次提现地址(后台 D5/K3 可配)。
+  rebindCooldownDays: number;
 }
 
 // 新人礼发放模式: risk_bucket = 按当前风险簇分桶(默认);direct = 直入可提(运营可关闸)。

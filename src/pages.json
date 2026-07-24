@@ -105,6 +105,14 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/me/wallet-address-rebind",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/me/usdt-guide",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/me/devices",
       "style": { "navigationStyle": "custom" }
     },

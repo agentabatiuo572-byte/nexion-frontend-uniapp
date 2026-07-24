@@ -1,11 +1,16 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { mockServerNow } from "./server-time";
+import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
 import { useBills } from "./bills";
+import { useFx } from "./fx";
+import { vndForUsdt } from "./fx-core";
 import {
+  BANK_MAX_DEPOSIT_USDT,
+  BANK_RECEIVE_ACCOUNTS,
+  BANK_VND_TOLERANCE,
   CHAIN_REQUIRED_CONFIRMATIONS,
   MIN_DEPOSIT_USDT,
   chainDepositFeeUsdt,
@@ -14,11 +19,14 @@ import {
   isDuplicateTxHash,
   mockChainTxHash,
   mockDepositId,
+  mockMemoCode,
+  pickBankAccount,
+  type BankReceiveAccount,
 } from "./deposits-core";
-import type { ChainDepositChannel, DepositIntent, DepositRecord } from "./types";
+import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord } from "./types";
 
-// 入金 store(PAY-规格 [FEAT-PAY01] 链上三网络;[FEAT-PAY02] 银行轨 intents
-// 本任务只建骨架字段,意向单生命周期动作归 A4)。
+// 入金 store(PAY-规格 [FEAT-PAY01] 链上三网络;[FEAT-PAY02] 银行轨意向单
+// 生命周期:createBankIntent → 回调匹配/超时/取消;锁价语义见 [FEAT-PAY03])。
 //
 // MOCK 铁律:status server-canonical——本文件的「到账引擎」扮演的是服务端
 // (链上侦测 → 确认推进 → 入账),页面/client 无任何写状态入口(纯展示)。
@@ -41,10 +49,12 @@ function hydrate(accountKey: string): DepositsRow {
 }
 
 /** bills memo 用通道标签(账单 memo 与既有 seed "Top-up · USDT-TRC20" 同款式)。 */
-const CHANNEL_MEMO: Record<ChainDepositChannel, string> = {
+const CHANNEL_MEMO: Record<DepositChannel, string> = {
   "usdt-trc20": "USDT-TRC20",
   "usdt-erc20": "USDT-ERC20",
   "usdt-bep20": "USDT-BEP20",
+  "bank-vietqr": "Bank VietQR",
+  "card-intl": "Card",
 };
 
 // 确认推进节奏(演示压缩;真链 TRC20 分钟级)。detected → 1.2s → confirming,
@@ -72,7 +82,8 @@ export const useDeposits = defineStore("deposits", () => {
     });
   }
 
-  /** 账号切换重绑:装载该账号分行,停掉上一账号的在途引擎定时器。 */
+  /** 账号切换重绑:装载该账号分行,停掉上一账号的在途引擎定时器,
+   *  再对新账号在途意向单做一次 server 状态收敛(过期落地 + 定时器重武装)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     timers.forEach((t) => clearTimeout(t));
@@ -80,6 +91,7 @@ export const useDeposits = defineStore("deposits", () => {
     const row = hydrate(boundKey);
     records.value = row.records;
     intents.value = row.intents;
+    syncBankIntents();
   }
 
   /** 专属充值地址:同账号同网络恒定(mock 确定性派生;PROD server 派发)。 */
@@ -87,15 +99,56 @@ export const useDeposits = defineStore("deposits", () => {
     return deriveDepositAddress(boundKey, network);
   }
 
-  /** 延迟回调禁 stale 闭包:一律现读 records.value 现改现写(feedback_delayed_callback_stale_closure)。 */
+  // 通道启停位(server 配置非用户态,不入账号分行;mock 种子全启用。
+  // PROD:GET /api/config/deposit-channels 的 enabled 字段,本段被拉取结果替换)。
+  const chainChannelEnabled = ref<Record<ChainDepositChannel, boolean>>({
+    "usdt-trc20": true,
+    "usdt-bep20": true,
+    "usdt-erc20": true,
+  });
+
+  /** ⚠️ DEV/DEMO-ONLY:后台启停链上通道(D1 通道配置形态)。 */
+  function _devSetChannelEnabled(network: ChainDepositChannel, enabled: boolean): boolean {
+    if (import.meta.env.PROD) return false;
+    if (!(network in chainChannelEnabled.value)) return false; // console 驱动,入参不可信
+    chainChannelEnabled.value = { ...chainChannelEnabled.value, [network]: enabled === true };
+    return true;
+  }
+
+  // 收款账户池镜像(server 配置非用户态,不入账号分行;种子 = deposits-core 池,
+  // 停用/熔断统一 enabled=false。PROD:GET /api/config/bank-accounts 下发,本段被替换)。
+  const bankAccounts = ref<BankReceiveAccount[]>(BANK_RECEIVE_ACCOUNTS.map((a) => ({ ...a })));
+  /** 池内还有可用户?否 → 银行转账通道置灰([FEAT-PAY02] ⑤ 空状态)。 */
+  const bankRailAvailable = computed(() => bankAccounts.value.some((a) => a.enabled));
+
+  /** ⚠️ DEV/DEMO-ONLY:按账号尾 4 位启停收款账户(admin bank-rail 启停/熔断形态)。 */
+  function _devSetBankAccountEnabled(tail4: string, enabled: boolean): boolean {
+    if (import.meta.env.PROD) return false;
+    const tail = String(tail4).trim();
+    if (!/^\d{4}$/.test(tail)) return false; // console 驱动,入参不可信
+    if (!bankAccounts.value.some((a) => a.accountNumber.replace(/\s/g, "").endsWith(tail))) return false;
+    bankAccounts.value = bankAccounts.value.map((a) =>
+      a.accountNumber.replace(/\s/g, "").endsWith(tail) ? { ...a, enabled: enabled === true } : a,
+    );
+    return true;
+  }
+
+  /** 延迟回调禁 stale 闭包:一律现读 records.value 现改现写(feedback_delayed_callback_stale_closure)。
+   *  persist 失败回滚内存态,防内存/存储分叉(同 bills.add 先例);跨 store
+   *  的余额/账单原子性归 PROD server 事务,mock 已在文件头声明边界。 */
   function patchRecord(depositId: string, patch: Partial<DepositRecord>): DepositRecord | null {
+    const previous = records.value;
     let next: DepositRecord | null = null;
     records.value = records.value.map((r) => {
       if (r.depositId !== depositId) return r;
       next = { ...r, ...patch };
       return next;
     });
-    if (next) persist();
+    if (!next) return null;
+    if (!persist()) {
+      records.value = previous;
+      return null;
+    }
     return next;
   }
 
@@ -115,7 +168,7 @@ export const useDeposits = defineStore("deposits", () => {
       symbol: "USDT",
       amount: rec.creditedUsdt,
       status: "posted",
-      memo: `Top-up · ${CHANNEL_MEMO[rec.channel as ChainDepositChannel] ?? rec.channel}`,
+      memo: `Top-up · ${CHANNEL_MEMO[rec.channel]}`,
       ref: rec.txHash ?? rec.depositId,
     });
     patchRecord(depositId, { status: "credited", creditedAt: mockServerNow() });
@@ -207,6 +260,224 @@ export const useDeposits = defineStore("deposits", () => {
     return patchRecord(depositId, { status: "returned" }) !== null;
   }
 
+  // ════════ 银行轨意向单生命周期([FEAT-PAY02] ③④;mock 扮演 server)════════
+
+  /** 意向单补丁(同 patchRecord:现读现改现写,persist 失败回滚防内存/存储分叉)。 */
+  function patchIntent(intentId: string, patch: Partial<DepositIntent>): DepositIntent | null {
+    const previous = intents.value;
+    let next: DepositIntent | null = null;
+    intents.value = intents.value.map((i) => {
+      if (i.intentId !== intentId) return i;
+      next = { ...i, ...patch };
+      return next;
+    });
+    if (!next) return null;
+    if (!persist()) {
+      intents.value = previous;
+      return null;
+    }
+    return next;
+  }
+
+  function clearIntentTimer(intentId: string) {
+    const timer = timers.get(intentId);
+    if (timer) {
+      clearTimeout(timer);
+      timers.delete(intentId);
+    }
+  }
+
+  /** 锁价窗到点置 expired(mock server 侧推进)。回调现读 intents.value 现改,
+   *  禁 stale 闭包(feedback_delayed_callback_stale_closure);账号切换即停。 */
+  function scheduleIntentExpiry(intentId: string) {
+    const key = boundKey;
+    const intent = intents.value.find((i) => i.intentId === intentId);
+    if (!intent || intent.status !== "awaiting_payment") return;
+    clearIntentTimer(intentId);
+    timers.set(
+      intentId,
+      setTimeout(
+        () => {
+          timers.delete(intentId);
+          if (boundKey !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
+          const cur = intents.value.find((i) => i.intentId === intentId);
+          if (!cur || cur.status !== "awaiting_payment") return;
+          patchIntent(intentId, { status: "expired" });
+        },
+        Math.max(0, intent.expireAt - mockServerNow()),
+      ),
+    );
+  }
+
+  /** server 状态收敛(启动/换号即跑):已过锁价窗的在途单落 expired,未过期的重新武装
+   *  超时定时器。PROD:server 持续推进,client 拉取即收敛,本函数删除。 */
+  function syncBankIntents() {
+    const now = mockServerNow();
+    intents.value
+      .filter((i) => i.status === "awaiting_payment")
+      .forEach((i) => {
+        if (i.expireAt <= now) patchIntent(i.intentId, { status: "expired" });
+        else scheduleIntentExpiry(i.intentId);
+      });
+  }
+
+  /** 生成付款单(PROD = POST /api/deposits/bank-intents;校验失败即 422 形态返 null)。
+   *  锁价:fxRate/vndAmount/expireAt 均在此刻定格,后续调价不影响本单(规格 ② 异常2)。 */
+  function createBankIntent(usdtAmount: number): DepositIntent | null {
+    if (!Number.isFinite(usdtAmount)) return null;
+    const amt = +usdtAmount.toFixed(2);
+    if (amt < MIN_DEPOSIT_USDT || amt > BANK_MAX_DEPOSIT_USDT) return null;
+    const fx = useFx();
+    // 牌价不可用禁下单([FEAT-PAY03] ② 异常1);锁价窗缺失同视为配置不可用(禁写死回退)。
+    if (!fx.fxAvailable || fx.lockWindowMin <= 0) return null;
+    // 收款账户池无可用户(全部停用/熔断)禁下单([FEAT-PAY02] ⑤ 空状态)
+    const bankAccount = pickBankAccount(intents.value.length, bankAccounts.value);
+    if (!bankAccount) return null;
+    const now = mockServerNow();
+    const fxRate = fx.quoteRate;
+    // 附言码在途期内唯一(mock 域 = 本账号在途单;PROD server 全局唯一)
+    let memoCode = mockMemoCode();
+    while (intents.value.some((i) => i.status === "awaiting_payment" && i.memoCode === memoCode)) {
+      memoCode = mockMemoCode();
+    }
+    const intent: DepositIntent = {
+      intentId: mockDepositId(now),
+      usdtAmount: amt,
+      fxRate,
+      vndAmount: vndForUsdt(amt, fxRate),
+      memoCode,
+      bankAccount,
+      status: "awaiting_payment",
+      expireAt: now + fx.lockWindowMin * ONE_MINUTE_MS,
+    };
+    const previous = intents.value;
+    intents.value = [intent, ...intents.value];
+    if (!persist()) {
+      intents.value = previous;
+      return null;
+    }
+    scheduleIntentExpiry(intent.intentId);
+    return intent;
+  }
+
+  /** 取消付款单:client 仅可对 awaiting_payment 执行;终态再处置拒绝(server 409 形态)。 */
+  function cancelBankIntent(intentId: string): boolean {
+    const intent = intents.value.find((i) => i.intentId === intentId);
+    if (!intent || intent.status !== "awaiting_payment") return false;
+    clearIntentTimer(intentId);
+    return patchIntent(intentId, { status: "cancelled" }) !== null;
+  }
+
+  /** 银行轨入账(mock server 内部;精确匹配 / 差额按实收核销两条边共用)。
+   *  幂等三重同链上 settleCredited:状态机边界(调用方把关)+ 记录判重(depositId=intentId)
+   *  + bills.addOnce(ref=intentId)。0 手续费;PROD 同事务置 credited + 记账 + 写账单(§5 分录)。 */
+  function settleBankIntent(intentId: string, creditedUsdt: number, receivedVnd: number): boolean {
+    const intent = intents.value.find((i) => i.intentId === intentId);
+    if (!intent) return false;
+    const credited = +creditedUsdt.toFixed(2);
+    if (credited <= 0) return false;
+    if (!useApp().recordDeposit(credited)) return false;
+    useBills().addOnce({
+      type: "topup",
+      symbol: "USDT",
+      amount: credited,
+      status: "posted",
+      memo: `Top-up · ${CHANNEL_MEMO["bank-vietqr"]}`,
+      ref: intent.intentId,
+    });
+    const now = mockServerNow();
+    if (!records.value.some((r) => r.depositId === intent.intentId)) {
+      // DepositRecord 与意向单同号互相关联([FEAT-PAY02] ③);银行轨无链上字段。
+      const rec: DepositRecord = {
+        depositId: intent.intentId,
+        channel: "bank-vietqr",
+        grossAmountUsdt: credited,
+        feeUsdt: 0,
+        creditedUsdt: credited,
+        status: "credited",
+        createdAt: now,
+        creditedAt: now,
+      };
+      records.value = [rec, ...records.value];
+    }
+    patchIntent(intentId, { status: "credited", receivedVnd, matchedAt: now });
+    return true;
+  }
+
+  /** ⚠️ DEV/DEMO-ONLY:模拟「银行回单到达」(tester 驱动通道)。省参 = 命中最新在途单、
+   *  金额精确 → credited;差额超容差 ±1,000₫ → mismatch_review;对 expired 单调用 =
+   *  迟到转账(只登记回单进人工核对,不自动入账,[FEAT-PAY02] ② 异常1)。
+   *  同单重复回报 no-op;credited/cancelled/return_pending 终态拒(server 409 形态)。
+   *  PROD 无此入口:真实链路 = PSP 回单回调,server 匹配推进。 */
+  function _devBankCallback(intentId?: string, receivedVnd?: number): DepositIntent | null {
+    if (import.meta.env.PROD) return null;
+    const target = intentId
+      ? intents.value.find((i) => i.intentId === intentId)
+      : intents.value.find((i) => i.status === "awaiting_payment");
+    if (!target) return null;
+    if (target.status === "credited" || target.status === "cancelled" || target.status === "return_pending") return null;
+    // console 驱动,入参不可信:非法金额回落为精确金额
+    const received =
+      typeof receivedVnd === "number" && Number.isFinite(receivedVnd) && receivedVnd > 0
+        ? Math.round(receivedVnd)
+        : target.vndAmount;
+    if (target.status === "expired") {
+      // ponytail: 过期后宽限期(10min)内按锁定价自动入账属真后台回单时间戳匹配,mock 统一走人工核对展示。
+      return patchIntent(target.intentId, { receivedVnd: received, matchedAt: mockServerNow() });
+    }
+    if (target.status === "mismatch_review") return null; // 已在人工核对,重复回单 no-op
+    clearIntentTimer(target.intentId);
+    if (Math.abs(received - target.vndAmount) > BANK_VND_TOLERANCE) {
+      return patchIntent(target.intentId, {
+        status: "mismatch_review",
+        receivedVnd: received,
+        matchedAt: mockServerNow(),
+      });
+    }
+    // 容差内按锁定牌价足额入账(规格阳光路径)
+    if (!settleBankIntent(target.intentId, target.usdtAmount, received)) return null;
+    return intents.value.find((i) => i.intentId === target.intentId) ?? null;
+  }
+
+  /** ⚠️ DEV/DEMO-ONLY:直接催熟超时(tester 驱动;省参 = 最新在途单)。 */
+  function _devBankExpire(intentId?: string): boolean {
+    if (import.meta.env.PROD) return false;
+    const target = intentId
+      ? intents.value.find((i) => i.intentId === intentId)
+      : intents.value.find((i) => i.status === "awaiting_payment");
+    if (!target || target.status !== "awaiting_payment") return false;
+    clearIntentTimer(target.intentId);
+    return patchIntent(target.intentId, { status: "expired" }) !== null;
+  }
+
+  /** ⚠️ DEV/DEMO-ONLY(后台动作形态):mismatch_review 人工处置——按实收核销入账或
+   *  登记退回。仅 mismatch_review 可处置,其余拒绝(server 409 形态)。PROD:后台 D1
+   *  高敏动作(确认 + 理由 + 审计 + 失败态),endpoint 形态
+   *  POST /api/admin/deposits/bank-intents/:id/resolve { action: "credit"|"return", reason };client 无入口。 */
+  function _devResolveBankMismatch(intentId: string, resolution: "credit" | "return"): boolean {
+    if (import.meta.env.PROD) return false;
+    const intent = intents.value.find((i) => i.intentId === intentId);
+    if (!intent || intent.status !== "mismatch_review") return false;
+    if (resolution === "return") return patchIntent(intentId, { status: "return_pending" }) !== null;
+    // 按实收核销:实收 VND 按本单锁定牌价折 USDT(0 费;fxRate > 0 由下单校验保证)
+    const receivedVnd = intent.receivedVnd ?? intent.vndAmount;
+    return settleBankIntent(intentId, receivedVnd / intent.fxRate, receivedVnd);
+  }
+
+  /** ⚠️ DEV/DEMO-ONLY(后台动作形态):过期单迟到转账人工匹配补入账(孤儿队列,
+   *  [FEAT-PAY02] ④ expired → credited 边)。仅「expired 且已登记回单(bankCallback
+   *  对过期单调用过)」可走,按实收 × 锁定牌价折 USDT 入账;其余拒绝(server 409 形态)。
+   *  PROD:后台 D1 孤儿队列高敏动作(确认 + 理由 + 审计 + 失败态);client 无入口。 */
+  function _devResolveLateBankTransfer(intentId: string): boolean {
+    if (import.meta.env.PROD) return false;
+    const intent = intents.value.find((i) => i.intentId === intentId);
+    if (!intent || intent.status !== "expired" || !intent.receivedVnd) return false;
+    return settleBankIntent(intentId, intent.receivedVnd / intent.fxRate, intent.receivedVnd);
+  }
+
+  // 启动即收敛一次(挂载账号的在途单:过期落 expired / 未过期重新武装定时器)。
+  syncBankIntents();
+
   // tester 驱动通道:DEV 挂 globalThis.__nxDev(PROD 不挂 —— guard 双层之外层)。
   // store 在 rebindAccountScopedStores(App 启动恢复/login/register)首次实例化时挂上。
   if (!import.meta.env.PROD) {
@@ -215,15 +486,32 @@ export const useDeposits = defineStore("deposits", () => {
       ...(g.__nxDev ?? {}),
       simulateIncomingTransfer: _devSimulateIncomingTransfer,
       resolveDustHold: _devResolveDustHold,
+      setChannelEnabled: _devSetChannelEnabled,
+      bankCallback: _devBankCallback,
+      bankExpire: _devBankExpire,
+      resolveBankMismatch: _devResolveBankMismatch,
+      resolveLateBankTransfer: _devResolveLateBankTransfer,
+      setBankAccountEnabled: _devSetBankAccountEnabled,
     };
   }
 
   return {
     records,
     intents,
+    chainChannelEnabled,
+    bankAccounts,
+    bankRailAvailable,
     bindAccount,
     depositAddress,
+    createBankIntent,
+    cancelBankIntent,
     _devSimulateIncomingTransfer,
     _devResolveDustHold,
+    _devSetChannelEnabled,
+    _devBankCallback,
+    _devBankExpire,
+    _devResolveBankMismatch,
+    _devResolveLateBankTransfer,
+    _devSetBankAccountEnabled,
   };
 });
