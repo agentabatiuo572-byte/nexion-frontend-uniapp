@@ -1,6 +1,6 @@
 # 全平台展示级运营数字单源锚改造
 
-状态:Aligned(主人 2026-07-24 拍板:按提案开工;1.42M 行采「注册用户 Members」口径)· 定级 M · 工作线 ④ uniapp
+状态:Shipped(2026-07-24 · PRD v3.7 三处 + 契约表已同步;uniapp 82283d0 → origin/UniApp,admin 镜像 d3e755f → origin/rhythm-configurable)· 主人拍板:按提案开工 + 1.42M 采「注册用户 Members」口径 + goal 授权审计拍板项按最佳解直接执行 · 定级 M · 工作线 ④ uniapp
 
 ## Why
 
