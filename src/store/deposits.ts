@@ -35,10 +35,16 @@ import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord 
 // 入金 store(PAY-规格 [FEAT-PAY01] 链上三网络;[FEAT-PAY02] 银行轨意向单
 // 生命周期:createBankIntent → 回调匹配/超时/取消;锁价语义见 [FEAT-PAY03])。
 //
-// MOCK 铁律:status server-canonical——本文件的「到账引擎」扮演的是服务端
-// (链上侦测 → 确认推进 → 入账),页面/client 无任何写状态入口(纯展示)。
-// PROD 切换:引擎整体删除,client 改为轮询 GET /api/deposits 收敛状态;
-// 入账(余额 + 账单)由 server 在 credited 落库事务内完成。
+// MOCK 铁律:status server-canonical——状态推进(链上侦测 → 确认数 → 入账、
+// 银行轨回单匹配、卡轨授权结果)一律由本文件扮演的「服务端」裁定,页面只提交意图、
+// 只读结果,不自己算状态。client 可发起的写入口恰好三个,均为「用户动作」而非
+// 「状态推进」:createBankIntent(下单)/ cancelBankIntent(撤单)/ submitCardPayment(付款)。
+// PROD 切换:到账引擎与授权模拟整体删除,client 改为轮询收敛状态;那三个用户动作
+// 各接一个 endpoint;入账(余额 + 账单)由 server 在 credited 落库事务内完成。
+//
+// ⚠️ 本文件注释里的 `/api/...` 全部是**候选命名**:PAY 规格未定义 API 层(全文 0 个
+// /api/),PRD v3.7 也尚未同步入金新架构的接口章节。接后台时以届时的接口契约为准,
+// 勿把这些路径当既定契约引用(规则:注释 endpoint 必在 PRD 有据,否则标候选)。
 
 const ACCOUNTS_KEY = "nexgrid-deposits-accounts-v1"; // { [accountKey]: { records, intents } }
 
@@ -104,6 +110,31 @@ export const useDeposits = defineStore("deposits", () => {
   /** 专属充值地址:同账号同网络恒定(mock 确定性派生;PROD server 派发)。 */
   function depositAddress(network: ChainDepositChannel): string {
     return deriveDepositAddress(boundKey, network);
+  }
+
+  /** 当前绑定账号键(只读)。组件发起「跨延迟」的资金动作时先捕获,回调时传回校验 ——
+   *  与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形。 */
+  function currentAccountKey(): string {
+    return boundKey;
+  }
+
+  /** 单号铸造(server mint 形态)。🔴 必须查重:`DP-YYYYMMDD-NNNN` 同日仅 9000 种,
+   *  而 depositId 是三轨共享主键 —— 撞号会让 `records.find(depositId)` 命中错记录,
+   *  链上单被判成终态后引擎直接 return 且定时器已释放,那笔钱永久停在 confirming。
+   *  次要标识(memoCode / authCode / txHash)本就有查重,主键反而没有,此处补齐。
+   *  查重域 = records ∪ intents(两者共用同一号段:意向单入账时 intentId 即 depositId)。 */
+  function mintDepositId(now: number): string {
+    let id = mockDepositId(now);
+    // 重摇设上界:9000 号段被占满(或 mock 随机源被钉死)时无界 while 会转死页面。
+    // 兜底返回带序号后缀的唯一串,宁可号形略异也不挂死(PROD 由 server 保证唯一)。
+    for (let i = 0; i < 50; i++) {
+      const taken =
+        records.value.some((r) => r.depositId === id) ||
+        intents.value.some((i2) => i2.intentId === id);
+      if (!taken) return id;
+      id = mockDepositId(now);
+    }
+    return `${id}-${records.value.length + intents.value.length}`;
   }
 
   // 通道启停位(server 配置非用户态,不入账号分行;mock 种子全启用。
@@ -237,7 +268,7 @@ export const useDeposits = defineStore("deposits", () => {
     const gross = +amountUsdt.toFixed(2);
     const fee = chainDepositFeeUsdt(network);
     const rec: DepositRecord = {
-      depositId: mockDepositId(now),
+      depositId: mintDepositId(now),
       channel: network,
       grossAmountUsdt: gross,
       feeUsdt: fee,
@@ -348,7 +379,7 @@ export const useDeposits = defineStore("deposits", () => {
       memoCode = mockMemoCode();
     }
     const intent: DepositIntent = {
-      intentId: mockDepositId(now),
+      intentId: mintDepositId(now),
       usdtAmount: amt,
       fxRate,
       vndAmount: vndForUsdt(amt, fxRate),
@@ -487,10 +518,19 @@ export const useDeposits = defineStore("deposits", () => {
   /** 卡支付。本函数扮演「client 提交 → 收单方 3DS 授权 → server 入账」三步:
    *  PROD = POST /api/deposits/card 提交,收单方授权后 server webhook 落库入账,
    *  client 轮询 GET /api/deposits 收敛;本层的授权模拟整体删除。
-   *  返回 null = 未入账(入参越界 / 拒付),调用方展示拒付态并允许重试。
-   *  幂等三重同链上:授权号判重(在途重摇避撞)+ 直落终态 + bills.addOnce(ref=授权号)。
+   *  返回 null = 未入账(账号已切走 / 入参越界 / 拒付 / 落盘失败),调用方展示拒付态并允许重试。
+   *  🔴 副作用顺序:先落单 + persist,过了才动钱 —— 「失败」必须等于「什么都没发生」。
+   *     反过来(先动钱、落盘失败再回滚单据)会让 UI 那颗重试按钮把「已扣款」变成可重复刷余额:
+   *     余额加了 N 次、账单 N 条、入金单 0 条,正是本次改动要消灭的对账黑洞。
+   *  🔴 幂等域:mock 只保证「一次提交内」(授权号由本次提交现铸,跨提交无从判重);
+   *     跨提交幂等归 PROD 的 Idempotency-Key(收单方 + server 侧),mock 不承诺。
    *  🔴 计费方向:卡费另收在用户卡上 → gross = 实扣额、credited = 用户输入额。 */
-  function submitCardPayment(creditedUsdt: number): DepositRecord | null {
+  function submitCardPayment(creditedUsdt: number, expectedAccountKey: string): DepositRecord | null {
+    // 账号守卫:授权等待期(组件侧 ~3.8s)内账号可能被切走(会话被踢/登出会 rebind 到
+    // default),此时入账必须作废,否则钱记进别人账上、还白送对方入金资格进度。
+    // 与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形 ——
+    // 差别只在这段延迟活在组件里,store 够不着,故由调用方捕获并回传。
+    if (expectedAccountKey !== boundKey) return null;
     const credited = +creditedUsdt.toFixed(2);
     // 信任边界:金额来自输入框,NaN/±Infinity/越界一律拒(server 422 形态)
     if (!Number.isFinite(credited)) return null;
@@ -498,19 +538,14 @@ export const useDeposits = defineStore("deposits", () => {
     // ⚠️ MOCK-ONLY:扮演收单方 3DS 授权。PROD:收单方回调带真实授权结果。
     if (Math.random() < CARD_DECLINE_RATE) return null;
     let authCode = mockCardAuthCode();
-    while (isDuplicateAuthCode(records.value, authCode)) authCode = mockCardAuthCode();
-    if (!useApp().recordDeposit(credited)) return null;
-    useBills().addOnce({
-      type: "topup",
-      symbol: "USDT",
-      amount: credited,
-      status: "posted",
-      memo: `Top-up · ${CHANNEL_MEMO["card-intl"]}`,
-      ref: authCode,
-    });
+    // 同 mintDepositId:重摇设上界,避免号段占满/随机源异常时死循环转死页面。
+    for (let i = 0; i < 50 && isDuplicateAuthCode(records.value, authCode); i++) {
+      authCode = mockCardAuthCode();
+    }
+    if (isDuplicateAuthCode(records.value, authCode)) return null; // 摇不出新号:拒绝入账,不冒重复风险
     const now = mockServerNow();
     const rec: DepositRecord = {
-      depositId: mockDepositId(now),
+      depositId: mintDepositId(now),
       channel: "card-intl",
       grossAmountUsdt: cardChargeUsd(credited),
       feeUsdt: cardFeeUsd(credited),
@@ -520,12 +555,28 @@ export const useDeposits = defineStore("deposits", () => {
       createdAt: now,
       creditedAt: now,
     };
+    // ① 先落单 + 落盘:此刻零跨 store 副作用,失败即干净返回,用户重试安全。
     const previous = records.value;
     records.value = [rec, ...records.value];
     if (!persist()) {
       records.value = previous;
       return null;
     }
+    // ② 落盘过了才动钱。credited 已过 [MIN, MAX] 双门,recordDeposit 只拒 NaN/≤0/>1e9,
+    //    此处恒真;万一失败则回滚单据,宁可「无单无钱」也不留「有单无钱」。
+    if (!useApp().recordDeposit(credited)) {
+      records.value = previous;
+      persist();
+      return null;
+    }
+    useBills().addOnce({
+      type: "topup",
+      symbol: "USDT",
+      amount: credited,
+      status: "posted",
+      memo: `Top-up · ${CHANNEL_MEMO["card-intl"]}`,
+      ref: authCode,
+    });
     return rec;
   }
 
@@ -557,6 +608,7 @@ export const useDeposits = defineStore("deposits", () => {
     bankRailAvailable,
     bindAccount,
     depositAddress,
+    currentAccountKey,
     createBankIntent,
     cancelBankIntent,
     submitCardPayment,

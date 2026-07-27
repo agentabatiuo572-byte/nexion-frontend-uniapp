@@ -1,7 +1,8 @@
 <!--
   TopupCardForm — ported from me/wallet/topup/page.tsx CardPayForm.
-  Stripe/Checkout.com-style hosted card page: amount input (USDT + 3.5% card fee
-  → USD charged) + card form (number / expiry / CVV / holder / country / ZIP,
+  Stripe/Checkout.com-style hosted card page: amount input (USDT + card fee 另收
+  → USD charged;费率/限额单源在 deposits-core,此处不复述数值) + card form
+  (number / expiry / CVV / holder / country / ZIP,
   brand auto-detect) + "Pay $X" CTA + PCI/3DS trust footer. Submit → processing →
   3DS → deposits.submitCardPayment()：store 扮演收单方授权 + server 入账，成功落
   credited 入金单（走与链上/银行轨同一状态机，后台对账可见）+ 记账 + 写账单，
@@ -12,7 +13,9 @@
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
       <text class="font-mono-tabular" style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
-      <text style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">{{ t.topupChrome.change }}</text>
+      <!-- 授权进行中不可中断:此时切走会卸载本组件,但计时中的授权仍会落账 ——
+           入口留着等于把「无取消出口」伪装成有,故只在可操作的两态显示。 -->
+      <text v-if="phase === 'form' || phase === 'fail'" style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">{{ t.topupChrome.change }}</text>
     </view>
 
     <!-- Processing / 3DS -->
@@ -105,7 +108,8 @@
       </view>
 
       <!-- Submit -->
-      <view class="w-full flex items-center justify-center active:opacity-90" :style="submitBtnStyle" @click="handleSubmit">
+      <!-- 禁用态不给按压反馈:否则死按钮假装自己活着(点了没反应还闪一下)。 -->
+      <view class="w-full flex items-center justify-center" :class="isValid ? 'active:opacity-90' : ''" :style="submitBtnStyle" @click="handleSubmit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" :stroke="isValid ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
         <text style="margin-left: 6px">{{ fmt(t.topupChrome.payCta, { amount: `$${chargeUSD.toFixed(2)}` }) }}</text>
       </view>
@@ -210,7 +214,11 @@ function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAmount(e: Event) {
-  amount.value = detailVal(e).replace(/[^\d.]/g, "");
+  // 数字 + 单小数点 + 两位小数(与 deposit-bank-pane 同款):只剥非法字符的话
+  // "50.5.5" 会原样回显,而 parseFloat 只取 50.5 —— 屏幕数字与实扣金额对不上。
+  const raw = detailVal(e).replace(/[^\d.]/g, "");
+  const m = raw.match(/^(\d*)(?:\.(\d{0,2}))?/);
+  amount.value = m ? m[1] + (m[2] !== undefined ? `.${m[2]}` : "") : "";
 }
 function onCardNum(e: Event) {
   const d = detailVal(e).replace(/\D/g, "").slice(0, 19);
@@ -235,13 +243,16 @@ function onCountry(e: Event) {
 
 async function handleSubmit() {
   if (!isValid.value) return;
+  // 授权前捕获账号:这段 3.8s 等待活在组件里,期间会话可能被踢/登出(App.vue 会把
+  // 各 store 重绑到 default),回来若不校验就会把钱记进别人账上。store 侧比对后作废。
+  const acct = deposits.currentAccountKey();
   phase.value = "processing";
   await new Promise((r) => setTimeout(r, 1400));
   phase.value = "3ds";
   await new Promise((r) => setTimeout(r, 2400));
   // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
   // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
-  const rec = deposits.submitCardPayment(usdtAmount.value);
+  const rec = deposits.submitCardPayment(usdtAmount.value, acct);
   if (rec) {
     authCode.value = rec.authCode ?? rec.depositId;
     phase.value = "success";

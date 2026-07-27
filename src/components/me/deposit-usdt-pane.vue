@@ -274,8 +274,8 @@ function goSupport() {
 // ── 最近入金(纯展示;状态由 store mock 引擎推进,server-canonical)──
 const sortedRecords = computed(() => [...dep.records].sort((a, b) => b.createdAt - a.createdAt));
 /** 法币轨(VietQR / 银行卡)入账后与链上记录同列此区,标题按通道分流。
- *  全键 Record:新增通道时 TS 强制补齐,不会静默落进 USDT 文案(此前卡入金被标成
- *  「USDT 充值」正是漏了分流)。 */
+ *  全键 Record 而非三元表达式:新增通道时 TS 强制补齐,不会静默落进 USDT 文案 ——
+ *  卡轨接入本列表时正是先踩了这个(旧写法「非银行轨即 USDT」会把卡入金标成 USDT 充值)。 */
 function rowTitle(r: DepositRecord): string {
   const tc = t.value.topupChrome;
   const titles: Record<DepositChannel, string> = {
@@ -314,7 +314,8 @@ function noteText(r: DepositRecord): string {
 }
 function goRecord(r: DepositRecord) {
   // 法币轨(银行转账 / 银行卡)无链上哈希,tx 浏览器框架页语义不符 → 跳账单页
-  // (与成功态「查看账单」同口径)。判据取自 deposits-core 单源,新增法币轨自动排除。
+  // (银行轨成功态的「查看账单」同口径;卡轨成功态回钱包,此处统一到账单页)。
+  // 判据取自 deposits-core 单源,新增法币轨自动排除。
   if (!isChainChannel(r.channel)) {
     navTo("/pages/me/wallet-bills");
     return;

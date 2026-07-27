@@ -68,6 +68,7 @@
 | creditedUsdt | number | 是 | — | = gross − fee;入账额 |
 | address | string | 链上必 | — | 每用户 × 每网络专属充值地址,server 派发、恒定不轮换;mock 由 accountKey 确定性派生 |
 | txHash | string | 链上必 | — | 链上交易哈希;幂等键(同 txHash 不重复入账;原型留形状,真后台生效) |
+| authCode | string | 卡轨必 | — | 收单方授权号 `CK-NNNNNN`;卡轨幂等键(同 authCode 重复回调 no-op),与 txHash 同形 |
 | confirmations / requiredConfirmations | number | 链上必 | 0 / 按网络 | 默认 TRC20 20 · ERC20 12 · BEP20 15,后台 D1 可配;server 推进 |
 | status | enum | 是 | — | 见④;server-canonical,client 绝不本地推进 |
 | createdAt / creditedAt | number | 是/否 | — | ms epoch,服务端时间戳(account-cloud 快照按 TIME_ANCHOR 同步) |
@@ -80,7 +81,19 @@
 | usdt-bep20 | 1 USDT | $10 | — | 启用 |
 | usdt-erc20 | 5 USDT | $10 | — | 启用(大额适用) |
 | bank-vietqr | 0 | $10 等值 | $5,000 | 启用(见 [FEAT-PAY02]) |
-| card-intl | 3.5% | $30 | 沿用现行 | 启用(辅助;对齐经济模型,见 §7) |
+| card-intl | 3.5%(**另收**,见下) | $30 | $5,000 | 启用(辅助;对齐经济模型,见 §7) |
+
+**卡轨(card-intl)补充规则**(与链上/银行轨同一入金记录与状态机,差异仅三处):
+
+1. **计费方向相反**:链上「从到账额里扣」(credited = gross − fee),卡「在用户卡上另收」(实扣 = 入账额 + 费)。落库时 `grossAmountUsdt` = 实扣额(平台实收)、`creditedUsdt` = 用户输入额,仍满足 `credited = gross − fee`,账本口径与另两轨统一。
+2. **同步授权、无确认推进**:收单方 3DS 授权成功即直落 `credited`,不经 `detected/confirming`;授权失败不建单、不记账,页面展示拒付并允许重试。
+3. **幂等键为 authCode**(非 txHash);无 `address / txHash / confirmations` 三个链上字段,故入金记录点击进入的是账单流水页而非链上交易详情页。
+
+限额门双层:界面提交前拦 + server 入账前拦(绕过界面直接调用同样拒),越界属 `422` 形态,**不得复用收单方拒付文案**(真实原因是超限,提示发卡行拒绝会误导用户去联系银行)。
+
+**幂等域(2026-07-27 审计定稿)**:授权号由**收单方**签发并随回调带回,server 以它为幂等键,同授权号重复回调 no-op。⚠️ 原型的授权号是提交时现铸的,只保证「一次提交内」不重复;**跨提交幂等必须由 PROD 侧的 `Idempotency-Key`(client 生成、随请求上送、server 去重)承担**,接后台时不可依赖原型的这条腿。
+
+**副作用顺序(资金安全硬约束)**:落单据 → 落盘 → 才动余额与账单。反序(先动钱、落盘失败再回滚单据)会让失败态既扣了钱又显示「支付被拒 + 可重试」,用户每重试一次就多入账一次,而入金单一条都没有 —— 对账查不到,是本架构最不能出的错。
 
 **④ 状态机 + 禁止动作**
 

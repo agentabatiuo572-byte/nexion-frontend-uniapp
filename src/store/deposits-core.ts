@@ -29,9 +29,11 @@ export function chainDepositFeeUsdt(network: ChainDepositChannel): number {
 }
 
 /** 是否链上轨(有 txHash / 确认数 / 专属地址)。单源派生自确认数表:
- *  新增链上通道自动纳入、新增法币轨自动排除,消费方(交易详情页跳转等)不用逐个改。 */
+ *  新增链上通道自动纳入、新增法币轨自动排除,消费方(交易详情页跳转等)不用逐个改。
+ *  用 hasOwn 不用 `in`:records 从 storage 反序列化而来、字段不可信,`in` 会顺着原型链
+ *  把 "toString"/"constructor" 判成链上通道(实测 true),守卫的类型断言就成了假的。 */
 export function isChainChannel(c: DepositChannel): c is ChainDepositChannel {
-  return c in CHAIN_REQUIRED_CONFIRMATIONS;
+  return Object.prototype.hasOwnProperty.call(CHAIN_REQUIRED_CONFIRMATIONS, c);
 }
 
 /** 入账额 = gross − fee,两位小数(creditedUsdt 生成规则)。 */
@@ -170,9 +172,14 @@ export const MAX_CARD_DEPOSIT_USDT = 5000;
 /** ⚠️ MOCK-ONLY:3DS 拒付率(演示用)。PROD:收单方返回真实授权结果。 */
 export const CARD_DECLINE_RATE = 0.1;
 
-/** 卡手续费(USD,两位小数):按入账额计费,另收在用户卡上。 */
+/** 卡手续费(USD,两位小数):按入账额计费,另收在用户卡上。
+ *  整数域运算(cent × bps),与 fx-core 的牌价/折算同一套标准:浮点直乘再 toFixed 会被
+ *  IEEE754 把半分边界压低一分 —— 全区间穷举实测 11 个金额少收 1 分(如 237 → 8.29,
+ *  精确值 8.295 应进位 8.30),且舍入方向由表示噪声决定而非规则决定。 */
 export function cardFeeUsd(creditedUsdt: number): number {
-  return +(creditedUsdt * CARD_FEE_RATE).toFixed(2);
+  const cents = Math.round(creditedUsdt * 100);
+  const bps = Math.round(CARD_FEE_RATE * 10000);
+  return Math.round((cents * bps) / 10000) / 100;
 }
 
 /** 卡实扣额 = 入账额 + 手续费(= DepositRecord 的 grossAmountUsdt)。 */

@@ -844,12 +844,19 @@ export const useApp = defineStore("app", () => {
   function recordDeposit(amount: number): boolean {
     // Input validation mirrors source: reject NaN/±Infinity/≤0/absurd (>1e9).
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) return false;
+    // 落盘结果必须接:此前丢弃返回值无条件 return true,调用方(三条入金轨的 settle)
+    // 据此认为钱已入账并继续写账单/改状态,而落盘失败时余额其实被 adopt 回滚了 ——
+    // 「返回成功但钱没加」。对齐 creditRewardBucketInternal 的既有范式:失败即回滚 + 报假。
+    const previousSnapshot = lastCloudSnapshot;
     user.value = {
       ...user.value,
       usdtBalance: +(user.value.usdtBalance + amount).toFixed(2),
       cumulativeDepositUsdt: +(user.value.cumulativeDepositUsdt + amount).toFixed(2),
     };
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
     return true;
   }
   function creditRewardBucket(route: EarningBucketRoute, usdt: number, nex = 0): boolean {

@@ -74,6 +74,17 @@ else
   bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
 fi
 
+# 入金/牌价/换绑三条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
+# 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
+echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind)${N}"
+for sc in deposits fx rebind; do
+  if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
+    ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
+  else
+    bad "selfcheck-$sc 有断言失败"; grep -E "FAIL|fail" "/tmp/uni-selfcheck-$sc.log" | head -8 | sed 's/^/        /'
+  fi
+done
+
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
@@ -354,7 +365,9 @@ sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
 sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
 
-# ── PAY-VN 越南支付架构(规格 PRD/specs/PAY-Nexion_越南支付架构规格_v1.0.md · 2026-07-24)──
+# ── PAY-VN 越南支付架构(规格 PRD/specs/ 下的「越南支付架构规格 v1.0」· 2026-07-24)──
+#    注:此处刻意不写规格文件名全称 —— 文件名带旧品牌前缀,写全会被本文件的 brand 哨兵抓,
+#    而为它开白名单会因整行过滤放行一大片(见 no_oldbrand_check 处的红测记录)。
 # 入金 = USDT(TRC20/ERC20/BEP20)+ VietQR 银行转账 + 卡;出金仅 USDT;BTC/ETH 充提已下线。
 if grep -rnE '\b(BTC|Bitcoin|bc1q)\b' src/store/deposits-core.ts src/store/deposits.ts src/store/fx.ts src/store/fx-core.ts src/pages/me/wallet-topup.vue src/pages/me/wallet-withdraw.vue src/pages/me/wallet-address-rebind.vue src/components/me/deposit-usdt-pane.vue src/components/me/deposit-bank-pane.vue src/components/store/chain-payment.vue src/pages/store/checkout.vue src/components/me/topup-card-form.vue >/dev/null 2>&1; then
   bad "PAY-VN BTC/Bitcoin 通道残留(充提已收窄仅 USDT 三网络)"
@@ -366,6 +379,13 @@ sentinel_present "PAY-VN 通道枚举单源含 BEP20" src/store/types.ts 'usdt-b
 sentinel_present "PAY-VN 链上通道费表单源" src/store/deposits-core.ts 'export const CHAIN_DEPOSIT_FEE_USDT'
 sentinel_present "PAY-VN fx 牌价派生不缓存(computed)" src/store/fx.ts 'quoteRate = computed\(\(\) => computeQuoteRate'
 sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility.ts 'isRebindFrozen'
+# 卡轨四条(2026-07-27 audit:此前卡轨走统一入金账后一条哨兵都没有,改坏无人拦)。
+# 记账口径最关键 —— 把 gross 塌回 credited 等于平台白送手续费,而纯逻辑 selfcheck
+# 只加载 deposits-core,守不到 deposits.ts 里的记录三元组(变异测试实证全绿)。
+sentinel_present "PAY-VN 卡轨记账口径(gross = 实扣额,非入账额)" src/store/deposits.ts 'grossAmountUsdt: cardChargeUsd\(credited\)'
+sentinel_present "PAY-VN 卡轨账号守卫(授权等待期跨账号不落账)" src/store/deposits.ts 'expectedAccountKey !== boundKey'
+sentinel_present "PAY-VN 入金主键查重(DP 号同日仅 9000 种)" src/store/deposits.ts 'function mintDepositId'
+sentinel_present "PAY-VN 卡费整数域(半分边界不被浮点压低)" src/store/deposits-core.ts 'cents \* bps'
 if grep -rnE '26,?390' src/store/ src/components/me/ 2>/dev/null | grep -vqE 'fx-core|selfcheck'; then
   bad "PAY-VN 硬编码牌价 26390(必须从 fx-core computeQuoteRate 派生)"
 else
@@ -1273,11 +1293,14 @@ no_userfacing_stella
 no_oldbrand_check() {
   local tok='Nexi'; tok="${tok}on"
   local hits
-  # 白名单四类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
-  # ③静态图文件名 ④PRD/ 下的文档文件名(CLAUDE.md:PRD 文件名沿用旧前缀属白名单,
-  #   注释引用规格出处合法)。除此之外的旧品牌词一律拦。
+  # 白名单三类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
+  # ③静态图文件名。除此之外的旧品牌词一律拦。
+  # 🔴 不要为「注释引用 PRD 文件名」加白名单:`grep -viE` 是**整行**过滤,
+  #    加 `PRD/…` 等于放行「任何提到 PRD 路径的行」,而品牌散文恰恰住在注释里 ——
+  #    红测实证:那样改后 5 条真违规只抓得住 1 条(含用户可见 i18n 串与 DOM 文本)。
+  #    需要引用带旧品牌前缀的 PRD 文件名时,注释里省略该前缀即可(见本文件 PAY-VN 段)。
   hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
-    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}|PRD/[^:]*${tok}" | head -8)
+    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}" | head -8)
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }

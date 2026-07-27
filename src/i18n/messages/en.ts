@@ -4671,7 +4671,7 @@ export const en = {
     change: "Change",
     paySuccess: "Payment successful",
     payDeclined: "Card declined",
-    payDeclinedReason: "Reason: do_not_honor (issuer)",
+    payDeclinedReason: "Reason: declined by issuer (do_not_honor)",
     youReceive: "You receive",
     cardCharged: "Card charged",
     complianceCheck: "Compliance check",

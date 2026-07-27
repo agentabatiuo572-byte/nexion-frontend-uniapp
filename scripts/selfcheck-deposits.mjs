@@ -138,6 +138,10 @@ console.log("selfcheck-deposits — deposits-core 纯逻辑断言");
     && MAX_CARD_DEPOSIT_USDT === 5000 && CARD_DECLINE_RATE === 0.1);
   check("卡费两位小数(100 → 3.5 / 33.33 → 1.17)",
     cardFeeUsd(100) === 3.5 && cardFeeUsd(33.33) === 1.17);
+  // 🔴 浮点回归靶(同 fx-core 的 27,000×1.5% → 27,410):237 × 3.5% = 8.295 属半分进位边界,
+  // 浮点直乘 + toFixed 会被 IEEE754 压成 8.29(全区间穷举 11 个金额中招)。整数域算法必得 8.30。
+  check("卡费半分边界不被浮点压低(237 → 8.30 · 923 → 32.31 · 3917 → 137.10)",
+    cardFeeUsd(237) === 8.3 && cardFeeUsd(923) === 32.31 && cardFeeUsd(3917) === 137.1);
   check("实扣 = 入账额 + 费(100 → 103.5),用户到账额不缩水",
     cardChargeUsd(100) === 103.5 && cardChargeUsd(30) === 31.05);
   // 🔴 与链上反向的核心不变量:credited = gross − fee 在卡轨同样成立(记账口径统一)
@@ -148,10 +152,13 @@ console.log("selfcheck-deposits — deposits-core 纯逻辑断言");
     }));
   const auths = Array.from({ length: 200 }, () => mockCardAuthCode());
   check("授权号 CK-+6 位数字(×200)", auths.every((a) => /^CK-\d{6}$/.test(a)));
-  const cardRecords = [{ authCode: "CK-123456" }, { txHash: "0xabc" }];
+  // fixture 里必须有一条 authCode 为空串的记录:否则「空授权号 → false」是空断言 ——
+  // 删掉被测函数的 `if (!authCode) return false` guard 也不会红(变异测试实证)。
+  const cardRecords = [{ authCode: "CK-123456" }, { txHash: "0xabc" }, { authCode: "" }];
   check("已存在授权号 → 判重 true", isDuplicateAuthCode(cardRecords, "CK-123456") === true);
   check("新授权号 → 判重 false", isDuplicateAuthCode(cardRecords, "CK-999999") === false);
-  check("空授权号 → false(链上/银行轨无授权号不误伤)", isDuplicateAuthCode(cardRecords, "") === false);
+  check("空授权号 → false(即便 fixture 里存在空串记录,也不得判成重复)",
+    isDuplicateAuthCode(cardRecords, "") === false);
 }
 
 console.log(`\n${pass} pass / ${fail} fail`);
