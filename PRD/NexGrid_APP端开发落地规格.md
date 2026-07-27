@@ -1,6 +1,6 @@
-# Nexion 移动端 App — 开发落地规格(Dev-Ready Spec)
+# NexGrid 移动端 App — 开发落地规格(Dev-Ready Spec)
 
-> **本文件是什么**:从 `Nexion_产品功能架构设计文档_v3.7.md`(18 章 5053 行)提炼的**前端 app 开发落地契约速查**。源 PRD 回答「产品做什么、为什么」;本文件回答「建哪些页、定什么类型/store、调什么 API、算什么公式、状态怎么流转」——前端按本文件即可落地,产品背景再查源 PRD 对应 §锚点。
+> **本文件是什么**:从 `NexGrid_产品功能架构设计文档_v3.7.md`(18 章 5053 行)提炼的**前端 app 开发落地契约速查**。源 PRD 回答「产品做什么、为什么」;本文件回答「建哪些页、定什么类型/store、调什么 API、算什么公式、状态怎么流转」——前端按本文件即可落地,产品背景再查源 PRD 对应 §锚点。
 >
 > **怎么用(按阶段)**:
 > - 开工前必读 → **第 0 章 全局铁律**(贯穿全站的硬约束)+ **第 7 章 已知冲突 & 开发缺口**(源 PRD 内部矛盾 + TBD,落地前须收口单源)。
@@ -67,7 +67,7 @@ trade-in/replace composer 等跨 store 操作:任一步失败全 rollback(设备
 
 | 路由 | 页面/组件 | 职责 | 数据依赖 | 关键交互·状态 | §锚点 |
 |---|---|---|---|---|---|
-| (全局壳) | IOSFrame chassis | 所有路由统一套 iOS 外壳(StatusBar/Header/Scroll/TabBar/HomeIndicator) | `useTheme`(persist `nexion-theme-v1`) | 默认 dark + SSR 直出防闪;tab vs sub-route 顶部留白不同 | §3.1 |
+| (全局壳) | IOSFrame chassis | 所有路由统一套 iOS 外壳(StatusBar/Header/Scroll/TabBar/HomeIndicator) | `useTheme`(persist `nexgrid-theme-v1`) | 默认 dark + SSR 直出防闪;tab vs sub-route 顶部留白不同 | §3.1 |
 | (全局) | TabBar 5-tab | 底部主导航 Home/Earn/Store/Team/Me | 路由 active 态 | 仅 tab 路由显示 Header+TabBar | §3.2 |
 
 ### 1.2 账户与身份(§4)
@@ -228,15 +228,15 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 - **`useExchangeV3`**:`todayUserUsedUSD`(≤50)、`todayPlatformUsedUSD`(≤20,000)、`dayKey`、`lifetimeExchangedUSD`(≥100 触发 KYC)、`kycVerified`、`queue`(QueuedExchange 未定义形态)。SC。§12.10
 
 ### 2.4 设备/试用域
-- **`useFreeTrial`**(persist `nexion-trial-v1`):`status:enum{idle,active,grace,extended,redeemed,failed,cancelled}` · `cardTokenId` · `startedAt/activeEndsAt/graceEndsAt/extendedEndsAt/scheduledChargeAt/finishedAt:ms-epoch|null` · `failReason` · `extensionGranted` · `shadowFrozenAtUSD/NEX`(grace 冻结,**永不入资金/统计**)。派生(不存):`liveShadowUSD/NEX(now)`、`remainingMs`、`isHighQualityEligible`、`computeDiscountedPrice`。§12.18
-- **`useCards`**(persist `nexion-cards-v1`):`cards[]{tokenId(PSP,非 PAN),brand:enum{visa,mastercard,amex,unionpay,unknown},last4,expiry,holder,boundAt}` · `defaultTokenId`。🔴 PAN/CVV 永不入 store/localStorage。§12.17
+- **`useFreeTrial`**(persist `nexgrid-trial-v1`):`status:enum{idle,active,grace,extended,redeemed,failed,cancelled}` · `cardTokenId` · `startedAt/activeEndsAt/graceEndsAt/extendedEndsAt/scheduledChargeAt/finishedAt:ms-epoch|null` · `failReason` · `extensionGranted` · `shadowFrozenAtUSD/NEX`(grace 冻结,**永不入资金/统计**)。派生(不存):`liveShadowUSD/NEX(now)`、`remainingMs`、`isHighQualityEligible`、`computeDiscountedPrice`。§12.18
+- **`useCards`**(persist `nexgrid-cards-v1`):`cards[]{tokenId(PSP,非 PAN),brand:enum{visa,mastercard,amex,unionpay,unknown},last4,expiry,holder,boundAt}` · `defaultTokenId`。🔴 PAN/CVV 永不入 store/localStorage。§12.17
 
 ### 2.5 团队/社交域
 - **`useNetwork`**:`members[]{id,name,avatar,city,vRank(0-12),layer(1-7),binary:enum{left,right},isSpillover,joinedAt,monthVolumeUSD,totalVolumeUSD,status,sponsorId?}`。V-Rank 升级判定派生(`lib/v3/v-rank.ts`),**server 可在 client 显示 100% 时 reject**。§12.4
 - **`useSponsorship`**:`sponsorCode`(URL `?ref`+server,first-wins **不可补绑**) · `sponsor{name,vRank,title,city,downlines}` · `giftClaimed` · `boundAt`。§12.8
 
 ### 2.6 资产/二级市场域
-- **`useGenesis`**(persist `nexion-genesis` v2):`totalSlots(1000)` · `soldSlots` · `myOwned`(migrate:`myOwned>ownedTokenIds.length` 按 soldSlots 倒推回填) · `ownedTokenIds:number[]` · `myListings[]{tokenId,askPriceUSDT,listedAt}` · `unitPriceUSDT(9999)`。actions:`purchase/listNode/cancelListing/fulfillSale`。persist version:2+migrate。§12.7
+- **`useGenesis`**(persist `nexgrid-genesis` v2):`totalSlots(1000)` · `soldSlots` · `myOwned`(migrate:`myOwned>ownedTokenIds.length` 按 soldSlots 倒推回填) · `ownedTokenIds:number[]` · `myListings[]{tokenId,askPriceUSDT,listedAt}` · `unitPriceUSDT(9999)`。actions:`purchase/listNode/cancelListing/fulfillSale`。persist version:2+migrate。§12.7
 
 ### 2.7 通知域
 - **`useNotifications`**:`items[]{id,kind:enum{commission,team,staking,market,genesis,system},title,body?,ctaLabel?,ctaHref?,ts,readAt:number|null}`,cap 200。§12.9
@@ -244,18 +244,18 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 ### 2.8 任务/激励/签到域(均独立 persist)
 | Store | 关键字段 | persist key | 不变量 | § |
 |---|---|---|---|---|
-| `useQuest` | `completed:QuestTaskId[]`·`claimedFinal`·`startedAt` | `nexion-quest-v1` | 24h 窗(86,400,000);claimFinal +500 NEX+badge | §12.11 |
-| `usePoints` | `points(def8)`·`history[](50 ring)`·`lastSignedInAt`·`signInStreak`·`longestStreak`·`streakSavers(def1)`·`claimedMilestones[]` | `nexion-points` | `pointsRequiredFor=ceil(usdt/10)`;断签 48h;Saver 恢复 ≤min(longest,30) | §12.12 |
-| `useWeeklyQuest` | `weekKey`·`tier1Completed/Claimed`·`tier2Completed/Claimed[]`·`bonusClaimed` | `nexion-weekly-quest-v1` | `rollWeekIfStale` 跨周清 | §12.13 |
-| `useMonthlyChallenge` | `monthKey`·`claimedIds:ChallengeId[]` | `nexion-monthly-challenge-v1` | `rollMonthIfStale` 跨月清(基于 joinedAt 月数分段) | §12.14 |
-| `useEventQuest` | `joined[]`·`claimed[]`·`joinedAt:Record` | `nexion-event-quest-v1` | 仅 trackable 持久化;claim→creditNex+achievements | §12.15 |
-| `useDailyPowerUp` | `claimed:StreakPowerUpId[]`·`claimedAt:Record` | `nexion-daily-powerup-v1` | unlock 派生自 signInStreak 不持久化 | §12.16 |
-| `useLuckySpin` | `bonusTickets`·`lastFreeSpinDate(UTC)`·`history[](20)`·`realPrizeSoldOut/coverageDegraded`(镜像) | `nexion-lucky-spin-v1` | 会话态不持久;真实奖须 server RNG+三护栏;按 UTC 日桶 | §12.19 |
-| `useMilestones` | `firedIds`(部分未定义) | `nexion-milestones-v1` | 刷新不重触发;一次 fire 一档 | §11.3a |
+| `useQuest` | `completed:QuestTaskId[]`·`claimedFinal`·`startedAt` | `nexgrid-quest-v1` | 24h 窗(86,400,000);claimFinal +500 NEX+badge | §12.11 |
+| `usePoints` | `points(def8)`·`history[](50 ring)`·`lastSignedInAt`·`signInStreak`·`longestStreak`·`streakSavers(def1)`·`claimedMilestones[]` | `nexgrid-points` | `pointsRequiredFor=ceil(usdt/10)`;断签 48h;Saver 恢复 ≤min(longest,30) | §12.12 |
+| `useWeeklyQuest` | `weekKey`·`tier1Completed/Claimed`·`tier2Completed/Claimed[]`·`bonusClaimed` | `nexgrid-weekly-quest-v1` | `rollWeekIfStale` 跨周清 | §12.13 |
+| `useMonthlyChallenge` | `monthKey`·`claimedIds:ChallengeId[]` | `nexgrid-monthly-challenge-v1` | `rollMonthIfStale` 跨月清(基于 joinedAt 月数分段) | §12.14 |
+| `useEventQuest` | `joined[]`·`claimed[]`·`joinedAt:Record` | `nexgrid-event-quest-v1` | 仅 trackable 持久化;claim→creditNex+achievements | §12.15 |
+| `useDailyPowerUp` | `claimed:StreakPowerUpId[]`·`claimedAt:Record` | `nexgrid-daily-powerup-v1` | unlock 派生自 signInStreak 不持久化 | §12.16 |
+| `useLuckySpin` | `bonusTickets`·`lastFreeSpinDate(UTC)`·`history[](20)`·`realPrizeSoldOut/coverageDegraded`(镜像) | `nexgrid-lucky-spin-v1` | 会话态不持久;真实奖须 server RNG+三护栏;按 UTC 日桶 | §12.19 |
+| `useMilestones` | `firedIds`(部分未定义) | `nexgrid-milestones-v1` | 刷新不重触发;一次 fire 一档 | §11.3a |
 | `useAchievements` | 未定义形态(`unlock(badgeId)`+实物奖 queue) | 未定义 key | 实物奖 V≥1 首达发 1 次 | §12.16 |
 
 ### 2.9 偏好/购物/目标/合规域
-`useCart`(`items:string[]`,`nexion-cart-v1`)/ `useGoals`(`Goal[]` 形态未详,`nexion-goals-v1`)/ `usePreferences`(sound·haptics·6×NotifKind mute,`nexion-preferences-v1`)/ `useRiskDisclosure`(`accepted`·`acceptedAt`,`nexion-risk-disclosure-v1`,首次提现/staking/NEXv2 前 gate)/ `useProductPhaseOverride`(`pinned`,`nexion-product-phase-override-v1`,**6 phase×8 dial,server 权威 `GET /api/admin/platform/phase-config`,UI 永不暴露 phase id**)。
+`useCart`(`items:string[]`,`nexgrid-cart-v1`)/ `useGoals`(`Goal[]` 形态未详,`nexgrid-goals-v1`)/ `usePreferences`(sound·haptics·6×NotifKind mute,`nexgrid-preferences-v1`)/ `useRiskDisclosure`(`accepted`·`acceptedAt`,`nexgrid-risk-disclosure-v1`,首次提现/staking/NEXv2 前 gate)/ `useProductPhaseOverride`(`pinned`,`nexgrid-product-phase-override-v1`,**6 phase×8 dial,server 权威 `GET /api/admin/platform/phase-config`,UI 永不暴露 phase id**)。
 
 ### 2.10 开发须补类型(PRD 未定义形态)
 `CurrentTask`、`CompletedTask`(§12.2)、`QueuedExchange`(§12.10)、`Bill`(仅 `addBill` action)、`Withdrawal`(仅 `submitWithdrawal`)、`Achievement`(§12.16)、`Goal`(§11.12.3)。**多数业务 store 的 persist key PRD 未明示**(仅 §12.7+ 激励类给出)。
@@ -541,7 +541,7 @@ selectors:`selectActiveDevices/InactiveDevices/ActiveCount/ActivePhone`、`deriv
 ### 6.3 i18n(§14)
 语言:`en`/`zh` 完整;`es/fr/de/ja/ko/ar` 占位(fallback en)。实现:`lib/i18n/use-t.ts`(`useT()`)+`format.ts`(`fmt(s,params)`)+`messages/{en,zh}.ts`(各 ~770 keys,30+ namespace)。
 namespace 含:tabs/headerTitles(60+ 路由)/headerSubtitles(23)/home/earn/store/team/wallet/onboarding/me/profile/security/staking/trust/genesis/rank/unilevel/binary/pool/commissions/network/daily/marketplace/leaderboard/market/events/learn/kycExpress/tickets/tradein/milestones/productPhase/premium/nexV2Lock/riskDisclosure/missions/weeklyQuest/...。
-纪律:en/zh 双语镜像加 key;关键页 i18n 全覆盖无 hardcode;品牌名/token 符号(NEXION/USDT/NEX)保留英文;**文案禁 `模拟/mock/demo/演示/simulated/自动扣款`**,试用称"试用收益"(§16.2.5)。
+纪律:en/zh 双语镜像加 key;关键页 i18n 全覆盖无 hardcode;品牌名/token 符号(NEXGRID/USDT/NEX)保留英文;**文案禁 `模拟/mock/demo/演示/simulated/自动扣款`**,试用称"试用收益"(§16.2.5)。
 
 ### 6.4 非功能(§15/§16)
 - **性能**:LCP<2.5s · 路由 TTI<500ms · 60fps · localStorage<50ms。
@@ -624,7 +624,7 @@ namespace 含:tabs/headerTitles(60+ 路由)/headerSubtitles(23)/home/earn/store/
 ---
 
 ## 附:与源 PRD 的关系 + 维护约定
-- **本文件 vs 源 PRD**:本文件是**前端 app 开发落地契约速查**(页面/数据/API/公式/状态机),从 `Nexion_产品功能架构设计文档_v3.7.md`(18 章 5053 行)提炼;源 PRD 保留为产品背景档案(为什么做、交互细节、视觉)。
+- **本文件 vs 源 PRD**:本文件是**前端 app 开发落地契约速查**(页面/数据/API/公式/状态机),从 `NexGrid_产品功能架构设计文档_v3.7.md`(18 章 5053 行)提炼;源 PRD 保留为产品背景档案(为什么做、交互细节、视觉)。
 - **冲突裁决**:本文件与源 PRD 正文冲突 → 以源 PRD 为准;源 PRD **内部数值自相矛盾**处以第 7 章裁决为单一真相源。
 - **维护**:源 PRD 改动 → 同步本文件对应章;新增页/接口/参数 → 对应章追加 + 更新第 1 章 & §6.6。
 - **PRD-no-UI**:视觉规格(px/字号/颜色/磨砂配方)归设计 SKILL,不进本文件;源 PRD 中混入的 51 处视觉数值是历史实现细节,前端实现时以设计稿/SKILL 为视觉权威。

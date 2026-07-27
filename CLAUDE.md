@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-**这是 NexGrid 前端的唯一实现面**（产品品牌 2026-07-22 由 Nexion 全局改名 NexGrid；工程目录 / skill 名 / PRD 文件名 / 内部存量标识沿用 Nexion 前缀，属白名单）（主人 2026-06-14 拍板：前端新功能/改动都在这里做。H5 `Nexion-prototype` 已于 2026-06-26 退役删除）。任意 Nexion 任务先读 `D:\WORKS\PLAN\WORKFLOW.md` 判工作线 + 加载 `nexion-workflow` skill；本工程（uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
+**这是 NexGrid 前端的唯一实现面**（产品品牌 2026-07-22 由 Nexion 改名 NexGrid，2026-07-28 完成后台 / 根 PRD / Nexion-CC / janus 全域收口，含持久键与 PRD 文件名；**工程目录名与 skill 名沿用 Nexion 前缀**，属白名单）（主人 2026-06-14 拍板：前端新功能/改动都在这里做。H5 `Nexion-prototype` 已于 2026-06-26 退役删除）。任意 NexGrid 任务先读 `D:\WORKS\PLAN\WORKFLOW.md` 判工作线 + 加载 `nexion-workflow` skill；本工程（uniapp 线）任务走 `nexion-uniapp-port` skill（自带四阶段闭环 + React→Vue/uni 映射 cookbook）。
 
 ## Heads-up: uni-app (Vue3)，不是 React/Next
 
@@ -58,4 +58,4 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 - 迁移台账：`docs/PORT-LEDGER.md`（源坐标 + 版本锁 + 页面矩阵 + 进度）
 - 踩坑登记：`docs/PORT-PITFALLS.md`（P-001~，每条已转脚本哨兵或硬规则）
 - 产品日志：`docs/前端产品更新日志.md`
-- 前端 PRD：`D:\WORKS\PLAN\PRD\Nexion_产品功能架构设计文档_v3.7.md`（`nexion-prd-sync` 同步对象）
+- 前端 PRD：`D:\WORKS\PLAN\PRD\NexGrid_产品功能架构设计文档_v3.7.md`（`nexion-prd-sync` 同步对象）

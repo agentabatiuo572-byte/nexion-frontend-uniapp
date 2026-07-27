@@ -138,11 +138,11 @@ const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>
 const t = useT();
 
 const PRODUCT_PHOTO: Record<string, { src: string; tierCode: string }> = {
-  "stellarbox-s1": { src: "/static/img/products/nexionbox-s1-v4.png", tierCode: "S1" },
-  "stellarbox-pro": { src: "/static/img/products/nexionbox-pro-v2.png", tierCode: "Pro" },
-  "stellarbox-pro-v2": { src: "/static/img/products/nexionbox-pro-v2.png", tierCode: "Pro v2" },
-  "stellarrack-p1": { src: "/static/img/products/nexionrack-p1-v2.png", tierCode: "Rack P1" },
-  "stellarrack-p2": { src: "/static/img/products/nexionrack-p1-v2.png", tierCode: "Rack P2" },
+  "stellarbox-s1": { src: "/static/img/products/nexgridbox-s1-v4.png", tierCode: "S1" },
+  "stellarbox-pro": { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro" },
+  "stellarbox-pro-v2": { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro v2" },
+  "stellarrack-p1": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" },
+  "stellarrack-p2": { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P2" },
 };
 
 const isShare = computed(() => props.product.tier === "Share");

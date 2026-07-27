@@ -1,4 +1,4 @@
-# NexGrid(Nexion)越南市场支付架构规格(三位一体)v1.0
+# NexGrid 越南市场支付架构规格(三位一体)v1.0
 
 > ⚠️ 本文件是工作区 `PRD/specs/` 的**只读副本**(随功能变更同步覆盖)。改规格请改 PRD 原件,勿直接改本副本。
 
@@ -396,7 +396,7 @@ FxQuoteConfig(单源 = 后台 [D6];client 只读):
 
 ## §10 交付物与下一步
 
-- 本规格:`PRD/specs/PAY-Nexion_越南支付架构规格_v1.0.md`(spec-lint --strict PASS)。
+- 本规格:`PRD/specs/PAY-NexGrid_越南支付架构规格_v1.0.md`(spec-lint --strict PASS)。
 - 可点原型:`PRD/prototypes/pay-vn-rails.html`(钱类关键流:链上充值 / VietQR / 提现收窄 + 换绑)。
 - 实施拆解:`Nexion-uniapp/docs/changes/2026-07-24-vn-payment-rails.plan.md`(uniapp 批次 A + admin 批次 B + PRD 修订批次 C;子任务 AC 逐条继承本规格 ② GWT;plan 过主人章后进子任务循环)。
 - 前端 PRD §9 正文修订走 nexion-prd-sync,后台模块细化走 nexion-admin-prd(批次 C)。
