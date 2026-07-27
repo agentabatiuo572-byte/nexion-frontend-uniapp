@@ -284,6 +284,8 @@ export interface DepositRecord {
   address?: string;
   /** 链上必:链上交易哈希 = 幂等键(同 txHash 重复上报 no-op)。 */
   txHash?: string;
+  /** 卡轨必:收单方授权号 = 幂等键(同 authCode 重复回调 no-op)。 */
+  authCode?: string;
   /** 链上必:当前确认数;server 推进。 */
   confirmations?: number;
   /** 链上必:默认 TRC20 20 · ERC20 12 · BEP20 15(后台 D1 可配)。 */

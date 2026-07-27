@@ -11,12 +11,19 @@ import {
   BANK_MAX_DEPOSIT_USDT,
   BANK_RECEIVE_ACCOUNTS,
   BANK_VND_TOLERANCE,
+  CARD_DECLINE_RATE,
   CHAIN_REQUIRED_CONFIRMATIONS,
+  MAX_CARD_DEPOSIT_USDT,
+  MIN_CARD_DEPOSIT_USDT,
   MIN_DEPOSIT_USDT,
+  cardChargeUsd,
+  cardFeeUsd,
   chainDepositFeeUsdt,
   computeCreditedUsdt,
   deriveDepositAddress,
+  isDuplicateAuthCode,
   isDuplicateTxHash,
+  mockCardAuthCode,
   mockChainTxHash,
   mockDepositId,
   mockMemoCode,
@@ -475,6 +482,53 @@ export const useDeposits = defineStore("deposits", () => {
     return settleBankIntent(intentId, intent.receivedVnd / intent.fxRate, intent.receivedVnd);
   }
 
+  // ════════ 卡通道(国际卡辅助轨;同步授权,无确认数推进)════════
+
+  /** 卡支付。本函数扮演「client 提交 → 收单方 3DS 授权 → server 入账」三步:
+   *  PROD = POST /api/deposits/card 提交,收单方授权后 server webhook 落库入账,
+   *  client 轮询 GET /api/deposits 收敛;本层的授权模拟整体删除。
+   *  返回 null = 未入账(入参越界 / 拒付),调用方展示拒付态并允许重试。
+   *  幂等三重同链上:授权号判重(在途重摇避撞)+ 直落终态 + bills.addOnce(ref=授权号)。
+   *  🔴 计费方向:卡费另收在用户卡上 → gross = 实扣额、credited = 用户输入额。 */
+  function submitCardPayment(creditedUsdt: number): DepositRecord | null {
+    const credited = +creditedUsdt.toFixed(2);
+    // 信任边界:金额来自输入框,NaN/±Infinity/越界一律拒(server 422 形态)
+    if (!Number.isFinite(credited)) return null;
+    if (credited < MIN_CARD_DEPOSIT_USDT || credited > MAX_CARD_DEPOSIT_USDT) return null;
+    // ⚠️ MOCK-ONLY:扮演收单方 3DS 授权。PROD:收单方回调带真实授权结果。
+    if (Math.random() < CARD_DECLINE_RATE) return null;
+    let authCode = mockCardAuthCode();
+    while (isDuplicateAuthCode(records.value, authCode)) authCode = mockCardAuthCode();
+    if (!useApp().recordDeposit(credited)) return null;
+    useBills().addOnce({
+      type: "topup",
+      symbol: "USDT",
+      amount: credited,
+      status: "posted",
+      memo: `Top-up · ${CHANNEL_MEMO["card-intl"]}`,
+      ref: authCode,
+    });
+    const now = mockServerNow();
+    const rec: DepositRecord = {
+      depositId: mockDepositId(now),
+      channel: "card-intl",
+      grossAmountUsdt: cardChargeUsd(credited),
+      feeUsdt: cardFeeUsd(credited),
+      creditedUsdt: credited,
+      authCode,
+      status: "credited",
+      createdAt: now,
+      creditedAt: now,
+    };
+    const previous = records.value;
+    records.value = [rec, ...records.value];
+    if (!persist()) {
+      records.value = previous;
+      return null;
+    }
+    return rec;
+  }
+
   // 启动即收敛一次(挂载账号的在途单:过期落 expired / 未过期重新武装定时器)。
   syncBankIntents();
 
@@ -505,6 +559,7 @@ export const useDeposits = defineStore("deposits", () => {
     depositAddress,
     createBankIntent,
     cancelBankIntent,
+    submitCardPayment,
     _devSimulateIncomingTransfer,
     _devResolveDustHold,
     _devSetChannelEnabled,

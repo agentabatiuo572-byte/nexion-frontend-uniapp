@@ -153,6 +153,7 @@ import {
   CHAIN_REQUIRED_CONFIRMATIONS,
   MIN_DEPOSIT_USDT,
   fnv1a,
+  isChainChannel,
   mulberry32,
 } from "@/store/deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
@@ -272,9 +273,19 @@ function goSupport() {
 
 // ── 最近入金(纯展示;状态由 store mock 引擎推进,server-canonical)──
 const sortedRecords = computed(() => [...dep.records].sort((a, b) => b.createdAt - a.createdAt));
-/** 银行轨(VietQR)入账后与链上记录同列此区,标题按通道分流。 */
+/** 法币轨(VietQR / 银行卡)入账后与链上记录同列此区,标题按通道分流。
+ *  全键 Record:新增通道时 TS 强制补齐,不会静默落进 USDT 文案(此前卡入金被标成
+ *  「USDT 充值」正是漏了分流)。 */
 function rowTitle(r: DepositRecord): string {
-  return r.channel === "bank-vietqr" ? t.value.bankPane.bankDeposit : t.value.topupChrome.usdtDeposit;
+  const tc = t.value.topupChrome;
+  const titles: Record<DepositChannel, string> = {
+    "usdt-trc20": tc.usdtDeposit,
+    "usdt-bep20": tc.usdtDeposit,
+    "usdt-erc20": tc.usdtDeposit,
+    "bank-vietqr": t.value.bankPane.bankDeposit,
+    "card-intl": tc.cardDeposit,
+  };
+  return titles[r.channel];
 }
 function rowAmount(r: DepositRecord): string {
   return (r.creditedUsdt > 0 ? r.creditedUsdt : r.grossAmountUsdt).toFixed(2);
@@ -302,8 +313,9 @@ function noteText(r: DepositRecord): string {
   return "";
 }
 function goRecord(r: DepositRecord) {
-  // 银行转账无链上哈希,tx 浏览器框架页语义不符 → 跳账单页(与成功态「查看账单」同口径)
-  if (r.channel === "bank-vietqr") {
+  // 法币轨(银行转账 / 银行卡)无链上哈希,tx 浏览器框架页语义不符 → 跳账单页
+  // (与成功态「查看账单」同口径)。判据取自 deposits-core 单源,新增法币轨自动排除。
+  if (!isChainChannel(r.channel)) {
     navTo("/pages/me/wallet-bills");
     return;
   }

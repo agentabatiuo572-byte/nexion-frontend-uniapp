@@ -3,8 +3,9 @@
   Stripe/Checkout.com-style hosted card page: amount input (USDT + 3.5% card fee
   → USD charged) + card form (number / expiry / CVV / holder / country / ZIP,
   brand auto-detect) + "Pay $X" CTA + PCI/3DS trust footer. Submit → processing →
-  3DS → 90% success / 10% fail. On success calls useApp.recordDeposit + writes a
-  topup bill (the source's Round-12 P0 fix). All data is mock; no real requests.
+  3DS → deposits.submitCardPayment()：store 扮演收单方授权 + server 入账，成功落
+  credited 入金单（走与链上/银行轨同一状态机，后台对账可见）+ 记账 + 写账单，
+  失败展示拒付并可重试。费率/最低额单源在 deposits-core。All data is mock.
 -->
 <template>
   <view class="mx-4 space-y-3">
@@ -56,9 +57,11 @@
           <text class="font-mono-tabular" style="font-size: 15px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="grid grid-cols-2" :style="feeRowStyle">
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.cardFeeLabel }} · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2); margin-left: 4px">${{ feeUSD.toFixed(2) }}</text></text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.topupChrome.cardFeeLabel, { rate: feeRateLabel }) }} · <text class="font-mono-tabular tabular-nums" style="color: var(--v5-ink-2); margin-left: 4px">${{ feeUSD.toFixed(2) }}</text></text>
           <text class="text-right" style="font-size: 12px"><text style="color: var(--v5-ink-3)">{{ t.topupChrome.cardCharged }}</text><text class="font-mono-tabular tabular-nums" style="font-weight: 600; color: var(--v5-ink); margin-left: 4px">${{ chargeUSD.toFixed(2) }}</text></text>
         </view>
+        <!-- 限额常驻:事前告知 + 越界即禁用原因(不让用户填完一整张卡才吃「发卡行拒绝」)。 -->
+        <view><text class="block" :style="limitHintStyle">{{ limitHint }}</text></view>
       </view>
 
       <!-- Card form — outer shell dropped; the surface-2 fields are the units -->
@@ -120,15 +123,20 @@
 import { ref, computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { useDeposits } from "@/store/deposits";
+import {
+  CARD_FEE_RATE,
+  MAX_CARD_DEPOSIT_USDT,
+  MIN_CARD_DEPOSIT_USDT,
+  cardChargeUsd,
+  cardFeeUsd,
+} from "@/store/deposits-core";
 import CardBrandBadge from "@/components/me/card-brand-badge.vue";
 
 const emit = defineEmits<{ changeChannel: [] }>();
 
 const t = useT();
-const app = useApp();
-const bills = useBills();
+const deposits = useDeposits();
 
 const amount = ref("50");
 const cardNum = ref("");
@@ -151,8 +159,9 @@ const countryIdx = ref(0);
 const phase = ref<"form" | "processing" | "3ds" | "success" | "fail">("form");
 
 const usdtAmount = computed(() => Math.max(0, parseFloat(amount.value) || 0));
-const feeUSD = computed(() => usdtAmount.value * 0.035);
-const chargeUSD = computed(() => usdtAmount.value + feeUSD.value);
+// 费率/最低额单源在 deposits-core(真后台 = D1 通道配置下发),组件禁写死。
+const feeUSD = computed(() => cardFeeUsd(usdtAmount.value));
+const chargeUSD = computed(() => cardChargeUsd(usdtAmount.value));
 
 const brand = computed<"visa" | "mc" | "amex" | "unknown">(() => {
   const d = cardNum.value.replace(/\s/g, "");
@@ -162,10 +171,25 @@ const brand = computed<"visa" | "mc" | "amex" | "unknown">(() => {
   return "unknown";
 });
 
-// 卡通道最低充值 $30(通道收窄裁决;链上 USDT 通道 min 仍为 $10)。
+// 费率标签由常量派生(此前文案里写死 "3.5%",后台调费率文案不跟)。
+const feeRateLabel = computed(() => `${+(CARD_FEE_RATE * 100).toFixed(2)}%`);
+const limitHint = computed(() =>
+  fmt(t.value.topupChrome.cardLimitHint, {
+    min: `$${MIN_CARD_DEPOSIT_USDT}`,
+    max: `$${MAX_CARD_DEPOSIT_USDT.toLocaleString("en-US")}`,
+  }),
+);
+/** 越界(高于上限 / 低于下限但已填了金额)→ 提示转警示色,当禁用原因用。 */
+const amountOutOfRange = computed(
+  () => usdtAmount.value > 0 && (usdtAmount.value < MIN_CARD_DEPOSIT_USDT || usdtAmount.value > MAX_CARD_DEPOSIT_USDT),
+);
+
+// 卡通道限额(通道收窄裁决;链上 USDT 通道 min 更低,见 MIN_DEPOSIT_USDT)。
+// 上限门与 store 的 submitCardPayment 同源:界面先拦,绕过界面也拦得住。
 const isValid = computed(
   () =>
-    usdtAmount.value >= 30 &&
+    usdtAmount.value >= MIN_CARD_DEPOSIT_USDT &&
+    usdtAmount.value <= MAX_CARD_DEPOSIT_USDT &&
     cardNum.value.replace(/\s/g, "").length >= 13 &&
     /^\d{2}\/\d{2}$/.test(expiry.value) &&
     /^\d{3,4}$/.test(cvv.value) &&
@@ -173,10 +197,12 @@ const isValid = computed(
     zip.value.trim().length >= 3,
 );
 
+// 授权号 = 收据号 = 账单 ref,三处同源(此前收据号是 computed 内现摇的随机数,
+// 任一响应式依赖变化就换一个号,且与账单 ref 对不上)。
+const authCode = ref("");
 const receiptLine = computed(() => {
-  const receiptNo = Math.floor(Math.random() * 900000 + 100000);
   const last4 = cardNum.value.replace(/\s/g, "").slice(-4);
-  return fmt(t.value.topupChrome.receiptLine, { no: `CK-${receiptNo}`, amount: chargeUSD.value.toFixed(2), last4 });
+  return fmt(t.value.topupChrome.receiptLine, { no: authCode.value, amount: chargeUSD.value.toFixed(2), last4 });
 });
 
 // ── input handlers (uni input event → e.detail.value) ──
@@ -213,18 +239,11 @@ async function handleSubmit() {
   await new Promise((r) => setTimeout(r, 1400));
   phase.value = "3ds";
   await new Promise((r) => setTimeout(r, 2400));
-  if (Math.random() > 0.1) {
-    app.recordDeposit(usdtAmount.value);
-    // ⚠️ Round 12 P0 fix: write a bill for the card top-up (server-owned in
-    // prod via PSP webhook on successful charge — POST /api/wallet/topup).
-    bills.add({
-      type: "topup",
-      symbol: "USDT",
-      amount: usdtAmount.value,
-      status: "posted",
-      memo: "Card top-up",
-      ref: `TOPUP-${Date.now().toString(36).toUpperCase()}`,
-    });
+  // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
+  // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
+  const rec = deposits.submitCardPayment(usdtAmount.value);
+  if (rec) {
+    authCode.value = rec.authCode ?? rec.depositId;
     phase.value = "success";
   } else {
     phase.value = "fail";
@@ -348,6 +367,12 @@ const feeRowStyle: CSSProperties = {
   gap: "8px",
   borderTop: "1px solid var(--v5-border)",
 };
+// 越界时转警示色 —— 提示行同时承担「为什么按钮点不动」。
+const limitHintStyle = computed<CSSProperties>(() => ({
+  marginTop: "6px",
+  fontSize: "12px",
+  color: amountOutOfRange.value ? "var(--v5-brand-2)" : "var(--v5-ink-4)",
+}));
 // De-carded — fields sit directly on the page floor.
 const formCardStyle: CSSProperties = {
   padding: "2px 0 0",

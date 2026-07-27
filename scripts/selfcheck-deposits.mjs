@@ -127,5 +127,32 @@ console.log("selfcheck-deposits — deposits-core 纯逻辑断言");
   check("附言码 NX-+6 位且全用无易混字符集(×200)", codes.every((c) => /^NX-[346789ACDEFHJKMNPRTWXY]{6}$/.test(c)));
 }
 
+// 8) 卡通道:费另收(charge = credited + fee,与链上 gross−fee 反向)· 限额 · 授权号幂等
+{
+  const {
+    CARD_FEE_RATE, MIN_CARD_DEPOSIT_USDT, MAX_CARD_DEPOSIT_USDT, CARD_DECLINE_RATE,
+    cardFeeUsd, cardChargeUsd, mockCardAuthCode, isDuplicateAuthCode,
+  } = core;
+  check("卡费率 3.5% / 最低 $30 / 上限 $5,000 / 拒付率 10%",
+    CARD_FEE_RATE === 0.035 && MIN_CARD_DEPOSIT_USDT === 30
+    && MAX_CARD_DEPOSIT_USDT === 5000 && CARD_DECLINE_RATE === 0.1);
+  check("卡费两位小数(100 → 3.5 / 33.33 → 1.17)",
+    cardFeeUsd(100) === 3.5 && cardFeeUsd(33.33) === 1.17);
+  check("实扣 = 入账额 + 费(100 → 103.5),用户到账额不缩水",
+    cardChargeUsd(100) === 103.5 && cardChargeUsd(30) === 31.05);
+  // 🔴 与链上反向的核心不变量:credited = gross − fee 在卡轨同样成立(记账口径统一)
+  check("卡轨仍满足 credited = gross − fee(账本口径与链上一致)",
+    [30, 100, 33.33, 4999.99].every((c) => {
+      const credited = +c.toFixed(2);
+      return +(cardChargeUsd(credited) - cardFeeUsd(credited)).toFixed(2) === credited;
+    }));
+  const auths = Array.from({ length: 200 }, () => mockCardAuthCode());
+  check("授权号 CK-+6 位数字(×200)", auths.every((a) => /^CK-\d{6}$/.test(a)));
+  const cardRecords = [{ authCode: "CK-123456" }, { txHash: "0xabc" }];
+  check("已存在授权号 → 判重 true", isDuplicateAuthCode(cardRecords, "CK-123456") === true);
+  check("新授权号 → 判重 false", isDuplicateAuthCode(cardRecords, "CK-999999") === false);
+  check("空授权号 → false(链上/银行轨无授权号不误伤)", isDuplicateAuthCode(cardRecords, "") === false);
+}
+
 console.log(`\n${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

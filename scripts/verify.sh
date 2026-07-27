@@ -1273,10 +1273,11 @@ no_userfacing_stella
 no_oldbrand_check() {
   local tok='Nexi'; tok="${tok}on"
   local hits
-  # 白名单三类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
-  # ③静态图文件名。除此之外的旧品牌词一律拦。
+  # 白名单四类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
+  # ③静态图文件名 ④PRD/ 下的文档文件名(CLAUDE.md:PRD 文件名沿用旧前缀属白名单,
+  #   注释引用规格出处合法)。除此之外的旧品牌词一律拦。
   hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
-    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}" | head -8)
+    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}|PRD/[^:]*${tok}" | head -8)
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }

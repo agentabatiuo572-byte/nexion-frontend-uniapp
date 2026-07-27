@@ -1,4 +1,4 @@
-import type { ChainDepositChannel, DepositIntent, DepositRecord } from "./types";
+import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord } from "./types";
 
 // 入金纯逻辑(PAY-规格 [FEAT-PAY01] ③)。零依赖(vue/pinia/uni 均不引),
 // deposits store 与 scripts/selfcheck-deposits.mjs 共用同一实现。
@@ -26,6 +26,12 @@ export const MIN_DEPOSIT_USDT = 10;
 
 export function chainDepositFeeUsdt(network: ChainDepositChannel): number {
   return CHAIN_DEPOSIT_FEE_USDT[network];
+}
+
+/** 是否链上轨(有 txHash / 确认数 / 专属地址)。单源派生自确认数表:
+ *  新增链上通道自动纳入、新增法币轨自动排除,消费方(交易详情页跳转等)不用逐个改。 */
+export function isChainChannel(c: DepositChannel): c is ChainDepositChannel {
+  return c in CHAIN_REQUIRED_CONFIRMATIONS;
 }
 
 /** 入账额 = gross − fee,两位小数(creditedUsdt 生成规则)。 */
@@ -146,6 +152,40 @@ export function qrDotMatrix(seed: string, n = 21): boolean[] {
   return cells;
 }
 
+// ── 卡通道(国际卡辅助轨 mock 种子)──────────────────────────────────
+// 真后台 = D1 通道配置(费率/最低额/单笔上限)下发,client 拉取,拉取失败禁回退写死值。
+// 🔴 计费方向与链上相反:链上「从到账额里扣」(credited = gross − fee),
+//    卡「在用户卡上另收」(charge = credited + fee)——用户到账额 = 输入额,不缩水。
+//    落 DepositRecord 时 gross = charge(平台实收),仍满足 credited = gross − fee。
+
+/** 卡通道费率(3.5%;后台 D1 可配)。 */
+export const CARD_FEE_RATE = 0.035;
+
+/** 卡通道最低充值(USD;通道收窄裁决,链上 min 仍为 MIN_DEPOSIT_USDT)。 */
+export const MIN_CARD_DEPOSIT_USDT = 30;
+
+/** 卡通道单笔上限(USD;与银行轨同值但各自可配,后台按通道分别下发)。 */
+export const MAX_CARD_DEPOSIT_USDT = 5000;
+
+/** ⚠️ MOCK-ONLY:3DS 拒付率(演示用)。PROD:收单方返回真实授权结果。 */
+export const CARD_DECLINE_RATE = 0.1;
+
+/** 卡手续费(USD,两位小数):按入账额计费,另收在用户卡上。 */
+export function cardFeeUsd(creditedUsdt: number): number {
+  return +(creditedUsdt * CARD_FEE_RATE).toFixed(2);
+}
+
+/** 卡实扣额 = 入账额 + 手续费(= DepositRecord 的 grossAmountUsdt)。 */
+export function cardChargeUsd(creditedUsdt: number): number {
+  return +(creditedUsdt + cardFeeUsd(creditedUsdt)).toFixed(2);
+}
+
+/** ⚠️ MOCK-ONLY:卡授权号 `CK-NNNNNN`(幂等键,同链上 txHash 之于链上轨)。
+ *  PROD = 收单方返回的授权号,禁客户端造。 */
+export function mockCardAuthCode(): string {
+  return `CK-${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
 // ── 幂等 ───────────────────────────────────────────────────────────
 
 /** 同 txHash 已存在 → 重复上报 no-op([FEAT-PAY01] ④ 幂等键)。 */
@@ -155,6 +195,15 @@ export function isDuplicateTxHash(
 ): boolean {
   if (!txHash) return false;
   return records.some((r) => r.txHash === txHash);
+}
+
+/** 同授权号已存在 → 重复回调 no-op(卡轨幂等键,与 isDuplicateTxHash 同形)。 */
+export function isDuplicateAuthCode(
+  records: readonly Pick<DepositRecord, "authCode">[],
+  authCode: string,
+): boolean {
+  if (!authCode) return false;
+  return records.some((r) => r.authCode === authCode);
 }
 
 // ── MOCK 单号 / 哈希铸造 ───────────────────────────────────────────
