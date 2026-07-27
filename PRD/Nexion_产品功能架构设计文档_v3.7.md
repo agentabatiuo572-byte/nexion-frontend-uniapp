@@ -12,6 +12,16 @@
 
 ---
 
+## 配套规格文档
+
+本文档为平台功能主索引;专项功能的三位一体详细规格(用户故事 / GWT 验收+异常 / 数据字典 / 状态机 / 交互 4 态 / 点击流)另立文档,与本文档交叉引用:
+
+| 规格文档 | 覆盖范围 | 对应章节 | 位置 |
+|---|---|---|---|
+| 越南市场支付架构规格 v1.0 | 充值(USDT TRC20/BEP20/ERC20 + VietQR 银行转账 + 国际卡)· 出金仅 USDT · 汇率牌价 · 提现地址换绑 | §9 钱包 | specs/PAY-Nexion_越南支付架构规格_v1.0.md(前端仓副本 Nexion-uniapp/docs/specs/) |
+
+---
+
 ## 目录
 
 1. 产品概述
@@ -202,8 +212,10 @@ TabBar:active tab 显示背景 chip 高亮。
 /me/security/kyc-express         KYC-Express 说明页
 /me/wallet                       钱包主页
 /me/wallet/topup                 充值 + KYC-Express
-/me/wallet/withdraw              提现
+/me/wallet/withdraw              提现(网络随绑定地址派生,只读)
 /me/wallet/withdraw/tracking     提现追踪
+/me/wallet/address-rebind        更换提现地址($1 回验 + 24h 冻结)
+/me/wallet/usdt-guide            如何获取 USDT(新手指引)
 /me/wallet/exchange              NEX↔USDT 兑换
 /me/wallet/exchange/how-it-works 兑换玩法说明页
 /me/wallet/repurchase            复投
@@ -1730,7 +1742,7 @@ Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页�
 
 | Step | 内容 | 推进触发 |
 |---|---|---|
-| select-payment | 4 支付方式选择(USDT TRC20 / USDT ERC20 / BTC / Card)| `Continue` |
+| select-payment | 4 支付方式选择(USDT TRC20 / BEP20 / ERC20 / Card)| `Continue` |
 | confirm | Review order:产品 / 数量 / 支付方式 / 物流 / 费用拆解 / 总额 | `Pay now`(链上)或 `Continue to payment`(Card)|
 | pay-instructions | 链上 → QR + 地址 + 倒计时;Card → saved-cards selector + CVV(§7.3.3)| 链上 12s auto-detect 模拟确认 / Card 提交 |
 | awaiting | 等待网络/支付方确认(2.4s mock)| 自动 |
@@ -1745,13 +1757,13 @@ Price box 之后的紧迫感 strip(Sprint A-1 / B.1)。**目的**:让产品页�
 | 支付方式 | 显示行 | Total 计算 |
 |---|---|---|
 | Card | Subtotal + Card processing fee (3.5%) + Total | `price × 1.035` |
-| 链上(USDT/BTC)| Network fee: Free + Total | `price` |
+| 链上(USDT 三网络)| Network fee: Free + Total | `price` |
 
 CTA 文案:Card 显示 `Continue to payment`(继续进入支付),链上显示 `Pay now`(立即支付)。**点击 CTA 直接进 pay-instructions,不弹任何 confirm modal**(去除冗余双重确认)。
 
 #### 7.3.3 pay-instructions 分支
 
-**链上分支(USDT TRC20/ERC20 / BTC)**:
+**链上分支(USDT TRC20 / BEP20 / ERC20)**:
 - 140×140 QR 二维码 + 真实网络格式钱包地址
 - 30 分钟支付倒计时
 - 12s auto-detect 模拟链上确认
@@ -2750,67 +2762,120 @@ iOS Settings 风分组列表:
 
 ### 9.2 充值 `/me/wallet/topup`
 
-#### 9.2.1 5 个充值渠道
+#### 9.2.1 三条充值通道
 
-| Channel | Fee | Time | Min | Path |
+| 通道 | 手续费 | 最低额 | 单笔上限 | 到账方式 |
 |---|---|---|---|---|
-| USDT (TRC20) | 1 USDT | 5 min | $10 | 链上 |
-| USDT (ERC20) | 5 USDT | 15 min | $10 | 链上 |
-| Bitcoin | 0.5% | 30 min | $20 | 链上 |
-| Ethereum | 0.5% | 15 min | $20 | 链上 |
-| **Visa / Mastercard** | **3.5%** | **Instant** | **$10** | **法币** |
+| USDT 链上 · TRC20 | 1 USDT | $10 | — | 链上确认数达标自动入账 |
+| USDT 链上 · BEP20 | 1 USDT | $10 | — | 同上 |
+| USDT 链上 · ERC20 | 5 USDT | $10 | — | 同上 |
+| 银行转账 · VietQR | 0 | $10 等值 | $5,000 | 回单匹配自动入账 |
+| 国际卡 · Visa/Mastercard | 3.5%(另收) | $30 | $5,000 | 收单授权成功即入账 |
 
-⚠️ **关键分流原则**:CARD 与 4 个链上 channel 走**完全不同的支付流程**,不能复用 DepositCard。CARD → 调起信用卡表单(`CardPayForm`),链上 channel → 调起钱包地址 + QR(`DepositCard`)。
+通道费率、最低额、单笔上限、启停位均由后台按通道下发,前端不写死;拉取失败禁回退默认值,
+该通道置为不可用而非按旧值放行。BTC / Ethereum 充值通道已下线。
 
-#### 9.2.2 链上 channel 流程(crypto)
+#### 9.2.2 统一入金账
 
-选网络 → 生成 QR + 钱包地址(TRC20: `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`)→ 倒计时 30 分钟 → 12 秒自动检测入账 → 余额到账。
+三条通道共用同一份入金记录与状态机,后台对账看到的是同一份数据,不存在只走余额、
+不留入金单的通道。
 
-#### 9.2.3 Visa / Mastercard 流程(`CardPayForm`)
+```mermaid
+stateDiagram-v2
+    [*] --> detected: 链上侦测到转账
+    detected --> confirming: 金额 ≥ 最低额
+    detected --> dust_hold: 金额 < 最低额
+    confirming --> credited: 确认数达标,入账 + 写账单
+    dust_hold --> credited: 后台人工核销
+    dust_hold --> returned: 后台登记退回
+    [*] --> credited: 银行回单匹配 / 卡授权成功(同步入账,不经确认推进)
+    credited --> [*]
+    returned --> [*]
+```
 
-对标 Stripe / Checkout.com Hosted Payment Page。
+**计费方向按通道分两类**(两类都满足「入账额 = 实收额 − 手续费」,账本口径统一):
 
-**A. Amount Preview Card**:
-- `YOU RECEIVE: $X USDT` 大字 inline 可编辑(USDT 数量,即用户最终到账)
-- 实时计算 `Card fee 3.5% · $Y` + `Card charged $Z`(用户信用卡实际被刷金额 = USDT + 3.5%)
+- 链上:从到账额里扣,入账额 = 转入额 − 通道费。
+- 国际卡:费另收在用户卡上,入账额 = 用户输入额、实扣 = 入账额 + 费;入金记录的实收额记实扣额。
+- 银行转账:0 费,按下单时锁定的牌价折算。
 
-**B. Card Form**(灰底 + border + focus-within:lemon/55 视觉):
-- **Card number** input + **brand 自动识别**(右上角彩色徽章,首位 `4 → VISA` / `5 / 2 → MC` / `34 / 37 → AMEX`,默认 `•••`),4-4-4-4 格式化,最长 19 字符
-- **Expiry MM/YY** + **CVV** 分两列(MM/YY 自动插斜杠;CVV 3-4 位数字)
-- **Cardholder name** 自动大写
-- **Country dropdown**(9 国 emoji flag:🇺🇸 🇬🇧 🇨🇦 🇦🇺 🇩🇪 🇯🇵 🇸🇬 🇭🇰 🇦🇪)+ **ZIP/Postal**(自动大写,10 字符上限)
-- 所有 input 加 `autoComplete="cc-number / cc-exp / cc-csc / cc-name / postal-code"`,触发浏览器 / 系统密码管家自动填充
+**幂等键按通道**:链上 = 交易哈希 · 银行 = 付款单号 · 国际卡 = 收单方授权号。
+同键重复回报一律 no-op,不重复入账;账单按同一键去重兜底。
 
-**C. Submit & Phase State**:
+**副作用顺序**:先落入金单并持久化,过了才动余额与账单 —— 「失败」必须等于「什么都没发生」,
+否则失败态既扣了钱又允许重试,会重复入账且对账查不到。
 
-| Phase | 表现 | 时长 |
-|---|---|---|
-| `form` | Pay $Z 按钮 — 表单不合法时禁用,合法时可点 | — |
-| `processing` | spinner + `Authorizing card…` + `Submitting to issuing bank · do not close this window` | 1.4s |
-| `3ds` | spinner + `3D Secure verification` + `Your bank may text you a code · standing by` | 2.4s |
-| `success`(90%)| ✓ + `Payment successful · $X USDT credited` + `Receipt #CK-NNNNNN · Charged $Z to ••••XXXX` + Back to wallet CTA | — |
-| `fail`(10%)| ⚠️ + `Card declined · Reason: do_not_honor (issuer)` + Try again 按钮 | — |
+**状态权威**:状态一律由服务端裁定,客户端只提交意图、只读结果,不本地推进状态。
 
-成功路径触发 `useApp.creditBalance(usdtAmount)`,余额到账。
+#### 9.2.3 USDT 链上充值
 
-**D. 表单合法性校验**:`usdtAmount ≥ 10 && 卡号 ≥ 13 位 && MM/YY 匹配 && CVV 3-4 位 && holder ≥ 2 字符 && zip ≥ 3 字符`。
+- 每用户 × 每网络一个专属充值地址,服务端派发、长期恒定不轮换,转入即可归属到人。
+- 所需确认数按网络配置(TRC20 20 · BEP20 15 · ERC20 12,后台可调),达标即自动入账。
+- 页面常驻错网络警示:仅通过所选网络转入,错网络 / 错资产转账无法找回。
+- 提供「如何获取 USDT」新手指引与「充值未到账」工单入口。
 
-**E. Trust Footer**:`ShieldCheck` icon + `Card processed by Checkout.com (PCI DSS Level 1) · Nexion never sees your full card number · 3D Secure 2.2 enforced for transactions over $50`。
+**异常路径**:
 
-#### 9.2.4 业务规则
+| 场景 | 处理 |
+|---|---|
+| 转入额低于最低额 | 入金单挂起,不自动入账;后台人工核销或登记退回 |
+| 转入额不足以覆盖通道费 | 只能退回,不可核销入账 |
+| 错网络转入 | 侦测不到,不生成入金单;走工单人工核实 |
+| 确认停滞超 30 分钟 | 提示网络拥堵,不自动置失败;走满仍正常入账 |
 
-- **手续费 3.5%** 进入平台风控备付金(`fee_buffer` 余额),非利润口径
-- **3D Secure 阈值** $50(MasterCard / Visa 默认 SCA 触发线)
-- **失败重试** 同卡 24h 内允许 5 次,超过自动锁卡 24h(防 BIN attack)
-- **PCI 范围** 卡号 / CVV 仅在前端 input 出现,提交时通过 Checkout.com Frames 直接送至 acquirer(Nexion 后端永远拿不到 PAN)
-- **支付商** Checkout.com(主)+ Stripe(备),按地区路由 BIN 自动选择
+#### 9.2.4 VietQR 银行转账
 
-#### 9.2.5 充值记录写入规则
+面向越南本地用户的主力法币通道:按当前牌价下单,转越南盾,按锁定牌价折成 USDT 入账,平台 0 手续费。
 
-- regular top-up 写入钱包账单,保留 channel / network / amount / txHash / status。
-- KYC top-up 同步写入 KYC verification 状态,并把已验证钱包地址作为提现地址一致性校验依据。
-- 充值页必须区分 regular top-up 与 KYC-Express top-up,不得只展示静态说明。
+- **下单锁价**:生成付款单时锁定牌价、应付越南盾金额与倒计时;窗口内平台调价不影响已生成的单。
+- **附言码**:每单铸一个在途唯一的附言码,用户转账时填入,作为回单归属的主匹配依据。
+- **精确零头**:应付金额精确到盾、不凑整千,零头本身作为第二重匹配线索。
+- **收款账户池**:从可用账户池轮询派发;单账户可停用 / 熔断并移出轮换,池内无可用账户时该通道置灰。
 
+**付款单状态机**:
+
+```mermaid
+stateDiagram-v2
+    [*] --> awaiting_payment: 生成付款单(锁价窗开始)
+    awaiting_payment --> credited: 附言命中 + 金额在容差内
+    awaiting_payment --> mismatch_review: 金额差超容差
+    awaiting_payment --> expired: 锁价窗到点未付
+    awaiting_payment --> cancelled: 用户主动取消
+    mismatch_review --> credited: 后台按实收核销
+    mismatch_review --> return_pending: 后台登记退回
+    expired --> credited: 迟到转账,后台按锁定价补入账
+    credited --> [*]
+    cancelled --> [*]
+    return_pending --> [*]
+```
+
+**三类进人工挂账**(钱已到银行、只是认不到人,记入负债科目「待核实入金」,不计入用户可提余额):
+无附言码或附言残缺且金额撞不上任何在途单;实收与应付差异超容差(默认 ±1,000₫);
+锁价窗过期后才到账且超出宽限。挂账各行折算金额之和恒等于该科目余额。
+
+#### 9.2.5 国际卡充值
+
+辅助通道。提交卡信息后由收单方完成 3DS 授权,授权成功即直落已入账,不经确认推进。
+
+- 限额门双层:界面提交前拦 + 服务端入账前拦,绕过界面直接调用同样拒绝。
+- 限额提示常驻展示,越界即给出禁用原因,不得复用收单方拒付文案 —— 真实原因是超限,
+  提示发卡行拒绝会误导用户去联系银行。
+- 卡号 / CVV 不落平台后端,由收单方直连采集;平台只接收授权结果与授权号。
+- 同卡短时间内重试次数与锁卡时长由后台配置。
+
+#### 9.2.6 汇率牌价
+
+越南盾牌价由后台单一配置派生,前端只做展示与换算,不缓存、不写死:
+
+- 牌价 = 基准价 ×(1 + 买入点差),取整到十位;点差合法区间 0 ~ 3%,越界后台拒绝写入。
+- 牌价不可用(缺字段 / 非法值 / 点差越界)时禁止下单,不猜价、不回退默认值。
+- 换算全程整数域运算(点差转基点、金额转分),避免小数进位在半分边界上偏一档。
+
+#### 9.2.7 充值记录
+
+- 三通道的入金记录同列「最近入金」,按通道分流展示标题与跳转:链上轨可进链上交易详情,
+  法币轨无链上哈希,进账单流水。
+- 入金记录与账单、收据三处使用同一单号口径,互相可反查。
 ### 9.3 提现 `/me/wallet/withdraw`
 
 #### 9.3.1 流程
@@ -2818,10 +2883,57 @@ iOS Settings 风分组列表:
 | 步 | 字段 | 校验 |
 |---|---|---|
 | 1 | 金额 | ≥ $20 |
-| 2 | 网络 | USDT-TRC20(推荐) / USDT-ERC20 / BTC / ETH |
-| 3 | 收款地址 | > 10 字符 |
+| 2 | 网络 | 随绑定地址派生,只读;换网络 = 走换绑重新验证 |
+| 3 | 收款地址 | 只读,取当前已验证的绑定地址;不手输 |
 | 4 | NEX 抵扣手续费(可选) | 见 9.3.2;NEX 不足不阻拦,仅手续费升高 |
 | 5 | 提交 | 进入提现追踪 |
+
+#### 9.3.1-1 出金币种与网络
+
+出金仅支持 USDT,网络同充值三条链(TRC20 / ERC20 / BEP20)。BTC / Ethereum 提现通道已下线。
+收款网络不再由用户在提现页选择,而是随当前绑定地址派生并只读展示 —— 杜绝选出与地址不匹配的网络。
+
+#### 9.3.1-2 提现地址换绑
+
+单地址原则:同一时刻只有一个已验证的提现地址,提现一律打到该地址。更换走独立流程:
+
+```mermaid
+flowchart TD
+  A[发起换绑] --> B[填写新地址]
+  B --> C[从新地址转入 $1 完成所有权回验]
+  C --> D{回验到账?}
+  D -- 否 --> E[换绑单过期作废,旧地址继续有效]
+  D -- 是 --> F[新地址生效 · 旧地址撤销]
+  F --> G[提现冻结 24 小时]
+  G --> H[冻结结束,可正常提现]
+```
+
+- **$1 回验**:必须从新地址主动转入验证金额,证明用户掌握该地址私钥;回验金额入账不退。
+- **24 小时冻结**:换绑生效后冻结提现,防盗号即时转移资产。冻结判定下沉在风控评估层,
+  绕过界面直接调用同样拦得住,不只是按钮置灰。
+- **换绑频次**:每 7 天最多一次(后台可配)。
+- **新地址大额审核**:绑定未满 7 天的新地址提现 $1,000 以上,自动转人工审核。
+
+#### 9.3.1-3 出金三道闸
+
+```mermaid
+flowchart TD
+  W0[用户发起提现] --> W1{风控评估}
+  W1 -- 拒绝 --> WR[不建单 · 不扣款]
+  W1 -- 冻结 --> WF[建单进冻结队列 · 资金占用 · 人工处置]
+  W1 -- 人工/延迟 --> WM[建单进审核队列]
+  W1 -- 通过 --> W2{额度双门}
+  W2 -- 可提额度不足 --> WX[拒绝]
+  W2 -- 总余额不足 --> WX
+  W2 -- 两门都过 --> W3[原子扣款:总余额与可提额度同步扣减]
+  W3 --> W4[建提现单 · 排队上链]
+```
+
+- **第一道 风控路由**:拒绝路由不建单不扣款;冻结 / 人工 / 延迟三种路由建单进队列,
+  资金占用但不放款,状态由服务端与人工推进。
+- **第二道 额度双门**:可提额度门(只有已解锁收益可提,充值本金不可提)+ 总余额门
+  (纵深兜底,任何情况下不放行超过总余额的提现)。两门独立校验。
+- **第三道 原子扣款**:总余额与可提额度在同一步扣减,不存在扣一半的中间态。
 
 #### 9.3.1a 提现提交闭环
 
@@ -5321,6 +5433,87 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 
 ---
 
+
+### 12.18 Deposit(useDeposits,按账号分行持久化)
+
+三条充值通道共用的入金记录与银行付款单。状态由服务端裁定,客户端只读。
+
+```
+{
+  records: DepositRecord[];          // 三通道共用的入金记录
+  intents: DepositIntent[];          // 银行轨付款单(链上/卡轨不产生)
+
+  depositAddress(network): string    // 每账号 × 每网络专属地址,恒定不轮换
+  createBankIntent(usdtAmount): DepositIntent | null   // 锁价下单;牌价不可用/账户池空 → null
+  cancelBankIntent(intentId): boolean                   // 仅在途单可撤
+  submitCardPayment(usdt, accountKey): DepositRecord | null  // 卡支付;账号已切走/越界/拒付 → null
+}
+
+DepositRecord = {
+  depositId: string;                 // 服务端铸 `DP-YYYYMMDD-NNNN`(与提现 WD- 同族),铸号查重
+  channel: 'usdt-trc20' | 'usdt-erc20' | 'usdt-bep20' | 'bank-vietqr' | 'card-intl';
+  grossAmountUsdt: number;           // 平台实收(链上=转入额;卡=实扣额=入账+费;银行=入账额)
+  feeUsdt: number;                   // 按通道费率,服务端计算
+  creditedUsdt: number;              // = gross − fee,入账额
+  address?: string;                  // 链上必:专属充值地址
+  txHash?: string;                   // 链上必:交易哈希,幂等键
+  authCode?: string;                 // 卡轨必:收单方授权号,幂等键
+  confirmations?: number;            // 链上必:当前确认数,服务端推进
+  requiredConfirmations?: number;    // 链上必:达标线,后台按网络可配
+  status: 'detected' | 'confirming' | 'dust_hold' | 'credited' | 'returned';
+  createdAt: number;
+  creditedAt?: number;
+}
+
+DepositIntent = {
+  intentId: string;                  // 同 DP- 号族;入账时即该笔入金记录的 depositId
+  usdtAmount: number;                // 下单额
+  fxRate: number;                    // 下单瞬间锁定的牌价,后续调价不影响本单
+  vndAmount: number;                 // 应付越南盾,精确到盾不凑整千(零头兼作匹配线索)
+  memoCode: string;                  // 附言码,在途唯一,回单归属主依据
+  bankAccount: { bankName; accountName; accountNumber };  // 从可用账户池轮询派发
+  receivedVnd?: number;              // 回单实收
+  status: 'awaiting_payment' | 'credited' | 'mismatch_review' | 'expired' | 'cancelled' | 'return_pending';
+  expireAt: number;                  // 锁价窗终点
+  matchedAt?: number;
+}
+```
+
+**约束**:入金记录按账号分行存储,换账号不继承;跨延迟的资金动作(卡支付授权等待期)
+必须校验发起时的账号仍是当前账号,否则作废,防止把钱记进切换后的账号。
+
+### 12.19 Wallet Pairing(useWalletPairing,按账号分行持久化)
+
+提现地址绑定与换绑。单地址原则:同一时刻只有一个 active 绑定。
+
+```
+WalletBinding = {
+  bindingId: string;
+  address: string;                   // 已验证的提现地址
+  network: 'USDT-TRC20' | 'USDT-ERC20' | 'USDT-BEP20';  // 随地址派生,提现页只读展示
+  status: 'pending' | 'active' | 'revoked' | 'expired' | 'cancelled';
+  verifiedAt?: number;               // $1 回验到账时间
+  freezeUntil?: number;              // = verifiedAt + 24h,冻结期内禁提现
+  createdAt: number;
+}
+```
+
+**约束**:冻结判定下沉在风控评估层,绕过界面直接调用同样拒绝;换绑频次上限与冻结时长后台可配。
+
+### 12.20 FX Quote(useFx)
+
+越南盾牌价,由后台单一配置派生,前端不缓存、不写死。
+
+```
+{
+  baseRateVndPerUsdt: number;        // 基准价,后台下发
+  buySpreadPct: number;              // 买入点差,合法区间 0 ~ 3%,越界后台拒写
+  lockWindowMin: number;             // 锁价窗时长(分钟)
+  quoteRate: derived;                // = round(base ×(1 + spread)/10)× 10,取整到十位
+  fxAvailable: derived;              // 缺字段/非法值/点差越界 → false,禁止下单
+}
+```
+
 ## 13. 业务规则与计算公式
 
 ### 13.1 设备收益生成(双币种,spec §8.1)
@@ -5425,6 +5618,20 @@ progressPct = avg(checks);
 | `share.appDownload.officialUrl` | 空 | 浏览器 H5 注册成功页的 Nexion 官网 APP 下载地址(§4.1.1);仅接受 HTTPS,空值或非法地址显示不可点击占位,App 不消费;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
 | 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
 | OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
+| `deposit.chain.fee` | TRC20 1 / BEP20 1 / ERC20 5 USDT | 链上通道费(按网络,后台可配);从到账额里扣 |
+| `deposit.chain.confirmations` | TRC20 20 / BEP20 15 / ERC20 12 | 入账所需确认数(按网络,后台可配)|
+| `deposit.min` | $10 | 链上与银行轨最低充值额;低于此额挂起等人工处置 |
+| `deposit.bank.max` | $5,000 | 银行转账单笔上限 |
+| `deposit.bank.tolerance` | ±1,000₫ | 回单与应付金额容差;超出转人工核对,永不自动入账 |
+| `deposit.card.feeRate` | 3.5% | 国际卡费率;**另收在用户卡上**(实扣 = 入账额 + 费)|
+| `deposit.card.min` / `.max` | $30 / $5,000 | 卡通道单笔下限与上限(与银行轨各自可配)|
+| `fx.baseRateVndPerUsdt` | 后台下发 | 越南盾基准价;拉取失败禁止下单,不回退默认值 |
+| `fx.buySpreadPct` | 后台下发,合法区间 0 ~ 3% | 买入点差;牌价 = 基准价 ×(1 + 点差),取整到十位 |
+| `fx.lockWindowMin` | 30 | 付款单锁价窗时长(分钟)|
+| `withdraw.rebind.verifyAmount` | $1 | 换绑提现地址的所有权回验金额(入账不退)|
+| `withdraw.rebind.freezeHours` | 24 | 换绑生效后的提现冻结时长;判定下沉风控层 |
+| `withdraw.rebind.cooldownDays` | 7 | 两次换绑最小间隔 |
+| `withdraw.newAddressReviewUsd` | $1,000 | 绑定未满冷却期的新地址提现超此额转人工审核 |
 | `Notification CAP` | 200 | 通知中心最多 |
 | `MAX_DEVICES` | 6 | **激活槽位上限**(不限购,激活进槽时 `activateDevice()` 守卫,Sprint #146-1)|
 | `INTERRUPT_GRACE_MS` | 30,000(30s) | phone 掉电/掉网后任务重连宽限窗口;窗口内恢复则续跑原任务,超时则取消(`lib/store/interrupt.ts`)|
