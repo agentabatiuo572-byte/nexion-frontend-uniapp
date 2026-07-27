@@ -1,4 +1,4 @@
-# Nexion · 产品需求文档(PRD)
+# NexGrid · 产品需求文档(PRD)
 
 | 项 | 值 |
 |---|---|
@@ -6,7 +6,7 @@
 | 版本 | v3.7 |
 | 文档类型 | Product Requirements Document |
 | 适用对象 | 产品 / 设计 / 前端 / 测试 / 业务 |
-| 适用系统 | Nexion 移动端 H5 应用 |
+| 适用系统 | NexGrid 移动端 H5 应用 |
 
 > **声明**:本文档为研究性原型的产品需求规格,系统中所有业务数据(收益、佣金、价格、TVL)均为模拟生成,不涉及真实资金。
 
@@ -18,7 +18,7 @@
 
 | 规格文档 | 覆盖范围 | 对应章节 | 位置 |
 |---|---|---|---|
-| 越南市场支付架构规格 v1.0 | 充值(USDT TRC20/BEP20/ERC20 + VietQR 银行转账 + 国际卡)· 出金仅 USDT · 汇率牌价 · 提现地址换绑 | §9 钱包 | specs/PAY-Nexion_越南支付架构规格_v1.0.md(前端仓副本 Nexion-uniapp/docs/specs/) |
+| 越南市场支付架构规格 v1.0 | 充值(USDT TRC20/BEP20/ERC20 + VietQR 银行转账 + 国际卡)· 出金仅 USDT · 汇率牌价 · 提现地址换绑 | §9 钱包 | specs/PAY-NexGrid_越南支付架构规格_v1.0.md(前端仓副本 Nexion-uniapp/docs/specs/) |
 
 ---
 
@@ -49,11 +49,11 @@
 
 ### 1.1 产品定位
 
-Nexion 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中东)的**分布式 AI 推理算力共享平台**。
+NexGrid 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中东)的**分布式 AI 推理算力共享平台**。
 
 核心叙事:**"Your phone is the AI cluster. Earn while you sleep."** — 用户的智能手机 NPU 在闲置时间为平台对接的 AI 客户(图像生成、LLM 推理、语音转写等)执行小型推理任务,获得 USDT 收益。
 
-用户还可购买专用算力设备(NexionBox 系列)获得更高收益。
+用户还可购买专用算力设备(NexGridBox 系列)获得更高收益。
 
 ### 1.2 目标用户
 
@@ -69,13 +69,13 @@ Nexion 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中
 
 - **零门槛**:装 App 就能开始赚钱,无需购买硬件
 - **零摩擦**:注册 90 秒内首笔收益到账
-- **多层路径**:从手机 → NexionBox S1 → Pro → Rack → 创世节点的清晰升级阶梯
+- **多层路径**:从手机 → NexGridBox S1 → Pro → Rack → 创世节点的清晰升级阶梯
 - **多种收益**:静态(设备算力)+ 动态(团队推广 + 质押)双引擎
 - **可证可查**:每笔收益附 Proof-of-Compute 推理收据 + 链上 attestation
 
 ### 1.4 商业模式
 
-- 设备销售:NexionBox S1 $649 / Pro $1,199 / Rack P1 $4,499 / Genesis $9,999
+- 设备销售:NexGridBox S1 $649 / Pro $1,199 / Rack P1 $4,499 / Genesis $9,999
 - 团队分润佣金体系(影响力网络版税 + 双轨)
 - NEX 平台代币经济(锁仓 / 兑换 / 二级市场)
 - 算力市场撮合服务费(向 AI 客户收取)
@@ -104,7 +104,7 @@ Nexion 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中
 | L1 | Newbie / 新手 | 已注册,手机算力自动接入 | 看每天能赚多少 | 24h 在线 + 首笔收益 |
 | L2 | Active / 活跃 | 累计 $5+ 收益 | 稳定获益,尝试提现 | 首次提现成功 |
 | L3 | Upgrade-ready / 升级候选 | 主动查看硬件商城 | 寻求更高收益 | 完成设备购买 |
-| L4 | Owner / 持有者 | 已购 NexionBox 1+ 台 | 最大化收益 | 复购 / 追加台数 |
+| L4 | Owner / 持有者 | 已购 NexGridBox 1+ 台 | 最大化收益 | 复购 / 追加台数 |
 | L5 | Ambassador / 推广大使 | 推荐 3+ 成功注册 | 团队收益,被动分成 | 裂变传播 |
 
 > 内部 `UserTier` enum 保留 `"L0"|"L1"|…|"L5"` 标识符;UI 一律走 i18n `profile.tierLabels` 显示功能化标签,**不暴露 L\d 编号**,避免与已废弃的 MLM 层级数字混淆。
@@ -118,7 +118,7 @@ Nexion 是面向全球非中国市场(北美、欧洲、东南亚、日韩、中
 | 场景 | 用户 | 触发 | 期望结果 |
 |---|---|---|---|
 | 注册 + 首单收益 | 新用户 | 完成手机号验证 | 90 秒内看到首笔 $0.0003 推理收益 + welcome gift |
-| 升级硬件 | 活跃用户 | 看到手机收益瓶颈 | 在 store 选购 NexionBox 并完成支付 |
+| 升级硬件 | 活跃用户 | 看到手机收益瓶颈 | 在 store 选购 NexGridBox 并完成支付 |
 | 邀请好友 | 推广用户 | 分享 referral link | 朋友通过链接注册 → 双方获得礼包 + 邀请人后续拿团队分润 |
 | 提现 | 活跃用户 | 收益达 $20+ | 选网络 + 输地址 → KYC 通过 → 48h 内到账 |
 | 质押增益 | 设备持有者 | 想锁仓获更高 APY | 选 30/90/180/365 天档位 + 金额 → 锁仓 |
@@ -133,7 +133,7 @@ Day 3:   $0.13 → 推送"提现需满 $20" + 推荐裂变 hint
 Day 7:   $0.42 → "🔒 Upgrade Unlocks" 显示锁定的高价任务
 Day 14:  $0.78 → 商城 hero "117× more"
 Day 21:  $1.20 → "推荐 1 人得 $10"
-Day 30:  $1.80 → 月报 + "NexionBox 月入 $210"
+Day 30:  $1.80 → 月报 + "NexGridBox 月入 $210"
 Day 45:  触发升级决策 → S1 详情页
 Day 60:  完成购买 → 日收益从 $0.06 跳到 $7.00
 Day 90:  活跃推广者,V2-V3 头衔追求
@@ -150,7 +150,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 | 区 | 内容 |
 |---|---|
 | Status Bar | 实时时钟 + Dynamic Island + 信号/WiFi/电量 |
-| Header App Row(仅 tab 路由) | Nexion logo + 铃铛(打开 Nova drawer) + Locale Switcher |
+| Header App Row(仅 tab 路由) | NexGrid logo + 铃铛(打开 Nova drawer) + Locale Switcher |
 | ScrollContainer | 内容主区 |
 | TabBar(仅 tab 路由) | 5 个 tab,floating pill 样式 |
 | Home Indicator | iOS 风白条 |
@@ -159,7 +159,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 - Header / TabBar 锁定在 chassis 边界,内容独立滚动
 - **滚动位置记忆**:chassis 记录各页滚动容器位置;从二级页 `navigateBack` 回上层时恢复到跳转前的滚动位置,前进进入新页则落到顶部
 - overscroll-behavior contain
-- **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexion-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
+- **默认主题 dark**(产品默认 dark mode 体验)。SSR 阶段 `<html data-theme="dark">` 直出,zustand `useTheme.mode` 初值同步为 `"dark"`,避免首屏闪光;旧用户在 localStorage `nexgrid-theme-v1` 中 persist 过 `"light"` 仍保留其个性选择,新用户 / 清缓存进来即落到 dark
 - **Chassis 顶部留白**:tab 路由首屏 hero 紧贴 brand row;sub-route(`SetPageHeader` 模式页)在此基础上再下移,避免第一张 IOSList 撞 header 底沿
 
 ### 3.2 底部 5-Tab 主导航
@@ -168,7 +168,7 @@ Day 90:  活跃推广者,V2-V3 头衔追求
 |---|---|---|---|
 | 1 | Home | `/` | Dashboard,综合所有维度的实时信息 |
 | 2 | Earn | `/earn` | 我的设备 + 任务中心 + 收益统计 + Market |
-| 3 | Store | `/store` | NexionBox 商城 + 订单 |
+| 3 | Store | `/store` | NexGridBox 商城 + 订单 |
 | 4 | Team | `/team` | 团队体系全套(等级 + 分润 + 配额 + 大使) |
 | 5 | Me | `/me` | 个人中心(Profile + Wallet + 扩展 + Preferences) |
 
@@ -297,21 +297,21 @@ TabBar:active tab 显示背景 chip 高亮。
 
 **邀请码携带与锁定**(绑定规则详见 §4.3):
 - 第 2 步含邀请码输入框(选填)。码来源优先级:`?ref` URL 参数 > 落地页暂存码 pendingRefCode(§4.3.1)> 用户手输。
-- 链接来源码(`?ref` / pendingRefCode)通过格式预检(`NEXION-XXXX`,大小写不敏感,统一大写)后**锁定置灰展示——不可修改、不可清除**,框内锁形图示 + 「邀请码来自邀请链接 · 不可修改」提示;注册前换码的唯一途径是打开新的邀请链接。
+- 链接来源码(`?ref` / pendingRefCode)通过格式预检(`NEXGRID-XXXX`,大小写不敏感,统一大写)后**锁定置灰展示——不可修改、不可清除**,框内锁形图示 + 「邀请码来自邀请链接 · 不可修改」提示;注册前换码的唯一途径是打开新的邀请链接。
 - 缺失 / 非法码视同无码,输入框保持可手输;登录页 `?ref` 同一预检,非法码不入绑定链。
 
 注册页底部含合规脚注「创建账号即表示同意服务条款和隐私政策」,其中「服务条款」下划线可点,进入 §4.7.5 服务条款页;「隐私政策」当前为占位文本(无独立页)。
 
 #### 4.1.1 注册成功页 `/register/success`(浏览器 H5)
 
-**目的**:确认新人礼到账状态,并在浏览器 H5 提供 Nexion 官网 APP 下载入口。App 壳内注册不经过本页,直接进入 onboarding。
+**目的**:确认新人礼到账状态,并在浏览器 H5 提供 NexGrid 官网 APP 下载入口。App 壳内注册不经过本页,直接进入 onboarding。
 
 | 元素 | 内容 |
 |---|---|
-| 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 Nexion,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
+| 成功徽记 + 标题 | 「注册成功」;副行随绑定态:有 sponsor →「欢迎加入 NexGrid,{sponsor} 的团队」,无绑定 → 通用欢迎语 |
 | 礼包确认卡 | 金额同源 `rewards.welcomeGift`;两态:已入账(绿 chip「已入账,余额可见」)/ 风控锁定(琥珀 chip「已锁定 · 审核通过后释放」+「在 APP 保持在线可加速解锁」,对应 §4.3.5 分桶);未带码注册整卡隐藏 |
 | H5 装 APP 权益 3 行 | 仅浏览器 H5 显示:在线加速礼包与收益解锁 / 设备收益实时推送 / 更稳的连接与算力调度;App 不渲染此提醒区 |
-| H5 官网下载引导 | 提示可通过 Nexion 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
+| H5 官网下载引导 | 提示可通过 NexGrid 官网下载 APP;读取 `share.appDownload.officialUrl` 作为唯一链接。有效 HTTPS 地址显示「前往官网下载 APP」;空值或非法地址显示「官网下载 APP 地址暂未开放」的不可点击状态,不生成死链接;App 不渲染此区 |
 | 继续出口 | 「继续」→ `/onboarding/estimator`(既有 onboarding 链),始终可用 |
 
 **规则**:礼包状态由注册流程的风险评估结果带入(`?gift=posted|pending|none`),本页只读展示、不发生任何入账;`officialUrl` 仅接受 HTTPS,优先在新窗口打开,弹窗被拦时改为当前页跳转;返回键视同「继续」,不可返回注册流。App 正常注册直接进入 onboarding;即使直接访问本页,也不显示 H5 安装权益与官网下载提醒。
@@ -386,8 +386,8 @@ TabBar:active tab 显示背景 chip 高亮。
 | CTA(次) | "Sign in" → `/login?ref=CODE` |
 
 **状态变体与归因暂存**:
-- 码格式预检:`NEXION-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
-- 本机已登录 → 顶部提示条「你已注册,邀请链接对新用户有效,新人礼每账号仅一次」,隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 Nexion」(不重复发礼)。
+- 码格式预检:`NEXGRID-XXXX`(大小写不敏感;服务端权威校验与反作弊另行,§4.3.5)。缺失 / 非法码 → 隐藏 Sponsor 卡与 `REF/CODE` 徽章,其余内容照常(通用落地,不阻断注册;注册页邀请码回到可手输)。
+- 本机已登录 → 顶部提示条「你已注册,邀请链接对新用户有效,新人礼每账号仅一次」,隐藏 Sponsor 卡与注册 / 登录入口,主 CTA 变「进入 NexGrid」(不重复发礼)。
 - **pendingRefCode(归因暂存)**:合法码到达落地页即写入本地暂存;访客当场不注册、此后从任意入口进注册页仍自动带码并锁定(§4.1)。注册前新码 last-touch 覆盖;绑定发生即清除;已绑定设备忽略新码(first-wins,§4.3.2)。
 - 生产短链 `{share.baseUrl}CODE`(§13.3)由服务端 302 至本页;`share.baseUrl` 未配置(开发 / 演示)时分享链接回退当前站点地址直连本页,扫码当场可达。
 
@@ -478,7 +478,7 @@ KYC-Express 与充值共用 `/me/wallet/topup?kyc=1` 入口。用户从提现触
 3. **§2 WHAT YOU PROVIDE**(ListChecks)— 3 步 StepRow:Full legal name / Government ID photo / Liveness selfie(30s 人脸扫描)
 4. **§3 WHAT WE NEVER ASK**(Lock)— 3 个 IconRow:🚫 SSN / 🚫 银行登录 / 🚫 家庭成员信息 — 隐私安抚段
 5. **§4 WHAT YOU UNLOCK**(Sparkles)— 4 个权益 IconRow:💸 提现 cap $100 → $50K · ⚡ 当日到账(免 24h hold) · 🛡 合规盾 · 🏆 +20 NEX
-6. **§5 PARTNERS · COMPLIANCE**(ShieldCheck)— Sumsub(Tier-1 KYC,Binance / Bybit / Crypto.com 共用,SOC 2 Type II) / GDPR + MiCA(EU region 存储 + right-to-erasure) / Encrypted at rest(零知识加密,Nexion 员工无法解密)
+6. **§5 PARTNERS · COMPLIANCE**(ShieldCheck)— Sumsub(Tier-1 KYC,Binance / Bybit / Crypto.com 共用,SOC 2 Type II) / GDPR + MiCA(EU region 存储 + right-to-erasure) / Encrypted at rest(零知识加密,NexGrid 员工无法解密)
 7. **§6 FAQ** 4 问:多久验证完 / 证件不是英文怎么办 / 不验证能提现吗 / 被拒怎么办
 8. **CTA** — `Start KYC-Express` → `/me/wallet/topup?kyc=1` + footer `Free · ~90 seconds · powered by Sumsub`
 
@@ -746,7 +746,7 @@ Hero 信息层:
 
 #### 4.7.2 Step 2 — `/onboarding/estimator` 收益估算
 
-读取手机 NPU 规格 → 显示移动算力档位 + 日收益基线 + NexionBox 对比卡(117× 解锁钩)。详细规则参 §11(暂略,本次未改动)。
+读取手机 NPU 规格 → 显示移动算力档位 + 日收益基线 + NexGridBox 对比卡(117× 解锁钩)。详细规则参 §11(暂略,本次未改动)。
 
 #### 4.7.3 Step 3 — `/onboarding/connect` 算力校准
 
@@ -850,7 +850,7 @@ Persist 字段 `userSet: boolean`:false 时允许 auto-detect 覆盖;一旦用�
 | # | 主题 |
 |---|---|
 | 01 | 接受与资格(年满 18 · 非 OFAC 制裁辖区) |
-| 02 | Nexion 服务(智能合约算力市场 · 不保证任务量 / 定价 / 需求) |
+| 02 | NexGrid 服务(智能合约算力市场 · 不保证任务量 / 定价 / 需求) |
 | 03 | 账户与安全(登录凭据 / 2FA / 钱包私钥自管) |
 | 04 | 硬件购买与运行(激活即终成交 · 随使用逐步折旧 · trade-in 折抵剩余效能) |
 | 05 | 收益、奖励与 NEX 代币(收益为预测非承诺 · 代币市场风险 · 量力而行) |
@@ -860,13 +860,13 @@ Persist 字段 `userSet: boolean`:false 时允许 auto-detect 覆盖;一旦用�
 | 09 | 费用、税费与变更(逐笔披露 · 自负税费 · 变更应用内通知后继续使用视为接受) |
 | 10 | 免责、责任与适用法律(按现状无保证收益 · 责任上限为前三月费用 · 具约束力仲裁) |
 
-风险披露交叉链接 →「平台风险披露」`/me/risk-disclosure?return=/onboarding/intro`(§11.4a)。footer 合规主体:Nexion Compliance Authority · FinCEN MSB# · MiCA-aligned · legal@nexion.io。
+风险披露交叉链接 →「平台风险披露」`/me/risk-disclosure?return=/onboarding/intro`(§11.4a)。footer 合规主体:NexGrid Compliance Authority · FinCEN MSB# · MiCA-aligned · legal@nexgrid.io。
 
 i18n namespace `terms`(en/zh 镜像);无后端,纯客户端展示页。真后台对接时条款正文应可由 `GET /admin/legal/terms?locale=&jurisdiction=` 下发,对标 §11.4a risk-disclosure 的「监管改条款当天可改」能力。
 
 #### 4.7.6 登录态路由守卫(Auth / Onboarding Guard)
 
-会话态由 `useAuth`(persist key `nexion-auth-v1`)的两个标志决定:`isAuthenticated`(是否已登录)与 `onboardingComplete`(是否完成 onboarding)。守卫负责拦截「未登录」或「已登录但未走完 onboarding」的用户访问受保护页,把他们送回正确的漏斗起点。
+会话态由 `useAuth`(persist key `nexgrid-auth-v1`)的两个标志决定:`isAuthenticated`(是否已登录)与 `onboardingComplete`(是否完成 onboarding)。守卫负责拦截「未登录」或「已登录但未走完 onboarding」的用户访问受保护页,把他们送回正确的漏斗起点。
 
 **守卫规则**:每次路由变化(以及应用回到前台时)校验当前页面:
 
@@ -909,16 +909,16 @@ sequenceDiagram
 
 **目的**:SPEC-4 后,同一账号允许签名 App / H5 / 白 App 接管态等多载体会话并存,算力设备在线状态与业务登录会话解耦。包含三项强相关能力:① 多载体 session registry;② 会话被主动退出、指定下线或风控停用时在途任务中断回退;③ 新物理设备登录触发算力重新校准。
 
-**设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexion-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
+**设备身份**:每个安装持有稳定的 `deviceId`(`lib/device-id.ts`,首次用 `uni.getSystemInfo` + uuid 生成并持久化 `nexgrid-device-id-v1`)+ 友好 `deviceName`(如「iPhone · iOS」)。deviceId 是「是否同一台物理设备」的判据。
 
-**会话模型**:账户级 session registry (`nexion-account-sessions-v1` = `{schema, sessions:{[sessionId]:{accountKey, deviceId, deviceName, entrySurface, loginAt, lastSeenAt, killedAt?, endedAt?}}}`)代表服务端会话表的 mock。每次登录新增一条会话,不覆盖其他设备 / 载体。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)读取自己的会话记录:
+**会话模型**:账户级 session registry (`nexgrid-account-sessions-v1` = `{schema, sessions:{[sessionId]:{accountKey, deviceId, deviceName, entrySurface, loginAt, lastSeenAt, killedAt?, endedAt?}}}`)代表服务端会话表的 mock。每次登录新增一条会话,不覆盖其他设备 / 载体。每个端内存持有自己的 `sessionId`,通过轮询(`GET /api/auth/session`,H5 额外监听跨标签 storage 事件)读取自己的会话记录:
 
 - **同账号其他会话**(不同 `deviceId` / `entrySurface`)→ 并存,不触发强踢;
 - **当前会话退出**(`endedAt`) / **记录被删** / **吊销**(`killedAt`)→ 当前端判定为登录失效。
 
 **失效处置(任务中断回退)**:当前会话失效 → 在途任务无宽限立即作废(`interruptAllTasks`,见 §12.2:所有激活设备 `currentTask=null`、清 `miningSince`、不发收据、放弃进度=「回退」)+ 冻结挖矿(`miningPaused`)+ reLaunch 到登录失效阻断屏 `/session/kicked`(显示原因[已退出 / 会话已停用]+ 任务已回退提示 +「重新登录」)。重新登录新增当前载体会话 → 守卫恢复挖矿(`resumeMining`)。
 
-**新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexion-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
+**新设备校准**:登录时比对本机 deviceId 与该账号上次校准设备(`nexgrid-calibrated-device-v1`)。**不同且账号曾校准过** → `requiresRecalibration` → 登录后跳转算力重新校准仪式(`/onboarding/connect?mode=recalibrate`,复用 §6.10 校准流程,文案「检测到新设备,正在重新校准算力」)。完成后记录本机为该账号校准设备、重置连续在线稳定加成、回首页。首次注册的首次校准走标准 onboarding,不触发此分支。
 
 **会话状态机**:
 
@@ -1010,7 +1010,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 显示用户 fleet(phone + 已购 box):
 
 每行:
-- 设备 icon + 型号名(Your phone / NexionBox S1 / Pro / Rack)
+- 设备 icon + 型号名(Your phone / NexGridBox S1 / Pro / Rack)
 - GPU 型号 + 实时温度 + 负载 / 状态(online / paused / offline)
 - 今日产出 +$X.XX(实时)
 
@@ -1018,7 +1018,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 - 显示下一档没拥有的设备 + 倍数(8× / 30× / 133×)+ 价格
 - 点击直跳 `/store/[productId]`
 
-### 5.5 实时网络任务(On Nexion Grid)
+### 5.5 实时网络任务(On NexGrid Grid)
 
 显示当前正在跑的 3 个 AI 任务(每 5s 刷新):
 - 客户 logo + AI 模型(SDXL Turbo / Llama 3.2 / Whisper)+ 客户名 + 城市
@@ -1110,7 +1110,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 ### 5.13 设备对比卡(Math Card)
 
-`Your phone needs 27 days to earn $1.62. NexionBox S1 earns it in 90 seconds.`
+`Your phone needs 27 days to earn $1.62. NexGridBox S1 earns it in 90 seconds.`
 - 双 bar 对比(phone 长 vs box 短)
 - CTA:`See the math` → `/store`
 
@@ -1165,7 +1165,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 | 1 | bind_bank_card | Link a bank card | `/me/wallet/cards/new` | 绑卡页绑卡成功(server-canonical `card.bound`)时 markComplete | +50 NEX |
 | 2 | visit_earn | Open Earn tab | `/earn` | QuestRouteWatcher 监听 pathname | +30 NEX |
 | 3 | visit_store | Browse the store | `/store` | QuestRouteWatcher 监听 pathname | +50 NEX |
-| 4 | view_product_roi | View a NexionBox ROI | `/store/stellarbox-s1` | QuestRouteWatcher 监听 `/store/{id}`(排除 `/store/orders` 和 `/store/checkout`)| +100 NEX |
+| 4 | view_product_roi | View a NexGridBox ROI | `/store/stellarbox-s1` | QuestRouteWatcher 监听 `/store/{id}`(排除 `/store/orders` 和 `/store/checkout`)| +100 NEX |
 | 5 | setup_profile | Set up your profile | `/me/profile` | Profile 页 Save 时 markComplete | +80 NEX |
 | 6 | invite_friend | Invite 1 friend | `/team` | Team 页 copyCode 时 markComplete | +200 NEX + $1 USDT |
 
@@ -1180,11 +1180,11 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 **L2 — 主 CTA bar**(整宽)
 - 文案 i18n `quest.buyCta`:
-  - zh `购首台 NexionBox · 启动 $38/日永续收益`
-  - en `Get your first NexionBox · earn $38/day forever`
+  - zh `购首台 NexGridBox · 启动 $38/日永续收益`
+  - en `Get your first NexGridBox · earn $38/day forever`
 - 左侧 Sparkles icon + 右侧 ArrowRight icon
 - href = `/store/stellarbox-s1`(主推 SKU 详情页)
-- 设计目的:服务 [转化优先级第一原则](#§1 NexionBox 购买导向),把 Day-One Quest 直接接到入金动作。点击同时也会触发 task #4 `view_product_roi` 自动完成(+100 NEX),双重激励
+- 设计目的:服务 [转化优先级第一原则](#§1 NexGridBox 购买导向),把 Day-One Quest 直接接到入金动作。点击同时也会触发 task #4 `view_product_roi` 自动完成(+100 NEX),双重激励
 
 **L3 — 次 CTA bar**(整宽)
 - 文案 i18n `quest.expand`(`查看 6 项任务` / `View 6 tasks`)+ ChevronDown icon
@@ -1225,7 +1225,7 @@ Fleet-aware 4 slot 每 8 秒轮换,每条带 CTA:
 
 - 平台以固定节奏(每 1 秒一拍)读取当前页面,页面变化时映射到对应任务:`/earn` → `visit_earn`、`/store` → `visit_store`、商品详情页 `/store/{id}` → `view_product_roi`(排除 `/store/orders`、`/store/checkout`)。
 - 首次落在匹配页 → `markComplete(id)` 返回该任务的奖励(NEX,部分含 USDT);仅在**首次完成**时入账 NEX / USDT 并弹 `+N NEX` toast。
-- 幂等:已完成任务重复访问返回 `firstTime:false`,不重复派奖(完成态持久化于 `nexion-quest-v1`,刷新后不再触发)。
+- 幂等:已完成任务重复访问返回 `firstTime:false`,不重复派奖(完成态持久化于 `nexgrid-quest-v1`,刷新后不再触发)。
 - 非路由型任务(bind_bank_card / setup_profile / invite_friend)在对应动作处(绑卡成功 / Profile 保存 / 分享邀请)手动调 `markComplete` 派奖,不由本监听覆盖;首次派奖同步写账单 bonus 行。
 
 ```mermaid
@@ -1262,7 +1262,7 @@ sequenceDiagram
 | 设备类型 | 卡片字段 |
 |---|---|
 | Phone | NPU 型号 + Mobile NPU ~28 TOPS + 实时算力曲线 + 今日已产(USDT 主字 + NEX 副字)+ est/hour(USDT + NEX 双行)+ 充电状态 + WiFi 状态 + **Tasks you're locked out of** mini section。Hero `−$N 每天流失` 损失锚 + 3 行锁定任务,每行右侧 `+$N/d` daily potential(`(86400/avgSec) × QUEUE_SATURATION × avgReward`)+ VRAM 要求 + 底部 `Unlock N more tasks →` 链 /store |
-| NexionBox S1/Pro/Rack | GPU 型号 + 温度 + VRAM 占用 + 功耗 + 今日已产 + est/hour + 当前任务 + 累计运行天数 |
+| NexGridBox S1/Pro/Rack | GPU 型号 + 温度 + VRAM 占用 + 功耗 + 今日已产 + est/hour + 当前任务 + 累计运行天数 |
 | Cloud Share | 纯虚拟设备,无硬件状态,仅显示累计产出(双币) |
 
 **操作**:Pause / Resume / 进入 detail 页 / 取消激活(跳 `/me/devices`)
@@ -1299,15 +1299,15 @@ sequenceDiagram
 
 位置:**TotalEarnedCard 紧后**,与今日已赚数字形成"赚到 $X / 少赚 $X"对比对(损失厌恶最大化)。Trial 入口在其后,提供正向救济出口。
 
-**目的**:显式化"用户当前用手机赚到的"与"NexionBox S1 上限可以赚到的"之间的差额,把潜在损失搬到桌面。
+**目的**:显式化"用户当前用手机赚到的"与"NexGridBox S1 上限可以赚到的"之间的差额,把潜在损失搬到桌面。
 
 **UI 规格**:
 
 - 顶部 `↓ MISSED TODAY` 标签(TrendingDown icon)
-- 大字 `−$X.XX` + 副字 `vs NexionBox S1 ceiling`
+- 大字 `−$X.XX` + 副字 `vs NexGridBox S1 ceiling`
 - 双 progress bar:
   - `Your phone $0.06/d` — 细条,宽度按 phone/S1 比例(~0.16%)
-  - `NexionBox S1 ceiling $7.00/d` — 实条,100% 满
+  - `NexGridBox S1 ceiling $7.00/d` — 实条,100% 满
 - 底部 row:
   - 左:`Cumulative missed since signup` + 大字 `−$X,XXX` + 小字 `NNd`
   - 右:pill CTA `Stop the bleeding →` → /store
@@ -1448,7 +1448,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
    - `/day`
    - 旁边 `UNTAPPED` chip(SKILL 卡片嵌套规则:无 border)
 
-3. **Subtitle**:`{empty} × NexionBox S1 @ $7.00/d · {multiplier}× your phone`(具体硬件 + phone 倍数,转化语言)。
+3. **Subtitle**:`{empty} × NexGridBox S1 @ $7.00/d · {multiplier}× your phone`(具体硬件 + phone 倍数,转化语言)。
 
 4. **6-col slot grid**:
    - **已用 slot**:device-kind icon(从 `KIND_ICON` 映射)+ 右上 pulse 圆点(`v5-hb-pulse-success` 2.4s)
@@ -1472,7 +1472,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 - `potentialDaily = empty × promo.targetDaily`(随推广目标设备日收益,ladder 化)
 - `promo = derivePromoUpgrade(devices)` — 派生推广基准对象:激活真实设备中**最高**日收益的一台为 base,推广目标为算力阶梯下一档(参 §13.2a)
 - `multiplier = round(potentialDaily / promo.baseDaily)`(若 `baseDaily > 0`;无激活设备时不显示倍数行)
-- `baseName` 从 `promo.baseName` 取(随 active 设备切换:`Your phone` / `NexionBox S1` / 等)
+- `baseName` 从 `promo.baseName` 取(随 active 设备切换:`Your phone` / `NexGridBox S1` / 等)
 - `fleetCurrentDaily = activeDevices.reduce((s, d) => s + d.baseRate, 0)`(实际激活设备日产之和,不再硬编 `count × 0.06`)
 - `fleetRankPctIfFilled = max(8, min(94, round(potentialDaily / NETWORK_AVG_DAILY × 70)))`
 - `empty ≤ 0` → 渲染 Capped 状态
@@ -1493,7 +1493,7 @@ getNetworkMonthlyLoss(devices)      → { totalMonthlyLossUSD, degradableCount }
 
 1. **构造即单调**:评分 S = 各「越好越高」子分的正权重加权和,且 score→TOPS 映射严格递增 → 严格更弱的设备数学上不可能超过更强的设备。
 2. **失败取低**:任一信号读不到 → 按低值兜底,绝不取高 → 未知机 / 模拟器 / 批量廉价端落在真旗舰之下(亦为防多端薅羊毛的护城河)。
-3. **确定性 + 按 deviceId 缓存**(`nexion-device-baseline-v1`):同机永远同分,重新校准复现同值(建立信任而非随机);新设备(新 deviceId)按自身信号重算,自然不同 → 支撑换机重校准。
+3. **确定性 + 按 deviceId 缓存**(`nexgrid-device-baseline-v1`):同机永远同分,重新校准复现同值(建立信任而非随机);新设备(新 deviceId)按自身信号重算,自然不同 → 支撑换机重校准。
 
 **呈现量级**:S → 评分 0–100(典型机 ≈ 87)+ TOPS(真实手机 NPU ~8–58 区间,典型机 28.3)+ 档位 Tier 1–5。
 
@@ -1558,11 +1558,11 @@ flowchart TD
 | 产品 | 状态 | 价格 | 日产 USDT | 日产 NEX | 倍数 vs Phone |
 |---|---|---|---|---|---|
 | Phone(基准) | — | $0 | $0.06 | 10 | 1× |
-| NexionBox S1 | **legacy** | $649 | $7.00 | 40 | 117× |
-| NexionBox Pro | **legacy** | $1,199 | $13.00 | 80 | 217× |
-| NexionBox Pro v2 | active | $1,319 | $14.00 | 90 | 233× |
-| NexionRack P1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
-| NexionRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
+| NexGridBox S1 | **legacy** | $649 | $7.00 | 40 | 117× |
+| NexGridBox Pro | **legacy** | $1,199 | $13.00 | 80 | 217× |
+| NexGridBox Pro v2 | active | $1,319 | $14.00 | 90 | 233× |
+| NexGridRack P1 | **legacy** | $4,499 | $45.00 | 300 | 750× |
+| NexGridRack P2 | active | $7,499 | $75.00 | 500 | 1,250× |
 | Cloud Share | active | $19.9 | $0.19 | 3 | 3× |
 
 **经典款(市场售卖状态)**:S1 / Pro / Rack P1 标 `status="legacy"`(目录较早上架的型号,与置换资格**正交**),ProductCard 左下角显示「经典款 / Classic」chip(i18n `store.cardLegacyBadge`)。仍正常售卖;§6.8 产能递减 + §7.5 阶梯抵扣共同引导升级更高算力。
@@ -1573,8 +1573,8 @@ flowchart TD
 
 | 产品 | unlocksAtPhase | 时点(参 §13.4 phase 月段)|
 |---|---|---|
-| NexionBox Pro v2 | `P3` | 月 ≥ 4 |
-| NexionRack P2 | `P5` | 月 ≥ 8 |
+| NexGridBox Pro v2 | `P3` | 月 ≥ 4 |
+| NexGridRack P2 | `P5` | 月 ≥ 8 |
 
 上架门对**置换路径同样生效**(未正式上架的 SKU 不可作置换目标,结算深链同拦)——例外为「置换侧抢先购」开关(`tradeInEarlyAccess{enabled, leadDays}`,上架参数配置项,**默认关闭**,后台 E1 面板可配):开启后**仅置换路径**可在正式上架前 `leadDays` 天(运营档位 7/14/30/60/90)内购买该 SKU,置换目标行带「抢先升级」标;商城正门(列表 Locked 卡/详情/非置换深链)始终不受抢先购影响。与运营「强制解锁」动作的优先级:强制解锁=全面正式上架,抢先购开关随之无作用面,两者不冲突。
 
@@ -1626,12 +1626,12 @@ flowchart TD
 
 | 产品 | 门类型 | 条件 | mode | 锁额 cap / sold | enforce |
 |---|---|---|---|---|---|
-| NexionBox Pro | 单活跃直推 | ≥ 5 活跃直推 | all | 1,000 / 977(余 23)| 硬拦 |
-| NexionRack P1 | 组合 | V≥3 **或** ≥15 活跃直推 **或** 团队业绩 ≥ $20,000 | either | 100 / 92(余 8)| 硬拦 |
+| NexGridBox Pro | 单活跃直推 | ≥ 5 活跃直推 | all | 1,000 / 977(余 23)| 硬拦 |
+| NexGridRack P1 | 组合 | V≥3 **或** ≥15 活跃直推 **或** 团队业绩 ≥ $20,000 | either | 100 / 92(余 8)| 硬拦 |
 
 > 锁额 `remaining` 是该 SKU"还剩 N 件"的**单一来源**(收编原 `stock` 展示,消除双口径)。其余 SKU 默认无购买门;Pro v2 / Rack P2 维持阶段门(`unlocksAtPhase`)。
 
-**列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexionBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
+**列表顶端 VsPhoneHero**:`Your phone $0.06/d ↔ NexGridBox S1 $7.00/d`,中间 `117× MORE` boost chip,两侧带 `+NEX/d` 副字(双币展示)。倍数 = round(S1 日产 / phone 日产) = round(7 / 0.06) = 117;营销文案与实时计算徽章统一用此单一派生值,不另行圆整。
 
 **Promo 并存**:升级置换横幅(§7.6)已改为按「用户是否持有可置换设备」动态显隐(无 phase 窗口),与 S1 促销条各自独立渲染;旧「window 开放时隐藏 S1 promo」互斥规则随 phase 窗口机制一并退役。
 
@@ -1791,7 +1791,7 @@ CTA 文案:Card 显示 `Continue to payment`(继续进入支付),链上显示 `P
 - **首单**:
   - `<Confetti originRef={medalRef}>` 全屏彩带(detail § 14.3.1.1)
   - 🏅 medal spring 入场
-  - 大字 `🎉 Your first NexionBox is on its way`
+  - 大字 `🎉 Your first NexGridBox is on its way`
   - 副字 `We'll provision your slot in the data center within minutes.`
   - Sparkles icon + `Achievement unlocked · First Hardware Owner · +200 NEX`
 
@@ -1803,7 +1803,7 @@ CTA 文案:Card 显示 `Continue to payment`(继续进入支付),链上显示 `P
 
 **结算与驻留态**:结账即时结算 —— `createOrder` 创建订单时同时记入 `placed`(已下单)与 `paid`(已付款)两条时间线事件,订单初始驻留态为 `paid`。`placed` 仅是时间线上的瞬时事件,正常流程不停留于该状态(无独立"待付款"驻留态)。
 
-**自动履约推进(全局)**:订单付款后无需用户干预即可自动履约。平台对所有在途订单(`paid` / `provisioning`)以固定节奏(每 6 秒一拍)逐段推进:`paid → provisioning`(分配机位)→ `provisioning → activated`(设备上线)。订单进入 `activated` 的同一更新内,平台**自动生成并激活一台对应商品的设备**(`addDevice(productId)` + `activateDevice`,受 §12.x `MAX_DEVICES=6` 活跃槽位上限约束),并写入 `deviceId` / `activatedAt` / 时间线 `Device live · joined Nexion network`,从而把购买动作与 Earn 模块的设备机队接起来。用户停留在某订单详情页(`/store/[id]`)时,该订单以更快的节奏(每 3 秒一拍)单独推进,使进度条实时可见。
+**自动履约推进(全局)**:订单付款后无需用户干预即可自动履约。平台对所有在途订单(`paid` / `provisioning`)以固定节奏(每 6 秒一拍)逐段推进:`paid → provisioning`(分配机位)→ `provisioning → activated`(设备上线)。订单进入 `activated` 的同一更新内,平台**自动生成并激活一台对应商品的设备**(`addDevice(productId)` + `activateDevice`,受 §12.x `MAX_DEVICES=6` 活跃槽位上限约束),并写入 `deviceId` / `activatedAt` / 时间线 `Device live · joined NexGrid network`,从而把购买动作与 Earn 模块的设备机队接起来。用户停留在某订单详情页(`/store/[id]`)时,该订单以更快的节奏(每 3 秒一拍)单独推进,使进度条实时可见。
 
 ```mermaid
 stateDiagram-v2
@@ -1832,7 +1832,7 @@ stateDiagram-v2
 - **Deployment #**(原"运单号")+ **Datacenter**(原"承运商",显示 SG / FRA / VA 机房 ID)+ 数据中心 API 模拟说明
 - 到 `activated` 阶段自动 `addDevice(productId)` 添加设备到 fleet
 
-**文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:排行榜 Podium 实物奖品(Genesis Node / NexionBox 等,见 §8.11.5)保留 shipping 语义。
+**文案规则**:平台不涉及实体物流(机房托管 = 数据中心一键开通),所有 "shipping / tracking / courier" 文案统一改为 "deployment / activation / datacenter"。例外:排行榜 Podium 实物奖品(Genesis Node / NexGridBox 等,见 §8.11.5)保留 shipping 语义。
 
 ### 7.5 升级置换(Trade-in)— 随时下架 + 产出阶梯抵扣
 
@@ -1961,8 +1961,8 @@ flowchart TD
 
 | Action | Store call | 效果 | i18n key |
 |---|---|---|---|
-| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexionBox-S1(落地产能 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
-| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexionRack-P1(落地产能 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
+| Seed S1 | `_devSeedLegacyDevice("stellarbox-s1", 5)` | 加一台 5 个月前购买的 NexGridBox-S1(落地产能 ~70%) | `replay.demoSeedTitle/Hint/Cta` |
+| Seed Rack | `_devSeedLegacyDevice("stellarrack-p1", 8)` | 加一台 8 个月前购买的 NexGridRack-P1(落地产能 ~50%) | `replay.demoSeedRack/RackHint/RackCta` |
 | Fast-forward | `_devFastForwardAll(3)` | 全部参与递减设备 purchasedAt 拨回 3 个月 | `replay.demoFastForwardTitle/Hint/Cta` |
 | Reset | `_devResetDevices()` | 重置回 phone-only(purchasedAt = user.joinedAt) | `replay.demoResetTitle/Hint/Cta` |
 | Trigger milestone | `useMilestones.reset() + _devBumpEarningsTotal(150)` | 重置已触发的里程碑 + 拨高 earnings 跨过 $100 阈值,§11.3a watcher 下次 poll 时 fire celebration overlay | `replay.demoMilestoneTitle/Hint/Cta` |
@@ -1970,7 +1970,7 @@ flowchart TD
 
 每个 action 触发 toast 反馈(模板 `replay.demoToastSeeded/FastForwarded/Reset/Full`),容量校验 MAX_DEVICES。
 
-**设计意图**:快速展示"用户买了 NexionBox 4-5 个月后看到接单量递减 + 升级置换引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
+**设计意图**:快速展示"用户买了 NexGridBox 4-5 个月后看到接单量递减 + 升级置换引导"完整路径,不能等真时间。这些 demo helpers 不影响真实用户流程(用户从 /store 正常购买的设备 purchasedAt = Date.now())。
 
 ### 7.6 升级置换横幅(TradeinWindowBanner)
 
@@ -2081,7 +2081,7 @@ ProgramRow 右侧 value 按内容自动分类,影响视觉强度:
 
 **内容**(自上而下):
 
-1. **邀请码展示 + 复制**:展示 `user.referralCode`(如 `NEXION-8K9X`),配复制按钮 · 点击调 `navigator.clipboard.writeText(code)` + toast `Copied {code}` + 1.6s 内反馈 Check
+1. **邀请码展示 + 复制**:展示 `user.referralCode`(如 `NEXGRID-8K9X`),配复制按钮 · 点击调 `navigator.clipboard.writeText(code)` + toast `Copied {code}` + 1.6s 内反馈 Check
 
 2. **双向奖励**:
    - You get(邀请人):`$200 + 200 NEX` / `per friend signup · 10% direct royalty`(佣金费率单一来源 §4.3.4 / §8.3.1)
@@ -2187,7 +2187,7 @@ flowchart LR
 | V7 | Fleet Cmdr 舰队司令 | $1M + 6×V5 | 直推 + 7 度扩展 | 5% | 16 |
 | V8 | Star Admiral 星上将 | $3M + 7×V6 | 直推 + 8 度扩展 | 5% | 32 |
 | V9 | Galaxy Lord 星河领主 | $10M | 直推 + 9 度扩展 | 5% | 64 |
-| V10 | Nexion Founder 联合创始 | $30M | 无限扩展 0.5% | 5% | 128 |
+| V10 | NexGrid Founder 联合创始 | $30M | 无限扩展 0.5% | 5% | 128 |
 | V11 | Cosmic Sovereign 宇宙至尊 | $100M | 无限扩展 1% | 5% | 256 |
 | V12 | Singularity 奇点 | $500M | 无限扩展 1.5% | 5% | 512 |
 
@@ -2199,7 +2199,7 @@ flowchart LR
 
 | 条件 | 字段 | 计入规则 |
 |---|---|---|
-| 自买累计 | `selfBuyUSD` | **仅本人下单**支付的 NexionBox / NexionRack / Cloud Share USDT 金额。复投锁仓 / NEX 内购 / 礼包赠送 **不计**。退款金额从累计中扣除。 |
+| 自买累计 | `selfBuyUSD` | **仅本人下单**支付的 NexGridBox / NexGridRack / Cloud Share USDT 金额。复投锁仓 / NEX 内购 / 礼包赠送 **不计**。退款金额从累计中扣除。 |
 | 直推数 | `directRefs` | 直接邀请并完成注册 + KYC-Express 的下家数(数学层 L1)。**仅去重计数**(同手机号 / 同钱包重复绑定不重复计)。降级 / 注销的下家从计数中扣除。 |
 | 团队业绩 | `teamVolumeUSD` | 直推 + 扩展网络全部下线**所有订单 USDT 金额累加**(数学层 L1-L7;超过 V7 后按对应 unilevelDepth)。包括首购 / 复投 / 商城升级 / Cloud Share 充值。退款扣减。 |
 | 下属 V 级数 | `vDownlines` | "≥Vn 等级"直推下家数,**含直推中达到目标 V 级或更高的人**。例:V3 要求 `vDownlines: { 1: 2 }` 表示需要 ≥2 个 V≥1 的直推(若直推中有 V3,也按 V≥1 计 1 个)。 |
@@ -2373,7 +2373,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 | 3 | 自动分配机制(内部 spillover) | 网络伙伴在某轨业绩饱和时,新邀请自动分配到下游轨道,形成"网络伙伴主动帮你扩展轨道"的体验。增强网络绑定关系,降低用户主动退出意愿。 |
 | 4 | LTV 延长 | 两轨无封顶 + 强制平衡,提供"持续投入还能再增长"的长期激励路径,把用户活跃生命周期从单一网络版税的 ~6 个月延长到 ~18-24 个月(基于行业基准数据)。 |
 
-##### 8.4.0.3 与 Nexion 产品目标的契合
+##### 8.4.0.3 与 NexGrid 产品目标的契合
 
 | 产品目标 | 双轨对碰的贡献 |
 |---|---|
@@ -2394,7 +2394,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 每条轨道的月活跃业绩 = **该轨道全部下游成员**(从直推到轨道末端,不限网络深度)**当月合格交易 USDT 金额累加**。
 
 **计入项**:
-- 设备首购(NexionBox S1 / Pro / NexionRack P1 / Cloud Share)
+- 设备首购(NexGridBox S1 / Pro / NexGridRack P1 / Cloud Share)
 - 设备复购(同账户购买第二台及以上)
 - Cloud Share 加仓充值
 - §9.5 复投激励中用 USDT 余额触发的复投订单
@@ -2502,7 +2502,7 @@ NEX 双币奖励规则不变:每笔订单的版税同时按 `UNILEVEL_NEX[layer]
 
 7. **§5 A real example: meet Sarah**(3 月 timeline 卡 stack)
    - Month 1:Tom (Track A) + Alex (Track B) 各小额订单 → 两轨未过门槛 → bonus $0(`· below qualifying threshold` tag)
-   - Month 2:Tom + Alex 各邀请 2 人买 NexionBox S1 → A $2,600 / B $2,200 → bonus $220
+   - Month 2:Tom + Alex 各邀请 2 人买 NexGridBox S1 → A $2,600 / B $2,200 → bonus $220
    - Month 3(高亮卡):A $4,500 / B $2,400 → bonus $240(按较小一轨)
    - 💡 takeaway 卡:`The slower track sets your reward. Invest in both.`
 
@@ -2644,8 +2644,8 @@ Direct / Extended 二分类可折叠列表:
 
 | 设备 | 解锁条件 | 月度库存 |
 |---|---|---|
-| NexionBox Pro | 5+ 已激活直推 | 1,000 台(余 23)|
-| NexionRack P1 | 15+ 直推 **或** 团队月业绩 ≥ $20,000 | 100 台(余 8)|
+| NexGridBox Pro | 5+ 已激活直推 | 1,000 台(余 23)|
+| NexGridRack P1 | 15+ 直推 **或** 团队月业绩 ≥ $20,000 | 100 台(余 8)|
 
 > 解锁条件 / 阈值 / 库存 / 进度**单源自商品目录的 `purchaseGate` 配置**(§7.1)与 `evaluatePurchaseGate`,本页不自带硬编码数值;运营在后台调门槛 / 锁额,本页与商城卡 / 详情 / 结账同步变化。tier 的名称 / 价格 / perks 同源自 catalog,杜绝口径分叉。
 
@@ -2703,7 +2703,7 @@ UI:
 4. **Podium(Top 3)**:
    - 顺序:#2(左)/ #1(中,凸起)/ #3(右)
    - 每格:奖牌 emoji 🥇🥈🥉 + 圆头像(单字符)+ handle + 国旗 + USD 金额 + `{n} directs`
-   - 卡下方 3 行实物奖列表:`#1 Genesis Node + Rack ×1 / #2 NexionBox Pro ×3 / #3 NexionBox Pro ×1`
+   - 卡下方 3 行实物奖列表:`#1 Genesis Node + Rack ×1 / #2 NexGridBox Pro ×3 / #3 NexGridBox Pro ×1`
 
 5. **#4 - #100 List**(单卡 + 4 列):
    - 列头:`# / Inviter / Directs / Earned`
@@ -2741,8 +2741,8 @@ UI:
 | Rank | 奖牌 | 实物 |
 |---|---|---|
 | #1 | 🥇 | Genesis Node + Rack ×1 |
-| #2 | 🥈 | NexionBox Pro ×3 |
-| #3 | 🥉 | NexionBox Pro ×1 |
+| #2 | 🥈 | NexGridBox Pro ×3 |
+| #3 | 🥉 | NexGridBox Pro ×1 |
 
 ---
 
@@ -3302,7 +3302,7 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
 
 **实现细节**:
 - `lib/mock/streak-powerups.ts` 4 个 `StreakPowerUp` 定义(id / threshold / icon / tint / href / badgeId)
-- `lib/store/daily-powerup.ts` `useDailyPowerUp` zustand persist `nexion-daily-powerup-v1`(`claimed: StreakPowerUpId[]` + `claimedAt: Record<id, ms>`)
+- `lib/store/daily-powerup.ts` `useDailyPowerUp` zustand persist `nexgrid-daily-powerup-v1`(`claimed: StreakPowerUpId[]` + `claimedAt: Record<id, ms>`)
 - `app/components/daily/streak-power-ups.tsx` mounted-guarded(`claimed` 来自 persist,需 hydrate 后才读)
 - 严守 [feedback_no_meta_in_product]:UI 文案绝不出现 "phase boost" / "exit theater" / 任何元层面术语,只用真实平台话术(Royalty Boost / NEX yield boost / APY boost / Whitelist priority)
 
@@ -3431,7 +3431,7 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
 
 ### 9.11 免费试用 `/me/trial` (Sprint #146-2)
 
-**目的**:绑卡式免费试用 NexionBox S1,试用期满自动转购,作为 SaaS 转化漏斗的核心拉新机制。对标 Audible / Apple Arcade / Spotify 等成熟试用模型。
+**目的**:绑卡式免费试用 NexGridBox S1,试用期满自动转购,作为 SaaS 转化漏斗的核心拉新机制。对标 Audible / Apple Arcade / Spotify 等成熟试用模型。
 
 #### 9.11.1 状态机
 
@@ -3460,7 +3460,7 @@ extended (extensionDays 天,继续 push)
 | Home mount 自动 push claim sheet | session-once,1.5s 延迟,canStart && status=idle 时 |
 | Home `TrialHeroBanner` (idle+canStart) | $116 hero + social proof + 立即领取 pill |
 | Earn 顶部 `TrialHeroBanner` (idle+canStart) | 同上,inline 多入口 |
-| Earn 顶部 `TrialGhostSlot` (active/grace/extended) | NexionBox S1 设备卡:试用中标识 + live shadow + ETA + 早购折扣 + 买断 CTA;**占用 1 个设备槽位,试用期 MissedIncomeBanner 让位以避免转化卡重复** |
+| Earn 顶部 `TrialGhostSlot` (active/grace/extended) | NexGridBox S1 设备卡:试用中标识 + live shadow + ETA + 早购折扣 + 买断 CTA;**占用 1 个设备槽位,试用期 MissedIncomeBanner 让位以避免转化卡重复** |
 | Home 顶部 `TrialGhostSlot` (active/grace/extended) | 同上 |
 | Me 页 `TrialEntry` | idle+canStart:pill;active:card |
 | `/me/trial` 详情页 | 倒计时 + shadow 累计 + 绑卡卡 + 提前购买折扣表 + 去赚取页 CTA(forward-only;**取消试用入口移至 `/me/devices` 设备管理**)|
@@ -3729,7 +3729,7 @@ interface TrialConfig {
                 ↓
            子账号取消试用 → 进 30 天冷却
                 ↓
-           localStorage.removeItem('nexion-trial-v1') → 重置全部 state
+           localStorage.removeItem('nexgrid-trial-v1') → 重置全部 state
                 ↓
            canStart() 重新返 true → 回到"开试用"步骤,无限循环
 ```
@@ -3861,10 +3861,10 @@ i18n keys 在 `genesisHowItWorks.*` namespace ~55 keys。
   - `跨链桥维护中。预计恢复:24h`
   - `Collection 正在 OpenSea 等待 ✓ 认证审核,通过后可见`
   - `Cloudflare 1015 错误:OpenSea 边缘节点限流`
-- 安抚文案:`别担心 — 你的挂单仍在 Nexion 站内市场正常显示`
-- 站内导流 chip:`💡 大多数持有人选择在 Nexion 站内 P2P 交易 · 更快 + 零 gas`
-- 双按钮:`重试连接` + `返回 Nexion 市场`(主 CTA)
-- 重试逻辑:再次 2.4s loading,从 5 个错误中随机选,直到用户点 `返回 Nexion 市场` 关闭
+- 安抚文案:`别担心 — 你的挂单仍在 NexGrid 站内市场正常显示`
+- 站内导流 chip:`💡 大多数持有人选择在 NexGrid 站内 P2P 交易 · 更快 + 零 gas`
+- 双按钮:`重试连接` + `返回 NexGrid 市场`(主 CTA)
+- 重试逻辑:再次 2.4s loading,从 5 个错误中随机选,直到用户点 `返回 NexGrid 市场` 关闭
 
 所有 marketplace 文案 i18n key 在 `marketplace.*` namespace(~70 keys,en + zh)。
 
@@ -4043,7 +4043,7 @@ DAO 治理功能本期**仅作为持有人权益的文字承诺**(在 Perks 列�
 | Channel | 默认频率 | 触发条件 / 内容 |
 |---|---|---|
 | tradein-nudge | 15 min tick / 60 min cooldown | 车队(参与递减设备)平均产能 < 65% 且持有可置换设备时触发;文案钩子 = 当前产能 / 月度差额 + 该设备实时可抵额,CTA `查看置换选项 →` 跳 /me/devices 置换入口;无 phase 分档(代际窗口叙事已删) |
-| monthly-task-lock | 30 min tick / 30 d cd(P1-P2)/ 7 d cd(P3-P4)/ 3.5 d cd(P5-P6) | Sprint 2 收尾(Gap D)— 月度任务锁定累计推送,phase-keyed 节奏。读 `getTaskLockSummary(joinedAt)` 取 thisMonthUSD,`getLockedTeasers(maxVram, 1)[0]` 取最佳 model 名。文案三 variant(early/mid/late phase bucket):early `Heads up — $N premium tasks (model) unaccepted this month. NexionBox would clear most.` → /store;mid `Premium queue's running hot — missed $N this month (model pool). Pro v2 catches 2.5× throughput.` → /me/devices;late `**Final upgrade window.** Lost ~$N this month on model alone, plus fleet degrading. Rack P2 trade-in closes when this window does.` → /me/devices(Batch E 迁移)|
+| monthly-task-lock | 30 min tick / 30 d cd(P1-P2)/ 7 d cd(P3-P4)/ 3.5 d cd(P5-P6) | Sprint 2 收尾(Gap D)— 月度任务锁定累计推送,phase-keyed 节奏。读 `getTaskLockSummary(joinedAt)` 取 thisMonthUSD,`getLockedTeasers(maxVram, 1)[0]` 取最佳 model 名。文案三 variant(early/mid/late phase bucket):early `Heads up — $N premium tasks (model) unaccepted this month. NexGridBox would clear most.` → /store;mid `Premium queue's running hot — missed $N this month (model pool). Pro v2 catches 2.5× throughput.` → /me/devices;late `**Final upgrade window.** Lost ~$N this month on model alone, plus fleet degrading. Rack P2 trade-in closes when this window does.` → /me/devices(Batch E 迁移)|
 | social-event | 20 min tick / 30 min cd | Sprint A-2 / A.5 — 5 类全网"真实事件"等概率派发:大额提现走推荐网络 30% / V 级升级 25% / Genesis 二级成交 20% / AI 客户月 NEX 消费 +18-50% 15% / 网络小时新增 10%。文案严守真实平台叙事风,无 PM 内部术语 |
 | quest-grace-reminder | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务进 grace 窗口(24-72h)且未 claim 时 push,CTA → `/` 回 Home 继续。详 §5.15.5 |
 | quest-final-expired | 5 min tick / 7 day cd(一次性) | Sprint Quest-A+B — 用户首日任务彻底过期(72h+)且未 claim 时 push,CTA → `/me/achievements` 查看 badge 状态。详 §5.15.5 |
@@ -4105,7 +4105,7 @@ flowchart LR
     - **返回**:cancel,不动状态
   - Sheet 内显示当前任务实时进度(model / client / 奖励 / progress% / ETA)
 - 列表项 chip:`pendingDeactivate=true` 时显示"任务完成后自动取消" warning chip(Clock icon)
-- 空 inventory 状态:dashed 框 + "还没有任何设备 / 前往商城购买 NexionBox" + 底部 brand pill `前往商城购买`
+- 空 inventory 状态:dashed 框 + "还没有任何设备 / 前往商城购买 NexGridBox" + 底部 brand pill `前往商城购买`
 
 **取消激活的连锁效应**(完整一致性):
 - 设备退出 active fleet:Earn 页"我的设备"section / Home FleetSection / MyEarnings 卡均同步消失
@@ -4215,7 +4215,7 @@ flowchart LR
 | $NEX listings | PancakeSwap / Uniswap / CoinGecko / CoinMarketCap "Live",Binance / Coinbase "审核中" |
 | Bug bounty | $50,000 per critical · HackerOne · 24h triage SLA |
 | KYC & AML | Jumio / Sumsub / Chainalysis / Elliptic / ComplyAdvantage |
-| Footer | compliance@nexion.ai |
+| Footer | compliance@nexgrid.ai |
 
 **Sprint A-1 / A.2 新增**:Leadership team + Q3 2026 financials 两 section 在 Investors → Press → NEX anchor 链条中插入(Leadership 在 Investors 后 Press 前;Q3 在 Press 后 NEX anchor 前),进一步强化"真实 fintech / Web3 公司"信号。所有 PDF / LinkedIn 链接均为占位 `href="#"`,纯视觉剧场。
 
@@ -4229,7 +4229,7 @@ flowchart LR
 
 **页面结构**:
 1. iOS nav back to `/trust` + 标题 `About NEX token`
-2. Hero + 标签 `PLATFORM TOKEN` + 大标题 `NEX — the token that powers Nexion's compute economy.`
+2. Hero + 标签 `PLATFORM TOKEN` + 大标题 `NEX — the token that powers NexGrid's compute economy.`
 3. §1 NEX vs USDT 对照表(Property / USDT / NEX 三列;Token type / Current price / Volatility / Primary use 四行)
 4. §2 NEX 4 个来源 IconRow:
    - ⚙️ 设备挖矿(主产出:每笔推理任务完成 mint NEX,即时滴灌入持仓)
@@ -4289,8 +4289,8 @@ sequenceDiagram
 | earn-100 | $100+ | +100 NEX | "First $100 earned — your phone has officially paid back its activation overhead." |
 | earn-500 | $500+ | +250 NEX | "Half-grand reached. Hardware tier upgrades start unlocking measurable ROI." |
 | earn-1000 | $1,000+ | +500 NEX | "Four-figure earner. You're outpacing 88% of solo-phone accounts." |
-| earn-5000 | $5,000+ | +1,500 NEX | "Mid five-figure operator. Most users at this stage already own a NexionBox Pro." |
-| earn-10000 | $10,000+ | +3,000 NEX | "Top 2% of Nexion earners. Founders Tier consideration unlocks at $25K." |
+| earn-5000 | $5,000+ | +1,500 NEX | "Mid five-figure operator. Most users at this stage already own a NexGridBox Pro." |
+| earn-10000 | $10,000+ | +3,000 NEX | "Top 2% of NexGrid earners. Founders Tier consideration unlocks at $25K." |
 
 **Overlay UI**(portal 到 body):
 - Trophy icon spring 入场
@@ -4302,7 +4302,7 @@ sequenceDiagram
 
 **fire 节奏**:一次只触发一个 milestone,即使越过多档也走 cascade(每 4s 检查一个),避免视觉打架 + 增强戏剧化。
 
-**Persist**:`useMilestones` zustand persist(key `nexion-milestones-v1`)记录 firedIds,刷新不重触发。
+**Persist**:`useMilestones` zustand persist(key `nexgrid-milestones-v1`)记录 firedIds,刷新不重触发。
 
 **Demo 触发入口**(`/me/replay-tour` Lifecycle demo section,Sprint 2 第三阶段 §7.5.6 同位置):"Trigger earnings milestone" 按钮 → `resetMilestones() + _devBumpEarningsTotal(150)` → 下一次 poll 时 fire $100 阈值。
 
@@ -4316,7 +4316,7 @@ sequenceDiagram
 
 合规剧场关键件 — 真实加密交易所 ToS 风格强制阅读 + 双 gate 确认(scroll-to-bottom + checkbox)。首次提现 / 首次 staking 锁仓前拦截;常驻入口在个人中心「帮助与支持」分组。
 
-**Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexion-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
+**Store**:`lib/store/risk-disclosure.ts` — `useRiskDisclosure` zustand persist(`nexgrid-risk-disclosure-v1`),`{ accepted, acceptedAt, accept, reset }`。
 
 **页面结构**:
 1. iOS nav back + 标题 `Platform risk disclosure`
@@ -4364,11 +4364,11 @@ sequenceDiagram
 - **Network** — hero `TEAM REACH 👥 N` 大字
 
 **共享区域(所有 variant)**:
-- 顶部 brand 行(Nexion logo + `PROOF OF CONTRIBUTION` label)
+- 顶部 brand 行(NexGrid logo + `PROOF OF CONTRIBUTION` label)
 - 用户名 + Member since + **VBadge** 组件露出当前 V 级
 - 3 mini stats:Active days / Devices / Top X% of network(基于 lifetime 收益分位)
 - **Achievements chips 横滑**:V{N} {title} / {n}d streak / {n} devices / {n}d active(动态生成)
-- **Referral 区**:大字 `NEXION-XXXX` 推荐码 + 完整 URL(点击复制)+ QR 占位图案(从 referralCode 哈希)
+- **Referral 区**:大字 `NEXGRID-XXXX` 推荐码 + 完整 URL(点击复制)+ QR 占位图案(从 referralCode 哈希)
 
 **分享触点**:
 - 顶部 `Quick share` CTA → 调起 `navigator.share()` 原生 sheet(无原生支持时回退到 clipboard.writeText + toast)
@@ -4376,9 +4376,9 @@ sequenceDiagram
 - 每目的地 icon + label,点击复制对应 shareText 到剪贴板
 
 **Share Text 模板**(根据 variant 切换):
-- Earnings:`💸 Earned $X on Nexion in N days. Join my network: {refUrl}`
-- Streak:`🔥 N-day streak on Nexion. Daily check-ins drip passive NEX. Join me: {refUrl}`
-- Network:`🌐 My Nexion network is N strong across 7 layers. Compound earnings from each. Join: {refUrl}`
+- Earnings:`💸 Earned $X on NexGrid in N days. Join my network: {refUrl}`
+- Streak:`🔥 N-day streak on NexGrid. Daily check-ins drip passive NEX. Join me: {refUrl}`
+- Network:`🌐 My NexGrid network is N strong across 7 layers. Compound earnings from each. Join: {refUrl}`
 
 **数据源**:
 - earnings / activeDays / devices / referralCode / displayName / joinedAt → `useApp` + `useProfile`
@@ -4481,7 +4481,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 
 | 类别 | 角色 | 会话语义 |
 |---|---|---|
-| `advisor` 专属顾问 | 增长顾问 | **顾问主动触达**:预置带转化 CTA 的引导消息(如「设备闲置 ~30%,升级 Pro 多赚」→ `/store`;「180 天锁仓 95% APY」→ `/staking`),以未读呈现,引导购买 NexionBox / 锁仓 / 复投 |
+| `advisor` 专属顾问 | 增长顾问 | **顾问主动触达**:预置带转化 CTA 的引导消息(如「设备闲置 ~30%,升级 Pro 多赚」→ `/store`;「180 天锁仓 95% APY」→ `/staking`),以未读呈现,引导购买 NexGridBox / 锁仓 / 复投 |
 | `support` 普通客服 | 客服支持 | **用户发起**:处理售前 / 售后问题(账户 / 提现 / 订单等);用户发消息 → 真人客服回复 |
 | `ai` Nova | AI 算力顾问 | §11.0A Nova 作为 AI 类型并入;保留 quick-prompt + 自动 push 通道;会话头部「人工客服」入口路由到 `support` 会话(§11.0A.3) |
 
@@ -4512,7 +4512,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 
 1. **NEX Hero**:
    - 标签 `YOUR PLATFORM TOKEN`
-   - 左:N 圆 icon + `NEX / USDT` + 副字 `Nexion · #{rank}`
+   - 左:N 圆 icon + `NEX / USDT` + 副字 `NexGrid · #{rank}`
    - 右:大字价格 + `▲/▼ XX.XX% (24h)`
    - 时段 tabs:`1H / 24H / 7D / 1M / ALL`
    - K-line area chart(上涨 / 下跌)
@@ -4564,7 +4564,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 #### 11.10.2 页面结构(自上而下 4 段)
 
 1. **Featured Hero**:
-   - 主推 1 个 ongoing 活动(默认 NexionBox Pro Flash Upgrade)
+   - 主推 1 个 ongoing 活动(默认 NexGridBox Pro Flash Upgrade)
    - 显示 `FEATURED` 标签 + Trophy icon + emoji 大字 + 标题 + 副标 + 奖励 chip + 倒计时 + 进度条 + 大按钮 CTA
 
 2. **5-Tab nav**(胶囊):All / Ongoing / Upcoming / Joined / Ended
@@ -4579,7 +4579,7 @@ i18n keys 在 `tickets.*` namespace,~40 keys。
 
 | EventKind | 标签 | 典型示例 |
 |---|---|---|
-| `discount`  | Flash Sale     | NexionBox Pro $500 OFF 7d |
+| `discount`  | Flash Sale     | NexGridBox Pro $500 OFF 7d |
 | `referral`  | Refer & Earn   | Refer 5 · Win a Pro |
 | `wheel`     | Lucky Wheel    | Spring Daily Spin |
 | `regional`  | Regional PK    | LatAm vs SEA vs EU $20K |
@@ -4682,7 +4682,7 @@ Events 分两大类:
 - **折扣 tier**:2 件 5% / 3 件 8% / 4+ 件 12%(`BUNDLE_DISCOUNT_TIERS`)
 - **结算**:点「结算」余额直付——复用单品 checkout 下单内核,一次为组合内每个商品建单(`orders.createOrder`,组合折扣按单价比例分摊)、按组合总价扣平台余额(`app.debitBalance`,余额不足则拦截报错)、写一条组合购买账单、清空组合车、跳 `/store/orders`。账本单源 = 扣款 = 账单 = 组合总价
 - **UI**:Hero 折扣 tier grid + In-bundle 列表 + Suggestions(剩余产品)+ 底部 Subtotal/Discount/Total 卡 + 合并日产能
-- **Store**:`useCart` zustand persist(`nexion-cart-v1`)— `items: string[]` + add/remove/clear/has
+- **Store**:`useCart` zustand persist(`nexgrid-cart-v1`)— `items: string[]` + add/remove/clear/has
 - **i18n**:`bundle.*` namespace ~14 keys
 
 #### 11.12.2 交易详情 `/tx/[hash]`(Sprint A-2 / A.4)
@@ -4697,14 +4697,14 @@ Events 分两大类:
 - **目的**:用户主动设目标,系统派发推荐设备 tier
 - **算法**:`perDay = target / days` → 推荐 Cloud Share / S1 / Pro / Rack(按 dailyEarn 阶梯)
 - **UI**:Hero + Target input + 4 preset targets + 4 preset deadlines + Recommendation card + Active goals list with progress bars
-- **Store**:`useGoals` zustand persist(`nexion-goals-v1`)— `Goal[]` + setGoal/markAchieved/remove
+- **Store**:`useGoals` zustand persist(`nexgrid-goals-v1`)— `Goal[]` + setGoal/markAchieved/remove
 - **i18n**:`goals.*` namespace ~17 keys
 
 #### 11.12.4 偏好设置 `/me/preferences`(Sprint P-full / P8 + P9)
 
 - **目的**:音效 / 触感 / 通知 6 类偏好的统一切换中心
 - **2 组 toggle**:Feedback(sound + haptics)+ Notifications(6 种 NotifKind 各自 mute)
-- **Store**:`usePreferences` zustand persist(`nexion-preferences-v1`)
+- **Store**:`usePreferences` zustand persist(`nexgrid-preferences-v1`)
 - **i18n**:`preferences.*` namespace ~14 keys
 
 #### 11.12.5 全局搜索 `/search`(Sprint P-full / P6)
@@ -4724,7 +4724,7 @@ Events 分两大类:
 #### 11.12.7 Compliance Re-verification banner(Sprint A-3 / A.7)
 
 - **位置**:`(main)/layout.tsx` 内挂载,phase P5+(`complianceHoldEnabled`)触发
-- **24h dismiss cooldown**:localStorage `nexion-compliance-banner-dismissed-at`
+- **24h dismiss cooldown**:localStorage `nexgrid-compliance-banner-dismissed-at`
 - **文案**:`Compliance re-verification window` + `Random KYC + KYT spot checks are active`(用户视角真实庞氏话术)
 - **i18n**:`complianceBanner.*` 3 keys
 
@@ -4880,7 +4880,7 @@ Events 分两大类:
 
 ## 12. 数据模型
 
-> **持久化作用域**:用户资产类 store 按账号分行持久化——`{[accountKey]: row}` 表(键 `nexion-<entity>-accounts-v1`),换账号即换行、互不继承,详见 §4.8。下文各实体注明的旧设备级 `nexion-*-v1` 持久 key 已废弃,实体字段结构不变;平台态 / 设备偏好类仍用全局键。
+> **持久化作用域**:用户资产类 store 按账号分行持久化——`{[accountKey]: row}` 表(键 `nexgrid-<entity>-accounts-v1`),换账号即换行、互不继承,详见 §4.8。下文各实体注明的旧设备级 `nexgrid-*-v1` 持久 key 已废弃,实体字段结构不变;平台态 / 设备偏好类仍用全局键。
 
 ### 12.1 User(useApp.user)
 
@@ -4986,7 +4986,7 @@ Events 分两大类:
 
 **初始 seed**:onboarding 完成后,phone 自动 `activatedAt = purchasedAt`(强制激活,无 skip)。用户进 APP 后可在 `/me/devices` 取消激活,使手机进入库存状态。
 
-### 12.3 Order(useOrders,persist key `nexion-orders-v4`)
+### 12.3 Order(useOrders,persist key `nexgrid-orders-v4`)
 
 ```
 {
@@ -5004,7 +5004,7 @@ Events 分两大类:
   activatedAt?: number;
   timeline: OrderTimelineEvent[];   // 每段推进追加一条 { status, ts, note? }
   deviceId?: string;            // activated 后自动生成的设备 id
-  dataCenter: "Singapore DC" | "Frankfurt DC";   // NexionRack P1/P2 → Frankfurt,其余 → Singapore
+  dataCenter: "Singapore DC" | "Frankfurt DC";   // NexGridRack P1/P2 → Frankfurt,其余 → Singapore
 }
 
 OrderTimelineEvent = { status: OrderStatus; ts: number; note?: string }
@@ -5065,7 +5065,7 @@ OrderTimelineEvent = { status: OrderStatus; ts: number; note?: string }
 }
 ```
 
-### 12.7 Genesis Holding(useGenesis,persist `nexion-genesis` v2)
+### 12.7 Genesis Holding(useGenesis,persist `nexgrid-genesis` v2)
 
 ```
 {
@@ -5171,7 +5171,7 @@ Conversation:
 }
 ```
 
-### 12.11 Quest(useQuest,persist key `nexion-quest-v1`)
+### 12.11 Quest(useQuest,persist key `nexgrid-quest-v1`)
 
 ```
 {
@@ -5194,7 +5194,7 @@ QuestTaskId =
 
 各任务奖励见 §5.15.3 任务清单;路由型任务的自动完成 + 派奖编排见 §5.15.7。`markComplete` 只返回是否首次完成 + 应派金额,余额 / 账单写入由调用方编排(store 不互相 import)。
 
-### 12.12 NEX 水龙头(useNexFaucet,persist key `nexion-nex-faucet`)
+### 12.12 NEX 水龙头(useNexFaucet,persist key `nexgrid-nex-faucet`)
 
 签到状态机 + 连签 + 里程碑。NEX 余额不在此 store —— NEX 单源在钱包 `nexBalance`(§12.x),签到 / 里程碑发放的 NEX 通过 `useApp.creditNex` 入钱包持仓。本 store 只持有签到节奏状态。
 
@@ -5221,7 +5221,7 @@ FaucetEvent = { ts: number, delta: number, reason: string }   // delta = 本次�
 computeWithdrawFee(amount, userNex, penaltyFeeRate, nexFeeOffsetRate): WithdrawFee  // 提现费 + NEX 优惠抵扣(grossFee/requiredNex/nexBurned/feeWaived/actualFee/netReceive),见 §9.3.2
 ```
 
-### 12.13 Weekly Quest(useWeeklyQuest,persist key `nexion-weekly-quest-v1`)
+### 12.13 Weekly Quest(useWeeklyQuest,persist key `nexgrid-weekly-quest-v1`)
 
 ```
 {
@@ -5241,7 +5241,7 @@ computeWithdrawFee(amount, userNex, penaltyFeeRate, nexFeeOffsetRate): WithdrawF
 }
 ```
 
-### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexion-monthly-challenge-v1`;**Q-2 待实装**,i18n 命名空间已预留、store 未建)
+### 12.14 Monthly Challenge(useMonthlyChallenge,persist key `nexgrid-monthly-challenge-v1`;**Q-2 待实装**,i18n 命名空间已预留、store 未建)
 
 ```
 {
@@ -5260,7 +5260,7 @@ ChallengeId =
 
 参 §11.14 Monthly Challenge 派发器(5 主题基于 `user.joinedAt` 月数分段)。
 
-### 12.15 Event Quest(useEventQuest,persist key `nexion-event-quest-v1`)
+### 12.15 Event Quest(useEventQuest,persist key `nexgrid-event-quest-v1`)
 
 ```
 {
@@ -5278,7 +5278,7 @@ ChallengeId =
 
 仅 trackable event(参 §11.10.6 4 个 trackable event id)会通过 `useEventQuest.join` 持久化用户参与;decorative event 用 `events.ts` hardcode `joined` 字段。
 
-### 12.16 Daily Power-Up(useDailyPowerUp,persist key `nexion-daily-powerup-v1`)
+### 12.16 Daily Power-Up(useDailyPowerUp,persist key `nexgrid-daily-powerup-v1`)
 
 ```
 {
@@ -5296,7 +5296,7 @@ StreakPowerUpId =
 
 Unlock 状态(streak ≥ threshold)纯派生于 `useNexFaucet.signInStreak`,**不持久化** — 只持久化"已激活该 perk"的决定。激活同时 `useAchievements.unlock(badgeId)` 写入勋章成就。参 §9.8.6 完整规格。
 
-### 12.17 Saved Card(useCards,persist key `nexion-cards-v1`)
+### 12.17 Saved Card(useCards,persist key `nexgrid-cards-v1`)
 
 ```
 {
@@ -5328,7 +5328,7 @@ SavedCard = {
 - `^62` → unionpay
 - 否则 → unknown
 
-### 12.18 FreeTrial(useFreeTrial,persist key `nexion-trial-v1`)
+### 12.18 FreeTrial(useFreeTrial,persist key `nexgrid-trial-v1`)
 
 ```
 {
@@ -5371,7 +5371,7 @@ computeDiscountedPrice(config): { subtotal; discount; total }
 
 ---
 
-### 12.19 Lucky Spin(useLuckySpin,persist key `nexion-lucky-spin-v1`)
+### 12.19 Lucky Spin(useLuckySpin,persist key `nexgrid-lucky-spin-v1`)
 
 ```
 {
@@ -5425,7 +5425,7 @@ realPrizeActive(): boolean             // 售罄 / 降级 → false(真实奖档
 | stackWithTrial / stackWithOthers / splittable | boolean | 叠加试用收益 / 叠加其它优惠 / 可拆分(默认均 false) |
 | status | "active" \| "paused" | 投放中 / 暂停 |
 
-**用户钱包**(useVoucher,persist key `nexion-voucher-v1`;真后台 `GET /api/me/vouchers`):`claimed[]`,每条 `{ id, claimedAt, usedAt? }`。
+**用户钱包**(useVoucher,persist key `nexgrid-voucher-v1`;真后台 `GET /api/me/vouchers`):`claimed[]`,每条 `{ id, claimedAt, usedAt? }`。
 
 派生:`claimableVouchers`(可领:active + 有效期内 + 受众匹配 + 未领)/ `claimedUnused`(已领未用且有效)/ `expiredVouchers`(已领未用但过期);`bestVoucherFor(skuId, price)` 在已领适用券中选抵扣最大者;纯函数 `computeVoucherDiscount(def, subtotal)` 为单源折扣算法(满减按门槛、折扣按封顶、抵扣不超小计)。
 
@@ -5590,17 +5590,17 @@ progressPct = avg(checks);
 - Home `ConversionBanner` / `DoTheMathCard`("Activate {targetName} · earn ${targetDaily}/day · payback ~{targetPayback} days · {multiplier}× {baseName}")
 - `EmptySlotsHint` Subtitle("{empty} × {targetName} @ ${targetDaily}/d · {multiplier}× {baseName}")
 - `MissedIncomeBanner`(试用期隐藏):非试用态显示 base 与 target 的日收益差(gap = targetDaily − baseDaily)累计错过收益,ceiling 对比 = {targetName}
-- Home `AddDeviceRow`("Add a NexionBox")与 `DoTheMathCard` 的 CTA href 均指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
+- Home `AddDeviceRow`("Add a NexGridBox")与 `DoTheMathCard` 的 CTA href 均指向 `derivePromoUpgrade().targetKind`(已激活 Pro/Rack 的用户被推向下一档,而非硬锚 S1;无激活设备时 fallback S1)
 - 任何未来推广卡片接同一 helper,不重复实现倍数算法
 
 **边界**:
-- 全无激活设备 → fallback 锚定 S1 baseline,`multiplier = 0`,UI 隐藏倍数行,只显示 target 设备(eg "Activate NexionBox S1 · earn $7.00/day · anchor pricing")
+- 全无激活设备 → fallback 锚定 S1 baseline,`multiplier = 0`,UI 隐藏倍数行,只显示 target 设备(eg "Activate NexGridBox S1 · earn $7.00/day · anchor pricing")
 - 激活设备已到 ladder 顶(Rack P1)→ target 保持 Rack P1,`multiplier = 0`,UI 隐藏倍数行 / 切换为 anchor pricing 或升级 trade-in 推广(见 §7.5)
 
 **base 设备跃迁的连锁效应**(典型用户路径):
-1. 仅手机激活时:base = phone → target = S1,推广文本 `"117× phone → NexionBox S1"`
+1. 仅手机激活时:base = phone → target = S1,推广文本 `"117× phone → NexGridBox S1"`
 2. 用户激活 S1(或 Pro / Rack)后:`derivePromoUpgrade` 的 base 立即取激活真实设备中最高日收益者(S1),target 跃迁至其上一档(Pro)
-3. 全站推广文本随之切换:`"117× phone"` → `"2× NexionBox S1 → Pro"`(或对应 target),回本天数同步切到 target 设备
+3. 全站推广文本随之切换:`"117× phone"` → `"2× NexGridBox S1 → Pro"`(或对应 target),回本天数同步切到 target 设备
 4. 任务推送 / weekly quest / Home upsell / MissedIncomeBanner 推广广告自动更新,不需要手动 i18n key 切换
 
 ### 13.3 关键参数集
@@ -5613,9 +5613,9 @@ progressPct = avg(checks);
 | `rewards.welcomeGift.usdtAmount` / `.nexAmount` | 5 / 20 | 注册礼包金额(平台配置,后台 H8 可调;NEX 收缩至 20,主 NEX 产出归设备挖矿)|
 | `rewards.welcomeGift.lockMode` | `risk_bucket` | 礼包发放模式:`risk_bucket`=按账户风险桶发放 / `direct`=直入可提(活动期开闸)|
 | `rewards.inviterReward.nexAmount` | 200 | 邀请人奖励:邀请人每成功邀请一名新用户自身获得的 NEX(平台配置,后台 H8 可调);与新人礼 `welcomeGift` 相互独立——礼包给被邀请人、此项给邀请人 |
-| `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexion.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
+| `share.baseUrl` | 空 | 分享短链前缀(生产如 `https://nexgrid.ai/ref/`,配套服务端 302 至落地页);空 = 回退当前站点地址直连落地页(开发 / 演示扫码可达);平台配置,后台可调 |
 | `share.channels[]` | Zalo / Telegram / WhatsApp / Messenger / 短信 / X / 复制 / 海报 / 系统分享 | 渠道面板清单与顺序(运营可调,越南盘默认 Zalo 首位);每项含 intent 类型(web 直开 / scheme 复制降级 / 本地动作)与 intent URL 模板 |
-| `share.appDownload.officialUrl` | 空 | 浏览器 H5 注册成功页的 Nexion 官网 APP 下载地址(§4.1.1);仅接受 HTTPS,空值或非法地址显示不可点击占位,App 不消费;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
+| `share.appDownload.officialUrl` | 空 | 浏览器 H5 注册成功页的 NexGrid 官网 APP 下载地址(§4.1.1);仅接受 HTTPS,空值或非法地址显示不可点击占位,App 不消费;与 `computeShare.downloadUrl`(PC 客户端)为两套配置不混用 |
 | 收益三桶 + 释放 / 提现风控参数 | 见 SPEC-7 | `riskCluster.*` / `withdrawRules.*` / `riskScore.dimensionWeights` 全表(平台配置,后台可调)在 `PRD/三端架构改造/specs/SPEC-7-H5风险簇与收益释放.md` §5 |
 | OTP 发送闸门 `otpGate.*` | 冷却 60s · 滑块阈值 2(第 3 次起)· 有效期 300s · 输错上限 5 · ticket 120s | 验证码防轰炸参数组(平台配置,后台可调):`resendSeconds` / `captchaAfterSends`(24h 窗内成功发送达此值后下一次需过滑块)/ `otpTtlSeconds` / `maxVerifyAttempts` / `captchaTicketTtlSeconds`;规则与状态机见 §4.6.2 |
 | `deposit.chain.fee` | TRC20 1 / BEP20 1 / ERC20 5 USDT | 链上通道费(按网络,后台可配);从到账额里扣 |
@@ -5684,8 +5684,8 @@ progressPct = avg(checks);
 | Genesis 销售进度 ticker | +1~3 张 / 30s | 销售进度条 FOMO 抖动(独立于真实成交)|
 | Genesis 单节点排放参考等值 | 上所后 NEX 排放,展示等值 ≈ 平台日交易额 × 0.1% ÷ 1000 | NEX 计价参考(非保证),上所前不派发;保底口径(节点价 × 0.1% ≈ $10/节点/日)挂后台负债科目#4 |
 | 收益里程碑阈值 / 奖励 | $100/$500/$1k/$5k/$10k → +100/250/500/1500/3000 NEX | 累计收益(life-to-date)跨档各触发一次自动派奖 + 庆祝(§11.3a),firedIds 持久化幂等 |
-| 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexion-milestones-v1` 持久化已触发档 |
-| 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(§5.15.7),`nexion-quest-v1` 持久化幂等 |
+| 里程碑监听节奏 | 每 4s 一拍 | 跨档检测一次推一档(cascade),`nexgrid-milestones-v1` 持久化已触发档 |
+| 首日路由任务奖励 | visit_earn +30 / visit_store +50 / view_product_roi +100 NEX | 路由型任务首次落地页自动完成派奖(§5.15.7),`nexgrid-quest-v1` 持久化幂等 |
 | 首日路由监听节奏 | 每 1s 一拍 | 读当前页映射任务 id,页面变化才判定 |
 | 订单自动履约节奏 | 每 6s 一拍(全局)/ 每 3s(详情页) | `paid → provisioning → activated` 逐段推进,到 activated 自动生成并激活设备(§7.4)|
 | Initial USDT balance | $24,856.56 | mock user 启动余额(够买 1 张二级 Genesis 留出余量)|
@@ -5732,7 +5732,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 > 提现惩罚费率 = 无 NEX 抵扣时按提现金额收取的费率;NEX 抵扣率恒定 $0.40 / NEX(不随 phase),烧 NEX 按优惠率减免该费、烧够全免(见 §9.3.2)。
 
-**派发规则**:`useProductPhase()` hook = `useProductPhaseOverride.pinned ?? getPhaseForMonth(getMonthsSince(user.joinedAt))`。`useProductPhaseOverride` 是 zustand persist(`nexion-product-phase-override-v1`),PM demo 用 `setPinned(id)` 强制锁某 phase。
+**派发规则**:`useProductPhase()` hook = `useProductPhaseOverride.pinned ?? getPhaseForMonth(getMonthsSince(user.joinedAt))`。`useProductPhaseOverride` 是 zustand persist(`nexgrid-product-phase-override-v1`),PM demo 用 `setPinned(id)` 强制锁某 phase。
 
 #### 13.4.2 接入点
 
@@ -5782,7 +5782,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 - LocaleSwitcher 组件在 Header / 注册页 / 登录页
 - 用户选择持久化到 localStorage
-- 不可翻译保留英文:品牌名(NEXION / NVIDIA / TechCrunch...)、token 符号(USDT / NEX / ERC-721)
+- 不可翻译保留英文:品牌名(NEXGRID / NVIDIA / TechCrunch...)、token 符号(USDT / NEX / ERC-721)
 
 ---
 
@@ -5840,7 +5840,7 @@ Sprint 3。把 12 月生命周期固化为 6 个 phase,每个 phase 派发若干
 
 - 用户可见文案严禁出现:`模拟` / `mock` / `demo` / `演示` / `simulated` / `自动扣款` 等暴露原型属性的字眼
 - 试用相关文案统一称"试用收益",不写"模拟收益 / shadow earning"
-- 营销话术(NexionBox 营销 / FOMO / 提现劝阻)与合规文案均按真平台口径
+- 营销话术(NexGridBox 营销 / FOMO / 提现劝阻)与合规文案均按真平台口径
 
 ### 16.3 可用性
 
@@ -6030,5 +6030,5 @@ Skeleton 视觉实现统一使用 `<Skeleton.{Line/Card/Circle/Hero/Block}>` 组
 
 **文档结束**
 
-Nexion Product Team
+NexGrid Product Team
 本文档为研究性原型的产品需求规格,仅供产品研究与教学用途。

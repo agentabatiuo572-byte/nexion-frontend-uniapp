@@ -81,9 +81,9 @@ import { computed, type CSSProperties } from "vue";
 const props = defineProps<{ tier: "Entry" | "Pro" | "Flagship" | "Share" }>();
 
 const PHOTO_MAP: Record<string, { src: string; tierCode: string } | null> = {
-  Entry: { src: "/static/img/products/nexionbox-s1-v4.png", tierCode: "S1" },
-  Pro: { src: "/static/img/products/nexionbox-pro-v2.png", tierCode: "Pro" },
-  Flagship: { src: "/static/img/products/nexionrack-p1-v2.png", tierCode: "Rack P1" },
+  Entry: { src: "/static/img/products/nexgridbox-s1-v4.png", tierCode: "S1" },
+  Pro: { src: "/static/img/products/nexgridbox-pro-v2.png", tierCode: "Pro" },
+  Flagship: { src: "/static/img/products/nexgridrack-p1-v2.png", tierCode: "Rack P1" },
   Share: null,
 };
 

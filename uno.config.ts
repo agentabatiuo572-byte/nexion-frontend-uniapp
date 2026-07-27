@@ -1,6 +1,6 @@
 import { defineConfig, presetWind3, presetAttributify } from "unocss";
 
-// Nexion uni-app UnoCSS config.
+// NexGrid uni-app UnoCSS config.
 // presetWind3 = Tailwind v3-compatible utilities (covers the ~5449 className
 // usages ported from the Next.js prototype, including arbitrary values like
 // text-[var(--v5-ink)] / bg-[var(--v5-surface)] which resolve against the CSS
