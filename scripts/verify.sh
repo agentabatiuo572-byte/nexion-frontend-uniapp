@@ -721,7 +721,16 @@ spec6_entry_surface_homes_present() {
     if(!/surface="signed"/.test(signed)) throw new Error("signed entry page does not render signed surface");
     if(!/surface="h5"/.test(h5)) throw new Error("h5 entry page does not render h5 surface");
     if(!/surface="white"/.test(white)) throw new Error("white entry page does not render white surface");
-    const body=fs.readFileSync("src/components/entry-surfaces/entry-surface-home.vue","utf8")+index;
+    // 三端入口文案 2026-07-28 迁进 i18n(entrySurface 命名空间)——语义 token 与
+    // 泄漏守卫跟着文案走,否则组件里没文案了,这两道门会变成永真的空门。
+    const nsSlice=(file)=>{
+      const src=fs.readFileSync(file,"utf8");
+      const m=src.match(/\n  entrySurface: \{[\s\S]*?\n  \},/);
+      if(!m) throw new Error(`SPEC-6 i18n namespace entrySurface missing in ${file}`);
+      return m[0];
+    };
+    const i18nCopy=["src/i18n/messages/en.ts","src/i18n/messages/zh.ts","src/i18n/messages/vi.ts"].map(nsSlice).join("\n");
+    const body=fs.readFileSync("src/components/entry-surfaces/entry-surface-home.vue","utf8")+index+i18nCopy;
     for(const token of ["在线增强","基础托管","体检融合"]){ if(!body.includes(token)) throw new Error(`SPEC-6 surface semantic token missing: ${token}`); }
     if(/secondary:\s*\{\s*label:\s*"PC sharing path",\s*href:\s*"\/pages\/compute-share\/download"/.test(body)) throw new Error("H5 entry must not advertise a disabled-by-default PC download path as direct CTA");
     if(/ENV_FILTERED|MANUAL_HOLD|keyword\d+|computeShareEnabled|H5_BASE_FACTOR|home-signed|home-h5|home-cloak|原型演示|工程字段名/.test(body)) throw new Error("SPEC-6 entry UI leaks withdrawn or engineering copy");

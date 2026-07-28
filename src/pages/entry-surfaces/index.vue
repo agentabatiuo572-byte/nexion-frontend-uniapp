@@ -2,9 +2,9 @@
   <AppChassis active="home">
     <view class="entry-index">
       <view class="entry-index__head">
-        <text class="entry-index__eyebrow">三端入口</text>
-        <text class="entry-index__title">完整可点击链接</text>
-        <text class="entry-index__body">签名版 APP、H5 网页版、白 APP 接管首页分开进入，正盘默认首页保持独立。</text>
+        <text class="entry-index__eyebrow">{{ t.entrySurface.indexEyebrow }}</text>
+        <text class="entry-index__title">{{ t.entrySurface.indexTitle }}</text>
+        <text class="entry-index__body">{{ t.entrySurface.indexBody }}</text>
       </view>
 
       <view class="entry-index__list">
@@ -24,33 +24,43 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import { useSetPageHeader } from "@/composables/use-page-header";
+import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 
-const links = [
+const t = useT();
+
+// 行标题走 i18n;route / fullUrl 是地址不是文案,不翻。
+const LINKS: ReadonlyArray<{ key: keyof typeof t.value.entrySurface.surfaces; route: string; fullUrl: string }> = [
   {
-    label: "签名版 APP 首页",
+    key: "signed",
     route: "/pages/entry-surfaces/signed",
     fullUrl: "http://localhost:5173/#/pages/entry-surfaces/signed",
   },
   {
-    label: "H5 网页版首页",
+    key: "h5",
     route: "/pages/entry-surfaces/h5",
     fullUrl: "http://localhost:5173/#/pages/entry-surfaces/h5",
   },
   {
-    label: "白 APP 接管首页",
+    key: "white",
     route: "/pages/entry-surfaces/white?entry=white-app",
     fullUrl: "http://localhost:5173/#/pages/entry-surfaces/white?entry=white-app",
   },
 ];
 
-useSetPageHeader({
-  title: "三端入口",
-  subtitle: "完整链接",
+const links = computed(() =>
+  LINKS.map((l) => ({ ...l, label: t.value.entrySurface.surfaces[l.key].linkLabel })),
+);
+
+// getter 形式 —— 切语言时 nav header 跟着变。
+useSetPageHeader(() => ({
+  title: t.value.entrySurface.indexNavTitle,
+  subtitle: t.value.entrySurface.indexNavSubtitle,
   backHref: "/",
-});
+}));
 
 function open(route: string) {
   navTo(route);

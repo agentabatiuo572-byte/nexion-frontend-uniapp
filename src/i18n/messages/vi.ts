@@ -620,6 +620,24 @@ export const vi: Messages = {
     aiDropMessage:
       "Có tin đồn Anthropic Claude 4.6 ra mắt tối nay. Nhu cầu suy luận LLM có thể tăng vọt +30%.",
     aiDropEta: "Dự kiến: 18h · giữ thiết bị online để bắt giá đỉnh",
+    workloads: {
+      IG: { label: "Tạo ảnh", unit: "mỗi ảnh" },
+      LL: { label: "Suy luận LLM", unit: "mỗi 1k token" },
+      VG: { label: "Tạo video", unit: "mỗi giây" },
+      FT: { label: "Tinh chỉnh", unit: "mỗi lượt" },
+      EM: { label: "Vector hóa", unit: "mỗi 1k đoạn" },
+      SP: { label: "Giọng nói", unit: "mỗi giây audio" },
+    },
+    flagshipRow: "Mô hình flagship 405B",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "Điện thoại của bạn",
+    bestFor: {
+      rackP1: "Huấn luyện + LLM 405B",
+      boxPro: "Sức tính hạng flagship",
+      boxS1: "LLM 70B",
+      cloudShare: "Rào cản thấp nhất",
+      phone: "Hạng NPU di động",
+    },
   },
 
   genesisHolder: {
@@ -700,6 +718,79 @@ export const vi: Messages = {
     notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong ngăn Nova và trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
+  // (在线增强 / 基础托管 / 体检融合)由 verify.sh 盯在 zh.ts 那一段里。
+  entrySurface: {
+    indexNavTitle: "Các lối vào",
+    indexNavSubtitle: "Link đầy đủ",
+    indexEyebrow: "Ba lối vào",
+    indexTitle: "Link đầy đủ có thể bấm",
+    indexBody: "Trang chủ ứng dụng đã ký, bản web H5 và bàn giao ứng dụng trắng mở riêng; trang chủ mặc định vẫn độc lập.",
+    fullLinks: "Xem đủ ba link lối vào",
+    surfaces: {
+      signed: {
+        linkLabel: "Trang chủ ứng dụng đã ký",
+        kicker: "Ứng dụng đã ký",
+        title: "Buồng lái kiếm tiền luôn bật",
+        body: "Ứng dụng đã cài giữ nguyên toàn bộ mạng thiết bị, ví, cửa hàng, đội nhóm và tăng tốc thời gian thực.",
+        modeLabel: "Chế độ tính toán",
+        modeValue: "Tăng cường khi online",
+        primaryLabel: "Mở bảng thu nhập",
+        secondaryLabel: "Quản lý thiết bị",
+        metrics: {
+          a: { label: "Tăng tốc online", value: "Đầy đủ" },
+          b: { label: "Dàn thiết bị", value: "6 khe" },
+          c: { label: "Dữ liệu tài khoản", value: "Dùng chung" },
+        },
+        steps: {
+          a: { title: "Khởi động", body: "Ứng dụng đã cài mở thẳng vào tài khoản thu nhập." },
+          b: { title: "Giữ online", body: "Trạng thái phần cứng máy đẩy vào mô hình tăng tốc thời gian thực." },
+          c: { title: "Dòng tiền", body: "Ví, cửa hàng và đội nhóm luôn cách một chạm." },
+        },
+      },
+      h5: {
+        linkLabel: "Trang chủ bản web H5",
+        kicker: "Bản web H5",
+        title: "Kiếm tiền trên di động qua web",
+        body: "Trình duyệt di động vẫn giữ thiết bị tài khoản và ví mà không chiếm nền. Chia sẻ PC hiện ra khi khả dụng.",
+        modeLabel: "Chế độ tính toán",
+        modeValue: "Lưu trữ cơ bản",
+        primaryLabel: "Mở trang kiếm tiền",
+        secondaryLabel: "Quản lý khe thiết bị",
+        metrics: {
+          a: { label: "Vào bằng trình duyệt", value: "Tức thì" },
+          b: { label: "Thiết bị điện thoại", value: "Được giữ" },
+          c: { label: "Đường PC", value: "Tùy chọn" },
+        },
+        steps: {
+          a: { title: "Mở link", body: "Trình duyệt vào thẳng trang kiếm tiền di động." },
+          b: { title: "Đăng ký thiết bị", body: "Năng lực máy được giữ như giá trị thiết bị ở cấp tài khoản." },
+          c: { title: "Lộ trình nâng cấp", body: "Ứng dụng cài đặt luôn hiện; chia sẻ PC xuất hiện khi khả dụng." },
+        },
+      },
+      white: {
+        linkLabel: "Trang chủ bàn giao ứng dụng trắng",
+        kicker: "Bàn giao ứng dụng trắng",
+        title: "Từ quét sức khỏe vào trang chủ NexGrid",
+        body: "Điểm phần cứng, số dư tài khoản và trạng thái dàn thiết bị nằm chung một màn bàn giao trước khi vào các tab chính.",
+        modeLabel: "Trạng thái lối vào",
+        modeValue: "Hợp nhất kết quả quét",
+        primaryLabel: "Tiếp tục vào NexGrid",
+        secondaryLabel: "Phiên đăng nhập",
+        metrics: {
+          a: { label: "Điểm sức khỏe", value: "Hiển thị" },
+          b: { label: "Trạng thái dàn máy", value: "Đã hợp nhất" },
+          c: { label: "Bàn giao tab", value: "Mượt" },
+        },
+        steps: {
+          a: { title: "Vào lớp vỏ", body: "Ngôn ngữ hình ảnh của công cụ quét được giữ ở đầu màn bàn giao." },
+          b: { title: "Đọc tài khoản", body: "Số dư, thiết bị và phiên đăng nhập đến từ cùng một trạng thái tài khoản." },
+          c: { title: "Đi tiếp", body: "Các tab cửa hàng, kiếm tiền, đội nhóm và ví tiếp tục như sản phẩm chính." },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "Tìm kiếm",
     placeholder: "Tìm thiết bị, thành viên, FAQ, trang…",
@@ -712,6 +803,34 @@ export const vi: Messages = {
       product: "Sản phẩm cửa hàng",
       member: "Thành viên mạng lưới",
       faq: "FAQ + hướng dẫn",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "Trang chủ / Bảng điều khiển", sub: "Thu nhập trực tiếp · bảng giá · tổng quan" },
+      earn: { label: "Kiếm tiền / Dàn thiết bị", sub: "Thẻ thiết bị · trung tâm tác vụ · hiệu suất" },
+      store: { label: "Cửa hàng", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "Thu cũ đổi mới", sub: "Ngừng dùng máy cũ, trừ thẳng vào máy mới" },
+      team: { label: "Trung tâm đội nhóm", sub: "Hoa hồng / hạng V / mạng lưới" },
+      royalty: { label: "Hoa hồng mạng lưới ảnh hưởng", sub: "Trực tiếp + thưởng sản lượng mạng lưới" },
+      networkMap: { label: "Sơ đồ mạng lưới", sub: "Quỹ đạo trực tiếp / mở rộng" },
+      wallet: { label: "Ví", sub: "Số dư + rút + nạp" },
+      withdraw: { label: "Rút tiền", sub: "Rút USDT về ví on-chain" },
+      staking: { label: "Kho staking", sub: "4 kỳ khóa, tối đa 180%" },
+      genesis: { label: "Chợ Genesis", sub: "Giao dịch Genesis thứ cấp" },
+      goals: { label: "Mục tiêu thu nhập", sub: "Đặt mục tiêu + lộ trình gợi ý" },
+      risk: { label: "Công bố rủi ro", sub: "Cần đọc" },
+      developer: { label: "Nhà phát triển / API", sub: "API công khai + tích hợp đối tác" },
+      globe: { label: "Bản đồ mạng lưới toàn cầu", sub: "Node hoạt động toàn cầu" },
+      market: { label: "Thị trường", sub: "Giá tác vụ AI + biểu đồ NEX" },
+      events: { label: "Sự kiện", sub: "Khuyến mãi · thi đua · theo mùa" },
+      missions: { label: "Nhiệm vụ", sub: "Thử thách · chuỗi ngày · vượt ải" },
+    },
+    faqEntries: {
+      royalty: { label: "Hoa hồng mạng lưới ảnh hưởng hoạt động thế nào", sub: "Trực tiếp + thưởng sản lượng mạng lưới + bậc tỷ lệ" },
+      staking: { label: "Staking hoạt động thế nào", sub: "Kỳ khóa + APY + phí phạt rút sớm" },
+      genesis: { label: "Genesis hoạt động thế nào", sub: "NFT sáng lập + đặc quyền + thứ cấp" },
+      nex: { label: "Giải thích token NEX", sub: "Nguồn · công dụng · cơ chế đốt" },
     },
   },
 
@@ -1057,6 +1176,7 @@ export const vi: Messages = {
       label: "HOẠT ĐỘNG NEX GẦN ĐÂY",
       viewAll: "Xem tất cả",
       empty: "Chưa có hoạt động NEX nào",
+      miningLabel: "Trả thưởng đào · dàn thiết bị",
     },
     note: "NEX là token của nền tảng NexGrid. Bạn có thể đổi sang USDT ở mục Quy đổi, hoặc dùng để bù phí rút USDT.",
   },
@@ -2913,6 +3033,11 @@ export const vi: Messages = {
       90: "Cân bằng · được chọn nhiều nhất",
       180: "Cửa sổ trước niêm yết",
       365: "Lợi suất Founder · airdrop ×2",
+    },
+    ribbon: {
+      // 不用「Được chọn nhiều nhất」—— 与 90d blurb 完全同文,两行会撞车
+      popular: "Phổ biến nhất",
+      topYield: "Lợi suất cao nhất",
     },
     penaltySuffix: "phí phạt rút sớm",
     calc: {

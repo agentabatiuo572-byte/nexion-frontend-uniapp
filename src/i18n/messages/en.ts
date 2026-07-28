@@ -619,6 +619,24 @@ export const en = {
     aiDropMessage:
       "Anthropic Claude 4.6 launch rumored tonight. LLM Inference demand may spike +30%.",
     aiDropEta: "Est. window: 18h · keep devices online to capture peak rates",
+    workloads: {
+      IG: { label: "Image Gen", unit: "per image" },
+      LL: { label: "LLM Inference", unit: "per 1k tok" },
+      VG: { label: "Video Gen", unit: "per sec" },
+      FT: { label: "Fine-tune", unit: "per job" },
+      EM: { label: "Embedding", unit: "per 1k chunks" },
+      SP: { label: "Speech", unit: "per audio sec" },
+    },
+    flagshipRow: "405B flagship",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "Your phone",
+    bestFor: {
+      rackP1: "Training + 405B LLM",
+      boxPro: "Flagship compute",
+      boxS1: "LLM 70B",
+      cloudShare: "Low barrier entry",
+      phone: "Mobile NPU tier",
+    },
   },
 
   genesisHolder: {
@@ -699,6 +717,79 @@ export const en = {
     notifFooter: "Disabling a category suppresses the Nova drawer + notification center entries. Critical compliance notifications cannot be disabled.",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token(zh 的
+  // 在线增强 / 基础托管 / 体检融合)由 verify.sh 盯在 zh.ts 这一段里。
+  entrySurface: {
+    indexNavTitle: "Entry surfaces",
+    indexNavSubtitle: "Full links",
+    indexEyebrow: "Three entry surfaces",
+    indexTitle: "Full clickable links",
+    indexBody: "Signed app, H5 web and white-app takeover homes each open separately; the default home stays independent.",
+    fullLinks: "See all three entry links",
+    surfaces: {
+      signed: {
+        linkLabel: "Signed app home",
+        kicker: "Signed app",
+        title: "Always-on earning cockpit",
+        body: "Full device network, wallet, store, team and live boost stay available from the installed app.",
+        modeLabel: "Compute mode",
+        modeValue: "Online boost",
+        primaryLabel: "Open earning dashboard",
+        secondaryLabel: "Manage devices",
+        metrics: {
+          a: { label: "Online boost", value: "Full" },
+          b: { label: "Device fleet", value: "6 slots" },
+          c: { label: "Account data", value: "Shared" },
+        },
+        steps: {
+          a: { title: "Launch", body: "Installed app opens directly into the earning account." },
+          b: { title: "Keep online", body: "Phone hardware status feeds the live boost model." },
+          c: { title: "Move money", body: "Wallet, store and team flows stay one tap away." },
+        },
+      },
+      h5: {
+        linkLabel: "H5 web home",
+        kicker: "H5 web",
+        title: "Base-hosted mobile earning",
+        body: "Mobile browser keeps account devices and wallet available without background lock-in. PC sharing appears when available.",
+        modeLabel: "Compute mode",
+        modeValue: "Base hosted",
+        primaryLabel: "Open earn view",
+        secondaryLabel: "Manage device slots",
+        metrics: {
+          a: { label: "Browser access", value: "Instant" },
+          b: { label: "Phone device", value: "Kept" },
+          c: { label: "PC path", value: "Optional" },
+        },
+        steps: {
+          a: { title: "Open link", body: "Browser lands on the mobile earning surface." },
+          b: { title: "Register device", body: "Phone capability is kept as account-level device value." },
+          c: { title: "Upgrade path", body: "Installed app stays visible; PC sharing appears when it is available." },
+        },
+      },
+      white: {
+        linkLabel: "White-app takeover home",
+        kicker: "White-app takeover",
+        title: "Health scan into NexGrid home",
+        body: "Hardware score, account balance and fleet status stay on one takeover screen before moving into the live tabs.",
+        modeLabel: "Entry state",
+        modeValue: "Scan merged",
+        primaryLabel: "Continue to NexGrid",
+        secondaryLabel: "Security sessions",
+        metrics: {
+          a: { label: "Health score", value: "Visible" },
+          b: { label: "Fleet status", value: "Merged" },
+          c: { label: "Tab handoff", value: "Smooth" },
+        },
+        steps: {
+          a: { title: "Enter shell", body: "Health-tool visual language remains at the top of the handoff." },
+          b: { title: "Read account", body: "Balance, devices and sessions come from the same account state." },
+          c: { title: "Move onward", body: "Store, earn, team and wallet tabs continue as the live product." },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "Search",
     placeholder: "Search devices, members, FAQ, pages…",
@@ -711,6 +802,34 @@ export const en = {
       product: "Store products",
       member: "Network members",
       faq: "FAQ + guides",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "Home / Mission Control", sub: "Live earnings · ticker · dashboard" },
+      earn: { label: "Earn / Fleet", sub: "Device cards · task center · efficiency" },
+      store: { label: "Store", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "Trade-in", sub: "Retire & credit toward an upgrade" },
+      team: { label: "Team hub", sub: "Royalty / V-rank / network" },
+      royalty: { label: "Influence Network Royalty", sub: "Direct + Network Yield Bonus" },
+      networkMap: { label: "Network visualization", sub: "Direct / Extended orbits" },
+      wallet: { label: "Wallet", sub: "Balance + withdraw + topup" },
+      withdraw: { label: "Withdraw", sub: "Cash out USDT to chain" },
+      staking: { label: "Staking Vault", sub: "4 lock tiers up to 180%" },
+      genesis: { label: "Genesis marketplace", sub: "Secondary Genesis trading" },
+      goals: { label: "Goals", sub: "Set earnings target + recommended path" },
+      risk: { label: "Risk disclosure", sub: "Required reading" },
+      developer: { label: "Developer / API", sub: "Public API + partner integrations" },
+      globe: { label: "Globe / Network map", sub: "Worldwide active nodes" },
+      market: { label: "Market", sub: "AI workload prices + NEX K-line" },
+      events: { label: "Events", sub: "Promotions · contests · seasonal" },
+      missions: { label: "Missions", sub: "Quests · streaks · challenges" },
+    },
+    faqEntries: {
+      royalty: { label: "How Influence Network Royalty works", sub: "Direct + Network Yield Bonus + Rate Tier" },
+      staking: { label: "How Staking works", sub: "Lock periods + APY + early unlock penalty" },
+      genesis: { label: "How Genesis works", sub: "Founder NFT + perks + secondary" },
+      nex: { label: "NEX token explained", sub: "Sources · uses · burn mechanism" },
     },
   },
 
@@ -1056,6 +1175,7 @@ export const en = {
       label: "RECENT NEX ACTIVITY",
       viewAll: "View all",
       empty: "No NEX activity yet",
+      miningLabel: "Mining payout · fleet",
     },
     note: "NEX is the NexGrid platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
   },
@@ -2982,6 +3102,10 @@ export const en = {
       90: "Balanced · most chosen",
       180: "Pre-listing window",
       365: "Founder yield · airdrop ×2",
+    },
+    ribbon: {
+      popular: "Most popular",
+      topYield: "Highest yield",
     },
     penaltySuffix: "early-withdraw penalty",
     calc: {

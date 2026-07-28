@@ -99,43 +99,51 @@ const q = ref("");
 const devices = computed(() => app.visibleDevices);
 const members = computed(() => network.members);
 
-// Static route catalog. href = uni page path when the page is ported,
-// otherwise a placeholder path that navigate's fail:()=>{} swallows.
-const ROUTES: ReadonlyArray<{ label: string; href: string; sub: string }> = [
-  { label: "Home / Mission Control", href: "/pages/index/index", sub: "Live earnings · ticker · dashboard" },
-  { label: "Earn / Fleet", href: "/pages/earn/earn", sub: "Device cards · task center · efficiency" },
-  { label: "Store", href: "/pages/store/store", sub: "NexGridBox / Rack / Cloud Share" },
-  { label: "Trade-in", href: "/pages/me/devices", sub: "Retire & credit toward an upgrade" },
-  { label: "Team hub", href: "/pages/team/team", sub: "Royalty / V-rank / network" },
-  { label: "Influence Network Royalty", href: "/pages/team/unilevel", sub: "Direct + Network Yield Bonus" },
-  { label: "Network visualization", href: "/pages/team/network", sub: "Direct / Extended orbits" },
-  { label: "Wallet", href: "/pages/me/wallet", sub: "Balance + withdraw + topup" },
-  { label: "Withdraw", href: "/pages/me/wallet-withdraw", sub: "Cash out USDT to chain" },
-  { label: "Staking Vault", href: "/pages/staking/staking", sub: "4 lock tiers up to 180%" },
-  { label: "Genesis marketplace", href: "/pages/genesis/marketplace", sub: "Secondary Genesis trading" },
-  { label: "Goals", href: "/pages/me/goals", sub: "Set earnings target + recommended path" },
-  { label: "Risk disclosure", href: "/pages/me/risk-disclosure", sub: "Required reading" },
-  { label: "Developer / API", href: "/pages/developer/developer", sub: "Public API + partner integrations" },
-  { label: "Globe / Network map", href: "/pages/globe/globe", sub: "Worldwide active nodes" },
-  { label: "Market", href: "/pages/market/market", sub: "AI workload prices + NEX K-line" },
-  { label: "Events", href: "/pages/events/events", sub: "Promotions · contests · seasonal" },
-  { label: "Missions", href: "/pages/missions/missions", sub: "Quests · streaks · challenges" },
+// Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
+// only the key→href binding stays here. href = uni page path when the page is
+// ported, otherwise a placeholder path that navigate's fail:()=>{} swallows.
+type RouteKey = keyof typeof t.value.search.routes;
+type FaqKey = keyof typeof t.value.search.faqEntries;
+
+const ROUTES: ReadonlyArray<{ key: RouteKey; href: string }> = [
+  { key: "home", href: "/pages/index/index" },
+  { key: "earn", href: "/pages/earn/earn" },
+  { key: "store", href: "/pages/store/store" },
+  { key: "tradeIn", href: "/pages/me/devices" },
+  { key: "team", href: "/pages/team/team" },
+  { key: "royalty", href: "/pages/team/unilevel" },
+  { key: "networkMap", href: "/pages/team/network" },
+  { key: "wallet", href: "/pages/me/wallet" },
+  { key: "withdraw", href: "/pages/me/wallet-withdraw" },
+  { key: "staking", href: "/pages/staking/staking" },
+  { key: "genesis", href: "/pages/genesis/marketplace" },
+  { key: "goals", href: "/pages/me/goals" },
+  { key: "risk", href: "/pages/me/risk-disclosure" },
+  { key: "developer", href: "/pages/developer/developer" },
+  { key: "globe", href: "/pages/globe/globe" },
+  { key: "market", href: "/pages/market/market" },
+  { key: "events", href: "/pages/events/events" },
+  { key: "missions", href: "/pages/missions/missions" },
 ];
 
-const FAQ: ReadonlyArray<{ label: string; href: string; sub: string }> = [
-  { label: "How Unilevel Royalty works", href: "/pages/team/unilevel", sub: "Direct + Network Yield Bonus + Rate Tier" },
-  { label: "How Staking works", href: "/pages/staking/staking", sub: "Lock periods + APY + early unlock penalty" },
-  { label: "How Genesis works", href: "/pages/genesis/genesis", sub: "Founder NFT + perks + secondary" },
-  { label: "NEX token explained", href: "/pages/me/wallet", sub: "Sources · uses · burn mechanism" },
+const FAQ: ReadonlyArray<{ key: FaqKey; href: string }> = [
+  { key: "royalty", href: "/pages/team/unilevel" },
+  { key: "staking", href: "/pages/staking/staking" },
+  { key: "genesis", href: "/pages/genesis/genesis" },
+  { key: "nex", href: "/pages/me/wallet" },
 ];
 
 const results = computed<Hit[]>(() => {
   const query = q.value.trim().toLowerCase();
   if (!query) return [];
   const out: Hit[] = [];
+  // 过滤跑在当前语言的译文上,不是英文字面量 —— 换语言后搜索词跟着换语言可搜。
+  const routeCopy = t.value.search.routes;
+  const faqCopy = t.value.search.faqEntries;
   for (const r of ROUTES) {
-    if (r.label.toLowerCase().includes(query) || r.sub.toLowerCase().includes(query)) {
-      out.push({ group: "route", label: r.label, sublabel: r.sub, href: r.href });
+    const c = routeCopy[r.key];
+    if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
+      out.push({ group: "route", label: c.label, sublabel: c.sub, href: r.href });
     }
   }
   for (const p of PRODUCTS) {
@@ -164,8 +172,9 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const f of FAQ) {
-    if (f.label.toLowerCase().includes(query) || f.sub.toLowerCase().includes(query)) {
-      out.push({ group: "faq", label: f.label, sublabel: f.sub, href: f.href });
+    const c = faqCopy[f.key];
+    if (c.label.toLowerCase().includes(query) || c.sub.toLowerCase().includes(query)) {
+      out.push({ group: "faq", label: c.label, sublabel: c.sub, href: f.href });
     }
   }
   return out.slice(0, 30);

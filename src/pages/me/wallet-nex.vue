@@ -186,7 +186,8 @@ const activity = computed(() => {
   const items: Array<{ id: string; ts: number; kind: string; nex: number; label: string }> = [];
   for (const e of commission.events) {
     if (e.amountNEX > 0) {
-      items.push({ id: e.id, ts: e.ts, kind: e.kind, nex: e.amountNEX, label: `${e.sourceUserName} · ${e.kind}` });
+      // e.kind 是枚举值,直接渲染会把 unilevel/binary 这种内部词漏给用户 —— 走 i18n 映射。
+      items.push({ id: e.id, ts: e.ts, kind: e.kind, nex: e.amountNEX, label: `${e.sourceUserName} · ${t.value.commissions.kind[e.kind]}` });
     }
   }
   for (let i = 0; i < 5; i++) {
@@ -195,7 +196,7 @@ const activity = computed(() => {
       ts: Date.now() - i * 86400_000,
       kind: "mining",
       nex: todayNEX.value * (0.6 + i * 0.1),
-      label: "Mining payout · fleet",
+      label: t.value.nexWallet.activity.miningLabel,
     });
   }
   return items.sort((a, b) => b.ts - a.ts).slice(0, 10);

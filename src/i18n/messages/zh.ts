@@ -606,6 +606,24 @@ export const zh: Messages = {
     aiDropAlert: "AI Drop 警报",
     aiDropMessage: "Anthropic Claude 4.6 据传今晚发布。LLM 推理需求可能上涨 +30%。",
     aiDropEta: "预计 18 小时后 · 保持设备在线以捕获高峰价",
+    workloads: {
+      IG: { label: "图像生成", unit: "每张" },
+      LL: { label: "LLM 推理", unit: "每千 token" },
+      VG: { label: "视频生成", unit: "每秒" },
+      FT: { label: "微调训练", unit: "每单" },
+      EM: { label: "向量嵌入", unit: "每千段" },
+      SP: { label: "语音处理", unit: "每音频秒" },
+    },
+    flagshipRow: "405B 旗舰模型",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "你的手机",
+    bestFor: {
+      rackP1: "训练 + 405B 大模型",
+      boxPro: "旗舰级算力",
+      boxS1: "70B 大模型",
+      cloudShare: "门槛最低",
+      phone: "手机 NPU 档",
+    },
   },
 
   genesisHolder: {
@@ -686,6 +704,79 @@ export const zh: Messages = {
     notifFooter: "禁用某类后,Nova drawer 与通知中心不再推送对应条目。关键合规通知不可禁用。",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
+  // 在线增强 / 基础托管 / 体检融合 就在下面 modeValue,verify.sh 盯这一段。
+  entrySurface: {
+    indexNavTitle: "三端入口",
+    indexNavSubtitle: "完整链接",
+    indexEyebrow: "三端入口",
+    indexTitle: "完整可点击链接",
+    indexBody: "签名版 APP、H5 网页版、白 APP 接管首页分开进入,默认首页保持独立。",
+    fullLinks: "查看三端完整入口链接",
+    surfaces: {
+      signed: {
+        linkLabel: "签名版 APP 首页",
+        kicker: "签名版 APP",
+        title: "常驻在线的收益驾驶舱",
+        body: "安装版 APP 里,设备网络、钱包、商城、团队和实时加成全都在。",
+        modeLabel: "算力模式",
+        modeValue: "在线增强",
+        primaryLabel: "打开收益面板",
+        secondaryLabel: "管理设备",
+        metrics: {
+          a: { label: "在线加成", value: "完整" },
+          b: { label: "设备槽位", value: "6 个" },
+          c: { label: "账号数据", value: "共享" },
+        },
+        steps: {
+          a: { title: "启动", body: "安装版 APP 直接进入收益账号。" },
+          b: { title: "保持在线", body: "手机硬件状态实时喂给加成模型。" },
+          c: { title: "资金流转", body: "钱包、商城、团队一键可达。" },
+        },
+      },
+      h5: {
+        linkLabel: "H5 网页版首页",
+        kicker: "H5 网页版",
+        title: "网页版移动收益",
+        body: "手机浏览器里账号设备和钱包照常可用,不占用后台;电脑共享可用时会出现。",
+        modeLabel: "算力模式",
+        modeValue: "基础托管",
+        primaryLabel: "打开赚币页",
+        secondaryLabel: "管理设备槽位",
+        metrics: {
+          a: { label: "浏览器进入", value: "即开即用" },
+          b: { label: "手机设备", value: "保留" },
+          c: { label: "电脑通道", value: "可选" },
+        },
+        steps: {
+          a: { title: "打开链接", body: "浏览器直达移动端收益页。" },
+          b: { title: "登记设备", body: "手机算力按账号级设备价值保留。" },
+          c: { title: "升级路径", body: "安装版 APP 始终可见;电脑共享可用时出现。" },
+        },
+      },
+      white: {
+        linkLabel: "白 APP 接管首页",
+        kicker: "白 APP 接管",
+        title: "体检直通 NexGrid 首页",
+        body: "硬件评分、账户余额、设备状态先集中在一屏交接页,再进入正式标签页。",
+        modeLabel: "入口状态",
+        modeValue: "体检融合",
+        primaryLabel: "继续进入 NexGrid",
+        secondaryLabel: "登录设备管理",
+        metrics: {
+          a: { label: "体检评分", value: "可见" },
+          b: { label: "设备状态", value: "已合并" },
+          c: { label: "标签页交接", value: "顺滑" },
+        },
+        steps: {
+          a: { title: "进入外壳", body: "交接页顶部保留体检工具的视觉语言。" },
+          b: { title: "读取账号", body: "余额、设备、登录会话来自同一份账号状态。" },
+          c: { title: "继续前进", body: "商城、赚币、团队、钱包标签页照常是正式产品。" },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "搜索",
     placeholder: "搜索设备、成员、FAQ、页面...",
@@ -698,6 +789,34 @@ export const zh: Messages = {
       product: "商城商品",
       member: "网络成员",
       faq: "FAQ + 指南",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "首页 / 任务中心", sub: "实时收益 · 行情跑马灯 · 总览" },
+      earn: { label: "赚币 / 设备群", sub: "设备卡片 · 任务中心 · 效率" },
+      store: { label: "商城", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "以旧换新", sub: "退役旧机,抵扣升级款" },
+      team: { label: "团队中心", sub: "分成 / V 等级 / 网络" },
+      royalty: { label: "影响力网络分成", sub: "直推 + 网络收益奖金" },
+      networkMap: { label: "网络关系图", sub: "直推 / 延伸轨道" },
+      wallet: { label: "钱包", sub: "余额 + 提现 + 充值" },
+      withdraw: { label: "提现", sub: "USDT 提到链上" },
+      staking: { label: "质押金库", sub: "4 档锁仓,最高 180%" },
+      genesis: { label: "Genesis 交易市场", sub: "Genesis 二级交易" },
+      goals: { label: "收益目标", sub: "设定收益目标 + 推荐路径" },
+      risk: { label: "风险披露", sub: "必读" },
+      developer: { label: "开发者 / API", sub: "公开 API + 合作方接入" },
+      globe: { label: "全球节点地图", sub: "全球活跃节点" },
+      market: { label: "行情", sub: "AI 工作负载价格 + NEX K 线" },
+      events: { label: "活动", sub: "促销 · 赛事 · 季节限定" },
+      missions: { label: "任务", sub: "挑战 · 连签 · 关卡" },
+    },
+    faqEntries: {
+      royalty: { label: "影响力网络分成怎么算", sub: "直推 + 网络收益奖金 + 费率档" },
+      staking: { label: "质押怎么玩", sub: "锁仓期 + APY + 提前解锁罚金" },
+      genesis: { label: "Genesis 是什么", sub: "创世 NFT + 权益 + 二级市场" },
+      nex: { label: "NEX 代币说明", sub: "来源 · 用途 · 销毁机制" },
     },
   },
 
@@ -1041,6 +1160,7 @@ export const zh: Messages = {
       label: "NEX 近期记录",
       viewAll: "查看全部",
       empty: "暂无 NEX 记录",
+      miningLabel: "挖矿收益 · 设备群",
     },
     note: "NEX 是 NexGrid 平台代币,可兑换 USDT,或用于抵扣 USDT 提现手续费。",
   },
@@ -2931,6 +3051,10 @@ export const zh: Messages = {
       90: "均衡选择 · 最热门",
       180: "上线前窗口",
       365: "Founder 收益 · 空投 ×2",
+    },
+    ribbon: {
+      popular: "最多人选",
+      topYield: "收益最高",
     },
     penaltySuffix: "提前赎回罚款",
     calc: {
