@@ -48,19 +48,22 @@
             <text v-if="brand !== 'unknown'" class="font-mono-tabular shrink-0" :style="brandChipStyle">{{ brandLabel(brand) }}</text>
           </view>
 
+          <!-- 卡号/有效期/CVV 归 <HostedCardVault>(收单方托管,本页拿不到明文);
+               持卡人姓名是账单信息不是卡数据,照旧由本页收。 -->
+          <HostedCardVault ref="vaultRef" @change="onCardChange">
           <view :style="formFieldsStyle">
             <view>
               <text class="block" :style="labelStyle">{{ t.cards.formPanLabel }}</text>
-              <input class="font-mono-tabular tabular-nums" :style="[inputStyle, { letterSpacing: '0.05em' }]" type="text" inputmode="numeric" :value="pan" placeholder="1234 5678 9012 3456" @input="onPan" />
+              <HostedCardField kind="pan" class="font-mono-tabular tabular-nums" :input-style="[inputStyle, { letterSpacing: '0.05em' }]" placeholder="1234 5678 9012 3456" :aria-label="t.cards.formPanLabel" />
             </view>
             <view class="grid grid-cols-2" style="gap: 8px">
               <view>
                 <text class="block" :style="labelStyle">{{ t.cards.formExpiryLabel }}</text>
-                <input class="font-mono-tabular tabular-nums w-full" :style="inputStyle" type="text" inputmode="numeric" :value="expiry" placeholder="MM/YY" @input="onExpiry" />
+                <HostedCardField kind="expiry" class="font-mono-tabular tabular-nums w-full" :input-style="inputStyle" placeholder="MM/YY" :aria-label="t.cards.formExpiryLabel" />
               </view>
               <view>
                 <text class="block" :style="labelStyle">{{ t.cards.formCvvLabel }}</text>
-                <input class="font-mono-tabular tabular-nums w-full" :style="inputStyle" type="text" inputmode="numeric" :value="cvv" placeholder="123" @input="onCvv" />
+                <HostedCardField kind="cvv" class="font-mono-tabular tabular-nums w-full" :input-style="inputStyle" placeholder="123" :aria-label="t.cards.formCvvLabel" />
               </view>
             </view>
             <view>
@@ -83,6 +86,7 @@
               </label>
             </checkbox-group>
           </view>
+          </HostedCardVault>
         </view>
 
         <!-- Submit -->
@@ -106,7 +110,10 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { useCards, detectBrand, brandLabel } from "@/store/cards";
+import { useCards, brandLabel } from "@/store/cards";
+import type { CardBrand } from "@/store/cards-core";
+import HostedCardVault from "@/components/me/hosted-card-vault.vue";
+import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useTrialConfig } from "@/store/trial-config";
 import { useQuest } from "@/store/quest";
 import { useApp } from "@/store/app";
@@ -150,9 +157,15 @@ function safeReturnTo(raw: string | undefined, fallback: string): string {
   return fallback;
 }
 
-const pan = ref("");
-const expiry = ref("");
-const cvv = ref("");
+// 🔴 卡号 / 有效期 / CVV 不在本页 —— 归 <HostedCardVault>,本页只收到 ready 与
+// brand,绑定时经 tokenize() 拿 token + 后四位 + 有效期落库。
+const vaultRef = ref<InstanceType<typeof HostedCardVault> | null>(null);
+const cardReady = ref(false);
+const brand = ref<CardBrand>("unknown");
+function onCardChange(e: { ready: boolean; brand: CardBrand }) {
+  cardReady.value = e.ready;
+  brand.value = e.brand;
+}
 const holder = ref("");
 const setAsDefault = ref(true);
 const isBinding = ref(false);
@@ -160,17 +173,6 @@ const isBinding = ref(false);
 // uni input event → e.detail.value (typed Event; mirrors topup-card-form).
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
-}
-function onPan(e: Event) {
-  const digits = detailVal(e).replace(/\D/g, "").slice(0, 19);
-  pan.value = digits.replace(/(\d{4})(?=\d)/g, "$1 ");
-}
-function onExpiry(e: Event) {
-  const d = detailVal(e).replace(/\D/g, "").slice(0, 4);
-  expiry.value = d.length < 3 ? d : `${d.slice(0, 2)}/${d.slice(2)}`;
-}
-function onCvv(e: Event) {
-  cvv.value = detailVal(e).replace(/\D/g, "").slice(0, 4);
 }
 function onHolder(e: Event) {
   holder.value = detailVal(e);
@@ -180,13 +182,8 @@ function onDefaultGroupChange(e: Event) {
   setAsDefault.value = value.includes("default");
 }
 
-const digits = computed(() => pan.value.replace(/\s/g, ""));
-const brand = computed(() => detectBrand(digits.value));
-const validPan = computed(() => digits.value.length >= 13);
-const validExpiry = computed(() => /^\d{2}\/\d{2}$/.test(expiry.value));
-const validCvv = computed(() => /^\d{3,4}$/.test(cvv.value));
 const validHolder = computed(() => holder.value.trim().length >= 2);
-const valid = computed(() => validPan.value && validExpiry.value && validCvv.value && validHolder.value);
+const valid = computed(() => cardReady.value && validHolder.value);
 const canSubmit = computed(() => valid.value && !isBinding.value);
 const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.formDefaultOn : t.value.cards.formDefaultOff));
 
@@ -202,13 +199,17 @@ const trialSuffixText = computed(() =>
 
 function handleBind() {
   if (!canSubmit.value) return;
+  // 明文由 <HostedCardVault> 交给收单方换 token(真实现 = SDK createToken)。
+  // 本页拿到的是 token / 后四位 / 卡组织 / 有效期四样,连同本页自己收的持卡人姓名
+  // 共五个字段落库 —— 卡号与 CVV 不在其中,明文无从写入(SavedCard 根本没这两个字段)。
+  const card = vaultRef.value?.tokenize();
+  if (!card) return;
   isBinding.value = true;
-  // MOCK-ONLY: real backend posts raw PAN/CVV to PSP tokenization (never our
-  // server); client stores only display fields. Here we synthesize a fake token.
   const tokenId = cardsStore.add({
-    brand: brand.value,
-    last4: digits.value.slice(-4),
-    expiry: expiry.value,
+    tokenId: card.token,
+    brand: card.brand,
+    last4: card.last4,
+    expiry: card.expiry,
     holder: holder.value.trim().toUpperCase(),
   }, { makeDefault: setAsDefault.value });
   if (setAsDefault.value) cardsStore.setDefault(tokenId);
@@ -226,7 +227,7 @@ function handleBind() {
     if (quest.rewardNex > 0) bills.add({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
     toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
   } else {
-    toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(brand.value), last4: digits.value.slice(-4) }));
+    toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
   }
   uni.redirectTo({
     url: returnTo.value,

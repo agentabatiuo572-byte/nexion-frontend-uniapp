@@ -2876,6 +2876,23 @@ stateDiagram-v2
 - 三通道的入金记录同列「最近入金」,按通道分流展示标题与跳转:链上轨可进链上交易详情,
   法币轨无链上哈希,进账单流水。
 - 入金记录与账单、收据三处使用同一单号口径,互相可反查。
+
+#### 9.2.8 充值后台接口契约
+
+(server endpoint TBD,候选命名,真后台对接时正式确认。入账状态一律 server 权威,客户端无写入口。)
+
+| Endpoint | Method | Payload | 用途 |
+|---|---|---|---|
+| `/api/config/deposit-channels` | `GET` | — | 下发三通道的费率 / 最低额 / 单笔上限 / 确认数 / 启停位。**拉取失败禁回退写死值**,按通道维护处理 |
+| `/api/config/bank-accounts` | `GET` | — | 下发收款账户池(启停 / 日限 / 熔断 / 轮换),银行轨专属 |
+| `/api/deposits/address` | `GET` | `?network=` | 取当前用户在该网络的专属充值地址(server 派发,同账号同网络恒定、不轮换)|
+| `/api/deposits` | `GET` | `?cursor=` | 入金记录列表(三通道合流,server 权威状态)|
+| `/api/deposits/bank-intents` | `POST` | `{ amountUsdt }` | 生成银行付款单:锁定牌价 + 派发收款账户 + 铸造附言码,返回锁价窗到期时间 |
+| `/api/deposits/bank-intents/:id/cancel` | `POST` | — | 用户取消在途付款单(仅待付款态可调,终态拒绝)|
+| `/api/deposits/card` | `POST` | `{ token, amountUsdt, holder, billing }` —— **token 来自收单方 SDK** | 卡通道充值下单;授权结果由收单方回调 server,server 在同一事务内入账 + 记账 + 写账单 |
+
+链上到账与银行回单均为**服务端事件驱动**(链上侦测服务 / 银行回单推送),客户端只轮询拉取状态收敛,没有任何推进状态的入口。
+
 ### 9.3 提现 `/me/wallet/withdraw`
 
 #### 9.3.1 流程
@@ -3404,10 +3421,10 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
 
 **与 checkout 衔接**:
 - checkout 页 `CardPaymentForm` 调 `useCards()` 读列表 + defaultTokenId
-- 已绑卡:渲染 selector + CVV input
-- 无绑卡:渲染空态 + 跳绑卡页 CTA
-- 选中 + CVV 填完才启用 `支付 ${total}` 按钮
-- CVV 仅本次提交使用,**永不持久化**
+- 已绑卡:列出可选卡 + CVV 复验(托管字段,平台不接触明文)
+- 无绑卡:空态 + 去绑卡入口,入口须带返回地址,绑完回到结账流程
+- 选中卡 + CVV 填足才允许付款,否则按钮禁用并显示禁用原因
+- CVV 仅换取一次性 `cvvToken` 供本次提交,**平台侧不持有、不持久化**
 
 **解绑试用绑定卡拦截**(Sprint #146-2 MVP-C):
 - 用户在 `/me/wallet/cards` 点击解绑按钮时,若该卡 `tokenId === useFreeTrial.cardTokenId` 且 trial status ∈ {`active`, `grace`, `extended`}:
@@ -3418,16 +3435,29 @@ Day-30 的 `🎰 Lucky Spin × 1` 奖励发放 1 张转盘抽奖券,进入 §11.
   - 用户点确认解绑 → 调 `useFreeTrial.cancel("unbind")` + `useCards.remove(tokenId)` + toast,顺序服务端事务化
 - 非 trial 绑定卡,走原默认 confirm 流程
 
+**卡数据采集模型**(2026-07-28 定,前端已按此实现):
+
+采用**收单方托管字段**(hosted fields)模型 —— 卡号、有效期、CVV 由收单方 SDK 在其自有域内采集与令牌化,**平台前端与平台后端都不接触明文卡号与 CVV**。这是产品对用户承诺「不会接触你的完整卡号」的实现方式,也是把合规自评保持在最轻档位的前提。
+
+- 卡号 / CVV:只存在于收单方 SDK 的采集面内,平台侧任何代码都读不到。
+- 有效期:随令牌一并返回平台(卡列表需展示「有效期 09/30」),真实收单方亦然;它属持卡人数据但不属敏感认证数据,与卡号 / CVV 不同级。
+- 持卡人姓名 / 账单地址:非卡数据,由平台自行采集并随令牌提交。
+
+🔴 **禁止**把明文卡号或 CVV 提交给平台自有接口 —— 那会让整个平台后端进入持卡人数据环境,合规成本与责任范围完全不同。
+
 **Cards 后台接口契约**(server endpoint TBD,候选命名,真后台对接时正式确认):
 
 | Endpoint | Method | Payload | 用途 |
 |---|---|---|---|
+| `/api/cards/session` | `POST` | — | 换取收单方 SDK 的一次性客户端会话凭证(用于在页面挂载托管字段)。凭证短时效、限单用户 |
 | `/api/cards` | `GET` | — | 列出当前用户已绑定的卡(返回 tokenId / brand / last4 / expiry / holder / boundAt)|
-| `/api/cards/tokens` | `POST` | `{ pan, expiry, cvv, holder }`(TLS + 不留存原始 PAN)| PSP tokenization,返回 `{ tokenId, brand, last4, expMonth, expYear }`;**客户端永不见 PAN/CVV** |
+| `/api/cards` | `POST` | `{ token, holder }` —— **token 来自收单方 SDK,平台不接触明文** | 绑卡:后端持 token 向收单方确认并落库,返回展示字段。**幂等**:同一 token 重复提交视为重绑,更新展示字段而非新增一行(真实收单方对同一张卡返回同一 token)|
 | `/api/cards/:tokenId` | `DELETE` | — | 解绑(撤销 token)。Trial 绑定卡解绑前必须先 POST `/api/trial/cancel { reason:"unbind" }` |
 | `/api/cards/:tokenId/default` | `PUT` | — | 设为默认支付卡 |
 
-⚠️ 当前 prototype 用 `useCards` zustand persist 模拟 PSP token store;真后台对接时,所有 mutation 走 server endpoint,client 只 cache 显示字段(`brand / last4 / expiry / holder`)。
+用已存卡付款时,CVV 复验同样走托管字段产出一次性 `cvvToken`,随订单提交(`POST /api/orders` 携带 `{ tokenId, cvvToken }`),平台不接触 CVV 明文。
+
+⚠️ 当前原型用本地状态模拟收单方 token 库,并用一个托管字段容器组件充当 SDK 的对等物:卡号 / CVV 的明文只存在于该组件内部,三个调用面(充值 / 绑卡 / 结账)在代码上取不到。真后台对接时替换该组件为收单方 SDK,调用面不改;所有 mutation 走 server endpoint,client 只 cache 展示字段(`brand / last4 / expiry / holder`)。
 
 ### 9.11 免费试用 `/me/trial` (Sprint #146-2)
 
