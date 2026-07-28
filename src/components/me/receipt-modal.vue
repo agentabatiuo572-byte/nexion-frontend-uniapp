@@ -74,6 +74,7 @@ import { computed, ref, onUnmounted, type CSSProperties } from "vue";
 import type { Receipt, ReceiptDetails } from "@/mock/receipt";
 import { shortenHex } from "@/mock/receipt";
 import { useT } from "@/i18n/use-t";
+import { workloadLabel } from "@/lib/workload-label";
 import { toast } from "@/store/ui";
 
 const props = defineProps<{ receipt: Receipt | null }>();
@@ -194,7 +195,7 @@ const sections = computed<DescSection[]>(() => {
       {
         rows: [
           { k: "compliance_id", v: r.id, accent: true },
-          { k: "type", v: r.type },
+          { k: "type", v: workloadLabel(t.value, r.category) },
           { k: "program", v: r.model },
           { k: "authority", v: r.client },
         ],
@@ -232,7 +233,7 @@ const sections = computed<DescSection[]>(() => {
     {
       rows: [
         { k: "job_id", v: r.id, accent: true },
-        { k: "type", v: r.type },
+        { k: "type", v: workloadLabel(t.value, r.category) },
         { k: "model", v: r.model },
         ...(r.details ? detailRows(r.details) : []),
       ],

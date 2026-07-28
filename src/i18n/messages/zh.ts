@@ -603,9 +603,29 @@ export const zh: Messages = {
     liveLabel: "2 分钟前更新",
     priceIndex: "AI 工作负载价格指数",
     deviceRanking: "设备日收益排行",
+    // 6 类工作负载单源(TaskCategory)。价格指数(MarketBoard)与任务中心 /
+    // 设备卡的任务行共用 —— 模型名(Flux.1 [dev]、Kling 2.0…)保持不译。
+    workloads: {
+      IG: { label: "图像生成", unit: "按张" },
+      VG: { label: "视频生成", unit: "按秒" },
+      LL: { label: "LLM 推理", unit: "按千 token" },
+      FT: { label: "微调", unit: "按任务" },
+      EM: { label: "向量嵌入", unit: "按千段" },
+      SP: { label: "语音", unit: "按音频秒" },
+    },
     aiDropAlert: "AI Drop 警报",
     aiDropMessage: "Anthropic Claude 4.6 据传今晚发布。LLM 推理需求可能上涨 +30%。",
     aiDropEta: "预计 18 小时后 · 保持设备在线以捕获高峰价",
+    flagshipRow: "405B 旗舰模型",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "你的手机",
+    bestFor: {
+      rackP1: "训练 + 405B 大模型",
+      boxPro: "旗舰级算力",
+      boxS1: "70B 大模型",
+      cloudShare: "门槛最低",
+      phone: "手机 NPU 档",
+    },
   },
 
   genesisHolder: {
@@ -686,6 +706,79 @@ export const zh: Messages = {
     notifFooter: "禁用某类后,Nova drawer 与通知中心不再推送对应条目。关键合规通知不可禁用。",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
+  // 在线增强 / 基础托管 / 体检融合 就在下面 modeValue,verify.sh 盯这一段。
+  entrySurface: {
+    indexNavTitle: "三端入口",
+    indexNavSubtitle: "完整链接",
+    indexEyebrow: "三端入口",
+    indexTitle: "完整可点击链接",
+    indexBody: "签名版 APP、H5 网页版、白 APP 接管首页分开进入,默认首页保持独立。",
+    fullLinks: "查看三端完整入口链接",
+    surfaces: {
+      signed: {
+        linkLabel: "签名版 APP 首页",
+        kicker: "签名版 APP",
+        title: "常驻在线的收益驾驶舱",
+        body: "安装版 APP 里,设备网络、钱包、商城、团队和实时加成全都在。",
+        modeLabel: "算力模式",
+        modeValue: "在线增强",
+        primaryLabel: "打开收益面板",
+        secondaryLabel: "管理设备",
+        metrics: {
+          a: { label: "在线加成", value: "完整" },
+          b: { label: "设备槽位", value: "6 个" },
+          c: { label: "账号数据", value: "共享" },
+        },
+        steps: {
+          a: { title: "启动", body: "安装版 APP 直接进入收益账号。" },
+          b: { title: "保持在线", body: "手机硬件状态实时喂给加成模型。" },
+          c: { title: "资金流转", body: "钱包、商城、团队一键可达。" },
+        },
+      },
+      h5: {
+        linkLabel: "H5 网页版首页",
+        kicker: "H5 网页版",
+        title: "网页版移动收益",
+        body: "手机浏览器里账号设备和钱包照常可用,不占用后台;电脑共享可用时会出现。",
+        modeLabel: "算力模式",
+        modeValue: "基础托管",
+        primaryLabel: "打开赚币页",
+        secondaryLabel: "管理设备槽位",
+        metrics: {
+          a: { label: "浏览器进入", value: "即开即用" },
+          b: { label: "手机设备", value: "保留" },
+          c: { label: "电脑通道", value: "可选" },
+        },
+        steps: {
+          a: { title: "打开链接", body: "浏览器直达移动端收益页。" },
+          b: { title: "登记设备", body: "手机算力按账号级设备价值保留。" },
+          c: { title: "升级路径", body: "安装版 APP 始终可见;电脑共享可用时出现。" },
+        },
+      },
+      white: {
+        linkLabel: "白 APP 接管首页",
+        kicker: "白 APP 接管",
+        title: "体检直通 NexGrid 首页",
+        body: "硬件评分、账户余额、设备状态先集中在一屏交接页,再进入正式标签页。",
+        modeLabel: "入口状态",
+        modeValue: "体检融合",
+        primaryLabel: "继续进入 NexGrid",
+        secondaryLabel: "登录设备管理",
+        metrics: {
+          a: { label: "体检评分", value: "可见" },
+          b: { label: "设备状态", value: "已合并" },
+          c: { label: "标签页交接", value: "顺滑" },
+        },
+        steps: {
+          a: { title: "进入外壳", body: "交接页顶部保留体检工具的视觉语言。" },
+          b: { title: "读取账号", body: "余额、设备、登录会话来自同一份账号状态。" },
+          c: { title: "继续前进", body: "商城、赚币、团队、钱包标签页照常是正式产品。" },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "搜索",
     placeholder: "搜索设备、成员、FAQ、页面...",
@@ -698,6 +791,34 @@ export const zh: Messages = {
       product: "商城商品",
       member: "网络成员",
       faq: "FAQ + 指南",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "首页 / 任务中心", sub: "实时收益 · 行情跑马灯 · 总览" },
+      earn: { label: "赚币 / 设备群", sub: "设备卡片 · 任务中心 · 效率" },
+      store: { label: "商城", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "以旧换新", sub: "退役旧机,抵扣升级款" },
+      team: { label: "团队中心", sub: "分成 / V 等级 / 网络" },
+      royalty: { label: "影响力网络分成", sub: "直推 + 网络收益奖金" },
+      networkMap: { label: "网络关系图", sub: "直推 / 延伸轨道" },
+      wallet: { label: "钱包", sub: "余额 + 提现 + 充值" },
+      withdraw: { label: "提现", sub: "USDT 提到链上" },
+      staking: { label: "质押金库", sub: "4 档锁仓,最高 180%" },
+      genesis: { label: "Genesis 交易市场", sub: "Genesis 二级交易" },
+      goals: { label: "收益目标", sub: "设定收益目标 + 推荐路径" },
+      risk: { label: "风险披露", sub: "必读" },
+      developer: { label: "开发者 / API", sub: "公开 API + 合作方接入" },
+      globe: { label: "全球节点地图", sub: "全球活跃节点" },
+      market: { label: "行情", sub: "AI 工作负载价格 + NEX K 线" },
+      events: { label: "活动", sub: "促销 · 赛事 · 季节限定" },
+      missions: { label: "任务", sub: "挑战 · 连签 · 关卡" },
+    },
+    faqEntries: {
+      royalty: { label: "影响力网络分成怎么算", sub: "直推 + 网络收益奖金 + 费率档" },
+      staking: { label: "质押怎么玩", sub: "锁仓期 + APY + 提前解锁罚金" },
+      genesis: { label: "Genesis 是什么", sub: "创世 NFT + 权益 + 二级市场" },
+      nex: { label: "NEX 代币说明", sub: "来源 · 用途 · 销毁机制" },
     },
   },
 
@@ -1041,6 +1162,7 @@ export const zh: Messages = {
       label: "NEX 近期记录",
       viewAll: "查看全部",
       empty: "暂无 NEX 记录",
+      miningLabel: "挖矿收益 · 设备群",
     },
     note: "NEX 是 NexGrid 平台代币,可兑换 USDT,或用于抵扣 USDT 提现手续费。",
   },
@@ -1520,6 +1642,44 @@ export const zh: Messages = {
     detFeaturedIn: "媒体报道",
     detCompliance: "合规认证",
     detFaq: "常见问题",
+    detPaybackMonths: "{n} 个月",
+    detPaybackDays: "{n} 天",
+    detCtaPayback: "${daily}/天 · {payback}回本",
+    specGpu: "GPU",
+    specVram: "显存",
+    specPower: "功耗",
+    specDatacenter: "数据中心",
+    specDatacenterValue: "新加坡",
+    specUptime: "在线率 SLA",
+    specWarranty: "质保",
+    specWarrantyValue: "24 个月",
+    aiRowImageGen: "图像生成(SDXL)",
+    aiRowLlm: "LLM 推理",
+    aiRowVideo: "视频生成",
+    aiRowFineTune: "微调(LoRA)",
+    aiRowUnlocks: "可解锁任务池",
+    aiUnitImgMin: "张/分钟",
+    aiUnitTokSec: "k tok/秒",
+    aiUnitMinHour: "分钟/小时",
+    aiUnitMin: "分钟",
+    faq: {
+      location: {
+        q: "设备实际放在哪里?",
+        a: "在我们的新加坡数据中心。你不会收到实体硬件——运维和电费全部包含在内。",
+      },
+      withdraw: {
+        q: "收益随时可以提现吗?",
+        a: "可以,满 $20 起提。首次提现 24 小时内处理完成。需先完成 KYC-Express(存入 $1)验证你的钱包。",
+      },
+      demand: {
+        q: "如果 AI 需求下滑怎么办?",
+        a: "收益随 AI 任务池价格浮动。历史低位:即使在需求清淡期也有 $24/天。",
+      },
+      refund: {
+        q: "有退款期吗?",
+        a: "设备未激活可 7 天内全额退款。激活后可在交易市场转售。",
+      },
+    },
     coProductNotFound: "未找到商品。",
     coRowProduct: "商品",
     coRowQuantity: "数量",
@@ -1599,6 +1759,40 @@ export const zh: Messages = {
     releaseComingToast: "该机型即将上架,敬请期待",
     cardHighTierLine: "可接高阶任务:{pool}",
     comingSoonSubtitle: "批量生产将在周期后期出货",
+    // 按 SKU 的营销文案,以 Product.id 为键(数据结构与英文源在 src/mock/products.ts)。
+    // 商品 `name` 是品牌名,永不翻译。verify.sh 断言每个 PRODUCTS id 在此都有条目。
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "个人 AI 推理机 · 全托管",
+        badge: "热销",
+        unlocks: "LLM 70B 推理池",
+      },
+      "stellarbox-pro": {
+        tagline: "GPU 翻倍,赚钱能力也翻倍。",
+        badge: "正热",
+        unlocks: "旗舰算力池(微调 + 405B 推理)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "2.5 倍 S1 吞吐 —— 为高阶任务池而生。",
+        badge: "升级首选",
+        unlocks: "旗舰 AI + 多租户 405B",
+      },
+      "stellarrack-p1": {
+        tagline: "数据中心级 A100 机架,给认真的运营者。",
+        badge: "旗舰",
+        unlocks: "训练池(RLHF / 从零训练 8B)",
+      },
+      "stellarrack-p2": {
+        tagline: "数据中心 H100 机架 —— 算力天花板。",
+        badge: "旗舰",
+        unlocks: "训练池(RLHF / 从零训练 70B)",
+      },
+      "cloud-share": {
+        tagline: "不用买机器 —— 直接买一份网络算力。",
+        badge: "低门槛",
+        unlocks: "按份接入网络的图像生成 + 向量嵌入 + 语音池",
+      },
+    },
     tradeinUpgrade: {
       label: "升级置换",
       title: "你的 {name} 可抵 ${credit}",
@@ -2187,6 +2381,34 @@ export const zh: Messages = {
       marketLiquidity: "📊 $NEX 24 小时成交量创新高 · 各交易场所池子深度提升。",
       marketLiquidityCta: "信任中心",
     },
+    reply: {
+      deviceOne: "1 台在线设备",
+      deviceMany: "{n} 台在线设备",
+      todayTop: "收益最高的是 {name}({gpu}),今天已赚 ${amount}。",
+      todayNoDevice: "还没有在线设备——接入一台就能开始赚了。",
+      todayBody:
+        "今天到目前为止,你在 {devices}上已经赚了 ${amount}。\n\n{topLine}\n\n你的任务大多跑在 {poolA} + {poolB}池——以你的显存档位来说很正常。要我讲讲怎么解锁 {poolC}吗?",
+      boostLocked:
+        "三个见效快的办法:\n\n1. 至少留一台设备整夜在线——{pool}池在 UTC 02:00-06:00 是高峰。\n2. 你现在的配置上限是 {vram}GB 显存。升级到 {tier} 就能解锁 {model}({type})——单个任务给 {reward}。\n3. 用你的邀请码拉个朋友——他终身收益的 5% 归你。",
+      boostMaxed:
+        "你已经是最高档位了,厉害。还想再往上有两条路:\n\n1. 再加一台 NexGridBox,并行跑微调任务。\n2. 继续推邀请——你这个档位每个邀请拿终身 8% 分成。",
+      hotLlm:
+        "🔥 {pool}价格在过去一小时跳涨 +18%,起因是 Anthropic 发布 Claude 4.6。需求高峰预计持续到今晚。",
+      hotVideo:
+        "📈 {pool}档位的量是平时的 2.4 倍——Atrium AI 今天在跑一批广告渲染。吃吞吐,给钱也大方。",
+      hotFineTune:
+        "💎 {pool}队列积压到 812 个任务(平常 280)。高显存设备优先派单。旗舰算力池按标准费率的 +30% 结算。",
+      topJobsOpen:
+        "你所在的池子里,现在给钱最多的开放任务:\n\n• Llama 3.1 405B 推理 —— 每 1k tokens $0.62(Helix Labs)\n• Sora 级视频 —— 每段 8 秒 $1.80(Atrium AI)\n• DPO · Llama 3.1 70B 微调 —— 每个任务 $0.42(Northwind Research)\n\n这些你的设备都能跑,派单是自动的。",
+      topJobsLocked:
+        "超出你当前显存上限({vram}GB)的高价任务:\n\n{lines}\n\n升级之后就都解锁了——你想好了随时找我。",
+      topJobsLockedLine: "• {model}({type})—— {reward} · 需要 {tier}",
+      welcome:
+        "嘿——我是 Nova,你的算力顾问。我会盯着行情,有赚头的机会就叫你。\n\n点下面的话题开始吧。",
+      ctaBrowseStore: "去商城看看 →",
+      ctaOpenTeam: "打开团队 →",
+      ctaOpenMarket: "查看行情 →",
+    },
   },
   receipt: {
     title: "收据",
@@ -2207,6 +2429,9 @@ export const zh: Messages = {
     catEM: "Embedding",
     catSP: "语音",
     catKY: "KYC",
+    typeWalletPairing: "钱包绑定",
+    sigCopied: "签名已复制",
+    clearedToast: "已删除 {n} 条收据",
   },
   language: {
     pageTitle: "语言",
@@ -2937,6 +3162,10 @@ export const zh: Messages = {
       90: "均衡选择 · 最热门",
       180: "上线前窗口",
       365: "Founder 收益 · 空投 ×2",
+    },
+    ribbon: {
+      popular: "最多人选",
+      topYield: "收益最高",
     },
     penaltySuffix: "提前赎回罚款",
     calc: {

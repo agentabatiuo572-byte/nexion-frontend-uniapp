@@ -10,8 +10,8 @@
 
   Phase-gated products (unlocksAtPhase not yet reached) render the shared
   <LockedProductCard> in place of the full page (mirrors ProductDetailGate).
-  Dense mock strings (FAQ / compliance / media) are kept as faithful
-  English data, not i18n (matches the source's inline arrays).
+  Spec-sheet labels and the FAQ are i18n copy; publication and certification
+  names (Forbes / SOC 2 …) stay untranslated as proper nouns.
 -->
 <template>
   <AppChassis active="store">
@@ -42,8 +42,8 @@
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender :tier="product.tier" />
             <!-- Folded-corner ribbon -->
-            <view v-if="product.badge" class="absolute" :style="ribbonStyle">
-              <text>{{ product.badge }}</text>
+            <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
+              <text>{{ copy.badge }}</text>
             </view>
             <!-- Live activity danmaku -->
             <LiveSocialProof :product="product" />
@@ -54,15 +54,15 @@
             <view class="flex items-start justify-between" style="gap: 12px">
               <view class="min-w-0">
                 <text class="block truncate" :style="nameStyle">{{ product.name }}</text>
-                <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ product.tagline }}</text>
+                <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
               </view>
               <text v-if="!isShare" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
             </view>
 
             <!-- trust chips -->
             <view class="flex flex-wrap" style="margin-top: 14px; gap: 8px">
-              <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} sold</text>
-              <text v-if="stockLow" class="font-mono-tabular" :style="codeChip('amber')">🔥 only {{ product.stock }} left</text>
+              <text class="font-mono-tabular" :style="codeChip('success')">✓ {{ soldText }} {{ t.store.soldLabel }}</text>
+              <text v-if="stockLow" class="font-mono-tabular" :style="codeChip('amber')">🔥 {{ product.stock }} {{ t.store.onlyXLeft }}</text>
             </view>
           </view>
         </view>
@@ -203,6 +203,7 @@ import { isPhaseReached } from "@/store/product-phase";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
+import { productCopy } from "@/lib/product-copy";
 
 const t = useT();
 const phase = useProductPhase();
@@ -215,6 +216,13 @@ onLoad((options) => {
 
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
 const isShare = computed(() => product.value?.tier === "Share");
+// Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
+// both consumers are inside `v-if="product"`, so the blanks never render.
+const copy = computed(() =>
+  product.value
+    ? productCopy(t.value, product.value)
+    : { tagline: "", badge: "", unlocks: "" },
+);
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
@@ -257,45 +265,50 @@ const paybackDays = computed(() =>
 const paybackLabel = computed(() => {
   if (!product.value || isShare.value) return "";
   const d = Math.round(product.value.price / product.value.dailyEarn);
-  return d >= 60 ? `${(d / 30).toFixed(1)} months` : `${d} days`;
+  return d >= 60
+    ? fmt(t.value.store.detPaybackMonths, { n: (d / 30).toFixed(1) })
+    : fmt(t.value.store.detPaybackDays, { n: d });
 });
 
-// Hardware spec rows — real fields + plausible managed-service spec
+// Hardware spec rows — per-SKU fields (gpu / vram / power) stay as authored in
+// products.ts; the managed-service rows are copy and resolve per locale.
 const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
   const p = product.value;
   if (!p) return [];
+  const s = t.value.store;
   return [
-    { k: "GPU", v: p.gpu },
-    { k: "VRAM", v: p.vram },
-    { k: "Power", v: p.power ?? "—" },
-    { k: "Datacenter", v: "Singapore" },
-    { k: "Uptime SLA", v: "99.9%" },
-    { k: "Warranty", v: "24 months" },
+    { k: s.specGpu, v: p.gpu },
+    { k: s.specVram, v: p.vram },
+    { k: s.specPower, v: p.power ?? "—" },
+    { k: s.specDatacenter, v: s.specDatacenterValue },
+    { k: s.specUptime, v: "99.9%" },
+    { k: s.specWarranty, v: s.specWarrantyValue },
   ];
 });
 
-// AI perf rows from product.ai
+// AI perf rows from product.ai. `unlocks` is per-SKU marketing copy → resolved
+// through productCopy() alongside tagline/badge, not read raw off the mock.
 const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
   const ai = product.value?.ai;
   if (!ai) return [];
+  const s = t.value.store;
   const rows: { k: string; v: string }[] = [];
-  if (ai.imageGenPerMin) rows.push({ k: "Image gen (SDXL)", v: `${ai.imageGenPerMin} img/min` });
-  if (ai.llmTokensPerSec) rows.push({ k: "LLM inference", v: `${(ai.llmTokensPerSec / 1000).toFixed(1)}k tok/sec` });
-  if (ai.videoMinPerHour) rows.push({ k: "Video gen", v: `${ai.videoMinPerHour} min / hour` });
-  if (ai.fineTuneMins) rows.push({ k: "Fine-tune (LoRA)", v: `~${ai.fineTuneMins} min` });
-  if (ai.unlocks) rows.push({ k: "Unlocks pool", v: ai.unlocks });
+  if (ai.imageGenPerMin) rows.push({ k: s.aiRowImageGen, v: `${ai.imageGenPerMin} ${s.aiUnitImgMin}` });
+  if (ai.llmTokensPerSec) rows.push({ k: s.aiRowLlm, v: `${(ai.llmTokensPerSec / 1000).toFixed(1)}${s.aiUnitTokSec}` });
+  if (ai.videoMinPerHour) rows.push({ k: s.aiRowVideo, v: `${ai.videoMinPerHour} ${s.aiUnitMinHour}` });
+  if (ai.fineTuneMins) rows.push({ k: s.aiRowFineTune, v: `~${ai.fineTuneMins} ${s.aiUnitMin}` });
+  if (copy.value.unlocks) rows.push({ k: s.aiRowUnlocks, v: copy.value.unlocks });
   return rows;
 });
 
-// Mock FAQ / trust — faithful English data (not i18n; matches source)
+// Trust marks are proper nouns — publications and certification schemes keep
+// their registered names in every locale.
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
 const compliance = ["SOC 2 Type II", "ISO 27001", "Chainalysis KYT"];
-const faqs = [
-  { q: "Where is the device physically?", a: "In our Singapore datacenter. You never receive hardware — all maintenance and power is included." },
-  { q: "Can I withdraw earnings anytime?", a: "Yes, from $20. First withdrawal processes within 24 hours. KYC-Express ($1 deposit) required to verify your wallet." },
-  { q: "What if AI demand drops?", a: "Earnings scale with AI workload pool pricing. Historical floor: $24/day even during low-demand periods." },
-  { q: "Is there a refund window?", a: "7-day money-back if device hasn't been activated. After activation, resale on marketplace." },
-];
+const faqs = computed(() => {
+  const f = t.value.store.faq;
+  return [f.location, f.withdraw, f.demand, f.refund];
+});
 
 // ── text helpers (toFixed / toLocaleString / fmt out of template) ──
 const stockLow = computed(
@@ -353,7 +366,9 @@ watch(
     sticky.show({
       href: `/pages/store/checkout?product=${product.value.id}`,
       amount: `$${priceText.value}`,
-      amountSubtext: isShare.value ? undefined : `$${dailyEarnText.value}/d · ${paybackLabel.value} payback`,
+      amountSubtext: isShare.value
+        ? undefined
+        : fmt(t.value.store.detCtaPayback, { daily: dailyEarnText.value, payback: paybackLabel.value }),
       buttonLabel: t.value.store.cardBuyNow,
       showTabBar: false,
     });
@@ -522,7 +537,7 @@ const faqCardStyle: CSSProperties = {
   borderTop: "1px solid var(--v5-border)",
 };
 function faqItemStyle(i: number): CSSProperties {
-  return { borderBottom: i < faqs.length - 1 ? "1px solid var(--v5-border)" : "none" };
+  return { borderBottom: i < faqs.value.length - 1 ? "1px solid var(--v5-border)" : "none" };
 }
 const faqQStyle: CSSProperties = {
   padding: "14px 0",

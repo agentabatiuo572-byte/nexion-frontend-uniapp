@@ -4,7 +4,8 @@
     1. AI Workload Price Index (6 workloads · 24h delta · 7-pt sparkline)
     2. Device earnings ranking (5 tiers, phone last → upgrade pull)
   Distinct from home's MarketBoardCard (different data + layout). Static mock
-  data (workload/model proper nouns untranslated). Ranking rows with an href
+  numbers; workload names/units come from t.market.workloads (shared with Task
+  Center + device cards). Model names stay untranslated. Ranking rows with an href
   route to that tier's store detail. Conversion role: feeds the tier-locked
   tasks banner below it on /earn.
 -->
@@ -30,10 +31,10 @@
         <view class="flex items-center gap-2.5">
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
-              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
-              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ w.unit }}</text>
+              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.market.workloads[w.code].label }}</text>
+              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.market.workloads[w.code].unit }}</text>
             </view>
-            <text v-if="w.flagship" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
+            <text v-if="w.flagshipDelta !== undefined" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ t.market.flagshipRow }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagshipDelta.toFixed(1) }}%</text></text>
           </view>
           <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-2); width: 64px">${{ formatPrice(w.price) }}</text>
           <text class="tabular-nums shrink-0 text-right" style="font-family: var(--font-v5); font-size: 12px; width: 48px" :style="{ color: arrowColor(w) }">{{ arrow(w) }} {{ Math.abs(w.delta).toFixed(1) }}%</text>
@@ -56,8 +57,8 @@
         v-on="d.kind ? { click: () => d.kind && goDetail(d.kind) } : {}"
       >
         <view class="flex-1 min-w-0">
-          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.uiChrome.best }}</text></text>
-          <text v-if="d.bestFor" class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ d.bestFor }}</text>
+          <text class="block truncate" :style="{ fontSize: '15px', color: d.isPhone ? 'var(--v5-ink-3)' : 'var(--v5-ink-2)', fontWeight: d.isPhone ? 400 : 600 }">{{ d.name ?? t.market.yourPhone }}<text v-if="d.rank === 1" style="margin-left: 6px; font-size: 12px; color: var(--v5-warning-ink)">{{ t.uiChrome.best }}</text></text>
+          <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.market.bestFor[d.bestForKey] }}</text>
         </view>
         <text class="tabular-nums shrink-0" :style="{ fontFamily: 'var(--font-v5)', fontSize: '14.5px', fontWeight: 400, color: 'var(--v5-warning-ink)' }">${{ d.dailyEarn.toFixed(2) }}/d</text>
         <svg v-if="d.kind" class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -69,44 +70,46 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import type { DeviceKind } from "@/store/types";
+import type { DeviceKind, TaskCategory } from "@/store/types";
 
 interface WorkloadPrice {
-  code: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
-  label: string;
-  unit: string;
+  code: TaskCategory;
   price: number;
   delta: number;
   spark: number[];
-  flagship?: { label: string; delta: number };
+  flagshipDelta?: number;
 }
 
 interface DeviceRanking {
   rank: 1 | 2 | 3 | 4 | 5;
-  name: string;
+  /** 商品品牌名(不翻译);手机档没有商品名,走 t.market.yourPhone。 */
+  name?: string;
+  bestForKey: keyof typeof t.value.market.bestFor;
   dailyEarn: number;
-  bestFor?: string;
   isPhone?: boolean;
   kind?: Exclude<DeviceKind, "phone">;
 }
 
 const t = useT();
 
+// Label + unit come from t.market.workloads[code] — the same key set the Task
+// Center job rows and device cards read, so a workload is named identically
+// everywhere. Only the numbers live here (flagship 行的文案走 t.market.flagshipRow)。
 const PRICE_INDEX: WorkloadPrice[] = [
-  { code: "IG", label: "Image Gen", unit: "per image", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
-  { code: "LL", label: "LLM Inference", unit: "per 1k tok", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagship: { label: "405B flagship", delta: 32.1 } },
-  { code: "VG", label: "Video Gen", unit: "per sec", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
-  { code: "FT", label: "Fine-tune", unit: "per job", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
-  { code: "EM", label: "Embedding", unit: "per 1k chunks", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
-  { code: "SP", label: "Speech", unit: "per audio sec", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
+  { code: "IG", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
+  { code: "LL", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagshipDelta: 32.1 },
+  { code: "VG", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
+  { code: "FT", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
+  { code: "EM", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
+  { code: "SP", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [
-  { rank: 1, name: "NexGridRack P1", dailyEarn: 45, bestFor: "Training + 405B LLM", kind: "stellarrack-p1" },
-  { rank: 2, name: "NexGridBox Pro", dailyEarn: 13, bestFor: "Flagship compute", kind: "stellarbox-pro" },
-  { rank: 3, name: "NexGridBox S1", dailyEarn: 7, bestFor: "LLM 70B", kind: "stellarbox-s1" },
-  { rank: 4, name: "Inference Share", dailyEarn: 0.19, bestFor: "Low barrier entry", kind: "cloud-share" },
-  { rank: 5, name: "Your phone", dailyEarn: 0.06, bestFor: "Mobile NPU tier", isPhone: true },
+  { rank: 1, name: "NexGridRack P1", dailyEarn: 45, bestForKey: "rackP1", kind: "stellarrack-p1" },
+  { rank: 2, name: "NexGridBox Pro", dailyEarn: 13, bestForKey: "boxPro", kind: "stellarbox-pro" },
+  { rank: 3, name: "NexGridBox S1", dailyEarn: 7, bestForKey: "boxS1", kind: "stellarbox-s1" },
+  { rank: 4, name: "Inference Share", dailyEarn: 0.19, bestForKey: "cloudShare", kind: "cloud-share" },
+  { rank: 5, dailyEarn: 0.06, bestForKey: "phone", isPhone: true },
 ];
 
 function formatPrice(n: number): string {

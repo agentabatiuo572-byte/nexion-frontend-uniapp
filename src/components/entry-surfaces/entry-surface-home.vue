@@ -55,8 +55,8 @@
         </view>
       </view>
 
-      <view class="entry-link" role="button" tabindex="0" aria-label="查看三端完整入口链接" @click="go('/pages/entry-surfaces/index')">
-        <text>查看三端完整入口链接</text>
+      <view class="entry-link" role="button" tabindex="0" :aria-label="t.entrySurface.fullLinks" @click="go('/pages/entry-surfaces/index')">
+        <text>{{ t.entrySurface.fullLinks }}</text>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M7 17 17 7" />
           <path d="M8 7h9v9" />
@@ -69,101 +69,51 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 
 type SurfaceKey = "signed" | "h5" | "white";
 
-interface EntryAction {
-  label: string;
-  href: string;
-}
-interface EntryMetric {
-  label: string;
-  value: string;
-}
-interface EntryStep {
-  title: string;
-  body: string;
-}
-interface EntrySurfaceData {
-  kicker: string;
-  title: string;
-  body: string;
-  modeLabel: string;
-  modeValue: string;
-  primary: EntryAction;
-  secondary: EntryAction;
-  metrics: EntryMetric[];
-  steps: EntryStep[];
-  iconPath: string;
-}
-
 const props = defineProps<{ surface: SurfaceKey }>();
+const t = useT();
 
-const SURFACES: Record<SurfaceKey, EntrySurfaceData> = {
+// 文案在 i18n(entrySurface.surfaces.*);这里只留跟语言无关的东西:
+// 目的地路由 + hero 插画的 SVG path。
+const SHELLS: Record<SurfaceKey, { primaryHref: string; secondaryHref: string; iconPath: string }> = {
   signed: {
-    kicker: "签名版 APP",
-    title: "Always-on earning cockpit",
-    body: "Full device network, wallet, store, team and live boost stay available from the installed app.",
-    modeLabel: "算力模式",
-    modeValue: "在线增强",
-    primary: { label: "Open earning dashboard", href: "/" },
-    secondary: { label: "Manage devices", href: "/pages/me/devices" },
-    metrics: [
-      { label: "Online boost", value: "Full" },
-      { label: "Device fleet", value: "6 slots" },
-      { label: "Account data", value: "Shared" },
-    ],
-    steps: [
-      { title: "Launch", body: "Installed app opens directly into the earning account." },
-      { title: "Keep online", body: "Phone hardware status feeds the live boost model." },
-      { title: "Move money", body: "Wallet, store and team flows stay one tap away." },
-    ],
+    primaryHref: "/",
+    secondaryHref: "/pages/me/devices",
     iconPath: "M169 64h14M176 57v14M160 83c7 5 25 5 32 0",
   },
   h5: {
-    kicker: "H5 网页版",
-    title: "Base-hosted mobile earning",
-    body: "Mobile browser keeps account devices and wallet available without background lock-in. PC sharing appears when available.",
-    modeLabel: "算力模式",
-    modeValue: "基础托管",
-    primary: { label: "Open earn view", href: "/pages/earn/earn" },
-    secondary: { label: "Manage device slots", href: "/pages/me/devices" },
-    metrics: [
-      { label: "Browser access", value: "Instant" },
-      { label: "Phone device", value: "Kept" },
-      { label: "PC path", value: "Optional" },
-    ],
-    steps: [
-      { title: "Open link", body: "Browser lands on the mobile earning surface." },
-      { title: "Register device", body: "Phone capability is kept as account-level device value." },
-      { title: "Upgrade path", body: "Installed app stays visible; PC sharing appears when it is available." },
-    ],
+    primaryHref: "/pages/earn/earn",
+    secondaryHref: "/pages/me/devices",
     iconPath: "M161 55h31v23h-31zM169 86h15M176 78v8",
   },
   white: {
-    kicker: "白 APP 接管",
-    title: "Health scan into NexGrid home",
-    body: "Hardware score, account balance and fleet status stay on one takeover screen before moving into the live tabs.",
-    modeLabel: "入口状态",
-    modeValue: "体检融合",
-    primary: { label: "Continue to NexGrid", href: "/" },
-    secondary: { label: "Security sessions", href: "/pages/me/security" },
-    metrics: [
-      { label: "Health score", value: "Visible" },
-      { label: "Fleet status", value: "Merged" },
-      { label: "Tab handoff", value: "Smooth" },
-    ],
-    steps: [
-      { title: "Enter shell", body: "Health-tool visual language remains at the top of the handoff." },
-      { title: "Read account", body: "Balance, devices and sessions come from the same account state." },
-      { title: "Move onward", body: "Store, earn, team and wallet tabs continue as the live product." },
-    ],
+    primaryHref: "/",
+    secondaryHref: "/pages/me/security",
     iconPath: "M160 64c6-10 26-10 32 0M165 78h22M176 50v42",
   },
 };
 
-const data = computed(() => SURFACES[props.surface]);
+const shell = computed(() => SHELLS[props.surface]);
+const copy = computed(() => t.value.entrySurface.surfaces[props.surface]);
+const data = computed(() => {
+  const c = copy.value;
+  return {
+    kicker: c.kicker,
+    title: c.title,
+    body: c.body,
+    modeLabel: c.modeLabel,
+    modeValue: c.modeValue,
+    primary: { label: c.primaryLabel, href: shell.value.primaryHref },
+    secondary: { label: c.secondaryLabel, href: shell.value.secondaryHref },
+    metrics: [c.metrics.a, c.metrics.b, c.metrics.c],
+    steps: [c.steps.a, c.steps.b, c.steps.c],
+    iconPath: shell.value.iconPath,
+  };
+});
 const toneClass = computed(() => `entry-page--${props.surface}`);
 
 function go(href: string) {

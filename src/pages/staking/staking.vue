@@ -140,12 +140,11 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
-const RIBBONS: Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>> = {
-  180: { label: "Most popular", tone: "cyan" },
-  365: { label: "Highest yield", tone: "gold" },
-};
-
 const t = useT();
+const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>>>(() => ({
+  180: { label: t.value.stakingV3.ribbon.popular, tone: "cyan" },
+  365: { label: t.value.stakingV3.ribbon.topYield, tone: "gold" },
+}));
 const app = useApp();
 const bills = useBills();
 const staking = useStaking();

@@ -615,10 +615,31 @@ export const en = {
     liveLabel: "Updated 2 min ago",
     priceIndex: "AI Workload Price Index",
     deviceRanking: "Device Earnings",
+    // Single source for the 6 workload categories (TaskCategory). Read by the
+    // price index (MarketBoard) AND the job/teaser rows in Task Center + device
+    // cards — model names (Flux.1 [dev], Kling 2.0 …) stay untranslated.
+    workloads: {
+      IG: { label: "Image Gen", unit: "per image" },
+      VG: { label: "Video Gen", unit: "per sec" },
+      LL: { label: "LLM Inference", unit: "per 1k tok" },
+      FT: { label: "Fine-tune", unit: "per job" },
+      EM: { label: "Embedding", unit: "per 1k chunks" },
+      SP: { label: "Speech", unit: "per audio sec" },
+    },
     aiDropAlert: "AI Drop alert",
     aiDropMessage:
       "Anthropic Claude 4.6 launch rumored tonight. LLM Inference demand may spike +30%.",
     aiDropEta: "Est. window: 18h · keep devices online to capture peak rates",
+    flagshipRow: "405B flagship",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "Your phone",
+    bestFor: {
+      rackP1: "Training + 405B LLM",
+      boxPro: "Flagship compute",
+      boxS1: "LLM 70B",
+      cloudShare: "Low barrier entry",
+      phone: "Mobile NPU tier",
+    },
   },
 
   genesisHolder: {
@@ -699,6 +720,79 @@ export const en = {
     notifFooter: "Disabling a category suppresses the Nova drawer + notification center entries. Critical compliance notifications cannot be disabled.",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token(zh 的
+  // 在线增强 / 基础托管 / 体检融合)由 verify.sh 盯在 zh.ts 这一段里。
+  entrySurface: {
+    indexNavTitle: "Entry surfaces",
+    indexNavSubtitle: "Full links",
+    indexEyebrow: "Three entry surfaces",
+    indexTitle: "Full clickable links",
+    indexBody: "Signed app, H5 web and white-app takeover homes each open separately; the default home stays independent.",
+    fullLinks: "See all three entry links",
+    surfaces: {
+      signed: {
+        linkLabel: "Signed app home",
+        kicker: "Signed app",
+        title: "Always-on earning cockpit",
+        body: "Full device network, wallet, store, team and live boost stay available from the installed app.",
+        modeLabel: "Compute mode",
+        modeValue: "Online boost",
+        primaryLabel: "Open earning dashboard",
+        secondaryLabel: "Manage devices",
+        metrics: {
+          a: { label: "Online boost", value: "Full" },
+          b: { label: "Device fleet", value: "6 slots" },
+          c: { label: "Account data", value: "Shared" },
+        },
+        steps: {
+          a: { title: "Launch", body: "Installed app opens directly into the earning account." },
+          b: { title: "Keep online", body: "Phone hardware status feeds the live boost model." },
+          c: { title: "Move money", body: "Wallet, store and team flows stay one tap away." },
+        },
+      },
+      h5: {
+        linkLabel: "H5 web home",
+        kicker: "H5 web",
+        title: "Base-hosted mobile earning",
+        body: "Mobile browser keeps account devices and wallet available without background lock-in. PC sharing appears when available.",
+        modeLabel: "Compute mode",
+        modeValue: "Base hosted",
+        primaryLabel: "Open earn view",
+        secondaryLabel: "Manage device slots",
+        metrics: {
+          a: { label: "Browser access", value: "Instant" },
+          b: { label: "Phone device", value: "Kept" },
+          c: { label: "PC path", value: "Optional" },
+        },
+        steps: {
+          a: { title: "Open link", body: "Browser lands on the mobile earning surface." },
+          b: { title: "Register device", body: "Phone capability is kept as account-level device value." },
+          c: { title: "Upgrade path", body: "Installed app stays visible; PC sharing appears when it is available." },
+        },
+      },
+      white: {
+        linkLabel: "White-app takeover home",
+        kicker: "White-app takeover",
+        title: "Health scan into NexGrid home",
+        body: "Hardware score, account balance and fleet status stay on one takeover screen before moving into the live tabs.",
+        modeLabel: "Entry state",
+        modeValue: "Scan merged",
+        primaryLabel: "Continue to NexGrid",
+        secondaryLabel: "Security sessions",
+        metrics: {
+          a: { label: "Health score", value: "Visible" },
+          b: { label: "Fleet status", value: "Merged" },
+          c: { label: "Tab handoff", value: "Smooth" },
+        },
+        steps: {
+          a: { title: "Enter shell", body: "Health-tool visual language remains at the top of the handoff." },
+          b: { title: "Read account", body: "Balance, devices and sessions come from the same account state." },
+          c: { title: "Move onward", body: "Store, earn, team and wallet tabs continue as the live product." },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "Search",
     placeholder: "Search devices, members, FAQ, pages…",
@@ -711,6 +805,34 @@ export const en = {
       product: "Store products",
       member: "Network members",
       faq: "FAQ + guides",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "Home / Mission Control", sub: "Live earnings · ticker · dashboard" },
+      earn: { label: "Earn / Fleet", sub: "Device cards · task center · efficiency" },
+      store: { label: "Store", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "Trade-in", sub: "Retire & credit toward an upgrade" },
+      team: { label: "Team hub", sub: "Royalty / V-rank / network" },
+      royalty: { label: "Influence Network Royalty", sub: "Direct + Network Yield Bonus" },
+      networkMap: { label: "Network visualization", sub: "Direct / Extended orbits" },
+      wallet: { label: "Wallet", sub: "Balance + withdraw + topup" },
+      withdraw: { label: "Withdraw", sub: "Cash out USDT to chain" },
+      staking: { label: "Staking Vault", sub: "4 lock tiers up to 180%" },
+      genesis: { label: "Genesis marketplace", sub: "Secondary Genesis trading" },
+      goals: { label: "Goals", sub: "Set earnings target + recommended path" },
+      risk: { label: "Risk disclosure", sub: "Required reading" },
+      developer: { label: "Developer / API", sub: "Public API + partner integrations" },
+      globe: { label: "Globe / Network map", sub: "Worldwide active nodes" },
+      market: { label: "Market", sub: "AI workload prices + NEX K-line" },
+      events: { label: "Events", sub: "Promotions · contests · seasonal" },
+      missions: { label: "Missions", sub: "Quests · streaks · challenges" },
+    },
+    faqEntries: {
+      royalty: { label: "How Influence Network Royalty works", sub: "Direct + Network Yield Bonus + Rate Tier" },
+      staking: { label: "How Staking works", sub: "Lock periods + APY + early unlock penalty" },
+      genesis: { label: "How Genesis works", sub: "Founder NFT + perks + secondary" },
+      nex: { label: "NEX token explained", sub: "Sources · uses · burn mechanism" },
     },
   },
 
@@ -1056,6 +1178,7 @@ export const en = {
       label: "RECENT NEX ACTIVITY",
       viewAll: "View all",
       empty: "No NEX activity yet",
+      miningLabel: "Mining payout · fleet",
     },
     note: "NEX is the NexGrid platform token. Convert it to USDT in Exchange, or use it to offset USDT withdrawal fees.",
   },
@@ -1536,6 +1659,48 @@ export const en = {
     detFeaturedIn: "Featured in",
     detCompliance: "Compliance",
     detFaq: "FAQ",
+    // Hardware spec sheet. Row labels + the two values that are prose rather
+    // than per-SKU data (gpu / vram / power values come from products.ts).
+    detPaybackMonths: "{n} months",
+    detPaybackDays: "{n} days",
+    detCtaPayback: "${daily}/d · {payback} payback",
+    specGpu: "GPU",
+    specVram: "VRAM",
+    specPower: "Power",
+    specDatacenter: "Datacenter",
+    specDatacenterValue: "Singapore",
+    specUptime: "Uptime SLA",
+    specWarranty: "Warranty",
+    specWarrantyValue: "24 months",
+    // AI performance sheet — row labels carry the benchmark model in parens,
+    // so they stay distinct from the bare workload names in t.market.workloads.
+    aiRowImageGen: "Image gen (SDXL)",
+    aiRowLlm: "LLM inference",
+    aiRowVideo: "Video gen",
+    aiRowFineTune: "Fine-tune (LoRA)",
+    aiRowUnlocks: "Unlocks pool",
+    aiUnitImgMin: "img/min",
+    aiUnitTokSec: "k tok/sec",
+    aiUnitMinHour: "min / hour",
+    aiUnitMin: "min",
+    faq: {
+      location: {
+        q: "Where is the device physically?",
+        a: "In our Singapore datacenter. You never receive hardware — all maintenance and power is included.",
+      },
+      withdraw: {
+        q: "Can I withdraw earnings anytime?",
+        a: "Yes, from $20. First withdrawal processes within 24 hours. KYC-Express ($1 deposit) required to verify your wallet.",
+      },
+      demand: {
+        q: "What if AI demand drops?",
+        a: "Earnings scale with AI workload pool pricing. Historical floor: $24/day even during low-demand periods.",
+      },
+      refund: {
+        q: "Is there a refund window?",
+        a: "7-day money-back if device hasn't been activated. After activation, resale on marketplace.",
+      },
+    },
     coProductNotFound: "Product not found.",
     coRowProduct: "Product",
     coRowQuantity: "Quantity",
@@ -1616,6 +1781,41 @@ export const en = {
     releaseComingToast: "This model is arriving soon — stay tuned",
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
+    // Per-SKU marketing copy, keyed by Product.id (src/mock/products.ts holds the
+    // data shape + English source). Product `name` is a brand mark and is NEVER
+    // translated. verify.sh asserts every PRODUCTS id has an entry here.
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "Personal AI inference box · fully managed",
+        badge: "Best Seller",
+        unlocks: "LLM 70B inference pool",
+      },
+      "stellarbox-pro": {
+        tagline: "Double the GPUs, double the earning power.",
+        badge: "Trending",
+        unlocks: "Flagship compute pool (Fine-tune + 405B inference)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "2.5× S1 throughput — built for higher-tier task pools.",
+        badge: "Upgrade Pick",
+        unlocks: "Flagship AI + multi-tenant 405B",
+      },
+      "stellarrack-p1": {
+        tagline: "Datacenter-grade A100 rack for serious operators.",
+        badge: "Flagship",
+        unlocks: "Training pool (RLHF / from-scratch 8B)",
+      },
+      "stellarrack-p2": {
+        tagline: "Datacenter H100 rack — the top compute tier.",
+        badge: "Flagship",
+        unlocks: "Training pool (RLHF / 70B from-scratch)",
+      },
+      "cloud-share": {
+        tagline: "No hardware needed — buy a slice of the network.",
+        badge: "Low Barrier",
+        unlocks: "Fractional access to network's IG + EM + SP pools",
+      },
+    },
     tradeinUpgrade: {
       label: "Upgrade trade-in",
       title: "Your {name} is worth ${credit} in credit",
@@ -2210,6 +2410,38 @@ export const en = {
       marketLiquidity: "📊 $NEX 24h volume hit a new high · pool liquidity deepened across venues.",
       marketLiquidityCta: "Trust Center",
     },
+    // Quick-prompt reply scripts (drawer chip → Nova answer). Previously
+    // hardcoded English in mock/nova-templates.ts. Workload names are injected
+    // from t.market.workloads so Nova names a pool exactly like the rest of the
+    // app does. Model / client / device names are proper nouns — not translated.
+    reply: {
+      deviceOne: "1 active device",
+      deviceMany: "{n} active devices",
+      todayTop: "Top earner: {name} ({gpu}) at ${amount} today.",
+      todayNoDevice: "No active devices yet — connect one to start earning.",
+      todayBody:
+        "You've earned ${amount} so far today across {devices}.\n\n{topLine}\n\nMost of your jobs ran on the {poolA} + {poolB} pools — typical for your VRAM tier. Want me to explain how to unlock {poolC}?",
+      boostLocked:
+        "Three quick wins:\n\n1. Keep at least one device online overnight — the {pool} pool peaks 02:00-06:00 UTC.\n2. Your current rig caps at {vram}GB VRAM. Upgrading to {tier} unlocks {model} ({type}) — a single job pays {reward}.\n3. Refer a friend with your invite code — you earn 5% of their lifetime payouts.",
+      boostMaxed:
+        "You already run the highest tier — nice. Two ways to scale further:\n\n1. Add a second NexGridBox to handle parallel fine-tune jobs.\n2. Keep referring — your tier earns 8% lifetime split on each referral.",
+      hotLlm:
+        "🔥 {pool} prices jumped +18% in the last hour after Anthropic's Claude 4.6 launch. Demand surge expected through tonight.",
+      hotVideo:
+        "📈 {pool} tier seeing 2.4× normal volume — Atrium AI is running a campaign render today. Throughput-bound, well-paying.",
+      hotFineTune:
+        "💎 {pool} queue depth at 812 jobs (vs 280 baseline). High-VRAM devices getting first pick. Flagship compute pool at +30% of standard rate.",
+      topJobsOpen:
+        "Right now the highest-paying open jobs in your pool:\n\n• Llama 3.1 405B inference — $0.62 per 1k tokens (Helix Labs)\n• Sora-class video — $1.80 per 8s clip (Atrium AI)\n• DPO · Llama 3.1 70B fine-tune — $0.42 per job (Northwind Research)\n\nYour devices can run all of these. Routing handled automatically.",
+      topJobsLocked:
+        "Top jobs above your current VRAM cap ({vram}GB):\n\n{lines}\n\nEach unlocks once you upgrade — let me know when you're ready.",
+      topJobsLockedLine: "• {model} ({type}) — {reward} · needs {tier}",
+      welcome:
+        "Hey — I'm Nova, your compute advisor. I'll watch the market and ping you when there's an opportunity to earn more.\n\nTry the chips below to start.",
+      ctaBrowseStore: "Browse Store →",
+      ctaOpenTeam: "Open Team →",
+      ctaOpenMarket: "Open Market →",
+    },
   },
   receipt: {
     title: "Receipts",
@@ -2231,6 +2463,12 @@ export const en = {
     catEM: "Embedding",
     catSP: "Speech",
     catKY: "KYC",
+    // Receipt `type` row. The 6 AI workloads resolve from t.market.workloads at
+    // render time (receipts persist, so a baked label would freeze the language
+    // it was generated in); only the KYC receipt needs its own label here.
+    typeWalletPairing: "Wallet Pairing",
+    sigCopied: "Signature copied",
+    clearedToast: "{n} receipts removed",
   },
   language: {
     pageTitle: "Language",
@@ -2988,6 +3226,10 @@ export const en = {
       90: "Balanced · most chosen",
       180: "Pre-listing window",
       365: "Founder yield · airdrop ×2",
+    },
+    ribbon: {
+      popular: "Most popular",
+      topYield: "Highest yield",
     },
     penaltySuffix: "early-withdraw penalty",
     calc: {
