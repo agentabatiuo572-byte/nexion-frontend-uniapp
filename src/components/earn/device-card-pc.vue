@@ -194,7 +194,7 @@
     <!-- Current task (non-reconnecting) -->
     <view v-if="task && !reconnecting" style="padding: 0 20px 16px">
       <text class="block mb-2" :style="sectionLabelStyle">{{ t.earn.currentTask }}</text>
-      <text class="block" style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ task.type }}</text>
+      <text class="block" style="font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--v5-ink) 95%, transparent); line-height: 1.2">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ workloadLabel(task.category) }}</text>
       <view class="mt-0.5 flex items-center gap-1.5 flex-wrap" style="font-size: 12px; color: var(--v5-ink-3)">
         <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">#{{ task.id }}</text>
         <text style="color: var(--v5-ink-4)">·</text>
@@ -311,7 +311,8 @@ import { computed, nextTick, ref, watch, onMounted, onUnmounted, type CSSPropert
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
-import type { Device, DeviceKind } from "@/store/types";
+import type { Device, DeviceKind, TaskCategory } from "@/store/types";
+import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/tasks";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
@@ -326,6 +327,12 @@ const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolea
 const emit = defineEmits<{ toggle: [] }>();
 const app = useApp();
 const t = useT();
+
+// Model names are proper nouns (untranslated); the workload half is copy.
+// Resolved from `category` at render — the baked `task.type` string is English.
+function workloadLabel(category: TaskCategory): string {
+  return resolveWorkloadLabel(t.value, category);
+}
 
 // 1s re-render so progress + countdown tick.
 const now = ref(Date.now());

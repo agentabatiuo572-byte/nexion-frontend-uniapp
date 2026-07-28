@@ -54,7 +54,7 @@
             <view class="truncate" :style="rowTitleStyle">
               <text>{{ r.model }}</text>
               <text style="color: var(--v5-ink-4); margin: 0 4px">·</text>
-              <text style="color: var(--v5-ink-3)">{{ r.type }}</text>
+              <text style="color: var(--v5-ink-3)">{{ typeLabel(r) }}</text>
             </view>
             <view class="truncate" :style="rowSubStyle">
               <text>{{ r.client }}</text>
@@ -88,6 +88,8 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import ReceiptCatIcon from "@/components/me/receipt-cat-icon.vue";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { workloadLabel } from "@/lib/workload-label";
 import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
@@ -166,13 +168,19 @@ async function handleClearAll() {
   if (ok) {
     const n = receipts.value.length;
     receiptsStore.clear();
-    toast.success(t.value.receipt.clearAll, `${n} receipts removed`);
+    toast.success(t.value.receipt.clearAll, fmt(t.value.receipt.clearedToast, { n }));
   }
+}
+
+// Receipts persist, so the baked English `r.type` is resolved from `category`
+// at render instead — see lib/workload-label.ts.
+function typeLabel(r: Receipt): string {
+  return workloadLabel(t.value, r.category);
 }
 
 function copySig(r: Receipt) {
   uni.setClipboardData({ data: r.signature, showToast: false, fail: () => {} });
-  toast.success("Signature copied", r.signature.substring(0, 16) + "...");
+  toast.success(t.value.receipt.sigCopied, r.signature.substring(0, 16) + "...");
 }
 
 function rowAmount(r: Receipt): string {

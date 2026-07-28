@@ -616,10 +616,31 @@ export const vi: Messages = {
     liveLabel: "Cập nhật 2 phút trước",
     priceIndex: "Chỉ số giá tác vụ AI",
     deviceRanking: "Thu nhập theo thiết bị",
+    // Nguồn duy nhất cho 6 loại tác vụ (TaskCategory). Dùng chung bởi chỉ số giá
+    // (MarketBoard) và các dòng tác vụ ở Task Center + thẻ thiết bị — tên model
+    // (Flux.1 [dev], Kling 2.0…) giữ nguyên không dịch.
+    workloads: {
+      IG: { label: "Tạo ảnh", unit: "mỗi ảnh" },
+      VG: { label: "Tạo video", unit: "mỗi giây" },
+      LL: { label: "Suy luận LLM", unit: "mỗi 1k token" },
+      FT: { label: "Tinh chỉnh", unit: "mỗi tác vụ" },
+      EM: { label: "Nhúng vector", unit: "mỗi 1k đoạn" },
+      SP: { label: "Giọng nói", unit: "mỗi giây audio" },
+    },
     aiDropAlert: "Cảnh báo AI Drop",
     aiDropMessage:
       "Có tin đồn Anthropic Claude 4.6 ra mắt tối nay. Nhu cầu suy luận LLM có thể tăng vọt +30%.",
     aiDropEta: "Dự kiến: 18h · giữ thiết bị online để bắt giá đỉnh",
+    flagshipRow: "Mô hình flagship 405B",
+    // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
+    yourPhone: "Điện thoại của bạn",
+    bestFor: {
+      rackP1: "Huấn luyện + LLM 405B",
+      boxPro: "Sức tính hạng flagship",
+      boxS1: "LLM 70B",
+      cloudShare: "Rào cản thấp nhất",
+      phone: "Hạng NPU di động",
+    },
   },
 
   genesisHolder: {
@@ -700,6 +721,79 @@ export const vi: Messages = {
     notifFooter: "Tắt một nhóm sẽ ẩn các mục tương ứng trong ngăn Nova và trung tâm thông báo. Thông báo tuân thủ quan trọng không thể tắt.",
   },
 
+  // 三端入口走查页(/pages/entry-surfaces/*)。SPEC-6 语义 token
+  // (在线增强 / 基础托管 / 体检融合)由 verify.sh 盯在 zh.ts 那一段里。
+  entrySurface: {
+    indexNavTitle: "Các lối vào",
+    indexNavSubtitle: "Link đầy đủ",
+    indexEyebrow: "Ba lối vào",
+    indexTitle: "Link đầy đủ có thể bấm",
+    indexBody: "Trang chủ ứng dụng đã ký, bản web H5 và bàn giao ứng dụng trắng mở riêng; trang chủ mặc định vẫn độc lập.",
+    fullLinks: "Xem đủ ba link lối vào",
+    surfaces: {
+      signed: {
+        linkLabel: "Trang chủ ứng dụng đã ký",
+        kicker: "Ứng dụng đã ký",
+        title: "Buồng lái kiếm tiền luôn bật",
+        body: "Ứng dụng đã cài giữ nguyên toàn bộ mạng thiết bị, ví, cửa hàng, đội nhóm và tăng tốc thời gian thực.",
+        modeLabel: "Chế độ tính toán",
+        modeValue: "Tăng cường khi online",
+        primaryLabel: "Mở bảng thu nhập",
+        secondaryLabel: "Quản lý thiết bị",
+        metrics: {
+          a: { label: "Tăng tốc online", value: "Đầy đủ" },
+          b: { label: "Dàn thiết bị", value: "6 khe" },
+          c: { label: "Dữ liệu tài khoản", value: "Dùng chung" },
+        },
+        steps: {
+          a: { title: "Khởi động", body: "Ứng dụng đã cài mở thẳng vào tài khoản thu nhập." },
+          b: { title: "Giữ online", body: "Trạng thái phần cứng máy đẩy vào mô hình tăng tốc thời gian thực." },
+          c: { title: "Dòng tiền", body: "Ví, cửa hàng và đội nhóm luôn cách một chạm." },
+        },
+      },
+      h5: {
+        linkLabel: "Trang chủ bản web H5",
+        kicker: "Bản web H5",
+        title: "Kiếm tiền trên di động qua web",
+        body: "Trình duyệt di động vẫn giữ thiết bị tài khoản và ví mà không chiếm nền. Chia sẻ PC hiện ra khi khả dụng.",
+        modeLabel: "Chế độ tính toán",
+        modeValue: "Lưu trữ cơ bản",
+        primaryLabel: "Mở trang kiếm tiền",
+        secondaryLabel: "Quản lý khe thiết bị",
+        metrics: {
+          a: { label: "Vào bằng trình duyệt", value: "Tức thì" },
+          b: { label: "Thiết bị điện thoại", value: "Được giữ" },
+          c: { label: "Đường PC", value: "Tùy chọn" },
+        },
+        steps: {
+          a: { title: "Mở link", body: "Trình duyệt vào thẳng trang kiếm tiền di động." },
+          b: { title: "Đăng ký thiết bị", body: "Năng lực máy được giữ như giá trị thiết bị ở cấp tài khoản." },
+          c: { title: "Lộ trình nâng cấp", body: "Ứng dụng cài đặt luôn hiện; chia sẻ PC xuất hiện khi khả dụng." },
+        },
+      },
+      white: {
+        linkLabel: "Trang chủ bàn giao ứng dụng trắng",
+        kicker: "Bàn giao ứng dụng trắng",
+        title: "Từ quét sức khỏe vào trang chủ NexGrid",
+        body: "Điểm phần cứng, số dư tài khoản và trạng thái dàn thiết bị nằm chung một màn bàn giao trước khi vào các tab chính.",
+        modeLabel: "Trạng thái lối vào",
+        modeValue: "Hợp nhất kết quả quét",
+        primaryLabel: "Tiếp tục vào NexGrid",
+        secondaryLabel: "Phiên đăng nhập",
+        metrics: {
+          a: { label: "Điểm sức khỏe", value: "Hiển thị" },
+          b: { label: "Trạng thái dàn máy", value: "Đã hợp nhất" },
+          c: { label: "Bàn giao tab", value: "Mượt" },
+        },
+        steps: {
+          a: { title: "Vào lớp vỏ", body: "Ngôn ngữ hình ảnh của công cụ quét được giữ ở đầu màn bàn giao." },
+          b: { title: "Đọc tài khoản", body: "Số dư, thiết bị và phiên đăng nhập đến từ cùng một trạng thái tài khoản." },
+          c: { title: "Đi tiếp", body: "Các tab cửa hàng, kiếm tiền, đội nhóm và ví tiếp tục như sản phẩm chính." },
+        },
+      },
+    },
+  },
+
   search: {
     navTitle: "Tìm kiếm",
     placeholder: "Tìm thiết bị, thành viên, FAQ, trang…",
@@ -712,6 +806,34 @@ export const vi: Messages = {
       product: "Sản phẩm cửa hàng",
       member: "Thành viên mạng lưới",
       faq: "FAQ + hướng dẫn",
+    },
+    // 路由 / FAQ 目录文案。search.vue 的过滤器直接跑在这里的译文上——
+    // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
+    routes: {
+      home: { label: "Trang chủ / Bảng điều khiển", sub: "Thu nhập trực tiếp · bảng giá · tổng quan" },
+      earn: { label: "Kiếm tiền / Dàn thiết bị", sub: "Thẻ thiết bị · trung tâm tác vụ · hiệu suất" },
+      store: { label: "Cửa hàng", sub: "NexGridBox / Rack / Cloud Share" },
+      tradeIn: { label: "Thu cũ đổi mới", sub: "Ngừng dùng máy cũ, trừ thẳng vào máy mới" },
+      team: { label: "Trung tâm đội nhóm", sub: "Hoa hồng / hạng V / mạng lưới" },
+      royalty: { label: "Hoa hồng mạng lưới ảnh hưởng", sub: "Trực tiếp + thưởng sản lượng mạng lưới" },
+      networkMap: { label: "Sơ đồ mạng lưới", sub: "Quỹ đạo trực tiếp / mở rộng" },
+      wallet: { label: "Ví", sub: "Số dư + rút + nạp" },
+      withdraw: { label: "Rút tiền", sub: "Rút USDT về ví on-chain" },
+      staking: { label: "Kho staking", sub: "4 kỳ khóa, tối đa 180%" },
+      genesis: { label: "Chợ Genesis", sub: "Giao dịch Genesis thứ cấp" },
+      goals: { label: "Mục tiêu thu nhập", sub: "Đặt mục tiêu + lộ trình gợi ý" },
+      risk: { label: "Công bố rủi ro", sub: "Cần đọc" },
+      developer: { label: "Nhà phát triển / API", sub: "API công khai + tích hợp đối tác" },
+      globe: { label: "Bản đồ mạng lưới toàn cầu", sub: "Node hoạt động toàn cầu" },
+      market: { label: "Thị trường", sub: "Giá tác vụ AI + biểu đồ NEX" },
+      events: { label: "Sự kiện", sub: "Khuyến mãi · thi đua · theo mùa" },
+      missions: { label: "Nhiệm vụ", sub: "Thử thách · chuỗi ngày · vượt ải" },
+    },
+    faqEntries: {
+      royalty: { label: "Hoa hồng mạng lưới ảnh hưởng hoạt động thế nào", sub: "Trực tiếp + thưởng sản lượng mạng lưới + bậc tỷ lệ" },
+      staking: { label: "Staking hoạt động thế nào", sub: "Kỳ khóa + APY + phí phạt rút sớm" },
+      genesis: { label: "Genesis hoạt động thế nào", sub: "NFT sáng lập + đặc quyền + thứ cấp" },
+      nex: { label: "Giải thích token NEX", sub: "Nguồn · công dụng · cơ chế đốt" },
     },
   },
 
@@ -1057,6 +1179,7 @@ export const vi: Messages = {
       label: "HOẠT ĐỘNG NEX GẦN ĐÂY",
       viewAll: "Xem tất cả",
       empty: "Chưa có hoạt động NEX nào",
+      miningLabel: "Trả thưởng đào · dàn thiết bị",
     },
     note: "NEX là token của nền tảng NexGrid. Bạn có thể đổi sang USDT ở mục Quy đổi, hoặc dùng để bù phí rút USDT.",
   },
@@ -1515,6 +1638,44 @@ export const vi: Messages = {
     detFeaturedIn: "Xuất hiện trên",
     detCompliance: "Tuân thủ",
     detFaq: "Câu hỏi thường gặp",
+    detPaybackMonths: "{n} tháng",
+    detPaybackDays: "{n} ngày",
+    detCtaPayback: "${daily}/ngày · hoàn vốn sau {payback}",
+    specGpu: "GPU",
+    specVram: "VRAM",
+    specPower: "Công suất",
+    specDatacenter: "Trung tâm dữ liệu",
+    specDatacenterValue: "Singapore",
+    specUptime: "SLA thời gian hoạt động",
+    specWarranty: "Bảo hành",
+    specWarrantyValue: "24 tháng",
+    aiRowImageGen: "Tạo ảnh (SDXL)",
+    aiRowLlm: "Suy luận LLM",
+    aiRowVideo: "Tạo video",
+    aiRowFineTune: "Tinh chỉnh (LoRA)",
+    aiRowUnlocks: "Nhóm tác vụ mở khóa",
+    aiUnitImgMin: "ảnh/phút",
+    aiUnitTokSec: "k tok/giây",
+    aiUnitMinHour: "phút / giờ",
+    aiUnitMin: "phút",
+    faq: {
+      location: {
+        q: "Thiết bị đặt ở đâu?",
+        a: "Tại trung tâm dữ liệu của chúng tôi ở Singapore. Bạn không nhận phần cứng — toàn bộ bảo trì và điện năng đã bao gồm.",
+      },
+      withdraw: {
+        q: "Tôi có thể rút thu nhập bất cứ lúc nào không?",
+        a: "Được, từ $20. Lần rút đầu tiên xử lý trong vòng 24 giờ. Cần hoàn tất KYC-Express (nạp $1) để xác minh ví của bạn.",
+      },
+      demand: {
+        q: "Nếu nhu cầu AI giảm thì sao?",
+        a: "Thu nhập biến động theo giá của nhóm tác vụ AI. Mức thấp nhất từng ghi nhận: $24/ngày ngay cả trong giai đoạn nhu cầu thấp.",
+      },
+      refund: {
+        q: "Có thời hạn hoàn tiền không?",
+        a: "Hoàn tiền trong 7 ngày nếu thiết bị chưa được kích hoạt. Sau khi kích hoạt, có thể bán lại trên chợ giao dịch.",
+      },
+    },
     coProductNotFound: "Không tìm thấy sản phẩm.",
     coRowProduct: "Sản phẩm",
     coRowQuantity: "Số lượng",
@@ -1590,6 +1751,41 @@ export const vi: Messages = {
     releaseComingToast: "Mẫu này sắp ra mắt — hãy đón chờ",
     cardHighTierLine: "Nhận các nhiệm vụ cấp cao hơn: {pool}",
     comingSoonSubtitle: "Lô sản xuất sẽ ra mắt muộn hơn trong chu kỳ",
+    // Nội dung tiếp thị theo từng SKU, khóa theo Product.id (cấu trúc dữ liệu và
+    // bản gốc tiếng Anh nằm ở src/mock/products.ts). Trường `name` là tên thương
+    // hiệu, KHÔNG bao giờ dịch. verify.sh kiểm tra mọi id trong PRODUCTS đều có ở đây.
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "Hộp suy luận AI cá nhân · vận hành trọn gói",
+        badge: "Bán chạy",
+        unlocks: "Bể suy luận LLM 70B",
+      },
+      "stellarbox-pro": {
+        tagline: "Gấp đôi GPU, gấp đôi sức kiếm tiền.",
+        badge: "Đang hot",
+        unlocks: "Bể tính toán hàng đầu (Tinh chỉnh + suy luận 405B)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "Thông lượng gấp 2.5× S1 — sinh ra cho các bể tác vụ cấp cao.",
+        badge: "Lựa chọn nâng cấp",
+        unlocks: "AI hàng đầu + 405B đa người thuê",
+      },
+      "stellarrack-p1": {
+        tagline: "Rack A100 chuẩn trung tâm dữ liệu cho người vận hành nghiêm túc.",
+        badge: "Hàng đầu",
+        unlocks: "Bể huấn luyện (RLHF / huấn luyện 8B từ đầu)",
+      },
+      "stellarrack-p2": {
+        tagline: "Rack H100 trung tâm dữ liệu — bậc tính toán cao nhất.",
+        badge: "Hàng đầu",
+        unlocks: "Bể huấn luyện (RLHF / huấn luyện 70B từ đầu)",
+      },
+      "cloud-share": {
+        tagline: "Không cần phần cứng — mua một phần của mạng lưới.",
+        badge: "Rào cản thấp",
+        unlocks: "Truy cập theo phần vào các bể Tạo ảnh + Nhúng vector + Giọng nói",
+      },
+    },
     tradeinUpgrade: {
       label: "Đổi máy nâng cấp",
       title: "{name} của bạn được định giá ${credit}",
@@ -2160,6 +2356,34 @@ export const vi: Messages = {
       marketLiquidity: "📊 Khối lượng $NEX 24h lập đỉnh mới · thanh khoản các pool sâu hơn.",
       marketLiquidityCta: "Trung tâm tin cậy",
     },
+    reply: {
+      deviceOne: "1 thiết bị đang hoạt động",
+      deviceMany: "{n} thiết bị đang hoạt động",
+      todayTop: "Thiết bị kiếm nhiều nhất: {name} ({gpu}) với ${amount} hôm nay.",
+      todayNoDevice: "Chưa có thiết bị nào hoạt động — kết nối một thiết bị để bắt đầu kiếm tiền.",
+      todayBody:
+        "Hôm nay bạn đã kiếm được ${amount} trên {devices}.\n\n{topLine}\n\nPhần lớn tác vụ của bạn chạy ở nhóm {poolA} + {poolB} — điển hình với mức VRAM của bạn. Bạn có muốn tôi giải thích cách mở khóa {poolC} không?",
+      boostLocked:
+        "Ba cách hiệu quả nhanh:\n\n1. Giữ ít nhất một thiết bị online qua đêm — nhóm {pool} đạt đỉnh lúc 02:00-06:00 UTC.\n2. Cấu hình hiện tại của bạn giới hạn ở {vram}GB VRAM. Nâng lên {tier} sẽ mở khóa {model} ({type}) — mỗi tác vụ trả {reward}.\n3. Giới thiệu bạn bè bằng mã mời của bạn — bạn nhận 5% thu nhập trọn đời của họ.",
+      boostMaxed:
+        "Bạn đã ở hạng cao nhất rồi — tuyệt. Còn hai cách để mở rộng thêm:\n\n1. Thêm một NexGridBox nữa để chạy song song các tác vụ tinh chỉnh.\n2. Tiếp tục giới thiệu — hạng của bạn nhận 8% trọn đời cho mỗi lượt giới thiệu.",
+      hotLlm:
+        "🔥 Giá {pool} vừa tăng +18% trong một giờ qua sau khi Anthropic ra mắt Claude 4.6. Dự kiến nhu cầu tăng mạnh suốt tối nay.",
+      hotVideo:
+        "📈 Hạng {pool} đang có lưu lượng gấp 2,4 lần bình thường — Atrium AI hôm nay chạy một đợt render chiến dịch. Nặng về thông lượng, trả cao.",
+      hotFineTune:
+        "💎 Hàng đợi {pool} đang ở mức 812 tác vụ (so với 280 thông thường). Thiết bị VRAM cao được ưu tiên nhận trước. Nhóm điện toán flagship trả +30% so với mức chuẩn.",
+      topJobsOpen:
+        "Hiện tại các tác vụ mở trả cao nhất trong nhóm của bạn:\n\n• Suy luận Llama 3.1 405B — $0,62 mỗi 1k token (Helix Labs)\n• Video cỡ Sora — $1,80 mỗi clip 8 giây (Atrium AI)\n• DPO · Tinh chỉnh Llama 3.1 70B — $0,42 mỗi tác vụ (Northwind Research)\n\nThiết bị của bạn chạy được tất cả. Việc điều phối là tự động.",
+      topJobsLocked:
+        "Các tác vụ vượt giới hạn VRAM hiện tại của bạn ({vram}GB):\n\n{lines}\n\nMỗi tác vụ sẽ mở khóa khi bạn nâng cấp — cứ báo tôi khi bạn sẵn sàng.",
+      topJobsLockedLine: "• {model} ({type}) — {reward} · cần {tier}",
+      welcome:
+        "Chào — tôi là Nova, cố vấn điện toán của bạn. Tôi sẽ theo dõi thị trường và báo bạn khi có cơ hội kiếm thêm.\n\nThử các gợi ý bên dưới để bắt đầu.",
+      ctaBrowseStore: "Xem cửa hàng →",
+      ctaOpenTeam: "Mở nhóm →",
+      ctaOpenMarket: "Xem thị trường →",
+    },
   },
   receipt: {
     title: "Biên lai",
@@ -2180,6 +2404,9 @@ export const vi: Messages = {
     catEM: "Embedding",
     catSP: "Giọng nói",
     catKY: "KYC",
+    typeWalletPairing: "Ghép ví",
+    sigCopied: "Đã sao chép chữ ký",
+    clearedToast: "Đã xóa {n} biên lai",
   },
   language: {
     pageTitle: "Ngôn ngữ",
@@ -2919,6 +3146,11 @@ export const vi: Messages = {
       90: "Cân bằng · được chọn nhiều nhất",
       180: "Cửa sổ trước niêm yết",
       365: "Lợi suất Founder · airdrop ×2",
+    },
+    ribbon: {
+      // 不用「Được chọn nhiều nhất」—— 与 90d blurb 完全同文,两行会撞车
+      popular: "Phổ biến nhất",
+      topYield: "Lợi suất cao nhất",
     },
     penaltySuffix: "phí phạt rút sớm",
     calc: {

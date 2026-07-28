@@ -30,7 +30,7 @@
           </view>
           <text class="block mt-1" :style="titleStyle">{{ product.name }}</text>
           <view v-if="detailsOpen">
-            <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ product.tagline }}</text>
+            <text class="block mt-1 line-clamp-2" style="font-size: 13px; color: var(--v5-ink-3); line-height: 1.35">{{ copy.tagline }}</text>
             <view class="mt-2 flex items-center font-mono-tabular truncate" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
               <text style="color: var(--v5-ink-2)">{{ product.gpu }}</text>
               <text style="color: var(--v5-ink-4)">·</text>
@@ -76,9 +76,11 @@ import {
   useScrollGrowProgress,
   PROGRESS_GROW_TRANSITION,
 } from "@/composables/use-scroll-grow-progress";
+import { productCopy } from "@/lib/product-copy";
 
 const props = defineProps<{ product: Product }>();
 const t = useT();
+const copy = computed(() => productCopy(t.value, props.product));
 
 const PHASE_TO_PROGRESS: Record<string, { current: number; total: number; pct: number }> = {
   P3: { current: 1, total: 3, pct: 33 },

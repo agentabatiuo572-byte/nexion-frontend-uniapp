@@ -134,7 +134,7 @@ const intervals: ReturnType<typeof setInterval>[] = [];
 
 onMounted(() => {
   timers.push(setTimeout(() => {
-    nova.push(welcomeMessage(), { cooldownKey: "welcome", cooldownMs: WELCOME_COOLDOWN });
+    nova.push(welcomeMessage(t.value), { cooldownKey: "welcome", cooldownMs: WELCOME_COOLDOWN });
   }, WELCOME_DELAY));
 
   // 在回调内部读 t.value(而非外层捕获快照)→ 切语言后新推送即用新语言。
