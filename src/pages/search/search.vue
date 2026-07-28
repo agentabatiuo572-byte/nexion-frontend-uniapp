@@ -81,6 +81,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
 import { PRODUCTS } from "@/mock/products";
+import { productCopy } from "@/lib/product-copy";
 
 type Group = "route" | "device" | "product" | "member" | "faq";
 interface Hit {
@@ -139,11 +140,14 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const p of PRODUCTS) {
-    if (p.name.toLowerCase().includes(query) || p.tagline.toLowerCase().includes(query)) {
+    // Match on the copy the user can actually see, so a Vietnamese query hits a
+    // Vietnamese tagline. `name` is a brand mark — untranslated on both sides.
+    const tagline = productCopy(t.value, p).tagline;
+    if (p.name.toLowerCase().includes(query) || tagline.toLowerCase().includes(query)) {
       out.push({
         group: "product",
         label: p.name,
-        sublabel: `$${p.price} · ${p.tagline}`,
+        sublabel: `$${p.price} · ${tagline}`,
         href: `/pages/store/detail?id=${p.id}`,
       });
     }

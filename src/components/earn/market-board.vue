@@ -4,7 +4,8 @@
     1. AI Workload Price Index (6 workloads · 24h delta · 7-pt sparkline)
     2. Device earnings ranking (5 tiers, phone last → upgrade pull)
   Distinct from home's MarketBoardCard (different data + layout). Static mock
-  data (workload/model proper nouns untranslated). Ranking rows with an href
+  numbers; workload names/units come from t.market.workloads (shared with Task
+  Center + device cards). Model names stay untranslated. Ranking rows with an href
   route to that tier's store detail. Conversion role: feeds the tier-locked
   tasks banner below it on /earn.
 -->
@@ -30,8 +31,8 @@
         <view class="flex items-center gap-2.5">
           <view class="flex-1 min-w-0">
             <view class="flex items-baseline gap-1.5">
-              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ w.label }}</text>
-              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ w.unit }}</text>
+              <text class="truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.market.workloads[w.code].label }}</text>
+              <text class="truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.market.workloads[w.code].unit }}</text>
             </view>
             <text v-if="w.flagship" class="block truncate" style="font-size: 12px; color: var(--v5-warning-ink); margin-top: 2px">↳ {{ w.flagship.label }} <text class="tabular-nums" style="font-family: var(--font-v5)">↑{{ w.flagship.delta.toFixed(1) }}%</text></text>
           </view>
@@ -69,12 +70,10 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import type { DeviceKind } from "@/store/types";
+import type { DeviceKind, TaskCategory } from "@/store/types";
 
 interface WorkloadPrice {
-  code: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
-  label: string;
-  unit: string;
+  code: TaskCategory;
   price: number;
   delta: number;
   spark: number[];
@@ -92,13 +91,16 @@ interface DeviceRanking {
 
 const t = useT();
 
+// Label + unit come from t.market.workloads[code] — the same key set the Task
+// Center job rows and device cards read, so a workload is named identically
+// everywhere. Only the numbers live here.
 const PRICE_INDEX: WorkloadPrice[] = [
-  { code: "IG", label: "Image Gen", unit: "per image", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
-  { code: "LL", label: "LLM Inference", unit: "per 1k tok", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagship: { label: "405B flagship", delta: 32.1 } },
-  { code: "VG", label: "Video Gen", unit: "per sec", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
-  { code: "FT", label: "Fine-tune", unit: "per job", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
-  { code: "EM", label: "Embedding", unit: "per 1k chunks", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
-  { code: "SP", label: "Speech", unit: "per audio sec", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
+  { code: "IG", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
+  { code: "LL", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagship: { label: "405B flagship", delta: 32.1 } },
+  { code: "VG", price: 0.18, delta: -1.2, spark: [0.65, 0.7, 0.6, 0.55, 0.62, 0.58, 0.62] },
+  { code: "FT", price: 0.06, delta: 0.0, spark: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5] },
+  { code: "EM", price: 0.0008, delta: 2.1, spark: [0.4, 0.45, 0.4, 0.5, 0.52, 0.55, 0.57] },
+  { code: "SP", price: 0.0003, delta: 0.3, spark: [0.5, 0.48, 0.5, 0.52, 0.5, 0.51, 0.52] },
 ];
 
 const DEVICE_RANKINGS: DeviceRanking[] = [

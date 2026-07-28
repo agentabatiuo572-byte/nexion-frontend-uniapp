@@ -603,6 +603,16 @@ export const zh: Messages = {
     liveLabel: "2 分钟前更新",
     priceIndex: "AI 工作负载价格指数",
     deviceRanking: "设备日收益排行",
+    // 6 类工作负载单源(TaskCategory)。价格指数(MarketBoard)与任务中心 /
+    // 设备卡的任务行共用 —— 模型名(Flux.1 [dev]、Kling 2.0…)保持不译。
+    workloads: {
+      IG: { label: "图像生成", unit: "按张" },
+      VG: { label: "视频生成", unit: "按秒" },
+      LL: { label: "LLM 推理", unit: "按千 token" },
+      FT: { label: "微调", unit: "按任务" },
+      EM: { label: "向量嵌入", unit: "按千段" },
+      SP: { label: "语音", unit: "按音频秒" },
+    },
     aiDropAlert: "AI Drop 警报",
     aiDropMessage: "Anthropic Claude 4.6 据传今晚发布。LLM 推理需求可能上涨 +30%。",
     aiDropEta: "预计 18 小时后 · 保持设备在线以捕获高峰价",
@@ -1593,6 +1603,40 @@ export const zh: Messages = {
     releaseComingToast: "该机型即将上架,敬请期待",
     cardHighTierLine: "可接高阶任务:{pool}",
     comingSoonSubtitle: "批量生产将在周期后期出货",
+    // 按 SKU 的营销文案,以 Product.id 为键(数据结构与英文源在 src/mock/products.ts)。
+    // 商品 `name` 是品牌名,永不翻译。verify.sh 断言每个 PRODUCTS id 在此都有条目。
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "个人 AI 推理机 · 全托管",
+        badge: "热销",
+        unlocks: "LLM 70B 推理池",
+      },
+      "stellarbox-pro": {
+        tagline: "GPU 翻倍,赚钱能力也翻倍。",
+        badge: "正热",
+        unlocks: "旗舰算力池(微调 + 405B 推理)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "2.5 倍 S1 吞吐 —— 为高阶任务池而生。",
+        badge: "升级首选",
+        unlocks: "旗舰 AI + 多租户 405B",
+      },
+      "stellarrack-p1": {
+        tagline: "数据中心级 A100 机架,给认真的运营者。",
+        badge: "旗舰",
+        unlocks: "训练池(RLHF / 从零训练 8B)",
+      },
+      "stellarrack-p2": {
+        tagline: "数据中心 H100 机架 —— 算力天花板。",
+        badge: "旗舰",
+        unlocks: "训练池(RLHF / 从零训练 70B)",
+      },
+      "cloud-share": {
+        tagline: "不用买机器 —— 直接买一份网络算力。",
+        badge: "低门槛",
+        unlocks: "按份接入网络的图像生成 + 向量嵌入 + 语音池",
+      },
+    },
     tradeinUpgrade: {
       label: "升级置换",
       title: "你的 {name} 可抵 ${credit}",

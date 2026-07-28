@@ -24,27 +24,30 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 
-const links = [
-  {
-    label: "签名版 APP 首页",
-    route: "/pages/entry-surfaces/signed",
-    fullUrl: "http://localhost:5173/#/pages/entry-surfaces/signed",
-  },
-  {
-    label: "H5 网页版首页",
-    route: "/pages/entry-surfaces/h5",
-    fullUrl: "http://localhost:5173/#/pages/entry-surfaces/h5",
-  },
-  {
-    label: "白 APP 接管首页",
-    route: "/pages/entry-surfaces/white?entry=white-app",
-    fullUrl: "http://localhost:5173/#/pages/entry-surfaces/white?entry=white-app",
-  },
+const LINKS = [
+  { label: "签名版 APP 首页", route: "/pages/entry-surfaces/signed" },
+  { label: "H5 网页版首页", route: "/pages/entry-surfaces/h5" },
+  { label: "白 APP 接管首页", route: "/pages/entry-surfaces/white?entry=white-app" },
 ];
+
+// The displayed URL must match wherever the app is actually served — a hardcoded
+// origin is wrong on any other port (worktree dev server) or deployed host.
+// pathname carries the deploy base path ("/" in dev, "/app/" under a sub-path);
+// non-H5 targets have no `window`, so those fall back to the route alone.
+const origin = computed(() =>
+  typeof window !== "undefined" && window.location
+    ? `${window.location.origin}${window.location.pathname}`
+    : "",
+);
+
+const links = computed(() =>
+  LINKS.map((l) => ({ ...l, fullUrl: `${origin.value}#${l.route}` })),
+);
 
 useSetPageHeader({
   title: "三端入口",
