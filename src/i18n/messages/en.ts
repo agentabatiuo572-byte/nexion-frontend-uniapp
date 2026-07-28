@@ -349,7 +349,8 @@ export const en = {
     poolV3Unlock: "V3+ to unlock",
     // DoTheMathCard (ZONE 5)
     doMathTitle: "Do the math",
-    doMathHeadline: "{target} earns {mult} what your {base} does — every single day.",
+    // {base} carries its own possessive ("Your phone") — see lib/device-copy.ts.
+    doMathHeadline: "{target} earns {mult} what {base} does — every single day.",
     doMathDaily: "daily",
     doMathPayback: "payback",
     doMathVs: "vs {base}",
@@ -2445,6 +2446,26 @@ export const en = {
       ctaOpenTeam: "Open Team →",
       ctaOpenMarket: "Open Market →",
     },
+  },
+  // Device display strings. The Device record stores English (a real backend
+  // would return it, and devices persist), so the UI resolves these from the
+  // stable `kind` at render — see lib/device-copy.ts. Only descriptive strings
+  // live here: SKU names (NexGridBox S1, Cloud Share) and hardware models
+  // (4× RTX 4090) are brand marks and stay untranslated in every locale.
+  device: {
+    nameComputerGpu: "Computer GPU",
+    nameSharedComputer: "Shared computer",
+    // Mid-sentence forms. The standalone names are label-cased ("Your phone");
+    // dropped into running copy they need sentence case.
+    namePhoneInline: "your phone",
+    nameComputerGpuInline: "your computer GPU",
+    gpuMobileNpu: "Mobile NPU · ~{tops} TOPS",
+    gpuComputerShared: "Computer GPU · shared",
+    gpuDistributed: "Distributed",
+    locSingaporeDc: "Singapore Data Center",
+    locFrankfurtDc: "Frankfurt Data Center",
+    locLinkedComputer: "Linked computer",
+    promoNoActive: "(no active device)",
   },
   receipt: {
     title: "Receipts",

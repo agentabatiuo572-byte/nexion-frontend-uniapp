@@ -23,13 +23,13 @@
       style="position: fixed; inset: 0; z-index: 200; background: var(--v5-bg-color-mask)"
       role="dialog"
       aria-modal="true"
-      :aria-label="device.name"
+      :aria-label="displayName"
       @click="closeMenu"
       @keydown="onMenuKeydown"
     >
       <view class="w-full rounded-t-2xl p-3" style="background: var(--v5-surface); border-top: 1px solid var(--v5-border)" @click.stop>
         <view class="mx-auto mb-2" style="width: 40px; height: 4px; border-radius: 3px; background: var(--v5-border-strong)" />
-        <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ device.name }}</text>
+        <text class="block px-2 py-1.5 truncate font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayName }}</text>
         <view class="space-y-1">
           <view class="nx-device-quick-stats flex items-center gap-2.5 px-3 py-2.5 rounded-lg active:opacity-70" role="button" tabindex="0" @click="goStatsMenu" @keydown.enter.stop.prevent="goStatsMenu" @keydown.space.stop.prevent="goStatsMenu">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" /></svg>
@@ -65,7 +65,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="kindIconPath" /></svg>
         </view>
         <view class="min-w-0" style="flex: 1">
-          <text class="block truncate" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ device.name }}</text>
+          <text class="block truncate" style="font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ displayName }}</text>
           <view class="flex items-center gap-1.5" style="margin-top: 3px">
             <view :style="{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: statusColor, boxShadow: statusGlow ? `0 0 6px ${statusColor}` : 'none' }" />
             <text class="nx-device-status-label" style="font-size: 12px" :style="{ color: statusColor }">{{ statusLabel }}</text>
@@ -90,7 +90,7 @@
     <view v-if="expanded" class="nx-device-card__details">
       <!-- device identity: gpu · location + lifecycle chip -->
       <view class="flex items-center justify-between gap-2" style="padding: 0 20px 12px">
-        <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ device.gpu }}<text v-if="device.location"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ device.location }}</text></text>
+        <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ displayGpu }}<text v-if="displayLocation"><text style="color: var(--v5-ink-4); margin: 0 6px">·</text>{{ displayLocation }}</text></text>
         <view v-if="degradable && inSubsidy" class="nx-device-explainer inline-flex items-center gap-1 shrink-0 active:opacity-70" :style="subsidyChipStyle" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
           <text>{{ subsidyText }}</text>
         </view>
@@ -313,6 +313,7 @@ import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
+import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/tasks";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
@@ -333,6 +334,12 @@ const t = useT();
 function workloadLabel(category: TaskCategory): string {
   return resolveWorkloadLabel(t.value, category);
 }
+
+// Device identity is resolved from `kind` too — the stored name/gpu/location
+// are English and persist per account. See lib/device-copy.ts.
+const displayName = computed(() => deviceName(t.value, props.device));
+const displayGpu = computed(() => deviceGpuLabel(t.value, props.device));
+const displayLocation = computed(() => deviceLocation(t.value, props.device));
 
 // 1s re-render so progress + countdown tick.
 const now = ref(Date.now());

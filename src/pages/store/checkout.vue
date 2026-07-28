@@ -228,6 +228,7 @@ import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
@@ -447,7 +448,7 @@ const tradeinChipText = computed(() => {
   const ti = appliedTradeinView.value;
   if (!ti) return "";
   return fmt(t.value.tradein.checkoutCreditChip, {
-    name: ti.device.name,
+    name: deviceName(t.value, ti.device),
     credit: tradeinCreditText.value,
   });
 });
@@ -831,7 +832,8 @@ watch(step, (s) => {
       // 账单 memo 走 i18n(用户账单页直接渲染,禁硬编码英文)。
       const memoParts: string[] = [];
       if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
-      if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: ti.device.name, amount: tradeInCredit }));
+      // 设备名经 device-copy 解析(存档只认 kind,显示随语言切换);试用促销/抵扣两行为 FEAT-TRIAL02 转化单分项。
+      if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: deviceName(t.value, ti.device), amount: tradeInCredit }));
       if (promo > 0) memoParts.push(fmt(t.value.store.coBillTrialDiscountPart, { amount: promo.toFixed(2) }));
       if (applyTrial && trialOffsetUSD > 0) memoParts.push(fmt(t.value.store.coBillTrialOffsetPart, { amount: trialOffsetUSD.toFixed(2) }));
       if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee, rate: cardFeeRateLabel() }));

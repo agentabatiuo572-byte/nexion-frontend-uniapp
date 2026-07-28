@@ -350,7 +350,7 @@ export const vi: Messages = {
     poolV3Unlock: "V3+ để mở",
     // DoTheMathCard (ZONE 5)
     doMathTitle: "Tính thử",
-    doMathHeadline: "{target} sinh lời gấp {mult} so với {base} của bạn — mỗi ngày.",
+    doMathHeadline: "{target} sinh lời gấp {mult} so với {base} — mỗi ngày.",
     doMathDaily: "mỗi ngày",
     doMathPayback: "hoàn vốn",
     doMathVs: "so với {base}",
@@ -2389,6 +2389,19 @@ export const vi: Messages = {
       ctaOpenTeam: "Mở nhóm →",
       ctaOpenMarket: "Xem thị trường →",
     },
+  },
+  device: {
+    nameComputerGpu: "GPU máy tính",
+    nameSharedComputer: "Máy tính chia sẻ",
+    namePhoneInline: "điện thoại của bạn",
+    nameComputerGpuInline: "GPU máy tính của bạn",
+    gpuMobileNpu: "NPU di động · ~{tops} TOPS",
+    gpuComputerShared: "GPU máy tính · chia sẻ",
+    gpuDistributed: "Phân tán",
+    locSingaporeDc: "Trung tâm dữ liệu Singapore",
+    locFrankfurtDc: "Trung tâm dữ liệu Frankfurt",
+    locLinkedComputer: "Máy tính đã liên kết",
+    promoNoActive: "(chưa có thiết bị hoạt động)",
   },
   receipt: {
     title: "Biên lai",

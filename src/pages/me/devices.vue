@@ -159,6 +159,7 @@ import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
@@ -235,7 +236,7 @@ function handleTradein(d: Device) {
   // 激活中且任务运行:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格
   // DEV02A 异常2)。库存机的出厂任务不在跑,不阻断——判定单源 isDeviceTaskBlocked。
   if (isDeviceTaskBlocked(d)) {
-    tradeinSheet.showRetireBlock(d.id, d.name);
+    tradeinSheet.showRetireBlock(d.id, deviceName(t.value, d));
     return;
   }
   tradeinSheet.showRetire(d.id);
@@ -250,7 +251,7 @@ async function handleActivate(d: Device) {
   // authoritative without app.ts importing the trial store.
   const ok = app.activateDevice(d.id, trialReserved.value);
   if (ok) {
-    toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: d.name }));
+    toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) }));
   } else {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
   }
@@ -263,14 +264,14 @@ async function handleDeactivate(d: Device) {
     return;
   }
   const ok = await uiConfirm({
-    title: fmt(t.value.myDevices.inventoryConfirmDeactivateTitle, { deviceName: d.name }),
+    title: fmt(t.value.myDevices.inventoryConfirmDeactivateTitle, { deviceName: deviceName(t.value, d) }),
     message: t.value.myDevices.inventoryConfirmDeactivateMsg,
     confirmLabel: t.value.myDevices.inventoryConfirmDeactivateOk,
     cancelLabel: t.value.myDevices.inventoryConfirmDeactivateCancel,
   });
   if (ok) {
     app.deactivateDevice(d.id);
-    toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: d.name }));
+    toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
   }
 }
 
@@ -278,7 +279,7 @@ function onSheetWait() {
   const d = sheetDevice.value;
   if (!d) return;
   app.scheduleDeactivation(d.id);
-  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: d.name }));
+  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
 }
 
@@ -286,7 +287,7 @@ function onSheetForce() {
   const d = sheetDevice.value;
   if (!d) return;
   app.deactivateDevice(d.id);
-  toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: d.name }));
+  toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
 }
 
