@@ -91,6 +91,7 @@ import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { getLockedTeasers } from "@/mock/tasks";
 import type { TaskCategory } from "@/store/types";
+import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
@@ -106,7 +107,7 @@ function receiptFor(id: string): Receipt | undefined {
 // Model names are proper nouns (untranslated); the workload half is copy.
 // Resolved from `category` at render — the baked `task.type` string is English.
 function workloadLabel(category: TaskCategory): string {
-  return t.value.market.workloads[category].label;
+  return resolveWorkloadLabel(t.value, category);
 }
 
 // History list: completed tasks across all devices, most-recent first (last 20).

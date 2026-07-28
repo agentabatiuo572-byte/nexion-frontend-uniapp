@@ -359,7 +359,7 @@ function onChip(key: string) {
   schedule(() => nova.setTyping(true), AI_TYPING_ON_MS);
   schedule(() => {
     nova.setTyping(false);
-    nova.push(replyToQuickPrompt(k, { earningsToday: app.earnings.today, devices: app.visibleDevices, onlineCount }));
+    nova.push(replyToQuickPrompt(t.value, k, { earningsToday: app.earnings.today, devices: app.visibleDevices, onlineCount }));
   }, AI_REPLY_MS);
 }
 

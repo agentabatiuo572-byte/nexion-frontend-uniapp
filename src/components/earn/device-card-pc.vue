@@ -312,6 +312,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { derivePromoUpgrade } from "@/store/device-types";
 import type { Device, DeviceKind, TaskCategory } from "@/store/types";
+import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
 import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/tasks";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
@@ -330,7 +331,7 @@ const t = useT();
 // Model names are proper nouns (untranslated); the workload half is copy.
 // Resolved from `category` at render — the baked `task.type` string is English.
 function workloadLabel(category: TaskCategory): string {
-  return t.value.market.workloads[category].label;
+  return resolveWorkloadLabel(t.value, category);
 }
 
 // 1s re-render so progress + countdown tick.

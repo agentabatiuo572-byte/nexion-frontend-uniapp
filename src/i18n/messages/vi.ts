@@ -1638,6 +1638,44 @@ export const vi: Messages = {
     detFeaturedIn: "Xuất hiện trên",
     detCompliance: "Tuân thủ",
     detFaq: "Câu hỏi thường gặp",
+    detPaybackMonths: "{n} tháng",
+    detPaybackDays: "{n} ngày",
+    detCtaPayback: "${daily}/ngày · hoàn vốn sau {payback}",
+    specGpu: "GPU",
+    specVram: "VRAM",
+    specPower: "Công suất",
+    specDatacenter: "Trung tâm dữ liệu",
+    specDatacenterValue: "Singapore",
+    specUptime: "SLA thời gian hoạt động",
+    specWarranty: "Bảo hành",
+    specWarrantyValue: "24 tháng",
+    aiRowImageGen: "Tạo ảnh (SDXL)",
+    aiRowLlm: "Suy luận LLM",
+    aiRowVideo: "Tạo video",
+    aiRowFineTune: "Tinh chỉnh (LoRA)",
+    aiRowUnlocks: "Nhóm tác vụ mở khóa",
+    aiUnitImgMin: "ảnh/phút",
+    aiUnitTokSec: "k tok/giây",
+    aiUnitMinHour: "phút / giờ",
+    aiUnitMin: "phút",
+    faq: {
+      location: {
+        q: "Thiết bị đặt ở đâu?",
+        a: "Tại trung tâm dữ liệu của chúng tôi ở Singapore. Bạn không nhận phần cứng — toàn bộ bảo trì và điện năng đã bao gồm.",
+      },
+      withdraw: {
+        q: "Tôi có thể rút thu nhập bất cứ lúc nào không?",
+        a: "Được, từ $20. Lần rút đầu tiên xử lý trong vòng 24 giờ. Cần hoàn tất KYC-Express (nạp $1) để xác minh ví của bạn.",
+      },
+      demand: {
+        q: "Nếu nhu cầu AI giảm thì sao?",
+        a: "Thu nhập biến động theo giá của nhóm tác vụ AI. Mức thấp nhất từng ghi nhận: $24/ngày ngay cả trong giai đoạn nhu cầu thấp.",
+      },
+      refund: {
+        q: "Có thời hạn hoàn tiền không?",
+        a: "Hoàn tiền trong 7 ngày nếu thiết bị chưa được kích hoạt. Sau khi kích hoạt, có thể bán lại trên chợ giao dịch.",
+      },
+    },
     coProductNotFound: "Không tìm thấy sản phẩm.",
     coRowProduct: "Sản phẩm",
     coRowQuantity: "Số lượng",
@@ -2312,6 +2350,34 @@ export const vi: Messages = {
       marketLiquidity: "📊 Khối lượng $NEX 24h lập đỉnh mới · thanh khoản các pool sâu hơn.",
       marketLiquidityCta: "Trung tâm tin cậy",
     },
+    reply: {
+      deviceOne: "1 thiết bị đang hoạt động",
+      deviceMany: "{n} thiết bị đang hoạt động",
+      todayTop: "Thiết bị kiếm nhiều nhất: {name} ({gpu}) với ${amount} hôm nay.",
+      todayNoDevice: "Chưa có thiết bị nào hoạt động — kết nối một thiết bị để bắt đầu kiếm tiền.",
+      todayBody:
+        "Hôm nay bạn đã kiếm được ${amount} trên {devices}.\n\n{topLine}\n\nPhần lớn tác vụ của bạn chạy ở nhóm {poolA} + {poolB} — điển hình với mức VRAM của bạn. Bạn có muốn tôi giải thích cách mở khóa {poolC} không?",
+      boostLocked:
+        "Ba cách hiệu quả nhanh:\n\n1. Giữ ít nhất một thiết bị online qua đêm — nhóm {pool} đạt đỉnh lúc 02:00-06:00 UTC.\n2. Cấu hình hiện tại của bạn giới hạn ở {vram}GB VRAM. Nâng lên {tier} sẽ mở khóa {model} ({type}) — mỗi tác vụ trả {reward}.\n3. Giới thiệu bạn bè bằng mã mời của bạn — bạn nhận 5% thu nhập trọn đời của họ.",
+      boostMaxed:
+        "Bạn đã ở hạng cao nhất rồi — tuyệt. Còn hai cách để mở rộng thêm:\n\n1. Thêm một NexGridBox nữa để chạy song song các tác vụ tinh chỉnh.\n2. Tiếp tục giới thiệu — hạng của bạn nhận 8% trọn đời cho mỗi lượt giới thiệu.",
+      hotLlm:
+        "🔥 Giá {pool} vừa tăng +18% trong một giờ qua sau khi Anthropic ra mắt Claude 4.6. Dự kiến nhu cầu tăng mạnh suốt tối nay.",
+      hotVideo:
+        "📈 Hạng {pool} đang có lưu lượng gấp 2,4 lần bình thường — Atrium AI hôm nay chạy một đợt render chiến dịch. Nặng về thông lượng, trả cao.",
+      hotFineTune:
+        "💎 Hàng đợi {pool} đang ở mức 812 tác vụ (so với 280 thông thường). Thiết bị VRAM cao được ưu tiên nhận trước. Nhóm điện toán flagship trả +30% so với mức chuẩn.",
+      topJobsOpen:
+        "Hiện tại các tác vụ mở trả cao nhất trong nhóm của bạn:\n\n• Suy luận Llama 3.1 405B — $0,62 mỗi 1k token (Helix Labs)\n• Video cỡ Sora — $1,80 mỗi clip 8 giây (Atrium AI)\n• DPO · Tinh chỉnh Llama 3.1 70B — $0,42 mỗi tác vụ (Northwind Research)\n\nThiết bị của bạn chạy được tất cả. Việc điều phối là tự động.",
+      topJobsLocked:
+        "Các tác vụ vượt giới hạn VRAM hiện tại của bạn ({vram}GB):\n\n{lines}\n\nMỗi tác vụ sẽ mở khóa khi bạn nâng cấp — cứ báo tôi khi bạn sẵn sàng.",
+      topJobsLockedLine: "• {model} ({type}) — {reward} · cần {tier}",
+      welcome:
+        "Chào — tôi là Nova, cố vấn điện toán của bạn. Tôi sẽ theo dõi thị trường và báo bạn khi có cơ hội kiếm thêm.\n\nThử các gợi ý bên dưới để bắt đầu.",
+      ctaBrowseStore: "Xem cửa hàng →",
+      ctaOpenTeam: "Mở nhóm →",
+      ctaOpenMarket: "Xem thị trường →",
+    },
   },
   receipt: {
     title: "Biên lai",
@@ -2332,6 +2398,9 @@ export const vi: Messages = {
     catEM: "Embedding",
     catSP: "Giọng nói",
     catKY: "KYC",
+    typeWalletPairing: "Ghép ví",
+    sigCopied: "Đã sao chép chữ ký",
+    clearedToast: "Đã xóa {n} biên lai",
   },
   language: {
     pageTitle: "Ngôn ngữ",

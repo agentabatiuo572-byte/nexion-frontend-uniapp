@@ -1642,6 +1642,44 @@ export const zh: Messages = {
     detFeaturedIn: "媒体报道",
     detCompliance: "合规认证",
     detFaq: "常见问题",
+    detPaybackMonths: "{n} 个月",
+    detPaybackDays: "{n} 天",
+    detCtaPayback: "${daily}/天 · {payback}回本",
+    specGpu: "GPU",
+    specVram: "显存",
+    specPower: "功耗",
+    specDatacenter: "数据中心",
+    specDatacenterValue: "新加坡",
+    specUptime: "在线率 SLA",
+    specWarranty: "质保",
+    specWarrantyValue: "24 个月",
+    aiRowImageGen: "图像生成(SDXL)",
+    aiRowLlm: "LLM 推理",
+    aiRowVideo: "视频生成",
+    aiRowFineTune: "微调(LoRA)",
+    aiRowUnlocks: "可解锁任务池",
+    aiUnitImgMin: "张/分钟",
+    aiUnitTokSec: "k tok/秒",
+    aiUnitMinHour: "分钟/小时",
+    aiUnitMin: "分钟",
+    faq: {
+      location: {
+        q: "设备实际放在哪里?",
+        a: "在我们的新加坡数据中心。你不会收到实体硬件——运维和电费全部包含在内。",
+      },
+      withdraw: {
+        q: "收益随时可以提现吗?",
+        a: "可以,满 $20 起提。首次提现 24 小时内处理完成。需先完成 KYC-Express(存入 $1)验证你的钱包。",
+      },
+      demand: {
+        q: "如果 AI 需求下滑怎么办?",
+        a: "收益随 AI 任务池价格浮动。历史低位:即使在需求清淡期也有 $24/天。",
+      },
+      refund: {
+        q: "有退款期吗?",
+        a: "设备未激活可 7 天内全额退款。激活后可在交易市场转售。",
+      },
+    },
     coProductNotFound: "未找到商品。",
     coRowProduct: "商品",
     coRowQuantity: "数量",
@@ -2337,6 +2375,34 @@ export const zh: Messages = {
       marketLiquidity: "📊 $NEX 24 小时成交量创新高 · 各交易场所池子深度提升。",
       marketLiquidityCta: "信任中心",
     },
+    reply: {
+      deviceOne: "1 台在线设备",
+      deviceMany: "{n} 台在线设备",
+      todayTop: "收益最高的是 {name}({gpu}),今天已赚 ${amount}。",
+      todayNoDevice: "还没有在线设备——接入一台就能开始赚了。",
+      todayBody:
+        "今天到目前为止,你在 {devices}上已经赚了 ${amount}。\n\n{topLine}\n\n你的任务大多跑在 {poolA} + {poolB}池——以你的显存档位来说很正常。要我讲讲怎么解锁 {poolC}吗?",
+      boostLocked:
+        "三个见效快的办法:\n\n1. 至少留一台设备整夜在线——{pool}池在 UTC 02:00-06:00 是高峰。\n2. 你现在的配置上限是 {vram}GB 显存。升级到 {tier} 就能解锁 {model}({type})——单个任务给 {reward}。\n3. 用你的邀请码拉个朋友——他终身收益的 5% 归你。",
+      boostMaxed:
+        "你已经是最高档位了,厉害。还想再往上有两条路:\n\n1. 再加一台 NexGridBox,并行跑微调任务。\n2. 继续推邀请——你这个档位每个邀请拿终身 8% 分成。",
+      hotLlm:
+        "🔥 {pool}价格在过去一小时跳涨 +18%,起因是 Anthropic 发布 Claude 4.6。需求高峰预计持续到今晚。",
+      hotVideo:
+        "📈 {pool}档位的量是平时的 2.4 倍——Atrium AI 今天在跑一批广告渲染。吃吞吐,给钱也大方。",
+      hotFineTune:
+        "💎 {pool}队列积压到 812 个任务(平常 280)。高显存设备优先派单。旗舰算力池按标准费率的 +30% 结算。",
+      topJobsOpen:
+        "你所在的池子里,现在给钱最多的开放任务:\n\n• Llama 3.1 405B 推理 —— 每 1k tokens $0.62(Helix Labs)\n• Sora 级视频 —— 每段 8 秒 $1.80(Atrium AI)\n• DPO · Llama 3.1 70B 微调 —— 每个任务 $0.42(Northwind Research)\n\n这些你的设备都能跑,派单是自动的。",
+      topJobsLocked:
+        "超出你当前显存上限({vram}GB)的高价任务:\n\n{lines}\n\n升级之后就都解锁了——你想好了随时找我。",
+      topJobsLockedLine: "• {model}({type})—— {reward} · 需要 {tier}",
+      welcome:
+        "嘿——我是 Nova,你的算力顾问。我会盯着行情,有赚头的机会就叫你。\n\n点下面的话题开始吧。",
+      ctaBrowseStore: "去商城看看 →",
+      ctaOpenTeam: "打开团队 →",
+      ctaOpenMarket: "查看行情 →",
+    },
   },
   receipt: {
     title: "收据",
@@ -2357,6 +2423,9 @@ export const zh: Messages = {
     catEM: "Embedding",
     catSP: "语音",
     catKY: "KYC",
+    typeWalletPairing: "钱包绑定",
+    sigCopied: "签名已复制",
+    clearedToast: "已删除 {n} 条收据",
   },
   language: {
     pageTitle: "语言",

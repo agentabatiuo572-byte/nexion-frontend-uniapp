@@ -5,9 +5,22 @@
 // pre-formatted message string. Ported subset: the welcome push + the 4
 // quick-prompt replies the drawer offers. ctaHref keeps the prototype's
 // logical web path; the drawer maps it to a uni route at tap time.
+//
+// Copy lives in t.nova.reply, passed in as `t` rather than read from a store —
+// same convention as mock/conversations.ts and mock/card-notifications.ts.
+// Callers read t.value inside the reply callback so a locale switch applies to
+// the next push; already-sent messages keep the language they were sent in,
+// which is what a real chat log does.
+//
+// Workload names come from t.market.workloads via workloadLabel(), so Nova
+// names a pool exactly as the market board and task center do. Model, client
+// and device names are proper nouns and stay untranslated.
 
 import type { NovaMessage } from "@/store/nova";
 import type { Device } from "@/store/types";
+import type { Messages } from "@/i18n/messages/en";
+import { fmt } from "@/i18n/format";
+import { workloadLabel } from "@/lib/workload-label";
 import { isDeviceOnline } from "@/lib/hashpower";
 import { getLockedTeasers } from "./tasks";
 
@@ -22,23 +35,35 @@ type PushBody = Omit<NovaMessage, "id" | "ts" | "sender">;
 // ───── Reply builders (user quick-prompt → Nova reply) ─────
 
 export function replyToQuickPrompt(
+  t: Messages,
   key: QuickPromptKey,
   ctx: { earningsToday: number; devices: Device[]; onlineCount: number },
 ): PushBody {
+  const r = t.nova.reply;
   switch (key) {
     case "explain-today": {
       const top = topDevice(ctx.devices);
       const topLine = top
-        ? `Top earner: **${top.name}** (${top.gpu}) at $${top.todayEarnings.toFixed(2)} today.`
-        : "No active devices yet — connect one to start earning.";
+        ? fmt(r.todayTop, {
+            name: top.name,
+            gpu: top.gpu,
+            amount: top.todayEarnings.toFixed(2),
+          })
+        : r.todayNoDevice;
+      const devices =
+        ctx.onlineCount === 1
+          ? r.deviceOne
+          : fmt(r.deviceMany, { n: ctx.onlineCount });
       return {
         kind: "nova-reply",
-        text:
-          `You've earned **$${ctx.earningsToday.toFixed(2)}** so far today across ` +
-          `${ctx.onlineCount} active device${ctx.onlineCount === 1 ? "" : "s"}.\n\n` +
-          `${topLine}\n\n` +
-          `Most of your jobs ran on the Image Gen + Speech pools — typical for your VRAM tier. ` +
-          `Want me to explain how to unlock LLM Inference?`,
+        text: fmt(r.todayBody, {
+          amount: ctx.earningsToday.toFixed(2),
+          devices,
+          topLine,
+          poolA: workloadLabel(t, "IG"),
+          poolB: workloadLabel(t, "SP"),
+          poolC: workloadLabel(t, "LL"),
+        }),
       };
     }
     case "how-to-boost": {
@@ -47,48 +72,35 @@ export function replyToQuickPrompt(
       if (teaser) {
         return {
           kind: "nova-reply",
-          text:
-            `Three quick wins:\n\n` +
-            `1. Keep at least one device online overnight — the LLM pool peaks 02:00-06:00 UTC.\n` +
-            `2. Your current rig caps at **${maxVram}GB VRAM**. Upgrading to **${teaser.unlockTier}** ` +
-            `unlocks **${teaser.model}** (${teaser.type}) — a single job pays ${teaser.rewardHint}.\n` +
-            `3. Refer a friend with the code in /team — you earn 5% of their lifetime payouts.`,
-          ctaLabel: "Browse Store →",
+          text: fmt(r.boostLocked, {
+            pool: workloadLabel(t, "LL"),
+            vram: maxVram,
+            tier: teaser.unlockTier,
+            model: teaser.model,
+            type: workloadLabel(t, teaser.category),
+            reward: teaser.rewardHint,
+          }),
+          ctaLabel: r.ctaBrowseStore,
           ctaHref: "/store",
         };
       }
       return {
         kind: "nova-reply",
-        text:
-          `You already run the highest tier — nice. Two ways to scale further:\n\n` +
-          `1. Add a second NexGridBox to handle parallel fine-tune jobs.\n` +
-          `2. Push referrals via /team — your tier earns 8% lifetime split on each referral.`,
-        ctaLabel: "Open Team →",
+        text: r.boostMaxed,
+        ctaLabel: r.ctaOpenTeam,
         ctaHref: "/team",
       };
     }
     case "whats-hot": {
       const events = [
-        {
-          text:
-            `🔥 **LLM Inference** prices jumped **+18%** in the last hour after Anthropic's ` +
-            `Claude 4.6 launch. Demand surge expected through tonight.`,
-        },
-        {
-          text:
-            `📈 **Video Gen** tier seeing 2.4× normal volume — Atrium AI is running a campaign ` +
-            `render today. Throughput-bound, well-paying.`,
-        },
-        {
-          text:
-            `💎 **Fine-tune** queue depth at **812 jobs** (vs 280 baseline). High-VRAM devices ` +
-            `getting first pick. Flagship compute pool at +30% of standard rate.`,
-        },
+        fmt(r.hotLlm, { pool: workloadLabel(t, "LL") }),
+        fmt(r.hotVideo, { pool: workloadLabel(t, "VG") }),
+        fmt(r.hotFineTune, { pool: workloadLabel(t, "FT") }),
       ];
       return {
         kind: "nova-reply",
-        text: events[Math.floor(Math.random() * events.length)].text,
-        ctaLabel: "Open Market →",
+        text: events[Math.floor(Math.random() * events.length)],
+        ctaLabel: r.ctaOpenMarket,
         ctaHref: "/earn",
       };
     }
@@ -96,25 +108,22 @@ export function replyToQuickPrompt(
       const maxVram = Math.max(0, ...ctx.devices.map((d) => d.vramTotal));
       const lockedTop = getLockedTeasers(maxVram, 3);
       if (lockedTop.length === 0) {
-        return {
-          kind: "nova-reply",
-          text:
-            `Right now the highest-paying open jobs in your pool:\n\n` +
-            `• **Llama 3.1 405B inference** — $0.62 per 1k tokens (Helix Labs)\n` +
-            `• **Sora-class video** — $1.80 per 8s clip (Atrium AI)\n` +
-            `• **DPO · Llama 3.1 70B fine-tune** — $0.42 per job (Northwind Research)\n\n` +
-            `Your devices can run all of these. Routing handled automatically.`,
-        };
+        return { kind: "nova-reply", text: r.topJobsOpen };
       }
       const lines = lockedTop
-        .map((t) => `• **${t.model}** (${t.type}) — ${t.rewardHint} · needs ${t.unlockTier}`)
+        .map((teaser) =>
+          fmt(r.topJobsLockedLine, {
+            model: teaser.model,
+            type: workloadLabel(t, teaser.category),
+            reward: teaser.rewardHint,
+            tier: teaser.unlockTier,
+          }),
+        )
         .join("\n");
       return {
         kind: "nova-reply",
-        text:
-          `Top jobs above your current VRAM cap (${maxVram}GB):\n\n${lines}\n\n` +
-          `Each unlocks once you upgrade — let me know when you're ready.`,
-        ctaLabel: "Browse Store →",
+        text: fmt(r.topJobsLocked, { vram: maxVram, lines }),
+        ctaLabel: r.ctaBrowseStore,
         ctaHref: "/store",
       };
     }
@@ -130,13 +139,11 @@ function topDevice(devices: Device[]): Device | undefined {
 
 // ───── Auto-push template (proactive welcome) ─────
 
-export function welcomeMessage(): PushBody {
+export function welcomeMessage(t: Messages): PushBody {
   return {
     kind: "welcome",
-    text:
-      `Hey — I'm **Nova**, your compute advisor. I'll watch the market and ping you ` +
-      `when there's an opportunity to earn more.\n\nTry the chips below to start.`,
-    ctaLabel: "Browse Store →",
+    text: t.nova.reply.welcome,
+    ctaLabel: t.nova.reply.ctaBrowseStore,
     ctaHref: "/store",
   };
 }

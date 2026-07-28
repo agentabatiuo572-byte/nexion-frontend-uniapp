@@ -1659,6 +1659,48 @@ export const en = {
     detFeaturedIn: "Featured in",
     detCompliance: "Compliance",
     detFaq: "FAQ",
+    // Hardware spec sheet. Row labels + the two values that are prose rather
+    // than per-SKU data (gpu / vram / power values come from products.ts).
+    detPaybackMonths: "{n} months",
+    detPaybackDays: "{n} days",
+    detCtaPayback: "${daily}/d · {payback} payback",
+    specGpu: "GPU",
+    specVram: "VRAM",
+    specPower: "Power",
+    specDatacenter: "Datacenter",
+    specDatacenterValue: "Singapore",
+    specUptime: "Uptime SLA",
+    specWarranty: "Warranty",
+    specWarrantyValue: "24 months",
+    // AI performance sheet — row labels carry the benchmark model in parens,
+    // so they stay distinct from the bare workload names in t.market.workloads.
+    aiRowImageGen: "Image gen (SDXL)",
+    aiRowLlm: "LLM inference",
+    aiRowVideo: "Video gen",
+    aiRowFineTune: "Fine-tune (LoRA)",
+    aiRowUnlocks: "Unlocks pool",
+    aiUnitImgMin: "img/min",
+    aiUnitTokSec: "k tok/sec",
+    aiUnitMinHour: "min / hour",
+    aiUnitMin: "min",
+    faq: {
+      location: {
+        q: "Where is the device physically?",
+        a: "In our Singapore datacenter. You never receive hardware — all maintenance and power is included.",
+      },
+      withdraw: {
+        q: "Can I withdraw earnings anytime?",
+        a: "Yes, from $20. First withdrawal processes within 24 hours. KYC-Express ($1 deposit) required to verify your wallet.",
+      },
+      demand: {
+        q: "What if AI demand drops?",
+        a: "Earnings scale with AI workload pool pricing. Historical floor: $24/day even during low-demand periods.",
+      },
+      refund: {
+        q: "Is there a refund window?",
+        a: "7-day money-back if device hasn't been activated. After activation, resale on marketplace.",
+      },
+    },
     coProductNotFound: "Product not found.",
     coRowProduct: "Product",
     coRowQuantity: "Quantity",
@@ -2362,6 +2404,38 @@ export const en = {
       marketLiquidity: "📊 $NEX 24h volume hit a new high · pool liquidity deepened across venues.",
       marketLiquidityCta: "Trust Center",
     },
+    // Quick-prompt reply scripts (drawer chip → Nova answer). Previously
+    // hardcoded English in mock/nova-templates.ts. Workload names are injected
+    // from t.market.workloads so Nova names a pool exactly like the rest of the
+    // app does. Model / client / device names are proper nouns — not translated.
+    reply: {
+      deviceOne: "1 active device",
+      deviceMany: "{n} active devices",
+      todayTop: "Top earner: {name} ({gpu}) at ${amount} today.",
+      todayNoDevice: "No active devices yet — connect one to start earning.",
+      todayBody:
+        "You've earned ${amount} so far today across {devices}.\n\n{topLine}\n\nMost of your jobs ran on the {poolA} + {poolB} pools — typical for your VRAM tier. Want me to explain how to unlock {poolC}?",
+      boostLocked:
+        "Three quick wins:\n\n1. Keep at least one device online overnight — the {pool} pool peaks 02:00-06:00 UTC.\n2. Your current rig caps at {vram}GB VRAM. Upgrading to {tier} unlocks {model} ({type}) — a single job pays {reward}.\n3. Refer a friend with your invite code — you earn 5% of their lifetime payouts.",
+      boostMaxed:
+        "You already run the highest tier — nice. Two ways to scale further:\n\n1. Add a second NexGridBox to handle parallel fine-tune jobs.\n2. Keep referring — your tier earns 8% lifetime split on each referral.",
+      hotLlm:
+        "🔥 {pool} prices jumped +18% in the last hour after Anthropic's Claude 4.6 launch. Demand surge expected through tonight.",
+      hotVideo:
+        "📈 {pool} tier seeing 2.4× normal volume — Atrium AI is running a campaign render today. Throughput-bound, well-paying.",
+      hotFineTune:
+        "💎 {pool} queue depth at 812 jobs (vs 280 baseline). High-VRAM devices getting first pick. Flagship compute pool at +30% of standard rate.",
+      topJobsOpen:
+        "Right now the highest-paying open jobs in your pool:\n\n• Llama 3.1 405B inference — $0.62 per 1k tokens (Helix Labs)\n• Sora-class video — $1.80 per 8s clip (Atrium AI)\n• DPO · Llama 3.1 70B fine-tune — $0.42 per job (Northwind Research)\n\nYour devices can run all of these. Routing handled automatically.",
+      topJobsLocked:
+        "Top jobs above your current VRAM cap ({vram}GB):\n\n{lines}\n\nEach unlocks once you upgrade — let me know when you're ready.",
+      topJobsLockedLine: "• {model} ({type}) — {reward} · needs {tier}",
+      welcome:
+        "Hey — I'm Nova, your compute advisor. I'll watch the market and ping you when there's an opportunity to earn more.\n\nTry the chips below to start.",
+      ctaBrowseStore: "Browse Store →",
+      ctaOpenTeam: "Open Team →",
+      ctaOpenMarket: "Open Market →",
+    },
   },
   receipt: {
     title: "Receipts",
@@ -2383,6 +2457,12 @@ export const en = {
     catEM: "Embedding",
     catSP: "Speech",
     catKY: "KYC",
+    // Receipt `type` row. The 6 AI workloads resolve from t.market.workloads at
+    // render time (receipts persist, so a baked label would freeze the language
+    // it was generated in); only the KYC receipt needs its own label here.
+    typeWalletPairing: "Wallet Pairing",
+    sigCopied: "Signature copied",
+    clearedToast: "{n} receipts removed",
   },
   language: {
     pageTitle: "Language",
