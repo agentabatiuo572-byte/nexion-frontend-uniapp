@@ -229,6 +229,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
+import { deviceName, deviceNameByKind } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
 const sheet = useTradeinSheet();
@@ -254,7 +255,10 @@ const confirming = ref(false);
  *  (user-owned hardware), so fall back to the device spec name, then the raw
  *  kind — never a bare literal, never a missing i18n key. */
 function kindLabel(kind: DeviceKind): string {
-  return getProduct(kind)?.name ?? DEVICE_SPECS[kind]?.name ?? kind;
+  // SKU name first (brand mark). Kinds with no store listing — phone, pc-gpu —
+  // fall back to the localized device name, not the English DEVICE_SPECS one:
+  // the user's own phone can be the traded-in / replaced device here.
+  return getProduct(kind)?.name ?? deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
 }
 
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
@@ -292,7 +296,7 @@ const choiceSources = computed(() => {
     .map((d) => ({
       id: d.id,
       label: fmt(t.value.tradein.choiceTradeInOption, {
-        name: d.name,
+        name: deviceName(t.value, d),
         credit: previewCredit(d, s.newPrice).toFixed(2),
       }),
     }));
@@ -349,7 +353,7 @@ const retireView = computed(() => {
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
   });
   return {
-    subtitle: fmt(t.value.tradein.retireSubtitle, { name: device.name }),
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }),
     targets,
   };
 });

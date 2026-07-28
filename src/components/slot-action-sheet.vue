@@ -53,7 +53,7 @@
               <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><path d="M6 6h.01" /><path d="M6 18h.01" /></svg>
             </view>
             <view class="sas-device-meta">
-              <text class="sas-device-name">{{ d.name }}</text>
+              <text class="sas-device-name">{{ deviceName(t, d) }}</text>
               <text class="sas-device-rate">${{ d.baseRate.toFixed(2) }}/d</text>
             </view>
             <view class="sas-device-power">
@@ -74,6 +74,7 @@ import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
 
@@ -111,7 +112,7 @@ function onActivate(d: Device) {
   }
   const ok = app.activateDevice(d.id, reservedSlots.value);
   if (ok) {
-    toast.success(fmt(t.value.slotSheet.toastActivated, { name: d.name }));
+    toast.success(fmt(t.value.slotSheet.toastActivated, { name: deviceName(t.value, d) }));
     sheet.hide();
   }
 }

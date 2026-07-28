@@ -47,6 +47,7 @@ import DeviceCardPC from "@/components/earn/device-card-pc.vue";
 import { navTo } from "@/lib/route";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
+import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 
 const app = useApp();
 const t = useT();
@@ -67,11 +68,12 @@ onLoad((options) => {
 const device = computed(
   () => app.visibleDevices.find((item) => item.id === id.value && item.activatedAt !== null) ?? null,
 );
-const deviceTitle = computed(() => {
-  if (!device.value) return t.value.earn.deviceDetailTitle;
-  return device.value.kind === "phone" ? t.value.earn.yourPhone : device.value.name;
-});
-const deviceSubtitle = computed(() => device.value?.gpu ?? "");
+const deviceTitle = computed(() =>
+  device.value ? deviceName(t.value, device.value) : t.value.earn.deviceDetailTitle,
+);
+const deviceSubtitle = computed(() =>
+  device.value ? deviceGpuLabel(t.value, device.value) : "",
+);
 
 function goEarn() {
   navTo("/earn");

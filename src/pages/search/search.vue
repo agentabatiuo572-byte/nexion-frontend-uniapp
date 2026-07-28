@@ -82,6 +82,7 @@ import { useApp } from "@/store/app";
 import { useNetwork } from "@/store/network";
 import { PRODUCTS } from "@/mock/products";
 import { productCopy } from "@/lib/product-copy";
+import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
 
 type Group = "route" | "device" | "product" | "member" | "faq";
 interface Hit {
@@ -161,8 +162,12 @@ const results = computed<Hit[]>(() => {
     }
   }
   for (const d of devices.value) {
-    if (d.name.toLowerCase().includes(query) || d.gpu.toLowerCase().includes(query)) {
-      out.push({ group: "device", label: d.name, sublabel: d.gpu, href: "/pages/earn/earn" });
+    // Same rule as products above: match the strings the user can actually see.
+    // SKU names and hardware models pass through untranslated on both sides.
+    const name = deviceName(t.value, d);
+    const gpu = deviceGpuLabel(t.value, d);
+    if (name.toLowerCase().includes(query) || gpu.toLowerCase().includes(query)) {
+      out.push({ group: "device", label: name, sublabel: gpu, href: "/pages/earn/earn" });
     }
   }
   for (const m of members.value.slice(0, 30)) {

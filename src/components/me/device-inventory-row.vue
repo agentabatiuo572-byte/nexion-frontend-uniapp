@@ -15,8 +15,8 @@
         <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" :stroke="iconColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
       </view>
       <view class="flex-1 min-w-0">
-        <text class="block truncate" :style="nameStyle">{{ device.name }}</text>
-        <text class="block truncate" :style="specStyle">${{ device.baseRate.toFixed(2) }}/d · {{ device.gpu }}</text>
+        <text class="block truncate" :style="nameStyle">{{ deviceName(t, device) }}</text>
+        <text class="block truncate" :style="specStyle">${{ device.baseRate.toFixed(2) }}/d · {{ deviceGpuLabel(t, device) }}</text>
         <view v-if="device.pendingDeactivate" class="inline-flex items-center" :style="pendingChipStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
           <text>{{ pendingChipLabel }}</text>
@@ -46,6 +46,10 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
+import { useT } from "@/i18n/use-t";
+import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
+
+const t = useT();
 
 const props = withDefaults(
   defineProps<{

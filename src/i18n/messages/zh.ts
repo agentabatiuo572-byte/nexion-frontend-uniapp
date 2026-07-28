@@ -338,7 +338,7 @@ export const zh: Messages = {
     poolV3Unlock: "V3+ 解锁",
     // DoTheMathCard (ZONE 5)
     doMathTitle: "算笔账",
-    doMathHeadline: "{target} 每天赚的，是你的 {base} 的 {mult}。",
+    doMathHeadline: "{target} 每天赚的，是{base}的 {mult}。",
     doMathDaily: "每日",
     doMathPayback: "回本",
     doMathVs: "对比 {base}",
@@ -2412,6 +2412,19 @@ export const zh: Messages = {
       ctaOpenTeam: "打开团队 →",
       ctaOpenMarket: "查看行情 →",
     },
+  },
+  device: {
+    nameComputerGpu: "电脑显卡",
+    nameSharedComputer: "共享电脑",
+    namePhoneInline: "你的手机",
+    nameComputerGpuInline: "你的电脑显卡",
+    gpuMobileNpu: "移动 NPU · 约 {tops} TOPS",
+    gpuComputerShared: "电脑显卡 · 共享",
+    gpuDistributed: "分布式",
+    locSingaporeDc: "新加坡数据中心",
+    locFrankfurtDc: "法兰克福数据中心",
+    locLinkedComputer: "已连接的电脑",
+    promoNoActive: "(暂无在线设备)",
   },
   receipt: {
     title: "收据",
