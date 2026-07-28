@@ -42,8 +42,8 @@
           <view class="relative border-b" style="border-color: var(--v5-border)">
             <ProductRender :tier="product.tier" />
             <!-- Folded-corner ribbon -->
-            <view v-if="product.badge" class="absolute" :style="ribbonStyle">
-              <text>{{ product.badge }}</text>
+            <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
+              <text>{{ copy.badge }}</text>
             </view>
             <!-- Live activity danmaku -->
             <LiveSocialProof :product="product" />
@@ -54,7 +54,7 @@
             <view class="flex items-start justify-between" style="gap: 12px">
               <view class="min-w-0">
                 <text class="block truncate" :style="nameStyle">{{ product.name }}</text>
-                <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ product.tagline }}</text>
+                <text class="block" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3)">{{ copy.tagline }}</text>
               </view>
               <text v-if="!isShare" class="shrink-0 tabular-nums" :style="multBadgeStyle">{{ speedup }}×</text>
             </view>
@@ -203,6 +203,7 @@ import { isPhaseReached } from "@/store/product-phase";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
+import { productCopy } from "@/lib/product-copy";
 
 const t = useT();
 const phase = useProductPhase();
@@ -215,6 +216,13 @@ onLoad((options) => {
 
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
 const isShare = computed(() => product.value?.tier === "Share");
+// Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
+// both consumers are inside `v-if="product"`, so the blanks never render.
+const copy = computed(() =>
+  product.value
+    ? productCopy(t.value, product.value)
+    : { tagline: "", badge: "", unlocks: "" },
+);
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {

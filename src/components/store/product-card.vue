@@ -33,8 +33,8 @@
       <view aria-hidden :style="fadeStyle" />
 
       <!-- Badge ribbon -->
-      <view v-if="product.badge" class="absolute" :style="ribbonStyle">
-        <text>{{ product.badge }}</text>
+      <view v-if="copy.badge" class="absolute" :style="ribbonStyle">
+        <text>{{ copy.badge }}</text>
       </view>
 
       <!-- Tier-code chip + Legacy chip (photo) -->
@@ -72,9 +72,9 @@
         </view>
 
         <!-- FEAT-DEV01: 高阶任务能力线(算力越高可接任务面越大 · 数据取 SKU 解锁算力池) -->
-        <view v-if="product.ai?.unlocks" class="mt-1.5 flex items-center gap-1.5">
+        <view v-if="copy.unlocks" class="mt-1.5 flex items-center gap-1.5">
           <svg class="shrink-0" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
-          <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: product.ai.unlocks }) }}</text>
+          <text class="min-w-0 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ fmt(t.store.cardHighTierLine, { pool: copy.unlocks }) }}</text>
         </view>
 
         <!-- Purchase gate — locked state (等级门/锁额) -->
@@ -131,11 +131,13 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
+import { productCopy } from "@/lib/product-copy";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>(), {
   featured: false,
 });
 const t = useT();
+const copy = computed(() => productCopy(t.value, props.product));
 
 const PRODUCT_PHOTO: Record<string, { src: string; tierCode: string }> = {
   "stellarbox-s1": { src: "/static/img/products/nexionbox-s1-v4.png", tierCode: "S1" },

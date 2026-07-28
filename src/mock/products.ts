@@ -51,6 +51,9 @@ export interface Product {
   installMonths?: number;
   sold: number;
   stock?: number;
+  // ponytail: NOT rendered anywhere today — deliberately left untranslated so we
+  // don't carry 72 dead key-pairs across en/zh/vi. If a spec sheet ever renders
+  // these, move them into `store.catalog.<id>` alongside tagline/badge/unlocks first.
   features: string[];
   // v3.1 AI workload throughput specs (§5.3.1)
   ai?: AIPerformance;

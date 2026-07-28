@@ -4,7 +4,8 @@
     1. AI Workload Price Index (6 workloads · 24h delta · 7-pt sparkline)
     2. Device earnings ranking (5 tiers, phone last → upgrade pull)
   Distinct from home's MarketBoardCard (different data + layout). Static mock
-  data (workload/model proper nouns untranslated). Ranking rows with an href
+  numbers; workload names/units come from t.market.workloads (shared with Task
+  Center + device cards). Model names stay untranslated. Ranking rows with an href
   route to that tier's store detail. Conversion role: feeds the tier-locked
   tasks banner below it on /earn.
 -->
@@ -69,10 +70,10 @@
 <script setup lang="ts">
 import type { CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import type { DeviceKind } from "@/store/types";
+import type { DeviceKind, TaskCategory } from "@/store/types";
 
 interface WorkloadPrice {
-  code: "IG" | "VG" | "LL" | "FT" | "EM" | "SP";
+  code: TaskCategory;
   price: number;
   delta: number;
   spark: number[];
@@ -91,7 +92,9 @@ interface DeviceRanking {
 
 const t = useT();
 
-// 价格 / 走势是数据,文案(label / unit / flagship 行)在 i18n。
+// Label + unit come from t.market.workloads[code] — the same key set the Task
+// Center job rows and device cards read, so a workload is named identically
+// everywhere. Only the numbers live here (flagship 行的文案走 t.market.flagshipRow)。
 const PRICE_INDEX: WorkloadPrice[] = [
   { code: "IG", price: 0.003, delta: 4.2, spark: [0.4, 0.5, 0.42, 0.55, 0.6, 0.7, 0.72] },
   { code: "LL", price: 0.0024, delta: 18.7, spark: [0.3, 0.35, 0.4, 0.42, 0.6, 0.78, 0.88], flagshipDelta: 32.1 },

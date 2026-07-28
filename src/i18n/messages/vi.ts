@@ -616,18 +616,21 @@ export const vi: Messages = {
     liveLabel: "Cập nhật 2 phút trước",
     priceIndex: "Chỉ số giá tác vụ AI",
     deviceRanking: "Thu nhập theo thiết bị",
+    // Nguồn duy nhất cho 6 loại tác vụ (TaskCategory). Dùng chung bởi chỉ số giá
+    // (MarketBoard) và các dòng tác vụ ở Task Center + thẻ thiết bị — tên model
+    // (Flux.1 [dev], Kling 2.0…) giữ nguyên không dịch.
+    workloads: {
+      IG: { label: "Tạo ảnh", unit: "mỗi ảnh" },
+      VG: { label: "Tạo video", unit: "mỗi giây" },
+      LL: { label: "Suy luận LLM", unit: "mỗi 1k token" },
+      FT: { label: "Tinh chỉnh", unit: "mỗi tác vụ" },
+      EM: { label: "Nhúng vector", unit: "mỗi 1k đoạn" },
+      SP: { label: "Giọng nói", unit: "mỗi giây audio" },
+    },
     aiDropAlert: "Cảnh báo AI Drop",
     aiDropMessage:
       "Có tin đồn Anthropic Claude 4.6 ra mắt tối nay. Nhu cầu suy luận LLM có thể tăng vọt +30%.",
     aiDropEta: "Dự kiến: 18h · giữ thiết bị online để bắt giá đỉnh",
-    workloads: {
-      IG: { label: "Tạo ảnh", unit: "mỗi ảnh" },
-      LL: { label: "Suy luận LLM", unit: "mỗi 1k token" },
-      VG: { label: "Tạo video", unit: "mỗi giây" },
-      FT: { label: "Tinh chỉnh", unit: "mỗi lượt" },
-      EM: { label: "Vector hóa", unit: "mỗi 1k đoạn" },
-      SP: { label: "Giọng nói", unit: "mỗi giây audio" },
-    },
     flagshipRow: "Mô hình flagship 405B",
     // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
     yourPhone: "Điện thoại của bạn",
@@ -1704,6 +1707,41 @@ export const vi: Messages = {
     releaseComingToast: "Mẫu này sắp ra mắt — hãy đón chờ",
     cardHighTierLine: "Nhận các nhiệm vụ cấp cao hơn: {pool}",
     comingSoonSubtitle: "Lô sản xuất sẽ ra mắt muộn hơn trong chu kỳ",
+    // Nội dung tiếp thị theo từng SKU, khóa theo Product.id (cấu trúc dữ liệu và
+    // bản gốc tiếng Anh nằm ở src/mock/products.ts). Trường `name` là tên thương
+    // hiệu, KHÔNG bao giờ dịch. verify.sh kiểm tra mọi id trong PRODUCTS đều có ở đây.
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "Hộp suy luận AI cá nhân · vận hành trọn gói",
+        badge: "Bán chạy",
+        unlocks: "Bể suy luận LLM 70B",
+      },
+      "stellarbox-pro": {
+        tagline: "Gấp đôi GPU, gấp đôi sức kiếm tiền.",
+        badge: "Đang hot",
+        unlocks: "Bể tính toán hàng đầu (Tinh chỉnh + suy luận 405B)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "Thông lượng gấp 2.5× S1 — sinh ra cho các bể tác vụ cấp cao.",
+        badge: "Lựa chọn nâng cấp",
+        unlocks: "AI hàng đầu + 405B đa người thuê",
+      },
+      "stellarrack-p1": {
+        tagline: "Rack A100 chuẩn trung tâm dữ liệu cho người vận hành nghiêm túc.",
+        badge: "Hàng đầu",
+        unlocks: "Bể huấn luyện (RLHF / huấn luyện 8B từ đầu)",
+      },
+      "stellarrack-p2": {
+        tagline: "Rack H100 trung tâm dữ liệu — bậc tính toán cao nhất.",
+        badge: "Hàng đầu",
+        unlocks: "Bể huấn luyện (RLHF / huấn luyện 70B từ đầu)",
+      },
+      "cloud-share": {
+        tagline: "Không cần phần cứng — mua một phần của mạng lưới.",
+        badge: "Rào cản thấp",
+        unlocks: "Truy cập theo phần vào các bể Tạo ảnh + Nhúng vector + Giọng nói",
+      },
+    },
     tradeinUpgrade: {
       label: "Đổi máy nâng cấp",
       title: "{name} của bạn được định giá ${credit}",

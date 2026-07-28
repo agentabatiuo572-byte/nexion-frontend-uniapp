@@ -74,6 +74,29 @@ else
   bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
 fi
 
+# Key mirroring proves en/zh/vi agree with EACH OTHER, not that they cover every
+# SKU. A product added to products.ts without a store.catalog entry silently
+# falls back to English prose on the store card / detail / search (the exact leak
+# the 2026-07-28 sweep closed) — assert id parity so the fallback stays dead code.
+if "$NODE_BIN" -e '
+  const fs=require("fs");
+  const ids=[...fs.readFileSync("src/mock/products.ts","utf8").matchAll(/^\s{4}id:\s*"([^"]+)"/gm)].map(m=>m[1]);
+  if(ids.length===0) throw new Error("no PRODUCTS ids parsed — sentinel is blind, fix the matcher");
+  for(const loc of ["en","zh","vi"]){
+    const src=fs.readFileSync(`src/i18n/messages/${loc}.ts`,"utf8");
+    const block=src.match(/catalog:\s*\{[\s\S]*?\n    \},/);
+    if(!block) throw new Error(`${loc}.ts: store.catalog block not found`);
+    for(const id of ids){
+      if(!block[0].includes(`"${id}"`)) throw new Error(`${loc}.ts: store.catalog missing SKU "${id}"`);
+    }
+  }
+  console.log(`product catalog copy covers all ${ids.length} SKUs x 3 locales`);
+' >/tmp/uni-catalog-parity.log 2>&1; then
+  ok "$(cat /tmp/uni-catalog-parity.log)"
+else
+  bad "product catalog i18n parity"; head -5 /tmp/uni-catalog-parity.log | sed 's/^/        /'
+fi
+
 # 入金/牌价/换绑三条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
 # 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
 echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind)${N}"
@@ -709,11 +732,17 @@ spec6_entry_surface_homes_present() {
     for(const file of requiredFiles){ if(!fs.existsSync(file)) throw new Error(`SPEC-6 file missing: ${file}`); }
     const index=fs.readFileSync("src/pages/entry-surfaces/index.vue","utf8");
     const fullLinks=[
-      "http://localhost:5173/#/pages/entry-surfaces/signed",
-      "http://localhost:5173/#/pages/entry-surfaces/h5",
-      "http://localhost:5173/#/pages/entry-surfaces/white?entry=white-app",
+      "/pages/entry-surfaces/signed",
+      "/pages/entry-surfaces/h5",
+      "/pages/entry-surfaces/white?entry=white-app",
     ];
     for(const link of fullLinks){ if(!index.includes(link)) throw new Error(`SPEC-6 full clickable link missing: ${link}`); }
+    // The shown URL must be derived from the runtime origin. A hardcoded host is
+    // wrong on every port/host but the one it was written on (worktree dev server
+    // on 5174, any deploy) — assert the derivation instead of the old literals.
+    if(!/window\.location\.origin/.test(index)) throw new Error("SPEC-6 entry link URL must derive from window.location.origin");
+    if(!/\$\{origin\.value\}#\$\{l\.route\}/.test(index)) throw new Error("SPEC-6 entry fullUrl must be composed as <origin>#<route>");
+    if(/https?:\/\/localhost/.test(index)) throw new Error("SPEC-6 entry index must not hardcode a localhost origin");
     if(!/@(tap|click)="open\(item\.route\)"/.test(index)) throw new Error("SPEC-6 full links are not clickable rows");
     const signed=fs.readFileSync("src/pages/entry-surfaces/signed.vue","utf8");
     const h5=fs.readFileSync("src/pages/entry-surfaces/h5.vue","utf8");

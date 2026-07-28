@@ -41,7 +41,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="categoryIconPath(teaser.category)" /></svg>
           </view>
           <view class="flex-1 min-w-0">
-            <text class="block truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ teaser.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ teaser.type }}</text></text>
+            <text class="block truncate" style="font-size: 13px; font-weight: 500; color: var(--v5-ink-2)">{{ teaser.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(teaser.category) }}</text></text>
             <text class="block truncate" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 2px">{{ t.earn.requires }} <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-tech-cyan-ink)">{{ teaser.minVRAM }}GB VRAM</text> · {{ teaser.unlockTier }}</text>
           </view>
           <view class="text-right shrink-0">
@@ -72,7 +72,7 @@
     <view v-else class="pb-3 space-y-1.5">
       <view v-for="(task, i) in allRecent" :key="i" class="flex items-center justify-between gap-2" style="font-size: 12px">
         <svg class="shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-        <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ task.type }}</text></text>
+        <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
         <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">+${{ task.reward.toFixed(3) }}</text>
         <text class="text-right shrink-0" style="font-size: 12px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
         <view v-if="receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
@@ -101,6 +101,12 @@ const receipts = useReceipts();
 const openReceipt = ref<Receipt | null>(null);
 function receiptFor(id: string): Receipt | undefined {
   return receipts.byId(id);
+}
+
+// Model names are proper nouns (untranslated); the workload half is copy.
+// Resolved from `category` at render — the baked `task.type` string is English.
+function workloadLabel(category: TaskCategory): string {
+  return t.value.market.workloads[category].label;
 }
 
 // History list: completed tasks across all devices, most-recent first (last 20).

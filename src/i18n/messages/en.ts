@@ -615,18 +615,21 @@ export const en = {
     liveLabel: "Updated 2 min ago",
     priceIndex: "AI Workload Price Index",
     deviceRanking: "Device Earnings",
-    aiDropAlert: "AI Drop alert",
-    aiDropMessage:
-      "Anthropic Claude 4.6 launch rumored tonight. LLM Inference demand may spike +30%.",
-    aiDropEta: "Est. window: 18h · keep devices online to capture peak rates",
+    // Single source for the 6 workload categories (TaskCategory). Read by the
+    // price index (MarketBoard) AND the job/teaser rows in Task Center + device
+    // cards — model names (Flux.1 [dev], Kling 2.0 …) stay untranslated.
     workloads: {
       IG: { label: "Image Gen", unit: "per image" },
-      LL: { label: "LLM Inference", unit: "per 1k tok" },
       VG: { label: "Video Gen", unit: "per sec" },
+      LL: { label: "LLM Inference", unit: "per 1k tok" },
       FT: { label: "Fine-tune", unit: "per job" },
       EM: { label: "Embedding", unit: "per 1k chunks" },
       SP: { label: "Speech", unit: "per audio sec" },
     },
+    aiDropAlert: "AI Drop alert",
+    aiDropMessage:
+      "Anthropic Claude 4.6 launch rumored tonight. LLM Inference demand may spike +30%.",
+    aiDropEta: "Est. window: 18h · keep devices online to capture peak rates",
     flagshipRow: "405B flagship",
     // 排行榜里唯一非商品名的一行(其余是 NexGridBox/Rack 等品牌名,不翻译)
     yourPhone: "Your phone",
@@ -1730,6 +1733,41 @@ export const en = {
     releaseComingToast: "This model is arriving soon — stay tuned",
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
+    // Per-SKU marketing copy, keyed by Product.id (src/mock/products.ts holds the
+    // data shape + English source). Product `name` is a brand mark and is NEVER
+    // translated. verify.sh asserts every PRODUCTS id has an entry here.
+    catalog: {
+      "stellarbox-s1": {
+        tagline: "Personal AI inference box · fully managed",
+        badge: "Best Seller",
+        unlocks: "LLM 70B inference pool",
+      },
+      "stellarbox-pro": {
+        tagline: "Double the GPUs, double the earning power.",
+        badge: "Trending",
+        unlocks: "Flagship compute pool (Fine-tune + 405B inference)",
+      },
+      "stellarbox-pro-v2": {
+        tagline: "2.5× S1 throughput — built for higher-tier task pools.",
+        badge: "Upgrade Pick",
+        unlocks: "Flagship AI + multi-tenant 405B",
+      },
+      "stellarrack-p1": {
+        tagline: "Datacenter-grade A100 rack for serious operators.",
+        badge: "Flagship",
+        unlocks: "Training pool (RLHF / from-scratch 8B)",
+      },
+      "stellarrack-p2": {
+        tagline: "Datacenter H100 rack — the top compute tier.",
+        badge: "Flagship",
+        unlocks: "Training pool (RLHF / 70B from-scratch)",
+      },
+      "cloud-share": {
+        tagline: "No hardware needed — buy a slice of the network.",
+        badge: "Low Barrier",
+        unlocks: "Fractional access to network's IG + EM + SP pools",
+      },
+    },
     tradeinUpgrade: {
       label: "Upgrade trade-in",
       title: "Your {name} is worth ${credit} in credit",
