@@ -120,7 +120,7 @@
             <CheckoutRow v-if="hasVoucher || isCard || hasTradein" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
             <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
-            <CheckoutRow v-if="isCard" :label="t.store.coRowCardFee" :value="`$${cardFeeText}`" />
+            <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
             <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
@@ -215,6 +215,7 @@ import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
 import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
@@ -265,10 +266,11 @@ const voucher = useVoucher();
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
 const PAYMENT_METHODS = computed<PaymentMethod[]>(() => [
-  { id: "usdt-trc20", label: "USDT (TRC20)", hint: "Lowest fee · 5 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "usdt-bep20", label: "USDT (BEP20)", hint: "Low fee · 5 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "usdt-erc20", label: "USDT (ERC20)", hint: "15 min", iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "card", label: "Card", hint: "Instant · +3.5% fee", iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
+  { id: "usdt-trc20", label: "USDT (TRC20)", hint: t.value.store.coHintTrc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  { id: "usdt-bep20", label: "USDT (BEP20)", hint: t.value.store.coHintBep20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  { id: "usdt-erc20", label: "USDT (ERC20)", hint: t.value.store.coHintErc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  // 费率单源:文案走 i18n 模板,{rate} 仍由 cardFeeRateLabel() 从 CARD_FEE_RATE 派生。
+  { id: "card", label: "Card", hint: fmt(t.value.store.coCardHint, { rate: cardFeeRateLabel() }), iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
 ]);
 
 const tradein = useTradeinSheet();
@@ -317,7 +319,7 @@ const { gate: purchaseGate } = usePurchaseGate(product);
 
 // ─── Voucher redemption ──────────────────────────────────────────────────
 // Best claimed-unused voucher applicable to this SKU at its base price. The
-// discount applies to the device subtotal; the 3.5% card fee (if any) is then
+// discount applies to the device subtotal; the card fee (if any) is then
 // computed on the discounted subtotal. The voucher is marked used once the
 // order persists (single-use). bestVoucherFor returns null when none applies.
 // Stacking/性质 policy (后台可配,见 OpsVoucher): voucher is the SOLE discount in
@@ -457,7 +459,9 @@ const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
 // Header "Total" = device price after voucher (still excludes card fee, matching
 // the pre-voucher convention). Card fee is computed on the discounted subtotal.
 const netPriceText = computed(() => netPrice.value.toLocaleString());
-const cardFee = computed(() => (isCard.value ? +(netPrice.value * 0.035).toFixed(2) : 0));
+// 算法也单源:整数域(cent × bps)与入金同一套。浮点直乘再 toFixed 会在半分边界
+// 被 IEEE754 压低一分(实测 14 个金额少收 1 分),同一笔费率两种算法两个答案。
+const cardFee = computed(() => (isCard.value ? cardFeeUsd(netPrice.value) : 0));
 const cardFeeText = computed(() => cardFee.value.toLocaleString());
 const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
@@ -572,10 +576,10 @@ watch(step, (s) => {
       }
       const tradeInCredit = ti?.credit ?? 0;
       const net = Math.max(0, +(p.price - discount - tradeInCredit).toFixed(2));
-      // Card payment charges the displayed total INCLUDING the 3.5% fee
+      // Card payment charges the displayed total INCLUDING the card fee
       // (chain payments have no fee). Mock approximation of server-side PSP
       // debit — production: POST /api/orders does authorize+capture atomically.
-      const fee = isCard.value ? +(net * 0.035).toFixed(2) : 0;
+      const fee = isCard.value ? cardFeeUsd(net) : 0;
       const chargeTotal = +(net + fee).toFixed(2);
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
@@ -607,7 +611,7 @@ watch(step, (s) => {
       const memoParts: string[] = [];
       if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
       if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: ti.device.name, amount: tradeInCredit }));
-      if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee }));
+      if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee, rate: cardFeeRateLabel() }));
       bills.add({
         type: "purchase",
         symbol: "USDT",

@@ -109,6 +109,33 @@ export function isChrome(className, borderColorRaw) {
   return false;
 }
 
+/**
+ * allowlist 的尺寸匹配:route + cls 已精确对上之后,尺寸允许 ±SIZE_TOL px 漂移。
+ *
+ * 🔴 为什么不精确匹配(同一根因第 3 次发作:genesis hero 232→242 · orb 卡 388→391 → 391→390):
+ *   size 是**字体度量的函数**,而全站首选字体 "General Sans" 本工程根本不随包发运
+ *   (index.html 只取 Manrope / JetBrains Mono,tokens.css 那句「loaded via <link> in
+ *   layout.tsx」是从 Next 原型抄来的、在 uni 侧不成立)。于是行高取决于**跑门那台机器
+ *   装没装 General Sans**——同一份源码换机器/换时间就差 1px,精确 pin 必然假红。
+ *   2026-07-24 B4 那轮已经踩过一次,当时的对策是在 commit message 里写「改字号必顺手核对
+ *   各基线里 pin 了尺寸的条目」——把机器能测的事交给人记,4 天后原样再犯。归层:进门。
+ *
+ * 只给 allowlist 容差,不给基线:基线本来就有自愈路径(--update-baseline,且被 added=0 守着);
+ * allowlist 没有,失配只会把人推向 --update-baseline,而那会把「带裁决理由的例外」洗成
+ * 「无理由的存量」——恰恰是本文件通篇在防的那件事。
+ *
+ * ±2 的取值:真实设计改动(改字号 10→12 撑高 3px、热区 34→44 撑高 10px)仍会失配并被拦下来复核,
+ * 只放行度量抖动的 1~2px。
+ */
+export const SIZE_TOL = 2;
+export function sizeMatches(exemptSize, hitSize) {
+  if (!exemptSize) return true;              // 未 pin 尺寸 = 不按尺寸收窄
+  const parse = (s) => { const m = /^(\d+)x(\d+)$/.exec(String(s).trim()); return m ? [+m[1], +m[2]] : null; };
+  const a = parse(exemptSize), b = parse(hitSize);
+  if (!a || !b) return String(exemptSize) === String(hitSize);   // 格式不对 → 退回严格相等,不放水
+  return Math.abs(a[0] - b[0]) <= SIZE_TOL && Math.abs(a[1] - b[1]) <= SIZE_TOL;
+}
+
 export function judge({ fill, sides, chrome, dashed, isoRing, ring, outline }) {
   if (!fill || chrome) return null;
   // 《03》§3 明写 border 的两个合法归属,判据来自规范不是为放行调参:
@@ -242,9 +269,20 @@ function selftest() {
   p("阴性 ≤16px 圆形隔离描边环", null, judge({ fill: true, sides: 4, chrome: false, isoRing: true }));
   p("阳性 大圆形填充带边不被隔离环误放", "full", judge({ fill: true, sides: 4, chrome: false, isoRing: false }));
 
-  // allowlist reason 必填
+  // 🔴 allowlist 尺寸容差(2026-07-28:同一根因第 3 次发作后归层进门,见 sizeMatches 注释)
+  p("阳性 尺寸完全相同", true, sizeMatches("358x390", "358x390"));
+  p("阳性 高度 -1px 度量漂移(orb 卡 391→390 真实案例)", true, sizeMatches("358x391", "358x390"));
+  p("阳性 宽高各 +2px 仍在容差内", true, sizeMatches("358x390", "360x392"));
+  p("阴性 高度差 3px(改字号 10→12 的真实位移)必须失配复核", false, sizeMatches("358x388", "358x391"));
+  p("阴性 高度差 10px(热区 34→44 的真实位移)必须失配复核", false, sizeMatches("358x232", "358x242"));
+  p("阴性 同页同 cls 的另一个元素不被容差误放", false, sizeMatches("358x54", "358x252"));
+  p("未 pin 尺寸 = 不按尺寸收窄", true, sizeMatches("", "358x390"));
+  p("格式不合法退回严格相等(不放水)", false, sizeMatches("358*390", "358x390"));
+
+  // allowlist reason 必填 + size 格式必须可解析(否则 sizeMatches 静默退回严格相等 = 容差形同虚设)
   const ex = fs.existsSync(ALLOWLIST) ? JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).exemptions ?? [] : [];
   p("allowlist 每条有 reason", 0, ex.filter((e) => !e.reason || !String(e.reason).trim()).length);
+  p("allowlist 每条 size 格式合法(WxH)", 0, ex.filter((e) => e.size && !/^\d+x\d+$/.test(String(e.size).trim())).length);
 
   const bad = P.filter((x) => !x.ok);
   console.log("=== zero-border gate selftest ===");
@@ -266,8 +304,9 @@ const key = (h) => `${h.route}|${h.kind}|${h.cls}|${h.size}`;
 const ex = fs.existsSync(ALLOWLIST) ? JSON.parse(fs.readFileSync(ALLOWLIST, "utf8")).exemptions ?? [] : [];
 // 豁免必须 route + cls + size 三者都对上才放行 —— cls 常是泛用工具类(如 "relative overflow-hidden"),
 // 只比 route+cls 会把同页所有同类名元素一起放走(C1 验收批评过整文件级豁免过宽,同一个病)。
+// size 走 ±SIZE_TOL 容差(见 sizeMatches:字体度量随机器变,精确 pin 会假红)。
 const allowed = (h) =>
-  ex.some((e) => (!e.route || e.route === h.route) && (!e.cls || e.cls === h.cls) && (!e.size || e.size === h.size));
+  ex.some((e) => (!e.route || e.route === h.route) && (!e.cls || e.cls === h.cls) && sizeMatches(e.size, h.size));
 const live = hits.filter((h) => !allowed(h));
 
 if (process.argv.includes("--update-baseline")) {

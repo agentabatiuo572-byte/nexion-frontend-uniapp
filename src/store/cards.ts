@@ -10,7 +10,11 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // stored — only last4 + brand + expiry + holder name, matching how PSPs
 // (Stripe, Adyen) tokenize cards.
 // MOCK-ONLY: real PSP returns a token id; here we generate a uuid as `tokenId`.
-export type CardBrand = "visa" | "mastercard" | "amex" | "unionpay" | "unknown";
+// 卡组织判定/标签是零依赖纯逻辑,住 cards-core.ts(node 自检脚本要直跑);
+// 存量调用方仍按 `from "@/store/cards"` 引用,此处原样透出。
+import { detectBrand, brandLabel, type CardBrand } from "./cards-core";
+export { detectBrand, brandLabel };
+export type { CardBrand };
 
 export interface SavedCard {
   /** Mock PSP token id — never the real PAN */
@@ -34,25 +38,6 @@ function uuid(): string {
     return (crypto as Crypto).randomUUID();
   }
   return `card_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
-}
-
-/** Brand detection from raw digits (Luhn-prefix heuristic, not exhaustive) */
-export function detectBrand(digits: string): CardBrand {
-  if (/^4/.test(digits)) return "visa";
-  if (/^(5[1-5]|2[2-7])/.test(digits)) return "mastercard";
-  if (/^3[47]/.test(digits)) return "amex";
-  if (/^62/.test(digits)) return "unionpay";
-  return "unknown";
-}
-
-export function brandLabel(brand: CardBrand): string {
-  switch (brand) {
-    case "visa": return "Visa";
-    case "mastercard": return "Mastercard";
-    case "amex": return "American Express";
-    case "unionpay": return "UnionPay";
-    default: return "Card";
-  }
 }
 
 interface PersistShape {
@@ -87,10 +72,21 @@ export const useCards = defineStore("cards", () => {
     defaultTokenId.value = next.defaultTokenId;
   }
 
-  function add(input: Omit<SavedCard, "tokenId" | "boundAt">, opts: { makeDefault?: boolean } = {}): string {
-    const tokenId = uuid();
+  /** tokenId 由收单方 tokenize 产出(见 hosted-card-vault),调用方传入;
+   *  未传时退回本地 uuid —— PROD 只留前者,后者随 mock 一起删。 */
+  function add(
+    input: Omit<SavedCard, "tokenId" | "boundAt"> & { tokenId?: string },
+    opts: { makeDefault?: boolean } = {},
+  ): string {
+    const tokenId = input.tokenId ?? uuid();
     const card: SavedCard = { ...input, tokenId, boundAt: Date.now() };
-    cards.value = [...cards.value, card];
+    // 同 token 去重:真实收单方对**同一张卡**返回同一个 token,同卡再绑一次不该落两行
+    // (会一个列表两条、remove 一次删俩、find 只命中头一条)。语义 = 重绑即更新展示字段。
+    const dup = cards.value.findIndex((c) => c.tokenId === tokenId);
+    cards.value =
+      dup >= 0
+        ? cards.value.map((c, i) => (i === dup ? card : c))
+        : [...cards.value, card];
     // First card auto-defaults unless the binding form explicitly opts out.
     if (opts.makeDefault === true || (defaultTokenId.value === null && opts.makeDefault !== false)) {
       defaultTokenId.value = tokenId;

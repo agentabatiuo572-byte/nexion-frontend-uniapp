@@ -74,10 +74,10 @@ else
   bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
 fi
 
-# 入金/牌价/换绑三条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
+# 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
 # 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
-echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind)${N}"
-for sc in deposits fx rebind; do
+echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards)${N}"
+for sc in deposits fx rebind cards; do
   if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
     ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
   else
@@ -1864,6 +1864,27 @@ tag_comment_gate() {
   fi
 }
 tag_comment_gate
+
+# ── 卡数据信任边界(2026-07-28):明文卡号 / CVV 只许住托管组件 ──
+# 产品文案向用户承诺「NexGrid 不会接触你的完整卡号」;这句话只能靠代码结构守住,
+# 任何人在 hosted-card-vault 之外再写一个卡号 / CVV 输入框,承诺即变不实陈述。
+# 判据认「数据绑定」不认关键词(cvvLength / cvvFocused / kind="cvv" 均放行)。
+card_data_boundary_gate() {
+  if "$NODE_BIN" scripts/card-data-boundary.mjs --selftest > /tmp/uniapp-cardboundary-selftest.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-cardboundary-selftest.log)"
+  else
+    bad "card-data-boundary selftest 失败(判据失效即门失效;node scripts/card-data-boundary.mjs --selftest 看明细)"
+    tail -6 /tmp/uniapp-cardboundary-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/card-data-boundary.mjs > /tmp/uniapp-cardboundary.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-cardboundary.log)"
+  else
+    bad "明文卡字段出现在托管组件之外 — 文案承诺「不会接触你的完整卡号」会变成不实陈述"
+    tail -10 /tmp/uniapp-cardboundary.log | sed 's/^/        /'
+  fi
+}
+card_data_boundary_gate
 
 # ── 空状态哨兵(C5 2026-07-23):《06》缺省页体系真的渲染得出来 ──
 # 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空

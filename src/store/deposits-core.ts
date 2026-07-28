@@ -172,7 +172,15 @@ export const MAX_CARD_DEPOSIT_USDT = 5000;
 /** ⚠️ MOCK-ONLY:3DS 拒付率(演示用)。PROD:收单方返回真实授权结果。 */
 export const CARD_DECLINE_RATE = 0.1;
 
+/** 费率展示串(如 "3.5%")。文案单源 —— 各页禁自己拼百分号,
+ *  否则后台调费率时文案不跟(踩过:i18n 里 3 条把 3.5% 写死)。 */
+export function cardFeeRateLabel(): string {
+  return `${+(CARD_FEE_RATE * 100).toFixed(2)}%`;
+}
+
 /** 卡手续费(USD,两位小数):按入账额计费,另收在用户卡上。
+ *  🔴 商城结账也必须调这个,别再写 `+(x * rate).toFixed(2)` —— 费率单源了不等于
+ *  算法单源,两种算法同一笔费率会给出两个答案(对抗审查穷举出 14 个金额差 1 分)。
  *  整数域运算(cent × bps),与 fx-core 的牌价/折算同一套标准:浮点直乘再 toFixed 会被
  *  IEEE754 把半分边界压低一分 —— 全区间穷举实测 11 个金额少收 1 分(如 237 → 8.29,
  *  精确值 8.295 应进位 8.30),且舍入方向由表示噪声决定而非规则决定。 */

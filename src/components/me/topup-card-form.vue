@@ -9,6 +9,12 @@
   失败展示拒付并可重试。费率/最低额单源在 deposits-core。All data is mock.
 -->
 <template>
+  <!-- 🔴 vault 包住**全部阶段**,不能只包表单分支:拒付切到失败态会卸载表单分支,
+       vault 若在里面就连同已输入的卡一起销毁,点重试得重输整张卡(改造前那些值住在
+       本组件、不随分支卸载,是活的)。真实收单方拒付后也保留已输入卡号。
+       状态在 vault、输入框无状态,所以字段可以随分支来去而值仍在 —— 这正是当初
+       把状态放 vault 的原因。vault 渲染 <slot/> 零 DOM,space-y-3 的子元素间距不受影响。 -->
+  <HostedCardVault ref="vaultRef" @change="onCardChange">
   <view class="mx-4 space-y-3">
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
@@ -67,24 +73,26 @@
         <view><text class="block" :style="limitHintStyle">{{ limitHint }}</text></view>
       </view>
 
-      <!-- Card form — outer shell dropped; the surface-2 fields are the units -->
+      <!-- Card form — outer shell dropped; the surface-2 fields are the units.
+           卡号/有效期/CVV 归 <HostedCardVault>(收单方托管,本组件拿不到明文);
+           持卡人/国家/邮编是账单信息不是卡数据,照旧由本组件收(真实 SDK 亦然)。 -->
       <view class="space-y-3" :style="formCardStyle">
         <view :style="fieldStyle">
           <text class="block font-mono-tabular" :style="fieldLabelStyle">{{ t.wallet.ffCardNumber }}</text>
           <view class="flex items-center" style="margin-top: 2px; gap: 8px">
-            <input class="font-mono-tabular flex-1 min-w-0 tabular-nums" :style="fieldInputStyle" type="text" inputmode="numeric" :value="cardNum" placeholder="1234 5678 9012 3456" @input="onCardNum" />
-            <CardBrandBadge :brand="brand" />
+            <HostedCardField kind="pan" class="font-mono-tabular flex-1 min-w-0 tabular-nums" :input-style="fieldInputStyle" placeholder="1234 5678 9012 3456" :aria-label="t.wallet.ffCardNumber" />
+            <CardBrandBadge :brand="badgeBrand" />
           </view>
         </view>
 
         <view class="grid grid-cols-2" style="gap: 8px">
           <view :style="fieldStyle">
             <text class="block font-mono-tabular" :style="fieldLabelStyle">{{ t.wallet.ffExpiry }}</text>
-            <input class="font-mono-tabular w-full tabular-nums" :style="fieldInputStyle" type="text" inputmode="numeric" :value="expiry" placeholder="MM/YY" @input="onExpiry" />
+            <HostedCardField kind="expiry" class="font-mono-tabular w-full tabular-nums" :input-style="fieldInputStyle" placeholder="MM/YY" :aria-label="t.wallet.ffExpiry" />
           </view>
           <view :style="fieldStyle">
             <text class="block font-mono-tabular" :style="fieldLabelStyle">{{ t.wallet.ffCvv }}</text>
-            <input class="font-mono-tabular w-full tabular-nums" :style="fieldInputStyle" type="text" inputmode="numeric" :value="cvv" placeholder="•••" @input="onCvv" />
+            <HostedCardField kind="cvv" class="font-mono-tabular w-full tabular-nums" :input-style="fieldInputStyle" placeholder="•••" :aria-label="t.wallet.ffCvv" />
           </view>
         </view>
 
@@ -121,6 +129,7 @@
       </view>
     </template>
   </view>
+  </HostedCardVault>
 </template>
 
 <script setup lang="ts">
@@ -129,13 +138,16 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDeposits } from "@/store/deposits";
 import {
-  CARD_FEE_RATE,
   MAX_CARD_DEPOSIT_USDT,
   MIN_CARD_DEPOSIT_USDT,
   cardChargeUsd,
+  cardFeeRateLabel,
   cardFeeUsd,
 } from "@/store/deposits-core";
 import CardBrandBadge from "@/components/me/card-brand-badge.vue";
+import HostedCardVault from "@/components/me/hosted-card-vault.vue";
+import HostedCardField from "@/components/me/hosted-card-field.vue";
+import type { CardBrand } from "@/store/cards-core";
 
 const emit = defineEmits<{ changeChannel: [] }>();
 
@@ -143,9 +155,22 @@ const t = useT();
 const deposits = useDeposits();
 
 const amount = ref("50");
-const cardNum = ref("");
-const expiry = ref("");
-const cvv = ref("");
+// 🔴 卡号 / 有效期 / CVV 不在本组件 —— 归 <HostedCardVault>,本组件只收到
+// ready(可否提交)与 brand(卡组织图标),提交时经 tokenize() 拿 token + 后四位。
+const vaultRef = ref<InstanceType<typeof HostedCardVault> | null>(null);
+const cardReady = ref(false);
+const cardBrand = ref<CardBrand>("unknown");
+function onCardChange(e: { ready: boolean; brand: CardBrand }) {
+  cardReady.value = e.ready;
+  cardBrand.value = e.brand;
+}
+// 徽章只认 visa/mc/amex;unionpay 落 unknown(本通道只收 Visa/Mastercard,
+// 与改造前该组件的判断结果一致,不引入展示变化)。
+const badgeBrand = computed<"visa" | "mc" | "amex" | "unknown">(() => {
+  if (cardBrand.value === "mastercard") return "mc";
+  if (cardBrand.value === "visa" || cardBrand.value === "amex") return cardBrand.value;
+  return "unknown";
+});
 const holder = ref("");
 const zip = ref("");
 const COUNTRY_LABELS = [
@@ -167,16 +192,9 @@ const usdtAmount = computed(() => Math.max(0, parseFloat(amount.value) || 0));
 const feeUSD = computed(() => cardFeeUsd(usdtAmount.value));
 const chargeUSD = computed(() => cardChargeUsd(usdtAmount.value));
 
-const brand = computed<"visa" | "mc" | "amex" | "unknown">(() => {
-  const d = cardNum.value.replace(/\s/g, "");
-  if (d.startsWith("4")) return "visa";
-  if (d.startsWith("5") || d.startsWith("2")) return "mc";
-  if (d.startsWith("34") || d.startsWith("37")) return "amex";
-  return "unknown";
-});
-
-// 费率标签由常量派生(此前文案里写死 "3.5%",后台调费率文案不跟)。
-const feeRateLabel = computed(() => `${+(CARD_FEE_RATE * 100).toFixed(2)}%`);
+// 费率标签由常量派生(此前文案里写死 "3.5%",后台调费率文案不跟);
+// 派生公式住 deposits-core,四个消费方共用一份。
+const feeRateLabel = computed(() => cardFeeRateLabel());
 const limitHint = computed(() =>
   fmt(t.value.topupChrome.cardLimitHint, {
     min: `$${MIN_CARD_DEPOSIT_USDT}`,
@@ -194,9 +212,7 @@ const isValid = computed(
   () =>
     usdtAmount.value >= MIN_CARD_DEPOSIT_USDT &&
     usdtAmount.value <= MAX_CARD_DEPOSIT_USDT &&
-    cardNum.value.replace(/\s/g, "").length >= 13 &&
-    /^\d{2}\/\d{2}$/.test(expiry.value) &&
-    /^\d{3,4}$/.test(cvv.value) &&
+    cardReady.value &&
     holder.value.trim().length >= 2 &&
     zip.value.trim().length >= 3,
 );
@@ -204,10 +220,11 @@ const isValid = computed(
 // 授权号 = 收据号 = 账单 ref,三处同源(此前收据号是 computed 内现摇的随机数,
 // 任一响应式依赖变化就换一个号,且与账单 ref 对不上)。
 const authCode = ref("");
-const receiptLine = computed(() => {
-  const last4 = cardNum.value.replace(/\s/g, "").slice(-4);
-  return fmt(t.value.topupChrome.receiptLine, { no: authCode.value, amount: chargeUSD.value.toFixed(2), last4 });
-});
+// 后四位来自 tokenize() 的回执(本组件唯一能看到的卡片段),提交时定格。
+const last4 = ref("");
+const receiptLine = computed(() =>
+  fmt(t.value.topupChrome.receiptLine, { no: authCode.value, amount: chargeUSD.value.toFixed(2), last4: last4.value }),
+);
 
 // ── input handlers (uni input event → e.detail.value) ──
 function detailVal(e: Event): string {
@@ -219,17 +236,6 @@ function onAmount(e: Event) {
   const raw = detailVal(e).replace(/[^\d.]/g, "");
   const m = raw.match(/^(\d*)(?:\.(\d{0,2}))?/);
   amount.value = m ? m[1] + (m[2] !== undefined ? `.${m[2]}` : "") : "";
-}
-function onCardNum(e: Event) {
-  const d = detailVal(e).replace(/\D/g, "").slice(0, 19);
-  cardNum.value = d.replace(/(.{4})/g, "$1 ").trim();
-}
-function onExpiry(e: Event) {
-  const d = detailVal(e).replace(/\D/g, "").slice(0, 4);
-  expiry.value = d.length <= 2 ? d : d.slice(0, 2) + "/" + d.slice(2);
-}
-function onCvv(e: Event) {
-  cvv.value = detailVal(e).replace(/\D/g, "").slice(0, 4);
 }
 function onHolder(e: Event) {
   holder.value = detailVal(e).toUpperCase();
@@ -243,6 +249,11 @@ function onCountry(e: Event) {
 
 async function handleSubmit() {
   if (!isValid.value) return;
+  // 先向收单方取 token(真实现 = SDK createToken;未填全返 null,对齐其 incomplete
+  // 错误)。明文不经本组件,后续全程只带 token 与后四位。
+  const card = vaultRef.value?.tokenize();
+  if (!card) return;
+  last4.value = card.last4;
   // 授权前捕获账号:这段 3.8s 等待活在组件里,期间会话可能被踢/登出(App.vue 会把
   // 各 store 重绑到 default),回来若不校验就会把钱记进别人账上。store 侧比对后作废。
   const acct = deposits.currentAccountKey();
