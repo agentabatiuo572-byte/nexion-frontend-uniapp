@@ -111,6 +111,17 @@ done
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  # 🔴 先认工程再认状态码:同机跑着 Nexion-CC(:5273)/ janus(:5174),端口被串台时
+  # 本段会整体假绿 —— curl 拿到的是 CSR 空壳,任何 Vite SPA 都回 200(实测踩过)。
+  # 判据用「取到的是真模块还是 SPA 兜底页」:Vite 对不存在的路径回 index.html,
+  # 状态码同样 200,所以只看状态码的探针本身就是个假绿(踩过,红测才揪出来)。
+  # vi.ts = 越南语包,本仓独有(janus / CC 只有中英双语),故可作身份标识。
+  IDENTITY_BODY=$("$CURL_BIN" -s "$BASE_URL/src/i18n/messages/vi.ts" 2>/dev/null | head -c 200)
+  case "$IDENTITY_BODY" in
+    "<!DOCTYPE html>"*|"<!doctype html>"*|"")
+      bad "$BASE_URL 上跑的不是 Nexion-uniapp(vi.ts 取到 SPA 兜底页)— 别对着别的工程验" ;;
+    *) ok "dev server 身份 = Nexion-uniapp(vi.ts 是真模块)" ;;
+  esac
   check_http "Home shell" "/"
   # Ported routes append here as Batch 1/2 land:
   # check_http "Earn" "/#/pages/earn/earn"
