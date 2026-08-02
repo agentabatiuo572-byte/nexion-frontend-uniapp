@@ -223,10 +223,11 @@ function goTicketCreate() {
 
 const contactLinkStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)", minHeight: "44px", paddingLeft: "10px", paddingRight: "10px" };
 const searchIconStyle: CSSProperties = { position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", zIndex: 1 };
-// Search — recessed fill, no border (input idiom: surface-3, single visual difference).
+// Search — 输入框贴在页面底上,零 border。原 surface-3 对页面底亮色仅 ΔE 2.7(分不出),
+// 整个搜索框在亮色主题下看不见,改 L1 surface(对页面底 ΔE 6.42 亮 / 6.32 暗)。
 const searchInputStyle: CSSProperties = {
   width: "100%",
-  background: "var(--v5-surface-3)",
+  background: "var(--v5-surface)",
   borderRadius: "12px",
   padding: "10px 12px 10px 36px",
   fontSize: "13px",
@@ -242,7 +243,8 @@ function chipStyle(active: boolean): CSSProperties {
     borderRadius: "999px",
     fontSize: "12px",
     fontWeight: 500,
-    background: active ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface-2)",
+    // 未选中原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),分类胶囊直接坐在页面底上 → 改 L1
+    background: active ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface)",
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
   };
 }

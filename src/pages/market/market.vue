@@ -246,7 +246,8 @@ const segWrapStyle: CSSProperties = {
   gap: "2px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface-2)",
+  // hero 已去卡,轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
   gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
 };
 function segItemStyle(active: boolean): CSSProperties {
@@ -281,7 +282,7 @@ const buyTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: 
 const sellBtnStyle: CSSProperties = {
   height: "44px",
   gap: "6px",
-  background: "var(--v5-surface-2)",
+  background: "var(--v5-surface)", // hero 已去卡,按钮贴页面底:原 surface-2 与页面底同色不可辨,改 L1
 };
 const sellTextStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 
@@ -329,7 +330,8 @@ const catGridStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
 };
 function catItemStyle(active: boolean): CSSProperties {
   return {

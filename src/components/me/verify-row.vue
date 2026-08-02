@@ -51,7 +51,8 @@ const badgeStyle = computed<CSSProperties>(() => ({
   borderRadius: "50%",
   flexShrink: 0,
   background: props.done ? "var(--v5-brand)" : isActive.value ? "var(--v5-brand-2)" : "var(--v5-surface-2)",
-  color: props.done || isActive.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
+  // 亮底(brand / brand-2 实心)上的文字必须走 on-brand 家族,ink 在两者上都到不了 AA。
+  color: props.done ? "var(--v5-on-brand)" : isActive.value ? "var(--v5-on-brand-2)" : "var(--v5-ink-4)",
 }));
 const labelStyle = computed<CSSProperties>(() => ({
   color: props.done

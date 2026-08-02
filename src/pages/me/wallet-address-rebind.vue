@@ -357,7 +357,9 @@ const kycGateCtaStyle: CSSProperties = {
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
-  color: "var(--v5-ink)",
+  // 亮底文字走 on-brand 家族:ink 配暖橙实测 2.41:1,on-brand-2 是 7.64:1
+  // (tokens.css 自己的注释就写着「white on orange fails WCAG AA」)。
+  color: "var(--v5-on-brand-2)",
 };
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
@@ -366,11 +368,12 @@ const metaLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-// Recessed input idiom(de-card 白名单:surface-3 填充零描边)。
+// 输入框零描边。所在容器(模板 view=form 那层 mx-4)无底色 → 输入框直接贴页面底;
+// 原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1。
 const addressInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "48px",
-  background: "var(--v5-surface-3)",
+  background: "var(--v5-surface)",
   borderRadius: "12px",
   padding: "12px",
   boxSizing: "border-box",
@@ -424,7 +427,7 @@ const startCtaStyle = computed<CSSProperties>(() => ({
   height: "48px",
   borderRadius: "999px",
   background: canStart.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: canStart.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
+  color: canStart.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
 const startCtaTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
@@ -436,7 +439,7 @@ const primaryCtaStyle: CSSProperties = {
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
-  color: "var(--v5-ink)",
+  color: "var(--v5-on-brand)",
 };
 const ghostBtnStyle: CSSProperties = {
   marginTop: "10px",

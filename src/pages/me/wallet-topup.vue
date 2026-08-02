@@ -415,7 +415,8 @@ function networkRowStyle(active: boolean): CSSProperties {
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
 const segWrapStyle: CSSProperties = {
   margin: "0 16px 16px",
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
   borderRadius: "16px",
   padding: "4px",
   gap: "2px",
@@ -474,13 +475,13 @@ const qrInnerStyle: CSSProperties = {
     "radial-gradient(circle, rgba(0,0,0,0.85) 25%, #fff 25%, #fff 50%, rgba(0,0,0,0.85) 50%, rgba(0,0,0,0.85) 75%, #fff 75%)",
   backgroundSize: "12px 12px",
 };
-// On the de-carded page floor the address row reads as an input — one step
-// above the bg, copy button one step above the row.
+// 地址行贴在已去卡的页面底上,读作一个输入框。原 surface-2 号称「比页面底高一档」,
+// 实测亮色下对页面底仅 ΔE 2.2(分不出),等于没高;改 L1 surface,复制按钮仍在其上一档。
 const addressRowStyle: CSSProperties = {
   marginTop: "16px",
   padding: "12px",
   gap: "8px",
-  background: "var(--v5-surface-2)",
+  background: "var(--v5-surface)",
 };
 const copyBtnStyle: CSSProperties = {
   width: "36px",

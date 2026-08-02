@@ -277,7 +277,8 @@ const inviteCtaStyle: CSSProperties = {
 function wingStyle(isWeak: boolean): CSSProperties {
   return {
     padding: "14px",
-    background: isWeak ? "var(--v5-warning-soft)" : "var(--v5-surface-2)",
+    // 非弱侧原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
+    background: isWeak ? "var(--v5-warning-soft)" : "var(--v5-surface)",
   };
 }
 const weakBadgeStyle: CSSProperties = {

@@ -260,7 +260,7 @@ const notFoundBtnStyle: CSSProperties = {
   minHeight: "44px",
   padding: "0 20px",
   borderRadius: "999px",
-  background: "var(--v5-surface-2)",
+  background: "var(--v5-surface)", // 空态 CTA 贴页面底:原 surface-2 与页面底同色不可辨,改 L1
   color: "var(--v5-ink)",
   fontFamily: "var(--font-v5)",
   fontSize: "13px",

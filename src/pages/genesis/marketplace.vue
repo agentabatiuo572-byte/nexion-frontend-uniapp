@@ -421,7 +421,8 @@ const viewOpenSeaStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 500,
 };
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface-2)" };
+// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface)" };
 function tabPillStyle(active: boolean): CSSProperties {
   return {
     // 《07》tap≥44:原 40px(同页 sortPill 已补,这条是同类)
@@ -457,7 +458,7 @@ function sortPillStyle(active: boolean): CSSProperties {
     fontWeight: 500,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     letterSpacing: "0.04em",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface)", // 未选中 pill 贴页面底:原 surface-2 与页面底同色不可辨,改 L1(选中态不动)
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
     // 零-border(《03》§6):选中态靠 brand-soft 底 + brand 文字表达,不描边。
     // 两态都不带 border,状态切换无 1px 位移。

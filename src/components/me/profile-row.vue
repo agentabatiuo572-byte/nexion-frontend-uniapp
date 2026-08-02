@@ -105,7 +105,8 @@ const kycPendingChipStyle: CSSProperties = {
 };
 const joinedChipStyle: CSSProperties = {
   ...codeTagBase,
-  background: "var(--v5-surface-2)",
+  // 原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),此 chip 直接坐在页面底上 → 改 L1
+  background: "var(--v5-surface)",
   color: "var(--v5-ink-2)",
 };
 </script>

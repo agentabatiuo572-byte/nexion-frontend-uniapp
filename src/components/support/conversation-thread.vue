@@ -219,7 +219,7 @@ function formatLines(text: string): { text: string; bold: boolean }[][] {
 }
 
 const sendStyle = computed<CSSProperties>(() => ({
-  background: draft.value.trim() ? "var(--v5-brand)" : "var(--v5-surface-2)",
+  background: draft.value.trim() ? "var(--v5-brand)" : "var(--v5-surface)", // 输入条自身无底色,按钮贴页面底:原 surface-2 与页面底同色不可辨,改 L1
 }));
 </script>
 

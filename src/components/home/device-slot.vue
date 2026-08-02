@@ -40,7 +40,7 @@ const bayStyle = computed(() => ({
   width: "48px",
   height: "48px",
   borderRadius: "14px",
-  background: isOnline.value ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+  background: isOnline.value ? "var(--v5-brand-soft)" : "var(--v5-surface)", // 离线槽位贴页面底:原 surface-2 与页面底同色不可辨,改 L1
 }));
 const iconKind = computed(() => {
   const k = props.device.kind;

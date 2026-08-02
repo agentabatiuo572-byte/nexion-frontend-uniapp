@@ -29,7 +29,8 @@
     <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">
-        <view class="flex gap-0.5" style="background: var(--v5-surface-2); border-radius: 12px; padding: 3px">
+        <!-- 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 已是 brand-soft,不撞色 -->
+        <view class="flex gap-0.5" style="background: var(--v5-surface); border-radius: 12px; padding: 3px">
           <view v-for="r in RANGES" :key="r" class="flex-1 grid place-items-center active:opacity-70" :style="pillStyle(r)" @click="range = r">
             <text :style="pillLabelStyle(r)">{{ rangeLabel(r) }}</text>
           </view>

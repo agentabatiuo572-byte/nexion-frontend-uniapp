@@ -183,7 +183,8 @@ const ctaBackStyle: CSSProperties = {
   width: "100%",
   height: "44px",
   borderRadius: "999px",
-  background: "var(--v5-surface-2)",
+  // 返回 CTA 直接坐在页面底上(不在任何卡片内)→ 用 L1 surface;亮色下 surface-2 与页面底几乎同色不可辨
+  background: "var(--v5-surface)",
   color: "var(--v5-ink-2)",
   fontSize: "13px",
   fontWeight: 500,
