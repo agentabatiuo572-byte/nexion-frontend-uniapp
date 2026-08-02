@@ -44,6 +44,19 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     firstWithdrawalManual: true,
     newAddressHoldHours: 24,
     rebindCooldownDays: 7,
+    // FEAT-WD01a:默认 $50(主人 2026-07-31 拍板),单源在后台 D5,此处仅 mock seed。
+    smallAmountThresholdUsd: 50,
+    // FEAT-WD01b:默认 1 笔/日,单源在后台 D5(dailyLimitCount),此处仅 mock seed。
+    dailyWithdrawLimitCount: 1,
+    // FEAT-WD01b:到账时效 24h(T+1);大额审查窗口 0 天(当前运营阶段未开)。
+    // 两值单源在后台 D5,此处仅 mock seed。
+    payoutSlaHours: 24,
+    payoutReviewWindowDays: 0,
+    // FEAT-WD01c:网络费 1% + 下限 $1 / 上限 $25。下限对齐 TRC20 实际 gas(约 $1),
+    // 上限防大额提现被按比例收走过多。三值单源在后台 D5,此处仅 mock seed。
+    networkFeeRate: 0.01,
+    networkFeeMin: 1,
+    networkFeeMax: 25,
   },
   rewards: {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。

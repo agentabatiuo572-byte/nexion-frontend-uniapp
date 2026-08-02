@@ -11,7 +11,6 @@ import {
   CHAIN_TO_WITHDRAW_NETWORK,
   fromWithdrawNetwork,
   isChainAddressValid,
-  isInFlightWithdrawal,
   mintBindingId,
   rebindStartBlockReason,
   REBIND_VERIFY_WINDOW_MS,
@@ -182,7 +181,12 @@ export const useWalletPairing = defineStore("walletPairing", () => {
   const freezeUntil = computed<number | undefined>(() => activeBinding.value?.freezeUntil);
 
   function hasInFlightWithdrawal(): boolean {
-    return isInFlightWithdrawal(useApp().latestWithdrawal?.status);
+    // 🔴 问**整张列表**:只看最新一笔时,人工审核单还没放款而后提的一笔已到账,
+    // 换绑闸就被静默架空(独立验收实测)—— 收款地址能在放款前被换掉。
+    // inFlightWithdrawals 本身就是按「非终态」筛出来的(occupiesWithdrawalSlot),非空即有单占着槽。
+    // 曾经在这里再用一份白名单谓词二次过滤,把外层的正确性抵消掉 —— sent / frozen 被漏掉,
+    // 风控冻结中、钱已扣的账户能改收款地址(2026-08-01 审计,资金安全级)。判据只留一份。
+    return useApp().inFlightWithdrawals.length > 0;
   }
 
   /** 发起换绑前的禁止动作检查(null = 可发起;提现页/换绑页共用同一判定)。 */

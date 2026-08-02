@@ -16,6 +16,13 @@ const { code } = transformSync(src, { loader: "ts", format: "esm" });
 const core = await import(
   "data:text/javascript;base64," + Buffer.from(code, "utf8").toString("base64")
 );
+// 「这张单还占着槽吗」的唯一判据住在 arrival-core(非终态即占用)。
+// 换绑闸此前挂在 pairing-core 的一份白名单上,漏了 sent / frozen —— 白名单已删,这里直接测正主。
+const arrivalSrc = readFileSync(path.join(root, "src", "store", "withdrawal-arrival-core.ts"), "utf8");
+const { occupiesWithdrawalSlot } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(transformSync(arrivalSrc, { loader: "ts", format: "esm" }).code, "utf8").toString("base64")
+);
 
 let pass = 0;
 let fail = 0;
@@ -33,8 +40,6 @@ const {
   REBIND_VERIFY_WINDOW_MS,
   REBIND_FREEZE_MS,
   isRebindFrozen,
-  IN_FLIGHT_WITHDRAWAL_STATUSES,
-  isInFlightWithdrawal,
   isChainAddressValid,
   mintBindingId,
   rebindStartBlockReason,
@@ -65,12 +70,28 @@ console.log("selfcheck-rebind — wallet-pairing-core 纯逻辑断言");
   check("首尾空白 trim 后判定", isChainAddressValid("usdt-erc20", "  0x" + "ab".repeat(20) + "  "));
 }
 
-// 3) 在途提现单集合(submitted ~ processing)
+// 3) 🔴 「这张单还占着槽吗」—— 只许有一份判据,且必须是「非终态即占用」
+//
+// 这里原本断言的是一份**白名单** IN_FLIGHT_WITHDRAWAL_STATUSES = [submitted, review-pending,
+// review-passed, processing],最后一行还写着「sent / frozen … 判假」——
+// 哨兵把那个漏洞当成正确行为焊死了。实际后果(2026-08-01 审计,资金安全级):
+// 账户被风控冻结、钱已经扣了的单据落在 frozen,换绑闸认不出来 → 放款前收款地址可以被改掉。
+//
+// 白名单与黑名单的**失败方向相反**:白名单漏一个新状态 = 默认「不在途」= 闸放行(危险);
+// 黑名单终态漏一个 = 默认「在途」= 闸拦住(保守)。涉及钱的判据一律取保守那一侧。
+// 白名单已删,全站统一 occupiesWithdrawalSlot。
 {
-  const inFlight = ["submitted", "review-pending", "review-passed", "processing"];
-  check("在途集合 = submitted~processing 四态", JSON.stringify([...IN_FLIGHT_WITHDRAWAL_STATUSES]) === JSON.stringify(inFlight));
-  check("四在途态全判真", inFlight.every((s) => isInFlightWithdrawal(s)));
-  check("sent/confirmed/frozen/refunded/undefined 判假", ["sent", "confirmed", "frozen", "review-rejected", "refunded", undefined].every((s) => !isInFlightWithdrawal(s)));
+  const TERMINAL = ["confirmed", "review-rejected", "address-invalid", "tx-failed", "refunded"];
+  const NON_TERMINAL = ["submitted", "review-pending", "review-passed", "processing", "sent", "frozen"];
+  check("非终态一律判「占着槽」(含 sent / frozen —— 白名单版漏的正是这两个)",
+    NON_TERMINAL.every((s) => occupiesWithdrawalSlot(s)),
+    NON_TERMINAL.filter((s) => !occupiesWithdrawalSlot(s)).join(",") || "");
+  check("终态一律判「不占槽」", TERMINAL.every((s) => !occupiesWithdrawalSlot(s)),
+    TERMINAL.filter((s) => occupiesWithdrawalSlot(s)).join(",") || "");
+  check("undefined 判不占槽(没有单据)", !occupiesWithdrawalSlot(undefined));
+  // 新增状态默认落在保守侧:任何没被列进终态表的状态都算在途
+  check("🔴 新增未知状态默认按「在途」处理(黑名单的保守方向)",
+    occupiesWithdrawalSlot("some-future-status"));
 }
 
 // 4) 发起换绑禁止动作优先级:在途单 > 进行中换绑单 > 频控

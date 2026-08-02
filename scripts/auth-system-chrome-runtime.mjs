@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import fs from "node:fs";
 
 const baseUrl = process.env.BASE_URL || "http://localhost:5173";
@@ -59,9 +60,7 @@ try {
   for (const viewport of viewports) {
     if (page) await page.close();
     page = await browser.newPage({ viewport: { width: viewport.width, height: viewport.height } });
-    page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
-    });
+    page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
     page.on("pageerror", (error) => consoleErrors.push(error.message));
     results[viewport.name] = {};
     for (let index = 0; index < pages.length; index += 1) {

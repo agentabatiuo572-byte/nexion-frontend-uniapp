@@ -245,8 +245,15 @@ export interface Withdrawal {
   status: WithdrawalStatus;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
+  /** FEAT-WD01a:本单是否命中小额免审快车道。 */
+  fastLaneApplied?: boolean;
+  /** FEAT-WD01a:被快车道免掉的闸名。必须随单落盘 —— 只算不存 = 事后审计与客服
+   *  都还原不出「这单当时免了哪几道」,等于没做。与 riskReasons 同源同去处。 */
+  waivedGates?: string[];
   submittedAt: number;
   estimatedCompletion: number;
+  /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
+  confirmedAt?: number;
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────

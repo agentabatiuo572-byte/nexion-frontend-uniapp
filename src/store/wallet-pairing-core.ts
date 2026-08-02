@@ -98,17 +98,16 @@ export function mintBindingId(now: number): string {
 
 // ── 频控 / 禁止动作(规格 ④)─────────────────────────────────────────
 
-/** 在途提现单 = submitted ~ processing(含审核队列两态);在途禁发起换绑。 */
-export const IN_FLIGHT_WITHDRAWAL_STATUSES: readonly WithdrawalStatus[] = [
-  "submitted",
-  "review-pending",
-  "review-passed",
-  "processing",
-];
-
-export function isInFlightWithdrawal(status: WithdrawalStatus | undefined): boolean {
-  return status !== undefined && IN_FLIGHT_WITHDRAWAL_STATUSES.includes(status);
-}
+// 🔴 这里曾有一份「在途状态白名单」IN_FLIGHT_WITHDRAWAL_STATUSES = [submitted,
+// review-pending, review-passed, processing] 和它的 isInFlightWithdrawal()。已删除。
+//
+// 删的理由(2026-08-01 审计,资金安全级):它漏了 sent 与 frozen 两个**占着单据槽**的状态,
+// 于是「风控冻结中、钱已经扣了」的账户,换绑闸认不出来 → 可以在放款前自由改收款地址。
+// 而同一个概念在 withdrawal-arrival-core 里已有正确实现 occupiesWithdrawalSlot(非终态即占用)。
+//
+// 结构上的教训:同一个概念**不许有两份判据**。而且白名单和黑名单的失败方向是相反的 ——
+// 白名单漏一个新状态 = 默认「不在途」= 闸放行(危险);黑名单终态漏一个 = 默认「在途」= 闸拦住(保守)。
+// 涉及钱的判据一律取保守那一侧。全站统一 occupiesWithdrawalSlot,本文件不再导出同义谓词。
 
 export type RebindBlockReason = "withdrawal-in-flight" | "cooldown" | "order-in-progress";
 

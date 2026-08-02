@@ -136,8 +136,7 @@ export const en = {
     s5Body:
       "All yield figures shown in the app are projections based on current network parameters and recent demand, not guarantees. Earnings fluctuate and may decline over time. NEX is a platform reward token whose value can move sharply and is not deposit-insured. Never commit more than you can afford to lose.",
     s6Title: "Wallet, withdrawals & compliance",
-    s6Body:
-      "Standard withdrawals settle within 30 days and require NEX to be burned for network settlement. Amounts above published thresholds may enter enhanced compliance review. KYC verification is required once lifetime withdrawals exceed $100. Funds are held in segregated reserve accounts and we apply Chainalysis-grade transaction monitoring as required by our MSB registration.",
+    s6Body: "Routine withdrawals settle within {h} hours. You verify wallet ownership once before your first withdrawal; that verified address then becomes your only payout address. Amounts above published thresholds may enter enhanced compliance review. Funds are held in segregated reserve accounts and we apply Chainalysis-grade transaction monitoring under our MSB registration.",
     s7Title: "Referral & network rewards",
     s7Body:
       "Direct Royalty and Network Yield Bonus are paid from platform margin, never from a friend's deposit. Rewards depend on referred users completing qualifying actions. Spam, fake accounts, or mass-recruitment schemes are prohibited, will be voided, and may result in suspension and forfeiture of pending rewards.",
@@ -578,7 +577,7 @@ export const en = {
     subsidyBadge: "New-device task subsidy · {n} days left",
     subsidyBadgeLastDay: "New-device task subsidy · ends today",
     taskPoolLineTitle: "AI task pool is upgrading",
-    taskPoolLineBody: "Platform tasks demand ever more compute: higher-tier tasks grow while lower-tier volume declines with device age; higher-compute devices can book a wider slice of the pool.",
+    taskPoolLineBody: "Platform tasks demand ever more compute: higher-tier tasks grow while lower-tier volume keeps shrinking; a device with fixed compute can therefore book a narrowing slice each month, while higher-compute devices reach a wider one.",
     capExplainTitle: "Task capacity & the new-device subsidy",
     capExplainS1Title: "Why the task pool keeps upgrading",
     capExplainS1Body: "AI models keep iterating and newer tasks demand more compute (VRAM). Higher-tier tasks take a growing share of the pool while lower-tier volume shrinks — so the slice a given device can book narrows month over month, and earnings taper until the capacity floor.",
@@ -810,7 +809,7 @@ export const en = {
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
     routes: {
       home: { label: "Home / Mission Control", sub: "Live earnings · ticker · dashboard" },
-      earn: { label: "Earn / Fleet", sub: "Device cards · task center · efficiency" },
+      earn: { label: "Earn / Fleet", sub: "Device cards · task center · task capacity" },
       store: { label: "Store", sub: "NexGridBox / Rack / Cloud Share" },
       tradeIn: { label: "Trade-in", sub: "Retire & credit toward an upgrade" },
       team: { label: "Team hub", sub: "Royalty / V-rank / network" },
@@ -924,7 +923,8 @@ export const en = {
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal windows + compliance review",
-    s4Body: "Standard withdrawals settle in 30 days from request to wallet. Amounts over $1,000 may enter an enhanced compliance review window of 45 days during periods of elevated regulatory scrutiny. The withdrawal fee is a penalty rate (default 20%) that you can offset by burning NEX — each NEX waives far more fee than its swap value, so enough NEX waives the fee entirely; with no NEX the full penalty applies. Earn NEX through daily check-ins, mining, and referral activity.",
+    s4Body: "Standard withdrawals land about {h} hours after you request them. The withdrawal fee uses the current phase rate of {pct}; burning NEX offsets it at a favourable rate (each NEX offsets far more than its exchange value) and clears it entirely once you burn enough — without NEX you pay the full rate. Earn NEX through check-ins, mining and referrals. The on-chain network fee is charged separately and scales with the amount within a floor and a cap.",
+    s4BodyLargeAmount: "Withdrawals above ${large} may enter a {d}-day enhanced compliance review window; the later of the two dates applies.",
     s5Title: "Staking lock-ups are irreversible",
     s5Body: "Staking pools (30d / 90d / 180d / 365d) lock principal for the full term. Early unlock forfeits 100% of accrued yield premium and deducts 5% / 15% / 30% / 50% of principal respectively. Read each pool's terms separately before locking.",
     s6Title: "Network economics + referral compensation",
@@ -1992,9 +1992,9 @@ export const en = {
     withdrawableAvailable: "Withdrawable:",
     useMax: "Use max",
     networkRecommended: "Recommended",
-    networkHintTrc20: "Lowest fee · 5 min",
-    networkHintBep20: "Low fee · 5 min",
-    networkHintErc20: "15 min · for large amounts",
+    networkHintTrc20: "Lower cost · ~5 min on-chain",
+    networkHintBep20: "Lower cost · ~5 min on-chain",
+    networkHintErc20: "~15 min on-chain · suits large amounts",
     feeLabel: "Network fee",
     receiveLabel: "You receive",
     confirmWithdraw: "Confirm Withdrawal",
@@ -2069,9 +2069,19 @@ export const en = {
     timeMinutesAgo: "{n}m ago",
     timeHoursAgo: "{n}h ago",
     timeDaysAgo: "{n}d ago",
-    firstTimeReview: "First-time review: within 24 hours.",
-    minWithdrawNote: "Minimum withdrawal: $20. The fee shown above can be waived by burning NEX.",
-    dailyLimitNote: "Daily limit: 1 withdrawal per day.",
+    firstTimeReview: "First withdrawal requires manual confirmation.",
+
+    fastLaneOnTitle: "This one processes right away",
+    fastLaneOnBody: "Waived: {g}. It goes out on the standard timeline.",
+    fastLaneCta: "Withdraw ${n} instead",
+    waivedGates: {
+      "new-address-hold": "the new-address hold",
+      "first-withdrawal-review": "the first-withdrawal review",
+    },
+    minWithdrawNote: "Minimum withdrawal: ${n}.",
+
+    minWithdrawNoteOffset: " The fee shown above can be waived by burning NEX.",
+    dailyLimitNote: "Daily limit: {n} per day.",
     complianceGateBody: "Per MiCA Art. 22 and the FATF Travel Rule, wallet ownership must be verified before payouts. Complete the one-time KYC-Express ($1 USDT, fully credited).",
     withdrawalStatusSubtitle: "Withdrawal Status",
     noActiveWithdrawal: "No active withdrawal.",
@@ -2085,9 +2095,28 @@ export const en = {
     trackProgressLabel: "Progress",
     trackViaLine: "via {network} · Fee ${fee}",
     trackEtaDone: "Funds delivered to your address",
-    trackEtaPending: "Estimated completion within 24 hours",
+
+    withdrawBillWriteFailed: "Withdrawal submitted, but the bill entry could not be saved. You can still track it on the withdrawal status page.",
+
+    trackFailedBody: "This withdrawal did not complete. Your funds have not left your account. Contact support for details.",
+    trackEtaPending: "Expected within {n} hours",
+
+    trackEtaTitlePending: "Processing",
+
+    trackArrivedAt: "Arrived {time}",
+
+    trackContactSupport: "Contact support",
+
+
+    trackSubmitAnother: "Withdraw again",
     trackReviewNote: "First-time withdrawal · Automated + account review",
     withdrawRouteReviewTitle: "Withdrawal will be reviewed",
+
+    withdrawRouteRejectTitle: "This one can't be submitted",
+
+    withdrawRouteRejectBody: "Your account state does not allow a withdrawal right now. No request is created and nothing is charged. Please contact support for help.",
+
+    fastLaneUndo: "Undo — restore my original amount",
     withdrawRouteReviewBody: "This receiving address has related account activity. The request can be submitted, but it will stay in review until checks are complete.",
     withdrawRouteHeldTitle: "Review in progress",
     withdrawRouteHeldSub: "The request is waiting for account and address review. It will not move forward automatically.",
@@ -2806,6 +2835,18 @@ export const en = {
   },
 
   bills: {
+    // 账单文案码表:渲染时才翻译。写入时翻译会把语言冻在那一刻,切语言后旧账单还是旧语言;
+    // 真后端返回的也应该是码而不是句子。
+    memo: {
+      earnDaily: "Daily AI inference earnings",
+      referDirect: "Direct referral 5% commission",
+      welcomeBonus: "Welcome bonus credited on activation",
+      achFirstContribution: "Achievement · First Contribution",
+      achFirstDollar: "Achievement · First Dollar",
+      kycVerify: "KYC-Express · wallet ownership verification",
+      topupTrc20: "Top-up · USDT-TRC20",
+      withdrawTrc20: "Withdrawal · USDT-TRC20",
+    },
     title: "Bills",
     back: "Back",
     subtitle: "Reconcile every credit and debit on your NexGrid wallet.",
@@ -3507,12 +3548,22 @@ export const en = {
     dailyCheckIn: "Daily check-in",
     earnNexCta: "Mine more NEX",
     // NEX fee-offset model (replaces old points / hard-burn gate)
-    feeGross: "Fee ({rate})",
+    feeGross: "Total fee",
     feeCharged: "Fee",
+    feeNetworkRow: "Network fee",
+
+    feeDetailPlaceholder: "Enter an amount to see the fee breakdown",
+
+    feeConfigUnavailableTitle: "Fee rates updating",
+
+    feeConfigUnavailableBody: "The latest fee rates are unavailable. Submission is paused so you are never charged at a stale rate.",
+
+    feeConfigRetry: "Retry",
+    feePenaltyRow: "Platform fee",
     feeOffsetRow: "NEX offset",
     feeOffsetTitle: "Offset the fee with NEX",
     feeFullyWaived: "✓ {nex} NEX burned · withdrawal fee fully waived ($0).",
-    feePartial: "Not enough NEX — fee is {rate} (${gross}). Earn NEX to lower or waive it.",
+    feePartial: "Not enough NEX — this withdrawal costs ${gross} (network + platform fee). Earn NEX to lower or waive it.",
     feeOffsetRule:
       "Each NEX waives ${perNex} of fee — well above its swap value. Burn {required} NEX to waive the fee fully; partial NEX offsets pro-rata, the rest is paid in USDT.",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
@@ -3536,8 +3587,17 @@ export const en = {
     submitReasonAmountRequired: "Enter a withdrawal amount.",
     submitReasonMinAmount: "Minimum withdrawal is ${n}.",
     submitReasonMaxAmount: "Available withdrawable balance is ${n}.",
+
+    submitReasonFeeConfigUnavailable: "Fee rates are updating, please try again shortly",
+
+    dailyLimitReached: "Daily withdrawal limit reached. Next withdrawal available {time}.",
     submitReasonAddressRequired: "Enter a valid receiving address.",
     submitReasonReviewBlocked: "This request cannot be submitted right now.",
+
+    submitReasonInFlight: "Your previous withdrawal is still in progress. You can submit a new one once it completes.",
+
+
+    submitReasonUnderReview: "Your previous withdrawal is under manual review. You can submit a new one after it is resolved — contact support from the withdrawal status page for an update.",
     exchangePoolToday: "Platform pool today",
     // Sprint A-1 / B.2 — Reverse-talk staking alternative
     stakeAlt: {

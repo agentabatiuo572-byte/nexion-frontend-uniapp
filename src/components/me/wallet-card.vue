@@ -60,7 +60,7 @@
         <view :style="actionsBlockStyle">
           <text class="block" style="font-family: var(--font-jet-mono), ui-monospace, monospace; font-size: 12px; color: var(--v5-ink-4); margin-bottom: 8px">{{ t.me.quickActions }}</text>
           <view class="grid grid-cols-3" style="gap: 8px">
-            <WalletActionBtn href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT" primary>
+            <WalletActionBtn href="/pages/me/wallet-topup" :label="t.me.topup" sub="USDT">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3" /><path d="m6 11 6 6 6-6" /><path d="M19 21H5" /></svg>
             </WalletActionBtn>
             <WalletActionBtn href="/pages/me/wallet-withdraw" :label="t.me.withdraw" sub="USDT">
@@ -111,7 +111,8 @@ const app = useApp();
 const bills = useBills();
 
 const buckets = computed(() => app.user.earningBuckets);
-const usdt = computed(() => buckets.value.withdrawableUsdt);
+// 2026-07-31:与 wallet.vue / wallet-withdraw 同源 —— 可提口径 = 总余额(held 两桶账外)。
+const usdt = computed(() => app.user.usdtBalance);
 const intPart = computed(() => Math.floor(usdt.value).toLocaleString());
 const fracPart = computed(() => (usdt.value - Math.floor(usdt.value)).toFixed(2).slice(2));
 const pendingLine = computed(() =>

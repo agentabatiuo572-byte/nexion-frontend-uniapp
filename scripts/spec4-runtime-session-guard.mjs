@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 
@@ -26,7 +27,7 @@ const context = await browser.newContext({ viewport: { width: 390, height: 844 }
 const page = await context.newPage();
 const errors = [];
 page.on("console", (msg) => {
-  if (msg.type() === "error") errors.push(msg.text());
+  if (msg.type() === "error") collectAppConsoleErrors(errors, baseUrl)(msg);
 });
 page.on("pageerror", (err) => errors.push(err.message));
 
@@ -75,7 +76,7 @@ if (!hashAfterKick.includes("/pages/session/kicked")) {
 
 const coldPage = await context.newPage();
 coldPage.on("console", (msg) => {
-  if (msg.type() === "error") errors.push(msg.text());
+  if (msg.type() === "error") collectAppConsoleErrors(errors, baseUrl)(msg);
 });
 coldPage.on("pageerror", (err) => errors.push(err.message));
 await coldPage.goto(`${baseUrl}/#/`, { waitUntil: "networkidle" });

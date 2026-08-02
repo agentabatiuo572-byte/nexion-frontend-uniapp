@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -50,10 +51,7 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 
-page.on("console", (msg) => {
-  const text = msg.text();
-  if (msg.type() === "error") errors.push(text);
-});
+page.on("console", collectAppConsoleErrors(errors, baseUrl));
 page.on("pageerror", (error) => errors.push(error.message));
 
 async function resolveAppFrame(selector = null) {

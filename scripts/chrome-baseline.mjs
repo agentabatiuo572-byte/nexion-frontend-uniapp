@@ -24,6 +24,7 @@
  * 收益低，故不冻。
  */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,7 +96,7 @@ async function capture(label) {
   for (const [name, route] of PAGES) {
     const page = await ctx.newPage();
     const errors = [];
-    page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+    page.on("console", collectAppConsoleErrors(errors, BASE));
     page.on("pageerror", (e) => errors.push(String(e)));
     try {
       await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });

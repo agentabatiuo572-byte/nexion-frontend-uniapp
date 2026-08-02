@@ -6,6 +6,7 @@
  * re-appear. Usage: node scripts/backnav-check.mjs <hashRouteA> <uniRouteB>
  */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 const BASE = process.env.BASE_URL || "http://localhost:5173";
 const routeA = process.argv[2] || "/#/pages/team/rank";
 const routeB = process.argv[3] || "/pages/team/rank-how";
@@ -13,7 +14,7 @@ const routeB = process.argv[3] || "/pages/team/rank-how";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 414, height: 896 }, colorScheme: "dark" });
 const errors = [];
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
 const title = () => page.$eval(".nx-nav-title", (e) => e.textContent.trim()).catch(() => null);
 

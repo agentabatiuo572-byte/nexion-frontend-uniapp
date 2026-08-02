@@ -137,8 +137,7 @@ export const vi: Messages = {
     s5Body:
       "Mọi con số lợi nhuận hiển thị trong ứng dụng đều là dự phóng dựa trên tham số mạng lưới hiện tại và nhu cầu gần đây, không phải cam kết. Thu nhập dao động và có thể giảm theo thời gian. NEX là token thưởng của nền tảng, giá trị có thể biến động mạnh và không được bảo hiểm tiền gửi. Đừng bao giờ đầu tư nhiều hơn mức bạn có thể chịu mất.",
     s6Title: "Ví, rút tiền & tuân thủ",
-    s6Body:
-      "Rút tiền tiêu chuẩn hoàn tất trong vòng 30 ngày và cần đốt NEX để thanh toán trên mạng lưới. Các khoản vượt ngưỡng đã công bố có thể vào diện rà soát tuân thủ tăng cường. Bạn cần xác minh KYC một khi tổng rút trọn đời vượt $100. Tiền được giữ trong các tài khoản dự trữ tách biệt, và chúng tôi áp dụng giám sát giao dịch cấp Chainalysis theo yêu cầu đăng ký MSB của mình.",
+    s6Body: "Lệnh rút thông thường tất toán trong {h} giờ. Trước lần rút đầu tiên bạn cần xác minh quyền sở hữu ví một lần; địa chỉ đã xác minh sau đó là địa chỉ nhận tiền duy nhất. Số tiền vượt ngưỡng công bố có thể vào diện rà soát tuân thủ tăng cường. Tiền được giữ ở tài khoản dự trữ tách biệt, và chúng tôi áp dụng giám sát giao dịch cấp Chainalysis theo đăng ký MSB.",
     s7Title: "Phần thưởng giới thiệu & mạng lưới",
     s7Body:
       "Hoa hồng trực tiếp và Thưởng lợi nhuận mạng lưới được trả từ biên lợi nhuận của nền tảng, không bao giờ lấy từ tiền nạp của bạn bè. Phần thưởng phụ thuộc vào việc người được giới thiệu hoàn thành các hành động hợp lệ. Spam, tài khoản giả hay các chiêu lôi kéo người hàng loạt đều bị cấm, sẽ bị hủy, và có thể dẫn tới khóa tài khoản cùng mất các phần thưởng đang chờ.",
@@ -579,7 +578,7 @@ export const vi: Messages = {
     subsidyBadge: "Trợ cấp tác vụ máy mới · còn {n} ngày",
     subsidyBadgeLastDay: "Trợ cấp tác vụ máy mới · hết hạn hôm nay",
     taskPoolLineTitle: "Kho tác vụ AI đang nâng cấp",
-    taskPoolLineBody: "Tác vụ nền tảng ngày càng cần nhiều sức mạnh tính toán: tác vụ bậc cao tăng lên còn lượng tác vụ bậc thấp giảm dần theo tuổi thiết bị; máy tính toán mạnh hơn thì nhận được phần lớn hơn trong kho.",
+    taskPoolLineBody: "Tác vụ nền tảng ngày càng đòi hỏi nhiều sức mạnh tính toán hơn: tác vụ bậc cao tăng lên còn lượng tác vụ bậc thấp tiếp tục giảm; thiết bị có sức mạnh tính toán cố định vì vậy nhận được phần thu hẹp dần theo từng tháng, còn thiết bị tính toán mạnh hơn tiếp cận phần rộng hơn trong kho.",
     capExplainTitle: "Công suất tác vụ & trợ cấp máy mới",
     capExplainS1Title: "Vì sao kho tác vụ liên tục nâng cấp",
     capExplainS1Body: "Các mô hình AI liên tục cải tiến và tác vụ mới hơn cần nhiều sức mạnh tính toán (VRAM) hơn. Tác vụ bậc cao chiếm phần ngày càng lớn trong kho còn lượng tác vụ bậc thấp co lại — nên phần một thiết bị nhận được thu hẹp dần theo từng tháng, và thu nhập giảm dần cho tới sàn công suất.",
@@ -811,7 +810,7 @@ export const vi: Messages = {
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
     routes: {
       home: { label: "Trang chủ / Bảng điều khiển", sub: "Thu nhập trực tiếp · bảng giá · tổng quan" },
-      earn: { label: "Kiếm tiền / Dàn thiết bị", sub: "Thẻ thiết bị · trung tâm tác vụ · hiệu suất" },
+      earn: { label: "Kiếm tiền / Dàn thiết bị", sub: "Thẻ thiết bị · trung tâm tác vụ · năng lực tác vụ" },
       store: { label: "Cửa hàng", sub: "NexGridBox / Rack / Cloud Share" },
       tradeIn: { label: "Thu cũ đổi mới", sub: "Ngừng dùng máy cũ, trừ thẳng vào máy mới" },
       team: { label: "Trung tâm đội nhóm", sub: "Hoa hồng / hạng V / mạng lưới" },
@@ -925,7 +924,8 @@ export const vi: Messages = {
     s3Title: "Rủi ro thị trường của token (NEX)",
     s3Body: "NEX là token thưởng của nền tảng. Giá trị quy ra USD có thể biến động ±20% mỗi ngày, tùy theo nhu cầu suy luận AI, dòng mua lại và bối cảnh thị trường crypto nói chung. Token nắm giữ không được bảo hiểm FDIC / SIPC. Đừng staking hay giữ nhiều NEX hơn mức bạn có thể chịu mất.",
     s4Title: "Kỳ rút tiền + rà soát tuân thủ",
-    s4Body: "Rút tiền tiêu chuẩn hoàn tất trong 30 ngày kể từ lúc yêu cầu tới khi về ví. Khoản trên $1,000 có thể vào kỳ rà soát tuân thủ tăng cường 45 ngày trong những giai đoạn giám sát pháp lý gắt gao. Phí rút tiền là mức phạt (mặc định 20%) mà bạn có thể bù lại bằng cách đốt NEX — mỗi NEX miễn được phí cao hơn nhiều so với giá quy đổi của nó, nên đủ NEX thì miễn phí hoàn toàn; không có NEX thì chịu phạt đầy đủ. Kiếm NEX qua điểm danh hằng ngày, đào và hoạt động giới thiệu.",
+    s4Body: "Lệnh rút tiêu chuẩn về ví sau khoảng {h} giờ kể từ lúc yêu cầu. Phí rút tính theo mức phí của giai đoạn hiện tại là {pct}; đốt NEX được bù theo tỷ lệ ưu đãi (mỗi NEX bù nhiều hơn hẳn giá trị quy đổi), đốt đủ thì miễn hoàn toàn, không đốt NEX thì trả đủ mức phí. NEX kiếm được qua điểm danh / đào / giới thiệu. Phí mạng lưới on-chain tính riêng, thay đổi theo số tiền và có mức sàn, mức trần.",
+    s4BodyLargeAmount: "Lệnh rút trên ${large} có thể vào cửa sổ rà soát tuân thủ tăng cường {d} ngày; thời điểm về ví lấy mốc muộn hơn trong hai mốc.",
     s5Title: "Khóa staking là không thể đảo ngược",
     s5Body: "Các pool staking (30 / 90 / 180 / 365 ngày) khóa vốn gốc trọn kỳ hạn. Mở sớm sẽ mất 100% phần lợi nhuận cộng thêm đã tích và bị trừ lần lượt 5% / 15% / 30% / 50% vốn gốc. Đọc kỹ điều khoản của từng pool trước khi khóa.",
     s6Title: "Mô hình kinh tế mạng lưới + thù lao giới thiệu",
@@ -1954,9 +1954,9 @@ export const vi: Messages = {
     withdrawableAvailable: "Có thể rút:",
     useMax: "Rút tối đa",
     networkRecommended: "Khuyên dùng",
-    networkHintTrc20: "Phí thấp nhất · 5 phút",
-    networkHintBep20: "Phí thấp · 5 phút",
-    networkHintErc20: "15 phút · cho số tiền lớn",
+    networkHintTrc20: "Chi phí thấp hơn · xác nhận on-chain ~5 phút",
+    networkHintBep20: "Chi phí thấp hơn · xác nhận on-chain ~5 phút",
+    networkHintErc20: "Xác nhận on-chain ~15 phút · hợp số tiền lớn",
     feeLabel: "Phí mạng",
     receiveLabel: "Bạn nhận được",
     confirmWithdraw: "Xác nhận rút tiền",
@@ -2031,9 +2031,19 @@ export const vi: Messages = {
     timeMinutesAgo: "{n} phút trước",
     timeHoursAgo: "{n} giờ trước",
     timeDaysAgo: "{n} ngày trước",
-    firstTimeReview: "Xét duyệt lần đầu: trong vòng 24 giờ.",
-    minWithdrawNote: "Rút tối thiểu: $20. Phí ở trên có thể được miễn bằng cách đốt NEX.",
-    dailyLimitNote: "Giới hạn: 1 lần rút mỗi ngày.",
+    firstTimeReview: "Lần rút đầu tiên cần xác nhận thủ công.",
+
+    fastLaneOnTitle: "Lệnh này xử lý ngay",
+    fastLaneOnBody: "Đã miễn: {g}. Vẫn về theo thời gian tiêu chuẩn.",
+    fastLaneCta: "Rút ${n} thay vì vậy",
+    waivedGates: {
+      "new-address-hold": "thời gian chờ địa chỉ mới",
+      "first-withdrawal-review": "xét duyệt lần rút đầu tiên",
+    },
+    minWithdrawNote: "Rút tối thiểu: ${n}.",
+
+    minWithdrawNoteOffset: " Phí phía trên có thể được miễn bằng cách đốt NEX.",
+    dailyLimitNote: "Giới hạn mỗi ngày: {n} lần.",
     complianceGateBody: "Theo Điều 22 MiCA và Quy tắc Du lịch FATF, phải xác minh quyền sở hữu ví trước khi chi trả. Hãy hoàn tất KYC-Express một lần ($1 USDT, được hoàn lại đầy đủ).",
     withdrawalStatusSubtitle: "Trạng thái rút tiền",
     noActiveWithdrawal: "Không có lệnh rút nào đang xử lý.",
@@ -2047,9 +2057,28 @@ export const vi: Messages = {
     trackProgressLabel: "Tiến độ",
     trackViaLine: "qua {network} · Phí ${fee}",
     trackEtaDone: "Tiền đã chuyển tới địa chỉ của bạn",
-    trackEtaPending: "Dự kiến hoàn tất trong vòng 24 giờ",
+
+    withdrawBillWriteFailed: "Đã gửi lệnh rút, nhưng không lưu được dòng sao kê. Bạn vẫn có thể theo dõi ở trang trạng thái rút tiền.",
+
+    trackFailedBody: "Lệnh rút này chưa hoàn tất. Tiền vẫn còn trong tài khoản của bạn. Liên hệ hỗ trợ để biết chi tiết.",
+    trackEtaPending: "Dự kiến trong {n} giờ",
+
+    trackEtaTitlePending: "Đang xử lý",
+
+    trackArrivedAt: "Đã nhận {time}",
+
+    trackContactSupport: "Liên hệ hỗ trợ",
+
+
+    trackSubmitAnother: "Rút thêm lần nữa",
     trackReviewNote: "Lần rút đầu tiên · Tự động + xét duyệt tài khoản",
     withdrawRouteReviewTitle: "Lệnh rút sẽ được xét duyệt",
+
+    withdrawRouteRejectTitle: "Lệnh này không gửi được",
+
+    withdrawRouteRejectBody: "Trạng thái tài khoản hiện không cho phép rút tiền. Hệ thống không tạo lệnh và không trừ tiền. Vui lòng liên hệ hỗ trợ.",
+
+    fastLaneUndo: "Hoàn tác — khôi phục số tiền ban đầu",
     withdrawRouteReviewBody: "Địa chỉ nhận này có hoạt động tài khoản liên quan. Bạn vẫn gửi được yêu cầu, nhưng sẽ nằm trong xét duyệt cho đến khi kiểm tra xong.",
     withdrawRouteHeldTitle: "Đang xét duyệt",
     withdrawRouteHeldSub: "Yêu cầu đang chờ xét duyệt tài khoản và địa chỉ. Nó sẽ không tự động chuyển tiếp.",
@@ -2729,6 +2758,18 @@ export const vi: Messages = {
   },
 
   bills: {
+    // 账单文案码表:渲染时才翻译。写入时翻译会把语言冻在那一刻,切语言后旧账单还是旧语言;
+    // 真后端返回的也应该是码而不是句子。
+    memo: {
+      earnDaily: "Thu nhập suy luận AI hằng ngày",
+      referDirect: "Hoa hồng giới thiệu trực tiếp 5%",
+      welcomeBonus: "Quà tân thủ được cộng khi kích hoạt",
+      achFirstContribution: "Thành tựu · Lần đóng góp đầu tiên",
+      achFirstDollar: "Thành tựu · Đô-la đầu tiên",
+      kycVerify: "KYC-Express · xác minh quyền sở hữu ví",
+      topupTrc20: "Nạp tiền · USDT-TRC20",
+      withdrawTrc20: "Rút tiền · USDT-TRC20",
+    },
     title: "Sao kê",
     back: "Quay lại",
     subtitle: "Đối soát mọi khoản thu và chi trên ví NexGrid của bạn.",
@@ -3427,12 +3468,22 @@ export const vi: Messages = {
     needMoreNexToast: "Không đủ NEX để bù phí",
     dailyCheckIn: "Điểm danh hàng ngày",
     earnNexCta: "Đào thêm NEX",
-    feeGross: "Phí ({rate})",
+    feeGross: "Tổng phí",
     feeCharged: "Phí",
+    feeNetworkRow: "Phí mạng lưới",
+
+    feeDetailPlaceholder: "Nhập số tiền để xem chi tiết phí",
+
+    feeConfigUnavailableTitle: "Đang cập nhật biểu phí",
+
+    feeConfigUnavailableBody: "Hiện chưa lấy được biểu phí mới nhất. Đã tạm dừng gửi để tránh bị tính theo mức phí cũ.",
+
+    feeConfigRetry: "Thử lại",
+    feePenaltyRow: "Phí nền tảng",
     feeOffsetRow: "Bù bằng NEX",
     feeOffsetTitle: "Dùng NEX để bù phí",
     feeFullyWaived: "✓ Đã đốt {nex} NEX · miễn hoàn toàn phí rút ($0).",
-    feePartial: "Không đủ NEX — phí là {rate} (${gross}). Kiếm thêm NEX để giảm hoặc miễn phí.",
+    feePartial: "Không đủ NEX — lần rút này tốn ${gross} (phí mạng + phí nền tảng). Kiếm thêm NEX để giảm hoặc miễn phí.",
     feeOffsetRule:
       "Mỗi NEX miễn được ${perNex} phí — cao hơn hẳn giá trị quy đổi của nó. Đốt {required} NEX để miễn toàn bộ phí; số NEX ít hơn sẽ bù theo tỷ lệ, phần còn lại trả bằng USDT.",
     complianceHoldTitle: "Đang áp dụng rà soát tuân thủ tăng cường",
@@ -3454,8 +3505,17 @@ export const vi: Messages = {
     submitReasonAmountRequired: "Nhập số tiền muốn rút.",
     submitReasonMinAmount: "Số tiền rút tối thiểu là ${n}.",
     submitReasonMaxAmount: "Số dư có thể rút là ${n}.",
+
+    submitReasonFeeConfigUnavailable: "Đang cập nhật biểu phí, vui lòng thử lại sau",
+
+    dailyLimitReached: "Đã hết số lần rút hôm nay. Có thể rút tiếp từ {time}.",
     submitReasonAddressRequired: "Nhập địa chỉ nhận hợp lệ.",
     submitReasonReviewBlocked: "Yêu cầu này hiện chưa thể gửi.",
+
+    submitReasonInFlight: "Lệnh rút trước vẫn đang xử lý. Bạn có thể rút tiếp sau khi lệnh đó hoàn tất.",
+
+
+    submitReasonUnderReview: "Lệnh rút trước đang được xét duyệt thủ công. Bạn có thể rút tiếp sau khi xử lý xong — liên hệ hỗ trợ ở trang trạng thái rút tiền để biết tiến độ.",
     exchangePoolToday: "Quỹ nền tảng hôm nay",
     stakeAlt: {
       label: "Số này sẽ thành bao nhiêu nếu bạn khóa staking",

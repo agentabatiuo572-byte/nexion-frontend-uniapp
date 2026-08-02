@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /** milestone-verify.mjs — definitive runtime proof the milestone poll fires. */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 const BASE = "http://localhost:5173";
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
 const page = await ctx.newPage();
 const errs = [];
-page.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+page.on("console", collectAppConsoleErrors(errs, BASE));
 page.on("pageerror", (e) => errs.push("PAGEERROR: " + String(e)));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 

@@ -188,13 +188,22 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
 /**
  * 提现费 + NEX 优惠抵扣模型(取代旧积分/硬燃烧门槛)。
- *  - grossFee   = 金额 × penaltyFeeRate(无 NEX 抵扣时的费,「大幅增加」的那档)
- *  - requiredNex= 全额抵扣所需 NEX = grossFee / offsetRate
+ *
+ * 🔴 总费是**两笔相加**(FEAT-WD01c),后端对这条等式有硬校验:
+ *  - networkFee = clamp(金额 × networkFeeRate, min, max) —— 链上转账真实成本
+ *  - penaltyFee = 金额 × penaltyFeeRate —— 平台留存杠杆
+ *  - grossFee   = networkFee + penaltyFee
+ *  - requiredNex= 全额抵扣所需 NEX = grossFee / offsetRate(按**总费**算,不是只按惩罚费)
  *  - nexBurned  = min(用户 NEX, requiredNex)(部分抵扣)
  *  - feeWaived  = nexBurned × offsetRate(封顶 grossFee)
  *  - actualFee  = grossFee − feeWaived(烧够则 0)
  *  - netReceive = 金额 − actualFee
- * offsetRate 远高于市价(#3:抵扣价值高于实际兑换价值)。两费率后台可调(phase / admin D.withdraw.*)。
+ *
+ * ⚠️ 这段文档头必须与实现同步改 —— 2026-07-31 本文件曾被误用 git checkout 整段回滚,
+ *    是**照着注释重建**的。一份写着旧公式的文档头 = 下一次回滚的复发引信。
+ *
+ * offsetRate 远高于市价(#3:抵扣价值高于实际兑换价值)。
+ * 费率后台可调:penaltyFeeRate 走 phase/H1;networkFee 三件套走 admin D5。
  */
 export interface WithdrawFee {
   grossFee: number;
@@ -203,20 +212,80 @@ export interface WithdrawFee {
   feeWaived: number;
   actualFee: number;
   netReceive: number;
+  /** 链上转账成本(已夹在 min/max 之间) */
+  networkFee: number;
+  /** 惩罚费(= 金额 × penaltyFeeRate),不含网络费 */
+  penaltyFee: number;
 }
 
+/** 网络费配置(后台 D5 可配)。 */
+export interface NetworkFeeConfig {
+  /** 比例(0–0.05),对金额取比例 */
+  rate: number;
+  /** 下限(USDT):小额提现按此兜底,防止按比例算出 $0.1 这种付不起链上 gas 的数 */
+  min: number;
+  /** 上限(USDT):大额提现按此封顶 */
+  max: number;
+}
+
+/**
+ * 网络费配置可用性(规格 FEAT-WD01c ② 异常4)。
+ * 缺字段 / NaN / 负数 / 比例越界(> 5%,后台 D5 的合法上限)/ min > max 任一 → 不可用。
+ *
+ * 🔴 不可用时调用方必须**禁止下单**,绝不回退写死值 —— 与汇率牌价同口径(isFxQuoteUsable)。
+ * 理由:回退写死值 = 用户按 A 费率下单、平台按 B 费率扣款,资金面对不上账。
+ * 🔴 那 5% 是后台 D5 的法定上限,本函数是**唯一执行者** ——
+ *    删掉它意味着后端下发 50% 时提 $100 只到手 $30 而页面照渲(独立验收实测)。
+ *    行为覆盖在 scripts/selfcheck-withdrawfee.mjs。
+ */
+export function isNetworkFeeConfigUsable(cfg: Partial<NetworkFeeConfig> | undefined | null): boolean {
+  if (!cfg) return false;
+  const rate = cfg.rate;
+  const min = cfg.min;
+  const max = cfg.max;
+  if (!Number.isFinite(rate) || (rate as number) < 0 || (rate as number) > 0.05) return false;
+  if (!Number.isFinite(min) || (min as number) < 0) return false;
+  if (!Number.isFinite(max) || (max as number) < 0) return false;
+  return (max as number) >= (min as number);
+}
+
+/**
+ * 网络费:先按比例,再夹进 [min, max]。min > max 这种坏配置下取 min,不返回负数。
+ *
+ * 🔴 金额为 0 时返回 0,**不套下限** —— 否则用户还没输金额,明细区就显示「网络手续费 $1」,
+ * 且总费($1)> 提现额($0),既误导又违反后端 `netReceive ≤ amount` 不变量。
+ * 下限的语义是「真发生一笔链上转账时至少要付的 gas」,没有转账就没有这笔费。
+ */
+export function computeNetworkFee(amountUSDT: number, cfg: NetworkFeeConfig): number {
+  const amount = Math.max(0, amountUSDT);
+  if (amount <= 0) return 0;
+  const min = Math.max(0, cfg.min);
+  const max = Math.max(min, cfg.max);
+  const raw = amount * Math.max(0, cfg.rate);
+  return Math.min(Math.max(raw, min), max);
+}
+
+/**
+ * 🔴 FEAT-WD01c:总费是**两笔相加** —— grossFee = networkFee + 金额 × penaltyFeeRate。
+ * 后端对这条等式有硬校验(误差 > 0.0001 即判数据非法)。前端此前只算了后半截,
+ * 接真后端后用户看到的费会比实扣的少 —— 资金面最不能出的错。
+ * NEX 抵扣作用于**总费**(含网络费),与后端一致。
+ */
 export function computeWithdrawFee(
   amountUSDT: number,
   userNex: number,
   penaltyFeeRate: number,
   nexFeeOffsetRate: number,
+  networkFeeConfig: NetworkFeeConfig,
 ): WithdrawFee {
   const amount = Math.max(0, amountUSDT);
-  const grossFee = amount * penaltyFeeRate;
+  const networkFee = computeNetworkFee(amount, networkFeeConfig);
+  const penaltyFee = amount * penaltyFeeRate;
+  const grossFee = networkFee + penaltyFee;
   const requiredNex = nexFeeOffsetRate > 0 ? grossFee / nexFeeOffsetRate : 0;
   const nexBurned = Math.min(Math.max(0, userNex), requiredNex);
   const feeWaived = Math.min(grossFee, nexBurned * nexFeeOffsetRate);
   const actualFee = Math.max(0, grossFee - feeWaived);
   const netReceive = Math.max(0, amount - actualFee);
-  return { grossFee, requiredNex, nexBurned, feeWaived, actualFee, netReceive };
+  return { networkFee, penaltyFee, grossFee, requiredNex, nexBurned, feeWaived, actualFee, netReceive };
 }

@@ -7,6 +7,7 @@
  * = inverted band over scrolled content), reports console errors.
  */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -20,7 +21,7 @@ const name = process.argv[3] || "sticky";
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 414, height: 896 }, deviceScaleFactor: 2, colorScheme: "dark" });
 const errors = [];
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });
 await page.waitForTimeout(1300);

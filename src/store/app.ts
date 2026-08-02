@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { PLATFORM_UTC_OFFSET_HOURS } from "./withdrawal-eligibility-core";
 import { computed, ref } from "vue";
 import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
@@ -21,7 +22,11 @@ import {
   _devGrantManualRelease as _devGrantManualReleaseLedger,
   type ReleaseOutcome,
 } from "@/store/earning-release";
-import { recordAttestation } from "@/store/risk-identity";
+import { markWithdrawn, recordAttestation, recordWithdrawAddressUse } from "@/store/risk-identity";
+import { advanceArrival, estimateArrivalAt, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
+import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/wallet-pairing-core";
+import { CLAIM_SETTLE_MS, claimWithdrawSlot, releaseWithdrawSlot } from "@/store/withdraw-daily-count";
+import { mockServerNow } from "@/store/server-time";
 import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
 import type { DeviceCapability } from "@/lib/device-capability";
 import { useReceipts } from "./receipts";
@@ -176,7 +181,7 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
     user: createInitialUser(email || accountKey || "alex@nexgrid.ai"),
     devices: makeInitialDevices(),
     earnings: createInitialEarnings(),
-    latestWithdrawal: null,
+    withdrawals: [],
   };
 }
 
@@ -284,7 +289,34 @@ export const useApp = defineStore("app", () => {
   const devices = ref<Device[]>(bootSnapshot.devices);
   const earnings = ref<EarningsState>(bootSnapshot.earnings);
   const global = ref<GlobalStats>(createInitialGlobal());
-  const latestWithdrawal = ref<Withdrawal | null>(bootSnapshot.latestWithdrawal);
+  /**
+   * 🔴 提现单**列表**是源真理(与真后端 GET /api/withdrawals 同构)。
+   * 此前只存最新一条,第二笔建单会把第一笔整个顶掉 —— 钱已扣、单据不可达、
+   * 到账推进也永不再碰它。列表化后并发/跨日的多笔各自独立推进,互不覆盖。
+   */
+  const withdrawals = ref<Withdrawal[]>(bootSnapshot.withdrawals ?? []);
+  /**
+   * 🔴 在途单(非终态)列表。**列表级的问题必须问它,不能问 latestWithdrawal** ——
+   * 独立验收实测:模型改成列表后,三个消费者仍拿「只问最新一条」的老问法去问
+   * 列表级问题,于是「一张在途单 + 一张更新的已到账单」这个组合下全部答错:
+   * 账单结算结算错单、钱包入口整行消失、换绑闸被静默架空。
+   */
+  const inFlightWithdrawals = computed(() => withdrawals.value.filter((w) => occupiesWithdrawalSlot(w.status)));
+  /**
+   * 展示面的**主单**:优先最早的在途单(用户最关心还没到账的那笔),
+   * 都结清了才退回最近一笔。钱包入口与追踪页共用它,口径才不会打架。
+   */
+  const primaryWithdrawal = computed<Withdrawal | null>(() => {
+    const pending = inFlightWithdrawals.value;
+    if (pending.length) return pending.reduce((a, b) => (b.submittedAt < a.submittedAt ? b : a));
+    return latestWithdrawal.value;
+  });
+  /** 最近一笔(按提交时刻)。派生值,不是独立状态。 */
+  const latestWithdrawal = computed<Withdrawal | null>(() =>
+    withdrawals.value.length
+      ? withdrawals.value.reduce((a, b) => (b.submittedAt > a.submittedAt ? b : a))
+      : null,
+  );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
   const cfg = useConfig();
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
@@ -331,7 +363,7 @@ export const useApp = defineStore("app", () => {
     user.value = normalizedSnapshot.user;
     devices.value = snapshot.devices;
     earnings.value = snapshot.earnings;
-    latestWithdrawal.value = snapshot.latestWithdrawal;
+    withdrawals.value = snapshot.withdrawals ?? [];
     syncDeviceRuntime(snapshot.devices, resetRuntime);
     lastCloudSnapshot = normalizedSnapshot;
     accountCloudUpdatedAt.value = normalizedSnapshot.updatedAt;
@@ -348,7 +380,7 @@ export const useApp = defineStore("app", () => {
       user: user.value,
       devices: devices.value,
       earnings: earnings.value,
-      latestWithdrawal: latestWithdrawal.value,
+      withdrawals: withdrawals.value,
     };
     const result = mergeAndWriteAccountSnapshotResult(lastCloudSnapshot, snapshot);
     adoptAccountSnapshot(result.snapshot);
@@ -792,6 +824,33 @@ export const useApp = defineStore("app", () => {
   }
 
   // ── Balance primitives (register/login/wallet use these) ──
+  /**
+   * 🔴 提现进入失败终态时把钱退回去(幂等)。
+   *
+   * 提现在提交那一刻就扣了款(applyDebit),所以任何「这笔最终没打出去」的终态
+   * —— 驳回 / 地址无效 / 上链失败 / 已退款 —— 都必须把钱还给用户。
+   * 全仓此前**没有任何退款实现**,而账单也不会被置为 failed:
+   * 两个缺口分开看都像「反正 mock 里走不到」,合起来就是「钱扣了、单子废了、没人还」。
+   * 退款与置账单失败必须在**同一处**完成,否则接后端时必然只做一半(审计明确点名)。
+   *
+   * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单退一次。
+   * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
+   */
+  function refundFailedWithdrawals(): string[] {
+    const FAILED: Withdrawal["status"][] = ["review-rejected", "address-invalid", "tx-failed", "refunded"];
+    const done: string[] = [];
+    for (const wd of withdrawals.value) {
+      if (!FAILED.includes(wd.status)) continue;
+      if (!(wd.amount > 0)) continue;
+      // 🔴 复用 creditRewardBucketOnce,不要自己拼 user.value 的绝对值:
+      // account-cloud 把余额当**增量计数器**做三方合并,直接写绝对值会被合并算回去
+      // (实测:可提桶加上了、总余额纹丝不动 —— 一半生效比不生效更难查)。
+      // 这个 action 同时加总余额与可提桶,且自带 appliedRewardKeys 幂等,正是退款要的语义。
+      if (creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)) done.push(wd.id);
+    }
+    return done;
+  }
+
   function creditBalance(amount: number) {
     // NaN/Infinity/负数守卫(对齐 recordDeposit):脏 amount 会把余额污染成 NaN,
     // 此后一切 debit 检查恒过 = 无限钱(审计 P2-5)。
@@ -938,29 +997,79 @@ export const useApp = defineStore("app", () => {
   // fails) so caller surfaces an error toast. Ported from index.ts submitWithdrawal
   // (Round 7 P0 fix: now debits balance — previously balance stayed full, an
   // infinite-mint vector).
-  function submitWithdrawal(
+  async function submitWithdrawal(
     amount: number,
     network: Withdrawal["network"],
     address: string,
     fee: number,
     riskRoute: WithdrawalRiskRoute = "pass",
     riskReasons: string[] = [],
-  ): string | null {
+    // FEAT-WD01a:快车道留痕随单落盘 —— 只算不存的话,事后审计与客服都还原不出
+    // 「这单当时免了哪几道闸」,等于没做。与 riskReasons 同源同去处。
+    fastLaneApplied = false,
+    waivedGates: string[] = [],
+  ): Promise<string | null> {
     // SPEC-7 FEAT-RISK03: reject 路由禁止扣款建单;freeze/manual/delay 建单进
     // 对应队列(资金占用),状态由服务端/人工推进,client 不推进。
     if (riskRoute === "reject") return null;
     // 金额有效性守卫(对齐 debitBalance):NaN/±Infinity/≤0 一律拒 —— 负数会让下方
     // usdtBalance - amount 反向加钱,NaN 污染余额为 NaN 后一切校验恒过(无限钱)。
     if (!Number.isFinite(amount) || amount <= 0) return null;
+    // (单槽闸已删除:单据改成列表后,新单不再顶掉在途单 —— 那道闸本就是为兜单槽
+    //  模型加的产品限制,真后端没有它,留着反而会在人工审核单无出口时把用户锁死。)
     const currentUser = withDefaultEarningBuckets(user.value);
-    // 双门:可提额度门 + 总余额门。正常态 debitBalance 的 clamp 保证 withdrawableUsdt ≤
-    // usdtBalance,后者恒不触发;但作为纵深兜底 —— 万一多端快照 merge(两字段独立
-    // last-write-wins)或未来新增扣款路径漏 clamp 让可提额度 > 总余额,也绝不放行超过
-    // 总余额的提现(negative-balance 最后防线)。
-    if (currentUser.earningBuckets.withdrawableUsdt < amount) return null;
+    // 单门:总余额门。2026-07-31 规则变更 —— 充值本金允许提现(按标准费率收费),
+    // 故不再以 withdrawableUsdt 为准入分母。pendingReviewUsdt / bonusLockedUsdt 本就
+    // 账外(不计入 usdtBalance),风控扣留仍然生效:被扣留的收益压根不在总余额里。
+    // 这一门同时是 negative-balance 最后防线 —— 任何情况下不放行超过总余额的提现。
     if (currentUser.usdtBalance < amount) return null;
-    const now = Date.now();
-    const yyyymmdd = new Date(now).toISOString().slice(0, 10).replace(/-/g, "");
+    // 🔴 并发透支门(2026-07-31 审计 P0):内存余额可能是过期快照 —— account-cloud 把
+    // usdtBalance 当加法计数器做三路 merge,两个标签页/端各自本地合法的扣款合并后会相加。
+    // 门禁分母从 withdrawableUsdt(常年很小)换成 usdtBalance 后,可透支上限被放大到整个
+    // 账户余额,故这里必须以**落盘的最新余额**再核一次(等价于真后端在事务内重读行)。
+    // 读不到快照(首次/清缓存)时放行,由上面的内存门 + merge 层 clamp 兜底。
+    // 🔴 全程钉死入口那一刻的账号。本函数跨多个 await(占额度 150ms + 重放 ≤450ms),
+    // 期间 storage 事件 / 会话被踢 / 换号登录都会调 bindAccount 改掉 accountKey.value ——
+    // 实测:A 发起提现、60ms 后切到 B,结果额度扣在 A、钱和单据落在 B(两个用户各自莫名其妙)。
+    const acct = accountKey.value;
+    const freshBalance = readAccountSnapshot(acct)?.user?.usdtBalance;
+    if (Number.isFinite(freshBalance) && (freshBalance as number) < amount) return null;
+    const now = mockServerNow();
+    const rules = cfg.config.withdrawRules;
+    // 🔴 FEAT-WD01b 每日笔数:**先占额度再建单**(与上面的并发透支门同源思路)。
+    // 页面提交前的预判读的是 600ms 异步评估之前的计数,两个标签页会各自读到
+    // 「今天还没提过」——独立验收实测 3 轮 3 中。这一行是真正的闸,预判只是 UI。
+    // 放在所有拒绝条件之后:被拒的提交不该白占额度。
+    // 占用是**异步**的(写入后要等跨进程传播收敛再回读验令牌,见 claimWithdrawSlot)——
+    // 复验实测:纯同步的读-改-写在两个独立标签页之间 12 轮 12 中都拦不住。
+    const claimToken = await claimWithdrawSlot(acct, rules.dailyWithdrawLimitCount, now);
+    if (!claimToken) return null;
+    // 占用等待期间余额可能被另一端花掉 —— 落盘余额再核一次;不过就把额度还回去
+    // (被拒的提交不该白吃额度)。这之后本函数不再有失败路径。
+    // await 期间账号被换掉 → 立刻收手并归还额度,绝不把钱记到新账号头上。
+    if (accountKey.value !== acct) {
+      releaseWithdrawSlot(acct, claimToken);
+      return null;
+    }
+    const settledBalance = readAccountSnapshot(acct)?.user?.usdtBalance;
+    if (Number.isFinite(settledBalance) && (settledBalance as number) < amount) {
+      releaseWithdrawSlot(acct, claimToken);
+      return null;
+    }
+    // 🔴 await 之后必须**重取**内存态:这 150ms 里本页的计息 / 结算 tick 可能已经改过
+    // user.value。拿 await 之前的旧快照回写 = 把这期间的收益抹掉(自己丢自己的更新)。
+    const settledUser = withDefaultEarningBuckets(user.value);
+    if (settledUser.usdtBalance < amount) {
+      releaseWithdrawSlot(acct, claimToken);
+      return null;
+    }
+    // 🔴 单号里的日期用**平台日**(越南 UTC+7),与每日笔数上限、可再提时刻同一个「今天」。
+    // 原本用 UTC 日:同一屏上单号写 20260731、提示写「08-02 02:00 后可再提」,
+    // 用户拿单号问客服时两边对不上是哪一天的单。
+    const yyyymmdd = new Date(now + PLATFORM_UTC_OFFSET_HOURS * 3600_000)
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, "");
     const seq = Math.floor(1000 + Math.random() * 9000);
     const id = `WD-${yyyymmdd}-${seq}`;
     const initialStatus: Withdrawal["status"] =
@@ -976,21 +1085,125 @@ export const useApp = defineStore("app", () => {
       status: initialStatus,
       riskRoute,
       riskReasons,
+      fastLaneApplied,
+      waivedGates,
       submittedAt: now,
-      estimatedCompletion: now + 24 * 3600 * 1000,
+      // FEAT-WD01b:到账时刻由后台 D5 参数算,不再写死 24h —— 写死的话运营调了
+      // 「到账时效」页面照旧显示次日,承诺与实际两张皮。大额命中审查窗口时取更晚者。
+      estimatedCompletion: estimateArrivalAt(now, amount, {
+        payoutSlaHours: rules.payoutSlaHours,
+        payoutReviewWindowDays: rules.payoutReviewWindowDays,
+        largeAmountUsdt: NEW_ADDRESS_LARGE_AMOUNT_USDT,
+      }),
     };
-    latestWithdrawal.value = wd;
-    user.value = {
-      ...currentUser,
-      usdtBalance: +(currentUser.usdtBalance - amount).toFixed(2),
-      earningBuckets: {
-        ...currentUser.earningBuckets,
-        withdrawableUsdt: +(currentUser.earningBuckets.withdrawableUsdt - amount).toFixed(2),
-        lastBucketedAt: now,
-      },
+    withdrawals.value = [wd, ...withdrawals.value];
+    // 扣款顺序:先耗已解锁收益,再耗充值本金(与 debitBalance 消费顺序相反 —— 消费时
+    // 先耗本金保住可提额度,提现时先耗收益,两边都让 withdrawableUsdt 尽快归零而不会
+    // 出现「可提额度 > 总余额」)。两个 clamp 缺一不可:max(0,…) 防提本金时可提额度
+    // 转负;min(…, 扣后总余额) 保 withdrawableUsdt ≤ usdtBalance 不变量。
+    // 🔴 两个 clamp 的**唯一**实现在下面的 applyDebit —— 此处曾留一份重构后没人用的
+    // 副本,而哨兵正 pin 在那份死代码上:真 clamp 改坏了哨兵照样绿(审计实测)。
+    // 🔴 本地权威副本。落盘后**内存态可能被回滚**:persistAccountSnapshot 会把合并结果
+    // adopt 回 user.value / latestWithdrawal,而合并里「本页没改过的 key」取的是 latest,
+    // 跨渲染进程读到的 latest 可能是别的标签页写的旧值 —— 于是本页刚提交的扣款和单据
+    // 被自己 adopt 回旧状态。复验轨迹实测到这一幕:补写那一下写回去的就是被回滚后的旧值。
+    // 所以重放必须以**这份不会被 adopt 动到的本地副本**为准,不能读 user.value。
+    // 🔴 幂等键随扣款一起落盘(沿用 creditRewardBucketInternal 的既有范式)。
+    // 判「这笔扣款到底落没落」不能看提现单槽 —— latestWithdrawal 只有**一个**槽位,
+    // 并发的另一笔提现会占走它,本单的判据就永远不成立、重放空转三轮(审计 P0 第二形态)。
+    const previousSnapshot = lastCloudSnapshot;
+    const applyDebit = (base: UserState): UserState => {
+      const u = withDefaultEarningBuckets(base);
+      const usdt = +(u.usdtBalance - amount).toFixed(2);
+      return {
+        ...u,
+        usdtBalance: usdt,
+        earningBuckets: {
+          ...u.earningBuckets,
+          withdrawableUsdt: Math.min(Math.max(0, +(u.earningBuckets.withdrawableUsdt - amount).toFixed(2)), usdt),
+          lastBucketedAt: now,
+        },
+        appliedRewardKeys: { ...u.appliedRewardKeys, [id]: true },
+      };
     };
-    persistAccountSnapshot();
+    const committedUser = applyDebit(settledUser);
+    user.value = committedUser;
+    if (!persistAccountSnapshot()) {
+      // 落盘失败(配额满 / 隐私模式 / storage 被禁):回滚内存、归还额度,别返回成功单号 ——
+      // 否则页面会照常写账单并跳转,刷新后「钱还在、账单在、单据没了」。
+      adoptAccountSnapshot(previousSnapshot);
+      releaseWithdrawSlot(acct, claimToken);
+      return null;
+    }
+    // 风控台账与扣款同一个同步任务:这两笔登记原本在页面里、扣款之后 ~1.2s 才跑,
+    // 用户在这段等待里关掉页面就会「钱扣了但首提标记没置位、共用地址没登记」——
+    // 首提永远当第一次(每笔都 manual),跨账户共用收款地址的强信号也查不出来。
+    recordWithdrawAddressUse(acct, network, address);
+    markWithdrawn(acct);
+    // 🔴 落盘收敛重放(独立验收两轮实测的资金 P0:单据在、账单在、余额一分没少 = 凭空提现)。
+    // 判据是**单号**(唯一且只属于本次),所以重放只在「这单没落上」时发生,不可能重复扣款。
+    // 最多 3 次、每次等一个传播周期:并发方在这个量级早已收工,收敛后就稳定;
+    // 次数有上限,不会因为对方持续写而空转。
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise<void>((r) => setTimeout(r, CLAIM_SETTLE_MS));
+      // 账号在重放期间被换掉就停手:再写下去就是往别人账上记账。
+      if (accountKey.value !== acct) break;
+      const stored = readAccountSnapshot(acct);
+      // 判据是**幂等键**不是提现单槽:单槽只有一个位置,并发的另一笔提现会占走它,
+      // 那样本单永远判不成立、三轮全空转(审计 P0 第二形态)。
+      if (stored?.user?.appliedRewardKeys?.[id]) break;
+      if (!stored) { persistAccountSnapshot(); continue; }
+      // 🔴 重放必须**在落盘现状上重算扣款**,不能回写提交那一刻的绝对快照。
+      // 合并层把余额当加法计数器(delta = next − base):先 adopt(stored) 再写绝对值,
+      // delta 就等于「绝对值 − 落盘值」,合并结果被强行设成那个绝对值 ——
+      // 并发方在这期间的余额变动(买设备 / 充值 / 领奖)会被整个抹平,方向为负时等于凭空造钱。
+      // 改成从 stored 重新推导后,delta 恒等于 −amount,并发方的改动全部保留。
+      // 🔴 重放也要核余额:主路径核了四次,这里一次不核 —— stored 余额在这期间缩水时
+      // applyDebit 会算出负值,再被 merge 层 clamp 静默兜成 0(拒绝变成悄悄清零)。
+      if (withDefaultEarningBuckets(stored.user).usdtBalance < amount) break;
+      adoptAccountSnapshot(stored);
+      user.value = applyDebit(stored.user);
+      // 重放本单:列表里已有就替换,被并发方抹掉了就补回
+      withdrawals.value = withdrawals.value.some((w) => w.id === id)
+        ? withdrawals.value.map((w) => (w.id === id ? wd : w))
+        : [wd, ...withdrawals.value];
+      persistAccountSnapshot();
+    }
     return id;
+  }
+
+  /**
+   * FEAT-WD01b 到账推进:到点把 pass 路由单据补齐到 confirmed。
+   *
+   * 由 App 层在前台轮询 + onShow 调用 —— 关 App 三天再打开时,一次调用就补齐,
+   * 不按天数循环推进(判定只看「now ≥ 预计到账」,与离线多久无关)。
+   * 幂等性在纯函数里:推进过的单再进来返回 null,这里 null 就不写盘、不通知。
+   *
+   * 🔴 只改状态与到账时间,**不碰余额**:钱在提交时已扣,推进不是记账事件。
+   * PROD:整块删掉,状态改由 GET /api/withdrawals/:id(或 SSE)权威回传。
+   */
+  /**
+   * 到点推进,返回**本次真正推进了哪几笔的单号**(空数组 = 没有可推进的)。
+   * 🔴 返回 boolean 不够:推进是全表扫,而调用方要按单号去结算对应的账单行 ——
+   * 只回一个 true 会让调用方退回去问「最新一笔是谁」,于是结算结到别的单上
+   * (独立验收实测:到账那笔账单永远处理中,还在处理的那笔反被标成已入账)。
+   */
+  function advanceWithdrawalArrival(): string[] {
+    // 🔴 全表扫:每一笔各自到点各自推进。单条版只看最新一笔,
+    // 前面那笔到点了也永远推不动(列表化后这个洞自动消失)。
+    const now = mockServerNow();
+    const prev = withdrawals.value;
+    const next = prev.map((w) => advanceArrival(w, now) ?? w);
+    const advancedIds = next.filter((w, i) => w !== prev[i]).map((w) => w.id);
+    if (!advancedIds.length) return [];
+    withdrawals.value = next;
+    // 诚实返回落盘结果:落盘失败时内存说已到账、磁盘还是处理中,而内存一旦置 confirmed
+    // 后续轮询就恒返回 false 永不重试(只有整页重载才自愈)。失败即回滚内存,下个 tick 再试。
+    if (!persistAccountSnapshot()) {
+      withdrawals.value = prev;
+      return [];
+    }
+    return advancedIds;
   }
 
   // ⚠️ DEV/DEMO-ONLY(SPEC-7 收编): 仅 pass 路由的提现可由 demo 驱动推进主链
@@ -1000,6 +1213,8 @@ export const useApp = defineStore("app", () => {
     if (import.meta.env.PROD) return; // demo-only 状态推进,store 层二层 guard(硬规则5)
     const wd = latestWithdrawal.value;
     if (!wd) return;
+    const pos = withdrawals.value.findIndex((w) => w.id === wd.id);
+    if (pos < 0) return;
     if (wd.riskRoute && wd.riskRoute !== "pass") return;
     const order: Withdrawal["status"][] = [
       "submitted",
@@ -1010,17 +1225,23 @@ export const useApp = defineStore("app", () => {
     ];
     const idx = order.indexOf(wd.status);
     if (idx === -1 || idx >= order.length - 1) return;
-    latestWithdrawal.value = { ...wd, status: order[idx + 1] };
+    const nextStatus = order[idx + 1];
+    // demo 手动推到 confirmed 时也要记到账时间,否则追踪页的「实际到账」是空的
+    // (真实推进路径在 advanceWithdrawalArrival,两条路必须产出同形状的单)。
+    const updated: Withdrawal =
+      nextStatus === "confirmed" ? { ...wd, status: nextStatus, confirmedAt: wd.estimatedCompletion } : { ...wd, status: nextStatus };
+    withdrawals.value = withdrawals.value.map((w, i) => (i === pos ? updated : w));
     persistAccountSnapshot();
   }
 
   return {
     accountKey, entrySurface, accountCloudUpdatedAt,
-    user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global, latestWithdrawal, miningPaused,
+    user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global,
+    withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, _devAdvanceWithdrawal, _devGrantManualRelease,
+    submitWithdrawal, advanceWithdrawalArrival, refundFailedWithdrawals, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });
