@@ -6,73 +6,126 @@ import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 /**
- * Free trial — classic SaaS free-trial → auto-billing model.
- * Ported from Nexion-prototype/lib/store/free-trial.ts (zustand persist →
- * Pinia + uni storage).
+ * Free trial — FEAT-TRIAL02 cardless machine (spec signed 2026-07-31).
+ *
+ * State machine (spec ④):
+ *   none →(claim)active →(expiry)grace →(grace end)ended
+ *   active|grace →(buy with credit via checkout)converted   (terminal)
+ *   active →(explicit user cancel)ended
+ *
+ * Hard behavior boundaries (spec ④): NEVER auto-charge, NEVER auto-order,
+ * NEVER require a payment method to claim; `ended` stops shadow accrual;
+ * `converted` is terminal (no rollback). Conversion money/order side effects
+ * live in the checkout page (cross-store composition, P-031/032) — this store
+ * only moves its own state.
+ *
+ * Eligibility (spec 异常2): one trial per account — `ended`/`converted` are
+ * permanently ineligible ("已用过"/"已购机"); the spec state machine has no
+ * ended→claim edge, so there is no cooldown-based re-claim.
  *
  * ⚠️ MOCK-VS-PRODUCTION: every action maps to a REST endpoint (PRD §9.11a).
- * Server-side responsibilities mocked here: all time decisions (mockServerNow),
- * all charge attempts (mockChargeAttempt), eligibility (canStart cooldown),
- * shadow accrual freeze (poll active→grace).
- *
- * State machine: idle → active → grace → extended → {redeemed|failed|cancelled}
+ *   start()        → POST /api/trial/start          (no body — cardless)
+ *   convert()      → server-side within POST /api/orders (same transaction)
+ *   cancel()       → POST /api/trial/cancel
+ *   eligibility()  → GET  /api/trial/eligibility → { ok, reason? }
+ *   poll()         → GET  /api/trial/state (server cron advances the machine)
  */
 
-/** ⚠️ MOCK: client-side RNG. PRODUCTION: POST /api/trial/charge (server decides). */
-function mockChargeAttempt(failRate: number): { ok: boolean; reason: ChargeFailReason | null } {
-  if (Math.random() < failRate) {
-    return { ok: false, reason: "insufficient_funds" };
-  }
-  return { ok: true, reason: null };
-}
+export type TrialStatus = "none" | "active" | "grace" | "ended" | "converted";
 
-export type TrialStatus =
-  | "idle"
-  | "active"
-  | "grace"
-  | "extended"
-  | "redeemed"
-  | "failed"
-  | "cancelled";
-
-export type ChargeFailReason = "insufficient_funds" | "card_invalid" | "unknown";
+/** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error). */
+export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed";
 
 interface FreeTrialState {
   status: TrialStatus;
-  cardTokenId: string | null;
   startedAt: number | null;
-  activeEndsAt: number | null;
+  /** Trial-period end (server-canonical name per spec ③; legacy rows stored `activeEndsAt`). */
+  expiresAt: number | null;
   graceEndsAt: number | null;
-  extendedEndsAt: number | null;
-  scheduledChargeAt: number | null;
   finishedAt: number | null;
-  failReason: ChargeFailReason | null;
-  extensionGranted: boolean;
   shadowFrozenAtUSD: number;
   shadowFrozenAtNEX: number;
+  /** Legacy card-era trial migrated onto the cardless rules (spec 异常6) — page shows a notice. */
+  legacyCardMigrated: boolean;
 }
 
 const INITIAL: FreeTrialState = {
-  status: "idle",
-  cardTokenId: null,
+  status: "none",
   startedAt: null,
-  activeEndsAt: null,
+  expiresAt: null,
   graceEndsAt: null,
-  extendedEndsAt: null,
-  scheduledChargeAt: null,
   finishedAt: null,
-  failReason: null,
-  extensionGranted: false,
   shadowFrozenAtUSD: 0,
   shadowFrozenAtNEX: 0,
+  legacyCardMigrated: false,
 };
 
-// 旧设备级单键 "nexgrid-trial-v1" 废弃(存量无账号归属,mock 可重建);试用状态机按账号分行。
+// 存量键不换(规格 异常6):旧行在 hydrate 时就地迁移到新状态机。
 const ACCOUNTS_KEY = "nexgrid-trial-accounts-v1"; // { [accountKey]: FreeTrialState }
 
+/** Legacy (card-era) persisted row shape — superset read for migration.
+ *  `status` widens to string because legacy rows carry retired enum values. */
+interface LegacyTrialRow extends Omit<Partial<FreeTrialState>, "status"> {
+  status?: string;
+  cardTokenId?: string | null;
+  activeEndsAt?: number | null;
+  extendedEndsAt?: number | null;
+}
+
+/**
+ * Migrate a persisted row (legacy or current) to the FEAT-TRIAL02 shape
+ * (spec 异常6): idle→none · extended→grace (graceEndsAt takes the later of the
+ * two boundaries) · redeemed→converted · failed|cancelled→ended (finishedAt
+ * kept for the "ended at" display). A card-era row still active/grace gets
+ * `legacyCardMigrated` so the trial page can show the rules-changed notice.
+ */
+function migrateRow(row: LegacyTrialRow): FreeTrialState {
+  let status: TrialStatus;
+  let graceEndsAt = row.graceEndsAt ?? null;
+  let legacyCardMigrated = row.legacyCardMigrated ?? false;
+  switch (row.status) {
+    case "idle":
+      status = "none";
+      break;
+    case "extended": {
+      status = "grace";
+      const merged = Math.max(graceEndsAt ?? 0, row.extendedEndsAt ?? 0);
+      graceEndsAt = merged > 0 ? merged : null;
+      break;
+    }
+    case "redeemed":
+      status = "converted";
+      break;
+    case "failed":
+    case "cancelled":
+      status = "ended";
+      break;
+    case "none":
+    case "active":
+    case "grace":
+    case "ended":
+    case "converted":
+      status = row.status;
+      break;
+    default:
+      return { ...INITIAL };
+  }
+  if ((status === "active" || status === "grace") && row.cardTokenId) legacyCardMigrated = true;
+  return {
+    status,
+    startedAt: row.startedAt ?? null,
+    expiresAt: row.expiresAt ?? row.activeEndsAt ?? null,
+    graceEndsAt,
+    finishedAt: row.finishedAt ?? null,
+    shadowFrozenAtUSD: row.shadowFrozenAtUSD ?? 0,
+    shadowFrozenAtNEX: row.shadowFrozenAtNEX ?? 0,
+    legacyCardMigrated,
+  };
+}
+
 function hydrate(accountKey: string): FreeTrialState {
-  const row = readAccountRow<Partial<FreeTrialState>>(ACCOUNTS_KEY, accountKey);
-  if (row && typeof row.status === "string") return { ...INITIAL, ...row };
+  const row = readAccountRow<LegacyTrialRow>(ACCOUNTS_KEY, accountKey);
+  if (row && typeof row.status === "string") return migrateRow(row);
   return { ...INITIAL };
 }
 
@@ -81,142 +134,105 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   let boundKey = "default";
   const init = hydrate(boundKey);
   const status = ref<TrialStatus>(init.status);
-  const cardTokenId = ref<string | null>(init.cardTokenId);
   const startedAt = ref<number | null>(init.startedAt);
-  const activeEndsAt = ref<number | null>(init.activeEndsAt);
+  const expiresAt = ref<number | null>(init.expiresAt);
   const graceEndsAt = ref<number | null>(init.graceEndsAt);
-  const extendedEndsAt = ref<number | null>(init.extendedEndsAt);
-  const scheduledChargeAt = ref<number | null>(init.scheduledChargeAt);
   const finishedAt = ref<number | null>(init.finishedAt);
-  const failReason = ref<ChargeFailReason | null>(init.failReason);
-  const extensionGranted = ref<boolean>(init.extensionGranted);
   const shadowFrozenAtUSD = ref<number>(init.shadowFrozenAtUSD);
   const shadowFrozenAtNEX = ref<number>(init.shadowFrozenAtNEX);
+  const legacyCardMigrated = ref<boolean>(init.legacyCardMigrated);
 
   function persist() {
     writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, {
       status: status.value,
-      cardTokenId: cardTokenId.value,
       startedAt: startedAt.value,
-      activeEndsAt: activeEndsAt.value,
+      expiresAt: expiresAt.value,
       graceEndsAt: graceEndsAt.value,
-      extendedEndsAt: extendedEndsAt.value,
-      scheduledChargeAt: scheduledChargeAt.value,
       finishedAt: finishedAt.value,
-      failReason: failReason.value,
-      extensionGranted: extensionGranted.value,
       shadowFrozenAtUSD: shadowFrozenAtUSD.value,
       shadowFrozenAtNEX: shadowFrozenAtNEX.value,
+      legacyCardMigrated: legacyCardMigrated.value,
     });
   }
 
-  /** 账号切换重绑:装载该账号的试用状态机(防跨账号继承试用资格/冷却/影子收益)。 */
-  function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    const next = hydrate(boundKey);
+  function load(next: FreeTrialState) {
     status.value = next.status;
-    cardTokenId.value = next.cardTokenId;
     startedAt.value = next.startedAt;
-    activeEndsAt.value = next.activeEndsAt;
+    expiresAt.value = next.expiresAt;
     graceEndsAt.value = next.graceEndsAt;
-    extendedEndsAt.value = next.extendedEndsAt;
-    scheduledChargeAt.value = next.scheduledChargeAt;
     finishedAt.value = next.finishedAt;
-    failReason.value = next.failReason;
-    extensionGranted.value = next.extensionGranted;
     shadowFrozenAtUSD.value = next.shadowFrozenAtUSD;
     shadowFrozenAtNEX.value = next.shadowFrozenAtNEX;
+    legacyCardMigrated.value = next.legacyCardMigrated;
   }
 
-  // PRODUCTION: GET /api/trial/eligibility → { canStart, reason? }
+  /** 账号切换重绑:装载该账号的试用状态机(防跨账号继承试用资格/影子收益)。 */
+  function bindAccount(rawAccountKey: string) {
+    boundKey = normalizeAccountKey(rawAccountKey);
+    load(hydrate(boundKey));
+  }
+
+  // PRODUCTION: GET /api/trial/eligibility → { ok, reason? }
+  function eligibility(): { ok: boolean; reason?: TrialIneligibleReason } {
+    if (status.value === "active" || status.value === "grace") return { ok: false, reason: "in-progress" };
+    if (status.value === "converted") return { ok: false, reason: "converted" };
+    if (status.value === "ended") return { ok: false, reason: "used" };
+    if (!useTrialConfig().config.phaseOpen) return { ok: false, reason: "phase-closed" };
+    return { ok: true };
+  }
+
+  /** Boolean view of eligibility() — kept for the many entry-surface gates. */
   function canStart(): boolean {
-    const cfg = useTrialConfig().config;
-    if (!cfg.phaseOpen) return false;
-    if (status.value !== "idle") {
-      if (finishedAt.value === null) return false;
-      const cooldownEndsAt = finishedAt.value + cfg.cooldownDays * ONE_DAY_MS;
-      if (mockServerNow() < cooldownEndsAt) return false;
-    }
-    return status.value === "idle" || ["redeemed", "failed", "cancelled"].includes(status.value);
+    return eligibility().ok;
   }
 
-  // PRODUCTION: POST /api/trial/start { cardTokenId } → returns full state.
-  function startWithCard(tokenId: string) {
+  // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
+  // Idempotent: a second call while ineligible is a no-op (spec 异常3 — one
+  // trial per account, concurrent taps produce exactly one).
+  function start(): { ok: boolean; reason?: TrialIneligibleReason } {
+    const elig = eligibility();
+    if (!elig.ok) return { ok: false, reason: elig.reason };
     const cfg = useTrialConfig().config;
-    if (!canStart()) return;
     const now = mockServerNow();
-    const ae = now + cfg.trialDays * ONE_DAY_MS;
-    const ge = ae + cfg.graceDays * ONE_DAY_MS;
+    const exp = now + cfg.trialDays * ONE_DAY_MS;
     status.value = "active";
-    cardTokenId.value = tokenId;
     startedAt.value = now;
-    activeEndsAt.value = ae;
-    graceEndsAt.value = ge;
-    extendedEndsAt.value = null;
-    scheduledChargeAt.value = ge;
+    expiresAt.value = exp;
+    graceEndsAt.value = exp + cfg.graceDays * ONE_DAY_MS;
     finishedAt.value = null;
-    failReason.value = null;
-    extensionGranted.value = false;
     shadowFrozenAtUSD.value = 0;
     shadowFrozenAtNEX.value = 0;
-    persist();
-  }
-
-  // PRODUCTION: POST /api/trial/redeem-early → server PSP charge + discount.
-  function redeemEarly(): { ok: boolean; reason?: ChargeFailReason } {
-    const cfg = useTrialConfig().config;
-    if (!["active", "grace", "extended"].includes(status.value)) return { ok: false, reason: "unknown" };
-    const result = mockChargeAttempt(cfg.chargeFailRate);
-    if (!result.ok) {
-      status.value = "failed";
-      failReason.value = result.reason;
-      finishedAt.value = mockServerNow();
-      persist();
-      return { ok: false, reason: result.reason ?? "unknown" };
-    }
-    status.value = "redeemed";
-    finishedAt.value = mockServerNow();
-    scheduledChargeAt.value = null;
+    legacyCardMigrated.value = false;
     persist();
     return { ok: true };
   }
 
-  // PRODUCTION: POST /api/trial/cancel { reason }
-  function cancel(reason: "unbind" | "explicit") {
-    if (!["active", "grace", "extended"].includes(status.value)) return;
-    status.value = "cancelled";
+  // PRODUCTION: server-side inside POST /api/orders (order + convert atomic).
+  // Only active|grace convert (spec ④); terminal, no rollback. Returns false
+  // when the machine isn't convertible — the checkout must have bailed earlier.
+  function convert(): boolean {
+    if (status.value !== "active" && status.value !== "grace") return false;
+    status.value = "converted";
     finishedAt.value = mockServerNow();
-    scheduledChargeAt.value = null;
-    void reason;
-    persist();
-  }
-
-  // PRODUCTION: POST /api/trial/extension { accept: true }
-  function acceptExtension(): boolean {
-    const cfg = useTrialConfig().config;
-    if (status.value !== "grace" || extensionGranted.value) return false;
-    if (graceEndsAt.value === null) return false;
-    const ee = graceEndsAt.value + cfg.extensionDays * ONE_DAY_MS;
-    status.value = "extended";
-    extensionGranted.value = true;
-    extendedEndsAt.value = ee;
-    scheduledChargeAt.value = ee;
     persist();
     return true;
   }
 
-  // PRODUCTION: POST /api/trial/extension { accept: false }
-  function declineExtension() {
-    extensionGranted.value = true; // mark decided so the sheet doesn't re-fire
+  // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`
+  // — grace has nothing left to cancel (production already stopped).
+  function cancel() {
+    if (status.value !== "active") return;
+    status.value = "ended";
+    finishedAt.value = mockServerNow();
     persist();
   }
 
-  // PRODUCTION: client polls GET /api/trial/state (or SSE/WS). State-machine
-  // advancement done server-side by a scheduled job; this mock poll runs it
-  // client-side so the demo works standalone.
+  // PRODUCTION: client polls GET /api/trial/state; advancement runs server-side
+  // by cron. Spec ④ 禁止动作:grace→ended flips STATE ONLY — zero debit, zero
+  // order, zero device writes ever happen here.
   function poll(now: number) {
     const cfg = useTrialConfig().config;
-    if (status.value === "active" && activeEndsAt.value !== null && now >= activeEndsAt.value) {
+    if (status.value === "active" && expiresAt.value !== null && now >= expiresAt.value) {
       const elapsedDays = Math.min(cfg.trialDays, (now - (startedAt.value ?? now)) / ONE_DAY_MS);
       status.value = "grace";
       shadowFrozenAtUSD.value = +(cfg.shadowDailyUSD * elapsedDays).toFixed(2);
@@ -225,78 +241,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       return;
     }
     if (status.value === "grace" && graceEndsAt.value !== null && now >= graceEndsAt.value) {
-      if (cfg.autoChargeAtEnd && !extensionGranted.value && shadowFrozenAtUSD.value >= cfg.highQualityThresholdUSD) {
-        return;
-      }
-      if (cfg.autoChargeAtEnd) {
-        const result = mockChargeAttempt(cfg.chargeFailRate);
-        if (!result.ok) {
-          status.value = "failed";
-          failReason.value = result.reason;
-        } else {
-          status.value = "redeemed";
-        }
-      } else {
-        status.value = "cancelled";
-      }
+      status.value = "ended";
       finishedAt.value = now;
-      scheduledChargeAt.value = null;
-      persist();
-      return;
-    }
-    if (status.value === "extended" && extendedEndsAt.value !== null && now >= extendedEndsAt.value) {
-      if (cfg.autoChargeAtEnd) {
-        const result = mockChargeAttempt(cfg.chargeFailRate);
-        if (!result.ok) {
-          status.value = "failed";
-          failReason.value = result.reason;
-        } else {
-          status.value = "redeemed";
-        }
-      } else {
-        status.value = "cancelled";
-      }
-      finishedAt.value = now;
-      scheduledChargeAt.value = null;
       persist();
     }
-  }
-
-  function reset() {
-    status.value = INITIAL.status;
-    cardTokenId.value = INITIAL.cardTokenId;
-    startedAt.value = INITIAL.startedAt;
-    activeEndsAt.value = INITIAL.activeEndsAt;
-    graceEndsAt.value = INITIAL.graceEndsAt;
-    extendedEndsAt.value = INITIAL.extendedEndsAt;
-    scheduledChargeAt.value = INITIAL.scheduledChargeAt;
-    finishedAt.value = INITIAL.finishedAt;
-    failReason.value = INITIAL.failReason;
-    extensionGranted.value = INITIAL.extensionGranted;
-    shadowFrozenAtUSD.value = INITIAL.shadowFrozenAtUSD;
-    shadowFrozenAtNEX.value = INITIAL.shadowFrozenAtNEX;
-    persist();
-  }
-
-  // Keeps finishedAt so the 30d cooldown clock starts (never bypass via reset).
-  function markChargeFailed(reason: ChargeFailReason) {
-    status.value = "failed";
-    failReason.value = reason;
-    finishedAt.value = mockServerNow();
-    scheduledChargeAt.value = null;
-    persist();
   }
 
   return {
-    status, cardTokenId, startedAt, activeEndsAt, graceEndsAt, extendedEndsAt,
-    scheduledChargeAt, finishedAt, failReason, extensionGranted,
-    shadowFrozenAtUSD, shadowFrozenAtNEX,
-    canStart, startWithCard, redeemEarly, cancel, acceptExtension,
-    declineExtension, poll, reset, markChargeFailed, bindAccount,
+    status, startedAt, expiresAt, graceEndsAt, finishedAt,
+    shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
+    eligibility, canStart, start, convert, cancel, poll, bindAccount,
   };
 });
 
-/** Live shadow accrual — display value during active/grace/extended. */
+/** Live shadow accrual — accrues during active, frozen during grace, 0 on
+ *  none/ended/converted (spec ④: `ended` never accrues further). */
 export function liveShadowUSD(now: number): number {
   const s = useFreeTrial();
   const cfg = useTrialConfig().config;
@@ -304,9 +263,7 @@ export function liveShadowUSD(now: number): number {
     const elapsedMs = Math.min(cfg.trialDays * ONE_DAY_MS, now - s.startedAt);
     return +(cfg.shadowDailyUSD * (elapsedMs / ONE_DAY_MS)).toFixed(2);
   }
-  if (["grace", "extended"].includes(s.status)) {
-    return s.shadowFrozenAtUSD;
-  }
+  if (s.status === "grace") return s.shadowFrozenAtUSD;
   return 0;
 }
 
@@ -317,29 +274,19 @@ export function liveShadowNEX(now: number): number {
     const elapsedMs = Math.min(cfg.trialDays * ONE_DAY_MS, now - s.startedAt);
     return +(cfg.shadowDailyNEX * (elapsedMs / ONE_DAY_MS)).toFixed(0);
   }
-  if (["grace", "extended"].includes(s.status)) {
-    return s.shadowFrozenAtNEX;
-  }
+  if (s.status === "grace") return s.shadowFrozenAtNEX;
   return 0;
 }
 
 /** Remaining ms until the next state boundary. */
 export function remainingMs(now: number): number {
   const s = useFreeTrial();
-  if (s.status === "active" && s.activeEndsAt !== null) return Math.max(0, s.activeEndsAt - now);
+  if (s.status === "active" && s.expiresAt !== null) return Math.max(0, s.expiresAt - now);
   if (s.status === "grace" && s.graceEndsAt !== null) return Math.max(0, s.graceEndsAt - now);
-  if (s.status === "extended" && s.extendedEndsAt !== null) return Math.max(0, s.extendedEndsAt - now);
   return 0;
 }
 
-/** Whether user is currently eligible for the high-quality extension offer. */
-export function isHighQualityEligible(): boolean {
-  const s = useFreeTrial();
-  const cfg = useTrialConfig().config;
-  return s.status === "grace" && !s.extensionGranted && s.shadowFrozenAtUSD >= cfg.highQualityThresholdUSD;
-}
-
-const SLOT_RESERVING_STATUSES: TrialStatus[] = ["active", "grace", "extended"];
+const SLOT_RESERVING_STATUSES: TrialStatus[] = ["active", "grace"];
 
 /** Non-reactive variant for store actions (e.g. useApp.activateDevice slot cap). */
 export function trialReservesSlotNow(): boolean {

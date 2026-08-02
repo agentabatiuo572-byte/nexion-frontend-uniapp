@@ -4,7 +4,7 @@
 
   Reads as a high-tier device under test-drive: device identity + live shadow
   earnings hero + trial-cycle progress + a buy CTA that converts. Hidden unless
-  the trial is active/grace/extended. Hierarchy via internal aurora glow + lift
+  the trial is active/grace (grace renders as stopped). Hierarchy via internal aurora glow + lift
   (NOT an accent border), distinct from TrialHeroBanner (idle coupon entry).
 
   Spacing: caller controls horizontal margin via inherited `class` (no internal
@@ -127,28 +127,20 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-const visible = computed(() => ["active", "grace", "extended"].includes(trial.status));
+const visible = computed(() => trial.status === "active" || trial.status === "grace");
 
 const shadowUSD = computed(() => liveShadowUSD(now.value));
 const shadowNEX = computed(() => liveShadowNEX(now.value));
 const ms = computed(() => remainingMs(now.value));
 
-const ribbon = computed(() => {
-  const s = trial.status;
-  return s === "active"
-    ? t.value.trial.ghostRibbonActive
-    : s === "grace"
-      ? t.value.trial.ghostRibbonGrace
-      : t.value.trial.ghostRibbonExtended;
-});
-const tint = computed(() => {
-  const s = trial.status;
-  return s === "active"
-    ? "var(--v5-brand-2)"
-    : s === "grace"
-      ? "var(--v5-warning)"
-      : "var(--v5-tech-cyan)";
-});
+// Grace = stopped (spec ⑤): the ribbon says production stopped — never claims
+// the device is still earning.
+const ribbon = computed(() =>
+  trial.status === "grace" ? t.value.trial.ghostRibbonGrace : t.value.trial.ghostRibbonActive,
+);
+const tint = computed(() =>
+  trial.status === "grace" ? "var(--v5-warning)" : "var(--v5-brand-2)",
+);
 
 const etaLabel = computed(() => {
   const m = ms.value;
@@ -162,7 +154,7 @@ const etaLabel = computed(() => {
 
 const progressPct = computed(() => {
   const cfg = trialCfg.config;
-  const totalMs = (cfg.trialDays + cfg.graceDays + cfg.extensionDays) * ONE_DAY;
+  const totalMs = (cfg.trialDays + cfg.graceDays) * ONE_DAY;
   const elapsedMs = trial.startedAt !== null ? now.value - trial.startedAt : 0;
   return Math.min(100, Math.max(2, (elapsedMs / totalMs) * 100));
 });

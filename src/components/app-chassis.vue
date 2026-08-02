@@ -150,8 +150,6 @@
       <SlotActionSheet />
       <TradeinSheets />
       <LuckySpinSheet />
-      <TrialExtensionSheet />
-      <TrialUnbindRetentionSheet />
       <StickyCtaBar />
       <MessageDrawer />
     </template>
@@ -170,8 +168,6 @@ import SlotActionSheet from "@/components/slot-action-sheet.vue";
 import StickyCtaBar from "@/components/sticky-cta-bar.vue";
 import TradeinSheets from "@/components/tradein-sheets.vue";
 import LuckySpinSheet from "@/components/lucky-spin-sheet.vue";
-import TrialExtensionSheet from "@/components/trial-extension-sheet.vue";
-import TrialUnbindRetentionSheet from "@/components/trial-unbind-retention-sheet.vue";
 import MessageDrawer from "@/components/message-drawer.vue";
 import VoucherClaimSheet from "@/components/voucher-claim-sheet.vue";
 import VoucherBanner from "@/components/voucher-banner.vue";

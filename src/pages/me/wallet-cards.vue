@@ -3,12 +3,9 @@
   Saved bank cards list + management. Each card: brand + •••• last4, default
   badge, "Set as default" + "Unbind" actions. Empty state + "Add a new card"
   CTA + PCI disclaimer. Reads the new useCards store; remove is destructive →
-  confirm() (P: destructive → confirm). Trial-card interception (ported): if the
-  card being removed is the bound trial card during an active/grace/extended
-  trial, open the retention sheet (useTrialUnbindSheet.show(tokenId)) INSTEAD of
-  removing — the sheet's confirm path runs the atomic cancel("unbind") + remove.
-  Cross-store check (cards + free-trial) is composed here at the page layer
-  (stores never import each other, P-031/032). SetPageHeader → SubPageHeader.
+  confirm() (P: destructive → confirm). Cards are fully decoupled from the
+  free trial (FEAT-TRIAL02 异常5): unbinding any card never touches the trial —
+  no retention sheet, no trial cancel. SetPageHeader → SubPageHeader.
   SSR mounted-guard dropped. Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -74,16 +71,12 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { confirm, toast } from "@/store/ui";
 import { useCards, brandLabel, type SavedCard } from "@/store/cards";
-import { useFreeTrial } from "@/store/free-trial";
-import { useTrialUnbindSheet } from "@/store/trial-unbind-retention-sheet";
 import { useNotifications } from "@/store/notifications";
 import { cardUnboundNotification } from "@/mock/card-notifications";
 
 const t = useT();
 const cardsStore = useCards();
 const notifs = useNotifications();
-const freeTrial = useFreeTrial();
-const unbindSheet = useTrialUnbindSheet();
 
 const cards = computed(() => cardsStore.cards);
 const defaultTokenId = computed(() => cardsStore.defaultTokenId);
@@ -96,21 +89,9 @@ function setDefault(tokenId: string) {
   cardsStore.setDefault(tokenId);
 }
 
-const TRIAL_HOLDING_STATUSES = ["active", "grace", "extended"] as const;
-
 async function handleRemove(card: SavedCard) {
-  // Trial-card interception: if this is the bound trial card during a live
-  // trial (active/grace/extended), open the retention sheet INSTEAD of removing.
-  // The sheet's "Remove anyway" path runs the atomic cancel("unbind") + remove;
-  // "Keep this card" dismisses with no change. (P-031/032: composed here.)
-  const isTrialCard =
-    freeTrial.cardTokenId === card.tokenId &&
-    (TRIAL_HOLDING_STATUSES as readonly string[]).includes(freeTrial.status);
-  if (isTrialCard) {
-    unbindSheet.show(card.tokenId);
-    return;
-  }
-  // Non-trial card: plain destructive confirm + remove.
+  // FEAT-TRIAL02 异常5: unbinding is trial-agnostic — every card takes the
+  // same destructive confirm + remove path, and the trial state never changes.
   const ok = await confirm({
     title: t.value.cards.unbindConfirmTitle,
     message: `${brandLabel(card.brand)} •••• ${card.last4}`,
