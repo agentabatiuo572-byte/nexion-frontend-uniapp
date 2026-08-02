@@ -32,6 +32,10 @@ export interface Bill {
   memoKey?: string;
   memoParams?: Record<string, string | number>;
   ref?: string;
+  /** 链上转账条目的网络短码。🔴 必须大写(tx 页 `options.net in NET_LINES` 白名单,小写静默丢弃)。
+   *  memo 正迁 memoKey(语言码位),网络不能永远靠 memo 文案正则反解 —— 这个字段就是网络的码位;
+   *  非链上条目(奖励/兑换/NEX 等)不填。 */
+  network?: "TRC20" | "ERC20" | "BEP20";
   balanceAfter?: number;
 }
 
@@ -91,10 +95,9 @@ function seedBills(): Bill[] {
   list.push({ ts: now - 14 * DAY + 5 * 3600 * 1000, type: "achievement", symbol: "NEX", amount: 20, status: "posted", memo: "Achievement · First Dollar", memoKey: "achFirstDollar" });
   list.push({ ts: now - 7 * DAY, type: "kyc", symbol: "USDT", amount: 1.0, status: "posted", memo: "KYC-Express · wallet ownership verification", memoKey: "kycVerify", ref: "KYC-2026-A78214" });
   list.push({ ts: now - 12 * DAY, type: "topup", symbol: "USDT", amount: 50.0, status: "posted", memo: "Top-up · USDT-TRC20", memoKey: "topupTrc20", ref: "TX-20260503-7621" });
-  // 🔴 落 posted 终态、不留在途:它在 app.withdrawals 里没有对应单据,
-  // advanceWithdrawalArrival 永远扫不到 → 会永久停在「处理中」,追踪页还查无此单;
-  // 同时它让提现页的「这是你第一次提现」与账单内容自相矛盾(种子之间不自洽)。
-  list.push({ ts: now - 9 * DAY, type: "withdraw", symbol: "USDT", amount: -20.0, status: "posted", memo: "Withdraw · USDT-TRC20", memoKey: "withdrawTrc20", ref: "WD-20260722-3284" });
+  // 🔴 种子不造 withdraw 行:提现账单行与提现单据(app.withdrawals)必须同源成对 ——
+  // 只造账单行的话,追踪页按单号深链必「查无此单」(每个新账号都命中),
+  // 还与提现页「这是你第一次提现」自相矛盾(证伪报告 C-2,2026-08-02 起删除)。
 
   return list.sort((a, b) => b.ts - a.ts).map((b) => ({ ...b, id: mockServerId("BL") }));
 }
@@ -183,7 +186,10 @@ export const useBills = defineStore("bills", () => {
     const previous = bills.value;
     let changed = false;
     const next = previous.map((b) => {
-      if (b.ref !== ref || b.status === status) return b;
+      // 🔴 只推进**在途(pending)**行。同一单号下可能还挂着已终态的行 —— NEX 燃烧行
+      // 落 posted 即事实已发生,失败终态若把它一起翻成 failed,账单说「没烧」而余额里
+      // NEX 真少了,两个口径必有一个是假(审计 P1,2026-08-02;NEX 费按规则不退)。
+      if (b.ref !== ref || b.status !== "pending" || b.status === status) return b;
       changed = true;
       return { ...b, status };
     });

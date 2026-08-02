@@ -36,11 +36,14 @@
 
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
       <view v-else-if="!wd" class="px-5 text-center">
-        <text class="block" :style="emptyTextStyle">{{ t.wallet.noActiveWithdrawal }}</text>
+        <text class="block" :style="emptyTextStyle">{{ deepLinkMiss ? t.wallet.withdrawalNotFound : t.wallet.noActiveWithdrawal }}</text>
         <!-- 《07》tap≥44:空状态的行动链接独占一行,不吃 WCAG 2.5.8 的 inline 豁免 → 撑热区(原 88×22) -->
-        <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
+        <!-- 日限用尽时置灰 + 给原因(与「再提一笔」同判据同文案)。深链 miss 让本空态在
+             「有单据+额度已满」时也可达,不加这道就是外观可点、点了没反应的死链接(审计双镜头 P1)。 -->
+        <view :class="againDisabled ? '' : 'active:opacity-70'" :style="againDisabled ? 'opacity:0.4' : ''" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="againDisabled ? 'true' : 'false'" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
           <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
+        <text v-if="againDisabled" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
       </view>
 
       <template v-else>
@@ -131,7 +134,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -151,7 +155,17 @@ const app = useApp();
 const cfg = useConfig();
 // 🔴 用**主单**(优先最早的在途单):只显示「最新一笔」时,在途的人工审核单
 // 会被后提且已到账的那笔挤掉,用户查不到自己还在审核的钱(独立验收实测)。
-const wd = computed(() => app.primaryWithdrawal);
+// 深链(?id=)按单号精确定位;找不到走「查无此单」空态,**绝不回落主单** ——
+// 回落等于把别的单渲染在这个单号名下(账单深链串数据 P0 同型,2026-08-02)。
+const deepLinkId = ref<string | null>(null);
+onLoad((options) => {
+  deepLinkId.value = typeof options?.id === "string" && options.id ? options.id : null;
+});
+const wd = computed(() => {
+  if (deepLinkId.value) return app.withdrawals.find((x) => x.id === deepLinkId.value) ?? null;
+  return app.primaryWithdrawal;
+});
+const deepLinkMiss = computed(() => deepLinkId.value !== null && !wd.value);
 
 // ⑤ 加载态的触发源。不拉配置的话「预计 N 小时内完成」只能写死,
 // 骨架也永远进不了 DOM(死 UI)—— 两个问题同一个根。

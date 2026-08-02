@@ -659,6 +659,20 @@ function balancedBody(src, from) {
         // 网络必须大写:tx 页用 `options.net in NET_LINES` 白名单校验,小写会被静默丢弃
         && c.includes("m[1].toUpperCase()");
     })());
+  // 🔴 账单分流三件套(2026-08-02 审计修复的机器 pin)。上一条的四根针脚**兜底分支单独即可喂饱**——
+  // 把「按 ref 反查入金记录取真实确认数」的 rec 分支整个删掉照样绿,故单独 pin:
+  // ① withdraw 行深链追踪页(单据真状态,不再被 tx 页恒「已确认」编造);
+  // ② topup 行优先反查入金记录、传真实 confs;
+  // ③ 入金面板非 credited 的链上记录不进 tx 页(在途记录渲成「已确认」=编造)。
+  check("🔴 账单分流:withdraw→追踪页深链 / topup 反查记录传真实 confs / pane 非 credited 不进 tx",
+    (() => {
+      const bills = stripComments(readSrc("src/pages/me/wallet-bills.vue"));
+      const pane = stripComments(readSrc("src/components/me/deposit-usdt-pane.vue"));
+      return bills.includes("wallet-withdraw-tracking?id=")
+        && bills.includes("deposits.records.find")
+        && bills.includes('p.set("confs"')
+        && pane.includes('r.status !== "credited"');
+    })());
   // 🔴 小额线取后台配置,且**三处用同一个落地值**(比较 / 写入输入框 / 文案显示)。
   // 原来比较用原值、写入 toFixed(2)、显示 toFixed(0):线配成 49.999 时写进去的 50.00 反而超过原值,
   // 快车道不生效而 CTA 判据仍成立 → 一个点多少次都没反应、也永不消失的按钮;

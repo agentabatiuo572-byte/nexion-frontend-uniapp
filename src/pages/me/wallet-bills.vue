@@ -39,12 +39,13 @@
           <view
             v-for="(b, i) in g.rows"
             :key="b.id"
-            class="flex items-center active:opacity-90"
+            class="flex items-center"
+            :class="billClickable(b) ? 'active:opacity-90' : ''"
             :style="rowStyle(i)"
-            role="button"
-            tabindex="0"
-            :aria-label="billAria(b)"
-            @click.stop="goBill(b)"
+            :role="billClickable(b) ? 'button' : undefined"
+            :tabindex="billClickable(b) ? 0 : undefined"
+            :aria-label="billClickable(b) ? billAria(b) : undefined"
+            v-on="billRowOn(b)"
           >
             <view class="grid place-items-center shrink-0" :style="iconChipStyle(b.type)">
               <BillTypeIcon :type="b.type" :color="typeColor(b.type)" />
@@ -91,11 +92,14 @@ import BillTypeIcon from "@/components/me/bill-type-icon.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
+import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
+import { mockServerNow } from "@/store/server-time";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const locale = useLocaleStore();
 const billsStore = useBills();
+const deposits = useDeposits();
 
 type Tab = "all" | "in" | "out";
 const TABS: Tab[] = ["all", "in", "out"];
@@ -193,27 +197,69 @@ function billHash(b: Bill): string {
   return b.ref || b.id;
 }
 function billAria(b: Bill): string {
-  return `${typeLabel(b.type)} ${b.memo} ${billHash(b)}`;
+  // 用 billMemo(渲染时翻译)而不是写入时冻结语言的 raw memo —— 切语言后读屏不再旧语直出
+  return `${typeLabel(b.type)} ${billMemo(b)} ${billHash(b)}`;
 }
 /**
- * 🔴 带**真实参数**进交易详情。只传 hash 的话,tx 页缺参会按 hash 播种随机编一个金额
- * (50~10000)、网络硬回落 Ethereum、时间也是随机的 —— 用户点自己那笔 $30 的提现,
- * 看到的是「$4,312.77 · Ethereum Mainnet」,一笔跟他毫无关系的交易(2026-08-01 审计)。
- * 入金侧早就焊了这道防线(deposit-usdt-pane「tx 页入参优先,防种子假数据与本笔矛盾」),
- * 账单侧一直没焊 —— 同型只修了一半的典型。
+ * 🔴 账单行按条目性质分流(2026-08-02 走查 P0 + 证伪修订):
+ *  - withdraw(含同单号的 NEX 燃烧行)→ 提现追踪页:单据真状态机,审核中的单不再被 tx 页
+ *    恒定的「已确认」编造;NEX 行点开看所属提现单,不再被按 hash 编成一笔链上交易;
+ *  - topup 链上 → tx 页带真实参数,优先按 ref 反查入金记录(毛额/真实确认数/收款地址,
+ *    与 deposit-usdt-pane.goRecord 同口径);记录缺失(种子)退回 network 字段/memo 正则;
+ *  - 其余(奖励/成就/兑换/购买/质押/KYC 返还)不是链上转账,没有「交易详情」可看 →
+ *    行不可点(billClickable 同判据),宁可不可点也不编造。
  */
+function billClickable(b: Bill): boolean {
+  if (b.type === "withdraw") return !!b.ref;
+  if (b.type === "topup") return txParamsForTopup(b) !== null;
+  return false;
+}
+/** 不可点行**不注册** click 监听:留着监听器 + 零按压反馈会被 tap-feedback 门判成死控件,
+ *  读屏/命中层面也仍在伪装可点(审计 P1)。 */
+function billRowOn(b: Bill) {
+  return billClickable(b)
+    ? { click: (e: Event) => { e.stopPropagation(); goBill(b); } }
+    : {};
+}
 function goBill(b: Bill) {
+  if (b.type === "withdraw") {
+    // ref = 提现单号(USDT 主行与 NEX 燃烧行同 ref);追踪页按单号显示,查无此单走空态
+    if (b.ref) navTo(`/pages/me/wallet-withdraw-tracking?id=${b.ref}`);
+    return;
+  }
+  if (b.type === "topup") {
+    const p = txParamsForTopup(b);
+    if (p) navTo(`/pages/tx/hash?${p.toString()}`);
+    return;
+  }
+  // 其余类型不导航(billClickable 已把行渲染为不可点,这里只是键盘/兜底防线)
+}
+/** topup 行的 tx 页真实参数;拼不出真实网络就返回 null —— 宁可不可点,不让 tx 页编数。 */
+function txParamsForTopup(b: Bill): URLSearchParams | null {
   const p = new URLSearchParams({ hash: billHash(b) });
-  // 金额:USDT 用绝对值(tx 页展示的是转账额,方向由类型体现);NEX 不是链上转账,不喂金额
+  const rec = deposits.records.find((r) => (r.txHash ?? r.depositId) === b.ref);
+  const recNet = rec ? CHAIN_NET_SHORT[rec.channel] : undefined;
+  if (rec && recNet) {
+    // 与 goRecord 同口径:金额 = 链上转账毛额(gross),确认数 = 真实值(修「56 confirmations」同类编造)
+    p.set("amount", rec.grossAmountUsdt.toFixed(2));
+    p.set("net", recNet);
+    p.set("confs", String(rec.confirmations ?? 0));
+    if (rec.address) p.set("to", rec.address);
+    p.set("age", String(Math.max(1, Math.round((mockServerNow() - b.ts) / 60_000))));
+    return p;
+  }
+  // 存量兜底(种子行等无入金记录):网络取字段或 memo 正则,金额用账单额(与本行自洽)
+  const net = b.network ?? billNetwork(b);
+  if (!net) return null;
   if (b.symbol === "USDT") p.set("amount", Math.abs(b.amount).toFixed(2));
-  const net = billNetwork(b);
-  if (net) p.set("net", net);
-  p.set("age", String(Math.max(1, Math.round((Date.now() - b.ts) / 60_000))));
-  navTo(`/pages/tx/hash?${p.toString()}`);
+  p.set("net", net);
+  // 时敏路径统一走 mockServerNow 单时源(server-time.ts 约定;直用 Date.now 接后端换时源不跟)
+  p.set("age", String(Math.max(1, Math.round((mockServerNow() - b.ts) / 60_000))));
+  return p;
 }
 
 /**
- * 从账单 memo 里认出链(提现/充值的 memo 带 `USDT-TRC20` 这类网络标识)。认不出就不传,让 tx 页走默认。
+ * 从账单 memo 里认出链(存量条目的 memo 带 `USDT-TRC20` 这类网络标识)。认不出就不认。
  * ⚠️ 必须返回**大写**:tx 页的 NET_LINES 键是 TRC20 / ERC20 / BEP20,且它用 `options.net in NET_LINES`
  * 做白名单校验 —— 传小写会被静默丢弃,参数「传了」但没生效,退化成随机编数(这类假修最难发现)。
  */

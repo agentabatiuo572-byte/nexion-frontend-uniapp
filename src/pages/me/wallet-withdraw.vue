@@ -904,7 +904,8 @@ async function handleSubmit() {
   submitting.value = false;
   submittingQuote.value = null;
     submittingNexBalance.value = null;
-  uni.navigateTo({ url: "/pages/me/wallet-withdraw-tracking", fail: () => {} });
+  // 带单号深链:刚提交第二笔时追踪页不再错位显示最早在途单(证伪建议 2)
+  uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
 }
 
 function goKyc() {

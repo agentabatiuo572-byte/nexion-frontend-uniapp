@@ -132,7 +132,7 @@ export const vi: Messages = {
       "Bạn có trách nhiệm bảo vệ thông tin đăng nhập, xác thực hai lớp và khóa ví của mình. Mọi hoạt động dưới tài khoản của bạn là trách nhiệm của bạn. Hãy báo cho chúng tôi ngay nếu có truy cập trái phép. Chúng tôi có thể tạm khóa các tài khoản có dấu hiệu gian lận, mở nhiều tài khoản hoặc lộ thông tin đăng nhập.",
     s4Title: "Mua & vận hành phần cứng",
     s4Body:
-      "Giao dịch mua NexGridBox / NexGridRack là cuối cùng một khi thiết bị đã được kích hoạt trên mạng lưới. Kho tác vụ AI của nền tảng liên tục nâng cấp: tác vụ bậc cao ngày càng nhiều, còn lượng tác vụ bậc thấp giảm dần theo tuổi thiết bị, nên số tác vụ một thiết bị nhận được — và thu nhập của nó — cũng thu hẹp theo; xem Công bố rủi ro để biết chi tiết. Bạn có thể cho một thiết bị đang sở hữu nghỉ bất cứ lúc nào và đổi nó lấy thiết bị bậc cao hơn; mức trừ giá được tính theo bậc mà tổng sản lượng trọn đời của thiết bị rơi vào, chứ không theo giá gốc.",
+      "Giao dịch mua NexGridBox / NexGridRack là cuối cùng một khi thiết bị đã được kích hoạt trên mạng lưới. Kho tác vụ AI của nền tảng liên tục nâng cấp: tác vụ bậc cao ngày càng nhiều, còn lượng tác vụ bậc thấp tiếp tục giảm, nên số tác vụ một thiết bị có sức mạnh tính toán cố định nhận được — và thu nhập của nó — thu hẹp dần theo từng tháng; xem Công bố rủi ro để biết chi tiết. Bạn có thể cho một thiết bị đang sở hữu nghỉ bất cứ lúc nào và đổi nó lấy thiết bị bậc cao hơn; mức trừ giá được tính theo bậc mà tổng sản lượng trọn đời của thiết bị rơi vào, chứ không theo giá gốc.",
     s5Title: "Thu nhập, phần thưởng & token NEX",
     s5Body:
       "Mọi con số lợi nhuận hiển thị trong ứng dụng đều là dự phóng dựa trên tham số mạng lưới hiện tại và nhu cầu gần đây, không phải cam kết. Thu nhập dao động và có thể giảm theo thời gian. NEX là token thưởng của nền tảng, giá trị có thể biến động mạnh và không được bảo hiểm tiền gửi. Đừng bao giờ đầu tư nhiều hơn mức bạn có thể chịu mất.",
@@ -919,7 +919,7 @@ export const vi: Messages = {
     alreadyAcceptedCta: "Đã xác nhận",
     s1Title: "Dự phóng thu nhập là dự báo, không phải lời hứa",
     s1Body: "Mọi ước tính lợi nhuận theo ngày / tháng / năm hiển thị trên NexGrid đều dựa trên tham số mạng lưới hiện tại và nhu cầu khách hàng gần đây. Thu nhập thực tế sẽ dao động ±15% mỗi tuần và có thể giảm khi có thêm thiết bị vào mạng hoặc khi giá tính toán đi xuống. Kết quả trong quá khứ không đảm bảo cho kết quả tương lai.",
-    s2Title: "Kho tác vụ liên tục nâng cấp — số tác vụ nhận được giảm theo tuổi thiết bị",
+    s2Title: "Kho tác vụ liên tục nâng cấp — số tác vụ thiết bị nhận được thu hẹp theo từng tháng",
     s2Body: "Kho tác vụ AI của NexGrid liên tục nâng cấp: tác vụ mới hơn cần nhiều sức mạnh tính toán (VRAM) hơn, nên tác vụ bậc cao tăng lên còn lượng tác vụ bậc thấp co lại. Số tác vụ một thiết bị nhận được thu hẹp dần theo từng tháng trong năm đầu — về sau càng nhanh — cho tới khi chỉ còn phần thu nhập ở mức sàn công suất. Thiết bị vừa kích hoạt được trợ cấp ưu tiên tác vụ để luôn chạy đủ công suất. Mức trừ giá khi đổi máy được tính theo bậc mà tổng sản lượng trọn đời của thiết bị rơi vào — càng sản xuất nhiều thì mức trừ giá càng nhỏ.",
     s3Title: "Rủi ro thị trường của token (NEX)",
     s3Body: "NEX là token thưởng của nền tảng. Giá trị quy ra USD có thể biến động ±20% mỗi ngày, tùy theo nhu cầu suy luận AI, dòng mua lại và bối cảnh thị trường crypto nói chung. Token nắm giữ không được bảo hiểm FDIC / SIPC. Đừng staking hay giữ nhiều NEX hơn mức bạn có thể chịu mất.",
@@ -2047,6 +2047,7 @@ export const vi: Messages = {
     complianceGateBody: "Theo Điều 22 MiCA và Quy tắc Du lịch FATF, phải xác minh quyền sở hữu ví trước khi chi trả. Hãy hoàn tất KYC-Express một lần ($1 USDT, được hoàn lại đầy đủ).",
     withdrawalStatusSubtitle: "Trạng thái rút tiền",
     noActiveWithdrawal: "Không có lệnh rút nào đang xử lý.",
+    withdrawalNotFound: "Không tìm thấy hồ sơ của lệnh rút này.",
     submitNewWithdrawal: "Tạo lệnh rút mới →",
     trackSubmittedHint: "Đã nhận yêu cầu",
     trackReviewHint: "Sàng lọc tự động + xét duyệt tài khoản",
