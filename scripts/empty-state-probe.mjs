@@ -9,6 +9,7 @@
 //
 // 用法:node scripts/empty-state-probe.mjs [--theme light]
 import { chromium } from "playwright";
+import { collectAppConsoleErrors, isThirdPartyResourceError } from "./lib/console-origin-filter.mjs";
 
 const BASE = process.env.UNI_BASE_URL || "http://localhost:5173";
 const THEME = process.argv.includes("--theme") ? process.argv[process.argv.indexOf("--theme") + 1] : "dark";
@@ -48,7 +49,7 @@ const page = await browser.newPage({ viewport: { width: 390, height: 844 }, loca
 page.setDefaultTimeout(20000);
 const consoleErrors = [];
 page.on("console", (m) => {
-  if (m.type() === "error" && !/favicon/i.test(m.text())) consoleErrors.push(m.text().slice(0, 90));
+  if (m.type() === "error" && !/favicon/i.test(m.text()) && !isThirdPartyResourceError(m.text(), m.location?.().url, BASE)) consoleErrors.push(m.text().slice(0, 90));
 });
 
 const rows = [];

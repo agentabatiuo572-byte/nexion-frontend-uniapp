@@ -119,4 +119,11 @@ for (const [name, file] of LOCALES) {
 
 if (failed) process.exit(1);
 
-console.log(`uniapp i18n mirror PASS: en/zh/vi ${enKeys.size} keys · ${enMarks.size} 条带插值文案占位符对齐`);
+// 🔴 总结行不许和刚打印的 INFO 自相矛盾。原文恒写「占位符对齐」,
+// 哪怕上面刚列出 N 条差异 —— 谁把这行 PASS 当成「三语插值已验」就会得到假结论
+// (2026-08-01 审计 completeness critic 点名)。差异数如实带出来。
+const markNote =
+  markMismatch > 0
+    ? `${enMarks.size} 条带插值文案(其中 ${markMismatch} 条占位符集合跨语言不同,已按 INFO 逐条列出待人工审阅)`
+    : `${enMarks.size} 条带插值文案占位符完全对齐`;
+console.log(`uniapp i18n mirror PASS: en/zh/vi ${enKeys.size} keys · ${markNote}`);

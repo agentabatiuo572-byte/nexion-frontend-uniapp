@@ -125,8 +125,7 @@ export const zh: Messages = {
     s5Body:
       "应用内展示的所有收益数字均为基于当前网络参数与近期需求的预测，并非承诺。收益会波动，并可能随时间下降。NEX 是平台奖励代币，价值可能剧烈变动，且不受存款保险保障。切勿投入超过你可承受损失的金额。",
     s6Title: "钱包、提现与合规",
-    s6Body:
-      "常规提现在 30 天内结算，并需燃烧 NEX 完成网络结算。超过公布阈值的金额可能进入加强合规审查。当累计提现超过 100 美元时需完成 KYC 验证。资金存放于隔离储备账户，我们依据 MSB 注册要求采用 Chainalysis 级别的交易监控。",
+    s6Body: "常规提现在 {h} 小时内结算。提现前需完成一次钱包所有权验证,验证通过后地址即为唯一收款地址。超过公布阈值的金额可能进入加强合规审查。资金存放于隔离储备账户,我们依据 MSB 注册要求采用 Chainalysis 级别的交易监控。",
     s7Title: "推荐与网络奖励",
     s7Body:
       "直推权益金与网络收益奖金均由平台利润支付，绝不来自好友的充值。奖励取决于被推荐用户完成合格行为。垃圾推广、虚假账户或大规模拉人方案均被禁止，将被作废，并可能导致账户暂停及待发放奖励被没收。",
@@ -566,7 +565,7 @@ export const zh: Messages = {
     subsidyBadge: "新机任务补贴 · 剩余 {n} 天",
     subsidyBadgeLastDay: "新机任务补贴 · 今日到期",
     taskPoolLineTitle: "AI 任务池升级中",
-    taskPoolLineBody: "平台任务对算力要求逐步提高:高阶任务增多,低阶任务量随设备月龄递减;更高算力设备可承接更大任务面。",
+    taskPoolLineBody: "平台任务对算力要求逐步提高:高阶任务增多、低阶任务持续减少;算力固定的设备可接任务面因此逐月收窄,更高算力设备能承接更大任务面。",
     capExplainTitle: "任务产能与新机补贴",
     capExplainS1Title: "任务池为什么在升级",
     capExplainS1Body: "AI 模型持续迭代,新任务对算力(显存)的要求越来越高。任务池中高阶任务占比上升,低阶任务量随之减少 —— 同一台设备可承接的任务面因此逐月收窄,收益相应递减,直至产能下限。",
@@ -796,7 +795,7 @@ export const zh: Messages = {
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
     routes: {
       home: { label: "首页 / 任务中心", sub: "实时收益 · 行情跑马灯 · 总览" },
-      earn: { label: "赚币 / 设备群", sub: "设备卡片 · 任务中心 · 效率" },
+      earn: { label: "赚币 / 设备群", sub: "设备卡片 · 任务中心 · 任务产能" },
       store: { label: "商城", sub: "NexGridBox / Rack / Cloud Share" },
       tradeIn: { label: "以旧换新", sub: "退役旧机,抵扣升级款" },
       team: { label: "团队中心", sub: "分成 / V 等级 / 网络" },
@@ -910,7 +909,8 @@ export const zh: Messages = {
     s3Title: "代币(NEX)市场风险",
     s3Body: "NEX 是平台奖励代币。其美元计价价值可能每日 ±20% 波动,受 AI 推理需求 / 回购流 / 加密市场环境影响。代币持有不受 FDIC / SIPC 保险。锁仓或持有的 NEX 数量不应超过你可承受的损失。",
     s4Title: "提现窗口 + 合规审查",
-    s4Body: "标准提现从申请到入账约 30 天。> $1,000 的提现在监管审查升级期间可能进入 45 天增强审查窗口。提现手续费按惩罚费率收取(默认 20%),烧 NEX 可按优惠率抵扣(每 NEX 抵扣额远高于其兑换价值)、烧够即全免,无 NEX 则按全额惩罚费;NEX 可通过签到 / 挖矿 / 推荐活动获得。",
+    s4Body: "标准提现从申请到入账约 {h} 小时。提现手续费按当前阶段费率 {pct} 计,烧 NEX 可按优惠率抵扣(每 NEX 抵扣额远高于其兑换价值)、烧够即全免,不烧 NEX 则按全额费率;NEX 可通过签到 / 挖矿 / 推荐活动获得。链上网络费另计,随金额浮动并设有上下限。",
+    s4BodyLargeAmount: "超过 ${large} 的提现可能进入 {d} 天的增强合规审查窗口,到账时间以两者中更晚者为准。",
     s5Title: "Staking 锁仓不可撤销",
     s5Body: "Staking 池(30d / 90d / 180d / 365d)锁仓全期不可取出。提前赎回扣除全部累计溢价,并依次扣除 5% / 15% / 30% / 50% 本金。锁仓前请单独阅读各档条款。",
     s6Title: "网络经济模型 + 推荐人激励",
@@ -1968,9 +1968,9 @@ export const zh: Messages = {
     withdrawableAvailable: "可提现:",
     useMax: "全部提现",
     networkRecommended: "推荐",
-    networkHintTrc20: "手续费最低 · 约 5 分钟",
-    networkHintBep20: "手续费低 · 约 5 分钟",
-    networkHintErc20: "约 15 分钟 · 适合大额",
+    networkHintTrc20: "费用较低 · 链上确认约 5 分钟",
+    networkHintBep20: "费用较低 · 链上确认约 5 分钟",
+    networkHintErc20: "链上确认约 15 分钟 · 适合大额",
     feeLabel: "网络手续费",
     receiveLabel: "实际到账",
     confirmWithdraw: "确认提现",
@@ -2045,9 +2045,19 @@ export const zh: Messages = {
     timeMinutesAgo: "{n} 分钟前",
     timeHoursAgo: "{n} 小时前",
     timeDaysAgo: "{n} 天前",
-    firstTimeReview: "首次提现审核:24 小时内。",
-    minWithdrawNote: "最低提现:$20。上方手续费可通过烧 NEX 抵扣。",
-    dailyLimitNote: "每日限额:1 笔/日。",
+    firstTimeReview: "首次提现需人工确认。",
+
+    fastLaneOnTitle: "这笔可立即处理",
+    fastLaneOnBody: "已免去:{g}。提交后按标准时效到账。",
+    fastLaneCta: "改为 ${n} 提现",
+    waivedGates: {
+      "new-address-hold": "新地址保护期",
+      "first-withdrawal-review": "首次提现人工复核",
+    },
+    minWithdrawNote: "最低提现:${n}。",
+
+    minWithdrawNoteOffset: "上方手续费可通过烧 NEX 抵扣。",
+    dailyLimitNote: "每日限额:{n} 笔/日。",
     complianceGateBody: "根据 MiCA 第 22 条与 FATF 旅行规则,放款前须验证钱包所有权。请完成一次性 KYC-Express(1 USDT,全额返还)。",
     withdrawalStatusSubtitle: "提现状态",
     noActiveWithdrawal: "暂无进行中的提现。",
@@ -2061,9 +2071,28 @@ export const zh: Messages = {
     trackProgressLabel: "进度",
     trackViaLine: "通过 {network} · 手续费 ${fee}",
     trackEtaDone: "资金已送达你的地址",
-    trackEtaPending: "预计 24 小时内完成",
+
+    withdrawBillWriteFailed: "提现已提交,但账单记录写入失败。可在提现进度页查看这笔提现。",
+
+    trackFailedBody: "这笔提现没有完成,资金未离开你的账户。详情可联系客服。",
+    trackEtaPending: "预计 {n} 小时内完成",
+
+    trackEtaTitlePending: "提现处理中",
+
+    trackArrivedAt: "实际到账 {time}",
+
+    trackContactSupport: "联系人工客服",
+
+
+    trackSubmitAnother: "再提一笔",
     trackReviewNote: "首次提现 · 自动 + 人工双重审核",
     withdrawRouteReviewTitle: "提现将进入审核",
+
+    withdrawRouteRejectTitle: "这笔无法提交",
+
+    withdrawRouteRejectBody: "当前账户状态不允许发起提现。不会创建提现单,也不会扣款。请联系客服协助处理。",
+
+    fastLaneUndo: "撤销,改回原来的金额",
     withdrawRouteReviewBody: "这个收款地址已有相关账号活动。可以提交提现,但会在审核完成前保持待处理。",
     withdrawRouteHeldTitle: "人工审核中",
     withdrawRouteHeldSub: "提现正在等待账户和地址审核,不会自动推进到打款。",
@@ -2757,6 +2786,18 @@ export const zh: Messages = {
   },
 
   bills: {
+    // 账单文案码表:渲染时才翻译。写入时翻译会把语言冻在那一刻,切语言后旧账单还是旧语言;
+    // 真后端返回的也应该是码而不是句子。
+    memo: {
+      earnDaily: "每日 AI 推理收益",
+      referDirect: "直推 5% 佣金",
+      welcomeBonus: "激活赠送的新人礼",
+      achFirstContribution: "成就 · 首次贡献算力",
+      achFirstDollar: "成就 · 赚到第一美元",
+      kycVerify: "KYC-Express · 钱包所有权验证",
+      topupTrc20: "充值 · USDT-TRC20",
+      withdrawTrc20: "提现 · USDT-TRC20",
+    },
     title: "账单流水",
     back: "返回",
     subtitle: "核对 NexGrid 钱包的每一笔收支。",
@@ -3437,12 +3478,22 @@ export const zh: Messages = {
     dailyCheckIn: "每日签到",
     earnNexCta: "去挖矿赚 NEX",
     // NEX 抵扣手续费模型(取代旧积分 / 硬燃烧门槛)
-    feeGross: "手续费 ({rate})",
+    feeGross: "总手续费",
     feeCharged: "手续费",
+    feeNetworkRow: "网络手续费",
+
+    feeDetailPlaceholder: "输入金额后显示费用明细",
+
+    feeConfigUnavailableTitle: "费率更新中",
+
+    feeConfigUnavailableBody: "暂时拿不到最新费率,为避免按过期费率扣款,已暂停提交。",
+
+    feeConfigRetry: "重试",
+    feePenaltyRow: "平台手续费",
     feeOffsetRow: "NEX 抵扣",
     feeOffsetTitle: "用 NEX 抵扣手续费",
     feeFullyWaived: "✓ 已烧 {nex} NEX · 提现手续费全免($0)。",
-    feePartial: "NEX 不够 —— 手续费按 {rate} 收 ${gross}。攒 NEX 可降低甚至免除。",
+    feePartial: "NEX 不够 —— 本次手续费 ${gross}(网络费 + 平台费)。攒 NEX 可降低甚至免除。",
     feeOffsetRule:
       "每 1 NEX 抵 ${perNex} 手续费,远高于其兑换价值。烧够 {required} NEX 即手续费全免;不足按比例抵扣,余额以 USDT 支付。",
     // Sprint 3 — 合规审查 banner(用户视角:监管要求,不暴露 phase 概念)
@@ -3466,8 +3517,17 @@ export const zh: Messages = {
     submitReasonAmountRequired: "请输入提现金额。",
     submitReasonMinAmount: "最低提现金额为 ${n}。",
     submitReasonMaxAmount: "当前可提现余额为 ${n}。",
+
+    submitReasonFeeConfigUnavailable: "费率更新中,请稍后再试",
+
+    dailyLimitReached: "今日提现次数已用完,{time} 后可再提。",
     submitReasonAddressRequired: "请输入有效收款地址。",
     submitReasonReviewBlocked: "当前暂不能提交这笔提现。",
+
+    submitReasonInFlight: "上一笔提现还在处理中,完成后才能再提。",
+
+
+    submitReasonUnderReview: "上一笔提现正在人工核验,核验完成后才能再提。可在提现进度页联系客服查询。",
     exchangePoolToday: "今日平台资金池",
     // Sprint A-1 / B.2 — 反向劝阻 staking 备选
     stakeAlt: {

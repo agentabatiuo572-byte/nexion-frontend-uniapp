@@ -1,3 +1,4 @@
+import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useGenesis } from "@/store/genesis";
 import { useVRank } from "@/store/v-rank";
 import { useOrders } from "@/store/orders";
@@ -49,6 +50,7 @@ import { useNova } from "@/store/nova";
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
+  useRiskDisclosure().bindAccount(accountKey);
   useGenesis().bindAccount(accountKey);
   useVRank().bindAccount(accountKey);
   useOrders().bindAccount(accountKey);

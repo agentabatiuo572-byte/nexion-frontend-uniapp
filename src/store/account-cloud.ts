@@ -11,7 +11,15 @@ export interface AccountCloudSnapshot {
   user: UserState;
   devices: Device[];
   earnings: EarningsState;
-  latestWithdrawal: Withdrawal | null;
+  /**
+   * 🔴 提现单**列表**,不是「最新一条」。
+   * 真后端 GET /api/withdrawals 返回的就是列表;此前只存最新一条(单槽)是与真后端
+   * 不同构的 mock 简化,直接导致两个 P0:① 第二笔建单把第一笔整个顶掉(钱已扣、单据
+   * 从此不可达、到账推进也永不再碰它)② 为兜这个洞加的「在途不许再提」闸,在人工审核
+   * 单没有出口时把用户永久锁死。改成列表后两个问题从根上消失,也满足项目铁律
+   * 「Mock 必须 100% 真后台结构、随时可接真后台零重写」。
+   */
+  withdrawals: Withdrawal[];
 }
 
 export interface AccountSnapshotWriteResult {
@@ -57,6 +65,9 @@ const TIME_ANCHOR_KEYS = new Set([
   "completedAt",
   "submittedAt",
   "estimatedCompletion",
+  // FEAT-WD01b 实际到账时刻。漏加会让 merge 退化成 last-write-wins 而非取最新
+  // (踩过:R7 心跳字段就是这么漏的),两端并发时到账时间会被旧快照写回。
+  "confirmedAt",
   "lastBucketedAt",
 ]);
 
@@ -110,7 +121,17 @@ function writeTable(table: AccountCloudTable): boolean {
 export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | null {
   const key = normalizeAccountKey(accountKey);
   const row = readTable()[key];
-  return row && row.schema === 1 ? row : null;
+  return row && row.schema === 1 ? upgradeLegacyWithdrawals(row) : null;
+}
+
+/**
+ * 老快照升级:单条 latestWithdrawal → withdrawals 列表。
+ * schema 不升版 —— 只新增字段并在读盘处补齐,不做破坏性迁移;老用户的历史单不丢。
+ */
+function upgradeLegacyWithdrawals(row: AccountCloudSnapshot): AccountCloudSnapshot {
+  if (Array.isArray(row.withdrawals)) return row;
+  const legacy = (row as unknown as { latestWithdrawal?: Withdrawal | null }).latestWithdrawal;
+  return { ...row, withdrawals: legacy ? [legacy] : [] };
 }
 
 export function writeAccountSnapshot(snapshot: AccountCloudSnapshot): boolean {
@@ -281,20 +302,34 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
   return order.map((id) => latestById.get(id)).filter((d): d is Device => !!d);
 }
 
-function mergeLatestWithdrawal(
-  base: Withdrawal | null,
-  next: Withdrawal | null,
-  latest: Withdrawal | null,
-): Withdrawal | null {
-  if (sameValue(base, next)) return latest;
-  if (!next) return next;
-  if (!latest) return next;
-  if (next.id !== latest.id) {
-    return latest.submittedAt >= next.submittedAt ? latest : next;
+/**
+ * 提现单列表三路合并:**按单号取并集**,同一单的状态取 rank 更靠后的那份。
+ *
+ * 关键性质(单条版没有的):两端各自新建的单**都会保留**,不再互相顶掉。
+ * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
+ * last-write 会把已到账的单退回处理中。
+ */
+function mergeWithdrawals(
+  base: Withdrawal[],
+  next: Withdrawal[],
+  latest: Withdrawal[],
+): Withdrawal[] {
+  const byId = new Map<string, Withdrawal>();
+  for (const w of [...latest, ...next]) {
+    const prev = byId.get(w.id);
+    if (!prev) {
+      byId.set(w.id, w);
+      continue;
+    }
+    const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
+    const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
+    byId.set(w.id, c > a ? w : prev);
   }
-  const nextRank = WITHDRAWAL_STATUS_RANK[next.status] ?? 0;
-  const latestRank = WITHDRAWAL_STATUS_RANK[latest.status] ?? 0;
-  return latestRank >= nextRank ? latest : next;
+  // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
+  const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));
+  return [...byId.values()]
+    .filter((w) => !deleted.has(w.id))
+    .sort((x, y) => y.submittedAt - x.submittedAt);
 }
 
 export function mergeAccountSnapshots(
@@ -318,7 +353,7 @@ export function mergeAccountSnapshots(
       next.earnings as unknown as JsonRecord,
       latest.earnings as unknown as JsonRecord,
     ) as unknown as EarningsState,
-    latestWithdrawal: mergeLatestWithdrawal(base.latestWithdrawal, next.latestWithdrawal, latest.latestWithdrawal),
+    withdrawals: mergeWithdrawals(base.withdrawals ?? [], next.withdrawals ?? [], latest.withdrawals ?? []),
   };
 }
 

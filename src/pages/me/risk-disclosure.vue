@@ -81,6 +81,11 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { navBack } from "@/lib/route";
+import { useProductPhase } from "@/composables/use-product-phase";
+import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
+import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/wallet-pairing-core";
+import { useConfig } from "@/store/config";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -92,6 +97,7 @@ import { safeReturnTo } from "@/routing/safe-return-to";
 
 const SCROLL_THRESHOLD_PX = 24;
 
+const cfg = useConfig();
 const t = useT();
 const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
@@ -137,11 +143,30 @@ onUnmounted(() => {
   observer = null;
 });
 
+/**
+ * 🔴 提现窗口这一段的数字必须从配置来(2026-08-01 走查 P0-2)。
+ * 原文写死「标准提现从申请到入账约 30 天 / > $1,000 进入 45 天增强审查窗口」,
+ * 而系统实际是提交 + payoutSlaHours(默认 24 小时),大额审查窗口当前阶段配置为 0 天。
+ * 这段是**提交提现前强制勾选确认**的文件 —— 写着系统根本不执行的时限,是最硬的谎。
+ * 大额审查窗口配成 0(该阶段不开)时,整句不出现,而不是显示「0 天窗口」。
+ */
+/** 惩罚费率随运营阶段派发(P5=25% / P6=30%),披露里写死 20% 就是谎。与提现页同源。 */
+const phase = useProductPhase();
+const penaltyPctText = computed(() => `${(phase.value.withdrawPenaltyFeeRate * 100).toFixed(0)}%`);
+const withdrawWindowBody = computed(() => {
+  const rules = cfg.config.withdrawRules;
+  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(rules.payoutSlaHours), pct: penaltyPctText.value });
+  if (normalizeReviewWindowDays(rules.payoutReviewWindowDays) <= 0) return base;
+  return `${base} ${fmt(w.value.s4BodyLargeAmount, {
+    large: NEW_ADDRESS_LARGE_AMOUNT_USDT.toFixed(0),
+    d: normalizeReviewWindowDays(rules.payoutReviewWindowDays),
+  })}`;
+});
 const blocks = computed(() => [
   { n: 1, title: w.value.s1Title, body: w.value.s1Body },
   { n: 2, title: w.value.s2Title, body: w.value.s2Body },
   { n: 3, title: w.value.s3Title, body: w.value.s3Body },
-  { n: 4, title: w.value.s4Title, body: w.value.s4Body },
+  { n: 4, title: w.value.s4Title, body: withdrawWindowBody.value },
   { n: 5, title: w.value.s5Title, body: w.value.s5Body },
   { n: 6, title: w.value.s6Title, body: w.value.s6Body },
   { n: 7, title: w.value.s7Title, body: w.value.s7Body },
@@ -160,7 +185,11 @@ function onAccept() {
   if (!canAccept.value) return;
   risk.accept();
   toast.success(w.value.acceptToast);
-  uni.navigateTo({ url: returnTo.value, fail: () => uni.reLaunch({ url: returnTo.value, fail: () => {} }) });
+  // 🔴 用 navigateBack 回到**原来那个页面实例**。navigateTo 是压一个新页:
+  // 用户在提现页输的金额随新实例重置为空、原实例被压在栈底,提交意图 100% 丢失,
+  // 而且页面栈变成 withdraw → disclosure → withdraw,再按返回会退回披露页(死循环观感)。
+  // 冷启动直达本页时栈里只有一页,裸 navigateBack 是空操作(P-054)—— 走 helper,它会按栈深选 pop 还是 reLaunch。
+  navBack(returnTo.value);
 }
 
 // Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——

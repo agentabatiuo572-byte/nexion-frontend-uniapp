@@ -7,13 +7,14 @@
  * Usage: node scripts/trial-check.mjs
  */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 const BASE = process.env.BASE_URL || "http://localhost:5173";
 
 async function check(route) {
   const ctx = await browser.newContext({ viewport: { width: 414, height: 896 }, colorScheme: "dark" });
   const page = await ctx.newPage();
   const errors = [];
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("console", collectAppConsoleErrors(errors, BASE));
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });
   await page.waitForTimeout(2600); // > 1500ms auto-push delay

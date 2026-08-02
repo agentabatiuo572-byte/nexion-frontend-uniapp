@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./config-types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
+import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -46,10 +47,59 @@ export const useConfig = defineStore("config", () => {
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
   // PROD: GET /api/config/platform 失败/超时时由请求层置位。
+  // 配置重拉的合成延迟(mock)。对齐 refresh.ts 的 REFRESH_LATENCY_MS 量级 ——
+  // 必须 > 0 且够长到能画出一帧骨架,否则加载态是死 UI。
+  const CONFIG_LOAD_LATENCY_MS = 600;
+
   const syncFailed = ref(false);
+
+  /**
+   * 🔴 提现费率配置是否合法 —— **在信任边界校验,不在消费点校验**。
+   *
+   * 为什么放这儿(2026-07-31 第 5 轮复验结论):原先是页面自己拿 withdrawRules 现判,
+   * 属于「消费点校验」—— 任何人在页面读到值**之前**动手脚(例如给它套一层
+   * 防御性默认值)就能让校验器永远看不到坏值,失败态永不触发、按写死值收费,
+   * 而所有文本哨兵全绿。补文本断言补了三次、每次都被「保留被 pin 的串、改掉喂给它的数据」绕过。
+   *
+   * 挪到这里后,「在页面塞默认值」这个动作本身失去意义:裁决在上游已经做出,
+   * 页面只消费结论。这也正是本项目 coding-style 的原话:
+   * 「Validate at system boundaries / never trust external data (API responses)」。
+   *
+   * PROD:同一个判据用在 GET /api/config/platform 的响应上,不合法即置 syncFailed。
+   */
+  const feeConfigValid = computed(() => {
+    const r = config.value.withdrawRules;
+    return isNetworkFeeConfigUsable({
+      rate: r.networkFeeRate,
+      min: r.networkFeeMin,
+      max: r.networkFeeMax,
+    });
+  });
 
   function isEnabled(flag: FeatureFlagKey): boolean {
     return config.value.featureFlags[flag] === true;
+  }
+
+  /**
+   * 重拉平台配置(失败态的重试出口)。
+   * MOCK:清 syncFailed 即恢复(种子本就在内存)。
+   * PROD:GET /api/config/platform → 成功覆盖 config 并清 syncFailed;失败保持置位。
+   * 🔴 失败时**不得**把 config 重置成前端种子 —— 那等于回退写死值(FEAT-RISK02 异常3)。
+   */
+  const loading = ref(false);
+  async function load(): Promise<void> {
+    if (loading.value) return;
+    loading.value = true;
+    try {
+      // 🔴 必须有真 await:同步置位会让 loading 的 true/false 落在同一个微任务里,
+      // 骨架进得了 DOM 却一帧都画不出来(实测 rAF 20 帧 / 25ms 采样 17 帧均 0 骨架),
+      // 等于死 UI。合成延迟对齐工程既有先例 refresh.ts 的 REFRESH_LATENCY_MS。
+      // PROD:这里换成真实的 GET /api/config/platform,延迟天然存在。
+      await new Promise<void>((r) => setTimeout(r, CONFIG_LOAD_LATENCY_MS));
+      syncFailed.value = false;
+    } finally {
+      loading.value = false;
+    }
   }
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
@@ -81,5 +131,5 @@ export const useConfig = defineStore("config", () => {
     };
   }
 
-  return { config, syncFailed, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
+  return { config, syncFailed, loading, load, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });

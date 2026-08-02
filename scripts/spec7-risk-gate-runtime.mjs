@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 // SPEC-7 K1 上限两闸 runtime 哨兵：
 //   C. 设备上限内注册放行 + gift 随风险桶(direct 开关生效)
@@ -13,7 +14,7 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("console", (msg) => {
-  if (msg.type() === "error") errors.push(msg.text());
+  if (msg.type() === "error") collectAppConsoleErrors(errors, baseUrl)(msg);
 });
 page.on("pageerror", (error) => errors.push(error.message));
 

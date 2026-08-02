@@ -48,6 +48,87 @@ function stopTick() {
   }
 }
 
+// ── 提现到账推进轮询(FEAT-WD01b)──
+// 追踪页只展示、不推进(SPEC-7),所以「用户点进追踪页发现已到账」这条路径要靠这个
+// 定时器兜住 —— 5s 一次:一次调用就是一个纯函数判定 + 一次 null 判断,开销可忽略,
+// 但用户不会盯着「处理中」干等半分钟。真正的离线缺口补齐发生在 onShow 那一下。
+// PROD: 整块删掉,状态改由 SSE/webhook 推。
+const ARRIVAL_TICK_MS = 5_000;
+let arrivalTimer: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * 到账推进 + 账单结算。两件事必须一起做:
+ * 单据推到「已到账」而账单行还停在「处理中」的话,追踪页说到账了、账单页说处理中,
+ * 同一笔钱两个说法;而且账单页的流水余额只累加已入账的行,这笔提现永远不进流水。
+ * store 之间不互相 import(P-031),所以这个跨 store 编排放在 App 层。
+ */
+function advanceArrivalAndSettleBill() {
+  const app = useApp();
+  // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
+  // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
+  const advanced = app.advanceWithdrawalArrival();
+  if (advanced.length) {
+    const bills = useBills();
+    for (const ref of advanced) bills.settleByRef(ref, "posted");
+  }
+  // 结算失败的那几笔不靠「记在内存里下次重试」找回来 —— 见 reconcileBills 的注释。
+  reconcileBills();
+}
+
+/**
+ * 🔴 对账:把「已到账的单据」和「还停在处理中的账单行」拉齐。
+ *
+ * 这里原本是一个模块级的 `pendingBillSettle` Set:结算失败就记下来、下一轮重试。
+ * 问题是它**只在内存里**——用户刷新一次页面 / 关掉 App 重开,这个 Set 就没了,
+ * 而到账推进本身是幂等的(推过的单不会再出现在返回数组里),于是那笔单**永远不会再被结算**:
+ * 追踪页说「已到账」、账单页说「处理中」,正是注释自称要防的永久裂脑,防御却只覆盖同一个页面生命周期。
+ *
+ * 根治不是把那个 Set 持久化,而是**别记**:该做什么完全可以从现有数据推出来 ——
+ * 单据是终态、账单行还没跟上,就是待办。这样刷新、换设备、隔一周回来都能自愈,零额外存储。
+ */
+function reconcileBills() {
+  const app = useApp();
+  const bills = useBills();
+  // ① 已到账 → 账单入账
+  for (const wd of app.withdrawals) {
+    if (wd.status !== "confirmed") continue;
+    const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
+    if (row && row.status !== "posted") bills.settleByRef(wd.id, "posted");
+  }
+  // ② 失败终态 → **先退款再置账单失败**,两件事必须成对。
+  //    提现在提交那一刻就扣了款,「单子废了但钱没还」是最伤的一种不一致。
+  for (const id of app.refundFailedWithdrawals()) bills.settleByRef(id, "failed");
+  //    退款幂等,但账单可能上一轮没落盘成功 → 这里补一次(与①同样的自愈思路)
+  for (const wd of app.withdrawals) {
+    if (!["review-rejected", "address-invalid", "tx-failed", "refunded"].includes(wd.status)) continue;
+    const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
+    if (row && row.status !== "failed") bills.settleByRef(wd.id, "failed");
+  }
+  // ③ 赠金:锁定 / 待审桶都空了 = 没有还锁着的赠金,那笔「处理中」的赠金账单该入账了。
+  //    释放走 applyReleaseOutcome,它只动桶和余额、**不写账单**,
+  //    于是账单里那行 +$5 会永远停在「处理中」。这里从数据推出它已经落地。
+  const b = app.user.earningBuckets;
+  if (b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0) {
+    for (const row of bills.bills) {
+      if (row.type === "bonus" && row.status === "pending" && row.ref) bills.settleByRef(row.ref, "posted");
+    }
+  }
+}
+
+function startArrivalPoll() {
+  stopArrivalPoll();
+  arrivalTimer = setInterval(() => {
+    if (!ensureBusinessLoopsAllowed()) return;
+    advanceArrivalAndSettleBill();
+  }, ARRIVAL_TICK_MS);
+}
+function stopArrivalPoll() {
+  if (arrivalTimer) {
+    clearInterval(arrivalTimer);
+    arrivalTimer = undefined;
+  }
+}
+
 // ── Trial state-machine poll (ports SimulationProvider's TRIAL_TICK loop) ──
 // uni's trial.vue only ticks `now` for display; nothing advanced the free-trial
 // machine (active→grace→redeemed/failed/cancelled), so this is the sole driver.
@@ -509,6 +590,7 @@ function stopQuestWatch() {
 
 function stopBusinessLoops() {
   stopTick();
+  stopArrivalPoll();
   stopTrialPoll();
   stopOrderPoll();
   stopMilestonePoll();
@@ -557,7 +639,11 @@ onShow(() => {
   attachSessionWatch();
   if (!ensureBusinessLoopsAllowed()) return; // no business writes on auth/session flow pages
   useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
+  // FEAT-WD01b:前台第一时间补齐到账缺口 —— 关 App 三天再打开,这一下就补完
+  // (纯函数只看「now ≥ 预计到账」,与离线时长无关;推进过的单再调是 no-op)。
+  advanceArrivalAndSettleBill();
   startTick();
+  startArrivalPoll();
   startTrialPoll();
   startOrderPoll();
   startMilestonePoll();

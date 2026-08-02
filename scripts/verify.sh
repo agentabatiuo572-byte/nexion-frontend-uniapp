@@ -99,8 +99,8 @@ fi
 
 # 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
 # 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
-echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards)${N}"
-for sc in deposits fx rebind cards; do
+echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards · withdrawfee · fastlane · feegate)${N}"
+for sc in deposits fx rebind cards withdrawfee fastlane feegate arrival i18n-interp console-filter slacopy onbrand; do
   if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
     ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
   else
@@ -111,7 +111,7 @@ done
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  # 🔴 先认工程再认状态码:同机跑着 Nexion-CC(:5273)/ janus(:5174),端口被串台时
+  # 🔴 先认工程再认状态码:同机跑着 CC(:5273)/ janus(:5174),端口被串台时
   # 本段会整体假绿 —— curl 拿到的是 CSR 空壳,任何 Vite SPA 都回 200(实测踩过)。
   # 判据用「取到的是真模块还是 SPA 兜底页」:Vite 对不存在的路径回 index.html,
   # 状态码同样 200,所以只看状态码的探针本身就是个假绿(踩过,红测才揪出来)。
@@ -362,8 +362,9 @@ else
   ok "SPEC-7 release engine has no auto release source (R1)"
 fi
 sentinel_present "SPEC-7 eligibility reads live cluster (R5)" src/store/withdrawal-eligibility.ts 'evaluateAccountCluster\(key\)'
-sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-eligibility.ts 'first-withdrawal-review'
-sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility.ts 'new-address-hold'
+# 判定已下沉到 core(shell 只转发原始对象);断言跟着逻辑走,别 pin 在空壳上。
+sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-eligibility-core.ts 'first-withdrawal-review'
+sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility-core.ts 'new-address-hold'
 # 消费层: 注册 / 结算 / 钱包 / 提现
 sentinel_present "SPEC-7 register evaluates via engine" src/pages/register/register.vue 'evaluateRegistration\(prospectiveIdentity\(\)'
 sentinel_present "SPEC-7 register honors signup gate" src/pages/register/register.vue 'assessment\.gateRoute !== "manual_or_reject"'
@@ -412,7 +413,8 @@ sentinel_present "PAY-VN 通道枚举单源含 VietQR" src/store/types.ts 'bank-
 sentinel_present "PAY-VN 通道枚举单源含 BEP20" src/store/types.ts 'usdt-bep20'
 sentinel_present "PAY-VN 链上通道费表单源" src/store/deposits-core.ts 'export const CHAIN_DEPOSIT_FEE_USDT'
 sentinel_present "PAY-VN fx 牌价派生不缓存(computed)" src/store/fx.ts 'quoteRate = computed\(\(\) => computeQuoteRate'
-sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility.ts 'isRebindFrozen'
+# 换绑冻结的判定从 shell 的 isRebindFrozen() 调用改为 core 内联算(toRawFacts),断言改盯 core 的冻结闸本身。
+sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility-core.ts 'rebind-freeze'
 # 卡轨四条(2026-07-27 audit:此前卡轨走统一入金账后一条哨兵都没有,改坏无人拦)。
 # 记账口径最关键 —— 把 gross 塌回 credited 等于平台白送手续费,而纯逻辑 selfcheck
 # 只加载 deposits-core,守不到 deposits.ts 里的记录三元组(变异测试实证全绿)。
@@ -467,7 +469,26 @@ sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earnin
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
 sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
-sentinel_present "SPEC-7 withdraw page uses withdrawable bucket" src/pages/me/wallet-withdraw.vue 'app\.user\.earningBuckets\.withdrawableUsdt'
+# 2026-07-31 规则变更(充值本金可提):可提上限从 withdrawableUsdt 改为 usdtBalance。
+# held 两桶本就账外,风控扣留仍生效。本哨兵改为锁「上限读总余额」这个新正解。
+sentinel_present "withdraw page available = total balance (principal withdrawable)" src/pages/me/wallet-withdraw.vue 'const maxWithdrawable = computed\(\(\) => app\.user\.usdtBalance\)'
+# 可提口径三处同源(2026-07-31 踩坑):提现页改了口径,钱包页/钱包卡片仍读旧桶 → 首页显示
+# 的「可提现 USDT」与实际能提的数对不上。三处必须同读 usdtBalance,任一回退即红。
+withdrawable_source_parity() {
+  local miss=""
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
+  if [ -z "$miss" ]; then ok "withdrawable display source parity (wallet + card = total balance)";
+  else bad "withdrawable display source DRIFT — still on old bucket: $miss"; fi
+  # 反向面(2026-07-31 审计 P1):上面只验「新写法在」,不验「旧写法不在」—— 若有人在这三个
+  # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
+  local stale
+  stale=$(grep -nE '(earningBuckets|buckets(\.value)?)\.withdrawableUsdt' \
+    src/pages/me/wallet.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
+  if [ -z "$stale" ]; then ok "no stale withdrawable-bucket reads in wallet surfaces (0 hits)";
+  else bad "stale withdrawable-bucket read resurfaced (口径分裂面)"; echo "$stale" | sed 's/^/        /'; fi
+}
+withdrawable_source_parity
 sentinel_present "SPEC-7 withdraw page consumes eligibility engine" src/pages/me/wallet-withdraw.vue 'from "@/store/withdrawal-eligibility"'
 sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/pages/me/wallet-withdraw.vue 'await requestWithdrawalEligibility'
 sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
@@ -478,7 +499,23 @@ sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-w
 sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wallet-topup.vue 'recordPaymentInstrument\(app\.accountKey'
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
 sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
-sentinel_present "SPEC-7 withdrawal debits withdrawable bucket" src/store/app.ts 'withdrawableUsdt: \+\(currentUser\.earningBuckets\.withdrawableUsdt - amount\)'
+# 提现扣款双 clamp(2026-07-31):先耗收益再耗本金,可提额度不得转负、不得超剩余总余额。
+# 少任一 clamp → 提本金时 withdrawableUsdt 变负 或 > usdtBalance(negative-balance P0 复发面)。
+# grep 逐行匹配,而该表达式跨行 → 拆成两条单行判据,两条都在才算数。
+# 并发透支门(2026-07-31 审计 P0):门禁分母改成 usdtBalance 后,可透支上限从「已解锁收益」
+# 放大到整个账户余额;account-cloud 把余额当加法计数器 merge,多端各自本地合法的扣款会相加。
+# 提交前必须重读落盘余额二次核验(等价真后端事务内重读行)。删掉这行 = P0 敞口恢复。
+# ⚠️ 判据别 pin 在局部变量名上 —— 一次无害重命名要么把资金门弄红、要么(更糟)让它
+# 盯上重构后没人用的死代码而假绿(两种审计都实测到过)。这里改成数**门的道数**:
+# 提现链上必须有两处「重读落盘余额」(占额度前一次、await 之后一次),少一处即红。
+gate_sites=$(grep -c 'readAccountSnapshot(acct)?\.user?\.usdtBalance' src/store/app.ts 2>/dev/null || echo 0)
+if [ "${gate_sites:-0}" -eq 2 ]; then
+  ok "withdrawal re-reads persisted balance x2 (concurrency gate, sample ${gate_sites})"
+else
+  bad "withdrawal 落盘余额复核应恰有 2 处(占额度前 + await 后),实得 ${gate_sites}"
+fi
+sentinel_present "withdrawal clamps withdrawable >= 0" src/store/app.ts 'Math\.max\(0, \+\(u\.earningBuckets\.withdrawableUsdt - amount\)\.toFixed\(2\)\)'
+sentinel_present "withdrawal clamps withdrawable <= usdt" src/store/app.ts 'withdrawableUsdt: Math\.min\('
 # 负余额不变量(2026-07-10 P0): 购买共用 debitBalance 减总余额时必 clamp 可提额度 ≤ 剩余
 # 总余额,否则可提额度 > 总余额 → 提现门(只看可提额度)放行超总余额提现 → usdtBalance 变负
 # (凭空取钱)。两条哨兵锁 debitBalance 的 clamp + submitWithdrawal 的总余额兜底门。
@@ -513,20 +550,44 @@ if [ -f src/store/withdrawal-risk.ts ]; then
 else
   ok "SPEC-7 legacy withdrawal-risk.ts removed"
 fi
-if grep -q 'app\.advanceWithdrawal' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null; then
+# 🔴 剥注释再判,且用 '(' 收尾:新函数名 advanceWithdrawalArrival 是旧禁用串的**超集**,
+# 不加这两道会被文件头注释里的一句说明误命中而假红(审计实测)。
+if sed 's|//.*||; s|<!--.*-->||' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null | grep -q 'app\.advanceWithdrawal('; then
   bad "SPEC-7 tracking page must not auto-advance withdrawals"
 else
   ok "SPEC-7 tracking page is display-only"
+fi
+# FEAT-WD01b 到账推进(2026-07-31 规则收窄,签字 plan T6):
+# 原 SPEC-7 写「client 零推进」,现允许**一条**推进路径 —— 到达建单时就已承诺的
+# estimatedCompletion 后,把 pass 路由推进到 confirmed。人工/延迟/冻结/异常终态永不推进。
+# 判定全在 withdrawal-arrival-core 的纯函数里(selfcheck-arrival 55 条行为断言 + 4 路红测),
+# 这里只守「推进入口唯一且接的是那个纯函数」——判定守得再严,接错地方一样白守。
+# ⚠️ sentinel_present 的 pattern 走 grep -E,括号是分组不是字面量 —— 必须转义,
+# 否则哨兵恒假红(本条第一版就这么栽了)。
+sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
+sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
+# 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
+adv_sites=$(grep -rcE 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+# 🔴 必须 == 1,不能写 <= 1:0 处意味着推进整个没了,那也是坏的。
+# 判据里「候选为空」要当失败处理,否则判据一失效就变成永远绿(踩过多次)。
+if [ "${adv_sites:-0}" -eq 1 ]; then
+  ok "WD01b 恰有一处把提现置为 confirmed(推进路径单源,样本 ${adv_sites})"
+else
+  bad "WD01b 有 ${adv_sites} 处把提现置为 confirmed(应恰为 1)—— 0=推进丢失,>1=路径散了(单源在 withdrawal-arrival-core.advanceArrival)"
 fi
 if grep -q 'app\.creditBalance(gift\.usdt)' src/pages/register/register.vue 2>/dev/null; then
   bad "SPEC-7 register gift must not credit USDT balance directly (R6)"
 else
   ok "SPEC-7 register gift not directly credited to balance (R6)"
 fi
-if grep -q 'const usdtBalance = computed(() => app\.user\.usdtBalance)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
-  bad "SPEC-7 withdraw page must not use total USDT balance as available"
+# 【已退役 2026-07-31】原反向哨兵禁止提现页读总余额 —— 那是「充值本金不可提」时代的判据,
+# 规则变更后读总余额恰是正解(见上面的 withdraw page available 哨兵)。
+# 它真正防的 P0 是「可提额度 > 总余额仍放行 → 余额变负」,那道防线是 app.ts 的总余额门,
+# 由下面的 P0 neg-balance 哨兵继续守。此处改守新不变量:held 两桶不得混入可提口径。
+if grep -qE 'maxWithdrawable[^\n]*(pendingReviewUsdt|bonusLockedUsdt)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
+  bad "withdraw available must exclude held buckets (pending_review / bonus_locked)"
 else
-  ok "SPEC-7 withdraw page uses withdrawable amount, not total balance"
+  ok "withdraw available excludes held buckets"
 fi
 if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/app.ts 2>/dev/null; then
   bad "SPEC-7 settle must not credit NEX balance outside buckets"

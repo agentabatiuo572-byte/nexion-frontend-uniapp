@@ -7,6 +7,7 @@
  * Same determinism freezes as chrome-baseline (time / setInterval / Math.random).
  */
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,7 +47,7 @@ await ctx.addInitScript(() => {
 });
 const page = await ctx.newPage();
 const errors = [];
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });
 await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});

@@ -1,7 +1,10 @@
 <!--
   Withdrawal tracking (ported from Nexion-prototype/app/(main)/me/wallet/withdraw/tracking/page.tsx).
   5-step status stepper. Reads app.latestWithdrawal; empty state when none.
-  Status is display-only here; backend/admin simulation owns progression.
+  🔴 本页只展示、不推进状态(SPEC-7 + verify 哨兵守着)。到账推进由 App 层驱动
+  (App.vue 的 onShow 补齐 + 定时轮询 → app.advanceWithdrawalArrival),
+  判定单源在 withdrawal-arrival-core.advanceArrival;接真后端时改由服务端推送。
+  四态(加载骨架 / 空 / 进行中 / 终态)见下方三个分支 + etaSub。
   Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -9,8 +12,30 @@
     <view style="padding-bottom: 16px">
       <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
 
+      <!-- ⑤ 加载态:步进条骨架(不是通用转圈)—— 骨架必须与真实结构同形,
+           否则加载完一跳,用户以为页面换了。触发源是本页 onMounted 的 cfg.load()。
+           🔴 只在**确有单据**时才骨架:没有提现记录的用户根本不依赖配置,
+           让他先盯 600ms 骨架再看到「暂无提现」是白等,空状态要立刻出。 -->
+      <view v-if="wd && cfg.loading" class="px-4" style="display: flex; flex-direction: column; gap: 12px" aria-busy="true">
+        <view :style="heroStyle">
+          <view :style="skelStyle('72px', '12px')" />
+          <view :style="skelStyle('160px', '34px', '6px')" />
+          <view :style="skelStyle('120px', '12px', '6px')" />
+        </view>
+        <view :style="stepperStyle">
+          <view :style="skelStyle('48px', '12px')" />
+          <view v-for="i in 5" :key="i" class="flex" style="gap: 12px; padding-top: 14px">
+            <view :style="skelStyle('24px', '24px', '0', '999px')" />
+            <view style="flex: 1">
+              <view :style="skelStyle('40%', '13px')" />
+              <view :style="skelStyle('64%', '12px', '4px')" />
+            </view>
+          </view>
+        </view>
+      </view>
+
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
-      <view v-if="!wd" class="px-5 text-center">
+      <view v-else-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ t.wallet.noActiveWithdrawal }}</text>
         <!-- 《07》tap≥44:空状态的行动链接独占一行,不吃 WCAG 2.5.8 的 inline 豁免 → 撑热区(原 88×22) -->
         <view class="active:opacity-70" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
@@ -33,27 +58,28 @@
 
           <!-- Status stepper — outer card dropped, stepper structure kept;
                hairline opens the group. -->
-          <view :style="stepperStyle">
+          <!-- 失败终态不渲染步进条:五步全灰、连「已提交」都不打勾,而下方卡片说转账失败(对抗证伪坐实) -->
+          <view v-if="!isFailedEnd" :style="stepperStyle">
             <text class="block" :style="progressLabelStyle">{{ t.wallet.trackProgressLabel }}</text>
             <view class="relative">
               <view v-for="(step, i) in steps" :key="step.key" class="flex relative" :style="stepLiStyle(i === steps.length - 1)">
                 <!-- connector -->
-                <view v-if="i < steps.length - 1" :style="connectorStyle(i < currentIdx)" />
+                <view v-if="i < steps.length - 1" :style="connectorStyle(i < doneUpTo)" />
                 <!-- icon -->
                 <view class="grid place-items-center shrink-0" style="width: 24px; height: 24px">
-                  <view v-if="i < currentIdx" class="grid place-items-center" :style="doneIconStyle">
+                  <view v-if="i < doneUpTo" class="grid place-items-center" :style="doneIconStyle">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                   </view>
-                  <view v-else-if="i === currentIdx" class="grid place-items-center glow-green" :style="currentIconStyle">
+                  <view v-else-if="i === currentIdx && showSpinner" class="grid place-items-center glow-green" :style="currentIconStyle">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
                   </view>
                   <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2"><circle cx="12" cy="12" r="9" /></svg>
                 </view>
                 <!-- text -->
                 <view style="flex: 1; padding-top: 2px">
-                  <text class="block" :style="stepLabelStyle(i > currentIdx)">{{ step.label }}</text>
+                  <text class="block" :style="stepLabelStyle(i >= doneUpTo && i !== currentIdx)">{{ step.label }}</text>
                   <text class="block" :style="stepHintStyle">{{ step.hint }}</text>
-                  <text v-if="i <= currentIdx" class="block" :style="stepTimeStyle">{{ relTime(wd.submittedAt + i * STEP_DELAY_MS) }}</text>
+                  <text v-if="stepTimeText(i)" class="block" :style="stepTimeStyle">{{ stepTimeText(i) }}</text>
                 </view>
               </view>
             </view>
@@ -61,15 +87,37 @@
 
           <!-- Estimated completion / SPEC-7 风控持有态(manual/delay=审核中,freeze=冻结)
                normal = floor note (hairline opens it); frozen = danger accent callout. -->
-          <view class="flex items-start" :style="isFrozenHold ? etaFrozenCardStyle : etaCardStyle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="isFrozenHold ? 'var(--v5-danger)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
+          <view class="flex items-start" :style="isFrozenHold || isFailedEnd ? etaFrozenCardStyle : etaCardStyle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" :stroke="isFrozenHold || isFailedEnd ? 'var(--v5-danger)' : 'var(--v5-brand)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
             <view style="flex: 1">
               <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
               <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
               <view v-if="heldReasonLines.length" style="margin-top: 6px">
                 <text v-for="line in heldReasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
               </view>
+              <!-- 人工审核 / 冻结态给客服出口:告诉用户「不会自动放款」却不给人问,
+                   等于把人钉在原地(业务链必须有下一步)。 -->
+              <view v-if="needsSupport" class="active:opacity-70" :style="supportLinkStyle" role="button" tabindex="0" :aria-label="t.wallet.trackContactSupport" @click.stop="goSupport">
+                <text :style="supportLinkTextStyle">{{ t.wallet.trackContactSupport }} →</text>
+              </view>
             </view>
+          </view>
+
+          <!-- ⑥ 再提一笔:今日额度用完时置灰 + 说明为什么,不做死按钮 -->
+          <view class="flex flex-col items-center" style="gap: 6px">
+            <view
+              class="flex items-center justify-center"
+              :class="againDisabled ? '' : 'active:opacity-80'"
+              :style="againBtnStyle"
+              role="button"
+              tabindex="0"
+              :aria-disabled="againDisabled ? 'true' : 'false'"
+              :aria-label="t.wallet.trackSubmitAnother"
+              @click.stop="goWithdraw"
+            >
+              <text>{{ t.wallet.trackSubmitAnother }}</text>
+            </view>
+            <text v-if="againDisabled" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
           </view>
 
           <!-- Back to wallet -->
@@ -83,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -92,12 +140,27 @@ import { useApp } from "@/store/app";
 import type { WithdrawalStatus } from "@/store/types";
 import { navTo } from "@/lib/route";
 import { riskReasonLines } from "@/lib/risk-reason-text";
+import { useConfig } from "@/store/config";
+import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
+import { dailyLimitStatus } from "@/store/withdrawal-eligibility";
 
 const STEP_DELAY_MS = 3500;
 
 const t = useT();
 const app = useApp();
-const wd = computed(() => app.latestWithdrawal);
+const cfg = useConfig();
+// 🔴 用**主单**(优先最早的在途单):只显示「最新一笔」时,在途的人工审核单
+// 会被后提且已到账的那笔挤掉,用户查不到自己还在审核的钱(独立验收实测)。
+const wd = computed(() => app.primaryWithdrawal);
+
+// ⑤ 加载态的触发源。不拉配置的话「预计 N 小时内完成」只能写死,
+// 骨架也永远进不了 DOM(死 UI)—— 两个问题同一个根。
+onMounted(() => {
+  void cfg.load();
+  // 🔴 本页**不推进状态**(SPEC-7:追踪页只展示)。到账推进统一由 App 层驱动
+  // (onShow 补齐 + 定时轮询),页面只读 latestWithdrawal —— 页面自己推进的话,
+  // 「谁能改这单的状态」就散成两处,以后接服务端推送要拆两遍。
+});
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
   { key: "submitted", label: t.value.wallet.submitted, hint: t.value.wallet.trackSubmittedHint },
@@ -107,8 +170,55 @@ const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>
   { key: "confirmed", label: t.value.wallet.confirmed, hint: t.value.wallet.trackConfirmedHint },
 ]);
 
-const currentIdx = computed(() => steps.value.findIndex((s) => s.key === wd.value?.status));
+// 🔴 失败终态。此前这四个态没有任何分支,全部掉进兜底渲染成「正在处理 · 预计 24 小时内完成」——
+// 钱没打出去,页面却说一切正常,而且连客服入口都没有;同时钱包列表那行写的是「转账失败」,
+// 列表与它自己的详情页互相打脸(审计 P0)。
+const FAILED_STATUSES: WithdrawalStatus[] = ["review-rejected", "address-invalid", "tx-failed", "refunded"];
+const isFailedEnd = computed(() => !!wd.value && FAILED_STATUSES.includes(wd.value.status));
+const failedTitle = computed(() => {
+  const s = wd.value?.status;
+  const w = t.value.wallet;
+  if (s === "review-rejected") return w.reviewRejected;
+  if (s === "address-invalid") return w.statusAddressInvalid;
+  if (s === "tx-failed") return w.statusTxFailed;
+  if (s === "refunded") return w.statusRefunded;
+  return "";
+});
+// 🔴 拦截/异常态一律要有客服出口。原判据只看 riskRoute,而 frozen 也可能由后台对一张
+// pass 路由的在途单事后冻结(types.ts 明写「K3 route freeze 或 D2 处置」)——
+// 那种单文案叫用户联系客服,页面上却没有客服入口。
 const routeHeld = computed(() => !!wd.value?.riskRoute && wd.value.riskRoute !== "pass");
+const needsSupport = computed(() => routeHeld.value || isFrozenHold.value || isFailedEnd.value);
+// 终态:5 步全部走满,最后一步不能还转圈 —— 转圈代表「进行中」,
+// 钱都到账了还转,用户会以为卡住了。
+const isTerminalDone = computed(() => wd.value?.status === "confirmed");
+const currentIdx = computed(() => {
+  const idx = steps.value.findIndex((s) => s.key === wd.value?.status);
+  // review-pending / frozen 不在主链 5 步里,findIndex 返回 -1 会让整条步进条全灰
+  // (看不出走到哪了)。按规格停在第 1 步:已提交,等审核。
+  if (idx === -1 && wd.value) return 0;
+  return idx;
+});
+/** 打勾的步数。终态时 = 全部 5 步;否则 = 当前步之前的都打勾。 */
+const doneUpTo = computed(() => (isTerminalDone.value ? steps.value.length : Math.max(0, currentIdx.value)));
+/** 失败终态 / 冻结态不再转圈:转圈代表「还在推进」,而它已经不会再推进了。 */
+const showSpinner = computed(() => !isTerminalDone.value && !isFailedEnd.value && !isFrozenHold.value);
+/** 到账时效(小时)——从后台 D5 配置取,坏配置回落 24h。 */
+const slaHours = computed(() => normalizeSlaHours(cfg.config.withdrawRules.payoutSlaHours));
+
+// ⑥ 「再提一笔」的可用性。判据来自 core(纯查询,不占额度);
+// 依赖 latestWithdrawal 让本页提交完回来时重算,不然会停在旧结论上。
+const dailyLimit = computed(() => {
+  void wd.value;
+  return dailyLimitStatus(app.accountKey);
+});
+const againDisabled = computed(() => dailyLimit.value.reached);
+const againReasonText = computed(() => {
+  const at = new Date(dailyLimit.value.resetAt);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${p2(at.getMonth() + 1)}-${p2(at.getDate())} ${p2(at.getHours())}:${p2(at.getMinutes())}`;
+  return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
+});
 // SPEC-7: freeze 路由/冻结状态用独立危险态文案;manual/delay 用审核中文案。
 const isFrozenHold = computed(() => wd.value?.riskRoute === "freeze" || wd.value?.status === "frozen");
 // 命中原因 → 业务话术(工程 reason code 不直出;R5: 展示存单快照的服务端结论)。
@@ -124,19 +234,57 @@ const viaLine = computed(() =>
 const etaTitle = computed(() =>
   wd.value?.status === "confirmed"
     ? t.value.wallet.trackEtaDone
-    : isFrozenHold.value
+    : isFailedEnd.value
+      ? failedTitle.value
+      : isFrozenHold.value
       ? t.value.wallet.routeHeldFrozenTitle
       : routeHeld.value
         ? t.value.wallet.withdrawRouteHeldTitle
-        : t.value.wallet.trackEtaPending,
+        // 🔴 标题必须用**不带插值**的 key。这里原来直接取 trackEtaPending,而那条
+        // 文案在改成「预计 {n} 小时内完成」之后带了占位符 —— 没过 fmt 就直出,
+        // 用户看到的是标题「预计 {n} 小时内完成」+ 副标题「预计 24 小时内完成」
+        // (同一句两遍,其中一遍是坏的)。改一个 key 的插值形态必须扫全部消费者。
+        : t.value.wallet.trackEtaTitlePending,
 );
-const etaSub = computed(() =>
-  isFrozenHold.value
-    ? t.value.wallet.routeHeldFrozenBody
-    : routeHeld.value
-      ? t.value.wallet.withdrawRouteHeldSub
-      : t.value.wallet.trackReviewNote,
-);
+const etaSub = computed(() => {
+  // 失败终态不给「预计到账」——钱没走成,给的是原因 + 客服出口(见 needsSupport)。
+  if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
+  if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
+  if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
+  // 终态给实际到账时刻;进行中给「预计 N 小时内完成」——
+  // N 从后台到账时效插值,此前写死 24,运营改了参数页面照旧承诺次日(空头承诺)。
+  if (isTerminalDone.value && wd.value) {
+    const at = wd.value.confirmedAt ?? wd.value.estimatedCompletion;
+    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.trackReviewNote;
+  }
+  return fmt(t.value.wallet.trackEtaPending, { n: String(slaHours.value) });
+});
+
+/** 「MM-DD HH:mm」本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */
+function absTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/**
+ * 每步的时间行。最后一步在终态显示**实际到账时刻**(来自单据的 confirmedAt,
+ * 不是这里现编的);其余步沿用 demo 的相对时间阶梯。
+ */
+function stepTimeText(i: number): string {
+  const w = wd.value;
+  if (!w) return "";
+  if (isTerminalDone.value && i === steps.value.length - 1) {
+    const at = w.confirmedAt ?? w.estimatedCompletion;
+    return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : "";
+  }
+  // 🔴 只给单据里**真有**的时刻:提交(第 1 步)与实际到账(末步)。
+  // 中间三步没有任何时间戳,原先用 3.5 秒假阶梯现编 —— 跨整点时会渲染成
+  // 「73h/73h/72h/72h」,等于对一件从未发生过的事(链上广播)做时间断言;
+  // 而生产路径本来就是 submitted 直接跳 confirmed,中间三步从不被进入。
+  if (i === 0) return relTime(w.submittedAt);
+  return "";
+}
 
 function relTime(ts: number): string {
   if (ts > Date.now()) return t.value.wallet.timePending;
@@ -148,10 +296,19 @@ function relTime(ts: number): string {
 }
 
 function goWithdraw() {
+  if (againDisabled.value) return; // 置灰按钮不能靠视觉拦,点击也得真的不走
   navTo("/pages/me/wallet-withdraw");
 }
 function goWallet() {
   navTo("/me/wallet");
+}
+function goSupport() {
+  navTo("/pages/me/support");
+}
+
+/** ⑤ 骨架块。与真实结构同尺寸,加载完不跳版。 */
+function skelStyle(w: string, h: string, mt = "0", radius = "6px"): CSSProperties {
+  return { width: w, height: h, marginTop: mt, borderRadius: radius, background: "var(--v5-surface-2)", opacity: 0.6 };
 }
 
 const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
@@ -201,6 +358,23 @@ const etaFrozenCardStyle: CSSProperties = {
 const etaTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink)" };
 const etaSubStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
 const reasonLineStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
+// 客服出口 —— 独占一行的行动链接,撑到 44px 热区(《07》tap≥44,不吃 inline 豁免)。
+const supportLinkStyle: CSSProperties = { display: "inline-flex", alignItems: "center", minHeight: "44px", marginTop: "2px" };
+const supportLinkTextStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)" };
+// 「再提一笔」= 主行动,但在追踪页不抢主 CTA 的位置(用描边而非实心品牌色);
+// 置灰态压低对比并去掉 active 反馈,视觉上就说明「现在按不了」。
+const againBtnStyle = computed<CSSProperties>(() => ({
+  width: "100%",
+  height: "44px",
+  borderRadius: "999px",
+  background: againDisabled.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
+  color: againDisabled.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
+  opacity: againDisabled.value ? 0.6 : 1,
+  transition: "opacity 150ms ease",
+}));
+const againReasonStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.5 };
 const backBtnStyle: CSSProperties = {
   width: "100%",
   height: "44px",

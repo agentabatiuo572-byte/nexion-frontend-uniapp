@@ -82,6 +82,27 @@ export interface WithdrawRulesConfig {
   newAddressHoldHours: number;
   // PAY04 换绑频控: 每 N 天最多更换一次提现地址(后台 D5/K3 可配)。
   rebindCooldownDays: number;
+  // 🔴 FEAT-WD01a 小额免审线(USD,后台 D5 可配)。金额 ≤ 此值时免掉「首提必审」与
+  //    「新地址 hold」两道**冷启动保守闸**;0 = 关闭快车道。
+  //    ⚠️ 风控闸(冻结簇/共用地址/风险分/大额账龄)不受此值影响,照常裁决。
+  smallAmountThresholdUsd: number;
+  // 🔴 FEAT-WD01b 每日提现笔数上限(后台 D5 可配)。达上限时**不建单不扣款**。
+  //    页面上那句「每日限额 N 笔/日」必须从这里插值 —— 此前是写死的空头承诺:
+  //    文案写着 1 笔/日,代码里没有任何计数,用户提几笔都行。
+  dailyWithdrawLimitCount: number;
+  // 🔴 FEAT-WD01b 到账时效(小时,后台 D5 payoutSlaHours 可配,值域 1–168)。
+  //    预计到账 = 提交 + 本值;24 = 次日到账(T+1)。
+  payoutSlaHours: number;
+  // 🔴 FEAT-WD01b 大额到账审查窗口(天,后台 D5 cooldownDays 可配;0 = 该阶段不开)。
+  //    金额 ≥ 大额线时,与「提交 + 到账时效」**取更晚者**。
+  //    注意与 rebindCooldownDays 不是一回事:那个是换绑频控,这个是大额到账等待。
+  payoutReviewWindowDays: number;
+  // 🔴 FEAT-WD01c 网络费三件套(后台 D5 可配)。链上转账真实成本,与惩罚费**相加**构成总费:
+  //    grossFee = networkFee + 金额 × penaltyFeeRate —— 后端对这条等式有硬校验。
+  //    比例算完要夹进 [min, max]:小额按 min 兜底(否则算出 $0.1 付不起 gas),大额按 max 封顶。
+  networkFeeRate: number;
+  networkFeeMin: number;
+  networkFeeMax: number;
 }
 
 // 新人礼发放模式: risk_bucket = 按当前风险簇分桶(默认);direct = 直入可提(运营可关闸)。
