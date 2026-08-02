@@ -105,10 +105,55 @@ async function signOutToDefault(frame, phone) {
   }, phone);
 }
 
+// FEAT-AUTH03:注册场景发码前 server 可要求滑块。真拖解层(不是 stub):读 dev bridge
+// 暴露的 targetRatio,按组件同一几何式(offsetRatio = curX / (trackW − 48),容差 ±2%)
+// 反解落点,用 Playwright 鼠标事件走 H5 window 级 move/up 监听链。
+async function solveCaptchaSlider(frame, phone) {
+  // challenge 就绪的 DOM 证据:拼块只在 challenge 加载后渲染(v-if)。
+  await frame.locator(".cs-piece").waitFor({ state: "visible", timeout: 10_000 });
+  const geometry = await frame.evaluate((p) => ({
+    targetRatio: window.__nexgridAuthDev.inspect(p).captcha?.targetRatio ?? null,
+    trackWidth: document.querySelector("#cs-track")?.getBoundingClientRect().width ?? 0,
+  }), phone);
+  assert(typeof geometry.targetRatio === "number" && geometry.targetRatio > 0, `captcha targetRatio unavailable for ${phone}`);
+  assert(geometry.trackWidth > 48, `captcha track geometry unavailable (width=${geometry.trackWidth})`);
+  const handleBox = await frame.locator(".cs-handle").boundingBox();
+  const trackBox = await frame.locator("#cs-track").boundingBox();
+  assert(handleBox && trackBox, "captcha slider bounding boxes unavailable");
+  // 组件判定 offsetRatio = curX / (trackW − 48),坐标全在 iframe 内部系;device-shell
+  // 可能对 iframe 施加缩放,页面级拖距按实测 scale 换算(未缩放时 scale=1 恒等)。
+  const scale = trackBox.width / geometry.trackWidth;
+  const dx = geometry.targetRatio * (geometry.trackWidth - 48) * scale;
+  const startX = handleBox.x + handleBox.width / 2;
+  const startY = handleBox.y + handleBox.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + dx, startY, { steps: 12 });
+  await page.mouse.up();
+  // 成功 → 组件短暂展示成功态后 emit → 弹层卸载,页面自动带票重发。
+  await frame.locator(".cs-mask").waitFor({ state: "detached", timeout: 10_000 });
+}
+
 async function enterPhoneAndSend(frame, digits = phoneDigits) {
   await frame.locator(".rg-phone__in input").fill(digits);
   await frame.locator(".rg-cta").click();
-  await frame.locator(".rg-step2").waitFor({ state: "visible", timeout: 10_000 });
+  // FEAT-AUTH03 容忍式:滑块层弹出则真拖解层,未弹则直过(.rg-step2 与 .cs-card 均为
+  // 条件渲染,presence 即可判)。「注册必弹滑块」的正向断言不在这儿 —— 在
+  // assertAuthDirectorySchemaBarrier 的 reserve() auth03-gate 探针,这样对闸门判定做
+  // 注入实验(I3 红测)时 4 条 UI 流不被连坐。
+  let sawCaptcha = false;
+  await waitUntil(async () => {
+    if (await frame.locator(".rg-step2").count()) return true;
+    if (await frame.locator(".cs-card").count()) {
+      sawCaptcha = true;
+      return true;
+    }
+    return false;
+  }, "neither the OTP step nor the captcha layer appeared after send");
+  if (sawCaptcha) {
+    await solveCaptchaSlider(frame, `+1${digits}`);
+    await frame.locator(".rg-step2").waitFor({ state: "visible", timeout: 10_000 });
+  }
 }
 
 async function enterOtp(frame) {
@@ -398,13 +443,26 @@ async function assertAuthDirectorySchemaBarrier(frame) {
       resolveAuthAccount,
       resolveAuthAccountById,
     } = await import("/src/store/auth-account.ts");
-    const { otpSend, otpVerify, registerVerifiedPhone } = await import("/src/store/auth-otp.ts");
+    const { captchaChallenge, captchaVerify, otpSend, otpVerify, registerVerifiedPhone } = await import("/src/store/auth-otp.ts");
     const { commitRegistration } = await import("/src/store/risk-cluster.ts");
     const { completeSignIn } = await import("/src/auth/complete-sign-in.ts");
     const riskKey = "nexgrid-risk-registry-v1";
     const reset = () => localStorage.clear();
     const reserve = async (phone) => {
-      const sent = await otpSend(phone, "register");
+      // FEAT-AUTH03 正向断言:注册场景无票 send 必须返回 captcha_required(harness 既
+      // 适配又是 AUTH03 的 runtime 证据,不是单纯绕过;删掉 otpSend 判定行时这里必红)。
+      // captcha_required 分支不写 SendLog,后续带票 send 不会撞冷却。
+      const gateProbe = await otpSend(phone, "register");
+      if (gateProbe.ok || gateProbe.error !== "captcha_required") {
+        return { ok: false, stage: "auth03-gate", gateProbe };
+      }
+      const challenge = await captchaChallenge(phone);
+      const pass = await captchaVerify(phone, {
+        challengeId: challenge.challengeId,
+        offsetRatio: challenge.targetRatio,
+      });
+      if (!pass.ok) return { ok: false, stage: "captcha", pass };
+      const sent = await otpSend(phone, "register", pass.ticket);
       if (!sent.ok) return { ok: false, stage: "send", sent };
       const verified = await otpVerify(phone, "register", sent.requestId, "111111");
       if (!verified.ok) return { ok: false, stage: "verify", verified };
@@ -555,6 +613,10 @@ async function assertAuthDirectorySchemaBarrier(frame) {
   assert(result.cleanupJournalAfterFailure?.state === "directory-committed", "failed journal cleanup did not retain a committed fail-closed barrier");
   assert(!result.cleanupAfterDirectoryDelete?.ok && result.cleanupAfterDirectoryDelete.error === "account_directory_unavailable", "committed legacy migration recreated an account after directory deletion");
   assert(!result.cleanupDirectoryRecreated, "committed legacy migration unexpectedly rewrote a deleted directory");
+  assert(
+    result.pendingReserve?.stage !== "auth03-gate" && result.freshReserve?.stage !== "auth03-gate",
+    `AUTH03 gate probe failed: bare register send did not return captcha_required (pending=${JSON.stringify(result.pendingReserve?.gateProbe ?? null)} fresh=${JSON.stringify(result.freshReserve?.gateProbe ?? null)})`,
+  );
   assert(result.pendingReserve?.ok && result.pendingRiskCommitted, "pending reservation did not reach persisted K1 state");
   assert(result.pendingBeforeDelete?.ok && result.pendingBeforeDelete.account?.status === "pending", "pending reservation was not preserved before deletion");
   assert(result.pendingRisk?.ok && result.pendingRisk.sourceSchema === 2, "pending K1 persistence did not seal risk storage to schema2");
