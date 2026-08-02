@@ -1298,6 +1298,53 @@ debit_return_checked() {
   else bad "bare debitBalance/debitNex discards false return → bill recorded without charging (fix: const x=…;if(!x){toast;return})"; echo "$hits" | sed 's/^/        /'; fi
 }
 debit_return_checked
+
+# ── FEAT-TRIAL02 去绑卡不回潮哨兵(2026-08-02 包F)──
+# 哨兵A:绑卡时代源码指纹逐合取项清零(每项独立报告,防合并遮蔽;PASS 打样本量)。
+# cardTokenId/extendedEndsAt 仅豁免 src/store/free-trial.ts —— 那是 spec 异常6
+# 存量行迁移读取器(LegacyTrialRow),必须能读旧字段;其余任何文件出现即回潮。
+trial02_source_fingerprints() {
+  local files_n
+  files_n=$(find src -type f \( -name "*.vue" -o -name "*.ts" \) | wc -l | tr -d ' ')
+  local pat hits
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "markChargeFailed"; do
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced in src"; echo "$hits" | sed 's/^/        /'; fi
+  done
+  for pat in "cardTokenId" "extendedEndsAt"; do
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -v "^src/store/free-trial.ts:" | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside legacy-migration reader (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside free-trial.ts legacy reader"; echo "$hits" | sed 's/^/        /'; fi
+  done
+}
+trial02_source_fingerprints
+
+# 哨兵B:i18n 三语自动扣款时代文案清零(en/zh/vi 同扫)。
+trial02_i18n_legacy_copy() {
+  local lines_n
+  lines_n=$(cat src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts | wc -l | tr -d ' ')
+  local pat hits
+  for pat in "Auto-charge" "Auto-purchase" "自动扣款" "自动完成购买" "绑卡后开始试用" "Tự động thu tiền" "Tự động mua"; do
+    hits=$(grep -rnF "$pat" src/i18n/messages 2>/dev/null | head -3)
+    if [ -z "$hits" ]; then ok "TRIAL02 i18n legacy copy '$pat' = 0 (3 locales, $lines_n lines)";
+    else bad "TRIAL02 auto-charge-era copy '$pat' resurfaced in i18n"; echo "$hits" | sed 's/^/        /'; fi
+  done
+}
+trial02_i18n_legacy_copy
+
+# 哨兵C:状态机不变量 —— free-trial.ts 必须声明 convert(),且全文件零钱/设备/账单
+# API(spec ④:poll 的 grace→ended 只翻状态;转化侧效应只住 checkout,P-031 同向)。
+trial02_machine_invariants() {
+  local f="src/store/free-trial.ts"
+  if grep -qE 'function convert\(\)' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares convert() (1 hit)";
+  else bad "TRIAL02 free-trial.ts lost convert() — conversion cannot close the machine"; fi
+  local money
+  money=$(grep -nE "debitBalance|addDevice|bills\.add|creditBalance|creditNex" "$f" 2>/dev/null | head -5)
+  if [ -z "$money" ]; then ok "TRIAL02 free-trial.ts touches no money/device/bill APIs (0 hits)";
+  else bad "TRIAL02 free-trial.ts gained money/device side effects — poll must flip state only (spec ④)"; echo "$money" | sed 's/^/        /'; fi
+}
+trial02_machine_invariants
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
