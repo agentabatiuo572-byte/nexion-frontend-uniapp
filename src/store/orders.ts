@@ -44,7 +44,11 @@ export interface Order {
   tradeInCredit?: number;
   /** 被下架抵扣的旧设备 id(履约与审计追溯用)。 */
   tradeInDeviceId?: string;
-  total: number;            // USDT = unitPrice − discount − tradeInCredit
+  /** FEAT-TRIAL02 试用转化促销折扣(USDT)——与代金券分列,order-detail 分行展示。 */
+  promoDiscountUSD?: number;
+  /** FEAT-TRIAL02 试用抵扣金(USDT)——仅结算抵减;服务端在同一订单事务里复算并 convert。 */
+  trialOffsetUSD?: number;
+  total: number;            // USDT = unitPrice − discount − tradeInCredit − promoDiscountUSD − trialOffsetUSD
   paymentMethod: string;    // "usdt-trc20" etc
   status: OrderStatus;
   placedAt: number;
@@ -64,6 +68,8 @@ export interface CreateOrderInput {
   discount?: number;
   tradeInCredit?: number;
   tradeInDeviceId?: string;
+  promoDiscountUSD?: number;
+  trialOffsetUSD?: number;
 }
 
 // 旧设备级单键 "nexgrid-orders-v4" 废弃(存量无账号归属,mock 可重建);订单按账号分行。
@@ -132,7 +138,11 @@ export const useOrders = defineStore("orders", () => {
   }
 
   function createOrder(input: CreateOrderInput): Order {
-    const { productId, productName, unitPrice, paymentMethod, discount = 0, tradeInCredit = 0, tradeInDeviceId } = input;
+    const {
+      productId, productName, unitPrice, paymentMethod,
+      discount = 0, tradeInCredit = 0, tradeInDeviceId,
+      promoDiscountUSD = 0, trialOffsetUSD = 0,
+    } = input;
     const id = genOrderId();
     const now = Date.now();
     const order: Order = {
@@ -143,7 +153,11 @@ export const useOrders = defineStore("orders", () => {
       unitPrice,
       discount,
       ...(tradeInCredit > 0 && { tradeInCredit, tradeInDeviceId }),
-      total: Math.max(0, +(unitPrice - discount - tradeInCredit).toFixed(2)),
+      ...(promoDiscountUSD > 0 && { promoDiscountUSD }),
+      ...(trialOffsetUSD > 0 && { trialOffsetUSD }),
+      // 阶梯抵扣基数(FEAT-DEV02)吃这个净额:试用抵扣买入的设备,置换基数
+      // 一并按实付算,不按目录价虚高。
+      total: Math.max(0, +(unitPrice - discount - tradeInCredit - promoDiscountUSD - trialOffsetUSD).toFixed(2)),
       paymentMethod,
       // Resting state right after checkout is "paid"
       status: "paid",
