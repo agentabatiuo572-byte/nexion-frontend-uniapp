@@ -443,6 +443,26 @@ if grep -qE 'const RESEND_SECONDS' src/pages/login/login.vue src/pages/register/
 else
   ok "AUTH01 no local resend-seconds constants (config-derived)"
 fi
+# FEAT-AUTH03 注册场景滑块前置(规格 PRD/specs/FEAT-AUTH03-register-captcha-always.md)
+# 值 pin:防「键在值漂」—— seed 从 ["register"] 改掉时键 parity/tsc 仍全绿,只有这条红。
+# 剥 // 注释后再 grep:注释里残留的同字面量不得替代真 seed 值(子串哨兵必剥注释)。
+if sed 's|//.*||' src/mock/platform-config.ts | grep -qE 'captchaAlwaysScenes: \["register"\]'; then
+  ok 'AUTH03 captchaAlwaysScenes seed pinned to ["register"] (comment-stripped)'
+else
+  bad 'AUTH03 captchaAlwaysScenes seed pin missing/drifted in src/mock/platform-config.ts (comment-stripped grep)'
+fi
+# 接线门:判定必须出现在 otpSend 函数体内(剥注释后)。sed 函数头带左括号锚定(防
+# otpSendXxx 前缀撞名假绿),截取后剥 // 注释 —— 注释里的同名文本不算接线(红测 b1
+# 实抓:decision 注释在函数体内,不剥注释时删掉真判定门仍绿)。文件级 grep 抓不住
+# 「判定挪出 otpSend 但仍留在文件里」的形态(quota_claim_before_create 同族)。
+# 函数头改名/提取为空时 lines=0 按红处理(fail-closed)。
+auth03_body=$(sed -n '/^export async function otpSend(/,/^}/p' src/store/auth-otp.ts | sed 's|//.*||')
+auth03_body_lines=$(printf '%s\n' "$auth03_body" | grep -c .)
+if [ "$auth03_body_lines" -gt 0 ] && printf '%s' "$auth03_body" | grep -q 'captchaAlwaysScenes\.includes(scene)'; then
+  ok "AUTH03 scene-forced captcha wired inside otpSend body (scanned $auth03_body_lines code lines)"
+else
+  bad "AUTH03 captchaAlwaysScenes.includes(scene) not inside otpSend body (code lines=$auth03_body_lines; 判定未接线或被挪出函数体)"
+fi
 # FEAT-AUTH02 已注册手机号分流：账号目录是唯一事实源；验证码通过后才可发现
 # 老号进入既有登录链后，目标页 toast 必须持续展示可读提示。运行时链放在下方 H5
 # browser gate。
@@ -615,8 +635,14 @@ else
     bad "SPEC-7 param key parity missing: $parity_miss"
   fi
   # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
-  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 5 键逐一比对字面值;
+  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 数值 5 键逐一比对字面值;
   # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
+  # 🔴 包 A handoff(FEAT-AUTH03):otpGate 第 6 键 captchaAlwaysScenes(string[])暂不进本
+  # 循环 —— admin OtpGateParamDef 是 kind:"number" 单形态,数组参数的登记(类型加宽 + K2 渲染
+  # + defaultVal)是包 A 交付物;uniapp 侧值由上方 AUTH03 值 pin 哨兵看住,不留无门真空。
+  # 包 A 落地后必须:① 把该键补进本循环并删本注释;② 重写值提取 —— 下方 `defaultVal: [^,]+`
+  # 与 `$k: [^,]+` 正则遇多元素数组(如 ["login","register"])会在首个逗号处截断,
+  # 数组键须按括号配对整段提取,不能沿用现式。
   value_mismatch=""
   for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
            pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
@@ -632,18 +658,19 @@ else
     fi
   done
   if [ -z "$value_mismatch" ]; then
-    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 5)"
+    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;第 6 键 captchaAlwaysScenes 由 AUTH03 pin 哨兵看住,包 A 落地后进循环)"
   else
     bad "SPEC-7 param value parity drift: $value_mismatch"
   fi
-  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 5。两端同时
+  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 6(循环数值
+  # 5 键 + captchaAlwaysScenes 由 AUTH03 值 pin 哨兵看住,见上方包 A handoff)。两端同时
   # 新增键时键 parity 仍绿、值 parity 循环静默漏检,此处变红逼同步扩循环(2026-07-14 对抗审查 D 项缺口)
   seed_key_count=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
   og_key_count=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
-  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 5 ]; then
-    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=5, 与循环清单同步)"
+  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 6 ]; then
+    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=6, 与循环清单+AUTH03 pin 同步)"
   else
-    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 5) —— 新增/删除键须同步改值 parity 循环"
+    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 6) —— 新增/删除键须同步改值 parity 循环与 AUTH03 pin"
   fi
 fi
 # ── SPEC-2 电脑算力 sentinels ──
