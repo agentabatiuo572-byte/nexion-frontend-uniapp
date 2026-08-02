@@ -1,13 +1,9 @@
 <!--
-  TrialClaimSheet — chassis-level bottom sheet surfacing the free-trial offer +
-  routing to card binding. Ported from
-  Nexion-prototype/app/components/trial-claim-sheet.tsx.
-    · framer slide-up      → CSS keyframes
-    · lucide X/Sparkles/Clock → inline <svg>
-    · zero-friction copy (no charge/cap/grace numbers — disclosure lives on the
-      bind step ?trial=1 and /me/trial), fully i18n-routed (t.trial.sheet*).
-  The triggers (trial-hero-banner / trial-entry) already call
-  useTrialClaimSheet().show(); this is the missing UI that renders when open.
+  TrialClaimSheet — chassis-level bottom sheet surfacing the free-trial offer.
+  FEAT-TRIAL02: confirming claims the trial DIRECTLY (no card, no payment
+  method anywhere in the flow — spec ②⑤). Failure shows an inline error +
+  retry inside the sheet (never silent); ineligible surfaces the concrete
+  reason (异常2). Zero-friction copy, fully i18n-routed (t.trial.sheet*).
 -->
 <template>
   <view v-if="sheet.open" class="tcs-root">
@@ -74,11 +70,17 @@
         </view>
       </view>
 
+      <!-- Inline claim error + retry (spec ⑤ — never silent) -->
+      <view v-if="claimError" class="tcs-error">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+        <text class="tcs-error-t">{{ t.trial.claimErrorInline }}</text>
+      </view>
+
       <!-- CTAs -->
-      <view class="tcs-ctas" @click="onClaim">
-        <view class="tcs-claim" role="button" tabindex="0" :aria-label="t.trial.sheetClaimCta" @click.stop="onClaim">
+      <view class="tcs-ctas">
+        <view class="tcs-claim" :class="{ 'tcs-claim--busy': claiming }" role="button" tabindex="0" :aria-label="claimCtaLabel" :aria-busy="claiming ? 'true' : 'false'" @click.stop="onClaim">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /></svg>
-          <text class="tcs-claim-t">{{ t.trial.sheetClaimCta }}</text>
+          <text class="tcs-claim-t">{{ claimCtaLabel }}</text>
         </view>
         <view class="tcs-dismiss" role="button" tabindex="0" :aria-label="t.trial.sheetDismissCta" @click.stop="hide">
           <text class="tcs-dismiss-t">{{ t.trial.sheetDismissCta }}</text>
@@ -89,14 +91,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { useTrialConfig } from "@/store/trial-config";
-import { useFreeTrial } from "@/store/free-trial";
+import { useFreeTrial, type TrialIneligibleReason } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
 
 const sheet = useTrialClaimSheet();
 const trialConfig = useTrialConfig();
@@ -111,23 +112,48 @@ const prop1Sub = computed(() => fmt(t.value.trial.sheetProp1Sub, { days: String(
 const prop3Title = computed(() => fmt(t.value.trial.sheetProp3Title, { amount: String(cfg.value.discountCapUSD) }));
 const prop3Sub = computed(() => fmt(t.value.trial.sheetProp3Sub, { pct: (cfg.value.discountRate * 100).toFixed(0) }));
 
+// Claim submission — loading guard against double taps (异常3; the store's
+// start() is idempotent underneath, this just keeps the UI honest) + inline
+// error with retry (spec ⑤: failure is never silent).
+const claiming = ref(false);
+const claimError = ref(false);
+const claimCtaLabel = computed(() => (claimError.value ? t.value.trial.claimRetryCta : t.value.trial.sheetClaimCta));
+
+function reasonText(reason: TrialIneligibleReason | undefined): string {
+  const w = t.value.trial;
+  if (reason === "converted") return w.eligReasonConverted;
+  if (reason === "used") return w.eligReasonUsed;
+  if (reason === "in-progress") return w.eligReasonInProgress;
+  return w.eligReasonClosed;
+}
+
 function hide() {
+  claimError.value = false;
   sheet.hide();
 }
 function onClaim() {
-  // Eligibility guard: surfaces that don't pre-check (auto-push) could open this
-  // when the trial can't start — tell the user instead of routing to a bind that
-  // would silently fail to activate.
-  if (!freeTrial.canStart()) {
+  if (claiming.value) return;
+  // Eligibility guard with the CONCRETE reason (异常2): auto-push surfaces can
+  // open this sheet in a race where the trial can't start — tell the user why,
+  // never a generic error.
+  const elig = freeTrial.eligibility();
+  if (!elig.ok) {
     sheet.hide();
-    toast.info(t.value.trial.toastCannotStart);
+    toast.info(reasonText(elig.reason));
     return;
   }
+  claiming.value = true;
+  // PRODUCTION: await POST /api/trial/start — the claiming flag holds the CTA
+  // in its busy state for the round-trip. Mock resolves synchronously.
+  const r = freeTrial.start();
+  claiming.value = false;
+  if (!r.ok) {
+    claimError.value = true; // inline error + retry CTA, stay in the sheet
+    return;
+  }
+  claimError.value = false;
   sheet.hide();
-  // returnTo keeps the trial=1 marker so /me/trial auto-starts after the bind
-  // redirect; the top-level trial=1 lets the bind page show the disclosure.
-  const returnTo = encodeURIComponent("/pages/me/trial?trial=1");
-  navTo(`/pages/me/wallet-cards-new?returnTo=${returnTo}&trial=1`);
+  toast.success(t.value.trial.toastActivated);
 }
 </script>
 
@@ -321,11 +347,31 @@ function onClaim() {
   margin-top: 4px;
   line-height: 1.625;
 }
+.tcs-error {
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--v5-warning) 10%, transparent);
+}
+.tcs-error-t {
+  flex: 1;
+  font-size: 12px;
+  color: var(--v5-ink-2);
+  line-height: 1.625;
+  text-wrap: pretty;
+}
 .tcs-ctas {
   margin-top: 20px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.tcs-claim--busy {
+  opacity: 0.7;
+  pointer-events: none;
 }
 .tcs-claim {
   width: 100%;
