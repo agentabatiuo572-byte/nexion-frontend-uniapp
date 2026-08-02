@@ -33,6 +33,18 @@ if ! command -v "$NODE_BIN" >/dev/null 2>&1 && command -v node.exe >/dev/null 2>
   NODE_BIN="node.exe"
 fi
 
+# admin 仓根解析:主树 `../Nexion-admin-prototype` 相对路径优先;linked worktree
+# (.claude/worktrees/*)下该相对路径落空 → 用 git common-dir 反推主仓根再取同级
+# admin 仓(pkg-i 审查:worktree 内 SPEC-7 因路径假阴恒红)。git 不可用 / 独立打包 /
+# admin 仓真缺失时 ADMIN_ROOT 保持原相对值 → 下游各消费点维持原 bad/skip 行为。
+ADMIN_ROOT="$PROJECT_DIR/../Nexion-admin-prototype"
+if [ ! -d "$ADMIN_ROOT" ]; then
+  main_git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [ -n "$main_git_dir" ] && [ -d "$(dirname "$main_git_dir")/../Nexion-admin-prototype" ]; then
+    ADMIN_ROOT="$(dirname "$main_git_dir")/../Nexion-admin-prototype"
+  fi
+fi
+
 ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
 bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
 
@@ -463,6 +475,15 @@ if [ "$auth03_body_lines" -gt 0 ] && printf '%s' "$auth03_body" | grep -q 'captc
 else
   bad "AUTH03 captchaAlwaysScenes.includes(scene) not inside otpSend body (code lines=$auth03_body_lines; 判定未接线或被挪出函数体)"
 fi
+# UI→store 第三段接线 pin(pkg-i 审查 P2):register 页发码调用点必须字面传 "register"
+# 场景(剥 // 注释,防注释诱饵)。漂成 "login"/变量时产品回退到阈值规则而 store 层
+# 探针/接线门全绿 —— quota_claim_before_create 同族「判定对 ≠ 接上」缺口的 UI 段。
+# 注:login.vue 传 sceneAtRequest 变量是双场景页(login/reset)合法形态,不在 pin 范围。
+if sed 's|//.*||' src/pages/register/register.vue | grep -qF 'otpSend(phoneAtRequest, "register"'; then
+  ok 'AUTH03 register.vue passes literal "register" scene to otpSend (comment-stripped)'
+else
+  bad 'AUTH03 register.vue otpSend scene wiring drifted (expect literal otpSend(phoneAtRequest, "register" after comment strip)'
+fi
 # FEAT-AUTH02 已注册手机号分流：账号目录是唯一事实源；验证码通过后才可发现
 # 老号进入既有登录链后，目标页 toast 必须持续展示可读提示。运行时链放在下方 H5
 # browser gate。
@@ -615,7 +636,7 @@ else
   ok "SPEC-7 settle NEX route goes through buckets"
 fi
 # 双端参数 key parity: uniapp 配置契约 ↔ admin 参数寄存器(DR-7 结构一致)
-ADMIN_CFG="../Nexion-admin-prototype/lib/mock/admin/compute-config.ts"
+ADMIN_CFG="$ADMIN_ROOT/lib/mock/admin/compute-config.ts"
 if [ ! -f "$ADMIN_CFG" ]; then
   bad "SPEC-7 parity: admin compute-config.ts not found at $ADMIN_CFG"
 else
@@ -671,6 +692,12 @@ else
     ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=6, 与循环清单+AUTH03 pin 同步)"
   else
     bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 6) —— 新增/删除键须同步改值 parity 循环与 AUTH03 pin"
+  fi
+  # 包 A 前向提醒(WARN,非门):captchaAlwaysScenes 未登记 admin 侧前每轮可见,防欠账
+  # 蒸发;登记后自动沉默。真正的机器门 = 登记时按上方包 A handoff 注释两步接入值 parity
+  # 循环(spec FEAT-AUTH03 ⑦ 已列为包 A Done-when)。
+  if ! grep -q 'captchaAlwaysScenes' "$ADMIN_CFG"; then
+    printf "  ${Y}WARN${N}  %s\n" "SPEC-7 pkg-A pending: captchaAlwaysScenes 未登记 admin compute-config(登记后按包 A handoff 注释进值 parity 循环)"
   fi
 fi
 # ── SPEC-2 电脑算力 sentinels ──
@@ -1815,7 +1842,7 @@ home_task_carousel_contract
 # 不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
 # 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
 cross_repo_sampling_gate() {
-  local audit_js="$PROJECT_DIR/../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs"
+  local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
   local audit_arg="$audit_js"
   if [ ! -f "$audit_js" ]; then
     ok "cross-repo sampling evidence gate skipped (admin repo absent)"

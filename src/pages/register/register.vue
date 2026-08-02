@@ -341,7 +341,8 @@ async function requestCode(captchaTicket?: string) {
   }
   if (res.error === "captcha_required") { showCaptcha.value = true; return; }
   if (res.error === "rate_limited") {
-    error.value = fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec });
+    // 规格 ⑤(AUTH01/AUTH03 同口径):冷却中被拒 → Toast 剩余秒数;inline 错误条留给 verify 类错误。
+    toast.info(fmt(t.value.authOtp.errorTooFrequent, { s: res.retryAfterSec }));
     if (step.value === 2) startResend(res.retryAfterSec);
   }
 }
