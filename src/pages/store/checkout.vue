@@ -696,7 +696,10 @@ function methodIconStyle(active: boolean): CSSProperties {
     width: "36px",
     height: "36px",
     borderRadius: "8px",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+    // 两态原本都与所在行同色 → 图标框隐形:未选中 surface-2 撞未选中行的 surface-2,
+    // 选中 brand-soft 撞选中行的 brand-soft(第一轮只修了未选中,复扫才抓出选中态也坏)。
+    // 现在两态都从行里浮出来:选中用 L1 托住品牌色图标,未选中用 surface-3 内凹。
+    background: active ? "var(--v5-surface)" : "var(--v5-surface-3)",
   };
 }
 const payFootStyle: CSSProperties = { padding: "16px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };

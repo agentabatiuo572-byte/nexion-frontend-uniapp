@@ -259,7 +259,8 @@ const fieldLabelStyle: CSSProperties = {
 const nameRowStyle: CSSProperties = {
   marginTop: "4px",
   minHeight: "44px",
-  background: "var(--v5-surface-2)",
+  // 外层 fieldsWrap 无背景,此行直接坐在页面底上;surface-2 对页面底亮色 ΔE 2.2 不可辨 → 改 L1 surface。
+  background: "var(--v5-surface)",
   borderRadius: "8px",
   padding: "0 12px",
   gap: "10px",

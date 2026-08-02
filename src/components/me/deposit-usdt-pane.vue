@@ -494,7 +494,8 @@ const stateIconBoxStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   borderRadius: "14px",
-  background: "var(--v5-surface-2)",
+  // 图标框直接坐在页面底上,原 surface-2 与页面底同色不可辨,改 L1 surface。
+  background: "var(--v5-surface)",
 };
 const retryBtnStyle: CSSProperties = {
   marginTop: "14px",

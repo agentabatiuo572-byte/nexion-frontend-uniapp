@@ -243,7 +243,10 @@ function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSPropertie
     width: "40px",
     height: "40px",
     borderRadius: "12px",
-    background: ul ? `color-mix(in srgb, ${CAT_COLOR[cat]} 10%, transparent)` : "var(--v5-surface)",
+    // 未解锁态原用 --v5-surface,与所在卡片同色 → 图标框整个隐形(双主题)。
+    // 改 surface-3(同 security.vue 关闭态图标框的既有惯例);叠加下面的 opacity .5 后
+    // 对卡片仍有 ΔE≈4.5,弱而可见 —— 未解锁本就该弱,但不该没有。
+    background: ul ? `color-mix(in srgb, ${CAT_COLOR[cat]} 10%, transparent)` : "var(--v5-surface-3)",
     opacity: ul ? 1 : 0.5,
   };
 }

@@ -209,10 +209,10 @@ function openHit(h: Hit) {
 }
 
 // ── styles ──
-// White-list recessed input: surface-2 fill, no border.
+// 搜索框直接坐在页面底上,没有外层卡片可"凹陷"→ 用 L1 surface;surface-2 在亮色下与页面底几乎同色,搜索框会消失
 const inputWrapStyle: CSSProperties = {
   gap: "8px",
-  background: "var(--v5-surface-2)",
+  background: "var(--v5-surface)",
   borderRadius: "12px",
   padding: "0 12px",
   height: "48px",

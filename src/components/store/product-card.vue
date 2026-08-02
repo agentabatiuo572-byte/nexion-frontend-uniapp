@@ -301,7 +301,10 @@ const cloudChipStyle: CSSProperties = {
   letterSpacing: "0.22em",
   color: "var(--v5-tech-cyan-ink)",
   lineHeight: 1,
-  background: "rgba(255,255,255,0.85)",
+  // 原为硬编码 rgba(255,255,255,0.85):亮色主题下压在浅色媒体区上 ΔE=0 直接隐形,
+  // 且违反「颜色用 token 不写字面值」。换成 tech-cyan 软底 —— 与本行 ink 同语义配对,
+  // 也是 tech-money-card 既有的 soft+ink 组合,双主题都有定义。
+  background: "var(--v5-tech-cyan-soft)",
   padding: "5px 9px",
   borderRadius: "4px",
   fontWeight: 600,
@@ -378,9 +381,11 @@ const buyBtnStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 // Locked Buy CTA = muted (soft surface, no brand) when gate blocks purchase.
+// 用 surface-3 不用 surface-2 —— 按钮就落在 footerStyle 上,而 footer 本身是 surface-2,
+// 同值会让「解锁后购买」整颗按钮隐形(双主题实测 ΔE=0)。muted 的本意是弱化,不是消失。
 const buyBtnDynStyle = computed<CSSProperties>(() =>
   gate.value.blocked
-    ? { ...buyBtnStyle, background: "var(--v5-surface-2)", color: "var(--v5-ink-3)" }
+    ? { ...buyBtnStyle, background: "var(--v5-surface-3)", color: "var(--v5-ink-3)" }
     : buyBtnStyle,
 );
 const gateBoxStyle: CSSProperties = {

@@ -523,7 +523,7 @@ const saverBtnStyle = computed<CSSProperties>(() => ({
   padding: "0 16px",
   borderRadius: "999px",
   background: streakBroken.value ? "var(--v5-brand-2)" : "var(--v5-surface-2)",
-  color: streakBroken.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
+  color: streakBroken.value ? "var(--v5-on-brand-2)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "13px",

@@ -50,7 +50,7 @@ const props = withDefaults(
     title: string;
     desc?: string;
     ctaLabel?: string;
-    /** 转化型状态(no-owned-asset)把 CTA 做成实心品牌色,其余用弱一档的 soft 底 */
+    /** 转化型状态(no-owned-asset)把 CTA 做成实心品牌色,其余用 L1 surface 底(缺省页坐在页面底上) */
     emphasis?: boolean;
     /** 嵌在卡片/小容器里时收窄纵向留白 */
     compact?: boolean;
@@ -103,7 +103,8 @@ const ctaStyle = computed<CSSProperties>(() => ({
   display: "inline-flex",
   alignItems: "center",
   justifyContent: "center",
-  background: props.emphasis ? "var(--v5-brand)" : "var(--v5-surface-2)",
+  // 缺省页坐在页面底上,弱 CTA 原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface。
+  background: props.emphasis ? "var(--v5-brand)" : "var(--v5-surface)",
 }));
 const ctaTextStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",

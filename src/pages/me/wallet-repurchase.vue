@@ -208,7 +208,8 @@ function presetStyle(active: boolean): CSSProperties {
     borderRadius: "8px",
     fontSize: "12px",
     fontWeight: 600,
-    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
+    // 区块已去卡,档位直接坐在页面底上:原 surface-2 与页面底同色不可辨,改 L1 surface。
+    background: active ? "var(--v5-brand)" : "var(--v5-surface)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-2)",
   };
 }

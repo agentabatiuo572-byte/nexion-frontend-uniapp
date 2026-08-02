@@ -169,7 +169,8 @@ function pillStyle(active: boolean): CSSProperties {
     borderRadius: "999px",
     fontSize: "12px",
     fontWeight: 600,
-    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
+    // 未选中原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),筛选胶囊直接坐在页面底上 → 改 L1
+    background: active ? "var(--v5-brand)" : "var(--v5-surface)",
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
