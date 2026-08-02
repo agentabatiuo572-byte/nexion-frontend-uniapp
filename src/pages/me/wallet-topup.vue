@@ -355,7 +355,9 @@ function startVerifying() {
       amount: 1,
       status: "posted",
       memo: "KYC-Express compliance bonus",
-      ref: `KYC-${pairing.complianceCheckId ?? "PENDING"}`,
+      // complianceCheckId 本身就是 "KYC-2026-Axxxxx" 形态(nextComplianceId 恒带前缀),
+      // 再拼 "KYC-" 会落出 "KYC-KYC-…" 的双前缀单号(走查 P2-1)
+      ref: pairing.complianceCheckId ?? "KYC-PENDING",
     });
     kycPhase.value = "complete";
   }, KYC_PHASE_1_MS + KYC_PHASE_2_MS + 800);

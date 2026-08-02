@@ -131,7 +131,7 @@ export const en = {
       "You are responsible for safeguarding your login credentials, two-factor authentication, and wallet keys. Activity under your account is your responsibility. Notify us immediately of any unauthorized access. We may suspend accounts showing signs of fraud, multi-accounting, or credential compromise.",
     s4Title: "Hardware purchase & operation",
     s4Body:
-      "NexGridBox / NexGridRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume declines with device age, so the tasks a device can book — and its earnings — taper accordingly; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
+      "NexGridBox / NexGridRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume keeps shrinking, so the tasks a fixed-compute device can book — and its earnings — narrow month by month; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
     s5Title: "Earnings, rewards & the NEX token",
     s5Body:
       "All yield figures shown in the app are projections based on current network parameters and recent demand, not guarantees. Earnings fluctuate and may decline over time. NEX is a platform reward token whose value can move sharply and is not deposit-insured. Never commit more than you can afford to lose.",
@@ -918,7 +918,7 @@ export const en = {
     alreadyAcceptedCta: "Acknowledged",
     s1Title: "Earnings projections are forecasts, not promises",
     s1Body: "All daily / monthly / annual yield estimates shown on NexGrid are based on current network parameters and recent client demand. Actual earnings will fluctuate ±15% week-to-week and may decline as more devices join the network or as compute prices fall. Past performance is not indicative of future results.",
-    s2Title: "The task pool keeps upgrading — bookable tasks decline with device age",
+    s2Title: "The task pool keeps upgrading — a device's bookable tasks narrow month by month",
     s2Body: "NexGrid's AI task pool keeps upgrading: newer tasks demand more compute (VRAM), so higher-tier tasks grow while lower-tier task volume shrinks. The tasks a given device can book narrow month over month through its first year — faster in later months — until only the capacity-floor share of earnings remains. Newly activated devices receive a task-priority subsidy that keeps them booked at full capacity. Trade-in credit is set by the tier your device's lifetime output falls into — the more it has produced, the smaller the credit.",
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
@@ -2085,6 +2085,7 @@ export const en = {
     complianceGateBody: "Per MiCA Art. 22 and the FATF Travel Rule, wallet ownership must be verified before payouts. Complete the one-time KYC-Express ($1 USDT, fully credited).",
     withdrawalStatusSubtitle: "Withdrawal Status",
     noActiveWithdrawal: "No active withdrawal.",
+    withdrawalNotFound: "This withdrawal's record could not be found.",
     submitNewWithdrawal: "Submit a new withdrawal →",
     trackSubmittedHint: "Request received",
     trackReviewHint: "Automated screen + account review",

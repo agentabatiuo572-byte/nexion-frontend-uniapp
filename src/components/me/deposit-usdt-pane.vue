@@ -113,10 +113,11 @@
           <view
             v-for="r in sortedRecords"
             :key="r.depositId"
-            class="nx-dep-record-row flex items-start active:opacity-90"
+            class="nx-dep-record-row flex items-start"
+            :class="recordClickable(r) ? 'active:opacity-90' : ''"
             :style="recordRowStyle"
-            role="button"
-            @click="goRecord(r)"
+            :role="recordClickable(r) ? 'button' : undefined"
+            v-on="recordRowOn(r)"
           >
             <view class="grid place-items-center shrink-0" :style="depIconStyle">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
@@ -312,6 +313,14 @@ function noteText(r: DepositRecord): string {
   if (r.status === "confirming" && mockServerNow() - r.createdAt > CONFIRM_DELAY_NOTE_MS) return tc.confirmDelayed;
   return "";
 }
+/** 法币轨恒可点(跳账单页);链上轨只有已入账(credited)有交易详情可看(与 goRecord 同判据)。 */
+function recordClickable(r: DepositRecord): boolean {
+  return !isChainChannel(r.channel) || r.status === "credited";
+}
+/** 不可点记录行不注册 click 监听(同 wallet-bills.billRowOn:防 tap-feedback 门判死控件)。 */
+function recordRowOn(r: DepositRecord) {
+  return recordClickable(r) ? { click: () => goRecord(r) } : {};
+}
 function goRecord(r: DepositRecord) {
   // 法币轨(银行转账 / 银行卡)无链上哈希,tx 浏览器框架页语义不符 → 跳账单页
   // (银行轨成功态的「查看账单」同口径;卡轨成功态回钱包,此处统一到账单页)。
@@ -320,6 +329,9 @@ function goRecord(r: DepositRecord) {
     navTo("/pages/me/wallet-bills");
     return;
   }
+  // 🔴 在途/灰尘/退回的链上记录不进 tx 页:tx 页状态区恒渲「已确认」,对未到账记录是编造
+  // (账单深链 P0 的入金侧同类,证伪报告 R1);行内已展示确认进度与说明,无更多详情可看。
+  if (r.status !== "credited") return;
   // 带真实参数进交易详情:金额=链上转账额(gross,与费率行 gross−fee=credited 闭环)、
   // 网络、确认数、专属收款地址、发生时间——tx 页入参优先,防种子假数据与本笔矛盾。
   const p = new URLSearchParams({

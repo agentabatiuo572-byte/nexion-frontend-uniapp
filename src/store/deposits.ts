@@ -61,6 +61,13 @@ function hydrate(accountKey: string): DepositsRow {
   };
 }
 
+/** 链上通道 → tx 页网络短码(大写白名单键)。法币轨无映射:非链上转账,账单不落 network。 */
+export const CHAIN_NET_SHORT: Partial<Record<DepositChannel, "TRC20" | "ERC20" | "BEP20">> = {
+  "usdt-trc20": "TRC20",
+  "usdt-erc20": "ERC20",
+  "usdt-bep20": "BEP20",
+};
+
 /** bills memo 用通道标签(账单 memo 与既有 seed "Top-up · USDT-TRC20" 同款式)。 */
 const CHANNEL_MEMO: Record<DepositChannel, string> = {
   "usdt-trc20": "USDT-TRC20",
@@ -208,6 +215,8 @@ export const useDeposits = defineStore("deposits", () => {
       status: "posted",
       memo: `Top-up · ${CHANNEL_MEMO[rec.channel]}`,
       ref: rec.txHash ?? rec.depositId,
+      // 链上通道落网络码位(法币轨为 undefined 不落);账单详情跳转不再依赖 memo 文案正则
+      network: CHAIN_NET_SHORT[rec.channel],
     });
     patchRecord(depositId, { status: "credited", creditedAt: mockServerNow() });
     return true;
