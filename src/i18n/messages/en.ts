@@ -281,6 +281,7 @@ export const en = {
     rewardReviewBody: "This device already has account activity. Signup continues, but the welcome gift is held until review.",
     rewardReviewBodyUnbound: "Earnings and the welcome gift on a new account are held for review first, releasing as the account completes binding or app online verification.",
     giftCreditedToastSub: "Credited to wallet",
+    giftCreditedToastSubSponsor: "Sponsored by {name}",
     giftPendingToast: "Welcome gift pending review",
     giftPendingToastSub: "Signup is complete. The reward is held until account review is complete.",
     doneTitle: "You're in",
@@ -1539,6 +1540,7 @@ export const en = {
     bannerCta: "Claim",
     checkoutRowLabel: "Voucher",
     expiredNote: "A claimed voucher for this device has expired",
+    quoteChanged: "Voucher discount changed — review the updated total before paying",
   },
   // My Rewards (我的奖励) — vouchers (available/expired) + system rewards (USDT/NEX).
   rewards: {
@@ -3536,6 +3538,11 @@ export const en = {
     feeWhyNetworkBody: "Each withdrawal pays one fixed network confirmation fee. The amount depends on the network of your bound address and does not change with the withdrawal amount. When a network is free, this row shows $0.00.",
     feeWhyOffsetTitle: "Paying the fee with NEX",
     feeWhyOffsetBody: "Turn the NEX option on to cover the fee from your NEX balance. Only what is needed is used; if you hold less, the covered part is deducted and the rest is paid from the withdrawal. The option is off by default — NEX is never used without it.",
+    // FEAT-WD02 ⑥ — submit confirm dialog (amount / single confirm-fee line / NEX burn when on / net receive)
+    withdrawConfirmTitle: "Confirm withdrawal",
+    withdrawConfirmBody: "Withdraw ${amount} USDT · Network confirmation fee −${fee} · You receive ${receive}",
+    withdrawConfirmBodyNex: "Withdraw ${amount} USDT · Network confirmation fee −${fee} · NEX offset +${waived} ({nex} NEX) · You receive ${receive}",
+    withdrawConfirmCta: "Confirm",
 
     feeDetailPlaceholder: "Enter an amount to see the fee breakdown",
 

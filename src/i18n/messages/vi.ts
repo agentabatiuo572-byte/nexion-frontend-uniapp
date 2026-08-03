@@ -282,6 +282,7 @@ export const vi: Messages = {
     rewardReviewBody: "Thiết bị này đã có hoạt động tài khoản. Bạn vẫn đăng ký được, nhưng quà chào mừng sẽ tạm giữ tới khi xét duyệt xong.",
     rewardReviewBodyUnbound: "Thu nhập và quà chào mừng trên tài khoản mới sẽ được giữ lại để xét duyệt trước, rồi mở dần khi tài khoản hoàn tất liên kết hoặc xác minh online trong app.",
     giftCreditedToastSub: "Đã vào ví",
+    giftCreditedToastSubSponsor: "Được {name} mời",
     giftPendingToast: "Quà chào mừng đang chờ duyệt",
     giftPendingToastSub: "Đăng ký đã xong. Phần thưởng được giữ tới khi xét duyệt tài khoản xong.",
     doneTitle: "Hoàn tất",
@@ -1519,6 +1520,7 @@ export const vi: Messages = {
     bannerCta: "Nhận",
     checkoutRowLabel: "Voucher",
     expiredNote: "Một voucher đã nhận cho thiết bị này đã hết hạn",
+    quoteChanged: "Ưu đãi voucher đã thay đổi — vui lòng xem lại tổng mới trước khi thanh toán",
   },
   rewards: {
     title: "Phần thưởng của tôi",
@@ -3459,6 +3461,11 @@ export const vi: Messages = {
     feeWhyNetworkBody: "Mỗi lần rút trả một khoản phí xác nhận mạng cố định. Mức phí phụ thuộc vào mạng của địa chỉ đã liên kết và không thay đổi theo số tiền rút; khi mạng miễn phí, dòng này hiển thị $0.00.",
     feeWhyOffsetTitle: "Trả phí bằng NEX",
     feeWhyOffsetBody: "Bật tùy chọn NEX để bù phí từ số dư NEX của bạn. Chỉ dùng đúng số cần thiết; nếu bạn có ít hơn, phần bù được sẽ trừ đi và phần còn lại trả từ khoản rút. Tùy chọn mặc định tắt — không bật thì không bao giờ dùng NEX.",
+    // FEAT-WD02 ⑥ — hộp thoại xác nhận rút (số tiền / một dòng phí xác nhận / NEX dùng khi bật / thực nhận)
+    withdrawConfirmTitle: "Xác nhận rút tiền",
+    withdrawConfirmBody: "Rút ${amount} USDT · Phí xác nhận mạng −${fee} · Bạn nhận được ${receive}",
+    withdrawConfirmBodyNex: "Rút ${amount} USDT · Phí xác nhận mạng −${fee} · Bù bằng NEX +${waived} ({nex} NEX) · Bạn nhận được ${receive}",
+    withdrawConfirmCta: "Xác nhận",
 
     feeDetailPlaceholder: "Nhập số tiền để xem chi tiết phí",
 

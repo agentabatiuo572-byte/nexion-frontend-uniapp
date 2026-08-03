@@ -270,6 +270,7 @@ export const zh: Messages = {
     rewardReviewBody: "这台设备已有账号活动。注册可继续,新人奖励会先锁定,审核完成后按结果处理。",
     rewardReviewBodyUnbound: "新账户的收益与新人奖励会先进入审核,完成账户绑定或 App 在线验证后逐步释放。",
     giftCreditedToastSub: "已存入钱包",
+    giftCreditedToastSubSponsor: "来自 {name} 的邀请",
     giftPendingToast: "新人奖励待审核",
     giftPendingToastSub: "账号已创建,奖励会保留到账户审核完成。",
     doneTitle: "注册成功",
@@ -1521,6 +1522,7 @@ export const zh: Messages = {
     bannerCta: "领取",
     checkoutRowLabel: "代金券",
     expiredNote: "你领取的本设备代金券已过期",
+    quoteChanged: "代金券抵扣已变化,请重新确认最新金额后再支付",
   },
   // 我的奖励 —— 优惠券(可用/过期)+ 系统奖励(USDT/NEX)。
   rewards: {
@@ -3466,6 +3468,11 @@ export const zh: Messages = {
     feeWhyNetworkBody: "每笔提现收取一笔固定的网络确认费,金额按绑定地址所在的网络而定,与提现金额无关;若该网络当前免费,此行显示 $0.00。",
     feeWhyOffsetTitle: "用 NEX 抵扣",
     feeWhyOffsetBody: "开启 NEX 抵扣后,将从你的 NEX 余额中扣除所需数量抵扣本笔费用;持有不足时按可抵部分抵扣,剩余从提现中支付。该选项默认关闭,未开启时不会消耗任何 NEX。",
+    // FEAT-WD02 ⑥ — 提交确认弹窗(金额 / 单行网络确认费 / NEX 消耗(开了才显)/ 到手金额)
+    withdrawConfirmTitle: "确认提现",
+    withdrawConfirmBody: "提现 ${amount} USDT · 网络确认费 −${fee} · 实际到账 ${receive}",
+    withdrawConfirmBodyNex: "提现 ${amount} USDT · 网络确认费 −${fee} · NEX 抵扣 +${waived}(消耗 {nex} NEX)· 实际到账 ${receive}",
+    withdrawConfirmCta: "确认提现",
 
     feeDetailPlaceholder: "输入金额后显示费用明细",
 
