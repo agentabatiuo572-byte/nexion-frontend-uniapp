@@ -2044,6 +2044,30 @@ scrim_gate() {
 }
 scrim_gate
 
+# ── 全站层级秩序门(2026-08-04 第 2 轮审计 P1)──
+# 起因:滑块人机验证 .cs-layer 从建档起就是 z-index 90,输给 toast(9000)/确认弹窗(9100)/
+# 区号半屏(9001)/庆祝层(8900)。实测注册页三个操作点 elementFromPoint 全被 .cc-row 吃掉、
+# 把手拖不动,而发码流程正停在它上面等解开 = 死锁。层级此前没有任何机器门:改一个数字
+# tsc/verify/i18n 全绿。本门两个正交断言 —— ① 六层阶梯严格递增(解析不到=红,覆盖「删掉
+# z-index」这个遍历看不见的方向);② 天花板:全站扫 z-index,白名单外不许 ≥ 滑块(阶梯只
+# 遍历已知成员,新加的 9600 浮层要靠这条才看得见)。
+zindex_order_gate() {
+  if "$NODE_BIN" scripts/zindex-order.mjs --selftest > /tmp/uniapp-zindex-selftest.log 2>&1; then
+    ok "$(grep -c '^PASS' /tmp/uniapp-zindex-selftest.log) 项 zindex-order selftest 全过(逐个相邻对隔离红测 + 事故现场 90 + 删除方向 + 天花板新成员)"
+  else
+    bad "zindex-order selftest 失败(node scripts/zindex-order.mjs --selftest 看明细)"
+    grep -E "^FAIL" /tmp/uniapp-zindex-selftest.log | head -8 | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/zindex-order.mjs > /tmp/uniapp-zindex.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-zindex.log)"
+  else
+    bad "浮层层级秩序被破坏 — node scripts/zindex-order.mjs 看明细"
+    tail -10 /tmp/uniapp-zindex.log | sed 's/^/        /'
+  fi
+}
+zindex_order_gate
+
 # ── 双主题恒定着色 · 运行时正交门(C1 批次 2026-07-23) ──
 # 上面两道是静态门,只能钉「我已经想到的写法」。本批同一个坑连踩三次(按值比 token 漏变
 # alpha 副本 / 按值 grep 遮罩漏 11 个 / 按值 grep 网格线漏 2 个),根因都是「用值找角色」。
