@@ -589,6 +589,9 @@ const withdrawalRiskNotice = computed(
 );
 // SPEC-7: 提交进行中(风控校验加载态)。
 const submitting = ref(false);
+// FEAT-WD02 ⑥:确认弹窗在途守卫。弹窗打开期间 submitting 尚未置位,不挡的话
+// 连点 CTA 会叠出第二个弹窗,两次确认 = 双重建单(mask 盖住 CTA 是第二道,这是第一道)。
+const confirmingSubmit = ref(false);
 // ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
 const heldLine = computed(() => {
   const b = app.user.earningBuckets;
@@ -795,7 +798,7 @@ async function handleResetKyc() {
 }
 
 async function handleSubmit() {
-  if (submitting.value) return;
+  if (submitting.value || confirmingSubmit.value) return;
   if (!canSubmit.value) {
     toast.info(submitDisabledReason.value || t.value.walletV3.submitCtaDisabled);
     return;
@@ -805,9 +808,6 @@ async function handleSubmit() {
     uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
     return;
   }
-  // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
-  // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
-  submitting.value = true;
   // 🔴 金额也必须冻成快照。此前只冻了费用报价(submittingQuote)和 NEX 余额
   // (submittingNexBalance),唯独漏了**报价的分母**。而改金额的入口不止输入框:
   // 「全部提现」和降额 CTA 都是裸 <view @click>,提交期间照样点得动。
@@ -815,7 +815,44 @@ async function handleSubmit() {
   // **重新读一次**同一个 ref —— 扣款 $30 / 单据 $30 / 账单 -$24,856,三处口径分叉;
   // 反向还能用 $50 的小额免审裁决建出全余额的自动放行单,绕过新地址 hold 与大额强制人工。
   // 不变量:参与建单的每一个输入都在提交开始时冻结,await 之后一律用快照,不再读 ref。
+  // 快照取在确认弹窗打开**前**:弹窗里写的金额必须 = 建单用的金额(单源);弹窗 mask
+  // 挡住页面全部改金额入口,取早取晚同值,而「首个 await 后不再读 amountNum」是哨兵不变量。
   const amountSnapshot = amountNum.value;
+  // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
+  // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。preview 只供弹窗文案;
+  // 报价**冻结**(quoted / submittingQuote)仍发生在用户点确认之后,不得提前 ——
+  // 提前会放大已登记的 pre-freeze 漂移窗口。message 为纯文本(ui store MVP text-only),
+  // 费用行以 i18n 拼串表达,不动 ConfirmOptions。
+  const preview = feeCalc.value;
+  const confirmBody =
+    preview.nexBurned > 0
+      ? fmt(t.value.walletV3.withdrawConfirmBodyNex, {
+          amount: amountSnapshot.toFixed(2),
+          fee: preview.networkConfirmUsd.toFixed(2),
+          waived: preview.feeWaived.toFixed(2),
+          nex: fmtNex(preview.nexBurned),
+          receive: preview.netReceive.toFixed(2),
+        })
+      : fmt(t.value.walletV3.withdrawConfirmBody, {
+          amount: amountSnapshot.toFixed(2),
+          fee: preview.networkConfirmUsd.toFixed(2),
+          receive: preview.netReceive.toFixed(2),
+        });
+  confirmingSubmit.value = true;
+  let confirmed = false;
+  try {
+    confirmed = await uiConfirm({
+      title: t.value.walletV3.withdrawConfirmTitle,
+      message: confirmBody,
+      confirmLabel: t.value.walletV3.withdrawConfirmCta,
+    });
+  } finally {
+    confirmingSubmit.value = false;
+  }
+  if (!confirmed) return;
+  // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
+  // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
+  submitting.value = true;
   let fresh: WithdrawalEligibility;
   try {
     fresh = await requestWithdrawalEligibility(
