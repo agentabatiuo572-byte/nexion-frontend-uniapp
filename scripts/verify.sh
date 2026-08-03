@@ -2184,5 +2184,21 @@ empty_state_gate() {
 }
 empty_state_gate
 
+# ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
+# 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;
+# 且 active 单槽,连跨两级门槛前一级被覆盖永久丢通知。判据(esbuild 载真 store 测行为):
+# ①钱链路 4 路由 UI 挂起且 App.vue 奖励/记账不接路由门(分离证明) ②连跨两级离场
+# 逐条补发先低后高 ③ .ms-overlay < .nx-toast-host < .nx-mask ④普通页即时弹 +
+# 白名单前缀不过宽(pages/store/store 等近亲不误伤)。
+milestone_queue_gate() {
+  if "$NODE_BIN" scripts/selfcheck-milestone-queue.mjs > /tmp/uniapp-milestone-queue.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-milestone-queue.log)"
+  else
+    bad "里程碑庆祝队列门失败 — node scripts/selfcheck-milestone-queue.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-milestone-queue.log | head -8 | sed 's/^/        /'
+  fi
+}
+milestone_queue_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

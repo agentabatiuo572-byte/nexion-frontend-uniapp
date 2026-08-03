@@ -2,8 +2,11 @@
   <!-- Earnings milestone celebration overlay. Driven by useMilestones().active.
        Ported from Nexion-prototype/app/components/milestone-watcher.tsx — React
        Confetti + framer-motion replaced with CSS @keyframes (App webview has no
-       react-dom portal / framer). App.vue's 4s poll calls store.show(); this
-       host renders + auto-dismisses after OVERLAY_DURATION_MS. -->
+       react-dom portal / framer). App.vue's 4s poll calls store.show() (enqueue);
+       this host pumps store.advance(route) on a short interval so celebrations
+       stay suspended on money-flow routes (checkout / withdraw / trial) and
+       replay one-by-one afterwards; each shown one auto-dismisses after
+       OVERLAY_DURATION_MS. -->
   <view v-if="m.active" class="ms-overlay" @click="m.dismiss()">
     <!-- Backdrop dim + blur — lowers chassis noise so the medal is the focus. -->
     <view class="ms-backdrop" />
@@ -57,16 +60,42 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onUnmounted } from "vue";
+import { computed, watch, onMounted, onUnmounted } from "vue";
 import { useMilestones } from "@/store/milestones";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
 const OVERLAY_DURATION_MS = 5_200;
 const PARTICLE_COUNT = 36;
+const ADVANCE_TICK_MS = 300;
 
 const m = useMilestones();
 const t = useT();
+
+// ── Queue pump — same route source as global-ui.vue readRoute / App.vue
+//    readCurrentRoute (getCurrentPages, no leading slash; H5 hash fallback). ──
+function readRoute(): string {
+  try {
+    const ps = getCurrentPages();
+    const route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    if (route) return route;
+  } catch {
+    // fall through to H5 hash fallback
+  }
+  // #ifdef H5
+  try {
+    return window.location.hash.replace(/^#\/?/, "").replace(/^\//, "");
+  } catch {
+    return "";
+  }
+  // #endif
+  return "";
+}
+
+let advTimer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  advTimer = setInterval(() => m.advance(readRoute()), ADVANCE_TICK_MS);
+});
 
 // ── Derived copy (i18n) ──
 const thresholdLabel = computed(() =>
@@ -160,14 +189,24 @@ watch(
   },
 );
 
-onUnmounted(clearTimer);
+onUnmounted(() => {
+  clearTimer();
+  if (advTimer !== null) {
+    clearInterval(advTimer);
+    advTimer = null;
+  }
+});
 </script>
 
 <style scoped>
+/* 层级契约(2026-08-03 三路走查同族修复):庆祝弹层必须压在业务 UI 之下 —
+   .ms-overlay(8900) < .nx-toast-host(9000) < .nx-mask(9100, global-ui.vue)。
+   9300 时代它盖住支付确认弹窗与 toast 并吞点击;verify 门 selfcheck-milestone-queue
+   断言此不等式,改回 ≥9000 会红。 */
 .ms-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9300;
+  z-index: 8900;
   display: flex;
   align-items: center;
   justify-content: center;

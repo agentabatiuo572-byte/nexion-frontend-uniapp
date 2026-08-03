@@ -46,6 +46,24 @@ export interface ActiveMilestone {
   label: string;
 }
 
+/**
+ * 钱链路路由白名单 — 这些页面上庆祝弹层**挂起**(只压 UI,不压发奖励/记账):
+ * 结算、提现(含 tracking)、试用。前缀匹配,路由形态 = getCurrentPages().route
+ * (无前导斜杠,见 App.vue readCurrentRoute / global-ui.vue readRoute)。
+ * 三路走查同族缺陷(2026-08-03):.ms-overlay 盖住支付按钮/宽限提示/提现表单并吞点击。
+ */
+export const MONEY_FLOW_ROUTE_PREFIXES: ReadonlyArray<string> = [
+  "pages/store/checkout",
+  "pages/me/wallet-withdraw", // 前缀同时盖 pages/me/wallet-withdraw-tracking
+  "pages/me/trial",
+];
+
+/** Pure — true when the given route is inside a money flow (celebrations defer). */
+export function isMoneyFlowRoute(route: string): boolean {
+  if (!route) return false;
+  return MONEY_FLOW_ROUTE_PREFIXES.some((p) => route.startsWith(p));
+}
+
 // 旧设备级单键 "nexgrid-milestones-v1" 废弃(存量无账号归属,mock 可重建);里程碑 fired 态按账号分行。
 // 🔴 spec6-entry-surface-runtime.mjs 的反泄漏护栏键同步改为 nexgrid-milestones-accounts-v1。
 const ACCOUNTS_KEY = "nexgrid-milestones-accounts-v1"; // { [accountKey]: { firedIds: string[] } }
@@ -82,17 +100,22 @@ export const useMilestones = defineStore("milestones", () => {
   const firedIds = ref<string[]>(hydrate(boundKey));
 
   // ── session-only (drives the celebration overlay) ──
+  // `active` = the one currently on screen; `pendingCelebrations` = FIFO queue
+  // behind it. 队列不是单槽:同一次结算连跨两级($100 → $500)必须两条都保留、
+  // 离开钱链路后逐条补发(单槽会被第二条覆盖 → 前一级永久丢通知)。
   const active = ref<ActiveMilestone | null>(null);
+  const pendingCelebrations = ref<ActiveMilestone[]>([]);
 
   function persist() {
     writeAccountRow<{ firedIds: string[] }>(ACCOUNTS_KEY, boundKey, { firedIds: firedIds.value });
   }
 
-  /** 账号切换重绑:装载该账号的里程碑 fired 态;清掉会话庆祝弹窗(别把 A 的庆祝弹给 B)。 */
+  /** 账号切换重绑:装载该账号的里程碑 fired 态;清掉会话庆祝弹窗与待发队列(别把 A 的庆祝弹给 B)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     firedIds.value = hydrate(boundKey);
     active.value = null;
+    pendingCelebrations.value = [];
   }
 
   function isFired(id: string): boolean {
@@ -108,12 +131,40 @@ export const useMilestones = defineStore("milestones", () => {
   function reset() {
     firedIds.value = [];
     active.value = null;
+    pendingCelebrations.value = [];
     persist();
   }
 
-  /** Open the celebration overlay for a crossed milestone. */
+  /**
+   * Queue a celebration for a crossed milestone. **UI-only** — the reward/bill
+   * composition stays in the caller (App.vue) and is NEVER gated here: 钱链路
+   * 期间照发奖励照记账,只有「弹不弹」由 advance() 按路由决定。
+   */
   function show(milestone: ActiveMilestone) {
-    active.value = milestone;
+    pendingCelebrations.value = [...pendingCelebrations.value, milestone];
+  }
+
+  /**
+   * Promote the next queued celebration onto the screen — the ONLY path from
+   * queue → `active`. Money-flow routes (checkout / withdraw / trial) suspend
+   * promotion; an already-showing overlay is parked back at the FRONT of the
+   * queue (programmatic redirect edge) so it replays in full after leaving.
+   * Called on a short interval by milestone-celebration.vue with the current
+   * route. Returns true when a celebration was promoted.
+   */
+  function advance(route: string): boolean {
+    if (isMoneyFlowRoute(route)) {
+      if (active.value) {
+        pendingCelebrations.value = [active.value, ...pendingCelebrations.value];
+        active.value = null;
+      }
+      return false;
+    }
+    if (active.value || pendingCelebrations.value.length === 0) return false;
+    const [next, ...rest] = pendingCelebrations.value;
+    active.value = next;
+    pendingCelebrations.value = rest;
+    return true;
   }
 
   /** Close the celebration overlay (auto-called after the duration, or on tap). */
@@ -124,10 +175,12 @@ export const useMilestones = defineStore("milestones", () => {
   return {
     firedIds,
     active,
+    pendingCelebrations,
     isFired,
     markFired,
     reset,
     show,
+    advance,
     dismiss,
     bindAccount,
   };
