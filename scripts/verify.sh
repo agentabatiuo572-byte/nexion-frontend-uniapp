@@ -2224,5 +2224,22 @@ milestone_queue_gate() {
 }
 milestone_queue_gate
 
+# ── 结算页试用报价单源门(R2 P0,2026-08-04):展示与扣款同一次解析 ──
+# 第一轮把时间边界收敛成 resolveTrialAt 时只收了 store 内部,没收 checkout.vue
+# 这个消费者:该页一半读未推进的原始 status(模式/促销/抵扣),一半读实时解析器
+# (liveShadow*)——宽限期刚过、poll 未到的窗口里两边互斥,net 被拼成报价页从未
+# 展示过的数字直接扣款。判据(esbuild 载真实现 + 源码切片跑真结算块):
+# ①越界拒单零扣款 ②grace 内正常成交 ③$0 路径同样受守卫 ④展示净额==扣款净额
+# ⑤convert 返回 false 零扣款零建单 + 接线门(摘掉任一守卫即红)。
+checkout_trial_quote_gate() {
+  if "$NODE_BIN" scripts/selfcheck-checkout-trial-quote.mjs > /tmp/uniapp-checkout-trial-quote.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-checkout-trial-quote.log)"
+  else
+    bad "结算页试用报价单源门失败 — node scripts/selfcheck-checkout-trial-quote.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-checkout-trial-quote.log | head -8 | sed 's/^/        /'
+  fi
+}
+checkout_trial_quote_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

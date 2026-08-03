@@ -1800,6 +1800,7 @@ export const en = {
     coRowTrialOffset: "Trial credit",
     coTrialZeroNote: "Amount due is $0 — credit above the price isn't refunded or paid out.",
     coTrialQuoteChanged: "Trial pricing changed — review the updated total before paying",
+    coTotalQuoteChanged: "Amount due changed — review the updated total before paying",
     coBillTrialDiscountPart: "trial discount −${amount}",
     coBillTrialOffsetPart: "trial credit −${amount}",
     coBillTrialRemainderMemo: "Trial earnings remainder → balance · {name}",
