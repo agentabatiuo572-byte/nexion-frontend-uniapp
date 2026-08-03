@@ -1,5 +1,7 @@
 // FEAT-AUTH01 OTP 发送闸门与生命周期(PRD §4.6.2 / §16.2.1;规格
 // PRD/specs/FEAT-AUTH01-otp-antibomb-gate.md)。
+// FEAT-AUTH03 注册场景滑块前置:otpSend 的滑块判定按场景强制
+// (规格 PRD/specs/FEAT-AUTH03-register-captcha-always.md)。
 //
 // ⚠️ MOCK-ONLY: 本文件模拟 PRD 已列的 `POST /api/auth/otp/send`、
 // `POST /api/auth/otp/verify` 与 CAPTCHA provider adapter —— 判定走“服务端”规则
@@ -147,7 +149,8 @@ function hasValidTicket(st: CaptchaState, now: number): boolean {
 }
 
 // ── POST /api/auth/otp/send ───────────────────────────────────────────────
-// 闸门判定顺序(规格 ④):① 冷却 → ② 24h 限频(无有效 ticket 即 429)→ ③ 放行。
+// 闸门判定顺序(规格 ④):① 冷却 → ② 滑块判定(场景强制 ∨ 24h 限频;无有效
+// ticket 即拒)→ ③ 放行。冷却优先于凭证:冷却分支先返回,不触碰 captcha state。
 export async function otpSend(phone: string, scene: OtpScene, captchaTicket?: string): Promise<OtpSendResult> {
   await delay();
   const cfg = gate();
@@ -161,7 +164,10 @@ export async function otpSend(phone: string, scene: OtpScene, captchaTicket?: st
     return { ok: false, error: "rate_limited", retryAfterSec: Math.ceil((cooldownEndsAt - now) / 1000) };
   }
 
-  if (sends.length >= cfg.captchaAfterSends) {
+  // FEAT-AUTH03 判定规则(纯函数,server 与 mock 同构):
+  // 需要滑块 = captchaAlwaysScenes.includes(scene) || 该手机号24h成功发码数 >= captchaAfterSends。
+  const captchaRequired = cfg.captchaAlwaysScenes.includes(scene) || sends.length >= cfg.captchaAfterSends;
+  if (captchaRequired) {
     const st = captchaState(phone);
     // ticket 必须显式出示且与签发一致(规格 ④ 单次使用):未出示视同无票,
     // 不隐式复用 storage 里的存票——防"滑块成功但未消费的孤儿票"被后续

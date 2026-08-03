@@ -31,7 +31,11 @@ export const useConfig = defineStore("config", () => {
       dimensionWeights: { ...DEFAULT_PLATFORM_CONFIG.riskScore.dimensionWeights },
       weakSignalClusterThreshold: DEFAULT_PLATFORM_CONFIG.riskScore.weakSignalClusterThreshold,
     },
-    otpGate: { ...DEFAULT_PLATFORM_CONFIG.otpGate },
+    otpGate: {
+      ...DEFAULT_PLATFORM_CONFIG.otpGate,
+      // 数组字段展开新副本(仿 gpuTiers.keywords 先例):浅展开会共享数组引用,违反 store 克隆约定。
+      captchaAlwaysScenes: [...DEFAULT_PLATFORM_CONFIG.otpGate.captchaAlwaysScenes],
+    },
     computeShare: {
       downloadUrl: DEFAULT_PLATFORM_CONFIG.computeShare.downloadUrl,
       content: { ...DEFAULT_PLATFORM_CONFIG.computeShare.content },

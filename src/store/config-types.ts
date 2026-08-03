@@ -150,6 +150,10 @@ export interface OtpGateConfig {
   maxVerifyAttempts: number;
   // 滑块通过后签发 ticket 的有效期(秒),单次使用。
   captchaTicketTtlSeconds: number;
+  // FEAT-AUTH03: 每次发码必过滑块的场景;空数组 = 全部回落次数阈值规则。
+  // 平台可配,后台可调面由包 A 登记。值域与 auth-otp 的 OtpScene 相同,
+  // 内联字面量避免 config-types → auth-otp 反向依赖。
+  captchaAlwaysScenes: Array<"login" | "register" | "reset">;
 }
 
 // ── FEAT-SHARE01 分享链路配置(§13.3 share.*;K/E 域运营可调)─────────────

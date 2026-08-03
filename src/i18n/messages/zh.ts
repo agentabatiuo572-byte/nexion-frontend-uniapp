@@ -151,6 +151,8 @@ export const zh: Messages = {
     captchaThrottled: "尝试次数过多,请稍后再试",
     captchaVerified: "验证通过",
     captchaFailCount: "失败 {n} / {max}",
+    captchaLoadFailed: "加载失败,请检查网络后重试",
+    captchaRetry: "重试",
     errorTooFrequent: "操作过于频繁,{s} 秒后可重发",
     errorOtpInvalid: "验证码不正确,还可尝试 {n} 次",
     errorOtpExpired: "验证码已过期,请重新获取",
