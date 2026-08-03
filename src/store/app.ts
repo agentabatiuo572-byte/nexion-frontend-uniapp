@@ -1,8 +1,10 @@
 import { defineStore } from "pinia";
 import { PLATFORM_UTC_OFFSET_HOURS } from "./withdrawal-eligibility-core";
 import { computed, ref } from "vue";
-import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, EarningBucketRoute } from "./types";
+import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
+import { isWithdrawalFeeSnapshotValid } from "@/store/nex-faucet";
+import { getMonthsSince, getPhaseForMonth } from "@/store/product-phase";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
@@ -1001,7 +1003,8 @@ export const useApp = defineStore("app", () => {
     amount: number,
     network: Withdrawal["network"],
     address: string,
-    fee: number,
+    fee: WithdrawalFeeSnapshot,
+    offsetWithNex: boolean,
     riskRoute: WithdrawalRiskRoute = "pass",
     riskReasons: string[] = [],
     // FEAT-WD01a:快车道留痕随单落盘 —— 只算不存的话,事后审计与客服都还原不出
@@ -1015,6 +1018,13 @@ export const useApp = defineStore("app", () => {
     // 金额有效性守卫(对齐 debitBalance):NaN/±Infinity/≤0 一律拒 —— 负数会让下方
     // usdtBalance - amount 反向加钱,NaN 污染余额为 NaN 后一切校验恒过(无限钱)。
     if (!Number.isFinite(amount) || amount <= 0) return null;
+    // 🔴 FEAT-WD02 费用快照复验(mock 同构 server 边界;PROD = server 以权威费率重算并拒不一致单):
+    //  ① 意图守恒 —— offsetWithNex=false 时 nexBurned 必须为 0(无意图永不烧 NEX,规格 ③);
+    //  ② 等式 |actualFeeUsd − max(0, networkConfirmUsd − nexBurned×offsetRate)| ≤ 0.0001。
+    // offsetRate 按提交时点 phase 派发(§13.4 权威,全 phase $0.40 —— 与页面报价同源;
+    // demo 的 phase pin 不影响该值,故两侧恒一致)。拼装错/过期报价一律 fail-closed 拒单。
+    const offsetRateNow = getPhaseForMonth(getMonthsSince(user.value.joinedAt)).nexFeeOffsetRate;
+    if (!isWithdrawalFeeSnapshotValid(fee, offsetWithNex, offsetRateNow)) return null;
     // (单槽闸已删除:单据改成列表后,新单不再顶掉在途单 —— 那道闸本就是为兜单槽
     //  模型加的产品限制,真后端没有它,留着反而会在人工审核单无出口时把用户锁死。)
     const currentUser = withDefaultEarningBuckets(user.value);
@@ -1074,8 +1084,8 @@ export const useApp = defineStore("app", () => {
     const id = `WD-${yyyymmdd}-${seq}`;
     const initialStatus: Withdrawal["status"] =
       riskRoute === "freeze" ? "frozen" : riskRoute === "manual" || riskRoute === "delay" ? "review-pending" : "submitted";
-    // fee = authoritative new-model withdrawal fee (grossFee − NEX offset), passed
-    // by the caller from computeWithdrawFee. PROD: server computes + returns it.
+    // fee = FEAT-WD02 结构化快照(networkConfirmUsd/nexBurned/actualFeeUsd),上方已按
+    // server 等式复验;新单不含 penaltyUsd。PROD: server computes + returns it.
     const wd: Withdrawal = {
       id,
       amount,

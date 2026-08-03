@@ -909,7 +909,7 @@ export const zh: Messages = {
     s3Title: "代币(NEX)市场风险",
     s3Body: "NEX 是平台奖励代币。其美元计价价值可能每日 ±20% 波动,受 AI 推理需求 / 回购流 / 加密市场环境影响。代币持有不受 FDIC / SIPC 保险。锁仓或持有的 NEX 数量不应超过你可承受的损失。",
     s4Title: "提现窗口 + 合规审查",
-    s4Body: "标准提现从申请到入账约 {h} 小时。提现手续费按当前阶段费率 {pct} 计,烧 NEX 可按优惠率抵扣(每 NEX 抵扣额远高于其兑换价值)、烧够即全免,不烧 NEX 则按全额费率;NEX 可通过签到 / 挖矿 / 推荐活动获得。链上网络费另计,随金额浮动并设有上下限。",
+    s4Body: "标准提现从申请到入账约 {h} 小时。每笔提现收取一笔按网络设定的固定网络确认费,不随金额浮动,部分网络可能免费;可自选用 NEX 抵扣该费用 —— 该选项默认关闭,未开启时不会消耗 NEX。NEX 可通过签到 / 挖矿 / 推荐活动获得。",
     s4BodyLargeAmount: "超过 ${large} 的提现可能进入 {d} 天的增强合规审查窗口,到账时间以两者中更晚者为准。",
     s5Title: "Staking 锁仓不可撤销",
     s5Body: "Staking 池(30d / 90d / 180d / 365d)锁仓全期不可取出。提前赎回扣除全部累计溢价,并依次扣除 5% / 15% / 30% / 50% 本金。锁仓前请单独阅读各档条款。",
@@ -2056,7 +2056,7 @@ export const zh: Messages = {
     },
     minWithdrawNote: "最低提现:${n}。",
 
-    minWithdrawNoteOffset: "上方手续费可通过烧 NEX 抵扣。",
+    minWithdrawNoteOffset: "手续费可选择用 NEX 抵扣。",
     dailyLimitNote: "每日限额:{n} 笔/日。",
     complianceGateBody: "根据 MiCA 第 22 条与 FATF 旅行规则,放款前须验证钱包所有权。请完成一次性 KYC-Express(1 USDT,全额返还)。",
     withdrawalStatusSubtitle: "提现状态",
@@ -3476,12 +3476,23 @@ export const zh: Messages = {
 
   walletV3: {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
-    dailyCheckIn: "每日签到",
     earnNexCta: "去挖矿赚 NEX",
-    // NEX 抵扣手续费模型(取代旧积分 / 硬燃烧门槛)
-    feeGross: "总手续费",
+    // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
+    feeConfirmRow: "网络确认费",
     feeCharged: "手续费",
-    feeNetworkRow: "网络手续费",
+    feeOffsetRow: "NEX 抵扣",
+    feeOffsetToggle: "用 NEX 抵扣",
+    feeOffsetOffHint: "开启后用 NEX 抵扣本笔费用。当前持有 {n} NEX。",
+    feeOffsetOnFull: "将消耗 {nex} NEX · 本笔费用全额抵扣($0.00)。",
+    feeOffsetOnPartial: "将消耗 {nex} NEX · 可抵 ${waived},仍需支付 ${rest}。",
+    feeOffsetNoNex: "暂无 NEX 可抵扣。通过签到与设备挖矿可获得 NEX。",
+    feeOffsetFreeNetwork: "该网络当前免手续费,无需抵扣。",
+    feeWhyTitle: "费用说明",
+    feeWhyClose: "关闭",
+    feeWhyNetworkTitle: "网络确认费",
+    feeWhyNetworkBody: "每笔提现收取一笔固定的网络确认费,金额按绑定地址所在的网络而定,与提现金额无关;若该网络当前免费,此行显示 $0.00。",
+    feeWhyOffsetTitle: "用 NEX 抵扣",
+    feeWhyOffsetBody: "开启 NEX 抵扣后,将从你的 NEX 余额中扣除所需数量抵扣本笔费用;持有不足时按可抵部分抵扣,剩余从提现中支付。该选项默认关闭,未开启时不会消耗任何 NEX。",
 
     feeDetailPlaceholder: "输入金额后显示费用明细",
 
@@ -3490,13 +3501,6 @@ export const zh: Messages = {
     feeConfigUnavailableBody: "暂时拿不到最新费率,为避免按过期费率扣款,已暂停提交。",
 
     feeConfigRetry: "重试",
-    feePenaltyRow: "平台手续费",
-    feeOffsetRow: "NEX 抵扣",
-    feeOffsetTitle: "用 NEX 抵扣手续费",
-    feeFullyWaived: "✓ 已烧 {nex} NEX · 提现手续费全免($0)。",
-    feePartial: "NEX 不够 —— 本次手续费 ${gross}(网络费 + 平台费)。攒 NEX 可降低甚至免除。",
-    feeOffsetRule:
-      "每 1 NEX 抵 ${perNex} 手续费,远高于其兑换价值。烧够 {required} NEX 即手续费全免;不足按比例抵扣,余额以 USDT 支付。",
     // Sprint 3 — 合规审查 banner(用户视角:监管要求,不暴露 phase 概念)
     complianceHoldTitle: "升级合规审查窗口",
     complianceHoldBody: "近期监管要求 > $1,000 的提现进入 {days} 天增强审查窗口后才结算。小额提现按标准时间线。感谢你的耐心 — NexGrid 合规中心。",

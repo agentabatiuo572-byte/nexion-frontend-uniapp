@@ -4,16 +4,18 @@
   with a dev-only ?dev=1 reset) → rebind freeze banner (PAY04: 24h countdown) →
   compliance-hold banner (P5+) → amount input (Use Max) → network select → bound
   address row + 「更换」 rebind entry (PAY04: address = KYC binding, no manual input)
-  → fee/receive summary → warnings → StakeAlternativeCard (configured minimum) →
-  NEX burn gate (progress + daily-check-in / earn-NEX CTAs) → sticky submit.
+  → fee summary (single network-confirm fee row + "?" fee-why bottom sheet) → warnings →
+  StakeAlternativeCard (configured minimum) → NEX offset toggle (default OFF) → sticky submit.
 
   Gates: wallet-pairing (must be paired), rebind freeze window (submit greyed),
-  amount within configured withdrawable limits. NO hard NEX gate — NEX optionally OFFSETS the fee. Fee model:
-  grossFee = amount × penaltyFeeRate (the no-NEX fee); burning NEX waives
-  nexFeeOffsetRate USDT per NEX (favorable vs market). requiredNex fully waives;
-  partial NEX offsets pro-rata, remainder paid in USDT. Both rates backend-
-  configurable per phase. Submit burns nexBurned + app.submitWithdrawal + bills.add;
-  rolls burned NEX back if the USDT debit fails. Then → withdraw-tracking. <AppChassis active="me">.
+  amount within configured withdrawable limits. Fee model (FEAT-WD02):
+  fee = withdrawRules.networkConfirmFeeUsd[network] — fixed per withdrawal, admin D5
+  configurable ([0,25], seed TRC20/BEP20 $1 · ERC20 $5). NEX offset is OPT-IN
+  (offsetWithNex, default off): on → burn min(userNex, ceil(fee/offsetRate)), pay the
+  remainder; off → NEX is never burned. Submit freezes quote + toggle + amount,
+  burns NEX only when toggled on, app.submitWithdrawal re-verifies the fee snapshot
+  (server-shaped), bills.add; rolls burned NEX back if the USDT debit fails.
+  Then → withdraw-tracking. <AppChassis active="me">.
   Header is the shared sticky <SubPageHeader> (back=/pages/me/wallet, title="USDT",
   subtitle=t.wallet.withdraw — mirrors the prototype's
   <SetPageHeader title="USDT" subtitle={t.wallet.withdraw} backHref="/me/wallet"/>).
@@ -210,24 +212,22 @@
         <text class="block" style="font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ submitDisabledReason }}</text>
       </view>
       <view v-else class="mx-4 mt-4 space-y-1.5" style="padding: 0 2px">
-        <!-- FEAT-WD01c:总费 = 网络费 + 惩罚费。两笔分行列出,用户才看得出钱扣在哪。 -->
+        <!-- FEAT-WD02:单行网络确认费(每笔固定,按当前绑定网络取键;$0 显示 $0.00 不藏行)。
+             「?」打开费用说明半屏(规格 ⑥ 新增交付物)。 -->
         <view class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feeNetworkRow }}</text>
-          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">${{ networkFee.toFixed(2) }}</text>
-        </view>
-        <view class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feePenaltyRow }}</text>
-          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">${{ penaltyFee.toFixed(2) }}</text>
-        </view>
-        <view v-if="nexBurned > 0" class="flex items-center justify-between">
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeGrossLabel }}</text>
-          <text class="tabular-nums" :style="{ fontSize: '13px', color: 'var(--v5-ink-3)', textDecoration: 'line-through' }">${{ grossFee.toFixed(2) }}</text>
+          <view class="inline-flex items-center" style="gap: 2px">
+            <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.walletV3.feeConfirmRow }}</text>
+            <view class="grid place-items-center active:opacity-60" style="min-width: 32px; min-height: 32px; margin: -10px 0" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyTitle" @click="feeWhyOpen = true">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+            </view>
+          </view>
+          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-ink-3)">−${{ networkConfirmUsd.toFixed(2) }}</text>
         </view>
         <view v-if="nexBurned > 0" class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-brand)">{{ t.walletV3.feeOffsetRow }}</text>
-          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-brand)">−${{ feeWaived.toFixed(2) }} · {{ fmtNex(nexBurned) }} NEX</text>
+          <text class="tabular-nums" style="font-size: 13px; color: var(--v5-brand)">+${{ feeWaived.toFixed(2) }} · {{ fmtNex(nexBurned) }} NEX</text>
         </view>
-        <view class="flex items-center justify-between">
+        <view v-if="offsetWithNex" class="flex items-center justify-between">
           <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.feeCharged }}</text>
           <text class="tabular-nums" :style="{ fontSize: '13px', fontWeight: 600, color: fee > 0 ? 'var(--v5-ink)' : 'var(--v5-brand)' }">${{ fee.toFixed(2) }}</text>
         </view>
@@ -264,43 +264,58 @@
       <!-- Reverse-talk staking alternative -->
       <StakeAlternativeCard v-if="amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
 
-      <!-- NEX fee-offset panel (NEX optionally waives the fee; no hard gate) -->
-      <!-- 🔴 费率不可用时整块隐藏(2026-07-31 复验漏网点):
-           本面板的 requiredNex / 抵扣文案全都从费用算出来,坏配置下会渲染 NaN;
-           失败态下更糟 —— 上方写着「费率不可用、已暂停提交」,这里同屏还笃定显示
-           「52.5 NEX 已抵扣、手续费全免」,自相矛盾。凡是吃费用数据的区块,
-           都必须挂同一个 feeConfigUsable 门,不能只给费用明细区加。 -->
-      <view v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="mx-4 mt-3 rounded-2xl border" :style="nexGateStyle">
-        <view class="flex items-center justify-between" style="margin-bottom: 10px">
-          <view class="flex items-center" :style="nexGateLabelStyle">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="fullyWaived ? 'var(--v5-brand)' : 'var(--v5-brand-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 3 1.9 4.6L16 9.5l-4.6 1.9L9.5 16l-1.9-4.6L3 9.5l4.6-1.9z" /></svg>
-            <text style="margin-left: 6px">{{ t.walletV3.feeOffsetTitle }}</text>
+      <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关;取代旧「强制自动抵扣 + 进度条」面板) -->
+      <!-- 🔴 费率不可用时整块隐藏(历史漏网教训保留):
+           本面板文案全从费用算出来,坏配置下会渲染 NaN;失败态下更糟 —— 上方写着
+           「费率不可用、已暂停提交」,这里同屏还笃定显示抵扣数字,自相矛盾。
+           凡是吃费用数据的区块,都必须挂同一个 feeConfigUsable 门,不能只给费用明细区加。 -->
+      <view v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked" class="mx-4 mt-3 rounded-2xl" :style="nexGateStyle">
+        <view class="flex items-center justify-between" style="gap: 12px">
+          <view class="flex items-center min-w-0" :style="nexGateLabelStyle">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="offsetWithNex ? 'var(--v5-brand)' : 'var(--v5-brand-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 3 1.9 4.6L16 9.5l-4.6 1.9L9.5 16l-1.9-4.6L3 9.5l4.6-1.9z" /></svg>
+            <text style="margin-left: 6px">{{ t.walletV3.feeOffsetToggle }}</text>
           </view>
-          <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">{{ fmtNex(nexBalance) }} / {{ fmtNex(requiredNex) }}</text>
-        </view>
-        <view class="rounded-full overflow-hidden" style="height: 8px; background: color-mix(in srgb, var(--v5-surface-2) 60%, transparent)">
-          <view class="h-full rounded-full" :style="nexBarStyle" />
-        </view>
-        <view v-if="fullyWaived" style="margin-top: 8px">
-          <text style="font-size: 12px; color: var(--v5-brand)">{{ fullyWaivedText }}</text>
-        </view>
-        <view v-else style="margin-top: 8px">
-          <text class="block" style="font-size: 12px; color: var(--v5-ink); line-height: 1.4">{{ partialOffsetText }}</text>
-          <view class="grid grid-cols-2" style="margin-top: 8px; gap: 8px">
-            <view class="grid place-items-center active:opacity-70" :style="checkInBtnStyle" @click="goDailyCheckIn">
-              <view class="inline-flex items-center" style="gap: 6px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                <text>{{ t.walletV3.dailyCheckIn }}</text>
-              </view>
-            </view>
-            <view class="grid place-items-center active:scale-[0.97] transition-transform" :style="reinvestBtnStyle" @click="goEarnNex">
-              <view class="inline-flex items-center" style="gap: 6px">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
-                <text>{{ t.walletV3.earnNexCta }}</text>
-              </view>
+          <!-- 自绘开关(native <button>/<switch> 禁用):外层 44pt 热区,内层 track+knob。
+               NEX=0 置灰不可开,原因写在下方 hint + 去赚 NEX 入口。 -->
+          <view
+            class="nx-fee-offset-switch grid place-items-center shrink-0"
+            role="switch"
+            :aria-checked="offsetWithNex ? 'true' : 'false'"
+            :aria-disabled="offsetToggleDisabled ? 'true' : 'false'"
+            :aria-label="t.walletV3.feeOffsetToggle"
+            tabindex="0"
+            :style="switchHitStyle"
+            @click="toggleOffset"
+            @keydown.enter.prevent="toggleOffset"
+            @keydown.space.prevent="toggleOffset"
+          >
+            <view :style="switchTrackStyle">
+              <view :style="switchKnobStyle" />
             </view>
           </view>
-          <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ feeOffsetRuleText }}</text>
+        </view>
+        <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4">{{ offsetHintText }}</text>
+        <!-- NEX=0:开关置灰 + 去赚 NEX 入口(复用 earn 路由;去了再回来,页面实例保留,开关状态不丢) -->
+        <view v-if="offsetToggleDisabled" class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 2px" role="button" tabindex="0" :aria-label="t.walletV3.earnNexCta" @click="goEarnNex">
+          <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.walletV3.earnNexCta }} →</text>
+        </view>
+      </view>
+
+      <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
+           范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
+      <view v-if="feeWhyOpen">
+        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
+        <view class="nx-sheet-slide-up" :style="feeWhySheetStyle">
+          <view class="flex items-start justify-between" style="gap: 12px">
+            <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
+            <view class="grid place-items-center shrink-0 active:opacity-60" :style="feeWhyCloseStyle" role="button" tabindex="0" :aria-label="t.walletV3.feeWhyClose" @click="feeWhyOpen = false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            </view>
+          </view>
+          <text class="block" :style="feeWhySectionTitleStyle">{{ t.walletV3.feeWhyNetworkTitle }}</text>
+          <text class="block" :style="feeWhyBodyStyle">{{ t.walletV3.feeWhyNetworkBody }}</text>
+          <text class="block" :style="feeWhySectionTitleStyle">{{ t.walletV3.feeWhyOffsetTitle }}</text>
+          <text class="block" :style="feeWhyBodyStyle">{{ t.walletV3.feeWhyOffsetBody }}</text>
         </view>
       </view>
 
@@ -353,12 +368,11 @@ import { formatClock, freezeRemainingMs } from "@/store/wallet-pairing-core";
 import { mockServerNow } from "@/store/server-time";
 import {
   evaluateWithdrawal,
-  commitWithdrawal,
   dailyLimitStatus,
   requestWithdrawalEligibility,
   type WithdrawalEligibility,
 } from "@/store/withdrawal-eligibility";
-import { computeWithdrawFee } from "@/store/nex-faucet";
+import { computeWithdrawFee, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useConfig } from "@/store/config";
@@ -455,32 +469,35 @@ const freezeBannerText = computed(() =>
 const complianceHoldEnabled = computed(() => phase.value.complianceHoldEnabled);
 const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: phase.value.withdrawalCooldownDays }));
 
-// ── Fee model: NEX optionally offsets the withdrawal fee (replaces old points/hard-burn gate) ──
-// grossFee = amount × penaltyFeeRate; burning NEX waives nexFeeOffsetRate USDT/NEX (favorable vs
-// ~market). No hard block — short NEX just means a higher actual fee. Both rates backend-configurable
-// per phase (mirrors admin D.withdraw.penaltyFeeRate / nexFeeOffsetRate).
-// 提交期间连 NEX 余额一起冻:它渲染在「{余额} / {需要}」和进度条上,
-// 扣完 NEX 后进度条塌到 0、右上角显示 0 / 52.5,而正下方用冻结值说「52.5 NEX 已抵扣」——
-// 同屏自相矛盾(对抗证伪实测)。冻结面必须覆盖**同一条数据链上的全部渲染点**。
+// ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
+// fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
+// 开关 offsetWithNex 默认关 —— 关着一枚 NEX 都不烧;开着烧 min(userNex, ceil(fee/offsetRate))。
+// offsetRate 走 phase 派发(§13.4 权威,全档 $0.40)。配置读不到时不允许回退写死值 —— 见 feeConfigUsable 门。
+// 提交期间连 NEX 余额一起冻:开关 hint 与抵扣行都从费用链渲染,
+// 扣完 NEX 立刻重算会让页面在 spinner 期间自己改价(对抗证伪实测)。
+// 冻结面必须覆盖**同一条数据链上的全部渲染点**。
 /** 提交期间冻结的 NEX 余额(与报价同一时刻)。 */
 const submittingNexBalance = ref<number | null>(null);
 const nexBalance = computed(() => submittingNexBalance.value ?? app.user.nexBalance);
-const penaltyFeeRate = computed(() => phase.value.withdrawPenaltyFeeRate);
 const nexFeeOffsetRate = computed(() => phase.value.nexFeeOffsetRate);
-// FEAT-WD01c:网络费三件套走后台配置(D5 单源),与惩罚费相加构成总费。
-// 配置读不到时不允许回退写死值 —— 见下方 feeConfigReady 门。
-const networkFeeConfig = computed(() => ({
-  rate: cfg.config.withdrawRules.networkFeeRate,
-  min: cfg.config.withdrawRules.networkFeeMin,
-  max: cfg.config.withdrawRules.networkFeeMax,
-}));
+/** FEAT-WD02:NEX 抵扣开关(规格 ③:默认关;server 侧无此意图永不烧 NEX)。 */
+const offsetWithNex = ref(false);
+/** 按当前绑定网络取网络确认费键(网络派生自 pairing 响应式 —— 换绑回本页即时刷新)。 */
+const NETWORK_FEE_KEY: Record<Withdrawal["network"], WithdrawNetworkKey> = {
+  "USDT-TRC20": "trc20",
+  "USDT-BEP20": "bep20",
+  "USDT-ERC20": "erc20",
+};
+const networkConfirmFee = computed(
+  () => cfg.config.withdrawRules.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]],
+);
 const feeCalc = computed(() =>
   computeWithdrawFee(
     amountNum.value,
     nexBalance.value,
-    penaltyFeeRate.value,
+    offsetWithNex.value,
     nexFeeOffsetRate.value,
-    networkFeeConfig.value,
+    networkConfirmFee.value,
   ),
 );
 // 🔴 费率可用性是**两个合取项**,少一个就等于回退写死值:
@@ -503,10 +520,6 @@ async function retryFeeConfig() {
 // 骨架条:形状对齐真实明细行(标签窄、数值宽),非通用转圈。
 const feeSkeletonLabelStyle = "width: 72px; height: 12px; border-radius: 4px; background: var(--v5-surface-2)";
 const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; background: var(--v5-surface-2)";
-const networkFee = computed(() => feeCalc.value.networkFee);
-const penaltyFee = computed(() => feeCalc.value.penaltyFee);
-const grossFee = computed(() => feeCalc.value.grossFee);
-const requiredNex = computed(() => feeCalc.value.requiredNex);
 // 🔴 提交期间**冻结报价**。feeCalc 依赖 nexBalance,而提交链的第一步就是扣 NEX ——
 // 扣完之后整条链立刻重算,抵扣消失、费用跳回原价。两个后果:
 //  ① 页面在用户盯着 spinner 的这 ~1 秒里自己改价(明细两行消失、到账数字掉下来);
@@ -514,11 +527,35 @@ const requiredNex = computed(() => feeCalc.value.requiredNex);
 // 报价一旦用于扣款就必须定死,直到本次提交结束。
 const submittingQuote = ref<ReturnType<typeof computeWithdrawFee> | null>(null);
 const activeFee = computed(() => submittingQuote.value ?? feeCalc.value);
+const networkConfirmUsd = computed(() => activeFee.value.networkConfirmUsd);
 const nexBurned = computed(() => activeFee.value.nexBurned);
 const feeWaived = computed(() => activeFee.value.feeWaived);
 const fee = computed(() => activeFee.value.actualFee);
 const receive = computed(() => activeFee.value.netReceive);
 const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
+/** 开关置灰判据:没有 NEX 可抵(NEX=0 → 置灰 + 去赚 NEX 入口,规格 ② 异常1)。 */
+const offsetToggleDisabled = computed(() => nexBalance.value <= 0);
+function toggleOffset() {
+  // 提交期间输入面全冻结(与金额输入 :disabled 同纪律 —— 开关也是报价的输入)。
+  if (submitting.value) return;
+  // 置灰不可开:原因就写在下方 hint(NEX=0),旁边是去赚 NEX 出口。
+  if (offsetToggleDisabled.value) return;
+  offsetWithNex.value = !offsetWithNex.value;
+}
+/** 开关下方的状态行:置灰原因 / 免费网络 / 关态说明 / 开态消耗数(全额或部分)。 */
+const offsetHintText = computed(() => {
+  if (offsetToggleDisabled.value) return t.value.walletV3.feeOffsetNoNex;
+  if (networkConfirmUsd.value <= 0) return t.value.walletV3.feeOffsetFreeNetwork;
+  if (!offsetWithNex.value) return fmt(t.value.walletV3.feeOffsetOffHint, { n: fmtNex(nexBalance.value) });
+  if (fee.value <= 0.0001) return fmt(t.value.walletV3.feeOffsetOnFull, { nex: fmtNex(nexBurned.value) });
+  return fmt(t.value.walletV3.feeOffsetOnPartial, {
+    nex: fmtNex(nexBurned.value),
+    waived: feeWaived.value.toFixed(2),
+    rest: fee.value.toFixed(2),
+  });
+});
+/** 费用说明半屏开合。 */
+const feeWhyOpen = ref(false);
 /**
  * 🔴 让判定**跨过时间边界时重算一次**。
  *
@@ -704,18 +741,6 @@ function disabledReasonFor(amount: number, decision: WithdrawalEligibility): str
   return "";
 }
 const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));
-const penaltyPctText = computed(() => `${(penaltyFeeRate.value * 100).toFixed(0)}%`);
-const feeGrossLabel = computed(() => t.value.walletV3.feeGross);
-const fullyWaivedText = computed(() => fmt(t.value.walletV3.feeFullyWaived, { nex: fmtNex(nexBurned.value) }));
-const partialOffsetText = computed(() =>
-  fmt(t.value.walletV3.feePartial, { gross: grossFee.value.toFixed(2) }),
-);
-const feeOffsetRuleText = computed(() =>
-  fmt(t.value.walletV3.feeOffsetRule, {
-    perNex: nexFeeOffsetRate.value.toFixed(2),
-    required: fmtNex(requiredNex.value),
-  }),
-);
 
 function fmtNex(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
@@ -750,10 +775,6 @@ function useMax() {
   amount.value = maxWithdrawable.value.toFixed(2);
 }
 
-function goDailyCheckIn() {
-  // 去签到页攒 NEX(签到水龙头与计入钱包在 daily 页统一处理)
-  uni.navigateTo({ url: "/pages/daily/daily", fail: () => {} });
-}
 function goEarnNex() {
   // NEX 主来源 = 设备挖矿;引导去赚更多 NEX 才能解锁更大额提现
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
@@ -830,9 +851,13 @@ async function handleSubmit() {
   // 账单写进新账号的流水(store 层已钉死,页面层这两条是独立的跨账号资金路径)。
   const acct = app.accountKey;
   const quoted = feeCalc.value;
+  // 🔴 FEAT-WD02:抵扣开关随报价一起冻结(offsetWithNex 入提交快照)。开关本身在提交期间
+  // 被 toggleOffset 的 submitting 守卫锁死,这里再取快照是纪律性双保险 —— await 之后一律用快照。
+  const offsetSnapshot = offsetWithNex.value;
   const toBurn = quoted.nexBurned;
   submittingQuote.value = quoted;
   submittingNexBalance.value = app.user.nexBalance;
+  // 🔴 只有开着才烧(offsetSnapshot=false 时 quoted.nexBurned 恒 0,引擎已保证;此处不再判开关)。
   if (toBurn > 0 && !app.debitNex(toBurn)) {
     // Balance changed under us — bail without charging; recompute re-clamps next tick.
     submitting.value = false;
@@ -842,11 +867,13 @@ async function handleSubmit() {
     return;
   }
   // await:占额度要等跨标签页的竞争收敛(见 store 的 claimWithdrawSlot)
+  // FEAT-WD02:fee 传结构化快照(server 形状),store 入口按等式复验后落盘。
   const withdrawalId = await app.submitWithdrawal(
     amountSnapshot,
     network.value,
     boundAddress.value,
-    quoted.actualFee,
+    { networkConfirmUsd: quoted.networkConfirmUsd, nexBurned: quoted.nexBurned, actualFeeUsd: quoted.actualFee },
+    offsetSnapshot,
     fresh.route,
     fresh.riskReasons,
     fresh.fastLaneApplied,
@@ -1031,16 +1058,12 @@ const warnBoxStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
   padding: "16px",
 };
+// 抵扣面板:soft tint 无描边(卡内嵌套禁 border);开着且全额抵扣 → brand,其余 → brand-2。
 const nexGateStyle = computed<CSSProperties>(() => ({
-  padding: "16px",
-  background: fullyWaived.value
+  padding: "14px 16px",
+  background: offsetWithNex.value && fullyWaived.value
     ? "color-mix(in srgb, var(--v5-brand) 8%, transparent)"
     : "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  // Prototype: enough = border-[var(--v5-brand)]/30, short = border-[var(--v5-brand-2)]/35
-  // (the *-border tokens are 45% — too strong vs prototype).
-  borderColor: fullyWaived.value
-    ? "color-mix(in srgb, var(--v5-brand) 30%, transparent)"
-    : "color-mix(in srgb, var(--v5-brand-2) 35%, transparent)",
 }));
 const nexGateLabelStyle = computed<CSSProperties>(() => ({
   gap: "6px",
@@ -1048,27 +1071,79 @@ const nexGateLabelStyle = computed<CSSProperties>(() => ({
   fontSize: "12px",
   fontWeight: 500,
   letterSpacing: "0.06em",
-  color: fullyWaived.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
+  color: offsetWithNex.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
 }));
-const nexBarStyle = computed<CSSProperties>(() => ({
-  width: `${Math.min(100, (nexBalance.value / Math.max(requiredNex.value, 1)) * 100)}%`,
-  background: fullyWaived.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
-}));
-const checkInBtnStyle: CSSProperties = {
-  height: "40px",
-  borderRadius: "12px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink)",
-  fontSize: "12px",
-  fontWeight: 600,
-};
-const reinvestBtnStyle: CSSProperties = {
-  height: "40px",
+// 自绘开关:外层热区 ≥44pt(负 margin 不撑行高),内层 track 44×26 + knob 20。
+const switchHitStyle: CSSProperties = { minWidth: "56px", minHeight: "44px", margin: "-9px -6px" };
+const switchTrackStyle = computed<CSSProperties>(() => ({
+  width: "44px",
+  height: "26px",
   borderRadius: "999px",
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
-  fontSize: "12px",
+  padding: "3px",
+  boxSizing: "border-box",
+  transition: "background 160ms ease",
+  background: offsetToggleDisabled.value
+    ? "var(--v5-surface-2)"
+    : offsetWithNex.value
+      ? "var(--v5-brand)"
+      : "var(--v5-surface-3)",
+  opacity: offsetToggleDisabled.value ? 0.55 : 1,
+}));
+const switchKnobStyle = computed<CSSProperties>(() => ({
+  width: "20px",
+  height: "20px",
+  borderRadius: "999px",
+  background: offsetToggleDisabled.value
+    ? "var(--v5-ink-4)"
+    : offsetWithNex.value
+      ? "var(--v5-on-brand)"
+      : "var(--v5-ink-3)",
+  transform: offsetWithNex.value ? "translateX(18px)" : "translateX(0)",
+  transition: "transform 160ms ease",
+}));
+// 费用说明半屏(scrim z79 + panel z80,同 device-deactivate-sheet 范式)。
+const feeWhyScrimStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 79,
+  background: "rgba(8,8,12,0.45)",
+  backdropFilter: "blur(8px) saturate(150%)",
+};
+const feeWhySheetStyle: CSSProperties = {
+  position: "fixed",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 80,
+  borderTopLeftRadius: "16px",
+  borderTopRightRadius: "16px",
+  background: "var(--v5-surface)",
+  borderTop: "1px solid var(--v5-border)",
+  padding: "18px 16px calc(env(safe-area-inset-bottom) + 38px)",
+};
+const feeWhyTitleStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "15px",
   fontWeight: 600,
+  color: "var(--v5-ink)",
+};
+const feeWhyCloseStyle: CSSProperties = {
+  width: "32px",
+  height: "32px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
+};
+const feeWhySectionTitleStyle: CSSProperties = {
+  marginTop: "14px",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+};
+const feeWhyBodyStyle: CSSProperties = {
+  marginTop: "4px",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
+  lineHeight: 1.5,
 };
 const submitBtnStyle = computed<CSSProperties>(() => ({
   height: "48px",

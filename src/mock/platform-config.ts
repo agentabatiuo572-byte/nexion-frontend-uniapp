@@ -52,11 +52,10 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     // 两值单源在后台 D5,此处仅 mock seed。
     payoutSlaHours: 24,
     payoutReviewWindowDays: 0,
-    // FEAT-WD01c:网络费 1% + 下限 $1 / 上限 $25。下限对齐 TRC20 实际 gas(约 $1),
-    // 上限防大额提现被按比例收走过多。三值单源在后台 D5,此处仅 mock seed。
-    networkFeeRate: 0.01,
-    networkFeeMin: 1,
-    networkFeeMax: 25,
+    // FEAT-WD02:网络确认费(每笔固定,按网络)。TRC20/BEP20 $1、ERC20 $5(链上 gas 实情),
+    // 值域 [0, 25]。三键单源在后台 D5,此处仅 mock seed;与 admin-ops 契约声明逐键比值,
+    // 漂移由 verify.sh「WD02 network-confirm-fee parity」哨兵拦。
+    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 },
   },
   rewards: {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。

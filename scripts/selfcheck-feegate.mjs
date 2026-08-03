@@ -101,15 +101,26 @@ check("失败态给了重试出口",
 check("重试真能重拉配置(不是只清本地标志)",
   /await cfg\.load\(\)/.test(code));
 
-// ── ④ 费用标签不得用惩罚费率标注含网络费的总额 ──────────
-// 漏网史:`Fee (20%) $21.00` —— $100 的 20% 是 $20 不是 $21。改了明细区那处,
-// 另一处原样搬到 NEX 面板,复验又抓出来。两处都必须不传 rate。
-check("🔴 总费标签不插值惩罚费率(总额含网络费,标 20% 自相矛盾)",
-  !/feeGross,\s*\{\s*rate:/.test(code),
-  "feeGrossLabel 仍在传 rate");
-check("🔴 NEX 面板的费用文案也不插值惩罚费率(同一矛盾的第二处)",
-  !/feePartial,\s*\{\s*rate:/.test(code),
-  "partialOffsetText 仍在传 rate —— 复验实见 `fee is 20% ($21.00)`");
+// ── ④ FEAT-WD02:惩罚费概念清零 + 抵扣意图链 ──────────
+// 新模型 = 固定网络确认费 + 自选 NEX 抵扣。守三条:
+//  a) 页面不得残留惩罚费语汇(penaltyFeeRate / feePenaltyRow / penaltyPctText);
+//  b) 费用引擎必须吃 offsetWithNex 开关(删了它 = 回到强制自动烧);
+//  c) 提交链必须把开关快照传进 submitWithdrawal(server 侧意图字段,PROD POST body 必填)。
+check("🔴 页面无惩罚费残留(penaltyFeeRate/feePenaltyRow/penaltyPctText,注释已剥)",
+  !/penaltyFeeRate|feePenaltyRow|penaltyPctText/.test(code));
+check("🔴 报价引擎吃 offsetWithNex 开关(删判断 = 恒烧,回到旧强制抵扣)",
+  /computeWithdrawFee\(\s*amountNum\.value,\s*nexBalance\.value,\s*offsetWithNex\.value,/.test(flat.replace(/ /g, "")) ||
+  /computeWithdrawFee\( amountNum\.value, nexBalance\.value, offsetWithNex\.value,/.test(flat),
+  "feeCalc 不再传开关 —— NEX 会被无意图自动烧掉");
+check("🔴 提交链传开关快照(offsetSnapshot 入 submitWithdrawal —— server 意图字段)",
+  /const offsetSnapshot = offsetWithNex\.value/.test(code) &&
+  /app\.submitWithdrawal\([\s\S]{0,400}?offsetSnapshot,/.test(code));
+check("🔴 开关在提交期间冻结(toggleOffset 有 submitting 守卫)",
+  /function toggleOffset\(\)[\s\S]{0,200}?if \(submitting\.value\) return;/.test(code));
+check("费用行按当前绑定网络取键(networkConfirmFeeUsd[NETWORK_FEE_KEY[network]])",
+  /networkConfirmFeeUsd\[NETWORK_FEE_KEY\[network\.value\]\]/.test(code));
+check("「?」费用说明半屏存在且可开合",
+  /feeWhyOpen = true/.test(code) && /feeWhyOpen = false/.test(code) && /feeWhyNetworkBody/.test(code));
 
 console.log(`\n${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

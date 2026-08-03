@@ -97,12 +97,12 @@ export interface WithdrawRulesConfig {
   //    金额 ≥ 大额线时,与「提交 + 到账时效」**取更晚者**。
   //    注意与 rebindCooldownDays 不是一回事:那个是换绑频控,这个是大额到账等待。
   payoutReviewWindowDays: number;
-  // 🔴 FEAT-WD01c 网络费三件套(后台 D5 可配)。链上转账真实成本,与惩罚费**相加**构成总费:
-  //    grossFee = networkFee + 金额 × penaltyFeeRate —— 后端对这条等式有硬校验。
-  //    比例算完要夹进 [min, max]:小额按 min 兜底(否则算出 $0.1 付不起 gas),大额按 max 封顶。
-  networkFeeRate: number;
-  networkFeeMin: number;
-  networkFeeMax: number;
+  // 🔴 FEAT-WD02 网络确认费(后台 D5 可配,值域 [0, 25];种子 trc20/bep20 $1 · erc20 $5)。
+  //    每笔**固定**、按提现网络取键,取代旧「networkFee 比例夹逼 + 按金额比例平台费」双费模型;
+  //    0 = 该网络免手续费(合法值,页面显示 $0.00 不藏行)。
+  //    规格 ③ 数据字典把它挂在 PlatformConfig.withdrawFee 下;工程沿用 withdrawRules 容器
+  //    (叶子名/键/值域一致,容器差异已登记 T9 spec 勘误清单)。
+  networkConfirmFeeUsd: Record<"trc20" | "bep20" | "erc20", number>;
 }
 
 // 新人礼发放模式: risk_bucket = 按当前风险簇分桶(默认);direct = 直入可提(运营可关闸)。

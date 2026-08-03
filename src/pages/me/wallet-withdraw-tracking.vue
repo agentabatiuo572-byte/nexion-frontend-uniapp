@@ -242,8 +242,9 @@ const heldReasonLines = computed(() => {
   // 各页散抄 dict 会静默吞新增码(filter(Boolean) 无痕丢行)。
   return riskReasonLines(t.value, wd.value?.riskReasons);
 });
+// FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
 const viaLine = computed(() =>
-  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.toFixed(2) }) : "",
+  wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.actualFeeUsd.toFixed(2) }) : "",
 );
 const etaTitle = computed(() =>
   wd.value?.status === "confirmed"

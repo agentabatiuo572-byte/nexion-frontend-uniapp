@@ -923,7 +923,7 @@ export const en = {
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal windows + compliance review",
-    s4Body: "Standard withdrawals land about {h} hours after you request them. The withdrawal fee uses the current phase rate of {pct}; burning NEX offsets it at a favourable rate (each NEX offsets far more than its exchange value) and clears it entirely once you burn enough — without NEX you pay the full rate. Earn NEX through check-ins, mining and referrals. The on-chain network fee is charged separately and scales with the amount within a floor and a cap.",
+    s4Body: "Standard withdrawals land about {h} hours after you request them. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, mining and referrals.",
     s4BodyLargeAmount: "Withdrawals above ${large} may enter a {d}-day enhanced compliance review window; the later of the two dates applies.",
     s5Title: "Staking lock-ups are irreversible",
     s5Body: "Staking pools (30d / 90d / 180d / 365d) lock principal for the full term. Early unlock forfeits 100% of accrued yield premium and deducts 5% / 15% / 30% / 50% of principal respectively. Read each pool's terms separately before locking.",
@@ -2080,7 +2080,7 @@ export const en = {
     },
     minWithdrawNote: "Minimum withdrawal: ${n}.",
 
-    minWithdrawNoteOffset: " The fee shown above can be waived by burning NEX.",
+    minWithdrawNoteOffset: " The fee can optionally be covered with NEX.",
     dailyLimitNote: "Daily limit: {n} per day.",
     complianceGateBody: "Per MiCA Art. 22 and the FATF Travel Rule, wallet ownership must be verified before payouts. Complete the one-time KYC-Express ($1 USDT, fully credited).",
     withdrawalStatusSubtitle: "Withdrawal Status",
@@ -3546,12 +3546,23 @@ export const en = {
 
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
-    dailyCheckIn: "Daily check-in",
     earnNexCta: "Mine more NEX",
-    // NEX fee-offset model (replaces old points / hard-burn gate)
-    feeGross: "Total fee",
+    // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
+    feeConfirmRow: "Network confirmation fee",
     feeCharged: "Fee",
-    feeNetworkRow: "Network fee",
+    feeOffsetRow: "NEX offset",
+    feeOffsetToggle: "Pay the fee with NEX",
+    feeOffsetOffHint: "Turn on to cover this fee with NEX. You hold {n} NEX.",
+    feeOffsetOnFull: "Will use {nex} NEX · the fee is fully covered ($0.00).",
+    feeOffsetOnPartial: "Will use {nex} NEX · covers ${waived}, ${rest} still payable.",
+    feeOffsetNoNex: "No NEX available to cover the fee. Earn NEX through check-ins and mining.",
+    feeOffsetFreeNetwork: "This network currently charges no fee — nothing to cover.",
+    feeWhyTitle: "About the fee",
+    feeWhyClose: "Close",
+    feeWhyNetworkTitle: "Network confirmation fee",
+    feeWhyNetworkBody: "Each withdrawal pays one fixed network confirmation fee. The amount depends on the network of your bound address and does not change with the withdrawal amount. When a network is free, this row shows $0.00.",
+    feeWhyOffsetTitle: "Paying the fee with NEX",
+    feeWhyOffsetBody: "Turn the NEX option on to cover the fee from your NEX balance. Only what is needed is used; if you hold less, the covered part is deducted and the rest is paid from the withdrawal. The option is off by default — NEX is never used without it.",
 
     feeDetailPlaceholder: "Enter an amount to see the fee breakdown",
 
@@ -3560,13 +3571,6 @@ export const en = {
     feeConfigUnavailableBody: "The latest fee rates are unavailable. Submission is paused so you are never charged at a stale rate.",
 
     feeConfigRetry: "Retry",
-    feePenaltyRow: "Platform fee",
-    feeOffsetRow: "NEX offset",
-    feeOffsetTitle: "Offset the fee with NEX",
-    feeFullyWaived: "✓ {nex} NEX burned · withdrawal fee fully waived ($0).",
-    feePartial: "Not enough NEX — this withdrawal costs ${gross} (network + platform fee). Earn NEX to lower or waive it.",
-    feeOffsetRule:
-      "Each NEX waives ${perNex} of fee — well above its swap value. Burn {required} NEX to waive the fee fully; partial NEX offsets pro-rata, the rest is paid in USDT.",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
     complianceHoldTitle: "Enhanced compliance review in effect",
     complianceHoldBody: "Recent regulatory updates require an extended {days}-day review window for withdrawals over $1,000. Smaller amounts still settle on the standard timeline. Thanks for your patience — NexGrid Compliance Authority.",

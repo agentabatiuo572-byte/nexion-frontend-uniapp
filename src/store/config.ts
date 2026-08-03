@@ -19,7 +19,10 @@ export const useConfig = defineStore("config", () => {
     featureFlags: { ...DEFAULT_PLATFORM_CONFIG.featureFlags },
     onlineBonus: { ...DEFAULT_PLATFORM_CONFIG.onlineBonus },
     riskCluster: { ...DEFAULT_PLATFORM_CONFIG.riskCluster },
-    withdrawRules: { ...DEFAULT_PLATFORM_CONFIG.withdrawRules },
+    withdrawRules: {
+      ...DEFAULT_PLATFORM_CONFIG.withdrawRules,
+      networkConfirmFeeUsd: { ...DEFAULT_PLATFORM_CONFIG.withdrawRules.networkConfirmFeeUsd },
+    },
     rewards: {
       welcomeGift: { ...DEFAULT_PLATFORM_CONFIG.rewards.welcomeGift },
       inviterReward: { ...DEFAULT_PLATFORM_CONFIG.rewards.inviterReward },
@@ -67,14 +70,9 @@ export const useConfig = defineStore("config", () => {
    *
    * PROD:同一个判据用在 GET /api/config/platform 的响应上,不合法即置 syncFailed。
    */
-  const feeConfigValid = computed(() => {
-    const r = config.value.withdrawRules;
-    return isNetworkFeeConfigUsable({
-      rate: r.networkFeeRate,
-      min: r.networkFeeMin,
-      max: r.networkFeeMax,
-    });
-  });
+  const feeConfigValid = computed(() =>
+    isNetworkFeeConfigUsable(config.value.withdrawRules.networkConfirmFeeUsd),
+  );
 
   function isEnabled(flag: FeatureFlagKey): boolean {
     return config.value.featureFlags[flag] === true;

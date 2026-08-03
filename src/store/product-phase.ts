@@ -35,7 +35,6 @@ export interface PhaseParams {
   monthsTo: number;          // exclusive upper bound
   // Tightening dials (everything goes from "loose" to "harsh" across P1 → P6)
   inviteBonusMultiplier: number;       // 2.0 P1 → 1.0 by P3 onward
-  withdrawPenaltyFeeRate: number;      // 0.20 P1-P4 → 0.30 P6 — 无 NEX 抵扣时的提现费率(金额×rate;取代旧积分门槛)
   nexFeeOffsetRate: number;            // 0.40 USDT/NEX — 烧 1 NEX 抵扣的手续费(远高于市价 → #3 优惠抵扣)
   withdrawalCooldownDays: number;      // 30 P1-P4, 45 P5+
   binaryDailyCapUSD: number;           // 5000 P1-P3, 2000 P4+
@@ -49,7 +48,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 0,
     monthsTo: 2,
     inviteBonusMultiplier: 2.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -61,7 +59,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 2,
     monthsTo: 4,
     inviteBonusMultiplier: 1.5,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -73,7 +70,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 4,
     monthsTo: 6,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -85,7 +81,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 6,
     monthsTo: 8,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 2_000,
@@ -97,7 +92,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 8,
     monthsTo: 10,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.25,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,
@@ -109,7 +103,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 10,
     monthsTo: 999,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.3,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,

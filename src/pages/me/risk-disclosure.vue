@@ -82,7 +82,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { navBack } from "@/lib/route";
-import { useProductPhase } from "@/composables/use-product-phase";
 import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
 import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/wallet-pairing-core";
 import { useConfig } from "@/store/config";
@@ -150,12 +149,11 @@ onUnmounted(() => {
  * 这段是**提交提现前强制勾选确认**的文件 —— 写着系统根本不执行的时限,是最硬的谎。
  * 大额审查窗口配成 0(该阶段不开)时,整句不出现,而不是显示「0 天窗口」。
  */
-/** 惩罚费率随运营阶段派发(P5=25% / P6=30%),披露里写死 20% 就是谎。与提现页同源。 */
-const phase = useProductPhase();
-const penaltyPctText = computed(() => `${(phase.value.withdrawPenaltyFeeRate * 100).toFixed(0)}%`);
+/** FEAT-WD02:按金额比例的旧费率已删除 —— 费用是按网络固定的网络确认费,s4Body 不再插费率;
+ *  时限阈值 {h} 仍从配置插值(合规文本阈值必插值铁律)。 */
 const withdrawWindowBody = computed(() => {
   const rules = cfg.config.withdrawRules;
-  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(rules.payoutSlaHours), pct: penaltyPctText.value });
+  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(rules.payoutSlaHours) });
   if (normalizeReviewWindowDays(rules.payoutReviewWindowDays) <= 0) return base;
   return `${base} ${fmt(w.value.s4BodyLargeAmount, {
     large: NEW_ADDRESS_LARGE_AMOUNT_USDT.toFixed(0),

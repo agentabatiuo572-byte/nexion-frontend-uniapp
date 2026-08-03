@@ -236,12 +236,27 @@ export type WithdrawalStatus =
   | "tx-failed"
   | "refunded";
 
+/** FEAT-WD02 提现费快照(server 形状,POST /api/withdrawals 请求/响应同构)。
+ *  fee 从单数字换成结构化快照;penaltyUsd 仅历史单可能存在(旧双费模型),新单**不生成**。
+ *  存量数字 fee 在 account-cloud 读盘升级时归一(actualFeeUsd = 旧数字,
+ *  networkConfirmUsd/nexBurned 不可考记 0,🔴 禁按新规则重算 —— 展示层只读 actualFeeUsd)。 */
+export interface WithdrawalFeeSnapshot {
+  /** 报价时的网络确认费(USD,按网络固定) */
+  networkConfirmUsd: number;
+  /** 实际烧掉的 NEX(用户开抵扣才 > 0) */
+  nexBurned: number;
+  /** 实收费用 = max(0, networkConfirmUsd − nexBurned × offsetRate) */
+  actualFeeUsd: number;
+  /** 仅历史单(旧惩罚费模型)存在;新单不生成该字段 */
+  penaltyUsd?: number;
+}
+
 export interface Withdrawal {
   id: string;
   amount: number;
   network: "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
   address: string;
-  fee: number;
+  fee: WithdrawalFeeSnapshot;
   status: WithdrawalStatus;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
@@ -405,10 +420,13 @@ export interface AppState {
     amount: number,
     network: Withdrawal["network"],
     address: string,
-    fee: number,
+    fee: WithdrawalFeeSnapshot,
+    offsetWithNex: boolean,
     riskRoute?: WithdrawalRiskRoute,
     riskReasons?: string[],
-  ) => string | null; // fee = new-model actualFee (grossFee − NEX offset); null when insufficient balance or reject route
+    fastLaneApplied?: boolean,
+    waivedGates?: string[],
+  ) => Promise<string | null>; // FEAT-WD02: fee = 结构化快照(server 复验等式);null = 拒单(余额/额度/reject/快照非法)
   /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
   _devAdvanceWithdrawal: () => void;
   /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */
