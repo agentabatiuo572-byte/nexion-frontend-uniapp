@@ -125,13 +125,27 @@ export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | 
 }
 
 /**
- * 老快照升级:单条 latestWithdrawal → withdrawals 列表。
- * schema 不升版 —— 只新增字段并在读盘处补齐,不做破坏性迁移;老用户的历史单不丢。
+ * 老快照升级(读时升级,schema 不升版 —— 只补形,不做破坏性迁移;老用户的历史单不丢):
+ *  ① 单条 latestWithdrawal → withdrawals 列表(2026-08-01 单槽→列表迁移);
+ *  ② FEAT-WD02:数字 fee → 结构化快照 { networkConfirmUsd, nexBurned, actualFeeUsd }。
+ *     🔴 归一必须对「已是列表」的行也做 —— ①已上线,存量行**全部**带 withdrawals 数组,
+ *     归一只嵌在单槽分支里就对所有真实存量行失效(tracking 读 fee.actualFeeUsd → undefined 崩)。
+ *     旧数字只承载实收费:actualFeeUsd = 旧数字;networkConfirmUsd/nexBurned 不可考记 0,
+ *     🔴 禁按新规则重算(展示层只读 actualFeeUsd,无信息损失)。
  */
 function upgradeLegacyWithdrawals(row: AccountCloudSnapshot): AccountCloudSnapshot {
-  if (Array.isArray(row.withdrawals)) return row;
   const legacy = (row as unknown as { latestWithdrawal?: Withdrawal | null }).latestWithdrawal;
-  return { ...row, withdrawals: legacy ? [legacy] : [] };
+  const list: Withdrawal[] = Array.isArray(row.withdrawals) ? row.withdrawals : legacy ? [legacy] : [];
+  const needsUpgrade =
+    !Array.isArray(row.withdrawals) || list.some((wd) => typeof (wd as { fee?: unknown }).fee === "number");
+  if (!needsUpgrade) return row;
+  const withdrawals = list.map((wd) => {
+    const feeRaw = (wd as { fee?: unknown }).fee;
+    return typeof feeRaw === "number"
+      ? { ...wd, fee: { networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: feeRaw } }
+      : wd;
+  });
+  return { ...row, withdrawals };
 }
 
 export function writeAccountSnapshot(snapshot: AccountCloudSnapshot): boolean {

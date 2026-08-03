@@ -924,7 +924,7 @@ export const vi: Messages = {
     s3Title: "Rủi ro thị trường của token (NEX)",
     s3Body: "NEX là token thưởng của nền tảng. Giá trị quy ra USD có thể biến động ±20% mỗi ngày, tùy theo nhu cầu suy luận AI, dòng mua lại và bối cảnh thị trường crypto nói chung. Token nắm giữ không được bảo hiểm FDIC / SIPC. Đừng staking hay giữ nhiều NEX hơn mức bạn có thể chịu mất.",
     s4Title: "Kỳ rút tiền + rà soát tuân thủ",
-    s4Body: "Lệnh rút tiêu chuẩn về ví sau khoảng {h} giờ kể từ lúc yêu cầu. Phí rút tính theo mức phí của giai đoạn hiện tại là {pct}; đốt NEX được bù theo tỷ lệ ưu đãi (mỗi NEX bù nhiều hơn hẳn giá trị quy đổi), đốt đủ thì miễn hoàn toàn, không đốt NEX thì trả đủ mức phí. NEX kiếm được qua điểm danh / đào / giới thiệu. Phí mạng lưới on-chain tính riêng, thay đổi theo số tiền và có mức sàn, mức trần.",
+    s4Body: "Lệnh rút tiêu chuẩn về ví sau khoảng {h} giờ kể từ lúc yêu cầu. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng NEX — tùy chọn mặc định tắt, không bật thì không dùng NEX. Kiếm NEX qua điểm danh / đào / giới thiệu.",
     s4BodyLargeAmount: "Lệnh rút trên ${large} có thể vào cửa sổ rà soát tuân thủ tăng cường {d} ngày; thời điểm về ví lấy mốc muộn hơn trong hai mốc.",
     s5Title: "Khóa staking là không thể đảo ngược",
     s5Body: "Các pool staking (30 / 90 / 180 / 365 ngày) khóa vốn gốc trọn kỳ hạn. Mở sớm sẽ mất 100% phần lợi nhuận cộng thêm đã tích và bị trừ lần lượt 5% / 15% / 30% / 50% vốn gốc. Đọc kỹ điều khoản của từng pool trước khi khóa.",
@@ -2042,7 +2042,7 @@ export const vi: Messages = {
     },
     minWithdrawNote: "Rút tối thiểu: ${n}.",
 
-    minWithdrawNoteOffset: " Phí phía trên có thể được miễn bằng cách đốt NEX.",
+    minWithdrawNoteOffset: " Phí có thể được bù bằng NEX (tùy chọn).",
     dailyLimitNote: "Giới hạn mỗi ngày: {n} lần.",
     complianceGateBody: "Theo Điều 22 MiCA và Quy tắc Du lịch FATF, phải xác minh quyền sở hữu ví trước khi chi trả. Hãy hoàn tất KYC-Express một lần ($1 USDT, được hoàn lại đầy đủ).",
     withdrawalStatusSubtitle: "Trạng thái rút tiền",
@@ -3467,11 +3467,23 @@ export const vi: Messages = {
 
   walletV3: {
     needMoreNexToast: "Không đủ NEX để bù phí",
-    dailyCheckIn: "Điểm danh hàng ngày",
     earnNexCta: "Đào thêm NEX",
-    feeGross: "Tổng phí",
+    // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
+    feeConfirmRow: "Phí xác nhận mạng",
     feeCharged: "Phí",
-    feeNetworkRow: "Phí mạng lưới",
+    feeOffsetRow: "Bù bằng NEX",
+    feeOffsetToggle: "Trả phí bằng NEX",
+    feeOffsetOffHint: "Bật để dùng NEX bù khoản phí này. Bạn đang có {n} NEX.",
+    feeOffsetOnFull: "Sẽ dùng {nex} NEX · phí được bù toàn bộ ($0.00).",
+    feeOffsetOnPartial: "Sẽ dùng {nex} NEX · bù được ${waived}, còn phải trả ${rest}.",
+    feeOffsetNoNex: "Chưa có NEX để bù phí. Kiếm NEX qua điểm danh và đào bằng thiết bị.",
+    feeOffsetFreeNetwork: "Mạng này hiện miễn phí, không cần bù.",
+    feeWhyTitle: "Về khoản phí",
+    feeWhyClose: "Đóng",
+    feeWhyNetworkTitle: "Phí xác nhận mạng",
+    feeWhyNetworkBody: "Mỗi lần rút trả một khoản phí xác nhận mạng cố định. Mức phí phụ thuộc vào mạng của địa chỉ đã liên kết và không thay đổi theo số tiền rút; khi mạng miễn phí, dòng này hiển thị $0.00.",
+    feeWhyOffsetTitle: "Trả phí bằng NEX",
+    feeWhyOffsetBody: "Bật tùy chọn NEX để bù phí từ số dư NEX của bạn. Chỉ dùng đúng số cần thiết; nếu bạn có ít hơn, phần bù được sẽ trừ đi và phần còn lại trả từ khoản rút. Tùy chọn mặc định tắt — không bật thì không bao giờ dùng NEX.",
 
     feeDetailPlaceholder: "Nhập số tiền để xem chi tiết phí",
 
@@ -3480,13 +3492,6 @@ export const vi: Messages = {
     feeConfigUnavailableBody: "Hiện chưa lấy được biểu phí mới nhất. Đã tạm dừng gửi để tránh bị tính theo mức phí cũ.",
 
     feeConfigRetry: "Thử lại",
-    feePenaltyRow: "Phí nền tảng",
-    feeOffsetRow: "Bù bằng NEX",
-    feeOffsetTitle: "Dùng NEX để bù phí",
-    feeFullyWaived: "✓ Đã đốt {nex} NEX · miễn hoàn toàn phí rút ($0).",
-    feePartial: "Không đủ NEX — lần rút này tốn ${gross} (phí mạng + phí nền tảng). Kiếm thêm NEX để giảm hoặc miễn phí.",
-    feeOffsetRule:
-      "Mỗi NEX miễn được ${perNex} phí — cao hơn hẳn giá trị quy đổi của nó. Đốt {required} NEX để miễn toàn bộ phí; số NEX ít hơn sẽ bù theo tỷ lệ, phần còn lại trả bằng USDT.",
     complianceHoldTitle: "Đang áp dụng rà soát tuân thủ tăng cường",
     complianceHoldBody: "Các cập nhật quy định gần đây yêu cầu kéo dài thời gian rà soát thêm {days} ngày cho các khoản rút trên $1,000. Số tiền nhỏ hơn vẫn xử lý theo lịch tiêu chuẩn. Cảm ơn bạn đã kiên nhẫn — Ban Tuân thủ NexGrid.",
     complianceHeroTitle: "Cần kiểm tra tuân thủ",

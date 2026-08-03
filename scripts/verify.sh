@@ -646,6 +646,42 @@ else
     bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 5) —— 新增/删除键须同步改值 parity 循环"
   fi
 fi
+# ── FEAT-WD02 网络确认费种子逐键 parity(uniapp seed ↔ admin-ops 契约声明)──
+# 锚点身份:比对对象是 admin-ops wd02 契约测试里的**声明锚**(D5 无运行时 mock seed,
+# server-canonical,后端字段同步是人肉义务)—— 证的是 uniapp ↔ 声明,非 uniapp ↔ 运行时。
+# 值域上限 [0,25] 两侧各 pin 一份(uniapp 判据 26→false / admin normalize 30→invalid 固定靶)。
+# 路径两候选:主树(../admin-ops)与 .claude/worktrees/<pkg> 内自测(../../../../admin-ops)。
+WD02_ADMIN_ANCHOR=""
+for cand in "../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs" \
+            "../../../../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs"; do
+  [ -f "$cand" ] && WD02_ADMIN_ANCHOR="$cand" && break
+done
+if [ -z "$WD02_ADMIN_ANCHOR" ]; then
+  bad "WD02 confirm-fee parity: admin-ops 契约锚不存在(wd02-network-confirm-fee-contract.test.mjs)"
+else
+  wd02_parity=$("$NODE_BIN" -e "
+    const fs = require('fs');
+    const uni = fs.readFileSync('src/mock/platform-config.ts', 'utf8');
+    const adm = fs.readFileSync(process.argv[1], 'utf8');
+    const um = uni.match(/networkConfirmFeeUsd:\s*\{\s*trc20:\s*([\d.]+),\s*bep20:\s*([\d.]+),\s*erc20:\s*([\d.]+)\s*\}/);
+    const am = adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{ trc20: ([\d.]+), bep20: ([\d.]+), erc20: ([\d.]+) \}/);
+    if (!um) { console.log('FAIL uniapp seed 提取失败(platform-config networkConfirmFeeUsd 形状变了 —— 判据失效按红处理,禁空集全过)'); process.exit(0); }
+    if (!am) { console.log('FAIL admin 契约锚提取失败(WD02_SEED_NETWORK_CONFIRM_FEE_USD 形状变了)'); process.exit(0); }
+    const keys = ['trc20', 'bep20', 'erc20'];
+    const miss = [];
+    keys.forEach((k, i) => { if (Number(um[i + 1]) !== Number(am[i + 1])) miss.push(k + '(uni=' + um[i + 1] + '!=admin=' + am[i + 1] + ')'); });
+    // 覆盖度自守:两端键数必须 = 3(两端同增新网络时逐键循环静默漏检,此处变红逼同步扩清单)
+    const uniKeys = ((uni.match(/networkConfirmFeeUsd:\s*\{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
+    const admKeys = ((adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
+    if (uniKeys !== 3 || admKeys !== 3) miss.push('key-count(uni=' + uniKeys + ' admin=' + admKeys + ' 应各 3)');
+    console.log(miss.length ? 'FAIL ' + miss.join(' ') : 'OK');
+  " "$WD02_ADMIN_ANCHOR")
+  if [ "$wd02_parity" = "OK" ]; then
+    ok "WD02 network-confirm-fee parity(3 keys 逐键比值 · 锚=admin-ops wd02 契约声明,非运行时)"
+  else
+    bad "WD02 network-confirm-fee parity: $wd02_parity"
+  fi
+fi
 # ── SPEC-2 电脑算力 sentinels ──
 spec2_pc_gpu_kind_coverage() {
   local miss=""

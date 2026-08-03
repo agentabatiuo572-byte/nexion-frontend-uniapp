@@ -8,7 +8,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  *
  * 两件事:
  *  1) 提现费抵扣:NEX 可抵扣提现手续费(取代旧积分门槛)。纯函数 `computeWithdrawFee`;
- *     无 NEX 不拦截、按惩罚费率收费;烧 NEX 按优惠率抵扣。实际扣减由 wallet-withdraw
+ *     无 NEX 不拦截;NEX 抵扣为用户自选开关(FEAT-WD02)。实际扣减由 wallet-withdraw
  *     调 app.debitNex 完成(store 不 import app — 架构铁律)。
  *  2) 签到回访水龙头:每日签到 + 连胜 + 里程碑机制保留,奖励币种从积分换成少量 NEX。
  *     本 store 只管「签到状态机」(连胜/里程碑/saver)+ 一份展示用 history;真正把 NEX 计入钱包,
@@ -187,105 +187,103 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 });
 
 /**
- * 提现费 + NEX 优惠抵扣模型(取代旧积分/硬燃烧门槛)。
+ * 提现费 + NEX 自选抵扣模型(FEAT-WD02,取代 WD01c「网络费夹逼 + 按金额比例平台费」双费模型)。
  *
- * 🔴 总费是**两笔相加**(FEAT-WD01c),后端对这条等式有硬校验:
- *  - networkFee = clamp(金额 × networkFeeRate, min, max) —— 链上转账真实成本
- *  - penaltyFee = 金额 × penaltyFeeRate —— 平台留存杠杆
- *  - grossFee   = networkFee + penaltyFee
- *  - requiredNex= 全额抵扣所需 NEX = grossFee / offsetRate(按**总费**算,不是只按惩罚费)
- *  - nexBurned  = min(用户 NEX, requiredNex)(部分抵扣)
- *  - feeWaived  = nexBurned × offsetRate(封顶 grossFee)
- *  - actualFee  = grossFee − feeWaived(烧够则 0)
- *  - netReceive = 金额 − actualFee
+ * 🔴 费用 = **每笔固定的网络确认费**,按提现网络取值(后台 D5 networkConfirmFeeUsd 可配,
+ *    种子 TRC20/BEP20 $1.00 · ERC20 $5.00,值域 [0, 25]);旧「按金额比例的平台留存费」与 grossFee 概念已删除。
+ *  - networkConfirmUsd = 金额 ≤ 0 ? 0 : 配置值(没转账就没有这笔费;不再按金额比例)
+ *  - NEX 抵扣是**用户自选**(offsetWithNex,默认关):server 侧无此意图**永不烧 NEX**(规格 ③)
+ *  - requiredNex = offsetRate > 0 ? ceil(费 / offsetRate) : 0(整数 NEX,2026-08-02 拍板项1)
+ *  - nexBurned  = 开着才烧:min(用户 NEX, requiredNex);offsetRate ≤ 0 → 0(禁除零烧光)
+ *  - feeWaived  = min(费, nexBurned × offsetRate)(🔴 必须封顶费本身:ceil 会过烧 ≤1 NEX,
+ *                 3 NEX × $0.40 = $1.20 > $1.00 费 —— 账单只准记实际减免 $1.00,不记 $1.20)
+ *  - actualFee  = max(0, 费 − nexBurned × offsetRate)(server 权威校验等式,不出负数)
+ *  - netReceive = max(0, 金额 − actualFee)
  *
  * ⚠️ 这段文档头必须与实现同步改 —— 2026-07-31 本文件曾被误用 git checkout 整段回滚,
  *    是**照着注释重建**的。一份写着旧公式的文档头 = 下一次回滚的复发引信。
  *
- * offsetRate 远高于市价(#3:抵扣价值高于实际兑换价值)。
- * 费率后台可调:penaltyFeeRate 走 phase/H1;networkFee 三件套走 admin D5。
+ * offsetRate 远高于市价(#3:抵扣价值高于实际兑换价值),权威 §13.4(phase 全档 $0.40)。
+ * networkConfirmFeeUsd 三键走 admin D5;行为覆盖在 scripts/selfcheck-withdrawfee.mjs。
  */
 export interface WithdrawFee {
-  grossFee: number;
+  /** 本笔网络确认费(金额 ≤ 0 时为 0) */
+  networkConfirmUsd: number;
+  /** 全额抵扣所需 NEX(整数,ceil;费 0 或 offsetRate ≤ 0 时为 0) */
   requiredNex: number;
   nexBurned: number;
   feeWaived: number;
   actualFee: number;
   netReceive: number;
-  /** 链上转账成本(已夹在 min/max 之间) */
-  networkFee: number;
-  /** 惩罚费(= 金额 × penaltyFeeRate),不含网络费 */
-  penaltyFee: number;
 }
 
-/** 网络费配置(后台 D5 可配)。 */
-export interface NetworkFeeConfig {
-  /** 比例(0–0.05),对金额取比例 */
-  rate: number;
-  /** 下限(USDT):小额提现按此兜底,防止按比例算出 $0.1 这种付不起链上 gas 的数 */
-  min: number;
-  /** 上限(USDT):大额提现按此封顶 */
-  max: number;
-}
+export type WithdrawNetworkKey = "trc20" | "bep20" | "erc20";
+
+/** D5 网络确认费值域上限(USD)。admin normalize pin 同数字系,单边改会被 verify 的
+ *  跨仓 parity 哨兵与两侧固定靶(uniapp 26→false / admin 30→invalid)拦住。 */
+export const NETWORK_CONFIRM_FEE_MAX_USD = 25;
 
 /**
- * 网络费配置可用性(规格 FEAT-WD01c ② 异常4)。
- * 缺字段 / NaN / 负数 / 比例越界(> 5%,后台 D5 的合法上限)/ min > max 任一 → 不可用。
+ * 网络确认费配置可用性(规格 FEAT-WD02 ② 异常2)。
+ * 三键(trc20/bep20/erc20)齐全、均为有限数、∈[0, 25];任一违反 → 不可用。
+ * 0 合法($0 免费网络,显示 $0.00 不藏行)。
  *
  * 🔴 不可用时调用方必须**禁止下单**,绝不回退写死值 —— 与汇率牌价同口径(isFxQuoteUsable)。
- * 理由:回退写死值 = 用户按 A 费率下单、平台按 B 费率扣款,资金面对不上账。
- * 🔴 那 5% 是后台 D5 的法定上限,本函数是**唯一执行者** ——
- *    删掉它意味着后端下发 50% 时提 $100 只到手 $30 而页面照渲(独立验收实测)。
- *    行为覆盖在 scripts/selfcheck-withdrawfee.mjs。
+ * 理由:回退写死值 = 用户按 A 费下单、平台按 B 费扣款,资金面对不上账。
+ * 🔴 [0, 25] 是后台 D5 的法定值域,本函数是 uniapp 侧**唯一执行者**。
  */
-export function isNetworkFeeConfigUsable(cfg: Partial<NetworkFeeConfig> | undefined | null): boolean {
+export function isNetworkFeeConfigUsable(
+  cfg: Partial<Record<WithdrawNetworkKey, number>> | undefined | null,
+): boolean {
   if (!cfg) return false;
-  const rate = cfg.rate;
-  const min = cfg.min;
-  const max = cfg.max;
-  if (!Number.isFinite(rate) || (rate as number) < 0 || (rate as number) > 0.05) return false;
-  if (!Number.isFinite(min) || (min as number) < 0) return false;
-  if (!Number.isFinite(max) || (max as number) < 0) return false;
-  return (max as number) >= (min as number);
+  const keys: WithdrawNetworkKey[] = ["trc20", "bep20", "erc20"];
+  return keys.every((k) => {
+    const v = cfg[k];
+    return Number.isFinite(v) && (v as number) >= 0 && (v as number) <= NETWORK_CONFIRM_FEE_MAX_USD;
+  });
 }
 
 /**
- * 网络费:先按比例,再夹进 [min, max]。min > max 这种坏配置下取 min,不返回负数。
- *
- * 🔴 金额为 0 时返回 0,**不套下限** —— 否则用户还没输金额,明细区就显示「网络手续费 $1」,
- * 且总费($1)> 提现额($0),既误导又违反后端 `netReceive ≤ amount` 不变量。
- * 下限的语义是「真发生一笔链上转账时至少要付的 gas」,没有转账就没有这笔费。
- */
-export function computeNetworkFee(amountUSDT: number, cfg: NetworkFeeConfig): number {
-  const amount = Math.max(0, amountUSDT);
-  if (amount <= 0) return 0;
-  const min = Math.max(0, cfg.min);
-  const max = Math.max(min, cfg.max);
-  const raw = amount * Math.max(0, cfg.rate);
-  return Math.min(Math.max(raw, min), max);
-}
-
-/**
- * 🔴 FEAT-WD01c:总费是**两笔相加** —— grossFee = networkFee + 金额 × penaltyFeeRate。
- * 后端对这条等式有硬校验(误差 > 0.0001 即判数据非法)。前端此前只算了后半截,
- * 接真后端后用户看到的费会比实扣的少 —— 资金面最不能出的错。
- * NEX 抵扣作用于**总费**(含网络费),与后端一致。
+ * 🔴 FEAT-WD02 费用引擎。公式见文件头文档(与实现同笔改)。
+ * networkConfirmFeeUsd 传**单网络费值**(调用方按当前绑定网络取键);
+ * 合法性在信任边界(config.ts feeConfigValid)裁决,本函数只对负数做防御性钳零。
  */
 export function computeWithdrawFee(
   amountUSDT: number,
   userNex: number,
-  penaltyFeeRate: number,
+  offsetWithNex: boolean,
   nexFeeOffsetRate: number,
-  networkFeeConfig: NetworkFeeConfig,
+  networkConfirmFeeUsd: number,
 ): WithdrawFee {
   const amount = Math.max(0, amountUSDT);
-  const networkFee = computeNetworkFee(amount, networkFeeConfig);
-  const penaltyFee = amount * penaltyFeeRate;
-  const grossFee = networkFee + penaltyFee;
-  const requiredNex = nexFeeOffsetRate > 0 ? grossFee / nexFeeOffsetRate : 0;
-  const nexBurned = Math.min(Math.max(0, userNex), requiredNex);
-  const feeWaived = Math.min(grossFee, nexBurned * nexFeeOffsetRate);
-  const actualFee = Math.max(0, grossFee - feeWaived);
+  // 金额 0 → 费 0(保留「没转账就没这笔费」不变量,违者会渲染 总费 > 提现额)。
+  const fee = amount <= 0 ? 0 : Math.max(0, networkConfirmFeeUsd);
+  const rate = nexFeeOffsetRate;
+  // 🔴 offsetRate ≤ 0 守卫:纯函数入参外部可喂,少了它 ceil(fee/0) = Infinity →
+  //    nexBurned = min(userNex, ∞) = 烧光全部 NEX 抵 $0(独立证伪构造出的反例)。
+  const requiredNex = fee > 0 && rate > 0 ? Math.ceil(fee / rate) : 0;
+  const nexBurned = offsetWithNex && rate > 0 ? Math.min(Math.max(0, userNex), requiredNex) : 0;
+  const feeWaived = Math.min(fee, nexBurned * rate);
+  const actualFee = Math.max(0, fee - nexBurned * rate);
   const netReceive = Math.max(0, amount - actualFee);
-  return { networkFee, penaltyFee, grossFee, requiredNex, nexBurned, feeWaived, actualFee, netReceive };
+  return { networkConfirmUsd: fee, requiredNex, nexBurned, feeWaived, actualFee, netReceive };
+}
+
+/**
+ * 🔴 server 侧费用快照校验(mock 同构;PROD = POST /api/withdrawals 里 server 以权威
+ * 费率重算并拒不一致单)。app.submitWithdrawal 入口调用,拦两类坏单:
+ *  ① 意图守恒:offsetWithNex=false 时 nexBurned 必须为 0(无意图永不烧 NEX,规格 ③);
+ *  ② 等式:|actualFeeUsd − max(0, networkConfirmUsd − nexBurned × offsetRate)| ≤ 0.0001
+ *    (页面拼装错 / 过期报价落盘,一律 fail-closed 拒单)。
+ */
+export function isWithdrawalFeeSnapshotValid(
+  fee: { networkConfirmUsd: number; nexBurned: number; actualFeeUsd: number } | null | undefined,
+  offsetWithNex: boolean,
+  nexFeeOffsetRate: number,
+): boolean {
+  if (!fee) return false;
+  const parts = [fee.networkConfirmUsd, fee.nexBurned, fee.actualFeeUsd];
+  if (!parts.every((v) => Number.isFinite(v) && v >= 0)) return false;
+  if (!offsetWithNex && fee.nexBurned !== 0) return false;
+  return Math.abs(fee.actualFeeUsd - Math.max(0, fee.networkConfirmUsd - fee.nexBurned * nexFeeOffsetRate)) <= 0.0001;
 }
