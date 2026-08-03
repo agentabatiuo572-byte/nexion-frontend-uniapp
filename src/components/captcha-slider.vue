@@ -247,10 +247,10 @@ onUnmounted(() => {
 .cs-refresh:active { opacity: 0.7; }
 /* ⑤ 网络失败态:soft tint 重试 pill(零 border,tap ≥44,rest 态自带 affordance) */
 .cs-fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
-.cs-fail__t { font-size: 13.5px; color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
+.cs-fail__t { font-size: 13px; color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
 .cs-fail__btn { min-height: 44px; padding: 0 24px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
 .cs-fail__btn:active { opacity: 0.8; transform: scale(0.98); }
-.cs-fail__btn-t { font-size: 13.5px; font-weight: 600; color: var(--v5-brand); }
+.cs-fail__btn-t { font-size: 13px; font-weight: 600; color: var(--v5-brand); }
 
 /* 🔴 零-border 扫荡请勿删这条 border:它是**状态通道**,不是卡片描边 ——
    下面 .cs-track--err / --ok 靠改 border-color 传达验证成功/失败反馈,
