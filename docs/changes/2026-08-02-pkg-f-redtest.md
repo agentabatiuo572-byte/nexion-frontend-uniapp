@@ -32,4 +32,22 @@
 **子串假绿**(grep 子串假阳性坑的镜像形态)→ 已收紧为 `grep -qE 'function convert\(\)'`
 后复测转红。此判据修正即本轮红测的直接产出。
 
-结论:21/21 合取项独立转红 + 1 豁免负控通过;PASS 行均携样本量(扫描文件数 / 三语行数)。
+结论:20/20 合取项独立转红 + 1 豁免负控通过(共 21 项);PASS 行均携样本量(扫描文件数 / 三语行数)。
+
+## 追加:哨兵D 试用价双源等值(2026-08-03 双镜头审查整改轮)
+
+新哨兵 `scripts/selfcheck-trial-price-parity.mjs`(verify.sh TRIAL02 段 `trial02_price_parity`
+调用):断言 `trial-config.trialPriceUSD === products[trialProductId].price`(checkout 促销
+折扣行算基 vs 结算基数,今天 649/649 相等但此前无门看守)。node 直跑不依赖 dev server;
+提取失败(字段被删/商品下架/指针悬空)同样转红,不允许「找不到 = 静默全过」。
+
+方法同 F8:`cp` 备份 → 单侧注入 → 断言红 → `cp` 还原(禁 git checkout)→ 复跑绿;
+基线先证绿,还原后 `diff -q` 与备份逐字节一致。
+
+| # | 方向 | 注入形态(单独) | 注入后 | 还原后 |
+|---|---|---|---|---|
+| D1 | trial-config 侧 | `trialPriceUSD: 649` → `699` | FAIL(exit 1,双值打印) | 绿 |
+| D2 | products 侧 | stellarbox-s1 `price: 649` → `599` | FAIL(exit 1,双值打印) | 绿 |
+| D3 | 删除盲区负控 | `trialPriceUSD` 字段改名移出 DEFAULT | FAIL(exit 1,提取失败即红) | 绿 |
+
+verify.sh 包装函数经 stub ok/bad 驱动实测 PASS 行携双侧值;`bash -n scripts/verify.sh` 通过。

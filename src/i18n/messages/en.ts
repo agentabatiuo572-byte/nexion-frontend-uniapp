@@ -1358,6 +1358,7 @@ export const en = {
     eligReasonConverted: "You already own a device — check out the upgrades instead",
     eligReasonUsed: "This account has already used its free trial",
     eligReasonInProgress: "Your trial is already running — see the trial page",
+    eligReasonRisk: "This account can't claim the trial right now — contact support for details",
     eligReasonClosed: "The trial offer isn't open right now — check back soon",
     // /me/trial five-state page
     pageTitle: "Free trial",

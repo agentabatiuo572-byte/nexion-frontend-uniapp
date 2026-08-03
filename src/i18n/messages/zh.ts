@@ -1343,6 +1343,7 @@ export const zh: Messages = {
     eligReasonConverted: "你已拥有设备,去看看升级款吧",
     eligReasonUsed: "该账号已使用过免费试用",
     eligReasonInProgress: "试用正在进行中,去试用页看看",
+    eligReasonRisk: "该账号暂时无法领取,请联系客服了解详情",
     eligReasonClosed: "试用活动暂未开放,晚点再来看看",
     // /me/trial 五态页
     pageTitle: "免费试用",

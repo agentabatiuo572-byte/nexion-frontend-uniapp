@@ -1345,6 +1345,21 @@ trial02_machine_invariants() {
   else bad "TRIAL02 free-trial.ts gained money/device side effects — poll must flip state only (spec ④)"; echo "$money" | sed 's/^/        /'; fi
 }
 trial02_machine_invariants
+
+# 哨兵D:试用价双源等值 —— checkout 促销折扣行算自 trial-config.trialPriceUSD,
+# 结算基数用商品目录 products[trialProductId].price;后台独立改任意一边即静默
+# 脱节。运行时不耦合(生产 = 两张后端表),mock 侧焊值 parity 机器门;提取失败
+# (字段/商品被删、指针悬空)同样转红,不允许「找不到 = 静默全过」。
+trial02_price_parity() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-price-parity.mjs 2>&1); then
+    ok "TRIAL02 trial price dual-source parity: $out"
+  else
+    bad "TRIAL02 trial price dual-source parity broken"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial02_price_parity
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
