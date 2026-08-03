@@ -271,19 +271,39 @@ export function computeWithdrawFee(
 
 /**
  * 🔴 server 侧费用快照校验(mock 同构;PROD = POST /api/withdrawals 里 server 以权威
- * 费率重算并拒不一致单)。app.submitWithdrawal 入口调用,拦两类坏单:
+ * 费率重算并拒不一致单)。app.submitWithdrawal 入口调用,拦三类坏单:
  *  ① 意图守恒:offsetWithNex=false 时 nexBurned 必须为 0(无意图永不烧 NEX,规格 ③);
  *  ② 等式:|actualFeeUsd − max(0, networkConfirmUsd − nexBurned × offsetRate)| ≤ 0.0001
- *    (页面拼装错 / 过期报价落盘,一律 fail-closed 拒单)。
+ *    (页面拼装错 / 过期报价落盘,一律 fail-closed 拒单);
+ *  ③ 权威交叉核对(2026-08-03 资金 P1):networkConfirmUsd 必须与权威配置里当前网络的
+ *    费值一致,容差同 ②(|Δ| ≤ 0.0001 —— 严格 !== 会把 UI toFixed 反算值与配置存值的
+ *    浮点误差误判成攻击)。只校 ①② 时任意「自洽三元组」如 {0,0,0} 一路放行 =
+ *    客户端改配置即可 $0 费提现,真后台按此同构接线就是平台吃 gas。
+ *    权威 map 缺失 / 超值域(isNetworkFeeConfigUsable=false)/ 该网络键取不到 →
+ *    一律 fail-closed 拒单;$0 是合法权威值(免费网络),用 Number.isFinite 判存在性。
+ *
+ * network + authoritativeFeeMap 在**提交边界(app.submitWithdrawal)必传**(权威 map 走
+ * config.currentNetworkConfirmFeeUsd() 单源);页面的 staleness 预检(报价过期提示)
+ * 可不传,只走 ①② —— UI 预检不是资金门,资金门在 store 提交边界。两参传任一即启用 ③,
+ * 传了一半(另一半缺)按 fail-closed 拒。
  */
 export function isWithdrawalFeeSnapshotValid(
   fee: { networkConfirmUsd: number; nexBurned: number; actualFeeUsd: number } | null | undefined,
   offsetWithNex: boolean,
   nexFeeOffsetRate: number,
+  network?: WithdrawNetworkKey,
+  authoritativeFeeMap?: Partial<Record<WithdrawNetworkKey, number>> | null,
 ): boolean {
   if (!fee) return false;
   const parts = [fee.networkConfirmUsd, fee.nexBurned, fee.actualFeeUsd];
   if (!parts.every((v) => Number.isFinite(v) && v >= 0)) return false;
+  if (network !== undefined || authoritativeFeeMap !== undefined) {
+    if (!isNetworkFeeConfigUsable(authoritativeFeeMap)) return false;
+    const authoritative = network !== undefined ? authoritativeFeeMap?.[network] : undefined;
+    // Number.isFinite 而非 truthy:$0 免费网络的权威值 0 是合法值,`!authoritative` 会把它当缺失误拒。
+    if (!Number.isFinite(authoritative)) return false;
+    if (Math.abs(fee.networkConfirmUsd - (authoritative as number)) > 0.0001) return false;
+  }
   if (!offsetWithNex && fee.nexBurned !== 0) return false;
   return Math.abs(fee.actualFeeUsd - Math.max(0, fee.networkConfirmUsd - fee.nexBurned * nexFeeOffsetRate)) <= 0.0001;
 }

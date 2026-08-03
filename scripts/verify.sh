@@ -569,6 +569,12 @@ sentinel_present "P0 neg-balance: account-cloud has fund-invariant clamp" src/st
 sentinel_present "P0 neg-balance: merge writes clamped snapshot" src/store/account-cloud.ts 'const merged = clampAccountFundInvariants\(rawMerged\)'
 # 提现金额有效性守卫(对齐 debitBalance):NaN/±Inf/≤0 拒,防负数反向加钱 / NaN 污染余额。
 sentinel_present "P0 neg-balance: withdrawal rejects invalid amount" src/store/app.ts 'if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null'
+# 2026-08-03 提现资金 2×P1:①费用快照必须与权威配置交叉核对(自洽三元组不再放行,权威值走
+# config 纯函数单源);②失败提现退款必须连已烧 NEX 一起退(独立幂等键 refund-nex:)。
+# 行为固定靶 + 剥注释接线门在 selfcheck-withdrawfee.mjs(⑥⑦);这两条是快速哨兵层,pin 完整
+# 调用形态(短串会在注释里出现,pin 短串必被哄绿)。
+sentinel_present "P1 fee snapshot cross-checks authoritative config (5-arg call)" src/store/app.ts 'isWithdrawalFeeSnapshotValid\(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY\[network\], currentNetworkConfirmFeeUsd\(\)\)'
+sentinel_present "P1 failed-withdrawal refunds burned NEX via own idem key" src/store/app.ts 'creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)'
 # 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
 # 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。
 nex_guard_sites=$(grep -cE '!Number\.isFinite\(amount\) \|\| amount < 0' src/store/app.ts)
