@@ -230,7 +230,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.cs-layer { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px; }
+/* 🔴 全站层级秩序表(单源;机器门 scripts/zindex-order.mjs 逐条断言,改一处就红)
+   ── 低 ──────────────────────────────────────────────────────────── 高 ──
+     0–50   页内装饰 / 页面 chrome(aurora · refresher 5 · tabbar 30 · stickyCTA 35 · sub-page header 50)
+    90–100  底盘 chrome(.nx-top-chrome 90 · .nx-header/.nx-navheader 100)
+   110–200  底盘之上的常驻件(状态栏 110 · 消息抽屉 110/120 · opensea 120 · PC 设备卡 200)
+   790/800  业务半屏(trial-claim · slot-action · lucky-spin · voucher-claim · tradein · trial)
+       900  说明型半屏(capacity-explainer · tradein-ladder)
+ 8000/8001  分享半屏(share-channel · share-poster)
+      8900  里程碑庆祝 —— 必须在业务 UI 之下(2026-08-03 定,见 milestone-celebration.vue)
+ 9000/9001  瞬时层 / 选择器(toast host · 国家区号半屏)
+      9100  阻断式弹窗(confirm / netError 的 .nx-mask)
+ >>> 9500   本层:滑块人机验证 <<<
+     10050  模拟设备 chrome(状态栏 / Home Indicator,standalone-page-shell)
+
+   为什么滑块排在业务面最顶(9500):它是**阻断式安全控件**——弹出时发码流程正停在
+   这里等它解开。别的浮层被盖住只是「晚点再看」,它被盖住是**死锁**:用户看不见也点
+   不到,而流程不会自己往下走。原值 90(自 2026-07-06 建档起就是 90,c778889 遮罩重构
+   只是把它从 .cs-mask 原样搬到 .cs-layer,不是重构带入)输给了 toast/确认弹窗/区号半屏
+   /庆祝层等几乎所有浮层 —— 实测(register 键盘打开区号半屏)三个操作点全部 elementFromPoint
+   命中 .cc-row,把手拖不动。
+   为什么不排到最顶(< 10050):10050 是模拟硬件 chrome(顶部状态条 + Home Indicator,
+   后者 pointer-events:none),它模拟的是手机自身的系统层,且与垂直居中的滑块卡片零几何
+   重叠,压在滑块上不影响任何操作。 */
+.cs-layer { position: fixed; inset: 0; z-index: 9500; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .cs-mask { position: absolute; inset: 0; background: var(--v5-bg-color-mask); backdrop-filter: blur(4px); }
 .cs-card { position: relative; width: 100%; max-width: 340px; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 20px; padding: 18px; }
 .cs-head { display: flex; align-items: flex-start; justify-content: space-between; }
