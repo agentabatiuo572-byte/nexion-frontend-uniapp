@@ -1352,6 +1352,7 @@ export const vi: Messages = {
     eligReasonConverted: "Bạn đã sở hữu thiết bị — xem các bản nâng cấp nhé",
     eligReasonUsed: "Tài khoản này đã dùng thử miễn phí rồi",
     eligReasonInProgress: "Bạn đang trong thời gian dùng thử — xem tại trang dùng thử",
+    eligReasonRisk: "Tài khoản này hiện chưa thể nhận dùng thử — liên hệ hỗ trợ để biết thêm",
     eligReasonClosed: "Chương trình dùng thử hiện chưa mở — quay lại sau nhé",
     pageTitle: "Dùng thử miễn phí",
     pageHeaderSubtitle: "NexGridBox S1",

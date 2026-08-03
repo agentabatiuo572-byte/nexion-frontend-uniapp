@@ -210,6 +210,7 @@ const ineligibleReasonText = computed(() => {
   if (r === "converted") return w.value.eligReasonConverted;
   if (r === "used") return w.value.eligReasonUsed;
   if (r === "in-progress") return w.value.eligReasonInProgress;
+  if (r === "risk") return w.value.eligReasonRisk;
   return w.value.eligReasonClosed;
 });
 

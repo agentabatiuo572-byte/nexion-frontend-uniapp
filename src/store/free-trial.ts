@@ -33,8 +33,10 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 export type TrialStatus = "none" | "active" | "grace" | "ended" | "converted";
 
-/** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error). */
-export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed";
+/** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error).
+ *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
+ *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
+export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "risk";
 
 interface FreeTrialState {
   status: TrialStatus;
