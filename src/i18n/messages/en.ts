@@ -2820,6 +2820,7 @@ export const en = {
       kycVerify: "KYC-Express · wallet ownership verification",
       topupTrc20: "Top-up · USDT-TRC20",
       withdrawTrc20: "Withdrawal · USDT-TRC20",
+      withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",
     },
     title: "Bills",
     back: "Back",
@@ -3522,6 +3523,7 @@ export const en = {
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
     withdrawFeeStale: "The fee rate has been updated — please try again",
+    withdrawContextStale: "Your account or payout address changed — please submit again",
     earnNexCta: "Mine more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
     feeConfirmRow: "Network confirmation fee",

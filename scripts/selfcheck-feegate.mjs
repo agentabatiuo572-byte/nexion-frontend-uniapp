@@ -112,11 +112,13 @@ check("🔴 报价引擎吃 offsetWithNex 开关(删判断 = 恒烧,回到旧强
   /computeWithdrawFee\(\s*amountNum\.value,\s*nexBalance\.value,\s*offsetWithNex\.value,/.test(flat.replace(/ /g, "")) ||
   /computeWithdrawFee\( amountNum\.value, nexBalance\.value, offsetWithNex\.value,/.test(flat),
   "feeCalc 不再传开关 —— NEX 会被无意图自动烧掉");
-check("🔴 提交链传开关快照(offsetSnapshot 入 submitWithdrawal —— server 意图字段)",
-  /const offsetSnapshot = offsetWithNex\.value/.test(code) &&
-  /app\.submitWithdrawal\([\s\S]{0,400}?offsetSnapshot,/.test(code));
-check("🔴 开关在提交期间冻结(toggleOffset 有 submitting 守卫)",
-  /function toggleOffset\(\)[\s\S]{0,200}?if \(submitting\.value\) return;/.test(code));
+// 2026-08-04:开关快照并入统一提交快照 snap(三条 P1 同族收口,见 selfcheck-withdraw-freeze)。
+check("🔴 提交链传开关快照(offset 入 snap 且 snap.offset 进 submitWithdrawal —— server 意图字段)",
+  /const snap = \{[\s\S]{0,600}?offset: offsetWithNex\.value,/.test(code) &&
+  /app\.submitWithdrawal\([\s\S]{0,400}?snap\.offset,/.test(code));
+check("🔴 开关在提交期间冻结(toggleOffset 走 inputsLocked = submitting || confirmingSubmit)",
+  /function toggleOffset\(\)[\s\S]{0,200}?if \(inputsLocked\.value\) return;/.test(code)
+  && /const inputsLocked = computed\(\(\) => submitting\.value \|\| confirmingSubmit\.value\)/.test(code));
 check("费用行按当前绑定网络取键(networkConfirmFeeUsd[NETWORK_FEE_KEY[network]])",
   /networkConfirmFeeUsd\[NETWORK_FEE_KEY\[network\.value\]\]/.test(code));
 check("「?」费用说明半屏存在且可开合",

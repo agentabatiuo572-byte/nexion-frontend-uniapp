@@ -99,6 +99,30 @@ function reconcileBills() {
     const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
     if (row && row.status !== "failed") bills.settleByRef(wd.id, "failed");
   }
+  // ②b NEX 抵扣费退还 → 补一条**正向反向分录**(2026-08-04 R2 P1-A)。
+  //    退款只动了余额:钱包里 NEX 回来了,账单里那条「−N NEX(已入账)」却还孤零零挂着 ——
+  //    按账单对账的用户会少算自己的 NEX。改写那条行不是解法(烧确实发生过,改写 = 账本说没烧),
+  //    复式账本的规矩是**冲正靠反向分录**:同单号补一条 +N NEX,两行相抵 = 钱包净变化。
+  //    🔴 判据取自账本自己(退款幂等键已落盘),不是「单据是失败终态」—— 钱还没真退就记账,
+  //    等于账单抢在余额前面宣布退款,方向反了同样是裂脑。存在性判据 = 同单号的正向 NEX 行,
+  //    没有才补,故刷新 / 换设备 / 上一轮写盘失败都能自愈(与 ① 同一套思路)。
+  for (const wd of app.withdrawals) {
+    const burned = wd.fee?.nexBurned;
+    if (!(typeof burned === "number" && burned > 0)) continue;
+    if (!app.user.appliedRewardKeys?.["refund-nex:" + wd.id]) continue;
+    if (bills.bills.some((b) => b.ref === wd.id && b.symbol === "NEX" && b.amount > 0)) continue;
+    bills.add({
+      type: "withdraw",
+      symbol: "NEX",
+      amount: burned,
+      status: "posted",
+      // memoKey = 渲染时才翻译(切语言不留旧语);memo 只作兜底,与 bills.ts 的约定一致。
+      memo: `Fee offset refunded · ${Number.isInteger(burned) ? burned : burned.toFixed(1)} NEX returned`,
+      memoKey: "withdrawNexRefund",
+      memoParams: { nex: Number.isInteger(burned) ? String(burned) : burned.toFixed(1) },
+      ref: wd.id,
+    });
+  }
   // ③ 赠金:锁定 / 待审桶都空了 = 没有还锁着的赠金,那笔「处理中」的赠金账单该入账了。
   //    释放走 applyReleaseOutcome,它只动桶和余额、**不写账单**,
   //    于是账单里那行 +$5 会永远停在「处理中」。这里从数据推出它已经落地。

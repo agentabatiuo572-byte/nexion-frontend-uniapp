@@ -2745,6 +2745,7 @@ export const vi: Messages = {
       kycVerify: "KYC-Express · xác minh quyền sở hữu ví",
       topupTrc20: "Nạp tiền · USDT-TRC20",
       withdrawTrc20: "Rút tiền · USDT-TRC20",
+      withdrawNexRefund: "Hoàn bù phí · trả lại {nex} NEX",
     },
     title: "Sao kê",
     back: "Quay lại",
@@ -3445,6 +3446,7 @@ export const vi: Messages = {
   walletV3: {
     needMoreNexToast: "Không đủ NEX để bù phí",
     withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
+    withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",
