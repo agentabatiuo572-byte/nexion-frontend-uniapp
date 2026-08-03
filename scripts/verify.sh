@@ -1459,6 +1459,21 @@ trial02_price_parity() {
 }
 trial02_price_parity
 
+# 🔴 封装门(2026-08-04 结构性反思产物,见 docs/changes/2026-08-04-structural-reflection.md):
+# R1 抽了单一解析器却只扫「定义面」,R2 的 P0 就出在漏网的**消费者**(结算页混源扣款)。
+# 同型跨两轮复发 → 根因是「必须经解析器」只是约定、没被机器强制。本门堵死新消费者
+# 静默出现:消费者台账写在门脚本里(不在被查文件里,防同批编辑一起删),钱路径一律禁。
+trial_encapsulation_gate() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-encapsulation.mjs 2>&1); then
+    ok "$out"
+  else
+    bad "试用状态封装门:有未登记消费者或钱路径混源(见 scripts/selfcheck-trial-encapsulation.mjs)"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial_encapsulation_gate
+
 # 哨兵E:试用时间边界单一不变量(2026-08-03 缺陷族 P0+3×P1 同根)—— 所有时钟
 # 判定收敛到 trial-boundary.ts resolveTrialAt 一个纯函数。固定靶矩阵:①离线跨
 # 宽限期 convert 必拒 ②后台改 trialDays 不追溯存量冻结窗口 ③finishedAt=真边界
