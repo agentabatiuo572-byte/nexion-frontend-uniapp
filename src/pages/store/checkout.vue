@@ -594,12 +594,23 @@ function goAwaiting() {
 // expire mid-checkout — the global 4s TRIAL_TICK keeps running while the user
 // types card details) instead of silently charging a total that was never shown.
 let trialQuote: { applied: boolean } = { applied: false };
+// Voucher context joins the quote snapshot (audit P1): the confirmed step used
+// to LIVE-read voucherMatch — a voucher expiring/being redeemed mid-checkout
+// silently charged the un-discounted price the confirm step never showed.
+let voucherQuote: { id: string | null; discount: number } = { id: null, discount: 0 };
 
 function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
   confirming = true;
   trialQuote = { applied: trialConversionMode.value };
-  step.value = "pay-instructions";
+  voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
+  // $0 due (credits cover the displayed total, 异常4) → nothing to transfer:
+  // the chain QR / card form would solicit a 0-USDT payment with no executable
+  // action (and a real backend would invite a 0-value on-chain transfer). All
+  // money/order side effects hang on the step==='confirmed' watch below, so
+  // skipping pay-instructions + awaiting is pure navigation; non-zero totals
+  // keep the exact pre-existing path.
+  step.value = netPrice.value + cardFee.value === 0 ? "confirmed" : "pay-instructions";
   setTimeout(() => { confirming = false; }, 0);
 }
 
@@ -620,11 +631,17 @@ watch(step, (s) => {
     if (!p) return;
     // Persist order + spend bill — only ONCE per checkout (orderId guard).
     if (!orderId.value) {
-      // Capture the voucher discount BEFORE markUsed mutates the wallet (which
-      // would recompute voucherMatch → null). Discount applies to the device
-      // subtotal; card fee (if any) is computed on the discounted subtotal.
-      const discount = voucherDiscount.value;
-      const usedVoucherId = voucherMatch.value?.def.id ?? null;
+      // ── Voucher pay-time revalidation(与 trade-in/trial 失效守卫同构)──
+      // 券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
+      // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用
+      // 冻结值继续。冻结值也天然满足旧注释的「markUsed 之前取值」要求。
+      if ((voucherMatch.value?.def.id ?? null) !== voucherQuote.id) {
+        toast.warn(t.value.voucher.quoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      const discount = voucherQuote.discount;
+      const usedVoucherId = voucherQuote.id;
       // FEAT-DEV02:先快照抵扣上下文(clearApplied 会把 computed 归零),再走
       // 扣款→下架的同步原子块。抵扣只减应付;新机由订单履约管线 addDevice
       // 未激活入库,本块不生成设备。
