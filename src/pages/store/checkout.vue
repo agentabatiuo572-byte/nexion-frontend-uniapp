@@ -474,7 +474,7 @@ let interceptFired = false;
 function fireTradeinIntercept() {
   if (interceptFired) return;
   interceptFired = true;
-  // FEAT-TRIAL02: the trial conversion funnel doesn't intercept with trade-in —
+  // FEAT-TRIAL02: the trial conversion checkout doesn't intercept with trade-in —
   // promo + credit + trade-in + voucher quad-stacking is undefined by spec, and
   // the conversion order is the trial device itself (slot exchange), not an
   // upgrade off an old unit. Normal (non-trial) checkouts intercept as before.
