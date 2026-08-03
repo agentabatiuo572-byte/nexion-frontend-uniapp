@@ -1776,6 +1776,7 @@ export const zh: Messages = {
     coRowTrialOffset: "试用抵扣金",
     coTrialZeroNote: "应付 $0 · 超出购机款的抵扣金不退差额、不折现。",
     coTrialQuoteChanged: "试用价格已变化,请重新确认最新金额后再支付",
+    coTotalQuoteChanged: "应付金额已变化,请重新确认最新金额后再支付",
     coBillTrialDiscountPart: "试用折扣 −${amount}",
     coBillTrialOffsetPart: "试用抵扣金 −${amount}",
     coBillTrialRemainderMemo: "试用收益剩余入余额 · {name}",

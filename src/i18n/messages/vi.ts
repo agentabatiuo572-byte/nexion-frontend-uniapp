@@ -1769,6 +1769,7 @@ export const vi: Messages = {
     coRowTrialOffset: "Tiền khấu trừ dùng thử",
     coTrialZeroNote: "Số phải trả là $0 · phần khấu trừ vượt giá máy không được hoàn hay quy đổi.",
     coTrialQuoteChanged: "Giá dùng thử đã thay đổi — vui lòng xem lại tổng mới trước khi thanh toán",
+    coTotalQuoteChanged: "Số tiền phải trả đã thay đổi — vui lòng xem lại tổng mới trước khi thanh toán",
     coBillTrialDiscountPart: "giảm giá dùng thử −${amount}",
     coBillTrialOffsetPart: "tiền khấu trừ dùng thử −${amount}",
     coBillTrialRemainderMemo: "Phần lợi nhuận dùng thử còn lại → số dư · {name}",

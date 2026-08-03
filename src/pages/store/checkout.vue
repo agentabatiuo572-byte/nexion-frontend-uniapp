@@ -241,8 +241,10 @@ import { useOrders, type Order } from "@/store/orders";
 import { useBills } from "@/store/bills";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
-import { trialReservesSlotNow, useFreeTrial, liveShadowUSD, liveShadowNEX } from "@/store/free-trial";
+import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "@/store/trial-config";
+import { resolveTrialAt, accruedShadow } from "@/store/trial-boundary";
+import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
@@ -332,34 +334,64 @@ const product = computed<Product | undefined>(() => getProduct(productId.value))
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
 
-// ─── FEAT-TRIAL02 trial conversion mode ──────────────────────────────────
+// ─── FEAT-TRIAL02 trial conversion quote — 单一解析 ───────────────────────
 // The mode derives from STORE STATE (trial ∈ active|grace ∧ this SKU is the
 // trial product) — deliberately NO URL marker: a trial user reaching this
 // checkout through ANY entry (trial page CTA, store grid, deep link) gets the
 // credit rows, so the capability is never silently withheld; once the trial
 // has ended the same link falls back to the plain flow (spec ⑥ — post-grace
-// CTA is a plain purchase). Promo discount + credit both render as their own
-// money rows and are re-validated at pay time (see the confirmed step).
+// CTA is a plain purchase).
+//
+// 🔴 R2 P0 根治(2026-08-04):本页曾一半读 store 里未推进的原始 `status` ref
+// (模式 / 促销 / 抵扣行),一半读 `liveShadow*` 的实时解析器 —— 宽限期刚过、
+// 4s poll 未到的窗口里两边给出互斥答案(模式说「还能转化」而影子说「已结束」),
+// 净额被拼成一个报价页从未展示过的数字并直接扣款。修法:本页所有试用派生值
+// (是否适用 / 促销 / 抵扣 / 余额返还 / NEX)只有 `trialQuoteAt(now)` 一个出处
+// —— 一个时间戳、一次 resolveTrialAt,其余全部从这次解析结果派生;本页任何位置
+// 都不再读原始 `freeTrial.status`。展示侧按 1s ticker 解析,越界后 ≤1s 自动收回
+// 抵扣行;支付侧按 mockServerNow() 重解一次只用于「还能不能按这份报价成交」。
 const freeTrial = useFreeTrial();
 const trialCfg = computed(() => useTrialConfig().config);
-const trialConversionMode = computed(
-  () =>
-    (freeTrial.status === "active" || freeTrial.status === "grace") &&
-    productId.value === trialCfg.value.trialProductId,
-);
 // 1s ticker — the credit keeps accruing during active (display freshness).
-const nowTick = ref(Date.now());
+const nowTick = ref(mockServerNow());
 let trialTicker: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  trialTicker = setInterval(() => { nowTick.value = Date.now(); }, 1000);
+  trialTicker = setInterval(() => { nowTick.value = mockServerNow(); }, 1000);
 });
-const promoDiscount = computed(() =>
-  trialConversionMode.value ? computeDiscountedPrice(trialCfg.value).discount : 0,
-);
-const trialOffsetView = computed(() => {
-  if (!trialConversionMode.value) return { offsetUSD: 0, remainderUSD: 0 };
-  return computeTrialOffset(trialCfg.value, liveShadowUSD(nowTick.value));
-});
+
+interface TrialQuote {
+  /** 该时刻试用可转化 ∧ 本单就是试用机 → 促销/抵扣行生效 */
+  applied: boolean;
+  promo: number;
+  offsetUSD: number;
+  remainderUSD: number;
+  shadowNEX: number;
+}
+const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainderUSD: 0, shadowNEX: 0 };
+
+/** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
+function trialQuoteAt(now: number): TrialQuote {
+  const cfg = trialCfg.value;
+  const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
+  if ((r.status !== "active" && r.status !== "grace") || productId.value !== cfg.trialProductId) return NO_TRIAL;
+  // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
+  // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
+  const acc = accruedShadow(r, now, cfg);
+  const split = computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
+  return {
+    applied: true,
+    promo: computeDiscountedPrice(cfg).discount,
+    offsetUSD: split.offsetUSD,
+    remainderUSD: split.remainderUSD,
+    shadowNEX: r.status === "active" ? acc.nex : r.shadowFrozenAtNEX,
+  };
+}
+
+/** 展示侧的那一次解析 —— 确认页渲染的每个数字都出自它。 */
+const trialView = computed(() => trialQuoteAt(nowTick.value));
+const trialConversionMode = computed(() => trialView.value.applied);
+const promoDiscount = computed(() => trialView.value.promo);
+const trialOffsetView = computed(() => trialView.value);
 const promoDiscountText = computed(() => promoDiscount.value.toFixed(2));
 const trialOffsetText = computed(() => trialOffsetView.value.offsetUSD.toFixed(2));
 const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, { pct: (trialCfg.value.discountRate * 100).toFixed(0) }));
@@ -590,10 +622,13 @@ function goAwaiting() {
 }
 
 // FEAT-TRIAL02 quote snapshot: what the user committed to on the confirm step.
-// The persist block re-derives the trial context and BAILS on drift (grace can
-// expire mid-checkout — the global 4s TRIAL_TICK keeps running while the user
-// types card details) instead of silently charging a total that was never shown.
-let trialQuote: { applied: boolean } = { applied: false };
+// 快照 = 确认页此刻渲染的那一次解析(trialView),不是「支付时再算一遍」的第二份
+// 数字 —— 扣款金额只认这份快照(展示与扣款同源);支付时刻的重新解析只用来决定
+// 「还能不能按这份报价成交」,不能就拒单回报价步(grace 可能在结账途中到点,全局
+// 4s TRIAL_TICK 不会停),绝不改数字静默扣款。
+let trialQuote: TrialQuote = NO_TRIAL;
+/** 确认页展示过的应付总额(净额 + 卡费)—— 实际扣款不得超过它。 */
+let quotedTotal = 0;
 // Voucher context joins the quote snapshot (audit P1): the confirmed step used
 // to LIVE-read voucherMatch — a voucher expiring/being redeemed mid-checkout
 // silently charged the un-discounted price the confirm step never showed.
@@ -602,15 +637,16 @@ let voucherQuote: { id: string | null; discount: number } = { id: null, discount
 function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
   confirming = true;
-  trialQuote = { applied: trialConversionMode.value };
+  trialQuote = trialView.value;
+  quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
   // $0 due (credits cover the displayed total, 异常4) → nothing to transfer:
   // the chain QR / card form would solicit a 0-USDT payment with no executable
   // action (and a real backend would invite a 0-value on-chain transfer). All
   // money/order side effects hang on the step==='confirmed' watch below, so
   // skipping pay-instructions + awaiting is pure navigation; non-zero totals
-  // keep the exact pre-existing path.
-  step.value = netPrice.value + cardFee.value === 0 ? "confirmed" : "pay-instructions";
+  // keep the exact pre-existing path. 判据取快照总额,与下面扣款同一个数。
+  step.value = quotedTotal === 0 ? "confirmed" : "pay-instructions";
   setTimeout(() => { confirming = false; }, 0);
 }
 
@@ -670,31 +706,56 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
-      // ── FEAT-TRIAL02 pay-time revalidation(与 trade-in 失效守卫同构)──
-      // grace 可能在结账中途到点(全局 4s TRIAL_TICK 不会停):报价含抵扣而
-      // 支付时刻试用已不可转化 → 拒单回报价步,绝不按确认页没展示过的更高
-      // 净额静默扣款。整段同步执行,poll 无法在守卫与 convert 之间插入。
-      const trialNow = trialConversionMode.value;
-      if (trialQuote.applied && !trialNow) {
+      // ── FEAT-TRIAL02 支付时刻单一解析(R2 P0 根治)──
+      // 一个时间戳、一次 resolveTrialAt:`applyTrial` 与全部试用金额都出自这条
+      // 链,不再「模式读原始 ref、影子读解析器」拼出一个没人展示过的净额。解析
+      // 说已不可转化 → 拒单回报价步重新确认(与 voucher / trade-in 守卫同构),
+      // 绝不静默扣款。整段同步执行,poll 无法在守卫与 convert 之间插入。
+      const payNow = mockServerNow();
+      const payQuote = trialQuoteAt(payNow);
+      if (trialQuote.applied && !payQuote.applied) {
         toast.warn(t.value.store.coTrialQuoteChanged);
         step.value = "select-payment";
         return;
       }
-      const applyTrial = trialQuote.applied && trialNow;
-      // Snapshot the shadow BEFORE convert() — convert flips liveShadow* to 0
-      // (the App-layer conversion trap, 2026-06): offset/remainder/NEX must all
-      // read pre-convert values.
-      const shadowUSDNow = applyTrial ? liveShadowUSD(Date.now()) : 0;
-      const shadowNEXNow = applyTrial ? liveShadowNEX(Date.now()) : 0;
-      const trialSplit = applyTrial ? computeTrialOffset(trialCfg.value, shadowUSDNow) : { offsetUSD: 0, remainderUSD: 0 };
-      const promo = applyTrial ? promoDiscount.value : 0;
+      const applyTrial = trialQuote.applied;
+      // 金额一律取确认页那份报价快照(展示与扣款同源);支付时刻的解析只做闸不
+      // 改数字 —— 期间多累计的影子收益按「所见即所付」让渡,绝不反向多扣。
+      const promo = applyTrial ? trialQuote.promo : 0;
+      const trialOffsetUSD = applyTrial ? trialQuote.offsetUSD : 0;
+      const trialRemainderUSD = applyTrial ? trialQuote.remainderUSD : 0;
+      const shadowNEXNow = applyTrial ? trialQuote.shadowNEX : 0;
       const tradeInCredit = ti?.credit ?? 0;
-      const net = Math.max(0, +(p.price - discount - tradeInCredit - promo - trialSplit.offsetUSD).toFixed(2));
+      const net = Math.max(0, +(p.price - discount - tradeInCredit - promo - trialOffsetUSD).toFixed(2));
       // Card payment charges the displayed total INCLUDING the card fee
       // (chain payments have no fee). Mock approximation of server-side PSP
       // debit — production: POST /api/orders does authorize+capture atomically.
       const fee = isCard.value ? cardFeeUsd(net) : 0;
       const chargeTotal = +(net + fee).toFixed(2);
+      // 族级兜底闸:任何一项在确认页之后变差(如旧机抵扣随累计收益跌档),差额
+      // 都不许静默扣到用户头上 —— 超过展示过的总额一律拒单重报价。反向(变便宜)
+      // 放行:少收不伤用户,拒单反而白丢一单。
+      if (chargeTotal > quotedTotal) {
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      // convert() 是状态机的最终裁决(它自取 server now 再解析一次):返回 false
+      // = 拒绝转化,必须当拒单信号处理,且必须在扣款之前判定 —— 绝不允许「先扣
+      // 钱再发现不能转化」。余额充足性先只读判定,使 convert 成功后扣款必成功
+      // (validate → apply 两段式,对齐服务端 POST /api/orders 的单事务语义)。
+      if (applyTrial) {
+        if (app.user.usdtBalance < chargeTotal) {
+          toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+          step.value = "select-payment";
+          return;
+        }
+        if (!freeTrial.convert()) {
+          toast.warn(t.value.store.coTrialQuoteChanged);
+          step.value = "select-payment";
+          return;
+        }
+      }
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402),
@@ -717,21 +778,21 @@ watch(step, (s) => {
         paymentMethod: payment.value,
         discount,
         ...(ti && { tradeInCredit, tradeInDeviceId: ti.device.id }),
-        ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD: trialSplit.offsetUSD }),
+        ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD }),
       });
       orderId.value = ord.id;
       // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
-      // convert 在快照之后调用(见上)。设备由既有订单履约管线生成(tickOrders
-      // → advanceOrder → addDevice,吃 order.total 作置换基数),这里绝不直插。
+      // convert() 已在扣款前裁决并落 converted(见上);这里只做返还入账。设备由
+      // 既有订单履约管线生成(tickOrders → advanceOrder → addDevice,吃 order.total
+      // 作置换基数),这里绝不直插。金额全部来自确认页那份报价快照。
       if (applyTrial) {
-        freeTrial.convert();
         const convRef = `${ord.id}-TRIAL`;
-        if (trialSplit.remainderUSD > 0) {
-          app.creditBalance(trialSplit.remainderUSD);
+        if (trialRemainderUSD > 0) {
+          app.creditBalance(trialRemainderUSD);
           bills.add({
             type: "bonus",
             symbol: "USDT",
-            amount: trialSplit.remainderUSD,
+            amount: trialRemainderUSD,
             status: "posted",
             memo: fmt(t.value.store.coBillTrialRemainderMemo, { name: p.name }),
             ref: `${convRef}-EARN-USDT`,
@@ -749,7 +810,7 @@ watch(step, (s) => {
           });
         }
         const earnParts: string[] = [];
-        if (trialSplit.remainderUSD > 0) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialSplit.remainderUSD.toFixed(2) }));
+        if (trialRemainderUSD > 0) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
         if (shadowNEXNow > 0) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
         if (earnParts.length) toast.success(fmt(t.value.store.coTrialEarnToast, { parts: earnParts.join(" · ") }));
       }
@@ -760,7 +821,7 @@ watch(step, (s) => {
       if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
       if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: ti.device.name, amount: tradeInCredit }));
       if (promo > 0) memoParts.push(fmt(t.value.store.coBillTrialDiscountPart, { amount: promo.toFixed(2) }));
-      if (applyTrial && trialSplit.offsetUSD > 0) memoParts.push(fmt(t.value.store.coBillTrialOffsetPart, { amount: trialSplit.offsetUSD.toFixed(2) }));
+      if (applyTrial && trialOffsetUSD > 0) memoParts.push(fmt(t.value.store.coBillTrialOffsetPart, { amount: trialOffsetUSD.toFixed(2) }));
       if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee, rate: cardFeeRateLabel() }));
       bills.add({
         type: "purchase",
