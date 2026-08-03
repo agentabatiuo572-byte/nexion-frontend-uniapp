@@ -20,7 +20,7 @@
       <view v-if="sponsorPreview" class="rg-sponsor">
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.name[0] }}</text></view>
         <view class="rg-sponsor__body">
-          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> invited you</text>
+          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> {{ t.ref.invitedYou }}</text>
           <text class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
         </view>
         <text class="rg-sponsor__v">V{{ sponsorPreview.vRank }}</text>
@@ -543,7 +543,12 @@ function finish() {
         const nexBill = bills.addOnce({ type: "bonus", symbol: "NEX", amount: gift.nex, status: giftPosted ? "posted" : "pending", memo: giftMemo, ref: giftRef });
         if (!usdtBill || !nexBill) throw new Error("gift_bill_unavailable");
         if (posted && giftPosted) {
-          toast.success(`+$${gift.usdt} + ${gift.nex} NEX`, sponsorPreview.value ? `Sponsored by ${sponsorPreview.value.name}` : t.value.register.giftCreditedToastSub);
+          toast.success(
+            `+$${gift.usdt} + ${gift.nex} NEX`,
+            sponsorPreview.value
+              ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: sponsorPreview.value.name })
+              : t.value.register.giftCreditedToastSub,
+          );
         } else {
           toast.info(t.value.register.giftPendingToast, t.value.register.giftPendingToastSub);
         }
