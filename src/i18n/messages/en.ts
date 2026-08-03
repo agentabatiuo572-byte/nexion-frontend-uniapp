@@ -162,6 +162,8 @@ export const en = {
     captchaThrottled: "Too many attempts. Try again later.",
     captchaVerified: "Verified",
     captchaFailCount: "Fails {n} / {max}",
+    captchaLoadFailed: "Couldn't load. Check your connection and retry.",
+    captchaRetry: "Retry",
     errorTooFrequent: "Too frequent — retry in {s}s",
     errorOtpInvalid: "Incorrect code — {n} attempts left",
     errorOtpExpired: "Code expired — request a new one",

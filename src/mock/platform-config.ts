@@ -70,6 +70,8 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     otpTtlSeconds: 300,
     maxVerifyAttempts: 5,
     captchaTicketTtlSeconds: 120,
+    // FEAT-AUTH03: 注册场景每次发码必过滑块;login/reset 维持次数阈值规则。
+    captchaAlwaysScenes: ["register"],
   },
   // SPEC-7 §5b 七维权重 mock seed(K4 权威可配)。强维 0.8+,中维 0.4-0.5,弱维 ≤0.3。
   riskScore: {

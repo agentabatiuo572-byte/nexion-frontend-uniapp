@@ -11,8 +11,8 @@
         </view>
       </view>
 
-      <!-- 拼图区:challenge 未就绪 = 骨架占位(⑤ 空状态,禁白块) -->
-      <view id="cs-puzzle" class="cs-puzzle" :class="{ 'cs-puzzle--skeleton': !challenge }">
+      <!-- 拼图区:challenge 未就绪 = 骨架占位(⑤ 空状态,禁白块;>300ms 才出,防闪烁) -->
+      <view id="cs-puzzle" class="cs-puzzle" :class="{ 'cs-puzzle--skeleton': skeletonOn }">
         <template v-if="challenge">
           <view class="cs-slot" :style="{ left: slotLeft }" />
           <view class="cs-piece" :style="{ left: pieceLeft }" />
@@ -20,6 +20,11 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
           </view>
         </template>
+        <!-- ⑤ 报错/极限态:题面加载或校验网络失败 → 层内失败态 + 重试,不静默关闭 -->
+        <view v-else-if="loadFailed" class="cs-fail">
+          <text class="cs-fail__t">{{ t.authOtp.captchaLoadFailed }}</text>
+          <view class="cs-fail__btn" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
+        </view>
       </view>
 
       <!-- 滑轨 -->
@@ -53,7 +58,7 @@ import { ref, computed, onMounted, onUnmounted, getCurrentInstance } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { captchaChallenge, captchaVerify, MAX_CAPTCHA_FAILS, type CaptchaChallenge } from "@/store/auth-otp";
+import { captchaChallenge, captchaVerify, MAX_CAPTCHA_FAILS, type CaptchaChallenge, type CaptchaVerifyResult } from "@/store/auth-otp";
 
 const props = defineProps<{ phone: string }>();
 const emit = defineEmits<{ (e: "success", ticket: string): void; (e: "close"): void }>();
@@ -61,6 +66,8 @@ const emit = defineEmits<{ (e: "success", ticket: string): void; (e: "close"): v
 const t = useT();
 
 const challenge = ref<CaptchaChallenge | null>(null);
+const loadFailed = ref(false);
+const skeletonOn = ref(false);
 const curX = ref(0);
 const dragging = ref(false);
 const busy = ref(false);
@@ -77,7 +84,7 @@ const maxHandle = computed(() => Math.max(1, trackW.value - 48));
 // slot/piece 用 calc 定位:left = ratio × (拼图区宽 − 拼块 44px − 边距 8px)。
 const slotLeft = computed(() => `calc((100% - 52px) * ${challenge.value?.targetRatio ?? 0})`);
 const pieceLeft = computed(() => `calc((100% - 52px) * ${curX.value / maxHandle.value})`);
-const showHint = computed(() => !dragging.value && curX.value === 0 && !busy.value && !verified.value);
+const showHint = computed(() => !dragging.value && curX.value === 0 && !busy.value && !verified.value && !loadFailed.value);
 const trackCls = computed(() => ({ "cs-track--err": shaking.value, "cs-track--ok": verified.value, "cs-track--busy": busy.value }));
 const failText = computed(() => fmt(t.value.authOtp.captchaFailCount, { n: fails.value, max: MAX_CAPTCHA_FAILS }));
 
@@ -95,12 +102,37 @@ function measureTrack() {
     .exec();
 }
 
-async function reloadChallenge() {
+// ⑤ 加载态:< 300ms 不展示骨架(防闪烁);到点仍未就绪才亮。
+const SKELETON_DELAY_MS = 300;
+let skeletonTimer: ReturnType<typeof setTimeout> | null = null;
+function clearSkeleton() {
+  if (skeletonTimer) { clearTimeout(skeletonTimer); skeletonTimer = null; }
+  skeletonOn.value = false;
+}
+// 题面加载单入口:成功 → 渲染拼图;失败 → 层内失败态 + 重试(⑤ 断网不静默关闭)。
+// mock 的 captchaChallenge 不会 reject,此分支为 PROD 真滑块 SDK 的网络失败预留。
+async function loadChallenge() {
   if (busy.value) return;
   challenge.value = null;
+  loadFailed.value = false;
+  clearSkeleton();
+  skeletonTimer = setTimeout(() => { skeletonOn.value = true; }, SKELETON_DELAY_MS);
+  try {
+    challenge.value = await captchaChallenge(props.phone);
+    measureTrack();
+  } catch {
+    loadFailed.value = true;
+  } finally {
+    clearSkeleton();
+  }
+}
+async function reloadChallenge() {
+  if (busy.value) return;
   resetHandle();
-  challenge.value = await captchaChallenge(props.phone);
-  measureTrack();
+  await loadChallenge();
+}
+function onRetry() {
+  void loadChallenge();
 }
 
 function resetHandle() {
@@ -128,16 +160,27 @@ async function onUp() {
   dragging.value = false;
   if (curX.value <= 0) return; // 未拖动,忽略
   busy.value = true;
-  const res = await captchaVerify(props.phone, {
-    challengeId: challenge.value.challengeId,
-    offsetRatio: curX.value / maxHandle.value,
-  });
-  busy.value = false;
+  let res: CaptchaVerifyResult;
+  try {
+    res = await captchaVerify(props.phone, {
+      challengeId: challenge.value.challengeId,
+      offsetRatio: curX.value / maxHandle.value,
+    });
+  } catch {
+    // ⑤ 校验网络失败:转层内失败态可重试;busy 由 finally 兜底复位,关闭出口不被锁死。
+    resetHandle();
+    challenge.value = null;
+    loadFailed.value = true;
+    return;
+  } finally {
+    busy.value = false;
+  }
   if (res.ok) {
+    const ticket = res.ticket; // let+闭包丢失 narrowing,先取值再进 setTimeout
     verified.value = true;
     hintText.value = t.value.authOtp.captchaVerified;
     hintIsError.value = false;
-    setTimeout(() => emit("success", res.ticket), 300);
+    setTimeout(() => emit("success", ticket), 300);
     return;
   }
   if (res.error === "captcha_throttled") {
@@ -149,11 +192,10 @@ async function onUp() {
   hintText.value = t.value.authOtp.captchaFail;
   hintIsError.value = true;
   shaking.value = true;
-  setTimeout(async () => {
+  setTimeout(() => {
     shaking.value = false;
-    challenge.value = null;
     curX.value = 0;
-    challenge.value = await captchaChallenge(props.phone);
+    void loadChallenge(); // 重随机题面;网络失败同样落层内失败态
   }, 380);
 }
 function onCancel() {
@@ -165,19 +207,19 @@ function onCancel() {
 function winMove(e: MouseEvent) { onMove(e); }
 function winUp() { void onUp(); }
 
-onMounted(async () => {
+onMounted(() => {
   if (typeof window !== "undefined") {
     window.addEventListener("mousemove", winMove);
     window.addEventListener("mouseup", winUp);
   }
-  challenge.value = await captchaChallenge(props.phone);
-  measureTrack();
+  void loadChallenge();
 });
 onUnmounted(() => {
   if (typeof window !== "undefined") {
     window.removeEventListener("mousemove", winMove);
     window.removeEventListener("mouseup", winUp);
   }
+  if (skeletonTimer) clearTimeout(skeletonTimer);
 });
 </script>
 
@@ -203,6 +245,12 @@ onUnmounted(() => {
 .cs-piece { position: absolute; top: 53px; width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, color-mix(in srgb, var(--v5-brand) 90%, transparent), color-mix(in srgb, var(--v5-brand) 65%, transparent)); border: 1px solid rgba(255, 255, 255, 0.25); box-sizing: border-box; }
 .cs-refresh { position: absolute; right: 4px; top: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
 .cs-refresh:active { opacity: 0.7; }
+/* ⑤ 网络失败态:soft tint 重试 pill(零 border,tap ≥44,rest 态自带 affordance) */
+.cs-fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
+.cs-fail__t { font-size: 13.5px; color: var(--v5-ink-2); text-align: center; text-wrap: pretty; }
+.cs-fail__btn { min-height: 44px; padding: 0 24px; display: flex; align-items: center; justify-content: center; border-radius: 9999px; background: color-mix(in srgb, var(--v5-brand) 16%, transparent); }
+.cs-fail__btn:active { opacity: 0.8; transform: scale(0.98); }
+.cs-fail__btn-t { font-size: 13.5px; font-weight: 600; color: var(--v5-brand); }
 
 /* 🔴 零-border 扫荡请勿删这条 border:它是**状态通道**,不是卡片描边 ——
    下面 .cs-track--err / --ok 靠改 border-color 传达验证成功/失败反馈,

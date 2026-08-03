@@ -163,6 +163,8 @@ export const vi: Messages = {
     captchaThrottled: "Bạn đã thử quá nhiều lần. Vui lòng thử lại sau.",
     captchaVerified: "Đã xác minh",
     captchaFailCount: "Sai {n} / {max}",
+    captchaLoadFailed: "Tải thất bại, vui lòng kiểm tra mạng rồi thử lại",
+    captchaRetry: "Thử lại",
     errorTooFrequent: "Thao tác quá nhanh, vui lòng thử lại sau {s}s",
     errorOtpInvalid: "Mã sai — còn {n} lần thử",
     errorOtpExpired: "Mã đã hết hạn, vui lòng lấy mã mới.",
