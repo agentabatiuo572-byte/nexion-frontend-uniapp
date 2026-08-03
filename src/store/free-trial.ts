@@ -4,6 +4,13 @@ import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "./tr
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import {
+  resolveTrialAt,
+  accruedShadow,
+  type TrialBoundaryConfig,
+  type TrialRowSnapshot,
+  type TrialStatus,
+} from "./trial-boundary";
 
 /**
  * Free trial — FEAT-TRIAL02 cardless machine (spec signed 2026-07-31).
@@ -29,27 +36,21 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  *   cancel()       → POST /api/trial/cancel
  *   eligibility()  → GET  /api/trial/eligibility → { ok, reason? }
  *   poll()         → GET  /api/trial/state (server cron advances the machine)
+ *
+ * 🔴 时间边界单一不变量(2026-08-03):所有时钟判定收敛到 trial-boundary.ts 的
+ * `resolveTrialAt` —— poll/convert/eligibility/影子累计全部调它,本文件不再
+ * 出现任何 `now >= 边界` 的手写比对(cancel 是用户显式动作、非时钟判定,除外)。
  */
 
-export type TrialStatus = "none" | "active" | "grace" | "ended" | "converted";
+export type { TrialStatus } from "./trial-boundary";
 
 /** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error).
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
 export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "risk";
 
-interface FreeTrialState {
-  status: TrialStatus;
-  startedAt: number | null;
-  /** Trial-period end (server-canonical name per spec ③; legacy rows stored `activeEndsAt`). */
-  expiresAt: number | null;
-  graceEndsAt: number | null;
-  finishedAt: number | null;
-  shadowFrozenAtUSD: number;
-  shadowFrozenAtNEX: number;
-  /** Legacy card-era trial migrated onto the cardless rules (spec 异常6) — page shows a notice. */
-  legacyCardMigrated: boolean;
-}
+/** Persisted row shape — single source lives in trial-boundary.ts (resolver 同型)。 */
+type FreeTrialState = TrialRowSnapshot;
 
 const INITIAL: FreeTrialState = {
   status: "none",
@@ -80,8 +81,11 @@ interface LegacyTrialRow extends Omit<Partial<FreeTrialState>, "status"> {
  * two boundaries) · redeemed→converted · failed|cancelled→ended (finishedAt
  * kept for the "ended at" display). A card-era row still active/grace gets
  * `legacyCardMigrated` so the trial page can show the rules-changed notice.
+ * 同根补齐(2026-08-03):legacy 行进到 grace 却缺 `shadowFrozenAtUSD/NEX`
+ * (卡时代无此字段)时,用 resolver 同一个 `accruedShadow` 公式按冻结窗口
+ * 就地补齐 —— 迁移与边界推进共用唯一冻结公式,不允许第二套算法。
  */
-function migrateRow(row: LegacyTrialRow): FreeTrialState {
+function migrateRow(row: LegacyTrialRow, cfg: TrialBoundaryConfig): FreeTrialState {
   let status: TrialStatus;
   let graceEndsAt = row.graceEndsAt ?? null;
   let legacyCardMigrated = row.legacyCardMigrated ?? false;
@@ -113,7 +117,7 @@ function migrateRow(row: LegacyTrialRow): FreeTrialState {
       return { ...INITIAL };
   }
   if ((status === "active" || status === "grace") && row.cardTokenId) legacyCardMigrated = true;
-  return {
+  const out: FreeTrialState = {
     status,
     startedAt: row.startedAt ?? null,
     expiresAt: row.expiresAt ?? row.activeEndsAt ?? null,
@@ -123,18 +127,26 @@ function migrateRow(row: LegacyTrialRow): FreeTrialState {
     shadowFrozenAtNEX: row.shadowFrozenAtNEX ?? 0,
     legacyCardMigrated,
   };
+  // legacy extended→grace 行缺冻结影子值:按冻结窗口在边界时刻补齐(公式单源
+  // accruedShadow;窗口锚点缺失时补 0 —— fail-closed,不发明收益)。
+  if (out.status === "grace" && out.shadowFrozenAtUSD === 0 && out.shadowFrozenAtNEX === 0 && out.expiresAt !== null) {
+    const frozen = accruedShadow(out, out.expiresAt, cfg);
+    out.shadowFrozenAtUSD = frozen.usd;
+    out.shadowFrozenAtNEX = frozen.nex;
+  }
+  return out;
 }
 
-function hydrate(accountKey: string): FreeTrialState {
+function hydrate(accountKey: string, cfg: TrialBoundaryConfig): FreeTrialState {
   const row = readAccountRow<LegacyTrialRow>(ACCOUNTS_KEY, accountKey);
-  if (row && typeof row.status === "string") return migrateRow(row);
+  if (row && typeof row.status === "string") return migrateRow(row, cfg);
   return { ...INITIAL };
 }
 
 export const useFreeTrial = defineStore("freeTrial", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = hydrate(boundKey);
+  const init = hydrate(boundKey, useTrialConfig().config);
   const status = ref<TrialStatus>(init.status);
   const startedAt = ref<number | null>(init.startedAt);
   const expiresAt = ref<number | null>(init.expiresAt);
@@ -144,8 +156,9 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const shadowFrozenAtNEX = ref<number>(init.shadowFrozenAtNEX);
   const legacyCardMigrated = ref<boolean>(init.legacyCardMigrated);
 
-  function persist() {
-    writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, {
+  /** Current row as a plain snapshot — resolver 的唯一输入形态(生产 = GET /api/trial/state 行)。 */
+  function snapshot(): FreeTrialState {
+    return {
       status: status.value,
       startedAt: startedAt.value,
       expiresAt: expiresAt.value,
@@ -154,7 +167,22 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       shadowFrozenAtUSD: shadowFrozenAtUSD.value,
       shadowFrozenAtNEX: shadowFrozenAtNEX.value,
       legacyCardMigrated: legacyCardMigrated.value,
-    });
+    };
+  }
+
+  function persist() {
+    writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
+  }
+
+  /** 边界推进唯一入口:resolve 后有变化才落盘(poll/convert 共用;渲染路径禁调)。 */
+  function advanceTo(now: number): FreeTrialState {
+    const row = snapshot();
+    const resolved = resolveTrialAt(row, now, useTrialConfig().config);
+    if (resolved !== row) {
+      load(resolved);
+      persist();
+    }
+    return resolved;
   }
 
   function load(next: FreeTrialState) {
@@ -171,15 +199,19 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   /** 账号切换重绑:装载该账号的试用状态机(防跨账号继承试用资格/影子收益)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    load(hydrate(boundKey));
+    load(hydrate(boundKey, useTrialConfig().config));
   }
 
   // PRODUCTION: GET /api/trial/eligibility → { ok, reason? }
+  // 判定基于 resolveTrialAt 解析后的状态(只读、不落盘):离线跨过边界的行在
+  // 内存状态推进前就按真实时点判 —— 真 ended 的行拿 "used" 而不是 "in-progress"。
   function eligibility(): { ok: boolean; reason?: TrialIneligibleReason } {
-    if (status.value === "active" || status.value === "grace") return { ok: false, reason: "in-progress" };
-    if (status.value === "converted") return { ok: false, reason: "converted" };
-    if (status.value === "ended") return { ok: false, reason: "used" };
-    if (!useTrialConfig().config.phaseOpen) return { ok: false, reason: "phase-closed" };
+    const cfg = useTrialConfig().config;
+    const resolved = resolveTrialAt(snapshot(), mockServerNow(), cfg);
+    if (resolved.status === "active" || resolved.status === "grace") return { ok: false, reason: "in-progress" };
+    if (resolved.status === "converted") return { ok: false, reason: "converted" };
+    if (resolved.status === "ended") return { ok: false, reason: "used" };
+    if (!cfg.phaseOpen) return { ok: false, reason: "phase-closed" };
     return { ok: true };
   }
 
@@ -212,10 +244,15 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // PRODUCTION: server-side inside POST /api/orders (order + convert atomic).
   // Only active|grace convert (spec ④); terminal, no rollback. Returns false
   // when the machine isn't convertible — the checkout must have bailed earlier.
+  // 🔴 P0 防线:convert 内部自己取 mockServerNow() 并先 resolveTrialAt 推进边界,
+  // 绝不信任调用方(结算页)缓存的 now 或内存里的旧 status —— 用户离线跨过宽限期
+  // 后趁 poll 未跑下单,这里按真实时点判到 ended 即拒绝(边界推进结果已落盘)。
   function convert(): boolean {
-    if (status.value !== "active" && status.value !== "grace") return false;
+    const now = mockServerNow();
+    const resolved = advanceTo(now);
+    if (resolved.status !== "active" && resolved.status !== "grace") return false;
     status.value = "converted";
-    finishedAt.value = mockServerNow();
+    finishedAt.value = now;
     persist();
     return true;
   }
@@ -231,52 +268,39 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   // PRODUCTION: client polls GET /api/trial/state; advancement runs server-side
   // by cron. Spec ④ 禁止动作:grace→ended flips STATE ONLY — zero debit, zero
-  // order, zero device writes ever happen here.
+  // order, zero device writes ever happen here. 边界判定/级联/补齐全在
+  // resolveTrialAt(冻结窗口、finishedAt=真边界、null graceEndsAt 就地补齐)。
   function poll(now: number) {
-    const cfg = useTrialConfig().config;
-    if (status.value === "active" && expiresAt.value !== null && now >= expiresAt.value) {
-      const elapsedDays = Math.min(cfg.trialDays, (now - (startedAt.value ?? now)) / ONE_DAY_MS);
-      status.value = "grace";
-      shadowFrozenAtUSD.value = +(cfg.shadowDailyUSD * elapsedDays).toFixed(2);
-      shadowFrozenAtNEX.value = +(cfg.shadowDailyNEX * elapsedDays).toFixed(0);
-      persist();
-      return;
-    }
-    if (status.value === "grace" && graceEndsAt.value !== null && now >= graceEndsAt.value) {
-      status.value = "ended";
-      finishedAt.value = now;
-      persist();
-    }
+    advanceTo(now);
   }
 
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
-    eligibility, canStart, start, convert, cancel, poll, bindAccount,
+    eligibility, canStart, start, convert, cancel, poll, bindAccount, snapshot,
   };
 });
 
 /** Live shadow accrual — accrues during active, frozen during grace, 0 on
- *  none/ended/converted (spec ④: `ended` never accrues further). */
+ *  none/ended/converted (spec ④: `ended` never accrues further).
+ *  渲染路径游离函数:只读 resolveTrialAt 的解析结果拿正确时点语义(离线跨界的
+ *  行按真实状态显示,累计上限 = 冻结窗口),绝不在此写状态/落盘(Vue 反模式);
+ *  落盘由 poll/convert 独占。 */
 export function liveShadowUSD(now: number): number {
   const s = useFreeTrial();
   const cfg = useTrialConfig().config;
-  if (s.status === "active" && s.startedAt !== null) {
-    const elapsedMs = Math.min(cfg.trialDays * ONE_DAY_MS, now - s.startedAt);
-    return +(cfg.shadowDailyUSD * (elapsedMs / ONE_DAY_MS)).toFixed(2);
-  }
-  if (s.status === "grace") return s.shadowFrozenAtUSD;
+  const r = resolveTrialAt(s.snapshot(), now, cfg);
+  if (r.status === "active") return accruedShadow(r, now, cfg).usd;
+  if (r.status === "grace") return r.shadowFrozenAtUSD;
   return 0;
 }
 
 export function liveShadowNEX(now: number): number {
   const s = useFreeTrial();
   const cfg = useTrialConfig().config;
-  if (s.status === "active" && s.startedAt !== null) {
-    const elapsedMs = Math.min(cfg.trialDays * ONE_DAY_MS, now - s.startedAt);
-    return +(cfg.shadowDailyNEX * (elapsedMs / ONE_DAY_MS)).toFixed(0);
-  }
-  if (s.status === "grace") return s.shadowFrozenAtNEX;
+  const r = resolveTrialAt(s.snapshot(), now, cfg);
+  if (r.status === "active") return accruedShadow(r, now, cfg).nex;
+  if (r.status === "grace") return r.shadowFrozenAtNEX;
   return 0;
 }
 

@@ -1450,6 +1450,23 @@ trial02_price_parity() {
   fi
 }
 trial02_price_parity
+
+# 哨兵E:试用时间边界单一不变量(2026-08-03 缺陷族 P0+3×P1 同根)—— 所有时钟
+# 判定收敛到 trial-boundary.ts resolveTrialAt 一个纯函数。固定靶矩阵:①离线跨
+# 宽限期 convert 必拒 ②后台改 trialDays 不追溯存量冻结窗口 ③finishedAt=真边界
+# 非 now ④graceEndsAt=null 存量行补齐/fail-closed ⑤全迁移矩阵逐档落点 ⑥终态
+# 不可变;外加接线门(convert/poll/eligibility/liveShadow*/migrateRow 真路由到
+# resolver,cancel 显式窗口不被抢)。跑真实现(esbuild 转译),断言数带地板防空集。
+trial02_boundary_invariant() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-boundary.mjs 2>&1); then
+    ok "TRIAL02 time-boundary single invariant: $(printf '%s\n' "$out" | tail -n 1)"
+  else
+    bad "TRIAL02 time-boundary single invariant broken"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial02_boundary_invariant
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
