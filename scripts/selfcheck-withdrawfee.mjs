@@ -9,6 +9,10 @@
 //      feeWaived 必须是 $1.00 不是 $1.20;NEX 账单 memo 直接吃这个数,独立证伪抓出的反例)。
 //   ④ 🔴 offsetRate ≤ 0 除零守卫 —— 少了它 ceil(fee/0)=∞ → 烧光全部 NEX 抵 $0(同上反例)。
 //   ⑤ 配置判据三键齐全 ∈[0,25](0 合法);快照校验 isWithdrawalFeeSnapshotValid 拦意图/等式坏单。
+//   ⑥ 🔴 快照×权威配置交叉核对(2026-08-03 资金 P1):自洽三元组(如全 0)不放行;
+//      $0 权威值合法不误拒;容差 0.0001(非严格 !==);map 缺失/超值域 fail-closed。
+//   ⑦ 🔴 接线门(剥注释后判,判定对 ≠ 接上了):app.ts 提交边界必须 5 参调用校验器且权威值
+//      走 config 纯函数单源;失败提现退款必须 USDT(refund:)+NEX(refund-nex:)双独立幂等键。
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -162,6 +166,57 @@ const OFFSET = 0.4;
     isWithdrawalFeeSnapshotValid({ networkConfirmUsd: -1, nexBurned: 0, actualFeeUsd: 0 }, false, OFFSET) === false
     && isWithdrawalFeeSnapshotValid({ networkConfirmUsd: NaN, nexBurned: 0, actualFeeUsd: 0 }, false, OFFSET) === false
     && isWithdrawalFeeSnapshotValid(null, false, OFFSET) === false);
+}
+
+// ── ⑥ 快照×权威配置交叉核对(2026-08-03 资金 P1-A 固定靶) ──
+{
+  const AUTH = { trc20: 1, bep20: 1, erc20: 5 };
+  check("🔴 伪造自洽三元组 {0,0,0} 对上权威 $1 → 拒(客户端改配置 $0 费提现的原始攻击面)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: 0 }, false, OFFSET, "trc20", AUTH) === false);
+  check("合法单 + 权威一致 → 放行(fee$1 烧3 实付0,开抵扣)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 3, actualFeeUsd: 0 }, true, OFFSET, "trc20", AUTH) === true);
+  check("🔴 合法 $0 费网络不误拒(权威本来就是 0 —— truthy 判存在性会把 0 当缺失)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: 0 }, false, OFFSET, "trc20", { trc20: 0, bep20: 0, erc20: 0 }) === true);
+  check("🔴 权威值变动同步(权威改 $2:按旧 $1 拼的快照拒、按 $2 拼的过 —— 校验器跟 map 不跟常量)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 }, false, OFFSET, "trc20", { trc20: 2, bep20: 1, erc20: 5 }) === false
+    && isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 2, nexBurned: 0, actualFeeUsd: 2 }, false, OFFSET, "trc20", { trc20: 2, bep20: 1, erc20: 5 }) === true);
+  check("🔴 浮点容差:|Δ|=0.00005 ≤ 0.0001 过(UI toFixed 反算不误杀),0.001 拒",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1.00005, nexBurned: 0, actualFeeUsd: 1.00005 }, false, OFFSET, "trc20", AUTH) === true
+    && isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1.001, nexBurned: 0, actualFeeUsd: 1.001 }, false, OFFSET, "trc20", AUTH) === false);
+  check("权威 map 缺失/不可用 → fail-closed 拒(null map / 26 超值域)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 }, false, OFFSET, "trc20", null) === false
+    && isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 }, false, OFFSET, "trc20", { trc20: 1, bep20: 1, erc20: 26 }) === false);
+  check("网络键取对(erc20 单按 erc20 权威 $5 核;erc20 单填 trc20 的 $1 必拒)",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 5, nexBurned: 0, actualFeeUsd: 5 }, false, OFFSET, "erc20", AUTH) === true
+    && isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 }, false, OFFSET, "erc20", AUTH) === false);
+  check("不传权威参数(页面 staleness 预检的 3 参调用)保持旧行为放行",
+    isWithdrawalFeeSnapshotValid({ networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 }, false, OFFSET) === true);
+}
+
+// ── ⑦ 接线门(2026-08-03 资金 P1 A+B):判定对 ≠ 接上了 —— 把调用行摘掉/换参,纯函数
+//    固定靶照样全绿。剥注释后 pin 提交边界与退款现场(注释里出现判定式文本不得哄绿)。 ──
+const stripTs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+const appSrc = stripTs(readFileSync(path.join(root, "src", "store", "app.ts"), "utf8"));
+const cfgSrc = stripTs(readFileSync(path.join(root, "src", "store", "config.ts"), "utf8"));
+{
+  check("🔴 接线:submitWithdrawal 以 5 参调用校验器(network 映射键 + 权威 map)",
+    /isWithdrawalFeeSnapshotValid\(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY\[network\], currentNetworkConfirmFeeUsd\(\)\)/.test(appSrc));
+  check("🔴 接线:权威值走 config 纯函数单源(app.ts 从 @/store/config import,禁本地写死同名函数)",
+    /import \{[^}]*currentNetworkConfirmFeeUsd[^}]*\} from "@\/store\/config"/.test(appSrc)
+    && !/function currentNetworkConfirmFeeUsd/.test(appSrc));
+  const cfgFnStart = cfgSrc.indexOf("export function currentNetworkConfirmFeeUsd");
+  const cfgFn = cfgFnStart >= 0 ? cfgSrc.slice(cfgFnStart, cfgFnStart + 600) : "";
+  check("🔴 config 纯函数存在且 fail-closed(syncFailed / 值域坏 → null,禁回退种子值)",
+    cfgFnStart >= 0 && cfgFn.includes("isNetworkFeeConfigUsable") && cfgFn.includes("syncFailed") && cfgFn.includes("return null"));
+}
+{
+  check("🔴 退款双键:USDT 本金仍走 refund: 键", appSrc.includes('"refund:" + wd.id'));
+  check("🔴 退款双键:NEX 走独立 refund-nex: 键(复用单键会被 USDT 幂等挡掉永久漏退)",
+    appSrc.includes('"refund-nex:" + wd.id'));
+  check("🔴 NEX 退在 nex 参数位(usdt=0)—— 方向搞反 = 把 NEX 个数当美元退",
+    /creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)/.test(appSrc));
+  check("🔴 历史单安全:可选链取 nexBurned 且 >0 才退(纯数字 fee 不炸、无需退不算失败)",
+    /wd\.fee\?\.nexBurned/.test(appSrc) && /Number\.isFinite\(burnedNex\) && burnedNex > 0/.test(appSrc));
 }
 
 console.log(`\n${pass} pass / ${fail} fail`);

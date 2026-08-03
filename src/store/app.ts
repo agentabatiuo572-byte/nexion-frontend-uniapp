@@ -3,7 +3,7 @@ import { PLATFORM_UTC_OFFSET_HOURS } from "./withdrawal-eligibility-core";
 import { computed, ref } from "vue";
 import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
-import { isWithdrawalFeeSnapshotValid } from "@/store/nex-faucet";
+import { isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { resolveActivePhase } from "@/store/product-phase";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
@@ -15,7 +15,7 @@ import { GENESIS_INVITE_PATTERN } from "./genesis";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { FLEET_DEVICES } from "@/lib/platform-stats";
-import { useConfig } from "@/store/config";
+import { useConfig, currentNetworkConfirmFeeUsd } from "@/store/config";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
   appendLedgerEntry,
@@ -52,6 +52,14 @@ const ONE_DAY = ONE_DAY_MS;
 // ── module-level tick state (mirrors original module scope) ──
 const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
+
+// 提现单网络标识 → 费率配置键(与 wallet-withdraw.vue 的 NETWORK_FEE_KEY 同名同表,
+// server 侧做同一转换)。费用快照交叉核对(P1-A)按此从权威 map 取当前网络的费值。
+const NETWORK_FEE_KEY: Record<Withdrawal["network"], WithdrawNetworkKey> = {
+  "USDT-TRC20": "trc20",
+  "USDT-BEP20": "bep20",
+  "USDT-ERC20": "erc20",
+};
 
 function normalRandom(mean: number, std: number, min: number, max: number) {
   let u = 0, v = 0;
@@ -835,7 +843,14 @@ export const useApp = defineStore("app", () => {
    * 两个缺口分开看都像「反正 mock 里走不到」,合起来就是「钱扣了、单子废了、没人还」。
    * 退款与置账单失败必须在**同一处**完成,否则接后端时必然只做一半(审计明确点名)。
    *
-   * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单退一次。
+   * 🔴 退的是两种币(2026-08-03 资金 P1):USDT 本金之外,用户勾选 NEX 抵扣时页面在提交前
+   * 已 debitNex 真扣了 NEX —— 单据废了 = 网络费从没真付过,只退 USDT 不退 NEX 就是白烧。
+   * 幂等键**必须拆两个**(USDT 用 refund:、NEX 用 refund-nex:):复用单键会让
+   * 「USDT 退过 → NEX 因同键判已处理 → 永久跳过」。历史单 fee 是纯数字
+   * (account-cloud 读盘会归一出 nexBurned:0,但内存态不保证都走过归一),
+   * 故可选链取值且 >0 才退 —— undefined/0 = 本来无需退,绝不能被当成「退款失败」。
+   *
+   * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单每种币各退一次。
    * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
    */
   function refundFailedWithdrawals(): string[] {
@@ -849,6 +864,12 @@ export const useApp = defineStore("app", () => {
       // (实测:可提桶加上了、总余额纹丝不动 —— 一半生效比不生效更难查)。
       // 这个 action 同时加总余额与可提桶,且自带 appliedRewardKeys 幂等,正是退款要的语义。
       if (creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)) done.push(wd.id);
+      // NEX 抵扣费退还:独立幂等键;usdt 参数位传 0、NEX 走第 4 参(方向搞反 = 把 NEX
+      // 个数当美元退)。与 USDT 行互不阻塞:任一落盘失败,各自幂等键在下次调用重放补齐。
+      const burnedNex = wd.fee?.nexBurned;
+      if (Number.isFinite(burnedNex) && burnedNex > 0) {
+        creditRewardBucketOnce("refund-nex:" + wd.id, "withdrawable", 0, burnedNex);
+      }
     }
     return done;
   }
@@ -1020,13 +1041,19 @@ export const useApp = defineStore("app", () => {
     if (!Number.isFinite(amount) || amount <= 0) return null;
     // 🔴 FEAT-WD02 费用快照复验(mock 同构 server 边界;PROD = server 以权威费率重算并拒不一致单):
     //  ① 意图守恒 —— offsetWithNex=false 时 nexBurned 必须为 0(无意图永不烧 NEX,规格 ③);
-    //  ② 等式 |actualFeeUsd − max(0, networkConfirmUsd − nexBurned×offsetRate)| ≤ 0.0001。
+    //  ② 等式 |actualFeeUsd − max(0, networkConfirmUsd − nexBurned×offsetRate)| ≤ 0.0001;
+    //  ③ 权威交叉核对(2026-08-03 资金 P1)—— 快照 networkConfirmUsd 必须与权威配置里
+    //    当前网络的费值一致(容差同 ②)。只校 ①② 时任意自洽三元组(如全 0)一路放行 =
+    //    客户端改配置即可 $0 费提现。权威值走 currentNetworkConfirmFeeUsd() 纯函数单源,
+    //    fail-closed(配置 sync 失败 / 超值域 → null → 拒单,禁回退种子值);network 派生自
+    //    绑定关系(pairing.pairedNetwork),不是用户表单可改的输入;本校验只在提交这一刻
+    //    跑一次,不重放存量单 —— 历史单不受影响。
     // offsetRate 按提交时点 phase 派发(§13.4 权威,全 phase $0.40)。取值必须走
     // resolveActivePhase —— 与页面报价(use-product-phase)同一条解析路径:pin 优先、
     // 否则按注册月龄派生。曾在此直取时间派生 phase,pin 态下与页面报价分叉(审查 P2-2)。
     // 拼装错/过期报价一律 fail-closed 拒单。
     const offsetRateNow = resolveActivePhase(user.value.joinedAt).nexFeeOffsetRate;
-    if (!isWithdrawalFeeSnapshotValid(fee, offsetWithNex, offsetRateNow)) return null;
+    if (!isWithdrawalFeeSnapshotValid(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY[network], currentNetworkConfirmFeeUsd())) return null;
     // (单槽闸已删除:单据改成列表后,新单不再顶掉在途单 —— 那道闸本就是为兜单槽
     //  模型加的产品限制,真后端没有它,留着反而会在人工审核单无出口时把用户锁死。)
     const currentUser = withDefaultEarningBuckets(user.value);
