@@ -275,7 +275,7 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="offsetWithNex ? 'var(--v5-brand)' : 'var(--v5-brand-2)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9.5 3 1.9 4.6L16 9.5l-4.6 1.9L9.5 16l-1.9-4.6L3 9.5l4.6-1.9z" /></svg>
             <text style="margin-left: 6px">{{ t.walletV3.feeOffsetToggle }}</text>
           </view>
-          <!-- 自绘开关(native <button>/<switch> 禁用):外层 44pt 热区,内层 track+knob。
+          <!-- 自绘开关(禁用原生 button/switch 元素,uni 默认样式过重):外层 44pt 热区,内层 track+knob。
                NEX=0 置灰不可开,原因写在下方 hint + 去赚 NEX 入口。 -->
           <view
             class="nx-fee-offset-switch grid place-items-center shrink-0"
@@ -372,7 +372,7 @@ import {
   requestWithdrawalEligibility,
   type WithdrawalEligibility,
 } from "@/store/withdrawal-eligibility";
-import { computeWithdrawFee, type WithdrawNetworkKey } from "@/store/nex-faucet";
+import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useConfig } from "@/store/config";
@@ -854,6 +854,9 @@ async function handleSubmit() {
   // 🔴 FEAT-WD02:抵扣开关随报价一起冻结(offsetWithNex 入提交快照)。开关本身在提交期间
   // 被 toggleOffset 的 submitting 守卫锁死,这里再取快照是纪律性双保险 —— await 之后一律用快照。
   const offsetSnapshot = offsetWithNex.value;
+  // 费率也随报价一起冻结:store 在入口同刻用同一条 resolveActivePhase 路径取它做复验;
+  // 拒单后归因重跑必须用这枚冻结值,不然中途 phase 翻档/解 pin 会把归因带偏。
+  const rateSnapshot = nexFeeOffsetRate.value;
   const toBurn = quoted.nexBurned;
   submittingQuote.value = quoted;
   submittingNexBalance.value = app.user.nexBalance;
@@ -885,11 +888,24 @@ async function handleSubmit() {
     submitting.value = false;
     submittingQuote.value = null;
     submittingNexBalance.value = null;
-    // 建单被拒有两种原因,报错不能一律说「余额不足」——
-    // 另一种是今日额度被占走了(另一个标签页抢先建单)。此时余额是够的,
-    // 说余额不足等于骗人,而且没给下一步。重查一次额度状态挑对的话说。
+    // 建单被拒有三种原因,报错不能一律说「余额不足」——
+    // ① 费用快照复验不过(store 的 fail-closed 拒单:报价过期/拼装错)。用与提交时
+    //    相同的冻结入参重跑同一纯函数归因(零副作用),命中就说「费率已更新」,
+    //    引导重试 —— 重试会按新费率重新报价。
+    // ② 今日额度被占走(另一个标签页抢先建单)。此时余额是够的,说余额不足等于
+    //    骗人,而且没给下一步。重查一次额度状态挑对的话说。
+    // ③ 余额不足(兜底)。三分支互斥:①命中不再看②③,②命中不再看③。
+    const feeSnapshotStale = !isWithdrawalFeeSnapshotValid(
+      { networkConfirmUsd: quoted.networkConfirmUsd, nexBurned: quoted.nexBurned, actualFeeUsd: quoted.actualFee },
+      offsetSnapshot,
+      rateSnapshot,
+    );
     toast.error(
-      dailyLimitStatus(app.accountKey).reached ? dailyLimitReachedText.value : t.value.wallet.withdrawInsufficient,
+      feeSnapshotStale
+        ? t.value.walletV3.withdrawFeeStale
+        : dailyLimitStatus(app.accountKey).reached
+          ? dailyLimitReachedText.value
+          : t.value.wallet.withdrawInsufficient,
     );
     return;
   }

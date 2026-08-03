@@ -3467,6 +3467,7 @@ export const vi: Messages = {
 
   walletV3: {
     needMoreNexToast: "Không đủ NEX để bù phí",
+    withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",

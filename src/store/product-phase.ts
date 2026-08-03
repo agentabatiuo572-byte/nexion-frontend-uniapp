@@ -174,6 +174,22 @@ export const useProductPhaseOverride = defineStore("productPhaseOverride", () =>
   return { pinned, setPinned };
 });
 
+/**
+ * 活动 phase 的唯一解析路径:demo pin 优先(useProductPhaseOverride),否则按注册
+ * 月龄时间派生。页面报价(use-product-phase)与 store 的 server 侧费用复验
+ * (app.submitWithdrawal)都必须走这一条 —— 曾经两侧各自派生,pin 态下页面报价
+ * 与提交校验的 nexFeeOffsetRate 走两条路(审查 P2-2)。在 computed 内调用时,
+ * override.pinned 的读取照常被依赖追踪,pin 变更会触发重算。
+ */
+export function resolveActivePhase(joinedAt: number): PhaseParams {
+  const override = useProductPhaseOverride();
+  if (override.pinned) {
+    const p = PHASES.find((x) => x.id === override.pinned);
+    if (p) return p;
+  }
+  return getPhaseForMonth(getMonthsSince(joinedAt));
+}
+
 // ───────── FEAT-DEV02b:置换侧抢先购(上架节奏门 × 升级置换融合,2026-07-07 主人拍板) ─────────
 // Server-canonical: GET /api/config/release-gates (TBD)。后台 E1「上架节奏门」配置项。
 // 默认关闭 = 上架门对置换路径同样生效(未正式上架的 SKU 不可作置换目标,深链同拦)。
