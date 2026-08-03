@@ -71,6 +71,10 @@
           <DetailRow :label="t.orders.quantity" :value="`${order.quantity}`" />
           <DetailRow :label="t.orders.unitPrice" :value="`$${order.unitPrice.toLocaleString()}`" />
           <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`-$${order.discount.toLocaleString()}`" brand />
+          <!-- FEAT-TRIAL02 conversion order: promo + trial credit as their own
+               rows (never folded into the voucher line). -->
+          <DetailRow v-if="(order.promoDiscountUSD ?? 0) > 0" :label="t.orders.trialDiscount" :value="`-$${(order.promoDiscountUSD ?? 0).toLocaleString()}`" brand />
+          <DetailRow v-if="(order.trialOffsetUSD ?? 0) > 0" :label="t.orders.trialOffset" :value="`-$${(order.trialOffsetUSD ?? 0).toLocaleString()}`" brand />
           <DetailRow :label="t.orders.subtotal" :value="`$${(order.unitPrice * order.quantity).toLocaleString()}`" />
           <DetailRow :label="t.orders.total" :value="`$${order.total.toLocaleString()}`" big />
           <view class="grid" :style="tsGridStyle">

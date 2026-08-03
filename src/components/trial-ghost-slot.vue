@@ -4,7 +4,7 @@
 
   Reads as a high-tier device under test-drive: device identity + live shadow
   earnings hero + trial-cycle progress + a buy CTA that converts. Hidden unless
-  the trial is active/grace/extended. Hierarchy via internal aurora glow + lift
+  the trial is active/grace (grace renders as stopped). Hierarchy via internal aurora glow + lift
   (NOT an accent border), distinct from TrialHeroBanner (idle coupon entry).
 
   Spacing: caller controls horizontal margin via inherited `class` (no internal
@@ -37,7 +37,7 @@
       <view class="flex items-center gap-2.5">
         <view
           class="size-9 rounded-lg grid place-items-center shrink-0"
-          style="background: color-mix(in oklab, var(--v5-brand-2) 16%, transparent)"
+          :style="deviceIconStyle"
         >
           <svg
             width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -50,7 +50,7 @@
         </view>
         <view class="flex-1 min-w-0">
           <view class="flex items-center gap-1.5">
-            <text class="text-[13px] font-semibold text-[var(--v5-ink)] truncate">NexGridBox S1</text>
+            <text class="text-[13px] font-semibold truncate" :style="deviceNameStyle">NexGridBox S1</text>
             <text
               class="shrink-0 text-[12px] font-mono-tabular rounded px-1.5 py-0.5"
               style="background: color-mix(in oklab, var(--v5-brand-2) 16%, transparent); color: var(--v5-brand-2-ink)"
@@ -127,28 +127,32 @@ onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
-const visible = computed(() => ["active", "grace", "extended"].includes(trial.status));
+const visible = computed(() => trial.status === "active" || trial.status === "grace");
 
 const shadowUSD = computed(() => liveShadowUSD(now.value));
 const shadowNEX = computed(() => liveShadowNEX(now.value));
 const ms = computed(() => remainingMs(now.value));
 
-const ribbon = computed(() => {
-  const s = trial.status;
-  return s === "active"
-    ? t.value.trial.ghostRibbonActive
-    : s === "grace"
-      ? t.value.trial.ghostRibbonGrace
-      : t.value.trial.ghostRibbonExtended;
-});
-const tint = computed(() => {
-  const s = trial.status;
-  return s === "active"
-    ? "var(--v5-brand-2)"
-    : s === "grace"
-      ? "var(--v5-warning)"
-      : "var(--v5-tech-cyan)";
-});
+// Grace = stopped (spec ⑤): the ribbon says production stopped — never claims
+// the device is still earning.
+const ribbon = computed(() =>
+  trial.status === "grace" ? t.value.trial.ghostRibbonGrace : t.value.trial.ghostRibbonActive,
+);
+// Grace = stopped (spec ⑤ 设备灰显): the device visual body — icon area + device
+// name — greys out for at-a-glance "parked" reading. grayscale(1) desaturates the
+// brand-2 tint + icon stroke in one move; the name drops to ink-3. Amber warning
+// stays on the ribbon/progress. Active keeps the original brand-2 identity.
+const deviceIconStyle = computed(() =>
+  trial.status === "grace"
+    ? { background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)", filter: "grayscale(1)", opacity: 0.55 }
+    : { background: "color-mix(in oklab, var(--v5-brand-2) 16%, transparent)" },
+);
+const deviceNameStyle = computed(() =>
+  trial.status === "grace" ? { color: "var(--v5-ink-3)" } : { color: "var(--v5-ink)" },
+);
+const tint = computed(() =>
+  trial.status === "grace" ? "var(--v5-warning)" : "var(--v5-brand-2)",
+);
 
 const etaLabel = computed(() => {
   const m = ms.value;
@@ -162,7 +166,7 @@ const etaLabel = computed(() => {
 
 const progressPct = computed(() => {
   const cfg = trialCfg.config;
-  const totalMs = (cfg.trialDays + cfg.graceDays + cfg.extensionDays) * ONE_DAY;
+  const totalMs = (cfg.trialDays + cfg.graceDays) * ONE_DAY;
   const elapsedMs = trial.startedAt !== null ? now.value - trial.startedAt : 0;
   return Math.min(100, Math.max(2, (elapsedMs / totalMs) * 100));
 });

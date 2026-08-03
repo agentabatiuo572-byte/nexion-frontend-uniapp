@@ -231,10 +231,7 @@ const themeModeLabel = computed(() =>
 // Trial routing — hero slot (eligible to start) vs active row (running).
 const trialStatus = computed(() => trial.status);
 const trialIsActive = computed(
-  () =>
-    trialStatus.value === "active" ||
-    trialStatus.value === "grace" ||
-    trialStatus.value === "extended",
+  () => trialStatus.value === "active" || trialStatus.value === "grace",
 );
 const trialIsHero = computed(() => !trialIsActive.value && trial.canStart());
 

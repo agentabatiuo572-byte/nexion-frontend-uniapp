@@ -138,10 +138,18 @@ export const useVoucher = defineStore("voucher", () => {
   /**
    * Best redeemable voucher for a SKU at a given subtotal — the claimed-unused,
    * applicable voucher yielding the largest discount (> 0). null = none applies.
+   * opts.stackWithTrial (FEAT-TRIAL02 checkout conversion mode): only vouchers
+   * whose def.stackWithTrial is true participate — non-stackable ones neither
+   * appear nor apply on a trial order (server re-validates the same rule).
    */
-  function bestVoucherFor(skuId: string, subtotalUSD: number): VoucherMatch | null {
+  function bestVoucherFor(
+    skuId: string,
+    subtotalUSD: number,
+    opts?: { stackWithTrial?: boolean },
+  ): VoucherMatch | null {
     let best: VoucherMatch | null = null;
     for (const def of claimedUnused.value) {
+      if (opts?.stackWithTrial && !def.stackWithTrial) continue;
       if (!voucherAppliesToSku(def, skuId)) continue;
       const discountUSD = computeVoucherDiscount(def, subtotalUSD);
       if (discountUSD <= 0) continue;

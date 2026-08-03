@@ -40,9 +40,7 @@ const trial = useFreeTrial();
 const claimSheet = useTrialClaimSheet();
 const trialConfig = useTrialConfig();
 
-const isActive = computed(
-  () => trial.status === "active" || trial.status === "grace" || trial.status === "extended",
-);
+const isActive = computed(() => trial.status === "active" || trial.status === "grace");
 const visible = computed(() => !isActive.value && trial.canStart());
 
 const cfg = computed(() => trialConfig.config);
