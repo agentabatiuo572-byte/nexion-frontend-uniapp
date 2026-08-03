@@ -1,8 +1,9 @@
 <!--
-  TrialCountdownHero — active/grace/extended trial hero: ribbon + shadow earnings
-  (live), 4-cell countdown, full-cycle progress bar, start/end dates. Ported from
-  the inline CountdownHero in Nexion-prototype me/trial/page.tsx. Driven by `now`
-  (page ticker) + the free-trial boundaries passed in as props.
+  TrialCountdownHero — active/grace trial hero: ribbon + shadow earnings (live,
+  frozen in grace), 4-cell countdown, full-cycle progress bar, start/end dates.
+  Grace renders as the stopped state (warning tint + dimmed earnings, spec
+  FEAT-TRIAL02 ⑤). Driven by `now` (page ticker) + the free-trial boundaries
+  passed in as props.
 -->
 <template>
   <view class="relative overflow-hidden" :style="cardStyle">
@@ -53,9 +54,8 @@ const props = defineProps<{
   shadowUSD: number;
   shadowNEX: number;
   startedAt: number | null;
-  activeEndsAt: number | null;
+  expiresAt: number | null;
   graceEndsAt: number | null;
-  extendedEndsAt: number | null;
 }>();
 
 const t = useT();
@@ -66,7 +66,7 @@ const hours = computed(() => Math.floor((props.remainingMs % 86_400_000) / 3_600
 const minutes = computed(() => Math.floor((props.remainingMs % 3_600_000) / 60_000));
 const seconds = computed(() => Math.floor((props.remainingMs % 60_000) / 1000));
 
-const totalMs = computed(() => (cfg.value.trialDays + cfg.value.graceDays + cfg.value.extensionDays) * 86_400_000);
+const totalMs = computed(() => (cfg.value.trialDays + cfg.value.graceDays) * 86_400_000);
 const elapsedMs = computed(() => (props.startedAt !== null ? props.now - props.startedAt : 0));
 const progressPct = computed(() => Math.min(100, Math.max(0, (elapsedMs.value / totalMs.value) * 100)));
 
@@ -74,19 +74,16 @@ const w = computed(() => t.value.trial);
 const tint = computed(() => {
   if (props.status === "active") return "var(--v5-brand)";
   if (props.status === "grace") return "var(--v5-warning)";
-  if (props.status === "extended") return "var(--v5-tech-cyan)";
   return "var(--v5-ink-4)";
 });
 const ribbon = computed(() => {
   if (props.status === "active") return w.value.countdownActiveRibbon;
   if (props.status === "grace") return w.value.countdownGraceRibbon;
-  if (props.status === "extended") return w.value.countdownExtendedRibbon;
   return "";
 });
 const cta = computed(() => {
   if (props.status === "active") return w.value.countdownActiveCta;
   if (props.status === "grace") return w.value.countdownGraceCta;
-  if (props.status === "extended") return fmt(w.value.countdownExtendedCta, { n: String(cfg.value.extensionDays) });
   return "";
 });
 
@@ -97,11 +94,7 @@ const startDateLine = computed(() =>
 );
 const endDateLine = computed(() =>
   fmt(w.value.countdownEnd, {
-    date: props.extendedEndsAt
-      ? new Date(props.extendedEndsAt).toLocaleDateString()
-      : props.graceEndsAt
-        ? new Date(props.graceEndsAt).toLocaleDateString()
-        : w.value.countdownDateEmpty,
+    date: props.graceEndsAt ? new Date(props.graceEndsAt).toLocaleDateString() : w.value.countdownDateEmpty,
   }),
 );
 
@@ -113,9 +106,24 @@ const ribbonStyle = computed<CSSProperties>(() => ({
   letterSpacing: "0.06em",
   color: tint.value,
 }));
-const boxNameStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
+// Grace = stopped (spec ⑤ 设备灰显): the device name itself greys out — disabled
+// formula (ink-4 + reduced opacity), so the box reads as parked at a glance while
+// the amber warning stays on the ribbon/copy. Other states keep the resting ink-3.
+const boxNameStyle = computed<CSSProperties>(() => ({
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "12px",
+  color: props.status === "grace" ? "var(--v5-ink-4)" : "var(--v5-ink-3)",
+  opacity: props.status === "grace" ? 0.6 : 1,
+}));
 const dollarStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "15px", fontWeight: 500, color: "var(--v5-ink-3)", opacity: 0.75 };
-const shadowUsdStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "34px", fontWeight: 600, letterSpacing: "-0.024em", color: "var(--v5-ink)" };
+// Grace = stopped: the frozen figure dims to read as "no longer accruing".
+const shadowUsdStyle = computed<CSSProperties>(() => ({
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "34px",
+  fontWeight: 600,
+  letterSpacing: "-0.024em",
+  color: props.status === "grace" ? "var(--v5-ink-3)" : "var(--v5-ink)",
+}));
 const shadowNexStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "13px", color: "var(--v5-tech-cyan)", marginLeft: "6px" };
 const ctaLineStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const barTrackStyle: CSSProperties = { marginTop: "16px", height: "6px", borderRadius: "999px", background: "var(--v5-surface-3)", overflow: "hidden" };

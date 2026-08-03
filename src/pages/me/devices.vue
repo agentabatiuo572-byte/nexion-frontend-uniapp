@@ -58,7 +58,9 @@
               <text class="block" :style="trialSubStyle">{{ t.trial.deviceRowSub }}</text>
             </view>
           </view>
-          <view class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" @click="handleCancelTrial">
+          <!-- Spec ④: user cancel exists on the active edge only — grace has
+               nothing running to cancel (production already stopped). -->
+          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" @click="handleCancelTrial">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>
             <text :style="trialCancelLabelStyle">{{ t.trial.cancelCta }}</text>
           </view>
@@ -160,7 +162,6 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialConfig } from "@/store/trial-config";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
 import { PRODUCTS } from "@/mock/products";
@@ -174,11 +175,10 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
-const trialConfig = useTrialConfig();
 
-const trialActive = computed(() =>
-  ["active", "grace", "extended"].includes(trial.status),
-);
+// Typed against TrialStatus so a future enum change fails tsc here instead of
+// silently widening to string[] (FEAT-TRIAL02 audit trap).
+const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
@@ -293,12 +293,12 @@ function onSheetForce() {
 async function handleCancelTrial() {
   const ok = await uiConfirm({
     title: t.value.trial.cancelConfirmTitle,
-    message: fmt(t.value.trial.cancelConfirmMsg, { n: trialConfig.config.cooldownDays }),
+    message: t.value.trial.cancelConfirmMsg,
     confirmLabel: t.value.trial.cancelConfirmOk,
     cancelLabel: t.value.trial.cancelConfirmKeep,
   });
   if (ok) {
-    trial.cancel("explicit");
+    trial.cancel();
     toast.info(t.value.trial.toastCancelled);
   }
 }

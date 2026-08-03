@@ -1,9 +1,9 @@
 <!--
   TrialEntry — ported from me/page.tsx TrialEntry (Sprint #146-2).
   Two states, self-deciding:
-   • active/grace/extended → compact status row ("Trial · {state}" → /me/trial).
-   • else                  → <TrialPromoBanner> (idle free-trial ad banner, shared
-                             with Home; self-hides unless the trial is startable).
+   • active/grace → compact status row ("Trial · {state}" → /me/trial).
+   • else         → <TrialPromoBanner> (idle free-trial ad banner, shared
+                    with Home; self-hides unless the trial is startable).
   Reads useFreeTrial for the active/idle split; the promo banner owns its own
   store reads + claim-sheet trigger.
 -->
@@ -32,16 +32,10 @@ const t = useT();
 const trial = useFreeTrial();
 
 const status = computed(() => trial.status);
-const isActive = computed(
-  () => status.value === "active" || status.value === "grace" || status.value === "extended",
-);
+const isActive = computed(() => status.value === "active" || status.value === "grace");
 
 const stateLabel = computed(() =>
-  status.value === "active"
-    ? t.value.trial.activeStateActive
-    : status.value === "grace"
-      ? t.value.trial.activeStateGrace
-      : t.value.trial.activeStateExtended,
+  status.value === "grace" ? t.value.trial.activeStateGrace : t.value.trial.activeStateActive,
 );
 const activeTitle = computed(() => fmt(t.value.trial.activeTitle, { state: stateLabel.value }));
 
