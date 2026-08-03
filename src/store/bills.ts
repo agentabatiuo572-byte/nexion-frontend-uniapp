@@ -188,7 +188,12 @@ export const useBills = defineStore("bills", () => {
     const next = previous.map((b) => {
       // 🔴 只推进**在途(pending)**行。同一单号下可能还挂着已终态的行 —— NEX 燃烧行
       // 落 posted 即事实已发生,失败终态若把它一起翻成 failed,账单说「没烧」而余额里
-      // NEX 真少了,两个口径必有一个是假(审计 P1,2026-08-02;NEX 费按规则不退)。
+      // NEX 当时真少了,两个口径必有一个是假(审计 P1,2026-08-02)。
+      // 🔴 2026-08-04 修订:这条规则原本用「NEX 费按规则不退」论证,而 R1 已让失败提现
+      // 退还烧掉的 NEX —— 那个前提没了,规则本身仍然成立,但理由换成复式账本的通用规矩:
+      // **已终态分录是既成事实,冲正靠反向分录,不是改写原分录**。所以退还不改这一行,
+      // 而是同单号补一条 +N NEX 的正向行(见 App.vue reconcileBills ②b),
+      // 账单页两行相抵 = 钱包里 NEX 的净变化,账本与钱包对得上。
       if (b.ref !== ref || b.status !== "pending" || b.status === status) return b;
       changed = true;
       return { ...b, status };

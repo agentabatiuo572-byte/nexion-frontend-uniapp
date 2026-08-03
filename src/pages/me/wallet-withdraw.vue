@@ -91,7 +91,7 @@
         </view>
         <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
           <text style="font-family: var(--font-v5); font-size: 26px; color: var(--v5-ink-3)" class="shrink-0">$</text>
-          <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :disabled="submitting" @input="onAmount" />
+          <input class="flex-1 min-w-0 tabular-nums" :style="amountInputStyle" type="text" inputmode="decimal" :value="amount" placeholder="0.00" :disabled="inputsLocked" @input="onAmount" />
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-3)">USDT</text>
         </view>
         <view class="flex items-center justify-between" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">
@@ -375,9 +375,9 @@ import {
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { useConfig } from "@/store/config";
+import { useConfig, currentNetworkConfirmFeeUsd } from "@/store/config";
 import { confirm as uiConfirm, toast } from "@/store/ui";
-import type { Withdrawal } from "@/store/types";
+import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 
 // 提现网络收窄裁决:仅 USDT 三网络。展示标签表(网络本身随绑定只读,不再选)。
 const NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
@@ -500,6 +500,18 @@ const feeCalc = computed(() =>
     networkConfirmFee.value,
   ),
 );
+/**
+ * 冻结报价对**当前**权威值是否仍成立 —— 与 app.ts 提交边界同一个纯函数、同一组入参
+ * (5 参:含网络键与权威费率 map,fail-closed)。
+ *
+ * 🔴 这里读活值(nexFeeOffsetRate / currentNetworkConfirmFeeUsd)是**故意**的:
+ * 它就是「确认后校验」那一步 —— 拿冻结件去问权威值还认不认。与「await 之后一律用快照」
+ * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
+ * 等式恒成立、判据恒为真 = 这道门等于没有。
+ */
+function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: Withdrawal["network"]): boolean {
+  return isWithdrawalFeeSnapshotValid(fee, offset, nexFeeOffsetRate.value, NETWORK_FEE_KEY[net], currentNetworkConfirmFeeUsd());
+}
 // 🔴 费率可用性是**两个合取项**,少一个就等于回退写死值:
 //   ① 配置真拉到了(!syncFailed)—— 拉取失败时 store 仍保留 DEFAULT_PLATFORM_CONFIG 种子,
 //      光看值是「合法」的,只查值 = 按写死的 mock seed 算费并放行下单,正是规格禁止的回退。
@@ -523,8 +535,9 @@ const feeSkeletonValueStyle = "width: 56px; height: 13px; border-radius: 4px; ba
 // 🔴 提交期间**冻结报价**。feeCalc 依赖 nexBalance,而提交链的第一步就是扣 NEX ——
 // 扣完之后整条链立刻重算,抵扣消失、费用跳回原价。两个后果:
 //  ① 页面在用户盯着 spinner 的这 ~1 秒里自己改价(明细两行消失、到账数字掉下来);
-//  ② 更严重的是拿重算后的值去下单(见 handleSubmit 里的 quoted 快照)。
-// 报价一旦用于扣款就必须定死,直到本次提交结束。
+//  ② 更严重的是拿重算后的值去下单(见 handleSubmit 里的 snap.quote)。
+// 报价一旦要展示给用户确认就必须定死,直到本次提交结束 —— 冻结点在**确认弹窗打开之前**,
+// 弹窗文案、页面明细、扣款入参共用同一份 snap.quote(R2 P1-B:确认 A 报价被扣 B 报价)。
 const submittingQuote = ref<ReturnType<typeof computeWithdrawFee> | null>(null);
 const activeFee = computed(() => submittingQuote.value ?? feeCalc.value);
 const networkConfirmUsd = computed(() => activeFee.value.networkConfirmUsd);
@@ -537,7 +550,7 @@ const fullyWaived = computed(() => amountNum.value > 0 && fee.value <= 0.001);
 const offsetToggleDisabled = computed(() => nexBalance.value <= 0);
 function toggleOffset() {
   // 提交期间输入面全冻结(与金额输入 :disabled 同纪律 —— 开关也是报价的输入)。
-  if (submitting.value) return;
+  if (inputsLocked.value) return;
   // 置灰不可开:原因就写在下方 hint(NEX=0),旁边是去赚 NEX 出口。
   if (offsetToggleDisabled.value) return;
   offsetWithNex.value = !offsetWithNex.value;
@@ -592,6 +605,19 @@ const submitting = ref(false);
 // FEAT-WD02 ⑥:确认弹窗在途守卫。弹窗打开期间 submitting 尚未置位,不挡的话
 // 连点 CTA 会叠出第二个弹窗,两次确认 = 双重建单(mask 盖住 CTA 是第二道,这是第一道)。
 const confirmingSubmit = ref(false);
+/**
+ * 🔴 输入面冻结判据 = 提交中 **或** 确认弹窗打开中。
+ * 只看 submitting 的话,弹窗那几秒 submitting 还是 false —— 改金额的入口(输入框、
+ * 「全部提现」、降额 CTA、抵扣开关)全都还活着,只靠 mask 挡手。快照已让改动动不了钱,
+ * 但页面会立刻显示与刚确认的弹窗不同的数字,同一个提交出现两个口径。
+ */
+const inputsLocked = computed(() => submitting.value || confirmingSubmit.value);
+/** 提交链结束(成功 / 任一拒单分支)统一解冻:三个状态必须成对清,漏一个页面就永久卡在冻结报价上。 */
+function clearSubmitFreeze() {
+  submitting.value = false;
+  submittingQuote.value = null;
+  submittingNexBalance.value = null;
+}
 // ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
 const heldLine = computed(() => {
   const b = app.user.earningBuckets;
@@ -698,7 +724,7 @@ function undoSmallAmountLine() {
 /** 一键把金额降到小额线 —— 只说「改小就行」而不让他一键改,等于没给下一步。 */
 function useSmallAmountLine() {
   // 提交期间禁止改金额:输入框有 :disabled,这两个裸 <view @click> 入口没有。
-  if (submitting.value) return;
+  if (inputsLocked.value) return;
   previousAmount.value = amount.value;   // 记下原值,给撤销用
   amount.value = smallAmountLine.value.toFixed(2);
 }
@@ -774,7 +800,7 @@ function onAmount(e: Event) {
   amount.value = dot < 0 ? raw : raw.slice(0, dot + 1) + raw.slice(dot + 1).replace(/\./g, "").slice(0, 2);
 }
 function useMax() {
-  if (submitting.value) return;
+  if (inputsLocked.value) return;
   amount.value = maxWithdrawable.value.toFixed(2);
 }
 
@@ -808,35 +834,49 @@ async function handleSubmit() {
     uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
     return;
   }
-  // 🔴 金额也必须冻成快照。此前只冻了费用报价(submittingQuote)和 NEX 余额
-  // (submittingNexBalance),唯独漏了**报价的分母**。而改金额的入口不止输入框:
-  // 「全部提现」和降额 CTA 都是裸 <view @click>,提交期间照样点得动。
-  // 后果(两个独立 agent 各自实测):下单读的是调用那一刻的值、写账单是 1.2 秒之后
-  // **重新读一次**同一个 ref —— 扣款 $30 / 单据 $30 / 账单 -$24,856,三处口径分叉;
-  // 反向还能用 $50 的小额免审裁决建出全余额的自动放行单,绕过新地址 hold 与大额强制人工。
-  // 不变量:参与建单的每一个输入都在提交开始时冻结,await 之后一律用快照,不再读 ref。
-  // 快照取在确认弹窗打开**前**:弹窗里写的金额必须 = 建单用的金额(单源);弹窗 mask
-  // 挡住页面全部改金额入口,取早取晚同值,而「首个 await 后不再读 amountNum」是哨兵不变量。
-  const amountSnapshot = amountNum.value;
+  // 🔴 **一份提交快照收全族**(2026-08-04 R2 三条 P1 同一个根:跨 await 的状态漂移)。
+  //
+  // 参与这次提交的每一个输入 —— 账号 / 网络 / 收款地址 / 金额 / 可提上限 / 抵扣开关 / 报价 ——
+  // 在**第一个 await 之前**一次冻结;弹窗文案、扣款、建单、账单、拒单归因全部只读这一份。
+  // 此前只冻了金额,报价与账号却取在 `await uiConfirm` **之后**:
+  //  · 报价:feeCalc 依赖费率 / 网络确认费 / NEX 余额,而这些由后台配置同步、挖矿 tick、
+  //    阶段换档在任意时刻改写 —— 遮罩只挡用户的手,挡不住后台数据流。用户确认的是 A 报价,
+  //    实际扣的是 B 报价(R2 P1-B);
+  //  · 账号:确认期间换号 → debitNex 与账单全落到新账号,弹窗展示的却是旧账号的数字(R2 P1-C)。
+  // 不变量:首个 await 之后一律读 snap,不再读任何活值;活值只在下面「确认后校验」里
+  // 用来判「快照过期了没有」,判完不符即拒,绝不静默按新值扣款。
+  const q = feeCalc.value;
+  const snap = {
+    account: app.accountKey,
+    network: network.value,
+    address: boundAddress.value,
+    amount: amountNum.value,
+    maxWithdrawable: maxWithdrawable.value,
+    offset: offsetWithNex.value,
+    quote: q,
+    // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
+    fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
+  };
+  // 页面显示也钉在同一份快照上(弹窗 = 页面 = 扣款,一份)。遮罩后面的费用明细若还跟着活值走,
+  // 用户点完确认抬头就会看到与刚才弹窗不一样的数。
+  submittingQuote.value = snap.quote;
+  submittingNexBalance.value = app.user.nexBalance;
   // FEAT-WD02 ⑥「提交提现 → 现有确认弹窗」:金额 / 单行网络确认费 / NEX 抵扣消耗(开了才显)
-  // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。preview 只供弹窗文案;
-  // 报价**冻结**(quoted / submittingQuote)仍发生在用户点确认之后,不得提前 ——
-  // 提前会放大已登记的 pre-freeze 漂移窗口。message 为纯文本(ui store MVP text-only),
-  // 费用行以 i18n 拼串表达,不动 ConfirmOptions。
-  const preview = feeCalc.value;
+  // / 到手金额;取消 = 弹窗自带 Cancel,退出且不建单(业务链取消出口)。
+  // message 为纯文本(ui store MVP text-only),费用行以 i18n 拼串表达,不动 ConfirmOptions。
   const confirmBody =
-    preview.nexBurned > 0
+    snap.quote.nexBurned > 0
       ? fmt(t.value.walletV3.withdrawConfirmBodyNex, {
-          amount: amountSnapshot.toFixed(2),
-          fee: preview.networkConfirmUsd.toFixed(2),
-          waived: preview.feeWaived.toFixed(2),
-          nex: fmtNex(preview.nexBurned),
-          receive: preview.netReceive.toFixed(2),
+          amount: snap.amount.toFixed(2),
+          fee: snap.quote.networkConfirmUsd.toFixed(2),
+          waived: snap.quote.feeWaived.toFixed(2),
+          nex: fmtNex(snap.quote.nexBurned),
+          receive: snap.quote.netReceive.toFixed(2),
         })
       : fmt(t.value.walletV3.withdrawConfirmBody, {
-          amount: amountSnapshot.toFixed(2),
-          fee: preview.networkConfirmUsd.toFixed(2),
-          receive: preview.netReceive.toFixed(2),
+          amount: snap.amount.toFixed(2),
+          fee: snap.quote.networkConfirmUsd.toFixed(2),
+          receive: snap.quote.netReceive.toFixed(2),
         });
   confirmingSubmit.value = true;
   let confirmed = false;
@@ -849,30 +889,50 @@ async function handleSubmit() {
   } finally {
     confirmingSubmit.value = false;
   }
-  if (!confirmed) return;
+  if (!confirmed) {
+    clearSubmitFreeze();
+    return;
+  }
   // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
   // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
   submitting.value = true;
   let fresh: WithdrawalEligibility;
   try {
     fresh = await requestWithdrawalEligibility(
-      app.accountKey,
-      network.value,
-      boundAddress.value,
-      maxWithdrawable.value,
-      amountSnapshot,
+      snap.account,
+      snap.network,
+      snap.address,
+      snap.maxWithdrawable,
+      snap.amount,
     );
   } catch {
-    submitting.value = false;
+    clearSubmitFreeze();
     toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
     return;
   }
-  if (fresh.route === "reject" || !fresh.canSubmit || amountSnapshot > fresh.maxWithdrawableUsdt) {
-    submitting.value = false;
+  if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt) {
+    clearSubmitFreeze();
     // 拦截必须给原因 + 下一步。并发场景下这条分支最常见的成因是「另一个标签页刚把
     // 今日额度用掉了」——笼统的「暂不能提交」既没原因也没下一步(验收实测三标签页
     // 下 7/10 都落到这句)。额度用完是可判定的,就说清楚它。
     toast.error(fresh.dailyLimitReached ? dailyLimitReachedText.value : t.value.walletV3.submitReasonReviewBlocked);
+    return;
+  }
+  // 🔴 **确认后校验** —— 快照纪律的另一半。冻结件与当前权威值不符即拒单,绝不静默按新值扣款。
+  //  ① 身份三元组(账号 / 网络 / 收款地址)。确认期间换号 → 下面的 debitNex 与账单会全落到
+  //     新账号,而弹窗展示的是旧账号的数字;地址 / 网络若变了,等于把钱打到用户没确认过的地方。
+  //     store 层 submitWithdrawal 也钉死账号,但它管不到本页的 debitNex 与建单入参 —— 两层各管一段。
+  if (app.accountKey !== snap.account || network.value !== snap.network || boundAddress.value !== snap.address) {
+    clearSubmitFreeze();
+    toast.error(t.value.walletV3.withdrawContextStale);
+    return;
+  }
+  //  ② 报价。用与 store 提交边界同一个纯函数复验冻结报价;不成立就走既有「费率已更新,请重试」
+  //     分支 —— 重试会按新费率重新报价,由用户重新确认。放在 debitNex **之前**:
+  //     让 store 拒单后再回滚 NEX 也能对上账,但那条路多烧一次余额写盘,能不进就不进。
+  if (!quoteStillValid(snap.fee, snap.offset, snap.network)) {
+    clearSubmitFreeze();
+    toast.error(t.value.walletV3.withdrawFeeStale);
     return;
   }
   // ⚠️ MOCK-ONLY NON-ATOMIC cross-store handler (NEX burn + submitWithdrawal +
@@ -880,40 +940,26 @@ async function handleSubmit() {
   // server-side under an Idempotency-Key. debitNex is the friction gate (atomic,
   // returns false on insufficient); roll the burned NEX back if the USDT debit fails.
   // NEX is an optional fee-offset (no hard gate). Burn only what offsets the fee.
-  // 🔴 报价快照:下面第一行就要扣 NEX,而 fee/feeWaived/nexBurned 全都 computed 自
-  // nexBalance —— 扣完再读会读到**重算后**的值(抵扣消失、费用跳回原价)。
-  // 曾因此让「NEX 不够」的用户 NEX 白烧、手续费全额照收(审计 P0)。
-  // 一旦用于扣款,报价就必须定死:后续一律用 quoted,并把它挂上 submittingQuote 冻结页面显示。
-  // 🔴 页面层也要钉死账号:提交链约 2 秒,期间换号会让 NEX 回滚补给新账号、
-  // 账单写进新账号的流水(store 层已钉死,页面层这两条是独立的跨账号资金路径)。
-  const acct = app.accountKey;
-  const quoted = feeCalc.value;
-  // 🔴 FEAT-WD02:抵扣开关随报价一起冻结(offsetWithNex 入提交快照)。开关本身在提交期间
-  // 被 toggleOffset 的 submitting 守卫锁死,这里再取快照是纪律性双保险 —— await 之后一律用快照。
-  const offsetSnapshot = offsetWithNex.value;
-  // 费率也随报价一起冻结:store 在入口同刻用同一条 resolveActivePhase 路径取它做复验;
-  // 拒单后归因重跑必须用这枚冻结值,不然中途 phase 翻档/解 pin 会把归因带偏。
-  const rateSnapshot = nexFeeOffsetRate.value;
-  const toBurn = quoted.nexBurned;
-  submittingQuote.value = quoted;
-  submittingNexBalance.value = app.user.nexBalance;
-  // 🔴 只有开着才烧(offsetSnapshot=false 时 quoted.nexBurned 恒 0,引擎已保证;此处不再判开关)。
+  // 🔴 报价早在弹窗前就冻进 snap.quote 并挂上 submittingQuote —— 这里不再读 feeCalc:
+  // fee/feeWaived/nexBurned 全都 computed 自 nexBalance,下面第一行就要扣 NEX,
+  // 扣完再读会读到**重算后**的值(抵扣消失、费用跳回原价)。曾因此让「NEX 不够」的用户
+  // NEX 白烧、手续费全额照收(审计 P0);跨 await 重读则让用户确认 A 报价被扣 B 报价(R2 P1-B)。
+  const toBurn = snap.quote.nexBurned;
+  // 🔴 只有开着才烧(snap.offset=false 时 quote.nexBurned 恒 0,引擎已保证;此处不再判开关)。
   if (toBurn > 0 && !app.debitNex(toBurn)) {
     // Balance changed under us — bail without charging; recompute re-clamps next tick.
-    submitting.value = false;
-    submittingQuote.value = null;
-    submittingNexBalance.value = null;
+    clearSubmitFreeze();
     toast.error(t.value.walletV3.needMoreNexToast);
     return;
   }
   // await:占额度要等跨标签页的竞争收敛(见 store 的 claimWithdrawSlot)
   // FEAT-WD02:fee 传结构化快照(server 形状),store 入口按等式复验后落盘。
   const withdrawalId = await app.submitWithdrawal(
-    amountSnapshot,
-    network.value,
-    boundAddress.value,
-    { networkConfirmUsd: quoted.networkConfirmUsd, nexBurned: quoted.nexBurned, actualFeeUsd: quoted.actualFee },
-    offsetSnapshot,
+    snap.amount,
+    snap.network,
+    snap.address,
+    snap.fee,
+    snap.offset,
     fresh.route,
     fresh.riskReasons,
     fresh.fastLaneApplied,
@@ -921,45 +967,38 @@ async function handleSubmit() {
   );
   if (!withdrawalId) {
     // 账号已换 → 这笔 NEX 不能补给新账号(宁可不补也不能给错人)
-    if (toBurn > 0 && app.accountKey === acct) app.creditNex(toBurn);
-    submitting.value = false;
-    submittingQuote.value = null;
-    submittingNexBalance.value = null;
+    if (toBurn > 0 && app.accountKey === snap.account) app.creditNex(toBurn);
+    clearSubmitFreeze();
     // 建单被拒有三种原因,报错不能一律说「余额不足」——
-    // ① 费用快照复验不过(store 的 fail-closed 拒单:报价过期/拼装错)。用与提交时
-    //    相同的冻结入参重跑同一纯函数归因(零副作用),命中就说「费率已更新」,
-    //    引导重试 —— 重试会按新费率重新报价。
+    // ① 费用快照复验不过(store 的 fail-closed 拒单:报价过期/拼装错)。用与 store 入口
+    //    **同一个判据**(quoteStillValid,含当前权威费率)重跑归因,零副作用;命中就说
+    //    「费率已更新」,引导重试 —— 重试会按新费率重新报价。
+    //    🔴 归因必须问「快照对**现在**还成不成立」。拿冻结费率复验冻结报价等式恒成立,
+    //    于是费率刚在提交那一刹改掉的真·过期单会被错报成「余额不足」(R2 修订)。
     // ② 今日额度被占走(另一个标签页抢先建单)。此时余额是够的,说余额不足等于
     //    骗人,而且没给下一步。重查一次额度状态挑对的话说。
     // ③ 余额不足(兜底)。三分支互斥:①命中不再看②③,②命中不再看③。
-    const feeSnapshotStale = !isWithdrawalFeeSnapshotValid(
-      { networkConfirmUsd: quoted.networkConfirmUsd, nexBurned: quoted.nexBurned, actualFeeUsd: quoted.actualFee },
-      offsetSnapshot,
-      rateSnapshot,
-    );
     toast.error(
-      feeSnapshotStale
+      !quoteStillValid(snap.fee, snap.offset, snap.network)
         ? t.value.walletV3.withdrawFeeStale
-        : dailyLimitStatus(app.accountKey).reached
+        : dailyLimitStatus(snap.account).reached
           ? dailyLimitReachedText.value
           : t.value.wallet.withdrawInsufficient,
     );
     return;
   }
-  const charged = quoted.actualFee;
+  const charged = snap.quote.actualFee;
   const memo = fresh.route === "pass"
-    ? fmt(t.value.wallet.withdrawBillMemoPass, { network: network.value, fee: charged.toFixed(2) })
+    ? fmt(t.value.wallet.withdrawBillMemoPass, { network: snap.network, fee: charged.toFixed(2) })
     : t.value.wallet.withdrawBillMemoReview;
   // 🔴 账号已换就不写账单 —— 写进去就是别人的流水(bills 换号会重绑到新账号)
-  if (app.accountKey !== acct) {
-    submitting.value = false;
-    submittingQuote.value = null;
-    submittingNexBalance.value = null;
+  if (app.accountKey !== snap.account) {
+    clearSubmitFreeze();
     return;
   }
   // 账单写失败必须让用户知道:钱已经扣了,台账却没这一笔 —— 静默吞掉等于让用户
   // 在账单页查不到自己的钱去哪了。(bills 与账户快照是两份存储,mock 期无法原子。)
-  if (!bills.add({ type: "withdraw", symbol: "USDT", amount: -amountSnapshot, status: "pending", memo, ref: withdrawalId })) {
+  if (!bills.add({ type: "withdraw", symbol: "USDT", amount: -snap.amount, status: "pending", memo, ref: withdrawalId })) {
     toast.error(t.value.wallet.withdrawBillWriteFailed);
   }
   if (fresh.route !== "pass") {
@@ -975,15 +1014,13 @@ async function handleSubmit() {
       status: "posted",
       memo: fmt(t.value.wallet.withdrawNexFeeMemo, {
         nex: fmtNex(toBurn),
-        fee: quoted.feeWaived.toFixed(2),
+        fee: snap.quote.feeWaived.toFixed(2),
       }),
       ref: withdrawalId,
     });
     if (!nexBillOk) toast.error(t.value.wallet.withdrawBillWriteFailed);
   }
-  submitting.value = false;
-  submittingQuote.value = null;
-    submittingNexBalance.value = null;
+  clearSubmitFreeze();
   // 带单号深链:刚提交第二笔时追踪页不再错位显示最早在途单(证伪建议 2)
   uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
 }

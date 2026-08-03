@@ -2771,6 +2771,7 @@ export const zh: Messages = {
       kycVerify: "KYC-Express · 钱包所有权验证",
       topupTrc20: "充值 · USDT-TRC20",
       withdrawTrc20: "提现 · USDT-TRC20",
+      withdrawNexRefund: "手续费抵扣退还 · 退回 {nex} NEX",
     },
     title: "账单流水",
     back: "返回",
@@ -3452,6 +3453,7 @@ export const zh: Messages = {
   walletV3: {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
     withdrawFeeStale: "费率已更新,请重试",
+    withdrawContextStale: "账户或收款地址已变化,请重新提交",
     earnNexCta: "去挖矿赚 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
     feeConfirmRow: "网络确认费",

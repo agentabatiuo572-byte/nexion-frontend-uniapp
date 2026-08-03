@@ -727,18 +727,20 @@ function balancedBody(src, from) {
       const k = pgSrc.indexOf("{", sig);
       const body = k < 0 ? null : balancedBody(pgSrc, k);
       if (!body) return false;
-      if (!body.includes("const amountSnapshot = amountNum.value;")) return false;
-      // 剥注释后找第一个真 await,其后不许再出现裸 amountNum.value
+      // 剥注释后找第一个真 await:金额快照必须在它之前,其后不许再出现裸 amountNum.value
+      // (2026-08-04:金额快照并入统一提交快照 snap —— 账号/网络/地址/报价同刻冻结,
+      //  全族判据在 selfcheck-withdraw-freeze;这里只守金额这一条,两边互为交叉验证)
       const code = body.split("\r\n").filter((l) => !l.trim().startsWith("//")).join("\r\n");
+      const s = code.indexOf("amount: amountNum.value,");
       const a = code.indexOf("await ");
-      if (a < 0) return false;
+      if (s < 0 || a < 0 || s > a) return false;
       return !code.slice(a).includes("amountNum.value");
     })());
-  check("🔴 提交在途金额冻结:两个改金额的入口都有 submitting 守卫(输入框有 :disabled,它俩没有)",
+  check("🔴 提交在途金额冻结:两个改金额的入口都有 inputsLocked 守卫(输入框有 :disabled,它俩没有)",
     ["function useMax() {", "function useSmallAmountLine() {"].every((sig) => {
       const k = pgSrc.indexOf(sig);
       if (k < 0) return false;
-      return pgSrc.slice(k, k + 200).includes("if (submitting.value) return;");
+      return pgSrc.slice(k, k + 200).includes("if (inputsLocked.value) return;");
     }));
   // 🔴 账单的运行余额只认服务端下发的 balanceAfter。旧实现把**自己算错的**值写进每条账单并落盘,
   // 读盘不剥的话页面会把那批旧错值(实测盘上就有 60.3065,真实余额两万四)原样渲染 ——
