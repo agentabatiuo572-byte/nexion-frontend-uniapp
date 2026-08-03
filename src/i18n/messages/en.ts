@@ -3546,6 +3546,7 @@ export const en = {
 
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
+    withdrawFeeStale: "The fee rate has been updated — please try again",
     earnNexCta: "Mine more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
     feeConfirmRow: "Network confirmation fee",

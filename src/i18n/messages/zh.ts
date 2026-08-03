@@ -3476,6 +3476,7 @@ export const zh: Messages = {
 
   walletV3: {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
+    withdrawFeeStale: "费率已更新,请重试",
     earnNexCta: "去挖矿赚 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
     feeConfirmRow: "网络确认费",
