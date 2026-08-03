@@ -229,9 +229,12 @@ function stopOrderPoll() {
 // ── Earnings-milestone 4s poll (ports milestone-watcher.tsx) ──
 // Reads life-to-date earnings each tick; when it crosses the next unfired
 // threshold, fires exactly once: mark (idempotent guard) → credit NEX → write
-// the bonus bill → open the celebration overlay. The overlay (mounted in
-// global-ui.vue) owns its own confetti + 5.2s auto-dismiss; App.vue only calls
-// show(). nextUnfired returns the lowest unfired step (one at a time, original
+// the bonus bill → queue the celebration (store.show() enqueues; the overlay
+// host promotes via advance(), which suspends UI on money-flow routes —
+// checkout / withdraw / trial — and replays each queued tier afterwards).
+// 🔴 奖励/记账必须留在这里无条件执行,不许接路由门 / stopMilestonePoll:那会变成
+// 「钱链路期间不发奖励」而非「不弹窗」。UI 挂起只住在 store.advance()。
+// nextUnfired returns the lowest unfired step (one at a time, original
 // "fire one per tick" semantics) so the next poll surfaces the next tier.
 // Production: GET /api/config/milestones + atomic POST /api/me/milestones/:id/claim
 // (PRD §9.11e). Cross-store composition stays here (stores import-free).
