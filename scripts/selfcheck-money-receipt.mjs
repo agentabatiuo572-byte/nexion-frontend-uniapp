@@ -83,30 +83,42 @@ const ALLOW = {
 };
 /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
 function billsWriteHits(src) {
-  const recv = new Set(["useBills\\(\\)", "bills", "billsStore"]);
-  // 🔴 导入改名:`import { useBills as X } from "@/store/bills"` → `X()` 也是 receiver。
-  // 这一族是本门自己的红测抓出来的 —— 只认 `const s = useBills()` 时,改名导入零成本逃逸。
-  for (const m of src.matchAll(/import\s*\{[^}]*\buseBills\s+as\s+([A-Za-z_$][\w$]*)/g)) {
-    recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`) + "\\(\\)");
-  }
-  // `const s = useBills()` / `let s = useBills()` → s 也是 bills receiver
-  for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*useBills\(\)/g)) {
-    recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  }
+  // 🔴 判据翻转(2026-08-04 独立验收:枚举 receiver 名字的版本被实测出 **10 条逃逸**)。
+  //
+  // 上一版在枚举「哪些名字是 bills」——而名字是**开放集合**:改名导入、局部别名、
+  // 先声明后赋值(`let s; s = useBills()`)、多声明符、计算成员、解构改名
+  // (上一版拿**别名**去比方法名,永远比不中)、方法引用、本地 wrapper、可选调用、
+  // 形参注入 —— 每加一个名字,就漏掉下一种写法。其中「解构改名」与「先声明后赋值」
+  // 是**正常人会写出来的形状**,不是刁钻构造。
+  //
+  // 换成两段式:① 这文件**跟 bills store 有没有关系**(import / useBills 出现过);
+  // ② 有关系的话,**任何形式的写入方法调用都算**,不再判 receiver 叫什么。
+  // 这是**有意的过近似**:同一文件里不相干的 `foo.add(` 也会计入。可接受 ——
+  // 与 bills 有关系的文件本来就只有 WIRED ∪ ALLOW 那十几个,而 ALLOW 钉的是**精确条数**,
+  // 多算的那次会以「额度对不上」暴露出来,不会被静默吞掉。
+  // 宁可过近似再逐个登记,也不要欠近似而永远看不见。
+  if (!/useBills|@\/store\/bills|["']\.\/bills["']/.test(src)) return 0;
   let count = 0;
-  for (const r of recv) {
-    // `\s*\??\s*\.` 认可选链;`[\s\S]*?` 不用,直接允许方法名前后有空白与换行
-    const re = new RegExp(`(?<![\\w$])${r}\\s*\\??\\s*\\.\\s*(?:${METHODS})\\s*\\(`, "g");
-    count += [...src.matchAll(re)].length;
-  }
-  // 解构:`const { add, addOnce } = useBills()` → 之后的裸 `add(` 也是写入
-  for (const m of src.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*useBills\(\)/g)) {
+  // ① 任意 receiver 的成员调用(可选链 / 跨行 / 形参注入 / wrapper 全覆盖)
+  count += [...src.matchAll(new RegExp(`\\??\\.\\s*(?:${METHODS})\\s*\\(`, "g"))].length;
+  // ①b 计算成员 —— **不判方括号里写的是什么**:`useBills()["add"]` 的字符串内容被 strip
+  // 抹掉了(那是 strip 的正确行为),而 `bills[m]` 的方法名**运行期才知道**,静态判据
+  // 原理上判不出来。所以只判形状。receiver 仍判一层(名字含 bills 或 useBills() 的返回),
+  // 否则会误伤同文件里任何一张查表(实测 `QUEST_ROUTE_MEMO_TASK[id](t)` 被算了进来)。
+  count += [...src.matchAll(/(?:useBills\s*\??\s*\(\)|[\w$]*[Bb]ills[\w$]*)\s*\??\s*\[\s*[^\]\r\n]{1,40}\]\s*\(/g)].length;
+  // ② 解构出来的裸调 —— **按 key 判、按 alias 找**(改名是上一版漏掉的那族)
+  for (const m of src.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*[^;\n]*useBills\s*\??\s*\(\)/g)) {
     for (const part of m[1].split(",")) {
-      const nm = part.split(":").pop().trim();
-      if (!nm || !new RegExp(`^(?:${METHODS})$`).test(nm)) continue;
-      // 解构声明本身是 `{ add }`,不带 `(`,所以不必扣减
-      count += [...src.matchAll(new RegExp(`(?<![\\w$.])${nm}\\s*\\(`, "g"))].length;
+      const seg = part.split(":");
+      const key = (seg[0] ?? "").trim();
+      const alias = (seg[1] ?? seg[0] ?? "").trim();
+      if (!alias || !new RegExp(`^(?:${METHODS})$`).test(key)) continue;
+      count += [...src.matchAll(new RegExp(`(?<![\\w$.])${alias}\\s*\\(`, "g"))].length;
     }
+  }
+  // ③ 方法引用后再调:`const f = b.add;` → 之后的裸 `f(`
+  for (const m of src.matchAll(new RegExp(`(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*[\\w$.?]+\\.\\s*(?:${METHODS})\\s*[;\\r\\n]`, "g"))) {
+    count += [...src.matchAll(new RegExp(`(?<![\\w$.])${m[1]}\\s*\\(`, "g"))].length;
   }
   return count;
 }
@@ -617,7 +629,15 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 门看不见、正控也测不出。合取项必须逐个隔离。
   // 控制线走**与全站扫同一条路径**(scanSource),而不是直接调 billsWriteHits ——
   // 否则 .vue 分区段那一支不会被任何控制线走到。
-  const run = (code, rel = "probe.ts") => scanSource(rel, code);
+  // 🔴 控制线要带上 import —— 新判据第一关是「这文件跟 bills store 有没有关系」,
+  // 裸片段不含 import 会被第一关直接放过(实测:换判据后 7 条正控当场漏判)。
+  // 真实违规一定在一个 import 了 bills 的文件里,控制线也必须是那个形态。
+  // `NO_IMPORT|` 前缀 = 这条专门测「与 bills 无关的文件」那一路,不加前缀。
+  const IMPORT = 'import { useBills } from "@/store/bills";' + "\n";
+  const run = (code, rel = "probe.ts") =>
+    code.startsWith("NO_IMPORT|")
+      ? scanSource(rel, code.slice("NO_IMPORT|".length))
+      : scanSource(rel, IMPORT + code);
   const POS = [
     ['同行普通调用', '  bills.add({ type: "bonus" });'],
     ['useBills() 直调', '  useBills().addOnce({ type: "topup" });'],
@@ -637,13 +657,26 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // .vue 模板内联 handler:引号内是**表达式**不是数据 —— 这是分区段扫描那一支的唯一控制线,
     // 少了它,scanSource 的 .vue 分支就没有任何控制线走到(名单里加了分支却没测 = 从没验证过)。
     ['.vue 模板内联 handler', '<template><view @tap="bills.add({ type: 1 })" /></template>', 'probe.vue'],
+    // 🔴 以下 6 条来自 2026-08-04 独立验收 —— 它把上一版判据(枚举 receiver 名字)
+    // 实测出 10 条逃逸,其中「解构改名」与「先声明后赋值」是正常人会写出来的形状。
+    // 判据已翻转成「文件与 bills 有关 ⇒ 任何写入调用都算」,这些立成常驻正控防退化。
+    ['解构改名', '  const { add: writeBill } = useBills();\n  writeBill({ type: 1 });'],
+    ['方法引用后再调', '  const b = useBills();\n  const f = b.add;\n  f({ type: 1 });'],
+    ['先声明后赋值', '  let s;\n  s = useBills();\n  s.add({ type: 1 });'],
+    ['本地 wrapper', '  const billsOf = () => useBills();\n  billsOf().addOnce({ type: 1 });'],
+    ['形参注入', '  function pay(store) { store.add({ type: 1 }); }'],
+    ['计算方法名(运行期才知道)', '  const bills = useBills();\n  const m = 0;\n  bills[m]({ type: 1 });'],
   ];
   const NEG = [
     ['行尾注释里的调用(不许哄红)', '  doThing(); // 已不再 bills.add({ type: "x" }) 了'],
     ['块注释里的调用', '  /* 旧写法:bills.addMany([{...}]) */\n  postMoneyBills(d);'],
     ['字符串里的方法名', '  const doc = "bills.add(...) 已废弃";'],
     ['SFC 注释里的调用', '  <!-- 迁移前:bills.add({ type: "x" }) -->'],
-    ['同名但非 bills 的 receiver', '  cart.add({ id: 1 });\n  myBills.add({ x: 1 });'],
+    // 🔴 原来这里是「同名但非 bills 的 receiver 不该命中」。判据翻转后**有意过近似**:
+    // 第一关过了就不再判 receiver 叫什么,于是同文件里的 `cart.add(` 也会计入 ——
+    // 这是拿「多算再逐个登记」换「名字枚举漏一族就永久失明」,代价由 ALLOW 的精确条数兜住。
+    // 改成守第一关:与 bills **无关**的文件必须完全不受影响。
+    ['与 bills 无关的文件不受影响', 'NO_IMPORT|  cart.add({ id: 1 });\n  myBills.add({ x: 1 });'],
   ];
   const posMiss = POS.filter(([, code, rel]) => run(code, rel) === 0).map(([name]) => name);
   const negHit = NEG.filter(([, code, rel]) => run(code, rel) > 0).map(([name]) => name);
