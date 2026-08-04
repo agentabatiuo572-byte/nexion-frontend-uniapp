@@ -197,18 +197,21 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
   }
   check(`⑤ 可反序的 ${ORDERED.length} 处:发钱排在消费资格之前`, wrong.length === 0, wrong.join(" | "));
 
-  // 反不过来的两处(daily 的签到与里程碑,金额由消费动作自己决定)必须有自愈补发
+  // 🔴 反不过来的两处(签到 / 里程碑,金额由消费动作自己摇出)**刻意没有**自愈补发。
+  //
+  // 曾经加过一个,**实景走查当场证伪**:判据是「有领取状态、无对应账单行 ⇒ 补发」,
+  // 它分不清 ①从没发过(该补)与 ②发过了但账单行丢了(不该补)。而 ② 是可达的 ——
+  // 账单表走裸 writeAccountRow,另一标签页写一次就覆盖掉本页刚写的分录,而余额在账户快照里
+  // 按增量合并幸存。浏览器实测:余额 11940 → 11943,凭空多发一次。
+  // 少发是用户损失,多发是平台损失且不可追回;在拿到**权威的「已付」标记**之前这个判据
+  // 不可能正确。归「完全版 A」(账单与资金同一次落盘后,② 根本不会发生)。
+  //
+  // 所以这条门守的是**不许悄悄加回来**:重构落地前,任何「按账单缺失来补发」的自愈
+  // 都是二次发钱的入口。
   const daily = strip(readFileSync(path.join(root, "src", "pages", "daily", "daily.vue"), "utf8"));
-  check("⑤ 反不过来的两处有自愈补发(reconcileFaucetBills)且真的被挂上",
-    /function reconcileFaucetBills\(/.test(daily) && /onMounted\([\s\S]{0,200}reconcileFaucetBills\(\)/.test(daily));
-  // 🔴 判据只能用**代码结构**,不能用字符串字面量的内容 —— strip 会把模板串的字面部分抹掉
-  // (那是它的正确行为:字面量里不可能有调用)。第一版写了 `STREAK-D${m.day}` 当判据,
-  // 剥完就找不到,自己把自己判红了。改判「自愈函数体里同时走了两条数据源」。
-  const reconcile = daily.slice(daily.indexOf("function reconcileFaucetBills("));
-  const body = reconcile.slice(0, reconcile.indexOf("\nfunction ", 1));
-  check("⑤ 自愈覆盖两类:签到(取 faucet 流水)+ 里程碑(取静态档位表)",
-    /signInRef\(/.test(body) && /faucet\.claimedMilestones/.test(body) && /MILESTONES\.find\(/.test(body),
-    `signInRef=${/signInRef\(/.test(body)} milestones=${/faucet\.claimedMilestones/.test(body)} table=${/MILESTONES\.find\(/.test(body)}`);
+  const reAdded = daily.match(/function\s+(reconcile\w*)\s*\(/);
+  check("⑤ 🔴 daily 没有「按账单缺失补发」的自愈(重构前加回来 = 二次发钱入口)",
+    reAdded === null, reAdded ? `又出现了:${reAdded[1]}` : "");
 }
 
 console.log(`\n${pass} pass / ${fail} fail(样本:3 组行为固定靶(真收口点 + 真 store)· 5 个调用点扫 ref 稳定性 · 4 处顺序门 + 2 处自愈门)`);
