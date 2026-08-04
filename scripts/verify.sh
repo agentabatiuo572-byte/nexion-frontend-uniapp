@@ -2438,5 +2438,23 @@ deposit_claim_idem_gate() {
 }
 deposit_claim_idem_gate
 
+# ── 账户快照三处字面量字段集一致门(2026-08-04 完全版 A 改动③ 的安全网)──────────
+# AccountCloudSnapshot 的字段由**三个各自独立的对象字面量**构造(mergeAccountSnapshots 的
+# 返回值 / persistAccountSnapshot 拼的快照 / createSeedSnapshot 的种子),加字段必须同时改三处:
+#   漏 merge → 每次合并**静默抹掉**该字段,且只在 base&&latest 都在时才走合并,首写看起来正常;
+#   漏 persist → 每次落盘写出 undefined;漏 seed → 新账号该字段归属未定义。
+# 这三处**没有任何类型检查能兜住**:TS 只管返回类型,而两处都是「先取出再拼回」的写法,
+# 少一个字段照样过编译。判据判**集合**不判成员 —— 判成员的话每加一个字段就要记得加一条判据,
+# 而「忘了加」正是本门要防的那件事。外加与类型声明对齐 + 判据红测自证。
+snapshot_literals_gate() {
+  if "$NODE_BIN" scripts/selfcheck-snapshot-literals.mjs > /tmp/uniapp-snap-literals.log 2>&1; then
+    ok "快照字面量一致门 — $(tail -1 /tmp/uniapp-snap-literals.log)"
+  else
+    bad "快照字面量一致门失败 — node scripts/selfcheck-snapshot-literals.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-literals.log | head -8 | sed 's/^/        /'
+  fi
+}
+snapshot_literals_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
