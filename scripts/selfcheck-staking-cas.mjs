@@ -28,6 +28,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build, transformSync } from "esbuild";
+import { atAliasResolver } from "./lib/at-alias.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const STORE_DIR = path.join(root, "src", "store");
@@ -98,12 +99,7 @@ async function loadStore(rel) {
       setup(b) {
         b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
         b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
-        b.onResolve({ filter: /^@\// }, (a) => {
-          const base = path.join(root, "src", a.path.slice(2));
-          const hit = [base, `${base}.ts`, path.join(base, "index.ts")].find((p) => existsSync(p));
-          if (!hit) throw new Error(`selfcheck-staking-cas: 解析不到 ${a.path}`);
-          return { path: hit };
-        });
+        b.onResolve({ filter: /^@\// }, atAliasResolver(path.join(root, "src"), "selfcheck-staking-cas"));
         b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
       },
     }],

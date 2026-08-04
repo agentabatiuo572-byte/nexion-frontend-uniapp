@@ -25,6 +25,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
+import { atAliasResolver } from "./lib/at-alias.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
@@ -113,13 +114,7 @@ export { useUI } from "@/store/ui";`,
     setup(b) {
       b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
       b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
-      b.onResolve({ filter: /^@\// }, (a) => {
-        const base = path.join(SRC, a.path.slice(2));
-        // 文件优先于目录:`@/i18n` 既是目录也有 index.ts,先命中目录会让 esbuild 读目录报错。
-        const hit = [`${base}.ts`, path.join(base, "index.ts"), base].find((p) => existsSync(p) && statSync(p).isFile());
-        if (!hit) throw new Error(`selfcheck-money-receipt: 解析不到 ${a.path}`);
-        return { path: hit };
-      });
+      b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-money-receipt"));
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
     },
   }],

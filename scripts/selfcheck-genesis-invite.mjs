@@ -25,6 +25,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
+import { atAliasResolver } from "./lib/at-alias.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
@@ -92,12 +93,7 @@ async function loadModule(abs) {
       setup(b) {
         b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
         b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
-        b.onResolve({ filter: /^@\// }, (a) => {
-          const base = path.join(SRC, a.path.slice(2));
-          const hit = [base, `${base}.ts`, path.join(base, "index.ts")].find((p) => existsSync(p));
-          if (!hit) throw new Error(`selfcheck-genesis-invite: 解析不到 ${a.path}`);
-          return { path: hit };
-        });
+        b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-genesis-invite"));
         b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
       },
     }],

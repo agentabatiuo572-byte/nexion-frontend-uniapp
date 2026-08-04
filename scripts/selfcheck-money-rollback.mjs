@@ -25,6 +25,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
+import { atAliasResolver } from "./lib/at-alias.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
@@ -116,12 +117,7 @@ export { useUI } from "@/store/ui";`,
     setup(b) {
       b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
       b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
-      b.onResolve({ filter: /^@\// }, (a) => {
-        const base = path.join(SRC, a.path.slice(2));
-        const hit = [`${base}.ts`, path.join(base, "index.ts"), base].find((p) => existsSync(p) && statSync(p).isFile());
-        if (!hit) throw new Error(`selfcheck-money-rollback: 解析不到 ${a.path}`);
-        return { path: hit };
-      });
+      b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-money-rollback"));
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
     },
   }],
