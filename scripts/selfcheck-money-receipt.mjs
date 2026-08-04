@@ -375,8 +375,7 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
 
   const WIRED = [
     ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill"]],
-    // wallet-repurchase.vue 的收口改动依赖 staking store 的 `stake() → {ok}`(并发 agent 的
-    // 未提交改动),随那一笔一起落地;在此之前它按存量点留在下面的迁移台账里。
+    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill"]],
     ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
   ];
@@ -414,7 +413,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     "src/pages/genesis/marketplace.vue": 1,
     "src/pages/me/achievements.vue": 2,
     "src/pages/me/wallet-cards-new.vue": 2,
-    "src/pages/me/wallet-repurchase.vue": 1,
     "src/pages/me/wallet-topup.vue": 1,
     "src/pages/staking/staking.vue": 2,
     "src/pages/store/bundle.vue": 1,
