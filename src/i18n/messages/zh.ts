@@ -3251,6 +3251,8 @@ export const zh: Messages = {
       earlyDoneSubtitle: "+${refund} 返回 · ${penalty} 罚款",
       claimedTitle: "持仓已领取",
       claimedSubtitle: "+${total} 返回(利息 ${interest})",
+      staleTitle: "持仓刚有变动",
+      staleSubtitle: "这笔在别处已经处理过了,已经帮你刷到最新,看一眼再操作。",
     },
     howItWorksEntry: "规则介绍",
   },

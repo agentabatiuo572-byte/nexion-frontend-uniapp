@@ -236,6 +236,10 @@ async function handleEarlyWithdraw(p: StakingPosition) {
         penalty: r.penalty.toFixed(2),
       }),
     );
+  } else if (r.conflict) {
+    // 这笔在别处(另一标签页 / 另一端)已经动过,store 已把最新状态刷回来 —— 说清楚,
+    // 不能让用户点了没反应。
+    toast.warn(t.value.stakingV3.toast.staleTitle, t.value.stakingV3.toast.staleSubtitle);
   }
 }
 
@@ -259,6 +263,8 @@ function handleClaim(p: StakingPosition) {
         interest: r.interest.toFixed(2),
       }),
     );
+  } else if (r.conflict) {
+    toast.warn(t.value.stakingV3.toast.staleTitle, t.value.stakingV3.toast.staleSubtitle);
   }
 }
 

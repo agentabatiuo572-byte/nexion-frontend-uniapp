@@ -2258,5 +2258,25 @@ checkout_trial_quote_gate() {
 }
 checkout_trial_quote_gate
 
+# ── 质押持仓乐观并发门(存量 P1,2026-08-04):跨标签页竞态双记账 ──
+# earlyWithdraw / claim 原是裸 find→map→persist,persist 走纯覆盖式 writeAccountRow,
+# 全仓又没有 storage 事件重新水合持仓 —— H5 端 uni storage 就是 localStorage,两个标签页
+# 只要都打开过质押页,状态就**永久不同步**;同一笔仓位被两边各领一次,而 usdtBalance 是
+# ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记 = 真·双花。判据(esbuild 载真
+# store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份序列化 storage):
+# ①陈旧标签页重复领取被拒、余额只增加一次 ①b 读与写之间被插队同样拦得住(rev CAS)
+# ②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」返回值可区分 ④不传版本的老
+# 调用方(28 处在用)行为逐项不变 + 爆炸半径只有 staking ⑤建仓冲突重放不丢仓、id 不重号
+# ⑥接线门(判定对不对 / 有没有被接上是两道门)。
+staking_cas_gate() {
+  if "$NODE_BIN" scripts/selfcheck-staking-cas.mjs > /tmp/uniapp-staking-cas.log 2>&1; then
+    ok "质押持仓乐观并发门 — $(tail -1 /tmp/uniapp-staking-cas.log)"
+  else
+    bad "质押持仓乐观并发门失败 — node scripts/selfcheck-staking-cas.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-staking-cas.log | head -8 | sed 's/^/        /'
+  fi
+}
+staking_cas_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
