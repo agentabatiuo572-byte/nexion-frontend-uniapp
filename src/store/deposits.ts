@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
-import { postReceiptOnce } from "@/lib/money-receipt";
+import { postReceiptOnce, reportStuckFunds } from "@/lib/money-receipt";
 import { useFx } from "./fx";
 import { vndForUsdt } from "./fx-core";
 import {
@@ -268,7 +268,7 @@ export const useDeposits = defineStore("deposits", () => {
     if (!useApp().recordDeposit(rec.creditedUsdt)) {
       // 钱没加成:把状态退回去。否则单据写着「已到账」而余额没动,且状态已是终态 ——
       // 引擎再也不会推进这一笔,那笔钱就人间蒸发了。
-      commit((cur) => ({
+      const undone = commit((cur) => ({
         next: {
           records: cur.records.map((x) =>
             x.depositId === depositId ? { ...x, status: rec.status, creditedAt: rec.creditedAt } : x,
@@ -277,6 +277,10 @@ export const useDeposits = defineStore("deposits", () => {
         },
         result: true as const,
       }));
+      // 🔴 回滚自己也会失败,返回值必须被消费:失败时单据停在 credited 而余额没加,
+      // 引擎不会再推进这一笔 —— 静默吞掉等于让这笔钱悄无声息地卡死。走与收口点同一套
+      // 响亮终态(交易号 + 待对账队列 + 明确文案),把它交到用户和后台手上。
+      if (!undone.ok) reportStuckFunds(useApp().captureMoney(), depositId);
       return false;
     }
     // 记账走收口点的幂等变体(以 txHash 为 ref 判重),不再裸调 bills.addOnce ——
@@ -555,13 +559,16 @@ export const useDeposits = defineStore("deposits", () => {
     if (!useApp().recordDeposit(credited)) {
       // 钱没加成:单据回滚到入账前(否则单子写着已到账、余额没动,且终态门从此挡住重试)。
       const { intent, appended } = r.result;
-      commit((cur) => ({
+      const undone = commit((cur) => ({
         next: {
           records: appended ? cur.records.filter((x) => x.depositId !== intentId) : cur.records,
           intents: cur.intents.map((i) => (i.intentId === intentId ? intent : i)),
         },
         result: true as const,
       }));
+      // 🔴 同链上轨:回滚失败不许静默 —— 意向单停在 credited、终态门从此挡住一切重试,
+      // 而余额没加。走响亮终态交给用户与后台,不假装什么都没发生。
+      if (!undone.ok) reportStuckFunds(useApp().captureMoney(), intentId);
       return false;
     }
     // 与链上轨同口径:记账走收口点的幂等变体(ref=intentId 判重),不裸调账单写入。
@@ -700,10 +707,13 @@ export const useDeposits = defineStore("deposits", () => {
     // ② 落盘过了才动钱。credited 已过 [MIN, MAX] 双门,recordDeposit 只拒 NaN/≤0/>1e9,
     //    此处恒真;万一失败则回滚单据,宁可「无单无钱」也不留「有单无钱」。
     if (!useApp().recordDeposit(credited)) {
-      commit((cur) => ({
+      const undone = commit((cur) => ({
         next: { records: cur.records.filter((x) => x.depositId !== rec.depositId), intents: cur.intents },
         result: true as const,
       }));
+      // 🔴 同前两轨:删单失败时盘上留着一张「有单无钱」的 credited 记录 —— 静默吞掉
+      // 就是让它永远挂在那儿。走响亮终态,把交易号交出去。
+      if (!undone.ok) reportStuckFunds(useApp().captureMoney(), rec.depositId);
       return null;
     }
     postReceiptOnce({
