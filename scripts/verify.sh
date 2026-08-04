@@ -2296,6 +2296,28 @@ staking_cas_gate() {
 }
 staking_cas_gate
 
+# ── 资金 ⊗ 收据门(R4 缺陷族,2026-08-04):「钱动了、账没记上」──
+# 落盘失败在这一层是**静默**的:account-cloud 写不进去只是 persisted:false,bills.add
+# 写不进去只是 return null,两者都不抛异常;调用方却一律按「一定成功」继续铸货、弹成功。
+# 实测四处同型(app.ts 四个资金原语丢弃 persist 结果 + 创世购买 / 结算 / 复投丢弃 bills.add
+# 返回值),最惨一格是近 $15k 已扣、席位已铸、弹「购买成功」,账单页查无此单。根治 = 一条
+# 不变量 + 一个收口点 src/lib/money-receipt.ts(收据即指令,不写收据就动不了钱)。判据
+# (esbuild 载真 store + 真收口点跑真代码,假 storage 按 key 定点注入写失败):
+# ①资金原语落盘失败→返回 false 且内存不脏 ②bills 写失败→整笔回滚 + 报失败(含反向病症
+# 「账记了钱没动」) ③退款把 withdrawableUsdt 还原到扣款前(带裸 creditBalance 负控)
+# ④成功路径逐项等价(金额/舍入/clamp/守卫拒绝) ⑤接线门 + 3 语 i18n ⑥迁移棘轮:
+# 仍在裸调 bills 写入的存量点只许减不许增 ⑦多腿交易(兑换一进一出)原子性:两条分录
+# 一次落盘(数写盘次数),任一环失败 → 两腿资金一起还原、账上零残留(不许只剩一条)。
+money_receipt_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-receipt.mjs > /tmp/uniapp-money-receipt.log 2>&1; then
+    ok "资金 ⊗ 收据门 — $(tail -1 /tmp/uniapp-money-receipt.log)"
+  else
+    bad "资金 ⊗ 收据门失败 — node scripts/selfcheck-money-receipt.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-receipt.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_receipt_gate
+
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
 # /api/genesis/purchase` 和 `POST /api/swap`(PRD 根本没这接口)、试用转化写成

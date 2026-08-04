@@ -7,8 +7,8 @@
   slide-up → CSS <transition> (backdrop fade + panel slide).
 
   Cross-store side-effect (architecture铁律: stores don't import each other) —
-  the purchase handler composes genesis.purchase() + app.debitBalance() +
-  bills.add() here in the component.
+  the purchase handler composes postMoneyBill()(扣款 ⊗ 记账,见 lib/money-receipt.ts)
+  + genesis.purchase() here in the component.
 -->
 <template>
   <view v-if="open">
@@ -91,7 +91,7 @@ import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
@@ -101,7 +101,6 @@ const emit = defineEmits<{ "update:open": [boolean] }>();
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const genesis = useGenesis();
 const { gate } = useGenesisEligibility();
 
@@ -167,7 +166,27 @@ function handlePurchase() {
   let committed = false;
   try {
     const cost = qty.value * price.value;
-    if (!app.debitBalance(cost)) {
+    const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
+    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + bill + purchase are
+    // separate writes. PRODUCTION: one atomic transaction returning
+    // {balance, ownedTokenIds, billId}. Genesis **primary** subscription endpoint
+    // is TBD — PRD 未定义(§10.2.4 只定义二级 POST /api/genesis/secondary/fulfill
+    // 与 POST /api/genesis/{list,unlist});勿把候选路径当既定契约引用。
+    //
+    // 🔴 顺序 = 扣款⊗记账(原子)→ 铸席位(2026-08-04 R4「钱动了、账没记上」)。原顺序是
+    // 「扣款 → 铸席位 → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、
+    // 没人接 —— 于是近 $15k 已扣、席位已铸、弹「购买成功」,账单页却查无此单。收据挪到铸造
+    // 之前并与扣款收口成一次提交后,收据落不了盘 = 钱没扣、席位没铸、明确报错,零半执行残迹。
+    const before = app.captureMoney();
+    const paid = postMoneyBill({
+      type: "purchase",
+      symbol: "USDT",
+      amount: -cost,
+      status: "posted",
+      memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
+      ref: billRef,
+    });
+    if (paid === "insufficient") {
       toast.error(
         t.value.genesis.purchaseError,
         fmt(t.value.genesis.purchaseErrorSubtitle, {
@@ -177,28 +196,28 @@ function handlePurchase() {
       );
       return;
     }
-    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + purchase + bill are
-    // separate writes. PRODUCTION: POST /api/genesis/purchase (PRD §9.11e) is one
-    // atomic transaction returning {balance, ownedTokenIds, billId}.
+    if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
     const r = genesis.purchase(qty.value);
-    if (r.ok) {
-      bills.add({
-        type: "purchase",
-        symbol: "USDT",
-        amount: -cost,
-        status: "posted",
-        memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
-        ref: `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`,
-      });
-      toast.success(
-        fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
-        t.value.genesis.purchaseSubtitle,
+    if (!r.ok) {
+      // 铸造失败(售罄 / 限购竞态)→ 冲正,不留「扣钱无货」。走**同一个**收口点:
+      // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
+      //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
+      // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
+      //    已终态分录靠反向分录冲正、不改写原行(与提现 NEX 退还同规矩)。
+      postMoneyBill(
+        {
+          type: "purchase",
+          symbol: "USDT",
+          amount: cost,
+          status: "posted",
+          memo: `Genesis primary reversed · ${qty.value} slot${qty.value > 1 ? "s" : ""} refunded`,
+          memoKey: "genesisReversed",
+          memoParams: { n: qty.value },
+          ref: billRef,
+        },
+        { restoreTo: before },
       );
-      committed = true;
-      emitClose();
-    } else {
-      // 铸造失败 → 退款,不留「扣钱无货」;按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
-      app.creditBalance(cost);
+      // 按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
       if (r.reason === "cap") {
         toast.error(
           t.value.genesisEligibility.toastCapReached,
@@ -207,7 +226,14 @@ function handlePurchase() {
       } else {
         toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
       }
+      return;
     }
+    toast.success(
+      fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
+      t.value.genesis.purchaseSubtitle,
+    );
+    committed = true;
+    emitClose();
   } finally {
     // 只有真成交才继续持锁(面板正在关闭,解锁 = 给双击留窗口;由 open watcher 复位)。
     // 其余任何出口 —— 余额不足、铸造失败、抛异常 —— 立刻解锁,让用户能重试,

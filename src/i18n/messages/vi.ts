@@ -2762,6 +2762,8 @@ export const vi: Messages = {
       topupTrc20: "Nạp tiền · USDT-TRC20",
       withdrawTrc20: "Rút tiền · USDT-TRC20",
       withdrawNexRefund: "Hoàn bù phí · trả lại {nex} NEX",
+      genesisReversed: "Hủy giữ chỗ Genesis · hoàn lại {n} suất",
+      stakeReversed: "Hủy tái đầu tư · không mở được vị thế, đã hoàn tiền",
     },
     title: "Sao kê",
     back: "Quay lại",
@@ -3066,6 +3068,10 @@ export const vi: Messages = {
       "Rút lần đầu cần xác minh KYC-Express $1 để xác nhận quyền sở hữu ví.",
     orderCancelledTitle: "Đã hủy đơn hàng",
     orderCancelledMsg: "Khoản hoàn tiền sẽ về ví của bạn trong 1–3 ngày.",
+    txNotSavedTitle: "Giao dịch chưa được lưu",
+    txNotSavedMsg: "Số dư của bạn không thay đổi và không có ghi nhận nào. Vui lòng thử lại.",
+    billMissingTitle: "Chưa ghi nhận vào sao kê",
+    billMissingMsg: "Giao dịch đã thực hiện thành công nhưng chưa được thêm vào lịch sử sao kê.",
   },
 
   teamV3: {

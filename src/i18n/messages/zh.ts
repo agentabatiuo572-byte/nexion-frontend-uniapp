@@ -2788,6 +2788,8 @@ export const zh: Messages = {
       topupTrc20: "充值 · USDT-TRC20",
       withdrawTrc20: "提现 · USDT-TRC20",
       withdrawNexRefund: "手续费抵扣退还 · 退回 {nex} NEX",
+      genesisReversed: "创世席位预留撤销 · 退回 {n} 个名额",
+      stakeReversed: "复投撤销 · 仓位未能建立,金额已退回",
     },
     title: "账单流水",
     back: "返回",
@@ -3080,6 +3082,10 @@ export const zh: Messages = {
     kycRequiredMsg: "首次提现需通过 $1 KYC-Express 验证以确认钱包所有权。",
     orderCancelledTitle: "订单已取消",
     orderCancelledMsg: "退款将在 1–3 天内返回钱包。",
+    txNotSavedTitle: "交易未保存",
+    txNotSavedMsg: "余额没有变化,也没有产生任何记录,请重试。",
+    billMissingTitle: "账单未记录",
+    billMissingMsg: "这笔交易已生效,但没能写进你的账单记录。",
   },
 
   // ─── v3 反向 Ponzi 样本(镜像 en.ts teamV3 / stakingV3 / trust / genesis / walletV3) ───
