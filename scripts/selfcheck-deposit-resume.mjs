@@ -103,6 +103,22 @@ console.log("selfcheck-deposit-resume — 在途入金单刷新后必须继续�
     `未归类:${all.filter((s) => !ALLOWED.includes(s) && !DENIED.includes(s)).join(",") || "无"}`);
 }
 
+// ── ⑥ 状态回滚失败不许静默 ──────────────────────────────────────────────────
+// 三条轨在 recordDeposit 失败后都要把单据状态退回去,而那次回滚**自己也会失败**。
+// 原实现三处 commit 返回值全丢:失败时链上单永久停 credited 而余额没加、银行意向单被终态门
+// 挡住一切重试、卡轨留一张有单无钱的记录 —— 全部静默,用户与后台都无从得知。
+{
+  const CALLS = src.match(/const undone = commit\(/g) ?? [];
+  const CONSUMED = src.match(/if \(!undone\.ok\) reportStuckFunds\(/g) ?? [];
+  check(`⑥ 三条轨的状态回滚都接住返回值(实测 ${CALLS.length} 处回滚)`,
+    CALLS.length === 3, `找到 ${CALLS.length} 处,应为 3`);
+  check(`⑥ 每一处回滚失败都走响亮终态(实测消费 ${CONSUMED.length} 处)`,
+    CONSUMED.length === CALLS.length && CALLS.length > 0,
+    `回滚 ${CALLS.length} 处 / 消费 ${CONSUMED.length} 处`);
+  check("⑥ 走的是既有的 reportStuckFunds(交易号 + 待对账队列),不是另造一套或只弹 toast",
+    /import \{[^}]*reportStuckFunds[^}]*\} from "@\/lib\/money-receipt"/.test(src));
+}
+
 // ── 红测自证:判据不是空转 ──────────────────────────────────────────────────
 {
   // 正控:把每条判据的目标串从源码里摘掉,判据必须转 false。
