@@ -77,6 +77,32 @@ console.log("selfcheck-deposit-resume — 在途入金单刷新后必须继续�
     /function step\(\)\s*\{\s*timers\.delete\(depositId\);/.test(step));
 }
 
+// ── ⑤ 银行轨入账门必须是白名单,不是黑名单 ──────────────────────────────────
+// 原来只挡 `credited`,于是磁盘上已 cancelled / return_pending / expired 的单都能从这个口
+// 入账 —— 撤单与退回的意图被静默抹掉,与退回并发时还是双付。三个调用方各自的门跑在**内存**上,
+// 另一个标签页刚改的状态它们看不见;这里是唯一一道跑在**磁盘最新**上的门。
+{
+  const settle = between("function settleBankIntent(", "\n  /**");
+  // 白名单来源不是记忆:三个调用方分别要求 awaiting_payment / mismatch_review / expired。
+  const ALLOWED = ["awaiting_payment", "mismatch_review", "expired"];
+  const DENIED = ["credited", "cancelled", "return_pending"];
+  check(`⑤ 银行轨入账是白名单(${ALLOWED.join(" / ")} 三态才可入账)`,
+    ALLOWED.every((s) => settle.includes(`"${s}"`)),
+    ALLOWED.filter((s) => !settle.includes(`"${s}"`)).join(",") || "");
+  check("⑤ 判据形态是 `!== 白名单` 而不是 `=== 黑名单`(黑名单漏一个状态就是一条入账边)",
+    /status !== "/.test(settle) && !/status === "credited"\)? return null/.test(settle));
+  check(`⑤ 三个终态/退回态不在白名单里(${DENIED.join(" / ")})`,
+    DENIED.every((s) => !new RegExp(`status !== "${s}"`).test(settle)));
+  // 🔴 白名单的**完整性**判据:意向单状态共 6 个,白名单 3 + 拒绝 3 必须正好覆盖全集。
+  // 少了这条,types.ts 里新增一个状态时白名单会静默漏掉它(整套门共同漏掉「新增」这个方向)。
+  const union = readFileSync(path.join(root, "src", "store", "types.ts"), "utf8")
+    .match(/export type DepositIntentStatus =([\s\S]*?);/)?.[1] ?? "";
+  const all = [...union.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]);
+  check(`⑤ 白名单+拒绝名单 = 状态全集(实测 ${all.length} 个状态:${all.join(",")})`,
+    all.length === ALLOWED.length + DENIED.length && all.every((s) => ALLOWED.includes(s) || DENIED.includes(s)),
+    `未归类:${all.filter((s) => !ALLOWED.includes(s) && !DENIED.includes(s)).join(",") || "无"}`);
+}
+
 // ── 红测自证:判据不是空转 ──────────────────────────────────────────────────
 {
   // 正控:把每条判据的目标串从源码里摘掉,判据必须转 false。
@@ -95,5 +121,7 @@ console.log("selfcheck-deposit-resume — 在途入金单刷新后必须继续�
     misses.length === 0, misses.join(" | "));
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:${9} 条结构断言 · 3 条判据红测自证)`);
+// 样本量从实跑数取,不写死 —— 写死的话加了断言、标签还报旧数字,「加了没加」在输出里看不出来
+// (最后一条是红测自证,不算结构断言)。
+console.log(`\n${pass} pass / ${fail} fail(样本:${pass + fail - 1} 条结构断言 · 3 条判据红测自证)`);
 process.exit(fail === 0 ? 0 : 1);

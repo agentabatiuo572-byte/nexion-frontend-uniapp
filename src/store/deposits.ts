@@ -520,7 +520,15 @@ export const useDeposits = defineStore("deposits", () => {
     const r = commit((cur) => {
       const intent = cur.intents.find((i) => i.intentId === intentId);
       if (!intent) return null;
-      if (intent.status === "credited") return null; // 别处已入账,绝不再入第二次
+      // 🔴 白名单不是黑名单(2026-08-04 对抗审计 P0-3)。原来只挡 `credited`,于是
+      // 磁盘上已 cancelled(用户刚撤单)/ return_pending(正在退回)/ expired 的单,
+      // 都能从这个口被入账 —— 撤单与退回的意图被静默抹掉,与退回并发时还是双付。
+      // 三个调用方各自的门跑在**内存** `intents.value` 上,另一个标签页刚改的状态它们看不见;
+      // 这里是最后一道、也是唯一一道跑在**磁盘最新**上的门,必须穷举「谁可以入账」而不是
+      // 「谁不可以」—— 与链上轨 settleCredited 和 cancelBankIntent 同构(那两处本来就是白名单)。
+      if (intent.status !== "awaiting_payment" && intent.status !== "mismatch_review" && intent.status !== "expired") {
+        return null;
+      }
       // DepositRecord 与意向单同号互相关联([FEAT-PAY02] ③);银行轨无链上字段。
       const rec: DepositRecord = {
         depositId: intent.intentId,
