@@ -2258,6 +2258,24 @@ checkout_trial_quote_gate() {
 }
 checkout_trial_quote_gate
 
+# ── 兑换成交快照 + 创世购买重入守卫门(存量 2×P1,2026-08-04)──
+# 两条同族缺陷:动钱的入口没有重入守卫、跨 await 读活值。兑换页确认后 900ms 内
+# 汇率自己跳/用户翻方向改金额,实际成交 ≠ 用户确认的那笔,且额度只按确认那一刻校验
+# 过一次(改大金额即绕过每日额度);创世半屏 emitClose 异步生效,双击扣两笔铸两份。
+# 判据(抠正主函数原文注入执行,不抄判据副本):①确认后汇率变动→拒单零成交
+# ②确认后方向/金额被改→按快照成交 ③连点三次只成交一次 ④创世三击只扣一次
+# (含失败路径必解锁的反向靶) ⑤正常路径不受影响 + 结构纪律(快照冻在首个 await 前 /
+# 复验拿当前权威值 / 守卫非模块级 / 按钮 disabled 派生)。
+exchange_genesis_guard_gate() {
+  if "$NODE_BIN" scripts/selfcheck-exchange-genesis-guard.mjs > /tmp/uniapp-exchange-genesis-guard.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-exchange-genesis-guard.log)"
+  else
+    bad "兑换/创世重入守卫门失败 — node scripts/selfcheck-exchange-genesis-guard.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-exchange-genesis-guard.log | head -8 | sed 's/^/        /'
+  fi
+}
+exchange_genesis_guard_gate
+
 # ── 质押持仓乐观并发门(存量 P1,2026-08-04):跨标签页竞态双记账 ──
 # earlyWithdraw / claim 原是裸 find→map→persist,persist 走纯覆盖式 writeAccountRow,
 # 全仓又没有 storage 事件重新水合持仓 —— H5 端 uni storage 就是 localStorage,两个标签页

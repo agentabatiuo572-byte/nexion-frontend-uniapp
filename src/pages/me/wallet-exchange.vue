@@ -44,6 +44,7 @@
             :value="input"
             placeholder="0"
             placeholder-style="color: var(--v5-ink-2)"
+            :disabled="submitting"
             @input="onInput"
           />
           <text class="shrink-0" style="font-size: 15px; color: var(--v5-ink-3)">{{ fromSym }}</text>
@@ -91,8 +92,9 @@
 
       <!-- Confirm CTA -->
       <view style="margin: 16px 16px 0">
-        <!-- 金额无效时点了没用 → 显式 aria-disabled,而不是靠「没有按下反馈」暗示 -->
-        <view class="grid place-items-center" :class="{ 'active:opacity-90': valid }" role="button" :aria-disabled="valid ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
+        <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰(《05》§6.1
+             disabled 派生:文字降 ink-4 + 填充降 surface 系),而不是靠「没有按下反馈」暗示 -->
+        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
           <text :style="confirmTextStyle">{{ t.exchange.confirm }}</text>
         </view>
       </view>
@@ -249,14 +251,28 @@ const fromAmount = computed(() => {
   const n = parseFloat(input.value || "0");
   return isNaN(n) ? 0 : n;
 });
-const toAmount = computed(() => {
-  if (fromAmount.value === 0) return 0;
-  if (direction.value === "usdt2nex") return +(fromAmount.value / rate.value).toFixed(2);
-  return +(fromAmount.value * rate.value).toFixed(4);
-});
+/**
+ * 报价公式**单源**:页面展示与「确认后复验」跑同一个函数、同一套取整。
+ * 分成两份写的话,复验永远只是在跟自己的复制品比对 —— 判据自证,漂移照样漏过去。
+ */
+function quoteTo(dir: "usdt2nex" | "nex2usdt", from: number, r: number): number {
+  if (from === 0) return 0;
+  if (dir === "usdt2nex") return +(from / r).toFixed(2);
+  return +(from * r).toFixed(4);
+}
+const toAmount = computed(() => quoteTo(direction.value, fromAmount.value, rate.value));
 const overBalance = computed(() => fromAmount.value > fromBal.value);
 const underMin = computed(() => fromAmount.value > 0 && fromAmount.value < minFrom.value);
 const valid = computed(() => fromAmount.value > 0 && !overBalance.value && !underMin.value);
+/**
+ * 🔴 提交在途守卫(范式同 wallet-cards-new.vue 的 isBinding:`ref(false)` 挂在
+ * **组件实例**上,不用 checkout.vue 那个模块级 `let` —— 模块级变量跨实例共享,
+ * 任一提前 return 忘复位就把后续所有兑换永久锁死)。
+ * 置位点在**第一个 await 之前**,复位统一交给 finally:确认弹窗打开的那几秒
+ * 页面还活着,不挡就能叠出第二个弹窗 → 两次确认 = 两条完整兑换链。
+ */
+const submitting = ref(false);
+const ctaEnabled = computed(() => valid.value && !submitting.value);
 // USD value of this swap = the leg denominated in USDT
 const swapUSDValue = computed(() => (direction.value === "usdt2nex" ? fromAmount.value : toAmount.value));
 
@@ -268,9 +284,13 @@ function onInput(e: Event) {
   input.value = detailVal(e).replace(/[^0-9.]/g, "");
 }
 function setMax() {
+  // 提交在途时输入面整体冻结(输入框有 :disabled,这两个裸 <view @click> 入口没有)。
+  // 快照已让改动动不了钱,但页面会立刻显示与刚确认的弹窗不同的数字,同一笔出现两个口径。
+  if (submitting.value) return;
   input.value = String(fromBal.value);
 }
 function flip() {
+  if (submitting.value) return;
   direction.value = direction.value === "usdt2nex" ? "nex2usdt" : "usdt2nex";
   input.value = "";
 }
@@ -284,116 +304,163 @@ function goHowItWorks() {
 }
 
 async function handleConfirm() {
+  // 🔴 重入守卫排在最前:无守卫时连点两次会排队两条完整兑换链,而第二条的额度门
+  // 读到的还是第一条 v3.record 之前的计数 —— 两笔都放行,日限直接翻倍。
+  if (submitting.value) return;
   if (!valid.value) return;
 
-  // v3 gate: cap / KYC / queue
-  const gate = v3.canExchange(swapUSDValue.value);
-  if (!gate.ok) {
-    if (gate.reason === "kyc-required") {
-      const goKyc = await confirm({
-        title: t.value.exchange.kycRequiredTitle,
-        message: fmt(t.value.exchange.kycRequiredMessage, {
-          lifetime: gate.lifetime.toFixed(2),
-          threshold: String(gate.threshold),
-        }),
-        icon: "info",
-        confirmLabel: t.value.exchange.kycRequiredConfirm,
-      });
-      if (goKyc) {
-        // Reuse the KYC-Express flow on wallet-topup (?kyc=1)
-        uni.navigateTo({ url: "/pages/me/wallet-topup?kyc=1", fail: () => {} });
+  // 🔴 **成交快照冻在第一个 await 之前**(范式同 wallet-withdraw.vue 的 snap)。
+  // 方向 / 币种 / 金额 / 到账额 / 汇率 / USD 计值 / 账号 一次冻结;额度门、弹窗文案、
+  // 扣款、入账、记账、日限计数全部只读这一份。
+  // 此前它们全是活读,而「确认弹窗 + 900ms 结算延迟」这段窗口里:汇率每 15s 自己跳、
+  // 用户还能翻方向 / 改金额 —— 实际成交与用户点「确认」时看到的不是同一笔;
+  // 额度门更只在确认那一刻按当时的值校验过一次,确认后把金额改大即可绕过每日额度。
+  // 币种取 store 的类型单源(SwapEvent),不让对象字面量把 "USDT"|"NEX" 宽化成 string。
+  const snap = {
+    direction: direction.value,
+    fromSym: fromSym.value as SwapEvent["fromSym"],
+    toSym: toSym.value as SwapEvent["toSym"],
+    fromAmount: fromAmount.value,
+    toAmount: toAmount.value,
+    rate: rate.value,
+    usd: swapUSDValue.value,
+    account: app.accountKey,
+  };
+
+  submitting.value = true;
+  try {
+    // v3 gate: cap / KYC / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
+    const gate = v3.canExchange(snap.usd);
+    if (!gate.ok) {
+      if (gate.reason === "kyc-required") {
+        const goKyc = await confirm({
+          title: t.value.exchange.kycRequiredTitle,
+          message: fmt(t.value.exchange.kycRequiredMessage, {
+            lifetime: gate.lifetime.toFixed(2),
+            threshold: String(gate.threshold),
+          }),
+          icon: "info",
+          confirmLabel: t.value.exchange.kycRequiredConfirm,
+        });
+        if (goKyc) {
+          // Reuse the KYC-Express flow on wallet-topup (?kyc=1)
+          uni.navigateTo({ url: "/pages/me/wallet-topup?kyc=1", fail: () => {} });
+        }
+        return;
       }
-      return;
-    }
-    if (gate.reason === "user-cap") {
-      const queueIt = await confirm({
-        title: t.value.exchange.capReachedTitle,
-        message: fmt(t.value.exchange.capReachedMessage, {
-          used: gate.usedToday.toFixed(2),
-          cap: String(gate.cap),
-          amount: swapUSDValue.value.toFixed(2),
-        }),
-        icon: "warn",
-        confirmLabel: t.value.exchange.capReachedConfirm,
-      });
-      if (queueIt) {
-        v3.enqueue({ amountUSD: swapUSDValue.value, direction: direction.value });
-        toast.info(
-          t.value.exchange.queuedToastTitle,
-          fmt(t.value.exchange.queuedToastBody, { amount: swapUSDValue.value.toFixed(2) }),
+      if (gate.reason === "user-cap") {
+        const queueIt = await confirm({
+          title: t.value.exchange.capReachedTitle,
+          message: fmt(t.value.exchange.capReachedMessage, {
+            used: gate.usedToday.toFixed(2),
+            cap: String(gate.cap),
+            amount: snap.usd.toFixed(2),
+          }),
+          icon: "warn",
+          confirmLabel: t.value.exchange.capReachedConfirm,
+        });
+        if (queueIt) {
+          v3.enqueue({ amountUSD: snap.usd, direction: snap.direction });
+          toast.info(
+            t.value.exchange.queuedToastTitle,
+            fmt(t.value.exchange.queuedToastBody, { amount: snap.usd.toFixed(2) }),
+          );
+        }
+        return;
+      }
+      if (gate.reason === "platform-cap") {
+        toast.error(
+          t.value.exchange.platformExhaustedTitle,
+          fmt(t.value.exchange.platformExhaustedBody, { cap: (gate.cap / 1000).toFixed(0) }),
         );
+        return;
       }
+    }
+
+    const ok = await confirm({
+      title: t.value.exchange.confirm,
+      message: `${snap.fromSym} ${snap.fromAmount.toFixed(snap.fromSym === "USDT" ? 2 : 0)} → ${snap.toSym} ${snap.toAmount.toFixed(snap.toSym === "USDT" ? 4 : 0)}`,
+      icon: "info",
+      confirmLabel: t.value.exchange.confirm,
+    });
+    if (!ok) return;
+
+    toast.info(t.value.exchange.confirmingToast);
+    // 结算延迟(MOCK:真实现是 POST /api/swap 的往返)。写成 await 而不是 setTimeout 回调 ——
+    // 回调版的守卫在函数返回时就复位了,等于没守;await 让整条链留在同一个 try/finally 里。
+    await new Promise((r) => setTimeout(r, 900));
+
+    // 🔴 **确认后复验**:快照对**当前**权威值还成不成立。不成立一律拒单重报价,
+    // 绝不静默按新值成交 —— 用户确认的是 A,扣的就必须是 A,否则宁可什么都不发生。
+    //  ① 汇率:拿**当前**汇率按同一个 quoteTo 重算到账额;变了就是漂移。
+    //     (反过来用快照汇率复验快照报价,等式恒成立,这道门等于没有。)
+    if (quoteTo(snap.direction, snap.fromAmount, rate.value) !== snap.toAmount) {
+      toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleRate);
       return;
     }
-    if (gate.reason === "platform-cap") {
-      toast.error(
-        t.value.exchange.platformExhaustedTitle,
-        fmt(t.value.exchange.platformExhaustedBody, { cap: (gate.cap / 1000).toFixed(0) }),
-      );
+    //  ② 账号:确认期间换号 → 钱会扣在新账号头上,而弹窗展示的是旧账号的数。
+    //  ③ 额度:再问一次同一个门(入参仍是快照金额)。
+    //     ⚠️ 这只收口**本标签页**;计数器自身的跨标签页竞态是 exchange-v3.ts 的独立缺陷,不在本次范围。
+    if (app.accountKey !== snap.account || !v3.canExchange(snap.usd).ok) {
+      toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleContext);
       return;
     }
-  }
 
-  const ok = await confirm({
-    title: t.value.exchange.confirm,
-    message: `${fromSym.value} ${fromAmount.value.toFixed(fromSym.value === "USDT" ? 2 : 0)} → ${toSym.value} ${toAmount.value.toFixed(toSym.value === "USDT" ? 4 : 0)}`,
-    icon: "info",
-    confirmLabel: t.value.exchange.confirm,
-  });
-  if (!ok) return;
-
-  toast.info(t.value.exchange.confirmingToast);
-  setTimeout(() => {
-    const succ = direction.value === "usdt2nex" ? app.debitBalance(fromAmount.value) : app.debitNex(fromAmount.value);
+    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC):debit + credit + recordSwap +
+    // bills + v3.record 是分开的写。PRODUCTION:POST /api/swap 单事务,带 Idempotency-Key。
+    const succ = snap.direction === "usdt2nex" ? app.debitBalance(snap.fromAmount) : app.debitNex(snap.fromAmount);
     if (!succ) {
       toast.error(
         t.value.exchange.insufficientTitle,
-        t.value.exchange.insufficientMessage.replace("{sym}", fromSym.value),
+        t.value.exchange.insufficientMessage.replace("{sym}", snap.fromSym),
       );
       return;
     }
-    if (direction.value === "usdt2nex") app.creditNex(toAmount.value);
-    else app.creditBalance(toAmount.value);
+    if (snap.direction === "usdt2nex") app.creditNex(snap.toAmount);
+    else app.creditBalance(snap.toAmount);
 
     const evt = exchange.recordSwap({
-      fromSym: fromSym.value,
-      toSym: toSym.value,
-      fromAmount: fromAmount.value,
-      toAmount: toAmount.value,
-      rate: rate.value,
+      fromSym: snap.fromSym,
+      toSym: snap.toSym,
+      fromAmount: snap.fromAmount,
+      toAmount: snap.toAmount,
+      rate: snap.rate,
     });
 
     // Bills: debit + credit
     billsStore.add({
       type: "swap",
-      amount: -fromAmount.value,
-      symbol: fromSym.value,
+      amount: -snap.fromAmount,
+      symbol: snap.fromSym,
       status: "posted",
-      memo: `Swap ${fromSym.value} → ${toSym.value}`,
+      memo: `Swap ${snap.fromSym} → ${snap.toSym}`,
       ref: evt.id,
     });
     billsStore.add({
       type: "swap",
-      amount: toAmount.value,
-      symbol: toSym.value,
+      amount: snap.toAmount,
+      symbol: snap.toSym,
       status: "posted",
-      memo: `Swap ${fromSym.value} → ${toSym.value}`,
+      memo: `Swap ${snap.fromSym} → ${snap.toSym}`,
       ref: evt.id,
     });
 
     // Commit to v3 daily counters + lifetime
-    v3.record(swapUSDValue.value);
+    v3.record(snap.usd);
 
     toast.success(
       t.value.exchange.swapped,
       t.value.exchange.swappedDetail
-        .replace("{from}", fromSym.value)
-        .replace("{fromAmt}", String(fromAmount.value))
-        .replace("{to}", toSym.value)
-        .replace("{toAmt}", String(toAmount.value)),
+        .replace("{from}", snap.fromSym)
+        .replace("{fromAmt}", String(snap.fromAmount))
+        .replace("{to}", snap.toSym)
+        .replace("{toAmt}", String(snap.toAmount)),
     );
     input.value = "";
-  }, 900);
+  } finally {
+    // 所有出口(含取消 / 拒单 / 抛异常)统一解锁 —— 复位点只有一个,不会有分支漏掉。
+    submitting.value = false;
+  }
 }
 
 // ── derived labels ──
@@ -487,12 +554,12 @@ const errorStyle: CSSProperties = {
 const confirmStyle = computed<CSSProperties>(() => ({
   height: "44px",
   borderRadius: "12px",
-  background: valid.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
+  background: ctaEnabled.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
 }));
 const confirmTextStyle = computed<CSSProperties>(() => ({
   fontSize: "13px",
   fontWeight: 600,
-  color: valid.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
+  color: ctaEnabled.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
 const infoStyle: CSSProperties = {
   margin: "16px 16px 0",

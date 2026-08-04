@@ -67,8 +67,16 @@
           </view>
         </view>
 
-        <!-- Submit -->
-        <view class="w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" @click="handlePurchase">
+        <!-- Submit — 成交在途时置灰不可点(《05》§6.1 disabled 派生:文字/图标降 ink-4 +
+             填充降 surface 系,不新造灰色);按下反馈也随之撤掉,不给「还能再点一次」的暗示 -->
+        <view
+          class="w-full inline-flex items-center justify-center"
+          :class="{ 'active:opacity-85': !purchasing }"
+          role="button"
+          :aria-disabled="purchasing ? 'true' : 'false'"
+          :style="submitStyle"
+          @click="handlePurchase"
+        >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           <text>{{ t.genesis.confirmCta }}</text>
         </view>
@@ -98,6 +106,15 @@ const genesis = useGenesis();
 const { gate } = useGenesisEligibility();
 
 const qty = ref(1);
+/**
+ * 🔴 成交在途守卫。`emitClose()` 只是把 open 传给父级,面板要等下一次渲染才真卸载 ——
+ * 移动端快速双击会在这个窗口里第二次进到 handlePurchase,扣两笔钱、铸两份额度。
+ *
+ * 用 `ref(false)`(**组件实例**级)而不是 checkout.vue 那个模块级 `let confirming`:
+ * 模块级变量跨实例共享,而这是个会反复开合的半屏,任一提前 return 忘复位就把后续
+ * 所有创世购买永久锁死。复位交给 finally + 下面的 open watcher 兜底。
+ */
+const purchasing = ref(false);
 
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
@@ -105,11 +122,15 @@ const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
 const subtitleText = computed(() => fmt(t.value.genesis.confirmSubtitle, { price: price.value.toLocaleString() }));
 const subtotalText = computed(() => (qty.value * price.value).toLocaleString());
 
-// Reset qty to 1 each time the sheet opens.
+// Reset qty to 1 each time the sheet opens. 守卫一并解锁 —— 成交成功那条路径
+// **故意**持锁到面板关闭(解锁 = 给双击留窗口),再次打开时才是新的一次购买。
 watch(
   () => props.open,
   (o) => {
-    if (o) qty.value = 1;
+    if (o) {
+      qty.value = 1;
+      purchasing.value = false;
+    }
   },
 );
 
@@ -126,6 +147,8 @@ function emitClose() {
 }
 
 function handlePurchase() {
+  // 🔴 重入守卫排在最前(关闭是异步的,双击会在面板卸载前再进来一次)。
+  if (purchasing.value) return;
   // L3 复验(照 checkout F4b:防深链/时序绕过 UI 门)。顺序固定
   // eligibility → cap → balance → mint,资格/限购失败时零资金动作。
   if (!gate.value.eligible) {
@@ -139,46 +162,57 @@ function handlePurchase() {
     );
     return;
   }
-  const cost = qty.value * price.value;
-  if (!app.debitBalance(cost)) {
-    toast.error(
-      t.value.genesis.purchaseError,
-      fmt(t.value.genesis.purchaseErrorSubtitle, {
-        cost: cost.toLocaleString(),
-        balance: app.user.usdtBalance.toFixed(2),
-      }),
-    );
-    return;
-  }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + purchase + bill are
-  // separate writes. PRODUCTION: POST /api/genesis/purchase (PRD §9.11e) is one
-  // atomic transaction returning {balance, ownedTokenIds, billId}.
-  const r = genesis.purchase(qty.value);
-  if (r.ok) {
-    bills.add({
-      type: "purchase",
-      symbol: "USDT",
-      amount: -cost,
-      status: "posted",
-      memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
-      ref: `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`,
-    });
-    toast.success(
-      fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
-      t.value.genesis.purchaseSubtitle,
-    );
-    emitClose();
-  } else {
-    // 铸造失败 → 退款,不留「扣钱无货」;按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
-    app.creditBalance(cost);
-    if (r.reason === "cap") {
+  // 上锁点 = 第一次动钱之前。committed 只在真成交那条路径置位。
+  purchasing.value = true;
+  let committed = false;
+  try {
+    const cost = qty.value * price.value;
+    if (!app.debitBalance(cost)) {
       toast.error(
-        t.value.genesisEligibility.toastCapReached,
-        fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+        t.value.genesis.purchaseError,
+        fmt(t.value.genesis.purchaseErrorSubtitle, {
+          cost: cost.toLocaleString(),
+          balance: app.user.usdtBalance.toFixed(2),
+        }),
       );
-    } else {
-      toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
+      return;
     }
+    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + purchase + bill are
+    // separate writes. PRODUCTION: POST /api/genesis/purchase (PRD §9.11e) is one
+    // atomic transaction returning {balance, ownedTokenIds, billId}.
+    const r = genesis.purchase(qty.value);
+    if (r.ok) {
+      bills.add({
+        type: "purchase",
+        symbol: "USDT",
+        amount: -cost,
+        status: "posted",
+        memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
+        ref: `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`,
+      });
+      toast.success(
+        fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
+        t.value.genesis.purchaseSubtitle,
+      );
+      committed = true;
+      emitClose();
+    } else {
+      // 铸造失败 → 退款,不留「扣钱无货」;按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
+      app.creditBalance(cost);
+      if (r.reason === "cap") {
+        toast.error(
+          t.value.genesisEligibility.toastCapReached,
+          fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+        );
+      } else {
+        toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
+      }
+    }
+  } finally {
+    // 只有真成交才继续持锁(面板正在关闭,解锁 = 给双击留窗口;由 open watcher 复位)。
+    // 其余任何出口 —— 余额不足、铸造失败、抛异常 —— 立刻解锁,让用户能重试,
+    // 也就不会出现「某条提前 return 忘复位 → 后续购买永久锁死」。
+    if (!committed) purchasing.value = false;
   }
 }
 
@@ -261,20 +295,22 @@ const rowValBoldStyle: CSSProperties = {
   color: "var(--v5-ink)",
 };
 const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "8px 0" };
-const submitStyle: CSSProperties = {
+// disabled 派生(《05》§6.1):文字/图标降 --v5-ink-4 + 填充降 surface 系 + 撤 glow。
+// icon 是 stroke="currentColor"、文案继承 color → 一处改两者同步降。
+const submitStyle = computed<CSSProperties>(() => ({
   marginTop: "16px",
   height: "50px",
   padding: "0 28px",
   borderRadius: "999px",
   gap: "8px",
-  background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
-  color: "var(--v5-on-brand)",
+  background: purchasing.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
+  boxShadow: purchasing.value ? "none" : "var(--v5-spotlight-brand)",
+  color: purchasing.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "15px",
   letterSpacing: "-0.005em",
-};
+}));
 const kycNoticeStyle: CSSProperties = {
   marginTop: "12px",
   fontSize: "12px",
