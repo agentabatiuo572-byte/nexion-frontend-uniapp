@@ -229,7 +229,15 @@ const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   timer = setInterval(() => (tick.value += 1), 1000);
-  reconcileFaucetBills(); // 上次签到/里程碑发币没落盘的话,进页面补一次(幂等,不会变成第二次发)
+  // 🔴 这里曾挂过一个 reconcileFaucetBills()「签到/里程碑发币没落盘就补发」——**已撤销**。
+  // 实景走查当场证伪:判据是「有领取状态、无对应账单行 ⇒ 补发」,它分不清
+  //   ① 从没发过(该补)与 ② 发过了但账单行丢了(不该补)。
+  // 而 ② 是**可达**的:账单表走裸 writeAccountRow(无 CAS 无合并),另一标签页写一次就会
+  // 覆盖掉本页刚写的分录,而余额在账户快照里按增量合并**幸存**(实测靶
+  // scripts/measure-bills-crosstab-loss.mjs)。此时自愈会二次发钱 ——
+  // 浏览器实测:余额 11940 → 11943,凭空多发一次。
+  // 少发是用户损失,多发是平台损失且不可追回 —— 在拿到**权威的「已付」标记**之前,
+  // 这个判据不可能正确。归「完全版 A」一并解决(账单与资金同一次落盘后,②根本不会发生)。
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
@@ -311,39 +319,6 @@ function signInRef(ts: number): string {
   return `SIGNIN-${d.getFullYear()}${mm}${dd}`;
 }
 
-/** 🔴 签到 / 里程碑自愈:领取动作已落定(磁盘上记着领过)但账上没有对应分录 → 补发一次。
- *
- *  这两处的顺序都**反不过来**:签到的金额是 signIn() 自己摇出来的(随机倍率 + 连签奖励),
- *  里程碑的 claim 才是按磁盘最新态的权威判定(反过来会在别的标签页刚领过时白发)。
- *  于是失败面是「已领、没到账」,而两者都是一次性的、当天再点也没用。
- *
- *  对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
- *  该发什么完全能从现有数据推出:签到金额取 faucet 自己那条流水,里程碑金额取静态档位表。
- *  幂等出口保证补发不会变成第二次发钱;刷新 / 换设备 / 上轮写盘失败都能自愈,零额外存储。 */
-function reconcileFaucetBills() {
-  // ① 今天签过但没有今天那条分录
-  const last = faucet.lastSignedInAt;
-  if (last && new Date(last).toDateString() === new Date().toDateString()) {
-    const entry = faucet.history.find((h) => h.ts === last);
-    if (entry && entry.delta > 0) {
-      postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: entry.delta, status: "posted",
-        memo: entry.reason, ref: signInRef(last) }]);
-    }
-  }
-  // ② 领过的里程碑里,凡是发币档(usdt/nex)都该有一条分录
-  for (const day of faucet.claimedMilestones) {
-    const m = MILESTONES.find((x) => x.day === day);
-    if (!m || (m.reward.type !== "usdt" && m.reward.type !== "nex")) continue;
-    postMoneyBillsOnce([{
-      type: "bonus",
-      symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
-      amount: m.reward.amount,
-      status: "posted",
-      memo: `Streak milestone · Day-${m.day}`,
-      ref: `STREAK-D${m.day}`,
-    }]);
-  }
-}
 
 function handleCheckIn() {
   const r = faucet.signIn();
@@ -406,7 +381,8 @@ function handleClaimMilestone(m: Milestone) {
     // 判重永不命中,幂等出口会退化成普通出口、自愈也补不上(补一次就多发一次)。
     // 顺序保持「先 claim 后发钱」——那是有意的(见上方注释:claim 才是按磁盘最新态的权威判定,
     // 反过来会在别的标签页刚领过时白发一份)。代价是发钱失败会留「已领、没到账」,
-    // 由 reconcileFaucetBills 在进页面时补发。
+    // 这条残迹目前**没有自动补救**:曾挂过的自愈已撤销(判据分不清「没发过」与
+    // 「发过但账单丢了」,实测会二次发钱)。归「完全版 A」——账单与资金同一次落盘后不再存在。
     if (postMoneyBillsOnce([{
       type: "bonus",
       symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
