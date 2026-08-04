@@ -70,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVRank } from "@/store/v-rank";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -155,21 +155,27 @@ function onCta() {
 function onClaim() {
   const q = quest.value;
   if (!completed.value || !q) return;
-  if (wq.claimTier1()) {
-    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier1}
-    // claims, credits, and bills in one idempotent transaction.
-    const r = reward.value;
-    const refId = `WQUEST-${q.id}-${Date.now().toString(36).toUpperCase()}`;
-    // 同一次领取的两腿一次落盘:发了 NEX 却没发 $(或反过来)是半边账,比整笔没发更难对。
-    const drafts: ReceiptDraft[] = [
-      { type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId },
-    ];
-    if (q.rewardUsdt) {
-      drafts.push({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
-    }
-    if (postMoneyBills(drafts) !== "ok") return;
-    if (q.badgeId) ach.unlock(q.badgeId);
+  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier1}
+  // claims, credits, and bills in one idempotent transaction.
+  //
+  // 🔴 顺序 = **先发钱(幂等)→ 后消费资格**,不可换(2026-08-04 对抗审计 B-P1-3)。
+  // 原来是「先 claimTier1() 消费资格 → 发钱失败就 return」:资格没了、奖归零,用户白损失。
+  // 反过来「先发钱后消费」本会有重复发钱的风险,但 postMoneyBillsOnce 按稳定 ref 判重 ——
+  // 重放命中既有分录就不动钱直接返回 ok,于是这条顺序没有失效面。
+  // ref 必须稳定(周 + 任务 id),带时间戳的话判重永不命中 = 假幂等。
+  if (wq.tier1Claimed) return; // 已领过:原来由 claimTier1() 的内部守卫拦,现在提到发钱之前
+  const r = reward.value;
+  const refId = `WQUEST-${wq.weekKey}-${q.id}`;
+  // 同一次领取的两腿一次落盘:发了 NEX 却没发 $(或反过来)是半边账,比整笔没发更难对。
+  const drafts: ReceiptDraft[] = [
+    { type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId },
+  ];
+  if (q.rewardUsdt) {
+    drafts.push({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
   }
+  if (postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!wq.claimTier1()) return; // 资格没消费成:钱已幂等落定,下次重试命中 ref 不会再发
+  if (q.badgeId) ach.unlock(q.badgeId);
 }
 
 // ── styles ──

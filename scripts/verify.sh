@@ -2420,5 +2420,23 @@ deposit_resume_gate() {
 }
 deposit_resume_gate
 
+# ── 领奖族「发钱可重放 · 资格只消费一次」门(2026-08-04 对抗审计)────────────────
+# 领奖要同时满足两件互斥的事:资格只能消费一次(防重复领),奖必须发到(不能领了没发)。
+# 两种顺序各有一个失效面 —— 先消费资格则发钱失败时奖归零(5 处旧实况);先发钱则消费失败时
+# 下一拍再发一次(里程碑那处旧实况,平台重复出钱)。收口点加幂等出口 postMoneyBillsOnce
+# 按 ref 判重后,「先发钱后消费」就没有失效面了。
+# 判据:① 同 ref 重放不动钱不写第二条且返回 ok(带「换 ref 照常发」的反向靶)
+#      ② 首次路径与 postMoneyBills 等价 ③ 空 ref 直接抛错(不静默降级成假幂等)
+#      ④ 5 个调用点的 ref 全部稳定(带时间戳 = 判重永不命中) ⑤ 顺序门 + 反不过来那两处的自愈门
+deposit_claim_idem_gate() {
+  if "$NODE_BIN" scripts/selfcheck-claim-idempotency.mjs > /tmp/uniapp-claim-idem.log 2>&1; then
+    ok "领奖幂等门 — $(tail -1 /tmp/uniapp-claim-idem.log)"
+  else
+    bad "领奖幂等门失败 — node scripts/selfcheck-claim-idempotency.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-claim-idem.log | head -8 | sed 's/^/        /'
+  fi
+}
+deposit_claim_idem_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
