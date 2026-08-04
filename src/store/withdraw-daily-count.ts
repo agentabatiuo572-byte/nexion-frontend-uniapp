@@ -1,4 +1,4 @@
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { accountRowRev, readAccountRow, writeAccountRowCas } from "./account-scoped-storage";
 import { claimDailySlot, isClaimOwner } from "./withdrawal-eligibility-core";
 
 // FEAT-WD01b 每日提现笔数计数器(按账号分行落盘)。
@@ -34,9 +34,8 @@ export interface DailyCount {
   claimToken?: string;
 }
 
-/** 读当前落盘计数器。从未落盘返回 null(core 会当 0 处理)。 */
-export function readWithdrawCounter(accountKey: string): DailyCount | null {
-  const row = readAccountRow<Partial<DailyCount>>(ACCOUNTS_KEY, accountKey);
+/** 磁盘行 → 计数器。判据单源(读盘与带版本读盘共用一份,免得两处消毒长歪)。 */
+function sanitize(row: Partial<DailyCount> | null): DailyCount | null {
   // Number.isFinite 而不是 typeof === "number":后者放 NaN 过关。荒谬大值由 core 的
   // todayCountFrom 消毒(那边挡 NaN / 负数 / >上限 三种,消毒必须对称)。
   if (!row || !Number.isFinite(row.dayIndex) || !Number.isFinite(row.count)) return null;
@@ -45,6 +44,17 @@ export function readWithdrawCounter(accountKey: string): DailyCount | null {
     count: row.count as number,
     claimToken: typeof row.claimToken === "string" ? row.claimToken : undefined,
   };
+}
+
+/** 读当前落盘计数器。从未落盘返回 null(core 会当 0 处理)。 */
+export function readWithdrawCounter(accountKey: string): DailyCount | null {
+  return sanitize(readAccountRow<Partial<DailyCount>>(ACCOUNTS_KEY, accountKey));
+}
+
+/** 同上,外带该行版本号 —— CAS 写要拿它当 expectedRev。 */
+function readCounterWithRev(accountKey: string): { counter: DailyCount | null; rev: number } {
+  const raw = readAccountRow<Partial<DailyCount>>(ACCOUNTS_KEY, accountKey);
+  return { counter: sanitize(raw), rev: accountRowRev(raw) };
 }
 
 /** 每次占用生成的唯一令牌。够唯一即可,不用于安全用途。 */
@@ -64,14 +74,39 @@ function newClaimToken(): string {
  * 所以这里不再指望「读-改-写」原子:各写各的、带唯一令牌,等传播收敛(CLAIM_SETTLE_MS)
  * 后回读,**令牌还在的那一个才算占到**。收敛后全局只有一个胜者,只会建出一单。
  *
+ * 🔴 CAS 与令牌是**两道互补的闸,谁也替不了谁**(2026-08-04 接 CAS 时的边界结论):
+ *  - CAS 治「写覆盖」:同进程 / 传播已收敛的并发,后写的拿旧版本号会被挡下并**重判额度**;
+ *    此前是覆盖式写,后写的把先写的计数整份顶掉 —— 限额白设。
+ *  - CAS 治不了「读陈旧」:跨渲染进程时两边都读到写入前的版本号,各自 CAS 都过。
+ *    那一格仍然只能靠写后等传播 + 回读验令牌来分胜负,故下面整段一个字不能删。
+ *
  * 判定全在 core(claimDailySlot / isClaimOwner,纯函数,行为哨兵覆盖得到),这里只管读写与等待。
  * PROD:服务端在事务里 `UPDATE ... WHERE count < limit`,整段可删。
  */
 export async function claimWithdrawSlot(accountKey: string, limitCount: number, now: number): Promise<string | null> {
-  const { allowed, next } = claimDailySlot(readWithdrawCounter(accountKey), limitCount, now);
+  // 快速拒:额度本来就满了,连令牌都不必写(写了就要等 150ms 才能发现白等)。
+  const { allowed } = claimDailySlot(readWithdrawCounter(accountKey), limitCount, now);
   if (!allowed) return null;
   const token = newClaimToken();
-  writeAccountRow<DailyCount>(ACCOUNTS_KEY, accountKey, { ...next, claimToken: token });
+  // 带版本号占位:版本被推进过说明别处刚占过,重读**最新计数**再判一次额度(有界 3 次)。
+  let wrote = false;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const cur = readCounterWithRev(accountKey);
+    const fresh = claimDailySlot(cur.counter, limitCount, now);
+    if (!fresh.allowed) return null; // 别处刚把最后一格占走 —— 不写令牌,直接认输
+    const w = writeAccountRowCas<DailyCount>(
+      ACCOUNTS_KEY,
+      accountKey,
+      { ...fresh.next, claimToken: token },
+      cur.rev,
+    );
+    if (w.ok) {
+      wrote = true;
+      break;
+    }
+    if (!w.conflict) break; // storage 写不进去:下面的回读必然认不到令牌,按占用失败收场
+  }
+  if (!wrote) return null;
   await new Promise<void>((r) => setTimeout(r, CLAIM_SETTLE_MS));
   // 回读:令牌被别的标签页覆盖 = 这一格被人占走了,本次作废(不重试、不递减 ——
   // 递减会把胜者的占用一起抹掉)。
@@ -84,10 +119,17 @@ export async function claimWithdrawSlot(accountKey: string, limitCount: number, 
  * 🔴 被拒的提交不该白吃额度(这是一条 AC)。
  */
 export function releaseWithdrawSlot(accountKey: string, token: string): void {
-  const cur = readWithdrawCounter(accountKey);
-  if (!isClaimOwner(cur, token) || !cur) return;
-  writeAccountRow<DailyCount>(ACCOUNTS_KEY, accountKey, {
-    dayIndex: cur.dayIndex,
-    count: Math.max(0, cur.count - 1),
-  });
+  // 归还也走 CAS:覆盖式写会把「归还与另一端占用之间」那一格抹掉 —— 别人刚占的计数被
+  // 我这次退票连坐减掉 = 限额白多放一笔。版本变了就重读重判(所有权可能已经易主)。
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { counter, rev } = readCounterWithRev(accountKey);
+    if (!isClaimOwner(counter, token) || !counter) return;
+    const w = writeAccountRowCas<DailyCount>(
+      ACCOUNTS_KEY,
+      accountKey,
+      { dayIndex: counter.dayIndex, count: Math.max(0, counter.count - 1) },
+      rev,
+    );
+    if (w.ok || !w.conflict) return;
+  }
 }

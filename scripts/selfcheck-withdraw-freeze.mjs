@@ -126,7 +126,13 @@ const STUBS = {
   "vue-stub": `export const ref = (v) => ({ value: v });`,
   "storage-stub": `const mem = new Map();
 export const readAccountRow = (t, k) => mem.get(t + "|" + k) ?? null;
-export const writeAccountRow = (t, k, row) => { mem.set(t + "|" + k, row); return true; };`,
+export const writeAccountRow = (t, k, row) => { mem.set(t + "|" + k, row); return true; };
+// 本门只用 nex-faucet 的两个**纯函数**(computeWithdrawFee / isWithdrawalFeeSnapshotValid),
+// 从不实例化那个 store,所以它的 CAS 提交器不需要在这里跑。真被调到 = 用法变了,
+// 炸出来比返回个假对象静默跑偏好(乐观并发行为归 scripts/selfcheck-money-cas.mjs)。
+export const createAccountRowCommit = () => {
+  throw new Error("selfcheck-withdraw-freeze: 本门不实例化走 CAS 的 store —— 要测并发请用 selfcheck-money-cas.mjs");
+};`,
   "cloud-stub": `export const normalizeAccountKey = (s) => String(s || "default").trim().toLowerCase();`,
   "id-stub": `let n = 0; export const mockServerId = (p) => p + "-" + (++n);`,
   "time-stub": `export const mockServerNow = () => Date.now();`,

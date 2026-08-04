@@ -84,3 +84,92 @@ export function writeAccountRowCas<T extends object>(
     return { ok: false, conflict: false, rev: expectedRev };
   }
 }
+
+/** commit 的结果:成了带 result,没成分「被别处改过」与「本来就不该成交」两类。 */
+export type AccountRowCommitResult<R> = { ok: true; result: R } | { ok: false; conflict: boolean };
+
+/** 一次变更。返回 null = 在**磁盘最新状态**上复核,前置条件不成立(不写盘、不改内存)。 */
+export type AccountRowApply<Row, R> = (current: Row) => { next: Row; result: R } | null;
+
+export interface AccountRowCommitter<Row extends object> {
+  /** 账号切换重绑:记住该账号行的版本,返回磁盘上的业务状态(null = 该账号还没有行)。 */
+  bind(rawAccountKey: string): Row | null;
+  commit<R>(apply: AccountRowApply<Row, R>): AccountRowCommitResult<R>;
+  /** 当前绑定的账号键(只读)。 */
+  accountKey(): string;
+}
+
+/**
+ * 乐观并发提交器 —— staking.ts 那个 `commit()` 的共用引擎。
+ *
+ * read-modify-write 三步收在一个地方:
+ *   ① 基准取**磁盘最新**行,而不是本标签页可能已经陈旧几小时的内存副本;
+ *   ② apply 在新鲜状态上重新校验前置条件 —— 别处已经领走/消费掉的返回 null,
+ *      调用方拿到 ok:false,绝不会第二次入账(这是双花的根);
+ *   ③ 带 rev 做 CAS 落盘;rev 被推进过说明 ①→③ 之间又被插了一脚,重跑一轮(有界 3 次)。
+ *
+ * conflict=true 专指「期间被别处改过」,与「本来就不满足条件」分开,页面据此提示
+ * 「数据已更新」而不是点了没反应。任何一种失败都不写盘、不改内存 = 绝不静默覆盖。
+ *
+ * 🔴 为什么抽成共用件而不是每个 store 抄一遍:重试上界、conflict 归因、「失败也要把磁盘
+ * 最新态刷进内存」这三条都是**错了不会报错、只会静默双花**的细节。抄 N 份 = N 个各自
+ * 长歪的机会。staking.ts 保留它自己那份内联实现(它的机器门按行文 pin 了实现细节,
+ * 本轮不动它 —— 见 docs/changes/2026-08-04-money-cas-p1.md)。
+ */
+export function createAccountRowCommit<Row extends object>(opts: {
+  tableKey: string;
+  /** 磁盘行 → 业务状态。行不存在 / 格式不认识 → null。 */
+  parse: (raw: unknown) => Row | null;
+  /** 当前内存态 —— 磁盘读不出来时的基准(storage 不可用时保持 CAS 上线前的行为)。 */
+  snapshot: () => Row;
+  /** 把基准 / 结果刷进内存 ref。成功与「前置条件不成立」两条路都会调 —— 后者让本标签页
+   *  立刻看到别处的最新结果,不再永久陈旧。 */
+  sync: (row: Row) => void;
+}): AccountRowCommitter<Row> {
+  let boundKey = "default";
+  let knownRev = 0;
+
+  function readDisk(): { row: Row | null; rev: number } {
+    const raw = readAccountRow<object>(opts.tableKey, boundKey);
+    return { row: raw === null ? null : opts.parse(raw), rev: accountRowRev(raw) };
+  }
+
+  return {
+    bind(rawAccountKey: string): Row | null {
+      boundKey = normalizeAccountKey(rawAccountKey);
+      const disk = readDisk();
+      knownRev = disk.rev;
+      return disk.row;
+    },
+
+    accountKey(): string {
+      return boundKey;
+    },
+
+    commit<R>(apply: AccountRowApply<Row, R>): AccountRowCommitResult<R> {
+      let raced = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const disk = readDisk();
+        // 读不出行 = 该账号还没写过 / storage 不可用 → 退回内存态当基准(保持既有行为)。
+        const base = disk.row ?? opts.snapshot();
+        const baseRev = disk.row ? disk.rev : knownRev;
+        raced = raced || baseRev !== knownRev;
+        const applied = apply(base);
+        if (!applied) {
+          opts.sync(base); // 前置条件不成立:把别处的最新结果同步到 UI,再回报失败
+          knownRev = baseRev;
+          return { ok: false, conflict: raced };
+        }
+        const w = writeAccountRowCas<Row>(opts.tableKey, boundKey, applied.next, baseRev);
+        if (w.ok) {
+          opts.sync(applied.next);
+          knownRev = w.rev;
+          return { ok: true, result: applied.result };
+        }
+        if (!w.conflict) return { ok: false, conflict: false }; // storage 写不进去:内存不动,按失败处理
+        raced = true;
+      }
+      return { ok: false, conflict: true };
+    },
+  };
+}

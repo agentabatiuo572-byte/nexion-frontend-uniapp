@@ -354,7 +354,15 @@ async function doSpin(skipConfirm = false) {
     return;
   }
 
-  spin.spin(); // 消费票 + mock server roll(server-canonical RNG 占位)+ 置 spinning + 目标角
+  // 消费票 + mock server roll(server-canonical RNG 占位)+ 置 spinning + 目标角。
+  // 🔴 票没扣成就不能转轮子:上面的 availableSpins() 预判读的是本页内存态,而票是
+  // 每日配额 + 稀缺资源;别的标签页刚花掉时 store 按磁盘最新态拒掉,此时还往下走
+  // 就是两个标签页花同一张票各中一次奖。
+  const r = spin.spin();
+  if (!r.ok) {
+    if (r.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    return;
+  }
   // 兜底结算:即便 transitionend 不触发(切后台 / 节流)也按动画时长强制结算,
   // 保证已消费的票一定兑现。idempotent settle 防与 transitionend 双触发重复派奖。
   clearSettleTimer();

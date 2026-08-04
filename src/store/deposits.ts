@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
 import { useBills } from "./bills";
@@ -53,11 +52,13 @@ interface DepositsRow {
   intents: DepositIntent[];
 }
 
-function hydrate(accountKey: string): DepositsRow {
-  const row = readAccountRow<Partial<DepositsRow>>(ACCOUNTS_KEY, accountKey);
+/** 磁盘行 → 入金账本。行不存在 → null(调用方退回空账本 / 内存态)。 */
+function parseRow(raw: unknown): DepositsRow | null {
+  const row = raw as Partial<DepositsRow> | null;
+  if (!row) return null;
   return {
-    records: row && Array.isArray(row.records) ? row.records : [],
-    intents: row && Array.isArray(row.intents) ? row.intents : [],
+    records: Array.isArray(row.records) ? row.records : [],
+    intents: Array.isArray(row.intents) ? row.intents : [],
   };
 }
 
@@ -85,30 +86,47 @@ const CONFIRM_WINDOW_MS = 10_000;
 export const useDeposits = defineStore("deposits", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import 的编排收口)。
-  let boundKey = "default";
-  const initial = hydrate(boundKey);
-  const records = ref<DepositRecord[]>(initial.records);
-  const intents = ref<DepositIntent[]>(initial.intents);
+  const records = ref<DepositRecord[]>([]);
+  const intents = ref<DepositIntent[]>([]);
 
   // mock 到账引擎的在途定时器(depositId → timer)。账号切换即停:引擎跑在
   // client,跨账号继续推进会把钱记进新绑账号;PROD 服务端持续推进,
   // client 重新拉取即收敛(切回账号后记录停在 confirming,属 mock 已知边界)。
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
-  function persist(): boolean {
-    return writeAccountRow<DepositsRow>(ACCOUNTS_KEY, boundKey, {
-      records: records.value,
-      intents: intents.value,
-    });
+  /**
+   * 落盘唯一出口:乐观并发提交器(存量 P1 · 跨标签页竞态重复入账)。
+   *
+   * 此前每条路径都是「现读内存 → 改 → writeAccountRow 覆盖式落盘」。H5 端 uni storage
+   * 就是 localStorage,同源多标签页共享同一份,而全仓没有任何 storage 事件重新水合入金
+   * 账本 —— 两个标签页只要都打开过充值页,状态就**永久不同步**。落到状态推进上:
+   * 两端各自把同一笔 confirming 单推成 credited,各调一次 recordDeposit,而 usdtBalance
+   * 是 account-cloud 的 ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记 = 真·双花。
+   *
+   * 三条入账路径(链上 settleCredited / 银行轨 settleBankIntent / 卡轨 submitCardPayment)
+   * 现在统一是「状态先 CAS 落盘,过了才动钱」,前置条件一律在**磁盘最新**账本上复核。
+   */
+  const rows = createAccountRowCommit<DepositsRow>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseRow,
+    snapshot: () => ({ records: records.value, intents: intents.value }),
+    sync: (row) => {
+      records.value = row.records;
+      intents.value = row.intents;
+    },
+  });
+  const commit = rows.commit;
+  /** 当前绑定账号键。 */
+  function boundKey(): string {
+    return rows.accountKey();
   }
 
   /** 账号切换重绑:装载该账号分行,停掉上一账号的在途引擎定时器,
    *  再对新账号在途意向单做一次 server 状态收敛(过期落地 + 定时器重武装)。 */
   function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
     timers.forEach((t) => clearTimeout(t));
     timers.clear();
-    const row = hydrate(boundKey);
+    const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
     records.value = row.records;
     intents.value = row.intents;
     syncBankIntents();
@@ -116,32 +134,36 @@ export const useDeposits = defineStore("deposits", () => {
 
   /** 专属充值地址:同账号同网络恒定(mock 确定性派生;PROD server 派发)。 */
   function depositAddress(network: ChainDepositChannel): string {
-    return deriveDepositAddress(boundKey, network);
+    return deriveDepositAddress(boundKey(), network);
   }
 
   /** 当前绑定账号键(只读)。组件发起「跨延迟」的资金动作时先捕获,回调时传回校验 ——
-   *  与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形。 */
+   *  与两条 mock 引擎的 `const key = boundKey(); … if (boundKey() !== key) return;` 同形。 */
   function currentAccountKey(): string {
-    return boundKey;
+    return boundKey();
   }
 
   /** 单号铸造(server mint 形态)。🔴 必须查重:`DP-YYYYMMDD-NNNN` 同日仅 9000 种,
    *  而 depositId 是三轨共享主键 —— 撞号会让 `records.find(depositId)` 命中错记录,
    *  链上单被判成终态后引擎直接 return 且定时器已释放,那笔钱永久停在 confirming。
    *  次要标识(memoCode / authCode / txHash)本就有查重,主键反而没有,此处补齐。
-   *  查重域 = records ∪ intents(两者共用同一号段:意向单入账时 intentId 即 depositId)。 */
-  function mintDepositId(now: number): string {
+   *  查重域 = records ∪ intents(两者共用同一号段:意向单入账时 intentId 即 depositId)。
+   *
+   *  🔴 查重域取**入参那份账本**(commit 里传的是磁盘最新态),不是内存副本:CAS 之前
+   *  两个标签页撞号会被 last-write-wins 掩盖(其中一笔本来就会被顶掉),现在两笔都留得住,
+   *  撞号就成了真事故 —— 与质押 `stk-${Date.now()}` 那条同型(见 staking.ts 的 mockServerId)。 */
+  function mintDepositId(now: number, ledger: DepositsRow): string {
     let id = mockDepositId(now);
     // 重摇设上界:9000 号段被占满(或 mock 随机源被钉死)时无界 while 会转死页面。
     // 兜底返回带序号后缀的唯一串,宁可号形略异也不挂死(PROD 由 server 保证唯一)。
     for (let i = 0; i < 50; i++) {
       const taken =
-        records.value.some((r) => r.depositId === id) ||
-        intents.value.some((i2) => i2.intentId === id);
+        ledger.records.some((r) => r.depositId === id) ||
+        ledger.intents.some((i2) => i2.intentId === id);
       if (!taken) return id;
       id = mockDepositId(now);
     }
-    return `${id}-${records.value.length + intents.value.length}`;
+    return `${id}-${ledger.records.length + ledger.intents.length}`;
   }
 
   // 通道启停位(server 配置非用户态,不入账号分行;mock 种子全启用。
@@ -178,36 +200,66 @@ export const useDeposits = defineStore("deposits", () => {
     return true;
   }
 
-  /** 延迟回调禁 stale 闭包:一律现读 records.value 现改现写(feedback_delayed_callback_stale_closure)。
-   *  persist 失败回滚内存态,防内存/存储分叉(同 bills.add 先例);跨 store
+  /** 延迟回调禁 stale 闭包:一律现读**磁盘最新**账本现改现写
+   *  (feedback_delayed_callback_stale_closure + 跨标签页 CAS)。
+   *  失败不写盘也不改内存,防内存/存储分叉(同 bills.add 先例);跨 store
    *  的余额/账单原子性归 PROD server 事务,mock 已在文件头声明边界。 */
   function patchRecord(depositId: string, patch: Partial<DepositRecord>): DepositRecord | null {
-    const previous = records.value;
-    let next: DepositRecord | null = null;
-    records.value = records.value.map((r) => {
-      if (r.depositId !== depositId) return r;
-      next = { ...r, ...patch };
-      return next;
+    const r = commit((cur) => {
+      let next: DepositRecord | null = null;
+      const records2 = cur.records.map((x) => {
+        if (x.depositId !== depositId) return x;
+        next = { ...x, ...patch };
+        return next;
+      });
+      if (!next) return null;
+      return { next: { records: records2, intents: cur.intents }, result: next };
     });
-    if (!next) return null;
-    if (!persist()) {
-      records.value = previous;
-      return null;
-    }
-    return next;
+    return r.ok ? r.result : null;
   }
 
   /** 入账(mock server 内部;confirming 走满 / dust 人工核销两条边共用)。
-   *  幂等三重:状态机边界(仅 confirming|dust_hold 可入)+ recordDeposit 原子
-   *  入账 + bills.addOnce 以 txHash 为 ref 判重。PROD:server 在同一事务内
-   *  置 credited + 记账 + 写账单(复式分录见规格 §5)。 */
+   *  幂等四重:状态机边界(仅 confirming|dust_hold 可入)在**磁盘最新**记录上复核 +
+   *  CAS 落盘 + recordDeposit 原子入账 + bills.addOnce 以 txHash 为 ref 判重。
+   *  PROD:server 在同一事务内置 credited + 记账 + 写账单(复式分录见规格 §5)。
+   *
+   *  🔴 顺序是「先落状态,过了才动钱」—— 与 submitCardPayment 同一条铁律。原先是
+   *  「先入账、再 patch 状态」:两个标签页各拿自己陈旧的内存副本判状态门,两次
+   *  recordDeposit 都过,ADDITIVE 的 usdtBalance 把两笔都记上 = 同一笔充值入账两次。 */
   function settleCredited(depositId: string): boolean {
-    const rec = records.value.find((r) => r.depositId === depositId);
-    if (!rec) return false;
-    // credited/returned 终态禁再处置(server 409 形态);detected 不可直接入账。
-    if (rec.status !== "confirming" && rec.status !== "dust_hold") return false;
-    if (rec.creditedUsdt <= 0) return false; // gross ≤ fee 的 dust 不可核销入账,只能退回
-    if (!useApp().recordDeposit(rec.creditedUsdt)) return false;
+    const now = mockServerNow();
+    const r = commit((cur) => {
+      const rec = cur.records.find((x) => x.depositId === depositId);
+      if (!rec) return null;
+      // credited/returned 终态禁再处置(server 409 形态);detected 不可直接入账。
+      if (rec.status !== "confirming" && rec.status !== "dust_hold") return null;
+      if (rec.creditedUsdt <= 0) return null; // gross ≤ fee 的 dust 不可核销入账,只能退回
+      return {
+        next: {
+          records: cur.records.map((x) =>
+            x.depositId === depositId ? { ...x, status: "credited" as const, creditedAt: now } : x,
+          ),
+          intents: cur.intents,
+        },
+        result: rec,
+      };
+    });
+    if (!r.ok) return false;
+    const rec = r.result;
+    if (!useApp().recordDeposit(rec.creditedUsdt)) {
+      // 钱没加成:把状态退回去。否则单据写着「已到账」而余额没动,且状态已是终态 ——
+      // 引擎再也不会推进这一笔,那笔钱就人间蒸发了。
+      commit((cur) => ({
+        next: {
+          records: cur.records.map((x) =>
+            x.depositId === depositId ? { ...x, status: rec.status, creditedAt: rec.creditedAt } : x,
+          ),
+          intents: cur.intents,
+        },
+        result: true as const,
+      }));
+      return false;
+    }
     useBills().addOnce({
       type: "topup",
       symbol: "USDT",
@@ -218,20 +270,19 @@ export const useDeposits = defineStore("deposits", () => {
       // 链上通道落网络码位(法币轨为 undefined 不落);账单详情跳转不再依赖 memo 文案正则
       network: CHAIN_NET_SHORT[rec.channel],
     });
-    patchRecord(depositId, { status: "credited", creditedAt: mockServerNow() });
     return true;
   }
 
   /** mock 到账引擎:detected → confirming(或 dust_hold 停住)→ 逐步推进
    *  确认数 → 走满调 settleCredited。每步回源读当前记录,终态即停。 */
   function scheduleConfirmations(depositId: string) {
-    const key = boundKey;
+    const key = boundKey();
     function queue(ms: number) {
       timers.set(depositId, setTimeout(step, ms));
     }
     function step() {
       timers.delete(depositId);
-      if (boundKey !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
+      if (boundKey() !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
       const rec = records.value.find((r) => r.depositId === depositId);
       if (!rec) return;
       if (rec.status === "detected") {
@@ -276,23 +327,27 @@ export const useDeposits = defineStore("deposits", () => {
     const now = mockServerNow();
     const gross = +amountUsdt.toFixed(2);
     const fee = chainDepositFeeUsdt(network);
-    const rec: DepositRecord = {
-      depositId: mintDepositId(now),
-      channel: network,
-      grossAmountUsdt: gross,
-      feeUsdt: fee,
-      creditedUsdt: computeCreditedUsdt(gross, fee),
-      address: depositAddress(network),
-      txHash: hash,
-      confirmations: 0,
-      requiredConfirmations: CHAIN_REQUIRED_CONFIRMATIONS[network],
-      status: "detected",
-      createdAt: now,
-    };
-    records.value = [rec, ...records.value];
-    persist();
-    scheduleConfirmations(rec.depositId);
-    return rec;
+    // 追加型:单号与 txHash 判重都跑在磁盘最新账本上,冲突时整段在最新账本上重放。
+    const r = commit((cur) => {
+      if (isDuplicateTxHash(cur.records, hash)) return null; // no-op(别处已登记同一笔)
+      const rec: DepositRecord = {
+        depositId: mintDepositId(now, cur),
+        channel: network,
+        grossAmountUsdt: gross,
+        feeUsdt: fee,
+        creditedUsdt: computeCreditedUsdt(gross, fee),
+        address: depositAddress(network),
+        txHash: hash,
+        confirmations: 0,
+        requiredConfirmations: CHAIN_REQUIRED_CONFIRMATIONS[network],
+        status: "detected",
+        createdAt: now,
+      };
+      return { next: { records: [rec, ...cur.records], intents: cur.intents }, result: rec };
+    });
+    if (!r.ok) return null;
+    scheduleConfirmations(r.result.depositId);
+    return r.result;
   }
 
   /** ⚠️ DEV/DEMO-ONLY(后台动作形态):dust_hold 人工处置——核销入账或登记退回。
@@ -309,21 +364,19 @@ export const useDeposits = defineStore("deposits", () => {
 
   // ════════ 银行轨意向单生命周期([FEAT-PAY02] ③④;mock 扮演 server)════════
 
-  /** 意向单补丁(同 patchRecord:现读现改现写,persist 失败回滚防内存/存储分叉)。 */
+  /** 意向单补丁(同 patchRecord:基准取磁盘最新,CAS 落盘,失败不写盘不改内存)。 */
   function patchIntent(intentId: string, patch: Partial<DepositIntent>): DepositIntent | null {
-    const previous = intents.value;
-    let next: DepositIntent | null = null;
-    intents.value = intents.value.map((i) => {
-      if (i.intentId !== intentId) return i;
-      next = { ...i, ...patch };
-      return next;
+    const r = commit((cur) => {
+      let next: DepositIntent | null = null;
+      const intents2 = cur.intents.map((i) => {
+        if (i.intentId !== intentId) return i;
+        next = { ...i, ...patch };
+        return next;
+      });
+      if (!next) return null;
+      return { next: { records: cur.records, intents: intents2 }, result: next };
     });
-    if (!next) return null;
-    if (!persist()) {
-      intents.value = previous;
-      return null;
-    }
-    return next;
+    return r.ok ? r.result : null;
   }
 
   function clearIntentTimer(intentId: string) {
@@ -337,7 +390,7 @@ export const useDeposits = defineStore("deposits", () => {
   /** 锁价窗到点置 expired(mock server 侧推进)。回调现读 intents.value 现改,
    *  禁 stale 闭包(feedback_delayed_callback_stale_closure);账号切换即停。 */
   function scheduleIntentExpiry(intentId: string) {
-    const key = boundKey;
+    const key = boundKey();
     const intent = intents.value.find((i) => i.intentId === intentId);
     if (!intent || intent.status !== "awaiting_payment") return;
     clearIntentTimer(intentId);
@@ -346,7 +399,7 @@ export const useDeposits = defineStore("deposits", () => {
       setTimeout(
         () => {
           timers.delete(intentId);
-          if (boundKey !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
+          if (boundKey() !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
           const cur = intents.value.find((i) => i.intentId === intentId);
           if (!cur || cur.status !== "awaiting_payment") return;
           patchIntent(intentId, { status: "expired" });
@@ -382,58 +435,64 @@ export const useDeposits = defineStore("deposits", () => {
     if (!bankAccount) return null;
     const now = mockServerNow();
     const fxRate = fx.quoteRate;
-    // 附言码在途期内唯一(mock 域 = 本账号在途单;PROD server 全局唯一)
-    let memoCode = mockMemoCode();
-    while (intents.value.some((i) => i.status === "awaiting_payment" && i.memoCode === memoCode)) {
-      memoCode = mockMemoCode();
-    }
-    const intent: DepositIntent = {
-      intentId: mintDepositId(now),
-      usdtAmount: amt,
-      fxRate,
-      vndAmount: vndForUsdt(amt, fxRate),
-      memoCode,
-      bankAccount,
-      status: "awaiting_payment",
-      expireAt: now + fx.lockWindowMin * ONE_MINUTE_MS,
-    };
-    const previous = intents.value;
-    intents.value = [intent, ...intents.value];
-    if (!persist()) {
-      intents.value = previous;
-      return null;
-    }
-    scheduleIntentExpiry(intent.intentId);
-    return intent;
+    // 追加型:单号与附言码判重都跑在磁盘最新账本上(两个标签页同时下单不许撞号 ——
+    // depositId 是三轨共享主键,撞号会让 find() 命中错单据,那笔钱永久卡住)。
+    const r = commit((cur) => {
+      // 附言码在途期内唯一(mock 域 = 本账号在途单;PROD server 全局唯一)
+      let memoCode = mockMemoCode();
+      while (cur.intents.some((i) => i.status === "awaiting_payment" && i.memoCode === memoCode)) {
+        memoCode = mockMemoCode();
+      }
+      const intent: DepositIntent = {
+        intentId: mintDepositId(now, cur),
+        usdtAmount: amt,
+        fxRate,
+        vndAmount: vndForUsdt(amt, fxRate),
+        memoCode,
+        bankAccount,
+        status: "awaiting_payment",
+        expireAt: now + fx.lockWindowMin * ONE_MINUTE_MS,
+      };
+      return { next: { records: cur.records, intents: [intent, ...cur.intents] }, result: intent };
+    });
+    if (!r.ok) return null;
+    scheduleIntentExpiry(r.result.intentId);
+    return r.result;
   }
 
-  /** 取消付款单:client 仅可对 awaiting_payment 执行;终态再处置拒绝(server 409 形态)。 */
-  function cancelBankIntent(intentId: string): boolean {
-    const intent = intents.value.find((i) => i.intentId === intentId);
-    if (!intent || intent.status !== "awaiting_payment") return false;
+  /** 取消付款单:client 仅可对 awaiting_payment 执行;终态再处置拒绝(server 409 形态)。
+   *  状态门在**磁盘最新**意向单上复核:别处刚付款/刚超时的单不会被这边撤掉。 */
+  function cancelBankIntent(intentId: string): { ok: boolean; conflict?: boolean } {
+    const r = commit((cur) => {
+      const intent = cur.intents.find((i) => i.intentId === intentId);
+      if (!intent || intent.status !== "awaiting_payment") return null;
+      return {
+        next: {
+          records: cur.records,
+          intents: cur.intents.map((i) => (i.intentId === intentId ? { ...i, status: "cancelled" as const } : i)),
+        },
+        result: true as const,
+      };
+    });
+    if (!r.ok) return { ok: false, conflict: r.conflict };
     clearIntentTimer(intentId);
-    return patchIntent(intentId, { status: "cancelled" }) !== null;
+    return { ok: true };
   }
 
   /** 银行轨入账(mock server 内部;精确匹配 / 差额按实收核销两条边共用)。
    *  幂等三重同链上 settleCredited:状态机边界(调用方把关)+ 记录判重(depositId=intentId)
    *  + bills.addOnce(ref=intentId)。0 手续费;PROD 同事务置 credited + 记账 + 写账单(§5 分录)。 */
   function settleBankIntent(intentId: string, creditedUsdt: number, receivedVnd: number): boolean {
-    const intent = intents.value.find((i) => i.intentId === intentId);
-    if (!intent) return false;
     const credited = +creditedUsdt.toFixed(2);
     if (credited <= 0) return false;
-    if (!useApp().recordDeposit(credited)) return false;
-    useBills().addOnce({
-      type: "topup",
-      symbol: "USDT",
-      amount: credited,
-      status: "posted",
-      memo: `Top-up · ${CHANNEL_MEMO["bank-vietqr"]}`,
-      ref: intent.intentId,
-    });
     const now = mockServerNow();
-    if (!records.value.some((r) => r.depositId === intent.intentId)) {
+    // 🔴 同 settleCredited:先把「意向单置 credited + 关联入金单落账」CAS 落盘,过了才动钱。
+    // 新增的 credited 终态门是双花的闸 —— 原先本函数没有任何状态门(全靠三个调用方各自
+    // 把关自己那条边),两端并发回报同一张单时两次 recordDeposit 都会过。
+    const r = commit((cur) => {
+      const intent = cur.intents.find((i) => i.intentId === intentId);
+      if (!intent) return null;
+      if (intent.status === "credited") return null; // 别处已入账,绝不再入第二次
       // DepositRecord 与意向单同号互相关联([FEAT-PAY02] ③);银行轨无链上字段。
       const rec: DepositRecord = {
         depositId: intent.intentId,
@@ -445,9 +504,38 @@ export const useDeposits = defineStore("deposits", () => {
         createdAt: now,
         creditedAt: now,
       };
-      records.value = [rec, ...records.value];
+      const appended = !cur.records.some((x) => x.depositId === intent.intentId);
+      return {
+        next: {
+          records: appended ? [rec, ...cur.records] : cur.records,
+          intents: cur.intents.map((i) =>
+            i.intentId === intentId ? { ...i, status: "credited" as const, receivedVnd, matchedAt: now } : i,
+          ),
+        },
+        result: { intent, appended },
+      };
+    });
+    if (!r.ok) return false;
+    if (!useApp().recordDeposit(credited)) {
+      // 钱没加成:单据回滚到入账前(否则单子写着已到账、余额没动,且终态门从此挡住重试)。
+      const { intent, appended } = r.result;
+      commit((cur) => ({
+        next: {
+          records: appended ? cur.records.filter((x) => x.depositId !== intentId) : cur.records,
+          intents: cur.intents.map((i) => (i.intentId === intentId ? intent : i)),
+        },
+        result: true as const,
+      }));
+      return false;
     }
-    patchIntent(intentId, { status: "credited", receivedVnd, matchedAt: now });
+    useBills().addOnce({
+      type: "topup",
+      symbol: "USDT",
+      amount: credited,
+      status: "posted",
+      memo: `Top-up · ${CHANNEL_MEMO["bank-vietqr"]}`,
+      ref: intentId,
+    });
     return true;
   }
 
@@ -539,7 +627,7 @@ export const useDeposits = defineStore("deposits", () => {
     // default),此时入账必须作废,否则钱记进别人账上、还白送对方入金资格进度。
     // 与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形 ——
     // 差别只在这段延迟活在组件里,store 够不着,故由调用方捕获并回传。
-    if (expectedAccountKey !== boundKey) return null;
+    if (expectedAccountKey !== boundKey()) return null;
     const credited = +creditedUsdt.toFixed(2);
     // 信任边界:金额来自输入框,NaN/±Infinity/越界一律拒(server 422 形态)
     if (!Number.isFinite(credited)) return null;
@@ -553,29 +641,32 @@ export const useDeposits = defineStore("deposits", () => {
     }
     if (isDuplicateAuthCode(records.value, authCode)) return null; // 摇不出新号:拒绝入账,不冒重复风险
     const now = mockServerNow();
-    const rec: DepositRecord = {
-      depositId: mintDepositId(now),
-      channel: "card-intl",
-      grossAmountUsdt: cardChargeUsd(credited),
-      feeUsdt: cardFeeUsd(credited),
-      creditedUsdt: credited,
-      authCode,
-      status: "credited",
-      createdAt: now,
-      creditedAt: now,
-    };
-    // ① 先落单 + 落盘:此刻零跨 store 副作用,失败即干净返回,用户重试安全。
-    const previous = records.value;
-    records.value = [rec, ...records.value];
-    if (!persist()) {
-      records.value = previous;
-      return null;
-    }
+    // ① 先落单 + CAS 落盘:此刻零跨 store 副作用,失败即干净返回,用户重试安全。
+    //    授权号判重与单号铸造都移到磁盘最新账本上 —— 别的标签页刚落的单这边也看得见。
+    const r = commit((cur) => {
+      if (isDuplicateAuthCode(cur.records, authCode)) return null;
+      const rec: DepositRecord = {
+        depositId: mintDepositId(now, cur),
+        channel: "card-intl",
+        grossAmountUsdt: cardChargeUsd(credited),
+        feeUsdt: cardFeeUsd(credited),
+        creditedUsdt: credited,
+        authCode,
+        status: "credited",
+        createdAt: now,
+        creditedAt: now,
+      };
+      return { next: { records: [rec, ...cur.records], intents: cur.intents }, result: rec };
+    });
+    if (!r.ok) return null;
+    const rec = r.result;
     // ② 落盘过了才动钱。credited 已过 [MIN, MAX] 双门,recordDeposit 只拒 NaN/≤0/>1e9,
     //    此处恒真;万一失败则回滚单据,宁可「无单无钱」也不留「有单无钱」。
     if (!useApp().recordDeposit(credited)) {
-      records.value = previous;
-      persist();
+      commit((cur) => ({
+        next: { records: cur.records.filter((x) => x.depositId !== rec.depositId), intents: cur.intents },
+        result: true as const,
+      }));
       return null;
     }
     useBills().addOnce({
@@ -589,8 +680,8 @@ export const useDeposits = defineStore("deposits", () => {
     return rec;
   }
 
-  // 启动即收敛一次(挂载账号的在途单:过期落 expired / 未过期重新武装定时器)。
-  syncBankIntents();
+  // 启动即装载 "default" 行 + 收敛一次(在途单:过期落 expired / 未过期重新武装定时器)。
+  bindAccount("default");
 
   // tester 驱动通道:DEV 挂 globalThis.__nxDev(PROD 不挂 —— guard 双层之外层)。
   // store 在 rebindAccountScopedStores(App 启动恢复/login/register)首次实例化时挂上。
