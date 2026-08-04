@@ -3324,6 +3324,8 @@ export const en = {
       earlyDoneSubtitle: "+${refund} returned · ${penalty} penalty",
       claimedTitle: "Position claimed",
       claimedSubtitle: "+${total} returned (interest ${interest})",
+      staleTitle: "Positions just changed",
+      staleSubtitle: "This one was already handled elsewhere. We've refreshed it for you — take a look before you try again.",
     },
     howItWorksEntry: "Rules",
   },

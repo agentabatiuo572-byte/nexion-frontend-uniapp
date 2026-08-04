@@ -3239,6 +3239,8 @@ export const vi: Messages = {
       earlyDoneSubtitle: "+${refund} đã trả · phạt ${penalty}",
       claimedTitle: "Đã nhận vị thế",
       claimedSubtitle: "+${total} đã về (lãi ${interest})",
+      staleTitle: "Vị thế vừa thay đổi",
+      staleSubtitle: "Khoản này đã được xử lý ở nơi khác. Đã làm mới cho bạn — xem lại rồi hãy thử tiếp.",
     },
     howItWorksEntry: "Quy tắc",
   },

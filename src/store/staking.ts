@@ -1,7 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { accountRowRev, readAccountRow, writeAccountRowCas } from "./account-scoped-storage";
+import { mockServerId } from "./mock-id";
 
 /**
  * Ported from Nexion-prototype/lib/v3/staking.ts (zustand persist → Pinia + uni storage).
@@ -76,26 +77,80 @@ function seedPositions(): StakingPosition[] {
   ];
 }
 
-function hydrate(accountKey: string): StakingPosition[] {
-  const row = readAccountRow<{ positions?: StakingPosition[] }>(ACCOUNTS_KEY, accountKey);
-  if (row && Array.isArray(row.positions)) return row.positions;
-  return seedPositions();
+interface StakingSnapshot {
+  positions: StakingPosition[];
+  rev: number;
+}
+
+/** 磁盘上的当前持仓 + 版本号。行不存在 / storage 读不出来 → null(与「行是空数组」区分:
+ *  前者要退回内存态或种子,后者是真的一笔都没有)。 */
+function readSnapshot(accountKey: string): StakingSnapshot | null {
+  const row = readAccountRow<{ positions?: StakingPosition[]; rev?: number }>(ACCOUNTS_KEY, accountKey);
+  if (row && Array.isArray(row.positions)) return { positions: row.positions, rev: accountRowRev(row) };
+  return null;
+}
+
+function hydrate(accountKey: string): StakingSnapshot {
+  return readSnapshot(accountKey) ?? { positions: seedPositions(), rev: 0 };
 }
 
 export const useStaking = defineStore("staking", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const positions = ref<StakingPosition[]>(hydrate(boundKey));
+  const boot = hydrate(boundKey);
+  let boundRev = boot.rev;
+  const positions = ref<StakingPosition[]>(boot.positions);
 
-  function persist() {
-    writeAccountRow<{ positions: StakingPosition[] }>(ACCOUNTS_KEY, boundKey, { positions: positions.value });
+  /**
+   * 乐观并发提交(CAS)。read-modify-write 三步都收在这里:
+   *   ① 基准取**磁盘最新**持仓,而不是本标签页可能已经陈旧几小时的内存副本;
+   *   ② apply 在新鲜状态上重新校验前置条件 —— 别处已经领走/赎回的仓位返回 null,
+   *      调用方拿到 ok:false,绝不会第二次入账(这是双花的根);
+   *   ③ 带 rev 做 CAS 落盘;rev 被推进过说明 ①→③ 之间又被插了一脚,重跑一轮(有界 3 次)。
+   *
+   * conflict=true 专指「期间被别处改过」,与「仓位状态本来就不满足」分开,页面据此提示
+   * 「数据已更新」而不是点了没反应。任何一种失败都不写盘、不改内存 = 绝不静默覆盖。
+   */
+  function commit<R>(
+    apply: (current: StakingPosition[]) => { next: StakingPosition[]; result: R } | null,
+  ): { ok: true; result: R } | { ok: false; conflict: boolean } {
+    let raced = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const disk = readSnapshot(boundKey);
+      // 读不出行 = 该账号还没写过 / storage 不可用 → 退回内存态当基准(保持既有行为)。
+      const base = disk ? disk.positions : positions.value;
+      const baseRev = disk ? disk.rev : boundRev;
+      raced = raced || baseRev !== boundRev;
+      const applied = apply(base);
+      if (!applied) {
+        positions.value = base; // 前置条件不成立:把别处的最新结果同步到 UI,再回报失败
+        boundRev = baseRev;
+        return { ok: false, conflict: raced };
+      }
+      const w = writeAccountRowCas<{ positions: StakingPosition[] }>(
+        ACCOUNTS_KEY,
+        boundKey,
+        { positions: applied.next },
+        baseRev,
+      );
+      if (w.ok) {
+        positions.value = applied.next;
+        boundRev = w.rev;
+        return { ok: true, result: applied.result };
+      }
+      if (!w.conflict) return { ok: false, conflict: false }; // storage 写不进去:内存不动,按失败处理
+      raced = true;
+    }
+    return { ok: false, conflict: true };
   }
 
   /** 账号切换重绑:装载该账号的持仓行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    positions.value = hydrate(boundKey);
+    const row = hydrate(boundKey);
+    positions.value = row.positions;
+    boundRev = row.rev;
   }
 
   function totalLocked() {
@@ -128,7 +183,10 @@ export const useStaking = defineStore("staking", () => {
   function stake(amount: number, termDays: StakingTerm): StakingPosition {
     const t = Date.now();
     const pos: StakingPosition = {
-      id: `stk-${t}`,
+      // 🔴 不能用 `stk-${t}`:同一毫秒内建的两笔仓位 id 完全相同。CAS 之前这条被
+      // last-write-wins 掩盖(其中一笔本来就会被顶掉),现在两笔都留得住,重号仓位会让
+      // find(id) 永远只命中第一笔 —— 第二笔从此领不出来。走全仓统一的 mock id 单点。
+      id: mockServerId("STK"),
       amountUSDT: amount,
       termDays,
       apy: STAKING_APY[termDays],
@@ -136,54 +194,62 @@ export const useStaking = defineStore("staking", () => {
       unlockTs: t + termDays * ONE_DAY,
       status: "active",
     };
-    positions.value = [pos, ...positions.value];
-    persist();
+    // 追加型变更:冲突时在**别处写完的最新列表**上重放这次追加,两个标签页各自建的仓都留得住
+    // (与领取/赎回不同,新建仓位有唯一 id,天然可合并,不存在「同一笔被建两次」)。
+    const r = commit((current) => ({ next: [pos, ...current], result: pos }));
+    // storage 写不进去(配额满等)时保持 CAS 上线前的行为:内存仍记这笔,刚扣的钱不凭空消失。
+    if (!r.ok && !r.conflict) positions.value = [pos, ...positions.value];
     return pos;
   }
 
-  function earlyWithdraw(id: string): { ok: boolean; refund: number; penalty: number } {
-    const p = positions.value.find((x) => x.id === id);
-    if (!p || p.status !== "active") return { ok: false, refund: 0, penalty: 0 };
-    const penaltyRate = STAKING_PENALTY[p.termDays];
-    const penalty = p.amountUSDT * penaltyRate;
-    const refund = p.amountUSDT - penalty;
-    positions.value = positions.value.map((x) =>
-      x.id === id ? { ...x, status: "early-withdrawn" as const } : x,
-    );
-    persist();
-    return { ok: true, refund, penalty };
+  function earlyWithdraw(id: string): { ok: boolean; refund: number; penalty: number; conflict?: boolean } {
+    const r = commit((current) => {
+      const p = current.find((x) => x.id === id);
+      // 🔴 前置条件复核跑在磁盘最新状态上:别处已经赎回过的仓位在这里就被挡住,不会二次退款。
+      if (!p || p.status !== "active") return null;
+      const penaltyRate = STAKING_PENALTY[p.termDays];
+      const penalty = p.amountUSDT * penaltyRate;
+      return {
+        next: current.map((x) => (x.id === id ? { ...x, status: "early-withdrawn" as const } : x)),
+        result: { refund: p.amountUSDT - penalty, penalty },
+      };
+    });
+    if (!r.ok) return { ok: false, refund: 0, penalty: 0, conflict: r.conflict };
+    return { ok: true, refund: r.result.refund, penalty: r.result.penalty };
   }
 
   // ⚠️ MOCK-ONLY: interest computed client-side via simple APY formula.
   // PRODUCTION: POST /api/stakes/:id/claim returns {principal, interest}.
-  function claim(id: string): { ok: boolean; principal: number; interest: number } {
-    const p = positions.value.find((x) => x.id === id);
-    if (!p || (p.status !== "active" && p.status !== "matured")) {
-      return { ok: false, principal: 0, interest: 0 };
-    }
-    if (Date.now() < p.unlockTs) return { ok: false, principal: 0, interest: 0 };
-    const interest = p.amountUSDT * p.apy * (p.termDays / 365);
-    positions.value = positions.value.map((x) =>
-      x.id === id ? { ...x, status: "claimed" as const } : x,
-    );
-    persist();
-    return { ok: true, principal: p.amountUSDT, interest };
+  function claim(id: string): { ok: boolean; principal: number; interest: number; conflict?: boolean } {
+    const r = commit((current) => {
+      const p = current.find((x) => x.id === id);
+      // 🔴 同 earlyWithdraw:领取资格按磁盘最新状态判,别处领过就不再放行(双花的闸在这一行)。
+      if (!p || (p.status !== "active" && p.status !== "matured")) return null;
+      if (Date.now() < p.unlockTs) return null;
+      return {
+        next: current.map((x) => (x.id === id ? { ...x, status: "claimed" as const } : x)),
+        result: { principal: p.amountUSDT, interest: p.amountUSDT * p.apy * (p.termDays / 365) },
+      };
+    });
+    if (!r.ok) return { ok: false, principal: 0, interest: 0, conflict: r.conflict };
+    return { ok: true, principal: r.result.principal, interest: r.result.interest };
   }
 
+  // 页面每 4s 调一次。无到期仓位时 apply 返回 null,commit 顺手把磁盘最新态同步进内存 ——
+  // 于是打开着质押页的标签页会自动跟上别处的变更(此前永远看不到)。
   function markMatured() {
     const t = Date.now();
-    let changed = false;
-    const next = positions.value.map((p) => {
-      if (p.status === "active" && p.unlockTs <= t) {
-        changed = true;
-        return { ...p, status: "matured" as const };
-      }
-      return p;
+    commit((current) => {
+      let changed = false;
+      const next = current.map((p) => {
+        if (p.status === "active" && p.unlockTs <= t) {
+          changed = true;
+          return { ...p, status: "matured" as const };
+        }
+        return p;
+      });
+      return changed ? { next, result: true as const } : null;
     });
-    if (changed) {
-      positions.value = next;
-      persist();
-    }
   }
 
   return {
