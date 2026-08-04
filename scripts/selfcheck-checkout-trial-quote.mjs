@@ -10,7 +10,8 @@
 // 从余额扣走。本门焊死三条不变量:
 //   ① 单一时刻、单一解析:结算路径所有试用派生值出自一次 trialQuoteAt(now)
 //   ② 展示与扣款同源:确认页净额 == 实际扣款净额(同一份报价快照)
-//   ③ 越界拒单:解析说不可转化 / convert() 返回 false → 零扣款零建单
+//   ③ 越界拒单:解析说不可转化 → 零扣款零建单;convert() 返回 false(裁决在扣款之后,
+//     见 W8)→ 不建单且刚扣的钱精确退回,退不回去走响亮终态
 //
 // 执行的是真实现:resolveTrialAt/accruedShadow 由 esbuild bundle 真跑;
 // computeTrialOffset/computeDiscountedPrice 从 trial-config.ts 源码切片转译;
@@ -134,13 +135,14 @@ const viewSlice = sliceRange(
   "checkout.vue",
 );
 const netPriceSlice = sliceStatement(coSrc, "const netPrice = computed(", "checkout.vue");
-// 支付时刻结算块:从单一解析取时间戳,到真正扣款那一行(含全部守卫)
-const paySlice = sliceRange(
-  coSrc,
-  "const payNow = mockServerNow();",
-  "const ok = app.debitBalance(chargeTotal);",
-  "checkout.vue",
-);
+// 支付时刻结算块:从单一解析取时间戳,到扣款 + 试用转化裁决结束(含全部守卫)。
+// 🔴 终点锚是**下一条语句的开头**(扣款成功后的旧机下架),再把这半截 if 削掉 ——
+// 2026-08-04 R5 把 convert() 挪到扣款之后,原来以扣款行为终点的切片会把转化裁决
+// 与退款分支整段切掉,门就再也看不见它们(切少了 = 静默漏测,与找不到同样危险)。
+const PAY_END = "if (ti) {";
+const paySlice = sliceRange(coSrc, "const payNow = mockServerNow();", PAY_END, "checkout.vue")
+  .slice(0, -PAY_END.length);
+if (!paySlice.includes("freeTrial.convert()")) die("checkout.vue 结算切片里没有 convert() —— 切片区间与实现已经对不上");
 
 // ── 装配可执行模块 ──
 const assembled = `
@@ -148,7 +150,7 @@ ${priceSlices}
 export function build(deps) {
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
-          voucherDiscount, tradeinCredit, nowTick } = deps;
+          voucherDiscount, tradeinCredit, nowTick, reportStuckFunds } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
@@ -204,10 +206,14 @@ function bench(opts) {
     isCard = false, convertReturns = null, productId = "stellarbox-s1",
     // 上游污染注入(R3 P1 固定靶):商品价被写成非数值时,金额链全线 NaN。
     productPrice = null,
+    // R5 固定靶:退款自己也落盘失败(补偿链的下一层),必须走响亮终态而不是通用文案。
+    restoreFails = false,
   } = opts;
   const store = { row: { ...row }, converted: false };
   const toasts = [];
   const debits = [];
+  const restores = [];
+  const stuck = [];
   let payClock = payClockAt;
   const deps = {
     computed: computedShim,
@@ -221,7 +227,12 @@ function bench(opts) {
     app: {
       user: { usdtBalance: balance },
       debitBalance: (amt) => { debits.push(amt); if (balance < amt) return false; return true; },
+      // 冲正基准与冲正本身(真语义在 app.ts / selfcheck-money-rollback):这里只需可观测
+      // 「有没有退、退的是不是扣款前那份快照」,以及退款失败时页面怎么处置。
+      captureMoney: () => ({ usdtBalance: balance, nexBalance: 0, withdrawableUsdt: balance, applied: { usdtBalance: 0, nexBalance: 0, withdrawableUsdt: 0 } }),
+      restoreMoney: (snap) => { restores.push(snap); return !restoreFails; },
     },
+    reportStuckFunds: (snap) => { stuck.push(snap); return "stuck"; },
     freeTrial: {
       snapshot: () => ({ ...store.row }),
       // convert() 的真判据在 free-trial.ts(已由 selfcheck-trial-boundary 的接线门
@@ -263,7 +274,8 @@ function bench(opts) {
     isCard: { value: isCard },
     step,
   });
-  return { shownNet, shownTotal, snapshot, mode, out, step: step.value, toasts, debits, converted: store.converted };
+  return { shownNet, shownTotal, snapshot, mode, out, step: step.value, toasts, debits, restores, stuck,
+    converted: store.converted };
 }
 
 // ── ② 正常 grace 内 → 按展示净额扣款(基线:守卫不能误伤正常单)──
@@ -326,14 +338,25 @@ function bench(opts) {
   check("settle", "③旧缺陷金额(21)不会被扣走", !badZero.debits.includes(21));
 }
 
-// ── ⑤ convert() 返回 false → 零扣款零建单(返回值不许丢弃)──
+// ── ⑤ convert() 返回 false → 不建单,且刚扣的钱原样退回(返回值不许丢弃)──
+//    2026-08-04 R5 改序:convert 是不可逆终态,排在扣款**之后**(扣款还有一条预检堵不住的
+//    落盘失败路径,先 convert 就会「试用烧了、单没下」且不可恢复)。于是这条路径的正确处置
+//    从「零扣款」变成「扣了必须精确退回」,退不回去则走响亮终态。
 {
   const b = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false });
   check("settle", "⑤convert 拒绝 → 不成交", b.out === undefined);
-  check("settle", "⑤convert 拒绝 → 零扣款(判定在扣款之前)", b.debits.length === 0);
+  check("settle", "⑤convert 拒绝 → 刚扣的钱被精确退回(退到扣款前那份快照)",
+    b.debits.length === 1 && b.restores.length === 1 && b.restores[0].usdtBalance === 100_000);
   check("settle", "⑤convert 拒绝 → 回报价步 + 提示", b.step === "select-payment" && b.toasts.includes("TRIAL_QUOTE_CHANGED"));
+  check("settle", "⑤convert 拒绝 → 未走响亮终态(退款成功时不该惊动客服)", b.stuck.length === 0);
+  // R5 固定靶:退款自己也失败 —— 钱真扣着,不许再弹「报价已变」了事。
+  const s = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false, restoreFails: true });
+  check("settle", "⑤🔴 退款也失败 → 走响亮终态(交易号 + 待对账),而不是通用「报价已变」",
+    s.stuck.length === 1 && !s.toasts.includes("TRIAL_QUOTE_CHANGED"));
+  check("settle", "⑤退款失败时仍然不建单、仍退回报价步", s.out === undefined && s.step === "select-payment");
   const okc = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: true });
-  check("settle", "⑤convert 通过 → 正常扣款(守卫不误伤)", okc.out && okc.debits.length === 1);
+  check("settle", "⑤convert 通过 → 正常扣款且不退款(守卫不误伤)",
+    okc.out && okc.debits.length === 1 && okc.restores.length === 0);
 }
 
 // ── ④b 族级兜底闸:确认页之后总额变贵(旧机抵扣跌档)→ 拒单不静默补扣 ──
@@ -400,11 +423,16 @@ function bench(opts) {
     /trialQuote\.remainderUSD/.test(payBare) && /trialQuote\.shadowNEX/.test(payBare) &&
     !/promoDiscount\.value/.test(payBare) && !/trialOffsetView\.value/.test(payBare) &&
     !/trialConversionMode\.value/.test(payBare));
-  check("wiring", "W7 convert() 返回值被判定(不许丢弃)", /if\s*\(!freeTrial\.convert\(\)\)/.test(payBare));
+  check("wiring", "W7 convert() 返回值被判定(不许丢弃)", /if\s*\(applyTrial && !freeTrial\.convert\(\)\)/.test(payBare));
   const idxConvert = bare.indexOf("freeTrial.convert()");
   const idxDebit = bare.indexOf("app.debitBalance(chargeTotal)");
   const idxOrder = bare.indexOf("orders.createOrder(");
-  check("wiring", "W8 convert 判定在扣款之前(先裁决后扣钱)", idxConvert > 0 && idxDebit > 0 && idxConvert < idxDebit);
+  // 🔴 R5 反转:convert() 是不可逆终态,必须排在扣款**之后** —— 扣款的落盘失败路径是
+  // 只读预检堵不住的,先 convert 就会「试用烧了、钱没扣、单没下」,且用户无从恢复。
+  check("wiring", "W8 convert 判定在扣款之后(不可逆终态不许排在钱扣住之前)",
+    idxConvert > 0 && idxDebit > 0 && idxDebit < idxConvert);
+  check("wiring", "W8b convert 失败分支必须退款,且退款返回值被消费(退不回去 → 响亮终态)",
+    /if\s*\(app\.restoreMoney\(beforePay\)\)/.test(payBare) && /reportStuckFunds\(beforePay\)/.test(payBare));
   check("wiring", "W9 建单在扣款之后(任一前置守卫 return 都必然零建单)", idxOrder > idxDebit);
   check("wiring", "W10 族级兜底闸在位:扣款额超过展示总额一律拒单",
     /if\s*\(chargeTotal > quotedTotal\)/.test(payBare));

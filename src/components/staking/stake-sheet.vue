@@ -1,11 +1,10 @@
 <!--
-  StakeSheet — customize-and-lock staking sheet (ported from
-  Nexion-prototype/app/components/staking-sheet-host.tsx). uni has no chassis
-  sheet host for sub-pages, so the sheet is embedded in staking.vue and toggled
-  via `v-model:open` + a `term` prop. framer slide-up → CSS <transition>.
+  StakeSheet — customize-and-lock staking sheet. uni has no chassis sheet host
+  for sub-pages, so the sheet is embedded in staking.vue and toggled via
+  `v-model:open` + a `term` prop. Slide-up is a CSS <transition>.
 
-  Cross-store side-effect (架构铁律): submit composes app.debitBalance() +
-  staking.stake() + bills.add() here, not in the store.
+  Cross-store side-effect (架构铁律): submit 在这里组合「扣款⊗记账 + 建仓」,
+  不在 store 里。资金与收据一律走收口点 postMoneyBill,不裸调资金原语 / 账单写入。
 -->
 <template>
   <view v-if="open && term !== null">
@@ -199,7 +198,12 @@ function submit() {
       },
       { restoreTo: before },
     );
-    toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.toast.openFailedSubtitle);
+    // 归因分两种(R5):conflict=true 是别处刚改过持仓(刷新重试有意义),
+    // false 是本机存储写不进去(重试也白搭,得换个环境)—— 文案不许混用。
+    toast.error(
+      t.value.stakingV3.toast.openFailedTitle,
+      opened.conflict ? t.value.stakingV3.toast.openFailedSubtitle : t.value.stakingV3.toast.openFailedStorageSubtitle,
+    );
     return;
   }
   toast.success(

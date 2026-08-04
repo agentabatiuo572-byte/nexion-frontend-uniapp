@@ -2377,5 +2377,29 @@ genesis_invite_gate() {
 }
 genesis_invite_gate
 
+# ── 冲正(回滚)自身门(R5 五项,2026-08-04)——「回滚失败被静默」+「回滚凭空造钱」──
+# R4 根治「资金变更的落盘失败被静默忽略」,R5 在**回滚这一层**发现同型:① stake() 的存储
+# 异常分支把仓位只塞内存并报成功(同一函数体 4 行后的注释正写明这么做刷新即人间蒸发),
+# ② 收口点两处 restoreMoney 的返回值没人接 —— 回滚自己失败时用户看到的仍是「余额没有变化」
+# 而钱已经扣了,③ 结算页把不可逆的 convert() 排在扣款之前(扣款的落盘失败路径预检堵不住,
+# 试用被烧掉且不可恢复),⑤ restoreMoney 写绝对值,而合并层按增量合并 —— 两个标签页各扣
+# $30 各回滚一次,余额从 $100 变 $130(凭空造钱)。判据(esbuild 载真 store + 真收口点跑真
+# 代码,假 storage 按 key/第几次写定点注入失败;⑤ 用两个 store 实例 = 两个标签页共享一份
+# 序列化 storage —— 单实例跑一遍这条永远测不出来):
+# ①存储异常 → ok=false/conflict=false、内存与磁盘都没有这笔(+撤掉注入的反向靶)
+# ②回滚失败 → stuck + 交易号 + 待对账队列 + 不再弹通用文案(带「回滚成功仍走通用文案」负控)
+# ②b 无事可回滚时不许误报"钱卡住了" ⑤两标签页各扣各回滚,磁盘回到 $100(+单页负控)
+# ⑥接线门(两处回滚返回值真被消费 / stake 分支真删了内存兜底 / 两个页面按归因分文案 /
+# 结算页 convert 真排在扣款之后)⑦三语文案真解析取值、互不相同、正文含 {id}。
+money_rollback_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-rollback.mjs > /tmp/uniapp-money-rollback.log 2>&1; then
+    ok "冲正(回滚)自身门 — $(tail -1 /tmp/uniapp-money-rollback.log)"
+  else
+    bad "冲正(回滚)自身门失败 — node scripts/selfcheck-money-rollback.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-rollback.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_rollback_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

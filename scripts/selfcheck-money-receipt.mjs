@@ -30,15 +30,17 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
 const read = (...p) => readFileSync(path.join(root, ...p), "utf8");
 
-const samples = { primitives: 4, targets: 0, scanned: 0, ledgerFiles: 0, locales: 0 };
+const samples = { primitives: 5, targets: 0, scanned: 0, ledgerFiles: 0, locales: 0 };
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
 }
-/** 行首 // 与块注释一起剥 —— 只剥「整行就是注释」的,不碰 url 里的 //。 */
-const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+/** 行首 // 与块注释一起剥 —— 只剥「整行就是注释」的,不碰 url 里的 //。
+ *  🔴 SFC 的 `<!-- -->` 也要剥:.vue 头注里写一句 `bills.add()` 就能把接线门顶红(实测
+ *  stake-sheet 正是如此),而门查的是真调用不是文档。注释不参与编译,更不该参与判定。 */
+const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 /** 从 needle 起花括号配对抠出整块原文。抠不到 = 实现被改名/删除,直接炸(不许静默放行)。 */
 function grabBlock(src, needle) {
   const start = src.indexOf(needle);
@@ -238,8 +240,11 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   const paid = postMoneyBill(draft({ amount: -7999 }));
   check("③ 扣款成功,可提额度被 clamp 到剩余总余额(既有不变量,未改)",
     paid === "ok" && money().usdt === 1 && money().withdrawable === 1, JSON.stringify(money()));
-  check("③ captureMoney 返回的就是资金三元组(字段名与 restoreMoney 对得上)",
-    same(Object.keys(snapshot).sort(), ["nexBalance", "usdtBalance", "withdrawableUsdt"]), Object.keys(snapshot).join(","));
+  // applied = 本页自己动过多少钱的读数(R5 起冲正按它算增量,不写绝对值);三个绝对值仍在。
+  check("③ captureMoney 返回资金三元组 + applied 读数(字段名与 restoreMoney 对得上)",
+    same(Object.keys(snapshot).sort(), ["applied", "nexBalance", "usdtBalance", "withdrawableUsdt"])
+    && same(Object.keys(snapshot.applied).sort(), ["nexBalance", "usdtBalance", "withdrawableUsdt"]),
+    Object.keys(snapshot).join(","));
 
   const reversed = postMoneyBill(draft({ amount: 7999, memo: "reversal" }), { restoreTo: snapshot });
   check("③ 🔴 冲正后 withdrawableUsdt 恢复到扣款前(不是停在被 clamp 的 1)",
@@ -364,7 +369,10 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
 // ── ⑤ 接线门:判定对不对 / 有没有被接上,是两道门 ─────────────────────────────────
 {
   const appSrc = strip(read("src", "store", "app.ts"));
-  for (const fn of ["function creditBalance", "function debitBalance", "function creditNex", "function debitNex"]) {
+  // 🔴 名单含 restoreMoney(R5 补漏):它和四个原语一样改余额、一样会落盘失败,漏在名单外
+  // 就等于「冲正落盘失败」这一格没人守 —— 而那正是 R5 P0 的所在层。
+  for (const fn of ["function creditBalance", "function debitBalance", "function creditNex", "function debitNex",
+    "function restoreMoney"]) {
     const body = grabBlock(appSrc, fn);
     check(`⑤ app.ts ${fn.replace("function ", "")} 接了落盘结果 + 失败回滚`,
       /if \(!persistAccountSnapshot\(\)\)/.test(body) && /adoptAccountSnapshot\(previousSnapshot\)/.test(body),
@@ -376,6 +384,7 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   const WIRED = [
     ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill"]],
     ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill"]],
+    ["src/components/staking/stake-sheet.vue", ["postMoneyBill"]], // R5 补登:与复投页同形的第二个建仓入口
     ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
   ];
@@ -387,10 +396,11 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   }
   const locales = ["en", "zh", "vi"];
   samples.locales = locales.length;
-  check(`⑤ i18n 失败提示 ${locales.length} 语齐(txNotSaved + billMissing + 两条冲正 memo)`,
+  check(`⑤ i18n 失败提示 ${locales.length} 语齐(txNotSaved + billMissing + fundsStuck + 两条冲正 memo)`,
     locales.every((l) => {
       const src = read("src", "i18n", "messages", `${l}.ts`);
-      return ["txNotSavedTitle:", "txNotSavedMsg:", "billMissingTitle:", "billMissingMsg:", "genesisReversed:", "stakeReversed:"]
+      return ["txNotSavedTitle:", "txNotSavedMsg:", "billMissingTitle:", "billMissingMsg:",
+        "fundsStuckTitle:", "fundsStuckMsg:", "genesisReversed:", "stakeReversed:"]
         .every((k) => src.includes(k));
     }));
 }
@@ -428,7 +438,12 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     }
   })(SRC);
   samples.scanned = files.length;
-  const CALL = /(?:useBills\(\)|bills|billsStore)\.(?:add|addOnce|addForAccount)\(\s*[{a-zA-Z"'`]/g;
+  // 🔴 原语名单必须与 bills 的**全部**写入原语对齐(R5:漏了 addMany —— 而它正是「N 条分录
+  // 一次落盘」的多腿原语、本族不变量的核心机制。收口点被绕开时全树对裸调 addMany 零监控)。
+  // 名单来源不是记忆:bills.ts 里对外暴露的**建分录**函数(add / addMany / addOnce /
+  // addForAccount)。`settleByRef` 故意不在内 —— 它改的是已有分录的状态,收口点不替代它,
+  // 把它算进来这道「只许减不许增」的棘轮就没有迁移目标可减了(另有 App.vue 等在用)。
+  const CALL = /(?:useBills\(\)|bills|billsStore)\.(?:add|addMany|addOnce|addForAccount)\(\s*[{a-zA-Z"'`[]/g;
   const found = {};
   for (const f of files) {
     const rel = path.relative(root, f).replace(/\\/g, "/");

@@ -207,12 +207,13 @@ export const useStaking = defineStore("staking", () => {
     // (与领取/赎回不同,新建仓位有唯一 id,天然可合并,不存在「同一笔被建两次」)。
     const r = commit((current) => ({ next: [pos, ...current], result: pos }));
     if (r.ok) return { ok: true, position: pos };
-    // storage 写不进去(配额满等)时保持 CAS 上线前的行为:内存仍记这笔,刚扣的钱不凭空消失。
-    // 这一路仓位**是存在的**(用户看得见、能赎回),所以照报成功。
-    if (!r.conflict) {
-      positions.value = [pos, ...positions.value];
-      return { ok: true, position: pos };
-    }
+    // 🔴 两条失败分支同等对待(2026-08-04 R5:此前本分支自相矛盾)。
+    // storage 写不进去(配额满 / 隐私模式)时曾把仓位塞进内存并**照报成功** —— 而下面那条
+    // 注释早就写明这么做的后果:本标签页看得见、磁盘上没有,刷新即人间蒸发,而钱已经扣了、
+    // 账单已经写了,调用方拿着 ok:true 不会冲正。失败就是失败,如实回报,由调用方退款。
+    // `conflict` 区分归因:false = 存储写不进去(重试也白搭,要提示换个环境),
+    // true = 别处正在改这个账号(刷新后重试有意义)。调用方据此给不同文案。
+    if (!r.conflict) return { ok: false, position: null, conflict: false };
     // 🔴 3 次版本冲突全耗尽:既没落盘、也不进内存 —— 这笔仓位**根本不存在**。
     // 唯一正确的处置是把失败如实回报给调用方,由它把刚扣的钱退回去;
     // 这里跟着做内存兜底反而更糟:本标签页看得见、磁盘上没有,刷新即人间蒸发。
