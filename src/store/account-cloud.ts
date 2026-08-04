@@ -407,33 +407,6 @@ export function mergeAndWriteAccountSnapshot(
 }
 
 /** Fail-aware variant used by money/reward flows that may not acknowledge a lost write. */
-/** 只是「又过了一秒」的心跳时间戳 —— 内容比对时排除。
- *
- *  🔴 实测(不是推断):即使某一拍**一分钱收益都没产生**,`lastBucketedAt` 与
- *  `onlineHeartbeatAt` 仍被盖成当前时刻。第一版脏检查没排除它们,60 拍照写 60 次,零改善。
- *
- *  🔴 为什么排除它们是安全的:这两个字段**只表示「这一拍跑过了」**,不承载金额或状态 ——
- *  真有收益的那一拍必然伴随 `todayEarnings` / 桶余额 / `lastSettledAt` 的变化(实测那一拍
- *  有 24 项差异),那时照写不误。它们晚 N 秒落盘的唯一后果:强杀重开后 `isDeviceOnline`
- *  的 3 分钟判定窗口平移 N 秒,而 N 的上界就是「下一次真有变化的写盘」——活跃机队上是秒级。
- *
- *  🔴 **不排除 `lastSettledAt`**:它是计价锚点,与钱同生共死,少写一次就少付一段。 */
-const HEARTBEAT_ONLY_KEYS = new Set(["lastBucketedAt", "onlineHeartbeatAt"]);
-
-/** 稳定序列化(键排序 + 排除 `updatedAt` 与纯心跳戳)—— 只用于「内容变没变」的比对。
- *
- *  🔴 必须键排序:磁盘那份是 JSON.parse 出来的(键序 = 上次写入时的序),内存这份可能来自
- *  `{ ...next }` 展开或合并函数的对象字面量,两者键序未必一致。直接 JSON.stringify 比的
- *  就成了「键序一样吗」而不是「内容一样吗」—— 判据恒判"有变化",脏检查白做。 */
-function stableJson(value: unknown, isRoot = true): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
-  if (Array.isArray(value)) return `[${value.map((v) => stableJson(v, false)).join(",")}]`;
-  const obj = value as Record<string, unknown>;
-  const keys = Object.keys(obj)
-    .filter((k) => !(isRoot && k === "updatedAt") && !HEARTBEAT_ONLY_KEYS.has(k))
-    .sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableJson(obj[k], false)}`).join(",")}}`;
-}
 
 export function mergeAndWriteAccountSnapshotResult(
   base: AccountCloudSnapshot | null,
@@ -443,18 +416,22 @@ export function mergeAndWriteAccountSnapshotResult(
   const latest = readAccountSnapshot(key);
   const rawMerged = base && latest ? mergeAccountSnapshots(base, next, latest) : { ...next, accountKey: key, updatedAt: Date.now() };
   const merged = clampAccountFundInvariants(rawMerged);
-  // 🔴 内容没变就不写盘(2026-08-04 完全版 A 第一步,行为中性)。
+  // 🔴 **无条件写盘**。曾经在这里加过「内容没变就跳过」的脏检查(2026-08-04,已撤),
+  // 别再加回来 —— 撤销理由是**实测**,不是风格偏好:
   //
-  // 实测:静置 60 秒账户快照被写 **60 次**,而真正产生收益的只有 ~29 次
-  // (settle 的 SETTLE_MIN_MS 是 1.8s)—— 一半以上的写盘内容一个字节都没变。
-  // 而每次写盘是「读整表 + JSON.parse 全表 → 改一行 → 序列化整表写回」,空写也是全额代价。
+  //   真浏览器、真 105KB 账户表:`setItem` 102µs · `JSON.stringify` 74µs
+  //   → 跳过一次写盘只省 ~177µs,而能跳的只有 1/3 的拍,折合 **59µs**;
+  //   而「内容变没变」的判据本身(键排序稳定序列化,每次要跑两遍)要 **1126µs**。
+  //   **判据花掉的是它省下的约 19 倍。** 写盘从来不是贵的那头。
   //
-  // 🔴 只跳过**写**,绝不跳过前面的读 + 三路合并 —— 那一步是本页**收取其它标签页改动**的
-  // 唯一时机(今天靠每秒一次 persist 顺带完成)。跳掉它,一个闲置标签页会永远看不到
-  // 另一页刚充的钱。省的是写,不是同步。
-  const sameAsDisk = latest !== null && stableJson(latest) === stableJson(merged);
-  const writeSucceeded = sameAsDisk ? true : writeAccountSnapshot(merged);
-  const stored = sameAsDisk ? latest : readAccountSnapshot(key);
+  // 独立证伪还查出:跳过写等于**连内存里的新值一起回退**(`stored = latest` 会被
+  // adopt 回去),而判据的安全性压在两条没写下来、也没有任何机器门守的不变量上 ——
+  // 红测把 `todayEarnings` 塞进排除名单,钱当场少算(10 而非 25),全部哨兵照样绿。
+  //
+  // 真要降写盘成本,先量「贵在哪」再动手,别再从「少写几次」这个方向猜。
+  // 台账:docs/changes/2026-08-04-design-v2.md;门:scripts/selfcheck-snapshot-write.mjs
+  const writeSucceeded = writeAccountSnapshot(merged);
+  const stored = readAccountSnapshot(key);
   return {
     snapshot: stored ?? merged,
     persisted: writeSucceeded && stored !== null,

@@ -2456,5 +2456,22 @@ snapshot_literals_gate() {
 }
 snapshot_literals_gate
 
+# ── 账户快照必须无条件写盘 ────────────────────────────────────────────────────
+# 2026-08-05:曾在写盘路径上加过「内容没变就跳过」的脏检查,写盘次数 60→40 看着是赚的。
+# 真浏览器实测把它推翻:setItem 105KB 只要 102µs,跳一次只省 ~177µs 且只有 1/3 的拍能跳
+# (折合 59µs),而判据本身每拍要 1126µs —— **花掉的是省下的约 19 倍**,tick 净慢 ~70%。
+# 独立证伪另查出:跳过写会连内存新值一起回退,且判据的安全性压在两条没写下来的不变量上
+# (红测把 todayEarnings 塞进排除名单 → 钱当场少算,当时全部哨兵照样绿)。
+# 本门拦的不是「跳过写一定错」,而是「没量就凭直觉再走一遍这个方向」。
+snapshot_write_gate() {
+  if "$NODE_BIN" scripts/selfcheck-snapshot-write.mjs > /tmp/uniapp-snap-write.log 2>&1; then
+    ok "快照无条件写盘门 — $(tail -1 /tmp/uniapp-snap-write.log)"
+  else
+    bad "快照无条件写盘门失败 — node scripts/selfcheck-snapshot-write.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-write.log | head -8 | sed 's/^/        /'
+  fi
+}
+snapshot_write_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
