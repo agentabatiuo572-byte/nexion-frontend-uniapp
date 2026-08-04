@@ -2358,5 +2358,24 @@ money_cas_gate() {
 }
 money_cas_gate
 
+# ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
+# 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
+# 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表
+# 跑真代码,多个 store 实例 = 多个账号共享一份序列化 storage):
+# ①同一码第二次核销必拒 ②本账号已持码再提另一码必拒且原码不受影响、新码不被吞
+# ③不存在/已作废/已被使用三种归因各自分开且不泄露核销者 ④两账号并发同码只成功一个
+# ⑤已核销是终态、用户侧无任何作废/释放出口 ⑥格式正确但从未发放的码必拒(缺陷本体)
+# ⑦接线门(资格门真按「持有已核销的码」判定 + action 真走码表)⑧落盘失败整笔回滚
+# ⑨五种文案 × 3 语真解析取值、互不相同。
+genesis_invite_gate() {
+  if "$NODE_BIN" scripts/selfcheck-genesis-invite.mjs > /tmp/uniapp-genesis-invite.log 2>&1; then
+    ok "创世邀请码码表核销门 — $(tail -1 /tmp/uniapp-genesis-invite.log)"
+  else
+    bad "创世邀请码码表核销门失败 — node scripts/selfcheck-genesis-invite.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-genesis-invite.log | head -8 | sed 's/^/        /'
+  fi
+}
+genesis_invite_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

@@ -1,4 +1,5 @@
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
+import type { GenesisInviteRedeemResult } from "./genesis-invite";
 import type { EntrySurface } from "@/lib/entry-surface";
 
 export type DeviceKind =
@@ -196,7 +197,8 @@ export interface UserState {
   cumulativeDepositUsdt: number;
   /** 已核销的创世邀请码(FEAT-GEN08 资格通道4)。per-user 凭证,必须随
    *  account-cloud 快照按账号走(设备级存储会跨账号继承 → 资格门旁路)。
-   *  null = 未核销。仅由 setGenesisInviteCode action 写入(格式校验)。
+   *  null = 未核销。仅由 setGenesisInviteCode action 写入(查平台码表核销,不是格式校验);
+   *  语义 = 「本账号已核销的那个码」,一人至多一个。
    *  ⚠️ MOCK-ONLY: production = POST /api/genesis/invite/redeem server 核销。 */
   genesisInviteCode: string | null;
 }
@@ -403,8 +405,9 @@ export interface AppState {
    *  Topup page calls this instead of bare creditBalance so eligibility rules
    *  (`cumulative-deposit-usdt`) stay in sync with actual deposit flow. */
   recordDeposit: (amount: number) => boolean;
-  /** 核销创世邀请码(格式校验,合法即写入 user.genesisInviteCode 并随快照持久)。 */
-  setGenesisInviteCode: (raw: string) => boolean;
+  /** 核销创世邀请码:查码表 + 三态校验(码不存在 / 非未使用 / 本账号已持码),
+   *  通过才写入 user.genesisInviteCode 并随快照持久;拒绝时带归因供页面分文案。 */
+  setGenesisInviteCode: (raw: string) => GenesisInviteRedeemResult;
   // Sprint 2 third phase — prototype demo helpers (PM-facing, not user-facing)
   _devSeedLegacyDevice: (kind: DeviceKind, monthsAgo: number) => void;
   _devFastForwardAll: (months: number) => void;
