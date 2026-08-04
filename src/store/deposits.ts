@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
-import { useBills } from "./bills";
+import { postReceiptOnce } from "@/lib/money-receipt";
 import { useFx } from "./fx";
 import { vndForUsdt } from "./fx-core";
 import {
@@ -220,7 +220,7 @@ export const useDeposits = defineStore("deposits", () => {
 
   /** 入账(mock server 内部;confirming 走满 / dust 人工核销两条边共用)。
    *  幂等四重:状态机边界(仅 confirming|dust_hold 可入)在**磁盘最新**记录上复核 +
-   *  CAS 落盘 + recordDeposit 原子入账 + bills.addOnce 以 txHash 为 ref 判重。
+   *  CAS 落盘 + recordDeposit 原子入账 + postReceiptOnce 以 txHash 为 ref 判重。
    *  PROD:server 在同一事务内置 credited + 记账 + 写账单(复式分录见规格 §5)。
    *
    *  🔴 顺序是「先落状态,过了才动钱」—— 与 submitCardPayment 同一条铁律。原先是
@@ -260,7 +260,9 @@ export const useDeposits = defineStore("deposits", () => {
       }));
       return false;
     }
-    useBills().addOnce({
+    // 记账走收口点的幂等变体(以 txHash 为 ref 判重),不再裸调 bills.addOnce ——
+    // 「钱动了、账没记上」那一族的收口纪律,入金轨同样适用。
+    postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: rec.creditedUsdt,
@@ -481,7 +483,7 @@ export const useDeposits = defineStore("deposits", () => {
 
   /** 银行轨入账(mock server 内部;精确匹配 / 差额按实收核销两条边共用)。
    *  幂等三重同链上 settleCredited:状态机边界(调用方把关)+ 记录判重(depositId=intentId)
-   *  + bills.addOnce(ref=intentId)。0 手续费;PROD 同事务置 credited + 记账 + 写账单(§5 分录)。 */
+   *  + postReceiptOnce(ref=intentId)。0 手续费;PROD 同事务置 credited + 记账 + 写账单(§5 分录)。 */
   function settleBankIntent(intentId: string, creditedUsdt: number, receivedVnd: number): boolean {
     const credited = +creditedUsdt.toFixed(2);
     if (credited <= 0) return false;
@@ -528,7 +530,8 @@ export const useDeposits = defineStore("deposits", () => {
       }));
       return false;
     }
-    useBills().addOnce({
+    // 与链上轨同口径:记账走收口点的幂等变体(ref=intentId 判重),不裸调账单写入。
+    postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: credited,
@@ -669,7 +672,7 @@ export const useDeposits = defineStore("deposits", () => {
       }));
       return null;
     }
-    useBills().addOnce({
+    postReceiptOnce({
       type: "topup",
       symbol: "USDT",
       amount: credited,

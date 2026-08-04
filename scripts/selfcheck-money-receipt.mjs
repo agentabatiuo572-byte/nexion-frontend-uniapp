@@ -98,7 +98,7 @@ export const watch = () => {};`,
 };
 const bundle = await build({
   stdin: {
-    contents: `export { postMoneyBill, postMoneyBills, postReceiptOnly } from "@/lib/money-receipt";
+    contents: `export { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce } from "@/lib/money-receipt";
 export { useApp } from "@/store/app";
 export { useBills } from "@/store/bills";
 export { useUI } from "@/store/ui";`,
@@ -124,7 +124,7 @@ export { useUI } from "@/store/ui";`,
     },
   }],
 });
-const { postMoneyBill, postMoneyBills, postReceiptOnly, useApp, useBills, useUI } =
+const { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce, useApp, useBills, useUI } =
   await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 const app = useApp();
@@ -310,6 +310,21 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     postReceiptOnly(draft({ amount: -10, ref: "SC-RO-2" })) === false
     && ui.toasts.some((t) => t.kind === "error"));
   failKey = null;
+
+  // postReceiptOnce:同语义 + 按 ref 判重(三条入金轨的钱由 recordDeposit 落定且不可回滚,
+  // 而到账回调会重投 —— 幂等与失败处置必须在同一个收口点里,不许调用点各写各的)
+  reset();
+  check("④ postReceiptOnce 正常写入返回 true", postReceiptOnce(draft({ amount: 30, ref: "SC-ONCE" })) === true);
+  check("④ 🔴 同 ref 重放不写出第二条(入金回调重投是常态,判重丢了就是重复入账的账)",
+    postReceiptOnce(draft({ amount: 30, ref: "SC-ONCE" })) === true && bills.bills.length === 1 && billCount() === 1);
+  check("④ postReceiptOnce 换 ref 照常写入(判重是按 ref,不是把所有重复都吞掉)",
+    postReceiptOnce(draft({ amount: 30, ref: "SC-ONCE-2" })) === true && bills.bills.length === 2);
+  ui.toasts = [];
+  failKey = (k) => k === BILLS_KEY;
+  check("④ 🔴 postReceiptOnce 写失败返回 false 且弹错(幂等不等于可以静默)",
+    postReceiptOnce(draft({ amount: 30, ref: "SC-ONCE-3" })) === false
+    && ui.toasts.some((t) => t.kind === "error"));
+  failKey = null;
 }
 
 // ── ⑦ 多腿交易(兑换:一进一出两腿 + 两条分录)原子性 ────────────────────────────────
@@ -381,13 +396,31 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   check("⑤ app.ts 暴露 captureMoney / restoreMoney(冲正的唯一正确基准)",
     /captureMoney,\s*restoreMoney/.test(appSrc) && /function restoreMoney\(/.test(appSrc));
 
+  // 全站每一个动钱的调用点都在这张表上 —— 台账(⑥)清零只证明「没人裸调」,
+  // 这张表证明「都接到收口点上了」。两件事分开守:漏接一个,⑥ 也是绿的。
   const WIRED = [
+    ["src/App.vue", ["postMoneyBill", "postReceiptOnly"]],
     ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill"]],
-    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill"]],
+    ["src/components/home/weekly-quest-hero.vue", ["postMoneyBills"]],
+    ["src/components/home/weekly-quest-list.vue", ["postMoneyBill"]],
+    ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
     ["src/components/staking/stake-sheet.vue", ["postMoneyBill"]], // R5 补登:与复投页同形的第二个建仓入口
-    ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
+    ["src/components/tradein-sheets.vue", ["postMoneyBill"]],
+    ["src/lib/share.ts", ["postMoneyBills"]],
+    ["src/pages/daily/daily.vue", ["postMoneyBill"]],
+    ["src/pages/events/events.vue", ["postMoneyBill"]],
+    ["src/pages/genesis/marketplace.vue", ["postMoneyBill"]],
+    ["src/pages/me/achievements.vue", ["postMoneyBills"]],
+    ["src/pages/me/wallet-cards-new.vue", ["postMoneyBills"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
+    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill"]],
+    ["src/pages/me/wallet-topup.vue", ["postMoneyBill"]],
+    ["src/pages/staking/staking.vue", ["postMoneyBill"]],
+    ["src/pages/store/bundle.vue", ["postReceiptOnly"]],
+    ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
+    ["src/store/deposits.ts", ["postReceiptOnce"]],
   ];
+  samples.wired = WIRED.length;
   for (const [rel, needles] of WIRED) {
     const src = strip(readFileSync(path.join(root, rel), "utf8"));
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
@@ -407,27 +440,10 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
 
 // ── ⑥ 迁移棘轮:仍在裸调 bills 写入的存量点只许减不许增 ─────────────────────────────
 {
-  // 收口点(postMoneyBill / postReceiptOnly)已就位,新代码没有理由再裸调。存量点是本轮
-  // 文件边界外的迁移欠账(另有并发 agent 在这些文件上),这道门保证它**只减不增**。
-  // 键是文件不是行号 —— 行号会被并发编辑冲掉,文件+条数不会。
-  const LEDGER = {
-    "src/App.vue": 2,
-    "src/components/home/weekly-quest-hero.vue": 2,
-    "src/components/home/weekly-quest-list.vue": 2,
-    "src/components/lucky-spin-sheet.vue": 2,
-    
-    "src/components/tradein-sheets.vue": 3,
-    "src/lib/share.ts": 2,
-    "src/pages/daily/daily.vue": 3,
-    "src/pages/events/events.vue": 1,
-    "src/pages/genesis/marketplace.vue": 1,
-    "src/pages/me/achievements.vue": 2,
-    "src/pages/me/wallet-cards-new.vue": 2,
-    "src/pages/me/wallet-topup.vue": 1,
-    "src/pages/staking/staking.vue": 2,
-    "src/pages/store/bundle.vue": 1,
-    "src/store/deposits.ts": 3,
-  };
+  // 🔴 存量已清零(2026-08-04 迁移收官):16 个文件 / 29 处裸调全部接到收口点。
+  // 台账留空不是把门拆了 —— 它现在是**零容忍**:任何文件冒出一处丢弃返回值的
+  // bills 写入,`n > 0` 立刻判红。键是文件不是行号(行号会被并发编辑冲掉)。
+  const LEDGER = {};
   const CHOKEPOINT = "src/lib/money-receipt.ts";
   const files = [];
   (function walk(d) {
@@ -441,37 +457,59 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 🔴 原语名单必须与 bills 的**全部**写入原语对齐(R5:漏了 addMany —— 而它正是「N 条分录
   // 一次落盘」的多腿原语、本族不变量的核心机制。收口点被绕开时全树对裸调 addMany 零监控)。
   // 名单来源不是记忆:bills.ts 里对外暴露的**建分录**函数(add / addMany / addOnce /
-  // addForAccount)。`settleByRef` 故意不在内 —— 它改的是已有分录的状态,收口点不替代它,
-  // 把它算进来这道「只许减不许增」的棘轮就没有迁移目标可减了(另有 App.vue 等在用)。
+  // addForAccount)。`settleByRef` 故意不在内 —— 它改的是已有分录的状态,收口点不替代它。
   const CALL = /(?:useBills\(\)|bills|billsStore)\.(?:add|addMany|addOnce|addForAccount)\(\s*[{a-zA-Z"'`[]/g;
+  /** 一行里是否有「丢弃返回值」的 bills 写入 = 调用处在语句位:
+   *  前缀为空,或以 ; { } 或 `if (…)` 的右括号收尾。判据只写这一份,正控/负控与全站扫共用它 ——
+   *  各写一份的话,正控测的就不是真正在跑的那条判据。 */
+  function isBareWrite(line) {
+    CALL.lastIndex = 0;
+    const m = CALL.exec(line);
+    if (!m) return false;
+    const prefix = line.slice(0, m.index).trim();
+    return prefix === "" || /[;{}]$/.test(prefix) || /\)$/.test(prefix);
+  }
   const found = {};
   for (const f of files) {
     const rel = path.relative(root, f).replace(/\\/g, "/");
     if (rel === CHOKEPOINT) continue;
     const src = strip(readFileSync(f, "utf8"));
     for (const line of src.split(/\r?\n/)) {
-      CALL.lastIndex = 0;
-      const m = CALL.exec(line);
-      if (!m) continue;
-      // 返回值被丢弃 = 调用处在语句位:调用前缀为空,或以 ; { } 或 `if (…)` 的右括号收尾。
-      const prefix = line.slice(0, m.index).trim();
-      if (prefix === "" || /[;{}]$/.test(prefix) || /\)$/.test(prefix)) found[rel] = (found[rel] ?? 0) + 1;
+      if (isBareWrite(line)) found[rel] = (found[rel] ?? 0) + 1;
     }
   }
   samples.ledgerFiles = Object.keys(LEDGER).length;
   const grown = Object.entries(found).filter(([f, n]) => n > (LEDGER[f] ?? 0));
   const total = Object.values(found).reduce((a, b) => a + b, 0);
-  check(`⑥ 🔴 裸调 bills 写入不许新增(扫 ${files.length} 个源文件,存量 ${total} 处 / ${Object.keys(found).length} 文件)`,
+  check(`⑥ 🔴 裸调 bills 写入清零后不许回潮(扫 ${files.length} 个源文件,当前 ${total} 处 / ${Object.keys(found).length} 文件)`,
     grown.length === 0, grown.map(([f, n]) => `${f}: ${n} > ${LEDGER[f] ?? 0}`).join(" | "));
-  // 台账收干净了只是提示不是失败:并发迁移期这会来回抖,而"减少"本身不是回归。
-  // 硬门只守"增长"那一面(见上一条)。
-  const stale = Object.keys(LEDGER).filter((f) => !(f in found));
-  if (stale.length) console.log(`  INFO  ⑥ 台账里这些文件已清空,可从 LEDGER 删除:${stale.join(", ")}`);
-  check("⑥ 扫描器没有空转(判据失效 = 空集全过,这一条是它的活体证明)",
-    total > 0 && files.length > 100, `total=${total} files=${files.length}`);
+  // 🔴 活体证明改成正控 + 负控。原来这条靠「存量 total > 0」自证判据还活着 —— 迁移做完
+  // total 归零,那条断言会**反过来判红**:把「欠账还完了」误报成回归,逼下一个人留一处不迁。
+  // 判据的活性该由它对已知样本的判断来证明,而不是由生产代码里还欠着多少债来证明。
+  const POS = [
+    '    bills.add({ type: "bonus" });',
+    '  useBills().addOnce({ type: "topup" });',
+    '  if (x) { billsStore.addForAccount(k, { type: "withdraw" }); }',
+    // addMany 是 R5 才补进原语名单的多腿写入,必须有自己的正控 —— 名单里加了一项、
+    // 却没有一条控制线走那一项,等于这一支从没被验证过(合取项逐个隔离)。
+    '  bills.addMany([{ type: "bonus" }, { type: "fee" }]);',
+  ];
+  const NEG = [
+    '  const b = bills.add({ type: "bonus" });',                        // 接了返回值
+    '  if (!bills.addForAccount(a, { type: "withdraw" })) return;',     // 接了并判了
+    '  return useBills().addOnce({ type: "topup" });',                  // 返回给上层处置
+  ];
+  const posHit = POS.filter(isBareWrite).length;
+  const negHit = NEG.filter(isBareWrite).length;
+  // 条数从数组长度取,不写死 —— 写死的话往 POS/NEG 里加了控制线,标签还报旧数字,
+  // 「加了没加」在输出里看不出来(样本量必须是真数,不是记忆里的数)。
+  check(`⑥ 扫描器没有空转:正控 ${POS.length} 条必中 / 负控 ${NEG.length} 条必不中(判据失效当场暴露,不靠存量自证)`,
+    posHit === POS.length && negHit === 0 && files.length > 100,
+    `pos=${posHit}/${POS.length} neg=${negHit}/0 files=${files.length}`);
 }
 
 console.log(`\n${pass} pass / ${fail} fail(样本:${samples.primitives} 个资金原语 × 3 断言 · `
   + `${samples.targets} 组固定靶(真 store + 真收口点,注入式落盘失败) · `
-  + `${samples.scanned} 个源文件扫裸调 · ${samples.ledgerFiles} 个文件在迁移台账 · ${samples.locales} 语 i18n)`);
+  + `${samples.scanned} 个源文件扫裸调 · ${samples.wired} 个调用点在接线门 · `
+  + `${samples.ledgerFiles} 个文件欠迁移 · ${samples.locales} 语 i18n)`);
 process.exit(fail ? 1 : 0);
