@@ -169,7 +169,9 @@ function handleRepurchase() {
         status: "posted",
         memo: `Re-invest reversed · 90d stake refunded`,
         memoKey: "stakeReversed",
-        ref: billRef,
+        // 🔴 冲正分录的幂等键要与原分录分开(addOnce 按 ref+type+symbol 判重,
+        // 原本三项完全相同 → 将来任何幂等写都会误命中冲正行)。同 marketplace。
+        ref: `${billRef}-REV`,
       },
       { restoreTo: before },
     );
