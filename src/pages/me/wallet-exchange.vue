@@ -422,9 +422,9 @@ async function handleConfirm() {
     }
 
     // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC):debit + credit + recordSwap +
-    // bills + v3.record 是分开的写。PRODUCTION:兑换提交单事务,带 Idempotency-Key
-    // (endpoint TBD;PRD 未定义用户端兑换写接口,只有 GET /api/config/exchange/caps
-    //  与 POST /api/admin/exchange/pause;勿把候选路径当既定契约引用)。
+    // bills + v3.record 是分开的写。PRODUCTION:POST /api/exchange/swap 单事务提交,
+    // 带 Idempotency-Key(PRD §9.4.3;阈值走 GET /api/config/exchange/caps,
+    //  全局暂停走 POST /api/admin/exchange/pause)。
     // 🔴 一进一出两腿 + 两条分录 = **一笔交易**,走多腿收口点一次提交(2026-08-04 R4)。
     // 原实现:debit → credit → 两次裸 billsStore.add。bills.add 写不进去时返回 null 且不抛
     // 异常、没人接 —— 钱两边都动了、弹「兑换完成」,账单页却只有半边甚至一条都没有。
