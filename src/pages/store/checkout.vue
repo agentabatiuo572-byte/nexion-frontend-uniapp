@@ -740,6 +740,18 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
+      // 🔴 非数值金额必须在**任何终态副作用之前**拦掉(R3 P1)。NaN 参与比较恒为假 ——
+      // 上面的族级兜底闸(`chargeTotal > quotedTotal`)与下面的余额预检(`余额 < chargeTotal`)
+      // **两道都会静默放行**,于是 convert() 把试用打成 converted(不可逆终态),而随后的
+      // debitBalance(NaN) 被 store 侧的 Number.isFinite 守卫拒掉 —— 净结果是「单没下、钱没扣、
+      // 试用永久没了」。app.ts 的余额三函数早已为同一类污染加了守卫,这里是对称的调用侧缺口。
+      // 一条闸收全族:入账两项(试用剩余 / NEX)虽有 `> 0` 挡着不会污染余额,但 NaN 会让它们
+      // **静默漏发**给用户 —— 同一处判掉,不留「一个金额一道守卫」的散点。
+      if (![chargeTotal, net, fee, trialRemainderUSD, shadowNEXNow].every((v) => Number.isFinite(v) && v >= 0)) {
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
       // convert() 是状态机的最终裁决(它自取 server now 再解析一次):返回 false
       // = 拒绝转化,必须当拒单信号处理,且必须在扣款之前判定 —— 绝不允许「先扣
       // 钱再发现不能转化」。余额充足性先只读判定,使 convert 成功后扣款必成功

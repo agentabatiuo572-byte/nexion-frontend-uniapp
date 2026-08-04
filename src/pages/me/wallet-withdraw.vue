@@ -991,14 +991,14 @@ async function handleSubmit() {
   const memo = fresh.route === "pass"
     ? fmt(t.value.wallet.withdrawBillMemoPass, { network: snap.network, fee: charged.toFixed(2) })
     : t.value.wallet.withdrawBillMemoReview;
-  // 🔴 账号已换就不写账单 —— 写进去就是别人的流水(bills 换号会重绑到新账号)
-  if (app.accountKey !== snap.account) {
-    clearSubmitFreeze();
-    return;
-  }
+  // 🔴 账单一律写回**被扣款的那个账号**(snap.account),不写「当前绑定的账号」(R3 P1)。
+  // 原实现在换号时直接 return 不写:动机对(写进当前账号 = 别人的流水),结论错 ——
+  // 钱已经扣在旧账号上,不写就是「有扣款、无凭证」。addForAccount 直写目标账号行,
+  // 目标即当前账号时退化为 add()(同步刷新内存态,页面立刻可见)。
+  const switched = app.accountKey !== snap.account;
   // 账单写失败必须让用户知道:钱已经扣了,台账却没这一笔 —— 静默吞掉等于让用户
   // 在账单页查不到自己的钱去哪了。(bills 与账户快照是两份存储,mock 期无法原子。)
-  if (!bills.add({ type: "withdraw", symbol: "USDT", amount: -snap.amount, status: "pending", memo, ref: withdrawalId })) {
+  if (!bills.addForAccount(snap.account, { type: "withdraw", symbol: "USDT", amount: -snap.amount, status: "pending", memo, ref: withdrawalId })) {
     toast.error(t.value.wallet.withdrawBillWriteFailed);
   }
   if (fresh.route !== "pass") {
@@ -1007,7 +1007,8 @@ async function handleSubmit() {
   if (toBurn > 0) {
     // NEX 已经真扣了(debitNex),账单写失败同样要让用户知道 —— 与上面 USDT 行同口径。
     // 静默吞掉 = NEX 少了、账单没有这一笔、用户零感知。
-    const nexBillOk = bills.add({
+    // 与 USDT 行同口径:写回被扣 NEX 的那个账号,不看当前绑定。
+    const nexBillOk = bills.addForAccount(snap.account, {
       type: "withdraw",
       symbol: "NEX",
       amount: -toBurn,
@@ -1021,6 +1022,8 @@ async function handleSubmit() {
     if (!nexBillOk) toast.error(t.value.wallet.withdrawBillWriteFailed);
   }
   clearSubmitFreeze();
+  // 换号后不跳追踪页:那笔单属于旧账号,当前账号的追踪页查不到它(深链会落空态)。
+  if (switched) return;
   // 带单号深链:刚提交第二笔时追踪页不再错位显示最早在途单(证伪建议 2)
   uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
 }

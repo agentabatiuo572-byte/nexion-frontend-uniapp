@@ -202,6 +202,8 @@ function bench(opts) {
   const {
     row, clockAt, payClockAt = clockAt, balance = 100_000, voucher = 0, tradein = 0,
     isCard = false, convertReturns = null, productId = "stellarbox-s1",
+    // 上游污染注入(R3 P1 固定靶):商品价被写成非数值时,金额链全线 NaN。
+    productPrice = null,
   } = opts;
   const store = { row: { ...row }, converted: false };
   const toasts = [];
@@ -255,7 +257,7 @@ function bench(opts) {
   const out = api.settle({
     trialQuote: snapshot,
     quotedTotal: shownTotal,
-    p: PRODUCT,
+    p: productPrice === null ? PRODUCT : { ...PRODUCT, price: productPrice },
     discount: voucher,
     ti: tradein > 0 ? { credit: tradein, device: { id: "dev-old", name: "Old" } } : null,
     isCard: { value: isCard },
@@ -415,6 +417,17 @@ function bench(opts) {
     const m = readSrc("src", "i18n", "messages", `${lang}.ts`);
     check("wiring", `W13-${lang} store.coTotalQuoteChanged 文案存在`, /coTotalQuoteChanged:\s*"[^"]{4,}"/.test(m));
   }
+}
+
+// ── ⑥ 非数值金额(R3 P1):NaN 比较恒为假 → 族级兜底闸与余额预检**都会静默放行**,
+//    convert() 会把试用打成不可逆终态,而 debitBalance(NaN) 被 store 守卫拒掉 ——
+//    净结果「单没下、钱没扣、试用永久没了」。守卫必须排在任何终态副作用之前。
+{
+  const b = bench({ row: rowGrace, clockAt: T0 + 5 * D, productPrice: Number.NaN });
+  check("settle", "⑥金额非数值 → 拒单(不成交)", b.out === undefined);
+  check("settle", "⑥金额非数值 → 零扣款", b.debits.length === 0);
+  check("settle", "⑥金额非数值 → 试用**未被烧成终态**(守卫排在 convert 之前)", b.converted === false);
+  check("settle", "⑥金额非数值 → 回报价步 + 提示", b.step === "select-payment" && b.toasts.length > 0);
 }
 
 // ── 收口:样本量地板(防空集假绿)──

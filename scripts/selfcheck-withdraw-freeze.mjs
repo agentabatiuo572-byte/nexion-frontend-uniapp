@@ -265,5 +265,37 @@ const { useBills } = await loadStore("bills.ts");
       readFileSync(path.join(root, "src", "i18n", "messages", `${l}.ts`), "utf8").includes("withdrawContextStale:")));
 }
 
+// ── ⑦ 行为固定靶:换号后账单必须写回**被扣款的那个账号**(R3 P1)────────────
+// 原实现在换号时直接 return 不写:动机对(写进当前账号 = 别人的流水),结论错 ——
+// 钱已扣在旧账号,不写就是「有扣款、无凭证」。addForAccount 直写目标账号行。
+{
+  const store = useBills();
+  const OLD = "acct-old";
+  const NEW = "acct-new";
+  const REF = "WD-CROSS-1";
+  store.bindAccount(OLD);
+  const seenOld = () => store.bills.value ?? store.bills;
+  // 模拟 await 期间换号:钱扣在 OLD,写账单时当前绑定已是 NEW
+  store.bindAccount(NEW);
+  const wrote = store.addForAccount(OLD, {
+    type: "withdraw", symbol: "USDT", amount: -50, status: "pending", memo: "cross", ref: REF,
+  });
+  check("⑦ 换号后写账单返回成功(不再静默 return 丢凭证)", !!wrote);
+  check("⑦ 当前(新)账号视图里**没有**这笔别人的流水",
+    !(seenOld()).some((b) => b.ref === REF));
+  store.bindAccount(OLD);
+  check("⑦ 切回被扣款账号后,这笔流水在(金额/单号都对)",
+    (seenOld()).some((b) => b.ref === REF && b.amount === -50 && b.symbol === "USDT"));
+  // 目标账号 == 当前账号时应退化为 add(),同步刷新内存态
+  const same = store.addForAccount(OLD, {
+    type: "withdraw", symbol: "NEX", amount: -3, status: "posted", memo: "same", ref: "WD-SAME-1",
+  });
+  check("⑦ 目标即当前账号 → 退化为 add(),内存态同步可见(页面立刻能看到)",
+    !!same && (seenOld()).some((b) => b.ref === "WD-SAME-1"));
+  check("⑦ 提现页两处账单写入均已改走 addForAccount(不再有裸 bills.add 漏写)",
+    (pageRaw.match(/bills\.addForAccount\(\s*snap\.account/g) || []).length === 2
+    && !/bills\.add\(\{\s*type:\s*"withdraw"/.test(pageRaw));
+}
+
 console.log(`\n${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
