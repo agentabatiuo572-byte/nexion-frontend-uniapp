@@ -30,8 +30,10 @@ import { build, transformSync } from "esbuild";
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const EXCHANGE = path.join(root, "src", "pages", "me", "wallet-exchange.vue");
 const SHEET = path.join(root, "src", "components", "genesis", "purchase-sheet.vue");
+const RECEIPT = path.join(root, "src", "lib", "money-receipt.ts");
 const exRaw = readFileSync(EXCHANGE, "utf8");
 const shRaw = readFileSync(SHEET, "utf8");
+const receiptRaw = readFileSync(RECEIPT, "utf8");
 
 let pass = 0;
 let fail = 0;
@@ -54,7 +56,34 @@ function grabBlock(src, needle) {
   }
   throw new Error(`selfcheck-exchange-genesis-guard: \`${needle}\` 括号不闭合`);
 }
+/** 从 needle 起抠出一条到分号为止的语句(括号配平后才认分号)。抠不到直接炸。 */
+function grabStatement(src, needle) {
+  const start = src.indexOf(needle);
+  if (start < 0) throw new Error(`selfcheck-exchange-genesis-guard: 源码里找不到 \`${needle}\`(实现被改名或删除?)`);
+  let depth = 0;
+  for (let i = start; i < src.length; i++) {
+    const c = src[i];
+    if ("({[".includes(c)) depth++;
+    else if (")}]".includes(c)) depth--;
+    else if (c === ";" && depth === 0) return src.slice(start, i + 1);
+  }
+  throw new Error(`selfcheck-exchange-genesis-guard: \`${needle}\` 语句不闭合`);
+}
 const ts2js = (src) => transformSync(src, { loader: "ts" }).code;
+
+/**
+ * 把页面的**取整 / 报价 / 展示**四个正主(money / amtLabel / quoteTo / swapLine)原文抠出来
+ * 执行 —— 判据绝不抄一份副本:抄了的话固定靶就是在跟自己的复制品比对,页面怎么漂都发现不了。
+ * MONEY_SRC 单独拎出来是因为 quoteTo 与 handleConfirm 都依赖它,注入哪边都得带上。
+ */
+const MONEY_SRC = ts2js(grabStatement(exRaw, "const money = "));
+const pageMath = new Function(
+  `${MONEY_SRC}\n${ts2js([
+    grabStatement(exRaw, "const amtLabel = "),
+    grabBlock(exRaw, "function quoteTo("),
+    grabBlock(exRaw, "function swapLine("),
+  ].join("\n"))}\n; return { money, amtLabel, quoteTo, swapLine };`,
+)();
 
 console.log("selfcheck-exchange-genesis-guard — 兑换成交快照单源化 + 创世购买重入守卫");
 
@@ -112,10 +141,10 @@ const iDebit = Math.min(
   check("A② 确认后复验拿**当前**汇率(rate.value)对比快照到账额,不是拿快照复验快照",
     iRateGate >= 0 && iRateGate > iAwait && iRateGate < iDebit,
     `gate@${iRateGate} await@${iAwait} debit@${iDebit}`);
-  check("A② 复验与页面展示共用同一个报价公式 quoteTo(全文只此一处 toFixed 报价实现)",
+  check("A② 复验与页面展示共用同一个报价公式 quoteTo(报价实现全文只此一处)",
     /function quoteTo\(/.test(strip(exRaw))
     && /const toAmount = computed\(\(\) => quoteTo\(/.test(strip(exRaw))
-    && (strip(exRaw).match(/\+\(from \/ r\)\.toFixed|\+\(from \* r\)\.toFixed/g) || []).length === 2);
+    && (strip(exRaw).match(/return money\(dir === "usdt2nex" \? from \/ r : from \* r\);/g) || []).length === 1);
   check("A② 账号 + 额度复验也排在扣款之前(拒单零资金动作)",
     confirmBody.indexOf("app.accountKey !== snap.account") > iAwait
     && confirmBody.indexOf("app.accountKey !== snap.account") < iDebit
@@ -124,11 +153,57 @@ const iDebit = Math.min(
     /finally \{[\s\S]{0,200}submitting\.value = false;[\s\S]{0,40}\}/.test(confirmBody));
   check("A③ 结算延迟写成 await(setTimeout 回调版守卫在函数返回时就复位了 = 等于没守)",
     /await new Promise\(\(r\) => setTimeout\(r, 900\)\)/.test(confirmBody));
-  // 成交动作一律读快照 —— 逐个动钱/记账入口点名核对。
-  const SETTLE = ["app.debitBalance(snap.fromAmount)", "app.debitNex(snap.fromAmount)",
-    "app.creditNex(snap.toAmount)", "app.creditBalance(snap.toAmount)", "v3.record(snap.usd)"];
-  const notSnap = SETTLE.filter((s) => !confirmBody.includes(s));
-  check(`A② 全部 ${SETTLE.length} 个动钱/计数入口的入参都是快照`, notSnap.length === 0, notSnap.join(","));
+  // 🔴 守的是**性质**(成交入参必须来自快照),不是「调用了哪个函数」。
+  // 原判据点名 `app.debitBalance(snap.fromAmount)` 等四个裸原语,收口成 postMoneyBills 之后
+  // 它们在页面里不再出现 —— 这次恰好判假红了,但同族写法(扫不到 → 没有违规 → 绿)正是
+  // 判据比它所判的形态活得更久、静默失效的经典形态。所以:扫**一组**资金原语,
+  // **一个都扫不到直接判失败**,再断言入参是 snap.*。
+  const MONEY_CALLS = ["postMoneyBills(", "postMoneyBill(", "app.debitBalance(", "app.debitNex(",
+    "app.creditBalance(", "app.creditNex("];
+  const moneyHit = MONEY_CALLS.filter((c) => confirmBody.includes(c));
+  check(`A② 成交经由资金原语落地(扫 ${MONEY_CALLS.length} 个,命中 ${moneyHit.length} 个;一个都扫不到即判失败)`,
+    moneyHit.length > 0, "成交链里找不到任何资金原语 —— 判据已与实现脱节,不是没有违规");
+  // 两腿 = 一进一出,金额与币种都必须取自快照;日限计数同理。少一腿 = 复式账本只记了一半。
+  const LEGS = [
+    ["出账腿金额", "amount: -snap.fromAmount"],
+    ["出账腿币种", "symbol: snap.fromSym"],
+    ["入账腿金额", "amount: snap.toAmount"],
+    ["入账腿币种", "symbol: snap.toSym"],
+    ["日限计数", "v3.record(snap.usd)"],
+  ];
+  const notSnap = LEGS.filter(([, s]) => !confirmBody.includes(s)).map(([n]) => n);
+  check(`A② 成交 ${LEGS.length} 项入参全部取自快照(一进一出两腿的金额+币种、日限计数)`,
+    notSnap.length === 0, notSnap.join(","));
+}
+// ══ A④ 展示精度 == 账本精度(结构):全页只有一个取整口径,四个展示口零二次舍入 ══════
+{
+  const ex = strip(exRaw);
+  check("A④ 账本精度单源 money() = +n.toFixed(2),报价两个方向共用它(不再分方向各取各的整)",
+    /const money = \(n: number\): number => \+n\.toFixed\(2\);/.test(ex)
+    && /return money\(dir === "usdt2nex" \? from \/ r : from \* r\);/.test(ex));
+  check("A④ 用户输入进入资金链路时就归到账本精度(否则账单记 1.2345 而账本只动 1.23)",
+    /const fromAmount = computed\(\(\) => \{[\s\S]{0,120}return isNaN\(n\) \? 0 : money\(n\);/.test(ex));
+  check("A④ 展示口径固定 2 位(min=max 同时钉死;只钉 max 会被 toLocaleString 的默认 min=0 放过)",
+    /const amtLabel = [\s\S]{0,160}minimumFractionDigits: 2, maximumFractionDigits: 2/.test(ex));
+  // 🔴 四个展示口逐个点名 —— 「新写法在不在」是弱判据,四处**全部**经由 amtLabel 才算数。
+  const SITES = [
+    ["收款卡", /const toAmountLabel = computed\(\(\) => amtLabel\(toAmount\.value\)\)/],
+    ["确认弹窗", /message: `\$\{snap\.fromSym\} \$\{amtLabel\(snap\.fromAmount\)\} → \$\{snap\.toSym\} \$\{amtLabel\(snap\.toAmount\)\}`/],
+    ["成功 toast", /\.replace\("\{fromAmt\}", amtLabel\(snap\.fromAmount\)\)[\s\S]{0,80}\.replace\("\{toAmt\}", amtLabel\(snap\.toAmount\)\)/],
+    ["历史行", /return `\$\{amtLabel\(h\.fromAmount\)\} \$\{h\.fromSym\} → \$\{amtLabel\(h\.toAmount\)\} \$\{h\.toSym\}`/],
+  ];
+  const off = SITES.filter(([, re]) => !re.test(ex)).map(([n]) => n);
+  check(`A④ 🔴 ${SITES.length} 个展示口(收款卡/确认弹窗/成功 toast/历史行)全部经由 amtLabel`,
+    off.length === 0, off.join(","));
+  // 🔴 强判据 = 数「旧表述还剩几处」,为 0 才算修了(只验新写法在不在会漏掉遗留的那一处)。
+  const OLD = [
+    ["确认弹窗 NEX 取 0 位", /snap\.(from|to)Amount\.toFixed\(/],
+    ["历史行 NEX 取 0 位", /h\.(from|to)Amount\.toFixed\(/],
+    ["收款卡 maximumFractionDigits 分币种", /toAmount\.value\.toLocaleString\(undefined, \{ maximumFractionDigits/],
+    ["报价按方向分取整", /\+\(from [/*] r\)\.toFixed\(/],
+  ];
+  const left = OLD.filter(([, re]) => re.test(ex)).map(([n]) => n);
+  check(`A④ 🔴 ${OLD.length} 种旧的二次舍入写法全文 0 残留`, left.length === 0, left.join(","));
 }
 {
   // 提交在途时输入面整体冻结(裸 <view @click> 入口没有 :disabled,得自己挡)。
@@ -151,8 +226,15 @@ const purchaseBody = strip(grabBlock(strip(shRaw), "function handlePurchase()"))
   check("B④ 重入守卫排在最前(先于资格门与任何资金动作)",
     /function handlePurchase\(\) \{\s*if \(purchasing\.value\) return;/.test(purchaseBody));
   const iLockP = purchaseBody.indexOf("purchasing.value = true");
-  const iDebitP = purchaseBody.indexOf("app.debitBalance(cost)");
-  check("B④ 上锁点在第一次动钱之前", iLockP >= 0 && iLockP < iDebitP, `lock@${iLockP} debit@${iDebitP}`);
+  // 🔴 判据盯的是「第一次动钱」这件事,不是某一个函数名。原来写死 `app.debitBalance(cost)`,
+  // 收口到 postMoneyBill 之后它 indexOf 返回 -1 —— 而 -1 会让 `iLock < iDebit` 直接为假,
+  // 这次是红了;但同族的写法(找不到就当没有 → 恒真)正是哨兵假绿的经典形态。
+  // 改成扫**一组**资金原语取最早那个,并且**一个都扫不到就判失败**(不是默默放行)。
+  const MONEY_PRIMS = ["app.captureMoney()", "postMoneyBill(", "app.debitBalance(", "app.debitNex(", "app.creditBalance("];
+  const moneyHits = MONEY_PRIMS.map((p) => purchaseBody.indexOf(p)).filter((i) => i >= 0);
+  const iMoneyP = moneyHits.length ? Math.min(...moneyHits) : -1;
+  check(`B④ 上锁点在第一次动钱之前(扫 ${MONEY_PRIMS.length} 个资金原语,命中 ${moneyHits.length} 个)`,
+    iLockP >= 0 && iMoneyP >= 0 && iLockP < iMoneyP, `lock@${iLockP} firstMoney@${iMoneyP}`);
   check("B④ 复位在 finally,且只有真成交才继续持锁(committed 标记)",
     /finally \{[\s\S]{0,400}if \(!committed\) purchasing\.value = false;[\s\S]{0,40}\}/.test(purchaseBody)
     && /committed = true;\s*emitClose\(\);/.test(purchaseBody));
@@ -169,15 +251,20 @@ const purchaseBody = strip(grabBlock(strip(shRaw), "function handlePurchase()"))
 // ══ C. 行为固定靶 —— 跑**页面里那两个正主函数**,不是抄一份逻辑 ═══════════════
 // 依赖用 stub(判的是页面的快照/守卫纪律,不是 store 算术);t 载真 en.ts,
 // 缺 key 会直接暴露成 undefined。
-const enMod = await import(
-  "data:text/javascript;base64," +
-  Buffer.from(
-    (await build({ entryPoints: [path.join(root, "src", "i18n", "messages", "en.ts")], bundle: true, write: false, format: "esm" }))
-      .outputFiles[0].text,
-    "utf8",
-  ).toString("base64")
-);
-const EN = enMod.default ?? enMod.en ?? Object.values(enMod)[0];
+const LANGS = ["en", "zh", "vi"];
+/** 值必须是**非空字符串**。undefined / null / "" / 全空白一律不算有文案 —— 用户看到的是空白提示。 */
+const nonEmpty = (v) => typeof v === "string" && v.trim().length > 0;
+/** 真解析:把 locale 模块 bundle 出来取**值**,不是在文件文本里找 key 名(注释能骗过子串扫描)。 */
+async function loadLocale(l) {
+  const out = await build({
+    entryPoints: [path.join(root, "src", "i18n", "messages", `${l}.ts`)],
+    bundle: true, write: false, format: "esm",
+  });
+  const mod = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
+  return mod[l] ?? mod.default ?? Object.values(mod)[0];
+}
+const LOCALES = Object.fromEntries(await Promise.all(LANGS.map(async (l) => [l, await loadLocale(l)])));
+const EN = LOCALES.en;
 const t = { value: EN };
 const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
 
@@ -186,11 +273,30 @@ function makeApp(usdt, nex) {
   return {
     calls,
     accountKey: "acct-1",
-    user: { usdtBalance: usdt, nexBalance: nex },
-    debitBalance(n) { calls.push(["debitBalance", n]); if (this.user.usdtBalance < n) return false; this.user.usdtBalance -= n; return true; },
+    // withdrawableUsdt 一并建模:退款只还总余额不还可提额度正是 restoreMoney 要防的那个坑,
+    // 少了这一维,「退款还原对不对」就无从判起。
+    user: { usdtBalance: usdt, nexBalance: nex, earningBuckets: { withdrawableUsdt: usdt } },
+    debitBalance(n) {
+      calls.push(["debitBalance", n]);
+      if (this.user.usdtBalance < n) return false;
+      this.user.usdtBalance -= n;
+      // 对齐 app.ts:扣款把可提额度 clamp 到扣款后的总余额(退款不还原就永久压低)。
+      this.user.earningBuckets.withdrawableUsdt = Math.min(this.user.earningBuckets.withdrawableUsdt, this.user.usdtBalance);
+      return true;
+    },
     debitNex(n) { calls.push(["debitNex", n]); if (this.user.nexBalance < n) return false; this.user.nexBalance -= n; return true; },
     creditBalance(n) { calls.push(["creditBalance", n]); this.user.usdtBalance += n; return true; },
     creditNex(n) { calls.push(["creditNex", n]); this.user.nexBalance += n; return true; },
+    captureMoney() {
+      return { usdtBalance: this.user.usdtBalance, nexBalance: this.user.nexBalance, withdrawableUsdt: this.user.earningBuckets.withdrawableUsdt };
+    },
+    restoreMoney(snap) {
+      calls.push(["restoreMoney", snap.usdtBalance]);
+      this.user.usdtBalance = snap.usdtBalance;
+      this.user.nexBalance = snap.nexBalance;
+      this.user.earningBuckets.withdrawableUsdt = snap.withdrawableUsdt;
+      return true;
+    },
   };
 }
 function makeV3(capUsd = 50) {
@@ -204,43 +310,70 @@ function makeV3(capUsd = 50) {
 
 /** 把兑换页的 quoteTo + handleConfirm 原文注入执行(改坏它这里必红)。 */
 function buildHandleConfirm(env) {
-  const src = `${ts2js(grabBlock(exRaw, "function quoteTo("))}\n${ts2js(grabBlock(exRaw, "async function handleConfirm()"))}\n; return handleConfirm;`;
+  const src = `${MONEY_SRC}\n${ts2js(grabBlock(exRaw, "function quoteTo("))}\n${ts2js(grabBlock(exRaw, "async function handleConfirm()"))}\n; return handleConfirm;`;
   const names = Object.keys(env);
   // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
   return new Function(...names, src)(...names.map((n) => env[n]));
 }
-/** 一整套兑换页现场:100 NEX → USDT @0.085。 */
-function exchangeFixture({ onConfirm } = {}) {
+/**
+ * 一整套兑换页现场,默认 100 NEX → USDT @0.085。
+ * 🔴 到账额用**页面自己的 quoteTo** 算(不是在这里手写一遍公式)——
+ * 判据抄一份副本的话,页面报价怎么漂,固定靶都会跟着漂,永远绿。
+ */
+function buildPostMoneyBills(app, bills, toast) {
+  // 同 buildPostMoneyBill:从**返回类型**处起抠函数体,避开参数默认值 `opts = {}` 的花括号。
+  const grabbed = grabBlock(receiptRaw.slice(receiptRaw.indexOf("export function postMoneyBills(")), "): MoneyReceiptOutcome");
+  const body = grabbed.slice(grabbed.indexOf("{"));
+  const src = `function postMoneyBills(drafts, opts = {}) ${ts2js(body)}\n; return postMoneyBills;`;
+  // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
+  return new Function("useApp", "useBills", "getT", "toast", src)(() => app, () => bills, () => t.value, toast);
+}
+function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, rate: r = 0.085 } = {}) {
   const app = makeApp(500, 1000);
   const v3 = makeV3();
   const swaps = [];
   const billRows = [];
   const toasts = [];
-  const rate = { value: 0.085 };
-  const direction = { value: "nex2usdt" };
-  const fromAmount = { value: 100 };
-  const toAmount = { value: +(100 * 0.085).toFixed(4) };
-  const swapUSDValue = { value: +(100 * 0.085).toFixed(4) };
+  const confirmMessages = [];
+  const billsStub = {
+    add: (r2) => { billRows.push(r2); return r2; },
+    addMany: (ds) => { billRows.push(...ds); return ds; },
+  };
+  const toastStub = {
+    info: (a, b) => toasts.push(["info", a, b]),
+    error: (a, b) => toasts.push(["error", a, b]),
+    success: (a, b) => toasts.push(["success", a, b]),
+  };
+  const rate = { value: r };
+  const direction = { value: dir };
+  const fromAmount = { value: pageMath.money(from) };
+  const toAmount = { value: pageMath.quoteTo(dir, pageMath.money(from), r) };
+  const swapUSDValue = { value: dir === "usdt2nex" ? fromAmount.value : toAmount.value };
   const env = {
     submitting: { value: false },
     valid: { value: true },
     direction, fromAmount, toAmount, rate, swapUSDValue,
-    fromSym: { value: "NEX" }, toSym: { value: "USDT" },
-    input: { value: "100" },
+    fromSym: { value: dir === "usdt2nex" ? "USDT" : "NEX" },
+    toSym: { value: dir === "usdt2nex" ? "NEX" : "USDT" },
+    input: { value: String(from) },
     app, v3, t, fmt,
+    amtLabel: pageMath.amtLabel,
     uni: { navigateTo: () => {} },
     setTimeout: (fn) => globalThis.setTimeout(fn, 0),
-    confirm: async () => { if (onConfirm) onConfirm({ rate, direction, fromAmount, toAmount, swapUSDValue, app }); return true; },
-    toast: {
-      info: (a, b) => toasts.push(["info", a, b]),
-      error: (a, b) => toasts.push(["error", a, b]),
-      success: (a, b) => toasts.push(["success", a, b]),
+    confirm: async (opts) => {
+      confirmMessages.push(opts?.message);
+      if (onConfirm) onConfirm({ rate, direction, fromAmount, toAmount, swapUSDValue, app });
+      return true;
     },
+    toast: toastStub,
     exchange: { recordSwap: (e) => { swaps.push(e); return { ...e, id: `SW-${swaps.length}` }; } },
-    billsStore: { add: (r) => billRows.push(r) },
+    billsStore: billsStub,
+    // 兑换是一进一出**两条分录**,收口点是复数腿的 postMoneyBills;同样跑真实现,
+    // 不写替身 —— 替身一写,「展示 == 入账」就变成在跟我自己写的假入账对账。
+    postMoneyBills: buildPostMoneyBills(app, billsStub, toastStub),
   };
-  return { env, app, v3, swaps, billRows, toasts, rate, direction, fromAmount, toAmount, swapUSDValue,
-    handleConfirm: buildHandleConfirm(env) };
+  return { env, app, v3, swaps, billRows, toasts, confirmMessages, rate, direction, fromAmount,
+    toAmount, swapUSDValue, handleConfirm: buildHandleConfirm(env) };
 }
 
 // ── ⑤ 正常路径不受影响(先立基线,否则后面「零成交」全是同值自证)────────────
@@ -268,8 +401,12 @@ let BASE;
     f.app.user.nexBalance === 1000 && f.app.user.usdtBalance === 500
     && f.swaps.length === 0 && f.billRows.length === 0 && f.v3.recorded.length === 0,
     `nex=${f.app.user.nexBalance} usdt=${f.app.user.usdtBalance} swaps=${f.swaps.length}`);
+  // 🔴 先断言期望值本身非空,再比对:两边都可能是 undefined 的等式恒成立 = 判据自证。
+  // 文案被删空时这条必须红,而不是「toast 传 undefined、期望也 undefined」皆大欢喜。
   check("C① 拒单走「报价已过期」并说明未扣款(给出下一步,不是无声失败)",
-    f.toasts.some((x) => x[0] === "error" && x[1] === EN.exchange.quoteStaleTitle && x[2] === EN.exchange.quoteStaleRate));
+    nonEmpty(EN.exchange.quoteStaleTitle) && nonEmpty(EN.exchange.quoteStaleRate)
+    && f.toasts.some((x) => x[0] === "error" && x[1] === EN.exchange.quoteStaleTitle && x[2] === EN.exchange.quoteStaleRate),
+    `title=${JSON.stringify(EN.exchange.quoteStaleTitle)}`);
   check("C① 固定靶不是同值自证:新汇率算出的到账额(9)确实 ≠ 弹窗展示的 8.5",
     +(100 * 0.09).toFixed(4) !== 8.5 && BASE.usdt === 508.5);
   check("C① 反证:旧实现(回调里重读活值)会按 0.09 成交 —— 差别就在「用哪份」",
@@ -321,6 +458,103 @@ let BASE;
     f.v3.used === 8.5, `used=${f.v3.used}`);
 }
 
+// ── ⑦ 两腿原子性:收据落不了盘 → 两侧资金都还原、账上零残留 ──────────────────
+// 兑换是复式的一进一出。这一维此前没人守:资金动完两腿、收据写失败,若只还原一侧
+// (或干脆不还原),用户就会「NEX 少了、USDT 没多」而账单页什么都查不到。
+// 收口点的选择是 N 条分录**一次** addMany —— 所以「第一腿落了第二腿没落」这个中间态
+// 按构造根本不存在;要守的是**落盘失败时资金侧的对称还原**。
+{
+  const f = exchangeFixture();
+  f.env.billsStore.addMany = () => null;              // 收据落盘失败(bills.addMany 返回 null)
+  const nex0 = f.app.user.nexBalance, usdt0 = f.app.user.usdtBalance;
+  await f.handleConfirm();
+  check("C⑦ 收据落盘失败 → 两侧资金都还原(NEX 与 USDT 双双回到成交前),不是只还一侧",
+    f.app.user.nexBalance === nex0 && f.app.user.usdtBalance === usdt0,
+    `nex ${nex0}→${f.app.user.nexBalance} usdt ${usdt0}→${f.app.user.usdtBalance}`);
+  check("C⑦ 账上零残留 + 不记 swap 历史 + 日限不计(半执行痕迹一条都不许留)",
+    f.billRows.length === 0 && f.swaps.length === 0 && f.v3.recorded.length === 0,
+    `bills=${f.billRows.length} swaps=${f.swaps.length} rec=${f.v3.recorded.length}`);
+  check("C⑦ 用户拿到明确失败提示(不是静默吞掉后照弹「兑换完成」)",
+    f.toasts.some((x) => x[0] === "error") && !f.toasts.some((x) => x[0] === "success"),
+    JSON.stringify(f.toasts.map((x) => x[0])));
+  // 结构面:N 条分录必须一次落盘。退化成「逐腿 add」就重新造出中间态,行为靶未必抓得到。
+  const receiptStripped = strip(receiptRaw);
+  check("C⑦ 收口点用单次 addMany 落 N 条分录(不是循环逐腿 add,那会重新造出半落盘中间态)",
+    /bills\.addMany\(drafts\)/.test(receiptStripped)
+    && !/for \([^)]*of drafts\)[\s\S]{0,120}bills\.add\(/.test(receiptStripped));
+}
+
+// ── ⑥ 🔴 展示 == 入账:四个展示口与实际到账逐位同值(1/0.085 是本轮实测反例)────────
+/** 取字符串里最后一个数字(去掉千分位)。展示串形如 `USDT 1.00 → NEX 11.76`。 */
+const lastNum = (s) => {
+  const m = String(s).match(/[\d,]+\.\d+|\d+/g);
+  return m ? Number(m[m.length - 1].replace(/,/g, "")) : NaN;
+};
+/** 取字符串里第一个数字 —— 付出腿(`NEX 11.76 → USDT 1.00`)。 */
+const firstNum = (s) => {
+  const m = String(s).match(/[\d,]+\.\d+|\d+/g);
+  return m ? Number(m[0].replace(/,/g, "")) : NaN;
+};
+{
+  // 收款腿:1 USDT @0.085 → 11.76 NEX。旧实现三个展示口把 NEX 取整到 0 位 → 屏幕上写「12」。
+  const f = exchangeFixture({ direction: "usdt2nex", from: 1, rate: 0.085 });
+  const before = f.app.user.nexBalance;
+  await f.handleConfirm();
+  const credited = +(f.app.user.nexBalance - before).toFixed(2);
+  const quote = pageMath.quoteTo("usdt2nex", 1, 0.085);
+  const shown = [
+    ["收款卡", pageMath.amtLabel(quote)],                                  // toAmountLabel = amtLabel(toAmount)
+    ["确认弹窗", f.confirmMessages[0]],                                     // 正主 handleConfirm 真传给 confirm() 的那句
+    ["成功 toast", f.toasts.find((x) => x[0] === "success")?.[2]],
+    ["历史行", pageMath.swapLine(f.swaps[0])],                              // 正主 swapLine 跑真的 SwapEvent
+  ];
+
+  check("⑥ 固定靶成立:1 USDT @0.085 实际到账 11.76 NEX(报价与入账同值)",
+    credited === 11.76 && quote === 11.76, `credited=${credited} quote=${quote}`);
+  check("⑥ 🔴 固定靶不是同值自证:旧写法(NEX 取 0 位)会显示「12」,与到账 11.76 差 0.24",
+    (11.76).toFixed(0) === "12" && +(Number((11.76).toFixed(0)) - credited).toFixed(2) === 0.24);
+  const wrong = shown.filter(([, s]) => lastNum(s) !== credited).map(([n, s]) => `${n}="${s}"`);
+  check(`⑥ 🔴 ${shown.length} 个展示口读出来的数都 == 实际到账 ${credited}(逐口 parse 回数比,不比字符串)`,
+    wrong.length === 0 && shown.every(([, s]) => typeof s === "string" && s.length > 0), wrong.join(" | "));
+  check("⑥ 🔴 四个展示口一个都没出现旧的「12」",
+    shown.every(([, s]) => !/\b12\b/.test(String(s))), shown.map(([n, s]) => `${n}=${s}`).join(" | "));
+  check("⑥ 账单两行也记同一个数(-1 USDT 出 / +11.76 NEX 入,不是 +12)",
+    f.billRows.length === 2 && f.billRows[0].amount === -1 && f.billRows[1].amount === 11.76,
+    JSON.stringify(f.billRows.map((b) => b.amount)));
+}
+{
+  // 付出腿:余额 11.76 NEX 点 MAX → 11.76 NEX 出。旧实现弹窗/历史同样取整成「12 NEX」,
+  // 而实际扣的是 11.76 —— 与收款腿是同一个缺陷的另一面,不能只修一面。
+  const f = exchangeFixture({ direction: "nex2usdt", from: 11.76, rate: 0.085 });
+  const before = f.app.user.nexBalance;
+  await f.handleConfirm();
+  const debited = +(before - f.app.user.nexBalance).toFixed(2);
+  const shown = [
+    ["确认弹窗", f.confirmMessages[0]],
+    ["成功 toast", f.toasts.find((x) => x[0] === "success")?.[2]],
+    ["历史行", pageMath.swapLine(f.swaps[0])],
+  ];
+  const wrong = shown.filter(([, s]) => firstNum(s) !== debited).map(([n, s]) => `${n}="${s}"`);
+  check(`⑥ 🔴 付出腿同样对齐:实扣 ${debited} NEX,${shown.length} 个展示口读出来的都是它(旧写法显示 12)`,
+    debited === 11.76 && wrong.length === 0, wrong.join(" | "));
+  check("⑥ 付出腿账单行 = 实扣额(-11.76,不是 -12)",
+    f.billRows[0]?.amount === -11.76, JSON.stringify(f.billRows.map((b) => b.amount)));
+}
+{
+  // 反方向的「过细」形态:NEX→USDT 旧实现报 4 位小数,而账本只落 2 位 → 展示 10.5374 实入 10.54。
+  const f = exchangeFixture({ direction: "nex2usdt", from: 123, rate: 0.08567 });
+  const before = f.app.user.usdtBalance;
+  await f.handleConfirm();
+  const credited = +(f.app.user.usdtBalance - before).toFixed(2);
+  check("⑥ 🔴 过细的一面也堵上:123 NEX @0.08567 报价 10.54 == 入账 10.54(旧写法报 10.5374)",
+    credited === 10.54 && pageMath.quoteTo("nex2usdt", 123, 0.08567) === 10.54
+    && +(123 * 0.08567).toFixed(4) === 10.5374,
+    `credited=${credited} quote=${pageMath.quoteTo("nex2usdt", 123, 0.08567)}`);
+  check("⑥ 展示口读出来的仍 == 入账(4 位小数那份从没真正到过账)",
+    lastNum(f.confirmMessages[0]) === credited && lastNum(pageMath.swapLine(f.swaps[0])) === credited,
+    `msg=${f.confirmMessages[0]}`);
+}
+
 // ── ④ 创世双击 → 只扣一次款只铸一份 ──────────────────────────────────────
 function buildHandlePurchase(env) {
   const src = `${ts2js(grabBlock(shRaw, "function handlePurchase()"))}\n; return handlePurchase;`;
@@ -328,13 +562,40 @@ function buildHandlePurchase(env) {
   // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
   return new Function(...names, src)(...names.map((n) => env[n]));
 }
-function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true } } = {}) {
+/**
+ * 资金收口点 postMoneyBill 也**跑真实现**(从 lib/money-receipt.ts 原文抠出来注入),
+ * 不写替身:handlePurchase 现在把扣款与记账都委托给它,替身一写,「只扣一次」就变成
+ * 在跟我自己写的假扣款对账 —— 页面真怎么动钱反而测不到。
+ */
+function buildPostMoneyBill(app, bills, toast) {
+  // 从**返回类型**处起抠函数体:直接从函数名起抠会撞上参数默认值 `opts = {}` 的那对花括号,
+  // 括号配平在那里就归零,抠出来的是半截签名(实测 esbuild 直接 transform 失败)。
+  // 签名本身是类型化糖(ts2js 后就是这一行),函数体一字不改地原文注入。
+  const grabbed = grabBlock(receiptRaw.slice(receiptRaw.indexOf("export function postMoneyBill(")), "): MoneyReceiptOutcome");
+  const body = grabbed.slice(grabbed.indexOf("{"));   // 去掉 needle 自带的返回类型前缀
+  const src = `function postMoneyBill(draft, opts = {}) ${ts2js(body)}\n; return postMoneyBill;`;
+  // 🔴 单数版现在只是复数版的壳(`return postMoneyBills([draft], opts)`),复数正主必须
+  // 一起进同一个闭包 —— 只注入单数体会在运行时炸 `postMoneyBills is not defined`。
+  // 复用已有的 buildPostMoneyBills,不另写第二份注入。
+  // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
+  return new Function("useApp", "useBills", "getT", "toast", "postMoneyBills", src)(
+    () => app, () => bills, () => t.value, toast, buildPostMoneyBills(app, bills, toast),
+  );
+}
+function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, billsFail = false } = {}) {
   const app = makeApp(usdt, 0);
   const minted = [];
   const billRows = [];
   const toasts = [];
   const closes = [];
   const purchasing = { value: false };
+  // 收口点走 addMany(N 条分录一次落盘);add 保留给仍在裸调的存量路径。
+  // billsFail 两个入口都要挡 —— 只挡一个的话「收据落盘失败」那条靶会从没挡的那边溜过去。
+  const bills = {
+    add: (r) => { if (billsFail) return null; billRows.push(r); return r; },
+    addMany: (ds) => { if (billsFail) return null; billRows.push(...ds); return ds; },
+  };
+  const toast = { error: (a, b) => toasts.push(["error", a, b]), success: (a, b) => toasts.push(["success", a, b]) };
   const env = {
     purchasing,
     qty: { value: 1 },
@@ -343,8 +604,8 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true } } 
     gate: { value: { eligible: true, capRemaining } },
     app, t, fmt,
     genesis: { purchase: (n) => { if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason }; minted.push(n); return { ok: true, cost: n * 9999 }; } },
-    bills: { add: (r) => billRows.push(r) },
-    toast: { error: (a, b) => toasts.push(["error", a, b]), success: (a, b) => toasts.push(["success", a, b]) },
+    postMoneyBill: buildPostMoneyBill(app, bills, toast),
+    toast,
     emitClose: () => closes.push(1),
     GENESIS_ELIGIBILITY: { perUserCap: 5 },
   };
@@ -374,9 +635,23 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true } } 
     && poor.app.user.usdtBalance === 100);
   const soldOut = genesisFixture({ mint: { ok: false, reason: "sold-out" } });
   soldOut.handlePurchase();
-  check("C④ 铸造失败 → 已扣款原路退回(余额复原)+ 守卫解锁 + 0 行账单",
-    soldOut.app.user.usdtBalance === 50000 && soldOut.purchasing.value === false
-    && soldOut.billRows.length === 0 && soldOut.closes.length === 0);
+  // 收口到 postMoneyBill 之后,铸造失败的正确形态从「0 行账单」变成「1 扣 + 1 反向冲正,净和 0」:
+  // 已终态分录不改写,靠反向分录冲正(与提现 NEX 退还同规矩)。余额与**可提额度**都必须还原 ——
+  // 盲加 credit 只还总余额,一次失败退款就把可提额永久压低($8000 → $1)。
+  const soldOutNet = soldOut.billRows.reduce((a, b) => a + b.amount, 0);
+  check("C④ 铸造失败 → 账本 1 扣 + 1 反向冲正(净和 0)+ 余额与可提额度都还原 + 守卫解锁 + 不关面板",
+    soldOut.app.user.usdtBalance === 50000 && soldOut.app.user.earningBuckets.withdrawableUsdt === 50000
+    && soldOut.billRows.length === 2 && soldOutNet === 0
+    && soldOut.purchasing.value === false && soldOut.closes.length === 0,
+    `usdt=${soldOut.app.user.usdtBalance} withdrawable=${soldOut.app.user.earningBuckets.withdrawableUsdt} bills=${soldOut.billRows.length} net=${soldOutNet}`);
+  // 收据落不了盘 = 钱不许动、席位不许铸,且守卫必须解锁(否则一次落盘故障锁死后续所有购买)。
+  const noReceipt = genesisFixture({ billsFail: true });
+  noReceipt.handlePurchase();
+  check("C④ 收据落盘失败 → 资金精确还原 · 零铸造 · 零账单 · 不关面板 · 守卫解锁",
+    noReceipt.app.user.usdtBalance === 50000 && noReceipt.app.user.earningBuckets.withdrawableUsdt === 50000
+    && noReceipt.minted.length === 0 && noReceipt.billRows.length === 0
+    && noReceipt.closes.length === 0 && noReceipt.purchasing.value === false,
+    `usdt=${noReceipt.app.user.usdtBalance} minted=${noReceipt.minted.length}`);
   soldOut.env.genesis.purchase = (n) => { soldOut.minted.push(n); return { ok: true, cost: n * 9999 }; };
   soldOut.handlePurchase();
   check("C④ 失败后重试真的能成(解锁不是嘴上说说:第二次跑通并铸出 1 份)",
@@ -390,15 +665,27 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true } } 
 }
 
 // ── i18n:新增拒单文案三语齐 ───────────────────────────────────────────────
+// 🔴 这道门此前是**纯子串扫描**(`src.includes(`${k}:`)`),两个致命假绿:
+//   ① key 名写进注释就能骗过 —— 审计红测实证:删掉三个文案值、只在注释里留 key 名,
+//      门仍 43/43 全绿,而真实用户看到的是**空白的错误提示**。
+//   ② 更糟的是上面 C① 的 `x[1] === EN.exchange.quoteStaleTitle`:key 缺失时
+//      toast 传的和期望的**两边都是 undefined**,恒等成立 —— 判据自证。
+// 改法:真解析取值 + 断言「值本身是非空字符串」(不是「key 名字符串存在于文件里」);
+// 比对类断言一律先过 nonEmpty 再比,杜绝 undefined === undefined。
 {
   const keys = ["quoteStaleTitle", "quoteStaleRate", "quoteStaleContext"];
-  const langs = ["en", "zh", "vi"];
-  const missing = [];
-  for (const l of langs) {
-    const src = readFileSync(path.join(root, "src", "i18n", "messages", `${l}.ts`), "utf8");
-    for (const k of keys) if (!src.includes(`${k}:`)) missing.push(`${l}.${k}`);
+  const bad = [];
+  for (const l of LANGS) {
+    for (const k of keys) {
+      const v = LOCALES[l]?.exchange?.[k];
+      if (!nonEmpty(v)) bad.push(`${l}.exchange.${k}=${JSON.stringify(v)}`);
+    }
   }
-  check(`i18n:拒单文案 ${keys.length} key × ${langs.length} 语齐(en/zh/vi)`, missing.length === 0, missing.join(","));
+  check(`i18n:拒单文案 ${keys.length} key × ${LANGS.length} 语真解析取值且非空(en/zh/vi)`,
+    bad.length === 0, bad.join(","));
+  check("i18n:三语文案互不相同(整份复制粘贴 = 有值但没翻译,子串扫描一样看不出来)",
+    new Set(LANGS.map((l) => LOCALES[l].exchange.quoteStaleTitle)).size === LANGS.length,
+    LANGS.map((l) => LOCALES[l].exchange.quoteStaleTitle).join(" | "));
 }
 
 // PASS 行打样本量:光看「N pass」看不出这门到底覆盖了多少东西,也就看不出它有没有空转。
@@ -406,6 +693,8 @@ console.log(
   `\n${pass} pass / ${fail} fail(样本:兑换 handleConfirm + 创世 handlePurchase 两个正主函数原文注入执行` +
   ` · ${confirmBody.slice(iAwait).split(/\r?\n/).length} 行 await 后代码逐行扫 9 个活值 token` +
   ` · 8 项成交输入快照 + 5 个动钱/计数入口 · 5 组行为固定靶(汇率漂移/方向金额篡改/连点3次/创世同tick3击/正常路径)` +
-  ` · 4 条创世反向靶(余额不足·铸造失败·失败后重试·限购满不上锁) · 3 key × 3 语 i18n)`,
+  ` · 5 条创世反向靶(余额不足·铸造失败冲正·收据落盘失败·失败后重试·限购满不上锁)` +
+  ` · 兑换两腿原子性 4 靶(收据落盘失败 → 双侧资金还原·账上零残留·明确失败·单次 addMany)` +
+  ` · 资金收口点 postMoneyBill 跑真实现(lib/money-receipt.ts 原文注入) · 3 key × 3 语 i18n)`,
 );
 process.exit(fail ? 1 : 0);
