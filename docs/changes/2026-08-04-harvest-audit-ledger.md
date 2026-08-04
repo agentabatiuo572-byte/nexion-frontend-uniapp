@@ -224,3 +224,20 @@ verify **407 pass / 0 fail**;`vue-tsc` 0 错。
 **M-1 账单跨标签页丢失(P0)** —— `bills.persist` 走裸 `writeAccountRow`,而入金侧已上 CAS。
 修法与「完全版 A」存储路线是同一件事(账单归属 / 事务边界),分开做要白做两遍,按主人拍板并进重构。
 实测靶:`scripts/measure-bills-crosstab-loss.mjs`。
+
+---
+
+## ⑨ 收尾待办:admin-ops 的分支处置(**未执行,等所有任务结束**)
+
+主人指令(2026-08-04):「现在的 admin-ops 本地如果动了代码,所有任务结束后提交的
+`nexion-ops-console` **新建一个分支**,现在不要动 main。」
+
+**实测状态**(截至本轮):
+
+| 项 | 现状 | 处置 |
+|---|---|---|
+| 本地分支 | `main`,且**领先 origin/main 5 个提交**(`05960c4` / `65f87bc` / `9988588` / `a5f459b` / `2c477b4`) | 🔴 **不能直接 push** —— 当前分支就是 main,推上去正是主人禁止的那件事。需先从 HEAD 建新分支再推 |
+| 未提交 | 6 改 + 3 未跟踪(邀请码后台侧:`g4-invite-codes.tsx` / `g4-invite-client.ts` / 契约测试 / `verify.mjs` 挂齿轮 / g4-genesis+types+g-view 接线 / 两份审计状态报告) | ⚠️ **待主人裁**:按拍板 C 这批「不在本轮建」,但代码已存在;留着不提交有丢失风险,提交到**新分支**(不是 main)则既保住又不违反 C |
+| 机器门 | `node scripts/verify.mjs` 在第 14/33 齿断 —— **已知环境缺口不是回归**:`channel-parity` 等五齿硬读兄弟仓 `nexion-backend`,本工作区没有那个仓(admin 自己的 CLAUDE.md 写明) | 推分支时如实说明,不伪装成全绿 |
+
+**两个要主人拍的**:① 新分支叫什么;② 那 9 个未提交文件跟不跟着上新分支。
