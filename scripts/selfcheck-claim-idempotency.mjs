@@ -43,6 +43,10 @@ const SITES = [
   "src/pages/events/events.vue",
   "src/pages/me/achievements.vue",
   "src/pages/daily/daily.vue",
+  // quest 族三处 —— 独立验收指出它们与领奖族同型却漏改,现已统一(先发钱后消费 + 稳定 ref)
+  "src/App.vue",
+  "src/lib/share.ts",
+  "src/pages/me/wallet-cards-new.vue",
 ];
 
 console.log("selfcheck-claim-idempotency — 领奖族:发钱可重放,资格只消费一次");
@@ -164,16 +168,19 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
     // 只扫 `ref:` 那一行的话,时间戳藏在变量定义里就永远看不见(红测实测:给 hero 的
     // refId 掺 Date.now(),门纹丝不动)。所以两头都要看:字面 ref 行 + 它引用的变量定义。
     const refs = [];
+    const pushVarDef = (name) => {
+      for (const d of src.matchAll(new RegExp(`(?:const|let|var)\\s+${name}\\s*=([^\\r\\n]*)`, "g"))) refs.push(d[1]);
+    };
     for (const m of src.matchAll(/ref:([^\r\n]*)/g)) {
       const raw = m[1];
       refs.push(raw);
       // `ref: someVar` / `ref: someVar,` / `ref: someVar }` → 把那个变量的定义也拉进来判
       const varName = raw.match(/^\s*([A-Za-z_$][\w$]*)\s*[,}\r\n]?/)?.[1];
-      if (!varName) continue;
-      for (const d of src.matchAll(new RegExp(`(?:const|let|var)\\s+${varName}\\s*=([^\\r\\n]*)`, "g"))) {
-        refs.push(d[1]);
-      }
+      if (varName) pushVarDef(varName);
     }
+    // 🔴 **属性简写** `{ …, ref }` —— share.ts 就是这么写的,只认 `ref:` 的话整个文件
+    // 一条都扫不到(空集断言当场抓住)。简写时变量名一定就叫 `ref`,直接取它的定义。
+    if (/[,{]\s*ref\s*[,}]/.test(src)) pushVarDef("ref");
     // 🔴 空集必须判失败:一个在册的领奖文件**一条 ref 都扫不到**,只有两种可能 ——
     // 它其实没在用幂等出口(该从名单里去掉),或判据又对不上写法(该修判据)。
     // 两种都不该静默全过(哨兵假绿的经典形状:空集使全称命题恒真)。
@@ -275,5 +282,6 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
   }
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:3 组行为固定靶(真收口点 + 真 store)· 5 个调用点扫 ref 稳定性 · 4 处顺序门 + 2 处自愈门)`);
+// 样本量从实跑数取,不写死 —— 名单从 5 涨到 8 时标签还报 5,「加了没加」在输出里看不出来。
+console.log(`\n${pass} pass / ${fail} fail(样本:3 组行为固定靶(真收口点 + 真 store)· ${SITES.length} 个调用点扫 ref 稳定性 · 顺序门 + 自愈门 + 反向入册门)`);
 process.exit(fail === 0 ? 0 : 1);

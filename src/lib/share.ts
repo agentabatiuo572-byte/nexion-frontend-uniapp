@@ -3,7 +3,7 @@
 // 链接构造全站唯一入口(禁页面自拼 nexgrid.ai/ref/);渠道表来自 platform
 // config(运营可调);分享事件 client 记录(server-canonical `share.performed`)。
 import { useApp } from "@/store/app";
-import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useConfig } from "@/store/config";
 import { useQuest } from "@/store/quest";
 import { toast } from "@/store/ui";
@@ -183,14 +183,20 @@ export function recordShareEvent(channel: string, surface: ShareSurface) {
   } catch {
     // storage unavailable — 事件缺失不阻断分享
   }
-  const res = useQuest().markComplete("invite_friend");
-  if (!res.firstTime) return;
+  // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
+  // 三处漏改)。原来是先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
+  // 而 quest 是一次性的,再也拿不到。奖励从静态表就能查到,顺序反得过来。
+  const quest = useQuest();
+  if (quest.isComplete("invite_friend")) return;
+  const task = quest.QUEST_TASKS.find((tk) => tk.id === "invite_friend");
+  if (!task) return;
   const t = useT();
-  const ref = `QST-${Date.now().toString(36).toUpperCase()}`;
+  const ref = `QST-invite_friend`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中
   // 同一次任务完成的两腿一次落盘 —— 入账由收据的 amount/symbol 派生,不再单独 credit*。
   const drafts: ReceiptDraft[] = [];
-  if (res.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: res.rewardUsdt, status: "posted", memo: t.value.share.questRewardMemo, ref });
-  if (res.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: res.rewardNex, status: "posted", memo: t.value.share.questRewardMemo, ref });
-  if (drafts.length && postMoneyBills(drafts) !== "ok") return;
-  toast.success(`+${res.rewardNex} NEX · +$${res.rewardUsdt}`, t.value.share.questRewardToast);
+  if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!useQuest().markComplete("invite_friend").firstTime) return; // 消费失败:重试命中同 ref 不再发
+  toast.success(`+${task.nexReward} NEX · +$${task.usdtReward ?? 0}`, t.value.share.questRewardToast);
 }

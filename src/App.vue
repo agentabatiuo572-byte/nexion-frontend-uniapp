@@ -9,7 +9,7 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useBills } from "@/store/bills";
-import { postMoneyBill, postMoneyBills, postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBill, postMoneyBillsOnce, postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -518,21 +518,27 @@ function checkQuestRoute() {
   lastQuestRoute = route;
   const id = questIdForRoute(route);
   if (!id) return;
-  const r = useQuest().markComplete(id);
-  if (!r.firstTime) return;
+  // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
+  // 三处漏改)。原来先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
+  // 而 quest 是一次性的,再也拿不到。奖励从静态表查得到,顺序反得过来。
+  const quest = useQuest();
+  if (quest.isComplete(id)) return;
+  const task = quest.QUEST_TASKS.find((tk) => tk.id === id);
+  if (!task) return;
   const t = useT().value;
   // 🔴 路由任务奖励曾经是**裸 creditNex + 零账单**:钱每次都进、账单页永远查无此单
   // (不是失败路径才发作,是必然)。两道门都看不见它 —— 迁移棘轮只盯 bills.* 写入,
   // 接线门对 App.vue 只查文件里有没有收口点(里程碑那段已经提供了)。
   // 与 share.ts 的 invite_friend、wallet-cards-new 的 bind_bank_card 同族,现统一走收口点。
-  const ref = `QST-${id}-${Date.now().toString(36).toUpperCase()}`;
+  const ref = `QST-${id}`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中 = 假幂等
   const memo = fmt(t.quest.routeMemo, { task: QUEST_ROUTE_MEMO_TASK[id](t) });
   const drafts: ReceiptDraft[] = [];
-  if (r.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: r.rewardNex, status: "posted", memo, ref });
-  if (r.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: r.rewardUsdt, status: "posted", memo, ref });
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo, ref });
+  if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo, ref });
   if (!drafts.length) return;
-  if (postMoneyBills(drafts) !== "ok") return; // 收口点已提示;任务已消费但奖零发,同 quest 族既有取舍
-  toast.success(fmt(t.quest.routeToast, { n: r.rewardNex }));
+  if (postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!useQuest().markComplete(id).firstTime) return; // 消费失败:重试命中同 ref 不会再发
+  toast.success(fmt(t.quest.routeToast, { n: task.nexReward }));
 }
 
 function startQuestWatch() {
