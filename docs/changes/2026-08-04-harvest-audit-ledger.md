@@ -103,3 +103,25 @@
 | **合计** | **13** | **24** | **27** |
 
 🔴 **一条必须让主人知道的口径修正**:我此前报的「verify 406 pass / 0 fail」如实反映了门的输出,但**门本身有盲区**(P0-2 实测:`security.ts` 40 行真代码被 strip 吞掉,门对那些区间是瞎的)。**通过 ≠ 干净。**
+
+---
+
+## ④ 对抗证伪层 · 第一批(入金三轨 + main 的两条实测)
+
+**成立 2 / 降级 7 / 推翻 1。** skeptic 的降级理由逐条给了证据,已采纳。
+
+| 原编号 | 裁决 | 理由(skeptic 给的证据) |
+|---|---|---|
+| **M-1** 账单跨标签页丢失 | ✅ **成立(P0)** | 已复跑确认。模拟无失真三点核实:① `bills.ts:141` 走裸 `writeAccountRow` 整份覆盖、无 rev 无合并;② 全仓唯一 storage 事件监听在 `App.vue:395-401`,只认 session 键、**不水合 bills**;③ `__nxTab` 分实例 = 两套内存 store + 一份序列化磁盘,与真标签页(两个 JS realm 共享 localStorage)语义一致 |
+| **P1-2** settleCredited 失败不重排 | ✅ **成立,且反方向加重** | `281` 先 `timers.delete`、`302-305` 不看返回值属实。但**触发面比原报告宽得多**:`scheduleConfirmations` 全仓只在 `351` 被调用一次,`bindAccount`(`126-133`)只跑 `syncBankIntents()`、**对 records 零重排** → **刷新一次页面打断确认中的单就永久卡 confirming**,不需要 settle 失败 |
+| P0-2 回滚 commit 返回值全丢 | ⬇️ 降 **P1** | 「同层 storage → 回滚必然失败」**被推翻**:失败源是 `nexgrid-account-cloud-v1`,回滚写的是 `nexgrid-deposits-accounts-v1`,**不同键**;且回滚把 `creditedAt` 置回 undefined = 体积不增,配额压力下反而最可能成功。另有一条纯入参校验失败路径(storage 健康)回滚必成功。定性应为「失败被静默吞掉、无从得知」 |
+| P0-3 银行轨黑名单门 | ⬇️ 降 **P1** | 门不一致属实,三条边逐个隔离:`_devBankCallback` 磁盘 cancelled 可入账(真)· `_devResolveBankMismatch` 磁盘 return_pending 可入账 = 双付(真)· `_devResolveLateBankTransfer` **第二次被 497 挡住(这条不成立)**。降级依据:三个调用方全部 `import.meta.env.PROD` 早返(`551/596/610`),**PROD 构建里银行轨根本无法入账**;且需两标签页。dev 演示环境可触发 |
+| P1-1 记账失败不回滚 | ⬇️ 降 **P2** | 「钱和状态都不回滚」是**写明的设计**:`money-receipt.ts:179-190`「入金是外部已到账的事实,回滚等于把用户真转进来的钱抹掉,这一族只补收据不动钱」;返回值丢弃已被 `postReceiptOnce` 内部 `toast.error`(`:194`)兜住。**仅剩真缺口**:`reconcileBills` 确无 topup 分支,而本仓自己的自愈教条(`App.vue:76-84`)恰好适用 |
+| P1-3 patchRecord 返回值全丢 | ⬇️ 降 **P2** | 三处只有一处是死的:`292` dust_hold 失败后无 queue = 死(真);`295`/`302` 失败后仍 queue / 进磁盘复核,**自愈**。「返回值全丢即分支全死」的推断不成立 |
+| **P1-4 卡轨 ref 不稳定** | ❌ **推翻(误报)** | ① `deposits.ts:625-626` 显式声明幂等域边界(跨提交幂等归 PROD 的 Idempotency-Key)= 既定 mock 边界;② **语义读反了**:每次 `submitCardPayment` = 一次新的收单方授权,两次提交本就是两笔真扣款、两条账单;③「重放」无路径:提交按钮只在 form 态渲染,decline 发生在落单**之前**,零副作用 |
+| P1-5 缺 isFinite/上限 | ⬇️ 降 **P3** | `NaN <= 0` 为 false 属实,但影响被下游吃掉(`recordDeposit` 拒 NaN/±Inf/>1e9 → 走回滚 → 净效果为零);`fxRate===0` 路径**不可达**(`createBankIntent:434` 要求 `fx.fxAvailable`,而 quoteRate ≤ 0 即不可用)。剩余价值 = 纵深防御 |
+| P1-6 定时器清早了 | ⬇️ 降 **P2** | 「永不过期」**被推翻**:`bindAccount:132` 每次重绑都跑 `syncBankIntents()`,过期即落 expired、未过期即重新武装 → 下次刷新/登录自愈。残迹窗口 = 本次会话剩余时间,非永久 |
+| **M-2** strip 块注释劫持 | ⬇️ 降 **P2**,但**换了一条更要命的** | 根因定位:`security.ts:8` 注释里 `/api/me/*` 的 `e/*` 被当块注释开头,吃到 char 1838。但「会不会漏掉真实违规」实测为**否**(被吞区域内裸调 = 0,全树裸调总数就是 0)。🔴 **真正的弱点**:`:508` 的正控 `POS.filter(isBareWrite)` **绕过 strip 直喂字符串** —— 只证明了正则活着,**没证明代码进得来**。合取项 `strip && isBareWrite` 只隔离了后一项。将来违规若落在被吞区,门看不见、正控也测不出。修 strip 或让正控过 strip,二选一 |
+
+**元教训(归层)**:M-2 这条正是我自己写进纪律的「红测按合取项逐个隔离」被自己违反 —— 门里有两个串联判据,红测只测了第二个。
+⇒ 归**流程层**:凡判据是 `A && B` 形式,正控必须**分别**能证明 A 与 B 各自在起作用。
