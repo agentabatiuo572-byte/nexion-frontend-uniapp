@@ -24,7 +24,7 @@
  * applies only to power/network blips.
  *
  * ⚠️ MOCK-ONLY: production runs this clock server-side — the device agent's
- * heartbeat drives it (PRD §9.11d candidate `POST /api/device/:id/heartbeat`);
+ * heartbeat drives it (PRD §6.11/§12.2 candidate `POST /api/device/:id/heartbeat`);
  * the client store only mirrors the `interruptedAt` the server reports.
  */
 export const INTERRUPT_GRACE_MS = 30_000;

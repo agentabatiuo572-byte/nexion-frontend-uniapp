@@ -15,7 +15,7 @@ import { mockServerId } from "./mock-id";
  * ⚠️ MOCK-ONLY: APY/penalty tables + interest formula are client-side.
  * PRODUCTION: GET /api/config/staking/pools returns a unified
  * {poolId, currency, term, apy, penalty, enabled} list; claim()/earlyWithdraw()
- * route via POST /api/stakes/:id/{claim|early-withdraw} (one server transaction
+ * route via POST /api/staking/:id/{claim|early-withdraw} (PRD §9.11e; one server transaction
  * returning canonical {balance, billId, receiptId}). Any client-hardcoded APY
  * must be deleted when wiring the backend.
  */
@@ -219,7 +219,7 @@ export const useStaking = defineStore("staking", () => {
   }
 
   // ⚠️ MOCK-ONLY: interest computed client-side via simple APY formula.
-  // PRODUCTION: POST /api/stakes/:id/claim returns {principal, interest}.
+  // PRODUCTION: POST /api/staking/:id/claim (PRD §9.11e) returns {principal, interest}.
   function claim(id: string): { ok: boolean; principal: number; interest: number; conflict?: boolean } {
     const r = commit((current) => {
       const p = current.find((x) => x.id === id);

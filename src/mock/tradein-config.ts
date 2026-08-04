@@ -1,6 +1,6 @@
 /**
  * ⚠️ MOCK-ONLY TRADEIN_CONFIG — server-authoritative business config.
- * Production: GET /api/config/tradein (TBD; candidate name, not yet in PRD §9.11).
+ * Production: GET /api/config/tradein (PRD §7.5.1 / §9.11c.1).
  * Admin mutates via PUT /api/admin/tradein/config (TBD; candidate).
  * FEAT-DEV02 (Aligned 2026-07-06):随时下架 + 产出阶梯抵扣。抵扣由文件底部的
  * TRADEIN_CREDIT_LADDER / computeTradeInCredit 承载(按「累计产出 ÷ 实付价」

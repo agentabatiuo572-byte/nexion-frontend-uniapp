@@ -104,7 +104,7 @@ export function computeDiscountedPrice(config: TrialConfig): {
  * Split accrued trial earnings into price-offset portion (capped) + post-purchase
  * balance remainder. Single source of truth shared by every surface that quotes
  * the credit (trial page + checkout conversion) so they never diverge.
- * Real backend: server computes this inside POST /api/orders (conversion order).
+ * Real backend: server computes this inside POST /api/trial/convert (PRD §9.11a.2).
  */
 export function computeTrialOffset(
   config: TrialConfig,

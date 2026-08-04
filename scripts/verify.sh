@@ -2296,5 +2296,22 @@ staking_cas_gate() {
 }
 staking_cas_gate
 
+# ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
+# 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
+# /api/genesis/purchase` 和 `POST /api/swap`(PRD 根本没这接口)、试用转化写成
+# `POST /api/orders`(PRD 是 /api/trial/convert)、`POST /api/store/checkout`
+# (那是页面路由不是 API)。tsc / 既有 verify 全绿也抓不到 —— 注释不参与编译。
+# 判据:扫全部注释行的 /api/ 引用,对哨兵脚本内的台账逐条比对(台账不写在被查文件里,
+# 否则改注释顺手改台账 = 门等于没有)。三向红:代码有台账没 / 台账有代码没 / 扫到 0 条。
+endpoint_citation_gate() {
+  if "$NODE_BIN" scripts/endpoint-citation-sentinel.mjs > /tmp/uniapp-endpoint-citation.log 2>&1; then
+    ok "接口引用台账门 — $(tail -1 /tmp/uniapp-endpoint-citation.log)"
+  else
+    bad "接口引用台账门失败 — node scripts/endpoint-citation-sentinel.mjs 看明细"
+    grep -E "^  [0-9]+\." /tmp/uniapp-endpoint-citation.log | head -8 | sed 's/^/        /'
+  fi
+}
+endpoint_citation_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

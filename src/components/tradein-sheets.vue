@@ -35,11 +35,13 @@
   NOT mutate here — it defers to checkout's single persist block. Production:
   each flow maps to a single server transaction; the client mirrors the rollback.
 
-  Endpoints (all TBD; candidate names, not yet in PRD §9.11):
-    - Trade-in:         POST /api/orders (tradeInDeviceId; server re-computes
-                        the ladder credit + retires the device transactionally)
-    - Path B replace:   POST /api/devices/deactivate + POST /api/store/checkout
-    - Path B keep+buy:  POST /api/store/checkout (new device lands inactive)
+  Endpoints(逐条出处;PRD 未定义的显式标 TBD,不许当既定契约引用):
+    - Trade-in:         POST /api/orders (PRD §7.5 — 携 tradeInDeviceId,server
+                        同事务复算阶梯抵扣 + 下架旧机)
+    - Path B replace:   POST /api/devices/deactivate + POST /api/orders
+                        (deactivate 见 PRD §9.11c.1 composer endpoints,PRD 原文
+                        标 "TBD; candidates";下单仍走 POST /api/orders)
+    - Path B keep+buy:  POST /api/orders (new device lands inactive)
 -->
 <template>
   <view v-if="state.kind !== 'none'" class="tis-root">

@@ -386,7 +386,7 @@ async function handleConfirm() {
     if (!ok) return;
 
     toast.info(t.value.exchange.confirmingToast);
-    // 结算延迟(MOCK:真实现是 POST /api/swap 的往返)。写成 await 而不是 setTimeout 回调 ——
+    // 结算延迟(MOCK:真实现是兑换提交 endpoint〔TBD;PRD 未定义〕的往返)。写成 await 而不是 setTimeout 回调 ——
     // 回调版的守卫在函数返回时就复位了,等于没守;await 让整条链留在同一个 try/finally 里。
     await new Promise((r) => setTimeout(r, 900));
 
@@ -407,7 +407,9 @@ async function handleConfirm() {
     }
 
     // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC):debit + credit + recordSwap +
-    // bills + v3.record 是分开的写。PRODUCTION:POST /api/swap 单事务,带 Idempotency-Key。
+    // bills + v3.record 是分开的写。PRODUCTION:兑换提交单事务,带 Idempotency-Key
+    // (endpoint TBD;PRD 未定义用户端兑换写接口,只有 GET /api/config/exchange/caps
+    //  与 POST /api/admin/exchange/pause;勿把候选路径当既定契约引用)。
     const succ = snap.direction === "usdt2nex" ? app.debitBalance(snap.fromAmount) : app.debitNex(snap.fromAmount);
     if (!succ) {
       toast.error(
