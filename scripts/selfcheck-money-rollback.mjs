@@ -21,7 +21,7 @@
 // 方法:行为断言用 esbuild 载**真 store + 真收口点**跑真代码(不抄判据副本),假 uni storage
 // 按 key/第几次写定点注入失败;⑤ 用**两个 store 实例 = 两个标签页**共享同一份 JSON 序列化
 // storage(与 localStorage 同语义:跨标签页拿不到同一个对象引用),单实例跑一遍测不出这条。
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";

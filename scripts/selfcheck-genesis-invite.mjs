@@ -21,7 +21,7 @@
 // 方法:结构断言跑在**剥注释后的正主源码**上(注释里出现判定式文本不得哄绿);行为断言
 // esbuild 载**真 app store + 真码表模块**跑真代码(不是抄一份判据副本),两个 store 实例
 // = 两个账号,共享同一份 JSON 序列化的假 storage(与 localStorage 同语义)。
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
