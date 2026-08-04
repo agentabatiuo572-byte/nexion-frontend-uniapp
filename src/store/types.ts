@@ -344,7 +344,10 @@ export interface DepositIntent {
   /** 收款账户池按轮换策略分配;server 派发(用户需完整账号转账,不脱敏)。 */
   bankAccount: { accountName: string; accountNumber: string; bankName: string };
   status: DepositIntentStatus;
-  /** ms epoch;创建 + 30min 锁价窗(宽限 10min,D1 可配)。 */
+  /** ms epoch;创建 + 30min 锁价窗(宽限 10min,D1 可配)。 */  /** 下单时刻(ms epoch,server 时钟)。入账时透传给 DepositRecord.createdAt ——
+   *  否则单据的「创建 → 到账」耗时恒为 0,后台对账看不出真实等待时长。 */
+  createdAt: number;
+
   expireAt: number;
   /** 回单实收金额(VND)。 */
   receivedVnd?: number;

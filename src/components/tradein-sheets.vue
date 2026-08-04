@@ -30,7 +30,7 @@
   ⚠️ MOCK-ONLY CROSS-STORE COMPOSERS
   ---
   Touches stores: useApp (devices), useTradeinSheet;资金变更走 lib/money-receipt 收口点。
-  Path B (replace/keep-buy/force) composers mutate app.devices + debit here with
+  Path B (replace/keep-buy/force) composers mutate app.devices + postMoneyBill here with
   documented rollback ordering. The FEAT-DEV02 trade-in path deliberately does
   NOT mutate here — it defers to checkout's single persist block. Production:
   each flow maps to a single server transaction; the client mirrors the rollback.
@@ -519,7 +519,8 @@ function onKeepBuy() {
   if (s.kind !== "replace" || confirming.value) return;
   confirming.value = true;
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Keep & buy" branch.
-  // Order: addDevice (default inactive) → debit → bill / rollback. No demotion.
+  // Order: addDevice (default inactive) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。
+  // 注释曾写「debit → bill / rollback」两步 —— 那是迁到收口点之前的形态,已过期。No demotion.
   const newId = app.addDevice(s.newKind);
   const paid = postMoneyBill({
     type: "purchase",
@@ -579,7 +580,7 @@ function onForce() {
   // whole point).
   //
   // Order: snapshot task → addDevice(new) → deactivate(old, clears task) →
-  //   activate(new) → debit → bill. Each failure restores the old device's task.
+  //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
   const newId = app.addDevice(s.newKind);
   app.deactivateDevice(lowest.id); // frees slot + wipes currentTask

@@ -248,6 +248,10 @@ function onCountry(e: Event) {
 }
 
 async function handleSubmit() {
+  // 🔴 重入守卫(2026-08-04 对抗审计 P2-7):按钮只在 form 态渲染,但那是**渲染**层的拦截 ——
+  // 同一 tick 内的双击(或触摸 + 点击双发)会在 `phase.value = "processing"` 生效前
+  // 进来第二遍,于是两次授权、两条入金单、两次扣款。判据放在函数第一行,不依赖渲染时序。
+  if (phase.value !== "form") return;
   if (!isValid.value) return;
   // 先向收单方取 token(真实现 = SDK createToken;未填全返 null,对齐其 incomplete
   // 错误)。明文不经本组件,后续全程只带 token 与后四位。

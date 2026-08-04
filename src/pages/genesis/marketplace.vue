@@ -330,7 +330,7 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
   if (!genesis.acquireSecondary(l.tokenId)) {
     // 承接失败(已持有该 token / 撞单人限购)→ 冲正,走**同一个**收口点:
     // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
