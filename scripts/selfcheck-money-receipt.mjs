@@ -32,6 +32,9 @@ const SRC = path.join(root, "src");
 const read = (...p) => readFileSync(path.join(root, ...p), "utf8");
 
 const samples = { primitives: 5, targets: 0, scanned: 0, ledgerFiles: 0, locales: 0 };
+// ⑤ 的接线名单要给 ⑥ 的反向入册门用,而两者各在自己的块作用域里 —— 用模块级变量传递,
+// 不复制一份(复制的那份会和真名单漂移,门就变成对着旧名单判)。
+let wiredFiles = [];
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail) {
@@ -489,7 +492,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/components/home/weekly-quest-hero.vue", ["postMoneyBills"]],
     ["src/components/home/weekly-quest-list.vue", ["postMoneyBill"]],
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
-    ["src/components/staking/stake-sheet.vue", ["postMoneyBill"]], // R5 补登:与复投页同形的第二个建仓入口
+    // R5 补登:与复投页同形的第二个建仓入口。三针 —— 它 `:166` 取基准、`:199` 冲正,
+    // 与另三条冲正路径完全同形,却一直只上了 1 针(删掉 `{restoreTo}` 门照样绿)。
+    ["src/components/staking/stake-sheet.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/components/tradein-sheets.vue", ["postMoneyBill"]],
     ["src/lib/share.ts", ["postMoneyBills"]],
     ["src/pages/daily/daily.vue", ["postMoneyBill"]],
@@ -506,16 +511,44 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/store/deposits.ts", ["postReceiptOnce"]],
   ];
   samples.wired = WIRED.length;
+  wiredFiles = WIRED.map(([f]) => f);
+  /** 从 `needle(` 起按括号配对抠出**这一次调用的完整实参块**(跨行)。
+   *  🔴 为什么要它:原来三针是 `src.includes(...)` 全文件共现即过 —— `captureMoney()` 写在
+   *  页面顶部、`restoreTo:` 落在另一个无关对象里,冲正分支实际已被删,门照样绿(实测)。
+   *  绑到同一次调用上,「有没有这个形状」才真的被守住。 */
+  function callArgs(src, needle) {
+    const out = [];
+    let from = 0;
+    for (;;) {
+      const i = src.indexOf(`${needle}(`, from);
+      if (i < 0) break;
+      let depth = 0;
+      let j = i + needle.length;
+      for (; j < src.length; j++) {
+        if (src[j] === "(") depth++;
+        else if (src[j] === ")") { depth--; if (depth === 0) { j++; break; } }
+      }
+      out.push(src.slice(i, j));
+      from = j;
+    }
+    return out;
+  }
   for (const [rel, needles] of WIRED) {
     // keepStrings:⑤ 的 needle 含 import 路径与 `restoreTo:` 这类字面量,字符串内容要留;
     // ⑥ 判的是调用,字符串内容必须抹(见 strip 头注)。两档口径不同,不能共用一份。
     const src = strip(readFileSync(path.join(root, rel), "utf8"), true);
+    const hasNeedles = needles.every((n) => src.includes(n.endsWith(":") ? n : `${n}(`));
+    // 🔴 形状门:带 `restoreTo:` 的路径,那个属性必须真的落在某一次 postMoneyBill 的实参里,
+    // 且同一文件确实取过基准(captureMoney)。三者散落三处 = 冲正已被拆掉,不算数。
+    const shaped = !needles.includes("restoreTo:")
+      || callArgs(src, "postMoneyBill").some((a) => a.includes("restoreTo"));
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
       // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
       // 其余是调用点,补 `(` —— 否则光有 import 也算数。
-      needles.every((n) => src.includes(n.endsWith(":") ? n : `${n}(`)) && src.includes('from "@/lib/money-receipt"')
-      && !/\bbills\.add\(/.test(src), needles.join("+"));
+      hasNeedles && shaped && src.includes('from "@/lib/money-receipt"')
+      && !/\bbills\.add\(/.test(src), needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
   }
+
   const locales = ["en", "zh", "vi"];
   samples.locales = locales.length;
   check(`⑤ i18n 失败提示 ${locales.length} 语齐(txNotSaved + billMissing + fundsStuck + 三条冲正 memo)`,
@@ -627,6 +660,24 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     grown.length === 0, grown.map(([f, n]) => `${f}: ${n} > ${ALLOW[f] ?? 0}`).join(" | "));
   if (shrunk.length) {
     console.log(`  INFO  白名单额度高于实测,建议下调:${shrunk.map(([f, q]) => `${f} ${found[f] ?? 0}/${q}`).join(" | ")}`);
+  }
+  // 🔴 反向入册门:WIRED 是**手工名单**,新页面自己调收口点(或直调 bills)时没人提醒入册,
+  // 于是 ⑤ 不查(不在册)、⑥ 不响(在 ALLOW 里或走了收口点)—— 两道门同时失明。
+  // 判据:全站「调了收口点导出符 或 调了 bills 写入原语」的文件集合,必须 ⊆ WIRED ∪ ALLOW。
+  {
+    const EXPORTS = ["postMoneyBill", "postMoneyBills", "postReceiptOnly", "postReceiptOnce"];
+    if (!wiredFiles.length) throw new Error("selfcheck-money-receipt: ⑤ 的接线名单没传过来,反向入册门会空转");
+    const enrolled = new Set([...wiredFiles, ...Object.keys(ALLOW)]);
+    const outside = [];
+    for (const f of files) {
+      const rel = path.relative(root, f).replace(/\\/g, "/");
+      if (enrolled.has(rel)) continue;
+      const s = strip(readFileSync(f, "utf8"));
+      const usesChokepoint = EXPORTS.some((e) => new RegExp(`(?<![\\w$.])${e}\\s*\\(`).test(s));
+      if (usesChokepoint || scanSource(rel, readFileSync(f, "utf8")) > 0) outside.push(rel);
+    }
+    check(`⑤ 🔴 反向入册:动钱/记账的文件必须在 WIRED 或 ALLOW 里(扫 ${files.length} 个,册外 ${outside.length} 个)`,
+      outside.length === 0, outside.join(" | "));
   }
   // 🔴 活体证明靠正控 + 负控,不靠「存量 total > 0」自证 —— 迁移做完 total 归零后,
   // 那种自证会**反过来判红**:把「欠账还完了」误报成回归,逼下一个人留一处不迁。
