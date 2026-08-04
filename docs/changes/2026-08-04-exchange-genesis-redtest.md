@@ -65,6 +65,59 @@ const succ = snap.direction === "usdt2nex" ? app.debitBalance(snap.fromAmount) :
 **aria/置灰只是告知,不是闸**;真正拦住第二次的是那句 `if (submitting.value) return;`。
 两者都要有,但不能拿视觉当守卫。
 
+## 二之二、并发改动后的判据跟进(postMoneyBill 收口)
+
+创世购买链随后被收口到 `postMoneyBill`(扣款 ⊗ 记账原子提交,`src/lib/money-receipt.ts`,
+非本轮作者)。本门的 B/C④ 段随之更新 —— 重入守卫本身一字未动,只改判据与固定靶:
+
+- `B④ 上锁点在第一次动钱之前`:原写死 `app.debitBalance(cost)`,收口后 `indexOf` 返回 −1。
+  这次恰好判假、红了,但「找不到就当没有」正是哨兵假绿的经典形态。改为扫**一组**资金原语
+  取最早命中,并且**一个都扫不到就判失败**(空集不放行)。
+- `C④` fixture:`makeApp` 补 `captureMoney` / `restoreMoney` 与 `withdrawableUsdt` 维度;
+  `postMoneyBill` **跑真实现**(从 money-receipt.ts 原文抠出注入),不写替身 —— 写了替身,
+  「只扣一次」就变成在跟自己写的假扣款对账。
+- 铸造失败靶按新语义改写:从「0 行账单」改为「1 扣 + 1 反向冲正,净和 0,且余额与
+  **可提额度**都还原」;新增「收据落盘失败 → 资金精确还原 · 零铸造 · 零账单 · 守卫解锁」。
+
+| # | 靶 | 注入形态 | 结果 | 判定 |
+|---|---|---|---|---|
+| RB1 | B④ 上锁点判据仍有牙 | 删掉 `purchasing.value = true` | 红 5 条,全部同一合取项(守卫)：B④ + 4 条 C④ 双击行为 | ✅ |
+| RB2 | B④ 空集不放行 | `captureMoney` / `postMoneyBill` 同时改名 → 命中 0 | 红 1 条(`命中 0 个`)且脚本抛错终止,未静默放行 | ✅ |
+| RC1 | C④ 收据落盘失败靶 | 收据写失败后不还原资金 | 红 1 条 | ✅ |
+| RC2 | 桩里的 `withdrawableUsdt` clamp 到底能不能分辨对错 | 冲正入参 `{ restoreTo: before }` → `{}`(退化成裸 `creditBalance`) | 红 1 条,现场 `usdt=50000 withdrawable=40001` —— **总余额看着完全还原了,只有可提额度被悄悄压低** | ✅ |
+
+4/4 成立;每例 `cp` 还原后 sha256 byte-identical,复跑 59 pass / 0 fail。
+
+🔴 RC2 是这轮最值得记的一条:**桩不建 clamp,裸 `creditBalance` 与 `restoreTo` 在门下长得一模一样**
+(总余额都回到 50000),门看起来验了、其实分辨不出对错。`makeApp` 的 `debitBalance` 必须照
+`app.ts` 同款把 `withdrawableUsdt` clamp 到扣款后余额,这条断言才有牙。
+
+## 二之三、收口到 postMoneyBills 后的判据跟进 + 两腿原子性
+
+兑换成交链随后也被收口到 `postMoneyBills`(N 条分录**一次** `bills.addMany` 落盘,
+非本轮作者)。跟进三处,重入守卫与快照纪律本身一字未动:
+
+- **A② 改判性质,不再点名函数**。原判据点名 `app.debitBalance(snap.fromAmount)` 等四个裸原语,
+  收口后它们在页面里不再出现。改为:扫**一组**资金原语(含 `postMoneyBills`)、**一个都扫不到
+  直接判失败**,再断言一进一出两腿的金额+币种与日限计数**全部取自 `snap.*`**。
+- **注入作用域修复**:`postMoneyBill`(单数)现在只是 `postMoneyBills` 的壳,只注入单数函数体会
+  在运行时炸 `postMoneyBills is not defined`。复用已有的 `buildPostMoneyBills` 一起注入同一闭包。
+- **新增 C⑦ 两腿原子性**(此前无人守):兑换是复式一进一出,收据落不了盘时若只还原一侧,
+  用户就会「NEX 少了、USDT 没多」而账单页查无此单。
+
+| # | 靶 | 注入形态 | 结果 | 判定 |
+|---|---|---|---|---|
+| RD1 | A② 空集不放行 | 成交处 `postMoneyBills` 改名 → 6 个原语命中 0 | 红 1 条(`命中 0 个`),**不是静默绿** | ✅ |
+| RD2 | A② 入参必须取自快照 | 出账腿改回活读 `fromAmount.value` | 红 6 条,全部同族(A② 两条 + C② 四条行为靶) | ✅ |
+| RD3 | C⑦ 两腿原子性 | `addMany` 失败分支不还原资金 | 红 2 条(C⑦ + C④,共用同一个 `restoreMoney`) | ✅ |
+
+3/3 成立;`cp` 还原后 sha256 byte-identical,复跑 64 pass / 0 fail。
+
+🔴 **这轮的元教训(比 clamp 那条更一般)**:判据可以比它所判的形态**活得更久**。
+跨 owner 只是让它提前暴露成死锁;单 owner 下它表现为**慢性静默失效** —— 判据钉死一个函数名,
+重构后扫不到 → 没有违规 → 绿,更难发现。持久修法三件套:判**一组**原语 + **扫不到就判失败**
++ 断言**性质**(入参是不是快照)而非**具体调用了哪个函数**。
+
 ## 三、边界声明
 
 本次只收口**单标签页内**的快照漂移与重入。台账另有一条独立缺陷
