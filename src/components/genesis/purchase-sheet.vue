@@ -167,8 +167,9 @@ function handlePurchase() {
   try {
     const cost = qty.value * price.value;
     const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
-    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + bill + purchase are
-    // separate writes. PRODUCTION: one atomic transaction returning
+    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账已被 postMoneyBill
+    // 收口成一次提交,但「铸席位」仍是**另一次写** —— 整笔仍非原子。
+    // PRODUCTION: one atomic transaction returning
     // {balance, ownedTokenIds, billId}. Genesis **primary** subscription endpoint
     // is TBD — PRD 未定义(§10.2.4 只定义二级 POST /api/genesis/secondary/fulfill
     // 与 POST /api/genesis/{list,unlist});勿把候选路径当既定契约引用。
