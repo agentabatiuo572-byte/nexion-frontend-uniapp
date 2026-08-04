@@ -6,8 +6,8 @@
   (4 rows, sheet on tap) → CompoundCalculator → my positions → variable-APY
   notice. Wrapped in <AppChassis active="me"> (reached from /me/wallet). The
   source's chassis-level StakingSheetHost is folded into <StakeSheet
-  v-model:open :term>. claim / early-withdraw compose staking + app.creditBalance
-  + bills.add in the page handlers.
+  v-model:open :term>. claim / early-withdraw compose staking + postMoneyBill
+  (入账 ⊗ 记账,见 lib/money-receipt.ts) in the page handlers.
 -->
 <template>
   <AppChassis active="me">
@@ -126,8 +126,7 @@ import CompoundCalculator from "@/components/staking/compound-calculator.vue";
 import StakeSheet from "@/components/staking/stake-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import {
   useStaking,
   STAKING_APY,
@@ -145,8 +144,6 @@ const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cya
   180: { label: t.value.stakingV3.ribbon.popular, tone: "cyan" },
   365: { label: t.value.stakingV3.ribbon.topYield, tone: "gold" },
 }));
-const app = useApp();
-const bills = useBills();
 const staking = useStaking();
 
 const sheetOpen = ref(false);
@@ -217,18 +214,20 @@ async function handleEarlyWithdraw(p: StakingPosition) {
     confirmLabel: t.value.stakingV3.toast.earlyConfirmCta,
   });
   if (!ok) return;
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): unstake + credit + bill.
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:平仓(CAS)→ 入账⊗记账(原子)。
+  // 🔴 顺序不可换:先入账后平仓的话,平仓撞并发冲突就成了「钱拿到、仓还在」= 可重复领。
+  //    代价是这条极窄的失败路径(仓已平、退款落盘失败)靠收口点的失败提示交底 ——
+  //    store 侧没有反向 API 可冲正,真后端由同事务解决。
   const r = staking.earlyWithdraw(p.id);
   if (r.ok) {
-    app.creditBalance(r.refund);
-    bills.add({
+    if (postMoneyBill({
       type: "unstake",
       symbol: "USDT",
       amount: r.refund,
       status: "posted",
       memo: `Stake early withdraw · ${p.id} (penalty $${r.penalty.toFixed(2)})`,
       ref: `STAKE-EW-${p.id}`,
-    });
+    }) !== "ok") return;
     toast.warn(
       t.value.stakingV3.toast.earlyDoneTitle,
       fmt(t.value.stakingV3.toast.earlyDoneSubtitle, {
@@ -244,18 +243,17 @@ async function handleEarlyWithdraw(p: StakingPosition) {
 }
 
 function handleClaim(p: StakingPosition) {
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): claim + credit + bill.
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:领取(CAS)→ 入账⊗记账(原子,顺序理由同上)。
   const r = staking.claim(p.id);
   if (r.ok) {
-    app.creditBalance(r.principal + r.interest);
-    bills.add({
+    if (postMoneyBill({
       type: "unstake",
       symbol: "USDT",
       amount: r.principal + r.interest,
       status: "posted",
       memo: `Stake claim · ${p.id} (interest $${r.interest.toFixed(2)})`,
       ref: `STAKE-CLAIM-${p.id}`,
-    });
+    }) !== "ok") return;
     toast.success(
       t.value.stakingV3.toast.claimedTitle,
       fmt(t.value.stakingV3.toast.claimedSubtitle, {

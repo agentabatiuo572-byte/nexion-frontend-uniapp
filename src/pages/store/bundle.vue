@@ -152,7 +152,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { useBills } from "@/store/bills";
+import { postReceiptOnly } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -251,7 +251,10 @@ function onCheckout() {
       discount: +(p.price * pct).toFixed(2),
     }),
   );
-  useBills().add({
+  // 🔴 走 postReceiptOnly 而不是 postMoneyBill(与 checkout.vue 主账单同口径):扣款必须
+  // 发生在建单之前,而单子已经建好并进入履约 —— 收据写失败时回滚资金只还钱、还不回那几台设备。
+  // 既定处置是让用户明确看见收据没记上,而不是像原来那样丢弃返回值静默吞掉。
+  postReceiptOnly({
     type: "purchase",
     symbol: "USDT",
     amount: -charge,
