@@ -2845,6 +2845,8 @@ export const en = {
       topupTrc20: "Top-up · USDT-TRC20",
       withdrawTrc20: "Withdrawal · USDT-TRC20",
       withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",
+      genesisReversed: "Genesis reservation reversed · {n} slot(s) refunded",
+      stakeReversed: "Re-invest reversed · stake could not be opened, amount refunded",
     },
     title: "Bills",
     back: "Back",
@@ -3151,6 +3153,12 @@ export const en = {
       "First-time withdrawals need a $1 KYC-Express verification to confirm wallet ownership.",
     orderCancelledTitle: "Order cancelled",
     orderCancelledMsg: "Your refund will appear in your wallet within 1–3 days.",
+    // 资金 ⊗ 收据不变量的两种失败面(见 lib/money-receipt.ts):txNotSaved = 整笔已还原,
+    // billMissing = 资金已生效但收据没记上(不可回滚的场景)。文案禁提"存储/写入失败"等工程词。
+    txNotSavedTitle: "Transaction not saved",
+    txNotSavedMsg: "Your balance is unchanged and nothing was recorded. Please try again.",
+    billMissingTitle: "Receipt not recorded",
+    billMissingMsg: "This transaction went through, but it could not be added to your bill history.",
   },
 
   // ─── v3 reverse-Ponzi sample namespaces ─────────────────────────

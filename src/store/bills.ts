@@ -168,17 +168,36 @@ export const useBills = defineStore("bills", () => {
     return next;
   }
 
-  function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+  /**
+   * 🔴 一次落盘写 N 条分录 —— 复式账本里「一笔交易」的分录必须同生共死(2026-08-04 R4)。
+   *
+   * 为什么不是循环调 `add()`:add 每条各 persist 一次,于是存在「第一条落了、第二条没落」
+   * 的中间态。兑换这种**一进一出**的交易一旦卡在那儿,账本上只剩半边,而钱两边都已经动了 ——
+   * 用户看到「兑换完成」,账单里却只有扣、没有进。把 N 条一次性拼进数组再写一次盘,
+   * 那个中间态**根本不存在**:要么 N 条全在,要么一条不留。调用方因此不需要
+   * 「删掉第一条」或「补一条冲正分录」这类补丁 —— 没有既成事实要冲正。
+   *
+   * 同一笔交易的分录共用一个 ts(它们本来就发生在同一时刻)。
+   * PROD:服务端在同一事务里写这 N 条分录,client 只消费。
+   */
+  function addMany(drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[]): Bill[] | null {
+    if (!drafts.length) return [];
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
-    const next: Bill = { ...b, id: mockServerId("BL"), ts: mockServerNow() };
+    const ts = mockServerNow();
+    const next: Bill[] = drafts.map((b) => ({ ...b, id: mockServerId("BL"), ts }));
     const previous = bills.value;
-    bills.value = recomputeBalance([next, ...previous]);
+    bills.value = recomputeBalance([...next, ...previous]);
     if (!persist()) {
       bills.value = previous;
       return null;
     }
     return next;
+  }
+
+  /** 单条 = N=1 的退化情形。走同一条实现,两者的落盘/回滚语义不可能各自漂移。 */
+  function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+    return addMany([b])?.[0] ?? null;
   }
 
   /** Stable ref + type + symbol is the mock server idempotency key. */
@@ -228,5 +247,5 @@ export const useBills = defineStore("bills", () => {
     return true;
   }
 
-  return { bills, add, addForAccount, addOnce, seed, settleByRef, bindAccount };
+  return { bills, add, addMany, addForAccount, addOnce, seed, settleByRef, bindAccount };
 });

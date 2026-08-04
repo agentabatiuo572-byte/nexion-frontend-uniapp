@@ -195,7 +195,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBills } from "@/lib/money-receipt";
 import { useExchange, type SwapEvent } from "@/store/exchange";
 import { useWalletPairing } from "@/store/wallet-pairing";
 import {
@@ -209,7 +209,6 @@ import {
 
 const t = useT();
 const app = useApp();
-const billsStore = useBills();
 const exchange = useExchange();
 const walletPairing = useWalletPairing();
 const v3 = useExchangeV3();
@@ -410,41 +409,33 @@ async function handleConfirm() {
     // bills + v3.record 是分开的写。PRODUCTION:兑换提交单事务,带 Idempotency-Key
     // (endpoint TBD;PRD 未定义用户端兑换写接口,只有 GET /api/config/exchange/caps
     //  与 POST /api/admin/exchange/pause;勿把候选路径当既定契约引用)。
-    const succ = snap.direction === "usdt2nex" ? app.debitBalance(snap.fromAmount) : app.debitNex(snap.fromAmount);
-    if (!succ) {
+    // 🔴 一进一出两腿 + 两条分录 = **一笔交易**,走多腿收口点一次提交(2026-08-04 R4)。
+    // 原实现:debit → credit → 两次裸 billsStore.add。bills.add 写不进去时返回 null 且不抛
+    // 异常、没人接 —— 钱两边都动了、弹「兑换完成」,账单页却只有半边甚至一条都没有。
+    // 收口后:资金两腿与两条分录同生共死(分录一次落盘,不存在"落了一条"的中间态);
+    // 任何一环失败 → restoreMoney 精确还原资金三元组(含 withdrawableUsdt)+ 明确报错。
+    // recordSwap 放在提交成功之后:它是这笔交易的**流水快照**,交易没成就不该有这条记录。
+    const swapMemo = `Swap ${snap.fromSym} → ${snap.toSym}`;
+    const swapRef = `SWAP-${Date.now().toString(36).toUpperCase()}`;
+    const posted = postMoneyBills([
+      { type: "swap", amount: -snap.fromAmount, symbol: snap.fromSym, status: "posted", memo: swapMemo, ref: swapRef },
+      { type: "swap", amount: snap.toAmount, symbol: snap.toSym, status: "posted", memo: swapMemo, ref: swapRef },
+    ]);
+    if (posted === "insufficient") {
       toast.error(
         t.value.exchange.insufficientTitle,
         t.value.exchange.insufficientMessage.replace("{sym}", snap.fromSym),
       );
       return;
     }
-    if (snap.direction === "usdt2nex") app.creditNex(snap.toAmount);
-    else app.creditBalance(snap.toAmount);
+    if (posted !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
 
-    const evt = exchange.recordSwap({
+    exchange.recordSwap({
       fromSym: snap.fromSym,
       toSym: snap.toSym,
       fromAmount: snap.fromAmount,
       toAmount: snap.toAmount,
       rate: snap.rate,
-    });
-
-    // Bills: debit + credit
-    billsStore.add({
-      type: "swap",
-      amount: -snap.fromAmount,
-      symbol: snap.fromSym,
-      status: "posted",
-      memo: `Swap ${snap.fromSym} → ${snap.toSym}`,
-      ref: evt.id,
-    });
-    billsStore.add({
-      type: "swap",
-      amount: snap.toAmount,
-      symbol: snap.toSym,
-      status: "posted",
-      memo: `Swap ${snap.fromSym} → ${snap.toSym}`,
-      ref: evt.id,
     });
 
     // Commit to v3 daily counters + lifetime

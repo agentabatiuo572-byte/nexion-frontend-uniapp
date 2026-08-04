@@ -91,6 +91,17 @@ function createEarningBuckets(withdrawableUsdt: number, now = Date.now()): UserS
   };
 }
 
+/**
+ * 资金三元组快照 —— 冲正(退款 / 回滚)的基准。三个字段就是全部会被资金原语动到的量:
+ * debitBalance 同时改 usdtBalance 与 withdrawableUsdt(clamp),debitNex 改 nexBalance。
+ * 少一个字段,退款就还原不回扣款前(见 restoreMoney 头注)。
+ */
+export interface MoneySnapshot {
+  usdtBalance: number;
+  nexBalance: number;
+  withdrawableUsdt: number;
+}
+
 function withDefaultEarningBuckets(user: UserState): UserState {
   return {
     ...user,
@@ -874,16 +885,35 @@ export const useApp = defineStore("app", () => {
     return done;
   }
 
-  function creditBalance(amount: number) {
+  /**
+   * 🔴 四个资金原语:落盘失败必须让调用方看见(2026-08-04 R4「钱动了、账没记上」同族根治)。
+   *
+   * 原实现都是「改内存 → persistAccountSnapshot() → **丢弃返回值**」。落盘失败时磁盘还是
+   * 旧值、内存已是新值 —— 刷新即回退,用户眼里就是「钱凭空回来 / 凭空消失」;而调用方按
+   * 「一定成功」继续铸货、写账单、弹成功提示。修法直接沿用本文件既有范式(recordDeposit /
+   * creditRewardBucketInternal):失败即 adoptAccountSnapshot(previousSnapshot) 把内存退回
+   * 与磁盘一致的那一份,并报假。
+   *
+   * 🔴 成功路径逐字节等价:守卫、clamp、金额计算、赋值内容与写盘顺序一个字没改;新增的只有
+   * 「失败时回滚 + 返回 false」这条原本不存在的分支。credit 两函数由 void 拓宽为 boolean —
+   * 全部既有调用点都在语句位丢弃返回值,行为不变。
+   */
+  function creditBalance(amount: number): boolean {
     // NaN/Infinity/负数守卫(对齐 recordDeposit):脏 amount 会把余额污染成 NaN,
     // 此后一切 debit 检查恒过 = 无限钱(审计 P2-5)。
-    if (!Number.isFinite(amount) || amount < 0) return;
+    if (!Number.isFinite(amount) || amount < 0) return false;
+    const previousSnapshot = lastCloudSnapshot;
     user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(2) };
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    return true;
   }
   function debitBalance(amount: number): boolean {
     if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.usdtBalance < amount) return false;
+    const previousSnapshot = lastCloudSnapshot;
     const nextUsdt = +(user.value.usdtBalance - amount).toFixed(2);
     // 维护不变量 withdrawableUsdt ≤ usdtBalance:花钱先消耗不可提部分(如充值本金),
     // 花穿后才吃可提收益,可提额度随之收敛到剩余总余额。缺此 clamp,提现门(submitWithdrawal
@@ -894,22 +924,68 @@ export const useApp = defineStore("app", () => {
       usdtBalance: nextUsdt,
       earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
     };
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
     return true;
   }
-  function creditNex(amount: number) {
+  function creditNex(amount: number): boolean {
     // NaN/Infinity/负数守卫(对齐 creditBalance):脏 amount 会把 nexBalance 污染成 NaN,
     // 此后一切 debitNex 检查恒过 = 无限 NEX。
-    if (!Number.isFinite(amount) || amount < 0) return;
+    if (!Number.isFinite(amount) || amount < 0) return false;
+    const previousSnapshot = lastCloudSnapshot;
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance + amount).toFixed(2) };
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    return true;
   }
   function debitNex(amount: number): boolean {
     // 对齐 debitBalance:负数 amount 会让 `bal < amount` 恒 false 而反向增币,NaN 污染余额。
     if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.nexBalance < amount) return false;
+    const previousSnapshot = lastCloudSnapshot;
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance - amount).toFixed(2) };
-    persistAccountSnapshot();
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    return true;
+  }
+
+  /** 资金三元组快照 —— 冲正(退款)唯一正确的基准。 */
+  function captureMoney(): MoneySnapshot {
+    const u = withDefaultEarningBuckets(user.value);
+    return { usdtBalance: u.usdtBalance, nexBalance: u.nexBalance, withdrawableUsdt: u.earningBuckets.withdrawableUsdt };
+  }
+
+  /**
+   * 🔴 精确冲正:把资金三元组**还原**到扣款前那份快照,而不是反向调一次 creditBalance。
+   *
+   * 为什么非有不可:debitBalance 会把 withdrawableUsdt clamp 到扣款后的总余额,而
+   * creditBalance 只加总余额、**不还原可提额度** —— 「扣款 → 后续失败 → 退款」走一遍,
+   * 用户的可提额度就被永久压低一次(审计场景:可提 $8000 的账号买一次创世节点失败退款后
+   * 只剩 $1,钱回来了但提不出去)。退款语义必须与扣款语义对称,对称的唯一实现是还原快照。
+   *
+   * 写绝对值在 account-cloud 的增量三路合并下依然正确:base = lastCloudSnapshot(已含那次
+   * 扣款),delta = 快照值 − 扣款后值 = 正好那一笔的反向增量。
+   */
+  function restoreMoney(snap: MoneySnapshot): boolean {
+    if (![snap.usdtBalance, snap.nexBalance, snap.withdrawableUsdt].every((v) => Number.isFinite(v) && v >= 0)) return false;
+    const previousSnapshot = lastCloudSnapshot;
+    const current = withDefaultEarningBuckets(user.value);
+    user.value = {
+      ...current,
+      usdtBalance: snap.usdtBalance,
+      nexBalance: snap.nexBalance,
+      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: snap.withdrawableUsdt },
+    };
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
     return true;
   }
   /** 核销创世邀请码(FEAT-GEN08 通道4)。per-account:随 account-cloud 快照走,
@@ -1279,7 +1355,8 @@ export const useApp = defineStore("app", () => {
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
-    creditBalance, debitBalance, creditNex, debitNex, recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
+    creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
+    recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
     submitWithdrawal, advanceWithdrawalArrival, refundFailedWithdrawals, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };

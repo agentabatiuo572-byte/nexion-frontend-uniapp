@@ -5,7 +5,7 @@
 
   Steps: select-payment → confirm → pay-instructions (chain QR / card form) →
   awaiting → confirmed → activating → live. On entering "confirmed" the order is
-  persisted ONCE (debit balance incl. card fee → orders.createOrder → bills.add),
+  persisted ONCE (debit balance incl. card fee → orders.createOrder → postReceiptOnly),
   with first-order celebration. framer AnimatePresence → CSS @keyframes fade.
 
   Batch C trade-in intercept (ported): on first mount, for purchasable DEVICE
@@ -239,7 +239,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { useBills } from "@/store/bills";
+import { postMoneyBill, postReceiptOnly } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
@@ -276,7 +276,6 @@ interface PaymentMethod {
 const t = useT();
 const app = useApp();
 const orders = useOrders();
-const bills = useBills();
 const voucher = useVoucher();
 
 // wallet icon path (lucide Wallet), credit-card path
@@ -800,31 +799,33 @@ watch(step, (s) => {
       // 作置换基数),这里绝不直插。金额全部来自确认页那份报价快照。
       if (applyTrial) {
         const convRef = `${ord.id}-TRIAL`;
-        if (trialRemainderUSD > 0) {
-          app.creditBalance(trialRemainderUSD);
-          bills.add({
+        // 🔴 入账 ⊗ 收据走同一个收口点(2026-08-04 R4)。原实现是「creditBalance / creditNex →
+        // 裸 bills.add」,收据写失败时返回 null 没人接:钱加了、账单没有,而下面的 toast 还
+        // 照旧宣布「你到手了 $X」。收口后收据落不了盘 = 入账原样退回、这一项不进 toast。
+        const usdtCredited =
+          trialRemainderUSD > 0 &&
+          postMoneyBill({
             type: "bonus",
             symbol: "USDT",
             amount: trialRemainderUSD,
             status: "posted",
             memo: fmt(t.value.store.coBillTrialRemainderMemo, { name: p.name }),
             ref: `${convRef}-EARN-USDT`,
-          });
-        }
-        if (shadowNEXNow > 0) {
-          app.creditNex(shadowNEXNow);
-          bills.add({
+          }) === "ok";
+        const nexCredited =
+          shadowNEXNow > 0 &&
+          postMoneyBill({
             type: "bonus",
             symbol: "NEX",
             amount: shadowNEXNow,
             status: "posted",
             memo: fmt(t.value.store.coBillTrialNexMemo, { name: p.name }),
             ref: `${convRef}-EARN-NEX`,
-          });
-        }
+          }) === "ok";
+        // 只报**真的到账**的那几项 —— 报了没到账的钱等于二次欺骗。
         const earnParts: string[] = [];
-        if (trialRemainderUSD > 0) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
-        if (shadowNEXNow > 0) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
+        if (usdtCredited) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
+        if (nexCredited) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
         if (earnParts.length) toast.success(fmt(t.value.store.coTrialEarnToast, { parts: earnParts.join(" · ") }));
       }
       // Consume the voucher (single-use) once the order is persisted.
@@ -837,7 +838,12 @@ watch(step, (s) => {
       if (promo > 0) memoParts.push(fmt(t.value.store.coBillTrialDiscountPart, { amount: promo.toFixed(2) }));
       if (applyTrial && trialOffsetUSD > 0) memoParts.push(fmt(t.value.store.coBillTrialOffsetPart, { amount: trialOffsetUSD.toFixed(2) }));
       if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee, rate: cardFeeRateLabel() }));
-      bills.add({
+      // 🔴 主账单走 postReceiptOnly 而不是 postMoneyBill(2026-08-04 R4)。这一笔的扣款发生在
+      // 上面(必须先扣款才建单),中间夹着 createOrder + 旧机下架 + voucher 核销 —— 全都没有
+      // undo。收据写失败时回滚资金 = 只还钱、还不回已经进入履约管线的设备,等于白送一台;
+      // 所以这里的既定处置是**让用户明确看见收据没记上**(与提现页同口径),而不是像原来那样
+      // 丢弃 bills.add 的返回值、静默吞掉。
+      postReceiptOnly({
         type: "purchase",
         symbol: "USDT",
         amount: -chargeTotal,

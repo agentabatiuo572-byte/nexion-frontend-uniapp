@@ -1,0 +1,126 @@
+/**
+ * 资金 ⊗ 收据 —— 一条不变量,一个收口点(2026-08-04 R4「钱动了、账没记上」同族根治)。
+ *
+ * 🔴 不变量:**任何资金变更都必须与它的收据同生共死**。要么两边都落盘,要么资金被精确
+ * 还原(含 withdrawableUsdt)、账上不留半条记录;无论哪种,调用方一定拿到结果、用户一定
+ * 看到提示。绝不允许「扣了钱 → 弹成功 → 账单页查无此单」。
+ *
+ * 为什么必须收口成一个函数而不是每处各写各的:资金变更与账单是**两份独立存储**
+ * (account-cloud 快照 vs bills 账号行),mock 期没有事务。失败是静默的
+ * (`bills.add` 写不进去返回 null 而不抛异常),于是每个调用点都要自己记得「接返回值、
+ * 精确退款、报错」—— 实测四处里有四处忘了(创世购买 / 结算 / 复投 / 资金原语本身)。
+ * 把顺序与失败处置写在一处,新调用点从此**继承**正确行为,而不是重新发明它。
+ *
+ * 单据即指令:资金动作由 draft 的 `amount` 符号 + `symbol` 派生,所以经这条路
+ * **不写收据就动不了钱**——这才是「一条不变量收全族」的机制,不是四个补丁。
+ *
+ * PRODUCTION:整条替换为服务端单事务(POST /api/... 同笔提交扣款 + 分录),
+ * client 只消费返回值;本文件的三分支结果与那份 API 的语义一一对应。
+ */
+import { useApp, type MoneySnapshot } from "@/store/app";
+import { useBills, type Bill } from "@/store/bills";
+import { getT } from "@/i18n/use-t";
+import { toast } from "@/store/ui";
+
+/** 账单入参(id / ts / balanceAfter 由 store 与服务端时钟负责)。 */
+export type ReceiptDraft = Omit<Bill, "id" | "ts" | "balanceAfter">;
+
+/**
+ * - `ok`           两边都落盘。
+ * - `insufficient` 余额不足 / 金额非法 —— **零副作用**,调用点用自己的既有文案报错。
+ * - `failed`       落盘失败(资金或收据)—— 资金已还原、账上无记录、已弹通用失败提示。
+ */
+export type MoneyReceiptOutcome = "ok" | "insufficient" | "failed";
+
+export interface PostMoneyOptions {
+  /**
+   * 冲正模式:把资金**还原**到这份扣款前快照,而不是盲加一笔 credit。
+   * 退款必须走它 —— 扣款会 clamp 掉 withdrawableUsdt,盲加的 credit 不还原可提额度,
+   * 一次「扣款→失败→退款」就把用户的可提额度永久压低(审计场景:$8000 → $1)。
+   */
+  restoreTo?: MoneySnapshot;
+}
+
+/**
+ * 资金变更 + 收据,原子提交(单条 = 一腿的交易)。
+ *
+ * @param draft 收据即指令:`amount < 0` = 扣款,`> 0` = 入账;`symbol` 决定 USDT / NEX。
+ * @param opts  冲正时传 `restoreTo`(见 PostMoneyOptions)。
+ */
+export function postMoneyBill(draft: ReceiptDraft, opts: PostMoneyOptions = {}): MoneyReceiptOutcome {
+  return postMoneyBills([draft], opts);
+}
+
+/**
+ * 多腿交易的原子提交 —— 一进一出的兑换就是它(2026-08-04 R4 追加)。
+ *
+ * 🔴 为什么不是「循环调 postMoneyBill」:那样每条分录各落一次盘,于是存在
+ * 「出账分录落了、入账分录没落,而两边的钱都已经动了」这个中间态 —— 用户看到「兑换完成」,
+ * 账单里却只有扣、没有进。收口的选择是 **N 条分录一次落盘**(bills.addMany),
+ * 那个中间态**根本不存在**:
+ *   · 不需要「删掉第一条」—— 复式账本里已落盘的分录不改写,而且它压根没落盘;
+ *   · 也不需要「补一条反向冲正分录」—— 冲正的前提是「已成事实」,这里没有事实可冲,
+ *     补出来的两条只是账本噪声。
+ * 资金侧的对称还原由 restoreMoney 兜住(它还原 usdt / nex / withdrawable 三元组,
+ * 一进一出两腿动的正是其中两项)。与真后端「同一事务写这 N 条分录」逐字对应。
+ *
+ * 腿的顺序由调用方决定(出账在前、入账在后 = 与账本阅读顺序一致)。
+ */
+export function postMoneyBills(drafts: ReceiptDraft[], opts: PostMoneyOptions = {}): MoneyReceiptOutcome {
+  const app = useApp();
+  const bills = useBills();
+  if (!drafts.length) return "insufficient";
+  if (drafts.some((d) => !Number.isFinite(d.amount) || d.amount === 0)) return "insufficient";
+
+  // 回滚基准必须在动钱**之前**取(取晚了就是拿动过的状态当"原状")。
+  const undo: MoneySnapshot = app.captureMoney();
+
+  let moved = true;
+  if (opts.restoreTo) {
+    moved = app.restoreMoney(opts.restoreTo);
+  } else {
+    // 余额不足与落盘失败必须分开报:前者用户可自解(充值 / 改金额),后者是系统故障。
+    // 预检**按币种汇总全部扣款腿**再比 —— 逐腿比会放过「单腿够、合计不够」,变成
+    // 扣了第一腿才发现第二腿不行。只读,与紧随其后的扣款之间同步,中间插不进写。
+    const needUsdt = drafts.filter((d) => d.amount < 0 && d.symbol !== "NEX").reduce((s, d) => s - d.amount, 0);
+    const needNex = drafts.filter((d) => d.amount < 0 && d.symbol === "NEX").reduce((s, d) => s - d.amount, 0);
+    if (needUsdt > app.user.usdtBalance || needNex > app.user.nexBalance) return "insufficient";
+    for (const d of drafts) {
+      moved =
+        d.amount < 0
+          ? d.symbol === "NEX" ? app.debitNex(-d.amount) : app.debitBalance(-d.amount)
+          : d.symbol === "NEX" ? app.creditNex(d.amount) : app.creditBalance(d.amount);
+      if (!moved) break;
+    }
+  }
+  if (!moved) {
+    // 某一腿没落盘 → 把已经动过的腿一起还原(资金原语只保证自己那一次的对称)。
+    app.restoreMoney(undo);
+    toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
+    return "failed";
+  }
+
+  if (!bills.addMany(drafts)) {
+    // 钱已经落盘、收据没落盘 —— 正是本族要根治的那一格。资金精确还原到动钱之前
+    // (含 withdrawableUsdt),账上一条记录都不留,用户拿到明确失败。
+    app.restoreMoney(undo);
+    toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
+    return "failed";
+  }
+  return "ok";
+}
+
+/**
+ * 收据补记 —— 资金已在别处落定且**不可回滚**时用它(订单已建并进入履约、提现已提交)。
+ *
+ * 为什么保留这条路而不是一律回滚:回滚只还钱、还不回已经发出去的货(orders / genesis 的
+ * 铸造没有 undo),一律回滚等于把「少一张收据」换成「白送一台设备」。这里的既定处置是
+ * **让用户明确看见收据没记上**(与提现页同口径),而不是静默吞掉。
+ *
+ * @returns 收据是否落盘;false 时已弹提示。
+ */
+export function postReceiptOnly(draft: ReceiptDraft): boolean {
+  if (useBills().add(draft)) return true;
+  toast.error(getT().errors.billMissingTitle, getT().errors.billMissingMsg);
+  return false;
+}
