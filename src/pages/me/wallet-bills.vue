@@ -194,6 +194,9 @@ function fmtTime(ts: number): string {
   });
 }
 function billHash(b: Bill): string {
+  // 冲正分录的 ref 带 `-REV` 后缀(与原扣款分录分开幂等键,见 marketplace / stake-sheet 等)。
+  // **有意不剥掉**:两行并排时,同号会让用户分不清哪行是扣、哪行是退;带后缀反而清楚,
+  // 而且抄给客服时能直接定位到冲正那条。参考号是标识不是文案,与 `DP-20260804-0001` 同类。
   return b.ref || b.id;
 }
 function billAria(b: Bill): string {
