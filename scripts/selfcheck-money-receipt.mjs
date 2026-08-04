@@ -399,8 +399,13 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 全站每一个动钱的调用点都在这张表上 —— 台账(⑥)清零只证明「没人裸调」,
   // 这张表证明「都接到收口点上了」。两件事分开守:漏接一个,⑥ 也是绿的。
   const WIRED = [
+    // 🔴 三条冲正路径(purchase-sheet / marketplace / wallet-repurchase)都有「扣款 → 给货
+    // 失败 → 冲正」这一格,所以除了「走没走收口点」,还要守住冲正的**正确形状**:captureMoney
+    // 取基准 + restoreTo 还原。少了 restoreTo 的 `postMoneyBill(反向 draft)` 只是盲加一笔
+    // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
+    // 这种粗判据全绿。
     ["src/App.vue", ["postMoneyBill", "postReceiptOnly"]],
-    ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill"]],
+    ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/components/home/weekly-quest-hero.vue", ["postMoneyBills"]],
     ["src/components/home/weekly-quest-list.vue", ["postMoneyBill"]],
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
@@ -409,11 +414,11 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/lib/share.ts", ["postMoneyBills"]],
     ["src/pages/daily/daily.vue", ["postMoneyBill"]],
     ["src/pages/events/events.vue", ["postMoneyBill"]],
-    ["src/pages/genesis/marketplace.vue", ["postMoneyBill"]],
+    ["src/pages/genesis/marketplace.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/pages/me/achievements.vue", ["postMoneyBills"]],
     ["src/pages/me/wallet-cards-new.vue", ["postMoneyBills"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
-    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill"]],
+    ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/pages/me/wallet-topup.vue", ["postMoneyBill"]],
     ["src/pages/staking/staking.vue", ["postMoneyBill"]],
     ["src/pages/store/bundle.vue", ["postReceiptOnly"]],
@@ -424,16 +429,19 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   for (const [rel, needles] of WIRED) {
     const src = strip(readFileSync(path.join(root, rel), "utf8"));
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
-      needles.every((n) => src.includes(`${n}(`)) && src.includes('from "@/lib/money-receipt"')
+      // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
+      // 其余是调用点,补 `(` —— 否则光有 import 也算数。
+      needles.every((n) => src.includes(n.endsWith(":") ? n : `${n}(`)) && src.includes('from "@/lib/money-receipt"')
       && !/\bbills\.add\(/.test(src), needles.join("+"));
   }
   const locales = ["en", "zh", "vi"];
   samples.locales = locales.length;
-  check(`⑤ i18n 失败提示 ${locales.length} 语齐(txNotSaved + billMissing + fundsStuck + 两条冲正 memo)`,
+  check(`⑤ i18n 失败提示 ${locales.length} 语齐(txNotSaved + billMissing + fundsStuck + 三条冲正 memo)`,
     locales.every((l) => {
       const src = read("src", "i18n", "messages", `${l}.ts`);
       return ["txNotSavedTitle:", "txNotSavedMsg:", "billMissingTitle:", "billMissingMsg:",
-        "fundsStuckTitle:", "fundsStuckMsg:", "genesisReversed:", "stakeReversed:"]
+        "fundsStuckTitle:", "fundsStuckMsg:",
+        "genesisReversed:", "genesisSecondaryReversed:", "stakeReversed:"]
         .every((k) => src.includes(k));
     }));
 }
