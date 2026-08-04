@@ -4885,7 +4885,9 @@ export const en = {
     collapse: "Hide tasks",
     buyCta: "Get your first NexGridBox · earn $7/day forever",
     routeToast: "Quest complete · +{n} NEX",
-    bindCardMemo: "Day-one quest · Link bank card",
+    bindCardMemo: "Day-one quest · Link bank card",
+
+    routeMemo: "Day-one quest · {task}",
     t_bind_bank_card: "Link a bank card",
     t_visit_earn: "Open Earn tab",
     t_visit_store: "Browse the store",

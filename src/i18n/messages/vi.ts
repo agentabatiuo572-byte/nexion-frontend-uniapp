@@ -4785,7 +4785,9 @@ export const vi: Messages = {
     collapse: "Ẩn việc",
     buyCta: "Sắm NexGridBox đầu tiên · kiếm $7/ngày mãi mãi",
     routeToast: "Hoàn thành nhiệm vụ · +{n} NEX",
-    bindCardMemo: "Nhiệm vụ ngày đầu · Liên kết thẻ ngân hàng",
+    bindCardMemo: "Nhiệm vụ ngày đầu · Liên kết thẻ ngân hàng",
+
+    routeMemo: "Nhiệm vụ ngày đầu · {task}",
     t_bind_bank_card: "Liên kết thẻ ngân hàng",
     t_visit_earn: "Mở tab Earn",
     t_visit_store: "Dạo cửa hàng",

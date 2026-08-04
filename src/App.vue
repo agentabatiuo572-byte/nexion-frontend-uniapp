@@ -9,7 +9,7 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useBills } from "@/store/bills";
-import { postMoneyBill, postReceiptOnly } from "@/lib/money-receipt";
+import { postMoneyBill, postMoneyBills, postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -486,6 +486,17 @@ function scheduleAccountSessionBootstrap(attempt = 0) {
   bootstrapAccountSession();
 }
 
+/** 路由任务的 memo 任务名 —— 显式映射不做动态 key 拼接:三个 id 是穷举的,
+ *  动态拼 `t_${id}` 会在任务表增删时静默拿到 undefined,而 memo 是要落进账本的。 */
+const QUEST_ROUTE_MEMO_TASK: Record<QuestTaskId, (t: ReturnType<typeof useT>["value"]) => string> = {
+  bind_bank_card: (t) => t.quest.t_bind_bank_card,
+  visit_earn: (t) => t.quest.t_visit_earn,
+  visit_store: (t) => t.quest.t_visit_store,
+  view_product_roi: (t) => t.quest.t_view_product_roi,
+  setup_profile: (t) => t.quest.t_setup_profile,
+  invite_friend: (t) => t.quest.t_invite_friend,
+};
+
 function questIdForRoute(route: string): QuestTaskId | null {
   if (route === "pages/earn/earn") return "visit_earn";
   if (route === "pages/store/store") return "visit_store";
@@ -509,10 +520,18 @@ function checkQuestRoute() {
   if (!id) return;
   const r = useQuest().markComplete(id);
   if (!r.firstTime) return;
-  const app = useApp();
-  if (r.rewardNex > 0) app.creditNex(r.rewardNex);
-  if (r.rewardUsdt > 0) app.creditBalance(r.rewardUsdt);
   const t = useT().value;
+  // 🔴 路由任务奖励曾经是**裸 creditNex + 零账单**:钱每次都进、账单页永远查无此单
+  // (不是失败路径才发作,是必然)。两道门都看不见它 —— 迁移棘轮只盯 bills.* 写入,
+  // 接线门对 App.vue 只查文件里有没有收口点(里程碑那段已经提供了)。
+  // 与 share.ts 的 invite_friend、wallet-cards-new 的 bind_bank_card 同族,现统一走收口点。
+  const ref = `QST-${id}-${Date.now().toString(36).toUpperCase()}`;
+  const memo = fmt(t.quest.routeMemo, { task: QUEST_ROUTE_MEMO_TASK[id](t) });
+  const drafts: ReceiptDraft[] = [];
+  if (r.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: r.rewardNex, status: "posted", memo, ref });
+  if (r.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: r.rewardUsdt, status: "posted", memo, ref });
+  if (!drafts.length) return;
+  if (postMoneyBills(drafts) !== "ok") return; // 收口点已提示;任务已消费但奖零发,同 quest 族既有取舍
   toast.success(fmt(t.quest.routeToast, { n: r.rewardNex }));
 }
 

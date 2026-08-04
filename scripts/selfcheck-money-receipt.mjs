@@ -38,10 +38,95 @@ function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
 }
-/** 行首 // 与块注释一起剥 —— 只剥「整行就是注释」的,不碰 url 里的 //。
- *  🔴 SFC 的 `<!-- -->` 也要剥:.vue 头注里写一句 `bills.add()` 就能把接线门顶红(实测
- *  stake-sheet 正是如此),而门查的是真调用不是文档。注释不参与编译,更不该参与判定。 */
-const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/<!--[\s\S]*?-->/g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+/** 剥注释 —— **带状态的逐字符扫描**,不是正则。
+ *
+ *  🔴 为什么不能用正则(2026-08-04 对抗审计实测):
+ *   ① 正则版不认上下文 —— `security.ts:8` 的注释里写了一个以「斜杠+星号」结尾的 API 通配路径,
+ *      那两个字符被当成块注释开头,一路吃到 1838 字符外的真闭合符,**78 行剥成 38 行**,
+ *      `interface Persisted` 与 `function hydrate` 整段消失。全树 325/397 个文件掉行。
+ *      (本注释自己也踩过一次:原稿把那个通配路径原样写进来,当场把本块注释提前闭合。)
+ *   ② 只剥「整行 //」漏掉**行尾 //** —— 实测双向都能骗:一个只有 import 的假文件加一行
+ *      行尾注释「已迁到 postMoneyBill( 与 captureMoney( ,restoreTo: before」就能让接线门判绿;
+ *      真走收口点的文件写一句 `// 已不再 bills.add( 了` 就能把棘轮门判红。
+ *
+ *  状态机认:单/双引号、模板串(含 `${}` 嵌套)、正则字面量、行注释、块注释、SFC `<!-- -->`。
+ *  换行保留(行号不漂),被剥内容用空格填充。 */
+function strip(src, keepStrings = false) {
+  const out = [];
+  let i = 0;
+  const n = src.length;
+  // prev = 最近一个非空白的已输出字符,用来区分「除号」与「正则字面量开头」
+  let prev = "";
+  const push = (ch) => { out.push(ch); if (!/\s/.test(ch)) prev = ch; };
+  const blank = (ch) => out.push(ch === "\n" || ch === "\r" ? ch : " ");
+  while (i < n) {
+    const c = src[i];
+    const c2 = src[i + 1];
+    // SFC 注释
+    if (c === "<" && src.startsWith("<!--", i)) {
+      const end = src.indexOf("-->", i + 4);
+      const stop = end < 0 ? n : end + 3;
+      for (; i < stop; i++) blank(src[i]);
+      continue;
+    }
+    if (c === "/" && c2 === "/") {                       // 行注释(含行尾)
+      while (i < n && src[i] !== "\n") blank(src[i++]);
+      continue;
+    }
+    if (c === "/" && c2 === "*") {                       // 块注释
+      const end = src.indexOf("*/", i + 2);
+      const stop = end < 0 ? n : end + 2;
+      for (; i < stop; i++) blank(src[i]);
+      continue;
+    }
+    // 🔴 字符串**内容也要抹掉**:调用不可能活在字符串字面量里,而文档串 / 错误文案里
+    // 出现 `bills.add(` 是常事(实测负控「字符串里的方法名」原本被误判成违规)。
+    // 引号本身保留,长度恒等、行号不漂。
+    if (c === '"' || c === "'") {                        // 普通字符串
+      const emit = keepStrings ? push : blank;
+      push(c); i++;
+      while (i < n && src[i] !== c) {
+        if (src[i] === "\\") { emit(src[i++]); if (i < n) emit(src[i++]); continue; }
+        if (src[i] === "\n") break;                      // 未闭合:止于行尾,不吞后文
+        emit(src[i++]);
+      }
+      if (i < n && src[i] === c) push(src[i++]);
+      continue;
+    }
+    if (c === "`") {                                     // 模板串:字面部分抹掉,`${}` 里是**真代码**要留
+      push(c); i++;
+      let depth = 0;
+      while (i < n) {
+        if (src[i] === "\\") { blank(src[i++]); if (i < n) blank(src[i++]); continue; }
+        if (depth === 0 && src[i] === "$" && src[i + 1] === "{") { depth++; push(src[i++]); push(src[i++]); continue; }
+        if (depth > 0) {                                 // 插值内:原样保留
+          if (src[i] === "{") depth++;
+          else if (src[i] === "}") depth--;
+          push(src[i++]);
+          continue;
+        }
+        if (src[i] === "`") { push(src[i++]); break; }
+        (keepStrings ? push : blank)(src[i++]);
+      }
+      continue;
+    }
+    // 正则字面量:`/` 前是运算符/开括号/关键字位 → 是正则,不是除号
+    if (c === "/" && (prev === "" || "(,=:[!&|?{};+-*%~^".includes(prev))) {
+      push(c); i++;
+      let inClass = false;
+      while (i < n && src[i] !== "\n") {
+        if (src[i] === "\\") { push(src[i++]); if (i < n) push(src[i++]); continue; }
+        if (src[i] === "[") inClass = true;
+        else if (src[i] === "]") inClass = false;
+        else if (src[i] === "/" && !inClass) { push(src[i++]); break; }
+        push(src[i++]);
+      }
+      continue;
+    }
+    push(c); i++;
+  }
+  return out.join("");
+}
 /** 从 needle 起花括号配对抠出整块原文。抠不到 = 实现被改名/删除,直接炸(不许静默放行)。 */
 function grabBlock(src, needle) {
   const start = src.indexOf(needle);
@@ -422,7 +507,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   ];
   samples.wired = WIRED.length;
   for (const [rel, needles] of WIRED) {
-    const src = strip(readFileSync(path.join(root, rel), "utf8"));
+    // keepStrings:⑤ 的 needle 含 import 路径与 `restoreTo:` 这类字面量,字符串内容要留;
+    // ⑥ 判的是调用,字符串内容必须抹(见 strip 头注)。两档口径不同,不能共用一份。
+    const src = strip(readFileSync(path.join(root, rel), "utf8"), true);
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
       // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
       // 其余是调用点,补 `(` —— 否则光有 import 也算数。
@@ -458,57 +545,129 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   })(SRC);
   samples.scanned = files.length;
   // 🔴 原语名单必须与 bills 的**全部**写入原语对齐(R5:漏了 addMany —— 而它正是「N 条分录
-  // 一次落盘」的多腿原语、本族不变量的核心机制。收口点被绕开时全树对裸调 addMany 零监控)。
-  // 名单来源不是记忆:bills.ts 里对外暴露的**建分录**函数(add / addMany / addOnce /
-  // addForAccount)。`settleByRef` 故意不在内 —— 它改的是已有分录的状态,收口点不替代它。
-  const CALL = /(?:useBills\(\)|bills|billsStore)\.(?:add|addMany|addOnce|addForAccount)\(\s*[{a-zA-Z"'`[]/g;
-  /** 一行里是否有「丢弃返回值」的 bills 写入 = 调用处在语句位:
-   *  前缀为空,或以 ; { } 或 `if (…)` 的右括号收尾。判据只写这一份,正控/负控与全站扫共用它 ——
-   *  各写一份的话,正控测的就不是真正在跑的那条判据。 */
-  function isBareWrite(line) {
-    CALL.lastIndex = 0;
-    const m = CALL.exec(line);
-    if (!m) return false;
-    const prefix = line.slice(0, m.index).trim();
-    return prefix === "" || /[;{}]$/.test(prefix) || /\)$/.test(prefix);
+  // 一次落盘」的多腿原语、本族不变量的核心机制)。名单来源不是记忆:bills.ts 里对外暴露的
+  // **建分录**函数(add / addMany / addOnce / addForAccount)。`settleByRef` 故意不在内 ——
+  // 它改的是已有分录的状态,收口点不替代它。
+  const METHODS = "add|addMany|addOnce|addForAccount";
+  //
+  // 🔴 判据换口径(2026-08-04 对抗审计):原来判的是「**丢弃返回值**的裸调」,靠
+  // 「调用处在语句位」的前缀字符串识别。实测那条判据有三族逃逸,而且每族都是零成本触发:
+  //   ① **按行匹配** —— 真实 draft 都是多字段对象,`bills.add(` 后换行即逃(仓里无 .prettierrc,
+  //      而 purchase-sheet / stake-sheet / marketplace / wallet-repurchase 四处 `postMoneyBill(`
+  //      正是这种「首行只有 (、对象另起」的写法,同形迁到 bills.add( 就整族看不见);
+  //   ② **receiver 白名单只认三个名字** —— `const s = useBills(); s.add(…)` / `billStore.add(…)` /
+  //      `bills?.add(…)` / 解构后裸调 / `this.bills.add(…)` 全逃;
+  //   ③ **语句位前缀** —— void / await / 无花括号 else / 箭头体 / .then / 三元 / && / || /
+  //      .vue 内联 handler,10 种丢弃形态实测 10/10 逃逸。
+  //
+  // 换成:**任何对 bills 写入原语的调用都算,不再判返回值有没有被用**。
+  // 更简单、也严格更强 —— 合法的直调有且只有下面 ALLOW 里那几处,显式列出比逐处判语义可靠。
+  // (台账已清零,「丢弃 vs 接住」的区分本来就没有存在价值了。)
+  const ALLOW = {
+    // 收口点自己 —— 它就是唯一该调 bills 写入的地方。钉住条数:这里多出一处
+    // 丢弃式写入同样要被看见(原来整文件豁免 = 收口点内部零监控)。
+    "src/lib/money-receipt.ts": 3,
+    // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
+    // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
+    "src/pages/register/register.vue": 2,
+    // 跨账号写(addForAccount ×2):写的是**别的账号**的行,收口点只服务当前账号。
+    "src/pages/me/wallet-withdraw.vue": 2,
+  };
+  /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
+  function billsWriteHits(src) {
+    const recv = new Set(["useBills\\(\\)", "bills", "billsStore"]);
+    // `const s = useBills()` / `let s = useBills()` → s 也是 bills receiver
+    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*useBills\(\)/g)) {
+      recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    }
+    let count = 0;
+    for (const r of recv) {
+      // `\s*\??\s*\.` 认可选链;`[\s\S]*?` 不用,直接允许方法名前后有空白与换行
+      const re = new RegExp(`(?<![\\w$])${r}\\s*\\??\\s*\\.\\s*(?:${METHODS})\\s*\\(`, "g");
+      count += [...src.matchAll(re)].length;
+    }
+    // 解构:`const { add, addOnce } = useBills()` → 之后的裸 `add(` 也是写入
+    for (const m of src.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*useBills\(\)/g)) {
+      for (const part of m[1].split(",")) {
+        const nm = part.split(":").pop().trim();
+        if (!nm || !new RegExp(`^(?:${METHODS})$`).test(nm)) continue;
+        // 解构声明本身是 `{ add }`,不带 `(`,所以不必扣减
+        count += [...src.matchAll(new RegExp(`(?<![\\w$.])${nm}\\s*\\(`, "g"))].length;
+      }
+    }
+    return count;
+  }
+  /** 🔴 `.vue` 要分区段扫:`<template>` 里引号内是**表达式**(`@tap="bills.add(…)"` 实测能逃),
+   *  `<script>` 里引号内是**数据**(文案里出现 `bills.add(` 是常事)。同一份口径必错一边。 */
+  function scanSource(rel, raw) {
+    if (!rel.endsWith(".vue")) return billsWriteHits(strip(raw));
+    let total = 0;
+    let last = 0;
+    for (const m of raw.matchAll(/<script[\s\S]*?<\/script>/g)) {
+      total += billsWriteHits(strip(raw.slice(last, m.index), true)); // 模板段:保留引号内容
+      total += billsWriteHits(strip(m[0]));                            // 脚本段:抹掉引号内容
+      last = m.index + m[0].length;
+    }
+    total += billsWriteHits(strip(raw.slice(last), true));
+    return total;
   }
   const found = {};
   for (const f of files) {
     const rel = path.relative(root, f).replace(/\\/g, "/");
-    if (rel === CHOKEPOINT) continue;
-    const src = strip(readFileSync(f, "utf8"));
-    for (const line of src.split(/\r?\n/)) {
-      if (isBareWrite(line)) found[rel] = (found[rel] ?? 0) + 1;
-    }
+    const n = scanSource(rel, readFileSync(f, "utf8"));
+    if (n > 0) found[rel] = n;
   }
-  samples.ledgerFiles = Object.keys(LEDGER).length;
-  const grown = Object.entries(found).filter(([f, n]) => n > (LEDGER[f] ?? 0));
+  samples.ledgerFiles = Object.keys(ALLOW).length;
+  // 双向判定:超出白名单额度 = 回潮;**低于**额度 = 白名单该收紧(删了调用却没删额度,
+  // 等于给未来的新调用留了免检名额)。降数不报错但要显式提示,防止额度变成僵尸配额。
+  const grown = Object.entries(found).filter(([f, n]) => n > (ALLOW[f] ?? 0));
+  const shrunk = Object.entries(ALLOW).filter(([f, q]) => (found[f] ?? 0) < q);
   const total = Object.values(found).reduce((a, b) => a + b, 0);
-  check(`⑥ 🔴 裸调 bills 写入清零后不许回潮(扫 ${files.length} 个源文件,当前 ${total} 处 / ${Object.keys(found).length} 文件)`,
-    grown.length === 0, grown.map(([f, n]) => `${f}: ${n} > ${LEDGER[f] ?? 0}`).join(" | "));
-  // 🔴 活体证明改成正控 + 负控。原来这条靠「存量 total > 0」自证判据还活着 —— 迁移做完
-  // total 归零,那条断言会**反过来判红**:把「欠账还完了」误报成回归,逼下一个人留一处不迁。
-  // 判据的活性该由它对已知样本的判断来证明,而不是由生产代码里还欠着多少债来证明。
+  check(`⑥ 🔴 bills 写入原语只许在白名单内调用(扫 ${files.length} 个源文件,当前 ${total} 处 / ${Object.keys(found).length} 文件,白名单额度 ${Object.values(ALLOW).reduce((a, b) => a + b, 0)})`,
+    grown.length === 0, grown.map(([f, n]) => `${f}: ${n} > ${ALLOW[f] ?? 0}`).join(" | "));
+  if (shrunk.length) {
+    console.log(`  INFO  白名单额度高于实测,建议下调:${shrunk.map(([f, q]) => `${f} ${found[f] ?? 0}/${q}`).join(" | ")}`);
+  }
+  // 🔴 活体证明靠正控 + 负控,不靠「存量 total > 0」自证 —— 迁移做完 total 归零后,
+  // 那种自证会**反过来判红**:把「欠账还完了」误报成回归,逼下一个人留一处不迁。
+  //
+  // 🔴 控制线必须**过 strip**(2026-08-04 对抗审计):原来是 `POS.filter(isBareWrite)`,
+  // 直接把字符串喂给正则、**绕开了 strip**。判据是 `strip && 匹配` 两项串联,那样只证明了
+  // 后一项活着,前一项(代码进不进得来)从没被测过 —— 违规若落在 strip 吞掉的区间里,
+  // 门看不见、正控也测不出。合取项必须逐个隔离。
+  // 控制线走**与全站扫同一条路径**(scanSource),而不是直接调 billsWriteHits ——
+  // 否则 .vue 分区段那一支不会被任何控制线走到。
+  const run = (code, rel = "probe.ts") => scanSource(rel, code);
   const POS = [
-    '    bills.add({ type: "bonus" });',
-    '  useBills().addOnce({ type: "topup" });',
-    '  if (x) { billsStore.addForAccount(k, { type: "withdraw" }); }',
-    // addMany 是 R5 才补进原语名单的多腿写入,必须有自己的正控 —— 名单里加了一项、
-    // 却没有一条控制线走那一项,等于这一支从没被验证过(合取项逐个隔离)。
-    '  bills.addMany([{ type: "bonus" }, { type: "fee" }]);',
+    ['同行普通调用', '  bills.add({ type: "bonus" });'],
+    ['useBills() 直调', '  useBills().addOnce({ type: "topup" });'],
+    ['另一个 receiver 名', '  if (x) { billsStore.addForAccount(k, { type: "withdraw" }); }'],
+    // addMany 是多腿写入原语,名单里加了一项却没有对应控制线 = 那一支从没被验证过
+    ['多腿原语 addMany', '  bills.addMany([{ type: "bonus" }, { type: "fee" }]);'],
+    // 以下四条是对抗审计实测逃逸的形态,逐个立成常驻正控
+    ['跨行(调用与实参不同行)', '  bills.add(\n    { type: "bonus" },\n  );'],
+    ['局部别名 receiver', '  const s = useBills();\n  s.add({ type: "bonus" });'],
+    ['可选链', '  bills?.add({ type: "bonus" });'],
+    ['丢弃形态 void / 箭头体', '  void bills.add({ type: "x" });\n  const f = () => bills.addOnce({ type: "y" });'],
+    ['解构后裸调', '  const { addOnce } = useBills();\n  addOnce({ type: "topup" });'],
+    // .vue 模板内联 handler:引号内是**表达式**不是数据 —— 这是分区段扫描那一支的唯一控制线,
+    // 少了它,scanSource 的 .vue 分支就没有任何控制线走到(名单里加了分支却没测 = 从没验证过)。
+    ['.vue 模板内联 handler', '<template><view @tap="bills.add({ type: 1 })" /></template>', 'probe.vue'],
   ];
   const NEG = [
-    '  const b = bills.add({ type: "bonus" });',                        // 接了返回值
-    '  if (!bills.addForAccount(a, { type: "withdraw" })) return;',     // 接了并判了
-    '  return useBills().addOnce({ type: "topup" });',                  // 返回给上层处置
+    ['行尾注释里的调用(不许哄红)', '  doThing(); // 已不再 bills.add({ type: "x" }) 了'],
+    ['块注释里的调用', '  /* 旧写法:bills.addMany([{...}]) */\n  postMoneyBills(d);'],
+    ['字符串里的方法名', '  const doc = "bills.add(...) 已废弃";'],
+    ['SFC 注释里的调用', '  <!-- 迁移前:bills.add({ type: "x" }) -->'],
+    ['同名但非 bills 的 receiver', '  cart.add({ id: 1 });\n  myBills.add({ x: 1 });'],
   ];
-  const posHit = POS.filter(isBareWrite).length;
-  const negHit = NEG.filter(isBareWrite).length;
-  // 条数从数组长度取,不写死 —— 写死的话往 POS/NEG 里加了控制线,标签还报旧数字,
+  const posMiss = POS.filter(([, code, rel]) => run(code, rel) === 0).map(([name]) => name);
+  const negHit = NEG.filter(([, code, rel]) => run(code, rel) > 0).map(([name]) => name);
+  // 条数从数组长度取,不写死 —— 写死的话往 POS/NEG 里加了控制线标签还报旧数字,
   // 「加了没加」在输出里看不出来(样本量必须是真数,不是记忆里的数)。
-  check(`⑥ 扫描器没有空转:正控 ${POS.length} 条必中 / 负控 ${NEG.length} 条必不中(判据失效当场暴露,不靠存量自证)`,
-    posHit === POS.length && negHit === 0 && files.length > 100,
-    `pos=${posHit}/${POS.length} neg=${negHit}/0 files=${files.length}`);
+  check(`⑥ 扫描器没有空转:正控 ${POS.length} 条必中 / 负控 ${NEG.length} 条必不中(判据+strip 两项都过,不靠存量自证)`,
+    posMiss.length === 0 && negHit.length === 0 && files.length > 100,
+    `漏判=${posMiss.join(",") || "无"} 误判=${negHit.join(",") || "无"} files=${files.length}`);
 }
 
 console.log(`\n${pass} pass / ${fail} fail(样本:${samples.primitives} 个资金原语 × 3 断言 · `
