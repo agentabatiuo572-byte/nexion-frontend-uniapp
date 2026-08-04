@@ -306,7 +306,9 @@ function formatTs(ts: number): string {
 function handleCheckIn() {
   const r = faucet.signIn();
   if (!r.ok) {
-    toast.info("Already checked in today", "Come back tomorrow for more NEX.");
+    // conflict = 别的标签页刚签过(store 已刷新到最新);否则就是本页自己今天已签。
+    if (r.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    else toast.info("Already checked in today", "Come back tomorrow for more NEX.");
     return;
   }
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
@@ -339,7 +341,14 @@ function handleClaimMilestone(m: Milestone) {
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
   const rewardDisplay = t.value.daily.milestones[m.rewardKey];
-  faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
+  // 🔴 必须先看 ok:上面两道预判读的是本页内存态,而里程碑领取是**一次性**的。
+  // 别的标签页刚领过时 store 会按磁盘最新态拒掉,此时还往下走就是白发一份奖励。
+  const claim = faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
+  if (!claim.ok) {
+    if (claim.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    else toast.info(t.value.daily.milestones.claimedToast, "");
+    return;
+  }
   // USDT / NEX milestone rewards actually credit the wallet + write a bill.
   if (m.reward.type === "usdt" || m.reward.type === "nex") {
     // MOCK-ONLY NON-ATOMIC: PROD milestone-claim endpoint TBD must atomically
@@ -363,8 +372,11 @@ function handleClaimMilestone(m: Milestone) {
 }
 
 function handleUseSaver() {
-  if (faucet.useSaver()) {
+  const r = faucet.useSaver();
+  if (r.ok) {
     toast.success(t.value.daily.saver.restored, "");
+  } else if (r.conflict) {
+    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
   } else {
     toast.info(t.value.daily.saver.onlyWhenBroken, "");
   }

@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 
 /**
  * NEX 水龙头 + 提现闸 — 由旧 points.ts 演化(积分系统下线,NEX 接管)。
@@ -62,45 +61,64 @@ function defaults(): FaucetData {
   };
 }
 
-function hydrate(accountKey: string): FaucetData {
-  const row = readAccountRow<Partial<FaucetData>>(ACCOUNTS_KEY, accountKey);
+/** 磁盘行 → 签到状态机。格式不认识 → null(调用方退回 defaults / 内存态)。
+ *  旧设备级 points 迁移已废除:设备级存量无账号归属,迁给任一账号=臆断多发,mock 可重建。 */
+function parseRow(raw: unknown): FaucetData | null {
+  const row = raw as Partial<FaucetData> | null;
   if (
-    row &&
-    Array.isArray(row.claimedMilestones) && Array.isArray(row.history) &&
-    typeof row.lastSignedInAt === "number"
+    !row ||
+    !Array.isArray(row.claimedMilestones) || !Array.isArray(row.history) ||
+    typeof row.lastSignedInAt !== "number"
   ) {
-    return { ...defaults(), ...row };
+    return null;
   }
-  // 旧设备级 points 迁移已废除:设备级存量无账号归属,迁给任一账号=臆断多发,mock 可重建。
-  return defaults();
+  const d = defaults();
+  const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
+  return {
+    history: row.history,
+    lastSignedInAt: row.lastSignedInAt,
+    signInStreak: num(row.signInStreak, d.signInStreak),
+    longestStreak: num(row.longestStreak, d.longestStreak),
+    streakSavers: num(row.streakSavers, d.streakSavers),
+    claimedMilestones: row.claimedMilestones,
+  };
 }
 
 export const useNexFaucet = defineStore("nexFaucet", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
-  let boundKey = "default";
-  const init = hydrate(boundKey);
-  const history = ref<FaucetEvent[]>(init.history);
-  const lastSignedInAt = ref(init.lastSignedInAt);
-  const signInStreak = ref(init.signInStreak);
-  const longestStreak = ref(init.longestStreak);
-  const streakSavers = ref(init.streakSavers);
-  const claimedMilestones = ref<number[]>(init.claimedMilestones);
+  const history = ref<FaucetEvent[]>([]);
+  const lastSignedInAt = ref(0);
+  const signInStreak = ref(0);
+  const longestStreak = ref(0);
+  const streakSavers = ref(0);
+  const claimedMilestones = ref<number[]>([]);
 
-  function persist() {
-    writeAccountRow<FaucetData>(ACCOUNTS_KEY, boundKey, {
+  // 落盘唯一出口:乐观并发提交器。签到 / 里程碑 / saver 都是**每日或一次性配额**,
+  // 覆盖式写会让两个标签页各领一次(daily 页领完直接 app.creditNex → 白发币)。
+  const rows = createAccountRowCommit<FaucetData>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseRow,
+    snapshot: () => ({
       history: history.value,
       lastSignedInAt: lastSignedInAt.value,
       signInStreak: signInStreak.value,
       longestStreak: longestStreak.value,
       streakSavers: streakSavers.value,
       claimedMilestones: claimedMilestones.value,
-    });
-  }
+    }),
+    sync: (row) => {
+      history.value = row.history;
+      lastSignedInAt.value = row.lastSignedInAt;
+      signInStreak.value = row.signInStreak;
+      longestStreak.value = row.longestStreak;
+      streakSavers.value = row.streakSavers;
+      claimedMilestones.value = row.claimedMilestones;
+    },
+  });
 
   /** 账号切换重绑:装载该账号的签到状态机(防跨账号继承连胜/里程碑/saver)。 */
   function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    const next = hydrate(boundKey);
+    const next = rows.bind(rawAccountKey) ?? defaults();
     history.value = next.history;
     lastSignedInAt.value = next.lastSignedInAt;
     signInStreak.value = next.signInStreak;
@@ -108,76 +126,100 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
     streakSavers.value = next.streakSavers;
     claimedMilestones.value = next.claimedMilestones;
   }
+  bindAccount("default");
 
   /**
    * 签到。更新连胜状态 + 记一条 history 事件,返回本次获得的 NEX。
    * 不在此计入钱包余额 — 调用方(daily 页)负责 `app.creditNex(gained)`(架构铁律:store 不 import app)。
+   *
+   * 🔴 「今天签过没」按**磁盘最新**的 lastSignedInAt 判 —— 别的标签页刚签过的,这里就被挡住,
+   * 一天绝不发两次币。幸运倍率只摇一次(重试沿用同一结果,不给重试当抽奖机)。
    */
-  function signIn(): { ok: boolean; gained: number; streak: number; multiplier: number } {
+  function signIn(): { ok: boolean; gained: number; streak: number; multiplier: number; conflict?: boolean } {
     const t = Date.now();
-    const last = lastSignedInAt.value;
-    // 同一天不可重复
-    if (last && new Date(last).toDateString() === new Date(t).toDateString()) {
-      return { ok: false, gained: 0, streak: signInStreak.value, multiplier: 1 };
-    }
-    const continuous = last && t - last < 2 * ONE_DAY;
-    const newStreak = continuous ? signInStreak.value + 1 : 1;
-    const baseGain = SIGNIN_BASE_NEX;
-    const bonus = newStreak > 0 && newStreak % 7 === 0 ? SIGNIN_STREAK7_BONUS_NEX : 0;
     // Lucky multiplier: 1.0x baseline, 15% chance of 1.5x, 5% chance of 2x.
     const roll = Math.random();
     const multiplier = roll < 0.05 ? 2 : roll < 0.20 ? 1.5 : 1;
-    const gained = Math.round((baseGain + bonus) * multiplier);
-    const newLongest = Math.max(longestStreak.value, newStreak);
-    lastSignedInAt.value = t;
-    signInStreak.value = newStreak;
-    longestStreak.value = newLongest;
-    history.value = [
-      {
-        ts: t,
-        delta: gained,
-        reason:
-          multiplier > 1
-            ? `Daily +${baseGain + bonus} × ${multiplier}x lucky`
-            : bonus
-              ? `Day-${newStreak} streak bonus`
-              : "Daily check-in",
-      },
-      ...history.value.slice(0, 49),
-    ];
-    persist();
-    return { ok: true, gained, streak: newStreak, multiplier };
+    const r = rows.commit((cur) => {
+      const last = cur.lastSignedInAt;
+      // 同一天不可重复
+      if (last && new Date(last).toDateString() === new Date(t).toDateString()) return null;
+      const continuous = last && t - last < 2 * ONE_DAY;
+      const newStreak = continuous ? cur.signInStreak + 1 : 1;
+      const baseGain = SIGNIN_BASE_NEX;
+      const bonus = newStreak > 0 && newStreak % 7 === 0 ? SIGNIN_STREAK7_BONUS_NEX : 0;
+      const gained = Math.round((baseGain + bonus) * multiplier);
+      return {
+        next: {
+          ...cur,
+          lastSignedInAt: t,
+          signInStreak: newStreak,
+          longestStreak: Math.max(cur.longestStreak, newStreak),
+          history: [
+            {
+              ts: t,
+              delta: gained,
+              reason:
+                multiplier > 1
+                  ? `Daily +${baseGain + bonus} × ${multiplier}x lucky`
+                  : bonus
+                    ? `Day-${newStreak} streak bonus`
+                    : "Daily check-in",
+            },
+            ...cur.history.slice(0, 49),
+          ],
+        },
+        result: { gained, streak: newStreak },
+      };
+    });
+    if (!r.ok) {
+      return { ok: false, gained: 0, streak: signInStreak.value, multiplier: 1, conflict: r.conflict };
+    }
+    return { ok: true, gained: r.result.gained, streak: r.result.streak, multiplier };
   }
 
-  function useSaver(): boolean {
-    if (streakSavers.value <= 0) return false;
-    if (signInStreak.value !== 0 && lastSignedInAt.value > 0 && Date.now() - lastSignedInAt.value < 2 * ONE_DAY) {
-      // Streak isn't actually broken
-      return false;
-    }
-    const yesterday = Date.now() - ONE_DAY;
-    streakSavers.value = streakSavers.value - 1;
-    lastSignedInAt.value = yesterday;
-    signInStreak.value = Math.max(1, Math.min(30, longestStreak.value || 1));
-    history.value = [
-      { ts: Date.now(), delta: 0, reason: "Streak saver used" },
-      ...history.value.slice(0, 49),
-    ];
-    persist();
-    return true;
+  function useSaver(): { ok: boolean; conflict?: boolean } {
+    const now = Date.now();
+    const r = rows.commit((cur) => {
+      // 🔴 saver 存量与「连胜是否真断了」都按磁盘最新态判:别处刚用掉的那张不会被再用一次。
+      if (cur.streakSavers <= 0) return null;
+      if (cur.signInStreak !== 0 && cur.lastSignedInAt > 0 && now - cur.lastSignedInAt < 2 * ONE_DAY) {
+        return null; // Streak isn't actually broken
+      }
+      return {
+        next: {
+          ...cur,
+          streakSavers: cur.streakSavers - 1,
+          lastSignedInAt: now - ONE_DAY,
+          signInStreak: Math.max(1, Math.min(30, cur.longestStreak || 1)),
+          history: [{ ts: now, delta: 0, reason: "Streak saver used" }, ...cur.history.slice(0, 49)],
+        },
+        result: true as const,
+      };
+    });
+    return r.ok ? { ok: true } : { ok: false, conflict: r.conflict };
   }
 
   /**
    * 领取里程碑。校验未领 + 连胜达标后标记已领 + 记 history,返回是否成功。
-   * NEX 计入钱包由调用方负责(`app.creditNex(gainedNex)`)。
+   * NEX 计入钱包由调用方负责(`app.creditNex(gainedNex)`)——
+   * 🔴 调用方必须先看 ok:里程碑奖励是一次性的,失败还照发就是白送一份。
    */
-  function claimMilestone(day: number, gainedNex: number, reason: string): boolean {
-    if (claimedMilestones.value.includes(day)) return false;
-    if (signInStreak.value < day) return false;
-    claimedMilestones.value = [...claimedMilestones.value, day];
-    history.value = [{ ts: Date.now(), delta: gainedNex, reason }, ...history.value.slice(0, 49)];
-    persist();
-    return true;
+  function claimMilestone(day: number, gainedNex: number, reason: string): { ok: boolean; conflict?: boolean } {
+    const now = Date.now();
+    const r = rows.commit((cur) => {
+      if (cur.claimedMilestones.includes(day)) return null;
+      if (cur.signInStreak < day) return null;
+      return {
+        next: {
+          ...cur,
+          claimedMilestones: [...cur.claimedMilestones, day],
+          history: [{ ts: now, delta: gainedNex, reason }, ...cur.history.slice(0, 49)],
+        },
+        result: true as const,
+      };
+    });
+    return r.ok ? { ok: true } : { ok: false, conflict: r.conflict };
   }
 
   return {

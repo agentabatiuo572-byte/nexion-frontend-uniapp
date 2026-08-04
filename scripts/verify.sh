@@ -1207,12 +1207,12 @@ sentinel_present "P2-8 account-scope helper rebinds exchange" src/lib/account-sc
 sentinel_present "P2-8 account-scope helper rebinds exchange-v3" src/lib/account-scope.ts 'useExchangeV3\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds cards" src/lib/account-scope.ts 'useCards\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds nex-faucet" src/lib/account-scope.ts 'useNexFaucet\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 voucher store is account-scoped" src/store/voucher.ts 'writeAccountRow'
+sentinel_present "P2-8 voucher store is account-scoped" src/store/voucher.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 free-trial store is account-scoped" src/store/free-trial.ts 'writeAccountRow'
 sentinel_present "P2-8 exchange store is account-scoped" src/store/exchange.ts 'writeAccountRow'
 sentinel_present "P2-8 exchange-v3 store is account-scoped" src/store/exchange-v3.ts 'writeAccountRow'
 sentinel_present "P2-8 cards store is account-scoped" src/store/cards.ts 'writeAccountRow'
-sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow'
+sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow|createAccountRowCommit'
 # P2-8 wallet-pairing:KYC 配对源头按账号隔离(修 wallet-exchange 镜像旁路 exchange-v3.kycVerified)
 sentinel_present "P2-8 account-scope helper rebinds wallet-pairing" src/lib/account-scope.ts 'useWalletPairing\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 wallet-pairing store is account-scoped" src/store/wallet-pairing.ts 'writeAccountRow'
@@ -1232,8 +1232,8 @@ sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.
 sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
 sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
-sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow'
-sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow'
+sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow|createAccountRowCommit'
+sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow|createAccountRowCommit'
 # P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
@@ -2334,6 +2334,29 @@ endpoint_citation_gate() {
   fi
 }
 endpoint_citation_gate
+
+# ── P1 涉钱/配额 store 乐观并发门(存量 P1 二期,2026-08-04)──
+# 质押一期把 writeAccountRowCas 立起来后,同型缺陷还留在六个 store 上:deposits(入金单
+# 状态推进 + 到账入账,两端并发推进 = 同一笔充值入账两次)· voucher(同一张券各领一次)·
+# nex-faucet / daily-powerup / lucky-spin(每日与一次性配额被覆盖 = 额度绕过)·
+# withdraw-daily-count(提现日限额计数被覆盖 = 限额白设)。H5 端 uni storage 就是
+# localStorage,同源多标签页共享一份且全仓无 storage 事件重新水合 —— 状态**永久不同步**,
+# 而 usdtBalance/nexBalance 是 ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记。
+# 判据(esbuild 载真 store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份
+# 序列化 storage;只有 deposits 的 app/bills/fx 三个跨 store 组合方换成可观测假账本):
+# ①六个 store 各自的陈旧标签页重复领取被拒、余额/计数只动一次 ①b 读与写之间被插队同样
+# 拦得住(rev CAS)②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」可区分
+# ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(六个 store
+# 全路径走 CAS + 六处页面调用点真的读了 ok/conflict + 3 语 i18n)。
+money_cas_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > /tmp/uniapp-money-cas.log 2>&1; then
+    ok "P1 涉钱/配额乐观并发门 — $(tail -1 /tmp/uniapp-money-cas.log)"
+  else
+    bad "P1 涉钱/配额乐观并发门失败 — node scripts/selfcheck-money-cas.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-cas.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_cas_gate
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
