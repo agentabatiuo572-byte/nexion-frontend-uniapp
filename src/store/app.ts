@@ -11,7 +11,7 @@ import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle"
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { getCarrier, type Carrier } from "@/lib/carrier";
-import { GENESIS_INVITE_PATTERN } from "./genesis";
+import { claimGenesisInviteCode, redeemedInviteCodeOf, type GenesisInviteRedeemResult } from "./genesis-invite";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { FLEET_DEVICES } from "@/lib/platform-stats";
@@ -988,15 +988,31 @@ export const useApp = defineStore("app", () => {
     }
     return true;
   }
-  /** 核销创世邀请码(FEAT-GEN08 通道4)。per-account:随 account-cloud 快照走,
-   *  切号/新注册不继承(设备级存储会造成资格门跨账号旁路,审计 P1)。
-   *  mock 端格式校验;真后台 = POST /api/genesis/invite/redeem(server 核销)。 */
-  function setGenesisInviteCode(raw: string): boolean {
-    const code = raw.trim().toUpperCase();
-    if (!GENESIS_INVITE_PATTERN.test(code)) return false;
-    user.value = { ...user.value, genesisInviteCode: code };
-    persistAccountSnapshot();
-    return true;
+  /**
+   * 核销创世邀请码(规格 FEAT-GEN11)。per-account:随 account-cloud 快照走,
+   * 切号/新注册不继承(设备级存储会造成资格门跨账号旁路,审计 P1)。
+   *
+   * 由「只跑格式正则」改为查码表 + 三态校验:格式对但从未发放的串一律拒(旧缺陷本体 ——
+   * 任何 NEXGRID-OG-XXXX 都通过、同一码可被无限账号使用)。
+   * 真后台 = POST /api/genesis/invite/redeem(server 事务核销,一码一用由事务保证)。
+   */
+  function setGenesisInviteCode(raw: string): GenesisInviteRedeemResult {
+    // 异常3:本账号已持码 → 拒绝;**已持有的码不受影响**(不覆盖、不释放),所以这一问
+    // 必须排在占码之前 —— 排在后面等于先把新码占掉再拒,新码白白作废。
+    // 问码表(单源 + 每次现读磁盘),不问可能陈旧的 user.value:另一个标签页刚核销过时,
+    // 本页内存副本还是「没持码」,照它放行就能让同一个账号占掉第二个码。
+    if (redeemedInviteCodeOf(accountKey.value) !== null) return { ok: false, reason: "already-held" };
+    const claim = claimGenesisInviteCode(raw, accountKey.value);
+    if (!claim.ok) return claim;
+    const previousSnapshot = lastCloudSnapshot;
+    user.value = { ...user.value, genesisInviteCode: claim.code };
+    if (!persistAccountSnapshot()) {
+      // 码已占、凭证没落到账号上 = 用户永久失去一个限量凭证。整笔退回,报失败。
+      adoptAccountSnapshot(previousSnapshot);
+      claim.rollback();
+      return { ok: false, reason: "failed" };
+    }
+    return { ok: true, code: claim.code };
   }
 
   function recordDeposit(amount: number): boolean {
