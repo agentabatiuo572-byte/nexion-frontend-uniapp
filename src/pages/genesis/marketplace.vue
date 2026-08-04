@@ -337,7 +337,7 @@ function handleBuy(l: Listing) {
     //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
     // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
     //    已终态分录靠反向分录冲正、不改写原行(与一级预留冲正同规矩)。
-    postMoneyBill(
+    const reversed = postMoneyBill(
       {
         type: "purchase",
         symbol: "USDT",
@@ -350,6 +350,10 @@ function handleBuy(l: Listing) {
       },
       { restoreTo: before },
     );
+    // 🔴 冲正自己也会失败,返回值必须接:reversed !== "ok" 时钱**仍然扣着**,
+    // 此刻再弹「payment refunded」就是当面撒谎(2026-08-04 对抗审计 B-P1-2)。
+    // 收口点在 stuck 分支已经给了响亮终态 + 交易号,这里不再叠一句假承诺。
+    if (reversed !== "ok") return;
     // 文案如实说「已退款」,不复用成功话术(审计 P2-2)。
     toast.error(t.value.marketplace.acquireFailedTitle, t.value.marketplace.acquireFailedRefunded);
     return;

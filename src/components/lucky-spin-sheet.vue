@@ -274,15 +274,20 @@ const spinBtnStyle = computed<CSSProperties>(() => ({
 }));
 
 // ── payout (compose stores; lucky-spin store stays import-free of them) ──
-function creditPrize(sp: SpinPrize) {
+/** 派奖。返回 true = 奖真的到账了(或本就是不入余额的券),调用方才可以写历史 / 弹「你赢了」。
+ *  🔴 返回值必须被消费:原实现丢弃它,于是落盘失败时收口点弹「交易未保存」、
+ *  页面紧接着弹「你赢了 X」并把中奖记录**持久化**进历史 —— 假成功 + 假凭证,
+ *  是本族里唯一同时污染 UI 与持久数据的一条(2026-08-04 对抗审计 B-P1-5)。 */
+function creditPrize(sp: SpinPrize): boolean {
   const ref = `LSPIN-${sp.id}-${mockServerNow().toString(36)}`;
   const memo = fmt(t.value.luckySpin.billMemo, { prize: ls(sp) });
   if (sp.kind === "nex" || sp.kind === "usdt") {
     // 收据即指令:symbol 决定入哪种币,派奖与账单同生共死。
-    postMoneyBill({ type: "bonus", symbol: sp.kind === "nex" ? "NEX" : "USDT", amount: sp.amount, status: "posted", memo, ref });
+    return postMoneyBill({ type: "bonus", symbol: sp.kind === "nex" ? "NEX" : "USDT", amount: sp.amount, status: "posted", memo, ref }) === "ok";
   }
   // coupon: 购机抵扣券 — 记入转盘中奖历史(store.history,持久化),不入钱包余额
   // (对齐"仅抵购机款不可提现")。原型未建券兑换流;真后台落 coupon 账本 + 结账抵扣。
+  return true;
 }
 
 // ── settle (idempotent: only fires once per spin) ──
@@ -305,7 +310,10 @@ function settleSpin() {
     return;
   }
   spin.reveal();
-  creditPrize(sp);
+  // 🔴 顺序不可换、返回值不可丢:奖没到账就不许写历史、不许弹「你赢了」。
+  // 收口点在失败时已经弹过「交易未保存」,这里再补一句成功文案就是当面撒谎;
+  // 而 pushHistory 是**持久化**的,写下去等于给用户留一张查无此账的中奖凭证。
+  if (!creditPrize(sp)) return;
   spin.pushHistory(sp.id);
   toast.success(fmt(t.value.luckySpin.wonToast, { prize: ls(sp) }), t.value.luckySpin.wonToastSub);
 }

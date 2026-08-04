@@ -161,7 +161,7 @@ function handleRepurchase() {
   // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。
   const opened = staking.stake(amount.value, 90);
   if (!opened.ok) {
-    postMoneyBill(
+    const reversed = postMoneyBill(
       {
         type: "stake",
         symbol: "USDT",
@@ -173,6 +173,10 @@ function handleRepurchase() {
       },
       { restoreTo: before },
     );
+    // 🔴 冲正自己也会失败:reversed !== "ok" 时钱**仍然扣着**,而下面这条文案
+    // 明说「The full amount is back in your balance」—— 当面撒谎(对抗审计 B-P1-2)。
+    // 收口点在 stuck 分支已给了响亮终态 + 交易号,这里不再叠一句假承诺。
+    if (reversed !== "ok") return;
     // 同 stake-sheet:conflict=true 是别处刚改过持仓,false 是本机存储写不进去 —— 归因不混用。
     toast.error(
       t.value.stakingV3.toast.openFailedTitle,
