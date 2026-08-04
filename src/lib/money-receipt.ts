@@ -20,6 +20,8 @@
 import { useApp, type MoneySnapshot } from "@/store/app";
 import { useBills, type Bill } from "@/store/bills";
 import { getT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
+import { mockServerId } from "@/store/mock-id";
 import { toast } from "@/store/ui";
 
 /** 账单入参(id / ts / balanceAfter 由 store 与服务端时钟负责)。 */
@@ -29,8 +31,55 @@ export type ReceiptDraft = Omit<Bill, "id" | "ts" | "balanceAfter">;
  * - `ok`           两边都落盘。
  * - `insufficient` 余额不足 / 金额非法 —— **零副作用**,调用点用自己的既有文案报错。
  * - `failed`       落盘失败(资金或收据)—— 资金已还原、账上无记录、已弹通用失败提示。
+ * - `stuck`        回滚**自己也失败了** —— 钱真的被扣着,已弹响亮终态 + 交易号并入待对账队列。
  */
-export type MoneyReceiptOutcome = "ok" | "insufficient" | "failed";
+export type MoneyReceiptOutcome = "ok" | "insufficient" | "failed" | "stuck";
+
+/** 待对账条目:后端对账时按 `restoreTo` 把该账号的资金三元组还原回去。 */
+export interface StuckFundsCase {
+  /** 交易号 —— 用户报给客服的唯一凭据(也印在提示里)。 */
+  id: string;
+  at: number;
+  /** 业务单号(账单 ref);没有就是空串。 */
+  ref: string;
+  restoreTo: MoneySnapshot;
+}
+
+/** 尽力持久化(storage 正是刚刚出故障的那一层,写不进去也只能认)。 */
+const STUCK_KEY = "nexgrid-funds-stuck-v1";
+const STUCK_CAP = 50;
+const stuckQueue: StuckFundsCase[] = [];
+
+/** 读队列 —— 仅供自检 / 将来的对账页,产品内不消费。 */
+export function stuckFundsCases(): StuckFundsCase[] {
+  return [...stuckQueue];
+}
+
+/**
+ * 🔴 回滚失败的既定终态(2026-08-04 R5)。
+ *
+ * 资金与收据是两份独立存储、mock 期没有事务,所以补偿回滚**自己也会失败**;而回滚失败时
+ * 钱是真的被扣走了,再弹通用的「交易未保存 · 余额没有变化」就是对用户撒谎(R4 修的是
+ * 「弹成功、账本查无」,这里是它的镜像面:「弹失败、钱已扣」)。
+ *
+ * 🔴 这里**不做「回滚的回滚」** —— 那一层自己同样会失败,是无穷回归(见
+ * docs/changes/2026-08-04-structural-reflection-r5.md 第二节)。客户端的能力上界就到这:
+ * 让用户明确看见 + 留下可对账的凭据,残余风险显式交给后端对账。
+ * PRODUCTION:整段消失 —— 服务端单事务里根本没有「回滚失败」这个状态。
+ */
+export function reportStuckFunds(restoreTo: MoneySnapshot, ref = ""): "stuck" {
+  const record: StuckFundsCase = { id: mockServerId("FIX"), at: Date.now(), ref, restoreTo };
+  stuckQueue.push(record);
+  if (stuckQueue.length > STUCK_CAP) stuckQueue.splice(0, stuckQueue.length - STUCK_CAP);
+  try {
+    const prev = uni.getStorageSync(STUCK_KEY);
+    uni.setStorageSync(STUCK_KEY, [...(Array.isArray(prev) ? prev : []), record].slice(-STUCK_CAP));
+  } catch {
+    // storage 不可用正是走到这里的原因之一 —— 内存队列 + 用户手上的交易号已是兜底。
+  }
+  toast.error(getT().errors.fundsStuckTitle, fmt(getT().errors.fundsStuckMsg, { id: record.id }));
+  return "stuck";
+}
 
 export interface PostMoneyOptions {
   /**
@@ -95,7 +144,9 @@ export function postMoneyBills(drafts: ReceiptDraft[], opts: PostMoneyOptions = 
   }
   if (!moved) {
     // 某一腿没落盘 → 把已经动过的腿一起还原(资金原语只保证自己那一次的对称)。
-    app.restoreMoney(undo);
+    // 🔴 回滚的返回值必须被消费(R5):回滚失败 = 钱真的扣着,那时的既定终态是响亮告知 +
+    // 交易号 + 入待对账队列,而不是照旧弹「余额没有变化」。
+    if (!app.restoreMoney(undo)) return reportStuckFunds(undo, drafts[0].ref ?? "");
     toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
     return "failed";
   }
@@ -103,7 +154,7 @@ export function postMoneyBills(drafts: ReceiptDraft[], opts: PostMoneyOptions = 
   if (!bills.addMany(drafts)) {
     // 钱已经落盘、收据没落盘 —— 正是本族要根治的那一格。资金精确还原到动钱之前
     // (含 withdrawableUsdt),账上一条记录都不留,用户拿到明确失败。
-    app.restoreMoney(undo);
+    if (!app.restoreMoney(undo)) return reportStuckFunds(undo, drafts[0].ref ?? "");
     toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
     return "failed";
   }

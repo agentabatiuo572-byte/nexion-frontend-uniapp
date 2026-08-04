@@ -3160,6 +3160,9 @@ export const en = {
     txNotSavedMsg: "Your balance is unchanged and nothing was recorded. Please try again.",
     billMissingTitle: "Receipt not recorded",
     billMissingMsg: "This transaction went through, but it could not be added to your bill history.",
+    // 回滚自己也失败了(R5):钱是真的扣着,不许再说"余额没有变化"。必须给交易号 + 找人。
+    fundsStuckTitle: "Amount still held",
+    fundsStuckMsg: "We couldn't put this amount back. Contact support with reference {id} and they will release it for you.",
     // 跨标签页并发:这一笔在别处已经处理过了,store 已把最新状态刷回来。共用一对文案,
     // 不给每个 store 各写一套(用户看到的都是同一件事:你眼前这屏刚被别处改过)。
     staleTitle: "Just updated elsewhere",
@@ -3344,6 +3347,7 @@ export const en = {
       staleSubtitle: "This one was already handled elsewhere. We've refreshed it for you — take a look before you try again.",
       openFailedTitle: "Nothing was locked",
       openFailedSubtitle: "Your positions changed on another screen, so we stopped before locking this one. The full amount is back in your balance — try again.",
+      openFailedStorageSubtitle: "This device couldn't save the position, so we stopped before locking it. The full amount is back in your balance — free up some space or switch off private browsing, then try again.",
     },
     howItWorksEntry: "Rules",
   },

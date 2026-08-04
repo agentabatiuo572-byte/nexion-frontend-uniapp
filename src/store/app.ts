@@ -95,8 +95,19 @@ function createEarningBuckets(withdrawableUsdt: number, now = Date.now()): UserS
  * 资金三元组快照 —— 冲正(退款 / 回滚)的基准。三个字段就是全部会被资金原语动到的量:
  * debitBalance 同时改 usdtBalance 与 withdrawableUsdt(clamp),debitNex 改 nexBalance。
  * 少一个字段,退款就还原不回扣款前(见 restoreMoney 头注)。
+ *
+ * `applied` 是**本标签页自己动过多少钱**的读数(见 restoreMoney 头注)。冲正按增量回滚
+ * 而不是写绝对值,靠的就是它 —— 三个绝对值只用于 UI/日志与合法性校验,不参与算账。
  */
 export interface MoneySnapshot {
+  usdtBalance: number;
+  nexBalance: number;
+  withdrawableUsdt: number;
+  applied: MoneyDelta;
+}
+
+/** 一次资金变更在**合并之前**对本地三元组产生的增量(正=加,负=减)。 */
+interface MoneyDelta {
   usdtBalance: number;
   nexBalance: number;
   withdrawableUsdt: number;
@@ -903,17 +914,21 @@ export const useApp = defineStore("app", () => {
     // 此后一切 debit 检查恒过 = 无限钱(审计 P2-5)。
     if (!Number.isFinite(amount) || amount < 0) return false;
     const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
     user.value = { ...user.value, usdtBalance: +(user.value.usdtBalance + amount).toFixed(2) };
+    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
+    addMoneyApplied(applied);
     return true;
   }
   function debitBalance(amount: number): boolean {
     if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.usdtBalance < amount) return false;
     const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
     const nextUsdt = +(user.value.usdtBalance - amount).toFixed(2);
     // 维护不变量 withdrawableUsdt ≤ usdtBalance:花钱先消耗不可提部分(如充值本金),
     // 花穿后才吃可提收益,可提额度随之收敛到剩余总余额。缺此 clamp,提现门(submitWithdrawal
@@ -924,10 +939,12 @@ export const useApp = defineStore("app", () => {
       usdtBalance: nextUsdt,
       earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
     };
+    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
+    addMoneyApplied(applied);
     return true;
   }
   function creditNex(amount: number): boolean {
@@ -935,11 +952,14 @@ export const useApp = defineStore("app", () => {
     // 此后一切 debitNex 检查恒过 = 无限 NEX。
     if (!Number.isFinite(amount) || amount < 0) return false;
     const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance + amount).toFixed(2) };
+    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
+    addMoneyApplied(applied);
     return true;
   }
   function debitNex(amount: number): boolean {
@@ -947,18 +967,59 @@ export const useApp = defineStore("app", () => {
     if (!Number.isFinite(amount) || amount < 0) return false;
     if (user.value.nexBalance < amount) return false;
     const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
     user.value = { ...user.value, nexBalance: +(user.value.nexBalance - amount).toFixed(2) };
+    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
+    addMoneyApplied(applied);
     return true;
+  }
+
+  /**
+   * 🔴 本标签页自己动过的资金累计(**合并前**的本地增量之和,单调累加、永不清零)。
+   *
+   * 为什么需要它:account-cloud 把余额当计数器做三路合并(delta = next − base,见
+   * ADDITIVE_NUMBER_KEYS),而 base 是本页的 lastCloudSnapshot —— 它在 capture 之后
+   * 会**吸收别的标签页的扣款**(每次 persist 都 adopt 合并结果)。此时若冲正照旧写
+   * 「扣款前的绝对值」,delta 就等于「我的那笔 + 别人的那笔」,别人那笔被我一起"退"给了
+   * 用户:两个标签页各扣一次、各回滚一次,余额比开始时还多(审计实测 $100 → $130,凭空造钱)。
+   * 单页场景两者恒等,所以这条洞在单实例下永远测不出来 —— 必须双实例并发靶。
+   *
+   * 为什么是一个单调计数器而不是日志:冲正只需要「我自己动了多少」这一个差值,
+   * 快照记下自己那一刻的读数即可(嵌套 capture 各记各的),无需保留每笔明细、也就没有
+   * 清理与生命周期问题。别的标签页写了多少完全不进这个数,所以它天生与并发无关。
+   */
+  const moneyApplied: MoneyDelta = { usdtBalance: 0, nexBalance: 0, withdrawableUsdt: 0 };
+  /** 当前三元组(只读)。算本地增量与写快照共用一处,免得两边各读各的读出分歧。 */
+  function moneyValues(): MoneyDelta {
+    const u = withDefaultEarningBuckets(user.value);
+    return { usdtBalance: u.usdtBalance, nexBalance: u.nexBalance, withdrawableUsdt: u.earningBuckets.withdrawableUsdt };
+  }
+  /**
+   * 本地增量 = 现在 − before。🔴 **必须在 persistAccountSnapshot 之前取**:落盘会把
+   * 合并结果 adopt 回内存,之后再算就把别的标签页的增量也算进"我自己动的"里。
+   */
+  function moneyDeltaSince(before: MoneyDelta): MoneyDelta {
+    const now = moneyValues();
+    return {
+      usdtBalance: +(now.usdtBalance - before.usdtBalance).toFixed(6),
+      nexBalance: +(now.nexBalance - before.nexBalance).toFixed(6),
+      withdrawableUsdt: +(now.withdrawableUsdt - before.withdrawableUsdt).toFixed(6),
+    };
+  }
+  /** 只在**落盘成功后**记账:失败路径已 adopt 回滚,本地等于什么都没动过。 */
+  function addMoneyApplied(d: MoneyDelta) {
+    moneyApplied.usdtBalance = +(moneyApplied.usdtBalance + d.usdtBalance).toFixed(6);
+    moneyApplied.nexBalance = +(moneyApplied.nexBalance + d.nexBalance).toFixed(6);
+    moneyApplied.withdrawableUsdt = +(moneyApplied.withdrawableUsdt + d.withdrawableUsdt).toFixed(6);
   }
 
   /** 资金三元组快照 —— 冲正(退款)唯一正确的基准。 */
   function captureMoney(): MoneySnapshot {
-    const u = withDefaultEarningBuckets(user.value);
-    return { usdtBalance: u.usdtBalance, nexBalance: u.nexBalance, withdrawableUsdt: u.earningBuckets.withdrawableUsdt };
+    return { ...moneyValues(), applied: { ...moneyApplied } };
   }
 
   /**
@@ -969,23 +1030,46 @@ export const useApp = defineStore("app", () => {
    * 用户的可提额度就被永久压低一次(审计场景:可提 $8000 的账号买一次创世节点失败退款后
    * 只剩 $1,钱回来了但提不出去)。退款语义必须与扣款语义对称,对称的唯一实现是还原快照。
    *
-   * 写绝对值在 account-cloud 的增量三路合并下依然正确:base = lastCloudSnapshot(已含那次
-   * 扣款),delta = 快照值 − 扣款后值 = 正好那一笔的反向增量。
+   * 🔴 **按增量回滚,不写绝对值**(2026-08-04 R5 并发靶):合并层把余额当计数器,写绝对值时
+   * delta = 绝对值 − 本页 base,而 base 在 capture 之后会吸收别的标签页的扣款(见
+   * moneyApplied 头注)—— 那部分会被这一笔冲正一起"还"给用户。改成「从**当前**值里减去
+   * 我自己动过的那部分」后,delta 恒等于我那一笔的反向增量,别人的改动一分不动。
+   * 与提现落盘重放同一条纪律:先取现状,再基于它推导增量(见 submitWithdrawal 重放段)。
+   *
+   * 副作用:期间本页发生的**别的**入账(挖矿结算 / 奖励)不再被这一笔冲正抹平 —— 它们不在
+   * moneyApplied 的这段差值里(那些路径不走这四个原语),写绝对值时则会被一起回退。
    */
   function restoreMoney(snap: MoneySnapshot): boolean {
     if (![snap.usdtBalance, snap.nexBalance, snap.withdrawableUsdt].every((v) => Number.isFinite(v) && v >= 0)) return false;
+    // 「我自己动了多少」= 现在的读数 − 快照那一刻的读数。别的标签页写多少都不进这个数。
+    const owedUsdt = moneyApplied.usdtBalance - snap.applied.usdtBalance;
+    const owedNex = moneyApplied.nexBalance - snap.applied.nexBalance;
+    const owedWithdrawable = moneyApplied.withdrawableUsdt - snap.applied.withdrawableUsdt;
+    // 一分钱都没动过(第一腿就落盘失败、它自己已经 adopt 回滚了)→ 无事可做,直接成功。
+    // 🔴 不能在这里空转写一次盘:storage 正坏着,那一次写必然失败,于是「什么都没发生」
+    // 会被报成「回滚失败 = 钱卡住了」,凭空吓用户一跳并污染待对账队列。
+    if (owedUsdt === 0 && owedNex === 0 && owedWithdrawable === 0) return true;
     const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
+    const target = {
+      usdtBalance: +(before.usdtBalance - owedUsdt).toFixed(2),
+      nexBalance: +(before.nexBalance - owedNex).toFixed(2),
+      withdrawableUsdt: +(before.withdrawableUsdt - owedWithdrawable).toFixed(2),
+    };
+    if (!Object.values(target).every((v) => Number.isFinite(v))) return false;
     const current = withDefaultEarningBuckets(user.value);
     user.value = {
       ...current,
-      usdtBalance: snap.usdtBalance,
-      nexBalance: snap.nexBalance,
-      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: snap.withdrawableUsdt },
+      usdtBalance: target.usdtBalance,
+      nexBalance: target.nexBalance,
+      earningBuckets: { ...current.earningBuckets, withdrawableUsdt: target.withdrawableUsdt },
     };
+    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
+    addMoneyApplied(applied);
     return true;
   }
   /**

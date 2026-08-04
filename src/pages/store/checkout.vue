@@ -239,7 +239,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { postMoneyBill, postReceiptOnly } from "@/lib/money-receipt";
+import { postMoneyBill, postReceiptOnly, reportStuckFunds } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
@@ -752,27 +752,28 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
-      // convert() 是状态机的最终裁决(它自取 server now 再解析一次):返回 false
-      // = 拒绝转化,必须当拒单信号处理,且必须在扣款之前判定 —— 绝不允许「先扣
-      // 钱再发现不能转化」。余额充足性先只读判定,使 convert 成功后扣款必成功
-      // (validate → apply 两段式,对齐服务端 POST /api/orders 的单事务语义)。
-      if (applyTrial) {
-        if (app.user.usdtBalance < chargeTotal) {
-          toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
-          step.value = "select-payment";
-          return;
-        }
-        if (!freeTrial.convert()) {
-          toast.warn(t.value.store.coTrialQuoteChanged);
-          step.value = "select-payment";
-          return;
-        }
-      }
+      // 🔴 扣款排在 convert() **之前**(2026-08-04 R5 改序)。原顺序是「只读预检 → convert
+      // → 扣款」,理由是"预检使 convert 成功后扣款必成功" —— 但预检堵不住 debitBalance 的
+      // 另一条失败路径:**落盘失败**。那时试用已被打成 converted(不可逆终态且已持久化)、
+      // 余额被回滚、用户只看到「余额不足」,充值重试才发现试用永久没了 —— 不可恢复。
+      // 反过来排之后:扣款失败 → 试用一根汗毛没动(余额不足与落盘失败共用同一条退出);
+      // convert() 仍是状态机的最终裁决(自取 server now 再解析一次),只是挪到钱确实扣住
+      // 之后再问。PRODUCTION:两步本就是 POST /api/orders 的同一个事务,不存在先后。
+      const beforePay = app.captureMoney();
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402),
         // with an explicit toast (was a silent bounce, PR-D debt #3).
         toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+        step.value = "select-payment";
+        return;
+      }
+      if (applyTrial && !freeTrial.convert()) {
+        // 扣款与 convert 之间跨过宽限终点的极窄窗口:把刚扣的钱按增量精确退回
+        // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
+        // 绝不再弹一句"报价已变"了事。
+        if (app.restoreMoney(beforePay)) toast.warn(t.value.store.coTrialQuoteChanged);
+        else reportStuckFunds(beforePay);
         step.value = "select-payment";
         return;
       }

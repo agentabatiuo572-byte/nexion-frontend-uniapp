@@ -173,7 +173,11 @@ function handleRepurchase() {
       },
       { restoreTo: before },
     );
-    toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.toast.openFailedSubtitle);
+    // 同 stake-sheet:conflict=true 是别处刚改过持仓,false 是本机存储写不进去 —— 归因不混用。
+    toast.error(
+      t.value.stakingV3.toast.openFailedTitle,
+      opened.conflict ? t.value.stakingV3.toast.openFailedSubtitle : t.value.stakingV3.toast.openFailedStorageSubtitle,
+    );
     return;
   }
   toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: amount.value }));
