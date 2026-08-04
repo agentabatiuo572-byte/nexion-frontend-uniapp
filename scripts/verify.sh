@@ -2401,5 +2401,24 @@ money_rollback_gate() {
 }
 money_rollback_gate
 
+# ── 在途入金单「刷新后必须继续推进」门(2026-08-04 对抗审计)──────────────────
+# `scheduleConfirmations` 全仓只在**首次探测到入金时**调用一次,而推进靠内存里的 setTimeout;
+# 重绑账号(= 刷新 / 重新登录)只收敛了意向单,链上入金记录一直没人管 —— 于是用户刷新一次,
+# 停在 detected|confirming 的单永久失联,页面「确认中」转到天荒地老、钱不入账。
+# 这条不需要任何落盘失败就能触发,是每天都会发生的正常操作。
+# 判据:① bindAccount 真调 syncChainDeposits ② 只重排 detected|confirming、终态与 dust_hold 不重排
+# ③ 已有定时器不重复武装(双推进)④ 推进链路三处落盘失败必须 queue 重排而不是就地放弃
+#    (定时器在 step 开头已无条件 delete —— 这个前提本身也是一条断言,它变了上面三条要重新论证)
+# 外加红测自证:摘掉判据的目标串,对应断言必须转 false(不许空转)。
+deposit_resume_gate() {
+  if "$NODE_BIN" scripts/selfcheck-deposit-resume.mjs > /tmp/uniapp-deposit-resume.log 2>&1; then
+    ok "在途入金续推门 — $(tail -1 /tmp/uniapp-deposit-resume.log)"
+  else
+    bad "在途入金续推门失败 — node scripts/selfcheck-deposit-resume.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-deposit-resume.log | head -8 | sed 's/^/        /'
+  fi
+}
+deposit_resume_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

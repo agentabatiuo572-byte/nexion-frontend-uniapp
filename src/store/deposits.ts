@@ -130,6 +130,25 @@ export const useDeposits = defineStore("deposits", () => {
     records.value = row.records;
     intents.value = row.intents;
     syncBankIntents();
+    syncChainDeposits();
+  }
+
+  /** 🔴 链上入金的确认引擎重武装。
+   *
+   *  没有这一步的话:`scheduleConfirmations` 全仓**只在首次探测到入金时调用一次**(见下方
+   *  唯一调用点),而定时器只活在内存里。于是用户**刷新一次页面 / 重新登录**,任何还停在
+   *  detected|confirming 的单就再也没人推进 —— 永久卡住,页面上是「确认中」转到天荒地老。
+   *  这与 syncBankIntents 对意向单做的事是同一件,只是链上轨一直漏了。
+   *
+   *  与 mock 引擎的「账号切换即停」不冲突:那条是防止旧账号的定时器往新账号身上写,
+   *  而这里是给**新绑定的这个账号**重新武装它自己的在途单。
+   *  PROD:整块删掉,状态由链上 watcher / webhook 推。 */
+  function syncChainDeposits() {
+    for (const rec of records.value) {
+      if (rec.status !== "detected" && rec.status !== "confirming") continue; // 终态 / dust_hold 不重排
+      if (timers.has(rec.depositId)) continue;
+      scheduleConfirmations(rec.depositId);
+    }
   }
 
   /** 专属充值地址:同账号同网络恒定(mock 确定性派生;PROD server 派发)。 */
@@ -289,10 +308,15 @@ export const useDeposits = defineStore("deposits", () => {
       if (!rec) return;
       if (rec.status === "detected") {
         if (rec.grossAmountUsdt < MIN_DEPOSIT_USDT) {
-          patchRecord(depositId, { status: "dust_hold" }); // 停住等后台人工处置
+          // 🔴 落盘失败要重排,不能就地 return:dust_hold 是**终态**,这一步没写进去
+          // 就再也没人来推第二次(confirming 那支因为会重入尚能自愈,这支不能)。
+          if (!patchRecord(depositId, { status: "dust_hold" })) queue(stepDelay(1));
           return;
         }
-        patchRecord(depositId, { status: "confirming" });
+        if (!patchRecord(depositId, { status: "confirming" })) {
+          queue(stepDelay(rec.requiredConfirmations ?? 1));
+          return;
+        }
         queue(stepDelay(rec.requiredConfirmations ?? 1));
         return;
       }
@@ -301,7 +325,9 @@ export const useDeposits = defineStore("deposits", () => {
       const confs = Math.min(required, (rec.confirmations ?? 0) + 1);
       patchRecord(depositId, { confirmations: confs });
       if (confs >= required) {
-        settleCredited(depositId);
+        // 🔴 接返回值再重排:settleCredited 会因 CAS 冲突耗尽 / 落盘失败 / recordDeposit
+        // 拒绝而返 false,而定时器在 step 开头就已经 delete 掉了 —— 不重排 = 这笔永久卡 confirming。
+        if (!settleCredited(depositId)) queue(stepDelay(required));
         return;
       }
       queue(stepDelay(required));
