@@ -175,3 +175,22 @@ export function postReceiptOnly(draft: ReceiptDraft): boolean {
   toast.error(getT().errors.billMissingTitle, getT().errors.billMissingMsg);
   return false;
 }
+
+/**
+ * 幂等版收据补记 —— 语义同 postReceiptOnly(资金已落定、不可回滚),但按 `ref` 判重:
+ * 同一笔入金被重放(mock 到账引擎重试 / 用户刷新 / 回调重投)时不会写出第二条分录。
+ *
+ * 三条入金轨(链上 / 银行 / 卡)的钱由 app.recordDeposit 落定 —— 它除了加余额还累计
+ * cumulativeDepositUsdt,不是 postMoneyBill 的 creditBalance 能替代的;而入金是**外部
+ * 已经到账**的事实,回滚等于把用户真的转进来的钱抹掉。所以这一族只补收据,不动钱。
+ *
+ * 为什么幂等键放在收口点而不是各调用点自己 addOnce:判重与失败处置是同一件事的两面,
+ * 拆开的话下一个调用点又要重新发明一遍「接返回值 + 报错」——那正是本族缺陷的成因。
+ *
+ * @returns 收据是否已在账上(命中既有幂等键、没写出新行也算 true);false 时已弹提示。
+ */
+export function postReceiptOnce(draft: ReceiptDraft): boolean {
+  if (useBills().addOnce(draft)) return true;
+  toast.error(getT().errors.billMissingTitle, getT().errors.billMissingMsg);
+  return false;
+}

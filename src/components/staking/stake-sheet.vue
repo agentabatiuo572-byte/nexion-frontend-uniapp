@@ -3,8 +3,8 @@
   for sub-pages, so the sheet is embedded in staking.vue and toggled via
   `v-model:open` + a `term` prop. Slide-up is a CSS <transition>.
 
-  Cross-store side-effect (架构铁律): submit 在这里组合「扣款⊗记账 + 建仓」,
-  不在 store 里。资金与收据一律走收口点 postMoneyBill,不裸调资金原语 / 账单写入。
+  Cross-store side-effect (架构铁律): submit 在这里组合「扣款⊗记账 + 建仓」(收口点
+  postMoneyBill,见 lib/money-receipt.ts),不在 store 里;不裸调资金原语 / 账单写入。
 -->
 <template>
   <view v-if="open && term !== null">
