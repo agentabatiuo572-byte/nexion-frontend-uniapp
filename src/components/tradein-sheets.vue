@@ -29,7 +29,7 @@
 
   ⚠️ MOCK-ONLY CROSS-STORE COMPOSERS
   ---
-  Touches stores: useApp (devices/balance), useBills, useTradeinSheet.
+  Touches stores: useApp (devices), useTradeinSheet;资金变更走 lib/money-receipt 收口点。
   Path B (replace/keep-buy/force) composers mutate app.devices + debit here with
   documented rollback ordering. The FEAT-DEV02 trade-in path deliberately does
   NOT mutate here — it defers to checkout's single persist block. Production:
@@ -215,7 +215,7 @@
 import { computed, ref } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
@@ -236,7 +236,6 @@ import { fmt } from "@/i18n/format";
 
 const sheet = useTradeinSheet();
 const app = useApp();
-const bills = useBills();
 const t = useT();
 // 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
 const phase = useProductPhase();
@@ -484,15 +483,8 @@ function onReplace() {
     confirming.value = false;
     return;
   }
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices.filter((d) => d.id !== newId);
-    app.activateDevice(lowest.id, reservedSlots.value);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  bills.add({
+  // 收据即指令:amount 为负 = 扣款,扣款与这条 purchase 分录同生共死。
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
@@ -502,6 +494,15 @@ function onReplace() {
       oldKind: kindLabel(lowest.kind),
     }),
   });
+  if (paid !== "ok") {
+    // 钱没扣成(余额不足)或没记上账(收口点已还原资金 + 弹错)——设备侧的改动必须一起退回,
+    // 否则用户白得一台新机、老机还停着。
+    app.devices = app.devices.filter((d) => d.id !== newId);
+    app.activateDevice(lowest.id, reservedSlots.value);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),
@@ -520,20 +521,19 @@ function onKeepBuy() {
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Keep & buy" branch.
   // Order: addDevice (default inactive) → debit → bill / rollback. No demotion.
   const newId = app.addDevice(s.newKind);
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices.filter((d) => d.id !== newId);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  bills.add({
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
   });
+  if (paid !== "ok") {
+    app.devices = app.devices.filter((d) => d.id !== newId);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
   confirming.value = false;
   hide();
@@ -594,20 +594,10 @@ function onForce() {
     confirming.value = false;
     return;
   }
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices
-      .filter((d) => d.id !== newId)
-      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
-    app.activateDevice(lowest.id, reservedSlots.value);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  // Success: task stays forfeit (deactivate already wiped it). PRODUCTION:
+  // 成功即任务作废(deactivate 已抹掉);失败则连同任务一起还原。PRODUCTION:
   // server atomically refunds/keeps the partial task reward + recycles slot +
   // writes ledger in one tx with idempotency key {userId}-{oldId}-{newKind}-{nonce}.
-  bills.add({
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
@@ -617,6 +607,15 @@ function onForce() {
       oldKind: kindLabel(lowest.kind),
     }),
   });
+  if (paid !== "ok") {
+    app.devices = app.devices
+      .filter((d) => d.id !== newId)
+      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    app.activateDevice(lowest.id, reservedSlots.value);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),

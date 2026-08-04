@@ -197,7 +197,7 @@ import CompleteRow from "@/components/me/complete-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useDeposits } from "@/store/deposits";
 import { useWalletPairing, mockExternalAddress } from "@/store/wallet-pairing";
 import { recordPaymentInstrument } from "@/store/risk-identity";
@@ -243,7 +243,6 @@ const KYC_PHASE_2_MS = 4_000;
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const dep = useDeposits();
 const pairing = useWalletPairing();
 
@@ -347,9 +346,10 @@ function startVerifying() {
     pairing.complete({ address: senderAddress.value, network: network.value });
     // SPEC-7 §6: 绑定支付工具时登记风险身份维度(K1 聚簇的中维输入)。
     recordPaymentInstrument(app.accountKey, `${network.value}:${senderAddress.value}`);
-    app.creditBalance(1);
     // ⚠️ Round 12 P0 fix: write the KYC-Express $1 compliance-bonus bill.
-    bills.add({
+    // 收据即指令:+1 USDT 与这条 kyc 分录同生共死(不再单独 creditBalance)。落盘失败时
+    // 收口点已还原资金并弹错;配对/KYC 本身已经成立,照常推进到 complete。
+    postMoneyBill({
       type: "kyc",
       symbol: "USDT",
       amount: 1,

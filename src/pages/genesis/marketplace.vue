@@ -5,7 +5,7 @@
   Collection hero (4-stat grid + 7d floor delta + fake OpenSea redirect) →
   segmented tabs (listings / activity / mine) → sort pills + listing grid /
   activity feed / owned-token grid. Wrapped in <AppChassis active="me">. Buy
-  composes app.debitBalance + genesis.purchase + bills.add in the handler.
+  composes postMoneyBill(扣款 ⊗ 记账) + genesis.acquireSecondary in the handler.
   SEED_LISTINGS / SEED_ACTIVITY are faithful English mock arrays.
 -->
 <template>
@@ -133,7 +133,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { onMounted, onUnmounted } from "vue";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
@@ -144,7 +144,6 @@ const HOUR = 3600_000;
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
@@ -299,7 +298,21 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  if (!app.debitBalance(l.priceUSDT)) {
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:顺序 = 扣款⊗记账(原子)→ 承接。
+  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
+  // 不受售罄门影响。承接失败(已持有该 token)必须冲正,杜绝「扣钱不给货」。
+  // PRODUCTION: server validates listing, debits buyer, credits seller minus
+  // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
+  const before = app.captureMoney();
+  const paid = postMoneyBill({
+    type: "purchase",
+    symbol: "USDT",
+    amount: -l.priceUSDT,
+    status: "posted",
+    memo: `Genesis secondary · token #${l.tokenId}`,
+    ref: `GENESIS-SEC-${l.tokenId}`,
+  });
+  if (paid === "insufficient") {
     toast.error(
       t.value.marketplace.insufficient,
       fmt(t.value.marketplace.insufficientDesc, {
@@ -309,34 +322,35 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + acquire + bill.
-  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
-  // 不受售罄门影响。承接失败(已持有该 token)必须退款,杜绝「扣钱不给货」。
-  // PRODUCTION: server validates listing, debits buyer, credits seller minus
-  // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
-  const ok = genesis.acquireSecondary(l.tokenId);
-  if (ok) {
-    soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
-    bills.add({
-      type: "purchase",
-      symbol: "USDT",
-      amount: -l.priceUSDT,
-      status: "posted",
-      memo: `Genesis secondary · token #${l.tokenId}`,
-      ref: `GENESIS-SEC-${l.tokenId}`,
-    });
-    toast.success(
-      fmt(t.value.marketplace.acquiredToast, { id: l.tokenId }),
-      fmt(t.value.marketplace.acquiredDesc, {
-        paid: l.priceUSDT.toLocaleString(),
-        held: ownedCount.value,
-      }),
+  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  if (!genesis.acquireSecondary(l.tokenId)) {
+    // 承接失败(已持有该 token)→ 冲正,不留「扣钱无货」。与创世主售同一套:
+    // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 裸 creditBalance 只加总余额、
+    //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低;
+    // ② 补一条反向分录 —— 原实现退款一条账单都不写(同族的另一面:钱动了、账没记上)。
+    postMoneyBill(
+      {
+        type: "purchase",
+        symbol: "USDT",
+        amount: l.priceUSDT,
+        status: "posted",
+        memo: `Genesis secondary reversed · token #${l.tokenId} refunded`,
+        ref: `GENESIS-SEC-${l.tokenId}`,
+      },
+      { restoreTo: before },
     );
-  } else {
-    // 承接失败(已持有该 token)→ 退款;文案如实说「已退款」,不复用成功话术(审计 P2-2)。
-    app.creditBalance(l.priceUSDT);
+    // 文案如实说「已退款」,不复用成功话术(审计 P2-2)。
     toast.error(t.value.marketplace.acquireFailedTitle, t.value.marketplace.acquireFailedRefunded);
+    return;
   }
+  soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
+  toast.success(
+    fmt(t.value.marketplace.acquiredToast, { id: l.tokenId }),
+    fmt(t.value.marketplace.acquiredDesc, {
+      paid: l.priceUSDT.toLocaleString(),
+      held: ownedCount.value,
+    }),
+  );
 }
 
 function goGenesis() {
