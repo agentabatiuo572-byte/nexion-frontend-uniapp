@@ -346,7 +346,10 @@ function handleBuy(l: Listing) {
         memo: `Genesis secondary reversed · token #${l.tokenId} refunded`,
         memoKey: "genesisSecondaryReversed",
         memoParams: { id: l.tokenId },
-        ref: billRef,
+        // 🔴 冲正分录的幂等键要与原分录**分开**(2026-08-04 对抗审计 P2-9):
+        // `addOnce` 按 `ref + type + symbol` 三元组判重,而冲正与原扣款这三项原本完全相同 ——
+        // 将来任何一次幂等写(重放 / 补记)都会误命中冲正那行,把「已冲正」当成「已扣款」。
+        ref: `${billRef}-REV`,
       },
       { restoreTo: before },
     );
