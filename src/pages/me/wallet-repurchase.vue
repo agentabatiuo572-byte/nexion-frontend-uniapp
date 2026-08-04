@@ -155,7 +155,7 @@ function handleRepurchase() {
     toast.error(w.value.insufficient, fmt(w.value.insufficientSub, { a: user.value.usdtBalance.toFixed(2) }));
     return;
   }
-  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
   // 🔴 同 stake-sheet:建仓失败(版本冲突耗尽)必须把刚扣的钱退回,否则钱扣了仓位不存在。
   // 退回走同一个收口点:restoreTo 精确还原扣款前的 withdrawableUsdt(裸 creditBalance 只加
   // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。

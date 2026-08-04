@@ -196,7 +196,7 @@ function handlePurchase() {
       );
       return;
     }
-    if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+    if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
     const r = genesis.purchase(qty.value);
     if (!r.ok) {
       // 铸造失败(售罄 / 限购竞态)→ 冲正,不留「扣钱无货」。走**同一个**收口点:

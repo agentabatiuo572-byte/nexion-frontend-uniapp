@@ -58,7 +58,14 @@ function parseRow(raw: unknown): DepositsRow | null {
   if (!row) return null;
   return {
     records: Array.isArray(row.records) ? row.records : [],
-    intents: Array.isArray(row.intents) ? row.intents : [],
+    // 🔴 读时升级(照 account-cloud 的 upgradeLegacyWithdrawals 范式,只补形不做破坏性迁移):
+    // createdAt 是 2026-08-04 才加的字段,存量在途单没有它 —— 不补的话入账时透传出去就是
+    // undefined,后台对账拿到一个空时刻。不可考的值**不臆造**:用 expireAt 减去锁价窗口
+    // 会引入一个假的精确值,这里退而取 expireAt 本身(一定晚于真实下单时刻,但至少是真数据,
+    // 且只影响这批老单的耗时统计,不影响任何判定)。
+    intents: (Array.isArray(row.intents) ? row.intents : []).map((i) =>
+      typeof i.createdAt === "number" ? i : { ...i, createdAt: i.expireAt },
+    ),
   };
 }
 
@@ -483,6 +490,7 @@ export const useDeposits = defineStore("deposits", () => {
         memoCode,
         bankAccount,
         status: "awaiting_payment",
+        createdAt: now,
         expireAt: now + fx.lockWindowMin * ONE_MINUTE_MS,
       };
       return { next: { records: cur.records, intents: [intent, ...cur.intents] }, result: intent };
@@ -541,7 +549,10 @@ export const useDeposits = defineStore("deposits", () => {
         feeUsdt: 0,
         creditedUsdt: credited,
         status: "credited",
-        createdAt: now,
+        // 🔴 createdAt 是**下单时刻**不是入账时刻(2026-08-04 对抗审计 P2-4):
+        // 原来两者都写 now,后台对账里银行轨的「创建 → 到账」耗时恒为 0,
+        // 那正是这条轨最该被看见的指标(用户等了多久银行才到账)。
+        createdAt: intent.createdAt,
         creditedAt: now,
       };
       const appended = !cur.records.some((x) => x.depositId === intent.intentId);
