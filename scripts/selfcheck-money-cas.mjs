@@ -35,7 +35,7 @@
 // 🔴 诚实边界:deposits 依赖 app / bills / fx 三个**跨 store 组合方**,它们不是被测对象
 // (双花的判据 = 假账本上余额动了几次),故只把这三个换成可观测的假账本;deposits 自身、
 // deposits-core、account-scoped-storage 全是真代码。其余五个 store 一个依赖都没 stub。
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";

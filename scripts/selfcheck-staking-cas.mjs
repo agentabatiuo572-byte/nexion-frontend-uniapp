@@ -24,7 +24,7 @@
 // esbuild 载**真 store + 真 account-scoped-storage**跑真代码(不是抄一份判据副本),两个
 // store 实例 = 两个标签页,共享同一份 JSON 序列化的假 storage(与 localStorage 同语义:
 // 跨标签页不共享对象引用)。
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build, transformSync } from "esbuild";

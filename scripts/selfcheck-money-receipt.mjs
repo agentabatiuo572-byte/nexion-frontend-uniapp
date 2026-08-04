@@ -31,7 +31,9 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
 const read = (...p) => readFileSync(path.join(root, ...p), "utf8");
 
-const samples = { primitives: 5, targets: 0, scanned: 0, ledgerFiles: 0, locales: 0 };
+// primitives 从 PRIMS.length 取,不写死 —— 原来写死 5 而实跑只有 4 个原语,
+// 收尾行报的是记忆里的数;而这个脚本自己别处正反对「写死数字」。
+const samples = { primitives: 0, targets: 0, scanned: 0, ledgerFiles: 0, locales: 0 };
 // ⑤ 的接线名单要给 ⑥ 的反向入册门用,而两者各在自己的块作用域里 —— 用模块级变量传递,
 // 不复制一份(复制的那份会和真名单漂移,门就变成对着旧名单判)。
 let wiredFiles = [];
@@ -140,6 +142,75 @@ function grabBlock(src, needle) {
     else if (src[i] === "}") { depth--; if (depth === 0) return src.slice(start, i + 1); }
   }
   throw new Error(`selfcheck-money-receipt: \`${needle}\` 括号不闭合`);
+}
+
+const METHODS = "add|addMany|addOnce|addForAccount";
+//
+// 🔴 判据换口径(2026-08-04 对抗审计):原来判的是「**丢弃返回值**的裸调」,靠
+// 「调用处在语句位」的前缀字符串识别。实测那条判据有三族逃逸,而且每族都是零成本触发:
+//   ① **按行匹配** —— 真实 draft 都是多字段对象,`bills.add(` 后换行即逃(仓里无 .prettierrc,
+//      而 purchase-sheet / stake-sheet / marketplace / wallet-repurchase 四处 `postMoneyBill(`
+//      正是这种「首行只有 (、对象另起」的写法,同形迁到 bills.add( 就整族看不见);
+//   ② **receiver 白名单只认三个名字** —— `const s = useBills(); s.add(…)` / `billStore.add(…)` /
+//      `bills?.add(…)` / 解构后裸调 / `this.bills.add(…)` 全逃;
+//   ③ **语句位前缀** —— void / await / 无花括号 else / 箭头体 / .then / 三元 / && / || /
+//      .vue 内联 handler,10 种丢弃形态实测 10/10 逃逸。
+//
+// 换成:**任何对 bills 写入原语的调用都算,不再判返回值有没有被用**。
+// 更简单、也严格更强 —— 合法的直调有且只有下面 ALLOW 里那几处,显式列出比逐处判语义可靠。
+// (台账已清零,「丢弃 vs 接住」的区分本来就没有存在价值了。)
+const ALLOW = {
+  // 收口点自己 —— 它就是唯一该调 bills 写入的地方。钉住条数:这里多出一处
+  // 丢弃式写入同样要被看见(原来整文件豁免 = 收口点内部零监控)。
+  "src/lib/money-receipt.ts": 3,
+  // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
+  // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
+  "src/pages/register/register.vue": 2,
+  // 跨账号写(addForAccount ×2):写的是**别的账号**的行,收口点只服务当前账号。
+  "src/pages/me/wallet-withdraw.vue": 2,
+};
+/** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
+function billsWriteHits(src) {
+  const recv = new Set(["useBills\\(\\)", "bills", "billsStore"]);
+  // 🔴 导入改名:`import { useBills as X } from "@/store/bills"` → `X()` 也是 receiver。
+  // 这一族是本门自己的红测抓出来的 —— 只认 `const s = useBills()` 时,改名导入零成本逃逸。
+  for (const m of src.matchAll(/import\s*\{[^}]*\buseBills\s+as\s+([A-Za-z_$][\w$]*)/g)) {
+    recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`) + "\\(\\)");
+  }
+  // `const s = useBills()` / `let s = useBills()` → s 也是 bills receiver
+  for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*useBills\(\)/g)) {
+    recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  }
+  let count = 0;
+  for (const r of recv) {
+    // `\s*\??\s*\.` 认可选链;`[\s\S]*?` 不用,直接允许方法名前后有空白与换行
+    const re = new RegExp(`(?<![\\w$])${r}\\s*\\??\\s*\\.\\s*(?:${METHODS})\\s*\\(`, "g");
+    count += [...src.matchAll(re)].length;
+  }
+  // 解构:`const { add, addOnce } = useBills()` → 之后的裸 `add(` 也是写入
+  for (const m of src.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*useBills\(\)/g)) {
+    for (const part of m[1].split(",")) {
+      const nm = part.split(":").pop().trim();
+      if (!nm || !new RegExp(`^(?:${METHODS})$`).test(nm)) continue;
+      // 解构声明本身是 `{ add }`,不带 `(`,所以不必扣减
+      count += [...src.matchAll(new RegExp(`(?<![\\w$.])${nm}\\s*\\(`, "g"))].length;
+    }
+  }
+  return count;
+}
+/** 🔴 `.vue` 要分区段扫:`<template>` 里引号内是**表达式**(`@tap="bills.add(…)"` 实测能逃),
+ *  `<script>` 里引号内是**数据**(文案里出现 `bills.add(` 是常事)。同一份口径必错一边。 */
+function scanSource(rel, raw) {
+  if (!rel.endsWith(".vue")) return billsWriteHits(strip(raw));
+  let total = 0;
+  let last = 0;
+  for (const m of raw.matchAll(/<script[\s\S]*?<\/script>/g)) {
+    total += billsWriteHits(strip(raw.slice(last, m.index), true)); // 模板段:保留引号内容
+    total += billsWriteHits(strip(m[0]));                            // 脚本段:抹掉引号内容
+    last = m.index + m[0].length;
+  }
+  total += billsWriteHits(strip(raw.slice(last), true));
+  return total;
 }
 
 console.log("selfcheck-money-receipt — 资金变更 ⊗ 收据:落盘失败不许静默");
@@ -262,6 +333,7 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["debitNex", () => app.debitNex(60)],
     ["creditNex", () => app.creditNex(60)],
   ];
+  samples.primitives = PRIMS.length;
   samples.targets += PRIMS.length;
   for (const [name, run] of PRIMS) {
     const before = reset();
@@ -546,7 +618,10 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
       // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
       // 其余是调用点,补 `(` —— 否则光有 import 也算数。
       hasNeedles && shaped && src.includes('from "@/lib/money-receipt"')
-      && !/\bbills\.add\(/.test(src), needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
+      // 🔴 裸调禁令复用 ⑥ 的完整识别,不再只禁 `bills.add(` 这一种写法 —— 原判据下
+      // `useBills().add(` / `bills.addMany(` / 别名 receiver / 跨行 全是合法的。
+      && scanSource(rel, readFileSync(path.join(root, rel), "utf8")) === 0,
+      needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
   }
 
   const locales = ["en", "zh", "vi"];
@@ -573,7 +648,12 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     for (const e of readdirSync(d)) {
       const p = path.join(d, e);
       if (statSync(p).isDirectory()) walk(p);
-      else if (/\.(ts|vue)$/.test(e)) files.push(p);
+      else if (/\.(ts|tsx|vue|nvue|js|mjs)$/.test(e)) files.push(p);
+      // 🔴 冒出没纳入扫描的代码后缀要**响亮报错**,不许静默跳过 —— 静默跳过等于那类文件
+      // 对本门永久隐形(uni 工程的 .nvue 就是现成的例子)。先决定它该不该扫,别让它自己消失。
+      else if (/\.(jsx|cjs|mts|cts)$/.test(e)) {
+        throw new Error(`selfcheck-money-receipt: 出现未纳入扫描的代码后缀 ${p}`);
+      }
     }
   })(SRC);
   samples.scanned = files.length;
@@ -581,69 +661,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 一次落盘」的多腿原语、本族不变量的核心机制)。名单来源不是记忆:bills.ts 里对外暴露的
   // **建分录**函数(add / addMany / addOnce / addForAccount)。`settleByRef` 故意不在内 ——
   // 它改的是已有分录的状态,收口点不替代它。
-  const METHODS = "add|addMany|addOnce|addForAccount";
-  //
-  // 🔴 判据换口径(2026-08-04 对抗审计):原来判的是「**丢弃返回值**的裸调」,靠
-  // 「调用处在语句位」的前缀字符串识别。实测那条判据有三族逃逸,而且每族都是零成本触发:
-  //   ① **按行匹配** —— 真实 draft 都是多字段对象,`bills.add(` 后换行即逃(仓里无 .prettierrc,
-  //      而 purchase-sheet / stake-sheet / marketplace / wallet-repurchase 四处 `postMoneyBill(`
-  //      正是这种「首行只有 (、对象另起」的写法,同形迁到 bills.add( 就整族看不见);
-  //   ② **receiver 白名单只认三个名字** —— `const s = useBills(); s.add(…)` / `billStore.add(…)` /
-  //      `bills?.add(…)` / 解构后裸调 / `this.bills.add(…)` 全逃;
-  //   ③ **语句位前缀** —— void / await / 无花括号 else / 箭头体 / .then / 三元 / && / || /
-  //      .vue 内联 handler,10 种丢弃形态实测 10/10 逃逸。
-  //
-  // 换成:**任何对 bills 写入原语的调用都算,不再判返回值有没有被用**。
-  // 更简单、也严格更强 —— 合法的直调有且只有下面 ALLOW 里那几处,显式列出比逐处判语义可靠。
-  // (台账已清零,「丢弃 vs 接住」的区分本来就没有存在价值了。)
-  const ALLOW = {
-    // 收口点自己 —— 它就是唯一该调 bills 写入的地方。钉住条数:这里多出一处
-    // 丢弃式写入同样要被看见(原来整文件豁免 = 收口点内部零监控)。
-    "src/lib/money-receipt.ts": 3,
-    // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
-    // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
-    "src/pages/register/register.vue": 2,
-    // 跨账号写(addForAccount ×2):写的是**别的账号**的行,收口点只服务当前账号。
-    "src/pages/me/wallet-withdraw.vue": 2,
-  };
-  /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
-  function billsWriteHits(src) {
-    const recv = new Set(["useBills\\(\\)", "bills", "billsStore"]);
-    // `const s = useBills()` / `let s = useBills()` → s 也是 bills receiver
-    for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*useBills\(\)/g)) {
-      recv.add(m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    }
-    let count = 0;
-    for (const r of recv) {
-      // `\s*\??\s*\.` 认可选链;`[\s\S]*?` 不用,直接允许方法名前后有空白与换行
-      const re = new RegExp(`(?<![\\w$])${r}\\s*\\??\\s*\\.\\s*(?:${METHODS})\\s*\\(`, "g");
-      count += [...src.matchAll(re)].length;
-    }
-    // 解构:`const { add, addOnce } = useBills()` → 之后的裸 `add(` 也是写入
-    for (const m of src.matchAll(/(?:const|let|var)\s*\{([^}]*)\}\s*=\s*useBills\(\)/g)) {
-      for (const part of m[1].split(",")) {
-        const nm = part.split(":").pop().trim();
-        if (!nm || !new RegExp(`^(?:${METHODS})$`).test(nm)) continue;
-        // 解构声明本身是 `{ add }`,不带 `(`,所以不必扣减
-        count += [...src.matchAll(new RegExp(`(?<![\\w$.])${nm}\\s*\\(`, "g"))].length;
-      }
-    }
-    return count;
-  }
-  /** 🔴 `.vue` 要分区段扫:`<template>` 里引号内是**表达式**(`@tap="bills.add(…)"` 实测能逃),
-   *  `<script>` 里引号内是**数据**(文案里出现 `bills.add(` 是常事)。同一份口径必错一边。 */
-  function scanSource(rel, raw) {
-    if (!rel.endsWith(".vue")) return billsWriteHits(strip(raw));
-    let total = 0;
-    let last = 0;
-    for (const m of raw.matchAll(/<script[\s\S]*?<\/script>/g)) {
-      total += billsWriteHits(strip(raw.slice(last, m.index), true)); // 模板段:保留引号内容
-      total += billsWriteHits(strip(m[0]));                            // 脚本段:抹掉引号内容
-      last = m.index + m[0].length;
-    }
-    total += billsWriteHits(strip(raw.slice(last), true));
-    return total;
-  }
   const found = {};
   for (const f of files) {
     const rel = path.relative(root, f).replace(/\\/g, "/");
@@ -701,6 +718,10 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ['可选链', '  bills?.add({ type: "bonus" });'],
     ['丢弃形态 void / 箭头体', '  void bills.add({ type: "x" });\n  const f = () => bills.addOnce({ type: "y" });'],
     ['解构后裸调', '  const { addOnce } = useBills();\n  addOnce({ type: "topup" });'],
+    // 🔴 导入改名 —— 这一族是本门**自己的红测**抓出来的:判据换成「任何调用都算」之后仍然
+    // 只认 `const s = useBills()`,而 `import { useBills as X }` + `X().addMany(` 零成本逃逸。
+    // 立成常驻正控,判据再退化时当场暴露。
+    ['导入改名 + 跨行', '  import { useBills as rt } from "@/store/bills";\n  rt().addMany(\n    [{ type: "bonus" }],\n  );'],
     // .vue 模板内联 handler:引号内是**表达式**不是数据 —— 这是分区段扫描那一支的唯一控制线,
     // 少了它,scanSource 的 .vue 分支就没有任何控制线走到(名单里加了分支却没测 = 从没验证过)。
     ['.vue 模板内联 handler', '<template><view @tap="bills.add({ type: 1 })" /></template>', 'probe.vue'],
