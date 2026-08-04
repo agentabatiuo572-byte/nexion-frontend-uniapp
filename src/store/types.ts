@@ -204,7 +204,7 @@ export interface UserState {
 export interface EarningsState {
   today: number;             // USDT
   todayNEX: number;          // NEX (platform token)
-  thisWeek: number;          // USDT rolling 7-day. (TBD; candidate `GET /api/me/earnings?range=week` per PRD §9.11c.1)
+  thisWeek: number;          // USDT rolling 7-day. (`GET /api/me/earnings?range=week` per PRD §9.11c.1)
   thisMonth: number;
   total: number;
   history: { ts: number; amount: number }[]; // recent entries

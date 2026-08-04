@@ -32,7 +32,9 @@ import {
  *
  * ⚠️ MOCK-VS-PRODUCTION: every action maps to a REST endpoint (PRD §9.11a).
  *   start()        → POST /api/trial/start          (no body — cardless)
- *   convert()      → server-side within POST /api/orders (same transaction)
+ *   convert()      → POST /api/trial/convert       (PRD §9.11a.2 / §9.11e — server
+ *                                                   settles offset + creates the order
+ *                                                   in one transaction)
  *   cancel()       → POST /api/trial/cancel
  *   eligibility()  → GET  /api/trial/eligibility → { ok, reason? }
  *   poll()         → GET  /api/trial/state (server cron advances the machine)
@@ -241,7 +243,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     return { ok: true };
   }
 
-  // PRODUCTION: server-side inside POST /api/orders (order + convert atomic).
+  // PRODUCTION: POST /api/trial/convert (PRD §9.11a.2 / §9.11e — order + convert atomic).
   // Only active|grace convert (spec ④); terminal, no rollback. Returns false
   // when the machine isn't convertible — the checkout must have bailed earlier.
   // 🔴 P0 防线:convert 内部自己取 mockServerNow() 并先 resolveTrialAt 推进边界,

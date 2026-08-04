@@ -9,8 +9,8 @@
   Opening this page writes the rewards-seen watermark (clears the reward half
   of the Me-entry unread dot; the voucher half stays until used/expired).
 
-  Backend-replaceable: voucher counts from the voucher store (GET /api/me/
-  vouchers), credited totals derived from the bills ledger reward family
+  Backend-replaceable: voucher counts from the voucher store
+  (GET /api/me/vouchers), credited totals derived from the bills ledger reward family
   (GET /api/me/bills — isRewardBill, single source shared with the dot and
   the L2 lists). All-zero keeps the three cards (big zeros) + hint line.
   Wrapped in <AppChassis active="me">.
