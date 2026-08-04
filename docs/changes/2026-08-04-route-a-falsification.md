@@ -89,3 +89,56 @@ failKey = (k, n) => k === CLOUD_KEY && n === cloudWrites + 2; // 放行第一腿
 - 收口点够不到的四处(P1-4)要各自补或明确写进覆盖边界。
 
 **未定稿,等镜头2/3。**
+
+---
+
+# 证伪镜头3(迁移与消费者面)· 回报
+
+**结论:方案不能照现状实施。** 三处结构性不成立 + §六 机器门清单漏 6 个脚本(其中 1 个会直接崩、1 个会变成永久假绿)。
+
+## P0
+
+| # | 断言 | 依据 |
+|---|---|---|
+| P0-1 | **方案通篇没说「账单在内存里归谁」**,而这决定原子性能否成立。§三 只警告了 `mergeAccountSnapshots` 一个字面量,**漏了两个同型的**:`persistAccountSnapshot`(`app.ts:407-416`)与 `createSeedSnapshot`(`app.ts:207-218`)。漏 persist 那处 → 每次落盘写出 `bills: undefined` → 迁移判据 `!Array.isArray` 重新成立 → **下次读盘把老表陈旧账单搬回来**。症状不是「账单没了」,是**「账单时间倒流」,比丢失更难查** | app.ts 现在不持有 bills 数组(在 `bills.ts:138`);技术上可 import(已 import `useConfig`/`useReceipts`,不成环)但必须写进方案 |
+| P0-2 | **与镜头1 独立撞上同一条**:多腿交易资金腿仍逐腿各落一次盘,`money-receipt.ts:149` 的 `restoreMoney(undo)` **不能删**;「整条补偿链可删」只对 `:157` 那一处成立。现成的门会喊:`selfcheck-money-receipt.mjs:339-340` 断言「两条分录一次落盘」,改口径成 CLOUD_KEY 后实测值是 **3 不是 1** | |
+| P0-3 | **迁移不覆盖全部账号**:`readAccountSnapshot` 无快照行时返 null,方案伪码照字面实现 `row` 为 undefined **直接 TypeError**;加守卫则迁移不发生。而 `app.ts:434` **无条件** persist → 一旦写出 `bills: []`,判据永久满足 → 老表账单**永远搬不进来,零报错**。可达路径:account-cloud 表比 bills 行大一个量级,配额压力下 `writeTable` 先失败并**静默返回 false**,盘上就是「有账单行、无快照行」 | `account-cloud.ts:121-125` · `app.ts:207-218` / `:424` / `:434` |
+| P0-4 | `addForAccount` 在新结构下**没有安全落法**:搬进快照 = 盲覆盖别人整行(无三路合并、无 CAS,因为对别人的账号既无 base 也无内存态)。爆炸半径从「对方账单行」放大到**对方余额/设备/提现单整行** | `bills.ts:160-169` · 调用点 `wallet-withdraw.vue:1001/1011` · 固定靶 `selfcheck-withdraw-freeze.mjs:279-299` |
+| **P0-5** | 🔴 **§二 承重论证漏了 settle() 同一拍写的另外两张表** —— `appendLedgerEntry`(`app.ts:632` → `earning-release.ts:106-128`)**当场落盘且没传 idempotencyKey、走随机 id、无去重**;`recordAttestation`(`app.ts:593` → `risk-identity.ts:241-243`)同样当场落盘。节流后窗口内被强杀 → 重开按旧锚点重新计价 → **同一段墙钟再写一次台账、再记一次见证**。台账驱动释放判定与簇熔断,见证驱动 attest 阈值。⇒ 节流不是「分币级」,是**把释放引擎的输入窗口放大 10 倍**。**这条不解决就别上节流** | |
+| P0-6 | §五⑤ 拟焊的门对「用户动作把落盘**委托给** settle()」失明 —— `addComputeShareDevice` 成功路径末尾是 `settle()`(`app.ts:782`)不是直接 persist | |
+
+## P1(择要)
+
+- **P1-1 §六 漏了 6 个脚本**:`selfcheck-withdraw-freeze.mjs`(把 account-cloud 整个 stub 成只有 `normalizeAccountKey`,bills.ts 一取其它导出**直接崩**;且是全仓唯一 `seed()` 调用者 + `addForAccount` 固定靶)· `selfcheck-fastlane.mjs:748-752`(pin bills.ts 源码文本)· **`spec6-entry-surface-runtime.mjs:34,38`(单取老表 key → 老表不再被写 = 该断言恒不命中 = 永久假绿)** · `measure-persist-cost.mjs`(判据①的测量工具自身)· `verify.sh:1196` · `selfcheck-trial-encapsulation.mjs:49-50`
+- **P1-2** `selfcheck-money-receipt.mjs` 的 ②/⑦ 在新结构下**无法表达**(靠 `failKey` 区分两个 key 注入);且「最省事的修红写法会把门变成空转」(`:206` 的反向断言会因「什么都没写成功」恒真)。另 `reset()` 里 persist 在 `bills.bills = []` **之前**,合表后盘上留 40 条种子 → 一串「一条不留」断言全错
+- **P1-3** `mergeArrayByIdentity` 与 `mergeWithdrawals` 语义不兼容(前者同 id 走三路合并 → 字符串落 last-write → `posted` 会被退回 `pending`);两者**都没有删除语义**,而 `bills.seed()` 是整表替换 → 合并后变成「40 条新种子叠加在旧账单上」
+- **P1-4** 「老表只读」在 bills.ts 里做不到一半:**11 个**(不是 3 个)`app.bindAccount` 调用点全是 app 先、`rebindAccountScopedStores` 后
+- **P1-5** §四 的幂等只在「每次落盘都带 bills」前提下成立,而这个前提**没有门守**;三处字面量必须同步(方案漏了第三处)
+- **P1-7/P1-8** 全部消费者会因 `adoptAccountSnapshot` 整体替换数组引用而整树重渲染;且 `reconcileBills` **每 5s** 最多 5 次 `settleByRef`、每次一落盘,与判据①「每分钟总字节必须低于改前」**直接冲突**;而「静置 60 秒」的测法**测不到这条路径**(没有在途提现)
+
+## P2(择要,含对我的两处纠正)
+
+- **P2-1 我对沙箱的描述理由是错的(结论对)**:`vm.runInNewContext` 创建的是**带完整 ES 内建的新 realm**,sandbox 对象只是追加;实测 `Set/Object/Array` 全在(反证现成:`account-cloud.ts:33,54` 本来就在用 `new Set`)。真正缺的只有 `uni` 与 `process`。实测四格:顶层值导入 → **MODULE_NOT_FOUND 门直接崩**;`import type` + 加字段 → OK;读老表**包 try/catch**(照 `readTable()` 的形)→ **不炸**;不包 → `ReferenceError: uni is not defined`。⚠️ 最后一格今天照样绿,因为门从不调 `readAccountSnapshot` —— 一旦补 bills 用例走 `mergeAndWriteAccountSnapshotResult`(它在 `:415/419` 调两次)当场炸
+- **P2-2** `selfcheck-money-cas.mjs` 的 `bills-stub` / `__fakeBills` 是**死代码**(filter 只匹配相对导入 `./bills`,而实际走 `@/store/bills` 别名 → 解析成真 bills.ts),而 `verify.sh:2346` 的注释仍宣称 bills 被换成了可观测假账本 —— **一条既有假绿**
+- **P2-4** §二「一次补齐」是**期望值相等不是恒等**(`settleDevice:249-250` 每次抽随机 `marketMult`/`variation`,十次 1 秒 ≠ 一次 10 秒,均值同方差不同)
+- **P2-5** `lastTickAggregate` 的再播种依赖 persist→adopt 往返,节流改变其节奏;多标签页下别人的 `todayEarnings` 进来的时机从「每秒一点」变「10 秒一块」,**从没有固定靶证明过**
+
+## 它替我否掉的一条派单假设
+
+两张表的账号 key 归一化**完全一致** —— `account-scoped-storage.ts:1` 直接 import `account-cloud` 的 `normalizeAccountKey`,同一个函数。我派单里「逐个读出来比对,不一致就是迁移错位」的怀疑**不成立**。
+
+---
+
+# 修正方向(累计三个镜头,已能定形)
+
+**① 原子性**:两个镜头独立撞上同一条 —— 必须引入 **app 层的单次事务 action**(一次算完全部腿的 delta + 全部分录,只落一次盘),否则合表毫无意义。这与 `feedback_use_the_store_own_action` 的张力要显式论证。
+
+**② 节流:拆成两半,只取安全的那半**
+- ✅ **内容没变不写(脏检查)** —— **行为中性**:快照没变才跳过,跳过时 `appendLedgerEntry`/`recordAttestation` 那一拍本来也没有新分录。单独就砍掉实测 31/60 次空写(52%)。
+- ❌ **时间节流(10s)** —— 被 P0-5 毙掉:另外两张表不节流且台账无幂等键,会造成释放引擎输入重复计数。要上必须先给 `appendLedgerEntry` 焊幂等键并与快照同拍原子,那是另一个工程。**本轮不上。**
+
+**③ 账单 owner** 必须先定死(P0-1),且三处字面量同步要焊门 + 红测(摘掉任一处的 bills 行,门必须红)。
+
+**④ 跨账号写** 另给窄原语走 CAS,禁止 `writeAccountSnapshot`。
+
+**⑤ 机器门清单** 从 6 个补到 12 个,其中 `spec6-entry-surface-runtime.mjs` 必须同步否则永久假绿。
