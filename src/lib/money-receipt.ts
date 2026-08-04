@@ -217,7 +217,14 @@ export function postMoneyBillsOnce(drafts: ReceiptDraft[], opts: PostMoneyOption
   if (!ref) {
     throw new Error("postMoneyBillsOnce: 必须传稳定的 ref,否则判重永不命中 = 假幂等");
   }
-  // 判重域是**当前账号已落盘的分录**(bills 已按账号分行),命中即视为这一笔已经发过。
+  // 🔴 判重域的**诚实边界**:读的是 `bills.bills`,也就是**本标签页内存里**那份账单
+  // (bills 只在 bindAccount 时 hydrate,之后不再回读磁盘)。于是:
+  //   · 单标签页内的重放(重试 / 自愈补发 / 消费资格失败后再点)——完全可靠,这是本函数的主用途;
+  //   · **跨标签页**并发领同一笔 —— 另一页刚写的分录这边看不见,判重会漏,可能发两次。
+  // 后者不是本函数引入的:账单表本身走裸 writeAccountRow(无 CAS、无合并),跨标签页
+  // 本来就会丢分录(实测靶 scripts/measure-bills-crosstab-loss.mjs)。两者同一个根因,
+  // 归「完全版 A」存储重构一并解决(账单归属 + 事务边界),不在这里单独打补丁 ——
+  // 单独把这里改成读磁盘,只会得到一个「判重准了但分录仍会被覆盖」的半吊子。
   if (useBills().bills.some((b) => b.ref === ref)) return "ok";
   return postMoneyBills(drafts, opts);
 }

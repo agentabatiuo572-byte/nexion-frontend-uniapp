@@ -151,6 +151,10 @@ export function createAccountRowCommit<Row extends object>(opts: {
       for (let attempt = 0; attempt < 3; attempt++) {
         const disk = readDisk();
         // 读不出行 = 该账号还没写过 / storage 不可用 → 退回内存态当基准(保持既有行为)。
+        // 🔴 诚实边界(2026-08-04 对抗审计 P2-6):各 store 注释里写的「前置条件一律在
+        // **磁盘最新**账本上复核」,在这两种情形下**不成立** —— 此刻复核的是内存态。
+        // 后果有限(storage 读不出来时紧接着的写也会失败,commit 返 ok:false),
+        // 但那句话是绝对措辞,读的人会当成无条件保证。写在这里,别让它当保证。
         const base = disk.row ?? opts.snapshot();
         const baseRev = disk.row ? disk.rev : knownRev;
         raced = raced || baseRev !== knownRev;

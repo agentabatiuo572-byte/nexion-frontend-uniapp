@@ -1105,6 +1105,12 @@ export const useApp = defineStore("app", () => {
     // 落盘结果必须接:此前丢弃返回值无条件 return true,调用方(三条入金轨的 settle)
     // 据此认为钱已入账并继续写账单/改状态,而落盘失败时余额其实被 adopt 回滚了 ——
     // 「返回成功但钱没加」。对齐 creditRewardBucketInternal 的既有范式:失败即回滚 + 报假。
+    //
+    // 🔴 **刻意不进 moneyApplied 账**(2026-08-04 对抗审计 P2-3,钉死这条不变量):
+    // 四个资金原语都会 addMoneyApplied,而入金**不能**——moneyApplied 是 restoreMoney 的
+    // 冲正基准,入金一旦记进去,别处一次冲正就会把用户**真的转进来的钱**一起退掉。
+    // 入金是外部已到账的事实,不属于「本标签页动过的钱」那本账。
+    // 下一个照着 creditBalance 给这里补 addMoneyApplied 的人,会造出一个很难查的丢钱路径。
     const previousSnapshot = lastCloudSnapshot;
     user.value = {
       ...user.value,
