@@ -2789,6 +2789,7 @@ export const zh: Messages = {
       withdrawTrc20: "提现 · USDT-TRC20",
       withdrawNexRefund: "手续费抵扣退还 · 退回 {nex} NEX",
       genesisReversed: "创世席位预留撤销 · 退回 {n} 个名额",
+      genesisSecondaryReversed: "创世转让撤销 · 编号 #{id} 已退款",
       stakeReversed: "复投撤销 · 仓位未能建立,金额已退回",
       stakeOpenReversed: "锁仓撤销 · 仓位未能建立,金额已退回",
     },

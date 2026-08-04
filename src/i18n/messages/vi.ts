@@ -2763,6 +2763,7 @@ export const vi: Messages = {
       withdrawTrc20: "Rút tiền · USDT-TRC20",
       withdrawNexRefund: "Hoàn bù phí · trả lại {nex} NEX",
       genesisReversed: "Hủy giữ chỗ Genesis · hoàn lại {n} suất",
+      genesisSecondaryReversed: "Hủy chuyển nhượng Genesis · đã hoàn tiền token #{id}",
       stakeReversed: "Hủy tái đầu tư · không mở được vị thế, đã hoàn tiền",
       stakeOpenReversed: "Hủy khoá · không mở được vị thế, đã hoàn tiền",
     },

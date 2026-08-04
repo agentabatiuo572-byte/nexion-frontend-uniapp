@@ -5,7 +5,7 @@
   Collection hero (4-stat grid + 7d floor delta + fake OpenSea redirect) →
   segmented tabs (listings / activity / mine) → sort pills + listing grid /
   activity feed / owned-token grid. Wrapped in <AppChassis active="me">. Buy
-  composes postMoneyBill(扣款 ⊗ 记账) + genesis.acquireSecondary in the handler.
+  composes postMoneyBill(扣款⊗记账) + genesis.acquireSecondary in the handler.
   SEED_LISTINGS / SEED_ACTIVITY are faithful English mock arrays.
 -->
 <template>
@@ -298,11 +298,19 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:顺序 = 扣款⊗记账(原子)→ 承接。
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账 + acquire。
   // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
-  // 不受售罄门影响。承接失败(已持有该 token)必须冲正,杜绝「扣钱不给货」。
+  // 不受售罄门影响。承接失败(已持有该 token / 撞限购)必须冲正,杜绝「扣钱不给货」。
   // PRODUCTION: server validates listing, debits buyer, credits seller minus
-  // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
+  // royalty, transfers tokenId, writes bills atomically (PRD §10.2.4
+  // POST /api/genesis/secondary/fulfill)。
+  //
+  // 🔴 顺序 = 扣款⊗记账(原子)→ 承接(照一级 purchase-sheet 同族)。原顺序是「裸 debitBalance
+  // → acquire → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、没人接 ——
+  // 于是钱已扣、token 已到手、弹「承接成功」,账单页却查无此单。收据与扣款收口成一次提交后,
+  // 收据落不了盘 = 钱没扣、token 没给、明确报错,零半执行残迹。
+  const billRef = `GENESIS-SEC-${l.tokenId}`;
+  // 回滚基准必须在动钱**之前**取(取晚了就是拿动过的状态当"原状")。
   const before = app.captureMoney();
   const paid = postMoneyBill({
     type: "purchase",
@@ -310,7 +318,7 @@ function handleBuy(l: Listing) {
     amount: -l.priceUSDT,
     status: "posted",
     memo: `Genesis secondary · token #${l.tokenId}`,
-    ref: `GENESIS-SEC-${l.tokenId}`,
+    ref: billRef,
   });
   if (paid === "insufficient") {
     toast.error(
@@ -324,10 +332,11 @@ function handleBuy(l: Listing) {
   }
   if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
   if (!genesis.acquireSecondary(l.tokenId)) {
-    // 承接失败(已持有该 token)→ 冲正,不留「扣钱无货」。与创世主售同一套:
-    // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 裸 creditBalance 只加总余额、
-    //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低;
-    // ② 补一条反向分录 —— 原实现退款一条账单都不写(同族的另一面:钱动了、账没记上)。
+    // 承接失败(已持有该 token / 撞单人限购)→ 冲正,走**同一个**收口点:
+    // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
+    //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
+    // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
+    //    已终态分录靠反向分录冲正、不改写原行(与一级预留冲正同规矩)。
     postMoneyBill(
       {
         type: "purchase",
@@ -335,7 +344,9 @@ function handleBuy(l: Listing) {
         amount: l.priceUSDT,
         status: "posted",
         memo: `Genesis secondary reversed · token #${l.tokenId} refunded`,
-        ref: `GENESIS-SEC-${l.tokenId}`,
+        memoKey: "genesisSecondaryReversed",
+        memoParams: { id: l.tokenId },
+        ref: billRef,
       },
       { restoreTo: before },
     );

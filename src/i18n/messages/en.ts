@@ -2846,6 +2846,7 @@ export const en = {
       withdrawTrc20: "Withdrawal · USDT-TRC20",
       withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",
       genesisReversed: "Genesis reservation reversed · {n} slot(s) refunded",
+      genesisSecondaryReversed: "Genesis transfer reversed · token #{id} refunded",
       stakeReversed: "Re-invest reversed · stake could not be opened, amount refunded",
       stakeOpenReversed: "Lock reversed · position could not be opened, amount refunded",
     },
