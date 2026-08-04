@@ -5,7 +5,7 @@
  * rewritten to @/mock + @/store).
  *
  * ⚠️ MOCK-ONLY client-side check. Production: GET /api/devices/eligibility?kind=X
- * (TBD; candidate, not yet in PRD §9.11). Server is sole authority; client
+ * (PRD §7.5.1). Server is sole authority; client
  * eligibility is for UI affordance only (which sheet to open / lock button +
  * hint) and never gates the actual POST /api/orders call (PRD §7.5).
  *

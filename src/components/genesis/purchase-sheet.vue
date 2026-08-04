@@ -169,10 +169,9 @@ function handlePurchase() {
     const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
     // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账已被 postMoneyBill
     // 收口成一次提交,但「铸席位」仍是**另一次写** —— 整笔仍非原子。
-    // PRODUCTION: one atomic transaction returning
-    // {balance, ownedTokenIds, billId}. Genesis **primary** subscription endpoint
-    // is TBD — PRD 未定义(§10.2.4 只定义二级 POST /api/genesis/secondary/fulfill
-    // 与 POST /api/genesis/{list,unlist});勿把候选路径当既定契约引用。
+    // PRODUCTION: POST /api/genesis/primary/subscribe 单事务提交,返回
+    // {balance, ownedTokenIds, billId}(PRD §10.1.1;二级承接与挂单分别走
+    // POST /api/genesis/secondary/fulfill 与 POST /api/genesis/{list,unlist},§10.2.4)。
     //
     // 🔴 顺序 = 扣款⊗记账(原子)→ 铸席位(2026-08-04 R4「钱动了、账没记上」)。原顺序是
     // 「扣款 → 铸席位 → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、

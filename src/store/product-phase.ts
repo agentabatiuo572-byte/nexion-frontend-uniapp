@@ -191,7 +191,7 @@ export function resolveActivePhase(joinedAt: number): PhaseParams {
 }
 
 // ───────── FEAT-DEV02b:置换侧抢先购(上架节奏门 × 升级置换融合,2026-07-07 主人拍板) ─────────
-// Server-canonical: GET /api/config/release-gates (TBD)。后台 E1「上架节奏门」配置项。
+// Server-canonical: GET /api/config/release-gates (PRD §9.11c.1)。后台 E1「上架节奏门」配置项。
 // 默认关闭 = 上架门对置换路径同样生效(未正式上架的 SKU 不可作置换目标,深链同拦)。
 // 开启后,**仅置换路径**可在正式上架前 leadDays 天内购买该 SKU;商城正门(列表 Locked
 // 卡/详情/非置换深链)不受影响。与 admin「强制解锁」优先级:强制解锁=全面正式上架
