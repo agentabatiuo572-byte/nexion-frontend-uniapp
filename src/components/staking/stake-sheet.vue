@@ -86,7 +86,7 @@ import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 
@@ -98,7 +98,6 @@ const emit = defineEmits<{ "update:open": [boolean] }>();
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const staking = useStaking();
 
 const amount = ref(0);
@@ -162,24 +161,47 @@ function submit() {
     toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min, n: term }));
     return;
   }
-  if (!app.debitBalance(amount.value)) {
+  const billRef = `STAKE-OPEN-${Date.now().toString(36).toUpperCase()}`;
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): PRODUCTION 是一次服务端事务。
+  // 🔴 顺序 = 扣款⊗记账(原子)→ 建仓,与复投页同形。
+  const before = app.captureMoney();
+  const paid = postMoneyBill({
+    type: "stake",
+    symbol: "USDT",
+    amount: -amount.value,
+    status: "posted",
+    memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
+    ref: billRef,
+  });
+  if (paid === "insufficient") {
     toast.error(
       t.value.stakingV3.toast.insufficient,
       fmt(t.value.stakingV3.toast.insufficientSubtitle, { amount: app.user.usdtBalance.toFixed(2) }),
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + stake + bill.
-  // PRODUCTION: POST /api/staking/open (PRD §9.11e) is one atomic transaction.
-  staking.stake(amount.value, term);
-  bills.add({
-    type: "stake",
-    symbol: "USDT",
-    amount: -amount.value,
-    status: "posted",
-    memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
-    ref: `STAKE-OPEN-${Date.now().toString(36).toUpperCase()}`,
-  });
+  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  // 🔴 建仓会失败(3 次版本冲突耗尽 = 别处正在改这个账号的持仓),而钱在上面已经扣了。
+  // 不接失败信号的话:余额少了、账单写了、仓位不存在 —— 刷新后就是纯丢钱。
+  // 冲正走同一个收口点:restoreTo 精确还原扣款前的 withdrawableUsdt(裸 creditBalance 只加
+  // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。
+  const opened = staking.stake(amount.value, term);
+  if (!opened.ok) {
+    postMoneyBill(
+      {
+        type: "stake",
+        symbol: "USDT",
+        amount: amount.value,
+        status: "posted",
+        memo: `Stake open reversed · ${term}d refunded`,
+        memoKey: "stakeOpenReversed",
+        ref: billRef,
+      },
+      { restoreTo: before },
+    );
+    toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.toast.openFailedSubtitle);
+    return;
+  }
   toast.success(
     t.value.stakingV3.toast.stakeSuccess,
     fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: STAKING_APY[term] * 100, n: term }),

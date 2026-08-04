@@ -2790,6 +2790,7 @@ export const zh: Messages = {
       withdrawNexRefund: "手续费抵扣退还 · 退回 {nex} NEX",
       genesisReversed: "创世席位预留撤销 · 退回 {n} 个名额",
       stakeReversed: "复投撤销 · 仓位未能建立,金额已退回",
+      stakeOpenReversed: "锁仓撤销 · 仓位未能建立,金额已退回",
     },
     title: "账单流水",
     back: "返回",
@@ -3086,6 +3087,8 @@ export const zh: Messages = {
     txNotSavedMsg: "余额没有变化,也没有产生任何记录,请重试。",
     billMissingTitle: "账单未记录",
     billMissingMsg: "这笔交易已生效,但没能写进你的账单记录。",
+    staleTitle: "刚在别处更新过",
+    staleMsg: "这一笔已经在另一个页面处理过了。已为你刷新到最新,请先看一眼再重试。",
   },
 
   // ─── v3 反向 Ponzi 样本(镜像 en.ts teamV3 / stakingV3 / trust / genesis / walletV3) ───
@@ -3262,6 +3265,8 @@ export const zh: Messages = {
       claimedSubtitle: "+${total} 返回(利息 ${interest})",
       staleTitle: "持仓刚有变动",
       staleSubtitle: "这笔在别处已经处理过了,已经帮你刷到最新,看一眼再操作。",
+      openFailedTitle: "这笔没锁上",
+      openFailedSubtitle: "你的持仓在别处刚有变动,这笔就停下没锁。金额已全额退回余额,再试一次就好。",
     },
     howItWorksEntry: "规则介绍",
   },

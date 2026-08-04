@@ -246,9 +246,24 @@ const toSym = computed(() => (direction.value === "usdt2nex" ? "NEX" : "USDT"));
 const fromBal = computed(() => (direction.value === "usdt2nex" ? app.user.usdtBalance : app.user.nexBalance));
 const minFrom = computed(() => (direction.value === "usdt2nex" ? 1 : 10));
 
+/**
+ * 🔴 **账本精度 = 2 位,两个币种都是**:app.ts 的 creditBalance / debitBalance /
+ * creditNex / debitNex 落账时一律 `+(...).toFixed(2)` —— 0.01 就是这个平台真正能
+ * 成交的最小单位。报价、展示、成交必须**全部站在这一个精度上**:
+ *   · 有一处比它**粗** → 用户看到的不是实际到账的数(展示「12 NEX」实入 11.76,每笔差 0.24);
+ *   · 有一处比它**细** → 展示的小数位落账时被账本抹掉(报价 10.5374 实入 10.54)。
+ * 所以 money() 只此一个取整口径,报价 / 输入 / 展示三条路径共用,不给「二次舍入」留位置。
+ */
+const money = (n: number): number => +n.toFixed(2);
+/** 展示口径与 money() 同精度 —— 屏幕上的数 = 报价的数 = 落账的数。 */
+const amtLabel = (n: number): string =>
+  n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// 输入在**进入资金链路的那一刻**就归到账本精度:此后报价 / 额度门 / 扣款 / 账单 / 历史
+// 拿到的是同一个数。留着 1.2345 往下走的话,弹窗显示 1.23、账本扣 1.23、账单却记 1.2345。
 const fromAmount = computed(() => {
   const n = parseFloat(input.value || "0");
-  return isNaN(n) ? 0 : n;
+  return isNaN(n) ? 0 : money(n);
 });
 /**
  * 报价公式**单源**:页面展示与「确认后复验」跑同一个函数、同一套取整。
@@ -256,8 +271,7 @@ const fromAmount = computed(() => {
  */
 function quoteTo(dir: "usdt2nex" | "nex2usdt", from: number, r: number): number {
   if (from === 0) return 0;
-  if (dir === "usdt2nex") return +(from / r).toFixed(2);
-  return +(from * r).toFixed(4);
+  return money(dir === "usdt2nex" ? from / r : from * r);
 }
 const toAmount = computed(() => quoteTo(direction.value, fromAmount.value, rate.value));
 const overBalance = computed(() => fromAmount.value > fromBal.value);
@@ -378,7 +392,9 @@ async function handleConfirm() {
 
     const ok = await confirm({
       title: t.value.exchange.confirm,
-      message: `${snap.fromSym} ${snap.fromAmount.toFixed(snap.fromSym === "USDT" ? 2 : 0)} → ${snap.toSym} ${snap.toAmount.toFixed(snap.toSym === "USDT" ? 4 : 0)}`,
+      // 🔴 弹窗数字与到账数字必须逐位相同 —— 走同一个 amtLabel,不在这里另立取整规则。
+      // 曾经这行对 NEX 取整到 0 位:1 USDT @0.085 展示「12 NEX」,实入 11.76,每笔差 0.24。
+      message: `${snap.fromSym} ${amtLabel(snap.fromAmount)} → ${snap.toSym} ${amtLabel(snap.toAmount)}`,
       icon: "info",
       confirmLabel: t.value.exchange.confirm,
     });
@@ -445,9 +461,9 @@ async function handleConfirm() {
       t.value.exchange.swapped,
       t.value.exchange.swappedDetail
         .replace("{from}", snap.fromSym)
-        .replace("{fromAmt}", String(snap.fromAmount))
+        .replace("{fromAmt}", amtLabel(snap.fromAmount))
         .replace("{to}", snap.toSym)
-        .replace("{toAmt}", String(snap.toAmount)),
+        .replace("{toAmt}", amtLabel(snap.toAmount)),
     );
     input.value = "";
   } finally {
@@ -459,9 +475,7 @@ async function handleConfirm() {
 // ── derived labels ──
 const minLabel = computed(() => t.value.exchange.minAmount.replace("{n}", String(minFrom.value)).replace("{sym}", fromSym.value));
 const fromBalLabel = computed(() => (fromSym.value === "USDT" ? fromBal.value.toFixed(2) : fromBal.value.toLocaleString()));
-const toAmountLabel = computed(() =>
-  toAmount.value.toLocaleString(undefined, { maximumFractionDigits: toSym.value === "USDT" ? 4 : 0 }),
-);
+const toAmountLabel = computed(() => amtLabel(toAmount.value));
 const rateLabel = computed(() => t.value.exchange.rate.replace("{rate}", rate.value.toFixed(5)));
 const updatedLabel = computed(() => t.value.exchange.rateLastUpdated.replace("{n}", String(secsAgo.value)));
 const errorLabel = computed(() =>
@@ -472,8 +486,9 @@ const errorLabel = computed(() =>
 const kycUnverifiedLabel = computed(() => fmt(t.value.exchange.kycUnverified, { n: String(KYC_LIFETIME_THRESHOLD_USD) }));
 const lifetimeLabel = computed(() => fmt(t.value.exchange.lifetimeLabel, { n: v3.lifetimeExchangedUSD.toFixed(2) }));
 const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(v3.queue.length) }));
+// 历史行同样走 amtLabel:历史与余额对不上,多半就是这里自己又取了一次整。
 function swapLine(h: SwapEvent): string {
-  return `${h.fromAmount.toFixed(h.fromSym === "USDT" ? 2 : 0)} ${h.fromSym} → ${h.toAmount.toFixed(h.toSym === "USDT" ? 4 : 0)} ${h.toSym}`;
+  return `${amtLabel(h.fromAmount)} ${h.fromSym} → ${amtLabel(h.toAmount)} ${h.toSym}`;
 }
 
 // ── styles ──

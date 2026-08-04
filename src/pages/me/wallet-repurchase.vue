@@ -1,7 +1,7 @@
 <!--
   Re-invest Boost (ported from Nexion-prototype/app/(main)/me/wallet/repurchase/page.tsx).
   Funnels into another buy-in: 90d lock at 35% APY, 1.5× cultivation, Genesis lottery
-  ticket. Cross-store orchestration in handler (debit + stake + bills.add). framer
+  ticket. Cross-store orchestration in handler (postMoneyBill 扣款⊗记账 + stake). framer
   stagger → CSS nx-step-in. Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -95,7 +95,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useStaking } from "@/store/staking";
 
 const PRESETS = [100, 200, 500, 1000];
@@ -103,7 +103,6 @@ const PRESETS = [100, 200, 500, 1000];
 const t = useT();
 const w = computed(() => t.value.repurchase);
 const app = useApp();
-const bills = useBills();
 const staking = useStaking();
 
 const user = computed(() => app.user);
@@ -137,20 +136,46 @@ function onAmount(e: Event) {
 
 function handleRepurchase() {
   if (!canSubmit.value) return;
-  if (!app.debitBalance(amount.value)) {
-    toast.error(w.value.insufficient, fmt(w.value.insufficientSub, { a: user.value.usdtBalance.toFixed(2) }));
-    return;
-  }
+  const billRef = `REINVEST-${Date.now().toString(36).toUpperCase()}`;
   // Cross-store orchestration in the handler (stores don't import each other).
-  staking.stake(amount.value, 90);
-  bills.add({
+  // 🔴 顺序 = 扣款⊗记账(原子)→ 建仓(2026-08-04 R4「钱动了、账没记上」)。原顺序是
+  // 「扣款 → 建仓 → 裸 bills.add」,而 bills.add 写不进去时返回 null 且不抛异常、没人接 ——
+  // 钱扣了、仓建了、弹成功,账单页却查无此单。收口到 postMoneyBill 后,收据落不了盘
+  // = 钱没扣、仓没建、明确报错。
+  const before = app.captureMoney();
+  const paid = postMoneyBill({
     type: "stake",
     symbol: "USDT",
     amount: -amount.value,
     status: "posted",
     memo: `Re-invest · 90d stake`,
-    ref: `REINVEST-${Date.now().toString(36).toUpperCase()}`,
+    ref: billRef,
   });
+  if (paid === "insufficient") {
+    toast.error(w.value.insufficient, fmt(w.value.insufficientSub, { a: user.value.usdtBalance.toFixed(2) }));
+    return;
+  }
+  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  // 🔴 同 stake-sheet:建仓失败(版本冲突耗尽)必须把刚扣的钱退回,否则钱扣了仓位不存在。
+  // 退回走同一个收口点:restoreTo 精确还原扣款前的 withdrawableUsdt(裸 creditBalance 只加
+  // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。
+  const opened = staking.stake(amount.value, 90);
+  if (!opened.ok) {
+    postMoneyBill(
+      {
+        type: "stake",
+        symbol: "USDT",
+        amount: amount.value,
+        status: "posted",
+        memo: `Re-invest reversed · 90d stake refunded`,
+        memoKey: "stakeReversed",
+        ref: billRef,
+      },
+      { restoreTo: before },
+    );
+    toast.error(t.value.stakingV3.toast.openFailedTitle, t.value.stakingV3.toast.openFailedSubtitle);
+    return;
+  }
   toast.success(w.value.toastSuccess, fmt(w.value.toastSubtitle, { a: amount.value }));
   amount.value = 200;
 }

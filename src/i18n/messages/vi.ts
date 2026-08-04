@@ -2764,6 +2764,7 @@ export const vi: Messages = {
       withdrawNexRefund: "Hoàn bù phí · trả lại {nex} NEX",
       genesisReversed: "Hủy giữ chỗ Genesis · hoàn lại {n} suất",
       stakeReversed: "Hủy tái đầu tư · không mở được vị thế, đã hoàn tiền",
+      stakeOpenReversed: "Hủy khoá · không mở được vị thế, đã hoàn tiền",
     },
     title: "Sao kê",
     back: "Quay lại",
@@ -3072,6 +3073,8 @@ export const vi: Messages = {
     txNotSavedMsg: "Số dư của bạn không thay đổi và không có ghi nhận nào. Vui lòng thử lại.",
     billMissingTitle: "Chưa ghi nhận vào sao kê",
     billMissingMsg: "Giao dịch đã thực hiện thành công nhưng chưa được thêm vào lịch sử sao kê.",
+    staleTitle: "Vừa được cập nhật ở nơi khác",
+    staleMsg: "Mục này đã được xử lý ở màn hình khác. Chúng tôi đã làm mới giúp bạn — hãy xem lại trước khi thử lại.",
   },
 
   teamV3: {
@@ -3250,6 +3253,8 @@ export const vi: Messages = {
       claimedSubtitle: "+${total} đã về (lãi ${interest})",
       staleTitle: "Vị thế vừa thay đổi",
       staleSubtitle: "Khoản này đã được xử lý ở nơi khác. Đã làm mới cho bạn — xem lại rồi hãy thử tiếp.",
+      openFailedTitle: "Chưa khoá được khoản này",
+      openFailedSubtitle: "Vị thế của bạn vừa thay đổi ở nơi khác nên khoản này đã dừng lại. Toàn bộ số tiền đã về lại số dư — hãy thử lại.",
     },
     howItWorksEntry: "Quy tắc",
   },
