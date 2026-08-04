@@ -4766,7 +4766,9 @@ export const zh: Messages = {
     collapse: "收起任务",
     buyCta: "购首台 NexGridBox · 启动 $7/日永续收益",
     routeToast: "任务完成 · +{n} NEX",
-    bindCardMemo: "首日任务 · 绑定银行卡",
+    bindCardMemo: "首日任务 · 绑定银行卡",
+
+    routeMemo: "新手任务 · {task}",
     t_bind_bank_card: "绑定银行卡",
     t_visit_earn: "进入 Earn 页",
     t_visit_store: "浏览商城",
