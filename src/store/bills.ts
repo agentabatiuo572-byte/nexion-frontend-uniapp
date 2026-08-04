@@ -147,6 +147,27 @@ export const useBills = defineStore("bills", () => {
     bills.value = hydrate(boundKey);
   }
 
+  /**
+   * 🔴 写到**指定账号**的账单行,不看当前绑定(R3 P1)。
+   *
+   * 为什么需要它:提现在 `await` 期间被换号时,钱已经扣在**旧账号**上,但 `add()` 只会写进
+   * 当前绑定的那本账 —— 写就是别人的流水,不写则旧账号有扣款无凭证。二选一都是错的;正解是
+   * 把这一笔写回**真正被扣的那个账号**。
+   *
+   * 目标账号即当前绑定时走 `add()`(要同步刷新内存态,页面才能立刻看到);不同才走直写。
+   * 直写不碰 `bills.value` —— 那是当前账号的视图,把别人的流水塞进去正是本函数要避免的事。
+   */
+  function addForAccount(rawAccountKey: string, b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+    const target = normalizeAccountKey(rawAccountKey);
+    if (target === boundKey) return add(b);
+    const row = readAccountRow<{ bills?: Bill[] }>(ACCOUNTS_KEY, target);
+    const existing = Array.isArray(row?.bills) ? (row!.bills as Bill[]) : [];
+    const next: Bill = { ...b, id: mockServerId("BL"), ts: mockServerNow() };
+    const merged = recomputeBalance([next, ...existing]);
+    if (!writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, target, { bills: merged })) return null;
+    return next;
+  }
+
   function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
@@ -207,5 +228,5 @@ export const useBills = defineStore("bills", () => {
     return true;
   }
 
-  return { bills, add, addOnce, seed, settleByRef, bindAccount };
+  return { bills, add, addForAccount, addOnce, seed, settleByRef, bindAccount };
 });
