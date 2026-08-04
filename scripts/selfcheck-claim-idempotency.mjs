@@ -18,7 +18,7 @@
 //      金额由消费动作自己决定)必须有自愈补发。
 //
 // 方法:①②③ 用 esbuild 载**真收口点 + 真 store** 跑真代码;④⑤ 是结构断言,跑在正主源码上。
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
@@ -34,6 +34,16 @@ function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
 }
+
+// ④⑤ 与反向入册门共用这份名单 —— 复制三份的话它们会各自漂移,
+// 门就变成对着不同的旧名单判(名单本身也是判据的一部分)。
+const SITES = [
+  "src/components/home/weekly-quest-hero.vue",
+  "src/components/home/weekly-quest-list.vue",
+  "src/pages/events/events.vue",
+  "src/pages/me/achievements.vue",
+  "src/pages/daily/daily.vue",
+];
 
 console.log("selfcheck-claim-idempotency — 领奖族:发钱可重放,资格只消费一次");
 
@@ -140,42 +150,46 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
 
 // ── ④ 调用点的 ref 不带时间戳 ────────────────────────────────────────────────
 {
-  const SITES = [
-    "src/components/home/weekly-quest-hero.vue",
-    "src/components/home/weekly-quest-list.vue",
-    "src/pages/events/events.vue",
-    "src/pages/me/achievements.vue",
-    "src/pages/daily/daily.vue",
-  ];
   const bad = [];
+  const empty = [];
   for (const rel of SITES) {
     // 🔴 过 strip:文件头注里常写着示例调用(实测 hero / achievements 的头注就有
-    // `wq.claimTier1()` 与 `postMoneyBills`),不剥的话顺序门会拿文档当代码,报假阳性。
+    // `wq.claimTier1()` 与 `postMoneyBills`),不剥的话会拿文档当代码,报假阳性。
     const src = strip(readFileSync(path.join(root, rel), "utf8"));
-    // 抠出每个 postMoneyBillsOnce( 的实参块,看里面的 ref 有没有掺时间戳
-    let from = 0;
-    for (;;) {
-      const i = src.indexOf("postMoneyBillsOnce(", from);
-      if (i < 0) break;
-      let depth = 0, j = i + "postMoneyBillsOnce".length;
-      for (; j < src.length; j++) {
-        if (src[j] === "(") depth++;
-        else if (src[j] === ")") { depth--; if (depth === 0) { j++; break; } }
+    // 🔴 扫**整个文件**的 ref,不再只扫 `postMoneyBillsOnce(` 的实参块 ——
+    // 独立验收实测:hero 与 achievements 的 drafts **建在调用之外**(`const drafts = [...]`
+    // 再传进去),实参块里 `ref:` 命中 0 次,这两处的 ref 写成 `Date.now()` 门也全绿。
+    // 这一族错误的通用形状是「判据只看它以为代码会长的那个样子」。
+    // 🔴 ref 可能是**变量**(`ref: refId`,而 `const refId = ...` 在别处)——
+    // 只扫 `ref:` 那一行的话,时间戳藏在变量定义里就永远看不见(红测实测:给 hero 的
+    // refId 掺 Date.now(),门纹丝不动)。所以两头都要看:字面 ref 行 + 它引用的变量定义。
+    const refs = [];
+    for (const m of src.matchAll(/ref:([^\r\n]*)/g)) {
+      const raw = m[1];
+      refs.push(raw);
+      // `ref: someVar` / `ref: someVar,` / `ref: someVar }` → 把那个变量的定义也拉进来判
+      const varName = raw.match(/^\s*([A-Za-z_$][\w$]*)\s*[,}\r\n]?/)?.[1];
+      if (!varName) continue;
+      for (const d of src.matchAll(new RegExp(`(?:const|let|var)\\s+${varName}\\s*=([^\\r\\n]*)`, "g"))) {
+        refs.push(d[1]);
       }
-      const args = src.slice(i, j);
-      // 🔴 判据不能用 `ref:[^,}]*` —— 模板串里的 `${ev.id}` 自带一个 `}`,字符类当场被挡住,
-      // 于是 `ref: \`EVENT-${ev.id}-${Date.now()}\`` 这种真·假幂等一个都抓不到(红测实测漏判)。
-      // 改成:从 `ref:` 取到**本行结尾**再判 —— ref 一律写在一行内,足够且不会被 `}` 截断。
-      for (const m of args.matchAll(/ref:([^\r\n]*)/g)) {
-        if (/(Date\.now|mockServerNow|Math\.random)/.test(m[1])) {
-          bad.push(`${rel}(ref 掺了时间戳/随机数:${m[1].trim().slice(0, 48)})`);
-        }
+    }
+    // 🔴 空集必须判失败:一个在册的领奖文件**一条 ref 都扫不到**,只有两种可能 ——
+    // 它其实没在用幂等出口(该从名单里去掉),或判据又对不上写法(该修判据)。
+    // 两种都不该静默全过(哨兵假绿的经典形状:空集使全称命题恒真)。
+    if (refs.length === 0) empty.push(rel);
+    for (const r of refs) {
+      // 判据不能用 `ref:[^,}]*` —— 模板串里的 `${ev.id}` 自带一个 `}`,字符类当场被挡住,
+      // `ref: \`EVENT-${ev.id}-${Date.now()}\`` 这种真·假幂等一个都抓不到(红测实测漏判)。
+      // 取到**本行结尾**再判:ref 一律写在一行内,足够且不会被 `}` 截断。
+      if (/(Date\.now|mockServerNow|Math\.random)/.test(r)) {
+        bad.push(`${rel}(ref 掺了时间戳/随机数:${r.trim().slice(0, 48)})`);
       }
-      from = j;
     }
   }
   check(`④ 🔴 ${SITES.length} 个调用点的 ref 全部稳定(带时间戳 = 判重永不命中 = 假幂等)`,
-    bad.length === 0, bad.join(" | "));
+    bad.length === 0 && empty.length === 0,
+    [bad.join(" | "), empty.length ? `🔴 这些文件一条 ref 都没扫到(判据空转):${empty.join(",")}` : ""].filter(Boolean).join(" || "));
 }
 
 // ── ⑤ 顺序门 ────────────────────────────────────────────────────────────────
@@ -183,19 +197,45 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
   // 能反序的四处:发钱必须排在消费资格之前
   const ORDERED = [
     ["src/components/home/weekly-quest-hero.vue", "wq.claimTier1()"],
+    // 同一文件两个调用点(onClaimRow / onClaimBonus)—— 独立验收指出上一版只比第一次出现,
+    // bonus 那处从未被检查。两条都列出来,配对判据也已改成逐处比。
     ["src/components/home/weekly-quest-list.vue", "wq.claimTier2("],
+    ["src/components/home/weekly-quest-list.vue", "wq.claimBonus("],
     ["src/pages/events/events.vue", "eventQuest.claim("],
     ["src/pages/me/achievements.vue", "ach.claim("],
   ];
   const wrong = [];
+  let checkedPairs = 0;
   for (const [rel, consume] of ORDERED) {
     const src = strip(readFileSync(path.join(root, rel), "utf8"));
-    const post = src.indexOf("postMoneyBillsOnce(");
-    const eat = src.indexOf(consume);
-    if (post < 0 || eat < 0) { wrong.push(`${rel}(锚点找不到:post=${post} consume=${eat})`); continue; }
-    if (post > eat) wrong.push(`${rel}(消费资格排在发钱之前)`);
+    // 🔴 不能用 `indexOf` 只比**第一次出现**(独立验收实测:`weekly-quest-list.vue` 的
+    // `onClaimBonus` 是同文件第二个调用点,于是它**从未被检查过**)。
+    // 改成:每一处消费点,都要求它**前面**存在一次发钱调用 —— 逐个配对,不是全文件比大小。
+    const posts = [...src.matchAll(/postMoneyBillsOnce\s*\(/g)].map((m) => m.index);
+    const eats = [...src.matchAll(new RegExp(consume.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))].map((m) => m.index);
+    if (!posts.length || !eats.length) { wrong.push(`${rel}(锚点找不到:post=${posts.length} consume=${eats.length})`); continue; }
+    // 🔴 「之前有发钱」必须限定在**同一个函数体内**(红测实测:把 onClaimBonus 改回
+    // 先消费,门纹丝不动 —— 因为同文件里 onClaimRow 的发钱调用位置更靠前,跨函数就满足了)。
+    // 函数边界用「上一个顶格 `function ` / `const x = (` 」近似:本仓的 handler 都是顶层函数。
+    const fnStarts = [...src.matchAll(/^(?:function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\()/gm)].map((m) => m.index);
+    const fnStartOf = (idx) => fnStarts.filter((f) => f <= idx).pop() ?? 0;
+    for (const eat of eats) {
+      const fn = fnStartOf(eat);
+      // 🔴 只管**发钱的**领取路径。同一个 claim API 也被「不发钱」的路径用(实测
+      // `events.vue` 的 handleCta 处理折扣券:只领券、不动钱,那里没有发钱调用是**对的**)。
+      // 判据:该函数体内出现过发钱调用才纳入配对 —— 否则会把「本来就不发钱」误报成
+      // 「该发钱却没发」,而误报会逼下一个人把门关小,最后什么都守不住。
+      const fnEnd = fnStarts.find((f) => f > fn) ?? src.length;
+      const postsInFn = posts.filter((p) => p >= fn && p < fnEnd);
+      if (!postsInFn.length) continue;
+      checkedPairs++;
+      if (!postsInFn.some((p) => p < eat)) {
+        wrong.push(`${rel}@${eat}(这处消费资格排在同函数体内的发钱调用之前)`);
+      }
+    }
   }
-  check(`⑤ 可反序的 ${ORDERED.length} 处:发钱排在消费资格之前`, wrong.length === 0, wrong.join(" | "));
+  check(`⑤ 可反序的 ${ORDERED.length} 个文件 / ${checkedPairs} 个消费点:发钱排在消费资格之前`,
+    wrong.length === 0 && checkedPairs >= ORDERED.length, wrong.join(" | ") || `配对数 ${checkedPairs}`);
 
   // 🔴 反不过来的两处(签到 / 里程碑,金额由消费动作自己摇出)**刻意没有**自愈补发。
   //
@@ -212,6 +252,27 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
   const reAdded = daily.match(/function\s+(reconcile\w*)\s*\(/);
   check("⑤ 🔴 daily 没有「按账单缺失补发」的自愈(重构前加回来 = 二次发钱入口)",
     reAdded === null, reAdded ? `又出现了:${reAdded[1]}` : "");
+
+  // 🔴 反向入册门(独立验收:SITES / ORDERED 都是**手工名单且无反向门**,新调用点对 ④⑤ 天然隐形)。
+  // 判据:全站凡是调了 postMoneyBillsOnce 的文件,必须在 SITES 里 —— 名单漏一个就红。
+  {
+    const files = [];
+    (function walk(d) {
+      for (const e of readdirSync(d)) {
+        const p = path.join(d, e);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(ts|vue)$/.test(e)) files.push(p);
+      }
+    })(SRC);
+    const outside = [];
+    for (const f of files) {
+      const rel = path.relative(root, f).replace(/\\/g, "/");
+      if (rel === "src/lib/money-receipt.ts" || SITES.includes(rel)) continue;
+      if (/postMoneyBillsOnce\s*\(/.test(strip(readFileSync(f, "utf8")))) outside.push(rel);
+    }
+    check(`⑤ 🔴 反向入册:用了幂等出口的文件必须在名单里(扫 ${files.length} 个,册外 ${outside.length} 个)`,
+      outside.length === 0 && files.length > 100, outside.join(" | "));
+  }
 }
 
 console.log(`\n${pass} pass / ${fail} fail(样本:3 组行为固定靶(真收口点 + 真 store)· 5 个调用点扫 ref 稳定性 · 4 处顺序门 + 2 处自愈门)`);
