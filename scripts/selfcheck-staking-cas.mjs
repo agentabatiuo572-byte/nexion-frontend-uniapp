@@ -27,7 +27,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { build } from "esbuild";
+import { build, transformSync } from "esbuild";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const STORE_DIR = path.join(root, "src", "store");
@@ -71,11 +71,13 @@ console.log("selfcheck-staking-cas — 质押持仓写入乐观并发 + 跨标�
 // ── 假 uni storage:JSON 序列化,与 localStorage 同语义(两个标签页拿不到同一个对象引用) ──
 const store = new Map();
 let interleave = null; // 一次性钩子:模拟「A 读完、还没写」的那一瞬别的标签页抢先写入
+let onEveryRead = null; // 常驻钩子:每次读盘之间都有别处写入 → 3 次 CAS 重试全部撞版本(耗尽)
 const uni = {
   getStorageSync(key) {
     const raw = store.get(key);
     const value = raw === undefined ? "" : JSON.parse(raw);
     if (interleave) { const fn = interleave; interleave = null; fn(); }
+    if (onEveryRead) onEveryRead(key);
     return value;
   },
   setStorageSync(key, value) { store.set(key, JSON.stringify(value)); },
@@ -108,9 +110,25 @@ async function loadStore(rel) {
   });
   return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
 }
-const { useStaking } = await loadStore("staking.ts");
+const ts2js = (src) => transformSync(src, { loader: "ts" }).code;
+const { useStaking, STAKING_MIN, STAKING_APY } = await loadStore("staking.ts");
 const { readAccountRow, writeAccountRow, writeAccountRowCas, accountRowRev } =
   await loadStore("account-scoped-storage.ts");
+
+const LANGS = ["en", "zh", "vi"];
+/** 值必须是**非空字符串**。undefined / null / "" / 全空白一律不算有文案 —— 用户看到的是空白提示。 */
+const nonEmpty = (v) => typeof v === "string" && v.trim().length > 0;
+/** 真解析:bundle 出 locale 模块取**值**,不是在文件文本里找 key 名(注释能骗过子串扫描)。 */
+async function loadLocale(l) {
+  const out = await build({
+    entryPoints: [path.join(root, "src", "i18n", "messages", `${l}.ts`)],
+    bundle: true, write: false, format: "esm",
+  });
+  const mod = await import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
+  return mod[l] ?? mod.default ?? Object.values(mod)[0];
+}
+const LOCALES = Object.fromEntries(await Promise.all(LANGS.map(async (l) => [l, await loadLocale(l)])));
+const EN = LOCALES.en;
 
 const ACCOUNTS_KEY = "nexgrid-v3-staking-accounts-v1";
 const ONE_DAY = 86400 * 1000;
@@ -142,6 +160,17 @@ function openTab() {
 function creditIfOk(ledger, r) {
   if (r.ok) ledger.usdt = +(ledger.usdt + r.principal + r.interest).toFixed(2);
   return r;
+}
+/** 把磁盘上该账号行的版本号推进一格 = 别的标签页刚写过一次。直接动底层 Map,不经 uni(不递归)。 */
+function bumpDiskRev() {
+  const raw = store.get(ACCOUNTS_KEY);
+  if (raw === undefined) return;
+  const table = JSON.parse(raw);
+  for (const k of Object.keys(table)) table[k] = { ...table[k], rev: accountRowRev(table[k]) + 1 };
+  store.set(ACCOUNTS_KEY, JSON.stringify(table));
+}
+function diskRev() {
+  return accountRowRev(readAccountRow(ACCOUNTS_KEY, ACCT));
 }
 
 // ── ① 双标签页领同一笔:余额只增加一次 ──────────────────────────────────────────
@@ -192,15 +221,15 @@ function creditIfOk(ledger, r) {
   const tab = openTab();
 
   const opened = tab.stake(1000, 180);
-  check("② 建仓成功并落盘(id / 金额 / APY / 解锁时刻都对)",
-    opened.amountUSDT === 1000 && opened.termDays === 180
-    && diskPositions().some((p) => p.id === opened.id && p.amountUSDT === 1000));
+  check("② 建仓成功并落盘(ok=true + id / 金额 / APY / 解锁时刻都对)",
+    opened.ok === true && opened.position.amountUSDT === 1000 && opened.position.termDays === 180
+    && diskPositions().some((p) => p.id === opened.position.id && p.amountUSDT === 1000));
 
-  const rEarly = tab.earlyWithdraw(opened.id);
+  const rEarly = tab.earlyWithdraw(opened.position.id);
   check("② 提前赎回成功:退款 = 本金 − 罚金(180 天档罚 30%)",
     rEarly.ok === true && rEarly.penalty === 300 && rEarly.refund === 700);
   check("② 提前赎回落盘为 early-withdrawn",
-    diskPositions().find((p) => p.id === opened.id).status === "early-withdrawn");
+    diskPositions().find((p) => p.id === opened.position.id).status === "early-withdrawn");
 
   const rClaim = tab.claim("stk-solo");
   check("② 到期领取成功:本金 300 + 利息按 APY×期限",
@@ -242,7 +271,7 @@ function creditIfOk(ledger, r) {
     && notActive.refund === 0 && notActive.penalty === 0);
 
   check("③ 成功路径不带 conflict 噪声(ok=true 时 conflict 恒为 undefined)",
-    tab.stake(50, 30) && tab.earlyWithdraw(tab.positions.value[0].id).conflict === undefined);
+    tab.stake(50, 30).ok && tab.earlyWithdraw(tab.positions.value[0].id).conflict === undefined);
 
   // 返回形状不变:页面既有 `if (r.ok)` 分支一个字不用改
   const shape = tab.claim("stk-nope");
@@ -284,13 +313,24 @@ function creditIfOk(ledger, r) {
     writeAccountRowCas(TBL, "bob@x.com", { a: 99 }, 0).conflict === true
     && readAccountRow(TBL, "bob@x.com").a === 10);
 
-  // 爆炸半径:本轮只接质押一个消费者
+  // 爆炸半径:接 CAS 的 store 必须是**登记在册**的那几个,不许悄悄蔓延。
+  // 2026-08-04 二期把 P1 涉钱/配额档接了进来(deposits / voucher / nex-faucet /
+  // daily-powerup / lucky-spin / withdraw-daily-count,见 selfcheck-money-cas.mjs);
+  // 名单写死在这里,新增一个未登记的消费者就红 —— 台账不写在被查文件里,否则改代码
+  // 顺手改台账 = 门等于没有。
+  const CAS_CONSUMERS = [
+    "daily-powerup.ts", "deposits.ts", "lucky-spin.ts", "nex-faucet.ts",
+    "staking.ts", "voucher.ts", "withdraw-daily-count.ts",
+  ];
   const storeFiles = readdirSync(STORE_DIR).filter((f) => f.endsWith(".ts"));
   samples.storeFiles = storeFiles.length;
   const casConsumers = storeFiles.filter((f) =>
-    f !== "account-scoped-storage.ts" && readFileSync(path.join(STORE_DIR, f), "utf8").includes("writeAccountRowCas"));
-  check(`④ 爆炸半径受控:${storeFiles.length} 个 store 文件里只有 staking.ts 接了 CAS,其余 ${storeFiles.length - 2} 个一行没动`,
-    casConsumers.length === 1 && casConsumers[0] === "staking.ts", casConsumers.join(","));
+    f !== "account-scoped-storage.ts" &&
+    /writeAccountRowCas|createAccountRowCommit/.test(readFileSync(path.join(STORE_DIR, f), "utf8")));
+  check(`④ 爆炸半径受控:${storeFiles.length} 个 store 文件里恰好 ${CAS_CONSUMERS.length} 个登记在册的接了 CAS,其余 ${storeFiles.length - 1 - CAS_CONSUMERS.length} 个一行没动`,
+    casConsumers.join(",") === CAS_CONSUMERS.join(","), casConsumers.join(","));
+  check("④ staking 仍走自己那份内联 commit(本轮不重构它 —— 它的 ⑥ 接线门按行文 pin 了实现)",
+    /writeAccountRowCas</.test(strip(stakingRaw)) && !stakingRaw.includes("createAccountRowCommit"));
 }
 
 // ── ⑤ 追加型变更:两个标签页各建一仓,两笔都留得住 ──────────────────────────────
@@ -298,8 +338,8 @@ function creditIfOk(ledger, r) {
   seedDisk([]);
   const tabA = openTab();
   const tabB = openTab();
-  const posA = tabA.stake(111, 30);
-  const posB = tabB.stake(222, 90);
+  const posA = tabA.stake(111, 30).position;
+  const posB = tabB.stake(222, 90).position;
   const disk = diskPositions();
   const amounts = disk.map((p) => p.amountUSDT).sort((a, b) => a - b);
   check("⑤ 🔴 两个标签页各建的仓都在磁盘上(建仓不会被对方的陈旧数组顶掉)",
@@ -328,15 +368,140 @@ function creditIfOk(ledger, r) {
   check("⑥ 页面区分版本冲突并明示(领取 + 提前赎回两处,禁点了没反应)",
     (p.match(/else if \(r\.conflict\)/g) || []).length === 2
     && (p.match(/toast\.warn\(t\.value\.stakingV3\.toast\.staleTitle/g) || []).length === 2);
-  const locales = ["en", "zh", "vi"];
-  samples.locales = locales.length;
-  check(`⑥ i18n 冲突提示 ${locales.length} 语齐(staleTitle + staleSubtitle)`,
-    locales.every((l) => {
-      const src = readFileSync(path.join(root, "src", "i18n", "messages", `${l}.ts`), "utf8");
-      return src.includes("staleTitle:") && src.includes("staleSubtitle:");
-    }));
+  // 🔴 这道门此前是**纯子串扫描**(`src.includes("staleTitle:")`),把 key 名写进注释就能骗过:
+  // 审计红测实证 —— 删掉文案值、只在注释里留 key 名,门仍 39/39 全绿,而真实用户看到的是
+  // **空白的错误提示**。改法:真解析取值,断言「值是非空字符串」而不是「key 名出现在文件里」。
+  samples.locales = LANGS.length;
+  const KEYS = ["staleTitle", "staleSubtitle", "openFailedTitle", "openFailedSubtitle"];
+  const bad = [];
+  for (const l of LANGS) {
+    for (const k of KEYS) {
+      const v = LOCALES[l]?.stakingV3?.toast?.[k];
+      if (!nonEmpty(v)) bad.push(`${l}.stakingV3.toast.${k}=${JSON.stringify(v)}`);
+    }
+  }
+  check(`⑥ i18n 冲突/建仓失败提示 ${KEYS.length} key × ${LANGS.length} 语真解析取值且非空`,
+    bad.length === 0, bad.join(","));
+  check("⑥ 三语文案互不相同(整份复制粘贴 = 有值但没翻译,子串扫描一样看不出来)",
+    KEYS.every((k) => new Set(LANGS.map((l) => LOCALES[l].stakingV3.toast[k])).size === LANGS.length),
+    LANGS.map((l) => LOCALES[l].stakingV3.toast.openFailedTitle).join(" | "));
+}
+
+// ── ⑦ 🔴 建仓冲突耗尽 → 失败必须回报给调用方 + 调用方把钱退回 ────────────────────
+//   本轮自伤:stake() 只对「storage 不可用」有内存兜底,对「3 次版本冲突全失败」**零处置**,
+//   而签名 `: StakingPosition` 无论成没成都返回一个仓位对象 —— 调用方拿不到失败信号,
+//   于是余额已扣、账单已写、仓位不存在,刷新后钱就没了,收据成孤儿。
+{
+  seedDisk([]);
+  const tab = openTab();
+  const memBefore = tab.positions.value.length;
+
+  onEveryRead = (key) => { if (key === ACCOUNTS_KEY) bumpDiskRev(); };
+  const r = tab.stake(777, 30);
+  onEveryRead = null;
+
+  // 🔴 注入没生效就直接炸 —— 「跑绿了」必须是真跑过这个现场,不能是靶子没立起来的空转。
+  const rev = diskRev();
+  if (rev < 6) {
+    throw new Error(`selfcheck-staking-cas: ⑦ 冲突注入未生效(rev=${rev},期望 ≥6 = 3 次重试各读 2 次)——`
+      + " 靶子没立起来,后面的断言全是空转,拒绝继续。");
+  }
+  check(`⑦ 注入生效:每次读盘之间都被别处写过,3 次 CAS 重试全部撞版本(disk rev=${rev})`, rev >= 6);
+  check("⑦ 🔴 冲突耗尽 → ok=false / conflict=true / position=null(不再无论成没成都返回仓位)",
+    r.ok === false && r.conflict === true && r.position === null, JSON.stringify(r));
+  check("⑦ 🔴 仓位既没落盘也没进内存 —— 这笔真的不存在",
+    !diskPositions().some((p) => p.amountUSDT === 777)
+    && tab.positions.value.length === memBefore
+    && !tab.positions.value.some((p) => p.amountUSDT === 777));
+  check("⑦ 反向:同一现场撤掉冲突注入后建仓正常成交(证明拒单来自冲突,不是建仓本身坏了)",
+    (() => { const ok = tab.stake(777, 30); return ok.ok === true && ok.position.amountUSDT === 777; })());
+}
+
+// ⑦b 调用方:两个入口的**正主函数原文**注入执行 —— 「store 会回报失败」与「调用方接住了
+// 并把钱退回去」是两道门,只验前者等于没验(自伤那条正是「回报了没人接」)。
+{
+  const callers = [
+    ["质押半屏 stake-sheet", path.join(root, "src", "components", "staking", "stake-sheet.vue"), "function submit()", "submit"],
+    ["复投页 wallet-repurchase", path.join(root, "src", "pages", "me", "wallet-repurchase.vue"), "function handleRepurchase()", "handleRepurchase"],
+  ];
+  samples.callers = callers.length;
+  for (const [label, file, needle, fnName] of callers) {
+    const src = readFileSync(file, "utf8");
+    seedDisk([]);
+    const staking = openTab();
+    const START = 5000;
+    const AMT = 200;
+    // app 桩:**照抄 app.ts 四原语的真实语义**,尤其是 debitBalance 的 withdrawableUsdt clamp。
+    // 🔴 桩不建 clamp 的话,「裸 creditBalance 退款」与「restoreTo 精确还原」在门下长得一模一样,
+    // 门就分辨不出对错 —— 而这两者的差别正是「一次退款把用户可提额度永久压低」(实测 $8000 → $1)。
+    const bills = [];
+    const toasts = [];
+    const app = {
+      user: { usdtBalance: START, nexBalance: 0 },
+      withdrawable: START,
+      captureMoney() { return { usdt: this.user.usdtBalance, withdrawable: this.withdrawable }; },
+      restoreMoney(s) { this.user.usdtBalance = s.usdt; this.withdrawable = s.withdrawable; return true; },
+      debitBalance(n) {
+        if (this.user.usdtBalance < n) return false;
+        this.user.usdtBalance = +(this.user.usdtBalance - n).toFixed(2);
+        // 与 app.ts 同款:花钱先消耗不可提部分,可提额度随之向下收敛(单向,不会自己涨回来)。
+        this.withdrawable = Math.min(this.withdrawable, this.user.usdtBalance);
+        return true;
+      },
+      creditBalance(n) { this.user.usdtBalance = +(this.user.usdtBalance + n).toFixed(2); return true; },
+    };
+    const ledger = app.user;
+    /** 与 lib/money-receipt.ts 同语义:restoreTo 还原、amount<0 扣款,收据随资金同生共死。 */
+    const postMoneyBill = (draft, opts = {}) => {
+      if (opts.restoreTo) { app.restoreMoney(opts.restoreTo); bills.push(draft); return "ok"; }
+      if (draft.amount < 0) { if (!app.debitBalance(-draft.amount)) return "insufficient"; }
+      else app.creditBalance(draft.amount);
+      bills.push(draft);
+      return "ok";
+    };
+    const env = {
+      props: { term: 30 }, term: 30,
+      amount: { value: AMT },
+      canSubmit: { value: true },
+      user: { value: app.user },
+      STAKING_MIN, STAKING_APY,
+      app, staking, postMoneyBill,
+      bills: { add: (r2) => { bills.push(r2); return { id: "B1" }; } },
+      t: { value: EN }, w: { value: EN.repurchase },
+      fmt: (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => String(vars?.[k] ?? "")),
+      toast: {
+        error: (a, b) => toasts.push(["error", a, b]),
+        success: (a, b) => toasts.push(["success", a, b]),
+        warn: (a, b) => toasts.push(["warn", a, b]),
+      },
+      emitClose: () => {},
+      uni: { navigateTo: () => {} },
+    };
+    const names = Object.keys(env);
+    // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
+    const run = new Function(...names, `${ts2js(grabBlock(src, needle))}\n; return ${fnName};`)(...names.map((n) => env[n]));
+
+    const before = ledger.usdtBalance;
+    onEveryRead = (key) => { if (key === ACCOUNTS_KEY) bumpDiskRev(); };
+    run();
+    onEveryRead = null;
+
+    check(`⑦b [${label}] 🔴 建仓失败后余额被补回($${START},不是少了 $${AMT})`,
+      ledger.usdtBalance === START && before === START, `before=${before} after=${ledger.usdtBalance}`);
+    check(`⑦b [${label}] 🔴 可提额度也被还原($${START})—— 裸 creditBalance 只加总余额,退一次压低一次`,
+      app.withdrawable === START, `withdrawable=${app.withdrawable}(期望 ${START})`);
+    check(`⑦b [${label}] 🔴 有失败提示(不是静默失败,也不是弹「成功」)`,
+      toasts.some((x) => x[0] === "error" && x[1] === EN.stakingV3.toast.openFailedTitle)
+      && !toasts.some((x) => x[0] === "success"), JSON.stringify(toasts.map((x) => [x[0], x[1]])));
+    check(`⑦b [${label}] 🔴 磁盘上没有这笔仓位(失败就是什么都没发生)`,
+      !diskPositions().some((p) => p.amountUSDT === AMT));
+    check(`⑦b [${label}] 账上不留净额:所有账单行金额相加 = 0(要么没写,要么写了反向分录冲正)`,
+      +bills.reduce((s, b) => s + (b.amount ?? 0), 0).toFixed(2) === 0,
+      JSON.stringify(bills.map((b) => b.amount)));
+  }
 }
 
 console.log(`\n${pass} pass / ${fail} fail(样本:${samples.tabs} 个 store 实例=${samples.tabs} 标签页共享 1 份序列化 storage`
-  + ` · ${samples.targets} 组跨标签页固定靶 · ${samples.storeFiles} 个 store 文件扫爆炸半径 · ${samples.locales} 语 i18n)`);
+  + ` · ${samples.targets} 组跨标签页固定靶 · ${samples.storeFiles} 个 store 文件扫爆炸半径 · ${samples.locales} 语 × 4 key i18n 真解析取值`
+  + ` · 1 组建仓冲突耗尽靶(注入未生效直接抛错) · ${samples.callers} 个调用方正主函数原文注入(退款含可提额度还原))`);
 process.exit(fail ? 1 : 0);

@@ -2847,6 +2847,7 @@ export const en = {
       withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",
       genesisReversed: "Genesis reservation reversed · {n} slot(s) refunded",
       stakeReversed: "Re-invest reversed · stake could not be opened, amount refunded",
+      stakeOpenReversed: "Lock reversed · position could not be opened, amount refunded",
     },
     title: "Bills",
     back: "Back",
@@ -3159,6 +3160,10 @@ export const en = {
     txNotSavedMsg: "Your balance is unchanged and nothing was recorded. Please try again.",
     billMissingTitle: "Receipt not recorded",
     billMissingMsg: "This transaction went through, but it could not be added to your bill history.",
+    // 跨标签页并发:这一笔在别处已经处理过了,store 已把最新状态刷回来。共用一对文案,
+    // 不给每个 store 各写一套(用户看到的都是同一件事:你眼前这屏刚被别处改过)。
+    staleTitle: "Just updated elsewhere",
+    staleMsg: "This was already handled on another screen. We've refreshed it for you — take a look before trying again.",
   },
 
   // ─── v3 reverse-Ponzi sample namespaces ─────────────────────────
@@ -3337,6 +3342,8 @@ export const en = {
       claimedSubtitle: "+${total} returned (interest ${interest})",
       staleTitle: "Positions just changed",
       staleSubtitle: "This one was already handled elsewhere. We've refreshed it for you — take a look before you try again.",
+      openFailedTitle: "Nothing was locked",
+      openFailedSubtitle: "Your positions changed on another screen, so we stopped before locking this one. The full amount is back in your balance — try again.",
     },
     howItWorksEntry: "Rules",
   },

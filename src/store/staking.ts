@@ -180,7 +180,16 @@ export const useStaking = defineStore("staking", () => {
     return positions.value.filter((p) => p.status === "active").length;
   }
 
-  function stake(amount: number, termDays: StakingTerm): StakingPosition {
+  /**
+   * 返回形状对齐 earlyWithdraw / claim 的 `{ ok, …, conflict? }` —— 建仓和它们一样**会失败**,
+   * 而调用方在此之前已经 debitBalance 扣过钱了。此前签名是 `: StakingPosition`,无论成没成都
+   * 返回一个对象,调用方**拿不到失败信号**:3 次版本冲突全失败时仓位既没落盘也没进内存,
+   * 而钱已经扣了、账单已经写了 —— 刷新后钱没了、收据成孤儿。
+   */
+  function stake(
+    amount: number,
+    termDays: StakingTerm,
+  ): { ok: boolean; position: StakingPosition | null; conflict?: boolean } {
     const t = Date.now();
     const pos: StakingPosition = {
       // 🔴 不能用 `stk-${t}`:同一毫秒内建的两笔仓位 id 完全相同。CAS 之前这条被
@@ -197,9 +206,17 @@ export const useStaking = defineStore("staking", () => {
     // 追加型变更:冲突时在**别处写完的最新列表**上重放这次追加,两个标签页各自建的仓都留得住
     // (与领取/赎回不同,新建仓位有唯一 id,天然可合并,不存在「同一笔被建两次」)。
     const r = commit((current) => ({ next: [pos, ...current], result: pos }));
+    if (r.ok) return { ok: true, position: pos };
     // storage 写不进去(配额满等)时保持 CAS 上线前的行为:内存仍记这笔,刚扣的钱不凭空消失。
-    if (!r.ok && !r.conflict) positions.value = [pos, ...positions.value];
-    return pos;
+    // 这一路仓位**是存在的**(用户看得见、能赎回),所以照报成功。
+    if (!r.conflict) {
+      positions.value = [pos, ...positions.value];
+      return { ok: true, position: pos };
+    }
+    // 🔴 3 次版本冲突全耗尽:既没落盘、也不进内存 —— 这笔仓位**根本不存在**。
+    // 唯一正确的处置是把失败如实回报给调用方,由它把刚扣的钱退回去;
+    // 这里跟着做内存兜底反而更糟:本标签页看得见、磁盘上没有,刷新即人间蒸发。
+    return { ok: false, position: null, conflict: true };
   }
 
   function earlyWithdraw(id: string): { ok: boolean; refund: number; penalty: number; conflict?: boolean } {
