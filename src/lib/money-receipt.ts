@@ -88,6 +88,18 @@ export interface PostMoneyOptions {
    * 一次「扣款→失败→退款」就把用户的可提额度永久压低(审计场景:$8000 → $1)。
    */
   restoreTo?: MoneySnapshot;
+  /**
+   * 失败时**不弹**通用的「交易未保存 · 余额没有变化,也没有产生任何记录」——
+   * 由调用方自己交底。
+   *
+   * 🔴 什么时候该用它:那句通用文案的后半句在某些路径上**是假的**。质押平仓/领取就是:
+   * 仓位已经 CAS 落盘没了,资金却没到 —— 此时说「余额没有变化」对用户毫无意义,
+   * 说「也没有产生任何记录」更是反的。原来两条提示会**同时**弹出(收口点一条 + 页面一条),
+   * 互相矛盾(2026-08-04 独立验收)。
+   *
+   * 用它的调用方**必须**自己给出终态提示,不能只是把提示吞掉 —— 门里有断言守着。
+   */
+  silentFailure?: boolean;
 }
 
 /**
@@ -147,7 +159,7 @@ export function postMoneyBills(drafts: ReceiptDraft[], opts: PostMoneyOptions = 
     // 🔴 回滚的返回值必须被消费(R5):回滚失败 = 钱真的扣着,那时的既定终态是响亮告知 +
     // 交易号 + 入待对账队列,而不是照旧弹「余额没有变化」。
     if (!app.restoreMoney(undo)) return reportStuckFunds(undo, drafts[0].ref ?? "");
-    toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
+    if (!opts.silentFailure) toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
     return "failed";
   }
 
@@ -155,7 +167,7 @@ export function postMoneyBills(drafts: ReceiptDraft[], opts: PostMoneyOptions = 
     // 钱已经落盘、收据没落盘 —— 正是本族要根治的那一格。资金精确还原到动钱之前
     // (含 withdrawableUsdt),账上一条记录都不留,用户拿到明确失败。
     if (!app.restoreMoney(undo)) return reportStuckFunds(undo, drafts[0].ref ?? "");
-    toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
+    if (!opts.silentFailure) toast.error(getT().errors.txNotSavedTitle, getT().errors.txNotSavedMsg);
     return "failed";
   }
   return "ok";

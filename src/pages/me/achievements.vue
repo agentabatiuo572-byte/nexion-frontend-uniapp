@@ -184,7 +184,11 @@ function relativeWhen(ms: number): string {
 function handleClaim(id: string) {
   const def = ACHIEVEMENTS.find((a) => a.id === id);
   if (!def) return;
-  if (ach.isClaimed(id)) return;
+  // 🔴 前置门必须与消费门 `claim()` **等强**:后者的守卫是「记录存在(=已解锁)**且**未领」,
+  // 只查 `isClaimed` 会漏掉前一半 —— 先发钱后消费的顺序下,未解锁的成就会**先把奖发出去**
+  // 再被 claim() 拒。当前不可达(按钮只在 isUnlocked 时渲染),但「前置门弱于消费门」
+  // 正是这类事故的定义:渲染层的拦截不是判定层的拦截(卡轨双击那条同一形状)。
+  if (!ach.isUnlocked(id) || ach.isClaimed(id)) return;
   const name = label(def);
   // 同一次领取的两腿一次落盘 —— 发了 NEX 没发 $ 是半边账,收据即指令(不再单独 credit*)。
   // 🔴 顺序 = 先发钱(幂等)→ 后消费资格(2026-08-04 对抗审计 B-P1-3):原来是先 ach.claim(id)

@@ -234,7 +234,7 @@ async function handleEarlyWithdraw(p: StakingPosition) {
       status: "posted",
       memo: `Stake early withdraw · ${p.id} (penalty $${r.penalty.toFixed(2)})`,
       ref: `STAKE-EW-${p.id}`,
-    });
+    }, { silentFailure: true });
     if (out === "failed") reportStuckFunds(app.captureMoney(), `STAKE-EW-${p.id}`);
     if (out !== "ok") return;
     toast.warn(
@@ -267,7 +267,7 @@ function handleClaim(p: StakingPosition) {
       status: "posted",
       memo: `Stake claim · ${p.id} (interest $${r.interest.toFixed(2)})`,
       ref: `STAKE-CLAIM-${p.id}`,
-    });
+    }, { silentFailure: true });
     if (out === "failed") reportStuckFunds(app.captureMoney(), `STAKE-CLAIM-${p.id}`);
     if (out !== "ok") return;
     toast.success(

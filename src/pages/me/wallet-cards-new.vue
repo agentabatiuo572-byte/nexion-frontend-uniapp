@@ -100,7 +100,7 @@ import type { CardBrand } from "@/store/cards-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
-import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 
 const t = useT();
 const cardsStore = useCards();
@@ -184,16 +184,20 @@ function handleBind() {
   // 首日任务 bind_bank_card(server-canonical `card.bound`):quest 只记完成,
   // 入账 + 账单 + toast 在调用层组合(对齐 quest.ts 头注约定,模式同 lib/share.ts)。
   // 幂等 — 非首次绑卡 firstTime=false,只出常规绑卡 toast,不重复发奖。
-  const quest = useQuest().markComplete("bind_bank_card");
-  if (quest.firstTime) {
-    const billRef = `QST-${Date.now().toString(36).toUpperCase()}`;
+  // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
+  // 三处漏改)。原来先 markComplete 消费掉,发钱失败奖就归零且再也拿不到。
+  const questStore = useQuest();
+  const task = questStore.QUEST_TASKS.find((tk) => tk.id === "bind_bank_card");
+  if (task && !questStore.isComplete("bind_bank_card")) {
+    const billRef = `QST-bind_bank_card`; // 稳定 ref:任务一次性,带时间戳 = 判重永不命中
     // 同一次任务完成的两腿一次落盘,入账由收据的 amount/symbol 派生(模式同 lib/share.ts)。
     const drafts: ReceiptDraft[] = [];
-    if (quest.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: quest.rewardUsdt, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    if (quest.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
     // 发奖失败已弹错并还原;绑卡本身已成立,照常回上一页,不把用户卡在表单里。
-    if (!drafts.length || postMoneyBills(drafts) === "ok") {
-      toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
+    if (!drafts.length || postMoneyBillsOnce(drafts) === "ok") {
+      questStore.markComplete("bind_bank_card"); // 消费失败:重试命中同 ref 不会再发
+      toast.success(fmt(t.value.quest.routeToast, { n: task.nexReward }));
     }
   } else {
     toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
