@@ -477,11 +477,11 @@ let BASE;
   check("C⑦ 用户拿到明确失败提示(不是静默吞掉后照弹「兑换完成」)",
     f.toasts.some((x) => x[0] === "error") && !f.toasts.some((x) => x[0] === "success"),
     JSON.stringify(f.toasts.map((x) => x[0])));
-  // 结构面:N 条分录必须一次落盘。退化成「逐腿 add」就重新造出中间态,行为靶未必抓得到。
-  const receiptStripped = strip(receiptRaw);
-  check("C⑦ 收口点用单次 addMany 落 N 条分录(不是循环逐腿 add,那会重新造出半落盘中间态)",
-    /bills\.addMany\(drafts\)/.test(receiptStripped)
-    && !/for \([^)]*of drafts\)[\s\S]{0,120}bills\.add\(/.test(receiptStripped));
+  // ponytail:「N 条分录一次落盘」这一维**不在这里重复焊**。
+  // 它归 money_receipt_gate ⑦ 段,那边是数真实写盘次数(setStorageSync 调用数 = 1)——
+  // 行为判据,重命名骗不过它;而我这边只能对**别人的文件**做源码正则,
+  // 一次无害的形参改名就会误红。那正是本轮元教训里「判据钉死实现形态」的另一面:
+  // 钉在自己不拥有的文件上,连修都轮不到我。本段只守**调用方**的正交面(见上三条)。
 }
 
 // ── ⑥ 🔴 展示 == 入账:四个展示口与实际到账逐位同值(1/0.085 是本轮实测反例)────────
@@ -694,7 +694,7 @@ console.log(
   ` · ${confirmBody.slice(iAwait).split(/\r?\n/).length} 行 await 后代码逐行扫 9 个活值 token` +
   ` · 8 项成交输入快照 + 5 个动钱/计数入口 · 5 组行为固定靶(汇率漂移/方向金额篡改/连点3次/创世同tick3击/正常路径)` +
   ` · 5 条创世反向靶(余额不足·铸造失败冲正·收据落盘失败·失败后重试·限购满不上锁)` +
-  ` · 兑换两腿原子性 4 靶(收据落盘失败 → 双侧资金还原·账上零残留·明确失败·单次 addMany)` +
+  ` · 兑换两腿原子性 3 靶(收据落盘失败 → 双侧资金还原·账上零残留·明确失败;单次落盘归 money_receipt_gate ⑦)` +
   ` · 资金收口点 postMoneyBill 跑真实现(lib/money-receipt.ts 原文注入) · 3 key × 3 语 i18n)`,
 );
 process.exit(fail ? 1 : 0);
