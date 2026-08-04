@@ -684,6 +684,26 @@ group();
     check(`⑥ ${file} 的变更路径全部经由 commit(实测 ${commits} 处,门槛 ${minCommits})`,
       commits >= minCommits, `commits=${commits}`);
   }
+  // 🔴 正交维度:「裸 writeAccountRow 有没有」查的是**存在的对不对**,查不到「该走 commit 的
+  // 有没有绕过去」。绕法不是再写一次盘,而是**直接改内存 ref 而根本不落盘** —— 页面当场看着对,
+  // 刷新即丢,而且完全绕开了前置条件复核。判据:每个持久化 ref 在全文只许被赋值 2 次
+  // (提交器的 sync 回调 + bindAccount),多一次就是有人在 commit 之外动了它。
+  const PERSISTED_REFS = {
+    "deposits.ts": ["records", "intents"],
+    "voucher.ts": ["claimed"],
+    "daily-powerup.ts": ["claimed", "claimedAt"],
+    "nex-faucet.ts": ["history", "lastSignedInAt", "signInStreak", "longestStreak", "streakSavers", "claimedMilestones"],
+    "lucky-spin.ts": ["bonusTickets", "lastFreeSpinDate", "history", "realPrizeSoldOut", "coverageDegraded"],
+  };
+  for (const [file, refs] of Object.entries(PERSISTED_REFS)) {
+    const s = strip(readSrc("src", "store", file));
+    const offenders = refs
+      .map((r) => [r, (s.match(new RegExp(`\\b${r}\\.value\\s*=[^=]`, "g")) || []).length])
+      .filter(([, n]) => n !== 2);
+    check(`⑥ 🔴 ${file} 的 ${refs.length} 个持久化 ref 只在 sync + bindAccount 两处被赋值(多一处 = 绕过 commit 直接改内存,不落盘)`,
+      offenders.length === 0, offenders.map(([r, n]) => `${r}=${n}`).join(","));
+  }
+
   const vou = strip(readSrc("src", "store", "voucher.ts"));
   check("⑥ 🔴 voucher 的 `watch(claimed, persist, deep)` 旁路已删除(留着它 = 绕过 CAS 的第二条落盘路)",
     !/\bwatch\s*\(/.test(vou), (vou.match(/.*watch\s*\(.*/g) || []).join(" | "));
