@@ -69,7 +69,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { postMoneyBill } from "@/lib/money-receipt";
+import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useAchievements } from "@/store/achievements";
@@ -144,36 +144,41 @@ function onRowCta(q: Tier2QuestDef) {
 }
 
 function onClaimRow(q: Tier2QuestDef) {
-  if (wq.claimTier2(q.id)) {
-    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier2/:id}
-    // claims, credits, and bills in one idempotent transaction.
-    const amount = rewardOf(q);
-    postMoneyBill({
-      type: "achievement",
-      symbol: "NEX",
-      amount,
-      status: "posted",
-      memo: `Weekly quest tier-2 · ${q.id}`,
-      ref: `WQT2-${q.id}-${Date.now().toString(36).toUpperCase()}`,
-    });
-  }
+  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier2/:id}
+  // claims, credits, and bills in one idempotent transaction.
+  //
+  // 🔴 同 hero:先发钱(幂等)→ 后消费资格。原来是「先消费资格 → 发钱**返回值都没接**」,
+  // 这处比同文件的孪生函数 onClaimBonus 还少一层(那个在同一提交里接了)——
+  // 发钱失败时资格已没、奖归零,而且连个提示都没有。ref 用「周 + 任务 id」保持稳定。
+  if (!wq.tier2Completed.includes(q.id) || wq.tier2Claimed.includes(q.id)) return;
+  const amount = rewardOf(q);
+  if (postMoneyBillsOnce([{
+    type: "achievement",
+    symbol: "NEX",
+    amount,
+    status: "posted",
+    memo: `Weekly quest tier-2 · ${q.id}`,
+    ref: `WQT2-${wq.weekKey}-${q.id}`,
+  }]) !== "ok") return;
+  wq.claimTier2(q.id); // 消费失败也不再发第二次:重试命中同一 ref
 }
 
 function onClaimBonus() {
-  if (wq.claimBonus()) {
-    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{bonus}
-    // claims, credits, and bills in one idempotent transaction.
-    const amount = Math.round(WEEKLY_BONUS_NEX * mult.value);
-    if (postMoneyBill({
-      type: "achievement",
-      symbol: "NEX",
-      amount,
-      status: "posted",
-      memo: "Weekly champion bonus",
-      ref: `WCHAMPION-${Date.now().toString(36).toUpperCase()}`,
-    }) !== "ok") return;
-    ach.unlock(WEEKLY_CHAMPION_BADGE_ID);
-  }
+  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{bonus}
+  // claims, credits, and bills in one idempotent transaction.
+  // 🔴 同 onClaimRow:先发钱(幂等)→ 后消费资格;ref 用周键保持稳定。
+  if (wq.bonusClaimed) return;
+  const amount = Math.round(WEEKLY_BONUS_NEX * mult.value);
+  if (postMoneyBillsOnce([{
+    type: "achievement",
+    symbol: "NEX",
+    amount,
+    status: "posted",
+    memo: "Weekly champion bonus",
+    ref: `WCHAMPION-${wq.weekKey}`,
+  }]) !== "ok") return;
+  if (!wq.claimBonus()) return;
+  ach.unlock(WEEKLY_CHAMPION_BADGE_ID);
 }
 
 // ── styles ──

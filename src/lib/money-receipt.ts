@@ -194,3 +194,30 @@ export function postReceiptOnce(draft: ReceiptDraft): boolean {
   toast.error(getT().errors.billMissingTitle, getT().errors.billMissingMsg);
   return false;
 }
+
+/**
+ * 幂等版「动钱 ⊗ 记账」—— 按 `ref` 判重:同一个 ref 已经在账上就直接返回 ok,**不再发第二次**。
+ *
+ * 为什么需要它(2026-08-04 对抗审计 B-P1-3 / P1-4 同族):
+ * 「领奖」这一族要同时满足两件互斥的事 —— 资格只能消费一次(防重复领),奖必须发到
+ * (不能领了却没发)。两种顺序各有一个失效面:
+ *   · 先消费资格 → 发钱失败,资格没了、奖归零(5 处现状,用户白白损失);
+ *   · 先发钱 → 消费资格失败,下一拍**再发一次**(里程碑那处的实况,平台重复出钱)。
+ * 只要发钱这一步**可以安全重放**,第二种顺序就没有失效面了:重放命中既有 ref,
+ * 不动钱、不写第二条分录,直接当成功,调用方接着去消费资格。
+ *
+ * 🔴 因此 `ref` 必须是**稳定标识**(如「第几周 + 任务 id」),不能带时间戳 ——
+ * 带时间戳的 ref 每次重放都是新值,判重永远不命中,这个函数就退化成 postMoneyBills。
+ * 传空 ref 直接抛错,不静默降级(静默降级 = 一个看起来幂等其实不幂等的调用点)。
+ *
+ * @returns "ok"(含命中幂等键、没动钱那一路)/ "insufficient" / "failed" / "stuck"
+ */
+export function postMoneyBillsOnce(drafts: ReceiptDraft[], opts: PostMoneyOptions = {}): MoneyReceiptOutcome {
+  const ref = drafts[0]?.ref;
+  if (!ref) {
+    throw new Error("postMoneyBillsOnce: 必须传稳定的 ref,否则判重永不命中 = 假幂等");
+  }
+  // 判重域是**当前账号已落盘的分录**(bills 已按账号分行),命中即视为这一笔已经发过。
+  if (useBills().bills.some((b) => b.ref === ref)) return "ok";
+  return postMoneyBills(drafts, opts);
+}

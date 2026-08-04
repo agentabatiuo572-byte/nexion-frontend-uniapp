@@ -184,7 +184,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
-import { postMoneyBill } from "@/lib/money-receipt";
+import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 
@@ -229,6 +229,7 @@ const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   timer = setInterval(() => (tick.value += 1), 1000);
+  reconcileFaucetBills(); // 上次签到/里程碑发币没落盘的话,进页面补一次(幂等,不会变成第二次发)
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
@@ -302,6 +303,48 @@ function formatTs(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
+/** 签到分录的稳定幂等键 = 当天日期(签到一天一次)。带时间戳的话判重永不命中 = 假幂等。 */
+function signInRef(ts: number): string {
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `SIGNIN-${d.getFullYear()}${mm}${dd}`;
+}
+
+/** 🔴 签到 / 里程碑自愈:领取动作已落定(磁盘上记着领过)但账上没有对应分录 → 补发一次。
+ *
+ *  这两处的顺序都**反不过来**:签到的金额是 signIn() 自己摇出来的(随机倍率 + 连签奖励),
+ *  里程碑的 claim 才是按磁盘最新态的权威判定(反过来会在别的标签页刚领过时白发)。
+ *  于是失败面是「已领、没到账」,而两者都是一次性的、当天再点也没用。
+ *
+ *  对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
+ *  该发什么完全能从现有数据推出:签到金额取 faucet 自己那条流水,里程碑金额取静态档位表。
+ *  幂等出口保证补发不会变成第二次发钱;刷新 / 换设备 / 上轮写盘失败都能自愈,零额外存储。 */
+function reconcileFaucetBills() {
+  // ① 今天签过但没有今天那条分录
+  const last = faucet.lastSignedInAt;
+  if (last && new Date(last).toDateString() === new Date().toDateString()) {
+    const entry = faucet.history.find((h) => h.ts === last);
+    if (entry && entry.delta > 0) {
+      postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: entry.delta, status: "posted",
+        memo: entry.reason, ref: signInRef(last) }]);
+    }
+  }
+  // ② 领过的里程碑里,凡是发币档(usdt/nex)都该有一条分录
+  for (const day of faucet.claimedMilestones) {
+    const m = MILESTONES.find((x) => x.day === day);
+    if (!m || (m.reward.type !== "usdt" && m.reward.type !== "nex")) continue;
+    postMoneyBillsOnce([{
+      type: "bonus",
+      symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
+      amount: m.reward.amount,
+      status: "posted",
+      memo: `Streak milestone · Day-${m.day}`,
+      ref: `STREAK-D${m.day}`,
+    }]);
+  }
+}
+
 function handleCheckIn() {
   const r = faucet.signIn();
   if (!r.ok) {
@@ -313,7 +356,15 @@ function handleCheckIn() {
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
   // (store never imports app). MOCK-ONLY NON-ATOMIC: PROD POST /api/faucet/sign-in
   // atomically grants NEX and emits the matching bill in one idempotent transaction.
-  if (postMoneyBill({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` }) !== "ok") return;
+  //
+  // 🔴 这一处的顺序**反不过来**(与 quest / event / achievement 三族不同):发多少 NEX 是
+  // signIn() 自己摇出来的(随机倍率 + 连签奖励),不先跑它就不知道金额。于是失败面是
+  // 「今天已签、NEX 没到」,而签到一天一次、当天再点也没用。
+  // 对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
+  // ref 用**当天日期**保持稳定,进页面时若发现「今天签过但账上没有那条分录」就补发;
+  // 幂等出口保证补发不会变成第二次发钱。
+  if (postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted",
+    memo: `Daily check-in · ${r.streak}-day streak`, ref: signInRef(faucet.lastSignedInAt) }]) !== "ok") return;
   try {
     uni.vibrateShort({ fail: () => {} });
   } catch {
@@ -351,16 +402,19 @@ function handleClaimMilestone(m: Milestone) {
   if (m.reward.type === "usdt" || m.reward.type === "nex") {
     // MOCK-ONLY NON-ATOMIC: PROD milestone-claim endpoint TBD must atomically
     // grant the reward and emit the matching bill in one idempotent transaction.
-    const ref = `STREAK-D${m.day}-${Date.now().toString(36).toUpperCase()}`;
-    // 收据即指令:symbol 决定入哪种币;失败时资金已还原、账上无记录,不再往下报成功。
-    if (postMoneyBill({
+    // 🔴 ref 去掉时间戳:里程碑一档只能领一次,`STREAK-D{day}` 天生稳定。带时间戳的话
+    // 判重永不命中,幂等出口会退化成普通出口、自愈也补不上(补一次就多发一次)。
+    // 顺序保持「先 claim 后发钱」——那是有意的(见上方注释:claim 才是按磁盘最新态的权威判定,
+    // 反过来会在别的标签页刚领过时白发一份)。代价是发钱失败会留「已领、没到账」,
+    // 由 reconcileFaucetBills 在进页面时补发。
+    if (postMoneyBillsOnce([{
       type: "bonus",
       symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
       amount: m.reward.amount,
       status: "posted",
       memo: `Streak milestone · Day-${m.day}`,
-      ref,
-    }) !== "ok") return;
+      ref: `STREAK-D${m.day}`,
+    }]) !== "ok") return;
   }
   // Day-30 "spin" milestone grants a bonus Lucky Spin ticket + opens the wheel.
   if (m.reward.type === "spin") {

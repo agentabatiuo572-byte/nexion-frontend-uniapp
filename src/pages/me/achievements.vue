@@ -83,7 +83,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
-import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
@@ -184,13 +184,17 @@ function relativeWhen(ms: number): string {
 function handleClaim(id: string) {
   const def = ACHIEVEMENTS.find((a) => a.id === id);
   if (!def) return;
-  if (!ach.claim(id)) return;
+  if (ach.isClaimed(id)) return;
   const name = label(def);
   // 同一次领取的两腿一次落盘 —— 发了 NEX 没发 $ 是半边账,收据即指令(不再单独 credit*)。
+  // 🔴 顺序 = 先发钱(幂等)→ 后消费资格(2026-08-04 对抗审计 B-P1-3):原来是先 ach.claim(id)
+  // 消费掉,发钱失败就 return —— 成就标记已置、奖归零且**再也领不了**(成就是一次性的)。
+  // ref 本来就是成就 id(天然稳定),换成幂等出口后重放不会重复发。
   const drafts: ReceiptDraft[] = [];
   if (def.rewardNex) drafts.push({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
   if (def.rewardUsdt) drafts.push({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
-  if (drafts.length && postMoneyBills(drafts) !== "ok") return;
+  if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!ach.claim(id)) return; // 消费失败:钱已幂等落定,下次重试命中同一 ref 不会再发
   toast.success(w.value.claimToast);
 }
 
