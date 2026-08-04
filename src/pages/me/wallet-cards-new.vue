@@ -100,8 +100,7 @@ import type { CardBrand } from "@/store/cards-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
 
 const t = useT();
 const cardsStore = useCards();
@@ -187,14 +186,15 @@ function handleBind() {
   // 幂等 — 非首次绑卡 firstTime=false,只出常规绑卡 toast,不重复发奖。
   const quest = useQuest().markComplete("bind_bank_card");
   if (quest.firstTime) {
-    const app = useApp();
-    const bills = useBills();
     const billRef = `QST-${Date.now().toString(36).toUpperCase()}`;
-    if (quest.rewardNex > 0) app.creditNex(quest.rewardNex);
-    if (quest.rewardUsdt > 0) app.creditBalance(quest.rewardUsdt);
-    if (quest.rewardUsdt > 0) bills.add({ type: "bonus", symbol: "USDT", amount: quest.rewardUsdt, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    if (quest.rewardNex > 0) bills.add({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
+    // 同一次任务完成的两腿一次落盘,入账由收据的 amount/symbol 派生(模式同 lib/share.ts)。
+    const drafts: ReceiptDraft[] = [];
+    if (quest.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: quest.rewardUsdt, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (quest.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    // 发奖失败已弹错并还原;绑卡本身已成立,照常回上一页,不把用户卡在表单里。
+    if (!drafts.length || postMoneyBills(drafts) === "ok") {
+      toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
+    }
   } else {
     toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
   }

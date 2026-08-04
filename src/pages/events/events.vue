@@ -3,7 +3,7 @@
 
   Featured hero → segmented tabs (All / Ongoing / Upcoming / Joined / Ended) →
   event cards list → footer note. Trackable events opt into join→claim flow
-  (event-quest store, P-027 reactive Record); claim credits NEX via app store
+  (event-quest store, P-027 reactive Record); claim 走 money-receipt 收口点
   + writes a bill. Decomposed into src/components/events/* (FeaturedHero /
   Card) — each carries its own scroll-grow bar.
 
@@ -71,8 +71,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import { useT } from "@/i18n/use-t";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
@@ -84,8 +83,6 @@ type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed:
 const TABS: TabId[] = ["all", "ongoing", "upcoming", "joined", "ended"];
 
 const t = useT();
-const app = useApp();
-const bills = useBills();
 const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
 
@@ -156,15 +153,14 @@ function handleClaim(ev: EnrichedEvent) {
     if (reward > 0) {
       // MOCK-ONLY NON-ATOMIC: PROD event-claim endpoint TBD must claim, credit,
       // and emit the matching bill in one idempotent transaction.
-      app.creditNex(reward);
-      bills.add({
+      if (postMoneyBill({
         type: "achievement",
         symbol: "NEX",
         amount: reward,
         status: "posted",
         memo: `Event reward · ${ev.id}`,
         ref: `EVENT-${ev.id}-${Date.now().toString(36).toUpperCase()}`,
-      });
+      }) !== "ok") return;
     }
     toast.success(t.value.events.toast.claimedTitle.replace("{n}", reward.toLocaleString()), ev.title);
   }

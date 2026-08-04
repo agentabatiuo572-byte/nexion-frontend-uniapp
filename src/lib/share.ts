@@ -3,7 +3,7 @@
 // 链接构造全站唯一入口(禁页面自拼 nexgrid.ai/ref/);渠道表来自 platform
 // config(运营可调);分享事件 client 记录(server-canonical `share.performed`)。
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
 import { useConfig } from "@/store/config";
 import { useQuest } from "@/store/quest";
 import { toast } from "@/store/ui";
@@ -186,12 +186,11 @@ export function recordShareEvent(channel: string, surface: ShareSurface) {
   const res = useQuest().markComplete("invite_friend");
   if (!res.firstTime) return;
   const t = useT();
-  const app = useApp();
-  const bills = useBills();
-  if (res.rewardNex > 0) app.creditNex(res.rewardNex);
-  if (res.rewardUsdt > 0) app.creditBalance(res.rewardUsdt);
   const ref = `QST-${Date.now().toString(36).toUpperCase()}`;
-  if (res.rewardUsdt > 0) bills.add({ type: "bonus", symbol: "USDT", amount: res.rewardUsdt, status: "posted", memo: t.value.share.questRewardMemo, ref });
-  if (res.rewardNex > 0) bills.add({ type: "bonus", symbol: "NEX", amount: res.rewardNex, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  // 同一次任务完成的两腿一次落盘 —— 入账由收据的 amount/symbol 派生,不再单独 credit*。
+  const drafts: ReceiptDraft[] = [];
+  if (res.rewardUsdt > 0) drafts.push({ type: "bonus", symbol: "USDT", amount: res.rewardUsdt, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  if (res.rewardNex > 0) drafts.push({ type: "bonus", symbol: "NEX", amount: res.rewardNex, status: "posted", memo: t.value.share.questRewardMemo, ref });
+  if (drafts.length && postMoneyBills(drafts) !== "ok") return;
   toast.success(`+${res.rewardNex} NEX · +$${res.rewardUsdt}`, t.value.share.questRewardToast);
 }

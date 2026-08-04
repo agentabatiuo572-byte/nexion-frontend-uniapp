@@ -69,7 +69,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { useAchievements } from "@/store/achievements";
@@ -89,7 +89,6 @@ import { navTo } from "@/lib/route";
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const app = useApp();
-const bills = useBills();
 const wq = useWeeklyQuest();
 const phase = useProductPhase();
 const ach = useAchievements();
@@ -149,8 +148,7 @@ function onClaimRow(q: Tier2QuestDef) {
     // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier2/:id}
     // claims, credits, and bills in one idempotent transaction.
     const amount = rewardOf(q);
-    app.creditNex(amount);
-    bills.add({
+    postMoneyBill({
       type: "achievement",
       symbol: "NEX",
       amount,
@@ -166,15 +164,14 @@ function onClaimBonus() {
     // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{bonus}
     // claims, credits, and bills in one idempotent transaction.
     const amount = Math.round(WEEKLY_BONUS_NEX * mult.value);
-    app.creditNex(amount);
-    bills.add({
+    if (postMoneyBill({
       type: "achievement",
       symbol: "NEX",
       amount,
       status: "posted",
       memo: "Weekly champion bonus",
       ref: `WCHAMPION-${Date.now().toString(36).toUpperCase()}`,
-    });
+    }) !== "ok") return;
     ach.unlock(WEEKLY_CHAMPION_BADGE_ID);
   }
 }

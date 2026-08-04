@@ -9,6 +9,7 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useBills } from "@/store/bills";
+import { postMoneyBill, postReceiptOnly } from "@/lib/money-receipt";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -111,7 +112,9 @@ function reconcileBills() {
     if (!(typeof burned === "number" && burned > 0)) continue;
     if (!app.user.appliedRewardKeys?.["refund-nex:" + wd.id]) continue;
     if (bills.bills.some((b) => b.ref === wd.id && b.symbol === "NEX" && b.amount > 0)) continue;
-    bills.add({
+    // 🔴 补记,**不是**动钱:NEX 已由 refundFailedWithdrawals 退回钱包(幂等键就在上一行的判据里),
+    // 这里只补它缺的那条分录。改成 postMoneyBill 会照着 +burned 再发一次 NEX = 退款翻倍。
+    postReceiptOnly({
       type: "withdraw",
       symbol: "NEX",
       amount: burned,
@@ -274,17 +277,20 @@ function pollMilestones() {
   const lifeToDate = (app.earnings.total ?? 0) + (app.earnings.today ?? 0);
   const step = nextUnfired(lifeToDate, m.firedIds);
   if (!step) return;
-  // Mark first so a slow credit/bill never re-enters the same step next tick.
-  m.markFired(step.id);
-  app.creditNex(step.nexReward);
-  useBills().add({
+  // 收据即指令:+NEX 由这一条落定,不再单独 creditNex(那样钱和账各走各的路)。
+  // 🔴 markFired 从「先标记」挪到落盘成功之后。先标记原本是防同一级被下一 tick 重入,
+  // 但发奖这条链自始至终同步,轮询之间插不进第二次;而「标了 + 没落盘」= 里程碑记成已发、
+  // 钱和账单都没有,用户永久少一级奖励。失败就停在未标记态,下一 tick 自愈重试
+  // (与 reconcileBills 同一套「该做什么从数据推出来」的思路)。
+  if (postMoneyBill({
     type: "achievement",
     symbol: "NEX",
     amount: step.nexReward,
     status: "posted",
     memo: `Earnings milestone · $${step.thresholdUSD}`,
     ref: `MILESTONE-${step.id}`,
-  });
+  }) !== "ok") return;
+  m.markFired(step.id);
   // Drive the global celebration overlay (label lets it resolve i18n copy).
   m.show({
     id: step.id,
