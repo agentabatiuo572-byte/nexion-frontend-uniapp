@@ -184,7 +184,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 
@@ -222,7 +222,6 @@ const TOP_STREAKERS = [
 const t = useT();
 const faucet = useNexFaucet();
 const app = useApp();
-const bills = useBills();
 const luckySpin = useLuckySpin();
 
 // Per-second tick for the countdown.
@@ -314,8 +313,7 @@ function handleCheckIn() {
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
   // (store never imports app). MOCK-ONLY NON-ATOMIC: PROD POST /api/faucet/sign-in
   // atomically grants NEX and emits the matching bill in one idempotent transaction.
-  app.creditNex(r.gained);
-  bills.add({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` });
+  if (postMoneyBill({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` }) !== "ok") return;
   try {
     uni.vibrateShort({ fail: () => {} });
   } catch {
@@ -354,13 +352,15 @@ function handleClaimMilestone(m: Milestone) {
     // MOCK-ONLY NON-ATOMIC: PROD milestone-claim endpoint TBD must atomically
     // grant the reward and emit the matching bill in one idempotent transaction.
     const ref = `STREAK-D${m.day}-${Date.now().toString(36).toUpperCase()}`;
-    if (m.reward.type === "usdt") {
-      app.creditBalance(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "USDT", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
-    } else {
-      app.creditNex(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "NEX", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
-    }
+    // 收据即指令:symbol 决定入哪种币;失败时资金已还原、账上无记录,不再往下报成功。
+    if (postMoneyBill({
+      type: "bonus",
+      symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
+      amount: m.reward.amount,
+      status: "posted",
+      memo: `Streak milestone · Day-${m.day}`,
+      ref,
+    }) !== "ok") return;
   }
   // Day-30 "spin" milestone grants a bonus Lucky Spin ticket + opens the wheel.
   if (m.reward.type === "spin") {

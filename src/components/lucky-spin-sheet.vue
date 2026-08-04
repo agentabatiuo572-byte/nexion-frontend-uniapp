@@ -6,8 +6,8 @@
                                 (animates between two wheelAngle values; no
                                  keyframe needed) + @transitionend settle
     · lucide X/Sparkles/Gift/ChevronRight/Ticket/History → inline <svg>
-    · zustand store           → useLuckySpin (Pinia); payout composes
-                                useApp / useBills in this component
+    · zustand store           → useLuckySpin (Pinia); payout 走 lib/money-receipt
+                                收口点(资金与账单同生共死),不在这里各调各的
                                 (stores never import each other).
   Entry points (orchestrator wires triggers):
     ① /events evt-spring-spin "Spin now" (kind === "wheel") → openSheet()
@@ -153,8 +153,7 @@ import {
   SEGMENT_COUNT,
   type SpinPrize,
 } from "@/store/lucky-spin";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { mockServerNow } from "@/store/server-time";
 import { toast, confirm, netError } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -167,8 +166,6 @@ const SEG = 360 / SEGMENT_COUNT;
 const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实裁决)
 
 const spin = useLuckySpin();
-const app = useApp();
-const bills = useBills();
 const t = useT();
 
 const poolOpen = ref(false);
@@ -280,12 +277,9 @@ const spinBtnStyle = computed<CSSProperties>(() => ({
 function creditPrize(sp: SpinPrize) {
   const ref = `LSPIN-${sp.id}-${mockServerNow().toString(36)}`;
   const memo = fmt(t.value.luckySpin.billMemo, { prize: ls(sp) });
-  if (sp.kind === "nex") {
-    app.creditNex(sp.amount);
-    bills.add({ type: "bonus", symbol: "NEX", amount: sp.amount, status: "posted", memo, ref });
-  } else if (sp.kind === "usdt") {
-    app.creditBalance(sp.amount);
-    bills.add({ type: "bonus", symbol: "USDT", amount: sp.amount, status: "posted", memo, ref });
+  if (sp.kind === "nex" || sp.kind === "usdt") {
+    // 收据即指令:symbol 决定入哪种币,派奖与账单同生共死。
+    postMoneyBill({ type: "bonus", symbol: sp.kind === "nex" ? "NEX" : "USDT", amount: sp.amount, status: "posted", memo, ref });
   }
   // coupon: 购机抵扣券 — 记入转盘中奖历史(store.history,持久化),不入钱包余额
   // (对齐"仅抵购机款不可提现")。原型未建券兑换流;真后台落 coupon 账本 + 结账抵扣。

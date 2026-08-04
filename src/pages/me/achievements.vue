@@ -2,7 +2,7 @@
   Achievements (ported from Nexion-prototype/app/(main)/me/achievements/page.tsx).
   Progress hero + categorized list with unlock state, reward + claim button.
   Unlock conditions auto-evaluate on mount against live app store. Cross-store
-  claim orchestration (creditNex/creditBalance + bills.add) lives in the handler.
+  claim orchestration 走 postMoneyBills 收口点(资金与账单同生共死),仍在 handler 里。
   Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -83,7 +83,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
 import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
@@ -91,7 +91,6 @@ import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/m
 const t = useT();
 const w = computed(() => t.value.achievements);
 const app = useApp();
-const bills = useBills();
 const ach = useAchievements();
 
 const CAT_COLOR: Record<AchievementCategory, string> = {
@@ -187,14 +186,11 @@ function handleClaim(id: string) {
   if (!def) return;
   if (!ach.claim(id)) return;
   const name = label(def);
-  if (def.rewardNex) {
-    app.creditNex(def.rewardNex);
-    bills.add({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
-  }
-  if (def.rewardUsdt) {
-    app.creditBalance(def.rewardUsdt);
-    bills.add({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
-  }
+  // 同一次领取的两腿一次落盘 —— 发了 NEX 没发 $ 是半边账,收据即指令(不再单独 credit*)。
+  const drafts: ReceiptDraft[] = [];
+  if (def.rewardNex) drafts.push({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
+  if (def.rewardUsdt) drafts.push({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
+  if (drafts.length && postMoneyBills(drafts) !== "ok") return;
   toast.success(w.value.claimToast);
 }
 

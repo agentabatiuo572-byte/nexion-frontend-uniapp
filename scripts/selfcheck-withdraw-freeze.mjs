@@ -206,12 +206,17 @@ const { useBills } = await loadStore("bills.ts");
   if (anchor < 0) throw new Error("selfcheck-withdraw-freeze: App.vue 里找不到 ②b NEX 退还反向分录段");
   const loopSrc = grabBlock(appVueRaw.slice(anchor), "for (const wd of app.withdrawals)");
   // eslint-disable-next-line no-new-func — 同上,执行的是正主原文
-  const reconcileNexRefund = new Function("app", "bills", loopSrc);
+  const reconcileNexRefund = new Function("app", "bills", "postReceiptOnly", loopSrc);
 
   const store = useBills();
   store.seed();
   // pinia 在 store 代理上解包 ref;stub 不解包,这里补上同一层语义(否则测的不是页面看到的形状)。
   const bills = { get bills() { return store.bills.value; }, add: store.add };
+  // ②b 段 2026-08-04 起走收口点 postReceiptOnly(钱已由 refundFailedWithdrawals 退回、
+  // 不可回滚,这里只补那条缺的分录)。替身与 lib/money-receipt.ts 同契约:写一行 + 返回是否落盘。
+  // 收口点自身的失败处置(报错不静默)归 selfcheck-money-receipt ④;本门只管这段对账逻辑
+  // **写出来的分录**对不对 —— 两道门各守一段,不互相顶替。
+  const postReceiptOnly = (draft) => !!bills.add(draft);
   const ID = "WD-20260804-1234";
   const app = {
     withdrawals: [{ id: ID, status: "tx-failed", amount: 50, fee: { networkConfirmUsd: 1, nexBurned: 3, actualFeeUsd: 0 } }],
@@ -224,11 +229,11 @@ const { useBills } = await loadStore("bills.ts");
   bills.add({ type: "withdraw", symbol: "NEX", amount: -3, status: "posted", memo: "burn", ref: ID });
   check("⑥ 起点:账单里只有 −3 NEX 一行,净和 −3(钱包已扣)", nexRows().length === 1 && nexNet() === -3);
 
-  reconcileNexRefund(app, bills);
+  reconcileNexRefund(app, bills, postReceiptOnly);
   check("⑥ 退款幂等键未落 → 不抢跑记账(账单不得先于余额宣布退款)", nexRows().length === 1 && nexNet() === -3);
 
   app.user.appliedRewardKeys["refund-nex:" + ID] = true;   // store 真退了 NEX
-  reconcileNexRefund(app, bills);
+  reconcileNexRefund(app, bills, postReceiptOnly);
   const refundRow = nexRows().find((b) => b.amount > 0);
   check("⑥ 退款落盘 → 补一条 +3 NEX 反向分录(type/status/ref 与燃烧行同族)",
     !!refundRow && refundRow.amount === 3 && refundRow.status === "posted"
@@ -238,8 +243,8 @@ const { useBills } = await loadStore("bills.ts");
   check("⑥ 燃烧行仍是 posted(既成事实不改写,冲正靠反向分录)",
     nexRows().find((b) => b.amount < 0)?.status === "posted");
 
-  reconcileNexRefund(app, bills);
-  reconcileNexRefund(app, bills);
+  reconcileNexRefund(app, bills, postReceiptOnly);
+  reconcileNexRefund(app, bills, postReceiptOnly);
   check("⑥ 幂等:再跑 2 轮不重复补(判据 = 同单号已有正向 NEX 行)", nexRows().length === 2 && nexNet() === 0);
 
   // 没开抵扣的单(nexBurned 缺失 / 0)与历史纯数字 fee:一条都不许补
@@ -249,7 +254,7 @@ const { useBills } = await loadStore("bills.ts");
     { id: "WD-legacy-0001", status: "tx-failed", amount: 10, fee: 1 },
   );
   app.user.appliedRewardKeys["refund-nex:" + ID2] = true;
-  reconcileNexRefund(app, bills);
+  reconcileNexRefund(app, bills, postReceiptOnly);
   check("⑥ 没烧过 NEX 的单 + 历史纯数字 fee 的单:0 条反向分录(不凭空发币)",
     bills.bills.filter((b) => b.amount > 0 && (b.ref === ID2 || b.ref === "WD-legacy-0001")).length === 0);
 

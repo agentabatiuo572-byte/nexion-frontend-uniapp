@@ -106,21 +106,38 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
 // ── ① 分离证明(奖励侧):App.vue pollMilestones 里 credit/bill 无条件,
 //     不许接路由门或 stopMilestonePoll(那会变成「钱链路期间不发奖励」)。──
 {
-  const appSrc = readFileSync(path.join(root, "src", "App.vue"), "utf8");
+  // 🔴 判代码不判散文:整段行注释先剥掉再 indexOf。不剥的话注释两头都能骗它 ——
+  // 写一句「不再单独 creditNex」会被当成真的调了 creditNex 判红(假红),
+  // 而写一句「// postMoneyBill」又能让顺序断言凭空变绿(假绿)。与 selfcheck-money-receipt
+  // 的 strip 同口径:只剥整行 //(行尾注释里可能藏 https:// 这类内容,不碰)。
+  const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  const appSrc = stripComments(readFileSync(path.join(root, "src", "App.vue"), "utf8"));
   const start = appSrc.indexOf("function pollMilestones()");
   const end = appSrc.indexOf("function startMilestonePoll()");
   const bodyFound = start !== -1 && end !== -1 && end > start;
   check("① App.vue 里 pollMilestones 函数体可定位(分离证明的前提)", bodyFound, `start=${start} end=${end}`);
   if (bodyFound) {
     const body = appSrc.slice(start, end);
+    // 🔴 2026-08-04 组合更新:「markFired → creditNex → bills.add → show」
+    //   → 「postMoneyBill(资金 ⊗ 收据,一次提交)→ markFired → show」。两处都不是风格改动:
+    //   ① 资金与账单拆成两步时,bills.add 写不进去**返回 null 且不抛异常**、没人接 ——
+    //      于是发了 NEX、弹了庆祝,账单页查无此单(R4「钱动了、账没记上」缺陷族);
+    //   ② markFired 原本排在最前面防重入,但这条链自始至终同步、轮询之间插不进第二次,
+    //      而「标了 + 没落盘」= 里程碑记成已发、钱和账都没有,用户永久少一级奖励。
+    //      改成落盘成功才标记,失败停在未标记态、下一 tick 自愈重试。
+    //   本门守的是「奖励侧无条件执行」这条不变量,顺序断言随实现更新,但只许更严不许更松。
+    const iPost = body.indexOf("postMoneyBill(");
     const iMark = body.indexOf("markFired");
-    const iCredit = body.indexOf("creditNex");
-    const iBill = body.indexOf(".add(");
     const iShow = body.indexOf(".show(");
-    check("① 组合完整且有序:markFired → creditNex → bills.add → show(4/4 步齐)",
-      iMark !== -1 && iCredit !== -1 && iBill !== -1 && iShow !== -1 &&
-        iMark < iCredit && iCredit < iBill && iBill < iShow,
-      `idx mark=${iMark} credit=${iCredit} bill=${iBill} show=${iShow}`);
+    const iGuard = body.indexOf('!== "ok"');
+    check("① 组合完整且有序:postMoneyBill → markFired → show(3/3 步齐)",
+      iPost !== -1 && iMark !== -1 && iShow !== -1 && iPost < iMark && iMark < iShow,
+      `idx post=${iPost} mark=${iMark} show=${iShow}`);
+    check("① 🔴 资金与收据不许拆开:体内无裸 creditNex / bills.add(拆开就是发了 NEX 却查无此单)",
+      body.indexOf("creditNex") === -1 && body.indexOf(".add(") === -1,
+      `creditNex=${body.indexOf("creditNex")} add=${body.indexOf(".add(")}`);
+    check("① 🔴 收口点返回值被判定(丢弃返回值 = 落盘失败照样标记已发、照样弹庆祝)",
+      iGuard !== -1 && iGuard > iPost && iGuard < iMark, `guard=${iGuard}`);
     check("① 奖励侧不接 UI 路由门:pollMilestones 体内无 isMoneyFlowRoute 调用",
       body.indexOf("isMoneyFlowRoute") === -1);
     check("① 奖励侧不接停轮询机制:pollMilestones 体内无 stopMilestonePoll 调用",

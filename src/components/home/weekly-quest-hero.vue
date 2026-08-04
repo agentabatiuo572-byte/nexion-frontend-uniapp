@@ -7,8 +7,9 @@
   Phase reward multiplier applies for display only; phase id never surfaced.
 
   Cross-store orchestration lives in the click handler (stores don't import each
-  other): claim = wq.claimTier1() + app.creditNex/creditBalance + bills.add +
-  achievements.unlock. navTo() maps the quest's logical href to a uni route.
+  other): claim = wq.claimTier1() + postMoneyBills(奖励分录) + achievements.unlock。
+  资金变更由收据的 amount/symbol 派生,不再单独调 creditNex/creditBalance。
+  navTo() maps the quest's logical href to a uni route.
 -->
 <template>
   <view v-if="visible" class="mt-3">
@@ -69,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBills, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVRank } from "@/store/v-rank";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -87,7 +88,6 @@ const vRank = useVRank();
 const phase = useProductPhase();
 const wq = useWeeklyQuest();
 const ach = useAchievements();
-const bills = useBills();
 const mounted = ref(false);
 
 onMounted(() => {
@@ -160,12 +160,14 @@ function onClaim() {
     // claims, credits, and bills in one idempotent transaction.
     const r = reward.value;
     const refId = `WQUEST-${q.id}-${Date.now().toString(36).toUpperCase()}`;
-    app.creditNex(r);
-    bills.add({ type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
+    // 同一次领取的两腿一次落盘:发了 NEX 却没发 $(或反过来)是半边账,比整笔没发更难对。
+    const drafts: ReceiptDraft[] = [
+      { type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId },
+    ];
     if (q.rewardUsdt) {
-      app.creditBalance(q.rewardUsdt);
-      bills.add({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
+      drafts.push({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
     }
+    if (postMoneyBills(drafts) !== "ok") return;
     if (q.badgeId) ach.unlock(q.badgeId);
   }
 }
