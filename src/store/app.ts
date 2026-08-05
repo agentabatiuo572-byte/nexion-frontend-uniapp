@@ -188,9 +188,9 @@ function createInitialEarnings(): EarningsState {
 // (51.2k jobs/hr global ⇒ ~5–6 min median job at this concurrency).
 const ACTIVE_JOBS_SEED = 4812;
 
-function createInitialGlobal(): GlobalStats {
+function createInitialGlobal(onlineBaseline: number): GlobalStats {
   return {
-    activeDevices: FLEET_DEVICES,
+    activeDevices: onlineBaseline,
     nodes: 156,
     countries: 47,
     uptime: 99.7,
@@ -321,7 +321,24 @@ export const useApp = defineStore("app", () => {
   const user = ref<UserState>(bootSnapshot.user);
   const devices = ref<Device[]>(bootSnapshot.devices);
   const earnings = ref<EarningsState>(bootSnapshot.earnings);
-  const global = ref<GlobalStats>(createInitialGlobal());
+  // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
+  //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
+  //   配置非法时回退编译期锚 —— 全局条不许因单个参数坏而冻结(异常3 的「单项坏不拖垮」);
+  //   首页脉搏卡的「该格占位」判定读配置本体,不读这里的回退值,两层各管各的。
+  const cfg = useConfig();
+  //   ⚠️ publicStats 整段可能缺席:若干机器门用最小配置桩装载本 store(邀请码门实测炸在这),
+  //   老持久行升级期同理 —— 缺席按「配置未知」走编译期锚回退,不许在 setup 期抛。
+  const pulseOnlineBaseline = (): number => {
+    const ps = cfg.config.publicStats;
+    if (!ps) return FLEET_DEVICES;
+    const v = Math.round(ps.fleetDevices * (ps.onlineRatePct / 100));
+    return Number.isFinite(v) && v > 0 ? v : FLEET_DEVICES;
+  };
+  const pulseJitterBand = (): number => {
+    const j = cfg.config.publicStats?.onlineJitter;
+    return Number.isFinite(j) && j >= 0 ? (j as number) : 24;
+  };
+  const global = ref<GlobalStats>(createInitialGlobal(pulseOnlineBaseline()));
   /**
    * 🔴 提现单**列表**是源真理(与真后端 GET /api/withdrawals 同构)。
    * 此前只存最新一条,第二笔建单会把第一笔整个顶掉 —— 钱已扣、单据不可达、
@@ -351,7 +368,7 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
-  const cfg = useConfig();
+  // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
   const slotDevices = computed(() =>
     computeShareEnabled.value ? devices.value : devices.value.filter((d) => d.kind !== "pc-gpu"),
@@ -469,9 +486,12 @@ export const useApp = defineStore("app", () => {
     const devDrift = Math.random();
     const nextDevices = global.value.activeDevices + (devDrift > 0.8 ? 1 : devDrift < 0.2 ? -1 : 0);
     const nextJobs = global.value.activeJobs + Math.floor(Math.random() * 5) - 2;
+    // 呼吸带跟配置走(运营改了舰队/在线率/抖幅,已开着的会话在带内自然漂过去)
+    const devBase = pulseOnlineBaseline();
+    const devBand = pulseJitterBand();
     global.value = {
       ...global.value,
-      activeDevices: Math.min(FLEET_DEVICES + 24, Math.max(FLEET_DEVICES - 24, nextDevices)),
+      activeDevices: Math.min(devBase + devBand, Math.max(devBase - devBand, nextDevices)),
       activeJobs: Math.min(ACTIVE_JOBS_SEED + 36, Math.max(ACTIVE_JOBS_SEED - 36, nextJobs)),
     };
     if (miningPaused.value) return;

@@ -21,6 +21,21 @@ export const DAILY_PAYOUT_USD = FLEET_DEVICES * FLEET_AVG_DAILY_USD;
 /** ≈ $7.9/sec — live rate displays wobble around this, never accumulate. */
 export const PAYOUT_PER_SEC_USD = DAILY_PAYOUT_USD / 86_400;
 
+/**
+ * 注册用户展示值:从锚点按月增速**推算**,不累加、不回退(规格 FEAT-HOME02 ③,
+ * 与上面 PAYOUT 同范式)。刷新页面得到同一时刻同一值;运营改基数即重置锚点。
+ * 🔴 它同时是排名分母里的「真实人口」—— 首页第一格与第三格必须用同一次派生,
+ * 两处各算一份就会出现「注册 1.42M 人、你排 1.5M 名」这种自相矛盾。
+ */
+export function derivedRegisteredUsers(
+  ps: { registeredUsersBase: number; registeredUsersMonthlyGrowthPct: number; registeredUsersAnchorAt: number },
+  now: number,
+): number {
+  const months = Math.max(0, (now - ps.registeredUsersAnchorAt) / (30 * 24 * 3_600_000));
+  const v = ps.registeredUsersBase * Math.pow(1 + ps.registeredUsersMonthlyGrowthPct / 100, months);
+  return Number.isFinite(v) ? Math.floor(v) : Number.NaN;
+}
+
 /** ≈ $20.5M — the "this month" round expression (30-day anchor month). */
 export const MONTHLY_PAYOUT_USD = DAILY_PAYOUT_USD * 30;
 

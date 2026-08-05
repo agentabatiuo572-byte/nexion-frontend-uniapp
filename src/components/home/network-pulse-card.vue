@@ -1,9 +1,6 @@
 <!--
-  NetworkPulseCard — ZONE 2 global-grid live metrics (ported from
-  mission-control.tsx NetworkPulseCard). Header + live $/sec (platform anchor ±
-  wobble) + 2×2 metric grid (label · value · sub · sparkline). Money/fleet
-  values derive from src/lib/platform-stats.ts + store fleet count (single
-  anchor); subs are dense mock stat strings.
+  NetworkPulseCard — ZONE 2 global-grid metrics(规格 FEAT-HOME02)。
+  三格:注册用户 / 在线设备 / 你的排名 —— 全部由展示配置与真实派生驱动,零写死值。
 -->
 <template>
   <view>
@@ -18,28 +15,44 @@
           <PulseDot color="var(--v5-tech-cyan)" />
           <text>{{ t.home.networkGlobalGrid }}</text>
         </view>
-        <!-- 🔴 实时支付流数字已删(FEAT-HOME02 定案):它与「今日支付」是同一笔钱的两种表达
-             (每秒值 × 86400 = 日支付额),主人 2026-07-31 拍板两处一并删。
-             首页脉搏板块自此不披露任何平台支付规模,只讲用户规模、设备规模与个人位次。
-             条头保留左侧「全球算力网 + 脉冲点」作为实时标记,右侧留空不补别的数字。 -->
+        <!-- 条头右侧刻意留空:实时支付流数字已删(FEAT-HOME02 定案,与「今日支付」同一笔钱两种表达)。 -->
       </view>
 
       <view class="grid grid-cols-3">
-        <!-- 横向 padding 14 → 12:①《03》§1 8pt grid(14 不在阶梯,12=space-3)
-             ②腾出 4px,修 h3 20px 指标值(如 #18,742)撑破容器 2px 的溢出 -->
         <view
           v-for="(m, i) in metrics"
           :key="m.k"
           class="grid items-center gap-2"
+          :class="m.tap ? 'active:opacity-70' : ''"
           :style="{ gridTemplateColumns: '1fr', padding: '12px', borderRight: i < metrics.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
+          v-on="m.tap ? { click: m.tap } : {}"
         >
           <view class="min-w-0">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.k }}</text>
-            <text class="block mt-0.5 tabular-nums" :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '20px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }">{{ m.v }}</text>
-            <text class="block mt-1 font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-4)">{{ m.sub }}</text>
+            <!-- 骨架条:配置重拉中(<300ms 不闪由 store 合成延迟保证,mock 期只在「重试」后可见) -->
+            <view v-if="m.skeleton" class="mt-1.5" style="height: 18px; width: 72%; border-radius: 6px; background: var(--v5-surface-3)" />
+            <text
+              v-else
+              class="block mt-0.5 tabular-nums"
+              :style="{ fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: m.vSize ?? '20px', color: m.tone, letterSpacing: '-0.014em', lineHeight: 1.05, whiteSpace: 'nowrap' }"
+            >{{ m.v }}</text>
+            <!-- 可点副行(未上榜引导 CTA)才挂监听 + active 反馈;纯展示副行零监听 ——
+                 无条件挂 handler 会让 tap-feedback 探针把不可点的格也计为 tap 目标(P-059 同轮抓的)。
+                 热区:负 margin 抵消的 padding 把可点面拉到 ≥40px,视觉不变。 -->
+            <text
+              v-if="m.subTap"
+              class="block mt-1 font-mono-tabular truncate active:opacity-70"
+              :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)', padding: '14px 0', margin: '-14px 0' }"
+              @click.stop="m.subTap()"
+            >{{ m.sub }}</text>
+            <text
+              v-else
+              class="block mt-1 font-mono-tabular truncate"
+              :style="{ fontSize: '12px', color: m.subTone ?? 'var(--v5-ink-4)' }"
+            >{{ m.sub }}</text>
           </view>
           <view style="height: 32px">
-            <HomeSparkline :data="m.data" :color="m.color" :height="32" />
+            <HomeSparkline v-if="m.data" :data="m.data" :color="m.color" :height="32" />
           </view>
         </view>
       </view>
@@ -48,33 +61,149 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useT } from "@/i18n/use-t";
+import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
+import { useRankSnapshot } from "@/store/rank-snapshot";
+import { computeRank } from "@/lib/network-rank";
+import { derivedRegisteredUsers } from "@/lib/platform-stats";
+import { toast } from "@/store/ui";
+import { navTo } from "@/lib/route";
 import PulseDot from "./pulse-dot.vue";
 import HomeSparkline from "./home-sparkline.vue";
 
 const t = useT();
 const app = useApp();
+const cfg = useConfig();
+const snap = useRankSnapshot();
 
-// 🔴 「今日支付」格与条头每秒支付流**一并删除**(FEAT-HOME02 定案,主人 2026-07-31 拍板):
-//   两者是同一笔钱的两种表达(每秒值 × 86400 = 日支付额)。首页脉搏自此不披露平台支付规模。
-//
-// 🔴 **平台日支付锚本身不得删** —— 介绍页 / 信任页 / 全球网格 / 分享海报 / 商城种子
-//   仍在从它派生;连锚一起删会造成全站数字坍塌。这里只是不再**展示**它。
-//   `platform_stats_anchor` 哨兵原本要求本文件必须消费日支付锚那个符号,删展示后判据不再成立 ——
-//   已按规格要求**调整判据而非放宽哨兵**(改判见 verify.sh 该门 (3b) 段注释)。
-//
-// 🔴 **注意:本文件里不许再出现那几个符号名,连注释里也不行** —— 哨兵扫全文,
-//   不区分代码与注释。今天已经在三个不同文件上踩到同一个形态(接口路径 / 舰队数字 / 本处),
-//   所以这里刻意用中文描述而不写符号名。
+// 时间锚:进场取一次,onShow 由首页下拉刷新链路带动重渲(排名禁缓存,但也不该每秒重算 ——
+// 分位表与算力在秒级都不变;真正的秒级时钟属于创世倒计时那类,不属于这里)。
+const nowTs = ref(Date.now());
+onMounted(() => { nowTs.value = Date.now(); });
 
-const metrics = computed(() => [
-  { k: t.value.home.networkMembers, v: "1.42M", sub: "registered · +2.9% /mo", tone: "var(--v5-ink)", data: [1.38, 1.39, 1.4, 1.4, 1.41, 1.41, 1.42, 1.42], color: "var(--v5-brand)" },
-  { k: t.value.home.networkDevices, v: app.global.activeDevices.toLocaleString(), sub: "live · 51.2k jobs/hr", tone: "var(--v5-ink)", data: [27.8, 27.9, 28.0, 28.1, 28.1, 28.2, 28.3, 28.4], color: "var(--v5-tech-cyan-ink)" },
-  // ⏳ 排名格仍是写死值,**下一增量**接真实派生(lib/network-rank.ts 已就位并有机器门):
-  //    myTotalHashrate → 百分位 → 名次;零算力显示「未上榜」。需要新增三语文案键,
-  //    而 i18n 文件此刻正被独立验收读取(冻结中),故本增量先不动它。
-  { k: t.value.home.networkYourRank, v: "#18,742", sub: "↑ 12 in 24h", tone: "var(--v5-brand)", data: [-19, -19, -19, -18.9, -18.9, -18.85, -18.8, -18.74], color: "var(--v5-brand)" },
-]);
+/** 紧凑缩写(规格异常6):超长数字不撑破 89.3px 值槽,不换行断字。 */
+function compact(n: number): string {
+  if (!Number.isFinite(n)) return "";
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 100_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+/** 装饰性走势(确定性,从当前值倒推 8 点缓坡;不声称历史数据,只是视觉纹理)。 */
+const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i * 0.0004));
+
+// ── 格 1:注册用户(基数按月增速从锚点推算;派生值同时是排名分母的真实人口)──
+const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats, nowTs.value));
+// ── 格 3:名次(每次渲染由当下算力 + 当下配置现算,禁缓存名次)──
+const rank = computed(() =>
+  computeRank({
+    myTotalHashrate: app.myTotalHashrateAt(nowTs.value),
+    table: cfg.config.publicStats.hashratePercentileTable,
+    realPopulation: registered.value,
+    virtualPopulation: cfg.config.publicStats.virtualUserCount,
+  }),
+);
+const rankDelta = computed(() => {
+  const r = rank.value;
+  return r.kind === "ranked" ? snap.deltaFor(r.rank, nowTs.value) : null;
+});
+
+interface Cell {
+  k: string;
+  v: string;
+  vSize?: string;
+  tone: string;
+  sub: string;
+  subTone?: string;
+  data?: number[] | null;
+  color?: string;
+  skeleton: boolean;
+  tap?: () => void;
+  subTap?: () => void;
+}
+
+/** 配置失败的占位格(规格异常2:骨架→「数据更新中」+ 重试;禁回退写死数字)。 */
+function placeholderCell(label: string): Cell {
+  return {
+    k: label,
+    v: t.value.home.networkStatUpdating,
+    vSize: "12.5px",
+    tone: "var(--v5-ink-3)",
+    sub: t.value.home.networkStatRetry,
+    subTone: "var(--v5-tech-cyan-ink)",
+    data: null,
+    skeleton: cfg.loading,
+    tap: () => { void cfg.load(); },
+  };
+}
+
+const metrics = computed<Cell[]>(() => {
+  const ps = cfg.config.publicStats;
+  const failed = cfg.syncFailed;
+
+  // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
+  const membersBad = failed || !Number.isFinite(registered.value) || registered.value < 0;
+  const members: Cell = membersBad
+    ? placeholderCell(t.value.home.networkMembers)
+    : {
+        k: t.value.home.networkMembers,
+        v: compact(registered.value),
+        tone: "var(--v5-ink)",
+        sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
+        data: ramp(registered.value),
+        color: "var(--v5-brand)",
+        skeleton: cfg.loading,
+      };
+
+  // 格 2 在线设备 —— 值来自 store 的呼吸态(基线与带宽都由配置驱动,见 app.ts)
+  const devicesBad = failed || !Number.isFinite(ps.fleetDevices) || ps.fleetDevices <= 0;
+  const devices: Cell = devicesBad
+    ? placeholderCell(t.value.home.networkDevices)
+    : {
+        k: t.value.home.networkDevices,
+        v: compact(app.global.activeDevices),
+        tone: "var(--v5-ink)",
+        sub: t.value.home.networkDevicesSub,
+        data: ramp(app.global.activeDevices),
+        color: "var(--v5-tech-cyan-ink)",
+        skeleton: cfg.loading,
+      };
+
+  // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2)
+  const r = rank.value;
+  let rankCell: Cell;
+  if (failed || r.kind === "unavailable") {
+    rankCell = placeholderCell(t.value.home.networkYourRank);
+  } else if (r.kind === "unranked") {
+    rankCell = {
+      k: t.value.home.networkYourRank,
+      // 未上榜整态降档(槽位契约:vi 全称 20px 放不下,≤12px 才进 89.3px 槽 —— 见 en.ts 注)
+      v: t.value.home.networkRankUnranked,
+      vSize: "12.5px",
+      tone: "var(--v5-ink-2)",
+      sub: t.value.home.networkRankUnrankedHint,
+      subTone: "var(--v5-brand)",
+      data: null,
+      skeleton: cfg.loading,
+      tap: () => toast.info(t.value.home.networkRankTipUnranked),
+      subTap: () => navTo("/store"), // 引导整条即 CTA(规格 ⑥:设备/商城既有入口)
+    };
+  } else {
+    rankCell = {
+      k: t.value.home.networkYourRank,
+      v: `#${compact(r.rank)}`,
+      tone: "var(--v5-brand)",
+      sub: rankDelta.value !== null ? fmt(t.value.home.networkRankUp24h, { n: rankDelta.value }) : "",
+      // 名次越小越好:走势画成向下缓坡(视觉「在前进」),数据仍是确定性装饰
+      data: Array.from({ length: 8 }, (_, i) => -r.rank * (1 + (7 - i) * 0.0004)),
+      color: "var(--v5-brand)",
+      skeleton: cfg.loading,
+      tap: () => toast.info(t.value.home.networkRankTipRanked),
+    };
+  }
+
+  return [members, devices, rankCell];
+});
 </script>

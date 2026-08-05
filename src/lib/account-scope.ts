@@ -31,6 +31,7 @@ import { useRewardsSeen } from "@/store/rewards-seen";
 import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
+import { useRankSnapshot } from "@/store/rank-snapshot";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -67,6 +68,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useWalletPairing().bindAccount(accountKey);
   useQuest().bindAccount(accountKey);
   useWeeklyQuest().bindAccount(accountKey);
+  useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useEventQuest().bindAccount(accountKey);
   useMilestones().bindAccount(accountKey);
   useAchievements().bindAccount(accountKey);

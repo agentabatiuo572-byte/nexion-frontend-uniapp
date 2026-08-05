@@ -45,6 +45,7 @@ const LEDGER = {
   "GET /api/account/sessions": "PRD §4.7",
   "POST /api/account/sessions/:id/revoke": "PRD §4.7",
   "POST /api/me/password": "TBD: PRD §4.6.5 用 POST /api/auth/password/change;本处为旧候选名,接后台时以 auth 为准",
+  "GET /api/pulse/rank-snapshot": "TBD: PRD 未定义 —— 包 G 排名 24h 快照的候选名(rank-snapshot.ts 注释已标 TBD),PRD 同步时定名",
   "/api/me/*": "PRD §12.2(自身档案读写族,非单一 endpoint)",
 
   // ── config(server-canonical 业务参数)──────────────────────────────
