@@ -2706,6 +2706,7 @@ export const zh: Messages = {
       achFirstContribution: "成就 · 首次贡献算力",
       achFirstDollar: "成就 · 赚到第一美元",
       kycVerify: "验证返还(历史)",
+      legacyRebindRefund: "验证转账返还(流程已下线)",
       topupTrc20: "充值 · USDT-TRC20",
       withdrawTrc20: "提现 · USDT-TRC20",
       withdrawNexRefund: "手续费抵扣退还 · 退回 {nex} NEX",

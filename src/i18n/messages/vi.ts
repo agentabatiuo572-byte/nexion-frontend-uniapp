@@ -2635,7 +2635,7 @@ export const vi: Messages = {
       "Ngay khi bạn gửi lệnh, cả hai số dư trong ví được cập nhật tức thì. Không phải chờ đợi — khoản tiền đã thuộc về bạn.",
     s3Title: "Bảo vệ bằng hạn mức ngày",
     s3Intro:
-      "Để bảo vệ người dùng và nền tảng, quy đổi có sẵn các hạn mức tăng dần theo cấp xác minh của bạn.",
+      "Để bảo vệ người dùng và nền tảng, quy đổi có sẵn hạn mức ngày minh bạch.",
     lim1Label: "Hạn mức mỗi người · $50/ngày",
     lim1Body:
       "Mỗi tài khoản có thể quy đổi tối đa $50 giá trị mỗi ngày (đặt lại lúc 00:00 UTC). Nhằm ngăn một người dùng làm biến động thị trường.",
@@ -2680,6 +2680,7 @@ export const vi: Messages = {
       achFirstContribution: "Thành tựu · Lần đóng góp đầu tiên",
       achFirstDollar: "Thành tựu · Đô-la đầu tiên",
       kycVerify: "Hoàn tiền xác minh (cũ)",
+      legacyRebindRefund: "Hoàn tiền chuyển khoản xác minh (quy trình đã ngừng)",
       topupTrc20: "Nạp tiền · USDT-TRC20",
       withdrawTrc20: "Rút tiền · USDT-TRC20",
       withdrawNexRefund: "Hoàn bù phí · trả lại {nex} NEX",

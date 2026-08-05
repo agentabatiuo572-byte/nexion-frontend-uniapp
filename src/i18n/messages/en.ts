@@ -2718,7 +2718,7 @@ export const en = {
       "Once submitted, both balances update in your wallet on the next frame. No waiting period — the funds are yours.",
     s3Title: "Daily limit protection",
     s3Intro:
-      "To protect users and the platform, exchanges have built-in caps that scale with your verification level.",
+      "To protect users and the platform, exchanges have built-in transparent daily caps.",
     lim1Label: "Per-user daily cap · $50/day",
     lim1Body:
       "Each individual account can exchange up to $50 of value per calendar day (resets 00:00 UTC). Designed to keep one user from moving the market.",
@@ -2763,6 +2763,7 @@ export const en = {
       achFirstContribution: "Achievement · First Contribution",
       achFirstDollar: "Achievement · First Dollar",
       kycVerify: "Verification refund (legacy)",
+      legacyRebindRefund: "Verification transfer refund (flow retired)",
       topupTrc20: "Top-up · USDT-TRC20",
       withdrawTrc20: "Withdrawal · USDT-TRC20",
       withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",

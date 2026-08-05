@@ -133,13 +133,10 @@ const initial = computed(
 );
 // 提现地址(payout-address 单源;展示第一个已设网络的当前地址,掩码中段)
 const paired = computed(() => payout.hasAnyAddress);
-const walletAddress = computed(() => {
-  for (const network of PAYOUT_NETWORKS) {
-    const current = payout.currentFor(network);
-    if (current) return current.address;
-  }
-  return undefined;
-});
+// 展示与跳转必须同源同网络:入口显示的是哪个网络的地址,点进去就落哪个网络 ——
+// 否则 BEP20/ERC20 用户点「管理」落到 TRC20 空槽,看起来像地址丢失(审计 P1)。
+const walletNetwork = computed(() => PAYOUT_NETWORKS.find((network) => payout.currentFor(network)));
+const walletAddress = computed(() => (walletNetwork.value ? payout.currentFor(walletNetwork.value)?.address : undefined));
 const walletSub = computed(() =>
   walletAddress.value ? maskAddressMid(walletAddress.value) : t.value.profile.walletEmpty,
 );
@@ -189,8 +186,9 @@ function handleRegen() {
 }
 
 function goWallet() {
-  // 提现地址行 → 地址管理页(FEAT-KYC-RM01a)
-  uni.navigateTo({ url: "/pages/me/wallet-address-rebind", fail: () => {} });
+  // 提现地址行 → 地址管理页(带展示中的网络参数,与 wallet-withdraw.goManage 同模式)
+  const query = walletNetwork.value ? `?network=${walletNetwork.value}` : "";
+  uni.navigateTo({ url: `/pages/me/wallet-address-rebind${query}`, fail: () => {} });
 }
 
 // ── styles ──

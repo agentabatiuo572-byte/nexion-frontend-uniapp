@@ -213,12 +213,25 @@ export interface LegacyPairingRow {
     verifiedAt?: number;
     freezeUntil?: number;
   }>;
+  /** 旧换绑单(改版前发起的 $1 重验证;initiated/verifying = 切换时刻停在中途)。 */
+  rebindOrder?: { status?: string } | null;
   lastRebindAt?: number;
 }
 
 export type PairingMigrationResult =
   | { status: "empty" }
-  | { status: "migrated"; book: PayoutAddressBook; count: number }
+  | {
+      status: "migrated";
+      book: PayoutAddressBook;
+      count: number;
+      /**
+       * 🔴 切换时刻停在中途的换绑验证单($1 已可能转出、尚未被侦测)。
+       * 主人 2026-08-05 拍板(plan 第 3 条):**一律返还** —— 真后台按链上侦测区分
+       * 「已转出/未转出」,mock 没有真的链上侦测、无法区分,写死一个「假装能区分」的
+       * 判断比老实承认更危险,故本地一律按已转出返还 $1(消费点走幂等资金收口点)。
+       */
+      inFlightRebindRefund: boolean;
+    }
   | { status: "corrupt" };
 
 /**
@@ -302,5 +315,10 @@ export function migrateFromPairing(
     }
   }
 
-  return { status: "migrated", book, count };
+  // 中途换绑单侦测(见 PairingMigrationResult.inFlightRebindRefund 的决议注释)。
+  // 终态单(active/expired/cancelled)不返还:active 已生效、expired/cancelled 未转出。
+  const orderStatus = row.rebindOrder?.status;
+  const inFlightRebindRefund = orderStatus === "initiated" || orderStatus === "verifying";
+
+  return { status: "migrated", book, count, inFlightRebindRefund };
 }

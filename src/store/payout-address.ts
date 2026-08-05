@@ -7,6 +7,7 @@ import { mockServerNow } from "./server-time";
 import { useApp } from "./app";
 import { useConfig } from "./config";
 import { recordWithdrawAddressUse } from "./risk-identity";
+import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import {
   applyAddAddress,
   applyChangeAddress,
@@ -70,6 +71,29 @@ function hydrate(accountKey: string): PayoutAddressBook {
   const legacy = readAccountRow<LegacyPairingRow>(LEGACY_PAIRING_KEY, accountKey);
   const migrated = migrateFromPairing(legacy, cooldownDaysNow());
   if (migrated.status === "migrated") {
+    // 🔴 中途换绑单的 $1 返还先于写行(规格 RM01b ② 异常3 + 主人 2026-08-05 拍板第 3 条:
+    // 一律返还)。真后台差异:server 迁移事务按链上侦测区分「已转出照常返还 / 未转出无事发生」;
+    // mock 没有链上侦测、无法区分,一律按已转出返还 —— 宁可多还,不吞在途资金。
+    // 幂等靠 ref 判重(postMoneyBillsOnce);返还失败只留痕不阻断迁移(地址迁移优先级
+    // 高于 $1;PROD 由服务端事务保证两者原子,此处为 mock 存储层的诚实边界)。
+    if (migrated.inFlightRebindRefund) {
+      try {
+        const outcome = postMoneyBillsOnce([
+          {
+            type: "bonus",
+            symbol: "USDT",
+            amount: 1,
+            status: "posted",
+            memoKey: "legacyRebindRefund",
+            memo: "Verification transfer refund (flow retired)",
+            ref: `legacy-rebind-refund:${accountKey}`,
+          },
+        ]);
+        if (outcome !== "ok") console.error(`[payout-address] legacy rebind $1 refund not posted: ${outcome}`);
+      } catch (e) {
+        console.error("[payout-address] legacy rebind $1 refund failed", e);
+      }
+    }
     writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, accountKey, migrated.book);
     // 迁移地址按**原验证时刻**登记风控首见 —— 既有「新地址持有期」信号看到的是老地址,
     // 不产生新保护期(规格 ② 异常6:可直接提现、无需重验)。

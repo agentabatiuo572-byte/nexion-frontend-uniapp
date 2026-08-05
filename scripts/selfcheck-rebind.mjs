@@ -237,6 +237,17 @@ const HOUR = 3600 * 1000;
     migrateFromPairing({ walletPaired: true, pairedAt: paired }, 7).status === "corrupt");
   check("🔴 配对=true 但地址是空串 → status=corrupt",
     migrateFromPairing({ walletPaired: true, pairedWalletAddress: "  ", pairedAt: paired }, 7).status === "corrupt");
+  // e) 🔴 中途换绑单一律返还(主人 2026-08-05 拍板第 3 条;审计 P1 回归门)。
+  //    真后台按链上侦测区分,mock 无法区分 → initiated/verifying 一律标返还;
+  //    终态单(active/expired/cancelled)不返还。
+  check("🔴 切换时刻停在 verifying 的换绑单 → 标记返还 $1",
+    (() => { const rr = migrateFromPairing({ ...legacy, rebindOrder: { status: "verifying" } }, 7); return rr.status === "migrated" && rr.inFlightRebindRefund === true; })());
+  check("🔴 initiated 中途单同样标返还",
+    (() => { const rr = migrateFromPairing({ ...legacy, rebindOrder: { status: "initiated" } }, 7); return rr.status === "migrated" && rr.inFlightRebindRefund === true; })());
+  check("终态换绑单(expired)不返还",
+    (() => { const rr = migrateFromPairing({ ...legacy, rebindOrder: { status: "expired" } }, 7); return rr.status === "migrated" && rr.inFlightRebindRefund === false; })());
+  check("无换绑单 → 不返还",
+    (() => { const rr = migrateFromPairing(legacy, 7); return rr.status === "migrated" && rr.inFlightRebindRefund === false; })());
 }
 
 console.log(`\nselfcheck-rebind: ${pass} pass / ${fail} fail`);
