@@ -4384,6 +4384,7 @@ export const zh: Messages = {
     lastSale: "上次 ${k}K",
     buyCta: "购买",
     listCta: "挂单",
+    listBlockedDesc: "你已持有的席位不受影响,市场恢复后可再挂单。",
     noTokensTitle: "暂无 Genesis 节点",
     noTokensSub: "在上方浏览挂单或从一级预订",
     reservePrimary: "从一级预订",

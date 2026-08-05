@@ -158,16 +158,12 @@ const app = useApp();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
-const { marketClosed, secondaryBlock, closedNoticeKey } = useGenesisSaleGate();
-/** 阻断说明文案 —— 与创世页取自同一组 i18n 键,不另写一套措辞。 */
-const secondaryBlockText = computed(() => {
-  switch (secondaryBlock.value) {
-    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
-    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
-    case "halted": return t.value.genesis.marketClosed.halted;
-    default: return t.value.genesis.marketClosed.default;
-  }
-});
+const { marketClosed, secondaryBlock, blockText } = useGenesisSaleGate();
+/** 阻断说明文案 —— 走 blockText 唯一出口(P1-3 收口:此前 4 处各写一份同款 switch)。
+ *  二级的三种阻断(配置未知/关闭/熔断)与主判定共享同一批高优先档,blockText 恒能覆盖;
+ *  兜底只防 TS 层面的 null(渲染点有 v-if 闸,可购买态整块不渲染)。
+ *  上一版 `default:` 分支在可购买态也会算出「暂未开放」,靠外层 v-if 碰巧挡住 —— 已删。 */
+const secondaryBlockText = computed(() => blockText.value ?? t.value.genesis.marketClosed.default);
 const secondaryBlockSub = computed(() =>
   secondaryBlock.value === "configUnavailable"
     ? t.value.genesis.marketClosed.retryHint

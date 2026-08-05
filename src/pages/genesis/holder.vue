@@ -229,11 +229,13 @@ const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
 const dividendsOpen = computed(() => genesis.dividendsOpen);
 
 // 🔴 「还剩 N 席」同属名额紧迫文案(独立验收 P2-14),阻断态改说状态,不催单。
-const { showUrgency } = useGenesisSaleGate();
+// 🔴 阻断说明走 blockText 唯一出口(独立验收 P1-3):上一版写死 `.default`,
+//   售罄时这里说「暂未开放」而创世页说「已售罄」,同刻自相矛盾。售罄档落 `ctaSoldOut`。
+const { showUrgency, blockText } = useGenesisSaleGate();
 const notHolderBodyText = computed(() =>
   showUrgency.value
     ? fmt(t.value.genesisHolder.notHolderBody, { n: remaining.value })
-    : t.value.genesis.marketClosed.default,
+    : (blockText.value ?? t.value.genesis.ctaSoldOut),
 );
 
 // ── 上所前：额度 + 优先级（mock，backend-replaceable）──

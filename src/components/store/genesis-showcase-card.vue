@@ -84,7 +84,7 @@ import { toast } from "@/store/ui";
 const t = useT();
 const genesis = useGenesis();
 const { gate, eligible } = useGenesisEligibility();
-const { block, closedNoticeKey, showUrgency, preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
+const { block, blockText, showUrgency, preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
 
 const eligSheetOpen = ref(false);
 
@@ -95,8 +95,11 @@ const hardBlocked = computed(() => {
   const b = block.value;
   return b === "marketClosed" || b === "halted" || b === "configUnavailable";
 });
-// 预售未开是最外层态(优先于售罄/锁定);到点自动解锁。
-const locked = computed(() => !preSale.value && !soldOut.value && !eligible.value);
+// 🔴 资格锁行只在「可购买路径畅通、卡在资格」时出现 —— 判据问 `block` 单源,
+//   不再自己重算 preSale/soldOut(独立验收 confirmed P1:上一版 `!preSale && !soldOut
+//   && !eligible` 是**第二套判定**,漏了市场关闭三档 → 关闭态下锁行照样渲染
+//   「已满足 N/M 条件」,与规格 ④「单一派生,禁多处各判一套」正面冲突)。
+const locked = computed(() => block.value === null && !eligible.value);
 const countdownDisplay = computed(() => {
   if (!showTime.value) return "";
   const dayPart = countdownDays.value > 0 ? fmt(t.value.genesisEligibility.countdownDay, { n: countdownDays.value }) + " " : "";
@@ -120,13 +123,12 @@ const lockedMetText = computed(() => {
 const ctaText = computed(() => {
   // 🔴 阻断态一律问 `block` 单源(FEAT-GEN10 ④),与创世页同一出口 —— 关闭市场 ≠ 下架,
   //   卡片照常展示(showcaseEnabled 另管),只是不能买。
-  switch (block.value) {
-    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
-    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
-    case "halted": return t.value.genesis.marketClosed.halted;
-    case "soldOut": return t.value.store.genesisCardCtaMarket;
-    case "preSale": return t.value.genesisEligibility.comingSoon;
-  }
+  // 三档阻断说明走 blockText 唯一出口(P1-3 收口);售罄档是本卡自己的 CTA 词汇
+  //   (「去二级市场」,与创世页的「已售罄」刻意不同),留在本地。
+  const blocked = blockText.value;
+  if (blocked !== null) return blocked;
+  if (block.value === "soldOut") return t.value.store.genesisCardCtaMarket;
+  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
   if (locked.value) return t.value.genesisEligibility.cardCtaLocked;
   return t.value.genesisEligibility.cardCta;
 });

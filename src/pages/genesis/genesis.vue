@@ -210,7 +210,7 @@ const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
-const { block, marketClosed, showUrgency, closedNoticeKey, preSale, showTime, countdownDays, countdownClock } =
+const { block, marketClosed, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
   useGenesisSaleGate();
 
 const sheetOpen = ref(false);
@@ -262,13 +262,12 @@ const soldPct = computed(() => (sold.value / total.value) * 100);
 // 顺序由 genesisPurchaseBlock 定:配置未知 > 市场关闭 > 熔断 > 售罄 > 预售;
 // 全部放行后才轮到本页独有的资格门(L2,FEAT-GEN08)。
 const dockCtaText = computed(() => {
-  switch (block.value) {
-    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
-    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
-    case "halted": return t.value.genesis.marketClosed.halted;
-    case "soldOut": return t.value.genesis.ctaSoldOut;
-    case "preSale": return t.value.genesisEligibility.comingSoon;
-  }
+  // 三档阻断说明走 blockText 唯一出口(P1-3 收口:此前这段 switch 在 4 处各写一份)。
+  // 售罄 / 预售是本页自己的 CTA 词汇,不属于「阻断说明」,留在本地。
+  const blocked = blockText.value;
+  if (blocked !== null) return blocked;
+  if (block.value === "soldOut") return t.value.genesis.ctaSoldOut;
+  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
   if (!eligible.value) return t.value.genesisEligibility.dockLocked;
   return t.value.genesis.ctaReserve;
 });
