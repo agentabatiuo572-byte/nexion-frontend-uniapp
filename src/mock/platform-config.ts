@@ -34,13 +34,26 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     // 产生不同派生值」,首屏与刷新后对不上。运营改基数时由后台写入新锚点。
     registeredUsersAnchorAt: Date.UTC(2026, 7, 1),
     virtualUserCount: 12_000,
-    // 4 档种子:tops 升序、cumPct 单调不减且 ≤100。最高档刻意停在 96 ——
-    // 留出头部空间,免得任何人一上来就是「第 1 名」那种不可信结果(规格 异常5)。
+    // 分位表种子:tops 严格升序、cumPct 单调不减且 ≤100。最高档刻意停在 99.9 ——
+    // 超表顶封顶在最高档,永远给不出「第 1 名」那种不可信结果(规格 异常5)。
+    // 🔴 2026-08-05 扩档(台账 P1-3):旧表最高档 150 TOPS,任何持有托管硬件的账号
+    //   (2,640~52,800+ TOPS)全部撞 96% 封顶 → 名次钉死同一个数,「加算力看到排名前进」
+    //   对所有付费账号失效。现覆盖到最大合理舰队(10 台顶配机架 ≈ 53,000 TOPS)。
+    // 形状:虚拟人口大头在低算力(96% 在 150 TOPS 以下 = 手机用户),硬件持有者是头部
+    //   4%,尾部逐档稀疏(每 TOPS 密度单调下降)。前 4 档保持原值不动,手机档名次不漂移。
+    // 门:8 档参考舰队名次互不相同且随算力严格前进 —— selfcheck-account-hashrate.mjs
+    //   固定靶,舰队算力用 lib/account-hashrate 真模块现算。
     hashratePercentileTable: [
       { tops: 5, cumPct: 20 },
       { tops: 20, cumPct: 55 },
       { tops: 60, cumPct: 82 },
       { tops: 150, cumPct: 96 },
+      { tops: 700, cumPct: 97.6 },
+      { tops: 2_700, cumPct: 98.7 },
+      { tops: 5_400, cumPct: 99.3 },
+      { tops: 11_000, cumPct: 99.6 },
+      { tops: 27_000, cumPct: 99.8 },
+      { tops: 53_000, cumPct: 99.9 },
     ],
   },
   // SPEC-1 在线加成系数(单一来源:lib/hashpower.ts 派生 H5_BASE_FACTOR / CONTINUITY_FULL_MS)。

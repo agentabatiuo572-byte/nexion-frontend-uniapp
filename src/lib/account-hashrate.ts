@@ -9,22 +9,23 @@
 //     `fallbackCapability()` —— 与设备卡同一行写法(device-card-pc.vue:451);
 //   · 非手机的天花板     = 设备自己那行 GPU 规格串 `device.gpu`(如 "8× NVIDIA A100"),
 //     用 lib/gpu-tiers.ts 既有的 `matchGpuTier()` 解成档位 TOPS,再乘串里写明的张数。
-//     🔴 这不是新造的换算:型号→TOPS 的映射仓里本来就有(GPU_TIERS.keywords 已含
-//     rtx 4090 / rtx 5090 / a100 / h100),电脑 GPU 一直走它。上一版按「日产反推」
-//     另立了第二把尺子,读数与设备自己那行规格最多差 5.6 倍(8× H100 规格 5,280、
-//     反推 35,106),只要有任何一处把单台 TOPS 显示出来就当场自相矛盾。两把尺子已合并。
+//     🔴 档位表**必须由调用方穿进来**(store 传 `cfg.config.computeShare.gpuTiers`),
+//     本文件禁止 import 编译期常量当档位表 —— 这张表运营可编辑(admin E6 改档位
+//     TOPS / 增删识别词),读常量的话运营一改,排名跟不上:改档形态少算 0.725×,
+//     新识别词落 G2 兜底最多少算 7.3 倍,当下就翻转名次(台账 2026-08-05 新缺陷,
+//     实测)。哨兵:本文件出现 GPU_TIERS 字样、或 matchGpuTier 单参调用,
+//     selfcheck-account-hashrate.mjs 即红。
 //     覆盖不到型号关键词的串(cloud-share 的 "Distributed")落到 `matchGpuTier` 自带的
 //     G2 兜底 —— 那是它既有的声明行为,不在这里另发明补丁。
 //
-// ⚠️ **已知天花板(台账 P1-3),两处都在本文件之外,别在这里另发明公式去凑**:
+// ⚠️ **已知天花板(台账 P1-3 残留半边),在本文件之外,别在这里另发明公式去凑**:
 //   ① `lib/gpu-tiers.ts` 最高档 G6 把 RTX 4090 / 5090 / A100 / H100 收在同一档(660),
 //      于是 Pro / Pro v2 / Rack P1 / Rack P2 四个 SKU 天花板并列 5280 —— $1,199 与
-//      $7,499 的机器读数相同,映射对数据中心卡之间的差异没有分辨力。
-//   ② `mock/platform-config.ts` 分位表最高档只到 150 TOPS,超出即封顶 96%。
-//   叠加的后果(实测):手机+S1 = 2,667.5 TOPS、手机+10 台 Rack P2 = 52,827.5 TOPS,
-//   名次都是 57,281 —— 规格用户故事「加算力看到排名前进」对所有付费账号失效。
-//   要解:先给 G6 以上补档,再把分位表抬到硬件量级(两件事必须一起做,只抬分位表会
-//   立刻暴露 ① 的四并列)。本文件产出的算力本身是对的,不是这两条的成因。
+//      $7,499 的机器算力读数相同;同算力必同名次(规格 ③ 确定性),这四个 SKU 之间
+//      名次不区分。要解必须给 G6 以上补档(gpu-tiers.ts + 运营配置两侧一起动)。
+//   ② 分位表封顶 —— **已收口(2026-08-05)**:mock/platform-config.ts 种子扩到
+//      53,000 TOPS(10 档),覆盖最大合理舰队;8 档参考舰队名次互不相同且随算力
+//      严格前进,由 selfcheck-account-hashrate.mjs 固定靶钉住。
 //
 // 🔴 **任务量递减不进排名**。store/device-lifecycle.ts 的 `getEfficiency` **降的不是算力**:
 // 平台语义是硬件算力恒定不变,随时间递减的是它**能接到的任务量**。该文件自陈是
@@ -38,10 +39,20 @@
 // 排名格回答的也正是「你投入了多少算力」:那是采购决策,不该因设备变老而惩罚,
 // 何况任务量递减已经在收益侧罚过一次,进排名等于罚两遍。
 //
-// 「在不在产」的权威是 app.ts `settleDevice` 那张不结算清单(未激活 / status 非 online /
-// pausedReason 非空),**不是** `isDeviceOnline` —— 后者只回答「有没有常驻 App 心跳」
-// (决定拿满档还是拿 hosted 档)。拿它当在产判据的后果:H5 上一台正按 $0.036/日 真给钱、
-// 设备卡显示 16.4 TOPS 的手机,在排名里被算成 0,首页对着一个正在赚钱的用户说
+// 「在不在产」的参照系是 app.ts `settleDevice` 那张不结算清单 —— 它实际是 **5 条**
+// (store/app.ts:234-240):① activatedAt===null ② status!=="online" ③ kind==="cloud-share"
+// ④ pausedReason!=null ⑤ kind==="phone" 且(isCharging===false 或 isWifiConnected===false)。
+// 🔴 排名的在产判据只取其中 ①②④ 三条,**不是全等关系**,差出来的两条是刻意取舍,
+// 下一个人别按「权威=那张清单」把它们改回去:
+//   · ③ cloud-share:收益另路、算力在网 —— 不走 settleDevice 计息是收益侧的安排,
+//     排名照算它的档位算力(G2 兜底 90)。
+//   · ⑤ 手机不充电:结算给 $0,排名照算打折后的正数(charge 因子 0.6,28.3 标定实测
+//     16.5 TOPS)—— 与设备卡显示自洽(设备卡对不充电的手机也显示正 TOPS),
+//     展示≠结算,排名跟展示对齐。断网那半条殊途同归:既有模型的 network 因子把它
+//     归 0,与结算侧一致,但守它的是因子不是这张清单。
+// 也**不是** `isDeviceOnline` —— 后者只回答「有没有常驻 App 心跳」(决定拿满档还是拿
+// hosted 档)。拿它当在产判据的后果:H5 上一台正按 $0.036/日 真给钱、设备卡显示
+// 16.4 TOPS 的手机,在排名里被算成 0,首页对着一个正在赚钱的用户说
 // 「未上榜,激活设备就上榜」。心跳新鲜与否照旧原样传给既有单台模型,由它给档。
 //
 // 🔴 不吃抖动:`computeLiveHashpower` 的 jitter 是展示用的呼吸感(≈0.955–1.0 来回摆)。
@@ -52,6 +63,7 @@
 // Backend-replaceable:PROD 由服务端在 `GET /api/platform/rank` 里算同一个和,
 // client 这份是 mock 期的同构实现。
 import type { Device } from "@/store/types";
+import type { GpuTier } from "@/store/config-types";
 import { computeLiveHashpower, isDeviceOnline } from "./hashpower";
 import { fallbackCapability } from "./device-capability";
 import { matchGpuTier } from "./gpu-tiers";
@@ -68,11 +80,12 @@ export interface OnlineBonusInput {
   continuityFullHours: number;
 }
 
-/** 单台的算力天花板(TOPS)。手机用自己的标定值,其余读设备自己那行 GPU 规格串。 */
-export function deviceBaselineTops(device: Device): number {
+/** 单台的算力天花板(TOPS)。手机用自己的标定值,其余读设备自己那行 GPU 规格串,
+ *  用**调用方穿进来的运营档位表**解档(见文件头:禁编译期常量,运营改档要跟得上)。 */
+export function deviceBaselineTops(device: Device, gpuTiers: GpuTier[]): number {
   if (device.kind === "phone") return device.capabilityTops ?? fallbackCapability().tops;
   const gpu = device.gpu ?? "";
-  return Number(GPU_COUNT_RE.exec(gpu)?.[1] ?? 1) * matchGpuTier(gpu).tops;
+  return Number(GPU_COUNT_RE.exec(gpu)?.[1] ?? 1) * matchGpuTier(gpu, gpuTiers).tops;
 }
 
 /**
@@ -82,11 +95,16 @@ export function deviceBaselineTops(device: Device): number {
  * (如手机断网 → network 因子 0,由既有模型判)。两者都不该由本文件解释成「未上榜」——
  * 那是 network-rank.ts 的事。
  */
-export function deviceEffectiveTops(device: Device, now: number, onlineBonus: OnlineBonusInput): number {
-  // 在产判据 = settleDevice 的不结算清单(见文件头)。cloud-share 不在其中:
-  // 它不走 settleDevice 计息是收益侧的安排,算力照样在网。
+export function deviceEffectiveTops(
+  device: Device,
+  now: number,
+  onlineBonus: OnlineBonusInput,
+  gpuTiers: GpuTier[],
+): number {
+  // 在产判据 = settleDevice 不结算清单(5 条)里的 ①②④ 三条;cloud-share 与
+  // 手机不充电两条是刻意不取的取舍,别改回去 —— 逐条理由见文件头。
   if (device.activatedAt === null || device.status !== "online" || device.pausedReason != null) return 0;
-  const baselineTops = deviceBaselineTops(device);
+  const baselineTops = deviceBaselineTops(device, gpuTiers);
 
   if (device.kind === "phone") {
     return computeLiveHashpower({
@@ -116,9 +134,10 @@ export function accountTotalHashrate(
   devices: readonly Device[],
   now: number,
   onlineBonus: OnlineBonusInput,
+  gpuTiers: GpuTier[],
 ): number {
   return devices.reduce((sum, device) => {
-    const tops = deviceEffectiveTops(device, now, onlineBonus);
+    const tops = deviceEffectiveTops(device, now, onlineBonus, gpuTiers);
     return Number.isFinite(tops) && tops > 0 ? sum + tops : sum;
   }, 0);
 }

@@ -5,8 +5,14 @@
 // 守四件事,前三件是规格对这个入参的定义,第四件是它凭什么可信:
 //   ① **多台求和**:总算力 = 每台有效算力之和(不是只取一台、不是取平均、不是重复计)。
 //   ② **未激活不计**:activatedAt === null 的设备一台都不许进和。
-//   ③ **不在产不计 / 无设备为 0**:在产判据 = settleDevice 那张不结算清单(未激活 /
-//      status 非 online / pausedReason 非空)。🔴 **心跳过期 ≠ 不在产**:H5 上没有常驻
+//   ③ **不在产不计 / 无设备为 0**:参照系 = settleDevice 那张不结算清单,它实际是
+//      **5 条**(store/app.ts:234-240:未激活 / status 非 online / cloud-share /
+//      pausedReason 非空 / 手机未充电或无 WiFi)。排名的在产判据只取其中 3 条
+//      (未激活 / 非 online / pausedReason),差出来的两条是**刻意取舍**,别当 bug 修:
+//      · cloud-share:收益另路、算力在网(排名照算 G2 兜底 90);
+//      · 手机不充电:结算给 $0,排名照算打折正数(charge 0.6,28.3 标定实测 16.5)——
+//        与设备卡显示自洽,展示≠结算;断网那半条由既有模型 network 因子归 0。
+//      🔴 **心跳过期 ≠ 不在产**:H5 上没有常驻
 //      App 心跳的手机照样按 hosted 档真给钱、设备卡照样显示 TOPS,排名里必须同样有数,
 //      判成 0 就会对一个正在赚钱的用户说「未上榜,激活设备就上榜」。
 //      空舰队返回数字 0(**不返回 null**,「未上榜」是 lib/network-rank.ts 的三态)。
@@ -28,7 +34,7 @@
 // 方法:esbuild 载**真模块**跑真函数,设备也用真工厂 createDevice 造(不手搓 mock 对象,
 // 否则字段形状一漂,门还在绿)。uni 存储 API 在 node 里没有,给一个最小 stub。
 import { build } from "esbuild";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { atAliasResolver } from "./lib/at-alias.mjs";
@@ -52,6 +58,8 @@ const bundle = await build({
       export { GPU_TIERS } from "@/lib/gpu-tiers";
       export { createDevice, makeInitialDevices, DEVICE_SPECS } from "@/store/device-types";
       export { CAPACITY_EXEMPT_KINDS } from "@/store/device-lifecycle";
+      export { computeRank, isValidPercentileTable } from "@/lib/network-rank";
+      export { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
     `,
     resolveDir: root,
     loader: "ts",
@@ -64,7 +72,8 @@ const bundle = await build({
 const {
   accountTotalHashrate, deviceEffectiveTops, deviceBaselineTops,
   computeLiveHashpower, GPU_TIERS, createDevice, makeInitialDevices,
-  DEVICE_SPECS, CAPACITY_EXEMPT_KINDS,
+  DEVICE_SPECS, CAPACITY_EXEMPT_KINDS, computeRank, isValidPercentileTable,
+  DEFAULT_PLATFORM_CONFIG,
 } = await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 let pass = 0;
@@ -81,8 +90,11 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const NOW = Date.UTC(2026, 7, 5, 12, 0, 0); // 固定时刻:判据不许依赖真实时钟
 const BONUS = { h5BaseFactor: 0.6, continuityFullHours: 2 };
-const total = (devices, now = NOW) => accountTotalHashrate(devices, now, BONUS);
-const one = (device, now = NOW) => deviceEffectiveTops(device, now, BONUS);
+// 档位表默认给种子常量(与种子配置 computeShare.gpuTiers 同一对象);
+// 「真读配置」的行为靶在下方用**改过的表**单独验,不在这里混。
+const total = (devices, now = NOW, tiers = GPU_TIERS) => accountTotalHashrate(devices, now, BONUS, tiers);
+const one = (device, now = NOW, tiers = GPU_TIERS) => deviceEffectiveTops(device, now, BONUS, tiers);
+const ceiling = (device) => deviceBaselineTops(device, GPU_TIERS);
 
 /** 真工厂造的手机,再钉死运行态(在产 + 连续在线满档,免得判据踩到工厂里的 Date.now())。 */
 function phone(tops, over = {}) {
@@ -193,7 +205,7 @@ function hw(kind, over = {}) {
   check("🔴 ④ 手机单台 = computeLiveHashpower 的输出(改成自己算就红)",
     near(one(p), expected, 1e-9), `得到 ${one(p)},既有模型给 ${expected}`);
   check("④ 手机天花板取标定值 capabilityTops,不走日产反推",
-    deviceBaselineTops(p) === 33.3, `得到 ${deviceBaselineTops(p)}`);
+    ceiling(p) === 33.3, `得到 ${ceiling(p)}`);
   check("④ 手机不充电时贡献下降(条件因子真的生效,不是拿天花板直接求和)",
     one(phone(30, { isCharging: false })) < one(phone(30)) && one(phone(30, { isCharging: false })) > 0);
   check("④ 手机断网时贡献为 0(既有模型的 network 因子)",
@@ -239,7 +251,7 @@ function hw(kind, over = {}) {
     CAPACITY_EXEMPT_KINDS.join(","));
   for (const [kind, expected] of Object.entries(HW_CEILING_TOPS)) {
     check(`🔴 ④ ${kind} 天花板 = ${expected} TOPS(固定靶,与设备自己那行 GPU 规格串一致)`,
-      deviceBaselineTops(hw(kind)) === expected, `得到 ${deviceBaselineTops(hw(kind))}`);
+      ceiling(hw(kind)) === expected, `得到 ${ceiling(hw(kind))}`);
   }
 
   // 🔴 pc-gpu 有效路径(2026-08-05 证伪 B1 靶):上一版只造 6 类硬件、工厂种子又刻意不含
@@ -276,14 +288,109 @@ function hw(kind, over = {}) {
   // 每一档拿它自己的关键词造一个电脑 GPU,解出来必须**恰好**是该档的 tops。
   for (const tier of GPU_TIERS) {
     const gpuLabel = `NVIDIA ${tier.keywords[0].toUpperCase()} · ${tier.tops} TOPS`;
-    const resolved = deviceBaselineTops({ kind: "pc-gpu", gpu: gpuLabel });
+    const resolved = ceiling({ kind: "pc-gpu", gpu: gpuLabel });
     check(`④ 电脑 GPU 按型号串解出档位 ${tier.id} 的 tops(${tier.tops})`,
       resolved === tier.tops, `${gpuLabel} 解成 ${resolved}`);
   }
   check("④ 规格串写明的张数真的乘进去了(把 8× 当 1 张就红)",
-    deviceBaselineTops({ kind: "stellarbox-pro", gpu: "8× RTX 4090" })
-      === 8 * deviceBaselineTops({ kind: "stellarbox-pro", gpu: "RTX 4090" }),
-    `8 张 ${deviceBaselineTops({ kind: "stellarbox-pro", gpu: "8× RTX 4090" })} vs 1 张 ${deviceBaselineTops({ kind: "stellarbox-pro", gpu: "RTX 4090" })}`);
+    ceiling({ kind: "stellarbox-pro", gpu: "8× RTX 4090" })
+      === 8 * ceiling({ kind: "stellarbox-pro", gpu: "RTX 4090" }),
+    `8 张 ${ceiling({ kind: "stellarbox-pro", gpu: "8× RTX 4090" })} vs 1 张 ${ceiling({ kind: "stellarbox-pro", gpu: "RTX 4090" })}`);
+}
+
+// ── 🔴 GPU 档位单源:排名算力必须读**运营可配**的档位表 ─────────────────────
+// 台账 2026-08-05 新缺陷:account-hashrate 曾单参调 matchGpuTier(编译期常量),
+// 而这张表运营可编辑(admin E6 改档位 TOPS / 增删识别词;前端 store/app.ts 与
+// download 页都读 cfg.config.computeShare.gpuTiers)。运营一改,排名跟不上:
+// 改档形态少算 0.725×;新识别词落 G2 兜底最多少算 7.3 倍,当下就翻转名次。
+{
+  // 行为靶 A:改一档 tops → 聚合结果跟着变(证明真读了穿进来的表,不是常量)。
+  const g6 = GPU_TIERS[GPU_TIERS.length - 1];
+  const bumped = GPU_TIERS.map((t) => (t.id === g6.id ? { ...t, tops: 1000 } : t));
+  const pcg = hw("pc-gpu", { gpu: `NVIDIA ${g6.keywords[0].toUpperCase()}` });
+  check("🔴 ⑤ 改一档 tops(660→1000):pc-gpu 单台跟着变(改前 660 / 改后 1000)",
+    one(pcg) === g6.tops && one(pcg, NOW, bumped) === 1000,
+    `改前 ${one(pcg)} / 改后 ${one(pcg, NOW, bumped)}`);
+  check("🔴 ⑤ 改一档 tops:托管硬件(8× 串)聚合同样跟着变(8×1000)",
+    one(hw("stellarbox-pro"), NOW, bumped) === 8000,
+    `得到 ${one(hw("stellarbox-pro"), NOW, bumped)}`);
+
+  // 行为靶 B:运营给档位加识别词 → 新型号从 G2 兜底(90)升到正档(台账形态②原样)。
+  const withKeyword = GPU_TIERS.map((t) => (t.id === g6.id ? { ...t, keywords: [...t.keywords, "rtx 6090"] } : t));
+  const future = hw("pc-gpu", { gpu: "NVIDIA RTX 6090 · 660 TOPS" });
+  check("⑤ 未收录型号落 G2 兜底 90(现状钉住:这就是少算 7.3 倍的那一支)",
+    one(future) === 90, `得到 ${one(future)}`);
+  check("🔴 ⑤ 运营加识别词后,同一台立刻解到正档(90 → 660,不再走兜底)",
+    one(future, NOW, withKeyword) === g6.tops, `得到 ${one(future, NOW, withKeyword)}`);
+
+  // 单源哨兵(源码级,剥注释后判):
+  //   · account-hashrate.ts 出现 GPU_TIERS 字样 = 红(常量回退,连默认参数都不许);
+  //   · matchGpuTier 单参调用 = 红(丢掉穿进来的表);0 命中同样红(判据失效)。
+  const libSrc = readFileSync(path.join(SRC, "lib", "account-hashrate.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "")
+    .replace(/[ \t]\/\/.*$/gm, "");
+  check("🔴 ⑤ 哨兵:account-hashrate.ts 代码里 GPU_TIERS 字样 0 命中(禁 import 常量当档位表)",
+    !/\bGPU_TIERS\b/.test(libSrc));
+  const calls = [];
+  let at = 0;
+  while ((at = libSrc.indexOf("matchGpuTier(", at)) !== -1) {
+    let depth = 0;
+    let commas = 0;
+    let j = at + "matchGpuTier".length;
+    for (; j < libSrc.length; j++) {
+      if (libSrc[j] === "(") depth++;
+      else if (libSrc[j] === ")") { depth--; if (depth === 0) break; }
+      else if (libSrc[j] === "," && depth === 1) commas++;
+    }
+    calls.push({ args: commas + 1, text: libSrc.slice(at, j + 1) });
+    at = j;
+  }
+  check("⑤ 哨兵不空转:matchGpuTier 调用真实存在(0 命中 = 判据失效,同样红)",
+    calls.length >= 1, `命中 ${calls.length} 处`);
+  check("🔴 ⑤ 哨兵:每处 matchGpuTier 调用都带档位表第二参(单参 = 常量回退,红)",
+    calls.length >= 1 && calls.every((c) => c.args >= 2),
+    calls.map((c) => c.text).join(" | "));
+
+  // 🔴 消费面是**开放集合**(2026-08-06 独立证伪 P2):gpu-tiers.ts:57 的默认参
+  //   `tiers = GPU_TIERS` 仍开着口子 —— 上面只封 account-hashrate.ts 一个文件,
+  //   新增消费面单参调用就静默落回编译期常量,运营改表它跟不上。
+  //   按「单一真理源必锁消费面」:全仓扫,定义行豁免,单参即红。
+  const walkSrc = (dir, out = []) => {
+    for (const name of readdirSync(dir)) {
+      const full = path.join(dir, name);
+      if (statSync(full).isDirectory()) walkSrc(full, out);
+      else if (/\.(ts|vue)$/.test(name)) out.push(full);
+    }
+    return out;
+  };
+  const offenders = [];
+  let repoCalls = 0;
+  const filesWithCalls = new Set();
+  for (const file of walkSrc(SRC)) {
+    const text = readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "").replace(/[ \t]\/\/.*$/gm, "");
+    let p = 0;
+    while ((p = text.indexOf("matchGpuTier(", p)) !== -1) {
+      const isDef = /function\s+$/.test(text.slice(Math.max(0, p - 20), p));
+      if (!isDef) {
+        let depth = 0, commas = 0, j = p + "matchGpuTier".length;
+        for (; j < text.length; j++) {
+          if (text[j] === "(") depth++;
+          else if (text[j] === ")") { depth--; if (depth === 0) break; }
+          else if (text[j] === "," && depth === 1) commas++;
+        }
+        repoCalls += 1;
+        filesWithCalls.add(path.basename(file));
+        if (commas + 1 < 2) offenders.push(`${path.basename(file)}: ${text.slice(p, j + 1)}`);
+      }
+      p += "matchGpuTier".length;
+    }
+  }
+  check(`⑤ 全仓消费面扫描不空转(实扫 ${filesWithCalls.size} 个含调用的文件,今天已知 4 个)`,
+    repoCalls >= 3 && filesWithCalls.size >= 3, [...filesWithCalls].join(","));
+  check("🔴 ⑤ 全仓每处 matchGpuTier 调用都双参(新消费面单参 = 静默落回常量,红)",
+    offenders.length === 0, offenders.join(" | "));
 }
 
 // ── 🔴 时间不变 + 确定性 ───────────────────────────────────────────────────
@@ -337,6 +444,70 @@ function hw(kind, over = {}) {
     !!h5Phone && one(h5Phone) > 0, `手机 = ${h5Phone ? one(h5Phone) : "找不到"}`);
 }
 
+// ── 🔴 8 档参考舰队名次固定靶(台账 P1-3 收口自证)────────────────────────────
+// 旧种子分位表最高档 150 TOPS:持有任何托管硬件的账号(2,640+ TOPS)全部撞 96% 封顶,
+// 名次钉死同一个数,「加算力看到排名前进」对所有付费账号失效。本组用**真种子表**
+// (DEFAULT_PLATFORM_CONFIG,不手抄)+ 真聚合函数现算 8 档舰队,钉「互不相同且严格前进」。
+// ⚠️ 舰队取 8 个**算力互不相同**的形态:Pro / Pro v2 / Rack P1 / Rack P2 四 SKU 天花板
+//   并列 5280(G6 收同档 = 已知天花板①,见 account-hashrate.ts 文件头)——同算力必
+//   同名次(规格③确定性),那不是分位表能解的,靠 Pro 一档代表 + 机架台数拉开量级。
+{
+  const SEED = DEFAULT_PLATFORM_CONFIG.publicStats;
+  const SEED_TIERS = DEFAULT_PLATFORM_CONFIG.computeShare.gpuTiers;
+  check("🔴 ⑥ 真种子分位表通过 isValidPercentileTable(tops 严格升序 · cumPct 单调不减 ≤100 · ≥2 档)",
+    isValidPercentileTable(SEED.hashratePercentileTable) === true);
+  check("⑥ 种子表覆盖到最大合理舰队量级(最高档 ≥ 50,000 TOPS,10 台顶配机架 ≈ 52,800)",
+    SEED.hashratePercentileTable[SEED.hashratePercentileTable.length - 1].tops >= 50_000,
+    `最高档 ${SEED.hashratePercentileTable[SEED.hashratePercentileTable.length - 1].tops}`);
+
+  // 标定值取真工厂给的(node 下 = fallbackCapability);undefined 时真模块自会回退,不手抄。
+  const phoneFull = phone(createDevice("phone", "fleet-phone").capabilityTops);
+  const phoneH5 = phone(phoneFull.capabilityTops, { onlineHeartbeatAt: null });
+  const racks = (n) => Array.from({ length: n }, (_, i) => hw("stellarrack-p2", { id: `fleet-p2-${i}` }));
+  const FLEETS = [
+    ["只手机(H5,无常驻心跳)", [phoneH5]],
+    ["只手机(App 满档)", [phoneFull]],
+    ["手机 + 云算力", [phoneFull, hw("cloud-share")]],
+    ["手机 + S1", [phoneFull, hw("stellarbox-s1")]],
+    ["手机 + Pro(= Pro v2 / Rack P1 / Rack P2 同算力档)", [phoneFull, hw("stellarbox-pro")]],
+    ["手机 + 2× Rack P2", [phoneFull, ...racks(2)]],
+    ["手机 + 5× Rack P2", [phoneFull, ...racks(5)]],
+    ["手机 + 10× Rack P2(最大合理舰队)", [phoneFull, ...racks(10)]],
+  ];
+  // 算力用真聚合现算(档位表用种子配置那份);人口用种子配置,不手抄数字。
+  const rows = FLEETS.map(([label, devices]) => {
+    const tops = accountTotalHashrate(devices, NOW, BONUS, SEED_TIERS);
+    const r = computeRank({
+      myTotalHashrate: tops,
+      table: SEED.hashratePercentileTable,
+      realPopulation: SEED.registeredUsersBase,
+      virtualPopulation: SEED.virtualUserCount,
+    });
+    return { label, tops, r };
+  });
+  console.log(rows.map((x) => `        ${x.label}: ${x.tops} TOPS → ${x.r.kind === "ranked" ? `第 ${x.r.rank} 名(pct ${x.r.percentile.toFixed(3)})` : x.r.kind}`).join("\n"));
+  check("⑥ 固定靶不空转:8 档舰队算力互不相同且严格递增(舰队构造坏了先红这条)",
+    rows.every((x, i) => i === 0 || x.tops > rows[i - 1].tops),
+    rows.map((x) => x.tops).join(" → "));
+  check("🔴 ⑥ 8 档舰队全部 ranked(一个都不许掉成 unranked/unavailable)",
+    rows.every((x) => x.r.kind === "ranked"),
+    rows.map((x) => x.r.kind).join(","));
+  const ranks = rows.map((x) => x.r.rank);
+  check("🔴 ⑥ 8 档舰队名次**互不相同**(付费档不再钉死同一个数)",
+    new Set(ranks).size === ranks.length, ranks.join(" / "));
+  check("🔴 ⑥ 名次随算力**严格前进**(每一档都比上一档靠前,不止「不倒退」)",
+    ranks.every((r, i) => i === 0 || r < ranks[i - 1]), ranks.join(" → "));
+  const beyond = computeRank({
+    myTotalHashrate: 1e9,
+    table: SEED.hashratePercentileTable,
+    realPopulation: SEED.registeredUsersBase,
+    virtualPopulation: SEED.virtualUserCount,
+  });
+  check("🔴 ⑥ 超表顶封顶在最优档名次,且 > 1(规格 异常5:永远给不出「第 1 名」)",
+    beyond.kind === "ranked" && beyond.rank > 1 && beyond.rank <= ranks[ranks.length - 1],
+    JSON.stringify(beyond));
+}
+
 // ── 接线门:纯函数对 ≠ 有人在用 ─────────────────────────────────────────────
 // 上面全绿也可能是「库写好了、store 没接」或「接了又被改回自己算一遍」。
 // 判据读 app.ts 源码(先剥注释,免得注释里的字样冒充实现)。
@@ -360,6 +531,10 @@ function hw(kind, over = {}) {
     fnBody.length > 0 && !/Date\.now\(\)/.test(fnBody), fnBody);
   check("🔴 接线:传给聚合的 now 就是调用方给的那个入参(不是别处捞来的时刻)",
     /accountTotalHashrate\(\s*visibleDevices\.value\s*,\s*now\s*,/.test(fnBody), fnBody);
+  // 🔴 ⑤ 单源接线:档位表必须来自配置 store(运营在 E6 改档 / 加识别词,排名要跟着走)。
+  //   传常量 / 传空表 / 少传这一参,这条当场红(与上方源码哨兵互为表里:那边守库,这边守消费面)。
+  check("🔴 接线:GPU 档位表参数 = cfg.config.computeShare.gpuTiers(单源,禁常量/别处捞表)",
+    /accountTotalHashrate\([^;]*cfg\.config\.computeShare\.gpuTiers\s*\)/.test(fnBody), fnBody);
   // 🔴 这条第一版是**假绿**:`return\s*\{[\s\S]*?myTotalHashrate` 的惰性匹配会从文件里
   //   任意一个更早的 `return {` 起跳,把声明行当成 return 里的那一处 ——
   //   把 store return 里的名字删掉,门照样绿。改成只切最后一个 return 块再判。
@@ -373,10 +548,11 @@ function hw(kind, over = {}) {
 //   上一版是 FLOOR = 28 而实际 35 —— 留了 7 条余量,正好等于两个最关键判据组的总和
 //   (时间不变 3 条 + 接线 4 条),把它们整组删掉门照样 exit 0(实测)。
 //   留余量的地板等于没有地板。加断言 = 同步改这个数,失败信息里直接写着该改成几。
-const EXPECTED_CHECKS = 64; // 2026-08-05 结构轮 +7:台账完备性 ×3 + pc-gpu 有效路径 ×2 + 时间不变循环 6→8 机型 ×2
+// 2026-08-05 修复轮 +15:GPU 档位单源 ×7(行为靶 4 + 源码哨兵 3)+ 8 档舰队名次固定靶 ×7 + 档位表接线 ×1
+const EXPECTED_CHECKS = 81; // 2026-08-06 +2:matchGpuTier 全仓消费面扫描(不空转 + 单参即红)
 if (pass + fail !== EXPECTED_CHECKS) {
   console.log(`\nFAIL 断言总数 ${pass + fail} ≠ 台账 ${EXPECTED_CHECKS} —— 判据被删/被跳过?若是有意加断言,把 EXPECTED_CHECKS 改成 ${pass + fail}。`);
   process.exit(1);
 }
-console.log(`\n${pass} pass / ${fail} fail(样本:真工厂造的 8 类设备形态 · 6 类非手机天花板固定靶 · 6 档 GPU 型号解析 · 3 个时刻 + 365 天 · 50 次确定性重跑)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:真工厂造的 8 类设备形态 · 6 类非手机天花板固定靶 · 6 档 GPU 型号解析 · 改档/加词双形态 GPU 配置靶 · 8 档参考舰队名次(真种子分位表)· 3 个时刻 + 365 天 · 50 次确定性重跑)`);
 process.exit(fail === 0 ? 0 : 1);
