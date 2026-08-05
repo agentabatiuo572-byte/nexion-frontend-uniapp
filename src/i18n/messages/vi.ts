@@ -334,9 +334,22 @@ export const vi: Messages = {
     networkLive: "trực tiếp",
     networkGlobalGrid: "Lưới toàn cầu · trực tiếp",
     networkMembers: "Thành viên",
-    networkPaidToday: "Đã trả hôm nay",
     networkDevices: "Thiết bị",
     networkYourRank: "Hạng của bạn",
+    // FEAT-HOME02 phụ đề 3 ô nhịp mạng + 3 trạng thái hạng
+    networkMembersSub: "+{n}%/tháng",
+    networkDevicesSub: "đang chạy tác vụ",
+    networkRankUp24h: "tăng {n} bậc / 24h",
+    // 🔴 值槽 90.3px@20px 装不下任何含 "hạng" 的越南语说法(实测:Chưa xếp hạng 139.1 /
+    //   Chưa có hạng 127.8 / Không hạng 110.0 / Chưa hạng 101.1),故保留最地道的标准说法,
+    //   由接线方对「未上榜整态降档」渲染:≤12px 时 "Chưa xếp hạng" = 83.5px 才放得下。
+    networkRankUnranked: "Chưa xếp hạng",
+    networkRankUnrankedHint: "Kích hoạt để có hạng",
+    networkRankTipRanked: "Hạng của bạn tính theo tổng sức mạnh tính toán của các thiết bị đang hoạt động — càng mạnh thì hạng càng cao.",
+    networkRankTipUnranked: "Bạn chưa có hạng. Kích hoạt một thiết bị bất kỳ, sức mạnh tính toán của bạn sẽ được xếp hạng ngay.",
+    // 值槽 89.3px@20px 放不下 "Đang cập nhật"(实测 135.0px),换 "Đang tải" = 78.5px。
+    networkStatUpdating: "Đang tải",
+    networkStatRetry: "Thử lại",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
     rankYourRank: "Hạng của bạn",
     rankStep: "bậc",
@@ -1720,7 +1733,7 @@ export const vi: Messages = {
     cardHighTierLine: "Nhận các nhiệm vụ cấp cao hơn: {pool}",
     comingSoonSubtitle: "Lô sản xuất sẽ ra mắt muộn hơn trong chu kỳ",
     // Nội dung tiếp thị theo từng SKU, khóa theo Product.id (cấu trúc dữ liệu và
-    // bản gốc tiếng Anh nằm ở src/mock/products.ts). Trường `name` là tên thương
+    // bản gốc tiếng Anh nằm ở src/mock/products.ts). Trường name là tên thương
     // hiệu, KHÔNG bao giờ dịch. verify.sh kiểm tra mọi id trong PRODUCTS đều có ở đây.
     catalog: {
       "stellarbox-s1": {

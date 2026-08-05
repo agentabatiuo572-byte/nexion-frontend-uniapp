@@ -2503,6 +2503,42 @@ network_rank_gate() {
 }
 network_rank_gate
 
+# ── 排名入参「总有效算力」聚合门(FEAT-HOME02 ③)──────────────────────────────
+# 排名函数再对,喂进去的算力错了照样全错。这道门守聚合本身:
+#   ① 多台求和(不是只取一台/取平均) ② 未激活不计 ③ 不在产不计、无设备为数字 0
+#      —— 在产判据 = settleDevice 的不结算清单;**心跳过期不等于不在产**(H5 上的手机
+#      照样按 hosted 档计息,排名判它 0 就是对着一个正在赚钱的用户说「未上榜」)。
+#   ④ 口径复用 + 独立锚 —— 手机必须等于 computeLiveHashpower 的输出;非手机必须等于
+#      设备自己那行 GPU 规格串解出的 TOPS,期望值写死成字面数字(拿被测函数算期望值
+#      是自指判据,天花板整体 ×2 也照样全绿,已实测)。
+# 外加时间不变:同一批设备跨时刻必须**全等**,同一台设备持有 1 天与 400 天也必须全等 ——
+#   展示用抖动流进排名会每秒抖;任务量递减(算力恒定,降的是接单量)流进排名,
+#   会让用户什么都不做名次也往后掉。
+account_hashrate_gate() {
+  if "$NODE_BIN" scripts/selfcheck-account-hashrate.mjs > /tmp/uniapp-acct-hash.log 2>&1; then
+    ok "总有效算力聚合门 — $(tail -1 /tmp/uniapp-acct-hash.log)"
+  else
+    bad "总有效算力聚合门失败 — node scripts/selfcheck-account-hashrate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-acct-hash.log | head -8 | sed 's/^/        /'
+  fi
+}
+account_hashrate_gate
+
+# ── 门的门:机器门固定靶完整性(2026-08-05 包 G 结构性反思)────────────────────
+# 修复轮自伤 44%,「门假绿」两轮 8 条,共同根因 = 手写闭集 × 开放集合(加一个 SKU,
+# 旧门照样全绿放行;pc-gpu 整条判 0 仍 57 pass;语言豁免不带语言维)。本门扫全部门脚本:
+# 机型引用集必须等于「全集 / 递减豁免集 / 其补集」之一(全集从真模块导出派生,SKU 一变大
+# 所有涉机型的门当场红);点名语言文件必须三语齐点;例外台账逐条带理由且 0 命中即红。
+gate_targets_meta() {
+  if "$NODE_BIN" scripts/selfcheck-gate-targets.mjs > /tmp/uniapp-gate-targets.log 2>&1; then
+    ok "门的门(靶完整性)— $(tail -1 /tmp/uniapp-gate-targets.log)"
+  else
+    bad "门的门(靶完整性)失败 — node scripts/selfcheck-gate-targets.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-gate-targets.log | head -8 | sed 's/^/        /'
+  fi
+}
+gate_targets_meta
+
 # ── 创世购买可用性「单一派生」门(FEAT-GEN10 ④)────────────────────────────────
 # 被一次独立验收逼出来的:此前 composable 注释里写着这个文件名,而文件根本不存在 ——
 # 一个凭空的安全感,同轮验收抓到的 4 条缺陷全是这条不变量失守的样本。

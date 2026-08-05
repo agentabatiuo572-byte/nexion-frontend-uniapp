@@ -10,6 +10,7 @@ import { pickRandomTask } from "@/mock/tasks";
 import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
+import { accountTotalHashrate } from "@/lib/account-hashrate";
 import { getCarrier, type Carrier } from "@/lib/carrier";
 import { claimGenesisInviteCode, redeemedInviteCodeOf, type GenesisInviteRedeemResult } from "./genesis-invite";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
@@ -360,6 +361,27 @@ export const useApp = defineStore("app", () => {
   // share flag is off, UI hides those devices, but they still reserve backend
   // capacity; otherwise closing/reopening the flag can push the account past 6.
   const activeSlotCount = computed(() => devices.value.filter((d) => d.activatedAt !== null).length);
+  /**
+   * FEAT-HOME02 ③ 首页「你的排名」的入参:本账号全部在产设备的**有效算力之和**(TOPS)。
+   * 口径与聚合全在 lib/account-hashrate.ts(复用既有单台模型,不新造第二套)。
+   *
+   * 🔴 **收 now 入参,不写成 computed**:`Date.now()` 不是响应式源。写成
+   * `computed(() => accountTotalHashrate(..., Date.now(), ...))` 时 Vue 只在 devices /
+   * 配置变化时才重算,而 tick() 在会话被顶号 / 登出 / 吊销时早退(见 miningPaused),
+   * devices 不再被重新赋值 —— 这个值就永久冻在最后一次重算的那一刻:掉线三分钟以上的
+   * 手机仍按满档计进排名,而设备卡早已翻成离线(它用的是自己那个会走的 now ref)。
+   * 让调用方传自己的时钟(composables/use-now.ts 或组件的 now ref),依赖就是显式的,
+   * 页面时间一走值就跟着走。
+   *
+   * 问 visibleDevices 而不是 devices:电脑算力开关关掉时那些设备被冻结不产出
+   * (tick/settleDevice 的 freezeComputeShareDevice),算力自然也不该计。
+   *
+   * 0 = 没有在产设备。**「未上榜」不在这里判** —— 三态(ranked/unranked/unavailable)
+   * 是 lib/network-rank.ts 的事,这里只给一个数。
+   */
+  function myTotalHashrateAt(now: number): number {
+    return accountTotalHashrate(visibleDevices.value, now, cfg.config.onlineBonus);
+  }
   // When the session is invalidated (logged in elsewhere / logged out / admin
   // revoked), mining freezes: tick() early-returns so no earnings accrue while
   // this carrier has no valid session. Cleared by resumeMining() once a fresh
@@ -1457,7 +1479,7 @@ export const useApp = defineStore("app", () => {
 
   return {
     accountKey, entrySurface, accountCloudUpdatedAt,
-    user, devices, visibleDevices, slotDevices, activeSlotCount, earnings, global,
+    user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, persistAccountSnapshot,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
