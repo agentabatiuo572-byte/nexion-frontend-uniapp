@@ -51,7 +51,8 @@ const cfg = useConfig();
 //   (那是脉搏三格的规矩),页脚糊一个「数据更新中」比旧值更差。
 const perSecText = computed(() => {
   const ps = cfg.config.publicStats;
-  const v = ps && publicStatsHealth(ps).devicesOk ? payoutPerSecUsdOf(ps) : PAYOUT_PER_SEC_USD;
+  // 钱链回退只看 fleetOk(R2 P2:jitter/在线率越域不该把合法舰队值拖回种子锚)
+  const v = ps && publicStatsHealth(ps).fleetOk ? payoutPerSecUsdOf(ps) : PAYOUT_PER_SEC_USD;
   return `+$${v.toFixed(1)}/sec`;
 });
 

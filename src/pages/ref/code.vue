@@ -144,14 +144,15 @@ const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrun
 // (cfg 在下方与本页其它配置消费共用同一个 store 句柄。)
 const monthlyUsdOfCfg = (c: ReturnType<typeof useConfig>) => {
   const ps = c.config.publicStats;
-  return ps && publicStatsHealth(ps).devicesOk ? monthlyPayoutUsdOf(ps) : MONTHLY_PAYOUT_USD;
+  // 钱链回退只看 fleetOk(R2 P2 粒度)
+  return ps && publicStatsHealth(ps).fleetOk ? monthlyPayoutUsdOf(ps) : MONTHLY_PAYOUT_USD;
 };
 const joinersText = MONTHLY_NEW_JOINERS.toLocaleString("en-US");
 
 const t = useT();
 const code = ref("");
 const cfg = useConfig();
-const paidOutText = `$${(monthlyUsdOfCfg(cfg) / 1_000_000).toFixed(1)}M`;
+const paidOutText = computed(() => `$${(monthlyUsdOfCfg(cfg) / 1_000_000).toFixed(1)}M`); // 与同页礼包金额同型:computed,配置一改就跟(R2 P2 半改收口)
 const auth = useAuth();
 const sponsorship = useSponsorship();
 // 礼包金额单源派生自 platform config(禁写死镜像)。
