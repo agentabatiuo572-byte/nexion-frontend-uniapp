@@ -71,6 +71,12 @@ export interface Tier1Context {
   hasRackAnyGen: boolean;
   hasPremium: boolean;
   nexBalance: number;
+  /** 创世当前是否可购买(= 闸放行)。false 时不派 `buy_genesis` —— 派了用户也完不成。
+   *  🔴 规格只禁了「倒计时」与「名额紧迫文案」两种紧迫感形态,没人问过**任务系统**
+   *  是不是还在把用户推向一个已锁死的动作(独立 critic Q1)。用户领到一个不可能完成的
+   *  周任务、点进去发现按钮是灰的 —— 正是规格用户故事要避免的「反复尝试、误以为故障」,
+   *  只是入口从创世页挪到了任务页。 */
+  genesisPurchasable: boolean;
 }
 
 /**
@@ -80,8 +86,8 @@ export interface Tier1Context {
 export function dispatchTier1(ctx: Tier1Context): Tier1QuestDef {
   // 1. P6 + 持有 NEX → Vault
   if (ctx.phase === "P6" && ctx.nexBalance >= 5000) return TIER1_QUESTS.nex_v2_lock;
-  // 2. V6+ + 无 Genesis
-  if (ctx.myRank >= 6 && !ctx.hasGenesis) return TIER1_QUESTS.buy_genesis;
+  // 2. V6+ + 无 Genesis + **当前买得到**(关闭 / 熔断 / 售罄 / 未开售时不派,见 ctx 字段注释)
+  if (ctx.myRank >= 6 && !ctx.hasGenesis && ctx.genesisPurchasable) return TIER1_QUESTS.buy_genesis;
   // 3. 有 Rack + 余额 ≥ $2K
   if (ctx.hasRackAnyGen && ctx.balanceUSDT >= 2000) return TIER1_QUESTS.buy_additional_hw;
   // 4. 有 Pro/Rack P1(存在更高价升级目标即可置换,FEAT-DEV02)

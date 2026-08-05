@@ -183,7 +183,10 @@ function producedKinds(src) {
   //   独立验收唯一存活 P0 —— 之前它一次都没问过闸,弹「已挂单」成功却产出无人能接的死单)。
   //   2026-08-05 8→9:nova-bubble.vue 接闸(P1-2:「席位不多了·抢席位」推送此前对闸
   //   零引用,关闭态照发紧迫感;现推送前问 showUrgency,闸住换质押位文案)。
-  const EXPECTED_GATE_CONSUMERS = 9;
+  //   2026-08-05 9→10:weekly-quest-hero.vue 接闸(独立 critic Q1:周任务在关闭态仍派
+  //   「买创世」,用户领到不可能完成的任务、点进去按钮是灰的 —— 紧迫感的入口从创世页
+  //   挪到了任务页,规格只禁了倒计时/名额两种形态,没覆盖任务系统这一面)。
+  const EXPECTED_GATE_CONSUMERS = 10;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }
