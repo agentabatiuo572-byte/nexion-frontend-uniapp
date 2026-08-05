@@ -373,7 +373,7 @@ export const useGenesis = defineStore("genesis", () => {
     cfgStore.refresh();
     const blocked = genesisPurchaseBlock({
       configLoaded: cfgStore.loaded,
-      marketStatus: cfgStore.config.marketStatus,
+      marketOpenState: cfgStore.config.marketOpenState,
       halted: false, // 熔断槽位;见 genesis-config.ts 的 GenesisPurchaseInput.halted
       remaining: remaining(),
       saleStartAt: cfgStore.config.saleStartAt,
@@ -412,7 +412,7 @@ export const useGenesis = defineStore("genesis", () => {
     if (
       genesisSecondaryBlock({
         loaded: cfgStore.loaded,
-        marketStatus: cfgStore.config.marketStatus,
+        marketOpenState: cfgStore.config.marketOpenState,
         now: Date.now(),
       }) !== null
     ) {
@@ -454,7 +454,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   主售售罄或未开售都不妨碍转让;只有「市场关闭 / 熔断 / 配置未知」才拦。
     //
     // 🔴 判定必须**走同一个纯函数**,不许在这手写条件(独立验收 P1-5):
-    //   上一版这里写的是 `!loaded || marketStatus === "closed"`,而注释却声称
+    //   上一版这里写的是 `!loaded || marketOpenState === "closed"`,而注释却声称
     //   「熔断也拦」—— 注释与代码不符,且熔断接线当天二级承接会漏。
     //   现改为喂给 genesisPurchaseBlock,再按「与二级相关的阻断原因」筛,
     //   这样将来往优先级链里加档,这里自动跟上。
@@ -462,7 +462,7 @@ export const useGenesis = defineStore("genesis", () => {
     cfgStore.refresh(); // 动钱前重读权威源,同 purchase(hydrate-once 修复)
     const blocked = genesisSecondaryBlock({
       loaded: cfgStore.loaded,
-      marketStatus: cfgStore.config.marketStatus,
+      marketOpenState: cfgStore.config.marketOpenState,
       now: Date.now(),
     });
     if (blocked !== null) return false;

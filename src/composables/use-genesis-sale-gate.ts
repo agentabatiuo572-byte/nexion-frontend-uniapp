@@ -21,7 +21,7 @@ import { useT } from "@/i18n/use-t";
  * 「按钮写着可买、点了没反应」或「按钮灰着却能点进结算」。机器门:
  * `scripts/selfcheck-genesis-gate.mjs`。
  *
- * MOCK-ONLY:marketStatus / saleStartAt / showCountdown 均 server-canonical(admin G4)。
+ * MOCK-ONLY:marketOpenState / saleStartAt / showCountdown 均 server-canonical(admin G4)。
  */
 export interface UseGenesisSaleGateResult {
   /** 最高优先级的阻断原因;`null` = 可购买。页面据此出文案与行为,不再自判。 */
@@ -88,7 +88,7 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
   const block = computed(() =>
     genesisPurchaseBlock({
       configLoaded: cfg.loaded,
-      marketStatus: cfg.config.marketStatus,
+      marketOpenState: cfg.config.marketOpenState,
       // 🔴 熔断槽位:前端目前无生产者(后台 J1 有 genesis 闸但未接线),恒 false。
       //   理由与「为什么不删这个参数」写在 genesis-config.ts 的 GenesisPurchaseInput.halted。
       halted: false,
@@ -100,7 +100,7 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
 
   // 走共享纯函数,与 store 的 acquireSecondary 同一套输入口径(见其定义处的注释)。
   const secondaryBlock = computed(() =>
-    genesisSecondaryBlock({ loaded: cfg.loaded, marketStatus: cfg.config.marketStatus, now: nowTs.value }),
+    genesisSecondaryBlock({ loaded: cfg.loaded, marketOpenState: cfg.config.marketOpenState, now: nowTs.value }),
   );
 
   const marketClosed = computed(() => block.value === "marketClosed");
