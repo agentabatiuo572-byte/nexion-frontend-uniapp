@@ -274,25 +274,43 @@ function freshDefaults(): GenesisConfig {
 function storageReadable(): boolean {
   const probeKey = "nexgrid-storage-probe";
   const token = `p${Date.now()}`;
+  let ok = false;
   try {
     uni.setStorageSync(probeKey, token);
-    const back = uni.getStorageSync(probeKey);
-    uni.removeStorageSync(probeKey);
-    return back === token;
+    ok = uni.getStorageSync(probeKey) === token;
   } catch {
-    return false; // 抛了也算不可用(别的端可能真抛)
+    ok = false; // 抛了也算不可用(别的端可能真抛)
   }
+  // 🔴 清理**不参与判据**(2026-08-05 独立验收 P1):remove 抛错时 set 与 get 都已成功,
+  //   源显然可用。上一版把 remove 放在同一个 try 内、且排在 `return back === token` 之前,
+  //   于是「配额满 / 隐私模式 / 端实现差异」导致的清理失败被误判成「源不可达」——
+  //   主售 + 二级 + 挂单三条链一起 fail-closed 锁死。
+  //   token 保持每次唯一:证明的是「**这一次**写落地了」,换成常量的话
+  //   「remove 失败 + set 失败」组合会读回上一轮残留值而误报 OK(证伪 agent B3)。
+  try { uni.removeStorageSync(probeKey); } catch { /* 清理失败不改判据 */ }
+  return ok;
 }
 
 function hydrate(): { config: GenesisConfig; ok: boolean } {
-  if (!storageReadable()) {
+  let raw: unknown;
+  try {
+    raw = uni.getStorageSync(STORAGE_KEY);
+  } catch {
     // 🔴 源不可达 → configUnavailable 保守锁购(规格异常3)。与「盘上存了脏值」方向相反:
     //   脏值回退 open(一个坏字节不该永久停售),源不可达才锁。
     return { config: freshDefaults(), ok: false };
   }
-  try {
-    const s = uni.getStorageSync(STORAGE_KEY) as { config?: Partial<GenesisConfig> } | "";
-    if (s && typeof s === "object" && s.config) {
+  // 🔴 先读、读到合法对象就**不写探针**(2026-08-05 证伪 agent B5)。
+  //   读成功本身就是「源可读」的证明 —— 再写一轮探针是纯冗余。探针只用来分辨
+  //   「从没存过」与「源挂了」,而这两种情况都表现为读回空值,见下面那一支。
+  //   🔴 明确不做的两件:① 不给探针结果加时间窗缓存 —— 缓存期内源真坏掉会把
+  //   fail-closed 翻成 fail-open(已关的市场重新开门且可下单),而 purchase /
+  //   listNode / acquireSecondary 三处动钱前的 refresh() 要的正是**当下**的源;
+  //   ② 不给探针键加随机后缀 —— 固定键自覆盖,随机键在 remove 失败时每次冷启动
+  //   泄漏一条(小程序端同步存储有 10MB 上限),而它要防的键碰撞全仓只有这一处生产者。
+  if (raw && typeof raw === "object" && (raw as { config?: unknown }).config) {
+    try {
+      const s = raw as { config: Partial<GenesisConfig> };
       // Merge over defaults so newly-added fields exist for old persisted state.
       const merged = { ...DEFAULT_GENESIS_CONFIG, ...s.config };
       merged.tiers = sanitizeTiers(s.config.tiers, 0);
@@ -309,13 +327,16 @@ function hydrate(): { config: GenesisConfig; ok: boolean } {
       if (!Array.isArray(merged.opsListings)) merged.opsListings = [];
       if (!Array.isArray(merged.fomoActivity)) merged.fomoActivity = [];
       return { config: merged, ok: true };
+    } catch {
+      // 读已经成功了(源可用),走到这里说明是**解析/合并**炸了(脏值等)——
+      // 那是脏值不是源不可达,按 fail-open 回默认值放行,与上面的 fail-closed 分工不同。
+      return { config: freshDefaults(), ok: true };
     }
-    return { config: freshDefaults(), ok: true }; // 首次运行:没存过 ≠ 拉取失败
-  } catch {
-    // 探针已判源可用,走到这里说明是**解析**炸了(脏 JSON 等)—— 那是脏值不是源不可达,
-    // 按 fail-open 回默认值放行,与上面 storageReadable() 的 fail-closed 分工不同。
-    return { config: freshDefaults(), ok: true };
   }
+  // 读回空:分不清「从没存过」与「源挂了」,这时才需要往返探针来定这一分。
+  return storageReadable()
+    ? { config: freshDefaults(), ok: true }    // 首次运行:没存过 ≠ 拉取失败
+    : { config: freshDefaults(), ok: false };  // 源不可达 → configUnavailable 保守锁购
 }
 
 export const useGenesisConfig = defineStore("genesisConfig", () => {

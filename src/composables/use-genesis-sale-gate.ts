@@ -113,13 +113,24 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
   const cfg = useGenesisConfig();
   const genesis = useGenesis();
 
+  // 🔴 retain / release 必须一一对应(2026-08-05 独立验收 P2)。
+  //   直接把 releaseClock 挂上 onUnmounted 的话,「没 mount 却触发 unmount」的情形
+  //   (Suspense / async setup)会把 clockRefs 多减一次 —— 于是仍挂载着的其它消费者
+  //   倒计时集体冻结、15s 配置轮询停摆。`Math.max(0, …)` 只防负数,防不住提前归零。
+  //   仓内今天没有 Suspense,属潜伏;一个组件级布尔就焊死,不留给以后。
+  let clockHeld = false;
   onMounted(() => {
     // 🔴 消费者进场即重读配置源(hydrate-once 修复的 UI 面):config 是共享 Pinia store,
     //   任一消费者 refresh,所有已挂载消费者的 computed 一起更新。
     cfg.refresh();
+    clockHeld = true;
     retainClock();
   });
-  onUnmounted(releaseClock);
+  onUnmounted(() => {
+    if (!clockHeld) return;
+    clockHeld = false;
+    releaseClock();
+  });
 
   const block = computed(() =>
     genesisPurchaseBlock({

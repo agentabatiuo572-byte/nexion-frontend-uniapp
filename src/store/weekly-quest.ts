@@ -85,6 +85,11 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     tier2Completed.value = next.tier2Completed;
     tier2Claimed.value = next.tier2Claimed;
     bonusClaimed.value = next.bonusClaimed;
+    // 🔴 换账号后必须立刻滚周(2026-08-05 独立证伪 A4)。周滚只挂在 onMounted 上,
+    //   而账号切换时首页 hero 早已挂载、不会重跑 —— 于是装进来的若是**上周**那一行,
+    //   上周的完成态会被当成本周的直接渲染,领取键可用。rollWeekIfStale 本就幂等,
+    //   不陈旧时一个字节都不写。
+    rollWeekIfStale();
   }
 
   /** Roll to current week if persisted weekKey is stale; called on mount. */

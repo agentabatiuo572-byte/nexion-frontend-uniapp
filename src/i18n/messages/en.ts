@@ -4518,7 +4518,7 @@ export const en = {
     confirmListCta: "List for sale",
     confirmCancelTitle: "Cancel listing #{id}?",
     confirmCancelMsg: "The node will return to your wallet (not listed). You can re-list later at any price.",
-    confirmCancelMsg2: "The node will return to your wallet (not listed). ",
+    confirmCancelMsgBlocked: "The node will return to your wallet (not listed). The market is closed right now — you can list it again once it reopens.",
     confirmCancelCta: "Cancel listing",
     cancelledToast: "Listing #{id} cancelled",
     cancelledDesc: "Node returned to wallet",
