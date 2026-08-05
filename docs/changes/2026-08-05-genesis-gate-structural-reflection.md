@@ -211,6 +211,22 @@ owner 与两个二层 owner 之外的任何引用即红。红测:往任一页面
 
 🔴 **规模已远超「包 H 收口」**:这是一个新的 M/L 级任务,**须先向主人交底再动手**,不能当作收尾顺手做完。
 
+### main 回源独立核实(不投票、不只信 agent · 2026-08-05)
+
+按「agent 的 finding 必须 main 亲自 Read 验证后才采纳」,对最重的 P0-3 逐项回源:
+
+| 断言 | 回源结果 |
+|---|---|
+| `hydrate()` 只在 store 构造时跑一次 | ✅ `genesis-config.ts:272` `const config = ref(hydrate())` —— **全仓再无第二个调用点**(grep 调用方 0 命中) |
+| 无任何刷新路径 | ✅ 该文件无 `onShow` / `visibilitychange` / `watch`;导出面 `{ config, loaded, update, reset }` **没有 refresh/reload** |
+| 本仓做不到 | ❌ **做得到** —— `store/app.ts` 等 5 处已有 `onShow` 先例,**范式现成,不是技术障碍** |
+
+**顺带独立撞见另一条**(不在派单范围,回源时自己看到的):
+`genesis-config.ts:280` `const loaded = ref(true)` —— **写死 true**。
+于是 `genesisPurchaseBlock` 的 `configUnavailable` 档**永远不可达**,
+那一整条分支(含它的文案键、它在 4 处 switch 里的 case、以及规格里为它写的「重试按钮」)
+全是**死代码**。这与镜头层报的「configUnavailable 全链路不可达」互为独立佐证。
+
 ## 四、给我自己的判据(比上面三条门更重要)
 
 **「已修」是我最不可信的一类断言,而我一再把它当结论用。**
