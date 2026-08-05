@@ -193,3 +193,13 @@ src/store/app.ts:234-240 的清单实际 5 条:`activatedAt===null` / `status!==
 ```
 我重跑 `bash scripts/verify.sh` → `━━ result: 406 pass, 7 fail ━━`(日志 scratchpad\auditG-verify.log)。7 条里 6 条全是 `page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:5173`:R7 + device detail runtime · SPEC-7 K1 device/payment registration gates · AUTH02 registered-number runtime handoff (en) · 同 (zh) · SPEC-4 account-cloud app sync · SPEC-4 runtime session guard。实测 `Get-NetTCPConnection -LocalPort 5173` → **LocalAddress = ::1 独占监听**,127.0.0.1 拒连、localhost 200(所以 verify 前段 curl 探活的齿轮 PASS,后段 Playwright 硬写 127.0.0.1 的全挂)。因此自述那句「IPv6-only 是真的但**不是** AUTH02 的成因,是并发争用偶发」在我这次实测里不成立——6 个齿轮就是被这个绑定挡住的,不是 flaky。第 7 条正是他们上报待拍板的 `markdown residue in i18n copy`(en.ts:342/343/346 注释里的 `**`),仍红。本组自己的门(总有效算力聚合门 57 pass / 0 fail)确实绿,但「verify 全绿」这句话覆盖不到那 6 个没跑起来的运行时齿轮——按本仓 memory「机器门全绿先问门跑了没」,收尾必须列出没跑的门,自述没列。
 ```
+
+---
+
+# R2 收尾记账(2026-08-06):三条 P2 不在本轮修,理由如下
+
+| 条 | 为什么不修 |
+|---|---|
+| 弹层连播压住未上榜引导 | 存量转化策略行为(里程碑/代金券自动推送),非包 G 引入;要不要给连播加节流是产品决策,待主人裁 |
+| vi 动态流 who 徽章溢出 5px | 脉搏卡之外的组件(同屏抽查捕获),属独立 UI 债,不夹带进包 G |
+| syncFailed 同屏降级不一致(三格占位、上方网格条仍显示种子值) | 网格条是营销纹理,规格异常3 只管脉搏三格;统一降级涉及「营销面要不要跟着示弱」的产品取向,待主人裁。现状 = 网格条永远回种子锚,注释已写明 |

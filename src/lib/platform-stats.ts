@@ -49,19 +49,22 @@ export interface PublicStatsShape {
  * 合法域逐字段取自规格 [FEAT-HOME02b] ③ 的表,别在这儿自造更严限制(上一轮后台就栽在自造 ≤8 档)。
  */
 export function publicStatsHealth(ps: PublicStatsShape | undefined | null): {
+  fleetOk: boolean; rateOk: boolean; jitterOk: boolean;
   membersOk: boolean; devicesOk: boolean; rankOk: boolean;
 } {
-  if (!ps) return { membersOk: false, devicesOk: false, rankOk: false };
+  if (!ps) return { fleetOk: false, rateOk: false, jitterOk: false, membersOk: false, devicesOk: false, rankOk: false };
   const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
   const inRange = (v: unknown, lo: number, hi: number) => fin(v) && v >= lo && v <= hi;
-  const devicesOk = inRange(ps.fleetDevices, 1_000, 1_000_000)
-    && inRange(ps.onlineRatePct, 50, 100)
-    && inRange(ps.onlineJitter, 0, 500);
+  // 🔴 逐字段拆开(R2 P2:钱链回退只该看 fleet,jitter 越域不该把合法舰队值拖回种子)。
+  const fleetOk = inRange(ps.fleetDevices, 1_000, 1_000_000);
+  const rateOk = inRange(ps.onlineRatePct, 50, 100);
+  const jitterOk = inRange(ps.onlineJitter, 0, 500);
+  const devicesOk = fleetOk && rateOk && jitterOk;
   const membersOk = inRange(ps.registeredUsersBase, 0, 100_000_000)
     && inRange(ps.registeredUsersMonthlyGrowthPct, 0, 50)
     && fin(ps.registeredUsersAnchorAt);
   const rankOk = inRange(ps.virtualUserCount, 0, 10_000_000);
-  return { membersOk, devicesOk, rankOk };
+  return { fleetOk, rateOk, jitterOk, membersOk, devicesOk, rankOk };
 }
 
 /** 舰队规模(配置本体;非法回种子由调用方按各自面的规矩决定,这里不吞)。 */
@@ -108,15 +111,17 @@ export function paidCumulativeNow(): number {
   return Math.round(PAID_CUMULATIVE_SEED_USD + Math.max(0, Date.now() - PAID_ANCHOR_MS) * PAID_RATE_PER_MS);
 }
 
-/** 累计支付的配置派生版:增速 = 配置舰队的日产换算(种子段历史沉淀不重算)。 */
-export function paidCumulativeNowOf(ps: PublicStatsShape, now: number = Date.now()): number {
-  return Math.round(PAID_CUMULATIVE_SEED_USD + (Math.max(0, now - PAID_ANCHOR_MS) * dailyPayoutUsdOf(ps)) / 86_400_000);
-}
+// 🔴 这里**刻意没有** paidCumulativeNowOf(第二次结构反思·族B):累计支付是时间积分,
+//   背着历史 —— 按「当前配置 × 全段 elapsed」派生,运营调低舰队它就整段回退(R2 审计 C5
+//   实锤,上一版就这么写的)。积分类 = 已沉淀段 + 当前参数 × 增量段;mock 无参数变更
+//   时点存储,沉淀段以编译期锚斜率计(paidCumulativeNow),PROD 由服务端累计。
+//   谁想加回配置版,先回答「参数变更时点存在哪」。
 
 /**
  * 紧凑缩写(规格异常6):超长数字不撑破值槽、不换行断字。
- * 🔴 边界经独立审计校正:999,950–999,999 在旧写法下输出「1000.0K」(6+1 字符还超槽),
- *   K/M/B 的换档一律提前到「四舍五入后会进位」那一点;≥1e9 补 B 档。
+ * 🔴 边界经独立审计校正(R2 二次校正口径):旧写法在 999,950–999,999 输出「1000.0K」。
+ *   换档阈值取 999_500/999_500_000 —— 即「按上一档显示会 ≥999.5 从而肉眼四舍五入进位」
+ *   的最小值,自该点起提前进 M/B 档;≥1e9 补 B 档。阈值=实现,别再按 999,950 复述。
  */
 export function compactNumber(n: number): string {
   if (!Number.isFinite(n)) return "";

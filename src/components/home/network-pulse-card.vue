@@ -29,7 +29,9 @@
         >
           <view class="min-w-0">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.k }}</text>
-            <!-- 骨架条:配置重拉中(<300ms 不闪由 store 合成延迟保证,mock 期只在「重试」后可见) -->
+            <!-- 骨架条:只属**占位格**(健康格有活数据,刷新期间保持旧值,不糊骨架 ——
+                 R2 审计:下拉链 900ms 后 load 600ms,任何纯时长防抖都会被常量击穿,
+                 「有值不换骨架」才是真防闪;300ms 防抖只管占位格自己的拉取显示)。 -->
             <view v-if="m.skeleton" class="mt-1.5" style="height: 18px; width: 72%; border-radius: 6px; background: var(--v5-surface-3)" />
             <text
               v-else
@@ -83,23 +85,29 @@ const snap = useRankSnapshot();
 //   挂载取一次 + **配置重拉完成沿再取一次**(下拉刷新会触发 cfg.load,见 store/refresh.ts)。
 //   两个刷新点之间冻结 —— 名次确定性正来自于此;秒级时钟属于创世倒计时,不属于这里。
 const nowTs = ref(Date.now());
-onMounted(() => {
+// 🔴 24h 前进量:**冻结成普通 ref,再提交**(第二次结构反思·族A)。
+//   R1 是「computed 里落盘」,R2 证明「先读后滚」照样死 —— commit 写快照源,
+//   展示 computed 追踪着它,paint 前被失效重算成 null。响应式系统里「顺序」不是「隔离」;
+//   真隔离 = 展示值在时点定格进普通 ref(它不追踪任何源),提交爱怎么写怎么写。
+const displayDelta = ref<number | null>(null);
+function refreshRankMoment() {
   nowTs.value = Date.now();
-  // 24h 快照:先读(preview 纯读进 computed)后滚(commit 只在这类显式时点),
-  // 顺序保证「隔天回访」当次能看到 ↑n —— 滚动写进 computed 读路径会 paint 前自我覆盖(审计 P1)。
   const r = rank.value;
-  if (r.kind === "ranked") snap.commit(r.rank, nowTs.value);
-});
-watch(() => cfg.loading, (l, was) => {
-  if (was && !l) {
-    nowTs.value = Date.now();
-    const r = rank.value;
-    if (r.kind === "ranked") snap.commit(r.rank, nowTs.value);
+  if (r.kind === "ranked") {
+    displayDelta.value = snap.preview(r.rank, nowTs.value); // 先冻结
+    snap.commit(r.rank, nowTs.value);                       // 后滚动,写不回展示值
+  } else {
+    displayDelta.value = null;
   }
+}
+onMounted(refreshRankMoment);
+watch(() => cfg.loading, (l, was) => {
+  if (was && !l) refreshRankMoment();
 });
 
-// 🔴 骨架 <300ms 防闪烁(规格 ⑤ 明写;mock 恰好 600ms 不是实现,是巧合 —— 审计 P2):
-//   loading 持续超过 300ms 才亮骨架,结束即灭。
+// 🔴 骨架防闪的真机制(R2 审计后改):**有活数据的格永不切骨架**(stale-while-revalidate,
+//   下拉链 await 900ms 后 load 600ms,600>300 恒成立,纯时长防抖必被击穿)。
+//   本防抖只服务**占位格**自己的「拉取中」显示:>300ms 才亮,免得点重试闪一下(规格 ⑤)。
 const showSkeleton = ref(false);
 let skeletonTimer: ReturnType<typeof setTimeout> | null = null;
 watch(() => cfg.loading, (l) => {
@@ -113,21 +121,23 @@ watch(() => cfg.loading, (l) => {
 /** 装饰性走势(确定性,从当前值倒推 8 点缓坡;不声称历史数据,只是视觉纹理)。 */
 const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i * 0.0004));
 
+// 健康度共享一份(三格 + 排名入参守卫同源)
+const health = computed(() => publicStatsHealth(cfg.config.publicStats));
 // ── 格 1:注册用户(基数按月增速从锚点推算;派生值同时是排名分母的真实人口)──
 const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats, nowTs.value));
 // ── 格 3:名次(每次渲染由当下算力 + 当下配置现算,禁缓存名次)──
-const rank = computed(() =>
-  computeRank({
+//   🔴 入参守卫(R2 P2):分母吃的是格 1 的派生 —— members 参数非法时它不是「被拖垮」,
+//   是它自己的输入坏了,同判 unavailable;ps 整段缺席(机器门最小桩)同理,不裸解引。
+const rank = computed(() => {
+  const ps = cfg.config.publicStats;
+  const h = health.value;
+  if (!ps || !h.membersOk || !h.rankOk) return { kind: "unavailable" } as const;
+  return computeRank({
     myTotalHashrate: app.myTotalHashrateAt(nowTs.value),
-    table: cfg.config.publicStats.hashratePercentileTable,
+    table: ps.hashratePercentileTable,
     realPopulation: registered.value,
-    virtualPopulation: cfg.config.publicStats.virtualUserCount,
-  }),
-);
-// preview 是纯读 —— computed 里零副作用(滚动落盘在 onMounted / 刷新沿,见上)
-const rankDelta = computed(() => {
-  const r = rank.value;
-  return r.kind === "ranked" ? snap.preview(r.rank, nowTs.value) : null;
+    virtualPopulation: ps.virtualUserCount,
+  });
 });
 
 interface Cell {
@@ -139,7 +149,7 @@ interface Cell {
   subTone?: string;
   data?: number[] | null;
   color?: string;
-  skeleton: boolean;
+  skeleton?: boolean; // 只属占位格:健康格有活数据,刷新期间保持旧值(stale-while-revalidate),不糊骨架
   tap?: () => void;
   subTap?: () => void;
 }
@@ -164,10 +174,10 @@ const metrics = computed<Cell[]>(() => {
   const failed = cfg.syncFailed;
   // 🔴 逐字段健康度(审计 P1「异常3 半缺」):判定收在 publicStatsHealth 单处,
   //   在线率越域 / 增速为负 / 虚拟人口为负都算非法 → 对应格占位,禁拿回退锚冒充真数据。
-  const health = publicStatsHealth(ps);
+  const h = health.value;
 
   // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
-  const membersBad = failed || !health.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
+  const membersBad = failed || !h.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
   const members: Cell = membersBad
     ? placeholderCell(t.value.home.networkMembers)
     : {
@@ -177,11 +187,10 @@ const metrics = computed<Cell[]>(() => {
         sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
         data: ramp(registered.value),
         color: "var(--v5-brand)",
-        skeleton: showSkeleton.value,
       };
 
   // 格 2 在线设备 —— 值来自 store 的呼吸态(基线与带宽都由配置驱动,见 app.ts)
-  const devicesBad = failed || !health.devicesOk;
+  const devicesBad = failed || !h.devicesOk;
   const devices: Cell = devicesBad
     ? placeholderCell(t.value.home.networkDevices)
     : {
@@ -191,13 +200,12 @@ const metrics = computed<Cell[]>(() => {
         sub: t.value.home.networkDevicesSub,
         data: ramp(app.global.activeDevices),
         color: "var(--v5-tech-cyan-ink)",
-        skeleton: showSkeleton.value,
       };
 
   // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2);rankOk 缺失同走占位
   const r = rank.value;
   let rankCell: Cell;
-  if (failed || !health.rankOk || r.kind === "unavailable") {
+  if (failed || !h.rankOk || r.kind === "unavailable") {
     rankCell = placeholderCell(t.value.home.networkYourRank);
   } else if (r.kind === "unranked") {
     rankCell = {
@@ -209,7 +217,6 @@ const metrics = computed<Cell[]>(() => {
       sub: t.value.home.networkRankUnrankedHint,
       subTone: "var(--v5-brand)",
       data: null,
-      skeleton: showSkeleton.value,
       tap: () => toast.info(t.value.home.networkRankTipUnranked),
       subTap: () => navTo("/store"), // 引导整条即 CTA(规格 ⑥:设备/商城既有入口)
     };
@@ -218,11 +225,10 @@ const metrics = computed<Cell[]>(() => {
       k: t.value.home.networkYourRank,
       v: `#${compact(r.rank)}`,
       tone: "var(--v5-brand)",
-      sub: rankDelta.value !== null ? fmt(t.value.home.networkRankUp24h, { n: rankDelta.value }) : "",
+      sub: displayDelta.value !== null ? fmt(t.value.home.networkRankUp24h, { n: displayDelta.value }) : "",
       // 名次越小越好:走势画成向下缓坡(视觉「在前进」),数据仍是确定性装饰
       data: Array.from({ length: 8 }, (_, i) => -r.rank * (1 + (7 - i) * 0.0004)),
       color: "var(--v5-brand)",
-      skeleton: showSkeleton.value,
       tap: () => toast.info(t.value.home.networkRankTipRanked),
     };
   }

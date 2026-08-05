@@ -371,7 +371,7 @@ export const en = {
     //     networkDevicesSub        副 89.3  86.4     60.0     79.2     —
     //     networkRankUp24h         副 89.3  72.0     69.6     79.2     12(2 位典型)
     //     networkRankUp24h         副 89.3  79.2     76.8     86.41    128(3 位上界)
-    //     networkRankUnrankedHint  副 89.3  72.0     84.0     55.7     —
+    //     networkRankUnrankedHint  副 89.3  72.0     84.0     55.7     —      ← vi 实测 55.7 略低于 7.2/字×8 的算术 57.6:无数字串不受 tabular 影响,字距实测偏窄;以实测为准
     //   别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。旧长式与其实测值
     //   (93.6/115.2/122.41/158.4/144.0 各 ✗)已随本次换串退役,不再是现网形态。
     networkMembersSub: "+{n}% /mo",

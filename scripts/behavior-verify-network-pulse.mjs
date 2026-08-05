@@ -60,6 +60,13 @@ await page.addInitScript(() => {
     "nexgrid-milestones-accounts-v1",
     JSON.stringify({ type: "object", data: { default: { firedIds: ["earn-100", "earn-500", "earn-1000", "earn-5000", "earn-10000"] } } }),
   );
+  // 🔴 注入 25h 前的名次快照(名次远差于当前)—— ⑥ 断言「隔天回访」徽标在 paint 后仍可见。
+  //   这是 R1/R2 两轮都栽的那条 P1 的回归门:滚动落盘若写回展示读路径,徽标会在
+  //   paint 前被自我覆盖成空(R2 用真调度器复放实锤)。uni 包装格式,按账号行。
+  localStorage.setItem(
+    "nexgrid-rank-snapshot-accounts-v1",
+    JSON.stringify({ type: "object", data: { default: { rank: 999_999, at: Date.now() - 25 * 3_600_000 } } }),
+  );
 });
 
 await page.goto("http://127.0.0.1:5173/?nx_device=off#/pages/index/index", { waitUntil: "networkidle" });
@@ -110,6 +117,27 @@ await page.waitForTimeout(600);
 const afterTap = await page.evaluate(() => document.body.innerText);
 check("④ 点排名格弹出口径提示(按已激活设备算力…)", /已激活设备|active devices|đang hoạt động/.test(afterTap),
   "点击后没找到提示文案");
+
+// ⑥ 「隔天回访」徽标 paint 后仍在(R1/R2 双轮 P1 的回归门):注入的 25h 快照名次远差于
+//    当前 → 前进量必为正 → 副行必须渲染「24h」字样;等 1.2s 保证跨过 paint 与微任务窗。
+await page.waitForTimeout(1200);
+// 🔴 针锚在**排名格自己的副行**:全文找 /24h/ 会被页面别处文案骗绿(红测第一发实锤 ——
+//   注入旧病形态它照样 PASS)。先定位值为 #… 的那格,取同格副行。
+const badge = await page.evaluate(() => {
+  const cells = [...document.querySelectorAll("uni-view")].filter((c) => {
+    const texts = [...c.querySelectorAll("uni-text")].map((n) => (n.textContent ?? "").trim());
+    return texts.some((s) => /^#[\d,.KM]+$/.test(s));
+  });
+  // 取最内层命中的容器(排名格),副行 = 该容器里排在 # 值之后的下一个 uni-text
+  const cell = cells[cells.length - 1];
+  if (!cell) return { found: false, sub: "" };
+  const texts = [...cell.querySelectorAll("uni-text")].map((n) => (n.textContent ?? "").trim());
+  const at = texts.findIndex((s) => /^#[\d,.KM]+$/.test(s));
+  return { found: true, sub: texts[at + 1] ?? "" };
+});
+check("🔴 ⑥ 隔天回访:排名格副行的 24h 前进徽标在 paint 后真实可见(不被滚动落盘自我覆盖)",
+  badge.found && /24h/.test(badge.sub) && /\d/.test(badge.sub),
+  badge.found ? `排名格副行实得「${badge.sub}」` : "没找到排名格");
 
 // ⑤ console
 check(`⑤ console error = 0(实收 ${errors.length})`, errors.length === 0, errors.slice(0, 3).join(" | "));

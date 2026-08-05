@@ -15,7 +15,7 @@ import { getCarrier, type Carrier } from "@/lib/carrier";
 import { claimGenesisInviteCode, redeemedInviteCodeOf, type GenesisInviteRedeemResult } from "./genesis-invite";
 import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
-import { FLEET_DEVICES } from "@/lib/platform-stats";
+import { FLEET_DEVICES, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig, currentNetworkConfirmFeeUsd } from "@/store/config";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
@@ -328,15 +328,19 @@ export const useApp = defineStore("app", () => {
   const cfg = useConfig();
   //   ⚠️ publicStats 整段可能缺席:若干机器门用最小配置桩装载本 store(邀请码门实测炸在这),
   //   老持久行升级期同理 —— 缺席按「配置未知」走编译期锚回退,不许在 setup 期抛。
+  //   🔴 收留判据 = publicStatsHealth(R2 审计 P1:上一版 isFinite&&>0 会把
+  //   「非法但为正」的越域值收留进 global.activeDevices,而 on-grid/trust/globe 三处
+  //   裸消费它 —— 同一行页脚里 200 万在线 × 按 2.8 万舰队算的 $/sec。根修这一个生产点,
+  //   消费者自动收敛;域判定与卡片占位共用同一个函数,两层永不打架)。
   const pulseOnlineBaseline = (): number => {
     const ps = cfg.config.publicStats;
-    if (!ps) return FLEET_DEVICES;
-    const v = Math.round(ps.fleetDevices * (ps.onlineRatePct / 100));
-    return Number.isFinite(v) && v > 0 ? v : FLEET_DEVICES;
+    if (!ps || !publicStatsHealth(ps).devicesOk) return FLEET_DEVICES;
+    return Math.round(ps.fleetDevices * (ps.onlineRatePct / 100));
   };
   const pulseJitterBand = (): number => {
-    const j = cfg.config.publicStats?.onlineJitter;
-    return Number.isFinite(j) && j >= 0 ? (j as number) : 24;
+    const ps = cfg.config.publicStats;
+    if (!ps || !publicStatsHealth(ps).jitterOk) return 24;
+    return ps.onlineJitter;
   };
   const global = ref<GlobalStats>(createInitialGlobal(pulseOnlineBaseline()));
   /**

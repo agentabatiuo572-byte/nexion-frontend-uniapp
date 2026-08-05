@@ -140,7 +140,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
-import { FLEET_DEVICES, fleetDevicesOf, paidCumulativeNow, paidCumulativeNowOf, publicStatsHealth } from "@/lib/platform-stats";
+import { FLEET_DEVICES, fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 
 const t = useT();
@@ -149,12 +149,16 @@ const t = useT();
 //   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
 //   rationale 见 docs/changes/2026-07-24-intro-stats-cumulative.md。
 const cfg = useConfig();
-const psOk = () => {
+const fleetOk = () => {
   const ps = cfg.config.publicStats;
-  return !!ps && publicStatsHealth(ps).devicesOk;
+  return !!ps && publicStatsHealth(ps).fleetOk;
 };
-const fleetNow = () => (psOk() ? fleetDevicesOf(cfg.config.publicStats) : FLEET_DEVICES);
-const paidNow = () => (psOk() ? paidCumulativeNowOf(cfg.config.publicStats) : paidCumulativeNow());
+const fleetNow = () => (fleetOk() ? fleetDevicesOf(cfg.config.publicStats) : FLEET_DEVICES);
+// 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
+//   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
+//   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
+//   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
+const paidNow = () => paidCumulativeNow();
 const paid = ref(paidNow());
 const devices = ref(fleetNow());
 

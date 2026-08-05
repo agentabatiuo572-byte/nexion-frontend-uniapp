@@ -1727,12 +1727,19 @@ platform_stats_anchor() {
     'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
     'src/store/app.ts|FLEET_DEVICES' \
     'src/components/home/on-grid-section.vue|payoutPerSecUsdOf' \
-    'src/pages/onboarding/intro.vue|paidCumulativeNowOf' \
+    'src/pages/onboarding/intro.vue|fleetDevicesOf' \
     'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
+    # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
-    if [ "$(grep -c "$sym" "$f" 2>/dev/null)" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
+    if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
+  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。**代码面**出现即红。
+  #   计数剥注释 —— 族B 注释自己就点名这个符号解释为什么禁,不剥的话哨兵抓自己的说明书
+  #   (首跑实锤:这条禁令与上面 pin 同分钟写就,上面剥了、这里没剥,P2-10 同型在相邻行重犯)。
+  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^\|[^:])//.*$|\1|' {} + 2>/dev/null | grep -q "paidCumulativeNowOf"; then
+    bad "platform-anchor: paidCumulativeNowOf 出现在代码面 —— 积分类禁跟配置,见 platform-stats 族B 注"; fails=1
+  fi
   # (4b) 2026-08-06 审计 P1 收口:钱链消费者必须走 *Of(配置派生)——上面三条 *Of pin 守
   #      「接了」;这一条守「种子恒等」:mock 种子必须从锚取值,开箱两侧不许各写一份字面量。
   if ! grep -qE 'fleetDevices: *FLEET_DEVICES' src/mock/platform-config.ts 2>/dev/null; then
