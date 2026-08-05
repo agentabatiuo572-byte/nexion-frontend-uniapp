@@ -55,7 +55,7 @@ export type GenesisPurchaseBlock =
 export interface GenesisPurchaseInput {
   /** 配置是否已成功拉到。false = 未知,走保守锁购。 */
   configLoaded: boolean;
-  marketStatus: "open" | "closed";
+  marketOpenState: "open" | "closed";
   /** 熔断是否生效。
    *
    *  🔴 **今天恒为 false,因为前端还没有这个信号的生产者** —— 后台 J1 有 `genesis` 熔断闸,
@@ -83,7 +83,7 @@ export interface GenesisPurchaseInput {
  */
 export function genesisPurchaseBlock(input: GenesisPurchaseInput): GenesisPurchaseBlock {
   if (!input.configLoaded) return "configUnavailable";
-  if (input.marketStatus === "closed") return "marketClosed";
+  if (input.marketOpenState === "closed") return "marketClosed";
   if (input.halted) return "halted";
   if (input.remaining <= 0) return "soldOut";
   if (isPreSale(input.saleStartAt, input.now)) return "preSale";
@@ -109,13 +109,13 @@ export function genesisShowsUrgency(block: GenesisPurchaseBlock): boolean {
  */
 export function genesisSecondaryBlock(cfg: {
   loaded: boolean;
-  marketStatus: "open" | "closed";
+  marketOpenState: "open" | "closed";
   halted?: boolean;
   now: number;
 }): GenesisPurchaseBlock {
   return genesisPurchaseBlock({
     configLoaded: cfg.loaded,
-    marketStatus: cfg.marketStatus,
+    marketOpenState: cfg.marketOpenState,
     halted: cfg.halted ?? false,
     remaining: Number.POSITIVE_INFINITY,
     saleStartAt: null,
@@ -164,7 +164,7 @@ export interface GenesisConfig {
    *  单源 = 后台 G4,server-canonical,client 仅缓存展示。
    *  🔴 与 `showcaseEnabled` **相互独立**:关闭市场 ≠ 下架(规格 ③)。
    *  🔴 与 `saleStartAt` 也独立,且优先级**高于**它(规格 ④)。 */
-  marketStatus: "open" | "closed";
+  marketOpenState: "open" | "closed";
   /** 关闭态文案变体;仅取 GENESIS_CLOSED_NOTICE_KEYS 内的值,非法值回退 "default"。 */
   closedNoticeKey: GenesisClosedNoticeKey;
   // 预售倒计时
@@ -193,7 +193,7 @@ const DAY = 86400_000;
 
 export const DEFAULT_GENESIS_CONFIG: GenesisConfig = {
   tiers: GENESIS_TIERS_DEFAULT.map((t) => ({ ...t })),
-  marketStatus: "open", // 默认开放(不阻断现状)
+  marketOpenState: "open", // 默认开放(不阻断现状)
   closedNoticeKey: "default",
   saleStartAt: null, // 默认已开售(不阻断现状)
   showCountdown: true,
@@ -265,7 +265,14 @@ function hydrate(): { config: GenesisConfig; ok: boolean } {
       // Merge over defaults so newly-added fields exist for old persisted state.
       const merged = { ...DEFAULT_GENESIS_CONFIG, ...s.config };
       merged.tiers = sanitizeTiers(s.config.tiers, 0);
-      if (merged.marketStatus !== "open" && merged.marketStatus !== "closed") merged.marketStatus = "open";
+      // 🔴 旧字段迁移(2026-08-05 marketStatus→marketOpenState,两端统一命名,主人拍板):
+      //   已持久化的老行只有旧字段;不迁的话 merge 拿不到值 → 回落默认 "open",
+      //   运营已关的市场会随一次升级**静默重开**。旧字段名的字面量全仓仅此一处,属迁移遗留。
+      const legacy = (s.config as { marketStatus?: unknown }).marketStatus;
+      if ((s.config as { marketOpenState?: unknown }).marketOpenState === undefined && (legacy === "open" || legacy === "closed")) {
+        merged.marketOpenState = legacy;
+      }
+      if (merged.marketOpenState !== "open" && merged.marketOpenState !== "closed") merged.marketOpenState = "open";
       if (!GENESIS_CLOSED_NOTICE_KEYS.includes(merged.closedNoticeKey)) merged.closedNoticeKey = "default";
       if (!Array.isArray(merged.perks) || merged.perks.length !== 4) merged.perks = emptyPerks();
       if (!Array.isArray(merged.opsListings)) merged.opsListings = [];

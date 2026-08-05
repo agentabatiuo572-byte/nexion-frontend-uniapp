@@ -7,7 +7,7 @@
 // v1(2026-08-05 上午):此前 composable 注释里写着这个文件名,而**文件根本不存在**。
 //   补建之后,判据是「文件里同时出现 return "marketClosed"/"halted"/"soldOut"/"preSale"
 //   四句才算有一套判定」。当天下午独立验收**实测构造了 6 种绕法,全部放行**:
-//     ① `if (!loaded || marketStatus === "closed") return false;` ← **上一轮那条缺陷的原样复发**
+//     ① `if (!loaded || marketOpenState === "closed") return false;` ← **上一轮那条缺陷的原样复发**
 //     ② 只抄两档 ③ 换单引号 ④ 用模板字面量 ⑤ 写成三元链 ⑥ 先赋值再 return
 //   外加:文件清单写死 7 个,**新文件根本不扫**,而消费面是开放集合。
 //   也就是说 v1 拦不住它唯一该拦的那种错误 —— 一个「看起来像门」的东西。
@@ -15,7 +15,7 @@
 // v2(本文件)针对性重建:
 //   🔴 **两条正交判据**,因为绕法①**不含任何档位字面量**,只靠扫字面量必漏:
 //      ④a 产出面:任一档位值在纯函数外**被产出**即红(不管什么引号 / 三元 / 先赋值后返回);
-//      ④b 输入面:决策输入(marketStatus / loaded)只许在白名单文件里被**比较**——
+//      ④b 输入面:决策输入(marketOpenState / loaded)只许在白名单文件里被**比较**——
 //          绕法①正是「不产出档位值、直接拿输入自己判」,只有这条抓得住。
 //   🔴 扫**全 src/**,不写死文件清单;扫到 0 个文件直接判红(空集会让全称判据恒真)。
 //   🔴 每条判据配**真**红测:把改坏的文本**喂回该条判据本身**,看它转不转红 ——
@@ -71,12 +71,12 @@ const INPUT_ALLOW = new Set([OWNER, "src/composables/use-genesis-sale-gate.ts"])
 
 // ── ① 优先级链:**用行为证明**,不读源码顺序 ─────────────────────────────────
 const FUTURE = 4102444800000;
-const base = { configLoaded: true, marketStatus: "open", halted: false, remaining: 10, saleStartAt: null, now: 1_700_000_000_000 };
+const base = { configLoaded: true, marketOpenState: "open", halted: false, remaining: 10, saleStartAt: null, now: 1_700_000_000_000 };
 const b = (o) => genesisPurchaseBlock({ ...base, ...o });
 {
   const cases = [
-    ["配置未知压过全部", { configLoaded: false, marketStatus: "closed", halted: true, remaining: 0, saleStartAt: FUTURE }, "configUnavailable"],
-    ["市场关闭压过熔断/售罄/预售", { marketStatus: "closed", halted: true, remaining: 0, saleStartAt: FUTURE }, "marketClosed"],
+    ["配置未知压过全部", { configLoaded: false, marketOpenState: "closed", halted: true, remaining: 0, saleStartAt: FUTURE }, "configUnavailable"],
+    ["市场关闭压过熔断/售罄/预售", { marketOpenState: "closed", halted: true, remaining: 0, saleStartAt: FUTURE }, "marketClosed"],
     ["熔断压过售罄/预售", { halted: true, remaining: 0, saleStartAt: FUTURE }, "halted"],
     ["售罄压过预售", { remaining: 0, saleStartAt: FUTURE }, "soldOut"],
     ["只剩预售未到", { saleStartAt: FUTURE }, "preSale"],
@@ -90,9 +90,9 @@ const b = (o) => genesisPurchaseBlock({ ...base, ...o });
 
 // ── ② 二级市场 ──────────────────────────────────────────────────────────────
 {
-  const s = (o) => genesisSecondaryBlock({ loaded: true, marketStatus: "open", now: base.now, ...o });
+  const s = (o) => genesisSecondaryBlock({ loaded: true, marketOpenState: "open", now: base.now, ...o });
   check(`🔴 ② 二级不受主售售罄影响`, s({}) === null, `实得 ${s({})}`);
-  check(`🔴 ② 二级照样被市场关闭拦`, s({ marketStatus: "closed" }) === "marketClosed", `实得 ${s({ marketStatus: "closed" })}`);
+  check(`🔴 ② 二级照样被市场关闭拦`, s({ marketOpenState: "closed" }) === "marketClosed", `实得 ${s({ marketOpenState: "closed" })}`);
   check(`🔴 ② 二级照样被配置未知拦`, s({ loaded: false }) === "configUnavailable", `实得 ${s({ loaded: false })}`);
 }
 
@@ -144,7 +144,7 @@ function producedKinds(src) {
 }
 
 // ══ ④b 输入面:决策输入只许在白名单文件里被比较 ══════════════════════════════
-// 🔴 绕法① `if (!loaded || marketStatus === "closed") return false;` **不含任何档位值**,
+// 🔴 绕法① `if (!loaded || marketOpenState === "closed") return false;` **不含任何档位值**,
 //    只有这条判据抓得住 —— 它拿决策**输入**自己判了一套。
 {
   const files = allSources();
@@ -152,8 +152,8 @@ function producedKinds(src) {
   for (const f of files) {
     if (INPUT_ALLOW.has(f)) continue;
     const src = strip(readFileSync(path.join(root, f), "utf8"), true);
-    // 比较 marketStatus,或把 .loaded 当布尔条件用(!x / x && / x ||)
-    if (/marketStatus\s*[=!]==/.test(src)) offenders.push(`${f}:marketStatus 比较`);
+    // 比较 marketOpenState,或把 .loaded 当布尔条件用(!x / x && / x ||)
+    if (/marketOpenState\s*[=!]==/.test(src)) offenders.push(`${f}:marketOpenState 比较`);
     if (/[!(]\s*\w+\.loaded\b|\w+\.loaded\s*(&&|\|\|)/.test(src)) offenders.push(`${f}:loaded 当条件`);
   }
   check(`🔴 ④b 决策输入只在 ${INPUT_ALLOW.size} 个白名单文件里被比较(实测越界 ${offenders.length} 处)`,
@@ -247,9 +247,9 @@ function urgencySitesUngated(src) {
   check(`红测自证:④a 不把 === 比较误判成产出`,
     producedKinds(`if (b === "marketClosed") show();`).length === 0, "误报比较");
   // ④b:绕法① —— 不含任何档位值的手写判定
-  const evasion1 = `if (!cfg.loaded || cfg.config.marketStatus === "closed") return false;`;
+  const evasion1 = `if (!cfg.loaded || cfg.config.marketOpenState === "closed") return false;`;
   check(`🔴 红测自证:④b 认得出绕法①(上一轮缺陷的原样复发,**v1 放行的那个**)`,
-    /marketStatus\s*[=!]==/.test(evasion1) || /[!(]\s*\w+\.loaded\b/.test(evasion1), "④b 也漏了 = 两条判据都白建");
+    /marketOpenState\s*[=!]==/.test(evasion1) || /[!(]\s*\w+\.loaded\b/.test(evasion1), "④b 也漏了 = 两条判据都白建");
   // ⑥:把闸从渲染行上摘掉,该条必须转红
   const gated = `<text v-if="showUrgency">{{ fmt(t.genesis.tier.left, { n }) }}</text>`;
   const ungated = gated.replace(/ v-if="showUrgency"/, "");
@@ -261,7 +261,7 @@ function urgencySitesUngated(src) {
 // ══ ⑦ 「该有的在不在」—— store 每个改变市场参与状态的 action 都必须问闸 ═══════════
 // 🔴 前六条判据全部只看「已经引用了闸的地方用得对不对」,对「本该引用却一个符号都
 //    不出现」的文件恒真 —— listNode(独立验收唯一存活 P0)正是从这个正交维度掉出去的:
-//    它不产出档位值、不比较 marketStatus、不引用 useGenesisSaleGate,①④⑤⑥ 对它全绿。
+//    它不产出档位值、不比较 marketOpenState、不引用 useGenesisSaleGate,①④⑤⑥ 对它全绿。
 // 🔴 判据锚点 = store 末尾 `return { … }` 那份**代码里已存在的显式清单**,不是自造的
 //    模式扫描(第一版按「函数体有没有写状态关键词」筛,静默漏掉了 listNode 本身)。
 //    新增导出成员必须写进那一处 → 门一定看得见;台账写在本脚本里,删成员改名都会红。
