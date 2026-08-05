@@ -123,6 +123,25 @@
 
 | # | 事实 | 处置 |
 |---|---|---|
-| P2-4 | `bills.seed()` 全仓**零调用点**(`bills.ts:211`),死代码 | 待清 |
+| P2-4 | ❌ **agent 这条是错的,已回源推翻**。`bills.seed()` **不是死代码**:`scripts/selfcheck-withdraw-freeze.mjs:212` 拿它当固定靶(`const store = useBills(); store.seed();`),按它删会当场打断一道机器门 | **不删**;教训见下 |
 | P2-1 | `lastBucketedAt` 零读取点这个**结论对**,但我写的「删了能省字节」这个**理由错**——`merged = {...latest}` 只遍历 next 的键,磁盘上的旧字段会永久带下去 | 结论保留,理由更正 |
 | P1-6 | 提案 §四.2 让 agent 评估 `stableJson` 开销,而那段代码当天已被撤销并焊门禁止复活 | 我派单时没同步,已作废 |
+
+### 🔴 P2-4 那条错报的教训(值得单记)
+
+agent 报「`bills.seed()` 全仓零调用点,死代码」。**我第一次自查也得出同样结论** ——
+因为我跑的是 `grep -rn "seed()" src/ | grep -i bill`:**只搜了 `src/`,而且用「行里有没有 bill 字样」筛**。
+真正的消费者在 `scripts/selfcheck-withdraw-freeze.mjs:212`,那行长这样:
+
+```js
+const store = useBills();
+store.seed();          // ← 既不在 src/,行里也没有 "bill" 这个词
+```
+
+**两个筛选条件各自把它漏掉一次。** 按这条报告删下去,会当场打断一道机器门的固定靶,
+而且 verify 要跑到那道门才报错——中间所有环节都是绿的。
+
+**判据**:凡是要**删**东西,消费面必须包含 `scripts/`(机器门 / harness 也是消费者),
+且筛选词只用**符号本身**,不叠加「行里应该还有什么词」这种二次条件
+(同族:[[feedback_sentinel_green_without_checking]] 的缩集陷阱、
+[[feedback_css_block_deletion_selector_sweep]] 的逐 selector 反查)。

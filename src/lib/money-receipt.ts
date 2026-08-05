@@ -234,9 +234,17 @@ export function postMoneyBillsOnce(drafts: ReceiptDraft[], opts: PostMoneyOption
   //   · 单标签页内的重放(重试 / 自愈补发 / 消费资格失败后再点)——完全可靠,这是本函数的主用途;
   //   · **跨标签页**并发领同一笔 —— 另一页刚写的分录这边看不见,判重会漏,可能发两次。
   // 后者不是本函数引入的:账单表本身走裸 writeAccountRow(无 CAS、无合并),跨标签页
-  // 本来就会丢分录(实测靶 scripts/measure-bills-crosstab-loss.mjs)。两者同一个根因,
-  // 归「完全版 A」存储重构一并解决(账单归属 + 事务边界),不在这里单独打补丁 ——
-  // 单独把这里改成读磁盘,只会得到一个「判重准了但分录仍会被覆盖」的半吊子。
+  // 本来就会丢分录(实测靶 scripts/measure-bills-crosstab-loss.mjs)。
+  //
+  // 🔴 **这是 mock 存储层的已知边界,主人 2026-08-05 拍板不在前端修,由真后端事务解决。**
+  //   曾提案把账单并进账户快照做成一次落盘,独立证伪判定不可行(6 条 P0,
+  //   见 docs/changes/2026-08-04-change2-proposal.md):四个资金原语各自内部落盘,
+  //   「合成一次写」这个前提就不成立;硬凑则回滚会报成功而钱真没了。
+  //   完整版要连带动账单归属 / 存量迁移 / 跨账号写法,全在资金路径上,
+  //   而换来的只是亚毫秒窗口——真后端一个事务就覆盖掉。
+  //
+  // 不修不等于不管:写失败是**响的**(回滚 + reportStuckFunds + txNotSaved 提示)。
+  // 单独把这里改成读磁盘也没用 —— 只会得到「判重准了但分录仍会被覆盖」的半吊子。
   if (useBills().bills.some((b) => b.ref === ref)) return "ok";
   return postMoneyBills(drafts, opts);
 }
