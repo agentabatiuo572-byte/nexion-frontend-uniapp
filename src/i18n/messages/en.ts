@@ -341,7 +341,8 @@ export const en = {
     //   值槽 = 89.3px(1、2 格)/ 90.3px(第 3 格「你的排名」),General Sans 20px/600、
     //   letter-spacing -0.28px,white-space:nowrap 且「无 truncate」(实测 text-overflow:clip),
     //   卡片外层 overflow:hidden → 超宽是「硬裁」,不是省略号。
-    //   副文本槽 = 89.3px,JetBrains Mono 12px/400,.truncate 挂在 <text> 那层
+    //   副文本槽 = 89.3px(1、2 格)/ 90.34px(第 3 格,与值槽同因:排名格宽 1px 差),
+    //   JetBrains Mono 12px/400,.truncate 挂在 <text> 那层
     //   (overflow:hidden + text-overflow:ellipsis;叶子 <span> 上读到 clip 是读错了层)
     //   → 超宽是「省略号」,不致命。
     //   放进值槽的任何语言必须 ≤ 89.3px@20px;放不下的整态降档渲染,别指望裁切。
@@ -351,22 +352,31 @@ export const en = {
     //   (第三支 probe 正是这样抓到上一版把 networkMembersSub 按 1 位数字量成 79.2 ✓,
     //    而它真实代入的是 mock/platform-config.ts:32 的 2.9 → 93.6 ✗。)
     //
+    // 🔴 量法(2026-08-05 定案):宽度随 webfont 加载态漂移 —— en/zh 不漂,只有 vi 漂,
+    //   同一 vi 串在字体未就绪 / 已就绪两态下会量出互相矛盾的数字(第三轮那三条
+    //   「更正」全部改反了方向,根因即此)。契约数字一律取 fonts.ready 之后的定态值:
+    //   写进真实槽节点触发真字体栈,等 document.fonts.ready,连续两趟一致才作数;
+    //   字体未就绪时量出的 vi 宽度一律作废,不得拿去「更正」下表。下表 vi 列已全部为定态值。
+    //   书写精度:本表记 probe 原值(两位小数);vi.ts 同键注释按 1 位圆整(78.5/139.1),
+    //   与本表 78.48/139.14 是**同一次定态测量的两种写法**(差 ≤0.04px),不是两套数据,
+    //   下轮 diff 对比时别当「契约不一致」误报。
+    //
     //   逐键实测宽(px;✗ = 超槽):
     //     键                       槽      en       zh       vi        {n} 代入值
-    //     networkStatUpdating      值 89.3  87.3     59.2     77.5     —
-    //     networkRankUnranked      值 90.3  73.4     59.2    138.4 ✗   —      ← 降档方案见 vi.ts 同键注释
+    //     networkStatUpdating      值 89.3  87.3     59.2     78.48    —
+    //     networkRankUnranked      值 90.3  73.4     59.2    139.14 ✗  —      ← 降档方案见 vi.ts 同键注释
     //     networkMembersSub        副 89.3  93.6 ✗   67.2     79.2     2.9(种子,恒 3 字符)
-    //     networkDevicesSub        副 89.3  86.4     60.0    113.4 ✗   —
-    //     networkRankUp24h         副 89.3  86.4     93.6 ✗  121.2 ✗   12(2 位典型)
-    //     networkRankUp24h         副 89.3  93.6 ✗  100.8 ✗  128.4 ✗   128(3 位上界)
-    //     networkRankUnrankedHint  副 89.3 158.4 ✗   84.0    141.6 ✗   —
+    //     networkDevicesSub        副 89.3  86.4     60.0    115.2 ✗   —
+    //     networkRankUp24h         副 89.3  86.4     93.6 ✗  122.41 ✗  12(2 位典型)
+    //     networkRankUp24h         副 89.3  93.6 ✗  100.8 ✗  129.61 ✗  128(3 位上界)
+    //     networkRankUnrankedHint  副 89.3 158.4 ✗   84.0    144.0 ✗   —
     //   副槽的 ✗ 只吃省略号(现网硬编码 sub registered · +2.9% /mo = 158.4px 本就已被截断,
-    //   属存量形态);值槽的 ✗ 必须靠降档解决。别用字符数估宽:vi 13 字符 = 138.4px、zh 5 字 = 59.2px。
+    //   属存量形态);值槽的 ✗ 必须靠降档解决。别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。
     //   副槽 ✗ 的短式备选(同一支 probe 实测,全部入槽,要收进槽时直接换,无需重量;
     //   带 {n} 的给「2 位 / 3 位」两档):
     //     en +{n}% /mo 64.8 · +{n} in 24h 72.0 / 79.2
     //     zh 「24h +{n} 名」69.6 / 76.8
-    //     vi +{n}%/tháng 79.2 · chạy tác vụ 78.0 · +{n} bậc/24h 78.6 / 85.8
+    //     vi +{n}%/tháng 79.2 · chạy tác vụ 79.2 · +{n} bậc/24h 79.2 / 86.41
     //   本轮「只收口值槽」(P1-2 / P2-1 的范围);副槽 5 处 ✗ 留给接线方连同布局一起定
     //   —— 未上榜态的 hint 是否横跨整卡而不是挤在 1/3 格里,会直接改掉它的可用宽。
     networkMembersSub: "+{n}% a month",

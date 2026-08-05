@@ -380,7 +380,9 @@ export const useApp = defineStore("app", () => {
    * 是 lib/network-rank.ts 的事,这里只给一个数。
    */
   function myTotalHashrateAt(now: number): number {
-    return accountTotalHashrate(visibleDevices.value, now, cfg.config.onlineBonus);
+    // GPU 档位表从配置 store 穿进去(运营在 E6 改档 / 加识别词,排名要跟着走),
+    // 与 connectComputeShareDevice / download 页同一单源 —— 禁读编译期常量。
+    return accountTotalHashrate(visibleDevices.value, now, cfg.config.onlineBonus, cfg.config.computeShare.gpuTiers);
   }
   // When the session is invalidated (logged in elsewhere / logged out / admin
   // revoked), mining freezes: tick() early-returns so no earnings accrue while
