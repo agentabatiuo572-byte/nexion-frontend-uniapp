@@ -80,11 +80,15 @@ import { isPurchasedHardwareKind } from "@/store/device-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const app = useApp();
 const vRank = useVRank();
+// 🔴 任务派发也要问闸:关闭 / 熔断 / 售罄 / 未开售时不派「买创世」,否则用户领到一个
+//   不可能完成的周任务(独立 critic Q1)。走唯一消费入口,本文件不自判。
+const { block: genesisBlock } = useGenesisSaleGate();
 const phase = useProductPhase();
 const wq = useWeeklyQuest();
 const ach = useAchievements();
@@ -119,6 +123,8 @@ const quest = computed<Tier1QuestDef | null>(() => {
     hasRackAnyGen,
     hasPremium: false, // mock placeholder (source parity)
     nexBalance: app.user.nexBalance,
+    // 判据走**唯一消费入口**,不在这自判(规格 ④「单一派生」)。
+    genesisPurchasable: genesisBlock.value === null,
   });
 });
 
