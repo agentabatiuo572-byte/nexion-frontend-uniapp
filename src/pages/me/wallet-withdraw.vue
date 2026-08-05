@@ -125,7 +125,7 @@
             :style="netChipStyle(nw.id)"
             role="button"
             :aria-selected="network === nw.id"
-            @click="network = nw.id"
+            @click="pickNetwork(nw.id)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
           </view>
@@ -417,6 +417,13 @@ const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.addre
 const boundAddressShort = computed(() => (boundAddress.value ? maskAddressMid(boundAddress.value) : "—"));
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
+
+// 网络也是报价/地址的输入 —— 提交在途一律冻结,与 useMax/useSmallAmountLine/toggleOffset
+// 同一纪律(审计 P2:评估窗口内切网络会让本可成功的提交被确认后校验无谓拒绑)。
+function pickNetwork(id: Withdrawal["network"]) {
+  if (inputsLocked.value) return;
+  network.value = id;
+}
 
 // ── 地址管理入口 + 换址后 24h 冻结(RM01a ⑤)──────────────────────
 // 管理入口常开:在途单 / 频控拦截由地址管理页与 store 的**同一个**判据呈现

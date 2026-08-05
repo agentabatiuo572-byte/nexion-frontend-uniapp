@@ -161,8 +161,10 @@
             </view>
           </view>
           <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
-          <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期) -->
-          <text v-if="holdActive" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ holdNoteText }}</text>
+          <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期)。
+               冻结期不叠挂:冻结横幅说「禁提」时再说「可能需复核」= 同屏两种结论
+               (审计 P1;与 wallet-withdraw 的 !frozenNow 反冗余门同型)。 -->
+          <text v-if="holdActive && !frozenNow" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ holdNoteText }}</text>
         </view>
 
         <!-- 更换入口 / 拦截态(在途单 > 频控,原因 + 下一步;规格 ② 异常2/3) -->
@@ -376,6 +378,9 @@ async function sendCode(captchaTicket?: string) {
         startResendCountdown(res.retryAfterSec);
         explicitStep.value = "otp";
       } else {
+        // 新页面实例撞上账号级发码冷却(如添加后立刻更换):toast 转瞬即逝,
+        // 表单区再落一条常驻提示,按钮才不像失灵(审计 P2)。
+        addrError.value = fmt(t.value.addrRebind.otpRateLimited, { s: res.retryAfterSec });
         toast.error(fmt(t.value.addrRebind.otpRateLimited, { s: res.retryAfterSec }));
       }
       return;

@@ -78,7 +78,22 @@
 
 ---
 
-## 五、本文件的由来
+## 五、独立审计(2026-08-06,3 agent 并行,实现方≠验收方)
+
+三视角:资金/状态机 · 删除完整性 · 交互/文案。合计 **0 P0 / 4 P1 / 2 P2**,全部采纳修复并复验:
+
+| 级 | 发现(审计方) | 修复 | 复验 |
+|---|---|---|---|
+| P1 | 迁移丢弃中途换绑单,主人拍板第 3 条「在途 $1 一律返还 + 注释标真后台差异」未落实(removal) | `migrateFromPairing` 侦测 initiated/verifying 单 → `postMoneyBillsOnce` 幂等返还 $1(bonus 账单,稳定 ref)+ 决议注释 | selfcheck-rebind 新增 4 条固定靶(65/65)+ 红测(摘判定→exit1)+ 实景:余额 +$1 整、账单落盘 |
+| P1 | 兑换说明 s3Intro「按认证等级」zh 已改 en/vi 漏改(ux) | en/vi 改写为统一日上限表述 | mirror PASS + 渲染复核 |
+| P1 | 换址后管理页「冻结禁提」与「保护期可能需复核」双横幅同屏矛盾(ux) | holdNote 加 `!frozenNow` 门(与提现页既有反冗余同型) | 实景:注入冻结+保护期重叠态 → 仅冻结横幅 |
+| P1 | 资料页管理入口不带网络参数,非 TRC20 用户落空态(ux) | `walletNetwork` computed(展示与跳转同源)+ 入口带 `?network=` | 实景:仅 BEP20 设址 → 点入落 bep20 显地址 |
+| P2 | 提现页网络 chip 在提交评估窗口可点,漂移被确认后校验无谓拒单(money) | `pickNetwork` 加 `inputsLocked` 守卫(与同页三控件同纪律) | 同型判据对齐,快照+确认后校验兜底不变 |
+| P2 | 发码撞账号级冷却且无进行中验证码时仅瞬态 toast,按钮似失灵(ux) | 冷却提示同时落表单常驻红字 | 代码路径复核 |
+
+哨兵同轮进化:selfcheck-claim-idempotency 反向入册门抓到新幂等消费者未登记 → payout-address.ts 入册。终态:tsc 0 · verify.sh 412/0 · selfcheck-rebind 65/65 · fastlane 115/115。
+
+## 六、本文件的由来
 
 规格 §⑦ 要求「实现线必须先产全量引用清单再动手」。本文是该清单 + 风险面分析 + 拆解,
 **尚未动任何代码**(实测:`src/pages/me/kyc.vue` 仍在,`pages.json` 仍注册该路由)。
