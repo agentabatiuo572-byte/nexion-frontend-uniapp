@@ -209,7 +209,7 @@ function billAria(b: Bill): string {
  *    恒定的「已确认」编造;NEX 行点开看所属提现单,不再被按 hash 编成一笔链上交易;
  *  - topup 链上 → tx 页带真实参数,优先按 ref 反查入金记录(毛额/真实确认数/收款地址,
  *    与 deposit-usdt-pane.goRecord 同口径);记录缺失(种子)退回 network 字段/memo 正则;
- *  - 其余(奖励/成就/兑换/购买/质押/KYC 返还)不是链上转账,没有「交易详情」可看 →
+ *  - 其余(奖励/成就/兑换/购买/质押/历史验证返还)不是链上转账,没有「交易详情」可看 →
  *    行不可点(billClickable 同判据),宁可不可点也不编造。
  */
 function billClickable(b: Bill): boolean {

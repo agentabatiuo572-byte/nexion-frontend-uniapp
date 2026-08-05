@@ -523,7 +523,10 @@ function balancedBody(src, from) {
     const appVueSrc = readSrc("src/App.vue");
     const walletSrc = readSrc("src/pages/me/wallet.vue");
     const trackSrc = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
-    const pairingSrc = readSrc("src/store/wallet-pairing.ts");
+    // 包 E(2026-08-05):换址闸从 wallet-pairing($1 配对)迁到 payout-address(地址直管)。
+    // 判据**先于机制改写**指向新 store —— 新文件缺席时 readSrc 直接抛错 = 红,
+    // 绝不允许「旧 store 删了、哨兵扫不到就当没违规」的静默假绿。
+    const payoutSrc = readSrc("src/store/payout-address.ts");
     check("🔴 到账推进返回**推进了哪几笔**,账单按单号逐个结算(不问「最新一笔是谁」)",
       appSrc.includes("function advanceWithdrawalArrival(): string[] {")
         && appVueSrc.includes("const advanced = app.advanceWithdrawalArrival();")
@@ -565,21 +568,31 @@ function balancedBody(src, from) {
       walletSrc.includes("app.primaryWithdrawal") && trackSrc.includes("app.primaryWithdrawal")
         && !/computed\(\(\) => app\.latestWithdrawal\)/.test(walletSrc)
         && !/computed\(\(\) => app\.latestWithdrawal\)/.test(trackSrc));
-    check("🔴 换绑闸问**整张在途列表**,不问最新一笔(否则放款前地址可被换掉)",
-      pairingSrc.includes("useApp().inFlightWithdrawals.length > 0"));
+    // 🔴 换址闸(更换提现地址前的在途单拦截)问**整张在途列表**,不问最新一笔 ——
+    // 只看最新一笔时,一张在途单 + 一张更新的已到账单会把闸静默架空,
+    // 收款地址能在放款前被换掉(独立验收实测)。RM01a 收窄为按网络拦:
+    // 判据 = 从整张 inFlightWithdrawals 列表按网络过滤,仍是列表级问法。
+    check("🔴 换址闸问**整张在途列表**(按网络过滤,不读 latestWithdrawal)",
+      payoutSrc.includes("useApp().inFlightWithdrawals.some((w) => w.network === CHAIN_TO_WITHDRAW_NETWORK[network])")
+        && !/latestWithdrawal/.test(stripComments(payoutSrc)));
     // 🔴 同一个概念只许有一份判据。曾经有两份:白名单 IN_FLIGHT_WITHDRAWAL_STATUSES(漏 sent / frozen)
     // 与黑名单 occupiesWithdrawalSlot(非终态即占用)。换绑闸挂在漏的那份上 ——
     // 风控冻结中、钱已扣的账户能改收款地址(2026-08-01 审计,资金安全级)。
     // 白名单的失败方向是「新状态默认不在途 = 放行」,黑名单是「默认在途 = 拦住」;涉及钱一律取保守侧。
     check("🔴 全站不得再出现第二份「在途」判据(白名单谓词已删,只走 occupiesWithdrawalSlot)",
-      ["src/store/wallet-pairing-core.ts", "src/store/wallet-pairing.ts", "src/pages/me/wallet-withdraw.vue"]
+      ["src/store/payout-address-core.ts", "src/store/payout-address.ts", "src/pages/me/wallet-withdraw.vue", "src/pages/me/wallet-address-rebind.vue"]
         .every((f) => {
           const s = readSrc(f).replace(/^\s*\/\/.*$/gm, "");   // 剥注释:历史说明里会提到这个名字
           return !s.includes("IN_FLIGHT_WITHDRAWAL_STATUSES") && !s.includes("isInFlightWithdrawal");
         }));
-    check("🔴 提现页的换绑入口也问在途集合(store 收口了、页面漏了 = 闸照样被架空)",
-      readSrc("src/pages/me/wallet-withdraw.vue")
-        .includes("const rebindEntryDisabled = computed(() => app.inFlightWithdrawals.length > 0);"));
+    // 🔴 判定对 ≠ 接上(quota_claim_before_create 同族):在途闸必须真喂进 store 的
+    // changeAddress 动作(hasInFlightWithdrawal 实参来自列表派生),页面的更换入口
+    // 必须问 store 同一个判据 —— 页面自己另算一份迟早漂移。
+    check("🔴 换址动作的在途实参来自列表派生(store 接线),且 changeAddress 首步过闸",
+      payoutSrc.includes("hasInFlightWithdrawal: hasInFlightWithdrawalOn(network)")
+        && payoutSrc.includes("const blocked = changeBlockReason(network);"));
+    check("🔴 地址管理页的更换入口问 store 同一个判据(不自算)",
+      stripComments(readSrc("src/pages/me/wallet-address-rebind.vue")).includes("payout.changeBlockReason("));
     check("🔴 store 暴露列表级派生值(inFlightWithdrawals / primaryWithdrawal)",
       appSrc.includes("const inFlightWithdrawals = computed(")
         && appSrc.includes("const primaryWithdrawal = computed<Withdrawal | null>("));

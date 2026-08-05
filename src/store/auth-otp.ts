@@ -21,7 +21,9 @@ import {
 import { normalizeRefCode } from "@/store/sponsorship";
 import type { EarningBucketRoute } from "@/store/types";
 
-export type OtpScene = "login" | "register" | "reset";
+// payout-address:提现地址添加/更换的 step-up 短信确认(FEAT-KYC-RM01a)。
+// 复用同一套生命周期(冷却 / 24h 限频滑块 / TTL / 次数上限),不另造第二套 OTP。
+export type OtpScene = "login" | "register" | "reset" | "payout-address";
 
 export type OtpSendResult =
   | { ok: true; requestId: string; resendAfterSec: number; expiresInSec: number }
@@ -287,6 +289,8 @@ export async function otpVerify(phone: string, scene: OtpScene, requestId: strin
     const account = resolveAuthAccount(phone);
     if (!account.ok) return { ok: false, error: "account_lookup_failed" };
     nextAction = account.account ? "sign_in" : "continue_registration";
+  } else if (scene === "payout-address") {
+    nextAction = "step_up"; // 已登录账号的敏感操作确认,不产生登录/重置后续动作
   } else {
     nextAction = scene === "login" ? "sign_in" : "reset_password";
   }

@@ -41,7 +41,6 @@ const ROUTE_TITLE_KEY: Record<string, HeaderTitleKey> = {
   "pages/me/wallet-repurchase": "meWalletRepurchase",
   "pages/me/profile": "meProfile",
   "pages/me/security": "meSecurity",
-  "pages/me/kyc": "meSecurityKycExpress",
   "pages/me/help": "meHelp",
   "pages/me/support": "meSupport",
   "pages/me/support-tickets": "meSupportTickets",

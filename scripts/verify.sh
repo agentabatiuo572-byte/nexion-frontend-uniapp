@@ -281,8 +281,8 @@ if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
 else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
 fi
-sentinel_present "wallet KYC reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
-sentinel_present "wallet KYC reset store has PROD guard" src/store/wallet-pairing.ts 'if \(import\.meta\.env\.PROD\) return'
+sentinel_present "wallet dev reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
+sentinel_present "payout-address dev reset store has PROD guard" src/store/payout-address.ts 'if \(import\.meta\.env\.PROD\) return'
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
 else
@@ -539,7 +539,8 @@ sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-wi
 sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
 sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
-sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wallet-topup.vue 'recordPaymentInstrument\(app\.accountKey'
+# (原「SPEC-7 pairing registers payment instrument」哨兵随 KYC 配对机制删除,2026-08-05 包 E。
+#  新模型的地址登记走 payout-address → recordWithdrawAddressUse,由 selfcheck-fastlane 接线门覆盖。)
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
 sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
 # 提现扣款双 clamp(2026-07-31):先耗收益再耗本金,可提额度不得转负、不得超剩余总余额。
@@ -1213,9 +1214,9 @@ sentinel_present "P2-8 exchange store is account-scoped" src/store/exchange.ts '
 sentinel_present "P2-8 exchange-v3 store is account-scoped" src/store/exchange-v3.ts 'writeAccountRow'
 sentinel_present "P2-8 cards store is account-scoped" src/store/cards.ts 'writeAccountRow'
 sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow|createAccountRowCommit'
-# P2-8 wallet-pairing:KYC 配对源头按账号隔离(修 wallet-exchange 镜像旁路 exchange-v3.kycVerified)
-sentinel_present "P2-8 account-scope helper rebinds wallet-pairing" src/lib/account-scope.ts 'useWalletPairing\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 wallet-pairing store is account-scoped" src/store/wallet-pairing.ts 'writeAccountRow'
+# 包 E:提现地址簿按账号隔离(设备级存储会让换号继承他人提现地址,RM01a 异常5)
+sentinel_present "P2-8 account-scope helper rebinds payout-address" src/lib/account-scope.ts 'usePayoutAddress\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 payout-address store is account-scoped" src/store/payout-address.ts 'writeAccountRow'
 # P2-8 batch-3 任务/成就/游戏化:任务/周任务/活动/里程碑/成就/目标/转盘/增益按账号隔离(摘任一行必红)
 sentinel_present "P2-8 account-scope helper rebinds quest" src/lib/account-scope.ts 'useQuest\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds weekly-quest" src/lib/account-scope.ts 'useWeeklyQuest\(\)\.bindAccount\(accountKey\)'

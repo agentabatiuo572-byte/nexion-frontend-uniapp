@@ -1,7 +1,7 @@
 <!--
   Trust Center (ported from Nexion-prototype/app/(main)/trust/page.tsx).
   Institutional façade: compliance badges, audits/reserves, partner wall, investors,
-  leadership, press, Q3 financials, NEX value-anchor, token listings, bug bounty, KYC.
+  leadership, press, Q3 financials, NEX value-anchor, token listings, bug bounty.
   Every artifact is in-product reassurance signalling. Reuses CardStagger + extracted
   trust-* components. Wrapped in <AppChassis active="me">.
 -->
@@ -173,17 +173,6 @@
           </view>
         </view>
 
-        <!-- KYC -->
-        <SectionHeader :label="tr.kycLabel">
-          <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg></template>
-        </SectionHeader>
-        <view :style="kycCardStyle">
-          <text class="block" :style="kycBodyStyle">{{ tr.kycBody }}</text>
-          <view class="flex" style="flex-wrap: wrap; gap: 6px; margin-top: 12px">
-            <text v-for="n in KYC_PROVIDERS" :key="n" :style="kycChipStyle">{{ n }}</text>
-          </view>
-        </view>
-
         <!-- Footer -->
         <view class="text-center" style="padding-top: 12px; padding-bottom: 4px">
           <text :style="footerStyle">{{ tr.footer }} </text>
@@ -217,7 +206,7 @@ const COMPLIANCE = [
   { label: "GDPR", body: "EU data residency", tint: "var(--v5-tech-cyan)" },
   { label: "HIPAA", body: "Healthcare verticals", tint: "var(--v5-tech-cyan)" },
   { label: "MSB License", body: "FinCEN MSB1234567", tint: "var(--v5-warning)" },
-  { label: "KYT · Chainalysis", body: "Real-time monitoring", tint: "var(--v5-warning)" },
+  { label: "Transaction screening", body: "Real-time monitoring", tint: "var(--v5-warning)" },
 ];
 const PARTNERS = [
   { name: "NVIDIA", tag: "Hardware partner" },
@@ -269,7 +258,6 @@ const LISTINGS = [
   { exchange: "Binance", state: "Tier-1 review", tint: "var(--v5-warning)" },
   { exchange: "Coinbase", state: "Application Q3", tint: "var(--v5-warning)" },
 ];
-const KYC_PROVIDERS = ["Jumio", "Sumsub", "Chainalysis", "Elliptic", "ComplyAdvantage"];
 
 function initials(name: string): string {
   return name
@@ -373,16 +361,6 @@ const bugIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRa
 const bugAmountStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const bugHintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "4px", lineHeight: 1.375 };
 const bugCtaStyle: CSSProperties = { marginTop: "8px", display: "inline-flex", minHeight: "44px", fontSize: "12px", color: "var(--v5-brand-2)", fontWeight: 600 };
-const kycCardStyle: CSSProperties = { borderRadius: "16px", padding: "16px", background: "var(--v5-surface)" };
-const kycBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
-const kycChipStyle: CSSProperties = {
-  padding: "2px 8px",
-  borderRadius: "999px",
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  background: "color-mix(in srgb, var(--v5-surface-2) 50%, transparent)",
-  color: "var(--v5-ink-2)",
-};
 const footerStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 const footerEmailStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-brand)" };
 </script>
