@@ -1725,11 +1725,19 @@ platform_stats_anchor() {
     'src/components/home/on-grid-section.vue|PAYOUT_PER_SEC_USD' \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
-    'src/store/app.ts|FLEET_DEVICES'; do
+    'src/store/app.ts|FLEET_DEVICES' \
+    'src/components/home/on-grid-section.vue|payoutPerSecUsdOf' \
+    'src/pages/onboarding/intro.vue|paidCumulativeNowOf' \
+    'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(grep -c "$sym" "$f" 2>/dev/null)" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
+  # (4b) 2026-08-06 审计 P1 收口:钱链消费者必须走 *Of(配置派生)——上面三条 *Of pin 守
+  #      「接了」;这一条守「种子恒等」:mock 种子必须从锚取值,开箱两侧不许各写一份字面量。
+  if ! grep -qE 'fleetDevices: *FLEET_DEVICES' src/mock/platform-config.ts 2>/dev/null; then
+    bad "platform-anchor: platform-config 种子不再取自编译期锚(两侧将各自漂移)"; fails=1
+  fi
   # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
   for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi

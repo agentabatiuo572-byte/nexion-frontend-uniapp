@@ -361,33 +361,28 @@ export const en = {
     //   与本表 78.48/139.14 是「同一次定态测量的两种写法」(差 ≤0.04px),不是两套数据,
     //   下轮 diff 对比时别当「契约不一致」误报。
     //
-    //   逐键实测宽(px;✗ = 超槽):
+    //   逐键实测宽(px;✗ = 超槽)。🔴 2026-08-06 审计后收口:副槽全部换短式入槽,
+    //   hint 也换短式(en "Get ranked" 72.0 / vi "Lên hạng" 55.7,无数字串同法定态实测),
+    //   「留给接线方」的作业就此清账 —— 下表即现网串的实测值,全部 ✓:
     //     键                       槽      en       zh       vi        {n} 代入值
     //     networkStatUpdating      值 89.3  87.3     59.2     78.48    —
-    //     networkRankUnranked      值 90.3  73.4     59.2    139.14 ✗  —      ← 降档方案见 vi.ts 同键注释
-    //     networkMembersSub        副 89.3  93.6 ✗   67.2     79.2     2.9(种子,恒 3 字符)
-    //     networkDevicesSub        副 89.3  86.4     60.0    115.2 ✗   —
-    //     networkRankUp24h         副 89.3  86.4     93.6 ✗  122.41 ✗  12(2 位典型)
-    //     networkRankUp24h         副 89.3  93.6 ✗  100.8 ✗  129.61 ✗  128(3 位上界)
-    //     networkRankUnrankedHint  副 89.3 158.4 ✗   84.0    144.0 ✗   —
-    //   副槽的 ✗ 只吃省略号(现网硬编码 sub registered · +2.9% /mo = 158.4px 本就已被截断,
-    //   属存量形态);值槽的 ✗ 必须靠降档解决。别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。
-    //   副槽 ✗ 的短式备选(同一支 probe 实测,全部入槽,要收进槽时直接换,无需重量;
-    //   带 {n} 的给「2 位 / 3 位」两档):
-    //     en +{n}% /mo 64.8 · +{n} in 24h 72.0 / 79.2
-    //     zh 「24h +{n} 名」69.6 / 76.8
-    //     vi +{n}%/tháng 79.2 · chạy tác vụ 79.2 · +{n} bậc/24h 79.2 / 86.41
-    //   本轮「只收口值槽」(P1-2 / P2-1 的范围);副槽 5 处 ✗ 留给接线方连同布局一起定
-    //   —— 未上榜态的 hint 是否横跨整卡而不是挤在 1/3 格里,会直接改掉它的可用宽。
-    networkMembersSub: "+{n}% a month",
+    //     networkRankUnranked      值 90.3  73.4     59.2    139.14 ✗  —      ← 值槽 ✗ 由降档解决(卡片 12.5px 渲染),见 vi.ts 同键注释
+    //     networkMembersSub        副 89.3  64.8     67.2     79.2     2.9(种子,恒 3 字符)
+    //     networkDevicesSub        副 89.3  86.4     60.0     79.2     —
+    //     networkRankUp24h         副 89.3  72.0     69.6     79.2     12(2 位典型)
+    //     networkRankUp24h         副 89.3  79.2     76.8     86.41    128(3 位上界)
+    //     networkRankUnrankedHint  副 89.3  72.0     84.0     55.7     —
+    //   别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。旧长式与其实测值
+    //   (93.6/115.2/122.41/158.4/144.0 各 ✗)已随本次换串退役,不再是现网形态。
+    networkMembersSub: "+{n}% /mo",
     networkDevicesSub: "running jobs",
-    networkRankUp24h: "up {n} in 24h",
+    networkRankUp24h: "+{n} in 24h",
     networkRankUnranked: "No rank",
     // 🔴 归属定案(2026-08-05,原规格 line 78「『未上榜』引导文案内的 CTA」没交代归属):
     //   「本条 hint 整条即 CTA」 —— 未上榜时它是可点元素,点进设备/商城既有入口。
     //   卡片一格只有一行副文本槽,放不下独立按钮,故不另立 CTA 文案键。
     //   接线方:别就地硬编码一句按钮文案,也别把它渲染成不可点的纯说明。
-    networkRankUnrankedHint: "Activate to get ranked",
+    networkRankUnrankedHint: "Get ranked",
     networkRankTipRanked: "Your rank goes by the total hashpower of your active devices — more hashpower, higher rank.",
     networkRankTipUnranked: "You don't have a rank yet. Activate any device and its hashpower gives you one.",
     networkStatUpdating: "Updating",

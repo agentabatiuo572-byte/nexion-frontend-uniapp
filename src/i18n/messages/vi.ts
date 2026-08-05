@@ -338,13 +338,13 @@ export const vi: Messages = {
     networkYourRank: "Hạng của bạn",
     // FEAT-HOME02 phụ đề 3 ô nhịp mạng + 3 trạng thái hạng
     networkMembersSub: "+{n}%/tháng",
-    networkDevicesSub: "đang chạy tác vụ",
-    networkRankUp24h: "tăng {n} bậc / 24h",
+    networkDevicesSub: "chạy tác vụ",
+    networkRankUp24h: "+{n} bậc/24h",
     // 🔴 值槽 90.3px@20px 装不下任何含 "hạng" 的越南语说法(实测:Chưa xếp hạng 139.1 /
     //   Chưa có hạng 127.8 / Không hạng 110.0 / Chưa hạng 101.1),故保留最地道的标准说法,
     //   由接线方对「未上榜整态降档」渲染:≤12px 时 "Chưa xếp hạng" = 83.5px 才放得下。
     networkRankUnranked: "Chưa xếp hạng",
-    networkRankUnrankedHint: "Kích hoạt để có hạng",
+    networkRankUnrankedHint: "Lên hạng",
     networkRankTipRanked: "Hạng của bạn tính theo tổng sức mạnh tính toán của các thiết bị đang hoạt động — càng mạnh thì hạng càng cao.",
     networkRankTipUnranked: "Bạn chưa có hạng. Kích hoạt một thiết bị bất kỳ, sức mạnh tính toán của bạn sẽ được xếp hạng ngay.",
     // 值槽 89.3px@20px 放不下 "Đang cập nhật"(实测 135.0px),换 "Đang tải" = 78.5px。

@@ -39,12 +39,21 @@
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { PAYOUT_PER_SEC_USD } from "@/lib/platform-stats";
+import { useConfig } from "@/store/config";
+import { computed } from "vue";
+import { payoutPerSecUsdOf, publicStatsHealth, PAYOUT_PER_SEC_USD } from "@/lib/platform-stats";
 
 const t = useT();
 const app = useApp();
-// Static footer rate — same single anchor the pulse-card wobbles around.
-const perSecText = `+$${PAYOUT_PER_SEC_USD.toFixed(1)}/sec`;
+const cfg = useConfig();
+// 🔴 $/sec 走配置派生(2026-08-06 审计 P1:此前设备数活着、这条死钉编译期锚 ——
+//   运营改舰队后**同一屏两套口径**)。配置坏时回种子锚:本条不在规格异常3 的占位管辖面
+//   (那是脉搏三格的规矩),页脚糊一个「数据更新中」比旧值更差。
+const perSecText = computed(() => {
+  const ps = cfg.config.publicStats;
+  const v = ps && publicStatsHealth(ps).devicesOk ? payoutPerSecUsdOf(ps) : PAYOUT_PER_SEC_USD;
+  return `+$${v.toFixed(1)}/sec`;
+});
 
 const GRID_CLIENTS = [
   { id: "P", name: "Pocket Studios", model: "SDXL Turbo", color: "var(--v5-brand)", city: "Berlin" },

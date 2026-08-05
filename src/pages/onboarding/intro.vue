@@ -140,15 +140,23 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
-import { FLEET_DEVICES, paidCumulativeNow } from "@/lib/platform-stats";
+import { FLEET_DEVICES, fleetDevicesOf, paidCumulativeNow, paidCumulativeNowOf, publicStatsHealth } from "@/lib/platform-stats";
+import { useConfig } from "@/store/config";
 
 const t = useT();
-// Cumulative payout + fleet count come from the platform single anchor
-// (src/lib/platform-stats.ts): cumulative is time-anchored derive-not-accumulate
-// so it never regresses across visits; daily-flow rationale in
-// docs/changes/2026-07-24-intro-stats-cumulative.md.
-const paid = ref(paidCumulativeNow());
-const devices = ref(FLEET_DEVICES);
+// 🔴 累计支付与舰队数走**配置派生**(2026-08-06 审计 P1:规格 ③「其它页面舰队数字
+//   继续从它派生」)。配置坏回种子锚(本页不在异常3 占位管辖面)。
+//   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
+//   rationale 见 docs/changes/2026-07-24-intro-stats-cumulative.md。
+const cfg = useConfig();
+const psOk = () => {
+  const ps = cfg.config.publicStats;
+  return !!ps && publicStatsHealth(ps).devicesOk;
+};
+const fleetNow = () => (psOk() ? fleetDevicesOf(cfg.config.publicStats) : FLEET_DEVICES);
+const paidNow = () => (psOk() ? paidCumulativeNowOf(cfg.config.publicStats) : paidCumulativeNow());
+const paid = ref(paidNow());
+const devices = ref(fleetNow());
 
 function fmtNum(n: number): string {
   return n.toLocaleString("en-US");
@@ -189,11 +197,13 @@ onMounted(() => {
   timer = setInterval(() => {
     // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
     // steps, so a reload can never show a smaller total than a longer session.
-    paid.value = paidCumulativeNow();
+    paid.value = paidNow();
     const drift = Math.random();
-    // ±24 band, same rationale as the store tick (bounded symmetric wobble).
-    if (drift > 0.75) devices.value = Math.min(FLEET_DEVICES + 24, devices.value + 1);
-    else if (drift < 0.25) devices.value = Math.max(FLEET_DEVICES - 24, devices.value - 1);
+    // ±24 band, same rationale as the store tick (bounded symmetric wobble),
+    // 带心随配置派生的舰队数走(审计 P1 的「其它页面舰队数字」半场)。
+    const base = fleetNow();
+    if (drift > 0.75) devices.value = Math.min(base + 24, devices.value + 1);
+    else if (drift < 0.25) devices.value = Math.max(base - 24, devices.value - 1);
   }, 1800);
 });
 onUnmounted(() => {

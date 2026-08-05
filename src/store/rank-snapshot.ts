@@ -28,7 +28,11 @@ const DAY_MS = 24 * 3_600_000;
 
 function hydrate(accountKey: string): Snap | null {
   const row = readAccountRow<Partial<Snap>>(ACCOUNTS_KEY, accountKey);
-  if (row && typeof row.rank === "number" && Number.isFinite(row.rank) && typeof row.at === "number") {
+  // at 必须有限且不在未来(容差 5 分钟):脏行 / 时钟回拨的旧行一律弃,当无快照处理
+  if (
+    row && typeof row.rank === "number" && Number.isFinite(row.rank)
+    && typeof row.at === "number" && Number.isFinite(row.at) && row.at <= Date.now() + 300_000
+  ) {
     return { rank: row.rank, at: row.at };
   }
   return null;
@@ -49,26 +53,33 @@ export const useRankSnapshot = defineStore("rankSnapshot", () => {
   }
 
   /**
-   * 报到当前名次,返回该显示的 24h 前进量(null = 不显示)。
-   * 调用方每次渲染用当下名次现算(禁缓存名次 —— 缓存的是**快照**,不是名次)。
+   * 🔴 读写分离(2026-08-06 独立审计 P1:滚动写在 computed 读路径里,双求值时
+   * 第二次求值读到刚滚完的新快照 → delta 变 null → **paint 前被自我覆盖**,
+   * 「隔天回访看到 ↑n」这个主场景永不可见)。
+   *   preview = 纯读,给 computed 用,零副作用;
+   *   commit  = 滚动落盘,只在挂载 / 刷新沿显式调一次。
    */
-  function deltaFor(currentRank: number, now: number): number | null {
+
+  /** 纯读:该显示的 24h 前进量(null = 不显示)。基线超 48h 视为过期,不拿 N 天进步冒充 24h。 */
+  function preview(currentRank: number, now: number): number | null {
     if (!Number.isFinite(currentRank) || currentRank < 1) return null;
     const s = snap.value;
-    if (s === null) {
-      snap.value = { rank: currentRank, at: now };
-      persist();
-      return null; // 首见:落盘,不显示(规格异常4)
-    }
-    if (now - s.at >= DAY_MS) {
-      const delta = s.rank - currentRank;
-      snap.value = { rank: currentRank, at: now };
-      persist();
-      return delta > 0 ? delta : null;
-    }
+    if (s === null) return null; // 无快照不显示(规格异常4)
+    const age = now - s.at;
+    if (age < 0 || age > 2 * DAY_MS) return null; // 时钟回拨 / 长离线基线过期
     const delta = s.rank - currentRank;
     return delta > 0 ? delta : null;
   }
 
-  return { snap, bindAccount, deltaFor };
+  /** 落盘:首见建立基线;基线满 24h 滚动成当前名次(preview 在滚动前读,顺序由调用方保证)。 */
+  function commit(currentRank: number, now: number): void {
+    if (!Number.isFinite(currentRank) || currentRank < 1) return;
+    const s = snap.value;
+    if (s === null || now - s.at >= DAY_MS || now - s.at < 0) {
+      snap.value = { rank: currentRank, at: now };
+      persist();
+    }
+  }
+
+  return { snap, bindAccount, preview, commit };
 });

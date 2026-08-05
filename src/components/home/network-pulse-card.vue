@@ -61,14 +61,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useRankSnapshot } from "@/store/rank-snapshot";
 import { computeRank } from "@/lib/network-rank";
-import { derivedRegisteredUsers } from "@/lib/platform-stats";
+import { derivedRegisteredUsers, publicStatsHealth, compactNumber as compact } from "@/lib/platform-stats";
 import { toast } from "@/store/ui";
 import { navTo } from "@/lib/route";
 import PulseDot from "./pulse-dot.vue";
@@ -79,18 +79,37 @@ const app = useApp();
 const cfg = useConfig();
 const snap = useRankSnapshot();
 
-// 时间锚:进场取一次,onShow 由首页下拉刷新链路带动重渲(排名禁缓存,但也不该每秒重算 ——
-// 分位表与算力在秒级都不变;真正的秒级时钟属于创世倒计时那类,不属于这里)。
+// 🔴 时间锚的真实机制(2026-08-06 审计纠正,上一版注释说的「下拉刷新带动重渲」不成立):
+//   挂载取一次 + **配置重拉完成沿再取一次**(下拉刷新会触发 cfg.load,见 store/refresh.ts)。
+//   两个刷新点之间冻结 —— 名次确定性正来自于此;秒级时钟属于创世倒计时,不属于这里。
 const nowTs = ref(Date.now());
-onMounted(() => { nowTs.value = Date.now(); });
+onMounted(() => {
+  nowTs.value = Date.now();
+  // 24h 快照:先读(preview 纯读进 computed)后滚(commit 只在这类显式时点),
+  // 顺序保证「隔天回访」当次能看到 ↑n —— 滚动写进 computed 读路径会 paint 前自我覆盖(审计 P1)。
+  const r = rank.value;
+  if (r.kind === "ranked") snap.commit(r.rank, nowTs.value);
+});
+watch(() => cfg.loading, (l, was) => {
+  if (was && !l) {
+    nowTs.value = Date.now();
+    const r = rank.value;
+    if (r.kind === "ranked") snap.commit(r.rank, nowTs.value);
+  }
+});
 
-/** 紧凑缩写(规格异常6):超长数字不撑破 89.3px 值槽,不换行断字。 */
-function compact(n: number): string {
-  if (!Number.isFinite(n)) return "";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 100_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+// 🔴 骨架 <300ms 防闪烁(规格 ⑤ 明写;mock 恰好 600ms 不是实现,是巧合 —— 审计 P2):
+//   loading 持续超过 300ms 才亮骨架,结束即灭。
+const showSkeleton = ref(false);
+let skeletonTimer: ReturnType<typeof setTimeout> | null = null;
+watch(() => cfg.loading, (l) => {
+  if (l) {
+    skeletonTimer = setTimeout(() => { showSkeleton.value = true; }, 300);
+  } else {
+    if (skeletonTimer !== null) { clearTimeout(skeletonTimer); skeletonTimer = null; }
+    showSkeleton.value = false;
+  }
+});
 /** 装饰性走势(确定性,从当前值倒推 8 点缓坡;不声称历史数据,只是视觉纹理)。 */
 const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i * 0.0004));
 
@@ -105,9 +124,10 @@ const rank = computed(() =>
     virtualPopulation: cfg.config.publicStats.virtualUserCount,
   }),
 );
+// preview 是纯读 —— computed 里零副作用(滚动落盘在 onMounted / 刷新沿,见上)
 const rankDelta = computed(() => {
   const r = rank.value;
-  return r.kind === "ranked" ? snap.deltaFor(r.rank, nowTs.value) : null;
+  return r.kind === "ranked" ? snap.preview(r.rank, nowTs.value) : null;
 });
 
 interface Cell {
@@ -134,7 +154,7 @@ function placeholderCell(label: string): Cell {
     sub: t.value.home.networkStatRetry,
     subTone: "var(--v5-tech-cyan-ink)",
     data: null,
-    skeleton: cfg.loading,
+    skeleton: showSkeleton.value,
     tap: () => { void cfg.load(); },
   };
 }
@@ -142,9 +162,12 @@ function placeholderCell(label: string): Cell {
 const metrics = computed<Cell[]>(() => {
   const ps = cfg.config.publicStats;
   const failed = cfg.syncFailed;
+  // 🔴 逐字段健康度(审计 P1「异常3 半缺」):判定收在 publicStatsHealth 单处,
+  //   在线率越域 / 增速为负 / 虚拟人口为负都算非法 → 对应格占位,禁拿回退锚冒充真数据。
+  const health = publicStatsHealth(ps);
 
   // 格 1 注册用户 —— 单项非法只坏本格(规格异常3)
-  const membersBad = failed || !Number.isFinite(registered.value) || registered.value < 0;
+  const membersBad = failed || !health.membersOk || !Number.isFinite(registered.value) || registered.value < 0;
   const members: Cell = membersBad
     ? placeholderCell(t.value.home.networkMembers)
     : {
@@ -154,11 +177,11 @@ const metrics = computed<Cell[]>(() => {
         sub: fmt(t.value.home.networkMembersSub, { n: ps.registeredUsersMonthlyGrowthPct }),
         data: ramp(registered.value),
         color: "var(--v5-brand)",
-        skeleton: cfg.loading,
+        skeleton: showSkeleton.value,
       };
 
   // 格 2 在线设备 —— 值来自 store 的呼吸态(基线与带宽都由配置驱动,见 app.ts)
-  const devicesBad = failed || !Number.isFinite(ps.fleetDevices) || ps.fleetDevices <= 0;
+  const devicesBad = failed || !health.devicesOk;
   const devices: Cell = devicesBad
     ? placeholderCell(t.value.home.networkDevices)
     : {
@@ -168,13 +191,13 @@ const metrics = computed<Cell[]>(() => {
         sub: t.value.home.networkDevicesSub,
         data: ramp(app.global.activeDevices),
         color: "var(--v5-tech-cyan-ink)",
-        skeleton: cfg.loading,
+        skeleton: showSkeleton.value,
       };
 
-  // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2)
+  // 格 3 你的排名 —— 三态(规格 ⑤/异常1/异常2);rankOk 缺失同走占位
   const r = rank.value;
   let rankCell: Cell;
-  if (failed || r.kind === "unavailable") {
+  if (failed || !health.rankOk || r.kind === "unavailable") {
     rankCell = placeholderCell(t.value.home.networkYourRank);
   } else if (r.kind === "unranked") {
     rankCell = {
@@ -186,7 +209,7 @@ const metrics = computed<Cell[]>(() => {
       sub: t.value.home.networkRankUnrankedHint,
       subTone: "var(--v5-brand)",
       data: null,
-      skeleton: cfg.loading,
+      skeleton: showSkeleton.value,
       tap: () => toast.info(t.value.home.networkRankTipUnranked),
       subTap: () => navTo("/store"), // 引导整条即 CTA(规格 ⑥:设备/商城既有入口)
     };
@@ -199,7 +222,7 @@ const metrics = computed<Cell[]>(() => {
       // 名次越小越好:走势画成向下缓坡(视觉「在前进」),数据仍是确定性装饰
       data: Array.from({ length: 8 }, (_, i) => -r.rank * (1 + (7 - i) * 0.0004)),
       color: "var(--v5-brand)",
-      skeleton: cfg.loading,
+      skeleton: showSkeleton.value,
       tap: () => toast.info(t.value.home.networkRankTipRanked),
     };
   }

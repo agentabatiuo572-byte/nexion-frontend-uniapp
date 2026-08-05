@@ -94,6 +94,9 @@ export interface RankInput {
  */
 export function computeRank(input: RankInput): RankResult {
   if (!isValidPercentileTable(input.table)) return { kind: "unavailable" };
+  // 🔴 负虚拟人口 = 非法配置(规格异常3 点名「负数」),不是「小一点的分母」——
+  //   独立审计实测小幅负值会溜进分母照常出 ranked。非法即 unavailable,别猜。
+  if (!Number.isFinite(input.virtualPopulation) || input.virtualPopulation < 0) return { kind: "unavailable" };
   const population = Math.floor(input.realPopulation) + Math.floor(input.virtualPopulation);
   if (!Number.isFinite(population) || population <= 0) return { kind: "unavailable" };
   if (!Number.isFinite(input.myTotalHashrate) || input.myTotalHashrate <= 0) return { kind: "unranked" };
