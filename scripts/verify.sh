@@ -1704,10 +1704,24 @@ platform_stats_anchor() {
   # (3) 28,432 role-collision guard: allowed ONLY in the lib (fleet anchor)
   stray=$(grep -rlEI '28,432|28432|28_432' src 2>/dev/null | grep -v 'lib/platform-stats\.ts' || true)
   if [ -n "$stray" ]; then bad "platform-anchor: 28,432 outside the anchor lib (role collision): $stray"; fails=1; fi
+  # (3b) 🔴 FEAT-HOME02:首页脉搏卡的「今日支付」格与条头每秒支付流已按规格删除,
+  #      原判据「network-pulse-card.vue 必须消费 DAILY_PAYOUT_USD」随之不成立。
+  #      规格明写「需同步调整判据**而非放宽哨兵**(防判据失效变空门)」,故改成两条:
+  #        ① 锚本身仍在,且 PAYOUT_PER_SEC_USD 仍**从它派生**(链没断,别的页面还在用);
+  #        ② 首页脉搏卡**不得**再出现任何平台支付规模数字(删了就不许回来)。
+  #      少了 ① 就等于允许有人把锚删掉;少了 ② 就等于允许把那格悄悄加回去。
+  if ! grep -qE 'DAILY_PAYOUT_USD *= *FLEET_DEVICES \* FLEET_AVG_DAILY_USD' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: 日支付锚定义不见了(其它页面仍从它派生,不可删)"; fails=1
+  fi
+  if ! grep -qE 'PAYOUT_PER_SEC_USD *= *DAILY_PAYOUT_USD */ *86_?400' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: 每秒支付流不再从日支付锚派生(派生链断 = 又成两个数)"; fails=1
+  fi
+  if grep -qE 'DAILY_PAYOUT_USD|MONTHLY_PAYOUT_USD|PAYOUT_PER_SEC_USD|networkPaidToday' src/components/home/network-pulse-card.vue 2>/dev/null; then
+    bad "platform-anchor: 首页脉搏卡又出现平台支付规模(FEAT-HOME02 已删,不得回归)"; fails=1
+  fi
   # (4) consumers wired to the single source: import present AND anchor symbol consumed
   #     (import-only would let a hardcoded near-value ride under a green light)
   for pair in \
-    'src/components/home/network-pulse-card.vue|DAILY_PAYOUT_USD' \
     'src/components/home/on-grid-section.vue|PAYOUT_PER_SEC_USD' \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \

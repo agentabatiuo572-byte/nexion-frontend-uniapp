@@ -104,7 +104,12 @@ const countdownDisplay = computed(() => {
 });
 const priceText = computed(() => genesis.unitPriceUSDT.toLocaleString());
 const eyebrowText = computed(() => fmt(t.value.store.genesisCardEyebrow, { n: genesis.totalSlots.toLocaleString() }));
-const leftText = computed(() => fmt(t.value.store.genesisCardLeft, { n: genesis.totalSlots - genesis.soldSlots }));
+// 🔴 闸放在**值本身**,不是放在模板的 v-if 上:值到哪都安全,不必指望每个渲染点
+//   都记得加条件。上一版闸在模板里、定义在这里,两处相隔几十行 —— 机器门看不出关联,
+//   人也容易在新增渲染点时漏掉(这正是「还剩一处没收」的温床)。
+const leftText = computed(() =>
+  showUrgency.value ? fmt(t.value.store.genesisCardLeft, { n: genesis.totalSlots - genesis.soldSlots }) : "",
+);
 const lockedLineText = computed(() =>
   GENESIS_ELIGIBILITY.mode === "all-of" ? t.value.genesisEligibility.cardLockedLineAll : t.value.genesisEligibility.cardLockedLine,
 );
