@@ -219,8 +219,11 @@ function handlePurchase() {
         },
         { restoreTo: before },
       );
-      // 按拒绝原因选反馈(售罄竞态 vs 限购,A-1)。
-      if (r.reason === "cap") {
+      // 按拒绝原因选反馈(售罄竞态 vs 限购 vs 市场关闭,A-1 / FEAT-GEN10 异常4)。
+      if (r.reason === "market-closed") {
+        // 用户已打开购买半屏、运营此刻切到关闭 → 就地说明。钱已在上方冲正,不留半成品订单。
+        toast.error(t.value.genesis.marketClosed.default, t.value.genesis.marketClosed.holdingsSafe);
+      } else if (r.reason === "cap") {
         toast.error(
           t.value.genesisEligibility.toastCapReached,
           fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),

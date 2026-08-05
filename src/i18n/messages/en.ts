@@ -3539,6 +3539,17 @@ export const en = {
     leftSuffix: "left",
     ctaReserve: "Claim seat",
     ctaSoldOut: "Sold out",
+    // Market-closed states (FEAT-GEN10). default/maintenance/restock are the
+    // operator-selectable copy variants — chosen from this list, never free text.
+    marketClosed: {
+      default: "Market not open yet",
+      maintenance: "Under maintenance — reservations paused",
+      restock: "This round is fully allocated",
+      halted: "Reservations paused",
+      configUnavailable: "Can't load status right now",
+      retryHint: "Please try again shortly",
+      holdingsSafe: "Nodes you already hold are unaffected",
+    },
     confirmTitle: "Reserve Genesis Node",
     confirmSubtitle: "${price} × quantity",
     quantity: "Quantity",
@@ -4885,7 +4896,7 @@ export const en = {
     collapse: "Hide tasks",
     buyCta: "Get your first NexGridBox · earn $7/day forever",
     routeToast: "Quest complete · +{n} NEX",
-    bindCardMemo: "Day-one quest · Link bank card",
+    bindCardMemo: "Day-one quest · Link bank card",
 
     routeMemo: "Day-one quest · {task}",
     t_bind_bank_card: "Link a bank card",

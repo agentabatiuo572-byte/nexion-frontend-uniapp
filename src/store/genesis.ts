@@ -5,6 +5,7 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 import {
   useGenesisConfig,
   tierForSold,
+  genesisPurchaseBlock,
   GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
   type GenesisTier,
 } from "@/store/genesis-config";
@@ -359,7 +360,24 @@ export const useGenesis = defineStore("genesis", () => {
   function purchase(
     n: number,
     tokenIds?: number[],
-  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" } {
+  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" } {
+    // 🔴 **服务端侧拒单**(规格 FEAT-GEN10 异常1/异常4)。前端置灰只挡住「正常点」,
+    //   挡不住深链直达结算、也挡不住「用户已打开购买半屏、运营此刻切关闭」。
+    //   这一层是 mock 的 server 同构面:**不管谁调、从哪调,关闭态一律拒**。
+    //   判定复用 genesisPurchaseBlock 同一条链 —— 页面与 store 不是两套规则。
+    const cfgStore = useGenesisConfig();
+    const blocked = genesisPurchaseBlock({
+      configLoaded: cfgStore.loaded,
+      marketStatus: cfgStore.config.marketStatus,
+      halted: false, // 熔断槽位;见 genesis-config.ts 的 GenesisPurchaseInput.halted
+      remaining: remaining(),
+      saleStartAt: cfgStore.config.saleStartAt,
+      now: Date.now(),
+    });
+    // sold-out / cap 沿用下方原有的更精确回执;这里只拦「不该卖」的那几种。
+    if (blocked === "marketClosed" || blocked === "halted" || blocked === "configUnavailable") {
+      return { ok: false, cost: 0, reason: "market-closed" };
+    }
     const rem = remaining();
     if (n > rem) return { ok: false, cost: 0, reason: "sold-out" };
     // 单人限购守卫（单源 L4：任何调用方自动继承；运营可配 G4 perUserCap）。
@@ -403,6 +421,12 @@ export const useGenesis = defineStore("genesis", () => {
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   function acquireSecondary(tokenId: number): boolean {
+    // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥:「二级市场入口(关闭态)
+    //   一并锁闭并说明,与购买同一状态源」)。只锁前端入口不锁这里,深链照样能承接。
+    //   注意:这里**不**看 soldOut / preSale —— 二级市场卖的是别人手里的存量,
+    //   主售售罄或未开售都不妨碍转让;只有「市场关闭 / 熔断 / 配置未知」才拦。
+    const cfgStore = useGenesisConfig();
+    if (!cfgStore.loaded || cfgStore.config.marketStatus === "closed") return false;
     if (ownedTokenIds.value.includes(tokenId)) return false;
     // 单人限购同样约束二级承接（持有增长的另一唯一入口）。
     if (myOwned.value + 1 > GENESIS_ELIGIBILITY.perUserCap) return false;

@@ -70,7 +70,9 @@
                   <text>{{ soldText }}</text>
                   <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> / {{ totalText }} {{ t.genesis.soldOf }}</text>
                 </text>
-                <text class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
+                <!-- 🔴 关闭态 / 售罄态不展示剩余名额紧迫文案(规格 FEAT-GEN10 ④:
+                     不对不可购买的东西制造紧迫感)。判据来自 showUrgency 单源,不在此处自判。 -->
+                <text v-if="showUrgency" class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
               </view>
             </view>
           </view>
@@ -141,8 +143,14 @@
 
     <!-- Sticky gold dock (folds source GenesisDockHost into the page) -->
     <view class="nx-genesis-dock" :style="dockWrapStyle">
-      <view class="relative w-full overflow-hidden active:scale-[0.98]" :style="dockBtnStyle" @click="openSheet">
-        <template v-if="remaining > 0">
+      <view
+        class="relative w-full overflow-hidden"
+        :class="dockDisabled ? '' : 'active:scale-[0.98]'"
+        :style="dockBtnStyle"
+        @click="openSheet"
+      >
+        <!-- 装饰(高光 / 描边 / 流光)只在**可购买**时出现:置灰按钮不该还在发光。 -->
+        <template v-if="dockActive">
           <view aria-hidden :style="dockSpecularStyle" />
           <view aria-hidden :style="dockRimStyle" />
           <view aria-hidden class="gen-anim" :style="dockSheenStyle" />
@@ -154,11 +162,14 @@
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">{{ countdownDisplay }}</text>
           </template>
-          <template v-else-if="remaining > 0 && eligible">
+          <!-- 价格只在**真能买**时露出:阻断态显示价格等于对着买不到的东西报价。 -->
+          <template v-else-if="dockActive && eligible">
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">${{ priceText }}</text>
           </template>
-          <svg v-if="!preSale" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          <!-- 右箭头 = 「点了会去某处」。可购买(开 sheet)与售罄(去二级市场)才有;
+               其余阻断态点了只给说明,不该用箭头暗示能往下走。 -->
+          <svg v-if="dockActive || block === 'soldOut'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
       </view>
     </view>
@@ -193,7 +204,8 @@ const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
-const { preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
+const { block, marketClosed, showUrgency, closedNoticeKey, preSale, showTime, countdownDays, countdownClock } =
+  useGenesisSaleGate();
 
 const sheetOpen = ref(false);
 const eligSheetOpen = ref(false);
@@ -240,12 +252,30 @@ const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const soldPct = computed(() => (sold.value / total.value) * 100);
 
-// Dock 四态文案:预售未开(最外层)/ 售罄 / 未达资格(→ 资格 sheet)/ 达标认购。
+// Dock 文案:**阻断原因来自唯一派生 `block`**(composable),本页不再自排优先级。
+// 顺序由 genesisPurchaseBlock 定:配置未知 > 市场关闭 > 熔断 > 售罄 > 预售;
+// 全部放行后才轮到本页独有的资格门(L2,FEAT-GEN08)。
 const dockCtaText = computed(() => {
-  if (preSale.value) return t.value.genesisEligibility.comingSoon;
-  if (remaining.value === 0) return t.value.genesis.ctaSoldOut;
+  switch (block.value) {
+    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
+    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
+    case "halted": return t.value.genesis.marketClosed.halted;
+    case "soldOut": return t.value.genesis.ctaSoldOut;
+    case "preSale": return t.value.genesisEligibility.comingSoon;
+  }
   if (!eligible.value) return t.value.genesisEligibility.dockLocked;
   return t.value.genesis.ctaReserve;
+});
+/** 主按钮是否处于「可购买」外观(金色高光)。任一阻断态都退到中性面 —— 复用原本
+ *  只给售罄用的那套中性样式,不另造 disabled 皮。 */
+const dockActive = computed(() => block.value === null);
+/** 是否置灰不可点。售罄**可点**(引导去二级市场),其余阻断态点了只给说明不开 sheet。 */
+const dockDisabled = computed(() => block.value !== null && block.value !== "soldOut");
+/** 阻断态的副说明(toast 第二行)。配置未知给「可重试」,其余给「持仓不受影响」定心。 */
+const blockHintSub = computed(() => {
+  if (block.value === "configUnavailable") return t.value.genesis.marketClosed.retryHint;
+  if (block.value === "preSale") return "";
+  return t.value.genesis.marketClosed.holdingsSafe;
 });
 // 倒计时副文本(showTime 时):「开售倒计时 {d天} HH:MM:SS」/「Opens in {d}d HH:MM:SS」。
 const countdownDisplay = computed(() => {
@@ -294,11 +324,17 @@ function emitSocial() {
 }
 
 function openSheet() {
-  // 预售未开(最外层门,FEAT-GEN09):不开任何 sheet,倒计时中。
-  if (preSale.value) return;
-  // 售罄 → 二级市场承接(GEN01 异常4;原 no-op 死按钮顺手修正)。
-  if (remaining.value === 0) {
+  // 🔴 阻断判定**只问 `block` 一处**(FEAT-GEN10 ④)。改造前这里与 dockCtaText 各写一套
+  //   if 链,两处顺序一致纯属巧合 —— 任一处加条件而另一处忘改就会「按钮与行为对不上」。
+  if (block.value === "soldOut") {
+    // 售罄 → 二级市场承接(GEN01 异常4);二级市场自身在关闭态也会锁,由该页自判。
     goMarketplace();
+    return;
+  }
+  if (block.value !== null) {
+    // 其余阻断态(配置未知 / 市场关闭 / 熔断 / 预售未到):不开任何 sheet。
+    // 🔴 禁静默无反馈(规格 ⑥):给出与按钮同一句说明,让用户知道不是点坏了。
+    toast.info(dockCtaText.value, blockHintSub.value);
     return;
   }
   // 资格门 L2:未达标 → 资格 sheet,不开购买 sheet(FEAT-GEN08)。
@@ -623,21 +659,21 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
   alignItems: "center",
   justifyContent: "center",
   background:
-    remaining.value > 0
+    dockActive.value
       // 吸底条按设计是**暗色金属面**,但原 alpha 0.55/0.72 在亮主题下被奶油页底冲淡,
       // 合成底只到 rgb(83,78,71) → 金色价格实测 3.95 不达 AA(暗主题 8.95 正常)。
       // 提到 0.88/0.92 让它在两个主题下都真的是暗面:亮主题合成底 rgb(38,32,26) → 7.73;
       // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
       ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
       : "var(--v5-surface-2)",
-  border: remaining.value > 0 ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
-  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
+  border: dockActive.value ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
+  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "15px",
   letterSpacing: "0.02em",
   boxShadow:
-    remaining.value > 0
+    dockActive.value
       ? [
           "inset 0 1px 0 rgba(255,255,255,0.40)",
           "inset 0 -1px 0 rgba(0,0,0,0.50)",
