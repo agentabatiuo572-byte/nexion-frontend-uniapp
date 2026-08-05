@@ -367,6 +367,10 @@ export const useGenesis = defineStore("genesis", () => {
     //   这一层是 mock 的 server 同构面:**不管谁调、从哪调,关闭态一律拒**。
     //   判定复用 genesisPurchaseBlock 同一条链 —— 页面与 store 不是两套规则。
     const cfgStore = useGenesisConfig();
+    // 🔴 动钱前重读权威源(独立验收 P0→P1「hydrate-once」):不 refresh 的话,判定读的是
+    //   store 构造时的内存快照 —— 运营切关闭后,已打开的会话照样买(实测 $23,998)。
+    //   真后台此行即「下单前服务端校验」,mock 期读盘就是读 server。
+    cfgStore.refresh();
     const blocked = genesisPurchaseBlock({
       configLoaded: cfgStore.loaded,
       marketStatus: cfgStore.config.marketStatus,
@@ -404,6 +408,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   用 genesisSecondaryBlock 而非 genesisPurchaseBlock:挂单是二级动作,
     //   主售售罄 / 未开售都不该妨碍转让,只有「市场关闭 / 熔断 / 配置未知」才拦。
     const cfgStore = useGenesisConfig();
+    cfgStore.refresh(); // 动状态前重读权威源,同 purchase(hydrate-once 修复)
     if (
       genesisSecondaryBlock({
         loaded: cfgStore.loaded,
@@ -454,6 +459,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   现改为喂给 genesisPurchaseBlock,再按「与二级相关的阻断原因」筛,
     //   这样将来往优先级链里加档,这里自动跟上。
     const cfgStore = useGenesisConfig();
+    cfgStore.refresh(); // 动钱前重读权威源,同 purchase(hydrate-once 修复)
     const blocked = genesisSecondaryBlock({
       loaded: cfgStore.loaded,
       marketStatus: cfgStore.config.marketStatus,

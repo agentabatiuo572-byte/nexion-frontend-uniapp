@@ -189,6 +189,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import PerkRow from "@/components/genesis/perk-row.vue";
@@ -208,6 +209,9 @@ import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/u
 const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+// 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
+//   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
+onShow(() => cfg.refresh());
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
 const { block, marketClosed, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
@@ -344,8 +348,21 @@ function openSheet() {
     goMarketplace();
     return;
   }
+  if (block.value === "configUnavailable") {
+    // 🔴 配置未知 → 点按即**重试**(规格异常3 的重试动作,此前全链路零实现):
+    //   重读配置源,成功即当场解锁;仍失败则给「可重试」说明。
+    //   结果判定问派生 `block`,不摸原料 `.loaded`(④b 门):refresh 写共享 store,
+    //   computed 同步失效,下一行读到的已是重读后的判定。
+    cfg.refresh();
+    if (block.value !== "configUnavailable") {
+      toast.success(t.value.genesis.marketClosed.retryOk);
+    } else {
+      toast.info(dockCtaText.value, blockHintSub.value);
+    }
+    return;
+  }
   if (block.value !== null) {
-    // 其余阻断态(配置未知 / 市场关闭 / 熔断 / 预售未到):不开任何 sheet。
+    // 其余阻断态(市场关闭 / 熔断 / 预售未到):不开任何 sheet。
     // 🔴 禁静默无反馈(规格 ⑥):给出与按钮同一句说明,让用户知道不是点坏了。
     toast.info(dockCtaText.value, blockHintSub.value);
     return;

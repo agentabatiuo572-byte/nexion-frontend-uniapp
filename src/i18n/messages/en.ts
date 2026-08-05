@@ -3548,6 +3548,7 @@ export const en = {
       halted: "Reservations paused",
       configUnavailable: "Can't load status right now",
       retryHint: "Please try again shortly",
+      retryOk: "Back online — you can continue",
       holdingsSafe: "Nodes you already hold are unaffected",
     },
     confirmTitle: "Reserve Genesis Node",

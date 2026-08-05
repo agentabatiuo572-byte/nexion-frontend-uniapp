@@ -3458,6 +3458,7 @@ export const vi: Messages = {
       halted: "Tạm dừng đặt mua",
       configUnavailable: "Chưa lấy được trạng thái",
       retryHint: "Vui lòng thử lại sau",
+      retryOk: "Đã khôi phục — bạn có thể tiếp tục",
       holdingsSafe: "Các node bạn đang sở hữu không bị ảnh hưởng",
     },
     confirmTitle: "Đặt Genesis Node",
