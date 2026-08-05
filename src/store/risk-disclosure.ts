@@ -14,7 +14,7 @@ import { normalizeAccountKey } from "./account-cloud";
 // 原实现是单键 nexgrid-risk-disclosure-v1,且不在 rebindAccountScopedStores 名单里:
 // A 账号接受过披露 → 换成 B 账号,accepted 仍为 true → B 的首次提现**直接跳过强制合规确认**,
 // 从未看到那份他必须勾选「我已阅读」的文件。凭证类 per-user 状态一律按账号作用域
-// (与 wallet-pairing / security 同档)。旧设备级单键废弃,存量重新走一次披露 —— 合规上这是对的方向。
+// (与 payout-address / security 同档)。旧设备级单键废弃,存量重新走一次披露 —— 合规上这是对的方向。
 const ACCOUNTS_KEY = "nexgrid-risk-disclosure-accounts-v1"; // { [accountKey]: {accepted, acceptedAt} }
 
 interface DisclosureState {

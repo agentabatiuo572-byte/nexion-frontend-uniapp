@@ -12,7 +12,7 @@
   products only, open the trade-in Choice sheet if the user owns a tradeable
   device, else the slot-full Replace sheet when active slots are capped, else
   fall through to the normal payment flow. Cross-store composition (eligibility
-  reads app/v-rank/network/wallet-pairing) lives here at the page layer via the
+  reads app/v-rank/network) lives here at the page layer via the
   useDeviceEligibility composable (stores never import each other, P-031/032).
   Wrapped in <AppChassis active="store">; the back + "Checkout" title live in the
   sticky chassis nav header via useSetPageHeader (mirrors the prototype's

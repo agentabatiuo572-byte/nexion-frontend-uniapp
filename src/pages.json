@@ -125,10 +125,6 @@
       "style": { "navigationStyle": "custom" }
     },
     {
-      "path": "pages/me/kyc",
-      "style": { "navigationStyle": "custom" }
-    },
-    {
       "path": "pages/me/goals",
       "style": { "navigationStyle": "custom" }
     },

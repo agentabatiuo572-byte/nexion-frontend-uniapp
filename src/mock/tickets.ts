@@ -63,22 +63,6 @@ export const TICKETS: Ticket[] = [
     ],
   },
   {
-    id: "TK-1023",
-    subject: "KYC documents rejected — what's wrong?",
-    category: "kyc",
-    status: "pending_user",
-    priority: "normal",
-    createdAt: NOW - 2 * DAY,
-    updatedAt: NOW - 9 * HOUR,
-    lastReplyAt: NOW - 9 * HOUR,
-    unread: 1,
-    owner: "Tomas R.",
-    messages: [
-      { ts: NOW - 2 * DAY, author: "user", body: "Just got 'KYC rejected' but no reason was shown. My passport is valid through 2031." },
-      { ts: NOW - 9 * HOUR, author: "agent", agentName: "Tomas R.", body: "Looked it up — the rejection reason was 'blurry photo, MRZ unreadable'. Please re-upload with better lighting and the bottom 2 lines clearly visible. Sumsub link reset, you have 3 retries left in 24h." },
-    ],
-  },
-  {
     id: "TK-1019",
     subject: "NexGridBox Pro disconnected after firmware v3.4",
     category: "hardware",
@@ -168,7 +152,8 @@ export const CATEGORY_LABEL: Record<TicketCategory, string> = {
   account: "Account",
   withdrawal: "Withdrawal",
   deposit: "Deposit",
-  kyc: "KYC",
+  // 历史类目值保留(存量工单渲染需要),标签中性化;新工单不再提供该类目。
+  kyc: "Account review",
   hardware: "Hardware",
   earnings: "Earnings",
   genesis: "Genesis",
