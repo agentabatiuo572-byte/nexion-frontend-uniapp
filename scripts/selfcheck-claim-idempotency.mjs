@@ -47,6 +47,8 @@ const SITES = [
   "src/App.vue",
   "src/lib/share.ts",
   "src/pages/me/wallet-cards-new.vue",
+  // 包 E(2026-08-06):迁移期中途换绑单 $1 一律返还(主人拍板),稳定 ref=legacy-rebind-refund:<账号>
+  "src/store/payout-address.ts",
 ];
 
 console.log("selfcheck-claim-idempotency — 领奖族:发钱可重放,资格只消费一次");

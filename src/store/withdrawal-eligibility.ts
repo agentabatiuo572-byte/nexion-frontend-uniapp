@@ -13,11 +13,12 @@ import type { Withdrawal } from "@/store/types";
 import type { WithdrawalRiskRoute } from "@/store/config-types";
 import { decideFromStores, isDailyLimitReached, nextDayResetAt } from "@/store/withdrawal-eligibility-core";
 import { readWithdrawCounter } from "@/store/withdraw-daily-count";
-import { useWalletPairing } from "@/store/wallet-pairing";
+import { usePayoutAddress } from "@/store/payout-address";
 import {
+  fromWithdrawNetwork,
   NEW_ADDRESS_AGE_DAYS,
   NEW_ADDRESS_LARGE_AMOUNT_USDT,
-} from "@/store/wallet-pairing-core";
+} from "@/store/payout-address-core";
 
 // SPEC-7 提现前置风控(mock K3,推倒重写版)。
 //
@@ -76,7 +77,9 @@ export function evaluateWithdrawal(
   const cluster = evaluateAccountCluster(key);
   const decision = decideFromStores({
     now: mockServerNow(),
-    binding: useWalletPairing().activeBinding,
+    // binding = 该网络当前提现地址的快照({freezeUntil, verifiedAt})。取数加工在
+    // payout-address-core.eligibilityBindingFor(selfcheck-rebind 行为覆盖),这里仍只转发。
+    binding: usePayoutAddress().bindingFor(fromWithdrawNetwork(network)),
     ownRecord: getRiskRecord(key),
     allRecords: listRiskRecords(),
     accountKey: key,

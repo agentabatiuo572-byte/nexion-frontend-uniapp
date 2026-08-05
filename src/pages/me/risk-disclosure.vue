@@ -83,7 +83,7 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { navBack } from "@/lib/route";
 import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
-import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/wallet-pairing-core";
+import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/payout-address-core";
 import { useConfig } from "@/store/config";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";

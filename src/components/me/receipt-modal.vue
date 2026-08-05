@@ -1,7 +1,7 @@
 <!--
   ReceiptModal — ported from
   Nexion-prototype/app/components/receipt/receipt-modal.tsx.
-  Bottom-anchored detail sheet for a Proof-of-Compute (or KYC) receipt. Scrim +
+  Bottom-anchored detail sheet for a Proof-of-Compute (or legacy wallet-verification) receipt. Scrim +
   slide-up card (nx-step-in, tokens.css). Sections rendered generically from a
   computed `sections` descriptor (the source's Row/RowCopy/Section/DetailsRows
   components collapse into {k, v, accent, muted, strong, copyValue, hint} rows).
@@ -21,13 +21,13 @@
 
       <!-- Header -->
       <view :style="headerStyle">
-        <text class="block" :style="headerKickerStyle">{{ isKyc ? "Wallet Ownership Verification" : "Proof of Compute" }}</text>
+        <text class="block" :style="headerKickerStyle">{{ isLegacyVerification ? "Wallet Verification (legacy)" : "Proof of Compute" }}</text>
         <view class="flex items-center" style="margin-top: 6px; gap: 8px">
           <text class="inline-flex items-center" :style="stampStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" :stroke="stampColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <text style="margin-left: 4px">{{ isKyc ? "KYC VERIFIED" : "VERIFIED" }}</text>
+            <text style="margin-left: 4px">VERIFIED</text>
           </text>
-          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isKyc ? "Paired" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
+          <text style="font-size: 12px; color: var(--v5-ink-3)">{{ isLegacyVerification ? "Recorded" : "Settled" }} · {{ fmtDate(receipt.settledAt) }}</text>
         </view>
       </view>
 
@@ -56,7 +56,7 @@
           </view>
           <text v-else class="text-right truncate" :style="valueStyle(row)">{{ row.v }}</text>
         </view>
-        <!-- KYC compliance checklist -->
+        <!-- 历史验证回执的核验清单(渲染兜底,仅存量数据) -->
         <view v-if="sec.checks" style="margin-top: 4px">
           <view v-for="chk in sec.checks" :key="chk" class="flex items-center" style="gap: 8px; padding: 2px 0">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M20 6 9 17l-5-5" /></svg>
@@ -81,8 +81,9 @@ const props = defineProps<{ receipt: Receipt | null }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const t = useT();
-const isKyc = computed(() => props.receipt?.category === "KY");
-const stampColor = computed(() => (isKyc.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
+// "KY" = 存量验证类回执(机制已删,历史数据保留可查 —— 白名单字段)。
+const isLegacyVerification = computed(() => props.receipt?.category === "KY");
+const stampColor = computed(() => (isLegacyVerification.value ? "var(--v5-tech-cyan)" : "var(--v5-brand)"));
 
 // ── tap-to-copy (matches prototype RowCopy: copy on tap, transient ✓ icon) ──
 // Backend-replaceable: copies the full underlying value; no real backend call.
@@ -370,7 +371,7 @@ const dividerStyle: CSSProperties = {
 function valueStyle(row: DescRow): CSSProperties {
   // Prototype default value = text-white/95 on a dark (`--v5-on-brand`) sheet.
   // Use theme-safe `var(--v5-ink) 95%` (resolves to near-white on dark, stays
-  // legible if the light theme is ever applied) — also matches the KYC checks'
+  // legible if the light theme is ever applied) — also matches the legacy checks'
   // theme-aware `var(--v5-ink) 85%` instead of a hardcoded literal white.
   return {
     color: row.accent ? "var(--v5-brand)" : row.muted ? "var(--v5-ink-3)" : "color-mix(in srgb, var(--v5-ink) 95%, transparent)",

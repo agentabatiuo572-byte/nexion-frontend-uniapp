@@ -2,8 +2,8 @@
   ChainPaymentInstructions — ported from Nexion-prototype/app/(main)/store/
   checkout/page.tsx (ChainPaymentInstructions + FauxQR). USDT-TRC20 / USDT-BEP20
   / USDT-ERC20 deposit screen: faux-QR + copyable address + 30-min countdown +
-  12s auto-detect that fires `complete`. wallet-pairing.ts isn't ported yet, so
-  mockExternalAddress is inlined here (mock-only, self-contained).
+  12s auto-detect that fires `complete`. mockExternalAddress is inlined here
+  (mock-only, self-contained).
 -->
 <template>
   <view class="rounded-2xl border overflow-hidden" :style="cardStyle">

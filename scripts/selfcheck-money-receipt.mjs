@@ -500,7 +500,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/pages/me/wallet-cards-new.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
     ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
-    ["src/pages/me/wallet-topup.vue", ["postMoneyBill"]],
+    // wallet-topup.vue 已移出收口名单(2026-08-05 包 E):KYC-Express $1 分录随机制删除,
+    // 页面本身不再产生任何资金分录(常规充值记账在 deposits store / panes 收口)。
+    // 下方零记账断言防它悄悄长回裸调。
     ["src/pages/staking/staking.vue", ["postMoneyBill"]],
     ["src/pages/store/bundle.vue", ["postReceiptOnly"]],
     ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
@@ -546,6 +548,14 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
       // `useBills().add(` / `bills.addMany(` / 别名 receiver / 跨行 全是合法的。
       && scanSource(rel, readFileSync(path.join(root, rel), "utf8")) === 0,
       needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
+  }
+
+  // 包 E(2026-08-05):充值页零记账断言 —— KYC-Express $1 分录随机制删除后,
+  // topup 页不得再出现任何记账调用(裸 bills 写入另由 ⑥ 零容忍门全站兜底)。
+  {
+    const src = readFileSync(path.join(root, "src/pages/me/wallet-topup.vue"), "utf8");
+    check("⑤ wallet-topup.vue 零记账(KYC 分录已随机制删除,常规充值在 deposits 收口)",
+      !src.includes("postMoneyBill") && !src.includes('from "@/lib/money-receipt"'));
   }
 
   const locales = ["en", "zh", "vi"];

@@ -14,7 +14,7 @@
 
   Secondary settings-row display values are wired to the live ported stores
   (security 2FA / achievements count / notifications unread / receipts / orders /
-  points), matching the source. KYC state is driven by the wallet-pairing store.
+  points), matching the source.
   Some settings targets are not-yet-ported pages → nav fail:()=>{}.
 
   Account section's "orders" row was relocated here from store.vue's old
@@ -102,7 +102,6 @@ import { useProfile } from "@/store/profile";
 import { useReceipts } from "@/store/receipts";
 import { useOrders } from "@/store/orders";
 import { useLocaleStore } from "@/store/locale";
-import { useWalletPairing } from "@/store/wallet-pairing";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
 import { useSecurity } from "@/store/security";
@@ -129,7 +128,6 @@ const profile = useProfile();
 const receipts = useReceipts();
 const orders = useOrders();
 const locale = useLocaleStore();
-const pairing = useWalletPairing();
 const faucet = useNexFaucet();
 const trial = useFreeTrial();
 const security = useSecurity();
@@ -203,7 +201,6 @@ interface QuickSection {
 const usdtBalance = computed(() => app.user.usdtBalance);
 const showWithdrawalLocked = computed(() => usdtBalance.value < MIN_WITHDRAWAL_USD);
 const profileName = computed(() => profile.displayName);
-const kycVerified = computed(() => pairing.walletPaired);
 const receiptCount = computed(() => receipts.receipts.length);
 const orderCount = computed(() => orders.orders.length);
 const streakDays = computed(() => faucet.signInStreak);
@@ -289,7 +286,6 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "orders", label: t.value.store.ordersChip, href: "/store/orders", icon: "package", meta: orderCount.value > 0 ? deviceOrdersMeta.value : undefined, tone: "purple" },
       { key: "genesis", label: t.value.me.genesisNode, href: "/genesis/holder", icon: "crown", meta: ownsGenesis.value ? myGenesisValue.value : undefined, tone: "orange" },
       { key: "cards", label: t.value.me.walletCardsRow, href: "/me/wallet-cards", icon: "card", meta: t.value.me.walletCardsMeta, tone: "muted" },
-      { key: "kyc", label: t.value.me.identityKyc, href: "/me/security", icon: "shield", meta: kycVerified.value ? t.value.me.kycVerified : t.value.me.kycPending, tone: kycVerified.value ? "success" : "orange" },
       { key: "profile", label: t.value.me.profile, href: "/me/profile", icon: "user", meta: profileName.value, tone: "muted" },
       { key: "security", label: t.value.me.security, href: "/me/security", icon: "lock", meta: twoFactorEnabled.value ? t.value.me.secWithPasskey : t.value.me.secNoTwoFa, tone: twoFactorEnabled.value ? "muted" : "orange" },
     ],

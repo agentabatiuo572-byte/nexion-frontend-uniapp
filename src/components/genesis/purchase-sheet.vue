@@ -87,7 +87,6 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
           <text>{{ t.genesis.confirmCta }}</text>
         </view>
-        <text class="block text-center" :style="kycNoticeStyle">{{ t.genesis.kycNotice }}</text>
       </view>
     </transition>
   </view>
@@ -398,12 +397,6 @@ const submitStyle = computed<CSSProperties>(() => ({
   fontSize: "15px",
   letterSpacing: "-0.005em",
 }));
-const kycNoticeStyle: CSSProperties = {
-  marginTop: "12px",
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-  lineHeight: 1.45,
-};
 </script>
 
 <style scoped>

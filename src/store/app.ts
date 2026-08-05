@@ -27,7 +27,7 @@ import {
 } from "@/store/earning-release";
 import { markWithdrawn, recordAttestation, recordWithdrawAddressUse } from "@/store/risk-identity";
 import { advanceArrival, estimateArrivalAt, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
-import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/wallet-pairing-core";
+import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/payout-address-core";
 import { CLAIM_SETTLE_MS, claimWithdrawSlot, releaseWithdrawSlot } from "@/store/withdraw-daily-count";
 import { mockServerNow } from "@/store/server-time";
 import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
