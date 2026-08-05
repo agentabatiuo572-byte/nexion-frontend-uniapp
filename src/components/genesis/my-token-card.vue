@@ -125,7 +125,12 @@ async function handleCancel() {
   if (!existing.value) return;
   const ok = await confirm({
     title: fmt(t.value.marketplace.confirmCancelTitle, { id: props.tokenId }),
-    message: t.value.marketplace.confirmCancelMsg,
+    // 🔴 关闭态下不许承诺「之后可以重新设价上架」—— 撤完就再也挂不上,直到运营重开。
+    //   这句矛盾是**给 listNode 接闸后新产生的**(独立验收 P1):撤单本身该放行(离场手段),
+    //   但确认框仍在用开放态的措辞,等于诱导用户做一个单向操作。
+    message: listBlocked.value
+      ? `${t.value.marketplace.confirmCancelMsg2}${t.value.marketplace.listBlockedDesc}`
+      : t.value.marketplace.confirmCancelMsg,
     confirmLabel: t.value.marketplace.confirmCancelCta,
     danger: true,
     icon: "warn",

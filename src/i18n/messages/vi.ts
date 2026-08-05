@@ -4418,6 +4418,7 @@ export const vi: Messages = {
     confirmListCta: "Rao bán",
     confirmCancelTitle: "Hủy tin rao #{id}?",
     confirmCancelMsg: "Node sẽ trở về ví của bạn (ngừng rao). Bạn có thể rao lại sau với giá bất kỳ.",
+    confirmCancelMsg2: "Node sẽ trở về ví của bạn (ngừng rao). ",
     confirmCancelCta: "Hủy tin rao",
     cancelledToast: "Đã hủy tin rao #{id}",
     cancelledDesc: "Node đã trở về ví",

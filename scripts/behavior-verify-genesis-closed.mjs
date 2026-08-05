@@ -135,7 +135,8 @@ try {
 
   await page.evaluate(([k, c]) => localStorage.setItem(k, JSON.stringify({ type: "object", data: { config: c } })),
     [CFG_KEY, { marketOpenState: "closed", closedNoticeKey: "maintenance" }]);
-  await wait(1500);
+  // 共享时钟每 15 tick(≈15s)重读一次配置 —— 等够一个周期再判,别在窗口内抢答。
+  await wait(18000);
   const caughtInPlace = /系统维护中|Under maintenance/i.test(await text());
 
   await hashGo("/pages/genesis/marketplace");

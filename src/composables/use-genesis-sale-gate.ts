@@ -78,12 +78,26 @@ function pad2(n: number): string {
 const nowTs = ref(Date.now());
 let clockRefs = 0;
 let clockTimer: ReturnType<typeof setInterval> | null = null;
+let tickCount = 0;
+
+/** 配置重读周期(秒)。挂在已有的秒级时钟上,**不另起定时器**。 */
+const CONFIG_POLL_TICKS = 15;
+
 function retainClock() {
   clockRefs += 1;
   if (clockTimer === null) {
     nowTs.value = Date.now(); // 首个消费者进场即对时,不等第一个 tick
+    tickCount = 0;
     clockTimer = setInterval(() => {
       nowTs.value = Date.now();
+      // 🔴 「用户停在页面上不动」也要跟上运营的状态切换(规格 ⑤「就地转为锁定态」)。
+      //   此前只有导航 / 下拉 / 硬刷新三条路径会重读 —— 干等不动时 UI 一直是旧的,
+      //   用户要点一下被拒才知道,而规格要的是提前变灰(运行时探针 ⑦a 实测红)。
+      //   🔴 挂在已有时钟上按 15 tick 触发,不另起 timer:轮询代价 = 每 15s 一次读盘,
+      //   而每实例一个新 timer 的代价随列表长度翻倍(同文件上一版刚踩过)。
+      //   真后台接上后这里换成 SSE / 长轮询,周期语义不变。
+      tickCount += 1;
+      if (tickCount % CONFIG_POLL_TICKS === 0) useGenesisConfig().refresh();
     }, 1000);
   }
 }
