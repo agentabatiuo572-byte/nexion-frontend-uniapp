@@ -131,6 +131,15 @@ const quest = computed<Tier1QuestDef | null>(() => {
 const mult = computed(() => getPhaseRewardMultiplier(phase.value.id));
 const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * mult.value) : 0));
 const rewardDisplay = computed(() => reward.value.toLocaleString());
+// 🔴 **不要**改成「已完成未领取的任务钉住不再重派」(2026-08-05 独立审计提过,证伪后否决)。
+//   看起来它修的是「闸一变、已完成的奖励静默作废」,实际会开三个更大的口子:
+//   ① `markTier1Complete` 是**点 CTA 就触发**的(见下面 onCta 的注释),不是真买到才触发
+//      —— 钉住 = 用户点一下、市场随即关闭,照样能领 2500 NEX 徽章,没买创世也领;
+//   ② 钉住的那支绕开 `genesisPurchasable` 判据,闸对它彻底失效;
+//   ③ `tier1Completed` 是从 storage 裸 cast 进来的字符串,脏值会让 `TIER1_QUESTS[脏值]`
+//      变 undefined → 整周不出任务卡且周冠军奖永久不可领。
+//   真要修得在服务端按**行为归因**判完成(本文件已是 backend-replaceable 的形状),
+//   而不是在渲染层钉一个「点过了」的标记。现在这版「闸一关任务就换掉」反而是刹车。
 const completed = computed(() => !!quest.value && wq.tier1Completed === quest.value.id);
 const visible = computed(() => mounted.value && !!quest.value && !wq.tier1Claimed);
 

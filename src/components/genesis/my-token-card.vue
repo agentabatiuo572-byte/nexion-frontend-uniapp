@@ -128,8 +128,11 @@ async function handleCancel() {
     // 🔴 关闭态下不许承诺「之后可以重新设价上架」—— 撤完就再也挂不上,直到运营重开。
     //   这句矛盾是**给 listNode 接闸后新产生的**(独立验收 P1):撤单本身该放行(离场手段),
     //   但确认框仍在用开放态的措辞,等于诱导用户做一个单向操作。
+    //   🔴 用整句独立键,不拼两串(2026-08-05 独立验收 P2):拼来的后半句原本是
+    //   **挂单被拒**场景的安抚语(「你已持有的席位不受影响」),放进撤单框里归因就错了;
+    //   且英/越两面靠值末尾的空格接缝,任何 trim 类格式化都会让它变成 "…(not listed).Seats…"。
     message: listBlocked.value
-      ? `${t.value.marketplace.confirmCancelMsg2}${t.value.marketplace.listBlockedDesc}`
+      ? t.value.marketplace.confirmCancelMsgBlocked
       : t.value.marketplace.confirmCancelMsg,
     confirmLabel: t.value.marketplace.confirmCancelCta,
     danger: true,
