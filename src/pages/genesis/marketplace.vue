@@ -132,6 +132,7 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue";
@@ -157,6 +158,8 @@ const t = useT();
 const app = useApp();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+// 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
+onShow(() => cfg.refresh());
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
 const { marketClosed, secondaryBlock, blockText } = useGenesisSaleGate();
 /** 阻断说明文案 —— 走 blockText 唯一出口(P1-3 收口:此前 4 处各写一份同款 switch)。

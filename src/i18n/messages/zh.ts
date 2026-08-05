@@ -3465,6 +3465,7 @@ export const zh: Messages = {
       halted: "认购已暂停",
       configUnavailable: "暂时无法获取状态",
       retryHint: "请稍后重试",
+      retryOk: "已恢复,可以继续操作",
       holdingsSafe: "已持有的节点与权益不受影响",
     },
     confirmTitle: "预订创世节点",

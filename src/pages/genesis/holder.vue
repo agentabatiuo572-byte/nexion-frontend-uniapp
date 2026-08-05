@@ -207,11 +207,13 @@
 
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_EMISSION } from "@/store/genesis";
+import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 
 const DAY = 86400_000;
@@ -232,6 +234,8 @@ const dividendsOpen = computed(() => genesis.dividendsOpen);
 // 🔴 阻断说明走 blockText 唯一出口(独立验收 P1-3):上一版写死 `.default`,
 //   售罄时这里说「暂未开放」而创世页说「已售罄」,同刻自相矛盾。售罄档落 `ctaSoldOut`。
 const { showUrgency, blockText } = useGenesisSaleGate();
+// 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
+onShow(() => useGenesisConfig().refresh());
 const notHolderBodyText = computed(() =>
   showUrgency.value
     ? fmt(t.value.genesisHolder.notHolderBody, { n: remaining.value })

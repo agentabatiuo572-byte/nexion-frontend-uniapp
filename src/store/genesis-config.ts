@@ -245,39 +245,65 @@ function sanitizeTiers(tiers: unknown, minTotal: number): GenesisTier[] {
   return (tiers as GenesisTier[]).map((t) => ({ id: String(t.id), from: t.from, to: t.to, priceUSDT: t.priceUSDT }));
 }
 
-function hydrate(): GenesisConfig {
+function freshDefaults(): GenesisConfig {
+  return { ...DEFAULT_GENESIS_CONFIG, tiers: DEFAULT_GENESIS_CONFIG.tiers.map((t) => ({ ...t })), perks: emptyPerks() };
+}
+
+/**
+ * 读一次配置源(mock 期 = uni storage;真后台 = `GET /api/config/genesis`)。
+ * `ok` 区分两种「读不到」:
+ *   - **首次运行**(源里没存过值)→ 返回默认值,`ok: true` —— 正常情形;
+ *   - **源本身抛错**(storage API 不可用 / 真后台请求失败)→ `ok: false`,
+ *     `genesisPurchaseBlock` 随即走 `configUnavailable` 保守锁购(规格异常3)。
+ * 🔴 fail-safe 方向:盘上存了**脏值**回退 open(一个坏字节不该永久停售);
+ *   **源不可达**才锁购 —— 两种失败方向相反,不许合并。
+ */
+function hydrate(): { config: GenesisConfig; ok: boolean } {
   try {
     const s = uni.getStorageSync(STORAGE_KEY) as { config?: Partial<GenesisConfig> } | "";
     if (s && typeof s === "object" && s.config) {
       // Merge over defaults so newly-added fields exist for old persisted state.
       const merged = { ...DEFAULT_GENESIS_CONFIG, ...s.config };
       merged.tiers = sanitizeTiers(s.config.tiers, 0);
-      // 🔴 fail-safe 方向要选对:非法 marketStatus 回退 **open**,不是 closed。
-      //   这里是「盘上存了脏值」,不是「配置拉不到」——后者由 genesisPurchaseBlock 的
-      //   configUnavailable 走保守锁购。把脏值也当成关闭,会让一个坏字节永久停售。
       if (merged.marketStatus !== "open" && merged.marketStatus !== "closed") merged.marketStatus = "open";
       if (!GENESIS_CLOSED_NOTICE_KEYS.includes(merged.closedNoticeKey)) merged.closedNoticeKey = "default";
       if (!Array.isArray(merged.perks) || merged.perks.length !== 4) merged.perks = emptyPerks();
       if (!Array.isArray(merged.opsListings)) merged.opsListings = [];
       if (!Array.isArray(merged.fomoActivity)) merged.fomoActivity = [];
-      return merged;
+      return { config: merged, ok: true };
     }
+    return { config: freshDefaults(), ok: true }; // 首次运行:没存过 ≠ 拉取失败
   } catch {
-    // first run
+    // 🔴 storage API 抛错 = 配置源不可达 → configUnavailable 档的**真实触发路径**。
+    //   此前这里被当成 first run 吞掉、loaded 写死 true,导致该档全链路不可达,
+    //   规格异常3 的重试流程成了死代码(独立验收 confirmed P1)。
+    return { config: freshDefaults(), ok: false };
   }
-  return { ...DEFAULT_GENESIS_CONFIG, tiers: DEFAULT_GENESIS_CONFIG.tiers.map((t) => ({ ...t })), perks: emptyPerks() };
 }
 
 export const useGenesisConfig = defineStore("genesisConfig", () => {
-  const config = ref<GenesisConfig>(hydrate());
-  /** 配置是否可用。
-   *
-   *  🔴 mock 期恒 true —— 配置是同步从本地读的,没有会失败的网络请求;
-   *  `hydrate()` 读不到时返回的是**默认值**(首次运行的正常情形),不是「拉取失败」。
-   *  真后台接上后,这里改由 `GET /api/config/genesis` 的结果驱动:请求失败 → false,
-   *  `genesisPurchaseBlock` 随即返回 `configUnavailable` 走保守锁购(规格 FEAT-GEN10 异常3)。
-   *  🔴 别为了「让异常3 现在就能演」把它硬编码成 false —— 那会让所有人都买不了。 */
-  const loaded = ref(true);
+  const first = hydrate();
+  const config = ref<GenesisConfig>(first.config);
+  /** 配置是否可用 —— 由**最近一次读源的真实结果**驱动,不写死。
+   *  false 时 `genesisPurchaseBlock` 返回 `configUnavailable` 保守锁购;
+   *  `refresh()` 成功即恢复(= 规格异常3 的「重试」)。 */
+  const loaded = ref(first.ok);
+
+  /**
+   * 🔴 重新读配置源。这是关闭态能约束**已打开会话**的关键(独立验收 P0→P1):
+   *   config 只在 store 构造时读一次的话,运营切了状态,已开着页面的用户照旧能买
+   *   (实测 hash 导航 + 不刷新完成 $23,998 认购)。三类调用点:
+   *   ① 创世相关页面 onShow —— UI 跟上最新状态;
+   *   ② composable 挂载时 —— 组件级消费者(首页快捷入口/商城卡)进场即取新;
+   *   ③ 🔴 store 资金动作入口(purchase / listNode / acquireSecondary)——
+   *      动钱前**必再读一次**,这是 mock 期对「服务端拒单」的忠实模拟:
+   *      判定读的不再是构造时的内存快照,而是当下的权威源。
+   */
+  function refresh() {
+    const r = hydrate();
+    config.value = r.config;
+    loaded.value = r.ok;
+  }
 
   function persist() {
     try {
@@ -291,9 +317,9 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
     persist();
   }
   function reset() {
-    config.value = { ...DEFAULT_GENESIS_CONFIG, tiers: DEFAULT_GENESIS_CONFIG.tiers.map((t) => ({ ...t })), perks: emptyPerks() };
+    config.value = freshDefaults();
     persist();
   }
 
-  return { config, loaded, update, reset };
+  return { config, loaded, update, reset, refresh };
 });
