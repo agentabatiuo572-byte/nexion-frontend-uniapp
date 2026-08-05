@@ -258,5 +258,80 @@ function urgencySitesUngated(src) {
     `受闸态 ${urgencySitesUngated(gated).length} 条 / 摘闸态 ${urgencySitesUngated(ungated).length} 条`);
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:7 组优先级固定靶 · 3 组二级 · 6 种紧迫感态 · 全 src 扫描 · 2 条正交结构判据 · 9 条判据红测自证含 v1 被绕的 6 种形态)`);
+// ══ ⑦ 「该有的在不在」—— store 每个改变市场参与状态的 action 都必须问闸 ═══════════
+// 🔴 前六条判据全部只看「已经引用了闸的地方用得对不对」,对「本该引用却一个符号都
+//    不出现」的文件恒真 —— listNode(独立验收唯一存活 P0)正是从这个正交维度掉出去的:
+//    它不产出档位值、不比较 marketStatus、不引用 useGenesisSaleGate,①④⑤⑥ 对它全绿。
+// 🔴 判据锚点 = store 末尾 `return { … }` 那份**代码里已存在的显式清单**,不是自造的
+//    模式扫描(第一版按「函数体有没有写状态关键词」筛,静默漏掉了 listNode 本身)。
+//    新增导出成员必须写进那一处 → 门一定看得见;台账写在本脚本里,删成员改名都会红。
+{
+  const storeSrc = readFileSync(path.join(root, "src/store/genesis.ts"), "utf8");
+
+  // 台账:必须问闸的 action(改变持有/席位/挂单状态的用户入口)。
+  const MUST_ASK = ["purchase", "listNode", "acquireSecondary"];
+  // 豁免台账 —— 每条必须写理由,留白等于没想过:
+  const EXEMPT = {
+    cancelListing: "离场手段,非市场参与入口;关闭态拦撤单=没收用户处置权(规格②只锁「购买/挂单」)",
+    tickSales: "模拟他人成交的世界演进,非本人动作;闸在用户入口不在时间推进",
+    bindAccount: "账号切换的数据装载,不产生交易",
+    setNexListed: "上所状态由运营侧驱动,与购买可用性正交",
+  };
+  const READONLY = ["remaining", "soldPct", "tierRemaining", "emissionSnapshot", "reservedAllocationNEX"];
+  const BLOCK_CALL = /genesisPurchaseBlock|genesisSecondaryBlock/;
+
+  const exportedMembers = (src) => {
+    const m = src.match(/return \{\s*\n\s*totalSlots[\s\S]*?\n\s*\};/);
+    if (!m) return null; // 导出块没了 = 判据失效,必红
+    const names = [...new Set([...m[0].matchAll(/\b([a-zA-Z_]\w*)\b/g)].map((x) => x[1]))];
+    return names.filter((n) => n !== "return");
+  };
+  const bodyOf = (src, name) => {
+    const lines = src.split(/\r?\n/);
+    const start = lines.findIndex((l) => new RegExp(`^\\s*(?:async\\s+)?function\\s+${name}\\b`).test(l));
+    if (start < 0) return null;
+    let end = lines.length;
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^\s*(?:async\s+)?function\s+\w+/.test(lines[i])) { end = i; break; }
+    }
+    return lines.slice(start, end).join("\n");
+  };
+  const violations = (src) => {
+    const out = [];
+    const exported = exportedMembers(src);
+    if (!exported || exported.length < 10) return ["判据失效:store 导出块解析不出成员"];
+    for (const name of MUST_ASK) {
+      const body = bodyOf(src, name);
+      if (body === null) { out.push(`台账登记的 ${name} 不存在(台账已漂)`); continue; }
+      if (!BLOCK_CALL.test(body)) out.push(`${name}() 改变持有状态却没问闸`);
+    }
+    const known = new Set([...MUST_ASK, ...Object.keys(EXEMPT), ...READONLY]);
+    for (const n of exported.filter((n) => bodyOf(src, n) !== null)) {
+      if (!known.has(n)) out.push(`导出函数 ${n} 未在门台账登记(标 MUST_ASK / EXEMPT+理由 / READONLY)`);
+    }
+    return out;
+  };
+
+  const real = violations(storeSrc);
+  check(`🔴 ⑦ 改变市场参与状态的 action 全部问闸(MUST_ASK ${MUST_ASK.length} · 豁免 ${Object.keys(EXEMPT).length} · 只读 ${READONLY.length})`,
+    real.length === 0, real.join(" ; "));
+
+  // 红测(逐合取项隔离,不写 A||B):
+  check(`🔴 红测自证:⑦ 摘掉 purchase 的闸必须转红`,
+    violations(storeSrc.replace(/genesisPurchaseBlock/g, "xxBlock")).some((v) => v.includes("purchase()")),
+    "摘闸后没红 = ⑦ 空转");
+  check(`🔴 红测自证:⑦ 台账成员改名(台账漂移)必须转红`,
+    violations(storeSrc.replace(/function listNode/, "function listNode2")).some((v) => v.includes("不存在")),
+    "改名后没红 = 台账不看守自身");
+  check(`🔴 红测自证:⑦ 新增未登记的导出 action 必须转红`,
+    (() => {
+      const injected = storeSrc
+        .replace(/function tickSales/, "function sneakyMint(){ myOwned.value += 1; persist(); return true; }\n  function tickSales")
+        .replace(/purchase, listNode, cancelListing, acquireSecondary/, "purchase, listNode, cancelListing, acquireSecondary, sneakyMint");
+      return violations(injected).some((v) => v.includes("sneakyMint"));
+    })(),
+    "未登记新成员没红 = 开放集合的入口没封住");
+}
+
+console.log(`\n${pass} pass / ${fail} fail(样本:7 组优先级固定靶 · 3 组二级 · 6 种紧迫感态 · 全 src 扫描 · 3 条正交结构判据 · 12 条判据红测自证含 v1 被绕的 6 种形态)`);
 process.exit(fail === 0 ? 0 : 1);
