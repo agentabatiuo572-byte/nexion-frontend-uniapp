@@ -115,7 +115,7 @@ const { gate } = useGenesisEligibility();
 //   用户已打开半屏、运营此刻切关闭 → 走完扣款才被 store 拒 → 冲正 → 一句 toast,
 //   而半屏不关、按钮仍可点,连点 N 次就写 2N 条账单(扣款 + 冲正各一条)。
 //   规格 ⑤ 要的是「**就地转为锁定态 + 说明**」,不是弹个提示了事。
-const { block, closedNoticeKey } = useGenesisSaleGate();
+const { block, blockText } = useGenesisSaleGate();
 
 const qty = ref(1);
 /**
@@ -134,13 +134,10 @@ const sheetBlocked = computed(() => {
   const b = block.value;
   return b === "marketClosed" || b === "halted" || b === "configUnavailable";
 });
-const sheetBlockText = computed(() => {
-  switch (block.value) {
-    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
-    case "halted": return t.value.genesis.marketClosed.halted;
-    default: return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
-  }
-});
+// 走 blockText 唯一出口(P1-3 收口)。兜底只防 TS null:sheetBlocked 为真时
+// block 必是三档阻断之一,blockText 恒非 null。上一版 `default:` 在可购买态也会
+// 算出「暂未开放」,靠 sheetBlocked 碰巧挡住 —— 已删。
+const sheetBlockText = computed(() => blockText.value ?? t.value.genesis.marketClosed.default);
 
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
@@ -256,7 +253,9 @@ function handlePurchase() {
       // 按拒绝原因选反馈(售罄竞态 vs 限购 vs 市场关闭,A-1 / FEAT-GEN10 异常4)。
       if (r.reason === "market-closed") {
         // 用户已打开购买半屏、运营此刻切到关闭 → 就地说明。钱已在上方冲正,不留半成品订单。
-        toast.error(t.value.genesis.marketClosed.default, t.value.genesis.marketClosed.holdingsSafe);
+        // 🔴 文案走 blockText,不写死 `.default`:运营选了「维护中」变体时,这条 toast
+        //   曾照样说「暂未开放」—— 后台专门为防串档把变体改成下拉,前端这里再写死就白改了。
+        toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
       } else if (r.reason === "cap") {
         toast.error(
           t.value.genesisEligibility.toastCapReached,

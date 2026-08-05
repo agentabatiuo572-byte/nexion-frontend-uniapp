@@ -4495,6 +4495,7 @@ export const en = {
     lastSale: "last ${k}K",
     buyCta: "Buy",
     listCta: "List",
+    listBlockedDesc: "Seats you already hold are unaffected — you can list again once the market reopens.",
     noTokensTitle: "No Genesis Nodes yet",
     noTokensSub: "Browse listings above or reserve a fresh mint",
     reservePrimary: "Reserve from primary",

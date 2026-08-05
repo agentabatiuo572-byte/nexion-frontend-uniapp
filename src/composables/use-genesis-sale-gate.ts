@@ -8,6 +8,7 @@ import {
   type GenesisPurchaseBlock,
 } from "@/store/genesis-config";
 import { useGenesis } from "@/store/genesis";
+import { useT } from "@/i18n/use-t";
 
 /**
  * useGenesisSaleGate — 创世购买可用性的**唯一消费入口**(规格 FEAT-GEN09 + FEAT-GEN10)。
@@ -39,6 +40,18 @@ export interface UseGenesisSaleGateResult {
   showUrgency: ComputedRef<boolean>;
   /** 关闭态文案变体键(默认 "default")。 */
   closedNoticeKey: ComputedRef<string>;
+  /**
+   * 三档**阻断说明**文案的唯一出口:`configUnavailable` / `marketClosed` / `halted`。
+   *
+   * 🔴 只管这三档,其余档返回 `null` —— 因为 `soldOut` / `preSale` / 可购买态的措辞
+   *    **各面本就不同**(创世页售罄说「已售罄」、商城卡说「去二级市场」),那是各面的
+   *    CTA 词汇,不是重复。把五档一起合并会把商城卡的售罄文案悄悄改掉。
+   *
+   * 🔴 返回 `null` 而不是兜底成 `marketClosed.default`:上一版有两处靠 `default:` 兜住
+   *    可购买态(block 为 null 时也算出一句「市场暂未开放」),只因外层另有闸挡着才没露出来。
+   *    返回 null 让调用方必须显式处理自己的档,那种「靠外层碰巧挡住」的写法会当场暴露。
+   */
+  blockText: ComputedRef<string | null>;
   /** 未开售(预售锁定态)。到点自动翻 false。 */
   preSale: ComputedRef<boolean>;
   /** 是否显示倒计时具体时间。**关闭态下恒 false**(规格 ④:不对不可购买的东西制造紧迫感)。 */
@@ -91,6 +104,26 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
   const showUrgency = computed(() => genesisShowsUrgency(block.value));
   const closedNoticeKey = computed(() => cfg.config.closedNoticeKey);
 
+  // 三档阻断说明的**唯一映射出口**。改造前这段 switch 在 4 个页面各写了一份
+  // (还有 2 个页面连写都没写、直接写死 `.default`,于是售罄时说成「暂未开放」,
+  //  与创世页同刻互相矛盾 —— 独立验收 P1-3)。合并到这里之后没有第二处能写错。
+  const t = useT();
+  const blockText = computed<string | null>(() => {
+    const notices = t.value.genesis.marketClosed;
+    switch (block.value) {
+      case "configUnavailable":
+        return notices.configUnavailable;
+      case "halted":
+        return notices.halted;
+      case "marketClosed":
+        // 变体键来自后台下拉白名单;取不到时回落 default(hydrate 已做白名单校验,这里是二道保险)。
+        return notices[closedNoticeKey.value as "default"] ?? notices.default;
+      default:
+        // soldOut / preSale / 可购买 —— 各面措辞不同,由调用方自己出。
+        return null;
+    }
+  });
+
   const preSale = computed(() => isPreSale(cfg.config.saleStartAt, nowTs.value));
   // 🔴 倒计时受 showUrgency 闸:市场关闭时即使 saleStartAt 还没到,也不显示倒计时。
   const showTime = computed(
@@ -111,5 +144,5 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
     return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
   });
 
-  return { block, secondaryBlock, marketClosed, showUrgency, closedNoticeKey, preSale, showTime, countdownDays, countdownClock };
+  return { block, secondaryBlock, marketClosed, showUrgency, closedNoticeKey, blockText, preSale, showTime, countdownDays, countdownClock };
 }

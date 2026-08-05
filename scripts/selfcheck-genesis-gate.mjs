@@ -176,10 +176,12 @@ function producedKinds(src) {
   const actual = allSources().filter((f) => strip(readFileSync(path.join(root, f), "utf8"), true).includes("useGenesisSaleGate")).length;
   // 基数台账(改动数字必须同时说明原因):
   //   genesis.vue · genesis-showcase-card.vue · marketplace.vue · purchase-sheet.vue
-  //   · quick-action-row.vue · holder.vue · composable 自身定义处 = 7
+  //   · quick-action-row.vue · holder.vue · my-token-card.vue · composable 自身定义处 = 8
   //   🔴 首跑时我写的是 6 —— 因为后来给购买半屏也接了闸却忘了同步这个数。
   //   基数台账正是为了逼出这种「加了消费者没登记 / 摘了闸没人知道」。
-  const EXPECTED_GATE_CONSUMERS = 7;
+  //   2026-08-05 7→8:my-token-card.vue 接闸(挂单出售是规格 ② 点名要锁的入口,
+  //   独立验收唯一存活 P0 —— 之前它一次都没问过闸,弹「已挂单」成功却产出无人能接的死单)。
+  const EXPECTED_GATE_CONSUMERS = 8;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }

@@ -55,11 +55,14 @@ const faucet = useNexFaucet();
 const genesis = useGenesis();
 // 🔴 首页快捷入口的「剩 N 席」也是名额紧迫文案(独立验收 P2-14):创世页与商城卡都关了,
 //   这里没关,关闭态下首页仍在催「仅剩 153 席」。判据走同一个 composable,不另写。
-const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
+// 🔴 阻断说明走 blockText **唯一出口**(独立验收 P1-3):上一版这里写死 `.default`,
+//   把 5 档阻断塌缩成一句「市场暂未开放」—— 售罄时首页说「暂未开放」、创世页说「已售罄」,
+//   同刻互相矛盾且首页是事实错误。售罄档落 `ctaSoldOut`(blockText 只管三档阻断说明)。
+const { showUrgency: genesisUrgencyOk, blockText: genesisBlockText } = useGenesisSaleGate();
 
 const chips = computed(() => [
   { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: t.value.home.quickStakeApy, tone: "brand" as const },
-  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : t.value.genesis.marketClosed.default, tone: "warm" as const },
+  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : (genesisBlockText.value ?? t.value.genesis.ctaSoldOut), tone: "warm" as const },
   { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: t.value.home.quickMissionsActive, tone: "brand" as const },
   { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: fmt(t.value.home.quickDailyStreak, { n: faucet.signInStreak }), tone: "warm" as const },
 ]);

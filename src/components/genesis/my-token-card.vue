@@ -39,8 +39,8 @@
         </view>
         <text class="block" :style="floorHintStyle">{{ floorHintText }}</text>
         <view class="w-full flex items-center justify-center active:scale-[0.97]" :style="listBtnStyle" @click="handleList">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg>
-          <text>{{ t.marketplace.listCta }}</text>
+          <svg v-if="!listBlocked" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg>
+          <text>{{ listBlocked ? (blockText ?? t.genesis.marketClosed.default) : t.marketplace.listCta }}</text>
         </view>
       </template>
     </view>
@@ -53,6 +53,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useGenesis } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast, confirm } from "@/store/ui";
 
 const props = defineProps<{ tokenId: number }>();
@@ -62,6 +63,12 @@ const genesis = useGenesis();
 const cfg = useGenesisConfig();
 // 二级地板价派生 marketStats 单源(FEAT-GEN09;运营 G4 可配,不缓存硬编码 — 与 marketplace 同源)。
 const floor = computed(() => cfg.config.marketStats.floor);
+
+// 🔴 挂单是规格 ② 点名要锁的两个入口之一(另一个是购买)。判定走**共用闸**,
+//   不在本文件自判 —— store 侧 listNode 也已接同一个闸,双层守。
+//   撤单**刻意不拦**(离场手段,理由见 store/genesis.ts 的 cancelListing 注释)。
+const { secondaryBlock, blockText } = useGenesisSaleGate();
+const listBlocked = computed(() => secondaryBlock.value !== null);
 
 const askPrice = ref(floor.value);
 
@@ -90,6 +97,12 @@ function onAskInput(e: Event) {
 }
 
 async function handleList() {
+  // 🔴 阻断态给说明,不静默(规格 ⑥「禁静默无反馈」)。放在 confirm **之前** ——
+  //   没必要让用户先确认一件注定失败的事。
+  if (listBlocked.value) {
+    toast.info(blockText.value ?? t.value.genesis.marketClosed.default, t.value.marketplace.listBlockedDesc);
+    return;
+  }
   const ok = await confirm({
     title: fmt(t.value.marketplace.confirmListTitle, { id: props.tokenId }),
     message: fmt(t.value.marketplace.confirmListMsg, {
@@ -242,16 +255,18 @@ const floorHintStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
-const listBtnStyle: CSSProperties = {
+// 🔴 阻断态下按钮退到中性面。用 ink-3 而非 ink-3 以外的更暗档:阻断说明是用户此刻
+//   最需要读到的一行,不能渲染成看不见(独立验收 P1-1 实测通用 disabled 配方只有 2.23,不达 AA)。
+const listBtnStyle = computed<CSSProperties>(() => ({
   marginTop: "10px",
   height: "44px",
   borderRadius: "999px",
   // 迷你表单提交(输入挂单价→挂单):全宽实心柠檬绿合理;仅去光晕(网格多卡,光晕铁律仅限主 CTA)。
-  background: "var(--v5-brand)",
-  color: "var(--v5-on-brand)",
+  background: listBlocked.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
+  color: listBlocked.value ? "var(--v5-ink-3)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 550,
   fontSize: "13px",
   letterSpacing: "-0.005em",
-};
+}));
 </script>

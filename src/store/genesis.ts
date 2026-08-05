@@ -397,6 +397,22 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function listNode(tokenId: number, askPriceUSDT: number): boolean {
+    // 🔴 挂单出售与承接走**同一个**关闭闸(规格 FEAT-GEN10 ② 明写要锁的两个入口是
+    //   「购买 / 二级市场挂单」;「挂单」在本产品词汇表里是卖方动作,买方叫「承接」)。
+    //   不接闸的后果不是「少拦一次」,而是关闭态下产出一批**谁也接不了的死单**:
+    //   卖家以为在等买家,运营以为已停市而挂单数还在涨,客服查不出这单从一开始就无效。
+    //   用 genesisSecondaryBlock 而非 genesisPurchaseBlock:挂单是二级动作,
+    //   主售售罄 / 未开售都不该妨碍转让,只有「市场关闭 / 熔断 / 配置未知」才拦。
+    const cfgStore = useGenesisConfig();
+    if (
+      genesisSecondaryBlock({
+        loaded: cfgStore.loaded,
+        marketStatus: cfgStore.config.marketStatus,
+        now: Date.now(),
+      }) !== null
+    ) {
+      return false;
+    }
     if (!ownedTokenIds.value.includes(tokenId)) return false;
     if (myListings.value.some((l) => l.tokenId === tokenId)) return false;
     if (askPriceUSDT <= 0) return false;
@@ -405,6 +421,11 @@ export const useGenesis = defineStore("genesis", () => {
     return true;
   }
 
+  // 🔴 **撤单刻意不接闸** —— 它是**离场手段**,不是市场参与入口。
+  //   规格 ② 点名要锁的是「购买 / 挂单」两个**入口**,撤单不在其中。
+  //   若关闭态连撤单也拦,用户的席位就被困在一张永远卖不掉的单里,既不能撤回也无人承接
+  //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
+  //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
   function cancelListing(tokenId: number): boolean {
     if (!myListings.value.some((l) => l.tokenId === tokenId)) return false;
     myListings.value = myListings.value.filter((l) => l.tokenId !== tokenId);

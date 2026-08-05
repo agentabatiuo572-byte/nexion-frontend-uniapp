@@ -4395,6 +4395,7 @@ export const vi: Messages = {
     lastSale: "gần nhất ${k}K",
     buyCta: "Mua",
     listCta: "Rao bán",
+    listBlockedDesc: "Suất bạn đang giữ không bị ảnh hưởng — có thể rao bán lại khi thị trường mở lại.",
     noTokensTitle: "Chưa có Genesis Node nào",
     noTokensSub: "Xem các tin rao ở trên hoặc đặt trước một suất đúc mới",
     reservePrimary: "Đặt từ sơ cấp",
