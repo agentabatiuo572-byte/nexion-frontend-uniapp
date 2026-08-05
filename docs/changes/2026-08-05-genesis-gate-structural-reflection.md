@@ -127,6 +127,28 @@ owner 与两个二层 owner 之外的任何引用即红。红测:往任一页面
 - `closedNoticeKey` 在 `pages/` `components/` 出现次数 → **0**,判据变成一行 grep 的**闭集合**;
 - 门里 ④a/④b 那堆猜形态的正则可以**整段删除**,不是再加。
 
+### 🔴 合并前必读:4 份 switch **并非全等**,盲目合并会静默改行为
+
+逐份对比后(2026-08-05 实测),它们分成**两半**:
+
+| 档 | 4 处是否一致 | 结论 |
+|---|---|---|
+| `configUnavailable` / `marketClosed` / `halted` | ✅ **四处逐字相同**(含 `[noticeKey] ?? default` 兜底) | **这三档才是可抽取的公共部分** |
+| `soldOut` | ❌ 创世页 → `genesis.ctaSoldOut`;商城卡 → `store.genesisCardCtaMarket`(**去二级市场**) | 各面 CTA 词汇本就不同,**不是重复** |
+| `preSale` | 创世页 / 商城卡 → `comingSoon`;另两处落进 `default:` | 同上 |
+| `null`(可购买) | 创世页 → 资格门 → `ctaReserve`;商城卡 → `cardCta` | 同上 |
+
+**若把 5 档一起合并,商城卡的售罄文案会从「去二级市场」被悄悄改成「已售罄」** —— 一次没人要求、也没人会立刻发现的行为变更。这正是重构最典型的伤人方式。
+
+**因此 `blockText` 的契约收窄为**:
+
+> 只负责**三档阻断说明**(`configUnavailable` / `marketClosed` / `halted`),
+> 其余档一律返回 `null`,**逼调用方显式处理自己的 CTA 文案**。
+
+顺带修掉一处既有脆弱:`purchase-sheet` 与 `marketplace` 现在靠 `default:` 兜住「可购买」态
+—— 即 block 为 `null` 时它们也会算出一句「市场暂未开放」,只因外层另有 `sheetBlocked` /
+`marketClosed` 闸挡着才没露出来。**返回 `null` 后,这种「靠外层碰巧挡住」的写法会直接暴露成类型错误。**
+
 ### 子任务拆解(每个 ≤1 上下文,独立 tester 验收才许打勾)
 
 | # | 子任务 | 独立验收判据 |
