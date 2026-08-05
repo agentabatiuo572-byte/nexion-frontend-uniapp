@@ -237,6 +237,20 @@ owner 与两个二层 owner 之外的任何引用即红。红测:往任一页面
 | 无任何刷新路径 | ✅ 该文件无 `onShow` / `visibilitychange` / `watch`;导出面 `{ config, loaded, update, reset }` **没有 refresh/reload** |
 | 本仓做不到 | ❌ **做得到** —— `store/app.ts` 等 5 处已有 `onShow` 先例,**范式现成,不是技术障碍** |
 
+**P0-2(跨仓字段名)同样回源核实 —— 判据是「双向零命中」**:
+
+| 查什么 | 结果 |
+|---|---|
+| 前端字段名 | `marketStatus`(`genesis-config.ts:58/86/112`) |
+| 后台字段名 | `openState`(`g4-client.ts:176/359`) |
+| **后台里有 `marketStatus` 吗** | **0 个文件** |
+| **前端里有 `openState` 吗** | **0 个文件** |
+
+双向零命中 ⇒ **两端之间没有任何适配层**。接后端时后台下发的值灌不进前端 → 前端读到空 →
+配置合并的 fail-open 把非法值**回退成 `open`** ⇒ **运营已关市场,用户端照常可购,全程无报错**。
+(后台 `g4-client.ts:170` 自己的注释也写着「熔断闸……与下面的 `openState` **不是**一回事」
+—— 连后台侧都在担心这两个名字被搞混。)
+
 **顺带独立撞见另一条**(不在派单范围,回源时自己看到的):
 `genesis-config.ts:280` `const loaded = ref(true)` —— **写死 true**。
 于是 `genesisPurchaseBlock` 的 `configUnavailable` 档**永远不可达**,
