@@ -18,17 +18,20 @@
           <PulseDot color="var(--v5-tech-cyan)" />
           <text>{{ t.home.networkGlobalGrid }}</text>
         </view>
-        <text class="tabular-nums" style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
+        <!-- 🔴 实时支付流数字已删(FEAT-HOME02 定案):它与「今日支付」是同一笔钱的两种表达
+             (每秒值 × 86400 = 日支付额),主人 2026-07-31 拍板两处一并删。
+             首页脉搏板块自此不披露任何平台支付规模,只讲用户规模、设备规模与个人位次。
+             条头保留左侧「全球算力网 + 脉冲点」作为实时标记,右侧留空不补别的数字。 -->
       </view>
 
-      <view class="grid grid-cols-2">
+      <view class="grid grid-cols-3">
         <!-- 横向 padding 14 → 12:①《03》§1 8pt grid(14 不在阶梯,12=space-3)
              ②腾出 4px,修 h3 20px 指标值(如 #18,742)撑破容器 2px 的溢出 -->
         <view
           v-for="(m, i) in metrics"
           :key="m.k"
           class="grid items-center gap-2"
-          :style="{ gridTemplateColumns: '1fr 60px', padding: '12px', borderRight: i % 2 === 0 ? '1px solid var(--v5-border)' : 'none', borderBottom: i < 2 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
+          :style="{ gridTemplateColumns: '1fr', padding: '12px', borderRight: i < metrics.length - 1 ? '1px solid var(--v5-border)' : 'none', minWidth: 0 }"
         >
           <view class="min-w-0">
             <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ m.k }}</text>
@@ -45,36 +48,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
-import { DAILY_PAYOUT_USD, PAYOUT_PER_SEC_USD } from "@/lib/platform-stats";
 import PulseDot from "./pulse-dot.vue";
 import HomeSparkline from "./home-sparkline.vue";
 
 const t = useT();
 const app = useApp();
 
-// Live $/sec — symmetric wobble around the anchor rate, RECOMPUTED each tick
-// (never accumulated: the old drifting ticker extrapolated to $18.6M/day).
-const perSec = ref(PAYOUT_PER_SEC_USD);
-let perSecTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  perSecTimer = setInterval(() => {
-    perSec.value = PAYOUT_PER_SEC_USD + (Math.random() - 0.5) * 0.6;
-  }, 1600);
-});
-onUnmounted(() => {
-  if (perSecTimer) clearInterval(perSecTimer);
-});
-const perSecText = computed(() => `+$${perSec.value.toFixed(1)}/sec`);
-
-const dailyPaidText = `$${Math.round(DAILY_PAYOUT_USD / 1000)}K`; // $682K/day anchor
+// 🔴 「今日支付」格与条头每秒支付流**一并删除**(FEAT-HOME02 定案,主人 2026-07-31 拍板):
+//   两者是同一笔钱的两种表达(每秒值 × 86400 = 日支付额)。首页脉搏自此不披露平台支付规模。
+//
+// 🔴 **平台日支付锚本身不得删** —— 介绍页 / 信任页 / 全球网格 / 分享海报 / 商城种子
+//   仍在从它派生;连锚一起删会造成全站数字坍塌。这里只是不再**展示**它。
+//   `platform_stats_anchor` 哨兵原本要求本文件必须消费日支付锚那个符号,删展示后判据不再成立 ——
+//   已按规格要求**调整判据而非放宽哨兵**(改判见 verify.sh 该门 (3b) 段注释)。
+//
+// 🔴 **注意:本文件里不许再出现那几个符号名,连注释里也不行** —— 哨兵扫全文,
+//   不区分代码与注释。今天已经在三个不同文件上踩到同一个形态(接口路径 / 舰队数字 / 本处),
+//   所以这里刻意用中文描述而不写符号名。
 
 const metrics = computed(() => [
   { k: t.value.home.networkMembers, v: "1.42M", sub: "registered · +2.9% /mo", tone: "var(--v5-ink)", data: [1.38, 1.39, 1.4, 1.4, 1.41, 1.41, 1.42, 1.42], color: "var(--v5-brand)" },
-  { k: t.value.home.networkPaidToday, v: dailyPaidText, sub: "+1.9% vs yest.", tone: "var(--v5-success)", data: [0.51, 0.55, 0.58, 0.61, 0.63, 0.65, 0.67, 0.68], color: "var(--v5-success-ink)" },
   { k: t.value.home.networkDevices, v: app.global.activeDevices.toLocaleString(), sub: "live · 51.2k jobs/hr", tone: "var(--v5-ink)", data: [27.8, 27.9, 28.0, 28.1, 28.1, 28.2, 28.3, 28.4], color: "var(--v5-tech-cyan-ink)" },
+  // ⏳ 排名格仍是写死值,**下一增量**接真实派生(lib/network-rank.ts 已就位并有机器门):
+  //    myTotalHashrate → 百分位 → 名次;零算力显示「未上榜」。需要新增三语文案键,
+  //    而 i18n 文件此刻正被独立验收读取(冻结中),故本增量先不动它。
   { k: t.value.home.networkYourRank, v: "#18,742", sub: "↑ 12 in 24h", tone: "var(--v5-brand)", data: [-19, -19, -19, -18.9, -18.9, -18.85, -18.8, -18.74], color: "var(--v5-brand)" },
 ]);
 </script>
