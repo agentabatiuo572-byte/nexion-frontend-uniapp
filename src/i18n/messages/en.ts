@@ -1,5 +1,5 @@
 // English message dictionary — the source of truth for all keys.
-// `Messages` type is exported so other locales must match its shape.
+// Messages type is exported so other locales must match its shape.
 
 export const en = {
   tabs: {
@@ -333,9 +333,55 @@ export const en = {
     networkLive: "live",
     networkGlobalGrid: "Global grid · live",
     networkMembers: "Members",
-    networkPaidToday: "Paid today",
     networkDevices: "Devices",
     networkYourRank: "Your rank",
+    // FEAT-HOME02 pulse metric subs + rank tri-state (ranked / unranked / config unavailable)
+    //
+    // 🔴 槽位契约(2026-08-05 三次独立 DOM probe 实测,375px 视口 / network-pulse-card.vue 三格):
+    //   值槽 = 89.3px(1、2 格)/ 90.3px(第 3 格「你的排名」),General Sans 20px/600、
+    //   letter-spacing -0.28px,white-space:nowrap 且「无 truncate」(实测 text-overflow:clip),
+    //   卡片外层 overflow:hidden → 超宽是「硬裁」,不是省略号。
+    //   副文本槽 = 89.3px,JetBrains Mono 12px/400,.truncate 挂在 <text> 那层
+    //   (overflow:hidden + text-overflow:ellipsis;叶子 <span> 上读到 clip 是读错了层)
+    //   → 超宽是「省略号」,不致命。
+    //   放进值槽的任何语言必须 ≤ 89.3px@20px;放不下的整态降档渲染,别指望裁切。
+    //
+    // 🔴 量插值键必须代「真实会渲染的值」,不是随手挑的位数 —— JetBrains Mono 12px 每字符 7.2px,
+    //   位数差一位就够翻转 ✓/✗。本表的代入值逐键写在末列,别再用字面 {n} 或拍脑袋的位数量。
+    //   (第三支 probe 正是这样抓到上一版把 networkMembersSub 按 1 位数字量成 79.2 ✓,
+    //    而它真实代入的是 mock/platform-config.ts:32 的 2.9 → 93.6 ✗。)
+    //
+    //   逐键实测宽(px;✗ = 超槽):
+    //     键                       槽      en       zh       vi        {n} 代入值
+    //     networkStatUpdating      值 89.3  87.3     59.2     77.5     —
+    //     networkRankUnranked      值 90.3  73.4     59.2    138.4 ✗   —      ← 降档方案见 vi.ts 同键注释
+    //     networkMembersSub        副 89.3  93.6 ✗   67.2     79.2     2.9(种子,恒 3 字符)
+    //     networkDevicesSub        副 89.3  86.4     60.0    113.4 ✗   —
+    //     networkRankUp24h         副 89.3  86.4     93.6 ✗  121.2 ✗   12(2 位典型)
+    //     networkRankUp24h         副 89.3  93.6 ✗  100.8 ✗  128.4 ✗   128(3 位上界)
+    //     networkRankUnrankedHint  副 89.3 158.4 ✗   84.0    141.6 ✗   —
+    //   副槽的 ✗ 只吃省略号(现网硬编码 sub registered · +2.9% /mo = 158.4px 本就已被截断,
+    //   属存量形态);值槽的 ✗ 必须靠降档解决。别用字符数估宽:vi 13 字符 = 138.4px、zh 5 字 = 59.2px。
+    //   副槽 ✗ 的短式备选(同一支 probe 实测,全部入槽,要收进槽时直接换,无需重量;
+    //   带 {n} 的给「2 位 / 3 位」两档):
+    //     en +{n}% /mo 64.8 · +{n} in 24h 72.0 / 79.2
+    //     zh 「24h +{n} 名」69.6 / 76.8
+    //     vi +{n}%/tháng 79.2 · chạy tác vụ 78.0 · +{n} bậc/24h 78.6 / 85.8
+    //   本轮「只收口值槽」(P1-2 / P2-1 的范围);副槽 5 处 ✗ 留给接线方连同布局一起定
+    //   —— 未上榜态的 hint 是否横跨整卡而不是挤在 1/3 格里,会直接改掉它的可用宽。
+    networkMembersSub: "+{n}% a month",
+    networkDevicesSub: "running jobs",
+    networkRankUp24h: "up {n} in 24h",
+    networkRankUnranked: "No rank",
+    // 🔴 归属定案(2026-08-05,原规格 line 78「『未上榜』引导文案内的 CTA」没交代归属):
+    //   「本条 hint 整条即 CTA」 —— 未上榜时它是可点元素,点进设备/商城既有入口。
+    //   卡片一格只有一行副文本槽,放不下独立按钮,故不另立 CTA 文案键。
+    //   接线方:别就地硬编码一句按钮文案,也别把它渲染成不可点的纯说明。
+    networkRankUnrankedHint: "Activate to get ranked",
+    networkRankTipRanked: "Your rank goes by the total hashpower of your active devices — more hashpower, higher rank.",
+    networkRankTipUnranked: "You don't have a rank yet. Activate any device and its hashpower gives you one.",
+    networkStatUpdating: "Updating",
+    networkStatRetry: "Retry",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
     rankYourRank: "Your rank",
     rankStep: "step",
@@ -1422,7 +1468,7 @@ export const en = {
     urgencyGrace1h: "Last hour: your ${amount} trial credit is about to expire",
   },
   novaCard: {
-    // Home NovaCard — chat bubble form (distinct from full `nova` chat namespace)
+    // Home NovaCard — chat bubble form (distinct from full nova chat namespace)
     senderName: "Nova",
     senderRole: "AI advisor",
     messageWithPercent: "Your yield is {pct}% of peer S1 owners. Worth running the ROI math?",
@@ -1751,7 +1797,7 @@ export const en = {
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
     // Per-SKU marketing copy, keyed by Product.id (src/mock/products.ts holds the
-    // data shape + English source). Product `name` is a brand mark and is NEVER
+    // data shape + English source). Product name is a brand mark and is NEVER
     // translated. verify.sh asserts every PRODUCTS id has an entry here.
     catalog: {
       "stellarbox-s1": {
@@ -2449,7 +2495,7 @@ export const en = {
   },
   // Device display strings. The Device record stores English (a real backend
   // would return it, and devices persist), so the UI resolves these from the
-  // stable `kind` at render — see lib/device-copy.ts. Only descriptive strings
+  // stable kind at render — see lib/device-copy.ts. Only descriptive strings
   // live here: SKU names (NexGridBox S1, Cloud Share) and hardware models
   // (4× RTX 4090) are brand marks and stay untranslated in every locale.
   device: {
@@ -2487,7 +2533,7 @@ export const en = {
     catEM: "Embedding",
     catSP: "Speech",
     catKY: "KYC",
-    // Receipt `type` row. The 6 AI workloads resolve from t.market.workloads at
+    // Receipt type row. The 6 AI workloads resolve from t.market.workloads at
     // render time (receipts persist, so a baked label would freeze the language
     // it was generated in); only the KYC receipt needs its own label here.
     typeWalletPairing: "Wallet Pairing",

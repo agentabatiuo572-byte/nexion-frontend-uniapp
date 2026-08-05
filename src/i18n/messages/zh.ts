@@ -322,9 +322,19 @@ export const zh: Messages = {
     networkLive: "实时",
     networkGlobalGrid: "全球网格 · 实时",
     networkMembers: "注册用户",
-    networkPaidToday: "今日支付",
     networkDevices: "在线设备",
     networkYourRank: "你的排名",
+    // FEAT-HOME02 脉搏三格副文本 + 排名三态(上榜 / 未上榜 / 配置拉不到)
+    networkMembersSub: "每月 +{n}%",
+    networkDevicesSub: "正在跑任务",
+    networkRankUp24h: "24h 上升 {n} 名",
+    networkRankUnranked: "未上榜",
+    networkRankUnrankedHint: "激活设备就上榜",
+    networkRankTipRanked: "排名按你已激活设备的算力总和来算,算力越高名次越靠前。",
+    networkRankTipUnranked: "还没上榜。激活任意一台设备,算力一进网就有名次。",
+    // 值槽 89.3px@20px 放不下「数据更新中」(实测 98.6px),缩到「更新中」= 59.2px。
+    networkStatUpdating: "更新中",
+    networkStatRetry: "重试",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
     rankYourRank: "你的等级",
     rankStep: "阶",

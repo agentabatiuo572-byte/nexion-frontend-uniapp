@@ -33,19 +33,29 @@ const dt = read("src/store/device-types.ts");
 const pr = read("src/mock/products.ts");
 const en = read("src/i18n/messages/en.ts");
 const zh = read("src/i18n/messages/zh.ts");
+// 🔴 vi 一并锚(2026-08-05 元门抓的语言缺面):本门 2026-06 双语时代写就,vi 上线后没扩 ——
+//   vi 文案里的日产数字漂了没人看得见,而 vi 是主人验收面之一。键奇偶归 mirror 门管,
+//   **数值奇偶**必须逐语言锚。
+const vi = read("src/i18n/messages/vi.ts");
 const tc = read("src/store/trial-config.ts");
 
-// SKUs shared between the device fleet and the store catalog (phone is
-// device-only and checked via the i18n subline instead).
-const SHARED = [
-  "stellarbox-s1",
-  "stellarbox-pro",
-  "stellarbox-pro-v2",
-  "stellarrack-p1",
-  "stellarrack-p2",
-  "cloud-share",
-];
+// 🔴 舰队∩商城的 SKU 集合**从 DEVICE_SPECS 派生,不手写**(2026-08-05 元门抓的第一批):
+//   手写 6 条时新增 SKU 两边都不会红 —— 「广告价 ≠ 实付价」的漂移对新机型整个失守。
+//   派生后:DEVICE_SPECS 加一个 SKU → 它自动进 SHARED → 商城没同步加就当场红。
+//   排除清单是**定点引用**(各带理由),不是集合枚举;完备性由下面的断言钉住。
+const DEVICE_ONLY = {
+  phone: "只在舰队不进商城;its 日产由 i18n 副行(vsNexPerDay)单独锚,见下",
+  "pc-gpu": "用户自有电脑,按档位表分成,无固定日产档,商城不售",
+};
+const specsBlock = dt.slice(dt.indexOf("DEVICE_SPECS"), dt.indexOf("\n};", dt.indexOf("DEVICE_SPECS")));
+const FLEET_KINDS = [...specsBlock.matchAll(/^\s*["']?([a-z][a-z0-9-]*)["']?:\s*\{\s*name:/gm)].map((m) => m[1]);
+const SHARED = FLEET_KINDS.filter((k) => !(k in DEVICE_ONLY));
 const errs = [];
+// 派生自证:解析缩集必炸(候选=0/缩集全过是已知假绿形态);排除项必须真实存在于舰队。
+if (FLEET_KINDS.length < 8) errs.push(`DEVICE_SPECS 解析异常:只认出 ${FLEET_KINDS.length} 个机型(${FLEET_KINDS.join(",")})`);
+for (const k of Object.keys(DEVICE_ONLY)) {
+  if (!FLEET_KINDS.includes(k)) errs.push(`DEVICE_ONLY 排除项 "${k}" 不在 DEVICE_SPECS 里(改名了?排除清单跟着失效)`);
+}
 
 // ── device specs: each kind is a single { … } line in DEVICE_SPECS ──
 // `baseRate:` matches the USDT field, not `baseRateNEX:` (that has NEX before
@@ -93,7 +103,7 @@ const i18nNum = (src, key) => {
   const m = src.match(new RegExp(`${key}:\\s*"\\+?\\s*([0-9.]+)`));
   return m ? +m[1] : NaN;
 };
-for (const [label, src] of [["en", en], ["zh", zh]]) {
+for (const [label, src] of [["en", en], ["zh", zh], ["vi", vi]]) {
   if (phone) {
     const v = i18nNum(src, "vsNexPerDay");
     if (v !== phone.nex) errs.push(`i18n ${label}: vsNexPerDay ${v} ≠ phone baseRateNEX ${phone.nex}`);
@@ -127,5 +137,5 @@ if (errs.length) {
   process.exit(1);
 }
 console.log(
-  `device-yield parity OK (${SHARED.length} SKUs × USDT+NEX + i18n phone/S1 sublines en+zh + trial shadow vs ${trialId})`,
+  `device-yield parity OK (${SHARED.length} SKUs 派生自 DEVICE_SPECS(共 ${FLEET_KINDS.length} 机型 − ${Object.keys(DEVICE_ONLY).length} 定点排除) × USDT+NEX + i18n phone/S1 sublines en+zh+vi + trial shadow vs ${trialId})`,
 );
