@@ -66,24 +66,46 @@ function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
+/**
+ * 秒级共享时钟(倒计时与到点解锁用)。
+ *
+ * 🔴 **模块级 + 引用计数,不是每实例一个** —— 本 composable 的消费者里有
+ *   `MyTokenCard`,它在二级市场「我的」页签里按持仓数 `v-for` 渲染(上限 5 张)。
+ *   每实例一个定时器 = 5 张卡 5 个秒级 timer,各自 tick 都触发一轮 computed 失效,
+ *   而那张卡**根本不渲染倒计时**(实测:2 张卡确实起了 2 个 1000ms timer)。
+ *   时钟本就是全局事实,不是每个消费者各有一份。
+ */
+const nowTs = ref(Date.now());
+let clockRefs = 0;
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+function retainClock() {
+  clockRefs += 1;
+  if (clockTimer === null) {
+    nowTs.value = Date.now(); // 首个消费者进场即对时,不等第一个 tick
+    clockTimer = setInterval(() => {
+      nowTs.value = Date.now();
+    }, 1000);
+  }
+}
+function releaseClock() {
+  clockRefs = Math.max(0, clockRefs - 1);
+  if (clockRefs === 0 && clockTimer !== null) {
+    clearInterval(clockTimer);
+    clockTimer = null;
+  }
+}
+
 export function useGenesisSaleGate(): UseGenesisSaleGateResult {
   const cfg = useGenesisConfig();
   const genesis = useGenesis();
-  const nowTs = ref(Date.now());
-  let timer: ReturnType<typeof setInterval> | null = null;
 
   onMounted(() => {
     // 🔴 消费者进场即重读配置源(hydrate-once 修复的 UI 面):config 是共享 Pinia store,
     //   任一消费者 refresh,所有已挂载消费者的 computed 一起更新。
     cfg.refresh();
-    nowTs.value = Date.now();
-    timer = setInterval(() => {
-      nowTs.value = Date.now();
-    }, 1000);
+    retainClock();
   });
-  onUnmounted(() => {
-    if (timer) clearInterval(timer);
-  });
+  onUnmounted(releaseClock);
 
   const block = computed(() =>
     genesisPurchaseBlock({
