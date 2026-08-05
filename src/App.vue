@@ -593,6 +593,13 @@ onLaunch(() => {
   // OS-scheme listener for "system" mode.
   // #ifdef H5
   document.documentElement.setAttribute("data-theme", useTheme().resolved);
+  // 包 E(FEAT-KYC-RM01b ② 异常2):已下线验证页的历史深链兜底 ——
+  // 路由已注销,冷开命中时平滑落安全页 + 一句「该流程已下线」,禁 404/白屏。
+  // 提示由落地页 onLoad 自弹(from 参数):onLaunch 直接 toast 会在页面挂载完成前
+  // 就到时自动消失,冷启实测两次都看不见(实景走查抓到的时序坑)。
+  if (/\/pages\/me\/kyc([?#/]|$)/.test(readCurrentRouteOrHash())) {
+    uni.reLaunch({ url: "/pages/me/security?from=retired-flow", fail: () => {} });
+  }
   // #endif
   if (isStaticReviewRoute(readCurrentRouteOrHash())) {
     stopBusinessLoops();

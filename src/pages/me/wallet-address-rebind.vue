@@ -1,10 +1,12 @@
 <!--
-  WalletAddressRebind — 提现地址换绑(PAY-规格 [FEAT-PAY04] ②阳光2+异常1-4 / ④⑤⑥)。
-  step1 新地址 + 网络 + 安全提示 → 「开始验证」建换绑单(verifying,30min 倒计时)→
-  step2 $1 验证视图(平台验证地址 + QR + 三步指示,复用 KYC-Express 动画语汇)→
-  服务端侦测到账(__nxDev.rebindVerified)→ 原子换绑成功态;异常:来源不符红字可重试 /
-  超时 expired 可重新发起 / 7 天频控与在途提现单在 store 拦截。
-  状态 server-canonical:页面只建单/取消/轮询,生效由 mock server 引擎(store _dev*)推进。
+  WalletAddressRebind — 提现地址管理(FEAT-KYC-RM01a ②⑤⑥)。
+  每网络一个当前地址,用户直填自管:
+  · 未设置 → 添加流:地址输入 → 短信 OTP(走既有 auth-otp 生命周期,含滑块升级)→ 生效
+    (新地址保护期由既有风控信号裁决,页面只做标记提示)。
+  · 已设置 → 展示当前地址(掩码中段 + 来源标记 + 生效时间)+ 冻结横幅(hh:mm:ss 真倒计时)
+    + 频控绝对时刻 + 历史地址展开区;更换流 = 拦截判定(在途单 > 频控,store 单一判据)→
+    表单 → OTP → 二次确认(明示旧址停用 + 24h 冻结 + 频控)→ 原子替换 → 成功态。
+  状态 server-canonical:判定与事务在 payout-address store(PROD 由服务端 payout-addresses 接口族替换,TBD)。
   壳与 wallet 子页同款:<AppChassis active="me"> + <SubPageHeader>。
 -->
 <template>
@@ -12,36 +14,9 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-withdraw" :title="t.addrRebind.title" :subtitle="t.addrRebind.subtitle" />
 
-      <!-- ── 未 KYC 空状态:无绑定可换 → 引导先完成钱包验证(⑤ 不白屏)── -->
-      <view v-if="view === 'kyc'" class="mx-4" :style="kycGateStyle">
-        <view class="flex items-start" style="gap: 10px">
-          <view class="shrink-0 grid place-items-center" :style="kycGateIconStyle">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          </view>
-          <view class="flex-1 min-w-0">
-            <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.walletV3.complianceHeroTitle }}</text>
-            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.wallet.complianceGateBody }}</text>
-          </view>
-        </view>
-        <view class="nx-rebind-kyc-cta mt-3 w-full grid place-items-center active:opacity-85" :style="kycGateCtaStyle" role="button" @click="goKyc">
-          <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 600">{{ t.walletV3.kycCta }}</text>
-        </view>
-      </view>
-
-      <!-- ── step1:新地址 + 网络 + 安全提示 ── -->
-      <view v-else-if="view === 'form'" class="mx-4" style="padding: 0 2px">
-        <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.newAddressLabel }}</text></view>
-        <input
-          class="nx-rebind-address-input mt-2 w-full font-mono"
-          :style="addressInputStyle"
-          type="text"
-          :value="newAddress"
-          :placeholder="addressPlaceholder"
-          @input="onAddressInput"
-        />
-        <view v-if="addrError"><text class="block" :style="errorTextStyle">{{ t.addrRebind.invalidAddress }}</text></view>
-
-        <view style="margin-top: 18px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
+      <!-- ── 网络切换(与提现页同语汇)── -->
+      <view class="mx-4" style="padding: 0 2px">
+        <view><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.networkLabel }}</text></view>
         <view class="flex" style="gap: 8px; margin-top: 8px">
           <view
             v-for="nw in NETWORKS"
@@ -50,130 +25,218 @@
             :style="netChipStyle(nw.id)"
             role="button"
             :aria-selected="network === nw.id"
-            @click="network = nw.id"
+            @click="switchNetwork(nw.id)"
           >
             <text :style="netChipLabelStyle(nw.id)">{{ nw.label }}</text>
             <text v-if="nw.id === 'usdt-trc20'" :style="netChipTagStyle">{{ t.topupChrome.netRecommended }}</text>
           </view>
         </view>
-
-        <!-- 安全提示(冻结 24h + 每 7 天一次;规格 ⑤ 默认态) -->
-        <view class="flex" :style="warnlineStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
-          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ safetyNoteText }}</text></view>
-        </view>
-
-        <view
-          class="nx-rebind-start-cta w-full grid place-items-center"
-          :class="{ 'active:opacity-90 transition-opacity': canStart }"
-          role="button"
-          :aria-disabled="canStart ? 'false' : 'true'"
-          :style="startCtaStyle"
-          @click="startVerify"
-        >
-          <text :style="startCtaTextStyle">{{ t.addrRebind.startVerifyCta }}</text>
-        </view>
-        <view class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="leave">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
       </view>
 
-      <!-- ── step2:$1 验证视图(verifying + 30min 倒计时)── -->
-      <view v-else-if="view === 'verify'" class="mx-4 nx-step-in" style="padding: 0 2px">
-        <view><text class="block text-center" :style="verifyTitleStyle">{{ t.addrRebind.verifyTitle }}</text></view>
-        <view><text class="block text-center tabular-nums" :style="verifyAmtStyle">${{ REBIND_VERIFY_AMOUNT_USDT }}</text></view>
-        <view class="flex items-center justify-center" style="margin-top: 6px; gap: 6px">
-          <text :style="verifyRuleStyle">{{ t.addrRebind.verifyRule }}</text>
-          <text class="tabular-nums" :style="countdownStyle">{{ countdownText }}</text>
-        </view>
-
-        <!-- 异常2:来源不符红字,可重试(窗口不中断) -->
-        <view v-if="wrongSource" class="flex" :style="wrongSourceBoxStyle">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-          <view class="flex-1 min-w-0"><text :style="wrongSourceTextStyle">{{ t.addrRebind.wrongSource }}</text></view>
-        </view>
-
-        <!-- 平台验证地址 + QR(确定性点阵,seed = 平台验证地址;同 deposit pane 先例) -->
-        <view :style="qrBoxStyle">
-          <view :style="qrGridStyle" aria-hidden>
-            <view v-for="(d, i) in qrCells" :key="i" :style="d ? qrDarkCellStyle : undefined" />
-          </view>
-        </view>
-        <view style="margin-top: 10px">
-          <text class="block text-center" :style="platformAddrLabelStyle">{{ t.addrRebind.platformAddrLabel }}</text>
-          <text class="block text-center font-mono" :style="platformAddrStyle">{{ platformAddress }}</text>
-        </view>
-
-        <!-- 三步指示(复用 KYC-Express VerifyRow 语汇) -->
-        <view style="margin-top: 18px" class="space-y-3">
-          <VerifyRow :step="1" :label="t.addrRebind.stepSend" :done="true" />
-          <VerifyRow :step="2" :label="t.addrRebind.stepDetect" :done="step2Done" />
-          <VerifyRow :step="3" :label="t.addrRebind.stepEffective" :done="step3Done" :enabled="step2Done" />
-        </view>
-
-        <view class="nx-rebind-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="askCancel">
-          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
-        </view>
-      </view>
-
-      <!-- ── 超时 expired:可重新发起 ── -->
-      <view v-else-if="view === 'expired'" class="mx-4 nx-step-in" style="padding: 0 2px">
-        <view class="flex flex-col items-center" style="padding: 32px 0 0">
-          <view class="grid place-items-center" :style="stateIconBoxStyle">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
-          </view>
-          <view><text class="block text-center" :style="stateTitleStyle">{{ t.addrRebind.expiredTitle }}</text></view>
-          <view><text class="block text-center" :style="stateBodyStyle">{{ t.addrRebind.expiredBody }}</text></view>
-        </view>
-        <view class="nx-rebind-restart-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" @click="restart">
-          <text :style="startCtaTextStyle">{{ t.addrRebind.restartCta }}</text>
-        </view>
-      </view>
-
-      <!-- ── 成功态:新地址生效 + 旧地址失效 + 冻结说明 ── -->
-      <view v-else class="mx-4 nx-step-in" style="padding: 0 2px">
+      <!-- ── 成功态 ── -->
+      <view v-if="step === 'success'" class="mx-4 nx-step-in" style="padding: 0 2px">
         <view class="flex flex-col items-center" style="padding: 32px 0 0">
           <view class="grid place-items-center" :style="successIconBoxStyle">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
           </view>
-          <view><text class="block text-center" :style="stateTitleStyle">{{ t.addrRebind.successTitle }}</text></view>
-          <view><text class="block text-center" :style="stateBodyStyle">{{ t.addrRebind.successBody }}</text></view>
+          <view><text class="block text-center" :style="stateTitleStyle">{{ successIsChange ? t.addrRebind.successTitle : t.addrRebind.addSuccessTitle }}</text></view>
+          <view><text class="block text-center" :style="stateBodyStyle">{{ successIsChange ? t.addrRebind.successBody : t.addrRebind.addSuccessBody }}</text></view>
           <view style="margin-top: 14px" class="w-full">
             <view class="flex items-center justify-between" :style="successRowStyle">
               <text :style="successRowLabelStyle">{{ t.addrRebind.successNewAddr }}</text>
-              <text class="font-mono tabular-nums" :style="successRowValStyle">{{ activatedAddressShort }}</text>
+              <text class="font-mono tabular-nums" :style="successRowValStyle">{{ maskAddressMid(current?.address ?? '') }}</text>
             </view>
+          </view>
+          <!-- 首次添加:新地址保护期标记(时长取后台配置,不写死) -->
+          <view v-if="!successIsChange" class="w-full flex" :style="warnlineStyle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+            <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
           </view>
         </view>
         <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" @click="finish">
-          <text :style="startCtaTextStyle">{{ t.addrRebind.successCta }}</text>
+          <text :style="ctaTextStyle">{{ t.addrRebind.successCta }}</text>
+        </view>
+      </view>
+
+      <!-- ── OTP 确认(添加/更换共用;走既有发码冷却 / 次数上限 / 失效重取)── -->
+      <view v-else-if="step === 'otp'" class="mx-4 nx-step-in" style="padding: 0 2px">
+        <view style="margin-top: 18px"><text class="block" :style="stateTitleStyle">{{ t.addrRebind.otpTitle }}</text></view>
+        <view><text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.5">{{ otpBodyText }}</text></view>
+        <input
+          class="nx-rebind-otp-input mt-3 w-full font-mono-tabular"
+          :style="addressInputStyle"
+          type="text"
+          inputmode="numeric"
+          maxlength="6"
+          :value="otpCode"
+          :placeholder="t.addrRebind.otpPlaceholder"
+          @input="onOtpInput"
+        />
+        <view v-if="otpError"><text class="block" :style="errorTextStyle">{{ otpError }}</text></view>
+        <view class="flex items-center" style="margin-top: 10px; gap: 12px">
+          <view class="inline-flex items-center" :class="{ 'active:opacity-70': resendLeft <= 0 && !otpSending }" style="min-height: 44px" role="button" :aria-disabled="resendLeft > 0 || otpSending ? 'true' : 'false'" @click="resendCode">
+            <text style="font-size: 12px" :style="{ color: resendLeft > 0 || otpSending ? 'var(--v5-ink-4)' : 'var(--v5-brand)' }">
+              {{ resendLeft > 0 ? fmt(t.addrRebind.otpResendIn, { s: resendLeft }) : t.addrRebind.otpResendCta }}
+            </text>
+          </view>
+        </view>
+        <view
+          class="nx-rebind-otp-confirm w-full grid place-items-center"
+          :class="{ 'active:opacity-90 transition-opacity': otpReady && !otpVerifying }"
+          role="button"
+          :aria-disabled="otpReady && !otpVerifying ? 'false' : 'true'"
+          :style="otpConfirmStyle"
+          @click="confirmOtp"
+        >
+          <text :style="ctaTextStyle">{{ otpVerifying ? t.wallet.submitChecking : t.addrRebind.otpConfirmCta }}</text>
+        </view>
+        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="backToBase">
+          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
+        </view>
+      </view>
+
+      <!-- ── 表单(添加 / 更换共用:新地址输入 + 安全提示)── -->
+      <view v-else-if="step === 'form'" class="mx-4" style="padding: 0 2px">
+        <view v-if="mode === 'add'" style="margin-top: 16px">
+          <text class="block" style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.addrRebind.emptyGuideTitle }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.5">{{ t.addrRebind.emptyGuideBody }}</text>
+        </view>
+        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.newAddressLabel }}</text></view>
+        <input
+          class="nx-rebind-address-input mt-2 w-full font-mono"
+          :style="addressInputStyle"
+          type="text"
+          :value="newAddress"
+          :placeholder="addressPlaceholder"
+          @input="onAddressInput"
+        />
+        <view v-if="addrError"><text class="block" :style="errorTextStyle">{{ addrError }}</text></view>
+
+        <!-- 安全提示(冻结 24h + 每 7 天一次;规格 ⑤ 默认态。仅更换流展示 —— 首次添加不冻结不频控) -->
+        <view v-if="mode === 'change'" class="flex" :style="warnlineStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ safetyNoteText }}</text></view>
+        </view>
+        <view v-else class="flex" :style="warnlineStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
+        </view>
+
+        <view
+          class="nx-rebind-start-cta w-full grid place-items-center"
+          :class="{ 'active:opacity-90 transition-opacity': canProceed && !otpSending }"
+          role="button"
+          :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
+          :style="startCtaStyle"
+          @click="proceedToOtp"
+        >
+          <text :style="ctaTextStyle">{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
+        </view>
+        <view v-if="mode === 'change'" class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="backToBase">
+          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
+        </view>
+        <view v-else class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="leave">
+          <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
+        </view>
+      </view>
+
+      <!-- ── 默认态:当前地址 + 更换入口 + 历史(规格 ⑤)── -->
+      <view v-else class="mx-4" style="padding: 0 2px">
+        <!-- 冻结横幅(hh:mm:ss 真倒计时) -->
+        <view v-if="frozenNow" class="nx-rebind-freeze-banner mt-3 flex items-start" :style="freezeBannerStyle">
+          <view class="grid place-items-center shrink-0" :style="freezeIconStyle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
+          </view>
+          <view class="flex-1 min-w-0" style="margin-left: 10px">
+            <text class="block" style="font-size: 12px; color: var(--v5-danger); font-weight: 500; line-height: 1.4">{{ freezeBannerText }}</text>
+          </view>
+        </view>
+
+        <view style="margin-top: 16px"><text class="font-mono-tabular" :style="metaLabelStyle">{{ t.addrRebind.currentLabel }}</text></view>
+        <view class="mt-2" :style="currentCardStyle">
+          <view class="flex items-center" style="gap: 8px">
+            <text class="font-mono flex-1 min-w-0" style="font-size: 13px; color: var(--v5-ink); white-space: nowrap">{{ maskAddressMid(current?.address ?? '') }}</text>
+            <view v-if="current?.source === 'migrated'" class="shrink-0 grid place-items-center" :style="migratedBadgeStyle">
+              <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ t.addrRebind.sourceMigrated }}</text>
+            </view>
+          </view>
+          <text class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">{{ t.addrRebind.addedAtLabel }} · {{ fmtStamp(current?.addedAt ?? 0) }}</text>
+          <!-- 新地址保护期标记(user 来源且未满 hold 时长;migrated 不产生保护期) -->
+          <text v-if="holdActive" class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-warning); line-height: 1.4">{{ holdNoteText }}</text>
+        </view>
+
+        <!-- 更换入口 / 拦截态(在途单 > 频控,原因 + 下一步;规格 ② 异常2/3) -->
+        <view v-if="changeBlock === 'withdrawal-in-flight'" class="mt-3 flex" :style="blockBoxStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+          <view class="flex-1 min-w-0">
+            <text class="block" :style="warnTextStyle">{{ t.addrRebind.inFlightBlocked }}</text>
+            <view class="nx-rebind-goto-tracking inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" @click="goTracking">
+              <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }} →</text>
+            </view>
+          </view>
+        </view>
+        <view v-else-if="changeBlock === 'cooldown'" class="mt-3 flex" :style="blockBoxStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+          <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ cooldownUntilText }}</text></view>
+        </view>
+        <view
+          v-else
+          class="nx-rebind-change-cta w-full grid place-items-center active:opacity-90"
+          :style="primaryCtaStyle"
+          role="button"
+          @click="startChange"
+        >
+          <text :style="ctaTextStyle">{{ t.addrRebind.changeCta }}</text>
+        </view>
+
+        <!-- 历史地址(只读,含来源与停用时间;规格 ⑥「查看历史地址」展开区) -->
+        <view v-if="history.length > 0" style="margin-top: 20px">
+          <view class="nx-rebind-history-toggle inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen">
+            <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ historyOpen ? t.addrRebind.historyTitle : t.addrRebind.historyToggle }}</text>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ marginLeft: '4px', transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }"><path d="m6 9 6 6 6-6" /></svg>
+          </view>
+          <view v-if="historyOpen" class="space-y-2" style="margin-top: 4px">
+            <view v-for="(h, i) in historyDesc" :key="i" :style="historyRowStyle">
+              <view class="flex items-center" style="gap: 8px">
+                <text class="font-mono flex-1 min-w-0" style="font-size: 12px; color: var(--v5-ink-2); white-space: nowrap">{{ maskAddressMid(h.address) }}</text>
+                <text v-if="h.source === 'migrated'" class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.addrRebind.sourceMigrated }}</text>
+              </view>
+              <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-4)">{{ fmt(t.addrRebind.historyReplacedAt, { time: fmtStamp(h.replacedAt) }) }}</text>
+            </view>
+          </view>
         </view>
       </view>
     </view>
+    <CaptchaSlider v-if="showCaptcha" :phone="otpPhone" @success="onCaptchaOk" @close="showCaptcha = false" />
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
-import VerifyRow from "@/components/me/verify-row.vue";
+import CaptchaSlider from "@/components/captcha-slider.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navBack } from "@/lib/route";
+import { navBack, navTo } from "@/lib/route";
 import { confirm as uiConfirm, toast } from "@/store/ui";
+import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
-import { useDeposits } from "@/store/deposits";
-import { useWalletPairing } from "@/store/wallet-pairing";
+import { usePayoutAddress } from "@/store/payout-address";
 import { mockServerNow } from "@/store/server-time";
-import { fnv1a, mulberry32 } from "@/store/deposits-core";
-import { formatClock, REBIND_VERIFY_AMOUNT_USDT } from "@/store/wallet-pairing-core";
+import { otpSend, otpVerify } from "@/store/auth-otp";
+import {
+  formatClock,
+  freezeRemainingMs,
+  isChainAddressValid,
+  maskAddressMid,
+} from "@/store/payout-address-core";
 import type { ChainDepositChannel } from "@/store/types";
 
 const t = useT();
-const pairing = useWalletPairing();
-const dep = useDeposits();
+const app = useApp();
+const payout = usePayoutAddress();
 const cfg = useConfig();
 
 // ── 网络选择(标签为链名专有名词,非文案)──
@@ -182,185 +245,277 @@ const NETWORKS: { id: ChainDepositChannel; label: string }[] = [
   { id: "usdt-bep20", label: "BEP20" },
   { id: "usdt-erc20", label: "ERC20" },
 ];
-
-const newAddress = ref("");
 const network = ref<ChainDepositChannel>("usdt-trc20");
-const addrError = ref(false);
-const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
-const canStart = computed(() => newAddress.value.trim().length > 0);
-const safetyNoteText = computed(() =>
-  fmt(t.value.addrRebind.safetyNote, { days: cfg.config.withdrawRules.rebindCooldownDays }),
-);
 
+onLoad((options) => {
+  const q = (options as Record<string, string> | undefined)?.network;
+  if (q === "usdt-trc20" || q === "usdt-erc20" || q === "usdt-bep20") network.value = q;
+});
+
+// ── 视图状态机 ──
+// base(无 current → form/add;有 current → view)+ 显式步骤(form/otp/success)。
+type Step = "base" | "form" | "otp" | "success";
+const explicitStep = ref<Step>("base");
+const mode = ref<"add" | "change">("add");
+const successIsChange = ref(false);
+const current = computed(() => payout.currentFor(network.value));
+const history = computed(() => payout.stateFor(network.value).history);
+const historyDesc = computed(() => [...history.value].reverse());
+const historyOpen = ref(false);
+const step = computed<"view" | "form" | "otp" | "success">(() => {
+  if (explicitStep.value === "otp") return "otp";
+  if (explicitStep.value === "success") return "success";
+  if (explicitStep.value === "form") return "form";
+  return current.value ? "view" : "form"; // base:空槽直接落添加表单(内联引导语)
+});
+// base 态推导 mode:空槽 = add;显式进入更换 = change。
+function switchNetwork(id: ChainDepositChannel) {
+  if (network.value === id) return;
+  network.value = id;
+  explicitStep.value = "base";
+  mode.value = "add";
+  resetOtp();
+  newAddress.value = "";
+  addrError.value = "";
+  historyOpen.value = false;
+}
+
+// ── 表单 ──
+const newAddress = ref("");
+const addrError = ref("");
+const addressPlaceholder = computed(() => (network.value === "usdt-trc20" ? "TR7NHq..." : "0x..."));
+const canProceed = computed(() => newAddress.value.trim().length > 0);
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
 }
 function onAddressInput(e: Event) {
   newAddress.value = detailVal(e);
-  addrError.value = false;
+  addrError.value = "";
+}
+const effectiveMode = computed<"add" | "change">(() => (current.value ? mode.value : "add"));
+
+// ── 拦截判定(store 单一判据:在途单 > 频控;页面不自算)──
+const changeBlock = computed(() => {
+  void nowTick.value; // 频控是时间函数,跨过 nextChangeAt 边界要重算
+  return payout.changeBlockReason(network.value);
+});
+function startChange() {
+  // 双门:入口判一次,store.changeAddress 落库前再判一次(与提交同款纪律)。
+  if (changeBlock.value) return;
+  mode.value = "change";
+  explicitStep.value = "form";
+}
+function goTracking() {
+  navTo("/pages/me/wallet-withdraw-tracking");
 }
 
-// ── 视图状态机(store 换绑单派生;成功态由生效动画收口)──
-const order = computed(() => pairing.rebindOrder);
-const localSuccess = ref(false);
-const dismissedTerminal = ref(false);
-const step2Done = ref(false);
-const step3Done = ref(false);
-const view = computed<"kyc" | "form" | "verify" | "expired" | "success">(() => {
-  if (!pairing.walletPaired) return "kyc"; // 未 KYC 无绑定可换 → 引导态(不白屏不跳走)
-  if (localSuccess.value) return "success";
-  const o = order.value;
-  if (o?.status === "verifying") return "verify";
-  if (o?.status === "expired" && !dismissedTerminal.value) return "expired";
-  return "form";
+// ── OTP(走既有生命周期:冷却 / 24h 限频滑块 / TTL / 次数上限)──
+const otpPhone = computed(() => app.accountKey);
+// 🔴 只有账号键长得像手机号才显示掩码;种子/邮箱形态一律用通用句 ——
+// 否则内部账号键(如 "default")会被当成手机号直接亮给用户(实景走查抓到)。
+const otpPhoneMasked = computed(() => {
+  const p = otpPhone.value;
+  const digits = p.replace(/[^0-9]/g, "");
+  if (digits.length < 7 || /[@a-zA-Z]/.test(p)) return "";
+  return `${p.slice(0, 3)}****${p.slice(-2)}`;
 });
-const wrongSource = computed(() => order.value?.lastError === "wrong-source");
-/** 生效地址(成功态展示;order 已 active 时 = 新绑定地址)。 */
-const activatedAddressShort = computed(() => {
-  const a = pairing.activeBinding?.address ?? order.value?.address ?? "";
-  return a.length > 20 ? `${a.slice(0, 10)}…${a.slice(-6)}` : a;
-});
-
-// 服务端生效(order verifying → active)→ 三步动画走完 → 成功态。
-let stageTimers: ReturnType<typeof setTimeout>[] = [];
-watch(
-  () => order.value?.status,
-  (s, prev) => {
-    if (s === "active" && prev === "verifying") {
-      step2Done.value = true;
-      stageTimers.push(setTimeout(() => (step3Done.value = true), 700));
-      stageTimers.push(setTimeout(() => (localSuccess.value = true), 1300));
-    }
-  },
+const otpBodyText = computed(() =>
+  otpPhoneMasked.value
+    ? fmt(t.value.addrRebind.otpBody, { phone: otpPhoneMasked.value })
+    : t.value.addrRebind.otpBodyGeneric,
 );
+const otpRequestId = ref<string | null>(null);
+const otpCode = ref("");
+const otpError = ref("");
+const otpSending = ref(false);
+const otpVerifying = ref(false);
+// 码已核验但事务未落(用户取消了二次确认弹窗)→ 再次点确认不重复消费验证码。
+const otpVerifiedOnce = ref(false);
+const resendLeft = ref(0);
+const showCaptcha = ref(false);
+let resendTimer: ReturnType<typeof setInterval> | undefined;
+const otpReady = computed(() => otpCode.value.trim().length === 6 && !!otpRequestId.value);
+function onOtpInput(e: Event) {
+  otpCode.value = detailVal(e).replace(/[^0-9]/g, "").slice(0, 6);
+  otpError.value = "";
+}
+function startResendCountdown(sec: number) {
+  resendLeft.value = sec;
+  if (resendTimer) clearInterval(resendTimer);
+  resendTimer = setInterval(() => {
+    resendLeft.value -= 1;
+    if (resendLeft.value <= 0 && resendTimer) clearInterval(resendTimer);
+  }, 1000);
+}
+function resetOtp() {
+  otpRequestId.value = null;
+  otpCode.value = "";
+  otpError.value = "";
+  otpVerifiedOnce.value = false;
+  resendLeft.value = 0;
+  if (resendTimer) clearInterval(resendTimer);
+}
+async function sendCode(captchaTicket?: string) {
+  if (otpSending.value) return;
+  otpSending.value = true;
+  try {
+    const res = await otpSend(otpPhone.value, "payout-address", captchaTicket);
+    if (res.ok) {
+      otpRequestId.value = res.requestId;
+      startResendCountdown(res.resendAfterSec);
+      explicitStep.value = "otp";
+      return;
+    }
+    if (res.error === "captcha_required") {
+      showCaptcha.value = true;
+      return;
+    }
+    if (res.error === "rate_limited") {
+      // 冷却期不重发也不失效现有码:已有 requestId 时直接进码输入,倒计时接管
+      if (otpRequestId.value) {
+        startResendCountdown(res.retryAfterSec);
+        explicitStep.value = "otp";
+      } else {
+        toast.error(fmt(t.value.addrRebind.otpRateLimited, { s: res.retryAfterSec }));
+      }
+      return;
+    }
+    toast.error(t.value.addrRebind.otpSendFailed);
+  } finally {
+    otpSending.value = false;
+  }
+}
+function onCaptchaOk(ticket: string) {
+  showCaptcha.value = false;
+  void sendCode(ticket);
+}
+function resendCode() {
+  if (resendLeft.value > 0 || otpSending.value) return;
+  void sendCode();
+}
+function proceedToOtp() {
+  if (!canProceed.value || otpSending.value) return;
+  const addr = newAddress.value;
+  if (!isChainAddressValid(network.value, addr)) {
+    addrError.value = t.value.addrRebind.invalidAddress; // 字段级红字,永不静默截断/自动纠正
+    return;
+  }
+  if (effectiveMode.value === "change" && payout.currentFor(network.value)?.address === addr.trim()) {
+    addrError.value = t.value.addrRebind.sameAddress;
+    return;
+  }
+  void sendCode();
+}
+async function confirmOtp() {
+  if (!otpReady.value || otpVerifying.value) return;
+  otpVerifying.value = true;
+  try {
+    if (!otpVerifiedOnce.value) {
+      const res = await otpVerify(otpPhone.value, "payout-address", otpRequestId.value!, otpCode.value.trim());
+      if (!res.ok) {
+        if (res.error === "otp_invalid") otpError.value = fmt(t.value.addrRebind.otpInvalid, { n: res.attemptsLeft });
+        else if (res.error === "otp_expired") otpError.value = t.value.addrRebind.otpExpired;
+        else if (res.error === "otp_attempts_exceeded") otpError.value = t.value.addrRebind.otpExhausted;
+        else otpError.value = t.value.addrRebind.startFailed;
+        return;
+      }
+      otpVerifiedOnce.value = true;
+    }
+    await applyAfterOtp();
+  } finally {
+    otpVerifying.value = false;
+  }
+}
+async function applyAfterOtp() {
+  if (effectiveMode.value === "add") {
+    const res = payout.addAddress(network.value, newAddress.value);
+    if (!res.ok) {
+      // already-set = 并发竞态(另一端刚添加),回落展示态;其余给通用失败(不静默)。
+      if (res.reason === "invalid-address") addrError.value = t.value.addrRebind.invalidAddress;
+      else toast.error(t.value.addrRebind.startFailed);
+      explicitStep.value = "base";
+      resetOtp();
+      return;
+    }
+    successIsChange.value = false;
+    explicitStep.value = "success";
+    resetOtp();
+    return;
+  }
+  // 更换:二次确认,明示旧址停用 + 24h 冻结 + 频控(规格 ② 阳光2)
+  const ok = await uiConfirm({
+    title: t.value.addrRebind.changeConfirmTitle,
+    message: fmt(t.value.addrRebind.changeConfirmBody, { days: cooldownDays.value }),
+    icon: "warn",
+    confirmLabel: t.value.addrRebind.changeConfirmYes,
+  });
+  if (!ok) return; // 留在 OTP 态,可再次确认(码已 consumed 则重发)
+  const res = payout.changeAddress(network.value, newAddress.value);
+  if (!res.ok) {
+    if (res.reason === "withdrawal-in-flight") toast.error(t.value.addrRebind.inFlightBlocked);
+    else if (res.reason === "cooldown") toast.error(cooldownUntilText.value);
+    else if (res.reason === "invalid-address") addrError.value = t.value.addrRebind.invalidAddress;
+    else if (res.reason === "same-address") addrError.value = t.value.addrRebind.sameAddress;
+    else toast.error(t.value.addrRebind.startFailed);
+    explicitStep.value = res.reason === "invalid-address" || res.reason === "same-address" ? "form" : "base";
+    resetOtp();
+    return;
+  }
+  successIsChange.value = true;
+  explicitStep.value = "success";
+  resetOtp();
+}
+function backToBase() {
+  explicitStep.value = "base";
+  mode.value = "add";
+  resetOtp();
+  addrError.value = "";
+}
 
-// ── 30min 倒计时(server 时钟;归零后轮询收敛 expired)──
+// ── 冻结 / 频控展示(server 时钟 1s tick)──
 const nowTick = ref(mockServerNow());
 let tickTimer: ReturnType<typeof setInterval> | undefined;
-const countdownText = computed(() => {
-  const o = order.value;
-  if (!o) return "";
-  return formatClock(o.expiresAt - nowTick.value);
-});
 onMounted(() => {
-  tickTimer = setInterval(() => {
-    nowTick.value = mockServerNow();
-    const o = order.value;
-    if (o?.status === "verifying" && nowTick.value > o.expiresAt) pairing.pollRebindOrder();
-  }, 1000);
+  tickTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
-  stageTimers.forEach((x) => clearTimeout(x));
-  stageTimers = [];
+  if (resendTimer) clearInterval(resendTimer);
 });
-
-onLoad(() => {
-  pairing.pollRebindOrder(); // 冷开收敛陈旧 verifying(server-canonical 轮询形态)
+const freezeLeftMs = computed(() => freezeRemainingMs(payout.stateFor(network.value).freezeUntil, nowTick.value));
+const frozenNow = computed(() => freezeLeftMs.value > 0);
+const freezeBannerText = computed(() =>
+  fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
+);
+const cooldownDays = computed(() => cfg.config.withdrawRules.rebindCooldownDays);
+function fmtStamp(ts: number): string {
+  const d = new Date(ts);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+// 频控拦截给绝对时刻(平台口径,不说「明天」;规格 ② 异常3)
+const cooldownUntilText = computed(() => {
+  const at = payout.stateFor(network.value).nextChangeAt;
+  return fmt(t.value.addrRebind.cooldownUntil, { time: at ? fmtStamp(at) : "" });
+});
+const safetyNoteText = computed(() => fmt(t.value.addrRebind.safetyNote, { days: cooldownDays.value }));
+// 新地址保护期标记:时长取后台配置(newAddressHoldHours),判定输入与风控信号同源
+const holdNoteText = computed(() => fmt(t.value.addrRebind.holdNote, { h: cfg.config.withdrawRules.newAddressHoldHours }));
+const holdActive = computed(() => {
+  const c = current.value;
+  if (!c || c.source !== "user") return false;
+  return nowTick.value - c.addedAt < cfg.config.withdrawRules.newAddressHoldHours * 3600 * 1000;
 });
 
 // ── 动作 ──
-function goKyc() {
-  uni.navigateTo({ url: "/pages/me/wallet-topup?kyc=1", fail: () => {} });
-}
-function startVerify() {
-  if (!canStart.value) return;
-  const res = pairing.startRebind(newAddress.value, network.value);
-  if (res.ok) {
-    step2Done.value = false;
-    step3Done.value = false;
-    dismissedTerminal.value = false;
-    return;
-  }
-  if (res.reason === "invalid-address") {
-    addrError.value = true;
-    return;
-  }
-  if (res.reason === "cooldown") {
-    toast.error(fmt(t.value.addrRebind.cooldownBlocked, { days: cfg.config.withdrawRules.rebindCooldownDays }));
-    return;
-  }
-  if (res.reason === "withdrawal-in-flight") {
-    toast.error(t.value.addrRebind.inFlightBlocked);
-    return;
-  }
-  // order-in-progress / 持久化写失败等其余分支:通用失败提示,不静默。
-  toast.error(t.value.addrRebind.startFailed);
-}
-
-async function askCancel() {
-  const ok = await uiConfirm({
-    title: t.value.addrRebind.cancelConfirmTitle,
-    message: t.value.addrRebind.cancelConfirmBody,
-    icon: "warn",
-    confirmLabel: t.value.addrRebind.cancelConfirmYes,
-  });
-  if (ok && pairing.cancelRebind()) {
-    dismissedTerminal.value = true; // cancelled 终态 → 回表单
-  }
-}
-
-function restart() {
-  dismissedTerminal.value = true; // expired 单留存(终态禁再处置),表单重新发起新单
-}
-
 function leave() {
   navBack("/pages/me/wallet-withdraw");
 }
-
 function finish() {
-  navBack("/pages/me/wallet-withdraw");
+  navBack("/pages/me/wallet-withdraw"); // 完成后返回提现页,地址由响应式 store 即时回填
 }
-
-// ── 平台验证地址 + QR 点阵(同 deposit-usdt-pane 先例:确定性伪随机 + 定位角)──
-// 验证收款地址复用账号专属充值地址(同账号同网络恒定;PROD server 派发)。
-const platformAddress = computed(() => {
-  const nw = order.value?.network ?? network.value;
-  return dep.depositAddress(nw);
-});
-const QR_N = 21;
-function finderDark(dx: number, dy: number): boolean {
-  const ring = Math.max(Math.abs(dx - 3), Math.abs(dy - 3));
-  return ring === 3 || ring <= 1;
-}
-const qrCells = computed<boolean[]>(() => {
-  const rnd = mulberry32(fnv1a(platformAddress.value || "nexgrid"));
-  const cells: boolean[] = [];
-  for (let cy = 0; cy < QR_N; cy++) {
-    for (let cx = 0; cx < QR_N; cx++) {
-      const inTL = cx < 7 && cy < 7;
-      const inTR = cx >= QR_N - 7 && cy < 7;
-      const inBL = cx < 7 && cy >= QR_N - 7;
-      if (inTL) cells.push(finderDark(cx, cy));
-      else if (inTR) cells.push(finderDark(cx - (QR_N - 7), cy));
-      else if (inBL) cells.push(finderDark(cx, cy - (QR_N - 7)));
-      else cells.push(rnd() > 0.52);
-    }
-  }
-  return cells;
-});
 
 // ── styles ──
-// 未 KYC 引导态(withdraw 页 KYC gate 同款语汇)。
-const kycGateStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--v5-brand-2) 10%, transparent)",
-  borderRadius: "16px",
-  padding: "16px",
-};
-const kycGateIconStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "12px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 20%, transparent)",
-};
-const kycGateCtaStyle: CSSProperties = {
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-2)",
-  // 亮底文字走 on-brand 家族:ink 配暖橙实测 2.41:1,on-brand-2 是 7.64:1
-  // (tokens.css 自己的注释就写着「white on orange fails WCAG AA」)。
-  color: "var(--v5-on-brand-2)",
-};
 const metaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
   fontSize: "12px",
@@ -368,8 +523,7 @@ const metaLabelStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   letterSpacing: "0.06em",
 };
-// 输入框零描边。所在容器(模板 view=form 那层 mx-4)无底色 → 输入框直接贴页面底;
-// 原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1。
+// 输入框零描边,贴页面底(容器无底色 → surface L1,与既有子页同型)。
 const addressInputStyle: CSSProperties = {
   width: "100%",
   minHeight: "48px",
@@ -422,20 +576,48 @@ const warnTextStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.5,
 };
+const blockBoxStyle: CSSProperties = {
+  padding: "12px",
+  borderRadius: "12px",
+  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+  gap: "8px",
+};
+const currentCardStyle: CSSProperties = {
+  padding: "12px",
+  borderRadius: "12px",
+  background: "var(--v5-surface)",
+};
+const migratedBadgeStyle: CSSProperties = {
+  padding: "3px 8px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
+};
+const historyRowStyle: CSSProperties = {
+  padding: "10px 12px",
+  borderRadius: "12px",
+  background: "var(--v5-surface)",
+};
 const startCtaStyle = computed<CSSProperties>(() => ({
   marginTop: "20px",
   height: "48px",
   borderRadius: "999px",
-  background: canStart.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  color: canStart.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
+  background: canProceed.value && !otpSending.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
+  color: canProceed.value && !otpSending.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
 }));
-const startCtaTextStyle: CSSProperties = {
+const otpConfirmStyle = computed<CSSProperties>(() => ({
+  marginTop: "20px",
+  height: "48px",
+  borderRadius: "999px",
+  background: otpReady.value && !otpVerifying.value ? "var(--v5-brand)" : "var(--v5-surface-2)",
+  color: otpReady.value && !otpVerifying.value ? "var(--v5-on-brand)" : "var(--v5-ink-4)",
+}));
+const ctaTextStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "15px",
   fontWeight: 600,
 };
 const primaryCtaStyle: CSSProperties = {
-  marginTop: "24px",
+  marginTop: "16px",
   height: "48px",
   borderRadius: "999px",
   background: "var(--v5-brand)",
@@ -451,81 +633,16 @@ const ghostTextStyle: CSSProperties = {
   fontWeight: 500,
   color: "var(--v5-ink-3)",
 };
-const verifyTitleStyle: CSSProperties = {
-  marginTop: "10px",
-  fontSize: "15px",
-  fontWeight: 600,
-  color: "var(--v5-ink)",
-};
-const verifyAmtStyle: CSSProperties = {
-  marginTop: "6px",
-  fontFamily: "var(--font-v5)",
-  fontSize: "34px",
-  fontWeight: 600,
-  color: "var(--v5-brand)",
-  lineHeight: 1.1,
-};
-const verifyRuleStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-3)",
-};
-const countdownStyle: CSSProperties = {
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "var(--v5-warning)",
-  letterSpacing: "0.04em",
-  whiteSpace: "nowrap",
-};
-const wrongSourceBoxStyle: CSSProperties = {
-  marginTop: "12px",
-  padding: "10px 12px",
-  borderRadius: "12px",
+const freezeBannerStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-danger) 8%, transparent)",
-  gap: "8px",
+  borderRadius: "12px",
+  padding: "10px 12px",
 };
-const wrongSourceTextStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-danger)",
-  lineHeight: 1.5,
-};
-const qrBoxStyle: CSSProperties = {
-  width: "148px",
-  height: "148px",
-  margin: "16px auto 0",
-  borderRadius: "16px",
-  background: "#ffffff",
-  padding: "8px",
-  display: "grid",
-  placeItems: "center",
-};
-const qrGridStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  display: "grid",
-  gridTemplateColumns: `repeat(${QR_N}, 1fr)`,
-  gridTemplateRows: `repeat(${QR_N}, 1fr)`,
-};
-const qrDarkCellStyle: CSSProperties = {
-  background: "rgba(0,0,0,0.85)", // QR 物理黑,白卡内固定色(同 deposit pane 点阵先例)
-  borderRadius: "1px",
-};
-const platformAddrLabelStyle: CSSProperties = {
-  fontSize: "12px",
-  color: "var(--v5-ink-4)",
-};
-const platformAddrStyle: CSSProperties = {
-  marginTop: "4px",
-  fontSize: "12px",
-  color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)",
-  wordBreak: "break-all",
-  lineHeight: 1.5,
-  padding: "0 12px",
-};
-const stateIconBoxStyle: CSSProperties = {
-  width: "44px",
-  height: "44px",
-  borderRadius: "16px",
-  background: "var(--v5-surface-2)",
+const freezeIconStyle: CSSProperties = {
+  width: "28px",
+  height: "28px",
+  borderRadius: "8px",
+  background: "color-mix(in srgb, var(--v5-danger) 16%, transparent)",
 };
 const successIconBoxStyle: CSSProperties = {
   width: "52px",
@@ -563,7 +680,8 @@ const successRowValStyle: CSSProperties = {
 </script>
 
 <style scoped>
-:deep(.nx-rebind-address-input .uni-input-input) {
+:deep(.nx-rebind-address-input .uni-input-input),
+:deep(.nx-rebind-otp-input .uni-input-input) {
   min-height: 22px;
   height: 22px;
   line-height: 22px;

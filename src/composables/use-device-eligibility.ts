@@ -3,7 +3,6 @@ import type { Device, DeviceKind } from "@/store/types";
 import { useApp } from "@/store/app";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
-import { useWalletPairing } from "@/store/wallet-pairing";
 import { MAX_DEVICES } from "@/store/device-types";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import {
@@ -18,7 +17,7 @@ import { DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
  * useDeviceEligibility — Vue composable port of
  * Nexion-prototype/lib/hooks/use-device-eligibility.ts.
  *
- * Composes 4 Pinia stores (app / v-rank / network / wallet-pairing) into an
+ * Composes 3 Pinia stores (app / v-rank / network) into an
  * EligibilityContext and evaluates it against TRADEIN_CONFIG. Cross-store
  * composition lives at the COMPONENT/PAGE layer (this composable is called from
  * a page's setup, never from a store) so the architecture rule "stores never
@@ -47,17 +46,13 @@ export function useDeviceEligibility(
   const app = useApp();
   const vRank = useVRank();
   const network = useNetwork();
-  const pairing = useWalletPairing();
 
   // EligibilityContext rebuilt reactively from the store refs.
+  // (认证等级条件已随 FEAT-KYC-RM01b 从规则集移除;其余条件与优先级不变。)
   const ctx = computed<EligibilityContext>(() => ({
     devices: app.visibleDevices,
     vRank: vRank.myRank,
     cumulativeDepositUsdt: app.user.cumulativeDepositUsdt,
-    // ⚠️ MOCK-ONLY kycTier inference (mirrors source): walletPaired → "basic"
-    // as a coarse stand-in until KYC tiers ship. Production reads
-    // GET /api/users/me.kycTier ∈ {none, basic, verified, enhanced}.
-    kycTier: pairing.walletPaired ? "basic" : "none",
     accountCreatedAt: app.user.joinedAt,
     // Direct referrals excluding system spillover (real-platform "your referrals").
     referralConfirmedCount: network.members.filter(

@@ -304,7 +304,7 @@ const aiPerfRows = computed<{ k: string; v: string }[]>(() => {
 // Trust marks are proper nouns — publications and certification schemes keep
 // their registered names in every locale.
 const featuredMedia = ["Forbes", "CoinDesk", "TechCrunch", "The Block"];
-const compliance = ["SOC 2 Type II", "ISO 27001", "Chainalysis KYT"];
+const compliance = ["SOC 2 Type II", "ISO 27001", "CE / FCC"];
 const faqs = computed(() => {
   const f = t.value.store.faq;
   return [f.location, f.withdraw, f.demand, f.refund];

@@ -1,6 +1,6 @@
 <!--
   Security — ported from Nexion-prototype/app/(main)/me/security/page.tsx.
-  Password change (collapsible inline form) · 2FA toggle · KYC-Express link ·
+  Password change (collapsible inline form) · 2FA toggle ·
   active sessions (revoke / revoke-all) · danger zone (delete account).
 
   Wrapped in <AppChassis active="me">; SubPageHeader (back chevron) scrolls
@@ -55,19 +55,6 @@
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.twoFactorHint }}</text>
 
-      <!-- ───── KYC-Express ───── -->
-      <view class="mx-4" :style="[cardStyle, groupGap]">
-        <view class="flex items-center active:opacity-90" :style="rowStyle" @click="goKyc">
-          <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-tech-cyan-soft)')">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          </view>
-          <view class="flex-1 min-w-0">
-            <text class="block" :style="rowLabelStyle">{{ t.kycExpress.pageTitle }}</text>
-            <text class="block truncate" :style="rowSubStyle">{{ t.kycExpress.ctaNote }}</text>
-          </view>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-        </view>
-      </view>
 
       <!-- ───── Active sessions ───── -->
       <text class="block mx-4" :style="sectionHeadStyle">{{ t.security.sessionsTitle }}</text>
@@ -114,6 +101,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -126,7 +114,16 @@ import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 
+
 const t = useT();
+
+// 已下线验证流深链兜底的落地提示(App.vue 只负责 reLaunch;页面挂载后再弹,
+// 否则冷启期间 toast 到时自动消失,用户永远看不见 —— FEAT-KYC-RM01b ② 异常2)。
+onLoad((options) => {
+  if ((options as Record<string, string> | undefined)?.from === "retired-flow") {
+    toast.info(t.value.topupChrome.flowRetired);
+  }
+});
 const security = useSecurity();
 const auth = useAuth();
 const app = useApp();
@@ -277,10 +274,6 @@ async function handleDeleteAccount() {
     rebindAccountScopedStores("default");
     uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
   }
-}
-
-function goKyc() {
-  uni.navigateTo({ url: "/pages/me/kyc", fail: () => {} });
 }
 
 // ── styles ──

@@ -42,7 +42,7 @@ export function computeCreditedUsdt(grossAmountUsdt: number, feeUsdt: number): n
 }
 
 // ── 每用户 × 每网络专属充值地址(确定性派生)────────────────────────
-// wallet-pairing 的 mockExternalAddress 是「随机一次性」形态;充值地址必须
+// mockExternalAddress(chain-payment 内联版)是「随机一次性」形态;充值地址必须
 // 「同账号同网络恒定」(server 派发恒定不轮换),故同形态 + 确定性种子:
 // seed = hash(accountKey|network) → 种子化 PRNG → 逐字符生成。
 // PROD: GET /api/deposits/address?network= 返回 server 派发地址,本段整体删除。

@@ -2,7 +2,7 @@ import type { WithdrawalRiskRoute } from "./config-types";
 
 // 提现风控路由**纯逻辑**(SPEC-7 K3 + FEAT-WD01a 小额免审)。
 // 零依赖(vue / pinia / uni / 其它 store 均不引),与 fx-core / deposits-core /
-// wallet-pairing-core 同一分层惯例:core = 判定,store = 取数接线。
+// payout-address-core 同一分层惯例:core = 判定,store = 取数接线。
 //
 // 🔴 为什么必须抽出来(2026-07-31 熔断后的结论):
 // 「小额免审只免两道冷启动闸、永不越过风控裁决」是一条**行为**约束。

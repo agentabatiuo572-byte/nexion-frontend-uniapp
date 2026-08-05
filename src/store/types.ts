@@ -157,9 +157,8 @@ export interface Device {
   miningSince?: number | null;
 }
 
-// NOTE: WalletPairingState (v3.2 KYC-Express §5.4.3.2.1) lives in its own
-// store at lib/store/wallet-pairing.ts (zustand + persist) because it needs
-// localStorage persistence independent of useApp.
+// NOTE: 提现地址簿(FEAT-KYC-RM01a)在 store/payout-address.ts 独立持久化
+// (按账号作用域,localStorage persistence independent of useApp)。
 
 export type UserTier = "L0" | "L1" | "L2" | "L3" | "L4" | "L5";
 
@@ -189,7 +188,7 @@ export interface UserState {
   appliedRewardKeys?: Record<string, true>;
   /** Lifetime sum of completed USDT deposits/topups. Used by tradein eligibility
    *  `cumulative-deposit-usdt` rule. Seeded 0; incremented ONLY by recordDeposit
-   *  action (NOT earnings, NOT exchange, NOT trade-in credit, NOT KYC bonus,
+   *  action (NOT earnings, NOT exchange, NOT trade-in credit,
    *  NOT weekly-quest reward).
    *  ⚠️ MOCK-ONLY: production server-canonical via
    *  GET /api/users/me.cumulativeDepositUsdt
@@ -417,7 +416,7 @@ export interface AppState {
   _devResetDevices: () => void;
   // Sprint A-1 / E.2 — bump lifetime earnings to trigger milestone celebrations on demand
   _devBumpEarningsTotal: (amountUSD: number) => void;
-  creditBalance: (amount: number) => void;  // KYC-Express $1 credit (v3.2)
+  creditBalance: (amount: number) => void;
   debitBalance: (amount: number) => boolean; // returns false if insufficient
   creditNex: (amount: number) => void;
   debitNex: (amount: number) => boolean;

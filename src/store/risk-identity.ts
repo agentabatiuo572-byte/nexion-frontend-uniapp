@@ -215,12 +215,17 @@ export function recordRegistration(accountKey: string, sponsorId: string | null)
   }));
 }
 
-export function recordWithdrawAddressUse(accountKey: string, network: string, address: string): void {
+/**
+ * 登记提现地址首见。seenAt 缺省 = 现在;存量迁移(payout-address)传原配对验证时刻,
+ * 让既有「新地址持有期」信号把迁移地址视为老地址(规格 RM01a 异常6:无新保护期)。
+ * 已登记过的地址不覆盖(first-seen wins)。
+ */
+export function recordWithdrawAddressUse(accountKey: string, network: string, address: string, seenAt?: number): void {
   const hash = withdrawAddressHash(network, address);
   upsert(accountKey, (r) =>
     r.withdrawAddresses.some((a) => a.hash === hash)
       ? r
-      : { ...r, withdrawAddresses: [...r.withdrawAddresses, { hash, firstSeenAt: Date.now() }] },
+      : { ...r, withdrawAddresses: [...r.withdrawAddresses, { hash, firstSeenAt: seenAt ?? Date.now() }] },
   );
 }
 

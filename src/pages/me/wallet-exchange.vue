@@ -2,12 +2,12 @@
   Wallet Exchange — ported from Nexion-prototype/app/(main)/me/wallet/exchange/page.tsx.
   NEX↔USDT swap: pay/receive cards with live-jittered rate + flip, free network
   fee, plus the v3 risk-control dashboard (per-user $50/day cap, platform
-  $20K/day pool, KYC trigger at $100 lifetime, queue). Confirm flow gates via
+  $20K/day pool, queue). Confirm flow gates via
   useExchangeV3.canExchange → debit/credit app balances, recordSwap, write two
   bills (debit + credit), commit v3 counters.
 
   Ports the basic exchange store + the v3 risk store (both new — exchange.ts /
-  exchange-v3.ts). Reuses app (credit/debit USDT+NEX), bills, wallet-pairing.
+  exchange-v3.ts). Reuses app (credit/debit USDT+NEX), bills.
   useScrollGrowProgress + IntersectionObserver ($el) is dropped (P-018 precedent)
   — cap bars render at their final width directly. window.location.href → uni
   navigateTo. SSR mounted-guard dropped. Intervals cleaned in onUnmounted
@@ -140,19 +140,6 @@
           </view>
         </view>
 
-        <!-- KYC status -->
-        <view class="flex items-center" :style="kycRowStyle">
-          <template v-if="v3.kycVerified">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-success); font-weight: 500">{{ t.exchange.kycVerified }}</text>
-          </template>
-          <template v-else>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
-            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-warning)">{{ kycUnverifiedLabel }}</text>
-          </template>
-          <text class="font-mono-tabular" style="margin-left: auto; font-size: 12px; color: var(--v5-ink-3)">{{ lifetimeLabel }}</text>
-        </view>
-
         <!-- Queue -->
         <view v-if="v3.queue.length > 0" :style="queueWrapStyle">
           <view class="flex items-center" :style="queueTitleStyle">
@@ -197,12 +184,10 @@ import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
 import { useExchange, type SwapEvent } from "@/store/exchange";
-import { useWalletPairing } from "@/store/wallet-pairing";
 import {
   useExchangeV3,
   USER_DAILY_CAP_USD,
   PLATFORM_DAILY_CAP_USD,
-  KYC_LIFETIME_THRESHOLD_USD,
   dailyUserPctUsed,
   dailyPlatformPctUsed,
 } from "@/store/exchange-v3";
@@ -210,7 +195,6 @@ import {
 const t = useT();
 const app = useApp();
 const exchange = useExchange();
-const walletPairing = useWalletPairing();
 const v3 = useExchangeV3();
 
 const history = computed(() => exchange.history);
@@ -220,10 +204,9 @@ const direction = ref<"usdt2nex" | "nex2usdt">("nex2usdt");
 const input = ref("");
 const secsAgo = ref(0);
 
-// Sync v3 KYC mirror to wallet-pairing on mount (+ roll daily counters).
+// Roll daily counters on mount.
 onMounted(() => {
   v3.resetIfNewDay();
-  v3.setKycVerified(walletPairing.walletPaired);
 });
 
 // Periodic rate refresh (15s) + "n seconds ago" ticker (500ms). Page-level
@@ -342,25 +325,10 @@ async function handleConfirm() {
 
   submitting.value = true;
   try {
-    // v3 gate: cap / KYC / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
+    // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
+    // (大额兑换直接放行:$100 终身累计门已随 FEAT-KYC-RM01b 删除,汇率与日限不变。)
     const gate = v3.canExchange(snap.usd);
     if (!gate.ok) {
-      if (gate.reason === "kyc-required") {
-        const goKyc = await confirm({
-          title: t.value.exchange.kycRequiredTitle,
-          message: fmt(t.value.exchange.kycRequiredMessage, {
-            lifetime: gate.lifetime.toFixed(2),
-            threshold: String(gate.threshold),
-          }),
-          icon: "info",
-          confirmLabel: t.value.exchange.kycRequiredConfirm,
-        });
-        if (goKyc) {
-          // Reuse the KYC-Express flow on wallet-topup (?kyc=1)
-          uni.navigateTo({ url: "/pages/me/wallet-topup?kyc=1", fail: () => {} });
-        }
-        return;
-      }
       if (gate.reason === "user-cap") {
         const queueIt = await confirm({
           title: t.value.exchange.capReachedTitle,
@@ -483,8 +451,6 @@ const errorLabel = computed(() =>
     ? t.value.exchange.insufficientMessage.replace("{sym}", fromSym.value)
     : t.value.exchange.minAmount.replace("{n}", String(minFrom.value)).replace("{sym}", fromSym.value),
 );
-const kycUnverifiedLabel = computed(() => fmt(t.value.exchange.kycUnverified, { n: String(KYC_LIFETIME_THRESHOLD_USD) }));
-const lifetimeLabel = computed(() => fmt(t.value.exchange.lifetimeLabel, { n: v3.lifetimeExchangedUSD.toFixed(2) }));
 const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(v3.queue.length) }));
 // 历史行同样走 amtLabel:历史与余额对不上,多半就是这里自己又取了一次整。
 function swapLine(h: SwapEvent): string {
@@ -579,7 +545,7 @@ const infoStyle: CSSProperties = {
   lineHeight: 1.625,
 };
 // De-carded: the risk-control dashboard sits on the page floor; the mono title
-// opens it and the inner kyc/queue hairlines carry the section breaks.
+// opens it and the inner queue hairlines carry the section breaks.
 const dashStyle: CSSProperties = {
   margin: "16px 16px 0",
   padding: "0 2px",
@@ -614,10 +580,6 @@ const platformBarStyle = computed<CSSProperties>(() => ({
   background: "var(--v5-brand-2)",
   transition: "width 600ms cubic-bezier(0.16,1,0.3,1)",
 }));
-const kycRowStyle: CSSProperties = {
-  paddingTop: "10px",
-  borderTop: "1px solid var(--v5-border)",
-};
 const queueWrapStyle: CSSProperties = {
   marginTop: "12px",
   paddingTop: "12px",
