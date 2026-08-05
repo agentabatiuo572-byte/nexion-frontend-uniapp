@@ -255,18 +255,21 @@ const floorHintStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
 };
-// 🔴 阻断态下按钮退到中性面。用 ink-3 而非 ink-3 以外的更暗档:阻断说明是用户此刻
-//   最需要读到的一行,不能渲染成看不见(独立验收 P1-1 实测通用 disabled 配方只有 2.23,不达 AA)。
-const listBtnStyle = computed<CSSProperties>(() => ({
+// 🔴 阻断/可用两态**分成两个样式块**,不写三元:on-brand 哨兵按「同一块里 brand 底 +
+//   ink 字」判违例,三元分支的相关性静态看不出来 —— 拆块后各块语义自明,也更好读。
+const listBtnBase: CSSProperties = {
   marginTop: "10px",
   height: "44px",
   borderRadius: "999px",
-  // 迷你表单提交(输入挂单价→挂单):全宽实心柠檬绿合理;仅去光晕(网格多卡,光晕铁律仅限主 CTA)。
-  background: listBlocked.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  color: listBlocked.value ? "var(--v5-ink-3)" : "var(--v5-on-brand)",
   fontFamily: "var(--font-v5)",
   fontWeight: 550,
   fontSize: "13px",
   letterSpacing: "-0.005em",
-}));
+};
+// 迷你表单提交(输入挂单价→挂单):全宽实心柠檬绿合理;仅去光晕(网格多卡,光晕铁律仅限主 CTA)。
+const listBtnActiveStyle: CSSProperties = { ...listBtnBase, background: "var(--v5-brand)", color: "var(--v5-on-brand)" };
+// 阻断态退中性面。字用 ink-3 不用更暗档:阻断说明是用户此刻最需要读到的一行,
+// 不能渲染成看不见(独立验收 P1-1:通用 disabled 配方实测对比度 2.23,不达 AA 的 4.5)。
+const listBtnBlockedStyle: CSSProperties = { ...listBtnBase, background: "var(--v5-surface-2)", color: "var(--v5-ink-3)" };
+const listBtnStyle = computed<CSSProperties>(() => (listBlocked.value ? listBtnBlockedStyle : listBtnActiveStyle));
 </script>
