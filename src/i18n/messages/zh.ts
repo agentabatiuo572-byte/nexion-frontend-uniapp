@@ -4407,6 +4407,7 @@ export const zh: Messages = {
     confirmListCta: "确认挂单",
     confirmCancelTitle: "取消 #{id} 的挂单?",
     confirmCancelMsg: "节点将回到你的钱包(下架),你之后可以重新设价上架。",
+    confirmCancelMsg2: "节点将回到你的钱包(下架)。",
     confirmCancelCta: "确认取消",
     cancelledToast: "#{id} 挂单已取消",
     cancelledDesc: "节点已回到钱包",

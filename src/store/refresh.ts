@@ -4,6 +4,7 @@ import { useApp } from "./app";
 import { trialReservesSlotNow } from "./free-trial";
 import { tickOrders } from "./orders";
 import { useExchange } from "./exchange";
+import { useGenesisConfig } from "./genesis-config";
 
 /**
  * Pull-to-refresh store. Ported from Nexion-prototype/lib/store/refresh.ts
@@ -32,6 +33,10 @@ export const useRefresh = defineStore("refresh", () => {
       useApp().tick(3500);
       tickOrders(trialReservesSlotNow() ? 1 : 0);
       useExchange().refreshRate();
+      // 🔴 下拉刷新在用户心智里就是「重新拉数据」,创世配置(市场开关 / 文案变体)必须一并重读
+      //   —— 否则运营已关市场,用户下拉了也纠正不过来,而这正是他会做的第一个自救动作
+      //   (独立验收 P1)。config 是共享 store,一处刷新全消费者的 computed 同步更新。
+      useGenesisConfig().refresh();
     } finally {
       isRefreshing.value = false;
     }

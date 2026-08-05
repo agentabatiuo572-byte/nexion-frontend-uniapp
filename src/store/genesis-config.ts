@@ -258,7 +258,38 @@ function freshDefaults(): GenesisConfig {
  * 🔴 fail-safe 方向:盘上存了**脏值**回退 open(一个坏字节不该永久停售);
  *   **源不可达**才锁购 —— 两种失败方向相反,不许合并。
  */
+/**
+ * 探配置源是否真的可读 —— **不能靠 `uni.getStorageSync` 抛异常来判**。
+ *
+ * 🔴 独立审计回源实测(`@dcloudio/uni-h5` 的 `getStorageSync` 实现):它自己包了
+ *    `try { … } catch { return "" }`,存储缺失 / 被禁用 / 读失败**一律被吞成空串**。
+ *    所以外层的 catch 永远接不到东西 —— 上一版就是这么写的,`loaded` 恒 true,
+ *    `configUnavailable` 依旧是死代码,而我却报了「已修」。
+ *    更糟的是方向反了:存储真不可用时反而回落 `open`(放行),与本文件注释宣称的
+ *    「源不可达才锁购」正相反。
+ *
+ * 判据改成**往返自证**:写一个探针键再读回来,值对不上就是源不可用。
+ * 这不依赖任何 API 的异常语义,换端 / 换实现都成立。
+ */
+function storageReadable(): boolean {
+  const probeKey = "nexgrid-storage-probe";
+  const token = `p${Date.now()}`;
+  try {
+    uni.setStorageSync(probeKey, token);
+    const back = uni.getStorageSync(probeKey);
+    uni.removeStorageSync(probeKey);
+    return back === token;
+  } catch {
+    return false; // 抛了也算不可用(别的端可能真抛)
+  }
+}
+
 function hydrate(): { config: GenesisConfig; ok: boolean } {
+  if (!storageReadable()) {
+    // 🔴 源不可达 → configUnavailable 保守锁购(规格异常3)。与「盘上存了脏值」方向相反:
+    //   脏值回退 open(一个坏字节不该永久停售),源不可达才锁。
+    return { config: freshDefaults(), ok: false };
+  }
   try {
     const s = uni.getStorageSync(STORAGE_KEY) as { config?: Partial<GenesisConfig> } | "";
     if (s && typeof s === "object" && s.config) {
@@ -281,10 +312,9 @@ function hydrate(): { config: GenesisConfig; ok: boolean } {
     }
     return { config: freshDefaults(), ok: true }; // 首次运行:没存过 ≠ 拉取失败
   } catch {
-    // 🔴 storage API 抛错 = 配置源不可达 → configUnavailable 档的**真实触发路径**。
-    //   此前这里被当成 first run 吞掉、loaded 写死 true,导致该档全链路不可达,
-    //   规格异常3 的重试流程成了死代码(独立验收 confirmed P1)。
-    return { config: freshDefaults(), ok: false };
+    // 探针已判源可用,走到这里说明是**解析**炸了(脏 JSON 等)—— 那是脏值不是源不可达,
+    // 按 fail-open 回默认值放行,与上面 storageReadable() 的 fail-closed 分工不同。
+    return { config: freshDefaults(), ok: true };
   }
 }
 

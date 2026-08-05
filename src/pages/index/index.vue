@@ -94,7 +94,8 @@
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, nextTick, ref, watch } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
+import { useGenesisConfig } from "@/store/genesis-config";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import GreetingHeader from "@/components/home/greeting-header.vue";
@@ -127,6 +128,10 @@ const TASK_CAROUSEL_INTERVAL_MS = 5000;
 const TASK_CARD_COLLAPSED_HEIGHT = 184;
 
 const t = useT();
+// 🔴 首页承载 QuickActionRow(创世快捷入口,受闸文案),必须跟着重读配置(独立验收 P1:
+//   此前只有 3 个创世页接了 onShow,首页与商城页漏接 —— 用户停在首页,运营切关闭,
+//   首页仍在催「仅剩 N 席」)。
+onShow(() => useGenesisConfig().refresh());
 const locale = useLocaleStore();
 const platformConfig = useConfig();
 const instance = getCurrentInstance();

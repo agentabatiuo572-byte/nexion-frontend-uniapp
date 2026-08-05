@@ -70,6 +70,7 @@ import ProductCard from "@/components/store/product-card.vue";
 import PurchaseTicker from "@/components/store/purchase-ticker.vue";
 import LockedProductCard from "@/components/store/locked-product-card.vue";
 import GenesisShowcaseCard from "@/components/store/genesis-showcase-card.vue";
+import { onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
@@ -78,6 +79,10 @@ import { isPhaseReached } from "@/store/product-phase";
 
 const t = useT();
 const genesisCfg = useGenesisConfig();
+// 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
+//   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
+//   只有页面级 onShow 能把它翻回来。
+onShow(() => genesisCfg.refresh());
 const phase = useProductPhase();
 
 // mounted guard: phase override persists in storage, rehydrates client-only —

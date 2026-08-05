@@ -286,13 +286,21 @@ function urgencySitesUngated(src) {
     const names = [...new Set([...m[0].matchAll(/\b([a-zA-Z_]\w*)\b/g)].map((x) => x[1]))];
     return names.filter((n) => n !== "return");
   };
+  // 🔴 必须同时认 `function f(){}` 与 `const f = () => {}` 两种形态(独立审计 P1):
+  //   上一版只认 function 声明 —— 有人写 `const mintFree = () => { myOwned.value += 1 }`
+  //   并加进 return 块,门**静默豁免**(bodyOf 返回 null → 不在 fnLike 里 → 台账不查它)。
+  //   这与「判据锚在已存在的显式清单上」不冲突:清单仍是 return 块,这里只是把
+  //   「怎么算一个函数」认全,不认全等于清单里有成员被悄悄跳过。
+  const DECL = (n) => new RegExp(`^\\s*(?:async\\s+)?function\\s+${n}\\b|^\\s*const\\s+${n}\\s*=\\s*(?:async\\s*)?(?:\\(|function\\b)`);
+  const ANY_DECL = /^\s*(?:async\s+)?function\s+\w+|^\s*const\s+\w+\s*=\s*(?:async\s*)?(?:\(|function\b)/;
   const bodyOf = (src, name) => {
     const lines = src.split(/\r?\n/);
-    const start = lines.findIndex((l) => new RegExp(`^\\s*(?:async\\s+)?function\\s+${name}\\b`).test(l));
+    const re = DECL(name);
+    const start = lines.findIndex((l) => re.test(l));
     if (start < 0) return null;
     let end = lines.length;
     for (let i = start + 1; i < lines.length; i++) {
-      if (/^\s*(?:async\s+)?function\s+\w+/.test(lines[i])) { end = i; break; }
+      if (ANY_DECL.test(lines[i])) { end = i; break; }
     }
     return lines.slice(start, end).join("\n");
   };
@@ -303,7 +311,10 @@ function urgencySitesUngated(src) {
     for (const name of MUST_ASK) {
       const body = bodyOf(src, name);
       if (body === null) { out.push(`台账登记的 ${name} 不存在(台账已漂)`); continue; }
-      if (!BLOCK_CALL.test(body)) out.push(`${name}() 改变持有状态却没问闸`);
+      // 🔴 必须剥注释再判(本条红测自己抓出来的洞):listNode 的注释里写着
+      //   「用 genesisSecondaryBlock 而非 genesisPurchaseBlock」—— 不剥的话,一个**零调用**
+      //   的函数只要注释里提一嘴闸的名字就能骗过判据。全仓共用 strip 正是为了这个。
+      if (!BLOCK_CALL.test(strip(body, true))) out.push(`${name}() 改变持有状态却没问闸`);
     }
     const known = new Set([...MUST_ASK, ...Object.keys(EXEMPT), ...READONLY]);
     for (const n of exported.filter((n) => bodyOf(src, n) !== null)) {
@@ -323,7 +334,7 @@ function urgencySitesUngated(src) {
   check(`🔴 红测自证:⑦ 台账成员改名(台账漂移)必须转红`,
     violations(storeSrc.replace(/function listNode/, "function listNode2")).some((v) => v.includes("不存在")),
     "改名后没红 = 台账不看守自身");
-  check(`🔴 红测自证:⑦ 新增未登记的导出 action 必须转红`,
+  check(`🔴 红测自证:⑦ 新增未登记的导出 action(function 形态)必须转红`,
     (() => {
       const injected = storeSrc
         .replace(/function tickSales/, "function sneakyMint(){ myOwned.value += 1; persist(); return true; }\n  function tickSales")
@@ -331,6 +342,24 @@ function urgencySitesUngated(src) {
       return violations(injected).some((v) => v.includes("sneakyMint"));
     })(),
     "未登记新成员没红 = 开放集合的入口没封住");
+  // 🔴 箭头形态单独一条(合取项逐个隔离):上一版只测了 function 形态,箭头形态静默豁免。
+  check(`🔴 红测自证:⑦ 新增未登记的导出 action(**箭头**形态)必须转红`,
+    (() => {
+      const injected = storeSrc
+        .replace(/function tickSales/, "const arrowMint = () => { myOwned.value += 1; persist(); return true; };\n  function tickSales")
+        .replace(/purchase, listNode, cancelListing, acquireSecondary/, "purchase, listNode, cancelListing, acquireSecondary, arrowMint");
+      return violations(injected).some((v) => v.includes("arrowMint"));
+    })(),
+    "箭头形态没红 = 换个写法就能绕过整道门");
+  // 🔴 台账里的 action 若被改写成箭头形态,闸判定仍须生效(不能因为形态变了就查不到函数体)
+  check(`🔴 红测自证:⑦ 台账 action 改写成箭头形态后,摘闸仍必须转红`,
+    (() => {
+      const arrowed = storeSrc
+        .replace(/function listNode\(([^)]*)\)[^{]*\{/, "const listNode = ($1) => {")
+        .replace(/genesisSecondaryBlock/g, "xxBlock");
+      return violations(arrowed).some((v) => v.includes("listNode"));
+    })(),
+    "改成箭头就查不到 = 判据被写法绕过");
 }
 
 // ══ ⑧ 跨仓 parity:字段名字面量 + 关闭态文案变体键三向一致 ═══════════════════════
