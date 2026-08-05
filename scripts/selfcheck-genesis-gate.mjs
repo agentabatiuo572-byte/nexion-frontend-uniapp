@@ -333,5 +333,60 @@ function urgencySitesUngated(src) {
     "未登记新成员没红 = 开放集合的入口没封住");
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:7 组优先级固定靶 · 3 组二级 · 6 种紧迫感态 · 全 src 扫描 · 3 条正交结构判据 · 12 条判据红测自证含 v1 被绕的 6 种形态)`);
+// ══ ⑧ 跨仓 parity:字段名字面量 + 关闭态文案变体键三向一致 ═══════════════════════
+// 🔴 独立验收 P0-2 根因:前端 marketStatus / 后台 openState **双向零命中**,无任何适配层,
+//    接线那天后台下发的值灌不进前端 → fail-open 静默回落 "open" → 运营已关、用户照买。
+//    2026-08-05 两端统一 marketOpenState(主人拍板);本判据焊住它不再分叉。
+// 🔴 变体键是**三份手抄副本**(uniapp 白名单 / admin 下拉 options / i18n 三语键),
+//    今天相等纯属人工同步 —— 后台加一个 "holiday" 前端不认,hydrate 静默回退 default,
+//    运营看不出任何异常(错题集「键 parity ≠ 值 parity」同型)。
+// 🔴 兄弟仓文件读不到 = **红**,不是跳过(同工作区两仓,与 canon-sentinel 同款前提)。
+{
+  const adminClient = "../admin-ops/lib/admin/g4-client.ts";
+  const adminView = "../admin-ops/app/components/domain-views/g-tabs/g4-genesis.tsx";
+  let clientSrc = null, viewSrc = null;
+  try { clientSrc = readFileSync(path.join(root, adminClient), "utf8"); } catch { /* red below */ }
+  try { viewSrc = readFileSync(path.join(root, adminView), "utf8"); } catch { /* red below */ }
+  check(`🔴 ⑧ 兄弟仓 admin-ops 两文件可读(parity 的取材面)`, clientSrc !== null && viewSrc !== null,
+    `读不到 ${clientSrc === null ? adminClient : ""} ${viewSrc === null ? adminView : ""} —— 判据失效必红,不许静默跳过`);
+
+  if (clientSrc !== null && viewSrc !== null) {
+    // a) 字段名:后台契约必须用统一名,且旧名已绝迹(排除注释里的历史说明)
+    const strippedClient = strip(clientSrc, false);
+    check(`🔴 ⑧a 后台契约字段 = marketOpenState(与前端同名)`,
+      /marketOpenState:\s*"open"\s*\|\s*"closed"/.test(clientSrc),
+      `admin g4-client 里找不到 marketOpenState 类型声明`);
+    const oldNameHits = [...strippedClient.matchAll(/\bopenState\b/g)].length + [...strip(viewSrc, false).matchAll(/\bopenState\b/g)].length;
+    check(`🔴 ⑧b 旧字段名 openState 在后台代码面 = 0(实测 ${oldNameHits})`, oldNameHits === 0,
+      `旧名残留 = 改名只做了一半,接线时必串档`);
+
+    // b) 变体键三向:uniapp 白名单 == admin options == i18n 三语键面
+    const uniList = (() => {
+      const m = readFileSync(path.join(root, "src/store/genesis-config.ts"), "utf8")
+        .match(/GENESIS_CLOSED_NOTICE_KEYS\s*=\s*\[([^\]]+)\]/);
+      return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : null;
+    })();
+    const adminList = (() => {
+      const m = viewSrc.match(/options:\s*\[([^\]]+)\]/);
+      return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : null;
+    })();
+    const same = (a, b) => a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+    check(`🔴 ⑧c 变体键白名单两仓一致(uniapp ${uniList?.join("/") ?? "解析失败"} vs admin ${adminList?.join("/") ?? "解析失败"})`,
+      same(uniList, adminList), `任一侧加/删/改序而另一侧没动 = 静默回退 default`);
+    if (uniList && uniList.length >= 3) {
+      for (const lang of ["zh", "en", "vi"]) {
+        const msgs = readFileSync(path.join(root, `src/i18n/messages/${lang}.ts`), "utf8");
+        const missing = uniList.filter((k) => !new RegExp(`\\b${k}:\\s*"`).test(
+          (msgs.match(/marketClosed:\s*\{[\s\S]*?\n\s{4}\}/) ?? [""])[0]));
+        check(`⑧d 变体键在 ${lang} 的 marketClosed 命名空间齐全`, missing.length === 0, `缺 ${missing.join(",")}`);
+      }
+    }
+    // 红测(合取项隔离):往 admin options 注入新键必须转红
+    const injected = viewSrc.replace(/options:\s*\["default", "maintenance", "restock"\]/, `options: ["default", "maintenance", "restock", "holiday"]`);
+    const injList = (() => { const m = injected.match(/options:\s*\[([^\]]+)\]/); return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : null; })();
+    check(`🔴 红测自证:⑧c 后台加 "holiday" 而前端没加必须转红`, !same(uniList, injList), `注入没红 = parity 空转`);
+  }
+}
+
+console.log(`\n${pass} pass / ${fail} fail(样本:7 组优先级固定靶 · 3 组二级 · 6 种紧迫感态 · 全 src 扫描 · 4 条正交结构判据 · 13 条判据红测自证含 v1 被绕的 6 种形态)`);
 process.exit(fail === 0 ? 0 : 1);
