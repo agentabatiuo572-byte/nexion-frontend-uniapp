@@ -201,8 +201,37 @@ export interface ShareConfig {
   };
 }
 
+/** 对外公布数据(规格 FEAT-HOME02 ③;后台单源 = H 域「对外公布数据」卡)。
+ *
+ *  🔴 `fleetDevices` 是**平台舰队规模锚**:公布日产、每秒支付流、累计支付,以及
+ *  介绍页 / 信任页 / 全球网格 / 分享海报的舰队数字**全部由它派生**。各页禁止另存一份
+ *  (既有 `platform_stats_anchor` 哨兵守这条)。改它 = 改一切平台级金额口径。
+ *
+ *  🔴 `virtualUserCount` 与 `hashratePercentileTable` 只用于**排名分母与百分位映射**,
+ *  **永不**以任何形式出现在用户可见文案、字段名或接口响应的展示字段里(产品内 0 元层)。 */
+export interface PublicStatsConfig {
+  /** 平台舰队规模锚。合法域 [1000, 1000000]。 */
+  fleetDevices: number;
+  /** 在线率(%)。在线设备 = 舰队规模 × 该比例。合法域 [50, 100]。 */
+  onlineRatePct: number;
+  /** 在线数展示抖动幅度(台)。**只影响视觉呼吸感,不参与任何金额派生**。[0, 500]。 */
+  onlineJitter: number;
+  /** 注册用户展示基数。[0, 100000000]。 */
+  registeredUsersBase: number;
+  /** 注册用户月增速(%)。前端按时间锚派生当前值 —— **推算不累加**,故刷新不回退。[0, 50]。 */
+  registeredUsersMonthlyGrowthPct: number;
+  /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
+  registeredUsersAnchorAt: number;
+  /** 虚拟人口规模。真实人口 + 它 = 排名分母。[0, 10000000]。 */
+  virtualUserCount: number;
+  /** 虚拟人口算力分布档(tops 升序、cumPct 单调不减且 ≤100、至少 2 档)。
+   *  校验与消费见 `lib/network-rank.ts`;非法即该项不可用,不拖垮其它两格。 */
+  hashratePercentileTable: { tops: number; cumPct: number }[];
+}
+
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
+  publicStats: PublicStatsConfig;
   onlineBonus: OnlineBonus;
   riskCluster: RiskClusterConfig;
   withdrawRules: WithdrawRulesConfig;

@@ -2473,5 +2473,35 @@ snapshot_write_gate() {
 }
 snapshot_write_gate
 
+# ── 首页「你的排名」派生的行为门(FEAT-HOME02)──────────────────────────────
+# 守规格里三条**对用户的承诺**,不是实现细节:
+#   ① 加算力名次只前进不倒退 ② 零算力不编造名次(「未上榜」与「算不出来」不合并)
+#   ③ 同输入必同输出(禁随机,刷新不跳动)
+# ① 的地基是分位表单调性,所以门拒收非单调表不是洁癖 —— 表一非单调,承诺①当场失效
+# 而界面毫无察觉(名次会随算力上升往后掉)。
+network_rank_gate() {
+  if "$NODE_BIN" scripts/selfcheck-network-rank.mjs > /tmp/uniapp-net-rank.log 2>&1; then
+    ok "排名派生行为门 — $(tail -1 /tmp/uniapp-net-rank.log)"
+  else
+    bad "排名派生行为门失败 — node scripts/selfcheck-network-rank.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-net-rank.log | head -8 | sed 's/^/        /'
+  fi
+}
+network_rank_gate
+
+# ── 创世购买可用性「单一派生」门(FEAT-GEN10 ④)────────────────────────────────
+# 被一次独立验收逼出来的:此前 composable 注释里写着这个文件名,而文件根本不存在 ——
+# 一个凭空的安全感,同轮验收抓到的 4 条缺陷全是这条不变量失守的样本。
+# 守两件事:① 优先级链对不对(行为验证,不读源码顺序)② 有没有人绕过它自判(结构验证)。
+genesis_gate() {
+  if "$NODE_BIN" scripts/selfcheck-genesis-gate.mjs > /tmp/uniapp-gen-gate.log 2>&1; then
+    ok "创世单一派生门 — $(tail -1 /tmp/uniapp-gen-gate.log)"
+  else
+    bad "创世单一派生门失败 — node scripts/selfcheck-genesis-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-gen-gate.log | head -8 | sed 's/^/        /'
+  fi
+}
+genesis_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

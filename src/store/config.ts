@@ -17,6 +17,12 @@ export const useConfig = defineStore("config", () => {
   // PROD: hydrate from GET /api/config/platform instead of the mock seed.
   const config = ref<PlatformConfig>({
     featureFlags: { ...DEFAULT_PLATFORM_CONFIG.featureFlags },
+    publicStats: {
+      ...DEFAULT_PLATFORM_CONFIG.publicStats,
+      // 🔴 分位表必须深拷贝:浅拷贝会让 store 与 seed 共享同一个数组,
+      //   运营改一档就把「默认值」本身改掉了,reset 也回不去。
+      hashratePercentileTable: DEFAULT_PLATFORM_CONFIG.publicStats.hashratePercentileTable.map((b) => ({ ...b })),
+    },
     onlineBonus: { ...DEFAULT_PLATFORM_CONFIG.onlineBonus },
     riskCluster: { ...DEFAULT_PLATFORM_CONFIG.riskCluster },
     withdrawRules: {

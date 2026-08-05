@@ -35,7 +35,11 @@
 
         <!-- Live tier price row(预售态优先显倒计时/即将开售)-->
         <view class="flex items-end justify-between" style="margin-top: 14px; gap: 10px">
-          <view v-if="preSale">
+          <!-- 🔴 阻断态(市场关闭 / 熔断 / 配置未知)**不报价**(独立验收 P2-12):
+               创世页同态已经把价格删了,这里还并列显示「当前档 $11,999」+「市场暂未开放」,
+               两个入口对同一件事说两套话。判据走 block,与创世页同源。 -->
+          <view v-if="hardBlocked" />
+          <view v-else-if="preSale">
             <text class="block" :style="tierLabelStyle">{{ t.genesisEligibility.comingSoon }}</text>
             <text v-if="showTime" class="block font-display tabular-nums nowrap" :style="priceStyle">{{ countdownDisplay }}</text>
           </view>
@@ -45,10 +49,11 @@
           </view>
           <text v-else :style="soldOutStyle">{{ t.store.genesisCardSoldOut }}</text>
 
-          <!-- CTA pill -->
+          <!-- CTA pill。右箭头 = 「点了会去某处」;硬阻断态点了只给说明,不该用箭头暗示能往下走
+               (与创世页 dock 同一条规矩)。 -->
           <view class="inline-flex items-center justify-center" :style="ctaStyle">
             <text :style="ctaTextStyle">{{ ctaText }}</text>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+            <svg v-if="!hardBlocked" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
 
@@ -84,6 +89,12 @@ const { block, closedNoticeKey, showUrgency, preSale, showTime, countdownDays, c
 const eligSheetOpen = ref(false);
 
 const soldOut = computed(() => genesis.totalSlots - genesis.soldSlots <= 0);
+/** 「硬阻断」= 市场关闭 / 熔断 / 配置未知。**售罄与预售不算** —— 那两态本来就有各自的
+ *  展示语言(售罄字样 / 倒计时),不该被这条规则连坐。与创世页 dock 的取舍一致。 */
+const hardBlocked = computed(() => {
+  const b = block.value;
+  return b === "marketClosed" || b === "halted" || b === "configUnavailable";
+});
 // 预售未开是最外层态(优先于售罄/锁定);到点自动解锁。
 const locked = computed(() => !preSale.value && !soldOut.value && !eligible.value);
 const countdownDisplay = computed(() => {

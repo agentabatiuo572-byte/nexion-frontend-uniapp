@@ -148,6 +148,9 @@ const LEDGER = {
   "POST /api/share/event": "PRD §11.9",
   "POST /api/sponsorship/bind": "PRD §9.11e",
   "GET /api/platform/stats": "PRD §5.5",
+  // FEAT-HOME02:排名派生目前是 client 纯函数(lib/network-rank.ts),真后台接管后
+  // 由本端点返回同一套结果。前端 PRD 尚无该条目 —— 实现批次收口时随 nexion-prd-sync 补。
+  "GET /api/platform/rank": "TBD: FEAT-HOME02 排名派生;规格已签字,PRD 条目待收口时补",
   "GET /api/leaderboard": "PRD §8.11.3",
   "GET /api/config/exchange/caps": "PRD §9.11c.1",
   "POST /api/exchange/swap": "PRD §9.4.3",
