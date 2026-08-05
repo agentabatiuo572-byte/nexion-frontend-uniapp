@@ -327,7 +327,7 @@ export const zh: Messages = {
     // FEAT-HOME02 脉搏三格副文本 + 排名三态(上榜 / 未上榜 / 配置拉不到)
     networkMembersSub: "每月 +{n}%",
     networkDevicesSub: "正在跑任务",
-    networkRankUp24h: "24h 上升 {n} 名",
+    networkRankUp24h: "24h +{n} 名",
     networkRankUnranked: "未上榜",
     networkRankUnrankedHint: "激活设备就上榜",
     networkRankTipRanked: "排名按你已激活设备的算力总和来算,算力越高名次越靠前。",

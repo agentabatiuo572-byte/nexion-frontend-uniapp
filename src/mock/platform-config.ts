@@ -16,8 +16,9 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     homeWeeklyPromoEnabled: true,
   },
   // FEAT-HOME02 对外公布数据 mock seed(后台 H 域「对外公布数据」卡权威可配)。
-  // 🔴 fleetDevices 是**平台舰队规模锚**,`lib/platform-stats.ts` 从这里取值再派生
-  //   公布日产 / 每秒支付流 / 累计支付;各页禁止另存一份(platform_stats_anchor 哨兵守着)。
+  // 🔴 方向(2026-08-06 审计纠正:上一版这段注释写反了):**编译期锚在 lib**,
+  //   本 seed 从锚取值保证开箱恒等;运行时消费(公布日产/每秒支付流/累计支付/各页舰队数)
+  //   一律经 lib 的 *Of(config.publicStats) 派生 —— 配置是运行期权威,锚只是种子与回退。
   // 🔴 virtualUserCount 与 hashratePercentileTable 只进排名分母与百分位映射,
   //   **永不外露到用户可见的任何地方**(产品内 0 元层)。
   publicStats: {

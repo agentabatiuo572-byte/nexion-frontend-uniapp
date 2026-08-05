@@ -4,6 +4,7 @@ import { useApp } from "./app";
 import { trialReservesSlotNow } from "./free-trial";
 import { tickOrders } from "./orders";
 import { useExchange } from "./exchange";
+import { useConfig } from "./config";
 import { useGenesisConfig } from "./genesis-config";
 
 /**
@@ -37,6 +38,10 @@ export const useRefresh = defineStore("refresh", () => {
       //   —— 否则运营已关市场,用户下拉了也纠正不过来,而这正是他会做的第一个自救动作
       //   (独立验收 P1)。config 是共享 store,一处刷新全消费者的 computed 同步更新。
       useGenesisConfig().refresh();
+      // 🔴 平台展示配置同理(2026-08-06 审计 P2 同型):脉搏三格 / 页脚 $/sec 的失败态,
+      //   用户第一自救动作就是下拉 —— 不重拉配置,占位态永远刷不回来。fire-and-forget:
+      //   load 自带合成延迟与 loading 态,卡片骨架去闪由 300ms 防抖门管。
+      void useConfig().load();
     } finally {
       isRefreshing.value = false;
     }
