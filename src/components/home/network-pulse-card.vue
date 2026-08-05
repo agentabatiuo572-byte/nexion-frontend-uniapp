@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
@@ -118,6 +118,7 @@ watch(() => cfg.loading, (l) => {
     showSkeleton.value = false;
   }
 });
+onUnmounted(() => { if (skeletonTimer !== null) clearTimeout(skeletonTimer); }); // R3 P2 卫生债
 /** 装饰性走势(确定性,从当前值倒推 8 点缓坡;不声称历史数据,只是视觉纹理)。 */
 const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i * 0.0004));
 
@@ -139,6 +140,12 @@ const rank = computed(() => {
     virtualPopulation: ps.virtualUserCount,
   });
 });
+// R3 降级 P2:rank 会随设备增减在已挂载页面上活翻(6s 订单 tick 在任意页发货)——
+// **kind 一迁移**就重取时刻(补落基线/清滞留值)。只盯 kind 不盯名次值:名次里掺着
+// 时间派生的人口,盯值会让 refreshRankMoment 的 nowTs 触发自转;displayDelta 是普通 ref、
+// commit 不在展示读路径,kind-watch 不会重开族A写读环。必须放在 rank 声明之后
+// (watch 源 getter 创建即求值,放前面是 TDZ 崩页 —— 首跑实锤,5 个浏览器齿轮全灭)。
+watch(() => rank.value.kind, (k, was) => { if (k !== was) refreshRankMoment(); });
 
 interface Cell {
   k: string;

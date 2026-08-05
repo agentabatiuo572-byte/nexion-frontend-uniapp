@@ -334,7 +334,9 @@ export const useApp = defineStore("app", () => {
   //   消费者自动收敛;域判定与卡片占位共用同一个函数,两层永不打架)。
   const pulseOnlineBaseline = (): number => {
     const ps = cfg.config.publicStats;
-    if (!ps || !publicStatsHealth(ps).devicesOk) return FLEET_DEVICES;
+    // R3 P2:jitter 只属呼吸带(band 自己会回退 24),越域不该把合法舰队基线拖回种子
+    const h = publicStatsHealth(ps ?? null);
+    if (!ps || !h.fleetOk || !h.rateOk) return FLEET_DEVICES;
     return Math.round(ps.fleetDevices * (ps.onlineRatePct / 100));
   };
   const pulseJitterBand = (): number => {
