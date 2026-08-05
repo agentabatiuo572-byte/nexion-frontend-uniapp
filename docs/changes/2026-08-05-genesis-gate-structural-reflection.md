@@ -100,6 +100,44 @@
 `marketStatus|closedNoticeKey|halted` 在 `src/pages/` 与 `src/components/` 下出现次数必须 = **0**;
 owner 与两个二层 owner 之外的任何引用即红。红测:往任一页面塞一处引用 → 必红。
 
+## 三·补二 · 回源看真实的行之后,修法进一步缩小(2026-08-05)
+
+上一节只数了**次数**没看**内容**,结论偏大。逐行回源后事实是:
+
+`use-genesis-sale-gate.ts` **已经**是单一消费入口,已导出 `block` / `showUrgency` / `marketClosed` 等派生值。
+页面并没有自己重算判定 —— 它们重复的是**另一件事:把 block 翻译成文案**。
+
+**真实分布(6 处)**:
+
+| 处 | 现状 |
+|---|---|
+| `genesis.vue:264-274` · `marketplace.vue:163-170` · `purchase-sheet.vue:135-141` · `genesis-showcase-card.vue:120-132` | 各写**一份相同的 switch**,都在做 `t.genesis.marketClosed[closedNoticeKey as "default"] ?? 兜底` |
+| `quick-action-row.vue:62` · `holder.vue:233-237` | **连 switch 都没写**,直接写死 `.default` ← 未修#1 的用户可见缺陷 |
+
+即:**判定没散,散的是「判定 → 文案」这一步**。而 `closedNoticeKey` 之所以要导出给页面,唯一原因就是让它们各自做这一步。
+
+**因此修法收缩为一件事**(比原计划小得多,且是纯删除性收敛):
+
+> 在 composable 里加 `blockText`(**一个** switch,含 `closedNoticeKey` 变体查找与兜底),
+> 6 处全部改用它;`closedNoticeKey` **不再导出**。
+
+连带效果:
+- 4 份重复 switch **删掉**(含重复 4 次的 `as "default"` 类型断言,本身是坏味道);
+- 2 处写死的自动拿到正确文案 —— **未修#1 不需要单独修**;
+- `closedNoticeKey` 在 `pages/` `components/` 出现次数 → **0**,判据变成一行 grep 的**闭集合**;
+- 门里 ④a/④b 那堆猜形态的正则可以**整段删除**,不是再加。
+
+### 子任务拆解(每个 ≤1 上下文,独立 tester 验收才许打勾)
+
+| # | 子任务 | 独立验收判据 |
+|---|---|---|
+| H-1 | composable 加 `blockText`,移除 `closedNoticeKey` 导出 | 类型 0 错;`blockText` 对 5 档 block × 3 种 notice 变体各出一次,快照固定靶 |
+| H-2 | 4 处改调 `blockText`,删各自 switch | 4 文件净删行 > 净增行;`closedNoticeKey` 在 pages/components 计数 = **0** |
+| H-3 | 2 处写死点接上 `blockText` | 🔴 **实景**:售罄态下首页 / 持有页 / 创世页三处文案**一致**(当前实测互相矛盾) |
+| H-4 | 门改判据:删猜形态的正则,换闭集合计数 + 红测 | 🔴 红测**按合取项逐个隔离**(现 ④b 写成 `A \|\| B` 致一支恒真,另一支坏掉照绿);往任一页面塞一处引用必红 |
+| H-5 | Nova 接闸(未修#3) | 🔴 实景:关闭态下不再产出「席位不多了」通知 |
+| H-6 | 阻断态配色(未修#1 的 P1-1)| 🔴 实测对比度 ≥ 4.5(现 2.23 / 暗 3.47) |
+
 ## 四、给我自己的判据(比上面三条门更重要)
 
 **「已修」是我最不可信的一类断言,而我一再把它当结论用。**
