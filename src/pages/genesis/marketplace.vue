@@ -64,6 +64,16 @@
           </view>
         </view>
 
+        <!-- 市场关闭说明(FEAT-GEN10 ⑥:二级市场一并锁闭**并说明**)。
+             只说状态与影响,不做倒计时、不催 —— 关闭态禁紧迫感元素。 -->
+        <view v-if="marketClosed" class="flex items-start" :style="closedNoticeStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <view style="flex: 1; margin-left: 8px">
+            <text class="block" :style="closedNoticeTitleStyle">{{ t.genesis.marketClosed.default }}</text>
+            <text class="block" :style="closedNoticeSubStyle">{{ t.genesis.marketClosed.holdingsSafe }}</text>
+          </view>
+        </view>
+
         <!-- Tabs -->
         <view class="grid grid-cols-3" :style="tabsStyle">
           <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
@@ -137,6 +147,7 @@ import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 
 const ONE_DAY = 86400 * 1000;
@@ -147,6 +158,7 @@ const app = useApp();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
+const { marketClosed } = useGenesisSaleGate();
 
 // 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
 const stats = computed(() => cfg.config.marketStats);
@@ -284,6 +296,13 @@ onUnmounted(() => {
 });
 
 function handleBuy(l: Listing) {
+  // 🔴 市场关闭闸放在**最前**(规格 FEAT-GEN10 ⑥:二级市场与购买同一状态源)。
+  //   零资金动作就拦掉 —— store 层 acquireSecondary 也有同一道闸兜底,但那时钱已经扣了、
+  //   要走冲正;能在这里挡住就别让钱先动。
+  if (marketClosed.value) {
+    toast.error(t.value.genesis.marketClosed.default, t.value.genesis.marketClosed.holdingsSafe);
+    return;
+  }
   // 资格门(FEAT-GEN08,appliesTo=both 时二级同门):确认前拦截,零资金动作。
   // 打开资格 sheet 引导补齐,而非仅 toast。
   if (gatesSecondary.value && !eligible.value) {
@@ -454,6 +473,28 @@ const viewOpenSeaStyle: CSSProperties = {
   fontWeight: 500,
 };
 // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+// 市场关闭说明条(FEAT-GEN10)。soft bg tint + **零 border**(带 bg 的容器不加边框,
+// 卡片嵌套铁律);用 warning 语义色而非 error —— 这是运营节奏,不是故障。
+const closedNoticeStyle: CSSProperties = {
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+  color: "var(--v5-warning-ink)",
+  borderRadius: "14px",
+  padding: "12px 14px",
+};
+const closedNoticeTitleStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "13px", // 档内值(value-ladder 合法集 {56,44,36,34,26,20,15,13,12};13.5 会被哨兵判红)
+  fontWeight: 550,
+  textWrap: "pretty",
+};
+const closedNoticeSubStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
+  marginTop: "2px",
+  lineHeight: 1.5,
+  textWrap: "pretty",
+};
 const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface)" };
 function tabPillStyle(active: boolean): CSSProperties {
   return {

@@ -25,7 +25,8 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
             <text class="font-mono-tabular" :style="eyebrowStyle">{{ eyebrowText }}</text>
           </view>
-          <text v-if="!soldOut" class="font-mono-tabular tabular-nums nowrap" :style="leftChipStyle">{{ leftText }}</text>
+          <!-- 剩余席位是紧迫感元素:关闭态 / 售罄态不显(FEAT-GEN10 ④),判据同 showUrgency 单源。 -->
+          <text v-if="showUrgency" class="font-mono-tabular tabular-nums nowrap" :style="leftChipStyle">{{ leftText }}</text>
         </view>
 
         <!-- Title + perks line -->
@@ -73,11 +74,12 @@ import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { toast } from "@/store/ui";
 
 const t = useT();
 const genesis = useGenesis();
 const { gate, eligible } = useGenesisEligibility();
-const { preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
+const { block, closedNoticeKey, showUrgency, preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
 
 const eligSheetOpen = ref(false);
 
@@ -100,8 +102,15 @@ const lockedMetText = computed(() => {
   return fmt(t.value.genesisEligibility.cardLockedMet, { met, total: gate.value.conditions.length });
 });
 const ctaText = computed(() => {
-  if (preSale.value) return t.value.genesisEligibility.comingSoon;
-  if (soldOut.value) return t.value.store.genesisCardCtaMarket;
+  // 🔴 阻断态一律问 `block` 单源(FEAT-GEN10 ④),与创世页同一出口 —— 关闭市场 ≠ 下架,
+  //   卡片照常展示(showcaseEnabled 另管),只是不能买。
+  switch (block.value) {
+    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
+    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
+    case "halted": return t.value.genesis.marketClosed.halted;
+    case "soldOut": return t.value.store.genesisCardCtaMarket;
+    case "preSale": return t.value.genesisEligibility.comingSoon;
+  }
   if (locked.value) return t.value.genesisEligibility.cardCtaLocked;
   return t.value.genesisEligibility.cardCta;
 });
@@ -111,10 +120,14 @@ function goGenesis() {
   uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
 }
 function onCardTap() {
-  // 预售未开:不跳不开 sheet(整卡不可认购,只展示倒计时/即将开售)。
-  if (preSale.value) return;
-  if (soldOut.value) {
+  // 🔴 与 ctaText 同问 `block` 一处,顺序不在此重排(FEAT-GEN10 ④)。
+  if (block.value === "soldOut") {
     uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+    return;
+  }
+  if (block.value !== null) {
+    // 阻断态:不跳不开 sheet。禁静默无反馈 —— 给与卡面同一句说明。
+    if (block.value !== "preSale") toast.info(ctaText.value, t.value.genesis.marketClosed.holdingsSafe);
     return;
   }
   if (locked.value) {

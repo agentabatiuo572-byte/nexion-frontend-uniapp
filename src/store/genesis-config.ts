@@ -42,6 +42,60 @@ export function isPreSale(saleStartAt: number | null, now: number): boolean {
   return saleStartAt != null && now < saleStartAt;
 }
 
+// ── 购买可用性:唯一派生出口(规格 FEAT-GEN10 ④)──────────────────────────────
+/** 阻断原因;`null` = 可购买。顺序即优先级,`genesisPurchaseBlock` 按此链取**最高**一条。 */
+export type GenesisPurchaseBlock =
+  | "configUnavailable" // 配置未知 → 保守锁购(异常3:禁在配置未知时放行)
+  | "marketClosed"      // 运营把市场设为暂未开放
+  | "halted"            // 熔断(J 域既有闸;见下方注释:前端尚无生产者)
+  | "soldOut"           // 售罄 → 引导二级市场
+  | "preSale"           // 预售未到 → 倒计时锁
+  | null;
+
+export interface GenesisPurchaseInput {
+  /** 配置是否已成功拉到。false = 未知,走保守锁购。 */
+  configLoaded: boolean;
+  marketStatus: "open" | "closed";
+  /** 熔断是否生效。
+   *
+   *  🔴 **今天恒为 false,因为前端还没有这个信号的生产者** —— 后台 J1 有 `genesis` 熔断闸,
+   *  但它与 uniapp 之间没有接线(实测:前端全仓无任何消费熔断闸的代码)。这是**既有缺口**,
+   *  不是 FEAT-GEN10 引入的;而规格 §⑦ 明写「熔断闸沿用 J 域既有键,本规格不新增 kill 闸、
+   *  不改闸数」,所以这里**只留槽位不造闸**:类型齐全、优先级已排好,接线落地当天把它接上即可。
+   *  🔴 别把它删掉「简化」—— 删了之后接线的人会重新在别处判一套,正是本函数要防的事。 */
+  halted: boolean;
+  /** 剩余可售名额。 */
+  remaining: number;
+  saleStartAt: number | null;
+  now: number;
+}
+
+/**
+ * 购买可用性的**唯一**判定出口(纯函数,server 与 mock 同构)。
+ *
+ * 🔴 为什么必须收成一处:改造前「能不能买」在 `dockCtaText`(按钮文案)与 `openSheet`
+ * (点击处理)**各判一套**,两处顺序恰好一致纯属巧合 —— 任一处加条件而另一处忘了,
+ * 就会出现「按钮写着可买、点了没反应」或反过来「按钮灰着却能点进结算」。
+ * 规格 FEAT-GEN10 ④ 因此要求单一派生,**禁多处各判一套**。
+ *
+ * 优先级(规格 ④,不可换序):配置未知 > 市场关闭 > 熔断 > 售罄 > 预售倒计时。
+ * 取**最高一条**,不叠加、不闪烁互换(异常2)。
+ */
+export function genesisPurchaseBlock(input: GenesisPurchaseInput): GenesisPurchaseBlock {
+  if (!input.configLoaded) return "configUnavailable";
+  if (input.marketStatus === "closed") return "marketClosed";
+  if (input.halted) return "halted";
+  if (input.remaining <= 0) return "soldOut";
+  if (isPreSale(input.saleStartAt, input.now)) return "preSale";
+  return null;
+}
+
+/** 关闭态**不得**展示倒计时与名额紧迫文案(规格 ④:不对不可购买的东西制造紧迫感)。
+ *  售罄同理(已经没了,催也没用)。判据集中在此,页面不各自 if。 */
+export function genesisShowsUrgency(block: GenesisPurchaseBlock): boolean {
+  return block === null || block === "preSale";
+}
+
 // ── 预售页权益(4 项,双语;空字段 = 回退现 i18n)──
 export interface GenesisPerk {
   nameZh: string;
@@ -70,9 +124,22 @@ export interface GenesisMarketStats {
   floorDeltaPct: number;
 }
 
+/** 关闭态文案变体键 —— **白名单常量**,后台只能在其中选,不能自由输入正文。
+ *  规格 FEAT-GEN10 ③:「禁后台自由输入正文,防绕过文案纪律」。
+ *  每个键在 i18n `genesis.marketClosed.*` 下三语镜像。 */
+export const GENESIS_CLOSED_NOTICE_KEYS = ["default", "maintenance", "restock"] as const;
+export type GenesisClosedNoticeKey = (typeof GENESIS_CLOSED_NOTICE_KEYS)[number];
+
 export interface GenesisConfig {
   // 阶梯定价
   tiers: GenesisTier[];
+  /** 市场状态(规格 FEAT-GEN10):`closed` = 页面照常可看、但一律不可购买。
+   *  单源 = 后台 G4,server-canonical,client 仅缓存展示。
+   *  🔴 与 `showcaseEnabled` **相互独立**:关闭市场 ≠ 下架(规格 ③)。
+   *  🔴 与 `saleStartAt` 也独立,且优先级**高于**它(规格 ④)。 */
+  marketStatus: "open" | "closed";
+  /** 关闭态文案变体;仅取 GENESIS_CLOSED_NOTICE_KEYS 内的值,非法值回退 "default"。 */
+  closedNoticeKey: GenesisClosedNoticeKey;
   // 预售倒计时
   saleStartAt: number | null;
   showCountdown: boolean;
@@ -99,6 +166,8 @@ const DAY = 86400_000;
 
 export const DEFAULT_GENESIS_CONFIG: GenesisConfig = {
   tiers: GENESIS_TIERS_DEFAULT.map((t) => ({ ...t })),
+  marketStatus: "open", // 默认开放(不阻断现状)
+  closedNoticeKey: "default",
   saleStartAt: null, // 默认已开售(不阻断现状)
   showCountdown: true,
   showcaseEnabled: true,
@@ -156,6 +225,11 @@ function hydrate(): GenesisConfig {
       // Merge over defaults so newly-added fields exist for old persisted state.
       const merged = { ...DEFAULT_GENESIS_CONFIG, ...s.config };
       merged.tiers = sanitizeTiers(s.config.tiers, 0);
+      // 🔴 fail-safe 方向要选对:非法 marketStatus 回退 **open**,不是 closed。
+      //   这里是「盘上存了脏值」,不是「配置拉不到」——后者由 genesisPurchaseBlock 的
+      //   configUnavailable 走保守锁购。把脏值也当成关闭,会让一个坏字节永久停售。
+      if (merged.marketStatus !== "open" && merged.marketStatus !== "closed") merged.marketStatus = "open";
+      if (!GENESIS_CLOSED_NOTICE_KEYS.includes(merged.closedNoticeKey)) merged.closedNoticeKey = "default";
       if (!Array.isArray(merged.perks) || merged.perks.length !== 4) merged.perks = emptyPerks();
       if (!Array.isArray(merged.opsListings)) merged.opsListings = [];
       if (!Array.isArray(merged.fomoActivity)) merged.fomoActivity = [];
@@ -169,6 +243,14 @@ function hydrate(): GenesisConfig {
 
 export const useGenesisConfig = defineStore("genesisConfig", () => {
   const config = ref<GenesisConfig>(hydrate());
+  /** 配置是否可用。
+   *
+   *  🔴 mock 期恒 true —— 配置是同步从本地读的,没有会失败的网络请求;
+   *  `hydrate()` 读不到时返回的是**默认值**(首次运行的正常情形),不是「拉取失败」。
+   *  真后台接上后,这里改由 `GET /api/config/genesis` 的结果驱动:请求失败 → false,
+   *  `genesisPurchaseBlock` 随即返回 `configUnavailable` 走保守锁购(规格 FEAT-GEN10 异常3)。
+   *  🔴 别为了「让异常3 现在就能演」把它硬编码成 false —— 那会让所有人都买不了。 */
+  const loaded = ref(true);
 
   function persist() {
     try {
@@ -186,5 +268,5 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
     persist();
   }
 
-  return { config, update, reset };
+  return { config, loaded, update, reset };
 });

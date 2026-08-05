@@ -3456,6 +3456,17 @@ export const zh: Messages = {
     leftSuffix: "剩余",
     ctaReserve: "认购",
     ctaSoldOut: "已售罄",
+    // 市场关闭态(FEAT-GEN10)。default/maintenance/restock 是后台可选的文案变体,
+    // 后台只能在这三个里选,不能自由输入正文。
+    marketClosed: {
+      default: "当前市场暂未开放",
+      maintenance: "系统维护中,暂停认购",
+      restock: "本轮名额已发放完毕",
+      halted: "认购已暂停",
+      configUnavailable: "暂时无法获取状态",
+      retryHint: "请稍后重试",
+      holdingsSafe: "已持有的节点与权益不受影响",
+    },
     confirmTitle: "预订创世节点",
     confirmSubtitle: "${price} × 数量",
     quantity: "数量",
@@ -4766,7 +4777,7 @@ export const zh: Messages = {
     collapse: "收起任务",
     buyCta: "购首台 NexGridBox · 启动 $7/日永续收益",
     routeToast: "任务完成 · +{n} NEX",
-    bindCardMemo: "首日任务 · 绑定银行卡",
+    bindCardMemo: "首日任务 · 绑定银行卡",
 
     routeMemo: "新手任务 · {task}",
     t_bind_bank_card: "绑定银行卡",

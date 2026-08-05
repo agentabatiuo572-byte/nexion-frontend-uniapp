@@ -3449,6 +3449,17 @@ export const vi: Messages = {
     leftSuffix: "còn lại",
     ctaReserve: "Giữ suất",
     ctaSoldOut: "Đã bán hết",
+    // Trạng thái đóng thị trường (FEAT-GEN10). default/maintenance/restock là các
+    // biến thể nội dung vận hành chọn từ danh sách này, không nhập tự do.
+    marketClosed: {
+      default: "Thị trường chưa mở",
+      maintenance: "Đang bảo trì — tạm dừng đặt mua",
+      restock: "Đợt này đã phân bổ hết",
+      halted: "Tạm dừng đặt mua",
+      configUnavailable: "Chưa lấy được trạng thái",
+      retryHint: "Vui lòng thử lại sau",
+      holdingsSafe: "Các node bạn đang sở hữu không bị ảnh hưởng",
+    },
     confirmTitle: "Đặt Genesis Node",
     confirmSubtitle: "${price} × số lượng",
     quantity: "Số lượng",
@@ -4785,7 +4796,7 @@ export const vi: Messages = {
     collapse: "Ẩn việc",
     buyCta: "Sắm NexGridBox đầu tiên · kiếm $7/ngày mãi mãi",
     routeToast: "Hoàn thành nhiệm vụ · +{n} NEX",
-    bindCardMemo: "Nhiệm vụ ngày đầu · Liên kết thẻ ngân hàng",
+    bindCardMemo: "Nhiệm vụ ngày đầu · Liên kết thẻ ngân hàng",
 
     routeMemo: "Nhiệm vụ ngày đầu · {task}",
     t_bind_bank_card: "Liên kết thẻ ngân hàng",
