@@ -6,6 +6,7 @@ import {
   useGenesisConfig,
   tierForSold,
   genesisPurchaseBlock,
+  genesisSecondaryBlock,
   GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
   type GenesisTier,
 } from "@/store/genesis-config";
@@ -421,12 +422,23 @@ export const useGenesis = defineStore("genesis", () => {
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   function acquireSecondary(tokenId: number): boolean {
-    // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥:「二级市场入口(关闭态)
-    //   一并锁闭并说明,与购买同一状态源」)。只锁前端入口不锁这里,深链照样能承接。
-    //   注意:这里**不**看 soldOut / preSale —— 二级市场卖的是别人手里的存量,
+    // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥)。只锁前端入口不锁这里,
+    //   深链照样能承接。
+    //   注意:这里**不**看 soldOut / preSale —— 二级卖的是别人手里的存量,
     //   主售售罄或未开售都不妨碍转让;只有「市场关闭 / 熔断 / 配置未知」才拦。
+    //
+    // 🔴 判定必须**走同一个纯函数**,不许在这手写条件(独立验收 P1-5):
+    //   上一版这里写的是 `!loaded || marketStatus === "closed"`,而注释却声称
+    //   「熔断也拦」—— 注释与代码不符,且熔断接线当天二级承接会漏。
+    //   现改为喂给 genesisPurchaseBlock,再按「与二级相关的阻断原因」筛,
+    //   这样将来往优先级链里加档,这里自动跟上。
     const cfgStore = useGenesisConfig();
-    if (!cfgStore.loaded || cfgStore.config.marketStatus === "closed") return false;
+    const blocked = genesisSecondaryBlock({
+      loaded: cfgStore.loaded,
+      marketStatus: cfgStore.config.marketStatus,
+      now: Date.now(),
+    });
+    if (blocked !== null) return false;
     if (ownedTokenIds.value.includes(tokenId)) return false;
     // 单人限购同样约束二级承接（持有增长的另一唯一入口）。
     if (myOwned.value + 1 > GENESIS_ELIGIBILITY.perUserCap) return false;

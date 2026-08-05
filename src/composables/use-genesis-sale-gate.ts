@@ -4,6 +4,7 @@ import {
   isPreSale,
   genesisPurchaseBlock,
   genesisShowsUrgency,
+  genesisSecondaryBlock,
   type GenesisPurchaseBlock,
 } from "@/store/genesis-config";
 import { useGenesis } from "@/store/genesis";
@@ -24,6 +25,14 @@ import { useGenesis } from "@/store/genesis";
 export interface UseGenesisSaleGateResult {
   /** 最高优先级的阻断原因;`null` = 可购买。页面据此出文案与行为,不再自判。 */
   block: ComputedRef<GenesisPurchaseBlock>;
+  /** 二级市场(承接他人挂单)的阻断原因。
+   *
+   *  与主售的差别只有一处:**二级不受主售名额与开售时间影响** —— 卖的是别人手里的存量,
+   *  主售售罄或未开售都不妨碍转让。所以这里把那两档喂成「恒不命中」,
+   *  而不是靠调用方漏判来「碰巧不拦」。
+   *  🔴 放在 composable 里是为了让 store 的 `acquireSecondary` 与本页**共用同一套口径**;
+   *  上一版页面自己写 `marketClosed`、store 自己写另一套条件,两处早已不一致(验收 P1-5/P1-6)。 */
+  secondaryBlock: ComputedRef<GenesisPurchaseBlock>;
   /** 市场关闭态(= block === "marketClosed"),给需要单独渲染关闭说明的地方用。 */
   marketClosed: ComputedRef<boolean>;
   /** 是否允许展示紧迫感元素(倒计时 / 剩余名额)。关闭态与售罄态一律 false。 */
@@ -73,6 +82,11 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
     }),
   );
 
+  // 走共享纯函数,与 store 的 acquireSecondary 同一套输入口径(见其定义处的注释)。
+  const secondaryBlock = computed(() =>
+    genesisSecondaryBlock({ loaded: cfg.loaded, marketStatus: cfg.config.marketStatus, now: nowTs.value }),
+  );
+
   const marketClosed = computed(() => block.value === "marketClosed");
   const showUrgency = computed(() => genesisShowsUrgency(block.value));
   const closedNoticeKey = computed(() => cfg.config.closedNoticeKey);
@@ -97,5 +111,5 @@ export function useGenesisSaleGate(): UseGenesisSaleGateResult {
     return `${pad2(hh)}:${pad2(mm)}:${pad2(ss)}`;
   });
 
-  return { block, marketClosed, showUrgency, closedNoticeKey, preSale, showTime, countdownDays, countdownClock };
+  return { block, secondaryBlock, marketClosed, showUrgency, closedNoticeKey, preSale, showTime, countdownDays, countdownClock };
 }

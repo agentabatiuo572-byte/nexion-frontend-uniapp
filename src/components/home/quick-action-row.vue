@@ -48,14 +48,18 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useGenesis } from "@/store/genesis";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 
 const t = useT();
 const faucet = useNexFaucet();
 const genesis = useGenesis();
+// 🔴 首页快捷入口的「剩 N 席」也是名额紧迫文案(独立验收 P2-14):创世页与商城卡都关了,
+//   这里没关,关闭态下首页仍在催「仅剩 153 席」。判据走同一个 composable,不另写。
+const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
 
 const chips = computed(() => [
   { href: "/pages/staking/staking", icon: "gem", label: t.value.home.quickStake, sub: t.value.home.quickStakeApy, tone: "brand" as const },
-  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }), tone: "warm" as const },
+  { href: "/pages/genesis/genesis", icon: "crown", label: t.value.home.quickGenesisLabel, sub: genesisUrgencyOk.value ? fmt(t.value.home.quickGenesisLeft, { n: genesis.totalSlots - genesis.soldSlots }) : t.value.genesis.marketClosed.default, tone: "warm" as const },
   { href: "/pages/missions/missions", icon: "target", label: t.value.home.quickMissions, sub: t.value.home.quickMissionsActive, tone: "brand" as const },
   { href: "/pages/daily/daily", icon: "flame", label: t.value.home.quickDaily, sub: fmt(t.value.home.quickDailyStreak, { n: faucet.signInStreak }), tone: "warm" as const },
 ]);

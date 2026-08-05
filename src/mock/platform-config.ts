@@ -1,5 +1,6 @@
 import type { PlatformConfig } from "@/store/config-types";
 import { GPU_TIERS } from "@/lib/gpu-tiers";
+import { FLEET_DEVICES } from "@/lib/platform-stats";
 
 // MOCK-ONLY seed for platform config / feature flags (backend-replaceable).
 // Future PROD `GET /api/config/platform` returns this shape by projecting each
@@ -13,6 +14,34 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     // day-one task statuses and promo-banner status; client remains read-only.
     homeNewcomerTasksEnabled: true,
     homeWeeklyPromoEnabled: true,
+  },
+  // FEAT-HOME02 对外公布数据 mock seed(后台 H 域「对外公布数据」卡权威可配)。
+  // 🔴 fleetDevices 是**平台舰队规模锚**,`lib/platform-stats.ts` 从这里取值再派生
+  //   公布日产 / 每秒支付流 / 累计支付;各页禁止另存一份(platform_stats_anchor 哨兵守着)。
+  // 🔴 virtualUserCount 与 hashratePercentileTable 只进排名分母与百分位映射,
+  //   **永不外露到用户可见的任何地方**(产品内 0 元层)。
+  publicStats: {
+    // 🔴 **不在这里重写舰队规模的字面量** —— 那个数只许出现在 lib/platform-stats.ts(锚文件);
+    //   在这抄一份就是把单源变双源,两处早晚分叉。哨兵 platform_stats_anchor 守这条,
+    //   它刚刚把我抄的那份抓了出来(连**注释里写出那个数**也算违例,因为它扫全文)。
+    //   运行期真值以本配置为准,种子值取自锚。
+    fleetDevices: FLEET_DEVICES,
+    onlineRatePct: 100,
+    onlineJitter: 24,
+    registeredUsersBase: 1_420_000,
+    registeredUsersMonthlyGrowthPct: 2.9,
+    // 锚点固定为常量而非 Date.now():store 顶层取当前时刻会让「同一份种子在不同时刻
+    // 产生不同派生值」,首屏与刷新后对不上。运营改基数时由后台写入新锚点。
+    registeredUsersAnchorAt: Date.UTC(2026, 7, 1),
+    virtualUserCount: 12_000,
+    // 4 档种子:tops 升序、cumPct 单调不减且 ≤100。最高档刻意停在 96 ——
+    // 留出头部空间,免得任何人一上来就是「第 1 名」那种不可信结果(规格 异常5)。
+    hashratePercentileTable: [
+      { tops: 5, cumPct: 20 },
+      { tops: 20, cumPct: 55 },
+      { tops: 60, cumPct: 82 },
+      { tops: 150, cumPct: 96 },
+    ],
   },
   // SPEC-1 在线加成系数(单一来源:lib/hashpower.ts 派生 H5_BASE_FACTOR / CONTINUITY_FULL_MS)。
   // 与 admin compute-config COMPUTE_COEFFICIENTS 同 key,运营在 E6 调,PROD 由服务端下发。

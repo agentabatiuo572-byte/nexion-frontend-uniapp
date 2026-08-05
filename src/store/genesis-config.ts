@@ -96,6 +96,33 @@ export function genesisShowsUrgency(block: GenesisPurchaseBlock): boolean {
   return block === null || block === "preSale";
 }
 
+/**
+ * **二级市场**(承接他人挂单)的阻断判定。
+ *
+ * 与主售只差两处输入:二级卖的是**别人手里的存量**,主售售罄或未开售都不妨碍转让,
+ * 所以名额与开售时间两档喂成恒不命中 —— 而不是靠调用方漏判来「碰巧不拦」。
+ *
+ * 🔴 **写成函数是因为它有两个调用方**(marketplace 页面 + store 的 acquireSecondary),
+ * 而 store 用不了 composable(没有组件生命周期)。上一版两边各拼一套输入,
+ * 结果页面只挡「市场关闭」、store 只挡「关闭 + 配置未知」,注释还写着「熔断也拦」——
+ * 三处说法互不一致(2026-08-05 独立验收 P1-5 / P1-6)。
+ */
+export function genesisSecondaryBlock(cfg: {
+  loaded: boolean;
+  marketStatus: "open" | "closed";
+  halted?: boolean;
+  now: number;
+}): GenesisPurchaseBlock {
+  return genesisPurchaseBlock({
+    configLoaded: cfg.loaded,
+    marketStatus: cfg.marketStatus,
+    halted: cfg.halted ?? false,
+    remaining: Number.POSITIVE_INFINITY,
+    saleStartAt: null,
+    now: cfg.now,
+  });
+}
+
 // ── 预售页权益(4 项,双语;空字段 = 回退现 i18n)──
 export interface GenesisPerk {
   nameZh: string;

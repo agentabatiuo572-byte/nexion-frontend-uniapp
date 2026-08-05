@@ -100,7 +100,10 @@
                 <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
                 <text :style="tr.isCurrent ? tierChipLiveStyle : tierChipSoldStyle">{{ tr.isCurrent ? t.genesis.tier.live : t.genesis.tier.soldOut }}</text>
               </view>
-              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
+              <!-- 🔴 「还剩 N 席」也是名额紧迫文案,与 hero 那处同一条规则(FEAT-GEN10 ④)。
+                   独立验收 P1-4:上次只关了 hero,这里漏了,关闭态实测仍显示「Live · 153 left」。
+                   阻断态改显总席位数(中性事实),不显剩余。 -->
+              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
             </view>
             <view class="text-right shrink-0">
               <text class="block tabular-nums" :style="tierPriceStyle">${{ tr.priceText }}</text>
@@ -155,7 +158,10 @@
           <view aria-hidden :style="dockRimStyle" />
           <view aria-hidden class="gen-anim" :style="dockSheenStyle" />
         </template>
-        <view class="relative inline-flex items-center" style="z-index: 1; gap: 6px; color: var(--v5-genesis-gold-on-dark)">
+        <!-- 🔴 这层的 color 供给 crown 图标与倒计时(它们用 currentColor / 继承),
+             同样必须跟 dockActive 走 —— 只改 dockLabelStyle 会剩下图标和倒计时还是金色,
+             在中性底上照样看不清(独立验收 P0 点名了「倒计时 1.95」这一处)。 -->
+        <view class="relative inline-flex items-center" :style="dockInnerStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
           <text :style="dockLabelStyle">{{ dockCtaText }}</text>
           <template v-if="preSale && showTime">
@@ -317,6 +323,14 @@ let socialId: ReturnType<typeof setTimeout> | null = null;
 let tickId: ReturnType<typeof setInterval> | null = null;
 
 function emitSocial() {
+  // 🔴 关闭态不播「某某刚买了 N 个」(独立验收 P1-3)。它既是紧迫感元素,
+  //   又与「市场未开放」当面互相拆台 —— 页面一边说买不了,一边播别人正在买。
+  //   注意是**不播新的、也清掉旧的**:只停止定时器会让最后一条留在屏上。
+  if (!showUrgency.value) {
+    latest.value = null;
+    socialId = setTimeout(emitSocial, 8_000); // 继续轮询,恢复开放后自动接上
+    return;
+  }
   const buyer = BUYER_NAMES[Math.floor(Math.random() * BUYER_NAMES.length)];
   const qty = 1 + Math.floor(Math.random() * 3);
   latest.value = { buyer, qty, ago: Date.now() };
@@ -369,7 +383,14 @@ function goMarketplace() {
 
 onMounted(() => {
   emitSocial();
-  tickId = setInterval(() => genesis.tickSales(), 30_000);
+  // 🔴 关闭态不推进已售数(独立验收 P1-2):实测 65 秒内进度条从 847 跳到 850,
+  //   而同屏按钮写着「市场暂未开放」。关闭期够长会自己跑到售罄,恢复开放即无货。
+  //   闸放在**调用处**而非 tickSales 内部 —— tickSales 是 store 的通用推进器,
+  //   把页面态的判定塞进 store 会让它对其它调用方也生效,那是另一种耦合。
+  tickId = setInterval(() => {
+    if (!showUrgency.value) return;
+    genesis.tickSales();
+  }, 30_000);
 });
 onUnmounted(() => {
   if (socialId) clearTimeout(socialId);
@@ -710,9 +731,19 @@ const dockSheenStyle: CSSProperties = {
   animation: "gen-sheen 4.5s ease-in-out infinite",
   pointerEvents: "none",
 };
+// 🔴 判据必须与 dockBtnStyle 用**同一个** `dockActive`,不能一个问 dockActive、
+//   一个问 remaining —— 底色换成中性面而文字仍取金色,在亮主题下就是**白字白底**
+//   (实测对比度 1.17)。2026-08-05 独立验收 P0:同一处样式共 5 个取色点,
+//   我只改了块内 4 个,漏掉本行,连带把原本正常的「预售倒计时」态也一起打翻。
 const dockLabelStyle = computed<CSSProperties>(() => ({
-  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
+  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontWeight: 600,
+}));
+/** dock 内层容器色 —— 图标(currentColor)与倒计时靠它继承。与 dockLabelStyle 同判据。 */
+const dockInnerStyle = computed<CSSProperties>(() => ({
+  zIndex: 1,
+  gap: "6px",
+  color: dockActive.value ? "var(--v5-genesis-gold-on-dark)" : "var(--v5-ink-4)",
 }));
 const dockDividerStyle: CSSProperties = {
   width: "1px",

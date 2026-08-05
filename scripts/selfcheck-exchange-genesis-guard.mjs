@@ -582,7 +582,7 @@ function buildPostMoneyBill(app, bills, toast) {
     () => app, () => bills, () => t.value, toast, buildPostMoneyBills(app, bills, toast),
   );
 }
-function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, billsFail = false } = {}) {
+function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, billsFail = false, sheetBlocked = false } = {}) {
   const app = makeApp(usdt, 0);
   const minted = [];
   const billRows = [];
@@ -602,6 +602,10 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
     price: { value: 9999 },
     remaining: { value: 940 },
     gate: { value: { eligible: true, capRemaining } },
+    // FEAT-GEN10:半屏自己接了市场闸。默认「未阻断」,让本门原有的重入/扣款靶子照跑;
+    // 下面另有一组专门把它设成阻断态,验「零资金动作」。
+    sheetBlocked: { value: sheetBlocked },
+    sheetBlockText: { value: "市场暂未开放" },
     app, t, fmt,
     genesis: { purchase: (n) => { if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason }; minted.push(n); return { ok: true, cost: n * 9999 }; } },
     postMoneyBill: buildPostMoneyBill(app, bills, toast),
@@ -625,6 +629,30 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
   check("C④ 成交后继续持锁(面板正在关闭,解锁就是给双击留窗口)", f.purchasing.value === true);
   check("C④ 成功 toast 只弹 1 次(1 次购买 = 1 条反馈)",
     f.toasts.filter((x) => x[0] === "success").length === 1, JSON.stringify(f.toasts.map((x) => x[0])));
+}
+// ── C⑦ 市场闸:阻断态**零资金动作**(FEAT-GEN10 异常4 / 2026-08-05 验收 P1-7)──────
+// 独立验收实测:此前半屏完全不知道市场状态 —— 用户已打开半屏、运营此刻切关闭,
+// 走完扣款才被 store 拒 → 冲正 → 一句 toast,而半屏不关、按钮仍可点,
+// 连点 N 次就写 **2N 条**账单(扣款 + 冲正各一条)。这组靶子把它钉死。
+{
+  const f = genesisFixture({ sheetBlocked: true });
+  f.handlePurchase();
+  f.handlePurchase();
+  f.handlePurchase();
+  check("🔴 C⑦ 阻断态连点 3 次:0 次扣款",
+    f.app.calls.filter((c) => c[0] === "debitBalance").length === 0,
+    `实得 ${f.app.calls.filter((c) => c[0] === "debitBalance").length} 次`);
+  check("🔴 C⑦ 阻断态连点 3 次:0 行账单(不是「扣了再冲正」的成对写入)",
+    f.billRows.length === 0, `实得 ${f.billRows.length} 行`);
+  check("🔴 C⑦ 阻断态不铸造席位", f.minted.length === 0, `实得 ${JSON.stringify(f.minted)}`);
+  check("C⑦ 阻断态给了说明(禁静默无反应)", f.toasts.length >= 1, `toasts=${f.toasts.length}`);
+  check("C⑦ 阻断态不上重入锁(解除后能立刻重试,不用关面板)", f.purchasing.value === false);
+  // 反向对照:同一 fixture 不阻断时必须**真能买**,证明上面 5 条不是因为 fixture 坏了才全 0
+  const ok = genesisFixture({ sheetBlocked: false });
+  ok.handlePurchase();
+  check("🔴 C⑦ 反向对照:不阻断时确实会扣款(否则上面的 0 是假绿)",
+    ok.app.calls.filter((c) => c[0] === "debitBalance").length === 1 && ok.billRows.length === 1,
+    `debits=${ok.app.calls.filter((c) => c[0] === "debitBalance").length} bills=${ok.billRows.length}`);
 }
 {
   // 🔴 反向不变量:失败路径必须立刻解锁 —— 否则「提前 return 忘复位」= 后续购买永久锁死。

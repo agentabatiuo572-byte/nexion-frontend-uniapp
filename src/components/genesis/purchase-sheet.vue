@@ -69,7 +69,14 @@
 
         <!-- Submit — 成交在途时置灰不可点(《05》§6.1 disabled 派生:文字/图标降 ink-4 +
              填充降 surface 系,不新造灰色);按下反馈也随之撤掉,不给「还能再点一次」的暗示 -->
+        <!-- 🔴 开着的时候运营切了关闭 → **就地转锁定态**(规格 ⑤ 异常4),
+             而不是「让他点、扣了钱再冲正、再弹个提示」。按钮同时置灰,连点写不出账单。 -->
+        <view v-if="sheetBlocked" class="w-full" :style="blockedNoticeStyle">
+          <text class="block" :style="blockedTitleStyle">{{ sheetBlockText }}</text>
+          <text class="block" :style="blockedSubStyle">{{ t.genesis.marketClosed.holdingsSafe }}</text>
+        </view>
         <view
+          v-else
           class="w-full inline-flex items-center justify-center"
           :class="{ 'active:opacity-85': !purchasing }"
           role="button"
@@ -94,6 +101,7 @@ import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 
 const props = defineProps<{ open: boolean }>();
@@ -103,6 +111,11 @@ const t = useT();
 const app = useApp();
 const genesis = useGenesis();
 const { gate } = useGenesisEligibility();
+// 🔴 半屏必须**自己**接闸(独立验收 P1-7)。此前它完全不知道市场状态:
+//   用户已打开半屏、运营此刻切关闭 → 走完扣款才被 store 拒 → 冲正 → 一句 toast,
+//   而半屏不关、按钮仍可点,连点 N 次就写 2N 条账单(扣款 + 冲正各一条)。
+//   规格 ⑤ 要的是「**就地转为锁定态 + 说明**」,不是弹个提示了事。
+const { block, closedNoticeKey } = useGenesisSaleGate();
 
 const qty = ref(1);
 /**
@@ -114,6 +127,20 @@ const qty = ref(1);
  * 所有创世购买永久锁死。复位交给 finally + 下面的 open watcher 兜底。
  */
 const purchasing = ref(false);
+
+/** 半屏是否已被阻断(市场关闭 / 熔断 / 配置未知)。**售罄与预售不在此列** ——
+ *  半屏只在可购买时才被打开,那两态由调用方拦在门外;这里管的是「开着的时候翻脸」。 */
+const sheetBlocked = computed(() => {
+  const b = block.value;
+  return b === "marketClosed" || b === "halted" || b === "configUnavailable";
+});
+const sheetBlockText = computed(() => {
+  switch (block.value) {
+    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
+    case "halted": return t.value.genesis.marketClosed.halted;
+    default: return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
+  }
+});
 
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
@@ -148,6 +175,13 @@ function emitClose() {
 function handlePurchase() {
   // 🔴 重入守卫排在最前(关闭是异步的,双击会在面板卸载前再进来一次)。
   if (purchasing.value) return;
+  // 🔴 市场闸排在**所有资金动作之前**(独立验收 P1-7)。UI 已在阻断态换成锁定块,
+  //   这里是第二道 —— 防程序化调用与「点下去那一刻正好翻脸」的竞态穿过。
+  //   零资金动作返回:不扣款就没有冲正,也就写不出成对的账单。
+  if (sheetBlocked.value) {
+    toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
+    return;
+  }
   // L3 复验(照 checkout F4b:防深链/时序绕过 UI 门)。顺序固定
   // eligibility → cap → balance → mint,资格/限购失败时零资金动作。
   if (!gate.value.eligible) {
@@ -328,6 +362,29 @@ const rowValBoldStyle: CSSProperties = {
 const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "8px 0" };
 // disabled 派生(《05》§6.1):文字/图标降 --v5-ink-4 + 填充降 surface 系 + 撤 glow。
 // icon 是 stroke="currentColor"、文案继承 color → 一处改两者同步降。
+// 半屏内的锁定块(替代提交按钮)。soft tint + **零 border**(带 bg 的容器不加边框);
+// 用 warning 语义而非 error —— 这是运营节奏,不是故障。
+const blockedNoticeStyle: CSSProperties = {
+  marginTop: "16px",
+  padding: "14px 16px",
+  borderRadius: "14px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+};
+const blockedTitleStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "13px",
+  fontWeight: 550,
+  color: "var(--v5-warning-ink)",
+  textWrap: "pretty",
+};
+const blockedSubStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
+  marginTop: "3px",
+  lineHeight: 1.5,
+  textWrap: "pretty",
+};
 const submitStyle = computed<CSSProperties>(() => ({
   marginTop: "16px",
   height: "50px",

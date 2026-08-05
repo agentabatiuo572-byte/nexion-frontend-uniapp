@@ -66,11 +66,11 @@
 
         <!-- 市场关闭说明(FEAT-GEN10 ⑥:二级市场一并锁闭**并说明**)。
              只说状态与影响,不做倒计时、不催 —— 关闭态禁紧迫感元素。 -->
-        <view v-if="marketClosed" class="flex items-start" :style="closedNoticeStyle">
+        <view v-if="secondaryBlock !== null" class="flex items-start" :style="closedNoticeStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
           <view style="flex: 1; margin-left: 8px">
-            <text class="block" :style="closedNoticeTitleStyle">{{ t.genesis.marketClosed.default }}</text>
-            <text class="block" :style="closedNoticeSubStyle">{{ t.genesis.marketClosed.holdingsSafe }}</text>
+            <text class="block" :style="closedNoticeTitleStyle">{{ secondaryBlockText }}</text>
+            <text class="block" :style="closedNoticeSubStyle">{{ secondaryBlockSub }}</text>
           </view>
         </view>
 
@@ -96,7 +96,7 @@
           </scroll-view>
 
           <view class="grid grid-cols-2" style="gap: 10px">
-            <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" @buy="handleBuy(l)" />
+            <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" :disabled="secondaryBlock !== null" @buy="handleBuy(l)" />
           </view>
         </template>
 
@@ -158,7 +158,21 @@ const app = useApp();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
-const { marketClosed } = useGenesisSaleGate();
+const { marketClosed, secondaryBlock, closedNoticeKey } = useGenesisSaleGate();
+/** 阻断说明文案 —— 与创世页取自同一组 i18n 键,不另写一套措辞。 */
+const secondaryBlockText = computed(() => {
+  switch (secondaryBlock.value) {
+    case "configUnavailable": return t.value.genesis.marketClosed.configUnavailable;
+    case "marketClosed": return t.value.genesis.marketClosed[closedNoticeKey.value as "default"] ?? t.value.genesis.marketClosed.default;
+    case "halted": return t.value.genesis.marketClosed.halted;
+    default: return t.value.genesis.marketClosed.default;
+  }
+});
+const secondaryBlockSub = computed(() =>
+  secondaryBlock.value === "configUnavailable"
+    ? t.value.genesis.marketClosed.retryHint
+    : t.value.genesis.marketClosed.holdingsSafe,
+);
 
 // 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
 const stats = computed(() => cfg.config.marketStats);
@@ -274,7 +288,11 @@ function scheduleFomo() {
   const { fomoIntervalMinMs: mn, fomoIntervalMaxMs: mx } = cfg.config;
   const delay = mn + Math.random() * Math.max(0, mx - mn);
   fomoTimer = setTimeout(() => {
-    if (cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
+    // 🔴 阻断态不生成虚拟成交(独立验收 P2-13)。页面一边说「买不了」、一边不停播
+    //   「刚有人成交」,是当面互相拆台;它与创世页的社会证明属同一类紧迫感元素。
+    //   注意保留下面的 scheduleFomo() 递归 —— 只跳过本次生成,恢复开放后自动接上,
+    //   而不是把定时器停掉(停掉就再也不会自己恢复)。
+    if (secondaryBlock.value === null && cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
       liveFomo.value = [genFomoSale(fomoCountToday), ...liveFomo.value].slice(0, 30);
       fomoCountToday += 1;
     }
@@ -296,11 +314,15 @@ onUnmounted(() => {
 });
 
 function handleBuy(l: Listing) {
-  // 🔴 市场关闭闸放在**最前**(规格 FEAT-GEN10 ⑥:二级市场与购买同一状态源)。
+  // 🔴 阻断闸放在**最前**(规格 FEAT-GEN10 ⑥:二级市场与购买同一状态源)。
   //   零资金动作就拦掉 —— store 层 acquireSecondary 也有同一道闸兜底,但那时钱已经扣了、
   //   要走冲正;能在这里挡住就别让钱先动。
-  if (marketClosed.value) {
-    toast.error(t.value.genesis.marketClosed.default, t.value.genesis.marketClosed.holdingsSafe);
+  //
+  // 🔴 判的是 `secondaryBlock !== null` 而**不是** `marketClosed`(独立验收 P1-6):
+  //   上一版只挡「市场关闭」,于是「配置未知 / 熔断」时会先扣钱、再被 store 拒、再冲正,
+  //   用户看到的是通用「承接失败」,既没有锁定说明也没有重试入口(违规格 异常3)。
+  if (secondaryBlock.value !== null) {
+    toast.error(secondaryBlockText.value, secondaryBlockSub.value);
     return;
   }
   // 资格门(FEAT-GEN08,appliesTo=both 时二级同门):确认前拦截,零资金动作。
