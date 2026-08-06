@@ -11,9 +11,9 @@
   sentinel mechanism (auto-loads when the tail sentinel scrolls into view).
   Unknown / missing cat falls back to voucher (spec ② exception 4).
 
-  Backend-replaceable: vouchers GET /api/me/vouchers; records GET /api/me/
-  bills?type=reward&symbol=USDT|NEX&cursor=&limit=10 (server-side cursor
-  pagination; the mock slices the local ledger). Wrapped in <AppChassis>.
+  Backend-replaceable: vouchers GET /api/me/vouchers; records
+  GET /api/me/bills?type=reward&symbol=USDT|NEX&cursor=&limit=10 (server-side
+  cursor pagination; the mock slices the local ledger). Wrapped in <AppChassis>.
 -->
 <template>
   <AppChassis active="me">

@@ -5,8 +5,8 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
 // Ported from Nexion-prototype/lib/store/exchange.ts (zustand → Pinia).
 // Basic swap store: live-jittered NEX↔USDT rate + swap history.
-// MOCK-ONLY: client mints swap id + rate; production POSTs /api/swap and
-// subscribes the canonical rate (server is the authority).
+// MOCK-ONLY: client mints swap id + rate; production submits POST /api/exchange/swap
+// (PRD §9.4.3) and subscribes the canonical rate (server is the authority).
 export interface SwapEvent {
   id: string;
   ts: number;

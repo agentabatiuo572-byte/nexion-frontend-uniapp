@@ -35,7 +35,6 @@ export interface PhaseParams {
   monthsTo: number;          // exclusive upper bound
   // Tightening dials (everything goes from "loose" to "harsh" across P1 → P6)
   inviteBonusMultiplier: number;       // 2.0 P1 → 1.0 by P3 onward
-  withdrawPenaltyFeeRate: number;      // 0.20 P1-P4 → 0.30 P6 — 无 NEX 抵扣时的提现费率(金额×rate;取代旧积分门槛)
   nexFeeOffsetRate: number;            // 0.40 USDT/NEX — 烧 1 NEX 抵扣的手续费(远高于市价 → #3 优惠抵扣)
   withdrawalCooldownDays: number;      // 30 P1-P4, 45 P5+
   binaryDailyCapUSD: number;           // 5000 P1-P3, 2000 P4+
@@ -49,7 +48,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 0,
     monthsTo: 2,
     inviteBonusMultiplier: 2.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -61,7 +59,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 2,
     monthsTo: 4,
     inviteBonusMultiplier: 1.5,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -73,7 +70,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 4,
     monthsTo: 6,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 5_000,
@@ -85,7 +81,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 6,
     monthsTo: 8,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.2,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 30,
     binaryDailyCapUSD: 2_000,
@@ -97,7 +92,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 8,
     monthsTo: 10,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.25,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,
@@ -109,7 +103,6 @@ export const PHASES: ReadonlyArray<PhaseParams> = [
     monthsFrom: 10,
     monthsTo: 999,
     inviteBonusMultiplier: 1.0,
-    withdrawPenaltyFeeRate: 0.3,
     nexFeeOffsetRate: 0.4,
     withdrawalCooldownDays: 45,
     binaryDailyCapUSD: 2_000,
@@ -181,8 +174,24 @@ export const useProductPhaseOverride = defineStore("productPhaseOverride", () =>
   return { pinned, setPinned };
 });
 
+/**
+ * 活动 phase 的唯一解析路径:demo pin 优先(useProductPhaseOverride),否则按注册
+ * 月龄时间派生。页面报价(use-product-phase)与 store 的 server 侧费用复验
+ * (app.submitWithdrawal)都必须走这一条 —— 曾经两侧各自派生,pin 态下页面报价
+ * 与提交校验的 nexFeeOffsetRate 走两条路(审查 P2-2)。在 computed 内调用时,
+ * override.pinned 的读取照常被依赖追踪,pin 变更会触发重算。
+ */
+export function resolveActivePhase(joinedAt: number): PhaseParams {
+  const override = useProductPhaseOverride();
+  if (override.pinned) {
+    const p = PHASES.find((x) => x.id === override.pinned);
+    if (p) return p;
+  }
+  return getPhaseForMonth(getMonthsSince(joinedAt));
+}
+
 // ───────── FEAT-DEV02b:置换侧抢先购(上架节奏门 × 升级置换融合,2026-07-07 主人拍板) ─────────
-// Server-canonical: GET /api/config/release-gates (TBD)。后台 E1「上架节奏门」配置项。
+// Server-canonical: GET /api/config/release-gates (PRD §9.11c.1)。后台 E1「上架节奏门」配置项。
 // 默认关闭 = 上架门对置换路径同样生效(未正式上架的 SKU 不可作置换目标,深链同拦)。
 // 开启后,**仅置换路径**可在正式上架前 leadDays 天内购买该 SKU;商城正门(列表 Locked
 // 卡/详情/非置换深链)不受影响。与 admin「强制解锁」优先级:强制解锁=全面正式上架

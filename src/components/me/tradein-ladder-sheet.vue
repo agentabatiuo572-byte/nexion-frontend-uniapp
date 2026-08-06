@@ -37,6 +37,7 @@ import { computed, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
 import { TRADEIN_CREDIT_LADDER } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
 const props = defineProps<{ device: Device | null }>();
@@ -69,7 +70,7 @@ const deviceLine = computed(() => {
   const d = props.device;
   if (!d) return "";
   return fmt(t.value.tradein.ladderDeviceLine, {
-    name: d.name,
+    name: deviceName(t.value, d),
     earned: (d.cumulativeEarningsUsdt ?? 0).toFixed(2),
     ratio: ratioPct.value.toFixed(1),
     band: currentBand.value + 1,

@@ -6,8 +6,8 @@
                                 (animates between two wheelAngle values; no
                                  keyframe needed) + @transitionend settle
     · lucide X/Sparkles/Gift/ChevronRight/Ticket/History → inline <svg>
-    · zustand store           → useLuckySpin (Pinia); payout composes
-                                useApp / useBills in this component
+    · zustand store           → useLuckySpin (Pinia); payout 走 lib/money-receipt
+                                收口点(资金与账单同生共死),不在这里各调各的
                                 (stores never import each other).
   Entry points (orchestrator wires triggers):
     ① /events evt-spring-spin "Spin now" (kind === "wheel") → openSheet()
@@ -153,8 +153,7 @@ import {
   SEGMENT_COUNT,
   type SpinPrize,
 } from "@/store/lucky-spin";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { mockServerNow } from "@/store/server-time";
 import { toast, confirm, netError } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -167,8 +166,6 @@ const SEG = 360 / SEGMENT_COUNT;
 const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实裁决)
 
 const spin = useLuckySpin();
-const app = useApp();
-const bills = useBills();
 const t = useT();
 
 const poolOpen = ref(false);
@@ -277,18 +274,20 @@ const spinBtnStyle = computed<CSSProperties>(() => ({
 }));
 
 // ── payout (compose stores; lucky-spin store stays import-free of them) ──
-function creditPrize(sp: SpinPrize) {
+/** 派奖。返回 true = 奖真的到账了(或本就是不入余额的券),调用方才可以写历史 / 弹「你赢了」。
+ *  🔴 返回值必须被消费:原实现丢弃它,于是落盘失败时收口点弹「交易未保存」、
+ *  页面紧接着弹「你赢了 X」并把中奖记录**持久化**进历史 —— 假成功 + 假凭证,
+ *  是本族里唯一同时污染 UI 与持久数据的一条(2026-08-04 对抗审计 B-P1-5)。 */
+function creditPrize(sp: SpinPrize): boolean {
   const ref = `LSPIN-${sp.id}-${mockServerNow().toString(36)}`;
   const memo = fmt(t.value.luckySpin.billMemo, { prize: ls(sp) });
-  if (sp.kind === "nex") {
-    app.creditNex(sp.amount);
-    bills.add({ type: "bonus", symbol: "NEX", amount: sp.amount, status: "posted", memo, ref });
-  } else if (sp.kind === "usdt") {
-    app.creditBalance(sp.amount);
-    bills.add({ type: "bonus", symbol: "USDT", amount: sp.amount, status: "posted", memo, ref });
+  if (sp.kind === "nex" || sp.kind === "usdt") {
+    // 收据即指令:symbol 决定入哪种币,派奖与账单同生共死。
+    return postMoneyBill({ type: "bonus", symbol: sp.kind === "nex" ? "NEX" : "USDT", amount: sp.amount, status: "posted", memo, ref }) === "ok";
   }
   // coupon: 购机抵扣券 — 记入转盘中奖历史(store.history,持久化),不入钱包余额
   // (对齐"仅抵购机款不可提现")。原型未建券兑换流;真后台落 coupon 账本 + 结账抵扣。
+  return true;
 }
 
 // ── settle (idempotent: only fires once per spin) ──
@@ -311,7 +310,10 @@ function settleSpin() {
     return;
   }
   spin.reveal();
-  creditPrize(sp);
+  // 🔴 顺序不可换、返回值不可丢:奖没到账就不许写历史、不许弹「你赢了」。
+  // 收口点在失败时已经弹过「交易未保存」,这里再补一句成功文案就是当面撒谎;
+  // 而 pushHistory 是**持久化**的,写下去等于给用户留一张查无此账的中奖凭证。
+  if (!creditPrize(sp)) return;
   spin.pushHistory(sp.id);
   toast.success(fmt(t.value.luckySpin.wonToast, { prize: ls(sp) }), t.value.luckySpin.wonToastSub);
 }
@@ -354,7 +356,15 @@ async function doSpin(skipConfirm = false) {
     return;
   }
 
-  spin.spin(); // 消费票 + mock server roll(server-canonical RNG 占位)+ 置 spinning + 目标角
+  // 消费票 + mock server roll(server-canonical RNG 占位)+ 置 spinning + 目标角。
+  // 🔴 票没扣成就不能转轮子:上面的 availableSpins() 预判读的是本页内存态,而票是
+  // 每日配额 + 稀缺资源;别的标签页刚花掉时 store 按磁盘最新态拒掉,此时还往下走
+  // 就是两个标签页花同一张票各中一次奖。
+  const r = spin.spin();
+  if (!r.ok) {
+    if (r.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    return;
+  }
   // 兜底结算:即便 transitionend 不触发(切后台 / 节流)也按动画时长强制结算,
   // 保证已消费的票一定兑现。idempotent settle 防与 transitionend 双触发重复派奖。
   clearSettleTimer();

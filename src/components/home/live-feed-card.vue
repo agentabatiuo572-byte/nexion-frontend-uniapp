@@ -9,7 +9,10 @@
   <view>
     <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
-      <view class="flex gap-0.5" style="padding: 3px; background: var(--v5-surface-2); border-radius: 9px">
+      <!-- 轨道贴页面底:原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1。
+           配套把选中 pill 从「白底+投影」换成 brand-soft 底(见 tabStyle),
+           否则轨道和选中 pill 都是白的,等于修掉隐形又弄丢选中态。 -->
+      <view class="flex gap-0.5" style="padding: 3px; background: var(--v5-surface); border-radius: 9px">
         <!-- 《08》§2 反馈恒定:选中态原先是空 class,按下去零反馈。
              切到自己虽然不改变什么,但用户仍需要「点到了」的确认。 -->
         <view
@@ -19,7 +22,7 @@
           :style="tabStyle(tb.id)"
           @click="tab = tb.id"
         >
-          <text :style="{ color: tab === tb.id ? 'var(--v5-ink)' : 'var(--v5-ink-3)', fontWeight: tab === tb.id ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ tb.label }}</text>
+          <text :style="{ color: tab === tb.id ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontWeight: tab === tb.id ? 600 : 500, fontFamily: 'var(--font-v5)', fontSize: '12px', letterSpacing: '-0.005em' }">{{ tb.label }}</text>
         </view>
       </view>
       <view v-if="tab === 'earnings'" class="inline-flex items-center gap-1 font-mono-tabular active:opacity-70 transition-opacity" style="min-height: 32px; font-size: 12px; color: var(--v5-ink-3)" @click.stop="goCommissions">
@@ -158,9 +161,12 @@ function tabStyle(id: "activity" | "earnings"): CSSProperties {
     alignItems: "center",
     padding: "0 12px",
     borderRadius: "12px",
-    background: on ? "var(--v5-surface)" : "transparent",
-    // 《03》§3:实底元素零 border ——「0 0 0 Npx」的 box-shadow 环就是描边的另一种写法,同受约束(C2 验收抓出)
-    boxShadow: on ? "0 1px 2px rgba(0,0,0,0.10)" : "none",
+    // 选中态改用 brand-soft 底 + brand 文字 —— 与本仓库同类分段/排序控件一致
+    // (genesis/marketplace 的 sortPillStyle、home/device-slot 的在线态)。
+    // 原「白底 + 投影」在轨道提到 L1(白)之后会与轨道撞色,只剩一层淡投影可辨;
+    // 且靠 box-shadow 表达选中本就违反《03》「不用 box-shadow 做层级」。
+    background: on ? "var(--v5-brand-soft)" : "transparent",
+    boxShadow: "none",
   };
 }
 function whoBadgeStyle(r: FeedRow): CSSProperties {

@@ -33,6 +33,8 @@ import { useNova } from "@/store/nova";
 import { useConversations } from "@/store/conversations";
 import { useNotifications, type NotifKind } from "@/store/notifications";
 import { welcomeMessage } from "@/mock/nova-templates";
+import { useGenesisConfig } from "@/store/genesis-config";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { navTo } from "@/lib/route";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -42,6 +44,9 @@ const t = useT();
 const nova = useNova();
 const conversations = useConversations();
 const notifications = useNotifications();
+// 创世闸(P1-2):推送前判紧迫感是否被允许;声明见 stakingEventMessage 内注释。
+const genesisCfg = useGenesisConfig();
+const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
 
 // Bubble badge reflects ALL unread — Nova pushes + human-category conversations
 // (the advisor's proactive seed shows immediately as a conversion hook). Tapping
@@ -103,7 +108,19 @@ function stakingEventMessage(p: NovaPush): ChannelMsg {
   const r = Math.random();
   if (r < 0.4) return { text: p.stakingApyUp, ctaLabel: p.stakingApyUpCta, ctaHref: "/staking" };
   // 不编具体余席数(与 live remaining 矛盾会自曝;数字可信铁律)。
-  if (r < 0.7) return { text: p.stakingGenesisLow, ctaLabel: p.stakingGenesisLowCta, ctaHref: "/genesis" };
+  if (r < 0.7) {
+    // 🔴 「席位不多了」是名额紧迫文案,必须受创世闸(独立验收 P1-2:此前本文件对闸
+    //   零引用,市场关闭期间照推「抢席位」,用户点进去按钮是灰的 —— 规格 ④ 明令禁止
+    //   对不可购买的东西制造紧迫感)。判定走 useGenesisSaleGate 唯一消费入口,不自判。
+    //   推送在定时器里触发、可能距挂载已久 → 判定前先重读配置源(refresh 写共享 store,
+    //   computed 同步失效,紧接着读到的就是新值),不吃 hydrate-once 的旧快照。
+    genesisCfg.refresh();
+    if (genesisUrgencyOk.value) {
+      return { text: p.stakingGenesisLow, ctaLabel: p.stakingGenesisLowCta, ctaHref: "/genesis" };
+    }
+    // 闸住 → 落到质押位文案,不发创世紧迫感(推送频道照常活跃,只换内容)。
+    return { text: p.stakingLockNow, ctaLabel: p.stakingLockNowCta, ctaHref: "/staking" };
+  }
   if (r < 0.9) return { text: p.stakingLockNow, ctaLabel: p.stakingLockNowCta, ctaHref: "/staking" };
   return { text: p.stakingMatures, ctaLabel: p.stakingMaturesCta, ctaHref: "/staking" };
 }

@@ -107,7 +107,8 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
-import { useWalletPairing } from "@/store/wallet-pairing";
+import { usePayoutAddress } from "@/store/payout-address";
+import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
@@ -117,7 +118,7 @@ const t = useT();
 const app = useApp();
 const auth = useAuth();
 const profile = useProfile();
-const pairing = useWalletPairing();
+const payout = usePayoutAddress();
 
 // Local edit buffer (committed on Save), mirroring the source useState.
 const name = ref(profile.displayName);
@@ -130,12 +131,14 @@ const email = computed(() => auth.email || app.user.email);
 const initial = computed(
   () => (displayName.value || email.value || "S").trim()[0]?.toUpperCase() || "S",
 );
-const paired = computed(() => pairing.walletPaired);
-const walletAddress = computed(() => pairing.pairedWalletAddress);
+// 提现地址(payout-address 单源;展示第一个已设网络的当前地址,掩码中段)
+const paired = computed(() => payout.hasAnyAddress);
+// 展示与跳转必须同源同网络:入口显示的是哪个网络的地址,点进去就落哪个网络 ——
+// 否则 BEP20/ERC20 用户点「管理」落到 TRC20 空槽,看起来像地址丢失(审计 P1)。
+const walletNetwork = computed(() => PAYOUT_NETWORKS.find((network) => payout.currentFor(network)));
+const walletAddress = computed(() => (walletNetwork.value ? payout.currentFor(walletNetwork.value)?.address : undefined));
 const walletSub = computed(() =>
-  paired.value && walletAddress.value
-    ? `${walletAddress.value.slice(0, 8)}…${walletAddress.value.slice(-6)}`
-    : t.value.profile.walletEmpty,
+  walletAddress.value ? maskAddressMid(walletAddress.value) : t.value.profile.walletEmpty,
 );
 
 const userTier = computed<Tier>(() => (app.user.tier as Tier) ?? "L0");
@@ -183,7 +186,9 @@ function handleRegen() {
 }
 
 function goWallet() {
-  uni.navigateTo({ url: "/pages/me/wallet", fail: () => {} });
+  // 提现地址行 → 地址管理页(带展示中的网络参数,与 wallet-withdraw.goManage 同模式)
+  const query = walletNetwork.value ? `?network=${walletNetwork.value}` : "";
+  uni.navigateTo({ url: `/pages/me/wallet-address-rebind${query}`, fail: () => {} });
 }
 
 // ── styles ──
@@ -259,7 +264,8 @@ const fieldLabelStyle: CSSProperties = {
 const nameRowStyle: CSSProperties = {
   marginTop: "4px",
   minHeight: "44px",
-  background: "var(--v5-surface-2)",
+  // 外层 fieldsWrap 无背景,此行直接坐在页面底上;surface-2 对页面底亮色 ΔE 2.2 不可辨 → 改 L1 surface。
+  background: "var(--v5-surface)",
   borderRadius: "8px",
   padding: "0 12px",
   gap: "10px",

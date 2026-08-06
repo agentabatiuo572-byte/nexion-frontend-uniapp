@@ -7,7 +7,7 @@ import type { VRank } from "./v-rank";
  * ⚠️ MOCK-ONLY canon (V_VOTES + GLOBAL_V_DISTRIBUTION + GMV base).
  * Production (backend-replaceable, 字段 1:1):
  *   GET /api/config/leadership-pool → { poolRatio, weeklyGmvUsdt, monthlyCapUsdt, unlockRank, voteWeights }  (PRD §9.11c.1)
- *   GET /api/pool/state            → { globalVDistribution, currentWeekPoolUsdt, history }  (candidate; PRD §9.11 待补)
+ *   GET /api/pool/state            → { globalVDistribution, currentWeekPoolUsdt, history }  (PRD §8.5.2)
  * Client display only; server computes the authoritative mySharePct + payouts.
  *
  * 玩法 — 全球领导奖池(头部集中虹吸,真派生):

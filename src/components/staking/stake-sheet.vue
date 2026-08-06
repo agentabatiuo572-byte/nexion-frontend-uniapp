@@ -1,11 +1,10 @@
 <!--
-  StakeSheet — customize-and-lock staking sheet (ported from
-  Nexion-prototype/app/components/staking-sheet-host.tsx). uni has no chassis
-  sheet host for sub-pages, so the sheet is embedded in staking.vue and toggled
-  via `v-model:open` + a `term` prop. framer slide-up → CSS <transition>.
+  StakeSheet — customize-and-lock staking sheet. uni has no chassis sheet host
+  for sub-pages, so the sheet is embedded in staking.vue and toggled via
+  `v-model:open` + a `term` prop. Slide-up is a CSS <transition>.
 
-  Cross-store side-effect (架构铁律): submit composes app.debitBalance() +
-  staking.stake() + bills.add() here, not in the store.
+  Cross-store side-effect (架构铁律): submit 在这里组合「扣款⊗记账 + 建仓」(收口点
+  postMoneyBill,见 lib/money-receipt.ts),不在 store 里;不裸调资金原语 / 账单写入。
 -->
 <template>
   <view v-if="open && term !== null">
@@ -86,7 +85,7 @@ import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 
@@ -98,7 +97,6 @@ const emit = defineEmits<{ "update:open": [boolean] }>();
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const staking = useStaking();
 
 const amount = ref(0);
@@ -162,24 +160,54 @@ function submit() {
     toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min, n: term }));
     return;
   }
-  if (!app.debitBalance(amount.value)) {
+  const billRef = `STAKE-OPEN-${Date.now().toString(36).toUpperCase()}`;
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): PRODUCTION 是一次服务端事务。
+  // 🔴 顺序 = 扣款⊗记账(原子)→ 建仓,与复投页同形。
+  const before = app.captureMoney();
+  const paid = postMoneyBill({
+    type: "stake",
+    symbol: "USDT",
+    amount: -amount.value,
+    status: "posted",
+    memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
+    ref: billRef,
+  });
+  if (paid === "insufficient") {
     toast.error(
       t.value.stakingV3.toast.insufficient,
       fmt(t.value.stakingV3.toast.insufficientSubtitle, { amount: app.user.usdtBalance.toFixed(2) }),
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + stake + bill.
-  // PRODUCTION: POST /api/staking/open (PRD §9.11e) is one atomic transaction.
-  staking.stake(amount.value, term);
-  bills.add({
-    type: "stake",
-    symbol: "USDT",
-    amount: -amount.value,
-    status: "posted",
-    memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
-    ref: `STAKE-OPEN-${Date.now().toString(36).toUpperCase()}`,
-  });
+  if (paid !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+  // 🔴 建仓会失败(3 次版本冲突耗尽 = 别处正在改这个账号的持仓),而钱在上面已经扣了。
+  // 不接失败信号的话:余额少了、账单写了、仓位不存在 —— 刷新后就是纯丢钱。
+  // 冲正走同一个收口点:restoreTo 精确还原扣款前的 withdrawableUsdt(裸 creditBalance 只加
+  // 总余额、不还可提额度,退一次压低一次),并补一条反向分录 —— 不留「有扣款无凭证」。
+  const opened = staking.stake(amount.value, term);
+  if (!opened.ok) {
+    postMoneyBill(
+      {
+        type: "stake",
+        symbol: "USDT",
+        amount: amount.value,
+        status: "posted",
+        memo: `Stake open reversed · ${term}d refunded`,
+        memoKey: "stakeOpenReversed",
+        // 🔴 冲正分录的幂等键要与原分录分开(addOnce 按 ref+type+symbol 判重,
+        // 原本三项完全相同 → 将来任何幂等写都会误命中冲正行)。同 marketplace。
+        ref: `${billRef}-REV`,
+      },
+      { restoreTo: before },
+    );
+    // 归因分两种(R5):conflict=true 是别处刚改过持仓(刷新重试有意义),
+    // false 是本机存储写不进去(重试也白搭,得换个环境)—— 文案不许混用。
+    toast.error(
+      t.value.stakingV3.toast.openFailedTitle,
+      opened.conflict ? t.value.stakingV3.toast.openFailedSubtitle : t.value.stakingV3.toast.openFailedStorageSubtitle,
+    );
+    return;
+  }
   toast.success(
     t.value.stakingV3.toast.stakeSuccess,
     fmt(t.value.stakingV3.toast.stakeSubtitle, { amount: amount.value, apy: STAKING_APY[term] * 100, n: term }),

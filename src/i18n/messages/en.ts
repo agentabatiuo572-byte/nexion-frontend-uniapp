@@ -1,5 +1,5 @@
 // English message dictionary — the source of truth for all keys.
-// `Messages` type is exported so other locales must match its shape.
+// Messages type is exported so other locales must match its shape.
 
 export const en = {
   tabs: {
@@ -36,7 +36,6 @@ export const en = {
     meWalletRepurchase: "Re-invest",
     meProfile: "Profile",
     meSecurity: "Security",
-    meSecurityKycExpress: "KYC-Express",
     meHelp: "Help center",
     meSupport: "Support",
     meSupportTickets: "Tickets",
@@ -131,19 +130,18 @@ export const en = {
       "You are responsible for safeguarding your login credentials, two-factor authentication, and wallet keys. Activity under your account is your responsibility. Notify us immediately of any unauthorized access. We may suspend accounts showing signs of fraud, multi-accounting, or credential compromise.",
     s4Title: "Hardware purchase & operation",
     s4Body:
-      "NexGridBox / NexGridRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume declines with device age, so the tasks a device can book — and its earnings — taper accordingly; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
+      "NexGridBox / NexGridRack purchases are final once the device is activated on the network. The platform's AI task pool keeps upgrading: higher-tier tasks grow while lower-tier task volume keeps shrinking, so the tasks a fixed-compute device can book — and its earnings — narrow month by month; see the Risk Disclosure for details. You may retire an owned device at any time and trade it in toward a higher-tier device; the credit is set by the tier your device's lifetime output falls into, not by its original price.",
     s5Title: "Earnings, rewards & the NEX token",
     s5Body:
       "All yield figures shown in the app are projections based on current network parameters and recent demand, not guarantees. Earnings fluctuate and may decline over time. NEX is a platform reward token whose value can move sharply and is not deposit-insured. Never commit more than you can afford to lose.",
     s6Title: "Wallet, withdrawals & compliance",
-    s6Body:
-      "Standard withdrawals settle within 30 days and require NEX to be burned for network settlement. Amounts above published thresholds may enter enhanced compliance review. KYC verification is required once lifetime withdrawals exceed $100. Funds are held in segregated reserve accounts and we apply Chainalysis-grade transaction monitoring as required by our MSB registration.",
+    s6Body: "Routine withdrawals settle within {h} hours. Withdrawals go to the payout address you set yourself (SMS-confirmed, changeable any time, with a security freeze after a change). Amounts above published thresholds may enter enhanced compliance review. Funds are held in segregated reserve accounts and transaction monitoring applies under our MSB registration.",
     s7Title: "Referral & network rewards",
     s7Body:
       "Direct Royalty and Network Yield Bonus are paid from platform margin, never from a friend's deposit. Rewards depend on referred users completing qualifying actions. Spam, fake accounts, or mass-recruitment schemes are prohibited, will be voided, and may result in suspension and forfeiture of pending rewards.",
     s8Title: "Prohibited conduct",
     s8Body:
-      "You may not use NexGrid to launder funds, manipulate token markets, bypass KYC, operate multiple accounts to farm rewards, decompile or tamper with the network, or interfere with other participants' devices. Violations may lead to immediate termination and reporting to relevant authorities.",
+      "You may not use NexGrid to launder funds, manipulate token markets, bypass risk controls, operate multiple accounts to farm rewards, decompile or tamper with the network, or interfere with other participants' devices. Violations may lead to immediate termination and reporting to relevant authorities.",
     s9Title: "Fees, taxes & changes",
     s9Body:
       "Network, withdrawal, and card-processing fees are disclosed at the point of each transaction. You are solely responsible for any taxes on your earnings. We may update these terms; material changes will be notified in-app, and continued use after the effective date constitutes acceptance.",
@@ -163,6 +161,8 @@ export const en = {
     captchaThrottled: "Too many attempts. Try again later.",
     captchaVerified: "Verified",
     captchaFailCount: "Fails {n} / {max}",
+    captchaLoadFailed: "Couldn't load. Check your connection and retry.",
+    captchaRetry: "Retry",
     errorTooFrequent: "Too frequent — retry in {s}s",
     errorOtpInvalid: "Incorrect code — {n} attempts left",
     errorOtpExpired: "Code expired — request a new one",
@@ -280,6 +280,7 @@ export const en = {
     rewardReviewBody: "This device already has account activity. Signup continues, but the welcome gift is held until review.",
     rewardReviewBodyUnbound: "Earnings and the welcome gift on a new account are held for review first, releasing as the account completes binding or app online verification.",
     giftCreditedToastSub: "Credited to wallet",
+    giftCreditedToastSubSponsor: "Sponsored by {name}",
     giftPendingToast: "Welcome gift pending review",
     giftPendingToastSub: "Signup is complete. The reward is held until account review is complete.",
     doneTitle: "You're in",
@@ -331,9 +332,60 @@ export const en = {
     networkLive: "live",
     networkGlobalGrid: "Global grid · live",
     networkMembers: "Members",
-    networkPaidToday: "Paid today",
     networkDevices: "Devices",
     networkYourRank: "Your rank",
+    // FEAT-HOME02 pulse metric subs + rank tri-state (ranked / unranked / config unavailable)
+    //
+    // 🔴 槽位契约(2026-08-05 三次独立 DOM probe 实测,375px 视口 / network-pulse-card.vue 三格):
+    //   值槽 = 89.3px(1、2 格)/ 90.3px(第 3 格「你的排名」),General Sans 20px/600、
+    //   letter-spacing -0.28px,white-space:nowrap 且「无 truncate」(实测 text-overflow:clip),
+    //   卡片外层 overflow:hidden → 超宽是「硬裁」,不是省略号。
+    //   副文本槽 = 89.3px(1、2 格)/ 90.34px(第 3 格,与值槽同因:排名格宽 1px 差),
+    //   JetBrains Mono 12px/400,.truncate 挂在 <text> 那层
+    //   (overflow:hidden + text-overflow:ellipsis;叶子 <span> 上读到 clip 是读错了层)
+    //   → 超宽是「省略号」,不致命。
+    //   放进值槽的任何语言必须 ≤ 89.3px@20px;放不下的整态降档渲染,别指望裁切。
+    //
+    // 🔴 量插值键必须代「真实会渲染的值」,不是随手挑的位数 —— JetBrains Mono 12px 每字符 7.2px,
+    //   位数差一位就够翻转 ✓/✗。本表的代入值逐键写在末列,别再用字面 {n} 或拍脑袋的位数量。
+    //   (第三支 probe 正是这样抓到上一版把 networkMembersSub 按 1 位数字量成 79.2 ✓,
+    //    而它真实代入的是 mock/platform-config.ts:32 的 2.9 → 93.6 ✗。)
+    //
+    // 🔴 量法(2026-08-05 定案):宽度随 webfont 加载态漂移 —— en/zh 不漂,只有 vi 漂,
+    //   同一 vi 串在字体未就绪 / 已就绪两态下会量出互相矛盾的数字(第三轮那三条
+    //   「更正」全部改反了方向,根因即此)。契约数字一律取 fonts.ready 之后的定态值:
+    //   写进真实槽节点触发真字体栈,等 document.fonts.ready,连续两趟一致才作数;
+    //   字体未就绪时量出的 vi 宽度一律作废,不得拿去「更正」下表。下表 vi 列已全部为定态值。
+    //   书写精度:本表记 probe 原值(两位小数);vi.ts 同键注释按 1 位圆整(78.5/139.1),
+    //   与本表 78.48/139.14 是「同一次定态测量的两种写法」(差 ≤0.04px),不是两套数据,
+    //   下轮 diff 对比时别当「契约不一致」误报。
+    //
+    //   逐键实测宽(px;✗ = 超槽)。🔴 2026-08-06 审计后收口:副槽全部换短式入槽,
+    //   hint 也换短式(en "Get ranked" 72.0 / vi "Lên hạng" 55.7,无数字串同法定态实测),
+    //   「留给接线方」的作业就此清账 —— 下表即现网串的实测值,全部 ✓:
+    //     键                       槽      en       zh       vi        {n} 代入值
+    //     networkStatUpdating      值 89.3  87.3     59.2     78.48    —
+    //     networkRankUnranked      值 90.3  73.4     59.2    139.14 ✗  —      ← 值槽 ✗ 由降档解决(卡片 12.5px 渲染),见 vi.ts 同键注释
+    //     networkMembersSub        副 89.3  64.8     67.2     79.2     2.9(种子,恒 3 字符)
+    //     networkDevicesSub        副 89.3  86.4     60.0     79.2     —
+    //     networkRankUp24h         副 89.3  72.0     69.6     79.2     12(2 位典型)
+    //     networkRankUp24h         副 89.3  79.2     76.8     86.41    128(3 位上界)
+    //     networkRankUnrankedHint  副 89.3  72.0     84.0     55.7     —      ← vi 实测 55.7 略低于 7.2/字×8 的算术 57.6:无数字串不受 tabular 影响,字距实测偏窄;以实测为准
+    //   别用字符数估宽:vi 13 字符 = 139.14px、zh 5 字 = 59.2px。旧长式与其实测值
+    //   (93.6/115.2/122.41/158.4/144.0 各 ✗)已随本次换串退役,不再是现网形态。
+    networkMembersSub: "+{n}% /mo",
+    networkDevicesSub: "running jobs",
+    networkRankUp24h: "+{n} in 24h",
+    networkRankUnranked: "No rank",
+    // 🔴 归属定案(2026-08-05,原规格 line 78「『未上榜』引导文案内的 CTA」没交代归属):
+    //   「本条 hint 整条即 CTA」 —— 未上榜时它是可点元素,点进设备/商城既有入口。
+    //   卡片一格只有一行副文本槽,放不下独立按钮,故不另立 CTA 文案键。
+    //   接线方:别就地硬编码一句按钮文案,也别把它渲染成不可点的纯说明。
+    networkRankUnrankedHint: "Get ranked",
+    networkRankTipRanked: "Your rank goes by the total hashpower of your active devices — more hashpower, higher rank.",
+    networkRankTipUnranked: "You don't have a rank yet. Activate any device and its hashpower gives you one.",
+    networkStatUpdating: "Updating",
+    networkStatRetry: "Retry",
     // VRankCard + LeadershipPoolCard (ZONE 4; structural labels keyed)
     rankYourRank: "Your rank",
     rankStep: "step",
@@ -347,7 +399,8 @@ export const en = {
     poolV3Unlock: "V3+ to unlock",
     // DoTheMathCard (ZONE 5)
     doMathTitle: "Do the math",
-    doMathHeadline: "{target} earns {mult} what your {base} does — every single day.",
+    // {base} carries its own possessive ("Your phone") — see lib/device-copy.ts.
+    doMathHeadline: "{target} earns {mult} what {base} does — every single day.",
     doMathDaily: "daily",
     doMathPayback: "payback",
     doMathVs: "vs {base}",
@@ -578,7 +631,7 @@ export const en = {
     subsidyBadge: "New-device task subsidy · {n} days left",
     subsidyBadgeLastDay: "New-device task subsidy · ends today",
     taskPoolLineTitle: "AI task pool is upgrading",
-    taskPoolLineBody: "Platform tasks demand ever more compute: higher-tier tasks grow while lower-tier volume declines with device age; higher-compute devices can book a wider slice of the pool.",
+    taskPoolLineBody: "Platform tasks demand ever more compute: higher-tier tasks grow while lower-tier volume keeps shrinking; a device with fixed compute can therefore book a narrowing slice each month, while higher-compute devices reach a wider one.",
     capExplainTitle: "Task capacity & the new-device subsidy",
     capExplainS1Title: "Why the task pool keeps upgrading",
     capExplainS1Body: "AI models keep iterating and newer tasks demand more compute (VRAM). Higher-tier tasks take a growing share of the pool while lower-tier volume shrinks — so the slice a given device can book narrows month over month, and earnings taper until the capacity floor.",
@@ -715,7 +768,7 @@ export const en = {
       staking: "Staking maturities",
       market: "Market + NEX price",
       genesis: "Genesis activity",
-      system: "System / KYC / regulatory",
+      system: "System / compliance / regulatory",
     },
     notifFooter: "Disabling a category suppresses the Nova drawer + notification center entries. Critical compliance notifications cannot be disabled.",
   },
@@ -810,7 +863,7 @@ export const en = {
     // 换语言后搜索词也必须跟着换语言可搜,不能只翻显示层。
     routes: {
       home: { label: "Home / Mission Control", sub: "Live earnings · ticker · dashboard" },
-      earn: { label: "Earn / Fleet", sub: "Device cards · task center · efficiency" },
+      earn: { label: "Earn / Fleet", sub: "Device cards · task center · task capacity" },
       store: { label: "Store", sub: "NexGridBox / Rack / Cloud Share" },
       tradeIn: { label: "Trade-in", sub: "Retire & credit toward an upgrade" },
       team: { label: "Team hub", sub: "Royalty / V-rank / network" },
@@ -861,7 +914,7 @@ export const en = {
 
   complianceBanner: {
     title: "Compliance re-verification window",
-    body: "Random KYC + KYT spot checks are active across the network. No action required unless you receive a direct request.",
+    body: "Routine compliance and safety spot checks are active across the network. No action required unless you receive a direct request.",
     cta: "Review disclosure →",
   },
 
@@ -919,18 +972,19 @@ export const en = {
     alreadyAcceptedCta: "Acknowledged",
     s1Title: "Earnings projections are forecasts, not promises",
     s1Body: "All daily / monthly / annual yield estimates shown on NexGrid are based on current network parameters and recent client demand. Actual earnings will fluctuate ±15% week-to-week and may decline as more devices join the network or as compute prices fall. Past performance is not indicative of future results.",
-    s2Title: "The task pool keeps upgrading — bookable tasks decline with device age",
+    s2Title: "The task pool keeps upgrading — a device's bookable tasks narrow month by month",
     s2Body: "NexGrid's AI task pool keeps upgrading: newer tasks demand more compute (VRAM), so higher-tier tasks grow while lower-tier task volume shrinks. The tasks a given device can book narrow month over month through its first year — faster in later months — until only the capacity-floor share of earnings remains. Newly activated devices receive a task-priority subsidy that keeps them booked at full capacity. Trade-in credit is set by the tier your device's lifetime output falls into — the more it has produced, the smaller the credit.",
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal windows + compliance review",
-    s4Body: "Standard withdrawals settle in 30 days from request to wallet. Amounts over $1,000 may enter an enhanced compliance review window of 45 days during periods of elevated regulatory scrutiny. The withdrawal fee is a penalty rate (default 20%) that you can offset by burning NEX — each NEX waives far more fee than its swap value, so enough NEX waives the fee entirely; with no NEX the full penalty applies. Earn NEX through daily check-ins, mining, and referral activity.",
+    s4Body: "Standard withdrawals land about {h} hours after you request them. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, mining and referrals.",
+    s4BodyLargeAmount: "Withdrawals above ${large} may enter a {d}-day enhanced compliance review window; the later of the two dates applies.",
     s5Title: "Staking lock-ups are irreversible",
     s5Body: "Staking pools (30d / 90d / 180d / 365d) lock principal for the full term. Early unlock forfeits 100% of accrued yield premium and deducts 5% / 15% / 30% / 50% of principal respectively. Read each pool's terms separately before locking.",
     s6Title: "Network economics + referral compensation",
-    s6Body: "Direct Royalty (10% of qualifying friend orders at base rate, scaled by Rate Tier) and Network Yield Bonus (algorithmic extended-network yield) are paid from platform margin, not from the friend's pocket. Referral rewards depend on referred users completing qualifying actions. Mass-recruitment or spam referrals will be voided and may result in account suspension.",
-    s7Title: "Custody, KYC, and regulatory jurisdiction",
-    s7Body: "NexGrid is operated by NexGrid Compliance Authority under FinCEN MSB registration #MSB1234567, with MiCA-aligned compliance procedures and Chainalysis KYT integration. Funds are held in segregated reserve accounts audited quarterly by PwC. KYC is required for withdrawals exceeding lifetime $100. NexGrid is not available in OFAC-sanctioned jurisdictions.",
+    s6Body: "Direct Royalty (10% of a qualifying friend order at the base tier, scaled up by Rate Tier) and Network Yield Bonus (algorithmic extended-network yield) are paid from platform margin, not from the friend's pocket. Referral rewards depend on referred users completing qualifying actions. Mass-recruitment or spam referrals will be voided and may result in account suspension.",
+    s7Title: "Custody, compliance, and regulatory jurisdiction",
+    s7Body: "NexGrid is operated by NexGrid Compliance Authority under FinCEN MSB registration #MSB1234567, with MiCA-aligned compliance procedures. Funds are held in segregated reserve accounts audited quarterly by PwC. NexGrid is not available in OFAC-sanctioned jurisdictions.",
     scrollHint: "Please scroll through all sections before acknowledging.",
     checkboxLabel: "I have read the 7 sections above and understand that earnings are projections, bookable task volume declines as the task pool upgrades, tokens carry market risk, and withdrawals may be subject to compliance review.",
     acceptCta: "I acknowledge — continue",
@@ -968,7 +1022,6 @@ export const en = {
     eligibilityHintOwnPrevTier: "Own at least {count} device on the previous tier",
     eligibilityHintVRank: "Reach V{level} via team building",
     eligibilityHintDeposit: "Cumulative deposit ≥ ${amount}",
-    eligibilityHintKyc: "Complete {tier} verification",
     eligibilityHintDaysActive: "Active for {days}+ days",
     eligibilityHintReferral: "Confirm {count}+ referrals",
     eligibilityHintTradeIn: "Unlock by buying via upgrade trade-in",
@@ -1088,62 +1141,6 @@ export const en = {
     backToTickets: "Back to tickets",
   },
 
-  kycExpress: {
-    pageTitle: "About KYC-Express",
-    heroLabel: "IDENTITY VERIFICATION",
-    heroTitle: "KYC-Express · 90 seconds, one time, never again.",
-    heroSub: "A short ID check that lifts your $100 withdrawal cap, unlocks faster payouts, and keeps your account compliant with FATF/MiCA rules.",
-    whyTitle: "WHEN IT TRIGGERS",
-    whySub: "KYC-Express is required only at these specific thresholds — most users hit it on their first large withdrawal.",
-    triggers: {
-      a: { label: "Lifetime exchange > $100", body: "Cumulative NEX↔USDT conversion crosses $100 (per regulator rules)." },
-      b: { label: "Single withdrawal > $100", body: "Any USDT withdrawal request above $100 in one go." },
-      c: { label: "Region escalation", body: "Some countries require verification regardless of amount; we'll prompt early." },
-      d: { label: "Risk-flag review", body: "Rare — unusual login pattern, device change, or compliance audit." },
-    },
-    stepsTitle: "WHAT YOU PROVIDE",
-    steps: {
-      a: { title: "Full legal name", body: "As shown on your government ID. Must match the document photo." },
-      b: { title: "Government ID photo", body: "Passport, national ID, or driver's license — front side, well-lit." },
-      c: { title: "Liveness selfie", body: "30-second face scan to match the document photo. We do not store the raw video." },
-    },
-    privacyTitle: "WHAT WE NEVER ASK FOR",
-    privacy: {
-      a: { emoji: "🚫", label: "Social Security Number", body: "We are not a US bank. SSN is never required and we will never ask." },
-      b: { emoji: "🚫", label: "Bank login / passwords", body: "All payouts are wallet-to-wallet. We never need your bank credentials." },
-      c: { emoji: "🚫", label: "Family member info", body: "KYC-Express verifies you, not your relatives." },
-    },
-    unlockTitle: "WHAT YOU UNLOCK",
-    unlock: {
-      a: { emoji: "💸", label: "Withdrawal cap lifted", body: "From $100 → up to $50,000 per day after verification." },
-      b: { emoji: "⚡", label: "Same-day payout", body: "Verified accounts skip the 24h hold and pay out within 30 minutes." },
-      c: { emoji: "🛡", label: "Compliance shield", body: "Locked from regulator freeze actions — you're cleared." },
-      d: { emoji: "🏆", label: "+10 NEX", body: "Completion bonus credited automatically — counts toward future withdrawals." },
-    },
-    trustTitle: "PARTNERS · COMPLIANCE",
-    trust: {
-      a: { label: "Sumsub", body: "Tier-1 KYC provider used by Binance, Bybit, Crypto.com. SOC 2 Type II audited." },
-      b: { label: "GDPR + MiCA", body: "Data stored in EU region; right-to-erasure honored on request." },
-      c: { label: "Encrypted at rest", body: "Document images held in zero-knowledge encrypted blob storage. NexGrid staff cannot decrypt." },
-    },
-    faqTitle: "FAQ",
-    faqs: {
-      a: { q: "How long until I'm verified?", a: "Median 7 minutes, max 24 hours. Most users complete the live selfie portion in under 90 seconds." },
-      b: { q: "What if my document is in another language?", a: "Sumsub supports 138 countries / 5,000+ ID types. Latin/Cyrillic/Arabic/CJK all accepted." },
-      c: { q: "Can I withdraw without verification?", a: "Yes — up to $100 cumulative without KYC. Withdrawals beyond that require KYC-Express." },
-      d: { q: "What if I'm rejected?", a: "We'll show the exact reason (blurry photo, expired doc, etc.) and let you retry up to 5 times in 24 hours." },
-    },
-    cta: "Start KYC-Express",
-    ctaNote: "Free · ~90 seconds · powered by Sumsub",
-    flow: {
-      verificationDeposit: "Verification deposit",
-      depositCreditHint: "Fully credited to your NexGrid balance. Counts toward your $20 first withdrawal threshold.",
-      generateAddressCta: "Generate deposit address",
-      paymentSentCta: "I've completed the payment",
-      verificationComplete: "Verification complete",
-      continueToWithdrawal: "Continue to withdrawal",
-    },
-  },
 
   nexWallet: {
     pageTitle: "NEX Wallet",
@@ -1335,9 +1332,9 @@ export const en = {
     // /me TrialEntry — active state
     activeTitle: "Trial in progress · {state}",
     activeStateActive: "Active",
-    activeStateGrace: "Grace period",
-    activeStateExtended: "Extended",
-    // claim sheet (chassis popup — zero-friction entry copy)
+    activeStateGrace: "Production stopped",
+    // claim sheet (chassis popup — cardless: confirming starts the trial
+    // directly, FEAT-TRIAL02; failure shows an inline retry, never silent)
     sheetCapLabel: "Limited free",
     sheetTitle: "NexGridBox S1 free trial",
     sheetCloseAria: "Close",
@@ -1352,80 +1349,73 @@ export const en = {
     sheetProp3Sub: "Buy during the trial for {pct}% off — the sooner the better",
     sheetClaimCta: "Start free trial",
     sheetDismissCta: "Maybe later",
-    // /me/trial full page — header / toasts / hero / actions
+    claimErrorInline: "Couldn't start your trial just now — nothing was claimed. Try again.",
+    claimRetryCta: "Retry claim",
+    // Ineligible reasons (spec 异常2 — concrete, never a generic error)
+    eligReasonConverted: "You already own a device — check out the upgrades instead",
+    eligReasonUsed: "This account has already used its free trial",
+    eligReasonInProgress: "Your trial is already running — see the trial page",
+    eligReasonRisk: "This account can't claim the trial right now — contact support for details",
+    eligReasonClosed: "The trial offer isn't open right now — check back soon",
+    // /me/trial five-state page
     pageTitle: "Free trial",
     pageHeaderSubtitle: "NexGridBox S1",
     toastActivated: "Free trial activated · NexGridBox S1",
-    toastDebitFailedNoBalance: "Payment failed · Insufficient balance",
-    toastDebitFailedTrialEnded: "Payment failed · Trial has ended",
-    toastPurchaseComplete: "Purchase complete · paid ${amount}",
-    toastPurchaseCompleteWithEarn: "Purchase complete · paid ${amount} · trial earnings applied to your device, ${remainder} credited to balance",
-    toastPurchaseCompleteOffsetOnly: "Purchase complete · paid ${amount} · trial earnings applied to your device",
-    toastCannotStart: "Trial unavailable right now · cooldown active or the offer has ended",
-    toastCancelled: "Trial cancelled",
-    boundCardFooter: "Charged ${price} when trial ends",
-    boundCardManage: "Manage",
-    discountBannerLabel: "Buy early, save ${amount}",
-    rowSubtotal: "Subtotal",
-    rowDiscount: "Trial discount ({pct}%)",
-    rowTotal: "Pay now",
-    rowEarningsOffset: "Trial earnings applied",
+    offsetAccruedLabel: "Trial credit accrued",
     offsetRemainderNote: "${remainder} credited to your balance after purchase",
-    buyCta: "Buy NexGridBox S1 now",
-    cancelCta: "Cancel trial",
+    offsetUsableUntil: "Trial credit stays usable until {time}",
+    buyCtaOffset: "Buy now · ${amount} credit applies",
+    graceBuyCta: "Buy with your ${amount} credit",
+    buyCtaPlain: "Go to purchase",
+    stoppedNote: "Production has stopped",
+    rulesEntry: "How the trial credit works",
+    rulesTitle: "Trial credit rules",
+    rulesBefore: "Before purchase, trial earnings only offset the device price (up to ${cap}).",
+    rulesNoCash: "The credit can't be withdrawn or cashed out.",
+    rulesAfter: "After you complete the purchase, earnings above the cap are credited to your balance.",
+    rulesExpiry: "If you don't purchase within {days} days after the trial ends, the credit expires.",
+    rulesGotCta: "Got it",
+    legacyMigratedNote: "Rules updated: nothing is charged to your card when the trial ends — you complete the purchase yourself, and your card stays untouched.",
     goEarnCta: "See your earnings",
     ghostBadge: "On trial",
     ghostBuyCta: "Lock it in",
     ghostRibbonActive: "Free trial",
-    ghostRibbonGrace: "Grace period",
-    ghostRibbonExtended: "Extended access",
+    ghostRibbonGrace: "Production stopped",
     ghostEta: "{eta} left",
     ghostSubtitle: "NexGridBox S1 trial earnings",
+    ghostDiscount: "Buy early: save {amount} + earnings credit",
     deviceRowSub: "On free trial",
+    slotTag: "Trial",
+    cancelCta: "Cancel trial",
     cancelConfirmTitle: "Cancel free trial?",
-    cancelConfirmMsg: "Cancelling stops your trial earnings and blocks a new trial for {n} days. Cancel anyway?",
+    cancelConfirmMsg: "Cancelling stops the trial and zeroes your accrued credit; this account can't claim another free trial. Cancel anyway?",
     cancelConfirmOk: "Yes, cancel",
     cancelConfirmKeep: "Keep trial",
-    ghostDiscount: "Buy early: save {amount} + earnings credit",
-    slotTag: "Trial",
-    confirmPurchaseTitle: "Confirm purchase · NexGridBox S1",
-    confirmPurchaseMessage: "${amount} will be charged from your balance to complete the NexGridBox S1 purchase. Trial earnings have been applied toward the device price; any remaining earnings are credited to your balance after purchase.",
-    confirmPurchaseConfirm: "Confirm purchase",
-    confirmPurchaseCancel: "Not now",
-    fineprint: "Before purchase, trial earnings can only be applied toward your device price (up to a cap); any remaining earnings are credited to your balance after you complete the purchase. Cancel the trial midway and earnings reset to zero with no charge.",
+    toastCancelled: "Trial cancelled",
     countdownActiveRibbon: "Trial active",
     countdownActiveCta: "Earnings accrue during the trial period.",
-    countdownGraceRibbon: "Grace period",
-    countdownGraceCta: "Trial earnings are frozen — purchase to unlock.",
-    countdownExtendedRibbon: "Quality extension",
-    countdownExtendedCta: "You've unlocked {n} extra days.",
+    countdownGraceRibbon: "Production stopped",
+    countdownGraceCta: "Earnings stopped accruing — your credit is locked in. Buy to use it.",
     countdownStart: "Start {date}",
     countdownEnd: "Purchase by {date}",
     countdownDateEmpty: "—",
     idleTitleNew: "Try NexGridBox S1 free",
-    idleTitleAgain: "Try NexGridBox S1 again",
     idleBody: "{n} days free · cancel anytime",
     idleCta: "Claim trial",
-    terminalRedeemedTitle: "Trial purchase complete",
-    terminalRedeemedDesc: "NexGridBox S1 joined your compute fleet. Open Earn for live yield.",
-    terminalFailedTitle: "Payment failed",
-    terminalFailedDesc: "Trial ended. You can bind a card and apply again after cooldown.",
-    terminalCancelledTitle: "Trial cancelled",
-    terminalCancelledDesc: "Trial earnings zeroed. You can apply again after the cooldown.",
-    terminalCooldownLink: "Cooling down ({n} days until you can apply again)",
-    // SimulationProvider trial-lifecycle toasts (auto-redeem + urgency pushes)
-    toastAutoDebitFailed: "Payment failed · insufficient balance, trial ended",
-    toastConverted: "Trial complete · NexGridBox S1 joined the compute network{note}",
-    toastConvertedNoteRemainder: " · trial earnings applied to your device, ${remainder} credited to balance",
-    toastConvertedNoteOffset: " · trial earnings applied to your device",
-    toastConvertedNoDevice: "Purchase complete, but the device couldn't be added · please contact support",
-    toastConvertedNoDeviceSub: "(possibly a slot cap or a temporary error)",
-    toastGraceStarted: "Free trial ended · purchase will complete shortly",
+    endedTitle: "Trial ended",
+    endedDesc: "Your trial credit expired on {time}. New purchases settle at the standard price.",
+    convertedTitle: "Purchase complete",
+    convertedDesc: "Your NexGridBox S1 is owned and earning in your fleet.",
+    convertedDevicesCta: "View my devices",
+    // Lifecycle toasts + urgency pushes (App-layer poll; zero auto-charge)
+    graceStartToast: "Trial ended · production stopped. Your credit stays usable until {time}",
+    endedToast: "Trial credit expired",
     urgency24h: "24 hours left on your free trial · buy early and save ${amount}",
-    urgency1h: "Auto-purchase in 1 hour · not buying? Cancel now",
+    urgencyGrace24h: "Your ${amount} trial credit expires in 24 hours — use it before it's gone",
+    urgencyGrace1h: "Last hour: your ${amount} trial credit is about to expire",
   },
   novaCard: {
-    // Home NovaCard — chat bubble form (distinct from full `nova` chat namespace)
+    // Home NovaCard — chat bubble form (distinct from full nova chat namespace)
     senderName: "Nova",
     senderRole: "AI advisor",
     messageWithPercent: "Your yield is {pct}% of peer S1 owners. Worth running the ROI math?",
@@ -1521,35 +1511,6 @@ export const en = {
     connectedToast: "Computer linked as {tier}",
     disabledToast: "Computer GPU share is currently disabled",
   },
-  // TrialExtensionSheet — quality-user grace-boundary extension offer.
-  trialExtension: {
-    vipCap: "Quality members only",
-    title: "{days} more trial days, on us",
-    accruedLabel: "You've already earned",
-    prop1Title: "{hours} more hours to keep earning",
-    prop1Sub: "Trial earnings keep accruing, credited in full when you buy — and withdrawable",
-    prop2Title: "Keep your {pct}% early-buy discount",
-    prop2Sub: "Buy during the extension and still save ${amount} — miss it and it's full price",
-    acceptCta: "Claim {days}-day extension",
-    declineCta: "Not now — go to purchase",
-    toastFailTitle: "Extension didn't apply",
-    toastFailBody: "The trial isn't in its grace window, or the extension was already decided",
-    toastAccepted: "Extended by {days} days · earnings keep accruing",
-  },
-  // TrialUnbindRetentionSheet — intercept removal of the active trial card.
-  trialUnbind: {
-    confirmCap: "Confirm action",
-    title: "Remove this card?",
-    lossLabel: "You'll lose",
-    lossEarnNote: "Accrued trial earnings reset to zero — nothing credited",
-    lossDays: "{days} days of free trial left",
-    lossCooldown: "No new trial for {days} days",
-    retainTitle: "Staying on trial pays off",
-    retainSub: "Trial earnings merge in when you buy, and buying early saves an extra ${amount}",
-    keepCta: "Keep this card · stay on trial",
-    unbindCta: "Remove anyway · end trial",
-    toastUnbound: "Trial ended · card removed",
-  },
   // Voucher (代金券) — claim popup + fallback banner + checkout redemption.
   voucher: {
     popupCap: "Limited offer",
@@ -1573,6 +1534,7 @@ export const en = {
     bannerCta: "Claim",
     checkoutRowLabel: "Voucher",
     expiredNote: "A claimed voucher for this device has expired",
+    quoteChanged: "Voucher discount changed — review the updated total before paying",
   },
   // My Rewards (我的奖励) — vouchers (available/expired) + system rewards (USDT/NEX).
   rewards: {
@@ -1690,7 +1652,7 @@ export const en = {
       },
       withdraw: {
         q: "Can I withdraw earnings anytime?",
-        a: "Yes, from $20. First withdrawal processes within 24 hours. KYC-Express ($1 deposit) required to verify your wallet.",
+        a: "Yes, from $20. First withdrawal processes within 24 hours. Withdrawals go to the payout address you set in your wallet.",
       },
       demand: {
         q: "What if AI demand drops?",
@@ -1782,7 +1744,7 @@ export const en = {
     cardHighTierLine: "Books higher-tier tasks: {pool}",
     comingSoonSubtitle: "Production batches ship later in the cycle",
     // Per-SKU marketing copy, keyed by Product.id (src/mock/products.ts holds the
-    // data shape + English source). Product `name` is a brand mark and is NEVER
+    // data shape + English source). Product name is a brand mark and is NEVER
     // translated. verify.sh asserts every PRODUCTS id has an entry here.
     catalog: {
       "stellarbox-s1": {
@@ -1828,6 +1790,18 @@ export const en = {
     coBillVoucherPart: "voucher −${amount}",
     coBillTradeinPart: "trade-in {name} −${amount}",
     coBillCardFeePart: "incl. {rate} card fee ${amount}",
+    coRowTrialDiscount: "Trial discount ({pct}%)",
+    coRowTrialOffset: "Trial credit",
+    coTrialZeroNote: "Amount due is $0 — credit above the price isn't refunded or paid out.",
+    coTrialQuoteChanged: "Trial pricing changed — review the updated total before paying",
+    coTotalQuoteChanged: "Amount due changed — review the updated total before paying",
+    coBillTrialDiscountPart: "trial discount −${amount}",
+    coBillTrialOffsetPart: "trial credit −${amount}",
+    coBillTrialRemainderMemo: "Trial earnings remainder → balance · {name}",
+    coBillTrialNexMemo: "Trial earnings → balance · {name} · NEX",
+    coTrialEarnUsdtPart: "+${amount} to balance",
+    coTrialEarnNexPart: "+{n} NEX",
+    coTrialEarnToast: "Trial earnings credited · {parts}",
     // Sprint A-1 / E.1: first-order celebration
     firstOrderTitle: "🎉 Your first NexGridBox is on its way",
     firstOrderBody: "We'll provision your slot in the data center within minutes.",
@@ -1992,9 +1966,9 @@ export const en = {
     withdrawableAvailable: "Withdrawable:",
     useMax: "Use max",
     networkRecommended: "Recommended",
-    networkHintTrc20: "Lowest fee · 5 min",
-    networkHintBep20: "Low fee · 5 min",
-    networkHintErc20: "15 min · for large amounts",
+    networkHintTrc20: "Lower cost · ~5 min on-chain",
+    networkHintBep20: "Lower cost · ~5 min on-chain",
+    networkHintErc20: "~15 min on-chain · suits large amounts",
     feeLabel: "Network fee",
     receiveLabel: "You receive",
     confirmWithdraw: "Confirm Withdrawal",
@@ -2069,12 +2043,22 @@ export const en = {
     timeMinutesAgo: "{n}m ago",
     timeHoursAgo: "{n}h ago",
     timeDaysAgo: "{n}d ago",
-    firstTimeReview: "First-time review: within 24 hours.",
-    minWithdrawNote: "Minimum withdrawal: $20. The fee shown above can be waived by burning NEX.",
-    dailyLimitNote: "Daily limit: 1 withdrawal per day.",
-    complianceGateBody: "Per MiCA Art. 22 and the FATF Travel Rule, wallet ownership must be verified before payouts. Complete the one-time KYC-Express ($1 USDT, fully credited).",
+    firstTimeReview: "First withdrawal requires manual confirmation.",
+
+    fastLaneOnTitle: "This one processes right away",
+    fastLaneOnBody: "Waived: {g}. It goes out on the standard timeline.",
+    fastLaneCta: "Withdraw ${n} instead",
+    waivedGates: {
+      "new-address-hold": "the new-address hold",
+      "first-withdrawal-review": "the first-withdrawal review",
+    },
+    minWithdrawNote: "Minimum withdrawal: ${n}.",
+
+    minWithdrawNoteOffset: " The fee can optionally be covered with NEX.",
+    dailyLimitNote: "Daily limit: {n} per day.",
     withdrawalStatusSubtitle: "Withdrawal Status",
     noActiveWithdrawal: "No active withdrawal.",
+    withdrawalNotFound: "This withdrawal's record could not be found.",
     submitNewWithdrawal: "Submit a new withdrawal →",
     trackSubmittedHint: "Request received",
     trackReviewHint: "Automated screen + account review",
@@ -2085,9 +2069,28 @@ export const en = {
     trackProgressLabel: "Progress",
     trackViaLine: "via {network} · Fee ${fee}",
     trackEtaDone: "Funds delivered to your address",
-    trackEtaPending: "Estimated completion within 24 hours",
+
+    withdrawBillWriteFailed: "Withdrawal submitted, but the bill entry could not be saved. You can still track it on the withdrawal status page.",
+
+    trackFailedBody: "This withdrawal did not complete. Your funds have not left your account. Contact support for details.",
+    trackEtaPending: "Expected within {n} hours",
+
+    trackEtaTitlePending: "Processing",
+
+    trackArrivedAt: "Arrived {time}",
+
+    trackContactSupport: "Contact support",
+
+
+    trackSubmitAnother: "Withdraw again",
     trackReviewNote: "First-time withdrawal · Automated + account review",
     withdrawRouteReviewTitle: "Withdrawal will be reviewed",
+
+    withdrawRouteRejectTitle: "This one can't be submitted",
+
+    withdrawRouteRejectBody: "Your account state does not allow a withdrawal right now. No request is created and nothing is charged. Please contact support for help.",
+
+    fastLaneUndo: "Undo — restore my original amount",
     withdrawRouteReviewBody: "This receiving address has related account activity. The request can be submitted, but it will stay in review until checks are complete.",
     withdrawRouteHeldTitle: "Review in progress",
     withdrawRouteHeldSub: "The request is waiting for account and address review. It will not move forward automatically.",
@@ -2096,11 +2099,7 @@ export const en = {
     withdrawNexFeeMemo: "Fee offset · {nex} NEX used (-${fee} fee)",
     trackBackToWallet: "Back to Wallet",
     addFunds: "Add funds",
-    complianceCheck: "Compliance check",
     copyAddress: "Copy address",
-    verifyReceiving: "Receiving on-chain confirmation…",
-    verifyKyt: "Chainalysis KYT screening…",
-    verifyPairing: "Pairing wallet to your account…",
     ffCardNumber: "Card number",
     ffExpiry: "Expiry",
     ffCvv: "CVV",
@@ -2130,13 +2129,6 @@ export const en = {
     unbindToast: "Card unbound",
     // New card form
     newTitle: "Bind a bank card",
-    trialDiscloseTitle: "Auto-charge when the trial ends",
-    trialDiscloseBody:
-      "When your {days}-day free trial ends, this card will be used to complete the NexGridBox S1 purchase",
-    trialDiscloseAmount: " {amount}",
-    trialDiscloseSuffix:
-      ". Trial earnings go toward your device price (up to ${cap} off); any remaining earnings are credited to your balance after purchase;",
-    trialDiscloseCancel: " cancel any time to forfeit earnings without being charged.",
     formCardType: "Credit / Debit card",
     formSecurityNote: "256-bit TLS · PCI DSS Level 1 tokenization",
     formPanLabel: "Card number",
@@ -2235,7 +2227,6 @@ export const en = {
     walletBalance: "Wallet Balance",
     open: "Open",
     wallet: "Wallet",
-    kyc: "KYC",
     security: "Security",
     achievements: "Achievements",
     achievementsHint: "12 unlocked · 6 to go",
@@ -2300,11 +2291,6 @@ export const en = {
     secPreferences: "Preferences",
     secHelp: "Help & Support",
     profile: "Profile",
-    identityKyc: "Identity (KYC)",
-    kycVerified: "✓ Verified",
-    kycPending: "Pending",
-    profileKycVerifiedChip: "KYC verified",
-    profileKycPendingChip: "KYC pending",
     profileJoinedDay: "Joined {n}d",
     quickActions: "Quick actions",
     walletSlotUnlock: "Unlock",
@@ -2443,6 +2429,26 @@ export const en = {
       ctaOpenMarket: "Open Market →",
     },
   },
+  // Device display strings. The Device record stores English (a real backend
+  // would return it, and devices persist), so the UI resolves these from the
+  // stable kind at render — see lib/device-copy.ts. Only descriptive strings
+  // live here: SKU names (NexGridBox S1, Cloud Share) and hardware models
+  // (4× RTX 4090) are brand marks and stay untranslated in every locale.
+  device: {
+    nameComputerGpu: "Computer GPU",
+    nameSharedComputer: "Shared computer",
+    // Mid-sentence forms. The standalone names are label-cased ("Your phone");
+    // dropped into running copy they need sentence case.
+    namePhoneInline: "your phone",
+    nameComputerGpuInline: "your computer GPU",
+    gpuMobileNpu: "Mobile NPU · ~{tops} TOPS",
+    gpuComputerShared: "Computer GPU · shared",
+    gpuDistributed: "Distributed",
+    locSingaporeDc: "Singapore Data Center",
+    locFrankfurtDc: "Frankfurt Data Center",
+    locLinkedComputer: "Linked computer",
+    promoNoActive: "(no active device)",
+  },
   receipt: {
     title: "Receipts",
     proofOfCompute: "Proof of Compute",
@@ -2462,11 +2468,11 @@ export const en = {
     catFT: "Fine-tune",
     catEM: "Embedding",
     catSP: "Speech",
-    catKY: "KYC",
+    catKY: "Verification (legacy)",
     // Receipt `type` row. The 6 AI workloads resolve from t.market.workloads at
     // render time (receipts persist, so a baked label would freeze the language
-    // it was generated in); only the KYC receipt needs its own label here.
-    typeWalletPairing: "Wallet Pairing",
+    // it was generated in); only the legacy verification receipt needs its own label here.
+    typeWalletPairing: "Wallet verification (legacy)",
     sigCopied: "Signature copied",
     clearedToast: "{n} receipts removed",
   },
@@ -2517,9 +2523,9 @@ export const en = {
     savedToast: "Profile updated",
     noChangesToast: "No profile changes to save",
     walletAddress: "Wallet address",
-    walletEmpty: "Not paired yet",
-    walletPair: "Pair wallet",
-    walletPaired: "Paired",
+    walletEmpty: "Not set yet",
+    walletPair: "Set address",
+    walletPaired: "Manage",
     sectionAccount: "Account",
     sectionPublic: "Public profile",
     joinedOn: "Joined on",
@@ -2617,14 +2623,14 @@ export const en = {
     chDiscord: "Discord",
     chDiscordHint: "discord.gg/nexgrid · #ask-an-engineer",
     chTicket: "Open a ticket",
-    chTicketHint: "For account / KYC / payout escalations",
+    chTicketHint: "For account / payout escalations",
     chEmail: "Email",
     chEmailHint: "support@nexgrid.ai · within 24h",
     pinnedTitle: "Pinned by support",
     pinnedItem1:
       "Withdrawals processed Mon-Fri 09:00-21:00 UTC. Weekend queue clears Monday.",
     pinnedItem2:
-      "First-time withdrawals require KYC-Express ($1 deposit). One-time, per wallet.",
+      "Set your withdrawal address in the wallet before withdrawing (SMS confirmation). One-time setup per network.",
     pinnedItem3:
       "Devices that go offline for 24h reset their compounding streak — keep them charging.",
     pinnedItem4:
@@ -2712,6 +2718,9 @@ export const en = {
     quoteRefreshing: "Refreshing rate…",
     confirm: "Confirm Exchange",
     confirmingToast: "Submitting on-chain swap…",
+    quoteStaleTitle: "Quote expired",
+    quoteStaleRate: "The rate refreshed while you were confirming. Nothing was swapped and your balances are unchanged — check the new quote and confirm again.",
+    quoteStaleContext: "Your limits or account changed while you were confirming. Nothing was swapped and your balances are unchanged — please try again.",
     swapped: "Swap complete",
     swappedDetail: "{from} {fromAmt} → {to} {toAmt}",
     insufficientTitle: "Insufficient balance",
@@ -2726,15 +2735,8 @@ export const en = {
     capsLabel: "Daily exchange caps",
     capsReset: "Resets midnight",
     yourDaily: "Your daily",
-    kycVerified: "KYC verified",
-    kycUnverified: "Unverified · KYC triggers at ${n} lifetime",
-    lifetimeLabel: "Lifetime ${n}",
     queuedLabel: "Queued for tomorrow ({n})",
     // Gate dialogs / toasts
-    kycRequiredTitle: "KYC verification required",
-    kycRequiredMessage:
-      "You've exchanged ${lifetime} lifetime · once total crosses ${threshold} we require KYC-Express ($1 USDT).",
-    kycRequiredConfirm: "Verify now",
     capReachedTitle: "Daily limit reached",
     capReachedMessage:
       "You've exchanged ${used} of your ${cap}/day cap. Queue this ${amount} swap for tomorrow's reset?",
@@ -2750,7 +2752,7 @@ export const en = {
     heroLabel: "NEX ↔ USDT EXCHANGE",
     heroTitle: "Convert NEX to USDT (or back) at live market rate.",
     heroSub:
-      "Move between NexGrid's platform token and the dollar-pegged stablecoin in your wallet. Daily caps and KYC tiers protect both you and the platform.",
+      "Move between NexGrid's platform token and the dollar-pegged stablecoin in your wallet. Daily caps protect both you and the platform.",
     s1Title: "Why a built-in exchange?",
     s1Para1:
       "Your earnings come in two forms — USDT (stablecoin you can withdraw) and NEX (platform token used for rewards and discounts). Most users want to convert NEX into USDT to eventually cash out. This page lets you do that instantly at the live market price.",
@@ -2765,18 +2767,15 @@ export const en = {
     s2Step3Title: "Funds settle instantly",
     s2Step3Body:
       "Once submitted, both balances update in your wallet on the next frame. No waiting period — the funds are yours.",
-    s3Title: "Daily limits & KYC tiers",
+    s3Title: "Daily limit protection",
     s3Intro:
-      "To protect users and the platform, exchanges have built-in caps that scale with your verification level.",
+      "To protect users and the platform, exchanges have built-in transparent daily caps.",
     lim1Label: "Per-user daily cap · $50/day",
     lim1Body:
       "Each individual account can exchange up to $50 of value per calendar day (resets 00:00 UTC). Designed to keep one user from moving the market.",
     lim2Label: "Platform-wide daily pool · $20,000/day",
     lim2Body:
       "Total daily exchange volume across all users is capped at $20K. If the pool is full, swap goes into a queue and processes on next-day reset.",
-    lim3Label: "KYC threshold · $100 lifetime",
-    lim3Body:
-      "Once your lifetime exchange volume exceeds $100, the platform requires KYC verification (one-time, takes ~2 minutes). All future exchanges remain available.",
     s3HintTitle: "Why daily limits?",
     s3HintBody:
       "Caps prevent fraud and large-scale arbitrage that would hurt token holders. They also satisfy FATF Travel Rule and MiCA regulatory requirements for crypto-to-fiat conversions.",
@@ -2801,11 +2800,29 @@ export const en = {
       "Not in one step. Swap NEX→USDT here first, then withdraw USDT to your wallet or off-ramp to fiat through any USDT-compatible exchange.",
     faqQ4: "What if I need more than $50/day?",
     faqA4:
-      "Complete KYC to unlock higher limits. Verified users gradually qualify for elevated tiers based on account history and trust score.",
+      "The daily cap is the same for every account. Anything above it queues automatically for the next day and processes in submission order — no extra steps.",
     ctaBack: "Got it · take me back",
   },
 
   bills: {
+    // 账单文案码表:渲染时才翻译。写入时翻译会把语言冻在那一刻,切语言后旧账单还是旧语言;
+    // 真后端返回的也应该是码而不是句子。
+    memo: {
+      earnDaily: "Daily AI inference earnings",
+      referDirect: "Direct referral 5% commission",
+      welcomeBonus: "Welcome bonus credited on activation",
+      achFirstContribution: "Achievement · First Contribution",
+      achFirstDollar: "Achievement · First Dollar",
+      kycVerify: "Verification refund (legacy)",
+      legacyRebindRefund: "Verification transfer refund (flow retired)",
+      topupTrc20: "Top-up · USDT-TRC20",
+      withdrawTrc20: "Withdrawal · USDT-TRC20",
+      withdrawNexRefund: "Fee offset refunded · {nex} NEX returned",
+      genesisReversed: "Genesis reservation reversed · {n} slot(s) refunded",
+      genesisSecondaryReversed: "Genesis transfer reversed · token #{id} refunded",
+      stakeReversed: "Re-invest reversed · stake could not be opened, amount refunded",
+      stakeOpenReversed: "Lock reversed · position could not be opened, amount refunded",
+    },
     title: "Bills",
     back: "Back",
     subtitle: "Reconcile every credit and debit on your NexGrid wallet.",
@@ -2819,7 +2836,7 @@ export const en = {
     typeWithdraw: "Withdrawal",
     typePurchase: "Purchase",
     typeSwap: "Swap",
-    typeKyc: "KYC",
+    typeKyc: "Verification (legacy)",
     typeStake: "Stake",
     typeUnstake: "Unstake",
     typeAchievement: "Achievement",
@@ -2883,6 +2900,8 @@ export const en = {
     unitPrice: "Unit price",
     subtotal: "Subtotal",
     discount: "Discount",
+    trialDiscount: "Trial discount",
+    trialOffset: "Trial credit",
     total: "Total",
     timelineTitle: "Deployment timeline",
     trackingNumber: "Deployment #",
@@ -3104,11 +3123,21 @@ export const en = {
     chainCongestedTitle: "Blockchain congestion",
     chainCongestedMsg:
       "The {chain} network is experiencing high mempool load. Your transaction is queued and will be re-broadcast automatically.",
-    kycRequiredTitle: "KYC-Express required",
-    kycRequiredMsg:
-      "First-time withdrawals need a $1 KYC-Express verification to confirm wallet ownership.",
     orderCancelledTitle: "Order cancelled",
     orderCancelledMsg: "Your refund will appear in your wallet within 1–3 days.",
+    // 资金 ⊗ 收据不变量的两种失败面(见 lib/money-receipt.ts):txNotSaved = 整笔已还原,
+    // billMissing = 资金已生效但收据没记上(不可回滚的场景)。文案禁提"存储/写入失败"等工程词。
+    txNotSavedTitle: "Transaction not saved",
+    txNotSavedMsg: "Your balance is unchanged and nothing was recorded. Please try again.",
+    billMissingTitle: "Receipt not recorded",
+    billMissingMsg: "This transaction went through, but it could not be added to your bill history.",
+    // 回滚自己也失败了(R5):钱是真的扣着,不许再说"余额没有变化"。必须给交易号 + 找人。
+    fundsStuckTitle: "Amount still held",
+    fundsStuckMsg: "We couldn't put this amount back. Contact support with reference {id} and they will release it for you.",
+    // 跨标签页并发:这一笔在别处已经处理过了,store 已把最新状态刷回来。共用一对文案,
+    // 不给每个 store 各写一套(用户看到的都是同一件事:你眼前这屏刚被别处改过)。
+    staleTitle: "Just updated elsewhere",
+    staleMsg: "This was already handled on another screen. We've refreshed it for you — take a look before trying again.",
   },
 
   // ─── v3 reverse-Ponzi sample namespaces ─────────────────────────
@@ -3285,6 +3314,11 @@ export const en = {
       earlyDoneSubtitle: "+${refund} returned · ${penalty} penalty",
       claimedTitle: "Position claimed",
       claimedSubtitle: "+${total} returned (interest ${interest})",
+      staleTitle: "Positions just changed",
+      staleSubtitle: "This one was already handled elsewhere. We've refreshed it for you — take a look before you try again.",
+      openFailedTitle: "Nothing was locked",
+      openFailedSubtitle: "Your positions changed on another screen, so we stopped before locking this one. The full amount is back in your balance — try again.",
+      openFailedStorageSubtitle: "This device couldn't save the position, so we stopped before locking it. The full amount is back in your balance — free up some space or switch off private browsing, then try again.",
     },
     howItWorksEntry: "Rules",
   },
@@ -3388,9 +3422,6 @@ export const en = {
     bugBountyAmount: "Up to $50,000 per critical",
     bugBountyHint: "Hosted on HackerOne · 24h triage SLA · 47 bugs resolved to date",
     bugBountyCta: "Submit a finding",
-    kycLabel: "KYC & AML",
-    kycBody:
-      "Identity verification is powered by Jumio and Sumsub. Wallet screening uses Chainalysis KYT for real-time monitoring against OFAC and FATF lists.",
     footer: "Compliance inquiries:",
     download: "Download PDF",
     viewOnChain: "View on-chain",
@@ -3413,6 +3444,10 @@ export const en = {
     inviteVerify: "Verify",
     invitePlaceholder: "NEXGRID-OG-XXXX",
     inviteInvalid: "Invalid invite code",
+    inviteUsed: "This invite code has already been redeemed",
+    inviteVoided: "This invite code has been revoked",
+    inviteAlreadyHeld: "This account has already used an invite code",
+    inviteFailed: "Couldn't verify just now — please try again",
     inviteApplied: "Invite code verified",
     unlockedTitle: "Access granted",
     unlockedSub: "You can subscribe to Genesis Node now.",
@@ -3471,6 +3506,18 @@ export const en = {
     leftSuffix: "left",
     ctaReserve: "Claim seat",
     ctaSoldOut: "Sold out",
+    // Market-closed states (FEAT-GEN10). default/maintenance/restock are the
+    // operator-selectable copy variants — chosen from this list, never free text.
+    marketClosed: {
+      default: "Market not open yet",
+      maintenance: "Under maintenance — reservations paused",
+      restock: "This round is fully allocated",
+      halted: "Reservations paused",
+      configUnavailable: "Can't load status right now",
+      retryHint: "Please try again shortly",
+      retryOk: "Back online — you can continue",
+      holdingsSafe: "Nodes you already hold are unaffected",
+    },
     confirmTitle: "Reserve Genesis Node",
     confirmSubtitle: "${price} × quantity",
     quantity: "Quantity",
@@ -3481,7 +3528,6 @@ export const en = {
     getRowValue: "OG seat · listing priority",
     totalDue: "Total due",
     confirmCta: "Confirm",
-    kycNotice: "KYC required for purchases ≥ $5,000",
     purchaseSuccess: "{n} Genesis seat{s} secured",
     purchaseSubtitle: "OG seat secured · listing priority locked",
     purchaseError: "Insufficient USDT",
@@ -3504,40 +3550,64 @@ export const en = {
 
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
-    dailyCheckIn: "Daily check-in",
+    withdrawFeeStale: "The fee rate has been updated — please try again",
+    withdrawContextStale: "Your account or payout address changed — please submit again",
     earnNexCta: "Mine more NEX",
-    // NEX fee-offset model (replaces old points / hard-burn gate)
-    feeGross: "Fee ({rate})",
+    // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
+    feeConfirmRow: "Network confirmation fee",
     feeCharged: "Fee",
     feeOffsetRow: "NEX offset",
-    feeOffsetTitle: "Offset the fee with NEX",
-    feeFullyWaived: "✓ {nex} NEX burned · withdrawal fee fully waived ($0).",
-    feePartial: "Not enough NEX — fee is {rate} (${gross}). Earn NEX to lower or waive it.",
-    feeOffsetRule:
-      "Each NEX waives ${perNex} of fee — well above its swap value. Burn {required} NEX to waive the fee fully; partial NEX offsets pro-rata, the rest is paid in USDT.",
+    feeOffsetToggle: "Pay the fee with NEX",
+    feeOffsetOffHint: "Turn on to cover this fee with NEX. You hold {n} NEX.",
+    feeOffsetOnFull: "Will use {nex} NEX · the fee is fully covered ($0.00).",
+    feeOffsetOnPartial: "Will use {nex} NEX · covers ${waived}, ${rest} still payable.",
+    feeOffsetNoNex: "No NEX available to cover the fee. Earn NEX through check-ins and mining.",
+    feeOffsetFreeNetwork: "This network currently charges no fee — nothing to cover.",
+    feeWhyTitle: "About the fee",
+    feeWhyClose: "Close",
+    feeWhyNetworkTitle: "Network confirmation fee",
+    feeWhyNetworkBody: "Each withdrawal pays one fixed network confirmation fee. The amount depends on the network of your bound address and does not change with the withdrawal amount. When a network is free, this row shows $0.00.",
+    feeWhyOffsetTitle: "Paying the fee with NEX",
+    feeWhyOffsetBody: "Turn the NEX option on to cover the fee from your NEX balance. Only what is needed is used; if you hold less, the covered part is deducted and the rest is paid from the withdrawal. The option is off by default — NEX is never used without it.",
+    // FEAT-WD02 ⑥ — submit confirm dialog (amount / single confirm-fee line / NEX burn when on / net receive)
+    withdrawConfirmTitle: "Confirm withdrawal",
+    withdrawConfirmBody: "Withdraw ${amount} USDT · Network confirmation fee −${fee} · You receive ${receive}",
+    withdrawConfirmBodyNex: "Withdraw ${amount} USDT · Network confirmation fee −${fee} · NEX offset +${waived} ({nex} NEX) · You receive ${receive}",
+    withdrawConfirmCta: "Confirm",
+
+    feeDetailPlaceholder: "Enter an amount to see the fee breakdown",
+
+    feeConfigUnavailableTitle: "Fee rates updating",
+
+    feeConfigUnavailableBody: "The latest fee rates are unavailable. Submission is paused so you are never charged at a stale rate.",
+
+    feeConfigRetry: "Retry",
     // Sprint 3 — Compliance hold banner(用户视角:监管收紧导致额度审查延长,不暴露 phase 概念)
     complianceHoldTitle: "Enhanced compliance review in effect",
     complianceHoldBody: "Recent regulatory updates require an extended {days}-day review window for withdrawals over $1,000. Smaller amounts still settle on the standard timeline. Thanks for your patience — NexGrid Compliance Authority.",
     // Withdraw page CTAs + compliance hero
-    complianceHeroTitle: "Compliance check required",
-    kycCta: "Complete KYC-Express ($1)",
-    kycPowered: "Powered by Chainalysis KYT · SOC 2 Type II audited",
-    kycVerified: "KYC-Express verified",
-    resetKycLabel: "Reset KYC",
-    resetKycTitle: "Reset KYC-Express pairing?",
-    resetKycMessage: "Reset your KYC-Express pairing? Withdrawals will be blocked until KYC-Express is completed again.",
-    resetKycConfirm: "Reset",
-    resetKycToastTitle: "KYC pairing reset",
-    resetKycToastBody: "Complete KYC-Express again to withdraw.",
+    resetAddrLabel: "Reset address",
+    resetAddrTitle: "Clear withdrawal addresses?",
+    resetAddrMessage: "This clears all withdrawal addresses and history for this account (testing only).",
+    resetAddrConfirm: "Clear",
+    resetAddrToastTitle: "Withdrawal addresses cleared",
+    resetAddrToastBody: "Add a withdrawal address to withdraw again.",
     submitCtaPaired: "Submit withdrawal request",
-    submitCtaUnpaired: "Verification required",
     submitCtaDisabled: "Submit withdrawal request",
-    submitReasonUnpaired: "Complete KYC-Express first.",
     submitReasonAmountRequired: "Enter a withdrawal amount.",
     submitReasonMinAmount: "Minimum withdrawal is ${n}.",
     submitReasonMaxAmount: "Available withdrawable balance is ${n}.",
-    submitReasonAddressRequired: "Enter a valid receiving address.",
+
+    submitReasonFeeConfigUnavailable: "Fee rates are updating, please try again shortly",
+
+    dailyLimitReached: "Daily withdrawal limit reached. Next withdrawal available {time}.",
+    submitReasonAddressRequired: "Add a withdrawal address first.",
     submitReasonReviewBlocked: "This request cannot be submitted right now.",
+
+    submitReasonInFlight: "Your previous withdrawal is still in progress. You can submit a new one once it completes.",
+
+
+    submitReasonUnderReview: "Your previous withdrawal is under manual review. You can submit a new one after it is resolved — contact support from the withdrawal status page for an update.",
     exchangePoolToday: "Platform pool today",
     // Sprint A-1 / B.2 — Reverse-talk staking alternative
     stakeAlt: {
@@ -3600,7 +3670,7 @@ export const en = {
       "USDT spent buying your own devices (NexGridBox / Cloud Share). Refunds are deducted. NEX-token purchases and gift packs don't count.",
     req2Label: "2. Direct invites",
     req2Body:
-      "Number of friends you personally invited who completed sign-up and KYC. Only unique accounts count; downgraded or closed accounts are removed.",
+      "Number of friends you personally invited who completed sign-up. Only unique accounts count; downgraded or closed accounts are removed.",
     req3Label: "3. Team volume",
     req3Body:
       "Total USDT spent by everyone in your network (your invites, their invites, and so on). Includes device purchases and re-purchases across all layers.",
@@ -3639,7 +3709,7 @@ export const en = {
       "Alice's two V1 invites (Bob and Carol) each build out their own teams. Both cross the $5,000 team-volume mark and auto-promote to V2. Alice receives a +2,000 NEX cultivation bonus for each promotion.",
     s5Phase2Title: "Phase 2 — A new invite matures",
     s5Phase2Body:
-      "Alice invites David, who completes KYC and buys his first NexGridBox. David grows his own small team and also reaches V2. Alice now has 3 direct invites at V2 (Bob, Carol, David) — and her team-volume total has climbed to about $52,000 from cumulative orders across the network.",
+      "Alice invites David, who signs up and buys his first NexGridBox. David grows his own small team and also reaches V2. Alice now has 3 direct invites at V2 (Bob, Carol, David) — and her team-volume total has climbed to about $52,000 from cumulative orders across the network.",
     s5Phase3Title: "Phase 3 — Promotion trigger",
     s5Phase3Body:
       "David places one more NexGridBox order. The system re-checks Alice's rank progress.",
@@ -4386,6 +4456,7 @@ export const en = {
     lastSale: "last ${k}K",
     buyCta: "Buy",
     listCta: "List",
+    listBlockedDesc: "Seats you already hold are unaffected — you can list again once the market reopens.",
     noTokensTitle: "No Genesis Nodes yet",
     noTokensSub: "Browse listings above or reserve a fresh mint",
     reservePrimary: "Reserve from primary",
@@ -4407,6 +4478,7 @@ export const en = {
     confirmListCta: "List for sale",
     confirmCancelTitle: "Cancel listing #{id}?",
     confirmCancelMsg: "The node will return to your wallet (not listed). You can re-list later at any price.",
+    confirmCancelMsgBlocked: "The node will return to your wallet (not listed). The market is closed right now — you can list it again once it reopens.",
     confirmCancelCta: "Cancel listing",
     cancelledToast: "Listing #{id} cancelled",
     cancelledDesc: "Node returned to wallet",
@@ -4750,7 +4822,7 @@ export const en = {
     tier1_subscribe_premium_body: "Re-invest your withdrawable balance into a 90-day lock: 35% APY + 1.5× cultivation + Genesis raffle tickets.",
     tier1_subscribe_premium_cta: "Re-invest",
     tier1_buy_first_box_title: "Buy your first NexGridBox · stop bleeding $7/day",
-    tier1_buy_first_box_body: "S1 produces 117× your phone's daily output. Pays itself back in 93 days at base rate.",
+    tier1_buy_first_box_body: "S1 produces 117× your phone's daily output. Pays itself back in 93 days at the base output tier.",
     tier1_buy_first_box_cta: "Shop NexGridBox",
     tier1_topup_balance_title: "Top up your wallet · activate hardware path",
     tier1_topup_balance_body: "Reach $200 balance to unlock the NexGridBox S1 / Cloud Share entry tiers.",
@@ -4788,6 +4860,8 @@ export const en = {
     buyCta: "Get your first NexGridBox · earn $7/day forever",
     routeToast: "Quest complete · +{n} NEX",
     bindCardMemo: "Day-one quest · Link bank card",
+
+    routeMemo: "Day-one quest · {task}",
     t_bind_bank_card: "Link a bank card",
     t_visit_earn: "Open Earn tab",
     t_visit_store: "Browse the store",
@@ -4922,24 +4996,14 @@ export const en = {
     payDeclinedReason: "Reason: declined by issuer (do_not_honor)",
     youReceive: "You receive",
     cardCharged: "Card charged",
-    complianceCheck: "Compliance check",
     network: "Network",
-    sendExactly: "Send exactly",
-    awaitingOnChain: "Awaiting on-chain confirmation…",
-    autoDetect: "auto-detect",
-    walletPairedCredited: "Wallet paired · $1.00 credited to your balance",
     scanOrCopy: "Scan QR or copy the address below",
-    scanWithWallet: "Scan with your wallet · or copy address below",
-    usdtLocked: "USDT · locked",
     fee: "Fee",
     time5min: "5 min",
     time15min: "15 min",
-    addrValidWarn: "Address valid for 30 minutes. Only send {network} to this address — cross-chain transfers cannot be recovered.",
     sendVia: "Send via {network}",
-    sendOneVia: "Send $1.00 via {network}",
-    paymentReceivedFrom: "Payment received from",
-    senderWallet: "sender wallet",
     segUsdt: "USDT on-chain",
+    flowRetired: "This flow has been retired.",
     segCard: "Bank card",
     netRecommended: "Recommended · lowest fee",
     netFee: "Fee {fee} USDT",
@@ -4973,9 +5037,6 @@ export const en = {
     creditedToWallet: "{amount} USDT credited to your wallet",
     backToWallet: "Back to wallet",
     contactIssuer: "Contact your card issuer or try a different card. No charge was made.",
-    kycPairedWallet: "Paired wallet",
-    kycComplianceId: "Compliance ID",
-    kycVerifiedAt: "Verified at",
   },
   usdtGuide: {
     title: "How to get USDT",
@@ -5072,42 +5133,58 @@ export const en = {
     sheetOk: "Got it",
   },
   addrRebind: {
-    title: "Change withdrawal address",
-    subtitle: "Security verification",
-    changeCta: "Change",
-    inFlightBlocked: "A withdrawal is in progress. You can change the address once it completes.",
-    freezeBanner: "Withdrawal address changed — security freeze in effect · {t} left",
-    submitFrozenReason: "Withdrawals are frozen for security after an address change.",
+    title: "Withdrawal address",
+    subtitle: "Address management",
+    manageCta: "Manage",
+    addCta: "Add withdrawal address",
+    changeCta: "Change address",
+    emptyGuideTitle: "Set your withdrawal address",
+    emptyGuideBody: "Withdrawals go to your own wallet address — set it once and use it long-term.",
+    currentLabel: "Current address",
+    addedAtLabel: "In effect since",
+    sourceMigrated: "Earlier address · carried over",
+    holdNote: "New-address protection for {h} hours: withdrawals may need an extra review during this window.",
     newAddressLabel: "New address",
     invalidAddress: "That address does not look valid for the selected network.",
+    sameAddress: "The new address is the same as the current one.",
     networkLabel: "Network",
     safetyNote:
       "To keep funds safe: withdrawals freeze for 24 hours after a change, and the address can be changed at most once every {days} days.",
-    startVerifyCta: "Start verification",
-    cancelCta: "Cancel change",
-    cancelConfirmTitle: "Cancel this change?",
-    cancelConfirmBody: "The verification order will be cancelled and your current address stays in effect.",
-    cancelConfirmYes: "Cancel change",
-    cooldownBlocked: "The withdrawal address can be changed at most once every {days} days.",
-    verifyTitle: "Send the verification amount from the new address",
-    verifyRule: "The transfer must come from the address being bound",
-    platformAddrLabel: "Platform verification address",
-    stepSend: "Send the transfer",
-    stepDetect: "On-chain detection",
-    stepEffective: "New address takes effect",
-    wrongSource: "The verification transfer came from a different address. Send $1 from the new address to retry.",
-    expiredTitle: "Verification timed out",
-    expiredBody:
-      "The 30-minute window has passed and this change request expired. Your current address stays in effect — you can start again.",
-    restartCta: "Start again",
+    inFlightBlocked: "A withdrawal is in progress. You can change the address once it completes.",
+    inFlightGoCta: "View withdrawal progress",
+    cooldownUntil: "You can change it again after {time}.",
+    freezeBanner: "Withdrawal address changed — security freeze in effect · {t} left",
+    submitFrozenReason: "Withdrawals are frozen for security after an address change.",
+    otpTitle: "SMS confirmation",
+    otpBody: "A code has been sent to {phone}",
+    otpBodyGeneric: "A code has been sent to your registered phone",
+    otpSendCta: "Send code",
+    otpResendCta: "Resend",
+    otpResendIn: "Resend in {s}s",
+    otpPlaceholder: "6-digit code",
+    otpConfirmCta: "Confirm",
+    otpInvalid: "Incorrect code — {n} attempts left",
+    otpExpired: "The code has expired. Please request a new one.",
+    otpExhausted: "Too many attempts. Please request a new code.",
+    otpRateLimited: "Too many requests — try again in {s}s.",
+    otpSendFailed: "Could not send the code. Please try again.",
+    changeConfirmTitle: "Change withdrawal address?",
+    changeConfirmBody:
+      "The old address stops receiving immediately. Withdrawals freeze for 24 hours after the change, and no further change is possible for {days} days.",
+    changeConfirmYes: "Confirm change",
+    addSuccessTitle: "Withdrawal address in effect",
+    addSuccessBody: "Future withdrawals will go to this address.",
     successTitle: "New address in effect",
     successBody:
       "The previous address has been deactivated. For security, withdrawals stay frozen for 24 hours before resuming.",
     successNewAddr: "New address",
     successCta: "Got it",
+    historyTitle: "Address history",
+    historyToggle: "View address history",
+    historyReplacedAt: "Deactivated {time}",
+    cancelCta: "Cancel",
     reasonNewAddressAge: "Withdrawal address changed less than 7 days ago — large withdrawals require manual review",
-    networkFollowsBinding: "The network follows your bound address. To use a different network, change the withdrawal address.",
-    startFailed: "Could not start verification. Please try again.",
+    startFailed: "Something went wrong. Please try again.",
   },
 };
 

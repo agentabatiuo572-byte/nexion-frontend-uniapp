@@ -5,6 +5,8 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 import {
   useGenesisConfig,
   tierForSold,
+  genesisPurchaseBlock,
+  genesisSecondaryBlock,
   GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
   type GenesisTier,
 } from "@/store/genesis-config";
@@ -359,7 +361,28 @@ export const useGenesis = defineStore("genesis", () => {
   function purchase(
     n: number,
     tokenIds?: number[],
-  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" } {
+  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" } {
+    // 🔴 **服务端侧拒单**(规格 FEAT-GEN10 异常1/异常4)。前端置灰只挡住「正常点」,
+    //   挡不住深链直达结算、也挡不住「用户已打开购买半屏、运营此刻切关闭」。
+    //   这一层是 mock 的 server 同构面:**不管谁调、从哪调,关闭态一律拒**。
+    //   判定复用 genesisPurchaseBlock 同一条链 —— 页面与 store 不是两套规则。
+    const cfgStore = useGenesisConfig();
+    // 🔴 动钱前重读权威源(独立验收 P0→P1「hydrate-once」):不 refresh 的话,判定读的是
+    //   store 构造时的内存快照 —— 运营切关闭后,已打开的会话照样买(实测 $23,998)。
+    //   真后台此行即「下单前服务端校验」,mock 期读盘就是读 server。
+    cfgStore.refresh();
+    const blocked = genesisPurchaseBlock({
+      configLoaded: cfgStore.loaded,
+      marketOpenState: cfgStore.config.marketOpenState,
+      halted: false, // 熔断槽位;见 genesis-config.ts 的 GenesisPurchaseInput.halted
+      remaining: remaining(),
+      saleStartAt: cfgStore.config.saleStartAt,
+      now: Date.now(),
+    });
+    // sold-out / cap 沿用下方原有的更精确回执;这里只拦「不该卖」的那几种。
+    if (blocked === "marketClosed" || blocked === "halted" || blocked === "configUnavailable") {
+      return { ok: false, cost: 0, reason: "market-closed" };
+    }
     const rem = remaining();
     if (n > rem) return { ok: false, cost: 0, reason: "sold-out" };
     // 单人限购守卫（单源 L4：任何调用方自动继承；运营可配 G4 perUserCap）。
@@ -378,6 +401,23 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function listNode(tokenId: number, askPriceUSDT: number): boolean {
+    // 🔴 挂单出售与承接走**同一个**关闭闸(规格 FEAT-GEN10 ② 明写要锁的两个入口是
+    //   「购买 / 二级市场挂单」;「挂单」在本产品词汇表里是卖方动作,买方叫「承接」)。
+    //   不接闸的后果不是「少拦一次」,而是关闭态下产出一批**谁也接不了的死单**:
+    //   卖家以为在等买家,运营以为已停市而挂单数还在涨,客服查不出这单从一开始就无效。
+    //   用 genesisSecondaryBlock 而非 genesisPurchaseBlock:挂单是二级动作,
+    //   主售售罄 / 未开售都不该妨碍转让,只有「市场关闭 / 熔断 / 配置未知」才拦。
+    const cfgStore = useGenesisConfig();
+    cfgStore.refresh(); // 动状态前重读权威源,同 purchase(hydrate-once 修复)
+    if (
+      genesisSecondaryBlock({
+        loaded: cfgStore.loaded,
+        marketOpenState: cfgStore.config.marketOpenState,
+        now: Date.now(),
+      }) !== null
+    ) {
+      return false;
+    }
     if (!ownedTokenIds.value.includes(tokenId)) return false;
     if (myListings.value.some((l) => l.tokenId === tokenId)) return false;
     if (askPriceUSDT <= 0) return false;
@@ -386,6 +426,11 @@ export const useGenesis = defineStore("genesis", () => {
     return true;
   }
 
+  // 🔴 **撤单刻意不接闸** —— 它是**离场手段**,不是市场参与入口。
+  //   规格 ② 点名要锁的是「购买 / 挂单」两个**入口**,撤单不在其中。
+  //   若关闭态连撤单也拦,用户的席位就被困在一张永远卖不掉的单里,既不能撤回也无人承接
+  //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
+  //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
   function cancelListing(tokenId: number): boolean {
     if (!myListings.value.some((l) => l.tokenId === tokenId)) return false;
     myListings.value = myListings.value.filter((l) => l.tokenId !== tokenId);
@@ -403,6 +448,24 @@ export const useGenesis = defineStore("genesis", () => {
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   function acquireSecondary(tokenId: number): boolean {
+    // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥)。只锁前端入口不锁这里,
+    //   深链照样能承接。
+    //   注意:这里**不**看 soldOut / preSale —— 二级卖的是别人手里的存量,
+    //   主售售罄或未开售都不妨碍转让;只有「市场关闭 / 熔断 / 配置未知」才拦。
+    //
+    // 🔴 判定必须**走同一个纯函数**,不许在这手写条件(独立验收 P1-5):
+    //   上一版这里写的是 `!loaded || marketOpenState === "closed"`,而注释却声称
+    //   「熔断也拦」—— 注释与代码不符,且熔断接线当天二级承接会漏。
+    //   现改为喂给 genesisPurchaseBlock,再按「与二级相关的阻断原因」筛,
+    //   这样将来往优先级链里加档,这里自动跟上。
+    const cfgStore = useGenesisConfig();
+    cfgStore.refresh(); // 动钱前重读权威源,同 purchase(hydrate-once 修复)
+    const blocked = genesisSecondaryBlock({
+      loaded: cfgStore.loaded,
+      marketOpenState: cfgStore.config.marketOpenState,
+      now: Date.now(),
+    });
+    if (blocked !== null) return false;
     if (ownedTokenIds.value.includes(tokenId)) return false;
     // 单人限购同样约束二级承接（持有增长的另一唯一入口）。
     if (myOwned.value + 1 > GENESIS_ELIGIBILITY.perUserCap) return false;

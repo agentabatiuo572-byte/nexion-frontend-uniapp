@@ -14,7 +14,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
  * Persistence: MOCK-ONLY local mirror (nexgrid-rewards-seen-v1). Real backend
  * owns the watermark on the user profile (`rewardsSeenAt`): the page open
  * fires PATCH /api/me/rewards/seen (server stamps the time — client clocks
- * are not trusted) and GET /api/me returns it. This store mirrors that exact
+ * are not trusted) and GET /api/users/me returns it. This store mirrors that exact
  * shape so cutover is a fetch swap; default 0 = everything unread, which is
  * the correct first-run behavior (seeded credits surface the page).
  */

@@ -1,6 +1,7 @@
 import { computed, type ComputedRef } from "vue";
 import type { DeviceKind } from "@/store/types";
 import { useApp } from "@/store/app";
+import { redeemedInviteCodeOf } from "@/store/genesis-invite";
 import { useVRank } from "@/store/v-rank";
 import {
   useGenesis,
@@ -44,8 +45,11 @@ export function useGenesisEligibility(): UseGenesisEligibilityResult {
       vRank: vRank.myRank,
       // active + inventory 都计（countOwned 语义）。
       flagshipCount: app.visibleDevices.filter((d) => FLAGSHIP_KINDS.includes(d.kind)).length,
-      // per-account 凭证(app.user 随 account-cloud 快照走);?? null 兜老快照 undefined。
-      hasInvite: (app.user.genesisInviteCode ?? null) != null,
+      // 🔴 判定 = 「本账号**真持有一个已核销的码**」(规格 FEAT-GEN11 ⑦),不再看格式:
+      // 问码表(status=used && redeemedBy=本账号),user 侧字段只是展示凭证不作数。
+      // 重算时机:本 computed 同时读了 app.user(上面 cumulativeDepositUsdt),核销成功会整体
+      // 替换 user.value → 依赖触发 → UI 立刻解锁,不需要额外订阅码表。
+      hasInvite: redeemedInviteCodeOf(app.accountKey) !== null,
       myOwned: genesis.myOwned,
     }),
   );

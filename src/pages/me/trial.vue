@@ -1,10 +1,16 @@
 <!--
-  Free-trial dashboard (ported from Nexion-prototype/app/(main)/me/trial/page.tsx).
-  Idle/terminal: claim CTA + status. Active/grace/extended: countdown hero, shadow
-  accrued, bound card, early-purchase (with charge-disclosing confirm), discount
-  preview. Auto-starts the trial when returning from card binding with `?trial=1`.
-  Cross-store redeem orchestration (debit + credit remainder + NEX + device spawn +
-  bills) lives in the handler. Wrapped in <AppChassis active="me">.
+  Free-trial dashboard — FEAT-TRIAL02 cardless five-state page (spec ⑤):
+    · none      → claim intro (CTA opens the claim sheet; ineligible = disabled
+                  CTA + concrete reason, 异常2)
+    · active    → countdown hero + accrued credit + "buy now (credit applies)"
+                  CTA → checkout (conversion mode derives from store state)
+    · grace     → stopped state: dimmed hero + "production stopped" + credit
+                  amount + expiry time + buy CTA (异常1 surface)
+    · ended     → terminal: credit expired (time + reason) + plain buy CTA
+    · converted → terminal: owned — link to device inventory
+  A "how the credit works" entry opens the in-page rules sheet (spec ⑥).
+  Conversion money/order all live in checkout — this page never debits.
+  Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
@@ -12,7 +18,7 @@
       <SubPageHeader back="/pages/me/me" :title="t.trial.pageTitle" :subtitle="t.trial.pageHeaderSubtitle" />
 
       <view class="mx-4" style="display: flex; flex-direction: column; gap: 12px">
-        <!-- Active cycle -->
+        <!-- ═══ active / grace — running cycle ═══ -->
         <template v-if="isActiveCycle">
           <CountdownHero
             :status="status"
@@ -21,76 +27,118 @@
             :shadow-u-s-d="shadowUSD"
             :shadow-n-e-x="shadowNEX"
             :started-at="freeTrial.startedAt"
-            :active-ends-at="freeTrial.activeEndsAt"
+            :expires-at="freeTrial.expiresAt"
             :grace-ends-at="freeTrial.graceEndsAt"
-            :extended-ends-at="freeTrial.extendedEndsAt"
           />
 
-          <view v-if="boundCard" :style="boundCardStyle">
-            <view class="flex items-center" style="gap: 12px">
-              <view class="grid place-items-center shrink-0" :style="cardIconBoxStyle">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></svg>
-              </view>
-              <view class="min-w-0" style="flex: 1">
-                <text class="block" :style="cardNumStyle">{{ boundCardLabel }} •••• {{ boundCard.last4 }}</text>
-                <text class="block" :style="cardFooterStyle">{{ boundCardFooter }}</text>
-              </view>
-              <view class="flex items-center active:opacity-70" :style="manageStyle" @click="goCards">
-                <text>{{ t.trial.boundCardManage }}</text>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-              </view>
-            </view>
+          <!-- Legacy card-era trial migrated → rules-changed notice (异常6) -->
+          <view v-if="freeTrial.legacyCardMigrated" class="flex items-start" :style="legacyNoteStyle">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 1px; flex-shrink: 0"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
+            <text style="margin-left: 8px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ t.trial.legacyMigratedNote }}</text>
           </view>
 
-          <!-- Discount preview — de-carded: offer + price rows on the page floor -->
-          <view :style="discountWrapStyle">
-            <text class="block" :style="discountLabelStyle">{{ discountBannerLabel }}</text>
-            <view style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px">
-              <Row :label="t.trial.rowSubtotal" :value="`$${discountInfo.subtotal.toLocaleString()}`" />
-              <Row :label="discountRowLabel" :value="`−$${discountInfo.discount.toFixed(2)}`" accent />
-              <Row v-if="trialOffset.offsetUSD > 0" :label="t.trial.rowEarningsOffset" :value="`−$${trialOffset.offsetUSD.toFixed(2)}`" accent />
-              <view :style="dividerStyle" />
-              <Row :label="t.trial.rowTotal" :value="`$${payNow.toLocaleString()}`" big />
-              <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
+          <!-- Grace: stopped note — device dimmed above; here the plain words -->
+          <view v-if="status === 'grace'" :style="stoppedRowStyle">
+            <view class="flex items-center" style="gap: 6px">
+              <view style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-warning); flex-shrink: 0" />
+              <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.trial.stoppedNote }}</text>
             </view>
-            <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="buyBtnStyle" @click="handleRedeem">
+            <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625">{{ offsetUsableUntilText }}</text>
+          </view>
+
+          <!-- Accrued credit + conversion CTA -->
+          <view :style="creditWrapStyle">
+            <view class="flex items-center justify-between">
+              <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.trial.offsetAccruedLabel }}</text>
+              <text class="font-mono-tabular" style="font-size: 15px; font-weight: 600; color: var(--v5-tech-cyan); white-space: nowrap">${{ trialOffset.offsetUSD.toFixed(2) }}</text>
+            </view>
+            <text v-if="trialOffset.remainderUSD > 0" class="block" :style="remainderNoteStyle">{{ offsetRemainderNote }}</text>
+            <view class="w-full flex items-center justify-center active:scale-[0.98] active:opacity-85" :style="buyBtnStyle" role="button" tabindex="0" :aria-label="buyCtaText" @click="goCheckout">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-              <text style="margin-left: 6px">{{ t.trial.buyCta }}</text>
+              <text style="margin-left: 6px">{{ buyCtaText }}</text>
             </view>
           </view>
 
-          <view class="w-full flex items-center justify-center active:opacity-90" :style="goEarnStyle" @click="goEarn">
+          <!-- Rules entry -->
+          <view class="w-full flex items-center justify-between active:opacity-70" :style="rulesEntryStyle" role="button" tabindex="0" :aria-label="t.trial.rulesEntry" @click="rulesOpen = true">
+            <text style="font-size: 13px; color: var(--v5-ink-2)">{{ t.trial.rulesEntry }}</text>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          </view>
+
+          <view class="w-full flex items-center justify-center active:opacity-90" :style="goEarnStyle" role="button" tabindex="0" :aria-label="t.trial.goEarnCta" @click="goEarn">
             <text>{{ t.trial.goEarnCta }} →</text>
           </view>
-
-          <text class="block" :style="fineprintStyle">{{ t.trial.fineprint }}</text>
         </template>
 
-        <!-- Idle / terminal -->
-        <template v-else>
-          <view v-if="showIdle" :style="idleCardStyle">
-            <view class="grid place-items-center" :style="idleIconBoxStyle">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
-            </view>
-            <text class="block" :style="idleTitleStyle">{{ status === "idle" ? t.trial.idleTitleNew : t.trial.idleTitleAgain }}</text>
-            <text class="block" :style="idleBodyStyle">{{ idleBody }}</text>
-            <view class="inline-flex items-center justify-center active:scale-[0.98]" :style="idleCtaStyle" role="button" tabindex="0" :aria-label="t.trial.idleCta" @click="claim">
-              <text>{{ t.trial.idleCta }}</text>
-            </view>
+        <!-- ═══ none — claim intro ═══ -->
+        <view v-else-if="status === 'none'" :style="idleCardStyle">
+          <view class="grid place-items-center" :style="idleIconBoxStyle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
           </view>
+          <text class="block" :style="idleTitleStyle">{{ t.trial.idleTitleNew }}</text>
+          <text class="block" :style="idleBodyStyle">{{ idleBody }}</text>
+          <view
+            class="inline-flex items-center justify-center"
+            :class="canStartNow ? 'active:scale-[0.98]' : ''"
+            :style="canStartNow ? idleCtaStyle : idleCtaDisabledStyle"
+            role="button"
+            tabindex="0"
+            :aria-label="t.trial.idleCta"
+            :aria-disabled="canStartNow ? 'false' : 'true'"
+            @click="claim"
+          >
+            <text>{{ t.trial.idleCta }}</text>
+          </view>
+          <!-- Ineligible → concrete reason under the disabled CTA (异常2) -->
+          <text v-if="!canStartNow" class="block" :style="reasonNoteStyle">{{ ineligibleReasonText }}</text>
+        </view>
 
-          <view v-else :style="terminalCardStyle">
-            <view class="grid place-items-center" :style="terminalIconBoxStyle">
-              <view v-html="terminalView.icon" />
-            </view>
-            <text class="block" :style="idleTitleStyle">{{ terminalView.title }}</text>
-            <text class="block" :style="idleBodyStyle">{{ terminalView.desc }}</text>
-            <view class="inline-flex items-center justify-center active:opacity-70" :style="cooldownLinkStyle" @click="goDevices">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><path d="M5 22h14" /><path d="M5 2h14" /><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22" /><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2" /></svg>
-              <text>{{ terminalCooldownLink }}</text>
-            </view>
+        <!-- ═══ ended — credit expired terminal ═══ -->
+        <view v-else-if="status === 'ended'" :style="terminalCardStyle">
+          <view class="grid place-items-center" :style="terminalIconBoxStyle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
           </view>
-        </template>
+          <text class="block" :style="idleTitleStyle">{{ t.trial.endedTitle }}</text>
+          <text class="block" :style="idleBodyStyle">{{ endedDesc }}</text>
+          <view class="inline-flex items-center justify-center active:scale-[0.98]" :style="idleCtaStyle" role="button" tabindex="0" :aria-label="t.trial.buyCtaPlain" @click="goCheckout">
+            <text>{{ t.trial.buyCtaPlain }}</text>
+          </view>
+        </view>
+
+        <!-- ═══ converted — owned terminal ═══ -->
+        <view v-else :style="terminalCardStyle">
+          <view class="grid place-items-center" :style="terminalIconBoxStyle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
+          </view>
+          <text class="block" :style="idleTitleStyle">{{ t.trial.convertedTitle }}</text>
+          <text class="block" :style="idleBodyStyle">{{ t.trial.convertedDesc }}</text>
+          <view class="inline-flex items-center justify-center active:opacity-70" :style="cooldownLinkStyle" role="button" tabindex="0" :aria-label="t.trial.convertedDevicesCta" @click="goDevices">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><rect width="20" height="8" x="2" y="2" rx="2" ry="2" /><rect width="20" height="8" x="2" y="14" rx="2" ry="2" /><line x1="6" x2="6.01" y1="6" y2="6" /><line x1="6" x2="6.01" y1="18" y2="18" /></svg>
+            <text>{{ t.trial.convertedDevicesCta }}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- ═══ Rules half-sheet (spec ⑥「查看抵扣规则」) ═══ -->
+    <view v-if="rulesOpen" class="trs-root">
+      <view class="trs-backdrop" @click="rulesOpen = false" />
+      <view class="trs-panel" @click.stop>
+        <view class="flex items-center justify-between">
+          <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ t.trial.rulesTitle }}</text>
+          <view class="grid place-items-center active:opacity-70" style="width: 36px; height: 36px; border-radius: 999px; background: var(--v5-surface-2)" role="button" tabindex="0" :aria-label="t.trial.sheetCloseAria" @click="rulesOpen = false">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+          </view>
+        </view>
+        <view style="margin-top: 14px; display: flex; flex-direction: column; gap: 10px">
+          <view v-for="(line, i) in rulesLines" :key="i" class="flex items-start" style="gap: 8px">
+            <view style="width: 6px; height: 6px; border-radius: 50%; background: var(--v5-brand); margin-top: 6px; flex-shrink: 0" />
+            <text style="flex: 1; font-size: 13px; color: var(--v5-ink-2); line-height: 1.625; text-wrap: pretty">{{ line }}</text>
+          </view>
+        </view>
+        <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="rulesGotStyle" role="button" tabindex="0" :aria-label="t.trial.rulesGotCta" @click="rulesOpen = false">
+          <text>{{ t.trial.rulesGotCta }}</text>
+        </view>
       </view>
     </view>
   </AppChassis>
@@ -98,34 +146,19 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
-import Row from "@/components/me/trial-discount-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { toast, confirm } from "@/store/ui";
-import {
-  useFreeTrial,
-  liveShadowUSD,
-  liveShadowNEX,
-  remainingMs,
-  type TrialStatus,
-} from "@/store/free-trial";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "@/store/trial-config";
-import { useCards, brandLabel } from "@/store/cards";
+import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
+import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
-import { MAX_DEVICES } from "@/store/device-types";
+import { navTo } from "@/lib/route";
 
 const t = useT();
 const freeTrial = useFreeTrial();
 const trialConfig = useTrialConfig();
-const cards = useCards();
-const app = useApp();
-const bills = useBills();
 
 const cfg = computed(() => trialConfig.config);
 const status = computed(() => freeTrial.status);
@@ -143,133 +176,64 @@ onUnmounted(() => {
   ticker = null;
 });
 
-// Auto-start trial when returning from card binding with ?trial=1.
-onLoad((options) => {
-  if (options?.trial !== "1") return;
-  if (!freeTrial.canStart()) {
-    toast.info(t.value.trial.toastCannotStart);
-    return;
-  }
-  const tokenToUse = cards.defaultTokenId ?? cards.cards[cards.cards.length - 1]?.tokenId;
-  if (!tokenToUse) return;
-  freeTrial.startWithCard(tokenToUse);
-  toast.success(t.value.trial.toastActivated);
-});
-
-const isActiveCycle = computed(() => status.value === "active" || status.value === "grace" || status.value === "extended");
+const isActiveCycle = computed(() => status.value === "active" || status.value === "grace");
 const shadowUSD = computed(() => liveShadowUSD(now.value));
 const shadowNEX = computed(() => liveShadowNEX(now.value));
 const remainingMsValue = computed(() => remainingMs(now.value));
-const boundCard = computed(() => (freeTrial.cardTokenId ? cards.cards.find((c) => c.tokenId === freeTrial.cardTokenId) ?? null : null));
-const boundCardLabel = computed(() => (boundCard.value ? brandLabel(boundCard.value.brand) : ""));
-const discountInfo = computed(() => computeDiscountedPrice(cfg.value));
 const trialOffset = computed(() => computeTrialOffset(cfg.value, shadowUSD.value));
-const payNow = computed(() => +Math.max(0, discountInfo.value.total - trialOffset.value.offsetUSD).toFixed(2));
 
 const w = computed(() => t.value.trial);
-const boundCardFooter = computed(() => fmt(w.value.boundCardFooter, { price: cfg.value.trialPriceUSD.toLocaleString() }));
-const discountBannerLabel = computed(() => fmt(w.value.discountBannerLabel, { amount: cfg.value.discountCapUSD.toString() }));
-const discountRowLabel = computed(() => fmt(w.value.rowDiscount, { pct: (cfg.value.discountRate * 100).toFixed(0) }));
-const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: trialOffset.value.remainderUSD.toFixed(2) }));
-
-// Idle vs terminal split (mirrors source IdleOrTerminal).
-const canStartNow = computed(() => freeTrial.canStart());
-const showIdle = computed(
-  () =>
-    status.value === "idle" ||
-    (canStartNow.value && (status.value === "cancelled" || status.value === "failed" || status.value === "redeemed")),
-);
 const idleBody = computed(() => fmt(w.value.idleBody, { n: String(cfg.value.trialDays) }));
-const terminalCooldownLink = computed(() => fmt(w.value.terminalCooldownLink, { n: String(cfg.value.cooldownDays) }));
-
-const CHECK_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>`;
-const X_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>`;
-const ALERT_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>`;
-const terminalView = computed(() => {
-  if (status.value === "redeemed") return { icon: CHECK_SVG, title: w.value.terminalRedeemedTitle, desc: w.value.terminalRedeemedDesc };
-  if (status.value === "failed") return { icon: X_SVG, title: w.value.terminalFailedTitle, desc: w.value.terminalFailedDesc };
-  if (status.value === "cancelled") return { icon: ALERT_SVG, title: w.value.terminalCancelledTitle, desc: w.value.terminalCancelledDesc };
-  return { icon: "", title: "", desc: "" };
+const offsetRemainderNote = computed(() => fmt(w.value.offsetRemainderNote, { remainder: trialOffset.value.remainderUSD.toFixed(2) }));
+const offsetUsableUntilText = computed(() =>
+  fmt(w.value.offsetUsableUntil, {
+    time: freeTrial.graceEndsAt !== null ? new Date(freeTrial.graceEndsAt).toLocaleString() : w.value.countdownDateEmpty,
+  }),
+);
+const buyCtaText = computed(() =>
+  status.value === "grace"
+    ? fmt(w.value.graceBuyCta, { amount: trialOffset.value.offsetUSD.toFixed(2) })
+    : fmt(w.value.buyCtaOffset, { amount: trialOffset.value.offsetUSD.toFixed(2) }),
+);
+const endedDesc = computed(() => {
+  const at = freeTrial.finishedAt ?? freeTrial.graceEndsAt;
+  return fmt(w.value.endedDesc, { time: at !== null ? new Date(at).toLocaleString() : w.value.countdownDateEmpty });
 });
 
+// none-state eligibility (异常2 — concrete reason, never a generic error).
+const canStartNow = computed(() => {
+  void now.value; // re-evaluate each tick (eligibility isn't reactive on config alone)
+  return freeTrial.canStart();
+});
+const ineligibleReasonText = computed(() => {
+  const r = freeTrial.eligibility().reason;
+  if (r === "converted") return w.value.eligReasonConverted;
+  if (r === "used") return w.value.eligReasonUsed;
+  if (r === "in-progress") return w.value.eligReasonInProgress;
+  if (r === "risk") return w.value.eligReasonRisk;
+  return w.value.eligReasonClosed;
+});
+
+// Rules sheet (spec ⑥: pre-purchase offset / no cash-out / post-purchase
+// remainder → balance / expiry).
+const rulesOpen = ref(false);
+const rulesLines = computed(() => [
+  fmt(w.value.rulesBefore, { cap: String(cfg.value.trialOffsetCapUSD) }),
+  w.value.rulesNoCash,
+  w.value.rulesAfter,
+  fmt(w.value.rulesExpiry, { days: String(cfg.value.graceDays) }),
+]);
+
 function claim() {
+  if (!canStartNow.value) return; // disabled CTA — reason line explains why
   useTrialClaimSheet().show();
 }
 
-async function handleRedeem() {
-  const nowMs = Date.now();
-  const shadowUSDBeforeRedeem = liveShadowUSD(nowMs);
-  const shadowNEXBeforeRedeem = liveShadowNEX(nowMs);
-  const { offsetUSD, remainderUSD } = computeTrialOffset(cfg.value, shadowUSDBeforeRedeem);
-  const chargeAmount = +Math.max(0, discountInfo.value.total - offsetUSD).toFixed(2);
-
-  if (app.user.usdtBalance < chargeAmount) {
-    toast.error(w.value.toastDebitFailedNoBalance);
-    return;
-  }
-
-  // Explicit charge-disclosing confirmation before any debit.
-  const confirmed = await confirm({
-    title: w.value.confirmPurchaseTitle,
-    message: fmt(w.value.confirmPurchaseMessage, { amount: chargeAmount.toLocaleString() }),
-    confirmLabel: w.value.confirmPurchaseConfirm,
-    cancelLabel: w.value.confirmPurchaseCancel,
-    icon: "info",
-  });
-  if (!confirmed) return;
-
-  const result = freeTrial.redeemEarly();
-  if (!result.ok) {
-    toast.error(w.value.toastDebitFailedTrialEnded);
-    return;
-  }
-
-  // Cross-store orchestration in the handler (stores don't import each other).
-  // confirm 期间并发窗口:余额可能被别端(多端/其他购买)消耗,预检查(上方)已 stale。
-  // debit 失败必须中止不记账单;redeemEarly 已推进 redeemed,故翻 failed 起冷却
-  // (保留 finishedAt),不留 redeemed-but-nothing 死状态。对齐 App.vue handleAutoRedeem。
-  const debitOk = app.debitBalance(chargeAmount);
-  if (!debitOk) {
-    freeTrial.markChargeFailed("insufficient_funds");
-    toast.error(w.value.toastDebitFailedNoBalance);
-    return;
-  }
-  const purchaseRef = `TRIAL-EARLY-${Date.now().toString(36).toUpperCase()}`;
-  bills.add({
-    type: "purchase",
-    symbol: "USDT",
-    amount: -chargeAmount,
-    status: "posted",
-    memo: `Trial early-redeem · NexGridBox S1 (promo -$${discountInfo.value.discount}, earnings -$${offsetUSD})`,
-    ref: purchaseRef,
-  });
-  if (remainderUSD > 0) {
-    app.creditBalance(remainderUSD);
-    bills.add({ type: "bonus", symbol: "USDT", amount: remainderUSD, status: "posted", memo: "Trial earnings remainder → balance · NexGridBox S1", ref: `${purchaseRef}-EARN-USDT` });
-  }
-  if (shadowNEXBeforeRedeem > 0) {
-    app.creditNex(shadowNEXBeforeRedeem);
-    bills.add({ type: "bonus", symbol: "NEX", amount: shadowNEXBeforeRedeem, status: "posted", memo: "Trial earnings → balance · NEX", ref: `${purchaseRef}-EARN-NEX` });
-  }
-  // Provision device (mirrors simulation-provider auto-redeem path).
-  // 实付 = 促销价 − 收益抵扣;作为该设备日后置换抵扣的基数(FEAT-DEV02)。
-  app.addDevice(cfg.value.trialProductId, { paidPriceUsdt: chargeAmount });
-  const newId = app.devices[app.devices.length - 1]?.id;
-  if (newId && app.activeSlotCount < MAX_DEVICES) {
-    app.activateDevice(newId);
-  }
-  const amountStr = chargeAmount.toLocaleString();
-  if (shadowUSDBeforeRedeem <= 0) {
-    toast.success(fmt(w.value.toastPurchaseComplete, { amount: amountStr }));
-  } else if (remainderUSD > 0) {
-    toast.success(fmt(w.value.toastPurchaseCompleteWithEarn, { amount: amountStr, remainder: remainderUSD.toFixed(2) }));
-  } else {
-    toast.success(fmt(w.value.toastPurchaseCompleteOffsetOnly, { amount: amountStr }));
-  }
-}
-
-function goCards() {
-  uni.navigateTo({ url: "/pages/me/wallet-cards", fail: () => {} });
+// Conversion CTA → checkout. The trial context derives from store state
+// (status ∈ active|grace ∧ product = trialProductId) — no URL marker, so the
+// same link is the plain purchase entry once the trial has ended.
+function goCheckout() {
+  navTo(`/pages/store/checkout?product=${cfg.value.trialProductId}`);
 }
 function goEarn() {
   uni.navigateTo({ url: "/pages/earn/earn", fail: () => {} });
@@ -278,22 +242,14 @@ function goDevices() {
   uni.navigateTo({ url: "/pages/me/devices", fail: () => {} });
 }
 
-// De-carded: the bound-card info row + discount offer sit on the page floor,
-// each opened by a hairline. The CountdownHero above stays the sole spotlight.
-const boundCardStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
-const discountWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
-const cardIconBoxStyle: CSSProperties = { width: "36px", height: "36px", borderRadius: "8px", background: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)" };
-const cardNumStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", fontFamily: "var(--font-jet-mono), ui-monospace, monospace" };
-const cardFooterStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", marginTop: "2px" };
-const manageStyle: CSSProperties = { gap: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
-// Discount hook — savings accent kept prominent; de-uppercased (a full
-// sentence, not a mono cap kicker).
-const discountLabelStyle: CSSProperties = { fontFamily: "var(--font-v5)", fontSize: "13px", fontWeight: 600, color: "var(--v5-tech-cyan)" };
-const dividerStyle: CSSProperties = { height: "1px", background: "var(--v5-border)", margin: "6px 0" };
-const remainderNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625 };
+// ── styles — hairline-separated blocks on the page floor ──
+const legacyNoteStyle: CSSProperties = { padding: "10px 2px 0" };
+const stoppedRowStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
+const creditWrapStyle: CSSProperties = { padding: "13px 2px 0", borderTop: "1px solid var(--v5-border)" };
+const remainderNoteStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", marginTop: "6px", lineHeight: 1.625, textWrap: "pretty" };
 const buyBtnStyle: CSSProperties = { marginTop: "12px", width: "100%", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
+const rulesEntryStyle: CSSProperties = { minHeight: "44px", padding: "0 2px", borderTop: "1px solid var(--v5-border)" };
 const goEarnStyle: CSSProperties = { width: "100%", height: "44px", borderRadius: "999px", background: "var(--v5-surface-2)", fontSize: "13px", color: "var(--v5-ink-2)" };
-const fineprintStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-4)", lineHeight: 1.625, paddingLeft: "4px" };
 const idleCardStyle: CSSProperties = {
   borderRadius: "16px",
   border: "1px dashed var(--v5-border-strong)",
@@ -303,9 +259,53 @@ const idleCardStyle: CSSProperties = {
 };
 const idleIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", margin: "0 auto" };
 const idleTitleStyle: CSSProperties = { marginTop: "12px", fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
-const idleBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375, padding: "0 8px" };
+const idleBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.375, padding: "0 8px", textWrap: "pretty" };
 const idleCtaStyle: CSSProperties = { marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
-const terminalCardStyle: CSSProperties = { borderRadius: "16px", border: "1px solid var(--v5-border)", background: "var(--v5-surface)", padding: "24px 20px", textAlign: "center" };
+const idleCtaDisabledStyle: CSSProperties = { marginTop: "16px", height: "48px", padding: "0 24px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-4)", fontSize: "13px", fontWeight: 600 };
+const reasonNoteStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625, textWrap: "pretty" };
+const terminalCardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", padding: "24px 20px", textAlign: "center" };
 const terminalIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "var(--v5-surface-2)", margin: "0 auto" };
-const cooldownLinkStyle: CSSProperties = { marginTop: "16px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const cooldownLinkStyle: CSSProperties = { marginTop: "16px", minHeight: "44px", fontSize: "13px", color: "var(--v5-ink-2)" };
+const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
 </script>
+
+<style scoped>
+.trs-root {
+  position: fixed;
+  inset: 0;
+  z-index: 790;
+}
+.trs-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--v5-bg-color-mask);
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
+  animation: trs-fade 0.24s ease-out;
+}
+.trs-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 800;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  background: var(--v5-surface);
+  border-top: 1px solid var(--v5-border);
+  padding: 20px 16px;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 38px);
+  animation: trs-slide-up 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes trs-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes trs-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .trs-backdrop, .trs-panel { animation: none; }
+}
+</style>

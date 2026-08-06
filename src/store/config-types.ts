@@ -82,6 +82,27 @@ export interface WithdrawRulesConfig {
   newAddressHoldHours: number;
   // PAY04 换绑频控: 每 N 天最多更换一次提现地址(后台 D5/K3 可配)。
   rebindCooldownDays: number;
+  // 🔴 FEAT-WD01a 小额免审线(USD,后台 D5 可配)。金额 ≤ 此值时免掉「首提必审」与
+  //    「新地址 hold」两道**冷启动保守闸**;0 = 关闭快车道。
+  //    ⚠️ 风控闸(冻结簇/共用地址/风险分/大额账龄)不受此值影响,照常裁决。
+  smallAmountThresholdUsd: number;
+  // 🔴 FEAT-WD01b 每日提现笔数上限(后台 D5 可配)。达上限时**不建单不扣款**。
+  //    页面上那句「每日限额 N 笔/日」必须从这里插值 —— 此前是写死的空头承诺:
+  //    文案写着 1 笔/日,代码里没有任何计数,用户提几笔都行。
+  dailyWithdrawLimitCount: number;
+  // 🔴 FEAT-WD01b 到账时效(小时,后台 D5 payoutSlaHours 可配,值域 1–168)。
+  //    预计到账 = 提交 + 本值;24 = 次日到账(T+1)。
+  payoutSlaHours: number;
+  // 🔴 FEAT-WD01b 大额到账审查窗口(天,后台 D5 cooldownDays 可配;0 = 该阶段不开)。
+  //    金额 ≥ 大额线时,与「提交 + 到账时效」**取更晚者**。
+  //    注意与 rebindCooldownDays 不是一回事:那个是换绑频控,这个是大额到账等待。
+  payoutReviewWindowDays: number;
+  // 🔴 FEAT-WD02 网络确认费(后台 D5 可配,值域 [0, 25];种子 trc20/bep20 $1 · erc20 $5)。
+  //    每笔**固定**、按提现网络取键,取代旧「networkFee 比例夹逼 + 按金额比例平台费」双费模型;
+  //    0 = 该网络免手续费(合法值,页面显示 $0.00 不藏行)。
+  //    规格 ③ 数据字典把它挂在 PlatformConfig.withdrawFee 下;工程沿用 withdrawRules 容器
+  //    (叶子名/键/值域一致,容器差异已登记 T9 spec 勘误清单)。
+  networkConfirmFeeUsd: Record<"trc20" | "bep20" | "erc20", number>;
 }
 
 // 新人礼发放模式: risk_bucket = 按当前风险簇分桶(默认);direct = 直入可提(运营可关闸)。
@@ -129,6 +150,10 @@ export interface OtpGateConfig {
   maxVerifyAttempts: number;
   // 滑块通过后签发 ticket 的有效期(秒),单次使用。
   captchaTicketTtlSeconds: number;
+  // FEAT-AUTH03: 每次发码必过滑块的场景;空数组 = 全部回落次数阈值规则。
+  // 平台可配,后台可调面由包 A 登记。值域与 auth-otp 的 OtpScene 相同,
+  // 内联字面量避免 config-types → auth-otp 反向依赖。
+  captchaAlwaysScenes: Array<"login" | "register" | "reset" | "payout-address">;
 }
 
 // ── FEAT-SHARE01 分享链路配置(§13.3 share.*;K/E 域运营可调)─────────────
@@ -176,8 +201,37 @@ export interface ShareConfig {
   };
 }
 
+/** 对外公布数据(规格 FEAT-HOME02 ③;后台单源 = H 域「对外公布数据」卡)。
+ *
+ *  🔴 `fleetDevices` 是**平台舰队规模锚**:公布日产、每秒支付流、累计支付,以及
+ *  介绍页 / 信任页 / 全球网格 / 分享海报的舰队数字**全部由它派生**。各页禁止另存一份
+ *  (既有 `platform_stats_anchor` 哨兵守这条)。改它 = 改一切平台级金额口径。
+ *
+ *  🔴 `virtualUserCount` 与 `hashratePercentileTable` 只用于**排名分母与百分位映射**,
+ *  **永不**以任何形式出现在用户可见文案、字段名或接口响应的展示字段里(产品内 0 元层)。 */
+export interface PublicStatsConfig {
+  /** 平台舰队规模锚。合法域 [1000, 1000000]。 */
+  fleetDevices: number;
+  /** 在线率(%)。在线设备 = 舰队规模 × 该比例。合法域 [50, 100]。 */
+  onlineRatePct: number;
+  /** 在线数展示抖动幅度(台)。**只影响视觉呼吸感,不参与任何金额派生**。[0, 500]。 */
+  onlineJitter: number;
+  /** 注册用户展示基数。[0, 100000000]。 */
+  registeredUsersBase: number;
+  /** 注册用户月增速(%)。前端按时间锚派生当前值 —— **推算不累加**,故刷新不回退。[0, 50]。 */
+  registeredUsersMonthlyGrowthPct: number;
+  /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
+  registeredUsersAnchorAt: number;
+  /** 虚拟人口规模。真实人口 + 它 = 排名分母。[0, 10000000]。 */
+  virtualUserCount: number;
+  /** 虚拟人口算力分布档(tops 升序、cumPct 单调不减且 ≤100、至少 2 档)。
+   *  校验与消费见 `lib/network-rank.ts`;非法即该项不可用,不拖垮其它两格。 */
+  hashratePercentileTable: { tops: number; cumPct: number }[];
+}
+
 export interface PlatformConfig {
   featureFlags: FeatureFlags;
+  publicStats: PublicStatsConfig;
   onlineBonus: OnlineBonus;
   riskCluster: RiskClusterConfig;
   withdrawRules: WithdrawRulesConfig;

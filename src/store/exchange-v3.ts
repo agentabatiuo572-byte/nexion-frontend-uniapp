@@ -9,8 +9,9 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // Enforces spec §8 caps:
 //   - Per-user daily cap: $50 USDT equivalent
 //   - Platform daily cap: $20,000 USDT equivalent (shared, simulated)
-//   - KYC trigger: lifetime exchanged ≥ $100 → KYC-Express required
 //   - Queue: requests over today's cap wait until tomorrow's reset
+// (终身累计 $100 触发 KYC 的门已随 FEAT-KYC-RM01b 删除 —— 其目的就是 KYC 导流,
+//  机制既删门随删;汇率与日限规则不变。)
 //
 // `canExchange(usd)` returns the gating decision; `record(usd)` commits after
 // success. `resetIfNewDay()` rolls the daily counters at midnight.
@@ -18,7 +19,6 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // here is a prototype stub.
 export const USER_DAILY_CAP_USD = 50;
 export const PLATFORM_DAILY_CAP_USD = 20_000;
-export const KYC_LIFETIME_THRESHOLD_USD = 100;
 
 export interface QueuedExchange {
   id: string;
@@ -30,8 +30,7 @@ export interface QueuedExchange {
 export type Gate =
   | { ok: true }
   | { ok: false; reason: "user-cap"; usedToday: number; cap: number }
-  | { ok: false; reason: "platform-cap"; usedToday: number; cap: number }
-  | { ok: false; reason: "kyc-required"; lifetime: number; threshold: number };
+  | { ok: false; reason: "platform-cap"; usedToday: number; cap: number };
 
 // 旧设备级单键 "nexgrid-exchange-v3" 废弃(存量无账号归属,mock 可重建);兑换风控计数按账号分行。
 const ACCOUNTS_KEY = "nexgrid-exchange-v3-accounts-v1"; // { [accountKey]: PersistShape }
@@ -44,8 +43,6 @@ interface PersistShape {
   todayUserUsedUSD: number;
   todayPlatformUsedUSD: number;
   dayKey: string;
-  lifetimeExchangedUSD: number;
-  kycVerified: boolean;
   queue: QueuedExchange[];
 }
 
@@ -54,8 +51,6 @@ function defaults(): PersistShape {
     todayUserUsedUSD: 0,
     todayPlatformUsedUSD: 0,
     dayKey: todayKey(),
-    lifetimeExchangedUSD: 0,
-    kycVerified: false,
     queue: [],
   };
 }
@@ -69,15 +64,13 @@ function hydrate(accountKey: string): PersistShape {
 export const useExchangeV3 = defineStore("exchangeV3", () => {
   // ponytail: todayPlatformUsedUSD 名义是平台共享计数,但整块 stub 落进 per-account 行——
   // store 已声明真后台 server-side 拥有全部计数,demo 里平台日上限 $20k 从不触及,每账号各记
-  // 自己那份对显示无差;真后台替换时平台计数归 server 全局、用户计数(含 kyc/终身额)归 per-user。
-  // 关键防泄漏靶:kycVerified / lifetimeExchangedUSD / todayUserUsedUSD 换账号不得继承。
+  // 自己那份对显示无差;真后台替换时平台计数归 server 全局、用户计数归 per-user。
+  // 关键防泄漏靶:todayUserUsedUSD 换账号不得继承。
   let boundKey = "default";
   const init = hydrate(boundKey);
   const todayUserUsedUSD = ref(init.todayUserUsedUSD);
   const todayPlatformUsedUSD = ref(init.todayPlatformUsedUSD);
   const dayKey = ref(init.dayKey);
-  const lifetimeExchangedUSD = ref(init.lifetimeExchangedUSD);
-  const kycVerified = ref(init.kycVerified);
   const queue = ref<QueuedExchange[]>(init.queue);
 
   function persist() {
@@ -85,21 +78,17 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
       todayUserUsedUSD: todayUserUsedUSD.value,
       todayPlatformUsedUSD: todayPlatformUsedUSD.value,
       dayKey: dayKey.value,
-      lifetimeExchangedUSD: lifetimeExchangedUSD.value,
-      kycVerified: kycVerified.value,
       queue: queue.value,
     });
   }
 
-  /** 账号切换重绑:装载该账号的兑换风控计数(防跨账号继承 KYC 资格/日限/终身额)。 */
+  /** 账号切换重绑:装载该账号的兑换风控计数(防跨账号继承日限)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     const next = hydrate(boundKey);
     todayUserUsedUSD.value = next.todayUserUsedUSD;
     todayPlatformUsedUSD.value = next.todayPlatformUsedUSD;
     dayKey.value = next.dayKey;
-    lifetimeExchangedUSD.value = next.lifetimeExchangedUSD;
-    kycVerified.value = next.kycVerified;
     queue.value = next.queue;
   }
 
@@ -114,15 +103,6 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
   }
 
   function canExchange(usd: number): Gate {
-    // KYC gate triggers at lifetime ≥ $100
-    if (!kycVerified.value && lifetimeExchangedUSD.value + usd > KYC_LIFETIME_THRESHOLD_USD) {
-      return {
-        ok: false,
-        reason: "kyc-required",
-        lifetime: lifetimeExchangedUSD.value,
-        threshold: KYC_LIFETIME_THRESHOLD_USD,
-      };
-    }
     if (todayUserUsedUSD.value + usd > USER_DAILY_CAP_USD) {
       return { ok: false, reason: "user-cap", usedToday: todayUserUsedUSD.value, cap: USER_DAILY_CAP_USD };
     }
@@ -135,7 +115,6 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
   function record(usd: number) {
     todayUserUsedUSD.value += usd;
     todayPlatformUsedUSD.value += usd;
-    lifetimeExchangedUSD.value += usd;
     persist();
   }
 
@@ -149,15 +128,9 @@ export const useExchangeV3 = defineStore("exchangeV3", () => {
     persist();
   }
 
-  function setKycVerified(v: boolean) {
-    kycVerified.value = v;
-    persist();
-  }
-
   return {
-    todayUserUsedUSD, todayPlatformUsedUSD, dayKey, lifetimeExchangedUSD,
-    kycVerified, queue,
-    resetIfNewDay, canExchange, record, enqueue, setKycVerified, bindAccount,
+    todayUserUsedUSD, todayPlatformUsedUSD, dayKey, queue,
+    resetIfNewDay, canExchange, record, enqueue, bindAccount,
   };
 });
 

@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const accountKey = "spec4-sync@nexgrid.ai";
@@ -17,7 +18,7 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const errors = [];
 page.on("console", (msg) => {
-  if (msg.type() === "error") errors.push(msg.text());
+  if (msg.type() === "error") collectAppConsoleErrors(errors, baseUrl)(msg);
 });
 page.on("pageerror", (err) => errors.push(err.message));
 

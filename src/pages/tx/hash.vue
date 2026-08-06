@@ -242,15 +242,16 @@ const copyBtnStyle: CSSProperties = {
 // TxRow hairlines are the internal dividers.
 const detailsCardStyle: CSSProperties = { marginTop: "12px", borderRadius: "16px", background: "var(--v5-surface)", overflow: "hidden" };
 // External-explorer explainer — de-carded to the page floor (ancillary guidance,
-// not part of the receipt); content aligns to the mx-4 gutter, buttons keep their
-// surface-2 fill.
+// not part of the receipt); content aligns to the mx-4 gutter, buttons take the
+// surface fill (L1 = the layer that sits on the page floor).
 const extCardStyle: CSSProperties = { marginTop: "12px" };
 const extTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const extBodyStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 const extBtnStyle: CSSProperties = {
   height: "44px",
   borderRadius: "8px",
-  background: "var(--v5-surface-2)",
+  // 外链按钮所在的 extCard 已去壳(无背景)→ 按钮直接贴页面底,用 L1 surface;surface-2 在亮色下与页面底几乎同色
+  background: "var(--v5-surface)",
   fontSize: "12px",
   color: "var(--v5-ink-2)",
 };

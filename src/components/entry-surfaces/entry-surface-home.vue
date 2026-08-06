@@ -338,7 +338,8 @@ function go(href: string) {
   margin-top: 12px;
   padding: 0 14px;
   border-radius: 8px;
-  background: var(--v5-surface-2);
+  /* 可点链接行直接坐在 entry-page 底(--v5-bg)上,surface-2 与页面底同色不可辨 → 改 L1 surface,与同级 entry-mode / entry-metric 对齐 */
+  background: var(--v5-surface);
   color: var(--v5-ink-2);
   font-size: 13px;
   font-weight: 600;

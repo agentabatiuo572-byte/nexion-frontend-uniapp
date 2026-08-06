@@ -10,4 +10,15 @@ const uni = (uniPlugin as unknown as { default?: typeof uniPlugin }).default ?? 
 
 export default defineConfig({
   plugins: [uni(), UnoCSS()],
+  server: {
+    // 🔴 双栈监听(2026-08-05 结构性反思第 1 步)。此前默认只绑 [::1]:
+    //   curl localhost=200 而 127.0.0.1=拒连 → verify 前段 curl 探活全绿、
+    //   后段硬写 127.0.0.1 的 6 个 Playwright 齿轮 ERR_CONNECTION_REFUSED,
+    //   **「没跑起来」被读成「跑过且绿」**,两轮 agent 还对根因得出互相矛盾的结论。
+    //   host:true → Node 监听 `::` 双栈,127.0.0.1 / [::1] / localhost / 局域网都通。
+    //   修在服务端一处,不追着改 N 个脚本里写死的地址(那是散弹枪,新脚本必复发)。
+    host: true,
+    port: 5173,
+    strictPort: true, // 5173 被占就明着炸,不许静默换端口把 verify 全家变假红
+  },
 });

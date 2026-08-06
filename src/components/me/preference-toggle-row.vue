@@ -46,7 +46,11 @@ const switchTrackStyle = computed<CSSProperties>(() => ({
   height: "20px",
   borderRadius: "999px",
   padding: "2px",
-  background: props.value ? "var(--v5-brand)" : "var(--v5-surface)",
+  // 关闭态用 surface-3(《03》L0-L3 阶梯里的「recessed input / inset」,语义即内凹槽)。
+  // 原值 --v5-surface 与本行所在的设置卡同色 → 亮色下白轨+白圆点+白卡三层同色,
+  // 整个开关消失;暗色下轨道也隐形只剩一个悬空白点。surface-3 对卡片 ΔE 9.1(亮)/
+  // 10.7(暗),两个主题都一眼可辨。
+  background: props.value ? "var(--v5-brand)" : "var(--v5-surface-3)",
 }));
 const knobStyle = computed<CSSProperties>(() => ({
   display: "block",

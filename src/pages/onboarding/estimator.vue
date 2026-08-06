@@ -291,7 +291,8 @@ function leaveEstimator() {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: var(--v5-surface);
+  /* 原 --v5-surface 与外层 .cmp 同色 → 图标框隐形(双主题)。surface-3 = 内凹 inset 语义。 */
+  background: var(--v5-surface-3);
   display: flex;
   align-items: center;
   justify-content: center;

@@ -1,4 +1,5 @@
 import type { GpuTier, GpuTierId, WithdrawalRiskRoute } from "./config-types";
+import type { GenesisInviteRedeemResult } from "./genesis-invite";
 import type { EntrySurface } from "@/lib/entry-surface";
 
 export type DeviceKind =
@@ -156,9 +157,8 @@ export interface Device {
   miningSince?: number | null;
 }
 
-// NOTE: WalletPairingState (v3.2 KYC-Express §5.4.3.2.1) lives in its own
-// store at lib/store/wallet-pairing.ts (zustand + persist) because it needs
-// localStorage persistence independent of useApp.
+// NOTE: 提现地址簿(FEAT-KYC-RM01a)在 store/payout-address.ts 独立持久化
+// (按账号作用域,localStorage persistence independent of useApp)。
 
 export type UserTier = "L0" | "L1" | "L2" | "L3" | "L4" | "L5";
 
@@ -188,7 +188,7 @@ export interface UserState {
   appliedRewardKeys?: Record<string, true>;
   /** Lifetime sum of completed USDT deposits/topups. Used by tradein eligibility
    *  `cumulative-deposit-usdt` rule. Seeded 0; incremented ONLY by recordDeposit
-   *  action (NOT earnings, NOT exchange, NOT trade-in credit, NOT KYC bonus,
+   *  action (NOT earnings, NOT exchange, NOT trade-in credit,
    *  NOT weekly-quest reward).
    *  ⚠️ MOCK-ONLY: production server-canonical via
    *  GET /api/users/me.cumulativeDepositUsdt
@@ -196,7 +196,8 @@ export interface UserState {
   cumulativeDepositUsdt: number;
   /** 已核销的创世邀请码(FEAT-GEN08 资格通道4)。per-user 凭证,必须随
    *  account-cloud 快照按账号走(设备级存储会跨账号继承 → 资格门旁路)。
-   *  null = 未核销。仅由 setGenesisInviteCode action 写入(格式校验)。
+   *  null = 未核销。仅由 setGenesisInviteCode action 写入(查平台码表核销,不是格式校验);
+   *  语义 = 「本账号已核销的那个码」,一人至多一个。
    *  ⚠️ MOCK-ONLY: production = POST /api/genesis/invite/redeem server 核销。 */
   genesisInviteCode: string | null;
 }
@@ -204,7 +205,7 @@ export interface UserState {
 export interface EarningsState {
   today: number;             // USDT
   todayNEX: number;          // NEX (platform token)
-  thisWeek: number;          // USDT rolling 7-day. (TBD; candidate `GET /api/me/earnings?range=week` per PRD §9.11c.1)
+  thisWeek: number;          // USDT rolling 7-day. (`GET /api/me/earnings?range=week` per PRD §9.11c.1)
   thisMonth: number;
   total: number;
   history: { ts: number; amount: number }[]; // recent entries
@@ -236,17 +237,39 @@ export type WithdrawalStatus =
   | "tx-failed"
   | "refunded";
 
+/** FEAT-WD02 提现费快照(server 形状,POST /api/withdrawals 请求/响应同构)。
+ *  fee 从单数字换成结构化快照;penaltyUsd 仅历史单可能存在(旧双费模型),新单**不生成**。
+ *  存量数字 fee 在 account-cloud 读盘升级时归一(actualFeeUsd = 旧数字,
+ *  networkConfirmUsd/nexBurned 不可考记 0,🔴 禁按新规则重算 —— 展示层只读 actualFeeUsd)。 */
+export interface WithdrawalFeeSnapshot {
+  /** 报价时的网络确认费(USD,按网络固定) */
+  networkConfirmUsd: number;
+  /** 实际烧掉的 NEX(用户开抵扣才 > 0) */
+  nexBurned: number;
+  /** 实收费用 = max(0, networkConfirmUsd − nexBurned × offsetRate) */
+  actualFeeUsd: number;
+  /** 仅历史单(旧惩罚费模型)存在;新单不生成该字段 */
+  penaltyUsd?: number;
+}
+
 export interface Withdrawal {
   id: string;
   amount: number;
   network: "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
   address: string;
-  fee: number;
+  fee: WithdrawalFeeSnapshot;
   status: WithdrawalStatus;
   riskRoute?: WithdrawalRiskRoute;
   riskReasons?: string[];
+  /** FEAT-WD01a:本单是否命中小额免审快车道。 */
+  fastLaneApplied?: boolean;
+  /** FEAT-WD01a:被快车道免掉的闸名。必须随单落盘 —— 只算不存 = 事后审计与客服
+   *  都还原不出「这单当时免了哪几道」,等于没做。与 riskReasons 同源同去处。 */
+  waivedGates?: string[];
   submittedAt: number;
   estimatedCompletion: number;
+  /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
+  confirmedAt?: number;
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────
@@ -320,6 +343,9 @@ export interface DepositIntent {
   /** 收款账户池按轮换策略分配;server 派发(用户需完整账号转账,不脱敏)。 */
   bankAccount: { accountName: string; accountNumber: string; bankName: string };
   status: DepositIntentStatus;
+  /** 下单时刻(ms epoch,server 时钟)。入账时透传给 DepositRecord.createdAt ——
+   *  否则单据的「创建 → 到账」耗时恒为 0,后台对账看不出真实等待时长。 */
+  createdAt: number;
   /** ms epoch;创建 + 30min 锁价窗(宽限 10min,D1 可配)。 */
   expireAt: number;
   /** 回单实收金额(VND)。 */
@@ -381,15 +407,16 @@ export interface AppState {
    *  Topup page calls this instead of bare creditBalance so eligibility rules
    *  (`cumulative-deposit-usdt`) stay in sync with actual deposit flow. */
   recordDeposit: (amount: number) => boolean;
-  /** 核销创世邀请码(格式校验,合法即写入 user.genesisInviteCode 并随快照持久)。 */
-  setGenesisInviteCode: (raw: string) => boolean;
+  /** 核销创世邀请码:查码表 + 三态校验(码不存在 / 非未使用 / 本账号已持码),
+   *  通过才写入 user.genesisInviteCode 并随快照持久;拒绝时带归因供页面分文案。 */
+  setGenesisInviteCode: (raw: string) => GenesisInviteRedeemResult;
   // Sprint 2 third phase — prototype demo helpers (PM-facing, not user-facing)
   _devSeedLegacyDevice: (kind: DeviceKind, monthsAgo: number) => void;
   _devFastForwardAll: (months: number) => void;
   _devResetDevices: () => void;
   // Sprint A-1 / E.2 — bump lifetime earnings to trigger milestone celebrations on demand
   _devBumpEarningsTotal: (amountUSD: number) => void;
-  creditBalance: (amount: number) => void;  // KYC-Express $1 credit (v3.2)
+  creditBalance: (amount: number) => void;
   debitBalance: (amount: number) => boolean; // returns false if insufficient
   creditNex: (amount: number) => void;
   debitNex: (amount: number) => boolean;
@@ -398,10 +425,13 @@ export interface AppState {
     amount: number,
     network: Withdrawal["network"],
     address: string,
-    fee: number,
+    fee: WithdrawalFeeSnapshot,
+    offsetWithNex: boolean,
     riskRoute?: WithdrawalRiskRoute,
     riskReasons?: string[],
-  ) => string | null; // fee = new-model actualFee (grossFee − NEX offset); null when insufficient balance or reject route
+    fastLaneApplied?: boolean,
+    waivedGates?: string[],
+  ) => Promise<string | null>; // FEAT-WD02: fee = 结构化快照(server 复验等式);null = 拒单(余额/额度/reject/快照非法)
   /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
   _devAdvanceWithdrawal: () => void;
   /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */

@@ -33,7 +33,7 @@
           <!-- target rate bar -->
           <view>
             <view class="flex justify-between items-baseline font-mono-tabular mb-1" style="font-size: 12px; color: var(--v5-ink-3)">
-              <text style="color: var(--v5-brand)">{{ promo.targetName }}</text>
+              <text style="color: var(--v5-brand)">{{ targetLabel }}</text>
               <text class="tabular-nums" style="color: var(--v5-ink); font-weight: 500">{{ targetRate }}</text>
             </view>
             <view class="rounded-full overflow-hidden" style="height: 3px; background: var(--v5-surface-3)">
@@ -64,12 +64,19 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
+import { deviceNameByKind, deviceNameInline } from "@/lib/device-copy";
 
 const t = useT();
 const app = useApp();
 
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-const baseShort = computed(() => (promo.value.baseKind === "phone" ? "phone" : promo.value.baseName));
+// Headline + "vs {base}" drop this into running copy → sentence-cased form.
+const baseShort = computed(() =>
+  deviceNameInline(t.value, promo.value.baseKind, promo.value.baseName),
+);
+const targetLabel = computed(() =>
+  deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
+);
 const baseWidthPct = computed(() => Math.max(0.4, (promo.value.baseDaily / promo.value.targetDaily) * 100));
 const baseRate = computed(() => `$${promo.value.baseDaily.toFixed(2)} /d`);
 const targetRate = computed(() => `$${promo.value.targetDaily.toFixed(2)} /d`);
@@ -79,7 +86,7 @@ const targetRate = computed(() => `$${promo.value.targetDaily.toFixed(2)} /d`);
 const headlineSegs = computed(() => {
   const tpl = t.value.home.doMathHeadline;
   const vars: Record<string, { text: string; color: string }> = {
-    target: { text: promo.value.targetName, color: "var(--v5-ink)" },
+    target: { text: targetLabel.value, color: "var(--v5-ink)" },
     mult: { text: `${promo.value.multiplier}×`, color: "var(--v5-success-ink)" },
     base: { text: baseShort.value, color: "var(--v5-brand-2-ink)" },
   };

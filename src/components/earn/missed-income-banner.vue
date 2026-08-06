@@ -74,6 +74,7 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
+import { deviceNameByKind } from "@/lib/device-copy";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -122,10 +123,13 @@ const cumulativeMissedRounded = computed(() =>
 const phoneWidthPct = computed(() => (promo.value.baseDaily / promo.value.targetDaily) * 100);
 
 const baseLabel = computed(() =>
-  promo.value.baseKind === "phone" ? t.value.earn.yourPhone : promo.value.baseName,
+  deviceNameByKind(t.value, promo.value.baseKind, promo.value.baseName),
 );
-const vsCeilingText = computed(() => fmt(t.value.earn.vsDeviceCeiling, { name: promo.value.targetName }));
-const ceilingText = computed(() => fmt(t.value.earn.deviceCeiling, { name: promo.value.targetName }));
+const targetLabel = computed(() =>
+  deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
+);
+const vsCeilingText = computed(() => fmt(t.value.earn.vsDeviceCeiling, { name: targetLabel.value }));
+const ceilingText = computed(() => fmt(t.value.earn.deviceCeiling, { name: targetLabel.value }));
 
 const phoneBarStyle = computed<CSSProperties>(() => ({
   width: `${inView.value ? phoneWidthPct.value : 0}%`,

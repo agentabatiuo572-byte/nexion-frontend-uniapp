@@ -29,17 +29,19 @@
 
   ⚠️ MOCK-ONLY CROSS-STORE COMPOSERS
   ---
-  Touches stores: useApp (devices/balance), useBills, useTradeinSheet.
-  Path B (replace/keep-buy/force) composers mutate app.devices + debit here with
+  Touches stores: useApp (devices), useTradeinSheet;资金变更走 lib/money-receipt 收口点。
+  Path B (replace/keep-buy/force) composers mutate app.devices + postMoneyBill here with
   documented rollback ordering. The FEAT-DEV02 trade-in path deliberately does
   NOT mutate here — it defers to checkout's single persist block. Production:
   each flow maps to a single server transaction; the client mirrors the rollback.
 
-  Endpoints (all TBD; candidate names, not yet in PRD §9.11):
-    - Trade-in:         POST /api/orders (tradeInDeviceId; server re-computes
-                        the ladder credit + retires the device transactionally)
-    - Path B replace:   POST /api/devices/deactivate + POST /api/store/checkout
-    - Path B keep+buy:  POST /api/store/checkout (new device lands inactive)
+  Endpoints(逐条出处;PRD 未定义的显式标 TBD,不许当既定契约引用):
+    - Trade-in:         POST /api/orders (PRD §7.5 — 携 tradeInDeviceId,server
+                        同事务复算阶梯抵扣 + 下架旧机)
+    - Path B replace:   POST /api/devices/deactivate + POST /api/orders
+                        (deactivate 见 PRD §9.11c.1 composer endpoints,PRD 原文
+                        标 "TBD; candidates";下单仍走 POST /api/orders)
+    - Path B keep+buy:  POST /api/orders (new device lands inactive)
 -->
 <template>
   <view v-if="state.kind !== 'none'" class="tis-root">
@@ -213,7 +215,7 @@
 import { computed, ref } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { trialReservesSlotNow } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { getProduct, PRODUCTS } from "@/mock/products";
@@ -229,11 +231,11 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { navTo } from "@/lib/route";
 import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
+import { deviceName, deviceNameByKind } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
 const sheet = useTradeinSheet();
 const app = useApp();
-const bills = useBills();
 const t = useT();
 // 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
 const phase = useProductPhase();
@@ -254,7 +256,10 @@ const confirming = ref(false);
  *  (user-owned hardware), so fall back to the device spec name, then the raw
  *  kind — never a bare literal, never a missing i18n key. */
 function kindLabel(kind: DeviceKind): string {
-  return getProduct(kind)?.name ?? DEVICE_SPECS[kind]?.name ?? kind;
+  // SKU name first (brand mark). Kinds with no store listing — phone, pc-gpu —
+  // fall back to the localized device name, not the English DEVICE_SPECS one:
+  // the user's own phone can be the traded-in / replaced device here.
+  return getProduct(kind)?.name ?? deviceNameByKind(t.value, kind, DEVICE_SPECS[kind]?.name ?? kind);
 }
 
 /** FEAT-DEV02 预览抵扣(阶梯)。真值 server-authoritative;与结算持久块同一算法。 */
@@ -292,7 +297,7 @@ const choiceSources = computed(() => {
     .map((d) => ({
       id: d.id,
       label: fmt(t.value.tradein.choiceTradeInOption, {
-        name: d.name,
+        name: deviceName(t.value, d),
         credit: previewCredit(d, s.newPrice).toFixed(2),
       }),
     }));
@@ -349,7 +354,7 @@ const retireView = computed(() => {
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
   });
   return {
-    subtitle: fmt(t.value.tradein.retireSubtitle, { name: device.name }),
+    subtitle: fmt(t.value.tradein.retireSubtitle, { name: deviceName(t.value, device) }),
     targets,
   };
 });
@@ -478,15 +483,8 @@ function onReplace() {
     confirming.value = false;
     return;
   }
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices.filter((d) => d.id !== newId);
-    app.activateDevice(lowest.id, reservedSlots.value);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  bills.add({
+  // 收据即指令:amount 为负 = 扣款,扣款与这条 purchase 分录同生共死。
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
@@ -496,6 +494,15 @@ function onReplace() {
       oldKind: kindLabel(lowest.kind),
     }),
   });
+  if (paid !== "ok") {
+    // 钱没扣成(余额不足)或没记上账(收口点已还原资金 + 弹错)——设备侧的改动必须一起退回,
+    // 否则用户白得一台新机、老机还停着。
+    app.devices = app.devices.filter((d) => d.id !== newId);
+    app.activateDevice(lowest.id, reservedSlots.value);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),
@@ -512,22 +519,22 @@ function onKeepBuy() {
   if (s.kind !== "replace" || confirming.value) return;
   confirming.value = true;
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Keep & buy" branch.
-  // Order: addDevice (default inactive) → debit → bill / rollback. No demotion.
+  // Order: addDevice (default inactive) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。
+  // 注释曾写「debit → bill / rollback」两步 —— 那是迁到收口点之前的形态,已过期。No demotion.
   const newId = app.addDevice(s.newKind);
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices.filter((d) => d.id !== newId);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  bills.add({
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
     status: "posted",
     memo: fmt(t.value.tradein.keepBuyBillMemo, { newKind: kindLabel(s.newKind) }),
   });
+  if (paid !== "ok") {
+    app.devices = app.devices.filter((d) => d.id !== newId);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(s.newKind) }));
   confirming.value = false;
   hide();
@@ -573,7 +580,7 @@ function onForce() {
   // whole point).
   //
   // Order: snapshot task → addDevice(new) → deactivate(old, clears task) →
-  //   activate(new) → debit → bill. Each failure restores the old device's task.
+  //   activate(new) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。Each failure restores the old device's task.
   const taskSnapshot = lowest.currentTask;
   const newId = app.addDevice(s.newKind);
   app.deactivateDevice(lowest.id); // frees slot + wipes currentTask
@@ -588,20 +595,10 @@ function onForce() {
     confirming.value = false;
     return;
   }
-  const debited = app.debitBalance(s.newPrice);
-  if (!debited) {
-    app.devices = app.devices
-      .filter((d) => d.id !== newId)
-      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
-    app.activateDevice(lowest.id, reservedSlots.value);
-    toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
-    confirming.value = false;
-    return;
-  }
-  // Success: task stays forfeit (deactivate already wiped it). PRODUCTION:
+  // 成功即任务作废(deactivate 已抹掉);失败则连同任务一起还原。PRODUCTION:
   // server atomically refunds/keeps the partial task reward + recycles slot +
   // writes ledger in one tx with idempotency key {userId}-{oldId}-{newKind}-{nonce}.
-  bills.add({
+  const paid = postMoneyBill({
     type: "purchase",
     symbol: "USDT",
     amount: -s.newPrice,
@@ -611,6 +608,15 @@ function onForce() {
       oldKind: kindLabel(lowest.kind),
     }),
   });
+  if (paid !== "ok") {
+    app.devices = app.devices
+      .filter((d) => d.id !== newId)
+      .map((d) => (d.id === lowest.id ? { ...d, currentTask: taskSnapshot } : d));
+    app.activateDevice(lowest.id, reservedSlots.value);
+    if (paid === "insufficient") toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: s.newPrice.toFixed(2) }));
+    confirming.value = false;
+    return;
+  }
   toast.success(
     fmt(t.value.tradein.replaceSuccessToast, {
       newKind: kindLabel(s.newKind),

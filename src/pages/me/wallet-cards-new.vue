@@ -5,7 +5,8 @@
   default" toggle. On submit: validate, derive brand + last4, persist via
   useCards.add() (PAN/CVV NEVER stored), navigate back to the cards list.
 
-  ?trial=1 (from a trial claim flow) surfaces the auto-charge disclosure here.
+  Cards serve MALL PAYMENT only — the free trial is cardless (FEAT-TRIAL02
+  spec ⑦: the claim flow never routes here and no trial disclosure renders).
   useSearchParams → onLoad(query). safeReturnTo → inline relative-path guard
   (open-redirect defense). <input type=checkbox> → custom tap toggle (uni).
   router.push(returnTo) → uni.redirectTo. Wrapped in <AppChassis active="me">.
@@ -16,22 +17,6 @@
       <SubPageHeader back="/pages/me/wallet-cards" :title="t.cards.newTitle" />
 
       <view :style="bodyStyle">
-        <!-- Trial auto-charge disclosure (only when ?trial=1) -->
-        <view v-if="isTrialBinding" class="flex items-start" :style="trialBoxStyle">
-          <view class="grid place-items-center shrink-0" :style="trialIconStyle">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-          </view>
-          <view class="flex-1 min-w-0" style="margin-left: 12px">
-            <text class="block" :style="trialTitleStyle">{{ t.cards.trialDiscloseTitle }}</text>
-            <view :style="trialBodyStyle">
-              <text>{{ trialBodyText }}</text>
-              <text class="font-mono-tabular" style="color: var(--v5-ink-2)">{{ trialAmountText }}</text>
-              <text>{{ trialSuffixText }}</text>
-              <text style="color: var(--v5-ink-2)">{{ t.cards.trialDiscloseCancel }}</text>
-            </view>
-          </view>
-        </view>
-
         <!-- Form card -->
         <view :style="formCardStyle">
           <view class="flex items-center" :style="formHeadStyle">
@@ -114,27 +99,20 @@ import { useCards, brandLabel } from "@/store/cards";
 import type { CardBrand } from "@/store/cards-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
-import { useTrialConfig } from "@/store/trial-config";
 import { useQuest } from "@/store/quest";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 
 const t = useT();
 const cardsStore = useCards();
-const trialConfig = useTrialConfig();
 
-// Query (onLoad — page-level): ?trial=1 surfaces auto-charge disclosure;
-// ?returnTo=<relative path> for post-bind navigation (open-redirect guarded).
-// Initialize from the H5 URL hash query FIRST (covers direct deep-link / refresh,
-// and the case where onLoad doesn't re-fire on a hash-only change to an already-
-// mounted page instance). onLoad then overrides for the uni.navigateTo path (App
-// + in-SPA nav). Without the hash fallback, ?trial=1 on a refreshed/deep-linked
-// page failed to surface the auto-charge disclosure. (P-044)
+// Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
+// navigation (open-redirect guarded). Initialize from the H5 URL hash query
+// FIRST (covers direct deep-link / refresh, and the case where onLoad doesn't
+// re-fire on a hash-only change to an already-mounted page instance). onLoad
+// then overrides for the uni.navigateTo path (App + in-SPA nav). (P-044)
 const initialQ = parseHashQuery();
-const isTrialBinding = ref(initialQ.trial === "1");
 const returnTo = ref(safeReturnTo(initialQ.returnTo, "/pages/me/wallet-cards"));
 onLoad((q) => {
-  if (q?.trial !== undefined) isTrialBinding.value = q.trial === "1";
   if (q?.returnTo !== undefined) returnTo.value = safeReturnTo(q.returnTo, "/pages/me/wallet-cards");
 });
 
@@ -187,16 +165,6 @@ const valid = computed(() => cardReady.value && validHolder.value);
 const canSubmit = computed(() => valid.value && !isBinding.value);
 const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.formDefaultOn : t.value.cards.formDefaultOff));
 
-// Trial disclosure text (split because the placeholders interleave with
-// styled spans — mirror source structure).
-const trialBodyText = computed(() => fmt(t.value.cards.trialDiscloseBody, { days: String(trialConfig.config.trialDays) }));
-const trialAmountText = computed(() =>
-  fmt(t.value.cards.trialDiscloseAmount, { amount: `$${trialConfig.config.trialPriceUSD.toLocaleString()}` }),
-);
-const trialSuffixText = computed(() =>
-  fmt(t.value.cards.trialDiscloseSuffix, { cap: String(trialConfig.config.trialOffsetCapUSD) }),
-);
-
 function handleBind() {
   if (!canSubmit.value) return;
   // 明文由 <HostedCardVault> 交给收单方换 token(真实现 = SDK createToken)。
@@ -216,16 +184,21 @@ function handleBind() {
   // 首日任务 bind_bank_card(server-canonical `card.bound`):quest 只记完成,
   // 入账 + 账单 + toast 在调用层组合(对齐 quest.ts 头注约定,模式同 lib/share.ts)。
   // 幂等 — 非首次绑卡 firstTime=false,只出常规绑卡 toast,不重复发奖。
-  const quest = useQuest().markComplete("bind_bank_card");
-  if (quest.firstTime) {
-    const app = useApp();
-    const bills = useBills();
-    const billRef = `QST-${Date.now().toString(36).toUpperCase()}`;
-    if (quest.rewardNex > 0) app.creditNex(quest.rewardNex);
-    if (quest.rewardUsdt > 0) app.creditBalance(quest.rewardUsdt);
-    if (quest.rewardUsdt > 0) bills.add({ type: "bonus", symbol: "USDT", amount: quest.rewardUsdt, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    if (quest.rewardNex > 0) bills.add({ type: "bonus", symbol: "NEX", amount: quest.rewardNex, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
-    toast.success(fmt(t.value.quest.routeToast, { n: quest.rewardNex }));
+  // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
+  // 三处漏改)。原来先 markComplete 消费掉,发钱失败奖就归零且再也拿不到。
+  const questStore = useQuest();
+  const task = questStore.QUEST_TASKS.find((tk) => tk.id === "bind_bank_card");
+  if (task && !questStore.isComplete("bind_bank_card")) {
+    const billRef = `QST-bind_bank_card`; // 稳定 ref:任务一次性,带时间戳 = 判重永不命中
+    // 同一次任务完成的两腿一次落盘,入账由收据的 amount/symbol 派生(模式同 lib/share.ts)。
+    const drafts: ReceiptDraft[] = [];
+    if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo: t.value.quest.bindCardMemo, ref: billRef });
+    // 发奖失败已弹错并还原;绑卡本身已成立,照常回上一页,不把用户卡在表单里。
+    if (!drafts.length || postMoneyBillsOnce(drafts) === "ok") {
+      questStore.markComplete("bind_bank_card"); // 消费失败:重试命中同 ref 不会再发
+      toast.success(fmt(t.value.quest.routeToast, { n: task.nexReward }));
+    }
   } else {
     toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
   }
@@ -237,21 +210,6 @@ function handleBind() {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px" };
-const trialBoxStyle: CSSProperties = {
-  marginBottom: "12px",
-  borderRadius: "16px",
-  padding: "14px 16px",
-  background: "var(--v5-surface)",
-  border: "1px solid color-mix(in srgb, var(--v5-warning) 40%, transparent)",
-};
-const trialIconStyle: CSSProperties = {
-  width: "32px",
-  height: "32px",
-  borderRadius: "999px",
-  background: "color-mix(in srgb, var(--v5-warning) 18%, transparent)",
-};
-const trialTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)", lineHeight: 1.375 };
-const trialBodyStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.625 };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
 // floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the

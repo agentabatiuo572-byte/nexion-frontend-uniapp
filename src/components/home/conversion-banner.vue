@@ -63,6 +63,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
+import { deviceNameByKind } from "@/lib/device-copy";
 import { useNow } from "@/composables/use-now";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), {
@@ -88,7 +89,9 @@ const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => promo.value.targetDaily.toFixed(2));
 const subtitleText = computed(() =>
   promo.value.multiplier > 0
-    ? fmt(t.value.home.weeklyQuestActivateToClaim, { device: promo.value.targetName })
+    ? fmt(t.value.home.weeklyQuestActivateToClaim, {
+        device: deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
+      })
     : t.value.home.weeklyQuestAddCapacity,
 );
 

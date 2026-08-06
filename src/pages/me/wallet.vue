@@ -161,7 +161,9 @@ function showLockedSheet() {
 }
 
 const buckets = computed(() => app.user.earningBuckets);
-const usdt = computed(() => buckets.value.withdrawableUsdt);
+// 2026-07-31:充值本金可提后,「可提现 USDT」= 总余额(held 两桶本就账外,不含在内)。
+// 必须与 wallet-withdraw 的 maxWithdrawable 同源,否则钱包页显示的数与实际能提的数对不上。
+const usdt = computed(() => app.user.usdtBalance);
 const nexLabel = computed(() => app.user.nexBalance.toLocaleString());
 const pending = computed(() => app.user.pendingEarnings);
 const pendingReview = computed(() => buckets.value.pendingReviewUsdt);
@@ -184,7 +186,9 @@ const cardsSub = computed(() =>
     : t.value.wallet.cardsReuseHint,
 );
 
-const latestWithdrawal = computed(() => app.latestWithdrawal);
+// 🔴 用**主单**(优先最早的在途单)而不是「最新一笔」:一张在途 + 一张更新的已到账时,
+// 问「最新一笔」会拿到已到账那张 → 入口整行消失,在审核的那笔钱用户再也看不到。
+const latestWithdrawal = computed(() => app.primaryWithdrawal);
 const showWithdrawal = computed(
   () => !!latestWithdrawal.value && latestWithdrawal.value.status !== "confirmed",
 );

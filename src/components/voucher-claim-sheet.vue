@@ -124,7 +124,14 @@ function hide() {
   sheet.hide();
 }
 function onClaim(v: VoucherDef) {
-  if (voucher.claim(v.id)) toast.success(t.value.voucher.claimedToast);
+  const r = voucher.claim(v.id);
+  if (r.ok) {
+    toast.success(t.value.voucher.claimedToast);
+  } else if (r.conflict) {
+    // 这张券在别处(另一标签页 / 另一端)已经领过,store 已把最新券包刷回来 —— 说清楚,
+    // 不能让用户点了没反应。
+    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+  }
 }
 function onUse(v: VoucherDef) {
   sheet.hide();

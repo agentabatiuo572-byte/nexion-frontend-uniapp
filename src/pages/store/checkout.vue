@@ -5,14 +5,14 @@
 
   Steps: select-payment → confirm → pay-instructions (chain QR / card form) →
   awaiting → confirmed → activating → live. On entering "confirmed" the order is
-  persisted ONCE (debit balance incl. card fee → orders.createOrder → bills.add),
+  persisted ONCE (debit balance incl. card fee → orders.createOrder → postReceiptOnly),
   with first-order celebration. framer AnimatePresence → CSS @keyframes fade.
 
   Batch C trade-in intercept (ported): on first mount, for purchasable DEVICE
   products only, open the trade-in Choice sheet if the user owns a tradeable
   device, else the slot-full Replace sheet when active slots are capped, else
   fall through to the normal payment flow. Cross-store composition (eligibility
-  reads app/v-rank/network/wallet-pairing) lives here at the page layer via the
+  reads app/v-rank/network) lives here at the page layer via the
   useDeviceEligibility composable (stores never import each other, P-031/032).
   Wrapped in <AppChassis active="store">; the back + "Checkout" title live in the
   sticky chassis nav header via useSetPageHeader (mirrors the prototype's
@@ -57,6 +57,16 @@
               <text class="tabular-nums" :style="payTotalStyle">${{ netPriceText }}</text>
             </view>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ paybackLine }}</text>
+            <!-- FEAT-TRIAL02: conversion credit chips (promo + accrued credit) -->
+            <view v-if="promoDiscount > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ promoRowLabel }} −${{ promoDiscountText }}</text>
+            </view>
+            <view v-if="trialOffsetView.offsetUSD > 0" class="flex items-center" style="gap: 5px; margin-top: 6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 7v5l3.5 2" /></svg>
+              <text style="font-size: 12px; color: var(--v5-tech-cyan)">{{ t.store.coRowTrialOffset }} −${{ trialOffsetText }}</text>
+            </view>
+            <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
             <view v-if="hasVoucher" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2z" /><path d="M13 5v14" /></svg>
               <text style="font-size: 12px; color: var(--v5-brand)">{{ t.voucher.checkoutRowLabel }} −${{ voucherDiscountText }}</text>
@@ -115,15 +125,19 @@
             <CheckoutRow :label="t.store.coRowQuantity" value="1" />
             <CheckoutRow :label="t.store.coRowPayment" :value="paymentLabel" />
             <CheckoutRow :label="t.store.coRowShipping" :value="t.store.coShippingValue" />
-            <!-- Subtotal revealed when a voucher applies (to show the discount) or
-                 when a card fee applies; voucher row sits between subtotal & fee. -->
-            <CheckoutRow v-if="hasVoucher || isCard || hasTradein" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
+            <!-- Subtotal revealed when any deduction applies (to anchor the
+                 discount rows) or when a card fee applies. -->
+            <CheckoutRow v-if="hasVoucher || isCard || hasTradein || trialConversionMode" :label="t.store.coRowSubtotal" :value="`$${priceText}`" />
+            <CheckoutRow v-if="promoDiscount > 0" :label="promoRowLabel" :value="`−$${promoDiscountText}`" />
+            <CheckoutRow v-if="trialOffsetView.offsetUSD > 0" :label="t.store.coRowTrialOffset" :value="`−$${trialOffsetText}`" />
             <CheckoutRow v-if="hasVoucher" :label="t.voucher.checkoutRowLabel" :value="`−$${voucherDiscountText}`" />
             <CheckoutRow v-if="hasTradein" :label="t.tradein.checkoutRowLabel" :value="`−$${tradeinCreditText}`" />
             <CheckoutRow v-if="isCard" :label="fmt(t.store.coRowCardFee, { rate: cardFeeRateLabel() })" :value="`$${cardFeeText}`" />
             <CheckoutRow v-else :label="t.store.coRowNetworkFee" :value="t.store.coFeeFree" />
             <view style="height: 1px; background: var(--v5-border); margin: 4px 0" />
             <CheckoutRow :label="t.store.coRowTotal" :value="`$${confirmTotalText}`" big />
+            <!-- 异常4: $0 due keeps the explicit confirm; surplus never refunds -->
+            <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
           </view>
           <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="onConfirmPay">
             <text @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
@@ -207,13 +221,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onLoad, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
 import CardPayment from "@/components/store/card-payment.vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
@@ -224,10 +239,13 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { useBills } from "@/store/bills";
+import { postMoneyBill, postReceiptOnly, reportStuckFunds } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
-import { trialReservesSlotNow } from "@/store/free-trial";
+import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "@/store/trial-config";
+import { resolveTrialAt, accruedShadow } from "@/store/trial-boundary";
+import { mockServerNow } from "@/store/server-time";
 import { useDeviceEligibility } from "@/composables/use-device-eligibility";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { useSetPageHeader } from "@/composables/use-page-header";
@@ -258,7 +276,6 @@ interface PaymentMethod {
 const t = useT();
 const app = useApp();
 const orders = useOrders();
-const bills = useBills();
 const voucher = useVoucher();
 
 // wallet icon path (lucide Wallet), credit-card path
@@ -317,23 +334,87 @@ const product = computed<Product | undefined>(() => getProduct(productId.value))
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
 
+// ─── FEAT-TRIAL02 trial conversion quote — 单一解析 ───────────────────────
+// The mode derives from STORE STATE (trial ∈ active|grace ∧ this SKU is the
+// trial product) — deliberately NO URL marker: a trial user reaching this
+// checkout through ANY entry (trial page CTA, store grid, deep link) gets the
+// credit rows, so the capability is never silently withheld; once the trial
+// has ended the same link falls back to the plain flow (spec ⑥ — post-grace
+// CTA is a plain purchase).
+//
+// 🔴 R2 P0 根治(2026-08-04):本页曾一半读 store 里未推进的原始 `status` ref
+// (模式 / 促销 / 抵扣行),一半读 `liveShadow*` 的实时解析器 —— 宽限期刚过、
+// 4s poll 未到的窗口里两边给出互斥答案(模式说「还能转化」而影子说「已结束」),
+// 净额被拼成一个报价页从未展示过的数字并直接扣款。修法:本页所有试用派生值
+// (是否适用 / 促销 / 抵扣 / 余额返还 / NEX)只有 `trialQuoteAt(now)` 一个出处
+// —— 一个时间戳、一次 resolveTrialAt,其余全部从这次解析结果派生;本页任何位置
+// 都不再读原始 `freeTrial.status`。展示侧按 1s ticker 解析,越界后 ≤1s 自动收回
+// 抵扣行;支付侧按 mockServerNow() 重解一次只用于「还能不能按这份报价成交」。
+const freeTrial = useFreeTrial();
+const trialCfg = computed(() => useTrialConfig().config);
+// 1s ticker — the credit keeps accruing during active (display freshness).
+const nowTick = ref(mockServerNow());
+let trialTicker: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  trialTicker = setInterval(() => { nowTick.value = mockServerNow(); }, 1000);
+});
+
+interface TrialQuote {
+  /** 该时刻试用可转化 ∧ 本单就是试用机 → 促销/抵扣行生效 */
+  applied: boolean;
+  promo: number;
+  offsetUSD: number;
+  remainderUSD: number;
+  shadowNEX: number;
+}
+const NO_TRIAL: TrialQuote = { applied: false, promo: 0, offsetUSD: 0, remainderUSD: 0, shadowNEX: 0 };
+
+/** 单一解析:给定时刻解析一次试用状态机,派生本页全部试用金额(纯函数,零落盘)。 */
+function trialQuoteAt(now: number): TrialQuote {
+  const cfg = trialCfg.value;
+  const r = resolveTrialAt(freeTrial.snapshot(), now, cfg);
+  if ((r.status !== "active" && r.status !== "grace") || productId.value !== cfg.trialProductId) return NO_TRIAL;
+  // 影子口径与 free-trial.liveShadow* 同一条规则(active 按冻结窗口累计 /
+  // grace 取边界定格值),但锚在本次解析出的行上,不再各读各的时钟。
+  const acc = accruedShadow(r, now, cfg);
+  const split = computeTrialOffset(cfg, r.status === "active" ? acc.usd : r.shadowFrozenAtUSD);
+  return {
+    applied: true,
+    promo: computeDiscountedPrice(cfg).discount,
+    offsetUSD: split.offsetUSD,
+    remainderUSD: split.remainderUSD,
+    shadowNEX: r.status === "active" ? acc.nex : r.shadowFrozenAtNEX,
+  };
+}
+
+/** 展示侧的那一次解析 —— 确认页渲染的每个数字都出自它。 */
+const trialView = computed(() => trialQuoteAt(nowTick.value));
+const trialConversionMode = computed(() => trialView.value.applied);
+const promoDiscount = computed(() => trialView.value.promo);
+const trialOffsetView = computed(() => trialView.value);
+const promoDiscountText = computed(() => promoDiscount.value.toFixed(2));
+const trialOffsetText = computed(() => trialOffsetView.value.offsetUSD.toFixed(2));
+const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, { pct: (trialCfg.value.discountRate * 100).toFixed(0) }));
+
 // ─── Voucher redemption ──────────────────────────────────────────────────
 // Best claimed-unused voucher applicable to this SKU at its base price. The
 // discount applies to the device subtotal; the card fee (if any) is then
 // computed on the discounted subtotal. The voucher is marked used once the
 // order persists (single-use). bestVoucherFor returns null when none applies.
-// Stacking/性质 policy (后台可配,见 OpsVoucher): voucher is the SOLE discount in
-// this checkout flow (trial-offset lives in the trial redeem flow; bundle
-// discount in the bundle page), so stackWithTrial/stackWithOthers are honored
-// trivially here. 不可提现 is inherent — the discount only reduces price, never
-// credits the balance; 不可拆分 is inherent — one voucher applied whole, then markUsed.
+// Stacking/性质 policy (后台可配,见 OpsVoucher): in trial conversion mode only
+// stackWithTrial vouchers participate (bestVoucherFor filter — non-stackable
+// ones neither appear nor apply); voucher math stays on the base price, the
+// promo + trial-credit rows subtract alongside it. 不可提现 is inherent — the
+// discount only reduces price, never credits the balance; 不可拆分 is inherent —
+// one voucher applied whole, then markUsed.
 // Real backend: redemption is server-side & atomic — the checkout sends `voucherId`
 // in the POST /api/orders body; the server re-validates (claimed/unused/applicable/
 // stacking) + marks it redeemed in the same transaction as order creation. The
 // markUsed() below is the mock's optimistic mirror of that server effect.
 const voucherMatch = computed(() => {
   const p = product.value;
-  return p ? voucher.bestVoucherFor(p.id, p.price) : null;
+  if (!p) return null;
+  return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
 const hasVoucher = computed(() => voucherDiscount.value > 0);
@@ -366,7 +447,7 @@ const tradeinChipText = computed(() => {
   const ti = appliedTradeinView.value;
   if (!ti) return "";
   return fmt(t.value.tradein.checkoutCreditChip, {
-    name: ti.device.name,
+    name: deviceName(t.value, ti.device),
     credit: tradeinCreditText.value,
   });
 });
@@ -384,8 +465,20 @@ function reAddTradein() {
 }
 
 const netPrice = computed(() =>
-  Math.max(0, +(((product.value?.price ?? 0) - voucherDiscount.value - tradeinCredit.value).toFixed(2))),
+  Math.max(
+    0,
+    +(
+      ((product.value?.price ?? 0) -
+        voucherDiscount.value -
+        tradeinCredit.value -
+        promoDiscount.value -
+        trialOffsetView.value.offsetUSD)
+    ).toFixed(2),
+  ),
 );
+// 异常4: credit ≥ amount due → $0 payable, the explicit confirm step stays and
+// the page states the surplus is never refunded.
+const trialZeroDue = computed(() => trialConversionMode.value && netPrice.value === 0);
 // P2-1: if the user CLAIMED a voucher that applies to this SKU but it has expired
 // (so bestVoucherFor skipped it), surface a muted "已过期" note instead of silently
 // showing no discount. Only when no active voucher applies.
@@ -413,6 +506,11 @@ let interceptFired = false;
 function fireTradeinIntercept() {
   if (interceptFired) return;
   interceptFired = true;
+  // FEAT-TRIAL02: the trial conversion checkout doesn't intercept with trade-in —
+  // promo + credit + trade-in + voucher quad-stacking is undefined by spec, and
+  // the conversion order is the trial device itself (slot exchange), not an
+  // upgrade off an old unit. Normal (non-trial) checkouts intercept as before.
+  if (trialConversionMode.value) return;
   const p = getProduct(productId.value);
   if (!p || !KNOWN_KINDS.includes(p.id as DeviceKind)) return;
   const kind = p.id as DeviceKind;
@@ -452,7 +550,13 @@ const firstOrderCelebrating = ref(false);
 
 const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
-const capped = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
+const cappedRaw = computed(() => app.activeSlotCount + reservedSlots.value >= MAX_DEVICES);
+// Conversion order = the trial's own reserved slot converts into the real
+// device (slot exchange) — don't scare the user with a slots-full warning that
+// counts the very slot this purchase frees (only warn when real actives cap).
+const capped = computed(() =>
+  trialConversionMode.value ? app.activeSlotCount >= MAX_DEVICES : cappedRaw.value,
+);
 
 // ── derived text ──
 const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
@@ -517,10 +621,32 @@ function goAwaiting() {
   step.value = "awaiting";
 }
 
+// FEAT-TRIAL02 quote snapshot: what the user committed to on the confirm step.
+// 快照 = 确认页此刻渲染的那一次解析(trialView),不是「支付时再算一遍」的第二份
+// 数字 —— 扣款金额只认这份快照(展示与扣款同源);支付时刻的重新解析只用来决定
+// 「还能不能按这份报价成交」,不能就拒单回报价步(grace 可能在结账途中到点,全局
+// 4s TRIAL_TICK 不会停),绝不改数字静默扣款。
+let trialQuote: TrialQuote = NO_TRIAL;
+/** 确认页展示过的应付总额(净额 + 卡费)—— 实际扣款不得超过它。 */
+let quotedTotal = 0;
+// Voucher context joins the quote snapshot (audit P1): the confirmed step used
+// to LIVE-read voucherMatch — a voucher expiring/being redeemed mid-checkout
+// silently charged the un-discounted price the confirm step never showed.
+let voucherQuote: { id: string | null; discount: number } = { id: null, discount: 0 };
+
 function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
   confirming = true;
-  step.value = "pay-instructions";
+  trialQuote = trialView.value;
+  quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
+  voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
+  // $0 due (credits cover the displayed total, 异常4) → nothing to transfer:
+  // the chain QR / card form would solicit a 0-USDT payment with no executable
+  // action (and a real backend would invite a 0-value on-chain transfer). All
+  // money/order side effects hang on the step==='confirmed' watch below, so
+  // skipping pay-instructions + awaiting is pure navigation; non-zero totals
+  // keep the exact pre-existing path. 判据取快照总额,与下面扣款同一个数。
+  step.value = quotedTotal === 0 ? "confirmed" : "pay-instructions";
   setTimeout(() => { confirming = false; }, 0);
 }
 
@@ -541,11 +667,17 @@ watch(step, (s) => {
     if (!p) return;
     // Persist order + spend bill — only ONCE per checkout (orderId guard).
     if (!orderId.value) {
-      // Capture the voucher discount BEFORE markUsed mutates the wallet (which
-      // would recompute voucherMatch → null). Discount applies to the device
-      // subtotal; card fee (if any) is computed on the discounted subtotal.
-      const discount = voucherDiscount.value;
-      const usedVoucherId = voucherMatch.value?.def.id ?? null;
+      // ── Voucher pay-time revalidation(与 trade-in/trial 失效守卫同构)──
+      // 券可能在结算途中失效/被核销:live match 与确认页快照(voucherQuote)
+      // 不一致 → 拒单回报价步,绝不按确认页没展示过的净额静默扣款;相等才用
+      // 冻结值继续。冻结值也天然满足旧注释的「markUsed 之前取值」要求。
+      if ((voucherMatch.value?.def.id ?? null) !== voucherQuote.id) {
+        toast.warn(t.value.voucher.quoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      const discount = voucherQuote.discount;
+      const usedVoucherId = voucherQuote.id;
       // FEAT-DEV02:先快照抵扣上下文(clearApplied 会把 computed 归零),再走
       // 扣款→下架的同步原子块。抵扣只减应付;新机由订单履约管线 addDevice
       // 未激活入库,本块不生成设备。
@@ -574,18 +706,74 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
+      // ── FEAT-TRIAL02 支付时刻单一解析(R2 P0 根治)──
+      // 一个时间戳、一次 resolveTrialAt:`applyTrial` 与全部试用金额都出自这条
+      // 链,不再「模式读原始 ref、影子读解析器」拼出一个没人展示过的净额。解析
+      // 说已不可转化 → 拒单回报价步重新确认(与 voucher / trade-in 守卫同构),
+      // 绝不静默扣款。整段同步执行,poll 无法在守卫与 convert 之间插入。
+      const payNow = mockServerNow();
+      const payQuote = trialQuoteAt(payNow);
+      if (trialQuote.applied && !payQuote.applied) {
+        toast.warn(t.value.store.coTrialQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      const applyTrial = trialQuote.applied;
+      // 金额一律取确认页那份报价快照(展示与扣款同源);支付时刻的解析只做闸不
+      // 改数字 —— 期间多累计的影子收益按「所见即所付」让渡,绝不反向多扣。
+      const promo = applyTrial ? trialQuote.promo : 0;
+      const trialOffsetUSD = applyTrial ? trialQuote.offsetUSD : 0;
+      const trialRemainderUSD = applyTrial ? trialQuote.remainderUSD : 0;
+      const shadowNEXNow = applyTrial ? trialQuote.shadowNEX : 0;
       const tradeInCredit = ti?.credit ?? 0;
-      const net = Math.max(0, +(p.price - discount - tradeInCredit).toFixed(2));
+      const net = Math.max(0, +(p.price - discount - tradeInCredit - promo - trialOffsetUSD).toFixed(2));
       // Card payment charges the displayed total INCLUDING the card fee
       // (chain payments have no fee). Mock approximation of server-side PSP
       // debit — production: POST /api/orders does authorize+capture atomically.
       const fee = isCard.value ? cardFeeUsd(net) : 0;
       const chargeTotal = +(net + fee).toFixed(2);
+      // 族级兜底闸:任何一项在确认页之后变差(如旧机抵扣随累计收益跌档),差额
+      // 都不许静默扣到用户头上 —— 超过展示过的总额一律拒单重报价。反向(变便宜)
+      // 放行:少收不伤用户,拒单反而白丢一单。
+      if (chargeTotal > quotedTotal) {
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      // 🔴 非数值金额必须在**任何终态副作用之前**拦掉(R3 P1)。NaN 参与比较恒为假 ——
+      // 上面的族级兜底闸(`chargeTotal > quotedTotal`)与下面的余额预检(`余额 < chargeTotal`)
+      // **两道都会静默放行**,于是 convert() 把试用打成 converted(不可逆终态),而随后的
+      // debitBalance(NaN) 被 store 侧的 Number.isFinite 守卫拒掉 —— 净结果是「单没下、钱没扣、
+      // 试用永久没了」。app.ts 的余额三函数早已为同一类污染加了守卫,这里是对称的调用侧缺口。
+      // 一条闸收全族:入账两项(试用剩余 / NEX)虽有 `> 0` 挡着不会污染余额,但 NaN 会让它们
+      // **静默漏发**给用户 —— 同一处判掉,不留「一个金额一道守卫」的散点。
+      if (![chargeTotal, net, fee, trialRemainderUSD, shadowNEXNow].every((v) => Number.isFinite(v) && v >= 0)) {
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      // 🔴 扣款排在 convert() **之前**(2026-08-04 R5 改序)。原顺序是「只读预检 → convert
+      // → 扣款」,理由是"预检使 convert 成功后扣款必成功" —— 但预检堵不住 debitBalance 的
+      // 另一条失败路径:**落盘失败**。那时试用已被打成 converted(不可逆终态且已持久化)、
+      // 余额被回滚、用户只看到「余额不足」,充值重试才发现试用永久没了 —— 不可恢复。
+      // 反过来排之后:扣款失败 → 试用一根汗毛没动(余额不足与落盘失败共用同一条退出);
+      // convert() 仍是状态机的最终裁决(自取 server now 再解析一次),只是挪到钱确实扣住
+      // 之后再问。PRODUCTION:两步本就是 POST /api/orders 的同一个事务,不存在先后。
+      const beforePay = app.captureMoney();
       const ok = app.debitBalance(chargeTotal);
       if (!ok) {
         // Insufficient balance — bail out of the auto-advance chain (402),
         // with an explicit toast (was a silent bounce, PR-D debt #3).
         toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: chargeTotal.toFixed(2) }));
+        step.value = "select-payment";
+        return;
+      }
+      if (applyTrial && !freeTrial.convert()) {
+        // 扣款与 convert 之间跨过宽限终点的极窄窗口:把刚扣的钱按增量精确退回
+        // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
+        // 绝不再弹一句"报价已变"了事。
+        if (app.restoreMoney(beforePay)) toast.warn(t.value.store.coTrialQuoteChanged);
+        else reportStuckFunds(beforePay);
         step.value = "select-payment";
         return;
       }
@@ -603,16 +791,60 @@ watch(step, (s) => {
         paymentMethod: payment.value,
         discount,
         ...(ti && { tradeInCredit, tradeInDeviceId: ti.device.id }),
+        ...(applyTrial && { promoDiscountUSD: promo, trialOffsetUSD }),
       });
       orderId.value = ord.id;
+      // ── FEAT-TRIAL02 conversion side effects(订单落盘同笔,同步块内)──
+      // convert() 已在扣款前裁决并落 converted(见上);这里只做返还入账。设备由
+      // 既有订单履约管线生成(tickOrders → advanceOrder → addDevice,吃 order.total
+      // 作置换基数),这里绝不直插。金额全部来自确认页那份报价快照。
+      if (applyTrial) {
+        const convRef = `${ord.id}-TRIAL`;
+        // 🔴 入账 ⊗ 收据走同一个收口点(2026-08-04 R4)。原实现是「creditBalance / creditNex →
+        // 裸 bills.add」,收据写失败时返回 null 没人接:钱加了、账单没有,而下面的 toast 还
+        // 照旧宣布「你到手了 $X」。收口后收据落不了盘 = 入账原样退回、这一项不进 toast。
+        const usdtCredited =
+          trialRemainderUSD > 0 &&
+          postMoneyBill({
+            type: "bonus",
+            symbol: "USDT",
+            amount: trialRemainderUSD,
+            status: "posted",
+            memo: fmt(t.value.store.coBillTrialRemainderMemo, { name: p.name }),
+            ref: `${convRef}-EARN-USDT`,
+          }) === "ok";
+        const nexCredited =
+          shadowNEXNow > 0 &&
+          postMoneyBill({
+            type: "bonus",
+            symbol: "NEX",
+            amount: shadowNEXNow,
+            status: "posted",
+            memo: fmt(t.value.store.coBillTrialNexMemo, { name: p.name }),
+            ref: `${convRef}-EARN-NEX`,
+          }) === "ok";
+        // 只报**真的到账**的那几项 —— 报了没到账的钱等于二次欺骗。
+        const earnParts: string[] = [];
+        if (usdtCredited) earnParts.push(fmt(t.value.store.coTrialEarnUsdtPart, { amount: trialRemainderUSD.toFixed(2) }));
+        if (nexCredited) earnParts.push(fmt(t.value.store.coTrialEarnNexPart, { n: shadowNEXNow.toLocaleString() }));
+        if (earnParts.length) toast.success(fmt(t.value.store.coTrialEarnToast, { parts: earnParts.join(" · ") }));
+      }
       // Consume the voucher (single-use) once the order is persisted.
       if (discount > 0 && usedVoucherId) voucher.markUsed(usedVoucherId);
       // 账单 memo 走 i18n(用户账单页直接渲染,禁硬编码英文)。
       const memoParts: string[] = [];
       if (discount > 0) memoParts.push(fmt(t.value.store.coBillVoucherPart, { amount: discount }));
-      if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: ti.device.name, amount: tradeInCredit }));
+      // 设备名经 device-copy 解析(存档只认 kind,显示随语言切换);试用促销/抵扣两行为 FEAT-TRIAL02 转化单分项。
+      if (ti) memoParts.push(fmt(t.value.store.coBillTradeinPart, { name: deviceName(t.value, ti.device), amount: tradeInCredit }));
+      if (promo > 0) memoParts.push(fmt(t.value.store.coBillTrialDiscountPart, { amount: promo.toFixed(2) }));
+      if (applyTrial && trialOffsetUSD > 0) memoParts.push(fmt(t.value.store.coBillTrialOffsetPart, { amount: trialOffsetUSD.toFixed(2) }));
       if (fee > 0) memoParts.push(fmt(t.value.store.coBillCardFeePart, { amount: fee, rate: cardFeeRateLabel() }));
-      bills.add({
+      // 🔴 主账单走 postReceiptOnly 而不是 postMoneyBill(2026-08-04 R4)。这一笔的扣款发生在
+      // 上面(必须先扣款才建单),中间夹着 createOrder + 旧机下架 + voucher 核销 —— 全都没有
+      // undo。收据写失败时回滚资金 = 只还钱、还不回已经进入履约管线的设备,等于白送一台;
+      // 所以这里的既定处置是**让用户明确看见收据没记上**(与提现页同口径),而不是像原来那样
+      // 丢弃 bills.add 的返回值、静默吞掉。
+      postReceiptOnly({
         type: "purchase",
         symbol: "USDT",
         amount: -chargeTotal,
@@ -652,7 +884,11 @@ function goTrack() {
 }
 
 // 离开结算页即放弃未使用的抵扣上下文(内存态,无半执行风险)。
-function cleanup() { clearAdvance(); tradein.clearApplied(); }
+function cleanup() {
+  clearAdvance();
+  tradein.clearApplied();
+  if (trialTicker) { clearInterval(trialTicker); trialTicker = undefined; }
+}
 onUnload(() => cleanup());
 onUnmounted(() => cleanup());
 
@@ -696,7 +932,10 @@ function methodIconStyle(active: boolean): CSSProperties {
     width: "36px",
     height: "36px",
     borderRadius: "8px",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+    // 两态原本都与所在行同色 → 图标框隐形:未选中 surface-2 撞未选中行的 surface-2,
+    // 选中 brand-soft 撞选中行的 brand-soft(第一轮只修了未选中,复扫才抓出选中态也坏)。
+    // 现在两态都从行里浮出来:选中用 L1 托住品牌色图标,未选中用 surface-3 内凹。
+    background: active ? "var(--v5-surface)" : "var(--v5-surface-3)",
   };
 }
 const payFootStyle: CSSProperties = { padding: "16px", borderColor: "color-mix(in srgb, var(--v5-border) 70%, transparent)" };

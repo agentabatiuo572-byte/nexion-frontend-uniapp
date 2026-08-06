@@ -207,24 +207,45 @@ if (sameIdRecentTask?.completedAt !== 3000) {
   throw new Error(`empty-baseline same-id recentTasks regressed latest completion: ${JSON.stringify(sameIdRecentTask)}`);
 }
 
-const withdrawalBase = structuredClone(base);
-withdrawalBase.latestWithdrawal = {
-  id: "wd-1",
+const mkWd = (id, status, submittedAt) => ({
+  id,
   amount: 10,
   network: "USDT-TRC20",
   address: "Tdemo",
   fee: 1,
-  status: "submitted",
-  submittedAt: 1000,
-  estimatedCompletion: 5000,
-};
+  status,
+  submittedAt,
+  estimatedCompletion: submittedAt + 4000,
+});
+const withdrawalBase = structuredClone(base);
+withdrawalBase.withdrawals = [mkWd("wd-1", "submitted", 1000)];
 const withdrawalLatest = structuredClone(withdrawalBase);
-withdrawalLatest.latestWithdrawal.status = "processing";
+withdrawalLatest.withdrawals[0].status = "processing";
 const withdrawalStale = structuredClone(withdrawalBase);
-withdrawalStale.latestWithdrawal.status = "review-passed";
+withdrawalStale.withdrawals[0].status = "review-passed";
 const withdrawalMerged = mergeAccountSnapshots(withdrawalBase, withdrawalStale, withdrawalLatest);
-if (withdrawalMerged.latestWithdrawal?.status !== "processing") {
-  throw new Error(`latestWithdrawal status regressed: ${withdrawalMerged.latestWithdrawal?.status}`);
+const wd1 = withdrawalMerged.withdrawals.find((w) => w.id === "wd-1");
+// 同一单:状态取 rank 更靠后的那份(跨进程「读最新」可能读到旧值,last-write 会把已到账退回处理中)
+if (wd1?.status !== "processing") {
+  throw new Error(`withdrawal status regressed: ${wd1?.status}`);
+}
+
+// 🔴 列表化才有的不变量:两端**各自新建**的单都必须保留。
+// 单条版这里会互相顶掉 —— 钱已扣、单据不可达、到账推进永不再碰它(2026-07-31 audit P0)。
+const wdBothBase = structuredClone(base);
+wdBothBase.withdrawals = [];
+const wdBothNext = structuredClone(wdBothBase);
+wdBothNext.withdrawals = [mkWd("wd-A", "submitted", 2000)];
+const wdBothLatest = structuredClone(wdBothBase);
+wdBothLatest.withdrawals = [mkWd("wd-B", "submitted", 2100)];
+const wdBothMerged = mergeAccountSnapshots(wdBothBase, wdBothNext, wdBothLatest);
+const bothIds = wdBothMerged.withdrawals.map((w) => w.id).sort().join(",");
+if (bothIds !== "wd-A,wd-B") {
+  throw new Error(`concurrent withdrawals must both survive, got: ${bothIds}`);
+}
+// 排序:最近提交的在前(展示面取 [0] 即最新)
+if (wdBothMerged.withdrawals[0].id !== "wd-B") {
+  throw new Error(`withdrawals must be sorted newest-first, got: ${wdBothMerged.withdrawals[0].id}`);
 }
 
 const secondLocalWrite = structuredClone(merged);

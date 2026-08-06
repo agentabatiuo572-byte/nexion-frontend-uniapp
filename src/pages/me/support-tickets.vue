@@ -154,7 +154,8 @@ const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
 const tabs: Tab[] = ["all", "open", "resolved", "closed"];
 
-const categoriesForNew: TicketCategory[] = ["withdrawal", "deposit", "kyc", "hardware", "account", "earnings", "technical", "other"];
+// 新工单不再提供身份核验类目(FEAT-KYC-RM01b);历史工单的该类目仍可渲染(标签中性化)。
+const categoriesForNew: TicketCategory[] = ["withdrawal", "deposit", "hardware", "account", "earnings", "technical", "other"];
 const newCat = ref<TicketCategory>("withdrawal");
 const subject = ref("");
 const desc = ref("");
@@ -279,7 +280,8 @@ const avgRowStyle: CSSProperties = {
 const avgLabelStyle: CSSProperties = { color: "var(--v5-ink-3)" };
 const avgValueStyle: CSSProperties = { marginLeft: "auto", fontFamily: "var(--font-jet-mono), ui-monospace, monospace", color: "var(--v5-brand-2)", fontWeight: 600 };
 // Segmented control — filled container, no border (single visual difference).
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface-2)" };
+// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "16px", background: "var(--v5-surface)" };
 function tabStyle(active: boolean): CSSProperties {
   return {
     height: "44px",
@@ -312,12 +314,14 @@ function catChipStyle(active: boolean): CSSProperties {
     color: active ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
-// Inputs — recessed fill, no border (input idiom: surface-3, single difference).
+// Inputs — 零 border。新建表单容器(模板 v-else-if create 那层)没有底色 → 输入框直接
+// 贴页面底;原 surface-3 对页面底亮色仅 ΔE 2.7(分不出),整个输入框在亮色下看不见。改 L1。
+// (该表单只在"新建工单"时渲染,自动扫描的默认渲染态覆盖不到,靠回源读模板发现。)
 const inputStyle: CSSProperties = {
   width: "100%",
   height: "44px",
   borderRadius: "12px",
-  background: "var(--v5-surface-3)",
+  background: "var(--v5-surface)",
   padding: "0 12px",
   fontSize: "15px",
   color: "var(--v5-ink)",
@@ -326,7 +330,8 @@ const textareaStyle: CSSProperties = {
   width: "100%",
   height: "140px",
   borderRadius: "12px",
-  background: "var(--v5-surface-3)",
+  // 同 inputStyle:贴页面底,surface-3 亮色下 ΔE 2.7 不可辨 → L1
+  background: "var(--v5-surface)",
   padding: "10px 12px",
   fontSize: "13px",
   color: "var(--v5-ink)",
@@ -361,13 +366,14 @@ function msgAuthorStyle(isUser: boolean): CSSProperties {
 }
 const msgTimeStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 const msgBodyStyle: CSSProperties = { fontSize: "13px", color: "color-mix(in srgb, var(--v5-ink) 90%, transparent)", lineHeight: 1.625 };
-// Reply zone — wrapper card dropped; the recessed textarea is the unit.
+// Reply zone — 外壳卡已删,textarea 自成一体。壳只剩 padding 无底色 → textarea 直接贴
+// 页面底;原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1(同新建表单输入框)。
 const replyCardStyle: CSSProperties = { padding: "4px 2px 0" };
 const replyTextareaStyle: CSSProperties = {
   width: "100%",
   height: "84px",
   borderRadius: "12px",
-  background: "var(--v5-surface-3)",
+  background: "var(--v5-surface)",
   padding: "8px 12px",
   fontSize: "13px",
   color: "var(--v5-ink)",

@@ -227,15 +227,18 @@ const heroIconStyle: CSSProperties = { width: "48px", height: "48px", background
 // -2px side margins pull the hairline back to full width (hero has a 2px optical inset).
 const heroFooterStyle: CSSProperties = { margin: "12px -2px 0", padding: "12px 2px 0", borderTop: "1px solid var(--v5-border)", fontSize: "12px" };
 
-const segWrapStyle: CSSProperties = { background: "var(--v5-surface-2)", borderRadius: "12px", padding: "3px", gap: "2px" };
+// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface
+const segWrapStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "12px", padding: "3px", gap: "2px" };
 function pillStyle(p: LeaderPeriod): CSSProperties {
   const on = period.value === p;
   // 《07》tap≥44(原 34);同型控件 earn 页已是 44,这里是漏掉的兄弟实例
-  return { height: "44px", borderRadius: "9px", background: on ? "var(--v5-surface)" : "transparent", boxShadow: on ? "0 1px 3px rgba(0,0,0,0.08)" : "none" };
+  // 选中态原是「surface 底 + 投影」,轨道提到 L1 后会与轨道撞色(只剩投影可辨),且投影表达层级违反《03》;
+  // 改 brand-soft 底 + brand 文字,与 earn / live-feed-card / marketplace sortPill 同一写法。
+  return { height: "44px", borderRadius: "9px", background: on ? "var(--v5-brand-soft)" : "transparent", boxShadow: "none" };
 }
 function pillLabelStyle(p: LeaderPeriod): CSSProperties {
   const on = period.value === p;
-  return { fontSize: "12px", fontWeight: on ? 600 : 500, color: on ? "var(--v5-ink)" : "var(--v5-ink-3)" };
+  return { fontSize: "12px", fontWeight: on ? 600 : 500, color: on ? "var(--v5-brand)" : "var(--v5-ink-3)" };
 }
 
 // Transparent stat row — was a second glowing surface card under the hero.
@@ -258,7 +261,8 @@ const podiumCardStyle: CSSProperties = { padding: "8px 0 0" };
 function podiumColStyle(isFirst: boolean): CSSProperties {
   return {
     padding: "10px",
-    background: isFirst ? "var(--v5-warning-soft)" : "var(--v5-surface-2)",
+    // 非第一名原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
+    background: isFirst ? "var(--v5-warning-soft)" : "var(--v5-surface)",
     transform: isFirst ? "translateY(-6px)" : "none",
   };
 }

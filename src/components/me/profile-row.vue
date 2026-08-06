@@ -1,9 +1,8 @@
 <!--
   ProfileRow — ported from me/page.tsx ProfileRow.
   Strict port of styles-v4.css .profile-row: avatar (56 circle, brand solid) +
-  name (display 600 18 -0.018) + phone mask (mono 12.5 ink-3) + 2 code-tag chips
-  (KYC verified/pending + Joined Nd). Taps through to /me/profile (not yet ported
-  → nav fail:()=>{}).
+  name (display 600 18 -0.018) + phone mask (mono 12.5 ink-3) + Joined Nd chip.
+  (身份认证徽章已随 FEAT-KYC-RM01b 删除。)Taps through to /me/profile.
 -->
 <template>
   <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" @click="goProfile">
@@ -14,14 +13,6 @@
       <text class="block truncate" :style="nameStyle">{{ name }}</text>
       <text class="block truncate" :style="metaStyle">{{ phoneMask }} · US</text>
       <view class="flex items-center" style="gap: 6px; margin-top: 6px">
-        <view v-if="kycVerified" class="inline-flex items-center" :style="kycVerifiedChipStyle">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-          <text>{{ t.me.profileKycVerifiedChip }}</text>
-        </view>
-        <view v-else class="inline-flex items-center" :style="kycPendingChipStyle">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /><line x1="12" x2="12" y1="9" y2="13" /><line x1="12" x2="12.01" y1="17" y2="17" /></svg>
-          <text>{{ t.me.profileKycPendingChip }}</text>
-        </view>
         <view class="inline-flex items-center" :style="joinedChipStyle">
           <text>{{ joinedLabel }}</text>
         </view>
@@ -36,19 +27,16 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
-import { useWalletPairing } from "@/store/wallet-pairing";
 
 const ONE_DAY_MS = 86400 * 1000;
 
 const t = useT();
 const app = useApp();
 const profile = useProfile();
-const pairing = useWalletPairing();
 
 const name = computed(() => profile.displayName);
 const initial = computed(() => (name.value || app.user.email || "S").trim()[0]?.toUpperCase() || "S");
 const phoneMask = "+1 (415) ••• 4892";
-const kycVerified = computed(() => pairing.walletPaired);
 const daysJoined = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / ONE_DAY_MS)));
 const joinedLabel = computed(() => fmt(t.value.me.profileJoinedDay, { n: daysJoined.value }));
 
@@ -91,21 +79,10 @@ const codeTagBase: CSSProperties = {
   fontWeight: 500,
   lineHeight: 1.5,
 };
-// KYC chip (both states) — border line removed per request, soft bg kept
-// (V5 inner-chip rule: soft bg tint + content color, no border).
-const kycVerifiedChipStyle: CSSProperties = {
-  ...codeTagBase,
-  background: "var(--v5-success-soft)",
-  color: "var(--v5-success-ink)",
-};
-const kycPendingChipStyle: CSSProperties = {
-  ...codeTagBase,
-  background: "var(--v5-brand-2-soft)",
-  color: "var(--v5-brand-2-ink)",
-};
 const joinedChipStyle: CSSProperties = {
   ...codeTagBase,
-  background: "var(--v5-surface-2)",
+  // 原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),此 chip 直接坐在页面底上 → 改 L1
+  background: "var(--v5-surface)",
   color: "var(--v5-ink-2)",
 };
 </script>

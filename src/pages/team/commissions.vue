@@ -249,7 +249,8 @@ function pillStyle(active: boolean, color: string): CSSProperties {
   return {
     height: "44px",
     padding: "0 16px",
-    background: active ? color : "var(--v5-surface-2)",
+    // 未选中态原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
+    background: active ? color : "var(--v5-surface)",
   };
 }
 // Bright active fill → on-brand text (brand-2 fill takes on-brand-2), incl. inactive fallback.
