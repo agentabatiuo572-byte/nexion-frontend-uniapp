@@ -71,6 +71,8 @@ export interface Tier1Context {
   hasRackAnyGen: boolean;
   hasPremium: boolean;
   nexBalance: number;
+  /** Whether the current Genesis gate allows a purchase. */
+  genesisPurchasable: boolean;
 }
 
 /**
@@ -81,7 +83,7 @@ export function dispatchTier1(ctx: Tier1Context): Tier1QuestDef {
   // 1. P6 + 持有 NEX → Vault
   if (ctx.phase === "P6" && ctx.nexBalance >= 5000) return TIER1_QUESTS.nex_v2_lock;
   // 2. V6+ + 无 Genesis
-  if (ctx.myRank >= 6 && !ctx.hasGenesis) return TIER1_QUESTS.buy_genesis;
+  if (ctx.myRank >= 6 && !ctx.hasGenesis && ctx.genesisPurchasable) return TIER1_QUESTS.buy_genesis;
   // 3. 有 Rack + 余额 ≥ $2K
   if (ctx.hasRackAnyGen && ctx.balanceUSDT >= 2000) return TIER1_QUESTS.buy_additional_hw;
   // 4. 有 Pro/Rack P1(存在更高价升级目标即可置换,FEAT-DEV02)

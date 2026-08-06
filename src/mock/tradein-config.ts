@@ -25,7 +25,6 @@ export type EligibilityRule =
   | { type: "own-prev-tier"; count: number }
   | { type: "v-rank-min"; level: number }
   | { type: "cumulative-deposit-usdt"; amount: number }
-  | { type: "kyc-tier"; tier: "basic" | "verified" | "enhanced" }
   | { type: "days-active"; days: number }
   | { type: "referral-count"; count: number }
   // FEAT-DEV02:fromKind 可省 = 任意合格设备的置换均满足本通道。

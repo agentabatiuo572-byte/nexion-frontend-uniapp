@@ -37,8 +37,6 @@ export interface EligibilityContext {
   vRank: number;
   /** Cumulative USDT deposit lifetime. */
   cumulativeDepositUsdt: number;
-  /** KYC level. "none" passes nothing requiring KYC. */
-  kycTier: "none" | "basic" | "verified" | "enhanced";
   /** Account creation timestamp (ms epoch). */
   accountCreatedAt: number;
   /** Confirmed referral count (binding completed + not refunded). */
@@ -66,13 +64,6 @@ export interface EligibilityResult {
 }
 
 // ─────────────────────────────────────────────────────────────── Helpers
-
-const KYC_RANK: Record<EligibilityContext["kycTier"], number> = {
-  none: 0,
-  basic: 1,
-  verified: 2,
-  enhanced: 3,
-};
 
 function daysSince(ms: number): number {
   return Math.floor((Date.now() - ms) / (24 * 60 * 60 * 1000));
@@ -139,17 +130,6 @@ export function checkRule(
         required: rule.amount,
         hintKey: "tradein.eligibilityHintDeposit",
       };
-
-    case "kyc-tier": {
-      const cur = KYC_RANK[ctx.kycTier];
-      const req = KYC_RANK[rule.tier];
-      return {
-        pass: cur >= req,
-        current: ctx.kycTier,
-        required: rule.tier,
-        hintKey: "tradein.eligibilityHintKyc",
-      };
-    }
 
     case "days-active": {
       const days = daysSince(ctx.accountCreatedAt);
