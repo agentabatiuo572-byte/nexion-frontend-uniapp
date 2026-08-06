@@ -93,6 +93,14 @@ export function nextUnfired(
   return null;
 }
 
+/**
+ * 连播间隙(主人 2026-08-06 拍板包 G P2#1 选项 a):一条看完到下一条弹出之间留 2.5s
+ * 空窗,让首页内容(尤其「未上榜→激活设备」引导,给零设备用户的购买入口)有露出时机。
+ * 只在 dismiss(看完/点掉)后生效;钱链路 park 是中断不是看完,不设冷却。
+ * 导出供 selfcheck-milestone-queue.mjs 引用同一值(间隙已是机器不变量)。
+ */
+export const CELEBRATION_GAP_MS = 2_500;
+
 export const useMilestones = defineStore("milestones", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
@@ -152,6 +160,9 @@ export const useMilestones = defineStore("milestones", () => {
    * Called on a short interval by milestone-celebration.vue with the current
    * route. Returns true when a celebration was promoted.
    */
+  // dismiss 后的连播冷却时刻(CELEBRATION_GAP_MS 见模块顶部);park 路径不设值。
+  let coolUntil = 0;
+
   function advance(route: string): boolean {
     if (isMoneyFlowRoute(route)) {
       if (active.value) {
@@ -161,6 +172,7 @@ export const useMilestones = defineStore("milestones", () => {
       return false;
     }
     if (active.value || pendingCelebrations.value.length === 0) return false;
+    if (Date.now() < coolUntil) return false;
     const [next, ...rest] = pendingCelebrations.value;
     active.value = next;
     pendingCelebrations.value = rest;
@@ -169,6 +181,7 @@ export const useMilestones = defineStore("milestones", () => {
 
   /** Close the celebration overlay (auto-called after the duration, or on tap). */
   function dismiss() {
+    if (active.value) coolUntil = Date.now() + CELEBRATION_GAP_MS;
     active.value = null;
   }
 
