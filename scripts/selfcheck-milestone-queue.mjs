@@ -51,7 +51,7 @@ const bundle = await build({
 const mod = await import(
   "data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64")
 );
-const { useMilestones, isMoneyFlowRoute, MONEY_FLOW_ROUTE_PREFIXES } = mod;
+const { useMilestones, isMoneyFlowRoute, MONEY_FLOW_ROUTE_PREFIXES, CELEBRATION_GAP_MS } = mod;
 
 let pass = 0;
 let fail = 0;
@@ -101,6 +101,11 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
       s.pendingCelebrations.value[0].id === "earn-100" &&
       s.pendingCelebrations.value[1].id === "earn-500",
     JSON.stringify(s.pendingCelebrations.value.map((x) => x.id)));
+  // ① park 是中断不是看完:离场后**立即**重放,不许被连播冷却挡(拍板的另一半;
+  //   谁把 coolUntil 误设进 park 分支,这里立刻红 —— F6 封口)。
+  check("① park 后离场立即重放(park 不设冷却)",
+    s.advance("pages/index/index") === true && s.active.value?.id === "earn-100",
+    String(s.active.value?.id));
 }
 
 // ── ① 分离证明(奖励侧):App.vue pollMilestones 里 credit/bill 无条件,
@@ -166,8 +171,16 @@ console.log("selfcheck-milestone-queue — 钱链路挂起 / 逐条补发 / z �
     s.pendingCelebrations.value.length === 1 && s.pendingCelebrations.value[0].id === "earn-500");
   check("② 上一条未 dismiss 时不抢屏", s.advance("pages/me/me") === false && s.active.value?.id === "earn-100");
   s.dismiss();
+  // ② 🔴 连播间隙(2026-08-06 主人拍板 P2#1):dismiss 后 GAP 内不许提升下一条 ——
+  //    这条断言钉住间隙本身,谁把冷却删了这里立刻红(不是只测「最终补发齐」)。
+  check(`② 🔴 连播间隙:dismiss 后立即 advance 不提升(冷却 ${CELEBRATION_GAP_MS}ms,首页内容要有露出时机)`,
+    typeof CELEBRATION_GAP_MS === "number" && CELEBRATION_GAP_MS >= 1000 &&
+      s.advance("pages/me/me") === false && s.active.value === null &&
+      s.pendingCelebrations.value.length === 1,
+    `gap=${CELEBRATION_GAP_MS} active=${JSON.stringify(s.active.value ?? null)}`);
+  await new Promise((resolve) => setTimeout(resolve, CELEBRATION_GAP_MS + 100));
   if (s.advance("pages/me/me")) replayed.push(s.active.value.id);
-  check("② 第二条补发 = $500 级,队列清空", s.active.value?.id === "earn-500" && s.pendingCelebrations.value.length === 0);
+  check("② 第二条补发 = $500 级,队列清空(足秒后)", s.active.value?.id === "earn-500" && s.pendingCelebrations.value.length === 0);
   s.dismiss();
   check(`② 补发总量与顺序:${JSON.stringify(replayed)}(样本 2 条,0 丢失)`,
     replayed.length === 2 && replayed[0] === "earn-100" && replayed[1] === "earn-500");
