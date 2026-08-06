@@ -39,7 +39,7 @@
         v-for="(r, i) in activityRows"
         :key="r.k"
         class="grid items-center gap-2.5 py-2 whitespace-nowrap"
-        :style="{ gridTemplateColumns: '44px 38px 1fr auto', borderBottom: i < activityRows.length - 1 ? '1px solid var(--v5-border)' : 'none', animation: i === 0 ? 'v5-ledger-fade 0.5s ease' : 'none' }"
+        :style="{ gridTemplateColumns: whoColTemplate, borderBottom: i < activityRows.length - 1 ? '1px solid var(--v5-border)' : 'none', animation: i === 0 ? 'v5-ledger-fade 0.5s ease' : 'none' }"
       >
         <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.ts }}</text>
         <text class="text-center" :style="whoBadgeStyle(r)">{{ whoLabel(r.who) }}</text>
@@ -73,6 +73,7 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useLocaleStore } from "@/store/locale";
 
 interface FeedRow {
   k: number;
@@ -169,6 +170,11 @@ function tabStyle(id: "activity" | "earnings"): CSSProperties {
     boxShadow: "none",
   };
 }
+// 身份徽章列宽按语言取值(包 G P2#2 选项 a):en「Peer」/zh「同伴」进 38px,
+// vi「Thành viên」实测 ~62px,固定 38px 溢出 5px+;列宽仍是常量 → 跨行对齐不破。
+const localeStore = useLocaleStore();
+const whoColTemplate = computed(() => `44px ${localeStore.code === "vi" ? "66px" : "38px"} 1fr auto`);
+
 function whoBadgeStyle(r: FeedRow): CSSProperties {
   const bg = r.lvl === "ok" ? "var(--v5-success-soft)" : r.lvl === "live" ? "var(--v5-tech-cyan-soft)" : "var(--v5-warning-soft)";
   const color = r.lvl === "ok" ? "var(--v5-success)" : r.lvl === "live" ? "var(--v5-tech-cyan)" : "var(--v5-warning)";

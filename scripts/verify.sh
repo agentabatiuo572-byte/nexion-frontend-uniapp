@@ -1722,8 +1722,10 @@ platform_stats_anchor() {
   fi
   # (4) consumers wired to the single source: import present AND anchor symbol consumed
   #     (import-only would let a hardcoded near-value ride under a green light)
+  # (4-注)2026-08-06 主人拍板(包 G P2#3 选 a):on-grid 页脚「配置坏回 PAYOUT_PER_SEC_USD
+  #        种子锚」退役,改与脉搏卡同判据占位降级 → 该消费对从台账移除(消费关系合法消亡,
+  #        非哨兵放宽);常量本身仍由上方 ① 派生链哨兵钉着,payoutPerSecUsdOf 消费对保留。
   for pair in \
-    'src/components/home/on-grid-section.vue|PAYOUT_PER_SEC_USD' \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
     'src/store/app.ts|FLEET_DEVICES' \
