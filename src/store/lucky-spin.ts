@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { mockServerNow } from "./server-time";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 
 /**
  * Lucky Spin 转盘 — daily free spin + Day-30 streak milestone bonus spins.
@@ -95,41 +94,42 @@ function targetAngleFor(prizeId: string, prevAngle: number): number {
 // 旧设备级单键 "nexgrid-lucky-spin-v1" 废弃(存量无账号归属,mock 可重建);转盘持久态按账号分行。
 const ACCOUNTS_KEY = "nexgrid-lucky-spin-accounts-v1"; // { [accountKey]: persisted spin state }
 
+interface SpinRow {
+  bonusTickets: number;
+  lastFreeSpinDate: string;
+  history: SpinWin[];
+  realPrizeSoldOut: boolean;
+  coverageDegraded: boolean;
+}
+
+function defaults(): SpinRow {
+  return {
+    bonusTickets: 0,
+    lastFreeSpinDate: "",
+    history: [],
+    realPrizeSoldOut: false,
+    coverageDegraded: false,
+  };
+}
+
+/** 磁盘行 → 转盘持久态。行不存在 → null(调用方退回 defaults / 内存态)。 */
+function parseRow(raw: unknown): SpinRow | null {
+  const s = raw as Partial<SpinRow> | null;
+  if (!s) return null;
+  return {
+    bonusTickets: typeof s.bonusTickets === "number" ? s.bonusTickets : 0,
+    lastFreeSpinDate: typeof s.lastFreeSpinDate === "string" ? s.lastFreeSpinDate : "",
+    history: Array.isArray(s.history) ? s.history : [],
+    realPrizeSoldOut: s.realPrizeSoldOut === true,
+    coverageDegraded: s.coverageDegraded === true,
+  };
+}
+
 export const useLuckySpin = defineStore("luckySpin", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   // ponytail: realPrizeSoldOut/coverageDegraded 名义是平台降级 flag,整块落 per-account 行——
   // 两者是 dev 演示开关(默认 false),真后台 server 全局裁决;真正需隔离的用户资产是
   // bonusTickets/lastFreeSpinDate/history(免费票/每日抽记录,换账号不得继承)。
-  let boundKey = "default";
-  // ── persisted (cross-session) ──
-  function hydrate(accountKey: string): {
-    bonusTickets: number;
-    lastFreeSpinDate: string;
-    history: SpinWin[];
-    realPrizeSoldOut: boolean;
-    coverageDegraded: boolean;
-  } {
-    const fallback = {
-      bonusTickets: 0,
-      lastFreeSpinDate: "",
-      history: [] as SpinWin[],
-      realPrizeSoldOut: false,
-      coverageDegraded: false,
-    };
-    const s = readAccountRow<Partial<typeof fallback>>(ACCOUNTS_KEY, accountKey);
-    if (s) {
-      return {
-        bonusTickets: typeof s.bonusTickets === "number" ? s.bonusTickets : 0,
-        lastFreeSpinDate: typeof s.lastFreeSpinDate === "string" ? s.lastFreeSpinDate : "",
-        history: Array.isArray(s.history) ? s.history : [],
-        realPrizeSoldOut: s.realPrizeSoldOut === true,
-        coverageDegraded: s.coverageDegraded === true,
-      };
-    }
-    return fallback;
-  }
-
-  const init = hydrate(boundKey);
 
   // ── session-only (not persisted) ──
   const open = ref(false);
@@ -138,26 +138,36 @@ export const useLuckySpin = defineStore("luckySpin", () => {
   const wheelAngle = ref(0);
 
   // ── persisted ──
-  const bonusTickets = ref(init.bonusTickets);
-  const lastFreeSpinDate = ref(init.lastFreeSpinDate);
-  const history = ref<SpinWin[]>(init.history);
-  const realPrizeSoldOut = ref(init.realPrizeSoldOut);
-  const coverageDegraded = ref(init.coverageDegraded);
+  const bonusTickets = ref(0);
+  const lastFreeSpinDate = ref("");
+  const history = ref<SpinWin[]>([]);
+  const realPrizeSoldOut = ref(false);
+  const coverageDegraded = ref(false);
 
-  function persist() {
-    writeAccountRow(ACCOUNTS_KEY, boundKey, {
+  // 落盘唯一出口:乐观并发提交器。票是**每日配额 + 稀缺资源**,覆盖式写会让两个标签页
+  // 各花掉同一张票各中一次奖(组件抽完直接 creditPrize → 白发奖)。
+  const rows = createAccountRowCommit<SpinRow>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseRow,
+    snapshot: () => ({
       bonusTickets: bonusTickets.value,
       lastFreeSpinDate: lastFreeSpinDate.value,
       history: history.value,
       realPrizeSoldOut: realPrizeSoldOut.value,
       coverageDegraded: coverageDegraded.value,
-    });
-  }
+    }),
+    sync: (row) => {
+      bonusTickets.value = row.bonusTickets;
+      lastFreeSpinDate.value = row.lastFreeSpinDate;
+      history.value = row.history;
+      realPrizeSoldOut.value = row.realPrizeSoldOut;
+      coverageDegraded.value = row.coverageDegraded;
+    },
+  });
 
   /** 账号切换重绑:装载该账号的转盘持久态(票/记录),并重置本地会话态(转盘动画/弹层)。 */
   function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    const next = hydrate(boundKey);
+    const next = rows.bind(rawAccountKey) ?? defaults();
     bonusTickets.value = next.bonusTickets;
     lastFreeSpinDate.value = next.lastFreeSpinDate;
     history.value = next.history;
@@ -169,6 +179,7 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     lastWonPrizeId.value = null;
     wheelAngle.value = 0;
   }
+  bindAccount("default");
 
   // ── derived (call as functions, like the source's selectors) ──
   function hasFreeSpinToday(): boolean {
@@ -194,10 +205,9 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     phase.value = "idle";
   }
 
-  /** Day-30 里程碑发 bonus 票 */
+  /** Day-30 里程碑发 bonus 票。增量型:冲突时在**别处写完的最新票数**上重放这次加票。 */
   function grantBonusTicket(n: number) {
-    bonusTickets.value = bonusTickets.value + n;
-    persist();
+    rows.commit((cur) => ({ next: { ...cur, bonusTickets: cur.bonusTickets + n }, result: true as const }));
   }
 
   function startConfirm() {
@@ -209,24 +219,30 @@ export const useLuckySpin = defineStore("luckySpin", () => {
 
   /**
    * 执行一次抽奖:消费 1 张票(免费优先)、mock server roll、置 spinning + 目标角。
-   * 返回中奖 prizeId(供组件在动画结束后 reveal + 派奖);无票返 null。
+   * ok=true 时 prizeId 为中奖档(供组件在动画结束后 reveal + 派奖);无票 / 票被别处花掉 → ok=false。
+   *
+   * 🔴 顺序是「先扣票落盘,过了才转轮子」:票的存量按**磁盘最新**判,别的标签页刚用掉的
+   * 今日免费次数在这里就被挡住。反过来(先转后扣)= 两个标签页各花同一张票各中一次奖,
+   * 而组件拿到 prizeId 就直接 creditPrize —— 白发两份奖。
    */
-  function spin(): string | null {
-    if (availableSpins() <= 0) return null;
-    const useFree = hasFreeSpinToday();
+  function spin(): { ok: boolean; prizeId: string | null; conflict?: boolean } {
+    const today = utcDate(mockServerNow());
+    const r = rows.commit((cur) => {
+      const free = cur.lastFreeSpinDate !== today;
+      if (!free && cur.bonusTickets <= 0) return null; // 今日免费已用 + 无 bonus 票
+      // 消费票:免费优先,否则扣 bonus 票(floor 0 防御:并发/重入永不为负)
+      const next = free
+        ? { ...cur, lastFreeSpinDate: today }
+        : { ...cur, bonusTickets: Math.max(0, cur.bonusTickets - 1) };
+      return { next, result: free };
+    });
+    if (!r.ok) return { ok: false, prizeId: null, conflict: r.conflict };
+    // 票已落盘;降级 flag 此刻是 commit 刚同步回来的最新值,roll 用它。
     const prize = rollPrize(!realPrizeActive());
-    const angle = targetAngleFor(prize.id, wheelAngle.value);
     phase.value = "spinning";
     lastWonPrizeId.value = prize.id;
-    wheelAngle.value = angle;
-    // 消费票:免费优先,否则扣 bonus 票(floor 0 防御:并发/重入永不为负)
-    if (useFree) {
-      lastFreeSpinDate.value = utcDate(mockServerNow());
-    } else {
-      bonusTickets.value = Math.max(0, bonusTickets.value - 1);
-    }
-    persist();
-    return prize.id;
+    wheelAngle.value = targetAngleFor(prize.id, wheelAngle.value);
+    return { ok: true, prizeId: prize.id };
   }
 
   /** 动画结束:置 won 态(派奖由组件 compose 各 store 完成,store 不跨 import)*/
@@ -239,12 +255,12 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     phase.value = "idle";
     lastWonPrizeId.value = null;
     // 退票:免费则清除今日已抽标记,否则退还 1 张 bonus
-    if (wasFree) {
-      lastFreeSpinDate.value = "";
-    } else {
-      bonusTickets.value = bonusTickets.value + 1;
-    }
-    persist();
+    rows.commit((cur) => ({
+      next: wasFree
+        ? { ...cur, lastFreeSpinDate: "" }
+        : { ...cur, bonusTickets: cur.bonusTickets + 1 },
+      result: true as const,
+    }));
   }
 
   /** 看完结果回 idle */
@@ -253,25 +269,25 @@ export const useLuckySpin = defineStore("luckySpin", () => {
     lastWonPrizeId.value = null;
   }
 
-  /** 记录中奖历史(组件派奖后调用)*/
+  /** 记录中奖历史(组件派奖后调用)。追加型:冲突时重放到别处写完的最新记录上,两边的都留得住。*/
   function pushHistory(prizeId: string) {
-    history.value = [{ prizeId, ts: mockServerNow() }, ...history.value].slice(0, 20);
-    persist();
+    const ts = mockServerNow();
+    rows.commit((cur) => ({
+      next: { ...cur, history: [{ prizeId, ts }, ...cur.history].slice(0, 20) },
+      result: true as const,
+    }));
   }
 
   // ── mock 演示开关(dev / 用于演示边界态)──
   function setRealPrizeSoldOut(v: boolean) {
-    realPrizeSoldOut.value = v;
-    persist();
+    rows.commit((cur) => ({ next: { ...cur, realPrizeSoldOut: v }, result: true as const }));
   }
   function setCoverageDegraded(v: boolean) {
-    coverageDegraded.value = v;
-    persist();
+    rows.commit((cur) => ({ next: { ...cur, coverageDegraded: v }, result: true as const }));
   }
   /** dev:重置今日免费次数(便于演示)*/
   function resetDailyFree() {
-    lastFreeSpinDate.value = "";
-    persist();
+    rows.commit((cur) => ({ next: { ...cur, lastFreeSpinDate: "" }, result: true as const }));
   }
 
   return {

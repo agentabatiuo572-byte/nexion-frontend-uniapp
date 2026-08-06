@@ -2,7 +2,7 @@
   Achievements (ported from Nexion-prototype/app/(main)/me/achievements/page.tsx).
   Progress hero + categorized list with unlock state, reward + claim button.
   Unlock conditions auto-evaluate on mount against live app store. Cross-store
-  claim orchestration (creditNex/creditBalance + bills.add) lives in the handler.
+  claim orchestration 走 postMoneyBills 收口点(资金与账单同生共死),仍在 handler 里。
   Wrapped in <AppChassis active="me">.
 -->
 <template>
@@ -83,7 +83,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
@@ -91,7 +91,6 @@ import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/m
 const t = useT();
 const w = computed(() => t.value.achievements);
 const app = useApp();
-const bills = useBills();
 const ach = useAchievements();
 
 const CAT_COLOR: Record<AchievementCategory, string> = {
@@ -185,16 +184,21 @@ function relativeWhen(ms: number): string {
 function handleClaim(id: string) {
   const def = ACHIEVEMENTS.find((a) => a.id === id);
   if (!def) return;
-  if (!ach.claim(id)) return;
+  // 🔴 前置门必须与消费门 `claim()` **等强**:后者的守卫是「记录存在(=已解锁)**且**未领」,
+  // 只查 `isClaimed` 会漏掉前一半 —— 先发钱后消费的顺序下,未解锁的成就会**先把奖发出去**
+  // 再被 claim() 拒。当前不可达(按钮只在 isUnlocked 时渲染),但「前置门弱于消费门」
+  // 正是这类事故的定义:渲染层的拦截不是判定层的拦截(卡轨双击那条同一形状)。
+  if (!ach.isUnlocked(id) || ach.isClaimed(id)) return;
   const name = label(def);
-  if (def.rewardNex) {
-    app.creditNex(def.rewardNex);
-    bills.add({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
-  }
-  if (def.rewardUsdt) {
-    app.creditBalance(def.rewardUsdt);
-    bills.add({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
-  }
+  // 同一次领取的两腿一次落盘 —— 发了 NEX 没发 $ 是半边账,收据即指令(不再单独 credit*)。
+  // 🔴 顺序 = 先发钱(幂等)→ 后消费资格(2026-08-04 对抗审计 B-P1-3):原来是先 ach.claim(id)
+  // 消费掉,发钱失败就 return —— 成就标记已置、奖归零且**再也领不了**(成就是一次性的)。
+  // ref 本来就是成就 id(天然稳定),换成幂等出口后重放不会重复发。
+  const drafts: ReceiptDraft[] = [];
+  if (def.rewardNex) drafts.push({ type: "achievement", symbol: "NEX", amount: def.rewardNex, status: "posted", memo: `Achievement · ${name}`, ref: id });
+  if (def.rewardUsdt) drafts.push({ type: "achievement", symbol: "USDT", amount: def.rewardUsdt, status: "posted", memo: `Achievement · ${name}`, ref: id });
+  if (drafts.length && postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!ach.claim(id)) return; // 消费失败:钱已幂等落定,下次重试命中同一 ref 不会再发
   toast.success(w.value.claimToast);
 }
 
@@ -243,7 +247,10 @@ function iconBoxStyle(a: AchievementDef, cat: AchievementCategory): CSSPropertie
     width: "40px",
     height: "40px",
     borderRadius: "12px",
-    background: ul ? `color-mix(in srgb, ${CAT_COLOR[cat]} 10%, transparent)` : "var(--v5-surface)",
+    // 未解锁态原用 --v5-surface,与所在卡片同色 → 图标框整个隐形(双主题)。
+    // 改 surface-3(同 security.vue 关闭态图标框的既有惯例);叠加下面的 opacity .5 后
+    // 对卡片仍有 ΔE≈4.5,弱而可见 —— 未解锁本就该弱,但不该没有。
+    background: ul ? `color-mix(in srgb, ${CAT_COLOR[cat]} 10%, transparent)` : "var(--v5-surface-3)",
     opacity: ul ? 1 : 0.5,
   };
 }

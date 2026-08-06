@@ -30,6 +30,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { PRODUCTS } from "@/mock/products";
@@ -67,7 +68,7 @@ const best = computed(() => {
     if (credit <= 0) continue;
     if (!out || credit > out.credit) {
       out = {
-        name: d.name,
+        name: deviceName(t.value, d),
         credit,
         target: target.name,
         net: Math.max(0, +(target.price - credit).toFixed(2)),

@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
-import { ref, computed, watch } from "vue";
+import { ref, computed } from "vue";
 import { mockServerNow } from "./server-time";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { createAccountRowCommit } from "./account-scoped-storage";
 import {
   listVouchers,
   getVoucher,
@@ -49,10 +48,14 @@ interface ClaimRecord {
 // 旧设备级单键 "nexgrid-voucher-v1" 废弃(存量无账号归属,mock 可重建);券包账本按账号分行。
 const ACCOUNTS_KEY = "nexgrid-voucher-accounts-v1"; // { [accountKey]: { claimed: ClaimRecord[] } }
 
-function hydrate(accountKey: string): ClaimRecord[] {
-  const row = readAccountRow<{ claimed?: ClaimRecord[] }>(ACCOUNTS_KEY, accountKey);
-  if (row && Array.isArray(row.claimed)) return row.claimed;
-  return [];
+interface VoucherRow {
+  claimed: ClaimRecord[];
+}
+
+/** 磁盘行 → 券包账本。格式不认识 → null(调用方退回空账本 / 内存态)。 */
+function parseRow(raw: unknown): VoucherRow | null {
+  const row = raw as { claimed?: ClaimRecord[] } | null;
+  return row && Array.isArray(row.claimed) ? { claimed: row.claimed } : null;
 }
 
 export interface VoucherMatch {
@@ -62,19 +65,25 @@ export interface VoucherMatch {
 
 export const useVoucher = defineStore("voucher", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
-  let boundKey = "default";
-  const claimed = ref<ClaimRecord[]>(hydrate(boundKey));
+  const claimed = ref<ClaimRecord[]>([]);
 
-  function persist() {
-    writeAccountRow<{ claimed: ClaimRecord[] }>(ACCOUNTS_KEY, boundKey, { claimed: claimed.value });
-  }
-  watch(claimed, persist, { deep: true });
+  // 落盘唯一出口:乐观并发提交器。此前是 `watch(claimed, persist, {deep:true})` —— 纯覆盖式,
+  // 两个标签页各领同一张券时后写的把先写的整份账本顶掉,两边都以为自己领到了。
+  // 🔴 watch 必须一并删掉:留着它就是一条绕过 CAS 的旁路,这道闸等于没接。
+  const rows = createAccountRowCommit<VoucherRow>({
+    tableKey: ACCOUNTS_KEY,
+    parse: parseRow,
+    snapshot: () => ({ claimed: claimed.value }),
+    sync: (row) => {
+      claimed.value = row.claimed;
+    },
+  });
 
-  /** 账号切换重绑:装载该账号的券包账本。boundKey 先行,赋值触发 watch 把新值幂等写回本账号行。 */
+  /** 账号切换重绑:装载该账号的券包账本。 */
   function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    claimed.value = hydrate(boundKey);
+    claimed.value = rows.bind(rawAccountKey)?.claimed ?? [];
   }
+  bindAccount("default");
 
   function record(id: string): ClaimRecord | undefined {
     return claimed.value.find((c) => c.id === id);
@@ -86,19 +95,35 @@ export const useVoucher = defineStore("voucher", () => {
     return record(id)?.usedAt != null;
   }
 
-  /** Claim a voucher (idempotent). Returns false if already claimed or invalid. */
-  function claim(id: string): boolean {
-    if (isClaimed(id)) return false;
+  /**
+   * Claim a voucher (idempotent). ok=false if already claimed or invalid.
+   * 🔴 「是否已领」复核跑在**磁盘最新**账本上 —— 别的标签页刚领过的券在这里就被挡住,
+   * 同一张券绝不会被领第二次(conflict=true 让页面提示「已在别处领取」而不是静默无反应)。
+   */
+  function claim(id: string): { ok: boolean; conflict?: boolean } {
     const def = getVoucher(id);
-    if (!def || !isVoucherValid(def)) return false;
-    claimed.value = [{ id, claimedAt: mockServerNow(), usedAt: null }, ...claimed.value];
-    return true;
+    if (!def || !isVoucherValid(def)) return { ok: false, conflict: false }; // 券本身不合格,与并发无关
+    const r = rows.commit((cur) => {
+      if (cur.claimed.some((c) => c.id === id)) return null;
+      return {
+        next: { claimed: [{ id, claimedAt: mockServerNow(), usedAt: null }, ...cur.claimed] },
+        result: true as const,
+      };
+    });
+    return r.ok ? { ok: true } : { ok: false, conflict: r.conflict };
   }
 
-  /** Mark a claimed voucher as redeemed (called once after an order consumes it). */
+  /** Mark a claimed voucher as redeemed (called once after an order consumes it).
+   *  天然幂等:别处已核销过 → apply 返回 null,终态本就是「已用」,无需回报失败。 */
   function markUsed(id: string): void {
     const now = mockServerNow();
-    claimed.value = claimed.value.map((c) => (c.id === id && c.usedAt == null ? { ...c, usedAt: now } : c));
+    rows.commit((cur) => {
+      if (!cur.claimed.some((c) => c.id === id && c.usedAt == null)) return null;
+      return {
+        next: { claimed: cur.claimed.map((c) => (c.id === id && c.usedAt == null ? { ...c, usedAt: now } : c)) },
+        result: true as const,
+      };
+    });
   }
 
   /** Vouchers the user can still CLAIM (active, in-window, not yet claimed). */
@@ -138,10 +163,18 @@ export const useVoucher = defineStore("voucher", () => {
   /**
    * Best redeemable voucher for a SKU at a given subtotal — the claimed-unused,
    * applicable voucher yielding the largest discount (> 0). null = none applies.
+   * opts.stackWithTrial (FEAT-TRIAL02 checkout conversion mode): only vouchers
+   * whose def.stackWithTrial is true participate — non-stackable ones neither
+   * appear nor apply on a trial order (server re-validates the same rule).
    */
-  function bestVoucherFor(skuId: string, subtotalUSD: number): VoucherMatch | null {
+  function bestVoucherFor(
+    skuId: string,
+    subtotalUSD: number,
+    opts?: { stackWithTrial?: boolean },
+  ): VoucherMatch | null {
     let best: VoucherMatch | null = null;
     for (const def of claimedUnused.value) {
+      if (opts?.stackWithTrial && !def.stackWithTrial) continue;
       if (!voucherAppliesToSku(def, skuId)) continue;
       const discountUSD = computeVoucherDiscount(def, subtotalUSD);
       if (discountUSD <= 0) continue;

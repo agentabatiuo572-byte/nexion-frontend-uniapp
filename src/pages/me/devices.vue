@@ -58,7 +58,9 @@
               <text class="block" :style="trialSubStyle">{{ t.trial.deviceRowSub }}</text>
             </view>
           </view>
-          <view class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" @click="handleCancelTrial">
+          <!-- Spec ④: user cancel exists on the active edge only — grace has
+               nothing running to cancel (production already stopped). -->
+          <view v-if="trial.status === 'active'" class="w-full flex items-center justify-center active:opacity-80" :style="trialCancelStyle" @click="handleCancelTrial">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></svg>
             <text :style="trialCancelLabelStyle">{{ t.trial.cancelCta }}</text>
           </view>
@@ -157,10 +159,10 @@ import DeviceDeactivateSheet from "@/components/me/device-deactivate-sheet.vue";
 import TradeinLadderSheet from "@/components/me/tradein-ladder-sheet.vue";
 import ComputeShareEntry from "@/components/earn/compute-share-entry.vue";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useFreeTrial } from "@/store/free-trial";
-import { useTrialConfig } from "@/store/trial-config";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { MAX_DEVICES } from "@/store/device-types";
 import { PRODUCTS } from "@/mock/products";
@@ -174,11 +176,10 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 const t = useT();
 const app = useApp();
 const trial = useFreeTrial();
-const trialConfig = useTrialConfig();
 
-const trialActive = computed(() =>
-  ["active", "grace", "extended"].includes(trial.status),
-);
+// Typed against TrialStatus so a future enum change fails tsc here instead of
+// silently widening to string[] (FEAT-TRIAL02 audit trap).
+const trialActive = computed(() => trial.status === "active" || trial.status === "grace");
 const activeDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !== null));
 const inactiveDevices = computed(() => app.visibleDevices.filter((d) => d.activatedAt === null));
 const inventoryEmpty = computed(() => activeDevices.value.length === 0 && inactiveDevices.value.length === 0);
@@ -235,7 +236,7 @@ function handleTradein(d: Device) {
   // 激活中且任务运行:阻断层(完成后可下架,查看任务/知道了),不硬拆(规格
   // DEV02A 异常2)。库存机的出厂任务不在跑,不阻断——判定单源 isDeviceTaskBlocked。
   if (isDeviceTaskBlocked(d)) {
-    tradeinSheet.showRetireBlock(d.id, d.name);
+    tradeinSheet.showRetireBlock(d.id, deviceName(t.value, d));
     return;
   }
   tradeinSheet.showRetire(d.id);
@@ -250,7 +251,7 @@ async function handleActivate(d: Device) {
   // authoritative without app.ts importing the trial store.
   const ok = app.activateDevice(d.id, trialReserved.value);
   if (ok) {
-    toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: d.name }));
+    toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) }));
   } else {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
   }
@@ -263,14 +264,14 @@ async function handleDeactivate(d: Device) {
     return;
   }
   const ok = await uiConfirm({
-    title: fmt(t.value.myDevices.inventoryConfirmDeactivateTitle, { deviceName: d.name }),
+    title: fmt(t.value.myDevices.inventoryConfirmDeactivateTitle, { deviceName: deviceName(t.value, d) }),
     message: t.value.myDevices.inventoryConfirmDeactivateMsg,
     confirmLabel: t.value.myDevices.inventoryConfirmDeactivateOk,
     cancelLabel: t.value.myDevices.inventoryConfirmDeactivateCancel,
   });
   if (ok) {
     app.deactivateDevice(d.id);
-    toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: d.name }));
+    toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
   }
 }
 
@@ -278,7 +279,7 @@ function onSheetWait() {
   const d = sheetDevice.value;
   if (!d) return;
   app.scheduleDeactivation(d.id);
-  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: d.name }));
+  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
 }
 
@@ -286,19 +287,19 @@ function onSheetForce() {
   const d = sheetDevice.value;
   if (!d) return;
   app.deactivateDevice(d.id);
-  toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: d.name }));
+  toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
   sheetDevice.value = null;
 }
 
 async function handleCancelTrial() {
   const ok = await uiConfirm({
     title: t.value.trial.cancelConfirmTitle,
-    message: fmt(t.value.trial.cancelConfirmMsg, { n: trialConfig.config.cooldownDays }),
+    message: t.value.trial.cancelConfirmMsg,
     confirmLabel: t.value.trial.cancelConfirmOk,
     cancelLabel: t.value.trial.cancelConfirmKeep,
   });
   if (ok) {
-    trial.cancel("explicit");
+    trial.cancel();
     toast.info(t.value.trial.toastCancelled);
   }
 }

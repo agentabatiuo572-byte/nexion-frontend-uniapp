@@ -33,6 +33,18 @@ if ! command -v "$NODE_BIN" >/dev/null 2>&1 && command -v node.exe >/dev/null 2>
   NODE_BIN="node.exe"
 fi
 
+# admin 仓根解析:主树 `../Nexion-admin-prototype` 相对路径优先;linked worktree
+# (.claude/worktrees/*)下该相对路径落空 → 用 git common-dir 反推主仓根再取同级
+# admin 仓(pkg-i 审查:worktree 内 SPEC-7 因路径假阴恒红)。git 不可用 / 独立打包 /
+# admin 仓真缺失时 ADMIN_ROOT 保持原相对值 → 下游各消费点维持原 bad/skip 行为。
+ADMIN_ROOT="$PROJECT_DIR/../Nexion-admin-prototype"
+if [ ! -d "$ADMIN_ROOT" ]; then
+  main_git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
+  if [ -n "$main_git_dir" ] && [ -d "$(dirname "$main_git_dir")/../Nexion-admin-prototype" ]; then
+    ADMIN_ROOT="$(dirname "$main_git_dir")/../Nexion-admin-prototype"
+  fi
+fi
+
 ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
 bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
 
@@ -99,8 +111,10 @@ fi
 
 # 入金/牌价/换绑/卡四条资金纯逻辑自检此前只能手跑,等于资金常量没有机器门 ——
 # 改费率/最低额/上限/容差不会红任何一条流水线(2026-07-27 audit 立案)。
-echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards)${N}"
-for sc in deposits fx rebind cards; do
+# withdraw-freeze(2026-08-04 R2 三条 P1):提交链快照单源化 —— 弹窗展示 = 扣款 = 建单
+# 用同一份冻结件,确认后与当前权威值核对不符即拒单;外加 NEX 退款反向分录(账本对得上钱包)。
+echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards · withdrawfee · withdraw-freeze · fastlane · feegate)${N}"
+for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate arrival i18n-interp console-filter slacopy onbrand; do
   if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
     ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
   else
@@ -111,7 +125,7 @@ done
 # ── (2) H5 routing (dev server must be up) ──
 echo -e "${C}[2] H5 routes HTTP 200 (${BASE_URL})${N}"
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  # 🔴 先认工程再认状态码:同机跑着 Nexion-CC(:5273)/ janus(:5174),端口被串台时
+  # 🔴 先认工程再认状态码:同机跑着 CC(:5273)/ janus(:5174),端口被串台时
   # 本段会整体假绿 —— curl 拿到的是 CSR 空壳,任何 Vite SPA 都回 200(实测踩过)。
   # 判据用「取到的是真模块还是 SPA 兜底页」:Vite 对不存在的路径回 index.html,
   # 状态码同样 200,所以只看状态码的探针本身就是个假绿(踩过,红测才揪出来)。
@@ -267,8 +281,8 @@ if grep -nE 'd\.status === "online"|props\.device\.status === "online"' \
 else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
 fi
-sentinel_present "wallet KYC reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
-sentinel_present "wallet KYC reset store has PROD guard" src/store/wallet-pairing.ts 'if \(import\.meta\.env\.PROD\) return'
+sentinel_present "wallet dev reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
+sentinel_present "payout-address dev reset store has PROD guard" src/store/payout-address.ts 'if \(import\.meta\.env\.PROD\) return'
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
 else
@@ -362,8 +376,9 @@ else
   ok "SPEC-7 release engine has no auto release source (R1)"
 fi
 sentinel_present "SPEC-7 eligibility reads live cluster (R5)" src/store/withdrawal-eligibility.ts 'evaluateAccountCluster\(key\)'
-sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-eligibility.ts 'first-withdrawal-review'
-sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility.ts 'new-address-hold'
+# 判定已下沉到 core(shell 只转发原始对象);断言跟着逻辑走,别 pin 在空壳上。
+sentinel_present "SPEC-7 first withdrawal reviewed (R2)" src/store/withdrawal-eligibility-core.ts 'first-withdrawal-review'
+sentinel_present "SPEC-7 new address hold routed (R2)" src/store/withdrawal-eligibility-core.ts 'new-address-hold'
 # 消费层: 注册 / 结算 / 钱包 / 提现
 sentinel_present "SPEC-7 register evaluates via engine" src/pages/register/register.vue 'evaluateRegistration\(prospectiveIdentity\(\)'
 sentinel_present "SPEC-7 register honors signup gate" src/pages/register/register.vue 'assessment\.gateRoute !== "manual_or_reject"'
@@ -412,7 +427,8 @@ sentinel_present "PAY-VN 通道枚举单源含 VietQR" src/store/types.ts 'bank-
 sentinel_present "PAY-VN 通道枚举单源含 BEP20" src/store/types.ts 'usdt-bep20'
 sentinel_present "PAY-VN 链上通道费表单源" src/store/deposits-core.ts 'export const CHAIN_DEPOSIT_FEE_USDT'
 sentinel_present "PAY-VN fx 牌价派生不缓存(computed)" src/store/fx.ts 'quoteRate = computed\(\(\) => computeQuoteRate'
-sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility.ts 'isRebindFrozen'
+# 换绑冻结的判定从 shell 的 isRebindFrozen() 调用改为 core 内联算(toRawFacts),断言改盯 core 的冻结闸本身。
+sentinel_present "PAY-VN 换绑冻结下沉评估层(server-canonical)" src/store/withdrawal-eligibility-core.ts 'rebind-freeze'
 # 卡轨四条(2026-07-27 audit:此前卡轨走统一入金账后一条哨兵都没有,改坏无人拦)。
 # 记账口径最关键 —— 把 gross 塌回 credited 等于平台白送手续费,而纯逻辑 selfcheck
 # 只加载 deposits-core,守不到 deposits.ts 里的记录三元组(变异测试实证全绿)。
@@ -441,6 +457,35 @@ if grep -qE 'const RESEND_SECONDS' src/pages/login/login.vue src/pages/register/
 else
   ok "AUTH01 no local resend-seconds constants (config-derived)"
 fi
+# FEAT-AUTH03 注册场景滑块前置(规格 PRD/specs/FEAT-AUTH03-register-captcha-always.md)
+# 值 pin:防「键在值漂」—— seed 从 ["register"] 改掉时键 parity/tsc 仍全绿,只有这条红。
+# 剥 // 注释后再 grep:注释里残留的同字面量不得替代真 seed 值(子串哨兵必剥注释)。
+if sed 's|//.*||' src/mock/platform-config.ts | grep -qE 'captchaAlwaysScenes: \["register"\]'; then
+  ok 'AUTH03 captchaAlwaysScenes seed pinned to ["register"] (comment-stripped)'
+else
+  bad 'AUTH03 captchaAlwaysScenes seed pin missing/drifted in src/mock/platform-config.ts (comment-stripped grep)'
+fi
+# 接线门:判定必须出现在 otpSend 函数体内(剥注释后)。sed 函数头带左括号锚定(防
+# otpSendXxx 前缀撞名假绿),截取后剥 // 注释 —— 注释里的同名文本不算接线(红测 b1
+# 实抓:decision 注释在函数体内,不剥注释时删掉真判定门仍绿)。文件级 grep 抓不住
+# 「判定挪出 otpSend 但仍留在文件里」的形态(quota_claim_before_create 同族)。
+# 函数头改名/提取为空时 lines=0 按红处理(fail-closed)。
+auth03_body=$(sed -n '/^export async function otpSend(/,/^}/p' src/store/auth-otp.ts | sed 's|//.*||')
+auth03_body_lines=$(printf '%s\n' "$auth03_body" | grep -c .)
+if [ "$auth03_body_lines" -gt 0 ] && printf '%s' "$auth03_body" | grep -q 'captchaAlwaysScenes\.includes(scene)'; then
+  ok "AUTH03 scene-forced captcha wired inside otpSend body (scanned $auth03_body_lines code lines)"
+else
+  bad "AUTH03 captchaAlwaysScenes.includes(scene) not inside otpSend body (code lines=$auth03_body_lines; 判定未接线或被挪出函数体)"
+fi
+# UI→store 第三段接线 pin(pkg-i 审查 P2):register 页发码调用点必须字面传 "register"
+# 场景(剥 // 注释,防注释诱饵)。漂成 "login"/变量时产品回退到阈值规则而 store 层
+# 探针/接线门全绿 —— quota_claim_before_create 同族「判定对 ≠ 接上」缺口的 UI 段。
+# 注:login.vue 传 sceneAtRequest 变量是双场景页(login/reset)合法形态,不在 pin 范围。
+if sed 's|//.*||' src/pages/register/register.vue | grep -qF 'otpSend(phoneAtRequest, "register"'; then
+  ok 'AUTH03 register.vue passes literal "register" scene to otpSend (comment-stripped)'
+else
+  bad 'AUTH03 register.vue otpSend scene wiring drifted (expect literal otpSend(phoneAtRequest, "register" after comment strip)'
+fi
 # FEAT-AUTH02 已注册手机号分流：账号目录是唯一事实源；验证码通过后才可发现
 # 老号进入既有登录链后，目标页 toast 必须持续展示可读提示。运行时链放在下方 H5
 # browser gate。
@@ -467,7 +512,26 @@ sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earnin
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
 sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
-sentinel_present "SPEC-7 withdraw page uses withdrawable bucket" src/pages/me/wallet-withdraw.vue 'app\.user\.earningBuckets\.withdrawableUsdt'
+# 2026-07-31 规则变更(充值本金可提):可提上限从 withdrawableUsdt 改为 usdtBalance。
+# held 两桶本就账外,风控扣留仍生效。本哨兵改为锁「上限读总余额」这个新正解。
+sentinel_present "withdraw page available = total balance (principal withdrawable)" src/pages/me/wallet-withdraw.vue 'const maxWithdrawable = computed\(\(\) => app\.user\.usdtBalance\)'
+# 可提口径三处同源(2026-07-31 踩坑):提现页改了口径,钱包页/钱包卡片仍读旧桶 → 首页显示
+# 的「可提现 USDT」与实际能提的数对不上。三处必须同读 usdtBalance,任一回退即红。
+withdrawable_source_parity() {
+  local miss=""
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
+  grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
+  if [ -z "$miss" ]; then ok "withdrawable display source parity (wallet + card = total balance)";
+  else bad "withdrawable display source DRIFT — still on old bucket: $miss"; fi
+  # 反向面(2026-07-31 审计 P1):上面只验「新写法在」,不验「旧写法不在」—— 若有人在这三个
+  # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
+  local stale
+  stale=$(grep -nE '(earningBuckets|buckets(\.value)?)\.withdrawableUsdt' \
+    src/pages/me/wallet.vue src/components/me/wallet-card.vue src/pages/me/wallet-withdraw.vue 2>/dev/null | head -4)
+  if [ -z "$stale" ]; then ok "no stale withdrawable-bucket reads in wallet surfaces (0 hits)";
+  else bad "stale withdrawable-bucket read resurfaced (口径分裂面)"; echo "$stale" | sed 's/^/        /'; fi
+}
+withdrawable_source_parity
 sentinel_present "SPEC-7 withdraw page consumes eligibility engine" src/pages/me/wallet-withdraw.vue 'from "@/store/withdrawal-eligibility"'
 sentinel_present "SPEC-7 withdraw submit re-evaluates async at submit (R5)" src/pages/me/wallet-withdraw.vue 'await requestWithdrawalEligibility'
 sentinel_present "SPEC-7 withdraw submit uses fresh route" src/pages/me/wallet-withdraw.vue 'fresh\.route'
@@ -475,10 +539,27 @@ sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-wi
 sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
 sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
-sentinel_present "SPEC-7 pairing registers payment instrument" src/pages/me/wallet-topup.vue 'recordPaymentInstrument\(app\.accountKey'
+# (原「SPEC-7 pairing registers payment instrument」哨兵随 KYC 配对机制删除,2026-08-05 包 E。
+#  新模型的地址登记走 payout-address → recordWithdrawAddressUse,由 selfcheck-fastlane 接线门覆盖。)
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
 sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
-sentinel_present "SPEC-7 withdrawal debits withdrawable bucket" src/store/app.ts 'withdrawableUsdt: \+\(currentUser\.earningBuckets\.withdrawableUsdt - amount\)'
+# 提现扣款双 clamp(2026-07-31):先耗收益再耗本金,可提额度不得转负、不得超剩余总余额。
+# 少任一 clamp → 提本金时 withdrawableUsdt 变负 或 > usdtBalance(negative-balance P0 复发面)。
+# grep 逐行匹配,而该表达式跨行 → 拆成两条单行判据,两条都在才算数。
+# 并发透支门(2026-07-31 审计 P0):门禁分母改成 usdtBalance 后,可透支上限从「已解锁收益」
+# 放大到整个账户余额;account-cloud 把余额当加法计数器 merge,多端各自本地合法的扣款会相加。
+# 提交前必须重读落盘余额二次核验(等价真后端事务内重读行)。删掉这行 = P0 敞口恢复。
+# ⚠️ 判据别 pin 在局部变量名上 —— 一次无害重命名要么把资金门弄红、要么(更糟)让它
+# 盯上重构后没人用的死代码而假绿(两种审计都实测到过)。这里改成数**门的道数**:
+# 提现链上必须有两处「重读落盘余额」(占额度前一次、await 之后一次),少一处即红。
+gate_sites=$(grep -c 'readAccountSnapshot(acct)?\.user?\.usdtBalance' src/store/app.ts 2>/dev/null || echo 0)
+if [ "${gate_sites:-0}" -eq 2 ]; then
+  ok "withdrawal re-reads persisted balance x2 (concurrency gate, sample ${gate_sites})"
+else
+  bad "withdrawal 落盘余额复核应恰有 2 处(占额度前 + await 后),实得 ${gate_sites}"
+fi
+sentinel_present "withdrawal clamps withdrawable >= 0" src/store/app.ts 'Math\.max\(0, \+\(u\.earningBuckets\.withdrawableUsdt - amount\)\.toFixed\(2\)\)'
+sentinel_present "withdrawal clamps withdrawable <= usdt" src/store/app.ts 'withdrawableUsdt: Math\.min\('
 # 负余额不变量(2026-07-10 P0): 购买共用 debitBalance 减总余额时必 clamp 可提额度 ≤ 剩余
 # 总余额,否则可提额度 > 总余额 → 提现门(只看可提额度)放行超总余额提现 → usdtBalance 变负
 # (凭空取钱)。两条哨兵锁 debitBalance 的 clamp + submitWithdrawal 的总余额兜底门。
@@ -491,6 +572,12 @@ sentinel_present "P0 neg-balance: account-cloud has fund-invariant clamp" src/st
 sentinel_present "P0 neg-balance: merge writes clamped snapshot" src/store/account-cloud.ts 'const merged = clampAccountFundInvariants\(rawMerged\)'
 # 提现金额有效性守卫(对齐 debitBalance):NaN/±Inf/≤0 拒,防负数反向加钱 / NaN 污染余额。
 sentinel_present "P0 neg-balance: withdrawal rejects invalid amount" src/store/app.ts 'if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null'
+# 2026-08-03 提现资金 2×P1:①费用快照必须与权威配置交叉核对(自洽三元组不再放行,权威值走
+# config 纯函数单源);②失败提现退款必须连已烧 NEX 一起退(独立幂等键 refund-nex:)。
+# 行为固定靶 + 剥注释接线门在 selfcheck-withdrawfee.mjs(⑥⑦);这两条是快速哨兵层,pin 完整
+# 调用形态(短串会在注释里出现,pin 短串必被哄绿)。
+sentinel_present "P1 fee snapshot cross-checks authoritative config (5-arg call)" src/store/app.ts 'isWithdrawalFeeSnapshotValid\(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY\[network\], currentNetworkConfirmFeeUsd\(\)\)'
+sentinel_present "P1 failed-withdrawal refunds burned NEX via own idem key" src/store/app.ts 'creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)'
 # 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
 # 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。
 nex_guard_sites=$(grep -cE '!Number\.isFinite\(amount\) \|\| amount < 0' src/store/app.ts)
@@ -513,20 +600,44 @@ if [ -f src/store/withdrawal-risk.ts ]; then
 else
   ok "SPEC-7 legacy withdrawal-risk.ts removed"
 fi
-if grep -q 'app\.advanceWithdrawal' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null; then
+# 🔴 剥注释再判,且用 '(' 收尾:新函数名 advanceWithdrawalArrival 是旧禁用串的**超集**,
+# 不加这两道会被文件头注释里的一句说明误命中而假红(审计实测)。
+if sed 's|//.*||; s|<!--.*-->||' src/pages/me/wallet-withdraw-tracking.vue 2>/dev/null | grep -q 'app\.advanceWithdrawal('; then
   bad "SPEC-7 tracking page must not auto-advance withdrawals"
 else
   ok "SPEC-7 tracking page is display-only"
+fi
+# FEAT-WD01b 到账推进(2026-07-31 规则收窄,签字 plan T6):
+# 原 SPEC-7 写「client 零推进」,现允许**一条**推进路径 —— 到达建单时就已承诺的
+# estimatedCompletion 后,把 pass 路由推进到 confirmed。人工/延迟/冻结/异常终态永不推进。
+# 判定全在 withdrawal-arrival-core 的纯函数里(selfcheck-arrival 55 条行为断言 + 4 路红测),
+# 这里只守「推进入口唯一且接的是那个纯函数」——判定守得再严,接错地方一样白守。
+# ⚠️ sentinel_present 的 pattern 走 grep -E,括号是分组不是字面量 —— 必须转义,
+# 否则哨兵恒假红(本条第一版就这么栽了)。
+sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
+sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
+# 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
+adv_sites=$(grep -rcE 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
+# 🔴 必须 == 1,不能写 <= 1:0 处意味着推进整个没了,那也是坏的。
+# 判据里「候选为空」要当失败处理,否则判据一失效就变成永远绿(踩过多次)。
+if [ "${adv_sites:-0}" -eq 1 ]; then
+  ok "WD01b 恰有一处把提现置为 confirmed(推进路径单源,样本 ${adv_sites})"
+else
+  bad "WD01b 有 ${adv_sites} 处把提现置为 confirmed(应恰为 1)—— 0=推进丢失,>1=路径散了(单源在 withdrawal-arrival-core.advanceArrival)"
 fi
 if grep -q 'app\.creditBalance(gift\.usdt)' src/pages/register/register.vue 2>/dev/null; then
   bad "SPEC-7 register gift must not credit USDT balance directly (R6)"
 else
   ok "SPEC-7 register gift not directly credited to balance (R6)"
 fi
-if grep -q 'const usdtBalance = computed(() => app\.user\.usdtBalance)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
-  bad "SPEC-7 withdraw page must not use total USDT balance as available"
+# 【已退役 2026-07-31】原反向哨兵禁止提现页读总余额 —— 那是「充值本金不可提」时代的判据,
+# 规则变更后读总余额恰是正解(见上面的 withdraw page available 哨兵)。
+# 它真正防的 P0 是「可提额度 > 总余额仍放行 → 余额变负」,那道防线是 app.ts 的总余额门,
+# 由下面的 P0 neg-balance 哨兵继续守。此处改守新不变量:held 两桶不得混入可提口径。
+if grep -qE 'maxWithdrawable[^\n]*(pendingReviewUsdt|bonusLockedUsdt)' src/pages/me/wallet-withdraw.vue 2>/dev/null; then
+  bad "withdraw available must exclude held buckets (pending_review / bonus_locked)"
 else
-  ok "SPEC-7 withdraw page uses withdrawable amount, not total balance"
+  ok "withdraw available excludes held buckets"
 fi
 if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/app.ts 2>/dev/null; then
   bad "SPEC-7 settle must not credit NEX balance outside buckets"
@@ -534,7 +645,7 @@ else
   ok "SPEC-7 settle NEX route goes through buckets"
 fi
 # 双端参数 key parity: uniapp 配置契约 ↔ admin 参数寄存器(DR-7 结构一致)
-ADMIN_CFG="../Nexion-admin-prototype/lib/mock/admin/compute-config.ts"
+ADMIN_CFG="$ADMIN_ROOT/lib/mock/admin/compute-config.ts"
 if [ ! -f "$ADMIN_CFG" ]; then
   bad "SPEC-7 parity: admin compute-config.ts not found at $ADMIN_CFG"
 else
@@ -554,8 +665,14 @@ else
     bad "SPEC-7 param key parity missing: $parity_miss"
   fi
   # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
-  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 5 键逐一比对字面值;
+  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 数值 5 键逐一比对字面值;
   # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
+  # 🔴 包 A handoff(FEAT-AUTH03):otpGate 第 6 键 captchaAlwaysScenes(string[])暂不进本
+  # 循环 —— admin OtpGateParamDef 是 kind:"number" 单形态,数组参数的登记(类型加宽 + K2 渲染
+  # + defaultVal)是包 A 交付物;uniapp 侧值由上方 AUTH03 值 pin 哨兵看住,不留无门真空。
+  # 包 A 落地后必须:① 把该键补进本循环并删本注释;② 重写值提取 —— 下方 `defaultVal: [^,]+`
+  # 与 `$k: [^,]+` 正则遇多元素数组(如 ["login","register"])会在首个逗号处截断,
+  # 数组键须按括号配对整段提取,不能沿用现式。
   value_mismatch=""
   for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
            pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
@@ -571,18 +688,61 @@ else
     fi
   done
   if [ -z "$value_mismatch" ]; then
-    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 5)"
+    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;第 6 键 captchaAlwaysScenes 由 AUTH03 pin 哨兵看住,包 A 落地后进循环)"
   else
     bad "SPEC-7 param value parity drift: $value_mismatch"
   fi
-  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 5。两端同时
+  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 6(循环数值
+  # 5 键 + captchaAlwaysScenes 由 AUTH03 值 pin 哨兵看住,见上方包 A handoff)。两端同时
   # 新增键时键 parity 仍绿、值 parity 循环静默漏检,此处变红逼同步扩循环(2026-07-14 对抗审查 D 项缺口)
   seed_key_count=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
   og_key_count=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
-  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 5 ]; then
-    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=5, 与循环清单同步)"
+  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 6 ]; then
+    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=6, 与循环清单+AUTH03 pin 同步)"
   else
-    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 5) —— 新增/删除键须同步改值 parity 循环"
+    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 6) —— 新增/删除键须同步改值 parity 循环与 AUTH03 pin"
+  fi
+  # 包 A 前向提醒(WARN,非门):captchaAlwaysScenes 未登记 admin 侧前每轮可见,防欠账
+  # 蒸发;登记后自动沉默。真正的机器门 = 登记时按上方包 A handoff 注释两步接入值 parity
+  # 循环(spec FEAT-AUTH03 ⑦ 已列为包 A Done-when)。
+  if ! grep -q 'captchaAlwaysScenes' "$ADMIN_CFG"; then
+    printf "  ${Y}WARN${N}  %s\n" "SPEC-7 pkg-A pending: captchaAlwaysScenes 未登记 admin compute-config(登记后按包 A handoff 注释进值 parity 循环)"
+  fi
+fi
+# ── FEAT-WD02 网络确认费种子逐键 parity(uniapp seed ↔ admin-ops 契约声明)──
+# 锚点身份:比对对象是 admin-ops wd02 契约测试里的**声明锚**(D5 无运行时 mock seed,
+# server-canonical,后端字段同步是人肉义务)—— 证的是 uniapp ↔ 声明,非 uniapp ↔ 运行时。
+# 值域上限 [0,25] 两侧各 pin 一份(uniapp 判据 26→false / admin normalize 30→invalid 固定靶)。
+# 路径两候选:主树(../admin-ops)与 .claude/worktrees/<pkg> 内自测(../../../../admin-ops)。
+WD02_ADMIN_ANCHOR=""
+for cand in "../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs" \
+            "../../../../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs"; do
+  [ -f "$cand" ] && WD02_ADMIN_ANCHOR="$cand" && break
+done
+if [ -z "$WD02_ADMIN_ANCHOR" ]; then
+  bad "WD02 confirm-fee parity: admin-ops 契约锚不存在(wd02-network-confirm-fee-contract.test.mjs)"
+else
+  wd02_parity=$("$NODE_BIN" -e "
+    const fs = require('fs');
+    const uni = fs.readFileSync('src/mock/platform-config.ts', 'utf8');
+    const adm = fs.readFileSync(process.argv[1], 'utf8');
+    const um = uni.match(/networkConfirmFeeUsd:\s*\{\s*trc20:\s*([\d.]+),\s*bep20:\s*([\d.]+),\s*erc20:\s*([\d.]+)\s*\}/);
+    const am = adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{ trc20: ([\d.]+), bep20: ([\d.]+), erc20: ([\d.]+) \}/);
+    if (!um) { console.log('FAIL uniapp seed 提取失败(platform-config networkConfirmFeeUsd 形状变了 —— 判据失效按红处理,禁空集全过)'); process.exit(0); }
+    if (!am) { console.log('FAIL admin 契约锚提取失败(WD02_SEED_NETWORK_CONFIRM_FEE_USD 形状变了)'); process.exit(0); }
+    const keys = ['trc20', 'bep20', 'erc20'];
+    const miss = [];
+    keys.forEach((k, i) => { if (Number(um[i + 1]) !== Number(am[i + 1])) miss.push(k + '(uni=' + um[i + 1] + '!=admin=' + am[i + 1] + ')'); });
+    // 覆盖度自守:两端键数必须 = 3(两端同增新网络时逐键循环静默漏检,此处变红逼同步扩清单)
+    const uniKeys = ((uni.match(/networkConfirmFeeUsd:\s*\{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
+    const admKeys = ((adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
+    if (uniKeys !== 3 || admKeys !== 3) miss.push('key-count(uni=' + uniKeys + ' admin=' + admKeys + ' 应各 3)');
+    console.log(miss.length ? 'FAIL ' + miss.join(' ') : 'OK');
+  " "$WD02_ADMIN_ANCHOR")
+  if [ "$wd02_parity" = "OK" ]; then
+    ok "WD02 network-confirm-fee parity(3 keys 逐键比值 · 锚=admin-ops wd02 契约声明,非运行时)"
+  else
+    bad "WD02 network-confirm-fee parity: $wd02_parity"
   fi
 fi
 # ── SPEC-2 电脑算力 sentinels ──
@@ -1048,15 +1208,15 @@ sentinel_present "P2-8 account-scope helper rebinds exchange" src/lib/account-sc
 sentinel_present "P2-8 account-scope helper rebinds exchange-v3" src/lib/account-scope.ts 'useExchangeV3\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds cards" src/lib/account-scope.ts 'useCards\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds nex-faucet" src/lib/account-scope.ts 'useNexFaucet\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 voucher store is account-scoped" src/store/voucher.ts 'writeAccountRow'
+sentinel_present "P2-8 voucher store is account-scoped" src/store/voucher.ts 'writeAccountRow|createAccountRowCommit'
 sentinel_present "P2-8 free-trial store is account-scoped" src/store/free-trial.ts 'writeAccountRow'
 sentinel_present "P2-8 exchange store is account-scoped" src/store/exchange.ts 'writeAccountRow'
 sentinel_present "P2-8 exchange-v3 store is account-scoped" src/store/exchange-v3.ts 'writeAccountRow'
 sentinel_present "P2-8 cards store is account-scoped" src/store/cards.ts 'writeAccountRow'
-sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow'
-# P2-8 wallet-pairing:KYC 配对源头按账号隔离(修 wallet-exchange 镜像旁路 exchange-v3.kycVerified)
-sentinel_present "P2-8 account-scope helper rebinds wallet-pairing" src/lib/account-scope.ts 'useWalletPairing\(\)\.bindAccount\(accountKey\)'
-sentinel_present "P2-8 wallet-pairing store is account-scoped" src/store/wallet-pairing.ts 'writeAccountRow'
+sentinel_present "P2-8 nex-faucet store is account-scoped" src/store/nex-faucet.ts 'writeAccountRow|createAccountRowCommit'
+# 包 E:提现地址簿按账号隔离(设备级存储会让换号继承他人提现地址,RM01a 异常5)
+sentinel_present "P2-8 account-scope helper rebinds payout-address" src/lib/account-scope.ts 'usePayoutAddress\(\)\.bindAccount\(accountKey\)'
+sentinel_present "P2-8 payout-address store is account-scoped" src/store/payout-address.ts 'writeAccountRow'
 # P2-8 batch-3 任务/成就/游戏化:任务/周任务/活动/里程碑/成就/目标/转盘/增益按账号隔离(摘任一行必红)
 sentinel_present "P2-8 account-scope helper rebinds quest" src/lib/account-scope.ts 'useQuest\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds weekly-quest" src/lib/account-scope.ts 'useWeeklyQuest\(\)\.bindAccount\(accountKey\)'
@@ -1073,8 +1233,8 @@ sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.
 sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
 sentinel_present "P2-8 achievements store is account-scoped" src/store/achievements.ts 'writeAccountRow'
 sentinel_present "P2-8 goals store is account-scoped" src/store/goals.ts 'writeAccountRow'
-sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow'
-sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow'
+sentinel_present "P2-8 lucky-spin store is account-scoped" src/store/lucky-spin.ts 'writeAccountRow|createAccountRowCommit'
+sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-powerup.ts 'writeAccountRow|createAccountRowCommit'
 # P2-8 batch-4 记录/账户:通知/凭证/工单/购物车/资料/安全/奖励水位线按账号隔离(摘任一行必红)
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
@@ -1237,6 +1397,100 @@ debit_return_checked() {
   else bad "bare debitBalance/debitNex discards false return → bill recorded without charging (fix: const x=…;if(!x){toast;return})"; echo "$hits" | sed 's/^/        /'; fi
 }
 debit_return_checked
+
+# ── FEAT-TRIAL02 去绑卡不回潮哨兵(2026-08-02 包F)──
+# 哨兵A:绑卡时代源码指纹逐合取项清零(每项独立报告,防合并遮蔽;PASS 打样本量)。
+# cardTokenId/extendedEndsAt 仅豁免 src/store/free-trial.ts —— 那是 spec 异常6
+# 存量行迁移读取器(LegacyTrialRow),必须能读旧字段;其余任何文件出现即回潮。
+trial02_source_fingerprints() {
+  local files_n
+  files_n=$(find src -type f \( -name "*.vue" -o -name "*.ts" \) | wc -l | tr -d ' ')
+  local pat hits
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "markChargeFailed"; do
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced in src"; echo "$hits" | sed 's/^/        /'; fi
+  done
+  for pat in "cardTokenId" "extendedEndsAt"; do
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -v "^src/store/free-trial.ts:" | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside legacy-migration reader (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside free-trial.ts legacy reader"; echo "$hits" | sed 's/^/        /'; fi
+  done
+}
+trial02_source_fingerprints
+
+# 哨兵B:i18n 三语自动扣款时代文案清零(en/zh/vi 同扫)。
+trial02_i18n_legacy_copy() {
+  local lines_n
+  lines_n=$(cat src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts | wc -l | tr -d ' ')
+  local pat hits
+  for pat in "Auto-charge" "Auto-purchase" "自动扣款" "自动完成购买" "绑卡后开始试用" "Tự động thu tiền" "Tự động mua"; do
+    hits=$(grep -rnF "$pat" src/i18n/messages 2>/dev/null | head -3)
+    if [ -z "$hits" ]; then ok "TRIAL02 i18n legacy copy '$pat' = 0 (3 locales, $lines_n lines)";
+    else bad "TRIAL02 auto-charge-era copy '$pat' resurfaced in i18n"; echo "$hits" | sed 's/^/        /'; fi
+  done
+}
+trial02_i18n_legacy_copy
+
+# 哨兵C:状态机不变量 —— free-trial.ts 必须声明 convert(),且全文件零钱/设备/账单
+# API(spec ④:poll 的 grace→ended 只翻状态;转化侧效应只住 checkout,P-031 同向)。
+trial02_machine_invariants() {
+  local f="src/store/free-trial.ts"
+  if grep -qE 'function convert\(\)' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares convert() (1 hit)";
+  else bad "TRIAL02 free-trial.ts lost convert() — conversion cannot close the machine"; fi
+  local money
+  money=$(grep -nE "debitBalance|addDevice|bills\.add|creditBalance|creditNex" "$f" 2>/dev/null | head -5)
+  if [ -z "$money" ]; then ok "TRIAL02 free-trial.ts touches no money/device/bill APIs (0 hits)";
+  else bad "TRIAL02 free-trial.ts gained money/device side effects — poll must flip state only (spec ④)"; echo "$money" | sed 's/^/        /'; fi
+}
+trial02_machine_invariants
+
+# 哨兵D:试用价双源等值 —— checkout 促销折扣行算自 trial-config.trialPriceUSD,
+# 结算基数用商品目录 products[trialProductId].price;后台独立改任意一边即静默
+# 脱节。运行时不耦合(生产 = 两张后端表),mock 侧焊值 parity 机器门;提取失败
+# (字段/商品被删、指针悬空)同样转红,不允许「找不到 = 静默全过」。
+trial02_price_parity() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-price-parity.mjs 2>&1); then
+    ok "TRIAL02 trial price dual-source parity: $out"
+  else
+    bad "TRIAL02 trial price dual-source parity broken"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial02_price_parity
+
+# 🔴 封装门(2026-08-04 结构性反思产物,见 docs/changes/2026-08-04-structural-reflection.md):
+# R1 抽了单一解析器却只扫「定义面」,R2 的 P0 就出在漏网的**消费者**(结算页混源扣款)。
+# 同型跨两轮复发 → 根因是「必须经解析器」只是约定、没被机器强制。本门堵死新消费者
+# 静默出现:消费者台账写在门脚本里(不在被查文件里,防同批编辑一起删),钱路径一律禁。
+trial_encapsulation_gate() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-encapsulation.mjs 2>&1); then
+    ok "$out"
+  else
+    bad "试用状态封装门:有未登记消费者或钱路径混源(见 scripts/selfcheck-trial-encapsulation.mjs)"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial_encapsulation_gate
+
+# 哨兵E:试用时间边界单一不变量(2026-08-03 缺陷族 P0+3×P1 同根)—— 所有时钟
+# 判定收敛到 trial-boundary.ts resolveTrialAt 一个纯函数。固定靶矩阵:①离线跨
+# 宽限期 convert 必拒 ②后台改 trialDays 不追溯存量冻结窗口 ③finishedAt=真边界
+# 非 now ④graceEndsAt=null 存量行补齐/fail-closed ⑤全迁移矩阵逐档落点 ⑥终态
+# 不可变;外加接线门(convert/poll/eligibility/liveShadow*/migrateRow 真路由到
+# resolver,cancel 显式窗口不被抢)。跑真实现(esbuild 转译),断言数带地板防空集。
+trial02_boundary_invariant() {
+  local out
+  if out=$("$NODE_BIN" scripts/selfcheck-trial-boundary.mjs 2>&1); then
+    ok "TRIAL02 time-boundary single invariant: $(printf '%s\n' "$out" | tail -n 1)"
+  else
+    bad "TRIAL02 time-boundary single invariant broken"
+    echo "$out" | sed 's/^/        /'
+  fi
+}
+trial02_boundary_invariant
 # Local-component import guard (terminal-audit P1): Vue SFC component registration
 # is LOCAL-scope only — a child .vue that uses <SectionHeader> in its template MUST
 # import section-header.vue itself; the parent page's import does NOT cascade. A
@@ -1451,18 +1705,50 @@ platform_stats_anchor() {
   # (3) 28,432 role-collision guard: allowed ONLY in the lib (fleet anchor)
   stray=$(grep -rlEI '28,432|28432|28_432' src 2>/dev/null | grep -v 'lib/platform-stats\.ts' || true)
   if [ -n "$stray" ]; then bad "platform-anchor: 28,432 outside the anchor lib (role collision): $stray"; fails=1; fi
+  # (3b) 🔴 FEAT-HOME02:首页脉搏卡的「今日支付」格与条头每秒支付流已按规格删除,
+  #      原判据「network-pulse-card.vue 必须消费 DAILY_PAYOUT_USD」随之不成立。
+  #      规格明写「需同步调整判据**而非放宽哨兵**(防判据失效变空门)」,故改成两条:
+  #        ① 锚本身仍在,且 PAYOUT_PER_SEC_USD 仍**从它派生**(链没断,别的页面还在用);
+  #        ② 首页脉搏卡**不得**再出现任何平台支付规模数字(删了就不许回来)。
+  #      少了 ① 就等于允许有人把锚删掉;少了 ② 就等于允许把那格悄悄加回去。
+  if ! grep -qE 'DAILY_PAYOUT_USD *= *FLEET_DEVICES \* FLEET_AVG_DAILY_USD' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: 日支付锚定义不见了(其它页面仍从它派生,不可删)"; fails=1
+  fi
+  if ! grep -qE 'PAYOUT_PER_SEC_USD *= *DAILY_PAYOUT_USD */ *86_?400' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: 每秒支付流不再从日支付锚派生(派生链断 = 又成两个数)"; fails=1
+  fi
+  if grep -qE 'DAILY_PAYOUT_USD|MONTHLY_PAYOUT_USD|PAYOUT_PER_SEC_USD|networkPaidToday' src/components/home/network-pulse-card.vue 2>/dev/null; then
+    bad "platform-anchor: 首页脉搏卡又出现平台支付规模(FEAT-HOME02 已删,不得回归)"; fails=1
+  fi
   # (4) consumers wired to the single source: import present AND anchor symbol consumed
   #     (import-only would let a hardcoded near-value ride under a green light)
   for pair in \
-    'src/components/home/network-pulse-card.vue|DAILY_PAYOUT_USD' \
     'src/components/home/on-grid-section.vue|PAYOUT_PER_SEC_USD' \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
     'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
-    'src/store/app.ts|FLEET_DEVICES'; do
+    'src/store/app.ts|FLEET_DEVICES' \
+    'src/components/home/on-grid-section.vue|payoutPerSecUsdOf' \
+    'src/pages/onboarding/intro.vue|fleetDevicesOf' \
+    'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
     f="${pair%%|*}"; sym="${pair##*|}"
+    # 🔴 计数剥注释(R2 P2:注释里提符号两次就能给死代码放行);s|…|| 形护 :// 协议串
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
-    if [ "$(grep -c "$sym" "$f" 2>/dev/null)" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
+    if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
+  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。**代码面**出现即红。
+  #   计数剥注释 —— 族B 注释自己就点名这个符号解释为什么禁,不剥的话哨兵抓自己的说明书
+  #   (首跑实锤:这条禁令与上面 pin 同分钟写就,上面剥了、这里没剥,P2-10 同型在相邻行重犯)。
+  # R3 P2:fail-open 补 witness —— 管道故障/空扫描时禁令会静默绿;扫描数必须够量才算判过
+  _pcno_scanned=$(find src -type f \( -name '*.ts' -o -name '*.vue' \) 2>/dev/null | wc -l)
+  if [ "${_pcno_scanned:-0}" -lt 50 ]; then bad "platform-anchor: 禁令哨兵扫描面异常($_pcno_scanned 文件)——判据失效不许静默过"; fails=1; fi
+  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^\|[^:])//.*$|\1|' {} + 2>/dev/null | grep -q "paidCumulativeNowOf"; then
+    bad "platform-anchor: paidCumulativeNowOf 出现在代码面 —— 积分类禁跟配置,见 platform-stats 族B 注"; fails=1
+  fi
+  # (4b) 2026-08-06 审计 P1 收口:钱链消费者必须走 *Of(配置派生)——上面三条 *Of pin 守
+  #      「接了」;这一条守「种子恒等」:mock 种子必须从锚取值,开箱两侧不许各写一份字面量。
+  if ! grep -qE 'fleetDevices: *FLEET_DEVICES' src/mock/platform-config.ts 2>/dev/null; then
+    bad "platform-anchor: platform-config 种子不再取自编译期锚(两侧将各自漂移)"; fails=1
+  fi
   # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
   for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
@@ -1727,7 +2013,7 @@ home_task_carousel_contract
 # 不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
 # 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
 cross_repo_sampling_gate() {
-  local audit_js="$PROJECT_DIR/../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs"
+  local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
   local audit_arg="$audit_js"
   if [ ! -f "$audit_js" ]; then
     ok "cross-repo sampling evidence gate skipped (admin repo absent)"
@@ -1807,6 +2093,30 @@ scrim_gate() {
   fi
 }
 scrim_gate
+
+# ── 全站层级秩序门(2026-08-04 第 2 轮审计 P1)──
+# 起因:滑块人机验证 .cs-layer 从建档起就是 z-index 90,输给 toast(9000)/确认弹窗(9100)/
+# 区号半屏(9001)/庆祝层(8900)。实测注册页三个操作点 elementFromPoint 全被 .cc-row 吃掉、
+# 把手拖不动,而发码流程正停在它上面等解开 = 死锁。层级此前没有任何机器门:改一个数字
+# tsc/verify/i18n 全绿。本门两个正交断言 —— ① 六层阶梯严格递增(解析不到=红,覆盖「删掉
+# z-index」这个遍历看不见的方向);② 天花板:全站扫 z-index,白名单外不许 ≥ 滑块(阶梯只
+# 遍历已知成员,新加的 9600 浮层要靠这条才看得见)。
+zindex_order_gate() {
+  if "$NODE_BIN" scripts/zindex-order.mjs --selftest > /tmp/uniapp-zindex-selftest.log 2>&1; then
+    ok "$(grep -c '^PASS' /tmp/uniapp-zindex-selftest.log) 项 zindex-order selftest 全过(逐个相邻对隔离红测 + 事故现场 90 + 删除方向 + 天花板新成员)"
+  else
+    bad "zindex-order selftest 失败(node scripts/zindex-order.mjs --selftest 看明细)"
+    grep -E "^FAIL" /tmp/uniapp-zindex-selftest.log | head -8 | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/zindex-order.mjs > /tmp/uniapp-zindex.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-zindex.log)"
+  else
+    bad "浮层层级秩序被破坏 — node scripts/zindex-order.mjs 看明细"
+    tail -10 /tmp/uniapp-zindex.log | sed 's/^/        /'
+  fi
+}
+zindex_order_gate
 
 # ── 双主题恒定着色 · 运行时正交门(C1 批次 2026-07-23) ──
 # 上面两道是静态门,只能钉「我已经想到的写法」。本批同一个坑连踩三次(按值比 token 漏变
@@ -1947,6 +2257,328 @@ empty_state_gate() {
   fi
 }
 empty_state_gate
+
+# ── 里程碑庆祝队列门(2026-08-03):钱链路挂起 + 逐条补发 + z 层级 ──
+# 三路独立走查同族缺陷:.ms-overlay 9300 盖住支付确认/宽限提示/提现表单并吞点击;
+# 且 active 单槽,连跨两级门槛前一级被覆盖永久丢通知。判据(esbuild 载真 store 测行为):
+# ①钱链路 4 路由 UI 挂起且 App.vue 奖励/记账不接路由门(分离证明) ②连跨两级离场
+# 逐条补发先低后高 ③ .ms-overlay < .nx-toast-host < .nx-mask ④普通页即时弹 +
+# 白名单前缀不过宽(pages/store/store 等近亲不误伤)。
+milestone_queue_gate() {
+  if "$NODE_BIN" scripts/selfcheck-milestone-queue.mjs > /tmp/uniapp-milestone-queue.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-milestone-queue.log)"
+  else
+    bad "里程碑庆祝队列门失败 — node scripts/selfcheck-milestone-queue.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-milestone-queue.log | head -8 | sed 's/^/        /'
+  fi
+}
+milestone_queue_gate
+
+# ── 结算页试用报价单源门(R2 P0,2026-08-04):展示与扣款同一次解析 ──
+# 第一轮把时间边界收敛成 resolveTrialAt 时只收了 store 内部,没收 checkout.vue
+# 这个消费者:该页一半读未推进的原始 status(模式/促销/抵扣),一半读实时解析器
+# (liveShadow*)——宽限期刚过、poll 未到的窗口里两边互斥,net 被拼成报价页从未
+# 展示过的数字直接扣款。判据(esbuild 载真实现 + 源码切片跑真结算块):
+# ①越界拒单零扣款 ②grace 内正常成交 ③$0 路径同样受守卫 ④展示净额==扣款净额
+# ⑤convert 返回 false 零扣款零建单 + 接线门(摘掉任一守卫即红)。
+checkout_trial_quote_gate() {
+  if "$NODE_BIN" scripts/selfcheck-checkout-trial-quote.mjs > /tmp/uniapp-checkout-trial-quote.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-checkout-trial-quote.log)"
+  else
+    bad "结算页试用报价单源门失败 — node scripts/selfcheck-checkout-trial-quote.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-checkout-trial-quote.log | head -8 | sed 's/^/        /'
+  fi
+}
+checkout_trial_quote_gate
+
+# ── 兑换成交快照 + 创世购买重入守卫门(存量 2×P1,2026-08-04)──
+# 两条同族缺陷:动钱的入口没有重入守卫、跨 await 读活值。兑换页确认后 900ms 内
+# 汇率自己跳/用户翻方向改金额,实际成交 ≠ 用户确认的那笔,且额度只按确认那一刻校验
+# 过一次(改大金额即绕过每日额度);创世半屏 emitClose 异步生效,双击扣两笔铸两份。
+# 判据(抠正主函数原文注入执行,不抄判据副本):①确认后汇率变动→拒单零成交
+# ②确认后方向/金额被改→按快照成交 ③连点三次只成交一次 ④创世三击只扣一次
+# (含失败路径必解锁的反向靶) ⑤正常路径不受影响 + 结构纪律(快照冻在首个 await 前 /
+# 复验拿当前权威值 / 守卫非模块级 / 按钮 disabled 派生)。
+exchange_genesis_guard_gate() {
+  if "$NODE_BIN" scripts/selfcheck-exchange-genesis-guard.mjs > /tmp/uniapp-exchange-genesis-guard.log 2>&1; then
+    ok "$(tail -1 /tmp/uniapp-exchange-genesis-guard.log)"
+  else
+    bad "兑换/创世重入守卫门失败 — node scripts/selfcheck-exchange-genesis-guard.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-exchange-genesis-guard.log | head -8 | sed 's/^/        /'
+  fi
+}
+exchange_genesis_guard_gate
+
+# ── 质押持仓乐观并发门(存量 P1,2026-08-04):跨标签页竞态双记账 ──
+# earlyWithdraw / claim 原是裸 find→map→persist,persist 走纯覆盖式 writeAccountRow,
+# 全仓又没有 storage 事件重新水合持仓 —— H5 端 uni storage 就是 localStorage,两个标签页
+# 只要都打开过质押页,状态就**永久不同步**;同一笔仓位被两边各领一次,而 usdtBalance 是
+# ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记 = 真·双花。判据(esbuild 载真
+# store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份序列化 storage):
+# ①陈旧标签页重复领取被拒、余额只增加一次 ①b 读与写之间被插队同样拦得住(rev CAS)
+# ②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」返回值可区分 ④不传版本的老
+# 调用方(28 处在用)行为逐项不变 + 爆炸半径只有 staking ⑤建仓冲突重放不丢仓、id 不重号
+# ⑥接线门(判定对不对 / 有没有被接上是两道门)。
+staking_cas_gate() {
+  if "$NODE_BIN" scripts/selfcheck-staking-cas.mjs > /tmp/uniapp-staking-cas.log 2>&1; then
+    ok "质押持仓乐观并发门 — $(tail -1 /tmp/uniapp-staking-cas.log)"
+  else
+    bad "质押持仓乐观并发门失败 — node scripts/selfcheck-staking-cas.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-staking-cas.log | head -8 | sed 's/^/        /'
+  fi
+}
+staking_cas_gate
+
+# ── 资金 ⊗ 收据门(R4 缺陷族,2026-08-04):「钱动了、账没记上」──
+# 落盘失败在这一层是**静默**的:account-cloud 写不进去只是 persisted:false,bills.add
+# 写不进去只是 return null,两者都不抛异常;调用方却一律按「一定成功」继续铸货、弹成功。
+# 实测四处同型(app.ts 四个资金原语丢弃 persist 结果 + 创世购买 / 结算 / 复投丢弃 bills.add
+# 返回值),最惨一格是近 $15k 已扣、席位已铸、弹「购买成功」,账单页查无此单。根治 = 一条
+# 不变量 + 一个收口点 src/lib/money-receipt.ts(收据即指令,不写收据就动不了钱)。判据
+# (esbuild 载真 store + 真收口点跑真代码,假 storage 按 key 定点注入写失败):
+# ①资金原语落盘失败→返回 false 且内存不脏 ②bills 写失败→整笔回滚 + 报失败(含反向病症
+# 「账记了钱没动」) ③退款把 withdrawableUsdt 还原到扣款前(带裸 creditBalance 负控)
+# ④成功路径逐项等价(金额/舍入/clamp/守卫拒绝) ⑤接线门 + 3 语 i18n ⑥迁移棘轮:
+# 仍在裸调 bills 写入的存量点只许减不许增 ⑦多腿交易(兑换一进一出)原子性:两条分录
+# 一次落盘(数写盘次数),任一环失败 → 两腿资金一起还原、账上零残留(不许只剩一条)。
+money_receipt_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-receipt.mjs > /tmp/uniapp-money-receipt.log 2>&1; then
+    ok "资金 ⊗ 收据门 — $(tail -1 /tmp/uniapp-money-receipt.log)"
+  else
+    bad "资金 ⊗ 收据门失败 — node scripts/selfcheck-money-receipt.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-receipt.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_receipt_gate
+
+# ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
+# 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
+# /api/genesis/purchase` 和 `POST /api/swap`(PRD 根本没这接口)、试用转化写成
+# `POST /api/orders`(PRD 是 /api/trial/convert)、`POST /api/store/checkout`
+# (那是页面路由不是 API)。tsc / 既有 verify 全绿也抓不到 —— 注释不参与编译。
+# 判据:扫全部注释行的 /api/ 引用,对哨兵脚本内的台账逐条比对(台账不写在被查文件里,
+# 否则改注释顺手改台账 = 门等于没有)。三向红:代码有台账没 / 台账有代码没 / 扫到 0 条。
+endpoint_citation_gate() {
+  if "$NODE_BIN" scripts/endpoint-citation-sentinel.mjs > /tmp/uniapp-endpoint-citation.log 2>&1; then
+    ok "接口引用台账门 — $(tail -1 /tmp/uniapp-endpoint-citation.log)"
+  else
+    bad "接口引用台账门失败 — node scripts/endpoint-citation-sentinel.mjs 看明细"
+    grep -E "^  [0-9]+\." /tmp/uniapp-endpoint-citation.log | head -8 | sed 's/^/        /'
+  fi
+}
+endpoint_citation_gate
+
+# ── P1 涉钱/配额 store 乐观并发门(存量 P1 二期,2026-08-04)──
+# 质押一期把 writeAccountRowCas 立起来后,同型缺陷还留在六个 store 上:deposits(入金单
+# 状态推进 + 到账入账,两端并发推进 = 同一笔充值入账两次)· voucher(同一张券各领一次)·
+# nex-faucet / daily-powerup / lucky-spin(每日与一次性配额被覆盖 = 额度绕过)·
+# withdraw-daily-count(提现日限额计数被覆盖 = 限额白设)。H5 端 uni storage 就是
+# localStorage,同源多标签页共享一份且全仓无 storage 事件重新水合 —— 状态**永久不同步**,
+# 而 usdtBalance/nexBalance 是 ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记。
+# 判据(esbuild 载真 store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份
+# 序列化 storage;只有 deposits 的 app/bills/fx 三个跨 store 组合方换成可观测假账本):
+# ①六个 store 各自的陈旧标签页重复领取被拒、余额/计数只动一次 ①b 读与写之间被插队同样
+# 拦得住(rev CAS)②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」可区分
+# ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(六个 store
+# 全路径走 CAS + 六处页面调用点真的读了 ok/conflict + 3 语 i18n)。
+money_cas_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > /tmp/uniapp-money-cas.log 2>&1; then
+    ok "P1 涉钱/配额乐观并发门 — $(tail -1 /tmp/uniapp-money-cas.log)"
+  else
+    bad "P1 涉钱/配额乐观并发门失败 — node scripts/selfcheck-money-cas.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-cas.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_cas_gate
+
+# ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
+# 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
+# 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表
+# 跑真代码,多个 store 实例 = 多个账号共享一份序列化 storage):
+# ①同一码第二次核销必拒 ②本账号已持码再提另一码必拒且原码不受影响、新码不被吞
+# ③不存在/已作废/已被使用三种归因各自分开且不泄露核销者 ④两账号并发同码只成功一个
+# ⑤已核销是终态、用户侧无任何作废/释放出口 ⑥格式正确但从未发放的码必拒(缺陷本体)
+# ⑦接线门(资格门真按「持有已核销的码」判定 + action 真走码表)⑧落盘失败整笔回滚
+# ⑨五种文案 × 3 语真解析取值、互不相同。
+genesis_invite_gate() {
+  if "$NODE_BIN" scripts/selfcheck-genesis-invite.mjs > /tmp/uniapp-genesis-invite.log 2>&1; then
+    ok "创世邀请码码表核销门 — $(tail -1 /tmp/uniapp-genesis-invite.log)"
+  else
+    bad "创世邀请码码表核销门失败 — node scripts/selfcheck-genesis-invite.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-genesis-invite.log | head -8 | sed 's/^/        /'
+  fi
+}
+genesis_invite_gate
+
+# ── 冲正(回滚)自身门(R5 五项,2026-08-04)——「回滚失败被静默」+「回滚凭空造钱」──
+# R4 根治「资金变更的落盘失败被静默忽略」,R5 在**回滚这一层**发现同型:① stake() 的存储
+# 异常分支把仓位只塞内存并报成功(同一函数体 4 行后的注释正写明这么做刷新即人间蒸发),
+# ② 收口点两处 restoreMoney 的返回值没人接 —— 回滚自己失败时用户看到的仍是「余额没有变化」
+# 而钱已经扣了,③ 结算页把不可逆的 convert() 排在扣款之前(扣款的落盘失败路径预检堵不住,
+# 试用被烧掉且不可恢复),⑤ restoreMoney 写绝对值,而合并层按增量合并 —— 两个标签页各扣
+# $30 各回滚一次,余额从 $100 变 $130(凭空造钱)。判据(esbuild 载真 store + 真收口点跑真
+# 代码,假 storage 按 key/第几次写定点注入失败;⑤ 用两个 store 实例 = 两个标签页共享一份
+# 序列化 storage —— 单实例跑一遍这条永远测不出来):
+# ①存储异常 → ok=false/conflict=false、内存与磁盘都没有这笔(+撤掉注入的反向靶)
+# ②回滚失败 → stuck + 交易号 + 待对账队列 + 不再弹通用文案(带「回滚成功仍走通用文案」负控)
+# ②b 无事可回滚时不许误报"钱卡住了" ⑤两标签页各扣各回滚,磁盘回到 $100(+单页负控)
+# ⑥接线门(两处回滚返回值真被消费 / stake 分支真删了内存兜底 / 两个页面按归因分文案 /
+# 结算页 convert 真排在扣款之后)⑦三语文案真解析取值、互不相同、正文含 {id}。
+money_rollback_gate() {
+  if "$NODE_BIN" scripts/selfcheck-money-rollback.mjs > /tmp/uniapp-money-rollback.log 2>&1; then
+    ok "冲正(回滚)自身门 — $(tail -1 /tmp/uniapp-money-rollback.log)"
+  else
+    bad "冲正(回滚)自身门失败 — node scripts/selfcheck-money-rollback.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-money-rollback.log | head -8 | sed 's/^/        /'
+  fi
+}
+money_rollback_gate
+
+# ── 在途入金单「刷新后必须继续推进」门(2026-08-04 对抗审计)──────────────────
+# `scheduleConfirmations` 全仓只在**首次探测到入金时**调用一次,而推进靠内存里的 setTimeout;
+# 重绑账号(= 刷新 / 重新登录)只收敛了意向单,链上入金记录一直没人管 —— 于是用户刷新一次,
+# 停在 detected|confirming 的单永久失联,页面「确认中」转到天荒地老、钱不入账。
+# 这条不需要任何落盘失败就能触发,是每天都会发生的正常操作。
+# 判据:① bindAccount 真调 syncChainDeposits ② 只重排 detected|confirming、终态与 dust_hold 不重排
+# ③ 已有定时器不重复武装(双推进)④ 推进链路三处落盘失败必须 queue 重排而不是就地放弃
+#    (定时器在 step 开头已无条件 delete —— 这个前提本身也是一条断言,它变了上面三条要重新论证)
+# 外加红测自证:摘掉判据的目标串,对应断言必须转 false(不许空转)。
+deposit_resume_gate() {
+  if "$NODE_BIN" scripts/selfcheck-deposit-resume.mjs > /tmp/uniapp-deposit-resume.log 2>&1; then
+    ok "在途入金续推门 — $(tail -1 /tmp/uniapp-deposit-resume.log)"
+  else
+    bad "在途入金续推门失败 — node scripts/selfcheck-deposit-resume.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-deposit-resume.log | head -8 | sed 's/^/        /'
+  fi
+}
+deposit_resume_gate
+
+# ── 领奖族「发钱可重放 · 资格只消费一次」门(2026-08-04 对抗审计)────────────────
+# 领奖要同时满足两件互斥的事:资格只能消费一次(防重复领),奖必须发到(不能领了没发)。
+# 两种顺序各有一个失效面 —— 先消费资格则发钱失败时奖归零(5 处旧实况);先发钱则消费失败时
+# 下一拍再发一次(里程碑那处旧实况,平台重复出钱)。收口点加幂等出口 postMoneyBillsOnce
+# 按 ref 判重后,「先发钱后消费」就没有失效面了。
+# 判据:① 同 ref 重放不动钱不写第二条且返回 ok(带「换 ref 照常发」的反向靶)
+#      ② 首次路径与 postMoneyBills 等价 ③ 空 ref 直接抛错(不静默降级成假幂等)
+#      ④ 5 个调用点的 ref 全部稳定(带时间戳 = 判重永不命中) ⑤ 顺序门 + 反不过来那两处的自愈门
+deposit_claim_idem_gate() {
+  if "$NODE_BIN" scripts/selfcheck-claim-idempotency.mjs > /tmp/uniapp-claim-idem.log 2>&1; then
+    ok "领奖幂等门 — $(tail -1 /tmp/uniapp-claim-idem.log)"
+  else
+    bad "领奖幂等门失败 — node scripts/selfcheck-claim-idempotency.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-claim-idem.log | head -8 | sed 's/^/        /'
+  fi
+}
+deposit_claim_idem_gate
+
+# ── 账户快照三处字面量字段集一致门(2026-08-04 完全版 A 改动③ 的安全网)──────────
+# AccountCloudSnapshot 的字段由**三个各自独立的对象字面量**构造(mergeAccountSnapshots 的
+# 返回值 / persistAccountSnapshot 拼的快照 / createSeedSnapshot 的种子),加字段必须同时改三处:
+#   漏 merge → 每次合并**静默抹掉**该字段,且只在 base&&latest 都在时才走合并,首写看起来正常;
+#   漏 persist → 每次落盘写出 undefined;漏 seed → 新账号该字段归属未定义。
+# 这三处**没有任何类型检查能兜住**:TS 只管返回类型,而两处都是「先取出再拼回」的写法,
+# 少一个字段照样过编译。判据判**集合**不判成员 —— 判成员的话每加一个字段就要记得加一条判据,
+# 而「忘了加」正是本门要防的那件事。外加与类型声明对齐 + 判据红测自证。
+snapshot_literals_gate() {
+  if "$NODE_BIN" scripts/selfcheck-snapshot-literals.mjs > /tmp/uniapp-snap-literals.log 2>&1; then
+    ok "快照字面量一致门 — $(tail -1 /tmp/uniapp-snap-literals.log)"
+  else
+    bad "快照字面量一致门失败 — node scripts/selfcheck-snapshot-literals.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-literals.log | head -8 | sed 's/^/        /'
+  fi
+}
+snapshot_literals_gate
+
+# ── 账户快照必须无条件写盘 ────────────────────────────────────────────────────
+# 2026-08-05:曾在写盘路径上加过「内容没变就跳过」的脏检查,写盘次数 60→40 看着是赚的。
+# 真浏览器实测把它推翻:setItem 105KB 只要 102µs,跳一次只省 ~177µs 且只有 1/3 的拍能跳
+# (折合 59µs),而判据本身每拍要 1126µs —— **花掉的是省下的约 19 倍**,tick 净慢 ~70%。
+# 独立证伪另查出:跳过写会连内存新值一起回退,且判据的安全性压在两条没写下来的不变量上
+# (红测把 todayEarnings 塞进排除名单 → 钱当场少算,当时全部哨兵照样绿)。
+# 本门拦的不是「跳过写一定错」,而是「没量就凭直觉再走一遍这个方向」。
+snapshot_write_gate() {
+  if "$NODE_BIN" scripts/selfcheck-snapshot-write.mjs > /tmp/uniapp-snap-write.log 2>&1; then
+    ok "快照无条件写盘门 — $(tail -1 /tmp/uniapp-snap-write.log)"
+  else
+    bad "快照无条件写盘门失败 — node scripts/selfcheck-snapshot-write.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-snap-write.log | head -8 | sed 's/^/        /'
+  fi
+}
+snapshot_write_gate
+
+# ── 首页「你的排名」派生的行为门(FEAT-HOME02)──────────────────────────────
+# 守规格里三条**对用户的承诺**,不是实现细节:
+#   ① 加算力名次只前进不倒退 ② 零算力不编造名次(「未上榜」与「算不出来」不合并)
+#   ③ 同输入必同输出(禁随机,刷新不跳动)
+# ① 的地基是分位表单调性,所以门拒收非单调表不是洁癖 —— 表一非单调,承诺①当场失效
+# 而界面毫无察觉(名次会随算力上升往后掉)。
+network_rank_gate() {
+  if "$NODE_BIN" scripts/selfcheck-network-rank.mjs > /tmp/uniapp-net-rank.log 2>&1; then
+    ok "排名派生行为门 — $(tail -1 /tmp/uniapp-net-rank.log)"
+  else
+    bad "排名派生行为门失败 — node scripts/selfcheck-network-rank.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-net-rank.log | head -8 | sed 's/^/        /'
+  fi
+}
+network_rank_gate
+
+# ── 排名入参「总有效算力」聚合门(FEAT-HOME02 ③)──────────────────────────────
+# 排名函数再对,喂进去的算力错了照样全错。这道门守聚合本身:
+#   ① 多台求和(不是只取一台/取平均) ② 未激活不计 ③ 不在产不计、无设备为数字 0
+#      —— 参照系 = settleDevice 的不结算清单,实际 **5 条**(未激活 / 非 online /
+#      cloud-share / pausedReason / 手机未充电或无 WiFi);排名只取其中 3 条,cloud-share
+#      (收益另路、算力在网)与手机不充电(结算给 0、排名照算打折正数,与设备卡显示
+#      自洽,展示≠结算)是刻意取舍,别当 bug 修回去。**心跳过期不等于不在产**(H5 上的
+#      手机照样按 hosted 档计息,排名判它 0 就是对着一个正在赚钱的用户说「未上榜」)。
+#   ④ 口径复用 + 独立锚 —— 手机必须等于 computeLiveHashpower 的输出;非手机必须等于
+#      设备自己那行 GPU 规格串解出的 TOPS,期望值写死成字面数字(拿被测函数算期望值
+#      是自指判据,天花板整体 ×2 也照样全绿,已实测)。
+#   ⑤ GPU 档位单源 —— 排名算力必须读运营可配的档位表(cfg.config.computeShare.gpuTiers
+#      穿参进聚合链):行为靶「改一档 tops / 加识别词 → 聚合跟着变」+ 源码哨兵
+#      (account-hashrate.ts 出现 GPU_TIERS 字样或 matchGpuTier 单参调用即红)。
+#   ⑥ 8 档参考舰队名次固定靶 —— 真种子分位表(已扩到 53,000 TOPS)下,只手机→10 台
+#      机架 8 档舰队名次互不相同且随算力严格前进;超表顶封顶不出「第 1 名」。
+# 外加时间不变:同一批设备跨时刻必须**全等**,同一台设备持有 1 天与 400 天也必须全等 ——
+#   展示用抖动流进排名会每秒抖;任务量递减(算力恒定,降的是接单量)流进排名,
+#   会让用户什么都不做名次也往后掉。
+account_hashrate_gate() {
+  if "$NODE_BIN" scripts/selfcheck-account-hashrate.mjs > /tmp/uniapp-acct-hash.log 2>&1; then
+    ok "总有效算力聚合门 — $(tail -1 /tmp/uniapp-acct-hash.log)"
+  else
+    bad "总有效算力聚合门失败 — node scripts/selfcheck-account-hashrate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-acct-hash.log | head -8 | sed 's/^/        /'
+  fi
+}
+account_hashrate_gate
+
+# ── 门的门:机器门固定靶完整性(2026-08-05 包 G 结构性反思)────────────────────
+# 修复轮自伤 44%,「门假绿」两轮 8 条,共同根因 = 手写闭集 × 开放集合(加一个 SKU,
+# 旧门照样全绿放行;pc-gpu 整条判 0 仍 57 pass;语言豁免不带语言维)。本门扫全部门脚本:
+# 机型引用集必须等于「全集 / 递减豁免集 / 其补集」之一(全集从真模块导出派生,SKU 一变大
+# 所有涉机型的门当场红);点名语言文件必须三语齐点;例外台账逐条带理由且 0 命中即红。
+gate_targets_meta() {
+  if "$NODE_BIN" scripts/selfcheck-gate-targets.mjs > /tmp/uniapp-gate-targets.log 2>&1; then
+    ok "门的门(靶完整性)— $(tail -1 /tmp/uniapp-gate-targets.log)"
+  else
+    bad "门的门(靶完整性)失败 — node scripts/selfcheck-gate-targets.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-gate-targets.log | head -8 | sed 's/^/        /'
+  fi
+}
+gate_targets_meta
+
+# ── 创世购买可用性「单一派生」门(FEAT-GEN10 ④)────────────────────────────────
+# 被一次独立验收逼出来的:此前 composable 注释里写着这个文件名,而文件根本不存在 ——
+# 一个凭空的安全感,同轮验收抓到的 4 条缺陷全是这条不变量失守的样本。
+# 守两件事:① 优先级链对不对(行为验证,不读源码顺序)② 有没有人绕过它自判(结构验证)。
+genesis_gate() {
+  if "$NODE_BIN" scripts/selfcheck-genesis-gate.mjs > /tmp/uniapp-gen-gate.log 2>&1; then
+    ok "创世单一派生门 — $(tail -1 /tmp/uniapp-gen-gate.log)"
+  else
+    bad "创世单一派生门失败 — node scripts/selfcheck-genesis-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-gen-gate.log | head -8 | sed 's/^/        /'
+  fi
+}
+genesis_gate
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

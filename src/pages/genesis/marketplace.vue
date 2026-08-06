@@ -5,7 +5,7 @@
   Collection hero (4-stat grid + 7d floor delta + fake OpenSea redirect) →
   segmented tabs (listings / activity / mine) → sort pills + listing grid /
   activity feed / owned-token grid. Wrapped in <AppChassis active="me">. Buy
-  composes app.debitBalance + genesis.purchase + bills.add in the handler.
+  composes postMoneyBill(扣款⊗记账) + genesis.acquireSecondary in the handler.
   SEED_LISTINGS / SEED_ACTIVITY are faithful English mock arrays.
 -->
 <template>
@@ -64,6 +64,16 @@
           </view>
         </view>
 
+        <!-- 市场关闭说明(FEAT-GEN10 ⑥:二级市场一并锁闭**并说明**)。
+             只说状态与影响,不做倒计时、不催 —— 关闭态禁紧迫感元素。 -->
+        <view v-if="secondaryBlock !== null" class="flex items-start" :style="closedNoticeStyle">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 8v4" /><path d="M12 16h.01" /></svg>
+          <view style="flex: 1; margin-left: 8px">
+            <text class="block" :style="closedNoticeTitleStyle">{{ secondaryBlockText }}</text>
+            <text class="block" :style="closedNoticeSubStyle">{{ secondaryBlockSub }}</text>
+          </view>
+        </view>
+
         <!-- Tabs -->
         <view class="grid grid-cols-3" :style="tabsStyle">
           <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
@@ -86,7 +96,7 @@
           </scroll-view>
 
           <view class="grid grid-cols-2" style="gap: 10px">
-            <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" @buy="handleBuy(l)" />
+            <ListingCard v-for="l in sortedListings" :key="l.tokenId" :l="l" :disabled="secondaryBlock !== null" @buy="handleBuy(l)" />
           </view>
         </template>
 
@@ -122,6 +132,7 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import ListingCard, { type Listing } from "@/components/genesis/listing-card.vue";
@@ -133,10 +144,11 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { onMounted, onUnmounted } from "vue";
-import { useBills } from "@/store/bills";
+import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 
 const ONE_DAY = 86400 * 1000;
@@ -144,10 +156,22 @@ const HOUR = 3600_000;
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+// 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
+onShow(() => cfg.refresh());
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
+const { marketClosed, secondaryBlock, blockText } = useGenesisSaleGate();
+/** 阻断说明文案 —— 走 blockText 唯一出口(P1-3 收口:此前 4 处各写一份同款 switch)。
+ *  二级的三种阻断(配置未知/关闭/熔断)与主判定共享同一批高优先档,blockText 恒能覆盖;
+ *  兜底只防 TS 层面的 null(渲染点有 v-if 闸,可购买态整块不渲染)。
+ *  上一版 `default:` 分支在可购买态也会算出「暂未开放」,靠外层 v-if 碰巧挡住 —— 已删。 */
+const secondaryBlockText = computed(() => blockText.value ?? t.value.genesis.marketClosed.default);
+const secondaryBlockSub = computed(() =>
+  secondaryBlock.value === "configUnavailable"
+    ? t.value.genesis.marketClosed.retryHint
+    : t.value.genesis.marketClosed.holdingsSafe,
+);
 
 // 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
 const stats = computed(() => cfg.config.marketStats);
@@ -263,7 +287,11 @@ function scheduleFomo() {
   const { fomoIntervalMinMs: mn, fomoIntervalMaxMs: mx } = cfg.config;
   const delay = mn + Math.random() * Math.max(0, mx - mn);
   fomoTimer = setTimeout(() => {
-    if (cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
+    // 🔴 阻断态不生成虚拟成交(独立验收 P2-13)。页面一边说「买不了」、一边不停播
+    //   「刚有人成交」,是当面互相拆台;它与创世页的社会证明属同一类紧迫感元素。
+    //   注意保留下面的 scheduleFomo() 递归 —— 只跳过本次生成,恢复开放后自动接上,
+    //   而不是把定时器停掉(停掉就再也不会自己恢复)。
+    if (secondaryBlock.value === null && cfg.config.fomoEnabled && fomoCountToday < cfg.config.fomoDailyCap) {
       liveFomo.value = [genFomoSale(fomoCountToday), ...liveFomo.value].slice(0, 30);
       fomoCountToday += 1;
     }
@@ -285,6 +313,17 @@ onUnmounted(() => {
 });
 
 function handleBuy(l: Listing) {
+  // 🔴 阻断闸放在**最前**(规格 FEAT-GEN10 ⑥:二级市场与购买同一状态源)。
+  //   零资金动作就拦掉 —— store 层 acquireSecondary 也有同一道闸兜底,但那时钱已经扣了、
+  //   要走冲正;能在这里挡住就别让钱先动。
+  //
+  // 🔴 判的是 `secondaryBlock !== null` 而**不是** `marketClosed`(独立验收 P1-6):
+  //   上一版只挡「市场关闭」,于是「配置未知 / 熔断」时会先扣钱、再被 store 拒、再冲正,
+  //   用户看到的是通用「承接失败」,既没有锁定说明也没有重试入口(违规格 异常3)。
+  if (secondaryBlock.value !== null) {
+    toast.error(secondaryBlockText.value, secondaryBlockSub.value);
+    return;
+  }
   // 资格门(FEAT-GEN08,appliesTo=both 时二级同门):确认前拦截,零资金动作。
   // 打开资格 sheet 引导补齐,而非仅 toast。
   if (gatesSecondary.value && !eligible.value) {
@@ -299,7 +338,29 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  if (!app.debitBalance(l.priceUSDT)) {
+  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账 + acquire。
+  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
+  // 不受售罄门影响。承接失败(已持有该 token / 撞限购)必须冲正,杜绝「扣钱不给货」。
+  // PRODUCTION: server validates listing, debits buyer, credits seller minus
+  // royalty, transfers tokenId, writes bills atomically (PRD §10.2.4
+  // POST /api/genesis/secondary/fulfill)。
+  //
+  // 🔴 顺序 = 扣款⊗记账(原子)→ 承接(照一级 purchase-sheet 同族)。原顺序是「裸 debitBalance
+  // → acquire → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、没人接 ——
+  // 于是钱已扣、token 已到手、弹「承接成功」,账单页却查无此单。收据与扣款收口成一次提交后,
+  // 收据落不了盘 = 钱没扣、token 没给、明确报错,零半执行残迹。
+  const billRef = `GENESIS-SEC-${l.tokenId}`;
+  // 回滚基准必须在动钱**之前**取(取晚了就是拿动过的状态当"原状")。
+  const before = app.captureMoney();
+  const paid = postMoneyBill({
+    type: "purchase",
+    symbol: "USDT",
+    amount: -l.priceUSDT,
+    status: "posted",
+    memo: `Genesis secondary · token #${l.tokenId}`,
+    ref: billRef,
+  });
+  if (paid === "insufficient") {
     toast.error(
       t.value.marketplace.insufficient,
       fmt(t.value.marketplace.insufficientDesc, {
@@ -309,34 +370,45 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): debit + acquire + bill.
-  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
-  // 不受售罄门影响。承接失败(已持有该 token)必须退款,杜绝「扣钱不给货」。
-  // PRODUCTION: server validates listing, debits buyer, credits seller minus
-  // royalty, transfers tokenId, writes bills atomically (PRD §9.11e).
-  const ok = genesis.acquireSecondary(l.tokenId);
-  if (ok) {
-    soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
-    bills.add({
-      type: "purchase",
-      symbol: "USDT",
-      amount: -l.priceUSDT,
-      status: "posted",
-      memo: `Genesis secondary · token #${l.tokenId}`,
-      ref: `GENESIS-SEC-${l.tokenId}`,
-    });
-    toast.success(
-      fmt(t.value.marketplace.acquiredToast, { id: l.tokenId }),
-      fmt(t.value.marketplace.acquiredDesc, {
-        paid: l.priceUSDT.toLocaleString(),
-        held: ownedCount.value,
-      }),
+  if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
+  if (!genesis.acquireSecondary(l.tokenId)) {
+    // 承接失败(已持有该 token / 撞单人限购)→ 冲正,走**同一个**收口点:
+    // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
+    //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
+    // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
+    //    已终态分录靠反向分录冲正、不改写原行(与一级预留冲正同规矩)。
+    const reversed = postMoneyBill(
+      {
+        type: "purchase",
+        symbol: "USDT",
+        amount: l.priceUSDT,
+        status: "posted",
+        memo: `Genesis secondary reversed · token #${l.tokenId} refunded`,
+        memoKey: "genesisSecondaryReversed",
+        memoParams: { id: l.tokenId },
+        // 🔴 冲正分录的幂等键要与原分录**分开**(2026-08-04 对抗审计 P2-9):
+        // `addOnce` 按 `ref + type + symbol` 三元组判重,而冲正与原扣款这三项原本完全相同 ——
+        // 将来任何一次幂等写(重放 / 补记)都会误命中冲正那行,把「已冲正」当成「已扣款」。
+        ref: `${billRef}-REV`,
+      },
+      { restoreTo: before },
     );
-  } else {
-    // 承接失败(已持有该 token)→ 退款;文案如实说「已退款」,不复用成功话术(审计 P2-2)。
-    app.creditBalance(l.priceUSDT);
+    // 🔴 冲正自己也会失败,返回值必须接:reversed !== "ok" 时钱**仍然扣着**,
+    // 此刻再弹「payment refunded」就是当面撒谎(2026-08-04 对抗审计 B-P1-2)。
+    // 收口点在 stuck 分支已经给了响亮终态 + 交易号,这里不再叠一句假承诺。
+    if (reversed !== "ok") return;
+    // 文案如实说「已退款」,不复用成功话术(审计 P2-2)。
     toast.error(t.value.marketplace.acquireFailedTitle, t.value.marketplace.acquireFailedRefunded);
+    return;
   }
+  soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
+  toast.success(
+    fmt(t.value.marketplace.acquiredToast, { id: l.tokenId }),
+    fmt(t.value.marketplace.acquiredDesc, {
+      paid: l.priceUSDT.toLocaleString(),
+      held: ownedCount.value,
+    }),
+  );
 }
 
 function goGenesis() {
@@ -421,7 +493,30 @@ const viewOpenSeaStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 500,
 };
-const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface-2)" };
+// 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+// 市场关闭说明条(FEAT-GEN10)。soft bg tint + **零 border**(带 bg 的容器不加边框,
+// 卡片嵌套铁律);用 warning 语义色而非 error —— 这是运营节奏,不是故障。
+const closedNoticeStyle: CSSProperties = {
+  background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)",
+  color: "var(--v5-warning-ink)",
+  borderRadius: "14px",
+  padding: "12px 14px",
+};
+const closedNoticeTitleStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "13px", // 档内值(value-ladder 合法集 {56,44,36,34,26,20,15,13,12};13.5 会被哨兵判红)
+  fontWeight: 550,
+  textWrap: "pretty",
+};
+const closedNoticeSubStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  color: "var(--v5-ink-3)",
+  marginTop: "2px",
+  lineHeight: 1.5,
+  textWrap: "pretty",
+};
+const tabsStyle: CSSProperties = { gap: "4px", padding: "4px", borderRadius: "12px", background: "var(--v5-surface)" };
 function tabPillStyle(active: boolean): CSSProperties {
   return {
     // 《07》tap≥44:原 40px(同页 sortPill 已补,这条是同类)
@@ -457,7 +552,7 @@ function sortPillStyle(active: boolean): CSSProperties {
     fontWeight: 500,
     fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
     letterSpacing: "0.04em",
-    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+    background: active ? "var(--v5-brand-soft)" : "var(--v5-surface)", // 未选中 pill 贴页面底:原 surface-2 与页面底同色不可辨,改 L1(选中态不动)
     color: active ? "var(--v5-brand)" : "var(--v5-ink-3)",
     // 零-border(《03》§6):选中态靠 brand-soft 底 + brand 文字表达,不描边。
     // 两态都不带 border,状态切换无 1px 位移。

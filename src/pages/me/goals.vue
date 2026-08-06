@@ -24,7 +24,7 @@
         <text class="block" :style="heroSubStyle">{{ heroSubLine }}</text>
       </view>
 
-      <!-- Setter — de-carded: labels + recessed input sit on the page floor -->
+      <!-- Setter — de-carded: labels + L1-filled input sit on the page floor -->
       <view class="mx-4" :style="setterWrapStyle">
         <text class="block" :style="fieldLabelStyle">{{ t.goals.targetLabel }}</text>
         <view class="flex items-center" :style="inputBoxStyle">
@@ -187,7 +187,8 @@ function presetTargetStyle(p: number): CSSProperties {
   return {
     height: "44px",
     borderRadius: "8px",
-    background: target.value === p ? "var(--v5-warning)" : "var(--v5-surface-2)",
+    // 未选中原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),预设块直接坐在页面底上 → 改 L1
+    background: target.value === p ? "var(--v5-warning)" : "var(--v5-surface)",
   };
 }
 function presetTargetLabelStyle(p: number): CSSProperties {
@@ -201,7 +202,8 @@ function presetDeadlineStyle(d: number): CSSProperties {
   return {
     height: "44px",
     borderRadius: "8px",
-    background: days.value === d ? "var(--v5-brand)" : "var(--v5-surface-2)",
+    // 同上:与目标预设同容器同尺寸,未选中态一并改 L1
+    background: days.value === d ? "var(--v5-brand)" : "var(--v5-surface)",
   };
 }
 function presetDeadlineLabelStyle(d: number): CSSProperties {
@@ -236,8 +238,8 @@ const heroSubStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   lineHeight: 1.6,
 };
-// Setter — de-carded floor block; the $ input gets a recessed surface-3 box
-// (de-card white-list: input = surface-3 recessed, no border).
+// Setter — de-carded floor block; the $ input box sits on the page floor at L1
+// surface (de-card white-list: input = filled box, no border).
 const setterWrapStyle: CSSProperties = { marginTop: "18px", padding: "0 2px" };
 const fieldLabelStyle: CSSProperties = {
   marginBottom: "8px",
@@ -251,7 +253,8 @@ const inputBoxStyle: CSSProperties = {
   height: "52px",
   padding: "0 14px",
   borderRadius: "12px",
-  background: "var(--v5-surface-3)",
+  // 输入框直接坐在页面底上,surface-3 对页面底亮色 ΔE 2.7 不可辨(内凹读不出来)→ 改 L1 surface。
+  background: "var(--v5-surface)",
 };
 const dollarStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",

@@ -11,7 +11,15 @@ export interface AccountCloudSnapshot {
   user: UserState;
   devices: Device[];
   earnings: EarningsState;
-  latestWithdrawal: Withdrawal | null;
+  /**
+   * 🔴 提现单**列表**,不是「最新一条」。
+   * 真后端 GET /api/withdrawals 返回的就是列表;此前只存最新一条(单槽)是与真后端
+   * 不同构的 mock 简化,直接导致两个 P0:① 第二笔建单把第一笔整个顶掉(钱已扣、单据
+   * 从此不可达、到账推进也永不再碰它)② 为兜这个洞加的「在途不许再提」闸,在人工审核
+   * 单没有出口时把用户永久锁死。改成列表后两个问题从根上消失,也满足项目铁律
+   * 「Mock 必须 100% 真后台结构、随时可接真后台零重写」。
+   */
+  withdrawals: Withdrawal[];
 }
 
 export interface AccountSnapshotWriteResult {
@@ -57,6 +65,9 @@ const TIME_ANCHOR_KEYS = new Set([
   "completedAt",
   "submittedAt",
   "estimatedCompletion",
+  // FEAT-WD01b 实际到账时刻。漏加会让 merge 退化成 last-write-wins 而非取最新
+  // (踩过:R7 心跳字段就是这么漏的),两端并发时到账时间会被旧快照写回。
+  "confirmedAt",
   "lastBucketedAt",
 ]);
 
@@ -110,7 +121,31 @@ function writeTable(table: AccountCloudTable): boolean {
 export function readAccountSnapshot(accountKey: string): AccountCloudSnapshot | null {
   const key = normalizeAccountKey(accountKey);
   const row = readTable()[key];
-  return row && row.schema === 1 ? row : null;
+  return row && row.schema === 1 ? upgradeLegacyWithdrawals(row) : null;
+}
+
+/**
+ * 老快照升级(读时升级,schema 不升版 —— 只补形,不做破坏性迁移;老用户的历史单不丢):
+ *  ① 单条 latestWithdrawal → withdrawals 列表(2026-08-01 单槽→列表迁移);
+ *  ② FEAT-WD02:数字 fee → 结构化快照 { networkConfirmUsd, nexBurned, actualFeeUsd }。
+ *     🔴 归一必须对「已是列表」的行也做 —— ①已上线,存量行**全部**带 withdrawals 数组,
+ *     归一只嵌在单槽分支里就对所有真实存量行失效(tracking 读 fee.actualFeeUsd → undefined 崩)。
+ *     旧数字只承载实收费:actualFeeUsd = 旧数字;networkConfirmUsd/nexBurned 不可考记 0,
+ *     🔴 禁按新规则重算(展示层只读 actualFeeUsd,无信息损失)。
+ */
+function upgradeLegacyWithdrawals(row: AccountCloudSnapshot): AccountCloudSnapshot {
+  const legacy = (row as unknown as { latestWithdrawal?: Withdrawal | null }).latestWithdrawal;
+  const list: Withdrawal[] = Array.isArray(row.withdrawals) ? row.withdrawals : legacy ? [legacy] : [];
+  const needsUpgrade =
+    !Array.isArray(row.withdrawals) || list.some((wd) => typeof (wd as { fee?: unknown }).fee === "number");
+  if (!needsUpgrade) return row;
+  const withdrawals = list.map((wd) => {
+    const feeRaw = (wd as { fee?: unknown }).fee;
+    return typeof feeRaw === "number"
+      ? { ...wd, fee: { networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: feeRaw } }
+      : wd;
+  });
+  return { ...row, withdrawals };
 }
 
 export function writeAccountSnapshot(snapshot: AccountCloudSnapshot): boolean {
@@ -281,20 +316,34 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
   return order.map((id) => latestById.get(id)).filter((d): d is Device => !!d);
 }
 
-function mergeLatestWithdrawal(
-  base: Withdrawal | null,
-  next: Withdrawal | null,
-  latest: Withdrawal | null,
-): Withdrawal | null {
-  if (sameValue(base, next)) return latest;
-  if (!next) return next;
-  if (!latest) return next;
-  if (next.id !== latest.id) {
-    return latest.submittedAt >= next.submittedAt ? latest : next;
+/**
+ * 提现单列表三路合并:**按单号取并集**,同一单的状态取 rank 更靠后的那份。
+ *
+ * 关键性质(单条版没有的):两端各自新建的单**都会保留**,不再互相顶掉。
+ * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
+ * last-write 会把已到账的单退回处理中。
+ */
+function mergeWithdrawals(
+  base: Withdrawal[],
+  next: Withdrawal[],
+  latest: Withdrawal[],
+): Withdrawal[] {
+  const byId = new Map<string, Withdrawal>();
+  for (const w of [...latest, ...next]) {
+    const prev = byId.get(w.id);
+    if (!prev) {
+      byId.set(w.id, w);
+      continue;
+    }
+    const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
+    const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
+    byId.set(w.id, c > a ? w : prev);
   }
-  const nextRank = WITHDRAWAL_STATUS_RANK[next.status] ?? 0;
-  const latestRank = WITHDRAWAL_STATUS_RANK[latest.status] ?? 0;
-  return latestRank >= nextRank ? latest : next;
+  // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
+  const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));
+  return [...byId.values()]
+    .filter((w) => !deleted.has(w.id))
+    .sort((x, y) => y.submittedAt - x.submittedAt);
 }
 
 export function mergeAccountSnapshots(
@@ -318,7 +367,7 @@ export function mergeAccountSnapshots(
       next.earnings as unknown as JsonRecord,
       latest.earnings as unknown as JsonRecord,
     ) as unknown as EarningsState,
-    latestWithdrawal: mergeLatestWithdrawal(base.latestWithdrawal, next.latestWithdrawal, latest.latestWithdrawal),
+    withdrawals: mergeWithdrawals(base.withdrawals ?? [], next.withdrawals ?? [], latest.withdrawals ?? []),
   };
 }
 
@@ -358,6 +407,7 @@ export function mergeAndWriteAccountSnapshot(
 }
 
 /** Fail-aware variant used by money/reward flows that may not acknowledge a lost write. */
+
 export function mergeAndWriteAccountSnapshotResult(
   base: AccountCloudSnapshot | null,
   next: AccountCloudSnapshot,
@@ -366,6 +416,20 @@ export function mergeAndWriteAccountSnapshotResult(
   const latest = readAccountSnapshot(key);
   const rawMerged = base && latest ? mergeAccountSnapshots(base, next, latest) : { ...next, accountKey: key, updatedAt: Date.now() };
   const merged = clampAccountFundInvariants(rawMerged);
+  // 🔴 **无条件写盘**。曾经在这里加过「内容没变就跳过」的脏检查(2026-08-04,已撤),
+  // 别再加回来 —— 撤销理由是**实测**,不是风格偏好:
+  //
+  //   真浏览器、真 105KB 账户表:`setItem` 102µs · `JSON.stringify` 74µs
+  //   → 跳过一次写盘只省 ~177µs,而能跳的只有 1/3 的拍,折合 **59µs**;
+  //   而「内容变没变」的判据本身(键排序稳定序列化,每次要跑两遍)要 **1126µs**。
+  //   **判据花掉的是它省下的约 19 倍。** 写盘从来不是贵的那头。
+  //
+  // 独立证伪还查出:跳过写等于**连内存里的新值一起回退**(`stored = latest` 会被
+  // adopt 回去),而判据的安全性压在两条没写下来、也没有任何机器门守的不变量上 ——
+  // 红测把 `todayEarnings` 塞进排除名单,钱当场少算(10 而非 25),全部哨兵照样绿。
+  //
+  // 真要降写盘成本,先量「贵在哪」再动手,别再从「少写几次」这个方向猜。
+  // 台账:docs/changes/2026-08-04-design-v2.md;门:scripts/selfcheck-snapshot-write.mjs
   const writeSucceeded = writeAccountSnapshot(merged);
   const stored = readAccountSnapshot(key);
   return {

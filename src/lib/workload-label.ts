@@ -1,4 +1,5 @@
-// Display label for an AI workload (and the KYC pseudo-workload receipts add).
+// Display label for an AI workload (plus the legacy "KY" verification pseudo-workload
+// kept only so historical receipts still render — FEAT-KYC-RM01b).
 //
 // The data layer bakes an English `type` string — store/types.ts
 // TASK_CATEGORY_LABEL feeds CurrentTask.type / LockedTeaser.type / Receipt.type
@@ -13,8 +14,8 @@
 import type { Messages } from "@/i18n/messages/en";
 import type { TaskCategory } from "@/store/types";
 
-// TaskCategory plus the "KY" pseudo-category receipts use (mirrors
-// ReceiptCategory in mock/receipt.ts; spelled out so lib/ stays free of a
+// TaskCategory plus the legacy "KY" pseudo-category persisted receipts may carry
+// (mirrors ReceiptCategory in mock/receipt.ts; spelled out so lib/ stays free of a
 // mock/ import).
 export type LabelCategory = TaskCategory | "KY";
 

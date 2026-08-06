@@ -3,7 +3,7 @@
 
   Featured hero → segmented tabs (All / Ongoing / Upcoming / Joined / Ended) →
   event cards list → footer note. Trackable events opt into join→claim flow
-  (event-quest store, P-027 reactive Record); claim credits NEX via app store
+  (event-quest store, P-027 reactive Record); claim 走 money-receipt 收口点
   + writes a bill. Decomposed into src/components/events/* (FeaturedHero /
   Card) — each carries its own scroll-grow bar.
 
@@ -71,8 +71,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import { useT } from "@/i18n/use-t";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
@@ -84,8 +83,6 @@ type EnrichedEvent = NexEvent & { _trackable: boolean; _done: boolean; _claimed:
 const TABS: TabId[] = ["all", "ongoing", "upcoming", "joined", "ended"];
 
 const t = useT();
-const app = useApp();
-const bills = useBills();
 const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
 
@@ -152,22 +149,21 @@ function handleJoin(ev: EnrichedEvent) {
 function handleClaim(ev: EnrichedEvent) {
   if (!ev._trackable || !ev._done || ev._claimed) return;
   const reward = rewardNexOf(ev);
-  if (eventQuest.claim(ev.id)) {
-    if (reward > 0) {
-      // MOCK-ONLY NON-ATOMIC: PROD event-claim endpoint TBD must claim, credit,
-      // and emit the matching bill in one idempotent transaction.
-      app.creditNex(reward);
-      bills.add({
-        type: "achievement",
-        symbol: "NEX",
-        amount: reward,
-        status: "posted",
-        memo: `Event reward · ${ev.id}`,
-        ref: `EVENT-${ev.id}-${Date.now().toString(36).toUpperCase()}`,
-      });
-    }
-    toast.success(t.value.events.toast.claimedTitle.replace("{n}", reward.toLocaleString()), ev.title);
-  }
+  // MOCK-ONLY NON-ATOMIC: PROD event-claim endpoint TBD must claim, credit,
+  // and emit the matching bill in one idempotent transaction.
+  // 🔴 顺序 = 先发钱(幂等)→ 后消费资格(2026-08-04 对抗审计 B-P1-3):原来先 claim 消费掉,
+  // 发钱失败就 return,资格没了奖归零。ref 去掉时间戳改成活动 id(活动只能领一次,天然稳定)——
+  // 带时间戳的 ref 判重永不命中,幂等出口会退化成普通出口。
+  if (reward > 0 && postMoneyBillsOnce([{
+    type: "achievement",
+    symbol: "NEX",
+    amount: reward,
+    status: "posted",
+    memo: `Event reward · ${ev.id}`,
+    ref: `EVENT-${ev.id}`,
+  }]) !== "ok") return;
+  if (!eventQuest.claim(ev.id)) return; // 消费失败:钱已幂等落定,重试命中同一 ref 不会再发
+  toast.success(t.value.events.toast.claimedTitle.replace("{n}", reward.toLocaleString()), ev.title);
 }
 
 // Decorative (non-trackable) CTA. The lucky-wheel event opens the Lucky Spin
@@ -188,7 +184,8 @@ function handleCta(ev: EnrichedEvent) {
 
 // ── styles ──
 const segWrapStyle: CSSProperties = {
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
   borderRadius: "16px",
   padding: "4px",
   gap: "2px",

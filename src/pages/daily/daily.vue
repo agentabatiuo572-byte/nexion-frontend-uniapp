@@ -184,7 +184,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 
@@ -222,7 +222,6 @@ const TOP_STREAKERS = [
 const t = useT();
 const faucet = useNexFaucet();
 const app = useApp();
-const bills = useBills();
 const luckySpin = useLuckySpin();
 
 // Per-second tick for the countdown.
@@ -230,6 +229,19 @@ const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   timer = setInterval(() => (tick.value += 1), 1000);
+  // 🔴 这里曾挂过一个 reconcileFaucetBills()「签到/里程碑发币没落盘就补发」——**已撤销**。
+  // 实景走查当场证伪:判据是「有领取状态、无对应账单行 ⇒ 补发」,它分不清
+  //   ① 从没发过(该补)与 ② 发过了但账单行丢了(不该补)。
+  // 而 ② 是**可达**的:账单表走裸 writeAccountRow(无 CAS 无合并),另一标签页写一次就会
+  // 覆盖掉本页刚写的分录,而余额在账户快照里按增量合并**幸存**(实测靶
+  // scripts/measure-bills-crosstab-loss.mjs)。此时自愈会二次发钱 ——
+  // 浏览器实测:余额 11940 → 11943,凭空多发一次。
+  // 少发是用户损失,多发是平台损失且不可追回 —— 在拿到**权威的「已付」标记**之前,
+  // 这个判据不可能正确。
+  // 🔴 **权威「已付」标记要等真后端**(主人 2026-08-05 拍板:不在前端做存储层事务重构,
+  //   提案已被独立证伪判定不可行,见 docs/changes/2026-08-04-change2-proposal.md)。
+  //   在那之前,这里**永远不要**加「按账单缺失来补发」的自愈——它必然是二次发钱的入口。
+  //   已焊门:scripts/selfcheck-claim-idempotency.mjs。
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
@@ -303,17 +315,35 @@ function formatTs(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
+/** 签到分录的稳定幂等键 = 当天日期(签到一天一次)。带时间戳的话判重永不命中 = 假幂等。 */
+function signInRef(ts: number): string {
+  const d = new Date(ts);
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `SIGNIN-${d.getFullYear()}${mm}${dd}`;
+}
+
+
 function handleCheckIn() {
   const r = faucet.signIn();
   if (!r.ok) {
-    toast.info("Already checked in today", "Come back tomorrow for more NEX.");
+    // conflict = 别的标签页刚签过(store 已刷新到最新);否则就是本页自己今天已签。
+    if (r.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    else toast.info("Already checked in today", "Come back tomorrow for more NEX.");
     return;
   }
   // Faucet store tracks streak only; crediting NEX to the wallet is composed here
   // (store never imports app). MOCK-ONLY NON-ATOMIC: PROD POST /api/faucet/sign-in
   // atomically grants NEX and emits the matching bill in one idempotent transaction.
-  app.creditNex(r.gained);
-  bills.add({ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted", memo: `Daily check-in · ${r.streak}-day streak` });
+  //
+  // 🔴 这一处的顺序**反不过来**(与 quest / event / achievement 三族不同):发多少 NEX 是
+  // signIn() 自己摇出来的(随机倍率 + 连签奖励),不先跑它就不知道金额。于是失败面是
+  // 「今天已签、NEX 没到」,而签到一天一次、当天再点也没用。
+  // 对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
+  // ref 用**当天日期**保持稳定,进页面时若发现「今天签过但账上没有那条分录」就补发;
+  // 幂等出口保证补发不会变成第二次发钱。
+  if (postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted",
+    memo: `Daily check-in · ${r.streak}-day streak`, ref: signInRef(faucet.lastSignedInAt) }]) !== "ok") return;
   try {
     uni.vibrateShort({ fail: () => {} });
   } catch {
@@ -339,19 +369,34 @@ function handleClaimMilestone(m: Milestone) {
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
   const rewardDisplay = t.value.daily.milestones[m.rewardKey];
-  faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
+  // 🔴 必须先看 ok:上面两道预判读的是本页内存态,而里程碑领取是**一次性**的。
+  // 别的标签页刚领过时 store 会按磁盘最新态拒掉,此时还往下走就是白发一份奖励。
+  const claim = faucet.claimMilestone(m.day, gainedNex, `Milestone Day-${m.day}: ${rewardDisplay}`);
+  if (!claim.ok) {
+    if (claim.conflict) toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
+    else toast.info(t.value.daily.milestones.claimedToast, "");
+    return;
+  }
   // USDT / NEX milestone rewards actually credit the wallet + write a bill.
   if (m.reward.type === "usdt" || m.reward.type === "nex") {
     // MOCK-ONLY NON-ATOMIC: PROD milestone-claim endpoint TBD must atomically
     // grant the reward and emit the matching bill in one idempotent transaction.
-    const ref = `STREAK-D${m.day}-${Date.now().toString(36).toUpperCase()}`;
-    if (m.reward.type === "usdt") {
-      app.creditBalance(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "USDT", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
-    } else {
-      app.creditNex(m.reward.amount);
-      bills.add({ type: "bonus", symbol: "NEX", amount: m.reward.amount, status: "posted", memo: `Streak milestone · Day-${m.day}`, ref });
-    }
+    // 🔴 ref 去掉时间戳:里程碑一档只能领一次,`STREAK-D{day}` 天生稳定。带时间戳的话
+    // 判重永不命中,幂等出口会退化成普通出口、自愈也补不上(补一次就多发一次)。
+    // 顺序保持「先 claim 后发钱」——那是有意的(见上方注释:claim 才是按磁盘最新态的权威判定,
+    // 反过来会在别的标签页刚领过时白发一份)。代价是发钱失败会留「已领、没到账」,
+    // 这条残迹目前**没有自动补救**,而且**按主人 2026-08-05 的拍板会一直如此**:
+    // 曾挂过的自愈已撤销(判据分不清「没发过」与「发过但账单丢了」,实测会二次发钱);
+    // 曾提案用存储层事务根治,独立证伪判定不可行。这是 mock 期的已知边界,由真后端事务收口。
+    // 发钱失败对用户是**响的**(有失败提示),不是静默吞掉。
+    if (postMoneyBillsOnce([{
+      type: "bonus",
+      symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
+      amount: m.reward.amount,
+      status: "posted",
+      memo: `Streak milestone · Day-${m.day}`,
+      ref: `STREAK-D${m.day}`,
+    }]) !== "ok") return;
   }
   // Day-30 "spin" milestone grants a bonus Lucky Spin ticket + opens the wheel.
   if (m.reward.type === "spin") {
@@ -363,8 +408,11 @@ function handleClaimMilestone(m: Milestone) {
 }
 
 function handleUseSaver() {
-  if (faucet.useSaver()) {
+  const r = faucet.useSaver();
+  if (r.ok) {
     toast.success(t.value.daily.saver.restored, "");
+  } else if (r.conflict) {
+    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
   } else {
     toast.info(t.value.daily.saver.onlyWhenBroken, "");
   }
@@ -523,7 +571,7 @@ const saverBtnStyle = computed<CSSProperties>(() => ({
   padding: "0 16px",
   borderRadius: "999px",
   background: streakBroken.value ? "var(--v5-brand-2)" : "var(--v5-surface-2)",
-  color: streakBroken.value ? "var(--v5-ink)" : "var(--v5-ink-4)",
+  color: streakBroken.value ? "var(--v5-on-brand-2)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "13px",

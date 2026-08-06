@@ -1,3 +1,4 @@
+import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useGenesis } from "@/store/genesis";
 import { useVRank } from "@/store/v-rank";
 import { useOrders } from "@/store/orders";
@@ -11,7 +12,7 @@ import { useExchange } from "@/store/exchange";
 import { useExchangeV3 } from "@/store/exchange-v3";
 import { useCards } from "@/store/cards";
 import { useNexFaucet } from "@/store/nex-faucet";
-import { useWalletPairing } from "@/store/wallet-pairing";
+import { usePayoutAddress } from "@/store/payout-address";
 import { useQuest } from "@/store/quest";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useEventQuest } from "@/store/event-quest";
@@ -30,6 +31,7 @@ import { useRewardsSeen } from "@/store/rewards-seen";
 import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
+import { useRankSnapshot } from "@/store/rank-snapshot";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -39,7 +41,7 @@ import { useNova } from "@/store/nova";
  *
  * 已收口(用户资产,随账号走):
  *  批1 钱类:创世持仓 · V 等级 · 订单 · 账单 · 入金记录/意向单 · 质押持仓 · 佣金事件
- *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(KYC/日限/终身额) · 绑卡 · 签到状态机 · 钱包配对(KYC 源头)
+ *  批2 券/试用/兑换:券包 · 试用状态机 · swap 记录 · 兑换风控计数(日限) · 绑卡 · 签到状态机 · 提现地址簿(包 E 地址直管)
  *  批3 任务/成就/游戏化:任务完成 · 周任务 · 活动任务 · 里程碑 fired · 成就 · 目标 · 幸运转盘票据 · 每日增益
  *  批4 记录/账户:通知 feed · 算力凭证 · 工单 · 购物车 · 资料 · 安全设置 · 奖励已读水位线
  *  批5 会话记录:会话中心(advisor/support) · Nova 记录 — 非持久,换号 = reset 重播种
@@ -49,6 +51,7 @@ import { useNova } from "@/store/nova";
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
+  useRiskDisclosure().bindAccount(accountKey);
   useGenesis().bindAccount(accountKey);
   useVRank().bindAccount(accountKey);
   useOrders().bindAccount(accountKey);
@@ -62,9 +65,10 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useExchangeV3().bindAccount(accountKey);
   useCards().bindAccount(accountKey);
   useNexFaucet().bindAccount(accountKey);
-  useWalletPairing().bindAccount(accountKey);
+  usePayoutAddress().bindAccount(accountKey);
   useQuest().bindAccount(accountKey);
   useWeeklyQuest().bindAccount(accountKey);
+  useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useEventQuest().bindAccount(accountKey);
   useMilestones().bindAccount(accountKey);
   useAchievements().bindAccount(accountKey);

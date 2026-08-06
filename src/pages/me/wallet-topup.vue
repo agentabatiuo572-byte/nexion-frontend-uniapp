@@ -1,210 +1,61 @@
 <!--
   WalletTopup — 充值页(PAY-规格 [FEAT-PAY01] ⑤ 信息架构,参照 pay-vn-rails.html)。
-  Two flows selected by ?kyc=1 (onLoad):
-   • Regular: 顶部 segmented 通道切换 —「USDT 链上」= <DepositUsdtPane>(三网络
-     chip + 专属地址 QR + 最近入金);「银行转账」= <DepositBankPane>(VietQR
-     意向单流,[FEAT-PAY02]);「银行卡」= <TopupCardForm> 原样接入。
-   • KYC-Express ($1 wallet-ownership verification): compliance banner +
-     phase machine select → awaiting (QR + 30min countdown + 12s auto-detect) →
-     verifying (3-step animation) → complete (pairs wallet via useWalletPairing,
-     credits $1 via useApp, writes a kyc bill, pushes nothing extra). On complete,
-     "Continue to withdrawal" → /me/wallet/withdraw.
+  顶部 segmented 通道切换 —「USDT 链上」= <DepositUsdtPane>(三网络 chip + 专属地址
+  QR + 最近入金);「银行转账」= <DepositBankPane>(VietQR 意向单流,[FEAT-PAY02]);
+  「银行卡」= <TopupCardForm> 原样接入。
+
+  2026-08-05 包 E(FEAT-KYC-RM01b):KYC-Express $1 验证流整体删除。
+  旧深链 ?kyc=1(历史消息/收藏)兜底:平滑落到充值页正常态 + 一句「该流程已下线」
+  轻提示 —— 禁 404/白屏(规格 ② 异常2)。
 
   Wrapped in <AppChassis active="me">. Header is the shared sticky <SubPageHeader>
-  (back=/pages/me/wallet). Title/subtitle dynamic: KYC-Express / Compliance check
-  in the $1 verification flow, Add funds / Top-up otherwise.
+  (back=/pages/me/wallet).
 -->
 <template>
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/wallet" :title="headerTitle" :subtitle="headerSubtitle" />
+      <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
-      <!-- ════════ KYC-Express flow ════════ -->
-      <template v-if="isKyc">
-        <text class="block mx-4 mb-2" :style="kycH1Style">KYC-Express</text>
-
-        <!-- Persistent compliance banner -->
-        <view class="mx-4 mb-3 flex items-center" :style="complianceBannerStyle">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-          <view class="flex-1 min-w-0" style="margin-left: 10px; font-size: 12px; line-height: 1.375">
-            <text style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent); font-weight: 500">{{ t.topupChrome.complianceCheck }}</text>
-            <text style="color: var(--v5-ink-3); margin-left: 6px">· Powered by Chainalysis KYT · MiCA-aligned</text>
-          </view>
+      <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
+      <view class="flex" :style="segWrapStyle">
+        <view
+          v-for="s in SEGMENTS"
+          :key="s.id"
+          :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
+          :style="segPillStyle(s.id)"
+          role="tab"
+          :aria-selected="seg === s.id"
+          @click="seg = s.id"
+        >
+          <text :style="segLabelStyle(s.id)">{{ segLabel(s.id) }}</text>
         </view>
+      </view>
 
-        <!-- select -->
-        <view v-if="kycPhase === 'select'" class="nx-step-in">
-          <!-- Verification amount — de-carded, sits on the page floor. -->
-          <view class="mx-4" :style="openBlockStyle">
-            <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.kycExpress.flow.verificationDeposit }}</text>
-            <view class="flex items-baseline" style="margin-top: 8px; gap: 8px">
-              <text class="tabular-nums" style="font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink)">$1.00</text>
-              <text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.usdtLocked }}</text>
-            </view>
-            <text class="block" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.375">{{ t.kycExpress.flow.depositCreditHint }}</text>
-          </view>
+      <!-- USDT 链上通道段 -->
+      <DepositUsdtPane v-if="seg === 'crypto'" />
 
-          <!-- Network picker — control rows keep their tint; card shell dropped. -->
-          <view class="mx-4 mt-4" style="padding: 0 2px; display: flex; flex-direction: column; gap: 4px">
-            <text class="block font-mono-tabular" :style="[metaLabelStyle, { padding: '0 0 6px' }]">{{ t.topupChrome.network }}</text>
-            <view
-              v-for="c in KYC_CHANNELS"
-              :key="c.id"
-              class="flex items-center active:opacity-90"
-              :style="networkRowStyle(network === c.id)"
-              @click="network = c.id"
-            >
-              <view class="grid place-items-center" :style="radioStyle(network === c.id)">
-                <view v-if="network === c.id" style="width: 8px; height: 8px; border-radius: 50%; background: var(--v5-brand)" />
-              </view>
-              <view class="flex-1" style="margin-left: 12px">
-                <text class="block" style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ c.label }}</text>
-                <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ t.topupChrome.fee }} {{ kycFee(c) }} · {{ chTime(c) }}</text>
-              </view>
-            </view>
-          </view>
+      <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
+      <DepositBankPane v-else-if="seg === 'bank'" />
 
-          <view class="mx-4 mt-4 mb-2">
-            <view class="nx-kyc-generate-address-cta w-full grid place-items-center active:opacity-90" :style="kycPrimaryBtnStyle" @click="kycPhase = 'awaiting'">
-              <view class="inline-flex items-center" style="gap: 8px">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-                <text>{{ t.kycExpress.flow.generateAddressCta }}</text>
-              </view>
-            </view>
-            <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">Per MiCA Art. 22 · FATF Travel Rule · US FinCEN Rule 314(b)</text>
-          </view>
-        </view>
-
-        <!-- awaiting -->
-        <view v-else-if="kycPhase === 'awaiting'" class="mx-4 nx-step-in" :style="openBlockStyle">
-          <view class="flex items-center justify-between">
-            <text class="font-mono-tabular" :style="metaLabelStyle">{{ fmt(t.topupChrome.sendOneVia, { network }) }}</text>
-            <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-3); letter-spacing: 0.06em">{{ mm }}:{{ ss }}</text>
-          </view>
-
-          <!-- QR placeholder -->
-          <view :style="qrBoxStyle">
-            <view :style="qrInnerStyle" />
-          </view>
-          <text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.scanWithWallet }}</text>
-
-          <view class="flex items-center rounded-xl" :style="addressRowStyle">
-            <text class="flex-1 font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); word-break: break-all">{{ depositAddress }}</text>
-            <view class="nx-kyc-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" @click="copyAddress">
-              <svg v-if="copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-              <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-            </view>
-          </view>
-
-          <view class="flex items-center justify-between" style="margin-top: 12px; font-size: 13px">
-            <text style="color: var(--v5-ink-3)">{{ t.topupChrome.sendExactly }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-brand)">1.00 USDT</text>
-          </view>
-
-          <view class="flex items-center rounded-xl" :style="awaitingBarStyle">
-            <view :style="miniSpinnerStyle" />
-            <text class="flex-1" style="margin-left: 8px; font-size: 13px; color: var(--v5-ink-3)">{{ t.topupChrome.awaitingOnChain }}</text>
-            <text style="font-size: 12px; color: var(--v5-ink-4)">{{ t.topupChrome.autoDetect }}</text>
-          </view>
-
-          <view class="nx-kyc-payment-sent-cta w-full grid place-items-center active:opacity-80" :style="markSentBtnStyle" @click="kycPhase = 'verifying'">
-            <text>{{ t.kycExpress.flow.paymentSentCta }}</text>
-          </view>
-
-          <text class="block" style="margin-top: 12px; font-size: 12px; color: var(--v5-ink-4); line-height: 1.4">{{ fmt(t.topupChrome.addrValidWarn, { network }) }}</text>
-        </view>
-
-        <!-- verifying -->
-        <view v-else-if="kycPhase === 'verifying'" class="mx-4 nx-step-in" :style="openBlockStyle">
-          <view class="flex items-center" style="gap: 6px; font-size: 13px; color: var(--v5-brand)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-            <text>{{ t.topupChrome.paymentReceivedFrom }} <text class="font-mono" style="color: color-mix(in srgb, var(--v5-ink) 90%, transparent)">{{ senderShort }}</text></text>
-          </view>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">1.00 USDT · {{ network }} · {{ t.topupChrome.senderWallet }}</text>
-
-          <view style="margin-top: 20px" class="space-y-3">
-            <VerifyRow :step="1" :label="t.wallet.verifyReceiving" :done="step1Done" />
-            <VerifyRow :step="2" :label="t.wallet.verifyKyt" :done="step2Done" :enabled="step1Done" />
-            <VerifyRow :step="3" :label="t.wallet.verifyPairing" :done="false" :enabled="step2Done" pending-hint="finalizing" />
-          </view>
-        </view>
-
-        <!-- complete -->
-        <view v-else class="mx-4 relative overflow-hidden nx-step-in" :style="completeCardStyle">
-          <view aria-hidden :style="completeWashStyle" />
-          <view class="relative">
-            <view :style="completeIconStyle">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335" /><path d="m9 11 3 3L22 4" /></svg>
-            </view>
-            <text class="block text-center" :style="completeTitleStyle">{{ t.kycExpress.flow.verificationComplete }}</text>
-            <text class="block text-center" style="margin-top: 4px; font-size: 13px; color: var(--v5-ink-3); line-height: 1.45">{{ t.topupChrome.walletPairedCredited }}</text>
-
-            <view style="margin-top: 16px" class="space-y-2">
-              <CompleteRow :k="t.topupChrome.kycPairedWallet" :v="senderShort" mono />
-              <CompleteRow :k="t.topupChrome.network" :v="network" />
-              <CompleteRow :k="t.topupChrome.kycComplianceId" :v="complianceId" mono accent />
-              <CompleteRow :k="t.topupChrome.kycVerifiedAt" :v="verifiedAt" />
-            </view>
-
-            <view class="nx-kyc-continue-withdraw-cta w-full flex items-center justify-center active:opacity-85" :style="completeBtnStyle" @click="goWithdraw">
-              <text>{{ t.kycExpress.flow.continueToWithdrawal }}</text>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
-            </view>
-          </view>
-        </view>
-      </template>
-
-      <!-- ════════ Regular top-up flow ════════ -->
-      <template v-else>
-        <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
-        <view class="flex" :style="segWrapStyle">
-          <view
-            v-for="s in SEGMENTS"
-            :key="s.id"
-            :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
-            :style="segPillStyle(s.id)"
-            role="tab"
-            :aria-selected="seg === s.id"
-            @click="seg = s.id"
-          >
-            <text :style="segLabelStyle(s.id)">{{ segLabel(s.id) }}</text>
-          </view>
-        </view>
-
-        <!-- USDT 链上通道段 -->
-        <DepositUsdtPane v-if="seg === 'crypto'" />
-
-        <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
-        <DepositBankPane v-else-if="seg === 'bank'" />
-
-        <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
-        <TopupCardForm v-else @change-channel="seg = 'crypto'" />
-      </template>
+      <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
+      <TopupCardForm v-else @change-channel="seg = 'crypto'" />
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
-import VerifyRow from "@/components/me/verify-row.vue";
-import CompleteRow from "@/components/me/complete-row.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
 import { useDeposits } from "@/store/deposits";
-import { useWalletPairing, mockExternalAddress } from "@/store/wallet-pairing";
-import { recordPaymentInstrument } from "@/store/risk-identity";
-import { CHAIN_DEPOSIT_FEE_USDT } from "@/store/deposits-core";
-import type { ChainDepositChannel, Withdrawal } from "@/store/types";
+import { toast } from "@/store/ui";
 
-// ── Regular flow:通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
+// ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";
 const SEGMENTS: { id: Seg }[] = [{ id: "crypto" }, { id: "bank" }, { id: "card" }];
 const seg = ref<Seg>("crypto");
@@ -215,207 +66,44 @@ function segLabel(id: Seg): string {
   return tc.segCard;
 }
 
-// ── KYC-Express 网络选择(绑定地址允许 USDT 三网络,规格 PAY04 ③)──
-interface Channel {
-  id: Withdrawal["network"];
-  label: string;
-  time: "5min" | "15min";
-}
-const KYC_CHANNELS: Channel[] = [
-  { id: "USDT-TRC20", label: "USDT (TRC20)", time: "5min" },
-  { id: "USDT-BEP20", label: "USDT (BEP20)", time: "5min" },
-  { id: "USDT-ERC20", label: "USDT (ERC20)", time: "15min" },
-];
-
-/** 费额单源 = deposits-core 通道费表("USDT-TRC20" → "usdt-trc20" 同名映射)。 */
-function kycFee(c: Channel): string {
-  return `${CHAIN_DEPOSIT_FEE_USDT[c.id.toLowerCase() as ChainDepositChannel]} USDT`;
-}
-
-function chTime(c: Channel): string {
-  const tc = t.value.topupChrome;
-  return c.time === "15min" ? tc.time15min : tc.time5min;
-}
-
-const KYC_DETECT_MS = 12_000;
-const KYC_PHASE_1_MS = 2_500;
-const KYC_PHASE_2_MS = 4_000;
-
 const t = useT();
-const app = useApp();
-const bills = useBills();
 const dep = useDeposits();
-const pairing = useWalletPairing();
 
-const isKyc = ref(false);
-
-// Header title/subtitle mirror the prototype's TopUpHeader (dynamic by flow).
-const headerTitle = computed(() => (isKyc.value ? "KYC-Express" : t.value.wallet.addFunds));
-const headerSubtitle = computed(() => (isKyc.value ? t.value.wallet.complianceCheck : t.value.wallet.topUp));
-
-function routeHasKyc(options?: Record<string, unknown>): boolean {
+// ── 旧验证流深链兜底(规格 RM01b ② 异常2:落正常态 + 轻提示,禁 404/白屏)──
+const retiredNoticeShown = ref(false);
+function hasLegacyKycParam(options?: Record<string, unknown>): boolean {
   if (options?.kyc === "1") return true;
   // H5 can keep the same page instance when only the hash query changes.
   if (typeof window === "undefined") return false;
   const [, query = ""] = window.location.hash.split("?");
   return new URLSearchParams(query).get("kyc") === "1";
 }
-function syncKycRoute(options?: Record<string, unknown>) {
-  isKyc.value = routeHasKyc(options);
+function noticeIfLegacyRoute(options?: Record<string, unknown>) {
+  if (retiredNoticeShown.value || !hasLegacyKycParam(options)) return;
+  retiredNoticeShown.value = true;
+  toast.info(t.value.topupChrome.flowRetired);
 }
-onLoad((options) => {
-  syncKycRoute(options as Record<string, unknown> | undefined);
-});
-
-// ── KYC flow state ──
-type KycPhase = "select" | "awaiting" | "verifying" | "complete";
-const kycPhase = ref<KycPhase>("select");
-const network = ref<Withdrawal["network"]>("USDT-TRC20");
-const copied = ref(false);
-
-const depositAddress = computed(() =>
-  network.value === "USDT-TRC20"
-    ? "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t"
-    : "0x4f7a2c8e9b1d3f5a6c8e0b2d4f6a8c0e21abcdef",
-);
-// Mock "user's external wallet" — what we'd see arriving on-chain (stable per phase).
-const senderAddress = ref(mockExternalAddress("USDT-TRC20"));
-const senderShort = computed(() => `${senderAddress.value.slice(0, 6)}…${senderAddress.value.slice(-4)}`);
-const complianceId = computed(() => pairing.complianceCheckId ?? "KYC-PENDING");
-const verifiedAt = new Date().toISOString().slice(0, 19).replace("T", " ");
-
-function copyAddress() {
-  uni.setClipboardData({
-    data: depositAddress.value,
-    showToast: false, // 系统 toast 恒中文,关掉(与 deposit-usdt-pane 同款收敛)
-    success: () => {
-      uni.hideToast();
-      copied.value = true;
-      setTimeout(() => (copied.value = false), 1500);
-    },
-    fail: () => {},
-  });
-}
-
-// ── 30-min countdown (awaiting) ──
-const secLeft = ref(30 * 60);
-const mm = computed(() => String(Math.floor(secLeft.value / 60)).padStart(2, "0"));
-const ss = computed(() => String(secLeft.value % 60).padStart(2, "0"));
-let countdownTimer: ReturnType<typeof setInterval> | undefined;
-let detectTimer: ReturnType<typeof setTimeout> | undefined;
-let verifyTimer: ReturnType<typeof setTimeout> | undefined;
-let step1Timer: ReturnType<typeof setTimeout> | undefined;
-let step2Timer: ReturnType<typeof setTimeout> | undefined;
 let hashRouteListener: (() => void) | undefined;
-
-const step1Done = ref(false);
-const step2Done = ref(false);
-
+onLoad((options) => {
+  noticeIfLegacyRoute(options as Record<string, unknown> | undefined);
+});
 onMounted(() => {
-  syncKycRoute();
+  noticeIfLegacyRoute();
   if (typeof window !== "undefined") {
-    hashRouteListener = () => syncKycRoute();
+    hashRouteListener = () => noticeIfLegacyRoute();
     window.addEventListener("hashchange", hashRouteListener);
   }
-  countdownTimer = setInterval(() => {
-    secLeft.value = Math.max(0, secLeft.value - 1);
-  }, 1000);
 });
 onUnmounted(() => {
   if (hashRouteListener && typeof window !== "undefined") window.removeEventListener("hashchange", hashRouteListener);
-  if (countdownTimer) clearInterval(countdownTimer);
-  if (detectTimer) clearTimeout(detectTimer);
-  if (verifyTimer) clearTimeout(verifyTimer);
-  if (step1Timer) clearTimeout(step1Timer);
-  if (step2Timer) clearTimeout(step2Timer);
 });
-
-// awaiting → auto-detect after KYC_DETECT_MS → verifying
-function startAwaitingDetect() {
-  if (detectTimer) clearTimeout(detectTimer);
-  detectTimer = setTimeout(() => {
-    kycPhase.value = "verifying";
-  }, KYC_DETECT_MS);
-}
-// verifying → run 3-step animation + commit pairing/credit/bill → complete
-function startVerifying() {
-  step1Done.value = false;
-  step2Done.value = false;
-  step1Timer = setTimeout(() => (step1Done.value = true), KYC_PHASE_1_MS);
-  step2Timer = setTimeout(() => (step2Done.value = true), KYC_PHASE_1_MS + KYC_PHASE_2_MS);
-  verifyTimer = setTimeout(() => {
-    pairing.complete({ address: senderAddress.value, network: network.value });
-    // SPEC-7 §6: 绑定支付工具时登记风险身份维度(K1 聚簇的中维输入)。
-    recordPaymentInstrument(app.accountKey, `${network.value}:${senderAddress.value}`);
-    app.creditBalance(1);
-    // ⚠️ Round 12 P0 fix: write the KYC-Express $1 compliance-bonus bill.
-    bills.add({
-      type: "kyc",
-      symbol: "USDT",
-      amount: 1,
-      status: "posted",
-      memo: "KYC-Express compliance bonus",
-      ref: `KYC-${pairing.complianceCheckId ?? "PENDING"}`,
-    });
-    kycPhase.value = "complete";
-  }, KYC_PHASE_1_MS + KYC_PHASE_2_MS + 800);
-}
-
-// Watch phase transitions (replaces the source's per-phase mount effects).
-watch(kycPhase, (p, prev) => {
-  if (p === "awaiting") {
-    secLeft.value = 30 * 60;
-    senderAddress.value = mockExternalAddress(network.value);
-    startAwaitingDetect();
-  }
-  if (p === "verifying" && prev !== "verifying") startVerifying();
-});
-
-function goWithdraw() {
-  uni.reLaunch({ url: "/pages/me/wallet-withdraw", fail: () => {} });
-}
 
 // ── styles ──
-const kycH1Style: CSSProperties = {
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "20px",
-  letterSpacing: "-0.018em",
-  color: "var(--v5-ink)",
-  lineHeight: 1.25,
-};
-const complianceBannerStyle: CSSProperties = {
-  background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
-  // Prototype: border-[var(--v5-brand-2)]/30 (30%), not the 45% *-border token.
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
-  borderRadius: "16px",
-  padding: "12px 16px",
-};
-// De-carded step container — content sits on the page floor, 2px optical inset.
-// Header breathing is global (SubPageHeader margin), so no top padding here.
-const openBlockStyle: CSSProperties = {
-  padding: "0 2px",
-};
-const metaLabelStyle: CSSProperties = {
-  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
-  fontSize: "12px",
-  fontWeight: 500,
-  color: "var(--v5-ink-3)",
-  letterSpacing: "0.06em",
-};
-// Radio control rows on the page floor — soft tint marks the active one.
-function networkRowStyle(active: boolean): CSSProperties {
-  return {
-    padding: "12px 10px",
-    margin: "0 -10px",
-    borderRadius: "12px",
-    background: active ? "color-mix(in srgb, var(--v5-brand) 6%, transparent)" : "transparent",
-  };
-}
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
 const segWrapStyle: CSSProperties = {
   margin: "0 16px 16px",
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
   borderRadius: "16px",
   padding: "4px",
   gap: "2px",
@@ -437,124 +125,4 @@ function segLabelStyle(id: Seg): CSSProperties {
     color: seg.value === id ? "var(--v5-on-brand)" : "var(--v5-ink-3)",
   };
 }
-function radioStyle(active: boolean): CSSProperties {
-  return {
-    width: "20px",
-    height: "20px",
-    borderRadius: "50%",
-    border: `2px solid ${active ? "var(--v5-brand)" : "var(--v5-border)"}`,
-    background: active ? "color-mix(in srgb, var(--v5-brand) 20%, transparent)" : "transparent",
-  };
-}
-// on-brand-2: near-black on the warm-orange fill — white/ink fails AA in dark.
-const kycPrimaryBtnStyle: CSSProperties = {
-  height: "48px",
-  borderRadius: "999px",
-  background: "var(--v5-brand-2)",
-  color: "var(--v5-on-brand-2)",
-  fontFamily: "var(--font-v5)",
-  fontSize: "15px",
-  fontWeight: 600,
-};
-const qrBoxStyle: CSSProperties = {
-  width: "160px",
-  height: "160px",
-  margin: "16px auto 0",
-  borderRadius: "16px",
-  background: "#ffffff",
-  padding: "8px",
-  display: "grid",
-  placeItems: "center",
-};
-const qrInnerStyle: CSSProperties = {
-  width: "100%",
-  height: "100%",
-  borderRadius: "8px",
-  backgroundImage:
-    "radial-gradient(circle, rgba(0,0,0,0.85) 25%, #fff 25%, #fff 50%, rgba(0,0,0,0.85) 50%, rgba(0,0,0,0.85) 75%, #fff 75%)",
-  backgroundSize: "12px 12px",
-};
-// On the de-carded page floor the address row reads as an input — one step
-// above the bg, copy button one step above the row.
-const addressRowStyle: CSSProperties = {
-  marginTop: "16px",
-  padding: "12px",
-  gap: "8px",
-  background: "var(--v5-surface-2)",
-};
-const copyBtnStyle: CSSProperties = {
-  width: "36px",
-  height: "36px",
-  borderRadius: "8px",
-  background: "var(--v5-surface-3)",
-};
-const awaitingBarStyle: CSSProperties = {
-  marginTop: "16px",
-  padding: "12px",
-  background: "color-mix(in srgb, var(--v5-brand-2) 8%, transparent)",
-  // Prototype: border-[var(--v5-brand-2)]/25 (25%), not the 45% *-border token.
-  border: "1px solid color-mix(in srgb, var(--v5-brand-2) 25%, transparent)",
-};
-const markSentBtnStyle: CSSProperties = {
-  marginTop: "12px",
-  height: "40px",
-  borderRadius: "999px",
-  background: "var(--v5-surface-2)",
-  color: "var(--v5-ink-2)",
-  fontSize: "13px",
-};
-const miniSpinnerStyle: CSSProperties = {
-  width: "16px",
-  height: "16px",
-  borderRadius: "50%",
-  border: "2px solid color-mix(in srgb, var(--v5-brand-2) 30%, transparent)",
-  borderTopColor: "var(--v5-brand-2)",
-  animation: "spin 1s linear infinite",
-  flexShrink: 0,
-};
-// Completion spotlight keeps its surface; accent border → neutral (big-card rule),
-// the success mood lives in the wash + icon instead.
-const completeCardStyle: CSSProperties = {
-  padding: "20px",
-  borderRadius: "16px",
-  background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
-};
-const completeWashStyle: CSSProperties = {
-  position: "absolute",
-  inset: "-20%",
-  background: "radial-gradient(40% 50% at 50% 0%, var(--v5-success-soft) 0%, transparent 60%)",
-  filter: "blur(8px)",
-  pointerEvents: "none",
-  opacity: 0.85,
-};
-const completeIconStyle: CSSProperties = {
-  width: "56px",
-  height: "56px",
-  margin: "0 auto",
-  borderRadius: "50%",
-  background: "var(--v5-success-soft)",
-  display: "grid",
-  placeItems: "center",
-};
-const completeTitleStyle: CSSProperties = {
-  marginTop: "14px",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 600,
-  fontSize: "15px",
-  letterSpacing: "-0.014em",
-  color: "var(--v5-ink)",
-};
-const completeBtnStyle: CSSProperties = {
-  marginTop: "20px",
-  height: "44px",
-  borderRadius: "999px",
-  background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
-  color: "var(--v5-on-brand)",
-  fontFamily: "var(--font-v5)",
-  fontWeight: 500,
-  fontSize: "13px",
-  letterSpacing: "-0.005em",
-};
 </script>

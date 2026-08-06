@@ -11,7 +11,7 @@
     :data-online="isOnline ? 'true' : 'false'"
     role="button"
     tabindex="0"
-    :aria-label="`${t.earn.deviceDetailTitle}: ${device.name} · ${isOnline ? t.earn.online : t.earn.offline}`"
+    :aria-label="`${t.earn.deviceDetailTitle}: ${displayName} · ${isOnline ? t.earn.online : t.earn.offline}`"
     @click="go"
     @keydown.enter.prevent="go"
     @keydown.space.prevent="go"
@@ -29,10 +29,13 @@ import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
 import { navTo } from "@/lib/route";
 import { isDeviceOnline } from "@/lib/hashpower";
+import { deviceName } from "@/lib/device-copy";
 import type { Device } from "@/store/types";
 
 const props = defineProps<{ device: Device }>();
 const t = useT();
+// Stored device name is English + persisted → resolve from `kind` at render.
+const displayName = computed(() => deviceName(t.value, props.device));
 
 const isOnline = computed(() => isDeviceOnline(props.device, Date.now()));
 const iconColor = computed(() => (isOnline.value ? "var(--v5-brand)" : "var(--v5-ink-3)"));
@@ -40,7 +43,7 @@ const bayStyle = computed(() => ({
   width: "48px",
   height: "48px",
   borderRadius: "14px",
-  background: isOnline.value ? "var(--v5-brand-soft)" : "var(--v5-surface-2)",
+  background: isOnline.value ? "var(--v5-brand-soft)" : "var(--v5-surface)", // 离线槽位贴页面底:原 surface-2 与页面底同色不可辨,改 L1
 }));
 const iconKind = computed(() => {
   const k = props.device.kind;

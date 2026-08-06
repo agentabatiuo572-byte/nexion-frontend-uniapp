@@ -10,32 +10,22 @@ import { ref } from "vue";
 export interface TrialConfig {
   /** Free trial duration in days (shadow accrues during this window) */
   trialDays: number;
-  /** Grace window after trial — shadow frozen, conversion pushes continue */
+  /** Grace window after trial — production stopped, credit stays usable (spec ③) */
   graceDays: number;
-  /** Extension granted to "high-quality" users at grace expiry */
-  extensionDays: number;
-  /** Active-purchase discount rate (applies during trial + grace + extension) */
+  /** Active-purchase discount rate (applies during trial + grace) */
   discountRate: number;
   /** Active-purchase discount hard cap, USD */
   discountCapUSD: number;
   /** Trial-earnings offset cap, USD (offsets device price at purchase; remainder
    *  credited to balance AFTER purchase; before purchase only offsets). 后台可调。 */
   trialOffsetCapUSD: number;
-  /** Auto-charge full price at end of grace + extension */
-  autoChargeAtEnd: boolean;
-  /** High-quality user threshold: shadow USD accrued (any time) */
-  highQualityThresholdUSD: number;
-  /** Mock charge failure rate (0..1) for demoing the failed-charge path */
-  chargeFailRate: number;
   /** Trial product id (currently only S1 supported) */
   trialProductId: "stellarbox-s1";
-  /** Trial product price (auto-charge target) */
+  /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
   /** Shadow accrual rates (S1 baseline per spec §3.1) */
   shadowDailyUSD: number;
   shadowDailyNEX: number;
-  /** Cooldown days between trial attempts (per account) */
-  cooldownDays: number;
   /** Whether trial is open in the current product phase */
   phaseOpen: boolean;
   // ── Auto-push controls (claim sheet 弹出策略,后台可控)──
@@ -48,18 +38,13 @@ export interface TrialConfig {
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
   trialDays: 3,
   graceDays: 7,
-  extensionDays: 3,
   discountRate: 0.15,
   discountCapUSD: 20,
   trialOffsetCapUSD: 50,
-  autoChargeAtEnd: true,
-  highQualityThresholdUSD: 100,
-  chargeFailRate: 0.01,
   trialProductId: "stellarbox-s1",
   trialPriceUSD: 649,
   shadowDailyUSD: 7,
   shadowDailyNEX: 40,
-  cooldownDays: 30,
   phaseOpen: true,
   autoPushEnabled: true,
   autoPushDelayMs: 1500,
@@ -104,7 +89,7 @@ export const useTrialConfig = defineStore("trialConfig", () => {
   return { config, update, reset };
 });
 
-/** Compute discounted price for a manual redeem during trial/grace/extension. */
+/** Compute discounted price for a conversion purchase during trial/grace. */
 export function computeDiscountedPrice(config: TrialConfig): {
   subtotal: number;
   discount: number;
@@ -117,9 +102,9 @@ export function computeDiscountedPrice(config: TrialConfig): {
 
 /**
  * Split accrued trial earnings into price-offset portion (capped) + post-purchase
- * balance remainder. Single source of truth shared by BOTH conversion paths
- * (early-redeem + auto-charge) so the two never diverge.
- * Real backend: server computes this in POST /api/trial/charge / redeem-early.
+ * balance remainder. Single source of truth shared by every surface that quotes
+ * the credit (trial page + checkout conversion) so they never diverge.
+ * Real backend: server computes this inside POST /api/trial/convert (PRD §9.11a.2).
  */
 export function computeTrialOffset(
   config: TrialConfig,

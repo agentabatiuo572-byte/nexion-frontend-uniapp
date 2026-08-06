@@ -134,8 +134,12 @@ const footerNextText = computed(() =>
 const footerAllText = computed(() => fmt(w.value.footerAll, { n: activatedCount.value }));
 
 function handleClaim(p: PowerUp) {
-  if (powerUp.claim(p.id)) {
+  const r = powerUp.claim(p.id);
+  if (r.ok) {
     toast.success(fmt(w.value.toastTitle, { name: w.value[`${p.key}_label`] }), w.value.toastBody);
+  } else if (r.conflict) {
+    // 这一档增益在别处已经激活过,store 已把最新领取态刷回来 —— 说清楚,别让用户点了没反应。
+    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
   }
   // Route into the deeper linked touchpoint (no-op if not yet ported).
   uni.navigateTo({ url: p.href, fail: () => {} });

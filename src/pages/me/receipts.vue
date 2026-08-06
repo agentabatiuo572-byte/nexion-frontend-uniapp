@@ -200,14 +200,15 @@ function shortDate(ts: number): string {
 const tabsRowStyle: CSSProperties = { margin: "0 16px 12px", gap: "8px" };
 function tabPillStyle(c: Tab): CSSProperties {
   const on = tab.value === c;
-  // Filter chip — filled tint (active) vs surface-2 (idle), no border: the fill
+  // Filter chip — filled tint (active) vs L1 surface (idle), no border: the fill
   // + text color is the single visual difference (V5 chip idiom).
   return {
     height: "44px",
     padding: "0 16px",
     borderRadius: "999px",
     gap: "4px",
-    background: on ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface-2)",
+    // 未选中原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),胶囊直接坐在页面底上 → 改 L1
+    background: on ? "color-mix(in srgb, var(--v5-brand) 15%, transparent)" : "var(--v5-surface)",
   };
 }
 function tabLabelStyle(c: Tab): CSSProperties {

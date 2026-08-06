@@ -4,16 +4,12 @@ import { useApp } from "@/store/app";
 import {
   useFreeTrial,
   liveShadowUSD,
-  liveShadowNEX,
   remainingMs,
-  isHighQualityEligible,
-  computeTrialOffset,
   trialReservesSlotNow,
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
-import { useTrialExtensionSheet } from "@/store/trial-extension-sheet";
 import { useBills } from "@/store/bills";
-import { MAX_DEVICES } from "@/store/device-types";
+import { postMoneyBill, postMoneyBillsOnce, postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -48,17 +44,123 @@ function stopTick() {
   }
 }
 
-// ── Trial state-machine poll (ports SimulationProvider's TRIAL_TICK loop) ──
-// uni's trial.vue only ticks `now` for display; nothing advanced the free-trial
-// machine (active→grace→redeemed/failed/cancelled), so this is the sole driver.
-// Runs at the App (component) layer so the terminal auto-redeem side effects can
-// compose multiple stores (debit + device spawn + bills) — stores never import
-// each other (P-031/032). Mirrors the prototype's TRIAL_TICK_MS = 4000.
+// ── 提现到账推进轮询(FEAT-WD01b)──
+// 追踪页只展示、不推进(SPEC-7),所以「用户点进追踪页发现已到账」这条路径要靠这个
+// 定时器兜住 —— 5s 一次:一次调用就是一个纯函数判定 + 一次 null 判断,开销可忽略,
+// 但用户不会盯着「处理中」干等半分钟。真正的离线缺口补齐发生在 onShow 那一下。
+// PROD: 整块删掉,状态改由 SSE/webhook 推。
+const ARRIVAL_TICK_MS = 5_000;
+let arrivalTimer: ReturnType<typeof setInterval> | undefined;
+
+/**
+ * 到账推进 + 账单结算。两件事必须一起做:
+ * 单据推到「已到账」而账单行还停在「处理中」的话,追踪页说到账了、账单页说处理中,
+ * 同一笔钱两个说法;而且账单页的流水余额只累加已入账的行,这笔提现永远不进流水。
+ * store 之间不互相 import(P-031),所以这个跨 store 编排放在 App 层。
+ */
+function advanceArrivalAndSettleBill() {
+  const app = useApp();
+  // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
+  // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
+  const advanced = app.advanceWithdrawalArrival();
+  if (advanced.length) {
+    const bills = useBills();
+    for (const ref of advanced) bills.settleByRef(ref, "posted");
+  }
+  // 结算失败的那几笔不靠「记在内存里下次重试」找回来 —— 见 reconcileBills 的注释。
+  reconcileBills();
+}
+
+/**
+ * 🔴 对账:把「已到账的单据」和「还停在处理中的账单行」拉齐。
+ *
+ * 这里原本是一个模块级的 `pendingBillSettle` Set:结算失败就记下来、下一轮重试。
+ * 问题是它**只在内存里**——用户刷新一次页面 / 关掉 App 重开,这个 Set 就没了,
+ * 而到账推进本身是幂等的(推过的单不会再出现在返回数组里),于是那笔单**永远不会再被结算**:
+ * 追踪页说「已到账」、账单页说「处理中」,正是注释自称要防的永久裂脑,防御却只覆盖同一个页面生命周期。
+ *
+ * 根治不是把那个 Set 持久化,而是**别记**:该做什么完全可以从现有数据推出来 ——
+ * 单据是终态、账单行还没跟上,就是待办。这样刷新、换设备、隔一周回来都能自愈,零额外存储。
+ */
+function reconcileBills() {
+  const app = useApp();
+  const bills = useBills();
+  // ① 已到账 → 账单入账
+  for (const wd of app.withdrawals) {
+    if (wd.status !== "confirmed") continue;
+    const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
+    if (row && row.status !== "posted") bills.settleByRef(wd.id, "posted");
+  }
+  // ② 失败终态 → **先退款再置账单失败**,两件事必须成对。
+  //    提现在提交那一刻就扣了款,「单子废了但钱没还」是最伤的一种不一致。
+  for (const id of app.refundFailedWithdrawals()) bills.settleByRef(id, "failed");
+  //    退款幂等,但账单可能上一轮没落盘成功 → 这里补一次(与①同样的自愈思路)
+  for (const wd of app.withdrawals) {
+    if (!["review-rejected", "address-invalid", "tx-failed", "refunded"].includes(wd.status)) continue;
+    const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
+    if (row && row.status !== "failed") bills.settleByRef(wd.id, "failed");
+  }
+  // ②b NEX 抵扣费退还 → 补一条**正向反向分录**(2026-08-04 R2 P1-A)。
+  //    退款只动了余额:钱包里 NEX 回来了,账单里那条「−N NEX(已入账)」却还孤零零挂着 ——
+  //    按账单对账的用户会少算自己的 NEX。改写那条行不是解法(烧确实发生过,改写 = 账本说没烧),
+  //    复式账本的规矩是**冲正靠反向分录**:同单号补一条 +N NEX,两行相抵 = 钱包净变化。
+  //    🔴 判据取自账本自己(退款幂等键已落盘),不是「单据是失败终态」—— 钱还没真退就记账,
+  //    等于账单抢在余额前面宣布退款,方向反了同样是裂脑。存在性判据 = 同单号的正向 NEX 行,
+  //    没有才补,故刷新 / 换设备 / 上一轮写盘失败都能自愈(与 ① 同一套思路)。
+  for (const wd of app.withdrawals) {
+    const burned = wd.fee?.nexBurned;
+    if (!(typeof burned === "number" && burned > 0)) continue;
+    if (!app.user.appliedRewardKeys?.["refund-nex:" + wd.id]) continue;
+    if (bills.bills.some((b) => b.ref === wd.id && b.symbol === "NEX" && b.amount > 0)) continue;
+    // 🔴 补记,**不是**动钱:NEX 已由 refundFailedWithdrawals 退回钱包(幂等键就在上一行的判据里),
+    // 这里只补它缺的那条分录。改成 postMoneyBill 会照着 +burned 再发一次 NEX = 退款翻倍。
+    postReceiptOnly({
+      type: "withdraw",
+      symbol: "NEX",
+      amount: burned,
+      status: "posted",
+      // memoKey = 渲染时才翻译(切语言不留旧语);memo 只作兜底,与 bills.ts 的约定一致。
+      memo: `Fee offset refunded · ${Number.isInteger(burned) ? burned : burned.toFixed(1)} NEX returned`,
+      memoKey: "withdrawNexRefund",
+      memoParams: { nex: Number.isInteger(burned) ? String(burned) : burned.toFixed(1) },
+      ref: wd.id,
+    });
+  }
+  // ③ 赠金:锁定 / 待审桶都空了 = 没有还锁着的赠金,那笔「处理中」的赠金账单该入账了。
+  //    释放走 applyReleaseOutcome,它只动桶和余额、**不写账单**,
+  //    于是账单里那行 +$5 会永远停在「处理中」。这里从数据推出它已经落地。
+  const b = app.user.earningBuckets;
+  if (b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0) {
+    for (const row of bills.bills) {
+      if (row.type === "bonus" && row.status === "pending" && row.ref) bills.settleByRef(row.ref, "posted");
+    }
+  }
+}
+
+function startArrivalPoll() {
+  stopArrivalPoll();
+  arrivalTimer = setInterval(() => {
+    if (!ensureBusinessLoopsAllowed()) return;
+    advanceArrivalAndSettleBill();
+  }, ARRIVAL_TICK_MS);
+}
+function stopArrivalPoll() {
+  if (arrivalTimer) {
+    clearInterval(arrivalTimer);
+    arrivalTimer = undefined;
+  }
+}
+
+// ── Trial state-machine poll (FEAT-TRIAL02 cardless machine) ──
+// The 4s poll only advances the lifecycle (active→grace→ended) and surfaces
+// toasts/urgency pushes. Spec ④ 禁止动作: NO auto-charge, NO auto-order — the
+// grace→ended flip touches state only; conversion money + the order live in
+// the checkout page (user-confirmed). Mirrors TRIAL_TICK_MS = 4000.
 const TRIAL_TICK_MS = 4000;
 const URGENCY_24H_MS = 24 * 3_600_000;
 const URGENCY_1H_MS = 60 * 60_000;
 // Session-scoped fire flags so urgency toasts don't spam every poll.
-const urgencyFired = { active24h: false, grace1h: false };
+const urgencyFired = { active24h: false, grace24h: false, grace1h: false };
 let trialTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollTrial() {
@@ -66,49 +168,30 @@ function pollTrial() {
   const freeTrial = useFreeTrial();
   const before = freeTrial.status;
   const nowMs = Date.now();
-  // Snapshot accrued shadow BEFORE poll potentially advances status to
-  // `redeemed` (which keeps the frozen value); on conversion these accrued
-  // earnings merge into the spendable balance.
-  const shadowUSDBeforeRedeem = liveShadowUSD(nowMs);
-  const shadowNEXBeforeRedeem = liveShadowNEX(nowMs);
   freeTrial.poll(nowMs);
   const after = freeTrial.status;
   const t = useT().value;
 
   if (before !== after) {
-    if (after === "redeemed") {
-      handleAutoRedeem(shadowUSDBeforeRedeem, shadowNEXBeforeRedeem);
-    } else if (after === "failed") {
-      toast.error(t.trial.toastAutoDebitFailed);
-    } else if (after === "cancelled") {
-      toast.info(t.trial.toastCancelled);
-    } else if (after === "grace") {
-      toast.info(t.trial.toastGraceStarted);
+    if (after === "grace") {
+      // Production stopped; the credit stays usable until graceEndsAt — always
+      // hand the user the exact time + next step (spec ④).
+      const until = freeTrial.graceEndsAt !== null ? new Date(freeTrial.graceEndsAt).toLocaleString() : "";
+      toast.info(fmt(t.trial.graceStartToast, { time: until }));
+      urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;
+    } else if (after === "ended") {
+      toast.info(t.trial.endedToast);
     } else if (after === "active") {
       urgencyFired.active24h = false;
+      urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;
     }
   }
 
-  // ── MVP-D: high-quality extension sheet trigger ──
-  // free-trial.poll() returns early (does NOT charge) when the grace boundary is
-  // reached while the user is high-quality (shadow ≥ threshold) and the offer
-  // hasn't been resolved. Surface the extension sheet once in that window.
-  const st = useFreeTrial();
-  if (
-    st.status === "grace" &&
-    !st.extensionGranted &&
-    isHighQualityEligible() &&
-    st.graceEndsAt !== null &&
-    nowMs >= st.graceEndsAt
-  ) {
-    const sheet = useTrialExtensionSheet();
-    if (!sheet.open) sheet.show();
-  }
-
-  // ── Urgency pushes — 24h left in active / 1h left in grace ──
-  if (st.status === "active" && st.activeEndsAt !== null) {
+  // ── Urgency pushes — active: 24h left; grace: credit expiring in 24h / 1h ──
+  const st = freeTrial;
+  if (st.status === "active" && st.expiresAt !== null) {
     const left = remainingMs(nowMs);
     if (!urgencyFired.active24h && left > 0 && left <= URGENCY_24H_MS) {
       urgencyFired.active24h = true;
@@ -116,87 +199,19 @@ function pollTrial() {
     }
   } else if (st.status === "grace" && st.graceEndsAt !== null) {
     const left = remainingMs(nowMs);
+    const credit = liveShadowUSD(nowMs).toFixed(2);
     if (!urgencyFired.grace1h && left > 0 && left <= URGENCY_1H_MS) {
       urgencyFired.grace1h = true;
-      toast.warn(t.trial.urgency1h);
+      urgencyFired.grace24h = true; // don't double-push inside the last hour
+      toast.warn(fmt(t.trial.urgencyGrace1h, { amount: credit }));
+    } else if (!urgencyFired.grace24h && left > 0 && left <= URGENCY_24H_MS) {
+      urgencyFired.grace24h = true;
+      toast.warn(fmt(t.trial.urgencyGrace24h, { amount: credit }));
     }
   } else {
     urgencyFired.active24h = false;
+    urgencyFired.grace24h = false;
     urgencyFired.grace1h = false;
-  }
-}
-
-// Terminal auto-redeem side effects (cross-store, composed at App layer).
-// Mirrors SimulationProvider's `after === "redeemed"` branch: auto-charge full
-// price minus the capped trial-earnings offset, write the purchase bill, credit
-// the earnings remainder + NEX, then spawn + activate the device. Maps to the
-// server cron POST /api/trial/charge (atomic) in production.
-function handleAutoRedeem(shadowUSDBeforeRedeem: number, shadowNEXBeforeRedeem: number) {
-  const app = useApp();
-  const bills = useBills();
-  const freeTrial = useFreeTrial();
-  const cfg = useTrialConfig().config;
-  const t = useT().value;
-
-  const { offsetUSD, remainderUSD } = computeTrialOffset(cfg, shadowUSDBeforeRedeem);
-  const chargeAmount = +Math.max(0, cfg.trialPriceUSD - offsetUSD).toFixed(2);
-  const debitOk = app.debitBalance(chargeAmount);
-  if (!debitOk) {
-    // Insufficient bound-card balance — flip to failed (keeps finishedAt so the
-    // cooldown clock starts; never reset() which would bypass cooldown).
-    freeTrial.markChargeFailed("insufficient_funds");
-    toast.error(t.trial.toastAutoDebitFailed);
-    return;
-  }
-  const purchaseRef = `TRIAL-${Date.now().toString(36).toUpperCase()}`;
-  bills.add({
-    type: "purchase",
-    symbol: "USDT",
-    amount: -chargeAmount,
-    status: "posted",
-    memo: `Trial converted · NexGridBox S1 (auto-charge, earnings -$${offsetUSD})`,
-    ref: purchaseRef,
-  });
-  if (remainderUSD > 0) {
-    app.creditBalance(remainderUSD);
-    bills.add({
-      type: "bonus",
-      symbol: "USDT",
-      amount: remainderUSD,
-      status: "posted",
-      memo: "Trial earnings remainder → balance · NexGridBox S1",
-      ref: `${purchaseRef}-EARN-USDT`,
-    });
-  }
-  if (shadowNEXBeforeRedeem > 0) {
-    app.creditNex(shadowNEXBeforeRedeem);
-    bills.add({
-      type: "bonus",
-      symbol: "NEX",
-      amount: shadowNEXBeforeRedeem,
-      status: "posted",
-      memo: "Trial earnings → balance · NEX",
-      ref: `${purchaseRef}-EARN-NEX`,
-    });
-  }
-  const beforeDevices = app.devices.length;
-  // 实付 = 促销价 − 收益抵扣;作为该设备日后置换抵扣的基数(FEAT-DEV02)。
-  app.addDevice(cfg.trialProductId, { paidPriceUsdt: chargeAmount });
-  const deviceAdded = app.devices.length > beforeDevices;
-  const newId = deviceAdded ? app.devices[app.devices.length - 1]?.id : null;
-  if (newId && app.activeSlotCount < MAX_DEVICES) {
-    app.activateDevice(newId);
-  }
-  const note =
-    shadowUSDBeforeRedeem <= 0
-      ? ""
-      : remainderUSD > 0
-        ? fmt(t.trial.toastConvertedNoteRemainder, { remainder: remainderUSD.toFixed(2) })
-        : t.trial.toastConvertedNoteOffset;
-  if (deviceAdded) {
-    toast.success(fmt(t.trial.toastConverted, { note }));
-  } else {
-    toast.warn(t.trial.toastConvertedNoDevice, t.trial.toastConvertedNoDeviceSub);
   }
 }
 
@@ -241,9 +256,12 @@ function stopOrderPoll() {
 // ── Earnings-milestone 4s poll (ports milestone-watcher.tsx) ──
 // Reads life-to-date earnings each tick; when it crosses the next unfired
 // threshold, fires exactly once: mark (idempotent guard) → credit NEX → write
-// the bonus bill → open the celebration overlay. The overlay (mounted in
-// global-ui.vue) owns its own confetti + 5.2s auto-dismiss; App.vue only calls
-// show(). nextUnfired returns the lowest unfired step (one at a time, original
+// the bonus bill → queue the celebration (store.show() enqueues; the overlay
+// host promotes via advance(), which suspends UI on money-flow routes —
+// checkout / withdraw / trial — and replays each queued tier afterwards).
+// 🔴 奖励/记账必须留在这里无条件执行,不许接路由门 / stopMilestonePoll:那会变成
+// 「钱链路期间不发奖励」而非「不弹窗」。UI 挂起只住在 store.advance()。
+// nextUnfired returns the lowest unfired step (one at a time, original
 // "fire one per tick" semantics) so the next poll surfaces the next tier.
 // Production: GET /api/config/milestones + atomic POST /api/me/milestones/:id/claim
 // (PRD §9.11e). Cross-store composition stays here (stores import-free).
@@ -259,17 +277,20 @@ function pollMilestones() {
   const lifeToDate = (app.earnings.total ?? 0) + (app.earnings.today ?? 0);
   const step = nextUnfired(lifeToDate, m.firedIds);
   if (!step) return;
-  // Mark first so a slow credit/bill never re-enters the same step next tick.
-  m.markFired(step.id);
-  app.creditNex(step.nexReward);
-  useBills().add({
+  // 收据即指令:+NEX 由这一条落定,不再单独 creditNex(那样钱和账各走各的路)。
+  // 🔴 markFired 从「先标记」挪到落盘成功之后。先标记原本是防同一级被下一 tick 重入,
+  // 但发奖这条链自始至终同步,轮询之间插不进第二次;而「标了 + 没落盘」= 里程碑记成已发、
+  // 钱和账单都没有,用户永久少一级奖励。失败就停在未标记态,下一 tick 自愈重试
+  // (与 reconcileBills 同一套「该做什么从数据推出来」的思路)。
+  if (postMoneyBill({
     type: "achievement",
     symbol: "NEX",
     amount: step.nexReward,
     status: "posted",
     memo: `Earnings milestone · $${step.thresholdUSD}`,
     ref: `MILESTONE-${step.id}`,
-  });
+  }) !== "ok") return;
+  m.markFired(step.id);
   // Drive the global celebration overlay (label lets it resolve i18n copy).
   m.show({
     id: step.id,
@@ -465,6 +486,17 @@ function scheduleAccountSessionBootstrap(attempt = 0) {
   bootstrapAccountSession();
 }
 
+/** 路由任务的 memo 任务名 —— 显式映射不做动态 key 拼接:三个 id 是穷举的,
+ *  动态拼 `t_${id}` 会在任务表增删时静默拿到 undefined,而 memo 是要落进账本的。 */
+const QUEST_ROUTE_MEMO_TASK: Record<QuestTaskId, (t: ReturnType<typeof useT>["value"]) => string> = {
+  bind_bank_card: (t) => t.quest.t_bind_bank_card,
+  visit_earn: (t) => t.quest.t_visit_earn,
+  visit_store: (t) => t.quest.t_visit_store,
+  view_product_roi: (t) => t.quest.t_view_product_roi,
+  setup_profile: (t) => t.quest.t_setup_profile,
+  invite_friend: (t) => t.quest.t_invite_friend,
+};
+
 function questIdForRoute(route: string): QuestTaskId | null {
   if (route === "pages/earn/earn") return "visit_earn";
   if (route === "pages/store/store") return "visit_store";
@@ -486,13 +518,27 @@ function checkQuestRoute() {
   lastQuestRoute = route;
   const id = questIdForRoute(route);
   if (!id) return;
-  const r = useQuest().markComplete(id);
-  if (!r.firstTime) return;
-  const app = useApp();
-  if (r.rewardNex > 0) app.creditNex(r.rewardNex);
-  if (r.rewardUsdt > 0) app.creditBalance(r.rewardUsdt);
+  // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
+  // 三处漏改)。原来先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
+  // 而 quest 是一次性的,再也拿不到。奖励从静态表查得到,顺序反得过来。
+  const quest = useQuest();
+  if (quest.isComplete(id)) return;
+  const task = quest.QUEST_TASKS.find((tk) => tk.id === id);
+  if (!task) return;
   const t = useT().value;
-  toast.success(fmt(t.quest.routeToast, { n: r.rewardNex }));
+  // 🔴 路由任务奖励曾经是**裸 creditNex + 零账单**:钱每次都进、账单页永远查无此单
+  // (不是失败路径才发作,是必然)。两道门都看不见它 —— 迁移棘轮只盯 bills.* 写入,
+  // 接线门对 App.vue 只查文件里有没有收口点(里程碑那段已经提供了)。
+  // 与 share.ts 的 invite_friend、wallet-cards-new 的 bind_bank_card 同族,现统一走收口点。
+  const ref = `QST-${id}`; // 稳定 ref:任务一次性,带时间戳会让判重永不命中 = 假幂等
+  const memo = fmt(t.quest.routeMemo, { task: QUEST_ROUTE_MEMO_TASK[id](t) });
+  const drafts: ReceiptDraft[] = [];
+  if (task.nexReward) drafts.push({ type: "bonus", symbol: "NEX", amount: task.nexReward, status: "posted", memo, ref });
+  if (task.usdtReward) drafts.push({ type: "bonus", symbol: "USDT", amount: task.usdtReward, status: "posted", memo, ref });
+  if (!drafts.length) return;
+  if (postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!useQuest().markComplete(id).firstTime) return; // 消费失败:重试命中同 ref 不会再发
+  toast.success(fmt(t.quest.routeToast, { n: task.nexReward }));
 }
 
 function startQuestWatch() {
@@ -509,6 +555,7 @@ function stopQuestWatch() {
 
 function stopBusinessLoops() {
   stopTick();
+  stopArrivalPoll();
   stopTrialPoll();
   stopOrderPoll();
   stopMilestonePoll();
@@ -546,6 +593,13 @@ onLaunch(() => {
   // OS-scheme listener for "system" mode.
   // #ifdef H5
   document.documentElement.setAttribute("data-theme", useTheme().resolved);
+  // 包 E(FEAT-KYC-RM01b ② 异常2):已下线验证页的历史深链兜底 ——
+  // 路由已注销,冷开命中时平滑落安全页 + 一句「该流程已下线」,禁 404/白屏。
+  // 提示由落地页 onLoad 自弹(from 参数):onLaunch 直接 toast 会在页面挂载完成前
+  // 就到时自动消失,冷启实测两次都看不见(实景走查抓到的时序坑)。
+  if (/\/pages\/me\/kyc([?#/]|$)/.test(readCurrentRouteOrHash())) {
+    uni.reLaunch({ url: "/pages/me/security?from=retired-flow", fail: () => {} });
+  }
   // #endif
   if (isStaticReviewRoute(readCurrentRouteOrHash())) {
     stopBusinessLoops();
@@ -557,7 +611,11 @@ onShow(() => {
   attachSessionWatch();
   if (!ensureBusinessLoopsAllowed()) return; // no business writes on auth/session flow pages
   useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
+  // FEAT-WD01b:前台第一时间补齐到账缺口 —— 关 App 三天再打开,这一下就补完
+  // (纯函数只看「now ≥ 预计到账」,与离线时长无关;推进过的单再调是 no-op)。
+  advanceArrivalAndSettleBill();
   startTick();
+  startArrivalPoll();
   startTrialPoll();
   startOrderPoll();
   startMilestonePoll();

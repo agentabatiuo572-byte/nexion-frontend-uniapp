@@ -7,8 +7,9 @@
   Phase reward multiplier applies for display only; phase id never surfaced.
 
   Cross-store orchestration lives in the click handler (stores don't import each
-  other): claim = wq.claimTier1() + app.creditNex/creditBalance + bills.add +
-  achievements.unlock. navTo() maps the quest's logical href to a uni route.
+  other): claim = wq.claimTier1() + postMoneyBills(奖励分录) + achievements.unlock。
+  资金变更由收据的 amount/symbol 派生,不再单独调 creditNex/creditBalance。
+  navTo() maps the quest's logical href to a uni route.
 -->
 <template>
   <view v-if="visible" class="mt-3">
@@ -69,7 +70,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
-import { useBills } from "@/store/bills";
+import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVRank } from "@/store/v-rank";
 import { useWeeklyQuest } from "@/store/weekly-quest";
 import { useProductPhase } from "@/composables/use-product-phase";
@@ -79,15 +80,18 @@ import { isPurchasedHardwareKind } from "@/store/device-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const app = useApp();
 const vRank = useVRank();
+// 🔴 任务派发也要问闸:关闭 / 熔断 / 售罄 / 未开售时不派「买创世」,否则用户领到一个
+//   不可能完成的周任务(独立 critic Q1)。走唯一消费入口,本文件不自判。
+const { block: genesisBlock } = useGenesisSaleGate();
 const phase = useProductPhase();
 const wq = useWeeklyQuest();
 const ach = useAchievements();
-const bills = useBills();
 const mounted = ref(false);
 
 onMounted(() => {
@@ -119,12 +123,23 @@ const quest = computed<Tier1QuestDef | null>(() => {
     hasRackAnyGen,
     hasPremium: false, // mock placeholder (source parity)
     nexBalance: app.user.nexBalance,
+    // 判据走**唯一消费入口**,不在这自判(规格 ④「单一派生」)。
+    genesisPurchasable: genesisBlock.value === null,
   });
 });
 
 const mult = computed(() => getPhaseRewardMultiplier(phase.value.id));
 const reward = computed(() => (quest.value ? Math.round(quest.value.rewardNex * mult.value) : 0));
 const rewardDisplay = computed(() => reward.value.toLocaleString());
+// 🔴 **不要**改成「已完成未领取的任务钉住不再重派」(2026-08-05 独立审计提过,证伪后否决)。
+//   看起来它修的是「闸一变、已完成的奖励静默作废」,实际会开三个更大的口子:
+//   ① `markTier1Complete` 是**点 CTA 就触发**的(见下面 onCta 的注释),不是真买到才触发
+//      —— 钉住 = 用户点一下、市场随即关闭,照样能领 2500 NEX 徽章,没买创世也领;
+//   ② 钉住的那支绕开 `genesisPurchasable` 判据,闸对它彻底失效;
+//   ③ `tier1Completed` 是从 storage 裸 cast 进来的字符串,脏值会让 `TIER1_QUESTS[脏值]`
+//      变 undefined → 整周不出任务卡且周冠军奖永久不可领。
+//   真要修得在服务端按**行为归因**判完成(本文件已是 backend-replaceable 的形状),
+//   而不是在渲染层钉一个「点过了」的标记。现在这版「闸一关任务就换掉」反而是刹车。
 const completed = computed(() => !!quest.value && wq.tier1Completed === quest.value.id);
 const visible = computed(() => mounted.value && !!quest.value && !wq.tier1Claimed);
 
@@ -155,19 +170,27 @@ function onCta() {
 function onClaim() {
   const q = quest.value;
   if (!completed.value || !q) return;
-  if (wq.claimTier1()) {
-    // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier1}
-    // claims, credits, and bills in one idempotent transaction.
-    const r = reward.value;
-    const refId = `WQUEST-${q.id}-${Date.now().toString(36).toUpperCase()}`;
-    app.creditNex(r);
-    bills.add({ type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
-    if (q.rewardUsdt) {
-      app.creditBalance(q.rewardUsdt);
-      bills.add({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
-    }
-    if (q.badgeId) ach.unlock(q.badgeId);
+  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier1}
+  // claims, credits, and bills in one idempotent transaction.
+  //
+  // 🔴 顺序 = **先发钱(幂等)→ 后消费资格**,不可换(2026-08-04 对抗审计 B-P1-3)。
+  // 原来是「先 claimTier1() 消费资格 → 发钱失败就 return」:资格没了、奖归零,用户白损失。
+  // 反过来「先发钱后消费」本会有重复发钱的风险,但 postMoneyBillsOnce 按稳定 ref 判重 ——
+  // 重放命中既有分录就不动钱直接返回 ok,于是这条顺序没有失效面。
+  // ref 必须稳定(周 + 任务 id),带时间戳的话判重永不命中 = 假幂等。
+  if (wq.tier1Claimed) return; // 已领过:原来由 claimTier1() 的内部守卫拦,现在提到发钱之前
+  const r = reward.value;
+  const refId = `WQUEST-${wq.weekKey}-${q.id}`;
+  // 同一次领取的两腿一次落盘:发了 NEX 却没发 $(或反过来)是半边账,比整笔没发更难对。
+  const drafts: ReceiptDraft[] = [
+    { type: "achievement", symbol: "NEX", amount: r, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId },
+  ];
+  if (q.rewardUsdt) {
+    drafts.push({ type: "achievement", symbol: "USDT", amount: q.rewardUsdt, status: "posted", memo: `Weekly quest reward · ${q.id}`, ref: refId });
   }
+  if (postMoneyBillsOnce(drafts) !== "ok") return;
+  if (!wq.claimTier1()) return; // 资格没消费成:钱已幂等落定,下次重试命中 ref 不会再发
+  if (q.badgeId) ach.unlock(q.badgeId);
 }
 
 // ── styles ──

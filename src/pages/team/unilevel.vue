@@ -385,7 +385,8 @@ function pillStyle(active: boolean): CSSProperties {
     padding: "0 16px",
     gap: "6px",
     borderRadius: "999px",
-    background: active ? "var(--v5-brand)" : "var(--v5-surface-2)",
+    // 未选中态原用 surface-2,与页面底同色(亮色 ΔE 2.2)不可辨,改 L1 surface。
+    background: active ? "var(--v5-brand)" : "var(--v5-surface)",
   };
 }
 function pillTextStyle(active: boolean): CSSProperties {
@@ -401,7 +402,8 @@ const memberGroupStyle: CSSProperties = { padding: "0 2px", borderTop: "1px soli
 function memberRowStyle(isLast: boolean): CSSProperties {
   return { padding: "12px 0", gap: "12px", borderBottom: isLast ? "none" : "1px solid var(--v5-border)" };
 }
-const memberAvatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface-2)" };
+// 头像框坐在透明发丝线组里(直接贴页面底),原 surface-2 同色不可辨,改 L1 surface。
+const memberAvatarStyle: CSSProperties = { width: "36px", height: "36px", background: "var(--v5-surface)" };
 // Ghost "View more" affordance — 44px tap target, boxed chrome dropped.
 const loadMoreBtnStyle: CSSProperties = { gap: "6px", height: "44px", marginTop: "2px" };
 const loadMoreLabelStyle: CSSProperties = { fontSize: "13px", fontWeight: 500, color: "var(--v5-ink-3)" };

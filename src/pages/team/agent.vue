@@ -358,9 +358,10 @@ const formCapStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
   marginBottom: "12px",
 };
-// Input idiom — recessed surface-3 fill, no border (single difference).
+// 输入框零描边。外层 formBlockStyle 只有 margin/padding 无底色 → 字段贴页面底;
+// 原 surface-3 亮色下对页面底仅 ΔE 2.7(分不出),改 L1。
 const fieldStyle: CSSProperties = {
-  background: "var(--v5-surface-3)",
+  background: "var(--v5-surface)",
   borderRadius: "12px",
   padding: "10px 12px",
 };

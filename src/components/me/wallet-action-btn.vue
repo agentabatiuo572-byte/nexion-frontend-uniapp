@@ -1,10 +1,11 @@
 <!--
   WalletActionBtn — ported from me/page.tsx WalletActionBtn.
   iOS-Wallet 3-up action: round 44px icon chip + label + currency sub-label.
-  Primary (Top-up) earns emphasis via brand-filled icon + spotlight glow (the
-  one allowed conversion-CTA halo per feedback_no_icon_halo_glow). Icon passed
-  via default slot (inline SVG using stroke="currentColor"). Navigates to `href`
-  (uni route) with fail:()=>{} for not-yet-ported targets.
+  三个动作等权、长得完全一样(主人 2026-07-31 终裁):同一实心 brand 底 + on-brand
+  图标,无主次之分。**不给任何一个加 spotlight halo** —— feedback_no_icon_halo_glow
+  规定 halo 仅限「唯一主 CTA」,三个平权后该豁免对谁都不成立,给三个都加正是它要防的。
+  Icon 走默认 slot(inline SVG 用 stroke="currentColor")。跳 `href`(uni route),
+  fail:()=>{} 兜未接入的目标。
 -->
 <template>
   <view class="flex flex-col items-center text-center active:opacity-90" style="gap: 6px; padding: 6px 2px; min-height: 44px" @click="go">
@@ -17,29 +18,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import type { CSSProperties } from "vue";
 
 const props = defineProps<{
   href: string;
   label: string;
   sub?: string;
-  primary?: boolean;
 }>();
 
 function go() {
   uni.navigateTo({ url: props.href, fail: () => {} });
 }
 
-const iconStyle = computed<CSSProperties>(() => ({
+const iconStyle: CSSProperties = {
   width: "44px",
   height: "44px",
   borderRadius: "999px",
-  background: props.primary ? "var(--v5-brand)" : "var(--v5-surface-2)",
-  // 《03》§6:内嵌 icon 容器用 soft bg tint,禁 border;
-  // 亮底文字/图标必须 --v5-on-brand(原用 --v5-bg 取巧,两主题语义不等价)
-  color: props.primary ? "var(--v5-on-brand)" : "var(--v5-brand)",
-  boxShadow: props.primary ? "var(--v5-spotlight-brand)" : "none",
-}));
+  // 《03》§6:内嵌 icon 容器禁 border;亮底图标必须 --v5-on-brand
+  // (原用 --v5-bg 取巧,两主题语义不等价)。
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+};
 const labelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,

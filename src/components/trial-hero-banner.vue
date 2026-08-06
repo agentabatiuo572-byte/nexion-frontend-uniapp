@@ -111,7 +111,7 @@ watch(inView, (v) => {
   if (v) played.value = true;
 });
 
-const visible = computed(() => trial.status === "idle" && trial.canStart());
+const visible = computed(() => trial.status === "none" && trial.canStart());
 
 const trialDays = computed(() => trialCfg.config.trialDays);
 const dailyEarn = computed(() => trialCfg.config.shadowDailyUSD);

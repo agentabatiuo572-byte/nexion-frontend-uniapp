@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -31,7 +32,7 @@ await page.route(/https:\/\/fonts\.gstatic\.com\/.*/, (route) =>
 );
 const errors = [];
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(message.text());
+  if (message.type() === "error") collectAppConsoleErrors(errors, baseUrl)(message);
 });
 page.on("pageerror", (error) => errors.push(error.message));
 

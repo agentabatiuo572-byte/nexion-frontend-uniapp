@@ -25,7 +25,8 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
             <text class="font-mono-tabular" :style="eyebrowStyle">{{ eyebrowText }}</text>
           </view>
-          <text v-if="!soldOut" class="font-mono-tabular tabular-nums nowrap" :style="leftChipStyle">{{ leftText }}</text>
+          <!-- 剩余席位是紧迫感元素:关闭态 / 售罄态不显(FEAT-GEN10 ④),判据同 showUrgency 单源。 -->
+          <text v-if="showUrgency" class="font-mono-tabular tabular-nums nowrap" :style="leftChipStyle">{{ leftText }}</text>
         </view>
 
         <!-- Title + perks line -->
@@ -34,7 +35,11 @@
 
         <!-- Live tier price row(预售态优先显倒计时/即将开售)-->
         <view class="flex items-end justify-between" style="margin-top: 14px; gap: 10px">
-          <view v-if="preSale">
+          <!-- 🔴 阻断态(市场关闭 / 熔断 / 配置未知)**不报价**(独立验收 P2-12):
+               创世页同态已经把价格删了,这里还并列显示「当前档 $11,999」+「市场暂未开放」,
+               两个入口对同一件事说两套话。判据走 block,与创世页同源。 -->
+          <view v-if="hardBlocked" />
+          <view v-else-if="preSale">
             <text class="block" :style="tierLabelStyle">{{ t.genesisEligibility.comingSoon }}</text>
             <text v-if="showTime" class="block font-display tabular-nums nowrap" :style="priceStyle">{{ countdownDisplay }}</text>
           </view>
@@ -44,10 +49,11 @@
           </view>
           <text v-else :style="soldOutStyle">{{ t.store.genesisCardSoldOut }}</text>
 
-          <!-- CTA pill -->
+          <!-- CTA pill。右箭头 = 「点了会去某处」;硬阻断态点了只给说明,不该用箭头暗示能往下走
+               (与创世页 dock 同一条规矩)。 -->
           <view class="inline-flex items-center justify-center" :style="ctaStyle">
             <text :style="ctaTextStyle">{{ ctaText }}</text>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+            <svg v-if="!hardBlocked" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
           </view>
         </view>
 
@@ -73,17 +79,27 @@ import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { toast } from "@/store/ui";
 
 const t = useT();
 const genesis = useGenesis();
 const { gate, eligible } = useGenesisEligibility();
-const { preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
+const { block, blockText, showUrgency, preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
 
 const eligSheetOpen = ref(false);
 
 const soldOut = computed(() => genesis.totalSlots - genesis.soldSlots <= 0);
-// 预售未开是最外层态(优先于售罄/锁定);到点自动解锁。
-const locked = computed(() => !preSale.value && !soldOut.value && !eligible.value);
+/** 「硬阻断」= 市场关闭 / 熔断 / 配置未知。**售罄与预售不算** —— 那两态本来就有各自的
+ *  展示语言(售罄字样 / 倒计时),不该被这条规则连坐。与创世页 dock 的取舍一致。 */
+const hardBlocked = computed(() => {
+  const b = block.value;
+  return b === "marketClosed" || b === "halted" || b === "configUnavailable";
+});
+// 🔴 资格锁行只在「可购买路径畅通、卡在资格」时出现 —— 判据问 `block` 单源,
+//   不再自己重算 preSale/soldOut(独立验收 confirmed P1:上一版 `!preSale && !soldOut
+//   && !eligible` 是**第二套判定**,漏了市场关闭三档 → 关闭态下锁行照样渲染
+//   「已满足 N/M 条件」,与规格 ④「单一派生,禁多处各判一套」正面冲突)。
+const locked = computed(() => block.value === null && !eligible.value);
 const countdownDisplay = computed(() => {
   if (!showTime.value) return "";
   const dayPart = countdownDays.value > 0 ? fmt(t.value.genesisEligibility.countdownDay, { n: countdownDays.value }) + " " : "";
@@ -91,7 +107,12 @@ const countdownDisplay = computed(() => {
 });
 const priceText = computed(() => genesis.unitPriceUSDT.toLocaleString());
 const eyebrowText = computed(() => fmt(t.value.store.genesisCardEyebrow, { n: genesis.totalSlots.toLocaleString() }));
-const leftText = computed(() => fmt(t.value.store.genesisCardLeft, { n: genesis.totalSlots - genesis.soldSlots }));
+// 🔴 闸放在**值本身**,不是放在模板的 v-if 上:值到哪都安全,不必指望每个渲染点
+//   都记得加条件。上一版闸在模板里、定义在这里,两处相隔几十行 —— 机器门看不出关联,
+//   人也容易在新增渲染点时漏掉(这正是「还剩一处没收」的温床)。
+const leftText = computed(() =>
+  showUrgency.value ? fmt(t.value.store.genesisCardLeft, { n: genesis.totalSlots - genesis.soldSlots }) : "",
+);
 const lockedLineText = computed(() =>
   GENESIS_ELIGIBILITY.mode === "all-of" ? t.value.genesisEligibility.cardLockedLineAll : t.value.genesisEligibility.cardLockedLine,
 );
@@ -100,8 +121,14 @@ const lockedMetText = computed(() => {
   return fmt(t.value.genesisEligibility.cardLockedMet, { met, total: gate.value.conditions.length });
 });
 const ctaText = computed(() => {
-  if (preSale.value) return t.value.genesisEligibility.comingSoon;
-  if (soldOut.value) return t.value.store.genesisCardCtaMarket;
+  // 🔴 阻断态一律问 `block` 单源(FEAT-GEN10 ④),与创世页同一出口 —— 关闭市场 ≠ 下架,
+  //   卡片照常展示(showcaseEnabled 另管),只是不能买。
+  // 三档阻断说明走 blockText 唯一出口(P1-3 收口);售罄档是本卡自己的 CTA 词汇
+  //   (「去二级市场」,与创世页的「已售罄」刻意不同),留在本地。
+  const blocked = blockText.value;
+  if (blocked !== null) return blocked;
+  if (block.value === "soldOut") return t.value.store.genesisCardCtaMarket;
+  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
   if (locked.value) return t.value.genesisEligibility.cardCtaLocked;
   return t.value.genesisEligibility.cardCta;
 });
@@ -111,10 +138,14 @@ function goGenesis() {
   uni.navigateTo({ url: "/pages/genesis/genesis", fail: () => {} });
 }
 function onCardTap() {
-  // 预售未开:不跳不开 sheet(整卡不可认购,只展示倒计时/即将开售)。
-  if (preSale.value) return;
-  if (soldOut.value) {
+  // 🔴 与 ctaText 同问 `block` 一处,顺序不在此重排(FEAT-GEN10 ④)。
+  if (block.value === "soldOut") {
     uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
+    return;
+  }
+  if (block.value !== null) {
+    // 阻断态:不跳不开 sheet。禁静默无反馈 —— 给与卡面同一句说明。
+    if (block.value !== "preSale") toast.info(ctaText.value, t.value.genesis.marketClosed.holdingsSafe);
     return;
   }
   if (locked.value) {

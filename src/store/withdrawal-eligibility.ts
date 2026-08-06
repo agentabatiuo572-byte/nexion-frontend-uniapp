@@ -1,4 +1,5 @@
 import { normalizeAccountKey } from "@/store/account-cloud";
+import { mockServerNow } from "@/store/server-time";
 import { useConfig } from "@/store/config";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
@@ -10,12 +11,14 @@ import {
 } from "@/store/risk-identity";
 import type { Withdrawal } from "@/store/types";
 import type { WithdrawalRiskRoute } from "@/store/config-types";
-import { useWalletPairing } from "@/store/wallet-pairing";
+import { decideFromStores, isDailyLimitReached, nextDayResetAt } from "@/store/withdrawal-eligibility-core";
+import { readWithdrawCounter } from "@/store/withdraw-daily-count";
+import { usePayoutAddress } from "@/store/payout-address";
 import {
-  isRebindFrozen,
+  fromWithdrawNetwork,
   NEW_ADDRESS_AGE_DAYS,
   NEW_ADDRESS_LARGE_AMOUNT_USDT,
-} from "@/store/wallet-pairing-core";
+} from "@/store/payout-address-core";
 
 // SPEC-7 提现前置风控(mock K3,推倒重写版)。
 //
@@ -38,20 +41,19 @@ export interface WithdrawalEligibility {
   route: WithdrawalRiskRoute;
   /** 稳定 reason code(页面渲染时映射 i18n,禁直出工程码)。 */
   riskReasons: string[];
+  /** FEAT-WD01a:本次是否命中小额免审快车道。 */
+  fastLaneApplied: boolean;
+  /** FEAT-WD01a:被快车道免掉的闸名(本会命中但因小额而未生效的);未命中时为空数组。 */
+  waivedGates: string[];
+  /** FEAT-WD01b:今日笔数是否已用完 */
+  dailyLimitReached: boolean;
+  /** FEAT-WD01b:下次可提时间(明日 0 点),用于文案插值 */
+  dailyCountResetAt: number;
   configVersion: string;
 }
 
-const ROUTE_SEVERITY: Record<WithdrawalRiskRoute, number> = {
-  pass: 0,
-  delay: 1,
-  manual: 2,
-  freeze: 3,
-  reject: 4,
-};
-
-function worse(a: WithdrawalRiskRoute, b: WithdrawalRiskRoute): WithdrawalRiskRoute {
-  return ROUTE_SEVERITY[b] > ROUTE_SEVERITY[a] ? b : a;
-}
+// ROUTE_SEVERITY / worse() 已迁到 withdrawal-eligibility-core.ts —— 判定逻辑单源在那边,
+// 这里留副本会让人以为改这里就能改行为(实际改了没用),故删净不留。
 
 export function evaluateWithdrawal(
   accountKey: string,
@@ -60,83 +62,72 @@ export function evaluateWithdrawal(
   withdrawableUsdt: number,
   requestedUsdt?: number,
 ): WithdrawalEligibility {
+  // 本函数只做一件事:**从各 store 把事实取齐**,然后交给纯函数判定。
+  // 判定逻辑一行都不在这里 —— 见 withdrawal-eligibility-core.ts 的 decideWithdrawalRoute。
+  // 这样拆的原因(2026-07-31 熔断结论):判定是纯函数才能被行为测试直接跑,
+  // 而「小额免审不得越过风控」是行为约束,只有行为测试守得住(源码结构哨兵被连续攻破四种绕法)。
   const cfg = useConfig().config;
   const rules = cfg.withdrawRules;
   const key = normalizeAccountKey(accountKey);
-  const reasons: string[] = [];
-  let route: WithdrawalRiskRoute = "pass";
 
-  // 0. 换绑 24h 冻结(PAY04):UI 置灰之外的评估层硬闸(console 直调不可绕),
-  // server-canonical 二层 guard 惯例。冻结期 route=freeze 且 canSubmit=false
-  // (不建单不占资金,区别于簇冻结的 freeze 建单进队列)。
-  const binding = useWalletPairing().activeBinding;
-  const rebindFrozen = isRebindFrozen(binding?.freezeUntil, Date.now());
-  if (rebindFrozen) {
-    route = worse(route, "freeze");
-    reasons.push("rebind-freeze");
-  }
-
-  // 1. 簇状态实时输入(R5)——即使余额已在可提桶,提现仍以当前簇为准。
+  // 🔴 本段**只许转发 store 原始对象**,不许有任何表达式(判空 / 三元 / 查找 / 遍历都不行)。
+  // 第 4 轮复验实证:外壳只要还留着表达式,原攻击就能一字不改地搬过来
+  // (S4 = 原 Bypass C 搬到外壳,五个外壳注入全绿全是真免闸)。
+  // 取字段、判空、找元素、跨账户比对全在 core 的 toRawFacts 里 —— 那边行为哨兵覆盖得到。
   const cluster = evaluateAccountCluster(key);
-  if (cluster.status === "frozen") {
-    route = worse(route, "freeze");
-    reasons.push("frozen-cluster");
-  } else if (cluster.status === "flagged") {
-    route = worse(route, "manual");
-    reasons.push("flagged-cluster");
-  }
-
-  // 5. mock K4 分达冻结建议线 → 人工升级(冻结决策留给 K1/D2,K3 不越权)。
-  if (cluster.score >= cfg.riskCluster.clusterFreezeSuggestThreshold) {
-    route = worse(route, "manual");
-    reasons.push("high-risk-score");
-  }
-
-  const trimmed = address.trim();
-  if (trimmed) {
-    const hash = withdrawAddressHash(network, trimmed);
-
-    // 2. 同地址跨账户复用(强信号)。
-    const reusedByOther = listRiskRecords().some(
-      (r) => r.accountKey !== key && r.withdrawAddresses.some((a) => a.hash === hash),
-    );
-    if (reusedByOther) {
-      route = worse(route, rules.sameAddressRoute);
-      reasons.push("shared-address");
-    }
-
-    // 4. 新地址绑定期(R2): 未见过 = 本次首绑,同样落 hold。
-    const own = getRiskRecord(key)?.withdrawAddresses.find((a) => a.hash === hash);
-    const holdMs = rules.newAddressHoldHours * 3600 * 1000;
-    if (!own || Date.now() - own.firstSeenAt < holdMs) {
-      route = worse(route, "delay");
-      reasons.push("new-address-hold");
-    }
-  }
-
-  // 3. 首提必审(R2)——无论其它信号如何,新账户首提最低也是 manual。
-  const hasWithdrawn = getRiskRecord(key)?.hasWithdrawn ?? false;
-  if (rules.firstWithdrawalManual && !hasWithdrawn) {
-    route = worse(route, "manual");
-    reasons.push("first-withdrawal-review");
-  }
-
-  // 6. 换绑地址账龄(PAY04 异常4):verifiedAt 起账龄 < 7 天 + 请求金额 ≥ $1,000
-  // → 强制 manual。绑定 store 已按账号重绑,与 accountKey 同源(mock 只评当前账号)。
-  if (requestedUsdt !== undefined && binding?.verifiedAt !== undefined) {
-    const ageMs = Date.now() - binding.verifiedAt;
-    if (ageMs < NEW_ADDRESS_AGE_DAYS * 24 * 3600 * 1000 && requestedUsdt >= NEW_ADDRESS_LARGE_AMOUNT_USDT) {
-      route = worse(route, "manual");
-      reasons.push("new-address-large-amount");
-    }
-  }
+  const decision = decideFromStores({
+    now: mockServerNow(),
+    // binding = 该网络当前提现地址的快照({freezeUntil, verifiedAt})。取数加工在
+    // payout-address-core.eligibilityBindingFor(selfcheck-rebind 行为覆盖),这里仍只转发。
+    binding: usePayoutAddress().bindingFor(fromWithdrawNetwork(network)),
+    ownRecord: getRiskRecord(key),
+    allRecords: listRiskRecords(),
+    accountKey: key,
+    addressHash: withdrawAddressHash(network, address.trim()),
+    address,
+    cluster,
+    freezeSuggestThreshold: cfg.riskCluster.clusterFreezeSuggestThreshold,
+    newAddressHoldHours: rules.newAddressHoldHours,
+    newAddressAgeDays: NEW_ADDRESS_AGE_DAYS,
+    largeAmountUsdt: NEW_ADDRESS_LARGE_AMOUNT_USDT,
+    requestedUsdt,
+    withdrawableUsdt,
+    smallAmountThresholdUsd: rules.smallAmountThresholdUsd,
+    minWithdrawableUsdt: rules.minWithdrawableUsdt,
+    sameAddressRoute: rules.sameAddressRoute,
+    firstWithdrawalManual: rules.firstWithdrawalManual,
+    withdrawCounter: readWithdrawCounter(key),
+    dailyWithdrawLimitCount: rules.dailyWithdrawLimitCount,
+  });
 
   return {
-    canSubmit: route !== "reject" && !rebindFrozen && withdrawableUsdt >= rules.minWithdrawableUsdt,
+    canSubmit: decision.canSubmit,
     maxWithdrawableUsdt: withdrawableUsdt,
-    route,
-    riskReasons: reasons,
-    configVersion: `wr:${rules.minWithdrawableUsdt}/${rules.sameAddressRoute}/${rules.firstWithdrawalManual ? "first-manual" : "first-open"}/${rules.newAddressHoldHours}h · ${cluster.configVersion}`,
+    route: decision.route,
+    riskReasons: decision.riskReasons,
+    // FEAT-WD01a:是否走了小额快车道 + 被免掉的闸名(审计与客服解释用)。
+    // PROD:server 权威回传,client 仅 UI cache。
+    fastLaneApplied: decision.fastLaneApplied,
+    waivedGates: decision.waivedGates,
+    dailyLimitReached: decision.dailyLimitReached,
+    dailyCountResetAt: nextDayResetAt(mockServerNow()),
+    configVersion: `wr:${rules.minWithdrawableUsdt}/${rules.sameAddressRoute}/${rules.firstWithdrawalManual ? "first-manual" : "first-open"}/${rules.newAddressHoldHours}h/fl:${rules.smallAmountThresholdUsd} · ${cluster.configVersion}`,
+  };
+}
+
+/**
+ * FEAT-WD01b:今日额度状态(**纯查询,不占用**)。追踪页「再提一笔」判置灰用。
+ * 本段同样只转发,判据在 core 的 isDailyLimitReached。
+ */
+export function dailyLimitStatus(accountKey: string): { reached: boolean; resetAt: number } {
+  const now = mockServerNow();
+  return {
+    reached: isDailyLimitReached(
+      readWithdrawCounter(normalizeAccountKey(accountKey)),
+      useConfig().config.withdrawRules.dailyWithdrawLimitCount,
+      now,
+    ),
+    resetAt: nextDayResetAt(now),
   };
 }
 
@@ -144,6 +135,10 @@ export function evaluateWithdrawal(
 export function commitWithdrawal(accountKey: string, network: Withdrawal["network"], address: string): void {
   recordWithdrawAddressUse(accountKey, network, address);
   markWithdrawn(accountKey);
+  // 🔴 每日笔数**不在这里** +1。曾经挂在这儿(建单成功后),被独立验收 3 轮 3 中
+  // 复现出并发绕过:「查 → 600ms 风控评估 → 建单 → 才写计数」中间的窗口太长。
+  // 现在改成建单前 claimWithdrawSlot 先占额度(app.ts submitWithdrawal),
+  // 挪回来就等于把漏洞放回去。
 }
 
 // ── 提交时点的服务端评估形态(⑤ 加载态 + 异常3 超时)────────────────────

@@ -12,3 +12,13 @@ export function riskReasonLines(t: Messages, codes: readonly string[] | undefine
   };
   return (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
 }
+
+// 免审闸 code → 用户话术。与上面同一套路(散抄 dict 会被 filter 静默吞行),
+// 故并列收口在这里:decideWithdrawalRoute 新增一道可免的闸时,只有这一处要补。
+export function waivedGateLines(t: Messages, codes: readonly string[] | undefined): string[] {
+  // `?? {}`:整块 waivedGates 被删时(三语同时删,tsc 因类型由 en.ts 派生而不报错)
+  // 这里会对 undefined 取下标直接抛 TypeError,把整个提现页的横幅计算炸掉。
+  // 缺文案最多是少显示一行,不该升级成白屏。
+  const dict = (t.wallet.waivedGates ?? {}) as Record<string, string>;
+  return (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
+}

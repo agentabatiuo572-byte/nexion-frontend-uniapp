@@ -62,6 +62,7 @@
 import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
+import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 
 const props = defineProps<{ device: Device | null }>();
@@ -84,7 +85,7 @@ onUnmounted(() => {
 
 const task = computed(() => props.device?.currentTask ?? null);
 const descLine = computed(() =>
-  props.device ? fmt(t.value.deactivateSheet.desc, { name: props.device.name }) : "",
+  props.device ? fmt(t.value.deactivateSheet.desc, { name: deviceName(t.value, props.device) }) : "",
 );
 const progressPct = computed(() => {
   const tk = task.value;

@@ -70,7 +70,9 @@
                   <text>{{ soldText }}</text>
                   <text style="color: var(--v5-genesis-gold-on-dark); font-weight: 500"> / {{ totalText }} {{ t.genesis.soldOf }}</text>
                 </text>
-                <text class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
+                <!-- 🔴 关闭态 / 售罄态不展示剩余名额紧迫文案(规格 FEAT-GEN10 ④:
+                     不对不可购买的东西制造紧迫感)。判据来自 showUrgency 单源,不在此处自判。 -->
+                <text v-if="showUrgency" class="gen-anim" :style="urgentStyle">{{ remaining }} {{ t.genesis.leftSuffix }}</text>
               </view>
             </view>
           </view>
@@ -98,7 +100,10 @@
                 <text :style="tierNameStyle">{{ t.genesis.tier[tr.labelKey] }}</text>
                 <text :style="tr.isCurrent ? tierChipLiveStyle : tierChipSoldStyle">{{ tr.isCurrent ? t.genesis.tier.live : t.genesis.tier.soldOut }}</text>
               </view>
-              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
+              <!-- 🔴 「还剩 N 席」也是名额紧迫文案,与 hero 那处同一条规则(FEAT-GEN10 ④)。
+                   独立验收 P1-4:上次只关了 hero,这里漏了,关闭态实测仍显示「Live · 153 left」。
+                   阻断态改显总席位数(中性事实),不显剩余。 -->
+              <text class="block" :style="tierMetaStyle">{{ tr.isCurrent && showUrgency ? fmt(t.genesis.tier.left, { n: tr.left }) : fmt(t.genesis.tier.seats, { n: tr.seatsTotal }) }}</text>
             </view>
             <view class="text-right shrink-0">
               <text class="block tabular-nums" :style="tierPriceStyle">${{ tr.priceText }}</text>
@@ -141,24 +146,36 @@
 
     <!-- Sticky gold dock (folds source GenesisDockHost into the page) -->
     <view class="nx-genesis-dock" :style="dockWrapStyle">
-      <view class="relative w-full overflow-hidden active:scale-[0.98]" :style="dockBtnStyle" @click="openSheet">
-        <template v-if="remaining > 0">
+      <view
+        class="relative w-full overflow-hidden"
+        :class="dockDisabled ? '' : 'active:scale-[0.98]'"
+        :style="dockBtnStyle"
+        @click="openSheet"
+      >
+        <!-- 装饰(高光 / 描边 / 流光)只在**可购买**时出现:置灰按钮不该还在发光。 -->
+        <template v-if="dockActive">
           <view aria-hidden :style="dockSpecularStyle" />
           <view aria-hidden :style="dockRimStyle" />
           <view aria-hidden class="gen-anim" :style="dockSheenStyle" />
         </template>
-        <view class="relative inline-flex items-center" style="z-index: 1; gap: 6px; color: var(--v5-genesis-gold-on-dark)">
+        <!-- 🔴 这层的 color 供给 crown 图标与倒计时(它们用 currentColor / 继承),
+             同样必须跟 dockActive 走 —— 只改 dockLabelStyle 会剩下图标和倒计时还是金色,
+             在中性底上照样看不清(独立验收 P0 点名了「倒计时 1.95」这一处)。 -->
+        <view class="relative inline-flex items-center" :style="dockInnerStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
           <text :style="dockLabelStyle">{{ dockCtaText }}</text>
           <template v-if="preSale && showTime">
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">{{ countdownDisplay }}</text>
           </template>
-          <template v-else-if="remaining > 0 && eligible">
+          <!-- 价格只在**真能买**时露出:阻断态显示价格等于对着买不到的东西报价。 -->
+          <template v-else-if="dockActive && eligible">
             <view :style="dockDividerStyle" />
             <text class="tabular-nums">${{ priceText }}</text>
           </template>
-          <svg v-if="!preSale" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+          <!-- 右箭头 = 「点了会去某处」。可购买(开 sheet)与售罄(去二级市场)才有;
+               其余阻断态点了只给说明,不该用箭头暗示能往下走。 -->
+          <svg v-if="dockActive || block === 'soldOut'" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
         </view>
       </view>
     </view>
@@ -172,6 +189,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import PerkRow from "@/components/genesis/perk-row.vue";
@@ -191,9 +209,13 @@ import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/u
 const t = useT();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
+// 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
+//   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
+onShow(() => cfg.refresh());
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
-const { preSale, showTime, countdownDays, countdownClock } = useGenesisSaleGate();
+const { block, marketClosed, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =
+  useGenesisSaleGate();
 
 const sheetOpen = ref(false);
 const eligSheetOpen = ref(false);
@@ -240,12 +262,29 @@ const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const soldPct = computed(() => (sold.value / total.value) * 100);
 
-// Dock 四态文案:预售未开(最外层)/ 售罄 / 未达资格(→ 资格 sheet)/ 达标认购。
+// Dock 文案:**阻断原因来自唯一派生 `block`**(composable),本页不再自排优先级。
+// 顺序由 genesisPurchaseBlock 定:配置未知 > 市场关闭 > 熔断 > 售罄 > 预售;
+// 全部放行后才轮到本页独有的资格门(L2,FEAT-GEN08)。
 const dockCtaText = computed(() => {
-  if (preSale.value) return t.value.genesisEligibility.comingSoon;
-  if (remaining.value === 0) return t.value.genesis.ctaSoldOut;
+  // 三档阻断说明走 blockText 唯一出口(P1-3 收口:此前这段 switch 在 4 处各写一份)。
+  // 售罄 / 预售是本页自己的 CTA 词汇,不属于「阻断说明」,留在本地。
+  const blocked = blockText.value;
+  if (blocked !== null) return blocked;
+  if (block.value === "soldOut") return t.value.genesis.ctaSoldOut;
+  if (block.value === "preSale") return t.value.genesisEligibility.comingSoon;
   if (!eligible.value) return t.value.genesisEligibility.dockLocked;
   return t.value.genesis.ctaReserve;
+});
+/** 主按钮是否处于「可购买」外观(金色高光)。任一阻断态都退到中性面 —— 复用原本
+ *  只给售罄用的那套中性样式,不另造 disabled 皮。 */
+const dockActive = computed(() => block.value === null);
+/** 是否置灰不可点。售罄**可点**(引导去二级市场),其余阻断态点了只给说明不开 sheet。 */
+const dockDisabled = computed(() => block.value !== null && block.value !== "soldOut");
+/** 阻断态的副说明(toast 第二行)。配置未知给「可重试」,其余给「持仓不受影响」定心。 */
+const blockHintSub = computed(() => {
+  if (block.value === "configUnavailable") return t.value.genesis.marketClosed.retryHint;
+  if (block.value === "preSale") return "";
+  return t.value.genesis.marketClosed.holdingsSafe;
 });
 // 倒计时副文本(showTime 时):「开售倒计时 {d天} HH:MM:SS」/「Opens in {d}d HH:MM:SS」。
 const countdownDisplay = computed(() => {
@@ -287,6 +326,14 @@ let socialId: ReturnType<typeof setTimeout> | null = null;
 let tickId: ReturnType<typeof setInterval> | null = null;
 
 function emitSocial() {
+  // 🔴 关闭态不播「某某刚买了 N 个」(独立验收 P1-3)。它既是紧迫感元素,
+  //   又与「市场未开放」当面互相拆台 —— 页面一边说买不了,一边播别人正在买。
+  //   注意是**不播新的、也清掉旧的**:只停止定时器会让最后一条留在屏上。
+  if (!showUrgency.value) {
+    latest.value = null;
+    socialId = setTimeout(emitSocial, 8_000); // 继续轮询,恢复开放后自动接上
+    return;
+  }
   const buyer = BUYER_NAMES[Math.floor(Math.random() * BUYER_NAMES.length)];
   const qty = 1 + Math.floor(Math.random() * 3);
   latest.value = { buyer, qty, ago: Date.now() };
@@ -294,11 +341,30 @@ function emitSocial() {
 }
 
 function openSheet() {
-  // 预售未开(最外层门,FEAT-GEN09):不开任何 sheet,倒计时中。
-  if (preSale.value) return;
-  // 售罄 → 二级市场承接(GEN01 异常4;原 no-op 死按钮顺手修正)。
-  if (remaining.value === 0) {
+  // 🔴 阻断判定**只问 `block` 一处**(FEAT-GEN10 ④)。改造前这里与 dockCtaText 各写一套
+  //   if 链,两处顺序一致纯属巧合 —— 任一处加条件而另一处忘改就会「按钮与行为对不上」。
+  if (block.value === "soldOut") {
+    // 售罄 → 二级市场承接(GEN01 异常4);二级市场自身在关闭态也会锁,由该页自判。
     goMarketplace();
+    return;
+  }
+  if (block.value === "configUnavailable") {
+    // 🔴 配置未知 → 点按即**重试**(规格异常3 的重试动作,此前全链路零实现):
+    //   重读配置源,成功即当场解锁;仍失败则给「可重试」说明。
+    //   结果判定问派生 `block`,不摸原料 `.loaded`(④b 门):refresh 写共享 store,
+    //   computed 同步失效,下一行读到的已是重读后的判定。
+    cfg.refresh();
+    if (block.value !== "configUnavailable") {
+      toast.success(t.value.genesis.marketClosed.retryOk);
+    } else {
+      toast.info(dockCtaText.value, blockHintSub.value);
+    }
+    return;
+  }
+  if (block.value !== null) {
+    // 其余阻断态(市场关闭 / 熔断 / 预售未到):不开任何 sheet。
+    // 🔴 禁静默无反馈(规格 ⑥):给出与按钮同一句说明,让用户知道不是点坏了。
+    toast.info(dockCtaText.value, blockHintSub.value);
     return;
   }
   // 资格门 L2:未达标 → 资格 sheet,不开购买 sheet(FEAT-GEN08)。
@@ -333,7 +399,14 @@ function goMarketplace() {
 
 onMounted(() => {
   emitSocial();
-  tickId = setInterval(() => genesis.tickSales(), 30_000);
+  // 🔴 关闭态不推进已售数(独立验收 P1-2):实测 65 秒内进度条从 847 跳到 850,
+  //   而同屏按钮写着「市场暂未开放」。关闭期够长会自己跑到售罄,恢复开放即无货。
+  //   闸放在**调用处**而非 tickSales 内部 —— tickSales 是 store 的通用推进器,
+  //   把页面态的判定塞进 store 会让它对其它调用方也生效,那是另一种耦合。
+  tickId = setInterval(() => {
+    if (!showUrgency.value) return;
+    genesis.tickSales();
+  }, 30_000);
 });
 onUnmounted(() => {
   if (socialId) clearTimeout(socialId);
@@ -623,21 +696,21 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
   alignItems: "center",
   justifyContent: "center",
   background:
-    remaining.value > 0
+    dockActive.value
       // 吸底条按设计是**暗色金属面**,但原 alpha 0.55/0.72 在亮主题下被奶油页底冲淡,
       // 合成底只到 rgb(83,78,71) → 金色价格实测 3.95 不达 AA(暗主题 8.95 正常)。
       // 提到 0.88/0.92 让它在两个主题下都真的是暗面:亮主题合成底 rgb(38,32,26) → 7.73;
       // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
       ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
       : "var(--v5-surface-2)",
-  border: remaining.value > 0 ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
-  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
+  border: dockActive.value ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
+  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "15px",
   letterSpacing: "0.02em",
   boxShadow:
-    remaining.value > 0
+    dockActive.value
       ? [
           "inset 0 1px 0 rgba(255,255,255,0.40)",
           "inset 0 -1px 0 rgba(0,0,0,0.50)",
@@ -674,9 +747,19 @@ const dockSheenStyle: CSSProperties = {
   animation: "gen-sheen 4.5s ease-in-out infinite",
   pointerEvents: "none",
 };
+// 🔴 判据必须与 dockBtnStyle 用**同一个** `dockActive`,不能一个问 dockActive、
+//   一个问 remaining —— 底色换成中性面而文字仍取金色,在亮主题下就是**白字白底**
+//   (实测对比度 1.17)。2026-08-05 独立验收 P0:同一处样式共 5 个取色点,
+//   我只改了块内 4 个,漏掉本行,连带把原本正常的「预售倒计时」态也一起打翻。
 const dockLabelStyle = computed<CSSProperties>(() => ({
-  color: remaining.value > 0 ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
+  color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontWeight: 600,
+}));
+/** dock 内层容器色 —— 图标(currentColor)与倒计时靠它继承。与 dockLabelStyle 同判据。 */
+const dockInnerStyle = computed<CSSProperties>(() => ({
+  zIndex: 1,
+  gap: "6px",
+  color: dockActive.value ? "var(--v5-genesis-gold-on-dark)" : "var(--v5-ink-4)",
 }));
 const dockDividerStyle: CSSProperties = {
   width: "1px",

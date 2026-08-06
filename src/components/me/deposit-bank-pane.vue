@@ -407,9 +407,13 @@ async function askCancel() {
     icon: "warn",
   });
   if (!ok) return;
-  if (dep.cancelBankIntent(it.intentId)) {
+  const r = dep.cancelBankIntent(it.intentId);
+  if (r.ok) {
     toast.success(t.value.bankPane.cancelledToast);
     viewIntentId.value = null;
+  } else if (r.conflict) {
+    // 这张付款单在别处已经付掉 / 超时 / 撤掉了,store 已把最新状态刷回来。
+    toast.warn(t.value.errors.staleTitle, t.value.errors.staleMsg);
   }
 }
 function goSupport() {

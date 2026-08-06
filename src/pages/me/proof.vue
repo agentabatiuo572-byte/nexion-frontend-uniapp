@@ -326,12 +326,13 @@ const variantLabelStyle: CSSProperties = {
   letterSpacing: "0.06em",
   color: "var(--v5-ink-3)",
 };
-// Segmented control — filled surface-2 container, no border (active pill is brand).
+// Segmented control — filled L1 surface container, no border (active pill is brand).
 const variantTabsStyle: CSSProperties = {
   gap: "4px",
   padding: "4px",
   borderRadius: "16px",
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 brand 实底,不撞色
+  background: "var(--v5-surface)",
 };
 function variantPillStyle(v: Variant): CSSProperties {
   const on = variant.value === v;

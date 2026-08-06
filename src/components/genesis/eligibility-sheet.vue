@@ -77,7 +77,7 @@
                   <text>{{ t.genesisEligibility.inviteVerify }}</text>
                 </view>
               </view>
-              <text v-if="inviteError" class="block" :style="inviteErrStyle">{{ t.genesisEligibility.inviteInvalid }}</text>
+              <text v-if="inviteErrorText" class="block" :style="inviteErrStyle">{{ inviteErrorText }}</text>
             </template>
           </view>
         </view>
@@ -105,6 +105,7 @@ import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { GENESIS_ELIGIBILITY, type GenesisGateCondition } from "@/store/genesis";
+import type { GenesisInviteRejectReason } from "@/store/genesis-invite";
 import { useApp } from "@/store/app";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
@@ -117,17 +118,30 @@ const app = useApp();
 const { gate } = useGenesisEligibility();
 
 const inviteInput = ref("");
-const inviteError = ref(false);
+/** 拒绝归因(null = 没出错)。四种拒绝各自文案,且都不透露核销者是谁。 */
+const inviteReject = ref<GenesisInviteRejectReason | null>(null);
 
 watch(
   () => props.open,
   (o) => {
     if (o) {
       inviteInput.value = "";
-      inviteError.value = false;
+      inviteReject.value = null;
     }
   },
 );
+
+const inviteErrorText = computed(() => {
+  const el = t.value.genesisEligibility;
+  switch (inviteReject.value) {
+    case "invalid": return el.inviteInvalid;
+    case "used": return el.inviteUsed;
+    case "void": return el.inviteVoided;
+    case "already-held": return el.inviteAlreadyHeld;
+    case "failed": return el.inviteFailed;
+    default: return "";
+  }
+});
 
 const subtitleText = computed(() =>
   GENESIS_ELIGIBILITY.mode === "all-of" ? t.value.genesisEligibility.subtitleAll : t.value.genesisEligibility.subtitleAny,
@@ -178,10 +192,12 @@ function goFix(key: GenesisGateCondition["key"]) {
 }
 
 function verifyInvite() {
-  inviteError.value = false;
-  // per-account 核销(随 account-cloud 快照走,切号不继承 — 审计 P1 修复)。
-  if (!app.setGenesisInviteCode(inviteInput.value)) {
-    inviteError.value = true;
+  inviteReject.value = null;
+  // per-account 核销(随 account-cloud 快照走,切号不继承 — 审计 P1 修复);
+  // 查平台码表 + 三态校验,拒绝带归因 → 四种失败各自文案(规格 FEAT-GEN11 ②)。
+  const result = app.setGenesisInviteCode(inviteInput.value);
+  if (!result.ok) {
+    inviteReject.value = result.reason;
     return;
   }
   toast.success(t.value.genesisEligibility.inviteApplied, "");

@@ -308,7 +308,8 @@ const sparkBoxStyle: CSSProperties = {
   marginTop: "14px",
   height: "56px",
   borderRadius: "10px",
-  background: "var(--v5-surface-2)",
+  // hero 已去卡,走势图底盒直接坐在页面底上;surface-2 与页面底同色不可辨 → 改 L1 surface。
+  background: "var(--v5-surface)",
 };
 const viewMarketStyle: CSSProperties = {
   marginTop: "10px",
@@ -322,11 +323,12 @@ const viewMarketStyle: CSSProperties = {
   letterSpacing: "0.04em",
   color: "var(--v5-brand-2)",
 };
-// Quick action cells — filled surface-2 tiles, no border (single visual difference).
+// Quick action cells — filled tiles, no border (single visual difference).
 const quickCellStyle: CSSProperties = {
   marginTop: "12px",
   borderRadius: "12px",
-  background: "var(--v5-surface-2)",
+  // 格子直接坐在页面底上,原 surface-2 与页面底同色不可辨,改 L1 surface。
+  background: "var(--v5-surface)",
   padding: "12px",
   textAlign: "center",
 };
@@ -397,7 +399,8 @@ const pnlCellValueStyle: CSSProperties = {
   fontSize: "13px",
   color: "var(--v5-ink)",
 };
-const useTileStyle: CSSProperties = { padding: "12px", borderRadius: "12px", background: "var(--v5-surface-2)" };
+// 所在区块已去卡,tile 直接坐在页面底上:原 surface-2 与页面底同色不可辨,改 L1 surface。
+const useTileStyle: CSSProperties = { padding: "12px", borderRadius: "12px", background: "var(--v5-surface)" };
 const useTileLabelStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-v5)",

@@ -265,7 +265,8 @@ const badgeStyle: CSSProperties = {
   color: "var(--v5-ink-2)",
 };
 const segWrapStyle: CSSProperties = {
-  background: "var(--v5-surface-2)",
+  // 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 是 tech-cyan 实底,不撞色
+  background: "var(--v5-surface)",
   borderRadius: "16px",
   padding: "4px",
   gap: "2px",
