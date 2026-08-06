@@ -245,3 +245,24 @@ export interface PlatformConfig {
   };
   share: ShareConfig;
 }
+
+type RuntimeWithdrawRuleKey =
+  | "smallAmountThresholdUsd"
+  | "dailyWithdrawLimitCount"
+  | "payoutSlaHours"
+  | "payoutReviewWindowDays"
+  | "networkConfirmFeeUsd";
+
+/**
+ * Transitional seed shape for older local Mock fixtures.
+ *
+ * Runtime consumers always receive a complete `PlatformConfig`; the config
+ * store supplies newly required fields outside the Mock dataset boundary.
+ */
+export type PlatformConfigSeed = Omit<PlatformConfig, "publicStats" | "withdrawRules" | "otpGate"> & {
+  publicStats?: PublicStatsConfig;
+  withdrawRules: Omit<WithdrawRulesConfig, RuntimeWithdrawRuleKey> &
+    Partial<Pick<WithdrawRulesConfig, RuntimeWithdrawRuleKey>>;
+  otpGate: Omit<OtpGateConfig, "captchaAlwaysScenes"> &
+    Partial<Pick<OtpGateConfig, "captchaAlwaysScenes">>;
+};
