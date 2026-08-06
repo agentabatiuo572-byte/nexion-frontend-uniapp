@@ -27,9 +27,23 @@
         </view>
         <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
-      <view class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
-        <text><text style="color: var(--v5-ink); font-weight: 500">{{ app.global.activeDevices.toLocaleString() }}</text> {{ t.home.onGridOnline }}</text>
-        <text style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
+      <!-- 页脚活数字与脉搏三格同判据降级(主人 2026-08-06 拍板包 G P2#3 选项 a):
+           此前配置坏时这里回种子锚,与隔壁「更新中」占位同屏自相矛盾;现口径一致。
+           单项坏降单侧(规格异常3「单项非法只坏本格」);双坏切单条占位 + 点按重试。
+           上方三行客户内容是静态样本(非配置数值),不在降级面。 -->
+      <view
+        v-if="devicesBad && fleetBad"
+        class="px-4 py-2 flex items-center justify-center font-mono-tabular active:opacity-70"
+        style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3); min-height: 44px"
+        @click="retryConfig"
+      >
+        <text>{{ t.home.networkStatUpdating }} · <text style="color: var(--v5-tech-cyan-ink)">{{ t.home.networkStatRetry }}</text></text>
+      </view>
+      <view v-else class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
+        <text v-if="devicesBad">{{ t.home.networkStatUpdating }}</text>
+        <text v-else><text style="color: var(--v5-ink); font-weight: 500">{{ app.global.activeDevices.toLocaleString() }}</text> {{ t.home.onGridOnline }}</text>
+        <text v-if="fleetBad">{{ t.home.networkStatUpdating }}</text>
+        <text v-else style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
       </view>
     </view>
   </view>
@@ -41,20 +55,29 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { computed } from "vue";
-import { payoutPerSecUsdOf, publicStatsHealth, PAYOUT_PER_SEC_USD } from "@/lib/platform-stats";
+import { payoutPerSecUsdOf, publicStatsHealth } from "@/lib/platform-stats";
 
 const t = useT();
 const app = useApp();
 const cfg = useConfig();
-// 🔴 $/sec 走配置派生(2026-08-06 审计 P1:此前设备数活着、这条死钉编译期锚 ——
-//   运营改舰队后**同一屏两套口径**)。配置坏时回种子锚:本条不在规格异常3 的占位管辖面
-//   (那是脉搏三格的规矩),页脚糊一个「数据更新中」比旧值更差。
+// 🔴 $/sec 走配置派生(2026-08-06 审计 P1:此前设备数活着、这条死钉编译期锚)。
+//   「配置坏回种子锚」的旧决策已被主人 2026-08-06 拍板(包 G P2#3 选 a)推翻:
+//   回锚会与脉搏卡的「更新中」占位同屏自相矛盾;现在坏 → template 层占位降级,
+//   本 computed 只在 fleetOk 时被读取(禁回退写死数字,与规格异常2 同口径)。
+const psHealth = computed(() => {
+  const ps = cfg.config.publicStats;
+  return ps ? publicStatsHealth(ps) : null;
+});
+const devicesBad = computed(() => cfg.syncFailed || !psHealth.value?.devicesOk);
+const fleetBad = computed(() => cfg.syncFailed || !psHealth.value?.fleetOk);
 const perSecText = computed(() => {
   const ps = cfg.config.publicStats;
-  // 钱链回退只看 fleetOk(R2 P2:jitter/在线率越域不该把合法舰队值拖回种子锚)
-  const v = ps && publicStatsHealth(ps).fleetOk ? payoutPerSecUsdOf(ps) : PAYOUT_PER_SEC_USD;
-  return `+$${v.toFixed(1)}/sec`;
+  if (!ps || fleetBad.value) return "";
+  return `+$${payoutPerSecUsdOf(ps).toFixed(1)}/sec`;
 });
+function retryConfig() {
+  void cfg.load();
+}
 
 const GRID_CLIENTS = [
   { id: "P", name: "Pocket Studios", model: "SDXL Turbo", color: "var(--v5-brand)", city: "Berlin" },
