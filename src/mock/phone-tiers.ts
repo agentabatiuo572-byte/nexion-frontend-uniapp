@@ -27,13 +27,30 @@ export interface PhoneTierYield {
   baseRateNex: number;
 }
 
-export const PHONE_TIER_YIELDS: PhoneTierYield[] = [
+export let PHONE_TIER_YIELDS: PhoneTierYield[] = [
   { tier: 1, baseRateUsdt: 0.04, baseRateNex: 6 },
   { tier: 2, baseRateUsdt: 0.05, baseRateNex: 8 },
   { tier: 3, baseRateUsdt: 0.06, baseRateNex: 10 },
   { tier: 4, baseRateUsdt: 0.08, baseRateNex: 13 },
   { tier: 5, baseRateUsdt: 0.095, baseRateNex: 16 },
 ];
+
+export function applyCanonicalPhoneTierYields(
+  tiers: ReadonlyArray<{ tier: number; baseRateUsdt: number; baseRateNex: number }>,
+): void {
+  if (
+    tiers.length !== 5
+    || tiers.some((row, index) => row.tier !== index + 1)
+    || tiers.some((row) => !Number.isFinite(row.baseRateUsdt) || !Number.isFinite(row.baseRateNex))
+  ) {
+    throw new Error("E2_PHONE_TIERS_RESPONSE_INVALID");
+  }
+  PHONE_TIER_YIELDS = tiers.map((row) => ({
+    tier: row.tier,
+    baseRateUsdt: row.baseRateUsdt,
+    baseRateNex: row.baseRateNex,
+  }));
+}
 
 /** Single accessor. PROD: replace body with the GET /api/config/phone-tiers result. */
 export function getPhoneTierYields(): PhoneTierYield[] {
