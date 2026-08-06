@@ -59,6 +59,7 @@ const bundle = await build({
       export { createDevice, makeInitialDevices, DEVICE_SPECS } from "@/store/device-types";
       export { CAPACITY_EXEMPT_KINDS } from "@/store/device-lifecycle";
       export { computeRank, isValidPercentileTable } from "@/lib/network-rank";
+      export { completePlatformConfigSeed } from "@/lib/platform-config-compat";
       export { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
     `,
     resolveDir: root,
@@ -73,7 +74,7 @@ const {
   accountTotalHashrate, deviceEffectiveTops, deviceBaselineTops,
   computeLiveHashpower, GPU_TIERS, createDevice, makeInitialDevices,
   DEVICE_SPECS, CAPACITY_EXEMPT_KINDS, computeRank, isValidPercentileTable,
-  DEFAULT_PLATFORM_CONFIG,
+  completePlatformConfigSeed, DEFAULT_PLATFORM_CONFIG,
 } = await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 let pass = 0;
@@ -452,8 +453,9 @@ function hw(kind, over = {}) {
 //   并列 5280(G6 收同档 = 已知天花板①,见 account-hashrate.ts 文件头)——同算力必
 //   同名次(规格③确定性),那不是分位表能解的,靠 Pro 一档代表 + 机架台数拉开量级。
 {
-  const SEED = DEFAULT_PLATFORM_CONFIG.publicStats;
-  const SEED_TIERS = DEFAULT_PLATFORM_CONFIG.computeShare.gpuTiers;
+  const COMPLETE_SEED = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
+  const SEED = COMPLETE_SEED.publicStats;
+  const SEED_TIERS = COMPLETE_SEED.computeShare.gpuTiers;
   check("🔴 ⑥ 真种子分位表通过 isValidPercentileTable(tops 严格升序 · cumPct 单调不减 ≤100 · ≥2 档)",
     isValidPercentileTable(SEED.hashratePercentileTable) === true);
   check("⑥ 种子表覆盖到最大合理舰队量级(最高档 ≥ 50,000 TOPS,10 台顶配机架 ≈ 52,800)",

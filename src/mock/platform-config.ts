@@ -1,12 +1,11 @@
-import type { PlatformConfig } from "@/store/config-types";
+import type { PlatformConfigSeed } from "@/store/config-types";
 import { GPU_TIERS } from "@/lib/gpu-tiers";
-import { FLEET_DEVICES } from "@/lib/platform-stats";
 
 // MOCK-ONLY seed for platform config / feature flags (backend-replaceable).
 // Future PROD `GET /api/config/platform` returns this shape by projecting each
 // domain's existing source (E/K/H3). The client treats the response as read-only;
 // this repo currently has no admin-to-client transport.
-export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
+export const DEFAULT_PLATFORM_CONFIG: PlatformConfigSeed = {
   featureFlags: {
     // DR-1: 电脑算力默认 OFF。
     computeShareEnabled: false,
@@ -14,29 +13,6 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     // day-one task statuses and promo-banner status; client remains read-only.
     homeNewcomerTasksEnabled: true,
     homeWeeklyPromoEnabled: true,
-  },
-  // Schema compatibility for the synced client. Existing local Mock datasets
-  // remain preserved; these values only satisfy the newly required config shape.
-  publicStats: {
-    fleetDevices: FLEET_DEVICES,
-    onlineRatePct: 100,
-    onlineJitter: 24,
-    registeredUsersBase: 1_420_000,
-    registeredUsersMonthlyGrowthPct: 2.9,
-    registeredUsersAnchorAt: Date.UTC(2026, 7, 1),
-    virtualUserCount: 12_000,
-    hashratePercentileTable: [
-      { tops: 5, cumPct: 20 },
-      { tops: 20, cumPct: 55 },
-      { tops: 60, cumPct: 82 },
-      { tops: 150, cumPct: 96 },
-      { tops: 700, cumPct: 97.6 },
-      { tops: 2_700, cumPct: 98.7 },
-      { tops: 5_400, cumPct: 99.3 },
-      { tops: 11_000, cumPct: 99.6 },
-      { tops: 27_000, cumPct: 99.8 },
-      { tops: 53_000, cumPct: 99.9 },
-    ],
   },
   // SPEC-1 在线加成系数(单一来源:lib/hashpower.ts 派生 H5_BASE_FACTOR / CONTINUITY_FULL_MS)。
   // 与 admin compute-config COMPUTE_COEFFICIENTS 同 key,运营在 E6 调,PROD 由服务端下发。
@@ -68,11 +44,6 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     firstWithdrawalManual: true,
     newAddressHoldHours: 24,
     rebindCooldownDays: 7,
-    smallAmountThresholdUsd: 50,
-    dailyWithdrawLimitCount: 1,
-    payoutSlaHours: 24,
-    payoutReviewWindowDays: 0,
-    networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 },
   },
   rewards: {
     // NEX 数量原 200(≈免费 $2000 提现抵扣额度)过松,已收紧到 20;此处仅 mock seed,运营在 K 域调。
@@ -87,7 +58,6 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfig = {
     otpTtlSeconds: 300,
     maxVerifyAttempts: 5,
     captchaTicketTtlSeconds: 120,
-    captchaAlwaysScenes: ["register"],
   },
   // SPEC-7 §5b 七维权重 mock seed(K4 权威可配)。强维 0.8+,中维 0.4-0.5,弱维 ≤0.3。
   riskScore: {

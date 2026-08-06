@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./config-types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable, type WithdrawNetworkKey } from "@/store/nex-faucet";
+import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -15,47 +16,7 @@ const IS_PRODUCTION = import.meta.env.PROD;
 // fetched response as READ-ONLY (no current admin push channel in this repo).
 export const useConfig = defineStore("config", () => {
   // PROD: hydrate from GET /api/config/platform instead of the mock seed.
-  const config = ref<PlatformConfig>({
-    featureFlags: { ...DEFAULT_PLATFORM_CONFIG.featureFlags },
-    publicStats: {
-      ...DEFAULT_PLATFORM_CONFIG.publicStats,
-      // 🔴 分位表必须深拷贝:浅拷贝会让 store 与 seed 共享同一个数组,
-      //   运营改一档就把「默认值」本身改掉了,reset 也回不去。
-      hashratePercentileTable: DEFAULT_PLATFORM_CONFIG.publicStats.hashratePercentileTable.map((b) => ({ ...b })),
-    },
-    onlineBonus: { ...DEFAULT_PLATFORM_CONFIG.onlineBonus },
-    riskCluster: { ...DEFAULT_PLATFORM_CONFIG.riskCluster },
-    withdrawRules: {
-      ...DEFAULT_PLATFORM_CONFIG.withdrawRules,
-      networkConfirmFeeUsd: { ...DEFAULT_PLATFORM_CONFIG.withdrawRules.networkConfirmFeeUsd },
-    },
-    rewards: {
-      welcomeGift: { ...DEFAULT_PLATFORM_CONFIG.rewards.welcomeGift },
-      inviterReward: { ...DEFAULT_PLATFORM_CONFIG.rewards.inviterReward },
-    },
-    riskScore: {
-      dimensionWeights: { ...DEFAULT_PLATFORM_CONFIG.riskScore.dimensionWeights },
-      weakSignalClusterThreshold: DEFAULT_PLATFORM_CONFIG.riskScore.weakSignalClusterThreshold,
-    },
-    otpGate: {
-      ...DEFAULT_PLATFORM_CONFIG.otpGate,
-      // 数组字段展开新副本(仿 gpuTiers.keywords 先例):浅展开会共享数组引用,违反 store 克隆约定。
-      captchaAlwaysScenes: [...DEFAULT_PLATFORM_CONFIG.otpGate.captchaAlwaysScenes],
-    },
-    computeShare: {
-      downloadUrl: DEFAULT_PLATFORM_CONFIG.computeShare.downloadUrl,
-      content: { ...DEFAULT_PLATFORM_CONFIG.computeShare.content },
-      gpuTiers: DEFAULT_PLATFORM_CONFIG.computeShare.gpuTiers.map((tier) => ({
-        ...tier,
-        keywords: [...tier.keywords],
-      })),
-    },
-    share: {
-      baseUrl: DEFAULT_PLATFORM_CONFIG.share.baseUrl,
-      channels: DEFAULT_PLATFORM_CONFIG.share.channels.map((c) => ({ ...c })),
-      appDownload: { ...DEFAULT_PLATFORM_CONFIG.share.appDownload },
-    },
-  });
+  const config = ref<PlatformConfig>(completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG));
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
