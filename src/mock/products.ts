@@ -2,6 +2,7 @@
 // Ported from Nexion-prototype/lib/mock/products.ts (zero React deps — plain data
 // + 2 pure helpers; copied faithfully so the store page renders the same 6 tiers).
 
+import { reactive } from "vue";
 import type { PhaseId } from "@/store/product-phase";
 
 // AI workload throughput per device — replaces "MH/s" hash rate in the
@@ -68,7 +69,7 @@ export interface Product {
   purchaseGate?: PurchaseGate;
 }
 
-export const PRODUCTS: Product[] = [
+export const PRODUCTS: Product[] = reactive([
   {
     id: "stellarbox-s1",
     name: "NexGridBox S1",
@@ -264,7 +265,15 @@ export const PRODUCTS: Product[] = [
     },
     status: "active",
   },
-];
+]);
+
+export function replaceProductCatalog(products: Product[]): void {
+  PRODUCTS.splice(0, PRODUCTS.length, ...products);
+}
+
+export function clearProductCatalog(): void {
+  PRODUCTS.splice(0, PRODUCTS.length);
+}
 
 export function getProduct(id: string): Product | undefined {
   return PRODUCTS.find((p) => p.id === id);
