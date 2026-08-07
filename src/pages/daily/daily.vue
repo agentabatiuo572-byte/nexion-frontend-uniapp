@@ -184,6 +184,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
@@ -342,8 +343,17 @@ function handleCheckIn() {
   // 对策照仓里既有的自愈教条(App.vue reconcileBills:「别记,从现有数据推出来」)——
   // ref 用**当天日期**保持稳定,进页面时若发现「今天签过但账上没有那条分录」就补发;
   // 幂等出口保证补发不会变成第二次发钱。
-  if (postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted",
-    memo: `Daily check-in · ${r.streak}-day streak`, ref: signInRef(faucet.lastSignedInAt) }]) !== "ok") return;
+  const paid = postMoneyBillsOnce([{ type: "bonus", symbol: "NEX", amount: r.gained, status: "posted",
+    memo: `Daily check-in · ${r.streak}-day streak`, ref: signInRef(faucet.lastSignedInAt) }]);
+  // 签到发奖这一跳就是上面那个 POST /api/faucet/sign-in —— 地区拒绝以它的结果回来。
+  // 🔴 翻译不出来(`null`)就是普通结果,原样落回下面的 `!== "ok"` 出口:
+  //    发钱失败仍然是发钱失败,不许被说成地区受限。
+  const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+  if (geo) {
+    toast.error(geo);
+    return;
+  }
+  if (paid !== "ok") return;
   try {
     uni.vibrateShort({ fail: () => {} });
   } catch {
@@ -389,14 +399,22 @@ function handleClaimMilestone(m: Milestone) {
     // 曾挂过的自愈已撤销(判据分不清「没发过」与「发过但账单丢了」,实测会二次发钱);
     // 曾提案用存储层事务根治,独立证伪判定不可行。这是 mock 期的已知边界,由真后端事务收口。
     // 发钱失败对用户是**响的**(有失败提示),不是静默吞掉。
-    if (postMoneyBillsOnce([{
+    const paid = postMoneyBillsOnce([{
       type: "bonus",
       symbol: m.reward.type === "usdt" ? "USDT" : "NEX",
       amount: m.reward.amount,
       status: "posted",
       memo: `Streak milestone · Day-${m.day}`,
       ref: `STREAK-D${m.day}`,
-    }]) !== "ok") return;
+    }]);
+    // 同签到:里程碑发奖是本页第二个发钱跳,地区拒绝以它的结果回来。
+    // `null` = 普通结果 → 原样走下面的 `!== "ok"` 出口。
+    const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+    if (geo) {
+      toast.error(geo);
+      return;
+    }
+    if (paid !== "ok") return;
   }
   // Day-30 "spin" milestone grants a bonus Lucky Spin ticket + opens the wheel.
   if (m.reward.type === "spin") {
