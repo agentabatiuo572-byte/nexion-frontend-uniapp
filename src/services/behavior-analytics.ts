@@ -436,7 +436,7 @@ type BehaviorTapEvent = {
   currentTarget?: { dataset?: Record<string, unknown> };
 };
 
-/** Native and mini-program controls can bind `@tap="trackBehaviorTap"`. */
+/** Native and mini-program controls can bind this handler to their tap event. */
 export function trackBehaviorTap(event: BehaviorTapEvent): void {
   try {
     const point = event.changedTouches?.[0] || event.touches?.[0] || event.detail;
