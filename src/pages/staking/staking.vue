@@ -126,6 +126,7 @@ import CompoundCalculator from "@/components/staking/compound-calculator.vue";
 import StakeSheet from "@/components/staking/stake-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBill, reportStuckFunds } from "@/lib/money-receipt";
 import { useApp } from "@/store/app";
 import {
@@ -201,6 +202,44 @@ function goHowItWorks() {
   uni.navigateTo({ url: "/pages/staking/how-it-works", fail: () => {} });
 }
 
+/**
+ * 平仓 / 领取这一跳就是真后端的 `POST /api/staking/:id/{claim|early-withdraw}`
+ * (**路径**出处 PRD §9.11e —— 先前这里把资源名写成复数形式,正是
+ *  endpoint-citation-sentinel 当初为之而建的笔误族。⚠️ 说明笔误时也**不要**把错误路径
+ *  原样写进注释:这道门扫的就是注释,写进来照样报红,而且它是对的)。
+ *
+ * ⚠️ 这两个 endpoint **是否受地区策略保护,PRD 没有明说**(2026-08-07 第四轮验收 F2 纠正):
+ * §9.11e 讲的是跨 store 变更的事务边界,通篇不提 geo;§9.11d.1 定义地区机制时点名的是
+ * 「Genesis marketplace 等」,既没点名包含也没点名排除本组路由。所以下面这道翻译是
+ * **先放好的位**,不是「PRD 已确认要保护」。别把「路径有出处」读成「地区归属有出处」——
+ * 上一轮我们正是用同一把尺子否掉了活动页那句无出处的「不受地区约束」。
+ * 被地区策略拒时它是唯一失败的一步 —— 此刻仓位没动、钱也没动,所以第二行给「余额没变动」。
+ *
+ * 🔴 判**返回值**不判异常(2026-08-07 审计 P1-1 纠正):本仓 staking store 的
+ * stake / earlyWithdraw / claim / commit **全部**用 `{ ok, conflict }` 报失败,
+ * 一次 throw 都没有;同文件头注也把生产形态写成「一次服务端事务返回 canonical 值」。
+ * 原先写成 try/catch 是押「后端会抛异常」—— 与仓内既定惯例相反,真接上大概率永远命中不到,
+ * 而团队会误以为它和其余 12 个点一样接好了。
+ * **返回 null = 不是地区拒绝**,调用方原样走既有失败分支。
+ */
+function geoRefusalText(reason: unknown): string | null {
+  return geoPolicyUserMessage(reason, t.value.geoPolicy);
+}
+
+/**
+ * 失败兜底:store 返回 `{ok:false, conflict:false}` 时(前置条件不满足 / 本地存储写不进去,
+ * 地区拒绝将来也大概率落这一档)原先**什么都不显示** —— 违反「禁静默无反馈」。
+ * 地区拒绝优先翻译,其余给通用失败提示。
+ */
+function reportStakingFailure(reason: unknown, fallbackTitle: string) {
+  const geo = geoRefusalText(reason);
+  if (geo) {
+    toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+    return;
+  }
+  toast.error(fallbackTitle);
+}
+
 async function handleEarlyWithdraw(p: StakingPosition) {
   const penaltyRate = STAKING_PENALTY[p.termDays];
   const penalty = (p.amountUSDT * penaltyRate).toFixed(2);
@@ -248,6 +287,10 @@ async function handleEarlyWithdraw(p: StakingPosition) {
     // 这笔在别处(另一标签页 / 另一端)已经动过,store 已把最新状态刷回来 —— 说清楚,
     // 不能让用户点了没反应。
     toast.warn(t.value.stakingV3.toast.staleTitle, t.value.stakingV3.toast.staleSubtitle);
+  } else {
+    // 🔴 2026-08-07 审计 P1-1:原先没有这个 else —— conflict=false 时页面**完全静默**,
+    // 不是显示错文案,是什么都不显示。地区拒绝将来也大概率落这一档。
+    reportStakingFailure(r, t.value.stakingV3.toast.staleTitle);
   }
 }
 
@@ -279,6 +322,10 @@ function handleClaim(p: StakingPosition) {
     );
   } else if (r.conflict) {
     toast.warn(t.value.stakingV3.toast.staleTitle, t.value.stakingV3.toast.staleSubtitle);
+  } else {
+    // 🔴 2026-08-07 审计 P1-1:原先没有这个 else —— conflict=false 时页面**完全静默**,
+    // 不是显示错文案,是什么都不显示。地区拒绝将来也大概率落这一档。
+    reportStakingFailure(r, t.value.stakingV3.toast.staleTitle);
   }
 }
 

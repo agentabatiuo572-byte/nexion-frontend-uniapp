@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * 首页网络脉搏卡的运行时行为探针(规格 FEAT-HOME02)— node 直跑,需 5173 dev:
+ * 首页网络脉搏卡的运行时行为探针(规格 FEAT-HOME02)— node 直跑,需 dev server:
  *   node scripts/behavior-verify-network-pulse.mjs
+ * 默认打 5173;worktree 里主 checkout 占着 5173 时必须显式改写 origin,否则探的是别人的树:
+ *   UNI_BASE_URL=http://localhost:5211 node scripts/behavior-verify-network-pulse.mjs
  *
  * 验的是「真渲染出来的东西」,不是源码声明:
  *   ① 三格在位,零写死值残留(#18,742 / ↑ 12 in 24h / registered·英文副文本 全部绝迹);
@@ -20,6 +22,7 @@ import { atAliasResolver } from "./lib/at-alias.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 
 let pass = 0, fail = 0;
 const check = (name, cond, detail = "") => {
@@ -50,7 +53,7 @@ const expectedRegisteredCompact = `${(expectedRegistered / 1_000_000).toFixed(2)
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
 const errors = [];
-page.on("console", collectAppConsoleErrors(errors, "http://127.0.0.1:5173"));
+page.on("console", collectAppConsoleErrors(errors, BASE));
 
 // 🔴 预注入「里程碑全部已放过」(uni 包装格式 {type,data},裸 JSON 会被判无效):
 //   种子账号收益跨过全部档位,冷启动会连播 5 层庆祝弹层,和点击测试赛跑必输。
@@ -69,7 +72,7 @@ await page.addInitScript(() => {
   );
 });
 
-await page.goto("http://127.0.0.1:5173/?nx_device=off#/pages/index/index", { waitUntil: "networkidle" });
+await page.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "networkidle" });
 await page.waitForTimeout(1200); // 进场动画 + store tick 首拍
 
 const body = await page.evaluate(() => document.body.innerText);

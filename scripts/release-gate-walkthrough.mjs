@@ -6,7 +6,7 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const baseUrl = "http://localhost:5173";
+const baseUrl = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const PHASE_FILE = "src/store/product-phase.ts";
 const results = [];
 let failed = 0;

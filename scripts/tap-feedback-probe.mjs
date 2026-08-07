@@ -19,7 +19,8 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
-const BASE = process.env.UNI_BASE_URL || "http://localhost:5173";
+// 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 统一名)——只认前者会在非 5173 端口静默打到别的工程树。
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const LEDGER_PATH = "docs/TAP-FEEDBACK-LEDGER.json";
 const args = process.argv.slice(2);
 const SELFTEST = args.includes("--selftest");
@@ -321,11 +322,13 @@ if (SELFTEST) {
 
 const routes = routesOf(SWEEP_ALL);
 const results = [];
+const failedRoutes = [];
 for (const [i, r] of routes.entries()) {
   try {
     results.push(await probeRoute(page, cdp, r, i));
   } catch (e) {
     console.error(`  ! ${r}: ${e.message.split("\n")[0]}`);
+    failedRoutes.push(r);
   }
 }
 await browser.close();
@@ -339,6 +342,14 @@ for (const r of results) {
 }
 
 const total = results.reduce((a, r) => a + r.targets.length, 0);
+// 🔴 覆盖面 witness:**探不到 ≠ 无违例**。上面那个 catch 把导航失败降级成一行 `!` 警告,
+//    然后本脚本一路走到 exit 0 —— 实测 BASE_URL 指向死端口时 5 条路由全 ERR_CONNECTION_REFUSED,
+//    它照样打印「无新违例(0 个 tap 目标)」并判绿,dev server 没起 / 端口指错时这道门静默全过。
+//    放在 UPDATE 之前:拿一次坏跑去 --update-ledger 会把 11 条存量黄灯清成空台账(门连基线一起丢)。
+if (failedRoutes.length || total === 0) {
+  console.error(`tap-feedback 判据失效:${failedRoutes.length}/${routes.length} 条路由探测失败,共扫到 ${total} 个 tap 目标(应 >0)——按红处理,不许当「无违例」`);
+  process.exit(1);
+}
 if (UPDATE) {
   writeFileSync(LEDGER_PATH, JSON.stringify({
     generatedAt: new Date().toISOString(),

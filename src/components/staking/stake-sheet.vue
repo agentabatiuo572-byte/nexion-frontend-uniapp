@@ -86,6 +86,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 
@@ -172,6 +173,12 @@ function submit() {
     memo: `Stake open · ${term}d @ ${(STAKING_APY[term] * 100).toFixed(0)}% APY`,
     ref: billRef,
   });
+  // 同 purchase-sheet:拒绝在扣款落地之前,「资金没动」成立。
+  const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+  if (geo) {
+    toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+    return;
+  }
   if (paid === "insufficient") {
     toast.error(
       t.value.stakingV3.toast.insufficient,

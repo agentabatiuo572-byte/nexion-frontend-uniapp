@@ -18,7 +18,10 @@
 
 set -u
 MODULE="${1:-all}"
-BASE_URL="${BASE_URL:-http://localhost:5173}"
+# 🔴 export:本脚本 spawn 的**每个**探针都必须打同一个 origin。不 export 时,只读
+#   UNI_BASE_URL 的那几个探针(dom-qa / tap-feedback / empty-state / invisible-fill)
+#   会各自回落 5173 —— worktree 里主 checkout 正占着 5173,于是它们静默验了别的工程树。
+export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
@@ -614,6 +617,23 @@ fi
 # 这里只守「推进入口唯一且接的是那个纯函数」——判定守得再严,接错地方一样白守。
 # ⚠️ sentinel_present 的 pattern 走 grep -E,括号是分组不是字面量 —— 必须转义,
 # 否则哨兵恒假红(本条第一版就这么栽了)。
+# ── app-route-single-reader:App.vue 路由读取口唯一(2026-08-07 同形越权洞族根治)──
+# 守门/会话驱逐/任务播种全部经 readCurrentRoute 单一读取口(自带 hash 兜底 + 归一化)。
+# 曾因「读取函数有两个:一个冷启动返回空、一个返回不同形原文」在三处判据上各咬一口。
+# 判据构造性:App.vue 全文(含注释)页面栈原语/地址栏 hash 各只许出现 1 次(都在读取口内),
+# 旧双读口函数名必须绝迹 —— 注释里也别写这些字面量,写「页面栈」即可。
+# ⚠️ 保护范围如实声明(独立审查 2026-08-07 指出):本哨兵只收口 App.vue 的**守卫判据**;
+#    global-ui / milestone-celebration / app-chassis / sub-page-header / tradein-sheets 另有
+#    5 份组件级读取口(纯展示/导航用,非权限资金判据),不在本哨兵内 —— 收口它们是独立后续包。
+# ⚠️ 计数用 -o 按**出现次数**:grep -c 数的是行数,同一行塞两个读取口不会涨数(审查构造性击穿过)。
+arsr_pages=$(grep -o "getCurrentPages" src/App.vue | wc -l | tr -d '[:space:]' || true)
+arsr_hash=$(grep -oE "location\.hash" src/App.vue | wc -l | tr -d '[:space:]' || true)
+arsr_orh=$(grep -o "readCurrentRouteOrHash" src/App.vue | wc -l | tr -d '[:space:]' || true)
+if [ "${arsr_pages:-0}" = "1" ] && [ "${arsr_hash:-0}" = "1" ] && [ "${arsr_orh:-0}" = "0" ]; then
+  ok "app-route-single-reader(页面栈原语=1 · hash 兜底=1 · 旧双读口=0)"
+else
+  bad "app-route-single-reader(页面栈原语=${arsr_pages} 期望1 · hash=${arsr_hash} 期望1 · 旧双读口=${arsr_orh} 期望0)"
+fi
 sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
@@ -1351,11 +1371,24 @@ no_native_button
 # click listeners → a dual-bound element fires its handler TWICE per tap/click
 # (steppers +2, toggles open-then-close, navigateTo ×2 → stack corruption via
 # the navTo fallback chain). uni's compiler maps @click → tap on mp targets, so
-# single @click is correct on every platform. Comment MENTIONS of "@tap"
-# (migration notes) are fine — only the binding form `@tap...=` is banned.
+# single @click is correct on every platform. Only a LIVE binding is banned:
+# comment bodies are blanked first (script //-line + /* */, template <!-- -->), so
+# a migration note that QUOTES `@tap="x"` — behavior-analytics.ts JSDoc, earn.vue
+# template note — is documentation, not a dual-bind. Blanking keeps the newlines
+# so the reported line numbers stay true.
 no_tap_binding() {
   local hits
-  hits=$(grep -rnE '@tap(\.[a-z]+)*=' src 2>/dev/null | head -5)
+  hits=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const blank=(m)=>m.replace(/[^\n]/g,"");
+const strip=(s)=>s.replace(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/g,blank).replace(/^[ \t]*\/\/.*$/gm,"");
+const re=/@tap(\.[a-z]+)*=/;
+const hits=[];
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);
+if(fs.statSync(p).isDirectory())walk(p);else if(/\.(vue|ts|js)$/.test(f)){
+strip(fs.readFileSync(p,"utf8")).split(/\r?\n/).forEach((ln,i)=>{
+if(re.test(ln))hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim())});}}})("src");
+if(hits.length){console.log(hits.slice(0,5).join("\n"));process.exit(1)}' 2>&1)
   if [ -z "$hits" ]; then ok "no @tap binding (single @click correct on all targets, P-059) (0 hits)";
   else bad "@tap binding — H5 double-fires alongside click; use single @click (P-059)"; echo "$hits" | sed 's/^/        /'; fi
 }
@@ -1756,7 +1789,9 @@ platform_stats_anchor() {
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
   done
   # (6) trust Q2 print ↔ admin managed-content mirror value parity (键 parity ≠ 值 parity)
-  ADMIN_ITABS="../Nexion-admin-prototype/app/components/domain-views/i-tabs/data.ts"
+  # 🔴 走 $ADMIN_ROOT(上方 36-44 行已解析 linked worktree 的情形),不写裸相对路径:
+  #   worktree 里 `../Nexion-admin-prototype` 落在 .claude/worktrees/ 下,文件恒读不到 → 两条恒假红。
+  ADMIN_ITABS="$ADMIN_ROOT/app/components/domain-views/i-tabs/data.ts"
   for v in '27,150' '\$47\.0M'; do
     if ! grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then bad "platform-anchor: trust.vue missing Q2 print /$v/"; fails=1; fi
     if ! grep -qE "$v" "$ADMIN_ITABS" 2>/dev/null; then bad "platform-anchor: admin i-tabs mirror missing /$v/ (cross-repo drift)"; fails=1; fi

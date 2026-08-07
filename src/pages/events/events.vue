@@ -71,6 +71,7 @@ import CardStagger from "@/components/card-stagger.vue";
 import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import { useT } from "@/i18n/use-t";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useLuckySpin } from "@/store/lucky-spin";
@@ -141,9 +142,18 @@ function rewardNexOf(ev: EnrichedEvent): number {
 
 function handleJoin(ev: EnrichedEvent) {
   if (!ev._trackable) return;
-  if (eventQuest.join(ev.id)) {
+  const joined = eventQuest.join(ev.id);
+  if (joined) {
     toast.success(t.value.events.toast.joinedTitle.replace("{name}", ev.title), t.value.events.toast.joinedBody);
+    return;
   }
+  // 🔴 join() 返回 false **只有一种含义:这个活动已经加入过**(幂等短路),不是失败。
+  // 2026-08-07 第四轮验收 F1:我上一版把它当失败弹「没能把你加进这个活动」——
+  // 用户连点两下就会看到与事实相反的报错。同文件领奖侧早就处理对了(幂等 false 静默返回),
+  // 这里对齐它。
+  // 至于地区拒绝:store 目前**没有任何表达「真失败」的通道**(join 只返回布尔),
+  // 所以这条路径没有可翻译的对象 —— 等接口层接通、join 能回出拒绝原因时再接,
+  // 硬接一个布尔值只会得到一段恒不触发的死代码。已记进交接书。
 }
 
 function handleClaim(ev: EnrichedEvent) {
@@ -154,14 +164,25 @@ function handleClaim(ev: EnrichedEvent) {
   // 🔴 顺序 = 先发钱(幂等)→ 后消费资格(2026-08-04 对抗审计 B-P1-3):原来先 claim 消费掉,
   // 发钱失败就 return,资格没了奖归零。ref 去掉时间戳改成活动 id(活动只能领一次,天然稳定)——
   // 带时间戳的 ref 判重永不命中,幂等出口会退化成普通出口。
-  if (reward > 0 && postMoneyBillsOnce([{
-    type: "achievement",
-    symbol: "NEX",
-    amount: reward,
-    status: "posted",
-    memo: `Event reward · ${ev.id}`,
-    ref: `EVENT-${ev.id}`,
-  }]) !== "ok") return;
+  const paid = reward > 0
+    ? postMoneyBillsOnce([{
+      type: "achievement",
+      symbol: "NEX",
+      amount: reward,
+      status: "posted",
+      memo: `Event reward · ${ev.id}`,
+      ref: `EVENT-${ev.id}`,
+    }])
+    : "ok";
+  // 领奖这一跳就是上面那个待定的 event-claim endpoint —— 地区拒绝以它的结果回来
+  // (join 那条路径已一并接上 —— 见 handleJoin 的说明)。
+  // 🔴 `null` = 普通结果,原样走下面的 `!== "ok"` 出口,发钱失败不许被说成地区受限。
+  const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+  if (geo) {
+    toast.error(geo);
+    return;
+  }
+  if (paid !== "ok") return;
   if (!eventQuest.claim(ev.id)) return; // 消费失败:钱已幂等落定,重试命中同一 ref 不会再发
   toast.success(t.value.events.toast.claimedTitle.replace("{n}", reward.toLocaleString()), ev.title);
 }
