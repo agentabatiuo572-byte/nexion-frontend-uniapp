@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** me-headers-check.mjs — confirm the 3 me-page section headers render + no Vue warn. */
 import { chromium } from "playwright";
-const BASE = "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
 const page = await ctx.newPage();
@@ -10,7 +10,7 @@ page.on("console", (m) => msgs.push(`${m.type()}: ${m.text()}`));
 page.on("pageerror", (e) => msgs.push("PAGEERROR: " + String(e)));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-await page.goto(`${BASE}/#/pages/me/me`, { waitUntil: "networkidle", timeout: 30000 });
+await page.goto(`${BASE}/?nx_device=off#/pages/me/me`, { waitUntil: "networkidle", timeout: 30000 });
 await wait(4000);
 const txt = await page.evaluate(() => document.body.innerText);
 const has = (s) => txt.includes(s);

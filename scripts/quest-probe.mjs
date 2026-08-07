@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /** quest-probe.mjs — observe the home day-one-quest-card real (store-driven) state. */
 import { chromium } from "playwright";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
 const p = await ctx.newPage();
-await p.goto("http://localhost:5173/#/pages/index/index", { waitUntil: "networkidle", timeout: 30000 });
+await p.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "networkidle", timeout: 30000 });
 await new Promise((r) => setTimeout(r, 2500));
 const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexgrid-quest-v1"));
 const completedCounterText = await p.evaluate(() => {
