@@ -158,7 +158,8 @@ function handleRepurchase() {
   // reported to the user as a region block.
   const geoPaid = geoPolicyUserMessage(paid, t.value.geoPolicy);
   if (geoPaid) {
-    toast.error(geoPaid);
+    // 同上:复投是动钱路径,拒单必须带资金交代。
+    toast.error(geoPaid, t.value.geoPolicy.fundsSafeNote);
     return;
   }
   if (paid === "insufficient") {

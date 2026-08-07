@@ -134,9 +134,13 @@ async function loadSrcModule(...rel) {
   });
   return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
 }
-// 复投页在拒单前先试译地区策略回执。这里注入**真实现**而不是桩:桩成「永远 null」
-// 等于把这条分支从门下摘掉,而桩成「永远有值」则会把普通失败吞成「地区受限」——
-// 两种桩都让下面「有失败提示 + 余额被补回」的断言失去判别力。
+// 复投页在拒单前先试译地区策略回执。这里注入**真实现**而不是桩。
+// ⚠️ 2026-08-07 审计订正:原注释说「两种桩都让断言失去判别力」——只有一半成立。
+// 本场景 START=5000 / AMT=200 恒够钱,postMoneyBill 只可能返回 "ok",
+// 所以「永远 null」的桩与真实现**逐位同行为**,并不削弱判别力;
+// 真正会出事的是「永远有值」的桩(把普通失败吞成地区受限),而那种桩现有断言
+// 本来就抓得住(它比对的是精确 toast 标题)。注入真实现仍是对的选择——
+// 它让这条分支跟着真实现走,不必在实现变化时同步维护桩。
 const { geoPolicyUserMessage } = await loadSrcModule("api", "geo-policy-error.ts");
 
 const ACCOUNTS_KEY = "nexgrid-v3-staking-accounts-v1";

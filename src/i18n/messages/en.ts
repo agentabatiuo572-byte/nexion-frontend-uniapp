@@ -175,10 +175,14 @@ export const en = {
   // argument, so renaming or dropping a key breaks every call site of
   // geoPolicyUserMessage().
   geoPolicy: {
-    blocked: "We're not open in your area yet.",
-    limited: "Your area only has some features open right now.",
-    endpoint: "This one isn't open in your area yet.",
-    unavailable: "We couldn't confirm where you are right now. Please try again.",
+    blocked: "We're not open in your area yet. Contact support if you need help.",
+    limited: "Some features aren't open in your area yet. Contact support for details.",
+    endpoint: "This feature isn't open in your area yet. Contact support if you need help.",
+    unavailable: "We couldn't confirm your region right now. Please try again.",
+    // 只在动钱的页面(提现/兑换/复购)作为提示的第二行传入。
+    // 被拦住的用户第一个念头是「我的钱呢」,不是「哪些功能开了」——本仓
+    // withdrawRouteRejectBody 早就把标准答案写出来了,这里对齐它。
+    fundsSafeNote: "Your balance is untouched and nothing has been charged.",
   },
   countryCodes: {
     title: "Country / region",

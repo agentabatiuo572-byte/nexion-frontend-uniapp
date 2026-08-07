@@ -172,10 +172,12 @@ export const vi: Messages = {
     errorServiceUnavailable: "Hiện chưa xác minh được tài khoản. Vui lòng thử lại.",
   },
   geoPolicy: {
-    blocked: "Khu vực của bạn hiện chưa được mở.",
-    limited: "Khu vực của bạn hiện chỉ mở một số tính năng.",
-    endpoint: "Tính năng này chưa mở ở khu vực của bạn.",
+    blocked: "NexGrid hiện chưa khả dụng ở khu vực của bạn. Liên hệ hỗ trợ nếu bạn cần trợ giúp.",
+    limited: "Một số tính năng chưa khả dụng ở khu vực của bạn. Liên hệ hỗ trợ để biết thêm.",
+    endpoint: "Tính năng này chưa khả dụng ở khu vực của bạn. Liên hệ hỗ trợ nếu bạn cần trợ giúp.",
     unavailable: "Hiện chưa xác nhận được khu vực của bạn. Vui lòng thử lại.",
+    // 只在动钱的页面(提现/兑换/复购)作为提示的第二行传入。
+    fundsSafeNote: "Số dư của bạn không thay đổi và không trừ khoản tiền nào.",
   },
   countryCodes: {
     title: "Quốc gia / khu vực",
