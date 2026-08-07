@@ -617,6 +617,23 @@ fi
 # 这里只守「推进入口唯一且接的是那个纯函数」——判定守得再严,接错地方一样白守。
 # ⚠️ sentinel_present 的 pattern 走 grep -E,括号是分组不是字面量 —— 必须转义,
 # 否则哨兵恒假红(本条第一版就这么栽了)。
+# ── app-route-single-reader:App.vue 路由读取口唯一(2026-08-07 同形越权洞族根治)──
+# 守门/会话驱逐/任务播种全部经 readCurrentRoute 单一读取口(自带 hash 兜底 + 归一化)。
+# 曾因「读取函数有两个:一个冷启动返回空、一个返回不同形原文」在三处判据上各咬一口。
+# 判据构造性:App.vue 全文(含注释)页面栈原语/地址栏 hash 各只许出现 1 次(都在读取口内),
+# 旧双读口函数名必须绝迹 —— 注释里也别写这些字面量,写「页面栈」即可。
+# ⚠️ 保护范围如实声明(独立审查 2026-08-07 指出):本哨兵只收口 App.vue 的**守卫判据**;
+#    global-ui / milestone-celebration / app-chassis / sub-page-header / tradein-sheets 另有
+#    5 份组件级读取口(纯展示/导航用,非权限资金判据),不在本哨兵内 —— 收口它们是独立后续包。
+# ⚠️ 计数用 -o 按**出现次数**:grep -c 数的是行数,同一行塞两个读取口不会涨数(审查构造性击穿过)。
+arsr_pages=$(grep -o "getCurrentPages" src/App.vue | wc -l | tr -d '[:space:]' || true)
+arsr_hash=$(grep -oE "location\.hash" src/App.vue | wc -l | tr -d '[:space:]' || true)
+arsr_orh=$(grep -o "readCurrentRouteOrHash" src/App.vue | wc -l | tr -d '[:space:]' || true)
+if [ "${arsr_pages:-0}" = "1" ] && [ "${arsr_hash:-0}" = "1" ] && [ "${arsr_orh:-0}" = "0" ]; then
+  ok "app-route-single-reader(页面栈原语=1 · hash 兜底=1 · 旧双读口=0)"
+else
+  bad "app-route-single-reader(页面栈原语=${arsr_pages} 期望1 · hash=${arsr_hash} 期望1 · 旧双读口=${arsr_orh} 期望0)"
+fi
 sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
