@@ -19,7 +19,7 @@ import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { isStaticReviewRoute } from "@/lib/static-review-routes";
+import { isStaticReviewRoute, normalizeRoute } from "@/lib/static-review-routes";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
@@ -329,12 +329,22 @@ const AUTH_WHITELIST_PREFIXES = [
   "pages/session/", // kicked screen — never auth/session-redirect away from it
 ];
 function isAuthWhitelisted(route: string): boolean {
-  return isStaticReviewRoute(route) || AUTH_WHITELIST_PREFIXES.some((p) => route.startsWith(p));
+  // 🔴 两个判据必须同形:normalizeRoute 吃得下 `pages/x` 与冷启动时的 `#/pages/x?q=1`。
+  //    原来后半段直接 startsWith,喂 hash 形态时白名单判不中 —— 守卫会在 intro 页
+  //    自己把自己踢回 intro(死循环),所以下面 checkAuthGuard 敢回退到 hash 的前提就是这里。
+  const r = normalizeRoute(route);
+  return isStaticReviewRoute(route) || AUTH_WHITELIST_PREFIXES.some((p) => r.startsWith(p));
 }
 // Returns true if it redirected (callers bail so they don't act on a route the
 // user is being kicked off of).
 function checkAuthGuard(): boolean {
-  const route = readCurrentRoute();
+  // 🔴 必须带 hash 兜底(2026-08-07 实测的越权缺口):H5 冷启动时 App 的 onShow 早于
+  //    页面栈建立,readCurrentRoute() 返回空 → 原来在下一行 `!route` 直接放行;
+  //    而**同一次** onShow 又因本守卫返回 false 而 return(见 onShow),
+  //    startQuestWatch() 永不执行 → 1s 轮询守卫不启动 → 之后再没有第二次检查。
+  //    净效果:登出态深链到任意业务页,就一直停在那里。实证:登出态进 earn 后
+  //    quest 键始终为 null(watcher 没跑),已登录态同路径立刻写入 visit_earn。
+  const route = readCurrentRouteOrHash();
   if (!route || isAuthWhitelisted(route)) return false; // no route yet / flow page
   const auth = useAuth();
   if (!auth.isAuthenticated) {
