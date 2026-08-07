@@ -8,7 +8,6 @@ export type ExchangeOrderStatus =
   | "SUCCESS"
   | "QUEUED"
   | "CANCELLED"
-  | "KYC_REQUIRED"
   | "USER_CAP"
   | "PLATFORM_CAP"
   | "GEO_BLOCKED";
@@ -20,7 +19,6 @@ export interface ExchangeCaps {
   feePct: number;
   feeMinUsdt: number;
   queueMode: "QUEUE" | "REJECT";
-  kycLifetimeThresholdUsdt: number;
   swapEnabled: boolean;
 }
 
@@ -44,13 +42,11 @@ export interface ExchangeSnapshot {
   todayUserUsedUsdt: number;
   todayPlatformUsedUsdt: number;
   lifetimeExchangedUsdt: number;
-  kycStatus: string;
   orders: ExchangeOrder[];
   order?: ExchangeOrder;
-  gate?: "KYC_REQUIRED" | "USER_CAP" | "PLATFORM_CAP" | "GEO_BLOCKED";
+  gate?: "USER_CAP" | "PLATFORM_CAP" | "GEO_BLOCKED";
   feeUsdt?: number;
   receiptId?: string;
-  kycReviewTicketId?: string;
 }
 
 export interface ExchangeApi {
@@ -70,24 +66,9 @@ const ORDER_STATUSES = new Set<ExchangeOrderStatus>([
   "SUCCESS",
   "QUEUED",
   "CANCELLED",
-  "KYC_REQUIRED",
   "USER_CAP",
   "PLATFORM_CAP",
   "GEO_BLOCKED",
-]);
-const KYC_STATUSES = new Set([
-  "NONE",
-  "UNVERIFIED",
-  "PENDING",
-  "PENDING_REVIEW",
-  "IN_REVIEW",
-  "REVIEWING",
-  "VERIFIED",
-  "APPROVED",
-  "PASSED",
-  "REJECTED",
-  "FAILED",
-  "EXPIRED",
 ]);
 
 function invalid(message: string): never {
@@ -128,14 +109,12 @@ function parseCaps(value: unknown): ExchangeCaps {
   const feePct = number(row?.feePct);
   const feeMinUsdt = number(row?.feeMinUsdt);
   const queueMode = text(row?.queueMode)?.toUpperCase();
-  const kycLifetimeThresholdUsdt = number(row?.kycLifetimeThresholdUsdt);
   if (!row || row.asset !== "NEX" || row.currency !== "USDT"
       || row.serverCanonical !== true || row.source !== "G2/G3 server configuration"
       || currentPrice === null || userDailyCapUsdt === null || userDailyCapUsdt > 10_000
       || platformDailyCapUsdt === null || platformDailyCapUsdt > 10_000_000
       || feePct === null || feePct > 10 || feeMinUsdt === null || feeMinUsdt > 5
       || !["QUEUE", "REJECT"].includes(queueMode ?? "")
-      || kycLifetimeThresholdUsdt === null || kycLifetimeThresholdUsdt > 1_000_000
       || typeof row.swapEnabled !== "boolean") {
     return invalid("EXCHANGE_CAPS_RESPONSE_INVALID");
   }
@@ -146,7 +125,6 @@ function parseCaps(value: unknown): ExchangeCaps {
     feePct,
     feeMinUsdt,
     queueMode: queueMode as ExchangeCaps["queueMode"],
-    kycLifetimeThresholdUsdt,
     swapEnabled: row.swapEnabled,
   };
 }
@@ -193,11 +171,10 @@ function parseSnapshot(value: unknown): ExchangeSnapshot {
   const todayUserUsedUsdt = number(row?.todayUserUsedUsdt);
   const todayPlatformUsedUsdt = number(row?.todayPlatformUsedUsdt);
   const lifetimeExchangedUsdt = number(row?.lifetimeExchangedUsdt);
-  const kycStatus = text(row?.kycStatus)?.toUpperCase();
   if (!row || row.serverCanonical !== true || !wallet
       || usdtAvailable === null || nexAvailable === null
       || todayUserUsedUsdt === null || todayPlatformUsedUsdt === null
-      || lifetimeExchangedUsdt === null || !kycStatus || !KYC_STATUSES.has(kycStatus)
+      || lifetimeExchangedUsdt === null
       || !Array.isArray(row.orders)) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
@@ -206,7 +183,7 @@ function parseSnapshot(value: unknown): ExchangeSnapshot {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
   const gate = optionalText(row, "gate")?.toUpperCase();
-  if (gate && !["KYC_REQUIRED", "USER_CAP", "PLATFORM_CAP", "GEO_BLOCKED"].includes(gate)) {
+  if (gate && !["USER_CAP", "PLATFORM_CAP", "GEO_BLOCKED"].includes(gate)) {
     return invalid("EXCHANGE_STATE_RESPONSE_INVALID");
   }
   return {
@@ -215,13 +192,11 @@ function parseSnapshot(value: unknown): ExchangeSnapshot {
     todayUserUsedUsdt,
     todayPlatformUsedUsdt,
     lifetimeExchangedUsdt,
-    kycStatus,
     orders,
     order: row.order === undefined ? undefined : parseOrder(row.order),
     gate: gate as ExchangeSnapshot["gate"],
     feeUsdt: optionalNumber(row, "feeUsdt"),
     receiptId: optionalText(row, "receiptId"),
-    kycReviewTicketId: optionalText(row, "kycReviewTicketId"),
   };
 }
 

@@ -10,8 +10,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 //   - Per-user daily cap: $50 USDT equivalent
 //   - Platform daily cap: $20,000 USDT equivalent (shared, simulated)
 //   - Queue: requests over today's cap wait until tomorrow's reset
-// (终身累计 $100 触发 KYC 的门已随 FEAT-KYC-RM01b 删除 —— 其目的就是 KYC 导流,
-//  机制既删门随删;汇率与日限规则不变。)
+// 汇率与日限规则保持不变。
 //
 // `canExchange(usd)` returns the gating decision; `record(usd)` commits after
 // success. `resetIfNewDay()` rolls the daily counters at midnight.

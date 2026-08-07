@@ -9,7 +9,6 @@ export type TicketCategory =
   | "account"
   | "withdrawal"
   | "deposit"
-  | "kyc"
   | "hardware"
   | "earnings"
   | "genesis"
@@ -60,22 +59,6 @@ export const TICKETS: Ticket[] = [
       { ts: NOW - 1.4 * DAY, author: "agent", agentName: "Marina K.", body: "Hi! I've escalated this to our payment desk — they'll verify the on-chain status within 4 hours. Reference #PD-7723." },
       { ts: NOW - 6 * HOUR, author: "agent", agentName: "Marina K.", body: "Update: payment desk found a TRC20 network congestion delay. Your tx is queued behind 4,200 others. ETA 8-12h. You'll get a push notification when it lands." },
       { ts: NOW - 4 * HOUR, author: "agent", agentName: "Marina K.", body: "Quick check — has the USDT arrived in your wallet yet? If not we can issue a manual replay." },
-    ],
-  },
-  {
-    id: "TK-1023",
-    subject: "KYC documents rejected — what's wrong?",
-    category: "kyc",
-    status: "pending_user",
-    priority: "normal",
-    createdAt: NOW - 2 * DAY,
-    updatedAt: NOW - 9 * HOUR,
-    lastReplyAt: NOW - 9 * HOUR,
-    unread: 1,
-    owner: "Tomas R.",
-    messages: [
-      { ts: NOW - 2 * DAY, author: "user", body: "Just got 'KYC rejected' but no reason was shown. My passport is valid through 2031." },
-      { ts: NOW - 9 * HOUR, author: "agent", agentName: "Tomas R.", body: "Looked it up — the rejection reason was 'blurry photo, MRZ unreadable'. Please re-upload with better lighting and the bottom 2 lines clearly visible. Sumsub link reset, you have 3 retries left in 24h." },
     ],
   },
   {
@@ -168,7 +151,6 @@ export const CATEGORY_LABEL: Record<TicketCategory, string> = {
   account: "Account",
   withdrawal: "Withdrawal",
   deposit: "Deposit",
-  kyc: "KYC",
   hardware: "Hardware",
   earnings: "Earnings",
   genesis: "Genesis",

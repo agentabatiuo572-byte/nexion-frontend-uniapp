@@ -1,5 +1,5 @@
 <!--
-  WalletWithdraw — 提现页(2026-08-05 包 E 后形态,FEAT-KYC-RM01a 地址直管)。
+  WalletWithdraw — 提现页，按网络直管提现地址。
   Top→bottom: dev-only ?dev=1 地址重置 → 换址冻结横幅(24h 倒计时,按所选网络)→
   compliance-hold banner (P5+) → amount input (Use Max) → network chips(可选,
   每网络独立当前地址)→ 地址行(掩码中段 + 「管理」入口)/ 空态引导卡(添加提现地址)
@@ -352,6 +352,7 @@ import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
 import { useBills } from "@/store/bills";
 import { usePayoutAddress } from "@/store/payout-address";
+import { remoteApiEnabled } from "@/api/runtime";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
 import {

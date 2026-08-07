@@ -203,15 +203,15 @@ const sections = computed<DescSection[]>(() => {
       },
       {
         rows: [
-          { k: "paired_wallet", copyKey: "paired_wallet", copyValue: r.kycWalletAddress ?? "0x", v: shortenHex(r.kycWalletAddress ?? "0x", 6, 4) },
-          { k: "network", v: r.kycNetwork ?? "—" },
-          { k: "signature", copyKey: "kyc_signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
+          { k: "paired_wallet", copyKey: "paired_wallet", copyValue: r.verificationWalletAddress ?? "0x", v: shortenHex(r.verificationWalletAddress ?? "0x", 6, 4) },
+          { k: "network", v: r.verificationNetwork ?? "—" },
+          { k: "signature", copyKey: "verification_signature", copyValue: r.signature, v: shortenHex(r.signature, 8, 6), hint: "rsa-sha256" },
         ],
       },
       {
         heading: "Compliance frameworks",
         rows: [],
-        checks: r.kycChecks ?? [],
+        checks: r.verificationChecks ?? [],
       },
       {
         rows: [

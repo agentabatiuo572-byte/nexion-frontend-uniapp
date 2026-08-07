@@ -1,5 +1,5 @@
 import type { ApiClient } from "./api-client";
-import type { KycState, SecurityMutation, SecurityState } from "./contracts";
+import type { SecurityMutation, SecurityState } from "./contracts";
 import { ApiError } from "./errors";
 
 export interface AccountApi {
@@ -8,7 +8,6 @@ export interface AccountApi {
   updateTwoFactor(enabled: boolean, currentPassword: string): Promise<SecurityMutation>;
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
-  kycStatus(): Promise<KycState>;
 }
 
 let idempotencySequence = 0;
@@ -84,35 +83,6 @@ function parseMutation(value: unknown): SecurityMutation {
   return source as SecurityMutation;
 }
 
-function parseKycState(value: unknown): KycState {
-  const source = record(value);
-  const pairedAddress = typeof source?.pairedAddress === "string" && source.pairedAddress.trim()
-    ? source.pairedAddress.trim()
-    : null;
-  const network = source?.network === "USDT-TRC20" || source?.network === "USDT-ERC20"
-    ? source.network
-    : null;
-  if (
-    !source
-    || typeof source.status !== "string"
-    || !source.status
-    || typeof source.walletPaired !== "boolean"
-    || typeof source.source !== "string"
-    || !source.source
-    || (source.walletPaired && (!pairedAddress || !network))
-    || (!source.walletPaired && (source.pairedAddress != null || source.network != null))
-  ) {
-    throw new ApiError({ kind: "protocol", message: "KYC_RESPONSE_INVALID" });
-  }
-  return {
-    status: source.status,
-    walletPaired: source.walletPaired,
-    pairedAddress,
-    network,
-    source: source.source,
-  };
-}
-
 export function createAccountApi(client: ApiClient): AccountApi {
   return {
     securityOverview: async () => parseSecurityState(await client.request({
@@ -140,10 +110,6 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "POST",
       path: "/api/app/security/sessions/revoke-others",
       idempotencyKey: mutationKey("revoke-other-sessions"),
-    })),
-    kycStatus: async () => parseKycState(await client.request({
-      method: "GET",
-      path: "/api/kyc/status",
     })),
   };
 }

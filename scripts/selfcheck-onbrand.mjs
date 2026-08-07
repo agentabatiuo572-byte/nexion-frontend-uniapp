@@ -4,7 +4,7 @@
 // 缘起(2026-08-01 审计 C-7,浏览器实测):
 //   · 提现页**主提交 CTA** = `--v5-brand` 底 + `--v5-ink` 字 → 对比度 **1.54:1**;
 //     换成 `--v5-on-brand` 是 11.98:1。
-//   · KYC CTA = `--v5-brand-2` 底 + `--v5-ink` 字 → 2.41:1;`--v5-on-brand-2` 是 7.64:1。
+//   · legacy CTA = `--v5-brand-2` 底 + `--v5-ink` 字 → 2.41:1;`--v5-on-brand-2` 是 7.64:1。
 //   · tokens.css 自己的注释就写着「white on orange fails WCAG AA」,而 verify 里
 //     grep `on-brand` 零命中 —— 这个维度**一道门都没有**,所以违规能一直躺着。
 //

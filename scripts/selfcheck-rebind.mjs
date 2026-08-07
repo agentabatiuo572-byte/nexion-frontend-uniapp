@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // 提现地址直管纯逻辑自检 — node 直跑,不起 Vue/uni:
 //   node scripts/selfcheck-rebind.mjs
-// 被测对象:src/store/payout-address-core.ts(FEAT-KYC-RM01a ③④)。
+// 被测对象:src/store/payout-address-core.ts（提现地址直管 ③④）。
 // 用 esbuild(vite 传递依赖)现场转译后 import,断言:
 //   链地址校验(单源)/ 在途单集合 / 更换禁止动作优先级(在途单 > 7 天频控)/
 //   原子更换后置条件(新址生效 + 旧址同事务入历史 + 24h 冻结 + 频控锚点)/
-//   首次添加不冻结不频控 / 冻结剩余与倒计时排版 / 掩码中段 /
+//   首次添加 24h 冻结与频控 / 冻结剩余与倒计时排版 / 掩码中段 /
 //   存量迁移三态(empty / migrated / corrupt —— 配对老数据不得静默变成空地址)。
 //
 // ⚠️ 2026-08-05 包 E:本文件从「wallet-pairing-core($1 配对换绑)」整体改写为

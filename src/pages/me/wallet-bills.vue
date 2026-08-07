@@ -115,7 +115,7 @@ const TYPE_COLOR: Record<BillType, string> = {
   withdraw: "var(--v5-brand-2)",
   purchase: "var(--v5-tech-cyan)",
   swap: "var(--v5-brand)",
-  kyc: "var(--v5-tech-cyan)",
+  verification: "var(--v5-tech-cyan)",
   stake: "var(--v5-warning)",
   unstake: "var(--v5-ink-3)",
   achievement: "var(--v5-warning)",

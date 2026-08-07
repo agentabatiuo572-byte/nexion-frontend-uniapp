@@ -154,7 +154,7 @@ const mode = ref<Mode>({ kind: "list" });
 const tab = ref<Tab>("all");
 const tabs: Tab[] = ["all", "open", "resolved", "closed"];
 
-// 新工单不再提供身份核验类目(FEAT-KYC-RM01b);历史工单的该类目仍可渲染(标签中性化)。
+// 新工单不再提供已下线的身份核验类目;历史工单仍可渲染(标签中性化)。
 const categoriesForNew: TicketCategory[] = ["withdrawal", "deposit", "hardware", "account", "earnings", "technical", "other"];
 const newCat = ref<TicketCategory>("withdrawal");
 const subject = ref("");

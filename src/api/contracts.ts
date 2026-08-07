@@ -54,11 +54,3 @@ export interface SecurityMutation {
   passwordChangedAt?: string | null;
   revokedSessionCount?: number | null;
 }
-
-export interface KycState {
-  status: string;
-  walletPaired: boolean;
-  pairedAddress: string | null;
-  network: "USDT-TRC20" | "USDT-ERC20" | null;
-  source: string;
-}

@@ -64,3 +64,18 @@ test("KYC removal guard catches case and identifier variants without matching st
   assert.equal(containsForbiddenKyc("stickyCTAKyc"), true);
   assert.equal(containsForbiddenKyc("src/pages/risk/kyc-review.css"), true);
 });
+
+test("remote payout-address flow is server-canonical", () => {
+  const api = fs.readFileSync("src/api/payout-address-api.ts", "utf8");
+  const runtime = fs.readFileSync("src/api/runtime.ts", "utf8");
+  const store = fs.readFileSync("src/store/payout-address.ts", "utf8");
+  const page = fs.readFileSync("src/pages/me/wallet-address-rebind.vue", "utf8");
+
+  assert.match(api, /path: "\/api\/payout-addresses"/);
+  assert.match(api, /path: "\/api\/payout-addresses\/otp\/send"/);
+  assert.match(api, /idempotencyKey: input\.idempotencyKey/);
+  assert.match(runtime, /createPayoutAddressApi\(apiClient\)/);
+  assert.match(store, /remoteApiEnabled \? emptyBook\(\) : hydrate\(boundKey\)/);
+  assert.match(store, /await payoutAddressApi\.save/);
+  assert.match(page, /await payout\.saveRemoteAddress/);
+});

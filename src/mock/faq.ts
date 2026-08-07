@@ -47,7 +47,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: "er-3",
     category: "earnings",
     q: "When do earnings settle?",
-    a: "Settled every job; consolidated daily at 00:00 UTC. You can withdraw any time once your USDT balance ≥ $20 and KYC-Express is complete.",
+    a: "Settled every job; consolidated daily at 00:00 UTC. You can withdraw once your USDT balance is at least $20 and a payout address is active.",
   },
   // Devices
   {
@@ -72,8 +72,8 @@ export const FAQ_ITEMS: FaqItem[] = [
   {
     id: "py-1",
     category: "payments",
-    q: "Why $1 KYC-Express?",
-    a: "It's a $1 USDT micro-deposit that cryptographically proves wallet ownership. Required once per wallet, per regulator request (MiCA Art. 22, FATF Travel Rule). The $1 is credited to your balance immediately.",
+    q: "Where do withdrawals go?",
+    a: "Withdrawals go to your own wallet address. Set it once per network in Withdrawal address — confirmed by SMS, changeable any time (24h freeze after a change).",
   },
   {
     id: "py-2",
@@ -117,7 +117,7 @@ export function botReply(query: string): FaqItem | null {
     }
   }
   if (/withdraw|提现/.test(q)) return FAQ_ITEMS.find((f) => f.id === "py-3") ?? null;
-  if (/kyc|实名/.test(q)) return FAQ_ITEMS.find((f) => f.id === "py-1") ?? null;
+  if (/address|地址/.test(q)) return FAQ_ITEMS.find((f) => f.id === "py-1") ?? null;
   if (/earn|收益|赚/.test(q)) return FAQ_ITEMS.find((f) => f.id === "er-1") ?? null;
   if (/phone|手机|npu/.test(q)) return FAQ_ITEMS.find((f) => f.id === "gs-2") ?? null;
   return null;

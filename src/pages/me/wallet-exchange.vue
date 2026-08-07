@@ -330,7 +330,7 @@ async function handleConfirm() {
   let settled = false;
   try {
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
-    // (大额兑换直接放行:$100 终身累计门已随 FEAT-KYC-RM01b 删除,汇率与日限不变。)
+    // 兑换只受汇率、日限、平台额度与地理限制约束。
     const gate = v3.canExchange(snap.usd);
     if (!gate.ok) {
       if (gate.reason === "user-cap") {

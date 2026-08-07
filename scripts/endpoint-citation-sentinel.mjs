@@ -99,7 +99,7 @@ const LEDGER = {
   "POST /api/withdrawals": "PRD §9.4 / §9.11e",
   "GET /api/withdrawals/:id": "PRD §9.11f(`GET /api/{module}/:id` 通式)",
   "POST /api/withdrawals/eligibility": "PRD §9.3.1-3",
-  "GET /api/payout-addresses": "TBD: 包 E 提现地址直管(FEAT-KYC-RM01a)新接口,PRD 接口章节待实现批次 C1 式修订收口(候选命名)",
+  "GET /api/payout-addresses": "包 E 提现地址直管新接口,服务端已按 payout-addresses 资源实现",
   "POST /api/payout-addresses": "TBD: 同上 —— 添加地址(OTP 在服务端事务内核验)",
   "PUT /api/payout-addresses/{network}": "TBD: 同上 —— 原子更换(在途单拦截 / 频控 / 冻结由服务端裁决)",
   "GET /api/deposits": "PRD §9.2.8",

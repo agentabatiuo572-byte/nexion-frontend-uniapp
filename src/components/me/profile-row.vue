@@ -2,7 +2,7 @@
   ProfileRow — ported from me/page.tsx ProfileRow.
   Strict port of styles-v4.css .profile-row: avatar (56 circle, brand solid) +
   name (display 600 18 -0.018) + phone mask (mono 12.5 ink-3) + Joined Nd chip.
-  (身份认证徽章已随 FEAT-KYC-RM01b 删除。)Taps through to /me/profile.
+  Taps through to /me/profile.
 -->
 <template>
   <view class="flex items-center active:opacity-90" style="gap: 14px; padding: 4px 0" @click="goProfile">

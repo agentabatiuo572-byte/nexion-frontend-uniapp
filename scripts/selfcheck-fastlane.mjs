@@ -523,7 +523,7 @@ function balancedBody(src, from) {
     const appVueSrc = readSrc("src/App.vue");
     const walletSrc = readSrc("src/pages/me/wallet.vue");
     const trackSrc = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
-    // 包 E(2026-08-05):换址闸从 wallet-pairing($1 配对)迁到 payout-address(地址直管)。
+    // 包 E(2026-08-05):换址闸从旧配对存储迁到 payout-address(地址直管)。
     // 判据**先于机制改写**指向新 store —— 新文件缺席时 readSrc 直接抛错 = 红,
     // 绝不允许「旧 store 删了、哨兵扫不到就当没违规」的静默假绿。
     const payoutSrc = readSrc("src/store/payout-address.ts");

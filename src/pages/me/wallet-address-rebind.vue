@@ -1,8 +1,7 @@
 <!--
-  WalletAddressRebind — 提现地址管理(FEAT-KYC-RM01a ②⑤⑥)。
+  WalletAddressRebind — 提现地址管理。
   每网络一个当前地址,用户直填自管:
-  · 未设置 → 添加流:地址输入 → 短信 OTP(走既有 auth-otp 生命周期,含滑块升级)→ 生效
-    (新地址保护期由既有风控信号裁决,页面只做标记提示)。
+  · 未设置 → 添加流:地址输入 → 短信 OTP → 服务端落库 → 24h 安全冻结。
   · 已设置 → 展示当前地址(掩码中段 + 来源标记 + 生效时间)+ 冻结横幅(hh:mm:ss 真倒计时)
     + 频控绝对时刻 + 历史地址展开区;更换流 = 拦截判定(在途单 > 频控,store 单一判据)→
     表单 → OTP → 二次确认(明示旧址停用 + 24h 冻结 + 频控)→ 原子替换 → 成功态。
@@ -216,6 +215,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
+import { asApiError } from "@/api/errors";
+import { remoteApiEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
@@ -333,6 +334,7 @@ const otpSending = ref(false);
 const otpVerifying = ref(false);
 // 码已核验但事务未落(用户取消了二次确认弹窗)→ 再次点确认不重复消费验证码。
 const otpVerifiedOnce = ref(false);
+const otpCommandKey = ref<string | null>(null);
 const resendLeft = ref(0);
 const showCaptcha = ref(false);
 let resendTimer: ReturnType<typeof setInterval> | undefined;
@@ -361,6 +363,24 @@ async function sendCode(captchaTicket?: string) {
   if (otpSending.value) return;
   otpSending.value = true;
   try {
+    if (remoteApiEnabled) {
+      try {
+        const challenge = await payout.sendRemoteOtp();
+        otpRequestId.value = challenge.challengeNo;
+        otpCommandKey.value = `payout-address:${globalThis.crypto?.randomUUID?.()
+          ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
+        startResendCountdown(60);
+        explicitStep.value = "otp";
+      } catch (cause) {
+        const error = asApiError(cause);
+        if (error.message === "PAYOUT_ADDRESS_OTP_COOLDOWN" || error.message === "PAYOUT_ADDRESS_OTP_DAILY_LIMIT") {
+          addrError.value = fmt(t.value.addrRebind.otpRateLimited, { s: 60 });
+        } else {
+          toast.error(t.value.addrRebind.otpSendFailed);
+        }
+      }
+      return;
+    }
     const res = await otpSend(otpPhone.value, "payout-address", captchaTicket);
     if (res.ok) {
       otpRequestId.value = res.requestId;
@@ -432,6 +452,41 @@ async function confirmOtp() {
   }
 }
 async function applyAfterOtp() {
+  const isChange = effectiveMode.value === "change";
+  if (isChange) {
+    // 二次确认发生在远端 OTP 被消费之前;取消不会制造半完成事务。
+    const ok = await uiConfirm({
+      title: t.value.addrRebind.changeConfirmTitle,
+      message: fmt(t.value.addrRebind.changeConfirmBody, { days: cooldownDays.value }),
+      icon: "warn",
+      confirmLabel: t.value.addrRebind.changeConfirmYes,
+    });
+    if (!ok) return;
+  }
+
+  if (remoteApiEnabled) {
+    try {
+      await payout.saveRemoteAddress({
+        network: network.value,
+        address: newAddress.value,
+        challengeNo: otpRequestId.value!,
+        code: otpCode.value.trim(),
+        idempotencyKey: otpCommandKey.value!,
+      });
+      successIsChange.value = isChange;
+      explicitStep.value = "success";
+      resetOtp();
+    } catch (cause) {
+      const error = asApiError(cause);
+      if (error.message === "PAYOUT_ADDRESS_OTP_INVALID") otpError.value = t.value.addrRebind.startFailed;
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_BLOCKED_BY_WITHDRAWAL") toast.error(t.value.addrRebind.inFlightBlocked);
+      else if (error.message === "PAYOUT_ADDRESS_CHANGE_COOLDOWN") toast.error(cooldownUntilText.value);
+      else if (error.message === "PAYOUT_ADDRESS_FORMAT_INVALID") addrError.value = t.value.addrRebind.invalidAddress;
+      else toast.error(t.value.addrRebind.startFailed);
+    }
+    return;
+  }
+
   if (effectiveMode.value === "add") {
     const res = payout.addAddress(network.value, newAddress.value);
     if (!res.ok) {

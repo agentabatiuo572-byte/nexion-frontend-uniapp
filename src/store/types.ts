@@ -157,7 +157,7 @@ export interface Device {
   miningSince?: number | null;
 }
 
-// NOTE: 提现地址簿(FEAT-KYC-RM01a)在 store/payout-address.ts 独立持久化
+// NOTE: 提现地址簿在 store/payout-address.ts 独立持久化
 // (按账号作用域,localStorage persistence independent of useApp)。
 
 export type UserTier = "L0" | "L1" | "L2" | "L3" | "L4" | "L5";

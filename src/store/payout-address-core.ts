@@ -1,11 +1,11 @@
 import type { ChainDepositChannel, Withdrawal } from "./types";
 
-// 提现地址直管纯逻辑(FEAT-KYC-RM01a ③④)。零依赖(vue/pinia/uni 均不引),
+// 提现地址直管纯逻辑。零依赖(vue/pinia/uni 均不引),
 // payout-address store 与 scripts/selfcheck-rebind.mjs 共用同一实现。
 //
-// 2026-08-05 包 E:取代 wallet-pairing-core($1 钱包配对/KYC-Express 已整体删除)。
+// 用户按网络直接维护提现地址。
 // 每网络至多一个当前提现地址,用户直填自管;更换 = 原子替换 + 24h 提现冻结 + 频控;
-// 首次添加只标记「新地址保护期」(经既有风控信号裁决),不冻结不频控。
+// 首次添加与更换都进入 24h 安全冻结;每次设置同时落下次可更换时间。
 
 // ── 参数(MOCK 单源常量)────────────────────────────────────────────
 // 频控天数走 config.withdrawRules.rebindCooldownDays(后台 D5 可配,调用方传入);
@@ -41,7 +41,7 @@ export interface NetworkPayoutState {
   history: PayoutHistoryEntry[];
   /** 更换成功即 now + 24h;冻结期内该网络提现提交禁用。null = 无冻结。 */
   freezeUntil: number | null;
-  /** = 更换成功时刻 + 频控天数;首次添加不设。null = 可随时更换。 */
+  /** = 添加/更换成功时刻 + 频控天数。null = 可随时更换。 */
   nextChangeAt: number | null;
 }
 
@@ -120,21 +120,23 @@ export function payoutChangeBlockReason(input: {
 // ── 原子操作(纯函数事务体;持久化归调用方,同一次写 = 同事务)─────────────
 
 /**
- * 首次添加(规格 ② 阳光1):空槽 → current 生效。
- * 不设冻结、不设频控 —— 两者只属于「更换」;新地址保护期由既有风控信号
- * (新地址持有期,以 addedAt 为首见时间)裁决,不在这里新造第二套判定。
+ * 首次添加:空槽 → current 登记,同时设置 24h 提现冻结和更换频控。
+ * addedAt 仍是既有新地址账龄信号的唯一首见时间。
  * 已有 current 时拒绝(更换必须走 applyChangeAddress 的显式确认链)→ null。
  */
 export function applyAddAddress(
   state: NetworkPayoutState,
   address: string,
   now: number,
+  cooldownDays: number,
 ): NetworkPayoutState | null {
   if (state.current !== null) return null;
   return {
     ...state,
     current: { address: address.trim(), addedAt: now, source: "user" },
     history: [...state.history],
+    freezeUntil: now + PAYOUT_FREEZE_MS,
+    nextChangeAt: now + cooldownDays * 24 * 3600 * 1000,
   };
 }
 
