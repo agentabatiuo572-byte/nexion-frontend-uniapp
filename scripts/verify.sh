@@ -1351,11 +1351,24 @@ no_native_button
 # click listeners → a dual-bound element fires its handler TWICE per tap/click
 # (steppers +2, toggles open-then-close, navigateTo ×2 → stack corruption via
 # the navTo fallback chain). uni's compiler maps @click → tap on mp targets, so
-# single @click is correct on every platform. Comment MENTIONS of "@tap"
-# (migration notes) are fine — only the binding form `@tap...=` is banned.
+# single @click is correct on every platform. Only a LIVE binding is banned:
+# comment bodies are blanked first (script //-line + /* */, template <!-- -->), so
+# a migration note that QUOTES `@tap="x"` — behavior-analytics.ts JSDoc, earn.vue
+# template note — is documentation, not a dual-bind. Blanking keeps the newlines
+# so the reported line numbers stay true.
 no_tap_binding() {
   local hits
-  hits=$(grep -rnE '@tap(\.[a-z]+)*=' src 2>/dev/null | head -5)
+  hits=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const blank=(m)=>m.replace(/[^\n]/g,"");
+const strip=(s)=>s.replace(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/g,blank).replace(/^[ \t]*\/\/.*$/gm,"");
+const re=/@tap(\.[a-z]+)*=/;
+const hits=[];
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);
+if(fs.statSync(p).isDirectory())walk(p);else if(/\.(vue|ts|js)$/.test(f)){
+strip(fs.readFileSync(p,"utf8")).split(/\r?\n/).forEach((ln,i)=>{
+if(re.test(ln))hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim())});}}})("src");
+if(hits.length){console.log(hits.slice(0,5).join("\n"));process.exit(1)}' 2>&1)
   if [ -z "$hits" ]; then ok "no @tap binding (single @click correct on all targets, P-059) (0 hits)";
   else bad "@tap binding — H5 double-fires alongside click; use single @click (P-059)"; echo "$hits" | sed 's/^/        /'; fi
 }
