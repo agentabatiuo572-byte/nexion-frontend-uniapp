@@ -338,13 +338,13 @@ function isAuthWhitelisted(route: string): boolean {
 // Returns true if it redirected (callers bail so they don't act on a route the
 // user is being kicked off of).
 function checkAuthGuard(): boolean {
-  // 🔴 必须带 hash 兜底(2026-08-07 实测的越权缺口):H5 冷启动时 App 的 onShow 早于
-  //    页面栈建立,readCurrentRoute() 返回空 → 原来在下一行 `!route` 直接放行;
-  //    而**同一次** onShow 又因本守卫返回 false 而 return(见 onShow),
-  //    startQuestWatch() 永不执行 → 1s 轮询守卫不启动 → 之后再没有第二次检查。
-  //    净效果:登出态深链到任意业务页,就一直停在那里。实证:登出态进 earn 后
-  //    quest 键始终为 null(watcher 没跑),已登录态同路径立刻写入 visit_earn。
-  const route = readCurrentRouteOrHash();
+  // 🔴 2026-08-07 这里连补两刀,缺一不可:
+  //    ① 读取空窗:冷启动裸读页面栈返回空 → `!route` 直接放行(读取口统一兜底+归一后关闭);
+  //    ② 跳转丢失:冷启动那一拍 reLaunch 会被进行中的首次导航吞掉(实景实测:守卫发了跳转、
+  //       页面纹丝不动),本函数返回 true 又让 onShow 提前收工 → 无重试。
+  //       所以守卫轮询在 onShow 里**无条件启动**(见 onShow),每秒重查直到跳转真正落地。
+  //    只修 ① 的状态在实景里与不修同果 —— verify 绿 ≠ 渲染 OK 的活例。
+  const route = readCurrentRoute();
   if (!route || isAuthWhitelisted(route)) return false; // no route yet / flow page
   const auth = useAuth();
   if (!auth.isAuthenticated) {
@@ -423,8 +423,8 @@ function detachSessionWatch() {
 // ── Quest route watcher (ports quest-route-watcher.tsx) ──
 // Auto-completes route-based first-day quest tasks when the user lands on the
 // matching page. The prototype watches logical routes (/earn, /store,
-// /store/:id); uni's physical routes are /pages/… (no leading slash from
-// getCurrentPages().route), so map physical → task id here. On a FIRST
+// /store/:id); uni's physical routes are page-stack form `pages/…` (no leading
+// slash — readCurrentRoute() normalizes), so map physical → task id here. On a FIRST
 // completion: credit the reward(s) + toast. Idempotent in the store (re-visits
 // return firstTime:false), so polling the route is safe. day-one-quest-card.vue
 // (protected home page) is NOT touched — only the data/reward side.
@@ -433,27 +433,28 @@ const QUEST_TICK_MS = 1000;
 let questTimer: ReturnType<typeof setInterval> | undefined;
 let lastQuestRoute = "";
 
-// getCurrentPages().route has NO leading slash (e.g. "pages/store/store").
+// 🔴 本文件**唯一**的路由读取口 —— 不要加第二个(verify 哨兵 app-route-single-reader 盯着)。
+//
+// 2026-08-07 同形洞一天三处(守门 checkAuthGuard / 会话驱逐 checkSession / 任务播种)。
+// 共同根因不是三处各自写错,是「读取函数有两个」这个结构:
+//   · 一个只读页面栈:H5 冷启动(onShow 早于页面栈建立)返回**空** → 判据把空当无害放行;
+//   · 一个带地址栏兜底:返回 `#/pages/x?q=1` 原文,与页面栈形态 `pages/x` 不同形
+//     → 谁忘了归一化谁就前缀匹配不中(白名单判不中 = 越权放行)。
+// 每个 call site 必须同时记住这两件事才不出错 —— 记不住是结构的错,所以合成一个:
+// 永远带兜底、永远归一成页面栈形态 `pages/x/y`(无前导斜杠、无查询串)。
+// 空只剩一种含义:真的还没有任何路由(App 端首帧)。
 function readCurrentRoute(): string {
+  let route = "";
   try {
     const ps = getCurrentPages();
-    return ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
-  } catch {
-    return "";
-  }
-}
-
-function readCurrentRouteOrHash(): string {
-  const route = readCurrentRoute();
-  if (route) return route;
+    route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+  } catch { /* 页面栈不可用 → 走下方兜底 */ }
   // #ifdef H5
-  try {
-    return window.location.hash || "";
-  } catch {
-    return "";
+  if (!route) {
+    try { route = window.location.hash || ""; } catch { route = ""; }
   }
   // #endif
-  return "";
+  return normalizeRoute(route);
 }
 
 function bootstrapAccountSession() {
@@ -484,7 +485,7 @@ function bootstrapAccountSession() {
 }
 
 function scheduleAccountSessionBootstrap(attempt = 0) {
-  const route = readCurrentRouteOrHash();
+  const route = readCurrentRoute();
   if (isStaticReviewRoute(route)) {
     stopBusinessLoops();
     return;
@@ -553,7 +554,9 @@ function checkQuestRoute() {
 
 function startQuestWatch() {
   stopQuestWatch();
-  lastQuestRoute = readCurrentRoute(); // seed without firing for the landing page
+  // 播种置空,故意不预填当前页:quest 一次性 + 发钱/markComplete 幂等,重放无害;
+  // 冷启深链落地页要记一次访问(112b9d0 以此作实证基线),预填会把这一次吞掉。
+  lastQuestRoute = "";
   questTimer = setInterval(checkQuestRoute, QUEST_TICK_MS);
 }
 function stopQuestWatch() {
@@ -573,7 +576,7 @@ function stopBusinessLoops() {
 }
 
 function canRunBusinessLoops(): boolean {
-  const route = readCurrentRouteOrHash();
+  const route = readCurrentRoute();
   if (!route || isAuthWhitelisted(route)) return false;
   const auth = useAuth();
   if (!auth.isAuthenticated || !auth.onboardingComplete) return false;
@@ -607,11 +610,12 @@ onLaunch(() => {
   // 路由已注销,冷开命中时平滑落安全页 + 一句「该流程已下线」,禁 404/白屏。
   // 提示由落地页 onLoad 自弹(from 参数):onLaunch 直接 toast 会在页面挂载完成前
   // 就到时自动消失,冷启实测两次都看不见(实景走查抓到的时序坑)。
-  if (/\/pages\/me\/kyc([?#/]|$)/.test(readCurrentRouteOrHash())) {
+  // 读取口已归一(无前导斜杠、无查询串),判据照归一形态写。
+  if (/^pages\/me\/kyc($|\/)/.test(readCurrentRoute())) {
     uni.reLaunch({ url: "/pages/me/security?from=retired-flow", fail: () => {} });
   }
   // #endif
-  if (isStaticReviewRoute(readCurrentRouteOrHash())) {
+  if (isStaticReviewRoute(readCurrentRoute())) {
     stopBusinessLoops();
     return;
   }
@@ -619,7 +623,15 @@ onLaunch(() => {
 });
 onShow(() => {
   attachSessionWatch();
-  if (!ensureBusinessLoopsAllowed()) return; // no business writes on auth/session flow pages
+  const allowed = ensureBusinessLoopsAllowed(); // 失败分支会 stopBusinessLoops(含守卫轮询)
+  // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
+  // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
+  // → onShow 提前收工 → 轮询没启动 → 再无第二枪,登出态照样停在业务页(与修复前同果)。
+  // checkQuestRoute 每 tick 首两行就是 checkAuthGuard/checkSession —— 它本身就是自愈重试环;
+  // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。必须放在 ensure 之后,
+  // 因为失败分支刚把它停掉。
+  startQuestWatch();
+  if (!allowed) return; // no business writes on auth/session flow pages
   useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
   // FEAT-WD01b:前台第一时间补齐到账缺口 —— 关 App 三天再打开,这一下就补完
   // (纯函数只看「now ≥ 预计到账」,与离线时长无关;推进过的单再调是 no-op)。
@@ -629,7 +641,6 @@ onShow(() => {
   startTrialPoll();
   startOrderPoll();
   startMilestonePoll();
-  startQuestWatch();
 });
 onHide(() => {
   detachSessionWatch();
