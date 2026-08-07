@@ -459,12 +459,16 @@ function readCurrentRoute(): string {
 
 function bootstrapAccountSession() {
   if (accountSessionBootstrapped) return;
-  accountSessionBootstrapped = true;
   // Bind the account-cloud snapshot and claim this carrier's session for an
   // already-authenticated account. Multi-carrier sessions coexist; forced
   // revokes are resolved by checkSession() once routes are ready.
   const auth = useAuth();
+  // 🔴 一次性资格只在**真的认领了**之后才消耗(独立审计 2026-08-07 P2-1):
+  // 原先在函数首行就置位,于是未认证时路过一次也把资格烧掉 —— 守卫每拍补认领这条
+  // 自愈路径对该标签的余生失效(登出态被踢到引导页那一拍正好烧掉它)。
+  // 今天没有可达危害(两个认证入口各自 claim),但那是巧合,不是设计。
   if (auth.isAuthenticated) {
+    accountSessionBootstrapped = true;
     const key = auth.email || auth.accountId || "default";
     const app = useApp();
     const session = useSession();
@@ -524,6 +528,17 @@ function checkQuestRoute() {
     return;
   }
   if (checkAuthGuard()) return; // unauth → redirected; don't credit quests
+  // 🔴 会话认领必须在这里补一枪 —— 同一根因的第二条腿(2026-08-07 实测,非推理):
+  // scheduleAccountSessionBootstrap 在静态评审页落地时直接 return,而 bootstrapAccountSession
+  // 是一次性的(accountSessionBootstrapped),于是这个标签**整个生命周期都没有 sessionId**;
+  // session.validate() 首行「没有 sessionId 就算 active」→ 跨标签登出/运营吊销**永远踢不掉它**,
+  // 哪怕守卫活着、哪怕早已走到业务页。落地页只是起点,不该决定本次加载的余生。
+  // 认领本身幂等(内部 accountSessionBootstrapped 短路),补在这里每 tick 是零成本 no-op。
+  // ⚠️ 事实更正(独立审计 2026-08-07 P2-1 实测):这一枪**不是只在业务页开**。
+  // 上方只短路了静态评审页;checkAuthGuard 对**全部**白名单前缀(onboarding/login/
+  // register/ref/tx/session)都返回 false,所以在这些页上同样会走到这里。这没问题
+  // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
+  bootstrapAccountSession();
   if (checkSession()) return; // evicted / needs recalibration → redirected
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
@@ -566,13 +581,21 @@ function stopQuestWatch() {
   }
 }
 
+// 🔴 守卫轮询(questTimer)**不属于**本函数 —— 它是安全装置,不是业务循环。
+// 根因(2026-08-07 第三次同型):原先 stopQuestWatch() 在这里,于是「当前页不该跑业务」的
+// 每一处判断(静态评审页 / 未认证 / 会话失效 / 冷启动引导)都会顺手把**全站唯一的**周期性
+// 权限守卫一起关掉 —— 而恰恰是这些页面最需要它(它们正是未授权者能停留、并借以跳进业务页
+// 的跳板)。叠加 H5 的 App 级 onShow 不随应用内跳转触发(只在整页加载 / 标签页重新可见时),
+// 关掉就**没有任何重新武装的路径**,守卫在本次页面加载内永久死亡。
+// 前两轮修的是「武装侧」(读取口归一 / onShow 无条件启动),没动「解除武装侧」,所以每次都只修好一半。
+// 🔴 不变量:守卫只随前台/后台成对开关 —— onShow 起、onHide 停,其余任何时候都活着。
+// 它在白名单页由自身前两行(checkAuthGuard/checkSession 的白名单短路)保持惰性,常开无业务副作用。
 function stopBusinessLoops() {
   stopTick();
   stopArrivalPoll();
   stopTrialPoll();
   stopOrderPoll();
   stopMilestonePoll();
-  stopQuestWatch();
 }
 
 function canRunBusinessLoops(): boolean {
@@ -623,13 +646,13 @@ onLaunch(() => {
 });
 onShow(() => {
   attachSessionWatch();
-  const allowed = ensureBusinessLoopsAllowed(); // 失败分支会 stopBusinessLoops(含守卫轮询)
+  const allowed = ensureBusinessLoopsAllowed(); // 失败分支只停业务循环,不再碰守卫
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
   // → onShow 提前收工 → 轮询没启动 → 再无第二枪,登出态照样停在业务页(与修复前同果)。
   // checkQuestRoute 每 tick 首两行就是 checkAuthGuard/checkSession —— 它本身就是自愈重试环;
-  // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。必须放在 ensure 之后,
-  // 因为失败分支刚把它停掉。
+  // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
+  // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
   if (!allowed) return; // no business writes on auth/session flow pages
   useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
@@ -645,6 +668,9 @@ onShow(() => {
 onHide(() => {
   detachSessionWatch();
   stopBusinessLoops();
+  // 守卫与前台成对:这里是它**唯一**的停点(见 stopBusinessLoops 上方的不变量)。
+  // App 进后台没有页面可越权,onShow 回前台会重新武装。
+  stopQuestWatch();
 });
 </script>
 
