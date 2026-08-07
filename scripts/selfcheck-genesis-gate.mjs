@@ -23,7 +23,8 @@
 //      (换掉 X 之后当然找不到 X),拿空字符串、拿一首诗跑都 true,从未喂回任何判据。
 //
 // 方法:行为断言用 esbuild 载**真纯函数**跑;结构断言跑在剥注释后的正主源码上。
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
@@ -374,11 +375,28 @@ function urgencySitesUngated(src) {
 //    运营看不出任何异常(错题集「键 parity ≠ 值 parity」同型)。
 // 🔴 兄弟仓文件读不到 = **红**,不是跳过(同工作区两仓,与 canon-sentinel 同款前提)。
 {
-  const adminClient = "../admin-ops/lib/admin/g4-client.ts";
-  const adminView = "../admin-ops/app/components/domain-views/g-tabs/g4-genesis.tsx";
+  // 🔴 兄弟仓根必须**解析**,不能写裸相对路径:linked worktree(.claude/worktrees/*)里
+  //    `<root>/../admin-ops` 落在 .claude/worktrees/ 下 → 恒读不到 → 本条恒红(判据失效红,
+  //    不是真缺陷),而下面 ⑧a-⑧d 连同它们的红测**整块被跳过** = 这道门在 worktree 里全暗。
+  //    解析法与 scripts/verify.sh:36-44 的 ADMIN_ROOT 同款:同级优先,落空则用 git common-dir
+  //    反推主 checkout 根(不写死 worktree 层级)。两条都解析不到 → 保持同级路径,读不到照旧判红。
+  const siblingRepo = (name) => {
+    const direct = path.join(root, "..", name);
+    if (existsSync(direct)) return direct;
+    try {
+      const common = execFileSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+      const viaMain = path.join(path.dirname(common), "..", name);
+      if (common && existsSync(viaMain)) return viaMain;
+    } catch { /* git 不可用 / 非仓库 → 落回同级路径,下游读不到即红 */ }
+    return direct;
+  };
+  const ADMIN_OPS = siblingRepo("admin-ops");
+  const adminClient = path.join(ADMIN_OPS, "lib/admin/g4-client.ts");
+  const adminView = path.join(ADMIN_OPS, "app/components/domain-views/g-tabs/g4-genesis.tsx");
   let clientSrc = null, viewSrc = null;
-  try { clientSrc = readFileSync(path.join(root, adminClient), "utf8"); } catch { /* red below */ }
-  try { viewSrc = readFileSync(path.join(root, adminView), "utf8"); } catch { /* red below */ }
+  try { clientSrc = readFileSync(adminClient, "utf8"); } catch { /* red below */ }
+  try { viewSrc = readFileSync(adminView, "utf8"); } catch { /* red below */ }
   check(`🔴 ⑧ 兄弟仓 admin-ops 两文件可读(parity 的取材面)`, clientSrc !== null && viewSrc !== null,
     `读不到 ${clientSrc === null ? adminClient : ""} ${viewSrc === null ? adminView : ""} —— 判据失效必红,不许静默跳过`);
 
