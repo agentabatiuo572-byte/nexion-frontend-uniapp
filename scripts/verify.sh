@@ -18,7 +18,9 @@
 
 set -u
 MODULE="${1:-all}"
-BASE_URL="${BASE_URL:-http://localhost:5173}"
+# 🔴 export:spawn 的每个 node 探针都继承同一个 origin。没有 export 时(2026-08-07 前),
+#    只给 BASE_URL 跑 verify,那些只认 env 的探针会静默回落 5173 = 打到别人的树报假绿。
+export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
