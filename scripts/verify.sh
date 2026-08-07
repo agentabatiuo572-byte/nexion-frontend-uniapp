@@ -2617,5 +2617,21 @@ genesis_gate() {
 }
 genesis_gate
 
+# ── 守卫存活性门(2026-08-07 · 守卫存活性族第三次复发后的结构根治)──────────────
+# 不变量:周期性权限守卫是**安全装置不是业务循环**,只随前台/后台成对开关。
+# 前两轮只修「武装侧」(读取口归一 / onShow 无条件启动),没人动「解除武装侧」——
+# stopQuestWatch() 藏在 stopBusinessLoops() 里显得天经地义,于是每一处「本页不该跑业务」
+# 都会顺手关掉全站唯一的周期守卫;H5 的 App 级 onShow 不随应用内跳转触发 = 关了就没得再开。
+# 本门守四条不变量,并每次运行对内存副本做四组缺陷注入自证判据还活着(判据死了也判红)。
+guard_liveness_gate() {
+  if "$NODE_BIN" scripts/selfcheck-guard-liveness.mjs > /tmp/uniapp-guard-liveness.log 2>&1; then
+    ok "守卫存活性门 — $(tail -1 /tmp/uniapp-guard-liveness.log)"
+  else
+    bad "守卫存活性门失败 — node scripts/selfcheck-guard-liveness.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-guard-liveness.log | head -8 | sed 's/^/        /'
+  fi
+}
+guard_liveness_gate
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]
