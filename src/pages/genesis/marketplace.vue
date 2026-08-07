@@ -144,6 +144,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { onMounted, onUnmounted } from "vue";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
@@ -360,6 +361,15 @@ function handleBuy(l: Listing) {
     memo: `Genesis secondary · token #${l.tokenId}`,
     ref: billRef,
   });
+  // 扣款⊗记账这一跳就是 PROD 的 POST /api/genesis/secondary/fulfill —— 地区拒绝以它的
+  // 结果回来。先翻译:`null` = 普通结果,下面的余额不足 / 落盘失败分支原样处理,
+  // 绝不能把一次普通的落盘失败说成地区受限。
+  const geoPaid = geoPolicyUserMessage(paid, t.value.geoPolicy);
+  if (geoPaid) {
+    // 二级承接是动钱路径,拒单必须带资金交代(拒在扣款落地前,余额确实没动)。
+    toast.error(geoPaid, t.value.geoPolicy.fundsSafeNote);
+    return;
+  }
   if (paid === "insufficient") {
     toast.error(
       t.value.marketplace.insufficient,

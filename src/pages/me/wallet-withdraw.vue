@@ -345,6 +345,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { navTo } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
@@ -885,9 +886,16 @@ async function handleSubmit() {
       snap.maxWithdrawable,
       snap.amount,
     );
-  } catch {
+  } catch (err) {
     clearSubmitFreeze();
-    toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
+    // The eligibility call is the one server round-trip on this path, so a region
+    // refusal surfaces here as a rejection. Translate it; `null` = not a region
+    // refusal, so keep the existing timeout message rather than mislabelling a
+    // genuine timeout as a region block.
+    const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+    // 钱路径上被拦,先说钱的下落 —— 用户第一个念头是「我那笔钱呢」,不是「哪些功能开了」。
+    if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+    else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
     return;
   }
   if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt) {

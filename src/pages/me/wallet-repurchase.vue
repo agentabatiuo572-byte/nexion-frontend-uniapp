@@ -93,6 +93,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import Row from "@/components/me/repurchase-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
@@ -151,6 +152,16 @@ function handleRepurchase() {
     memo: `Re-invest · 90d stake`,
     ref: billRef,
   });
+  // The ledger post is this page's server round-trip, so a region refusal comes
+  // back as its outcome. Translate first; `null` means it's an ordinary outcome
+  // and the branches below handle it unchanged — a failed post must never be
+  // reported to the user as a region block.
+  const geoPaid = geoPolicyUserMessage(paid, t.value.geoPolicy);
+  if (geoPaid) {
+    // 同上:复投是动钱路径,拒单必须带资金交代。
+    toast.error(geoPaid, t.value.geoPolicy.fundsSafeNote);
+    return;
+  }
   if (paid === "insufficient") {
     toast.error(w.value.insufficient, fmt(w.value.insufficientSub, { a: user.value.usdtBalance.toFixed(2) }));
     return;
