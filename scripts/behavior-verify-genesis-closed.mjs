@@ -17,7 +17,7 @@
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
-const BASE = "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const CFG_KEY = "nexgrid-genesis-config-v1";
 const ACC_KEY = "nexgrid-genesis-accounts-v1";
 const VP = { width: 390, height: 844 };
