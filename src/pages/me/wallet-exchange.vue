@@ -180,6 +180,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
@@ -434,6 +435,13 @@ async function handleConfirm() {
         .replace("{toAmt}", amtLabel(snap.toAmount)),
     );
     input.value = "";
+  } catch (err) {
+    // A region refusal surfaces on this path as a rejected submit. Translate it
+    // into a toast; anything else is not ours to swallow — rethrow so the
+    // existing failure behaviour (and the `finally` unlock below) is unchanged.
+    const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+    if (!geo) throw err;
+    toast.error(geo);
   } finally {
     // 所有出口(含取消 / 拒单 / 抛异常)统一解锁 —— 复位点只有一个,不会有分支漏掉。
     submitting.value = false;

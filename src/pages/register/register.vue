@@ -154,6 +154,7 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import {
   exchangeVerifiedSignIn,
   finalizeVerifiedRegistration,
@@ -367,6 +368,15 @@ function currentSponsorCode(): string | null {
   // 锁定码优先(?ref / pendingRefCode);仅无锁定时才取手输([FEAT-SHARE4] ③)。
   return lockedRef.value || normalizeRefCode(invite.value);
 }
+// A region-policy refusal reaches this page two ways: as a code on an OTP/
+// registration result, or as a thrown error out of the registration transaction.
+// `geoPolicyUserMessage` reads both shapes. `null` means it wasn't a region
+// refusal, and the caller must fall through to its existing mapping — otherwise
+// an unrelated failure would be reported to the user as a region block.
+function geoText(code: unknown): string | null {
+  return geoPolicyUserMessage(code, t.value.geoPolicy);
+}
+
 async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
@@ -395,6 +405,8 @@ async function verifyCode() {
   ) return;
   if (!res.ok) {
     verifying.value = false;
+    const geo = geoText(res.error);
+    if (geo) { error.value = geo; return; }
     if (res.error === "otp_invalid") {
       error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
     } else if (res.error === "otp_expired") {
@@ -554,10 +566,10 @@ function finish() {
         }
       }
     }
-  } catch {
+  } catch (err) {
     restorePreviousAccountScope();
     completing.value = false;
-    error.value = t.value.authOtp.errorServiceUnavailable;
+    error.value = geoText(err) ?? t.value.authOtp.errorServiceUnavailable;
     return;
   }
   const finalized = finalizeVerifiedRegistration(fullPhone.value, token);

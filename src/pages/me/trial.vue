@@ -151,6 +151,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -207,6 +208,11 @@ const canStartNow = computed(() => {
 });
 const ineligibleReasonText = computed(() => {
   const r = freeTrial.eligibility().reason;
+  // PROD: this reason is served by GET /api/trial/eligibility, so a region
+  // refusal arrives here as the reason code. Translate it first; `null` means an
+  // ordinary reason, which the named branches below still handle unchanged.
+  const geo = geoPolicyUserMessage(r, t.value.geoPolicy);
+  if (geo) return geo;
   if (r === "converted") return w.value.eligReasonConverted;
   if (r === "used") return w.value.eligReasonUsed;
   if (r === "in-progress") return w.value.eligReasonInProgress;

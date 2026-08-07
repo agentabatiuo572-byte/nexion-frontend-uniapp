@@ -126,6 +126,19 @@ async function loadLocale(l) {
 const LOCALES = Object.fromEntries(await Promise.all(LANGS.map(async (l) => [l, await loadLocale(l)])));
 const EN = LOCALES.en;
 
+/** 真解析:bundle 出 src 下的模块取**实现**。 */
+async function loadSrcModule(...rel) {
+  const out = await build({
+    entryPoints: [path.join(root, "src", ...rel)],
+    bundle: true, write: false, format: "esm",
+  });
+  return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
+}
+// 复投页在拒单前先试译地区策略回执。这里注入**真实现**而不是桩:桩成「永远 null」
+// 等于把这条分支从门下摘掉,而桩成「永远有值」则会把普通失败吞成「地区受限」——
+// 两种桩都让下面「有失败提示 + 余额被补回」的断言失去判别力。
+const { geoPolicyUserMessage } = await loadSrcModule("api", "geo-policy-error.ts");
+
 const ACCOUNTS_KEY = "nexgrid-v3-staking-accounts-v1";
 const ONE_DAY = 86400 * 1000;
 const ACCT = "tab-race@nexgrid.test";
@@ -461,7 +474,7 @@ function diskRev() {
       canSubmit: { value: true },
       user: { value: app.user },
       STAKING_MIN, STAKING_APY,
-      app, staking, postMoneyBill,
+      app, staking, postMoneyBill, geoPolicyUserMessage,
       bills: { add: (r2) => { bills.push(r2); return { id: "B1" }; } },
       t: { value: EN }, w: { value: EN.repurchase },
       fmt: (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => String(vars?.[k] ?? "")),
