@@ -7,7 +7,8 @@ const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, colorSch
 const p = await ctx.newPage();
 await p.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "networkidle", timeout: 30000 });
 await new Promise((r) => setTimeout(r, 2500));
-const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexgrid-quest-v1"));
+// 🔴 按账号分行的 accounts 键;旧单键 nexgrid-quest-v1 已废(src/store/quest.ts:71),读它恒 null。
+const questLocalStorage = await p.evaluate(() => localStorage.getItem("nexgrid-quest-accounts-v1"));
 const completedCounterText = await p.evaluate(() => {
   const el = [...document.querySelectorAll("text,view,span")].find((e) => /\/6/.test(e.textContent || "") && (e.textContent || "").length < 12);
   return el ? el.textContent.trim() : "(not found)";
