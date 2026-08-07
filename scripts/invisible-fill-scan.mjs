@@ -9,6 +9,7 @@
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 
+// 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 统一名)——只认前者会在非 5173 端口静默打到别的工程树。
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const args = process.argv.slice(2);
 const MODE = args.includes("--selftest") ? "selftest" : "sweep";

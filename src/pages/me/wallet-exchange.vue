@@ -180,6 +180,7 @@ import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
@@ -324,6 +325,9 @@ async function handleConfirm() {
   };
 
   submitting.value = true;
+  // settled 记录「这笔到底成交了没有」—— 下面 catch 里那句资金断言必须跟它走,
+  // 不能无条件说「一分没动」。见 catch 处注释。
+  let settled = false;
   try {
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
     // (大额兑换直接放行:$100 终身累计门已随 FEAT-KYC-RM01b 删除,汇率与日限不变。)
@@ -413,6 +417,7 @@ async function handleConfirm() {
       return;
     }
     if (posted !== "ok") return; // 落盘失败:资金已还原、账上无记录、收口点已提示
+    settled = true; // 过了这行 = 资金真的动过,此后任何拒绝都不许再说「一分没动」
 
     exchange.recordSwap({
       fromSym: snap.fromSym,
@@ -434,6 +439,17 @@ async function handleConfirm() {
         .replace("{toAmt}", amtLabel(snap.toAmount)),
     );
     input.value = "";
+  } catch (err) {
+    // A region refusal surfaces on this path as a rejected submit. Translate it
+    // into a toast; anything else is not ours to swallow — rethrow so the
+    // existing failure behaviour (and the `finally` unlock below) is unchanged.
+    const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+    if (!geo) throw err;
+    // 资金那句必须跟事实走,不能跟期望走:本 catch 在生产形态下可能落在
+    // 「已部分落账后重试」的下游,那时说「一分没动」就是当面撒谎(本仓在
+    // wallet-repurchase.vue 已为同形错误踩过一次)。settled 为真即已成交过,
+    // 此时只报拒绝原因、不做资金断言。
+    toast.error(geo, settled ? undefined : t.value.geoPolicy.fundsSafeNote);
   } finally {
     // 所有出口(含取消 / 拒单 / 抛异常)统一解锁 —— 复位点只有一个,不会有分支漏掉。
     submitting.value = false;

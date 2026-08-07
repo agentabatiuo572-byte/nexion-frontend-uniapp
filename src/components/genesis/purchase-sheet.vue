@@ -98,6 +98,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -216,6 +217,13 @@ function handlePurchase() {
       memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
       ref: billRef,
     });
+    // 地区拒绝先试译。拒绝发生在扣款**落地之前**(insufficient 分支同位),
+    // 所以此处说「资金没动」成立。翻不出来就原样走既有分支。
+    const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+    if (geo) {
+      toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+      return;
+    }
     if (paid === "insufficient") {
       toast.error(
         t.value.genesis.purchaseError,
