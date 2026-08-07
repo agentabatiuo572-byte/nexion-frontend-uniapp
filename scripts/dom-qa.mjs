@@ -12,6 +12,8 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
+// 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 与其余运行时探针的统一名)——
+// 只认前者时,`BASE_URL=<非 5173> bash scripts/verify.sh`(worktree 自测必需)会静默打到 5173 上的**别的工程树**。
 const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const LEDGER_PATH = "docs/DOM-QA-LEDGER.json";
 const args = process.argv.slice(2);

@@ -154,6 +154,7 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import {
   exchangeVerifiedSignIn,
   finalizeVerifiedRegistration,
@@ -367,6 +368,15 @@ function currentSponsorCode(): string | null {
   // 锁定码优先(?ref / pendingRefCode);仅无锁定时才取手输([FEAT-SHARE4] ③)。
   return lockedRef.value || normalizeRefCode(invite.value);
 }
+// A region-policy refusal reaches this page two ways: as a code on an OTP/
+// registration result, or as a thrown error out of the registration transaction.
+// `geoPolicyUserMessage` reads both shapes. `null` means it wasn't a region
+// refusal, and the caller must fall through to its existing mapping — otherwise
+// an unrelated failure would be reported to the user as a region block.
+function geoText(code: unknown): string | null {
+  return geoPolicyUserMessage(code, t.value.geoPolicy);
+}
+
 async function verifyCode() {
   if (verifying.value) return;
   error.value = null;
@@ -395,6 +405,8 @@ async function verifyCode() {
   ) return;
   if (!res.ok) {
     verifying.value = false;
+    const geo = geoText(res.error);
+    if (geo) { error.value = geo; return; }
     if (res.error === "otp_invalid") {
       error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
     } else if (res.error === "otp_expired") {
@@ -434,9 +446,11 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
   if (!exchange.ok) {
     verifying.value = false;
     if (exchange.error !== "account_directory_unavailable") verifiedToken.value = null;
-    error.value = exchange.error === "account_directory_unavailable"
+    // 第三条同形路径:老号在注册页触发的自动登录。它消费的错误与 login.vue 已接的
+    // 是同一个函数、同一个类型 —— 漏接会导致同一种拒绝在两条路上显示不同文案。
+    error.value = geoText(exchange.error) ?? (exchange.error === "account_directory_unavailable"
       ? t.value.authOtp.errorServiceUnavailable
-      : t.value.authOtp.errorOtpExpired;
+      : t.value.authOtp.errorOtpExpired);
     return;
   }
   // 立即进入既有登录完成链，不以人为计时器阻塞；toast 会随目标页面的 GlobalUi
@@ -452,9 +466,9 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
   });
   if (!completed.ok) {
     verifying.value = false;
-    error.value = completed.error === "account_pending"
+    error.value = geoText(completed.error) ?? (completed.error === "account_pending"
       ? t.value.login.errorRegistrationIncomplete
-      : t.value.authOtp.errorServiceUnavailable;
+      : t.value.authOtp.errorServiceUnavailable);
   }
 }
 function finish() {
@@ -492,9 +506,11 @@ function finish() {
     } else if (accountResult.error === "registration_blocked") {
       error.value = t.value.register.errorSignupLimited;
     } else {
-      error.value = accountResult.error === "account_directory_unavailable"
+      // 同形第四条:漏接会把地区拒单报成「验证码已过期」,用户重发验证码→再被拒→循环,
+      // 那是主动误导,不只是缺文案。
+      error.value = geoText(accountResult.error) ?? (accountResult.error === "account_directory_unavailable"
         ? t.value.authOtp.errorServiceUnavailable
-        : t.value.authOtp.errorOtpExpired;
+        : t.value.authOtp.errorOtpExpired);
     }
     completing.value = false;
     return;
@@ -554,19 +570,20 @@ function finish() {
         }
       }
     }
-  } catch {
+  } catch (err) {
     restorePreviousAccountScope();
     completing.value = false;
-    error.value = t.value.authOtp.errorServiceUnavailable;
+    error.value = geoText(err) ?? t.value.authOtp.errorServiceUnavailable;
     return;
   }
   const finalized = finalizeVerifiedRegistration(fullPhone.value, token);
   if (!finalized.ok) {
     restorePreviousAccountScope();
     completing.value = false;
-    error.value = finalized.error === "account_directory_unavailable"
+    // 同形第五条,理由同上。
+    error.value = geoText(finalized.error) ?? (finalized.error === "account_directory_unavailable"
       ? t.value.authOtp.errorServiceUnavailable
-      : t.value.authOtp.errorOtpExpired;
+      : t.value.authOtp.errorOtpExpired);
     return;
   }
   completeActivatedRegistration(finalized.accountId, restorePreviousAccountScope);

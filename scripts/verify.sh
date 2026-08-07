@@ -18,8 +18,9 @@
 
 set -u
 MODULE="${1:-all}"
-# 🔴 export:spawn 的每个 node 探针都继承同一个 origin。没有 export 时(2026-08-07 前),
-#    只给 BASE_URL 跑 verify,那些只认 env 的探针会静默回落 5173 = 打到别人的树报假绿。
+# 🔴 export:本脚本 spawn 的**每个**探针都必须打同一个 origin。不 export 时,只读
+#   UNI_BASE_URL 的那几个探针(dom-qa / tap-feedback / empty-state / invisible-fill)
+#   会各自回落 5173 —— worktree 里主 checkout 正占着 5173,于是它们静默验了别的工程树。
 export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
@@ -1353,11 +1354,24 @@ no_native_button
 # click listeners → a dual-bound element fires its handler TWICE per tap/click
 # (steppers +2, toggles open-then-close, navigateTo ×2 → stack corruption via
 # the navTo fallback chain). uni's compiler maps @click → tap on mp targets, so
-# single @click is correct on every platform. Comment MENTIONS of "@tap"
-# (migration notes) are fine — only the binding form `@tap...=` is banned.
+# single @click is correct on every platform. Only a LIVE binding is banned:
+# comment bodies are blanked first (script //-line + /* */, template <!-- -->), so
+# a migration note that QUOTES `@tap="x"` — behavior-analytics.ts JSDoc, earn.vue
+# template note — is documentation, not a dual-bind. Blanking keeps the newlines
+# so the reported line numbers stay true.
 no_tap_binding() {
   local hits
-  hits=$(grep -rnE '@tap(\.[a-z]+)*=' src 2>/dev/null | head -5)
+  hits=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const blank=(m)=>m.replace(/[^\n]/g,"");
+const strip=(s)=>s.replace(/\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->/g,blank).replace(/^[ \t]*\/\/.*$/gm,"");
+const re=/@tap(\.[a-z]+)*=/;
+const hits=[];
+(function walk(d){for(const f of fs.readdirSync(d)){const p=path.join(d,f);
+if(fs.statSync(p).isDirectory())walk(p);else if(/\.(vue|ts|js)$/.test(f)){
+strip(fs.readFileSync(p,"utf8")).split(/\r?\n/).forEach((ln,i)=>{
+if(re.test(ln))hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim())});}}})("src");
+if(hits.length){console.log(hits.slice(0,5).join("\n"));process.exit(1)}' 2>&1)
   if [ -z "$hits" ]; then ok "no @tap binding (single @click correct on all targets, P-059) (0 hits)";
   else bad "@tap binding — H5 double-fires alongside click; use single @click (P-059)"; echo "$hits" | sed 's/^/        /'; fi
 }
@@ -1758,7 +1772,9 @@ platform_stats_anchor() {
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
   done
   # (6) trust Q2 print ↔ admin managed-content mirror value parity (键 parity ≠ 值 parity)
-  ADMIN_ITABS="../Nexion-admin-prototype/app/components/domain-views/i-tabs/data.ts"
+  # 🔴 走 $ADMIN_ROOT(上方 36-44 行已解析 linked worktree 的情形),不写裸相对路径:
+  #   worktree 里 `../Nexion-admin-prototype` 落在 .claude/worktrees/ 下,文件恒读不到 → 两条恒假红。
+  ADMIN_ITABS="$ADMIN_ROOT/app/components/domain-views/i-tabs/data.ts"
   for v in '27,150' '\$47\.0M'; do
     if ! grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then bad "platform-anchor: trust.vue missing Q2 print /$v/"; fails=1; fi
     if ! grep -qE "$v" "$ADMIN_ITABS" 2>/dev/null; then bad "platform-anchor: admin i-tabs mirror missing /$v/ (cross-repo drift)"; fails=1; fi
