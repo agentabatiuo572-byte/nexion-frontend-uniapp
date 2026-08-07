@@ -2,7 +2,7 @@
 /** milestone-verify.mjs — definitive runtime proof the milestone poll fires. */
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
-const BASE = "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
 const page = await ctx.newPage();
@@ -11,7 +11,7 @@ page.on("console", collectAppConsoleErrors(errs, BASE));
 page.on("pageerror", (e) => errs.push("PAGEERROR: " + String(e)));
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-await page.goto(`${BASE}/#/pages/index/index`, { waitUntil: "networkidle", timeout: 30000 });
+await page.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "networkidle", timeout: 30000 });
 // Fresh start: wipe milestone+quest persisted state, then reload so stores re-hydrate empty.
 await page.evaluate(() => { localStorage.removeItem("nexgrid-milestones-v1"); localStorage.removeItem("nexgrid-quest-v1"); });
 await page.reload({ waitUntil: "networkidle" });

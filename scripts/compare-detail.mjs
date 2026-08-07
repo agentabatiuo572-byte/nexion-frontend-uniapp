@@ -5,8 +5,9 @@ import path from "node:path"; import fs from "node:fs"; import { fileURLToPath }
 const OUT = path.join(path.dirname(fileURLToPath(import.meta.url)), ".baseline", "_check");
 fs.mkdirSync(OUT, { recursive: true });
 const PROD = process.argv[2] || "stellarrack-p1";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const apps = [
-  { name: "uni", url: `http://localhost:5173/#/pages/store/detail?id=${PROD}`, scrollSel: ".nx-content" },
+  { name: "uni", url: `${BASE}/?nx_device=off#/pages/store/detail?id=${PROD}`, scrollSel: ".nx-content" },
 ];
 const browser = await chromium.launch();
 for (const a of apps) {

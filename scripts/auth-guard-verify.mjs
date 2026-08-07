@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** auth-guard-verify.mjs — runtime proof the demo-friendly auth guard behaves. */
 import { chromium } from "playwright";
-const BASE = "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const browser = await chromium.launch();
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 // uni H5 wraps stored objects as {type:"object",data:...}
@@ -10,12 +10,12 @@ const unauth = JSON.stringify({ type: "object", data: { isAuthenticated: false, 
 async function routeAfter(seedUnauth, target) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   const page = await ctx.newPage();
-  await page.goto(`${BASE}/#/pages/index/index`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.goto(`${BASE}/?nx_device=off#/pages/index/index`, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.evaluate((u) => {
     localStorage.clear();
     if (u) localStorage.setItem("nexgrid-auth-v1", u);
   }, seedUnauth ? unauth : null);
-  await page.goto(`${BASE}/#${target}`, { waitUntil: "networkidle", timeout: 30000 });
+  await page.goto(`${BASE}/?nx_device=off#${target}`, { waitUntil: "networkidle", timeout: 30000 });
   await wait(1800); // onShow guard + one 1s tick
   const route = await page.evaluate(() => (location.hash || "").replace(/^#/, ""));
   await ctx.close();
