@@ -171,6 +171,12 @@ export const vi: Messages = {
     errorOtpNotFound: "Hãy lấy mã xác minh trước đã",
     errorServiceUnavailable: "Hiện chưa xác minh được tài khoản. Vui lòng thử lại.",
   },
+  geoPolicy: {
+    blocked: "Khu vực của bạn hiện chưa được mở.",
+    limited: "Khu vực của bạn hiện chỉ mở một số tính năng.",
+    endpoint: "Tính năng này chưa mở ở khu vực của bạn.",
+    unavailable: "Hiện chưa xác nhận được khu vực của bạn. Vui lòng thử lại.",
+  },
   countryCodes: {
     title: "Quốc gia / khu vực",
     close: "Đóng bộ chọn quốc gia",

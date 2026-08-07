@@ -129,6 +129,7 @@ import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
 import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
@@ -281,6 +282,14 @@ function isCurrentOtpFlow(context: OtpFlowContext): boolean {
   );
 }
 
+// A region-policy refusal arrives as a code on the same result objects as every
+// other sign-in failure. Translate it first; `null` means it wasn't one, and the
+// caller must fall through to its existing mapping — otherwise an unrelated
+// failure would be reported to the user as a region block.
+function geoText(code: unknown): string | null {
+  return geoPolicyUserMessage(code, t.value.geoPolicy);
+}
+
 // Sign-in completion (shared by password + OTP). Binds the account-cloud
 // snapshot, claims this carrier's session, and routes a changed physical device
 // through recalibration before the main app.
@@ -300,11 +309,12 @@ function finishSignIn(
   });
   if (!result.ok) {
     loading.value = false;
-    error.value = result.error === "account_pending"
-      ? t.value.login.errorRegistrationIncomplete
-      : result.error === "account_not_found"
-        ? t.value.login.errorAccountNotRegistered
-      : t.value.authOtp.errorServiceUnavailable;
+    error.value = geoText(result.error)
+      ?? (result.error === "account_pending"
+        ? t.value.login.errorRegistrationIncomplete
+        : result.error === "account_not_found"
+          ? t.value.login.errorAccountNotRegistered
+        : t.value.authOtp.errorServiceUnavailable);
   }
 }
 
@@ -314,9 +324,10 @@ function finishVerifiedOtpSignIn(verifyToken: string, context: OtpFlowContext) {
   if (!exchange.ok) {
     if (!isCurrentOtpFlow(context)) return;
     loading.value = false;
-    error.value = exchange.error === "verify_token_invalid"
-      ? t.value.authOtp.errorOtpExpired
-      : t.value.authOtp.errorServiceUnavailable;
+    error.value = geoText(exchange.error)
+      ?? (exchange.error === "verify_token_invalid"
+        ? t.value.authOtp.errorOtpExpired
+        : t.value.authOtp.errorServiceUnavailable);
     return;
   }
   finishSignIn(exchange, context);

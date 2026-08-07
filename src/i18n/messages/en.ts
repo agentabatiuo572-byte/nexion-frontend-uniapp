@@ -170,6 +170,16 @@ export const en = {
     errorOtpNotFound: "Request a verification code first",
     errorServiceUnavailable: "We couldn't verify the account right now. Please try again.",
   },
+  // Region-policy refusals. The four keys are the four GeoPolicyErrorKind values
+  // declared in the geo-policy-error module — this namespace IS the GeoPolicyCopy
+  // argument, so renaming or dropping a key breaks every call site of
+  // geoPolicyUserMessage().
+  geoPolicy: {
+    blocked: "We're not open in your area yet.",
+    limited: "Your area only has some features open right now.",
+    endpoint: "This one isn't open in your area yet.",
+    unavailable: "We couldn't confirm where you are right now. Please try again.",
+  },
   countryCodes: {
     title: "Country / region",
     close: "Close country selector",

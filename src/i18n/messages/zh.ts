@@ -159,6 +159,12 @@ export const zh: Messages = {
     errorOtpNotFound: "请先获取验证码",
     errorServiceUnavailable: "暂时无法确认账号状态,请重试。",
   },
+  geoPolicy: {
+    blocked: "你所在的地区暂时还没开放。",
+    limited: "你所在的地区目前只开放了部分功能。",
+    endpoint: "这项功能在你所在的地区还没开放。",
+    unavailable: "暂时没能确认你所在的地区,请重试。",
+  },
   countryCodes: {
     title: "国家 / 地区",
     close: "关闭国家或地区选择",
