@@ -425,6 +425,10 @@ async function verifyCode() {
   if (!isCurrentOtpFlow(context)) return;
   if (!res.ok) {
     loading.value = false;
+    // 与 register.vue 的同名分支消费同一个 otpVerify 结果类型 —— 两边必须一起接,
+    // 否则同一种拒绝在登录页和注册页显示不同文案。
+    const geo = geoText(res.error);
+    if (geo) { error.value = geo; return; }
     if (res.error === "otp_invalid") {
       error.value = fmt(t.value.authOtp.errorOtpInvalid, { n: res.attemptsLeft });
     } else if (res.error === "otp_expired") {

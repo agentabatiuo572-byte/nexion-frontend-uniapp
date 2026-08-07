@@ -198,6 +198,7 @@ import GenesisPurchaseSheet from "@/components/genesis/purchase-sheet.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useLocaleStore } from "@/store/locale";
@@ -340,6 +341,18 @@ function emitSocial() {
   socialId = setTimeout(emitSocial, 8_000 + Math.random() * 6_000);
 }
 
+/**
+ * 阻断态的统一提示口。认购是动钱入口,被拦住时先把「钱怎么样了」说清楚 ——
+ * 与 `blockHintSub` 的 holdingsSafe 同一目的,只是地区拒绝有自己更准的那句。
+ * 🔴 翻译不出来(`null`)就是普通阻断态,原样走既有的 dockCtaText + blockHintSub,
+ *    绝不能把「市场关闭 / 熔断 / 配置未知」说成地区受限。
+ */
+function toastBlocked() {
+  const geo = geoPolicyUserMessage(block.value, t.value.geoPolicy);
+  if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+  else toast.info(dockCtaText.value, blockHintSub.value);
+}
+
 function openSheet() {
   // 🔴 阻断判定**只问 `block` 一处**(FEAT-GEN10 ④)。改造前这里与 dockCtaText 各写一套
   //   if 链,两处顺序一致纯属巧合 —— 任一处加条件而另一处忘改就会「按钮与行为对不上」。
@@ -357,14 +370,14 @@ function openSheet() {
     if (block.value !== "configUnavailable") {
       toast.success(t.value.genesis.marketClosed.retryOk);
     } else {
-      toast.info(dockCtaText.value, blockHintSub.value);
+      toastBlocked();
     }
     return;
   }
   if (block.value !== null) {
     // 其余阻断态(市场关闭 / 熔断 / 预售未到):不开任何 sheet。
     // 🔴 禁静默无反馈(规格 ⑥):给出与按钮同一句说明,让用户知道不是点坏了。
-    toast.info(dockCtaText.value, blockHintSub.value);
+    toastBlocked();
     return;
   }
   // 资格门 L2:未达标 → 资格 sheet,不开购买 sheet(FEAT-GEN08)。

@@ -160,10 +160,12 @@ export const zh: Messages = {
     errorServiceUnavailable: "暂时无法确认账号状态,请重试。",
   },
   geoPolicy: {
-    blocked: "你所在的地区暂时还没开放。",
-    limited: "你所在的地区目前只开放了部分功能。",
-    endpoint: "这项功能在你所在的地区还没开放。",
+    blocked: "我们还没在你所在的地区开放。需要帮助请联系客服。",
+    limited: "有些功能在你所在的地区还没开放。详情请联系客服。",
+    endpoint: "这项功能在你所在的地区还没开放。需要帮助请联系客服。",
     unavailable: "暂时没能确认你所在的地区,请重试。",
+    // 只在动钱的页面(提现/兑换/复购)作为提示的第二行传入。
+    fundsSafeNote: "余额未变动,也没有产生任何扣费。",
   },
   countryCodes: {
     title: "国家 / 地区",

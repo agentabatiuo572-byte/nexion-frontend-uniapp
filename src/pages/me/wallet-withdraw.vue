@@ -893,7 +893,8 @@ async function handleSubmit() {
     // refusal, so keep the existing timeout message rather than mislabelling a
     // genuine timeout as a region block.
     const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
-    if (geo) toast.error(geo);
+    // 钱路径上被拦,先说钱的下落 —— 用户第一个念头是「我那笔钱呢」,不是「哪些功能开了」。
+    if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
     else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
     return;
   }

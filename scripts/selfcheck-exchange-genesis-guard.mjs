@@ -264,6 +264,21 @@ async function loadLocale(l) {
   return mod[l] ?? mod.default ?? Object.values(mod)[0];
 }
 const LOCALES = Object.fromEntries(await Promise.all(LANGS.map(async (l) => [l, await loadLocale(l)])));
+
+/** 真解析:bundle 出 src 下的模块取**实现**。 */
+async function loadSrcModule(...rel) {
+  const out = await build({
+    entryPoints: [path.join(root, "src", ...rel)],
+    bundle: true, write: false, format: "esm",
+  });
+  return import("data:text/javascript;base64," + Buffer.from(out.outputFiles[0].text, "utf8").toString("base64"));
+}
+// 🔴 handleConfirm 的 catch 分支引用了 geoPolicyUserMessage 这个自由变量。
+// 本门用 new Function 注入真源码执行,env 少一个 key 就是 ReferenceError ——
+// 而且会把**整道门**炸掉,不是某条断言红。今天没踩到只因现有场景都走 return
+// 不走 throw;这是「还没人踩」不是「雷不存在」。凡改了被 eval 的函数,
+// 必须扫全部 eval 它的门脚本同步喂依赖(姊妹门 selfcheck-staking-cas.mjs 同理)。
+const { geoPolicyUserMessage } = await loadSrcModule("api", "geo-policy-error.ts");
 const EN = LOCALES.en;
 const t = { value: EN };
 const fmt = (s, vars) => String(s).replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
@@ -350,6 +365,7 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
   const toAmount = { value: pageMath.quoteTo(dir, pageMath.money(from), r) };
   const swapUSDValue = { value: dir === "usdt2nex" ? fromAmount.value : toAmount.value };
   const env = {
+    geoPolicyUserMessage,
     submitting: { value: false },
     valid: { value: true },
     direction, fromAmount, toAmount, rate, swapUSDValue,
@@ -597,6 +613,8 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
   };
   const toast = { error: (a, b) => toasts.push(["error", a, b]), success: (a, b) => toasts.push(["success", a, b]) };
   const env = {
+    // handlePurchase 的 geo 分支引用它;不喂 = 整道门 ReferenceError 崩溃(2026-08-07 实测)。
+    geoPolicyUserMessage,
     purchasing,
     qty: { value: 1 },
     price: { value: 9999 },

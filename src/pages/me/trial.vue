@@ -151,7 +151,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import CountdownHero from "@/components/me/trial-countdown-hero.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { geoPolicyErrorKind, geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store/free-trial";
 import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
@@ -211,8 +211,11 @@ const ineligibleReasonText = computed(() => {
   // PROD: this reason is served by GET /api/trial/eligibility, so a region
   // refusal arrives here as the reason code. Translate it first; `null` means an
   // ordinary reason, which the named branches below still handle unchanged.
+  // 这里是**禁用 CTA 下方的常驻说明**,不是 toast —— 页面上没有任何重试控件。
+  // 所以 unavailable 那条自带的「请重试」在这个位置是死胡同,换成本页既有的
+  // 「晚点再来看看」口径(eligReasonClosed 同款),其余三条照常用。
   const geo = geoPolicyUserMessage(r, t.value.geoPolicy);
-  if (geo) return geo;
+  if (geo) return geoPolicyErrorKind(r) === "unavailable" ? w.value.eligReasonClosed : geo;
   if (r === "converted") return w.value.eligReasonConverted;
   if (r === "used") return w.value.eligReasonUsed;
   if (r === "in-progress") return w.value.eligReasonInProgress;

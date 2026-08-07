@@ -446,9 +446,11 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
   if (!exchange.ok) {
     verifying.value = false;
     if (exchange.error !== "account_directory_unavailable") verifiedToken.value = null;
-    error.value = exchange.error === "account_directory_unavailable"
+    // 第三条同形路径:老号在注册页触发的自动登录。它消费的错误与 login.vue 已接的
+    // 是同一个函数、同一个类型 —— 漏接会导致同一种拒绝在两条路上显示不同文案。
+    error.value = geoText(exchange.error) ?? (exchange.error === "account_directory_unavailable"
       ? t.value.authOtp.errorServiceUnavailable
-      : t.value.authOtp.errorOtpExpired;
+      : t.value.authOtp.errorOtpExpired);
     return;
   }
   // 立即进入既有登录完成链，不以人为计时器阻塞；toast 会随目标页面的 GlobalUi
@@ -464,9 +466,9 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
   });
   if (!completed.ok) {
     verifying.value = false;
-    error.value = completed.error === "account_pending"
+    error.value = geoText(completed.error) ?? (completed.error === "account_pending"
       ? t.value.login.errorRegistrationIncomplete
-      : t.value.authOtp.errorServiceUnavailable;
+      : t.value.authOtp.errorServiceUnavailable);
   }
 }
 function finish() {
@@ -504,9 +506,11 @@ function finish() {
     } else if (accountResult.error === "registration_blocked") {
       error.value = t.value.register.errorSignupLimited;
     } else {
-      error.value = accountResult.error === "account_directory_unavailable"
+      // 同形第四条:漏接会把地区拒单报成「验证码已过期」,用户重发验证码→再被拒→循环,
+      // 那是主动误导,不只是缺文案。
+      error.value = geoText(accountResult.error) ?? (accountResult.error === "account_directory_unavailable"
         ? t.value.authOtp.errorServiceUnavailable
-        : t.value.authOtp.errorOtpExpired;
+        : t.value.authOtp.errorOtpExpired);
     }
     completing.value = false;
     return;
@@ -576,9 +580,10 @@ function finish() {
   if (!finalized.ok) {
     restorePreviousAccountScope();
     completing.value = false;
-    error.value = finalized.error === "account_directory_unavailable"
+    // 同形第五条,理由同上。
+    error.value = geoText(finalized.error) ?? (finalized.error === "account_directory_unavailable"
       ? t.value.authOtp.errorServiceUnavailable
-      : t.value.authOtp.errorOtpExpired;
+      : t.value.authOtp.errorOtpExpired);
     return;
   }
   completeActivatedRegistration(finalized.accountId, restorePreviousAccountScope);
