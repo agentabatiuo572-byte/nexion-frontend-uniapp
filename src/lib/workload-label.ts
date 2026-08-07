@@ -1,5 +1,5 @@
 // Display label for an AI workload (plus the legacy "KY" verification pseudo-workload
-// kept only so historical receipts still render — FEAT-KYC-RM01b).
+// kept only so historical receipts still render after the legacy identity flow was removed).
 //
 // The data layer bakes an English `type` string — store/types.ts
 // TASK_CATEGORY_LABEL feeds CurrentTask.type / LockedTeaser.type / Receipt.type

@@ -16,6 +16,7 @@ import { createMarketApi } from "./market-api";
 import { createGenesisApi } from "./genesis-api";
 import { createRepurchaseApi } from "./repurchase-api";
 import { createRiskDisclosureApi } from "./risk-disclosure-api";
+import { createPayoutAddressApi } from "./payout-address-api";
 // 注:trial-api 未随本批搬入 —— 它写于 2026-07-24,契约仍是「卡时代」试用机模型
 // (自动续费 / 提前赎回 / 延期三组字段),主线已在 FEAT-TRIAL02 改为无卡试用机,
 // 并焊了哨兵防该模型复活(哨兵按字段名匹配且不剥注释,故此处不列原字段名)。
@@ -70,6 +71,7 @@ export const marketApi = createMarketApi(apiClient);
 export const genesisApi = createGenesisApi(apiClient);
 export const repurchaseApi = createRepurchaseApi(apiClient);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
+export const payoutAddressApi = createPayoutAddressApi(apiClient);
 export const questApi = createQuestApi(apiClient);
 export const eventsApi = createEventsApi(apiClient);
 export const pointsApi = createPointsApi(apiClient);

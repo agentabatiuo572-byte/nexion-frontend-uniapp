@@ -135,7 +135,7 @@ export const en = {
     s5Body:
       "All yield figures shown in the app are projections based on current network parameters and recent demand, not guarantees. Earnings fluctuate and may decline over time. NEX is a platform reward token whose value can move sharply and is not deposit-insured. Never commit more than you can afford to lose.",
     s6Title: "Wallet, withdrawals & compliance",
-    s6Body: "Routine withdrawals settle within {h} hours. Withdrawals go to the payout address you set yourself (SMS-confirmed, changeable any time, with a security freeze after a change). Amounts above published thresholds may enter enhanced compliance review. Funds are held in segregated reserve accounts and transaction monitoring applies under our MSB registration.",
+    s6Body: "Withdrawals go to the payout address you set yourself (SMS-confirmed, changeable any time, with a security freeze after a change). Processing time follows the server-side order state. Amounts above published thresholds may enter enhanced compliance review. Funds are held in segregated reserve accounts and transaction monitoring applies under our MSB registration.",
     s7Title: "Referral & network rewards",
     s7Body:
       "Direct Royalty and Network Yield Bonus are paid from platform margin, never from a friend's deposit. Rewards depend on referred users completing qualifying actions. Spam, fake accounts, or mass-recruitment schemes are prohibited, will be voided, and may result in suspension and forfeiture of pending rewards.",
@@ -2827,7 +2827,7 @@ export const en = {
       welcomeBonus: "Welcome bonus credited on activation",
       achFirstContribution: "Achievement · First Contribution",
       achFirstDollar: "Achievement · First Dollar",
-      kycVerify: "Verification refund (legacy)",
+      verificationRefund: "Verification refund (legacy)",
       legacyRebindRefund: "Verification transfer refund (flow retired)",
       topupTrc20: "Top-up · USDT-TRC20",
       withdrawTrc20: "Withdrawal · USDT-TRC20",
@@ -2850,7 +2850,7 @@ export const en = {
     typeWithdraw: "Withdrawal",
     typePurchase: "Purchase",
     typeSwap: "Swap",
-    typeKyc: "Verification (legacy)",
+    typeVerification: "Verification (legacy)",
     typeStake: "Stake",
     typeUnstake: "Unstake",
     typeAchievement: "Achievement",

@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { payoutAddressApi, remoteApiEnabled } from "@/api/runtime";
+import type { PayoutAddressNetwork, PayoutAddressSnapshot } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -25,18 +27,46 @@ import {
   type PayoutChangeBlockReason,
 } from "./payout-address-core";
 
-// 提现地址直管(FEAT-KYC-RM01a)。每网络至多一个当前地址,用户直填 + OTP 确认;
-// $1 钱包配对 / KYC-Express 机制已删除(FEAT-KYC-RM01b),存量配对地址由
+// 提现地址直管。每网络至多一个当前地址,用户直填 + OTP 确认;存量配对地址由
 // migrateFromPairing 一次性自动迁移(source=migrated,无需重验、无新地址保护期)。
 //
 // server-canonical:PROD = GET /api/payout-addresses + POST(添加)/ PUT(更换,
 // 服务端在事务内做 OTP 核验、在途单拦截、频控与冻结落库),本 store 整体被替换;
 // client 只消费快照。按账号作用域存储(规格 ② 异常5:换号不继承)。
-// ⚠️ 上述 endpoint 均为 TBD 候选命名:FEAT-KYC-RM01 未定义 API 层,PRD 接口章节待实现批次修订。
+// 服务端接口与后端 payout-addresses 资源保持一致。
 
 const ACCOUNTS_KEY = "nexgrid-payout-address-accounts-v1"; // { [accountKey]: PayoutAddressBook }
 // 旧配对行只读消费(一次性迁移来源)。历史台账数据保留只读,不回写、不清洗、不删除。
 const LEGACY_PAIRING_KEY = "nexgrid-wallet-pairing-accounts-v1";
+
+const TO_SERVER_NETWORK: Record<ChainDepositChannel, PayoutAddressNetwork> = {
+  "usdt-trc20": "USDT-TRC20",
+  "usdt-bep20": "USDT-BEP20",
+  "usdt-erc20": "USDT-ERC20",
+};
+
+function remoteBook(snapshot: PayoutAddressSnapshot): PayoutAddressBook {
+  const result = emptyBook();
+  for (const row of snapshot.addresses) {
+    const network = PAYOUT_NETWORKS.find((candidate) => TO_SERVER_NETWORK[candidate] === row.network);
+    if (!network) continue;
+    const createdAt = Date.parse(row.createdAt);
+    const effectiveAt = Date.parse(row.effectiveAt);
+    result[network] = {
+      current: {
+        address: row.address,
+        addedAt: createdAt,
+        // Compatibility-imported addresses carry an effective time no later than their
+        // import row; user-managed addresses always have a future effective time.
+        source: effectiveAt <= createdAt ? "migrated" : "user",
+      },
+      history: [],
+      freezeUntil: row.changePending ? effectiveAt : null,
+      nextChangeAt: Date.parse(row.nextChangeAllowedAt),
+    };
+  }
+  return result;
+}
 
 /** 频控天数(后台 D5 可配;boot 早期 config store 不可用时回落种子同值 7)。 */
 function cooldownDaysNow(): number {
@@ -117,16 +147,57 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑。
   // 🔴 地址簿必按账号:设备级存储会让换号继承他人提现地址(资格旁路,规格 ② 异常5)。
   let boundKey = "default";
-  const book = ref<PayoutAddressBook>(hydrate(boundKey));
+  const book = ref<PayoutAddressBook>(remoteApiEnabled ? emptyBook() : hydrate(boundKey));
+  let remoteLoadVersion = 0;
 
   function persist(): boolean {
+    if (remoteApiEnabled) return false;
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
+  }
+
+  /** Remote mode is fail-closed: only a validated server snapshot may populate the book. */
+  async function refreshRemote(): Promise<void> {
+    if (!remoteApiEnabled) return;
+    const version = ++remoteLoadVersion;
+    const snapshot = await payoutAddressApi.list();
+    if (version !== remoteLoadVersion) return;
+    book.value = remoteBook(snapshot);
+  }
+
+  async function sendRemoteOtp() {
+    if (!remoteApiEnabled) throw new Error("REMOTE_API_DISABLED_IN_MOCK_MODE");
+    return payoutAddressApi.sendOtp();
+  }
+
+  async function saveRemoteAddress(input: {
+    network: ChainDepositChannel;
+    address: string;
+    challengeNo: string;
+    code: string;
+    idempotencyKey: string;
+  }): Promise<void> {
+    if (!remoteApiEnabled) throw new Error("REMOTE_API_DISABLED_IN_MOCK_MODE");
+    if (!isChainAddressValid(input.network, input.address)) throw new Error("PAYOUT_ADDRESS_FORMAT_INVALID");
+    await payoutAddressApi.save({
+      network: TO_SERVER_NETWORK[input.network],
+      address: input.address.trim(),
+      challengeNo: input.challengeNo,
+      code: input.code,
+      idempotencyKey: input.idempotencyKey,
+    });
+    await refreshRemote();
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    book.value = hydrate(boundKey);
+    remoteLoadVersion += 1;
+    if (remoteApiEnabled) {
+      book.value = emptyBook();
+      void refreshRemote().catch(() => undefined);
+    } else {
+      book.value = hydrate(boundKey);
+    }
   }
 
   /** 单网络状态(缺省网络回落空态,不抛)。 */
@@ -167,16 +238,17 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   }
 
   /**
-   * 首次添加(OTP 已在页面侧走既有生命周期核验;PROD = POST /api/payout-addresses(TBD 候选命名)。
-   * 生效即 current;新地址保护期经既有风控信号裁决(登记首见 = addedAt),不冻结不频控。
+   * Mock-only 首次添加。Remote mode 必须走 saveRemoteAddress,以服务端为唯一权威。
+   * 添加后设置 24h 安全冻结与更换频控,与后端事务后置条件一致。
    */
   function addAddress(
     network: ChainDepositChannel,
     address: string,
   ): { ok: true } | { ok: false; reason: "invalid-address" | "already-set" | "persist-failed" } {
+    if (remoteApiEnabled) return { ok: false, reason: "persist-failed" };
     if (!isChainAddressValid(network, address)) return { ok: false, reason: "invalid-address" };
     const now = mockServerNow();
-    const next = applyAddAddress(stateFor(network), address, now);
+    const next = applyAddAddress(stateFor(network), address, now, cooldownDaysNow());
     if (!next) return { ok: false, reason: "already-set" };
     const prev = book.value;
     book.value = { ...prev, [network]: next };
@@ -199,6 +271,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   ):
     | { ok: true }
     | { ok: false; reason: PayoutChangeBlockReason | "invalid-address" | "no-current" | "same-address" | "persist-failed" } {
+    if (remoteApiEnabled) return { ok: false, reason: "persist-failed" };
     const blocked = changeBlockReason(network);
     if (blocked) return { ok: false, reason: blocked };
     if (!isChainAddressValid(network, address)) return { ok: false, reason: "invalid-address" };
@@ -220,7 +293,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** ⚠️ DEV/DEMO-ONLY:tester 复位 —— 清除全部网络的冻结与频控(不动地址本身)。 */
   function _devClearRestrictions(): boolean {
-    if (import.meta.env.PROD) return false; // dev-only reset, store-layer second guard
+    if (import.meta.env.PROD || remoteApiEnabled) return false; // dev-only local reset, store-layer second guard
     const next = { ...book.value };
     for (const network of PAYOUT_NETWORKS) {
       next[network] = { ...next[network], freezeUntil: null, nextChangeAt: null };
@@ -232,7 +305,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** ⚠️ DEV/DEMO-ONLY:tester 复位 —— 清空当前账号地址簿(回到未设置空态)。 */
   function _devResetAddresses(): boolean {
-    if (import.meta.env.PROD) return false;
+    if (import.meta.env.PROD || remoteApiEnabled) return false;
     book.value = emptyBook();
     persist();
     return true;
@@ -257,6 +330,9 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     changeBlockReason,
     addAddress,
     changeAddress,
+    refreshRemote,
+    sendRemoteOtp,
+    saveRemoteAddress,
     bindAccount,
     _devClearRestrictions,
     _devResetAddresses,

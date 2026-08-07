@@ -2,8 +2,8 @@ import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export interface GenesisSalePolicy {
+  available: boolean;
   eligibilityEnabled: boolean;
-  kycRequired: boolean;
   maxPerUser: number;
   minAccountAgeDays: number;
   presaleEnabled: boolean;
@@ -20,9 +20,9 @@ export interface GenesisEligibility {
   ownedCount: number;
   maxPerUser: number;
   remainingCap: number;
-  kycRequired: boolean;
   minAccountAgeDays: number;
   accountAgeDays: number;
+  hasGenesisInvite: boolean;
 }
 
 export interface GenesisSeries {
@@ -134,13 +134,14 @@ function parseSale(value: unknown): GenesisSalePolicy {
   const maxPerUser = integer(row?.maxPerUser);
   const minAccountAgeDays = integer(row?.minAccountAgeDays);
   const unitPriceUsdt = number(row?.unitPriceUsdt, 0.000001);
-  if (!row || row.serverCanonical !== true || typeof row.eligibilityEnabled !== "boolean"
-      || typeof row.kycRequired !== "boolean" || maxPerUser === null || minAccountAgeDays === null
+  if (!row || row.serverCanonical !== true || typeof row.available !== "boolean"
+      || typeof row.eligibilityEnabled !== "boolean"
+      || maxPerUser === null || minAccountAgeDays === null
       || typeof row.presaleEnabled !== "boolean" || typeof row.showCountdown !== "boolean"
       || unitPriceUsdt === null || typeof row.open !== "boolean") return invalid();
   return {
+    available: row.available,
     eligibilityEnabled: row.eligibilityEnabled,
-    kycRequired: row.kycRequired,
     maxPerUser,
     minAccountAgeDays,
     presaleEnabled: row.presaleEnabled,
@@ -160,18 +161,19 @@ function parseEligibility(value: unknown): GenesisEligibility {
   const minAccountAgeDays = integer(row?.minAccountAgeDays);
   const accountAgeDays = integer(row?.accountAgeDays);
   if (!row || row.serverCanonical !== true || typeof row.eligible !== "boolean"
+      || typeof row.hasGenesisInvite !== "boolean"
       || !Array.isArray(row.reasons) || !row.reasons.every((reason) => typeof reason === "string")
       || ownedCount === null || maxPerUser === null || remainingCap === null
-      || typeof row.kycRequired !== "boolean" || minAccountAgeDays === null || accountAgeDays === null) return invalid();
+      || minAccountAgeDays === null || accountAgeDays === null) return invalid();
   return {
     eligible: row.eligible,
     reasons: [...row.reasons] as string[],
     ownedCount,
     maxPerUser,
     remainingCap,
-    kycRequired: row.kycRequired,
     minAccountAgeDays,
     accountAgeDays,
+    hasGenesisInvite: row.hasGenesisInvite,
   };
 }
 

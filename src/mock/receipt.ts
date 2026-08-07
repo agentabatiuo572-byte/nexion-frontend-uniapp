@@ -2,24 +2,19 @@
 // Each completed AI task → one receipt with mock cryptographic dressing
 // (signature, tx_hash, GPU fingerprint). All hex values are random — there
 // is no real on-chain footprint or verifiable signature.
-//
-// v3.2 §5.4.3.2.1 KYC-Express extension: wallet pairing also generates a
-// receipt with category "KY", surfaced in /me/receipts as a permanent
-// compliance record — serves as the platform's "we did due diligence"
-// defense if it later refuses a large withdrawal (reverse-ed §13.1).
+// Historical verification records can still be read, but no new ones are generated.
 
-import type { CompletedTask, Device, TaskCategory, Withdrawal } from "../store/types";
+import type { CompletedTask, Device, TaskCategory } from "../store/types";
 import { getClientById, AI_CLIENTS } from "./ai-clients";
 
-// Extended category to include KYC. TaskCategory stays narrow (only AI
-// workloads); ReceiptCategory is the wider type used in receipts UI.
+// "KY" is retained only as an opaque historical category code.
 export type ReceiptCategory = TaskCategory | "KY";
 
 export interface Receipt {
-  id: string;                 // task: "IG-A78234" · kyc: "KYC-2026-A78234"
+  id: string;
   category: ReceiptCategory;
-  type: string;               // human label, e.g. "Image Gen" or "Wallet Pairing"
-  model: string;              // e.g. "Flux.1 [dev]" or "KYC-Express"
+  type: string;               // human label, e.g. "Image Gen" or "Withdrawal"
+  model: string;
 
   // Client (signer / authority)
   client: string;
@@ -30,7 +25,7 @@ export interface Receipt {
   txHash: string;             // 64 hex
   blockNumber: number;
 
-  // Device that ran the task (KYC receipts use the paired wallet here)
+  // Device that ran the task (legacy verification receipts reuse this for the wallet)
   deviceName: string;
   deviceGpu: string;
   deviceFingerprint: string;  // 16 hex
@@ -45,20 +40,20 @@ export interface Receipt {
   unitPriceLabel: string;     // e.g. "$0.0030 / image" or "$1.00 / verification"
   unitsLabel: string;         // e.g. "8 images" or "1 wallet"
   gross: number;              // USDT
-  fee: number;                // USDT (3.3% for tasks, 0 for KYC)
+  fee: number;
   netPaid: number;            // USDT
 
   // Timing
   settledAt: number;          // epoch ms
   completedAt: number;        // epoch ms
 
-  // Task-only: per-category extras (KYC receipts omit)
+  // Per-category extras
   details?: ReceiptDetails;
 
-  // KYC-only: compliance frameworks + paired wallet
-  kycChecks?: string[];       // ["MiCA Art. 22", "FATF Travel Rule", ...]
-  kycNetwork?: Withdrawal["network"];
-  kycWalletAddress?: string;
+  // Historical verification fields are read-only.
+  verificationChecks?: string[];
+  verificationNetwork?: string;
+  verificationWalletAddress?: string;
 }
 
 export type ReceiptDetails =
@@ -294,63 +289,3 @@ export function shortenHex(s: string, head = 6, tail = 4): string {
 
 // Used by `unitPricing` short helper if called from UI directly.
 export { pickFromHash };
-
-// ───── KYC-Express receipt generator (v3.2 §5.4.3.2.1) ─────
-//
-// Wallet pairing completion produces a permanent compliance record alongside
-// the wallet-pairing state. This receipt sits in /me/receipts forever — its
-// reverse-ed purpose is to legitimize future large-withdrawal refusals via
-// "we performed enhanced KYT screening on your wallet" framing.
-
-const KYC_COMPLIANCE_CHECKS = [
-  "MiCA Art. 22",
-  "FATF Travel Rule",
-  "Chainalysis KYT",
-  "FinCEN Rule 314(b)",
-];
-
-export function generateKycReceipt(input: {
-  complianceCheckId: string;       // "KYC-2026-A78234"
-  walletAddress: string;
-  network: import("../store/types").Withdrawal["network"];
-  pairedAt: number;
-}): Receipt {
-  return {
-    id: input.complianceCheckId,
-    category: "KY",
-    type: "Wallet Pairing",
-    model: "KYC-Express",
-
-    // Authority "signer" — virtual compliance org
-    client: "NexGrid Compliance Authority",
-    clientAddress: "0x" + randomHex(40),
-
-    signature: "0x" + randomHex(64),
-    txHash: "0x" + randomHex(64),
-    blockNumber: 18_700_000 + Math.floor(Math.random() * 50_000),
-
-    // Device fields repurposed for the verified wallet
-    deviceName: "Verified wallet",
-    deviceGpu: input.network,
-    deviceFingerprint: randomHex(16),
-
-    durationSec: 12,                  // Verification took ~12s
-    vramPeakGb: 0,
-    vramTotalGb: 0,
-    energyKwh: 0,
-
-    unitPriceLabel: "$1.00 / verification",
-    unitsLabel: "1 wallet paired",
-    gross: 1.0,
-    fee: 0,
-    netPaid: 1.0,                     // Fully credited
-
-    settledAt: input.pairedAt,
-    completedAt: input.pairedAt,
-
-    // KYC-only fields
-    kycChecks: KYC_COMPLIANCE_CHECKS,
-    kycNetwork: input.network,
-    kycWalletAddress: input.walletAddress,
-  };
-}

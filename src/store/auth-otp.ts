@@ -21,7 +21,7 @@ import {
 import { normalizeRefCode } from "@/store/sponsorship";
 import type { EarningBucketRoute } from "@/store/types";
 
-// payout-address:提现地址添加/更换的 step-up 短信确认(FEAT-KYC-RM01a)。
+// payout-address:提现地址添加/更换的 step-up 短信确认。
 // 复用同一套生命周期(冷却 / 24h 限频滑块 / TTL / 次数上限),不另造第二套 OTP。
 export type OtpScene = "login" | "register" | "reset" | "payout-address";
 

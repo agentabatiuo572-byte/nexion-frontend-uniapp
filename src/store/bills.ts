@@ -10,7 +10,7 @@ import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 // with GET /api/bills and lets the server own ids + balanceAfter.
 export type BillType =
   | "earn" | "refer" | "bonus" | "topup" | "withdraw"
-  | "purchase" | "swap" | "kyc" | "stake" | "unstake" | "achievement";
+  | "purchase" | "swap" | "verification" | "stake" | "unstake" | "achievement";
 export type BillStatus = "posted" | "pending" | "failed";
 
 export interface Bill {

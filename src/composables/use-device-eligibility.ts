@@ -48,7 +48,7 @@ export function useDeviceEligibility(
   const network = useNetwork();
 
   // EligibilityContext rebuilt reactively from the store refs.
-  // (认证等级条件已随 FEAT-KYC-RM01b 从规则集移除;其余条件与优先级不变。)
+  // 设备资格只依据当前有效的账户与设备规则。
   const ctx = computed<EligibilityContext>(() => ({
     devices: app.visibleDevices,
     vRank: vRank.myRank,

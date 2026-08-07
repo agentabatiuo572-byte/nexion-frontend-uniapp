@@ -4,10 +4,6 @@
   QR + 最近入金);「银行转账」= <DepositBankPane>(VietQR 意向单流,[FEAT-PAY02]);
   「银行卡」= <TopupCardForm> 原样接入。
 
-  2026-08-05 包 E(FEAT-KYC-RM01b):KYC-Express $1 验证流整体删除。
-  旧深链 ?kyc=1(历史消息/收藏)兜底:平滑落到充值页正常态 + 一句「该流程已下线」
-  轻提示 —— 禁 404/白屏(规格 ② 异常2)。
-
   Wrapped in <AppChassis active="me">. Header is the shared sticky <SubPageHeader>
   (back=/pages/me/wallet).
 -->
@@ -68,35 +64,6 @@ function segLabel(id: Seg): string {
 
 const t = useT();
 const dep = useDeposits();
-
-// ── 旧验证流深链兜底(规格 RM01b ② 异常2:落正常态 + 轻提示,禁 404/白屏)──
-const retiredNoticeShown = ref(false);
-function hasLegacyKycParam(options?: Record<string, unknown>): boolean {
-  if (options?.kyc === "1") return true;
-  // H5 can keep the same page instance when only the hash query changes.
-  if (typeof window === "undefined") return false;
-  const [, query = ""] = window.location.hash.split("?");
-  return new URLSearchParams(query).get("kyc") === "1";
-}
-function noticeIfLegacyRoute(options?: Record<string, unknown>) {
-  if (retiredNoticeShown.value || !hasLegacyKycParam(options)) return;
-  retiredNoticeShown.value = true;
-  toast.info(t.value.topupChrome.flowRetired);
-}
-let hashRouteListener: (() => void) | undefined;
-onLoad((options) => {
-  noticeIfLegacyRoute(options as Record<string, unknown> | undefined);
-});
-onMounted(() => {
-  noticeIfLegacyRoute();
-  if (typeof window !== "undefined") {
-    hashRouteListener = () => noticeIfLegacyRoute();
-    window.addEventListener("hashchange", hashRouteListener);
-  }
-});
-onUnmounted(() => {
-  if (hashRouteListener && typeof window !== "undefined") window.removeEventListener("hashchange", hashRouteListener);
-});
 
 // ── styles ──
 // Segmented pill tabs — wallet-bills / SegmentedControl idiom.
