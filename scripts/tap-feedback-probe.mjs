@@ -19,7 +19,7 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
-const BASE = process.env.UNI_BASE_URL || "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const LEDGER_PATH = "docs/TAP-FEEDBACK-LEDGER.json";
 const args = process.argv.slice(2);
 const SELFTEST = args.includes("--selftest");
@@ -330,6 +330,17 @@ for (const [i, r] of routes.entries()) {
 }
 await browser.close();
 
+// 🔴 覆盖面 witness 必须**参与判定**,不能只打印(2026-08-07 实测的静默假绿):
+//    上面每条路由是 try/catch 只 console.error、不计失败。dev server 没起 / BASE 指错时
+//    5 条全 ERR_CONNECTION_REFUSED → results 为空 → 违例自然也是 0 → 一路走到末尾
+//    打印「无新违例(扫 5 路由 / 0 个 tap 目标)」并 exit 0,verify.sh 直接吃这个码报绿。
+//    那个「5」是**计划扫的**条数,不是扫成的。**「没扫到」≠「没问题」**。
+if (!results.length) {
+  console.error(`tap-feedback 门失效:计划扫 ${routes.length} 条路由,成功 0 条 —— ${BASE} 不可达?`);
+  console.error(`  没扫到不等于没问题;先确认 dev server 在 ${BASE} 上跑着(npm run dev:h5)。`);
+  process.exit(2);
+}
+
 // 指纹 = 路由 + 签名 + 类别(尺寸数值会因文案变动,不入指纹)
 const fp = (route, t, kind) => `${kind}|${route}|${t.sig}`;
 const found = new Map();
@@ -366,4 +377,5 @@ if (fresh.length) {
   if (fresh.length > 25) console.error(`  … 另 ${fresh.length - 25} 条`);
   process.exit(1);
 }
-console.log(`tap-feedback 无新违例(扫 ${routes.length} 路由 / ${total} 个 tap 目标;存量黄灯 ${known.size} 条)`);
+// 报「成功/计划」而不是光报计划数:部分路由挂掉时一眼看得出覆盖面不全。
+console.log(`tap-feedback 无新违例(扫 ${results.length}/${routes.length} 路由 / ${total} 个 tap 目标;存量黄灯 ${known.size} 条)`);

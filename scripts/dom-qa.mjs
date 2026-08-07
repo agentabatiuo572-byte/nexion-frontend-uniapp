@@ -12,7 +12,7 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
-const BASE = process.env.UNI_BASE_URL || "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const LEDGER_PATH = "docs/DOM-QA-LEDGER.json";
 const args = process.argv.slice(2);
 const MODE = args.includes("--selftest") ? "selftest" : "sweep";

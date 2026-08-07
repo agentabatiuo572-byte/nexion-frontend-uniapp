@@ -9,7 +9,7 @@
 import { chromium } from "playwright";
 import { readFileSync } from "node:fs";
 
-const BASE = process.env.UNI_BASE_URL || "http://localhost:5173";
+const BASE = process.env.UNI_BASE_URL || process.env.BASE_URL || "http://localhost:5173";
 const args = process.argv.slice(2);
 const MODE = args.includes("--selftest") ? "selftest" : "sweep";
 const SWEEP = args[args.indexOf("--sweep") + 1] === "all" ? "all" : "core";
