@@ -2633,5 +2633,21 @@ guard_liveness_gate() {
 }
 guard_liveness_gate
 
+# ── 守卫存活性 · 行为门 ────────────────────────────────────────────────────────
+# 上面那道是结构门(看代码形状)。这一族三轮出了三种形状,独立审计 2026-08-07 实测
+# 7 种改法能让缺陷复活而结构门全绿 —— 所以再加一道**只看行为**的:登出的人还能不能
+# 停在业务页上。代码怎么重构都拦得住。自带反向对照(已登录不许被误踢)与覆盖面 witness
+# (读不到路由即判红,P-080:探不到 ≠ 无违例)。
+if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/guard-liveness-runtime.mjs >/tmp/uni-guard-runtime.log 2>&1; then
+    ok "$(tail -1 /tmp/uni-guard-runtime.log)"
+  else
+    bad "守卫存活性行为门失败 — node scripts/guard-liveness-runtime.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uni-guard-runtime.log | head -6 | sed 's/^/        /'
+  fi
+else
+  printf "  ${Y}SKIP${N}  守卫存活性行为门 (dev server not running at %s)\n" "$BASE_URL"
+fi
+
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
 [ $fail -eq 0 ]

@@ -459,12 +459,16 @@ function readCurrentRoute(): string {
 
 function bootstrapAccountSession() {
   if (accountSessionBootstrapped) return;
-  accountSessionBootstrapped = true;
   // Bind the account-cloud snapshot and claim this carrier's session for an
   // already-authenticated account. Multi-carrier sessions coexist; forced
   // revokes are resolved by checkSession() once routes are ready.
   const auth = useAuth();
+  // 🔴 一次性资格只在**真的认领了**之后才消耗(独立审计 2026-08-07 P2-1):
+  // 原先在函数首行就置位,于是未认证时路过一次也把资格烧掉 —— 守卫每拍补认领这条
+  // 自愈路径对该标签的余生失效(登出态被踢到引导页那一拍正好烧掉它)。
+  // 今天没有可达危害(两个认证入口各自 claim),但那是巧合,不是设计。
   if (auth.isAuthenticated) {
+    accountSessionBootstrapped = true;
     const key = auth.email || auth.accountId || "default";
     const app = useApp();
     const session = useSession();
@@ -529,8 +533,11 @@ function checkQuestRoute() {
   // 是一次性的(accountSessionBootstrapped),于是这个标签**整个生命周期都没有 sessionId**;
   // session.validate() 首行「没有 sessionId 就算 active」→ 跨标签登出/运营吊销**永远踢不掉它**,
   // 哪怕守卫活着、哪怕早已走到业务页。落地页只是起点,不该决定本次加载的余生。
-  // 认领本身幂等(内部 accountSessionBootstrapped 短路),补在这里每 tick 是零成本 no-op;
-  // 评审页已在上方短路,所以这一枪只在真业务页开。
+  // 认领本身幂等(内部 accountSessionBootstrapped 短路),补在这里每 tick 是零成本 no-op。
+  // ⚠️ 事实更正(独立审计 2026-08-07 P2-1 实测):这一枪**不是只在业务页开**。
+  // 上方只短路了静态评审页;checkAuthGuard 对**全部**白名单前缀(onboarding/login/
+  // register/ref/tx/session)都返回 false,所以在这些页上同样会走到这里。这没问题
+  // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted / needs recalibration → redirected
   if (route === lastQuestRoute) return; // only act on route change
