@@ -18,7 +18,10 @@
 
 set -u
 MODULE="${1:-all}"
-BASE_URL="${BASE_URL:-http://localhost:5173}"
+# 🔴 export:本脚本 spawn 的**每个**探针都必须打同一个 origin。不 export 时,只读
+#   UNI_BASE_URL 的那几个探针(dom-qa / tap-feedback / empty-state / invisible-fill)
+#   会各自回落 5173 —— worktree 里主 checkout 正占着 5173,于是它们静默验了别的工程树。
+export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
@@ -1756,7 +1759,9 @@ platform_stats_anchor() {
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
   done
   # (6) trust Q2 print ↔ admin managed-content mirror value parity (键 parity ≠ 值 parity)
-  ADMIN_ITABS="../Nexion-admin-prototype/app/components/domain-views/i-tabs/data.ts"
+  # 🔴 走 $ADMIN_ROOT(上方 36-44 行已解析 linked worktree 的情形),不写裸相对路径:
+  #   worktree 里 `../Nexion-admin-prototype` 落在 .claude/worktrees/ 下,文件恒读不到 → 两条恒假红。
+  ADMIN_ITABS="$ADMIN_ROOT/app/components/domain-views/i-tabs/data.ts"
   for v in '27,150' '\$47\.0M'; do
     if ! grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then bad "platform-anchor: trust.vue missing Q2 print /$v/"; fails=1; fi
     if ! grep -qE "$v" "$ADMIN_ITABS" 2>/dev/null; then bad "platform-anchor: admin i-tabs mirror missing /$v/ (cross-repo drift)"; fails=1; fi
