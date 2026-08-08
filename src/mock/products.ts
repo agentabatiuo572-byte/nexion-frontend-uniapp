@@ -266,6 +266,16 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
+/** Fail closed while the canonical catalog is loading or unavailable. */
+export function clearProductCatalog(): void {
+  PRODUCTS.splice(0, PRODUCTS.length);
+}
+
+/** Replace the legacy read surface with the already validated server catalog. */
+export function replaceProductCatalog(products: readonly Product[]): void {
+  PRODUCTS.splice(0, PRODUCTS.length, ...products.map((product) => ({ ...product })));
+}
+
 export function getProduct(id: string): Product | undefined {
   return PRODUCTS.find((p) => p.id === id);
 }

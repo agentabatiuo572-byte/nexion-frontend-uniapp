@@ -17,6 +17,7 @@ import { getEntrySurface, type EntrySurface } from "@/lib/entry-surface";
 import { matchGpuTier } from "@/lib/gpu-tiers";
 import { FLEET_DEVICES, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig, currentNetworkConfirmFeeUsd } from "@/store/config";
+import { accumulateUsdAccrual, completedUsdCentDelta } from "@/lib/earnings-accrual";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import {
   appendLedgerEntry,
@@ -652,7 +653,8 @@ export const useApp = defineStore("app", () => {
     lastTickAggregate.usd = aggregateToday;
     lastTickAggregate.nex = aggregateTodayNEX;
 
-    const nextTodayUSD = +(earnings.value.today + positiveUsdDelta).toFixed(2);
+    const currentTodayUSD = earnings.value.today;
+    const nextTodayUSD = accumulateUsdAccrual(currentTodayUSD, positiveUsdDelta);
     const nextTodayNEX = +(earnings.value.todayNEX + positiveNexDelta).toFixed(2);
 
     devices.value = nextDevices;
@@ -660,11 +662,11 @@ export const useApp = defineStore("app", () => {
       ...earnings.value,
       today: nextTodayUSD,
       todayNEX: nextTodayNEX,
-      thisWeek: +(earnings.value.thisWeek + positiveUsdDelta).toFixed(2),
-      thisMonth: +(earnings.value.thisMonth + positiveUsdDelta).toFixed(2),
-      total: +(earnings.value.total + positiveUsdDelta).toFixed(2),
+      thisWeek: accumulateUsdAccrual(earnings.value.thisWeek, positiveUsdDelta),
+      thisMonth: accumulateUsdAccrual(earnings.value.thisMonth, positiveUsdDelta),
+      total: accumulateUsdAccrual(earnings.value.total, positiveUsdDelta),
     };
-    const routedUsd = +positiveUsdDelta.toFixed(2);
+    const routedUsd = completedUsdCentDelta(currentTodayUSD, nextTodayUSD);
     const routedNex = +positiveNexDelta.toFixed(2);
     user.value = {
       ...bucketUserEarnings(

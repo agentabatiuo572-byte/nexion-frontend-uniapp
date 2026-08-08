@@ -70,7 +70,6 @@ export const useConfig = defineStore("config", () => {
       config.value = {
         ...config.value,
         featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
-        publicStats: remote.publicStats,
         onlineBonus: remote.onlineBonus,
         rewards: remote.rewards,
         computeShare: remote.computeShare,
