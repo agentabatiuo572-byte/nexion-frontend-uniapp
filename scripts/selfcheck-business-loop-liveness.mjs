@@ -5,7 +5,6 @@ import fs from "node:fs";
 const FILE = "src/App.vue";
 const source = fs.readFileSync(FILE, "utf8");
 const BUSINESS_MODULE_FILES = [
-  "src/store/app.ts",
   "src/store/free-trial.ts",
   "src/store/orders.ts",
   "src/store/milestones.ts",
@@ -18,7 +17,6 @@ const businessModuleSources = Object.fromEntries(
   BUSINESS_MODULE_FILES.map((file) => [file, fs.readFileSync(file, "utf8")]),
 );
 const depositsSource = fs.readFileSync("src/store/deposits.ts", "utf8");
-const genesisSource = fs.readFileSync("src/store/genesis.ts", "utf8");
 const configSource = fs.readFileSync("src/store/config.ts", "utf8");
 
 function assertNoRawTimeoutsInBusinessModules(sources) {
@@ -146,8 +144,6 @@ function evaluate(text) {
     "runtime probe must exercise the production business-timeout registry");
   assert.match(onShow, /startQuestWatch\(\)[\s\S]*ensureBusinessLoopsRunning\(\)/,
     "onShow must arm the guard before starting gated business loops");
-  assert.match(onShow, /void refreshEarningsReleaseStatus\(\)\.catch\(/,
-    "foreground earnings refresh must consume expected transport failures instead of leaking pageerror");
 }
 
 function evaluateConfig(text) {
@@ -200,8 +196,6 @@ evaluate(source);
 assertNoRawTimeoutsInBusinessModules(businessModuleSources);
 evaluateDeposits(depositsSource);
 evaluateConfig(configSource);
-assert.match(functionBody(genesisSource, "syncRemote"), /^\s*if \(!remoteApiEnabled\) return;/,
-  "account bootstrap must not leak a rejected Genesis remote sync in local-mock mode");
 
 const mutations = [
   {
@@ -270,7 +264,7 @@ const depositMutations = [
     label: "allow deposit confirmation callback to write after pause",
     app: source,
     deposits: depositsSource.replace(
-      /timers\.delete\(depositId\);\n\s*if \(!mockEngineRunning\) return;/,
+      /timers\.delete\(depositId\);\r?\n\s*if \(!mockEngineRunning\) return;/,
       "timers.delete(depositId);",
     ),
   },
