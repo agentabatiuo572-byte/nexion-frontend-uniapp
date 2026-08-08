@@ -35,6 +35,17 @@ export const PHONE_TIER_YIELDS: PhoneTierYield[] = [
   { tier: 5, baseRateUsdt: 0.095, baseRateNex: 16 },
 ];
 
+/** Replace the legacy read surface with the already validated server snapshot. */
+export function applyCanonicalPhoneTierYields(
+  tiers: ReadonlyArray<Pick<PhoneTierYield, "tier" | "baseRateUsdt" | "baseRateNex">>,
+): void {
+  PHONE_TIER_YIELDS.splice(0, PHONE_TIER_YIELDS.length, ...tiers.map((row) => ({
+    tier: row.tier,
+    baseRateUsdt: row.baseRateUsdt,
+    baseRateNex: row.baseRateNex,
+  })));
+}
+
 /** Single accessor. PROD: replace body with the GET /api/config/phone-tiers result. */
 export function getPhoneTierYields(): PhoneTierYield[] {
   return PHONE_TIER_YIELDS;

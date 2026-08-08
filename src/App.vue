@@ -29,7 +29,6 @@ import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { useGenesisConfig } from "@/store/genesis-config";
-import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
 import { useDeposits } from "@/store/deposits";
 
@@ -795,7 +794,6 @@ onShow(() => {
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
-  void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
   detachSessionWatch();
