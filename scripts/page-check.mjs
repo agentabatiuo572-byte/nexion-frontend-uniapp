@@ -8,6 +8,15 @@
  */
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { directAppUrl } from "./lib/direct-app-url.mjs";
+import {
+  assertNoRuntimeErrors,
+  assertDirectPageCoverage,
+  assertSemanticSelectors,
+  assertUniAppRuntimeIdentity,
+  collectDirectPageWitness,
+  collectUniAppRuntimeIdentity,
+} from "./lib/probe-coverage.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +28,7 @@ const BASE = process.env.BASE_URL || "http://localhost:5173";
 const route = process.argv[2] || "/";
 const name = process.argv[3] || "check";
 const sels = (process.argv[4] || "").split(",").map((s) => s.trim()).filter(Boolean);
+assertSemanticSelectors(sels, "page-check");
 
 fs.mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
@@ -49,7 +59,7 @@ const page = await ctx.newPage();
 const errors = [];
 page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });
+await page.goto(directAppUrl(BASE, route), { waitUntil: "networkidle", timeout: 30000 });
 await page.evaluate(() => (document.fonts ? document.fonts.ready : null)).catch(() => {});
 await page.waitForTimeout(1200);
 await page.screenshot({ path: path.join(OUT, `${name}.png`) });
@@ -61,5 +71,22 @@ for (const sel of sels) {
     return { exists: true, text: (el.textContent || "").trim().slice(0, 80) };
   }, sel);
 }
-console.log(JSON.stringify({ route, consoleErrors: errors, selectors: found }, null, 2));
+const directAppDocument = await page.evaluate(() => ({
+  appChildren: document.querySelector("#app")?.childElementCount ?? 0,
+  iframeCount: document.querySelectorAll("iframe").length,
+}));
+const runtimeIdentity = await collectUniAppRuntimeIdentity(page);
+const routeWitness = await collectDirectPageWitness(page, errors);
+const result = { route, consoleErrors: errors, directAppDocument, selectors: found };
+console.log(JSON.stringify(result, null, 2));
 await browser.close();
+const missingSelectors = Object.entries(found).filter(([, value]) => !value.exists).map(([selector]) => selector);
+assertNoRuntimeErrors(errors, "page-check");
+assertUniAppRuntimeIdentity(runtimeIdentity, "page-check");
+const expectedRoute = directAppUrl(BASE, route).split("#", 2)[1] || "/";
+assertDirectPageCoverage(expectedRoute, routeWitness, "page-check");
+if (directAppDocument.appChildren === 0 || directAppDocument.iframeCount > 0) {
+  throw new Error(`page-check did not land on the direct app document: ${JSON.stringify(directAppDocument)}`);
+}
+if (missingSelectors.length) throw new Error(`page-check selectors missing: ${missingSelectors.join(", ")}`);
+console.log("PAGE-CHECK: PASS");

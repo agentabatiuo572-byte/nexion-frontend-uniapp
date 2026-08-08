@@ -100,6 +100,25 @@ export const useDeposits = defineStore("deposits", () => {
   // client,跨账号继续推进会把钱记进新绑账号;PROD 服务端持续推进,
   // client 重新拉取即收敛(切回账号后记录停在 confirming,属 mock 已知边界)。
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  let mockEngineRunning = false;
+
+  /** App 生命周期的集中停机口：静态评审页、登出、会话失效和后台态都必须清空在途推进。 */
+  function pauseMockEngine(): void {
+    mockEngineRunning = false;
+    timers.forEach((timer) => clearTimeout(timer));
+    timers.clear();
+  }
+
+  /**
+   * App 生命周期的集中恢复口。只从已通过认证/会话门的业务循环出口调用；恢复时从持久态
+   * 重建链上确认与银行意向单定时器，因此暂停期间不写状态，返回业务页后仍可收敛。
+   */
+  function resumeMockEngine(): void {
+    if (mockEngineRunning) return;
+    mockEngineRunning = true;
+    syncBankIntents();
+    syncChainDeposits();
+  }
 
   /**
    * 落盘唯一出口:乐观并发提交器(存量 P1 · 跨标签页竞态重复入账)。
@@ -136,8 +155,10 @@ export const useDeposits = defineStore("deposits", () => {
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
     records.value = row.records;
     intents.value = row.intents;
-    syncBankIntents();
-    syncChainDeposits();
+    if (mockEngineRunning) {
+      syncBankIntents();
+      syncChainDeposits();
+    }
   }
 
   /** 🔴 链上入金的确认引擎重武装。
@@ -151,6 +172,7 @@ export const useDeposits = defineStore("deposits", () => {
    *  而这里是给**新绑定的这个账号**重新武装它自己的在途单。
    *  PROD:整块删掉,状态由链上 watcher / webhook 推。 */
   function syncChainDeposits() {
+    if (!mockEngineRunning) return;
     for (const rec of records.value) {
       if (rec.status !== "detected" && rec.status !== "confirming") continue; // 终态 / dust_hold 不重排
       if (timers.has(rec.depositId)) continue;
@@ -308,12 +330,15 @@ export const useDeposits = defineStore("deposits", () => {
   /** mock 到账引擎:detected → confirming(或 dust_hold 停住)→ 逐步推进
    *  确认数 → 走满调 settleCredited。每步回源读当前记录,终态即停。 */
   function scheduleConfirmations(depositId: string) {
+    if (!mockEngineRunning) return;
     const key = boundKey();
     function queue(ms: number) {
+      if (!mockEngineRunning) return;
       timers.set(depositId, setTimeout(step, ms));
     }
     function step() {
       timers.delete(depositId);
+      if (!mockEngineRunning) return;
       if (boundKey() !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
       const rec = records.value.find((r) => r.depositId === depositId);
       if (!rec) return;
@@ -429,6 +454,7 @@ export const useDeposits = defineStore("deposits", () => {
   /** 锁价窗到点置 expired(mock server 侧推进)。回调现读 intents.value 现改,
    *  禁 stale 闭包(feedback_delayed_callback_stale_closure);账号切换即停。 */
   function scheduleIntentExpiry(intentId: string) {
+    if (!mockEngineRunning) return;
     const key = boundKey();
     const intent = intents.value.find((i) => i.intentId === intentId);
     if (!intent || intent.status !== "awaiting_payment") return;
@@ -438,6 +464,7 @@ export const useDeposits = defineStore("deposits", () => {
       setTimeout(
         () => {
           timers.delete(intentId);
+          if (!mockEngineRunning) return;
           if (boundKey() !== key) return; // 账号已切换,mock 引擎停(见顶部注释)
           const cur = intents.value.find((i) => i.intentId === intentId);
           if (!cur || cur.status !== "awaiting_payment") return;
@@ -451,6 +478,7 @@ export const useDeposits = defineStore("deposits", () => {
   /** server 状态收敛(启动/换号即跑):已过锁价窗的在途单落 expired,未过期的重新武装
    *  超时定时器。PROD:server 持续推进,client 拉取即收敛,本函数删除。 */
   function syncBankIntents() {
+    if (!mockEngineRunning) return;
     const now = mockServerNow();
     intents.value
       .filter((i) => i.status === "awaiting_payment")
@@ -748,6 +776,7 @@ export const useDeposits = defineStore("deposits", () => {
     g.__nxDev = {
       ...(g.__nxDev ?? {}),
       simulateIncomingTransfer: _devSimulateIncomingTransfer,
+      depositStatus: (depositId: string) => records.value.find((row) => row.depositId === depositId)?.status ?? null,
       resolveDustHold: _devResolveDustHold,
       setChannelEnabled: _devSetChannelEnabled,
       bankCallback: _devBankCallback,
@@ -765,6 +794,8 @@ export const useDeposits = defineStore("deposits", () => {
     bankAccounts,
     bankRailAvailable,
     bindAccount,
+    pauseMockEngine,
+    resumeMockEngine,
     depositAddress,
     currentAccountKey,
     createBankIntent,

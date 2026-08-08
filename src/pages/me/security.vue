@@ -15,6 +15,16 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
 
+      <view
+        v-if="retiredFlow"
+        data-qa="retired-flow-notice"
+        aria-live="polite"
+        class="mx-4"
+        style="margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--v5-warning); border-radius: 12px; background: var(--v5-warning-soft); color: var(--v5-ink-2)"
+      >
+        <text class="block" style="font-size: 13px; line-height: 1.5">{{ t.topupChrome.flowRetired }}</text>
+      </view>
+
       <!-- ───── Password + Two-factor (merged, de-carded group) ───── -->
       <view class="mx-4" :style="cardStyle">
         <view class="flex items-center active:opacity-90" :style="rowStyle" @click="editingPwd = !editingPwd">
@@ -116,11 +126,13 @@ import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 
 
 const t = useT();
+const retiredFlow = ref(false);
 
-// 已下线验证流深链兜底的落地提示(App.vue 只负责 reLaunch;页面挂载后再弹,
-// 否则冷启期间 toast 到时自动消失,用户永远看不见 —— FEAT-KYC-RM01b ② 异常2)。
+// 已下线验证流深链兜底：toast 提供即时反馈，页内 notice 保持可发现，
+// 避免冷启较快时 toast 在验收/用户看清之前到时消失。
 onLoad((options) => {
   if ((options as Record<string, string> | undefined)?.from === "retired-flow") {
+    retiredFlow.value = true;
     toast.info(t.value.topupChrome.flowRetired);
   }
 });

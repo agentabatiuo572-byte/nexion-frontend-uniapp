@@ -542,7 +542,7 @@ sentinel_present "SPEC-7 withdraw timeout does not debit" src/pages/me/wallet-wi
 sentinel_present "SPEC-7 withdraw shows held buckets line" src/pages/me/wallet-withdraw.vue 'heldBucketsLine'
 sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/wallet-withdraw-tracking.vue 'riskReasonLines\(t\.value'
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
-# (原「SPEC-7 pairing registers payment instrument」哨兵随 KYC 配对机制删除,2026-08-05 包 E。
+# (原「SPEC-7 pairing registers payment instrument」哨兵随旧配对机制删除,2026-08-05 包 E。
 #  新模型的地址登记走 payout-address → recordWithdrawAddressUse,由 selfcheck-fastlane 接线门覆盖。)
 sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
 sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
@@ -2633,20 +2633,56 @@ guard_liveness_gate() {
 }
 guard_liveness_gate
 
+# ── 探针覆盖与路由归一化门(2026-08-08 · P-080 同族根治)──────────────────────
+# 所有直接读 DOM 的脚本必须绕过 device-shell；视觉/DOM/鉴权探针零覆盖、崩溃或
+# 预期路由不符一律判红。权限白名单使用的路由在比较前折叠 dot segments。
+probe_safety_gate() {
+  if "$NODE_BIN" --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs > /tmp/uniapp-probe-safety.log 2>&1; then
+    ok "探针覆盖与路由归一化门 — $(grep -E '^ℹ pass ' /tmp/uniapp-probe-safety.log | tail -1)"
+  else
+    bad "探针覆盖与路由归一化门失败 — npm run test:probe-safety 看明细"
+    tail -16 /tmp/uniapp-probe-safety.log | sed 's/^/        /'
+  fi
+}
+probe_safety_gate
+
+# ── 业务循环存活性门(2026-08-08 · 守卫存活性同根因第三条腿)────────────────────
+# 静态评审页必须停业务，但 H5 站内返回业务页不会重发 App.onShow；由常驻守卫
+# 重新鉴权并经唯一集中出口幂等恢复。门内含十一组撤回/漏接/孤儿/递归 interval/timeout 变异红测。
+business_loop_liveness_gate() {
+  if "$NODE_BIN" scripts/selfcheck-business-loop-liveness.mjs > /tmp/uniapp-business-loop-liveness.log 2>&1; then
+    ok "业务循环存活性门 — $(tail -1 /tmp/uniapp-business-loop-liveness.log)"
+  else
+    bad "业务循环存活性门失败 — node scripts/selfcheck-business-loop-liveness.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)|AssertionError" /tmp/uniapp-business-loop-liveness.log | head -8 | sed 's/^/        /'
+  fi
+}
+business_loop_liveness_gate
+
+# ── Janus C2 停机取消门 ────────────────────────────────────────────────────────
+# 进入评审页、会话失效或 App 后台时，不只清下一轮 timer；已在飞的 report/apply
+# 也必须经 AbortSignal + 代次栅栏停止，禁止停机后继续写 runtime 或发送 ACK。
+janus_stop_cancellation_gate() {
+  if "$NODE_BIN" scripts/janus-stop-cancellation.test.mjs > /tmp/uniapp-janus-stop-cancellation.log 2>&1; then
+    ok "Janus C2 停机取消门 — $(tail -1 /tmp/uniapp-janus-stop-cancellation.log)"
+  else
+    bad "Janus C2 停机取消门失败 — node scripts/janus-stop-cancellation.test.mjs 看明细"
+    tail -12 /tmp/uniapp-janus-stop-cancellation.log | sed 's/^/        /'
+  fi
+}
+janus_stop_cancellation_gate
+
 # ── 守卫存活性 · 行为门 ────────────────────────────────────────────────────────
 # 上面那道是结构门(看代码形状)。这一族三轮出了三种形状,独立审计 2026-08-07 实测
 # 7 种改法能让缺陷复活而结构门全绿 —— 所以再加一道**只看行为**的:登出的人还能不能
 # 停在业务页上。代码怎么重构都拦得住。自带反向对照(已登录不许被误踢)与覆盖面 witness
 # (读不到路由即判红,P-080:探不到 ≠ 无违例)。
-if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/guard-liveness-runtime.mjs >/tmp/uni-guard-runtime.log 2>&1; then
-    ok "$(tail -1 /tmp/uni-guard-runtime.log)"
-  else
-    bad "守卫存活性行为门失败 — node scripts/guard-liveness-runtime.mjs 看明细"
-    grep -E "^  FAIL" /tmp/uni-guard-runtime.log | head -6 | sed 's/^/        /'
-  fi
+# Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
+if "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
+  ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
 else
-  printf "  ${Y}SKIP${N}  守卫存活性行为门 (dev server not running at %s)\n" "$BASE_URL"
+  bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
+  tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
 fi
 
 echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"

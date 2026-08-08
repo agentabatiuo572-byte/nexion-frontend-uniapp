@@ -6,7 +6,7 @@
 > 起因:一轮「让探针别打错 dev server」的工具修复,修好后探针开始能看见页面,
 > 于是照出了这一批本来就在、只是没人看得见的问题。
 
-## 状态(截至 2026-08-07 主线 849872b,逐条实测复核过)
+## 状态（2026-08-07 审计快照，已桥接至 2026-08-09 当前工作树）
 
 主线在本审计出结果的同时,已由 `pkg/x2-route-reader` 线做掉了族 A 的结构性修复
 (路由读取口收成单源 + **守卫轮询无条件启动**)。复核结论:
@@ -17,13 +17,32 @@
 | P0 · App.vue:614 静态审阅页进入 → 守卫整局不启动 | ✅ **已修**(`pkg/y1-guard-liveness`) | 实测:登出态评审页冷启动 → 应用内进提现页 → 落 `pages/onboarding/intro`;守卫 1s 定时器数由 0→1;评审页落地的标签补认领 sessionId,跨标签登出踢得掉。已由独立审计复跑确认 |
 | P1 · App.vue:335 业务轮询主路径回归 | ✅ **已修** | 实测:已登录从登录页冷启动→站内跳收益页,quest 键已写=轮询在跑 |
 | P1 · App.vue:522 / :622 守卫自毁与启动点 | ✅ **已修**(同上) | 与 P0:614 同一根因,已一并根治并单独红测:撤回修复即判红 |
-| 🆕 P1 · **同根因第三条腿:业务循环永久死亡** | 🔴 **仍开着** | 见下方「第三条腿」段。**不在 y1 范围内,未修** |
-| 族 B · 5 个探针缺 `?nx_device=off` | 🔴 **仍开着** | grep 复核:5 个文件均无该参数 |
-| 族 C · 3 个探针探不到也报绿 | 🔴 **仍开着** | grep 复核:覆盖面判定均未接入 |
-| 族 D · 归一化不折叠 `..` | 🔴 **仍开着** | 源码复核:仅剥前缀与 query |
+| 🆕 P1 · **同根因第三条腿:业务循环永久死亡** | ✅ **H5/local-mock 已修** | 集中启停与隔离 H5 行为门通过；门禁同时要求 `syncFailed=false`、原始设备/聚合收益和结算锚点实际推进，不再只看 timer；真实后端、原生真机与 Janus C2 端到端仍 HOLD |
+| 族 B · 5 个探针缺 `?nx_device=off` | ✅ **已修并加固** | 5 个探针统一走 `directAppUrl()`，要求业务语义标记、模块绑定的 UniApp runtime identity，并对 `console.error` / `pageerror` 失败关闭；空壳、无关 200 HTML、浅层伪造 DOM 与通用 `#app/body` 选择器不能报绿 |
+| 族 C · 3 个探针探不到也报绿 | ✅ **已修** | 截图/比对、DOM sweep、鉴权结果均接入 fail-closed 覆盖断言；零覆盖、缺图、崩溃与路由不符必红 |
+| 族 D · 归一化不折叠 `..` | ✅ **已修并覆盖已登录态** | 解码后折叠 `.`/`..`；同文档 hash 优先于陈旧页面栈，规范化导航失败会按 750ms 自愈重试；17 层编码、越根与畸形路径统一失败关闭到引导页，不再留下 Vue Router 白屏 |
 
-**净剩 10 条待排期**(族 B 5 条 + 族 C 3 条 + 族 D 1 条 + 新增的第三条腿 1 条)。
-族 B 是纯 grep 可测,建议连同哨兵一起做,一次焊死。
+**本审计确认的 14 条现已全部闭环；当前净剩 0 条。** 这里的“闭环”只覆盖本审计定义的前端探针、路由守卫与 H5/local-mock 生命周期范围，不扩大为真实后端资金结果、原生真机或 Janus C2 生产链路签发。
+
+## 2026-08-08 跟进：第三条腿的 H5/local-mock 生命周期缺陷已收口
+
+本节是对上方 2026-08-07 历史快照的状态桥接，不改写当日复现事实。当前工作树已把业务循环统一收进 `ensureBusinessLoopsRunning()` / `stopBusinessLoops()`，常驻守卫离开静态评审页后会重新校验认证与会话，并在授权成立时幂等恢复循环。
+
+- 结构证据：`scripts/selfcheck-business-loop-liveness.mjs` 通过，含删除路由自愈、删除幂等短路、漏接到账循环、停止函数失效、注入未登记 interval/timeout、漏停已登记 timeout、业务依赖模块内递归 timeout、入金 mock 引擎漏停/漏检查，以及退化为 timer-only witness / 反转 local-mock 配置分支共 13 组变异红测；
+- H5 行为证据：`scripts/business-loop-liveness-runtime.mjs` 的“业务页 → 评审页 → 业务页”与未登录 fail-closed 对照 2/2 通过，1/4/5/6 秒周期均按预期停机/恢复；已登录正向改用默认低速账号并观察 30 秒，逐值要求 `configSyncFailed=false`、原始设备收益、聚合收益、`lastSettledAt` 和格式化到分的可见金额都在返回业务页后推进；
+- 对抗复审发现过“六个 timer 均 running、但 local-mock 错把 Vite 的 200 HTML 当远程配置响应，`syncFailed=true` 令结算早退”的假绿。`useConfig().load()` 现按 `remoteApiEnabled` 分流：mock 只启用内存种子，不请求 `/api/config/platform`；remote 仍保持请求失败即暂停结算的 fail-closed 语义；
+- 第二轮对抗复审又发现默认低速账号虽然设备收益推进，但聚合值每 tick `toFixed(2)` 会反复吞掉 0.001 的分币以下增量。`earnings-accrual.ts` 现保留毫级累计，并只把新跨过的完整分路由进余额桶；纯函数合同 3/3 锁住 30 次 0.001 最终累计为 0.030、入桶 0.03 的不变量；
+- 对抗复审发现并修掉 Janus 在途竞态：`stopJanusC2Sync()` 现会 abort 当前请求并淘汰旧代次；延迟 report / runtime apply 红测证明停机后不会继续落运行态或发 ACK；
+- 行为门已纳入可自动起隔离 H5 server 的 `npm run verify`，dev server 未预启不再被当作可跳过条件；
+- 原守卫门未回归：结构门 19/19、H5 行为门 3/3 通过；
+- 状态：这 1 条在 H5/local-mock 范围转为 ✅，但真实后端资金结果、原生真机与 Janus C2 端到端仍为 HOLD；当前剩余量以顶部状态表为准。
+
+## 2026-08-09 复验：族 B / C / D 的假绿与已登录白屏已闭环
+
+- 族 B：`spec6-entry-surface-runtime.mjs`、`trial-check.mjs`、`sticky-check.mjs`、`backnav-check.mjs`、`page-check.mjs` 统一使用 `scripts/lib/direct-app-url.mjs` 生成 `?nx_device=off` 直渲地址；五个脚本全部拒绝运行时错误、逐值绑定预期地址栏 hash，入口页和通用页面探针还必须命中业务语义标记。`src/main.ts` 另提供只读 runtime marker 与 `import.meta.url`，探针会回取同源已加载模块并核对 marker、Vue 挂载、Uni API 与非空页面栈，浅层伪造 `html/body/#app/*`、业务 class 或 `uni` 方法，以及保留陈旧页面栈却清空 hash 的 witness 均不能充当候选身份。五探针已全部接入隔离 H5 总门；
+- 族 C：`chrome-baseline.mjs` 要求五张完整 PNG 与无错误报告，diff 两侧缺任一目标图即红；`dom-qa.mjs` 要求完整路由覆盖且任何 probe crash 禁止写入 ledger；`auth-guard-verify.mjs` 对已登录、登出重定向、引导页不循环及路径穿越四个结果逐值断言；
+- 族 D：`normalizeRoute()` 先有限次解码，再统一斜杠并折叠 dot segments；`routeFromH5Location()` 在同文档未知路由时以地址栏 hash 覆盖陈旧 UniApp 页面栈。H5 raw hash 经 `canonicalH5RouteUrl()` 归一化后 `reLaunch`，若首枪被路由器吞掉则 750ms 后重试；17 层编码、畸形编码与越根路径没有 canonical identity 时统一失败关闭到 onboarding。默认已登录与登出、首次直达与同文档切换均不再白屏；旧 KYC 深链落到安全页后同时提供即时 toast 与持久退役说明，冷启较快时也不依赖瞬时提示；
+- 防复发：`npm run test:probe-safety` 19/19，`npm run verify` 已串入结构门、H5 构建、20 个隔离浏览器场景及 5 个直接 DOM 探针；鉴权门 15/15 覆盖默认/登出、同文档 KYC 与 dot-segment、静态评审页连续三轮、16/17 层编码及 above-root，同时要求非空 App DOM、精确路由、可见退役说明及零 `pageerror`/同源 console error。2026-08-09 的 5173 local-mock 运行态同样全部通过；
 
 ### 🔴 第三条腿:路过静态评审页 → 全部业务循环永久死亡(含钱的路径)
 

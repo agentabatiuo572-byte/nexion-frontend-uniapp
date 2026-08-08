@@ -4,6 +4,7 @@ import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./conf
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
 import { isNetworkFeeConfigUsable, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
+import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 
 const IS_PRODUCTION = import.meta.env.PROD;
 
@@ -25,7 +26,7 @@ export const useConfig = defineStore("config", () => {
   // 必须 > 0 且够长到能画出一帧骨架,否则加载态是死 UI。
   const CONFIG_LOAD_LATENCY_MS = 600;
 
-  const syncFailed = ref(false);
+  const syncFailed = ref(true);
 
   /**
    * 🔴 提现费率配置是否合法 —— **在信任边界校验,不在消费点校验**。
@@ -60,12 +61,23 @@ export const useConfig = defineStore("config", () => {
     if (loading.value) return;
     loading.value = true;
     try {
-      // 🔴 必须有真 await:同步置位会让 loading 的 true/false 落在同一个微任务里,
-      // 骨架进得了 DOM 却一帧都画不出来(实测 rAF 20 帧 / 25ms 采样 17 帧均 0 骨架),
-      // 等于死 UI。合成延迟对齐工程既有先例 refresh.ts 的 REFRESH_LATENCY_MS。
-      // PROD:这里换成真实的 GET /api/config/platform,延迟天然存在。
-      await new Promise<void>((r) => setTimeout(r, CONFIG_LOAD_LATENCY_MS));
+      if (!remoteApiEnabled) {
+        await new Promise<void>((resolve) => setTimeout(resolve, CONFIG_LOAD_LATENCY_MS));
+        syncFailed.value = false;
+        return;
+      }
+      const remote = await platformConfigApi.platformConfig();
+      config.value = {
+        ...config.value,
+        featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
+        publicStats: remote.publicStats,
+        onlineBonus: remote.onlineBonus,
+        rewards: remote.rewards,
+        computeShare: remote.computeShare,
+      };
       syncFailed.value = false;
+    } catch {
+      syncFailed.value = true;
     } finally {
       loading.value = false;
     }

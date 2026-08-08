@@ -25,6 +25,7 @@
  */
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { assertCaptureCoverage, assertComparablePngCoverage } from "./lib/probe-coverage.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,6 +46,7 @@ const PAGES = [
   ["team", "/?nx_device=off#/pages/team/team"],
   ["me", "/?nx_device=off#/pages/me/me"],
 ];
+const EXPECTED_ROUTES = Object.fromEntries(PAGES.map(([name, route]) => [name, route.slice(route.indexOf("#") + 1)]));
 
 async function capture(label) {
   const dir = path.join(OUT, label);
@@ -114,6 +116,11 @@ async function capture(label) {
         const cs = (el) => (el ? getComputedStyle(el) : null);
         const header = q(".nx-header");
         return {
+          actualRoute: (location.hash || "").replace(/^#/, ""),
+          appChildren: q("#app")?.childElementCount ?? 0,
+          iframeCount: document.querySelectorAll("iframe").length,
+          bodyElements: document.querySelectorAll("body *").length,
+          bodyTextLength: (document.body?.innerText || "").trim().length,
           headerCount: document.querySelectorAll(".nx-header").length,
           pillCount: document.querySelectorAll(".nx-tabbar-pill").length,
           tabCount: document.querySelectorAll(".nx-tab").length,
@@ -132,6 +139,8 @@ async function capture(label) {
   await browser.close();
   console.log("captured", label, "→", dir);
   console.log(JSON.stringify(report, null, 2));
+  const pngFiles = fs.readdirSync(dir).filter((file) => file.endsWith(".png") && !file.startsWith("DIFF__"));
+  assertCaptureCoverage(PAGES.map(([name]) => name), report, pngFiles, EXPECTED_ROUTES);
 }
 
 function readPng(p) { return PNG.sync.read(fs.readFileSync(p)); }
@@ -139,9 +148,12 @@ function readPng(p) { return PNG.sync.read(fs.readFileSync(p)); }
 function diff(a, b) {
   const dirA = path.join(OUT, a), dirB = path.join(OUT, b);
   if (!fs.existsSync(dirA) || !fs.existsSync(dirB)) { console.error("missing capture dir", dirA, dirB); process.exit(2); }
+  const baselinePngs = fs.readdirSync(dirA).filter((file) => file.endsWith(".png") && !file.startsWith("DIFF__"));
+  const currentPngs = fs.readdirSync(dirB).filter((file) => file.endsWith(".png") && !file.startsWith("DIFF__"));
+  assertComparablePngCoverage(PAGES.map(([name]) => `${name}.png`), baselinePngs, currentPngs);
   let totalBad = 0;
   const results = [];
-  for (const f of fs.readdirSync(dirA).filter((f) => f.endsWith(".png") && !f.startsWith("DIFF__"))) {
+  for (const f of baselinePngs) {
     const pa = path.join(dirA, f), pb = path.join(dirB, f);
     if (!fs.existsSync(pb)) { results.push(`FAIL ${f}: MISSING in ${b}`); totalBad++; continue; }
     const ia = readPng(pa), ib = readPng(pb);

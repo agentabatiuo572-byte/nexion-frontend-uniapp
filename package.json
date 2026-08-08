@@ -35,7 +35,15 @@
     "build:quickapp-webview": "uni build -p quickapp-webview",
     "build:quickapp-webview-huawei": "uni build -p quickapp-webview-huawei",
     "build:quickapp-webview-union": "uni build -p quickapp-webview-union",
-    "type-check": "vue-tsc --noEmit"
+    "type-check": "vue-tsc --noEmit",
+    "test:kyc-removal": "node --test scripts/kyc-removal-contract.test.mjs",
+    "test:probe-safety": "node --test scripts/probe-safety-contract.test.mjs scripts/static-review-routes.test.mjs",
+    "test:earnings-accrual": "node --experimental-strip-types --test scripts/earnings-accrual-contract.test.mjs",
+    "test:business-loop-liveness": "node scripts/selfcheck-business-loop-liveness.mjs",
+    "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",
+    "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
+    "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
+    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

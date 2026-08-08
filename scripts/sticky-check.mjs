@@ -8,6 +8,14 @@
  */
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { directAppUrl } from "./lib/direct-app-url.mjs";
+import {
+  assertNoRuntimeErrors,
+  assertDirectPageCoverage,
+  assertUniAppRuntimeIdentity,
+  collectDirectPageWitness,
+  collectUniAppRuntimeIdentity,
+} from "./lib/probe-coverage.mjs";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -23,7 +31,7 @@ const page = await browser.newPage({ viewport: { width: 414, height: 896 }, devi
 const errors = [];
 page.on("console", collectAppConsoleErrors(errors, BASE));
 page.on("pageerror", (e) => errors.push(String(e)));
-await page.goto(BASE + route, { waitUntil: "networkidle", timeout: 30000 });
+await page.goto(directAppUrl(BASE, route), { waitUntil: "networkidle", timeout: 30000 });
 await page.waitForTimeout(1300);
 const before = await page.evaluate(() => {
   const el = document.querySelector(".spv");
@@ -44,11 +52,21 @@ const title = await page.evaluate(() => document.querySelector(".spv-title")?.te
 await page.addStyleTag({ content: ".spv{backdrop-filter:invert(1)!important;-webkit-backdrop-filter:invert(1)!important}" });
 await page.waitForTimeout(200);
 await page.screenshot({ path: path.join(OUT, `${name}-frost.png`) });
-console.log(JSON.stringify({
+const result = {
   route, title, spvExists: before !== null,
   topBeforeScroll: before, topAfterScroll: after,
   pinnedOK: before !== null && after !== null && Math.abs(after - before) <= 2,
   consoleErrors: errors,
   frostShot: `scripts/.baseline/_check/${name}-frost.png`,
-}, null, 2));
+};
+const runtimeIdentity = await collectUniAppRuntimeIdentity(page);
+const routeWitness = await collectDirectPageWitness(page, errors);
+console.log(JSON.stringify(result, null, 2));
 await browser.close();
+assertNoRuntimeErrors(errors, "sticky-check");
+assertUniAppRuntimeIdentity(runtimeIdentity, "sticky-check");
+assertDirectPageCoverage(route.slice(route.indexOf("#") + 1), routeWitness, "sticky-check");
+if (!result.pinnedOK || !result.title) {
+  throw new Error(`sticky header coverage failed: exists=${result.spvExists}, title=${String(result.title)}, pinned=${result.pinnedOK}`);
+}
+console.log("STICKY-CHECK: PASS");
