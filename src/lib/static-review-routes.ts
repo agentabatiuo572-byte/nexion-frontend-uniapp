@@ -12,7 +12,68 @@ const STATIC_REVIEW_PREFIXES = [
  * 两份正则各写一份必然漂移,权限判据经不起漂移。
  */
 export function normalizeRoute(route?: string | null): string {
-  return (route ?? "").replace(/^\/?#?\/?/, "").split("?")[0];
+  const raw = (route ?? "").trim().replace(/^\/?#?\/?/, "").split(/[?#]/, 1)[0];
+  let decoded = raw;
+  for (let pass = 0; pass < 16; pass += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) {
+        break;
+      }
+      decoded = next;
+    } catch {
+      return "";
+    }
+  }
+  // One non-mutating stability check lets exactly 16 layers through while
+  // rejecting any input that would need a 17th decoding pass.
+  try {
+    if (decodeURIComponent(decoded) !== decoded) return "";
+  } catch {
+    return "";
+  }
+  decoded = decoded.replace(/\\/g, "/").split(/[?#]/, 1)[0];
+
+  const canonical: string[] = [];
+  for (const segment of decoded.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (!canonical.length) return "";
+      canonical.pop();
+      continue;
+    }
+    canonical.push(segment);
+  }
+  return canonical.join("/");
+}
+
+/** Return the canonical uni.reLaunch URL for an H5 hash, preserving its query. */
+export function canonicalH5RouteUrl(route?: string | null): string {
+  const raw = String(route ?? "").trim();
+  const normalized = normalizeRoute(raw);
+  if (!normalized) return "";
+  const queryStart = raw.indexOf("?");
+  const query = queryStart >= 0 ? raw.slice(queryStart).split("#", 1)[0] : "";
+  return `/${normalized}${query}`;
+}
+
+/**
+ * Pick the live H5 route without trusting a stale UniApp page stack.
+ *
+ * Vue Router leaves getCurrentPages() on the previous page when a same-document
+ * hash points at a retired or non-canonical route.  The address bar is the user
+ * input in that case, so every non-root hash must win.  A bare `#/` is the one
+ * exception: it carries no page identity and the established page stack remains
+ * the better witness.
+ */
+export function routeFromH5Location(
+  pageRoute?: string | null,
+  hashRoute?: string | null,
+): string {
+  const hash = String(hashRoute ?? "").trim();
+  const rawPath = hash.replace(/^#/, "").split(/[?#]/, 1)[0];
+  if (hash && rawPath && rawPath !== "/") return normalizeRoute(hash);
+  return normalizeRoute(pageRoute);
 }
 
 export function isStaticReviewRoute(route?: string | null): boolean {

@@ -1,6 +1,6 @@
 <template>
   <AppChassis active="home">
-    <view class="entry-index">
+    <view class="entry-index" data-entry-surface="index">
       <view class="entry-index__head">
         <text class="entry-index__eyebrow">{{ t.entrySurface.indexEyebrow }}</text>
         <text class="entry-index__title">{{ t.entrySurface.indexTitle }}</text>

@@ -10,6 +10,7 @@ export interface HttpRequest {
   headers: Record<string, string>;
   body?: unknown;
   timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 export interface HttpResponse {
@@ -29,6 +30,7 @@ export interface ApiRequest {
   authenticated?: boolean;
   idempotencyKey?: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
   acceptedResponses?: ReadonlyArray<{
     status: number;
     code: number;
@@ -220,6 +222,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       method: apiRequest.method ?? "GET",
       headers,
       timeoutMs: apiRequest.timeoutMs ?? 12_000,
+      signal: apiRequest.signal,
     };
     if (apiRequest.body !== undefined) httpRequest.body = apiRequest.body;
 
@@ -255,22 +258,48 @@ export function createUniHttpTransport(): HttpTransport {
   return {
     request(request) {
       return new Promise((resolve, reject) => {
-        uni.request({
+        let settled = false;
+        let task: { abort?: () => void } | undefined;
+        const cleanup = () => request.signal?.removeEventListener("abort", onAbort);
+        const resolveOnce = (response: HttpResponse) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          resolve(response);
+        };
+        const rejectOnce = (error: ApiError) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(error);
+        };
+        const onAbort = () => {
+          task?.abort?.();
+          rejectOnce(new ApiError({
+            kind: "network",
+            message: "REQUEST_ABORTED",
+            retryable: false,
+          }));
+        };
+        if (request.signal?.aborted) {
+          onAbort();
+          return;
+        }
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        task = uni.request({
           url: request.url,
           method: request.method,
           header: request.headers,
           data: request.body as UniNamespace.RequestOptions["data"],
           timeout: request.timeoutMs,
-          success: (response) => resolve({
+          success: (response) => resolveOnce({
             status: response.statusCode,
             data: response.data,
             headers: response.header as Record<string, string>,
           }),
-          fail: () => reject(new ApiError({
-            kind: "network",
-            message: "NETWORK_UNAVAILABLE",
-            retryable: true,
-          })),
+          fail: () => rejectOnce(request.signal?.aborted
+            ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
+            : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true })),
         });
       });
     },

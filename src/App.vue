@@ -19,14 +19,53 @@ import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { isStaticReviewRoute, normalizeRoute } from "@/lib/static-review-routes";
+import {
+  canonicalH5RouteUrl,
+  isStaticReviewRoute,
+  normalizeRoute,
+  routeFromH5Location,
+} from "@/lib/static-review-routes";
+import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
+import { useConfig } from "@/store/config";
+import { useGenesisConfig } from "@/store/genesis-config";
+import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
+import { useDeposits } from "@/store/deposits";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 let lastTick = Date.now();
 let accountSessionBootstrapped = false;
+let businessLoopsRunning = false;
+const businessTimeouts = new Set<ReturnType<typeof setTimeout>>();
+let devBusinessTimeoutRuns = 0;
+let pendingCanonicalRouteRepair = "";
+let pendingCanonicalRouteRepairAt = 0;
+const ROUTE_REPAIR_RETRY_MS = 750;
+const INVALID_H5_ROUTE_FALLBACK = "/pages/onboarding/intro";
+
+/**
+ * 业务延迟任务的唯一登记口。新的延迟 poll 不得直接 setTimeout：否则进入
+ * 静态评审页/onHide 时没有 handle 可取消，回调仍可在安全边界外执行。
+ */
+function scheduleBusinessTimeout(task: () => void, delayMs: number): ReturnType<typeof setTimeout> | undefined {
+  if (!businessLoopsRunning) return undefined;
+  let handle: ReturnType<typeof setTimeout>;
+  handle = setTimeout(() => {
+    businessTimeouts.delete(handle);
+    if (!businessLoopsRunning || !ensureBusinessLoopsAllowed()) return;
+    task();
+  }, delayMs);
+  businessTimeouts.add(handle);
+  return handle;
+}
+
+function stopBusinessTimeouts(): void {
+  for (const handle of businessTimeouts) clearTimeout(handle);
+  businessTimeouts.clear();
+}
 
 function startTick() {
   stopTick();
@@ -444,14 +483,42 @@ let lastQuestRoute = "";
 // 永远带兜底、永远归一成页面栈形态 `pages/x/y`(无前导斜杠、无查询串)。
 // 空只剩一种含义:真的还没有任何路由(App 端首帧)。
 function readCurrentRoute(): string {
-  let route = "";
+  let pageRoute = "";
   try {
     const ps = getCurrentPages();
-    route = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
+    pageRoute = ps.length ? ((ps[ps.length - 1] as { route?: string }).route ?? "") : "";
   } catch { /* 页面栈不可用 → 走下方兜底 */ }
+  let route = pageRoute;
   // #ifdef H5
-  if (!route) {
-    try { route = window.location.hash || ""; } catch { route = ""; }
+  let hashRoute = "";
+  try { hashRoute = window.location.hash || ""; } catch { hashRoute = ""; }
+  route = routeFromH5Location(pageRoute, hashRoute);
+  const rawUrl = hashRoute.trim().replace(/^#/, "");
+  const rawPath = rawUrl.split(/[?#]/, 1)[0];
+  if (rawPath && rawPath !== "/") {
+    // Invalid encodings and above-root traversal have no canonical identity.
+    // They must still leave an unmatched white page, so fail closed to the
+    // onboarding shell instead of silently returning an empty route witness.
+    const canonicalUrl = canonicalH5RouteUrl(hashRoute) || INVALID_H5_ROUTE_FALLBACK;
+    const comparableRawUrl = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+    const repairRetryDue = pendingCanonicalRouteRepair !== canonicalUrl
+      || Date.now() - pendingCanonicalRouteRepairAt >= ROUTE_REPAIR_RETRY_MS;
+    if (canonicalUrl !== comparableRawUrl && repairRetryDue) {
+      pendingCanonicalRouteRepair = canonicalUrl;
+      pendingCanonicalRouteRepairAt = Date.now();
+      uni.reLaunch({
+        url: canonicalUrl,
+        fail: () => {
+          if (pendingCanonicalRouteRepair === canonicalUrl) {
+            pendingCanonicalRouteRepair = "";
+            pendingCanonicalRouteRepairAt = 0;
+          }
+        },
+      });
+    } else if (canonicalUrl === comparableRawUrl) {
+      pendingCanonicalRouteRepair = "";
+      pendingCanonicalRouteRepairAt = 0;
+    }
   }
   // #endif
   return normalizeRoute(route);
@@ -522,6 +589,12 @@ function questIdForRoute(route: string): QuestTaskId | null {
 
 function checkQuestRoute() {
   const route = readCurrentRoute();
+  const retiredRoute = resolveRetiredRoute(route);
+  if (retiredRoute) {
+    stopBusinessLoops();
+    uni.reLaunch({ url: retiredRoute });
+    return;
+  }
   if (isStaticReviewRoute(route)) {
     lastQuestRoute = route;
     stopBusinessLoops();
@@ -540,6 +613,10 @@ function checkQuestRoute() {
   // (认领是幂等的,未认证时不消耗一次性资格),但别照着旧注释的错误前提推理。
   bootstrapAccountSession();
   if (checkSession()) return; // evicted / needs recalibration → redirected
+  // H5 站内路由不会重发 App.onShow。静态评审页会按安全边界停掉业务循环，
+  // 所以离开评审页后必须由仍存活的守卫在这一拍重新校验并恢复；放在同路由短路前，
+  // 才能覆盖「路由已经切回业务页、lastQuestRoute 也已更新」的时序。
+  if (!ensureBusinessLoopsRunning()) return;
   if (route === lastQuestRoute) return; // only act on route change
   lastQuestRoute = route;
   const id = questIdForRoute(route);
@@ -581,6 +658,36 @@ function stopQuestWatch() {
   }
 }
 
+function installBusinessLoopProbe(): void {
+  if (!import.meta.env.DEV) return;
+  const target = globalThis as unknown as {
+    __nxBusinessLoopStatus?: () => Record<string, boolean | number>;
+    __nxScheduleBusinessLoopTimeout?: (delayMs: number) => void;
+    __nxBusinessLoopTimeoutRuns?: () => number;
+  };
+  target.__nxBusinessLoopStatus = () => {
+    const app = useApp();
+    const config = useConfig();
+    return {
+      running: businessLoopsRunning,
+      earnings: tickTimer !== undefined,
+      arrival: arrivalTimer !== undefined,
+      trial: trialTimer !== undefined,
+      order: orderTimer !== undefined,
+      milestone: milestoneTimer !== undefined,
+      pendingTimeouts: businessTimeouts.size,
+      configSyncFailed: config.syncFailed,
+      earningsToday: app.earnings.today,
+      deviceEarningsToday: app.devices.reduce((sum, device) => sum + device.todayEarnings, 0),
+      latestSettledAt: app.devices.reduce((latest, device) => Math.max(latest, device.lastSettledAt ?? 0), 0),
+    };
+  };
+  target.__nxScheduleBusinessLoopTimeout = (delayMs) => {
+    scheduleBusinessTimeout(() => { devBusinessTimeoutRuns += 1; }, delayMs);
+  };
+  target.__nxBusinessLoopTimeoutRuns = () => devBusinessTimeoutRuns;
+}
+
 // 🔴 守卫轮询(questTimer)**不属于**本函数 —— 它是安全装置,不是业务循环。
 // 根因(2026-08-07 第三次同型):原先 stopQuestWatch() 在这里,于是「当前页不该跑业务」的
 // 每一处判断(静态评审页 / 未认证 / 会话失效 / 冷启动引导)都会顺手把**全站唯一的**周期性
@@ -591,6 +698,10 @@ function stopQuestWatch() {
 // 🔴 不变量:守卫只随前台/后台成对开关 —— onShow 起、onHide 停,其余任何时候都活着。
 // 它在白名单页由自身前两行(checkAuthGuard/checkSession 的白名单短路)保持惰性,常开无业务副作用。
 function stopBusinessLoops() {
+  businessLoopsRunning = false;
+  stopBusinessTimeouts();
+  useDeposits().pauseMockEngine();
+  stopJanusC2Sync();
   stopTick();
   stopArrivalPoll();
   stopTrialPoll();
@@ -622,22 +733,52 @@ function ensureBusinessLoopsAllowed(): boolean {
   return true;
 }
 
+/**
+ * 业务循环的唯一启动出口。
+ *
+ * 守卫每秒都会调用本函数，因此必须先做授权/会话 fail-closed 判定，再用显式状态
+ * 保证幂等；不能调用旧的 start* 族反复清空并重建定时器。恢复成功时先补一次
+ * 离线结算与到账/账单对账，再启动周期任务，用户无需额外等 5 秒。
+ */
+function ensureBusinessLoopsRunning(): boolean {
+  if (!ensureBusinessLoopsAllowed()) return false;
+  if (businessLoopsRunning) return true;
+
+  useApp().settle();
+  advanceArrivalAndSettleBill();
+  businessLoopsRunning = true;
+  try {
+    useDeposits().resumeMockEngine();
+    startTick();
+    startArrivalPoll();
+    startTrialPoll();
+    startOrderPoll();
+    startMilestonePoll();
+    startJanusC2Sync();
+  } catch (error) {
+    stopBusinessLoops();
+    throw error;
+  }
+  return true;
+}
+
 onLaunch(() => {
+  installBusinessLoopProbe();
+  void useConfig().load();
+  void useGenesisConfig().refresh();
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
   // (system → OS scheme). Instantiating the store here also registers its live
   // OS-scheme listener for "system" mode.
   // #ifdef H5
   document.documentElement.setAttribute("data-theme", useTheme().resolved);
-  // 包 E(FEAT-KYC-RM01b ② 异常2):已下线验证页的历史深链兜底 ——
-  // 路由已注销,冷开命中时平滑落安全页 + 一句「该流程已下线」,禁 404/白屏。
-  // 提示由落地页 onLoad 自弹(from 参数):onLaunch 直接 toast 会在页面挂载完成前
-  // 就到时自动消失,冷启实测两次都看不见(实景走查抓到的时序坑)。
-  // 读取口已归一(无前导斜杠、无查询串),判据照归一形态写。
-  if (/^pages\/me\/kyc($|\/)/.test(readCurrentRoute())) {
-    uni.reLaunch({ url: "/pages/me/security?from=retired-flow", fail: () => {} });
-  }
   // #endif
+  const retiredRoute = resolveRetiredRoute(readCurrentRoute());
+  if (retiredRoute) {
+    stopBusinessLoops();
+    uni.reLaunch({ url: retiredRoute, fail: () => {} });
+    return;
+  }
   if (isStaticReviewRoute(readCurrentRoute())) {
     stopBusinessLoops();
     return;
@@ -646,7 +787,6 @@ onLaunch(() => {
 });
 onShow(() => {
   attachSessionWatch();
-  const allowed = ensureBusinessLoopsAllowed(); // 失败分支只停业务循环,不再碰守卫
   // 🔴 守卫轮询必须无条件启动(2026-08-07 实景抓到的残留洞):冷启动那一拍守卫虽已看见
   // 未登录+业务页并发起 reLaunch,但首次导航还在进行中,那一枪会被吞掉;守卫返回「已跳转」
   // → onShow 提前收工 → 轮询没启动 → 再无第二枪,登出态照样停在业务页(与修复前同果)。
@@ -654,16 +794,8 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  if (!allowed) return; // no business writes on auth/session flow pages
-  useApp().settle(); // PRD §6.11: settle the backgrounded gap in one shot on foreground
-  // FEAT-WD01b:前台第一时间补齐到账缺口 —— 关 App 三天再打开,这一下就补完
-  // (纯函数只看「now ≥ 预计到账」,与离线时长无关;推进过的单再调是 no-op)。
-  advanceArrivalAndSettleBill();
-  startTick();
-  startArrivalPoll();
-  startTrialPoll();
-  startOrderPoll();
-  startMilestonePoll();
+  if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
+  void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
   detachSessionWatch();

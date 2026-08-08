@@ -5,6 +5,7 @@ import {
   type JanusPlatform,
   type JanusReport,
   type JanusStatus,
+  type JanusTakeoverProgress,
 } from "@/api/janus-api";
 import { janusApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { getDeviceIdentity } from "@/lib/device-id";
@@ -15,6 +16,7 @@ const ACK_KEY = "nexgrid-janus-pending-ack-v2";
 const COUNTERS_KEY = "nexgrid-janus-counters-v2";
 const JANUS_SYNC_MS = 60_000;
 const STATUS_SET = new Set<string>(JANUS_STATUSES);
+const DEVICE_APP_VERSION = "NX1.0-UniApp";
 
 interface KeyValueStore {
   get(key: string): unknown;
@@ -37,7 +39,7 @@ interface CoordinatorOptions {
   api: JanusApi;
   storage: KeyValueStore;
   buildReport: () => JanusReport;
-  applyRuntime: (state: JanusRuntimeState) => Promise<void>;
+  applyRuntime: (state: JanusRuntimeState, signal?: AbortSignal) => Promise<JanusRuntimeState>;
   now: () => number;
   scope?: () => string;
 }
@@ -51,13 +53,128 @@ function errorMessage(error: unknown): string {
   return error instanceof Error && error.message ? error.message.slice(0, 500) : "JANUS_REMOTE_APPLY_FAILED";
 }
 
+function throwIfJanusSyncCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) throw new Error("JANUS_SYNC_CANCELLED");
+}
+
+function isJanusSyncCancelled(error: unknown, signal?: AbortSignal): boolean {
+  return signal?.aborted === true || (error instanceof Error && error.message === "JANUS_SYNC_CANCELLED");
+}
+
 export function createJanusCoordinator(options: CoordinatorOptions) {
-  async function sendPendingAck(): Promise<void> {
+  async function progress(value: JanusTakeoverProgress, signal?: AbortSignal): Promise<void> {
+    throwIfJanusSyncCancelled(signal);
+    await options.api.progress(value, signal);
+    throwIfJanusSyncCancelled(signal);
+  }
+
+  async function applyRuntime(value: JanusRuntimeState, signal?: AbortSignal): Promise<JanusRuntimeState> {
+    throwIfJanusSyncCancelled(signal);
+    const applied = await options.applyRuntime(value, signal);
+    throwIfJanusSyncCancelled(signal);
+    return applied;
+  }
+
+  async function applyTakeover(command: Extract<Awaited<ReturnType<JanusApi["pending"]>>, { hasCommand: true; commandType: string }>, deviceId: string, signal?: AbortSignal): Promise<void> {
+    throwIfJanusSyncCancelled(signal);
+    const base = {
+      deviceId,
+      commandId: command.commandId,
+      commandVersion: command.commandVersion,
+      deviceAppVersion: DEVICE_APP_VERSION,
+    };
+    if (command.commandType === "QUERY_APPLIED") {
+      throwIfJanusSyncCancelled(signal);
+      const applied = (options.storage.get("nexgrid-janus-runtime-v2") || {}) as Partial<JanusRuntimeState>;
+      const reset = applied.status === "RESET";
+      if (applied.commandVersion !== command.commandVersion || !applied.handoffReceipt?.trim()
+          || (!reset && (!applied.remoteUrlKey?.trim() || !Number.isSafeInteger(applied.remoteTargetVersion)
+            || !Number.isSafeInteger(applied.remoteTargetCatalogVersion)))) return;
+      await progress({
+        ...base,
+        phase: "SUCCEEDED",
+        actualTargetId: reset ? "none" : applied.remoteUrlKey,
+        actualTargetVersion: reset ? 0 : applied.remoteTargetVersion,
+        actualTargetCatalogVersion: reset ? 0 : applied.remoteTargetCatalogVersion,
+        deviceAppliedVersion: applied.commandVersion,
+        handoffReceipt: applied.handoffReceipt,
+        reconciliationId: command.reconciliationId,
+      }, signal);
+      return;
+    }
+    if (command.commandType === "REVOKE") {
+      try {
+        const applied = await applyRuntime({
+          status: "RESET",
+          revision: command.commandVersion,
+          commandId: command.commandId,
+          commandVersion: command.commandVersion,
+          deviceAppVersion: DEVICE_APP_VERSION,
+          appliedAt: options.now(),
+        }, signal);
+        await progress({ ...base, phase: "REVOKED", actualTargetId: "none", actualTargetVersion: 0, actualTargetCatalogVersion: 0, deviceAppliedVersion: command.commandVersion, handoffReceipt: applied.handoffReceipt }, signal);
+      } catch (error) {
+        if (isJanusSyncCancelled(error, signal)) throw error;
+        await progress({
+          ...base,
+          phase: "REVOKE_FAILED",
+          failureCode: "RUNTIME_REVOKE_FAILED",
+          failureClass: "cleanup",
+          failureMessage: errorMessage(error),
+        }, signal);
+        throw error;
+      }
+      return;
+    }
+    await progress({ ...base, phase: "RECEIVED" }, signal);
+    await progress({ ...base, phase: "LOADING" }, signal);
+    try {
+      const applied = await applyRuntime({
+        status: "ACTIVATED",
+        revision: command.commandVersion,
+        commandId: command.commandId,
+        commandVersion: command.commandVersion,
+        deviceAppVersion: DEVICE_APP_VERSION,
+        remoteUrlKey: command.remoteUrlKey,
+        remoteTargetVersion: command.remoteTargetVersion,
+        remoteTargetCatalogVersion: command.remoteTargetCatalogVersion,
+        remoteTargetUrl: command.remoteTargetUrl,
+        appliedAt: options.now(),
+      }, signal);
+      await progress({ ...base, phase: "HANDOFF_FETCHING" }, signal);
+      await progress({ ...base, phase: "HANDOFF_MERGING" }, signal);
+      await progress({ ...base, phase: "HANDOFF_ACKED" }, signal);
+      await progress({
+        ...base,
+        phase: "SUCCEEDED",
+        actualTargetId: command.remoteUrlKey,
+        actualTargetVersion: command.remoteTargetVersion,
+        actualTargetCatalogVersion: command.remoteTargetCatalogVersion,
+        deviceAppliedVersion: command.commandVersion,
+        handoffReceipt: applied.handoffReceipt,
+      }, signal);
+    } catch (error) {
+      if (isJanusSyncCancelled(error, signal)) throw error;
+      const contractFailure = errorMessage(error) === "JANUS_HANDOFF_PROOF_UNAVAILABLE";
+      await progress({
+        ...base,
+        phase: "FAILED",
+        failureCode: contractFailure ? "HANDOFF_PROOF_UNAVAILABLE" : "WEBVIEW_APPLY_FAILED",
+        failureClass: contractFailure ? "contract" : "webview",
+        failureMessage: errorMessage(error),
+      }, signal);
+      throw error;
+    }
+  }
+
+  async function sendPendingAck(signal?: AbortSignal): Promise<void> {
+    throwIfJanusSyncCancelled(signal);
     const key = scoped(ACK_KEY, options);
     const pending = options.storage.get(key);
     if (!pending || typeof pending !== "object") return;
     const ack = pending as JanusAck;
-    const confirmed = await options.api.ack(ack);
+    const confirmed = await options.api.ack(ack, signal);
+    throwIfJanusSyncCancelled(signal);
     const expectedState = ack.success ? "ACKED" : "FAILED";
     if (confirmed.revision !== ack.revision || confirmed.state !== expectedState) {
       throw new Error("JANUS_ACK_CONFIRMATION_MISMATCH");
@@ -65,24 +182,36 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
     options.storage.delete(key);
   }
 
-  async function acknowledge(ack: JanusAck): Promise<void> {
+  async function acknowledge(ack: JanusAck, signal?: AbortSignal): Promise<void> {
+    throwIfJanusSyncCancelled(signal);
     const key = scoped(ACK_KEY, options);
     options.storage.set(key, ack);
-    await sendPendingAck();
+    await sendPendingAck(signal);
   }
 
-  async function sync(): Promise<void> {
-    await sendPendingAck();
+  async function sync(signal?: AbortSignal): Promise<void> {
+    throwIfJanusSyncCancelled(signal);
+    await sendPendingAck(signal);
+    throwIfJanusSyncCancelled(signal);
     const reportKey = scoped(REPORT_KEY, options);
     const existing = options.storage.get(reportKey);
     const report = existing && typeof existing === "object"
       ? existing as JanusReport
       : options.buildReport();
-    if (!existing) options.storage.set(reportKey, report);
-    const reported = await options.api.report(report);
+    if (!existing) {
+      throwIfJanusSyncCancelled(signal);
+      options.storage.set(reportKey, report);
+    }
+    const reported = await options.api.report(report, signal);
+    throwIfJanusSyncCancelled(signal);
     options.storage.delete(reportKey);
-    const command = await options.api.pending(report.deviceId);
+    const command = await options.api.pending(report.deviceId, signal);
+    throwIfJanusSyncCancelled(signal);
     if (command.hasCommand) {
+      if ("commandType" in command) {
+        await applyTakeover(command, report.deviceId, signal);
+        return;
+      }
       const runtime: JanusRuntimeState = {
         status: command.desiredStatus,
         revision: command.revision,
@@ -93,15 +222,16 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
         appliedAt: options.now(),
       };
       try {
-        await options.applyRuntime(runtime);
+        await applyRuntime(runtime, signal);
       } catch (error) {
+        if (isJanusSyncCancelled(error, signal)) throw error;
         try {
           await acknowledge({
             deviceId: report.deviceId,
             revision: command.revision,
             success: false,
             message: errorMessage(error),
-          });
+          }, signal);
         } catch {
           // The stable failure ACK remains persisted. Preserve the actual
           // application error for diagnosis and retry the ACK on next sync.
@@ -114,16 +244,16 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
         success: true,
         appliedStatus: command.desiredStatus,
         message: "applied",
-      });
+      }, signal);
       return;
     }
     if (!STATUS_SET.has(reported.status)) throw new Error("JANUS_REPORT_RESPONSE_INVALID");
     if (!["HIT", "ACTIVATED", "MANUAL_FORCED"].includes(reported.status)) {
-      await options.applyRuntime({
+      await applyRuntime({
         status: reported.status,
         revision: Math.max(1, reported.version),
         appliedAt: options.now(),
-      });
+      }, signal);
     }
   }
 
@@ -266,38 +396,60 @@ const defaultCoordinator = createJanusCoordinator({
   api: janusApi,
   storage: uniStorage,
   buildReport: buildJanusReport,
-  applyRuntime: applyJanusRuntime,
+  applyRuntime: (state, signal) => applyJanusRuntime(state, undefined, signal),
   now: Date.now,
   scope: () => String(sessionVault.read()?.user.userId || ""),
 });
 
 let timer: ReturnType<typeof setInterval> | undefined;
-let syncing = false;
+let syncGeneration = 0;
+let activeController: AbortController | undefined;
+const syncingGenerations = new Set<number>();
 
-export async function syncJanusC2(): Promise<void> {
-  if (!remoteApiEnabled || !sessionVault.read()?.accessToken || syncing) return;
-  syncing = true;
+async function runJanusC2(generation: number, signal: AbortSignal): Promise<void> {
+  if (
+    generation !== syncGeneration
+    || signal.aborted
+    || !remoteApiEnabled
+    || !sessionVault.read()?.accessToken
+    || syncingGenerations.has(generation)
+  ) return;
+  syncingGenerations.add(generation);
   try {
-    await defaultCoordinator.sync();
+    await defaultCoordinator.sync(signal);
+    throwIfJanusSyncCancelled(signal);
+    if (generation !== syncGeneration) throw new Error("JANUS_SYNC_CANCELLED");
   } finally {
-    syncing = false;
+    syncingGenerations.delete(generation);
   }
 }
 
+export async function syncJanusC2(): Promise<void> {
+  const controller = activeController;
+  if (!controller) return;
+  await runJanusC2(syncGeneration, controller.signal);
+}
+
 export function startJanusC2Sync(): void {
-  if (!remoteApiEnabled) return;
   stopJanusC2Sync();
+  if (!remoteApiEnabled) return;
+  const generation = syncGeneration;
+  const controller = new AbortController();
+  activeController = controller;
   void syncJanusC2().catch(() => {
     // Stable report/ACK facts remain persisted for the next foreground or poll.
   });
   timer = setInterval(() => {
-    void syncJanusC2().catch(() => {
+    void runJanusC2(generation, controller.signal).catch(() => {
       // The next poll retries the exact persisted fact.
     });
   }, JANUS_SYNC_MS);
 }
 
 export function stopJanusC2Sync(): void {
+  syncGeneration += 1;
+  activeController?.abort();
+  activeController = undefined;
   if (timer) {
     clearInterval(timer);
     timer = undefined;

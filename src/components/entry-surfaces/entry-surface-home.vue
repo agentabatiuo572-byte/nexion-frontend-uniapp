@@ -1,6 +1,6 @@
 <template>
   <AppChassis active="home">
-    <view class="entry-page" :class="toneClass">
+    <view class="entry-page" :class="toneClass" :data-entry-surface="surface">
       <view class="entry-hero">
         <view class="entry-copy">
           <view class="entry-kicker">

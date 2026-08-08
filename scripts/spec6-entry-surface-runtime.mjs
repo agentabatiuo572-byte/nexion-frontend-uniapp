@@ -1,4 +1,11 @@
 import { chromium } from "playwright";
+import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
+import { directAppUrl } from "./lib/direct-app-url.mjs";
+import {
+  assertDirectPageCoverage,
+  assertUniAppRuntimeIdentity,
+  collectUniAppRuntimeIdentity,
+} from "./lib/probe-coverage.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://localhost:5173";
 const routes = [
@@ -7,6 +14,12 @@ const routes = [
   "/#/pages/entry-surfaces/h5",
   "/#/pages/entry-surfaces/white?entry=white-app",
 ];
+const requiredSelectors = new Map([
+  ["/#/pages/entry-surfaces/index", '[data-entry-surface="index"]'],
+  ["/#/pages/entry-surfaces/signed", '[data-entry-surface="signed"]'],
+  ["/#/pages/entry-surfaces/h5", '[data-entry-surface="h5"]'],
+  ["/#/pages/entry-surfaces/white", '[data-entry-surface="white"]'],
+]);
 const forbiddenText = [
   "Lifetime earnings",
   "Earnings milestone",
@@ -49,13 +62,33 @@ async function main() {
 
   for (const route of routes) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+    const pageErrors = [];
+    const consoleErrors = [];
+    page.on("pageerror", (error) => pageErrors.push(String(error)));
+    page.on("console", collectAppConsoleErrors(consoleErrors, baseUrl));
     await page.addInitScript((keys) => {
       for (const key of keys) localStorage.removeItem(key);
     }, businessStorageKeys);
-    await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
+    await page.goto(directAppUrl(baseUrl, route), { waitUntil: "domcontentloaded" });
     await page.locator("body").waitFor({ state: "visible", timeout: 10000 });
     await page.waitForTimeout(4700);
     const text = await page.locator("body").innerText({ timeout: 5000 });
+    const requiredSelector = requiredSelectors.get(route.split("?", 1)[0]);
+    if (!requiredSelector) throw new Error(`${route} has no semantic identity selector`);
+    const witness = await page.evaluate(() => ({
+      actualRoute: (location.hash || "").replace(/^#/, ""),
+      appChildren: document.querySelector("#app")?.childElementCount ?? 0,
+      iframeCount: document.querySelectorAll("iframe").length,
+      bodyElements: document.querySelectorAll("body *").length,
+      bodyTextLength: (document.body?.innerText || "").trim().length,
+    }));
+    witness.pageErrors = pageErrors;
+    witness.consoleErrors = consoleErrors;
+    assertDirectPageCoverage(route.slice(route.indexOf("#") + 1), witness, route);
+    assertUniAppRuntimeIdentity(await collectUniAppRuntimeIdentity(page), route);
+    if (await page.locator(requiredSelector).count() !== 1) {
+      throw new Error(`${route} semantic identity missing: ${requiredSelector}`);
+    }
     const leaked = forbiddenText.filter((token) => text.includes(token));
     if (leaked.length) throw new Error(`${route} leaked business overlay text: ${leaked.join(", ")}`);
     const storage = await page.evaluate((keys) => {

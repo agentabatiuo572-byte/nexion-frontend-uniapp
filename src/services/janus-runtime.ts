@@ -8,9 +8,14 @@ export interface JanusRuntimeState {
   remoteTargetCatalogVersion?: number;
   remoteTargetUrl?: string;
   appliedAt: number;
+  commandId?: string;
+  commandVersion?: number;
+  deviceAppVersion?: string;
+  handoffReceipt?: string;
 }
 
-export type JanusRemoteNavigator = (url: string) => Promise<void>;
+export interface JanusApplyEvidence { handoffReceipt: string }
+export type JanusRemoteNavigator = (url: string) => Promise<JanusApplyEvidence>;
 
 export const JANUS_RUNTIME_KEY = "nexgrid-janus-runtime-v2";
 const REMOTE_STATUSES = new Set<JanusStatus>(["HIT", "ACTIVATED", "MANUAL_FORCED"]);
@@ -33,7 +38,7 @@ function normalizeRemoteUrl(value: string): string {
   }
 }
 
-async function defaultRemoteNavigator(url: string): Promise<void> {
+async function defaultRemoteNavigator(url: string): Promise<JanusApplyEvidence> {
   const runtime = (globalThis as unknown as {
     plus?: {
       runtime?: {
@@ -53,11 +58,11 @@ async function defaultRemoteNavigator(url: string): Promise<void> {
         (error) => reject(new Error(error.message || "JANUS_REMOTE_APPLY_FAILED")),
       );
     });
-    return;
+    throw new Error("JANUS_HANDOFF_PROOF_UNAVAILABLE");
   }
   if (typeof window !== "undefined" && window.location) {
     window.location.assign(url);
-    return;
+    throw new Error("JANUS_HANDOFF_PROOF_UNAVAILABLE");
   }
   throw new Error("JANUS_REMOTE_TARGET_UNSUPPORTED");
 }
@@ -75,7 +80,9 @@ export function readJanusRuntime(): JanusRuntimeState | null {
 export async function applyJanusRuntime(
   runtime: JanusRuntimeState,
   navigateRemote: JanusRemoteNavigator = defaultRemoteNavigator,
-): Promise<void> {
+  signal?: AbortSignal,
+): Promise<JanusRuntimeState> {
+  if (signal?.aborted) throw new Error("JANUS_SYNC_CANCELLED");
   const next: JanusRuntimeState = {
     ...runtime,
     status: runtime.status.toUpperCase() as JanusStatus,
@@ -84,6 +91,16 @@ export async function applyJanusRuntime(
   if (!Number.isSafeInteger(next.revision) || next.revision <= 0) {
     throw new Error("JANUS_RUNTIME_REVISION_INVALID");
   }
+  const current = readJanusRuntime();
+  const currentVersion = Number(current?.commandVersion || current?.revision || 0);
+  const nextVersion = Number(next.commandVersion || next.revision);
+  if (currentVersion > nextVersion) throw new Error("JANUS_STALE_COMMAND_REJECTED");
+  if (currentVersion === nextVersion && current?.commandId && next.commandId && current.commandId !== next.commandId) {
+    throw new Error("JANUS_COMMAND_VERSION_COLLISION");
+  }
+  if (current && currentVersion === nextVersion && current.commandId === next.commandId
+      && current.status === next.status && current.remoteUrlKey === next.remoteUrlKey
+      && current.handoffReceipt) return current;
   if (REMOTE_STATUSES.has(next.status)) {
     if (
       !next.remoteUrlKey?.trim()
@@ -95,12 +112,19 @@ export async function applyJanusRuntime(
     ) throw new Error("JANUS_REMOTE_TARGET_BINDING_INVALID");
     next.remoteUrlKey = next.remoteUrlKey.trim();
     next.remoteTargetUrl = normalizeRemoteUrl(next.remoteTargetUrl);
-    await navigateRemote(next.remoteTargetUrl);
+    if (signal?.aborted) throw new Error("JANUS_SYNC_CANCELLED");
+    const evidence = await navigateRemote(next.remoteTargetUrl);
+    if (signal?.aborted) throw new Error("JANUS_SYNC_CANCELLED");
+    if (!evidence?.handoffReceipt?.trim()) throw new Error("JANUS_HANDOFF_PROOF_UNAVAILABLE");
+    next.handoffReceipt = evidence.handoffReceipt.trim();
   } else {
     delete next.remoteUrlKey;
     delete next.remoteTargetVersion;
     delete next.remoteTargetCatalogVersion;
     delete next.remoteTargetUrl;
+    next.handoffReceipt = `reset:${next.commandId || "status"}:${nextVersion}:${next.appliedAt}`;
   }
+  if (signal?.aborted) throw new Error("JANUS_SYNC_CANCELLED");
   uni.setStorageSync(JANUS_RUNTIME_KEY, next);
+  return next;
 }

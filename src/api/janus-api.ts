@@ -77,7 +77,36 @@ export type JanusPendingCommand =
       remoteTargetVersion?: number;
       remoteTargetCatalogVersion?: number;
       remoteTargetUrl?: string;
+    }
+  | {
+      hasCommand: true;
+      sid: string;
+      commandType: "ACTIVATE" | "CHANGE_TARGET" | "REVOKE" | "QUERY_APPLIED";
+      commandId: string;
+      commandVersion: number;
+      remoteUrlKey?: string;
+      remoteTargetVersion?: number;
+      remoteTargetCatalogVersion?: number;
+      remoteTargetUrl?: string;
+      reconciliationId?: string;
     };
+
+export interface JanusTakeoverProgress {
+  deviceId: string;
+  commandId: string;
+  commandVersion: number;
+  phase: "RECEIVED" | "LOADING" | "HANDOFF_FETCHING" | "HANDOFF_MERGING" | "HANDOFF_ACKED" | "SUCCEEDED" | "FAILED" | "REVOKED" | "REVOKE_FAILED";
+  actualTargetId?: string;
+  actualTargetVersion?: number;
+  actualTargetCatalogVersion?: number;
+  deviceAppliedVersion?: number;
+  deviceAppVersion?: string;
+  handoffReceipt?: string;
+  failureCode?: string;
+  failureClass?: "delivery" | "target" | "webview" | "handoff" | "lease" | "cleanup" | "contract";
+  failureMessage?: string;
+  reconciliationId?: string;
+}
 
 export interface JanusAck {
   deviceId: string;
@@ -94,9 +123,10 @@ export interface JanusAckResult {
 }
 
 export interface JanusApi {
-  report(report: JanusReport): Promise<JanusReportedDevice>;
-  pending(deviceId: string): Promise<JanusPendingCommand>;
-  ack(ack: JanusAck): Promise<JanusAckResult>;
+  report(report: JanusReport, signal?: AbortSignal): Promise<JanusReportedDevice>;
+  pending(deviceId: string, signal?: AbortSignal): Promise<JanusPendingCommand>;
+  ack(ack: JanusAck, signal?: AbortSignal): Promise<JanusAckResult>;
+  progress(progress: JanusTakeoverProgress, signal?: AbortSignal): Promise<void>;
 }
 
 const STATUS_SET = new Set<string>(JANUS_STATUSES);
@@ -190,6 +220,37 @@ function parsePending(value: unknown): JanusPendingCommand {
     if (Object.keys(row).some((key) => key !== "hasCommand")) return invalid("JANUS_PENDING_RESPONSE_INVALID");
     return { hasCommand: false };
   }
+  const commandType = text(row.commandType)?.toUpperCase();
+  if (commandType && ["ACTIVATE", "CHANGE_TARGET", "REVOKE", "QUERY_APPLIED"].includes(commandType)) {
+    const sid = text(row.sid);
+    const commandId = text(row.commandId);
+    const commandVersion = positiveInteger(row.commandVersion);
+    const remoteUrlKey = optionalText(row.expectedTargetId);
+    const remoteTargetVersion = optionalPositiveInteger(row.expectedTargetVersion);
+    const remoteTargetCatalogVersion = optionalPositiveInteger(row.expectedTargetCatalogVersion);
+    const remoteTargetUrl = row.remoteTargetUrl == null ? undefined : approvedHttpsUrl(row.remoteTargetUrl);
+    const reconciliationId = optionalText(row.reconciliationId);
+    if (!sid || !commandId || commandVersion === null || remoteUrlKey === null
+        || remoteTargetVersion === null || remoteTargetCatalogVersion === null
+        || remoteTargetUrl === null || reconciliationId === null) invalid("JANUS_TAKEOVER_PENDING_INVALID");
+    if (["ACTIVATE", "CHANGE_TARGET"].includes(commandType)
+        && (!remoteUrlKey || !remoteTargetVersion || !remoteTargetCatalogVersion || !remoteTargetUrl)) {
+      invalid("JANUS_TAKEOVER_PENDING_INVALID");
+    }
+    if (commandType === "QUERY_APPLIED" && !reconciliationId) invalid("JANUS_TAKEOVER_PENDING_INVALID");
+    return {
+      hasCommand: true,
+      sid,
+      commandType: commandType as "ACTIVATE" | "CHANGE_TARGET" | "REVOKE" | "QUERY_APPLIED",
+      commandId,
+      commandVersion,
+      remoteUrlKey,
+      remoteTargetVersion,
+      remoteTargetCatalogVersion,
+      remoteTargetUrl,
+      reconciliationId,
+    };
+  }
   const sid = text(row.sid);
   const revision = positiveInteger(row.revision);
   const desiredStatus = status(row.desiredStatus);
@@ -234,25 +295,37 @@ function parseAck(value: unknown): JanusAckResult {
 
 export function createJanusApi(client: ApiClient): JanusApi {
   return {
-    report: async (report) => parseReportedDevice(await client.request({
+    report: async (report, signal) => parseReportedDevice(await client.request({
       method: "POST",
       path: "/api/app/janus/reports",
       body: report,
       timeoutMs: 30_000,
+      signal,
     })),
-    pending: async (deviceId) => {
+    pending: async (deviceId, signal) => {
       const normalized = deviceId.trim();
       if (!normalized || normalized.length > 128) return invalid("JANUS_DEVICE_ID_INVALID");
       return parsePending(await client.request({
         method: "GET",
         path: `/api/app/janus/commands/pending?deviceId=${encodeURIComponent(normalized)}`,
+        signal,
       }));
     },
-    ack: async (ack) => parseAck(await client.request({
+    ack: async (ack, signal) => parseAck(await client.request({
       method: "POST",
       path: "/api/app/janus/commands/ack",
       body: ack,
       timeoutMs: 30_000,
+      signal,
     })),
+    progress: async (progress, signal) => {
+      await client.request({
+        method: "POST",
+        path: "/api/app/janus/takeover/progress",
+        body: progress,
+        timeoutMs: 30_000,
+        signal,
+      });
+    },
   };
 }

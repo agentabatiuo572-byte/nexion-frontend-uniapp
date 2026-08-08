@@ -11,6 +11,7 @@
 // 同源双胞胎:Nexion-admin-prototype/scripts/dom-qa-probe.mjs(agent-browser 版);改 PROBE 逻辑两边同步。
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { assertSweepCoverage } from "./lib/probe-coverage.mjs";
 
 // 端口来源:UNI_BASE_URL 优先,再退 BASE_URL(verify.sh 与其余运行时探针的统一名)——
 // 只认前者时,`BASE_URL=<非 5173> bash scripts/verify.sh`(worktree 自测必需)会静默打到 5173 上的**别的工程树**。
@@ -179,14 +180,31 @@ if (MODE === "selftest") {
 } else {
   const routes = routesOf(SWEEP);
   const findings = [];
+  const completedRoutes = [];
+  const crashes = [];
+  const landings = {};
+  const witnesses = {};
+  const pageErrors = {};
   for (const route of routes) {
     const url = `${BASE}/?nx_device=off#/${route}`;
+    const routePageErrors = [];
+    const onPageError = (error) => routePageErrors.push(String(error));
+    page.on("pageerror", onPageError);
     try {
       await page.goto(url, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1400); // 渲染/动效落定
       const ui = await landedFrame(page);
-      const landed = (await page.evaluate(() => location.hash)).replace(/^#\//, "").split("?")[0] || route;
+      const landed = (await page.evaluate(() => location.hash)).replace(/^#\//, "").split("?")[0];
       const res = await ui.evaluate(probe);
+      landings[route] = landed;
+      witnesses[route] = await ui.evaluate(() => ({
+        appChildren: document.querySelector("#app")?.childElementCount ?? 0,
+        iframeCount: document.querySelectorAll("iframe").length,
+        bodyElements: document.querySelectorAll("body *").length,
+        bodyTextLength: (document.body?.innerText || "").trim().length,
+      }));
+      pageErrors[route] = routePageErrors;
+      completedRoutes.push(route);
       if (process.env.DOM_QA_DEBUG) {
         const g = res.filter((f) => f.sev === "gate").length, i = res.length - g;
         const nodes = await ui.evaluate(() => document.querySelectorAll("body *").length);
@@ -194,8 +212,20 @@ if (MODE === "selftest") {
       }
       for (const f of res) findings.push({ ...f, route: landed, fp: `${landed}|${f.check}|${f.sig}` });
     } catch (e) {
+      crashes.push(route);
       findings.push({ check: "probe-crash", sig: "page", detail: String(e).slice(0, 120), sev: "gate", route, fp: `${route}|probe-crash|page` });
+    } finally {
+      page.off("pageerror", onPageError);
     }
+  }
+  let coverageFailed = false;
+  try {
+    assertSweepCoverage({ routes, completedRoutes, crashes, landings, witnesses, pageErrors });
+  } catch (error) {
+    coverageFailed = true;
+    exitCode = 1;
+    console.error(`DOM-QA COVERAGE FAIL:${error.message}`);
+    console.error("探针覆盖失败时禁止写入 ledger；修复服务器/路由/探针后重跑。");
   }
   // 按指纹去重(多路由 redirect 落同页)
   const uniq = new Map();
@@ -208,7 +238,10 @@ if (MODE === "selftest") {
   const known = new Set(ledger.entries.map((e) => e.fp));
   const fresh = gates.filter((f) => !known.has(f.fp));
 
-  if (UPDATE) {
+  if (coverageFailed) {
+    // Fail closed: probe crashes and zero/partial coverage are infrastructure failures,
+    // never acceptable ledger entries.
+  } else if (UPDATE) {
     const merged = new Map(ledger.entries.map((e) => [e.fp, e]));
     for (const f of gates) if (!merged.has(f.fp)) merged.set(f.fp, { fp: f.fp, route: f.route, check: f.check, sig: f.sig, detail: f.detail, since: new Date().toISOString().slice(0, 10) });
     mkdirSync("docs", { recursive: true });
