@@ -3,7 +3,7 @@ import { ApiError } from "./errors";
 import type { Withdrawal, WithdrawalStatus } from "../store/types";
 import type { WithdrawalRiskRoute } from "../store/config-types";
 
-export type SupportedWithdrawalNetwork = "USDT-TRC20" | "USDT-ERC20";
+export type SupportedWithdrawalNetwork = "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
 
 export interface WithdrawalSubmission {
   withdrawalNo: string;
@@ -11,6 +11,7 @@ export interface WithdrawalSubmission {
   chain: SupportedWithdrawalNetwork;
   status: string;
   holdUntil: string;
+  networkConfirmUsd: number;
   networkFee: number;
   penaltyFee: number;
   grossFee: number;
@@ -18,6 +19,8 @@ export interface WithdrawalSubmission {
   feeWaived: number;
   actualFee: number;
   netReceive: number;
+  policyVersion: string;
+  useNexFeeOffset: boolean;
   riskRoute: string;
   idSource: "server";
 }
@@ -26,11 +29,11 @@ export interface WithdrawalPolicy {
   minAmount: number;
   dailyLimitCount: number;
   balanceMaxRatio: number;
-  networkFeeRate: number;
-  networkFeeMin: number;
-  networkFeeMax: number;
+  smallAmountThresholdUsd: number;
+  payoutSlaHours: number;
+  networkConfirmFeeUsd: Record<"trc20" | "bep20" | "erc20", number>;
   nexFeeOffsetRate: number;
-  penaltyFeeRate: number;
+  policyVersion: string;
   cooldownDays: number;
   complianceHoldEnabled: boolean;
   withdrawalEnabled: boolean;
@@ -47,6 +50,8 @@ export interface WithdrawalApi {
     amount: number,
     chain: SupportedWithdrawalNetwork,
     targetAddress: string,
+    policyVersion: string,
+    useNexFeeOffset: boolean,
     idempotencyKey: string,
   ): Promise<WithdrawalSubmission>;
 }
@@ -74,6 +79,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const holdUntil = text(row?.holdUntil);
   const riskRoute = text(row?.riskRoute);
   const amount = number(row?.amount, Number.EPSILON);
+  const networkConfirmUsd = number(row?.networkConfirmUsd);
   const networkFee = number(row?.networkFee);
   const penaltyFee = number(row?.penaltyFee);
   const grossFee = number(row?.grossFee);
@@ -81,6 +87,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const feeWaived = number(row?.feeWaived);
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);
+  const policyVersion = text(row?.policyVersion);
   const allowedRiskRoutes = new Set([
     "fast-pass",
     "delay",
@@ -91,10 +98,12 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   ]);
   if (!row || !withdrawalNo || !status || !holdUntil || !riskRoute
       || !allowedRiskRoutes.has(riskRoute.toLowerCase())
-      || !["USDT-TRC20", "USDT-ERC20"].includes(String(chain))
-      || amount === null || networkFee === null || penaltyFee === null || grossFee === null
+      || !["USDT-TRC20", "USDT-BEP20", "USDT-ERC20"].includes(String(chain))
+      || amount === null || networkConfirmUsd === null || networkFee === null || penaltyFee === null || grossFee === null
       || nexBurned === null || feeWaived === null || actualFee === null || netReceive === null
+      || !policyVersion || typeof row.useNexFeeOffset !== "boolean"
       || row.idSource !== "server"
+      || Math.abs(networkConfirmUsd - networkFee) > 0.000001
       || Math.abs(networkFee + penaltyFee - grossFee) > 0.000001
       || Math.abs(grossFee - feeWaived - actualFee) > 0.000001
       || Math.abs(amount - actualFee - netReceive) > 0.000001) {
@@ -106,6 +115,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     chain: chain as SupportedWithdrawalNetwork,
     status,
     holdUntil,
+    networkConfirmUsd,
     networkFee,
     penaltyFee,
     grossFee,
@@ -113,6 +123,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     feeWaived,
     actualFee,
     netReceive,
+    policyVersion,
+    useNexFeeOffset: row.useNexFeeOffset,
     riskRoute,
     idSource: "server",
   };
@@ -123,24 +135,30 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   const minAmount = number(row?.minAmount, Number.EPSILON);
   const dailyLimitCount = number(row?.dailyLimitCount, 1);
   const balanceMaxRatio = number(row?.balanceMaxRatio, Number.EPSILON);
-  const networkFeeRate = number(row?.networkFeeRate);
-  const networkFeeMin = number(row?.networkFeeMin);
-  const networkFeeMax = number(row?.networkFeeMax);
+  const smallAmountThresholdUsd = number(row?.smallAmountThresholdUsd);
+  const payoutSlaHours = number(row?.payoutSlaHours, 1);
+  const networkFees = record(row?.networkConfirmFeeUsd);
+  const trc20 = number(networkFees?.trc20);
+  const bep20 = number(networkFees?.bep20);
+  const erc20 = number(networkFees?.erc20);
   const nexFeeOffsetRate = number(row?.nexFeeOffsetRate);
-  const penaltyPercent = number(row?.penaltyFeeRate);
+  const policyVersion = text(row?.policyVersion);
   const cooldownDays = number(row?.cooldownDays, 1);
   const currentPhase = text(row?.currentPhase);
   const currentMonth = number(row?.currentMonth, 1);
   const rawEnabledNetworks = row?.enabledNetworks;
   const enabledNetworks = Array.isArray(rawEnabledNetworks)
     ? rawEnabledNetworks.filter((item): item is SupportedWithdrawalNetwork =>
-      item === "USDT-TRC20" || item === "USDT-ERC20")
+      item === "USDT-TRC20" || item === "USDT-BEP20" || item === "USDT-ERC20")
     : [];
   if (!row || minAmount === null || dailyLimitCount === null || !Number.isInteger(dailyLimitCount)
       || balanceMaxRatio === null || balanceMaxRatio > 1
-      || networkFeeRate === null || networkFeeRate > 1
-      || networkFeeMin === null || networkFeeMax === null || networkFeeMax < networkFeeMin
-      || nexFeeOffsetRate === null || penaltyPercent === null || penaltyPercent > 100
+      || smallAmountThresholdUsd === null || smallAmountThresholdUsd > 500
+      || payoutSlaHours === null || payoutSlaHours > 168 || !Number.isInteger(payoutSlaHours)
+      || trc20 === null || bep20 === null || erc20 === null
+      || trc20 > 25 || bep20 > 25 || erc20 > 25
+      || [trc20, bep20, erc20].some((fee) => Math.abs(fee * 2 - Math.round(fee * 2)) > 0.000001)
+      || nexFeeOffsetRate === null || nexFeeOffsetRate <= 0 || !policyVersion
       || cooldownDays === null || !Number.isInteger(cooldownDays)
       || !currentPhase || currentMonth === null || !Number.isInteger(currentMonth)
       || typeof row.complianceHoldEnabled !== "boolean"
@@ -153,11 +171,11 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
     minAmount,
     dailyLimitCount,
     balanceMaxRatio,
-    networkFeeRate,
-    networkFeeMin,
-    networkFeeMax,
+    smallAmountThresholdUsd,
+    payoutSlaHours,
+    networkConfirmFeeUsd: { trc20, bep20, erc20 },
     nexFeeOffsetRate,
-    penaltyFeeRate: penaltyPercent / 100,
+    policyVersion,
     cooldownDays,
     complianceHoldEnabled: row.complianceHoldEnabled,
     withdrawalEnabled: row.withdrawalEnabled,
@@ -261,11 +279,11 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
       method: "GET",
       path: "/api/withdrawals/policy",
     })),
-    submit: async (amount, chain, targetAddress, idempotencyKey) =>
+    submit: async (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey) =>
       parseSubmission(await client.request({
         method: "POST",
         path: "/api/withdrawals",
-        body: { amount, chain, address: targetAddress },
+        body: { amount, chain, address: targetAddress, policyVersion, useNexFeeOffset },
         idempotencyKey,
         timeoutMs: 30_000,
       })),

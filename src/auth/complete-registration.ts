@@ -3,6 +3,7 @@ import { useApp } from "@/store/app";
 import { resolveAuthAccountById } from "@/store/auth-account";
 import { useAuth } from "@/store/auth";
 import { readAccountSessionRecords, useSession } from "@/store/session";
+import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 
 /**
  * ⚠️ MOCK-ONLY CROSS-STORE MUTATION：恢复 active 新账号的本地登录收口。
@@ -32,5 +33,6 @@ export function restoreActivatedRegistrationSession(accountId: string): boolean 
   const sessionPersisted = readAccountSessionRecords(accountId)
     .some((record) => record.sessionId === session.sessionId);
   if (!sessionPersisted) return abortRestore();
+  void refreshEarningsReleaseStatus(accountId).catch(() => {});
   return true;
 }

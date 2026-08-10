@@ -124,7 +124,7 @@ export const zh: Messages = {
     s5Body:
       "应用内展示的所有收益数字均为基于当前网络参数与近期需求的预测，并非承诺。收益会波动，并可能随时间下降。NEX 是平台奖励代币，价值可能剧烈变动，且不受存款保险保障。切勿投入超过你可承受损失的金额。",
     s6Title: "钱包、提现与合规",
-    s6Body: "常规提现在 {h} 小时内结算。提现将转入你自行设置的提现地址(短信确认,可随时更换;更换后有安全冻结期)。超过公布阈值的金额可能进入加强合规审查。资金存放于隔离储备账户,并依据 MSB 注册要求执行交易监控。",
+    s6Body: "提现将转入你自行设置的提现地址(短信确认,可随时更换;更换后有安全冻结期)。实际处理时刻以服务端订单状态为准；超过公布阈值的金额可能进入加强合规审查。资金存放于隔离储备账户,并依据 MSB 注册要求执行交易监控。",
     s7Title: "推荐与网络奖励",
     s7Body:
       "直推权益金与网络收益奖金均由平台利润支付，绝不来自好友的充值。奖励取决于被推荐用户完成合格行为。垃圾推广、虚假账户或大规模拉人方案均被禁止，将被作废，并可能导致账户暂停及待发放奖励被没收。",
@@ -929,7 +929,7 @@ export const zh: Messages = {
     s3Title: "代币(NEX)市场风险",
     s3Body: "NEX 是平台奖励代币。其美元计价价值可能每日 ±20% 波动,受 AI 推理需求 / 回购流 / 加密市场环境影响。代币持有不受 FDIC / SIPC 保险。锁仓或持有的 NEX 数量不应超过你可承受的损失。",
     s4Title: "提现窗口 + 合规审查",
-    s4Body: "标准提现从申请到入账约 {h} 小时。每笔提现收取一笔按网络设定的固定网络确认费,不随金额浮动,部分网络可能免费;可自选用 NEX 抵扣该费用 —— 该选项默认关闭,未开启时不会消耗 NEX。NEX 可通过签到 / 挖矿 / 推荐活动获得。",
+    s4Body: "提现处理时刻以服务端订单状态为准。每笔提现收取一笔按网络设定的固定网络确认费,不随金额浮动,部分网络可能免费;可自选用 NEX 抵扣该费用 —— 该选项默认关闭,未开启时不会消耗 NEX。NEX 可通过签到 / 挖矿 / 推荐活动获得。",
     s4BodyLargeAmount: "超过 ${large} 的提现可能进入 {d} 天的增强合规审查窗口,到账时间以两者中更晚者为准。",
     s5Title: "Staking 锁仓不可撤销",
     s5Body: "Staking 池(30d / 90d / 180d / 365d)锁仓全期不可取出。提前赎回扣除全部累计溢价,并依次扣除 5% / 15% / 30% / 50% 本金。锁仓前请单独阅读各档条款。",
@@ -2015,6 +2015,7 @@ export const zh: Messages = {
 
     trackFailedBody: "这笔提现没有完成,资金未离开你的账户。详情可联系客服。",
     trackEtaPending: "预计 {n} 小时内完成",
+    trackExpectedAt: "服务端预计处理时刻 {time}",
 
     trackEtaTitlePending: "提现处理中",
 
@@ -3327,7 +3328,7 @@ export const zh: Messages = {
     goFlagship: "看设备",
     goUpgrade: "去升级",
     inviteVerify: "核验",
-    invitePlaceholder: "NEXGRID-OG-XXXX",
+    invitePlaceholder: "NEXGRID-OG-16位邀请码",
     inviteInvalid: "邀请码无效",
     inviteUsed: "这个邀请码已经被用掉了",
     inviteVoided: "这个邀请码已作废",
@@ -3396,6 +3397,8 @@ export const zh: Messages = {
     marketClosed: {
       default: "当前市场暂未开放",
       maintenance: "系统维护中,暂停认购",
+      phase_control: "当前阶段暂未开放",
+      compliance: "因合规要求暂未开放",
       restock: "本轮名额已发放完毕",
       halted: "认购已暂停",
       configUnavailable: "暂时无法获取状态",
@@ -3484,6 +3487,7 @@ export const zh: Messages = {
     submitReasonMaxAmount: "当前可提现余额为 ${n}。",
 
     submitReasonFeeConfigUnavailable: "费率更新中,请稍后再试",
+    submitReasonWithdrawalClosed: "提现通道当前已关闭。",
 
     dailyLimitReached: "今日提现次数已用完,{time} 后可再提。",
     submitReasonAddressRequired: "请先添加提现地址。",
@@ -4989,7 +4993,7 @@ export const zh: Messages = {
     currentLabel: "当前地址",
     addedAtLabel: "生效时间",
     sourceMigrated: "早期地址 · 自动沿用",
-    holdNote: "新地址保护期 {h} 小时:期间提现可能需要额外审核。",
+    holdNote: "新地址安全冻结 {h} 小时:期间暂不可提现。",
     newAddressLabel: "新地址",
     invalidAddress: "地址格式与所选网络不符,请检查后重试",
     sameAddress: "新地址与当前地址相同",
@@ -4998,8 +5002,8 @@ export const zh: Messages = {
     inFlightBlocked: "有提现处理中,完成后才能更换地址",
     inFlightGoCta: "查看提现进度",
     cooldownUntil: "{time} 后可再次更换",
-    freezeBanner: "提现地址已更换,安全冻结中 · 剩余 {t}",
-    submitFrozenReason: "地址更换后安全冻结中,暂不可提现",
+    freezeBanner: "新提现地址安全冻结中 · 剩余 {t}",
+    submitFrozenReason: "新提现地址安全冻结中,暂不可提现",
     otpTitle: "短信确认",
     otpBody: "验证码已发送至 {phone}",
     otpBodyGeneric: "验证码已发送至你的注册手机",
@@ -5016,8 +5020,8 @@ export const zh: Messages = {
     changeConfirmTitle: "确认更换提现地址?",
     changeConfirmBody: "旧地址将立即停用;更换后提现冻结 24 小时,{days} 天内不可再次更换。",
     changeConfirmYes: "确认更换",
-    addSuccessTitle: "提现地址已生效",
-    addSuccessBody: "之后的提现将转入这个地址。",
+    addSuccessTitle: "提现地址已保存",
+    addSuccessBody: "安全冻结结束后,提现将转入这个地址。",
     successTitle: "新地址已生效",
     successBody: "旧地址已同时停用。为保障资金安全,提现冻结 24 小时后恢复。",
     successNewAddr: "新地址",

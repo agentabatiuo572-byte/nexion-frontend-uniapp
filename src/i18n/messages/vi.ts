@@ -136,7 +136,7 @@ export const vi: Messages = {
     s5Body:
       "Mọi con số lợi nhuận hiển thị trong ứng dụng đều là dự phóng dựa trên tham số mạng lưới hiện tại và nhu cầu gần đây, không phải cam kết. Thu nhập dao động và có thể giảm theo thời gian. NEX là token thưởng của nền tảng, giá trị có thể biến động mạnh và không được bảo hiểm tiền gửi. Đừng bao giờ đầu tư nhiều hơn mức bạn có thể chịu mất.",
     s6Title: "Ví, rút tiền & tuân thủ",
-    s6Body: "Lệnh rút thông thường tất toán trong {h} giờ. Tiền rút chuyển vào địa chỉ rút tiền do chính bạn thiết lập (xác nhận qua SMS, đổi được bất cứ lúc nào; sau khi đổi có thời gian đóng băng bảo mật). Số tiền vượt ngưỡng công bố có thể vào diện rà soát tuân thủ tăng cường. Tiền được giữ ở tài khoản dự trữ tách biệt, và giám sát giao dịch được áp dụng theo đăng ký MSB.",
+    s6Body: "Tiền rút chuyển vào địa chỉ rút tiền do chính bạn thiết lập (xác nhận qua SMS, đổi được bất cứ lúc nào; sau khi đổi có thời gian đóng băng bảo mật). Thời gian xử lý theo trạng thái lệnh phía máy chủ. Số tiền vượt ngưỡng công bố có thể vào diện rà soát tuân thủ tăng cường. Tiền được giữ ở tài khoản dự trữ tách biệt, và giám sát giao dịch được áp dụng theo đăng ký MSB.",
     s7Title: "Phần thưởng giới thiệu & mạng lưới",
     s7Body:
       "Hoa hồng trực tiếp và Thưởng lợi nhuận mạng lưới được trả từ biên lợi nhuận của nền tảng, không bao giờ lấy từ tiền nạp của bạn bè. Phần thưởng phụ thuộc vào việc người được giới thiệu hoàn thành các hành động hợp lệ. Spam, tài khoản giả hay các chiêu lôi kéo người hàng loạt đều bị cấm, sẽ bị hủy, và có thể dẫn tới khóa tài khoản cùng mất các phần thưởng đang chờ.",
@@ -947,7 +947,7 @@ export const vi: Messages = {
     s3Title: "Rủi ro thị trường của token (NEX)",
     s3Body: "NEX là token thưởng của nền tảng. Giá trị quy ra USD có thể biến động ±20% mỗi ngày, tùy theo nhu cầu suy luận AI, dòng mua lại và bối cảnh thị trường crypto nói chung. Token nắm giữ không được bảo hiểm FDIC / SIPC. Đừng staking hay giữ nhiều NEX hơn mức bạn có thể chịu mất.",
     s4Title: "Kỳ rút tiền + rà soát tuân thủ",
-    s4Body: "Lệnh rút tiêu chuẩn về ví sau khoảng {h} giờ kể từ lúc yêu cầu. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng NEX — tùy chọn mặc định tắt, không bật thì không dùng NEX. Kiếm NEX qua điểm danh / đào / giới thiệu.",
+    s4Body: "Thời gian xử lý rút tiền theo trạng thái lệnh phía máy chủ. Mỗi lần rút trả một khoản phí xác nhận mạng cố định thiết lập theo từng mạng; phí không thay đổi theo số tiền và một số mạng có thể miễn phí. Bạn có thể tùy chọn trả phí này bằng NEX — tùy chọn mặc định tắt, không bật thì không dùng NEX. Kiếm NEX qua điểm danh / đào / giới thiệu.",
     s4BodyLargeAmount: "Lệnh rút trên ${large} có thể vào cửa sổ rà soát tuân thủ tăng cường {d} ngày; thời điểm về ví lấy mốc muộn hơn trong hai mốc.",
     s5Title: "Khóa staking là không thể đảo ngược",
     s5Body: "Các pool staking (30 / 90 / 180 / 365 ngày) khóa vốn gốc trọn kỳ hạn. Mở sớm sẽ mất 100% phần lợi nhuận cộng thêm đã tích và bị trừ lần lượt 5% / 15% / 30% / 50% vốn gốc. Đọc kỹ điều khoản của từng pool trước khi khóa.",
@@ -2005,6 +2005,7 @@ export const vi: Messages = {
 
     trackFailedBody: "Lệnh rút này chưa hoàn tất. Tiền vẫn còn trong tài khoản của bạn. Liên hệ hỗ trợ để biết chi tiết.",
     trackEtaPending: "Dự kiến trong {n} giờ",
+    trackExpectedAt: "Thời gian xử lý dự kiến từ máy chủ: {time}",
 
     trackEtaTitlePending: "Đang xử lý",
 
@@ -3322,7 +3323,7 @@ export const vi: Messages = {
     goFlagship: "Xem thiết bị",
     goUpgrade: "Nâng cấp",
     inviteVerify: "Xác minh",
-    invitePlaceholder: "NEXGRID-OG-XXXX",
+    invitePlaceholder: "NEXGRID-OG-mã 16 ký tự",
     inviteInvalid: "Mã mời không hợp lệ",
     inviteUsed: "Mã mời này đã được dùng rồi",
     inviteVoided: "Mã mời này đã bị thu hồi",
@@ -3391,6 +3392,8 @@ export const vi: Messages = {
     marketClosed: {
       default: "Thị trường chưa mở",
       maintenance: "Đang bảo trì — tạm dừng đặt mua",
+      phase_control: "Chưa mở trong giai đoạn hiện tại",
+      compliance: "Chưa mở do yêu cầu tuân thủ",
       restock: "Đợt này đã phân bổ hết",
       halted: "Tạm dừng đặt mua",
       configUnavailable: "Chưa lấy được trạng thái",
@@ -3477,6 +3480,7 @@ export const vi: Messages = {
     submitReasonMaxAmount: "Số dư có thể rút là ${n}.",
 
     submitReasonFeeConfigUnavailable: "Đang cập nhật biểu phí, vui lòng thử lại sau",
+    submitReasonWithdrawalClosed: "Kênh rút tiền hiện đang đóng.",
 
     dailyLimitReached: "Đã hết số lần rút hôm nay. Có thể rút tiếp từ {time}.",
     submitReasonAddressRequired: "Vui lòng thêm địa chỉ rút tiền trước.",
@@ -5011,7 +5015,7 @@ export const vi: Messages = {
     currentLabel: "Địa chỉ hiện tại",
     addedAtLabel: "Có hiệu lực từ",
     sourceMigrated: "Địa chỉ trước đây · tự động giữ lại",
-    holdNote: "Bảo vệ địa chỉ mới trong {h} giờ: rút tiền trong thời gian này có thể cần duyệt thêm.",
+    holdNote: "Địa chỉ mới bị đóng băng bảo mật trong {h} giờ: chưa thể rút tiền trong thời gian này.",
     newAddressLabel: "Địa chỉ mới",
     invalidAddress: "Định dạng địa chỉ không khớp với mạng đã chọn, vui lòng kiểm tra lại",
     sameAddress: "Địa chỉ mới trùng với địa chỉ hiện tại.",
@@ -5021,8 +5025,8 @@ export const vi: Messages = {
     inFlightBlocked: "Có lệnh rút đang xử lý, hoàn tất xong mới có thể đổi địa chỉ",
     inFlightGoCta: "Xem tiến độ rút tiền",
     cooldownUntil: "Có thể đổi lại sau {time}.",
-    freezeBanner: "Địa chỉ rút tiền đã thay đổi, đang đóng băng bảo mật · còn {t}",
-    submitFrozenReason: "Đang đóng băng bảo mật sau khi đổi địa chỉ, tạm thời chưa thể rút",
+    freezeBanner: "Địa chỉ rút tiền mới đang đóng băng bảo mật · còn {t}",
+    submitFrozenReason: "Chưa thể rút tiền khi địa chỉ mới đang trong thời gian đóng băng bảo mật",
     otpTitle: "Xác nhận qua SMS",
     otpBody: "Mã đã được gửi tới {phone}",
     otpBodyGeneric: "Mã đã được gửi tới số điện thoại bạn đã đăng ký",
@@ -5040,8 +5044,8 @@ export const vi: Messages = {
     changeConfirmBody:
       "Địa chỉ cũ sẽ ngừng nhận ngay lập tức; sau khi đổi, rút tiền bị đóng băng 24 giờ và trong {days} ngày không thể đổi tiếp.",
     changeConfirmYes: "Xác nhận đổi",
-    addSuccessTitle: "Địa chỉ rút tiền đã có hiệu lực",
-    addSuccessBody: "Các lệnh rút sau này sẽ chuyển vào địa chỉ này.",
+    addSuccessTitle: "Đã lưu địa chỉ rút tiền",
+    addSuccessBody: "Sau khi hết đóng băng bảo mật, lệnh rút sẽ chuyển vào địa chỉ này.",
     successTitle: "Địa chỉ mới đã có hiệu lực",
     successBody: "Địa chỉ cũ đã ngừng sử dụng. Để bảo đảm an toàn, rút tiền đóng băng 24 giờ trước khi khôi phục.",
     successNewAddr: "Địa chỉ mới",

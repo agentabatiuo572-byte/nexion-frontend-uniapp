@@ -70,6 +70,7 @@ import { getProduct } from "@/mock/products";
 import { isSingleSkuVoucher, listVouchers, type VoucherDef } from "@/mock/vouchers";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 
@@ -84,7 +85,7 @@ const vouchers = computed<VoucherDef[]>(() => {
     ...voucher.claimableVouchers.map((v) => v.id),
     ...voucher.claimedUnused.map((v) => v.id),
   ]);
-  return listVouchers().filter((v) => showable.has(v.id));
+  return (remoteApiEnabled ? voucher.catalog : listVouchers()).filter((v) => showable.has(v.id));
 });
 
 function pad2(n: number): string {
@@ -123,7 +124,12 @@ function expiryText(v: VoucherDef): string {
 function hide() {
   sheet.hide();
 }
-function onClaim(v: VoucherDef) {
+async function onClaim(v: VoucherDef) {
+  if (remoteApiEnabled) {
+    if (await voucher.claimRemote(v.id)) toast.success(t.value.voucher.claimedToast);
+    else toast.error(t.value.authOtp.errorServiceUnavailable);
+    return;
+  }
   const r = voucher.claim(v.id);
   if (r.ok) {
     toast.success(t.value.voucher.claimedToast);

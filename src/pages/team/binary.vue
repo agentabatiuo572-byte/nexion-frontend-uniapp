@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -139,34 +139,44 @@ import { useNetwork, type NetworkMember } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { BINARY_SETTLE_PERIOD, SETTLE_PERIOD_DAYS } from "@/lib/binary-settlement";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const network = useNetwork();
 const commission = useCommission();
 const phase = useProductPhase();
 
-const MIN_THRESHOLD = 1000;
-const MATCH_RATE = 0.1;
-
-const DAILY_CAP = computed(() => phase.value.binaryDailyCapUSD);
-const sides = computed(() => network.byBinary());
-const leftMonthVol = computed(() => network.leftVolumeMonth());
-const rightMonthVol = computed(() => network.rightVolumeMonth());
+const snapshot = computed(() => commission.binarySnapshot);
+const remoteTrackA = computed(() => commission.binarySnapshot?.trackA ?? 0);
+const remoteTrackB = computed(() => commission.binarySnapshot?.trackB ?? 0);
+const settlePeriod = computed(() => remoteApiEnabled ? snapshot.value?.settlePeriod ?? "monthly" : BINARY_SETTLE_PERIOD);
+const settleDays = computed(() => SETTLE_PERIOD_DAYS[settlePeriod.value]);
+const MIN_THRESHOLD = computed(() => remoteApiEnabled ? snapshot.value?.threshold ?? 0 : 1000);
+const MATCH_RATE = computed(() => remoteApiEnabled ? snapshot.value?.matchRate ?? 0 : 0.1);
+const DAILY_CAP = computed(() => remoteApiEnabled ? snapshot.value?.dailyCap ?? 0 : phase.value.binaryDailyCapUSD);
+const sides = computed(() => remoteApiEnabled ? { left: [] as NetworkMember[], right: [] as NetworkMember[] } : network.byBinary());
+const leftMonthVol = computed(() => remoteApiEnabled ? remoteTrackA.value : network.leftVolumeMonth());
+const rightMonthVol = computed(() => remoteApiEnabled ? remoteTrackB.value : network.rightVolumeMonth());
 const weakSide = computed(() => (leftMonthVol.value <= rightMonthVol.value ? "left" : "right"));
 const weakVol = computed(() => Math.min(leftMonthVol.value, rightMonthVol.value));
 const strongVol = computed(() => Math.max(leftMonthVol.value, rightMonthVol.value));
 // 预计奖金随结算周期联动:较小轨「该周期业绩」(月业绩 × 周期天数/30) × 10%,封顶 = 日封顶 × 周期天数。
 // 默认每月 → min(月两轨)×10%,与可见的两轨月业绩 + 「{period}…估算」标签 + 「{freq}结算」节奏全自洽。
 const periodMatch = computed(() => {
-  const factor = SETTLE_PERIOD_DAYS[BINARY_SETTLE_PERIOD] / 30;
-  return Math.min(weakVol.value * factor * MATCH_RATE, DAILY_CAP.value * SETTLE_PERIOD_DAYS[BINARY_SETTLE_PERIOD]);
+  if (remoteApiEnabled) return snapshot.value?.estimatedAmountUsdt ?? 0;
+  const factor = settleDays.value / 30;
+  return Math.min(weakVol.value * factor * MATCH_RATE.value, DAILY_CAP.value * settleDays.value);
 });
-const blocked = computed(() => leftMonthVol.value < MIN_THRESHOLD || rightMonthVol.value < MIN_THRESHOLD);
+const blocked = computed(() => leftMonthVol.value < MIN_THRESHOLD.value || rightMonthVol.value < MIN_THRESHOLD.value);
 
 const recentBinaries = computed(() =>
-  commission.events.filter((e) => e.kind === "binary").slice(0, 5),
+  remoteApiEnabled
+    ? (snapshot.value?.recentMatches ?? []).map((match) => ({
+      id: match.id, sourceUserName: match.id, amountUSDT: match.amountUsdt, ts: match.createdAt,
+    }))
+    : commission.events.filter((e) => e.kind === "binary").slice(0, 5),
 );
-const spilloverCount = computed(() => network.members.filter((m) => m.isSpillover).length);
+const spilloverCount = computed(() => remoteApiEnabled ? snapshot.value?.autoPlacedMembers ?? 0 : network.members.filter((m) => m.isSpillover).length);
 
 function topOf(members: NetworkMember[]): NetworkMember | undefined {
   return [...members].sort((a, b) => b.monthVolumeUSD - a.monthVolumeUSD)[0];
@@ -185,7 +195,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "left",
     name: t.value.binary.leftWing,
-    count: sides.value.left.length,
+    count: remoteApiEnabled ? snapshot.value?.trackAMembers ?? 0 : sides.value.left.length,
     monthVol: leftMonthVol.value,
     isWeak: weakSide.value === "left",
     color: "var(--v5-brand)",
@@ -194,7 +204,7 @@ const wings = computed<Wing[]>(() => [
   {
     key: "right",
     name: t.value.binary.rightWing,
-    count: sides.value.right.length,
+    count: remoteApiEnabled ? snapshot.value?.trackBMembers ?? 0 : sides.value.right.length,
     monthVol: rightMonthVol.value,
     isWeak: weakSide.value === "right",
     color: "var(--v5-tech-cyan)",
@@ -204,9 +214,9 @@ const wings = computed<Wing[]>(() => [
 
 // 结算周期文案 + 数字据后台同源配置派生(默认每月),消除「页面暗示日结」与「每月结算」矛盾,
 // 并让 hero 预计金额随结算周期联动(数字 periodMatch + 标签 {period} + 节奏 {freq} 三者一致)。
-const periodFreqLabel = computed(() => t.value.binary.settlePeriodLabel[BINARY_SETTLE_PERIOD]);
+const periodFreqLabel = computed(() => t.value.binary.settlePeriodLabel[settlePeriod.value]);
 const estimateText = computed(() =>
-  fmt(t.value.binary.estimate, { period: t.value.binary.periodEstimateLabel[BINARY_SETTLE_PERIOD] }),
+  fmt(t.value.binary.estimate, { period: t.value.binary.periodEstimateLabel[settlePeriod.value] }),
 );
 const gapHintText = computed(() => fmt(t.value.binary.gapHint, { freq: periodFreqLabel.value }));
 const formulaText = computed(() =>
@@ -231,6 +241,11 @@ function wingMembersText(n: number): string {
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
 }
+
+onMounted(() => {
+  // Local track or commission data is not used in remote mode.
+  if (remoteApiEnabled) void commission.refreshCanonicalBinary();
+});
 
 // ─── styles ───
 // Soft tint pill — chip idiom, fill only (no border, single visual difference).

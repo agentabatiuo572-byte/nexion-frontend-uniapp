@@ -79,6 +79,7 @@ import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useDailyPowerUp, type StreakPowerUpId } from "@/store/daily-powerup";
 import { toast } from "@/store/ui";
+import { remoteApiEnabled } from "@/api/runtime";
 
 interface PowerUp {
   id: StreakPowerUpId;
@@ -133,7 +134,15 @@ const footerNextText = computed(() =>
 );
 const footerAllText = computed(() => fmt(w.value.footerAll, { n: activatedCount.value }));
 
-function handleClaim(p: PowerUp) {
+async function handleClaim(p: PowerUp) {
+  if (remoteApiEnabled) {
+    if (await powerUp.claimRemote(p.id)) {
+      toast.success(fmt(w.value.toastTitle, { name: w.value[`${p.key}_label`] }), w.value.toastBody);
+    } else {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+    }
+    return;
+  }
   const r = powerUp.claim(p.id);
   if (r.ok) {
     toast.success(fmt(w.value.toastTitle, { name: w.value[`${p.key}_label`] }), w.value.toastBody);

@@ -70,12 +70,6 @@ export const FAQ_ITEMS: FaqItem[] = [
   },
   // Payments
   {
-    id: "py-1",
-    category: "payments",
-    q: "Where do withdrawals go?",
-    a: "Withdrawals go to your own wallet address. Set it once per network in Withdrawal address — confirmed by SMS, changeable any time (24h freeze after a change).",
-  },
-  {
     id: "py-2",
     category: "payments",
     q: "What networks can I withdraw on?",
@@ -117,7 +111,6 @@ export function botReply(query: string): FaqItem | null {
     }
   }
   if (/withdraw|提现/.test(q)) return FAQ_ITEMS.find((f) => f.id === "py-3") ?? null;
-  if (/address|地址/.test(q)) return FAQ_ITEMS.find((f) => f.id === "py-1") ?? null;
   if (/earn|收益|赚/.test(q)) return FAQ_ITEMS.find((f) => f.id === "er-1") ?? null;
   if (/phone|手机|npu/.test(q)) return FAQ_ITEMS.find((f) => f.id === "gs-2") ?? null;
   return null;

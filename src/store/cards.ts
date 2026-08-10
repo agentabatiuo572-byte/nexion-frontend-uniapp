@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { paymentMethodApi, remoteApiEnabled } from "@/api/runtime";
 
 // Ported from Nexion-prototype/lib/store/cards.ts (zustand → Pinia).
 // Bank/credit card binding — saved-cards repository for the Card payment
@@ -28,6 +29,8 @@ export interface SavedCard {
   holder: string;
   /** epoch ms of binding */
   boundAt: number;
+  /** Server lifecycle state. Present only in the remote projection. */
+  status?: "BOUND";
 }
 
 // 旧设备级单键 "nexgrid-cards-v1" 废弃(存量无账号归属,mock 可重建);绑卡按账号分行。
@@ -56,17 +59,31 @@ function hydrate(accountKey: string): PersistShape {
 export const useCards = defineStore("cards", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = hydrate(boundKey);
+  const init = remoteApiEnabled ? { cards: [], defaultTokenId: null } : hydrate(boundKey);
   const cards = ref<SavedCard[]>(init.cards);
   const defaultTokenId = ref<string | null>(init.defaultTokenId);
 
   function persist() {
+    if (remoteApiEnabled) return;
     writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, { cards: cards.value, defaultTokenId: defaultTokenId.value });
+  }
+
+  function clearRemoteFacts() { cards.value = []; defaultTokenId.value = null; }
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const remote = await paymentMethodApi.list();
+      cards.value = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status }));
+      defaultTokenId.value = remote.find((card) => card.isDefault)?.tokenId ?? null;
+      return true;
+    } catch { clearRemoteFacts(); return false; }
   }
 
   /** 账号切换重绑:装载该账号绑定的银行卡(P2-8 设备级泄漏修复;绑卡=金融凭证,必按账号)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) { clearRemoteFacts(); void refreshRemote(); return; }
     const next = hydrate(boundKey);
     cards.value = next.cards;
     defaultTokenId.value = next.defaultTokenId;
@@ -78,6 +95,7 @@ export const useCards = defineStore("cards", () => {
     input: Omit<SavedCard, "tokenId" | "boundAt"> & { tokenId?: string },
     opts: { makeDefault?: boolean } = {},
   ): string {
+    if (remoteApiEnabled) return "";
     const tokenId = input.tokenId ?? uuid();
     const card: SavedCard = { ...input, tokenId, boundAt: Date.now() };
     // 同 token 去重:真实收单方对**同一张卡**返回同一个 token,同卡再绑一次不该落两行
@@ -96,6 +114,7 @@ export const useCards = defineStore("cards", () => {
   }
 
   function remove(tokenId: string) {
+    if (remoteApiEnabled) { void refreshRemote(); return; }
     const next = cards.value.filter((c) => c.tokenId !== tokenId);
     if (defaultTokenId.value === tokenId) {
       defaultTokenId.value = next[0]?.tokenId ?? null;
@@ -105,6 +124,7 @@ export const useCards = defineStore("cards", () => {
   }
 
   function setDefault(tokenId: string) {
+    if (remoteApiEnabled) { void refreshRemote(); return; }
     if (cards.value.some((c) => c.tokenId === tokenId)) {
       defaultTokenId.value = tokenId;
       persist();
@@ -115,5 +135,6 @@ export const useCards = defineStore("cards", () => {
     return cards.value.find((c) => c.tokenId === tokenId) ?? null;
   }
 
-  return { cards, defaultTokenId, add, remove, setDefault, getCard, bindAccount };
+  if (remoteApiEnabled) void refreshRemote();
+  return { cards, defaultTokenId, add, remove, setDefault, getCard, bindAccount, refreshRemote };
 });

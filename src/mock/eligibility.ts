@@ -7,7 +7,7 @@
  * ⚠️ MOCK-ONLY client-side check. Production: GET /api/devices/eligibility?kind=X
  * (TBD; candidate, not yet in PRD §9.11). Server is sole authority; client
  * eligibility is for UI affordance only (which sheet to open / lock button +
- * hint) and never gates the actual POST /api/orders/create call.
+ * hint) and never gates the actual POST /api/orders call.
  *
  * Each device kind has a `mode` (open / any-of / all-of) and a list of `rules`
  * (see @/mock/tradein-config schema). We evaluate every rule and aggregate per

@@ -32,6 +32,7 @@ import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useRankSnapshot } from "@/store/rank-snapshot";
+import { bindEarningsReleaseAccount } from "@/store/earning-release";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -51,7 +52,10 @@ import { useRankSnapshot } from "@/store/rank-snapshot";
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
-  useRiskDisclosure().bindAccount(accountKey);
+  // Server-authoritative financial buckets are never shared across accounts;
+  // the successful sign-in flow refreshes this cleared slot immediately.
+  bindEarningsReleaseAccount(accountKey);
+  useRiskDisclosure().bindAccount();
   useGenesis().bindAccount(accountKey);
   useVRank().bindAccount(accountKey);
   useOrders().bindAccount(accountKey);

@@ -365,6 +365,10 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
   const toAmount = { value: pageMath.quoteTo(dir, pageMath.money(from), r) };
   const swapUSDValue = { value: dir === "usdt2nex" ? fromAmount.value : toAmount.value };
   const env = {
+    // This harness exercises the explicit mock branch. Remote calls have a
+    // separate contract and must not be required by legacy local-CAS checks.
+    remoteApiEnabled: false,
+    exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
     geoPolicyUserMessage,
     submitting: { value: false },
     valid: { value: true },

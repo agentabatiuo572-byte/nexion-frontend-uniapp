@@ -69,9 +69,7 @@ const LEDGER = {
   "GET /api/config/release-gates": "PRD §9.11c.1",
 
   // ── genesis ───────────────────────────────────────────────────────────
-  "POST /api/genesis/primary/subscribe": "PRD §10.1.1",
   "POST /api/genesis/secondary/fulfill": "PRD §10.2.4",
-  "POST /api/genesis/{list,unlist}": "PRD §10.2.4",
   "GET /api/genesis/eligibility": "PRD §10.1.1",
   "POST /api/genesis/invite/redeem": "PRD §10.1.1(核销次数规则待主人定)",
 
@@ -100,7 +98,6 @@ const LEDGER = {
   "GET /api/withdrawals/:id": "PRD §9.11f(`GET /api/{module}/:id` 通式)",
   "POST /api/withdrawals/eligibility": "PRD §9.3.1-3",
   "GET /api/payout-addresses": "包 E 提现地址直管新接口,服务端已按 payout-addresses 资源实现",
-  "POST /api/payout-addresses": "TBD: 同上 —— 添加地址(OTP 在服务端事务内核验)",
   "PUT /api/payout-addresses/{network}": "TBD: 同上 —— 原子更换(在途单拦截 / 频控 / 冻结由服务端裁决)",
   "GET /api/deposits": "PRD §9.2.8",
   "GET /api/deposits/address": "PRD §9.2.8",

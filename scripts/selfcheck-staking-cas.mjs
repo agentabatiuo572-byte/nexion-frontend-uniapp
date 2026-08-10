@@ -89,6 +89,7 @@ globalThis.uni = uni;
 const STUBS = {
   "pinia-stub": `export const defineStore = (_id, setup) => setup;`,
   "vue-stub": `export const ref = (v) => ({ value: v });`,
+  "runtime-stub": `export const remoteApiEnabled = false; export const stakingApi = {};`,
 };
 async function loadStore(rel) {
   const out = await build({
@@ -99,6 +100,7 @@ async function loadStore(rel) {
       setup(b) {
         b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
         b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
+        b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime-stub", namespace: "stub" }));
         b.onResolve({ filter: /^@\// }, atAliasResolver(path.join(root, "src"), "selfcheck-staking-cas"));
         b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
       },
@@ -434,7 +436,7 @@ function diskRev() {
 // 并把钱退回去」是两道门,只验前者等于没验(自伤那条正是「回报了没人接」)。
 {
   const callers = [
-    ["质押半屏 stake-sheet", path.join(root, "src", "components", "staking", "stake-sheet.vue"), "function submit()", "submit"],
+    ["质押半屏 stake-sheet", path.join(root, "src", "components", "staking", "stake-sheet.vue"), "async function submit()", "submit"],
     ["复投页 wallet-repurchase", path.join(root, "src", "pages", "me", "wallet-repurchase.vue"), "function handleRepurchase()", "handleRepurchase"],
   ];
   samples.callers = callers.length;
@@ -475,6 +477,8 @@ function diskRev() {
     const env = {
       props: { term: 30 }, term: 30,
       amount: { value: AMT },
+      selectedPool: { value: undefined }, remotePending: { value: false }, remoteIntent: { value: null },
+      intentKey: () => "MOCK_INTENT_UNUSED",
       canSubmit: { value: true },
       user: { value: app.user },
       STAKING_MIN, STAKING_APY,
@@ -496,7 +500,7 @@ function diskRev() {
 
     const before = ledger.usdtBalance;
     onEveryRead = (key) => { if (key === ACCOUNTS_KEY) bumpDiskRev(); };
-    run();
+    await run();
     onEveryRead = null;
 
     check(`⑦b [${label}] 🔴 建仓失败后余额被补回($${START},不是少了 $${AMT})`,

@@ -1,7 +1,6 @@
 import { computed, type ComputedRef } from "vue";
 import type { DeviceKind } from "@/store/types";
 import { useApp } from "@/store/app";
-import { redeemedInviteCodeOf } from "@/store/genesis-invite";
 import { useVRank } from "@/store/v-rank";
 import {
   useGenesis,
@@ -49,7 +48,9 @@ export function useGenesisEligibility(): UseGenesisEligibilityResult {
       // 问码表(status=used && redeemedBy=本账号),user 侧字段只是展示凭证不作数。
       // 重算时机:本 computed 同时读了 app.user(上面 cumulativeDepositUsdt),核销成功会整体
       // 替换 user.value → 依赖触发 → UI 立刻解锁,不需要额外订阅码表。
-      hasInvite: redeemedInviteCodeOf(app.accountKey) !== null,
+      // The server redemption response is mirrored on the signed-in user only for
+      // rendering. Eligibility itself is always re-evaluated by Genesis APIs.
+      hasInvite: genesis.hasGenesisInvite,
       myOwned: genesis.myOwned,
     }),
   );

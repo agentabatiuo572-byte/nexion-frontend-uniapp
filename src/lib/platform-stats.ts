@@ -39,6 +39,7 @@ export interface PublicStatsShape {
   registeredUsersBase: number;
   registeredUsersMonthlyGrowthPct: number;
   registeredUsersAnchorAt: number;
+  realUserCount: number;
   virtualUserCount: number;
   hashratePercentileTable: ReadonlyArray<{ tops: number; cumPct: number }>;
 }
@@ -63,7 +64,8 @@ export function publicStatsHealth(ps: PublicStatsShape | undefined | null): {
   const membersOk = inRange(ps.registeredUsersBase, 0, 100_000_000)
     && inRange(ps.registeredUsersMonthlyGrowthPct, 0, 50)
     && fin(ps.registeredUsersAnchorAt);
-  const rankOk = inRange(ps.virtualUserCount, 0, 10_000_000);
+  const rankOk = inRange(ps.realUserCount, 0, 100_000_000)
+    && inRange(ps.virtualUserCount, 0, 10_000_000);
   return { fleetOk, rateOk, jitterOk, membersOk, devicesOk, rankOk };
 }
 
@@ -79,8 +81,7 @@ export function monthlyPayoutUsdOf(ps: PublicStatsShape): number { return dailyP
 /**
  * 注册用户展示值:从锚点按月增速**推算**,不累加、不回退(规格 FEAT-HOME02 ③,
  * 与上面 PAYOUT 同范式)。刷新页面得到同一时刻同一值;运营改基数即重置锚点。
- * 🔴 它同时是排名分母里的「真实人口」—— 首页第一格与第三格必须用同一次派生,
- * 两处各算一份就会出现「注册 1.42M 人、你排 1.5M 名」这种自相矛盾。
+ * 该值只用于营销展示；排名分母使用服务端 realUserCount，避免公布基数影响真实资格口径。
  */
 export function derivedRegisteredUsers(
   ps: { registeredUsersBase: number; registeredUsersMonthlyGrowthPct: number; registeredUsersAnchorAt: number },

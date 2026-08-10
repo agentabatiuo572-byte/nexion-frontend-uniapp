@@ -155,6 +155,7 @@ import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { authApi, remoteApiEnabled } from "@/api/runtime";
 import {
   exchangeVerifiedSignIn,
   finalizeVerifiedRegistration,
@@ -315,7 +316,7 @@ function onCta() {
   }
   if (step.value === 1) goSendCode();
   else if (step.value === 2) verifyCode();
-  else finish();
+  else void finish();
 }
 function goSendCode() {
   error.value = null;
@@ -328,6 +329,24 @@ async function requestCode(captchaTicket?: string) {
   const phoneAtRequest = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
   verifying.value = true;
+  if (remoteApiEnabled) {
+    try {
+      const res = await authApi.sendRegistrationOtp({ countryCode: country.value, phone: phoneClean.value });
+      if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
+      verifying.value = false;
+      otpRequestId.value = res.challengeNo;
+      verifiedToken.value = null;
+      code.value = ["", "", "", "", "", ""];
+      focusIdx.value = 0;
+      step.value = 2;
+      startResend(res.resendAfterSec);
+    } catch (cause) {
+      if (!mounted || flowVersion !== otpFlowVersion) return;
+      verifying.value = false;
+      error.value = geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
+    }
+    return;
+  }
   const res = await otpSend(phoneAtRequest, "register", captchaTicket);
   if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
   verifying.value = false;
@@ -386,6 +405,14 @@ async function verifyCode() {
     return;
   }
   if (!codeOk.value) { error.value = t.value.register.errorInvalidCode; return; }
+  // The remote contract validates the OTP atomically with registration. Do not
+  // mirror a successful verification in local storage before that authority has
+  // accepted it.
+  if (remoteApiEnabled) {
+    if (!otpRequestId.value) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+    step.value = 3;
+    return;
+  }
   // ⚠️ MOCK-ONLY: PRD 已列的 OTP verify 的 TTL/attempts/一码一与验后账号分流
   // 在 auth-otp mock；K1 注册评估仍在下方 client mock 执行，不能声称由本次 OTP
   // 响应返回。PROD 应由注册事务（endpoint/回执契约 TBD）原子重校验 verifyToken、
@@ -471,11 +498,37 @@ async function exchangeVerifiedAccount(token: string, phoneAtVerify: string, flo
       : t.value.authOtp.errorServiceUnavailable);
   }
 }
-function finish() {
+async function finish() {
   if (completing.value) return;
   error.value = null;
   if (!pwdOk.value) { error.value = t.value.register.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.register.passwordMismatch; return; }
+  if (remoteApiEnabled) {
+    const challengeNo = otpRequestId.value;
+    if (!challengeNo) {
+      error.value = t.value.authOtp.errorOtpExpired;
+      step.value = 2;
+      return;
+    }
+    completing.value = true;
+    try {
+      await authApi.register({
+        countryCode: country.value,
+        phone: phoneClean.value,
+        challengeNo,
+        code: codeStr.value,
+        password: password.value,
+        sponsorCode: currentSponsorCode(),
+      });
+      // authApi has stored only the server-issued session. No local account,
+      // sponsor, gift or risk fact is created in remote mode.
+      launchRegistrationSuccess();
+    } catch (cause) {
+      error.value = geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
+      completing.value = false;
+    }
+    return;
+  }
   const identity = prospectiveIdentity();
   const sponsorCode = currentSponsorCode();
   // 完成时点重评(含最新邀请码): R5 口径下评估随调随算,不留步骤间缓存。

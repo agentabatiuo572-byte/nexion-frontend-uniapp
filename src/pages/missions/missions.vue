@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -112,13 +112,30 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useEventQuest } from "@/store/event-quest";
 import { EVENTS } from "@/mock/events";
+import { eventsApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalEvent } from "@/api/events-api";
 
 const t = useT();
 const eventQuest = useEventQuest();
+const remoteEvents = ref<CanonicalEvent[]>([]);
+async function refreshRemoteEvents(): Promise<void> {
+  if (!remoteApiEnabled) return;
+  try { remoteEvents.value = (await eventsApi.state()).events; }
+  catch { remoteEvents.value = []; }
+}
+onMounted(() => { void refreshRemoteEvents(); });
 
 // Live Events row stat — ongoing / joined / claimable from the ported mock +
 // store (claimable = trackable + done + not yet claimed).
 const eventStats = computed(() => {
+  if (remoteApiEnabled) {
+    const current = remoteEvents.value;
+    return {
+      ongoing: current.filter((event) => event.state === "ongoing").length,
+      joined: current.filter((event) => event.state !== "ended" && ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus)).length,
+      claimable: current.filter((event) => event.userStatus === "CLAIMABLE").length,
+    };
+  }
   const ongoing = EVENTS.filter((ev) => ev.status === "ongoing").length;
   let joined = 0;
   let claimable = 0;

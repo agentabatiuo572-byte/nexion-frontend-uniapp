@@ -108,25 +108,25 @@ const HOUR = 3600 * 1000;
     payoutChangeBlockReason({ now, hasInFlightWithdrawal: false, nextChangeAt: null }) === null);
 }
 
-// 4) 首次添加(RM01a ② 阳光1):生效即 current,**不冻结不频控**(冻结/频控只属于「更换」)
+// 4) 首次添加:登记 current,同时进入 24h 安全冻结与 7 天更换频控
 {
   const now = 1_700_000_000_000;
   const s0 = emptyNetworkState();
-  const s1 = applyAddAddress(s0, "  0x" + "ab".repeat(20) + "  ", now);
+  const s1 = applyAddAddress(s0, "  0x" + "ab".repeat(20) + "  ", now, 7);
   check("空槽添加成功", s1 !== null);
   check("current 生效(地址 trim,addedAt=now,source=user)",
     s1.current?.address === "0x" + "ab".repeat(20) && s1.current?.addedAt === now && s1.current?.source === "user");
-  check("首次添加不设提现冻结", s1.freezeUntil === null);
-  check("首次添加不设频控锚点", s1.nextChangeAt === null);
+  check("首次添加设置 24h 提现冻结", s1.freezeUntil === now + DAY);
+  check("首次添加设置 7 天频控锚点", s1.nextChangeAt === now + 7 * DAY);
   check("历史不受影响", s1.history.length === 0);
-  check("已有 current 时 applyAddAddress 拒绝(更换必须走显式 change)", applyAddAddress(s1, "0x" + "cd".repeat(20), now) === null);
+  check("已有 current 时 applyAddAddress 拒绝(更换必须走显式 change)", applyAddAddress(s1, "0x" + "cd".repeat(20), now, 7) === null);
   check("入参 state 未被原地修改(immutability)", s0.current === null && s0.history.length === 0);
 }
 
 // 5) 原子更换(RM01a ② 阳光2 / ④):新址生效 + 旧址同事务入历史 + 冻结 + 频控,一步完成
 {
   const now = 1_700_000_000_000;
-  const s0 = applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now - 30 * DAY);
+  const s0 = applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now - 30 * DAY, 7);
   const s1 = applyChangeAddress(s0, "0x" + "cd".repeat(20), now, 7);
   check("有 current 时更换成功", s1 !== null);
   check("新址成为唯一 current(addedAt=now,source=user)",
@@ -180,12 +180,12 @@ const HOUR = 3600 * 1000;
 {
   const now = 1_700_000_000_000;
   check("无地址 → null(资格层跳过绑定相关闸)", eligibilityBindingFor(emptyNetworkState()) === null && eligibilityBindingFor(undefined) === null);
-  const s = applyChangeAddress(applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now - 30 * DAY), "0x" + "cd".repeat(20), now, 7);
+  const s = applyChangeAddress(applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now - 30 * DAY, 7), "0x" + "cd".repeat(20), now, 7);
   const b = eligibilityBindingFor(s);
   check("verifiedAt = current.addedAt(大额账龄闸的账龄起点)", b?.verifiedAt === now);
   check("freezeUntil 透传(rebind-freeze 闸输入)", b?.freezeUntil === now + PAYOUT_FREEZE_MS);
-  check("无冻结时 freezeUntil=undefined(不把 null 漏给判定层)",
-    eligibilityBindingFor(applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now))?.freezeUntil === undefined);
+  check("首次添加冻结透传给资格层",
+    eligibilityBindingFor(applyAddAddress(emptyNetworkState(), "0x" + "ab".repeat(20), now, 7))?.freezeUntil === now + PAYOUT_FREEZE_MS);
 }
 
 // 10) 🔴 存量迁移三态(RM01b/E-2:配对老数据 → 地址直管;失败不得静默变成空地址)

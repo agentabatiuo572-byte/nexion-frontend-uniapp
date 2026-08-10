@@ -64,6 +64,13 @@ export interface GenesisTransaction {
   completedAt: number;
 }
 
+export interface GenesisTier {
+  id: string;
+  from: number;
+  to: number;
+  priceUSDT: number;
+}
+
 export interface GenesisPublicState {
   series: GenesisSeries;
   sale: GenesisSalePolicy;
@@ -71,9 +78,21 @@ export interface GenesisPublicState {
   emissionOpen: boolean;
   listings: GenesisListing[];
   transactions: GenesisTransaction[];
+  tiers: GenesisTier[];
+  tiersVersion: number;
+  marketOpenState: "open" | "closed";
+  marketOpenStateVersion: number;
+  closedNoticeKey: string;
+  catalogAvailable: boolean;
+  tradeAvailable: boolean;
+  tradeBlockedReason: string;
 }
 
-export interface GenesisAccountState extends GenesisPublicState {
+export interface GenesisAccountState {
+  series: GenesisSeries;
+  sale: GenesisSalePolicy;
+  marketEnabled: boolean;
+  emissionOpen: boolean;
   holdings: GenesisHolding[];
   eligibility: GenesisEligibility;
   walletBalanceUsdt: number;
@@ -220,20 +239,57 @@ function parseTransaction(value: unknown): GenesisTransaction {
     completedAt: timestamp(row.completedAt) ?? invalid() };
 }
 
+function parseTier(value: unknown): GenesisTier {
+  const row = record(value);
+  const id = text(row?.id);
+  const from = integer(row?.from);
+  const to = integer(row?.to, 1);
+  const priceUSDT = number(row?.priceUSDT, 0.000001);
+  if (!row || !id || from === null || to === null || to <= from || priceUSDT === null) return invalid();
+  return { id, from, to, priceUSDT };
+}
+
 export function parseGenesisPublicState(value: unknown): GenesisPublicState {
   const row = record(value);
   const market = record(row?.market);
   const emission = record(row?.emission);
+  const marketOpenState = text(row?.marketOpenState);
+  const tiersVersion = integer(row?.tiersVersion);
+  const marketOpenStateVersion = integer(row?.marketOpenStateVersion);
+  const closedNoticeKey = text(row?.closedNoticeKey);
+  const tradeBlockedReason = typeof row?.tradeBlockedReason === "string" ? row.tradeBlockedReason : null;
   if (!row || row.serverCanonical !== true || !market || !emission
       || typeof market.enabled !== "boolean" || typeof emission.open !== "boolean"
-      || !Array.isArray(row.listings) || !Array.isArray(row.transactions)) return invalid();
+      || !Array.isArray(row.listings) || !Array.isArray(row.transactions) || !Array.isArray(row.tiers)
+      || (marketOpenState !== "open" && marketOpenState !== "closed")
+      || tiersVersion === null || marketOpenStateVersion === null || !closedNoticeKey
+      || typeof row.catalogAvailable !== "boolean" || typeof row.tradeAvailable !== "boolean"
+      || tradeBlockedReason === null
+      || (marketOpenState === "closed" && market.enabled)) return invalid();
+  const series = parseSeries(row.series);
+  const tiers = row.tiers.map(parseTier);
+  let boundary = 0;
+  for (const tier of tiers) {
+    if (tier.from !== boundary) return invalid();
+    boundary = tier.to;
+  }
+  if (row.catalogAvailable && (!tiers.length || boundary < series.soldSupply)) return invalid();
+  if (!row.catalogAvailable && (tiers.length || market.enabled || row.tradeAvailable)) return invalid();
   return {
-    series: parseSeries(row.series),
+    series,
     sale: parseSale(row.sale),
     marketEnabled: market.enabled,
     emissionOpen: emission.open,
     listings: row.listings.map(parseListing),
     transactions: row.transactions.map(parseTransaction),
+    tiers,
+    tiersVersion,
+    marketOpenState,
+    marketOpenStateVersion,
+    closedNoticeKey,
+    catalogAvailable: row.catalogAvailable,
+    tradeAvailable: row.tradeAvailable,
+    tradeBlockedReason,
   };
 }
 
@@ -250,8 +306,6 @@ export function parseGenesisAccountState(value: unknown): GenesisAccountState {
     sale,
     marketEnabled: row.marketEnabled,
     emissionOpen: row.emissionOpen,
-    listings: [],
-    transactions: [],
     holdings: row.holdings.map(parseHolding),
     eligibility: parseEligibility(row.eligibility),
     walletBalanceUsdt,
@@ -288,5 +342,17 @@ export function createGenesisApi(client: ApiClient) {
       path: `/api/genesis/listings/${encodeURIComponent(holdingNo)}/buy`,
       idempotencyKey,
     })),
+    redeem: async (code: string) => {
+      const normalized = code.trim().toUpperCase();
+      const row = record(await client.request({
+        method: "POST",
+        path: "/api/genesis/invite/redeem",
+        idempotencyKey: `genesis-invite:${normalized}`,
+        body: { code: normalized },
+      }));
+      const redeemedCode = text(row?.code);
+      if (!row || !redeemedCode || row.status !== "used") return invalid();
+      return { code: redeemedCode };
+    },
   };
 }

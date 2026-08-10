@@ -13,6 +13,8 @@
   <AppChassis active="me">
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
+      <text v-if="staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Mock 模式 · 非远端资金</text>
+      <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">远端权威数据不可用，质押操作已关闭</text>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Hero — de-carded: total-locked sits on the page floor; aurora + grid
@@ -71,9 +73,9 @@
             v-for="(term, i) in TERMS"
             :key="term"
             :term="term"
-            :apy="STAKING_APY[term]"
-            :penalty="STAKING_PENALTY[term]"
-            :min="STAKING_MIN[term]"
+            :apy="staking.pools.find((pool) => pool.termDays === term)?.apy ?? (staking.isMockMode ? STAKING_APY[term] : 0)"
+            :penalty="staking.pools.find((pool) => pool.termDays === term)?.penalty ?? (staking.isMockMode ? STAKING_PENALTY[term] : 0)"
+            :min="staking.pools.find((pool) => pool.termDays === term)?.minAmountUsdt ?? (staking.isMockMode ? STAKING_MIN[term] : 0)"
             :blurb="t.stakingV3.blurb[term]"
             :penalty-suffix="t.stakingV3.penaltySuffix"
             :ribbon="RIBBONS[term]"
@@ -151,11 +153,47 @@ const app = useApp(); // 仅用于 reportStuckFunds 取当前资金快照(入待
 
 const sheetOpen = ref(false);
 const sheetTerm = ref<StakingTerm | null>(null);
+const pendingRemoteMutations = ref(new Set<string>());
+const remoteMutationKeys = new Map<string, string>();
+
+function intentKey(kind: "claim" | "early", positionNo: string) {
+  const intent = `${kind}:${positionNo}`;
+  const existing = remoteMutationKeys.get(intent);
+  if (existing) return { intent, key: existing };
+  const key = `G1-${kind.toUpperCase()}-${positionNo}-${Date.now().toString(36)}`;
+  remoteMutationKeys.set(intent, key);
+  return { intent, key };
+}
+
+async function runRemoteMutation(kind: "claim" | "early", positionNo: string) {
+  const { intent, key } = intentKey(kind, positionNo);
+  if (pendingRemoteMutations.value.has(intent)) return false;
+  pendingRemoteMutations.value = new Set([...pendingRemoteMutations.value, intent]);
+  try {
+    if (kind === "claim") await staking.claimRemote(positionNo, key);
+    else await staking.earlyWithdrawRemote(positionNo, key);
+    remoteMutationKeys.delete(intent);
+    return true;
+  } catch {
+    // The request may have reached the service even when its response is unknown.
+    await staking.syncRemote().catch(() => {});
+    return false;
+  } finally {
+    const next = new Set(pendingRemoteMutations.value);
+    next.delete(intent);
+    pendingRemoteMutations.value = next;
+  }
+}
 
 // Tick every 4s: re-mature positions + refresh accrual/progress.
 const nowTs = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
+  if (!staking.isMockMode) {
+    void staking.syncRemote().catch(() => toast.error(t.value.stakingV3.toast.staleTitle));
+    timer = setInterval(() => { void staking.syncRemote().catch(() => {}); }, 4000);
+    return;
+  }
   staking.markMatured();
   timer = setInterval(() => {
     staking.markMatured();
@@ -255,6 +293,14 @@ async function handleEarlyWithdraw(p: StakingPosition) {
     confirmLabel: t.value.stakingV3.toast.earlyConfirmCta,
   });
   if (!ok) return;
+  if (!staking.isMockMode) {
+    if (await runRemoteMutation("early", p.id)) {
+      toast.warn(t.value.stakingV3.toast.earlyDoneTitle);
+    } else {
+      reportStakingFailure(null, t.value.stakingV3.toast.staleTitle);
+    }
+    return;
+  }
   // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:平仓(CAS)→ 入账⊗记账(原子)。
   // 🔴 顺序不可换:先入账后平仓的话,平仓撞并发冲突就成了「钱拿到、仓还在」= 可重复领。
   //    代价是这条极窄的失败路径(仓已平、退款落盘失败)靠收口点的失败提示交底 ——
@@ -294,7 +340,15 @@ async function handleEarlyWithdraw(p: StakingPosition) {
   }
 }
 
-function handleClaim(p: StakingPosition) {
+async function handleClaim(p: StakingPosition) {
+  if (!staking.isMockMode) {
+    if (await runRemoteMutation("claim", p.id)) {
+      toast.success(t.value.stakingV3.toast.claimedTitle);
+    } else {
+      reportStakingFailure(null, t.value.stakingV3.toast.staleTitle);
+    }
+    return;
+  }
   // ⚠️ MOCK-ONLY CROSS-STORE MUTATION:领取(CAS)→ 入账⊗记账(原子,顺序理由同上)。
   const r = staking.claim(p.id);
   if (r.ok) {

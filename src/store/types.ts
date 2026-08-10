@@ -409,7 +409,7 @@ export interface AppState {
   recordDeposit: (amount: number) => boolean;
   /** 核销创世邀请码:查码表 + 三态校验(码不存在 / 非未使用 / 本账号已持码),
    *  通过才写入 user.genesisInviteCode 并随快照持久;拒绝时带归因供页面分文案。 */
-  setGenesisInviteCode: (raw: string) => GenesisInviteRedeemResult;
+  setGenesisInviteCode: (raw: string) => Promise<GenesisInviteRedeemResult>;
   // Sprint 2 third phase — prototype demo helpers (PM-facing, not user-facing)
   _devSeedLegacyDevice: (kind: DeviceKind, monthsAgo: number) => void;
   _devFastForwardAll: (months: number) => void;
@@ -427,6 +427,8 @@ export interface AppState {
     address: string,
     fee: WithdrawalFeeSnapshot,
     offsetWithNex: boolean,
+    policyVersion: string,
+    idempotencyKey: string,
     riskRoute?: WithdrawalRiskRoute,
     riskReasons?: string[],
     fastLaneApplied?: boolean,

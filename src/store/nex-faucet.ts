@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { pointsApi, remoteApiEnabled } from "@/api/runtime";
 import { createAccountRowCommit } from "./account-scoped-storage";
 
 /**
@@ -92,6 +93,72 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const longestStreak = ref(0);
   const streakSavers = ref(0);
   const claimedMilestones = ref<number[]>([]);
+  const remoteMilestoneIds = ref<Record<number, number>>({});
+
+  function clearRemoteFacts() {
+    history.value = [];
+    lastSignedInAt.value = 0;
+    signInStreak.value = 0;
+    longestStreak.value = 0;
+    streakSavers.value = 0;
+    claimedMilestones.value = [];
+    remoteMilestoneIds.value = {};
+  }
+
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const snapshot = await pointsApi.state();
+      const last = snapshot.streak.lastCheckInDate ? Date.parse(`${snapshot.streak.lastCheckInDate}T00:00:00Z`) : 0;
+      lastSignedInAt.value = Number.isFinite(last) ? last : 0;
+      signInStreak.value = snapshot.streak.currentStreak;
+      longestStreak.value = snapshot.streak.longestStreak;
+      streakSavers.value = snapshot.streak.streakSavers;
+      claimedMilestones.value = snapshot.dailyMilestones
+        .filter((milestone) => milestone.status === "CLAIMED")
+        .map((milestone) => milestone.milestoneDay);
+      remoteMilestoneIds.value = Object.fromEntries(snapshot.dailyMilestones
+        .map((milestone) => [milestone.milestoneDay, milestone.milestoneId]));
+      return true;
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function checkInRemote(): Promise<{ ok: boolean; gained: number; streak: number; multiplier: number }> {
+    try {
+      const result = await pointsApi.checkIn(`h5-check-in:${new Date().toISOString().slice(0, 10)}`);
+      await refreshRemote();
+      return { ok: true, gained: result.rewardNex, streak: result.streakDays, multiplier: result.multiplier };
+    } catch {
+      clearRemoteFacts();
+      return { ok: false, gained: 0, streak: 0, multiplier: 1 };
+    }
+  }
+
+  async function claimMilestoneRemote(day: number): Promise<boolean> {
+    const milestoneId = remoteMilestoneIds.value[day];
+    if (!milestoneId) return false;
+    try {
+      await pointsApi.claimMilestone(milestoneId, `h5-milestone:${milestoneId}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function useSaverRemote(): Promise<boolean> {
+    try {
+      await pointsApi.useSaver(`h5-streak-saver:${new Date().toISOString().slice(0, 10)}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
 
   // 落盘唯一出口:乐观并发提交器。签到 / 里程碑 / saver 都是**每日或一次性配额**,
   // 覆盖式写会让两个标签页各领一次(daily 页领完直接 app.creditNex → 白发币)。
@@ -118,6 +185,11 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   /** 账号切换重绑:装载该账号的签到状态机(防跨账号继承连胜/里程碑/saver)。 */
   function bindAccount(rawAccountKey: string) {
+    if (remoteApiEnabled) {
+      clearRemoteFacts();
+      void refreshRemote();
+      return;
+    }
     const next = rows.bind(rawAccountKey) ?? defaults();
     history.value = next.history;
     lastSignedInAt.value = next.lastSignedInAt;
@@ -136,6 +208,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
    * 一天绝不发两次币。幸运倍率只摇一次(重试沿用同一结果,不给重试当抽奖机)。
    */
   function signIn(): { ok: boolean; gained: number; streak: number; multiplier: number; conflict?: boolean } {
+    if (remoteApiEnabled) return { ok: false, gained: 0, streak: 0, multiplier: 1 };
     const t = Date.now();
     // Lucky multiplier: 1.0x baseline, 15% chance of 1.5x, 5% chance of 2x.
     const roll = Math.random();
@@ -179,6 +252,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   }
 
   function useSaver(): { ok: boolean; conflict?: boolean } {
+    if (remoteApiEnabled) return { ok: false };
     const now = Date.now();
     const r = rows.commit((cur) => {
       // 🔴 saver 存量与「连胜是否真断了」都按磁盘最新态判:别处刚用掉的那张不会被再用一次。
@@ -206,6 +280,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
    * 🔴 调用方必须先看 ok:里程碑奖励是一次性的,失败还照发就是白送一份。
    */
   function claimMilestone(day: number, gainedNex: number, reason: string): { ok: boolean; conflict?: boolean } {
+    if (remoteApiEnabled) return { ok: false };
     const now = Date.now();
     const r = rows.commit((cur) => {
       if (cur.claimedMilestones.includes(day)) return null;
@@ -224,7 +299,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
-    signIn, useSaver, claimMilestone, bindAccount,
+    signIn, useSaver, claimMilestone, bindAccount, refreshRemote,
+    checkInRemote, claimMilestoneRemote, useSaverRemote,
   };
 });
 

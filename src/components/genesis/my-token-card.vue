@@ -113,7 +113,7 @@ async function handleList() {
     icon: "info",
   });
   if (!ok) return;
-  if (genesis.listNode(props.tokenId, askPrice.value)) {
+  if (await genesis.listNode(props.tokenId, askPrice.value)) {
     toast.success(
       fmt(t.value.marketplace.listedToast, { id: props.tokenId }),
       fmt(t.value.marketplace.listedDesc, { amount: askPrice.value.toLocaleString() }),
@@ -139,7 +139,7 @@ async function handleCancel() {
     icon: "warn",
   });
   if (!ok) return;
-  if (genesis.cancelListing(props.tokenId)) {
+  if (await genesis.cancelListing(props.tokenId)) {
     toast.info(
       fmt(t.value.marketplace.cancelledToast, { id: props.tokenId }),
       t.value.marketplace.cancelledDesc,

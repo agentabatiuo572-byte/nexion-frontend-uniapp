@@ -185,6 +185,7 @@ import { fmt } from "@/i18n/format";
 import { useNexFaucet } from "@/store/nex-faucet";
 import { useApp } from "@/store/app";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { remoteApiEnabled } from "@/api/runtime";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
@@ -325,7 +326,16 @@ function signInRef(ts: number): string {
 }
 
 
-function handleCheckIn() {
+async function handleCheckIn() {
+  if (remoteApiEnabled) {
+    const remote = await faucet.checkInRemote();
+    if (!remote.ok) {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+      return;
+    }
+    toast.success(`+${remote.gained} NEX`, `${remote.streak}-day streak`);
+    return;
+  }
   const r = faucet.signIn();
   if (!r.ok) {
     // conflict = 别的标签页刚签过(store 已刷新到最新);否则就是本页自己今天已签。
@@ -368,13 +378,21 @@ function handleCheckIn() {
   }
 }
 
-function handleClaimMilestone(m: Milestone) {
+async function handleClaimMilestone(m: Milestone) {
   if (claimedSet.value.has(m.day)) {
     toast.info(t.value.daily.milestones.claimedToast, "");
     return;
   }
   if (streak.value < m.day) {
     toast.info(t.value.daily.milestones.lockedToast, "");
+    return;
+  }
+  if (remoteApiEnabled) {
+    if (!await faucet.claimMilestoneRemote(m.day)) {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+      return;
+    }
+    toast.success(t.value.daily.milestones[m.rewardKey], `Day-${m.day} milestone claimed`);
     return;
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
@@ -425,7 +443,12 @@ function handleClaimMilestone(m: Milestone) {
   toast.success(rewardDisplay, `Day-${m.day} milestone claimed`);
 }
 
-function handleUseSaver() {
+async function handleUseSaver() {
+  if (remoteApiEnabled) {
+    if (await faucet.useSaverRemote()) toast.success(t.value.daily.saver.restored, "");
+    else toast.error(t.value.authOtp.errorServiceUnavailable);
+    return;
+  }
   const r = faucet.useSaver();
   if (r.ok) {
     toast.success(t.value.daily.saver.restored, "");

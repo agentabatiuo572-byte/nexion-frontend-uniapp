@@ -41,7 +41,9 @@ function matchSystemLocale(): LocaleCode | null {
 function hydrate(): Persisted {
   try {
     const saved = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
-    if (saved && saved.code) return { code: saved.code, userSet: !!saved.userSet };
+    if (saved && saved.code && LOCALES.some((locale) => locale.code === saved.code)) {
+      return { code: saved.code, userSet: !!saved.userSet };
+    }
   } catch {
     // ignore — first run
   }

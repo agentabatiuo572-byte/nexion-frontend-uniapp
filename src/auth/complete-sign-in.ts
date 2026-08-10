@@ -5,6 +5,7 @@ import { useSponsorship } from "@/store/sponsorship";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { safeReturnTo } from "@/routing/safe-return-to";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
+import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 
 interface CompleteSignInOptions {
   identity: string;
@@ -110,6 +111,10 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
       return { ok: false, error: "sign_in_storage_unavailable" };
     }
   }
+  // reLaunch does not reliably emit App.onShow in an existing H5 document.
+  // Fetch the new account's server buckets here; a failed request leaves the
+  // snapshot unavailable and the withdrawal endpoint still fails closed.
+  void refreshEarningsReleaseStatus(options.identity).catch(() => {});
   if (!auth.onboardingComplete) {
     uni.reLaunch({
       url: "/pages/onboarding/estimator",

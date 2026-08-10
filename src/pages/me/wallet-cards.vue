@@ -34,7 +34,7 @@
               <text class="block font-mono-tabular" :style="cardMetaStyle">{{ rowMeta(card) }}</text>
             </view>
           </view>
-          <view class="flex" :style="cardActionsStyle">
+          <view v-if="!remoteApiEnabled" class="flex" :style="cardActionsStyle">
             <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="setDefault(card.tokenId)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -73,6 +73,7 @@ import { confirm, toast } from "@/store/ui";
 import { useCards, brandLabel, type SavedCard } from "@/store/cards";
 import { useNotifications } from "@/store/notifications";
 import { cardUnboundNotification } from "@/mock/card-notifications";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();

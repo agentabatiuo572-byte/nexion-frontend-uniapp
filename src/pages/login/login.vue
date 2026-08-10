@@ -59,8 +59,8 @@
           </view>
           <view class="lg-resend">
             <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
-            <text v-if="resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
-            <text v-else class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
+            <text v-if="!remoteTwoFactorChallenge && resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
+            <text v-else-if="!remoteTwoFactorChallenge" class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
           </view>
         </view>
 
@@ -136,6 +136,8 @@ import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
+import { authApi } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
 
 const t = useT();
 const oauth = [
@@ -173,6 +175,7 @@ const returnParam = ref<string | null>(null);
 const refOnLogin = ref<string | null>(null);
 const otpRequestId = ref<string | null>(null);
 const otpVerifyToken = ref<string | null>(null);
+const remoteTwoFactorChallenge = ref<string | null>(null);
 
 let resendTimer: ReturnType<typeof setInterval> | undefined;
 let signInTimer: ReturnType<typeof setTimeout> | undefined;
@@ -269,6 +272,7 @@ function invalidateOtpFlow() {
   clearSignIn();
   otpRequestId.value = null;
   otpVerifyToken.value = null;
+  remoteTwoFactorChallenge.value = null;
 }
 
 function isCurrentOtpFlow(context: OtpFlowContext): boolean {
@@ -294,18 +298,17 @@ function geoText(code: unknown): string | null {
 // snapshot, claims this carrier's session, and routes a changed physical device
 // through recalibration before the main app.
 function finishSignIn(
-  otp: { accountId: string; signInIdempotencyKey: string; onboardingComplete: boolean } | null = null,
+  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
   if (!mounted || (context && !isCurrentOtpFlow(context))) return;
-  const identity = otp?.accountId ?? `${country.value}${phoneClean.value}@demo.nexgrid.ai`;
   const result = completeSignIn({
-    identity,
+    identity: session.accountId,
     returnTo: returnParam.value,
     sponsorCode: refOnLogin.value,
-    idempotencyKey: otp?.signInIdempotencyKey,
-    onboardingComplete: otp?.onboardingComplete,
+    idempotencyKey: session.signInIdempotencyKey,
+    onboardingComplete: session.onboardingComplete,
   });
   if (!result.ok) {
     loading.value = false;
@@ -390,22 +393,62 @@ function goSendCode() {
   if (!phoneOk.value) { error.value = t.value.login.errorInvalidPhone; return; }
   void requestCode();
 }
-function signInWithPassword() {
+function remoteLoginError(error: unknown): string {
+  const code = error instanceof ApiError ? error.message : "";
+  return geoText(code)
+    ?? (code === "USER_INVALID_CREDENTIALS" ? "手机号或密码不正确。" : t.value.authOtp.errorServiceUnavailable);
+}
+
+async function signInWithPassword() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!phoneOk.value || !pwdOk.value) { error.value = t.value.login.errorInvalidPassword; return; }
   const phoneAtSignIn = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
   loading.value = true;
-  signInTimer = setTimeout(() => {
+  try {
+    const result = await authApi.login({ countryCode: country.value, phone: phoneClean.value, password: password.value });
     if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtSignIn || step.value !== 1 || mode.value !== "password") return;
-    finishSignIn();
-  }, 700);
+    if (result.kind === "challenge") {
+      remoteTwoFactorChallenge.value = result.challengeNo;
+      code.value = ["", "", "", "", "", ""];
+      focusIdx.value = 0;
+      loading.value = false;
+      step.value = 2;
+      return;
+    }
+    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true });
+  } catch (loginError) {
+    if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtSignIn) return;
+    loading.value = false;
+    error.value = remoteLoginError(loginError);
+  }
+}
+
+async function verifyRemoteTwoFactor() {
+  const challengeNo = remoteTwoFactorChallenge.value;
+  if (!challengeNo) return;
+  loading.value = true;
+  try {
+    const result = await authApi.completeTwoFactor({
+      countryCode: country.value,
+      phone: phoneClean.value,
+      password: password.value,
+      challengeNo,
+      code: code.value.join(""),
+    });
+    if (result.kind !== "authenticated") throw new Error("TWO_FACTOR_SESSION_MISSING");
+    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true });
+  } catch (loginError) {
+    loading.value = false;
+    error.value = remoteLoginError(loginError);
+  }
 }
 async function verifyCode() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
+  if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
   const requestId = otpRequestId.value;
   if (!requestId) { loading.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
   const context: OtpFlowContext = {
@@ -473,6 +516,7 @@ function toggleMode() {
   code.value = ["", "", "", "", "", ""];
   otpRequestId.value = null;
   otpVerifyToken.value = null;
+  remoteTwoFactorChallenge.value = null;
   resendLeft.value = 0;
   step.value = 1;
   mode.value = mode.value === "password" ? "otp" : "password";

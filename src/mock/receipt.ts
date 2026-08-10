@@ -25,7 +25,7 @@ export interface Receipt {
   txHash: string;             // 64 hex
   blockNumber: number;
 
-  // Device that ran the task (legacy verification receipts reuse this for the wallet)
+  // Device that ran the task
   deviceName: string;
   deviceGpu: string;
   deviceFingerprint: string;  // 16 hex

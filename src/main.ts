@@ -1,8 +1,10 @@
-import { createSSRApp } from "vue";
+import { createSSRApp, watch } from "vue";
 import { createPinia } from "pinia";
 import App from "./App.vue";
 import { mountSpec7DevBridge } from "@/lib/spec7-dev-bridge";
 import { mountAuthOtpDevBridge } from "@/store/auth-otp";
+import { useI18nRuntime } from "@/store/i18n-runtime";
+import { useLocaleStore } from "@/store/locale";
 import "./styles/tokens.css";
 import "uno.css";
 
@@ -35,7 +37,13 @@ export function createApp() {
     };
   }
 
-  app.use(createPinia());
+  const pinia = createPinia();
+  app.use(pinia);
+  const locale = useLocaleStore(pinia);
+  const runtimeI18n = useI18nRuntime(pinia);
+  runtimeI18n.prepare();
+  void runtimeI18n.refresh(locale.code);
+  watch(() => locale.code, (next) => { void runtimeI18n.refresh(next); });
   if (import.meta.env.DEV) {
     // DEV-only: SPEC-7 演示桥(模拟后台处置下发)。
     mountSpec7DevBridge();

@@ -40,7 +40,19 @@ const bundle = await build({
     resolveDir: root, loader: "ts",
   },
   bundle: true, write: false, format: "esm",
-  plugins: [{ name: "alias", setup(b) { b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-genesis-gate")); } }],
+  plugins: [
+    {
+      name: "runtime-stub",
+      setup(b) {
+        b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime", namespace: "stub" }));
+        b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
+          contents: "export const genesisApi = Object.freeze({});",
+          loader: "js",
+        }));
+      },
+    },
+    { name: "alias", setup(b) { b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-genesis-gate")); } },
+  ],
 });
 const { genesisPurchaseBlock, genesisSecondaryBlock, genesisShowsUrgency } = await import(
   "data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64")
@@ -68,7 +80,13 @@ console.log("selfcheck-genesis-gate — 购买可用性必须只有一处判定(
 const KINDS = ["marketClosed", "halted", "soldOut", "preSale", "configUnavailable"];
 const OWNER = "src/store/genesis-config.ts";     // 判定本体唯一宿主
 /** 允许比较决策**输入**的文件:本体 + 它的唯一消费入口。别处比较 = 自己判了一套。 */
-const INPUT_ALLOW = new Set([OWNER, "src/composables/use-genesis-sale-gate.ts"]);
+const INPUT_ALLOW = new Set([
+  OWNER,
+  "src/composables/use-genesis-sale-gate.ts",
+  // Protocol validation may compare the enum with its legal values; it does
+  // not decide whether a purchase is allowed.
+  "src/api/genesis-api.ts",
+]);
 
 // ── ① 优先级链:**用行为证明**,不读源码顺序 ─────────────────────────────────
 const FUTURE = 4102444800000;
@@ -280,6 +298,7 @@ function urgencySitesUngated(src) {
     tickSales: "模拟他人成交的世界演进,非本人动作;闸在用户入口不在时间推进",
     bindAccount: "账号切换的数据装载,不产生交易",
     setNexListed: "上所状态由运营侧驱动,与购买可用性正交",
+    syncRemote: "只刷新服务端权威快照,不创建购买、持有或挂单状态",
   };
   const READONLY = ["remaining", "soldPct", "tierRemaining", "emissionSnapshot", "reservedAllocationNEX"];
   const BLOCK_CALL = /genesisPurchaseBlock|genesisSecondaryBlock/;
@@ -391,7 +410,7 @@ function urgencySitesUngated(src) {
     } catch { /* git 不可用 / 非仓库 → 落回同级路径,下游读不到即红 */ }
     return direct;
   };
-  const ADMIN_OPS = siblingRepo("admin-ops");
+  const ADMIN_OPS = siblingRepo("nexion-ops-console");
   const adminClient = path.join(ADMIN_OPS, "lib/admin/g4-client.ts");
   const adminView = path.join(ADMIN_OPS, "app/components/domain-views/g-tabs/g4-genesis.tsx");
   let clientSrc = null, viewSrc = null;
@@ -432,7 +451,8 @@ function urgencySitesUngated(src) {
       }
     }
     // 红测(合取项隔离):往 admin options 注入新键必须转红
-    const injected = viewSrc.replace(/options:\s*\["default", "maintenance", "restock"\]/, `options: ["default", "maintenance", "restock", "holiday"]`);
+    const injected = viewSrc.replace(/options:\s*\[([^\]]+)\]/,
+      (_match, items) => `options: [${items}, "holiday"]`);
     const injList = (() => { const m = injected.match(/options:\s*\[([^\]]+)\]/); return m ? [...m[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : null; })();
     check(`🔴 红测自证:⑧c 后台加 "holiday" 而前端没加必须转红`, !same(uniList, injList), `注入没红 = parity 空转`);
   }

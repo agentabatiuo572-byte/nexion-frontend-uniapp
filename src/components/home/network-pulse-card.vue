@@ -124,10 +124,10 @@ const ramp = (v: number) => Array.from({ length: 8 }, (_, i) => v * (0.997 + i *
 
 // 健康度共享一份(三格 + 排名入参守卫同源)
 const health = computed(() => publicStatsHealth(cfg.config.publicStats));
-// ── 格 1:注册用户(基数按月增速从锚点推算;派生值同时是排名分母的真实人口)──
+// ── 格 1:注册用户(公布基数按月增速从锚点推算，仅作展示)──
 const registered = computed(() => derivedRegisteredUsers(cfg.config.publicStats, nowTs.value));
 // ── 格 3:名次(每次渲染由当下算力 + 当下配置现算,禁缓存名次)──
-//   🔴 入参守卫(R2 P2):分母吃的是格 1 的派生 —— members 参数非法时它不是「被拖垮」,
+//   🔴 入参守卫(R2 P2):分母吃服务端真实账号数，营销公布基数不参与资格排名。
 //   是它自己的输入坏了,同判 unavailable;ps 整段缺席(机器门最小桩)同理,不裸解引。
 const rank = computed(() => {
   const ps = cfg.config.publicStats;
@@ -136,7 +136,7 @@ const rank = computed(() => {
   return computeRank({
     myTotalHashrate: app.myTotalHashrateAt(nowTs.value),
     table: ps.hashratePercentileTable,
-    realPopulation: registered.value,
+    realPopulation: ps.realUserCount,
     virtualPopulation: ps.virtualUserCount,
   });
 });

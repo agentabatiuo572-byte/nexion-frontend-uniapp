@@ -78,8 +78,6 @@ const ALLOW = {
   // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
   // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
   "src/pages/register/register.vue": 2,
-  // 跨账号写(addForAccount ×2):写的是**别的账号**的行,收口点只服务当前账号。
-  "src/pages/me/wallet-withdraw.vue": 2,
 };
 /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
 function billsWriteHits(src) {
@@ -176,9 +174,16 @@ export const defineStore = (id, setup) => () => {
   return cache.get(id);
 };`,
   "vue-stub": `export const ref = (v) => ({ __nxRef: true, value: v });
+export const shallowRef = ref;
 export const computed = (fn) => ({ __nxRef: true, get value() { return typeof fn === "function" ? fn() : fn.get(); } });
 export const reactive = (v) => v;
 export const watch = () => {};`,
+  "runtime-stub": `const unavailable = new Proxy({}, { get: () => async () => { throw new Error("runtime API is outside this self-check"); } });
+export const remoteApiEnabled = false;
+export const withdrawalApi = unavailable;
+export const genesisApi = unavailable;
+export const platformConfigApi = unavailable;
+export const earningsReleaseApi = unavailable;`,
 };
 const bundle = await build({
   stdin: {
@@ -197,6 +202,7 @@ export { useUI } from "@/store/ui";`,
     setup(b) {
       b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
       b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
+      b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime-stub", namespace: "stub" }));
       b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-money-receipt"));
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
     },
@@ -478,13 +484,13 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 全站每一个动钱的调用点都在这张表上 —— 台账(⑥)清零只证明「没人裸调」,
   // 这张表证明「都接到收口点上了」。两件事分开守:漏接一个,⑥ 也是绿的。
   const WIRED = [
-    // 🔴 三条冲正路径(purchase-sheet / marketplace / wallet-repurchase)都有「扣款 → 给货
-    // 失败 → 冲正」这一格,所以除了「走没走收口点」,还要守住冲正的**正确形状**:captureMoney
+    // 🔴 本地冲正路径(staking / wallet-repurchase)都有「扣款 → 给货失败 → 冲正」
+    // 这一格,所以除了「走没走收口点」,还要守住冲正的**正确形状**:captureMoney
     // 取基准 + restoreTo 还原。少了 restoreTo 的 `postMoneyBill(反向 draft)` 只是盲加一笔
     // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
     // 这种粗判据全绿。
     ["src/App.vue", ["postMoneyBill", "postReceiptOnly"]],
-    ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
+    // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
     ["src/components/home/weekly-quest-hero.vue", ["postMoneyBillsOnce"]],
     ["src/components/home/weekly-quest-list.vue", ["postMoneyBillsOnce"]],
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
@@ -495,7 +501,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/lib/share.ts", ["postMoneyBillsOnce"]],
     ["src/pages/daily/daily.vue", ["postMoneyBillsOnce"]],
     ["src/pages/events/events.vue", ["postMoneyBillsOnce"]],
-    ["src/pages/genesis/marketplace.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/pages/me/achievements.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-cards-new.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],

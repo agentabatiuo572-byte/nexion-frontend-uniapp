@@ -1,4 +1,4 @@
-import type { GpuTier, OnlineBonus, RewardsConfig } from "@/store/config-types";
+import type { GpuTier, OnlineBonus, PublicStatsConfig, RewardsConfig } from "@/store/config-types";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
@@ -6,6 +6,7 @@ export interface PlatformComputeConfigSnapshot {
   featureFlags: {
     computeShareEnabled: boolean;
   };
+  publicStats: PublicStatsConfig;
   onlineBonus: OnlineBonus;
   computeShare: {
     downloadUrl: string;
@@ -126,9 +127,58 @@ function parseGpuTiers(value: unknown): GpuTier[] {
   });
 }
 
+function parsePublicStats(value: unknown): PublicStatsConfig {
+  const projection = record(value);
+  const version = finiteNumber(projection.version);
+  const values = record(projection.values);
+  const fleetDevices = finiteNumber(values.fleetDevices);
+  const onlineRatePct = finiteNumber(values.onlineRatePct);
+  const onlineJitter = finiteNumber(values.onlineJitter);
+  const registeredUsersBase = finiteNumber(values.registeredUsersBase);
+  const registeredUsersMonthlyGrowthPct = finiteNumber(values.registeredUsersMonthlyGrowthPct);
+  const registeredUsersAnchorAt = finiteNumber(values.registeredUsersAnchorAt);
+  const virtualUserCount = finiteNumber(values.virtualUserCount);
+  const realUserCount = finiteNumber(projection.realUserCount);
+  if (!Number.isInteger(version) || version < 0
+      || !Number.isInteger(fleetDevices) || fleetDevices < 1_000 || fleetDevices > 1_000_000
+      || onlineRatePct < 50 || onlineRatePct > 100
+      || !Number.isInteger(onlineJitter) || onlineJitter < 0 || onlineJitter > 500
+      || !Number.isInteger(registeredUsersBase) || registeredUsersBase < 0 || registeredUsersBase > 100_000_000
+      || registeredUsersMonthlyGrowthPct < 0 || registeredUsersMonthlyGrowthPct > 50
+      || !Number.isInteger(registeredUsersAnchorAt) || registeredUsersAnchorAt <= 0
+      || !Number.isInteger(virtualUserCount) || virtualUserCount < 0 || virtualUserCount > 10_000_000
+      || !Number.isInteger(realUserCount) || realUserCount < 0 || realUserCount > 100_000_000
+      || !Array.isArray(values.hashratePercentileTable) || values.hashratePercentileTable.length < 2) invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
+  let previousTops = -1;
+  let previousPct = -1;
+  const hashratePercentileTable = values.hashratePercentileTable.map((raw) => {
+    const row = record(raw);
+    const tops = finiteNumber(row.tops);
+    const cumPct = finiteNumber(row.cumPct);
+    if (tops < 0 || tops <= previousTops || cumPct < previousPct || cumPct < 0 || cumPct > 100) {
+      return invalid("H9_PUBLIC_STATS_RESPONSE_INVALID");
+    }
+    previousTops = tops;
+    previousPct = cumPct;
+    return { tops, cumPct };
+  });
+  return {
+    fleetDevices,
+    onlineRatePct,
+    onlineJitter,
+    registeredUsersBase,
+    registeredUsersMonthlyGrowthPct,
+    registeredUsersAnchorAt,
+    realUserCount,
+    virtualUserCount,
+    hashratePercentileTable,
+  };
+}
+
 export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfigSnapshot {
   const root = record(value);
   const featureFlags = record(root.featureFlags);
+  const publicStats = parsePublicStats(root.publicStats);
   const onlineBonus = record(root.onlineBonus);
   const compute = record(root.computerCompute);
   const download = record(compute.download);
@@ -167,6 +217,7 @@ export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfi
 
   return {
     featureFlags: { computeShareEnabled: featureFlags.computeShareEnabled },
+    publicStats,
     onlineBonus: { h5BaseFactor, continuityFullHours },
     computeShare: {
       downloadUrl,

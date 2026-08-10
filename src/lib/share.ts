@@ -10,6 +10,7 @@ import { toast } from "@/store/ui";
 import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import type { ShareChannelDef } from "@/store/config-types";
+import { remoteApiEnabled } from "@/api/runtime";
 
 // §8.1.1 邀请人回报口径:每注册好友 lifetime 贡献估值(展示用)× 阶段倍率。
 // 单一常量源 — invite-earn-card 与渠道面板共用,禁再写局部镜像(F4)。
@@ -182,6 +183,11 @@ export function recordShareEvent(channel: string, surface: ShareSurface) {
     uni.setStorageSync(EVENTS_KEY, next);
   } catch {
     // storage unavailable — 事件缺失不阻断分享
+  }
+  if (remoteApiEnabled) {
+    // A client-side share intent is not proof of a server mission completion.
+    void useQuest().refreshRemote();
+    return;
   }
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
   // 三处漏改)。原来是先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,

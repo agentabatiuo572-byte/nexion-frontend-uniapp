@@ -40,8 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
@@ -49,7 +48,6 @@ import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
 import { useDeposits } from "@/store/deposits";
-import { toast } from "@/store/ui";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
 type Seg = "crypto" | "bank" | "card";

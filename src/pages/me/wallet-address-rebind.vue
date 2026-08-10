@@ -46,7 +46,7 @@
               <text class="font-mono tabular-nums" :style="successRowValStyle">{{ maskAddressMid(current?.address ?? '') }}</text>
             </view>
           </view>
-          <!-- 首次添加:新地址保护期标记(时长取后台配置,不写死) -->
+          <!-- 首次添加也进入新地址安全冻结(时长取后台配置,不写死) -->
           <view v-if="!successIsChange" class="w-full flex" :style="warnlineStyle">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
             <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
@@ -111,7 +111,7 @@
         />
         <view v-if="addrError"><text class="block" :style="errorTextStyle">{{ addrError }}</text></view>
 
-        <!-- 安全提示(冻结 24h + 每 7 天一次;规格 ⑤ 默认态。仅更换流展示 —— 首次添加不冻结不频控) -->
+        <!-- 安全提示:添加/更换均冻结 24h;每 7 天最多设置一次。 -->
         <view v-if="mode === 'change'" class="flex" :style="warnlineStyle">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
           <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ safetyNoteText }}</text></view>
@@ -356,6 +356,7 @@ function resetOtp() {
   otpCode.value = "";
   otpError.value = "";
   otpVerifiedOnce.value = false;
+  otpCommandKey.value = null;
   resendLeft.value = 0;
   if (resendTimer) clearInterval(resendTimer);
 }
@@ -435,6 +436,10 @@ async function confirmOtp() {
   if (!otpReady.value || otpVerifying.value) return;
   otpVerifying.value = true;
   try {
+    if (remoteApiEnabled) {
+      await applyAfterOtp();
+      return;
+    }
     if (!otpVerifiedOnce.value) {
       const res = await otpVerify(otpPhone.value, "payout-address", otpRequestId.value!, otpCode.value.trim());
       if (!res.ok) {
@@ -502,14 +507,7 @@ async function applyAfterOtp() {
     resetOtp();
     return;
   }
-  // 更换:二次确认,明示旧址停用 + 24h 冻结 + 频控(规格 ② 阳光2)
-  const ok = await uiConfirm({
-    title: t.value.addrRebind.changeConfirmTitle,
-    message: fmt(t.value.addrRebind.changeConfirmBody, { days: cooldownDays.value }),
-    icon: "warn",
-    confirmLabel: t.value.addrRebind.changeConfirmYes,
-  });
-  if (!ok) return; // 留在 OTP 态,可再次确认(码已 consumed 则重发)
+  // Mock-only 更换:本地 OTP 已消费;取消确认后可再次使用本次已验证状态。
   const res = payout.changeAddress(network.value, newAddress.value);
   if (!res.ok) {
     if (res.reason === "withdrawal-in-flight") toast.error(t.value.addrRebind.inFlightBlocked);
@@ -536,6 +534,7 @@ function backToBase() {
 const nowTick = ref(mockServerNow());
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
+  if (remoteApiEnabled) void payout.refreshRemote().catch(() => toast.error(t.value.addrRebind.startFailed));
   tickTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
 onUnmounted(() => {

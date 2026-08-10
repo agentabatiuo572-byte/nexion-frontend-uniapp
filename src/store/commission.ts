@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { commissionConfigApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
@@ -158,19 +160,35 @@ export const useCommission = defineStore("commission", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const events = ref<CommissionEvent[]>(hydrate(boundKey));
+  const events = ref<CommissionEvent[]>(remoteApiEnabled ? [] : hydrate(boundKey));
+  const binarySnapshot = ref<CanonicalBinaryState | null>(null);
 
   function persist() {
+    if (remoteApiEnabled) return;
     writeAccountRow<{ events: CommissionEvent[] }>(ACCOUNTS_KEY, boundKey, { events: events.value });
   }
 
   /** 账号切换重绑:装载该账号的佣金事件行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      binarySnapshot.value = null;
+      events.value = [];
+      void refreshCanonicalBinary();
+      return;
+    }
     events.value = hydrate(boundKey);
   }
 
+  async function refreshCanonicalBinary() {
+    if (!remoteApiEnabled) return;
+    binarySnapshot.value = null;
+    events.value = [];
+    binarySnapshot.value = await commissionConfigApi.binary();
+  }
+
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {
+    if (remoteApiEnabled) return;
     const ev: CommissionEvent = {
       ...e,
       id: `c-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -183,6 +201,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   function unlockMatured() {
+    if (remoteApiEnabled) return;
     const t = Date.now();
     const needsUpdate = events.value.some((e) => e.status === "cooling" && e.unlockAt <= t);
     if (!needsUpdate) return;
@@ -242,7 +261,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, bindAccount,
+    events, binarySnapshot, bindAccount, refreshCanonicalBinary,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

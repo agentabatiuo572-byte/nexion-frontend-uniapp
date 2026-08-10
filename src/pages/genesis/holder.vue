@@ -235,7 +235,10 @@ const dividendsOpen = computed(() => genesis.dividendsOpen);
 //   售罄时这里说「暂未开放」而创世页说「已售罄」,同刻自相矛盾。售罄档落 `ctaSoldOut`。
 const { showUrgency, blockText } = useGenesisSaleGate();
 // 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
-onShow(() => useGenesisConfig().refresh());
+onShow(() => {
+  void useGenesisConfig().refresh();
+  void genesis.syncRemote();
+});
 const notHolderBodyText = computed(() =>
   showUrgency.value
     ? fmt(t.value.genesisHolder.notHolderBody, { n: remaining.value })

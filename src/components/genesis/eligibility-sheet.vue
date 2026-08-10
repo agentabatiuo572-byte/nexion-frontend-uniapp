@@ -104,7 +104,7 @@
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { GENESIS_ELIGIBILITY, type GenesisGateCondition } from "@/store/genesis";
+import { GENESIS_ELIGIBILITY, useGenesis, type GenesisGateCondition } from "@/store/genesis";
 import type { GenesisInviteRejectReason } from "@/store/genesis-invite";
 import { useApp } from "@/store/app";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
@@ -115,6 +115,7 @@ const emit = defineEmits<{ "update:open": [boolean]; subscribe: [] }>();
 
 const t = useT();
 const app = useApp();
+const genesis = useGenesis();
 const { gate } = useGenesisEligibility();
 
 const inviteInput = ref("");
@@ -191,15 +192,16 @@ function goFix(key: GenesisGateCondition["key"]) {
   }
 }
 
-function verifyInvite() {
+async function verifyInvite() {
   inviteReject.value = null;
   // per-account 核销(随 account-cloud 快照走,切号不继承 — 审计 P1 修复);
   // 查平台码表 + 三态校验,拒绝带归因 → 四种失败各自文案(规格 FEAT-GEN11 ②)。
-  const result = app.setGenesisInviteCode(inviteInput.value);
+  const result = await app.setGenesisInviteCode(inviteInput.value);
   if (!result.ok) {
     inviteReject.value = result.reason;
     return;
   }
+  await genesis.syncRemote();
   toast.success(t.value.genesisEligibility.inviteApplied, "");
 }
 

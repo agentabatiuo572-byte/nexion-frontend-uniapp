@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { accountRowRev, readAccountRow, writeAccountRowCas } from "./account-scoped-storage";
 import { mockServerId } from "./mock-id";
+import { stakingApi, remoteApiEnabled } from "@/api/runtime";
+import type { StakingPool } from "@/api/staking-api";
 
 /**
  * Ported from Nexion-prototype/lib/v3/staking.ts (zustand persist → Pinia + uni storage).
@@ -56,7 +58,7 @@ export interface StakingPosition {
   apy: number;
   startTs: number;
   unlockTs: number;
-  status: "active" | "matured" | "early-withdrawn" | "claimed";
+  status: "pending-lock" | "active" | "matured" | "early-withdrawn" | "claimed" | "slashed" | "refunded";
 }
 
 // 旧设备级单键 "nexgrid-v3-staking-v1" 废弃(存量无账号归属,mock 可重建);持仓按账号分行。
@@ -95,12 +97,91 @@ function hydrate(accountKey: string): StakingSnapshot {
 }
 
 export const useStaking = defineStore("staking", () => {
+  const isMockMode = !remoteApiEnabled;
+  const pools = ref<StakingPool[]>([]);
+  const walletBalanceUsdt = ref(0);
+  const remoteError = ref<string | null>(null);
+  const remoteReady = ref(isMockMode);
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
   const boot = hydrate(boundKey);
   let boundRev = boot.rev;
   const positions = ref<StakingPosition[]>(boot.positions);
+
+  function clearRemoteState() {
+    pools.value = [];
+    positions.value = [];
+    walletBalanceUsdt.value = 0;
+    remoteReady.value = false;
+  }
+
+  function applyRemoteSnapshot(snapshot: Awaited<ReturnType<typeof stakingApi.fetchStakingPositions>>) {
+    positions.value = snapshot.positions.map((position) => ({
+      id: position.id,
+      amountUSDT: position.amountUSDT,
+      termDays: position.termDays,
+      apy: position.apy,
+      startTs: position.startTs,
+      unlockTs: position.unlockTs,
+      status: position.status,
+    }));
+    walletBalanceUsdt.value = snapshot.walletBalanceUsdt;
+    remoteError.value = null;
+    remoteReady.value = true;
+  }
+
+  async function syncRemote() {
+    if (!remoteApiEnabled) return;
+    try {
+      const [nextPools, snapshot] = await Promise.all([
+        stakingApi.fetchStakingPools(),
+        stakingApi.fetchStakingPositions(),
+      ]);
+      pools.value = nextPools;
+      applyRemoteSnapshot(snapshot);
+    } catch {
+      clearRemoteState();
+      remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
+      throw new Error(remoteError.value);
+    }
+  }
+
+  async function openRemote(tierKey: string, amountUsdt: number, idempotencyKey: string) {
+    try {
+      const snapshot = await stakingApi.openStakingPosition(tierKey, amountUsdt, idempotencyKey);
+      applyRemoteSnapshot(snapshot);
+      return snapshot;
+    } catch {
+      clearRemoteState();
+      remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
+      throw new Error(remoteError.value);
+    }
+  }
+
+  async function claimRemote(positionNo: string, idempotencyKey: string) {
+    try {
+      const snapshot = await stakingApi.claimStakingPosition(positionNo, idempotencyKey);
+      applyRemoteSnapshot(snapshot);
+      return snapshot;
+    } catch {
+      clearRemoteState();
+      remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
+      throw new Error(remoteError.value);
+    }
+  }
+
+  async function earlyWithdrawRemote(positionNo: string, idempotencyKey: string) {
+    try {
+      const snapshot = await stakingApi.earlyWithdrawStakingPosition(positionNo, idempotencyKey);
+      applyRemoteSnapshot(snapshot);
+      return snapshot;
+    } catch {
+      clearRemoteState();
+      remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
+      throw new Error(remoteError.value);
+    }
+  }
 
   /**
    * 乐观并发提交(CAS)。read-modify-write 三步都收在这里:
@@ -271,6 +352,11 @@ export const useStaking = defineStore("staking", () => {
   }
 
   return {
+    isMockMode,
+    pools,
+    walletBalanceUsdt,
+    remoteError,
+    remoteReady,
     positions,
     totalLocked,
     totalEarnedSoFar,
@@ -281,5 +367,9 @@ export const useStaking = defineStore("staking", () => {
     claim,
     markMatured,
     bindAccount,
+    syncRemote,
+    openRemote,
+    claimRemote,
+    earlyWithdrawRemote,
   };
 });

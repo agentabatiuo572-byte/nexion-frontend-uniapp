@@ -197,17 +197,19 @@ const OFFSET = 0.4;
 //    固定靶照样全绿。剥注释后 pin 提交边界与退款现场(注释里出现判定式文本不得哄绿)。 ──
 const stripTs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 const appSrc = stripTs(readFileSync(path.join(root, "src", "store", "app.ts"), "utf8"));
-const cfgSrc = stripTs(readFileSync(path.join(root, "src", "store", "config.ts"), "utf8"));
+const apiSrc = stripTs(readFileSync(path.join(root, "src", "api", "withdrawal-api.ts"), "utf8"));
+const pageSrc = stripTs(readFileSync(path.join(root, "src", "pages", "me", "wallet-withdraw.vue"), "utf8"));
 {
-  check("🔴 接线:submitWithdrawal 以 5 参调用校验器(network 映射键 + 权威 map)",
-    /isWithdrawalFeeSnapshotValid\(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY\[network\], currentNetworkConfirmFeeUsd\(\)\)/.test(appSrc));
-  check("🔴 接线:权威值走 config 纯函数单源(app.ts 从 @/store/config import,禁本地写死同名函数)",
-    /import \{[^}]*currentNetworkConfirmFeeUsd[^}]*\} from "@\/store\/config"/.test(appSrc)
-    && !/function currentNetworkConfirmFeeUsd/.test(appSrc));
-  const cfgFnStart = cfgSrc.indexOf("export function currentNetworkConfirmFeeUsd");
-  const cfgFn = cfgFnStart >= 0 ? cfgSrc.slice(cfgFnStart, cfgFnStart + 600) : "";
-  check("🔴 config 纯函数存在且 fail-closed(syncFailed / 值域坏 → null,禁回退种子值)",
-    cfgFnStart >= 0 && cfgFn.includes("isNetworkFeeConfigUsable") && cfgFn.includes("syncFailed") && cfgFn.includes("return null"));
+  check("🔴 接线:submitWithdrawal 把 policyVersion 与抵扣意图原样交给真实接口",
+    /withdrawalApi\.submit\(\s*amount,\s*network,\s*address,\s*policyVersion,\s*offsetWithNex,\s*idempotencyKey,?\s*\)/.test(appSrc));
+  check("🔴 接线:真实 POST 只提交意图,不接受客户端伪造费用快照",
+    /path:\s*"\/api\/withdrawals"/.test(apiSrc)
+    && /body:\s*\{\s*amount,\s*chain,\s*address:\s*targetAddress,\s*policyVersion,\s*useNexFeeOffset\s*\}/.test(apiSrc)
+    && !/body:\s*\{[^}]*networkConfirmUsd/.test(apiSrc));
+  check("🔴 页面费用来自 GET policy 且缺失时 fail-closed",
+    /withdrawalPolicy\.value\s*=\s*await withdrawalApi\.policy\(\)/.test(pageSrc)
+    && /withdrawalPolicy\.value\s*=\s*null/.test(pageSrc)
+    && /snap\.policyVersion/.test(pageSrc));
 }
 {
   check("🔴 退款双键:USDT 本金仍走 refund: 键", appSrc.includes('"refund:" + wd.id'));

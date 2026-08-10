@@ -252,6 +252,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
+import { orderApi, remoteApiEnabled } from "@/api/runtime";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 const MAX_DEVICES = 6;
@@ -544,6 +545,9 @@ const orderId = ref<string | null>(null);
 // Re-entry guard for the confirm→pay tap (mirrors source confirmingRef) —
 // prevents a double-tap from racing the step transition.
 let confirming = false;
+// Retries of one visible confirmation must resolve to the same server command;
+// navigating back to payment selection intentionally starts a new checkout.
+let remoteOrderIdempotencyKey: string | null = null;
 // Snapshot "was empty before this checkout" BEFORE createOrder increments it.
 const wasEmptyBefore = ref(orders.orders.length === 0);
 const firstOrderCelebrating = ref(false);
@@ -613,6 +617,7 @@ function goConfirm() {
 }
 
 function goSelectPayment() {
+  remoteOrderIdempotencyKey = null;
   step.value = "select-payment";
 }
 
@@ -634,12 +639,16 @@ let quotedTotal = 0;
 // silently charged the un-discounted price the confirm step never showed.
 let voucherQuote: { id: string | null; discount: number } = { id: null, discount: 0 };
 
-function onConfirmPay() {
+async function onConfirmPay() {
   if (confirming || step.value !== "confirm") return;
   confirming = true;
   trialQuote = trialView.value;
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
+  if (remoteApiEnabled) {
+    await submitRemoteOrder();
+    return;
+  }
   // $0 due (credits cover the displayed total, 异常4) → nothing to transfer:
   // the chain QR / card form would solicit a 0-USDT payment with no executable
   // action (and a real backend would invite a 0-value on-chain transfer). All
@@ -648,6 +657,53 @@ function onConfirmPay() {
   // keep the exact pre-existing path. 判据取快照总额,与下面扣款同一个数。
   step.value = quotedTotal === 0 ? "confirmed" : "pay-instructions";
   setTimeout(() => { confirming = false; }, 0);
+}
+
+function remoteOrderKey(): string {
+  if (remoteOrderIdempotencyKey) return remoteOrderIdempotencyKey;
+  const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  remoteOrderIdempotencyKey = `h7-order:${suffix}`;
+  return remoteOrderIdempotencyKey;
+}
+
+async function submitRemoteOrder(): Promise<void> {
+  const p = product.value;
+  const requestedVoucherId = voucherQuote.id;
+  if (!p) {
+    confirming = false;
+    return;
+  }
+  try {
+    const created = await orderApi.create({
+      productNo: p.id,
+      quantity: 1,
+      voucherId: requestedVoucherId,
+      idempotencyKey: remoteOrderKey(),
+    });
+    const receipt = created.voucherRedemption;
+    // A claimed voucher changes its UI state only after the order's explicit,
+    // server-issued redemption receipt. Missing/mismatched receipts fail closed.
+    if (requestedVoucherId
+      ? created.voucherId !== requestedVoucherId
+        || !receipt
+        || receipt.voucherId !== requestedVoucherId
+        || receipt.status !== "REDEEMED"
+        || receipt.discountUsdt !== created.discountUsdt
+      : receipt !== null) {
+      throw new Error("H7_VOUCHER_REDEMPTION_RECEIPT_INVALID");
+    }
+    orderId.value = created.orderNo;
+    if (requestedVoucherId) await voucher.refreshRemote();
+    step.value = "live";
+  } catch {
+    // No local order, balance debit, or voucher redemption mirror in remote mode.
+    step.value = "confirm";
+    toast.warn(t.value.tradein.errPurchaseFailed);
+  } finally {
+    confirming = false;
+  }
 }
 
 // ── state-machine timers (mirror source useEffect auto-advance chain) ──
