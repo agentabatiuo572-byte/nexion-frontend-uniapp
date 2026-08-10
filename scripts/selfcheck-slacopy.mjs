@@ -12,6 +12,10 @@
 //      且 indexOf 未命中返回 -1 喂给 slice 切出空串后**判 PASS**(候选为空全过)。
 //   ③ 红测靠「{h} 被删掉」变红,那条「不许写死时长」的子判据**从头到尾没被触发过**。
 // 现版:真解析读对象 + 判据写成语义(挖掉占位符后不许剩数字)+ 每个合取项各有独立红测。
+//
+// z1 判决(2026-08-10):c37e642 起时限承诺有意改版为「以服务端订单状态为准」({h} 插值退场,
+// 三语同步),披露正文渲染源改远端 chapters。本哨兵剩下的职责 = 时限文案不许写死数字
+// (非空 + 三语相异)+ 披露页渲染源钉远端。
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,60 +50,43 @@ for (const l of LOCALES) {
     check(`[${l}] ${key} 不含写死数字(挖掉占位符后)`, !hasHardcodedNumber(v),
       typeof v === "string" ? v.slice(0, 70) : "取不到值");
   }
-  // 各自必须带的占位符(缺了 = 数字没接上配置)
-  check(`[${l}] s4Body 带 {h}`, String(at(msgs[l], "riskDisclosure.s4Body") ?? "").includes("{h}"));
+  // z1 判决(2026-08-10):{h} 时限承诺句已有意改版为服务端口径(以服务端订单状态为准),
+  // s4Body / terms.s6Body 的占位符断言退役;无写死数字 + 非空 + 三语相异照守
+  // (前两者由上面 SLA_KEYS 循环覆盖,三语相异在循环后单独断言)。
+  // s4BodyLargeAmount 仍是插值句,必须带的占位符照旧(缺了 = 数字没接上配置)。
   check(`[${l}] s4BodyLargeAmount 带 {d} 与 {large}`,
     ["{d}", "{large}"].every((m) => String(at(msgs[l], "riskDisclosure.s4BodyLargeAmount") ?? "").includes(m)));
-  check(`[${l}] terms.s6Body 带 {h}`, String(at(msgs[l], "terms.s6Body") ?? "").includes("{h}"));
   // 首审提示改成不给时间承诺后,它自己也不许再出现数字
   check(`[${l}] wallet.firstTimeReview 不做时间承诺(系统对人工复核无推进机制)`,
     !hasHardcodedNumber(at(msgs[l], "wallet.firstTimeReview")),
     String(at(msgs[l], "wallet.firstTimeReview") ?? ""));
 }
 
-// ── 接线门:文案带了占位符,页面没插值 = 用户直接看到 "{h}" ────────
-// 判据锚定到目标标识符所在的**那个函数体**,不做整文件撒网(整文件 includes 可被
-// 「把表达式搬进死函数 / 写进注释」穿过)。
-const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-const rd = stripComments(read("src/pages/me/risk-disclosure.vue"));
-const tm = stripComments(read("src/pages/onboarding/terms.vue"));
-
-/**
- * 取一个 `const x = computed(() => {...})` 的完整函数体 —— 用**括号配对**,不用 indexOf 找 `});`。
- * 找字面 `});` 会被内层的 `fmt(..., { ... })` 提前截断(实测就这么断的),
- * 截断后判据落在半截代码上,红绿都不可信。解析器脆性是本轮哨兵自审点名的一族。
- */
-function bodyOf(src, startMark) {
-  const i = src.indexOf(startMark);
-  if (i < 0) return null;
-  let depth = 0, started = false;
-  for (let k = i; k < src.length; k++) {
-    const c = src[k];
-    if (c === "(" || c === "{") { depth++; started = true; }
-    else if (c === ")" || c === "}") {
-      depth--;
-      if (started && depth === 0) return src.slice(i, k + 1);
-    }
-  }
-  return null;
+// 三语互不相同:整份复制粘贴 = 有值但没翻译,「存在 + 无数字」两道门都看不出来。
+for (const key of ["riskDisclosure.s4Body", "terms.s6Body"]) {
+  const vals = LOCALES.map((l) => at(msgs[l], key));
+  check(`${key} 三语互不相同`,
+    new Set(vals.map((v) => String(v))).size === LOCALES.length,
+    vals.map((v) => String(v).slice(0, 40)).join(" | "));
 }
 
-const wwBody = bodyOf(rd, "const withdrawWindowBody = computed(");
-check("🔴 披露页 §04 的时长真的插了 payoutSlaHours(不插值 = 用户看到 {h})",
-  !!wwBody && wwBody.includes("w.value.s4Body") && wwBody.includes("normalizeSlaHours") && wwBody.includes("payoutSlaHours"),
-  wwBody ? "" : "找不到 withdrawWindowBody 函数体");
-check("🔴 大额审查句按窗口配置门控(配 0 不能显示「0 天窗口」)",
-  !!wwBody && wwBody.includes("payoutReviewWindowDays") && /return base/.test(wwBody));
-// 判据必须钉到 **`d:` 这个绑定本身**。只查「函数体里出现过 normalizeReviewWindowDays」太松:
-// 门控那行也含它,把 `d:` 上的 clamp 摘掉照样绿(红测实证)——一个判据守两件事就会这样。
-check("🔴 大额窗口天数与实现同口径夹值域(实现夹 30 天,文案不夹 = 配 3650 就写「3650 天」)",
-  !!wwBody && /d:\s*normalizeReviewWindowDays\(/.test(wwBody));
-check("🔴 门控也走同一个 clamp(负值 / NaN 时整句不出现)",
-  !!wwBody && /normalizeReviewWindowDays\([^)]*\)\s*<=\s*0/.test(wwBody));
-check("🔴 §04 真的用了派生结果渲染,不是直接铺原串",
-  rd.includes("body: withdrawWindowBody.value"));
-check("🔴 条款页 §06 同口径插值",
-  tm.includes("normalizeSlaHours") && tm.includes("payoutSlaHours") && tm.includes("w.s6Body"));
+// ── 接线门:披露正文的渲染源 ──────────────────────────────────────────────
+// 判据跑在剥注释后的源码上(注释里出现判定式文本不得哄绿)。
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const rd = stripComments(read("src/pages/me/risk-disclosure.vue"));
+
+// z1 判决(2026-08-10):§04 渲染源改为远端 chapters(risk store 拉取)后,本地派生
+// withdrawWindowBody 断链成死代码、已随本判决删除;原先钉它的 4 条结构断言
+// (s4Body 插值 / 大额句门控 / d: clamp / 门控 clamp)绿着守死代码 = 假绿,同批退役。
+// 换钉远端渲染源三合取,逐项独立断言(各自可红):
+check("🔴 披露正文渲染源 = 远端 chapters(disclosure.value?.chapters 真进渲染管线)",
+  rd.includes("disclosure.value?.chapters"));
+check("🔴 进页真的拉远端披露(risk.refresh())", rd.includes("risk.refresh()"));
+check("🔴 拉取失败有失败态出口(loadError 提示 + 重试)", rd.includes("loadError"));
+
+// z1 判决(2026-08-10):terms §06 的插值机制(normalizeSlaHours + payoutSlaHours +
+// w.s6Body 三合取断言)随 {h} 文案改版一并移除 —— terms.vue §06 与其余 section 同形
+// 直铺 body: w.s6Body,无特有结构可钉;文案面仍由上方 i18n 门(非空/无写死数字/三语相异)守。
 
 console.log(`\n${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

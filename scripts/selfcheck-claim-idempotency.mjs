@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
 import { atAliasResolver } from "./lib/at-alias.mjs";
+import { VUE_STUB_NXREF, runtimeStub } from "./lib/harness-stubs.mjs";
 import { strip } from "./lib/strip-code.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -73,10 +74,8 @@ export const defineStore = (id, setup) => () => {
   }));
   return cache.get(id);
 };`,
-  "vue-stub": `export const ref = (v) => ({ __nxRef: true, value: v });
-export const computed = (fn) => ({ __nxRef: true, get value() { return typeof fn === "function" ? fn() : fn.get(); } });
-export const reactive = (v) => v;
-export const watch = () => {};`,
+  "vue-stub": VUE_STUB_NXREF,
+  "runtime-stub": runtimeStub(root),
 };
 const bundle = await build({
   stdin: {
@@ -92,6 +91,7 @@ export { useBills } from "@/store/bills";`,
     setup(b) {
       b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
       b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
+      b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime-stub", namespace: "stub" }));
       b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-claim-idempotency"));
       b.onLoad({ filter: /.*/, namespace: "stub" }, (a) => ({ contents: STUBS[a.path], loader: "js" }));
     },

@@ -398,26 +398,39 @@ function urgencySitesUngated(src) {
   //    `<root>/../admin-ops` 落在 .claude/worktrees/ 下 → 恒读不到 → 本条恒红(判据失效红,
   //    不是真缺陷),而下面 ⑧a-⑧d 连同它们的红测**整块被跳过** = 这道门在 worktree 里全暗。
   //    解析法与 scripts/verify.sh:36-44 的 ADMIN_ROOT 同款:同级优先,落空则用 git common-dir
-  //    反推主 checkout 根(不写死 worktree 层级)。两条都解析不到 → 保持同级路径,读不到照旧判红。
-  const siblingRepo = (name) => {
+  //    反推主 checkout 根(不写死 worktree 层级)。
+  // 🔴 目录名是**双候选**(z1 2026-08-10):`admin-ops` = 本机主 checkout 目录名(工作区
+  //    分流表 🅱 线),`nexion-ops-console` = 同远端仓 / PR checkout 名(c37e642 曾单写后者,
+  //    本机只有前者 → 恒红)。依次探,存在即用;**两个都不存在才红**,红时列出全部候选路径,
+  //    保持「读不到必红禁跳过」语义。
+  const SIBLING_CANDIDATES = ["admin-ops", "nexion-ops-console"];
+  const probeSibling = (name) => {
+    const tried = [];
     const direct = path.join(root, "..", name);
-    if (existsSync(direct)) return direct;
+    tried.push(direct);
+    if (existsSync(direct)) return { hit: direct, tried };
     try {
       const common = execFileSync("git", ["-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
         { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-      const viaMain = path.join(path.dirname(common), "..", name);
-      if (common && existsSync(viaMain)) return viaMain;
-    } catch { /* git 不可用 / 非仓库 → 落回同级路径,下游读不到即红 */ }
-    return direct;
+      if (common) {
+        const viaMain = path.join(path.dirname(common), "..", name);
+        tried.push(viaMain);
+        if (existsSync(viaMain)) return { hit: viaMain, tried };
+      }
+    } catch { /* git 不可用 / 非仓库 → 只剩同级候选,读不到即红 */ }
+    return { hit: null, tried };
   };
-  const ADMIN_OPS = siblingRepo("nexion-ops-console");
+  const probes = SIBLING_CANDIDATES.map((name) => ({ name, ...probeSibling(name) }));
+  const ADMIN_OPS = probes.find((p) => p.hit)?.hit ?? probes[0].tried[0];
   const adminClient = path.join(ADMIN_OPS, "lib/admin/g4-client.ts");
   const adminView = path.join(ADMIN_OPS, "app/components/domain-views/g-tabs/g4-genesis.tsx");
   let clientSrc = null, viewSrc = null;
   try { clientSrc = readFileSync(adminClient, "utf8"); } catch { /* red below */ }
   try { viewSrc = readFileSync(adminView, "utf8"); } catch { /* red below */ }
-  check(`🔴 ⑧ 兄弟仓 admin-ops 两文件可读(parity 的取材面)`, clientSrc !== null && viewSrc !== null,
-    `读不到 ${clientSrc === null ? adminClient : ""} ${viewSrc === null ? adminView : ""} —— 判据失效必红,不许静默跳过`);
+  check(`🔴 ⑧ 兄弟仓运营后台两文件可读(parity 的取材面;候选 ${SIBLING_CANDIDATES.join(" / ")})`,
+    clientSrc !== null && viewSrc !== null,
+    `读不到 ${clientSrc === null ? adminClient : ""} ${viewSrc === null ? adminView : ""}`
+    + ` —— 判据失效必红,不许静默跳过;逐候选探过:${probes.map((p) => `${p.name}=[${p.tried.join(" | ")}]`).join(" ;; ")}`);
 
   if (clientSrc !== null && viewSrc !== null) {
     // a) 字段名:后台契约必须用统一名,且旧名已绝迹(排除注释里的历史说明)

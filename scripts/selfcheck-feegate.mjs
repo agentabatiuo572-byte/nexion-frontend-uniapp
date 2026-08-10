@@ -42,8 +42,11 @@ const code = page
 //    这与 selfcheck-fastlane 已修掉的「追加析取项」是同一个弱点,在兄弟哨兵里原样复发。
 const norm = (s) => s.replace(/\s+/g, " ").trim();
 const flat = norm(code);
-const FEE_USABLE_DEF = "const feeConfigUsable = computed(() => !cfg.syncFailed && cfg.feeConfigValid);";
-check("🔴 费率可用性定义逐字符合规(两个合取项,尾部不得追加任何分支)",
+// z1(2026-08-10):D5 remote-only 后判据换源 —— cfg.syncFailed/feeConfigValid 由
+// withdrawalPolicy 三合取取代(policy 非 null = 配置真拉到了;当前网络已启用;抵扣率 > 0)。
+// 「整串逐字、尾部不得追加任何分支」的防 || true 设计原样保留。
+const FEE_USABLE_DEF = "const feeConfigUsable = computed(() => { const policy = withdrawalPolicy.value; return policy !== null && policy.enabledNetworks.includes(network.value) && policy.nexFeeOffsetRate > 0; });";
+check("🔴 费率可用性定义逐字符合规(三个合取项,尾部不得追加任何分支)",
   flat.includes(FEE_USABLE_DEF),
   "定义已偏离 —— 追加 `|| true` 之类会让门恒真而看不出来");
 check("不可用时提交被拦(submitDisabledReason 里有这道门)",
@@ -82,6 +85,13 @@ check("模板不硬编码分隔空格(分隔符归各语言串,CJK 才不会多�
   !/\{\{ ' ' \}\}\{\{ t\.wallet\.minWithdrawNoteOffset \}\}/.test(code));
 check("🔴 最低提现额从配置插值,不写死(否则运营调值后同屏两个最低额)",
   /minWithdrawNoteText = computed\(\(\) => fmt\(t\.value\.wallet\.minWithdrawNote, \{ n: minWithdrawable\.value/.test(code));
+// ── ②b z1 B2(2026-08-10):质押劝阻卡禁在空表单渲染 ──────
+// 漏网史:minWithdrawable 回退 0 时 `amountNum >= minWithdrawable` 对空表单(0)恒真,
+// 劝阻卡在用户一个字没输时就弹出(真回归,z1 修掉)。三门齐挂:已输入金额 /
+// 达到最低额 / 报价未被拦(这笔提交不了就不劝改质押)。整串钉在组件标签上防挪门。
+check("🔴 质押劝阻卡 v-if 三合取齐挂(>0 · ≥最低额 · !quoteBlocked,空表单不渲染)",
+  code.includes('<StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked"'),
+  "minWithdrawable 回退 0 后 `0 >= 0` 恒真 —— 少 amountNum > 0 这道门,空表单直接弹劝阻卡");
 
 // ── ③ 四态齐且**加载态可达** ──────────────────────────
 // 漏网史:加载态原本排在失败态**后面**,而重试只可能从失败态发起,
@@ -99,7 +109,8 @@ check("四态齐(加载 / 不可用 / 未输入 / 默认)",
 check("失败态给了重试出口",
   /@click="retryFeeConfig"/.test(code) && /async function retryFeeConfig/.test(code));
 check("重试真能重拉配置(不是只清本地标志)",
-  /await cfg\.load\(\)/.test(code));
+  // z1(2026-08-10):重试改走 loadWithdrawalPolicy(仍是真重拉,只是换了通道)。
+  /await loadWithdrawalPolicy\(\)/.test(code));
 
 // ── ④ FEAT-WD02:惩罚费概念清零 + 抵扣意图链 ──────────
 // 新模型 = 固定网络确认费 + 自选 NEX 抵扣。守三条:
