@@ -28,10 +28,10 @@
           </view>
         </view>
 
-        <view v-if="trustLoading" :style="cardStyle"><text :style="complianceBodyStyle">正在核验适用于当前地区的公开披露…</text></view>
+        <view v-if="trustLoading" :style="cardStyle"><text :style="complianceBodyStyle">{{ tr.loadingDisclosure }}</text></view>
         <view v-else-if="error" :style="cardStyle">
-          <text :style="complianceBodyStyle">{{ trustLoadError }}</text>
-          <text class="block active:opacity-70" :style="retryStyle" @click="loadTrustSections">重试</text>
+          <text :style="complianceBodyStyle">{{ trustLoadErrorText }}</text>
+          <text class="block active:opacity-70" :style="retryStyle" @click="loadTrustSections">{{ t.ui.retry }}</text>
         </view>
         <view v-else :style="cardStyle">
           <view v-for="section in trustSections" :key="section.sectionKey" :style="serverSectionStyle">
@@ -213,6 +213,8 @@ import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
+import { toast } from "@/store/ui";
+import { navTo } from "@/lib/route";
 import { publicStatsHealth } from "@/lib/platform-stats";
 import { remoteApiEnabled, trustSectionApi } from "@/api/runtime";
 import type { PublishedTrustField, PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
@@ -232,10 +234,12 @@ const activeDevicesText = computed(() => {
 const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "zh");
 const trustSections = ref<(PublishedTrustSection & { fields: (PublishedTrustField & { href: string | null })[] })[]>([]);
 const trustLoading = ref(true);
-const trustLoadError = ref("");
+// 存 key 不存译文:译好的串快照进 ref 后不再跟随语言(uni 复用页面实例时,上一次访问
+// 用的语言会留在错误提示上 —— 2026-08-10 实景走查在教程中心实测到这个形态)。
+const trustLoadError = ref<"" | "errorOffline" | "errorGeoUnresolved" | "errorUnavailable">("");
 const error = trustLoadError;
+const trustLoadErrorText = computed(() => trustLoadError.value ? tr.value[trustLoadError.value] : "");
 const trustSnapshotLabel = computed(() => trustSections.value.length ? `v${trustSections.value.length}` : "—");
-const plusRuntime = (globalThis as { plus?: { runtime?: { openURL: (href: string) => void } } }).plus?.runtime;
 
 function safeHref(field: PublishedTrustField): string | null {
   const raw = field.value.trim();
@@ -248,16 +252,25 @@ function safeHref(field: PublishedTrustField): string | null {
 }
 function openHref(href: string | null) {
   if (!href) return;
-  if (href.startsWith("/")) { uni.navigateTo({ url: href }); return; }
-  if (plusRuntime) plusRuntime.openURL(href);
-  else pageCopy.value.openFailed;
+  if (href.startsWith("/")) { navTo(href); return; }
+  // 外链按端分支 —— 写法抄 src/lib/share.ts:100-114。原先只有 plus.runtime 一条路,
+  // 而 plus 只在 App 端注入,于是 H5 下每一条审计报告 / 链上链接都 100% 打不开;
+  // 且 plusRuntime 原本在模块作用域读一次,App 端注入晚于模块求值时会永久失效,故改成调用时读。
+  let opened = false;
+  // #ifdef H5
+  opened = !!window.open(href, "_blank");
+  // #endif
+  // #ifndef H5
+  const plusRuntime = (globalThis as { plus?: { runtime?: { openURL: (u: string) => void } } }).plus?.runtime;
+  if (plusRuntime) { plusRuntime.openURL(href); opened = true; }
+  // #endif
+  if (!opened) toast.error(t.value.trust.openFailed);
 }
-const pageCopy = computed(() => ({ openFailed: "无法在当前设备打开该链接" }));
 async function loadTrustSections() {
   trustLoading.value = true;
   trustLoadError.value = "";
   trustSections.value = [];
-  if (!remoteApiEnabled) { trustLoading.value = false; trustLoadError.value = "该公开披露仅在受信任网络可用；请连接后重试。"; return; }
+  if (!remoteApiEnabled) { trustLoading.value = false; trustLoadError.value = "errorOffline"; return; }
   try {
     const sections = await trustSectionApi.current();
     trustSections.value = sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, href: safeHref(field) })) }));
@@ -265,8 +278,8 @@ async function loadTrustSections() {
   } catch (error) {
     trustSections.value = [];
     trustLoadError.value = error instanceof Error && error.message.includes("GEO_COUNTRY_UNRESOLVED")
-      ? "暂时无法确认您所在地区的适用范围；页面不会用本地旧内容冒充最新事实，请检查网络后重试。"
-      : "公开披露暂不可用；页面不会用本地旧内容冒充最新事实，请稍后重试。";
+      ? "errorGeoUnresolved"
+      : "errorUnavailable";
   } finally { trustLoading.value = false; }
 }
 onMounted(() => { void loadTrustSections(); });

@@ -24,10 +24,22 @@ test("G2 remote mode never records a local wallet success", () => {
   assert.match(source, /await exchangeApi\.fetchState\(\)/);
   assert.match(source, /await exchangeApi\.swap\(/);
   assert.match(source, /remoteState\.value = null/);
-  assert.match(source, /远端权威数据/);
+  // 判据锚在 **i18n key** 上,不锚中文字面量:页面文案 2026-08-10 收进 src/i18n(硬编码中文
+  // 哨兵 scripts/i18n-hardcoded-cjk-sentinel.mjs 要求 .vue 里不得出现中文),锚字面量会让
+  // 这道门与那道门方向相反 —— 任何源码状态都不可能同时绿。
+  // 🔴 key 名收尾必须带边界:不带的话 `remoteNotProvidedXX` 这种笔误 key 照样匹配,
+  //    页面渲染空白而门报绿(红测实测出来的洞)。
+  assert.match(source, /t\.exchange\.remoteUnavailableClosed\b(?!\w)/);
   assert.match(source, /remoteState\.value\?\.orders/);
   assert.match(source, /remote mode must never render persisted exchange or v3 facts/);
-  assert.match(source, /远端未提供/);
+  assert.match(source, /t\.exchange\.remoteNotProvided\b(?!\w)/);
+  // 锚 key 就必须同时锚「key 有值」,否则指向一个不存在的键也能绿(悬空 key = 页面渲染空白)。
+  for (const locale of ["en", "zh", "vi"]) {
+    const dict = read(`src/i18n/messages/${locale}.ts`);
+    for (const key of ["remoteUnavailableClosed", "remoteNotProvided"]) {
+      assert.match(dict, new RegExp(`${key}:\\s*"[^"]+"`), `${locale}.ts 缺 exchange.${key} 或值为空`);
+    }
+  }
   const remoteCommand = source.indexOf("if (remoteApiEnabled) {", source.indexOf("async function handleConfirm"));
   const localGate = source.indexOf("v3.canExchange", source.indexOf("async function handleConfirm"));
   assert.ok(remoteCommand >= 0 && remoteCommand < localGate, "remote command must precede the local v3 gate");

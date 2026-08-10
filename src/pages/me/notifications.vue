@@ -47,7 +47,7 @@
 
       <!-- Timeline -->
       <view class="px-4">
-        <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle"><text>{{ notifs.error }}</text><text class="block" :style="ctaStyle('system')" @click="notifs.retryRemote()">重试</text></view>
+        <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle"><text>{{ notifsErrorText }}</text><text class="block" :style="ctaStyle('system')" @click="notifs.retryRemote()">{{ t.ui.retry }}</text></view>
         <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
           <view
@@ -73,7 +73,7 @@
             </view>
           </view>
         </view>
-        <text v-if="notifs.nextCursor && !notifs.loading" class="block text-center" :style="ctaStyle('system')" @click="notifs.loadMoreRemote()">加载更多</text>
+        <text v-if="notifs.nextCursor && !notifs.loading" class="block text-center" :style="ctaStyle('system')" @click="notifs.loadMoreRemote()">{{ t.notifs.loadMore }}</text>
       </view>
     </view>
   </AppChassis>
@@ -91,6 +91,10 @@ import { navTo } from "@/lib/route";
 
 const t = useT();
 const notifs = useNotifications();
+// store 保留机器码(SESSION_EXPIRED / NOTIFICATION_UNAVAILABLE / 服务端 envelope 原文…),
+// 视图侧统一映射成用户文案 —— 裸插值会把工程码上屏,违反「页面文案禁止错误码」。
+// 写法与 risk-disclosure.vue:108 同源。
+const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed : "");
 
 type Filter = "all" | NotifKind;
 const filter = ref<Filter>("all");

@@ -67,8 +67,8 @@
       <!-- List -->
       <scroll-view scroll-y class="md-list" :show-scrollbar="false">
         <view v-if="notifs.error" class="md-empty">
-          <text class="md-empty-t">{{ notifs.error }}</text>
-          <view class="md-detail-cta" data-testid="drawer-notification-retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">重试</text></view>
+          <text class="md-empty-t">{{ notifsErrorText }}</text>
+          <view class="md-detail-cta" data-testid="drawer-notification-retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">{{ t.ui.retry }}</text></view>
         </view>
         <view v-if="filtered.length === 0" class="md-empty">
           <text class="md-empty-t">{{ emptyText }}</text>
@@ -130,6 +130,9 @@ import { navTo } from "@/lib/route";
 const t = useT();
 const drawer = useMessageDrawer();
 const notifs = useNotifications();
+// 同 notifications.vue:抽屉挂在 app-chassis,全站每页都能弹出这块,
+// 裸插值 notifs.error 会把 SESSION_EXPIRED 这类工程码送到任意页面的用户眼前。
+const notifsErrorText = computed(() => notifs.error ? t.value.notifs.loadFailed : "");
 
 type Filter = "all" | NotifKind;
 const filter = ref<Filter>("all");
