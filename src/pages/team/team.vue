@@ -197,10 +197,11 @@ import InviteEarnCard from "@/components/team/invite-earn-card.vue";
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
 import NetworkOrbBackdrop from "@/components/team/network-orb-backdrop.vue";
 import { useT } from "@/i18n/use-t";
-import { useVRank, nextRankProgress, V_RANKS } from "@/store/v-rank";
+import { useVRank, nextRankProgress } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const vrank = useVRank();
@@ -209,7 +210,7 @@ const commission = useCommission();
 const pool = useLeadershipPool();
 
 const myRank = computed(() => vrank.myRank);
-const myRankDisplay = computed(() => `V${vrank.myRank} ${V_RANKS[vrank.myRank].title}`);
+const myRankDisplay = computed(() => `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
 const members = computed(() => network.members);
 const totalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
@@ -219,9 +220,9 @@ const rankInfo = computed(() =>
     myRank: vrank.myRank,
     selfBuyUSD: vrank.selfBuyUSD,
     directRefs: vrank.directRefs,
-    teamVolumeUSD: vrank.teamVolumeUSD,
-    vDownlineCounts: vrank.vDownlineCounts,
-  }),
+  teamVolumeUSD: vrank.teamVolumeUSD,
+  vDownlineCounts: vrank.vDownlineCounts,
+}, vrank.ladder),
 );
 
 const byLayerBuckets = computed(() => network.byLayer());
@@ -257,6 +258,14 @@ const extendedUSDT = computed(() => ledger.value.extendedUSDT);
 
 // Binary match snapshot.
 const binary = computed(() => {
+  if (remoteApiEnabled) {
+    const snapshot = commission.binarySnapshot;
+    return {
+      binaryMatch: snapshot?.estimatedAmountUsdt ?? 0,
+      leftVol: snapshot?.trackA ?? 0,
+      rightVol: snapshot?.trackB ?? 0,
+    };
+  }
   let L = 0, R = 0;
   for (const m of members.value) {
     if (m.binary === "left") L += m.monthVolumeUSD;
@@ -291,6 +300,11 @@ function go(url: string) {
 // unlockMatured at mount + every 60s.
 let unlockTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
+  if (remoteApiEnabled) {
+    void vrank.refreshCanonicalVRank();
+    void commission.refreshCanonicalBinary();
+    return;
+  }
   commission.unlockMatured();
   unlockTimer = setInterval(() => commission.unlockMatured(), 60_000);
 });

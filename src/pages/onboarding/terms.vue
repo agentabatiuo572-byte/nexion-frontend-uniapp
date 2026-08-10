@@ -60,14 +60,10 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
-import { fmt } from "@/i18n/format";
-import { useConfig } from "@/store/config";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
 import { navBack } from "@/lib/route";
 
-const cfg = useConfig();
 const t = useT();
 
 const blocks = computed(() => {
@@ -78,7 +74,7 @@ const blocks = computed(() => {
     { n: 3, title: w.s3Title, body: w.s3Body },
     { n: 4, title: w.s4Title, body: w.s4Body },
     { n: 5, title: w.s5Title, body: w.s5Body },
-    { n: 6, title: w.s6Title, body: fmt(w.s6Body, { h: normalizeSlaHours(cfg.config.withdrawRules.payoutSlaHours) }) },
+    { n: 6, title: w.s6Title, body: w.s6Body },
     { n: 7, title: w.s7Title, body: w.s7Body },
     { n: 8, title: w.s8Title, body: w.s8Body },
     { n: 9, title: w.s9Title, body: w.s9Body },

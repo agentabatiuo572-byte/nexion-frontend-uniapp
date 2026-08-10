@@ -32,6 +32,7 @@ import { computed, onMounted, onUnmounted } from "vue";
 import { useNova } from "@/store/nova";
 import { useConversations } from "@/store/conversations";
 import { useNotifications, type NotifKind } from "@/store/notifications";
+import { remoteApiEnabled } from "@/api/runtime";
 import { welcomeMessage } from "@/mock/nova-templates";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -150,6 +151,10 @@ const timers: ReturnType<typeof setTimeout>[] = [];
 const intervals: ReturnType<typeof setInterval>[] = [];
 
 onMounted(() => {
+  if (remoteApiEnabled) {
+    void notifications.refreshRemote();
+    return;
+  }
   timers.push(setTimeout(() => {
     nova.push(welcomeMessage(t.value), { cooldownKey: "welcome", cooldownMs: WELCOME_COOLDOWN });
   }, WELCOME_DELAY));

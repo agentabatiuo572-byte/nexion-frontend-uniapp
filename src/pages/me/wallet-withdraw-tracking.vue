@@ -12,30 +12,8 @@
     <view style="padding-bottom: 16px">
       <SubPageHeader :back="'/pages/me/wallet'" :title="wd ? wd.id : t.wallet.withdrawalStatusSubtitle" />
 
-      <!-- ⑤ 加载态:步进条骨架(不是通用转圈)—— 骨架必须与真实结构同形,
-           否则加载完一跳,用户以为页面换了。触发源是本页 onMounted 的 cfg.load()。
-           🔴 只在**确有单据**时才骨架:没有提现记录的用户根本不依赖配置,
-           让他先盯 600ms 骨架再看到「暂无提现」是白等,空状态要立刻出。 -->
-      <view v-if="wd && cfg.loading" class="px-4" style="display: flex; flex-direction: column; gap: 12px" aria-busy="true">
-        <view :style="heroStyle">
-          <view :style="skelStyle('72px', '12px')" />
-          <view :style="skelStyle('160px', '34px', '6px')" />
-          <view :style="skelStyle('120px', '12px', '6px')" />
-        </view>
-        <view :style="stepperStyle">
-          <view :style="skelStyle('48px', '12px')" />
-          <view v-for="i in 5" :key="i" class="flex" style="gap: 12px; padding-top: 14px">
-            <view :style="skelStyle('24px', '24px', '0', '999px')" />
-            <view style="flex: 1">
-              <view :style="skelStyle('40%', '13px')" />
-              <view :style="skelStyle('64%', '12px', '4px')" />
-            </view>
-          </view>
-        </view>
-      </view>
-
       <!-- Empty — no top gap; the sub-page header already provides the 24px inset. -->
-      <view v-else-if="!wd" class="px-5 text-center">
+      <view v-if="!wd" class="px-5 text-center">
         <text class="block" :style="emptyTextStyle">{{ deepLinkMiss ? t.wallet.withdrawalNotFound : t.wallet.noActiveWithdrawal }}</text>
         <!-- 《07》tap≥44:空状态的行动链接独占一行,不吃 WCAG 2.5.8 的 inline 豁免 → 撑热区(原 88×22) -->
         <!-- 日限用尽时置灰 + 给原因(与「再提一笔」同判据同文案)。深链 miss 让本空态在
@@ -134,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -144,15 +122,12 @@ import { useApp } from "@/store/app";
 import type { WithdrawalStatus } from "@/store/types";
 import { navTo } from "@/lib/route";
 import { riskReasonLines } from "@/lib/risk-reason-text";
-import { useConfig } from "@/store/config";
-import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { dailyLimitStatus } from "@/store/withdrawal-eligibility";
 
 const STEP_DELAY_MS = 3500;
 
 const t = useT();
 const app = useApp();
-const cfg = useConfig();
 // 🔴 用**主单**(优先最早的在途单):只显示「最新一笔」时,在途的人工审核单
 // 会被后提且已到账的那笔挤掉,用户查不到自己还在审核的钱(独立验收实测)。
 // 深链(?id=)按单号精确定位;找不到走「查无此单」空态,**绝不回落主单** ——
@@ -166,15 +141,6 @@ const wd = computed(() => {
   return app.primaryWithdrawal;
 });
 const deepLinkMiss = computed(() => deepLinkId.value !== null && !wd.value);
-
-// ⑤ 加载态的触发源。不拉配置的话「预计 N 小时内完成」只能写死,
-// 骨架也永远进不了 DOM(死 UI)—— 两个问题同一个根。
-onMounted(() => {
-  void cfg.load();
-  // 🔴 本页**不推进状态**(SPEC-7:追踪页只展示)。到账推进统一由 App 层驱动
-  // (onShow 补齐 + 定时轮询),页面只读 latestWithdrawal —— 页面自己推进的话,
-  // 「谁能改这单的状态」就散成两处,以后接服务端推送要拆两遍。
-});
 
 const steps = computed<{ key: WithdrawalStatus; label: string; hint: string }[]>(() => [
   { key: "submitted", label: t.value.wallet.submitted, hint: t.value.wallet.trackSubmittedHint },
@@ -217,8 +183,6 @@ const currentIdx = computed(() => {
 const doneUpTo = computed(() => (isTerminalDone.value ? steps.value.length : Math.max(0, currentIdx.value)));
 /** 失败终态 / 冻结态不再转圈:转圈代表「还在推进」,而它已经不会再推进了。 */
 const showSpinner = computed(() => !isTerminalDone.value && !isFailedEnd.value && !isFrozenHold.value);
-/** 到账时效(小时)——从后台 D5 配置取,坏配置回落 24h。 */
-const slaHours = computed(() => normalizeSlaHours(cfg.config.withdrawRules.payoutSlaHours));
 
 // ⑥ 「再提一笔」的可用性。判据来自 core(纯查询,不占额度);
 // 依赖 latestWithdrawal 让本页提交完回来时重算,不然会停在旧结论上。
@@ -266,13 +230,13 @@ const etaSub = computed(() => {
   if (isFailedEnd.value) return t.value.wallet.trackFailedBody;
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
   if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
-  // 终态给实际到账时刻;进行中给「预计 N 小时内完成」——
-  // N 从后台到账时效插值,此前写死 24,运营改了参数页面照旧承诺次日(空头承诺)。
+  // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
     const at = wd.value.confirmedAt ?? wd.value.estimatedCompletion;
     return Number.isFinite(at) ? fmt(t.value.wallet.trackArrivedAt, { time: absTime(at) }) : t.value.wallet.trackReviewNote;
   }
-  return fmt(t.value.wallet.trackEtaPending, { n: String(slaHours.value) });
+  const at = wd.value?.estimatedCompletion;
+  return Number.isFinite(at) ? fmt(t.value.wallet.trackExpectedAt, { time: absTime(at as number) }) : t.value.wallet.trackReviewNote;
 });
 
 /** 「MM-DD HH:mm」本地时刻。到账是**确定发生过的事**,给绝对时间比「3 小时前」可核对。 */

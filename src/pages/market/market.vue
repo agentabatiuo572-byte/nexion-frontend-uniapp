@@ -26,13 +26,13 @@
               </view>
               <view>
                 <text class="block font-display" :style="nexPairStyle">NEX / USDT</text>
-                <text class="block" :style="nexSubStyle">NexGrid · #{{ NEX.rank }}</text>
+                <text class="block" :style="nexSubStyle">NexGrid · #{{ nex.rank }}</text>
               </view>
             </view>
             <view class="text-right">
-              <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ fmtPrice(NEX.priceUSD) }}</text>
+              <text class="block font-display tabular-nums" :style="nexPriceStyle">{{ fmtPrice(nex.priceUSD) }}</text>
               <text class="block font-mono-tabular tabular-nums" :style="nexChangeStyle">
-                {{ nexUp ? "▲" : "▼" }} {{ Math.abs(NEX.change24h).toFixed(2) }}% (24h)
+                {{ nexUp ? "▲" : "▼" }} {{ Math.abs(nex.change24h).toFixed(2) }}% (24h)
               </text>
             </view>
           </view>
@@ -79,7 +79,7 @@
           <view class="flex items-center justify-between border-t" :style="athRowStyle">
             <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.marketPage.stats.ath }}</text>
             <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-2)' }">
-              {{ fmtPrice(NEX.ath) }}
+              {{ nex.ath > 0 ? fmtPrice(nex.ath) : "—" }}
               <text :style="{ color: 'var(--v5-brand-2)' }">({{ athDeltaPct.toFixed(1) }}% {{ t.marketPage.stats.athFromNow }})</text>
             </text>
           </view>
@@ -135,21 +135,37 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, type CSSProperties } from "vue";
+import { ref, computed, reactive, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import NexChart from "@/components/market/nex-chart.vue";
 import TokenRow from "@/components/market/token-row.vue";
 import { useT } from "@/i18n/use-t";
+import { useMarket } from "@/store/market";
 import {
   TOKENS, CATEGORIES, TIMEFRAMES,
   type TokenCategory, type Timeframe,
 } from "@/mock/tokens";
 
 const t = useT();
+const market = useMarket();
 
 const NEX = TOKENS.find((tk) => tk.symbol === "NEX")!;
+const nex = computed(() => market.isMockMode ? NEX : ({
+  rank: "—",
+  priceUSD: market.nexPriceUSDT,
+  change24h: market.change24hPct,
+  ath: 0,
+  marketCapUSD: market.marketCap,
+  volume24hUSD: market.volume24hUSDT,
+  fdvUSD: 0,
+  circulating: market.circulating,
+  totalSupply: 0,
+  spark24h: market.klineHourly,
+  spark30d: market.klineDaily,
+}));
+onMounted(() => { if (!market.isMockMode) void market.syncRemote().catch(() => {}); });
 
 type CatFilter = TokenCategory | "all" | "watchlist";
 const activeCat = ref<CatFilter>("all");
@@ -181,10 +197,10 @@ const filtered = computed(() => {
 });
 
 const nexChartData = computed(() =>
-  tf.value === "1M" || tf.value === "ALL" ? NEX.spark30d : NEX.spark24h,
+  tf.value === "1M" || tf.value === "ALL" ? nex.value.spark30d : nex.value.spark24h,
 );
-const nexUp = NEX.change24h > 0;
-const athDeltaPct = ((NEX.priceUSD - NEX.ath) / NEX.ath) * 100;
+const nexUp = computed(() => nex.value.change24h > 0);
+const athDeltaPct = computed(() => nex.value.ath > 0 ? ((nex.value.priceUSD - nex.value.ath) / nex.value.ath) * 100 : 0);
 
 function fmtPrice(n: number): string {
   if (n >= 1000) return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
@@ -206,12 +222,12 @@ function fmtNumber(n: number): string {
 }
 
 const statCells = computed(() => [
-  { label: t.value.marketPage.stats.marketCap, value: fmtBig(NEX.marketCapUSD) },
-  { label: t.value.marketPage.stats.vol24h, value: fmtBig(NEX.volume24hUSD) },
-  { label: t.value.marketPage.stats.fdv, value: fmtBig(NEX.fdvUSD) },
-  { label: t.value.marketPage.stats.circulating, value: fmtNumber(NEX.circulating) },
-  { label: t.value.marketPage.stats.totalSupply, value: fmtNumber(NEX.totalSupply) },
-  { label: t.value.marketPage.stats.rank, value: `#${NEX.rank}` },
+  { label: t.value.marketPage.stats.marketCap, value: fmtBig(nex.value.marketCapUSD) },
+  { label: t.value.marketPage.stats.vol24h, value: fmtBig(nex.value.volume24hUSD) },
+  { label: t.value.marketPage.stats.fdv, value: nex.value.fdvUSD > 0 ? fmtBig(nex.value.fdvUSD) : "—" },
+  { label: t.value.marketPage.stats.circulating, value: nex.value.circulating > 0 ? fmtNumber(nex.value.circulating) : "—" },
+  { label: t.value.marketPage.stats.totalSupply, value: nex.value.totalSupply > 0 ? fmtNumber(nex.value.totalSupply) : "—" },
+  { label: t.value.marketPage.stats.rank, value: nex.value.rank === "—" ? "—" : `#${nex.value.rank}` },
 ]);
 
 function goExchange() {
@@ -239,7 +255,7 @@ const nexPriceStyle: CSSProperties = { fontSize: "26px", fontWeight: 600, lineHe
 const nexChangeStyle = computed<CSSProperties>(() => ({
   marginTop: "4px",
   fontSize: "12px",
-  color: nexUp ? "var(--v5-brand)" : "var(--v5-brand-2)",
+  color: nexUp.value ? "var(--v5-brand)" : "var(--v5-brand-2)",
 }));
 const segWrapStyle: CSSProperties = {
   marginTop: "12px",

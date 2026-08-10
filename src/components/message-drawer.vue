@@ -66,6 +66,10 @@
 
       <!-- List -->
       <scroll-view scroll-y class="md-list" :show-scrollbar="false">
+        <view v-if="notifs.error" class="md-empty">
+          <text class="md-empty-t">{{ notifs.error }}</text>
+          <view class="md-detail-cta" data-testid="drawer-notification-retry" @click="notifs.retryRemote()"><text class="md-detail-cta-t">重试</text></view>
+        </view>
         <view v-if="filtered.length === 0" class="md-empty">
           <text class="md-empty-t">{{ emptyText }}</text>
         </view>
@@ -98,7 +102,7 @@
             <view class="md-detail-inner">
               <text v-if="n.body" class="md-detail-body">{{ n.body }}</text>
               <text class="md-detail-abs tabular-nums">{{ absoluteTime(n.ts) }}</text>
-              <view v-if="n.ctaLabel && n.ctaHref" class="md-detail-cta" @click.stop="onCta(n.ctaHref)">
+              <view v-if="n.ctaLabel && n.ctaHref" class="md-detail-cta" @click.stop="onCta(n)">
                 <text class="md-detail-cta-t">{{ n.ctaLabel }}</text>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
               </view>
@@ -191,12 +195,11 @@ function markAll() {
 function close() {
   drawer.close();
 }
-function onCta(href: string) {
+async function onCta(notification: Notification) {
+  const canonicalRoute = await notifs.recordCta(notification.id);
+  if (!canonicalRoute) return;
   close();
-  // notification ctaHrefs are prototype logical paths (e.g. /team/commissions,
-  // /genesis, /me/wallet/exchange) — map to the real uni route, else navigate
-  // silently fails (P-046).
-  navTo(href);
+  navTo(canonicalRoute);
 }
 
 function timeAgo(ts: number): string {

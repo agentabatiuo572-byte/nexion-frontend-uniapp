@@ -140,7 +140,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
-import { FLEET_DEVICES, fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
+import { fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 
 const t = useT();
@@ -153,7 +153,7 @@ const fleetOk = () => {
   const ps = cfg.config.publicStats;
   return !!ps && publicStatsHealth(ps).fleetOk;
 };
-const fleetNow = () => (fleetOk() ? fleetDevicesOf(cfg.config.publicStats) : FLEET_DEVICES);
+const fleetNow = () => (fleetOk() && !cfg.syncFailed ? fleetDevicesOf(cfg.config.publicStats) : null);
 // 🔴 累计支付**不跟配置走**(第二次结构反思·族B,R2 审计 C5):它是时间积分,背着历史 ——
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
 //   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
@@ -162,8 +162,8 @@ const paidNow = () => paidCumulativeNow();
 const paid = ref(paidNow());
 const devices = ref(fleetNow());
 
-function fmtNum(n: number): string {
-  return n.toLocaleString("en-US");
+function fmtNum(n: number | null): string {
+  return n === null ? "—" : n.toLocaleString("en-US");
 }
 
 // Deterministic PRNG (SSR-safe in the prototype; here just keeps positions stable).
@@ -206,8 +206,10 @@ onMounted(() => {
     // ±24 band, same rationale as the store tick (bounded symmetric wobble),
     // 带心随配置派生的舰队数走(审计 P1 的「其它页面舰队数字」半场)。
     const base = fleetNow();
-    if (drift > 0.75) devices.value = Math.min(base + 24, devices.value + 1);
-    else if (drift < 0.25) devices.value = Math.max(base - 24, devices.value - 1);
+    if (base === null) { devices.value = null; return; }
+    const current = devices.value ?? base;
+    if (drift > 0.75) devices.value = Math.min(base + 24, current + 1);
+    else if (drift < 0.25) devices.value = Math.max(base - 24, current - 1);
   }, 1800);
 });
 onUnmounted(() => {

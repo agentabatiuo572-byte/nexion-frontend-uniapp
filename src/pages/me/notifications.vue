@@ -47,6 +47,7 @@
 
       <!-- Timeline -->
       <view class="px-4">
+        <view v-if="notifs.error" data-testid="notification-error" :style="emptyCardStyle"><text>{{ notifs.error }}</text><text class="block" :style="ctaStyle('system')" @click="notifs.retryRemote()">重试</text></view>
         <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
           <view
@@ -72,13 +73,14 @@
             </view>
           </view>
         </view>
+        <text v-if="notifs.nextCursor && !notifs.loading" class="block text-center" :style="ctaStyle('system')" @click="notifs.loadMoreRemote()">加载更多</text>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -142,11 +144,17 @@ function timeAgo(ts: number): string {
   return `${Math.floor(mins / 1440)}d`;
 }
 
-function onTap(n: Notification) {
-  notifs.markRead(n.id);
-  const href = n.ctaHref ?? KIND_META[n.kind].href;
-  if (href) navTo(href); // ctaHref may be a prototype logical path (/team/commissions, /genesis…) seeded by nova-bubble — navTo maps it; /pages/ hrefs pass through (P-046)
+async function onTap(n: Notification) {
+  if (n.ctaHref) {
+    const canonicalRoute = await notifs.recordCta(n.id);
+    if (canonicalRoute) navTo(canonicalRoute);
+    return;
+  }
+  await notifs.markRead(n.id);
+  const href = KIND_META[n.kind].href;
+  if (href) navTo(href);
 }
+onMounted(() => { void notifs.refreshRemote(); });
 
 const unreadBadgeStyle: CSSProperties = {
   fontSize: "12px",

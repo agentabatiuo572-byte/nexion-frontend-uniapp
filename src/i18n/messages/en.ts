@@ -991,7 +991,7 @@ export const en = {
     s3Title: "Token (NEX) market risk",
     s3Body: "NEX is a platform reward token. Its USD-denominated value can move ±20% daily based on AI inference demand, buyback flow, and broader crypto market conditions. Token holdings are not FDIC / SIPC insured. Do not stake or hold more NEX than you can afford to lose.",
     s4Title: "Withdrawal windows + compliance review",
-    s4Body: "Standard withdrawals land about {h} hours after you request them. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, mining and referrals.",
+    s4Body: "Withdrawal processing time follows the server-side order state. Each withdrawal pays one fixed network confirmation fee set per network; it does not scale with the amount, and some networks may be free. You can optionally cover this fee with NEX — the option is off by default and NEX is never used without turning it on. Earn NEX through check-ins, mining and referrals.",
     s4BodyLargeAmount: "Withdrawals above ${large} may enter a {d}-day enhanced compliance review window; the later of the two dates applies.",
     s5Title: "Staking lock-ups are irreversible",
     s5Body: "Staking pools (30d / 90d / 180d / 365d) lock principal for the full term. Early unlock forfeits 100% of accrued yield premium and deducts 5% / 15% / 30% / 50% of principal respectively. Read each pool's terms separately before locking.",
@@ -2088,6 +2088,7 @@ export const en = {
 
     trackFailedBody: "This withdrawal did not complete. Your funds have not left your account. Contact support for details.",
     trackEtaPending: "Expected within {n} hours",
+    trackExpectedAt: "Server-estimated processing time: {time}",
 
     trackEtaTitlePending: "Processing",
 
@@ -3456,7 +3457,7 @@ export const en = {
     goFlagship: "View device",
     goUpgrade: "Upgrade",
     inviteVerify: "Verify",
-    invitePlaceholder: "NEXGRID-OG-XXXX",
+    invitePlaceholder: "NEXGRID-OG-16-character code",
     inviteInvalid: "Invalid invite code",
     inviteUsed: "This invite code has already been redeemed",
     inviteVoided: "This invite code has been revoked",
@@ -3525,6 +3526,8 @@ export const en = {
     marketClosed: {
       default: "Market not open yet",
       maintenance: "Under maintenance — reservations paused",
+      phase_control: "Unavailable during the current phase",
+      compliance: "Unavailable due to compliance requirements",
       restock: "This round is fully allocated",
       halted: "Reservations paused",
       configUnavailable: "Can't load status right now",
@@ -3613,6 +3616,7 @@ export const en = {
     submitReasonMaxAmount: "Available withdrawable balance is ${n}.",
 
     submitReasonFeeConfigUnavailable: "Fee rates are updating, please try again shortly",
+    submitReasonWithdrawalClosed: "Withdrawals are currently closed.",
 
     dailyLimitReached: "Daily withdrawal limit reached. Next withdrawal available {time}.",
     submitReasonAddressRequired: "Add a withdrawal address first.",
@@ -5157,7 +5161,7 @@ export const en = {
     currentLabel: "Current address",
     addedAtLabel: "In effect since",
     sourceMigrated: "Earlier address · carried over",
-    holdNote: "New-address protection for {h} hours: withdrawals may need an extra review during this window.",
+    holdNote: "New-address security freeze for {h} hours: withdrawals are unavailable during this window.",
     newAddressLabel: "New address",
     invalidAddress: "That address does not look valid for the selected network.",
     sameAddress: "The new address is the same as the current one.",
@@ -5167,8 +5171,8 @@ export const en = {
     inFlightBlocked: "A withdrawal is in progress. You can change the address once it completes.",
     inFlightGoCta: "View withdrawal progress",
     cooldownUntil: "You can change it again after {time}.",
-    freezeBanner: "Withdrawal address changed — security freeze in effect · {t} left",
-    submitFrozenReason: "Withdrawals are frozen for security after an address change.",
+    freezeBanner: "New withdrawal address security freeze · {t} left",
+    submitFrozenReason: "Withdrawals are unavailable while the new address is under its security freeze.",
     otpTitle: "SMS confirmation",
     otpBody: "A code has been sent to {phone}",
     otpBodyGeneric: "A code has been sent to your registered phone",
@@ -5186,8 +5190,8 @@ export const en = {
     changeConfirmBody:
       "The old address stops receiving immediately. Withdrawals freeze for 24 hours after the change, and no further change is possible for {days} days.",
     changeConfirmYes: "Confirm change",
-    addSuccessTitle: "Withdrawal address in effect",
-    addSuccessBody: "Future withdrawals will go to this address.",
+    addSuccessTitle: "Withdrawal address saved",
+    addSuccessBody: "Withdrawals will use this address after the security freeze ends.",
     successTitle: "New address in effect",
     successBody:
       "The previous address has been deactivated. For security, withdrawals stay frozen for 24 hours before resuming.",

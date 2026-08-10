@@ -5,7 +5,7 @@
   Collection hero (4-stat grid + 7d floor delta + fake OpenSea redirect) →
   segmented tabs (listings / activity / mine) → sort pills + listing grid /
   activity feed / owned-token grid. Wrapped in <AppChassis active="me">. Buy
-  composes postMoneyBill(扣款⊗记账) + genesis.acquireSecondary in the handler.
+  is settled atomically by the canonical Genesis backend transaction.
   SEED_LISTINGS / SEED_ACTIVITY are faithful English mock arrays.
 -->
 <template>
@@ -142,25 +142,25 @@ import OpenSeaModal from "@/components/genesis/opensea-modal.vue";
 import GenesisEligibilitySheet from "@/components/genesis/eligibility-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
 import { onMounted, onUnmounted } from "vue";
-import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { postMoneyBill } from "@/lib/money-receipt";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 
 const ONE_DAY = 86400 * 1000;
 const HOUR = 3600_000;
 
 const t = useT();
-const app = useApp();
 const genesis = useGenesis();
 const cfg = useGenesisConfig();
 // 页面每次露出重读配置(hydrate-once 修复;理由同 genesis.vue)。
-onShow(() => cfg.refresh());
+onShow(() => {
+  void cfg.refresh();
+  void genesis.syncRemote();
+});
 const { gate, eligible, gatesSecondary } = useGenesisEligibility();
 const { marketClosed, secondaryBlock, blockText } = useGenesisSaleGate();
 /** 阻断说明文案 —— 走 blockText 唯一出口(P1-3 收口:此前 4 处各写一份同款 switch)。
@@ -175,7 +175,11 @@ const secondaryBlockSub = computed(() =>
 );
 
 // 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
-const stats = computed(() => cfg.config.marketStats);
+const stats = computed(() => {
+  const rows = genesis.remoteListings;
+  const floor = rows.length ? Math.min(...rows.map((row) => row.priceUSDT)) : 0;
+  return { floor, vol24h: 0, listed: rows.length, owners: 0, floorDeltaPct: 0 };
+});
 
 const eligSheetOpen = ref(false);
 
@@ -221,24 +225,13 @@ function resolveListedAt(v: number): number {
   return v < 0 ? now + v : v;
 }
 
-// 挂单池 = 运营挂单(FEAT-GEN10)+ 种子卖单,合并去重、剔除已成交。UI 不暴露 source。
+// Real server listing pool. No local seed or operations registry participates.
 const mergedListings = computed<Listing[]>(() => {
-  const ops: Listing[] = cfg.config.opsListings.map((o) => ({
-    tokenId: o.tokenId,
-    priceUSDT: o.priceUSDT,
-    lastSaleUSDT: o.lastSaleUSDT,
-    seller: o.seller,
-    listedAt: resolveListedAt(o.listedAt),
-    traits: o.traits,
+  return genesis.remoteListings.map((row) => ({
+    ...row,
+    lastSaleUSDT: row.priceUSDT,
+    traits: { tier: `Founder #${row.tokenId}`, boost: "—", mintYear: 2026 },
   }));
-  const seen = new Set<number>();
-  const out: Listing[] = [];
-  for (const l of [...ops, ...SEED_LISTINGS]) {
-    if (soldTokenIds.value.has(l.tokenId) || seen.has(l.tokenId)) continue;
-    seen.add(l.tokenId);
-    out.push(l);
-  }
-  return out;
 });
 
 const sortedListings = computed(() => {
@@ -313,25 +306,15 @@ onUnmounted(() => {
   if (fomoTimer) clearTimeout(fomoTimer);
 });
 
-function handleBuy(l: Listing) {
-  // 🔴 阻断闸放在**最前**(规格 FEAT-GEN10 ⑥:二级市场与购买同一状态源)。
-  //   零资金动作就拦掉 —— store 层 acquireSecondary 也有同一道闸兜底,但那时钱已经扣了、
-  //   要走冲正;能在这里挡住就别让钱先动。
-  //
-  // 🔴 判的是 `secondaryBlock !== null` 而**不是** `marketClosed`(独立验收 P1-6):
-  //   上一版只挡「市场关闭」,于是「配置未知 / 熔断」时会先扣钱、再被 store 拒、再冲正,
-  //   用户看到的是通用「承接失败」,既没有锁定说明也没有重试入口(违规格 异常3)。
+async function handleBuy(listing: Listing) {
   if (secondaryBlock.value !== null) {
     toast.error(secondaryBlockText.value, secondaryBlockSub.value);
     return;
   }
-  // 资格门(FEAT-GEN08,appliesTo=both 时二级同门):确认前拦截,零资金动作。
-  // 打开资格 sheet 引导补齐,而非仅 toast。
   if (gatesSecondary.value && !eligible.value) {
     eligSheetOpen.value = true;
     return;
   }
-  // 单人限购同样约束二级承接(store 层 acquireSecondary L4 兜底)。
   if (gate.value.capRemaining < 1) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
@@ -339,86 +322,22 @@ function handleBuy(l: Listing) {
     );
     return;
   }
-  // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账 + acquire。
-  // 🔴 二级承接 = 转让(acquireSecondary),不是主售铸造(purchase)——不动 soldSlots/档价、
-  // 不受售罄门影响。承接失败(已持有该 token / 撞限购)必须冲正,杜绝「扣钱不给货」。
-  // PRODUCTION: server validates listing, debits buyer, credits seller minus
-  // royalty, transfers tokenId, writes bills atomically (PRD §10.2.4
-  // POST /api/genesis/secondary/fulfill)。
-  //
-  // 🔴 顺序 = 扣款⊗记账(原子)→ 承接(照一级 purchase-sheet 同族)。原顺序是「裸 debitBalance
-  // → acquire → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、没人接 ——
-  // 于是钱已扣、token 已到手、弹「承接成功」,账单页却查无此单。收据与扣款收口成一次提交后,
-  // 收据落不了盘 = 钱没扣、token 没给、明确报错,零半执行残迹。
-  const billRef = `GENESIS-SEC-${l.tokenId}`;
-  // 回滚基准必须在动钱**之前**取(取晚了就是拿动过的状态当"原状")。
-  const before = app.captureMoney();
-  const paid = postMoneyBill({
-    type: "purchase",
-    symbol: "USDT",
-    amount: -l.priceUSDT,
-    status: "posted",
-    memo: `Genesis secondary · token #${l.tokenId}`,
-    ref: billRef,
-  });
-  // 扣款⊗记账这一跳就是 PROD 的 POST /api/genesis/secondary/fulfill —— 地区拒绝以它的
-  // 结果回来。先翻译:`null` = 普通结果,下面的余额不足 / 落盘失败分支原样处理,
-  // 绝不能把一次普通的落盘失败说成地区受限。
-  const geoPaid = geoPolicyUserMessage(paid, t.value.geoPolicy);
-  if (geoPaid) {
-    // 二级承接是动钱路径,拒单必须带资金交代(拒在扣款落地前,余额确实没动)。
-    toast.error(geoPaid, t.value.geoPolicy.fundsSafeNote);
-    return;
+  try {
+    if (await genesis.acquireSecondary(listing.tokenId)) {
+      toast.success(
+        fmt(t.value.marketplace.acquiredToast, { id: listing.tokenId }),
+        fmt(t.value.marketplace.acquiredDesc, { paid: listing.priceUSDT.toLocaleString(), held: ownedCount.value }),
+      );
+      return;
+    }
+  } catch (error) {
+    const geoMessage = geoPolicyUserMessage(error, t.value.geoPolicy);
+    if (geoMessage) {
+      toast.error(geoMessage, t.value.geoPolicy.fundsSafeNote);
+      return;
+    }
   }
-  if (paid === "insufficient") {
-    toast.error(
-      t.value.marketplace.insufficient,
-      fmt(t.value.marketplace.insufficientDesc, {
-        need: l.priceUSDT.toLocaleString(),
-        balance: app.user.usdtBalance.toFixed(2),
-      }),
-    );
-    return;
-  }
-  if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
-  if (!genesis.acquireSecondary(l.tokenId)) {
-    // 承接失败(已持有该 token / 撞单人限购)→ 冲正,走**同一个**收口点:
-    // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
-    //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
-    // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
-    //    已终态分录靠反向分录冲正、不改写原行(与一级预留冲正同规矩)。
-    const reversed = postMoneyBill(
-      {
-        type: "purchase",
-        symbol: "USDT",
-        amount: l.priceUSDT,
-        status: "posted",
-        memo: `Genesis secondary reversed · token #${l.tokenId} refunded`,
-        memoKey: "genesisSecondaryReversed",
-        memoParams: { id: l.tokenId },
-        // 🔴 冲正分录的幂等键要与原分录**分开**(2026-08-04 对抗审计 P2-9):
-        // `addOnce` 按 `ref + type + symbol` 三元组判重,而冲正与原扣款这三项原本完全相同 ——
-        // 将来任何一次幂等写(重放 / 补记)都会误命中冲正那行,把「已冲正」当成「已扣款」。
-        ref: `${billRef}-REV`,
-      },
-      { restoreTo: before },
-    );
-    // 🔴 冲正自己也会失败,返回值必须接:reversed !== "ok" 时钱**仍然扣着**,
-    // 此刻再弹「payment refunded」就是当面撒谎(2026-08-04 对抗审计 B-P1-2)。
-    // 收口点在 stuck 分支已经给了响亮终态 + 交易号,这里不再叠一句假承诺。
-    if (reversed !== "ok") return;
-    // 文案如实说「已退款」,不复用成功话术(审计 P2-2)。
-    toast.error(t.value.marketplace.acquireFailedTitle, t.value.marketplace.acquireFailedRefunded);
-    return;
-  }
-  soldTokenIds.value = new Set(soldTokenIds.value).add(l.tokenId); // 承接后从盘面移除
-  toast.success(
-    fmt(t.value.marketplace.acquiredToast, { id: l.tokenId }),
-    fmt(t.value.marketplace.acquiredDesc, {
-      paid: l.priceUSDT.toLocaleString(),
-      held: ownedCount.value,
-    }),
-  );
+  toast.error(t.value.marketplace.insufficient);
 }
 
 function goGenesis() {

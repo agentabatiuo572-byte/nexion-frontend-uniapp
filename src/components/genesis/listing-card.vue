@@ -35,6 +35,7 @@ import { fmt } from "@/i18n/format";
 
 export interface Listing {
   tokenId: number;
+  holdingNo?: string;
   priceUSDT: number;
   lastSaleUSDT: number;
   seller: string;

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { reactive } from "vue";
+import { questApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
@@ -96,7 +97,40 @@ export const useQuest = defineStore("quest", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
   const completedMap = reactive<Record<string, boolean>>({});
-  for (const id of hydrate(boundKey)) completedMap[id] = true;
+  if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
+
+  function clearRemoteFacts() {
+    for (const key of Object.keys(completedMap)) delete completedMap[key];
+  }
+
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const snapshot = await questApi.state();
+      for (const quest of snapshot.quests) {
+        if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
+      }
+      return true;
+    } catch {
+      // Do not leave a previous account's progress visible after an authority
+      // failure. A retry may refill this map only from the server snapshot.
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function claimRemote(id: QuestTaskId): Promise<boolean> {
+    if (!remoteApiEnabled) return false;
+    try {
+      const result = await questApi.claim(id, `h3-quest-claim:${id}`);
+      if (result.status !== "CLAIMED") return false;
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
 
   function persist() {
     writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
@@ -107,7 +141,11 @@ export const useQuest = defineStore("quest", () => {
   /** 账号切换重绑:清空并装载该账号的任务完成态(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
-    for (const k of Object.keys(completedMap)) delete completedMap[k];
+    clearRemoteFacts();
+    if (remoteApiEnabled) {
+      void refreshRemote();
+      return;
+    }
     for (const id of hydrate(boundKey)) completedMap[id] = true;
   }
 
@@ -122,6 +160,12 @@ export const useQuest = defineStore("quest", () => {
    * App.vue can creditNex / creditBalance + emit a toast.
    */
   function markComplete(id: QuestTaskId): QuestCompleteResult {
+    if (remoteApiEnabled) {
+      // Route visitors are not proof that a server mission is claimable. The
+      // H3 endpoint remains the only authority for completion and reward.
+      void refreshRemote();
+      return { firstTime: false, rewardNex: 0, rewardUsdt: 0 };
+    }
     if (completedMap[id]) {
       return { firstTime: false, rewardNex: 0, rewardUsdt: 0 };
     }
@@ -140,9 +184,13 @@ export const useQuest = defineStore("quest", () => {
   }
 
   function reset() {
+    if (remoteApiEnabled) {
+      clearRemoteFacts();
+      return;
+    }
     for (const k of Object.keys(completedMap)) delete completedMap[k];
     persist();
   }
 
-  return { completedMap, QUEST_TASKS, isComplete, markComplete, reset, bindAccount };
+  return { completedMap, QUEST_TASKS, isComplete, markComplete, reset, bindAccount, refreshRemote, claimRemote };
 });

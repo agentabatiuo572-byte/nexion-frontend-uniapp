@@ -6,6 +6,10 @@
     role="button"
     :tabindex="props.active ? 0 : -1"
     :aria-hidden="!props.active"
+    :data-copy-source="managedCopy.status[MANAGED_POSITION] ?? 'fallback'"
+    :data-copy-key="managedCopy.deliveries[MANAGED_POSITION]?.copyKey ?? 'builtin'"
+    :data-copy-version="managedCopy.deliveries[MANAGED_POSITION]?.version ?? 'builtin'"
+    :data-experiment-id="managedCopy.deliveries[MANAGED_POSITION]?.experimentId ?? ''"
     @click="goStore"
     @keydown.enter.prevent="goStore"
     @keydown.space.prevent="goStore"
@@ -58,13 +62,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { derivePromoUpgrade } from "@/store/device-types";
 import { deviceNameByKind } from "@/lib/device-copy";
 import { useNow } from "@/composables/use-now";
+import { useContentCopy } from "@/store/content-copy";
+import { useLocaleStore } from "@/store/locale";
+import { refreshCanonicalOrders } from "@/store/order-canonical";
+
+const MANAGED_POSITION = "home.conversion-banner";
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), {
   active: true,
@@ -72,6 +81,14 @@ const props = withDefaults(defineProps<{ active?: boolean }>(), {
 const t = useT();
 const app = useApp();
 const nowTick = useNow();
+const managedCopy = useContentCopy();
+const locale = useLocaleStore();
+
+onMounted(() => {
+  void managedCopy.refresh(MANAGED_POSITION).then(() => {
+    if (managedCopy.deliveries[MANAGED_POSITION]?.experimentId) void refreshCanonicalOrders(true);
+  });
+});
 
 const promoMult = 1.5;
 const baseReward = 800;
@@ -87,12 +104,13 @@ const remainingLabel = computed(() => {
 
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
 const targetDailyText = computed(() => promo.value.targetDaily.toFixed(2));
+const managedCopyText = computed(() => managedCopy.localized(MANAGED_POSITION, locale.code));
 const subtitleText = computed(() =>
-  promo.value.multiplier > 0
+  managedCopyText.value || (promo.value.multiplier > 0
     ? fmt(t.value.home.weeklyQuestActivateToClaim, {
         device: deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
       })
-    : t.value.home.weeklyQuestAddCapacity,
+    : t.value.home.weeklyQuestAddCapacity),
 );
 
 const rootStyle: CSSProperties = {

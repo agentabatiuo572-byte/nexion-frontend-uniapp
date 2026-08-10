@@ -136,23 +136,24 @@ import { pickSponsor } from "@/mock/sponsors";
 import { useConfig } from "@/store/config";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
-import { MONTHLY_PAYOUT_USD, MONTHLY_NEW_JOINERS, monthlyPayoutUsdOf, publicStatsHealth } from "@/lib/platform-stats";
+import { monthlyPayoutUsdOf, publicStatsHealth } from "@/lib/platform-stats";
 
 const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrunch"];
-// This-month payout — 配置派生(审计 P1 半场收口),坏配置回种子锚;joiners is a
-// people-metric mock (the fleet-anchor figure is devices-only and must not play this role).
-// (cfg 在下方与本页其它配置消费共用同一个 store 句柄。)
-const monthlyUsdOfCfg = (c: ReturnType<typeof useConfig>) => {
-  const ps = c.config.publicStats;
-  // 钱链回退只看 fleetOk(R2 P2 粒度)
-  return ps && publicStatsHealth(ps).fleetOk ? monthlyPayoutUsdOf(ps) : MONTHLY_PAYOUT_USD;
-};
-const joinersText = MONTHLY_NEW_JOINERS.toLocaleString("en-US");
-
 const t = useT();
 const code = ref("");
 const cfg = useConfig();
-const paidOutText = computed(() => `$${(monthlyUsdOfCfg(cfg) / 1_000_000).toFixed(1)}M`); // 与同页礼包金额同型:computed,配置一改就跟(R2 P2 半改收口)
+const paidOutText = computed(() => {
+  const ps = cfg.config.publicStats;
+  return !cfg.syncFailed && publicStatsHealth(ps).fleetOk
+    ? `$${(monthlyPayoutUsdOf(ps) / 1_000_000).toFixed(1)}M`
+    : "—";
+});
+const joinersText = computed(() => {
+  const ps = cfg.config.publicStats;
+  return !cfg.syncFailed && publicStatsHealth(ps).membersOk
+    ? Math.round(ps.registeredUsersBase * ps.registeredUsersMonthlyGrowthPct / 100).toLocaleString("en-US")
+    : "—";
+});
 const auth = useAuth();
 const sponsorship = useSponsorship();
 // 礼包金额单源派生自 platform config(禁写死镜像)。

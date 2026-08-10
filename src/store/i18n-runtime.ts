@@ -96,7 +96,10 @@ export const useI18nRuntime = defineStore("i18n-runtime", () => {
 
   function messages(locale: LocaleCode): Readonly<Record<string, string>> {
     prepare();
-    return bundles.value[locale] ?? {};
+    // A cache is only an optimization. Until this locale is freshly confirmed by
+    // the service, callers must use the bundled dictionary rather than present
+    // stale remote wording as current policy content.
+    return status.value[locale] === "ready" ? bundles.value[locale] ?? {} : {};
   }
 
   return { bundles, fetchedAt, status, error, prepare, refresh, messages };

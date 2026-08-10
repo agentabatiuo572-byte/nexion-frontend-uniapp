@@ -52,6 +52,7 @@ export interface CreatedOrder {
   discountUsdt: number;
   amountUsdt: number;
   voucherId: string | null;
+  voucherRedemption: { voucherId: string; grantId: string; status: "REDEEMED"; discountUsdt: number } | null;
   paymentStatus: string;
   orderStatus: string;
   idSource: "server";
@@ -145,12 +146,21 @@ function canonicalOrder(value: unknown): CanonicalOrder {
 function createdOrder(value: unknown): CreatedOrder {
   const source = record(value);
   if (source.idSource !== "server") return invalid();
+  const rawRedemption = source.voucherRedemption;
+  const redemption = rawRedemption === null || rawRedemption === undefined ? null : record(rawRedemption);
+  const voucherRedemption = redemption === null ? null : {
+    voucherId: nonEmptyString(redemption.voucherId),
+    grantId: nonEmptyString(redemption.grantId),
+    status: redemption.status === "REDEEMED" ? "REDEEMED" as const : invalid(),
+    discountUsdt: finiteNumber(redemption.discountUsdt),
+  };
   return {
     orderNo: nonEmptyString(source.orderNo),
     subtotalUsdt: finiteNumber(source.subtotalUsdt),
     discountUsdt: finiteNumber(source.discountUsdt),
     amountUsdt: finiteNumber(source.amountUsdt),
     voucherId: nullableString(source.voucherId),
+    voucherRedemption,
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
     idSource: "server",

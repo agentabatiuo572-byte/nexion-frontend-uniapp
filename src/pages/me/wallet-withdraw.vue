@@ -350,6 +350,7 @@ import { navTo } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
+import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
 import { usePayoutAddress } from "@/store/payout-address";
 import { remoteApiEnabled } from "@/api/runtime";
@@ -364,9 +365,10 @@ import {
 import { computeWithdrawFee, isWithdrawalFeeSnapshotValid, type WithdrawNetworkKey } from "@/store/nex-faucet";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { useConfig, currentNetworkConfirmFeeUsd } from "@/store/config";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
+import { withdrawalApi } from "@/api/runtime";
+import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 // 提现网络收窄裁决:仅 USDT 三网络(可选;每网络各有独立当前地址,RM01a)。
 const NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
@@ -381,15 +383,35 @@ const bills = useBills();
 const payout = usePayoutAddress();
 const risk = useRiskDisclosure();
 const phase = useProductPhase();
-const cfg = useConfig();
+const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
+const withdrawalPolicyLoading = ref(false);
+
+async function loadWithdrawalPolicy(): Promise<void> {
+  if (withdrawalPolicyLoading.value) return;
+  withdrawalPolicyLoading.value = true;
+  try {
+    withdrawalPolicy.value = await withdrawalApi.policy();
+  } catch {
+    withdrawalPolicy.value = null;
+  } finally {
+    withdrawalPolicyLoading.value = false;
+  }
+}
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
 // pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
 // 注意:这里读 usdtBalance 是本规则的正解,不是 verify.sh 反向哨兵防的那个历史 P0
 // ——那个 P0 是「可提额度 > 总余额仍放行」,防线在 app.ts 的总余额门,未拆。
-const maxWithdrawable = computed(() => app.user.usdtBalance);
-const minWithdrawable = computed(() => cfg.config.withdrawRules.minWithdrawableUsdt);
-const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(cfg.config.withdrawRules.dailyWithdrawLimitCount) }));
+const maxWithdrawable = computed(() => {
+  if (earningsReleaseSnapshot.value?.clusterRestricted) return 0;
+  const buckets = earningsReleaseSnapshot.value?.buckets;
+  if (!buckets) return 0;
+  const serverWithdrawable = Math.max(0,
+    app.user.usdtBalance - buckets.pending_review - buckets.bonus_locked);
+  return serverWithdrawable * (withdrawalPolicy.value?.balanceMaxRatio ?? 0);
+});
+const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
+const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(withdrawalPolicy.value?.dailyLimitCount ?? 0) }));
 // 今日笔数用完时的提示 + 下次可提时刻(平台日边界,按用户本地时钟展示)
 const dailyLimitReachedText = computed(() => {
   // 🔴 给「MM-DD HH:mm」绝对时刻,不写「明日」。平台日按越南时区(UTC+7)切,
@@ -437,6 +459,8 @@ function goManage() {
 const nowTick = ref(mockServerNow());
 let freezeTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
+  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+  void loadWithdrawalPolicy();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
 onUnmounted(() => {
@@ -448,8 +472,8 @@ const freezeBannerText = computed(() =>
   fmt(t.value.addrRebind.freezeBanner, { t: formatClock(freezeLeftMs.value, { hours: true }) }),
 );
 
-const complianceHoldEnabled = computed(() => phase.value.complianceHoldEnabled);
-const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: phase.value.withdrawalCooldownDays }));
+const complianceHoldEnabled = computed(() => withdrawalPolicy.value?.complianceHoldEnabled === true);
+const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days: withdrawalPolicy.value?.cooldownDays ?? 0 }));
 
 // ── Fee model (FEAT-WD02): fixed per-network confirm fee + OPT-IN NEX offset ──
 // fee = withdrawRules.networkConfirmFeeUsd[network](后台 D5 单源,[0,25]);
@@ -461,7 +485,7 @@ const holdBody = computed(() => fmt(t.value.walletV3.complianceHoldBody, { days:
 /** 提交期间冻结的 NEX 余额(与报价同一时刻)。 */
 const submittingNexBalance = ref<number | null>(null);
 const nexBalance = computed(() => submittingNexBalance.value ?? app.user.nexBalance);
-const nexFeeOffsetRate = computed(() => phase.value.nexFeeOffsetRate);
+const nexFeeOffsetRate = computed(() => withdrawalPolicy.value?.nexFeeOffsetRate ?? 0);
 /** FEAT-WD02:NEX 抵扣开关(规格 ③:默认关;server 侧无此意图永不烧 NEX)。 */
 const offsetWithNex = ref(false);
 /** 按当前绑定网络取网络确认费键(网络派生自 pairing 响应式 —— 换绑回本页即时刷新)。 */
@@ -471,7 +495,7 @@ const NETWORK_FEE_KEY: Record<Withdrawal["network"], WithdrawNetworkKey> = {
   "USDT-ERC20": "erc20",
 };
 const networkConfirmFee = computed(
-  () => cfg.config.withdrawRules.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]],
+  () => withdrawalPolicy.value?.networkConfirmFeeUsd[NETWORK_FEE_KEY[network.value]] ?? 0,
 );
 const feeCalc = computed(() =>
   computeWithdrawFee(
@@ -492,21 +516,32 @@ const feeCalc = computed(() =>
  * 等式恒成立、判据恒为真 = 这道门等于没有。
  */
 function quoteStillValid(fee: WithdrawalFeeSnapshot, offset: boolean, net: Withdrawal["network"]): boolean {
-  return isWithdrawalFeeSnapshotValid(fee, offset, nexFeeOffsetRate.value, NETWORK_FEE_KEY[net], currentNetworkConfirmFeeUsd());
+  return isWithdrawalFeeSnapshotValid(
+    fee,
+    offset,
+    nexFeeOffsetRate.value,
+    NETWORK_FEE_KEY[net],
+    withdrawalPolicy.value?.networkConfirmFeeUsd ?? null,
+  );
 }
 // 🔴 费率可用性是**两个合取项**,少一个就等于回退写死值:
 //   ① 配置真拉到了(!syncFailed)—— 拉取失败时 store 仍保留 DEFAULT_PLATFORM_CONFIG 种子,
 //      光看值是「合法」的,只查值 = 按写死的 mock seed 算费并放行下单,正是规格禁止的回退。
 //   ② 拉到的值本身合法(isNetworkFeeConfigUsable)。
 // 与汇率牌价同口径:fx.ts 的 fxAvailable = !syncFailed && isFxQuoteUsable(...)。
-const feeConfigUsable = computed(() => !cfg.syncFailed && cfg.feeConfigValid);
+const feeConfigUsable = computed(() => {
+  const policy = withdrawalPolicy.value;
+  return policy !== null
+    && policy.enabledNetworks.includes(network.value)
+    && policy.nexFeeOffsetRate > 0;
+});
 // 重试出口(规格 ⑤ 报错态必须给下一步)。PROD:重拉 GET /api/config/platform。
 const feeConfigLoading = ref(false);
 async function retryFeeConfig() {
   if (feeConfigLoading.value) return;
   feeConfigLoading.value = true;
   try {
-    await cfg.load();
+    await loadWithdrawalPolicy();
   } finally {
     feeConfigLoading.value = false;
   }
@@ -602,11 +637,11 @@ function clearSubmitFreeze() {
 }
 // ⑤ 默认态: 审核中/锁定金额折叠展示(不参与可提最大值)。
 const heldLine = computed(() => {
-  const b = app.user.earningBuckets;
-  if (b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0) return "";
+  const b = earningsReleaseSnapshot.value?.buckets;
+  if (!b || (b.pending_review <= 0 && b.bonus_locked <= 0)) return "";
   return fmt(t.value.wallet.heldBucketsLine, {
-    p: b.pendingReviewUsdt.toFixed(2),
-    l: b.bonusLockedUsdt.toFixed(2),
+    p: b.pending_review.toFixed(2),
+    l: b.bonus_locked.toFixed(2),
   });
 });
 // 风控提示按命中原因给业务话术(工程码不直出;空时退回通用文案;码表单源 lib/risk-reason-text)。
@@ -620,7 +655,9 @@ const heldLine = computed(() => {
  * 快车道不生效而 CTA 判据仍成立 → 一个点多少次都没反应、也永不消失的按钮。
  * 向下取整(不是四舍五入)才不会越线。
  */
-const smallAmountLine = computed(() => Math.floor(cfg.config.withdrawRules.smallAmountThresholdUsd * 100) / 100);
+// WD01 is HOLD: the backend does not yet execute the advertised review/address bypass.
+// Keep the fast-lane branch unreachable instead of treating a persisted/displayed value as effective.
+const smallAmountLine = computed(() => 0);
 /**
  * 正向态:这笔**真的**免掉了闸,才值得说。
  * 🔴 判据用 waivedGates 而不是 fastLaneApplied —— 后者只表示「金额在小额线内」,
@@ -732,13 +769,14 @@ const riskNoticeBody = computed(() => {
  * 两个判据只要不是同一个源,迟早漂移。这里收成一个。
  */
 function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string {
+  // 费率可读与通道开放是两个独立事实。总开关关闭时仍展示服务端报价，
+  // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
+  if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
+  if (withdrawalPolicy.value?.withdrawalEnabled !== true) return t.value.walletV3.submitReasonWithdrawalClosed;
   // RM01a:该网络未设提现地址 → 最根本的前置,先说它(页面上方是引导卡,不是报错)。
   if (boundAddress.value.trim().length <= 10) return t.value.walletV3.submitReasonAddressRequired;
   // 换址冻结:24h 内提交按钮置灰(横幅带真倒计时)。
   if (frozenNow.value) return t.value.addrRebind.submitFrozenReason;
-  // 🔴 FEAT-WD01c 异常4:费率配置不可用 → 禁止下单,绝不按写死值算费。
-  // 与汇率牌价拉不到时禁下单同口径 —— 让用户按错的费率提交,到账后会少一笔说不清的钱。
-  if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
   // FEAT-WD01b:今日笔数用完 → 置灰 + 告知何时重置(不建单不扣款)
   if (decision.dailyLimitReached) return dailyLimitReachedText.value;
   if (amount <= 0) return t.value.walletV3.submitReasonAmountRequired;
@@ -835,6 +873,8 @@ async function handleSubmit() {
     amount: amountNum.value,
     maxWithdrawable: maxWithdrawable.value,
     offset: offsetWithNex.value,
+    policyVersion: withdrawalPolicy.value!.policyVersion,
+    idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     quote: q,
     // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
     fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
@@ -924,97 +964,37 @@ async function handleSubmit() {
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;
   }
-  // ⚠️ MOCK-ONLY NON-ATOMIC cross-store handler (NEX burn + submitWithdrawal +
-  // bills.add). Production = single POST /api/withdrawals tx that burns N NEX
-  // server-side under an Idempotency-Key. debitNex is the friction gate (atomic,
-  // returns false on insufficient); roll the burned NEX back if the USDT debit fails.
-  // NEX is an optional fee-offset (no hard gate). Burn only what offsets the fee.
-  // 🔴 报价早在弹窗前就冻进 snap.quote 并挂上 submittingQuote —— 这里不再读 feeCalc:
-  // fee/feeWaived/nexBurned 全都 computed 自 nexBalance,下面第一行就要扣 NEX,
-  // 扣完再读会读到**重算后**的值(抵扣消失、费用跳回原价)。曾因此让「NEX 不够」的用户
-  // NEX 白烧、手续费全额照收(审计 P0);跨 await 重读则让用户确认 A 报价被扣 B 报价(R2 P1-B)。
-  const toBurn = snap.quote.nexBurned;
-  // 🔴 只有开着才烧(snap.offset=false 时 quote.nexBurned 恒 0,引擎已保证;此处不再判开关)。
-  if (toBurn > 0 && !app.debitNex(toBurn)) {
-    // Balance changed under us — bail without charging; recompute re-clamps next tick.
-    clearSubmitFreeze();
-    toast.error(t.value.walletV3.needMoreNexToast);
-    return;
-  }
-  // await:占额度要等跨标签页的竞争收敛(见 store 的 claimWithdrawSlot)
-  // FEAT-WD02:fee 传结构化快照(server 形状),store 入口按等式复验后落盘。
-  const withdrawalId = await app.submitWithdrawal(
-    snap.amount,
-    snap.network,
-    snap.address,
-    snap.fee,
-    snap.offset,
-    fresh.route,
-    fresh.riskReasons,
-    fresh.fastLaneApplied,
-    fresh.waivedGates,
-  );
-  if (!withdrawalId) {
-    // 账号已换 → 这笔 NEX 不能补给新账号(宁可不补也不能给错人)
-    if (toBurn > 0 && app.accountKey === snap.account) app.creditNex(toBurn);
-    clearSubmitFreeze();
-    // 建单被拒有三种原因,报错不能一律说「余额不足」——
-    // ① 费用快照复验不过(store 的 fail-closed 拒单:报价过期/拼装错)。用与 store 入口
-    //    **同一个判据**(quoteStillValid,含当前权威费率)重跑归因,零副作用;命中就说
-    //    「费率已更新」,引导重试 —— 重试会按新费率重新报价。
-    //    🔴 归因必须问「快照对**现在**还成不成立」。拿冻结费率复验冻结报价等式恒成立,
-    //    于是费率刚在提交那一刹改掉的真·过期单会被错报成「余额不足」(R2 修订)。
-    // ② 今日额度被占走(另一个标签页抢先建单)。此时余额是够的,说余额不足等于
-    //    骗人,而且没给下一步。重查一次额度状态挑对的话说。
-    // ③ 余额不足(兜底)。三分支互斥:①命中不再看②③,②命中不再看③。
-    toast.error(
-      !quoteStillValid(snap.fee, snap.offset, snap.network)
-        ? t.value.walletV3.withdrawFeeStale
-        : dailyLimitStatus(snap.account).reached
-          ? dailyLimitReachedText.value
-          : t.value.wallet.withdrawInsufficient,
+  // Real D5 submit. The server is the sole authority for wallet reservation,
+  // fee calculation, optional NEX burn, release-bucket checks and ledger writes.
+  // No local balance/bill mutation is allowed before or after this call.
+  try {
+    const withdrawalId = await app.submitWithdrawal(
+      snap.amount,
+      snap.network,
+      snap.address,
+      snap.fee,
+      snap.offset,
+      snap.policyVersion,
+      snap.idempotencyKey,
+      fresh.route,
+      fresh.riskReasons,
+      fresh.fastLaneApplied,
+      fresh.waivedGates,
     );
+    clearSubmitFreeze();
+    if (!withdrawalId) {
+      toast.error(t.value.wallet.withdrawInsufficient);
+      return;
+    }
+    uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
+    return;
+  } catch {
+    clearSubmitFreeze();
+    await loadWithdrawalPolicy();
+    toast.error(t.value.walletV3.withdrawFeeStale);
     return;
   }
-  const charged = snap.quote.actualFee;
-  const memo = fresh.route === "pass"
-    ? fmt(t.value.wallet.withdrawBillMemoPass, { network: snap.network, fee: charged.toFixed(2) })
-    : t.value.wallet.withdrawBillMemoReview;
-  // 🔴 账单一律写回**被扣款的那个账号**(snap.account),不写「当前绑定的账号」(R3 P1)。
-  // 原实现在换号时直接 return 不写:动机对(写进当前账号 = 别人的流水),结论错 ——
-  // 钱已经扣在旧账号上,不写就是「有扣款、无凭证」。addForAccount 直写目标账号行,
-  // 目标即当前账号时退化为 add()(同步刷新内存态,页面立刻可见)。
-  const switched = app.accountKey !== snap.account;
-  // 账单写失败必须让用户知道:钱已经扣了,台账却没这一笔 —— 静默吞掉等于让用户
-  // 在账单页查不到自己的钱去哪了。(bills 与账户快照是两份存储,mock 期无法原子。)
-  if (!bills.addForAccount(snap.account, { type: "withdraw", symbol: "USDT", amount: -snap.amount, status: "pending", memo, ref: withdrawalId })) {
-    toast.error(t.value.wallet.withdrawBillWriteFailed);
-  }
-  if (fresh.route !== "pass") {
-    toast.info(t.value.wallet.withdrawRouteReviewTitle, t.value.wallet.withdrawRouteReviewBody);
-  }
-  if (toBurn > 0) {
-    // NEX 已经真扣了(debitNex),账单写失败同样要让用户知道 —— 与上面 USDT 行同口径。
-    // 静默吞掉 = NEX 少了、账单没有这一笔、用户零感知。
-    // 与 USDT 行同口径:写回被扣 NEX 的那个账号,不看当前绑定。
-    const nexBillOk = bills.addForAccount(snap.account, {
-      type: "withdraw",
-      symbol: "NEX",
-      amount: -toBurn,
-      status: "posted",
-      memo: fmt(t.value.wallet.withdrawNexFeeMemo, {
-        nex: fmtNex(toBurn),
-        fee: snap.quote.feeWaived.toFixed(2),
-      }),
-      ref: withdrawalId,
-    });
-    if (!nexBillOk) toast.error(t.value.wallet.withdrawBillWriteFailed);
-  }
-  clearSubmitFreeze();
-  // 换号后不跳追踪页:那笔单属于旧账号,当前账号的追踪页查不到它(深链会落空态)。
-  if (switched) return;
-  // 带单号深链:刚提交第二笔时追踪页不再错位显示最早在途单(证伪建议 2)
-  uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
+
 }
 
 // ── styles ──

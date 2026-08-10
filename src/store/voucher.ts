@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
+import { remoteApiEnabled, voucherApi } from "@/api/runtime";
 import { mockServerNow } from "./server-time";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import {
@@ -66,6 +67,64 @@ export interface VoucherMatch {
 export const useVoucher = defineStore("voucher", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   const claimed = ref<ClaimRecord[]>([]);
+  const remoteCatalog = ref<VoucherDef[]>([]);
+
+  function clearRemoteFacts() {
+    claimed.value = [];
+    remoteCatalog.value = [];
+  }
+
+  function toVoucherDef(row: Awaited<ReturnType<typeof voucherApi.state>>["vouchers"][number]): VoucherDef {
+    return {
+      id: row.id,
+      name: row.name,
+      type: row.type,
+      amountUSD: row.amountUSD,
+      percent: row.percent,
+      minPurchaseUSD: row.minPurchaseUSD,
+      maxDiscountUSD: row.maxDiscountUSD,
+      applicableSkus: row.applicableSkus,
+      audience: row.audience,
+      startAt: row.startAt,
+      endAt: row.endAt,
+      claimSurfaces: row.claimSurfaces,
+      popupEnabled: row.popupEnabled,
+      stackWithTrial: row.stackWithTrial,
+      stackWithOthers: row.stackWithOthers,
+      splittable: row.splittable,
+      status: row.status,
+    };
+  }
+
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const snapshot = await voucherApi.state();
+      remoteCatalog.value = snapshot.vouchers.map(toVoucherDef);
+      claimed.value = snapshot.vouchers
+        .filter((voucher) => voucher.grantStatus !== "UNCLAIMED")
+        .map((voucher) => ({
+          id: voucher.id,
+          claimedAt: 0,
+          usedAt: voucher.grantStatus === "USED" ? 0 : null,
+        }));
+      return true;
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function claimRemote(id: string, surface: VoucherDef["claimSurfaces"][number] = "home"): Promise<boolean> {
+    try {
+      await voucherApi.claim(id, surface, `h7-voucher-claim:${id}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
 
   // 落盘唯一出口:乐观并发提交器。此前是 `watch(claimed, persist, {deep:true})` —— 纯覆盖式,
   // 两个标签页各领同一张券时后写的把先写的整份账本顶掉,两边都以为自己领到了。
@@ -81,6 +140,11 @@ export const useVoucher = defineStore("voucher", () => {
 
   /** 账号切换重绑:装载该账号的券包账本。 */
   function bindAccount(rawAccountKey: string) {
+    if (remoteApiEnabled) {
+      clearRemoteFacts();
+      void refreshRemote();
+      return;
+    }
     claimed.value = rows.bind(rawAccountKey)?.claimed ?? [];
   }
   bindAccount("default");
@@ -101,6 +165,10 @@ export const useVoucher = defineStore("voucher", () => {
    * 同一张券绝不会被领第二次(conflict=true 让页面提示「已在别处领取」而不是静默无反应)。
    */
   function claim(id: string): { ok: boolean; conflict?: boolean } {
+    if (remoteApiEnabled) {
+      void claimRemote(id);
+      return { ok: false };
+    }
     const def = getVoucher(id);
     if (!def || !isVoucherValid(def)) return { ok: false, conflict: false }; // 券本身不合格,与并发无关
     const r = rows.commit((cur) => {
@@ -116,6 +184,11 @@ export const useVoucher = defineStore("voucher", () => {
   /** Mark a claimed voucher as redeemed (called once after an order consumes it).
    *  天然幂等:别处已核销过 → apply 返回 null,终态本就是「已用」,无需回报失败。 */
   function markUsed(id: string): void {
+    if (remoteApiEnabled) {
+      // Order creation owns voucher redemption atomically on the server.
+      void refreshRemote();
+      return;
+    }
     const now = mockServerNow();
     rows.commit((cur) => {
       if (!cur.claimed.some((c) => c.id === id && c.usedAt == null)) return null;
@@ -126,9 +199,11 @@ export const useVoucher = defineStore("voucher", () => {
     });
   }
 
+  const catalog = computed<VoucherDef[]>(() => remoteApiEnabled ? remoteCatalog.value : listVouchers());
+
   /** Vouchers the user can still CLAIM (active, in-window, not yet claimed). */
   const claimableVouchers = computed<VoucherDef[]>(() =>
-    listVouchers().filter((d) => isVoucherValid(d) && !isClaimed(d.id)),
+    catalog.value.filter((d) => isVoucherValid(d) && !isClaimed(d.id)),
   );
 
   /** Claimed, unused, still-valid vouchers — the user's redeemable wallet. */
@@ -136,7 +211,7 @@ export const useVoucher = defineStore("voucher", () => {
     const out: VoucherDef[] = [];
     for (const c of claimed.value) {
       if (c.usedAt != null) continue;
-      const def = getVoucher(c.id);
+      const def = (remoteApiEnabled ? remoteCatalog.value.find((voucher) => voucher.id === c.id) : getVoucher(c.id));
       if (def && isVoucherValid(def)) out.push(def);
     }
     return out;
@@ -148,7 +223,7 @@ export const useVoucher = defineStore("voucher", () => {
     const out: VoucherDef[] = [];
     for (const c of claimed.value) {
       if (c.usedAt != null) continue;
-      const def = getVoucher(c.id);
+      const def = (remoteApiEnabled ? remoteCatalog.value.find((voucher) => voucher.id === c.id) : getVoucher(c.id));
       if (def && !isVoucherValid(def)) out.push(def);
     }
     return out;
@@ -189,8 +264,11 @@ export const useVoucher = defineStore("voucher", () => {
     isClaimed,
     isUsed,
     claim,
+    claimRemote,
     markUsed,
+    refreshRemote,
     claimableVouchers,
+    catalog,
     claimedUnused,
     expiredVouchers,
     hasClaimableForSurface,

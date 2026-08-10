@@ -157,6 +157,9 @@ const commission = useCommission();
 
 let priceTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
+  if (!market.isMockMode) {
+    void market.syncRemote().catch(() => {});
+  }
   priceTimer = setInterval(() => market.tickPrice(), 3000);
 });
 onUnmounted(() => {
@@ -175,9 +178,7 @@ const todayNEX = computed(() =>
   app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
 );
 
-// Mock cost basis (avg buy price) — fixed 0.085 day-0 baseline for P&L visual.
-const COST_BASIS = 0.085;
-const totalSpent = computed(() => nexBalance.value * COST_BASIS);
+const totalSpent = computed(() => nexBalance.value * market.costBasis);
 const pnl = computed(() => usdValue.value - totalSpent.value);
 const pnlPct = computed(() => (totalSpent.value > 0 ? (pnl.value / totalSpent.value) * 100 : 0));
 
@@ -246,7 +247,7 @@ const breakdownRows = computed(() => [
 
 const pnlSummary = computed(() => `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`);
 const pnlCells = computed(() => [
-  { label: t.value.nexWallet.pnl.costBasis, value: `$${COST_BASIS.toFixed(3)}` },
+  { label: t.value.nexWallet.pnl.costBasis, value: market.costBasis > 0 ? `$${market.costBasis.toFixed(3)}` : "—" },
   { label: t.value.nexWallet.pnl.totalSpent, value: fmtUSD(totalSpent.value) },
   { label: t.value.nexWallet.pnl.currentValue, value: fmtUSD(usdValue.value) },
 ]);

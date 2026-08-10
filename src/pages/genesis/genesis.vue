@@ -212,7 +212,10 @@ const genesis = useGenesis();
 const cfg = useGenesisConfig();
 // 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
 //   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
-onShow(() => cfg.refresh());
+onShow(() => {
+  void cfg.refresh();
+  void genesis.syncRemote();
+});
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
 const { block, marketClosed, showUrgency, blockText, preSale, showTime, countdownDays, countdownClock } =

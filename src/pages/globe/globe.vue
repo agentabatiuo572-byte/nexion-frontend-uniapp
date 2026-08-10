@@ -180,11 +180,14 @@ import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
+import { publicStatsHealth } from "@/lib/platform-stats";
 import { REGIONS, type RegionData } from "@/mock/globe-regions";
 import { fmt } from "@/i18n/format";
 
 const t = useT();
 const app = useApp();
+const cfg = useConfig();
 
 const W = 440;
 const H = 240;
@@ -194,7 +197,12 @@ const pulseTick = ref(0);
 let pulseTimer = 0;
 
 const global = computed(() => app.global);
-const activeNodesText = computed(() => global.value.activeDevices.toLocaleString());
+const activeNodesText = computed(() => {
+  const health = publicStatsHealth(cfg.config.publicStats);
+  return cfg.syncFailed || !health.devicesOk
+    ? t.value.home.networkStatUpdating
+    : global.value.activeDevices.toLocaleString();
+});
 const activeJobsText = computed(() => global.value.activeJobs.toLocaleString());
 
 const me = REGIONS.find((r) => r.isYou)!;

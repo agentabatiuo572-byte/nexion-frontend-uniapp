@@ -1,29 +1,20 @@
-import { FLEET_DEVICES } from "@/lib/platform-stats";
 import type { PlatformConfig, PlatformConfigSeed } from "@/store/config-types";
 
 // Compatibility belongs to the runtime config boundary, not to local Mock
 // datasets. Remove these fallbacks when GET /api/config/platform is wired and
 // older seeds are no longer supported.
 const RUNTIME_PUBLIC_STATS_DEFAULT: PlatformConfig["publicStats"] = {
-  fleetDevices: FLEET_DEVICES,
-  onlineRatePct: 100,
-  onlineJitter: 24,
-  registeredUsersBase: 1_420_000,
-  registeredUsersMonthlyGrowthPct: 2.9,
-  registeredUsersAnchorAt: Date.UTC(2026, 7, 1),
-  virtualUserCount: 12_000,
-  hashratePercentileTable: [
-    { tops: 5, cumPct: 20 },
-    { tops: 20, cumPct: 55 },
-    { tops: 60, cumPct: 82 },
-    { tops: 150, cumPct: 96 },
-    { tops: 700, cumPct: 97.6 },
-    { tops: 2_700, cumPct: 98.7 },
-    { tops: 5_400, cumPct: 99.3 },
-    { tops: 11_000, cumPct: 99.6 },
-    { tops: 27_000, cumPct: 99.8 },
-    { tops: 53_000, cumPct: 99.9 },
-  ],
+  // Deliberately invalid sentinel: H9 must stay unavailable until the server
+  // projection is fetched and validated. Never replace it with plausible data.
+  fleetDevices: 0,
+  onlineRatePct: 0,
+  onlineJitter: 0,
+  registeredUsersBase: 0,
+  registeredUsersMonthlyGrowthPct: 0,
+  registeredUsersAnchorAt: 0,
+  realUserCount: 0,
+  virtualUserCount: 0,
+  hashratePercentileTable: [],
 };
 
 const RUNTIME_WITHDRAW_RULE_DEFAULTS = {

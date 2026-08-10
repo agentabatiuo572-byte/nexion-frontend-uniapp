@@ -65,10 +65,10 @@
              dropped, the fill is the single visual difference; rows hairlined. -->
         <view class="rounded-2xl overflow-hidden" :style="ladderCardStyle">
           <view
-            v-for="(r, idx) in V_RANKS"
+            v-for="(r, idx) in rankDefs"
             :key="r.v"
             class="flex items-start"
-            :style="rowStyle(rowStatus(r.v), idx === V_RANKS.length - 1)"
+            :style="rowStyle(rowStatus(r.v), idx === rankDefs.length - 1)"
           >
             <VBadgeIcon :v="r.v" :size="36" />
             <view class="flex-1 min-w-0">
@@ -99,12 +99,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadgeIcon from "@/components/team/v-badge-icon.vue";
 import { useT } from "@/i18n/use-t";
-import { useVRank, nextRankProgress, V_RANKS, type VRank, type VRankDef } from "@/store/v-rank";
+import { useVRank, nextRankProgress, type VRank, type VRankDef } from "@/store/v-rank";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 
 const t = useT();
@@ -112,7 +113,11 @@ const vState = useVRank();
 const { elRef: rankBarRef, inView: rankBarInView } = useScrollGrowProgress();
 
 const myRank = computed(() => vState.myRank);
-const currentDef = computed(() => V_RANKS[vState.myRank]);
+const rankDefs = computed(() => vState.ladder);
+const currentDef = computed(() => rankDefs.value[vState.myRank] ?? {
+  v: vState.myRank, title: "", cnTitle: "", conditions: {}, directBonus: 0,
+  unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+});
 const prog = computed(() =>
   nextRankProgress({
     myRank: vState.myRank,
@@ -120,8 +125,13 @@ const prog = computed(() =>
     directRefs: vState.directRefs,
     teamVolumeUSD: vState.teamVolumeUSD,
     vDownlineCounts: vState.vDownlineCounts,
-  }),
+  }, rankDefs.value),
 );
+
+onMounted(() => {
+  // Local rank data is not used in remote mode; the ladder and member progress arrive together.
+  if (remoteApiEnabled) void vState.refreshCanonicalVRank();
+});
 
 const heroSubText = computed(() => {
   const d = currentDef.value;

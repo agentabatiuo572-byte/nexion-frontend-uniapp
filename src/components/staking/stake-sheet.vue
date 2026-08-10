@@ -87,6 +87,7 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 
@@ -101,12 +102,24 @@ const app = useApp();
 const staking = useStaking();
 
 const amount = ref(0);
+const remotePending = ref(false);
+const remoteIntent = ref<{ fingerprint: string; key: string } | null>(null);
+const remoteGate = createRemoteIntentGate("G1");
+const selectedPool = computed(() => props.term === null ? undefined : staking.pools.find((pool) => pool.termDays === props.term));
+
+function intentKey(tierKey: string, amountUsdt: number) {
+  const fingerprint = `${tierKey}:${amountUsdt.toFixed(2)}`;
+  if (remoteIntent.value?.fingerprint === fingerprint) return remoteIntent.value.key;
+  const key = remoteGate.acquire("open", { tierKey, amountUsdt: amountUsdt.toFixed(2) }).key;
+  remoteIntent.value = { fingerprint, key };
+  return key;
+}
 
 // Seed the amount to the term's minimum each time the sheet opens.
 watch(
   () => [props.open, props.term] as const,
   ([o, term]) => {
-    if (o && term !== null) amount.value = STAKING_MIN[term];
+    if (o && term !== null) amount.value = selectedPool.value?.minAmountUsdt ?? STAKING_MIN[term];
   },
 );
 
@@ -114,24 +127,24 @@ const titleText = computed(() => (props.term !== null ? fmt(t.value.stakingV3.sh
 const subtitleText = computed(() =>
   props.term !== null
     ? fmt(t.value.stakingV3.sheet.subtitle, {
-        apy: (STAKING_APY[props.term] * 100).toFixed(0),
-        penalty: (STAKING_PENALTY[props.term] * 100).toFixed(0),
+        apy: ((selectedPool.value?.apy ?? STAKING_APY[props.term]) * 100).toFixed(0),
+        penalty: ((selectedPool.value?.penalty ?? STAKING_PENALTY[props.term]) * 100).toFixed(0),
       })
     : "",
 );
 const interestLabel = computed(() =>
   props.term !== null ? fmt(t.value.stakingV3.sheet.interest, { n: props.term }) : "",
 );
-const balanceText = computed(() => app.user.usdtBalance.toFixed(2));
+const balanceText = computed(() => (staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt).toFixed(2));
 const principalText = computed(() => amount.value.toFixed(2));
 const interestText = computed(() =>
-  props.term !== null ? (amount.value * STAKING_APY[props.term] * (props.term / 365)).toFixed(2) : "0.00",
+  props.term !== null ? (amount.value * (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365)).toFixed(2) : "0.00",
 );
 const unlockDateText = computed(() =>
   props.term !== null ? new Date(Date.now() + props.term * ONE_DAY_MS).toLocaleDateString() : "",
 );
 const totalText = computed(() =>
-  props.term !== null ? (amount.value * (1 + STAKING_APY[props.term] * (props.term / 365))).toFixed(2) : "0.00",
+  props.term !== null ? (amount.value * (1 + (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365))).toFixed(2) : "0.00",
 );
 const ctaText = computed(() =>
   props.term !== null ? fmt(t.value.stakingV3.sheet.cta, { amount: amount.value.toFixed(2), n: props.term }) : "",
@@ -147,18 +160,42 @@ function onAmountInput(e: Event) {
   amount.value = parseFloat(raw) || 0;
 }
 function setMax() {
-  amount.value = Math.floor(app.user.usdtBalance);
+  amount.value = Math.floor(staking.isMockMode ? app.user.usdtBalance : staking.walletBalanceUsdt);
 }
 function emitClose() {
   emit("update:open", false);
 }
 
-function submit() {
+async function submit() {
   const term = props.term;
   if (term === null) return;
-  const min = STAKING_MIN[term];
+  const min = selectedPool.value?.minAmountUsdt ?? STAKING_MIN[term];
   if (amount.value < min) {
     toast.error(t.value.stakingV3.toast.minAmount, fmt(t.value.stakingV3.toast.minAmountTerm, { min, n: term }));
+    return;
+  }
+  if (!staking.isMockMode) {
+    if (remotePending.value) return;
+    const pool = selectedPool.value;
+    if (!pool || !pool.enabled || pool.killed) {
+      toast.error(t.value.stakingV3.toast.openFailedTitle);
+      return;
+    }
+    remotePending.value = true;
+    try {
+      const key = intentKey(pool.tierKey, amount.value);
+      await staking.openRemote(pool.tierKey, amount.value, key);
+      remoteIntent.value = null;
+      remoteGate.complete(`${"open"}:${JSON.stringify({ tierKey: pool.tierKey, amountUsdt: amount.value.toFixed(2) })}`, true);
+      toast.success(t.value.stakingV3.toast.stakeSuccess);
+      emitClose();
+    } catch {
+      // Unknown timeout/result: read the authority before allowing a retry with the same key.
+      await staking.syncRemote().catch(() => {});
+      toast.error(t.value.stakingV3.toast.openFailedTitle);
+    } finally {
+      remotePending.value = false;
+    }
     return;
   }
   const billRef = `STAKE-OPEN-${Date.now().toString(36).toUpperCase()}`;

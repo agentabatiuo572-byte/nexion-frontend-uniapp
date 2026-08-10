@@ -321,6 +321,14 @@
       "style": { "navigationStyle": "custom" }
     },
     {
+      "path": "pages/learn/courses",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
+      "path": "pages/learn/course",
+      "style": { "navigationStyle": "custom" }
+    },
+    {
       "path": "pages/me/trial",
       "style": { "navigationStyle": "custom" }
     },

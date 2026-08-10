@@ -10,6 +10,8 @@ import {
   GENESIS_TIERS_DEFAULT as GENESIS_TIERS,
   type GenesisTier,
 } from "@/store/genesis-config";
+import { genesisApi, remoteApiEnabled } from "@/api/runtime";
+import type { GenesisAccountState, GenesisPublicState } from "@/api/genesis-api";
 
 // 阶梯档位类型 + 默认值现定义在 genesis-config.ts(叶子,避免 TDZ 循环);
 // re-export 兼容既有 import 方(canon-sentinel 改读 genesis-config,见 Step 5)。
@@ -95,7 +97,7 @@ export const GENESIS_ELIGIBILITY: GenesisEligibilityConfig = Object.freeze({
 });
 
 /** 创世邀请码格式(mock 端格式校验;真后台 = server 核销接口,格式仅兜底)。 */
-export const GENESIS_INVITE_PATTERN = /^NEXGRID-OG-[A-Z0-9]{4}$/;
+export const GENESIS_INVITE_PATTERN = /^NEXGRID-OG-[A-Z0-9]{16}$/;
 
 /** 资格求值输入。composable 层从 app / v-rank / genesis 组合(store 不互 import)。 */
 export interface GenesisEligibilityCtx {
@@ -269,6 +271,54 @@ export const useGenesis = defineStore("genesis", () => {
   const nexListed = ref(initGlobal.nexListed);
   const nexListedAt = ref<number | null>(initGlobal.nexListedAt);
   const lastTickTs = ref(0);
+  const holdingNoByTokenId = ref<Record<number, string>>({});
+  const listingNoByTokenId = ref<Record<number, string>>({});
+  const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
+  const hasGenesisInvite = ref(false);
+
+  function tokenIdFor(value: string): number {
+    let hash = 0;
+    for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) % 900_000;
+    return hash + 1;
+  }
+
+  function applyPublicState(state: GenesisPublicState): void {
+    totalSlots.value = state.series.totalSupply;
+    soldSlots.value = state.series.soldSupply;
+    nexListed.value = state.emissionOpen;
+    const listingMap: Record<number, string> = {};
+    remoteListings.value = state.listings.map((listing) => {
+      const tokenId = tokenIdFor(listing.holdingNo);
+      listingMap[tokenId] = listing.holdingNo;
+      return { tokenId, holdingNo: listing.holdingNo, priceUSDT: listing.askPriceUsdt, seller: listing.seller, listedAt: listing.listedAt };
+    });
+    listingNoByTokenId.value = listingMap;
+  }
+
+  function applyAccountState(state: GenesisAccountState): void {
+    totalSlots.value = state.series.totalSupply;
+    soldSlots.value = state.series.soldSupply;
+    nexListed.value = state.emissionOpen;
+    const holdingMap: Record<number, string> = {};
+    const ids = state.holdings.map((holding) => {
+      const tokenId = tokenIdFor(holding.holdingNo);
+      holdingMap[tokenId] = holding.holdingNo;
+      return tokenId;
+    });
+    holdingNoByTokenId.value = holdingMap;
+    ownedTokenIds.value = ids;
+    myOwned.value = ids.length;
+    hasGenesisInvite.value = state.eligibility.hasGenesisInvite;
+    myListings.value = state.holdings
+      .filter((holding) => holding.status === "LISTED" && holding.listingPriceUsdt !== null)
+      .map((holding) => ({ tokenId: tokenIdFor(holding.holdingNo), askPriceUSDT: holding.listingPriceUsdt!, listedAt: holding.listedAt ?? Date.now() }));
+  }
+
+  async function syncRemote(): Promise<void> {
+    if (!remoteApiEnabled) return;
+    applyPublicState(await genesisApi.state());
+    try { applyAccountState(await genesisApi.account()); } catch { /* public state remains usable before login */ }
+  }
 
   function persist() {
     try {
@@ -299,6 +349,7 @@ export const useGenesis = defineStore("genesis", () => {
     myOwned.value = u.myOwned;
     ownedTokenIds.value = u.ownedTokenIds;
     myListings.value = u.myListings;
+    void syncRemote();
   }
 
   function remaining() {
@@ -358,10 +409,30 @@ export const useGenesis = defineStore("genesis", () => {
   // 快照按账号走);genesis store 只保留全平台市场态(soldSlots/nexListed),
   // 设备级存 per-user 凭证会跨账号继承 → 资格门旁路(审计 P1)。
 
-  function purchase(
+  async function purchase(
     n: number,
     tokenIds?: number[],
-  ): { ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" } {
+  ): Promise<{ ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" }> {
+    try {
+      const beforePrice = unitPriceUSDT.value;
+      const state = await genesisApi.purchase(n, `genesis-purchase:${boundKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`);
+      applyAccountState(state);
+      await syncRemote();
+      return { ok: true, cost: n * beforePrice };
+    } catch {
+      await syncRemote().catch(() => undefined);
+      const block = genesisPurchaseBlock({
+        configLoaded: cfg.loaded,
+        marketOpenState: cfg.config.marketOpenState,
+        halted: false,
+        remaining: remaining(),
+        saleStartAt: cfg.config.saleStartAt,
+        now: Date.now(),
+      });
+      return { ok: false, cost: 0, reason: block === "soldOut" ? "sold-out" : "market-closed" };
+    }
+
+    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
     // 🔴 **服务端侧拒单**(规格 FEAT-GEN10 异常1/异常4)。前端置灰只挡住「正常点」,
     //   挡不住深链直达结算、也挡不住「用户已打开购买半屏、运营此刻切关闭」。
     //   这一层是 mock 的 server 同构面:**不管谁调、从哪调,关闭态一律拒**。
@@ -389,9 +460,10 @@ export const useGenesis = defineStore("genesis", () => {
     if (myOwned.value + n > GENESIS_ELIGIBILITY.perUserCap) return { ok: false, cost: 0, reason: "cap" };
     // 按下单时当前档价结算（跨档时以起始档价，简化：整单同价）。
     const cost = n * unitPriceUSDT.value;
-    const ids =
-      tokenIds && tokenIds.length === n
-        ? tokenIds
+    const requestedIds = tokenIds ?? [];
+    const ids: number[] =
+      requestedIds.length === n
+        ? [...requestedIds]
         : Array.from({ length: n }, (_, i) => soldSlots.value + 1 + i);
     soldSlots.value = Math.min(TOTAL_SLOTS, soldSlots.value + n);
     myOwned.value = myOwned.value + n;
@@ -400,7 +472,16 @@ export const useGenesis = defineStore("genesis", () => {
     return { ok: true, cost };
   }
 
-  function listNode(tokenId: number, askPriceUSDT: number): boolean {
+  async function listNode(tokenId: number, askPriceUSDT: number): Promise<boolean> {
+    const holdingNo = holdingNoByTokenId.value[tokenId];
+    if (!holdingNo) return false;
+    try {
+      applyAccountState(await genesisApi.list(holdingNo, askPriceUSDT, `genesis-list:${holdingNo}:${Date.now()}`));
+      await syncRemote();
+      return true;
+    } catch { return false; }
+
+    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
     // 🔴 挂单出售与承接走**同一个**关闭闸(规格 FEAT-GEN10 ② 明写要锁的两个入口是
     //   「购买 / 二级市场挂单」;「挂单」在本产品词汇表里是卖方动作,买方叫「承接」)。
     //   不接闸的后果不是「少拦一次」,而是关闭态下产出一批**谁也接不了的死单**:
@@ -431,7 +512,16 @@ export const useGenesis = defineStore("genesis", () => {
   //   若关闭态连撤单也拦,用户的席位就被困在一张永远卖不掉的单里,既不能撤回也无人承接
   //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
   //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
-  function cancelListing(tokenId: number): boolean {
+  async function cancelListing(tokenId: number): Promise<boolean> {
+    const holdingNo = holdingNoByTokenId.value[tokenId];
+    if (!holdingNo) return false;
+    try {
+      applyAccountState(await genesisApi.cancel(holdingNo, `genesis-cancel:${holdingNo}:${Date.now()}`));
+      await syncRemote();
+      return true;
+    } catch { return false; }
+
+    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
     if (!myListings.value.some((l) => l.tokenId === tokenId)) return false;
     myListings.value = myListings.value.filter((l) => l.tokenId !== tokenId);
     persist();
@@ -447,7 +537,21 @@ export const useGenesis = defineStore("genesis", () => {
    * verify gen_gate 哨兵护）;新增调用方必须复刻该门。本层只守 perUserCap。
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
-  function acquireSecondary(tokenId: number): boolean {
+  async function acquireSecondary(tokenId: number): Promise<boolean> {
+    const holdingNo = listingNoByTokenId.value[tokenId];
+    if (!holdingNo) return false;
+    try {
+      applyAccountState(await genesisApi.buy(holdingNo, `genesis-buy:${holdingNo}:${Date.now()}`));
+      await syncRemote();
+      return true;
+    } catch (error) {
+      // Preserve the backend policy/error token for the visible purchase surface.
+      // Treating every rejection as "insufficient funds" hides geo-policy and
+      // fail-closed responses and makes the user retry an action that cannot pass.
+      throw error;
+    }
+
+    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
     // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥)。只锁前端入口不锁这里,
     //   深链照样能承接。
     //   注意:这里**不**看 soldOut / preSale —— 二级卖的是别人手里的存量,
@@ -476,6 +580,9 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function tickSales() {
+    void syncRemote();
+    return;
+    /* istanbul ignore next -- local sales simulation is disabled. */
     const t = Date.now();
     if (t - lastTickTs.value < 30_000) return;
     const inc = 1 + Math.floor(Math.random() * 3); // 1-3
@@ -488,6 +595,7 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
+    remoteListings, hasGenesisInvite, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

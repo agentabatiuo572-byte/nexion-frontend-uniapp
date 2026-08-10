@@ -101,6 +101,7 @@ import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
+import { paymentMethodApi, remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();
@@ -165,7 +166,7 @@ const valid = computed(() => cardReady.value && validHolder.value);
 const canSubmit = computed(() => valid.value && !isBinding.value);
 const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.formDefaultOn : t.value.cards.formDefaultOff));
 
-function handleBind() {
+async function handleBind() {
   if (!canSubmit.value) return;
   // 明文由 <HostedCardVault> 交给收单方换 token(真实现 = SDK createToken)。
   // 本页拿到的是 token / 后四位 / 卡组织 / 有效期四样,连同本页自己收的持卡人姓名
@@ -173,6 +174,30 @@ function handleBind() {
   const card = vaultRef.value?.tokenize();
   if (!card) return;
   isBinding.value = true;
+  if (remoteApiEnabled) {
+    // The remote binder returns a server receipt; the local cards store only
+    // projects the subsequent authoritative GET and never persists this card.
+    try {
+      const bound = await paymentMethodApi.bind({ providerToken: card.token, brand: card.brand, last4: card.last4,
+        holder: holder.value.trim().toUpperCase(), makeDefault: setAsDefault.value,
+        idempotencyKey: `h3-card-bind:${card.token}` });
+      if (!await cardsStore.refreshRemote()) throw new Error("CARD_BIND_READBACK_FAILED");
+      const readBack = cardsStore.cards.find((item) => item.tokenId === bound.tokenId
+        && item.brand === bound.brand && item.last4 === bound.last4);
+      if (bound.status !== "BOUND" || readBack?.status !== "BOUND") throw new Error("CARD_BIND_READBACK_MISMATCH");
+    } catch {
+      isBinding.value = false;
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+      return;
+    }
+    toast.success(fmt(t.value.cards.bindToast, { brand: brandLabel(card.brand), last4: card.last4 }));
+    uni.redirectTo({
+      url: returnTo.value,
+      fail: () => { isBinding.value = false; navBack(returnTo.value); },
+    });
+    return;
+  }
+  const questStore = useQuest();
   const tokenId = cardsStore.add({
     tokenId: card.token,
     brand: card.brand,
@@ -186,7 +211,6 @@ function handleBind() {
   // 幂等 — 非首次绑卡 firstTime=false,只出常规绑卡 toast,不重复发奖。
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
   // 三处漏改)。原来先 markComplete 消费掉,发钱失败奖就归零且再也拿不到。
-  const questStore = useQuest();
   const task = questStore.QUEST_TASKS.find((tk) => tk.id === "bind_bank_card");
   if (task && !questStore.isComplete("bind_bank_card")) {
     const billRef = `QST-bind_bank_card`; // 稳定 ref:任务一次性,带时间戳 = 判重永不命中

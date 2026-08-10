@@ -29,8 +29,10 @@ import { resolveRetiredRoute } from "@/lib/retired-route-migrations";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useConfig } from "@/store/config";
 import { useGenesisConfig } from "@/store/genesis-config";
+import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
 import { useDeposits } from "@/store/deposits";
+import { remoteApiEnabled } from "@/api/runtime";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -620,6 +622,12 @@ function checkQuestRoute() {
   lastQuestRoute = route;
   const id = questIdForRoute(route);
   if (!id) return;
+  if (remoteApiEnabled) {
+    // Visiting a screen is not a completion event. Only an authoritative H3
+    // claim can update this state; refresh merely removes stale local facts.
+    void useQuest().refreshRemote();
+    return;
+  }
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
   // 三处漏改)。原来先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,
   // 而 quest 是一次性的,再也拿不到。奖励从静态表查得到,顺序反得过来。
@@ -794,6 +802,7 @@ onShow(() => {
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
+  void refreshEarningsReleaseStatus().catch(() => undefined);
 });
 onHide(() => {
   detachSessionWatch();

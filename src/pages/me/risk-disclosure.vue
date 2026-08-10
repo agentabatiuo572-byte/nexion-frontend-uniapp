@@ -1,12 +1,13 @@
 <!--
   Platform risk disclosure (ported from Nexion-prototype/app/(main)/me/risk-disclosure/page.tsx).
   Required reading before first withdrawal / staking lock. The accept button gates
-  on (a) scroll-to-bottom (IntersectionObserver on a bottom sentinel, resolved via
-  $el per P-019) and (b) checkbox tick. Acceptance persists via the risk-disclosure
+  on (a) uni-app scroll-view's auditable scroll-to-lower event and (b) checkbox tick.
+  Acceptance persists via the risk-disclosure
   store. Reads `?return=` for where to land. Wrapped in <AppChassis active="me">.
 -->
 <template>
   <AppChassis active="me">
+    <scroll-view scroll-y style="height: 100vh" @scrolltolower="onScrollToLower">
     <view style="padding-bottom: 32px">
       <SubPageHeader :back="returnTo" />
 
@@ -23,6 +24,10 @@
         <view v-if="accepted" class="flex items-center" :style="acceptedChipStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
           <text>{{ w.alreadyAccepted }}</text>
+        </view>
+        <view v-else-if="loadError" :style="hintStyle">
+          <text :style="hintTextStyle">{{ loadError }}</text>
+          <text class="block active:opacity-70" :style="retryStyle" @click="reload">重新获取适用于当前地区的披露</text>
         </view>
       </view>
 
@@ -46,9 +51,6 @@
           <text class="block" :style="blockBodyStyle">{{ b.body }}</text>
         </view>
       </view>
-
-      <!-- Bottom sentinel for scroll-to-bottom detection -->
-      <view ref="sentinelRef" class="mx-4" style="height: 1px; margin-top: 12px" />
 
       <!-- Scroll hint -->
       <view v-if="!scrolledToBottom && !accepted" class="mx-4 flex items-center" :style="hintStyle">
@@ -76,11 +78,12 @@
         <text class="block text-center" :style="disclaimerStyle">{{ w.disclaimer }}</text>
       </view>
     </view>
+    </scroll-view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, ref, onMounted, type CSSProperties } from "vue";
 import { navBack } from "@/lib/route";
 import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
 import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/payout-address-core";
@@ -89,18 +92,20 @@ import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
 
-const SCROLL_THRESHOLD_PX = 24;
-
 const cfg = useConfig();
 const t = useT();
+const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
+const disclosure = computed(() => risk.current);
+const loadError = computed(() => risk.error ? "当前地区的风险披露暂不可用；请检查网络后重试。未加载前不能确认。" : "");
 
 const returnTo = ref("/pages/me/me");
 onLoad((options) => {
@@ -110,37 +115,10 @@ onLoad((options) => {
 const scrolledToBottom = ref(false);
 const checked = ref(false);
 const selectedBlock = ref<number | null>(null);
-const sentinelRef = ref<HTMLElement | null>(null);
-let observer: IntersectionObserver | null = null;
-
-onMounted(() => {
-  if (typeof IntersectionObserver === "undefined") {
-    scrolledToBottom.value = true;
-    return;
-  }
-  const raw = sentinelRef.value as unknown;
-  const el: Element | null =
-    raw instanceof Element
-      ? raw
-      : (raw as { $el?: unknown } | null)?.$el instanceof Element
-        ? (raw as { $el: Element }).$el
-        : null;
-  if (!el) {
-    scrolledToBottom.value = true;
-    return;
-  }
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((e) => e.isIntersecting)) scrolledToBottom.value = true;
-    },
-    { rootMargin: `0px 0px -${SCROLL_THRESHOLD_PX}px 0px` },
-  );
-  observer.observe(el);
+onMounted(async () => {
+  await risk.refresh();
 });
-onUnmounted(() => {
-  observer?.disconnect();
-  observer = null;
-});
+function onScrollToLower() { scrolledToBottom.value = true; }
 
 /**
  * 🔴 提现窗口这一段的数字必须从配置来(2026-08-01 走查 P0-2)。
@@ -160,28 +138,24 @@ const withdrawWindowBody = computed(() => {
     d: normalizeReviewWindowDays(rules.payoutReviewWindowDays),
   })}`;
 });
-const blocks = computed(() => [
-  { n: 1, title: w.value.s1Title, body: w.value.s1Body },
-  { n: 2, title: w.value.s2Title, body: w.value.s2Body },
-  { n: 3, title: w.value.s3Title, body: w.value.s3Body },
-  { n: 4, title: w.value.s4Title, body: withdrawWindowBody.value },
-  { n: 5, title: w.value.s5Title, body: w.value.s5Body },
-  { n: 6, title: w.value.s6Title, body: w.value.s6Body },
-  { n: 7, title: w.value.s7Title, body: w.value.s7Body },
-]);
+const blocks = computed(() => disclosure.value?.chapters.map((chapter) => ({
+  n: Number(chapter.no),
+  title: locale.code === "vi" ? chapter.vi : locale.code === "en" ? chapter.en : chapter.zh,
+  body: locale.code === "vi" ? chapter.viBody : locale.code === "en" ? chapter.enBody : chapter.zhBody,
+})) ?? []);
 
 function sectionSelectedLabel(n: number): string {
   return fmt(w.value.sectionSelected, { n: String(n).padStart(2, "0") });
 }
 
-const canAccept = computed(() => scrolledToBottom.value && checked.value && !accepted.value);
+const canAccept = computed(() => Boolean(disclosure.value) && scrolledToBottom.value && checked.value && !accepted.value && !risk.loading);
 
 function toggleCheck() {
   if (scrolledToBottom.value && !accepted.value) checked.value = !checked.value;
 }
-function onAccept() {
+async function onAccept() {
   if (!canAccept.value) return;
-  risk.accept();
+  if (!await risk.accept()) return;
   toast.success(w.value.acceptToast);
   // 🔴 用 navigateBack 回到**原来那个页面实例**。navigateTo 是压一个新页:
   // 用户在提现页输的金额随新实例重置为空、原实例被压在栈底,提交意图 100% 丢失,
@@ -189,6 +163,7 @@ function onAccept() {
   // 冷启动直达本页时栈里只有一页,裸 navigateBack 是空操作(P-054)—— 走 helper,它会按栈深选 pop 还是 reLaunch。
   navBack(returnTo.value);
 }
+async function reload() { await risk.refresh(); }
 
 // Spotlight hero (whitelist ≤1):零 border(《03》§3,C2 第二轮起中性边也删)——
 // 边界靠 surface 与页面地板的微差色;the brand-2 mood lives in the icon + label.
@@ -253,6 +228,7 @@ const hintStyle: CSSProperties = {
   padding: "12px",
 };
 const hintTextStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-warning)" };
+const retryStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", color: "var(--v5-brand)" };
 // Acknowledgment gate — de-carded onto the page floor; a hairline opens the
 // action group (checkbox control + brand CTA pill are whitelisted as-is).
 const ackCardStyle: CSSProperties = {

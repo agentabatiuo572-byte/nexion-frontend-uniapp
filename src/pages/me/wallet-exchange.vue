@@ -17,6 +17,8 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
+      <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">远端权威数据不可用，兑换已关闭</text>
+      <text v-else-if="!remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Mock 模式 · 非远端成交</text>
 
       <!-- How-it-works entry + refresh — pill compacted to match the other pages;
            it stays paired with the rate-refresh button (no de-carded hero here to
@@ -117,8 +119,8 @@
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
             <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.exchange.yourDaily }}</text>
             <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
-              <text>${{ v3.todayUserUsedUSD.toFixed(2) }} </text>
-              <text style="color: var(--v5-ink-3)">/ ${{ USER_DAILY_CAP_USD }}</text>
+              <text>{{ remoteApiEnabled && !remoteState ? "远端未提供" : `$${displayUserUsed.toFixed(2)}` }} </text>
+              <text v-if="!remoteApiEnabled || remoteState" style="color: var(--v5-ink-3)">/ ${{ displayUserCap.toFixed(2) }}</text>
             </view>
           </view>
           <view :style="barTrackStyle">
@@ -131,8 +133,8 @@
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
             <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.exchangePoolToday }}</text>
             <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
-              <text>${{ (v3.todayPlatformUsedUSD / 1000).toFixed(1) }}K </text>
-              <text style="color: var(--v5-ink-3)">/ ${{ (PLATFORM_DAILY_CAP_USD / 1000).toFixed(0) }}K</text>
+              <text>{{ remoteApiEnabled && !remoteState ? "远端未提供" : `$${(displayPlatformUsed / 1000).toFixed(1)}K` }} </text>
+              <text v-if="!remoteApiEnabled || remoteState" style="color: var(--v5-ink-3)">/ ${{ (displayPlatformCap / 1000).toFixed(0) }}K</text>
             </view>
           </view>
           <view :style="barTrackStyle">
@@ -141,12 +143,12 @@
         </view>
 
         <!-- Queue -->
-        <view v-if="v3.queue.length > 0" :style="queueWrapStyle">
+        <view v-if="displayQueue.length > 0" :style="queueWrapStyle">
           <view class="flex items-center" :style="queueTitleStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
             <text style="margin-left: 6px">{{ queuedLabel }}</text>
           </view>
-          <view v-for="q in v3.queue.slice(0, 3)" :key="q.id" class="flex items-center justify-between" style="padding: 4px 0">
+          <view v-for="q in displayQueue.slice(0, 3)" :key="q.id" class="flex items-center justify-between" style="padding: 4px 0">
             <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
             <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">${{ q.amountUSD.toFixed(2) }}</text>
           </view>
@@ -184,6 +186,8 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
+import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
+import type { ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
 import {
   useExchangeV3,
@@ -197,9 +201,59 @@ const t = useT();
 const app = useApp();
 const exchange = useExchange();
 const v3 = useExchangeV3();
+const remoteState = ref<ExchangeSnapshot | null>(null);
+const remoteError = ref<string | null>(null);
 
-const history = computed(() => exchange.history);
-const rate = computed(() => exchange.rate);
+async function syncRemoteState() {
+  if (!remoteApiEnabled) return;
+  try {
+    remoteState.value = await exchangeApi.fetchState();
+    remoteError.value = null;
+  } catch {
+    // Failure-close: local balances, rates, queues and history are not a remote fallback.
+    remoteState.value = null;
+    remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
+    throw new Error(remoteError.value);
+  }
+}
+
+async function cancelRemoteOrder(exchangeNo: string) {
+  if (!remoteApiEnabled) return;
+  try {
+    remoteState.value = await exchangeApi.cancel(exchangeNo, `G2-CANCEL-${exchangeNo}-${Date.now().toString(36)}`);
+    remoteError.value = null;
+  } catch {
+    remoteState.value = null;
+    remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
+    throw new Error(remoteError.value);
+  }
+}
+
+const history = computed<SwapEvent[]>(() => {
+  if (!remoteApiEnabled) return exchange.history;
+  return (remoteState.value?.orders ?? []).map((order) => ({
+    id: order.exchangeNo,
+    ts: order.createdAt ?? 0,
+    fromSym: order.fromAsset,
+    toSym: order.toAsset,
+    fromAmount: order.fromAmount,
+    toAmount: order.toAmount,
+    rate: order.rate,
+  }));
+});
+// remote mode must never render persisted exchange or v3 facts.
+const displayUserUsed = computed(() => remoteApiEnabled ? (remoteState.value?.todayUserUsedUsdt ?? 0) : v3.todayUserUsedUSD);
+const displayPlatformUsed = computed(() => remoteApiEnabled ? (remoteState.value?.todayPlatformUsedUsdt ?? 0) : v3.todayPlatformUsedUSD);
+const displayUserCap = computed(() => remoteApiEnabled ? (remoteState.value?.caps.userDailyCapUsdt ?? 0) : USER_DAILY_CAP_USD);
+const displayPlatformCap = computed(() => remoteApiEnabled ? (remoteState.value?.caps.platformDailyCapUsdt ?? 0) : PLATFORM_DAILY_CAP_USD);
+const displayQueue = computed(() => remoteApiEnabled
+  ? (remoteState.value?.orders ?? []).filter((order) => order.status === "QUEUED").map((order) => ({
+    id: order.exchangeNo,
+    amountUSD: order.fromAsset === "USDT" ? order.fromAmount : order.toAmount,
+    direction: order.fromAsset === "NEX" ? "nex2usdt" as const : "usdt2nex" as const,
+  }))
+  : v3.queue);
+const rate = computed(() => remoteApiEnabled ? (remoteState.value?.caps.currentPrice ?? 0) : exchange.rate);
 
 const direction = ref<"usdt2nex" | "nex2usdt">("nex2usdt");
 const input = ref("");
@@ -207,6 +261,11 @@ const secsAgo = ref(0);
 
 // Roll daily counters on mount.
 onMounted(() => {
+  if (remoteApiEnabled) {
+    void syncRemoteState().catch(() => toast.error("远端权威数据暂不可用"));
+    return;
+  }
+  // Explicit mock mode only: local counters and local wallet receipts are never remote success.
   v3.resetIfNewDay();
 });
 
@@ -215,6 +274,10 @@ onMounted(() => {
 let rateTimer: ReturnType<typeof setInterval> | null = null;
 let agoTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
+  if (remoteApiEnabled) {
+    rateTimer = setInterval(() => { void syncRemoteState().catch(() => {}); }, 15000);
+    return;
+  }
   rateTimer = setInterval(() => exchange.refreshRate(), 15000);
   agoTimer = setInterval(() => {
     secsAgo.value = Math.floor((Date.now() - exchange.rateUpdatedAt) / 1000);
@@ -227,7 +290,12 @@ onUnmounted(() => {
 
 const fromSym = computed(() => (direction.value === "usdt2nex" ? "USDT" : "NEX"));
 const toSym = computed(() => (direction.value === "usdt2nex" ? "NEX" : "USDT"));
-const fromBal = computed(() => (direction.value === "usdt2nex" ? app.user.usdtBalance : app.user.nexBalance));
+const fromBal = computed(() => {
+  if (remoteApiEnabled) return direction.value === "usdt2nex"
+    ? (remoteState.value?.wallet.usdtAvailable ?? 0)
+    : (remoteState.value?.wallet.nexAvailable ?? 0);
+  return direction.value === "usdt2nex" ? app.user.usdtBalance : app.user.nexBalance;
+});
 const minFrom = computed(() => (direction.value === "usdt2nex" ? 1 : 10));
 
 /**
@@ -293,6 +361,12 @@ function flip() {
 }
 
 function onRefresh() {
+  if (remoteApiEnabled) {
+    void syncRemoteState()
+      .then(() => toast.info("远端权威数据已刷新"))
+      .catch(() => toast.error("远端权威数据暂不可用"));
+    return;
+  }
   exchange.refreshRate();
   toast.info(t.value.exchange.quoteRefreshing);
 }
@@ -329,6 +403,26 @@ async function handleConfirm() {
   // 不能无条件说「一分没动」。见 catch 处注释。
   let settled = false;
   try {
+    if (remoteApiEnabled) {
+      const ok = await confirm({
+        title: t.value.exchange.confirm,
+        message: `${snap.fromSym} ${amtLabel(snap.fromAmount)} → ${snap.toSym} ${amtLabel(snap.toAmount)}`,
+        icon: "info",
+        confirmLabel: t.value.exchange.confirm,
+      });
+      if (!ok) return;
+      const directionCode = snap.direction === "usdt2nex" ? "USDT_TO_NEX" : "NEX_TO_USDT";
+      remoteState.value = await exchangeApi.swap(
+        directionCode,
+        snap.fromAmount,
+        true,
+        `G2-SWAP-${directionCode}-${snap.fromAmount}-${Date.now().toString(36)}`,
+      );
+      remoteError.value = null;
+      input.value = "";
+      toast.success(t.value.exchange.swapped);
+      return;
+    }
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
     // 兑换只受汇率、日限、平台额度与地理限制约束。
     const gate = v3.canExchange(snap.usd);
@@ -440,6 +534,12 @@ async function handleConfirm() {
     );
     input.value = "";
   } catch (err) {
+    if (remoteApiEnabled) {
+      remoteState.value = null;
+      remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
+      toast.error("远端权威数据暂不可用");
+      return;
+    }
     // A region refusal surfaces on this path as a rejected submit. Translate it
     // into a toast; anything else is not ours to swallow — rethrow so the
     // existing failure behaviour (and the `finally` unlock below) is unchanged.
@@ -467,7 +567,7 @@ const errorLabel = computed(() =>
     ? t.value.exchange.insufficientMessage.replace("{sym}", fromSym.value)
     : t.value.exchange.minAmount.replace("{n}", String(minFrom.value)).replace("{sym}", fromSym.value),
 );
-const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(v3.queue.length) }));
+const queuedLabel = computed(() => fmt(t.value.exchange.queuedLabel, { n: String(displayQueue.value.length) }));
 // 历史行同样走 amtLabel:历史与余额对不上,多半就是这里自己又取了一次整。
 function swapLine(h: SwapEvent): string {
   return `${amtLabel(h.fromAmount)} ${h.fromSym} → ${amtLabel(h.toAmount)} ${h.toSym}`;
@@ -580,7 +680,9 @@ const barTrackStyle: CSSProperties = {
   overflow: "hidden",
 };
 const userBarStyle = computed<CSSProperties>(() => {
-  const pct = dailyUserPctUsed(v3.todayUserUsedUSD);
+  const pct = remoteApiEnabled
+    ? Math.min(1, displayUserUsed.value / Math.max(displayUserCap.value, 1))
+    : dailyUserPctUsed(v3.todayUserUsedUSD);
   return {
     height: "100%",
     width: `${pct * 100}%`,
@@ -591,7 +693,9 @@ const userBarStyle = computed<CSSProperties>(() => {
 });
 const platformBarStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: `${dailyPlatformPctUsed(v3.todayPlatformUsedUSD) * 100}%`,
+  width: `${remoteApiEnabled
+    ? Math.min(1, displayPlatformUsed.value / Math.max(displayPlatformCap.value, 1)) * 100
+    : dailyPlatformPctUsed(v3.todayPlatformUsedUSD) * 100}%`,
   borderRadius: "999px",
   background: "var(--v5-brand-2)",
   transition: "width 600ms cubic-bezier(0.16,1,0.3,1)",

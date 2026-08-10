@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { remoteApiEnabled, vRankApi } from "@/api/runtime";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
@@ -144,6 +145,26 @@ export interface VRankData {
 
 export type VRankProgressPatch = Partial<Omit<VRankData, "myRank">>;
 
+const EMPTY_V_RANK: VRankDef = {
+  v: 0, title: "", cnTitle: "", conditions: {}, directBonus: 0,
+  unilevelDepth: 0, peerBonus: 0, leadershipVotes: 0, cultivationBonus: 0,
+};
+
+function canonicalRank(row: Awaited<ReturnType<typeof vRankApi.ladder>>["ranks"][number]): VRankDef {
+  const conditions: VRankConditions = {};
+  if (row.selfBuyUSD !== undefined) conditions.selfBuyUSD = row.selfBuyUSD;
+  if (row.directRefs !== undefined) conditions.directRefs = row.directRefs;
+  if (row.teamVolumeUSD !== undefined) conditions.teamVolumeUSD = row.teamVolumeUSD;
+  if (row.requiredDownlineRank !== undefined && row.requiredDownlineCount !== undefined) {
+    conditions.vDownlines = { [row.requiredDownlineRank as VRank]: row.requiredDownlineCount };
+  }
+  return {
+    v: row.v as VRank, title: row.title, cnTitle: row.cnTitle, conditions,
+    directBonus: row.directBonus, unilevelDepth: row.unilevelDepth, peerBonus: row.peerBonus,
+    leadershipVotes: row.leadershipVotes, cultivationBonus: row.cultivationBonus,
+  };
+}
+
 // 等级是账号资产:per-account 行表(P2-8 设备级泄漏修复)。旧设备级单键
 // "nexgrid-v-rank-v1" 不迁移 —— 存量无账号归属,迁给任何账号都是臆断,就地废弃。
 const ACCOUNTS_KEY = "nexgrid-v-rank-accounts-v1"; // { [accountKey]: VRankData }
@@ -170,14 +191,16 @@ export const useVRank = defineStore("vRank", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = hydrate(boundKey);
+  const init = remoteApiEnabled ? { myRank: 0 as VRank, selfBuyUSD: 0, directRefs: 0, teamVolumeUSD: 0, vDownlineCounts: {} } : hydrate(boundKey);
   const myRank = ref<VRank>(init.myRank);
   const selfBuyUSD = ref(init.selfBuyUSD);
   const directRefs = ref(init.directRefs);
   const teamVolumeUSD = ref(init.teamVolumeUSD);
   const vDownlineCounts = ref<Partial<Record<VRank, number>>>(init.vDownlineCounts);
+  const ladder = ref<VRankDef[]>(remoteApiEnabled ? [] : V_RANKS);
 
   function persist() {
+    if (remoteApiEnabled) return;
     writeAccountRow<VRankData>(ACCOUNTS_KEY, boundKey, {
       myRank: myRank.value,
       selfBuyUSD: selfBuyUSD.value,
@@ -190,12 +213,29 @@ export const useVRank = defineStore("vRank", () => {
   /** 账号切换重绑:装载该账号的等级行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      void refreshCanonicalVRank();
+      return;
+    }
     const next = hydrate(boundKey);
     myRank.value = next.myRank;
     selfBuyUSD.value = next.selfBuyUSD;
     directRefs.value = next.directRefs;
     teamVolumeUSD.value = next.teamVolumeUSD;
     vDownlineCounts.value = next.vDownlineCounts;
+  }
+
+  async function refreshCanonicalVRank() {
+    if (!remoteApiEnabled) return;
+    const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+    ladder.value = remoteLadder.ranks.map(canonicalRank);
+    myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
+    selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
+    directRefs.value = remoteCurrent.progress.directRefs;
+    teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
+    vDownlineCounts.value = Object.fromEntries(
+      Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
+    ) as Partial<Record<VRank, number>>;
   }
 
   function setMyRank(v: VRank) {
@@ -210,16 +250,16 @@ export const useVRank = defineStore("vRank", () => {
     persist();
   }
 
-  return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, setMyRank, setProgress, bindAccount };
+  return { myRank, selfBuyUSD, directRefs, teamVolumeUSD, vDownlineCounts, ladder, setMyRank, setProgress, bindAccount, refreshCanonicalVRank };
 });
 
 /** 计算到下一阶的进度(0-1) */
-export function nextRankProgress(state: VRankData): {
+export function nextRankProgress(state: VRankData, ladder: VRankDef[] = V_RANKS): {
   next: VRankDef | null;
   progressPct: number;
   missing: string[];
 } {
-  const next = V_RANKS[state.myRank + 1];
+  const next = ladder[state.myRank + 1];
   if (!next) return { next: null, progressPct: 1, missing: [] };
   const c = next.conditions;
   const missing: string[] = [];
@@ -249,7 +289,7 @@ export function nextRankProgress(state: VRankData): {
       const have = state.vDownlineCounts[Number(v) as VRank] ?? 0;
       checks.push(Math.min(1, have / n));
       if (have < n) {
-        const def = V_RANKS[Number(v)];
+      const def = ladder[Number(v)] ?? EMPTY_V_RANK;
         const need = n - have;
         missing.push(`${need} more ${def.title} (V${v})`);
       }
@@ -294,9 +334,9 @@ const PERK_WEIGHT: Record<PerkUnlock["kind"], number> = {
 
 const TOP_UNLOCKS_CAP = 2; // UI keeps perk line single-line at 414w mobile
 
-export function nextRankGap(state: VRankData): NextRankGapInfo {
-  const current = V_RANKS[state.myRank];
-  const next = V_RANKS[state.myRank + 1];
+export function nextRankGap(state: VRankData, ladder: VRankDef[] = V_RANKS): NextRankGapInfo {
+  const current = ladder[state.myRank] ?? EMPTY_V_RANK;
+  const next = ladder[state.myRank + 1];
   if (!next) {
     return {
       next: null,

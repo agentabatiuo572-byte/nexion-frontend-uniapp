@@ -222,6 +222,8 @@ export interface PublicStatsConfig {
   registeredUsersMonthlyGrowthPct: number;
   /** 派生起点(ms epoch)。运营改基数即重置锚点。 */
   registeredUsersAnchorAt: number;
+  /** 服务端真实注册账号数，仅用于排名分母，不用于营销展示。 */
+  realUserCount: number;
   /** 虚拟人口规模。真实人口 + 它 = 排名分母。[0, 10000000]。 */
   virtualUserCount: number;
   /** 虚拟人口算力分布档(tops 升序、cumPct 单调不减且 ≤100、至少 2 档)。

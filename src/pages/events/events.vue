@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -72,6 +72,8 @@ import EventsFeaturedHero from "@/components/events/events-featured-hero.vue";
 import EventsCard from "@/components/events/events-card.vue";
 import { useT } from "@/i18n/use-t";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { eventsApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
 import { useLuckySpin } from "@/store/lucky-spin";
@@ -88,20 +90,59 @@ const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
 
 const tab = ref<TabId>("ongoing");
+const remoteEvents = ref<CanonicalEvent[]>([]);
+
+function remoteEventView(event: CanonicalEvent): NexEvent {
+  const tintByKind: Record<CanonicalEvent["kind"], string> = {
+    discount: "#FFC83D", referral: "#7DD3FC", wheel: "#C4B5FD", regional: "#FB7185",
+    boost: "#86EFAC", seasonal: "#F9A8D4", holding: "#93C5FD", onboarding: "#FDE68A",
+  };
+  return {
+    id: event.eventCode,
+    kind: event.kind,
+    status: event.state,
+    title: event.title,
+    subtitle: event.subtitle,
+    emoji: "✦",
+    tint: tintByKind[event.kind],
+    reward: `${event.rewardAmount} ${event.rewardName}`,
+    progress: event.trackable ? { current: event.progressValue, total: event.targetValue, label: "progress" } : null,
+    joined: ["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus),
+    href: event.href || undefined,
+    featured: event.featured,
+    trackable: event.trackable,
+    done: ["CLAIMABLE", "CLAIMED"].includes(event.userStatus),
+    rewardNEX: event.rewardType === "NEX" ? event.rewardAmount : 0,
+  };
+}
+
+async function loadRemoteEvents() {
+  if (!remoteApiEnabled) return;
+  try {
+    remoteEvents.value = (await eventsApi.state()).events;
+  } catch {
+    remoteEvents.value = [];
+  }
+}
+onMounted(() => { void loadRemoteEvents(); });
 
 // Enrich each event with live join/claim state from the store.
 const enrichedEvents = computed<EnrichedEvent[]>(() =>
-  EVENTS.map((ev) => {
+  (remoteApiEnabled ? remoteEvents.value.map(remoteEventView) : EVENTS).map((ev) => {
     const trackable = ev.trackable === true;
+    const remoteStatus = remoteApiEnabled
+      ? remoteEvents.value.find((event) => event.eventCode === ev.id)?.userStatus
+      : undefined;
     const joinedFromStore = eventQuest.isJoined(ev.id);
     const claimedFromStore = eventQuest.isClaimed(ev.id);
     return {
       ...ev,
-      // Fallback to mock hardcoded joined for decorative events
-      joined: trackable ? joinedFromStore : ev.joined,
+      // In remote mode the event snapshot itself is the authority. The store
+      // only mirrors it after an acknowledged command and must not override it.
+      joined: remoteApiEnabled ? ev.joined : (trackable ? joinedFromStore : ev.joined),
       _trackable: trackable,
       _done: ev.done ?? false,
-      _claimed: claimedFromStore,
+      _claimed: remoteApiEnabled ? remoteStatus === "CLAIMED" : claimedFromStore,
     };
   }),
 );
@@ -140,8 +181,17 @@ function rewardNexOf(ev: EnrichedEvent): number {
   return ev.rewardNEX ?? 0;
 }
 
-function handleJoin(ev: EnrichedEvent) {
+async function handleJoin(ev: EnrichedEvent) {
   if (!ev._trackable) return;
+  if (remoteApiEnabled) {
+    if (await eventQuest.joinRemote(ev.id)) {
+      await loadRemoteEvents();
+      toast.success(t.value.events.toast.joinedTitle.replace("{name}", ev.title), t.value.events.toast.joinedBody);
+    } else {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+    }
+    return;
+  }
   const joined = eventQuest.join(ev.id);
   if (joined) {
     toast.success(t.value.events.toast.joinedTitle.replace("{name}", ev.title), t.value.events.toast.joinedBody);
@@ -156,8 +206,17 @@ function handleJoin(ev: EnrichedEvent) {
   // 硬接一个布尔值只会得到一段恒不触发的死代码。已记进交接书。
 }
 
-function handleClaim(ev: EnrichedEvent) {
+async function handleClaim(ev: EnrichedEvent) {
   if (!ev._trackable || !ev._done || ev._claimed) return;
+  if (remoteApiEnabled) {
+    if (await eventQuest.claimRemote(ev.id)) {
+      await loadRemoteEvents();
+      toast.success(t.value.events.toast.claimedTitle.replace("{n}", rewardNexOf(ev).toLocaleString()), ev.title);
+    } else {
+      toast.error(t.value.authOtp.errorServiceUnavailable);
+    }
+    return;
+  }
   const reward = rewardNexOf(ev);
   // MOCK-ONLY NON-ATOMIC: PROD event-claim endpoint TBD must claim, credit,
   // and emit the matching bill in one idempotent transaction.

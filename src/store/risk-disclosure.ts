@@ -1,68 +1,45 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { normalizeAccountKey } from "./account-cloud";
+import { remoteApiEnabled, riskDisclosureApi } from "@/api/runtime";
+import type { RiskDisclosureCurrent } from "@/api/risk-disclosure-api";
 
-// Risk disclosure acceptance. Ported from
-// Nexion-prototype/lib/store/risk-disclosure.ts (zustand persist → Pinia + uni storage).
-//
-// Tracks whether the user has read & accepted the platform risk disclosure.
-// Required before first withdrawal / first staking lock. Once accepted, no
-// re-prompt (persisted across sessions).
-
-// 🔴 按**账号**分行,不是设备级(2026-08-01 审计)。
-// 原实现是单键 nexgrid-risk-disclosure-v1,且不在 rebindAccountScopedStores 名单里:
-// A 账号接受过披露 → 换成 B 账号,accepted 仍为 true → B 的首次提现**直接跳过强制合规确认**,
-// 从未看到那份他必须勾选「我已阅读」的文件。凭证类 per-user 状态一律按账号作用域
-// (与 payout-address / security 同档)。旧设备级单键废弃,存量重新走一次披露 —— 合规上这是对的方向。
-const ACCOUNTS_KEY = "nexgrid-risk-disclosure-accounts-v1"; // { [accountKey]: {accepted, acceptedAt} }
-
-interface DisclosureState {
-  accepted: boolean;
-  acceptedAt: number | null;
-}
-
-function hydrate(accountKey: string): DisclosureState {
-  const row = readAccountRow<Partial<DisclosureState>>(ACCOUNTS_KEY, accountKey);
-  if (row && typeof row.accepted === "boolean") {
-    return { accepted: row.accepted, acceptedAt: row.acceptedAt ?? null };
-  }
-  return { accepted: false, acceptedAt: null };
-}
-
+/** The server disclosure/version is the only compliance fact; never persist an acknowledgement locally. */
 export const useRiskDisclosure = defineStore("riskDisclosure", () => {
-  // boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
-  let boundKey = "default";
-  const init = hydrate(boundKey);
-  const accepted = ref(init.accepted);
-  const acceptedAt = ref<number | null>(init.acceptedAt);
+  const current = ref<RiskDisclosureCurrent | null>(null);
+  const accepted = ref(false);
+  const acceptedAt = ref<number | null>(null);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
 
-  function persist() {
-    writeAccountRow<DisclosureState>(ACCOUNTS_KEY, boundKey, {
-      accepted: accepted.value,
-      acceptedAt: acceptedAt.value,
-    });
+  function apply(snapshot: RiskDisclosureCurrent | null) {
+    current.value = snapshot;
+    accepted.value = snapshot?.acknowledged ?? false;
+    acceptedAt.value = snapshot?.acknowledgedAt ? Date.parse(snapshot.acknowledgedAt) || null : null;
   }
-
-  /** 账号切换重绑:装载该账号自己的披露接受状态(防跨账号继承强制合规确认)。 */
-  function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    const next = hydrate(boundKey);
-    accepted.value = next.accepted;
-    acceptedAt.value = next.acceptedAt;
+  async function refresh() {
+    apply(null);
+    error.value = null;
+    if (!remoteApiEnabled) { error.value = "RISK_DISCLOSURE_REMOTE_REQUIRED"; return; }
+    loading.value = true;
+    try {
+      const snapshot = await riskDisclosureApi.current();
+      current.value = snapshot;
+      accepted.value = snapshot.acknowledged;
+      acceptedAt.value = snapshot.acknowledgedAt ? Date.parse(snapshot.acknowledgedAt) || null : null;
+    } catch (cause) {
+      apply(null);
+      error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_UNAVAILABLE";
+    } finally { loading.value = false; }
   }
-
-  function accept() {
-    accepted.value = true;
-    acceptedAt.value = Date.now();
-    persist();
+  async function accept() {
+    if (!current.value || accepted.value) return false;
+    loading.value = true;
+    error.value = null;
+    try { apply(await riskDisclosureApi.acknowledge(current.value)); return accepted.value; }
+    catch (cause) { apply(null); error.value = cause instanceof Error ? cause.message : "RISK_DISCLOSURE_ACKNOWLEDGEMENT_FAILED"; return false; }
+    finally { loading.value = false; }
   }
-
-  function reset() {
-    accepted.value = false;
-    acceptedAt.value = null;
-    persist();
-  }
-
-  return { accepted, acceptedAt, accept, reset , bindAccount };
+  function bindAccount() { apply(null); void refresh(); }
+  function reset() { apply(null); void refresh(); }
+  return { current, accepted, acceptedAt, loading, error, refresh, accept, reset, bindAccount };
 });

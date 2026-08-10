@@ -6,9 +6,8 @@
   is embedded in genesis.vue and toggled via `v-model:open`. framer-motion
   slide-up → CSS <transition> (backdrop fade + panel slide).
 
-  Cross-store side-effect (architecture铁律: stores don't import each other) —
-  the purchase handler composes postMoneyBill()(扣款 ⊗ 记账,见 lib/money-receipt.ts)
-  + genesis.purchase() here in the component.
+  Purchase is submitted to the canonical Genesis backend transaction. The
+  client never pre-debits the wallet or writes a synthetic receipt.
 -->
 <template>
   <view v-if="open">
@@ -96,9 +95,6 @@
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useApp } from "@/store/app";
-import { postMoneyBill } from "@/lib/money-receipt";
-import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
@@ -108,7 +104,6 @@ const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
 
 const t = useT();
-const app = useApp();
 const genesis = useGenesis();
 const { gate } = useGenesisEligibility();
 // 🔴 半屏必须**自己**接闸(独立验收 P1-7)。此前它完全不知道市场状态:
@@ -169,18 +164,12 @@ function emitClose() {
   emit("update:open", false);
 }
 
-function handlePurchase() {
-  // 🔴 重入守卫排在最前(关闭是异步的,双击会在面板卸载前再进来一次)。
+async function handlePurchase() {
   if (purchasing.value) return;
-  // 🔴 市场闸排在**所有资金动作之前**(独立验收 P1-7)。UI 已在阻断态换成锁定块,
-  //   这里是第二道 —— 防程序化调用与「点下去那一刻正好翻脸」的竞态穿过。
-  //   零资金动作返回:不扣款就没有冲正,也就写不出成对的账单。
   if (sheetBlocked.value) {
     toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
     return;
   }
-  // L3 复验(照 checkout F4b:防深链/时序绕过 UI 门)。顺序固定
-  // eligibility → cap → balance → mint,资格/限购失败时零资金动作。
   if (!gate.value.eligible) {
     toast.error(t.value.genesisEligibility.toastIneligible, t.value.genesisEligibility.toastIneligibleSub);
     return;
@@ -192,85 +181,15 @@ function handlePurchase() {
     );
     return;
   }
-  // 上锁点 = 第一次动钱之前。committed 只在真成交那条路径置位。
   purchasing.value = true;
   let committed = false;
   try {
-    const cost = qty.value * price.value;
-    const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
-    // ⚠️ MOCK-ONLY CROSS-STORE MUTATION (NON-ATOMIC): 扣款⊗记账已被 postMoneyBill
-    // 收口成一次提交,但「铸席位」仍是**另一次写** —— 整笔仍非原子。
-    // PRODUCTION: POST /api/genesis/primary/subscribe 单事务提交,返回
-    // {balance, ownedTokenIds, billId}(PRD §10.1.1;二级承接与挂单分别走
-    // POST /api/genesis/secondary/fulfill 与 POST /api/genesis/{list,unlist},§10.2.4)。
-    //
-    // 🔴 顺序 = 扣款⊗记账(原子)→ 铸席位(2026-08-04 R4「钱动了、账没记上」)。原顺序是
-    // 「扣款 → 铸席位 → 裸 bills.add」,而 bills.add 写不进去时**返回 null 且不抛异常**、
-    // 没人接 —— 于是近 $15k 已扣、席位已铸、弹「购买成功」,账单页却查无此单。收据挪到铸造
-    // 之前并与扣款收口成一次提交后,收据落不了盘 = 钱没扣、席位没铸、明确报错,零半执行残迹。
-    const before = app.captureMoney();
-    const paid = postMoneyBill({
-      type: "purchase",
-      symbol: "USDT",
-      amount: -cost,
-      status: "posted",
-      memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
-      ref: billRef,
-    });
-    // 地区拒绝先试译。拒绝发生在扣款**落地之前**(insufficient 分支同位),
-    // 所以此处说「资金没动」成立。翻不出来就原样走既有分支。
-    const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
-    if (geo) {
-      toast.error(geo, t.value.geoPolicy.fundsSafeNote);
-      return;
-    }
-    if (paid === "insufficient") {
+    const result = await genesis.purchase(qty.value);
+    if (!result.ok) {
       toast.error(
-        t.value.genesis.purchaseError,
-        fmt(t.value.genesis.purchaseErrorSubtitle, {
-          cost: cost.toLocaleString(),
-          balance: app.user.usdtBalance.toFixed(2),
-        }),
+        result.reason === "market-closed" ? sheetBlockText.value : t.value.genesis.purchaseError,
+        result.reason === "market-closed" ? t.value.genesis.marketClosed.holdingsSafe : t.value.genesis.reduceQty,
       );
-      return;
-    }
-    if (paid !== "ok") return; // 落盘失败:资金已还原**或**已入待对账("stuck" 那格钱仍扣着,收口点给了交易号);账上无记录,收口点已提示
-    const r = genesis.purchase(qty.value);
-    if (!r.ok) {
-      // 铸造失败(售罄 / 限购竞态)→ 冲正,不留「扣钱无货」。走**同一个**收口点:
-      // ① restoreTo 精确还原扣款前的 withdrawableUsdt —— 原实现的裸 creditBalance 只加总余额、
-      //    不还可提额度,一次「扣款→失败→退款」就把用户可提额永久压低($8000 → $1,审计场景);
-      // ② 补一条反向分录 —— 原实现退款**一条账单都不写**(同族的另一面:钱动了、账没记上)。
-      //    已终态分录靠反向分录冲正、不改写原行(与提现 NEX 退还同规矩)。
-      postMoneyBill(
-        {
-          type: "purchase",
-          symbol: "USDT",
-          amount: cost,
-          status: "posted",
-          memo: `Genesis primary reversed · ${qty.value} slot${qty.value > 1 ? "s" : ""} refunded`,
-          memoKey: "genesisReversed",
-          memoParams: { n: qty.value },
-          // 🔴 冲正分录的幂等键要与原分录分开(addOnce 按 ref+type+symbol 判重,
-          // 原本三项完全相同 → 将来任何幂等写都会误命中冲正行)。同 marketplace。
-          ref: `${billRef}-REV`,
-        },
-        { restoreTo: before },
-      );
-      // 按拒绝原因选反馈(售罄竞态 vs 限购 vs 市场关闭,A-1 / FEAT-GEN10 异常4)。
-      if (r.reason === "market-closed") {
-        // 用户已打开购买半屏、运营此刻切到关闭 → 就地说明。钱已在上方冲正,不留半成品订单。
-        // 🔴 文案走 blockText,不写死 `.default`:运营选了「维护中」变体时,这条 toast
-        //   曾照样说「暂未开放」—— 后台专门为防串档把变体改成下拉,前端这里再写死就白改了。
-        toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
-      } else if (r.reason === "cap") {
-        toast.error(
-          t.value.genesisEligibility.toastCapReached,
-          fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
-        );
-      } else {
-        toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
-      }
       return;
     }
     toast.success(
@@ -280,9 +199,6 @@ function handlePurchase() {
     committed = true;
     emitClose();
   } finally {
-    // 只有真成交才继续持锁(面板正在关闭,解锁 = 给双击留窗口;由 open watcher 复位)。
-    // 其余任何出口 —— 余额不足、铸造失败、抛异常 —— 立刻解锁,让用户能重试,
-    // 也就不会出现「某条提前 return 忘复位 → 后续购买永久锁死」。
     if (!committed) purchasing.value = false;
   }
 }

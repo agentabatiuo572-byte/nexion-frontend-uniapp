@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { pointsApi, remoteApiEnabled } from "@/api/runtime";
 import { createAccountRowCommit } from "./account-scoped-storage";
 
 /**
@@ -42,6 +43,41 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   const claimed = ref<StreakPowerUpId[]>([]);
   const claimedAt = ref<Record<string, number>>({});
+  const remotePowerUpIds = ref<Record<string, number>>({});
+
+  function clearRemoteFacts() {
+    claimed.value = [];
+    claimedAt.value = {};
+    remotePowerUpIds.value = {};
+  }
+
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const snapshot = await pointsApi.state();
+      remotePowerUpIds.value = Object.fromEntries(snapshot.powerUps.map((powerUp) => [powerUp.powerUpCode, powerUp.powerUpId]));
+      claimed.value = snapshot.powerUps
+        .filter((powerUp) => powerUp.status === "ACTIVATED")
+        .map((powerUp) => powerUp.powerUpCode as StreakPowerUpId);
+      return true;
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function claimRemote(id: StreakPowerUpId): Promise<boolean> {
+    const powerUpId = remotePowerUpIds.value[id];
+    if (!powerUpId) return false;
+    try {
+      await pointsApi.activatePowerUp(powerUpId, `h5-power-up:${powerUpId}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
 
   // 落盘唯一出口:乐观并发提交器(每日一次性增益被两个标签页各领一次 = 白送一档增益)。
   const rows = createAccountRowCommit<DailyPowerUpData>({
@@ -56,6 +92,11 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
 
   /** 账号切换重绑:装载该账号的增益领取态(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
+    if (remoteApiEnabled) {
+      clearRemoteFacts();
+      void refreshRemote();
+      return;
+    }
     const row = rows.bind(rawAccountKey) ?? defaults();
     claimed.value = row.claimed;
     claimedAt.value = row.claimedAt;
@@ -64,6 +105,7 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
 
   /** 领一档增益。🔴 已领判定跑在**磁盘最新状态**上:别处领过的这里就被挡住,不会二次激活。 */
   function claim(id: StreakPowerUpId): { ok: boolean; conflict?: boolean } {
+    if (remoteApiEnabled) return { ok: false };
     const r = rows.commit((cur) => {
       if (cur.claimed.includes(id)) return null;
       return {
@@ -79,8 +121,12 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
   }
 
   function reset() {
+    if (remoteApiEnabled) {
+      clearRemoteFacts();
+      return;
+    }
     rows.commit(() => ({ next: defaults(), result: true as const }));
   }
 
-  return { claimed, claimedAt, claim, hasClaimed, reset, bindAccount };
+  return { claimed, claimedAt, claim, claimRemote, hasClaimed, reset, bindAccount, refreshRemote };
 });

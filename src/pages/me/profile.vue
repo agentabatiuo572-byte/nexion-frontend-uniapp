@@ -99,7 +99,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import NicknameSheet from "@/components/me/nickname-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -119,6 +120,9 @@ const app = useApp();
 const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
+onMounted(() => {
+  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+});
 
 // Local edit buffer (committed on Save), mirroring the source useState.
 const name = ref(profile.displayName);

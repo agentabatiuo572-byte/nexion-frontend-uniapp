@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Listing } from "@/components/genesis/listing-card.vue";
 import type { ActivityEvent } from "@/components/genesis/activity-row.vue";
+import { genesisApi } from "@/api/runtime";
 
 /**
  * Genesis config — 创世节点的「后台可控」参数(阶梯定价 / 预售倒计时 / 权益文案 /
@@ -154,7 +155,7 @@ export interface GenesisMarketStats {
 /** 关闭态文案变体键 —— **白名单常量**,后台只能在其中选,不能自由输入正文。
  *  规格 FEAT-GEN10 ③:「禁后台自由输入正文,防绕过文案纪律」。
  *  每个键在 i18n `genesis.marketClosed.*` 下三语镜像。 */
-export const GENESIS_CLOSED_NOTICE_KEYS = ["default", "maintenance", "restock"] as const;
+export const GENESIS_CLOSED_NOTICE_KEYS = ["default", "maintenance", "phase_control", "compliance"] as const;
 export type GenesisClosedNoticeKey = (typeof GENESIS_CLOSED_NOTICE_KEYS)[number];
 
 export interface GenesisConfig {
@@ -193,7 +194,7 @@ const DAY = 86400_000;
 
 export const DEFAULT_GENESIS_CONFIG: GenesisConfig = {
   tiers: GENESIS_TIERS_DEFAULT.map((t) => ({ ...t })),
-  marketOpenState: "open", // 默认开放(不阻断现状)
+  marketOpenState: "closed", // fail-closed until the server state is available
   closedNoticeKey: "default",
   saleStartAt: null, // 默认已开售(不阻断现状)
   showCountdown: true,
@@ -340,12 +341,17 @@ function hydrate(): { config: GenesisConfig; ok: boolean } {
 }
 
 export const useGenesisConfig = defineStore("genesisConfig", () => {
-  const first = hydrate();
-  const config = ref<GenesisConfig>(first.config);
+  const initial = freshDefaults();
+  initial.marketOpenState = "closed";
+  initial.tiers = [];
+  initial.opsListings = [];
+  initial.fomoActivity = [];
+  initial.fomoEnabled = false;
+  const config = ref<GenesisConfig>(initial);
   /** 配置是否可用 —— 由**最近一次读源的真实结果**驱动,不写死。
    *  false 时 `genesisPurchaseBlock` 返回 `configUnavailable` 保守锁购;
    *  `refresh()` 成功即恢复(= 规格异常3 的「重试」)。 */
-  const loaded = ref(first.ok);
+  const loaded = ref(false);
 
   /**
    * 🔴 重新读配置源。这是关闭态能约束**已打开会话**的关键(独立验收 P0→P1):
@@ -357,27 +363,25 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
    *      动钱前**必再读一次**,这是 mock 期对「服务端拒单」的忠实模拟:
    *      判定读的不再是构造时的内存快照,而是当下的权威源。
    */
-  function refresh() {
-    const r = hydrate();
-    config.value = r.config;
-    loaded.value = r.ok;
-  }
-
-  function persist() {
+  async function refresh() {
     try {
-      uni.setStorageSync(STORAGE_KEY, { config: config.value });
+      const state = await genesisApi.state();
+      config.value = {
+        ...config.value,
+        tiers: state.tiers.map((tier) => ({ ...tier })),
+        marketOpenState: state.marketOpenState,
+        closedNoticeKey: GENESIS_CLOSED_NOTICE_KEYS.includes(state.closedNoticeKey as GenesisClosedNoticeKey)
+          ? state.closedNoticeKey as GenesisClosedNoticeKey
+          : "default",
+        saleStartAt: state.sale.startAt,
+        showCountdown: state.sale.showCountdown,
+      };
+      loaded.value = true;
     } catch {
-      // storage unavailable
+      config.value = { ...config.value, marketOpenState: "closed", tiers: [] };
+      loaded.value = false;
     }
   }
-  function update(patch: Partial<GenesisConfig>) {
-    config.value = { ...config.value, ...patch };
-    persist();
-  }
-  function reset() {
-    config.value = freshDefaults();
-    persist();
-  }
 
-  return { config, loaded, update, reset, refresh };
+  return { config, loaded, refresh };
 });

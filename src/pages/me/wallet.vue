@@ -116,6 +116,7 @@ import WalletListRow from "@/components/me/wallet-list-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
+import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useCommission } from "@/store/commission";
 import { useCards } from "@/store/cards";
 import { useConfig } from "@/store/config";
@@ -160,7 +161,12 @@ function showLockedSheet() {
   });
 }
 
-const buckets = computed(() => app.user.earningBuckets);
+const buckets = computed(() => ({
+  pendingReviewUsdt: earningsReleaseSnapshot.value?.buckets.pending_review
+    ?? app.user.earningBuckets.pendingReviewUsdt,
+  bonusLockedUsdt: earningsReleaseSnapshot.value?.buckets.bonus_locked
+    ?? app.user.earningBuckets.bonusLockedUsdt,
+}));
 // 2026-07-31:充值本金可提后,「可提现 USDT」= 总余额(held 两桶本就账外,不含在内)。
 // 必须与 wallet-withdraw 的 maxWithdrawable 同源,否则钱包页显示的数与实际能提的数对不上。
 const usdt = computed(() => app.user.usdtBalance);

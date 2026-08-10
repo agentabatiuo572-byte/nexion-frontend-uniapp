@@ -23,11 +23,27 @@
             </view>
           </view>
           <view class="grid grid-cols-2 text-center" :style="heroStatsStyle">
-            <Stat :label="tr.tvlOnChain" :value="`$${(847302194 / 1000000).toFixed(1)}M`" tint="var(--v5-brand)" />
-            <Stat :label="tr.activeNodes" :value="global.activeDevices.toLocaleString()" />
+            <Stat :label="tr.tvlOnChain" :value="trustSnapshotLabel" tint="var(--v5-brand)" />
+            <Stat :label="tr.activeNodes" :value="activeDevicesText" />
           </view>
         </view>
 
+        <view v-if="trustLoading" :style="cardStyle"><text :style="complianceBodyStyle">正在核验适用于当前地区的公开披露…</text></view>
+        <view v-else-if="error" :style="cardStyle">
+          <text :style="complianceBodyStyle">{{ trustLoadError }}</text>
+          <text class="block active:opacity-70" :style="retryStyle" @click="loadTrustSections">重试</text>
+        </view>
+        <view v-else :style="cardStyle">
+          <view v-for="section in trustSections" :key="section.sectionKey" :style="serverSectionStyle">
+            <text class="block" :style="complianceLabelStyle">{{ section.description }}</text>
+            <text class="block" :style="complianceBodyStyle">{{ section.structure }} · {{ section.version }}</text>
+            <view v-for="field in section.fields" :key="field.key" :style="serverFieldStyle" @click="openHref(field.href)">
+              <text :style="complianceLabelStyle">{{ field.label }}</text>
+              <text class="block" :style="complianceBodyStyle">{{ field.value }}</text>
+            </view>
+          </view>
+        </view>
+        <view v-if="false">
         <!-- Compliance -->
         <SectionHeader :label="tr.complianceLabel">
           <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526" /><circle cx="12" cy="8" r="6" /></svg></template>
@@ -47,9 +63,9 @@
           <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg></template>
         </SectionHeader>
         <view :style="cardStyle">
-          <DocRow primary="Smart contract audit · CertiK" secondary="Report v2026-04-12 · No critical findings" :cta="tr.download" />
-          <DocRow primary="Reserve proof · Etherscan" secondary="On-chain 102.4% backed · USDT cold-stored" :cta="tr.viewOnChain" />
-          <DocRow primary="Resource attestation · Trail of Bits" secondary="Quarterly attestation of Genesis reserves & emission schedule" :cta="tr.latest" last />
+          <DocRow primary="" secondary="" :cta="tr.download" />
+          <DocRow primary="" secondary="" :cta="tr.viewOnChain" />
+          <DocRow primary="" secondary="" :cta="tr.latest" last />
         </view>
 
         <!-- Partner wall -->
@@ -172,6 +188,7 @@
             </view>
           </view>
         </view>
+        </view>
 
         <!-- Footer -->
         <view class="text-center" style="padding-top: 12px; padding-bottom: 4px">
@@ -184,7 +201,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -193,71 +210,74 @@ import Stat from "@/components/trust/trust-stat.vue";
 import DocRow from "@/components/trust/trust-doc-row.vue";
 import NexAnchorSection from "@/components/trust/nex-anchor-section.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { useApp } from "@/store/app";
+import { useConfig } from "@/store/config";
+import { publicStatsHealth } from "@/lib/platform-stats";
+import { remoteApiEnabled, trustSectionApi } from "@/api/runtime";
+import type { PublishedTrustField, PublishedTrustSection, TrustLocale } from "@/api/trust-section-api";
 
 const t = useT();
+const locale = useLocaleStore();
 const tr = computed(() => t.value.trust);
 const app = useApp();
+const cfg = useConfig();
 const global = computed(() => app.global);
+const activeDevicesText = computed(() => {
+  const health = publicStatsHealth(cfg.config.publicStats);
+  return cfg.syncFailed || !health.devicesOk
+    ? t.value.home.networkStatUpdating
+    : global.value.activeDevices.toLocaleString();
+});
+const language = computed<TrustLocale>(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code as TrustLocale : "zh");
+const trustSections = ref<(PublishedTrustSection & { fields: (PublishedTrustField & { href: string | null })[] })[]>([]);
+const trustLoading = ref(true);
+const trustLoadError = ref("");
+const error = trustLoadError;
+const trustSnapshotLabel = computed(() => trustSections.value.length ? `v${trustSections.value.length}` : "—");
+const plusRuntime = (globalThis as { plus?: { runtime?: { openURL: (href: string) => void } } }).plus?.runtime;
 
-const COMPLIANCE = [
-  { label: "SOC 2 Type II", body: "Q1 2026 audit complete", tint: "var(--v5-brand)" },
-  { label: "ISO 27001", body: "Certification renewed", tint: "var(--v5-brand)" },
-  { label: "GDPR", body: "EU data residency", tint: "var(--v5-tech-cyan)" },
-  { label: "HIPAA", body: "Healthcare verticals", tint: "var(--v5-tech-cyan)" },
-  { label: "MSB License", body: "FinCEN MSB1234567", tint: "var(--v5-warning)" },
-  { label: "Transaction screening", body: "Real-time monitoring", tint: "var(--v5-warning)" },
-];
-const PARTNERS = [
-  { name: "NVIDIA", tag: "Hardware partner" },
-  { name: "Intel", tag: "TEE provider" },
-  { name: "AMD", tag: "EPYC reference" },
-  { name: "Pocket", tag: "Customer · SDXL" },
-  { name: "Helix Labs", tag: "Customer · LLM" },
-  { name: "Echo", tag: "Customer · Whisper" },
-  { name: "Mosaic", tag: "Customer · Flux" },
-  { name: "Vector", tag: "Customer · Embedding" },
-];
-const INVESTORS = [
-  { name: "a16z crypto", stage: "Series B" },
-  { name: "Sequoia", stage: "Series A + B" },
-  { name: "Pantera", stage: "Seed + A" },
-  { name: "Polychain", stage: "Series A" },
-  { name: "Multicoin", stage: "Seed" },
-  { name: "Coinbase Ventures", stage: "Strategic" },
-];
-const LEADERSHIP = [
-  { name: "James Chen", role: "CEO & Co-founder", prev: "ex-Coinbase · ex-NVIDIA", tint: "var(--v5-brand)" },
-  { name: "Sarah Park", role: "CTO & Co-founder", prev: "ex-OpenAI · MIT CSAIL", tint: "var(--v5-tech-cyan)" },
-  { name: "Marcus Reid", role: "Chief Compliance Officer", prev: "ex-Circle · ex-FinCEN", tint: "var(--v5-warning)" },
-  { name: "Lena Volkov", role: "Head of AI Infrastructure", prev: "ex-Anthropic · ex-DeepMind", tint: "var(--v5-tech-cyan)" },
-  { name: "Aisha Tariq", role: "VP Engineering", prev: "ex-Stripe · ex-AWS", tint: "var(--v5-brand)" },
-];
-const PRESS = [
-  { outlet: "TechCrunch", title: "NexGrid raises $80M to decentralize AI compute", date: "2026-03" },
-  { outlet: "CoinDesk", title: "How NexGrid is powering the next wave of DePIN", date: "2026-02" },
-  { outlet: "Forbes", title: "The grid is shifting — and NexGrid is leading", date: "2026-01" },
-  { outlet: "The Block", title: "Inside the $487M NexGrid network", date: "2025-12" },
-];
-// Q2 2026 (closed quarter — a mid-quarter "audited" print is provably fake).
-// Payouts $47.0M ≈ quarter integral of the growth curve that exits at the
-// platform daily anchor ($682K/day); devices 27,150 +12% is the quarter-close
-// snapshot, putting today's live fleet anchor +4.8% above it on-trajectory.
-// Values mirror admin i-tabs/data.ts FINANCIALS_FIELDS (sentinel check 6).
-const QTR_FINANCIALS = [
-  { metric: "MRR", value: "$4.87M", delta: "+22%" },
-  { metric: "Active accounts", value: "184,206", delta: "+38%" },
-  { metric: "Devices online", value: "27,150", delta: "+12%" },
-  { metric: "Payouts processed", value: "$47.0M", delta: "+27%" },
-];
-const LISTINGS = [
-  { exchange: "PancakeSwap", state: "Live", tint: "var(--v5-success)" },
-  { exchange: "Uniswap V3", state: "Live", tint: "var(--v5-success)" },
-  { exchange: "CoinGecko", state: "Listed", tint: "var(--v5-success)" },
-  { exchange: "CoinMarketCap", state: "Listed", tint: "var(--v5-success)" },
-  { exchange: "Binance", state: "Tier-1 review", tint: "var(--v5-warning)" },
-  { exchange: "Coinbase", state: "Application Q3", tint: "var(--v5-warning)" },
-];
+function safeHref(field: PublishedTrustField): string | null {
+  const raw = field.value.trim();
+  const internal = raw.replace(/^\//, "");
+  if (/^(trust\/nex|market\/market)$/.test(internal)) return `/pages/${internal}`;
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password ? parsed.toString() : null;
+  } catch { return null; }
+}
+function openHref(href: string | null) {
+  if (!href) return;
+  if (href.startsWith("/")) { uni.navigateTo({ url: href }); return; }
+  if (plusRuntime) plusRuntime.openURL(href);
+  else pageCopy.value.openFailed;
+}
+const pageCopy = computed(() => ({ openFailed: "无法在当前设备打开该链接" }));
+async function loadTrustSections() {
+  trustLoading.value = true;
+  trustLoadError.value = "";
+  trustSections.value = [];
+  if (!remoteApiEnabled) { trustLoading.value = false; trustLoadError.value = "该公开披露仅在受信任网络可用；请连接后重试。"; return; }
+  try {
+    const sections = await trustSectionApi.current();
+    trustSections.value = sections.map((section) => ({ ...section, fields: section.fields.map((field) => ({ ...field, href: safeHref(field) })) }));
+    void Promise.allSettled(sections.map((section) => trustSectionApi.recordView(section.sectionKey, language.value)));
+  } catch (error) {
+    trustSections.value = [];
+    trustLoadError.value = error instanceof Error && error.message.includes("GEO_COUNTRY_UNRESOLVED")
+      ? "暂时无法确认您所在地区的适用范围；页面不会用本地旧内容冒充最新事实，请检查网络后重试。"
+      : "公开披露暂不可用；页面不会用本地旧内容冒充最新事实，请稍后重试。";
+  } finally { trustLoading.value = false; }
+}
+onMounted(() => { void loadTrustSections(); });
+
+const COMPLIANCE: { label: string; body: string; tint: string }[] = [];
+const PARTNERS: { name: string; tag: string }[] = [];
+const INVESTORS: { name: string; stage: string }[] = [];
+const LEADERSHIP: { name: string; role: string; prev: string; tint: string }[] = [];
+const PRESS: { outlet: string; title: string; date: string }[] = [];
+const QTR_FINANCIALS: { metric: string; value: string; delta: string }[] = [];
+const LISTINGS: { exchange: string; state: string; tint: string }[] = [];
 
 function initials(name: string): string {
   return name
@@ -279,6 +299,9 @@ const heroStatsStyle: CSSProperties = { marginTop: "12px", paddingTop: "12px", b
 // De-carded form-b container (single surface, no border): rows carry their own
 // hairline dividers. Used by Audits / Investors / Leadership / Press / Q3 / Listings.
 const cardStyle: CSSProperties = { borderRadius: "16px", background: "var(--v5-surface)", overflow: "hidden" };
+const serverSectionStyle: CSSProperties = { padding: "14px", borderBottom: "1px solid var(--v5-border)" };
+const serverFieldStyle: CSSProperties = { marginTop: "10px" };
+const retryStyle: CSSProperties = { marginTop: "12px", color: "var(--v5-brand)", fontSize: "13px" };
 const complianceCardStyle: CSSProperties = { borderRadius: "12px", padding: "10px", background: "var(--v5-surface)" };
 function dotStyle(tint: string): CSSProperties {
   return { width: "6px", height: "6px", borderRadius: "999px", background: tint };

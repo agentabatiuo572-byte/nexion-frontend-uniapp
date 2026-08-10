@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { reactive } from "vue";
+import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 
@@ -39,12 +40,55 @@ function hydrate(accountKey: string): PersistShape {
 export const useEventQuest = defineStore("eventQuest", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
-  const init = hydrate(boundKey);
+  const init = remoteApiEnabled ? { joined: [], claimed: [] } : hydrate(boundKey);
   // Record<id, true> membership maps (P-027: reactive Record, not Set/ref).
   const joinedMap = reactive<Record<string, boolean>>({});
   const claimedMap = reactive<Record<string, boolean>>({});
   for (const id of init.joined) joinedMap[id] = true;
   for (const id of init.claimed) claimedMap[id] = true;
+
+  function clearRemoteFacts() {
+    for (const key of Object.keys(joinedMap)) delete joinedMap[key];
+    for (const key of Object.keys(claimedMap)) delete claimedMap[key];
+  }
+
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    clearRemoteFacts();
+    try {
+      const snapshot = await eventsApi.state();
+      for (const event of snapshot.events) {
+        if (["JOINED", "CLAIMABLE", "CLAIMED"].includes(event.userStatus)) joinedMap[event.eventCode] = true;
+        if (event.userStatus === "CLAIMED") claimedMap[event.eventCode] = true;
+      }
+      return true;
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function joinRemote(id: string): Promise<boolean> {
+    if (!remoteApiEnabled) return join(id);
+    try {
+      await eventsApi.join(id, `h4-event-join:${id}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
+
+  async function claimRemote(id: string): Promise<boolean> {
+    if (!remoteApiEnabled) return claim(id);
+    try {
+      await eventsApi.claim(id, `h4-event-claim:${id}`);
+      return refreshRemote();
+    } catch {
+      clearRemoteFacts();
+      return false;
+    }
+  }
 
   function persist() {
     writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
@@ -56,9 +100,12 @@ export const useEventQuest = defineStore("eventQuest", () => {
   /** 账号切换重绑:清空并装载该账号的活动参与/领取态(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    clearRemoteFacts();
+    if (remoteApiEnabled) {
+      void refreshRemote();
+      return;
+    }
     const next = hydrate(boundKey);
-    for (const k of Object.keys(joinedMap)) delete joinedMap[k];
-    for (const k of Object.keys(claimedMap)) delete claimedMap[k];
     for (const id of next.joined) joinedMap[id] = true;
     for (const id of next.claimed) claimedMap[id] = true;
   }
@@ -72,6 +119,10 @@ export const useEventQuest = defineStore("eventQuest", () => {
 
   /** Returns true if this call newly joined (was not already joined). */
   function join(id: string): boolean {
+    if (remoteApiEnabled) {
+      void joinRemote(id);
+      return false;
+    }
     if (joinedMap[id]) return false;
     joinedMap[id] = true;
     persist();
@@ -80,11 +131,15 @@ export const useEventQuest = defineStore("eventQuest", () => {
 
   /** Returns true if this call newly claimed (was not already claimed). */
   function claim(id: string): boolean {
+    if (remoteApiEnabled) {
+      void claimRemote(id);
+      return false;
+    }
     if (claimedMap[id]) return false;
     claimedMap[id] = true;
     persist();
     return true;
   }
 
-  return { joinedMap, claimedMap, isJoined, isClaimed, join, claim, bindAccount };
+  return { joinedMap, claimedMap, isJoined, isClaimed, join, claim, joinRemote, claimRemote, refreshRemote, bindAccount };
 });
