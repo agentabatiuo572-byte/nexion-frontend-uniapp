@@ -401,7 +401,7 @@ export function computeWithdrawFee(
  *    一律 fail-closed 拒单;$0 是合法权威值(免费网络),用 Number.isFinite 判存在性。
  *
  * network + authoritativeFeeMap 在**提交边界(app.submitWithdrawal)必传**(权威 map 走
- * config.currentNetworkConfirmFeeUsd() 单源);页面的 staleness 预检(报价过期提示)
+ * 服务端 withdrawals policy 的 networkConfirmFeeUsd 单源);页面的 staleness 预检(报价过期提示)
  * 可不传,只走 ①② —— UI 预检不是资金门,资金门在 store 提交边界。两参传任一即启用 ③,
  * 传了一半(另一半缺)按 fail-closed 拒。
  */

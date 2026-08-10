@@ -511,7 +511,7 @@ const feeCalc = computed(() =>
  * 冻结报价对**当前**权威值是否仍成立 —— 与 app.ts 提交边界同一个纯函数、同一组入参
  * (5 参:含网络键与权威费率 map,fail-closed)。
  *
- * 🔴 这里读活值(nexFeeOffsetRate / currentNetworkConfirmFeeUsd)是**故意**的:
+ * 🔴 这里读活值(nexFeeOffsetRate / policy.networkConfirmFeeUsd)是**故意**的:
  * 它就是「确认后校验」那一步 —— 拿冻结件去问权威值还认不认。与「await 之后一律用快照」
  * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
  * 等式恒成立、判据恒为真 = 这道门等于没有。
