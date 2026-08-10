@@ -137,8 +137,10 @@ export function commitWithdrawal(accountKey: string, network: Withdrawal["networ
   markWithdrawn(accountKey);
   // 🔴 每日笔数**不在这里** +1。曾经挂在这儿(建单成功后),被独立验收 3 轮 3 中
   // 复现出并发绕过:「查 → 600ms 风控评估 → 建单 → 才写计数」中间的窗口太长。
-  // 现在改成建单前 claimWithdrawSlot 先占额度(app.ts submitWithdrawal),
-  // 挪回来就等于把漏洞放回去。
+  // 曾改成建单前 claimWithdrawSlot 先占额度;c37e642 提现整体让渡服务端事务后,
+  // 该占额度调用随本地扣款链一并删除 —— 现状是**客户端计数器无人递增**,
+  // 日限的真正执行方是服务端 policy.dailyLimitCount。客户端预检恒不触发这件事
+  // 已立案(z1 判决包「相邻发现 1」);无论怎么修,都不许把计数挪回建单之后。
 }
 
 // ── 提交时点的服务端评估形态(⑤ 加载态 + 异常3 超时)────────────────────

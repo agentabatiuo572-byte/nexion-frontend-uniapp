@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
 import { atAliasResolver } from "./lib/at-alias.mjs";
+import { VUE_STUB_NXREF, runtimeStub } from "./lib/harness-stubs.mjs";
 import { strip } from "./lib/strip-code.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -78,6 +79,10 @@ const ALLOW = {
   // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
   // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
   "src/pages/register/register.vue": 2,
+  // `businessTimeouts.add(handle)`(App.vue:62,Set.add 存定时器句柄,与 bills 无关)。
+  // 判据是**有意的过近似**(见 billsWriteHits 头注):文件跟 bills 有关系后,任何 `.add(`
+  // 成员调用都计入,多算的这一处按机制在额度里精确登记 —— 宁可过近似再逐个登记。
+  "src/App.vue": 1,
 };
 /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
 function billsWriteHits(src) {
@@ -173,17 +178,8 @@ export const defineStore = (id, setup) => () => {
   }));
   return cache.get(id);
 };`,
-  "vue-stub": `export const ref = (v) => ({ __nxRef: true, value: v });
-export const shallowRef = ref;
-export const computed = (fn) => ({ __nxRef: true, get value() { return typeof fn === "function" ? fn() : fn.get(); } });
-export const reactive = (v) => v;
-export const watch = () => {};`,
-  "runtime-stub": `const unavailable = new Proxy({}, { get: () => async () => { throw new Error("runtime API is outside this self-check"); } });
-export const remoteApiEnabled = false;
-export const withdrawalApi = unavailable;
-export const genesisApi = unavailable;
-export const platformConfigApi = unavailable;
-export const earningsReleaseApi = unavailable;`,
+  "vue-stub": VUE_STUB_NXREF,
+  "runtime-stub": runtimeStub(root),
 };
 const bundle = await build({
   stdin: {
@@ -489,7 +485,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 取基准 + restoreTo 还原。少了 restoreTo 的 `postMoneyBill(反向 draft)` 只是盲加一笔
     // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
     // 这种粗判据全绿。
-    ["src/App.vue", ["postMoneyBill", "postReceiptOnly"]],
+    // b023674 起周任务路由奖励并入 claim 族统一出口 postMoneyBillsOnce(claim-idempotency
+    // 门对它全绿);postMoneyBill(退款冲正)与 postReceiptOnly(补分录)两针照旧。
+    ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptOnly"]],
     // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
     ["src/components/home/weekly-quest-hero.vue", ["postMoneyBillsOnce"]],
     ["src/components/home/weekly-quest-list.vue", ["postMoneyBillsOnce"]],
@@ -512,6 +510,10 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/pages/store/bundle.vue", ["postReceiptOnly"]],
     ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
     ["src/store/deposits.ts", ["postReceiptOnce"]],
+    // z1 补登(2026-08-10):地址迁移返还走 postMoneyBillsOnce(ref 判重幂等)。此前
+    // EXPORTS 漏了 postMoneyBillsOnce,反向入册门对「只调它」的文件整体失明 —— 补上
+    // EXPORTS 的同时把这处存量入册。
+    ["src/store/payout-address.ts", ["postMoneyBillsOnce"]],
   ];
   samples.wired = WIRED.length;
   wiredFiles = WIRED.map(([f]) => f);
@@ -545,14 +547,17 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 且同一文件确实取过基准(captureMoney)。三者散落三处 = 冲正已被拆掉,不算数。
     const shaped = !needles.includes("restoreTo:")
       || callArgs(src, "postMoneyBill").some((a) => a.includes("restoreTo"));
+    // 🔴 裸调禁令复用 ⑥ 的完整识别 + ⑥ 的白名单额度同一口径:WIRED 文件默认 0 处裸调,
+    // 在 ALLOW 里精确登记过的除外(App.vue 的 Set.add 过近似命中走额度,超额照红)——
+    // 两道门对同一处命中各判一遍口径不同,会出现「⑥ 放行 ⑤ 顶回」的自相矛盾。
+    const bare = scanSource(rel, readFileSync(path.join(root, rel), "utf8"));
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
       // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
       // 其余是调用点,补 `(` —— 否则光有 import 也算数。
       hasNeedles && shaped && src.includes('from "@/lib/money-receipt"')
-      // 🔴 裸调禁令复用 ⑥ 的完整识别,不再只禁 `bills.add(` 这一种写法 —— 原判据下
-      // `useBills().add(` / `bills.addMany(` / 别名 receiver / 跨行 全是合法的。
-      && scanSource(rel, readFileSync(path.join(root, rel), "utf8")) === 0,
-      needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
+      && bare <= (ALLOW[rel] ?? 0),
+      needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里")
+      + (bare > (ALLOW[rel] ?? 0) ? ` ·🔴裸调 ${bare} 处 > 额度 ${ALLOW[rel] ?? 0}` : ""));
   }
 
   // 包 E(2026-08-05):充值页零记账断言 —— 旧 $1 验证分录随机制删除后,
@@ -621,7 +626,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 于是 ⑤ 不查(不在册)、⑥ 不响(在 ALLOW 里或走了收口点)—— 两道门同时失明。
   // 判据:全站「调了收口点导出符 或 调了 bills 写入原语」的文件集合,必须 ⊆ WIRED ∪ ALLOW。
   {
-    const EXPORTS = ["postMoneyBill", "postMoneyBills", "postReceiptOnly", "postReceiptOnce"];
+    // 🔴 postMoneyBillsOnce 必须在列(z1 2026-08-10):它是收口点真实导出面的一员
+    // (lib/money-receipt.ts:227),漏了它,新页面只调它就整个绕过反向入册门。
+    const EXPORTS = ["postMoneyBill", "postMoneyBills", "postMoneyBillsOnce", "postReceiptOnly", "postReceiptOnce"];
     if (!wiredFiles.length) throw new Error("selfcheck-money-receipt: ⑤ 的接线名单没传过来,反向入册门会空转");
     const enrolled = new Set([...wiredFiles, ...Object.keys(ALLOW)]);
     const outside = [];

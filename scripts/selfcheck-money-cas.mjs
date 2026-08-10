@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
 import { atAliasPlugin, atAliasResolver } from "./lib/at-alias.mjs";
+import { VUE_STUB_PLAIN, runtimeStub } from "./lib/harness-stubs.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const SRC = path.join(root, "src");
@@ -105,9 +106,8 @@ function resetLedger() {
 // ── 载真 store(只 stub pinia/vue 运行时外壳 + deposits 的三个跨 store 组合方) ──
 const STUBS = {
   "pinia-stub": `export const defineStore = (_id, setup) => setup;`,
-  "vue-stub": `export const ref = (v) => ({ value: v });
-    export const computed = (f) => ({ get value() { return f(); } });
-    export const watch = () => {};`,
+  "vue-stub": VUE_STUB_PLAIN,
+  "runtime-stub": runtimeStub(root),
   "app-stub": `export const useApp = () => globalThis.__fakeApp;`,
   "bills-stub": `export const useBills = () => globalThis.__fakeBills;`,
   "fx-stub": `export const useFx = () => globalThis.__fakeFx;`,
@@ -128,6 +128,7 @@ async function loadStore(rel) {
       setup(b) {
         b.onResolve({ filter: /^pinia$/ }, () => ({ path: "pinia-stub", namespace: "stub" }));
         b.onResolve({ filter: /^vue$/ }, () => ({ path: "vue-stub", namespace: "stub" }));
+        b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime-stub", namespace: "stub" }));
         for (const [filter, stub] of CROSS_STORE_STUBS) {
           b.onResolve({ filter }, () => ({ path: stub, namespace: "stub" }));
         }
@@ -678,8 +679,22 @@ group();
   }
   // 🔴 正交维度:「裸 writeAccountRow 有没有」查的是**存在的对不对**,查不到「该走 commit 的
   // 有没有绕过去」。绕法不是再写一次盘,而是**直接改内存 ref 而根本不落盘** —— 页面当场看着对,
-  // 刷新即丢,而且完全绕开了前置条件复核。判据:每个持久化 ref 在全文只许被赋值 2 次
-  // (提交器的 sync 回调 + bindAccount),多一次就是有人在 commit 之外动了它。
+  // 刷新即丢,而且完全绕开了前置条件复核。
+  //
+  // 判据 v2(z1 2026-08-10)。v1 是「每个持久化 ref 全文只许被赋值 2 次(sync 回调 + bindAccount)」;
+  // c37e642 起出现第三类**合法**赋值宿主 —— remote-apply 缝(refreshRemote / clearRemoteFacts:
+  // 远端权威快照灌回本地镜像 / 清远端事实,不走本地 commit 是设计不是绕过)。数次数改成**宿主分类**:
+  //   每一处 `ref.value =` 必须落在 {① 提交器 sync 回调, ② bindAccount, ③ remote-apply 函数};
+  //   ③ 不是名字白名单,是**构造性守卫**,二选一:
+  //     A. 函数体首句 `if (!remoteApiEnabled) return …` 自守;
+  //     B. 该函数在本文件的**全部**调用点(必须 ≥1,空集不证明守卫)都受守卫 —— 调用点位于
+  //        `if (remoteApiEnabled) {…}` 块内 / A 类函数体内 / 「体内调用了 A 类函数」的 remote
+  //        包装函数体内(claimRemote / checkInRemote 族 catch 里的清理是最后一种形态)。
+  //        ponytail: 包装函数自身被页面在 mock 态直调是已知天花板,升级路径 = 包装补首句自守。
+  //   列不进三类的赋值点照红,失败信息打「文件#函数#L行」。
+  // 🔴 删除向不失明(v1 的 `=== 2` 顺带守着这一面,分类判据必须显式接住):每个持久化 ref
+  //   必须在 sync 回调与 bindAccount 里**各至少赋值一次** —— sync 断了 = 提交结果灌不回内存,
+  //   bindAccount 断了 = 切号残留上一账号状态。
   const PERSISTED_REFS = {
     "deposits.ts": ["records", "intents"],
     "voucher.ts": ["claimed"],
@@ -687,13 +702,113 @@ group();
     "nex-faucet.ts": ["history", "lastSignedInAt", "signInStreak", "longestStreak", "streakSavers", "claimedMilestones"],
     "lucky-spin.ts": ["bonusTickets", "lastFreeSpinDate", "history", "realPrizeSoldOut", "coverageDegraded"],
   };
+  /** 行号保持的剥注释:块注释以空格填充不吞行、整行 // 置空 —— 偏移→行号才对得上。 */
+  const stripKeepLines = (s) => s
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\r\n]/g, " "))
+    .replace(/^([ \t]*)\/\/.*$/gm, "$1");
+  function analyzeAssignmentHosts(file, refs) {
+    const src = stripKeepLines(readSrc("src", "store", file));
+    const lineAt = (i) => src.slice(0, i).split("\n").length;
+    const matchBrace = (open) => {
+      let depth = 0;
+      for (let i = open; i < src.length; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}") { depth--; if (depth === 0) return i; }
+      }
+      return src.length - 1;
+    };
+    /** 函数体开括号:配对参数括号后,走过可选的 `: 返回类型`(类型里的 `{…}` 组与 `<…>`
+     *  里的花括号都不是函数体 —— `Promise<{ ok }>` / `: { ok } {` 两种形态都要跳过)。 */
+    const bodyOpenAfter = (parenOpen) => {
+      let depth = 0;
+      let i = parenOpen;
+      for (; i < src.length; i++) {
+        if (src[i] === "(") depth++;
+        else if (src[i] === ")") { depth--; if (depth === 0) { i++; break; } }
+      }
+      let angle = 0;
+      let prev = ")";
+      for (; i < src.length; i++) {
+        const c = src[i];
+        if (/\s/.test(c)) continue;
+        if (c === "<") { angle++; prev = c; continue; }
+        if (c === ">") { if (angle > 0) angle--; prev = c; continue; }
+        if (c === "{") {
+          if (angle === 0 && !/[:|&,(=]/.test(prev)) return i; // 真函数体
+          i = matchBrace(i);                                    // 类型对象组,整块跳过
+          prev = "}";
+          continue;
+        }
+        prev = c;
+      }
+      return -1;
+    };
+    const fns = [];
+    for (const m of src.matchAll(/(?:^|[\r\n])[ \t]*(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/g)) {
+      const open = bodyOpenAfter(m.index + m[0].length - 1);
+      if (open >= 0) fns.push({ name: m[1], open, close: matchBrace(open) });
+    }
+    for (const m of src.matchAll(/(?:^|[\r\n])[ \t]*(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)[^={]*=>\s*\{/g)) {
+      const open = m.index + m[0].length - 1;
+      fns.push({ name: m[1], open, close: matchBrace(open) });
+    }
+    for (const m of src.matchAll(/\bsync:\s*\([^)]*\)\s*=>\s*\{/g)) {
+      const open = m.index + m[0].length - 1;
+      fns.push({ name: "sync 回调", open, close: matchBrace(open) });
+    }
+    const hostOf = (i) => {
+      let best = null;
+      for (const f of fns) if (i > f.open && i < f.close && (!best || f.open > best.open)) best = f;
+      return best;
+    };
+    const guardRanges = [...src.matchAll(/if\s*\(\s*remoteApiEnabled\s*\)\s*\{/g)]
+      .map((m) => { const open = m.index + m[0].length - 1; return [open, matchBrace(open)]; });
+    const inGuardBlock = (i) => guardRanges.some(([a, b]) => i > a && i < b);
+    const bodyOf = (f) => src.slice(f.open + 1, f.close);
+    const isFormA = (f) => /^\s*if\s*\(\s*!remoteApiEnabled\s*\)\s*return\b/.test(bodyOf(f));
+    const formANames = fns.filter(isFormA).map((f) => f.name);
+    const callsFormA = (f) => formANames.some((n) => new RegExp(`(?<![\\w$.])${n}\\s*\\(`).test(bodyOf(f)));
+    const callSiteGuarded = (i) => {
+      if (inGuardBlock(i)) return true;
+      const host = hostOf(i);
+      return !!host && host.name !== "sync 回调" && (isFormA(host) || callsFormA(host));
+    };
+    const remoteApplyOk = (f) => {
+      if (isFormA(f)) return { ok: true };
+      const sites = [...src.matchAll(new RegExp(`(?<![\\w$.])${f.name}\\s*\\(`, "g"))]
+        .filter((m) => !/function\s+$/.test(src.slice(Math.max(0, m.index - 20), m.index)));
+      if (sites.length === 0) return { ok: false, why: "无自守且本文件 0 个调用点(空集不证明守卫)" };
+      const bad = sites.filter((m) => !callSiteGuarded(m.index));
+      return bad.length === 0
+        ? { ok: true }
+        : { ok: false, why: `存在未受守卫的调用点 L${bad.map((m) => lineAt(m.index)).join("/L")}` };
+    };
+    const out = { offenders: [], missing: [], stats: { sync: 0, bind: 0, remote: 0 } };
+    for (const ref of refs) {
+      let inSync = 0;
+      let inBind = 0;
+      for (const m of src.matchAll(new RegExp(`\\b${ref}\\.value\\s*=[^=]`, "g"))) {
+        const host = hostOf(m.index);
+        const at = `${file}#${host?.name ?? "模块顶层"}#L${lineAt(m.index)}(${ref})`;
+        if (!host) { out.offenders.push(`${at} —— 不在任何函数内`); continue; }
+        if (host.name === "sync 回调") { inSync++; out.stats.sync++; continue; }
+        if (host.name === "bindAccount") { inBind++; out.stats.bind++; continue; }
+        const verdict = remoteApplyOk(host);
+        if (verdict.ok) { out.stats.remote++; continue; }
+        out.offenders.push(`${at} —— ${verdict.why}`);
+      }
+      if (inSync < 1) out.missing.push(`${ref}: sync 回调 0 处赋值`);
+      if (inBind < 1) out.missing.push(`${ref}: bindAccount 0 处赋值`);
+    }
+    return out;
+  }
   for (const [file, refs] of Object.entries(PERSISTED_REFS)) {
-    const s = strip(readSrc("src", "store", file));
-    const offenders = refs
-      .map((r) => [r, (s.match(new RegExp(`\\b${r}\\.value\\s*=[^=]`, "g")) || []).length])
-      .filter(([, n]) => n !== 2);
-    check(`⑥ 🔴 ${file} 的 ${refs.length} 个持久化 ref 只在 sync + bindAccount 两处被赋值(多一处 = 绕过 commit 直接改内存,不落盘)`,
-      offenders.length === 0, offenders.map(([r, n]) => `${r}=${n}`).join(","));
+    const a = analyzeAssignmentHosts(file, refs);
+    check(`⑥ 🔴 ${file} 的 ${refs.length} 个持久化 ref 赋值宿主全落 {sync 回调, bindAccount, remote-apply 构造性守卫} 三类`
+      + `(实测 sync ${a.stats.sync} · bind ${a.stats.bind} · remote-apply ${a.stats.remote})`,
+      a.offenders.length === 0, a.offenders.join(" ; "));
+    check(`⑥ ${file} 每个持久化 ref 在 sync 回调与 bindAccount 各至少赋值一次(删除向:sync 断=提交灌不回内存,bind 断=切号串账)`,
+      a.missing.length === 0, a.missing.join(" ; "));
   }
 
   const vou = strip(readSrc("src", "store", "voucher.ts"));

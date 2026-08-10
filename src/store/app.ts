@@ -23,7 +23,8 @@ import {
   _devGrantManualRelease as _devGrantManualReleaseLedger,
   type ReleaseOutcome,
 } from "@/store/earning-release";
-import { markWithdrawn, recordAttestation, recordWithdrawAddressUse } from "@/store/risk-identity";
+import { recordAttestation } from "@/store/risk-identity";
+import { commitWithdrawal } from "@/store/withdrawal-eligibility";
 import { advanceArrival, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
 import { mockServerNow } from "@/store/server-time";
 import type { OnlineBonus, WithdrawalRiskRoute } from "@/store/config-types";
@@ -1227,16 +1228,18 @@ export const useApp = defineStore("app", () => {
       nextBuckets.bonusLockedUsdt = +(nextBuckets.bonusLockedUsdt + usdt).toFixed(2);
       nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
     }
-    // R1: 非可提的赠金也必须记台账分录,否则释放引擎(attest/manual)永远放不出它。
+    // R1 台账现由服务端持有,客户端 appendLedgerEntry 是恒 false 的过渡空壳 ——
+    // 与 settle 路径同形 fire-and-forget,不得再拿它的返回值判死:
+    // 否则 mock 模式下 held 两路由的入桶(风控标记账号的赠金/奖励)无条件失败
+    // (z1 判决包 B8,register 重试链实锤)。
     if (route === "pending_review" || route === "bonus_locked") {
-      const ledgerWritten = appendLedgerEntry(accountKey.value,
+      appendLedgerEntry(accountKey.value,
         evaluateAccountCluster(accountKey.value).clusterId,
         route,
         usdt,
         nex,
         idempotencyKey ?? undefined,
       );
-      if (!ledgerWritten) return false;
     }
     user.value = nextUser;
     if (!persistAccountSnapshot()) {
@@ -1276,6 +1279,9 @@ export const useApp = defineStore("app", () => {
     );
     const canonical = toCanonicalWithdrawal(submission, address);
     withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+    // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
+    // pre-check engine; the server keeps its own authoritative copy.
+    commitWithdrawal(accountKey.value, network, address);
     return canonical.id;
   }
 

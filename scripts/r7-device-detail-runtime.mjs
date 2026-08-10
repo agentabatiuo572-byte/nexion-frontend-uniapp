@@ -24,6 +24,15 @@ async function waitUntil(check, message, timeoutMs = 30_000) {
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+// 🔴 首页 1300ms 会自动弹代金券领取层(z=800 全屏遮罩),本探针随后要点首页设备格 ——
+// 谁先到全看机器负载:空闲时探针先点到(绿),套件满载时弹层先弹出(红)。这不是断言
+// 该管的变量,与上面 12s→30s 那次同源。按 chrome-baseline / trial-check 的既有家法预置
+// 弹层冷却把它移出判据;弹层本身的自动弹出由 trial-check 专项验。
+await page.addInitScript(() => {
+  const envelope = JSON.stringify({ type: "object", data: { lastClosedAt: 9999999999999 } });
+  try { localStorage.setItem("nexgrid-voucher-claim-sheet-v1", envelope); } catch (e) { void e; }
+  try { localStorage.setItem("nexgrid-trial-claim-sheet-v1", envelope); } catch (e) { void e; }
+});
 await page.route(/https:\/\/fonts\.googleapis\.com\/.*/, (route) =>
   route.fulfill({ status: 200, contentType: "text/css", body: "" }),
 );

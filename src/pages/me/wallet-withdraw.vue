@@ -253,7 +253,7 @@
       </view>
 
       <!-- Reverse-talk staking alternative -->
-      <StakeAlternativeCard v-if="amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
+      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
 
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关;取代旧「强制自动抵扣 + 进度条」面板) -->
       <!-- 🔴 费率不可用时整块隐藏(历史漏网教训保留):
@@ -400,8 +400,9 @@ async function loadWithdrawalPolicy(): Promise<void> {
 
 // 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
 // pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
-// 注意:这里读 usdtBalance 是本规则的正解,不是 verify.sh 反向哨兵防的那个历史 P0
-// ——那个 P0 是「可提额度 > 总余额仍放行」,防线在 app.ts 的总余额门,未拆。
+// 注意:这里读 usdtBalance 是本规则的正解。历史 P0(可提额度 > 总余额仍放行)的防线
+// 已随 c37e642 的本地扣款链一并移除 —— 客户端不再扣款,超额请求由本 computed 的
+// fail-closed 上限拦 + 服务端 reservation 拒;别再指望 app.ts 有总余额门。
 const maxWithdrawable = computed(() => {
   if (earningsReleaseSnapshot.value?.clusterRestricted) return 0;
   const buckets = earningsReleaseSnapshot.value?.buckets;
@@ -510,7 +511,7 @@ const feeCalc = computed(() =>
  * 冻结报价对**当前**权威值是否仍成立 —— 与 app.ts 提交边界同一个纯函数、同一组入参
  * (5 参:含网络键与权威费率 map,fail-closed)。
  *
- * 🔴 这里读活值(nexFeeOffsetRate / currentNetworkConfirmFeeUsd)是**故意**的:
+ * 🔴 这里读活值(nexFeeOffsetRate / policy.networkConfirmFeeUsd)是**故意**的:
  * 它就是「确认后校验」那一步 —— 拿冻结件去问权威值还认不认。与「await 之后一律用快照」
  * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
  * 等式恒成立、判据恒为真 = 这道门等于没有。
