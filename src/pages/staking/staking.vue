@@ -13,8 +13,8 @@
   <AppChassis active="me">
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
-      <text v-if="staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Mock 模式 · 非远端资金</text>
-      <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">远端权威数据不可用，质押操作已关闭</text>
+      <text v-if="staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.staking.mockModeNotice }}</text>
+      <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Hero — de-carded: total-locked sits on the page floor; aurora + grid

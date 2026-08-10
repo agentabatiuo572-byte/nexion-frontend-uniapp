@@ -396,7 +396,7 @@ function goSendCode() {
 function remoteLoginError(error: unknown): string {
   const code = error instanceof ApiError ? error.message : "";
   return geoText(code)
-    ?? (code === "USER_INVALID_CREDENTIALS" ? "手机号或密码不正确。" : t.value.authOtp.errorServiceUnavailable);
+    ?? (code === "USER_INVALID_CREDENTIALS" ? t.value.login.errorInvalidCredentials : t.value.authOtp.errorServiceUnavailable);
 }
 
 async function signInWithPassword() {

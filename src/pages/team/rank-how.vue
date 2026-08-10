@@ -35,7 +35,7 @@
             <VBadgeIcon :v="r.v" :size="22" />
             <text class="font-display tabular-nums" :style="ladderVStyle">V{{ r.v }}</text>
             <text :style="ladderTitleStyle">{{ r.title }}</text>
-            <text class="truncate" :style="ladderCnStyle">· {{ r.cnTitle }}</text>
+            <text v-if="isZh" class="truncate" :style="ladderCnStyle">· {{ r.cnTitle }}</text>
           </view>
         </view>
       </HowSection>
@@ -129,11 +129,16 @@ import HowIconRow from "@/components/how/how-icon-row.vue";
 import HowStepRow from "@/components/how/how-step-row.vue";
 import HowFaqRow from "@/components/how/how-faq-row.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { navBack } from "@/lib/route";
 import { V_RANKS } from "@/store/v-rank";
 
 const t = useT();
 const w = computed(() => t.value.rankHowItWorks);
+// 中文头衔只给中文用户看 —— 与 network-card.vue:83 的 titleOf 同一条守卫。
+// 缺它时 en/vi 用户会在 V 级阶梯上读到 13 行中文(独立审计实测)。
+const locale = useLocaleStore();
+const isZh = computed(() => locale.code === "zh");
 
 const requirements = computed(() => [
   { label: w.value.req1Label, body: w.value.req1Body },

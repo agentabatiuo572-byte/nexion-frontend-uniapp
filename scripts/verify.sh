@@ -89,6 +89,42 @@ else
   bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
 fi
 
+# ── 硬编码中文哨兵(2026-08-11)──────────────────────────────────────────────
+# 上面的镜像门只保证「已进词典的 key 三语齐」,对**压根没进词典**的字符串无感:
+# c37e642 一个提交把 10 个文件的用户可见文案直接写成中文,本文件里所有文案哨兵
+# (mock/演示词表 · funnel-meta · TRIAL02 · markdown 残留)全部没响 —— 它们只扫
+# src/i18n/messages/*.ts 的值,且判据是**枚举词表**,新词天然不在表里。
+# 本门反过来判:src/**/*.{vue,ts} 注释之外**含 CJK 即拦**,不枚举任何词。
+i18n_cjk_gate() {
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest > /tmp/uni-i18n-cjk-selftest.log 2>&1; then
+    ok "$(tail -1 /tmp/uni-i18n-cjk-selftest.log)"
+  else
+    bad "i18n-cjk selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest 看明细)"
+    tail -8 /tmp/uni-i18n-cjk-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs > /tmp/uni-i18n-cjk.log 2>&1; then
+    ok "$(tail -1 /tmp/uni-i18n-cjk.log)"
+  else
+    bad "页面/组件里有硬编码中文 — 搬进 src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读"
+    tail -12 /tmp/uni-i18n-cjk.log | sed 's/^/        /'
+  fi
+}
+i18n_cjk_gate
+
+# ── 远端权威契约门(2026-08-10 接线)────────────────────────────────────────────
+# 它此前是**孤儿门**:package.json 的 verify 链没有它,本文件也没有它 —— 于是它红了
+# 半天没人知道(实测:本轮把 wallet-exchange 的中文文案收进 i18n 后 G2 立刻红,
+# 而两条链全绿)。更糟的是它原本把判据锚在中文字面量上,与上面那道「不许有中文」
+# 的门方向相反,任何源码状态都不可能同时绿。判据已改锚 i18n key + 三语词典有值,
+# 并在**同一提交**里接上链 —— 机器门与被它判的实现不同时落地 = 修了也无从验证。
+if "$NODE_BIN" --test scripts/g-remote-authority-contract.test.mjs >/tmp/uni-g-remote-contract.log 2>&1; then
+  ok "远端权威契约门 $(grep -oE '(tests|pass|fail) [0-9]+' /tmp/uni-g-remote-contract.log | tr '\n' ' ' | tr -d '\r')(判据锚 i18n key + 三语词典有值,不锚中文字面量)"
+else
+  bad "远端权威契约门失败 — node --test scripts/g-remote-authority-contract.test.mjs 看明细"
+  grep -E "✖|AssertionError|expected" /tmp/uni-g-remote-contract.log | head -6 | sed 's/^/        /'
+fi
+
 # Key mirroring proves en/zh/vi agree with EACH OTHER, not that they cover every
 # SKU. A product added to products.ts without a store.catalog entry silently
 # falls back to English prose on the store card / detail / search (the exact leak
