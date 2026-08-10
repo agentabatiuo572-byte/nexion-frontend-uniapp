@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type { ComputeShareContent, FeatureFlagKey, PlatformConfig } from "./config-types";
 import { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
-import { isNetworkFeeConfigUsable, type WithdrawNetworkKey } from "@/store/nex-faucet";
+import { isNetworkFeeConfigUsable } from "@/store/nex-faucet";
 import { completePlatformConfigSeed } from "@/lib/platform-config-compat";
 import { platformConfigApi, remoteApiEnabled } from "@/api/runtime";
 
@@ -114,20 +114,7 @@ export const useConfig = defineStore("config", () => {
   return { config, syncFailed, loading, load, feeConfigValid, isEnabled, _devSetFlag, _devSetComputeShareContent, _devSetConfigSyncFailed };
 });
 
-/**
- * 🔴 权威网络确认费的唯一跨 store 取值路径(2026-08-03 资金 P1,仿 product-phase 的
- * resolveActivePhase:store 间不互相依赖对方实例语义,跨 store 消费走纯函数导出)。
- * app.submitWithdrawal 的费用快照交叉核对(isWithdrawalFeeSnapshotValid ③)从这里拿权威值。
- *
- * fail-closed:配置拉取失败(syncFailed —— store 里只剩前端种子,按种子收费 = 规格
- * FEAT-RISK02 异常3 明令禁止的回退)或值域不可用(isNetworkFeeConfigUsable=false)时
- * 返回 null,调用方必须拒单。判据与页面 feeConfigUsable(!syncFailed && feeConfigValid)
- * 完全同源同刻,故页面能报价的单在这里必取得到同一份权威值($0 免费网络不会被误拒)。
- * 返回浅拷贝,调用方改不到 store 内部状态。
- */
-export function currentNetworkConfirmFeeUsd(): Record<WithdrawNetworkKey, number> | null {
-  const store = useConfig();
-  const map = store.config.withdrawRules.networkConfirmFeeUsd;
-  if (store.syncFailed || !isNetworkFeeConfigUsable(map)) return null;
-  return { ...map };
-}
+// currentNetworkConfirmFeeUsd(权威网络费跨 store 纯函数)已随 c37e642 的 D5 policy
+// 权威化成为零调用死码,z1 判决包删除 —— 费用快照第 5 参权威源现为页面层
+// withdrawalPolicy.networkConfirmFeeUsd(服务端 /api/withdrawals/policy),留着死函数
+// 会诱使未来哨兵钉上它假绿。

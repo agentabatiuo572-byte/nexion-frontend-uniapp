@@ -85,9 +85,6 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, type CSSProperties } from "vue";
 import { navBack } from "@/lib/route";
-import { normalizeSlaHours, normalizeReviewWindowDays } from "@/store/withdrawal-arrival-core";
-import { NEW_ADDRESS_LARGE_AMOUNT_USDT } from "@/store/payout-address-core";
-import { useConfig } from "@/store/config";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -98,7 +95,6 @@ import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
 
-const cfg = useConfig();
 const t = useT();
 const locale = useLocaleStore();
 const w = computed(() => t.value.riskDisclosure);
@@ -120,24 +116,8 @@ onMounted(async () => {
 });
 function onScrollToLower() { scrolledToBottom.value = true; }
 
-/**
- * 🔴 提现窗口这一段的数字必须从配置来(2026-08-01 走查 P0-2)。
- * 原文写死「标准提现从申请到入账约 30 天 / > $1,000 进入 45 天增强审查窗口」,
- * 而系统实际是提交 + payoutSlaHours(默认 24 小时),大额审查窗口当前阶段配置为 0 天。
- * 这段是**提交提现前强制勾选确认**的文件 —— 写着系统根本不执行的时限,是最硬的谎。
- * 大额审查窗口配成 0(该阶段不开)时,整句不出现,而不是显示「0 天窗口」。
- */
-/** FEAT-WD02:按金额比例的旧费率已删除 —— 费用是按网络固定的网络确认费,s4Body 不再插费率;
- *  时限阈值 {h} 仍从配置插值(合规文本阈值必插值铁律)。 */
-const withdrawWindowBody = computed(() => {
-  const rules = cfg.config.withdrawRules;
-  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(rules.payoutSlaHours) });
-  if (normalizeReviewWindowDays(rules.payoutReviewWindowDays) <= 0) return base;
-  return `${base} ${fmt(w.value.s4BodyLargeAmount, {
-    large: NEW_ADDRESS_LARGE_AMOUNT_USDT.toFixed(0),
-    d: normalizeReviewWindowDays(rules.payoutReviewWindowDays),
-  })}`;
-});
+// z1 判决(2026-08-10):披露正文渲染源已改远端 chapters(risk store);本地派生 withdrawWindowBody
+// 及其配置插值随 {h} 时限文案改版(服务端口径)一并删除 —— selfcheck-slacopy.mjs 钉远端渲染源。
 const blocks = computed(() => disclosure.value?.chapters.map((chapter) => ({
   n: Number(chapter.no),
   title: locale.code === "vi" ? chapter.vi : locale.code === "en" ? chapter.en : chapter.zh,

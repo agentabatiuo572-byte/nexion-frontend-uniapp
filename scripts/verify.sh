@@ -117,7 +117,7 @@ fi
 # withdraw-freeze(2026-08-04 R2 三条 P1):提交链快照单源化 —— 弹窗展示 = 扣款 = 建单
 # 用同一份冻结件,确认后与当前权威值核对不符即拒单;外加 NEX 退款反向分录(账本对得上钱包)。
 echo -e "${C}[1.6] money selfchecks(deposits · fx · rebind · cards · withdrawfee · withdraw-freeze · fastlane · feegate)${N}"
-for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate arrival i18n-interp console-filter slacopy onbrand; do
+for sc in deposits fx rebind cards withdrawfee withdraw-freeze fastlane feegate arrival i18n-interp console-filter slacopy onbrand reward-buckets; do
   if "$NODE_BIN" "scripts/selfcheck-$sc.mjs" >"/tmp/uni-selfcheck-$sc.log" 2>&1; then
     ok "selfcheck-$sc: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' "/tmp/uni-selfcheck-$sc.log" | tail -1)"
   else
@@ -147,6 +147,28 @@ else
 fi
 
 # ── (3) source hygiene sentinels ──
+# ── [2.5] dev server API 模式前置断言(z1 判决 A,2026-08-10)──
+# 老套件的运行时探针全部驱动 mock 业务流;c37e642 后 app 默认 remote(无后端时启动噪声
+# + 注册等流程整条绕开 mock 分支),拿 remote 模式 server 跑这些探针 = 静默验错对象。
+# 判据:vite dev 转换头会内联整份 env JSON,直接 curl 源模块判 mode;探不到也红(禁跳过)。
+echo -e "${C}[2.5] dev server API mode preflight${N}"
+served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
+if [ -z "$served_env_head" ]; then
+  bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
+elif echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
+  ok "API-mode preflight: server 运行在 mock 模式(运行时探针的合法靶)"
+else
+  bad "API-mode preflight: server 非 mock 模式 —— 起法:VITE_NEXGRID_API_MODE=mock npm run dev:h5(remote 默认值会让全部运行时探针验错对象)"
+fi
+# B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
+# (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
+if "$NODE_BIN" scripts/selfcheck-remote-refresh-resilience.mjs > /tmp/uni-remote-resilience.log 2>&1; then
+  ok "远端刷新韧性门 — $(tail -1 /tmp/uni-remote-resilience.log)"
+else
+  bad "远端刷新韧性门失败 — node scripts/selfcheck-remote-refresh-resilience.mjs 看明细"
+  tail -8 /tmp/uni-remote-resilience.log | sed 's/^/        /'
+fi
+
 echo -e "${C}[3] grep sentinels over src/${N}"
 # React residue (should never survive a .tsx → .vue port)
 sentinel_absent "no className= (use class=)"      'className='
@@ -285,7 +307,15 @@ else
   ok "SPEC-1 R7 user-facing online state uses heartbeat seam"
 fi
 sentinel_present "wallet dev reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
-sentinel_present "payout-address dev reset store has PROD guard" src/store/payout-address.ts 'if \(import\.meta\.env\.PROD\) return'
+# z1 判决 A(2026-08-10):a8f57f4 把 guard 加强为 `PROD || remoteApiEnabled`,旧判据钉死
+# 单条件整串被正常加强撞红。改锚「函数级 PROD 守卫 ≥2 处」(两个 _dev reset 都要有),
+# 允许附加析取;剥注释防注释哄绿;0/1 处即红。
+payout_guard_sites=$(sed 's|//.*||' src/store/payout-address.ts | tr -d '\r' | grep -cE 'if \(import\.meta\.env\.PROD[^)]*\) return')
+if [ "${payout_guard_sites:-0}" -ge 2 ]; then
+  ok "payout-address dev reset store has PROD guard (×${payout_guard_sites},允许 || remoteApiEnabled 加强)"
+else
+  bad "payout-address dev reset PROD guard 应 ≥2 处(_devClearRestrictions + _devResetAddresses),实得 ${payout_guard_sites:-0}"
+fi
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
 else
@@ -361,7 +391,15 @@ sentinel_present "SPEC-7 K4 dimension weights typed (R3)" src/store/config-types
 sentinel_present "SPEC-7 risk cluster seeded" src/mock/platform-config.ts 'releaseMode: "attest_or_manual"'
 sentinel_present "SPEC-7 withdraw rules seeded" src/mock/platform-config.ts 'firstWithdrawalManual: true'
 sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode: "risk_bucket"'
-sentinel_present "SPEC-7 riskScore cloned into config store" src/store/config.ts 'dimensionWeights: \{ \.\.\.DEFAULT_PLATFORM_CONFIG\.riskScore\.dimensionWeights \}'
+# z1 判决 A:克隆逻辑 819a6da 起搬进 lib/platform-config-compat.ts(config store 经
+# completePlatformConfigSeed 初始化)。字面 pin 换行为门:克隆隔离 / captchaAlwaysScenes
+# 有效值 / WD02 网络费逐键 parity 全走「合成后的有效配置」,种子文件形态属实现细节。
+if "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
+  ok "platform-config compat 行为门 — $(tail -1 /tmp/uni-config-compat.log)"
+else
+  bad "platform-config compat 行为门失败 — node scripts/selfcheck-config-compat.mjs 看明细"
+  tail -12 /tmp/uni-config-compat.log | sed 's/^/        /'
+fi
 # 引擎层: 身份注册表(独立于会话存储)+ 实时聚簇 + 释放 + 提现前置
 sentinel_present "SPEC-7 risk registry isolated storage" src/store/risk-identity.ts 'nexgrid-risk-registry-v1'
 sentinel_present "SPEC-7 registry tracks first withdrawal (R2)" src/store/risk-identity.ts 'hasWithdrawn'
@@ -370,9 +408,14 @@ sentinel_present "SPEC-7 realtime cluster evaluator (R5)" src/store/risk-cluster
 sentinel_present "SPEC-7 multi-dimension clustering (R3)" src/store/risk-cluster.ts 'function dimensionHits'
 sentinel_present "SPEC-7 bare identity enters watch (R3)" src/store/risk-cluster.ts 'bare-identity'
 sentinel_present "SPEC-7 unbound free slot pends (R4)" src/store/risk-cluster.ts 'unbound-free-slot'
-sentinel_present "SPEC-7 release ledger exists (R1)" src/store/earning-release.ts 'nexgrid-earning-ledger-v1'
+# 【z1 判决 C · 显式退役】「release ledger exists(nexgrid-earning-ledger-v1)」与
+# 「cluster circuit breaker(clusterBreakerTripped)」两门删除:c37e642 起客户端释放引擎
+# 整体让渡后端(earning-release.ts 只剩远端快照只读 shell),本地账本/熔断的主语已不存在。
+# 替代防线:服务端下发 clusterRestricted(earnings-release-api 协议校验 + 新链
+# hard-block-k1-runtime-contract 四条)+ 下面两条重锚 pin。服务端账本义务已记 HANDOFF。
+sentinel_present "SPEC-7 release status served remotely (read-only client)" src/store/earning-release.ts 'refreshEarningsReleaseStatus'
+sentinel_present "SPEC-7 server breaker flag protocol-validated" src/api/earnings-release-api.ts 'clusterRestricted'
 sentinel_present "SPEC-7 release sources limited to attest|manual (R1)" src/store/earning-release.ts 'type ReleaseSource = "attest" \| "manual"'
-sentinel_present "SPEC-7 cluster circuit breaker (R1)" src/store/earning-release.ts 'clusterBreakerTripped'
 if grep -qE 'releasedBy: *"(timer|auto)"' src/store/earning-release.ts 2>/dev/null; then
   bad "SPEC-7 release engine must not have a time/auto release source (R1)"
 else
@@ -404,15 +447,11 @@ sentinel_present "SPEC-7 gift copy parameterized (zh)" src/i18n/messages/zh.ts '
 sentinel_present "SPEC-7 gift copy parameterized (en)" src/i18n/messages/en.ts '\{usd\} USDT \+ \{nex\} NEX'
 sentinel_present "SPEC-7 settle reads live cluster (R5)" src/store/app.ts 'evaluateAccountCluster\(accountKey\.value\)'
 sentinel_present "SPEC-7 settle buckets earnings" src/store/app.ts 'bucketUserEarnings'
-sentinel_present "SPEC-7 settle journals non-withdrawable routes (R1)" src/store/app.ts 'appendLedgerEntry\(accountKey\.value'
-SPEC7_LEDGER_SITES=$(grep -cE 'appendLedgerEntry\(accountKey\.value' src/store/app.ts 2>/dev/null)
-if [ "$SPEC7_LEDGER_SITES" = "2" ]; then
-  ok "SPEC-7 both bucket-credit paths journal to ledger (settle + reward)"
-else
-  bad "SPEC-7 expected 2 ledger journal sites (settle + creditRewardBucket), found $SPEC7_LEDGER_SITES"
-fi
+# 【z1 判决 C · 假绿清理】原「settle journals ×2」「settle applies release engine」三门
+# 删除:appendLedgerEntry / evaluateAttestRelease 在 c37e642 后是恒 no-op 空壳,钉空壳
+# 调用点 = 绿着守死代码(哨兵假绿病,盯上重构后没人用的代码)。空壳本体是过渡脚手架,
+# 由上方 read-only client pin + 新链契约接管。
 sentinel_present "SPEC-7 settle accrues app attestation" src/store/app.ts 'recordAttestation\(accountKey\.value'
-sentinel_present "SPEC-7 settle applies release engine (R1)" src/store/app.ts 'evaluateAttestRelease\(accountKey\.value'
 sentinel_present "SPEC-7 settle pauses on config sync failure" src/store/app.ts 'if \(cfgStore\.syncFailed\) return'
 sentinel_present "SPEC-7 config sync-failed dev toggle prod-guarded" src/store/config.ts '_devSetConfigSyncFailed'
 sentinel_present "SPEC-7 wallet shows config sync failure state" src/pages/me/wallet.vue 'syncFailedTitle'
@@ -461,13 +500,9 @@ else
   ok "AUTH01 no local resend-seconds constants (config-derived)"
 fi
 # FEAT-AUTH03 注册场景滑块前置(规格 PRD/specs/FEAT-AUTH03-register-captcha-always.md)
-# 值 pin:防「键在值漂」—— seed 从 ["register"] 改掉时键 parity/tsc 仍全绿,只有这条红。
-# 剥 // 注释后再 grep:注释里残留的同字面量不得替代真 seed 值(子串哨兵必剥注释)。
-if sed 's|//.*||' src/mock/platform-config.ts | grep -qE 'captchaAlwaysScenes: \["register"\]'; then
-  ok 'AUTH03 captchaAlwaysScenes seed pinned to ["register"] (comment-stripped)'
-else
-  bad 'AUTH03 captchaAlwaysScenes seed pin missing/drifted in src/mock/platform-config.ts (comment-stripped grep)'
-fi
+# z1 判决 A:captchaAlwaysScenes 已出种子进 compat 运行时默认(819a6da/c37e642),
+# 值 pin 改由 selfcheck-config-compat 对**合成后的有效配置**行为断言(种子显式覆盖掉
+# "register" 一样红);此处只留接线哨兵(下方三条不动)。
 # 接线门:判定必须出现在 otpSend 函数体内(剥注释后)。sed 函数头带左括号锚定(防
 # otpSendXxx 前缀撞名假绿),截取后剥 // 注释 —— 注释里的同名文本不算接线(红测 b1
 # 实抓:decision 注释在函数体内,不剥注释时删掉真判定门仍绿)。文件级 grep 抓不住
@@ -515,9 +550,21 @@ sentinel_present "SPEC-7 user carries earningBuckets" src/store/types.ts 'earnin
 sentinel_present "SPEC-7 legacy account snapshots receive bucket defaults" src/store/app.ts 'withDefaultEarningBuckets'
 sentinel_present "SPEC-7 wallet page reads earning buckets" src/pages/me/wallet.vue 'app\.user\.earningBuckets'
 sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wallet-card.vue 'app\.user\.earningBuckets'
-# 2026-07-31 规则变更(充值本金可提):可提上限从 withdrawableUsdt 改为 usdtBalance。
-# held 两桶本就账外,风控扣留仍生效。本哨兵改为锁「上限读总余额」这个新正解。
-sentinel_present "withdraw page available = total balance (principal withdrawable)" src/pages/me/wallet-withdraw.vue 'const maxWithdrawable = computed\(\(\) => app\.user\.usdtBalance\)'
+# z1 判决 A:2026-07-31「上限=总余额」规则被 D5 server-canonical 新规则取代 ——
+# 可提上限 =(总余额 − 服务端 held 两桶)× policy.balanceMaxRatio,且 clusterRestricted /
+# 无快照 / 无 policy 三态一律 fail-closed 归 0。判据钉四个承重构件,不钉整串表达式。
+wd_avail_src=$(sed -n '/const maxWithdrawable = computed/,/});/p' src/pages/me/wallet-withdraw.vue | tr -d '\r')
+wd_avail_miss=""
+[ -n "$wd_avail_src" ] || wd_avail_miss="${wd_avail_miss}computed-block-missing "
+echo "$wd_avail_src" | grep -q 'clusterRestricted) return 0' || wd_avail_miss="${wd_avail_miss}cluster-zero "
+echo "$wd_avail_src" | grep -q 'if (!buckets) return 0' || wd_avail_miss="${wd_avail_miss}nobuckets-zero "
+echo "$wd_avail_src" | grep -q 'balanceMaxRatio ?? 0' || wd_avail_miss="${wd_avail_miss}ratio-failclosed "
+echo "$wd_avail_src" | grep -q 'Math.max(0,' || wd_avail_miss="${wd_avail_miss}held-subtract-clamp "
+if [ -z "$wd_avail_miss" ]; then
+  ok "withdraw available fail-closed(cluster→0 · 无快照→0 · ×ratio??0 · max(0,余额−held))"
+else
+  bad "withdraw available fail-closed 缺件: $wd_avail_miss"
+fi
 # 可提口径三处同源(2026-07-31 踩坑):提现页改了口径,钱包页/钱包卡片仍读旧桶 → 首页显示
 # 的「可提现 USDT」与实际能提的数对不上。三处必须同读 usdtBalance,任一回退即红。
 withdrawable_source_parity() {
@@ -544,42 +591,63 @@ sentinel_present "SPEC-7 tracking maps risk reasons via i18n" src/pages/me/walle
 sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-withdraw-tracking.vue 'routeHeldFrozenTitle'
 # (原「SPEC-7 pairing registers payment instrument」哨兵随旧配对机制删除,2026-08-05 包 E。
 #  新模型的地址登记走 payout-address → recordWithdrawAddressUse,由 selfcheck-fastlane 接线门覆盖。)
-sentinel_present "SPEC-7 reject route never debits" src/store/app.ts 'if \(riskRoute === "reject"\) return null'
-sentinel_present "SPEC-7 risk route maps to queue status" src/store/app.ts 'riskRoute === "freeze" \? "frozen"'
-# 提现扣款双 clamp(2026-07-31):先耗收益再耗本金,可提额度不得转负、不得超剩余总余额。
-# 少任一 clamp → 提本金时 withdrawableUsdt 变负 或 > usdtBalance(negative-balance P0 复发面)。
-# grep 逐行匹配,而该表达式跨行 → 拆成两条单行判据,两条都在才算数。
-# 并发透支门(2026-07-31 审计 P0):门禁分母改成 usdtBalance 后,可透支上限从「已解锁收益」
-# 放大到整个账户余额;account-cloud 把余额当加法计数器 merge,多端各自本地合法的扣款会相加。
-# 提交前必须重读落盘余额二次核验(等价真后端事务内重读行)。删掉这行 = P0 敞口恢复。
-# ⚠️ 判据别 pin 在局部变量名上 —— 一次无害重命名要么把资金门弄红、要么(更糟)让它
-# 盯上重构后没人用的死代码而假绿(两种审计都实测到过)。这里改成数**门的道数**:
-# 提现链上必须有两处「重读落盘余额」(占额度前一次、await 之后一次),少一处即红。
-gate_sites=$(grep -c 'readAccountSnapshot(acct)?\.user?\.usdtBalance' src/store/app.ts 2>/dev/null || echo 0)
-if [ "${gate_sites:-0}" -eq 2 ]; then
-  ok "withdrawal re-reads persisted balance x2 (concurrency gate, sample ${gate_sites})"
+# z1 判决 A:客户端扣款链整删(c37e642),「reject 不扣款」改三层守:
+# ① 页面提交前 reject 闸;② API 回包白名单不含 reject(服务端若回 reject 即协议错);
+# ③ store 提交函数结构上不再写任何余额字段(负向断言,candidates 缺失即红)。
+sentinel_present "SPEC-7 reject route blocks before submit (page gate)" src/pages/me/wallet-withdraw.vue 'fresh\.route === "reject"'
+wd_routes_src=$(sed -n '/const allowedRiskRoutes = new Set/,/\]);/p' src/api/withdrawal-api.ts | tr -d '\r')
+if [ -n "$wd_routes_src" ] && ! echo "$wd_routes_src" | grep -q '"reject"'; then
+  ok "SPEC-7 API risk-route whitelist has no reject (server reject → protocol error)"
 else
-  bad "withdrawal 落盘余额复核应恰有 2 处(占额度前 + await 后),实得 ${gate_sites}"
+  bad "SPEC-7 allowedRiskRoutes 白名单缺失或含 reject(白名单块提取 ${#wd_routes_src} 字节)"
 fi
-sentinel_present "withdrawal clamps withdrawable >= 0" src/store/app.ts 'Math\.max\(0, \+\(u\.earningBuckets\.withdrawableUsdt - amount\)\.toFixed\(2\)\)'
-sentinel_present "withdrawal clamps withdrawable <= usdt" src/store/app.ts 'withdrawableUsdt: Math\.min\('
+wd_submit_body=$(sed -n '/async function submitWithdrawal(/,/^  }/p' src/store/app.ts | tr -d '\r')
+if [ -n "$wd_submit_body" ] && ! echo "$wd_submit_body" | grep -qE 'usdtBalance *[-+:=]|earningBuckets:'; then
+  ok "SPEC-7 submitWithdrawal never debits locally(函数体 $(echo "$wd_submit_body" | wc -l) 行无余额写入)"
+else
+  bad "SPEC-7 submitWithdrawal 函数体缺失或出现余额写入(本地扣款禁复活)"
+fi
+# z1 判决 A:「风控路由→队列状态」映射换输入源 —— 服务端 status 经 canonicalStatus()
+# 白名单映射(FROZEN→frozen 等),未知值必须抛协议错(禁静默降级为 submitted)。
+wd_status_src=$(sed -n '/function canonicalStatus(/,/^}/p' src/api/withdrawal-api.ts | tr -d '\r')
+wd_status_miss=""
+[ -n "$wd_status_src" ] || wd_status_miss="fn-missing "
+echo "$wd_status_src" | grep -q '"FROZEN"' || wd_status_miss="${wd_status_miss}frozen "
+echo "$wd_status_src" | grep -q '"REVIEW_PENDING"' || wd_status_miss="${wd_status_miss}review-pending "
+echo "$wd_status_src" | grep -q 'WITHDRAWAL_STATUS_INVALID' || wd_status_miss="${wd_status_miss}unknown-throws "
+if [ -z "$wd_status_miss" ]; then
+  ok "SPEC-7 server status maps to queue status (canonicalStatus + 未知值抛错)"
+else
+  bad "SPEC-7 canonicalStatus 缺件: $wd_status_miss"
+fi
+# 【z1 判决 C · 显式退役】「落盘余额复核 ×2」与「提现扣款 clamp ≥0」两门删除:
+# c37e642 起客户端不再本地扣款/落盘提现(submitWithdrawal 只镜像服务端回单),
+# 这两门守的操作主语已不存在;并发透支收敛 = 服务端事务 + idempotencyKey。
+# 🔴 幂等键 ≠ 并发闸(错题集同款)—— 服务端事务内重读余额的义务已记 HANDOFF。
+# 购买链(debitBalance)的姊妹 clamp 仍在,由下面 P0 neg-balance 两门继续守。
+sentinel_present "debit clamps withdrawable <= usdt (purchase path)" src/store/app.ts 'withdrawableUsdt: Math\.min\('
 # 负余额不变量(2026-07-10 P0): 购买共用 debitBalance 减总余额时必 clamp 可提额度 ≤ 剩余
-# 总余额,否则可提额度 > 总余额 → 提现门(只看可提额度)放行超总余额提现 → usdtBalance 变负
-# (凭空取钱)。两条哨兵锁 debitBalance 的 clamp + submitWithdrawal 的总余额兜底门。
+# 总余额。【z1 判决 C】原第二门「submitWithdrawal 总余额兜底」删除:本地扣款不存在后,
+# 超余额请求不再能破坏客户端状态(页面 fail-closed 上限拦 + 服务端 reservation 拒),
+# 兜底主语灭失。debitBalance 的 clamp 照守。
 sentinel_present "P0 neg-balance: debit clamps withdrawable<=balance" src/store/app.ts 'withdrawableUsdt: Math\.min\(buckets\.withdrawableUsdt, nextUsdt\)'
-sentinel_present "P0 neg-balance: withdrawal gate also checks total balance" src/store/app.ts 'if \(currentUser\.usdtBalance < amount\) return null'
 # merge 层(2026-07-10 审计补): account-cloud 把余额字段当独立加法计数器三路累加,多端并发
 # 扣款合并会把总余额扣穿为负 / 可提额度虚高;写盘前必过资金不变量收口(clamp ≥0 + withdrawable
 # ≤ balance),补住 debitBalance 单会话 clamp 管不到的这条旁路(2 个独立审计 + 复现脚本证实)。
 sentinel_present "P0 neg-balance: account-cloud has fund-invariant clamp" src/store/account-cloud.ts 'function clampAccountFundInvariants'
 sentinel_present "P0 neg-balance: merge writes clamped snapshot" src/store/account-cloud.ts 'const merged = clampAccountFundInvariants\(rawMerged\)'
-# 提现金额有效性守卫(对齐 debitBalance):NaN/±Inf/≤0 拒,防负数反向加钱 / NaN 污染余额。
-sentinel_present "P0 neg-balance: withdrawal rejects invalid amount" src/store/app.ts 'if \(!Number\.isFinite\(amount\) \|\| amount <= 0\) return null'
+# z1 判决 A:金额有效性守卫随本地扣款链移除,用户流上的守卫在页面层(拒 ≤0 + 输入剥非
+# 数字截 2 位);store 直调透传的残余缺口 = 服务端拒非法 amount 的义务,已记 HANDOFF。
+sentinel_present "P0 neg-balance: page rejects non-positive amount" src/pages/me/wallet-withdraw.vue 'if \(amount <= 0\) return'
+sentinel_present "P0 neg-balance: amount input strips non-numeric" src/pages/me/wallet-withdraw.vue 'replace\(/\[\^0-9\.\]/g, ""\)'
 # 2026-08-03 提现资金 2×P1:①费用快照必须与权威配置交叉核对(自洽三元组不再放行,权威值走
 # config 纯函数单源);②失败提现退款必须连已烧 NEX 一起退(独立幂等键 refund-nex:)。
 # 行为固定靶 + 剥注释接线门在 selfcheck-withdrawfee.mjs(⑥⑦);这两条是快速哨兵层,pin 完整
 # 调用形态(短串会在注释里出现,pin 短串必被哄绿)。
-sentinel_present "P1 fee snapshot cross-checks authoritative config (5-arg call)" src/store/app.ts 'isWithdrawalFeeSnapshotValid\(fee, offsetWithNex, offsetRateNow, NETWORK_FEE_KEY\[network\], currentNetworkConfirmFeeUsd\(\)\)'
+# z1 判决 A:5 参交叉核对活在页面提交链(确认后、submit 前),第 5 参权威源从 config
+# 纯函数换成服务端 policy;store 侧不再报价。判据钉页面调用形态 + 权威源。
+sentinel_present "P1 fee snapshot cross-checks policy authority (page, 5-arg)" src/pages/me/wallet-withdraw.vue 'withdrawalPolicy\.value\?\.networkConfirmFeeUsd \?\? null'
+sentinel_present "P1 fee snapshot guard sits in submit chain" src/pages/me/wallet-withdraw.vue 'if \(!quoteStillValid\(snap\.fee, snap\.offset, snap\.network\)\)'
 sentinel_present "P1 failed-withdrawal refunds burned NEX via own idem key" src/store/app.ts 'creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)'
 # 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
 # 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。
@@ -687,17 +755,13 @@ else
   # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
   # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 数值 5 键逐一比对字面值;
   # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
-  # 🔴 包 A handoff(FEAT-AUTH03):otpGate 第 6 键 captchaAlwaysScenes(string[])暂不进本
-  # 循环 —— admin OtpGateParamDef 是 kind:"number" 单形态,数组参数的登记(类型加宽 + K2 渲染
-  # + defaultVal)是包 A 交付物;uniapp 侧值由上方 AUTH03 值 pin 哨兵看住,不留无门真空。
-  # 包 A 落地后必须:① 把该键补进本循环并删本注释;② 重写值提取 —— 下方 `defaultVal: [^,]+`
-  # 与 `$k: [^,]+` 正则遇多元素数组(如 ["login","register"])会在首个逗号处截断,
-  # 数组键须按括号配对整段提取,不能沿用现式。
+  # z1 判决 A(2026-08-10):captchaAlwaysScenes 已出种子进 compat 运行时默认,由
+  # selfcheck-config-compat 对合成配置行为断言;键清单收成下面两个变量 —— 值循环与
+  # 覆盖度门共用同一份(单源)。admin 侧数组参数登记义务已记 HANDOFF。
+  SPEC7_RISKCLUSTER_KEYS="freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding"
+  SPEC7_OTPGATE_KEYS="resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds"
   value_mismatch=""
-  for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
-           pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
-           maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding \
-           resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds; do
+  for k in $SPEC7_RISKCLUSTER_KEYS $SPEC7_OTPGATE_KEYS; do
     uni_v=$(grep -oE "\b$k: [^,]+" src/mock/platform-config.ts | head -1 | sed "s/^$k: //" | tr -d '\r')
     # 尾逗号锚定对象字面量条目;类型声明的 union 行(key: "X" | ...)无逗号,天然排除(红测抓过 resendSeconds 撞 union 首键)
     adm_v=$(grep -A6 "key: \"$k\"," "$ADMIN_CFG" | grep -m1 -oE "defaultVal: [^,]+" | sed "s/^defaultVal: //" | tr -d '\r')
@@ -708,63 +772,28 @@ else
     fi
   done
   if [ -z "$value_mismatch" ]; then
-    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;第 6 键 captchaAlwaysScenes 由 AUTH03 pin 哨兵看住,包 A 落地后进循环)"
+    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;captchaAlwaysScenes 由 config-compat 行为门看住)"
   else
     bad "SPEC-7 param value parity drift: $value_mismatch"
   fi
-  # 值 parity 覆盖度自守:seed riskCluster 块键数必须 = 循环里的 11,otpGate 块 = 6(循环数值
-  # 5 键 + captchaAlwaysScenes 由 AUTH03 值 pin 哨兵看住,见上方包 A handoff)。两端同时
-  # 新增键时键 parity 仍绿、值 parity 循环静默漏检,此处变红逼同步扩循环(2026-07-14 对抗审查 D 项缺口)
-  seed_key_count=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
-  og_key_count=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -cE '^\s+\w+: [^{]')
-  if [ "$seed_key_count" -eq 11 ] && [ "$og_key_count" -eq 6 ]; then
-    ok "SPEC-7 value parity coverage (riskCluster=11 + otpGate=6, 与循环清单+AUTH03 pin 同步)"
+  # 值 parity 覆盖度自守(z1 判决 A:硬计数改集合等式,与循环键清单同源):种子块键集
+  # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
+  # 都在这里红(2026-07-14 对抗审查 D 项缺口的构造性版本)。
+  # 值起始 [^{] 过滤:块首行「riskCluster: {」自己也长得像键,不滤会多出幽灵键(红测实锤)。
+  seed_rc_keys=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  seed_og_keys=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  loop_rc_keys=$(echo "$SPEC7_RISKCLUSTER_KEYS" | tr ' ' '\n' | sort)
+  loop_og_keys=$(echo "$SPEC7_OTPGATE_KEYS" | tr ' ' '\n' | sort)
+  if [ -n "$seed_rc_keys" ] && [ -n "$seed_og_keys" ] && [ "$seed_rc_keys" = "$loop_rc_keys" ] && [ "$seed_og_keys" = "$loop_og_keys" ]; then
+    ok "SPEC-7 value parity coverage(种子键集==循环键集:riskCluster $(echo "$seed_rc_keys" | grep -c .) + otpGate $(echo "$seed_og_keys" | grep -c .))"
   else
-    bad "SPEC-7 value parity coverage: riskCluster=$seed_key_count(应 11) otpGate=$og_key_count(应 6) —— 新增/删除键须同步改值 parity 循环与 AUTH03 pin"
-  fi
-  # 包 A 前向提醒(WARN,非门):captchaAlwaysScenes 未登记 admin 侧前每轮可见,防欠账
-  # 蒸发;登记后自动沉默。真正的机器门 = 登记时按上方包 A handoff 注释两步接入值 parity
-  # 循环(spec FEAT-AUTH03 ⑦ 已列为包 A Done-when)。
-  if ! grep -q 'captchaAlwaysScenes' "$ADMIN_CFG"; then
-    printf "  ${Y}WARN${N}  %s\n" "SPEC-7 pkg-A pending: captchaAlwaysScenes 未登记 admin compute-config(登记后按包 A handoff 注释进值 parity 循环)"
+    bad "SPEC-7 value parity coverage 键集不等 —— seed(rc)=[$(echo $seed_rc_keys)] loop(rc)=[$(echo $loop_rc_keys)] seed(og)=[$(echo $seed_og_keys)] loop(og)=[$(echo $loop_og_keys)]"
   fi
 fi
-# ── FEAT-WD02 网络确认费种子逐键 parity(uniapp seed ↔ admin-ops 契约声明)──
-# 锚点身份:比对对象是 admin-ops wd02 契约测试里的**声明锚**(D5 无运行时 mock seed,
-# server-canonical,后端字段同步是人肉义务)—— 证的是 uniapp ↔ 声明,非 uniapp ↔ 运行时。
-# 值域上限 [0,25] 两侧各 pin 一份(uniapp 判据 26→false / admin normalize 30→invalid 固定靶)。
-# 路径两候选:主树(../admin-ops)与 .claude/worktrees/<pkg> 内自测(../../../../admin-ops)。
-WD02_ADMIN_ANCHOR=""
-for cand in "../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs" \
-            "../../../../admin-ops/tests/wd02-network-confirm-fee-contract.test.mjs"; do
-  [ -f "$cand" ] && WD02_ADMIN_ANCHOR="$cand" && break
-done
-if [ -z "$WD02_ADMIN_ANCHOR" ]; then
-  bad "WD02 confirm-fee parity: admin-ops 契约锚不存在(wd02-network-confirm-fee-contract.test.mjs)"
-else
-  wd02_parity=$("$NODE_BIN" -e "
-    const fs = require('fs');
-    const uni = fs.readFileSync('src/mock/platform-config.ts', 'utf8');
-    const adm = fs.readFileSync(process.argv[1], 'utf8');
-    const um = uni.match(/networkConfirmFeeUsd:\s*\{\s*trc20:\s*([\d.]+),\s*bep20:\s*([\d.]+),\s*erc20:\s*([\d.]+)\s*\}/);
-    const am = adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{ trc20: ([\d.]+), bep20: ([\d.]+), erc20: ([\d.]+) \}/);
-    if (!um) { console.log('FAIL uniapp seed 提取失败(platform-config networkConfirmFeeUsd 形状变了 —— 判据失效按红处理,禁空集全过)'); process.exit(0); }
-    if (!am) { console.log('FAIL admin 契约锚提取失败(WD02_SEED_NETWORK_CONFIRM_FEE_USD 形状变了)'); process.exit(0); }
-    const keys = ['trc20', 'bep20', 'erc20'];
-    const miss = [];
-    keys.forEach((k, i) => { if (Number(um[i + 1]) !== Number(am[i + 1])) miss.push(k + '(uni=' + um[i + 1] + '!=admin=' + am[i + 1] + ')'); });
-    // 覆盖度自守:两端键数必须 = 3(两端同增新网络时逐键循环静默漏检,此处变红逼同步扩清单)
-    const uniKeys = ((uni.match(/networkConfirmFeeUsd:\s*\{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
-    const admKeys = ((adm.match(/WD02_SEED_NETWORK_CONFIRM_FEE_USD = \{([^}]*)\}/) || [])[1] || '').split(',').filter((s) => s.includes(':')).length;
-    if (uniKeys !== 3 || admKeys !== 3) miss.push('key-count(uni=' + uniKeys + ' admin=' + admKeys + ' 应各 3)');
-    console.log(miss.length ? 'FAIL ' + miss.join(' ') : 'OK');
-  " "$WD02_ADMIN_ANCHOR")
-  if [ "$wd02_parity" = "OK" ]; then
-    ok "WD02 network-confirm-fee parity(3 keys 逐键比值 · 锚=admin-ops wd02 契约声明,非运行时)"
-  else
-    bad "WD02 network-confirm-fee parity: $wd02_parity"
-  fi
-fi
+# ── FEAT-WD02 网络确认费逐键 parity ──
+# z1 判决 A(2026-08-10):networkConfirmFeeUsd 已出种子进 compat 运行时默认(819a6da),
+# 文本提取器按设计红(判据失效必红,没白跑)。比对迁入 selfcheck-config-compat 行为门:
+# 取「合成后的有效值」逐键 vs admin-ops 契约锚(路径双候选 + 锚缺失必红 + 键数覆盖度照守)。
 # ── SPEC-2 电脑算力 sentinels ──
 spec2_pc_gpu_kind_coverage() {
   local miss=""
@@ -1629,14 +1658,16 @@ no_userfacing_stella
 no_oldbrand_check() {
   local tok='Nexi'; tok="${tok}on"
   local hits
-  # 白名单三类专有名词:①工程/仓库目录名 ②skill 名(注释里引用规范来源合法)
-  # ③静态图文件名。除此之外的旧品牌词一律拦。
+  # 白名单四类专有名词:①工程/仓库目录名(含后端仓 -backend 与运营台 -ops-console,
+  # c37e642 起契约测试按仓路径取材)②skill 名(注释里引用规范来源合法)
+  # ③静态图文件名 ④后端契约标识符(x-…-edge-country header 名由后端定,client 只能
+  # 跟随;改名义务已记 HANDOFF)。除此之外的旧品牌词一律拦。
   # 🔴 不要为「注释引用 PRD 文件名」加白名单:`grep -viE` 是**整行**过滤,
   #    加 `PRD/…` 等于放行「任何提到 PRD 路径的行」,而品牌散文恰恰住在注释里 ——
   #    红测实证:那样改后 5 条真违规只抓得住 1 条(含用户可见 i18n 串与 DOM 文本)。
   #    需要引用带旧品牌前缀的 PRD 文件名时,注释里省略该前缀即可(见本文件 PAY-VN 段)。
   hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
-    | grep -viE "${tok}-(prototype|uniapp|admin)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}" | head -8)
+    | grep -viE "${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}|x-${tok}-edge-country" | head -8)
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }
@@ -1758,10 +1789,14 @@ platform_stats_anchor() {
   # (4-注)2026-08-06 主人拍板(包 G P2#3 选 a):on-grid 页脚「配置坏回 PAYOUT_PER_SEC_USD
   #        种子锚」退役,改与脉搏卡同判据占位降级 → 该消费对从台账移除(消费关系合法消亡,
   #        非哨兵放宽);常量本身仍由上方 ① 派生链哨兵钉着,payoutPerSecUsdOf 消费对保留。
+  # (4-注2)z1 判决 A(2026-08-10):c37e642 把 joiners/fleet 展示从「编译期常量兜底」改成
+  #   「配置派生 + publicStatsHealth 门控 + '—' 占位」,MONTHLY_NEW_JOINERS / FLEET_DEVICES
+  #   两个消费对合法消亡(符号已从 import 整条移除,非死 import);消费对改钉 health 门控
+  #   接线,坏配置回落到编译期像真数据的旧路径若复活,这两条计数会先红。
   for pair in \
     'src/pages/onboarding/intro.vue|paidCumulativeNow' \
-    'src/pages/ref/code.vue|MONTHLY_NEW_JOINERS' \
-    'src/store/app.ts|FLEET_DEVICES' \
+    'src/pages/ref/code.vue|publicStatsHealth' \
+    'src/store/app.ts|publicStatsHealth' \
     'src/components/home/on-grid-section.vue|payoutPerSecUsdOf' \
     'src/pages/onboarding/intro.vue|fleetDevicesOf' \
     'src/pages/ref/code.vue|monthlyPayoutUsdOf'; do
@@ -1779,24 +1814,39 @@ platform_stats_anchor() {
   if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^\|[^:])//.*$|\1|' {} + 2>/dev/null | grep -q "paidCumulativeNowOf"; then
     bad "platform-anchor: paidCumulativeNowOf 出现在代码面 —— 积分类禁跟配置,见 platform-stats 族B 注"; fails=1
   fi
-  # (4b) 2026-08-06 审计 P1 收口:钱链消费者必须走 *Of(配置派生)——上面三条 *Of pin 守
-  #      「接了」;这一条守「种子恒等」:mock 种子必须从锚取值,开箱两侧不许各写一份字面量。
-  if ! grep -qE 'fleetDevices: *FLEET_DEVICES' src/mock/platform-config.ts 2>/dev/null; then
-    bad "platform-anchor: platform-config 种子不再取自编译期锚(两侧将各自漂移)"; fails=1
+  # (4b) z1 判决 A · 判据反转(2026-08-10):819a6da 把 publicStats 种子移出 mock,
+  #      c37e642 把 compat 默认清零并声明「Deliberately invalid sentinel …
+  #      Never replace it with plausible data」—— H9 在服务端投影到达前必须保持不可用。
+  #      新不变量:compat 的 publicStats 默认块不得出现任何非零可信值(空表也不得填充);
+  #      块提取失败同样红(判据失效不许静默过)。
+  compat_ps=$(sed -n '/RUNTIME_PUBLIC_STATS_DEFAULT/,/^};/p' src/lib/platform-config-compat.ts | tr -d '\r')
+  if [ -z "$compat_ps" ]; then
+    bad "platform-anchor: compat publicStats 默认块提取失败(判据失效必红)"; fails=1
+  elif echo "$compat_ps" | sed 's|//.*||' | grep -qE ': *[1-9]'; then
+    bad "platform-anchor: compat publicStats 默认出现非零可信值 —— H9 必须保持 invalid sentinel"; fails=1
+  fi
+  # joiners/fleet 的健康门控接线(z1):坏配置必须落 '—' 占位,不许渲染像真数字。
+  if ! sed -E 's|(^\|[^:])//.*$|\1|' src/pages/ref/code.vue 2>/dev/null | grep -q 'membersOk'; then
+    bad "platform-anchor: code.vue joiners 未走 membersOk 健康门控"; fails=1
   fi
   # (5) monthly-joiners value mirrored: exactly one 41,286 per locale (poster)
   for lf in src/i18n/messages/en.ts src/i18n/messages/zh.ts src/i18n/messages/vi.ts; do
     if [ "$(grep -cF '41,286' "$lf" 2>/dev/null)" -ne 1 ]; then bad "platform-anchor: $lf joiners 41,286 count != 1"; fails=1; fi
   done
-  # (6) trust Q2 print ↔ admin managed-content mirror value parity (键 parity ≠ 值 parity)
-  # 🔴 走 $ADMIN_ROOT(上方 36-44 行已解析 linked worktree 的情形),不写裸相对路径:
-  #   worktree 里 `../Nexion-admin-prototype` 落在 .claude/worktrees/ 下,文件恒读不到 → 两条恒假红。
-  ADMIN_ITABS="$ADMIN_ROOT/app/components/domain-views/i-tabs/data.ts"
+  # 【(6) z1 判决 C · 显式退役】trust Q2 字面量镜像(27,150 / $47.0M ↔ admin i-tabs data.ts)
+  # 删除:c37e642 把 trust 页 Q2 财务组整删(QTR_FINANCIALS=[] + 模板段 v-if=false),披露改
+  # trustSectionApi 按地区服务端下发;admin 活跃仓(admin-ops)同字段亦已服务端化、无字面量
+  # 可镜。编译期 Q2 镜像的主语两侧同时灭失;对照面若回流字面量,由 (1) legacy-literal 禁令
+  # 与服务端契约层守。守住「删了不许悄悄回来」:trust.vue 不得再出现本地 Q2 财务字面量。
   for v in '27,150' '\$47\.0M'; do
-    if ! grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then bad "platform-anchor: trust.vue missing Q2 print /$v/"; fails=1; fi
-    if ! grep -qE "$v" "$ADMIN_ITABS" 2>/dev/null; then bad "platform-anchor: admin i-tabs mirror missing /$v/ (cross-repo drift)"; fails=1; fi
+    if grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then
+      bad "platform-anchor: trust.vue 本地 Q2 财务字面量回流 /$v/(披露已服务端化,不得回退)"; fails=1
+    fi
   done
-  if [ "$fails" -eq 0 ]; then ok "platform-stats single anchor (legacy 0 · lib-confined · 5 consumers+symbols · joiners 1×3 · trust↔admin Q2 parity)"; fi
+  if ! grep -qE 'QTR_FINANCIALS: \{ metric: string; value: string; delta: string \}\[\] = \[\];' src/pages/trust/trust.vue 2>/dev/null; then
+    bad "platform-anchor: trust.vue QTR_FINANCIALS 不再是声明空数组(本地财务数据禁回流;产品若恢复本地 Q2 须重立镜像判据)"; fails=1
+  fi
+  if [ "$fails" -eq 0 ]; then ok "platform-stats single anchor (legacy 0 · lib-confined · consumers+health-gate · joiners 1×3 · compat 全零哨兵 · Q2 本地字面量 0)"; fi
 }
 platform_stats_anchor
 # FEAT-DEV01 等效换皮 P0 (2026-07-06): the task-capacity band literals in

@@ -59,6 +59,7 @@ const bundle = await build({
       export { createDevice, makeInitialDevices, DEVICE_SPECS } from "@/store/device-types";
       export { CAPACITY_EXEMPT_KINDS } from "@/store/device-lifecycle";
       export { computeRank, isValidPercentileTable } from "@/lib/network-rank";
+      export { publicStatsHealth } from "@/lib/platform-stats";
       export { completePlatformConfigSeed } from "@/lib/platform-config-compat";
       export { DEFAULT_PLATFORM_CONFIG } from "@/mock/platform-config";
     `,
@@ -74,7 +75,7 @@ const {
   accountTotalHashrate, deviceEffectiveTops, deviceBaselineTops,
   computeLiveHashpower, GPU_TIERS, createDevice, makeInitialDevices,
   DEVICE_SPECS, CAPACITY_EXEMPT_KINDS, computeRank, isValidPercentileTable,
-  completePlatformConfigSeed, DEFAULT_PLATFORM_CONFIG,
+  completePlatformConfigSeed, DEFAULT_PLATFORM_CONFIG, publicStatsHealth,
 } = await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 let pass = 0;
@@ -445,10 +446,18 @@ function hw(kind, over = {}) {
     !!h5Phone && one(h5Phone) > 0, `手机 = ${h5Phone ? one(h5Phone) : "找不到"}`);
 }
 
-// ── 🔴 8 档参考舰队名次固定靶(台账 P1-3 收口自证)────────────────────────────
-// 旧种子分位表最高档 150 TOPS:持有任何托管硬件的账号(2,640+ TOPS)全部撞 96% 封顶,
-// 名次钉死同一个数,「加算力看到排名前进」对所有付费账号失效。本组用**真种子表**
-// (DEFAULT_PLATFORM_CONFIG,不手抄)+ 真聚合函数现算 8 档舰队,钉「互不相同且严格前进」。
+// ── 🔴 ⑥ publicStats 合成种子 = 故意非法哨兵;名次固定靶改喂 fixture 表 ────────
+// 819a6da/c37e642 把 publicStats 从 mock 种子里整个移走:合成种子(compat 默认)现在是
+// **故意非法哨兵**(全零 + 空分位表,platform-config-compat.ts 原注 "Never replace it
+// with plausible data")—— H9 排名在服务端投影到达并通过校验前必须保持 unavailable。
+// 本组因此一分为三(z1 2026-08-10 改制,替换原「真种子表」2 条):
+//   a) 钉哨兵本身:合成种子必须全零 + 空表,且 isValidPercentileTable(空表)===false
+//      恰是期望 —— 有人往哨兵里塞一个「像样的数」= 排名在无服务端数据时凭空可用,当场红;
+//   b) 名次固定靶不缩水:改用 **fixture 表**喂真纯函数(表与人口基数 = 819a6da 删掉的
+//      那份 10 档种子,逐字抄进本脚本;fixture 是「合法表长什么样」的行为固定靶,
+//      不是断言线上种子仍长这样);
+//   c) 表合法性校验已上移 src/api/platform-config-api.ts(parsePublicStats:<2 档抛
+//      H9_PUBLIC_STATS_RESPONSE_INVALID)—— 钉住该分支存在。
 // ⚠️ 舰队取 8 个**算力互不相同**的形态:Pro / Pro v2 / Rack P1 / Rack P2 四 SKU 天花板
 //   并列 5280(G6 收同档 = 已知天花板①,见 account-hashrate.ts 文件头)——同算力必
 //   同名次(规格③确定性),那不是分位表能解的,靠 Pro 一档代表 + 机架台数拉开量级。
@@ -456,11 +465,36 @@ function hw(kind, over = {}) {
   const COMPLETE_SEED = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
   const SEED = COMPLETE_SEED.publicStats;
   const SEED_TIERS = COMPLETE_SEED.computeShare.gpuTiers;
-  check("🔴 ⑥ 真种子分位表通过 isValidPercentileTable(tops 严格升序 · cumPct 单调不减 ≤100 · ≥2 档)",
-    isValidPercentileTable(SEED.hashratePercentileTable) === true);
-  check("⑥ 种子表覆盖到最大合理舰队量级(最高档 ≥ 50,000 TOPS,10 台顶配机架 ≈ 52,800)",
-    SEED.hashratePercentileTable[SEED.hashratePercentileTable.length - 1].tops >= 50_000,
-    `最高档 ${SEED.hashratePercentileTable[SEED.hashratePercentileTable.length - 1].tops}`);
+
+  // a) 哨兵钉靶(z1 B7:全零在 members/rank/jitter 域里是合法值 —— 哨兵必须
+  //    「无正数」且「六个健康位全 false」双向成立,后者是行为判据,域改了也追得上)
+  const positives = Object.entries(SEED).filter(([, v]) => typeof v === "number" && v > 0);
+  check("🔴 ⑥a 合成种子 publicStats 无任何正数字段(有人塞了像样的数 = 红)",
+    positives.length === 0, positives.map(([k, v]) => `${k}=${v}`).join(","));
+  const flags = publicStatsHealth(SEED);
+  const trueFlags = Object.entries(flags).filter(([, v]) => v === true);
+  check("🔴 ⑥a 哨兵在 publicStatsHealth 六个维度上全部不可用(任一 true = 哨兵在该维冒充真数据)",
+    trueFlags.length === 0, trueFlags.map(([k]) => k).join(","));
+  check("🔴 ⑥a 合成种子分位表为空表,且 isValidPercentileTable(空表) === false(哨兵必须不可用)",
+    Array.isArray(SEED.hashratePercentileTable) && SEED.hashratePercentileTable.length === 0
+    && isValidPercentileTable(SEED.hashratePercentileTable) === false,
+    `len=${SEED.hashratePercentileTable?.length} valid=${isValidPercentileTable(SEED.hashratePercentileTable)}`);
+
+  // b) fixture 名次固定靶。来源:`git show 819a6da~1:src/mock/platform-config.ts`
+  //    (该 commit 把 publicStats 移出 mock 种子时删除的 10 档表 + 人口基数,逐字抄录)。
+  const FIXTURE_TABLE = [
+    { tops: 5, cumPct: 20 }, { tops: 20, cumPct: 55 }, { tops: 60, cumPct: 82 },
+    { tops: 150, cumPct: 96 }, { tops: 700, cumPct: 97.6 }, { tops: 2_700, cumPct: 98.7 },
+    { tops: 5_400, cumPct: 99.3 }, { tops: 11_000, cumPct: 99.6 }, { tops: 27_000, cumPct: 99.8 },
+    { tops: 53_000, cumPct: 99.9 },
+  ];
+  const FIXTURE_REAL_POPULATION = 1_420_000; // = registeredUsersBase(同 commit 同源)
+  const FIXTURE_VIRTUAL_POPULATION = 12_000; // = virtualUserCount(同上)
+  check("⑥b fixture 分位表通过 isValidPercentileTable(tops 严格升序 · cumPct 单调不减 ≤100 · ≥2 档)",
+    isValidPercentileTable(FIXTURE_TABLE) === true);
+  check("⑥b fixture 表覆盖到最大合理舰队量级(最高档 ≥ 50,000 TOPS,10 台顶配机架 ≈ 52,800)",
+    FIXTURE_TABLE[FIXTURE_TABLE.length - 1].tops >= 50_000,
+    `最高档 ${FIXTURE_TABLE[FIXTURE_TABLE.length - 1].tops}`);
 
   // 标定值取真工厂给的(node 下 = fallbackCapability);undefined 时真模块自会回退,不手抄。
   const phoneFull = phone(createDevice("phone", "fleet-phone").capabilityTops);
@@ -476,38 +510,47 @@ function hw(kind, over = {}) {
     ["手机 + 5× Rack P2", [phoneFull, ...racks(5)]],
     ["手机 + 10× Rack P2(最大合理舰队)", [phoneFull, ...racks(10)]],
   ];
-  // 算力用真聚合现算(档位表用种子配置那份);人口用种子配置,不手抄数字。
+  // 算力仍用真聚合现算(档位表用合成种子那份真配置);名次喂 fixture 表 + fixture 人口。
+  const rankOf = (tops) => computeRank({
+    myTotalHashrate: tops,
+    table: FIXTURE_TABLE,
+    realPopulation: FIXTURE_REAL_POPULATION,
+    virtualPopulation: FIXTURE_VIRTUAL_POPULATION,
+  });
   const rows = FLEETS.map(([label, devices]) => {
     const tops = accountTotalHashrate(devices, NOW, BONUS, SEED_TIERS);
-    const r = computeRank({
-      myTotalHashrate: tops,
-      table: SEED.hashratePercentileTable,
-      realPopulation: SEED.registeredUsersBase,
-      virtualPopulation: SEED.virtualUserCount,
-    });
-    return { label, tops, r };
+    return { label, tops, r: rankOf(tops) };
   });
   console.log(rows.map((x) => `        ${x.label}: ${x.tops} TOPS → ${x.r.kind === "ranked" ? `第 ${x.r.rank} 名(pct ${x.r.percentile.toFixed(3)})` : x.r.kind}`).join("\n"));
-  check("⑥ 固定靶不空转:8 档舰队算力互不相同且严格递增(舰队构造坏了先红这条)",
+  check("⑥b 固定靶不空转:8 档舰队算力互不相同且严格递增(舰队构造坏了先红这条)",
     rows.every((x, i) => i === 0 || x.tops > rows[i - 1].tops),
     rows.map((x) => x.tops).join(" → "));
-  check("🔴 ⑥ 8 档舰队全部 ranked(一个都不许掉成 unranked/unavailable)",
+  check("🔴 ⑥b 8 档舰队全部 ranked(一个都不许掉成 unranked/unavailable)",
     rows.every((x) => x.r.kind === "ranked"),
     rows.map((x) => x.r.kind).join(","));
   const ranks = rows.map((x) => x.r.rank);
-  check("🔴 ⑥ 8 档舰队名次**互不相同**(付费档不再钉死同一个数)",
+  check("🔴 ⑥b 8 档舰队名次**互不相同**(付费档不再钉死同一个数)",
     new Set(ranks).size === ranks.length, ranks.join(" / "));
-  check("🔴 ⑥ 名次随算力**严格前进**(每一档都比上一档靠前,不止「不倒退」)",
+  check("🔴 ⑥b 名次随算力**严格前进**(每一档都比上一档靠前,不止「不倒退」)",
     ranks.every((r, i) => i === 0 || r < ranks[i - 1]), ranks.join(" → "));
-  const beyond = computeRank({
-    myTotalHashrate: 1e9,
-    table: SEED.hashratePercentileTable,
-    realPopulation: SEED.registeredUsersBase,
-    virtualPopulation: SEED.virtualUserCount,
-  });
-  check("🔴 ⑥ 超表顶封顶在最优档名次,且 > 1(规格 异常5:永远给不出「第 1 名」)",
+  const beyond = rankOf(1e9);
+  check("🔴 ⑥b 超表顶封顶在最优档名次,且 > 1(规格 异常5:永远给不出「第 1 名」)",
     beyond.kind === "ranked" && beyond.rank > 1 && beyond.rank <= ranks[ranks.length - 1],
     JSON.stringify(beyond));
+
+  // c) 合法性校验的新宿主。parsePublicStats 未导出(只能经 parsePlatformComputeConfig
+  //    全量 payload 走到,合法 payload fixture 又脆又重)—— 结构钉,剥注释后判:
+  //    <2 档分支必须与 H9_PUBLIC_STATS_RESPONSE_INVALID 同语句;逐行单调墙同错误码。
+  const apiSrc = readFileSync(path.join(SRC, "api", "platform-config-api.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^[ \t]*\/\/.*$/gm, "")
+    .replace(/[ \t]\/\/.*$/gm, "");
+  check("🔴 ⑥c platform-config-api 拒绝 <2 档分位表(!Array.isArray || length < 2 → 抛 H9_PUBLIC_STATS_RESPONSE_INVALID)",
+    /!Array\.isArray\(values\.hashratePercentileTable\)\s*\|\|\s*values\.hashratePercentileTable\.length\s*<\s*2\)[\s\S]{0,40}?invalid\("H9_PUBLIC_STATS_RESPONSE_INVALID"\)/.test(apiSrc),
+    "platform-config-api.ts 里找不到该分支(校验被删/改弱?)");
+  check("⑥c 逐行校验墙也在:tops 严格升序 / cumPct 单调不减,违例抛同一错误码",
+    /tops\s*<=\s*previousTops[\s\S]{0,160}?invalid\("H9_PUBLIC_STATS_RESPONSE_INVALID"\)/.test(apiSrc),
+    "逐行单调校验缺失或错误码漂移");
 }
 
 // ── 接线门:纯函数对 ≠ 有人在用 ─────────────────────────────────────────────
@@ -551,10 +594,11 @@ function hw(kind, over = {}) {
 //   (时间不变 3 条 + 接线 4 条),把它们整组删掉门照样 exit 0(实测)。
 //   留余量的地板等于没有地板。加断言 = 同步改这个数,失败信息里直接写着该改成几。
 // 2026-08-05 修复轮 +15:GPU 档位单源 ×7(行为靶 4 + 源码哨兵 3)+ 8 档舰队名次固定靶 ×7 + 档位表接线 ×1
-const EXPECTED_CHECKS = 81; // 2026-08-06 +2:matchGpuTier 全仓消费面扫描(不空转 + 单参即红)
+// 2026-08-06 +2:matchGpuTier 全仓消费面扫描(不空转 + 单参即红)
+const EXPECTED_CHECKS = 86; // 2026-08-10 z1 +5:⑥ 改制 —— 哨兵钉靶 3(B7 无正数 + 六健康位全 false + 空表)+ fixture 表自证 2 + 校验宿主 2,替换原「真种子表」2 条
 if (pass + fail !== EXPECTED_CHECKS) {
   console.log(`\nFAIL 断言总数 ${pass + fail} ≠ 台账 ${EXPECTED_CHECKS} —— 判据被删/被跳过?若是有意加断言,把 EXPECTED_CHECKS 改成 ${pass + fail}。`);
   process.exit(1);
 }
-console.log(`\n${pass} pass / ${fail} fail(样本:真工厂造的 8 类设备形态 · 6 类非手机天花板固定靶 · 6 档 GPU 型号解析 · 改档/加词双形态 GPU 配置靶 · 8 档参考舰队名次(真种子分位表)· 3 个时刻 + 365 天 · 50 次确定性重跑)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:真工厂造的 8 类设备形态 · 6 类非手机天花板固定靶 · 6 档 GPU 型号解析 · 改档/加词双形态 GPU 配置靶 · 全零哨兵钉靶 + 8 档参考舰队名次(fixture 分位表=819a6da 删除的 10 档种子)· 3 个时刻 + 365 天 · 50 次确定性重跑)`);
 process.exit(fail === 0 ? 0 : 1);
