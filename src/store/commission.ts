@@ -184,7 +184,9 @@ export const useCommission = defineStore("commission", () => {
     if (!remoteApiEnabled) return;
     binarySnapshot.value = null;
     events.value = [];
-    binarySnapshot.value = await commissionConfigApi.binary();
+    try {
+      binarySnapshot.value = await commissionConfigApi.binary();
+    } catch { /* authority unavailable — snapshot stays null and renders the unavailable state */ }
   }
 
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {

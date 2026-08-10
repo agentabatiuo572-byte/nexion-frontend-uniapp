@@ -252,7 +252,6 @@ function onClaim() {
   position: relative;
   overflow: hidden;
   background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2));
-  border: 1px solid color-mix(in srgb, var(--v5-brand) 32%, transparent);
 }
 .tcs-hero-grid {
   position: absolute;
