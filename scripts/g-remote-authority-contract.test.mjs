@@ -6,6 +6,18 @@ import test from "node:test";
 const root = path.resolve(import.meta.dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
+/** 按大括号配对抠出某个顶层 i18n 命名空间的正文;抠不到就抛,不返回空串(空集会让断言全过)。 */
+function namespaceBlock(source, name) {
+  const start = source.search(new RegExp(`^  ${name}: \\{`, "m"));
+  assert.ok(start >= 0, `i18n 词典里找不到命名空间 ${name} —— 判据失效,按红处理`);
+  let depth = 0;
+  for (let i = source.indexOf("{", start); i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    else if (source[i] === "}") { depth -= 1; if (depth === 0) return source.slice(start, i + 1); }
+  }
+  assert.fail(`命名空间 ${name} 的大括号未闭合 —— 判据失效,按红处理`);
+}
+
 test("G1 remote mode consumes the server staking authority and fails closed", () => {
   const source = read("src/store/staking.ts");
   assert.match(source, /import\s*\{[^}]*stakingApi[^}]*remoteApiEnabled[^}]*\}\s*from\s*["']@\/api\/runtime["']/);
@@ -31,13 +43,26 @@ test("G2 remote mode never records a local wallet success", () => {
   //    页面渲染空白而门报绿(红测实测出来的洞)。
   assert.match(source, /t\.exchange\.remoteUnavailableClosed\b(?!\w)/);
   assert.match(source, /remoteState\.value\?\.orders/);
-  assert.match(source, /remote mode must never render persisted exchange or v3 facts/);
+  // 🔴 判据必须锚**行为**,不能锚注释:原本这里只断言「那句注释还在不在」,红测实测把
+  //    displayUserUsed 改成直接渲染本地持久计数、注释原样留着 —— 四道门全绿。
+  //    逐个锚住四个展示派生值的 `remoteApiEnabled ? 远端值 : 本地值` 形状。
+  for (const derived of ["displayUserUsed", "displayPlatformUsed", "displayUserCap", "displayPlatformCap"]) {
+    assert.match(
+      source,
+      new RegExp(`const ${derived} = computed\\(\\(\\) => remoteApiEnabled \\? \\(?remoteState\\.value\\?\\.`),
+      `${derived} 必须在远端模式下只读 remoteState —— 远端模式渲染本地持久事实会把 stale 额度当权威值展示`,
+    );
+  }
   assert.match(source, /t\.exchange\.remoteNotProvided\b(?!\w)/);
   // 锚 key 就必须同时锚「key 有值」,否则指向一个不存在的键也能绿(悬空 key = 页面渲染空白)。
+  // 🔴 必须**按命名空间取值**,不能对整份词典做子串匹配:remoteUnavailableClosed 在 exchange
+  //    与 staking 两个命名空间里都存在,整文件匹配时把 exchange 那条清成空串,staking 那条会
+  //    替它满足断言 —— 独立审计红测实测「四道门同时绿而横幅渲染空白」。
   for (const locale of ["en", "zh", "vi"]) {
     const dict = read(`src/i18n/messages/${locale}.ts`);
+    const ns = namespaceBlock(dict, "exchange");
     for (const key of ["remoteUnavailableClosed", "remoteNotProvided"]) {
-      assert.match(dict, new RegExp(`${key}:\\s*"[^"]+"`), `${locale}.ts 缺 exchange.${key} 或值为空`);
+      assert.match(ns, new RegExp(`\\b${key}:\\s*"[^"]+"`), `${locale}.ts 的 exchange 命名空间缺 ${key} 或值为空`);
     }
   }
   const remoteCommand = source.indexOf("if (remoteApiEnabled) {", source.indexOf("async function handleConfirm"));
