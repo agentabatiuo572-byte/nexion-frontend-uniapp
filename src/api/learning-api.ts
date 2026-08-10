@@ -10,7 +10,7 @@ export interface LearningApi {
   course(courseId: string, language: string): Promise<LearningCourse>;
   start(courseId: string, language: string): Promise<LearningCourse>;
   submitQuiz(courseId: string, answers: number[], idempotencyKey: string): Promise<LearningResult>;
-  complete(courseId: string): Promise<LearningResult>;
+  complete(courseId: string, idempotencyKey: string): Promise<LearningResult>;
 }
 function invalid(): never { throw new ApiError({ kind: "protocol", message: "LEARNING_RESPONSE_INVALID" }); }
 function record(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) return invalid(); return value as Record<string, unknown>; }
@@ -30,5 +30,7 @@ export function createLearningApi(client: ApiClient): LearningApi { return {
   course: async (courseId, language) => course(await client.request({ method: "GET", path: `/api/content/learning/courses/${encodeURIComponent(id(courseId))}?language=${encodeURIComponent(language)}` })),
   start: async (courseId, language) => course(await client.request({ method: "POST", path: `/api/content/learning/courses/${encodeURIComponent(id(courseId))}/start?language=${encodeURIComponent(language)}` })),
   submitQuiz: async (courseId, answers, idempotencyKey) => result(await client.request({ method: "POST", path: `/api/content/learning/courses/${encodeURIComponent(id(courseId))}/quiz`, idempotencyKey: key(idempotencyKey), body: { answers } })),
-  complete: async (courseId) => result(await client.request({ method: "POST", path: `/api/content/learning/courses/${encodeURIComponent(id(courseId))}/complete` })),
+  // 发 NEX 的 POST 必须带幂等键(与 quest/voucher/event 各 claim 同规格):无键时网络重试
+  // 会被服务端当成两次领取。key() 校验长度,空键直接抛,不静默降级成「没有幂等」。
+  complete: async (courseId, idempotencyKey) => result(await client.request({ method: "POST", path: `/api/content/learning/courses/${encodeURIComponent(id(courseId))}/complete`, idempotencyKey: key(idempotencyKey) })),
 }; }
