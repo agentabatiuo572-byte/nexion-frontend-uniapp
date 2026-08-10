@@ -310,11 +310,22 @@ sentinel_present "wallet dev reset UI is DEV-only" src/pages/me/wallet-withdraw.
 # z1 判决 A(2026-08-10):a8f57f4 把 guard 加强为 `PROD || remoteApiEnabled`,旧判据钉死
 # 单条件整串被正常加强撞红。改锚「函数级 PROD 守卫 ≥2 处」(两个 _dev reset 都要有),
 # 允许附加析取;剥注释防注释哄绿;0/1 处即红。
-payout_guard_sites=$(sed 's|//.*||' src/store/payout-address.ts | tr -d '\r' | grep -cE 'if \(import\.meta\.env\.PROD[^)]*\) return')
-if [ "${payout_guard_sites:-0}" -ge 2 ]; then
-  ok "payout-address dev reset store has PROD guard (×${payout_guard_sites},允许 || remoteApiEnabled 加强)"
+# 🔴 逐函数验,不数总数(z1 R2 独立审计:数总数会被「一个函数里写两遍守卫、另一个函数
+# 守卫被删」骗过)。剥行注释与块注释,防注释里的守卫字面哄绿。
+payout_guard_miss=""
+payout_src=$(sed 's|/\*[^*]*\*/||g; s|//.*||' src/store/payout-address.ts | tr -d '\r')
+for fn in _devClearRestrictions _devResetAddresses; do
+  body=$(echo "$payout_src" | sed -n "/function ${fn}(/,/^  }/p")
+  if [ -z "$body" ]; then
+    payout_guard_miss="${payout_guard_miss}${fn}(函数体抠不到) "
+  elif ! echo "$body" | grep -qE 'if \(import\.meta\.env\.PROD[^)]*\) return'; then
+    payout_guard_miss="${payout_guard_miss}${fn}(无 PROD 守卫) "
+  fi
+done
+if [ -z "$payout_guard_miss" ]; then
+  ok "payout-address 两个 dev reset 各自函数体内都有 PROD 守卫(允许 || remoteApiEnabled 加强)"
 else
-  bad "payout-address dev reset PROD guard 应 ≥2 处(_devClearRestrictions + _devResetAddresses),实得 ${payout_guard_sites:-0}"
+  bad "payout-address dev reset PROD 守卫缺失: $payout_guard_miss"
 fi
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
@@ -553,7 +564,9 @@ sentinel_present "SPEC-7 wallet card reads earning buckets" src/components/me/wa
 # z1 判决 A:2026-07-31「上限=总余额」规则被 D5 server-canonical 新规则取代 ——
 # 可提上限 =(总余额 − 服务端 held 两桶)× policy.balanceMaxRatio,且 clusterRestricted /
 # 无快照 / 无 policy 三态一律 fail-closed 归 0。判据钉四个承重构件,不钉整串表达式。
-wd_avail_src=$(sed -n '/const maxWithdrawable = computed/,/});/p' src/pages/me/wallet-withdraw.vue | tr -d '\r')
+# 🔴 必须剥注释再判(z1 R2 独立审计):不剥的话「旧口径备查」式注释就能让四个构件全命中,
+# 而实现里 fail-closed 已被删光 —— 资金路径上的注释哄绿。同文件 payout / AUTH03 两块的家法。
+wd_avail_src=$(sed -n '/const maxWithdrawable = computed/,/});/p' src/pages/me/wallet-withdraw.vue | sed 's|//.*||' | tr -d '\r')
 wd_avail_miss=""
 [ -n "$wd_avail_src" ] || wd_avail_miss="${wd_avail_miss}computed-block-missing "
 echo "$wd_avail_src" | grep -q 'clusterRestricted) return 0' || wd_avail_miss="${wd_avail_miss}cluster-zero "
@@ -595,11 +608,14 @@ sentinel_present "SPEC-7 tracking has frozen hold variant" src/pages/me/wallet-w
 # ① 页面提交前 reject 闸;② API 回包白名单不含 reject(服务端若回 reject 即协议错);
 # ③ store 提交函数结构上不再写任何余额字段(负向断言,candidates 缺失即红)。
 sentinel_present "SPEC-7 reject route blocks before submit (page gate)" src/pages/me/wallet-withdraw.vue 'fresh\.route === "reject"'
-wd_routes_src=$(sed -n '/const allowedRiskRoutes = new Set/,/\]);/p' src/api/withdrawal-api.ts | tr -d '\r')
-if [ -n "$wd_routes_src" ] && ! echo "$wd_routes_src" | grep -q '"reject"'; then
-  ok "SPEC-7 API risk-route whitelist has no reject (server reject → protocol error)"
+wd_routes_src=$(sed -n '/const allowedRiskRoutes = new Set/,/\]);/p' src/api/withdrawal-api.ts | sed 's|//.*||' | tr -d '\r')
+# 🔴 白名单在场 ≠ 白名单被消费(z1 R2 独立审计:摘掉校验行,白名单常量照样在)。
+# 两条合取:① 白名单不含 reject;② parseSubmission 真的拿它拒单。
+wd_routes_used=$(sed 's|//.*||' src/api/withdrawal-api.ts | tr -d '\r' | grep -cE '!allowedRiskRoutes\.has\(')
+if [ -n "$wd_routes_src" ] && ! echo "$wd_routes_src" | grep -q '"reject"' && [ "${wd_routes_used:-0}" -ge 1 ]; then
+  ok "SPEC-7 API risk-route whitelist has no reject 且被消费(拒单点 ×${wd_routes_used})"
 else
-  bad "SPEC-7 allowedRiskRoutes 白名单缺失或含 reject(白名单块提取 ${#wd_routes_src} 字节)"
+  bad "SPEC-7 allowedRiskRoutes 白名单缺失/含 reject/未被消费(块 ${#wd_routes_src} 字节,消费点 ${wd_routes_used:-0})"
 fi
 wd_submit_body=$(sed -n '/async function submitWithdrawal(/,/^  }/p' src/store/app.ts | tr -d '\r')
 if [ -n "$wd_submit_body" ] && ! echo "$wd_submit_body" | grep -qE 'usdtBalance *[-+:=]|earningBuckets:'; then
@@ -609,7 +625,7 @@ else
 fi
 # z1 判决 A:「风控路由→队列状态」映射换输入源 —— 服务端 status 经 canonicalStatus()
 # 白名单映射(FROZEN→frozen 等),未知值必须抛协议错(禁静默降级为 submitted)。
-wd_status_src=$(sed -n '/function canonicalStatus(/,/^}/p' src/api/withdrawal-api.ts | tr -d '\r')
+wd_status_src=$(sed -n '/function canonicalStatus(/,/^}/p' src/api/withdrawal-api.ts | sed 's|//.*||' | tr -d '\r')
 wd_status_miss=""
 [ -n "$wd_status_src" ] || wd_status_miss="fn-missing "
 echo "$wd_status_src" | grep -q '"FROZEN"' || wd_status_miss="${wd_status_miss}frozen "
@@ -1819,11 +1835,19 @@ platform_stats_anchor() {
   #      Never replace it with plausible data」—— H9 在服务端投影到达前必须保持不可用。
   #      新不变量:compat 的 publicStats 默认块不得出现任何非零可信值(空表也不得填充);
   #      块提取失败同样红(判据失效不许静默过)。
-  compat_ps=$(sed -n '/RUNTIME_PUBLIC_STATS_DEFAULT/,/^};/p' src/lib/platform-config-compat.ts | tr -d '\r')
+  # 🔴 白名单式判据(z1 R2 独立审计:原「禁 [1-9]」是黑名单,被 `fleetDevices: PLAUSIBLE_FLEET`
+  #    具名常量 / `0.4` 小数 / `0xC350` 十六进制整族绕过)。改成:块内每个字段值只许是
+  #    0 / -1 / [] 三种形态,其余一律红。awk 只取**第一个**块(sed 的 /a/,/b/ 会在第二次
+  #    出现处重开区间一路吃到文件尾,实测抓到半个文件 —— 那才是判据真正的失效面)。
+  compat_ps=$(awk '/RUNTIME_PUBLIC_STATS_DEFAULT/{f=1} f{print} f&&/^};/{exit}' src/lib/platform-config-compat.ts | sed 's|//.*||' | tr -d '\r')
   if [ -z "$compat_ps" ]; then
     bad "platform-anchor: compat publicStats 默认块提取失败(判据失效必红)"; fails=1
-  elif echo "$compat_ps" | sed 's|//.*||' | grep -qE ': *[1-9]'; then
-    bad "platform-anchor: compat publicStats 默认出现非零可信值 —— H9 必须保持 invalid sentinel"; fails=1
+  else
+    compat_bad=$(echo "$compat_ps" | grep -E '^\s+\w+:' | grep -vE '^\s+\w+: *(0|-1|\[\]),?\s*$' || true)
+    if [ -n "$compat_bad" ]; then
+      bad "platform-anchor: compat publicStats 默认字段值只许 0 / -1 / [](H9 必须保持 invalid sentinel),越界项:"
+      echo "$compat_bad" | sed 's/^/        /'; fails=1
+    fi
   fi
   # joiners/fleet 的健康门控接线(z1):坏配置必须落 '—' 占位,不许渲染像真数字。
   if ! sed -E 's|(^\|[^:])//.*$|\1|' src/pages/ref/code.vue 2>/dev/null | grep -q 'membersOk'; then

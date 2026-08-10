@@ -15,8 +15,8 @@
 | 4 | bare login-entry chrome runtime geometry | A(共因) | 18 页×2 视口全部几何断言通过,仅 console 断言红=启动期 3 个 unhandled rejection(B1)+ suite 从未声明 dev server 需 mock 模式 | B1 修复 + verify.sh 焊「server 必须 mock 模式」前置断言(构造性:探不到模式即红) |
 | 5 | payout-address PROD guard | A | 守卫仍在且**加强**:`if (import.meta.env.PROD \|\| remoteApiEnabled) return false`×2(payout-address.ts:296/308,a8f57f4);老判据钉死单条件字面 | 重锚:函数体内 `import.meta.env.PROD` 出现在守卫 return 且允许附加合取/析取;0 候选即红;两处都验 |
 | 6 | SPEC-7 riskScore cloned | A | 克隆逻辑 819a6da 搬进 compat(platform-config-compat.ts:64-67),写法同款(seed 展开),覆盖面更全;config store 经 completePlatformConfigSeed 初始化(config.ts:20) | 新 selfcheck-config-compat.mjs 行为断言:合成两次互不污染+改合成物不污染种子 |
-| 7 | SPEC-7 release ledger exists (R1) | C | c37e642 客户端释放引擎整体让渡后端:LEDGER_KEY/readLedger/writeLedger 删,appendLedgerEntry 成 `return false` 空壳;快照改 shallowRef+GET /api/earnings/release-status(earning-release.ts 15-39) | 显式删门。**连带处置殉葬绿门**:verify.sh:405-416 一带钉空壳调用的 journal×2/attest/release 哨兵同批退役(绿但守死代码=假绿);替代=新链 hard-block-k1 契约+earnings-release-api 协议校验。HANDOFF:服务端账本义务 |
-| 8 | SPEC-7 cluster circuit breaker (R1) | C | clusterBreakerTripped 函数+调用整删;替代=服务端下发 clusterRestricted(earnings-release-api.ts:10/34/55),唯一消费 wallet-withdraw.vue:406 归零可提;新链 hard-block-k1 已钉 4 条 | 显式删门,提交信息写明替代;消费点归零行为并入 #10 新判据 |
+| 7 | SPEC-7 release ledger exists (R1) | C | c37e642 客户端释放引擎整体让渡后端:LEDGER_KEY/readLedger/writeLedger 删,appendLedgerEntry 成 `return false` 空壳;快照改 shallowRef+GET /api/earnings/release-status(earning-release.ts 15-39) | 显式删门。**连带处置殉葬绿门**:verify.sh:405-416 一带钉空壳调用的 journal×2/attest/release 哨兵同批退役(绿但守死代码=假绿);替代=**本包已接入 npm run verify 的契约套件**(run-contract-suite:hard-block-k1 四条钉 clusterRestricted)+earnings-release-api 协议校验 —— V1-P0-1 更正:接入前它是无链执行的孤儿,原表述属空头支票。HANDOFF:服务端账本义务 |
+| 8 | SPEC-7 cluster circuit breaker (R1) | C | clusterBreakerTripped 函数+调用整删;替代=服务端下发 clusterRestricted(earnings-release-api.ts:10/34/55),唯一消费 wallet-withdraw.vue:406 归零可提;契约套件里的 hard-block-k1 已钉 4 条(本包接入前是孤儿) | 显式删门,提交信息写明替代;消费点归零行为并入 #10 新判据 |
 | 9 | AUTH03 captchaAlwaysScenes seed pin | A | 键从种子移出(otpGate 5 键),compat 运行时默认 `["register"]`(platform-config-compat.ts:35/43-45/70);种子类型改 Partial;消费链经 config store 合成配置闭合 | selfcheck-config-compat:合成后 captchaAlwaysScenes 含 "register"(行为断言,种子若显式覆盖为空必红);AUTH03 wiring 哨兵(470-490)不动 |
 | 10 | withdraw available = total balance | A | 2026-07-31 规则被新规则取代:(总余额−服务端 held 两桶)×balanceMaxRatio,clusterRestricted/无快照/无 policy 三态 fail-closed 归 0(wallet-withdraw.vue:405-412) | 重锚:钉 fail-closed 结构(三个归 0 分支+乘比率),不钉字面表达式 |
 | 11 | SPEC-7 reject route never debits | A | 本地扣款链删除(「never debits」结构性成立);reject 闸移页面提交前(wallet-withdraw.vue:942)+API 白名单不含 reject(withdrawal-api.ts:91-98 回包校验) | 重锚三合一:页面 pre-submit reject 闸在+API allowedRiskRoutes 无 reject+submitWithdrawal 函数体无余额写入(负向结构断言) |
@@ -41,7 +41,7 @@
 | 30 | platform-anchor: trust.vue 27,150 | C | Q2 字面量整删:QTR_FINANCIALS=[]+模板段 v-if="false"(trust.vue:46/279);披露改远端 trustSectionApi 按地区下发;admin-ops 侧同字段已服务端化(i4-trust.tsx:91),字面量 0 命中 | 显式删门(连同 $47.0M 与 admin data.ts 镜像判据);对照锚在停更仓,概念整体废弃 |
 | 31 | platform-anchor: trust.vue $47.0M | C | 同 #30 | 同 #30 |
 | 32 | sampling evidence(learn 2 页) | B6 | 门正当拦截:c37e642 仅有的两个新增页面 learn/courses+learn/course 无走查证据;证据体系最新体(plan/auditor/corpus)仍在 Nexion-admin-prototype,admin-ops 副本是旧子集(缺 UNI-FR-11/12+空心证据检查) | 给 2 页补采样证据(prototype 仓 corpus+shard 计划登记);体系迁 admin-ops 作为拍板项报主人 |
-| 33 | 四边描边容器(3 违例) | A+B2+B3 | ①genesis dock 禁用态:allowlist cls 钉了启用态类串,禁用态掉 active:scale 类→miss(元素本身已被豁免)→A 放宽 cls 匹配;②tcs-hero:1px brand 描边违《03》§3,被 voucher 弹层让位暴露→B3 删描边;③stake-alt 卡:渲染条件被 policy-null 回退削弱(0≥0 恒真),空表单即渲染→B2 收条件 amountNum>0 | ①改 allowlist 条目;②③产品修+门不动(zero-border 门本身工作正常) |
+| 33 | 四边描边容器(3 违例) | B2+B3+产品修 | ①genesis dock 禁用态:allowlist cls 钉了启用态类串,禁用态掉 active:scale 类→miss(元素本身已被豁免)→A 放宽 cls 匹配;②tcs-hero:1px brand 描边违《03》§3,被 voucher 弹层让位暴露→B3 删描边;③stake-alt 卡:渲染条件被 policy-null 回退削弱(0≥0 恒真),空表单即渲染→B2 收条件 amountNum>0 | ①**实际处置=产品修**(genesis dock 禁用态 border:none),非改 allowlist —— V1-P1-1 更正;②③产品修+门不动(zero-border 门本身工作正常) |
 | 34 | dom-qa 新 DOM 违例 | A(共因) | 5 路由 DOM 违例 0(gate=0 info=0);红=coverage 前置的 pageerror(B1 噪声) | B1 修复+mock 前置;dom-qa 门不动。附:team 页 25 节点疑点记走查清单 |
 | 35 | 兑换/创世重入守卫 | A | B④ 资金原语命中 0=创世购买让渡后端原子事务(purchase-sheet.vue:167-204,不再本地扣款);:580 needle 掉 async 前缀致 transform 崩 | 重写:锁点须在 `await genesis.purchase` 前+needle 换 async 形态+双击固定靶用 stub genesisApi 数调用次数(恰 1) |
 | 36 | P1 涉钱/配额乐观并发(money-cas) | A | harness 缺 shallowRef(stub 单源化已修);真断言浮出 3 红:voucher/daily-powerup/nex-faucet 的 remote-apply 缝(clearRemoteFacts/refreshRemote 等)是「sync+bindAccount」外第三类赋值,remote-gated(voucher.ts:99-105 首行守卫) | stub 单源化(scripts/lib/harness-stubs.mjs,runtime 导出面从磁盘扫)+判据扩第三类:remote-apply 函数需自带 remoteApiEnabled 守卫才豁免 |
@@ -73,14 +73,48 @@
 - **采样证据**:Nexion-admin-prototype 仓 commit `b702df4`(落在其当前所在分支 `rhythm-configurable`,未推送——门读工作树文件不受分支影响;归置留主人定)。
 - **相邻发现(未在 43 门内,已立案未擅修)**:① learn 双页整页硬编码中文(i18n 违规)→ 任务芯片 task_245aaf60;② SPEC-7 param key/value parity 两条绿门仍锚停更仓 Nexion-admin-prototype 的 compute-config.ts(值得迁 admin-ops,涉对侧文件结构差异,留拍板);③ c37e642 新增的远端契约测试(g/h-remote-authority、hard-block-auth/d5/h9/k6、h9-visible-user-method)**两条链都没接**(孤儿;h-remote 还需 nexion-backend 兄弟仓,本机缺);④ team 页 runtime 仅渲染 25 节点(其它 tab 572-693),疑似 remote 化后空壳,待实景走查确认。
 
+## 独立验收三路(2026-08-10 夜,报告存证)
+
+派三路只读独立 agent,派单未暗示期望结论。结果与处置:
+
+| 路 | 范围 | 结论 | 我的处置 |
+|---|---|---|---|
+| V2 代码评审 | 本包 8 项 B 修的产品代码 | CRITICAL 0 / HIGH 0,Approve;独立复现 B8 爆炸半径(修前**任何被风控路由的新用户注册**领礼包必抛错) | 采纳 M3(两处失效注释);**驳回** M1(catch 里加 console.error —— 会让 remote 无后端时全部「console error=0」探针变红,得不偿失,正解是 error ref 上浮到 UI,属产品决策);**驳回** L1(删「孤儿」i18n key —— slacopy 门仍在断言它们,删了门就瞎) |
+| V1 判决表审计 | 判决表 43 行 vs 实施(抽核 37 行,B 8/8 · C 7/7 · A 29/30) | 1 P0 + 3 P1 + 5 P2;14 个门只读复跑全绿且 pass 数与表逐一吻合 | P0-1 已修(见下);P1/P2 全部落表更正 |
+| V3 判据强度对抗 | 对每条新判据构造「缺陷仍在但判据仍绿」的绕法 | 4 P0 + 21 P1 + 11 P2;**同时确认「候选为 0 必判红」这条铁律本包全部落实到位,无一处「扫不到=没违规」** | 见下分层处置 |
+
+### 已修(本轮)
+
+- **V1-P0-1 · 空头支票**:表里把 hard-block-k1 当 C 类删门的「替代防线」,但它和另 7 个契约测试**两条链都没接**。根因不是「谁忘了接」,是这个仓的测试文件**天然可以变成孤儿**。→ 新建 `scripts/run-contract-suite.mjs` 登记门:每个 `scripts/*.test.mjs` 必须显式登记归属(chain 7 / elsewhere 5 / excluded 1+原因),未登记即红;接进 `npm run verify`。红测:新建一个未登记测试文件 → 判红。h-remote-authority 因依赖本机不存在的 `nexion-backend` 兄弟仓,登记为 excluded 并记 HANDOFF(不假装它在跑)。
+- **V3-P1-5/7/8/9/10 · 我自己引入的判据洞**:新写的 withdraw fail-closed / canonicalStatus / allowedRiskRoutes / payout PROD 守卫 / compat 哨兵五块**没继承本仓「剥注释再判」的家法**,注释即可哄绿;白名单只验在场不验被消费;PROD 守卫数总数不分函数;compat 用黑名单正则被具名常量绕过。→ 五处全部重写(剥注释 · 加消费点断言 · 逐函数验 · 黑名单改白名单「只许 0/-1/[]」· sed 区间改 awk 取首块)。compat 那条红测:注入 `fleetDevices: PLAUSIBLE_FLEET` → 旧判据放过、新判据判红。
+- **V3-P0-1 · 绿着守死代码 + 连带活缺陷**:fastlane 三条断言钉着零调用的 `claimWithdrawSlot` 内部实现。→ 退役三条,换一条「仍无调用方 + 复活须同批恢复三条实现级断言」(扫描面为空必红);产品侧缺陷单独立案(见下)。
+
+### 相邻发现:4 个活缺陷,超出 43 门范围,均已回源坐实并立案(不由我单方面改)
+
+均为 c37e642 引入、两条链都看不见。前三条已建任务卡,第 4 条并入卡 B:
+
+| # | 缺陷 | 回源证据 | 性质 |
+|---|---|---|---|
+| 1 | **提现日限客户端预检恒不触发**:计数器唯一写入方 `claimWithdrawSlot` 全站零调用 → `todayWithdrawCount` 恒 0 → `dailyLimitReached` 恒 false,而页面仍渲染「每日最多 N 笔」并留着置灰分支 | withdraw-daily-count.ts:86/:121 零调用 · eligibility.ts:99 · core:457 · wallet-withdraw.vue:250/:782/:948 | 体验/承诺与实现不符(服务端才是真闸);作为**门**的问题是 P0(套件全绿地放行) |
+| 2 | **服务端 publicStats 被解析后丢弃**:`config.ts` 的 merge 不含 publicStats → 全部 16 个消费点永久走「不可用」分支 | platform-config-api.ts 完整校验 · config.ts:70-76 无该字段 | 产品数字永远显示占位;且全套件**无任何门**守「服务端值有路径进 store」 |
+| 3 | **可提现口径三处分裂**(2026-07-31 老坑结构性复发):提现页扣 held 两桶再乘比率,钱包页/钱包卡片仍显示裸总余额;且存活的 `withdrawable_source_parity` 门**锁死了这个分裂**(谁去统一口径,门反而红) | wallet-withdraw.vue:405-412 vs wallet.vue:172 / wallet-card.vue:121 · verify.sh:570-583 | 用户看到的数 ≠ 能提的数 |
+| 4 | **小额免审注释说停用、实际在线**:`smallAmountLine≡0` 只让 CTA 不可达,真判定走 `rules.smallAmountThresholdUsd`(compat 仍 50)→ ≤$50 仍免掉首提必审与新地址 hold | wallet-withdraw.vue:660 注释 vs core:388 `isFastLane` · compat:24 | 客户端风控预检与注释矛盾,需产品口径 |
+
+### 未修:留给主人定轮次(V3 剩余 P1/P2 共 ~28 条)
+
+按价值排序的前几条:①`selfcheck-remote-refresh-resilience` 的缝扫描漏带参 `void fn(id)`、成员调用与箭头函数写法,且覆盖度是 `>=3` 下限而非基数台账(应改台账 + 扩扫 .vue/composables/lib);② `money-receipt` 的 `EXPORTS` 与 `money-cas` 的 `PERSISTED_REFS` 仍是手抄清单(应照 `harness-stubs` 的磁盘扫写法);③ 本包 11 个脚本里 10 个没有断言基数台账(删断言不会红 —— 本包自己一次删了 15 条没有任何门变红);④ `money-cas` 的 remote-apply 守卫是「一行可自由添加的标记」;⑤ trust Q2 禁令只禁两个旧字面量,新起一组本地财务数据照样过;⑥ brand 白名单三个新增项是**整行**豁免,src 里一条注释就能开洞。
+**这些是判据强度问题,不是当前有缺陷**;是否再开一轮由主人定(项目铁律:轮次不由 main 或 agent 决定)。
+
 ## 收口决定(推荐,待主人拍板 —— 本包未执行)
 
 **推荐:接回,不退役。** `npm run verify` 末尾串 `bash scripts/verify.sh`,并把孤儿契约测试同笔接入;拆细见收尾报告的拍板项(含代价/风险/不做会怎样)。核心理由:① 本包已把 43 红清零、判据全部构造化+红测,套件恢复资产状态;② 两链已有真实重叠(老套件末检=新链 verify-h5-runtime 同款自起隔离 server),接回只增不冲突;③ 「留着不跑=假装有门」在本仓 3 天内已实证三次(新链架空老套件 / 43 红无人跑 / 新契约测试无链可跑),不接回必然复发。
 
 ## HANDOFF 义务清单(随包写入后台仓交接书)
 
+0. **admin 侧数组参数登记**:captchaAlwaysScenes 需登记进 admin compute-config(其 OtpGateParamDef 是 number 单形态,数组参数要加宽类型+K2 渲染+defaultVal),登记后按 verify.sh 注释两步接进值 parity 循环(V1-P1-2 更正:此项原声称已记但清单里没有)。
 1. POST /api/withdrawals 服务端事务内:重读落盘余额(幂等键≠并发闸)、拒 NaN/≤0 金额、reject 路由零扣款、费用与 policyVersion 交叉核对。
 2. 收益释放:服务端账本+熔断(clusterRestricted)为唯一权威;客户端已只读。
 3. 创世邀请码:一码一用/一账号一次改服务端强制。
 4. `x-nexion-edge-country` header 名含旧品牌,改名需后端同步(client 测试跟随)。
 5. 采样证据体系(l1-shards/auditor/corpus)仍在停更的 Nexion-admin-prototype,是否迁 admin-ops 待拍板。
+6. `h-remote-authority-contract.test.mjs` 断言读兄弟仓 `../nexion-backend` 的 Java 源,本机无该 checkout —— 已在契约套件登记为 excluded(不假装它在跑),需在有后端仓的环境单跑。

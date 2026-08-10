@@ -43,7 +43,8 @@
     "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
     "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
-    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime"
+    "test:contracts": "node scripts/run-contract-suite.mjs",
+    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:contracts && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

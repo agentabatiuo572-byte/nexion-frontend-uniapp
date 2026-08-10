@@ -16,7 +16,7 @@
 // 词法检查永远追不上控制流。改测行为后,上述四种**全部会被抓到** ——
 // 因为它们要成为漏洞就必须改变路由结果,而路由结果正是这里断言的东西。
 // 反过来:不改变行为的改法本来就不是漏洞,不该报红。
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { transformSync } from "esbuild";
@@ -602,16 +602,30 @@ function functionBody(src, sig) {
     })());
   check("🔴 commitWithdrawal 不再事后计数(挪回去 = 把并发漏洞放回去)",
     !/bumpWithdrawCounter\s*\(/.test(elgSrc));
-  check("🔴 claimWithdrawSlot 的判定来自 core 的 claimDailySlot(不在存储层自己写规则)",
-    cntSrc.includes("claimDailySlot(readWithdrawCounter(accountKey), limitCount, now)"));
-  check("🔴 占用必须**写入后回读验令牌**(跨渲染进程 localStorage 非原子,复验 12/12 打穿过纯同步版)",
-    cntSrc.includes("isClaimOwner(readWithdrawCounter(accountKey), token)")
-      && /await new Promise<void>\(\(r\) => setTimeout\(r, CLAIM_SETTLE_MS\)\)/.test(cntSrc));
-  check("🔴 回读等待时长留足余量(实测危险窗口 ≈5ms,门槛设 ≥100ms)",
-    (() => {
-      const m = cntSrc.match(/export const CLAIM_SETTLE_MS = (\d+);/);
-      return !!m && Number(m[1]) >= 100;
-    })());
+  // 【z1 R2 独立审计 P0-1,2026-08-10】原三条断言(claimDailySlot 判定来源 / 写后回读验令牌 /
+  // CLAIM_SETTLE_MS ≥100ms)钉的是 claimWithdrawSlot 的**内部实现**,而 c37e642 之后
+  // 该函数在 src/ 全站零调用 —— 绿着守死代码(与本包判定 appendLedgerEntry 空壳同病)。
+  // 🔴 更重的是它连带的活缺陷:计数器无人递增 → todayWithdrawCount 恒 0 →
+  //    dailyLimitReached 恒 false,而页面仍在渲染「每日最多 N 笔」并留着置灰分支。
+  //    日限的真正执行方已是服务端(policy.dailyLimitCount);客户端预检形同虚设。
+  //    产品侧修法(从服务端镜像的提现列表按平台日现算)已记 HANDOFF,不在本包动。
+  // 这里改守「死透」+「复活必须连门一起复活」:任何人重新接线 claimWithdrawSlot,
+  // 这条会红,逼他把上面三条实现级断言一并恢复(知识留在机器里,不留在人脑里)。
+  {
+    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+      const p = path.join(dir, e.name);
+      return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
+    });
+    const files = walk(path.join(root, "src"));
+    // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
+    check(`🔴 claimWithdrawSlot 死态扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
+    const callers = files
+      .filter((p) => !p.endsWith(path.join("store", "withdraw-daily-count.ts")))
+      .filter((p) => /\bclaimWithdrawSlot\s*\(/.test(readFileSync(p, "utf8").replace(/^[ \t]*\/\/.*$/gm, "")))
+      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
+    check("🔴 claimWithdrawSlot 仍无调用方(客户端日限已让渡服务端;若复活,须同批恢复其判定/回读/时长三条实现级断言)",
+      callers.length === 0, callers.join(", "));
+  }
   // 🔴 双向告知的接线门。判定再准,页面不接 = 用户看不见(走查实证:快车道跑了
   // 一整轮,表单一个字都没提,用户以为「提多少都要审」)。两条判据都必须来自判定结果。
   const pgSrc = readSrc("src/pages/me/wallet-withdraw.vue");
