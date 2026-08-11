@@ -233,7 +233,16 @@ const purchaseBody = strip(grabBlock(strip(shRaw), "async function handlePurchas
   const iSubmitP = purchaseBody.indexOf("await genesis.purchase(");
   check("B④ 上锁点在提交动作之前(purchasing.value = true 先于 await genesis.purchase;锚点抠不到即红)",
     iLockP >= 0 && iSubmitP >= 0 && iLockP < iSubmitP, `lock@${iLockP} submit@${iSubmitP}`);
-  const MONEY_PRIMS = ["app.captureMoney()", "postMoneyBill(", "app.debitBalance(", "app.debitNex(", "app.creditBalance("];
+  // 🔴 原清单 5 项漏掉 4 个真实出口(z1 R2 对抗审计 P1-20):`"postMoneyBills(".includes("postMoneyBill(")`
+  //    是 **false**(后面跟的是 s 不是括号),于是 postMoneyBills / postMoneyBillsOnce /
+  //    postReceiptOnly / postReceiptOnce / app.creditNex 全部漏网,本地扣款可以照常复活。
+  //    收口点那半从**磁盘扫**(与 money-receipt 同一份真相),app.* 原语按前缀匹配。
+  const chokepointExports = [...receiptRaw.matchAll(/^export (?:async )?function (post\w+)/gm)].map((m) => `${m[1]}(`);
+  if (chokepointExports.length < 3) throw new Error(`收口点导出面只扫到 ${chokepointExports.length} 个 —— 判据失效,拒绝继续`);
+  const MONEY_PRIMS = [
+    ...chokepointExports,
+    "app.captureMoney()", "app.debitBalance(", "app.debitNex(", "app.creditBalance(", "app.creditNex(",
+  ];
   const localPrims = MONEY_PRIMS.filter((p) => purchaseBody.includes(p));
   check(`B④ 客户端本地资金原语 0 命中(扫 ${MONEY_PRIMS.length} 个;提交锚点在场才算数)`,
     iSubmitP >= 0 && localPrims.length === 0,
