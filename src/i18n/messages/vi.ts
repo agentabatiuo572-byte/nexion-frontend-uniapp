@@ -3435,6 +3435,22 @@ export const vi: Messages = {
     needMoreNexToast: "Không đủ NEX để bù phí",
     withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
     withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
+    withdrawResendTitle: "Gửi lại yêu cầu lần trước",
+    withdrawResendBody:
+      "Yêu cầu lần trước rút ${amount} về địa chỉ {network} {address} chưa nhận được xác nhận. Gửi lại sẽ không tạo lệnh rút thứ hai — nếu lần đầu đã thành công, bạn vẫn chỉ thấy lệnh đó.",
+    withdrawResendCta: "Gửi lại",
+    withdrawOutcomeUnknownTitle: "Chưa xác nhận được lệnh rút này",
+    withdrawOutcomeUnknownBody:
+      "Yêu cầu có thể đã đến hệ thống nên số dư vẫn có thể thay đổi. Đừng tạo lệnh rút khác — hãy bấm Rút tiền lần nữa, chúng tôi sẽ gửi lại đúng yêu cầu đó và không bao giờ chi trả hai lần.",
+    withdrawDeclinedTitle: "Không có lệnh rút nào được tạo",
+    withdrawDeclinedBody:
+      "Yêu cầu bị từ chối nên không có lệnh rút nào được tạo và số dư của bạn không thay đổi. Hãy kiểm tra số tiền và địa chỉ nhận rồi gửi lại.",
+    withdrawNotSentTitle: "Chúng tôi chưa gửi yêu cầu này",
+    withdrawNotSentBody:
+      "Thiết bị này không lưu được bản ghi giúp ngăn một lệnh rút bị chi trả hai lần, nên không có gì được gửi đi và số dư của bạn không thay đổi. Hãy giải phóng bớt dung lượng hoặc mở lại ứng dụng rồi thử lại.",
+    withdrawAlreadyOnFileTitle: "Yêu cầu này đã được ghi nhận",
+    withdrawAlreadyOnFileBody:
+      "Yêu cầu lần trước đã được ghi nhận nên không có khoản nào bị chi trả hai lần. Hãy mở trạng thái rút tiền để theo dõi.",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",

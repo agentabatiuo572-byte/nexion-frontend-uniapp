@@ -3440,6 +3440,20 @@ export const zh: Messages = {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
     withdrawFeeStale: "费率已更新,请重试",
     withdrawContextStale: "账户或收款地址已变化,请重新提交",
+    withdrawResendTitle: "重新发送刚才那一笔",
+    withdrawResendBody:
+      "刚才那笔 ${amount} 提到 {network} 地址 {address},没有拿到确认结果。再发一次不会生成第二笔提现 —— 如果上一次已经成功,你看到的还是那一笔。",
+    withdrawResendCta: "再发一次",
+    withdrawOutcomeUnknownTitle: "这笔提现还没确认结果",
+    withdrawOutcomeUnknownBody:
+      "请求可能已经送达,余额仍可能变动。先别另开一笔 —— 再点一次提现,我们会把同一笔原样重发,不会重复出款。",
+    withdrawDeclinedTitle: "没有生成提现单",
+    withdrawDeclinedBody: "本次请求被拒绝,没有生成提现单,余额没有变动。核对金额和收款地址后可以重新提交。",
+    withdrawNotSentTitle: "这笔没有发出去",
+    withdrawNotSentBody:
+      "这台设备存不下「防止同一笔被出款两次」的那条记录,所以没有发出去,余额没有变动。清一点设备空间或重开一次 App,再试。",
+    withdrawAlreadyOnFileTitle: "刚才那一笔已经在案",
+    withdrawAlreadyOnFileBody: "上一次提交已经记录在案,没有重复出款。到提现进度里就能跟进那一笔。",
     earnNexCta: "去挖矿赚 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
     feeConfirmRow: "网络确认费",

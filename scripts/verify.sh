@@ -663,7 +663,11 @@ sentinel_present "P0 neg-balance: amount input strips non-numeric" src/pages/me/
 # z1 判决 A:5 参交叉核对活在页面提交链(确认后、submit 前),第 5 参权威源从 config
 # 纯函数换成服务端 policy;store 侧不再报价。判据钉页面调用形态 + 权威源。
 sentinel_present "P1 fee snapshot cross-checks policy authority (page, 5-arg)" src/pages/me/wallet-withdraw.vue 'withdrawalPolicy\.value\?\.networkConfirmFeeUsd \?\? null'
-sentinel_present "P1 fee snapshot guard sits in submit chain" src/pages/me/wallet-withdraw.vue 'if \(!quoteStillValid\(snap\.fee, snap\.offset, snap\.network\)\)'
+# 2026-08-11 幂等 P0:唯一允许的豁免是**重放**(`!pending &&`)—— 重放送的是首次那份冻结
+# body,服务端按冻结的 policyVersion 定价 = 用户当初确认过的那个价;拿今天的费率复验上一次
+# 的报价,费率一变就恒不成立,只会让未收口的那笔永远收不了口。判据只放行这一个前缀,
+# 换任何别的条件(`!foo &&`)照红,防止「加个开关就把门关了」。
+sentinel_present "P1 fee snapshot guard sits in submit chain (replay-exempt only)" src/pages/me/wallet-withdraw.vue 'if \((!pending && )?!quoteStillValid\(snap\.fee, snap\.offset, snap\.network\)\)'
 sentinel_present "P1 failed-withdrawal refunds burned NEX via own idem key" src/store/app.ts 'creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)'
 # 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
 # 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。

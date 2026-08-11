@@ -346,6 +346,13 @@ import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { isIdempotencyConflict, isSettledRejection } from "@/api/errors";
+import {
+  forgetWithdrawAttempt,
+  newWithdrawKey,
+  readWithdrawAttempt,
+  rememberWithdrawAttempt,
+} from "@/lib/withdraw-attempt";
 import { navTo } from "@/lib/route";
 import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
@@ -846,9 +853,26 @@ async function handleResetAddresses() {
 
 async function handleSubmit() {
   if (submitting.value || confirmingSubmit.value) return;
-  if (!canSubmit.value) {
+  // 🔴 **上一次没确认结果的提交,必须先收口,才允许开始新的一笔**(2026-08-11 独立审计 P0)。
+  // 幂等键此前在本函数里每次点击现铸 → 超时重试 = 服务端第二张单,而幂等键存在的唯一场景
+  // 正是这个场景。键与它那一次的 body 一起冻在 lib/withdraw-attempt(落盘,理由见该文件),
+  // 存在未收口尝试时,本次提交 = **原样重放那一笔**,不是按当前输入开新的一笔:
+  // 这样用户改金额/换网络/切抵扣开关也无法绕过幂等键去建第二张单。
+  const pending = readWithdrawAttempt(app.accountKey);
+  // 重放路径绕开 canSubmit:它判的是「当前输入能不能开新的一笔」(费率拉不到、金额被清空、
+  // 今日额度用完都会为 false),而重放要发的是一笔**已经通过过这道门**的旧请求 ——
+  // 拿新意图的门去锁旧请求,等于把唯一的收口路径锁死。
+  if (!pending && !canSubmit.value) {
     toast.info(submitDisabledReason.value || t.value.walletV3.submitCtaDisabled);
     return;
+  }
+  if (pending) {
+    // 表单回填到冻结件:发出去的是上一次那笔,页面就必须显示上一次那笔,
+    // 否则弹窗/明细与真正发出的不是同一笔(地址是按网络派生的 computed,回填不了,
+    // 故弹窗里显式打出冻结的那个地址)。
+    amount.value = pending.amount.toFixed(2);
+    network.value = pending.network;
+    offsetWithNex.value = pending.offset;
   }
   if (!risk.accepted) {
     // Source pushes to the risk-disclosure page (not yet ported) and returns.
@@ -866,16 +890,19 @@ async function handleSubmit() {
   //  · 账号:确认期间换号 → debitNex 与账单全落到新账号,弹窗展示的却是旧账号的数字(R2 P1-C)。
   // 不变量:首个 await 之后一律读 snap,不再读任何活值;活值只在下面「确认后校验」里
   // 用来判「快照过期了没有」,判完不符即拒,绝不静默按新值扣款。
+  // 存在未收口尝试时,快照的每一项都取冻结件(而不是活值)—— 重放必须与首次逐字节相同,
+  // 否则撞上服务端「同 key + 异 body → 409 + 安全事件」。policyVersion 尤其:
+  // 它由后台发布节奏改写,用户看不见,却是 body 的一部分。
   const q = feeCalc.value;
   const snap = {
     account: app.accountKey,
-    network: network.value,
-    address: boundAddress.value,
-    amount: amountNum.value,
+    network: pending?.network ?? network.value,
+    address: pending?.address ?? boundAddress.value,
+    amount: pending?.amount ?? amountNum.value,
     maxWithdrawable: maxWithdrawable.value,
-    offset: offsetWithNex.value,
-    policyVersion: withdrawalPolicy.value!.policyVersion,
-    idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    offset: pending?.offset ?? offsetWithNex.value,
+    policyVersion: pending?.policyVersion ?? withdrawalPolicy.value!.policyVersion,
+    idempotencyKey: pending?.key ?? newWithdrawKey(),
     quote: q,
     // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
     fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
@@ -901,13 +928,23 @@ async function handleSubmit() {
           fee: snap.quote.networkConfirmUsd.toFixed(2),
           receive: snap.quote.netReceive.toFixed(2),
         });
+  // 重放走**另一份**确认文案:用户点的是「提现」,发出去的却是上一笔 —— 不明说等于替他做主。
+  // 这里打冻结件的金额/网络/地址,不打新报价:重放的费用由服务端按冻结的 policyVersion 定,
+  // 客户端此刻算出来的价不是那笔的价,展示它就是第二个口径。
+  const resendBody = pending
+    ? fmt(t.value.walletV3.withdrawResendBody, {
+        amount: snap.amount.toFixed(2),
+        network: NETWORKS.find((n) => n.id === snap.network)?.label ?? "",
+        address: maskAddressMid(snap.address),
+      })
+    : "";
   confirmingSubmit.value = true;
   let confirmed = false;
   try {
     confirmed = await uiConfirm({
-      title: t.value.walletV3.withdrawConfirmTitle,
-      message: confirmBody,
-      confirmLabel: t.value.walletV3.withdrawConfirmCta,
+      title: pending ? t.value.walletV3.withdrawResendTitle : t.value.walletV3.withdrawConfirmTitle,
+      message: pending ? resendBody : confirmBody,
+      confirmLabel: pending ? t.value.walletV3.withdrawResendCta : t.value.walletV3.withdrawConfirmCta,
     });
   } finally {
     confirmingSubmit.value = false;
@@ -919,40 +956,49 @@ async function handleSubmit() {
   // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
   // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
   submitting.value = true;
-  let fresh: WithdrawalEligibility;
-  try {
-    fresh = await requestWithdrawalEligibility(
-      snap.account,
-      snap.network,
-      snap.address,
-      snap.maxWithdrawable,
-      snap.amount,
-    );
-  } catch (err) {
-    clearSubmitFreeze();
-    // The eligibility call is the one server round-trip on this path, so a region
-    // refusal surfaces here as a rejection. Translate it; `null` = not a region
-    // refusal, so keep the existing timeout message rather than mislabelling a
-    // genuine timeout as a region block.
-    const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
-    // 钱路径上被拦,先说钱的下落 —— 用户第一个念头是「我那笔钱呢」,不是「哪些功能开了」。
-    if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
-    else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
-    return;
-  }
-  if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt) {
-    clearSubmitFreeze();
-    // 拦截必须给原因 + 下一步。并发场景下这条分支最常见的成因是「另一个标签页刚把
-    // 今日额度用掉了」——笼统的「暂不能提交」既没原因也没下一步(验收实测三标签页
-    // 下 7/10 都落到这句)。额度用完是可判定的,就说清楚它。
-    toast.error(fresh.dailyLimitReached ? dailyLimitReachedText.value : t.value.walletV3.submitReasonReviewBlocked);
-    return;
+  // 🔴 重放**不进**前置评估:它是给「新的一笔」用的前置过滤(判当前额度/风控放不放行),
+  // 而重放要送的那笔可能**已经在服务端落库了** —— 拿今天的额度去否掉它,并不能把它撤回来,
+  // 只会让未收口的那笔永远收不了口(实景实测:可提额跌到冻结金额以下,重放每次都被这里挡住)。
+  // 重放的权威是服务端的幂等记录:真不该放行,服务端会明确拒绝,那才是定局、才退役键。
+  let fresh: WithdrawalEligibility | null = null;
+  if (!pending) {
+    try {
+      fresh = await requestWithdrawalEligibility(
+        snap.account,
+        snap.network,
+        snap.address,
+        snap.maxWithdrawable,
+        snap.amount,
+      );
+    } catch (err) {
+      clearSubmitFreeze();
+      // The eligibility call is the one server round-trip on this path, so a region
+      // refusal surfaces here as a rejection. Translate it; `null` = not a region
+      // refusal, so keep the existing timeout message rather than mislabelling a
+      // genuine timeout as a region block.
+      const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+      // 钱路径上被拦,先说钱的下落 —— 用户第一个念头是「我那笔钱呢」,不是「哪些功能开了」。
+      if (geo) toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+      else toast.error(t.value.wallet.riskCheckTimeoutTitle, t.value.wallet.riskCheckTimeoutBody);
+      return;
+    }
+    if (fresh.route === "reject" || !fresh.canSubmit || snap.amount > fresh.maxWithdrawableUsdt) {
+      clearSubmitFreeze();
+      // 拦截必须给原因 + 下一步。并发场景下这条分支最常见的成因是「另一个标签页刚把
+      // 今日额度用掉了」——笼统的「暂不能提交」既没原因也没下一步(验收实测三标签页
+      // 下 7/10 都落到这句)。额度用完是可判定的,就说清楚它。
+      toast.error(fresh.dailyLimitReached ? dailyLimitReachedText.value : t.value.walletV3.submitReasonReviewBlocked);
+      return;
+    }
   }
   // 🔴 **确认后校验** —— 快照纪律的另一半。冻结件与当前权威值不符即拒单,绝不静默按新值扣款。
   //  ① 身份三元组(账号 / 网络 / 收款地址)。确认期间换号 → 下面的 debitNex 与账单会全落到
   //     新账号,而弹窗展示的是旧账号的数字;地址 / 网络若变了,等于把钱打到用户没确认过的地方。
   //     store 层 submitWithdrawal 也钉死账号,但它管不到本页的 debitNex 与建单入参 —— 两层各管一段。
-  if (app.accountKey !== snap.account || network.value !== snap.network || boundAddress.value !== snap.address) {
+  //     重放例外只放在**收款地址**这一项上:冻结件里的地址就是上一次真正发出去的那个,
+  //     期间换绑过地址不改变「那笔可能已经落库」这个事实,拿新地址去否掉重放,等于把
+  //     唯一的收口路径锁死 —— 而重放的地址由服务端按原键的原 body 认。账号与网络不放行。
+  if (app.accountKey !== snap.account || network.value !== snap.network || (!pending && boundAddress.value !== snap.address)) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawContextStale);
     return;
@@ -960,7 +1006,10 @@ async function handleSubmit() {
   //  ② 报价。用与 store 提交边界同一个纯函数复验冻结报价;不成立就走既有「费率已更新,请重试」
   //     分支 —— 重试会按新费率重新报价,由用户重新确认。放在 debitNex **之前**:
   //     让 store 拒单后再回滚 NEX 也能对上账,但那条路多烧一次余额写盘,能不进就不进。
-  if (!quoteStillValid(snap.fee, snap.offset, snap.network)) {
+  //     重放不进这道门:冻结件的权威是它自己那份 policyVersion(服务端按它定价并按原键
+  //     返回原结果),拿**今天**的费率去复验**上一次**的报价,费率一变就恒不成立 ——
+  //     那不是拦住一笔错价单,是让未收口的那笔永远收不了口。
+  if (!pending && !quoteStillValid(snap.fee, snap.offset, snap.network)) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;
@@ -968,6 +1017,23 @@ async function handleSubmit() {
   // Real D5 submit. The server is the sole authority for wallet reservation,
   // fee calculation, optional NEX burn, release-bucket checks and ledger writes.
   // No local balance/bill mutation is allowed before or after this call.
+  // 🔴 键与 body 落盘必须在请求**发出之前**:请求在途时被杀进程 / 刷页面,正是这条链
+  // 要兜住的那一刻;等回执回来再写,等于没写。
+  // 🔴 写不进去就**不发**(fail closed):落盘失败 = 这一次没有重放保护,超时之后再也认不回
+  // 那个键,用户一重试就是第二张单。宁可这一笔发不出去(钱一分没动、原因和下一步都给了),
+  // 也不发一笔「出了事没人认得回来」的。
+  if (!rememberWithdrawAttempt(snap.account, {
+    key: snap.idempotencyKey,
+    amount: snap.amount,
+    network: snap.network,
+    address: snap.address,
+    policyVersion: snap.policyVersion,
+    offset: snap.offset,
+  })) {
+    clearSubmitFreeze();
+    toast.error(t.value.walletV3.withdrawNotSentTitle, t.value.walletV3.withdrawNotSentBody);
+    return;
+  }
   try {
     const withdrawalId = await app.submitWithdrawal(
       snap.amount,
@@ -977,11 +1043,14 @@ async function handleSubmit() {
       snap.offset,
       snap.policyVersion,
       snap.idempotencyKey,
-      fresh.route,
-      fresh.riskReasons,
-      fresh.fastLaneApplied,
-      fresh.waivedGates,
+      // 重放没有本次前置评估(见上),这四项退回默认值。它们只喂本地留痕,
+      // 不进 POST body —— 换句话说重放的 body 仍与首次逐字节相同(app.ts submitWithdrawal)。
+      fresh?.route ?? "pass",
+      fresh?.riskReasons ?? [],
+      fresh?.fastLaneApplied ?? false,
+      fresh?.waivedGates ?? [],
     );
+    forgetWithdrawAttempt(snap.account);
     clearSubmitFreeze();
     if (!withdrawalId) {
       toast.error(t.value.wallet.withdrawInsufficient);
@@ -989,10 +1058,30 @@ async function handleSubmit() {
     }
     uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
     return;
-  } catch {
+  } catch (err) {
     clearSubmitFreeze();
-    await loadWithdrawalPolicy();
-    toast.error(t.value.walletV3.withdrawFeeStale);
+    // 🔴 **按结果分层,不再一律报「费率已更新,请重试」**(2026-08-11 独立审计 P0 的另一半):
+    // 那句话把超时/断网/服务端 5xx 全归因成计价问题,并主动把用户推去重试 —— 而重试正是
+    // 建出第二张单的动作。三档的分水岭只有一条:这一次在服务端**定局了没有**。
+    if (isIdempotencyConflict(err)) {
+      // 409 = 服务端这个键已有记录 ⇒ 上一次确实落库了。键已用掉,退役;但绝不能说「再试一次」。
+      forgetWithdrawAttempt(snap.account);
+      toast.error(t.value.walletV3.withdrawAlreadyOnFileTitle, t.value.walletV3.withdrawAlreadyOnFileBody);
+      return;
+    }
+    if (isSettledRejection(err)) {
+      // 服务端完整应答并拒绝 ⇒ 没建单、余额没动。键作废,下一笔重新铸;此时刷费率才对症
+      // (计价参数确实可能是被拒的原因)。
+      forgetWithdrawAttempt(snap.account);
+      await loadWithdrawalPolicy();
+      toast.error(t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
+      return;
+    }
+    // 结果未知(超时 / 断网 / 5xx / 应答解析不了):请求**可能已经落库**。
+    // 键与 body 原样留着 —— 下次点提交按原样重放,服务端同 key 同 body 返回原结果。
+    // 🔴 这一支绝不能调 loadWithdrawalPolicy:刷了 policyVersion 就变,重放的 body 跟着变,
+    // 正好撞上「同 key + 异 body → 409 + 安全事件」。
+    toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
     return;
   }
 
