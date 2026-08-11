@@ -330,10 +330,9 @@ function diskRev() {
 
   // 爆炸半径:接 CAS 的 store 必须是**登记在册**的那几个,不许悄悄蔓延。
   // 2026-08-04 二期把 P1 涉钱/配额档接了进来(deposits / voucher / nex-faucet /
-  // daily-powerup / lucky-spin / withdraw-daily-count,见 selfcheck-money-cas.mjs);
-  // 名单写死在这里,新增一个未登记的消费者就红 —— 台账不写在被查文件里,否则改代码
-  // 顺手改台账 = 门等于没有。
-  // 2026-08-11:withdraw-daily-count 出列 —— 该模块随 z1 审计 P0-1 删除
+  // daily-powerup / lucky-spin,见 selfcheck-money-cas.mjs);名单写死在这里,新增一个
+  // 未登记的消费者就红 —— 台账不写在被查文件里,否则改代码顺手改台账 = 门等于没有。
+  // 沿革:二期原本还有第六个 withdraw-daily-count,已于 2026-08-11 随包 z2 整体删除
   // (日限改由提现单列表现算,没有第二份计数状态,自然也不需要 CAS 防覆盖)。
   const CAS_CONSUMERS = [
     "daily-powerup.ts", "deposits.ts", "lucky-spin.ts", "nex-faucet.ts",

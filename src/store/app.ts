@@ -1279,6 +1279,18 @@ export const useApp = defineStore("app", () => {
     );
     const canonical = toCanonicalWithdrawal(submission, address);
     withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+    // 🔴 建单成功**必须落盘**。此前这里只改内存:刷新一次单据就没了,而它同时是
+    // 「今日提了几笔」的唯一凭据(日限预检)与「有没有在途单」的唯一凭据(换址闸)——
+    // 按一下 F5 两道闸一起失效(z2 R1 独立审计实测)。本函数之外没有兜底:
+    // 全文件的周期性落盘在 remote 模式下早退,到账推进要等几小时后到点才写盘。
+    //
+    // 🔴 落盘失败**不回滚内存**,与「到账推进」那条相反,原因是失败的方向不同:
+    //  - 到账推进:内存改的是**本地推导**出来的状态,回滚掉下个 tick 还能重推;
+    //    不回滚则内存说已到账、磁盘说处理中,轮询恒返回 false 永不重试。
+    //  - 这里:单据是**服务端已经创建**的既成事实。抹掉它等于让用户看不见一笔真实存在的
+    //    提现单,也可能诱发重复提交。落盘失败只是「刷新后会丢」,是降级不是错乱,
+    //    保留内存行严格优于回滚。真闸在服务端,少算一笔不会放行超额提现。
+    persistAccountSnapshot();
     // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
     // pre-check engine; the server keeps its own authoritative copy.
     commitWithdrawal(accountKey.value, network, address);

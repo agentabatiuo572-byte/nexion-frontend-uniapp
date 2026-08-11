@@ -112,10 +112,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import { withdrawalApi } from "@/api/runtime";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
+import { mockServerNow } from "@/store/server-time";
+import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -193,16 +195,45 @@ const showSpinner = computed(() => !isTerminalDone.value && !isFailedEnd.value &
 // policy 取不到 → 0 → 既有规则「上限 ≤0 视为未配置」→ 不置灰(fail-open,
 // 后端不可达时不把用户的下一步堵死;真拦不拦由提现页与服务端说了算)。
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
+/**
+ * 🔴 policy 拉取要能重来。只拉一次且失败静默吞的话,这一页实例**终身** fail-open:
+ * 「再提一笔」永不置灰,点进提现页却被日限拦死 —— 正是本文上面那句「同源」要消灭的分裂,
+ * 只是换了触发条件(R1 四份独立审计各自点名)。onShow 补拉:从提现页返回、切回前台都会重取。
+ */
+async function loadWithdrawalPolicy(): Promise<void> {
+  try {
+    withdrawalPolicy.value = await withdrawalApi.policy();
+  } catch {
+    withdrawalPolicy.value = null;
+  }
+}
+/**
+ * 🔴 平台日边界信号。判定里的「今天」走 mockServerNow(),它不是响应源 ——
+ * 没有这个依赖,停在本页跨过平台日 0 点后按钮**不解灰**,理由行还念着一个已经过去的时刻,
+ * 页面自己打自己脸(提现页为同一个失效专门建了 eligibilityClock,本页此前没跟上)。
+ * 只取「日序」不取秒:值只在跨过边界那一刻变,不会每分钟触发重算。
+ */
+const nowTick = ref(mockServerNow());
+let dayTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  void withdrawalApi.policy()
-    .then((p) => { withdrawalPolicy.value = p; })
-    .catch(() => { withdrawalPolicy.value = null; });
+  void loadWithdrawalPolicy();
+  dayTimer = setInterval(() => (nowTick.value = mockServerNow()), 60_000);
+});
+onShow(() => {
+  nowTick.value = mockServerNow();
+  void loadWithdrawalPolicy();
+});
+onUnmounted(() => {
+  if (dayTimer) clearInterval(dayTimer);
 });
 // app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
-const dailyLimit = computed(() => dailyLimitStatus({
-  limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
-  withdrawals: app.withdrawals,
-}));
+const dailyLimit = computed(() => {
+  void platformDayIndex(nowTick.value); // 建立对「平台日边界」的依赖,不参与计算
+  return dailyLimitStatus({
+    limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
+    withdrawals: app.withdrawals,
+  });
+});
 const againDisabled = computed(() => dailyLimit.value.reached);
 const againReasonText = computed(() => {
   const at = new Date(dailyLimit.value.resetAt);

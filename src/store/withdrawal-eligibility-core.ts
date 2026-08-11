@@ -320,11 +320,16 @@ export function countWithdrawalsOnPlatformDay(
   if (!Array.isArray(rows)) return 0;
   const today = platformDayIndex(now);
   let count = 0;
-  // 🔴 判据是**严格相等**,坏行因此天然出局:submittedAt 缺失 / NaN / 非数算出来的
-  // 日序都不等于今天。这里**不**再写一道 isFinite 消毒 —— 红测实证:删掉它没有任何
-  // 断言会红(没有输入能把它区分出来),那正是本仓反复清掉的「红测证明不了的防御代码」。
-  // ⚠️ 代价写在这:一旦把 === 放宽成 >= / <=,Infinity 这类坏值立刻会被算进今日额度,
-  //    把用户当天锁死。要改这个比较符,先把消毒加回来。
+  // 🔴 判据是**严格相等**,坏行因此天然出局:submittedAt 缺失 / NaN / Infinity /
+  // 字符串 / Date 对象算出来的日序都不等于今天。这里刻意**不写** typeof / isFinite 消毒 ——
+  // 红测两次实证:加或不加,没有任何输入能让断言变化(字符串走的是字符串拼接,
+  // 算出的日序离今天十万八千里,与被跳过同样得 0)。红测证明不了的防御 = 死代码。
+  //
+  // ⚠️ 两个代价写在这,改之前先看:
+  //  1. 把 === 放宽成 >= / <=,Infinity 会被算进今日额度、把用户当天锁死;
+  //  2. 后端若下发**字符串 / ISO 时间戳**,整张列表会静默计 0、日限再次失效 ——
+  //     与本包修的缺陷同型同样无声。那不是这里加消毒能救的(消毒的结果同样是 0),
+  //     得在契约层解决:见 HANDOFF U-7。
   for (const row of rows) {
     if (platformDayIndex(row?.submittedAt) === today) count++;
   }
