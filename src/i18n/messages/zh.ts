@@ -887,6 +887,8 @@ export const zh: Messages = {
     total: "合计",
     combinedDaily: "合并日产能",
     checkoutCta: "结算 · ${total}",
+    checkoutUnavailableCta: "套餐结算暂时不可用",
+    checkoutUnavailableHint: "套餐价暂时算不出来。你可以到商城单件购买,这里的套餐会给你留着。",
     checkoutSuccessTitle: "套餐已下单",
     checkoutSuccessBody: "{count} 台设备已下单 · 正在部署",
     checkoutBillMemo: "套餐购买 · {count} 台设备",
