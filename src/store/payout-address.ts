@@ -159,9 +159,11 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   async function refreshRemote(): Promise<void> {
     if (!remoteApiEnabled) return;
     const version = ++remoteLoadVersion;
-    const snapshot = await payoutAddressApi.list();
-    if (version !== remoteLoadVersion) return;
-    book.value = remoteBook(snapshot);
+    try {
+      const snapshot = await payoutAddressApi.list();
+      if (version !== remoteLoadVersion) return;
+      book.value = remoteBook(snapshot);
+    } catch { /* fail-closed:地址簿保持空,不拿旧快照冒充服务端事实 */ }
   }
 
   async function sendRemoteOtp() {

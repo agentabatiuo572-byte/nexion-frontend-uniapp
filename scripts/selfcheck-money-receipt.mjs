@@ -626,9 +626,15 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   // 于是 ⑤ 不查(不在册)、⑥ 不响(在 ALLOW 里或走了收口点)—— 两道门同时失明。
   // 判据:全站「调了收口点导出符 或 调了 bills 写入原语」的文件集合,必须 ⊆ WIRED ∪ ALLOW。
   {
-    // 🔴 postMoneyBillsOnce 必须在列(z1 2026-08-10):它是收口点真实导出面的一员
-    // (lib/money-receipt.ts:227),漏了它,新页面只调它就整个绕过反向入册门。
-    const EXPORTS = ["postMoneyBill", "postMoneyBills", "postMoneyBillsOnce", "postReceiptOnly", "postReceiptOnce"];
+    // 🔴 导出面从**磁盘扫**,不手抄(z1 R2 对抗审计 P1-19:上一轮正是被
+    // `postMoneyBillsOnce` 漏抄咬过,而当时的修法还是「手加一项」—— 下一个新出口照样
+    // 整体绕过本门)。判据:lib/money-receipt.ts 的全部 post* 导出;
+    // 扫不到(重命名/改写法)必须炸,不许静默拿空清单放行。
+    const CHOKEPOINT_SRC = read("src", "lib", "money-receipt.ts");
+    const EXPORTS = [...CHOKEPOINT_SRC.matchAll(/^export (?:async )?function (post\w+)/gm)].map((m) => m[1]);
+    if (EXPORTS.length < 3) {
+      throw new Error(`selfcheck-money-receipt: 收口点导出面只扫到 ${EXPORTS.length} 个(${EXPORTS.join(",")})—— 判据失效,拒绝继续`);
+    }
     if (!wiredFiles.length) throw new Error("selfcheck-money-receipt: ⑤ 的接线名单没传过来,反向入册门会空转");
     const enrolled = new Set([...wiredFiles, ...Object.keys(ALLOW)]);
     const outside = [];
