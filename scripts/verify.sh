@@ -578,14 +578,36 @@ if [ -z "$wd_avail_miss" ]; then
 else
   bad "withdraw available fail-closed 缺件: $wd_avail_miss"
 fi
-# 可提口径三处同源(2026-07-31 踩坑):提现页改了口径,钱包页/钱包卡片仍读旧桶 → 首页显示
-# 的「可提现 USDT」与实际能提的数对不上。三处必须同读 usdtBalance,任一回退即红。
+# 钱包展示面口径(2026-07-31 立门 → 2026-08-11 主人拍板"标签分离"后改判据)。
+#
+# 🔴 原判据只有「两处必须同读 usdtBalance」,并在注释里声称"三处同源=总余额"。
+#    但提现页的 maxWithdrawable 早已不是总余额(= (总余额−held两桶)×balanceMaxRatio,
+#    且三态 fail-closed 归 0),于是这道门**反而把口径分裂锁死了**:值一致的假象保住了,
+#    而两边标签都写「可提现」、数却恒不相等(后端缺席时提现页恒 0,钱包页两万四)。
+#    → 拍板结论不是把数值统一(那要么钱包页 fail-closed 归 0、要么提现页放宽到总余额
+#      架空风控扣留),而是**标签分离**:钱包页显示总余额、但不许自称「可提现」。
+#    故本门现在守两面:① 值仍是总余额(原判据,保留);② 标签不含「可提现」语义(新增)。
 withdrawable_source_parity() {
   local miss=""
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
-  if [ -z "$miss" ]; then ok "withdrawable display source parity (wallet + card = total balance)";
-  else bad "withdrawable display source DRIFT — still on old bucket: $miss"; fi
+  if [ -z "$miss" ]; then ok "wallet surfaces show total balance (app.user.usdtBalance)";
+  else bad "wallet surface value source DRIFT — still on old bucket: $miss"; fi
+  # 标签面:显示总余额没问题,标签**不许叫「可提现」** —— 那是提现页那个数的名字。
+  # 判据写成语义禁令(禁止某个词义),不枚举具体文案 —— 换句话说改文案可以,改回
+  # 「可提现」不行。样本量同时校验:key 少了/被改名 → 判据失锚,必须红而不是静默全过。
+  local label_lines label_n bad_labels
+  label_lines=$(grep -n 'usdtBalance: "' src/i18n/messages/zh.ts src/i18n/messages/en.ts src/i18n/messages/vi.ts 2>/dev/null | tr -d '\r')
+  label_n=$(printf '%s\n' "$label_lines" | grep -c 'usdtBalance: "')
+  bad_labels=$(printf '%s\n' "$label_lines" | grep -E '可提现|Withdrawable|có thể rút')
+  if [ "${label_n:-0}" -ne 6 ]; then
+    bad "usdtBalance 标签样本量应为 6(zh/en/vi × wallet+me),实得 ${label_n:-0} — 判据已失锚,先修判据"
+  elif [ -n "$bad_labels" ]; then
+    bad "钱包展示面标签仍自称「可提现」,而它显示的是总余额(与提现页可提额恒不等)"
+    printf '%s\n' "$bad_labels" | sed 's/^/        /'
+  else
+    ok "wallet balance label carries no 「可提现」 claim (sample 6/6: zh/en/vi × wallet+me)"
+  fi
   # 反向面(2026-07-31 审计 P1):上面只验「新写法在」,不验「旧写法不在」—— 若有人在这三个
   # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
   local stale
