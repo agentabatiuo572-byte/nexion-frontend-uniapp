@@ -18,7 +18,8 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
       <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.exchange.remoteUnavailableClosed }}</text>
-      <text v-else-if="!remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.exchange.mockModeNotice }}</text>
+      <!-- 同 staking:Mock 横幅是工程话,只给开发看,生产构建不渲染。 -->
+      <text v-else-if="!remoteApiEnabled && isDevBuild" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.exchange.mockModeNotice }}</text>
 
       <!-- How-it-works entry + refresh — pill compacted to match the other pages;
            it stays paired with the rate-refresh button (no de-carded hero here to
@@ -198,6 +199,8 @@ import {
 } from "@/store/exchange-v3";
 
 const t = useT();
+// 同 staking:生产构建里 import.meta.env.DEV 恒为 false,Mock 横幅被摇掉。
+const isDevBuild = import.meta.env.DEV;
 const app = useApp();
 const exchange = useExchange();
 const v3 = useExchangeV3();

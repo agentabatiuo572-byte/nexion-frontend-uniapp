@@ -13,7 +13,9 @@
   <AppChassis active="me">
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
-      <text v-if="staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.staking.mockModeNotice }}</text>
+      <!-- Mock 横幅只给开发看:它是工程话("Mock 模式"),按「页面文案禁止工程名词」不该上用户的屏;
+           而 mock 正是本地 demo 的运行模式,不加这道闸时任何人打开 demo 都会看到它。 -->
+      <text v-if="staking.isMockMode && isDevBuild" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.staking.mockModeNotice }}</text>
       <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
@@ -144,6 +146,8 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
 const t = useT();
+// Vite 在生产构建里把 import.meta.env.DEV 直接换成 false,整个横幅连同它的文案一起被摇掉。
+const isDevBuild = import.meta.env.DEV;
 const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>>>(() => ({
   180: { label: t.value.stakingV3.ribbon.popular, tone: "cyan" },
   365: { label: t.value.stakingV3.ribbon.topYield, tone: "gold" },

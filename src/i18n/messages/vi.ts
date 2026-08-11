@@ -2637,11 +2637,11 @@ export const vi: Messages = {
     queuedToastBody: "Lệnh quy đổi ${amount} sẽ thực hiện sau khi đặt lại lúc nửa đêm.",
     platformExhaustedTitle: "Quỹ nền tảng đã cạn",
     platformExhaustedBody: "Quỹ ${cap}K mỗi ngày đã hết. Vui lòng thử lại vào ngày mai.",
-    remoteUnavailableClosed: "Dữ liệu thẩm quyền từ máy chủ không khả dụng — đã đóng chức năng đổi",
+    remoteUnavailableClosed: "Hiện chưa thể quy đổi, vui lòng thử lại sau.",
     mockModeNotice: "Chế độ Mock · không khớp lệnh từ máy chủ",
-    remoteNotProvided: "Máy chủ chưa cung cấp",
-    remoteUnavailableToast: "Dữ liệu thẩm quyền từ máy chủ tạm thời không khả dụng",
-    remoteRefreshed: "Đã làm mới dữ liệu thẩm quyền từ máy chủ",
+    remoteNotProvided: "Chưa có dữ liệu",
+    remoteUnavailableToast: "Chưa lấy được dữ liệu mới nhất, vui lòng thử lại sau.",
+    remoteRefreshed: "Đã cập nhật dữ liệu",
   },
 
   exchangeHowItWorks: {
@@ -2854,7 +2854,7 @@ export const vi: Messages = {
     educationFooter:
       "Staking là tự nguyện hoãn rút tiền của bạn. Lãi thưởng APY cao hơn là để bù cho thời gian khóa vốn.",
     mockModeNotice: "Chế độ Mock · không phải tiền từ máy chủ",
-    remoteUnavailableClosed: "Dữ liệu thẩm quyền từ máy chủ không khả dụng — đã đóng thao tác staking",
+    remoteUnavailableClosed: "Hiện chưa thể thực hiện thao tác khóa vốn, vui lòng thử lại sau.",
   },
   achievements: {
     title: "Thành tựu",
