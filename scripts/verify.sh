@@ -2519,6 +2519,59 @@ money_receipt_gate() {
 }
 money_receipt_gate
 
+# ── 账单生产者门(z4,2026-08-11):渲染代码存在 ≠ 有生产者 ──
+# 缘起:wallet-bills.vue 一直有整套 `type:"withdraw"` 的渲染代码(图标/配色/可点/跳追踪页),
+# 但 08-10 的 remote 对齐把提现提交搬到 POST /api/withdrawals 时顺手删掉了页面里的两行
+# bills 写入 —— 全仓从此没有任何代码写得出一条正常的提现账单行。剩下的唯一生产者是
+# App.vue 里退还 NEX 抵扣费的**冲正**分录(+N NEX),而它要冲正的那条 −N 从没被写过。
+# 后果三连:App.vue 的 settleByRef / 两段对账恒空跑;用户被日限拦住时全站没有任何页面
+# 答得出「我今天提了哪几笔」;账单上只剩一条平台白送 NEX 的孤行。
+# 🔴 因此判据守的是**生产者**不是渲染:出事那天渲染分支一直都在,守它等于没守。
+# 判据(ground truth 全部从磁盘取,不手写清单):①BillType 全集解析自类型联合;②扫全站
+# 找账单 draft,按「币种 + 方向」(USDT- / NEX+ / seed: 前缀)分类;③实测与脚本内台账
+# **双向逐字相等** —— 少一族(生产者被删)红,多一族(新增未登记)也红;④渲染面与
+# BillType 全集互相覆盖。细到币种+方向是红测逼出来的:只记「有没有生产者」时,删掉提现
+# 主行后 NEX 抵扣腿仍撑着「有 debit 生产者」,门全绿而用户看不到自己提了多少钱。
+# 改台账前先跑 `--print` 看实测(本门自己的 swap 那行凭印象手写就被实测当场证伪)。
+bill_producer_gate() {
+  # 🔴 先红测再判定:哨兵失效即门失效。11 条注入逐个隔离一条 token(主行删 / 不记账文件冒充 /
+  # 记账文件冒充 / 多生产者只删其一 / 主行符号反 / 抵扣腿符号反 / 冲正行删 / 新类型未登记 /
+  # 种子删 / 嵌套掩护 / 币种改错)+ 1 条负控(无关改动不许红)+ 样本量自校。
+  # 注入锚点失配会自曝为 FAIL,不会静默当成「测过了」。
+  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs --selftest > /tmp/uniapp-bill-producers-selftest.log 2>&1; then
+    ok "bill-producers selftest: $(grep -Eo '[0-9]+ pass / [0-9]+ fail' /tmp/uniapp-bill-producers-selftest.log | tail -1)"
+  else
+    bad "bill-producers selftest 失败(哨兵失效即门失效;node scripts/selfcheck-bill-producers.mjs --selftest 看明细)"
+    grep -E "^  FAIL" /tmp/uniapp-bill-producers-selftest.log | head -8 | sed 's/^/        /'
+  fi
+  if "$NODE_BIN" scripts/selfcheck-bill-producers.mjs > /tmp/uniapp-bill-producers.log 2>&1; then
+    ok "账单生产者门 — $(tail -1 /tmp/uniapp-bill-producers.log)"
+  else
+    bad "账单生产者门失败 — node scripts/selfcheck-bill-producers.mjs 看明细;改了账单写入就同步台账(--print 看实测)"
+    grep -E "^  FAIL" /tmp/uniapp-bill-producers.log | head -8 | sed 's/^/        /'
+  fi
+}
+bill_producer_gate
+
+# ── 提现账单行 runtime 门(z4 R1,2026-08-11):生产者「存在」≠「跑得到」──
+# 上面那道静态门守住了「有没有代码写得出提现账单行」,但守不了可达性:`if (false)` 包起来、
+# 挪进一个永不被调用的函数、或者调用点落在走不到的分支上,静态判据全绿。同一轮独立审计还
+# 实测出 withdraw 那三条 token 里的 `NEX+`(抵扣费冲正行)在 remote 模式下运行期确实永不执行。
+# 本门在**真页面**上把整条链跑一遍:填金额 → 开 NEX 抵扣 → 提交 → 确认 → 写账单 → 跳转,
+# 只桩 withdrawalApi 两个方法(建单只认真后端,不桩一步都走不到),其余全是真代码。
+# 判据:①两条同单号分录(USDT 负额在途 + NEX 负额)②共用 ts 且真落盘 ③金额取服务端回执
+# (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
+# 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
+withdraw_bill_runtime_gate() {
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs > /tmp/uniapp-withdraw-bill-runtime.log 2>&1; then
+    ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
+  else
+    bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
+  fi
+}
+withdraw_bill_runtime_gate
+
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
 # /api/genesis/purchase` 和 `POST /api/swap`(PRD 根本没这接口)、试用转化写成

@@ -1264,11 +1264,25 @@ export const useApp = defineStore("app", () => {
     // 「这单当时免了哪几道闸」,等于没做。与 riskReasons 同源同去处。
     fastLaneApplied = false,
     waivedGates: string[] = [],
-  ): Promise<string | null> {
+    // 🔴 返回**整张单**而不是单号:调用方要按服务端真实回执记账 —— 手续费实际烧了多少 NEX
+    // 由服务端定(submission.nexBurned),本地报价只是预览。回单号的话调用方只能拿本地
+    // 报价去写账单 = 账本上那个数字指不到单源(本仓禁令),或者回头去 app.withdrawals 里
+    // 按 id 反查 —— 而那个列表会被 bindAccount 整体换掉,换号那一刻正好查空。
+    // 🔴 不返回 null:拒单路径全在服务端,失败一律**抛** ApiError 冒泡给页面分诊。
+  ): Promise<Withdrawal> {
     // D5 real boundary: the backend re-prices the request under policyVersion and
     // commits wallet reservation, optional NEX burn, order and ledgers atomically.
     // The local store only mirrors the returned order for rendering; it never
     // debits balances or chooses a fee bucket.
+    //
+    // 🔴 入口冻结账号(z4 R1 独立审计 P0)。本函数跨一个最长 30s 的 await,期间跨标签页
+    // 登出 / 运营吊销 / 重新登录都会 `bindAccount`,把 `accountKey.value` 与
+    // `withdrawals.value` 整体换成**另一个账号**的。原来 await 之后仍读活值,于是:
+    // 服务端按**发起时**那个账号的会话扣了钱,单据却落到换后的账号头上 —— 新账号凭空多一张
+    // 别人的在途单(占它的日限、锁死它的换址闸、失败时把 NEX 退给它),而真正被扣的账号
+    // 有扣款无单据,追踪页深链「查无此单」。
+    // 页面侧的账单行早已钉死 `snap.account`,只钉一半反而更糟:账与单分家,对账永远配不上。
+    const acct = accountKey.value;
     const submission = await withdrawalApi.submit(
       amount,
       network,
@@ -1278,6 +1292,37 @@ export const useApp = defineStore("app", () => {
       idempotencyKey,
     );
     const canonical = toCanonicalWithdrawal(submission, address);
+    // 🔴 换号了:这一单属于 acct,当前绑定的是别人。直接写进**冻结账号**的那一行,
+    // 内存(现在装的是新账号的视图)一个字都不碰 —— 与 bills.addManyForAccountOnce 同一条纪律。
+    // 落盘成败都要把单交还调用方:服务端已经建单,吞掉它 = 旧账号有扣款无凭证。
+    if (accountKey.value !== acct) {
+      const stored = readAccountSnapshot(acct);
+      // 🔴 诚实边界:冻结账号在盘上**没有行**时(它从没落过盘)这一单写不进去,
+      // 而且不该硬写 —— 手上唯一能拿来拼快照的是**当前账号**的余额/设备/收益,
+      // 拿它冒充另一个账号的经济状态,比丢一条单据坏得多。
+      // 此时页面侧的账单行仍会落到 acct(bills 那条路自己会 hydrate 出基线),
+      // 单据以服务端为准;这是降级,不是静默成功。
+      // 落盘结果要接住:写不进去时这一单只活在服务端,客户端两边都没有(内存装的是新账号)。
+      // 这是**降级不是成功**,所以如实交给日志式注释而不是静默丢弃返回值(z4 R2 P2-6)。
+      //
+      // 🔴 已知限制,别把它写成「会自愈」(z4 R3-bis 指出我上一版在这里许了做不到的承诺):
+      // App.vue ⓪ 的自愈**以单据可见为前提** —— 它遍历的是 `app.withdrawals`,而那份列表由
+      // `bindAccount` 从**本地快照**水合。若这一单从没写进该账号的本地快照(`stored` 为 null,
+      // 或下面这次写盘失败),那么重新绑回该账号也读不出它,⓪ **无源可补**。
+      // 触发要「提交中换号」叠加「该账号本地无快照 / 写盘失败」,概率很低,但不是零 ——
+      // 真正的兜底在服务端(单据是它建的),客户端到此为止。
+      if (stored) {
+        const list = [canonical, ...(stored.withdrawals ?? []).filter((item) => item.id !== canonical.id)];
+        const written = mergeAndWriteAccountSnapshotResult(stored, { ...stored, withdrawals: list, updatedAt: Date.now() });
+        if (!written.persisted) {
+          // 与本函数主路径同口径:单据是服务端既成事实,不因为本地写不进去就吞掉它。
+          // 调用方拿到 canonical 照常写账单行(账单是另一张表,可能写得进去)。
+        }
+      }
+      // 风控台账同样记到冻结账号,不记当前绑定(首提标记 / 共用地址强信号都是按账号的)。
+      commitWithdrawal(acct, network, address);
+      return canonical;
+    }
     withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
     // 🔴 建单成功**必须落盘**。此前这里只改内存:刷新一次单据就没了,而它同时是
     // 「今日提了几笔」的唯一凭据(日限预检)与「有没有在途单」的唯一凭据(换址闸)——
@@ -1309,8 +1354,10 @@ export const useApp = defineStore("app", () => {
     }
     // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
     // pre-check engine; the server keeps its own authoritative copy.
-    commitWithdrawal(accountKey.value, network, address);
-    return canonical.id;
+    // 账号取入口冻结值(此分支下它与 accountKey.value 相等,写死 acct 是为了让「本函数只认一个
+    // 账号」这件事在两条分支上同形 —— 不留一个读活值的口子给下一次改动)。
+    commitWithdrawal(acct, network, address);
+    return canonical;
   }
 
   /**

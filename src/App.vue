@@ -9,7 +9,9 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useBills } from "@/store/bills";
-import { postMoneyBill, postMoneyBillsOnce, postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBill, postMoneyBillsOnce, postReceiptOnly, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
+import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
+import type { Withdrawal } from "@/store/types";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -125,6 +127,32 @@ function advanceArrivalAndSettleBill() {
 function reconcileBills() {
   const app = useApp();
   const bills = useBills();
+  // ⓪ 🔴 单据在、账单缺 → **补写**(z4 R2,两路独立审计各自命中)。
+  //    本段其余四格都是「存在性判据 + 没有才补」的自愈,唯独提现主行原来只在提交那一刻写一次:
+  //    写失败(storage 抖动)只弹一条 toast 就再也不重试;而账单表是裸写整行、无 CAS
+  //    (2026-08-05 主人拍板不在前端修),跨标签页并发写会把刚落盘的分录整行覆盖掉。
+  //    于是这一族成了资金分录里唯一「丢了就永久没有」的一格 —— 用户回到的正是 z4 要修的原状态,
+  //    而所有门仍全绿(门守的是「有没有生产者」,不是「那一行此刻在不在」)。
+  //    判据同样从数据推出:单据齐全就该有分录,没有就补。分录形状与提交那一刻**共用同一个纯函数**
+  //    (lib/withdrawal-bill-drafts),两处各拼一份必然漂移。
+  //    账号用 app.accountKey:遍历的就是当前账号的单据,不存在跨账号补写。
+  //    🔴 补记要盖**单据的提交时刻**,不是「现在」:补一笔三天前的提现时若盖当前时钟,
+  //    那两行会落在账单页今天这一组的最上面 —— 账本给自己的历史标错日期(按 ts 分月分组)。
+  //    🔴 存在性判据必须与 store 的判重键**同一把**(含方向),否则同单号的 `+N NEX` 冲正行
+  //    会被当成 `−N` 已存在 —— 少补的恰好是烧掉那一条(z4 R3 独立审计 P0)。
+  //    🔴 逐单 try/catch:存量脏单(旧 schema 的 `fee` 缺失)会让 drafts 构造抛异常,
+  //    而本函数跑在 5s 轮询里、外层无 catch —— 一条脏数据能把 ①②②b③ 全部打停
+  //    (到账结算 / 失败结算 / 赠金入账集体停摆)。爆炸半径限制在这一单。
+  for (const wd of app.withdrawals) {
+    try {
+      const drafts = withdrawalBillDrafts(wd);
+      const has = (d: ReceiptDraft) => bills.bills.some(
+        (b) => b.ref === wd.id && b.symbol === d.symbol && (b.amount < 0) === (d.amount < 0),
+      );
+      if (drafts.every(has)) continue;
+      postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);
+    } catch { /* 这一单的数据不完整 —— 跳过它,别拖垮整个对账循环 */ }
+  }
   // ① 已到账 → 账单入账
   for (const wd of app.withdrawals) {
     if (wd.status !== "confirmed") continue;
@@ -144,13 +172,25 @@ function reconcileBills() {
   //    退款只动了余额:钱包里 NEX 回来了,账单里那条「−N NEX(已入账)」却还孤零零挂着 ——
   //    按账单对账的用户会少算自己的 NEX。改写那条行不是解法(烧确实发生过,改写 = 账本说没烧),
   //    复式账本的规矩是**冲正靠反向分录**:同单号补一条 +N NEX,两行相抵 = 钱包净变化。
-  //    🔴 判据取自账本自己(退款幂等键已落盘),不是「单据是失败终态」—— 钱还没真退就记账,
-  //    等于账单抢在余额前面宣布退款,方向反了同样是裂脑。存在性判据 = 同单号的正向 NEX 行,
-  //    没有才补,故刷新 / 换设备 / 上一轮写盘失败都能自愈(与 ① 同一套思路)。
+  //    🔴 判据必须是**退款这件事真的发生过**,不能是「单据失败了所以大概退了」。
+  //
+  //    z4 R2 我把它改成了「单据是失败终态」,理由是原判据(本地退款幂等键)在 remote 模式下
+  //    永不成立、这条冲正因此不可达。**那个改法是错的**(R3 独立审计当场揪出,我复核后确认):
+  //    remote 模式下 `refundFailedWithdrawals` 整个是 no-op,服务端也**没有**「失败提现退还已烧
+  //    NEX」这条契约(全仓与 docs/specs 都查不到)。按终态就写 +N,等于账本单方面宣布一笔
+  //    没有任何证据的退款 —— 比「少一条冲正」坏得多:少一条是漏记,凭空写一条是造假。
+  //    我上一版还在这里写「mock 下排在退款之后,两种模式都不会方向反」,两条腿都不成立
+  //    (mock 下压根建不出提现单)。那句话已删。
+  //
+  //    所以判据回到「有退款事实」。代价照实说明:remote 模式下这条冲正**目前不会触发**,
+  //    账单上那条 −N NEX 会一直挂着没有对手方 —— 它是**真的**(NEX 确实烧了),
+  //    只是「有没有退回来」客户端不知道。等服务端把退还契约定下来(或补一个可查的退款事实),
+  //    再把判据接到那个事实上。已知缺口,不用假分录填。
+  const NEX_REFUNDED = (wd: Withdrawal) => app.user.appliedRewardKeys?.["refund-nex:" + wd.id] === true;
   for (const wd of app.withdrawals) {
     const burned = wd.fee?.nexBurned;
     if (!(typeof burned === "number" && burned > 0)) continue;
-    if (!app.user.appliedRewardKeys?.["refund-nex:" + wd.id]) continue;
+    if (!NEX_REFUNDED(wd)) continue;
     if (bills.bills.some((b) => b.ref === wd.id && b.symbol === "NEX" && b.amount > 0)) continue;
     // 🔴 补记,**不是**动钱:NEX 已由 refundFailedWithdrawals 退回钱包(幂等键就在上一行的判据里),
     // 这里只补它缺的那条分录。改成 postMoneyBill 会照着 +burned 再发一次 NEX = 退款翻倍。

@@ -250,6 +250,12 @@ export interface WithdrawalFeeSnapshot {
   actualFeeUsd: number;
   /** 仅历史单(旧惩罚费模型)存在;新单不生成该字段 */
   penaltyUsd?: number;
+  /** 🔴 服务端下发的**减免额**(NEX 抵扣掉的那部分费用,USD)。
+   *  契约里 `grossFee − feeWaived == actualFee` 是被 parseSubmission 校验过的等式,
+   *  所以它是权威值。展示层**不许**用「毛费 − 实付」重建 —— 那个式子指的是三个源不是一个源,
+   *  而且漏掉 penaltyUsd 时会算出负数(z4 R2 P1-3;本仓禁令:显示的钱必须指到单源)。
+   *  历史单没有该字段。 */
+  feeWaivedUsd?: number;
 }
 
 export interface Withdrawal {
@@ -433,7 +439,11 @@ export interface AppState {
     riskReasons?: string[],
     fastLaneApplied?: boolean,
     waivedGates?: string[],
-  ) => Promise<string | null>; // FEAT-WD02: fee = 结构化快照(server 复验等式);null = 拒单(余额/额度/reject/快照非法)
+  // FEAT-WD02: fee = 结构化快照(server 复验等式)。回**整张单**,调用方按服务端回执记账,
+  // 不拿本地报价编数。🔴 没有 null 返回:所有拒单路径(余额/额度/风控/快照非法)自 2026-08-10
+  // 起都在服务端,客户端只会**抛**(ApiError),不会静默回一个空值 —— 保留 `| null` 会让
+  // 调用方写出一条永不执行的死分支,并诱导下一个读者以为余额闸还在客户端(z4 R2 P2-5)。
+  ) => Promise<Withdrawal>;
   /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
   _devAdvanceWithdrawal: () => void;
   /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */
