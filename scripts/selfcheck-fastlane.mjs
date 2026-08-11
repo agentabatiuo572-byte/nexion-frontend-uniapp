@@ -714,20 +714,58 @@ function functionBody(src, sig) {
     // 🔴 z5 更新:USDT 腿改走 refundWithdrawalDebit(扣款 ⇄ 退款成对的那一半)。
     // 原判据钉的是 creditRewardBucketOnce —— 那条路**内部第一行就是 `if (remoteApiEnabled) return false`**,
     // 而提现单只在 remote 模式下建得出来,于是退款在「唯一会产生提现的模式」里恒为 no-op。
+    // 🔴 判据一律走**剥注释**的源(appCode,非 appSrc)。z5 独立审计实测:用原文时把
+    // `if (refundWithdrawalDebit(wd)) done.push(wd.id);` 整行注释掉(退款腿实际死掉),
+    // 三条判据仍全绿 —— 与本文件 700-706 行给 App.vue 焊过的同一种绕法,app.ts 侧当时没跟上。
+    const appCode = stripComments(appSrc);
     check("🔴 提现失败终态:退款与置账单失败成对完成,且幂等",
-      appSrc.includes("function refundFailedWithdrawals(): string[] {")
-        && appSrc.includes("if (refundWithdrawalDebit(wd)) done.push(wd.id);")
+      appCode.includes("function refundFailedWithdrawals(): string[] {")
+        && appCode.includes("if (refundWithdrawalDebit(wd)) done.push(wd.id);")
         && appVueCode.includes('for (const id of app.refundFailedWithdrawals()) bills.settleByRef(id, "failed");'));
-    // 🔴 单独一条,不并进上面那个合取:这一条是 runtime 门**覆盖不到**的那半边 ——
+    // 🔴 下面两条单独列,不并进上面那个合取:它们是 runtime 门**覆盖不到**的那半边 ——
     // withdraw-bill-runtime.mjs 只在 mock 模式跑(verify [2.5] 强制),而 mock 下
-    // creditRewardBucketOnce 照常工作,把这条腿改回去 runtime 门仍然全绿,
-    // 红的是 remote 下真实用户的钱。所以退款腿「不受 API 模式影响」只能静态守。
-    {
-      const body = appSrc.slice(appSrc.indexOf("function refundWithdrawalDebit"));
-      check("🔴 退款腿**不受 API 模式影响**(remote 是唯一建得出提现单的模式,退款不能在那里 no-op)",
-        appSrc.includes("function refundWithdrawalDebit(wd: Withdrawal): boolean {")
-          && !/remoteApiEnabled/.test(body.slice(0, body.indexOf("\n  }") + 4)));
+    // creditRewardBucketOnce 照常工作,把腿改回去 runtime 门仍然全绿,红的是 remote 下真实用户的钱。
+    // 扣款腿同理:给它加一句 `if (remoteApiEnabled) return false;`,mock 下的 runtime 门也照绿,
+    // 而 remote(唯一建得出提现单的模式)下 z5 修的原缺陷原样复活。所以两条腿都要静态守。
+    // 🔴 能力上界(独立复核实跑证伪出来的,写下来免得下一个人高估这三条):
+    //   它们钉的是「字面量在不在」,不是「它的结果被消费」。仍能绕过的两种写法:
+    //   ① 把 `remoteApiEnabled` 换成别名函数(如 `apiIsRemote()`)—— 正则扫不到;
+    //   ② 把 `readAccountSnapshot(...)` 写成空转调用、判重仍只查内存;
+    //      或把回滚两行留在死分支里。
+    //   真正守「结果被消费」的是 runtime 门(withdraw-bill-runtime.mjs ⑥⑦,行为级),
+    //   但它只在 mock 模式跑 —— 两道门是分工:静态守 remote-only 的形状,runtime 守 mock 下的行为。
+    //   两边都不覆盖的那一格(remote 下的真实行为)本仓目前无门,已登记进
+    //   docs/changes/2026-08-11-z5-out-of-scope-findings.md 的 H 项。
+    for (const fn of ["applyWithdrawalDebit", "refundWithdrawalDebit"]) {
+      const signature = `function ${fn}(wd: Withdrawal): boolean {`;
+      const at = appCode.indexOf(signature);
+      const end = at < 0 ? -1 : appCode.indexOf("\n  }", at);
+      // 🔴 fail-closed:签名找不到、或切不出函数体(indexOf 回 -1)一律判红。
+      // 上一版写成 `slice(0, body.indexOf(...) + 4)`,-1 时切出 `"fun"` 三个字符 → 正则恒不命中
+      // → 判据恒真(独立审计实测:函数体单行化后含 remoteApiEnabled 仍判 true)。
+      const body = at >= 0 && end > at ? appCode.slice(at, end) : "";
+      // 🔴 连**调用方**一起扫。独立复核实跑证伪:把 `if (remoteApiEnabled) return false;`
+      // 从函数体挪进调用方 refundFailedWithdrawals,退款腿在 remote 下整体死掉,而只扫函数体的
+      // 判据照绿 —— 早退挪个位置就绕过去了,判据必须覆盖「这条腿实际会不会执行」的整段路径。
+      const callerAt = appCode.indexOf("function refundFailedWithdrawals(): string[] {");
+      const callerEnd = callerAt < 0 ? -1 : appCode.indexOf("\n  }", callerAt);
+      const callerBody = callerAt >= 0 && callerEnd > callerAt ? appCode.slice(callerAt, callerEnd) : "";
+      check(`🔴 ${fn} **不受 API 模式影响**(remote 是唯一建得出提现单的模式,这条腿不能在那里 no-op)`,
+        !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody));
+      // 🔴 落盘失败必须回滚内存并报假。删掉这两行(退回「改了内存就当成功」),
+      // money-receipt / withdrawfee / runtime 门**全部照绿** —— 它们的原语名单里没有这两个新函数。
+      check(`🔴 ${fn} 落盘失败必须回滚内存并报假(否则刷新即回退,用户眼里钱凭空变化)`,
+        !!body && /adoptAccountSnapshot\(previousSnapshot\);\s*return false;/.test(body.replace(/\s+/g, " ")));
+      // 🔴 幂等判据必须**复读磁盘**,不能只查内存:内存必然陈旧(全仓无跨标签页 storage 监听),
+      // 而 usdtBalance 按增量累加合并 —— 只查内存时两个标签页的 5s 对账会各退一次(实测退两倍)。
+      check(`🔴 ${fn} 幂等要查**磁盘**快照(只查内存挡不住另一个标签页再动一次钱)`,
+        !!body && /readAccountSnapshot\(accountKey\.value\)/.test(body));
     }
+    // 🔴 接线门:判定对 ≠ 接上了。把提现页那一行调用删掉,上面全部静态判据照样绿,
+    // 而 runtime 门在 mock 下也测不出 remote 的行为 —— 调用点必须自己被 pin 住。
+    check("🔴 接线:提现建单成功后**真的调**了扣款(删掉调用行,其余判据全绿也拦不住)",
+      stripComments(readSrc("src/pages/me/wallet-withdraw.vue"))
+        .includes("app.applyWithdrawalDebit(wd)"));
     // 赠金释放只动桶和余额、不写账单 → 那行「处理中」的赠金会永远停着。从数据推出它已落地。
     // 判据必须钉到**真正干活的那一句**(遍历 bills.bills 并 settleByRef),
     // 只查条件行的话,把循环源换成空数组照样绿(红测实证:改 `for (const row of [])` 不红)。

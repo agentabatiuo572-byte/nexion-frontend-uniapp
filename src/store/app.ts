@@ -991,13 +991,37 @@ export const useApp = defineStore("app", () => {
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
     const key = "wd-debit:" + wd.id;
-    const currentUser = withDefaultEarningBuckets(user.value);
+    // 🔴🔴 写前**复读磁盘**,与同文件 creditRewardBucketInternal 逐字同形(见其 readAccountSnapshot 段)。
+    // 只查内存是不够的,而且是我这版最初的错:内存里的 `appliedRewardKeys` 与 `usdtBalance`
+    // **必然陈旧** —— 全仓没有任何跨标签页 storage 监听(App.vue 只监听 session 键),
+    // 而 `usdtBalance` 在 account-cloud 的 ADDITIVE_NUMBER_KEYS 里按**增量累加**合并:
+    // 内存判重挡不住另一个标签页再加一笔 delta,两笔都会落到余额上。
+    // z5 三份独立审计各自实跑复现:重复退款 40→100→160、超卖被夹 100→40→0。
+    const stored = readAccountSnapshot(accountKey.value);
     // 已扣过:重放(自愈补写 / 用户回退再进)不再动钱,如实回真 —— 调用方要的是
-    // 「这笔的扣款到位了没有」,不是「本次有没有写」。
+    // 「这笔的扣款到位了没有」,不是「本次有没有写」。盘上有键就以盘为准并把内存拉齐。
+    if (stored?.user.appliedRewardKeys?.[key]) {
+      adoptAccountSnapshot(stored);
+      return true;
+    }
+    const currentUser = withDefaultEarningBuckets(user.value);
     if (currentUser.appliedRewardKeys?.[key]) return true;
-    if (currentUser.usdtBalance < amount) return false;
+    // 🔴 余额闸取**内存与磁盘的较小者**。只看内存会放行「另一标签页已经花掉这笔钱」的扣款,
+    // 合并后余额为负、被 clampAccountFundInvariants 静默夹到 0 —— 实扣 < amount,
+    // 而退款按 amount 全额退,差额就是凭空造出来的钱(红队实测:$100 余额买 $100 商品 + 提 $100,
+    // 失败退款后净得 $100 商品 + $100 余额)。取较小者后这条路被堵在扣款之前。
+    // 诚实边界:localStorage 没有锁,「读」与「写」终究两步,亚毫秒级双写窗口仍在 ——
+    // 那是本仓全部资金原语的同族既有暴露(debitBalance 同形),不是本函数独有,已登记成卡。
+    // 判据是**磁盘值**,不是 min(内存, 磁盘)。合并层的真值是 `disk + (next − base)`,
+    // 而 base ≡ 上次落盘时的内存态,所以本次扣款落盘后余额 = `disk − amount` —— 判 disk 才对。
+    // 上一版写 min() 是错的(独立复核实测):disk 比内存**多**时(另一标签页刚退款 / 刚入金,
+    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,而扣款**没有自愈** = 余额永久虚高,
+    // 正好退回本包要修的那个原状态。取不到盘(storage 不可用)才回落内存。
+    const authoritativeBalance = typeof stored?.user?.usdtBalance === "number"
+      ? stored.user.usdtBalance
+      : currentUser.usdtBalance;
+    if (authoritativeBalance < amount) return false;
     const previousSnapshot = lastCloudSnapshot;
-    const before = moneyValues();
     const nextUsdt = +(currentUser.usdtBalance - amount).toFixed(2);
     const buckets = currentUser.earningBuckets;
     user.value = {
@@ -1007,12 +1031,18 @@ export const useApp = defineStore("app", () => {
       earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
       appliedRewardKeys: { ...currentUser.appliedRewardKeys, [key]: true },
     };
-    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
-    addMoneyApplied(applied);
+    // 🔴🔴 **刻意不进 moneyApplied**,与 recordDeposit 同一条禁令(见其头注)。
+    // moneyApplied 是 restoreMoney 的冲正基准 = 「本标签页动过、且**可以回滚**的钱」。
+    // 提现的钱由服务端在建单事务里落定,**不可回滚**;记进去的话,别处一次
+    // 「captureMoney → 失败 → restoreMoney」就会把这笔提现连同它的退款一起冲掉:
+    // 退款被吞而 `wd-refund:` 键已置位、永不重试 = 用户的钱静默消失(z5 独立审计)。
+    // 触发不需要同一条调用链 —— App.vue 的 5s 对账是定时器驱动的,能落进任何一个
+    // capture/restore 窗口(质押 / 复投 / 结算都有)。
+    // 下一个照着 debitBalance 给这里补 addMoneyApplied 的人,会造出一条很难查的丢钱路径。
     return true;
   }
 
@@ -1040,24 +1070,36 @@ export const useApp = defineStore("app", () => {
     if (!Number.isFinite(amount) || amount <= 0) return false;
     const debitKey = "wd-debit:" + wd.id;
     const refundKey = "wd-refund:" + wd.id;
+    // 🔴🔴 写前**复读磁盘**(同 applyWithdrawalDebit 头注,同 creditRewardBucketInternal 范式)。
+    // 退款是这条链上唯一「加钱」的动作,只查内存的后果最重:两个标签页的 5s 对账各退一次,
+    // 而 usdtBalance 按增量累加合并 —— 两笔 `+amount` 全部计入 = 退了两倍。
+    // 三份独立审计各自实跑复现(40 → 100 → **160**)。
+    const stored = readAccountSnapshot(accountKey.value);
+    const storedKeys = stored?.user.appliedRewardKeys;
+    // 条件直接写 `stored?.` 而不是 `storedKeys?.` —— tsc 只在前者上把 stored 收窄成非 null。
+    // 🔴 命中即**直接返回,不 adopt**。这条路被 App.vue 的 5s 对账每一拍都走一遍
+    // (失败单永不离开 withdrawals 列表),而 adoptAccountSnapshot 是**整体覆写**
+    // user/devices/earnings/withdrawals 并重置 tick 聚合 —— 等于 12 次/分钟的全量状态覆写;
+    // 且 stored 是未过 hydrateSnapshotEconomics 的原始行,会把 legacy 设备的派生字段写回 undefined。
+    // 这里只需要「别退第二次」,不需要同步任何东西(独立复核实测发现的新引入问题)。
+    if (stored?.user.appliedRewardKeys?.[refundKey]) return false;
     const currentUser = withDefaultEarningBuckets(user.value);
     // 没扣过就没得退(remote 对齐期建的存量单、或扣款那步失败的单)——
     // 退一笔没扣过的钱就是凭空造钱,这一条比「漏退」严重得多。
-    if (!currentUser.appliedRewardKeys?.[debitKey]) return false;
+    // 内存与磁盘任一记着扣过即算扣过:扣款可能发生在**另一个标签页**。
+    if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;
     if (currentUser.appliedRewardKeys?.[refundKey]) return false;
     const previousSnapshot = lastCloudSnapshot;
-    const before = moneyValues();
     user.value = {
       ...currentUser,
       usdtBalance: +(currentUser.usdtBalance + amount).toFixed(2),
       appliedRewardKeys: { ...currentUser.appliedRewardKeys, [refundKey]: true },
     };
-    const applied = moneyDeltaSince(before);
     if (!persistAccountSnapshot()) {
       adoptAccountSnapshot(previousSnapshot);
       return false;
     }
-    addMoneyApplied(applied);
+    // 🔴🔴 与扣款同一条禁令:**不进 moneyApplied**(见 applyWithdrawalDebit 尾注)。
     return true;
   }
 

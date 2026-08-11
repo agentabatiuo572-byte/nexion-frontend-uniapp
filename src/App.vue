@@ -176,7 +176,10 @@ function reconcileBills() {
   //
   //    z4 R2 我把它改成了「单据是失败终态」,理由是原判据(本地退款幂等键)在 remote 模式下
   //    永不成立、这条冲正因此不可达。**那个改法是错的**(R3 独立审计当场揪出,我复核后确认):
-  //    remote 模式下 `refundFailedWithdrawals` 整个是 no-op,服务端也**没有**「失败提现退还已烧
+  //    ⚠️ 2026-08-11 z5 起,下面这句只对 **NEX 腿**成立,别再读成整个函数 —— USDT 本金腿
+  //    已改走 `refundWithdrawalDebit`(不含 remoteApiEnabled 分支),remote 下正常退款;
+  //    本段结论不变,因为它取舍的判据本来就只关 NEX 那一条腿。
+  //    remote 模式下 `refundFailedWithdrawals` 的 **NEX 腿**是 no-op,服务端也**没有**「失败提现退还已烧
   //    NEX」这条契约(全仓与 docs/specs 都查不到)。按终态就写 +N,等于账本单方面宣布一笔
   //    没有任何证据的退款 —— 比「少一条冲正」坏得多:少一条是漏记,凭空写一条是造假。
   //    我上一版还在这里写「mock 下排在退款之后,两种模式都不会方向反」,两条腿都不成立
