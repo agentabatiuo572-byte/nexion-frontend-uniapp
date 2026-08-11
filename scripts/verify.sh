@@ -2504,6 +2504,22 @@ money_cas_gate() {
 }
 money_cas_gate
 
+# ── 提现失败路径门(包 z2 R2 结构性反思 · 族 A,2026-08-11)──
+# 同一个任务里三次写下「失败时会如何如何」的注释,三次都与实际行为相反(建单后其实没落盘 /
+# 跨标签页写入其实进不来 / 落盘失败其实会把刚建的单静默抹掉)。共同根因:**正常路径会跑浏览器、
+# 会写固定靶,失败路径只写注释,而注释不参与执行,写什么都不会红。**
+# 根治 = 失败路径的行为断言必须有一条注入该失败的测试;本门就是那条测试。
+# 判据:载真 app store + 真 account-cloud + 真 storage 语义,注入写失败与刷新。
+withdraw_failpaths_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-failpaths.mjs > /tmp/uniapp-withdraw-failpaths.log 2>&1; then
+    ok "提现失败路径门 — $(tail -1 /tmp/uniapp-withdraw-failpaths.log)"
+  else
+    bad "提现失败路径门失败 — node scripts/selfcheck-withdraw-failpaths.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-withdraw-failpaths.log | head -8 | sed 's/^/        /'
+  fi
+}
+withdraw_failpaths_gate
+
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
 # 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表

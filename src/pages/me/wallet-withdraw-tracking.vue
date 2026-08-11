@@ -112,8 +112,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type CSSProperties } from "vue";
-import { onLoad, onShow } from "@dcloudio/uni-app";
+import { computed, onUnmounted, ref, type CSSProperties } from "vue";
+import { onLoad, onShow, onHide } from "@dcloudio/uni-app";
 import { withdrawalApi } from "@/api/runtime";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import { mockServerNow } from "@/store/server-time";
@@ -200,11 +200,22 @@ const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
  * 「再提一笔」永不置灰,点进提现页却被日限拦死 —— 正是本文上面那句「同源」要消灭的分裂,
  * 只是换了触发条件(R1 四份独立审计各自点名)。onShow 补拉:从提现页返回、切回前台都会重取。
  */
+const withdrawalPolicyLoading = ref(false);
 async function loadWithdrawalPolicy(): Promise<void> {
+  // 🔴 在途守卫:抄提现页那份 loader 时我漏抄了它。onShow 与 onMounted 首次进入会各触发一次,
+  // App 端每次回前台再叠一次 —— 没有守卫就会重复发请求,且**后到的响应覆盖先到的**。
+  if (withdrawalPolicyLoading.value) return;
+  withdrawalPolicyLoading.value = true;
   try {
     withdrawalPolicy.value = await withdrawalApi.policy();
   } catch {
-    withdrawalPolicy.value = null;
+    // 🔴 失败时**什么都不做**——保留上一次拿到的好值。
+    // 清空会让限额回落 0、判定按「不限制」放行:回前台那一刻网络抖一下,「再提一笔」就解灰,
+    // 点进去却被提现页拦死。仓内同类钱路径配置的既有惯例是失败朝「关」(见 genesis-config 的
+    // catch → marketOpenState:"closed")。设计上说的 fail-open 是「从没取到过」,
+    // 不是「取到过又被抹掉」——这两件事被我上一版混成了一件。
+  } finally {
+    withdrawalPolicyLoading.value = false;
   }
 }
 /**
@@ -215,17 +226,19 @@ async function loadWithdrawalPolicy(): Promise<void> {
  */
 const nowTick = ref(mockServerNow());
 let dayTimer: ReturnType<typeof setInterval> | undefined;
-onMounted(() => {
-  void loadWithdrawalPolicy();
-  dayTimer = setInterval(() => (nowTick.value = mockServerNow()), 60_000);
-});
+const stopDayTimer = () => { if (dayTimer) { clearInterval(dayTimer); dayTimer = undefined; } };
+// 🔴 定时器起停挂 onShow/onHide **成对**,不能只挂 onUnmounted —— 仓内明文硬规则(P-063),
+// 且隔壁 support/chat 就是这么写的。uni 页面栈会保活页面实例,前进离开时 onUnmounted 不触发:
+// 每往返一次就多留一个常驻 60s tick。我抄追踪页这段时只抄了「加个定时器」,没抄那条约束。
 onShow(() => {
   nowTick.value = mockServerNow();
+  stopDayTimer();
+  dayTimer = setInterval(() => (nowTick.value = mockServerNow()), 60_000);
   void loadWithdrawalPolicy();
 });
-onUnmounted(() => {
-  if (dayTimer) clearInterval(dayTimer);
-});
+onHide(stopDayTimer);
+onUnmounted(stopDayTimer); // 兜底:onHide 不触发的场景(直接销毁)仍要清
+
 // app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
 const dailyLimit = computed(() => {
   void platformDayIndex(nowTick.value); // 建立对「平台日边界」的依赖,不参与计算
