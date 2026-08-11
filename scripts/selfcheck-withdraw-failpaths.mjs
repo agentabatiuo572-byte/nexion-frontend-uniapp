@@ -176,6 +176,25 @@ const refresh = () => { app.bindAccount(ACCT); };
     `磁盘 ${(diskWithdrawals() ?? []).length} 条 / 注入前 ${firstDisk} 条`);
 }
 
+// ── ③b 🔴🔴 放回内存之后,它扛不扛得住下一次资金写 ────────────────
+// R3 独立审计在仓外沙箱复现:放回内存时只改了 withdrawals,没同步「比对基准」,
+// 于是任何**兄弟资金原语**的失败回滚(它们一律 adoptAccountSnapshot(旧快照))
+// 会把这一单再抹掉一次 —— 触发条件与本修法针对的条件是同一个(存储写不进去)。
+// 这条必须在真 store 上验:它是「我的修法到底立不立得住」的判据。
+{
+  reset();
+  await submit();                        // 磁盘上先有一行
+  failKey = (key) => key === CLOUD_KEY;  // 从此写不进去
+  const id2 = await submit();            // 落盘失败 → 放回内存
+  const inMemAfterPutBack = app.withdrawals.some((w) => w.id === id2);
+  // 兄弟资金原语:同样写不进去 → 它会走自己的失败回滚
+  const credited = app.creditBalance(1);
+  const survives = app.withdrawals.some((w) => w.id === id2);
+  check("🔴🔴 ③b 放回内存的单扛得住兄弟资金原语的失败回滚(否则修法等于没修)",
+    inMemAfterPutBack && credited === false && survives,
+    `放回=${inMemAfterPutBack} 入账返回=${credited} 仍在=${survives} 内存=${JSON.stringify(app.withdrawals.map((w) => w.id))}`);
+}
+
 // ── ④ 诚实边界:落盘失败 + 刷新 = 这一单会丢。写下来,免得被当成已覆盖 ──
 {
   reset();

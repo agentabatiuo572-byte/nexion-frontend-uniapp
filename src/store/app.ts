@@ -1299,6 +1299,13 @@ export const useApp = defineStore("app", () => {
     // 代价:内存有、磁盘无,直到下一次成功落盘补上。真闸在服务端,不会因此放行超额提现。
     if (!persistAccountSnapshot()) {
       withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+      // 🔴🔴 基准也要一起补,否则「放回内存」只活到下一次资金写为止。
+      // 兄弟资金原语(creditBalance / debitBalance / 奖励入账…)失败时一律
+      // `adoptAccountSnapshot(previousSnapshot)`,而 previousSnapshot 就是这个
+      // lastCloudSnapshot —— 它此刻还是**磁盘上那份不含本单的旧行**,回滚一次就把单又抹掉。
+      // 而触发它的条件(存储写不进去)与触发本分支的条件是**同一个**,所以必然连着发生。
+      // R3 独立审计在沙箱复现,我在真 store 上复验:放回=true → creditBalance 失败回滚 → 仍在=false。
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: withdrawals.value };
     }
     // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
     // pre-check engine; the server keeps its own authoritative copy.
