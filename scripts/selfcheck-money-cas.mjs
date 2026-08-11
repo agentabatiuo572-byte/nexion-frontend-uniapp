@@ -3,7 +3,7 @@
 //   node scripts/selfcheck-money-cas.mjs
 //
 // 背景(2026-08-04 存量 P1 二期 · 跨标签页竞态双记账):
-//   质押(staking)一期把 writeAccountRowCas 立起来之后,同型缺陷还留在六个 store 上
+//   质押(staking)一期把 writeAccountRowCas 立起来之后,同型缺陷还留在五个 store 上
 //   (判据见 docs/changes/2026-08-04-staking-cas-redtest.md 的「后续」表):
 //     deposits          入金单状态推进 + 到账入账,两端并发推进 = 同一笔充值入账两次
 //     voucher           代金券 claim 账本,同一张券两个标签页各领一次
@@ -17,13 +17,13 @@
 //
 // 🔴 守的不变量(编号对应红测文档 docs/changes/2026-08-04-money-cas-p1.md):
 //   ① 变更的前置条件在**磁盘最新状态**上复核 —— 别处已经领走 / 推进过的不再放行,
-//      余额 / 计数器只动一次(六个 store 各自的固定靶)。
+//      余额 / 计数器只动一次(五个 store 各自的固定靶)。
 //   ①b 「读完到写之间被插队」也拦得住 —— rev 版本号 CAS(写前复读挡不住这一格)。
 //   ② 正常单标签页路径不受影响(领取 / 入账 / 抽奖 / 占额度照常成交并落盘)。
 //   ③ 失败可区分:版本冲突 conflict=true,「本来就不该成交」conflict=false。
 //   ④ 向后兼容:writeAccountRow 逐字节没动,未接 CAS 的 store 行为一致。
 //   ⑤ 追加型变更冲突时重放到最新列表上,两个标签页各建的单都留得住 + 主键不重号。
-//   ⑥ 接线门:六个 store 真的全路径走了 CAS,页面真的接了失败信号(判定对不对 /
+//   ⑥ 接线门:五个 store 真的全路径走了 CAS,页面真的接了失败信号(判定对不对 /
 //      有没有被接上,是两道门)。
 //
 // 方法(同 selfcheck-staking-cas.mjs):结构断言跑在**剥注释后的正主源码**上(注释里出现

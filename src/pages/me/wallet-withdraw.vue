@@ -361,7 +361,6 @@ import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } f
 import { mockServerNow } from "@/store/server-time";
 import {
   evaluateWithdrawal,
-  dailyLimitStatus,
   requestWithdrawalEligibility,
   type WithdrawalEligibility,
 } from "@/store/withdrawal-eligibility";
@@ -371,6 +370,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
+import { ApiError } from "@/api/errors";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 // 提现网络收窄裁决:仅 USDT 三网络(可选;每网络各有独立当前地址,RM01a)。
@@ -432,6 +432,21 @@ const dailyFacts = computed(() => ({
   withdrawals: app.withdrawals,
 }));
 const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) }));
+/**
+ * 服务端「今日笔数已达上限」拒单的识别。
+ *
+ * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
+ * 但 code 是 HTTP 状态码(超日限多半统一 4xx,认不出是哪条规则),真正区分规则的是
+ * 服务端 envelope 的 message。契约里还没钉死这个串 —— 所以这里按**一组候选**宽松匹配,
+ * 并且**只用于换一句更准的话**,认不出就回落原文案,认错也不会放行或拦截任何东西。
+ * 待后端定名后收敛成单串:见 HANDOFF U-4。
+ */
+function isDailyLimitRejection(err: unknown): boolean {
+  const msg = err instanceof ApiError ? err.message : "";
+  if (!msg) return false;
+  const upper = msg.toUpperCase();
+  return upper.includes("DAILY_LIMIT") || upper.includes("DAILY_COUNT") || upper.includes("WITHDRAW_LIMIT_EXCEEDED");
+}
 // 今日笔数用完时的提示 + 下次可提时刻(平台日边界,按用户本地时钟展示)
 const dailyLimitReachedText = computed(() => {
   // 🔴 给「MM-DD HH:mm」绝对时刻,不写「明日」。平台日按越南时区(UTC+7)切,
@@ -896,6 +911,15 @@ async function handleSubmit() {
     policyVersion: withdrawalPolicy.value!.policyVersion,
     idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     quote: q,
+    // 🔴 日限事实**也进快照**,与 account 同源同刻。曾经这里刻意取活值,理由写的是
+    // 「确认弹窗期间另一个标签页提交成功,冻住的快照看不见它」—— 那句话是错的:
+    // 提现单列表是内存状态,别的标签页的写入根本不进本标签页(全仓没有任何 storage 事件
+    // 重新水合 store),活值与快照在跨标签页这件事上一样瞎。取活值买不到它声称的东西,
+    // 却引入了真问题:弹窗期间切账号,会拿**新账号的单据**去判**旧账号的额度**,
+    // 弹出一句对这个账号纯属虚假的「今日已用完」(R1 三份独立审计各自抓到)。
+    // 同标签页内输入面已锁、列表不会新增行,冻结无损失,还把「await 后只读 snap」这条
+    // 不变量恢复成没有例外。跨标签页并发由服务端事务兜底,本来就不该客户端管。
+    daily: dailyFacts.value,
     // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
     fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
   };
@@ -945,10 +969,7 @@ async function handleSubmit() {
       snap.network,
       snap.address,
       snap.maxWithdrawable,
-      // 🔴 日限事实取**当下活值**,不进 snap:snap 是「弹窗给用户看的那一份」,
-      // 刻意冻在确认前;而日限是道闸,要的是最新的单据列表 —— 确认弹窗 + 600ms 评估
-      // 这段时间里另一个标签页提交成功的话,冻住的快照正好看不见它。
-      dailyFacts.value,
+      snap.daily,
       snap.amount,
     );
   } catch (err) {
@@ -1012,8 +1033,17 @@ async function handleSubmit() {
     }
     uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
     return;
-  } catch {
+  } catch (err) {
     clearSubmitFreeze();
+    // 🔴 服务端拒单要说**服务端拒的那个原因**,不能一律回落「费率已更新」。
+    // 本包把并发场景明确交给「服务端事务拒掉第二笔」兜底 —— 那条路径的落点就是这里,
+    // 而它此前把超日限拒单说成费率问题,还顺手 loadWithdrawalPolicy() 诱导用户再试一次
+    // (试多少次都一样)。R1 两份独立审计各自点名:修了咽喉却没验流量真过咽喉。
+    // 服务端的 kind/code/message 本来就带着,只是先前无人分诊。
+    if (isDailyLimitRejection(err)) {
+      toast.error(dailyLimitReachedText.value);
+      return;
+    }
     await loadWithdrawalPolicy();
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;
