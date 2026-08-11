@@ -1876,7 +1876,7 @@ export const vi: Messages = {
   },
   wallet: {
     title: "Ví",
-    usdtBalance: "USDT có thể rút",
+    usdtBalance: "Số dư USDT",
     nexBalance: "Số dư NEX",
     pending: "Đang chờ",
     reviewingEarnings: "Đang xét duyệt",
@@ -2169,7 +2169,7 @@ export const vi: Messages = {
     slotsOpen: "còn {n} khe thiết bị trống",
     slotsOpenPlural: "còn {n} khe thiết bị trống",
     addDeviceCta: "Thêm thiết bị →",
-    usdtBalance: "USDT có thể rút",
+    usdtBalance: "Số dư USDT",
     pendingHint: "+${n} đang chờ · tự động xác nhận mỗi 24h",
     walletBucketsHint: "${review} đang xét duyệt · ${locked} bị khóa",
     nexTokens: "NEX token",
