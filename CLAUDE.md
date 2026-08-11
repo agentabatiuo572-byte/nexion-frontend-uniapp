@@ -16,7 +16,7 @@ This file provides guidance to Claude Code when working in this repository.
 ## Common commands
 
 ```bash
-npm run dev:h5            # H5 dev → http://localhost:5173（verify 期望此端口）
+VITE_NEXGRID_API_MODE=mock npm run dev:h5     # H5 dev（verify 的合法靶必须是 mock 模式）
 npm run dev:mp-weixin     # 微信小程序 dev
 npm run build:h5          # H5 生产构建 → dist/
 npm run type-check        # vue-tsc --noEmit（宣布完成前必须 0 错）
@@ -24,7 +24,16 @@ bash scripts/verify.sh    # 全量自测：类型 + i18n 镜像 + HTTP200 + 源�
 node scripts/i18n-key-mirror.mjs   # en/zh 双语 key 镜像（94 namespace）
 ```
 
-`verify.sh` 打 `http://localhost:5173`——dev server 必须在 5173 跑。verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。
+🔴 **verify 前先确认「靶子是本树 + mock 模式」**，两条都不满足就别看结论：
+
+```bash
+VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5399
+BASE_URL=http://localhost:5399 bash scripts/verify.sh
+```
+
+主 checkout 可以直接用默认 5173；**worktree 必须换端口并显式传 `BASE_URL`**——`BASE_URL` 默认 5173，而 5173 上多半是主 checkout 的 server，13 道运行时门会安静地验**另一棵树**还一路报 PASS。实测代价：同一提交对着错靶子跑出 10 红、对着本树 mock 跑是 418 pass / 0 fail——「一堆既有红门」整个是环境假象。`[2.6] 树身份 preflight` 现在会把这种情况判红（判据 `VITE_ROOT_DIR`，探不到也红）。
+
+verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另有一份哨兵文件 `.verify-exit.code`（`| tail` 会吞掉真实退出码，**外部判定读文件不读管道**）。
 
 ## 完成门（宣布 module done 前必走）
 

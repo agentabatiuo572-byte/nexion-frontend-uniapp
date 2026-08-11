@@ -1095,3 +1095,64 @@ worktree 下解析进了 `.claude/worktrees/` 里,文件恒读不到 —— 是�
 不要写成「在某个地方查有没有」。** 前者对搬家/包壳天然免疫,后者是打地鼠。
 🔴 **同一族出过 N 种形状之后,形状判据已经不够了,必须补一道行为门**
 (`scripts/guard-liveness-runtime.mjs`:真浏览器跑那条越权路径,代码怎么重构都拦得住)。
+
+---
+
+## P-082 · verify 对着「另一棵树」跑,还一路报 PASS —— 假红门批量制造机
+
+**踩坑(2026-08-11,独立审计 v4 报「37-38 条既有红门」追根)**
+
+审计结论是:`verify.sh` 末行 `[ $fail -eq 0 ]`,但链上有 37-38 条既有失败(两次跑还分别是 37 / 38),
+所以退出码恒 1、新门由 PASS 翻 FAIL 不可观测。回源实测后,**这个前提本身不成立**:
+
+| 跑法 | 靶子 | 结果 |
+|---|---|---|
+| A | `BASE_URL` 默认 5173 = **主 checkout** 的 server,且是 remote 模式 | 408 pass / **10 fail** |
+| B / B2 | 本 worktree + `VITE_NEXGRID_API_MODE=mock`,显式传 `BASE_URL` | 418 pass / **0 fail**(两次完全一致) |
+
+**根因**:`BASE_URL` 默认 `http://localhost:5173`,而 worktree 里 5173 上跑的是主 checkout 的 dev server。
+`[2]` 段那道「认工程」的判据用 `vi.ts` 在不在,只能分辨「是不是本产品」(vs janus / CC),
+**分辨不了「是不是本 checkout」——每棵 worktree 都有 vi.ts**。于是 13 道 `BASE_URL` 运行时门
+整体验了另一棵树上的另一个分支,还报 PASS;剩下那些跨不过 remote 模式的就变成「既有红门」。
+A 里那 10 条红(`SESSION_EXPIRED` / `API_ENVELOPE_INVALID` / 「OTP 步骤没出现」)全是 remote 模式的症状,
+不是代码回归。所谓「不稳定的 37 / 38」也是同一个假象:换成正确靶子后两次跑一模一样。
+
+**为什么以前没抓到**:`CLAUDE.md` 当时写的是「dev server 必须在 5173 跑」——
+这条指令在 worktree 里的字面执行结果,就是「把 verify 指向主 checkout」。文档本身在制造这个坑。
+
+**修法(三层都落了)**
+
+1. **机器门** `[2.6] 树身份 preflight`:`VITE_ROOT_DIR`(`@dcloudio/vite-plugin-uni` 注入,就是 vite 的 root)
+   与 `PROJECT_DIR` 规范化后比对,不等即红。这个值 `[2.5]` 早就拉进 `served_env_head` 了,白捡。
+   🔴 **探不到也红**(P-080):uni 哪天不发这个键,门要红给人看,不能静默变空门。
+   红测 5 例:本树 mock(绿)/ 别的树 remote(红)/ **别的树但 mock(红 —— 这一例证明老的 API-mode 门抓不到)**/
+   mock 但没 `VITE_ROOT_DIR`(红)/ 没 server(红)。
+2. **文档** `CLAUDE.md`:删掉「必须在 5173 跑」,改成「先确认靶子是本树 + mock」并给出 worktree 的换端口跑法。
+3. **心智**:🔴 **判「门红了」之前先判「验的是不是本树」**。同型见 memory「认树别靠 HTTP 200,靠差集指纹」。
+
+**连带修掉的两件事**
+
+- **退出码送不到人手里**:`.claude/settings.json` 直接挂 `bash scripts/verify.sh all` 当 Stop hook,
+  而 hook 语义是 exit 2 才阻断且只回喂 **stderr**,verify 只会给 0/1 且 158 处 FAIL 全打 **stdout**
+  → 红了既拦不住也说不出话。改法照抄同工作区 `Nexion-admin-prototype` 早就写对的
+  `.claude/hooks/verify-on-stop.mjs`(捕获 → stderr → exit 2),并且**环境不满足(靶子不对 / 没 server)
+  只警告不阻断**,免得没起 server 的机器每回合被顶回去。
+- **管道吞退出码**(WF-7 2026-07-09 / WF-10 2026-08-06,同型第 2 次,admin-ops 已焊、本仓一直挂账):
+  `verify.sh` 末尾 `trap EXIT` 原子写 `.verify-exit.code`,**外部判定读文件不读管道**。
+  `trap` 覆盖 `set -u` 半路暴毙那条路径 —— 那条路连 result 行都不会打,只有哨兵文件还能说真话。
+- **SKIP 不进账**:6 处 SKIP 以前是裸 `printf`,两个计数器都不碰,「0 fail」既可能是全跑过了也可能是
+  少跑了 6 道。现在 `skipped()` 计数,末行改成 `[ $fail -eq 0 ] && [ $skip -eq 0 ]`。
+
+**方法论**:🔴 **「一堆既有红门」先当环境假象查一遍再当技术债**。
+先问「靶子对不对」,再问「门对不对」——顺序反了,就会去给 37 条假红建「已知失败台账」,
+把环境噪声永久焊成「已知正常」。同仓已有前车之鉴:
+`docs/audit/2026-08-07-probe-and-guard-audit.md:600`(dom-qa 的 `--update-ledger` 对着坏 origin 收编一次,
+从此对「探不到」全盲)。
+
+**收尾(主人 2026-08-11 拍板 A)**:`.claude/hooks/` + `.claude/settings.json` 放开入库,
+让质量门本身跟着代码走版本 —— 原来 6 棵树各存一份、改一处要手拷 5 次,靠手动同步的守卫
+迟早漂移失效。gitignore 写法要注意:必须写 `.claude/*` 而不是 `.claude/`,父目录被整体忽略时
+git 不会递归进去、底下的 `!` 豁免会**静默失效**(经典陷阱)。已实测 `git add -A --dry-run`:
+只多进 2 个文件,主 checkout 底下那 9 棵 worktree 和 `settings.local.json` 一个没漏进来。
+连带语义变化:这道门从「装饰品」变成**真会拦人**的门 —— 但只在「靶子是本树 mock server」时拦;
+靶子不对(平时 remote 模式)只警告不拦,不会把没起 server 的人每回合顶回去。

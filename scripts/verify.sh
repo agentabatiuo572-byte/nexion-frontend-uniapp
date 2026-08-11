@@ -26,7 +26,22 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0
+pass=0; fail=0; skip=0
+
+# 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
+# admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
+# 待复制同款」)。why:`verify.sh | tail -60` 这种顺手写法,管道退出码 = tail 的 0,两次都
+# 差点把「门断在半路」读成全绿。外部判定**读这个文件,不读管道**。
+# trap EXIT 覆盖所有退出路径,含 set -u 半路暴毙 —— 那条路径连 result 行都不会打,
+# 只有哨兵文件还能说出真话。.tmp$$ 带 PID:6 棵树挂着同一个 Stop hook,并发跑不许互相踩。
+VERIFY_EXIT_SENTINEL="${VERIFY_EXIT_SENTINEL:-$PROJECT_DIR/.verify-exit.code}"
+_write_exit_sentinel() {
+  local rc=$?
+  printf '%s\n' "$rc" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
+    && mv -f "$VERIFY_EXIT_SENTINEL.tmp$$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
+  return $rc
+}
+trap _write_exit_sentinel EXIT
 CURL_BIN="${CURL_BIN:-curl}"
 if [ -f /proc/version ] && grep -qi microsoft /proc/version && command -v curl.exe >/dev/null 2>&1; then
   CURL_BIN="curl.exe"
@@ -50,6 +65,9 @@ fi
 
 ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
 bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
+# 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
+# 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
+skipped() { printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
 
 check_http() {
   local label="$1" route="$2"
@@ -143,7 +161,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   # Ported routes append here as Batch 1/2 land:
   # check_http "Earn" "/#/pages/earn/earn"
 else
-  printf "  ${Y}SKIP${N}  dev server not running at %s (run: npm run dev:h5)\n" "$BASE_URL"
+  skipped "dev server not running at $BASE_URL (run: npm run dev:h5)"
 fi
 
 # ── (3) source hygiene sentinels ──
@@ -159,6 +177,27 @@ elif echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
   ok "API-mode preflight: server 运行在 mock 模式(运行时探针的合法靶)"
 else
   bad "API-mode preflight: server 非 mock 模式 —— 起法:VITE_NEXGRID_API_MODE=mock npm run dev:h5(remote 默认值会让全部运行时探针验错对象)"
+fi
+
+# ── [2.6] dev server **树身份**前置断言(2026-08-11)────────────────────────────
+# 上面 [2] 的 vi.ts 判据只认「是不是本产品」(vs janus / CC),认不出「是不是**本 checkout**」——
+# vi.ts 每个 worktree 都有。实测代价:在 worktree 里不带 BASE_URL 跑,BASE_URL 默认 5173 =
+# 主 checkout 的 server,13 道 BASE_URL 运行时门整体验了**另一棵树**,还一路报 PASS。
+# 这就是「37-38 条既有红门」的真相:换成本树 mock server 后同一提交 418 pass / 0 fail。
+# 判据:VITE_ROOT_DIR 由 @dcloudio/vite-plugin-uni 的 CLI 注入、就是 vite 的 root,
+# [2.5] 已经把它拉进 served_env_head 了,白捡。规范化两边(大小写 / 反斜杠 / 盘符)后比对。
+# 🔴 探不到也红(禁 skip):P-080「探不到 ≠ 无违例」——uni 哪天不发这个键,这道门要红给人看,
+#    不能静默变空门。
+_norm_tree_path() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's|\\\\|/|g; s|\\|/|g; s|^/cygdrive/||; s|^/||; s|^\([a-z]\):|\1|; s|//*|/|g; s|/$||'; }
+served_root=$(printf '%s' "$served_env_head" | grep -o '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//')
+if [ -n "$served_env_head" ]; then
+  if [ -z "$served_root" ]; then
+    bad "树身份 preflight: $BASE_URL 的 env 里没有 VITE_ROOT_DIR —— 判据失效即判红,别当没违例(uni 版本变更?回源看 runtime-config.ts 首行)"
+  elif [ "$(_norm_tree_path "$served_root")" = "$(_norm_tree_path "$PROJECT_DIR")" ]; then
+    ok "树身份 preflight: server 服务的就是本树($served_root)"
+  else
+    bad "树身份 preflight: $BASE_URL 服务的是**另一棵树** —— server=[$served_root] 本树=[$PROJECT_DIR];所有 BASE_URL 运行时门会验错对象。起法:BASE_URL=http://localhost:<本树端口> 且 VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port <本树端口>"
+  fi
 fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
 # (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
@@ -277,7 +316,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  bare login-entry system chrome runtime geometry (dev server not running at %s)\n" "$BASE_URL"
+  skipped "bare login-entry system chrome runtime geometry (dev server not running at $BASE_URL)"
 fi
 # ── SPEC-1 R7: factor reads device truth, never the viewing carrier ──
 sentinel_present "SPEC-1 R7 online seam exported" src/lib/hashpower.ts 'export function isDeviceOnline'
@@ -1013,7 +1052,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  SPEC-6 entry-surface runtime isolation (dev server not running at %s)\n" "$BASE_URL"
+  skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
 fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
@@ -1024,7 +1063,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  R7 + device detail runtime (dev server not running at %s)\n" "$BASE_URL"
+  skipped "R7 + device detail runtime (dev server not running at $BASE_URL)"
 fi
 # 注册成功页的平台边界是编译条件,UA 伪造无法证明 App 分支。锁住 H5
 # 提醒块、App 无提醒、底部继续入口和官网配置字段这四个不变量。
@@ -1382,8 +1421,8 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
   fi
 else
-  printf "  ${Y}SKIP${N}  SPEC-4 account-cloud app sync (dev server not running at %s)\n" "$BASE_URL"
-  printf "  ${Y}SKIP${N}  SPEC-4 runtime session guard (dev server not running at %s)\n" "$BASE_URL"
+  skipped "SPEC-4 account-cloud app sync (dev server not running at $BASE_URL)"
+  skipped "SPEC-4 runtime session guard (dev server not running at $BASE_URL)"
 fi
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`
 # close tag compiles fine under vue-tsc/volar (lenient: script extends to EOF)
@@ -2759,5 +2798,5 @@ else
   tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
 fi
 
-echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
-[ $fail -eq 0 ]
+echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
+[ $fail -eq 0 ] && [ $skip -eq 0 ]
