@@ -89,6 +89,53 @@ else
   bad "i18n en/zh key mismatch"; head -20 /tmp/uni-i18n-mirror.log | sed 's/^/        /'
 fi
 
+# ── 硬编码中文哨兵(2026-08-11)──────────────────────────────────────────────
+# 上面的镜像门只保证「已进词典的 key 三语齐」,对**压根没进词典**的字符串无感:
+# c37e642 一个提交把 10 个文件的用户可见文案直接写成中文,本文件里所有文案哨兵
+# (mock/演示词表 · funnel-meta · TRIAL02 · markdown 残留)全部没响 —— 它们只扫
+# src/i18n/messages/*.ts 的值,且判据是**枚举词表**,新词天然不在表里。
+# 本门反过来判:src/**/*.{vue,ts} 注释之外**含 CJK 即拦**,不枚举任何词。
+i18n_cjk_gate() {
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest > /tmp/uni-i18n-cjk-selftest.log 2>&1; then
+    ok "$(tail -1 /tmp/uni-i18n-cjk-selftest.log)"
+  else
+    bad "i18n-cjk selftest 失败(哨兵失效即门失效;node scripts/i18n-hardcoded-cjk-sentinel.mjs --selftest 看明细)"
+    tail -8 /tmp/uni-i18n-cjk-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if "$NODE_BIN" scripts/i18n-hardcoded-cjk-sentinel.mjs > /tmp/uni-i18n-cjk.log 2>&1; then
+    ok "$(tail -1 /tmp/uni-i18n-cjk.log)"
+  else
+    bad "页面/组件里有硬编码中文 — 搬进 src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读"
+    tail -12 /tmp/uni-i18n-cjk.log | sed 's/^/        /'
+  fi
+}
+i18n_cjk_gate
+
+# ── 远端权威契约门(2026-08-10 接线)────────────────────────────────────────────
+# 它此前是**孤儿门**:package.json 的 verify 链没有它,本文件也没有它 —— 于是它红了
+# 半天没人知道(实测:本轮把 wallet-exchange 的中文文案收进 i18n 后 G2 立刻红,
+# 而两条链全绿)。更糟的是它原本把判据锚在中文字面量上,与上面那道「不许有中文」
+# 的门方向相反,任何源码状态都不可能同时绿。判据已改锚 i18n key + 三语词典有值,
+# 并在**同一提交**里接上链 —— 机器门与被它判的实现不同时落地 = 修了也无从验证。
+# 🔴 样本量必须当**判据**,不能只印进标签:`node --test` 对「一条 test 都没有」的文件同样 exit 0
+#    (注释掉 / test.skip / 条件为假的 describe 都会走到这一步),于是门退化成「tests 0 · PASS」。
+#    上面那道 i18n 门写了「扫不到文件即判红」的假绿防线,这道门得有对等的一条。
+"$NODE_BIN" --test scripts/g-remote-authority-contract.test.mjs >/tmp/uni-g-remote-contract.log 2>&1
+g_remote_rc=$?
+# 判据取 **pass 数**不取 tests 数:红测实测 `test.skip` 时 tests 仍计 4(skipped 1),拿 tests 当门会漏;
+# pass 数对「删掉 test」与「skip 掉 test」两种形态都会掉下来。
+# 按**字段**取数,别用 `^.` 锚行首:node --test 的汇总行前缀 `ℹ` 是 3 字节,grep 的 `.` 匹配单字节,
+# 取出来恒为空 —— 那样门会永远判红(方向安全,但判据其实已经失效,属另一种坏)。
+g_remote_pass=$(awk '$(NF-1)=="pass"{v=$NF} END{print v}' /tmp/uni-g-remote-contract.log)
+g_remote_fail=$(awk '$(NF-1)=="fail"{v=$NF} END{print v}' /tmp/uni-g-remote-contract.log)
+if [ "$g_remote_rc" -eq 0 ] && [ "${g_remote_pass:-0}" -ge 4 ] && [ "${g_remote_fail:-1}" -eq 0 ]; then
+  ok "远端权威契约门 pass ${g_remote_pass} / fail ${g_remote_fail}(判据锚 i18n key + exchange 命名空间内有值;pass<4 或 fail>0 一律判红)"
+else
+  bad "远端权威契约门失败(rc=$g_remote_rc pass=${g_remote_pass:-none} fail=${g_remote_fail:-none};pass 少于 4 = 有 test 被删或 skip,同样按红处理)"
+  grep -E "✖|AssertionError|expected" /tmp/uni-g-remote-contract.log | head -6 | sed 's/^/        /'
+fi
+
 # Key mirroring proves en/zh/vi agree with EACH OTHER, not that they cover every
 # SKU. A product added to products.ts without a store.catalog entry silently
 # falls back to English prose on the store card / detail / search (the exact leak
@@ -327,6 +374,16 @@ if [ -z "$payout_guard_miss" ]; then
 else
   bad "payout-address dev reset PROD 守卫缺失: $payout_guard_miss"
 fi
+# mock 诊断横幅是**开发**信息面(工程话),按仓规不得上用户的屏。两条断言缺一不可:
+#   ① 闸还在(删掉 `isDevBuild &&` 就红)② 文案没被搬回三语词典(搬回去就成了用户文案契约,
+#   而词典是普通对象、摇不掉,会原样进生产包 —— 这正是上一版 DEV-gate 没闭合的那半)。
+sentinel_present "staking mock notice is DEV-only" src/pages/staking/staking.vue 'v-if="isDevBuild && staking\.isMockMode"'
+sentinel_present "exchange mock notice is DEV-only" src/pages/me/wallet-exchange.vue 'v-else-if="isDevBuild && !remoteApiEnabled"'
+# 🔴 这条必须自己 grep:sentinel_absent 的默认排除清单里就有 /i18n/messages/,
+#    用它来断言「词典里没有某个键」会永远 0 命中 —— 门看着绿,其实压根没扫词典。
+mock_key_hits=$(grep -rn "mockModeNotice" src/i18n/messages src/pages src/components 2>/dev/null | head -5)
+if [ -z "$mock_key_hits" ]; then ok "mock 诊断文案不在 i18n 契约里 (0 hits · 已扫 i18n/messages + pages + components)"
+else bad "mock 诊断文案被搬回 i18n 词典 — 它是工程话,进词典就是用户文案契约,且词典对象摇不掉会原样进生产包"; echo "$mock_key_hits" | sed 's/^/        /'; fi
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
 else

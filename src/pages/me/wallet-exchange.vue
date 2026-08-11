@@ -17,8 +17,9 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
-      <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">远端权威数据不可用，兑换已关闭</text>
-      <text v-else-if="!remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Mock 模式 · 非远端成交</text>
+      <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.exchange.remoteUnavailableClosed }}</text>
+      <!-- 同 staking:开发诊断,DEV 构建才渲染,裸英文字面量不进三语词典。 -->
+      <text v-else-if="isDevBuild && !remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
 
       <!-- How-it-works entry + refresh — pill compacted to match the other pages;
            it stays paired with the rate-refresh button (no de-carded hero here to
@@ -119,7 +120,7 @@
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
             <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.exchange.yourDaily }}</text>
             <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
-              <text>{{ remoteApiEnabled && !remoteState ? "远端未提供" : `$${displayUserUsed.toFixed(2)}` }} </text>
+              <text>{{ remoteApiEnabled && !remoteState ? t.exchange.remoteNotProvided :`$${displayUserUsed.toFixed(2)}` }} </text>
               <text v-if="!remoteApiEnabled || remoteState" style="color: var(--v5-ink-3)">/ ${{ displayUserCap.toFixed(2) }}</text>
             </view>
           </view>
@@ -133,7 +134,7 @@
           <view class="flex items-center justify-between" style="margin-bottom: 4px">
             <text style="font-size: 12px; color: var(--v5-ink-2)">{{ t.walletV3.exchangePoolToday }}</text>
             <view class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">
-              <text>{{ remoteApiEnabled && !remoteState ? "远端未提供" : `$${(displayPlatformUsed / 1000).toFixed(1)}K` }} </text>
+              <text>{{ remoteApiEnabled && !remoteState ? t.exchange.remoteNotProvided :`$${(displayPlatformUsed / 1000).toFixed(1)}K` }} </text>
               <text v-if="!remoteApiEnabled || remoteState" style="color: var(--v5-ink-3)">/ ${{ (displayPlatformCap / 1000).toFixed(0) }}K</text>
             </view>
           </view>
@@ -198,6 +199,8 @@ import {
 } from "@/store/exchange-v3";
 
 const t = useT();
+// 同 staking:生产构建里 import.meta.env.DEV 恒为 false,Mock 横幅被摇掉。
+const isDevBuild = import.meta.env.DEV;
 const app = useApp();
 const exchange = useExchange();
 const v3 = useExchangeV3();
@@ -262,7 +265,7 @@ const secsAgo = ref(0);
 // Roll daily counters on mount.
 onMounted(() => {
   if (remoteApiEnabled) {
-    void syncRemoteState().catch(() => toast.error("远端权威数据暂不可用"));
+    void syncRemoteState().catch(() => toast.error(t.value.exchange.remoteUnavailableToast));
     return;
   }
   // Explicit mock mode only: local counters and local wallet receipts are never remote success.
@@ -363,8 +366,8 @@ function flip() {
 function onRefresh() {
   if (remoteApiEnabled) {
     void syncRemoteState()
-      .then(() => toast.info("远端权威数据已刷新"))
-      .catch(() => toast.error("远端权威数据暂不可用"));
+      .then(() => toast.info(t.value.exchange.remoteRefreshed))
+      .catch(() => toast.error(t.value.exchange.remoteUnavailableToast));
     return;
   }
   exchange.refreshRate();
@@ -537,7 +540,10 @@ async function handleConfirm() {
     if (remoteApiEnabled) {
       remoteState.value = null;
       remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
-      toast.error("远端权威数据暂不可用");
+      // 这条路径失败的是用户刚提交的**兑换动作**,不是一次数据读取 —— 与 :268/:370 两处
+      // 「拉取失败」共用一句「数据取不到,请稍后再试」会让用户以为刷新一下就好,
+      // 而实际是这笔兑换没有成交(独立审查判为文案与实际状态不符)。
+      toast.error(t.value.exchange.swapFailed);
       return;
     }
     // A region refusal surfaces on this path as a rejected submit. Translate it

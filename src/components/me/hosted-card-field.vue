@@ -50,7 +50,10 @@ const AUTOCOMPLETE: Record<HostedCardKind, string> = {
 };
 
 const injected = inject(HOSTED_CARD_VAULT);
-if (!injected) throw new Error("HostedCardField 必须放在 <HostedCardVault> 内");
+// 抛出串取英文错误码,与本仓既有码风一致(NOTIFICATION_UNAVAILABLE / SESSION_EXPIRED …):
+// 抛出串是工程内部话,不该长得像用户文案,也不该落进「注释外中文」的判定面。
+// 约束本身:必须放在 <HostedCardVault> 内。
+if (!injected) throw new Error("HOSTED_CARD_FIELD_REQUIRES_VAULT");
 // 收窄后再给模板用:模板作用域拿不到 if 里的类型收窄。
 const vault = injected;
 
