@@ -21,6 +21,21 @@
 //   ③ 金额取服务端回执,不是本地报价(故意让两者不同,断言落盘的是服务端那个数)
 //   ④ 同一笔重放(歧义结局保留幂等键 → 服务端返回同一张单)**不写第二对**
 //   ⑤ 账单页把它们渲染出来且可点(渲染面与生产面接得上)
+//   ⑥ 资金面:提交成功后余额**真的**少了服务端回执那个数、真落盘、重放不重复扣(z5)
+//   ⑦ 失败终态把这笔扣款**退回**,且退款幂等(扣款 ⇄ 退款成对,否则拒单 = 烧钱)
+//
+// 🔴 ⑥⑦ 的能力上界(与上面同一条纪律:先说清楚门守不到哪)——
+//   本门只在 **mock 模式**跑(verify.sh [2.5] 的 API-mode preflight 强制如此),
+//   所以 ⑦ 证的是「扣了必退、退了不重复」,**证不到**「退款在 remote 模式下也有效」。
+//   而提现单恰恰只在 remote 下才建得出来 —— 那一条靠 `refundWithdrawalDebit` 里
+//   压根没有 `remoteApiEnabled` 分支来保证(它的兄弟 creditRewardBucketOnce 有,
+//   USDT 腿此前正是走的那条,于是「唯一会产生提现的模式」里退款恒 no-op)。
+//   下一个把这条腿改回 creditRewardBucketOnce 的人:本门在 mock 下**照绿**,
+//   红的是 remote 下真实用户的钱。改之前先读 app.ts refundWithdrawalDebit 头注。
+//
+// 🔴 红测实录(2026-08-11 z5,基线 worktree 同脚本对跑):无扣款的原状态下 ⑦ 实测
+//   余额 9999 →(失败终态退款)**10479.25** —— 退了一笔从没扣过的钱,凭空 +$480.25。
+//   即「只有退款腿、没有扣款腿」本身就是一条印钞路径,不是单纯的少扣。
 import { chromium } from "playwright";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
@@ -166,9 +181,17 @@ try {
       return "ok";
     }
 
+    // 🔴 钱的那一面(z5):账单行与余额是同一笔事实的两个面,门必须两面都守。
+    // 只守账单 = 账上写着「−480.25」而钱包余额纹丝不动,而门全绿(z4 之后的实况)。
+    const balanceOf = () => app.user.usdtBalance;
+    const balanceBefore = balanceOf();
+
     // 第一次:歧义失败。页面停在原地(不跳转),账单**不该**有任何行。
     const first = await submitOnce();
     const rowsAfterFirst = bills.bills.filter((b) => b.type === "withdraw").length;
+    // 歧义结局 = 客户端还不知道单号,更不知道服务端建没建单 —— 此时扣款是**乐观扣款**,
+    // 一旦服务端其实没建单,钱就凭空少了。所以这一步必须原地不动。
+    const balanceAfterAmbiguous = balanceOf();
     const diskOf = () => ((uni.getStorageSync("nexgrid-bills-accounts-v1") || {})[app.accountKey]?.bills || [])
       .filter((b) => b.ref === WD_NO);
 
@@ -183,7 +206,39 @@ try {
       .filter((e) => (e.getAttribute("aria-label") || "").includes(WD_NO));
 
     const rows = bills.bills.filter((b) => b.ref === WD_NO);
+
+    // ── 资金面探针(全部在账单断言取样之后跑,不影响 ①–⑤)────────────────────
+    const balanceAfterSuccess = balanceOf();
+    // 扣款真落盘:内存对、盘上没有 = 刷新即回退,用户眼里「钱又回来了」。
+    const diskBalance = (uni.getStorageSync("nexgrid-account-cloud-v1") || {})[app.accountKey]?.user?.usdtBalance;
+    const wdRow = app.withdrawals.find((w) => w.id === WD_NO);
+    // ⑥ 重放不重复扣款:自愈补写 / 用户回退再进都会再走一次,第二次必须不动钱且如实回真。
+    // 🔴 探针不许因为「被测的东西不存在」而抛:整段 evaluate 一抛,输出就是一条堆栈,
+    // 20 条断言一条都不显示 —— 红测反而看不出是哪一条在守。缺函数 = 记 null 让断言去红。
+    const replayReturned = wdRow && typeof app.applyWithdrawalDebit === "function"
+      ? app.applyWithdrawalDebit(wdRow)
+      : null;
+    const balanceAfterReplay = balanceOf();
+    // ⑦ 🔴 扣款 ⇄ 退款必须**同模式**对称。这一格是红测本体:把 USDT 腿退回
+    // creditRewardBucketOnce(它内部 `if (remoteApiEnabled) return false`)当场变红 ——
+    // 而提现单只在 remote 下建得出来,所以那条路等于「拒单 = 用户的钱凭空烧掉」。
+    app.withdrawals = app.withdrawals.map((w) => (w.id === WD_NO ? { ...w, status: "tx-failed" } : w));
+    const refundedIds = app.refundFailedWithdrawals();
+    const balanceAfterRefund = balanceOf();
+    // 退款也要幂等:5s 一拍的对账会反复调它,每拍退一次就是印钞。
+    app.refundFailedWithdrawals();
+    const balanceAfterRefundReplay = balanceOf();
+
     return {
+      balanceBefore,
+      balanceAfterAmbiguous,
+      balanceAfterSuccess,
+      balanceAfterReplay,
+      balanceAfterRefund,
+      balanceAfterRefundReplay,
+      diskBalance,
+      replayReturned,
+      refundedIds,
       first,
       second,
       submitCalls,
@@ -229,6 +284,34 @@ try {
     result.clickable === 2, `可点 ${result.clickable} 行`);
   check("🔴 服务端报文解析器仍在守契约(喂违反费用等式的报文必抛 protocol 错)",
     result.parserAlive === true, "喂了坏报文却没抛 —— 契约校验已死");
+  // ── 资金面:账单行说钱动了,余额也必须真的动(z5)──────────────────────────
+  // 🔴 每条判据都必须在「整条链根本没跑」时也**红**。上一版有三条是
+  // 「余额没变 → 断言成立」的写法(不等于某值 / 盘上等于内存 / 退款后等于初始),
+  // 链条卡在第一步、余额恒 9999 时它们照样 PASS —— 空集全过的经典假绿。
+  // 现在一律钉在「实扣额 = 服务端回执」这个**必须发生过**的事实上。
+  const B = result;
+  const debited = +(B.balanceBefore - B.balanceAfterSuccess).toFixed(2);
+  const debitHappened = debited === SERVER_AMOUNT;
+  check("⑥ 歧义失败那一次**不扣款**(结局未定时乐观扣款 = 服务端没建单就凭空少钱)",
+    B.balanceAfterAmbiguous === B.balanceBefore && debitHappened,
+    `歧义后 ${B.balanceBefore} → ${B.balanceAfterAmbiguous};成功那次实扣 ${debited}`);
+  check(`⑥ 提交成功后余额**真的**少了服务端回执那个数(实扣 ${SERVER_AMOUNT},不是页面输入的 ${PAGE_AMOUNT})`,
+    debitHappened,
+    `实扣 ${debited}(${B.balanceBefore} → ${B.balanceAfterSuccess}),期望 ${SERVER_AMOUNT}`);
+  check("⑥ 扣款**真落盘**(只在内存 = 刷新后钱又回来了)",
+    debitHappened && B.diskBalance === B.balanceAfterSuccess,
+    `盘上 ${B.diskBalance} / 内存 ${B.balanceAfterSuccess}(实扣 ${debited})`);
+  check("⑥ 同一单重放**不重复扣款**,且如实回真(已扣到位 ≠ 本次写了)",
+    debitHappened && B.replayReturned === true && B.balanceAfterReplay === B.balanceAfterSuccess,
+    `返回 ${B.replayReturned}、重放后 ${B.balanceAfterReplay}(实扣 ${debited})`);
+  check("⑦ 🔴 失败终态**退回**这笔扣款(扣款与退款必须同模式对称,否则拒单 = 烧钱)",
+    debitHappened && B.refundedIds.includes(WD_NO) && B.balanceAfterRefund === B.balanceBefore,
+    `退回单号 ${JSON.stringify(B.refundedIds)}、退后 ${B.balanceAfterRefund}(期望 ${B.balanceBefore},实扣 ${debited})`);
+  check("⑦ 退款幂等(对账 5s 一拍反复调,每拍退一次就是印钞)",
+    debitHappened && B.balanceAfterRefund === B.balanceBefore
+      && B.balanceAfterRefundReplay === B.balanceAfterRefund,
+    `二次调用 ${B.balanceAfterRefund} → ${B.balanceAfterRefundReplay}`);
+
   check("零 console error", errors.length === 0, errors.slice(0, 3).join(" | "));
 } finally {
   await browser.close();

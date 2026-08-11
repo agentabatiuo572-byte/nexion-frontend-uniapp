@@ -1109,6 +1109,23 @@ async function handleSubmit() {
     if (!postReceiptForAccount(snap.account, withdrawalBillDrafts(wd))) {
       toast.error(t.value.wallet.withdrawBillWriteFailed);
     }
+    // 🔴 钱的那一面(2026-08-11 z5)。上一行只记账,余额是另一条线:remote 对齐把建单
+    // 搬去服务端时,本地扣款链被一并删掉,而**没有任何东西接手** —— 提交成功后钱包余额与
+    // 可提额度纹丝不动(可提额度是 `usdtBalance − 锁定桶` 派生的,同一个数不动就都不动)。
+    // 后果不止是数字难看:用户可以立刻按这个虚高值再提一笔,客户端预检照样判「余额够」,
+    // 一路放行到服务端才被拒。
+    // 「回拉服务端余额」这条路在本仓不成立 —— 全仓没有余额端点(见 applyWithdrawalDebit 头注),
+    // 余额的唯一持有者就是这个 store。
+    //
+    // 🔴 只在**没换号**时扣:换号后当前 store 装的是另一个账号的钱,扣它 = 扣错人。
+    // 与上一行账单写法的差别是有意的 —— 账单能按 accountKey 写进冻结账号的那一行,
+    // 而余额要动的是内存里的活值,换号后那份内存已经不是 snap.account 的了。
+    // 这一支是**降级不是成功**:钱在服务端已经动了,本地那份快照下次绑回来时不含这笔扣款。
+    // (与 store 侧「冻结账号无本地快照则不落单」同一条诚实边界:宁可少改一份显示,
+    //  也不拿当前账号的钱去冒充另一个账号的经济状态。)
+    if (app.accountKey === snap.account && !app.applyWithdrawalDebit(wd)) {
+      toast.error(t.value.wallet.withdrawDebitFailed);
+    }
     // 换号后不跳追踪页:那笔单属于旧账号,当前账号的追踪页查不到它(深链会落空态)。
     // 🔴 但必须给话:提交成功了、钱在旧账号动了,静默 return 会让新账号的用户以为什么都没发生
     // (业务链必须有下一步 —— z4 R1 独立审计)。

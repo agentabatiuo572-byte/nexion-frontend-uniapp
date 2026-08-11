@@ -444,6 +444,10 @@ export interface AppState {
   // 起都在服务端,客户端只会**抛**(ApiError),不会静默回一个空值 —— 保留 `| null` 会让
   // 调用方写出一条永不执行的死分支,并诱导下一个读者以为余额闸还在客户端(z4 R2 P2-5)。
   ) => Promise<Withdrawal>;
+  /** 建单成功后把这笔提现的钱**真的**从余额里扣掉(账单主行 `-wd.amount` 的资金面)。
+   *  按单号幂等、全有或全无;false = 没扣成(余额不足 / 落盘失败),调用方必须交底。
+   *  失败终态由 refundFailedWithdrawals 对称退回 —— 两者是一对,别只接其中一个。 */
+  applyWithdrawalDebit: (wd: Withdrawal) => boolean;
   /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
   _devAdvanceWithdrawal: () => void;
   /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */

@@ -2088,6 +2088,7 @@ export const en = {
     trackEtaDone: "Funds delivered to your address",
 
     withdrawBillWriteFailed: "Withdrawal submitted, but the bill entry could not be saved. You can still track it on the withdrawal status page.",
+    withdrawDebitFailed: "Withdrawal submitted, but your balance on this device could not be updated — it may still show the amount you just withdrew. Reopen the app to refresh; the withdrawal status page has the authoritative record.",
     withdrawSubmittedOtherAccountTitle: "Withdrawal submitted",
     withdrawSubmittedOtherAccountBody: "You signed in to a different account while this was being sent. The withdrawal belongs to the previous account — sign back in to that account to follow it.",
 

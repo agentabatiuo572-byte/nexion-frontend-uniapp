@@ -926,9 +926,16 @@ export const useApp = defineStore("app", () => {
    * 两个缺口分开看都像「反正 mock 里走不到」,合起来就是「钱扣了、单子废了、没人还」。
    * 退款与置账单失败必须在**同一处**完成,否则接后端时必然只做一半(审计明确点名)。
    *
-   * 🔴 退的是两种币(2026-08-03 资金 P1):USDT 本金之外,用户勾选 NEX 抵扣时页面在提交前
-   * 已 debitNex 真扣了 NEX —— 单据废了 = 网络费从没真付过,只退 USDT 不退 NEX 就是白烧。
-   * 幂等键**必须拆两个**(USDT 用 refund:、NEX 用 refund-nex:):复用单键会让
+   * 🔴 退的是两种币(2026-08-03 资金 P1):USDT 本金之外,NEX 抵扣费也要退 ——
+   * 单据废了 = 网络费从没真付过,只退 USDT 不退 NEX 就是白烧。
+   * ⚠️ 两条腿此刻**不对称**,别照着 USDT 那条读 NEX 这条(2026-08-11 z5 回源核对):
+   *   · USDT 退的是**本客户端自己扣过**的那一笔(applyWithdrawalDebit ⇄ refundWithdrawalDebit,
+   *     判据是扣款幂等标记,自洽闭环);
+   *   · NEX 是**服务端烧**的,客户端从没 debitNex 过(全仓零调用点 —— 这行上一版写的
+   *     「页面在提交前已 debitNex 真扣了 NEX」是 2026-08-10 remote 对齐前的旧事实,已失效)。
+   *     于是这条腿仍走 creditRewardBucketOnce,在 remote 模式下恒 no-op;要接的是
+   *     「失败提现退还已烧 NEX」那条服务端契约(App.vue ②b 头注),独立成卡,本包不动。
+   * 幂等键**必须拆两个**(USDT 用 wd-refund:、NEX 用 refund-nex:):复用单键会让
    * 「USDT 退过 → NEX 因同键判已处理 → 永久跳过」。历史单 fee 是纯数字
    * (account-cloud 读盘会归一出 nexBurned:0,但内存态不保证都走过归一),
    * 故可选链取值且 >0 才退 —— undefined/0 = 本来无需退,绝不能被当成「退款失败」。
@@ -942,11 +949,7 @@ export const useApp = defineStore("app", () => {
     for (const wd of withdrawals.value) {
       if (!FAILED.includes(wd.status)) continue;
       if (!(wd.amount > 0)) continue;
-      // 🔴 复用 creditRewardBucketOnce,不要自己拼 user.value 的绝对值:
-      // account-cloud 把余额当**增量计数器**做三方合并,直接写绝对值会被合并算回去
-      // (实测:可提桶加上了、总余额纹丝不动 —— 一半生效比不生效更难查)。
-      // 这个 action 同时加总余额与可提桶,且自带 appliedRewardKeys 幂等,正是退款要的语义。
-      if (creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)) done.push(wd.id);
+      if (refundWithdrawalDebit(wd)) done.push(wd.id);
       // NEX 抵扣费退还:独立幂等键;usdt 参数位传 0、NEX 走第 4 参(方向搞反 = 把 NEX
       // 个数当美元退)。与 USDT 行互不阻塞:任一落盘失败,各自幂等键在下次调用重放补齐。
       const burnedNex = wd.fee?.nexBurned;
@@ -955,6 +958,107 @@ export const useApp = defineStore("app", () => {
       }
     }
     return done;
+  }
+
+  /**
+   * 提现落定 → 扣款。与账单主行(`-wd.amount`)是同一笔事实的两个面。
+   *
+   * 🔴 为什么是「本地扣减」而不是「回拉服务端余额」(2026-08-11 z5 回源结论):
+   * `usdtBalance` 在本仓**没有服务端源**可拉 —— account-api 没有余额端点,全仓唯一的
+   * 余额类端点 `GET /api/earnings/release-status` 只回**锁定桶**(pending_review / bonus_locked);
+   * 而提现页的可提额度反过来是 `usdtBalance − 这两个桶`(wallet-withdraw.vue maxWithdrawable),
+   * 锚仍是本地这个数。所以「提交成功后回拉服务端余额」在本仓是空转:没有可拉的数,
+   * 拉回来两个显示值一分不动,缺陷原样还在。余额的唯一持有者就是本 store ——
+   * 购买 / 组合 / 质押 / 兑换 / 复投全部在此本地扣款,提现是 2026-08-10 remote 对齐后
+   * **唯一漏掉资金面的那条**:单据搬去了服务端,钱没跟着走。
+   * PRD §9.3 同口径:「当日笔数门…即不建单不扣款」(建单⇔扣款)、「提交为原子操作」。
+   *
+   * 🔴 全有或全无,余额不够整笔不扣并报假,**绝不夹到 0**:夹了的话实扣 < `wd.amount`,
+   * 而退款按 `wd.amount` 退,差额就是凭空造出来的钱。报假由调用方交底,不静默。
+   *
+   * 🔴 金额取服务端回执的**全额** `wd.amount`(手续费含在其中),与账单主行同一个数、
+   * 同一个源(PRD:全额出金,费用为其中差额);不取本地报价 snap.*。
+   *
+   * 🔴 扣款与幂等标记**一次赋值、一次落盘**:分两次写会留下「钱扣了、标记没落盘」的中间态,
+   * 而退款正是按这个标记判「这笔到底扣没扣过」—— 判错就是退一笔从没扣过的钱。
+   *
+   * NEX 抵扣费**不在这里扣**:它是服务端烧的,而「失败提现退还已烧 NEX」至今没有服务端契约,
+   * 客户端单方面扣掉就造出一条只烧不退的路。那一项独立成卡(见 refundFailedWithdrawals 头注)。
+   *
+   * PRODUCTION:整个函数消失 —— 扣款由 `POST /api/withdrawals` 同事务完成,client 只读回执。
+   */
+  function applyWithdrawalDebit(wd: Withdrawal): boolean {
+    const amount = wd.amount;
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    const key = "wd-debit:" + wd.id;
+    const currentUser = withDefaultEarningBuckets(user.value);
+    // 已扣过:重放(自愈补写 / 用户回退再进)不再动钱,如实回真 —— 调用方要的是
+    // 「这笔的扣款到位了没有」,不是「本次有没有写」。
+    if (currentUser.appliedRewardKeys?.[key]) return true;
+    if (currentUser.usdtBalance < amount) return false;
+    const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
+    const nextUsdt = +(currentUser.usdtBalance - amount).toFixed(2);
+    const buckets = currentUser.earningBuckets;
+    user.value = {
+      ...currentUser,
+      usdtBalance: nextUsdt,
+      // 与 debitBalance 同一条不变量:withdrawableUsdt ≤ usdtBalance(先吃不可提部分)。
+      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
+      appliedRewardKeys: { ...currentUser.appliedRewardKeys, [key]: true },
+    };
+    const applied = moneyDeltaSince(before);
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    addMoneyApplied(applied);
+    return true;
+  }
+
+  /**
+   * 失败提现退款 —— **只退本客户端真的扣过的那一笔**(判据 = 扣款幂等标记),按单号幂等。
+   *
+   * 🔴 为什么不复用 creditRewardBucketOnce(USDT 腿原来走的那条):它内部第一行就是
+   * `if (remoteApiEnabled) return false`,而提现单**只在 remote 模式下建得出来**
+   * (mock 模式 apiClient 一律 reject,建不出单)。也就是说退款在「唯一会产生提现的那个模式」里
+   * 恒为 no-op。在没有扣款的原状态下这不造成损失(没人扣钱,退不退都一样);
+   * 一旦扣款接上,那条 no-op 就变成「服务端拒单 = 用户的钱凭空烧掉」。
+   * **扣款与退款必须在同一个模式下同时有效** —— 只修一半比不修更坏,所以这一对一起改。
+   *
+   * 退款额恒等于扣款额(两边同为 `wd.amount`,且扣款全有或全无),故不会退多。
+   *
+   * 🔴 只加回 `usdtBalance`,**不动 withdrawableUsdt**:扣款那步的 clamp 是有损的
+   * (`min(w, u−a)` 不可逆),盲加 `+amount` 会把可提额度抬到比提现前还高 = 凭空多出可提额度。
+   * 方向刻意取保守侧:可提桶宁可偏低(它随收益自然回升,且提现页的可提上限本就取
+   * `usdtBalance − 锁定桶`、不读这个桶),绝不能偏高。
+   *
+   * PRODUCTION:整个函数消失 —— 退款由服务端在拒单同事务里完成,client 只读回执。
+   */
+  function refundWithdrawalDebit(wd: Withdrawal): boolean {
+    const amount = wd.amount;
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    const debitKey = "wd-debit:" + wd.id;
+    const refundKey = "wd-refund:" + wd.id;
+    const currentUser = withDefaultEarningBuckets(user.value);
+    // 没扣过就没得退(remote 对齐期建的存量单、或扣款那步失败的单)——
+    // 退一笔没扣过的钱就是凭空造钱,这一条比「漏退」严重得多。
+    if (!currentUser.appliedRewardKeys?.[debitKey]) return false;
+    if (currentUser.appliedRewardKeys?.[refundKey]) return false;
+    const previousSnapshot = lastCloudSnapshot;
+    const before = moneyValues();
+    user.value = {
+      ...currentUser,
+      usdtBalance: +(currentUser.usdtBalance + amount).toFixed(2),
+      appliedRewardKeys: { ...currentUser.appliedRewardKeys, [refundKey]: true },
+    };
+    const applied = moneyDeltaSince(before);
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    addMoneyApplied(applied);
+    return true;
   }
 
   /**
@@ -1430,7 +1534,7 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, advanceWithdrawalArrival, refundFailedWithdrawals, _devAdvanceWithdrawal, _devGrantManualRelease,
+    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refundFailedWithdrawals, _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });

@@ -708,15 +708,26 @@ function functionBody(src, sig) {
         && appVueCode.includes("reconcileBills();")
         && !appVueCode.includes("pendingBillSettle"));
     // 🔴 提现在提交那一刻就扣了款,所以任何「最终没打出去」的终态都必须把钱退回去。
-    // 全仓此前没有任何退款实现,账单也不会被置 failed —— 两个缺口分开看都像「反正走不到」,
-    // 合起来就是「钱扣了、单子废了、没人还」。退款与置账单失败必须在**同一处**完成,
+    // 账单也要同步置 failed —— 两个缺口分开看都像「反正走不到」,合起来就是
+    // 「钱扣了、单子废了、没人还」。退款与置账单失败必须在**同一处**完成,
     // 否则接后端时必然只做一半(审计明确点名)。
+    // 🔴 z5 更新:USDT 腿改走 refundWithdrawalDebit(扣款 ⇄ 退款成对的那一半)。
+    // 原判据钉的是 creditRewardBucketOnce —— 那条路**内部第一行就是 `if (remoteApiEnabled) return false`**,
+    // 而提现单只在 remote 模式下建得出来,于是退款在「唯一会产生提现的模式」里恒为 no-op。
     check("🔴 提现失败终态:退款与置账单失败成对完成,且幂等",
       appSrc.includes("function refundFailedWithdrawals(): string[] {")
-        // 🔴 必须复用现成的幂等入账 action。自己拼 user.value 的绝对值会被 account-cloud 的
-        // **增量合并**算回去 —— 实测:可提桶加上了、总余额纹丝不动。一半生效比不生效更难查。
-        && appSrc.includes('creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)')
+        && appSrc.includes("if (refundWithdrawalDebit(wd)) done.push(wd.id);")
         && appVueCode.includes('for (const id of app.refundFailedWithdrawals()) bills.settleByRef(id, "failed");'));
+    // 🔴 单独一条,不并进上面那个合取:这一条是 runtime 门**覆盖不到**的那半边 ——
+    // withdraw-bill-runtime.mjs 只在 mock 模式跑(verify [2.5] 强制),而 mock 下
+    // creditRewardBucketOnce 照常工作,把这条腿改回去 runtime 门仍然全绿,
+    // 红的是 remote 下真实用户的钱。所以退款腿「不受 API 模式影响」只能静态守。
+    {
+      const body = appSrc.slice(appSrc.indexOf("function refundWithdrawalDebit"));
+      check("🔴 退款腿**不受 API 模式影响**(remote 是唯一建得出提现单的模式,退款不能在那里 no-op)",
+        appSrc.includes("function refundWithdrawalDebit(wd: Withdrawal): boolean {")
+          && !/remoteApiEnabled/.test(body.slice(0, body.indexOf("\n  }") + 4)));
+    }
     // 赠金释放只动桶和余额、不写账单 → 那行「处理中」的赠金会永远停着。从数据推出它已落地。
     // 判据必须钉到**真正干活的那一句**(遍历 bills.bills 并 settleByRef),
     // 只查条件行的话,把循环源换成空数组照样绿(红测实证:改 `for (const row of [])` 不红)。
