@@ -13,8 +13,12 @@
   <AppChassis active="me">
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
-      <text v-if="staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Mock 模式 · 非远端资金</text>
-      <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">远端权威数据不可用，质押操作已关闭</text>
+      <!-- 开发诊断,不是产品文案:所以① 只在 DEV 构建渲染 ② 文案是裸英文字面量,不进三语词典 ——
+           进了词典它就成了「工程名词写死在用户文案契约里」,而且词典对象摇不掉、会原样进生产包。
+           ③ 与下面的 remoteError 分支解耦成独立 v-if:挂在同一条 v-else-if 链上时,这道闸一旦为假
+           就会把 remoteError 分支放出来,是个只等某天 mock 下写了 remoteError 就会炸的暗雷。 -->
+      <text v-if="isDevBuild && staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
+      <text v-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Hero — de-carded: total-locked sits on the page floor; aurora + grid
@@ -144,6 +148,8 @@ import { confirm as uiConfirm, toast } from "@/store/ui";
 const ONE_DAY_MS = 86400 * 1000;
 const TERMS: StakingTerm[] = [30, 90, 180, 365];
 const t = useT();
+// Vite 在生产构建里把 import.meta.env.DEV 直接换成 false,整个横幅连同它的文案一起被摇掉。
+const isDevBuild = import.meta.env.DEV;
 const RIBBONS = computed<Partial<Record<StakingTerm, { label: string; tone: "cyan" | "gold" }>>>(() => ({
   180: { label: t.value.stakingV3.ribbon.popular, tone: "cyan" },
   365: { label: t.value.stakingV3.ribbon.topYield, tone: "gold" },

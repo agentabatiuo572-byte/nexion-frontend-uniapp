@@ -241,6 +241,7 @@ export const en = {
     passwordMismatch: "Passwords don't match.",
     finishReset: "Update password and sign in",
     resetSuccess: "Password updated · signed in",
+    errorInvalidCredentials: "Phone number or password is incorrect.",
   },
   register: {
     title: "Create account",
@@ -1005,6 +1006,8 @@ export const en = {
     disclaimer: "Acknowledgment is logged with timestamp. Re-reading is available anytime via Me → Risk disclosure.",
     acceptToast: "Risk disclosure acknowledged · You can now access withdraw / staking / lock features.",
     sectionSelected: "Section {n} selected for review",
+    reloadRegionCta: "Reload the disclosures for your region",
+    loadErrorRegion: "Risk disclosures for your region are unavailable; check your connection and retry. Nothing is confirmed until they load.",
   },
 
   productPhase: {
@@ -2330,6 +2333,7 @@ export const en = {
     leftCount: "~{n} left",
     trustCenter: "Trust Center",
     auditsPartners: "Audits · partners",
+    learningRow: "Learning center",
     walletCardsRow: "Payment cards",
     walletCardsMeta: "Card manager",
     goalsRow: "Earning goals",
@@ -2760,6 +2764,11 @@ export const en = {
     queuedToastBody: "Swap ${amount} will execute after midnight reset.",
     platformExhaustedTitle: "Platform pool exhausted",
     platformExhaustedBody: "Daily pool of ${cap}K is drained. Try again tomorrow.",
+    remoteUnavailableClosed: "Exchange is unavailable right now. Please try again shortly.",
+    remoteNotProvided: "Not available",
+    remoteUnavailableToast: "Couldn't load the latest data. Please try again shortly.",
+    swapFailed: "The exchange didn't go through. Please try again shortly.",
+    remoteRefreshed: "Data updated",
   },
 
   exchangeHowItWorks: {
@@ -2972,6 +2981,7 @@ export const en = {
     insufficientToast: "Not enough NEX for this pool",
     educationFooter:
       "Staking voluntarily delays your withdrawals. Premium APY rewards compensate for lock-up time.",
+    remoteUnavailableClosed: "Staking is unavailable right now. Please try again shortly.",
   },
   achievements: {
     title: "Achievements",
@@ -3441,6 +3451,11 @@ export const en = {
     download: "Download PDF",
     viewOnChain: "View on-chain",
     latest: "Latest",
+    loadingDisclosure: "Verifying the disclosures that apply in your region…",
+    openFailed: "This link can't be opened on this device",
+    errorOffline: "These disclosures are only available over a trusted network; please connect and retry.",
+    errorGeoUnresolved: "We can't confirm which rules apply in your region right now; this page will not pass stale local content off as current — check your connection and retry.",
+    errorUnavailable: "Disclosures are unavailable right now; this page will not pass stale local content off as current — please retry shortly.",
   },
 
   genesisEligibility: {
@@ -4924,6 +4939,8 @@ export const en = {
     cardRebindTitle: "Replace your trial card",
     cardRebindBody: "Your {brand} •••• {last4} can no longer secure your free trial. Bind a new card soon so your end-of-trial purchase completes smoothly.",
     cardRebindCta: "Bind a new card",
+    loadMore: "Load more",
+    loadFailed: "We could not load your notifications. Check your connection and try again.",
   },
 
   // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).
@@ -5203,6 +5220,26 @@ export const en = {
     cancelCta: "Cancel",
     reasonNewAddressAge: "Withdrawal address changed less than 7 days ago — large withdrawals require manual review",
     startFailed: "Something went wrong. Please try again.",
+  },
+  learning: {
+    centerTitle: "Learning center",
+    centerLoading: "Loading the learning center…",
+    centerProgress: "{done}/{total} completed · {nex} NEX earned",
+    courseMeta: "{duration} · {nex} NEX reward",
+    centerOffline: "The learning center needs a trusted network connection; please connect and retry.",
+    centerGeoUnresolved: "We can't confirm which rules apply in your region right now; course content will not fall back to a stale cache — check your connection and retry.",
+    centerUnavailable: "The learning center is unavailable right now; please retry shortly.",
+    courseLoading: "Loading the course…",
+    courseVersionMeta: "Version {version} · {nex} NEX reward",
+    courseOffline: "Courses load over a trusted network; please go back to the learning center and retry.",
+    courseUnavailable: "This course is unavailable right now; please retry.",
+    submitQuiz: "Submit quiz",
+    answerAllFirst: "Answer every question before submitting.",
+    completeCourse: "Complete course",
+    resultPassed: "Completed",
+    resultFailed: "Not passed",
+    rewardGranted: " · {nex} NEX granted",
+    submitUnconfirmed: "Your submission is not confirmed yet; course progress has been re-read from the server, so rewards are never shown from local state.",
   },
 };
 

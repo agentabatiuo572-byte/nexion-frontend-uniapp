@@ -27,7 +27,7 @@
         </view>
         <view v-else-if="loadError" :style="hintStyle">
           <text :style="hintTextStyle">{{ loadError }}</text>
-          <text class="block active:opacity-70" :style="retryStyle" @click="reload">重新获取适用于当前地区的披露</text>
+          <text class="block active:opacity-70" :style="retryStyle" @click="reload">{{ w.reloadRegionCta }}</text>
         </view>
       </view>
 
@@ -101,7 +101,7 @@ const w = computed(() => t.value.riskDisclosure);
 const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
 const disclosure = computed(() => risk.current);
-const loadError = computed(() => risk.error ? "当前地区的风险披露暂不可用；请检查网络后重试。未加载前不能确认。" : "");
+const loadError = computed(() => risk.error ? w.value.loadErrorRegion : "");
 
 const returnTo = ref("/pages/me/me");
 onLoad((options) => {

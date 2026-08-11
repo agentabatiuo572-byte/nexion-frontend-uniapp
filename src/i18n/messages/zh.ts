@@ -224,6 +224,7 @@ export const zh: Messages = {
     passwordMismatch: "两次密码不一致。",
     finishReset: "更新密码并登录",
     resetSuccess: "密码已更新 · 已登录",
+    errorInvalidCredentials: "手机号或密码不正确。",
   },
   register: {
     title: "创建账号",
@@ -943,6 +944,8 @@ export const zh: Messages = {
     disclaimer: "确认操作会记录时间戳。可通过 Me → 风险提示书 重读。",
     acceptToast: "风险提示已确认 · 可进入 withdraw / staking / 锁仓功能。",
     sectionSelected: "第 {n} 节已选中供复核",
+    reloadRegionCta: "重新获取适用于当前地区的披露",
+    loadErrorRegion: "当前地区的风险披露暂不可用;请检查网络后重试。未加载前不能确认。",
   },
 
   productPhase: {
@@ -2254,6 +2257,7 @@ export const zh: Messages = {
     leftCount: "剩约 {n} 张",
     trustCenter: "信任中心",
     auditsPartners: "审计 · 合作方",
+    learningRow: "教程中心",
     walletCardsRow: "支付卡",
     walletCardsMeta: "卡片管理",
     goalsRow: "收益目标",
@@ -2658,6 +2662,11 @@ export const zh: Messages = {
     queuedToastBody: "${amount} 兑换将在午夜重置后执行。",
     platformExhaustedTitle: "平台额度已用尽",
     platformExhaustedBody: "今日 ${cap}K 额度已耗尽,请明日再试。",
+    remoteUnavailableClosed: "暂时无法兑换,请稍后再试",
+    remoteNotProvided: "暂无数据",
+    remoteUnavailableToast: "数据暂时取不到,请稍后再试",
+    swapFailed: "兑换没有成交,请稍后再试",
+    remoteRefreshed: "数据已更新",
   },
 
   exchangeHowItWorks: {
@@ -2862,6 +2871,7 @@ export const zh: Messages = {
     historyEmpty: "尚无到期记录。",
     insufficientToast: "NEX 不足以满足该锁仓池",
     educationFooter: "质押本质上是自愿延迟提现。溢价 APY 是对锁仓时长的补偿。",
+    remoteUnavailableClosed: "暂时无法进行锁仓操作,请稍后再试",
   },
   achievements: {
     title: "成就",
@@ -3312,6 +3322,11 @@ export const zh: Messages = {
     download: "下载 PDF",
     viewOnChain: "在链上查看",
     latest: "最新",
+    loadingDisclosure: "正在核验适用于当前地区的公开披露…",
+    openFailed: "无法在当前设备打开该链接",
+    errorOffline: "该公开披露仅在受信任网络可用;请连接后重试。",
+    errorGeoUnresolved: "暂时无法确认你所在地区的适用范围;页面不会用本地旧内容冒充最新事实,请检查网络后重试。",
+    errorUnavailable: "公开披露暂不可用;页面不会用本地旧内容冒充最新事实,请稍后重试。",
   },
 
   genesisEligibility: {
@@ -4759,6 +4774,8 @@ export const zh: Messages = {
     cardRebindTitle: "请更换试用担保卡",
     cardRebindBody: "你的 {brand} •••• {last4} 已无法继续为免费试用担保,请尽快绑定新卡,以保障试用结束时顺利完成购买。",
     cardRebindCta: "绑定新卡",
+    loadMore: "加载更多",
+    loadFailed: "通知没能加载出来,请检查网络后重试。",
   },
 
   // FEAT-SHARE01 邀请分享全链路(海报面板/渠道面板/入口)。
@@ -5032,5 +5049,25 @@ export const zh: Messages = {
     cancelCta: "取消",
     reasonNewAddressAge: "提现地址更换未满 7 天,大额提现需人工审核",
     startFailed: "操作失败,请稍后重试",
+  },
+  learning: {
+    centerTitle: "教程中心",
+    centerLoading: "正在加载教程中心…",
+    centerProgress: "已完成 {done}/{total} · 已获 {nex} NEX",
+    courseMeta: "{duration} · 奖励 {nex} NEX",
+    centerOffline: "教程中心需要连接受信任网络;请连接后重试。",
+    centerGeoUnresolved: "暂时无法确认你所在地区的适用范围;教程内容不会显示旧缓存,请检查网络后重试。",
+    centerUnavailable: "教程中心暂不可用;请稍后重试。",
+    courseLoading: "正在加载课程…",
+    courseVersionMeta: "版本 {version} · 奖励 {nex} NEX",
+    courseOffline: "课程需要在受信任网络中获取;请返回教程中心后重试。",
+    courseUnavailable: "课程暂不可用;请重试。",
+    submitQuiz: "提交测验",
+    answerAllFirst: "全部答完才能提交。",
+    completeCourse: "完成课程",
+    resultPassed: "已完成",
+    resultFailed: "未通过",
+    rewardGranted: " · 已发放 {nex} NEX",
+    submitUnconfirmed: "提交结果尚未确认;已重新读取课程进度,奖励不会按本地状态显示。",
   },
 };
