@@ -370,7 +370,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
-import { ApiError } from "@/api/errors";
+import { ApiError, isAmbiguousOutcome } from "@/api/errors";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 // 提现网络收窄裁决:仅 USDT 三网络(可选;每网络各有独立当前地址,RM01a)。
@@ -455,8 +455,14 @@ function clearSubmitIntent(): void {
   submitIntentKey.value = "";
   submitIntentSig.value = "";
 }
+
 /**
  * 服务端「今日笔数已达上限」拒单的识别。
+ *
+ * 🔴 实测更正(假后端 `dailyLimit` 档):超额拒单走 **HTTP 429**,而 429 不是 2xx,
+ * 所以客户端拿到的是 `kind:"http"` 而**不是** `business` —— `business` 只在 2xx 且
+ * 业务码非 0 时才产生。也就是说「按 kind 认」认不出它,真正认得出的是 message 这一路。
+ * 契约定名前保持串匹配;定名后收敛,见 HANDOFF U-4。
  *
  * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
  * 但 code 是 HTTP 状态码(超日限多半统一 4xx,认不出是哪条规则),真正区分规则的是
@@ -1078,29 +1084,29 @@ async function handleSubmit() {
     //
     // 分诊只做「换一句更准的话 + 决定要不要换幂等键」,不放行也不拦截任何东西,
     // 所以认错的代价有界。契约定名后收敛成单串:见 HANDOFF U-4。
-    const apiErr = err instanceof ApiError ? err : null;
-    // ① 服务端明确拒单(business)= 确定性结局 → 作废旧键,下次是新意图
-    if (apiErr?.kind === "business" || isDailyLimitRejection(err)) {
+    // ① 日限拒单:确定性结局(服务端明确拒了,没建单)。先认它,因为它走 429 → kind 是
+    //    "http" 而不是 "business",落到下面的歧义判定会被误当成「可能已建单」。
+    if (isDailyLimitRejection(err)) {
       clearSubmitIntent();
-      if (isDailyLimitRejection(err)) {
-        toast.error(dailyLimitReachedText.value);
-        return;
-      }
-      toast.error(t.value.walletV3.submitReasonReviewBlocked);
+      toast.error(dailyLimitReachedText.value);
       return;
     }
-    // ② 歧义结局(超时 / 网络)—— 服务端**可能已经建好单**。这里必须:
-    //    保留幂等键(重试才会命中服务端去重,而不是造出第二笔),
+    // ② 🔴🔴 歧义结局 —— 服务端**可能已经把单建好了**。两件事都必须做:
+    //    保留幂等键(重试命中服务端去重,而不是造出第二笔真出账),
     //    并且不说「请重新确认」那种把人往重按上推的话。
-    if (!apiErr || apiErr.kind === "network") {
-      // 🔴 不能复用现成的「本次未扣款,请稍后重试」——歧义结局下服务端**可能已经建单**,
-      // 那句话是新的假话。这里说的是实情:结果未知、别重按、去追踪页确认。
+    //    判定见 isAmbiguousOutcome —— 它的边界是假后端端到端实测出来的,不是推的。
+    if (isAmbiguousOutcome(err)) {
       toast.error(t.value.walletV3.submitUnknownTitle, t.value.walletV3.submitUnknownBody);
       return;
     }
-    // ③ 其余(auth / protocol / configuration / http):结局确定,换新键;
-    //    费率文案只留给**真的**报价失效那一类。
+    // ③ 确定性结局(服务端明确拒绝 / 根本没处理):作废旧键,下次是新的一笔意图。
+    const apiErr = err instanceof ApiError ? err : null;
     clearSubmitIntent();
+    if (apiErr?.kind === "business") {
+      toast.error(t.value.walletV3.submitReasonReviewBlocked);
+      return;
+    }
+    // 费率文案只留给**真的**报价失效那一类。
     await loadWithdrawalPolicy();
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;

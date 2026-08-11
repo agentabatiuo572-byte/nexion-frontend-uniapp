@@ -933,24 +933,29 @@ function functionBody(src, sig) {
         && pgCode.includes("function clearSubmitIntent(): void")
         // 现造键的老写法不许再出现在 snap 里
         && !/idempotencyKey: `withdrawal:\$\{app\.accountKey\}:\$\{Date\.now\(\)\}/.test(pgCode));
-    check("🔴🔴 失败按「结局是否确定」分诊:歧义(超时/网络)保留幂等键且不劝重按",
+    // 🔴🔴 判定本身已搬到接口层(src/api/errors.ts 的 isAmbiguousOutcome),
+    //    并由 selfcheck-withdraw-failpaths.mjs 用**真的 ApiError** 逐格行为验(12 格)。
+    //    这里只守**接线**:页面必须用那个函数、歧义分支不许清键、确定分支才清。
+    //    分工的理由:判定留在页面里就只能用字符串门,而字符串门抓不到语义错 ——
+    //    上一版的边界漏掉 http/504,门全绿而实测会重复出账。
+    check("🔴🔴 失败分诊接线:用接口层的歧义判定,歧义分支保留幂等键、确定分支才作废",
       (() => {
-        // 🔴 锚到**建单那个** catch。文件里有两处 `catch (err)`,靠前的是风控校验那一处 ——
-        // 直接 indexOf 会命中它,判据落在毫不相干的代码上而恒红(第一版实测踩到)。
         const submitAt = pgCode.indexOf("await app.submitWithdrawal(");
         if (submitAt < 0) return false;
         const i = pgCode.indexOf("} catch (err) {", submitAt);
         if (i < 0) return false;
         const seg = pgCode.slice(i, i + 2500);
-        // 歧义分支:从判据到该分支的 return 之间,必须出现「结果未确认」文案、
-        // 且**不得**出现清键动作。窗口钉到那个 return 为止 —— 放宽成固定字符数会把
-        // 后面别的分支里的 clearSubmitIntent 一起框进来(我第一版就这么写,当场假红)。
-        const nIdx = seg.indexOf('kind === "network"');
-        const nEnd = nIdx < 0 ? -1 : seg.indexOf("return;", nIdx);
-        const nBranch = nIdx >= 0 && nEnd > nIdx ? seg.slice(nIdx, nEnd) : "";
-        const ambiguousOk = nBranch.includes("submitUnknownTitle") && !nBranch.includes("clearSubmitIntent()");
-        // 确定性分支(服务端明确拒单 / 其余)才清键
-        const definitiveOk = /kind === "business"[\s\S]{0,120}?clearSubmitIntent\(\)/.test(seg);
+        // 用的是接口层那一个,不是页面自己再写一份
+        // 用 includes 精确串,不用正则 —— 这一行历史上被脚本改写吃掉反斜杠后变成非法正则
+        // (同「替换串静默损坏」那族坑,本文件顶部就写着别用正则写这类判据)。
+        if (!pgCode.includes("isAmbiguousOutcome") || !pgCode.includes('from "@/api/errors"')) return false;
+        if (/function isAmbiguousOutcome/.test(pgCode)) return false; // 页面里不许再有第二份实现
+        const aIdx = seg.indexOf("isAmbiguousOutcome(err)");
+        const aEnd = aIdx < 0 ? -1 : seg.indexOf("return;", aIdx);
+        const aBranch = aIdx >= 0 && aEnd > aIdx ? seg.slice(aIdx, aEnd) : "";
+        const ambiguousOk = aBranch.includes("submitUnknownTitle") && !aBranch.includes("clearSubmitIntent()");
+        // 确定性分支在歧义判定**之后**,且那里才清键
+        const definitiveOk = aEnd > 0 && seg.slice(aEnd).includes("clearSubmitIntent();");
         return ambiguousOk && definitiveOk;
       })());
 
