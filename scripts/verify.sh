@@ -152,13 +152,23 @@ fi
 # + 注册等流程整条绕开 mock 分支),拿 remote 模式 server 跑这些探针 = 静默验错对象。
 # 判据:vite dev 转换头会内联整份 env JSON,直接 curl 源模块判 mode;探不到也红(禁跳过)。
 echo -e "${C}[2.5] dev server API mode preflight${N}"
+# 🔴 两问,缺一不可(z1 R2 对抗审计 P1-24):本门自称要解决「验错对象」,却只问了模式、
+#    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
+#    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
+#    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
+served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
+expect_root=$(echo "$PROJECT_DIR" | sed 's|\\|/|g')
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
-elif echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
-  ok "API-mode preflight: server 运行在 mock 模式(运行时探针的合法靶)"
+elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
+  bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
+elif [ -z "$served_root" ]; then
+  bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
+elif [ "$(echo "$served_root" | tr 'A-Z' 'a-z')" != "$(echo "$expect_root" | tr 'A-Z' 'a-z')" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(并发多工作树时会给别人发绿灯)"
 else
-  bad "API-mode preflight: server 非 mock 模式 —— 起法:VITE_NEXGRID_API_MODE=mock npm run dev:h5(remote 默认值会让全部运行时探针验错对象)"
+  ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
 # (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
@@ -818,8 +828,26 @@ else
   # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
   # 都在这里红(2026-07-14 对抗审查 D 项缺口的构造性版本)。
   # 值起始 [^{] 过滤:块首行「riskCluster: {」自己也长得像键,不滤会多出幽灵键(红测实锤)。
+  # 🔴 但它同时把**对象值的键**一起滤掉了(z1 R2 对抗审计 P1-13):新增
+  #    `deviceFingerprint: { salt, ttlDays }` 这类参数在两侧键集里都看不见 → 静默不进
+  #    值 parity 循环,正是 captchaAlwaysScenes 那次的同型。故再加一道:块内**所有**
+  #    顶层键(含对象值)必须 = 循环键集 ∪ 显式登记的对象值键(下面登记表当前为空)。
+  SPEC7_OBJECT_VALUE_KEYS=""   # 形如 "deviceFingerprint tierWeights";登记即须写明谁在守它的值
   seed_rc_keys=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
   seed_og_keys=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  seed_all_keys=$(sed -n '/riskCluster: {/,/},/p;/otpGate: {/,/},/p' src/mock/platform-config.ts \
+    | grep -E '^\s+\w+:' | grep -oE '^\s+\w+:' | tr -d ' :\r' | grep -vE '^(riskCluster|otpGate)$' | sort -u)
+  loop_all_keys=$(printf '%s\n%s\n%s\n' "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" "$SPEC7_OBJECT_VALUE_KEYS" | tr ' ' '\n' | grep -v '^$' | sort -u)
+  unwatched=$(comm -23 <(echo "$seed_all_keys") <(echo "$loop_all_keys"))
+  # 🔴 空集必红:抽不到键(文件读不到 / 块形状变了)时上面的差集恒空 → 会假绿。
+  #    这条守卫是自己红测时发现的:cwd 漂了一次,判据就静默全过。
+  if [ "$(echo "$seed_all_keys" | grep -c .)" -lt 10 ]; then
+    bad "SPEC-7 参数键集抽取失败(只抽到 $(echo "$seed_all_keys" | grep -c .) 个,应 ≥10)—— 判据失效必红,禁空集全过"; fails=1
+  elif [ -z "$unwatched" ]; then
+    ok "SPEC-7 无脱管参数(含对象值键:种子顶层键集 ⊆ 循环键集 ∪ 对象值登记表)"
+  else
+    bad "SPEC-7 有参数脱离值 parity 看管(多半是对象/数组值的新键,判据的历史盲区):$(echo $unwatched)——补进循环或登记进 SPEC7_OBJECT_VALUE_KEYS 并写明谁守它的值"
+  fi
   loop_rc_keys=$(echo "$SPEC7_RISKCLUSTER_KEYS" | tr ' ' '\n' | sort)
   loop_og_keys=$(echo "$SPEC7_OTPGATE_KEYS" | tr ' ' '\n' | sort)
   if [ -n "$seed_rc_keys" ] && [ -n "$seed_og_keys" ] && [ "$seed_rc_keys" = "$loop_rc_keys" ] && [ "$seed_og_keys" = "$loop_og_keys" ]; then
@@ -1704,8 +1732,29 @@ no_oldbrand_check() {
   #    加 `PRD/…` 等于放行「任何提到 PRD 路径的行」,而品牌散文恰恰住在注释里 ——
   #    红测实证:那样改后 5 条真违规只抓得住 1 条(含用户可见 i18n 串与 DOM 文本)。
   #    需要引用带旧品牌前缀的 PRD 文件名时,注释里省略该前缀即可(见本文件 PAY-VN 段)。
-  hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
-    | grep -viE "${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}|x-${tok}-edge-country" | head -8)
+  # 🔴 白名单按 token 抠掉,不整行放行(z1 R2 对抗审计 P1-12):`grep -viE` 是**整行**过滤,
+  #    于是「一行里既有合法的后端仓路径、又有真的品牌泄漏」会被整行放走 ——
+  #    例:const heroTitle = "Nexion";  // 契约来源:nexion-backend/...  ← 旧判据放行。
+  #    改法:先把白名单形态从行里**删掉**,再看这一行还剩不剩旧词;剩了才算命中。
+  hits=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const tok=process.argv[1];
+const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country`,"gi");
+const hits=[];
+const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
+  for(const e of es){const p=path.join(d,e.name);
+    if(e.isDirectory())walk(p);
+    else if(/\.(vue|ts|js|mjs|json|html|css|md)$/.test(e.name)){
+      let txt=""; try{txt=fs.readFileSync(p,"utf8")}catch{continue}
+      txt.split(/\r?\n/).forEach((ln,i)=>{
+        const residual=ln.replace(WHITELIST,"");
+        if(new RegExp(tok,"i").test(residual)) hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim().slice(0,120));
+      });
+    }}};
+["src","scripts"].forEach(walk);
+try{ const h=fs.readFileSync("index.html","utf8"); h.split(/\r?\n/).forEach((ln,i)=>{ const r=ln.replace(WHITELIST,""); if(new RegExp(tok,"i").test(r)) hits.push("index.html:"+(i+1)+":"+ln.trim().slice(0,120)); }); }catch{}
+console.log(hits.slice(0,8).join("\n"));
+' "$tok" 2>/dev/null)
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }
@@ -1884,11 +1933,19 @@ platform_stats_anchor() {
   # trustSectionApi 按地区服务端下发;admin 活跃仓(admin-ops)同字段亦已服务端化、无字面量
   # 可镜。编译期 Q2 镜像的主语两侧同时灭失;对照面若回流字面量,由 (1) legacy-literal 禁令
   # 与服务端契约层守。守住「删了不许悄悄回来」:trust.vue 不得再出现本地 Q2 财务字面量。
+  # 🔴 禁的是「本地财务数据」这个类,不是那两个旧字符串(z1 R2 对抗审计 P1-11:
+  #    留着空的 QTR_FINANCIALS、另起一组 Q4_FINANCIALS 就能整族绕过)。判据两条:
+  #    ① 两个旧字面量不得回流;② trust.vue 里不得出现**任何**带内容的 *FINANCIALS 数组。
   for v in '27,150' '\$47\.0M'; do
     if grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then
       bad "platform-anchor: trust.vue 本地 Q2 财务字面量回流 /$v/(披露已服务端化,不得回退)"; fails=1
     fi
   done
+  fin_arrays=$(sed 's|//.*||' src/pages/trust/trust.vue 2>/dev/null | grep -nE '\w*FINANCIALS\w*[^=]*=\s*\[[^]]' | head -3)
+  if [ -n "$fin_arrays" ]; then
+    bad "platform-anchor: trust.vue 出现带内容的本地财务数组(披露一律服务端下发,禁另起一组绕过旧字面量禁令)"
+    echo "$fin_arrays" | sed 's/^/        /'; fails=1
+  fi
   if ! grep -qE 'QTR_FINANCIALS: \{ metric: string; value: string; delta: string \}\[\] = \[\];' src/pages/trust/trust.vue 2>/dev/null; then
     bad "platform-anchor: trust.vue QTR_FINANCIALS 不再是声明空数组(本地财务数据禁回流;产品若恢复本地 Q2 须重立镜像判据)"; fails=1
   fi
