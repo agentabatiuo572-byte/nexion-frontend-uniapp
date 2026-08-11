@@ -4871,6 +4871,8 @@ export const zh: Messages = {
     time15min: "约 15 分钟",
     sendVia: "通过 {network} 转入",
     segUsdt: "USDT 链上",
+    railsClosedTitle: "充值暂时不可用",
+    railsClosedDesc: "该通道正在接入中,充值已暂停。此处暂不展示任何收款信息 —— 也请不要向你此前保存过的地址或账号转账。",
     flowRetired: "该流程已下线",
     segCard: "银行卡",
     netRecommended: "推荐 · 手续费最低",

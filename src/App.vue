@@ -102,10 +102,23 @@ function advanceArrivalAndSettleBill() {
   const app = useApp();
   // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
   // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
+  // 远端模式下 advanceWithdrawalArrival 恒返回空(闸在 advanceArrival 里),状态改由
+  // refreshRemoteWithdrawals 从 GET /api/withdrawals/:id 镜像回来 —— 两条路产出同一种
+  // 「本次变动了哪几笔」,后面的结算与对账逻辑一字不改。
   const advanced = app.advanceWithdrawalArrival();
   if (advanced.length) {
     const bills = useBills();
     for (const ref of advanced) bills.settleByRef(ref, "posted");
+  }
+  if (remoteApiEnabled) {
+    // fire-and-forget:拉不到就保持原样,下一拍(5s)再问;reconcileBills 本身是
+    // 「从数据推出该做什么」的自愈式对账,晚一拍拿到镜像也能自己收敛。
+    void app.refreshRemoteWithdrawals()
+      .then((mirrored) => {
+        if (!mirrored.length) return;
+        reconcileBills();
+      })
+      .catch(() => undefined);
   }
   // 结算失败的那几笔不靠「记在内存里下次重试」找回来 —— 见 reconcileBills 的注释。
   reconcileBills();
@@ -310,6 +323,11 @@ let milestoneTimer: ReturnType<typeof setInterval> | undefined;
 
 function pollMilestones() {
   if (!ensureBusinessLoopsAllowed()) return;
+  // 🔴 远端模式不发:判据 lifeToDate 来自 app.earnings,而计收路径(app.settle)已归服务端;
+  // 这里再跑就是拿本地数字给自己发 NEX + 写一条账单行。真契约是
+  // GET /api/config/milestones + POST /api/me/milestones/:id/claim(PRD §11.3a / §9.11e),
+  // 由服务端裁决与发放,client 只展示。关掉不 latch:没人依赖里程碑触发才能解锁别的东西。
+  if (remoteApiEnabled) return;
   const app = useApp();
   const m = useMilestones();
   // Life-to-date = banked total + the still-accruing today bucket (matches the

@@ -12,8 +12,22 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
 
+      <!-- 🔴 远端模式:整页停摆,一个收款目标都不渲染。
+           两条轨是**链外真实付款**入口 —— 链上轨给的专属地址由 deriveDepositAddress
+           在本地用伪随机数派生(不是真地址),银行轨给的收款账号来自本地常量表,两者
+           都带一键复制。真后端未接线时展示它们 = 引导用户把真钱打进虚构的收款目标,
+           链上那笔不可找回。这与「不许伪造入账」是同一件事的两面:入账侧的四道闸挡住
+           「假装钱到了」,这道挡住「真把钱送出去」。
+           卡轨一并收进来:三条轨在远端模式下都没有服务端在对账,留一条能填的反而更费解。 -->
+      <EmptyState
+        v-if="remoteApiEnabled"
+        kind="locked-or-no-permission"
+        :title="t.topupChrome.railsClosedTitle"
+        :desc="t.topupChrome.railsClosedDesc"
+      />
+
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
-      <view class="flex" :style="segWrapStyle">
+      <view v-else class="flex" :style="segWrapStyle">
         <view
           v-for="s in SEGMENTS"
           :key="s.id"
@@ -27,14 +41,16 @@
         </view>
       </view>
 
-      <!-- USDT 链上通道段 -->
-      <DepositUsdtPane v-if="seg === 'crypto'" />
+      <template v-if="!remoteApiEnabled">
+        <!-- USDT 链上通道段 -->
+        <DepositUsdtPane v-if="seg === 'crypto'" />
 
-      <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
-      <DepositBankPane v-else-if="seg === 'bank'" />
+        <!-- 银行转账段(VietQR,[FEAT-PAY02]) -->
+        <DepositBankPane v-else-if="seg === 'bank'" />
 
-      <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
-      <TopupCardForm v-else @change-channel="seg = 'crypto'" />
+        <!-- 银行卡段 — 现有卡表单原样接入(Change → 回 USDT 段) -->
+        <TopupCardForm v-else @change-channel="seg = 'crypto'" />
+      </template>
     </view>
   </AppChassis>
 </template>
@@ -42,11 +58,13 @@
 <script setup lang="ts">
 import { ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
+import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
 
 // ── 通道 segmented(USDT 链上 / 银行转账 / 银行卡)──
