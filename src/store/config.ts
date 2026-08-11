@@ -70,6 +70,12 @@ export const useConfig = defineStore("config", () => {
       config.value = {
         ...config.value,
         featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
+        // 🔴 publicStats 是 H9 的**唯一**来源:种子里没有它(819a6da 把它移出 mock 数据),
+        //   compat 只补一个「故意非法」哨兵。这里漏写 = 服务端投影解析完就被丢掉,
+        //   publicStatsHealth 六位恒 false,16 个消费点永久走「不可用」占位(z1 独立审计 P0-3)。
+        //   本行由 scripts/remote-config-merge-contract.test.mjs 的覆盖等式钉着:
+        //   解析器返回的每个属于 PlatformConfig 的字段都必须在这里落地,漏一个即红。
+        publicStats: remote.publicStats,
         onlineBonus: remote.onlineBonus,
         rewards: remote.rewards,
         computeShare: remote.computeShare,
