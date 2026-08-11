@@ -2663,9 +2663,9 @@ export const zh: Messages = {
     platformExhaustedTitle: "平台额度已用尽",
     platformExhaustedBody: "今日 ${cap}K 额度已耗尽,请明日再试。",
     remoteUnavailableClosed: "暂时无法兑换,请稍后再试",
-    mockModeNotice: "Mock 模式 · 非远端成交",
     remoteNotProvided: "暂无数据",
     remoteUnavailableToast: "数据暂时取不到,请稍后再试",
+    swapFailed: "兑换没有成交,请稍后再试",
     remoteRefreshed: "数据已更新",
   },
 
@@ -2871,7 +2871,6 @@ export const zh: Messages = {
     historyEmpty: "尚无到期记录。",
     insufficientToast: "NEX 不足以满足该锁仓池",
     educationFooter: "质押本质上是自愿延迟提现。溢价 APY 是对锁仓时长的补偿。",
-    mockModeNotice: "Mock 模式 · 非远端资金",
     remoteUnavailableClosed: "暂时无法进行锁仓操作,请稍后再试",
   },
   achievements: {

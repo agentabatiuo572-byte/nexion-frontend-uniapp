@@ -333,6 +333,16 @@ else
 fi
 sentinel_present "wallet dev reset UI is DEV-only" src/pages/me/wallet-withdraw.vue 'import\.meta\.env\.DEV && options\?\.dev === "1"'
 sentinel_present "payout-address dev reset store has PROD guard" src/store/payout-address.ts 'if \(import\.meta\.env\.PROD\) return'
+# mock 诊断横幅是**开发**信息面(工程话),按仓规不得上用户的屏。两条断言缺一不可:
+#   ① 闸还在(删掉 `isDevBuild &&` 就红)② 文案没被搬回三语词典(搬回去就成了用户文案契约,
+#   而词典是普通对象、摇不掉,会原样进生产包 —— 这正是上一版 DEV-gate 没闭合的那半)。
+sentinel_present "staking mock notice is DEV-only" src/pages/staking/staking.vue 'v-if="isDevBuild && staking\.isMockMode"'
+sentinel_present "exchange mock notice is DEV-only" src/pages/me/wallet-exchange.vue 'v-else-if="isDevBuild && !remoteApiEnabled"'
+# 🔴 这条必须自己 grep:sentinel_absent 的默认排除清单里就有 /i18n/messages/,
+#    用它来断言「词典里没有某个键」会永远 0 命中 —— 门看着绿,其实压根没扫词典。
+mock_key_hits=$(grep -rn "mockModeNotice" src/i18n/messages src/pages src/components 2>/dev/null | head -5)
+if [ -z "$mock_key_hits" ]; then ok "mock 诊断文案不在 i18n 契约里 (0 hits · 已扫 i18n/messages + pages + components)"
+else bad "mock 诊断文案被搬回 i18n 词典 — 它是工程话,进词典就是用户文案契约,且词典对象摇不掉会原样进生产包"; echo "$mock_key_hits" | sed 's/^/        /'; fi
 if grep -qE '5-15%|5-15%' src/i18n/messages/en.ts src/i18n/messages/zh.ts 2>/dev/null; then
   bad "staking disclosure understates 180d/365d principal penalties"
 else
