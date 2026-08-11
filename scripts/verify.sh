@@ -775,7 +775,10 @@ if [ "${arsr_pages:-0}" = "1" ] && [ "${arsr_hash:-0}" = "1" ] && [ "${arsr_orh:
 else
   bad "app-route-single-reader(页面栈原语=${arsr_pages} 期望1 · hash=${arsr_hash} 期望1 · 旧双读口=${arsr_orh} 期望0)"
 fi
-sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
+# 2026-08-11:advanceArrival 多了第三个必填参数「谁是权威」(远端模式 client 不自推)。
+# 这条只守「全表扫 + 每笔都过同一个纯函数」,不钉死实参写法;权威闸本身由
+# selfcheck-arrival 第 0 节 + scripts/remote-authority-simulation.test.mjs 行为门守。
+sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now,[^)]*\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
 adv_sites=$(grep -rcE 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')
@@ -2518,6 +2521,33 @@ money_receipt_gate() {
   fi
 }
 money_receipt_gate
+
+# ── 本地建单权威门(2026-08-11):远端模式下页面不许自己造订单行 ──
+# 履约推进已归服务端(store/orders.ts 的 advanceOrder 有闸),但**建单**这一步的闸分散在
+# 各购买入口的 SFC 里,store 侧收不了口:createOrder 的返回值在 checkout 那条路上被立刻
+# 消费(ord.id),且调用点已越过两步不可逆动作(试用转正 / 旧机下架)——把它改成可空返回,
+# 回滚面是残的,比它要防的毛病更险。故这道门守**调用侧的结构不变量**:任何写本地订单行的
+# 页面,必须在建单**之前**先判 API 模式。新增购买入口若忘了判,这里立刻报红,而不是等到
+# 线上「钱扣了、单子永远停在已支付、机器一台不来」。
+local_order_authority_gate() {
+  local violations=0 f co_line guard_line
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    co_line=$(grep -nE "orders\.createOrder\(" "$f" | head -1 | cut -d: -f1)
+    # 🔴 必须排掉 import 行:它永远在文件顶部,拿它当「判过了」会让位置判据恒真 ——
+    #    红测实证(形态B:把真正那道闸挪到建单之后)门照样报绿,即假绿。
+    guard_line=$(grep -nE "remoteApiEnabled" "$f" | grep -vE "^[0-9]+:\s*import\b" | head -1 | cut -d: -f1)
+    if [ -z "$guard_line" ]; then
+      bad "本地建单权威门:$f 写本地订单行却全文没判 API 模式 — 远端模式下会造出服务端不认的单"
+      violations=$((violations + 1))
+    elif [ "$guard_line" -gt "$co_line" ]; then
+      bad "本地建单权威门:$f 的 API 模式判断(行 $guard_line)排在建单(行 $co_line)之后 — 挡不住"
+      violations=$((violations + 1))
+    fi
+  done < <(grep -rlE "orders\.createOrder\(" src/pages/ src/components/ --include=*.vue 2>/dev/null)
+  [ "$violations" -eq 0 ] && ok "本地建单权威门 — 写本地订单行的页面均在建单前判了 API 模式"
+}
+local_order_authority_gate
 
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST

@@ -614,6 +614,12 @@ export const useApp = defineStore("app", () => {
    *  The SINGLE mock accrual path — PROD replaces it with the candidate aggregate
    *  GET/SSE contract in PRD §9.11c.1; no settle mutation endpoint is frozen. */
   function settle() {
+    // 🔴 与上面的 tick() 同一道闸(此前只 tick 有,settle 漏了 —— 而 settle 是**唯一**的
+    // 计收路径,且 App.vue 的 ensureBusinessLoopsRunning / connectComputeShareDevice 都直调它)。
+    // 远端模式下这里每跑一次就凭设备墙钟给自己发一次钱:earnings.* 之外还经 bucketUserEarnings +
+    // applyReleaseOutcome 直写 usdtBalance / nexBalance / withdrawableUsdt。收益归服务端
+    // (GET /api/me/earnings —— PRD §9.11c.1),client 不自算。
+    if (remoteApiEnabled) return;
     if (miningPaused.value) return;
     const cfgStore = useConfig();
     // FEAT-RISK02 异常3: 配置同步失败 → 暂停结算并由钱包显示失败态;
@@ -1334,7 +1340,9 @@ export const useApp = defineStore("app", () => {
     // 前面那笔到点了也永远推不动(列表化后这个洞自动消失)。
     const now = mockServerNow();
     const prev = withdrawals.value;
-    const next = prev.map((w) => advanceArrival(w, now) ?? w);
+    // 🔴 远端模式交给 advanceArrival 自己拒绝(必填 ctx),不在这里 early-return:
+    // 判据留在纯函数里,才有一个能 node 直跑的落点(见 remote-authority-simulation.test.mjs)。
+    const next = prev.map((w) => advanceArrival(w, now, { serverAuthoritative: remoteApiEnabled }) ?? w);
     const advancedIds = next.filter((w, i) => w !== prev[i]).map((w) => w.id);
     if (!advancedIds.length) return [];
     withdrawals.value = next;
@@ -1347,11 +1355,56 @@ export const useApp = defineStore("app", () => {
     return advancedIds;
   }
 
+  /**
+   * 远端模式的**替代品**:把服务端单据状态镜像回本地(GET /api/withdrawals/:id,
+   * PRD §9.11f)。没有这一步,单纯关掉本地推进会把一个缺陷换成另一个 ——
+   * 在途单永不终结 → occupiesWithdrawalSlot 恒真 → 收款地址换绑入口
+   * (payout-address.hasInFlightWithdrawalOn)与「同时只能有一笔」的下一笔提现
+   * **永久**被拦,账单行也永远停在处理中。
+   *
+   * 只读不裁决:状态、到账时刻全取服务端值;拉不到就保持原样(下一拍再试),
+   * 绝不因为「问不到」就自己判一个。返回本次真正变动的单号,与
+   * advanceWithdrawalArrival 同形状,供 App 层按单号结算对应账单行。
+   */
+  async function refreshRemoteWithdrawals(): Promise<string[]> {
+    if (!remoteApiEnabled) return [];
+    const targets = inFlightWithdrawals.value;
+    if (!targets.length) return [];
+    const mirrors = await Promise.all(targets.map((w) =>
+      withdrawalApi.get(w.id).catch(() => null)));
+    const patches = new Map<string, Withdrawal>();
+    targets.forEach((w, i) => {
+      const remote = mirrors[i];
+      if (!remote || remote.status === w.status) return;
+      patches.set(w.id, {
+        ...w,
+        status: remote.status,
+        // 服务端没给到账时刻就不编一个:仍按「到点即已到」记 estimatedCompletion,
+        // 与 mock 推进同口径(见 advanceArrival 的 confirmedAt 注释)。
+        ...(remote.status === "confirmed"
+          ? { confirmedAt: remote.confirmedAt ?? w.estimatedCompletion }
+          : {}),
+      });
+    });
+    if (!patches.size) return [];
+    const prev = withdrawals.value;
+    withdrawals.value = prev.map((w) => patches.get(w.id) ?? w);
+    // 落盘失败即回滚内存 —— 与 advanceWithdrawalArrival 同一套「诚实返回落盘结果」。
+    if (!persistAccountSnapshot()) {
+      withdrawals.value = prev;
+      return [];
+    }
+    return [...patches.keys()];
+  }
+
   // ⚠️ DEV/DEMO-ONLY(SPEC-7 收编): 仅 pass 路由的提现可由 demo 驱动推进主链
   // 状态;manual/delay/freeze 的状态推进属于服务端/人工处置,client 永不推进。
   // PRODUCTION: status comes from server webhook/SSE/polling only.
   function _devAdvanceWithdrawal() {
     if (import.meta.env.PROD) return; // demo-only 状态推进,store 层二层 guard(硬规则5)
+    // 🔴 PROD 构建 ≠ 远端模式:remote 是默认档(runtime-config.ts),dev 构建里这个
+    // demo 驱动照样在线,一按就把服务端单据在本地改成已到账。两条闸各挡一面。
+    if (remoteApiEnabled) return;
     const wd = latestWithdrawal.value;
     if (!wd) return;
     const pos = withdrawals.value.findIndex((w) => w.id === wd.id);
@@ -1383,7 +1436,8 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, advanceWithdrawalArrival, refundFailedWithdrawals, _devAdvanceWithdrawal, _devGrantManualRelease,
+    submitWithdrawal, advanceWithdrawalArrival, refreshRemoteWithdrawals, refundFailedWithdrawals,
+    _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
 });

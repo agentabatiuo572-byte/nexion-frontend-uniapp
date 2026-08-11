@@ -18,7 +18,19 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const src = readFileSync(path.join(root, "src", "store", "withdrawal-arrival-core.ts"), "utf8");
 const { code } = transformSync(src, { loader: "ts", format: "esm" });
 const core = await import("data:text/javascript;base64," + Buffer.from(code, "utf8").toString("base64"));
-const { advanceArrival, estimateArrivalAt, normalizeSlaHours, DEFAULT_PAYOUT_SLA_HOURS, occupiesWithdrawalSlot } = core;
+const {
+  advanceArrival: advanceArrivalRaw,
+  estimateArrivalAt, normalizeSlaHours, DEFAULT_PAYOUT_SLA_HOURS, occupiesWithdrawalSlot,
+} = core;
+
+/**
+ * 2026-08-11:advanceArrival 多了第三个**必填**参数「谁是权威」——远端模式下
+ * client 不许自推(单据是服务端签发的,判据却是设备墙钟,把手机时间往后拨就能
+ * 让 App 宣布钱到了)。本文件下面几十条断言测的都是**本地权威**那一档的行为,
+ * 故在这里统一补上默认值,原有断言一字不改;远端那档单独在第 0 节钉。
+ */
+const LOCAL_AUTHORITY = { serverAuthoritative: false };
+const advanceArrival = (wd, now, ctx = LOCAL_AUTHORITY) => advanceArrivalRaw(wd, now, ctx);
 
 let pass = 0;
 let fail = 0;
@@ -47,6 +59,22 @@ function ticket(over = {}) {
     ...over,
   };
 }
+
+// ── 0. 🔴 远端权威时一步不推(2026-08-11)────────────────
+// remote 是**默认档**(src/api/runtime-config.ts:没有 VITE_NEXGRID_API_MODE=mock 就是它),
+// 所以这一节守的是产品实际跑的那一档。上面几十条「该推进」的断言反过来证明这道闸
+// 不是把功能整个关掉 —— 只测这一节的话,删光函数体也能全绿。
+for (const [label, over] of [
+  ["到点的 pass 单", {}],
+  ["离线三天的单", { estimatedCompletion: NOW - 3 * DAY }],
+  ["主链中间态 processing", { status: "processing" }],
+]) {
+  check(`🔴 远端权威:「${label}」也不推进(状态归服务端,墙钟不是权威)`,
+    advanceArrivalRaw(ticket(over), NOW, { serverAuthoritative: true }) === null);
+}
+check("🔴 漏传权威上下文 → 抛错,不静默按本地权威推进(必填参数的运行时那一面)", (() => {
+  try { advanceArrivalRaw(ticket(), NOW); return false; } catch { return true; }
+})());
 
 // ── 1. 到点推进 ────────────────────────────────────────
 {

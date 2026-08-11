@@ -44,8 +44,17 @@ export interface WithdrawalPolicy {
   source: "D5+H1";
 }
 
+/** 单据状态镜像 —— GET /api/withdrawals/:id (PRD §9.11f 的按 id 读单通式)。 */
+export interface WithdrawalStatusSnapshot {
+  withdrawalNo: string;
+  status: WithdrawalStatus;
+  /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
+  confirmedAt: number | null;
+}
+
 export interface WithdrawalApi {
   policy(): Promise<WithdrawalPolicy>;
+  get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;
   submit(
     amount: number,
     chain: SupportedWithdrawalNetwork,
@@ -273,11 +282,39 @@ export function toCanonicalWithdrawal(
   };
 }
 
+/**
+ * 状态镜像解析。🔴 fail-closed:单号 / 状态任一不合法即抛,调用方保持原状再问一次 ——
+ * 「问不到」绝不能降级成「自己判一个」,那正是本轮要消灭的东西。
+ */
+function parseStatusSnapshot(value: unknown): WithdrawalStatusSnapshot {
+  const row = record(value);
+  const withdrawalNo = text(row?.withdrawalNo);
+  const status = text(row?.status);
+  if (!row || !withdrawalNo || !status) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+  }
+  const rawConfirmedAt = row.confirmedAt;
+  // 时刻可以是毫秒数或 ISO 串;给了但读不出来 = 协议不符,不静默当没给。
+  let confirmedAt: number | null = null;
+  if (rawConfirmedAt !== null && rawConfirmedAt !== undefined && rawConfirmedAt !== "") {
+    const parsed = typeof rawConfirmedAt === "number" ? rawConfirmedAt : Date.parse(String(rawConfirmedAt));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+    }
+    confirmedAt = parsed;
+  }
+  return { withdrawalNo, status: canonicalStatus(status), confirmedAt };
+}
+
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
   return {
     policy: async () => parsePolicy(await client.request({
       method: "GET",
       path: "/api/withdrawals/policy",
+    })),
+    get: async (withdrawalNo) => parseStatusSnapshot(await client.request({
+      method: "GET",
+      path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,
     })),
     submit: async (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey) =>
       parseSubmission(await client.request({
