@@ -405,7 +405,14 @@ async function loadWithdrawalPolicy(): Promise<void> {
   }
 }
 
-// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
+// 🔴 这才是**可提现额度的唯一权威**:它出禁用理由(disabledReasonFor)、并在提交前
+// 二次核验(handleSubmit 里 snap.amount > fresh.maxWithdrawableUsdt 即拒)。
+// 钱包页 / 钱包卡片显示的是**账面总余额**(标签「USDT 余额」),两者本就不是一个数,
+// 不要再像 2026-07-31 那版注释那样声称"三处同源" —— 那次分裂就是这么留下的。
+//
+// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提**基数** = 总余额;
+// 在此基数上再扣 held 两桶、乘 policy.balanceMaxRatio,并三态 fail-closed 归 0
+// (风控簇受限 / 无收益快照 / 无 policy)。后端缺席时本值恒 0,属预期的保守失败。
 // pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
 // 注意:这里读 usdtBalance 是本规则的正解。历史 P0(可提额度 > 总余额仍放行)的防线
 // 已随 c37e642 的本地扣款链一并移除 —— 客户端不再扣款,超额请求由本 computed 的
@@ -665,6 +672,14 @@ const heldLine = computed(() => {
  */
 // WD01 is HOLD: the backend does not yet execute the advertised review/address bypass.
 // Keep the fast-lane branch unreachable instead of treating a persisted/displayed value as effective.
+//
+// 🔴 2026-08-11(主人拍板"真停"):这个 0 此前**只关了页面这一层**。判定层
+// (withdrawal-eligibility.ts → decideWithdrawalRoute)读的是另一个源
+// config.withdrawRules.smallAmountThresholdUsd,那边当时是 50 —— 于是「注释说停用、
+// 引擎在跑」:≤$50 的首提照样被免掉「首提必审」与「新地址 hold」,上面那条
+// fastLaneOn 横幅还会真弹「这笔可立即处理 · 已免去:首次提现审核」。
+// 现已把判定层的默认值一并置 0(platform-config-compat.ts),两层同时关闭。
+// ⚠️ 恢复快车道时**必须两层一起改**,只改一层就会复现这次的口径分裂。
 const smallAmountLine = computed(() => 0);
 /**
  * 正向态:这笔**真的**免掉了闸,才值得说。
