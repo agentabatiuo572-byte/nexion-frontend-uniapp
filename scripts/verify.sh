@@ -156,17 +156,51 @@ echo -e "${C}[2.5] dev server API mode preflight${N}"
 #    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
 #    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
 #    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
+#    上面那两问判的是「谁在服」,判据是两个路径字符串相等 —— 而同一个目录在本仓有四种
+#    写法,只统一反斜杠是不够的(2026-08-11 实测):
+#      · `D:\WORKS\x`   Node 的 process.cwd() 序进 vite 的 env JSON(反斜杠成对转义)
+#      · `D:/WORKS/x`   Node 起的 bash 里 pwd 给的形态 —— `npm run verify` 走这条
+#      · `/d/WORKS/x`   Git Bash(MINGW)的 pwd —— 本工程 CLAUDE.md 让人直接敲的就是这条
+#      · `/mnt/d/WORKS/x` WSL 的 pwd —— 本脚本上面的 /proc/version 分支就是为 WSL 留的
+#    原判据只把反斜杠换成斜杠、没归一盘符形态,于是 `D:/x` != `/d/x` 恒成立:`npm run verify`
+#    (Node 起 bash,两边都是 D:/)恰好判等看不出来,而 `bash scripts/verify.sh` 这条**必红**,
+#    还红成「服的是别的工作树」这种误导性结论。偏偏后者才是这道门唯一有意义的用法 ——
+#    前者由 run-legacy-suite.mjs 自起自验,树身份天然相等。门一旦落下「公认的正常红」就不
+#    再是门,所以把两边归一到同一形态再比,而不是把树身份校验删掉。
+norm_root() {
+  printf '%s' "$1" \
+    | sed -e 's|\\|/|g' -e 's|//*|/|g' -e 's|\(.\)/$|\1|' \
+          -e 's|^/mnt/\([A-Za-z]\)/|/\1/|' -e 's|^/mnt/\([A-Za-z]\)$|/\1|' \
+          -e 's|^\([A-Za-z]\):/|/\1/|'     -e 's|^\([A-Za-z]\):$|/\1|' \
+    | tr 'A-Z' 'a-z'
+}
+# 判据双向红测(常驻)。归一化有两种坏法,方向相反,只测一个方向不算数:
+#   ① 归不拢 → 同一目录的两种写法判不等,门恒红(本次修的就是这只);
+#   ② 归过头 → 不同工作树被折成相等,门恒绿地替别人发绿灯(比恒红危险得多)。
+#   任一方向坏了,下面那道树身份判断就不许发绿灯。
+if [ "$(norm_root 'D:\WORKS\x')" = "$(norm_root '/d/WORKS/x')" ] \
+   && [ "$(norm_root '/mnt/d/WORKS/x')" = "$(norm_root 'D:/works/x/')" ] \
+   && [ "$(norm_root '/d/WORKS/x')" != "$(norm_root '/d/WORKS/x/.claude/worktrees/w1')" ] \
+   && [ "$(norm_root 'D:/WORKS/x')" != "$(norm_root '/c/WORKS/x')" ]; then
+  norm_root_selftest=ok
+  ok "树身份判据自检(双向红测:D:\\ · D:/ · /d/ · /mnt/d/ 四种写法判等 + 嵌套工作树/异盘符判不等)"
+else
+  norm_root_selftest=broken
+  bad "树身份判据自检失败 —— norm_root 归一化坏了,下面的树身份判断不可信(动过 norm_root 就看这条)"
+fi
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
 served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
-expect_root=$(echo "$PROJECT_DIR" | sed 's|\\|/|g')
+expect_root="$PROJECT_DIR"
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
 elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
   bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
 elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
-elif [ "$(echo "$served_root" | tr 'A-Z' 'a-z')" != "$(echo "$expect_root" | tr 'A-Z' 'a-z')" ]; then
-  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(并发多工作树时会给别人发绿灯)"
+elif [ "$norm_root_selftest" != "ok" ]; then
+  bad "API-mode preflight: 树身份判据自检没过 —— 归一化不可信,这道门不发绿灯"
+elif [ "$(norm_root "$served_root")" != "$(norm_root "$expect_root")" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(norm_root "$served_root") vs $(norm_root "$expect_root");并发多工作树时会给别人发绿灯)"
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
