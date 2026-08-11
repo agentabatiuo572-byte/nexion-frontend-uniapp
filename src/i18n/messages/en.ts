@@ -2764,11 +2764,11 @@ export const en = {
     queuedToastBody: "Swap ${amount} will execute after midnight reset.",
     platformExhaustedTitle: "Platform pool exhausted",
     platformExhaustedBody: "Daily pool of ${cap}K is drained. Try again tomorrow.",
-    remoteUnavailableClosed: "Authoritative remote data unavailable — exchange is closed",
+    remoteUnavailableClosed: "Exchange is unavailable right now. Please try again shortly.",
     mockModeNotice: "Mock mode · not settled remotely",
-    remoteNotProvided: "Not provided remotely",
-    remoteUnavailableToast: "Authoritative remote data is unavailable",
-    remoteRefreshed: "Authoritative remote data refreshed",
+    remoteNotProvided: "Not available",
+    remoteUnavailableToast: "Couldn't load the latest data. Please try again shortly.",
+    remoteRefreshed: "Data updated",
   },
 
   exchangeHowItWorks: {
@@ -2982,7 +2982,7 @@ export const en = {
     educationFooter:
       "Staking voluntarily delays your withdrawals. Premium APY rewards compensate for lock-up time.",
     mockModeNotice: "Mock mode · not remote funds",
-    remoteUnavailableClosed: "Authoritative remote data unavailable — staking actions are closed",
+    remoteUnavailableClosed: "Staking is unavailable right now. Please try again shortly.",
   },
   achievements: {
     title: "Achievements",

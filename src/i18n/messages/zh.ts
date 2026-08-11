@@ -2662,11 +2662,11 @@ export const zh: Messages = {
     queuedToastBody: "${amount} 兑换将在午夜重置后执行。",
     platformExhaustedTitle: "平台额度已用尽",
     platformExhaustedBody: "今日 ${cap}K 额度已耗尽,请明日再试。",
-    remoteUnavailableClosed: "远端权威数据不可用,兑换已关闭",
+    remoteUnavailableClosed: "暂时无法兑换,请稍后再试",
     mockModeNotice: "Mock 模式 · 非远端成交",
-    remoteNotProvided: "远端未提供",
-    remoteUnavailableToast: "远端权威数据暂不可用",
-    remoteRefreshed: "远端权威数据已刷新",
+    remoteNotProvided: "暂无数据",
+    remoteUnavailableToast: "数据暂时取不到,请稍后再试",
+    remoteRefreshed: "数据已更新",
   },
 
   exchangeHowItWorks: {
@@ -2872,7 +2872,7 @@ export const zh: Messages = {
     insufficientToast: "NEX 不足以满足该锁仓池",
     educationFooter: "质押本质上是自愿延迟提现。溢价 APY 是对锁仓时长的补偿。",
     mockModeNotice: "Mock 模式 · 非远端资金",
-    remoteUnavailableClosed: "远端权威数据不可用,质押操作已关闭",
+    remoteUnavailableClosed: "暂时无法进行锁仓操作,请稍后再试",
   },
   achievements: {
     title: "成就",
