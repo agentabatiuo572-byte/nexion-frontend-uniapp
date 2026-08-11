@@ -29,7 +29,7 @@
       </view>
       <text class="block" :style="emptyTextStyle">{{ t.store.coNoSavedCard }}</text>
       <view class="w-full grid place-items-center active:opacity-80" :style="addCardBtnStyle" role="button" tabindex="0" :aria-label="t.store.coAddCardCta" @click.stop="goAddCard">
-        <text @click.stop="goAddCard">{{ t.store.coAddCardCta }}</text>
+        <text role="button" tabindex="0" @click.stop="goAddCard">{{ t.store.coAddCardCta }}</text>
       </view>
     </view>
 
@@ -94,10 +94,10 @@
     <!-- Pay + cancel -->
     <view style="padding: 8px 16px 16px">
       <view class="w-full grid place-items-center active:opacity-90" :style="payBtnStyle" role="button" tabindex="0" :aria-label="payLabel" @click.stop="onPay">
-        <text @click.stop="onPay">{{ payLabel }}</text>
+        <text role="button" tabindex="0" @click.stop="onPay">{{ payLabel }}</text>
       </view>
       <view class="w-full grid place-items-center active:opacity-80" :style="cancelBtnStyle" role="button" tabindex="0" :aria-label="t.store.coCancel" @click.stop="emitCancel">
-        <text @click.stop="emitCancel">{{ t.store.coCancel }}</text>
+        <text role="button" tabindex="0" @click.stop="emitCancel">{{ t.store.coCancel }}</text>
       </view>
     </view>
   </view>

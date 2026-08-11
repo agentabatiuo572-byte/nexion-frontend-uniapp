@@ -24,7 +24,7 @@
         <text class="block" :style="askLabelStyle">{{ askingChipText }}</text>
         <text class="block tabular-nums" :style="askPriceStyle">${{ existing.askPriceUSDT.toLocaleString() }}</text>
         <text class="block" :style="listedAgoStyle">{{ listedAgoText }}</text>
-        <view class="w-full flex items-center justify-center active:scale-[0.97]" :style="cancelBtnStyle" @click="handleCancel">
+        <view class="w-full flex items-center justify-center active:scale-[0.97]" :style="cancelBtnStyle" role="button" tabindex="0" @click="handleCancel">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           <text>{{ t.marketplace.cancelBtn }}</text>
         </view>
@@ -38,7 +38,7 @@
           <input class="flex-1 min-w-0 tabular-nums" :style="inputStyle" type="text" inputmode="numeric" :value="String(askPrice)" @input="onAskInput" />
         </view>
         <text class="block" :style="floorHintStyle">{{ floorHintText }}</text>
-        <view class="w-full flex items-center justify-center active:scale-[0.97]" :style="listBtnStyle" @click="handleList">
+        <view class="w-full flex items-center justify-center active:scale-[0.97]" :style="listBtnStyle" role="button" tabindex="0" @click="handleList">
           <svg v-if="!listBlocked" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r=".5" fill="currentColor" /></svg>
           <text>{{ listBlocked ? (blockText ?? t.genesis.marketClosed.default) : t.marketplace.listCta }}</text>
         </view>

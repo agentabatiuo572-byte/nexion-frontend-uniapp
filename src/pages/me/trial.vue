@@ -122,7 +122,7 @@
 
     <!-- ═══ Rules half-sheet (spec ⑥「查看抵扣规则」) ═══ -->
     <view v-if="rulesOpen" class="trs-root" role="dialog" aria-modal="true">
-      <view class="trs-backdrop" @click="rulesOpen = false" />
+      <view class="trs-backdrop" role="button" tabindex="0" @click="rulesOpen = false" />
       <view class="trs-panel" @click.stop>
         <view class="flex items-center justify-between">
           <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink)">{{ t.trial.rulesTitle }}</text>

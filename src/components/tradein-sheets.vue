@@ -48,7 +48,7 @@
     <view class="tis-backdrop" @click="hide" />
 
     <view class="tis-panel" @click.stop>
-      <view class="tis-close" @click="hide">
+      <view class="tis-close" role="button" tabindex="0" @click="hide">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
       </view>
 
@@ -62,12 +62,12 @@
             v-for="src in choiceSources"
             :key="src.id"
             class="tis-opt"
-            @click="onChooseTradein(src.id)"
+            role="button" tabindex="0" @click="onChooseTradein(src.id)"
           >
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4" /><path d="M20 7H4" /><path d="m8 21-4-4 4-4" /><path d="M4 17h16" /></svg>
             <text class="tis-opt-text">{{ src.label }}</text>
           </view>
-          <view class="tis-opt" @click="onChooseFullPrice">
+          <view class="tis-opt" role="button" tabindex="0" @click="onChooseFullPrice">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18 8 4A2 2 0 0 1 22 8v8a2 2 0 0 1-1.17 1.82l-8 4a2 2 0 0 1-1.66 0l-8-4A2 2 0 0 1 2 16V8a2 2 0 0 1 1.17-1.82l8-4a2 2 0 0 1 1.66 0z" /><path d="m7 4.5 10 5" /></svg>
             <text class="tis-opt-text">{{ t.tradein.choiceFullPriceOption }}</text>
           </view>
@@ -81,12 +81,12 @@
           <text class="tis-subtitle">{{ retireView.subtitle }}</text>
         </view>
         <view class="tis-opt-list">
-          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" @click="onPickTarget(p.id)">
+          <view v-for="p in retireView.targets" :key="p.id" class="tis-opt" role="button" tabindex="0" @click="onPickTarget(p.id)">
             <svg class="tis-opt-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /></svg>
             <text class="tis-opt-text">{{ p.label }}</text>
           </view>
         </view>
-        <view class="tis-ghost" @click="hide">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -124,10 +124,10 @@
 
         <text class="tis-disclaimer">{{ t.tradein.sheetDisclaimer }}</text>
 
-        <view class="tis-cta" :style="ctaHalo" @click="onConfirmTradein">
+        <view class="tis-cta" :style="ctaHalo" role="button" tabindex="0" @click="onConfirmTradein">
           <text class="tis-cta-text">{{ tradeinView.ctaText }}</text>
         </view>
-        <view class="tis-ghost" @click="hide">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -147,18 +147,18 @@
         <view
           class="tis-cta"
           :class="{ 'tis-cta-disabled': replaceView.insufficient }"
-          @click="onReplace"
+          role="button" tabindex="0" @click="onReplace"
         >
           <text class="tis-cta-text">{{ replaceView.replaceCta }}</text>
         </view>
         <view
           class="tis-secondary"
           :class="{ 'tis-cta-disabled': replaceView.insufficient }"
-          @click="onKeepBuy"
+          role="button" tabindex="0" @click="onKeepBuy"
         >
           <text class="tis-secondary-text">{{ replaceView.keepCta }}</text>
         </view>
-        <view class="tis-ghost" @click="hide">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide">
           <text class="tis-ghost-text">{{ t.tradein.replaceCancel }}</text>
         </view>
       </template>
@@ -170,7 +170,7 @@
           <text class="tis-title">{{ t.tradein.errReplaceUnavailable }}</text>
           <text class="tis-subtitle">{{ t.tradein.errPleaseRetry }}</text>
         </view>
-        <view class="tis-ghost" @click="hide">
+        <view class="tis-ghost" role="button" tabindex="0" @click="hide">
           <text class="tis-ghost-text">{{ t.tradein.sheetCancel }}</text>
         </view>
       </template>
@@ -187,22 +187,22 @@
 
         <!-- retire 阻断:等任务完成即可下架 → 查看任务 / 知道了(无 force,规格 DEV02A 异常2) -->
         <template v-if="state.origin === 'retire'">
-          <view class="tis-cta" @click="onGoTasks">
+          <view class="tis-cta" role="button" tabindex="0" @click="onGoTasks">
             <text class="tis-cta-text">{{ t.tradein.retireBlockViewTask }}</text>
           </view>
-          <view class="tis-ghost" @click="hide">
+          <view class="tis-ghost" role="button" tabindex="0" @click="hide">
             <text class="tis-ghost-text">{{ t.tradein.retireBlockOk }}</text>
           </view>
         </template>
         <template v-else>
-          <view class="tis-cta" @click="onWait">
+          <view class="tis-cta" role="button" tabindex="0" @click="onWait">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3.5 2" /></svg>
             <text class="tis-cta-text">{{ t.tradein.blockWaitCta }}</text>
           </view>
-          <view class="tis-warn-ghost" @click="onForce">
+          <view class="tis-warn-ghost" role="button" tabindex="0" @click="onForce">
             <text class="tis-warn-ghost-text">{{ t.tradein.blockForceCta }}</text>
           </view>
-          <view class="tis-ghost" @click="hide">
+          <view class="tis-ghost" role="button" tabindex="0" @click="hide">
             <text class="tis-ghost-text">{{ t.tradein.blockCancel }}</text>
           </view>
         </template>

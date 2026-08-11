@@ -21,7 +21,7 @@
             <text class="block" :style="titleStyle">{{ t.genesisEligibility.title }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -50,7 +50,7 @@
                 v-else-if="fixNavLabel(c.key)"
                 class="active:opacity-70"
                 :style="fixLinkStyle"
-                @click="goFix(c.key)"
+                role="button" tabindex="0" @click="goFix(c.key)"
               >{{ fixNavLabel(c.key) }}</text>
             </view>
 
@@ -73,7 +73,7 @@
                   confirm-type="done"
                   @confirm="verifyInvite"
                 />
-                <view class="inline-flex items-center justify-center active:opacity-80" :style="verifyBtnStyle" @click="verifyInvite">
+                <view class="inline-flex items-center justify-center active:opacity-80" :style="verifyBtnStyle" role="button" tabindex="0" @click="verifyInvite">
                   <text>{{ t.genesisEligibility.inviteVerify }}</text>
                 </view>
               </view>
@@ -90,7 +90,7 @@
           v-if="gate.eligible && !gate.capReached"
           class="w-full inline-flex items-center justify-center active:opacity-85"
           :style="subscribeStyle"
-          @click="emitSubscribe"
+          role="button" tabindex="0" @click="emitSubscribe"
         >
           <text>{{ t.genesisEligibility.unlockedCta }}</text>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>

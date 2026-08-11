@@ -32,7 +32,7 @@
       <view v-if="!product" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
-          <text @click.stop="goStore">{{ t.store.coBackToStore }}</text>
+          <text role="button" tabindex="0" @click.stop="goStore">{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
@@ -79,10 +79,10 @@
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
               <text class="flex-1" style="font-size: 12px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-              <text style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+              <text style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" role="button" tabindex="0" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
             </view>
             <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
+              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" role="button" tabindex="0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -112,7 +112,7 @@
               <text class="flex-1" style="margin-left: 6px">{{ slotsFullText }}</text>
             </view>
             <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" role="button" tabindex="0" :aria-label="t.store.coContinue" @click.stop="goConfirm">
-              <text @click.stop="goConfirm">{{ t.store.coContinue }}</text>
+              <text role="button" tabindex="0" @click.stop="goConfirm">{{ t.store.coContinue }}</text>
             </view>
           </view>
         </view>
@@ -140,10 +140,10 @@
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
           </view>
           <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="onConfirmPay">
-            <text @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
+            <text role="button" tabindex="0" @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
           </view>
           <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @click.stop="goSelectPayment">
-            <text @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
+            <text role="button" tabindex="0" @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
           </view>
         </view>
 
@@ -208,10 +208,10 @@
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
           <view class="flex" style="margin-top: 20px; gap: 8px">
             <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
-              <text @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
+              <text role="button" tabindex="0" @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
             </view>
             <view class="grid place-items-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" :aria-label="t.store.coDone" @click.stop="goStore">
-              <text @click.stop="goStore">{{ t.store.coDone }}</text>
+              <text role="button" tabindex="0" @click.stop="goStore">{{ t.store.coDone }}</text>
             </view>
           </view>
         </view>

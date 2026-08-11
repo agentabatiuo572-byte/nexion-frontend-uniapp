@@ -44,7 +44,7 @@
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
                 <text>{{ t.genesis.heroCrown }}</text>
               </view>
-              <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" @click="goHowItWorks">
+              <view class="inline-flex items-center shrink-0 active:opacity-80" :style="howPillStyle" role="button" tabindex="0" @click="goHowItWorks">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
                 <text style="margin: 0 6px">{{ t.genesis.howItWorksEntry }}</text>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -150,7 +150,7 @@
         class="relative w-full overflow-hidden"
         :class="dockDisabled ? '' : 'active:scale-[0.98]'"
         :style="dockBtnStyle"
-        @click="openSheet"
+        role="button" tabindex="0" @click="openSheet"
       >
         <!-- 装饰(高光 / 描边 / 流光)只在**可购买**时出现:置灰按钮不该还在发光。 -->
         <template v-if="dockActive">

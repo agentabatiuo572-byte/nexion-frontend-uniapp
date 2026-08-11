@@ -97,7 +97,7 @@
         <!-- Trade-in callout (legacy) -->
         <view v-if="showTradein" class="mt-2.5 flex items-center justify-between gap-2 font-mono-tabular" :style="tradeinBoxStyle">
           <text>{{ t.store.cardTradeUp }} · <text style="color: var(--v5-success-ink); font-weight: 500">{{ tradeCreditText }}</text></text>
-          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
+          <text class="whitespace-nowrap active:opacity-70" style="color: var(--v5-brand); font-weight: 500; font-family: var(--font-v5)" role="button" tabindex="0" @click.stop="goDevices">{{ t.store.cardTradeInCta }}</text>
         </view>
       </view>
     </view>
@@ -112,9 +112,9 @@
         </view>
       </view>
       <!-- 品牌填充按钮:opacity 取 85(《08》§2 状态派生公式) -->
-      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" @click.stop="onBuy">
+      <view class="inline-flex items-center justify-center whitespace-nowrap active:scale-[0.97] active:opacity-85" :style="buyBtnDynStyle" role="button" tabindex="0" @click.stop="onBuy">
         <svg v-if="gateLockedView" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; opacity: 0.9"><rect width="18" height="11" x="3" y="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-        <text @click.stop="onBuy">{{ buyLabel }}</text>
+        <text role="button" tabindex="0" @click.stop="onBuy">{{ buyLabel }}</text>
         <svg v-if="!gateLockedView" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 6px; opacity: 0.9"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
     </view>
