@@ -933,6 +933,26 @@ function functionBody(src, sig) {
         && pgCode.includes("function clearSubmitIntent(): void")
         // 现造键的老写法不许再出现在 snap 里
         && !/idempotencyKey: `withdrawal:\$\{app\.accountKey\}:\$\{Date\.now\(\)\}/.test(pgCode));
+    // 🔴🔴 意图签名必须**含收款地址、不含 policyVersion**。这一条是数据成分的断言
+    //（不是语义判断),所以字面判据在这里是够的 —— 但两个方向都要钉:
+    //  · 少了 address:歧义失败后改地址再提交会沿用旧键 → 服务端返回**打到旧地址**的那一单,
+    //    而响应里没有 address 可核,界面显示新地址、钱走旧地址(资金流向级,R3 点名);
+    //  · 多了 policyVersion:本页 onShow 会重取策略,版本一变签名就变、键就换 ——
+    //    正好在最不该换键的那一刻换掉,直接制造重复出账。
+    check("🔴🔴 幂等意图签名含收款地址、且不含 policyVersion(前者漏 = 钱走错地址,后者加 = 重复出账)",
+      (() => {
+        const i = pgCode.indexOf("function currentIdempotencyKey(): string");
+        if (i < 0) return false;
+        // 🔴 从**函数体的 `{`** 开始配对,不能从函数名开始 —— balancedBody 从函数名起数,
+        //    第一个闭合的是空参数表 `()`,于是只取到函数名那几个字,判据落在空串上恒红。
+        const brace = pgCode.indexOf("{", i);
+        const body = (brace > 0 ? balancedBody(pgCode, brace) : null) ?? pgCode.slice(i, i + 500);
+        const sigLine = (body.match(/const sig = `[^`]*`/) || [])[0] || "";
+        return sigLine.includes("app.accountKey") && sigLine.includes("network.value")
+          && sigLine.includes("amountNum.value") && sigLine.includes("boundAddress.value")
+          && sigLine.includes("offsetWithNex.value")
+          && !sigLine.includes("policyVersion");
+      })());
     // 🔴🔴 判定本身已搬到接口层(src/api/errors.ts 的 isAmbiguousOutcome),
     //    并由 selfcheck-withdraw-failpaths.mjs 用**真的 ApiError** 逐格行为验(12 格)。
     //    这里只守**接线**:页面必须用那个函数、歧义分支不许清键、确定分支才清。

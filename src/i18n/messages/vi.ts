@@ -1927,7 +1927,7 @@ export const vi: Messages = {
     riskCheckTimeoutTitle: "Kiểm tra quá thời gian",
     riskCheckTimeoutBody: "Mạng đang không ổn định. Chưa trừ gì cả — vui lòng thử lại sau ít phút.",
     routeHeldFrozenTitle: "Lệnh rút này đang tạm dừng",
-    routeHeldFrozenBody: "Chúng tôi tạm dừng lệnh rút này để giữ an toàn cho tiền của bạn — tiền vẫn nằm trong tài khoản. Cần hỗ trợ thì liên hệ bất cứ lúc nào.",
+    routeHeldFrozenBody: "Lệnh rút này đang tạm dừng. Khoản tiền được giữ cùng với lệnh — chưa chuyển đi và cũng không mất. Cần giúp thì liên hệ bộ phận hỗ trợ bất cứ lúc nào.",
     riskReasons: {
       "dim-serverDeviceId": "Dùng chung thiết bị với một tài khoản khác",
       "dim-ipBucket": "Cùng môi trường mạng với một tài khoản khác",
@@ -2016,7 +2016,7 @@ export const vi: Messages = {
 
     trackSubmitAnother: "Rút thêm lần nữa",
     trackReviewNote: "Lần rút đầu tiên · Đang kiểm tra an toàn",
-    withdrawRouteReviewTitle: "Lệnh này về chậm hơn một chút",
+    withdrawRouteReviewTitle: "Lệnh này cần xác nhận trước",
 
     withdrawRouteRejectTitle: "Lệnh này không gửi được",
 

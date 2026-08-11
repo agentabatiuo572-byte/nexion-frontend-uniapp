@@ -116,7 +116,13 @@ policy 取不到时限额为 0 → 现有规则「上限 ≤0 视为未配置 �
 2. 把其中一笔的 `submittedAt` 改到上一个平台日,提交按钮**恢复可点**(跨日归零真生效)。
 3. `policy.dailyLimitCount` 从 1 改成 3 时,今日已 1 笔仍可提(限额跟着服务端走,
    不再被本地 `1` 卡住)。
-4. policy 取不到(后端不可达)时**不拦**提交(fail-open,不把提现锁死)。
+4. ~~policy 取不到(后端不可达)时**不拦**提交(fail-open,不把提现锁死)。~~
+   🔴 **2026-08-11 更正:这条我写错了,且当时的走查方式验不出来。**
+   用本地假后端跑真页面实测:policy 取不到时页面**整页禁提交**(费率闸先拦),
+   所以「不把提现锁死」在页面层**不成立**。fail-open 只在**日限判定这一层**成立
+   (`isOverDailyCap` 对 ≤0 返回 false)。当时的走查只断言了 `dailyLimitReached=false`,
+   没断言「真的能提交」—— 判定值对 ≠ 用户能提交,这正是本包反复栽的那个坑。
+   **改写为**:policy 取不到时,日限**不额外加一道锁**(拦不拦由费率闸与服务端决定)。
 5. `src/` 全站无 `withdraw-daily-count` 残留引用;`grep claimWithdrawSlot` = 0。
 6. 机器门:`npm run type-check` 0 错 + `bash scripts/verify.sh` 全绿(含新增行为门,
    且新门经红测证明「改坏必红」)。
@@ -155,6 +161,40 @@ policy 取不到时限额为 0 → 现有规则「上限 ≤0 视为未配置 �
 
 **没能验到的一处**:提交后二次判定的那条 toast(`wallet-withdraw.vue` 提交路径),
 需要真的建单成功才会走到,无后端到不了。它吃的是同一个 `dailyFacts`,由接线门钉住表达式。
+
+## 🔴 怎么在本机把提现全链路真跑起来(下一个人照做即可)
+
+R3 灾备镜头点名:此前的走查手法**只存在于那次会话**,仓里零残留。现在留成配方:
+
+```bash
+# 1. 起假后端(零依赖;契约以 src/api/*.ts 的解析器为准,比文档严)
+node scripts/dev-stub-backend.mjs --port 8110
+
+# 2. .env.local 切到 remote + 假后端,然后**重启 dev server**(env 是编译期注入,热更新不生效)
+#    VITE_NEXGRID_API_MODE=remote
+#    VITE_NEXGRID_API_DEV_BASE_URL=http://127.0.0.1:8110
+
+# 3. 注入失败档 / 查台账
+curl -X POST localhost:8110/__stub/mode -H 'content-type: application/json' -d '{"submit":"createdThen504"}'
+curl localhost:8110/__stub/log      # orderCount / distinctKeys / 每笔单的幂等键
+curl -X POST localhost:8110/__stub/reset
+```
+
+页面里还要给一个登录态(vault 是内存态、不落盘):
+`(await import("/src/api/runtime.ts")).sessionVault.save({accessToken:"stub-access-token",refreshToken:"stub-refresh-token",tokenType:"Bearer",user:{userId:1001,countryCode:"VN",phone:"900000001",nickname:"stub"}})`
+
+⚠️ **跑 verify 前必须把 `.env.local` 切回 `VITE_NEXGRID_API_MODE=mock` 并重启 dev server** ——
+verify 的 API-mode preflight 明写 remote 会让全部运行时探针静默验错对象。
+
+### 用它测出来的事(都是此前只能靠读代码推断的)
+
+| 结论 | 怎么测的 |
+|---|---|
+| 超时重试**会**重复出账(修前) | `createdThen504` 档:服务端建单后网关超时 → 客户端得 `http/504` → 旧分诊判「确定」→ 换新键重试 → 台账 orderCount **2** |
+| 修后不再重复 | 同一实验,orderCount 恒 **1** |
+| 超额拒单走 **429**,客户端拿到的是 `http` 不是 `business` | `dailyLimit` 档;因此「按 kind 认日限拒单」认不出它 |
+| 后台把日限配成 0 会**打死整个提现页** | 策略三态真值表;已记 HANDOFF U-8 |
+| 「策略取不到时不拦提交」**在页面层不成立** | 同上;Done-when 4 已据此更正 |
 
 ## 回源扫同类(修一处必扫全族)
 

@@ -2010,7 +2010,7 @@ export const en = {
     riskCheckTimeoutTitle: "Check timed out",
     riskCheckTimeoutBody: "The network is unstable right now. Nothing was charged — please try again shortly.",
     routeHeldFrozenTitle: "This withdrawal is paused",
-    routeHeldFrozenBody: "We paused this withdrawal to keep your funds safe — the money is still in your account. Reach out to support any time.",
+    routeHeldFrozenBody: "This withdrawal is paused. The amount stays held with the request — it has not been sent out, and it is not lost. Reach out to support any time.",
     riskReasons: {
       "dim-serverDeviceId": "Same device as another account",
       "dim-ipBucket": "Same network environment as another account",
@@ -2099,7 +2099,7 @@ export const en = {
 
     trackSubmitAnother: "Withdraw again",
     trackReviewNote: "First withdrawal · Safety check in progress",
-    withdrawRouteReviewTitle: "This one takes a little longer",
+    withdrawRouteReviewTitle: "This one needs a check first",
 
     withdrawRouteRejectTitle: "This one can't be submitted",
 

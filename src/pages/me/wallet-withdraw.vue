@@ -435,15 +435,25 @@ const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n
 /**
  * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
  *
- * 键里带账号 + 网络 + 金额:换了任何一样就是**另一笔**意图,必须换键;
- * 同一笔意图重试则复用,让服务端的幂等去重能生效(否则超时重试 = 第二笔真出账)。
- * 只在**确定性结局**后作废:建单成功、或服务端明确拒单(kind==="business")。
- * 超时 / 网络失败是**歧义结局** —— 服务端可能已经建好单了,此时换新键是最危险的动作。
+ * 同一笔意图重试要复用同一把键,让服务端的幂等去重生效(否则超时重试 = 第二笔真出账);
+ * 而**换了任何一样「用户在要什么」的东西,就是另一笔意图**,必须换键。
+ *
+ * 签名 = 账号 | 网络 | 金额 | **收款地址** | NEX 抵扣开关。
+ *
+ * 🔴 收款地址是后补的,漏掉它是资金流向级缺陷(R3 独立审计点名):
+ * 歧义失败后用户改了收款地址再提交 → 沿用旧键 → 服务端幂等去重返回**打到旧地址**的那一单,
+ * 而客户端用**本地传入的新地址**渲染(建单响应里根本没有 address 可核)——
+ * 界面显示新地址、钱走旧地址,客户端永远发现不了。
+ *
+ * 🔴 policyVersion **故意不进签名**:它是平台状态,不是「用户在要什么」。
+ * 把它放进来会引出更坏的一条:歧义失败后本页 onShow 会重取策略,版本一变签名就变、
+ * 键就换 —— 正好在最不该换键的那一刻换掉,直接制造重复出账。
+ * 报价真变了由 quoteStillValid 那道闸拦,不靠幂等键表达。
  */
 const submitIntentKey = ref("");
 const submitIntentSig = ref("");
 function currentIdempotencyKey(): string {
-  const sig = `${app.accountKey}|${network.value}|${amountNum.value}|${offsetWithNex.value ? 1 : 0}`;
+  const sig = `${app.accountKey}|${network.value}|${amountNum.value}|${boundAddress.value}|${offsetWithNex.value ? 1 : 0}`;
   if (submitIntentSig.value !== sig || !submitIntentKey.value) {
     submitIntentSig.value = sig;
     submitIntentKey.value = `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
