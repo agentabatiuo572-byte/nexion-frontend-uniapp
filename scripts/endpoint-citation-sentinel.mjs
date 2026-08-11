@@ -113,6 +113,7 @@ const LEDGER = {
   "GET /api/me/bills": "PRD §11.5a",
   "GET /api/me/vouchers": "PRD §9.11c.2",
   "PATCH /api/me/rewards/seen": "PRD §11.5a",
+  "GET /api/earnings/release-status": "TBD: PRD 未定名 —— 收益放行桶(可提现 / 待审 / 赠金锁定)的读取端点,概念见 PRD §9.3「提现只认可提现桶」;实现在 src/api/earnings-release-api.ts。🔴 它**只回锁定桶,不回总余额**:全仓没有任何余额端点,所以「提现后回拉服务端余额」这条路不成立(见 app.ts applyWithdrawalDebit 头注)。PRD 同步时定名",
   "GET /api/me/earnings": "PRD §9.11c.1",
   "/api/me/earnings/stream": "PRD §9.11c.1(SSE)",
 
