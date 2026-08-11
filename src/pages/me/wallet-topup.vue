@@ -19,7 +19,7 @@
           :key="s.id"
           :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
-          role="tab"
+          role="tab" tabindex="0"
           :aria-selected="seg === s.id"
           @click="seg = s.id"
         >

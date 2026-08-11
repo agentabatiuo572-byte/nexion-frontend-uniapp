@@ -18,10 +18,16 @@
         <!-- 《07》tap≥44:空状态的行动链接独占一行,不吃 WCAG 2.5.8 的 inline 豁免 → 撑热区(原 88×22) -->
         <!-- 日限用尽时置灰 + 给原因(与「再提一笔」同判据同文案)。深链 miss 让本空态在
              「有单据+额度已满」时也可达,不加这道就是外观可点、点了没反应的死链接(审计双镜头 P1)。 -->
-        <view :class="againDisabled ? '' : 'active:opacity-70'" :style="againDisabled ? 'opacity:0.4' : ''" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="againDisabled ? 'true' : 'false'" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
+        <view :class="againDisabled ? '' : 'active:opacity-70'" :style="againDisabled ? 'opacity:0.4' : ''" style="display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; margin-top: 4px" role="button" tabindex="0" :aria-disabled="againDisabled ? 'true' : 'false'" :aria-describedby="againDisabled ? 'wd-again-reason-empty' : undefined" :aria-label="t.wallet.submitNewWithdrawal" @click.stop="goWithdraw">
           <text :style="emptyLinkStyle">{{ t.wallet.submitNewWithdrawal }}</text>
         </view>
-        <text v-if="againDisabled" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
+        <!-- 原因文本本来就是可见的,所以直接挂 id 复用,不另加 sr-only 副本(与 login/register
+             那两处的差别只在于:那边的原因文本只给读屏)。没有这条关联,读屏念完「已禁用」就没了 ——
+             为什么禁、什么时候能再试,只有看得见的人知道。
+             🔴 id 带 -empty 后缀与下方 v-else 分支区分开:两处文案相同,一度共用同一个 id,
+             靠「两分支互斥」保证唯一 —— 那是写在注释里的不变量,机器判不了,拆分支就会静默变成
+             重复 id(指向哪一个由渲染顺序决定)。改成各自独立的 id 后不再依赖任何口头约定。 -->
+        <text v-if="againDisabled" id="wd-again-reason-empty" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
       </view>
 
       <template v-else>
@@ -93,12 +99,13 @@
               role="button"
               tabindex="0"
               :aria-disabled="againDisabled ? 'true' : 'false'"
+              :aria-describedby="againDisabled ? 'wd-again-reason' : undefined"
               :aria-label="t.wallet.trackSubmitAnother"
               @click.stop="goWithdraw"
             >
               <text>{{ t.wallet.trackSubmitAnother }}</text>
             </view>
-            <text v-if="againDisabled" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
+            <text v-if="againDisabled" id="wd-again-reason" class="block text-center" :style="againReasonStyle">{{ againReasonText }}</text>
           </view>
 
           <!-- Back to wallet -->

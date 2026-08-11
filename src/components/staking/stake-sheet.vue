@@ -9,7 +9,7 @@
 <template>
   <view v-if="open && term !== null">
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
     </transition>
     <transition name="nx-sheet-slide">
       <view v-if="open" class="nx-sheet-panel" :style="panelStyle" @click.stop>
@@ -90,6 +90,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const PRESETS = [100, 500, 1000, 5000];
 const ONE_DAY_MS = 86400 * 1000;
@@ -371,6 +372,10 @@ const submitStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const noticeStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.45 };
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
 </script>
 
 <style scoped>

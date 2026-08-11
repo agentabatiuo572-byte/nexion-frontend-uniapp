@@ -96,7 +96,7 @@
       <view style="margin: 16px 16px 0">
         <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰(《05》§6.1
              disabled 派生:文字降 ink-4 + 填充降 surface 系),而不是靠「没有按下反馈」暗示 -->
-        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
+        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
           <text :style="confirmTextStyle">{{ t.exchange.confirm }}</text>
         </view>
       </view>

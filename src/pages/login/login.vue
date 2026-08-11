@@ -3,10 +3,10 @@
     <view class="lg-wrap" :inert="showCountries || undefined" :aria-hidden="showCountries">
       <!-- Top bar -->
       <view class="lg-top">
-        <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter="back" @keydown.space.prevent="back">
+        <view v-if="step > 1 || mode === 'reset'" class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.back" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6" /></svg>
         </view>
-        <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter="close" @keydown.space.prevent="close">
+        <view v-else class="lg-iconbtn" role="button" tabindex="0" :aria-label="t.login.close" @click="close" @keydown.enter.prevent="close" @keydown.space.prevent="close">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8D0DC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
         <view class="lg-brand">
@@ -32,7 +32,7 @@
         <!-- Step 1: phone (+ password for password mode) -->
         <view v-if="step === 1" class="lg-col">
           <view class="lg-phone">
-            <view class="lg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter="showCountries = true" @keydown.space.prevent="showCountries = true">
+            <view class="lg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
               <text class="lg-phone__cc-t">{{ country }}</text>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
             </view>
@@ -41,13 +41,13 @@
           <template v-if="mode === 'password'">
             <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': password && !pwdOk }">
               <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="password" @input="onPwd" />
-              <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
+              <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
                 <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
               </view>
             </view>
             <view class="lg-forgot-row">
-              <text class="lg-forgot" role="link" tabindex="0" @click="goReset" @keydown.enter="goReset" @keydown.space.prevent="goReset">{{ t.login.forgotPassword }}</text>
+              <text class="lg-forgot" role="link" tabindex="0" @click="goReset" @keydown.enter.prevent="goReset" @keydown.space.prevent="goReset">{{ t.login.forgotPassword }}</text>
             </view>
           </template>
         </view>
@@ -58,9 +58,9 @@
             <input v-for="(d, i) in code" :key="i" class="lg-otp__in" :class="{ 'lg-otp__in--filled': d }" type="number" :maxlength="1" :focus="focusIdx === i" :value="d" @input="onCode(i, $event)" />
           </view>
           <view class="lg-resend">
-            <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
+            <text class="lg-resend__change" role="button" tabindex="0" @click="back" @keydown.enter.prevent="back" @keydown.space.prevent="back">{{ t.login.changeNumber }}</text>
             <text v-if="!remoteTwoFactorChallenge && resendLeft > 0" class="lg-resend__count">{{ resendInText }}</text>
-            <text v-else-if="!remoteTwoFactorChallenge" class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
+            <text v-else-if="!remoteTwoFactorChallenge" class="lg-resend__btn" role="button" tabindex="0" @click="resend" @keydown.enter.prevent="resend" @keydown.space.prevent="resend">{{ t.login.resend }}</text>
           </view>
         </view>
 
@@ -68,7 +68,7 @@
         <view v-else class="lg-col">
           <view class="lg-field-wrap" :class="{ 'lg-field-wrap--err': newPassword && !newPwdOk }">
             <input class="lg-field--flex" :type="showPwd ? 'text' : 'password'" :placeholder="t.login.newPasswordPlaceholder || t.login.passwordPlaceholder" :maxlength="PASSWORD_MAX_LENGTH" :value="newPassword" @input="onNewPwd" />
-            <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
+            <view class="lg-eye" role="button" tabindex="0" :aria-label="showPwd ? t.login.hidePassword : t.login.showPassword" @click="showPwd = !showPwd" @keydown.enter.prevent="showPwd = !showPwd" @keydown.space.prevent="showPwd = !showPwd">
               <svg v-if="showPwd" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><path d="m2 2 20 20" /></svg>
               <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></svg>
             </view>
@@ -86,14 +86,14 @@
       </view>
 
       <!-- Primary CTA -->
-      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter="onPrimary" @keydown.space.prevent="onPrimary">
+      <view class="lg-cta" :class="canPrimary ? 'lg-cta--on' : ''" role="button" tabindex="0" :aria-disabled="!canPrimary || loading" :aria-describedby="!canPrimary && !loading ? 'lg-cta-reason' : undefined" data-system-chrome-primary @click="onPrimary" @keydown.enter.prevent="onPrimary" @keydown.space.prevent="onPrimary">
         <text v-if="loading" class="lg-cta__t lg-cta__t--on">···</text>
         <text v-else class="lg-cta__t" :class="canPrimary ? 'lg-cta__t--on' : ''">{{ primaryText }}</text>
       </view>
       <text v-if="!canPrimary && !loading" id="lg-cta-reason" class="lg-sr-only">{{ primaryDisabledReason }}</text>
 
       <!-- Mode switch (password ↔ otp), only on step 1 non-reset -->
-      <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter="toggleMode" @keydown.space.prevent="toggleMode">
+      <view v-if="step === 1 && mode !== 'reset'" class="lg-switch" role="button" tabindex="0" @click="toggleMode" @keydown.enter.prevent="toggleMode" @keydown.space.prevent="toggleMode">
         <text class="lg-switch__t">{{ mode === 'password' ? t.login.useCodeInstead : t.login.usePasswordInstead }}</text>
       </view>
 
@@ -101,7 +101,7 @@
       <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
         <view class="lg-social">
-          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
+          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter.prevent="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
             <view class="lg-social__ic" v-html="o.svg" />
             <text class="lg-social__lbl">{{ o.label }}</text>
           </view>
@@ -110,7 +110,7 @@
 
       <!-- Footer -->
       <view class="lg-footer">
-        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">{{ t.login.signUp }}</text></text>
+        <text v-if="step === 1 && mode !== 'reset'" class="lg-footer__acc">{{ t.login.noAccount }} <text class="lg-footer__link" role="link" tabindex="0" @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">{{ t.login.signUp }}</text></text>
       </view>
     </view>
 

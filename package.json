@@ -42,10 +42,11 @@
     "test:business-loop-liveness": "node scripts/selfcheck-business-loop-liveness.mjs",
     "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
+    "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs",
     "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
     "test:contracts": "node scripts/run-contract-suite.mjs",
     "test:legacy-suite": "node scripts/run-legacy-suite.mjs",
-    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:contracts && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime && npm run test:legacy-suite"
+    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:contracts && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run test:a11y-activate && npm run build:h5 && npm run test:h5-runtime && npm run test:legacy-suite"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

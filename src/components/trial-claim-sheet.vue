@@ -6,7 +6,7 @@
   reason (异常2). Zero-friction copy, fully i18n-routed (t.trial.sheet*).
 -->
 <template>
-  <view v-if="sheet.open" class="tcs-root">
+  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true">
     <view class="tcs-backdrop" @click="hide" />
 
     <view class="tcs-panel" @click.stop>
@@ -98,6 +98,7 @@ import { useFreeTrial, type TrialIneligibleReason } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTrialClaimSheet();
 const trialConfig = useTrialConfig();
@@ -156,6 +157,10 @@ function onClaim() {
   sheet.hide();
   toast.success(t.value.trial.toastActivated);
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 </script>
 
 <style scoped>

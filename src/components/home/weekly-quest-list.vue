@@ -29,7 +29,7 @@
         </view>
 
         <!-- completed: claimable button -->
-        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="completedRowStyle" @click="onClaimRow(q)">
+        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="completedRowStyle" @click="onClaimRow(q)">
           <view class="grid place-items-center shrink-0" :style="sparkBoxStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -38,7 +38,7 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="pendingRowStyle" @click="onRowCta(q)">
+        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="pendingRowStyle" @click="onRowCta(q)">
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
@@ -54,7 +54,7 @@
 
     <!-- Bonus row — all 5 done, claim championship bonus -->
     <view v-if="allFiveDone && !bonusClaimed" class="px-3 py-3" :style="bonusRowStyle">
-      <view class="flex items-center justify-center active:opacity-85" role="button" :style="bonusBtnStyle" @click="onClaimBonus">
+      <view class="flex items-center justify-center active:opacity-85" role="button" tabindex="0" :style="bonusBtnStyle" @click="onClaimBonus">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
         <text>{{ bonusCtaText }}</text>
       </view>
