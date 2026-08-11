@@ -57,7 +57,7 @@
               <text class="tabular-nums" style="color: var(--v5-success); font-weight: 600">+{{ stats.floorDeltaPct }}%</text>
               <text> {{ t.marketplace.past7d }}</text>
             </text>
-            <view class="inline-flex items-center active:opacity-80" :style="viewOpenSeaStyle" role="button" tabindex="0" @click.stop="openSeaOpen = true">
+            <view class="inline-flex items-center active:opacity-80" :style="viewOpenSeaStyle" @click.stop="openSeaOpen = true">
               <text style="pointer-events: none">{{ t.marketplace.viewOpenSea }} </text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events: none"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
             </view>
@@ -76,9 +76,9 @@
 
         <!-- Tabs -->
         <view class="grid grid-cols-3" :style="tabsStyle">
-          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" role="button" tabindex="0" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
-          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'activity')" role="button" tabindex="0" @click="tab = 'activity'"><text>{{ t.marketplace.activityTab }}</text></view>
-          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'mine')" role="button" tabindex="0" @click="tab = 'mine'"><text>{{ mineTabText }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'listings')" @click="tab = 'listings'"><text>{{ listingsTabText }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'activity')" @click="tab = 'activity'"><text>{{ t.marketplace.activityTab }}</text></view>
+          <view class="active:opacity-70 transition-opacity" :style="tabPillStyle(tab === 'mine')" @click="tab = 'mine'"><text>{{ mineTabText }}</text></view>
         </view>
 
         <!-- LISTINGS TAB -->
@@ -89,9 +89,9 @@
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>
                 <text>{{ t.marketplace.sortLabel }}</text>
               </text>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" role="button" tabindex="0" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" role="button" tabindex="0" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
-              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" role="button" tabindex="0" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'floor')" @click="sortKey = 'floor'"><text>{{ t.marketplace.sortPriceAsc }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'recent')" @click="sortKey = 'recent'"><text>{{ t.marketplace.sortRecent }}</text></view>
+              <view class="active:opacity-70 transition-opacity" :style="sortPillStyle(sortKey === 'lastSale')" @click="sortKey = 'lastSale'"><text>{{ t.marketplace.sortLastSale }}</text></view>
             </view>
           </scroll-view>
 
@@ -111,7 +111,7 @@
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><path d="M6 3h12l4 6-10 13L2 9Z" /><path d="M11 3 8 9l4 13 4-13-3-6" /><path d="M2 9h20" /></svg>
             <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.marketplace.noTokensTitle }}</text>
             <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.375">{{ t.marketplace.noTokensSub }}</text>
-            <view class="inline-block active:scale-95" :style="reserveBtnStyle" role="button" tabindex="0" @click="goGenesis">
+            <view class="inline-block active:scale-95" :style="reserveBtnStyle" @click="goGenesis">
               <text>{{ t.marketplace.reservePrimary }}</text>
             </view>
           </view>

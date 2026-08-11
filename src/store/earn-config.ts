@@ -1,9 +1,10 @@
 import { computed, ref } from "vue";
 import { earnConfigApi, remoteApiEnabled } from "@/api/runtime";
-import type { EarnPhoneTiers, EarnTaskPricing, TaskClass } from "@/api/earn-config-api";
+import type { EarnPhoneTiers, EarnTaskPricing, EarnTaskRoute, TaskClass } from "@/api/earn-config-api";
 import { applyCanonicalPhoneTierYields } from "@/mock/phone-tiers";
 import { TASK_CATEGORY_LABEL } from "@/store/types";
 import type { LockedTeaser } from "@/mock/tasks";
+import { avgEligibleReward as mockAvgEligibleReward, getLockedTeasers as getMockLockedTeasers } from "@/mock/tasks";
 
 type EarnConfigStatus = "idle" | "loading" | "ready" | "error";
 
@@ -11,6 +12,8 @@ const taskPricing = ref<EarnTaskPricing | null>(null);
 const phoneTiers = ref<EarnPhoneTiers | null>(null);
 const status = ref<EarnConfigStatus>("idle");
 const error = ref("");
+const route = ref<EarnTaskRoute | null>(null);
+const routeError = ref("");
 let loadVersion = 0;
 
 function unlockTierFor(minVRAM: number): string {
@@ -48,7 +51,19 @@ export function prepareEarnConfig(): void {
   if (remoteApiEnabled && status.value === "idle") void refreshEarnConfig();
 }
 
+async function refreshRoute(deviceVramGb: number): Promise<void> {
+  if (!remoteApiEnabled) return;
+  routeError.value = "";
+  try {
+    route.value = await earnConfigApi.route(deviceVramGb);
+  } catch (cause) {
+    route.value = null;
+    routeError.value = cause instanceof Error ? cause.message : "E2_TASK_ROUTE_UNAVAILABLE";
+  }
+}
+
 function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
+  if (!remoteApiEnabled) return getMockLockedTeasers(maxVram, count);
   const pricing = taskPricing.value;
   if (!pricing) return [];
   return pricing.taskClasses
@@ -66,13 +81,24 @@ function lockedTeasers(maxVram: number, count = 3): LockedTeaser[] {
     }));
 }
 
+function averageEligibleReward(maxVram: number): number {
+  if (!remoteApiEnabled) return mockAvgEligibleReward(maxVram);
+  const eligible = taskPricing.value?.taskClasses.filter((row) => row.enabled && row.minVRAM <= maxVram) ?? [];
+  if (!eligible.length) return 0;
+  return eligible.reduce((sum, row) => sum + (row.minReward + row.maxReward) / 2, 0) / eligible.length;
+}
+
 export function useEarnConfig() {
   return {
     status: computed(() => status.value),
     error: computed(() => error.value),
     taskPricing: computed(() => taskPricing.value),
     phoneTiers: computed(() => phoneTiers.value),
+    route: computed(() => route.value),
+    routeError: computed(() => routeError.value),
     lockedTeasers,
+    averageEligibleReward,
     refresh: refreshEarnConfig,
+    refreshRoute,
   };
 }

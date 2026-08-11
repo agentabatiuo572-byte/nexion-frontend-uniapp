@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const serverSessionReloadRecoveryOnly = process.argv.includes("--server-session-reload-recovery");
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -80,7 +81,10 @@ const serverArgs = [
 ];
 const server = spawn(serverCommand, serverArgs, {
   cwd: root,
-  env: { ...process.env, VITE_NEXGRID_API_MODE: "mock" },
+  env: {
+    ...process.env,
+    VITE_NEXGRID_API_MODE: serverSessionReloadRecoveryOnly ? "sandbox" : "mock",
+  },
   shell: false,
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -95,24 +99,28 @@ try {
   // starve those timers on Windows and create a false red even though the same
   // witness passes immediately in isolation. Keep the security-critical route
   // suites deterministic, then parallelise only the independent DOM probes.
-  const outputs = [
-    await runGate("guard-liveness-runtime.mjs", baseUrl),
-    await runGate("auth-guard-verify.mjs", baseUrl),
-    ...await Promise.all([
-    runGate("business-loop-liveness-runtime.mjs", baseUrl),
-    runGate("spec6-entry-surface-runtime.mjs", baseUrl),
-    runGate("trial-check.mjs", baseUrl),
-    runGate("sticky-check.mjs", baseUrl),
-    runGate("backnav-check.mjs", baseUrl),
-    runGate("page-check.mjs", baseUrl, [
-      "/#/pages/index/index",
-      "h5-runtime-home",
-      ".home-earnings-cluster",
-    ]),
-    ]),
-  ];
+  const outputs = serverSessionReloadRecoveryOnly
+    ? [await runGate("server-session-reload-recovery-runtime.mjs", baseUrl)]
+    : [
+      await runGate("guard-liveness-runtime.mjs", baseUrl),
+      await runGate("auth-guard-verify.mjs", baseUrl),
+      ...await Promise.all([
+        runGate("business-loop-liveness-runtime.mjs", baseUrl),
+        runGate("spec6-entry-surface-runtime.mjs", baseUrl),
+        runGate("trial-check.mjs", baseUrl),
+        runGate("sticky-check.mjs", baseUrl),
+        runGate("backnav-check.mjs", baseUrl),
+        runGate("page-check.mjs", baseUrl, [
+          "/#/pages/index/index",
+          "h5-runtime-home",
+          ".home-earnings-cluster",
+        ]),
+      ]),
+    ];
   for (const output of outputs) console.log(output.split(/\r?\n/).at(-1));
-  console.log(`H5 runtime gates: PASS (isolated server ${port}, 20 scenarios + 5 direct probes)`);
+  console.log(serverSessionReloadRecoveryOnly
+    ? `H5 server-session reload recovery: PASS (isolated server ${port}, returning + fresh flows)`
+    : `H5 runtime gates: PASS (isolated server ${port}, 20 scenarios + 5 direct probes)`);
 } finally {
   stopTree(server);
 }

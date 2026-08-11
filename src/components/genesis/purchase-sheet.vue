@@ -13,7 +13,7 @@
   <view v-if="open">
     <!-- Backdrop -->
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
     </transition>
     <!-- Panel -->
     <transition name="nx-sheet-slide">
@@ -24,7 +24,7 @@
             <text class="block" :style="titleStyle">{{ t.genesis.confirmTitle }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -33,13 +33,13 @@
         <view :style="stepperWrapStyle">
           <text class="block" :style="stepperLabelStyle">{{ t.genesis.quantity }}</text>
           <view class="flex items-center" style="margin-top: 8px; gap: 16px">
-            <view class="flex items-center justify-center active:opacity-70" :style="minusBtnStyle" role="button" tabindex="0" @click="dec">
+            <view class="flex items-center justify-center active:opacity-70" :style="minusBtnStyle" @click="dec">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /></svg>
             </view>
             <view class="flex-1 text-center">
               <text class="tabular-nums" :style="qtyStyle">{{ qty }}</text>
             </view>
-            <view class="flex items-center justify-center active:opacity-70" :style="plusBtnStyle" role="button" tabindex="0" @click="inc">
+            <view class="flex items-center justify-center active:opacity-70" :style="plusBtnStyle" @click="inc">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
             </view>
           </view>
@@ -78,7 +78,7 @@
           v-else
           class="w-full inline-flex items-center justify-center"
           :class="{ 'active:opacity-85': !purchasing }"
-          role="button" tabindex="0"
+          role="button"
           :aria-disabled="purchasing ? 'true' : 'false'"
           :style="submitStyle"
           @click="handlePurchase"
@@ -99,7 +99,6 @@ import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
@@ -322,10 +321,6 @@ const submitStyle = computed<CSSProperties>(() => ({
   fontSize: "15px",
   letterSpacing: "-0.005em",
 }));
-
-// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
-// 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
 </script>
 
 <style scoped>

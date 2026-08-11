@@ -9,7 +9,7 @@
 <template>
   <view v-if="open && term !== null">
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
     </transition>
     <transition name="nx-sheet-slide">
       <view v-if="open" class="nx-sheet-panel" :style="panelStyle" @click.stop>
@@ -19,7 +19,7 @@
             <text class="block" :style="titleStyle">{{ titleText }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -34,7 +34,7 @@
           </view>
           <!-- Presets -->
           <view class="grid grid-cols-4" style="margin-top: 16px; gap: 8px">
-            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" role="button" tabindex="0" @click="amount = p">
+            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" @click="amount = p">
               <text>${{ p.toLocaleString() }}</text>
             </view>
           </view>
@@ -44,7 +44,7 @@
               <text>{{ t.stakingV3.sheet.balance }} </text>
               <text style="color: var(--v5-ink); font-weight: 500">${{ balanceText }}</text>
             </text>
-            <text class="nx-staking-sheet-max-cta" :style="maxStyle" role="button" tabindex="0" @click="setMax">{{ t.stakingV3.sheet.max }}</text>
+            <text class="nx-staking-sheet-max-cta" :style="maxStyle" @click="setMax">{{ t.stakingV3.sheet.max }}</text>
           </view>
         </view>
 
@@ -70,7 +70,7 @@
         </view>
 
         <!-- Submit -->
-        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" role="button" tabindex="0" @click="submit">
+        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" @click="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <text>{{ ctaText }}</text>
         </view>
@@ -90,7 +90,6 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const PRESETS = [100, 500, 1000, 5000];
 const ONE_DAY_MS = 86400 * 1000;
@@ -372,10 +371,6 @@ const submitStyle: CSSProperties = {
   letterSpacing: "-0.005em",
 };
 const noticeStyle: CSSProperties = { marginTop: "12px", fontSize: "12px", color: "var(--v5-ink-3)", lineHeight: 1.45 };
-
-// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
-// 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
 </script>
 
 <style scoped>

@@ -15,7 +15,7 @@
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- ══ Empty state (no seats) ══ -->
         <template v-if="!hasNodes">
-          <view class="active:scale-[0.98]" :style="ctaCardStyle" role="button" tabindex="0" @click="goGenesis">
+          <view class="active:scale-[0.98]" :style="ctaCardStyle" @click="goGenesis">
             <view class="flex items-center" style="gap: 12px">
               <view class="grid place-items-center shrink-0" :style="ctaIconStyle">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></svg>
@@ -76,7 +76,7 @@
               <text>{{ t.genesisHolder.pre.progressStage }}</text>
               <text>{{ t.genesisHolder.pre.progressUnlock }}</text>
             </view>
-            <text class="block active:opacity-70" :style="howLinkStyle" role="button" tabindex="0" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
+            <text class="block active:opacity-70" :style="howLinkStyle" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
           </view>
 
           <!-- Points leaderboard -->
@@ -151,7 +151,7 @@
                   <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
                   <text class="block font-mono-tabular" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ t.genesisHolder.holdingCard.allocation }} {{ h.allocText }}</text>
                 </view>
-                <view class="grid place-items-center active:opacity-70" :style="holdingLinkStyle" role="button" tabindex="0" @click="goMarketplace">
+                <view class="grid place-items-center active:opacity-70" :style="holdingLinkStyle" @click="goMarketplace">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
                 </view>
               </view>
@@ -178,13 +178,13 @@
           <view>
             <text class="block" :style="sectionLabelStyle">{{ t.genesisHolder.actionsLabel }}</text>
             <view class="grid grid-cols-2" style="gap: 8px">
-              <view :style="actionTileStyle" class="active:scale-[0.97]" role="button" tabindex="0" @click="goGenesis">
+              <view :style="actionTileStyle" class="active:scale-[0.97]" @click="goGenesis">
                 <view class="grid place-items-center" :style="actionIconStyle('var(--v5-brand-2)')">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1" /><circle cx="19" cy="21" r="1" /><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" /></svg>
                 </view>
                 <text :style="actionLabelStyle">{{ t.genesisHolder.actions.buy }}</text>
               </view>
-              <view :style="actionTileStyle" class="active:scale-[0.97]" role="button" tabindex="0" @click="goMarketplace">
+              <view :style="actionTileStyle" class="active:scale-[0.97]" @click="goMarketplace">
                 <view class="grid place-items-center" :style="actionIconStyle('var(--v5-brand)')">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
                 </view>
@@ -194,7 +194,7 @@
           </view>
 
           <!-- Boost CTA (state-specific label) -->
-          <view class="active:scale-[0.98] text-center" :style="boostStyle" role="button" tabindex="0" @click="goStaking">
+          <view class="active:scale-[0.98] text-center" :style="boostStyle" @click="goStaking">
             <text :style="boostLabelStyle">{{ dividendsOpen ? t.genesisHolder.post.boostCta : t.genesisHolder.pre.boostCta }}</text>
           </view>
         </template>

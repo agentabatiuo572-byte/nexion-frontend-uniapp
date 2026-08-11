@@ -316,7 +316,7 @@ export const useGenesis = defineStore("genesis", () => {
 
   async function syncRemote(): Promise<void> {
     if (!remoteApiEnabled) return;
-    try { applyPublicState(await genesisApi.state()); } catch { /* fail-closed defaults keep the market closed */ }
+    applyPublicState(await genesisApi.state());
     try { applyAccountState(await genesisApi.account()); } catch { /* public state remains usable before login */ }
   }
 

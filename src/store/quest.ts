@@ -96,6 +96,9 @@ export const useQuest = defineStore("quest", () => {
   // P-027: reactive Record<id, true> membership map (Vue can't track Set internals)。
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
+  let accountEpoch = 0;
+  let refreshSequence = 0;
+  let claimSequence = 0;
   const completedMap = reactive<Record<string, boolean>>({});
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
@@ -105,9 +108,14 @@ export const useQuest = defineStore("quest", () => {
 
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    const epoch = accountEpoch;
+    const requestSequence = ++refreshSequence;
+    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
     clearRemoteFacts();
     try {
       const snapshot = await questApi.state();
+      if (!isCurrentRequest()) return false;
+      clearRemoteFacts();
       for (const quest of snapshot.quests) {
         if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
       }
@@ -115,19 +123,23 @@ export const useQuest = defineStore("quest", () => {
     } catch {
       // Do not leave a previous account's progress visible after an authority
       // failure. A retry may refill this map only from the server snapshot.
-      clearRemoteFacts();
+      if (isCurrentRequest()) clearRemoteFacts();
       return false;
     }
   }
 
   async function claimRemote(id: QuestTaskId): Promise<boolean> {
     if (!remoteApiEnabled) return false;
+    const epoch = accountEpoch;
+    const requestSequence = ++claimSequence;
+    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
     try {
       const result = await questApi.claim(id, `h3-quest-claim:${id}`);
+      if (!isCurrentRequest()) return false;
       if (result.status !== "CLAIMED") return false;
       return refreshRemote();
     } catch {
-      clearRemoteFacts();
+      if (isCurrentRequest()) clearRemoteFacts();
       return false;
     }
   }
@@ -140,6 +152,9 @@ export const useQuest = defineStore("quest", () => {
 
   /** 账号切换重绑:清空并装载该账号的任务完成态(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
+    accountEpoch += 1;
+    refreshSequence += 1;
+    claimSequence += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
     clearRemoteFacts();
     if (remoteApiEnabled) {

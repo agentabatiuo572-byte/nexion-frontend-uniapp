@@ -4,6 +4,10 @@ import { mockServerId } from "./mock-id";
 import { mockServerNow } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { fundsSandboxApi, fundsSandboxEnabled, fundsServerEnabled, referralRewardApi } from "@/api/runtime";
+import type { FundsSandboxLedgerEntry } from "@/api/funds-sandbox-api";
+import { projectFundsSandboxLedger } from "./funds-sandbox-ledger";
+import { projectReferralRewardBills } from "./referral-reward-bills";
 
 // Ported from Nexion-prototype/lib/store/bills.ts (zustand → Pinia).
 // MOCK-ONLY: 30-day history fabricated client-side; production replaces seed
@@ -37,6 +41,10 @@ export interface Bill {
    *  非链上条目(奖励/兑换/NEX 等)不填。 */
   network?: "TRC20" | "ERC20" | "BEP20";
   balanceAfter?: number;
+  reservedAfter?: number;
+  source?: "mock";
+  sourceEnvironment?: "SANDBOX";
+  entryRole?: string;
 }
 
 /**
@@ -134,15 +142,77 @@ export const useBills = defineStore("bills", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const bills = ref<Bill[]>(hydrate(boundKey));
+  const bills = ref<Bill[]>(fundsServerEnabled ? [] : hydrate(boundKey));
+  const serverStatus = ref<"idle" | "loading" | "ready" | "error">(fundsSandboxEnabled ? "idle" : "ready");
+  const serverError = ref("");
 
   function persist(): boolean {
+    if (fundsServerEnabled) return false;
     return writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, boundKey, { bills: bills.value });
+  }
+
+  /** Replace, never merge: server projections are the complete authoritative view. */
+  function adoptFundsSandboxLedger(
+    expectedAccountKey: string,
+    sourceEnvironment: "SANDBOX",
+    entries: FundsSandboxLedgerEntry[],
+    referralBills: Bill[] = [],
+  ): boolean {
+    if (!fundsSandboxEnabled || sourceEnvironment !== "SANDBOX"
+        || normalizeAccountKey(expectedAccountKey) !== boundKey) return false;
+    bills.value = recomputeBalance([...projectFundsSandboxLedger(entries), ...referralBills]);
+    serverStatus.value = "ready";
+    serverError.value = "";
+    return true;
+  }
+
+  async function refreshFundsSandboxLedger(): Promise<void> {
+    if (!fundsSandboxEnabled) {
+      if (fundsServerEnabled) {
+        bills.value = [];
+        serverStatus.value = "error";
+        serverError.value = "FUNDS_BILLS_PROVIDER_NOT_CONFIGURED";
+        throw new Error(serverError.value);
+      }
+      return;
+    }
+    const expectedAccountKey = boundKey;
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const [overview, referralSnapshot] = await Promise.all([
+        fundsSandboxApi.overview(),
+        referralRewardApi.snapshot(),
+      ]);
+      const referralBills = projectReferralRewardBills(referralSnapshot);
+      if (!adoptFundsSandboxLedger(expectedAccountKey, overview.sourceEnvironment, overview.ledger, referralBills)) {
+        throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+      }
+    } catch (cause) {
+      if (expectedAccountKey === boundKey) {
+        bills.value = [];
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+      }
+      throw cause;
+    }
   }
 
   /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (fundsServerEnabled) {
+      const expectedAccountKey = boundKey;
+      bills.value = [];
+      serverStatus.value = fundsSandboxEnabled ? "idle" : "error";
+      serverError.value = fundsSandboxEnabled ? "" : "FUNDS_BILLS_PROVIDER_NOT_CONFIGURED";
+      if (fundsSandboxEnabled) void refreshFundsSandboxLedger().catch((cause) => {
+        if (expectedAccountKey === boundKey && !serverError.value) {
+          serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+        }
+      });
+      return;
+    }
     bills.value = hydrate(boundKey);
   }
 
@@ -157,6 +227,7 @@ export const useBills = defineStore("bills", () => {
    * 直写不碰 `bills.value` —— 那是当前账号的视图,把别人的流水塞进去正是本函数要避免的事。
    */
   function addForAccount(rawAccountKey: string, b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+    if (fundsServerEnabled) return null;
     const target = normalizeAccountKey(rawAccountKey);
     if (target === boundKey) return add(b);
     const row = readAccountRow<{ bills?: Bill[] }>(ACCOUNTS_KEY, target);
@@ -180,6 +251,7 @@ export const useBills = defineStore("bills", () => {
    * PROD:服务端在同一事务里写这 N 条分录,client 只消费。
    */
   function addMany(drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[]): Bill[] | null {
+    if (fundsServerEnabled) return null;
     if (!drafts.length) return [];
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
@@ -201,6 +273,7 @@ export const useBills = defineStore("bills", () => {
 
   /** Stable ref + type + symbol is the mock server idempotency key. */
   function addOnce(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+    if (fundsServerEnabled) return null;
     const existing = b.ref
       ? bills.value.find((bill) => bill.ref === b.ref && bill.type === b.type && bill.symbol === b.symbol)
       : null;
@@ -208,6 +281,10 @@ export const useBills = defineStore("bills", () => {
   }
 
   function seed() {
+    if (fundsServerEnabled) {
+      bills.value = [];
+      return;
+    }
     bills.value = recomputeBalance(seedBills());
     persist();
   }
@@ -221,6 +298,7 @@ export const useBills = defineStore("bills", () => {
    * PROD:服务端 confirm 时 post 这条分录,client 只消费。
    */
   function settleByRef(ref: string, status: Bill["status"]): boolean {
+    if (fundsServerEnabled) return false;
     if (!ref) return false;
     const previous = bills.value;
     let changed = false;
@@ -246,5 +324,9 @@ export const useBills = defineStore("bills", () => {
     return true;
   }
 
-  return { bills, add, addMany, addForAccount, addOnce, seed, settleByRef, bindAccount };
+  return {
+    bills, serverStatus, serverError,
+    add, addMany, addForAccount, addOnce, seed, settleByRef, bindAccount,
+    adoptFundsSandboxLedger, refreshFundsSandboxLedger,
+  };
 });

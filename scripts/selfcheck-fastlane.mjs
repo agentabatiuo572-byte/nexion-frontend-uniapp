@@ -16,7 +16,7 @@
 // 词法检查永远追不上控制流。改测行为后,上述四种**全部会被抓到** ——
 // 因为它们要成为漏洞就必须改变路由结果,而路由结果正是这里断言的东西。
 // 反过来:不改变行为的改法本来就不是漏洞,不该报红。
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { transformSync } from "esbuild";
@@ -463,16 +463,6 @@ function balancedBody(src, from) {
   }
   return null;
 }
-/** 抠出具名函数的**函数体**:先配对吞掉参数表 `(…)`,再从函数体 `{` 配对到闭合 ——
- *  判据先锚进函数再 indexOf,防命中别处的同名调用/注释。 */
-function functionBody(src, sig) {
-  const at = src.indexOf(sig);
-  if (at < 0) return null;
-  const params = balancedBody(src, at);
-  if (!params) return null;
-  const open = src.indexOf("{", at + params.length);
-  return open < 0 ? null : balancedBody(src, open);
-}
 // ── 9. 🔴 接线门:判定守得再严,没接上也是零 ────────────────
 // 独立验收 F3 实证:把计数写入摘掉,三个哨兵 + type-check 全绿而限额完全失效。
 // 判定层是纯函数(上面已行为覆盖),「有没有被调用」只能在源码层守 —— 但守的是
@@ -483,11 +473,48 @@ function functionBody(src, sig) {
   const elgSrc = readSrc("src/store/withdrawal-eligibility.ts");
   const cntSrc = readSrc("src/store/withdraw-daily-count.ts");
 
-  // z1 判决 C(2026-08-10):submitWithdrawal 客户端占额度/扣款/落盘/重放链随 c37e642
-  // 整体让渡后端事务,本组接线断言(claimWithdrawSlot 占额度 / claim 先于建单 /
-  // releaseWithdrawSlot 归还 / applyDebit 差分扣款 / 落盘失败回滚 / 幂等键重放 /
-  // attempt<3 上限 / 平台日单号)主语灭失,整组删除;服务端义务(事务内占额度+复核)
-  // 已记 HANDOFF。行为断言半区照跑。
+  check("🔴 submitWithdrawal 建单前 await 占额度,占不到即 return null",
+    appSrc.includes("const claimToken = await claimWithdrawSlot(acct, rules.dailyWithdrawLimitCount, now);")
+      && appSrc.includes("if (!claimToken) return null;"));
+  check("🔴 占额度发生在建单**之前**(源码顺序:claim 早于 estimateArrivalAt)",
+    (() => {
+      const a = appSrc.indexOf("claimWithdrawSlot(acct");
+      const b = appSrc.indexOf("estimateArrivalAt(now, amount");
+      return a > 0 && b > 0 && a < b;
+    })());
+  check("🔴 占用等待期后余额被花掉 → 归还额度(被拒的提交不该白吃额度)",
+    appSrc.includes("releaseWithdrawSlot(acct, claimToken);"));
+  check("🔴 扣款基于 await **之后**重取的内存态(不拿旧快照回写,否则抹掉这期间的收益)",
+    appSrc.includes("const settledUser = withDefaultEarningBuckets(user.value);")
+      && appSrc.includes("const committedUser = applyDebit(settledUser);"));
+  check("🔴 扣款是**差分推导**不是绝对快照(合并层按 delta 累加,写绝对值会抹平并发方的余额变动)",
+    appSrc.includes("const applyDebit = (base: UserState): UserState => {")
+      && appSrc.includes("user.value = applyDebit(stored.user);")
+      // 重放循环里**不许**再出现回写绝对快照的写法(那正是抹平并发方余额的那一版)
+      && !/for \(let attempt[\s\S]{0,900}user\.value = committedUser;/.test(appSrc));
+  check("🔴 落盘失败要回滚内存 + 归还额度,不许返回成功单号",
+    (() => {
+      // 锚在提现那段(奖励入账也有同名的落盘失败回滚,indexOf 会锚错)
+      const i = appSrc.indexOf("const committedUser = applyDebit(settledUser);");
+      const seg = appSrc.slice(i, i + 900);
+      return i > 0
+        && seg.includes("if (!persistAccountSnapshot()) {")
+        && seg.includes("adoptAccountSnapshot(previousSnapshot);")
+        && seg.includes("releaseWithdrawSlot(acct, claimToken);")
+        && seg.includes("return null;");
+    })());
+  check("🔴 收敛重放的判据是**幂等键**不是提现单槽(单槽会被并发的另一笔占走,本单永远判不成立)",
+    appSrc.includes("if (stored?.user?.appliedRewardKeys?.[id]) break;")
+      && appSrc.includes("appliedRewardKeys: { ...u.appliedRewardKeys, [id]: true },"));
+  check("🔴 重放前先把落盘现状认作基线(否则差分为 0,合并会再写一遍旧值)",
+    (() => {
+      // 🔴 必须**锚在重放循环内**再找:adoptAccountSnapshot(stored) 在别的函数里也有,
+      // 直接 indexOf 会锚到第一处(奖励入账那段),判据就成了跨函数的假比较。
+      const loop = appSrc.indexOf("for (let attempt = 0; attempt < 3; attempt++)");
+      const a = appSrc.indexOf("adoptAccountSnapshot(stored);", loop);
+      const c = appSrc.indexOf("user.value = applyDebit(stored.user);", a);
+      return loop > 0 && a > loop && c > a && c - a < 200;
+    })());
   // 🔴 列表级问题不得读 latestWithdrawal —— 模型改成列表后,消费者若还用「只问最新一笔」
   //    的老问法去问列表级问题,在「一张在途 + 一张更新的已到账」组合下全部答错:
   //    账单结算结错单 / 钱包入口整行消失 / 换绑闸被静默架空(独立验收实测三条全中,
@@ -533,6 +560,9 @@ function functionBody(src, sig) {
     check("🔴 赠金释放后账单跟着入账(释放路径不写账单,只能靠对账推出来)",
       appVueCode.includes("b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0")
         && /for \(const row of bills\.bills\)[\s\S]{0,220}row\.type === "bonus"[\s\S]{0,160}bills\.settleByRef\(row\.ref, "posted"\)/.test(appVueCode));
+    // 「今天」只许有一个口径:单号、每日笔数、可再提时刻全按平台日(越南 UTC+7)。
+    check("🔴 单号里的日期用平台日,与每日笔数 / 可再提时刻同一个「今天」",
+      appSrc.includes("new Date(now + PLATFORM_UTC_OFFSET_HOURS * 3600_000)"));
 
     check("🔴 钱包入口与追踪页读**主单**(优先最早的在途单),不读最新一笔",
       walletSrc.includes("app.primaryWithdrawal") && trackSrc.includes("app.primaryWithdrawal")
@@ -567,12 +597,10 @@ function functionBody(src, sig) {
       appSrc.includes("const inFlightWithdrawals = computed(")
         && appSrc.includes("const primaryWithdrawal = computed<Withdrawal | null>("));
   }
-  // z1(2026-08-10):入列钉现写法 —— 前插 + **按 id 去重**(服务端幂等重放同一单号时
-  // 列表不得出现两行);语义强于旧「裸前插 [wd, ...]」。
   check("🔴 提现单是**列表**不是单条(与真后端 GET /api/withdrawals 同构)",
     appSrc.includes("const withdrawals = ref<Withdrawal[]>(bootSnapshot.withdrawals ?? []);")
       && appSrc.includes("const latestWithdrawal = computed<Withdrawal | null>(")
-      && appSrc.includes("withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];"));
+      && appSrc.includes("withdrawals.value = [wd, ...withdrawals.value];"));
   check("🔴 建单是**追加**不是覆盖(覆盖会把在途单连同已扣的钱一起顶掉)",
     !/latestWithdrawal\.value = wd;/.test(appSrc));
   check("🔴 到账推进**全表扫**(单条版只看最新一笔,前面那笔到点了也永远推不动)",
@@ -581,51 +609,23 @@ function functionBody(src, sig) {
     /withdrawals\.value = next;[\s\S]{0,400}?if \(!persistAccountSnapshot\(\)\) \{[\s\S]{0,80}?withdrawals\.value = prev;/.test(appSrc));
   check("🔴 单槽产品限制已删除(列表化后新单不再顶掉在途单,那条闸只会锁死用户)",
     !/occupiesWithdrawalSlot\(latestWithdrawal/.test(appSrc));
-  // z1 B4(2026-08-10):remote-only 后扣款在后端事务里,客户端义务收缩为「建单成功后
-  // 同步登记风控台账」—— submitWithdrawal 在 await withdrawalApi.submit **之后**调
-  // commitWithdrawal(首提标记 + 地址登记),本地预检引擎吃的就是这份台账,
-  // 漏接 = 首提/换址闸对提过现的账户永不触发。三合取逐项:
-  // (a) 调用在 submitWithdrawal 函数体内(functionBody 抠体再找,防命中别处);
-  // (b) 调用在建单 await 之后(建单失败会 throw 冒泡,不得先记台账);
-  // (c) commitWithdrawal 函数体内两笔台账(地址登记 + 首提标记)都落。
-  check("🔴 风控台账接线:submitWithdrawal 建单成功后同步 commitWithdrawal(首提标记 + 地址登记)",
-    (() => {
-      const body = functionBody(appSrc, "async function submitWithdrawal(");
-      if (!body) return false;
-      const call = body.indexOf("commitWithdrawal(accountKey.value, network, address);");
-      const submit = body.indexOf("await withdrawalApi.submit");
-      if (call < 0 || submit < 0 || submit > call) return false;
-      const elgBody = functionBody(elgSrc, "function commitWithdrawal(");
-      return !!elgBody
-        && elgBody.includes("recordWithdrawAddressUse(accountKey, network, address);")
-        && elgBody.includes("markWithdrawn(accountKey);");
-    })());
+  check("🔴 风控台账(首提标记 + 地址登记)与扣款在同一个同步任务里落地",
+    appSrc.includes("recordWithdrawAddressUse(acct, network, address);")
+      && appSrc.includes("markWithdrawn(acct);"));
+  check("🔴 重放次数有上限(不会因对方持续写而空转)",
+    /attempt < 3/.test(appSrc));
   check("🔴 commitWithdrawal 不再事后计数(挪回去 = 把并发漏洞放回去)",
     !/bumpWithdrawCounter\s*\(/.test(elgSrc));
-  // 【z1 R2 独立审计 P0-1,2026-08-10】原三条断言(claimDailySlot 判定来源 / 写后回读验令牌 /
-  // CLAIM_SETTLE_MS ≥100ms)钉的是 claimWithdrawSlot 的**内部实现**,而 c37e642 之后
-  // 该函数在 src/ 全站零调用 —— 绿着守死代码(与本包判定 appendLedgerEntry 空壳同病)。
-  // 🔴 更重的是它连带的活缺陷:计数器无人递增 → todayWithdrawCount 恒 0 →
-  //    dailyLimitReached 恒 false,而页面仍在渲染「每日最多 N 笔」并留着置灰分支。
-  //    日限的真正执行方已是服务端(policy.dailyLimitCount);客户端预检形同虚设。
-  //    产品侧修法(从服务端镜像的提现列表按平台日现算)已记 HANDOFF,不在本包动。
-  // 这里改守「死透」+「复活必须连门一起复活」:任何人重新接线 claimWithdrawSlot,
-  // 这条会红,逼他把上面三条实现级断言一并恢复(知识留在机器里,不留在人脑里)。
-  {
-    const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
-      const p = path.join(dir, e.name);
-      return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
-    });
-    const files = walk(path.join(root, "src"));
-    // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
-    check(`🔴 claimWithdrawSlot 死态扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
-    const callers = files
-      .filter((p) => !p.endsWith(path.join("store", "withdraw-daily-count.ts")))
-      .filter((p) => /\bclaimWithdrawSlot\s*\(/.test(readFileSync(p, "utf8").replace(/^[ \t]*\/\/.*$/gm, "")))
-      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
-    check("🔴 claimWithdrawSlot 仍无调用方(客户端日限已让渡服务端;若复活,须同批恢复其判定/回读/时长三条实现级断言)",
-      callers.length === 0, callers.join(", "));
-  }
+  check("🔴 claimWithdrawSlot 的判定来自 core 的 claimDailySlot(不在存储层自己写规则)",
+    cntSrc.includes("claimDailySlot(readWithdrawCounter(accountKey), limitCount, now)"));
+  check("🔴 占用必须**写入后回读验令牌**(跨渲染进程 localStorage 非原子,复验 12/12 打穿过纯同步版)",
+    cntSrc.includes("isClaimOwner(readWithdrawCounter(accountKey), token)")
+      && /await new Promise<void>\(\(r\) => setTimeout\(r, CLAIM_SETTLE_MS\)\)/.test(cntSrc));
+  check("🔴 回读等待时长留足余量(实测危险窗口 ≈5ms,门槛设 ≥100ms)",
+    (() => {
+      const m = cntSrc.match(/export const CLAIM_SETTLE_MS = (\d+);/);
+      return !!m && Number(m[1]) >= 100;
+    })());
   // 🔴 双向告知的接线门。判定再准,页面不接 = 用户看不见(走查实证:快车道跑了
   // 一整轮,表单一个字都没提,用户以为「提多少都要审」)。两条判据都必须来自判定结果。
   const pgSrc = readSrc("src/pages/me/wallet-withdraw.vue");
@@ -686,19 +686,14 @@ function functionBody(src, sig) {
         && bills.includes('p.set("confs"')
         && pane.includes('r.status !== "credited"');
     })());
-  // 🔴 小额线判据 z1(2026-08-10)起为**双态二选一**:
-  //  · HOLD 态 —— WD01 backend 未实现快车道,smallAmountLine 恒 0(免审分支故意不可达),
-  //    行 + 注释双锚:防有人「顺手」把线接回配置值而后端并不兑现免审承诺;
-  //  · 恢复态 —— 线回接后台配置时,必须整组回接**三处同一个落地值**(向下取到 2 位;
-  //    比较 / 写入输入框 / 文案显示)。原来比较用原值、写入 toFixed(2)、显示 toFixed(0):
-  //    线配 49.999 时写进去的 50.00 反而超过原值 → 一个点多少次都没反应、永不消失的按钮;
-  //    线配 20.5 时按钮写「改为 $21」而实际填 20.50,照字面手输 21 反被送出免审区间。
-  check("🔴 小额线:HOLD 态(恒 0 + WD01 HOLD 注释)或恢复态(config 派生三处同源落地值)",
-    (pgSrc.includes("const smallAmountLine = computed(() => 0);") && pgSrc.includes("WD01 is HOLD"))
-      || (pgSrc.includes("Math.floor(cfg.config.withdrawRules.smallAmountThresholdUsd * 100) / 100")
-        && pgSrc.includes("const smallAmountLineText = computed(")
-        && pgSrc.includes("fmt(t.value.wallet.fastLaneCta, { n: smallAmountLineText.value })")),
-    "两态皆不满足 —— 恢复快车道必须回接 config 派生三同源(比较/写入/显示同一落地值)");
+  // 🔴 小额线取后台配置,且**三处用同一个落地值**(比较 / 写入输入框 / 文案显示)。
+  // 原来比较用原值、写入 toFixed(2)、显示 toFixed(0):线配成 49.999 时写进去的 50.00 反而超过原值,
+  // 快车道不生效而 CTA 判据仍成立 → 一个点多少次都没反应、也永不消失的按钮;
+  // 线配成 20.5 时按钮写「改为 $21」而实际填 20.50,照字面手输 21 反被送出免审区间。
+  check("🔴 小额线取后台配置,且比较 / 写入 / 显示三处同一个落地值(向下取到 2 位)",
+    pgSrc.includes("Math.floor(cfg.config.withdrawRules.smallAmountThresholdUsd * 100) / 100")
+      && pgSrc.includes("const smallAmountLineText = computed(")
+      && pgSrc.includes("fmt(t.value.wallet.fastLaneCta, { n: smallAmountLineText.value })"));
   check("🔴 首审提示按判定结果显示,不再常显(否则与免审横幅当场对打)",
     pgSrc.includes('const firstTimeReviewApplies = computed(() => eligibility.value.riskReasons.includes("first-withdrawal-review"))')
       && pgSrc.includes('v-if="firstTimeReviewApplies"'));

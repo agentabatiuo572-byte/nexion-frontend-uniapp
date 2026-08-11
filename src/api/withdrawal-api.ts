@@ -40,8 +40,8 @@ export interface WithdrawalPolicy {
   enabledNetworks: SupportedWithdrawalNetwork[];
   currentPhase: string;
   currentMonth: number;
-  gateSource: "J1";
-  source: "D5+H1";
+  gateSource: "J1" | "FUNDS_SANDBOX";
+  source: "D5+H1" | "FUNDS_SANDBOX";
 }
 
 export interface WithdrawalApi {

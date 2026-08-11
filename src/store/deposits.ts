@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { createAccountRowCommit } from "./account-scoped-storage";
+import { normalizeAccountKey } from "./account-cloud";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
 import { postReceiptOnce, reportStuckFunds } from "@/lib/money-receipt";
@@ -30,6 +31,16 @@ import {
   type BankReceiveAccount,
 } from "./deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord } from "./types";
+import { fundsSandboxApi, fundsSandboxEnabled, fundsServerEnabled } from "@/api/runtime";
+import type { FundsSandboxOrder, FundsSandboxTopupChannel } from "@/api/funds-sandbox-api";
+import {
+  bindPendingFundsMutationOrder,
+  finishPendingFundsMutation,
+  finishPendingFundsMutationByOrder,
+  fundsAmountFingerprint,
+  pendingFundsMutationKey,
+  type FundsMutationIdentity,
+} from "@/lib/funds-mutation-key";
 
 // 入金 store(PAY-规格 [FEAT-PAY01] 链上三网络;[FEAT-PAY02] 银行轨意向单
 // 生命周期:createBankIntent → 回调匹配/超时/取消;锁价语义见 [FEAT-PAY03])。
@@ -95,12 +106,15 @@ export const useDeposits = defineStore("deposits", () => {
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import 的编排收口)。
   const records = ref<DepositRecord[]>([]);
   const intents = ref<DepositIntent[]>([]);
+  const serverStatus = ref<"idle" | "loading" | "ready" | "error">(fundsSandboxEnabled ? "idle" : "ready");
+  const serverError = ref("");
 
   // mock 到账引擎的在途定时器(depositId → timer)。账号切换即停:引擎跑在
   // client,跨账号继续推进会把钱记进新绑账号;PROD 服务端持续推进,
   // client 重新拉取即收敛(切回账号后记录停在 confirming,属 mock 已知边界)。
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   let mockEngineRunning = false;
+  let serverAccountKey = "default";
 
   /** App 生命周期的集中停机口：静态评审页、登出、会话失效和后台态都必须清空在途推进。 */
   function pauseMockEngine(): void {
@@ -114,6 +128,7 @@ export const useDeposits = defineStore("deposits", () => {
    * 重建链上确认与银行意向单定时器，因此暂停期间不写状态，返回业务页后仍可收敛。
    */
   function resumeMockEngine(): void {
+    if (fundsServerEnabled) return;
     if (mockEngineRunning) return;
     mockEngineRunning = true;
     syncBankIntents();
@@ -144,7 +159,7 @@ export const useDeposits = defineStore("deposits", () => {
   const commit = rows.commit;
   /** 当前绑定账号键。 */
   function boundKey(): string {
-    return rows.accountKey();
+    return fundsServerEnabled ? serverAccountKey : rows.accountKey();
   }
 
   /** 账号切换重绑:装载该账号分行,停掉上一账号的在途引擎定时器,
@@ -152,6 +167,20 @@ export const useDeposits = defineStore("deposits", () => {
   function bindAccount(rawAccountKey: string) {
     timers.forEach((t) => clearTimeout(t));
     timers.clear();
+    if (fundsServerEnabled) {
+      serverAccountKey = normalizeAccountKey(rawAccountKey);
+      const expectedAccountKey = serverAccountKey;
+      records.value = [];
+      intents.value = [];
+      serverStatus.value = fundsSandboxEnabled ? "idle" : "error";
+      serverError.value = fundsSandboxEnabled ? "" : "FUNDS_DEPOSIT_PROVIDER_NOT_CONFIGURED";
+      if (fundsSandboxEnabled) void refreshFundsSandboxDeposits().catch((cause) => {
+        if (expectedAccountKey === serverAccountKey && !serverError.value) {
+          serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
+        }
+      });
+      return;
+    }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
     records.value = row.records;
     intents.value = row.intents;
@@ -383,6 +412,7 @@ export const useDeposits = defineStore("deposits", () => {
     amountUsdt: number,
     txHash?: string,
   ): DepositRecord | null {
+    if (fundsServerEnabled) return null;
     if (import.meta.env.PROD) return null;
     if (!(network in CHAIN_REQUIRED_CONFIRMATIONS)) return null; // console 驱动,入参不可信
     if (!Number.isFinite(amountUsdt) || amountUsdt <= 0 || amountUsdt > 1e9) return null;
@@ -491,6 +521,7 @@ export const useDeposits = defineStore("deposits", () => {
   /** 生成付款单(PROD = POST /api/deposits/bank-intents;校验失败即 422 形态返 null)。
    *  锁价:fxRate/vndAmount/expireAt 均在此刻定格,后续调价不影响本单(规格 ② 异常2)。 */
   function createBankIntent(usdtAmount: number): DepositIntent | null {
+    if (fundsServerEnabled) return null;
     if (!Number.isFinite(usdtAmount)) return null;
     const amt = +usdtAmount.toFixed(2);
     if (amt < MIN_DEPOSIT_USDT || amt > BANK_MAX_DEPOSIT_USDT) return null;
@@ -706,6 +737,7 @@ export const useDeposits = defineStore("deposits", () => {
    *     跨提交幂等归 PROD 的 Idempotency-Key(收单方 + server 侧),mock 不承诺。
    *  🔴 计费方向:卡费另收在用户卡上 → gross = 实扣额、credited = 用户输入额。 */
   function submitCardPayment(creditedUsdt: number, expectedAccountKey: string): DepositRecord | null {
+    if (fundsServerEnabled) return null;
     // 账号守卫:授权等待期(组件侧 ~3.8s)内账号可能被切走(会话被踢/登出会 rebind 到
     // default),此时入账必须作废,否则钱记进别人账上、还白送对方入金资格进度。
     // 与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形 ——
@@ -766,6 +798,116 @@ export const useDeposits = defineStore("deposits", () => {
     return rec;
   }
 
+  function sandboxChannel(channel: FundsSandboxTopupChannel): DepositChannel {
+    if (channel === "VIETQR") return "bank-vietqr";
+    if (channel === "CARD") return "card-intl";
+    return "usdt-bep20";
+  }
+
+  function sandboxRecord(order: FundsSandboxOrder): DepositRecord {
+    const channel = sandboxChannel(order.channel);
+    const createdAt = Date.parse(order.createdAt);
+    const credited = order.status === "SETTLED";
+    return {
+      depositId: order.orderNo,
+      channel,
+      grossAmountUsdt: order.amount,
+      feeUsdt: 0,
+      creditedUsdt: order.amount,
+      status: credited ? "credited" : "detected",
+      createdAt,
+      ...(credited && order.settledAt ? { creditedAt: Date.parse(order.settledAt) } : {}),
+      ...(channel === "usdt-bep20" ? {
+        address: depositAddress("usdt-bep20"),
+        txHash: order.orderNo,
+        confirmations: credited ? CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"] : 0,
+        requiredConfirmations: CHAIN_REQUIRED_CONFIRMATIONS["usdt-bep20"],
+      } : {}),
+      ...(channel === "card-intl" ? { authCode: order.orderNo } : {}),
+    };
+  }
+
+  function sandboxIntent(order: FundsSandboxOrder): DepositIntent {
+    const fxRate = useFx().quoteRate;
+    const createdAt = Date.parse(order.createdAt);
+    return {
+      intentId: order.orderNo,
+      usdtAmount: order.amount,
+      fxRate,
+      vndAmount: vndForUsdt(order.amount, fxRate),
+      memoCode: `SBX-${order.orderNo.slice(-6)}`,
+      bankAccount: pickBankAccount(intents.value.length, bankAccounts.value) ?? BANK_RECEIVE_ACCOUNTS[0],
+      status: order.status === "SETTLED" ? "credited" : "awaiting_payment",
+      createdAt,
+      expireAt: createdAt + 30 * ONE_MINUTE_MS,
+      ...(order.settledAt ? { matchedAt: Date.parse(order.settledAt) } : {}),
+    };
+  }
+
+  async function refreshFundsSandboxDeposits(): Promise<void> {
+    if (!fundsSandboxEnabled) return;
+    const expectedAccountKey = serverAccountKey;
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const overview = await fundsSandboxApi.overview();
+      if (expectedAccountKey !== serverAccountKey) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+      const topups = overview.orders.filter((order) => order.kind === "TOPUP");
+      records.value = topups.map(sandboxRecord);
+      intents.value = topups.filter((order) => order.channel === "VIETQR").map(sandboxIntent);
+      topups.filter((order) => order.status === "SETTLED" || order.status === "FAILED")
+        .forEach((order) => finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", order.orderNo));
+      serverStatus.value = "ready";
+    } catch (cause) {
+      if (expectedAccountKey === serverAccountKey) {
+        records.value = [];
+        intents.value = [];
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
+      }
+      throw cause;
+    }
+  }
+
+  async function createSandboxTopup(
+    channel: FundsSandboxTopupChannel,
+    amount: number,
+    rawExpectedAccountKey: string,
+  ): Promise<DepositRecord | null> {
+    if (!fundsSandboxEnabled || !Number.isFinite(amount) || amount <= 0) return null;
+    const expectedAccountKey = serverAccountKey;
+    if (normalizeAccountKey(rawExpectedAccountKey) !== expectedAccountKey) {
+      throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+    }
+    const mutation: FundsMutationIdentity = {
+      accountKey: expectedAccountKey,
+      environment: "SANDBOX",
+      method: `TOPUP:${channel}`,
+      fingerprint: JSON.stringify({ channel, amount: fundsAmountFingerprint(amount) }),
+    };
+    const idempotencyKey = pendingFundsMutationKey(mutation);
+    const order = await fundsSandboxApi.createTopup(channel, amount, idempotencyKey);
+    if (expectedAccountKey !== serverAccountKey) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+    if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
+    bindPendingFundsMutationOrder(mutation, idempotencyKey, order.orderNo);
+    const record = sandboxRecord(order);
+    records.value = [record, ...records.value.filter((item) => item.depositId !== record.depositId)];
+    if (channel === "VIETQR") {
+      const intent = sandboxIntent(order);
+      intents.value = [intent, ...intents.value.filter((item) => item.intentId !== intent.intentId)];
+    }
+    await useApp().refreshFundsSandbox();
+    if (order.status === "SETTLED" || order.status === "FAILED") {
+      finishPendingFundsMutation(mutation, idempotencyKey);
+    }
+    return record;
+  }
+
+  async function createSandboxBankIntent(amount: number, expectedAccountKey: string): Promise<DepositIntent | null> {
+    const record = await createSandboxTopup("VIETQR", amount, expectedAccountKey);
+    return record ? intents.value.find((item) => item.intentId === record.depositId) ?? null : null;
+  }
+
   // 启动即装载 "default" 行 + 收敛一次(在途单:过期落 expired / 未过期重新武装定时器)。
   bindAccount("default");
 
@@ -784,12 +926,15 @@ export const useDeposits = defineStore("deposits", () => {
       resolveBankMismatch: _devResolveBankMismatch,
       resolveLateBankTransfer: _devResolveLateBankTransfer,
       setBankAccountEnabled: _devSetBankAccountEnabled,
+      sandboxTopup: (amount: number) => createSandboxTopup("CREGIS_USDT_BEP20", amount, currentAccountKey()),
     };
   }
 
   return {
     records,
     intents,
+    serverStatus,
+    serverError,
     chainChannelEnabled,
     bankAccounts,
     bankRailAvailable,
@@ -801,6 +946,9 @@ export const useDeposits = defineStore("deposits", () => {
     createBankIntent,
     cancelBankIntent,
     submitCardPayment,
+    refreshFundsSandboxDeposits,
+    createSandboxTopup,
+    createSandboxBankIntent,
     _devSimulateIncomingTransfer,
     _devResolveDustHold,
     _devSetChannelEnabled,
