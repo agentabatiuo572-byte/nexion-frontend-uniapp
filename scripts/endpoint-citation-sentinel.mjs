@@ -89,6 +89,7 @@ const LEDGER = {
 
   // ── orders / store ────────────────────────────────────────────────────
   "POST /api/orders": "PRD §7.5 / §9.10 / §9.11e",
+  "GET /api/orders": "TBD: PRD §7.4 只定义了按 id 读单;列表读回路已由 order-api.ts 的 list() 实现(store/order-canonical.ts 在用),PRD 同步时补条目",
   "GET /api/orders/:id": "PRD §7.4(SSE)",
   "GET /api/store/catalog": "PRD §7.1",
 

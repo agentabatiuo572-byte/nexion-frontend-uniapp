@@ -775,7 +775,10 @@ if [ "${arsr_pages:-0}" = "1" ] && [ "${arsr_hash:-0}" = "1" ] && [ "${arsr_orh:
 else
   bad "app-route-single-reader(页面栈原语=${arsr_pages} 期望1 · hash=${arsr_hash} 期望1 · 旧双读口=${arsr_orh} 期望0)"
 fi
-sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now\) \?\? w\)'
+# 2026-08-11:advanceArrival 多了第三个必填参数「谁是权威」(远端模式 client 不自推)。
+# 这条只守「全表扫 + 每笔都过同一个纯函数」,不钉死实参写法;权威闸本身由
+# selfcheck-arrival 第 0 节 + scripts/remote-authority-simulation.test.mjs 行为门守。
+sentinel_present "WD01b 到账推进入口唯一(App 层驱动 · 全表扫)" src/store/app.ts 'prev\.map\(\(w\) => advanceArrival\(w, now,[^)]*\) \?\? w\)'
 sentinel_present "WD01b 到账推进由 App 层轮询 + onShow 驱动" src/App.vue 'advanceWithdrawalArrival\(\)'
 # 扫 store 与页面两层,并容忍冒号后无空格的写法(两处都被审计红测穿过)。
 adv_sites=$(grep -rcE 'status: *"confirmed"' src/store src/pages 2>/dev/null | awk -F: '{s+=$2} END {print s+0}')

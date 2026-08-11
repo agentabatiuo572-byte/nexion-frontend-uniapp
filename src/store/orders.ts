@@ -15,6 +15,7 @@
 
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -175,6 +176,12 @@ export const useOrders = defineStore("orders", () => {
   }
 
   function advanceOrder(id: string, reservedSlots = 0) {
+    // 🔴 闸焊在这里而不是 tickOrders:三个驱动都从这条缝进来 —— App.vue 的 6s 轮询、
+    //    订单详情页自己那条 3s 定时器(在 stopBusinessLoops 管辖之外)、下拉刷新
+    //    (store/refresh.ts)。逐个驱动加判断必漏掉后两个。
+    //    远端模式下履约状态与设备库存都归服务端(GET /api/orders —— orderApi.list 已在用),
+    //    这里往前推一步就等于凭空发一台机器:next === "activated" 会 addDevice + activateDevice。
+    if (remoteApiEnabled) return;
     const cur = orders.value.find((o) => o.id === id);
     if (!cur || cur.status === "activated" || cur.status === "cancelled") return;
     const idx = TIMELINE.indexOf(cur.status);

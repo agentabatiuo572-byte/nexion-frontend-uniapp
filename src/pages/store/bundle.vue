@@ -150,6 +150,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { isPhaseReached } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { toast } from "@/store/ui";
+import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { postReceiptOnly } from "@/lib/money-receipt";
@@ -214,6 +215,15 @@ function onAddSuggestion(p: Product) {
 function onCheckout() {
   const list = products.value;
   if (list.length === 0) return;
+  // 🔴 远端模式拒单。本页是全站唯一还在**本地建单 + 本地扣余额**的购买入口
+  // (单品 checkout 早已改走 orderApi.create,见 checkout.vue 的 submitRemoteOrder)。
+  // 而履约推进(orders.advanceOrder)现已归服务端 —— 放行等于「钱扣了、单子永远停在
+  // 已支付、机器一台不来」。先拒单是两害相权:组合购在远端模式下待接
+  // POST /api/orders(每 SKU 一单),接上前不放它自己造一套本地账。
+  if (remoteApiEnabled) {
+    toast.warn(t.value.tradein.errPurchaseFailed);
+    return;
+  }
   // 购买资格门(等级门/锁额/售罄)——镜像单品 checkout 的门:suggestions 只挡上架节奏门
   // (unlocksAtPhase)、挡不住资格门,组合内任一 SKU 不达标即整单拒,防授权旁路(深链防线)。
   // 真后台仍以 POST /api/orders 服务端复检为准。

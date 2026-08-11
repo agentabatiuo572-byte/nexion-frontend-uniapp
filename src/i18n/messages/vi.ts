@@ -4892,6 +4892,8 @@ export const vi: Messages = {
     time15min: "≈ 15 phút",
     sendVia: "Chuyển qua {network}",
     segUsdt: "USDT on-chain",
+    railsClosedTitle: "Nạp tiền tạm thời không khả dụng",
+    railsClosedDesc: "Kênh này đang được kết nối nên việc nạp tiền tạm dừng. Hiện chưa hiển thị bất kỳ thông tin nhận tiền nào — vui lòng đừng chuyển tiền tới địa chỉ hay tài khoản bạn đã lưu trước đó.",
     flowRetired: "Quy trình này đã ngừng hoạt động.",
     segCard: "Thẻ ngân hàng",
     netRecommended: "Khuyên dùng · phí thấp nhất",
