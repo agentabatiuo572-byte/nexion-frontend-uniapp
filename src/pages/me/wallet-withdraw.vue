@@ -246,8 +246,11 @@
                  分隔空格用 {{ ' ' }} 显式写,直接写在标签间的前导空格会被编译器吃掉
                  (实测渲染成 `$20.The fee…` 粘在一起)。 -->
             <text class="block">{{ minWithdrawNoteText }}<text v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked">{{ t.wallet.minWithdrawNoteOffset }}</text></text>
-            <!-- 笔数从配置插值(此前写死「1 笔/日」而代码里零计数 —— 空头承诺) -->
-            <text class="block">{{ dailyLimitNoteText }}</text>
+            <!-- 🔴 这句只在**闸真的会拦**时才出现:limitCount ≤0 = 服务端没配 / policy 拉不到,
+                 判定层按「不限制」走,这时再说一句「每日限额:0 笔/日」就是当场撒谎
+                 (实景实测:后端不可达时它真的渲染成 0 笔/日)。
+                 「有没有这句话」与「闸生不生效」从此是同一个条件,不会再各走各的。 -->
+            <text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>
           </view>
         </view>
       </view>
@@ -412,7 +415,23 @@ const maxWithdrawable = computed(() => {
   return serverWithdrawable * (withdrawalPolicy.value?.balanceMaxRatio ?? 0);
 });
 const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
-const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(withdrawalPolicy.value?.dailyLimitCount ?? 0) }));
+/**
+ * 🔴 日限的两件事实**只从这一个地方取**,文案与闸共用它 —— 说的那个 N 和拦人用的 N
+ * 必须字面同源。此前文案取服务端 policy、判定取本地 config.withdrawRules(远端同步
+ * 压根不覆盖 withdrawRules,永远是前端写死的 1):服务端配 3 笔而客户端按 1 笔拦,
+ * 用户被自己的 App 挡在门外(z1 审计 P0-1 回源时发现的第二处缺陷)。
+ *
+ * 笔数不在这里算:把 app.withdrawals 原件交给 core 现算(平台日 UTC+7),
+ * 页面不许自己 filter —— 判定留在 core 才有行为门覆盖得到。
+ *
+ * policy 取不到 → limitCount = 0 → 既有规则「上限 ≤0 视为未配置」→ 不限制。
+ * 这个方向是**故意**的:后端不可达时宁可放行让服务端去拒,也不能把提现锁死。
+ */
+const dailyFacts = computed(() => ({
+  limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
+  withdrawals: app.withdrawals,
+}));
+const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) }));
 // 今日笔数用完时的提示 + 下次可提时刻(平台日边界,按用户本地时钟展示)
 const dailyLimitReachedText = computed(() => {
   // 🔴 给「MM-DD HH:mm」绝对时刻,不写「明日」。平台日按越南时区(UTC+7)切,
@@ -605,7 +624,7 @@ const eligibilityClock = computed(() => {
 });
 const eligibility = computed(() => {
   void eligibilityClock.value; // 建立对「时间边界」的依赖,不参与计算
-  return evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, amountNum.value);
+  return evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, amountNum.value);
 });
 // 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
 const withdrawalRiskNotice = computed(
@@ -687,7 +706,7 @@ const fastLaneOn = computed(
  * 直接把小额线代进同一个判定函数问一次,答案是什么就说什么。
  */
 const smallLineDecision = computed(() =>
-  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, smallAmountLine.value),
+  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value),
 );
 const fastLaneOverLine = computed(
   () =>
@@ -926,6 +945,10 @@ async function handleSubmit() {
       snap.network,
       snap.address,
       snap.maxWithdrawable,
+      // 🔴 日限事实取**当下活值**,不进 snap:snap 是「弹窗给用户看的那一份」,
+      // 刻意冻在确认前;而日限是道闸,要的是最新的单据列表 —— 确认弹窗 + 600ms 评估
+      // 这段时间里另一个标签页提交成功的话,冻住的快照正好看不见它。
+      dailyFacts.value,
       snap.amount,
     );
   } catch (err) {

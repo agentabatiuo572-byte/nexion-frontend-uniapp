@@ -29,7 +29,7 @@ const core = await import("data:text/javascript;base64," + Buffer.from(code, "ut
 // 第 3 轮复验教训:只测判定时,缝隙搬到了「取数/加工」那一层 ——
 // 外壳对纯函数撒谎(恒传 false、只在小额时隐瞒共用地址)同样能真免闸而哨兵全绿。
 // 现在加工也在 core 里,这里从原始事实喂进去,三层一起覆盖。
-const { decideFromStores, decideFromRawFacts, isFastLane, claimDailySlot, platformDayIndex, nextDayResetAt, todayCountFrom, PLATFORM_UTC_OFFSET_HOURS, isClaimOwner, MAX_SANE_DAILY_COUNT } = core;
+const { decideFromStores, decideFromRawFacts, isFastLane, platformDayIndex, nextDayResetAt, countWithdrawalsOnPlatformDay, isDailyLimitReached, isOverDailyCap, PLATFORM_UTC_OFFSET_HOURS } = core;
 
 let pass = 0;
 let fail = 0;
@@ -64,7 +64,7 @@ function base(over = {}) {
     minWithdrawableUsdt: 20,
     sameAddressRoute: "manual",
     firstWithdrawalManual: true,
-    withdrawCounter: null,
+    withdrawals: [],
     dailyWithdrawLimitCount: 0,
     ...over,
   };
@@ -100,7 +100,7 @@ function toSnapshot(f) {
     minWithdrawableUsdt: f.minWithdrawableUsdt,
     sameAddressRoute: f.sameAddressRoute,
     firstWithdrawalManual: f.firstWithdrawalManual,
-    withdrawCounter: f.withdrawCounter,
+    withdrawals: f.withdrawals,
     dailyWithdrawLimitCount: f.dailyWithdrawLimitCount,
   };
 }
@@ -334,102 +334,66 @@ for (let i = 0; i < SAMPLES; i++) {
 check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕过(含随机时钟,打掉时间炸弹)`,
   violations.length === 0, violations.slice(0, 6).join(" | "));
 
-// ── 7. FEAT-WD01b 每日提现笔数上限 ──────────────────────
-// 不变量:达上限 → canSubmit=false(**不建单不扣款**,与换绑冻结同档);
-// 跨日自动归零;上限 ≤0 视为未配置不限制(防坏配置把提现锁死)。
+// ── 7. FEAT-WD01b 每日提现笔数上限(计数源 = 提现单列表)──────────
+// 不变量:今日笔数 = 提现单列表里 submittedAt 落在**平台日**(越南 UTC+7)内的行数;
+// 达上限 → canSubmit=false(**不建单不扣款**,与换绑冻结同档);跨日自动归零;
+// 上限 ≤0 / 非法 视为未配置 → 不限制(坏配置、后端不可达都不该把提现锁死)。
+//
+// 🔴 本节是 z1 审计 P0-1 的回归门。旧实现把笔数存在一个独立计数器里,由建单前的
+//    claimWithdrawSlot 递增;c37e642 把建单让渡服务端事务后那个递增点随本地扣款链被删,
+//    计数器从此无人写 → 读出恒空 → todayWithdrawCount 恒 0 → dailyLimitReached 恒 false,
+//    而页面仍在渲染「每日最多 N 笔」并留着置灰分支(四处承诺全不可达)。
+//    改成从单据现算后,「提交成功」与「计数 +1」是**同一件事**,没有第二份状态可以掉队。
 {
-  const { todayCountFrom, platformDayIndex, nextDayResetAt } = core;
-  const today = platformDayIndex(NOW);
+  const RESET = nextDayResetAt(NOW);       // 下一个平台日 0 点(越南当地),即今日的右开边界
+  const rows = (...ts) => ts.map((t) => ({ submittedAt: t }));
+  const withRows = (list, limit) =>
+    decideFromStores({ ...toSnapshot(base({})), withdrawals: list, dailyWithdrawLimitCount: limit });
 
-  check("落盘计数器是今天 → 返回该计数", todayCountFrom({ dayIndex: today, count: 2 }, NOW) === 2);
-  check("落盘计数器是昨天 → 归零(跨日自动重置,无需定时清理)",
-    todayCountFrom({ dayIndex: today - 1, count: 9 }, NOW) === 0);
-  check("从未落盘 → 0", todayCountFrom(null, NOW) === 0 && todayCountFrom(undefined, NOW) === 0);
-  check("负数计数被夹到 0(坏数据不放大额度)",
-    todayCountFrom({ dayIndex: today, count: -5 }, NOW) === 0);
-  // 平台日按越南 UTC+7 切(不是 UTC)—— 断言写成「下一日序的起点」而不是写死 UTC 整点,
-  // 这样偏移改了断言仍然表达同一件事(第 5 轮教训:固定靶会随实现漂移变成假绿)。
-  check("下次重置时间 = 下一个平台日的起点",
-    nextDayResetAt(NOW) === (today + 1) * 24 * 3600 * 1000 - PLATFORM_UTC_OFFSET_HOURS * 3600 * 1000);
-
-  const withCounter = (count, limit) =>
-    decideFromStores({ ...toSnapshot(base({})), withdrawCounter: { dayIndex: today, count }, dailyWithdrawLimitCount: limit });
-
-  check("🔴 今日 0 笔 / 上限 1 → 可提", withCounter(0, 1).canSubmit === true);
-  check("🔴 今日 1 笔 / 上限 1 → 不可提(不建单不扣款)",
-    withCounter(1, 1).canSubmit === false && withCounter(1, 1).dailyLimitReached === true);
-  check("🔴 超出上限也判不可提(计数被外部改大也拦得住)", withCounter(9, 1).canSubmit === false);
-  check("运营把上限调到 3 → 今日已 1 笔仍可提(参数实时生效)",
-    withCounter(1, 3).canSubmit === true && withCounter(1, 3).dailyLimitReached === false);
-  check("上限 0(未配置)→ 不限制,不把提现锁死", withCounter(99, 0).canSubmit === true);
-  check("昨日的计数不影响今天",
-    decideFromStores({ ...toSnapshot(base({})), withdrawCounter: { dayIndex: today - 1, count: 99 }, dailyWithdrawLimitCount: 1 }).canSubmit === true);
-  check("🔴 达上限时不改路由(只挡提交)—— 路由仍反映真实风控裁决",
-    withCounter(1, 1).route === withCounter(0, 1).route);
-}
-
-// ── 8. FEAT-WD01b 额度占用(并发面正解)+ 平台时区 ──────────
-// 🔴 本节是 2026-07-31 独立验收 AC3 FAIL 的回归门。原实现「查 → 600ms 风控评估
-//    → 建单 → 才 +1」,两个标签页 3 轮 3 中各自建单。改成**建单前先占**后,
-//    「准不准」与「占完剩多少」都在 claimDailySlot 这一个纯函数里,可直接行为验。
-{
-  const C = (dayIndex, count) => ({ dayIndex, count });
-  const today = platformDayIndex(NOW);
-
-  check("🔴 首次占用:今日 0 笔 / 上限 1 → 准,计数落 1",
-    (() => { const r = claimDailySlot(null, 1, NOW); return r.allowed === true && r.next.count === 1 && r.next.dayIndex === today; })());
-  check("🔴 第二次占用:今日 1 笔 / 上限 1 → **不准**,计数不涨",
-    (() => { const r = claimDailySlot(C(today, 1), 1, NOW); return r.allowed === false && r.next.count === 1; })());
-  check("🔴 不准时计数不递增 —— 被拒的提交不该白吃额度",
-    claimDailySlot(C(today, 5), 1, NOW).next.count === 5);
-  check("上限 3:第 2、3 笔准,第 4 笔拒",
-    claimDailySlot(C(today, 1), 3, NOW).allowed && claimDailySlot(C(today, 2), 3, NOW).allowed
-      && !claimDailySlot(C(today, 3), 3, NOW).allowed);
-  check("跨日:昨日计数不占今日额度,占用后从 1 重新计",
-    (() => { const r = claimDailySlot(C(today - 1, 9), 1, NOW); return r.allowed && r.next.count === 1 && r.next.dayIndex === today; })());
-  check("上限 0(未配置)→ 一直准,但计数照记(留审计痕迹)",
-    (() => { const r = claimDailySlot(C(today, 7), 0, NOW); return r.allowed && r.next.count === 8; })());
-  check("上限为 NaN / 负数 → 当未配置,不锁死提现",
-    claimDailySlot(C(today, 7), NaN, NOW).allowed && claimDailySlot(C(today, 7), -1, NOW).allowed);
-  check("🔴 落盘计数是 NaN → 当 0(NaN >= 上限 恒 false,不挡就等于当天没限额)",
-    (() => { const r = claimDailySlot(C(today, NaN), 1, NOW); return r.allowed && r.next.count === 1; })());
-  // 🔴 消毒必须对称:小值坏数据让额度失效,大值坏数据把提现锁死 —— 两个方向都得挡。
-  // 复验实测:count=1e9 时当天一笔也提不出来(12 种注入里唯一的 FAIL 类型)。
-  check("🔴 落盘计数是荒谬大值(1e9)→ 当 0,不把当天提现锁死",
-    (() => { const r = claimDailySlot(C(today, 1e9), 1, NOW); return r.allowed && r.next.count === 1; })());
-  check("🔴 落盘计数是 Number.MAX_VALUE → 当 0,不锁死",
-    claimDailySlot(C(today, Number.MAX_VALUE), 1, NOW).allowed === true);
-  check("🔴 落盘计数是小数(非整数)→ 当 0(坏数据)",
-    todayCountFrom(C(today, 2.5), NOW) === 0);
-  check("合理范围内的计数照常生效(上限内不误伤)",
-    todayCountFrom(C(today, 3), NOW) === 3 && todayCountFrom(C(today, MAX_SANE_DAILY_COUNT), NOW) === MAX_SANE_DAILY_COUNT);
-  check("恰好超过合理上限一格 → 当 0",
-    todayCountFrom(C(today, MAX_SANE_DAILY_COUNT + 1), NOW) === 0);
-
-  // 令牌归属:跨标签页竞争的胜负判据
-  check("🔴 令牌一致 → 占用属于我", isClaimOwner({ claimToken: "tk-1" }, "tk-1") === true);
-  check("🔴 令牌被别人覆盖 → 不属于我(本次作废,只会有一个胜者)",
-    isClaimOwner({ claimToken: "tk-2" }, "tk-1") === false);
-  check("落盘没有令牌(老数据)→ 不算我的", isClaimOwner({ }, "tk-1") === false);
-  check("读不到计数器 → 不算我的", isClaimOwner(null, "tk-1") === false && isClaimOwner(undefined, "tk-1") === false);
-  check("空令牌不匹配任何东西(防 undefined === undefined 误判成占到)",
-    isClaimOwner({ claimToken: undefined }, "") === false && isClaimOwner({ claimToken: "" }, "") === false);
-  check("🔴 todayCountFrom 对 NaN 也返回 0(读盘与判定两层都挡)",
-    todayCountFrom(C(today, NaN), NOW) === 0);
-  check("落盘计数是负数 → 当 0", claimDailySlot(C(today, -3), 1, NOW).allowed === true);
-
-  // 平台时区:越南 UTC+7。权威市场的「一天」才是用户的一天。
-  check("平台时区偏移 = UTC+7(越南)", PLATFORM_UTC_OFFSET_HOURS === 7);
-  check("🔴 平台日边界落在越南当地 0 点",
-    (() => { const reset = nextDayResetAt(NOW); return (reset + 7 * 3600 * 1000) % (24 * 3600 * 1000) === 0; })());
-  check("🔴 重置时刻永远在未来 24h 内(不会算成过去或跳一天)",
-    (() => { const d = nextDayResetAt(NOW) - NOW; return d > 0 && d <= 24 * 3600 * 1000; })());
-  check("越南当地 23:59 与次日 00:01 分属两天",
+  // ① 计数本身
+  check("今日 1 笔 → 数出 1", countWithdrawalsOnPlatformDay(rows(NOW), NOW) === 1);
+  check("今日 3 笔 → 数出 3", countWithdrawalsOnPlatformDay(rows(NOW, NOW, NOW), NOW) === 3);
+  check("空列表 / 没有列表 → 0",
+    countWithdrawalsOnPlatformDay([], NOW) === 0
+      && countWithdrawalsOnPlatformDay(null, NOW) === 0
+      && countWithdrawalsOnPlatformDay(undefined, NOW) === 0);
+  // 🔴 异常在本条里接住,不许冒泡:红测实证,去掉被测的那道边界校验时 for...of 会真的抛,
+  // 未捕获的话整个文件当场中止 —— 本条之后的几十条断言一条都不会跑,别的回归被顺带藏掉
+  // (「fail-fast 把后续门静默停摆」那族坑)。接住 = 干净地报这一条红,其余照跑。
+  check("🔴 列表不是数组(存储被写坏)→ 0,不抛异常把整页判定带崩",
     (() => {
-      const localMidnight = nextDayResetAt(NOW);
-      return platformDayIndex(localMidnight - 60_000) !== platformDayIndex(localMidnight + 60_000);
+      try {
+        return countWithdrawalsOnPlatformDay("nope", NOW) === 0
+          && countWithdrawalsOnPlatformDay({ length: 9 }, NOW) === 0;
+      } catch { return false; }
     })());
-  check("🔴 [随机] 任意时刻:重置点属于次日、且当刻属于今日",
+  check("🔴 submittedAt 是坏值的行被跳过,不算进今日(算多的方向是把用户锁死)",
+    countWithdrawalsOnPlatformDay([{ submittedAt: NaN }, { submittedAt: Infinity }, { submittedAt: undefined }, null], NOW) === 0);
+  check("坏行与好行混在一起:只数好行",
+    countWithdrawalsOnPlatformDay([{ submittedAt: NaN }, { submittedAt: NOW }, null, { submittedAt: NOW }], NOW) === 2);
+
+  // ② 平台日边界(UTC+7)—— 四个固定靶钉死今日的左闭右开区间
+  check("🔴 边界:平台日最后 1 毫秒提交的单**算今天**",
+    countWithdrawalsOnPlatformDay(rows(RESET - 1), NOW) === 1);
+  check("🔴 边界:平台日 0 点整提交的单**算明天**(不占今日额度)",
+    countWithdrawalsOnPlatformDay(rows(RESET), NOW) === 0);
+  check("🔴 边界:今日第 1 毫秒提交的单算今天",
+    countWithdrawalsOnPlatformDay(rows(RESET - DAY), NOW) === 1);
+  check("🔴 边界:昨日最后 1 毫秒提交的单算昨天",
+    countWithdrawalsOnPlatformDay(rows(RESET - DAY - 1), NOW) === 0);
+  check("🔴 边界是**平台**日不是 UTC 日(把偏移当 0 会数错这一格)",
+    (() => {
+      // 越南当地 0 点的那一刻,UTC 还停在前一天 17:00 —— 若判定按 UTC 切日,
+      // 这两个时刻会被判成同一天,本条即红。
+      const utcMidnightToday = Math.floor(NOW / DAY) * DAY;
+      return PLATFORM_UTC_OFFSET_HOURS !== 0
+        && platformDayIndex(RESET - 1) !== platformDayIndex(RESET)
+        && platformDayIndex(utcMidnightToday) === platformDayIndex(utcMidnightToday + PLATFORM_UTC_OFFSET_HOURS * HOUR - 1);
+    })());
+  check("下次重置时间 = 下一个平台日的起点",
+    nextDayResetAt(NOW) === (platformDayIndex(NOW) + 1) * DAY - PLATFORM_UTC_OFFSET_HOURS * HOUR);
+  check("平台时区偏移 = UTC+7(越南)", PLATFORM_UTC_OFFSET_HOURS === 7);
+  check("🔴 [随机] 任意时刻:重置点属于次日、且落在未来 24h 内(不会算成过去或跳一天)",
     (() => {
       let seed = 777, bad = 0;
       for (let i = 0; i < 5000; i++) {
@@ -437,10 +401,57 @@ check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕�
         const ts = 1.5e12 + (seed / 0x7fffffff) * 6e11;
         const reset = nextDayResetAt(ts);
         if (platformDayIndex(reset) !== platformDayIndex(ts) + 1) bad++;
-        if (reset <= ts || reset - ts > 24 * 3600 * 1000) bad++;
+        if (reset <= ts || reset - ts > DAY) bad++;
       }
       return bad === 0;
     })());
+
+  // ③ 端到端判定:恰好到达上限的固定靶
+  check("🔴 上限 1 / 今日 0 笔 → 可提", withRows([], 1).canSubmit === true);
+  check("🔴 上限 1 / 今日**恰好** 1 笔 → 不可提(不建单不扣款)",
+    withRows(rows(NOW), 1).canSubmit === false && withRows(rows(NOW), 1).dailyLimitReached === true);
+  check("🔴 上限 3 / 今日 2 笔 → 可提(差一格时不许提前拦)",
+    withRows(rows(NOW, NOW), 3).canSubmit === true && withRows(rows(NOW, NOW), 3).dailyLimitReached === false);
+  check("🔴 上限 3 / 今日**恰好** 3 笔 → 不可提",
+    withRows(rows(NOW, NOW, NOW), 3).canSubmit === false);
+  check("超出上限也判不可提(列表被塞多也拦得住)",
+    withRows(rows(NOW, NOW, NOW, NOW), 3).canSubmit === false);
+  check("🔴 运营把上限从 1 调到 3 → 今日已 1 笔仍可提(限额跟着服务端 policy 实时走)",
+    withRows(rows(NOW), 3).canSubmit === true);
+  check("🔴 昨天的单不占今天的额度",
+    withRows(rows(RESET - DAY - 1, RESET - DAY - 2), 1).canSubmit === true);
+  check("🔴 边界固定靶:上限 1 + 昨日最后 1 毫秒 1 笔 → 可提;换成今日最后 1 毫秒 → 不可提",
+    withRows(rows(RESET - DAY - 1), 1).canSubmit === true
+      && withRows(rows(RESET - 1), 1).canSubmit === false);
+  check("🔴 上限 ≤0 / 非法(未配置、policy 取不到)→ 不限制,不把提现锁死",
+    withRows(rows(NOW, NOW, NOW), 0).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), -1).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), NaN).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), undefined).canSubmit === true);
+  check("🔴 上限被下发成字符串 \"1\" 也不误判成已达上限(判据只认有限数)",
+    withRows(rows(NOW), "1").canSubmit === true);
+  check("🔴 达上限时不改路由(只挡提交)—— 路由仍反映真实风控裁决",
+    withRows(rows(NOW), 1).route === withRows([], 1).route);
+
+  // ④ 两个页面同一判据:追踪页走 isDailyLimitReached,提现页走 decideFromStores,
+  //    两者必须永远同答。历史上它们各挂一份实现,配置被下发成字符串时结论相反 ——
+  //    追踪页说能提、提现页说不能提。
+  check("🔴 [随机] 追踪页判据与提现页判定恒等(两页不许各说各话)",
+    (() => {
+      let seed = 20260811, bad = 0;
+      for (let i = 0; i < 2000; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        const n = seed % 5;
+        const limit = (seed >> 5) % 4;
+        const list = Array.from({ length: n }, (_, k) => ({
+          submittedAt: (seed >> 9) % 2 === 0 ? NOW : RESET - DAY - 1 - k,
+        }));
+        if (isDailyLimitReached(list, limit, NOW) !== withRows(list, limit).dailyLimitReached) bad++;
+      }
+      return bad === 0;
+    })());
+  check("🔴 判据只有一份:isDailyLimitReached 与 isOverDailyCap∘countWithdrawalsOnPlatformDay 同答",
+    isDailyLimitReached(rows(NOW), 1, NOW) === isOverDailyCap(countWithdrawalsOnPlatformDay(rows(NOW), NOW), 1));
 }
 
 /**
@@ -481,7 +492,6 @@ function functionBody(src, sig) {
   const readSrc = (rel) => readFileSync(path.join(root, rel), "utf8");
   const appSrc = readSrc("src/store/app.ts");
   const elgSrc = readSrc("src/store/withdrawal-eligibility.ts");
-  const cntSrc = readSrc("src/store/withdraw-daily-count.ts");
 
   // z1 判决 C(2026-08-10):submitWithdrawal 客户端占额度/扣款/落盘/重放链随 c37e642
   // 整体让渡后端事务,本组接线断言(claimWithdrawSlot 占额度 / claim 先于建单 /
@@ -602,29 +612,63 @@ function functionBody(src, sig) {
     })());
   check("🔴 commitWithdrawal 不再事后计数(挪回去 = 把并发漏洞放回去)",
     !/bumpWithdrawCounter\s*\(/.test(elgSrc));
-  // 【z1 R2 独立审计 P0-1,2026-08-10】原三条断言(claimDailySlot 判定来源 / 写后回读验令牌 /
-  // CLAIM_SETTLE_MS ≥100ms)钉的是 claimWithdrawSlot 的**内部实现**,而 c37e642 之后
-  // 该函数在 src/ 全站零调用 —— 绿着守死代码(与本包判定 appendLedgerEntry 空壳同病)。
-  // 🔴 更重的是它连带的活缺陷:计数器无人递增 → todayWithdrawCount 恒 0 →
-  //    dailyLimitReached 恒 false,而页面仍在渲染「每日最多 N 笔」并留着置灰分支。
-  //    日限的真正执行方已是服务端(policy.dailyLimitCount);客户端预检形同虚设。
-  //    产品侧修法(从服务端镜像的提现列表按平台日现算)已记 HANDOFF,不在本包动。
-  // 这里改守「死透」+「复活必须连门一起复活」:任何人重新接线 claimWithdrawSlot,
-  // 这条会红,逼他把上面三条实现级断言一并恢复(知识留在机器里,不留在人脑里)。
+  // ── 日限接线门(z1 审计 P0-1 的回归门,2026-08-11)────────────────
+  // 判定层已被上面 §7 的行为断言全覆盖;这里守的是**接没接上、接的是不是那个源**。
+  // 缺陷史:计数器无人递增(判定恒 0)+ 文案取服务端 policy 而判定取本地 config
+  // (同一个「每日 N 笔」有两个数)。两处都是「判定对 ≠ 接对」,只有源码级判据守得住。
   {
+    const pgSrc2 = readSrc("src/pages/me/wallet-withdraw.vue");
+    const trackSrc2 = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
     const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
       const p = path.join(dir, e.name);
       return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
     });
     const files = walk(path.join(root, "src"));
     // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
-    check(`🔴 claimWithdrawSlot 死态扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
-    const callers = files
-      .filter((p) => !p.endsWith(path.join("store", "withdraw-daily-count.ts")))
-      .filter((p) => /\bclaimWithdrawSlot\s*\(/.test(readFileSync(p, "utf8").replace(/^[ \t]*\/\/.*$/gm, "")))
+    check(`🔴 日限扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
+
+    // ① 计数源:唯一合法源是提现单列表。任何「再存一份计数」的写法都必须红 ——
+    //    这正是缺陷的成因:计数器与真实提交是两份状态,递增点一删就永久掉队。
+    //    剥注释后再扫:本文件与源码的历史说明里都会提到这些名字。
+    const revived = files
+      .filter((p) => {
+        const s = stripComments(readFileSync(p, "utf8"));
+        return /\bclaimWithdrawSlot\s*\(|\breleaseWithdrawSlot\s*\(|\breadWithdrawCounter\s*\(|\bclaimDailySlot\s*\(|withdraw-daily-count/.test(s);
+      })
       .map((p) => path.relative(root, p).replace(/\\/g, "/"));
-    check("🔴 claimWithdrawSlot 仍无调用方(客户端日限已让渡服务端;若复活,须同批恢复其判定/回读/时长三条实现级断言)",
-      callers.length === 0, callers.join(", "));
+    check("🔴 本地日限计数器没有复活(计数唯一源 = 提现单列表;要再存一份计数就先来改这条门)",
+      revived.length === 0, revived.join(", "));
+
+    // ② 限额源:只许服务端 policy.dailyLimitCount。本地 config.withdrawRules 的远端同步
+    //    不覆盖 withdrawRules,取它等于按前端写死值拦人(服务端配 3 笔、客户端按 1 笔拦)。
+    const localLimitUsers = files
+      .filter((p) => /withdrawRules\s*[.?]*\.?\s*dailyWithdrawLimitCount|rules\.dailyWithdrawLimitCount/.test(stripComments(readFileSync(p, "utf8"))))
+      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
+    check("🔴 每日笔数上限不许再从本地 config.withdrawRules 取(唯一源 = 服务端 policy)",
+      localLimitUsers.length === 0, localLimitUsers.join(", "));
+
+    // ③ 两个页面都把「服务端限额 + 提现单列表」喂进判定。判据钉精确表达式,不钉关键词。
+    check("🔴 提现页:日限事实来自服务端 policy + app.withdrawals,且文案与闸共用同一个数",
+      pgSrc2.includes("limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,")
+        && pgSrc2.includes("withdrawals: app.withdrawals,")
+        && pgSrc2.includes("fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) })")
+        // 🔴 说不说这句 ⟺ 闸拦不拦。limitCount ≤0 时判定按「不限制」走,这句必须消失 ——
+        // 否则后端不可达时页面会写「每日限额:0 笔/日」(实景实测过的原话)。
+        && pgSrc2.includes('<text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>'));
+    check("🔴 提现页:显示判定与提交前复检都吃这份事实(少接一处 = 那条路径上的闸失效)",
+      (pgSrc2.match(/evaluateWithdrawal\(app\.accountKey, network\.value, boundAddress\.value, maxWithdrawable\.value, dailyFacts\.value,/g) || []).length === 2
+        && /requestWithdrawalEligibility\([\s\S]{0,400}?dailyFacts\.value,/.test(pgSrc2));
+    check("🔴 追踪页「再提一笔」与提现页同源(否则一页说能提、一页说不能提)",
+      trackSrc2.includes("dailyLimitStatus({")
+        && trackSrc2.includes("limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,")
+        && trackSrc2.includes("withdrawals: app.withdrawals,"));
+
+    // ④ 外壳仍然只转发:今日笔数在 core 现算,页面/外壳不许自己 filter 出一个数来
+    //    (外壳里留表达式 = 行为门覆盖不到那一层,这是本文件反复栽过的跟头)。
+    check("🔴 今日笔数在 core 现算,外壳只转发(外壳出现 filter/length 自算即红)",
+      elgSrc.includes("withdrawals: daily.withdrawals,")
+        && elgSrc.includes("dailyWithdrawLimitCount: daily.limitCount,")
+        && !/daily\.withdrawals\s*\.\s*(filter|length|reduce)/.test(stripComments(elgSrc)));
   }
   // 🔴 双向告知的接线门。判定再准,页面不接 = 用户看不见(走查实证:快车道跑了
   // 一整轮,表单一个字都没提,用户以为「提多少都要审」)。两条判据都必须来自判定结果。
@@ -644,7 +688,9 @@ function functionBody(src, sig) {
       const body = balancedBody(pgSrc, k);
       if (!body) return false;
       return body.includes('disabledReasonFor(smallAmountLine.value, smallLineDecision.value) === ""')
-        && pgSrc.includes("evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, smallAmountLine.value)")
+        // 假设金额那次评估必须**连日限事实一起**问 —— 少喂 dailyFacts 就等于拿一份
+        // 「日限恒不触发」的答案去劝用户降额,又回到 z1 P0-1 那个空头承诺。
+        && pgSrc.includes("evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value)")
         // 提交拦截本身必须是「入参为金额」的函数,否则 CTA 没法对假设金额问同一个问题
         && pgSrc.includes("function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string")
         && pgSrc.includes("const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));");
