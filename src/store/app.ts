@@ -1285,6 +1285,34 @@ export const useApp = defineStore("app", () => {
     );
     const canonical = toCanonicalWithdrawal(submission, address);
     withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+    // 🔴 建单成功**必须落盘**。此前这里只改内存:刷新一次单据就没了,而它同时是
+    // 「今日提了几笔」的唯一凭据(日限预检)与「有没有在途单」的唯一凭据(换址闸)——
+    // 按一下 F5 两道闸一起失效(z2 R1 独立审计实测)。本函数之外没有兜底:
+    // 全文件的周期性落盘在 remote 模式下早退,到账推进要等几小时后到点才写盘。
+    //
+    // 🔴 落盘失败要把这一单**放回内存**,而不是任其消失。
+    //
+    // 这里必须显式做,不能只写注释:`persistAccountSnapshot()` 内部**无条件**
+    // `adoptAccountSnapshot(result.snapshot)`,而 account-cloud 在写失败时返回的
+    // `snapshot` 是**磁盘上的旧行**(`stored ?? merged`)—— 于是刚建的这一单会被
+    // 静默地从内存抹掉。R2 独立审计两路各自注入实测复现;此前这段注释写的是
+    // 「失败不回滚」,与实际行为完全相反(本包第三次「注释声称了不存在的行为」)。
+    //
+    // 为什么是放回而不是接受回滚:单据是**服务端已经创建**的既成事实,抹掉它会让
+    // 用户跳到追踪页看见「查无此单」,而钱已经动了;这一单也会同时退出日限计数与
+    // 在途判定,连带把「在途期间禁止更换收款地址」那道闸一起架空。
+    // 落盘失败只是「刷新后会丢」,是降级;丢单是错乱,后者严重得多。
+    // 代价:内存有、磁盘无,直到下一次成功落盘补上。真闸在服务端,不会因此放行超额提现。
+    if (!persistAccountSnapshot()) {
+      withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+      // 🔴🔴 基准也要一起补,否则「放回内存」只活到下一次资金写为止。
+      // 兄弟资金原语(creditBalance / debitBalance / 奖励入账…)失败时一律
+      // `adoptAccountSnapshot(previousSnapshot)`,而 previousSnapshot 就是这个
+      // lastCloudSnapshot —— 它此刻还是**磁盘上那份不含本单的旧行**,回滚一次就把单又抹掉。
+      // 而触发它的条件(存储写不进去)与触发本分支的条件是**同一个**,所以必然连着发生。
+      // R3 独立审计在沙箱复现,我在真 store 上复验:放回=true → creditBalance 失败回滚 → 仍在=false。
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: withdrawals.value };
+    }
     // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
     // pre-check engine; the server keeps its own authoritative copy.
     commitWithdrawal(accountKey.value, network, address);

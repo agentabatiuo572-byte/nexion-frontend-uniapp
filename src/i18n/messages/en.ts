@@ -1993,8 +1993,8 @@ export const en = {
     confirmWithdraw: "Confirm Withdrawal",
     withdrawTrackingTitle: "Withdrawal in progress",
     submitted: "Submitted",
-    reviewPending: "Under manual review",
-    reviewPassed: "Review passed",
+    reviewPending: "Safety check in progress",
+    reviewPassed: "Check complete",
     processing: "Processing",
     sent: "Sent on-chain",
     confirmed: "Confirmed",
@@ -2006,16 +2006,16 @@ export const en = {
     syncFailedTitle: "Earnings settle after sync",
     syncFailedBody: "Platform settings could not sync just now. Settlement is paused and catches up automatically once restored — earned amounts are not affected.",
     pendingSheetTitle: "Earnings under review",
-    pendingSheetBody: "These earnings are recorded on your account and under review. They release after {hours} cumulative hours online in the app, or once manual review approves them; review does not pass automatically over time.",
+    pendingSheetBody: "These earnings are recorded on your account and under review. They release after {hours} cumulative hours online in the app, or once our safety check clears them; they do not clear automatically just by waiting.",
     lockedSheetTitle: "Locked rewards",
     lockedSheetBody: "These rewards are temporarily locked. Stay online in the app for {hours} cumulative hours to request release; items under investigation need manual handling first.",
     sheetOk: "Got it",
     heldBucketsLine: "Under review ${p} · Locked ${l} (not withdrawable)",
-    submitChecking: "Risk check in progress…",
+    submitChecking: "Safety check in progress…",
     riskCheckTimeoutTitle: "Check timed out",
     riskCheckTimeoutBody: "The network is unstable right now. Nothing was charged — please try again shortly.",
-    routeHeldFrozenTitle: "Withdrawal frozen",
-    routeHeldFrozenBody: "This withdrawal is under a risk hold. Funds stay frozen while it is handled; contact support if you need help.",
+    routeHeldFrozenTitle: "This withdrawal is paused",
+    routeHeldFrozenBody: "This withdrawal is paused. The amount stays held with the request — it has not been sent out, and it is not lost. Reach out to support any time.",
     riskReasons: {
       "dim-serverDeviceId": "Same device as another account",
       "dim-ipBucket": "Same network environment as another account",
@@ -2037,7 +2037,7 @@ export const en = {
       "high-risk-score": "Overall risk score is elevated",
       "shared-address": "Withdrawal address used by multiple accounts",
       "new-address-hold": "Newly added address is in a protection window",
-      "first-withdrawal-review": "First withdrawal requires manual confirmation",
+      "first-withdrawal-review": "Safety check on your first withdrawal",
     },
     topUpTitle: "Top-up",
     chooseMethod: "Choose method",
@@ -2062,14 +2062,14 @@ export const en = {
     timeMinutesAgo: "{n}m ago",
     timeHoursAgo: "{n}h ago",
     timeDaysAgo: "{n}d ago",
-    firstTimeReview: "First withdrawal requires manual confirmation.",
+    firstTimeReview: "We run one extra safety check on your first withdrawal, so it lands a little slower than usual.",
 
     fastLaneOnTitle: "This one processes right away",
     fastLaneOnBody: "Waived: {g}. It goes out on the standard timeline.",
     fastLaneCta: "Withdraw ${n} instead",
     waivedGates: {
       "new-address-hold": "the new-address hold",
-      "first-withdrawal-review": "the first-withdrawal review",
+      "first-withdrawal-review": "the safety check on your first withdrawal",
     },
     minWithdrawNote: "Minimum withdrawal: ${n}.",
 
@@ -2080,7 +2080,7 @@ export const en = {
     withdrawalNotFound: "This withdrawal's record could not be found.",
     submitNewWithdrawal: "Submit a new withdrawal →",
     trackSubmittedHint: "Request received",
-    trackReviewHint: "Automated screen + account review",
+    trackReviewHint: "Confirming your payout address",
     trackProcessingHint: "Preparing on-chain transaction",
     trackSentHint: "Transaction broadcast",
     trackConfirmedHint: "Funds delivered",
@@ -2103,17 +2103,17 @@ export const en = {
 
 
     trackSubmitAnother: "Withdraw again",
-    trackReviewNote: "First-time withdrawal · Automated + account review",
-    withdrawRouteReviewTitle: "Withdrawal will be reviewed",
+    trackReviewNote: "First withdrawal · Safety check in progress",
+    withdrawRouteReviewTitle: "This one needs a check first",
 
     withdrawRouteRejectTitle: "This one can't be submitted",
 
-    withdrawRouteRejectBody: "Your account state does not allow a withdrawal right now. No request is created and nothing is charged. Please contact support for help.",
+    withdrawRouteRejectBody: "Your account can not withdraw right now — nothing was moved and no request was created. Support can sort this out with you.",
 
     fastLaneUndo: "Undo — restore my original amount",
-    withdrawRouteReviewBody: "This receiving address has related account activity. The request can be submitted, but it will stay in review until checks are complete.",
-    withdrawRouteHeldTitle: "Review in progress",
-    withdrawRouteHeldSub: "The request is waiting for account and address review. It will not move forward automatically.",
+    withdrawRouteReviewBody: "This payout address is also linked to another account. To keep your funds safe we confirm this one before paying out — go ahead and submit as usual.",
+    withdrawRouteHeldTitle: "Safety check in progress",
+    withdrawRouteHeldSub: "We are confirming the payout address for this one. Nothing is paid out until that finishes.",
     withdrawBillMemoPass: "Withdraw to {network} · fee ${fee}",
     withdrawBillMemoReview: "Withdraw · additional review",
     withdrawNexFeeMemo: "Fee offset · {nex} NEX used (-${fee} fee)",
@@ -3585,6 +3585,8 @@ export const en = {
   walletV3: {
     needMoreNexToast: "Not enough NEX to offset the fee",
     withdrawFeeStale: "The fee rate has been updated — please try again",
+    submitUnknownTitle: "Submission result unconfirmed",
+    submitUnknownBody: "The connection dropped, so this withdrawal may already have gone through. Don't submit it again — check Withdrawal progress first, and only retry if it isn't there.",
     withdrawContextStale: "Your account or payout address changed — please submit again",
     earnNexCta: "Mine more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
@@ -3637,12 +3639,12 @@ export const en = {
 
     dailyLimitReached: "Daily withdrawal limit reached. Next withdrawal available {time}.",
     submitReasonAddressRequired: "Add a withdrawal address first.",
-    submitReasonReviewBlocked: "This request cannot be submitted right now.",
+    submitReasonReviewBlocked: "This one can't go through right now — try a different amount or come back shortly.",
 
     submitReasonInFlight: "Your previous withdrawal is still in progress. You can submit a new one once it completes.",
 
 
-    submitReasonUnderReview: "Your previous withdrawal is under manual review. You can submit a new one after it is resolved — contact support from the withdrawal status page for an update.",
+    submitReasonUnderReview: "Your last withdrawal is still going through its safety check. You can send another one as soon as that clears — support can give you an update from the withdrawal status page.",
     exchangePoolToday: "Platform pool today",
     // Sprint A-1 / B.2 — Reverse-talk staking alternative
     stakeAlt: {
@@ -5222,7 +5224,7 @@ export const en = {
     historyToggle: "View address history",
     historyReplacedAt: "Deactivated {time}",
     cancelCta: "Cancel",
-    reasonNewAddressAge: "Withdrawal address changed less than 7 days ago — large withdrawals require manual review",
+    reasonNewAddressAge: "Your payout address changed less than 7 days ago — we confirm large withdrawals first",
     startFailed: "Something went wrong. Please try again.",
   },
   learning: {

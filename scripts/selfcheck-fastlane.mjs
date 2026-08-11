@@ -29,10 +29,12 @@ const core = await import("data:text/javascript;base64," + Buffer.from(code, "ut
 // 第 3 轮复验教训:只测判定时,缝隙搬到了「取数/加工」那一层 ——
 // 外壳对纯函数撒谎(恒传 false、只在小额时隐瞒共用地址)同样能真免闸而哨兵全绿。
 // 现在加工也在 core 里,这里从原始事实喂进去,三层一起覆盖。
-const { decideFromStores, decideFromRawFacts, isFastLane, claimDailySlot, platformDayIndex, nextDayResetAt, todayCountFrom, PLATFORM_UTC_OFFSET_HOURS, isClaimOwner, MAX_SANE_DAILY_COUNT } = core;
+const { decideFromStores, decideFromRawFacts, isFastLane, platformDayIndex, nextDayResetAt, countWithdrawalsOnPlatformDay, isDailyLimitReached, isOverDailyCap, PLATFORM_UTC_OFFSET_HOURS } = core;
 
 let pass = 0;
 let fail = 0;
+/** 各随机层的**实测**覆盖指标。汇总行打它,而不是打循环上界(族 B 的根治)。 */
+const selfProof = {};
 function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
@@ -64,7 +66,7 @@ function base(over = {}) {
     minWithdrawableUsdt: 20,
     sameAddressRoute: "manual",
     firstWithdrawalManual: true,
-    withdrawCounter: null,
+    withdrawals: [],
     dailyWithdrawLimitCount: 0,
     ...over,
   };
@@ -100,7 +102,7 @@ function toSnapshot(f) {
     minWithdrawableUsdt: f.minWithdrawableUsdt,
     sameAddressRoute: f.sameAddressRoute,
     firstWithdrawalManual: f.firstWithdrawalManual,
-    withdrawCounter: f.withdrawCounter,
+    withdrawals: f.withdrawals,
     dailyWithdrawLimitCount: f.dailyWithdrawLimitCount,
   };
 }
@@ -235,9 +237,29 @@ for (const [label, over, wantRoute, wantReason] of RISK_CASES) {
 // 改法:不再试图枚举维度,而是**每个维度都随机取样**。攻击者无法预知会抽到什么,
 // 任何「在某组输入下才放行」的隐藏条件,只要被抽中一次就暴露。
 // 不变量(与免审无关,恒成立):**任一风控闸命中 → 路由至少和该闸要求的一样严**。
+/**
+ * 🔴🔴 确定性随机源(2026-08-11 R2 结构性反思,族 B)。
+ *
+ * 原来用的是 `seed = (seed * 1103515245 + 12345) & 0x7fffffff` —— 这一句在 JS 里是**坏的**:
+ * 乘积最大 2.37e18,远超双精度安全整数 9.01e15,低位在浮点乘法里被抹平。实测后果:
+ * **序列周期只有约 10,466 次取样**(之后逐条精确重复),**低 8 位有 73.8% 恒为 0**。
+ * 于是「20000 组随机取样」实际只有四百多组不同样本 —— PASS 行上的数字是**声明的循环次数**,
+ * 不是**实际的覆盖**。R2 独立审计实测抓出,我复跑确认。
+ *
+ * 换成 mulberry32:全部运算走 `Math.imul` 与位运算,恒在 32 位内,不碰浮点精度;
+ * 周期 2^32。同样是确定性的(同一种子同一序列),可复现性不变。
+ */
+function mulberry32(seedValue) {
+  let a = seedValue | 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 const SEED0 = 0x2f6e2b1;
-let seed = SEED0;
-const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const rnd = mulberry32(SEED0);
 const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 // 🔴 连续取值。第 5 轮复验证明:pick([...]) 是**有限集合**,
 // 「挂在清单之间的开区间」或「清单之外的值」上的免权,加到 2000 万组仍是 0 命中 ——
@@ -255,12 +277,15 @@ const REASON_ORDER = [
 ];
 
 let violations = [];
+const sampleFingerprints = new Set();
 const SAMPLES = 20000;
 for (let i = 0; i < SAMPLES; i++) {
   const threshold = rnd() < 0.15 ? 0 : mix(1, 2000, [20, 50, 200, 1000]);
+  // now 先算出来:下面的提现单时间戳要相对它取(同一组样本里时钟与单据必须同一个基准)
+  const f0now = Math.floor(rnd() * 4_000_000_000_000) + 1_000_000_000_000;
   const f = {
     // now 随机跨全天 + 跨月,直接打掉时间炸弹这一类
-    now: Math.floor(rnd() * 4_000_000_000_000) + 1_000_000_000_000,
+    now: f0now,
     clusterStatus: pick(["clear", "watch", "flagged", "frozen", "released"]),
     clusterScore: mix(0, 1, [0, 0.5, 0.7, 0.9, 1]),
     freezeSuggestThreshold: mix(0.3, 1, [0.5, 0.7, 0.9]),
@@ -276,8 +301,17 @@ for (let i = 0; i < SAMPLES; i++) {
     minWithdrawableUsdt: mix(0, 200, [10, 20, 75]),
     sameAddressRoute: pick(["delay", "manual", "freeze"]),
     firstWithdrawalManual: rnd() < 0.5,
-    withdrawCounter: null,
-    dailyWithdrawLimitCount: 0,
+    // 🔴 这两行一度是**死字段**:数据结构从「落盘计数器」换成「提现单列表」时我漏改了这里,
+    //    `withdrawCounter` 早已没人读(toSnapshot 读的是 withdrawals),而 limit 恒 0 = 恒不限制。
+    //    于是这两万组随机取样对日限**一格都没跑**,字段名却留着,读起来像已覆盖 ——
+    //    「哨兵假绿」最难发现的那一种(R1 独立审计抓出)。现在两者都随机化,并入 must 列表。
+    withdrawals: Array.from({ length: mixInt(0, 9, [0, 1, 2, 5]) }, () => ({
+      submittedAt: rnd() < 0.5 ? f0now : f0now - mixInt(1, 5, [1, 2]) * DAY,
+    })),
+    // 上限域取到 12:服务端契约(parsePolicy)只要求 ≥1 的整数、**无上界**,
+    // 域取太窄会让「上限大于某个数就失效」这类破坏天然测不到(R2 实测 1..4 时 `<6` 全绿)。
+    // 列表深度这一面交给 §7⑤ 的 property 层(那边 0..300),这里保持小而快。
+    dailyWithdrawLimitCount: rnd() < 0.2 ? 0 : mixInt(1, 12, [1, 2, 3, 10]),
   };
   f.freezeUntil = pick([undefined, f.now - 1000, f.now + 3600_000]);
   f.bindingVerifiedAt = pick([undefined, f.now - 1000, f.now - 40 * DAY]);
@@ -329,107 +363,98 @@ for (let i = 0; i < SAMPLES; i++) {
   if (!r.fastLaneApplied && r.waivedGates.length > 0) {
     violations.push(`#${i} 未走快车道却记了免闸 ${JSON.stringify(r.waivedGates)}`);
   }
+  // 🔴 日限并入 must:上限 >0 且今日笔数够,就必须拦;不够就必须不拦。
+  // 独立算一遍今日笔数(不调被测函数),这一层才真的在验日限而不是空转。
+  const dayOf = (t) => Math.floor((t + PLATFORM_UTC_OFFSET_HOURS * 3600 * 1000) / DAY);
+  const todayRows = f.withdrawals.filter((w) => dayOf(w.submittedAt) === dayOf(f.now)).length;
+  const wantReached = f.dailyWithdrawLimitCount > 0 && todayRows >= f.dailyWithdrawLimitCount;
+  if (r.dailyLimitReached !== wantReached) {
+    violations.push(`#${i} 日限判定错:今日 ${todayRows} 笔 / 上限 ${f.dailyWithdrawLimitCount} → 实得 ${r.dailyLimitReached}`);
+  }
+  if (wantReached && r.canSubmit) {
+    violations.push(`#${i} 日限已达却仍 canSubmit`);
+  }
+  // 指纹:量**实际覆盖**。旧发生器退化时,这个数会从两万塌到几百而循环次数纹丝不动。
+  sampleFingerprints.add(`${r.route}|${r.fastLaneApplied ? 1 : 0}|${r.waivedGates.length}|${r.riskReasons.length}|${r.dailyLimitReached ? 1 : 0}|${todayRows}|${f.dailyWithdrawLimitCount}`);
   if (violations.length > 6) break;
 }
-check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕过(含随机时钟,打掉时间炸弹)`,
-  violations.length === 0, violations.slice(0, 6).join(" | "));
+selfProof.s6 = { rounds: SAMPLES, fingerprints: sampleFingerprints.size };
+// 🔴🔴 判据里带上**实测指纹数**下限:光有「跑了 20000 轮」证明不了覆盖 ——
+// R2 实测旧发生器周期只有 ~10,466 次取样,两万轮里只有四百多组不同样本,而 PASS 行照报两万。
+check(`🔴 随机取样 ${SAMPLES} 组(实测 ${sampleFingerprints.size} 种不同结果指纹):任一风控闸命中必不被免审绕过`,
+  violations.length === 0 && sampleFingerprints.size >= 400,
+  violations.slice(0, 6).join(" | ") || `指纹只有 ${sampleFingerprints.size} 种,随机源可能已退化`);
 
-// ── 7. FEAT-WD01b 每日提现笔数上限 ──────────────────────
-// 不变量:达上限 → canSubmit=false(**不建单不扣款**,与换绑冻结同档);
-// 跨日自动归零;上限 ≤0 视为未配置不限制(防坏配置把提现锁死)。
+// ── 7. FEAT-WD01b 每日提现笔数上限(计数源 = 提现单列表)──────────
+// 不变量:今日笔数 = 提现单列表里 submittedAt 落在**平台日**(越南 UTC+7)内的行数;
+// 达上限 → canSubmit=false(**不建单不扣款**,与换绑冻结同档);跨日自动归零;
+// 上限 ≤0 / 非法 视为未配置 → 不限制(坏配置、后端不可达都不该把提现锁死)。
+//
+// 🔴 本节是 z1 审计 P0-1 的回归门。旧实现把笔数存在一个独立计数器里,由建单前的
+//    claimWithdrawSlot 递增;c37e642 把建单让渡服务端事务后那个递增点随本地扣款链被删,
+//    计数器从此无人写 → 读出恒空 → todayWithdrawCount 恒 0 → dailyLimitReached 恒 false,
+//    而页面仍在渲染「每日最多 N 笔」并留着置灰分支(四处承诺全不可达)。
+//    改成从单据现算后,「提交成功」与「计数 +1」是**同一件事**,没有第二份状态可以掉队。
 {
-  const { todayCountFrom, platformDayIndex, nextDayResetAt } = core;
-  const today = platformDayIndex(NOW);
+  const RESET = nextDayResetAt(NOW);       // 下一个平台日 0 点(越南当地),即今日的右开边界
+  const rows = (...ts) => ts.map((t) => ({ submittedAt: t }));
+  const withRows = (list, limit) =>
+    decideFromStores({ ...toSnapshot(base({})), withdrawals: list, dailyWithdrawLimitCount: limit });
 
-  check("落盘计数器是今天 → 返回该计数", todayCountFrom({ dayIndex: today, count: 2 }, NOW) === 2);
-  check("落盘计数器是昨天 → 归零(跨日自动重置,无需定时清理)",
-    todayCountFrom({ dayIndex: today - 1, count: 9 }, NOW) === 0);
-  check("从未落盘 → 0", todayCountFrom(null, NOW) === 0 && todayCountFrom(undefined, NOW) === 0);
-  check("负数计数被夹到 0(坏数据不放大额度)",
-    todayCountFrom({ dayIndex: today, count: -5 }, NOW) === 0);
-  // 平台日按越南 UTC+7 切(不是 UTC)—— 断言写成「下一日序的起点」而不是写死 UTC 整点,
-  // 这样偏移改了断言仍然表达同一件事(第 5 轮教训:固定靶会随实现漂移变成假绿)。
-  check("下次重置时间 = 下一个平台日的起点",
-    nextDayResetAt(NOW) === (today + 1) * 24 * 3600 * 1000 - PLATFORM_UTC_OFFSET_HOURS * 3600 * 1000);
-
-  const withCounter = (count, limit) =>
-    decideFromStores({ ...toSnapshot(base({})), withdrawCounter: { dayIndex: today, count }, dailyWithdrawLimitCount: limit });
-
-  check("🔴 今日 0 笔 / 上限 1 → 可提", withCounter(0, 1).canSubmit === true);
-  check("🔴 今日 1 笔 / 上限 1 → 不可提(不建单不扣款)",
-    withCounter(1, 1).canSubmit === false && withCounter(1, 1).dailyLimitReached === true);
-  check("🔴 超出上限也判不可提(计数被外部改大也拦得住)", withCounter(9, 1).canSubmit === false);
-  check("运营把上限调到 3 → 今日已 1 笔仍可提(参数实时生效)",
-    withCounter(1, 3).canSubmit === true && withCounter(1, 3).dailyLimitReached === false);
-  check("上限 0(未配置)→ 不限制,不把提现锁死", withCounter(99, 0).canSubmit === true);
-  check("昨日的计数不影响今天",
-    decideFromStores({ ...toSnapshot(base({})), withdrawCounter: { dayIndex: today - 1, count: 99 }, dailyWithdrawLimitCount: 1 }).canSubmit === true);
-  check("🔴 达上限时不改路由(只挡提交)—— 路由仍反映真实风控裁决",
-    withCounter(1, 1).route === withCounter(0, 1).route);
-}
-
-// ── 8. FEAT-WD01b 额度占用(并发面正解)+ 平台时区 ──────────
-// 🔴 本节是 2026-07-31 独立验收 AC3 FAIL 的回归门。原实现「查 → 600ms 风控评估
-//    → 建单 → 才 +1」,两个标签页 3 轮 3 中各自建单。改成**建单前先占**后,
-//    「准不准」与「占完剩多少」都在 claimDailySlot 这一个纯函数里,可直接行为验。
-{
-  const C = (dayIndex, count) => ({ dayIndex, count });
-  const today = platformDayIndex(NOW);
-
-  check("🔴 首次占用:今日 0 笔 / 上限 1 → 准,计数落 1",
-    (() => { const r = claimDailySlot(null, 1, NOW); return r.allowed === true && r.next.count === 1 && r.next.dayIndex === today; })());
-  check("🔴 第二次占用:今日 1 笔 / 上限 1 → **不准**,计数不涨",
-    (() => { const r = claimDailySlot(C(today, 1), 1, NOW); return r.allowed === false && r.next.count === 1; })());
-  check("🔴 不准时计数不递增 —— 被拒的提交不该白吃额度",
-    claimDailySlot(C(today, 5), 1, NOW).next.count === 5);
-  check("上限 3:第 2、3 笔准,第 4 笔拒",
-    claimDailySlot(C(today, 1), 3, NOW).allowed && claimDailySlot(C(today, 2), 3, NOW).allowed
-      && !claimDailySlot(C(today, 3), 3, NOW).allowed);
-  check("跨日:昨日计数不占今日额度,占用后从 1 重新计",
-    (() => { const r = claimDailySlot(C(today - 1, 9), 1, NOW); return r.allowed && r.next.count === 1 && r.next.dayIndex === today; })());
-  check("上限 0(未配置)→ 一直准,但计数照记(留审计痕迹)",
-    (() => { const r = claimDailySlot(C(today, 7), 0, NOW); return r.allowed && r.next.count === 8; })());
-  check("上限为 NaN / 负数 → 当未配置,不锁死提现",
-    claimDailySlot(C(today, 7), NaN, NOW).allowed && claimDailySlot(C(today, 7), -1, NOW).allowed);
-  check("🔴 落盘计数是 NaN → 当 0(NaN >= 上限 恒 false,不挡就等于当天没限额)",
-    (() => { const r = claimDailySlot(C(today, NaN), 1, NOW); return r.allowed && r.next.count === 1; })());
-  // 🔴 消毒必须对称:小值坏数据让额度失效,大值坏数据把提现锁死 —— 两个方向都得挡。
-  // 复验实测:count=1e9 时当天一笔也提不出来(12 种注入里唯一的 FAIL 类型)。
-  check("🔴 落盘计数是荒谬大值(1e9)→ 当 0,不把当天提现锁死",
-    (() => { const r = claimDailySlot(C(today, 1e9), 1, NOW); return r.allowed && r.next.count === 1; })());
-  check("🔴 落盘计数是 Number.MAX_VALUE → 当 0,不锁死",
-    claimDailySlot(C(today, Number.MAX_VALUE), 1, NOW).allowed === true);
-  check("🔴 落盘计数是小数(非整数)→ 当 0(坏数据)",
-    todayCountFrom(C(today, 2.5), NOW) === 0);
-  check("合理范围内的计数照常生效(上限内不误伤)",
-    todayCountFrom(C(today, 3), NOW) === 3 && todayCountFrom(C(today, MAX_SANE_DAILY_COUNT), NOW) === MAX_SANE_DAILY_COUNT);
-  check("恰好超过合理上限一格 → 当 0",
-    todayCountFrom(C(today, MAX_SANE_DAILY_COUNT + 1), NOW) === 0);
-
-  // 令牌归属:跨标签页竞争的胜负判据
-  check("🔴 令牌一致 → 占用属于我", isClaimOwner({ claimToken: "tk-1" }, "tk-1") === true);
-  check("🔴 令牌被别人覆盖 → 不属于我(本次作废,只会有一个胜者)",
-    isClaimOwner({ claimToken: "tk-2" }, "tk-1") === false);
-  check("落盘没有令牌(老数据)→ 不算我的", isClaimOwner({ }, "tk-1") === false);
-  check("读不到计数器 → 不算我的", isClaimOwner(null, "tk-1") === false && isClaimOwner(undefined, "tk-1") === false);
-  check("空令牌不匹配任何东西(防 undefined === undefined 误判成占到)",
-    isClaimOwner({ claimToken: undefined }, "") === false && isClaimOwner({ claimToken: "" }, "") === false);
-  check("🔴 todayCountFrom 对 NaN 也返回 0(读盘与判定两层都挡)",
-    todayCountFrom(C(today, NaN), NOW) === 0);
-  check("落盘计数是负数 → 当 0", claimDailySlot(C(today, -3), 1, NOW).allowed === true);
-
-  // 平台时区:越南 UTC+7。权威市场的「一天」才是用户的一天。
-  check("平台时区偏移 = UTC+7(越南)", PLATFORM_UTC_OFFSET_HOURS === 7);
-  check("🔴 平台日边界落在越南当地 0 点",
-    (() => { const reset = nextDayResetAt(NOW); return (reset + 7 * 3600 * 1000) % (24 * 3600 * 1000) === 0; })());
-  check("🔴 重置时刻永远在未来 24h 内(不会算成过去或跳一天)",
-    (() => { const d = nextDayResetAt(NOW) - NOW; return d > 0 && d <= 24 * 3600 * 1000; })());
-  check("越南当地 23:59 与次日 00:01 分属两天",
+  // ① 计数本身
+  check("今日 1 笔 → 数出 1", countWithdrawalsOnPlatformDay(rows(NOW), NOW) === 1);
+  check("今日 3 笔 → 数出 3", countWithdrawalsOnPlatformDay(rows(NOW, NOW, NOW), NOW) === 3);
+  check("空列表 / 没有列表 → 0",
+    countWithdrawalsOnPlatformDay([], NOW) === 0
+      && countWithdrawalsOnPlatformDay(null, NOW) === 0
+      && countWithdrawalsOnPlatformDay(undefined, NOW) === 0);
+  // 🔴 异常在本条里接住,不许冒泡:红测实证,去掉被测的那道边界校验时 for...of 会真的抛,
+  // 未捕获的话整个文件当场中止 —— 本条之后的几十条断言一条都不会跑,别的回归被顺带藏掉
+  // (「fail-fast 把后续门静默停摆」那族坑)。接住 = 干净地报这一条红,其余照跑。
+  check("🔴 列表不是数组(存储被写坏)→ 0,不抛异常把整页判定带崩",
     (() => {
-      const localMidnight = nextDayResetAt(NOW);
-      return platformDayIndex(localMidnight - 60_000) !== platformDayIndex(localMidnight + 60_000);
+      try {
+        return countWithdrawalsOnPlatformDay("nope", NOW) === 0
+          && countWithdrawalsOnPlatformDay({ length: 9 }, NOW) === 0;
+      } catch { return false; }
     })());
-  check("🔴 [随机] 任意时刻:重置点属于次日、且当刻属于今日",
+  check("🔴 submittedAt 是坏值的行被跳过,不算进今日(算多的方向是把用户锁死)",
+    countWithdrawalsOnPlatformDay([{ submittedAt: NaN }, { submittedAt: Infinity }, { submittedAt: undefined }, null], NOW) === 0);
+  // ⚠️ 这条**记录现状,不是保护**(措辞要诚实,否则读的人会以为这一面被守着):
+  // 时间戳若是字符串 / ISO / Date,当日单会被静默计 0 —— 日限于是再次失效,与本包修的
+  // 缺陷同型同样无声。加 typeof/isFinite 消毒**救不了**(消毒的结果同样是 0,红测两次实证
+  // 加与不加没有任何断言变化)。真正的解在契约层:HANDOFF U-7。
+  // 留这条靶是为了:后端契约一旦改成字符串,谁来动这里时能一眼看见这个已知代价。
+  check("⚠️ [现状记录·非保护] 时间戳为字符串 / ISO / Date 时静默计 0(契约风险见 HANDOFF U-7)",
+    countWithdrawalsOnPlatformDay([{ submittedAt: String(NOW) }], NOW) === 0
+      && countWithdrawalsOnPlatformDay([{ submittedAt: new Date(NOW).toISOString() }], NOW) === 0
+      // 混排时真数字那行必须照常算到 —— 这一半是真判据
+      && countWithdrawalsOnPlatformDay([{ submittedAt: String(NOW) }, { submittedAt: NOW }], NOW) === 1);
+  check("坏行与好行混在一起:只数好行",
+    countWithdrawalsOnPlatformDay([{ submittedAt: NaN }, { submittedAt: NOW }, null, { submittedAt: NOW }], NOW) === 2);
+
+  // ② 平台日边界(UTC+7)—— 四个固定靶钉死今日的左闭右开区间
+  check("🔴 边界:平台日最后 1 毫秒提交的单**算今天**",
+    countWithdrawalsOnPlatformDay(rows(RESET - 1), NOW) === 1);
+  check("🔴 边界:平台日 0 点整提交的单**算明天**(不占今日额度)",
+    countWithdrawalsOnPlatformDay(rows(RESET), NOW) === 0);
+  check("🔴 边界:今日第 1 毫秒提交的单算今天",
+    countWithdrawalsOnPlatformDay(rows(RESET - DAY), NOW) === 1);
+  check("🔴 边界:昨日最后 1 毫秒提交的单算昨天",
+    countWithdrawalsOnPlatformDay(rows(RESET - DAY - 1), NOW) === 0);
+  check("🔴 边界是**平台**日不是 UTC 日(把偏移当 0 会数错这一格)",
+    (() => {
+      // 越南当地 0 点的那一刻,UTC 还停在前一天 17:00 —— 若判定按 UTC 切日,
+      // 这两个时刻会被判成同一天,本条即红。
+      const utcMidnightToday = Math.floor(NOW / DAY) * DAY;
+      return PLATFORM_UTC_OFFSET_HOURS !== 0
+        && platformDayIndex(RESET - 1) !== platformDayIndex(RESET)
+        && platformDayIndex(utcMidnightToday) === platformDayIndex(utcMidnightToday + PLATFORM_UTC_OFFSET_HOURS * HOUR - 1);
+    })());
+  check("下次重置时间 = 下一个平台日的起点",
+    nextDayResetAt(NOW) === (platformDayIndex(NOW) + 1) * DAY - PLATFORM_UTC_OFFSET_HOURS * HOUR);
+  check("平台时区偏移 = UTC+7(越南)", PLATFORM_UTC_OFFSET_HOURS === 7);
+  check("🔴 [随机] 任意时刻:重置点属于次日、且落在未来 24h 内(不会算成过去或跳一天)",
     (() => {
       let seed = 777, bad = 0;
       for (let i = 0; i < 5000; i++) {
@@ -437,10 +462,149 @@ check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕�
         const ts = 1.5e12 + (seed / 0x7fffffff) * 6e11;
         const reset = nextDayResetAt(ts);
         if (platformDayIndex(reset) !== platformDayIndex(ts) + 1) bad++;
-        if (reset <= ts || reset - ts > 24 * 3600 * 1000) bad++;
+        if (reset <= ts || reset - ts > DAY) bad++;
       }
       return bad === 0;
     })());
+
+  // ③ 端到端判定:恰好到达上限的固定靶
+  check("🔴 上限 1 / 今日 0 笔 → 可提", withRows([], 1).canSubmit === true);
+  check("🔴 上限 1 / 今日**恰好** 1 笔 → 不可提(不建单不扣款)",
+    withRows(rows(NOW), 1).canSubmit === false && withRows(rows(NOW), 1).dailyLimitReached === true);
+  check("🔴 上限 3 / 今日 2 笔 → 可提(差一格时不许提前拦)",
+    withRows(rows(NOW, NOW), 3).canSubmit === true && withRows(rows(NOW, NOW), 3).dailyLimitReached === false);
+  check("🔴 上限 3 / 今日**恰好** 3 笔 → 不可提",
+    withRows(rows(NOW, NOW, NOW), 3).canSubmit === false);
+  check("超出上限也判不可提(列表被塞多也拦得住)",
+    withRows(rows(NOW, NOW, NOW, NOW), 3).canSubmit === false);
+  check("🔴 运营把上限从 1 调到 3 → 今日已 1 笔仍可提(限额跟着服务端 policy 实时走)",
+    withRows(rows(NOW), 3).canSubmit === true);
+  check("🔴 昨天的单不占今天的额度",
+    withRows(rows(RESET - DAY - 1, RESET - DAY - 2), 1).canSubmit === true);
+  check("🔴 边界固定靶:上限 1 + 昨日最后 1 毫秒 1 笔 → 可提;换成今日最后 1 毫秒 → 不可提",
+    withRows(rows(RESET - DAY - 1), 1).canSubmit === true
+      && withRows(rows(RESET - 1), 1).canSubmit === false);
+  check("🔴 上限 ≤0 / 非法(未配置、policy 取不到)→ 不限制,不把提现锁死",
+    withRows(rows(NOW, NOW, NOW), 0).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), -1).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), NaN).canSubmit === true
+      && withRows(rows(NOW, NOW, NOW), undefined).canSubmit === true);
+  check("🔴 上限被下发成字符串 \"1\" 也不误判成已达上限(判据只认有限数)",
+    withRows(rows(NOW), "1").canSubmit === true);
+  check("🔴 达上限时不改路由(只挡提交)—— 路由仍反映真实风控裁决",
+    withRows(rows(NOW), 1).route === withRows([], 1).route);
+
+  // 🔴🔴 主人 2026-08-11 拍板的口径:**已驳回 / 已退款 / 上链失败的单照样占当天一笔**
+  //     (「每日 N 笔」数的是发起次数,不是成功次数)。
+  //     此前这条规则零机器覆盖:靶子只造 {submittedAt},任何 `status !== "refunded"` 式过滤
+  //     对 undefined 恒真 → 加了过滤门也全绿,而「提一笔让它被驳回再提」正是绕限额最直接的
+  //     动机(R1 独立审计点名)。所以靶子必须**带上 status 字段**,过滤器一加就红。
+  {
+    const withStatus = (...ss) => ss.map((st) => ({ submittedAt: NOW, status: st, id: `WD-${st}`, amount: 25 }));
+    check("🔴🔴 已驳回 / 已退款 / 上链失败的单**照样占额度**(靶子带 status,加状态过滤即红)",
+      countWithdrawalsOnPlatformDay(withStatus("review-rejected", "refunded", "tx-failed"), NOW) === 3
+        && withRows(withStatus("review-rejected", "refunded", "tx-failed"), 3).dailyLimitReached === true
+        && withRows(withStatus("refunded"), 1).dailyLimitReached === true);
+    check("🔴 已到账 / 在途的单同样各占一笔(不看状态,只看是不是今天发起的)",
+      countWithdrawalsOnPlatformDay(withStatus("confirmed", "submitted", "review-pending"), NOW) === 3);
+  }
+
+  // ④ 两个页面同一判据:追踪页走 isDailyLimitReached,提现页走 decideFromStores,
+  //    两者必须永远同答。历史上它们各挂一份实现,配置被下发成字符串时结论相反 ——
+  //    追踪页说能提、提现页说不能提。
+  check("🔴 [随机] 追踪页判据与提现页判定恒等(两页不许各说各话)",
+    (() => {
+      let seed = 20260811, bad = 0;
+      for (let i = 0; i < 2000; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        const n = seed % 5;
+        const limit = (seed >> 5) % 4;
+        const list = Array.from({ length: n }, (_, k) => ({
+          submittedAt: (seed >> 9) % 2 === 0 ? NOW : RESET - DAY - 1 - k,
+        }));
+        if (isDailyLimitReached(list, limit, NOW) !== withRows(list, limit).dailyLimitReached) bad++;
+      }
+      return bad === 0;
+    })());
+  // 🔴 上面这条只能证明「没有第二份实现」,证明不了「这一份是对的」——两边是同一个组合,
+  //    实现里的任何缺陷两边同时错,恒等永远成立。真正的对错交给下面的 G1。
+  check("🔴 判据只有一份:isDailyLimitReached 与 isOverDailyCap∘countWithdrawalsOnPlatformDay 同答",
+    isDailyLimitReached(rows(NOW), 1, NOW) === isOverDailyCap(countWithdrawalsOnPlatformDay(rows(NOW), NOW), 1));
+
+  // ⑤ 🔴🔴 G1:对照**独立参考实现**的 property 测试。
+  //
+  // 为什么必须有这一条(2026-08-11 R1 结构性反思,见 docs/changes/2026-08-11-z2-R1-*.md):
+  // 上面那些固定靶的覆盖面 = **我的想象力**,而缺陷恰恰住在想象力之外。实测五组注入
+  // 全部逃过上面 26 条断言:① 列表超 4 笔就返回 0 ② 只数前 4 笔(分页语义)
+  // ③ 每天 22 点后返回 0(时间炸弹)—— 因为靶子列表最长 4 行、时间戳同质、时钟写死一个常量。
+  //
+  // 参考实现**独立重写**过滤与计数(只共用平台时区偏移这一个常量,不共用循环与判据),
+  // 随机跑长列表 × 随机时钟 × 混排时间戳。被测实现只要在**任何**一组上与它不等就红,
+  // 不需要我事先想到那种破坏形态。
+  check("🔴🔴 [property] 随机长列表 × 随机时钟:计数恒等于独立参考实现(靶子覆盖面不再等于我的想象力)",
+    (() => {
+      const OFF = PLATFORM_UTC_OFFSET_HOURS * 3600 * 1000;
+      const refDay = (t) => Math.floor((t + OFF) / DAY);
+      const refCount = (list, now) => {
+        let n = 0;
+        for (let i = 0; i < list.length; i++) {
+          const t = list[i] && list[i].submittedAt;
+          if (typeof t === "number" && refDay(t) === refDay(now)) n++;
+        }
+        return n;
+      };
+      const nextRand = mulberry32(20260811);
+      let bad = 0, maxLen = 0, sawToday = 0, reachedCases = 0, notReachedCases = 0;
+      const fingerprints = new Set();
+      for (let round = 0; round < 3000; round++) {
+        // 随机时钟:跨全天各时段、跨月、跨年,平台日边界随机落在任意位置
+        const now = 1.5e12 + nextRand() * 6e11;
+        const reset = nextDayResetAt(now);
+        // 🔴 长度域必须**超出实现里任何常量**。旧版上界恰好 50,于是
+        // `if (rows.length > 50) return 0` 与 `rows.slice(0, 50)` 两种破坏全绿(R2 实测)——
+        // 生成器的上界就是盲区的下界。这里 0..150,并在下面每 200 轮塞一次 300 笔的极值。
+        const len = round % 200 === 7 ? 300 : Math.floor(nextRand() * 151);
+        const list = [];
+        for (let i = 0; i < len; i++) {
+          const pick = Math.floor(nextRand() * 8);
+          // 混排:今日/昨日/明日/边界前后/远古/未来/重复时刻,单条列表里同时出现
+          const at = pick === 0 ? now
+            : pick === 1 ? reset - 1                       // 今日最后 1ms
+            : pick === 2 ? reset                           // 明日第 1ms
+            : pick === 3 ? reset - DAY                     // 今日第 1ms
+            : pick === 4 ? reset - DAY - 1                 // 昨日最后 1ms
+            : pick === 5 ? now - Math.floor(nextRand() * 30) * DAY
+            : pick === 6 ? now + Math.floor(nextRand() * 5) * DAY
+            : now - Math.floor(nextRand() * 6e10);
+          list.push({ submittedAt: at });
+        }
+        maxLen = Math.max(maxLen, len);
+        const want = refCount(list, now);
+        if (want > 0) sawToday++;
+        // 指纹:同一组 (今日笔数, 列表长度, 平台日序) 算一种。用来量**实际覆盖**,
+        // 而不是拿循环上界冒充覆盖 —— 旧发生器退化时正是这个数会塌下来。
+        fingerprints.add(`${want}|${len}|${refDay(now) % 997}`);
+        if (countWithdrawalsOnPlatformDay(list, now) !== want) { bad++; continue; }
+        // 顺带把端到端判定也对上:上限 >0 时,拦不拦必须与「参考计数 ≥ 上限」一致。
+        // 🔴 上限域必须超出服务端契约允许的范围:parsePolicy 只要求 ≥1 的整数、**无上界**,
+        //    旧版只取 1..4,于是 `limitCount < 6` 这种破坏全绿(R2 实测)。这里 1..60。
+        const limit = 1 + Math.floor(nextRand() * 60);
+        const decided = decideFromStores({
+          ...toSnapshot(base({ now })), now, withdrawals: list, dailyWithdrawLimitCount: limit,
+        }).dailyLimitReached;
+        if (decided !== (want >= limit)) bad++;
+        if (want >= limit) reachedCases++; else notReachedCases++;
+      }
+      // 🔴🔴 样本自证:报出去的必须是**实测**的覆盖,不是循环上界。
+      //    旧版三条阈值(maxLen>4 / sawToday>200)离实测值 12-14 倍,生成器退化 90% 仍绿;
+      //    而当时生成器**确实**在退化(周期 ~10,466)。现在:
+      //      · 指纹数下限贴实测(退化立刻击穿);
+      //      · 长度必须真的超过实现里任何常量;
+      //      · 「拦」与「不拦」两侧都必须真的各跑过几百次(只跑单侧等于半条门)。
+      selfProof.g1 = { fingerprints: fingerprints.size, maxLen, sawToday, reachedCases, notReachedCases };
+      return bad === 0 && fingerprints.size >= 1200 && maxLen >= 150
+        && sawToday > 2000 && reachedCases > 300 && notReachedCases > 300;
+    })(), JSON.stringify(selfProof.g1));
 }
 
 /**
@@ -449,10 +613,37 @@ check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕�
  * (2026-08-01 哨兵自审点名的「解析器脆性」族)。
  */
 /** 剥掉注释再做**反向**断言 —— 历史说明里往往会提到被禁的那个名字,不剥就被自己的注释命中假红。 */
+/**
+ * 🔴 G2(2026-08-11 R1 结构性反思):剥到**行尾注释**与 `<!-- -->`,且**正反两侧都必须用它**。
+ *
+ * 旧版只剥整行 `//` 与块注释,于是两种哄绿实测都过:
+ *  ① 把判据行整段注释掉、另写死一个值 —— 正向 includes 仍在注释里找到那串字面量;
+ *  ② 判据串挪到**行尾注释**里(`limitCount: 0, // limitCount: policy...`)—— 同上。
+ * 注释既能伪造存在、也能伪造违规,两个方向都得剥,而且要剥干净。
+ *
+ * ⚠️ 行尾 `//` 的剥法用了「行内不在引号里」的近似:先按引号切段,只在引号外找 `//`。
+ * 判据文件里没有含 `//` 的字符串字面量(URL 都写在注释里),这个近似够用;
+ * 若将来出现,这里会**多剥**(倾向假红),方向安全。
+ */
 function stripComments(s) {
   const block = new RegExp("/\\*[\\s\\S]*?\\*/", "g");
-  const line = new RegExp("^\\s*//.*$", "gm");
-  return s.replace(block, "").replace(line, "");
+  const html = new RegExp("<!--[\\s\\S]*?-->", "g");
+  return s.replace(block, "").replace(html, "").split(/\r?\n/).map((line) => {
+    let out = "", quote = null;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (quote) {
+        out += c;
+        if (c === "\\") { if (i + 1 < line.length) { out += line[++i]; } continue; }
+        if (c === quote) quote = null;
+        continue;
+      }
+      if (c === '"' || c === "'" || c === "`") { quote = c; out += c; continue; }
+      if (c === "/" && line[i + 1] === "/") break; // 引号外的 // 起,整行余下都是注释
+      out += c;
+    }
+    return out;
+  }).join("\n");
 }
 function balancedBody(src, from) {
   let depth = 0, started = false;
@@ -481,7 +672,6 @@ function functionBody(src, sig) {
   const readSrc = (rel) => readFileSync(path.join(root, rel), "utf8");
   const appSrc = readSrc("src/store/app.ts");
   const elgSrc = readSrc("src/store/withdrawal-eligibility.ts");
-  const cntSrc = readSrc("src/store/withdraw-daily-count.ts");
 
   // z1 判决 C(2026-08-10):submitWithdrawal 客户端占额度/扣款/落盘/重放链随 c37e642
   // 整体让渡后端事务,本组接线断言(claimWithdrawSlot 占额度 / claim 先于建单 /
@@ -605,29 +795,208 @@ function functionBody(src, sig) {
     })());
   check("🔴 commitWithdrawal 不再事后计数(挪回去 = 把并发漏洞放回去)",
     !/bumpWithdrawCounter\s*\(/.test(elgSrc));
-  // 【z1 R2 独立审计 P0-1,2026-08-10】原三条断言(claimDailySlot 判定来源 / 写后回读验令牌 /
-  // CLAIM_SETTLE_MS ≥100ms)钉的是 claimWithdrawSlot 的**内部实现**,而 c37e642 之后
-  // 该函数在 src/ 全站零调用 —— 绿着守死代码(与本包判定 appendLedgerEntry 空壳同病)。
-  // 🔴 更重的是它连带的活缺陷:计数器无人递增 → todayWithdrawCount 恒 0 →
-  //    dailyLimitReached 恒 false,而页面仍在渲染「每日最多 N 笔」并留着置灰分支。
-  //    日限的真正执行方已是服务端(policy.dailyLimitCount);客户端预检形同虚设。
-  //    产品侧修法(从服务端镜像的提现列表按平台日现算)已记 HANDOFF,不在本包动。
-  // 这里改守「死透」+「复活必须连门一起复活」:任何人重新接线 claimWithdrawSlot,
-  // 这条会红,逼他把上面三条实现级断言一并恢复(知识留在机器里,不留在人脑里)。
+  // ── 日限接线门(z1 审计 P0-1 的回归门,2026-08-11)────────────────
+  // 判定层已被上面 §7 的行为断言全覆盖;这里守的是**接没接上、接的是不是那个源**。
+  // 缺陷史:计数器无人递增(判定恒 0)+ 文案取服务端 policy 而判定取本地 config
+  // (同一个「每日 N 笔」有两个数)。两处都是「判定对 ≠ 接对」,只有源码级判据守得住。
   {
+    const pgSrc2 = readSrc("src/pages/me/wallet-withdraw.vue");
+    const trackSrc2 = readSrc("src/pages/me/wallet-withdraw-tracking.vue");
     const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
       const p = path.join(dir, e.name);
       return e.isDirectory() ? walk(p) : (/\.(ts|vue)$/.test(e.name) ? [p] : []);
     });
     const files = walk(path.join(root, "src"));
     // 扫描面为空 = 判据失效,必须红(禁「扫不到=没违规」)
-    check(`🔴 claimWithdrawSlot 死态扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
-    const callers = files
-      .filter((p) => !p.endsWith(path.join("store", "withdraw-daily-count.ts")))
-      .filter((p) => /\bclaimWithdrawSlot\s*\(/.test(readFileSync(p, "utf8").replace(/^[ \t]*\/\/.*$/gm, "")))
+    check(`🔴 日限扫描面非空(扫 ${files.length} 个源文件)`, files.length >= 100, `只扫到 ${files.length} 个`);
+
+    // 🔴 G2:正向判据也走剥注释版原文。旧版正向用生文本 includes,把判据行整段注释掉
+    //    或挪进行尾注释,门照样绿(实测两种都过)。
+    const pgCode = stripComments(pgSrc2);
+    const trackCode = stripComments(trackSrc2);
+    const elgCode = stripComments(elgSrc);
+    const coreCode = stripComments(readSrc("src/store/withdrawal-eligibility-core.ts"));
+
+    // ① 🔴🔴 G3:计数源守**赋值点集合等式**,不守禁名清单。
+    //
+    //    禁名清单是封闭集合,而「再存一份计数」的写法是开放集合 —— 实测把计数器改名成
+    //    `bumpDailyWithdrawCount` + 换个 storage 键就整条溜过去(R1 独立审计 + 我复跑确认)。
+    //    换个问法就构造性了:不管那份计数叫什么、存在哪,它**要生效就必须流进
+    //    `todayWithdrawCount`**(判定唯一读的那个字段)。于是守它的赋值点集合:
+    //    全 src 恰好一处,在 core 的 toRawFacts 里,右值恰为对提现单列表的现算。
+    const assignSites = files.flatMap((p) => {
+      const code = stripComments(readFileSync(p, "utf8"));
+      // 取到**行尾**再剥尾逗号 —— 用 `[^,\n]+` 会被右值内部的逗号
+      // (`count(s.withdrawals, s.now)`)提前截断,判据落在半截表达式上红绿都不可信。
+      return [...code.matchAll(/todayWithdrawCount\s*:\s*(.+)$/gm)]
+        .map((m) => ({ file: path.relative(root, p).replace(/\\/g, "/"), rhs: m[1].trim().replace(/[,;]\s*$/, "") }));
+    // 类型声明(`todayWithdrawCount: number;`)不是赋值,排除
+    }).filter((s) => s.rhs !== "number" && !s.rhs.startsWith("number"));
+    const assignDesc = assignSites.map((s) => `${s.file} ← ${s.rhs}`);
+    check("🔴🔴 今日笔数的赋值点**集合等式**:全 src 恰 2 处(core 现算 + core 内转发),右值只许来自提现单列表",
+      assignSites.length === 2
+        && assignSites.every((s) => s.file === "src/store/withdrawal-eligibility-core.ts")
+        && assignSites.some((s) => s.rhs === "countWithdrawalsOnPlatformDay(s.withdrawals, s.now)")
+        && assignSites.some((s) => s.rhs === "f.todayWithdrawCount"),
+      assignDesc.join(" | "));
+
+    // ② 限额源:类型级删除是真判据 —— 字段不在 config 类型里,任何取用都是 tsc 错。
+    //    所以守「字段保持删除」比守「没人取用」更靠前(后者在字段不存在时恒真、零信息)。
+    const cfgTypes = stripComments(readSrc("src/store/config-types.ts"));
+    const localLimitUsers = files
+      .filter((p) => /withdrawRules\s*[.?]*\.?\s*dailyWithdrawLimitCount|rules\.dailyWithdrawLimitCount/.test(stripComments(readFileSync(p, "utf8"))))
       .map((p) => path.relative(root, p).replace(/\\/g, "/"));
-    check("🔴 claimWithdrawSlot 仍无调用方(客户端日限已让渡服务端;若复活,须同批恢复其判定/回读/时长三条实现级断言)",
-      callers.length === 0, callers.join(", "));
+    check("🔴 每日笔数上限:本地配置字段保持删除(类型里加回来即红),且全 src 无人从 withdrawRules 取",
+      !/\bdailyWithdrawLimitCount\b/.test(cfgTypes) && localLimitUsers.length === 0,
+      `cfgTypes=${/\bdailyWithdrawLimitCount\b/.test(cfgTypes)} users=${localLimitUsers.join(",")}`);
+
+    // ③ 🔴🔴 G3:消费点**集合等式** —— 不是「这两个页面接对了」,而是「全 src 只有这些页面
+    //    在问日限,且每一处都喂了事实」。新页面漏喂 dailyFacts 时旧版枚举门全绿(审计点名)。
+    const CONSUMER_ALLOWLIST = [
+      "src/pages/me/wallet-withdraw-tracking.vue",
+      "src/pages/me/wallet-withdraw.vue",
+      "src/store/withdrawal-eligibility.ts", // 引擎自身(requestWithdrawalEligibility 内部转发)
+    ];
+    const consumers = files
+      .filter((p) => /\b(evaluateWithdrawal|dailyLimitStatus|requestWithdrawalEligibility)\s*\(/.test(stripComments(readFileSync(p, "utf8"))))
+      .map((p) => path.relative(root, p).replace(/\\/g, "/"))
+      .sort();
+    check("🔴🔴 日限消费点集合等式:只有登记在册的文件在问日限(新增消费面必须来改这张名单)",
+      consumers.join(",") === CONSUMER_ALLOWLIST.join(","), consumers.join(","));
+
+    // ③b 每个消费点都真的喂了事实(集合等式管「有谁」,这条管「喂没喂」)
+    check("🔴 提现页:日限事实来自服务端 policy + app.withdrawals,且文案与闸共用同一个数",
+      pgCode.includes("limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,")
+        && pgCode.includes("withdrawals: app.withdrawals,")
+        && pgCode.includes("fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) })")
+        // 🔴 说不说这句 ⟺ 闸拦不拦。limitCount ≤0 时判定按「不限制」走,这句必须消失 ——
+        // 否则后端不可达时页面会写「每日限额:0 笔/日」(实景实测过的原话)。
+        && pgCode.includes('<text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>'));
+    check("🔴 提现页:三个评估点(显示 / 降额 CTA / 提交前复检)**全部**吃这份事实,一处不落",
+      (() => {
+        // 数的是「全部 evaluateWithdrawal 调用」与「带 dailyFacts 的调用」两个集合是否相等,
+        // 不再写死 === 2(新增第四个合法评估点时旧写法会假红,漏喂时又不红)。
+        const all = (pgCode.match(/evaluateWithdrawal\s*\(/g) || []).length;
+        const fed = (pgCode.match(/evaluateWithdrawal\([^)]*dailyFacts\.value/g) || []).length;
+        // 提交前复检吃的是 snap.daily —— 与 snap.account 同源同刻。取活值会在弹窗期间
+        // 切账号时拿新账号的单据判旧账号的额度(R1 三份独立审计各自抓到),
+        // 且它声称的跨标签页收益不存在(别的标签页的写入根本不进本标签页内存)。
+        return all >= 2 && all === fed
+          && pgCode.includes("daily: dailyFacts.value,")
+          && /requestWithdrawalEligibility\([\s\S]{0,400}?snap\.daily,/.test(pgCode)
+          && !/requestWithdrawalEligibility\([\s\S]{0,400}?dailyFacts\.value,/.test(pgCode);
+      })());
+    check("🔴 追踪页「再提一笔」与提现页同源(否则一页说能提、一页说不能提)",
+      trackCode.includes("dailyLimitStatus({")
+        && trackCode.includes("limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,")
+        && trackCode.includes("withdrawals: app.withdrawals,")
+        // 集合等式是**文件粒度**的,同一文件里再多问一次它看不见 —— 所以这里也要
+        // 「全部调用 === 喂了服务端限额的调用」,补上文件内那一格。
+        && (trackCode.match(/dailyLimitStatus\s*\(/g) || []).length
+           === (trackCode.match(/dailyLimitStatus\(\{[\s\S]{0,200}?withdrawalPolicy\.value\?\.dailyLimitCount/g) || []).length);
+    // ③c 判定结论必须被**消费**(喂进去 ≠ 用起来):追踪页置灰 + 点击守卫,提现页拦截分支
+    check("🔴 判定结论真的被消费:追踪页据此置灰并挡点击,提现页据此给拦截理由",
+      trackCode.includes("const againDisabled = computed(() => dailyLimit.value.reached);")
+        && /aria-disabled="againDisabled/.test(trackCode)
+        && pgCode.includes("if (decision.dailyLimitReached) return dailyLimitReachedText.value;"));
+    // ③d 🔴 两个页面都必须**跨平台日边界重算**。判定里的「今天」走 mockServerNow(非响应源),
+    //     没有边界依赖就会:跨过 0 点后按钮不解灰、理由行念一个已经过去的时刻 —— 页面自己
+    //     打自己脸。提现页早有 eligibilityClock,追踪页此前没有(R1 四份独立审计各自点名),
+    //     而闸此前恒不触发所以这个失效是休眠的,本包让它变成可达死路。
+    check("🔴 两页的日限判定都挂了平台日边界依赖(跨日必重算,不停在旧结论上)",
+      /platformDayIndex\(now\)/.test(pgCode) && pgCode.includes("void eligibilityClock.value;")
+        && trackCode.includes("void platformDayIndex(nowTick.value);")
+        && /setInterval\(\(\) => \(nowTick\.value = mockServerNow\(\)\)/.test(trackCode));
+    // ③e 🔴 policy 拉取必须可重来。只拉一次且失败静默吞 = 该页实例终身 fail-open:
+    //     「再提一笔」永不置灰,点进去却被拦死 —— 换了触发条件的同一种两页分裂。
+    check("🔴 追踪页的 policy 拉取可重来(onShow 补拉),不是一次性静默失败",
+      trackCode.includes("async function loadWithdrawalPolicy()")
+        && /onShow\([\s\S]{0,400}?loadWithdrawalPolicy\(\);/.test(trackCode));
+    // 🔴🔴 族 C(「抄一半」)的三条回归门。R2 跨端镜头点名:我照着现成写法改,
+    //     却没把那处写法的**全部约束**一起带过来 —— 守卫抄丢了、钩子只挂了一半、还加错了页。
+    check("🔴 两个页面**都**在 onShow 重取 policy(真正靠限额拦人的是提现页 —— 上一版只给了追踪页)",
+      /onShow\([\s\S]{0,300}?loadWithdrawalPolicy\(\);/.test(pgCode)
+        && /onShow\([\s\S]{0,400}?loadWithdrawalPolicy\(\);/.test(trackCode));
+    check("🔴 追踪页的 loader 有在途守卫(抄提现页那份时漏抄 → 重复发请求 + 后到的覆盖先到的)",
+      trackCode.includes("if (withdrawalPolicyLoading.value) return;")
+        && trackCode.includes("withdrawalPolicyLoading.value = true;"));
+    check("🔴 policy 取数失败**不清空**已拿到的好值(清空 = 网络抖一下就把闸放开,与仓内钱路径惯例相反)",
+      !/catch\s*\{[^}]*withdrawalPolicy\.value = null/.test(trackCode));
+    check("🔴 60s 时钟起停 onShow/onHide **成对**(仓内硬规则 P-063:页面保活时 onUnmounted 不触发 → 定时器泄漏)",
+      trackCode.includes("onHide(stopDayTimer);")
+        && /onShow\([\s\S]{0,300}?setInterval\(/.test(trackCode)
+        && trackCode.includes("onUnmounted(stopDayTimer);"));
+
+    // ③f 🔴🔴 幂等键必须**跨重试复用**。现造一把新键 + 「请重新确认」的组合会在
+    //     超时(服务端已建单、响应没回来)时造出**第二笔真出账**(R2 资金安全级)。
+    //     判据钉三件:键来自复用函数、歧义结局不清键、确定性结局才清键。
+    check("🔴🔴 幂等键跨重试复用(超时重试不得换新键 —— 换键 = 服务端当新请求 = 重复出账)",
+      pgCode.includes("idempotencyKey: currentIdempotencyKey(),")
+        && pgCode.includes("function currentIdempotencyKey(): string")
+        && pgCode.includes("function clearSubmitIntent(): void")
+        // 现造键的老写法不许再出现在 snap 里
+        && !/idempotencyKey: `withdrawal:\$\{app\.accountKey\}:\$\{Date\.now\(\)\}/.test(pgCode));
+    // 🔴🔴 意图签名必须**含收款地址、不含 policyVersion**。这一条是数据成分的断言
+    //（不是语义判断),所以字面判据在这里是够的 —— 但两个方向都要钉:
+    //  · 少了 address:歧义失败后改地址再提交会沿用旧键 → 服务端返回**打到旧地址**的那一单,
+    //    而响应里没有 address 可核,界面显示新地址、钱走旧地址(资金流向级,R3 点名);
+    //  · 多了 policyVersion:本页 onShow 会重取策略,版本一变签名就变、键就换 ——
+    //    正好在最不该换键的那一刻换掉,直接制造重复出账。
+    check("🔴🔴 幂等意图签名含收款地址、且不含 policyVersion(前者漏 = 钱走错地址,后者加 = 重复出账)",
+      (() => {
+        const i = pgCode.indexOf("function currentIdempotencyKey(): string");
+        if (i < 0) return false;
+        // 🔴 从**函数体的 `{`** 开始配对,不能从函数名开始 —— balancedBody 从函数名起数,
+        //    第一个闭合的是空参数表 `()`,于是只取到函数名那几个字,判据落在空串上恒红。
+        const brace = pgCode.indexOf("{", i);
+        const body = (brace > 0 ? balancedBody(pgCode, brace) : null) ?? pgCode.slice(i, i + 500);
+        const sigLine = (body.match(/const sig = `[^`]*`/) || [])[0] || "";
+        return sigLine.includes("app.accountKey") && sigLine.includes("network.value")
+          && sigLine.includes("amountNum.value") && sigLine.includes("boundAddress.value")
+          && sigLine.includes("offsetWithNex.value")
+          && !sigLine.includes("policyVersion");
+      })());
+    // 🔴🔴 判定本身已搬到接口层(src/api/errors.ts 的 isAmbiguousOutcome),
+    //    并由 selfcheck-withdraw-failpaths.mjs 用**真的 ApiError** 逐格行为验(12 格)。
+    //    这里只守**接线**:页面必须用那个函数、歧义分支不许清键、确定分支才清。
+    //    分工的理由:判定留在页面里就只能用字符串门,而字符串门抓不到语义错 ——
+    //    上一版的边界漏掉 http/504,门全绿而实测会重复出账。
+    check("🔴🔴 失败分诊接线:用接口层的歧义判定,歧义分支保留幂等键、确定分支才作废",
+      (() => {
+        const submitAt = pgCode.indexOf("await app.submitWithdrawal(");
+        if (submitAt < 0) return false;
+        const i = pgCode.indexOf("} catch (err) {", submitAt);
+        if (i < 0) return false;
+        const seg = pgCode.slice(i, i + 2500);
+        // 用的是接口层那一个,不是页面自己再写一份
+        // 用 includes 精确串,不用正则 —— 这一行历史上被脚本改写吃掉反斜杠后变成非法正则
+        // (同「替换串静默损坏」那族坑,本文件顶部就写着别用正则写这类判据)。
+        if (!pgCode.includes("isAmbiguousOutcome") || !pgCode.includes('from "@/api/errors"')) return false;
+        if (/function isAmbiguousOutcome/.test(pgCode)) return false; // 页面里不许再有第二份实现
+        const aIdx = seg.indexOf("isAmbiguousOutcome(err)");
+        const aEnd = aIdx < 0 ? -1 : seg.indexOf("return;", aIdx);
+        const aBranch = aIdx >= 0 && aEnd > aIdx ? seg.slice(aIdx, aEnd) : "";
+        const ambiguousOk = aBranch.includes("submitUnknownTitle") && !aBranch.includes("clearSubmitIntent()");
+        // 确定性分支在歧义判定**之后**,且那里才清键
+        const definitiveOk = aEnd > 0 && seg.slice(aEnd).includes("clearSubmitIntent();");
+        return ambiguousOk && definitiveOk;
+      })());
+
+    // ④ 外壳仍然只转发:今日笔数在 core 现算,页面/外壳不许自己 filter 出一个数来
+    //    (外壳里留表达式 = 行为门覆盖不到那一层,这是本文件反复栽过的跟头)。
+    check("🔴 今日笔数在 core 现算,外壳只转发(外壳自算一个数即红)",
+      elgCode.includes("withdrawals: daily.withdrawals,")
+        && elgCode.includes("dailyWithdrawLimitCount: daily.limitCount,")
+        // 不再只禁三个方法名:先取别名再算同样绕过(`const l = daily.withdrawals; l.filter(...)`)。
+        // 改判「外壳里除了转发,不许出现任何对该列表的下标/遍历/聚合」——只认「原样转发」这一种形态。
+        && !/daily\.withdrawals\s*[.[]/.test(elgCode.replace("withdrawals: daily.withdrawals,", ""))
+        && !/\bdaily\.withdrawals\b(?![\s,)\]}])/.test(elgCode.replace("withdrawals: daily.withdrawals,", "")));
+    // ④b 计数函数的调用点集合等式:只许 core 自己调(外壳/页面各自调一次 = 各算各的)
+    const counterCallers = files
+      .filter((p) => /\bcountWithdrawalsOnPlatformDay\s*\(/.test(stripComments(readFileSync(p, "utf8"))))
+      .map((p) => path.relative(root, p).replace(/\\/g, "/"));
+    check("🔴 计数函数只许 core 内部调用(页面/外壳各自再算一遍 = 又出第二份口径)",
+      counterCallers.join(",") === "src/store/withdrawal-eligibility-core.ts", counterCallers.join(","));
   }
   // 🔴 双向告知的接线门。判定再准,页面不接 = 用户看不见(走查实证:快车道跑了
   // 一整轮,表单一个字都没提,用户以为「提多少都要审」)。两条判据都必须来自判定结果。
@@ -647,7 +1016,9 @@ function functionBody(src, sig) {
       const body = balancedBody(pgSrc, k);
       if (!body) return false;
       return body.includes('disabledReasonFor(smallAmountLine.value, smallLineDecision.value) === ""')
-        && pgSrc.includes("evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, smallAmountLine.value)")
+        // 假设金额那次评估必须**连日限事实一起**问 —— 少喂 dailyFacts 就等于拿一份
+        // 「日限恒不触发」的答案去劝用户降额,又回到 z1 P0-1 那个空头承诺。
+        && pgSrc.includes("evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value)")
         // 提交拦截本身必须是「入参为金额」的函数,否则 CTA 没法对假设金额问同一个问题
         && pgSrc.includes("function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string")
         && pgSrc.includes("const submitDisabledReason = computed(() => disabledReasonFor(amountNum.value, eligibility.value));");
@@ -775,5 +1146,21 @@ function functionBody(src, sig) {
     !/Date\.now\(\)/.test(elgSrc));
 }
 
-console.log(`\n${pass} pass / ${fail} fail`);
+// 🔴🔴 删除向的门(2026-08-11 R1)。门集体的盲区是**「该有的还在不在」**:
+// 独立审计实测 —— 把本文件的日限整节删掉,输出是 `73 pass / 0 fail`、退出码 0,
+// 没有任何东西会红。而本包处理旧门用的正是「删掉整节」这个动作,下一次即静默失守。
+//
+// 判据是**下限不是等式**:新增断言天天有,不该每次都来改这里;而删断言是罕见动作,
+// 必须撞线。下限按「当前条数 - 5」留一点重构余量,加断言时不必动它,
+// 真删掉一整节(几十条)必然击穿。
+const ASSERT_FLOOR = 100;
+if (pass + fail < ASSERT_FLOOR) {
+  console.log(`  FAIL  🔴🔴 断言总数 ${pass + fail} 跌破下限 ${ASSERT_FLOOR} —— 有断言被整段删除?`
+    + ` 删门是重大动作:确要删,连同本行下限一起改,并在 commit 里写明删了哪一节、为什么。`);
+  fail++;
+}
+// 🔴 汇总行报**实测覆盖**,不报循环上界(族 B 的根治:声明的数量 ≠ 实际的覆盖)。
+console.log(`\n${pass} pass / ${fail} fail(断言总数 ${pass + fail},下限 ${ASSERT_FLOOR}`
+  + ` · 实测:风控随机层 ${selfProof.s6?.fingerprints}/${selfProof.s6?.rounds} 种指纹`
+  + ` · 日限 property ${selfProof.g1?.fingerprints} 种指纹,最长列表 ${selfProof.g1?.maxLen} 笔,拦/不拦 ${selfProof.g1?.reachedCases}/${selfProof.g1?.notReachedCases})`);
 process.exit(fail ? 1 : 0);
