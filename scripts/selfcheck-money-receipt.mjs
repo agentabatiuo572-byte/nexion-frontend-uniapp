@@ -611,8 +611,13 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
     // 这种粗判据全绿。
     // b023674 起周任务路由奖励并入 claim 族统一出口 postMoneyBillsOnce(claim-idempotency
-    // 门对它全绿);postMoneyBill(退款冲正)与 postReceiptOnly(补分录)两针照旧。
-    ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptOnly"]],
+    // 门对它全绿);postMoneyBill(退款冲正)这一针照旧。
+    // 🔴 包 z6(2026-08-11)把 `postReceiptOnly` 换成 `postReceiptForAccount`:NEX 退还的冲正
+    // 分录原本在 App.vue 里单写一段(走 postReceiptOnly),现已并进 ⓪ 的纯函数
+    // `withdrawalBillDrafts`,由 ⓪ 既有的 `postReceiptForAccount` 一并落账 ——
+    // 补分录这件事没消失,只是换了出口。顺带把它入册:它一直是 App.vue 的动账出口之一,
+    // 却从没上过这张表(⓪ 的提现主行走的就是它),漏针的话这条路改坏了本门也不红。
+    ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptForAccount"]],
     // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
     ["src/components/home/weekly-quest-hero.vue", ["postMoneyBillsOnce"]],
     ["src/components/home/weekly-quest-list.vue", ["postMoneyBillsOnce"]],
