@@ -575,8 +575,11 @@ function functionBody(src, sig) {
       && appSrc.includes("withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];"));
   check("🔴 建单是**追加**不是覆盖(覆盖会把在途单连同已扣的钱一起顶掉)",
     !/latestWithdrawal\.value = wd;/.test(appSrc));
+  // 2026-08-11:调用多了第三个必填参数「谁是权威」(远端模式 client 不自推),
+  // 判据只钉「全表扫 + 每笔都过 advanceArrival」这层语义,不再钉死实参写法 ——
+  // 权威闸本身由 selfcheck-arrival 第 0 节与 remote-authority-simulation 行为门守。
   check("🔴 到账推进**全表扫**(单条版只看最新一笔,前面那笔到点了也永远推不动)",
-    appSrc.includes("const next = prev.map((w) => advanceArrival(w, now) ?? w);"));
+    /const next = prev\.map\(\(w\) => advanceArrival\(w, now,[^)]*\) \?\? w\);/.test(appSrc));
   check("🔴 推进落盘失败要回滚内存(否则内存说已到账、磁盘还是处理中,轮询永不重试)",
     /withdrawals\.value = next;[\s\S]{0,400}?if \(!persistAccountSnapshot\(\)\) \{[\s\S]{0,80}?withdrawals\.value = prev;/.test(appSrc));
   check("🔴 单槽产品限制已删除(列表化后新单不再顶掉在途单,那条闸只会锁死用户)",

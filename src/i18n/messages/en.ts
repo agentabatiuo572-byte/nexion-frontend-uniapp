@@ -5038,6 +5038,8 @@ export const en = {
     time15min: "15 min",
     sendVia: "Send via {network}",
     segUsdt: "USDT on-chain",
+    railsClosedTitle: "Top-up is temporarily unavailable",
+    railsClosedDesc: "Deposits are paused while we finish connecting this channel. No payment details are shown here for now — please don't send funds to any address or account you saved earlier.",
     flowRetired: "This flow has been retired.",
     segCard: "Bank card",
     netRecommended: "Recommended · lowest fee",
