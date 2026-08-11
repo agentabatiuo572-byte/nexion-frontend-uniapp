@@ -11,6 +11,7 @@ import { fmt } from "@/i18n/format";
 import { useT } from "@/i18n/use-t";
 import type { ShareChannelDef } from "@/store/config-types";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useReferralReward } from "@/store/referral-reward";
 
 // §8.1.1 邀请人回报口径:每注册好友 lifetime 贡献估值(展示用)× 阶段倍率。
 // 单一常量源 — invite-earn-card 与渠道面板共用,禁再写局部镜像(F4)。
@@ -28,10 +29,17 @@ export interface ShareEventRecord {
 const EVENTS_KEY = "nexgrid-share-events-v1";
 const EVENTS_CAP = 50;
 
-// 单源分享链接:配置了 baseUrl 用短链;空(mock/dev)回退运行时 origin 直连
-// hash 路由,扫码当场可达([FEAT-SHARE1] 异常1);无码返回空串(入口置灰)。
-export function buildShareLink(): string {
-  const code = useApp().user.referralCode;
+// 单源分享链接:服务端模式只能取 H8 当前用户投影中的邀请码；该投影缺失时
+// 返回空串而不是回退到浏览器 demo 身份。mock 模式仍保持原有本地演示行为。
+export function currentShareReferralCode(): string {
+  if (remoteApiEnabled) return useReferralReward().snapshot?.referralCode?.trim() ?? "";
+  return useApp().user.referralCode.trim();
+}
+
+// 配置了 baseUrl 用短链;空(mock/dev)回退运行时 origin 直连 hash 路由。
+// 无码返回空串，全部分享入口据此 fail closed。
+export function buildShareLink(referralCode = currentShareReferralCode()): string {
+  const code = referralCode.trim();
   if (!code) return "";
   const base = useConfig().config.share.baseUrl;
   if (base) return `${base}${code}`;
@@ -178,16 +186,18 @@ function readEvents(): ShareEventRecord[] {
 // invite_friend——quest store 只记完成,入账 + 账单 + toast 在这里组合
 // (对齐 quest.ts 头注的调用层组合约定)。
 export function recordShareEvent(channel: string, surface: ShareSurface) {
+  if (remoteApiEnabled) {
+    // A client-side share intent is not proof of a server mission completion.
+    // Do not write a local event row that a different session could mistake for
+    // a canonical H8 fact.
+    void useQuest().refreshRemote();
+    return;
+  }
   try {
     const next = [...readEvents(), { channel, surface, sharedAt: Date.now() }].slice(-EVENTS_CAP);
     uni.setStorageSync(EVENTS_KEY, next);
   } catch {
     // storage unavailable — 事件缺失不阻断分享
-  }
-  if (remoteApiEnabled) {
-    // A client-side share intent is not proof of a server mission completion.
-    void useQuest().refreshRemote();
-    return;
   }
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族
   // 三处漏改)。原来是先 markComplete 消费掉,发钱失败就 return —— 任务标记已置、奖归零,

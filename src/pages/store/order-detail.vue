@@ -122,7 +122,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted, type CSSProperties } from "vue";
-import { onLoad, onUnload } from "@dcloudio/uni-app";
+import { onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import DetailRow from "@/components/store/order-detail-row.vue";
 import { useT } from "@/i18n/use-t";
@@ -140,6 +140,7 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
 });
+onShow(() => { void orders.refreshRemote().catch(() => undefined); });
 
 const order = computed(() => orders.orders.find((o) => o.id === id.value));
 

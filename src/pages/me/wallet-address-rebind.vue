@@ -22,7 +22,7 @@
             :key="nw.id"
             :class="['flex-1 flex flex-col items-center justify-center active:opacity-85', `nx-rebind-net-${nw.label.toLowerCase()}`]"
             :style="netChipStyle(nw.id)"
-            role="button" tabindex="0"
+            role="button"
             :aria-selected="network === nw.id"
             @click="switchNetwork(nw.id)"
           >
@@ -52,7 +52,7 @@
             <view class="flex-1 min-w-0"><text :style="warnTextStyle">{{ holdNoteText }}</text></view>
           </view>
         </view>
-        <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" tabindex="0" @click="finish">
+        <view class="nx-rebind-done-cta w-full grid place-items-center active:opacity-90" :style="primaryCtaStyle" role="button" @click="finish">
           <text :style="ctaTextStyle">{{ t.addrRebind.successCta }}</text>
         </view>
       </view>
@@ -73,7 +73,7 @@
         />
         <view v-if="otpError"><text class="block" :style="errorTextStyle">{{ otpError }}</text></view>
         <view class="flex items-center" style="margin-top: 10px; gap: 12px">
-          <view class="inline-flex items-center" :class="{ 'active:opacity-70': resendLeft <= 0 && !otpSending }" style="min-height: 44px" role="button" tabindex="0" :aria-disabled="resendLeft > 0 || otpSending ? 'true' : 'false'" @click="resendCode">
+          <view class="inline-flex items-center" :class="{ 'active:opacity-70': resendLeft <= 0 && !otpSending }" style="min-height: 44px" role="button" :aria-disabled="resendLeft > 0 || otpSending ? 'true' : 'false'" @click="resendCode">
             <text style="font-size: 12px" :style="{ color: resendLeft > 0 || otpSending ? 'var(--v5-ink-4)' : 'var(--v5-brand)' }">
               {{ resendLeft > 0 ? fmt(t.addrRebind.otpResendIn, { s: resendLeft }) : t.addrRebind.otpResendCta }}
             </text>
@@ -82,14 +82,14 @@
         <view
           class="nx-rebind-otp-confirm w-full grid place-items-center"
           :class="{ 'active:opacity-90 transition-opacity': otpReady && !otpVerifying }"
-          role="button" tabindex="0"
+          role="button"
           :aria-disabled="otpReady && !otpVerifying ? 'false' : 'true'"
           :style="otpConfirmStyle"
           @click="confirmOtp"
         >
           <text :style="ctaTextStyle">{{ otpVerifying ? t.wallet.submitChecking : t.addrRebind.otpConfirmCta }}</text>
         </view>
-        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
+        <view class="nx-rebind-otp-cancel w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="backToBase">
           <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
         </view>
       </view>
@@ -124,17 +124,17 @@
         <view
           class="nx-rebind-start-cta w-full grid place-items-center"
           :class="{ 'active:opacity-90 transition-opacity': canProceed && !otpSending }"
-          role="button" tabindex="0"
+          role="button"
           :aria-disabled="canProceed && !otpSending ? 'false' : 'true'"
           :style="startCtaStyle"
           @click="proceedToOtp"
         >
           <text :style="ctaTextStyle">{{ otpSending ? t.wallet.submitChecking : t.addrRebind.otpSendCta }}</text>
         </view>
-        <view v-if="mode === 'change'" class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="backToBase">
+        <view v-if="mode === 'change'" class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="backToBase">
           <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
         </view>
-        <view v-else class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="leave">
+        <view v-else class="nx-rebind-cancel-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="leave">
           <text :style="ghostTextStyle">{{ t.addrRebind.cancelCta }}</text>
         </view>
       </view>
@@ -171,7 +171,7 @@
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="margin-top: 1px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">{{ t.addrRebind.inFlightBlocked }}</text>
-            <view class="nx-rebind-goto-tracking inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" tabindex="0" @click="goTracking">
+            <view class="nx-rebind-goto-tracking inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" @click="goTracking">
               <text style="font-size: 12px; font-weight: 500; color: var(--v5-brand)">{{ t.addrRebind.inFlightGoCta }} →</text>
             </view>
           </view>
@@ -184,7 +184,7 @@
           v-else
           class="nx-rebind-change-cta w-full grid place-items-center active:opacity-90"
           :style="primaryCtaStyle"
-          role="button" tabindex="0"
+          role="button"
           @click="startChange"
         >
           <text :style="ctaTextStyle">{{ t.addrRebind.changeCta }}</text>
@@ -192,7 +192,7 @@
 
         <!-- 历史地址(只读,含来源与停用时间;规格 ⑥「查看历史地址」展开区) -->
         <view v-if="history.length > 0" style="margin-top: 20px">
-          <view class="nx-rebind-history-toggle inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" tabindex="0" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen">
+          <view class="nx-rebind-history-toggle inline-flex items-center active:opacity-70" style="min-height: 44px" role="button" :aria-expanded="historyOpen ? 'true' : 'false'" @click="historyOpen = !historyOpen">
             <text style="font-size: 12px; font-weight: 500; color: var(--v5-ink-3)">{{ historyOpen ? t.addrRebind.historyTitle : t.addrRebind.historyToggle }}</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ marginLeft: '4px', transform: historyOpen ? 'rotate(180deg)' : 'none', transition: 'transform 160ms ease' }"><path d="m6 9 6 6 6-6" /></svg>
           </view>

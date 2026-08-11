@@ -43,7 +43,7 @@
       <view class="rg-body">
         <!-- Step 1: phone -->
         <view v-if="step === 1" class="rg-phone">
-          <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
+          <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter="showCountries = true" @keydown.space.prevent="showCountries = true">
             <text class="rg-phone__cc-t">{{ country }}</text>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
           </view>

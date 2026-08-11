@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { useApp } from "./app";
 import type { DeviceKind } from "./types";
+import type { CanonicalCapacityReplaceQuote, CanonicalTradeinQuote } from "@/api/device-e3-api";
 
 /**
  * Trade-in flow sheet state machine — Batch C (2026-05-27).
@@ -51,6 +52,7 @@ export type TradeinSheetState =
        *  drift between sheet open and user tap if `tick()` shifted the active
        *  devices' `todayEarnings` ordering in between. */
       oldDeviceId: string;
+      canonicalCapacityQuote?: CanonicalCapacityReplaceQuote;
     }
   | {
       kind: "block";
@@ -75,9 +77,9 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
   /** FEAT-DEV02 结算抵扣上下文:确认置换后写入,checkout 读它渲染抵扣行并在
    *  持久块原子执行(移除旧机+净额扣款+新机未激活入库);「移除」清空恢复原价。
    *  仅内存态(不持久):刷新丢弃=放弃抵扣,旧设备原状,无半执行风险。 */
-  const appliedTradein = ref<{ oldDeviceId: string; targetKind: DeviceKind } | null>(null);
-  function applyTradein(oldDeviceId: string, targetKind: DeviceKind) {
-    appliedTradein.value = { oldDeviceId, targetKind };
+  const appliedTradein = ref<{ oldDeviceId: string; targetKind: DeviceKind; canonicalQuote?: CanonicalTradeinQuote } | null>(null);
+  function applyTradein(oldDeviceId: string, targetKind: DeviceKind, canonicalQuote?: CanonicalTradeinQuote) {
+    appliedTradein.value = { oldDeviceId, targetKind, canonicalQuote };
   }
   function clearApplied() {
     appliedTradein.value = null;
@@ -119,6 +121,20 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     state.value = { kind: "replace", newKind, newPrice, oldDeviceId: lowest.id };
   }
 
+  function showCanonicalReplace(newKind: DeviceKind, newPrice: number, quote: CanonicalCapacityReplaceQuote) {
+    if (quote.decision !== "REPLACE_REQUIRED" || quote.sourceDeviceId == null) {
+      state.value = { kind: "none" };
+      return;
+    }
+    state.value = {
+      kind: "replace",
+      newKind,
+      newPrice,
+      oldDeviceId: String(quote.sourceDeviceId),
+      canonicalCapacityQuote: quote,
+    };
+  }
+
   function showBlock(
     oldDeviceId: string,
     oldDeviceName: string,
@@ -136,5 +152,5 @@ export const useTradeinSheet = defineStore("tradeinSheet", () => {
     state.value = { kind: "none" };
   }
 
-  return { state, appliedTradein, applyTradein, clearApplied, showChoice, showRetire, showTradein, showReplace, showBlock, showRetireBlock, hide };
+  return { state, appliedTradein, applyTradein, clearApplied, showChoice, showRetire, showTradein, showReplace, showCanonicalReplace, showBlock, showRetireBlock, hide };
 });

@@ -1,173 +1,101 @@
+import { computed, ref } from "vue";
 import { defineStore } from "pinia";
-import { ref } from "vue";
-import { currentWeekKey, type Tier1QuestId, type Tier2QuestId } from "@/mock/weekly-quests";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { questApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalQuest, QuestSnapshot } from "@/api/quest-api";
 
-/**
- * Weekly Quest store — ported from Nexion-prototype/lib/store/weekly-quest.ts
- * (zustand persist → Pinia + uni storage).
- *
- * Tracks per-week completion + claim state, deterministically reset on ISO-week
- * rollover (every Monday 00:00 UTC). rollWeekIfStale() compares the persisted
- * weekKey vs current on mount → on mismatch wipes completions + claim flags and
- * persists the new weekKey. Tier 1/2 quest defs live in mock/weekly-quests.ts;
- * this store only records what's been completed / claimed.
- *
- * Backend-replaceable: claim → POST /api/quests/weekly/{tier1|tier2/:id|bonus}
- * (PRD §9.11e atomic pattern); GET /api/quests/weekly is the config source
- * (admin H3 WEEKLY_T1/T2). Persist key carries a version suffix for migration.
- */
-
-// 旧设备级单键 "nexgrid-weekly-quest-v1" 废弃(存量无账号归属,mock 可重建);周任务进度按账号分行。
-const ACCOUNTS_KEY = "nexgrid-weekly-quest-accounts-v1"; // { [accountKey]: PersistShape }
-
-interface PersistShape {
-  weekKey: string;
-  tier1Completed: Tier1QuestId | null;
-  tier1Claimed: boolean;
-  tier2Completed: Tier2QuestId[];
-  tier2Claimed: Tier2QuestId[];
-  bonusClaimed: boolean;
+function idempotencyKey(questCode: string): string {
+  const suffix = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `weekly-${questCode}-${suffix}`.slice(0, 120);
 }
 
-function hydrate(accountKey: string): PersistShape {
-  const row = readAccountRow<Partial<PersistShape>>(ACCOUNTS_KEY, accountKey);
-  if (row) {
-    return {
-      weekKey: typeof row.weekKey === "string" ? row.weekKey : currentWeekKey(),
-      tier1Completed: (row.tier1Completed ?? null) as Tier1QuestId | null,
-      tier1Claimed: row.tier1Claimed === true,
-      tier2Completed: Array.isArray(row.tier2Completed) ? row.tier2Completed : [],
-      tier2Claimed: Array.isArray(row.tier2Claimed) ? row.tier2Claimed : [],
-      bonusClaimed: row.bonusClaimed === true,
-    };
-  }
-  return {
-    weekKey: currentWeekKey(),
-    tier1Completed: null,
-    tier1Claimed: false,
-    tier2Completed: [],
-    tier2Claimed: [],
-    bonusClaimed: false,
-  };
-}
-
+/** Weekly quests are a read-through projection of the server mission and reward ledger. */
 export const useWeeklyQuest = defineStore("weeklyQuest", () => {
-  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
-  let boundKey = "default";
-  const init = hydrate(boundKey);
-  const weekKey = ref(init.weekKey);
-  const tier1Completed = ref<Tier1QuestId | null>(init.tier1Completed);
-  const tier1Claimed = ref(init.tier1Claimed);
-  const tier2Completed = ref<Tier2QuestId[]>(init.tier2Completed);
-  const tier2Claimed = ref<Tier2QuestId[]>(init.tier2Claimed);
-  const bonusClaimed = ref(init.bonusClaimed);
+  const snapshot = ref<QuestSnapshot | null>(null);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+  const claiming = ref<string | null>(null);
+  const claimKeys = new Map<string, string>();
+  let accountEpoch = 0;
+  let refreshSequence = 0;
+  let claimSequence = 0;
 
-  function persist() {
-    writeAccountRow<PersistShape>(ACCOUNTS_KEY, boundKey, {
-      weekKey: weekKey.value,
-      tier1Completed: tier1Completed.value,
-      tier1Claimed: tier1Claimed.value,
-      tier2Completed: tier2Completed.value,
-      tier2Claimed: tier2Claimed.value,
-      bonusClaimed: bonusClaimed.value,
-    });
-  }
+  const tier1Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T1") ?? []);
+  const tier2Quests = computed(() => snapshot.value?.quests.filter((q) => q.layer === "WEEKLY_T2") ?? []);
+  const multiplier = computed(() => snapshot.value?.questBonusMultiplier ?? 1);
 
-  /** 账号切换重绑:装载该账号的周任务进度(P2-8 设备级泄漏修复)。 */
-  function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    const next = hydrate(boundKey);
-    weekKey.value = next.weekKey;
-    tier1Completed.value = next.tier1Completed;
-    tier1Claimed.value = next.tier1Claimed;
-    tier2Completed.value = next.tier2Completed;
-    tier2Claimed.value = next.tier2Claimed;
-    bonusClaimed.value = next.bonusClaimed;
-    // 🔴 换账号后必须立刻滚周(2026-08-05 独立证伪 A4)。周滚只挂在 onMounted 上,
-    //   而账号切换时首页 hero 早已挂载、不会重跑 —— 于是装进来的若是**上周**那一行,
-    //   上周的完成态会被当成本周的直接渲染,领取键可用。rollWeekIfStale 本就幂等,
-    //   不陈旧时一个字节都不写。
-    rollWeekIfStale();
-  }
-
-  /** Roll to current week if persisted weekKey is stale; called on mount. */
-  function rollWeekIfStale() {
-    const current = currentWeekKey();
-    if (weekKey.value !== current) {
-      weekKey.value = current;
-      tier1Completed.value = null;
-      tier1Claimed.value = false;
-      tier2Completed.value = [];
-      tier2Claimed.value = [];
-      bonusClaimed.value = false;
-      persist();
+  async function refresh(): Promise<boolean> {
+    const epoch = accountEpoch;
+    const requestSequence = ++refreshSequence;
+    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
+    if (!remoteApiEnabled) {
+      if (isCurrentRequest()) {
+        snapshot.value = null;
+        error.value = "WEEKLY_QUEST_SERVER_REQUIRED";
+        loading.value = false;
+      }
+      return false;
+    }
+    loading.value = true;
+    error.value = null;
+    try {
+      const next = await questApi.state();
+      if (!isCurrentRequest()) return false;
+      snapshot.value = next;
+      return true;
+    } catch (cause) {
+      if (isCurrentRequest()) {
+        snapshot.value = null;
+        error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_LOAD_FAILED";
+      }
+      return false;
+    } finally {
+      if (isCurrentRequest()) loading.value = false;
     }
   }
 
-  /** Mark tier 1 as complete (one-shot per week). Returns true if newly set. */
-  function markTier1Complete(id: Tier1QuestId): boolean {
-    if (tier1Completed.value === id) return false;
-    tier1Completed.value = id;
-    persist();
-    return true;
-  }
-  function claimTier1(): boolean {
-    if (!tier1Completed.value || tier1Claimed.value) return false;
-    tier1Claimed.value = true;
-    persist();
-    return true;
-  }
-
-  /** Mark tier 2 task complete. Idempotent. Returns true if newly set. */
-  function markTier2Complete(id: Tier2QuestId): boolean {
-    if (tier2Completed.value.includes(id)) return false;
-    tier2Completed.value = [...tier2Completed.value, id];
-    persist();
-    return true;
-  }
-  function claimTier2(id: Tier2QuestId): boolean {
-    if (!tier2Completed.value.includes(id)) return false;
-    if (tier2Claimed.value.includes(id)) return false;
-    tier2Claimed.value = [...tier2Claimed.value, id];
-    persist();
-    return true;
-  }
-
-  /** Claim the all-five-done bonus. Returns true if newly claimed. */
-  function claimBonus(): boolean {
-    if (bonusClaimed.value) return false;
-    bonusClaimed.value = true;
-    persist();
-    return true;
+  async function claim(quest: CanonicalQuest): Promise<boolean> {
+    if (!remoteApiEnabled || !["COMPLETED", "CLAIMABLE"].includes(quest.status) || claiming.value) return false;
+    const key = claimKeys.get(quest.questCode) ?? idempotencyKey(quest.questCode);
+    claimKeys.set(quest.questCode, key);
+    const epoch = accountEpoch;
+    const requestSequence = ++claimSequence;
+    const isCurrentRequest = () => epoch === accountEpoch && requestSequence === claimSequence;
+    claiming.value = quest.questCode;
+    error.value = null;
+    try {
+      const claimResult = await questApi.claim(quest.questCode, key);
+      if (!isCurrentRequest()) return false;
+      if (claimResult.questId !== quest.questCode) throw new Error("WEEKLY_QUEST_CLAIM_MISMATCH");
+      const readBack = await questApi.state();
+      if (!isCurrentRequest()) return false;
+      const authoritative = readBack.quests.find((row) => row.questCode === quest.questCode);
+      if (!authoritative || authoritative.status !== "CLAIMED") {
+        throw new Error("WEEKLY_QUEST_CLAIM_NOT_CONFIRMED");
+      }
+      snapshot.value = readBack;
+      claimKeys.delete(quest.questCode);
+      return true;
+    } catch (cause) {
+      if (isCurrentRequest()) {
+        error.value = cause instanceof Error ? cause.message : "WEEKLY_QUEST_CLAIM_FAILED";
+      }
+      return false;
+    } finally {
+      if (isCurrentRequest()) claiming.value = null;
+    }
   }
 
-  /** Demo helper — force a fresh week + clear completions. */
-  function reset() {
-    weekKey.value = currentWeekKey();
-    tier1Completed.value = null;
-    tier1Claimed.value = false;
-    tier2Completed.value = [];
-    tier2Claimed.value = [];
-    bonusClaimed.value = false;
-    persist();
+  function bindAccount(_accountKey: string) {
+    accountEpoch += 1;
+    refreshSequence += 1;
+    claimSequence += 1;
+    snapshot.value = null;
+    loading.value = false;
+    error.value = null;
+    claiming.value = null;
+    claimKeys.clear();
+    void refresh();
   }
 
-  return {
-    weekKey,
-    tier1Completed,
-    tier1Claimed,
-    tier2Completed,
-    tier2Claimed,
-    bonusClaimed,
-    rollWeekIfStale,
-    markTier1Complete,
-    claimTier1,
-    markTier2Complete,
-    claimTier2,
-    claimBonus,
-    reset,
-    bindAccount,
-  };
+  return { snapshot, loading, error, claiming, tier1Quests, tier2Quests, multiplier, refresh, claim, bindAccount };
 });

@@ -11,6 +11,7 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
+      <FundsSandboxBadge />
 
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
       <view class="flex" :style="segWrapStyle">
@@ -19,7 +20,7 @@
           :key="s.id"
           :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
-          role="tab" tabindex="0"
+          role="tab"
           :aria-selected="seg === s.id"
           @click="seg = s.id"
         >
@@ -43,6 +44,7 @@
 import { ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";

@@ -115,20 +115,23 @@ export const useNotifications = defineStore("notifications", () => {
     if (remoteApiEnabled) await notificationApi.clearRead();
     items.value = items.value.filter((item) => !item.readAt); recount(); persist();
   }
-  async function recordCta(id: string): Promise<string | null> {
+  async function recordRemoteAction(id: string, action: "cta" | "swipe_conversion"): Promise<string | null> {
+    if (!remoteApiEnabled) return null;
     const numericId = Number(id);
-    if (!Number.isSafeInteger(numericId) || numericId <= 0 || !remoteApiEnabled) return null;
+    if (!Number.isSafeInteger(numericId) || numericId <= 0) return null;
     try {
-      const result = await notificationApi.recordAction(numericId, "cta", `notification-cta-${numericId}`);
+      const result = await notificationApi.recordAction(numericId, action, `notification-${action}-${numericId}`);
       await markRead(id);
       return result.route;
     } catch (cause) {
       await refreshRemote();
-      error.value = cause instanceof Error ? cause.message : "NOTIFICATION_CTA_UNCERTAIN";
+      error.value = cause instanceof Error ? cause.message : "NOTIFICATION_ACTION_UNCERTAIN";
       return null;
     }
   }
+  async function recordCta(id: string) { return recordRemoteAction(id, "cta"); }
+  async function recordSwipeConversion(id: string) { return recordRemoteAction(id, "swipe_conversion"); }
   function clearAll() { if (remoteApiEnabled) { void refreshRemote(); return; } items.value = []; recount(); persist(); }
   function removeOne(id: string) { if (remoteApiEnabled) return; items.value = items.value.filter((item) => item.id !== id); recount(); persist(); }
-  return { items, unread, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, loadMoreRemote, retryRemote, recordCta };
+  return { items, unread, loading, error, nextCursor, push, markRead, markAllRead, clearRead, clearAll, removeOne, bindAccount, refreshRemote, loadMoreRemote, retryRemote, recordCta, recordSwipeConversion };
 });

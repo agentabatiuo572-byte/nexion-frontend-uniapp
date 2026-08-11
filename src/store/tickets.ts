@@ -1,112 +1,102 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { TICKETS, type Ticket, type TicketCategory } from "@/mock/tickets";
-import { normalizeAccountKey } from "./account-cloud";
-import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { supportApi } from "@/api/runtime";
+import type { Ticket, TicketCategory } from "@/domain/support";
 
-// 旧设备级单键 "nexgrid-support-tickets-v1" 废弃(存量无账号归属,mock 可重建);工单按账号分行。
-const ACCOUNTS_KEY = "nexgrid-support-tickets-accounts-v1"; // { [accountKey]: { tickets: Ticket[] } }
-
-function cloneTicket(ticket: Ticket): Ticket {
-  const raw = ticket as Partial<Ticket>;
-  return {
-    ...ticket,
-    lastReplyAt: raw.lastReplyAt ?? ticket.updatedAt,
-    owner: raw.owner ?? "Unassigned",
-    messages: ticket.messages.map((message) => ({ ...message })),
-  };
-}
-
-function seedTickets(): Ticket[] {
-  return TICKETS.map(cloneTicket);
-}
-
-function hydrate(accountKey: string): Ticket[] {
-  const row = readAccountRow<{ tickets?: Ticket[] }>(ACCOUNTS_KEY, accountKey);
-  if (row && Array.isArray(row.tickets)) return row.tickets.map(cloneTicket);
-  return seedTickets();
-}
-
-function nextTicketId(tickets: Ticket[]): string {
-  const max = tickets.reduce((acc, ticket) => {
-    const n = Number(ticket.id.replace(/^TK-/, ""));
-    return Number.isFinite(n) ? Math.max(acc, n) : acc;
-  }, 1024);
-  return `TK-${String(max + 1).padStart(4, "0")}`;
+function mutationKey(scope: string): string {
+  const label = scope.split(":", 1)[0].replace(/[^a-z0-9-]/gi, "").slice(0, 24) || "command";
+  return `support-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export const useTickets = defineStore("tickets", () => {
-  // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
-  let boundKey = "default";
-  const tickets = ref<Ticket[]>(hydrate(boundKey));
+  const tickets = ref<Ticket[]>([]);
+  const loading = ref(false);
+  const mutating = ref(false);
+  const error = ref<string | null>(null);
+  const pendingKeys = new Map<string, string>();
+  const inFlight = new Map<string, Promise<unknown>>();
+  let accountEpoch = 0;
 
-  function persist() {
-    writeAccountRow<{ tickets: Ticket[] }>(ACCOUNTS_KEY, boundKey, { tickets: tickets.value });
+  async function command<T>(intent: string, action: (key: string) => Promise<T>): Promise<T> {
+    const fingerprint = `${accountEpoch}:${intent}`;
+    const running = inFlight.get(fingerprint) as Promise<T> | undefined;
+    if (running) return running;
+    const key = pendingKeys.get(fingerprint) ?? mutationKey(intent);
+    pendingKeys.set(fingerprint, key);
+    const promise = action(key);
+    inFlight.set(fingerprint, promise);
+    mutating.value = true;
+    try {
+      const result = await promise;
+      pendingKeys.delete(fingerprint);
+      return result;
+    } finally {
+      inFlight.delete(fingerprint);
+      mutating.value = inFlight.size > 0;
+    }
   }
 
-  /** 账号切换重绑:装载该账号的工单(P2-8 设备级泄漏修复)。 */
-  function bindAccount(rawAccountKey: string) {
-    boundKey = normalizeAccountKey(rawAccountKey);
-    tickets.value = hydrate(boundKey);
+  function replace(ticket: Ticket) {
+    const rest = tickets.value.filter((row) => row.id !== ticket.id);
+    tickets.value = [ticket, ...rest].sort((a, b) => b.lastReplyAt - a.lastReplyAt);
   }
 
-  function createTicket(input: { category: TicketCategory; subject: string; body: string }): string {
-    const now = Date.now();
-    const id = nextTicketId(tickets.value);
-    const ticket: Ticket = {
-      id,
-      subject: input.subject.trim(),
-      category: input.category,
-      status: "open",
-      priority: "normal",
-      createdAt: now,
-      updatedAt: now,
-      lastReplyAt: now,
-      unread: 0,
-      owner: "Unassigned",
-      messages: [{ ts: now, author: "user", body: input.body.trim() }],
-    };
-    tickets.value = [ticket, ...tickets.value];
-    persist();
-    return id;
+  async function refresh(): Promise<void> {
+    const epoch = accountEpoch;
+    loading.value = true;
+    error.value = null;
+    try {
+      const items = (await supportApi.tickets()).items;
+      if (epoch === accountEpoch) tickets.value = items;
+    } catch (cause) {
+      if (epoch === accountEpoch) {
+        tickets.value = [];
+        error.value = cause instanceof Error ? cause.message : "SUPPORT_TICKETS_LOAD_FAILED";
+      }
+      throw cause;
+    } finally {
+      loading.value = false;
+    }
   }
 
-  function reply(id: string, body: string): boolean {
-    const next = tickets.value.map((ticket) => {
-      if (ticket.id !== id) return ticket;
-      const now = Date.now();
-      return {
-        ...ticket,
-        status: ticket.status === "closed" || ticket.status === "resolved" ? "open" : ticket.status,
-        updatedAt: now,
-        lastReplyAt: now,
-        messages: [...ticket.messages, { ts: now, author: "user" as const, body: body.trim() }],
-      };
-    });
-    const changed = next.some((ticket, index) => ticket !== tickets.value[index]);
-    if (!changed) return false;
-    tickets.value = next;
-    persist();
+  async function load(id: string): Promise<Ticket> {
+    const ticket = await supportApi.ticket(id);
+    replace(ticket);
+    return ticket;
+  }
+
+  async function createTicket(input: { category: TicketCategory; subject: string; body: string }): Promise<string> {
+    const epoch = accountEpoch;
+    const intent = `ticket-create:${input.category}:${input.subject.trim()}:${input.body.trim()}`;
+    const ticket = await command(intent, key => supportApi.createTicket(input, key));
+    if (epoch === accountEpoch) replace(ticket);
+    return ticket.id;
+  }
+
+  async function reply(id: string, body: string): Promise<boolean> {
+    const current = tickets.value.find((row) => row.id === id) ?? await load(id);
+    const epoch = accountEpoch;
+    const ticket = await command(`ticket-reply:${id}:${current.version}:${body.trim()}`,
+      key => supportApi.replyTicket(current, body, key));
+    if (epoch === accountEpoch) replace(ticket);
     return true;
   }
 
-  function close(id: string): boolean {
-    const next = tickets.value.map((ticket) =>
-      ticket.id === id
-        ? { ...ticket, status: "closed" as const, updatedAt: Date.now(), unread: 0 }
-        : ticket,
-    );
-    const changed = next.some((ticket, index) => ticket !== tickets.value[index]);
-    if (!changed) return false;
-    tickets.value = next;
-    persist();
+  async function close(id: string): Promise<boolean> {
+    const current = tickets.value.find((row) => row.id === id) ?? await load(id);
+    const epoch = accountEpoch;
+    const ticket = await command(`ticket-close:${id}:${current.version}`,
+      key => supportApi.closeTicket(current, key));
+    if (epoch === accountEpoch) replace(ticket);
     return true;
   }
 
-  function reset() {
-    tickets.value = seedTickets();
-    persist();
+  function clearAccount() {
+    accountEpoch += 1; tickets.value = []; error.value = null;
+    pendingKeys.clear(); inFlight.clear(); mutating.value = false;
   }
+  function bindAccount() { clearAccount(); }
+  function reset() { clearAccount(); }
 
-  return { tickets, createTicket, reply, close, reset, bindAccount };
+  return { tickets, loading, mutating, error, refresh, load, createTicket, reply, close, reset, bindAccount };
 });

@@ -299,8 +299,9 @@ async function handleCancelTrial() {
     cancelLabel: t.value.trial.cancelConfirmKeep,
   });
   if (ok) {
-    trial.cancel();
-    toast.info(t.value.trial.toastCancelled);
+    const result = await trial.cancel();
+    if (result?.ok) toast.info(t.value.trial.toastCancelled);
+    else toast.warn(t.value.trial.cancelError);
   }
 }
 

@@ -20,6 +20,7 @@
 
       <!-- Balance hero — de-carded: balance + actions sit on the page floor. -->
       <view :style="heroStyle">
+        <FundsSandboxBadge />
         <text class="block" :style="heroLabelStyle">{{ t.wallet.usdtBalance }}</text>
         <text class="block tabular-nums" :style="heroNumStyle">${{ usdt.toFixed(2) }}</text>
         <view class="inline-flex items-center active:opacity-70 transition-opacity" style="margin-top: 8px; gap: 6px" @click="goNex">
@@ -54,6 +55,10 @@
       <view v-if="configSyncFailed" :style="syncFailBoxStyle">
         <text class="block" :style="syncFailTitleStyle">{{ t.wallet.syncFailedTitle }}</text>
         <text class="block" :style="syncFailBodyStyle">{{ t.wallet.syncFailedBody }}</text>
+      </view>
+      <view v-if="fundsAuthorityError" :style="syncFailBoxStyle">
+        <text class="block" :style="syncFailTitleStyle">SANDBOX</text>
+        <text class="block break-all" :style="syncFailBodyStyle">{{ fundsAuthorityError }}</text>
       </view>
 
       <!-- Earnings list -->
@@ -112,6 +117,7 @@
 import { computed, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import WalletListRow from "@/components/me/wallet-list-row.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -124,6 +130,7 @@ import { confirm as uiConfirm } from "@/store/ui";
 import { evaluateAccountCluster } from "@/store/risk-cluster";
 import { riskReasonLines } from "@/lib/risk-reason-text";
 import type { WithdrawalStatus } from "@/store/types";
+import { fundsSandboxEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -132,6 +139,9 @@ const cards = useCards();
 const cfg = useConfig();
 
 const configSyncFailed = computed(() => cfg.syncFailed);
+const fundsAuthorityError = computed(() => fundsSandboxEnabled && app.fundsSandboxStatus === "error"
+  ? app.fundsSandboxError
+  : "");
 
 // SPEC-7 FEAT-RISK02 ⑥: 审核中/锁定信息弹层 — 释放规则 + 当前命中原因摘要
 // (reason code → i18n 业务话术,工程码不直出;R5: 原因现算不读缓存)。
@@ -167,19 +177,8 @@ const buckets = computed(() => ({
   bonusLockedUsdt: earningsReleaseSnapshot.value?.buckets.bonus_locked
     ?? app.user.earningBuckets.bonusLockedUsdt,
 }));
-// 🔴 这是**账面总余额**,标签叫「USDT 余额」——不叫「可提现」。两者是不同的数,不要再合并。
-//
-// 2026-08-11 主人拍板(口径分裂修复):原注释写着「可提现 USDT = 总余额,必须与
-// wallet-withdraw 的 maxWithdrawable 同源」,但 maxWithdrawable 早已不是总余额 ——
-// 它 = (总余额 − pending_review − bonus_locked) × policy.balanceMaxRatio,且在
-// 「风控簇受限 / 无收益快照 / 无 policy」三态下 fail-closed 归 0。后端缺席时它恒为 0,
-// 而这里照旧显示两万多,标签却都写着「可提现」→ 钱包页承诺的钱,提现流程不认。
-//
-// 拍板结论是**标签分离**而不是数值统一:账面有多少(这里)和此刻能提多少(提现页)
-// 本就是两个数;强行统一只有两条路 —— 要么这里跟着 fail-closed 显示 $0(用户不知道
-// 自己有钱),要么提现页放宽到总余额(架空风控扣留与 policy 比例,是资金门倒退)。
-// 差额去向由下面的 pendingReview / lockedRewards 两行呈现,可提额度以提现页为准。
-// 守门:verify.sh withdrawable_source_parity(值读总余额 + 标签不得含「可提现」)。
+// 2026-07-31:充值本金可提后,「可提现 USDT」= 总余额(held 两桶本就账外,不含在内)。
+// 必须与 wallet-withdraw 的 maxWithdrawable 同源,否则钱包页显示的数与实际能提的数对不上。
 const usdt = computed(() => app.user.usdtBalance);
 const nexLabel = computed(() => app.user.nexBalance.toLocaleString());
 const pending = computed(() => app.user.pendingEarnings);

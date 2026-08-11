@@ -104,7 +104,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { useProfile } from "@/store/profile";
 import { toast } from "@/store/ui";
-import { activateChannel, buildShareLink, copyText, recordShareEvent } from "@/lib/share";
+import { activateChannel, buildShareLink, copyText, currentShareReferralCode, recordShareEvent } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
 
 const props = defineProps<{ open: boolean }>();
@@ -387,7 +387,7 @@ function paint(link: string, myToken: number) {
   }
   ctx.setFillStyle(BRAND_ON_DARK);
   ctx.setFontSize(11);
-  ctx.fillText(app.user.referralCode, 20, footY + 40);
+  ctx.fillText(currentShareReferralCode(), 20, footY + 40);
   ctx.setFillStyle(FAINT_ON_DARK);
   ctx.setFontSize(8.5);
   ctx.fillText(t.value.share.scanTip, 20, footY + 58);

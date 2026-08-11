@@ -86,10 +86,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
-import { getLockedTeasers } from "@/mock/tasks";
+import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import type { TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
@@ -100,6 +100,8 @@ const app = useApp();
 const t = useT();
 const receipts = useReceipts();
 const openReceipt = ref<Receipt | null>(null);
+prepareEarnConfig();
+const earnConfig = useEarnConfig();
 function receiptFor(id: string): Receipt | undefined {
   return receipts.byId(id);
 }
@@ -119,7 +121,8 @@ const allRecent = computed(() =>
 );
 
 const maxVram = computed(() => app.visibleDevices.reduce((m, d) => Math.max(m, d.vramTotal), 0));
-const lockedTeasers = computed(() => getLockedTeasers(maxVram.value, 3));
+const lockedTeasers = computed(() => earnConfig.lockedTeasers(maxVram.value, 3));
+watch(maxVram, (value) => { void earnConfig.refreshRoute(value); }, { immediate: true });
 
 const historyHintText = computed(() =>
   t.value.taskHistory.historyHint.replace("{n}", String(allRecent.value.length)),
