@@ -10,7 +10,6 @@
 //     nex-faucet        每日签到 / 里程碑 / saver,覆盖式写 = 一天领两次
 //     daily-powerup     连胜增益一次性激活,覆盖 = 白送一档
 //     lucky-spin        每日免费票 + bonus 票,覆盖 = 一张票抽两次奖
-//     withdraw-daily-count 提现日限额计数,覆盖 = 限额白设
 //   H5 端 uni storage 就是 localStorage,同源多标签页共享同一份;全仓又没有任何 storage
 //   事件重新水合这些 store —— 窗口不是几毫秒的传播延迟,而是「两个标签页只要都打开过,
 //   状态就永久不同步」。而 usdtBalance / nexBalance 在 account-cloud 的 ADDITIVE_NUMBER_KEYS
@@ -47,7 +46,10 @@ const SRC = path.join(root, "src");
 const STORE_DIR = path.join(SRC, "store");
 const readSrc = (...p) => readFileSync(path.join(root, ...p), "utf8");
 
-const samples = { tabs: 2, stores: 6, targetGroups: 0, locales: 3 };
+// stores:2026-08-11 由 6 降为 5 —— withdraw-daily-count 随 z1 审计 P0-1 删除
+// (日限改由提现单列表现算,没有第二份计数状态要防覆盖)。这个数是**报出去的样本量**,
+// 少一个 store 就必须跟着降,否则 PASS 行会替一个不存在的被测对象背书。
+const samples = { tabs: 2, stores: 5, targetGroups: 0, locales: 3 };
 let pass = 0;
 let fail = 0;
 function check(name, cond, detail) {
@@ -145,11 +147,8 @@ const { useVoucher } = await loadStore("voucher.ts");
 const { useNexFaucet } = await loadStore("nex-faucet.ts");
 const { useDailyPowerUp } = await loadStore("daily-powerup.ts");
 const { useLuckySpin } = await loadStore("lucky-spin.ts");
-const { claimWithdrawSlot, releaseWithdrawSlot, readWithdrawCounter } =
-  await loadStore("withdraw-daily-count.ts");
 const { readAccountRow, writeAccountRow, writeAccountRowCas, accountRowRev } =
   await loadStore("account-scoped-storage.ts");
-const { platformDayIndex } = await loadStore("withdrawal-eligibility-core.ts");
 const { listVouchers, isVoucherValid } = await import(
   "data:text/javascript;base64," + Buffer.from(
     (await build({
@@ -167,7 +166,6 @@ const KEYS = {
   faucet: "nexgrid-nex-faucet-accounts-v1",
   powerup: "nexgrid-daily-powerup-accounts-v1",
   spin: "nexgrid-lucky-spin-accounts-v1",
-  withdraw: "nexgrid-withdraw-daily-count-v1",
 };
 
 /** 用**老调用方**写盘(不带 rev)= 真实存量行的形态,顺便证明老行能被 CAS 直接接管。 */
@@ -569,64 +567,12 @@ group();
     `tickets=${diskRow(KEYS.spin).bonusTickets}`);
 }
 
-// ══════════════ ① withdraw-daily-count:提现日限额计数 ══════════════
-group();
-{
-  const now = Date.now();
-  // 限额 1 笔:第二个标签页必须占不到
-  disk.clear();
-  const t1 = await claimWithdrawSlot(ACCT, 1, now);
-  const t2 = await claimWithdrawSlot(ACCT, 1, now);
-  check("①wd 限额 1 笔时第二次占用被拒(既有语义)", typeof t1 === "string" && t2 === null);
-  check("①wd 计数器停在 1(不会被第二次的覆盖式写改坏)",
-    readWithdrawCounter(ACCT).count === 1, JSON.stringify(readWithdrawCounter(ACCT)));
-
-  // 别处已占 1 格:本次必须在**磁盘最新计数**上累加,而不是拿自己算的 next 覆盖回去。
-  disk.clear();
-  writeAccountRow(KEYS.withdraw, ACCT, { dayIndex: platformDayIndex(now), count: 1, claimToken: "other-tab" });
-  const second = await claimWithdrawSlot(ACCT, 2, now);
-  check("①wd 别处已占 1 格时,本次累加到 2(不是覆盖回 1)",
-    typeof second === "string" && readWithdrawCounter(ACCT).count === 2,
-    `count=${readWithdrawCounter(ACCT).count}`);
-  const third = await claimWithdrawSlot(ACCT, 2, now);
-  check("①wd 额度用满后第三次被拒", third === null && readWithdrawCounter(ACCT).count === 2);
-
-  // ①b 🔴 真正的插队:本次**读完计数、还没写回**的那一瞬,另一个标签页完成一次占用。
-  // 覆盖式写在这里会把对方那一格整份顶掉(两边都写 count=1)→ 限额白设,还能再提一笔。
-  disk.clear();
-  armInterleave(
-    KEYS.withdraw,
-    () => {
-      const cur = readAccountRow(KEYS.withdraw, ACCT);
-      writeAccountRowCas(
-        KEYS.withdraw, ACCT,
-        { dayIndex: platformDayIndex(now), count: 1, claimToken: "other-tab" },
-        accountRowRev(cur),
-      );
-    },
-    1, // 跳过 claimWithdrawSlot 的快速拒那次读盘,插在 CAS 循环的「读」与「写」之间
-  );
-  const raced = await claimWithdrawSlot(ACCT, 2, now);
-  check("①b wd 插队确实发生了(另一端在本次读与写之间占掉一格,固定靶不是空转)",
-    diskRev(KEYS.withdraw) >= 2, `rev=${diskRev(KEYS.withdraw)}`);
-  check("①b wd 🔴 两格都算数(count=2)—— 覆盖式写会停在 1,限额白多放一笔",
-    readWithdrawCounter(ACCT).count === 2, `count=${readWithdrawCounter(ACCT).count}`);
-  check("①b wd 🔴 额度到顶后再占被拒(证明上面那 2 真的被当成 2 用)",
-    (await claimWithdrawSlot(ACCT, 2, now)) === null && typeof raced === "string");
-  check("①wd 占用写入走的是 CAS(行带版本号,老行 rev=0 → 落盘后 >0)", diskRev(KEYS.withdraw) > 0);
-
-  // 归还:只还自己的那一格,且不覆盖别处刚占的
-  disk.clear();
-  const tok = await claimWithdrawSlot(ACCT, 5, now);
-  releaseWithdrawSlot(ACCT, tok);
-  check("②wd 归还后计数减 1(被拒的提交不白吃额度)", readWithdrawCounter(ACCT).count === 0);
-  const tok2 = await claimWithdrawSlot(ACCT, 5, now);
-  releaseWithdrawSlot(ACCT, "someone-elses-token");
-  check("②wd 🔴 拿别人的令牌归还是 no-op(否则等于替别人退票)",
-    readWithdrawCounter(ACCT).count === 1 && typeof tok2 === "string");
-  check("②wd 跨日自动归零(日序对不上就当 0,不需要定时清理)",
-    readWithdrawCounter(ACCT).dayIndex === platformDayIndex(now));
-}
+// ══════════════ ①② withdraw-daily-count:已随 z1 审计 P0-1 整体删除 ══════════════
+// 2026-08-11:客户端不再维护日限计数器 —— 今日笔数改由 core 从提现单列表现算
+// (withdrawal-eligibility-core.countWithdrawalsOnPlatformDay),没有第二份状态就不必
+// 用 CAS + 令牌去防并发覆盖。原两节测的是 claimWithdrawSlot / releaseWithdrawSlot 的
+// 落盘竞争,模块已删,留着就是绿着守死代码(正是 z1 点名的那种假绿)。
+// 日限的行为覆盖现在全部在 scripts/selfcheck-fastlane.mjs §7(含平台日边界与到达上限固定靶)。
 
 // ══════════════ ④ 向后兼容:老写法逐字节不变 + 爆炸半径 ══════════════
 group();
@@ -814,13 +760,6 @@ group();
   const vou = strip(readSrc("src", "store", "voucher.ts"));
   check("⑥ 🔴 voucher 的 `watch(claimed, persist, deep)` 旁路已删除(留着它 = 绕过 CAS 的第二条落盘路)",
     !/\bwatch\s*\(/.test(vou), (vou.match(/.*watch\s*\(.*/g) || []).join(" | "));
-
-  const wd = strip(readSrc("src", "store", "withdraw-daily-count.ts"));
-  check("⑥ withdraw-daily-count 两条写路径都走 CAS(占用 + 归还)",
-    (wd.match(/writeAccountRowCas</g) || []).length === 2 && !/[^C]\bwriteAccountRow\(/.test(wd));
-  check("⑥ 🔴 令牌 + 等传播收敛那一段一个字没删(CAS 治写覆盖,治不了跨进程读陈旧)",
-    wd.includes("isClaimOwner(readWithdrawCounter(accountKey), token)")
-    && /await new Promise<void>\(\(r\) => setTimeout\(r, CLAIM_SETTLE_MS\)\)/.test(wd));
 
   const engine = strip(readSrc("src", "store", "account-scoped-storage.ts"));
   check("⑥ 共用提交器以**磁盘最新**行为基准(不是拿内存副本自证)",

@@ -20,16 +20,17 @@ const RUNTIME_PUBLIC_STATS_DEFAULT: PlatformConfig["publicStats"] = {
   hashratePercentileTable: [],
 };
 
+// 🔴 这里没有 dailyWithdrawLimitCount,且不许加回来:每日提现笔数上限的唯一来源是
+// 服务端 `GET /api/withdrawals/policy`。放一个本地默认值在这儿,等于给「客户端按写死的
+// 1 笔拦人、而服务端配的是 3 笔」留了后门(z1 审计 P0-1 同批发现)。
 const RUNTIME_WITHDRAW_RULE_DEFAULTS = {
   smallAmountThresholdUsd: 50,
-  dailyWithdrawLimitCount: 1,
   payoutSlaHours: 24,
   payoutReviewWindowDays: 0,
   networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 },
 } satisfies Pick<
   PlatformConfig["withdrawRules"],
   | "smallAmountThresholdUsd"
-  | "dailyWithdrawLimitCount"
   | "payoutSlaHours"
   | "payoutReviewWindowDays"
   | "networkConfirmFeeUsd"

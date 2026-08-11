@@ -333,9 +333,11 @@ function diskRev() {
   // daily-powerup / lucky-spin / withdraw-daily-count,见 selfcheck-money-cas.mjs);
   // 名单写死在这里,新增一个未登记的消费者就红 —— 台账不写在被查文件里,否则改代码
   // 顺手改台账 = 门等于没有。
+  // 2026-08-11:withdraw-daily-count 出列 —— 该模块随 z1 审计 P0-1 删除
+  // (日限改由提现单列表现算,没有第二份计数状态,自然也不需要 CAS 防覆盖)。
   const CAS_CONSUMERS = [
     "daily-powerup.ts", "deposits.ts", "lucky-spin.ts", "nex-faucet.ts",
-    "staking.ts", "voucher.ts", "withdraw-daily-count.ts",
+    "staking.ts", "voucher.ts",
   ];
   const storeFiles = readdirSync(STORE_DIR).filter((f) => f.endsWith(".ts"));
   samples.storeFiles = storeFiles.length;

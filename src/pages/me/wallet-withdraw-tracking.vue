@@ -112,8 +112,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, onMounted, ref, type CSSProperties } from "vue";
 import { onLoad } from "@dcloudio/uni-app";
+import { withdrawalApi } from "@/api/runtime";
+import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
@@ -184,12 +186,23 @@ const doneUpTo = computed(() => (isTerminalDone.value ? steps.value.length : Mat
 /** 失败终态 / 冻结态不再转圈:转圈代表「还在推进」,而它已经不会再推进了。 */
 const showSpinner = computed(() => !isTerminalDone.value && !isFailedEnd.value && !isFrozenHold.value);
 
-// ⑥ 「再提一笔」的可用性。判据来自 core(纯查询,不占额度);
-// 依赖 latestWithdrawal 让本页提交完回来时重算,不然会停在旧结论上。
-const dailyLimit = computed(() => {
-  void wd.value;
-  return dailyLimitStatus(app.accountKey);
+// ⑥ 「再提一笔」的可用性。
+// 🔴 两件事实必须与提现页**同源**,否则这页说能提、那页说不能提(历史上真出过):
+//   限额只认服务端 policy(提交时真正执行的那把尺子),笔数由 core 从 app.withdrawals 现算。
+//   本页原先只能拿到本地 config 的写死值,是分裂的一半。
+// policy 取不到 → 0 → 既有规则「上限 ≤0 视为未配置」→ 不置灰(fail-open,
+// 后端不可达时不把用户的下一步堵死;真拦不拦由提现页与服务端说了算)。
+const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
+onMounted(() => {
+  void withdrawalApi.policy()
+    .then((p) => { withdrawalPolicy.value = p; })
+    .catch(() => { withdrawalPolicy.value = null; });
 });
+// app.withdrawals 本身是响应源,提交完回到本页会自动重算 —— 不再需要 `void wd.value` 那种手动挂依赖。
+const dailyLimit = computed(() => dailyLimitStatus({
+  limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
+  withdrawals: app.withdrawals,
+}));
 const againDisabled = computed(() => dailyLimit.value.reached);
 const againReasonText = computed(() => {
   const at = new Date(dailyLimit.value.resetAt);
