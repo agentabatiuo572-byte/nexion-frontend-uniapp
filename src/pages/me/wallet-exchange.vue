@@ -24,12 +24,12 @@
            it stays paired with the rate-refresh button (no de-carded hero here to
            merge into — owner 2026-07-09). -->
       <view class="flex items-center" :style="topRowStyle">
-        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" @click="goHowItWorks">
+        <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howStyle" role="button" tabindex="0" @click="goHowItWorks">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14" /><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></svg>
           <text style="margin: 0 6px">{{ t.exchange.howItWorksEntry }}</text>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
-        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" @click="onRefresh">
+        <view class="grid place-items-center active:opacity-70" :style="refreshBtnStyle" role="button" tabindex="0" @click="onRefresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
         </view>
       </view>
@@ -53,7 +53,7 @@
         </view>
         <view class="flex items-center justify-between" style="margin-top: 6px">
           <text style="font-size: 12px; color: var(--v5-ink-4)">{{ minLabel }}</text>
-          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" @click="setMax">
+          <view class="inline-flex items-center active:bg-[color-mix(in_srgb,var(--v5-surface-2)_50%,transparent)]" :style="maxBtnStyle" role="button" tabindex="0" @click="setMax">
             <text style="color: var(--v5-brand)">{{ fromSym }} </text>
             <text class="tabular-nums" style="color: var(--v5-brand)">{{ fromBalLabel }}</text>
             <text style="color: var(--v5-brand)"> · {{ t.uiChrome.max }}</text>
@@ -63,7 +63,7 @@
 
       <!-- Flip -->
       <view class="flex justify-center" style="margin: 8px 0">
-        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" @click="flip">
+        <view class="grid place-items-center active:opacity-80" :style="flipBtnStyle" role="button" tabindex="0" @click="flip">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4" /><path d="M7 20V4" /><path d="m21 8-4-4-4 4" /><path d="M17 4v16" /></svg>
         </view>
       </view>

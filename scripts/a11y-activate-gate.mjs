@@ -330,7 +330,7 @@ if (filesTotal - filesWithTpl > NO_TEMPLATE_OK.size) {
 // 没有它,这道门的激励方向是反的 —— 它只管"声明了身份却没兑现"的,而**什么都不声明反倒免检**,
 // 于是新控件最省事的过门方式就是别写 role,桶必然单调变大,而门一路绿灯。
 // 基线是本卡收口时的实测值;这批存量归独立卡收,但**不许再涨**。
-const ZERO_PROMISE_BASELINE = 361;
+const ZERO_PROMISE_BASELINE = 273;
 if (zeroPromise > ZERO_PROMISE_BASELINE) {
   findings.D.push(
     `可点但零无障碍属性 ${zeroPromise} 处,超过基线 ${ZERO_PROMISE_BASELINE} —— 新增的可点区域没有声明 role/tabindex。` +

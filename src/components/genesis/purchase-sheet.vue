@@ -24,7 +24,7 @@
             <text class="block" :style="titleStyle">{{ t.genesis.confirmTitle }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -33,13 +33,13 @@
         <view :style="stepperWrapStyle">
           <text class="block" :style="stepperLabelStyle">{{ t.genesis.quantity }}</text>
           <view class="flex items-center" style="margin-top: 8px; gap: 16px">
-            <view class="flex items-center justify-center active:opacity-70" :style="minusBtnStyle" @click="dec">
+            <view class="flex items-center justify-center active:opacity-70" :style="minusBtnStyle" role="button" tabindex="0" @click="dec">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /></svg>
             </view>
             <view class="flex-1 text-center">
               <text class="tabular-nums" :style="qtyStyle">{{ qty }}</text>
             </view>
-            <view class="flex items-center justify-center active:opacity-70" :style="plusBtnStyle" @click="inc">
+            <view class="flex items-center justify-center active:opacity-70" :style="plusBtnStyle" role="button" tabindex="0" @click="inc">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
             </view>
           </view>

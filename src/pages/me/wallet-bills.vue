@@ -23,7 +23,7 @@
           :key="tb"
           class="flex-1 grid place-items-center active:opacity-70"
           :style="pillStyle(tb)"
-          @click="tab = tb"
+          role="button" tabindex="0" @click="tab = tb"
         >
           <text :style="pillLabelStyle(tb)">{{ tabLabel(tb) }}</text>
         </view>

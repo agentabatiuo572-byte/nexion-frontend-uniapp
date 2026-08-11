@@ -19,7 +19,7 @@
             <text class="block" :style="titleStyle">{{ titleText }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -34,7 +34,7 @@
           </view>
           <!-- Presets -->
           <view class="grid grid-cols-4" style="margin-top: 16px; gap: 8px">
-            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" @click="amount = p">
+            <view v-for="p in PRESETS" :key="p" class="active:opacity-80" :style="presetStyle(p)" role="button" tabindex="0" @click="amount = p">
               <text>${{ p.toLocaleString() }}</text>
             </view>
           </view>
@@ -44,7 +44,7 @@
               <text>{{ t.stakingV3.sheet.balance }} </text>
               <text style="color: var(--v5-ink); font-weight: 500">${{ balanceText }}</text>
             </text>
-            <text class="nx-staking-sheet-max-cta" :style="maxStyle" @click="setMax">{{ t.stakingV3.sheet.max }}</text>
+            <text class="nx-staking-sheet-max-cta" :style="maxStyle" role="button" tabindex="0" @click="setMax">{{ t.stakingV3.sheet.max }}</text>
           </view>
         </view>
 
@@ -70,7 +70,7 @@
         </view>
 
         <!-- Submit -->
-        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" @click="submit">
+        <view class="nx-staking-sheet-submit-cta w-full inline-flex items-center justify-center active:opacity-85" :style="submitStyle" role="button" tabindex="0" @click="submit">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
           <text>{{ ctaText }}</text>
         </view>

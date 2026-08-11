@@ -23,7 +23,7 @@
                 <text class="block" :style="heroPtsStyle">{{ w.benefits.apy }}</text>
               </view>
             </view>
-            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" @click="goHow">
+            <view class="inline-flex items-center shrink-0 active:scale-[0.98]" :style="howLinkStyle" role="button" tabindex="0" @click="goHow">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg>
               <text style="margin: 0 6px">{{ w.howItWorksEntry }}</text>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
@@ -53,7 +53,7 @@
           </view>
           <view class="grid grid-cols-4" style="gap: 8px; margin-top: 12px">
             <!-- 反馈恒定:选中档原是空 class,按下零反馈 -->
-            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" @click="amount = p">
+            <view v-for="p in presets" :key="p" class="active:opacity-70 transition-opacity" :style="presetStyle(amount === p)" role="button" tabindex="0" @click="amount = p">
               <text>${{ p }}</text>
             </view>
           </view>
@@ -75,7 +75,7 @@
         </view>
 
         <!-- CTA -->
-        <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" @click="handleRepurchase">
+        <view class="nx-repurchase-submit-cta w-full flex items-center justify-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="ctaStyle" role="button" tabindex="0" @click="handleRepurchase">
           <text>{{ ctaLabel }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" :stroke="canSubmit ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>

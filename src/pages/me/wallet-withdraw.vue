@@ -26,7 +26,7 @@
 
       <!-- dev-only tester reset(?dev=1):清空当前账号提现地址簿,复现空态引导 -->
       <view v-if="devMode" class="mx-4 mb-3 flex items-center justify-end">
-        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetAddresses">
+        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" role="button" tabindex="0" @click="handleResetAddresses">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
           <text style="margin-left: 4px">{{ t.walletV3.resetAddrLabel }}</text>
         </view>
@@ -57,7 +57,7 @@
       <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" @click="useMax">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" @click="useMax">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
@@ -295,7 +295,7 @@
       <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
            范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
       <view v-if="feeWhyOpen">
-        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
+        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" role="button" tabindex="0" @click="feeWhyOpen = false" />
         <view class="nx-sheet-slide-up" :style="feeWhySheetStyle">
           <view class="flex items-start justify-between" style="gap: 12px">
             <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
