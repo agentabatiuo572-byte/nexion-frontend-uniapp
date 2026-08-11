@@ -236,6 +236,7 @@ export const vi: Messages = {
     passwordMismatch: "Mật khẩu không khớp.",
     finishReset: "Cập nhật mật khẩu và đăng nhập",
     resetSuccess: "Đã cập nhật mật khẩu · đã đăng nhập",
+    errorInvalidCredentials: "Số điện thoại hoặc mật khẩu không đúng.",
   },
   register: {
     title: "Tạo tài khoản",
@@ -961,6 +962,8 @@ export const vi: Messages = {
     disclaimer: "Việc xác nhận được ghi lại kèm dấu thời gian. Bạn có thể đọc lại bất cứ lúc nào qua Của tôi → Công bố rủi ro.",
     acceptToast: "Đã xác nhận công bố rủi ro · Bạn đã có thể dùng các tính năng rút tiền / staking / khóa.",
     sectionSelected: "Đã chọn mục {n} để xem lại",
+    reloadRegionCta: "Tải lại công bố áp dụng cho khu vực của bạn",
+    loadErrorRegion: "Công bố rủi ro cho khu vực của bạn tạm thời không khả dụng; vui lòng kiểm tra mạng rồi thử lại. Chưa tải được thì chưa thể xác nhận.",
   },
 
   productPhase: {
@@ -2236,6 +2239,7 @@ export const vi: Messages = {
     leftCount: "còn ~{n}",
     trustCenter: "Trung tâm tin cậy",
     auditsPartners: "Kiểm toán · đối tác",
+    learningRow: "Trung tâm hướng dẫn",
     walletCardsRow: "Thẻ thanh toán",
     walletCardsMeta: "Quản lý thẻ",
     goalsRow: "Mục tiêu thu nhập",
@@ -2633,6 +2637,11 @@ export const vi: Messages = {
     queuedToastBody: "Lệnh quy đổi ${amount} sẽ thực hiện sau khi đặt lại lúc nửa đêm.",
     platformExhaustedTitle: "Quỹ nền tảng đã cạn",
     platformExhaustedBody: "Quỹ ${cap}K mỗi ngày đã hết. Vui lòng thử lại vào ngày mai.",
+    remoteUnavailableClosed: "Hiện chưa thể quy đổi, vui lòng thử lại sau.",
+    remoteNotProvided: "Chưa có dữ liệu",
+    remoteUnavailableToast: "Chưa lấy được dữ liệu mới nhất, vui lòng thử lại sau.",
+    swapFailed: "Giao dịch quy đổi chưa thành công, vui lòng thử lại sau.",
+    remoteRefreshed: "Đã cập nhật dữ liệu",
   },
 
   exchangeHowItWorks: {
@@ -2844,6 +2853,7 @@ export const vi: Messages = {
     insufficientToast: "Không đủ NEX cho gói này",
     educationFooter:
       "Staking là tự nguyện hoãn rút tiền của bạn. Lãi thưởng APY cao hơn là để bù cho thời gian khóa vốn.",
+    remoteUnavailableClosed: "Hiện chưa thể thực hiện thao tác khóa vốn, vui lòng thử lại sau.",
   },
   achievements: {
     title: "Thành tựu",
@@ -3307,6 +3317,11 @@ export const vi: Messages = {
     download: "Tải PDF",
     viewOnChain: "Xem on-chain",
     latest: "Mới nhất",
+    loadingDisclosure: "Đang xác minh các công bố áp dụng cho khu vực của bạn…",
+    openFailed: "Không thể mở liên kết này trên thiết bị hiện tại",
+    errorOffline: "Công bố này chỉ khả dụng qua mạng tin cậy; vui lòng kết nối rồi thử lại.",
+    errorGeoUnresolved: "Tạm thời chưa xác nhận được quy định áp dụng cho khu vực của bạn; trang này sẽ không lấy nội dung cũ đã lưu để thay cho dữ liệu mới nhất, vui lòng kiểm tra mạng rồi thử lại.",
+    errorUnavailable: "Công bố tạm thời không khả dụng; trang này sẽ không lấy nội dung cũ đã lưu để thay cho dữ liệu mới nhất, vui lòng thử lại sau.",
   },
 
   genesisEligibility: {
@@ -4780,6 +4795,8 @@ export const vi: Messages = {
     cardRebindTitle: "Thay thẻ dùng thử của bạn",
     cardRebindBody: "Thẻ {brand} •••• {last4} của bạn không còn bảo đảm được cho bản dùng thử miễn phí. Hãy liên kết thẻ mới sớm để giao dịch mua khi kết thúc dùng thử diễn ra suôn sẻ.",
     cardRebindCta: "Liên kết thẻ mới",
+    loadMore: "Tải thêm",
+    loadFailed: "Chưa tải được thông báo, vui lòng kiểm tra mạng rồi thử lại.",
   },
 
   // FEAT-SHARE01 invite share chain (poster sheet / channel sheet / entries).
@@ -5056,5 +5073,25 @@ export const vi: Messages = {
     cancelCta: "Hủy",
     reasonNewAddressAge: "Địa chỉ rút tiền đổi chưa đủ 7 ngày, rút số tiền lớn cần duyệt thủ công",
     startFailed: "Có lỗi xảy ra, vui lòng thử lại sau",
+  },
+  learning: {
+    centerTitle: "Trung tâm hướng dẫn",
+    centerLoading: "Đang tải trung tâm hướng dẫn…",
+    centerProgress: "Đã hoàn thành {done}/{total} · Đã nhận {nex} NEX",
+    courseMeta: "{duration} · Thưởng {nex} NEX",
+    centerOffline: "Trung tâm hướng dẫn cần kết nối mạng tin cậy; vui lòng kết nối rồi thử lại.",
+    centerGeoUnresolved: "Tạm thời chưa xác nhận được quy định áp dụng cho khu vực của bạn; nội dung hướng dẫn sẽ không hiển thị bản lưu cũ, vui lòng kiểm tra mạng rồi thử lại.",
+    centerUnavailable: "Trung tâm hướng dẫn tạm thời không khả dụng; vui lòng thử lại sau.",
+    courseLoading: "Đang tải bài học…",
+    courseVersionMeta: "Phiên bản {version} · Thưởng {nex} NEX",
+    courseOffline: "Bài học cần được tải qua mạng tin cậy; vui lòng quay lại trung tâm hướng dẫn rồi thử lại.",
+    courseUnavailable: "Bài học tạm thời không khả dụng; vui lòng thử lại.",
+    submitQuiz: "Nộp bài kiểm tra",
+    answerAllFirst: "Trả lời hết các câu hỏi rồi mới nộp được.",
+    completeCourse: "Hoàn thành bài học",
+    resultPassed: "Đã hoàn thành",
+    resultFailed: "Chưa đạt",
+    rewardGranted: " · Đã phát {nex} NEX",
+    submitUnconfirmed: "Kết quả nộp bài chưa được xác nhận; tiến độ bài học đã được đọc lại từ máy chủ, phần thưởng sẽ không hiển thị theo trạng thái cục bộ.",
   },
 };

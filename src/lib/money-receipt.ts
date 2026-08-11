@@ -227,7 +227,10 @@ export function postReceiptOnce(draft: ReceiptDraft): boolean {
 export function postMoneyBillsOnce(drafts: ReceiptDraft[], opts: PostMoneyOptions = {}): MoneyReceiptOutcome {
   const ref = drafts[0]?.ref;
   if (!ref) {
-    throw new Error("postMoneyBillsOnce: 必须传稳定的 ref,否则判重永不命中 = 假幂等");
+    // 约束:必须传稳定的 ref,否则判重永不命中 = 假幂等(见上方注释)。
+    // 抛出串取英文错误码,与本仓既有码风一致(MONEY_* / NOTIFICATION_* …)—— 工程内部话
+    // 不该长得像用户文案。当前两个调用点(App.vue / weekly-quest-hero.vue)都不把它上屏。
+    throw new Error("MONEY_RECEIPT_REF_REQUIRED");
   }
   // 🔴 判重域的**诚实边界**:读的是 `bills.bills`,也就是**本标签页内存里**那份账单
   // (bills 只在 bindAccount 时 hydrate,之后不再回读磁盘)。于是:
