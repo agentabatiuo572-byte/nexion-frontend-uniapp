@@ -778,13 +778,31 @@ function functionBody(src, sig) {
   // (a) 调用在 submitWithdrawal 函数体内(functionBody 抠体再找,防命中别处);
   // (b) 调用在建单 await 之后(建单失败会 throw 冒泡,不得先记台账);
   // (c) commitWithdrawal 函数体内两笔台账(地址登记 + 首提标记)都落。
-  check("🔴 风控台账接线:submitWithdrawal 建单成功后同步 commitWithdrawal(首提标记 + 地址登记)",
+  // (d) 🔴 账号必须是**入口冻结值**(z4 R1):本函数跨一个最长 30s 的 await,期间跨标签页
+  //     登出 / 吊销 / 重登都会 bindAccount 改掉 accountKey.value。台账记到换后的账号 =
+  //     首提标记与共用地址强信号全落到别人头上,而钱是从冻结那个账号扣的。
+  //     判据用「一个都不许读活值」而不是「至少有一处读冻结值」—— 后者放得过「两条分支
+  //     一条对一条错」,而本包的原始缺陷正是这种半修状态(账单钉死、单据没钉)。
+  check("🔴 风控台账接线:submitWithdrawal 建单成功后同步 commitWithdrawal(首提标记 + 地址登记,账号取入口冻结值)",
     (() => {
       const body = functionBody(appSrc, "async function submitWithdrawal(");
       if (!body) return false;
-      const call = body.indexOf("commitWithdrawal(accountKey.value, network, address);");
+      if (!/const acct = accountKey\.value;/.test(body)) return false; // 入口没冻结 = 后面无从谈起
+      const calls = [...body.matchAll(/commitWithdrawal\(([^)]*)\)/g)];
+      if (!calls.length) return false;
+      if (calls.some((m) => /accountKey\.value/.test(m[1]))) return false; // 任一处读活值即判红
+      if (!calls.every((m) => /^\s*acct\s*,\s*network\s*,\s*address\s*$/.test(m[1]))) return false;
+      const call = body.indexOf("commitWithdrawal(");
       const submit = body.indexOf("await withdrawalApi.submit");
       if (call < 0 || submit < 0 || submit > call) return false;
+      // 🔴 (e) 页面侧对称门(z4 R2 P1-3):账单**真正落地的地方**在提现页,而它把账号钉在
+      //     提交快照 `snap.account` 上。store 侧钉死了、页面侧没门守着,下一次改动把它写回
+      //     `app.accountKey` 时四道门全绿 —— 那正是本包 R1 的原始缺陷(只钉了一半)。
+      const pageBody = functionBody(readFileSync(path.join(root, "src/pages/me/wallet-withdraw.vue"), "utf8"),
+        "async function handleSubmit(");
+      if (!pageBody) return false;
+      const receipt = /postReceiptForAccount\(\s*([A-Za-z_$][\w$.]*)\s*,/.exec(stripComments(pageBody));
+      if (!receipt || receipt[1] !== "snap.account") return false;
       const elgBody = functionBody(elgSrc, "function commitWithdrawal(");
       return !!elgBody
         && elgBody.includes("recordWithdrawAddressUse(accountKey, network, address);")
