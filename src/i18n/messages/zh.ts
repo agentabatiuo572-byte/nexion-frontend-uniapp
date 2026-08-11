@@ -1937,7 +1937,7 @@ export const zh: Messages = {
     riskCheckTimeoutTitle: "校验超时",
     riskCheckTimeoutBody: "网络暂时不稳定,本次未扣款,请稍后重试。",
     routeHeldFrozenTitle: "这笔提现已暂停",
-    routeHeldFrozenBody: "为保护你的资金,这笔提现先暂停了,钱还在你的账户里。需要帮忙随时找客服。",
+    routeHeldFrozenBody: "这笔提现先暂停了。这笔钱跟着这张单一起保留着 —— 没有打出去,也没有丢。需要帮忙随时找客服。",
     riskReasons: {
       "dim-serverDeviceId": "与其他账号使用相同设备",
       "dim-ipBucket": "与其他账号来自相同网络环境",
@@ -2026,7 +2026,7 @@ export const zh: Messages = {
 
     trackSubmitAnother: "再提一笔",
     trackReviewNote: "首笔提现 · 安全确认中",
-    withdrawRouteReviewTitle: "这笔会慢一点到账",
+    withdrawRouteReviewTitle: "这笔要先过一道确认",
 
     withdrawRouteRejectTitle: "这笔无法提交",
 
