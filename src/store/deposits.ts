@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { ONE_MINUTE_MS, mockServerNow } from "./server-time";
 import { useApp } from "./app";
@@ -114,6 +115,12 @@ export const useDeposits = defineStore("deposits", () => {
    * 重建链上确认与银行意向单定时器，因此暂停期间不写状态，返回业务页后仍可收敛。
    */
   function resumeMockEngine(): void {
+    // 🔴 远端模式一步都不推:本文件顶部那条「MOCK 铁律」说状态由本文件扮演的服务端裁定 ——
+    // 远端模式下那个「服务端」是真的存在的,再扮演一次就是伪造。两条到账引擎(链上确认数
+    // 推进 → settleCredited、银行意向单)都靠 mockEngineRunning 起停,这里关掉即整体停摆。
+    // PROD 读回路:paymentApi 的 VietQR 意向单族(listVietQrIntents / getVietQrIntent,
+    // 见 api 目录下的 payment-api 模块)已实现但全站零调用点 —— 接线是独立一件事。
+    if (remoteApiEnabled) return;
     if (mockEngineRunning) return;
     mockEngineRunning = true;
     syncBankIntents();
@@ -182,6 +189,12 @@ export const useDeposits = defineStore("deposits", () => {
 
   /** 专属充值地址:同账号同网络恒定(mock 确定性派生;PROD server 派发)。 */
   function depositAddress(network: ChainDepositChannel): string {
+    // 🔴 远端模式返空串,**不返一个假地址**。deriveDepositAddress 是本地伪随机派生 ——
+    // 形状像 TRON/EVM 地址,但没有任何人持有它的私钥。真后端未接线时把它显示出来
+    // (页面还带一键复制),用户往那儿打 USDT 就是**永久丢币**。
+    // 闸放在 store 而不是只放页面:页面那道是用户看得见的空态,这道是能被 node 直跑
+    // 断言的不变量 —— 只焊在模板上的话,机器守不住(见 remote-authority-simulation)。
+    if (remoteApiEnabled) return "";
     return deriveDepositAddress(boundKey(), network);
   }
 
@@ -275,6 +288,7 @@ export const useDeposits = defineStore("deposits", () => {
    *  「先入账、再 patch 状态」:两个标签页各拿自己陈旧的内存副本判状态门,两次
    *  recordDeposit 都过,ADDITIVE 的 usdtBalance 把两笔都记上 = 同一笔充值入账两次。 */
   function settleCredited(depositId: string): boolean {
+    if (remoteApiEnabled) return false; // 入账 = 加钱,远端模式只归服务端(引擎已停,这是二层闸)
     const now = mockServerNow();
     const r = commit((cur) => {
       const rec = cur.records.find((x) => x.depositId === depositId);
@@ -491,6 +505,11 @@ export const useDeposits = defineStore("deposits", () => {
   /** 生成付款单(PROD = POST /api/deposits/bank-intents;校验失败即 422 形态返 null)。
    *  锁价:fxRate/vndAmount/expireAt 均在此刻定格,后续调价不影响本单(规格 ② 异常2)。 */
   function createBankIntent(usdtAmount: number): DepositIntent | null {
+    // 🔴 同 depositAddress:付款单会把收款账号 + 附言码摆出来(都带一键复制),而收款
+    // 账户来自本地常量表 BANK_RECEIVE_ACCOUNTS,远端模式下没有任何服务端在对账 ——
+    // 用户照着转了,钱就打进一个没人认领的账户。不发钱不等于无害:这条轨的伤害
+    // 发生在**链外**。返 null = 既有的 422 形态,调用方已有分支。
+    if (remoteApiEnabled) return null;
     if (!Number.isFinite(usdtAmount)) return null;
     const amt = +usdtAmount.toFixed(2);
     if (amt < MIN_DEPOSIT_USDT || amt > BANK_MAX_DEPOSIT_USDT) return null;
@@ -551,6 +570,7 @@ export const useDeposits = defineStore("deposits", () => {
    *  幂等三重同链上 settleCredited:状态机边界(调用方把关)+ 记录判重(depositId=intentId)
    *  + postReceiptOnce(ref=intentId)。0 手续费;PROD 同事务置 credited + 记账 + 写账单(§5 分录)。 */
   function settleBankIntent(intentId: string, creditedUsdt: number, receivedVnd: number): boolean {
+    if (remoteApiEnabled) return false; // 同 settleCredited:银行轨入账也是加钱
     const credited = +creditedUsdt.toFixed(2);
     if (credited <= 0) return false;
     const now = mockServerNow();
@@ -706,6 +726,10 @@ export const useDeposits = defineStore("deposits", () => {
    *     跨提交幂等归 PROD 的 Idempotency-Key(收单方 + server 侧),mock 不承诺。
    *  🔴 计费方向:卡费另收在用户卡上 → gross = 实扣额、credited = 用户输入额。 */
   function submitCardPayment(creditedUsdt: number, expectedAccountKey: string): DepositRecord | null {
+    // 🔴 三条入金轨里唯一**不经定时器、当场加钱**的一条:下面那行 `Math.random() < CARD_DECLINE_RATE`
+    // 就是本地扮演的收单方授权。远端模式下这等于自己给自己批一笔卡支付并即刻加余额
+    // (实测:remote 模式下调一次 → usdtBalance +$50)。返 null = 既有的拒付态,页面已有处理。
+    if (remoteApiEnabled) return null;
     // 账号守卫:授权等待期(组件侧 ~3.8s)内账号可能被切走(会话被踢/登出会 rebind 到
     // default),此时入账必须作废,否则钱记进别人账上、还白送对方入金资格进度。
     // 与两条 mock 引擎的 `const key = boundKey; … if (boundKey !== key) return;` 同形 ——
