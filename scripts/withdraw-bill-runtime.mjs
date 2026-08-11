@@ -206,8 +206,14 @@ try {
       .filter((e) => (e.getAttribute("aria-label") || "").includes(WD_NO));
 
     const rows = bills.bills.filter((b) => b.ref === WD_NO);
+    // 🔴 账单侧的取样要在这里就**求成纯值**。写在 return 字面量里等于在资金探针
+    // (下面会改单据状态、调退款)**之后**才求值 —— ① 的 `st === "pending"` 与 ② 的盘上条数
+    // 读到的就是后置状态。今天探针不写 bills 所以无害,但这是「取样点悄悄漂移」的经典形状。
+    const rowsSample = rows.map((b) => ({ sym: b.symbol, amt: b.amount, st: b.status, key: b.memoKey }));
+    const sameTsSample = rows.length === 2 && rows[0].ts === rows[1].ts;
+    const onDiskSample = diskOf().length;
 
-    // ── 资金面探针(全部在账单断言取样之后跑,不影响 ①–⑤)────────────────────
+    // ── 资金面探针(在上面那三行取样之后跑)────────────────────────────────
     const balanceAfterSuccess = balanceOf();
     // 扣款真落盘:内存对、盘上没有 = 刷新即回退,用户眼里「钱又回来了」。
     const diskBalance = (uni.getStorageSync("nexgrid-account-cloud-v1") || {})[app.accountKey]?.user?.usdtBalance;
@@ -223,10 +229,14 @@ try {
     // creditRewardBucketOnce(它内部 `if (remoteApiEnabled) return false`)当场变红 ——
     // 而提现单只在 remote 下建得出来,所以那条路等于「拒单 = 用户的钱凭空烧掉」。
     app.withdrawals = app.withdrawals.map((w) => (w.id === WD_NO ? { ...w, status: "tx-failed" } : w));
-    const refundedIds = app.refundFailedWithdrawals();
+    // 🔴 同 218 行的理由:被测的东西不存在时记空值让断言去红,别让整个 evaluate 抛出 ——
+    // 一抛就只剩一条堆栈,20 条断言一条都不显示,红测反而看不出是哪条在守。
+    const callRefund = () =>
+      (typeof app.refundFailedWithdrawals === "function" ? app.refundFailedWithdrawals() : null);
+    const refundedIds = callRefund();
     const balanceAfterRefund = balanceOf();
     // 退款也要幂等:5s 一拍的对账会反复调它,每拍退一次就是印钞。
-    app.refundFailedWithdrawals();
+    callRefund();
     const balanceAfterRefundReplay = balanceOf();
 
     return {
@@ -244,9 +254,9 @@ try {
       submitCalls,
       sameIdemKey: submitCalls.length === 2 && submitCalls[0] === submitCalls[1],
       rowsAfterFirst,
-      rows: rows.map((b) => ({ sym: b.symbol, amt: b.amount, st: b.status, key: b.memoKey })),
-      sameTs: rows.length === 2 && rows[0].ts === rows[1].ts,
-      onDisk: diskOf().length,
+      rows: rowsSample,
+      sameTs: sameTsSample,
+      onDisk: onDiskSample,
       clickable: clickable.length,
       route: location.hash,
       parserAlive,
@@ -259,7 +269,10 @@ try {
   check("提交链路走通(确认弹窗出现并被确认)", result.first === "ok" && result.second === "ok",
     `${result.first} / ${result.second} · 按钮=${JSON.stringify(result.labels)}`);
   check("④ 歧义失败那一次**不写任何账单行**(单据在服务端,客户端还不知道单号)",
-    result.rowsAfterFirst === 0, `写了 ${result.rowsAfterFirst} 条`);
+    // 🔴 必须合取上「后来真的写出了两条」:光判 `=== 0` 在整条链一步没走时恒真 ——
+    // z5 实测正是如此(链卡在第一步、17 条红,这一条照 PASS)。空集全过的同族。
+    result.rowsAfterFirst === 0 && result.rows.length === 2,
+    `歧义后写了 ${result.rowsAfterFirst} 条,最终 ${result.rows.length} 条`);
   const usdt = result.rows.find((r) => r.sym === "USDT");
   const nex = result.rows.find((r) => r.sym === "NEX");
   check("① 账单里出现两条同单号 withdraw 分录(USDT 主行 + NEX 抵扣费行)",
@@ -305,7 +318,10 @@ try {
     debitHappened && B.replayReturned === true && B.balanceAfterReplay === B.balanceAfterSuccess,
     `返回 ${B.replayReturned}、重放后 ${B.balanceAfterReplay}(实扣 ${debited})`);
   check("⑦ 🔴 失败终态**退回**这笔扣款(扣款与退款必须同模式对称,否则拒单 = 烧钱)",
-    debitHappened && B.refundedIds.includes(WD_NO) && B.balanceAfterRefund === B.balanceBefore,
+    // 🔴 `Array.isArray` 先判:refundedIds 为 null(退款函数不存在)时直接 `.includes` 会抛,
+    // 而这里是 node 侧、外层无 catch —— 一抛就吞掉全部 20 条断言,正是上一版注释声称要防的那件事。
+    debitHappened && Array.isArray(B.refundedIds) && B.refundedIds.includes(WD_NO)
+      && B.balanceAfterRefund === B.balanceBefore,
     `退回单号 ${JSON.stringify(B.refundedIds)}、退后 ${B.balanceAfterRefund}(期望 ${B.balanceBefore},实扣 ${debited})`);
   check("⑦ 退款幂等(对账 5s 一拍反复调,每拍退一次就是印钞)",
     debitHappened && B.balanceAfterRefund === B.balanceBefore

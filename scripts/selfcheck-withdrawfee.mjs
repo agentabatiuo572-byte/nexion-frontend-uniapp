@@ -216,9 +216,12 @@ const pageSrc = stripTs(readFileSync(path.join(root, "src", "pages", "me", "wall
   //    ("wd-refund:"…)。双键不变量原样保留(两种币各一把,复用单键会永久漏退其中一种),
   //    但判据同时钉住**新增的那半条**:退款以「本机真的扣过」为前提。
   //    没有这个前提时退款会退出一笔从没扣过的钱 —— 基线实测余额 9999 →(失败终态)10479.25。
-  check("🔴 退款双键:USDT 本金走 wd-refund: 键,且只退**真扣过**的那一笔",
+  // 判据钉两件事:① 键名仍与 NEX 腿分开;② 退款以「本机真扣过」为前提,且该前提
+  // **内存与磁盘都要查** —— 扣款可能发生在另一个标签页,只查内存会漏退;而只要前提整条
+  // 被删掉,退款就会退出一笔从没扣过的钱(z5 基线实测 9999 →(失败终态)10479.25)。
+  check("🔴 退款双键:USDT 本金走 wd-refund: 键,且只退**真扣过**的那一笔(内存+磁盘两面查)",
     appSrc.includes('"wd-refund:" + wd.id')
-      && /if \(!currentUser\.appliedRewardKeys\?\.\[debitKey\]\) return false;/.test(appSrc));
+      && /!currentUser\.appliedRewardKeys\?\.\[debitKey\]\s*&&\s*!storedKeys\?\.\[debitKey\]\)\s*return false;/.test(appSrc));
   check("🔴 退款双键:NEX 走独立 refund-nex: 键(复用单键会被 USDT 幂等挡掉永久漏退)",
     appSrc.includes('"refund-nex:" + wd.id'));
   check("🔴 NEX 退在 nex 参数位(usdt=0)—— 方向搞反 = 把 NEX 个数当美元退",
