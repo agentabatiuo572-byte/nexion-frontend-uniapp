@@ -21,7 +21,15 @@ dist
 .trash/
 .playwright-mcp/
 .playwright-cli/
-.claude/
+# 🔴 .claude/ 整体不入库,但**质量门本身要跟着代码走版本**(2026-08-11):
+#   verify 的 Stop 门外壳 + 接线以前是本机本树专有,6 棵树各拿一份、改一处要手拷 5 次,
+#   靠手动同步的守卫迟早漂移失效 —— 所以精确豁免这两项。
+#   写 `.claude/*` 而不是 `.claude/`:父目录被整体忽略时 git 不会递归进去,底下的
+#   反向豁免会**静默失效**(gitignore 经典陷阱)。
+#   worktrees/(主 checkout 下有 9 棵完整工作树)和 settings.local.json 仍被 `.claude/*` 兜住。
+.claude/*
+!.claude/hooks/
+!.claude/settings.json
 .vscode/*
 
 # chrome-baseline transient run outputs (regenerated each run; only baseline/ + _check/ are tracked references)
@@ -38,3 +46,5 @@ scripts/.baseline/baseline-*/
 *.njsproj
 *.sln
 *.sw?
+# verify.sh 退出码哨兵(WF-10 挂账修法):外部判定读它,不读管道
+.verify-exit.code
