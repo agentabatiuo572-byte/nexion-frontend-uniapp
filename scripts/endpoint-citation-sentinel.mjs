@@ -98,6 +98,9 @@ const LEDGER = {
   "GET /api/withdrawals/:id": "PRD §9.11f(`GET /api/{module}/:id` 通式)",
   "POST /api/withdrawals/eligibility": "PRD §9.3.1-3",
   "/api/withdrawals/policy": "TBD: PRD §9.4 未定义策略下发接口 —— D5 提现策略权威化(c37e642)新契约,withdrawal-api.ts 已按 GET /api/withdrawals/policy 实现,PRD 同步时定名",
+  // 同一个接口的带方法写法。2026-08-11 起日限的唯一权威来源就是它(z1 审计 P0-1:
+  // 客户端曾按本地 config 写死的 1 笔拦人,而文案报的是这里下发的数)。
+  "GET /api/withdrawals/policy": "TBD: 同上一条(带 method 的引用形式);dailyLimitCount 是每日提现笔数上限的唯一权威源",
   "GET /api/payout-addresses": "包 E 提现地址直管新接口,服务端已按 payout-addresses 资源实现",
   "PUT /api/payout-addresses/{network}": "TBD: 同上 —— 原子更换(在途单拦截 / 频控 / 冻结由服务端裁决)",
   "GET /api/deposits": "PRD §9.2.8",

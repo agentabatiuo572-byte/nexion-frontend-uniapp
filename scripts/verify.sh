@@ -2537,17 +2537,19 @@ endpoint_citation_gate() {
 endpoint_citation_gate
 
 # ── P1 涉钱/配额 store 乐观并发门(存量 P1 二期,2026-08-04)──
-# 质押一期把 writeAccountRowCas 立起来后,同型缺陷还留在六个 store 上:deposits(入金单
+# 质押一期把 writeAccountRowCas 立起来后,同型缺陷还留在五个 store 上:deposits(入金单
 # 状态推进 + 到账入账,两端并发推进 = 同一笔充值入账两次)· voucher(同一张券各领一次)·
-# nex-faucet / daily-powerup / lucky-spin(每日与一次性配额被覆盖 = 额度绕过)·
-# withdraw-daily-count(提现日限额计数被覆盖 = 限额白设)。H5 端 uni storage 就是
+# nex-faucet / daily-powerup / lucky-spin(每日与一次性配额被覆盖 = 额度绕过)。
+# (原第六个 withdraw-daily-count 已于 2026-08-11 随包 z2 整体删除 —— 客户端不再维护日限
+# 计数器,今日笔数改由 core 从提现单列表现算,没有第二份状态自然也不需要 CAS 防覆盖。)
+# H5 端 uni storage 就是
 # localStorage,同源多标签页共享一份且全仓无 storage 事件重新水合 —— 状态**永久不同步**,
 # 而 usdtBalance/nexBalance 是 ADDITIVE_NUMBER_KEYS(按增量三路合并)→ 两次入账都记。
 # 判据(esbuild 载真 store + 真 storage 层跑真代码,两个 store 实例 = 两个标签页共享一份
 # 序列化 storage;只有 deposits 的 app/bills/fx 三个跨 store 组合方换成可观测假账本):
-# ①六个 store 各自的陈旧标签页重复领取被拒、余额/计数只动一次 ①b 读与写之间被插队同样
+# ①五个 store 各自的陈旧标签页重复领取被拒、余额/计数只动一次 ①b 读与写之间被插队同样
 # 拦得住(rev CAS)②单标签页正常路径不受影响 ③版本冲突与「本来就不该成交」可区分
-# ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(六个 store
+# ④writeAccountRow 逐字节没动 ⑤追加型冲突重放不丢单、主键不重号 ⑥接线门(五个 store
 # 全路径走 CAS + 六处页面调用点真的读了 ok/conflict + 3 语 i18n)。
 money_cas_gate() {
   if "$NODE_BIN" scripts/selfcheck-money-cas.mjs > /tmp/uniapp-money-cas.log 2>&1; then
@@ -2558,6 +2560,22 @@ money_cas_gate() {
   fi
 }
 money_cas_gate
+
+# ── 提现失败路径门(包 z2 R2 结构性反思 · 族 A,2026-08-11)──
+# 同一个任务里三次写下「失败时会如何如何」的注释,三次都与实际行为相反(建单后其实没落盘 /
+# 跨标签页写入其实进不来 / 落盘失败其实会把刚建的单静默抹掉)。共同根因:**正常路径会跑浏览器、
+# 会写固定靶,失败路径只写注释,而注释不参与执行,写什么都不会红。**
+# 根治 = 失败路径的行为断言必须有一条注入该失败的测试;本门就是那条测试。
+# 判据:载真 app store + 真 account-cloud + 真 storage 语义,注入写失败与刷新。
+withdraw_failpaths_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-failpaths.mjs > /tmp/uniapp-withdraw-failpaths.log 2>&1; then
+    ok "提现失败路径门 — $(tail -1 /tmp/uniapp-withdraw-failpaths.log)"
+  else
+    bad "提现失败路径门失败 — node scripts/selfcheck-withdraw-failpaths.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-withdraw-failpaths.log | head -8 | sed 's/^/        /'
+  fi
+}
+withdraw_failpaths_gate
 
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
