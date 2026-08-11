@@ -156,6 +156,11 @@ echo -e "${C}[2.5] dev server API mode preflight${N}"
 #    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
 #    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
 #    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
+#    🔴 两侧必须归一到**同一种写法**再比:同一个目录在 Windows 侧是 `D:/x`,在 Git Bash 侧
+#    `pwd` 给的是 `/d/x` —— 只比字符串的话这道门在 Git Bash 下**恒红**(2026-08-11 实测),
+#    而恒红的门等于没有门:它每次都喊狼来了,人就不再看它,真的验错树那次也一样被无视。
+#    盘符写法与大小写一起归一;归一后仍不同 = 真的是别的工作树。
+norm_root() { echo "$1" | sed 's|\\|/|g' | sed -E 's|^/([a-zA-Z])/|\1:/|' | tr 'A-Z' 'a-z'; }
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
 served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
 expect_root=$(echo "$PROJECT_DIR" | sed 's|\\|/|g')
@@ -165,7 +170,7 @@ elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; the
   bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
 elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
-elif [ "$(echo "$served_root" | tr 'A-Z' 'a-z')" != "$(echo "$expect_root" | tr 'A-Z' 'a-z')" ]; then
+elif [ "$(norm_root "$served_root")" != "$(norm_root "$expect_root")" ]; then
   bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(并发多工作树时会给别人发绿灯)"
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
