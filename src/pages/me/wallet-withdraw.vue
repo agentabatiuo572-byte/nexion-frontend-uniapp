@@ -342,7 +342,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
@@ -433,6 +433,29 @@ const dailyFacts = computed(() => ({
 }));
 const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) }));
 /**
+ * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
+ *
+ * 键里带账号 + 网络 + 金额:换了任何一样就是**另一笔**意图,必须换键;
+ * 同一笔意图重试则复用,让服务端的幂等去重能生效(否则超时重试 = 第二笔真出账)。
+ * 只在**确定性结局**后作废:建单成功、或服务端明确拒单(kind==="business")。
+ * 超时 / 网络失败是**歧义结局** —— 服务端可能已经建好单了,此时换新键是最危险的动作。
+ */
+const submitIntentKey = ref("");
+const submitIntentSig = ref("");
+function currentIdempotencyKey(): string {
+  const sig = `${app.accountKey}|${network.value}|${amountNum.value}|${offsetWithNex.value ? 1 : 0}`;
+  if (submitIntentSig.value !== sig || !submitIntentKey.value) {
+    submitIntentSig.value = sig;
+    submitIntentKey.value = `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  }
+  return submitIntentKey.value;
+}
+/** 结局确定(成功 / 明确拒单)→ 下一次提交是新的一笔意图,换新键。 */
+function clearSubmitIntent(): void {
+  submitIntentKey.value = "";
+  submitIntentSig.value = "";
+}
+/**
  * 服务端「今日笔数已达上限」拒单的识别。
  *
  * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
@@ -497,6 +520,12 @@ onMounted(() => {
   if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
   void loadWithdrawalPolicy();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
+});
+// 🔴 回前台 / 返回本页时重取策略。上一轮我把这条补给了追踪页,**加错页了**:
+// 真正靠日限与最低额拦人的是**这一页**,而 App 端页面进栈后不销毁,不补拉就可能拿着
+// 好几天前的限额判人(R2 跨端镜头点名)。loader 自带在途守卫,重复触发是安全的。
+onShow(() => {
+  void loadWithdrawalPolicy();
 });
 onUnmounted(() => {
   if (freezeTimer) clearInterval(freezeTimer);
@@ -909,7 +938,13 @@ async function handleSubmit() {
     maxWithdrawable: maxWithdrawable.value,
     offset: offsetWithNex.value,
     policyVersion: withdrawalPolicy.value!.policyVersion,
-    idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    // 🔴🔴 幂等键**跨重试复用**,不是每次提交现造一把。
+    // 旧写法在这里现造:超时 / 断网时服务端**可能已经建好单**只是响应没回来,而页面弹的是
+    // 「费率已更新,请重新确认」把用户往重试上推 —— 重试再造一把新键,服务端视为新请求,
+    // **第二笔真出账**(R2 独立审计,资金安全级)。
+    // 现在:同一笔提现意图只 mint 一次,只有拿到**确定性结局**(建单成功 / 服务端明确拒单)
+    // 才作废重来;歧义结局(超时 / 网络)保留原键,重试即命中服务端的幂等去重。
+    idempotencyKey: currentIdempotencyKey(),
     quote: q,
     // 🔴 日限事实**也进快照**,与 account 同源同刻。曾经这里刻意取活值,理由写的是
     // 「确认弹窗期间另一个标签页提交成功,冻住的快照看不见它」—— 那句话是错的:
@@ -1027,6 +1062,7 @@ async function handleSubmit() {
       fresh.waivedGates,
     );
     clearSubmitFreeze();
+    clearSubmitIntent(); // 结局确定:成功建单 → 下一次是新的一笔意图
     if (!withdrawalId) {
       toast.error(t.value.wallet.withdrawInsufficient);
       return;
@@ -1035,15 +1071,36 @@ async function handleSubmit() {
     return;
   } catch (err) {
     clearSubmitFreeze();
-    // 🔴 服务端拒单要说**服务端拒的那个原因**,不能一律回落「费率已更新」。
-    // 本包把并发场景明确交给「服务端事务拒掉第二笔」兜底 —— 那条路径的落点就是这里,
-    // 而它此前把超日限拒单说成费率问题,还顺手 loadWithdrawalPolicy() 诱导用户再试一次
-    // (试多少次都一样)。R1 两份独立审计各自点名:修了咽喉却没验流量真过咽喉。
-    // 服务端的 kind/code/message 本来就带着,只是先前无人分诊。
-    if (isDailyLimitRejection(err)) {
-      toast.error(dailyLimitReachedText.value);
+    // 🔴🔴 失败要按**结局是否确定**分诊,不能一律回落「费率已更新,请重新确认」。
+    // 三件事此前全错:原因错(会话过期 / 5xx / 超日限都被说成费率变了)、
+    // 下一步错(诱导重试,而重试会换新幂等键 → 服务端可能真出第二笔)、
+    // 什么时候能行不说。R2 两路独立审计各自点名。
+    //
+    // 分诊只做「换一句更准的话 + 决定要不要换幂等键」,不放行也不拦截任何东西,
+    // 所以认错的代价有界。契约定名后收敛成单串:见 HANDOFF U-4。
+    const apiErr = err instanceof ApiError ? err : null;
+    // ① 服务端明确拒单(business)= 确定性结局 → 作废旧键,下次是新意图
+    if (apiErr?.kind === "business" || isDailyLimitRejection(err)) {
+      clearSubmitIntent();
+      if (isDailyLimitRejection(err)) {
+        toast.error(dailyLimitReachedText.value);
+        return;
+      }
+      toast.error(t.value.walletV3.submitReasonReviewBlocked);
       return;
     }
+    // ② 歧义结局(超时 / 网络)—— 服务端**可能已经建好单**。这里必须:
+    //    保留幂等键(重试才会命中服务端去重,而不是造出第二笔),
+    //    并且不说「请重新确认」那种把人往重按上推的话。
+    if (!apiErr || apiErr.kind === "network") {
+      // 🔴 不能复用现成的「本次未扣款,请稍后重试」——歧义结局下服务端**可能已经建单**,
+      // 那句话是新的假话。这里说的是实情:结果未知、别重按、去追踪页确认。
+      toast.error(t.value.walletV3.submitUnknownTitle, t.value.walletV3.submitUnknownBody);
+      return;
+    }
+    // ③ 其余(auth / protocol / configuration / http):结局确定,换新键;
+    //    费率文案只留给**真的**报价失效那一类。
+    clearSubmitIntent();
     await loadWithdrawalPolicy();
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;

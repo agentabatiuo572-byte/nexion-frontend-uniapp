@@ -33,6 +33,8 @@ const { decideFromStores, decideFromRawFacts, isFastLane, platformDayIndex, next
 
 let pass = 0;
 let fail = 0;
+/** 各随机层的**实测**覆盖指标。汇总行打它,而不是打循环上界(族 B 的根治)。 */
+const selfProof = {};
 function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
@@ -235,9 +237,29 @@ for (const [label, over, wantRoute, wantReason] of RISK_CASES) {
 // 改法:不再试图枚举维度,而是**每个维度都随机取样**。攻击者无法预知会抽到什么,
 // 任何「在某组输入下才放行」的隐藏条件,只要被抽中一次就暴露。
 // 不变量(与免审无关,恒成立):**任一风控闸命中 → 路由至少和该闸要求的一样严**。
+/**
+ * 🔴🔴 确定性随机源(2026-08-11 R2 结构性反思,族 B)。
+ *
+ * 原来用的是 `seed = (seed * 1103515245 + 12345) & 0x7fffffff` —— 这一句在 JS 里是**坏的**:
+ * 乘积最大 2.37e18,远超双精度安全整数 9.01e15,低位在浮点乘法里被抹平。实测后果:
+ * **序列周期只有约 10,466 次取样**(之后逐条精确重复),**低 8 位有 73.8% 恒为 0**。
+ * 于是「20000 组随机取样」实际只有四百多组不同样本 —— PASS 行上的数字是**声明的循环次数**,
+ * 不是**实际的覆盖**。R2 独立审计实测抓出,我复跑确认。
+ *
+ * 换成 mulberry32:全部运算走 `Math.imul` 与位运算,恒在 32 位内,不碰浮点精度;
+ * 周期 2^32。同样是确定性的(同一种子同一序列),可复现性不变。
+ */
+function mulberry32(seedValue) {
+  let a = seedValue | 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 const SEED0 = 0x2f6e2b1;
-let seed = SEED0;
-const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+const rnd = mulberry32(SEED0);
 const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 // 🔴 连续取值。第 5 轮复验证明:pick([...]) 是**有限集合**,
 // 「挂在清单之间的开区间」或「清单之外的值」上的免权,加到 2000 万组仍是 0 命中 ——
@@ -255,6 +277,7 @@ const REASON_ORDER = [
 ];
 
 let violations = [];
+const sampleFingerprints = new Set();
 const SAMPLES = 20000;
 for (let i = 0; i < SAMPLES; i++) {
   const threshold = rnd() < 0.15 ? 0 : mix(1, 2000, [20, 50, 200, 1000]);
@@ -282,10 +305,13 @@ for (let i = 0; i < SAMPLES; i++) {
     //    `withdrawCounter` 早已没人读(toSnapshot 读的是 withdrawals),而 limit 恒 0 = 恒不限制。
     //    于是这两万组随机取样对日限**一格都没跑**,字段名却留着,读起来像已覆盖 ——
     //    「哨兵假绿」最难发现的那一种(R1 独立审计抓出)。现在两者都随机化,并入 must 列表。
-    withdrawals: Array.from({ length: mixInt(0, 6, [0, 1, 2, 5]) }, () => ({
+    withdrawals: Array.from({ length: mixInt(0, 9, [0, 1, 2, 5]) }, () => ({
       submittedAt: rnd() < 0.5 ? f0now : f0now - mixInt(1, 5, [1, 2]) * DAY,
     })),
-    dailyWithdrawLimitCount: rnd() < 0.2 ? 0 : mixInt(1, 5, [1, 2, 3]),
+    // 上限域取到 12:服务端契约(parsePolicy)只要求 ≥1 的整数、**无上界**,
+    // 域取太窄会让「上限大于某个数就失效」这类破坏天然测不到(R2 实测 1..4 时 `<6` 全绿)。
+    // 列表深度这一面交给 §7⑤ 的 property 层(那边 0..300),这里保持小而快。
+    dailyWithdrawLimitCount: rnd() < 0.2 ? 0 : mixInt(1, 12, [1, 2, 3, 10]),
   };
   f.freezeUntil = pick([undefined, f.now - 1000, f.now + 3600_000]);
   f.bindingVerifiedAt = pick([undefined, f.now - 1000, f.now - 40 * DAY]);
@@ -348,10 +374,16 @@ for (let i = 0; i < SAMPLES; i++) {
   if (wantReached && r.canSubmit) {
     violations.push(`#${i} 日限已达却仍 canSubmit`);
   }
+  // 指纹:量**实际覆盖**。旧发生器退化时,这个数会从两万塌到几百而循环次数纹丝不动。
+  sampleFingerprints.add(`${r.route}|${r.fastLaneApplied ? 1 : 0}|${r.waivedGates.length}|${r.riskReasons.length}|${r.dailyLimitReached ? 1 : 0}|${todayRows}|${f.dailyWithdrawLimitCount}`);
   if (violations.length > 6) break;
 }
-check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕过(含随机时钟,打掉时间炸弹)`,
-  violations.length === 0, violations.slice(0, 6).join(" | "));
+selfProof.s6 = { rounds: SAMPLES, fingerprints: sampleFingerprints.size };
+// 🔴🔴 判据里带上**实测指纹数**下限:光有「跑了 20000 轮」证明不了覆盖 ——
+// R2 实测旧发生器周期只有 ~10,466 次取样,两万轮里只有四百多组不同样本,而 PASS 行照报两万。
+check(`🔴 随机取样 ${SAMPLES} 组(实测 ${sampleFingerprints.size} 种不同结果指纹):任一风控闸命中必不被免审绕过`,
+  violations.length === 0 && sampleFingerprints.size >= 400,
+  violations.slice(0, 6).join(" | ") || `指纹只有 ${sampleFingerprints.size} 种,随机源可能已退化`);
 
 // ── 7. FEAT-WD01b 每日提现笔数上限(计数源 = 提现单列表)──────────
 // 不变量:今日笔数 = 提现单列表里 submittedAt 落在**平台日**(越南 UTC+7)内的行数;
@@ -521,13 +553,17 @@ check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕�
         }
         return n;
       };
-      let seed = 20260811, bad = 0, maxLen = 0, sawToday = 0;
-      const nextRand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      const nextRand = mulberry32(20260811);
+      let bad = 0, maxLen = 0, sawToday = 0, reachedCases = 0, notReachedCases = 0;
+      const fingerprints = new Set();
       for (let round = 0; round < 3000; round++) {
         // 随机时钟:跨全天各时段、跨月、跨年,平台日边界随机落在任意位置
         const now = 1.5e12 + nextRand() * 6e11;
         const reset = nextDayResetAt(now);
-        const len = Math.floor(nextRand() * 51); // 0..50,远超固定靶的 4
+        // 🔴 长度域必须**超出实现里任何常量**。旧版上界恰好 50,于是
+        // `if (rows.length > 50) return 0` 与 `rows.slice(0, 50)` 两种破坏全绿(R2 实测)——
+        // 生成器的上界就是盲区的下界。这里 0..150,并在下面每 200 轮塞一次 300 笔的极值。
+        const len = round % 200 === 7 ? 300 : Math.floor(nextRand() * 151);
         const list = [];
         for (let i = 0; i < len; i++) {
           const pick = Math.floor(nextRand() * 8);
@@ -545,18 +581,30 @@ check(`🔴 随机取样 ${SAMPLES} 组:任一风控闸命中必不被免审绕�
         maxLen = Math.max(maxLen, len);
         const want = refCount(list, now);
         if (want > 0) sawToday++;
+        // 指纹:同一组 (今日笔数, 列表长度, 平台日序) 算一种。用来量**实际覆盖**,
+        // 而不是拿循环上界冒充覆盖 —— 旧发生器退化时正是这个数会塌下来。
+        fingerprints.add(`${want}|${len}|${refDay(now) % 997}`);
         if (countWithdrawalsOnPlatformDay(list, now) !== want) { bad++; continue; }
-        // 顺带把端到端判定也对上:上限 >0 时,拦不拦必须与「参考计数 ≥ 上限」一致
-        const limit = 1 + Math.floor(nextRand() * 4);
+        // 顺带把端到端判定也对上:上限 >0 时,拦不拦必须与「参考计数 ≥ 上限」一致。
+        // 🔴 上限域必须超出服务端契约允许的范围:parsePolicy 只要求 ≥1 的整数、**无上界**,
+        //    旧版只取 1..4,于是 `limitCount < 6` 这种破坏全绿(R2 实测)。这里 1..60。
+        const limit = 1 + Math.floor(nextRand() * 60);
         const decided = decideFromStores({
           ...toSnapshot(base({ now })), now, withdrawals: list, dailyWithdrawLimitCount: limit,
         }).dailyLimitReached;
         if (decided !== (want >= limit)) bad++;
+        if (want >= limit) reachedCases++; else notReachedCases++;
       }
-      // 🔴 样本自证:列表长度必须真的超过固定靶的 4、且必须真的出现过「今日有单」的组合,
-      //    否则这条 property 可能在空列表上空转而看起来很热闹(哨兵假绿的经典形态)。
-      return bad === 0 && maxLen > 4 && sawToday > 200;
-    })());
+      // 🔴🔴 样本自证:报出去的必须是**实测**的覆盖,不是循环上界。
+      //    旧版三条阈值(maxLen>4 / sawToday>200)离实测值 12-14 倍,生成器退化 90% 仍绿;
+      //    而当时生成器**确实**在退化(周期 ~10,466)。现在:
+      //      · 指纹数下限贴实测(退化立刻击穿);
+      //      · 长度必须真的超过实现里任何常量;
+      //      · 「拦」与「不拦」两侧都必须真的各跑过几百次(只跑单侧等于半条门)。
+      selfProof.g1 = { fingerprints: fingerprints.size, maxLen, sawToday, reachedCases, notReachedCases };
+      return bad === 0 && fingerprints.size >= 1200 && maxLen >= 150
+        && sawToday > 2000 && reachedCases > 300 && notReachedCases > 300;
+    })(), JSON.stringify(selfProof.g1));
 }
 
 /**
@@ -860,7 +908,51 @@ function functionBody(src, sig) {
     //     「再提一笔」永不置灰,点进去却被拦死 —— 换了触发条件的同一种两页分裂。
     check("🔴 追踪页的 policy 拉取可重来(onShow 补拉),不是一次性静默失败",
       trackCode.includes("async function loadWithdrawalPolicy()")
-        && /onShow\(\(\) => \{[\s\S]{0,200}?loadWithdrawalPolicy\(\);/.test(trackCode));
+        && /onShow\([\s\S]{0,400}?loadWithdrawalPolicy\(\);/.test(trackCode));
+    // 🔴🔴 族 C(「抄一半」)的三条回归门。R2 跨端镜头点名:我照着现成写法改,
+    //     却没把那处写法的**全部约束**一起带过来 —— 守卫抄丢了、钩子只挂了一半、还加错了页。
+    check("🔴 两个页面**都**在 onShow 重取 policy(真正靠限额拦人的是提现页 —— 上一版只给了追踪页)",
+      /onShow\([\s\S]{0,300}?loadWithdrawalPolicy\(\);/.test(pgCode)
+        && /onShow\([\s\S]{0,400}?loadWithdrawalPolicy\(\);/.test(trackCode));
+    check("🔴 追踪页的 loader 有在途守卫(抄提现页那份时漏抄 → 重复发请求 + 后到的覆盖先到的)",
+      trackCode.includes("if (withdrawalPolicyLoading.value) return;")
+        && trackCode.includes("withdrawalPolicyLoading.value = true;"));
+    check("🔴 policy 取数失败**不清空**已拿到的好值(清空 = 网络抖一下就把闸放开,与仓内钱路径惯例相反)",
+      !/catch\s*\{[^}]*withdrawalPolicy\.value = null/.test(trackCode));
+    check("🔴 60s 时钟起停 onShow/onHide **成对**(仓内硬规则 P-063:页面保活时 onUnmounted 不触发 → 定时器泄漏)",
+      trackCode.includes("onHide(stopDayTimer);")
+        && /onShow\([\s\S]{0,300}?setInterval\(/.test(trackCode)
+        && trackCode.includes("onUnmounted(stopDayTimer);"));
+
+    // ③f 🔴🔴 幂等键必须**跨重试复用**。现造一把新键 + 「请重新确认」的组合会在
+    //     超时(服务端已建单、响应没回来)时造出**第二笔真出账**(R2 资金安全级)。
+    //     判据钉三件:键来自复用函数、歧义结局不清键、确定性结局才清键。
+    check("🔴🔴 幂等键跨重试复用(超时重试不得换新键 —— 换键 = 服务端当新请求 = 重复出账)",
+      pgCode.includes("idempotencyKey: currentIdempotencyKey(),")
+        && pgCode.includes("function currentIdempotencyKey(): string")
+        && pgCode.includes("function clearSubmitIntent(): void")
+        // 现造键的老写法不许再出现在 snap 里
+        && !/idempotencyKey: `withdrawal:\$\{app\.accountKey\}:\$\{Date\.now\(\)\}/.test(pgCode));
+    check("🔴🔴 失败按「结局是否确定」分诊:歧义(超时/网络)保留幂等键且不劝重按",
+      (() => {
+        // 🔴 锚到**建单那个** catch。文件里有两处 `catch (err)`,靠前的是风控校验那一处 ——
+        // 直接 indexOf 会命中它,判据落在毫不相干的代码上而恒红(第一版实测踩到)。
+        const submitAt = pgCode.indexOf("await app.submitWithdrawal(");
+        if (submitAt < 0) return false;
+        const i = pgCode.indexOf("} catch (err) {", submitAt);
+        if (i < 0) return false;
+        const seg = pgCode.slice(i, i + 2500);
+        // 歧义分支:从判据到该分支的 return 之间,必须出现「结果未确认」文案、
+        // 且**不得**出现清键动作。窗口钉到那个 return 为止 —— 放宽成固定字符数会把
+        // 后面别的分支里的 clearSubmitIntent 一起框进来(我第一版就这么写,当场假红)。
+        const nIdx = seg.indexOf('kind === "network"');
+        const nEnd = nIdx < 0 ? -1 : seg.indexOf("return;", nIdx);
+        const nBranch = nIdx >= 0 && nEnd > nIdx ? seg.slice(nIdx, nEnd) : "";
+        const ambiguousOk = nBranch.includes("submitUnknownTitle") && !nBranch.includes("clearSubmitIntent()");
+        // 确定性分支(服务端明确拒单 / 其余)才清键
+        const definitiveOk = /kind === "business"[\s\S]{0,120}?clearSubmitIntent\(\)/.test(seg);
+        return ambiguousOk && definitiveOk;
+      })());
 
     // ④ 外壳仍然只转发:今日笔数在 core 现算,页面/外壳不许自己 filter 出一个数来
     //    (外壳里留表达式 = 行为门覆盖不到那一层,这是本文件反复栽过的跟头)。
@@ -1039,5 +1131,8 @@ if (pass + fail < ASSERT_FLOOR) {
     + ` 删门是重大动作:确要删,连同本行下限一起改,并在 commit 里写明删了哪一节、为什么。`);
   fail++;
 }
-console.log(`\n${pass} pass / ${fail} fail(断言总数 ${pass + fail},下限 ${ASSERT_FLOOR})`);
+// 🔴 汇总行报**实测覆盖**,不报循环上界(族 B 的根治:声明的数量 ≠ 实际的覆盖)。
+console.log(`\n${pass} pass / ${fail} fail(断言总数 ${pass + fail},下限 ${ASSERT_FLOOR}`
+  + ` · 实测:风控随机层 ${selfProof.s6?.fingerprints}/${selfProof.s6?.rounds} 种指纹`
+  + ` · 日限 property ${selfProof.g1?.fingerprints} 种指纹,最长列表 ${selfProof.g1?.maxLen} 笔,拦/不拦 ${selfProof.g1?.reachedCases}/${selfProof.g1?.notReachedCases})`);
 process.exit(fail ? 1 : 0);
