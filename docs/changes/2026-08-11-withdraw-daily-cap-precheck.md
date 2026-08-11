@@ -1,6 +1,9 @@
 # 提现每日笔数上限:客户端预检恒不触发(z1 审计 P0-1)
 
-- **状态**:Aligned(主人 2026-08-11 拍板:① 保留并修好客户端预检 ② 计数口径「全算」维持现有规则)
+- **状态**:Shipped(2026-08-11 合入主线 `UniApp` = `32e0c50`;合并后全量 verify 425 pass / 0 fail / 0 skip)
+  - 此前:Aligned(主人 2026-08-11 拍板:① 保留并修好客户端预检 ② 计数口径「全算」维持现有规则)
+  - 🔴 **未推远端**:本地主线比 `origin/UniApp` 多 18 少 10,推之前需先合远端那 10 个提交并重跑全门。
+    代价:后端同事从 GitHub 拉不到本轮写进 `docs/HANDOFF` 的 U-4 / U-7 / U-8 三条待定口径。
 - **包分支**:`pkg/z2-withdraw-cap`(worktree `.claude/worktrees/z2-withdraw-cap`,基线 `UniApp@c587c0d`)
 - **定级**:M(跨 4 个源文件 + 3 个门脚本;钱路径 → 子任务加 code-review)
 
