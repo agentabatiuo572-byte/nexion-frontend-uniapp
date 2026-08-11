@@ -9,9 +9,8 @@ import {
 } from "@/store/free-trial";
 import { useTrialConfig } from "@/store/trial-config";
 import { useBills } from "@/store/bills";
-import { postMoneyBill, postMoneyBillsOnce, postReceiptOnly, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
+import { postMoneyBill, postMoneyBillsOnce, postReceiptForAccount, type ReceiptDraft } from "@/lib/money-receipt";
 import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
-import type { Withdrawal } from "@/store/types";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
@@ -168,44 +167,14 @@ function reconcileBills() {
     const row = bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
     if (row && row.status !== "failed") bills.settleByRef(wd.id, "failed");
   }
-  // ②b NEX 抵扣费退还 → 补一条**正向反向分录**(2026-08-04 R2 P1-A)。
-  //    退款只动了余额:钱包里 NEX 回来了,账单里那条「−N NEX(已入账)」却还孤零零挂着 ——
-  //    按账单对账的用户会少算自己的 NEX。改写那条行不是解法(烧确实发生过,改写 = 账本说没烧),
-  //    复式账本的规矩是**冲正靠反向分录**:同单号补一条 +N NEX,两行相抵 = 钱包净变化。
-  //    🔴 判据必须是**退款这件事真的发生过**,不能是「单据失败了所以大概退了」。
-  //
-  //    z4 R2 我把它改成了「单据是失败终态」,理由是原判据(本地退款幂等键)在 remote 模式下
-  //    永不成立、这条冲正因此不可达。**那个改法是错的**(R3 独立审计当场揪出,我复核后确认):
-  //    remote 模式下 `refundFailedWithdrawals` 整个是 no-op,服务端也**没有**「失败提现退还已烧
-  //    NEX」这条契约(全仓与 docs/specs 都查不到)。按终态就写 +N,等于账本单方面宣布一笔
-  //    没有任何证据的退款 —— 比「少一条冲正」坏得多:少一条是漏记,凭空写一条是造假。
-  //    我上一版还在这里写「mock 下排在退款之后,两种模式都不会方向反」,两条腿都不成立
-  //    (mock 下压根建不出提现单)。那句话已删。
-  //
-  //    所以判据回到「有退款事实」。代价照实说明:remote 模式下这条冲正**目前不会触发**,
-  //    账单上那条 −N NEX 会一直挂着没有对手方 —— 它是**真的**(NEX 确实烧了),
-  //    只是「有没有退回来」客户端不知道。等服务端把退还契约定下来(或补一个可查的退款事实),
-  //    再把判据接到那个事实上。已知缺口,不用假分录填。
-  const NEX_REFUNDED = (wd: Withdrawal) => app.user.appliedRewardKeys?.["refund-nex:" + wd.id] === true;
-  for (const wd of app.withdrawals) {
-    const burned = wd.fee?.nexBurned;
-    if (!(typeof burned === "number" && burned > 0)) continue;
-    if (!NEX_REFUNDED(wd)) continue;
-    if (bills.bills.some((b) => b.ref === wd.id && b.symbol === "NEX" && b.amount > 0)) continue;
-    // 🔴 补记,**不是**动钱:NEX 已由 refundFailedWithdrawals 退回钱包(幂等键就在上一行的判据里),
-    // 这里只补它缺的那条分录。改成 postMoneyBill 会照着 +burned 再发一次 NEX = 退款翻倍。
-    postReceiptOnly({
-      type: "withdraw",
-      symbol: "NEX",
-      amount: burned,
-      status: "posted",
-      // memoKey = 渲染时才翻译(切语言不留旧语);memo 只作兜底,与 bills.ts 的约定一致。
-      memo: `Fee offset refunded · ${Number.isInteger(burned) ? burned : burned.toFixed(1)} NEX returned`,
-      memoKey: "withdrawNexRefund",
-      memoParams: { nex: Number.isInteger(burned) ? String(burned) : burned.toFixed(1) },
-      ref: wd.id,
-    });
-  }
+  // ②b NEX 抵扣费退还的冲正分录**已迁进 ⓪ 的纯函数**(lib/withdrawal-bill-drafts,2026-08-11)。
+  //    这里原本单独写一段,判据锚在本地幂等键 `refund-nex:<id>` 上 —— 而写那个键的函数
+  //    在 remote 模式下第一行就 `if (remoteApiEnabled) return false`、mock 模式下压根建不出
+  //    提现单,两头落空:这条冲正在**任何真实配置下都不可达**,用户烧掉的 NEX 有去无回。
+  //    根治不是放宽判据(z4 R2 试过按失败终态写,R3 独立审计判为「凭空宣布一笔没有证据的退款」
+  //    并回滚),而是**换证据源**:改锚服务端字段 `wd.nexRefunded`(契约见 FEAT-WD01 §4.6)。
+  //    既然判据变成了「从单据本身推出该有什么」,它就与其余分录同构,理应住在同一个纯函数里 ——
+  //    于是自愈、按方向判重、跨账号补记这三件事全部继承 ⓪,不必在这里各写一遍。
   // ③ 赠金:锁定 / 待审桶都空了 = 没有还锁着的赠金,那笔「处理中」的赠金账单该入账了。
   //    释放走 applyReleaseOutcome,它只动桶和余额、**不写账单**,
   //    于是账单里那行 +$5 会永远停在「处理中」。这里从数据推出它已经落地。

@@ -10,7 +10,7 @@
  *
  * 🔴 为什么要有自愈那一路(R2 completeness critic 的 P0):
  * 账单表是**裸写整行、无 CAS**(2026-08-05 主人拍板不在前端修),跨标签页并发写会把
- * 刚落盘的分录整行覆盖掉。资金分录里只有这一族没有自愈路径 —— 冲正行(App.vue ②b)
+ * 刚落盘的分录整行覆盖掉。资金分录里只有这一族没有自愈路径 —— 冲正行(下方退还分录)
  * 的存在性判据取自账本自身,丢了下一拍就补回来;而提现主行一旦被抹掉就**永久消失**,
  * 用户回到的正是本包要修的那个原状态,而所有门仍然全绿(门守的是「有没有生产者」,
  * 不是「那一行此刻在不在」)。把判据同样改成「从数据推出该有什么」,这一族才补齐。
@@ -56,7 +56,8 @@ export function billStatusForWithdrawal(status: Withdrawal["status"]): "posted" 
  * - USDT 主行:负额 = 用户「提了多少钱」的唯一凭据;状态跟单据当前态(自愈补写时可能
  *   已经是终态了,写 pending 再等下一拍结算是多余的一步,也会让账单短暂说谎)。
  * - NEX 抵扣费行:只在服务端真烧了 NEX 时才有;恒 `posted` —— 烧是既成事实,
- *   提现失败时由 App.vue ②b 补一条 +N 的反向分录冲正,不改写这一条。
+ *   提现失败时补一条 +N 的反向分录冲正(下一条),**不改写**这一条。
+ * - NEX 退还行(冲正):只在服务端说「已经退了」时才有。判据是线上字段 `wd.nexRefunded`。
  *
  * 🔴 每个数字都取自单据(服务端回执),不接受调用方另传 —— 本仓禁令:显示的钱必须指到单源。
  */
@@ -103,6 +104,37 @@ export function withdrawalBillDrafts(wd: Withdrawal): ReceiptDraft[] {
           ?? Math.max(0, fee.networkConfirmUsd + (fee.penaltyUsd ?? 0) - fee.actualFeeUsd)
         ).toFixed(2),
       },
+      ref: wd.id,
+    });
+  }
+  // 🔴 NEX 退还 → 冲正分录(原 App.vue ②b,2026-08-11 迁来本处)。
+  //
+  // 为什么冲正靠**反向分录**而不是改写上面那条 −N:烧确实发生过,改写 = 账本说没烧。
+  // 复式账本的规矩是同单号补一条 +N,两行相抵 = 钱包净变化。
+  //
+  // 🔴 判据是**服务端说退了**(`wd.nexRefunded`),不是「单据是失败终态所以大概退了」。
+  // z4 R2 按终态写过一版,R3 独立审计判定为「账本单方面宣布一笔没有任何证据的退款」并回滚:
+  // 少一条冲正是漏记(可自愈),凭空写一条是造假(不可逆)。原判据锚在一个**本地**幂等键上,
+  // 而写那个键的函数在 remote 模式下恒 no-op、mock 模式下压根建不出提现单 —— 两头落空,
+  // 这条冲正在任何真实配置下都不可达。现在锚到服务端事实,这是本次修复的全部要点。
+  //
+  // 🔴 金额取 `nexRefunded` 而不是 `nexBurned`:两者可以不等(将来若改成部分退还),
+  // 拿 burned 当退还额 = 显示的钱指到了另一个源(本仓禁令)。
+  //
+  // 🔴 `refunded > nexBurned` 一律不认:退得比烧的多 = 账本凭空造 NEX。此时**不夹到 nexBurned**
+  // 而是整条不写 —— 夹了会拿一个已知是错的数去写一条看着合理的分录,比缺一条坏。
+  // 这也是 `fee` 整个缺失(存量脏单)时的行为:不知道烧了多少,就无从验证退了多少。
+  const refunded = wd.nexRefunded;
+  if (typeof refunded === "number" && refunded > 0 && refunded <= fee.nexBurned) {
+    drafts.push({
+      type: "withdraw",
+      symbol: "NEX",
+      amount: refunded,
+      status: "posted",
+      // memoKey = 渲染时才翻译(切语言不留旧语);memo 只作兜底,与 bills.ts 的约定一致。
+      memo: `Fee offset refunded · ${fmtNex(refunded)} NEX returned`,
+      memoKey: "withdrawNexRefund",
+      memoParams: { nex: fmtNex(refunded) },
       ref: wd.id,
     });
   }
