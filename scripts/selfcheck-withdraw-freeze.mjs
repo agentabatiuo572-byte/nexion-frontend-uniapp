@@ -53,6 +53,43 @@ check("快照包含账号、网络、地址、金额、抵扣意图、policyVers
 check("确认后先复核账号/网络/地址，再调用真实提交", identityAt >= 0 && realSubmitAt > identityAt);
 check("页面按快照提交 policyVersion 与抵扣意图",
   /submitWithdrawal\(\s*snap\.amount,\s*snap\.network,\s*snap\.address,\s*snap\.fee,\s*snap\.offset,\s*snap\.policyVersion,\s*snap\.idempotencyKey/.test(submit));
+
+// ── 幂等键的一生(2026-08-11 独立审计 P0)──
+// 键此前在 handleSubmit 里每次点击现铸 → 超时重试 = 服务端第二张单;catch 又把所有异常
+// 一律报成「费率已更新,请重试」,主动把用户推去建那第二张单。三道门各钉一段:
+// 铸(不许现铸)→ 存(发请求前落盘)→ 判(结果未知时保留键、不刷费率、不喊重试)。
+const readAttemptAt = submit.indexOf("readWithdrawAttempt(");
+const rememberAt = submit.indexOf("rememberWithdrawAttempt(");
+const catchAt = submit.indexOf("} catch (", realSubmitAt);
+const catchTail = catchAt >= 0 ? submit.slice(catchAt) : "";
+
+check("幂等键不在提交函数里现铸(超时重试必须复用同一个键)",
+  !/idempotencyKey:[^\n]*(?:Date\.now|Math\.random|randomUUID)/.test(submit));
+check("快照优先取落盘的冻结件(重放要与首次逐字节相同,否则同键异 body 撞 409)",
+  readAttemptAt >= 0 && snapAt > readAttemptAt && /idempotencyKey:\s*pending\?\./.test(submit));
+// 落盘失败必须拒发:写不进去 = 这一次没有重放保护,超时后认不回那个键,用户一重试就是第二张单。
+check("未收口的提交尝试在请求发出前落盘,且落盘失败即拒发",
+  rememberAt >= 0 && rememberAt < realSubmitAt && /if \(!rememberWithdrawAttempt\(/.test(submit));
+// 刷费率只许出现在「服务端已定局拒绝」那一支的**大括号之内**:结果未知时刷它 →
+// policyVersion 变 → 重放的 body 跟着变 → 撞「同键异 body → 409 + 安全事件」。
+// 🔴 判据必须按大括号配对划界,不能按「另一个标识符出现在第几个字符」—— 后者能被
+// 「插在那个标识符前面」整个绕过(本门自己的变异测试抓到的洞)。
+const settledNeedle = "if (isSettledRejection(err)) {";
+let policyRefreshOnlyInSettled = false;
+if (catchTail.includes(settledNeedle)) {
+  const settledBlock = grabBlock(catchTail, settledNeedle);
+  const from = catchTail.indexOf(settledBlock);
+  const to = from + settledBlock.length;
+  policyRefreshOnlyInSettled = ![...catchTail.matchAll(/loadWithdrawalPolicy/g)]
+    .some((hit) => hit.index < from || hit.index >= to);
+}
+
+check("失败按结果分层:定局才退役键,结果未知时留键、不刷费率、不喊重试",
+  catchTail.includes("isIdempotencyConflict(")
+  && catchTail.includes("isSettledRejection(")
+  && catchTail.includes("withdrawOutcomeUnknown")
+  && !catchTail.includes("withdrawFeeStale")
+  && policyRefreshOnlyInSettled);
 check("页面提交路径没有本地扣 USDT、烧 NEX 或伪造提现账单",
   !/app\.(?:debitBalance|debitNex)\(/.test(submit)
   && !/bills\.(?:add|addForAccount)\(/.test(submit));

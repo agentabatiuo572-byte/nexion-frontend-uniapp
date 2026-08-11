@@ -30,6 +30,7 @@ const REGISTRY = {
   "hard-block-k6-runtime-contract.test.mjs": { how: "chain" },
   "g-remote-authority-contract.test.mjs": { how: "chain" },
   "g-remote-authority-behavior.test.mjs": { how: "chain" },
+  "withdraw-idempotency-contract.test.mjs": { how: "chain" },
   // ── elsewhere:已有入口在跑 ──
   "kyc-removal-contract.test.mjs": { how: "elsewhere", by: "npm run test:kyc-removal" },
   "probe-safety-contract.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
