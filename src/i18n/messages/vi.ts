@@ -1910,8 +1910,8 @@ export const vi: Messages = {
     confirmWithdraw: "Xác nhận rút tiền",
     withdrawTrackingTitle: "Đang xử lý rút tiền",
     submitted: "Đã gửi",
-    reviewPending: "Đang xét duyệt thủ công",
-    reviewPassed: "Đã duyệt",
+    reviewPending: "Đang kiểm tra an toàn",
+    reviewPassed: "Đã xác nhận xong",
     processing: "Đang xử lý",
     sent: "Đã gửi lên chain",
     confirmed: "Đã xác nhận",
@@ -1923,16 +1923,16 @@ export const vi: Messages = {
     syncFailedTitle: "Thu nhập sẽ được xác nhận sau khi đồng bộ",
     syncFailedBody: "Cấu hình nền tảng tạm thời chưa đồng bộ được. Việc xác nhận đang tạm dừng và sẽ tự bù lại khi khôi phục — khoản lợi nhuận của bạn không bị ảnh hưởng.",
     pendingSheetTitle: "Thu nhập đang xét duyệt",
-    pendingSheetBody: "Khoản thu nhập này đã được ghi vào tài khoản và đang xét duyệt. Sẽ được giải phóng sau khi bạn online trong app đủ {hours} giờ tích lũy, hoặc khi xét duyệt thủ công thông qua; việc xét duyệt không tự động thông qua theo thời gian.",
+    pendingSheetBody: "Khoản thu nhập này đã được ghi vào tài khoản của bạn và đang trong bước kiểm tra an toàn. Sẽ được giải phóng sau khi bạn online trong app đủ {hours} giờ tích lũy, hoặc khi chúng tôi kiểm tra xong; sẽ không tự thông qua chỉ vì để đó.",
     lockedSheetTitle: "Phần thưởng bị khóa",
     lockedSheetBody: "Phần thưởng này tạm thời bị khóa. Hãy online trong app đủ {hours} giờ tích lũy để yêu cầu giải phóng; những khoản đang được kiểm tra cần xử lý thủ công trước.",
     sheetOk: "Đã hiểu",
     heldBucketsLine: "Đang xét duyệt ${p} · Bị khóa ${l} (không thể rút)",
-    submitChecking: "Đang kiểm tra rủi ro…",
+    submitChecking: "Đang kiểm tra an toàn…",
     riskCheckTimeoutTitle: "Kiểm tra quá thời gian",
     riskCheckTimeoutBody: "Mạng đang không ổn định. Chưa trừ gì cả — vui lòng thử lại sau ít phút.",
-    routeHeldFrozenTitle: "Rút tiền bị đóng băng",
-    routeHeldFrozenBody: "Lệnh rút này đang bị giữ để xét duyệt rủi ro. Tiền vẫn bị đóng băng trong lúc xử lý; liên hệ hỗ trợ nếu bạn cần giúp đỡ.",
+    routeHeldFrozenTitle: "Lệnh rút này đang tạm dừng",
+    routeHeldFrozenBody: "Lệnh rút này đang tạm dừng. Khoản tiền được giữ cùng với lệnh — chưa chuyển đi và cũng không mất. Cần giúp thì liên hệ bộ phận hỗ trợ bất cứ lúc nào.",
     riskReasons: {
       "dim-serverDeviceId": "Dùng chung thiết bị với một tài khoản khác",
       "dim-ipBucket": "Cùng môi trường mạng với một tài khoản khác",
@@ -1954,7 +1954,7 @@ export const vi: Messages = {
       "high-risk-score": "Điểm rủi ro tổng thể đang ở mức cao",
       "shared-address": "Địa chỉ rút tiền được nhiều tài khoản dùng chung",
       "new-address-hold": "Địa chỉ mới thêm đang trong thời gian bảo vệ",
-      "first-withdrawal-review": "Lần rút đầu tiên cần xác nhận thủ công",
+      "first-withdrawal-review": "Kiểm tra an toàn cho lần rút đầu tiên",
     },
     topUpTitle: "Nạp tiền",
     chooseMethod: "Chọn phương thức",
@@ -1979,14 +1979,14 @@ export const vi: Messages = {
     timeMinutesAgo: "{n} phút trước",
     timeHoursAgo: "{n} giờ trước",
     timeDaysAgo: "{n} ngày trước",
-    firstTimeReview: "Lần rút đầu tiên cần xác nhận thủ công.",
+    firstTimeReview: "Với lần rút đầu tiên, chúng tôi kiểm tra an toàn thêm một bước nên tiền về chậm hơn bình thường một chút.",
 
     fastLaneOnTitle: "Lệnh này xử lý ngay",
     fastLaneOnBody: "Đã miễn: {g}. Vẫn về theo thời gian tiêu chuẩn.",
     fastLaneCta: "Rút ${n} thay vì vậy",
     waivedGates: {
       "new-address-hold": "thời gian chờ địa chỉ mới",
-      "first-withdrawal-review": "xét duyệt lần rút đầu tiên",
+      "first-withdrawal-review": "bước kiểm tra an toàn cho lần rút đầu tiên",
     },
     minWithdrawNote: "Rút tối thiểu: ${n}.",
 
@@ -1997,7 +1997,7 @@ export const vi: Messages = {
     withdrawalNotFound: "Không tìm thấy hồ sơ của lệnh rút này.",
     submitNewWithdrawal: "Tạo lệnh rút mới →",
     trackSubmittedHint: "Đã nhận yêu cầu",
-    trackReviewHint: "Sàng lọc tự động + xét duyệt tài khoản",
+    trackReviewHint: "Đang xác nhận địa chỉ nhận tiền",
     trackProcessingHint: "Đang chuẩn bị giao dịch on-chain",
     trackSentHint: "Đã phát giao dịch",
     trackConfirmedHint: "Đã chuyển tiền",
@@ -2020,17 +2020,17 @@ export const vi: Messages = {
 
 
     trackSubmitAnother: "Rút thêm lần nữa",
-    trackReviewNote: "Lần rút đầu tiên · Tự động + xét duyệt tài khoản",
-    withdrawRouteReviewTitle: "Lệnh rút sẽ được xét duyệt",
+    trackReviewNote: "Lần rút đầu tiên · Đang kiểm tra an toàn",
+    withdrawRouteReviewTitle: "Lệnh này cần xác nhận trước",
 
     withdrawRouteRejectTitle: "Lệnh này không gửi được",
 
-    withdrawRouteRejectBody: "Trạng thái tài khoản hiện không cho phép rút tiền. Hệ thống không tạo lệnh và không trừ tiền. Vui lòng liên hệ hỗ trợ.",
+    withdrawRouteRejectBody: "Tài khoản của bạn hiện chưa rút được — tiền không hề bị trừ và cũng chưa tạo lệnh nào. Hỗ trợ sẽ giúp bạn xử lý.",
 
     fastLaneUndo: "Hoàn tác — khôi phục số tiền ban đầu",
-    withdrawRouteReviewBody: "Địa chỉ nhận này có hoạt động tài khoản liên quan. Bạn vẫn gửi được yêu cầu, nhưng sẽ nằm trong xét duyệt cho đến khi kiểm tra xong.",
-    withdrawRouteHeldTitle: "Đang xét duyệt",
-    withdrawRouteHeldSub: "Yêu cầu đang chờ xét duyệt tài khoản và địa chỉ. Nó sẽ không tự động chuyển tiếp.",
+    withdrawRouteReviewBody: "Địa chỉ nhận này còn liên kết với một tài khoản khác. Để giữ an toàn cho tiền của bạn, chúng tôi xác nhận lệnh này trước khi chuyển — bạn cứ gửi như bình thường.",
+    withdrawRouteHeldTitle: "Đang kiểm tra an toàn",
+    withdrawRouteHeldSub: "Chúng tôi đang xác nhận địa chỉ nhận của lệnh này. Chưa chuyển tiền cho đến khi xong.",
     withdrawBillMemoPass: "Rút về {network} · phí ${fee}",
     withdrawBillMemoReview: "Rút tiền · xét duyệt bổ sung",
     withdrawNexFeeMemo: "Bù phí · đã dùng {nex} NEX (giảm ${fee} phí)",
@@ -3451,6 +3451,8 @@ export const vi: Messages = {
   walletV3: {
     needMoreNexToast: "Không đủ NEX để bù phí",
     withdrawFeeStale: "Mức phí đã được cập nhật, vui lòng thử lại",
+    submitUnknownTitle: "Chưa xác nhận được kết quả gửi lệnh",
+    submitUnknownBody: "Kết nối bị gián đoạn nên lệnh rút này có thể đã được gửi thành công. Đừng gửi lại — hãy kiểm tra Tiến độ rút tiền trước, chỉ thử lại nếu chưa thấy lệnh.",
     withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
@@ -3501,12 +3503,12 @@ export const vi: Messages = {
 
     dailyLimitReached: "Đã hết số lần rút hôm nay. Có thể rút tiếp từ {time}.",
     submitReasonAddressRequired: "Vui lòng thêm địa chỉ rút tiền trước.",
-    submitReasonReviewBlocked: "Yêu cầu này hiện chưa thể gửi.",
+    submitReasonReviewBlocked: "Lệnh này hiện chưa gửi được — thử số tiền khác hoặc quay lại sau ít phút.",
 
     submitReasonInFlight: "Lệnh rút trước vẫn đang xử lý. Bạn có thể rút tiếp sau khi lệnh đó hoàn tất.",
 
 
-    submitReasonUnderReview: "Lệnh rút trước đang được xét duyệt thủ công. Bạn có thể rút tiếp sau khi xử lý xong — liên hệ hỗ trợ ở trang trạng thái rút tiền để biết tiến độ.",
+    submitReasonUnderReview: "Lệnh rút trước vẫn đang trong bước kiểm tra an toàn. Xong bước đó là bạn rút tiếp được — hỗ trợ có thể cập nhật tiến độ ở trang trạng thái rút tiền.",
     exchangePoolToday: "Quỹ nền tảng hôm nay",
     stakeAlt: {
       label: "Số này sẽ thành bao nhiêu nếu bạn khóa staking",
@@ -5075,7 +5077,7 @@ export const vi: Messages = {
     historyToggle: "Xem lịch sử địa chỉ",
     historyReplacedAt: "Ngừng dùng {time}",
     cancelCta: "Hủy",
-    reasonNewAddressAge: "Địa chỉ rút tiền đổi chưa đủ 7 ngày, rút số tiền lớn cần duyệt thủ công",
+    reasonNewAddressAge: "Địa chỉ nhận vừa đổi chưa đủ 7 ngày — lệnh rút lớn sẽ được xác nhận trước",
     startFailed: "Có lỗi xảy ra, vui lòng thử lại sau",
   },
   learning: {

@@ -246,8 +246,11 @@
                  分隔空格用 {{ ' ' }} 显式写,直接写在标签间的前导空格会被编译器吃掉
                  (实测渲染成 `$20.The fee…` 粘在一起)。 -->
             <text class="block">{{ minWithdrawNoteText }}<text v-if="feeConfigUsable && amountNum > 0 && !quoteBlocked">{{ t.wallet.minWithdrawNoteOffset }}</text></text>
-            <!-- 笔数从配置插值(此前写死「1 笔/日」而代码里零计数 —— 空头承诺) -->
-            <text class="block">{{ dailyLimitNoteText }}</text>
+            <!-- 🔴 这句只在**闸真的会拦**时才出现:limitCount ≤0 = 服务端没配 / policy 拉不到,
+                 判定层按「不限制」走,这时再说一句「每日限额:0 笔/日」就是当场撒谎
+                 (实景实测:后端不可达时它真的渲染成 0 笔/日)。
+                 「有没有这句话」与「闸生不生效」从此是同一个条件,不会再各走各的。 -->
+            <text v-if="dailyFacts.limitCount > 0" class="block">{{ dailyLimitNoteText }}</text>
           </view>
         </view>
       </view>
@@ -339,7 +342,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
@@ -358,7 +361,6 @@ import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } f
 import { mockServerNow } from "@/store/server-time";
 import {
   evaluateWithdrawal,
-  dailyLimitStatus,
   requestWithdrawalEligibility,
   type WithdrawalEligibility,
 } from "@/store/withdrawal-eligibility";
@@ -368,6 +370,7 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
+import { ApiError, isAmbiguousOutcome } from "@/api/errors";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 // 提现网络收窄裁决:仅 USDT 三网络(可选;每网络各有独立当前地址,RM01a)。
@@ -412,7 +415,77 @@ const maxWithdrawable = computed(() => {
   return serverWithdrawable * (withdrawalPolicy.value?.balanceMaxRatio ?? 0);
 });
 const minWithdrawable = computed(() => withdrawalPolicy.value?.minAmount ?? 0);
-const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(withdrawalPolicy.value?.dailyLimitCount ?? 0) }));
+/**
+ * 🔴 日限的两件事实**只从这一个地方取**,文案与闸共用它 —— 说的那个 N 和拦人用的 N
+ * 必须字面同源。此前文案取服务端 policy、判定取本地 config.withdrawRules(远端同步
+ * 压根不覆盖 withdrawRules,永远是前端写死的 1):服务端配 3 笔而客户端按 1 笔拦,
+ * 用户被自己的 App 挡在门外(z1 审计 P0-1 回源时发现的第二处缺陷)。
+ *
+ * 笔数不在这里算:把 app.withdrawals 原件交给 core 现算(平台日 UTC+7),
+ * 页面不许自己 filter —— 判定留在 core 才有行为门覆盖得到。
+ *
+ * policy 取不到 → limitCount = 0 → 既有规则「上限 ≤0 视为未配置」→ 不限制。
+ * 这个方向是**故意**的:后端不可达时宁可放行让服务端去拒,也不能把提现锁死。
+ */
+const dailyFacts = computed(() => ({
+  limitCount: withdrawalPolicy.value?.dailyLimitCount ?? 0,
+  withdrawals: app.withdrawals,
+}));
+const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n: String(dailyFacts.value.limitCount) }));
+/**
+ * 🔴🔴 同一笔提现意图的幂等键(跨重试复用)。
+ *
+ * 同一笔意图重试要复用同一把键,让服务端的幂等去重生效(否则超时重试 = 第二笔真出账);
+ * 而**换了任何一样「用户在要什么」的东西,就是另一笔意图**,必须换键。
+ *
+ * 签名 = 账号 | 网络 | 金额 | **收款地址** | NEX 抵扣开关。
+ *
+ * 🔴 收款地址是后补的,漏掉它是资金流向级缺陷(R3 独立审计点名):
+ * 歧义失败后用户改了收款地址再提交 → 沿用旧键 → 服务端幂等去重返回**打到旧地址**的那一单,
+ * 而客户端用**本地传入的新地址**渲染(建单响应里根本没有 address 可核)——
+ * 界面显示新地址、钱走旧地址,客户端永远发现不了。
+ *
+ * 🔴 policyVersion **故意不进签名**:它是平台状态,不是「用户在要什么」。
+ * 把它放进来会引出更坏的一条:歧义失败后本页 onShow 会重取策略,版本一变签名就变、
+ * 键就换 —— 正好在最不该换键的那一刻换掉,直接制造重复出账。
+ * 报价真变了由 quoteStillValid 那道闸拦,不靠幂等键表达。
+ */
+const submitIntentKey = ref("");
+const submitIntentSig = ref("");
+function currentIdempotencyKey(): string {
+  const sig = `${app.accountKey}|${network.value}|${amountNum.value}|${boundAddress.value}|${offsetWithNex.value ? 1 : 0}`;
+  if (submitIntentSig.value !== sig || !submitIntentKey.value) {
+    submitIntentSig.value = sig;
+    submitIntentKey.value = `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  }
+  return submitIntentKey.value;
+}
+/** 结局确定(成功 / 明确拒单)→ 下一次提交是新的一笔意图,换新键。 */
+function clearSubmitIntent(): void {
+  submitIntentKey.value = "";
+  submitIntentSig.value = "";
+}
+
+/**
+ * 服务端「今日笔数已达上限」拒单的识别。
+ *
+ * 🔴 实测更正(假后端 `dailyLimit` 档):超额拒单走 **HTTP 429**,而 429 不是 2xx,
+ * 所以客户端拿到的是 `kind:"http"` 而**不是** `business` —— `business` 只在 2xx 且
+ * 业务码非 0 时才产生。也就是说「按 kind 认」认不出它,真正认得出的是 message 这一路。
+ * 契约定名前保持串匹配;定名后收敛,见 HANDOFF U-4。
+ *
+ * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
+ * 但 code 是 HTTP 状态码(超日限多半统一 4xx,认不出是哪条规则),真正区分规则的是
+ * 服务端 envelope 的 message。契约里还没钉死这个串 —— 所以这里按**一组候选**宽松匹配,
+ * 并且**只用于换一句更准的话**,认不出就回落原文案,认错也不会放行或拦截任何东西。
+ * 待后端定名后收敛成单串:见 HANDOFF U-4。
+ */
+function isDailyLimitRejection(err: unknown): boolean {
+  const msg = err instanceof ApiError ? err.message : "";
+  if (!msg) return false;
+  const upper = msg.toUpperCase();
+  return upper.includes("DAILY_LIMIT") || upper.includes("DAILY_COUNT") || upper.includes("WITHDRAW_LIMIT_EXCEEDED");
+}
 // 今日笔数用完时的提示 + 下次可提时刻(平台日边界,按用户本地时钟展示)
 const dailyLimitReachedText = computed(() => {
   // 🔴 给「MM-DD HH:mm」绝对时刻,不写「明日」。平台日按越南时区(UTC+7)切,
@@ -463,6 +536,12 @@ onMounted(() => {
   if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
   void loadWithdrawalPolicy();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
+});
+// 🔴 回前台 / 返回本页时重取策略。上一轮我把这条补给了追踪页,**加错页了**:
+// 真正靠日限与最低额拦人的是**这一页**,而 App 端页面进栈后不销毁,不补拉就可能拿着
+// 好几天前的限额判人(R2 跨端镜头点名)。loader 自带在途守卫,重复触发是安全的。
+onShow(() => {
+  void loadWithdrawalPolicy();
 });
 onUnmounted(() => {
   if (freezeTimer) clearInterval(freezeTimer);
@@ -605,7 +684,7 @@ const eligibilityClock = computed(() => {
 });
 const eligibility = computed(() => {
   void eligibilityClock.value; // 建立对「时间边界」的依赖,不参与计算
-  return evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, amountNum.value);
+  return evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, amountNum.value);
 });
 // 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
 const withdrawalRiskNotice = computed(
@@ -687,7 +766,7 @@ const fastLaneOn = computed(
  * 直接把小额线代进同一个判定函数问一次,答案是什么就说什么。
  */
 const smallLineDecision = computed(() =>
-  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, smallAmountLine.value),
+  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value),
 );
 const fastLaneOverLine = computed(
   () =>
@@ -875,8 +954,23 @@ async function handleSubmit() {
     maxWithdrawable: maxWithdrawable.value,
     offset: offsetWithNex.value,
     policyVersion: withdrawalPolicy.value!.policyVersion,
-    idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    // 🔴🔴 幂等键**跨重试复用**,不是每次提交现造一把。
+    // 旧写法在这里现造:超时 / 断网时服务端**可能已经建好单**只是响应没回来,而页面弹的是
+    // 「费率已更新,请重新确认」把用户往重试上推 —— 重试再造一把新键,服务端视为新请求,
+    // **第二笔真出账**(R2 独立审计,资金安全级)。
+    // 现在:同一笔提现意图只 mint 一次,只有拿到**确定性结局**(建单成功 / 服务端明确拒单)
+    // 才作废重来;歧义结局(超时 / 网络)保留原键,重试即命中服务端的幂等去重。
+    idempotencyKey: currentIdempotencyKey(),
     quote: q,
+    // 🔴 日限事实**也进快照**,与 account 同源同刻。曾经这里刻意取活值,理由写的是
+    // 「确认弹窗期间另一个标签页提交成功,冻住的快照看不见它」—— 那句话是错的:
+    // 提现单列表是内存状态,别的标签页的写入根本不进本标签页(全仓没有任何 storage 事件
+    // 重新水合 store),活值与快照在跨标签页这件事上一样瞎。取活值买不到它声称的东西,
+    // 却引入了真问题:弹窗期间切账号,会拿**新账号的单据**去判**旧账号的额度**,
+    // 弹出一句对这个账号纯属虚假的「今日已用完」(R1 三份独立审计各自抓到)。
+    // 同标签页内输入面已锁、列表不会新增行,冻结无损失,还把「await 后只读 snap」这条
+    // 不变量恢复成没有例外。跨标签页并发由服务端事务兜底,本来就不该客户端管。
+    daily: dailyFacts.value,
     // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
     fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
   };
@@ -926,6 +1020,7 @@ async function handleSubmit() {
       snap.network,
       snap.address,
       snap.maxWithdrawable,
+      snap.daily,
       snap.amount,
     );
   } catch (err) {
@@ -983,14 +1078,45 @@ async function handleSubmit() {
       fresh.waivedGates,
     );
     clearSubmitFreeze();
+    clearSubmitIntent(); // 结局确定:成功建单 → 下一次是新的一笔意图
     if (!withdrawalId) {
       toast.error(t.value.wallet.withdrawInsufficient);
       return;
     }
     uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
     return;
-  } catch {
+  } catch (err) {
     clearSubmitFreeze();
+    // 🔴🔴 失败要按**结局是否确定**分诊,不能一律回落「费率已更新,请重新确认」。
+    // 三件事此前全错:原因错(会话过期 / 5xx / 超日限都被说成费率变了)、
+    // 下一步错(诱导重试,而重试会换新幂等键 → 服务端可能真出第二笔)、
+    // 什么时候能行不说。R2 两路独立审计各自点名。
+    //
+    // 分诊只做「换一句更准的话 + 决定要不要换幂等键」,不放行也不拦截任何东西,
+    // 所以认错的代价有界。契约定名后收敛成单串:见 HANDOFF U-4。
+    // ① 日限拒单:确定性结局(服务端明确拒了,没建单)。先认它,因为它走 429 → kind 是
+    //    "http" 而不是 "business",落到下面的歧义判定会被误当成「可能已建单」。
+    if (isDailyLimitRejection(err)) {
+      clearSubmitIntent();
+      toast.error(dailyLimitReachedText.value);
+      return;
+    }
+    // ② 🔴🔴 歧义结局 —— 服务端**可能已经把单建好了**。两件事都必须做:
+    //    保留幂等键(重试命中服务端去重,而不是造出第二笔真出账),
+    //    并且不说「请重新确认」那种把人往重按上推的话。
+    //    判定见 isAmbiguousOutcome —— 它的边界是假后端端到端实测出来的,不是推的。
+    if (isAmbiguousOutcome(err)) {
+      toast.error(t.value.walletV3.submitUnknownTitle, t.value.walletV3.submitUnknownBody);
+      return;
+    }
+    // ③ 确定性结局(服务端明确拒绝 / 根本没处理):作废旧键,下次是新的一笔意图。
+    const apiErr = err instanceof ApiError ? err : null;
+    clearSubmitIntent();
+    if (apiErr?.kind === "business") {
+      toast.error(t.value.walletV3.submitReasonReviewBlocked);
+      return;
+    }
+    // 费率文案只留给**真的**报价失效那一类。
     await loadWithdrawalPolicy();
     toast.error(t.value.walletV3.withdrawFeeStale);
     return;

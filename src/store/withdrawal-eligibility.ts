@@ -12,7 +12,6 @@ import {
 import type { Withdrawal } from "@/store/types";
 import type { WithdrawalRiskRoute } from "@/store/config-types";
 import { decideFromStores, isDailyLimitReached, nextDayResetAt } from "@/store/withdrawal-eligibility-core";
-import { readWithdrawCounter } from "@/store/withdraw-daily-count";
 import { usePayoutAddress } from "@/store/payout-address";
 import {
   fromWithdrawNetwork,
@@ -55,11 +54,26 @@ export interface WithdrawalEligibility {
 // ROUTE_SEVERITY / worse() 已迁到 withdrawal-eligibility-core.ts —— 判定逻辑单源在那边,
 // 这里留副本会让人以为改这里就能改行为(实际改了没用),故删净不留。
 
+/**
+ * FEAT-WD01b 日限判定所需的两件事实,一律由调用方从**权威源**取好传进来
+ * (本模块不自己去摸,免得又长出第二份口径 —— 这正是 z1 审计 P0-1 的根因族)。
+ *
+ * 🔴 limitCount 只许来自服务端 `GET /api/withdrawals/policy`。本地
+ * `config.withdrawRules` 的远端同步不覆盖 withdrawRules,取它等于按前端写死值拦人。
+ * 🔴 withdrawals 直接给 `app.withdrawals` 原件 —— 今日笔数由 core 现算,
+ * 这里不许 filter / length,外壳一个表达式都不留。
+ */
+export interface WithdrawalDailyFacts {
+  limitCount: number;
+  withdrawals: ReadonlyArray<{ submittedAt: number }>;
+}
+
 export function evaluateWithdrawal(
   accountKey: string,
   network: Withdrawal["network"],
   address: string,
   withdrawableUsdt: number,
+  daily: WithdrawalDailyFacts,
   requestedUsdt?: number,
 ): WithdrawalEligibility {
   // 本函数只做一件事:**从各 store 把事实取齐**,然后交给纯函数判定。
@@ -96,8 +110,8 @@ export function evaluateWithdrawal(
     minWithdrawableUsdt: rules.minWithdrawableUsdt,
     sameAddressRoute: rules.sameAddressRoute,
     firstWithdrawalManual: rules.firstWithdrawalManual,
-    withdrawCounter: readWithdrawCounter(key),
-    dailyWithdrawLimitCount: rules.dailyWithdrawLimitCount,
+    withdrawals: daily.withdrawals,
+    dailyWithdrawLimitCount: daily.limitCount,
   });
 
   return {
@@ -116,17 +130,14 @@ export function evaluateWithdrawal(
 }
 
 /**
- * FEAT-WD01b:今日额度状态(**纯查询,不占用**)。追踪页「再提一笔」判置灰用。
- * 本段同样只转发,判据在 core 的 isDailyLimitReached。
+ * FEAT-WD01b:今日额度状态。追踪页「再提一笔」判置灰用。
+ * 本段同样只转发,判据在 core 的 isDailyLimitReached —— 与提现页那条置灰同一对函数,
+ * 两页才不会一个说能提一个说不能提。
  */
-export function dailyLimitStatus(accountKey: string): { reached: boolean; resetAt: number } {
+export function dailyLimitStatus(daily: WithdrawalDailyFacts): { reached: boolean; resetAt: number } {
   const now = mockServerNow();
   return {
-    reached: isDailyLimitReached(
-      readWithdrawCounter(normalizeAccountKey(accountKey)),
-      useConfig().config.withdrawRules.dailyWithdrawLimitCount,
-      now,
-    ),
+    reached: isDailyLimitReached(daily.withdrawals, daily.limitCount, now),
     resetAt: nextDayResetAt(now),
   };
 }
@@ -135,12 +146,11 @@ export function dailyLimitStatus(accountKey: string): { reached: boolean; resetA
 export function commitWithdrawal(accountKey: string, network: Withdrawal["network"], address: string): void {
   recordWithdrawAddressUse(accountKey, network, address);
   markWithdrawn(accountKey);
-  // 🔴 每日笔数**不在这里** +1。曾经挂在这儿(建单成功后),被独立验收 3 轮 3 中
-  // 复现出并发绕过:「查 → 600ms 风控评估 → 建单 → 才写计数」中间的窗口太长。
-  // 曾改成建单前 claimWithdrawSlot 先占额度;c37e642 提现整体让渡服务端事务后,
-  // 该占额度调用随本地扣款链一并删除 —— 现状是**客户端计数器无人递增**,
-  // 日限的真正执行方是服务端 policy.dailyLimitCount。客户端预检恒不触发这件事
-  // 已立案(z1 判决包「相邻发现 1」);无论怎么修,都不许把计数挪回建单之后。
+  // 🔴 每日笔数**不在这里** +1,以后也别加回来:今日笔数由 core 从提现单列表现算
+  // (countWithdrawalsOnPlatformDay),提交成功那一刻单据已经进列表,不需要第二份状态。
+  // 沿革:曾在这里事后 +1(独立验收 3 轮 3 中复现并发绕过)→ 改成建单前占额度 →
+  // c37e642 让渡服务端事务后占额度调用被删,计数器从此无人递增、预检恒不触发
+  // (z1 审计 P0-1)。凡是「再存一个计数」的修法都会重蹈同一条路。
 }
 
 // ── 提交时点的服务端评估形态(⑤ 加载态 + 异常3 超时)────────────────────
@@ -160,6 +170,7 @@ export function requestWithdrawalEligibility(
   network: Withdrawal["network"],
   address: string,
   withdrawableUsdt: number,
+  daily: WithdrawalDailyFacts,
   requestedUsdt?: number,
 ): Promise<WithdrawalEligibility> {
   return new Promise((resolve, reject) => {
@@ -168,7 +179,7 @@ export function requestWithdrawalEligibility(
         reject(new Error("risk-check-timeout"));
         return;
       }
-      resolve(evaluateWithdrawal(accountKey, network, address, withdrawableUsdt, requestedUsdt));
+      resolve(evaluateWithdrawal(accountKey, network, address, withdrawableUsdt, daily, requestedUsdt));
     }, 600);
   });
 }
