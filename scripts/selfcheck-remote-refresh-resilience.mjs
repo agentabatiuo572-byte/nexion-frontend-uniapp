@@ -34,22 +34,38 @@ console.log("selfcheck-remote-refresh-resilience — 权威不可达时刷新缝
 // ── 覆盖清单:磁盘真相,不手抄 ────────────────────────────────────────────────
 // 判据:src/store/*.ts 里被 `void xxx()` 触发、且函数体引用了 `@/api/runtime` 某 Api 的
 // async 函数。0 个候选 = 判据失效,必红。
-const storeDir = path.join(SRC, "store");
+// 🔴 扫描面与写法覆盖(z1 R2 对抗审计):v1 只认 `src/store/*.ts` 里的**无参裸函数名**
+//    `void fn()`,实测漏三族真实缝 —— 带参 `void joinRemote(id)`、成员调用
+//    `void x.refreshRemote()`、箭头函数 `const refreshRemote = async () => {}`
+//    (后者还会因 `indexOf("async function fn(")` 找不到而**静默 continue**)。
+//    这里三族全收,扫描面扩到 store + composables + lib;基数写成台账(见文件尾),
+//    不用 `>= 3` 下限 —— 从 13 退化到 3 也判绿的下限等于没守删除向。
+const SCAN_DIRS = ["store", "composables", "lib"];
 const targets = [];
-for (const f of readdirSync(storeDir).filter((n) => n.endsWith(".ts"))) {
-  const src = readFileSync(path.join(storeDir, f), "utf8");
-  if (!/from "@\/api\/runtime"/.test(src)) continue;
-  for (const m of src.matchAll(/void (\w+)\(\)/g)) {
-    const fn = m[1];
-    const bodyAt = src.indexOf(`async function ${fn}(`);
-    if (bodyAt < 0) continue;
-    if (!/Api\b/.test(src.slice(bodyAt, bodyAt + 2000))) continue;
-    targets.push({ file: `src/store/${f}`, fn });
+for (const dir of SCAN_DIRS) {
+  const abs = path.join(SRC, dir);
+  let entries = [];
+  try { entries = readdirSync(abs).filter((n) => n.endsWith(".ts")); } catch { continue; }
+  for (const f of entries) {
+    const rel = `src/${dir}/${f}`;
+    const src = readFileSync(path.join(abs, f), "utf8");
+    if (!/from "@\/api\/runtime"/.test(src)) continue;
+    // 三族写法:void fn(…) / void obj.fn(…) / void fn(…).catch(…)。
+    // 🔴 只吃到**第一个左括号**为止:早期版本允许跨过 `()` 再取一段,于是
+    //    `void refreshRemote().catch(...)` 被读成 `.catch`,payout-address 那条缝整条漏掉。
+    for (const m of src.matchAll(/void\s+([\w$.]+)\s*\(/g)) {
+      const fn = m[1].split(".").pop();
+      if (!fn || fn === "0") continue;
+      // 函数体定位:async function fn( / const fn = async ( / fn: async (
+      const declRe = new RegExp(`(?:async function ${fn}\\s*\\(|(?:const|let)\\s+${fn}\\s*=\\s*async\\s*\\(|\\b${fn}\\s*:\\s*async\\s*\\()`);
+      const declHit = declRe.exec(src);
+      if (!declHit) continue; // 跨模块调用(如 useContentCopy().x())本文件定位不到,不算本文件的缝
+      if (!/Api\b/.test(src.slice(declHit.index, declHit.index + 2000))) continue;
+      targets.push({ file: rel, fn });
+    }
   }
 }
 const uniq = [...new Map(targets.map((t) => [`${t.file}#${t.fn}`, t])).values()];
-check(`覆盖清单非空(磁盘扫出 ${uniq.length} 个 void 触发的远端刷新缝)`, uniq.length >= 3,
-  `找到 ${uniq.length} 个 —— 少于 3 说明扫描判据失效`);
 
 // ── harness:remote 开、API 全抛 ─────────────────────────────────────────────
 const disk = new Map();
@@ -71,7 +87,9 @@ function throwingRuntimeStub() {
     apiRuntimeConfig: 'export const apiRuntimeConfig = { mode: "remote", baseUrl: "http://unreachable.invalid" };',
   };
   const body = names
-    .map((n) => special[n] ?? `export const ${n} = new Proxy({}, { get: () => () => Promise.reject(new Error("AUTHORITY_UNREACHABLE")) });`)
+    // 🔴 每次 API 调用记一笔:这是「这条缝真的跑了」的唯一硬凭据(z1 R2 对抗审计:
+    //    原来只要 bindAccount 存在就 exercised++,缝被挪到别的入口一样报「全部触发」)。
+    .map((n) => special[n] ?? `export const ${n} = new Proxy({}, { get: () => (...a) => { globalThis.__z1ApiCalls++; return Promise.reject(new Error("AUTHORITY_UNREACHABLE")); } });`)
     .join("\n");
   return body;
 }
@@ -115,9 +133,20 @@ async function loadEntry(contents) {
 
 // 每个刷新缝:载它所在 store,取出同名导出或经 store 实例调用。刷新函数多为 store 内部
 // 函数,不一定导出 —— 统一经 bindAccount / 直调导出两条路径触发,再看 rejection 计数。
+// 🔴 触发登记表(z1 R2 对抗审计 P1-23):有些缝天然从门外触发不到(要业务参数,
+//    如 joinRemote(eventId))。这类必须**显式登记原因**,不许混在「已触发」里充数;
+//    未登记又没真打 API 的,一律红。判据 = 每条缝的 API 调用计数真的涨了。
+// 目前全部 16 条都能从门外触发到(直调导出或经 bindAccount),故为空。
+// 将来确有触发不到的缝,在此登记 `"file#fn": "为什么门外触发不到"`;
+// 登记了却其实能触发的(陈旧登记)由下面的 stale 断言顶回来 —— 登记表本身也要被守。
+const UNREACHABLE = {};
+globalThis.__z1ApiCalls = 0;
 let exercised = 0;
+const notExercised = [];
 for (const t of uniq) {
+  const key = `${t.file}#${t.fn}`;
   const modName = t.file.replace(/^src\//, "@/").replace(/\.ts$/, "");
+  const before = globalThis.__z1ApiCalls;
   try {
     const mod = await loadEntry(`export * from "${modName}";`);
     // 直调导出的刷新函数(若导出);否则触发 use store + bindAccount(常见 void 调用点)。
@@ -125,21 +154,36 @@ for (const t of uniq) {
       await mod[t.fn]();
     } else {
       const useName = Object.keys(mod).find((k) => k.startsWith("use"));
-      if (!useName) { check(`${t.file}#${t.fn} 可触发`, false, "store 无 use* 导出,触发不到"); continue; }
-      const store = mod[useName]();
-      if (typeof store.bindAccount === "function") store.bindAccount("resilience-probe@nexgrid.test");
-      else if (typeof store[t.fn] === "function") await store[t.fn]();
-      else { check(`${t.file}#${t.fn} 可触发`, false, "既不导出也无 bindAccount 入口"); continue; }
+      const store = useName ? mod[useName]() : null;
+      if (store && typeof store[t.fn] === "function") await store[t.fn]();
+      else if (store && typeof store.bindAccount === "function") store.bindAccount("resilience-probe@nexgrid.test");
     }
-    exercised++;
   } catch (err) {
-    check(`${t.file}#${t.fn} await 后 resolve(权威不可达不许 reject 冒泡)`, false, String(err?.message ?? err).slice(0, 160));
+    check(`${key} await 后 resolve(权威不可达不许 reject 冒泡)`, false, String(err?.message ?? err).slice(0, 160));
+    continue;
   }
+  // 让 fire-and-forget 的调用有机会发出去
+  await new Promise((r) => setTimeout(r, 5));
+  if (globalThis.__z1ApiCalls > before) exercised++;
+  else notExercised.push(key);
 }
+const unregistered = notExercised.filter((k) => !UNREACHABLE[k]);
+check(`🔴 未触发的缝必须登记原因(未登记 ${unregistered.length} 条)`, unregistered.length === 0,
+  unregistered.join(", "));
+const staleReg = Object.keys(UNREACHABLE).filter((k) => !notExercised.includes(k));
+check(`🔴 登记表无陈旧项(登记为不可达、实际却触发到的:${staleReg.length} 条)`, staleReg.length === 0,
+  staleReg.join(", "));
+check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条;登记为门外不可达 ${notExercised.length} 条`,
+  exercised + notExercised.length === uniq.length);
+// 🔴 基数台账(z1 R2 对抗审计 P1-25):`>= N` 下限守不住删除向 —— 从 16 退化到 3 也判绿。
+// 缝数变化必须有人来改这个数,顺带逼他确认新增/删除的那条缝该不该有门。
+const EXPECTED_SEAMS = 16;
+check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
+  uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来
 await new Promise((r) => setTimeout(r, 50));
 
-check(`全部刷新缝已触发(${exercised}/${uniq.length})`, exercised === uniq.length, `只触发到 ${exercised}`);
+// (原「全部刷新缝已触发」断言由上面三条取代:真凭据 + 登记表 + 基数台账)
 check(`unhandledRejection = 0(实测 ${rejections.length})`, rejections.length === 0,
   rejections.slice(0, 3).join(" | "));
 
