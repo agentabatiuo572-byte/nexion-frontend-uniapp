@@ -905,6 +905,8 @@ export const vi: Messages = {
     total: "Tổng cộng",
     combinedDaily: "Sản lượng ngày gộp lại",
     checkoutCta: "Thanh toán · ${total}",
+    checkoutUnavailableCta: "Tạm chưa thanh toán được combo",
+    checkoutUnavailableHint: "Hiện chưa tính được giá combo. Bạn vẫn có thể mua từng thiết bị tại cửa hàng — combo của bạn vẫn được giữ lại.",
     checkoutSuccessTitle: "Đã đặt đơn combo",
     checkoutSuccessBody: "Đã đặt {count} thiết bị · đang thiết lập",
     checkoutBillMemo: "Mua combo · {count} thiết bị",

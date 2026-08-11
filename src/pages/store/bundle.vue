@@ -11,10 +11,14 @@
   Wrapped in <AppChassis active="store">; back + "Bundle" title live in the sticky
   chassis nav header via useSetPageHeader (mirrors the prototype's
   <SetPageHeader backHref="/store"/>, whose chassis Header fills in the route
-  title headerTitles.storeBundle). Checkout settles via balance: reuses the
-  single-product checkout core (debit + createOrder per item + bill + insufficient-
-  balance guard) + the same purchase-gate deep-link defense, then clears the cart
-  and routes to /store/orders.
+  title headerTitles.storeBundle).
+
+  结算分两档:
+  - mock:余额直付——复用单品 checkout 下单内核(扣款 + 逐件 createOrder + 账单 +
+    余额不足拦截)+ 同一道购买资格门,然后清空组合车、跳 /store/orders。
+  - 远端:**不结算**。组合的阶梯折扣没法由服务端整单定价(理由见 onCheckout 的注释),
+    逐件下单会变成显示价与实收价不符。CTA 置灰换文案 + 一句 hint 把用户导向商城单件
+    购买,组合车原样保留。
 -->
 <template>
   <AppChassis active="store">
@@ -126,12 +130,24 @@
             <text :style="rowLabelStyle(false)">{{ t.bundle.combinedDaily }}</text>
             <text class="tabular-nums" :style="rowValueStyle('var(--v5-success)')">+${{ cumulativeDailyEarn.toFixed(2) }}/d</text>
           </view>
-          <!-- Checkout CTA (intentional placeholder — see header comment) -->
-          <view class="w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" :aria-label="checkoutCtaText" @click.stop="onCheckout">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
-            <text :style="ctaLabelStyle">{{ checkoutCtaText }}</text>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+          <!-- Checkout CTA — 结算不可用时置灰 + 换文案(禁用原因),下一步走 CTA 下方那句 hint。
+               箭头 / 上传图标一并撤掉:禁用态上留着「向前」的箭头是反语义的。 -->
+          <view
+            class="w-full flex items-center justify-center"
+            :class="checkoutUnavailable ? '' : 'active:scale-[0.98]'"
+            :style="ctaStyle"
+            role="button"
+            tabindex="0"
+            :aria-disabled="checkoutUnavailable"
+            :aria-label="ctaText"
+            @click.stop="onCheckout"
+          >
+            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18" /><path d="M5 10l7-7 7 7" /><path d="M5 21h14" /></svg>
+            <text :style="ctaLabelStyle">{{ ctaText }}</text>
+            <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </view>
+          <!-- 禁用原因 + 下一步(项目不变量:业务链必须有下一步 / 禁用原因)。 -->
+          <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ t.bundle.checkoutUnavailableHint }}</text>
         </view>
       </view>
     </view>
@@ -194,6 +210,12 @@ const tiersReversed = computed(() => BUNDLE_DISCOUNT_TIERS.slice().reverse());
 const totalText = computed(() => total.value.toLocaleString(undefined, { maximumFractionDigits: 0 }));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
 const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
+// 远端模式下组合价没法由服务端整单定价(理由见 onCheckout 里的长注释)→ 结算不可用。
+// 模块级常量,取值在应用启动时就定死,不需要响应式。
+const checkoutUnavailable = remoteApiEnabled;
+const ctaText = computed(() => (
+  checkoutUnavailable ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
+));
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -215,15 +237,19 @@ function onAddSuggestion(p: Product) {
 function onCheckout() {
   const list = products.value;
   if (list.length === 0) return;
-  // 🔴 远端模式拒单。本页是全站唯一还在**本地建单 + 本地扣余额**的购买入口
-  // (单品 checkout 早已改走 orderApi.create,见 checkout.vue 的 submitRemoteOrder)。
-  // 而履约推进(orders.advanceOrder)现已归服务端 —— 放行等于「钱扣了、单子永远停在
-  // 已支付、机器一台不来」。先拒单是两害相权:组合购在远端模式下待接
-  // POST /api/orders(每 SKU 一单),接上前不放它自己造一套本地账。
-  if (remoteApiEnabled) {
-    toast.warn(t.value.tradein.errPurchaseFailed);
-    return;
-  }
+  // 🔴 远端模式不结算 —— 深链 / 程序化点击的第二道防线(正常路径上 CTA 已置灰)。
+  // 本页是全站唯一还在**本地建单 + 本地扣余额**的购买入口(单品 checkout 早已改走
+  // orderApi.create,见 checkout.vue 的 submitRemoteOrder);而履约推进
+  // (orders.advanceOrder)现已归服务端 —— 放行等于「钱扣了、单子永远停在已支付、
+  // 机器一台不来」。
+  //
+  // 为什么不改走单品接口:POST /api/orders 的请求体只有 productNo + quantity +
+  // voucherId,客户端不传价格、由服务端定价,阶梯折扣(cart.ts 的 BUNDLE_DISCOUNT_TIERS)
+  // 没有任何字段能带过去 —— quantity 是「同型号 N 台」而组合是 N 个不同型号,券是单笔
+  // 单用跨不了 N 笔单。逐 SKU 发单 = 页面显示 −12%、服务端按全价收,是付款环节的价格
+  // 谎报。要诚实做只能由服务端整单定价,那个契约还不存在(PRD 3698 行只预告了折扣
+  // 阶梯配置下发,不含组合下单),故此处不结算,由 CTA 置灰 + hint 给用户下一步。
+  if (remoteApiEnabled) return;
   // 购买资格门(等级门/锁额/售罄)——镜像单品 checkout 的门:suggestions 只挡上架节奏门
   // (unlocksAtPhase)、挡不住资格门,组合内任一 SKU 不达标即整单拒,防授权旁路(深链防线)。
   // 真后台仍以 POST /api/orders 服务端复检为准。
@@ -427,20 +453,31 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
   };
 }
 
+// disabled 态按设计系统的状态派生公式:填充降 surface 系 + 文字/图标降 ink-4 + 去掉 glow,
+// 不新造灰色。checkoutUnavailable 是模块级常量,一次算好即可,不必上 computed。
 const ctaStyle: CSSProperties = {
   marginTop: "14px",
   gap: "6px",
   height: "50px",
   borderRadius: "999px",
-  background: "var(--v5-brand)",
-  boxShadow: "var(--v5-spotlight-brand)",
-  color: "var(--v5-on-brand)",
+  background: checkoutUnavailable ? "var(--v5-surface-2)" : "var(--v5-brand)",
+  boxShadow: checkoutUnavailable ? "none" : "var(--v5-spotlight-brand)",
+  color: checkoutUnavailable ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
 };
 const ctaLabelStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "15px",
   letterSpacing: "-0.005em",
-  color: "var(--v5-on-brand)",
+  color: checkoutUnavailable ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+};
+// 禁用原因 + 下一步那句。text-wrap: pretty 走排版铁律(禁末行孤字)。
+const ctaHintStyle: CSSProperties = {
+  marginTop: "10px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  lineHeight: 1.5,
+  color: "var(--v5-ink-3)",
+  textWrap: "pretty",
 };
 </script>

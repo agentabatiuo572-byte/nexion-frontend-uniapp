@@ -949,6 +949,8 @@ export const en = {
     total: "Total",
     combinedDaily: "Combined daily yield",
     checkoutCta: "Checkout · ${total}",
+    checkoutUnavailableCta: "Bundle checkout unavailable",
+    checkoutUnavailableHint: "Bundle pricing can't be worked out right now. You can still buy each device from the store — your bundle stays saved.",
     checkoutSuccessTitle: "Bundle order placed",
     checkoutSuccessBody: "{count} devices ordered · provisioning now",
     checkoutBillMemo: "Bundle purchase · {count} devices",
