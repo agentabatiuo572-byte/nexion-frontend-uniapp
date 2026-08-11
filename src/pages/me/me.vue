@@ -308,7 +308,7 @@ const quickSections = computed<QuickSection[]>(() => [
       { key: "faq", label: t.value.me.helpFaq, href: "/me/help", icon: "help", tone: "muted" },
       { key: "tickets", label: t.value.me.supportTicketsRow, href: "/me/support-tickets", icon: "ticket", tone: "orange" },
       { key: "trust", label: t.value.me.trustCenter, href: "/trust", icon: "trust", meta: t.value.me.auditsPartners, tone: "success" },
-      { key: "learning", label: "教程中心", href: "/learn/courses", icon: "book", tone: "brand" },
+      { key: "learning", label: t.value.me.learningRow, href: "/learn/courses", icon: "book", tone: "brand" },
       { key: "risk", label: t.value.me.riskRow, href: "/me/risk-disclosure", icon: "warning", tone: "orange" },
       { key: "developer", label: t.value.me.developer, href: "/developer", icon: "code", tone: "muted" },
     ],

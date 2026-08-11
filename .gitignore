@@ -28,8 +28,7 @@ dist
 # 例外:这两张是 verify.sh 每次跑都重写的探针产物(page-check / sticky-check),
 # 曾误入库又被 cfe98fe 移出——按文件名单独忽略,不整目录忽略(_check/ 下的
 # chk.png / w.png 是入库的参考图,整目录忽略会把将来新增的参考图一起静默吞掉)。
-# 本分支基线早于主线那条修复,所以在这里同样焊一份 —— 否则 `git add -A` 会再次带进来
-# (本包 da0310a 就这么中过一次:一条 docs commit 夹带了 402KB 截图)。
+# 包 z2 实测过它会复发:基线早于本规则的分支上,一条 docs commit 夹带了 402KB 截图。
 scripts/.baseline/_check/h5-runtime-home.png
 scripts/.baseline/_check/sticky-frost.png
 scripts/.baseline/current/
