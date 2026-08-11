@@ -2529,23 +2529,48 @@ money_receipt_gate
 # 回滚面是残的,比它要防的毛病更险。故这道门守**调用侧的结构不变量**:任何写本地订单行的
 # 页面,必须在建单**之前**先判 API 模式。新增购买入口若忘了判,这里立刻报红,而不是等到
 # 线上「钱扣了、单子永远停在已支付、机器一台不来」。
+# 判据抽成独立函数:真扫与红测自证**共用同一份代码**。分两份写的话,红测验的就不是
+# 真判据,自证等于没证。无违规则不输出,有则输出原因。
+_loa_violation() {
+  local f="$1" co_line guard_line
+  co_line=$(grep -nE "orders\.createOrder\(" "$f" | head -1 | cut -d: -f1)
+  [ -z "$co_line" ] && return 0
+  # 🔴 必须排掉 import 行:它永远在文件顶部,拿它当「判过了」会让位置判据恒真 ——
+  #    红测实证(把真正那道闸挪到建单之后)门照样报绿,即假绿。下面形态 B 就守这一点。
+  guard_line=$(grep -nE "remoteApiEnabled" "$f" | grep -vE "^[0-9]+:\s*import\b" | head -1 | cut -d: -f1)
+  if [ -z "$guard_line" ]; then
+    echo "写本地订单行却全文没判 API 模式 — 远端模式下会造出服务端不认的单"
+  elif [ "$guard_line" -gt "$co_line" ]; then
+    echo "API 模式判断(行 $guard_line)排在建单(行 $co_line)之后 — 挡不住"
+  fi
+}
+
 local_order_authority_gate() {
-  local violations=0 f co_line guard_line
+  local violations=0 f why tmp red
   while IFS= read -r f; do
     [ -z "$f" ] && continue
-    co_line=$(grep -nE "orders\.createOrder\(" "$f" | head -1 | cut -d: -f1)
-    # 🔴 必须排掉 import 行:它永远在文件顶部,拿它当「判过了」会让位置判据恒真 ——
-    #    红测实证(形态B:把真正那道闸挪到建单之后)门照样报绿,即假绿。
-    guard_line=$(grep -nE "remoteApiEnabled" "$f" | grep -vE "^[0-9]+:\s*import\b" | head -1 | cut -d: -f1)
-    if [ -z "$guard_line" ]; then
-      bad "本地建单权威门:$f 写本地订单行却全文没判 API 模式 — 远端模式下会造出服务端不认的单"
-      violations=$((violations + 1))
-    elif [ "$guard_line" -gt "$co_line" ]; then
-      bad "本地建单权威门:$f 的 API 模式判断(行 $guard_line)排在建单(行 $co_line)之后 — 挡不住"
+    why=$(_loa_violation "$f")
+    if [ -n "$why" ]; then
+      bad "本地建单权威门:$f $why"
       violations=$((violations + 1))
     fi
   done < <(grep -rlE "orders\.createOrder\(" src/pages/ src/components/ --include=*.vue 2>/dev/null)
-  [ "$violations" -eq 0 ] && ok "本地建单权威门 — 写本地订单行的页面均在建单前判了 API 模式"
+
+  # 🔴 红测自证:两种绕过形态必须各自被判出来,否则这道门是假绿。形态 B 同时守着
+  #    「import 行不算判过了」—— 若哪天判据退回取首个命中,B 会静默变绿,这里就报红。
+  tmp=$(mktemp -d)
+  printf 'const x = 1\norders.createOrder({})\n' > "$tmp/a.vue"
+  printf 'import { remoteApiEnabled } from "@/api/runtime"\norders.createOrder({})\nif (remoteApiEnabled) return\n' > "$tmp/b.vue"
+  red=0
+  [ -n "$(_loa_violation "$tmp/a.vue")" ] && red=$((red + 1))
+  [ -n "$(_loa_violation "$tmp/b.vue")" ] && red=$((red + 1))
+  rm -rf "$tmp"
+  if [ "$red" -ne 2 ]; then
+    bad "本地建单权威门:红测自证 $red/2 — 判据认不出绕过形态,这道门是假绿"
+    violations=$((violations + 1))
+  fi
+
+  [ "$violations" -eq 0 ] && ok "本地建单权威门 — 覆盖页均在建单前判了 API 模式(红测自证 2/2:整页不判 · 判断晚于建单)"
 }
 local_order_authority_gate
 
