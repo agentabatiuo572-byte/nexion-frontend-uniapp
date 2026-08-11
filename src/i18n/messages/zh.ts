@@ -1918,8 +1918,8 @@ export const zh: Messages = {
     confirmWithdraw: "确认提现",
     withdrawTrackingTitle: "提现进行中",
     submitted: "已提交",
-    reviewPending: "人工审核中",
-    reviewPassed: "审核通过",
+    reviewPending: "安全确认中",
+    reviewPassed: "确认完成",
     processing: "处理中",
     sent: "已上链",
     confirmed: "已到账",
@@ -1931,16 +1931,16 @@ export const zh: Messages = {
     syncFailedTitle: "收益结算稍后同步",
     syncFailedBody: "平台配置暂时未能同步,收益结算已暂停,恢复后自动补算,不影响已产生的收益。",
     pendingSheetTitle: "审核中收益",
-    pendingSheetBody: "这部分收益已记入账户,正在审核。释放方式:保持 App 在线累计满 {hours} 小时,或等待人工审核放行;审核不随时间自动通过。",
+    pendingSheetBody: "这部分收益已经算进你的账户了,正在做安全确认。保持 App 在线累计满 {hours} 小时就能释放,也可以等我们确认完;不会单纯因为放着不动就自动通过。",
     lockedSheetTitle: "锁定奖励",
     lockedSheetBody: "这部分奖励暂时锁定。保持 App 在线累计满 {hours} 小时可申请释放;若账户存在待核查事项,需人工处理后恢复。",
     sheetOk: "知道了",
     heldBucketsLine: "审核中 ${p} · 锁定 ${l}(不计入可提)",
-    submitChecking: "风控校验中…",
+    submitChecking: "安全确认中…",
     riskCheckTimeoutTitle: "校验超时",
     riskCheckTimeoutBody: "网络暂时不稳定,本次未扣款,请稍后重试。",
-    routeHeldFrozenTitle: "提现已冻结",
-    routeHeldFrozenBody: "该笔提现涉及风控核查,处理期间资金保持冻结;如需协助请联系客服。",
+    routeHeldFrozenTitle: "这笔提现已暂停",
+    routeHeldFrozenBody: "这笔提现先暂停了。这笔钱跟着这张单一起保留着 —— 没有打出去,也没有丢。需要帮忙随时找客服。",
     riskReasons: {
       "dim-serverDeviceId": "与其他账号使用相同设备",
       "dim-ipBucket": "与其他账号来自相同网络环境",
@@ -1962,7 +1962,7 @@ export const zh: Messages = {
       "high-risk-score": "综合风险评分偏高",
       "shared-address": "提现地址被多个账号使用",
       "new-address-hold": "新绑定地址处于保护期",
-      "first-withdrawal-review": "首次提现需人工确认",
+      "first-withdrawal-review": "首笔提现安全确认",
     },
     topUpTitle: "充值",
     chooseMethod: "选择充值方式",
@@ -1987,14 +1987,14 @@ export const zh: Messages = {
     timeMinutesAgo: "{n} 分钟前",
     timeHoursAgo: "{n} 小时前",
     timeDaysAgo: "{n} 天前",
-    firstTimeReview: "首次提现需人工确认。",
+    firstTimeReview: "第一笔提现我们会多做一道安全确认,到账比平时慢一些。",
 
     fastLaneOnTitle: "这笔可立即处理",
     fastLaneOnBody: "已免去:{g}。提交后按标准时效到账。",
     fastLaneCta: "改为 ${n} 提现",
     waivedGates: {
       "new-address-hold": "新地址保护期",
-      "first-withdrawal-review": "首次提现人工复核",
+      "first-withdrawal-review": "首笔提现的安全确认",
     },
     minWithdrawNote: "最低提现:${n}。",
 
@@ -2005,7 +2005,7 @@ export const zh: Messages = {
     withdrawalNotFound: "未找到这笔提现的单据记录。",
     submitNewWithdrawal: "发起新的提现 →",
     trackSubmittedHint: "已收到请求",
-    trackReviewHint: "自动筛查 + 人工复核",
+    trackReviewHint: "正在确认收款地址",
     trackProcessingHint: "正在准备链上交易",
     trackSentHint: "交易已广播",
     trackConfirmedHint: "资金已送达",
@@ -2028,17 +2028,17 @@ export const zh: Messages = {
 
 
     trackSubmitAnother: "再提一笔",
-    trackReviewNote: "首次提现 · 自动 + 人工双重审核",
-    withdrawRouteReviewTitle: "提现将进入审核",
+    trackReviewNote: "首笔提现 · 安全确认中",
+    withdrawRouteReviewTitle: "这笔要先过一道确认",
 
     withdrawRouteRejectTitle: "这笔无法提交",
 
-    withdrawRouteRejectBody: "当前账户状态不允许发起提现。不会创建提现单,也不会扣款。请联系客服协助处理。",
+    withdrawRouteRejectBody: "你的账户暂时提不了现,钱一分没动、也没有生成提现单。找客服看一下就能处理。",
 
     fastLaneUndo: "撤销,改回原来的金额",
-    withdrawRouteReviewBody: "这个收款地址已有相关账号活动。可以提交提现,但会在审核完成前保持待处理。",
-    withdrawRouteHeldTitle: "人工审核中",
-    withdrawRouteHeldSub: "提现正在等待账户和地址审核,不会自动推进到打款。",
+    withdrawRouteReviewBody: "这个收款地址还关联着别的账号。为了你的资金安全,这笔我们会先确认再打款 —— 照常提交就行。",
+    withdrawRouteHeldTitle: "安全确认中",
+    withdrawRouteHeldSub: "我们正在确认这笔的收款地址,确认完才会打款,不会自动放行。",
     withdrawBillMemoPass: "提现到 {network} · 手续费 ${fee}",
     withdrawBillMemoReview: "提现 · 追加审核",
     withdrawNexFeeMemo: "手续费抵扣 · 使用 {nex} NEX(减免 ${fee})",
@@ -3454,6 +3454,8 @@ export const zh: Messages = {
   walletV3: {
     needMoreNexToast: "NEX 不足,无法抵扣手续费",
     withdrawFeeStale: "费率已更新,请重试",
+    submitUnknownTitle: "提交结果未确认",
+    submitUnknownBody: "网络中断,这笔提现可能已经提交成功。请不要重复提交,到提现进度里确认;确实没提交成功再重试。",
     withdrawContextStale: "账户或收款地址已变化,请重新提交",
     earnNexCta: "去挖矿赚 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
@@ -3506,12 +3508,12 @@ export const zh: Messages = {
 
     dailyLimitReached: "今日提现次数已用完,{time} 后可再提。",
     submitReasonAddressRequired: "请先添加提现地址。",
-    submitReasonReviewBlocked: "当前暂不能提交这笔提现。",
+    submitReasonReviewBlocked: "这笔暂时提交不了,换个金额或稍后再试。",
 
     submitReasonInFlight: "上一笔提现还在处理中,完成后才能再提。",
 
 
-    submitReasonUnderReview: "上一笔提现正在人工核验,核验完成后才能再提。可在提现进度页联系客服查询。",
+    submitReasonUnderReview: "上一笔还在做安全确认,确认完就能再提。想知道进度可以在提现进度页找客服。",
     exchangePoolToday: "今日平台资金池",
     // Sprint A-1 / B.2 — 反向劝阻 staking 备选
     stakeAlt: {
@@ -5047,7 +5049,7 @@ export const zh: Messages = {
     historyToggle: "查看历史地址",
     historyReplacedAt: "{time} 停用",
     cancelCta: "取消",
-    reasonNewAddressAge: "提现地址更换未满 7 天,大额提现需人工审核",
+    reasonNewAddressAge: "收款地址刚换不到 7 天,大额提现我们会先确认一下",
     startFailed: "操作失败,请稍后重试",
   },
   learning: {

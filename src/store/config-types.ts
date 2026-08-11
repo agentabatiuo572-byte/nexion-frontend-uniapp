@@ -86,10 +86,11 @@ export interface WithdrawRulesConfig {
   //    「新地址 hold」两道**冷启动保守闸**;0 = 关闭快车道。
   //    ⚠️ 风控闸(冻结簇/共用地址/风险分/大额账龄)不受此值影响,照常裁决。
   smallAmountThresholdUsd: number;
-  // 🔴 FEAT-WD01b 每日提现笔数上限(后台 D5 可配)。达上限时**不建单不扣款**。
-  //    页面上那句「每日限额 N 笔/日」必须从这里插值 —— 此前是写死的空头承诺:
-  //    文案写着 1 笔/日,代码里没有任何计数,用户提几笔都行。
-  dailyWithdrawLimitCount: number;
+  // 🔴 FEAT-WD01b 每日提现笔数上限**不在这里** —— 唯一来源是服务端
+  //    `GET /api/withdrawals/policy` 的 dailyLimitCount(提交时真正执行的那把尺子)。
+  //    本文件这份配置的远端同步只覆盖 featureFlags/onlineBonus/rewards/computeShare,
+  //    withdrawRules 永远停在前端写死值;曾经文案取服务端的数、预检取这里的 1,
+  //    服务端配 3 笔而客户端按 1 笔拦人(z1 审计 P0-1 同批发现)。别把它加回来。
   // 🔴 FEAT-WD01b 到账时效(小时,后台 D5 payoutSlaHours 可配,值域 1–168)。
   //    预计到账 = 提交 + 本值;24 = 次日到账(T+1)。
   payoutSlaHours: number;
@@ -250,7 +251,6 @@ export interface PlatformConfig {
 
 type RuntimeWithdrawRuleKey =
   | "smallAmountThresholdUsd"
-  | "dailyWithdrawLimitCount"
   | "payoutSlaHours"
   | "payoutReviewWindowDays"
   | "networkConfirmFeeUsd";

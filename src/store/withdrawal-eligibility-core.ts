@@ -212,8 +212,17 @@ export interface WithdrawalStoreSnapshot {
   minWithdrawableUsdt: number;
   sameAddressRoute: WithdrawalRiskRoute;
   firstWithdrawalManual: boolean;
-  /** 本账户落盘的当日提现计数器(跨日判定在 core 做,外壳只转发) */
-  withdrawCounter: { dayIndex: number; count: number } | null | undefined;
+  /**
+   * 本账户的提现单列表(外壳原样转发 app.withdrawals)。今日笔数在 core 现算 ——
+   * 单据本身就是「今天提过几笔」的凭据,不另存计数器(见 countWithdrawalsOnPlatformDay)。
+   */
+  withdrawals: ReadonlyArray<{ submittedAt: number }> | null | undefined;
+  /**
+   * 🔴 每日笔数上限,**必须**来自服务端 `GET /api/withdrawals/policy` 的 dailyLimitCount ——
+   * 也就是提交时真正执行的那把尺子。曾经取本地 config.withdrawRules.dailyWithdrawLimitCount,
+   * 而那份配置的远端同步压根不覆盖 withdrawRules(永远是前端写死的 1):
+   * 页面文案按服务端的数说「每日最多 3 笔」、预检按本地的 1 拦 —— 用户被自己的 App 挡在门外。
+   */
   dailyWithdrawLimitCount: number;
 }
 
@@ -248,7 +257,7 @@ export function toRawFacts(s: WithdrawalStoreSnapshot): WithdrawalRawFacts {
     minWithdrawableUsdt: s.minWithdrawableUsdt,
     sameAddressRoute: s.sameAddressRoute,
     firstWithdrawalManual: s.firstWithdrawalManual,
-    todayWithdrawCount: todayCountFrom(s.withdrawCounter, s.now),
+    todayWithdrawCount: countWithdrawalsOnPlatformDay(s.withdrawals, s.now),
     dailyWithdrawLimitCount: s.dailyWithdrawLimitCount,
   };
 }
@@ -284,45 +293,49 @@ export function nextDayResetAt(ts: number): number {
 }
 
 /**
- * 今日已提笔数。入参是**落盘的**「日序 + 计数」二元组:
- *  - 日序与今天一致 → 返回计数
- *  - 日序是昨天或更早 → 返回 0(跨日自动归零,不需要定时清理任务)
- *  - 从未落盘过 → 0
+ * 今日已提笔数 —— 从**提现单列表**现算,不另存计数器。
  *
- * 🔴 用落盘值而不是内存值:并发面(两个标签页同时提交)必须以落盘计数为准,
- * 否则两边都以为「今天只提过 1 笔」而各自放行。
+ * 🔴 为什么是单据而不是计数器(2026-08-11,z1 审计 P0-1 的修法):
+ * 早先在 localStorage 存「日序 + 计数」,由建单前的 claimWithdrawSlot 递增。
+ * c37e642 把建单整体让渡服务端事务后,那个递增点随本地扣款链一起删掉了 ——
+ * 计数器从此无人递增,读出来恒空,预检恒不触发,而页面还在承诺「每日最多 N 笔」。
+ * 单据列表本身就是「今天提过几笔」的凭据:每笔成功提交恰好落一行(带服务端单号)、
+ * 随账号快照持久、按账号隔离、就是追踪页渲染的那份数据。**没有第二份状态就不会失配。**
  *
- * 🔴 已驳回 / 已退款的单据**仍然计数** —— 额度按「当天发起过几次」算,
- * 否则「故意提一笔让它被驳回、再提一笔」就能绕过限额。
+ * 🔴 已驳回 / 已退款 / 上链失败的单据**仍然计数**(主人 2026-08-11 确认维持原规则):
+ * 「每日最多 N 笔」的 N 数的是**发起次数**,不是成功次数。
+ *
+ * 🔴 并发面不再由客户端兜底:两个标签页可能都预检通过而各自提交,
+ * 由服务端事务拒掉第二笔。这是正确的分工 —— 客户端预检只为省一次白跑,
+ * 真闸永远在服务端(PROD 亦然)。此前的 CAS + 令牌 + 回读那套是在解
+ * 「客户端必须在建单前原子占用一格」,而建单权已经不在客户端了。
+ *
+ * 列表来自持久化存储(不可信边界):不是数组就当空 —— 那一步会真的抛异常
+ * (for...of 一个 {length:n} 对象),把整页判定带崩,所以必须显式挡。
  */
-export function todayCountFrom(
-  counter: { dayIndex: number; count: number } | null | undefined,
+export function countWithdrawalsOnPlatformDay(
+  rows: ReadonlyArray<{ submittedAt: number }> | null | undefined,
   now: number,
 ): number {
-  if (!counter) return 0;
-  if (counter.dayIndex !== platformDayIndex(now)) return 0;
-  // 🔴 消毒必须**对称**:NaN / 负数 / 荒谬大值都是坏数据,三种都得挡。
-  // NaN:typeof NaN === "number" 混得过读盘的类型守卫,且 `NaN >= 上限` 恒 false → 额度失效。
-  // 荒谬大值(1e9):`1e9 >= 1` 恒 true → 当天提现被锁死。方向相反,同样是坏数据惹的。
-  // 一天提现 1 万次已属荒谬 —— 超过就是被篡改或被写坏,按「读不到」处理。
-  // (client 计数本就可被本地篡改、PROD 以服务端为准,所以拒绝相信荒谬值不损失任何真防护。)
-  if (!Number.isSafeInteger(counter.count)) return 0;
-  if (counter.count < 0 || counter.count > MAX_SANE_DAILY_COUNT) return 0;
-  return counter.count;
+  if (!Array.isArray(rows)) return 0;
+  const today = platformDayIndex(now);
+  let count = 0;
+  // 🔴 判据是**严格相等**,坏行因此天然出局:submittedAt 缺失 / NaN / Infinity /
+  // 字符串 / Date 对象算出来的日序都不等于今天。这里刻意**不写** typeof / isFinite 消毒 ——
+  // 红测两次实证:加或不加,没有任何输入能让断言变化(字符串走的是字符串拼接,
+  // 算出的日序离今天十万八千里,与被跳过同样得 0)。红测证明不了的防御 = 死代码。
+  //
+  // ⚠️ 两个代价写在这,改之前先看:
+  //  1. 把 === 放宽成 >= / <=,Infinity 会被算进今日额度、把用户当天锁死;
+  //  2. 后端若下发**字符串 / ISO 时间戳**,整张列表会静默计 0、日限再次失效 ——
+  //     与本包修的缺陷同型同样无声。那不是这里加消毒能救的(消毒的结果同样是 0),
+  //     得在契约层解决:见 HANDOFF U-7。
+  for (const row of rows) {
+    if (platformDayIndex(row?.submittedAt) === today) count++;
+  }
+  return count;
 }
 
-/** 计数合理上限。超过即判为坏数据(见 todayCountFrom 的对称消毒)。 */
-export const MAX_SANE_DAILY_COUNT = 10_000;
-
-/**
- * 🔴 额度**占用**决策(纯函数)。并发面的正解是「先占后建」而不是「先查后建」:
- * 查与建之间隔着风控评估的异步往返(实测 600ms),两个标签页都能在对方写盘前
- * 读到「还没提过」——独立验收 3 轮 3 中复现,code review 独立指出同一处。
- *
- * 这里返回「准不准 + 占用后的新计数」,由存储层做一次**同步**读-改-写。
- * 残余窗口 = 那次同步读写之间的微秒级间隙(跨浏览器进程理论上仍可交错),
- * 与既有的并发透支门同一量级;真正的原子性只有服务端事务能给,PROD 以服务端为准。
- */
 /**
  * 🔴 「今日额度用满没有」的**唯一**判据。上限 ≤0 / 非法(含被下发成字符串)= 运营未配置
  * → 不限制(坏配置不该把提现锁死),但计数照记。
@@ -336,48 +349,17 @@ export function isOverDailyCap(used: number, limitCount: number): boolean {
   return capped && used >= limitCount;
 }
 
-export function claimDailySlot(
-  counter: { dayIndex: number; count: number } | null | undefined,
-  limitCount: number,
-  now: number,
-): { allowed: boolean; next: { dayIndex: number; count: number } } {
-  const today = platformDayIndex(now);
-  const used = todayCountFrom(counter, now);
-  const allowed = !isOverDailyCap(used, limitCount);
-  return { allowed, next: { dayIndex: today, count: allowed ? used + 1 : used } };
-}
-
 /**
- * 🔴 占用是否**真的属于我**(写入后回读比对令牌)。
- *
- * 为什么需要这一步:localStorage 的「读-改-写」**跨渲染进程不是原子的**。
- * Chrome 给独立打开的同源标签页分不同渲染进程,写入的传播是异步的 ——
- * 两个标签页在 ~1ms 内会各自读到写入**之前**的值,各自算出「还没提过」而都放行。
- * 独立验收 12 轮 12 中实测复现,「先占后建」只把窗口从 600ms 压到 ~1ms,没有消除它。
- *
- * 破法不是抢更快,而是**不依赖读写原子性**:各写各的、带唯一令牌,等传播收敛后回读,
- * 令牌还在的那一个才算占到。收敛后全局只有一个胜者,所以只会建出一单。
- * (代价:并发时败者被拒 —— 上限还没用完也会被拒一次,重试即可。方向偏保守,
- *  宁可少放一笔也不多放一笔。)
- */
-export function isClaimOwner(
-  counter: { claimToken?: string } | null | undefined,
-  token: string,
-): boolean {
-  if (!counter || !token) return false;
-  return counter.claimToken === token;
-}
-
-/**
- * 今日额度是否已用完(**纯查询,不占用**)。给「再提一笔」这类按钮判置灰用。
- * 与 claimDailySlot 同一判据,不另写一套 —— 两套判据迟早对不上。
+ * 今日额度是否已用完。给「再提一笔」这类按钮判置灰用。
+ * 与 decideWithdrawalRoute 里那句 dailyLimitReached 走同一对函数
+ * (countWithdrawalsOnPlatformDay + isOverDailyCap),不另写一套 —— 两套判据迟早对不上。
  */
 export function isDailyLimitReached(
-  counter: { dayIndex: number; count: number } | null | undefined,
+  rows: ReadonlyArray<{ submittedAt: number }> | null | undefined,
   limitCount: number,
   now: number,
 ): boolean {
-  return !claimDailySlot(counter, limitCount, now).allowed;
+  return isOverDailyCap(countWithdrawalsOnPlatformDay(rows, now), limitCount);
 }
 
 /**
@@ -451,7 +433,7 @@ export function decideWithdrawalRoute(input: WithdrawalRiskInput): WithdrawalRis
   // 🔴 FEAT-WD01b 每日笔数上限:达上限即**不建单不扣款**(与换绑冻结同档,
   // 区别于 manual/delay 那种"建单进队列、资金被占用"的路由)。
   // 上限 ≤ 0 视为未配置 → 不限制(避免坏配置把提现整个锁死)。
-  // 判据只此一份:委托给 claimDailySlot(经 isDailyLimitReached)。
+  // 判据只此一份:isOverDailyCap(追踪页的 isDailyLimitReached 也走它)。
   // 曾有第二份就地实现,配置被下发成字符串 "2" 时两份结论相反 ——
   // 真闸判「不限制」而 UI 判「已达上限」,追踪页说能提、提现页说不能提。
   const dailyLimitReached = isOverDailyCap(input.todayWithdrawCount, input.dailyWithdrawLimitCount);
