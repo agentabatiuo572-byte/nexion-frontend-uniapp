@@ -1886,7 +1886,7 @@ export const zh: Messages = {
   },
   wallet: {
     title: "钱包",
-    usdtBalance: "可提现 USDT",
+    usdtBalance: "USDT 余额",
     nexBalance: "NEX 余额",
     pending: "待入账",
     reviewingEarnings: "审核中收益",
@@ -2187,7 +2187,7 @@ export const zh: Messages = {
     slotsOpen: "{n} 个设备槽位空闲",
     slotsOpenPlural: "{n} 个设备槽位空闲",
     addDeviceCta: "添加设备 →",
-    usdtBalance: "可提现 USDT",
+    usdtBalance: "USDT 余额",
     pendingHint: "+${n} 待结算 · 每 24 小时自动入账",
     walletBucketsHint: "${review} 审核中 · ${locked} 锁定",
     nexTokens: "NEX 代币",
