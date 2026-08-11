@@ -2765,9 +2765,9 @@ export const en = {
     platformExhaustedTitle: "Platform pool exhausted",
     platformExhaustedBody: "Daily pool of ${cap}K is drained. Try again tomorrow.",
     remoteUnavailableClosed: "Exchange is unavailable right now. Please try again shortly.",
-    mockModeNotice: "Mock mode · not settled remotely",
     remoteNotProvided: "Not available",
     remoteUnavailableToast: "Couldn't load the latest data. Please try again shortly.",
+    swapFailed: "The exchange didn't go through. Please try again shortly.",
     remoteRefreshed: "Data updated",
   },
 
@@ -2981,7 +2981,6 @@ export const en = {
     insufficientToast: "Not enough NEX for this pool",
     educationFooter:
       "Staking voluntarily delays your withdrawals. Premium APY rewards compensate for lock-up time.",
-    mockModeNotice: "Mock mode · not remote funds",
     remoteUnavailableClosed: "Staking is unavailable right now. Please try again shortly.",
   },
   achievements: {

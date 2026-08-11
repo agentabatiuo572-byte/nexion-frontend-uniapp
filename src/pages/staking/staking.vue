@@ -13,10 +13,12 @@
   <AppChassis active="me">
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
-      <!-- Mock 横幅只给开发看:它是工程话("Mock 模式"),按「页面文案禁止工程名词」不该上用户的屏;
-           而 mock 正是本地 demo 的运行模式,不加这道闸时任何人打开 demo 都会看到它。 -->
-      <text v-if="staking.isMockMode && isDevBuild" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.staking.mockModeNotice }}</text>
-      <text v-else-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
+      <!-- 开发诊断,不是产品文案:所以① 只在 DEV 构建渲染 ② 文案是裸英文字面量,不进三语词典 ——
+           进了词典它就成了「工程名词写死在用户文案契约里」,而且词典对象摇不掉、会原样进生产包。
+           ③ 与下面的 remoteError 分支解耦成独立 v-if:挂在同一条 v-else-if 链上时,这道闸一旦为假
+           就会把 remoteError 分支放出来,是个只等某天 mock 下写了 remoteError 就会炸的暗雷。 -->
+      <text v-if="isDevBuild && staking.isMockMode" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
+      <text v-if="staking.remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.staking.remoteUnavailableClosed }}</text>
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Hero — de-carded: total-locked sits on the page floor; aurora + grid

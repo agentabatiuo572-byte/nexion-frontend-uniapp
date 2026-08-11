@@ -18,8 +18,8 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.exchange.title" />
       <text v-if="!remoteState && remoteError" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-danger)">{{ t.exchange.remoteUnavailableClosed }}</text>
-      <!-- 同 staking:Mock 横幅是工程话,只给开发看,生产构建不渲染。 -->
-      <text v-else-if="!remoteApiEnabled && isDevBuild" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">{{ t.exchange.mockModeNotice }}</text>
+      <!-- 同 staking:开发诊断,DEV 构建才渲染,裸英文字面量不进三语词典。 -->
+      <text v-else-if="isDevBuild && !remoteApiEnabled" class="block" style="margin: 0 16px; font-size: 12px; color: var(--v5-warning)">Dev build · mock data</text>
 
       <!-- How-it-works entry + refresh — pill compacted to match the other pages;
            it stays paired with the rate-refresh button (no de-carded hero here to
@@ -540,7 +540,10 @@ async function handleConfirm() {
     if (remoteApiEnabled) {
       remoteState.value = null;
       remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
-      toast.error(t.value.exchange.remoteUnavailableToast);
+      // 这条路径失败的是用户刚提交的**兑换动作**,不是一次数据读取 —— 与 :268/:370 两处
+      // 「拉取失败」共用一句「数据取不到,请稍后再试」会让用户以为刷新一下就好,
+      // 而实际是这笔兑换没有成交(独立审查判为文案与实际状态不符)。
+      toast.error(t.value.exchange.swapFailed);
       return;
     }
     // A region refusal surfaces on this path as a rejected submit. Translate it
