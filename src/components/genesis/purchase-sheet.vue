@@ -13,7 +13,7 @@
   <view v-if="open">
     <!-- Backdrop -->
     <transition name="nx-sheet-fade">
-      <view v-if="open" class="nx-sheet-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-sheet-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
     </transition>
     <!-- Panel -->
     <transition name="nx-sheet-slide">
@@ -78,7 +78,7 @@
           v-else
           class="w-full inline-flex items-center justify-center"
           :class="{ 'active:opacity-85': !purchasing }"
-          role="button"
+          role="button" tabindex="0"
           :aria-disabled="purchasing ? 'true' : 'false'"
           :style="submitStyle"
           @click="handlePurchase"
@@ -99,6 +99,7 @@ import { useGenesis, GENESIS_ELIGIBILITY } from "@/store/genesis";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
@@ -321,6 +322,10 @@ const submitStyle = computed<CSSProperties>(() => ({
   fontSize: "15px",
   letterSpacing: "-0.005em",
 }));
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => props.open), ".nx-sheet-backdrop", emitClose);
 </script>
 
 <style scoped>

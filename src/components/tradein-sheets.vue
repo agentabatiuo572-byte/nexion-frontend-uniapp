@@ -44,7 +44,7 @@
     - Path B keep+buy:  POST /api/orders (new device lands inactive)
 -->
 <template>
-  <view v-if="state.kind !== 'none'" class="tis-root">
+  <view v-if="state.kind !== 'none'" class="tis-root" role="dialog" aria-modal="true">
     <view class="tis-backdrop" @click="hide" />
 
     <view class="tis-panel" @click.stop>
@@ -233,6 +233,7 @@ import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTradeinSheet();
 const app = useApp();
@@ -627,6 +628,10 @@ function onForce() {
   hide();
   goDevices();
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => state.value.kind !== "none"), ".tis-root", hide);
 </script>
 
 <style scoped>

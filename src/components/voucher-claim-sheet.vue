@@ -7,7 +7,7 @@
   Zero card chrome on the protected tab pages — this is a chassis overlay.
 -->
 <template>
-  <view v-if="sheet.open" class="vcs-root">
+  <view v-if="sheet.open" class="vcs-root" role="dialog" aria-modal="true">
     <view class="vcs-backdrop" @click="hide" />
 
     <view class="vcs-panel" @click.stop>
@@ -64,6 +64,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { useVoucherClaimSheet } from "@/store/voucher-claim-sheet";
 import { useVoucher } from "@/store/voucher";
 import { getProduct } from "@/mock/products";
@@ -77,6 +78,9 @@ import { navTo } from "@/lib/route";
 const sheet = useVoucherClaimSheet();
 const voucher = useVoucher();
 const t = useT();
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮)。
+useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
 
 // Showable = claimable (unclaimed) ∪ claimed-unused (ready to use), in stable
 // catalog order so a card never jumps position when its CTA flips claim→use.

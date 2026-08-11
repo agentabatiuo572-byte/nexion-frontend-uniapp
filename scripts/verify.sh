@@ -400,6 +400,12 @@ sentinel_present "home row opens owned device id" src/components/home/device-row
 sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-slot.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="goBack"'
+# ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
+# 2026-08-11 量面结果说明了枚举式判据的天花板 —— 它们守住 4 个控件,而当时全仓有 151 个
+# 自造控件键盘不可达(覆盖率 3%)。构造性判据见文件末尾的 a11y_activate_gate:那道门遍历
+# 「全仓每一个模板元素」,新控件天然落进判定域,不需要谁记得往这张清单里补一行。
+# 这 4 条保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
+# 但**不要再往这张清单里加新的**——加了也追不上问题面的增长速度。
 # ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
 # 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
 sentinel_present "SPEC-7 risk cluster config typed" src/store/config-types.ts 'interface RiskClusterConfig'
@@ -2830,6 +2836,40 @@ janus_stop_cancellation_gate
 # 7 种改法能让缺陷复活而结构门全绿 —— 所以再加一道**只看行为**的:登出的人还能不能
 # 停在业务页上。代码怎么重构都拦得住。自带反向对照(已登录不许被误踢)与覆盖面 witness
 # (读不到路由即判红,P-080:探不到 ≠ 无违例)。
+# ── 自造控件键盘可达性 · 构造性门 ──────────────────────────────────────────────
+# 本仓禁用原生 <button>(P-036),于是每个自造按钮都得自己写键盘支持 —— 2026-08-11 实测
+# 151 处没写(焦点停得上去、按 Enter 没反应)。修法不是逐个补,是补上缺失的平台层
+# (src/lib/a11y-activate.ts):声明 role + tabindex 就得到键盘激活,和原生 <button> 一样。
+# 这道门守契约的两端:半个承诺(只写 role 或只写 tabindex)会红,平台层被删/未挂载也会红。
+# 判据遍历全仓每一个模板元素,不枚举控件名——枚举式判据在这仓被绕过过太多次。
+# selftest = 逐条注入违例证明每条判据真的会红(含行为门),哨兵失效即门失效。
+a11y_activate_gate() {
+  if "$NODE_BIN" scripts/a11y-activate-gate.redtest.mjs > /tmp/uni-a11y-activate-selftest.log 2>&1; then
+    ok "a11y-activate selftest — $(tail -1 /tmp/uni-a11y-activate-selftest.log)"
+  else
+    bad "a11y-activate selftest 失败(哨兵失效即门失效;node scripts/a11y-activate-gate.redtest.mjs 看明细)"
+    tail -12 /tmp/uni-a11y-activate-selftest.log | sed 's/^/        /'
+  fi
+  if "$NODE_BIN" scripts/a11y-activate-gate.mjs > /tmp/uni-a11y-activate.log 2>&1; then
+    # 🔴 取带 ✓ 的那行,不能用 head -1:门会先把「判不出」清单打到 stderr,
+    # head -1 抓到的是空行 → PASS 不带样本量,一眼看不出它到底扫了多少(本仓禁止这种绿)。
+    ok "$(grep -a '✓' /tmp/uni-a11y-activate.log | head -1 | sed 's/^ *✓ *//')"
+    grep -a 'ⓘ' /tmp/uni-a11y-activate.log | sed 's/^/        /'
+  else
+    bad "自造控件键盘可达性门失败 — node scripts/a11y-activate-gate.mjs 看明细"
+    tail -14 /tmp/uni-a11y-activate.log | sed 's/^/        /'
+  fi
+  # --experimental-strip-types:行为门 import 的是 .ts 源,Node <23.6 不带这个 flag 会直接炸。
+  if "$NODE_BIN" --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs > /tmp/uni-a11y-behavior.log 2>&1; then
+    # 用 -o 只取计数片段:node --test 的行首是多字节的 ℹ,拿 `^.` 去锚会匹配不上 → PASS 又变空消息。
+    ok "a11y 键盘激活行为门 — $(grep -aoE '(pass|fail) [0-9]+' /tmp/uni-a11y-behavior.log | tr '\n' ' ')"
+  else
+    bad "a11y 键盘激活行为门失败 — node --test scripts/a11y-activate-behavior.test.mjs 看明细"
+    tail -14 /tmp/uni-a11y-behavior.log | sed 's/^/        /'
+  fi
+}
+a11y_activate_gate
+
 # Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
 if "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
   ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"

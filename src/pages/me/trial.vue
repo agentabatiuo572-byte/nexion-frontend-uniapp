@@ -121,7 +121,7 @@
     </view>
 
     <!-- ═══ Rules half-sheet (spec ⑥「查看抵扣规则」) ═══ -->
-    <view v-if="rulesOpen" class="trs-root">
+    <view v-if="rulesOpen" class="trs-root" role="dialog" aria-modal="true">
       <view class="trs-backdrop" @click="rulesOpen = false" />
       <view class="trs-panel" @click.stop>
         <view class="flex items-center justify-between">
@@ -156,6 +156,7 @@ import { useFreeTrial, liveShadowUSD, liveShadowNEX, remainingMs } from "@/store
 import { useTrialConfig, computeTrialOffset } from "@/store/trial-config";
 import { useTrialClaimSheet } from "@/store/trial-claim-sheet";
 import { navTo } from "@/lib/route";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const t = useT();
 const freeTrial = useFreeTrial();
@@ -276,6 +277,10 @@ const terminalCardStyle: CSSProperties = { borderRadius: "16px", background: "va
 const terminalIconBoxStyle: CSSProperties = { width: "48px", height: "48px", borderRadius: "999px", background: "var(--v5-surface-2)", margin: "0 auto" };
 const cooldownLinkStyle: CSSProperties = { marginTop: "16px", minHeight: "44px", fontSize: "13px", color: "var(--v5-ink-2)" };
 const rulesGotStyle: CSSProperties = { marginTop: "18px", height: "48px", borderRadius: "999px", background: "var(--v5-brand)", color: "var(--v5-on-brand)", fontSize: "13px", fontWeight: 600 };
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => rulesOpen.value), ".trs-root", () => { rulesOpen.value = false; });
 </script>
 
 <style scoped>

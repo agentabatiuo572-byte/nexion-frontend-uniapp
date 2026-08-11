@@ -33,6 +33,7 @@ import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
 import { useDeposits } from "@/store/deposits";
 import { remoteApiEnabled } from "@/api/runtime";
+import { installKeyboardActivation } from "@/lib/a11y-activate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -770,6 +771,9 @@ function ensureBusinessLoopsRunning(): boolean {
 }
 
 onLaunch(() => {
+  // 🔴 必须在下面两处 early return(退役路由 / 静态评审页)**之前**挂:
+  // 那两类页面同样有自造按钮,晚一步挂 = 它们整页没有键盘可达性。
+  installKeyboardActivation();
   installBusinessLoopProbe();
   void useConfig().load();
   void useGenesisConfig().refresh();

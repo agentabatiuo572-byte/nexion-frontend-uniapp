@@ -11,7 +11,7 @@
 <template>
   <view v-if="open">
     <transition name="nx-elig-fade">
-      <view v-if="open" class="nx-elig-backdrop" @click="emitClose" />
+      <view v-if="open" class="nx-elig-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
     </transition>
     <transition name="nx-elig-slide">
       <view v-if="open" class="nx-elig-panel" :style="panelStyle" @click.stop>
@@ -109,6 +109,7 @@ import type { GenesisInviteRejectReason } from "@/store/genesis-invite";
 import { useApp } from "@/store/app";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean]; subscribe: [] }>();
@@ -335,6 +336,10 @@ const subscribeStyle: CSSProperties = {
   fontSize: "15px",
   letterSpacing: "-0.005em",
 };
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => props.open), ".nx-elig-backdrop", emitClose);
 </script>
 
 <style scoped>

@@ -114,7 +114,7 @@
       </view>
 
       <!-- Member detail bottom sheet -->
-      <view v-if="selected" class="nx-net-sheet-wrap">
+      <view v-if="selected" class="nx-net-sheet-wrap" role="dialog" aria-modal="true">
         <view class="nx-net-scrim" @click="selected = null" />
         <view class="nx-net-sheet" :style="sheetStyle">
           <view class="flex items-start justify-between">
@@ -170,6 +170,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
 import { useVRank, V_RANKS } from "@/store/v-rank";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const VIEW = 360;
 const CENTER = VIEW / 2;
@@ -298,6 +299,10 @@ const sheetStatLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-
 function sheetStatValStyle(color: string): CSSProperties {
   return { fontSize: "15px", fontWeight: 600, marginTop: "2px", color };
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => selected.value !== null), ".nx-net-sheet-wrap", () => { selected.value = null; });
 </script>
 
 <style scoped>

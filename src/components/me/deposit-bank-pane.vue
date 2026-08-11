@@ -51,7 +51,7 @@
         <view
           :class="['nx-bank-create-cta w-full grid place-items-center', ctaEnabled ? 'active:opacity-90' : '']"
           :style="createBtnStyle"
-          role="button"
+          role="button" tabindex="0"
           :aria-disabled="!ctaEnabled"
           @click="createOrder()"
         >
@@ -91,7 +91,7 @@
               <view
                 class="nx-bank-copy-account-cta grid place-items-center shrink-0 active:opacity-80"
                 :style="copyIconBtnStyle"
-                role="button"
+                role="button" tabindex="0"
                 :aria-label="t.bankPane.copyCta"
                 @click="copyAccount"
               >
@@ -111,7 +111,7 @@
             <text class="block font-mono-tabular" :style="metaLabelStyle">{{ t.bankPane.memoLabel }}</text>
             <text class="block font-mono-tabular" :style="memoCodeStyle">{{ intent.memoCode }}</text>
           </view>
-          <view class="nx-bank-copy-memo-cta grid place-items-center shrink-0 active:opacity-80" :style="memoCopyBtnStyle" role="button" @click="copyMemo">
+          <view class="nx-bank-copy-memo-cta grid place-items-center shrink-0 active:opacity-80" :style="memoCopyBtnStyle" role="button" tabindex="0" @click="copyMemo">
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.bankPane.copyCta }}</text>
           </view>
         </view>
@@ -124,11 +124,11 @@
           </view>
         </view>
 
-        <view class="nx-bank-paid-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" @click="paidPressed = true">
+        <view class="nx-bank-paid-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="paidPressed = true">
           <text>{{ t.bankPane.paidCta }}</text>
         </view>
         <!-- 取消 = ghost 弱权重(转化场景 cancel 必明显弱于主 CTA);仅 awaiting 态 -->
-        <view class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="askCancel">
+        <view class="nx-bank-cancel-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="askCancel">
           <text :style="ghostTextStyle">{{ t.bankPane.cancelCta }}</text>
         </view>
       </view>
@@ -143,7 +143,7 @@
         <view><text class="block text-center" :style="stateTitleStyle">{{ t.bankPane.waitingTitle }}</text></view>
         <view><text class="block text-center" :style="stateBodyStyle">{{ t.bankPane.waitingBody }}</text></view>
       </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="goSupport">
+      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
         <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
       </view>
     </template>
@@ -160,10 +160,10 @@
         </view>
         <view><text class="block text-center" :style="stateBodyStyle">{{ fmt(t.bankPane.successLine, { rate: rateText }) }}</text></view>
       </view>
-      <view class="nx-bank-done-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" @click="done">
+      <view class="nx-bank-done-cta w-full grid place-items-center active:opacity-90" :style="paidBtnStyle" role="button" tabindex="0" @click="done">
         <text>{{ t.bankPane.doneCta }}</text>
       </view>
-      <view class="nx-bank-bills-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="goBills">
+      <view class="nx-bank-bills-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goBills">
         <text :style="ghostTextStyle">{{ t.bankPane.viewBills }}</text>
       </view>
     </template>
@@ -184,7 +184,7 @@
       <view
         :class="['nx-bank-regen-cta w-full grid place-items-center', creating ? '' : 'active:opacity-90']"
         :style="paidBtnStyle"
-        role="button"
+        role="button" tabindex="0"
         :aria-disabled="creating"
         @click="regen"
       >
@@ -193,7 +193,7 @@
           <text>{{ creating ? t.bankPane.creating : t.bankPane.regenCta }}</text>
         </view>
       </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="goSupport">
+      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
         <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
       </view>
     </template>
@@ -220,10 +220,10 @@
           <view class="min-w-0"><text class="tabular-nums" :style="bankValStyle" style="white-space: nowrap">{{ fmtVnd(intent.receivedVnd ?? 0) }}</text></view>
         </view>
       </view>
-      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="done">
+      <view class="nx-bank-new-topup-cta w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="done">
         <text :style="ghostTextStyle">{{ t.bankPane.newTopupCta }}</text>
       </view>
-      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" @click="goSupport">
+      <view class="nx-bank-support-link w-full grid place-items-center active:opacity-70" :style="ghostBtnStyle" role="button" tabindex="0" @click="goSupport">
         <text :style="ghostTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
       </view>
     </template>

@@ -37,6 +37,7 @@ const REGISTRY = {
   "static-review-routes.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
   "earnings-accrual-contract.test.mjs": { how: "elsewhere", by: "npm run test:earnings-accrual(需 --experimental-strip-types)" },
   "janus-stop-cancellation.test.mjs": { how: "elsewhere", by: "npm run test:janus-stop-cancellation + verify.sh" },
+  "a11y-activate-behavior.test.mjs": { how: "elsewhere", by: "npm run test:a11y-activate + verify.sh 的 a11y_activate_gate(import .ts 源,需 type stripping)" },
   // ── excluded:写清原因 ──
   "h-remote-authority-contract.test.mjs": {
     how: "excluded",
