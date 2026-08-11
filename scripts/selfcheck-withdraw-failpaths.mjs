@@ -189,5 +189,45 @@ const refresh = () => { app.bindAccount(ACCT); };
     JSON.stringify(app.withdrawals.map((w) => w.id)));
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:真 app store + 真 account-cloud + 真 storage 语义 · 4 组失败/刷新注入)`);
+// ── ⑤ 🔴🔴 歧义结局判定:拿**真的 ApiError** 逐格验 ────────────────
+// 为什么这一节非有不可:判错的代价是**重复出账**。此前它只有字符串门(把函数改回
+// 「每次现造新键」时 114 条断言全绿),而边界本身是用假后端端到端实测出来的 ——
+// `createdThen504` 档(先建单再让网关超时)下客户端拿到 http/504,
+// 判成「确定」→ 换新键重试 → 服务端真出第二笔(台账 orderCount 2);修正后恒为 1。
+// 复现命令见 scripts/dev-stub-backend.mjs 顶部注释。
+{
+  const mod = await import("data:text/javascript;base64," + Buffer.from(
+    (await build({
+      stdin: { contents: `export { ApiError, isAmbiguousOutcome } from "@/api/errors";`, resolveDir: root, loader: "ts" },
+      bundle: true, write: false, format: "esm",
+      define: { "import.meta.env": JSON.stringify({ PROD: false, DEV: true, MODE: "selfcheck" }) },
+      plugins: [{ name: "alias", setup(b) { b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "failpaths-errors")); } }],
+    })).outputFiles[0].text, "utf8").toString("base64"));
+  const { ApiError, isAmbiguousOutcome } = mod;
+  const mk = (kind, status) => new ApiError({ kind, message: "X", status });
+
+  // 歧义(必须保留幂等键)—— 服务端**可能已经处理**
+  check("🔴🔴 网关超时 504 判为歧义(实测:判错即重复出账)", isAmbiguousOutcome(mk("http", 504)) === true);
+  check("🔴 服务端 500 判为歧义", isAmbiguousOutcome(mk("http", 500)) === true);
+  check("🔴 请求超时 408 判为歧义", isAmbiguousOutcome(mk("http", 408)) === true);
+  check("🔴 连接断(network)判为歧义", isAmbiguousOutcome(mk("network")) === true);
+  check("🔴🔴 响应读不懂(protocol)判为歧义 —— 响应已回来,单多半已建",
+    isAmbiguousOutcome(mk("protocol", 200)) === true);
+  check("🔴 不是 ApiError 的未知错一律判歧义(保守方向 = 不重复出账)",
+    isAmbiguousOutcome(new Error("boom")) === true && isAmbiguousOutcome(undefined) === true);
+
+  // 确定(可以换新键)—— 服务端明确拒绝或根本没处理
+  check("🔴 业务拒单判为确定", isAmbiguousOutcome(mk("business", 200)) === false);
+  check("🔴 鉴权失败判为确定", isAmbiguousOutcome(mk("auth", 401)) === false);
+  check("🔴 配置错判为确定", isAmbiguousOutcome(mk("configuration")) === false);
+  check("🔴 超额拒单 429 判为确定(它是被拒绝,不是被处理)",
+    isAmbiguousOutcome(mk("http", 429)) === false);
+  check("🔴 400 参数错判为确定", isAmbiguousOutcome(mk("http", 400)) === false);
+  // 🔴 方向性自证:把「歧义」判反的代价是重复出账,判保守的代价只是多留一把键。
+  //    所以任何**新增**的错误类别若判不准,必须落在歧义侧 —— 这条断言钉住那个默认。
+  check("🔴 默认落在歧义侧(新增未知 kind 时不会悄悄变成「确定」)",
+    isAmbiguousOutcome({ kind: "brand-new-kind" }) === true);
+}
+
+console.log(`\n${pass} pass / ${fail} fail(样本:真 app store + 真 account-cloud + 真 storage 语义 · 4 组失败/刷新注入 · 12 格歧义判定用真 ApiError)`);
 process.exit(fail ? 1 : 0);
