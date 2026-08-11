@@ -89,6 +89,19 @@ export function occupiesWithdrawalSlot(status: WithdrawalStatus | undefined): bo
   return status !== undefined && !TERMINAL_STATUSES.includes(status);
 }
 
+/** 本次推进的权威来源。`serverAuthoritative: true` = 远端模式:状态归服务端,client 永不自推。 */
+export interface AdvanceContext {
+  /**
+   * 🔴 必填(不给默认值)。远端模式下单据是**服务端签发**的(app.submitWithdrawal 把
+   * 服务端返回的 holdUntil 原样落进 estimatedCompletion),而本函数的判据是设备墙钟 ——
+   * 把手机时间往后拨,App 就会宣布「钱已到账」并解掉在途闸(换绑收款地址 / 第二笔提现)。
+   * 钱其实一分没动。
+   *
+   * 做成**必填参数**而不是可选开关:新调用点不写就编译不过,忘记 = 红,而不是默认伪造。
+   */
+  serverAuthoritative: boolean;
+}
+
 /**
  * 到点推进:满足条件返回**新单据**(不可变),否则返回 null 表示不动。
  *
@@ -98,8 +111,15 @@ export function occupiesWithdrawalSlot(status: WithdrawalStatus | undefined): bo
  * `confirmedAt` 记的是 `estimatedCompletion` 而不是 `now` —— 钱是在到点那刻到的,
  * 不是在用户打开 App 那刻到的;取定值也让补齐结果与打开时机无关(可复现)。
  */
-export function advanceArrival(wd: Withdrawal | null | undefined, now: number): Withdrawal | null {
+export function advanceArrival(
+  wd: Withdrawal | null | undefined,
+  now: number,
+  ctx: AdvanceContext,
+): Withdrawal | null {
   if (!wd) return null;
+  // 🔴 第一道:远端模式一律不推进。真状态由 GET /api/withdrawals/:id 回镜像
+  //    (app.refreshRemoteWithdrawals),client 只消费不裁决。
+  if (ctx.serverAuthoritative) return null;
   // 🔴 双重判定:路由与状态各挡一层。manual/delay 建单即 review-pending、freeze 即 frozen,
   // 状态判定本已覆盖;但 riskRoute 是这条规则的**语义单源**,漏了它以后有人加新状态就破了。
   if (wd.riskRoute !== undefined && wd.riskRoute !== "pass") return null;
