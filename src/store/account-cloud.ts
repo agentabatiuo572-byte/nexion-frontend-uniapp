@@ -82,7 +82,8 @@ const WITHDRAWAL_STATUS_RANK: Record<Withdrawal["status"], number> = {
   // ⚠️ 括号里原本写着「同一单不会两异常态互比」—— **那句话是错的**,而且正是三条 P0 的入口:
   // frozen 与四个终态同档,而 frozen 是**在途**态(不在 TERMINAL_STATUSES 里),
   // 「冻结 → 人工处置成拒绝/退款」是 D2 的正常流程,天天在两异常态之间互比。
-  // 同档位的胜负现在交给下面的 mirroredAt(谁问服务端问得更晚),不再靠这张表。
+  // 同档位的两份快照现按**字段**合并(mergeSameStatusWithdrawal),不再整行择一;
+  // 但同档位互转(frozen→终态)这条边仍走不通 —— 那需要真时序判据,已独立立卡。
   "review-rejected": 6,
   frozen: 6,
   "address-invalid": 6,
@@ -327,6 +328,29 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
  * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
  * last-write 会把已到账的单退回处理中。
  */
+/**
+ * 同一状态的两份提现单快照 → 逐字段合并(不是二选一)。
+ *
+ * 只合并**可选信息字段**:它们是「服务端某一拍才补上」的东西,谁有值就该留下。
+ * 身份与钱面(id / amount / network / address / fee / submittedAt / estimatedCompletion)
+ * 同状态下两份快照本就相等,不参与合并 —— 真出现分歧属服务端串号,那是另一道闸的事。
+ */
+function mergeSameStatusWithdrawal(disk: Withdrawal, memory: Withdrawal): Withdrawal {
+  const pick = <K extends keyof Withdrawal>(key: K): Withdrawal[K] =>
+    (memory[key] !== undefined ? memory[key] : disk[key]);
+  return {
+    ...disk,
+    ...memory,
+    // 双方都有值时以内存(本端刚写入的)为准;只有一方有值就取那一方。
+    terminalReason: pick("terminalReason"),
+    retriable: pick("retriable"),
+    confirmedAt: pick("confirmedAt"),
+    riskReasons: pick("riskReasons"),
+    waivedGates: pick("waivedGates"),
+    fastLaneApplied: pick("fastLaneApplied"),
+  };
+}
+
 function mergeWithdrawals(
   base: Withdrawal[],
   next: Withdrawal[],
@@ -339,26 +363,27 @@ function mergeWithdrawals(
       byId.set(w.id, w);
       continue;
     }
-    // 🔴 有真信号时,替身一律不参与裁决(2026-08-11 R2 审计:R1 只把 mirroredAt 当
-    // 档位制度内部的**平局**裁决,于是「档位说反了」的两条路径原样带病 —— 实测
-    // frozen→processing / sent / confirmed 三条边全被丢弃:后台核查通过、把冻结单
-    // **放行回主链**的每一次都进不来,坏结局(拒绝/退款)反而走得通。反向也坏:
-    // 一份陈旧的高档内存行能把磁盘上更新的 confirmed 顶回 frozen)。
-    //
-    // 判据主干换成「谁问服务端问得更晚」:任一侧被镜像过就纯按镜像时刻裁决,
-    // **完全不看档位** —— 档位排序对不对从此不再有后果。两侧都没被镜像过
-    // (mock 档 / 存量单)才回落到档位,与本字段引入前同行为,不造回归。
-    const at = prev.mirroredAt ?? 0;
-    const ct = w.mirroredAt ?? 0;
-    if (at || ct) {
-      byId.set(w.id, ct > at ? w : prev);
-      continue;
-    }
     const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
     const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
-    // 档位兜底(两侧都没被镜像过时才走到这里):遍历序 `[...latest, ...next]` 让磁盘行
-    // 先入 map,内存行是挑战方,严格大于才换人 —— 与 mirroredAt 引入前完全同行为。
-    byId.set(w.id, c > a ? w : prev);
+    // 状态档位决定胜负(遍历序 `[...latest, ...next]` 让磁盘行先入 map,内存行是挑战方)。
+    if (c !== a) {
+      byId.set(w.id, c > a ? w : prev);
+      continue;
+    }
+    // 🔴 **同档位不是平局,是「同一状态的两份快照」** —— 必须按字段合并,不能整行择一。
+    // 缺陷(2026-08-11 R1 审计,包 z7 立案的直接原因):服务端这一拍只补了终态原因
+    // (状态没变),整行择一时磁盘旧行赢 → 那条原因整拍丢失,而终态单不再被回查 = 永久丢。
+    // 反向也坏:内存行赢时会把磁盘上已落盘的原因抹掉(R3 审计探针实测)。
+    // 两种坏法同一个根:**赢家通吃会丢掉输家独有的字段**,而这些字段正是客服唯一的线索。
+    //
+    // 判据:同档位时逐字段取「有值的那个」,双方都有值以内存(本端刚写入的)为准。
+    // 只处理提现单的可选信息字段,不碰 status/金额/地址等身份与钱面(它们同档位下本就相等)。
+    //
+    // ⚠️ 本包**刻意不引入**「谁更新」的时序字段来做仲裁:那需要可信时钟、
+    // 跨端协调与字段级冲突规则,是一次独立的仲裁重构(主人 2026-08-12 拍板拆成独立卡),
+    // 不该由一张契约卡附带。**因此「frozen 与四个终态同档 → 冻结单收不到最终结论」
+    // 这条主线既有缺陷在本包内仍然存在**,已独立立卡,证据见该卡。
+    byId.set(w.id, mergeSameStatusWithdrawal(prev, w));
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
   const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));

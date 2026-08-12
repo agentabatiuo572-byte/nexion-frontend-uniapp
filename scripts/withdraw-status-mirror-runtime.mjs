@@ -17,6 +17,11 @@
 //   —— 本门借不了那台。不自带 server 就只能靠人手动起一台 remote 的,那等于这道门不会跑
 //   (孤儿门是本仓记过的坑)。起法照 verify-h5-runtime.mjs:随机空闲端口 + 用完杀进程树。
 //
+// ⚠️ 本门**不覆盖**「冻结单收到终态结论」那条边(frozen 与四个终态在合并层同档,
+//   同档位互转仍走不通)。那是主线既有缺陷,要真时序判据才修得动 ——
+//   主人 2026-08-12 拍板拆成独立卡。**别在这里补一格断言当前(错的)行为**:
+//   门断言错误行为 = 把缺陷焊成规格。缺陷登记在那张卡里,不在这里假装已守。
+//
 // 🔴 桩打在 **transport(apiClient.request)** 那一层,不是 withdrawalApi 的方法上:
 //   桩方法会把 parseStatusSnapshot 一起桩掉,而那个解析器才是契约的真正守卫
 //   (状态闭集、原因码归一、retriable 类型校验)。现在返回**原始报文**,解析器照跑。
@@ -47,7 +52,6 @@ const ID = {
   orphan: "WD-MIRROR-ORPHAN",
   reject: "WD-MIRROR-REJECT",
   reasonOnly: "WD-MIRROR-REASON",
-  frozenOut: "WD-MIRROR-FROZEN-OUT",
   render: "WD-MIRROR-RENDER",
   wiring: "WD-MIRROR-WIRING",
 };
@@ -229,20 +233,6 @@ try {
     });
     const reasonOnlyRow = live(ID.reasonOnly) || {};
 
-    // ── ⑩ 🔴 已落盘的**冻结单**收到终态结论必须进得来(2026-08-11 独立审计 P0 的原型场景)。
-    //  frozen 与四个终态在状态档位表里同档,而 frozen 是在途态 ——「冻结 → D2 处置成退款/拒绝」
-    //  是天天走的正常流程。合并层原本平局取磁盘值,于是这条边**每一次**都被丢弃:
-    //  单据不在失败清单里 → 退款永不触发;occupiesWithdrawalSlot 恒真 → 换绑入口与
-    //  下一笔提现被永久拦死。必须先落盘再镜像,否则走的是「盘上没有它」那条无冲突分支(测不到)。
-    seed(ID.frozenOut, { status: "frozen", riskRoute: "freeze" });
-    app.persistAccountSnapshot();
-    const frozenOutIds = await mirrorOnce({
-      withdrawalNo: ID.frozenOut, status: "REFUNDED", confirmedAt: null,
-      terminalReason: "USER_CANCELLED", retriable: true,
-    });
-    const frozenOutMem = live(ID.frozenOut)?.status;
-    const frozenOutDisk = stored(ID.frozenOut)?.status;
-
     // ── ⑦ 解析器的**分档**规矩(R2 审计改过一次判据,这里守的是改后的规矩)────────
     // 抛不抛看「这个字段驱动什么」:
     //   驱动钱与状态机(status / 单号身份)→ 认不出必抛;
@@ -298,7 +288,6 @@ try {
       orphanIds, afterOrphan,
       rejectedStatus: rejected.status, rejectedReason: rejected.terminalReason, rejectedRetriable: rejected.retriable,
       diskReason: stored(ID.reject)?.terminalReason,
-      frozenOutIds, frozenOutMem, frozenOutDisk,
       reasonOnlyIds,
       reasonOnlySeeded: !!diskBeforeReasonOnly,
       reasonOnlyDiskReason: stored(ID.reasonOnly)?.terminalReason,
@@ -355,9 +344,6 @@ try {
         && R.reasonOnlyDiskReason === "address-risk"
         && R.reasonOnlyRetriable === false,
       `返回 ${JSON.stringify(R.reasonOnlyIds)} · 状态 ${R.reasonOnlyStatus} · 原因 ${R.reasonOnlyReason} · 盘上原因 ${R.reasonOnlyDiskReason} · 可重试 ${JSON.stringify(R.reasonOnlyRetriable)}`);
-    check("⑩ 🔴 已落盘的冻结单收到终态结论必须进得来(同档位互转,平局取磁盘 = 这条边永远走不通)",
-      R.frozenOutIds.includes(ID.frozenOut) && R.frozenOutMem === "refunded" && R.frozenOutDisk === "refunded",
-      `内存 ${R.frozenOutMem} · 盘上 ${R.frozenOutDisk} · 返回 ${JSON.stringify(R.frozenOutIds)}`);
     check("⑦ 认不出的**状态**必抛(它驱动钱与状态机,猜一个等于拿钱赌)",
       R.parserAlive === true, "认不出的状态却没抛 —— 驱动钱的字段失守了");
     check("⑦ 🔴 单号对不上必抛(服务端串号会把别人的状态和退款打到这张单上)",

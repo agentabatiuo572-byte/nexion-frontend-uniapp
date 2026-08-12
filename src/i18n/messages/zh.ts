@@ -2028,7 +2028,7 @@ export const zh: Messages = {
 
     withdrawBillWriteFailed: "提现已提交,但账单记录写入失败。可在提现进度页查看这笔提现。",
 
-    trackFailedBody: "这笔提现没有完成,资金未离开你的账户。详情可联系客服。",
+    trackFailedBody: "这笔提现没有完成。这笔钱现在在哪,可以联系客服查。",
     trackEtaPending: "预计 {n} 小时内完成",
     trackExpectedAt: "服务端预计处理时刻 {time}",
 
