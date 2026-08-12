@@ -1,4 +1,4 @@
-import { isIdempotencyConflict, isSettledRejection } from "@/api/errors";
+import { ApiError, isIdempotencyConflict, isSettledRejection } from "@/api/errors";
 
 /**
  * 🔴🔴 提现提交失败的**唯一**判决处 —— 页面与机器门共用这一份,不许各写一份。
@@ -60,15 +60,22 @@ export function triageWithdrawFailure(err: unknown, ctx: TriageInput): TriageDec
   // 于是那一档在它唯一的现实输入上永不退役 —— 首提撞日限即把账号锁进重放模式,
   // 而重放每次又撞同一个日限,闭环。「加一个恒假的合取项」不是收敛,是把路堵死。
   //
-  // 为什么首提退役是安全的:这个判据匹配的是**服务端应答里的文案** —— 能匹配上,
-  // 就意味着服务端**回话了**;而它回的是「今天不能提」,即明确拒绝、没有建单。
-  // 超时 / 断网根本走不到这一档(那时拿不到任何服务端文案)。
-  // ⚠️ 残余风险:服务端若在**建单之后**的某个 5xx 里恰好带上同样的字样,会误退役。
-  // 消掉它的办法是让服务端给这个拒绝一个**有契约的错误码**(已写进后端交接书 U-4),
-  // 而不是在客户端继续猜字符串。
-  if (isDailyLimit) {
+  // 🔴 线型守卫(2026-08-13 第五轮审计后加,消掉上一版的另一侧风险):`isDailyLimit` 是对 `err.message` 的子串匹配,而 api-client 对**任何非 2xx**
+  // (含 500 / 502 / 504)都把服务端 envelope 的 message 原样透传。实测:
+  //   `500 + "DAILY_LIMIT_CHECK_FAILED"` / `504 + "WITHDRAW_LIMIT_EXCEEDED_UPSTREAM"` → 都会命中。
+  // 若不加这道守卫,「首提已建单 → 下游 5xx,文案里带上限额规则名」会被判成日限拒单并**退役键**,
+  // 用户按提示重提 = 新键 = **第二笔**。上一版为了躲这个风险加的是 `isSettledRejection`,
+  // 那个在 429 上恒假(429 被故意归为歧义),等于把整档判死 —— 见 docs/PORT-PITFALLS.md P-092。
+  //
+  // 这里换成**非空**的线型判据:日限拒单必然是「服务端回话了的 4xx / 业务拒绝」。
+  // 429 通得过(现实中日限就走 429),5xx / 断网 / 读不懂一律不认。
+  const serverRefusal = err instanceof ApiError
+    && (err.kind === "business"
+      || (err.kind === "http" && typeof err.status === "number" && err.status >= 400 && err.status < 500));
+  if (isDailyLimit && serverRefusal) {
     return { fate: isReplay ? "keep" : "retire", kind: "daily-limit", refreshPolicy: false };
   }
+  // 认得出日限文案、但线型不对(5xx 等)→ 不当日限,落回下面的通用判定(结果未知 ⇒ 保留键)。
 
   // ② 409 —— 重放路径上**唯一**成立的定局:服务端明确说「这个键我这儿已有记录」。
   if (isIdempotencyConflict(err)) {
