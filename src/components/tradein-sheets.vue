@@ -44,7 +44,7 @@
     - Path B keep+buy:  POST /api/orders (new device lands inactive)
 -->
 <template>
-  <view v-if="state.kind !== 'none'" class="tis-root">
+  <view v-if="state.kind !== 'none'" class="tis-root" role="dialog" aria-modal="true">
     <view class="tis-backdrop" @click="hide" />
 
     <view class="tis-panel" @click.stop>
@@ -212,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
@@ -233,9 +233,16 @@ import type { DeviceKind, Device } from "@/store/types";
 import { useT } from "@/i18n/use-t";
 import { deviceName, deviceNameByKind } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
+import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalCapacityReplaceQuote, CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
+import { productCatalogState } from "@/store/product-catalog";
+import { useOrders } from "@/store/orders";
+import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTradeinSheet();
 const app = useApp();
+const orders = useOrders();
 const t = useT();
 // 上架节奏门(FEAT-DEV02b):置换目标必须已正式上架,或处于抢先购窗口(开关默认关)。
 const phase = useProductPhase();
@@ -249,6 +256,15 @@ const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
 // rapid taps on a slow device could fire a composer twice before the device
 // array mutation propagates → double-bill / double-debit (Batch C R1 P0 #5).
 const confirming = ref(false);
+const canonicalQuote = ref<CanonicalTradeinQuote | null>(null);
+const canonicalTradeinConfig = ref<CanonicalTradeinConfig | null>(null);
+const capacityCommandKey = ref<string | null>(null);
+onMounted(() => {
+  if (!remoteApiEnabled) return;
+  void deviceE3Api.tradeinConfig().then((value) => { canonicalTradeinConfig.value = value; }).catch(() => {
+    canonicalTradeinConfig.value = null;
+  });
+});
 
 // ───────────────────────── helpers ─────────────────────────
 
@@ -298,10 +314,25 @@ const choiceSources = computed(() => {
       id: d.id,
       label: fmt(t.value.tradein.choiceTradeInOption, {
         name: deviceName(t.value, d),
-        credit: previewCredit(d, s.newPrice).toFixed(2),
+        credit: remoteApiEnabled ? "服务端报价" : previewCredit(d, s.newPrice).toFixed(2),
       }),
     }));
 });
+
+async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPrice: number): Promise<void> {
+  if (!remoteApiEnabled) {
+    canonicalQuote.value = null;
+    sheet.showTradein(oldDevice.id, targetKind, newPrice);
+    return;
+  }
+  try {
+    canonicalQuote.value = await deviceE3Api.quote(Number(oldDevice.id), targetKind);
+    sheet.showTradein(oldDevice.id, targetKind, newPrice);
+  } catch {
+    canonicalQuote.value = null;
+    toast.warn(t.value.tradein.errPleaseRetry);
+  }
+}
 
 function onChooseTradein(deviceId: string) {
   const s = state.value;
@@ -314,12 +345,28 @@ function onChooseTradein(deviceId: string) {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
   }
-  sheet.showTradein(oldDevice.id, s.targetKind, s.newPrice);
+  void openTradeinQuote(oldDevice, s.targetKind, s.newPrice);
 }
 
 function onChooseFullPrice() {
   const s = state.value;
   if (s.kind !== "choice") return;
+  if (remoteApiEnabled) {
+    void deviceE3Api.capacityQuote(s.targetKind).then(async (quote) => {
+      if (quote.decision === "REPLACE_REQUIRED") {
+        sheet.showCanonicalReplace(s.targetKind, quote.payableUsdt, quote);
+        return;
+      }
+      hide();
+      if (quote.decision === "NO_ACTIVE_DEVICE") {
+        await handleNoActiveDeviceDecision({
+          notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
+          refreshFleet: () => app.refreshRemoteFleet(),
+        });
+      }
+    }).catch(() => toast.warn(t.value.tradein.errPleaseRetry));
+    return;
+  }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
   // checkout flow proceeds normally to payment).
   if (app.activeSlotCount + reservedSlots.value >= MAX_DEVICES) {
@@ -334,6 +381,14 @@ function onChooseFullPrice() {
 const retireView = computed(() => {
   const s = state.value;
   if (s.kind !== "retire") return null;
+  if (remoteApiEnabled && (productCatalogState.status !== "ready"
+      || !canonicalTradeinConfig.value || !canonicalTradeinConfig.value.enabled)) {
+    return {
+      title: t.value.tradein.retireTitle,
+      subtitle: t.value.tradein.errPleaseRetry,
+      targets: [],
+    };
+  }
   const device = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!device) return null;
   const paid = device.paidPriceUsdt ?? 0;
@@ -341,7 +396,7 @@ const retireView = computed(() => {
   // 「仅限更高价」与「已上架 ∨ 抢先购窗口」均为运营可配规则,消费 flag 不硬编码。
   const targets = PRODUCTS.filter(
     (p) =>
-      (!TRADEIN_LADDER_RULES.requireHigherPrice || p.price > paid) &&
+      (!(remoteApiEnabled ? canonicalTradeinConfig.value?.requireHigherPrice !== false : TRADEIN_LADDER_RULES.requireHigherPrice) || p.price > paid) &&
       isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
   ).map((p) => {
     // 抢先购窗口内的未正式上架目标,行尾加「抢先升级」标(默认关闭时零渲染)。
@@ -369,7 +424,7 @@ function onPickTarget(productId: string) {
     toast.warn(t.value.tradein.errPleaseRetry);
     return;
   }
-  sheet.showTradein(device.id, productId as DeviceKind, p.price);
+  void openTradeinQuote(device, productId as DeviceKind, p.price);
 }
 
 // ───────────────────────── 2. tradein — 置换确认(去结算) ─────────────────────
@@ -379,11 +434,14 @@ const tradeinView = computed(() => {
   if (s.kind !== "tradein") return null;
   const oldDevice = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!oldDevice) return null; // device vanished (already traded) — render nothing
-  const paid = oldDevice.paidPriceUsdt ?? 0;
-  const earned = Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0);
-  const credit = previewCredit(oldDevice, s.newPrice);
-  const band = ladderBandFor(paid, earned);
-  const estNet = Math.max(0, +(s.newPrice - credit).toFixed(2));
+  const remoteQuote = remoteApiEnabled ? canonicalQuote.value : null;
+  if (remoteApiEnabled && (!remoteQuote || remoteQuote.sourceDeviceId !== Number(oldDevice.id)
+      || remoteQuote.targetProductNo !== s.newKind)) return null;
+  const paid = remoteQuote?.sourceActualPaidUsdt ?? oldDevice.paidPriceUsdt ?? 0;
+  const earned = remoteQuote?.cumulativeOutputUsdt ?? Math.max(0, oldDevice.cumulativeEarningsUsdt ?? 0);
+  const credit = remoteQuote?.discountUsdt ?? previewCredit(oldDevice, s.newPrice);
+  const band = remoteQuote ? null : ladderBandFor(paid, earned);
+  const estNet = remoteQuote?.payableUsdt ?? Math.max(0, +(s.newPrice - credit).toFixed(2));
   return {
     title: fmt(t.value.tradein.sheetTitle, {
       from: kindLabel(oldDevice.kind),
@@ -392,7 +450,9 @@ const tradeinView = computed(() => {
     // 只给设备名——内部 id 是工程标识,禁止渲染(页面文案禁字段名/枚举值)。
     oldDeviceText: oldDevice.name,
     earned: earned.toFixed(2),
-    bandText: band
+    bandText: remoteQuote
+      ? fmt(t.value.tradein.sheetBandText, { band: "服务端", pct: remoteQuote.creditRatePct })
+      : band
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
       : "—",
     credit: credit.toFixed(2),
@@ -419,7 +479,7 @@ function onConfirmTradein() {
   confirming.value = true;
   // FEAT-DEV02:确认 = 写入结算抵扣上下文,原子事务(净额扣款 + 移除旧机 + 新机
   // 未激活入库)统一发生在结算页持久块——本弹层不再直接动钱/动设备数组。
-  sheet.applyTradein(oldDevice.id, s.newKind);
+  sheet.applyTradein(oldDevice.id, s.newKind, remoteApiEnabled ? canonicalQuote.value ?? undefined : undefined);
   const targetId = s.newKind;
   hide();
   const cur = (getCurrentPages().slice(-1)[0] as { route?: string } | undefined)?.route ?? "";
@@ -437,6 +497,18 @@ function onConfirmTradein() {
 const replaceView = computed(() => {
   const s = state.value;
   if (s.kind !== "replace") return null;
+  if (remoteApiEnabled && s.canonicalCapacityQuote) {
+    return {
+      warning: fmt(t.value.tradein.replaceWarning, { newKind: kindLabel(s.newKind) }),
+      lowestText: fmt(t.value.tradein.replaceLowestText, {
+        name: s.canonicalCapacityQuote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
+        earn: "—",
+      }),
+      insufficient: !s.canonicalCapacityQuote.sufficientFunds,
+      replaceCta: fmt(t.value.tradein.replaceReplaceCta, { newKind: kindLabel(s.newKind) }),
+      keepCta: fmt(t.value.tradein.replaceKeepCta, { newKind: kindLabel(s.newKind) }),
+    };
+  }
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!lowest) return null; // snapshot device vanished — render nothing
   const insufficient = s.newPrice > app.user.usdtBalance;
@@ -452,9 +524,78 @@ const replaceView = computed(() => {
   };
 });
 
+function canonicalCapacityKey(quote: CanonicalCapacityReplaceQuote): string {
+  if (capacityCommandKey.value) return capacityCommandKey.value;
+  capacityCommandKey.value = `e3-capacity:${quote.sourceDeviceId}:${quote.targetProductNo}:${Date.now()}`;
+  return capacityCommandKey.value;
+}
+
+async function submitCanonicalCapacityReplacement(
+  quote: CanonicalCapacityReplaceQuote,
+  newKind: DeviceKind,
+): Promise<void> {
+  try {
+    if (quote.decision !== "REPLACE_REQUIRED" || quote.sourceDeviceId == null
+        || quote.targetProductNo !== newKind || quote.decisionSource !== "server") {
+      throw new Error("CAPACITY_REPLACEMENT_QUOTE_INVALID");
+    }
+    await completeVerifiedMutation({
+      submit: () => deviceE3Api.capacityReplace(
+        quote.sourceDeviceId!, quote.targetProductNo, canonicalCapacityKey(quote), quote,
+      ),
+      readback: async (submitted) => (await orderApi.list()).orders
+        .find((order) => order.orderNo === submitted.orderNo),
+      verifyOrder(submitted, persisted) {
+        if (!persisted || persisted.sourceDeviceId !== submitted.sourceDeviceId
+            || persisted.targetDeviceId !== submitted.targetDeviceId
+            || persisted.tradeinNo !== submitted.tradeinNo
+            || persisted.canonicalStatus !== "activated"
+            || persisted.paymentStatus.toUpperCase() !== "PAID"
+            || persisted.orderStatus.toUpperCase() !== "COMPLETED"
+            || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
+            || Math.abs(persisted.amountUsdt - submitted.walletDebitUsdt) > 0.000001
+            || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
+          throw new Error("CAPACITY_REPLACEMENT_READBACK_MISMATCH");
+        }
+      },
+      refreshOrders: () => orders.refreshRemote(),
+      refreshFleet: () => app.refreshRemoteFleet(),
+      verifyFleet(submitted) {
+        const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
+        const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
+        if (!target || target.activatedAt == null || (source && source.activatedAt != null)) {
+          throw new Error("CAPACITY_REPLACEMENT_FLEET_READBACK_MISMATCH");
+        }
+      },
+      commit() {
+        capacityCommandKey.value = null;
+        toast.success(fmt(t.value.tradein.replaceSuccessToast, {
+          newKind: kindLabel(newKind),
+          oldKind: quote.sourceDeviceName ?? t.value.tradein.errReplaceUnavailable,
+        }));
+        hide();
+        goDevices();
+      },
+    });
+  } catch {
+    toast.warn(t.value.tradein.errPleaseRetry);
+  } finally {
+    confirming.value = false;
+  }
+}
+
 function onReplace() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (remoteApiEnabled) {
+    if (!s.canonicalCapacityQuote) {
+      toast.warn(t.value.tradein.errPleaseRetry);
+      return;
+    }
+    confirming.value = true;
+    void submitCanonicalCapacityReplacement(s.canonicalCapacityQuote, s.newKind);
+    return;
+  }
   const lowest = app.devices.find((d) => d.id === s.oldDeviceId) ?? null;
   if (!lowest) return;
   confirming.value = true;
@@ -514,9 +655,34 @@ function onReplace() {
   goDevices();
 }
 
+async function submitCanonicalKeepBuy(newKind: DeviceKind): Promise<void> {
+  try {
+    const key = capacityCommandKey.value ?? `e3-capacity-keep:${newKind}:${Date.now()}`;
+    capacityCommandKey.value = key;
+    const created = await orderApi.create({ productNo: newKind, quantity: 1, idempotencyKey: key });
+    const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
+    if (!persisted || persisted.productNo !== newKind) throw new Error("CAPACITY_KEEP_ORDER_READBACK_MISMATCH");
+    await orders.refreshRemote();
+    await app.refreshRemoteFleet();
+    capacityCommandKey.value = null;
+    toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }));
+    hide();
+    goDevices();
+  } catch {
+    toast.warn(t.value.tradein.errPleaseRetry);
+  } finally {
+    confirming.value = false;
+  }
+}
+
 function onKeepBuy() {
   const s = state.value;
   if (s.kind !== "replace" || confirming.value) return;
+  if (remoteApiEnabled) {
+    confirming.value = true;
+    void submitCanonicalKeepBuy(s.newKind);
+    return;
+  }
   confirming.value = true;
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Keep & buy" branch.
   // Order: addDevice (default inactive) → postMoneyBill(扣款 ⊗ 记账,单次落盘)。
@@ -571,6 +737,13 @@ function onForce() {
     return;
   }
   confirming.value = true;
+  if (remoteApiEnabled) {
+    // Remote replacement is only admitted from a fresh server capacity quote;
+    // never execute the legacy local force composer against canonical state.
+    toast.warn(t.value.tradein.errPleaseRetry);
+    confirming.value = false;
+    return;
+  }
   // ⚠️ MOCK-ONLY CROSS-STORE COMPOSER — Path B "Force replace" branch.
   //
   // Task-forfeit safety (Batch C R2 P0): deactivateDevice wipes `currentTask`
@@ -627,6 +800,10 @@ function onForce() {
   hide();
   goDevices();
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => state.value.kind !== "none"), ".tis-root", hide);
 </script>
 
 <style scoped>

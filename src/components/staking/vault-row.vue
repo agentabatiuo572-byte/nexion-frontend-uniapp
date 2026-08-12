@@ -4,7 +4,7 @@
   Click → emits `open` so the page opens the stake sheet for this term.
 -->
 <template>
-  <view :class="['nx-staking-vault-row', `nx-staking-vault-row-${term}`, 'active:opacity-70']" :style="rowStyle" @click="emit('open')">
+  <view :class="['nx-staking-vault-row', `nx-staking-vault-row-${term}`, 'active:opacity-70']" :style="rowStyle" role="button" tabindex="0" @click="emit('open')">
     <!-- Tier code-tag -->
     <text :style="tierChipStyle">{{ term }}D</text>
 

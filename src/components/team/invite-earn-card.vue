@@ -16,12 +16,21 @@
     <!-- 24px grid overlay -->
     <view aria-hidden="true" :style="gridStyle" />
 
+    <view
+      v-if="isAuthoritativeSandbox"
+      data-testid="h8-sandbox-banner"
+      class="relative flex items-center"
+      :style="sandboxBannerStyle"
+    >
+      <text>{{ t.team.sandboxBanner }}</text>
+    </view>
+
     <!-- Top label row -->
     <view class="relative flex items-center justify-between" style="z-index: 1; font-size: 12px">
       <text :style="{ color: 'var(--v5-brand)', fontWeight: 500 }">💰 {{ t.team.earnForEachFriend }}</text>
       <view class="flex items-center" style="gap: 4px">
         <PulseDot color="var(--v5-success)" :size="6" />
-        <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-3)' }">{{ t.team.earnedTodayCount }}</text>
+        <text class="font-mono-tabular tabular-nums" :style="{ color: 'var(--v5-ink-3)' }">{{ settlementStatus }}</text>
       </view>
     </view>
 
@@ -37,16 +46,15 @@
       <!-- LEFT — stats -->
       <view class="min-w-0 flex flex-col" style="gap: 6px">
         <view class="flex items-baseline" style="gap: 4px; line-height: 1">
-          <text class="font-display tabular-nums" :style="leftDollarSignStyle">$</text>
-          <text class="font-mono-tabular" :style="leftDollarStyle">{{ dollarReward }}</text>
+          <text class="font-mono-tabular" :style="leftDollarStyle">{{ nexReward.toLocaleString() }}</text>
+          <text class="font-display tabular-nums" :style="leftDollarSignStyle">NEX</text>
         </view>
-        <text v-if="hasPromo" class="font-mono-tabular" :style="strikeStyle">${{ BASE_REWARD_DOLLAR_LABEL }}</text>
-        <text class="font-display tabular-nums" :style="nexLineStyle">+ {{ nexReward.toLocaleString() }} NEX</text>
+        <text class="font-display tabular-nums" :style="nexLineStyle">{{ t.team.serverRewardPerSettlement }}</text>
         <text :style="cooldownStyle">{{ t.team.perFriendCooldown }}</text>
         <!-- Cumulative earned pill -->
         <view class="inline-flex items-center" :style="earnedPillStyle">
           <text>💎</text>
-          <text v-if="lifetimeEarned > 0" class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan-ink)', fontWeight: 600 }">+${{ lifetimeEarned.toFixed(2) }}</text>
+          <text v-if="lifetimeEarned > 0" class="font-display tabular-nums" :style="{ color: 'var(--v5-tech-cyan-ink)', fontWeight: 600 }">+{{ lifetimeEarned.toLocaleString() }} NEX</text>
           <text v-else :style="{ color: 'var(--v5-tech-cyan-ink)' }">{{ t.team.beTheFirst }}</text>
         </view>
       </view>
@@ -71,19 +79,22 @@
 
         <view class="rounded-full flex items-center justify-center active:opacity-90" :style="primaryCtaStyle" @click="openShare">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-          <text :style="primaryCtaTextStyle">{{ shareParts[0] }}<text :style="{ fontWeight: 600 }">${{ dollarReward }}</text>{{ shareParts[1] }}</text>
+          <text :style="primaryCtaTextStyle">{{ fmt(t.team.shareAndEarn, { n: `${nexReward.toLocaleString()} NEX` }) }}</text>
         </view>
       </view>
     </view>
 
     <!-- Live commission ticker -->
     <view class="relative flex items-center overflow-hidden border-t" :style="tickerWrapStyle">
-      <view :key="tickerIdx" class="flex items-center w-full min-w-0 nx-step-in" style="gap: 6px; font-size: 12px">
+      <view v-if="tickerItem" :key="tickerIdx" class="flex items-center w-full min-w-0 nx-step-in" style="gap: 6px; font-size: 12px">
         <text class="shrink-0">⚡</text>
         <text class="shrink-0" :style="{ color: 'var(--v5-ink)', fontWeight: 500 }">{{ tickerItem.name }}</text>
         <text class="truncate" :style="{ color: 'var(--v5-ink-3)' }">{{ tickerItem.action }}</text>
         <text class="font-mono-tabular tabular-nums shrink-0" :style="tickerAmtStyle">{{ tickerItem.amount }}</text>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M7 7h10v10M7 17 17 7" /></svg>
+      </view>
+      <view v-else class="flex items-center w-full min-w-0" style="gap: 6px; font-size: 12px" @click="rewards.refresh()">
+        <text :style="{ color: 'var(--v5-ink-3)' }">{{ rewards.error ? t.team.rewardHistoryUnavailable : t.team.noSettledRewards }}</text>
       </view>
     </view>
   </view>
@@ -101,68 +112,66 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import PulseDot from "@/components/home/pulse-dot.vue";
 import ShareChannelSheet from "@/components/team/share-channel-sheet.vue";
 import SharePosterSheet from "@/components/team/share-poster-sheet.vue";
 import { useApp } from "@/store/app";
-import { useCommission } from "@/store/commission";
-import { useProductPhase } from "@/composables/use-product-phase";
+import { useReferralReward } from "@/store/referral-reward";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
-import { buildShareLink, copyText, INVITER_REWARD_NEX, INVITER_REWARD_USDT_ESTIMATE, recordShareEvent } from "@/lib/share";
+import { buildShareLink, copyText, recordShareEvent } from "@/lib/share";
+import { remoteApiEnabled } from "@/api/runtime";
+import { fmt } from "@/i18n/format";
 
 const t = useT();
 const app = useApp();
-const commission = useCommission();
-const phase = useProductPhase();
-
-// F4 口径单源:估值/NEX 常量取 lib/share(渠道面板同源),禁本地镜像。
-const BASE_REWARD_NEX = INVITER_REWARD_NEX;
-const BASE_REWARD_DOLLAR_LABEL = INVITER_REWARD_USDT_ESTIMATE;
+const rewards = useReferralReward();
+const isAuthoritativeSandbox = computed(() =>
+  rewards.snapshot?.source === "mock"
+  && rewards.snapshot?.sourceEnvironment === "SANDBOX",
+);
 
 interface TickerItem {
   name: string;
   action: string;
   amount: string;
 }
-const TICKER_ITEMS: TickerItem[] = [
-  { name: "Sarah K.", action: "just joined your network", amount: "+$45.20" },
-  { name: "Tom W.", action: "bought NexGridBox S1", amount: "+$130.00" },
-  { name: "Carlos R.", action: "upgraded to V3 Captain", amount: "+$28.40" },
-  { name: "Mei L.", action: "added a second device", amount: "+$76.00" },
-  { name: "Akira S.", action: "staked $5K · 180d", amount: "+$54.00" },
-  { name: "Priya N.", action: "claimed her Day-One bonus", amount: "+$12.00" },
-];
+const tickerItems = computed<TickerItem[]>(() => (rewards.snapshot?.recentRewards ?? []).map((row) => ({
+  name: row.settlementNo.length > 12 ? `${row.settlementNo.slice(0, 12)}…` : row.settlementNo,
+  action: row.releaseBucket === "withdrawable" ? t.value.team.settledToWallet : t.value.team.settledProtected,
+  amount: `+${row.amountNex.toLocaleString()} NEX`,
+})));
+const hasPromo = computed(() => false);
+const multiplier = computed(() => 1);
+const nexReward = computed(() => rewards.snapshot?.inviterRewardNex ?? 0);
+const lifetimeEarned = computed(() => rewards.snapshot?.lifetimeInviterNex ?? 0);
+const settlementStatus = computed(() => rewards.snapshot
+  ? fmt(t.value.team.settlementStatus, {
+      settled: rewards.snapshot.settledCount,
+      pending: rewards.snapshot.pendingCount,
+    })
+  : t.value.team.settlementUnavailable);
 
-const multiplier = computed(() => phase.value.inviteBonusMultiplier);
-const hasPromo = computed(() => multiplier.value > 1.0);
-const dollarReward = computed(() => Math.round(BASE_REWARD_DOLLAR_LABEL * multiplier.value));
-const nexReward = computed(() => Math.round(BASE_REWARD_NEX * multiplier.value));
-const lifetimeEarned = computed(() => commission.totalUSDTLifetime());
-
-const referralCode = computed(() => app.user.referralCode);
+const referralCode = computed(() => {
+  if (remoteApiEnabled) return rewards.snapshot?.referralCode ?? "";
+  return app.user.referralCode;
+});
 // 展示用短链标签从真实链接派生(禁写死 nexgrid.ai 与实际复制内容脱节,审计 P2)。
 const linkLabel = computed(() => {
-  const bare = buildShareLink().replace(/^https?:\/\//, "");
+  const bare = buildShareLink(referralCode.value).replace(/^https?:\/\//, "");
   if (!bare) return "—";
   return bare.length > 15 ? `${bare.slice(0, 15)}…` : bare;
 });
 
-const promoChipText = computed(() =>
-  fmt(t.value.team.invitePromoChip, {
-    multiplier: multiplier.value.toFixed(multiplier.value === Math.floor(multiplier.value) ? 0 : 1),
-  }),
-);
-const shareParts = computed(() => t.value.team.shareAndEarn.split("{n}"));
+const promoChipText = computed(() => "");
 
 const copiedCode = ref(false);
 const copiedLink = ref(false);
 const posterOpen = ref(false);
 const shareOpen = ref(false);
 const tickerIdx = ref(0);
-const tickerItem = computed(() => TICKER_ITEMS[tickerIdx.value]);
+const tickerItem = computed(() => tickerItems.value[tickerIdx.value] ?? null);
 
 // FEAT-SHARE1 异常2:码为空四入口置灰 + toast,不产出空码链接。
 function guardCode(): boolean {
@@ -185,7 +194,7 @@ async function copyCode() {
 }
 async function copyLink() {
   if (!guardCode()) return;
-  const ok = await copyText(buildShareLink());
+  const ok = await copyText(buildShareLink(referralCode.value));
   if (!ok) {
     toast.info(t.value.share.copyFailed);
     return;
@@ -204,11 +213,15 @@ function openShare() {
 }
 
 let tickerTimer: ReturnType<typeof setInterval> | null = null;
-onMounted(() => {
-  tickerTimer = setInterval(() => {
-    tickerIdx.value = (tickerIdx.value + 1) % TICKER_ITEMS.length;
+watch(() => tickerItems.value.length, (length) => {
+  if (tickerTimer) clearInterval(tickerTimer);
+  tickerTimer = null;
+  tickerIdx.value = 0;
+  if (length > 1) tickerTimer = setInterval(() => {
+    tickerIdx.value = (tickerIdx.value + 1) % length;
   }, 4200);
 });
+onMounted(() => void rewards.refresh());
 onUnmounted(() => {
   if (tickerTimer) clearInterval(tickerTimer);
 });
@@ -228,6 +241,16 @@ const gridStyle: CSSProperties = {
   backgroundSize: "24px 24px",
   pointerEvents: "none",
   zIndex: 0,
+};
+const sandboxBannerStyle: CSSProperties = {
+  zIndex: 1,
+  marginBottom: "10px",
+  padding: "7px 10px",
+  borderRadius: "10px",
+  background: "color-mix(in srgb, var(--v5-warning) 12%, var(--v5-surface))",
+  color: "var(--v5-warning-ink)",
+  fontSize: "12px",
+  fontWeight: 700,
 };
 const promoChipStyle: CSSProperties = {
   marginTop: "8px",

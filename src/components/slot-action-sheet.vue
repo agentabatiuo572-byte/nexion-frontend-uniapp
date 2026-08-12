@@ -13,7 +13,7 @@
   when open (mounted once at chassis level).
 -->
 <template>
-  <view v-if="sheet.open" class="sas-root">
+  <view v-if="sheet.open" class="sas-root" role="dialog" aria-modal="true">
     <view class="sas-backdrop" @click="hide" />
 
     <view class="sas-panel" @click.stop>
@@ -77,6 +77,7 @@ import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
 import type { Device } from "@/store/types";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useSlotActionSheet();
 const app = useApp();
@@ -121,6 +122,10 @@ function onGoStore() {
   sheet.hide();
   uni.navigateTo({ url: "/pages/store/store", fail: () => {} });
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => sheet.open), ".sas-root", hide);
 </script>
 
 <style scoped>

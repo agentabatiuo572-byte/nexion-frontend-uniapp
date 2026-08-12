@@ -4,11 +4,8 @@
   a timeline of routed events. Tapping a row marks it read and (if it carries a
   ctaHref) navigates. Wrapped in <AppChassis active="me">.
 
-  Scope note: source used a gesture SwipeRow for swipe-to-delete / mark-read /
-  conversion-shortcut actions. uni has no swipe primitive and the feed seeds empty
-  (events are pushed by the simulation in the full app), so rows degrade to
-  tap-to-read + ctaHref navigation; the conversion shortcut surfaces as the row's
-  ctaLabel chip. The store keeps push/removeOne for when seeding lands.
+  Remote rows preserve click CTA and left-swipe conversion as distinct actions.
+  Mock mode remains local-only and never reports a conversion to the API.
 -->
 <template>
   <AppChassis active="me">
@@ -55,6 +52,8 @@
             :key="n.id"
             class="flex items-start active:opacity-90"
             :style="rowStyle(i !== filtered.length - 1, !n.readAt)"
+            @touchstart="onTouchStart(n, $event)"
+            @touchend="onTouchEnd(n, $event)"
             @click="onTap(n)"
           >
             <view class="relative shrink-0">
@@ -88,6 +87,8 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNotifications, type NotifKind, type Notification } from "@/store/notifications";
 import { navTo } from "@/lib/route";
+import { remoteApiEnabled } from "@/api/runtime";
+import { isLeftConversionSwipe, type SwipePoint } from "@/lib/notification-swipe";
 
 const t = useT();
 const notifs = useNotifications();
@@ -149,14 +150,48 @@ function timeAgo(ts: number): string {
 }
 
 async function onTap(n: Notification) {
+  if (suppressedClick?.id === n.id && Date.now() <= suppressedClick.until) {
+    suppressedClick = null;
+    return;
+  }
   if (n.ctaHref) {
-    const canonicalRoute = await notifs.recordCta(n.id);
-    if (canonicalRoute) navTo(canonicalRoute);
+    if (remoteApiEnabled) {
+      const canonicalRoute = await notifs.recordCta(n.id);
+      if (canonicalRoute) navTo(canonicalRoute);
+    } else {
+      await notifs.markRead(n.id);
+      navTo(n.ctaHref);
+    }
     return;
   }
   await notifs.markRead(n.id);
   const href = KIND_META[n.kind].href;
   if (href) navTo(href);
+}
+
+type UniTouchEvent = { changedTouches?: ArrayLike<{ clientX: number; clientY: number }> };
+const touchStarts = new Map<string, SwipePoint>();
+let suppressedClick: { id: string; until: number } | null = null;
+
+function touchPoint(event: UniTouchEvent): SwipePoint | null {
+  const touch = event.changedTouches?.[0];
+  return touch ? { x: touch.clientX, y: touch.clientY, at: Date.now() } : null;
+}
+
+function onTouchStart(n: Notification, event: UniTouchEvent) {
+  const point = touchPoint(event);
+  if (point) touchStarts.set(n.id, point);
+}
+
+async function onTouchEnd(n: Notification, event: UniTouchEvent) {
+  const start = touchStarts.get(n.id);
+  touchStarts.delete(n.id);
+  const end = touchPoint(event);
+  if (!remoteApiEnabled) return;
+  if (!start || !end || !isLeftConversionSwipe(start, end)) return;
+  suppressedClick = { id: n.id, until: Date.now() + 800 };
+  const canonicalRoute = await notifs.recordSwipeConversion(n.id);
+  if (canonicalRoute) navTo(canonicalRoute);
 }
 onMounted(() => { void notifs.refreshRemote(); });
 

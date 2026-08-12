@@ -18,10 +18,7 @@ import { createRepurchaseApi } from "./repurchase-api";
 import { createRiskDisclosureApi } from "./risk-disclosure-api";
 import { createPayoutAddressApi } from "./payout-address-api";
 import { createPaymentMethodApi } from "./payment-method-api";
-// 注:trial-api 未随本批搬入 —— 它写于 2026-07-24,契约仍是「卡时代」试用机模型
-// (自动续费 / 提前赎回 / 延期三组字段),主线已在 FEAT-TRIAL02 改为无卡试用机,
-// 并焊了哨兵防该模型复活(哨兵按字段名匹配且不剥注释,故此处不列原字段名)。
-// 要接试用机后端须按现行无卡模型重写该 api。
+import { createTrialApi } from "./trial-api";
 import { createQuestApi } from "./quest-api";
 import { createEventsApi } from "./events-api";
 import { createPointsApi } from "./points-api";
@@ -33,12 +30,18 @@ import { createI18nApi } from "./i18n-api";
 import { createJanusApi } from "./janus-api";
 import { createBehaviorAnalyticsApi } from "./behavior-analytics-api";
 import { createEarningsReleaseApi } from "./earnings-release-api";
+import { createTaskAssignmentApi } from "./task-assignment-api";
+import { createFundsSandboxApi } from "./funds-sandbox-api";
+import { createReferralRewardApi } from "./referral-reward-api";
+import { createSupportApi } from "./support-api";
 import { readApiRuntimeConfig } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
 
 export const apiRuntimeConfig = readApiRuntimeConfig();
-export const remoteApiEnabled = apiRuntimeConfig.mode === "remote";
+export const remoteApiEnabled = apiRuntimeConfig.mode !== "mock";
+export const fundsSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
+export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";
 export const sessionVault = createRuntimeSessionVault();
 let unauthorizedHandler: (() => void | Promise<void>) | undefined;
 
@@ -75,6 +78,7 @@ export const repurchaseApi = createRepurchaseApi(apiClient);
 export const riskDisclosureApi = createRiskDisclosureApi(apiClient);
 export const payoutAddressApi = createPayoutAddressApi(apiClient);
 export const paymentMethodApi = createPaymentMethodApi(apiClient);
+export const trialApi = createTrialApi(apiClient);
 export const questApi = createQuestApi(apiClient);
 export const eventsApi = createEventsApi(apiClient);
 export const pointsApi = createPointsApi(apiClient);
@@ -86,6 +90,10 @@ export const i18nApi = createI18nApi(apiClient);
 export const janusApi = createJanusApi(apiClient);
 export const behaviorAnalyticsApi = createBehaviorAnalyticsApi(apiClient);
 export const earningsReleaseApi = createEarningsReleaseApi(apiClient);
+export const taskAssignmentApi = createTaskAssignmentApi(apiClient);
+export const fundsSandboxApi = createFundsSandboxApi(apiClient);
+export const referralRewardApi = createReferralRewardApi(apiClient);
+export const supportApi = createSupportApi(apiClient);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

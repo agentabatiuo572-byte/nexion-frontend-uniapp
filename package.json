@@ -41,11 +41,16 @@
     "test:earnings-accrual": "node --experimental-strip-types --test scripts/earnings-accrual-contract.test.mjs",
     "test:business-loop-liveness": "node scripts/selfcheck-business-loop-liveness.mjs",
     "test:janus-stop-cancellation": "node scripts/janus-stop-cancellation.test.mjs",
+    "test:production-boundaries": "node --test scripts/acceptance-h5-sandbox-config.test.mjs scripts/funds-mutation-key-behavior.test.mjs scripts/funds-recoverable-operation-behavior.test.mjs scripts/funds-sandbox-ledger-behavior.test.mjs scripts/funds-sandbox-visible-label-contract.test.mjs scripts/funds-sandbox-withdrawal-contract.test.mjs scripts/funds-server-sandbox-contract.test.mjs scripts/funds-server-sandbox-regression.test.mjs scripts/h8-first-user-truth-contract.test.mjs scripts/h8-sandbox-referral-bill-contract.test.mjs scripts/janus-h5-executor-hold-contract.test.mjs scripts/kl-sandbox-executor-contract.test.mjs",
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
+    "test:session-reload-recovery": "node --test scripts/server-session-reload-recovery-contract.test.mjs && node scripts/verify-h5-runtime.mjs --server-session-reload-recovery",
     "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
     "test:withdraw-status-mirror": "node scripts/withdraw-status-mirror-runtime.mjs",
     "test:contracts": "node scripts/run-contract-suite.mjs",
-    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:contracts && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime && npm run test:withdraw-status-mirror"
+    "test:legacy-suite": "node scripts/run-legacy-suite.mjs",
+    "test:learning-contracts": "node --experimental-strip-types --test scripts/learning-submission.test.mjs",
+    "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs",
+    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:contracts && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness && npm run test:a11y-activate && npm run test:learning-contracts && npm run build:h5 && npm run test:h5-runtime && npm run test:withdraw-status-mirror && npm run test:legacy-suite"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",

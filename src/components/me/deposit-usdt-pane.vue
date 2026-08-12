@@ -8,6 +8,7 @@
 -->
 <template>
   <view class="mx-4" style="padding: 0 2px">
+    <FundsSandboxBadge />
     <!-- ── 加载骨架(chip 行 / QR 区 / 入口区,匹配真实形状)── -->
     <view v-if="phase === 'loading'">
       <view class="flex" style="gap: 8px">
@@ -23,7 +24,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
       </view>
       <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.addrLoadFailed }}</text></view>
-      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" @click="load">
+      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load">
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text>
       </view>
     </view>
@@ -36,7 +37,7 @@
           :key="nw.id"
           :class="['flex-1 flex flex-col items-center justify-center', isEnabled(nw.id) ? 'active:opacity-85' : '', `nx-dep-net-${nw.label.toLowerCase()}`]"
           :style="chipStyle(nw.id)"
-          role="button"
+          role="button" tabindex="0"
           :aria-disabled="!isEnabled(nw.id)"
           @click="pickNet(nw.id)"
         >
@@ -59,7 +60,7 @@
           <view class="flex-1 min-w-0">
             <text class="font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); white-space: nowrap">{{ shortAddr }}</text>
           </view>
-          <view class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" @click="copyAddr">
+          <view class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="copyAddr">
             <svg v-if="copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
@@ -69,6 +70,14 @@
           <view><text :style="metaCapStyle">{{ t.topupChrome.minDeposit }} <text :style="metaValStyle">${{ MIN_DEPOSIT_USDT }}</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.fee }} <text :style="metaValStyle">{{ CHAIN_DEPOSIT_FEE_USDT[activeNet] }} USDT</text></text></view>
           <view><text :style="metaCapStyle">{{ t.topupChrome.confirmationsLabel }} <text :style="metaValStyle">{{ CHAIN_REQUIRED_CONFIRMATIONS[activeNet] }}</text></text></view>
+        </view>
+        <view v-if="fundsSandboxEnabled" :style="warnlineStyle">
+          <view class="flex-1 min-w-0">
+            <text class="block" :style="warnTextStyle">Cregis USDT-BEP20</text>
+          </view>
+          <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
+            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "处理中" : "+25 USDT" }}</text>
+          </view>
         </view>
       </view>
 
@@ -88,11 +97,11 @@
 
       <!-- ── 指引 / 工单入口(透明 hairline 组)── -->
       <view style="margin-top: 16px">
-        <view class="nx-dep-usdt-guide-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" @click="goGuide">
+        <view class="nx-dep-usdt-guide-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goGuide">
           <text :style="linkTextStyle">{{ t.topupChrome.howToGetUsdt }}</text>
           <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
         </view>
-        <view class="nx-dep-support-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" @click="goSupport">
+        <view class="nx-dep-support-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goSupport">
           <text :style="linkTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
           <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
         </view>
@@ -117,6 +126,7 @@
             :class="recordClickable(r) ? 'active:opacity-90' : ''"
             :style="recordRowStyle"
             :role="recordClickable(r) ? 'button' : undefined"
+            :tabindex="recordClickable(r) ? 0 : undefined"
             v-on="recordRowOn(r)"
           >
             <view class="grid place-items-center shrink-0" :style="depIconStyle">
@@ -147,6 +157,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { toast } from "@/store/ui";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { useDeposits } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -158,6 +169,8 @@ import {
   mulberry32,
 } from "@/store/deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositRecord } from "@/store/types";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
+import { fundsSandboxEnabled } from "@/api/runtime";
 
 const t = useT();
 const dep = useDeposits();
@@ -198,6 +211,7 @@ onUnmounted(() => {
 // ── 网络选择(停用 chip 不可选;所选被停用时回落到首个启用网络)──
 const net = ref<ChainDepositChannel>("usdt-trc20");
 function isEnabled(id: ChainDepositChannel): boolean {
+  if (fundsSandboxEnabled) return id === "usdt-bep20";
   return dep.chainChannelEnabled[id] === true;
 }
 const activeNet = computed<ChainDepositChannel | null>(() => {
@@ -236,6 +250,20 @@ function copyAddr() {
     },
     fail: () => {},
   });
+}
+
+const sandboxSubmitting = ref(false);
+async function simulateSandboxTopup() {
+  if (!fundsSandboxEnabled || sandboxSubmitting.value) return;
+  sandboxSubmitting.value = true;
+  try {
+    const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", 25, dep.currentAccountKey());
+    if (record) toast.success("SANDBOX 服务端已入账 25 USDT");
+  } catch (cause) {
+    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? "服务器暂时未完成入账，请稍后刷新重试");
+  } finally {
+    sandboxSubmitting.value = false;
+  }
 }
 
 // ── QR 点阵:21×21 确定性伪随机 + 三角定位块,seed = 专属地址 → 切网络图案随之变。

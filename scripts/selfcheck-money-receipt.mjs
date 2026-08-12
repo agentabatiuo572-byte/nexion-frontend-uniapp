@@ -98,9 +98,10 @@ const ALLOW = {
   // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
   // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
   "src/pages/register/register.vue": 2,
-  // `businessTimeouts.add(handle)`(App.vue:62,Set.add 存定时器句柄,与 bills 无关)。
+  // `businessTimeouts.add(handle)`(App.vue:76,Set.add 存定时器句柄,与 bills 无关)。
   // 判据是**有意的过近似**(见 billsWriteHits 头注):文件跟 bills 有关系后,任何 `.add(`
   // 成员调用都计入,多算的这一处按机制在额度里精确登记 —— 宁可过近似再逐个登记。
+  // (该条目在 2026-08-12 双向分叉合并里丢过一次,合并算法按「只有一边改」取了没有它的那侧。)
   "src/App.vue": 1,
 };
 /** 找出一个文件里全部 bills 写入调用的位置(跨行、认别名、认解构、认可选链)。 */
@@ -197,7 +198,11 @@ export const defineStore = (id, setup) => () => {
   }));
   return cache.get(id);
 };`,
-  "vue-stub": VUE_STUB_NXREF,
+  "vue-stub": `export const ref = (v) => ({ __nxRef: true, value: v });
+export const shallowRef = ref;
+export const computed = (fn) => ({ __nxRef: true, get value() { return typeof fn === "function" ? fn() : fn.get(); } });
+export const reactive = (v) => v;
+export const watch = () => {};`,
   "runtime-stub": runtimeStub(root),
 };
 const bundle = await build({
@@ -610,18 +615,16 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 取基准 + restoreTo 还原。少了 restoreTo 的 `postMoneyBill(反向 draft)` 只是盲加一笔
     // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
     // 这种粗判据全绿。
-    // b023674 起周任务路由奖励并入 claim 族统一出口 postMoneyBillsOnce(claim-idempotency
-    // 门对它全绿);postMoneyBill(退款冲正)与 postReceiptOnly(补分录)两针照旧。
     ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptOnly"]],
     // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
-    ["src/components/home/weekly-quest-hero.vue", ["postMoneyBillsOnce"]],
-    ["src/components/home/weekly-quest-list.vue", ["postMoneyBillsOnce"]],
+    // weekly-quest 两页的本地发奖已迁服务端(2026-08-12 批次),不再走收口点 —— 台账按事实移除。
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
     // R5 补登:与复投页同形的第二个建仓入口。三针 —— 它 `:166` 取基准、`:199` 冲正,
     // 与另三条冲正路径完全同形,却一直只上了 1 针(删掉 `{restoreTo}` 门照样绿)。
     ["src/components/staking/stake-sheet.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
     ["src/components/tradein-sheets.vue", ["postMoneyBill"]],
     ["src/lib/share.ts", ["postMoneyBillsOnce"]],
+    ["src/store/payout-address.ts", ["postMoneyBillsOnce"]],
     ["src/pages/daily/daily.vue", ["postMoneyBillsOnce"]],
     ["src/pages/events/events.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/achievements.vue", ["postMoneyBillsOnce"]],
@@ -638,10 +641,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/pages/store/bundle.vue", ["postReceiptOnly"]],
     ["src/pages/store/checkout.vue", ["postMoneyBill", "postReceiptOnly"]],
     ["src/store/deposits.ts", ["postReceiptOnce"]],
-    // z1 补登(2026-08-10):地址迁移返还走 postMoneyBillsOnce(ref 判重幂等)。此前
-    // EXPORTS 漏了 postMoneyBillsOnce,反向入册门对「只调它」的文件整体失明 —— 补上
-    // EXPORTS 的同时把这处存量入册。
-    ["src/store/payout-address.ts", ["postMoneyBillsOnce"]],
   ];
   samples.wired = WIRED.length;
   wiredFiles = WIRED.map(([f]) => f);
@@ -675,17 +674,16 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 且同一文件确实取过基准(captureMoney)。三者散落三处 = 冲正已被拆掉,不算数。
     const shaped = !needles.includes("restoreTo:")
       || callArgs(src, "postMoneyBill").some((a) => a.includes("restoreTo"));
-    // 🔴 裸调禁令复用 ⑥ 的完整识别 + ⑥ 的白名单额度同一口径:WIRED 文件默认 0 处裸调,
-    // 在 ALLOW 里精确登记过的除外(App.vue 的 Set.add 过近似命中走额度,超额照红)——
-    // 两道门对同一处命中各判一遍口径不同,会出现「⑥ 放行 ⑤ 顶回」的自相矛盾。
-    const bare = scanSource(rel, readFileSync(path.join(root, rel), "utf8"));
     check(`⑤ ${rel.split("/").pop()} 走收口点且不再裸调 bills.add`,
       // 以 `:` 收尾的 needle 是**对象属性**(restoreTo: before)不是调用,原样找;
       // 其余是调用点,补 `(` —— 否则光有 import 也算数。
       hasNeedles && shaped && src.includes('from "@/lib/money-receipt"')
-      && bare <= (ALLOW[rel] ?? 0),
-      needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里")
-      + (bare > (ALLOW[rel] ?? 0) ? ` ·🔴裸调 ${bare} 处 > 额度 ${ALLOW[rel] ?? 0}` : ""));
+      // 🔴 裸调禁令复用 ⑥ 的完整识别,不再只禁 `bills.add(` 这一种写法 —— 原判据下
+      // `useBills().add(` / `bills.addMany(` / 别名 receiver / 跨行 全是合法的。
+      // 🔴 口径必须与 ⑥ 同源(2026-08-12 合并收口):⑥ 已改成「≤ ALLOW 登记额度」,
+      // 这里若仍写死 === 0,同一处过近似命中会被 ⑥ 放行、被 ⑤ 顶回,两条自相矛盾。
+      && scanSource(rel, readFileSync(path.join(root, rel), "utf8")) <= (ALLOW[rel] ?? 0),
+      needles.join("+") + (shaped ? "" : " ·🔴restoreTo 不在 postMoneyBill 实参里"));
   }
 
   // 包 E(2026-08-05):充值页零记账断言 —— 旧 $1 验证分录随机制删除后,

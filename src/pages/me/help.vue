@@ -49,7 +49,8 @@
 
       <!-- FAQ list -->
       <view class="mx-4" :style="faqWrapStyle">
-        <EmptyState v-if="filtered.length === 0" kind="no-search-results" :title="t.empty.searchTitle" :desc="t.empty.searchDesc" compact />
+        <EmptyState v-if="faqLoadError" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="loadFaqs" />
+        <EmptyState v-else-if="filtered.length === 0" :kind="query.trim() ? 'no-search-results' : 'empty-list'" :title="query.trim() ? t.empty.searchTitle : t.empty.listTitle" :desc="query.trim() ? t.empty.searchDesc : t.empty.listDesc" compact />
         <template v-else>
           <view
             v-for="(it, i) in filtered"
@@ -102,7 +103,7 @@
             @confirm="sendToBot"
           />
           <!-- 输入为空时点了没用 → 显式 aria-disabled;有内容时给按下反馈 -->
-          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot">
+          <view class="grid place-items-center" :class="{ 'active:opacity-80 transition-opacity': !!botInput.trim() }" role="button" tabindex="0" :aria-disabled="botInput.trim() ? 'false' : 'true'" :style="sendBtnStyle(!!botInput.trim())" @click="sendToBot">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="botInput.trim() ? 'var(--v5-on-brand)' : 'var(--v5-ink-4)'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
           </view>
         </view>
@@ -129,22 +130,37 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { FAQ_ITEMS, type FaqCategory, botReply } from "@/mock/faq";
+import { supportApi } from "@/api/runtime";
+import type { SupportFaq } from "@/domain/support";
+import { useLocaleStore } from "@/store/locale";
 import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.help);
+const locale = useLocaleStore();
+type FaqCategory = "getting-started" | "earnings" | "devices" | "payments" | "technical";
+const faqs = ref<SupportFaq[]>([]);
 
 const catOrder: FaqCategory[] = ["getting-started", "earnings", "devices", "payments", "technical"];
 
 const query = ref("");
 const cat = ref<FaqCategory | "all">("all");
 const openId = ref<string | null>(null);
+const faqLoadError = ref(false);
+
+async function loadFaqs() {
+  faqLoadError.value = false;
+  try { faqs.value = await supportApi.faqs(locale.code); }
+  catch { faqs.value = []; faqLoadError.value = true; }
+}
+
+onShow(() => { void loadFaqs(); });
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -158,7 +174,7 @@ function toggleFaq(id: string) {
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
-  return FAQ_ITEMS.filter((it) => {
+  return faqs.value.map((it) => ({ ...it, q: it.question, a: it.answer })).filter((it) => {
     const inCat = cat.value === "all" || it.category === cat.value;
     const inSearch = !q || it.q.toLowerCase().includes(q) || it.a.toLowerCase().includes(q);
     return inCat && inSearch;
@@ -207,8 +223,11 @@ function sendToBot() {
   thinking.value = true;
   bumpScroll();
   setTimeout(() => {
-    const hit = botReply(q);
-    bot.value = [...bot.value, { id: `b-${Date.now()}`, from: "bot", text: hit ? hit.a : w.value.botUnmatched }];
+    const needle = q.toLowerCase();
+    const hit = faqs.value.find((item) => item.question.toLowerCase().includes(needle)
+      || item.answer.toLowerCase().includes(needle)
+      || needle.split(/\s+/).some((word) => word.length > 3 && `${item.question} ${item.answer}`.toLowerCase().includes(word)));
+    bot.value = [...bot.value, { id: `b-${Date.now()}`, from: "bot", text: hit ? hit.answer : w.value.botUnmatched }];
     thinking.value = false;
     bumpScroll();
   }, 900);

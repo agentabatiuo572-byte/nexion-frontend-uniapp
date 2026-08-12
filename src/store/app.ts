@@ -1,10 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import type { Device, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
+import type { Device, CurrentTask, CompletedTask, UserState, EarningsState, GlobalStats, Withdrawal, WithdrawalFeeSnapshot, EarningBucketRoute } from "./types";
 import type { DeviceKind } from "./types";
 import { ONE_DAY_MS, makeInitialDevices, createDevice, backfillDeviceEconomics, MAX_DEVICES, type CreateDeviceOptions } from "./device-types";
 import { pickRandomTask } from "@/mock/tasks";
-import { isDegradable, getEfficiency, getMonthsOwned } from "./device-lifecycle";
+import { isDegradable, getEfficiency, getMonthsOwned, installCanonicalLifecycleConfig } from "./device-lifecycle";
 import { interruptInfo } from "./interrupt";
 import { continuityFactor, thermalFactor, isDeviceOnline } from "@/lib/hashpower";
 import { accountTotalHashrate } from "@/lib/account-hashrate";
@@ -23,6 +23,10 @@ import {
   _devGrantManualRelease as _devGrantManualReleaseLedger,
   type ReleaseOutcome,
 } from "@/store/earning-release";
+// 🔴 合并裁决(本地线 ⟵⟶ 远端线):远端线把 commitWithdrawal 整个删掉、改导入两个原语
+// 却一个都没用 —— 结果是「首提标记 / 收款地址使用登记」两条本地预检输入彻底断流。
+// 本地线保留 commitWithdrawal(它就是那两个原语的组合,见 withdrawal-eligibility),
+// 且改成记到**入口冻结账号**。故这里恢复 commitWithdrawal,去掉那两个从未被使用的导入。
 import { recordAttestation } from "@/store/risk-identity";
 import { commitWithdrawal } from "@/store/withdrawal-eligibility";
 import { advanceArrival, occupiesWithdrawalSlot } from "@/store/withdrawal-arrival-core";
@@ -37,8 +41,33 @@ import {
   readAccountSnapshot,
   type AccountCloudSnapshot,
 } from "./account-cloud";
-import { remoteApiEnabled, withdrawalApi } from "@/api/runtime";
+import {
+  deviceE3Api,
+  fundsSandboxApi,
+  fundsSandboxEnabled,
+  fundsServerEnabled,
+  remoteApiEnabled,
+  sessionVault,
+  taskAssignmentApi,
+  withdrawalApi,
+} from "@/api/runtime";
+import {
+  sandboxEvidenceFromOverview,
+  type FundsSandboxEvidence,
+  type FundsSandboxOrder,
+  type FundsSandboxWallet,
+} from "@/api/funds-sandbox-api";
+import type { CanonicalE3Device } from "@/api/device-e3-api";
+import type { CanonicalTaskAssignment, CanonicalTaskAssignments, TrustedTaskCompletionProof } from "@/api/task-assignment-api";
+import type { UserSession } from "@/api/contracts";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
+import {
+  bindPendingFundsMutationOrder,
+  finishPendingFundsMutationByOrder,
+  fundsAmountFingerprint,
+  pendingFundsMutationKey,
+  type FundsMutationIdentity,
+} from "@/lib/funds-mutation-key";
 
 // Ported from Nexion-prototype/lib/store/index.ts (useApp), zustand → Pinia.
 // MOCK-ONLY: entire earnings simulation runs client-side. Production replaces
@@ -52,6 +81,9 @@ const ONE_DAY = ONE_DAY_MS;
 // ── module-level tick state (mirrors original module scope) ──
 const deviceTimers = new Map<string, { vital: number }>();
 const lastTickAggregate = { usd: 0, nex: 0 };
+let remoteTaskSyncInFlight = false;
+let remoteTaskSyncAfter = 0;
+const REMOTE_TASK_SYNC_MS = 5000;
 
 function normalRandom(mean: number, std: number, min: number, max: number) {
   let u = 0, v = 0;
@@ -209,6 +241,38 @@ function createSeedSnapshot(accountKey: string, email: string, entrySurface: Ent
   };
 }
 
+/**
+ * A server-mode subject must start from an explicit empty projection.  Never
+ * derive this object from account-cloud/localStorage: doing so would retain
+ * withdrawals, reward idempotency keys or another account's merge base while
+ * the authoritative refresh is still in flight (or unavailable).
+ */
+function createServerEmptySnapshot(accountKey: string, email: string, entrySurface: EntrySurface): AccountCloudSnapshot {
+  const emptyUser = createInitialUser(email || accountKey);
+  return {
+    schema: 1,
+    accountKey: normalizeAccountKey(accountKey),
+    entrySurface,
+    updatedAt: 0,
+    user: {
+      ...emptyUser,
+      tier: "L0",
+      joinedAt: 0,
+      cumulativeDepositUsdt: 0,
+      genesisInviteCode: null,
+      referralCode: "",
+      usdtBalance: 0,
+      nexBalance: 0,
+      pendingEarnings: 0,
+      earningBuckets: createEarningBuckets(0, 0),
+      appliedRewardKeys: {},
+    },
+    devices: [],
+    earnings: { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] },
+    withdrawals: [],
+  };
+}
+
 /** PRD §6.11 — the single earnings-accrual path (settle-single-source).
  *  Accrues a device by the WALL-CLOCK Δ since its `lastSettledAt` anchor (NOT by
  *  accumulated tick time), then re-anchors to `now`. Driving accrual off the
@@ -305,13 +369,26 @@ function freezeComputeShareDevice(d: Device): Device {
 
 export const useApp = defineStore("app", () => {
   const bootSurface = getEntrySurface();
-  const bootSnapshot = hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexgrid.ai", bootSurface);
+  const bootSnapshot = remoteApiEnabled
+    ? createServerEmptySnapshot("default", "", bootSurface)
+    : hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexgrid.ai", bootSurface);
   const accountKey = ref(bootSnapshot.accountKey);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
-  const user = ref<UserState>(bootSnapshot.user);
-  const devices = ref<Device[]>(bootSnapshot.devices);
-  const earnings = ref<EarningsState>(bootSnapshot.earnings);
+  const user = ref<UserState>(remoteApiEnabled ? {
+    ...bootSnapshot.user,
+    joinedAt: 0,
+    usdtBalance: 0,
+    nexBalance: 0,
+    pendingEarnings: 0,
+    earningBuckets: createEarningBuckets(0, 0),
+  } : bootSnapshot.user);
+  const devices = ref<Device[]>(remoteApiEnabled ? [] : bootSnapshot.devices);
+  const earnings = ref<EarningsState>(remoteApiEnabled
+    ? { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] }
+    : bootSnapshot.earnings);
+  const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const remoteFleetError = ref("");
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
   //   在线数 = 舰队规模 × 在线率;呼吸带 = ±onlineJitter(只影响视觉,不进任何金额派生)。
   //   配置非法时回退编译期锚 —— 全局条不许因单个参数坏而冻结(异常3 的「单项坏不拖垮」);
@@ -359,7 +436,7 @@ export const useApp = defineStore("app", () => {
    * 此前只存最新一条,第二笔建单会把第一笔整个顶掉 —— 钱已扣、单据不可达、
    * 到账推进也永不再碰它。列表化后并发/跨日的多笔各自独立推进,互不覆盖。
    */
-  const withdrawals = ref<Withdrawal[]>(bootSnapshot.withdrawals ?? []);
+  const withdrawals = ref<Withdrawal[]>(remoteApiEnabled ? [] : bootSnapshot.withdrawals ?? []);
   /**
    * 🔴 在途单(非终态)列表。**列表级的问题必须问它,不能问 latestWithdrawal** ——
    * 独立验收实测:模型改成列表后,三个消费者仍拿「只问最新一条」的老问法去问
@@ -383,6 +460,13 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
+  const fundsSandboxStatus = ref<"idle" | "loading" | "ready" | "error">(fundsSandboxEnabled ? "idle" : "ready");
+  const fundsSandboxError = ref("");
+  // It starts absent and is cleared before every read. A surface can therefore
+  // never label a stale, missing, malformed, or contradictory response as a
+  // sandbox success.
+  const fundsSandboxEvidence = ref<FundsSandboxEvidence | null>(null);
+  let fundsSandboxBootstrapInFlight: { accountKey: string; request: Promise<boolean> } | null = null;
   // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
   const slotDevices = computed(() =>
@@ -460,6 +544,20 @@ export const useApp = defineStore("app", () => {
   reseedDeviceRuntime(devices.value);
 
   function persistAccountSnapshot(): boolean {
+    // 🔴🔴 返回值语义 = 「内存这一拍可以留下吗」,**不是**「有没有写磁盘」
+    // (2026-08-12 双向分叉合并实测出的资金级缺陷,根治而非逐点打补丁)。
+    //
+    // 远端档按设计不落本地盘(状态归服务端)。但本函数有 12 个调用点,清一色是
+    // `if (!persistAccountSnapshot()) { 回滚内存; return false; }` —— 于是同一个 false
+    // 被当成「落盘失败」,把刚写进内存的**服务端结论**整个回滚掉。
+    // 后果(远端档 = 生产档):服务端说这单被拒/已到账,客户端写进去又立刻撤回,
+    // 单据永远停在处理中 → 在途闸永不释放 → 换绑收款地址与下一笔提现被永久拦死,
+    // 账单行永远「处理中」。扣款 / 退款 / 奖励入账三族都会踩同一个碰撞。
+    //
+    // 所以这里返回 true:不落盘是**预期结果**,不是失败,内存该留下。
+    // 真正的落盘失败仍由下面的 result.persisted 如实返回 false(mock 档 storage 抖动)。
+    // 判据:这条不变量由 withdraw-status-mirror-runtime 的「结论落定」格看住。
+    if (remoteApiEnabled) return true;
     const snapshot: AccountCloudSnapshot = {
       schema: 1,
       accountKey: accountKey.value,
@@ -475,8 +573,208 @@ export const useApp = defineStore("app", () => {
     return result.persisted;
   }
 
+  function canonicalKind(device: CanonicalE3Device): DeviceKind {
+    const raw = `${device.productCode} ${device.deviceType}`.toLowerCase();
+    if (raw.includes("phone") || raw.includes("mobile")) return "phone";
+    if (raw.includes("pc-gpu") || raw.includes("compute-share")) return "pc-gpu";
+    if (raw.includes("cloud")) return "cloud-share";
+    if (raw.includes("rack") && raw.includes("p2")) return "stellarrack-p2";
+    if (raw.includes("rack")) return "stellarrack-p1";
+    if (raw.includes("pro-v2") || raw.includes("pro_v2")) return "stellarbox-pro-v2";
+    if (raw.includes("pro")) return "stellarbox-pro";
+    if (raw.includes("s1")) return "stellarbox-s1";
+    throw new Error("E3_DEVICE_KIND_UNSUPPORTED");
+  }
+
+  function canonicalDevice(device: CanonicalE3Device, serverNow: number): Device {
+    const capacity = Math.max(0, Math.min(1, device.capacityPct / 100));
+    const fullDailyUsdt = capacity > 0 ? device.dailyUsdt / capacity : 0;
+    const fullDailyNex = capacity > 0 ? device.dailyNex / capacity : 0;
+    const active = ["ACTIVE", "ONLINE", "BUSY"].includes(device.status);
+    return {
+      id: String(device.id),
+      kind: canonicalKind(device),
+      name: device.name,
+      gpu: device.gpuModel,
+      gpuModel: device.gpuModel,
+      vramTotal: device.vramTotalGb,
+      basePower: device.basePowerW,
+      baseRate: fullDailyUsdt,
+      baseRateNEX: fullDailyNex,
+      purchasedAt: device.purchasedAt ?? serverNow,
+      activatedAt: active ? (device.activatedAt ?? serverNow) : null,
+      lastSettledAt: null,
+      onlineHeartbeatAt: null,
+      status: active ? "online" : "offline",
+      gpuUsage: 0,
+      gpuTemp: 0,
+      gpuPower: 0,
+      vramUsed: 0,
+      currentTask: null,
+      recentTasks: [],
+      taskLockUntil: null,
+      todayEarnings: 0,
+      todayEarningsNEX: 0,
+      cumulativeEarningsUsdt: device.cumulativeOutputUsdt,
+      paidPriceUsdt: device.actualPaidUsdt,
+      location: device.location,
+      pausedReason: null,
+    };
+  }
+
+  function remoteTask(task: CanonicalTaskAssignment, location: string): CurrentTask {
+    return {
+      id: task.taskNo,
+      category: task.taskClass,
+      type: task.taskName,
+      model: task.model,
+      client: task.client,
+      location,
+      totalSec: task.requiredSeconds,
+      startedAt: task.startedAt,
+      reward: task.rewardUsdt,
+    };
+  }
+
+  function applyRemoteAssignments(base: Device[], state: CanonicalTaskAssignments): Device[] {
+    const byDevice = new Map(state.devices.map((entry) => [String(entry.deviceId), entry]));
+    return base.map((device) => {
+      const authority = byDevice.get(device.id);
+      if (!authority) return { ...device, currentTask: null, recentTasks: [], taskLockUntil: null };
+      return {
+        ...device,
+        taskLockUntil: authority.lockUntil,
+        currentTask: authority.currentTask ? remoteTask(authority.currentTask, device.location ?? "") : null,
+        recentTasks: authority.recentTasks.map((entry) => ({
+          ...remoteTask(entry, device.location ?? ""),
+          completedAt: entry.completedAt ?? entry.completableAt,
+        })),
+      };
+    });
+  }
+
+  async function trustedTaskProof(task: CanonicalTaskAssignment): Promise<TrustedTaskCompletionProof> {
+    const provider = (globalThis as typeof globalThis & {
+      __NEXION_TRUSTED_TASK_PROOF__?: (challenge: {
+        taskNo: string; deviceId: number; proofNonce: string; proofExpiresAt: number;
+      }) => Promise<TrustedTaskCompletionProof>;
+    }).__NEXION_TRUSTED_TASK_PROOF__;
+    if (!provider || !task.proofNonce || !task.proofExpiresAt) {
+      throw new Error("TASK_ASSIGNMENT_TRUSTED_EXECUTOR_UNAVAILABLE");
+    }
+    return provider({ taskNo: task.taskNo, deviceId: task.deviceId,
+      proofNonce: task.proofNonce, proofExpiresAt: task.proofExpiresAt });
+  }
+
+  function taskMutationKey(scope: string): string {
+    return `e18:${scope}:${Math.floor(Date.now() / 60000)}`;
+  }
+
+  async function syncRemoteTaskAssignments(): Promise<void> {
+    const calledAt = Date.now();
+    if (!remoteApiEnabled || miningPaused.value || remoteTaskSyncInFlight || calledAt < remoteTaskSyncAfter) return;
+    remoteTaskSyncInFlight = true;
+    remoteTaskSyncAfter = calledAt + REMOTE_TASK_SYNC_MS;
+    try {
+      let state = await taskAssignmentApi.state();
+      devices.value = applyRemoteAssignments(devices.value, state);
+      for (const device of devices.value) {
+        const authority = state.devices.find((entry) => String(entry.deviceId) === device.id);
+        if (!authority || device.status !== "online" || device.activatedAt == null) continue;
+        if (authority.currentTask && authority.currentTask.completableAt <= state.serverNow) {
+          const proof = await trustedTaskProof(authority.currentTask);
+          await taskAssignmentApi.complete(authority.currentTask.taskNo, proof,
+            taskMutationKey(`complete:${authority.currentTask.taskNo}`));
+        } else if (!authority.currentTask && (authority.lockUntil == null || authority.lockUntil <= state.serverNow)) {
+          await taskAssignmentApi.claim(authority.deviceId, taskMutationKey(`claim:${authority.deviceId}`));
+        }
+      }
+      await refreshRemoteFleet();
+    } catch (cause) {
+      remoteFleetStatus.value = "error";
+      remoteFleetError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
+    } finally {
+      remoteTaskSyncInFlight = false;
+    }
+  }
+
+  async function refreshRemoteFleet(): Promise<void> {
+    if (!remoteApiEnabled) return;
+    const expectedAccountKey = accountKey.value;
+    remoteFleetStatus.value = "loading";
+    remoteFleetError.value = "";
+    try {
+      const [fleet, assignmentState] = await Promise.all([deviceE3Api.fleet(), taskAssignmentApi.state()]);
+      if (expectedAccountKey !== accountKey.value) throw new Error("REMOTE_ACCOUNT_CHANGED");
+      installCanonicalLifecycleConfig(fleet.capacitySchedule);
+      const nextDevices = applyRemoteAssignments(
+        fleet.devices.map((device) => canonicalDevice(device, fleet.serverNow)), assignmentState);
+      devices.value = nextDevices;
+      syncDeviceRuntime(nextDevices, true);
+      user.value = {
+        ...user.value,
+        joinedAt: fleet.userJoinedAt,
+        nexBalance: fleet.walletNex,
+        pendingEarnings: 0,
+        ...(fundsSandboxEnabled ? {} : {
+          usdtBalance: fleet.walletUsdt,
+          earningBuckets: createEarningBuckets(fleet.walletUsdt, fleet.userJoinedAt),
+        }),
+      };
+      earnings.value = {
+        today: 0,
+        todayNEX: 0,
+        thisWeek: 0,
+        thisMonth: 0,
+        total: 0,
+        history: [],
+      };
+      remoteFleetStatus.value = "ready";
+    } catch (cause) {
+      if (expectedAccountKey === accountKey.value) {
+        devices.value = [];
+        syncDeviceRuntime([], true);
+        user.value = {
+          ...user.value,
+          joinedAt: 0,
+          nexBalance: 0,
+          pendingEarnings: 0,
+          ...(fundsSandboxEnabled ? {} : {
+            usdtBalance: 0,
+            earningBuckets: createEarningBuckets(0, 0),
+          }),
+        };
+        earnings.value = { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] };
+        remoteFleetStatus.value = "error";
+        remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+      }
+      throw cause;
+    }
+  }
+
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
     const key = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      const emptySnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
+      accountKey.value = emptySnapshot.accountKey;
+      entrySurface.value = emptySnapshot.entrySurface;
+      miningPaused.value = false;
+      adoptAccountSnapshot(emptySnapshot, true);
+      withdrawals.value = [];
+      lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
+      remoteFleetStatus.value = "idle";
+      remoteFleetError.value = "";
+      fundsSandboxStatus.value = fundsSandboxEnabled ? "idle" : "ready";
+      fundsSandboxError.value = "";
+      fundsSandboxEvidence.value = null;
+      void refreshRemoteFleet().catch((cause) => {
+        if (key === accountKey.value && !remoteFleetError.value) {
+          remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
+        }
+      });
+      if (fundsSandboxEnabled) void refreshFundsSandboxForAccount(key);
+      return;
+    }
     const snapshot = hydrateSnapshotEconomics(readAccountSnapshot(key)) ?? createSeedSnapshot(key, rawAccountKey, surface);
     accountKey.value = snapshot.accountKey;
     entrySurface.value = surface;
@@ -491,7 +789,10 @@ export const useApp = defineStore("app", () => {
   }
 
   function tick(deltaMs: number) {
-    if (remoteApiEnabled) return;
+    if (remoteApiEnabled) {
+      void syncRemoteTaskAssignments();
+      return;
+    }
     // ── Global platform stats jitter ──
     // Runs even while the personal session is paused — platform-wide figures
     // must not freeze on an individual's mining state. Symmetric BOUNDED
@@ -950,6 +1251,22 @@ export const useApp = defineStore("app", () => {
    * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
    */
   function refundFailedWithdrawals(): string[] {
+    // 🔴🔴 合并裁决(资金安全级,这一条不改就是「扣了不退」)。
+    // ⚠️ 本段刻意**不写出**远端线那道闸的代码原文 —— 写出来会让按串匹配的哨兵匹到注释而假绿
+    //    (本仓家法:资金路径上的判据必须剥注释再判)。
+    // 远端线在这里早退的判据是 fundsServerEnabled,而它 ≡ remoteApiEnabled
+    // (两者都是 mode !== "mock",见 api/runtime.ts)—— 提现单**只在**远端模式下建得出来,
+    // 于是那道闸让退款在唯一会产生提现的模式里恒为 no-op。
+    // 它在远端线自己的世界里是对的:那边客户端一分钱都不扣。但本地线把扣款接了回来
+    // (applyWithdrawalDebit),两条腿必须同模式同时有效 —— 只留扣款不留退款 =
+    // 服务端每拒一单,用户的钱就凭空烧掉一笔。
+    // 保留的是它真正想守的那一半:**服务端持有余额的那条轨不许客户端本地退**。
+    // 那条轨是 sandbox(refreshFundsSandbox / adoptFundsSandboxWallet 会把钱包整体
+    // 按服务端值重投影,本地再退一次就是双计);普通 remote 轨全仓没有余额端点,
+    // 余额的唯一持有者就是本 store,退款必须留在这里。
+    // 另:远端线那句「不许用本地奖励桶退款」原样有效 —— NEX 那条腿走
+    // creditRewardBucketOnce,它自身的 fundsServerEnabled / remoteApiEnabled 双闸未动。
+    if (fundsSandboxEnabled) return [];
     const FAILED: Withdrawal["status"][] = ["review-rejected", "address-invalid", "tx-failed", "refunded"];
     const done: string[] = [];
     for (const wd of withdrawals.value) {
@@ -994,6 +1311,11 @@ export const useApp = defineStore("app", () => {
    * PRODUCTION:整个函数消失 —— 扣款由 `POST /api/withdrawals` 同事务完成,client 只读回执。
    */
   function applyWithdrawalDebit(wd: Withdrawal): boolean {
+    // 🔴 sandbox 轨的钱包由服务端持有:建单响应里的 `order.wallet` 已经是**扣完之后**的余额,
+    // 且 adoptFundsSandboxWallet 已经把它整体投影进来。这里再扣一次就是双计。
+    // 回 true 而不是 false:钱确实动了(在服务端),调用方不该弹「扣款失败」。
+    // 与 refundFailedWithdrawals 的 sandbox 闸成对 —— 那条轨扣与退都归服务端。
+    if (fundsSandboxEnabled) return true;
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
     const key = "wd-debit:" + wd.id;
@@ -1304,6 +1626,7 @@ export const useApp = defineStore("app", () => {
   }
 
   function recordDeposit(amount: number): boolean {
+    if (fundsServerEnabled) return false;
     // Input validation mirrors source: reject NaN/±Infinity/≤0/absurd (>1e9).
     if (!Number.isFinite(amount) || amount <= 0 || amount > 1e9) return false;
     // 落盘结果必须接:此前丢弃返回值无条件 return true,调用方(三条入金轨的 settle)
@@ -1336,6 +1659,7 @@ export const useApp = defineStore("app", () => {
    * in the same account-cloud snapshot, so replay after a crash is a no-op.
    */
   function creditRewardBucketOnce(idempotencyKey: string, route: EarningBucketRoute, usdt: number, nex = 0): boolean {
+    if (fundsServerEnabled) return false;
     const key = idempotencyKey.trim();
     if (!key) return false;
     return creditRewardBucketInternal(route, usdt, nex, key);
@@ -1380,10 +1704,15 @@ export const useApp = defineStore("app", () => {
       nextBuckets.bonusLockedUsdt = +(nextBuckets.bonusLockedUsdt + usdt).toFixed(2);
       nextBuckets.lockedNex = +(nextBuckets.lockedNex + nex).toFixed(2);
     }
-    // R1 台账现由服务端持有,客户端 appendLedgerEntry 是恒 false 的过渡空壳 ——
-    // 与 settle 路径同形 fire-and-forget,不得再拿它的返回值判死:
-    // 否则 mock 模式下 held 两路由的入桶(风控标记账号的赠金/奖励)无条件失败
-    // (z1 判决包 B8,register 重试链实锤)。
+    // R1 台账现由服务端持有,客户端 appendLedgerEntry 是恒 false 的过渡空壳
+    // (earning-release.ts 里就是一行 `return false`)—— 与 settle 路径同形 fire-and-forget,
+    // 🔴 不得再拿它的返回值判死:否则 mock 模式下 held 两路由的入桶(风控标记账号的赠金/奖励)
+    // 无条件失败(z1 判决包 B8,register 重试链实锤)。
+    //
+    // 🔴 合并裁决:远端线把这里改回了「拿返回值判死」,并附理由「非可提的赠金也必须记台账分录,
+    // 否则释放引擎(attest/manual)永远放不出它」。理由本身成立,但那个改法达不到它 ——
+    // 空壳恒 false,判死只会把入桶整个打掉,分录一条也不会多。真正的解法是服务端把分录写进
+    // 释放引擎(已在后端交接书里),客户端这层在空壳期只能 fire-and-forget。
     if (route === "pending_review" || route === "bonus_locked") {
       appendLedgerEntry(accountKey.value,
         evaluateAccountCluster(accountKey.value).clusterId,
@@ -1402,6 +1731,138 @@ export const useApp = defineStore("app", () => {
   }
 
   // D5: create the withdrawal exclusively through the real backend transaction.
+  function adoptFundsSandboxWallet(wallet: FundsSandboxWallet): void {
+    const current = withDefaultEarningBuckets(user.value);
+    user.value = {
+      ...current,
+      usdtBalance: wallet.availableUsdt,
+      earningBuckets: {
+        ...current.earningBuckets,
+        withdrawableUsdt: wallet.availableUsdt,
+        policyVersion: "funds-sandbox-v1",
+        lastBucketedAt: Date.now(),
+      },
+    };
+  }
+
+  /** Server auth is the only source for this display identity in remote modes. */
+  function projectServerIdentity(identity: UserSession) {
+    if (!remoteApiEnabled) return;
+    user.value = { ...user.value, email: `${identity.countryCode}${identity.phone}` };
+  }
+
+  function canonicalFundsSandboxWithdrawal(order: FundsSandboxOrder, fallback?: Withdrawal): Withdrawal {
+    if (order.kind !== "WITHDRAWAL" || !order.targetAddress) throw new Error("FUNDS_SANDBOX_ORDER_INVALID");
+    const submittedAt = Date.parse(order.createdAt);
+    const status: Withdrawal["status"] = order.status === "CONFIRMED"
+      ? "confirmed"
+      : order.status === "FAILED"
+        ? "tx-failed"
+        : "submitted";
+    return {
+      id: order.orderNo,
+      amount: order.amount,
+      network: "USDT-BEP20",
+      address: order.targetAddress,
+      fee: fallback?.fee ?? { networkConfirmUsd: 0, nexBurned: 0, actualFeeUsd: 0 },
+      status,
+      riskRoute: fallback?.riskRoute ?? "pass",
+      riskReasons: fallback?.riskReasons ?? [],
+      submittedAt,
+      // Informational only. Server modes are guarded from ETA-based finalization below.
+      estimatedCompletion: submittedAt,
+      ...(order.settledAt && status === "confirmed" ? { confirmedAt: Date.parse(order.settledAt) } : {}),
+      serverVersion: order.version,
+      source: "mock",
+      sourceEnvironment: "SANDBOX",
+    };
+  }
+
+  async function refreshFundsSandbox(): Promise<void> {
+    if (!fundsSandboxEnabled) {
+      fundsSandboxEvidence.value = null;
+      return;
+    }
+    const expectedAccountKey = accountKey.value;
+    fundsSandboxStatus.value = "loading";
+    fundsSandboxError.value = "";
+    fundsSandboxEvidence.value = null;
+    try {
+      const overview = await fundsSandboxApi.overview();
+      if (expectedAccountKey !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+      adoptFundsSandboxWallet(overview.wallet);
+      const existing = new Map(withdrawals.value.map((item) => [item.id, item]));
+      withdrawals.value = overview.orders
+        .filter((item) => item.kind === "WITHDRAWAL")
+        .map((item) => canonicalFundsSandboxWithdrawal(item, existing.get(item.orderNo)));
+      overview.orders
+        .filter((item) => item.kind === "WITHDRAWAL" && (item.status === "CONFIRMED" || item.status === "FAILED"))
+        .forEach((item) => finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", item.orderNo));
+      fundsSandboxEvidence.value = sandboxEvidenceFromOverview(overview);
+      fundsSandboxStatus.value = "ready";
+    } catch (cause) {
+      if (expectedAccountKey === accountKey.value) {
+        const current = withDefaultEarningBuckets(user.value);
+        user.value = {
+          ...current,
+          usdtBalance: 0,
+          earningBuckets: { ...current.earningBuckets, withdrawableUsdt: 0 },
+        };
+        withdrawals.value = [];
+        fundsSandboxStatus.value = "error";
+        fundsSandboxError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_REFRESH_FAILED";
+        fundsSandboxEvidence.value = null;
+      }
+      throw cause;
+    }
+  }
+
+  /**
+   * Login and H5 bootstrap call this after binding an account. It is purposely
+   * stricter than the API client default: a sandbox read only starts when the
+   * current server session belongs to that account and carries a Bearer token.
+   * This prevents a fresh context from briefly presenting local/zero money as
+   * a successful sandbox while its authenticated wallet authority was never
+   * actually queried.
+   */
+  function refreshFundsSandboxForAccount(rawAccountKey: string): Promise<boolean> {
+    const expectedAccountKey = normalizeAccountKey(rawAccountKey);
+    if (!fundsSandboxEnabled) {
+      fundsSandboxEvidence.value = null;
+      return Promise.resolve(false);
+    }
+    if (fundsSandboxBootstrapInFlight?.accountKey === expectedAccountKey) {
+      return fundsSandboxBootstrapInFlight.request;
+    }
+    const request = (async () => {
+      const session = sessionVault.read();
+      const sessionMatchesAccount = !!session
+        && session.accessToken.trim().length > 0
+        && session.tokenType.toLowerCase() === "bearer"
+        && `user:${session.user.userId}` === expectedAccountKey;
+      if (!sessionMatchesAccount || expectedAccountKey !== accountKey.value) {
+        if (expectedAccountKey === accountKey.value) {
+          fundsSandboxStatus.value = "error";
+          fundsSandboxError.value = "FUNDS_SANDBOX_BEARER_SESSION_REQUIRED";
+          fundsSandboxEvidence.value = null;
+        }
+        return false;
+      }
+      try {
+        await refreshFundsSandbox();
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+    const slot = { accountKey: expectedAccountKey, request };
+    fundsSandboxBootstrapInFlight = slot;
+    void request.finally(() => {
+      if (fundsSandboxBootstrapInFlight === slot) fundsSandboxBootstrapInFlight = null;
+    });
+    return request;
+  }
+
   async function submitWithdrawal(
     amount: number,
     network: Withdrawal["network"],
@@ -1409,6 +1870,12 @@ export const useApp = defineStore("app", () => {
     fee: WithdrawalFeeSnapshot,
     offsetWithNex: boolean,
     policyVersion: string,
+    // 🔴 幂等键由**调用方**传入,不在这里现造(合并裁决,资金安全级)。
+    // 远端线把这个参数删了、改在函数内用 lib/funds-mutation-key 的生产侧工厂现造一把 ——
+    // 那个工厂每调一次就 randomUUID 一次,于是「超时重试」在服务端眼里是一次**全新请求**,
+    // 第二笔真出账。页面按「一笔提现意图」只 mint 一次并跨重试复用
+    // (wallet-withdraw.vue `currentIdempotencyKey`),只有拿到确定性结局才换键。
+    // 沙箱轨例外:走远端线的持久注册表(见下方 `mutation`),它跨重载/跨标签页更强。
     idempotencyKey: string,
     riskRoute: WithdrawalRiskRoute = "pass",
     riskReasons: string[] = [],
@@ -1422,11 +1889,6 @@ export const useApp = defineStore("app", () => {
     // 按 id 反查 —— 而那个列表会被 bindAccount 整体换掉,换号那一刻正好查空。
     // 🔴 不返回 null:拒单路径全在服务端,失败一律**抛** ApiError 冒泡给页面分诊。
   ): Promise<Withdrawal> {
-    // D5 real boundary: the backend re-prices the request under policyVersion and
-    // commits wallet reservation, optional NEX burn, order and ledgers atomically.
-    // The local store only mirrors the returned order for rendering; it never
-    // debits balances or chooses a fee bucket.
-    //
     // 🔴 入口冻结账号(z4 R1 独立审计 P0)。本函数跨一个最长 30s 的 await,期间跨标签页
     // 登出 / 运营吊销 / 重新登录都会 `bindAccount`,把 `accountKey.value` 与
     // `withdrawals.value` 整体换成**另一个账号**的。原来 await 之后仍读活值,于是:
@@ -1435,6 +1897,69 @@ export const useApp = defineStore("app", () => {
     // 有扣款无单据,追踪页深链「查无此单」。
     // 页面侧的账单行早已钉死 `snap.account`,只钉一半反而更糟:账与单分家,对账永远配不上。
     const acct = accountKey.value;
+    // Durable pending mutation keys belong only to the isolated server sandbox.
+    // 生产轨的幂等键由调用方传入(见参数头注),不在这里现造。
+    const mutation: FundsMutationIdentity | null = fundsSandboxEnabled ? {
+      accountKey: acct,
+      environment: "SANDBOX",
+      method: `WITHDRAWAL:${network}`,
+      fingerprint: JSON.stringify({
+        channel: "CREGIS_USDT_BEP20",
+        amount: fundsAmountFingerprint(amount),
+        targetAddress: address.trim(),
+      }),
+    } : null;
+    if (fundsSandboxEnabled) {
+      if (!mutation) throw new Error("FUNDS_SANDBOX_MUTATION_IDENTITY_MISSING");
+      const sandboxKey = pendingFundsMutationKey(mutation);
+      // A sandbox withdrawal is only possible after the *same* authenticated
+      // wallet read supplied an explicit isolated policy. Never borrow a
+      // production D5/J1 rule, a local seed, or a stale wallet value here.
+      const sandboxPolicy = fundsSandboxEvidence.value?.withdrawalPolicy;
+      if (!sandboxPolicy
+          || fundsSandboxStatus.value !== "ready"
+          || fundsSandboxEvidence.value?.source !== "mock"
+          || fundsSandboxEvidence.value?.sourceEnvironment !== "SANDBOX"
+          || fundsSandboxEvidence.value?.mode !== "LOCAL_SANDBOX") {
+        throw new Error("FUNDS_SANDBOX_WITHDRAWAL_POLICY_REQUIRED");
+      }
+      if (network !== sandboxPolicy.network
+          || sandboxPolicy.channel !== "CREGIS_USDT_BEP20"
+          || sandboxPolicy.withdrawalEnabled !== true
+          || sandboxPolicy.enabledNetworks.length !== 1
+          || sandboxPolicy.enabledNetworks[0] !== network) {
+        throw new Error("FUNDS_SANDBOX_WITHDRAWAL_CHANNEL_DISABLED");
+      }
+      const sandboxAvailable = user.value.usdtBalance * sandboxPolicy.balanceMaxRatio;
+      if (amount < sandboxPolicy.minAmount || amount > sandboxAvailable) {
+        throw new Error("FUNDS_SANDBOX_INSUFFICIENT_BALANCE");
+      }
+      const order = await fundsSandboxApi.createWithdrawal(amount, address, sandboxKey);
+      if (acct !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+      if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
+      bindPendingFundsMutationOrder(mutation, sandboxKey, order.orderNo);
+      adoptFundsSandboxWallet(order.wallet);
+      const canonical = canonicalFundsSandboxWithdrawal(order, {
+        id: order.orderNo,
+        amount,
+        network,
+        address,
+        fee,
+        status: "submitted",
+        riskRoute,
+        riskReasons,
+        fastLaneApplied,
+        waivedGates,
+        submittedAt: Date.parse(order.createdAt),
+        estimatedCompletion: Date.parse(order.createdAt),
+      });
+      withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
+      return canonical;
+    }
+    // D5 real boundary: the backend re-prices the request under policyVersion and
+    // commits wallet reservation, optional NEX burn, order and ledgers atomically.
+    // The local store only mirrors the returned order for rendering; it never
+    // debits balances or chooses a fee bucket.
     const submission = await withdrawalApi.submit(
       amount,
       network,
@@ -1447,6 +1972,12 @@ export const useApp = defineStore("app", () => {
     // 🔴 换号了:这一单属于 acct,当前绑定的是别人。直接写进**冻结账号**的那一行,
     // 内存(现在装的是新账号的视图)一个字都不碰 —— 与 bills.addManyForAccountOnce 同一条纪律。
     // 落盘成败都要把单交还调用方:服务端已经建单,吞掉它 = 旧账号有扣款无凭证。
+    //
+    // 🔴 合并裁决:远端线在 await 之后直接 `throw REMOTE_ACCOUNT_CHANGED`,已按本分支取代。
+    // 两边同样冻结账号、同样拒绝把单写进新账号的内存(隔离意图一致),但抛的那条把
+    // **服务端已经建好、已经扣过钱的单据**整个丢掉 —— 页面 catch 到的是一次失败,
+    // 账单不写、追踪页查不到,用户只剩「钱少了、什么都没有」。本分支把单落到冻结账号并
+    // 交还调用方(页面据此写 snap.account 的账单行并提示「已提交到另一账号」)。
     if (accountKey.value !== acct) {
       const stored = readAccountSnapshot(acct);
       // 🔴 诚实边界:冻结账号在盘上**没有行**时(它从没落过盘)这一单写不进去,
@@ -1529,12 +2060,16 @@ export const useApp = defineStore("app", () => {
    * (独立验收实测:到账那笔账单永远处理中,还在处理的那笔反被标成已入账)。
    */
   function advanceWithdrawalArrival(): string[] {
+    if (fundsServerEnabled) return [];
     // 🔴 全表扫:每一笔各自到点各自推进。单条版只看最新一笔,
     // 前面那笔到点了也永远推不动(列表化后这个洞自动消失)。
     const now = mockServerNow();
     const prev = withdrawals.value;
-    // 🔴 远端模式交给 advanceArrival 自己拒绝(必填 ctx),不在这里 early-return:
-    // 判据留在纯函数里,才有一个能 node 直跑的落点(见 remote-authority-simulation.test.mjs)。
+    // 🔴 远端模式的**真判据**在 advanceArrival 里(必填 ctx):判据留在纯函数里,才有一个
+    // 能 node 直跑的落点(见 remote-authority-simulation.test.mjs)。上面那行
+    // `if (fundsServerEnabled) return []` 是远端线加的第二道同向闸(fundsServerEnabled ≡
+    // remoteApiEnabled),行为完全重合,保留它只是为了让「客户端 ETA 永不推进服务端单据」
+    // 这件事在函数入口就一眼可见(funds-server-sandbox-contract 也钉了它)。
     const next = prev.map((w) => advanceArrival(w, now, { serverAuthoritative: remoteApiEnabled }) ?? w);
     const advancedIds = next.filter((w, i) => w !== prev[i]).map((w) => w.id);
     if (!advancedIds.length) return [];
@@ -1633,9 +2168,10 @@ export const useApp = defineStore("app", () => {
   // 状态;manual/delay/freeze 的状态推进属于服务端/人工处置,client 永不推进。
   // PRODUCTION: status comes from server webhook/SSE/polling only.
   function _devAdvanceWithdrawal() {
-    if (import.meta.env.PROD) return; // demo-only 状态推进,store 层二层 guard(硬规则5)
+    if (import.meta.env.PROD || fundsServerEnabled) return; // demo-only 状态推进,store 层二层 guard(硬规则5)
     // 🔴 PROD 构建 ≠ 远端模式:remote 是默认档(runtime-config.ts),dev 构建里这个
-    // demo 驱动照样在线,一按就把服务端单据在本地改成已到账。两条闸各挡一面。
+    // demo 驱动照样在线,一按就把服务端单据在本地改成已到账。三条闸各挡一面
+    // (PROD 构建 / 服务端资金轨 / 远端 API 模式)。
     if (remoteApiEnabled) return;
     const wd = latestWithdrawal.value;
     if (!wd) return;
@@ -1660,15 +2196,36 @@ export const useApp = defineStore("app", () => {
     persistAccountSnapshot();
   }
 
+  async function applyFundsSandboxCallback(orderNo: string, status: "CONFIRMED" | "FAILED"): Promise<boolean> {
+    if (!fundsSandboxEnabled) return false;
+    const expectedAccountKey = accountKey.value;
+    const current = withdrawals.value.find((item) => item.id === orderNo);
+    if (!current || current.serverVersion === undefined || current.status !== "submitted") return false;
+    const eventId = `SBX-APP-${orderNo}-${status}`;
+    const order = await fundsSandboxApi.applyCallback(orderNo, status, current.serverVersion, eventId);
+    if (expectedAccountKey !== accountKey.value) throw new Error("FUNDS_SANDBOX_ACCOUNT_CHANGED");
+    if (!order.wallet) throw new Error("FUNDS_SANDBOX_WALLET_MISSING");
+    adoptFundsSandboxWallet(order.wallet);
+    const canonical = canonicalFundsSandboxWithdrawal(order, current);
+    withdrawals.value = withdrawals.value.map((item) => item.id === orderNo ? canonical : item);
+    if (order.status === "CONFIRMED" || order.status === "FAILED") {
+      finishPendingFundsMutationByOrder(expectedAccountKey, "SANDBOX", orderNo);
+    }
+    return true;
+  }
+
   return {
     accountKey, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
+    remoteFleetStatus, remoteFleetError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
-    bindAccount, persistAccountSnapshot,
+    bindAccount, projectServerIdentity, persistAccountSnapshot, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
+    fundsSandboxStatus, fundsSandboxError, fundsSandboxEvidence,
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refundFailedWithdrawals,
+    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals,
+    applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };

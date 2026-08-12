@@ -11,6 +11,7 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.wallet.addFunds" :subtitle="t.wallet.topUp" />
+      <FundsSandboxBadge />
 
       <!-- 🔴 远端模式:整页停摆,一个收款目标都不渲染。
            两条轨是**链外真实付款**入口 —— 链上轨给的专属地址由 deriveDepositAddress
@@ -33,7 +34,7 @@
           :key="s.id"
           :class="['flex-1 grid place-items-center active:opacity-70', `nx-topup-seg-${s.id}`]"
           :style="segPillStyle(s.id)"
-          role="tab"
+          role="tab" tabindex="0"
           :aria-selected="seg === s.id"
           @click="seg = s.id"
         >
@@ -60,6 +61,7 @@ import { ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import TopupCardForm from "@/components/me/topup-card-form.vue";
 import DepositUsdtPane from "@/components/me/deposit-usdt-pane.vue";
 import DepositBankPane from "@/components/me/deposit-bank-pane.vue";

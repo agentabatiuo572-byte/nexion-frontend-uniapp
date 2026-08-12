@@ -10,6 +10,8 @@ import {
 import { janusApi, remoteApiEnabled, sessionVault } from "@/api/runtime";
 import { getDeviceIdentity } from "@/lib/device-id";
 import { applyJanusRuntime, type JanusRuntimeState } from "./janus-runtime";
+import { JANUS_RUNTIME_KEY } from "./janus-runtime";
+import { createJanusExecutor } from "./janus-sandbox-executor";
 
 const REPORT_KEY = "nexgrid-janus-pending-report-v2";
 const ACK_KEY = "nexgrid-janus-pending-ack-v2";
@@ -17,6 +19,34 @@ const COUNTERS_KEY = "nexgrid-janus-counters-v2";
 const JANUS_SYNC_MS = 60_000;
 const STATUS_SET = new Set<string>(JANUS_STATUSES);
 const DEVICE_APP_VERSION = "NX1.0-UniApp";
+
+/**
+ * The UniApp H5 bundle is a remote user interface, not a Janus device
+ * executor. It has no device-bound claim signer, so posting a report would
+ * inevitably fail the server's executor-claim contract. Keep that limitation
+ * explicit for any surface that wants to render the runtime state.
+ */
+export type JanusSyncAvailability =
+  | { state: "READY" }
+  | { state: "HOLD"; code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
+
+function janusSyncAvailability(): JanusSyncAvailability {
+  // The native Janus shell owns device identity and executor claims. H5 may
+  // display account state, but must never impersonate that executor.
+  try {
+    if (String(uni.getSystemInfoSync().uniPlatform || "").toLowerCase() === "web") {
+      return { state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
+    }
+  } catch {
+    // A host without the UniApp runtime cannot prove it owns a native executor.
+    return { state: "HOLD", code: "JANUS_NATIVE_EXECUTOR_REQUIRED" };
+  }
+  return { state: "READY" };
+}
+
+export function currentJanusSyncAvailability(): JanusSyncAvailability {
+  return janusSyncAvailability();
+}
 
 interface KeyValueStore {
   get(key: string): unknown;
@@ -98,6 +128,11 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
         actualTargetCatalogVersion: reset ? 0 : applied.remoteTargetCatalogVersion,
         deviceAppliedVersion: applied.commandVersion,
         handoffReceipt: applied.handoffReceipt,
+        proofMode: applied.proofMode,
+        executorId: applied.executorId,
+        proofNonce: applied.proofNonce,
+        proofTimestamp: applied.proofTimestamp,
+        proofSignature: applied.proofSignature,
         reconciliationId: command.reconciliationId,
       }, signal);
       return;
@@ -112,7 +147,7 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
           deviceAppVersion: DEVICE_APP_VERSION,
           appliedAt: options.now(),
         }, signal);
-        await progress({ ...base, phase: "REVOKED", actualTargetId: "none", actualTargetVersion: 0, actualTargetCatalogVersion: 0, deviceAppliedVersion: command.commandVersion, handoffReceipt: applied.handoffReceipt }, signal);
+        await progress({ ...base, phase: "REVOKED", actualTargetId: "none", actualTargetVersion: 0, actualTargetCatalogVersion: 0, deviceAppliedVersion: command.commandVersion, handoffReceipt: applied.handoffReceipt, proofMode: applied.proofMode, executorId: applied.executorId, proofNonce: applied.proofNonce, proofTimestamp: applied.proofTimestamp, proofSignature: applied.proofSignature }, signal);
       } catch (error) {
         if (isJanusSyncCancelled(error, signal)) throw error;
         await progress({
@@ -152,6 +187,11 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
         actualTargetCatalogVersion: command.remoteTargetCatalogVersion,
         deviceAppliedVersion: command.commandVersion,
         handoffReceipt: applied.handoffReceipt,
+        proofMode: applied.proofMode,
+        executorId: applied.executorId,
+        proofNonce: applied.proofNonce,
+        proofTimestamp: applied.proofTimestamp,
+        proofSignature: applied.proofSignature,
       }, signal);
     } catch (error) {
       if (isJanusSyncCancelled(error, signal)) throw error;
@@ -238,12 +278,28 @@ export function createJanusCoordinator(options: CoordinatorOptions) {
         }
         throw error;
       }
+      const applied = (options.storage.get("nexgrid-janus-runtime-v2") || {}) as Partial<JanusRuntimeState>;
       await acknowledge({
         deviceId: report.deviceId,
         revision: command.revision,
         success: true,
         appliedStatus: command.desiredStatus,
         message: "applied",
+        handoffReceipt: applied.handoffReceipt,
+        deviceAppliedVersion: command.revision,
+        deviceAppVersion: DEVICE_APP_VERSION,
+        // 🔴 没有实际目标就**不报这个字段**,不要填 "none"(2026-08-12 合并收口):
+        // 后台 K6 拿 actualTargetId 与「批准目标」逐字比对来报「目标不一致 / 对账未完成」,
+        // 填一个伪值会让它把「设备没报」误判成「设备报了个叫 none 的目标」;契约本身
+        // (janus-api.ts actualTargetId?: string)就允许缺省。门:hard-block-k6。
+        actualTargetId: applied.remoteUrlKey || undefined,
+        actualTargetVersion: applied.remoteTargetVersion || 0,
+        actualTargetCatalogVersion: applied.remoteTargetCatalogVersion || 0,
+        proofMode: applied.proofMode,
+        executorId: applied.executorId,
+        proofNonce: applied.proofNonce,
+        proofTimestamp: applied.proofTimestamp,
+        proofSignature: applied.proofSignature,
       }, signal);
       return;
     }
@@ -392,11 +448,42 @@ export function buildJanusReport(now = Date.now()): JanusReport {
   };
 }
 
+const sandboxEnabled = import.meta.env.DEV && import.meta.env.VITE_JANUS_EXECUTOR_MODE === "sandbox";
+const sandboxExecutor = sandboxEnabled ? createJanusExecutor({
+  mode: "sandbox",
+  production: import.meta.env.PROD,
+  allowedSubjects: String(import.meta.env.VITE_JANUS_SANDBOX_SUBJECTS || "").split(","),
+  allowedTargetKeys: String(import.meta.env.VITE_JANUS_SANDBOX_TARGETS || "").split(","),
+  sandboxToken: String(import.meta.env.VITE_JANUS_SANDBOX_TOKEN || ""),
+  now: Date.now,
+}) : null;
+
+async function applyConfiguredJanusRuntime(state: JanusRuntimeState, signal?: AbortSignal): Promise<JanusRuntimeState> {
+  if (!sandboxExecutor) return applyJanusRuntime(state, undefined, signal);
+  const subject = String(sessionVault.read()?.user.userId || "");
+  const targetKey = state.remoteUrlKey || "none";
+  const evidence = await sandboxExecutor.apply({
+    subject,
+    targetKey,
+    targetUrl: state.remoteTargetUrl || "https://sandbox.invalid/reset",
+    targetVersion: state.remoteTargetVersion || 0,
+    targetCatalogVersion: state.remoteTargetCatalogVersion || 0,
+    commandVersion: state.commandVersion || state.revision,
+  });
+  if (!evidence.proofSignature) throw new Error("JANUS_SANDBOX_TOKEN_REQUIRED");
+  const applied = await applyJanusRuntime(state, async () => ({ handoffReceipt: evidence.handoffReceipt }), signal);
+  const persisted: JanusRuntimeState = { ...applied, ...evidence };
+  uni.setStorageSync(JANUS_RUNTIME_KEY, persisted);
+  const readback = uni.getStorageSync(JANUS_RUNTIME_KEY) as Partial<JanusRuntimeState> | "";
+  if (!readback || readback.handoffReceipt !== evidence.handoffReceipt) throw new Error("JANUS_SANDBOX_READBACK_FAILED");
+  return persisted;
+}
+
 const defaultCoordinator = createJanusCoordinator({
   api: janusApi,
   storage: uniStorage,
   buildReport: buildJanusReport,
-  applyRuntime: (state, signal) => applyJanusRuntime(state, undefined, signal),
+  applyRuntime: applyConfiguredJanusRuntime,
   now: Date.now,
   scope: () => String(sessionVault.read()?.user.userId || ""),
 });
@@ -411,6 +498,7 @@ async function runJanusC2(generation: number, signal: AbortSignal): Promise<void
     generation !== syncGeneration
     || signal.aborted
     || !remoteApiEnabled
+    || janusSyncAvailability().state !== "READY"
     || !sessionVault.read()?.accessToken
     || syncingGenerations.has(generation)
   ) return;
@@ -432,7 +520,7 @@ export async function syncJanusC2(): Promise<void> {
 
 export function startJanusC2Sync(): void {
   stopJanusC2Sync();
-  if (!remoteApiEnabled) return;
+  if (!remoteApiEnabled || janusSyncAvailability().state !== "READY") return;
   const generation = syncGeneration;
   const controller = new AbortController();
   activeController = controller;

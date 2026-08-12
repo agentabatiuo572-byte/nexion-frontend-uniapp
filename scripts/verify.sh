@@ -199,13 +199,23 @@ fi
 # + 注册等流程整条绕开 mock 分支),拿 remote 模式 server 跑这些探针 = 静默验错对象。
 # 判据:vite dev 转换头会内联整份 env JSON,直接 curl 源模块判 mode;探不到也红(禁跳过)。
 echo -e "${C}[2.5] dev server API mode preflight${N}"
+# 🔴 两问,缺一不可(z1 R2 对抗审计 P1-24):本门自称要解决「验错对象」,却只问了模式、
+#    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
+#    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
+#    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
+served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
+expect_root=$(echo "$PROJECT_DIR" | sed 's|\\|/|g')
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
-elif echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
-  ok "API-mode preflight: server 运行在 mock 模式(运行时探针的合法靶)"
+elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
+  bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
+elif [ -z "$served_root" ]; then
+  bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
+elif [ "$(echo "$served_root" | tr 'A-Z' 'a-z')" != "$(echo "$expect_root" | tr 'A-Z' 'a-z')" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(并发多工作树时会给别人发绿灯)"
 else
-  bad "API-mode preflight: server 非 mock 模式 —— 起法:VITE_NEXGRID_API_MODE=mock npm run dev:h5(remote 默认值会让全部运行时探针验错对象)"
+  ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
 # B1(z1 判决包):远端刷新缝「权威不可达」韧性 —— API 全抛时必须自吞降级;三处裸 await
 # (v-rank/commission/genesis)曾把 6 条 console-error=0 运行时门全部打红。
@@ -447,6 +457,12 @@ sentinel_present "home row opens owned device id" src/components/home/device-row
 sentinel_present "home slot device detail is keyboard-accessible" src/components/home/device-slot.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "home row device detail is keyboard-accessible" src/components/home/device-row.vue '@keydown\.enter\.prevent="go"'
 sentinel_present "shared sub-page back is keyboard-accessible" src/components/sub-page-header.vue '@keydown\.enter\.prevent="goBack"'
+# ⚠️ 上面这 4 条 keyboard-accessible 哨兵是**枚举式**的:各盯死一个控件名 + 一个 handler 名。
+# 2026-08-11 量面结果说明了枚举式判据的天花板 —— 它们守住 4 个控件,而当时全仓有 151 个
+# 自造控件键盘不可达(覆盖率 3%)。构造性判据见文件末尾的 a11y_activate_gate:那道门遍历
+# 「全仓每一个模板元素」,新控件天然落进判定域,不需要谁记得往这张清单里补一行。
+# 这 4 条保留:它们额外锁的是「这几个具体控件的具体行为别被改掉」,与构造性门不重叠;
+# 但**不要再往这张清单里加新的**——加了也追不上问题面的增长速度。
 # ── SPEC-7 风险簇/三桶/释放/提现 sentinels(推倒重写版 2026-07-02)──
 # 契约层: 全参数寄存器 + 新增整改 key(R1/R2/R4)
 sentinel_present "SPEC-7 risk cluster config typed" src/store/config-types.ts 'interface RiskClusterConfig'
@@ -635,14 +651,36 @@ if [ -z "$wd_avail_miss" ]; then
 else
   bad "withdraw available fail-closed 缺件: $wd_avail_miss"
 fi
-# 可提口径三处同源(2026-07-31 踩坑):提现页改了口径,钱包页/钱包卡片仍读旧桶 → 首页显示
-# 的「可提现 USDT」与实际能提的数对不上。三处必须同读 usdtBalance,任一回退即红。
+# 钱包展示面口径(2026-07-31 立门 → 2026-08-11 主人拍板"标签分离"后改判据)。
+#
+# 🔴 原判据只有「两处必须同读 usdtBalance」,并在注释里声称"三处同源=总余额"。
+#    但提现页的 maxWithdrawable 早已不是总余额(= (总余额−held两桶)×balanceMaxRatio,
+#    且三态 fail-closed 归 0),于是这道门**反而把口径分裂锁死了**:值一致的假象保住了,
+#    而两边标签都写「可提现」、数却恒不相等(后端缺席时提现页恒 0,钱包页两万四)。
+#    → 拍板结论不是把数值统一(那要么钱包页 fail-closed 归 0、要么提现页放宽到总余额
+#      架空风控扣留),而是**标签分离**:钱包页显示总余额、但不许自称「可提现」。
+#    故本门现在守两面:① 值仍是总余额(原判据,保留);② 标签不含「可提现」语义(新增)。
 withdrawable_source_parity() {
   local miss=""
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/pages/me/wallet.vue || miss="${miss}wallet.vue "
   grep -qE 'const usdt = computed\(\(\) => app\.user\.usdtBalance\)' src/components/me/wallet-card.vue || miss="${miss}wallet-card.vue "
-  if [ -z "$miss" ]; then ok "withdrawable display source parity (wallet + card = total balance)";
-  else bad "withdrawable display source DRIFT — still on old bucket: $miss"; fi
+  if [ -z "$miss" ]; then ok "wallet surfaces show total balance (app.user.usdtBalance)";
+  else bad "wallet surface value source DRIFT — still on old bucket: $miss"; fi
+  # 标签面:显示总余额没问题,标签**不许叫「可提现」** —— 那是提现页那个数的名字。
+  # 判据写成语义禁令(禁止某个词义),不枚举具体文案 —— 换句话说改文案可以,改回
+  # 「可提现」不行。样本量同时校验:key 少了/被改名 → 判据失锚,必须红而不是静默全过。
+  local label_lines label_n bad_labels
+  label_lines=$(grep -n 'usdtBalance: "' src/i18n/messages/zh.ts src/i18n/messages/en.ts src/i18n/messages/vi.ts 2>/dev/null | tr -d '\r')
+  label_n=$(printf '%s\n' "$label_lines" | grep -c 'usdtBalance: "')
+  bad_labels=$(printf '%s\n' "$label_lines" | grep -E '可提现|Withdrawable|có thể rút')
+  if [ "${label_n:-0}" -ne 6 ]; then
+    bad "usdtBalance 标签样本量应为 6(zh/en/vi × wallet+me),实得 ${label_n:-0} — 判据已失锚,先修判据"
+  elif [ -n "$bad_labels" ]; then
+    bad "钱包展示面标签仍自称「可提现」,而它显示的是总余额(与提现页可提额恒不等)"
+    printf '%s\n' "$bad_labels" | sed 's/^/        /'
+  else
+    ok "wallet balance label carries no 「可提现」 claim (sample 6/6: zh/en/vi × wallet+me)"
+  fi
   # 反向面(2026-07-31 审计 P1):上面只验「新写法在」,不验「旧写法不在」—— 若有人在这三个
   # 文件里顺手加一处引用旧桶的辅助展示(主 computed 仍正确),上面照样全绿而页面口径已分裂。
   local stale
@@ -856,8 +894,26 @@ else
   # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
   # 都在这里红(2026-07-14 对抗审查 D 项缺口的构造性版本)。
   # 值起始 [^{] 过滤:块首行「riskCluster: {」自己也长得像键,不滤会多出幽灵键(红测实锤)。
+  # 🔴 但它同时把**对象值的键**一起滤掉了(z1 R2 对抗审计 P1-13):新增
+  #    `deviceFingerprint: { salt, ttlDays }` 这类参数在两侧键集里都看不见 → 静默不进
+  #    值 parity 循环,正是 captchaAlwaysScenes 那次的同型。故再加一道:块内**所有**
+  #    顶层键(含对象值)必须 = 循环键集 ∪ 显式登记的对象值键(下面登记表当前为空)。
+  SPEC7_OBJECT_VALUE_KEYS=""   # 形如 "deviceFingerprint tierWeights";登记即须写明谁在守它的值
   seed_rc_keys=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
   seed_og_keys=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  seed_all_keys=$(sed -n '/riskCluster: {/,/},/p;/otpGate: {/,/},/p' src/mock/platform-config.ts \
+    | grep -E '^\s+\w+:' | grep -oE '^\s+\w+:' | tr -d ' :\r' | grep -vE '^(riskCluster|otpGate)$' | sort -u)
+  loop_all_keys=$(printf '%s\n%s\n%s\n' "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" "$SPEC7_OBJECT_VALUE_KEYS" | tr ' ' '\n' | grep -v '^$' | sort -u)
+  unwatched=$(comm -23 <(echo "$seed_all_keys") <(echo "$loop_all_keys"))
+  # 🔴 空集必红:抽不到键(文件读不到 / 块形状变了)时上面的差集恒空 → 会假绿。
+  #    这条守卫是自己红测时发现的:cwd 漂了一次,判据就静默全过。
+  if [ "$(echo "$seed_all_keys" | grep -c .)" -lt 10 ]; then
+    bad "SPEC-7 参数键集抽取失败(只抽到 $(echo "$seed_all_keys" | grep -c .) 个,应 ≥10)—— 判据失效必红,禁空集全过"; fails=1
+  elif [ -z "$unwatched" ]; then
+    ok "SPEC-7 无脱管参数(含对象值键:种子顶层键集 ⊆ 循环键集 ∪ 对象值登记表)"
+  else
+    bad "SPEC-7 有参数脱离值 parity 看管(多半是对象/数组值的新键,判据的历史盲区):$(echo $unwatched)——补进循环或登记进 SPEC7_OBJECT_VALUE_KEYS 并写明谁守它的值"
+  fi
   loop_rc_keys=$(echo "$SPEC7_RISKCLUSTER_KEYS" | tr ' ' '\n' | sort)
   loop_og_keys=$(echo "$SPEC7_OTPGATE_KEYS" | tr ' ' '\n' | sort)
   if [ -n "$seed_rc_keys" ] && [ -n "$seed_og_keys" ] && [ "$seed_rc_keys" = "$loop_rc_keys" ] && [ "$seed_og_keys" = "$loop_og_keys" ]; then
@@ -1742,8 +1798,29 @@ no_oldbrand_check() {
   #    加 `PRD/…` 等于放行「任何提到 PRD 路径的行」,而品牌散文恰恰住在注释里 ——
   #    红测实证:那样改后 5 条真违规只抓得住 1 条(含用户可见 i18n 串与 DOM 文本)。
   #    需要引用带旧品牌前缀的 PRD 文件名时,注释里省略该前缀即可(见本文件 PAY-VN 段)。
-  hits=$(grep -rniEI "$tok" src index.html scripts 2>/dev/null \
-    | grep -viE "${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:]*${tok}|x-${tok}-edge-country" | head -8)
+  # 🔴 白名单按 token 抠掉,不整行放行(z1 R2 对抗审计 P1-12):`grep -viE` 是**整行**过滤,
+  #    于是「一行里既有合法的后端仓路径、又有真的品牌泄漏」会被整行放走 ——
+  #    例:const heroTitle = "Nexion";  // 契约来源:nexion-backend/...  ← 旧判据放行。
+  #    改法:先把白名单形态从行里**删掉**,再看这一行还剩不剩旧词;剩了才算命中。
+  hits=$("$NODE_BIN" -e '
+const fs=require("fs"),path=require("path");
+const tok=process.argv[1];
+const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country`,"gi");
+const hits=[];
+const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
+  for(const e of es){const p=path.join(d,e.name);
+    if(e.isDirectory())walk(p);
+    else if(/\.(vue|ts|js|mjs|json|html|css|md)$/.test(e.name)){
+      let txt=""; try{txt=fs.readFileSync(p,"utf8")}catch{continue}
+      txt.split(/\r?\n/).forEach((ln,i)=>{
+        const residual=ln.replace(WHITELIST,"");
+        if(new RegExp(tok,"i").test(residual)) hits.push(p.split(path.sep).join("/")+":"+(i+1)+":"+ln.trim().slice(0,120));
+      });
+    }}};
+["src","scripts"].forEach(walk);
+try{ const h=fs.readFileSync("index.html","utf8"); h.split(/\r?\n/).forEach((ln,i)=>{ const r=ln.replace(WHITELIST,""); if(new RegExp(tok,"i").test(r)) hits.push("index.html:"+(i+1)+":"+ln.trim().slice(0,120)); }); }catch{}
+console.log(hits.slice(0,8).join("\n"));
+' "$tok" 2>/dev/null)
   if [ -z "$hits" ]; then ok "brand: no legacy '${tok}' outside whitelist (0 hits)";
   else bad "brand: legacy '${tok}' residual (rebrand=NexGrid, see docs/changes/2026-07-22-nexgrid-rebrand.md)"; echo "$hits" | sed 's/^/        /'; fi
 }
@@ -1922,11 +1999,19 @@ platform_stats_anchor() {
   # trustSectionApi 按地区服务端下发;admin 活跃仓(admin-ops)同字段亦已服务端化、无字面量
   # 可镜。编译期 Q2 镜像的主语两侧同时灭失;对照面若回流字面量,由 (1) legacy-literal 禁令
   # 与服务端契约层守。守住「删了不许悄悄回来」:trust.vue 不得再出现本地 Q2 财务字面量。
+  # 🔴 禁的是「本地财务数据」这个类,不是那两个旧字符串(z1 R2 对抗审计 P1-11:
+  #    留着空的 QTR_FINANCIALS、另起一组 Q4_FINANCIALS 就能整族绕过)。判据两条:
+  #    ① 两个旧字面量不得回流;② trust.vue 里不得出现**任何**带内容的 *FINANCIALS 数组。
   for v in '27,150' '\$47\.0M'; do
     if grep -qE "$v" src/pages/trust/trust.vue 2>/dev/null; then
       bad "platform-anchor: trust.vue 本地 Q2 财务字面量回流 /$v/(披露已服务端化,不得回退)"; fails=1
     fi
   done
+  fin_arrays=$(sed 's|//.*||' src/pages/trust/trust.vue 2>/dev/null | grep -nE '\w*FINANCIALS\w*[^=]*=\s*\[[^]]' | head -3)
+  if [ -n "$fin_arrays" ]; then
+    bad "platform-anchor: trust.vue 出现带内容的本地财务数组(披露一律服务端下发,禁另起一组绕过旧字面量禁令)"
+    echo "$fin_arrays" | sed 's/^/        /'; fails=1
+  fi
   if ! grep -qE 'QTR_FINANCIALS: \{ metric: string; value: string; delta: string \}\[\] = \[\];' src/pages/trust/trust.vue 2>/dev/null; then
     bad "platform-anchor: trust.vue QTR_FINANCIALS 不再是声明空数组(本地财务数据禁回流;产品若恢复本地 Q2 须重立镜像判据)"; fails=1
   fi
@@ -2933,6 +3018,40 @@ janus_stop_cancellation_gate
 # 7 种改法能让缺陷复活而结构门全绿 —— 所以再加一道**只看行为**的:登出的人还能不能
 # 停在业务页上。代码怎么重构都拦得住。自带反向对照(已登录不许被误踢)与覆盖面 witness
 # (读不到路由即判红,P-080:探不到 ≠ 无违例)。
+# ── 自造控件键盘可达性 · 构造性门 ──────────────────────────────────────────────
+# 本仓禁用原生 <button>(P-036),于是每个自造按钮都得自己写键盘支持 —— 2026-08-11 实测
+# 151 处没写(焦点停得上去、按 Enter 没反应)。修法不是逐个补,是补上缺失的平台层
+# (src/lib/a11y-activate.ts):声明 role + tabindex 就得到键盘激活,和原生 <button> 一样。
+# 这道门守契约的两端:半个承诺(只写 role 或只写 tabindex)会红,平台层被删/未挂载也会红。
+# 判据遍历全仓每一个模板元素,不枚举控件名——枚举式判据在这仓被绕过过太多次。
+# selftest = 逐条注入违例证明每条判据真的会红(含行为门),哨兵失效即门失效。
+a11y_activate_gate() {
+  if "$NODE_BIN" scripts/a11y-activate-gate.redtest.mjs > /tmp/uni-a11y-activate-selftest.log 2>&1; then
+    ok "a11y-activate selftest — $(tail -1 /tmp/uni-a11y-activate-selftest.log)"
+  else
+    bad "a11y-activate selftest 失败(哨兵失效即门失效;node scripts/a11y-activate-gate.redtest.mjs 看明细)"
+    tail -12 /tmp/uni-a11y-activate-selftest.log | sed 's/^/        /'
+  fi
+  if "$NODE_BIN" scripts/a11y-activate-gate.mjs > /tmp/uni-a11y-activate.log 2>&1; then
+    # 🔴 取带 ✓ 的那行,不能用 head -1:门会先把「判不出」清单打到 stderr,
+    # head -1 抓到的是空行 → PASS 不带样本量,一眼看不出它到底扫了多少(本仓禁止这种绿)。
+    ok "$(grep -a '✓' /tmp/uni-a11y-activate.log | head -1 | sed 's/^ *✓ *//')"
+    grep -a 'ⓘ' /tmp/uni-a11y-activate.log | sed 's/^/        /'
+  else
+    bad "自造控件键盘可达性门失败 — node scripts/a11y-activate-gate.mjs 看明细"
+    tail -14 /tmp/uni-a11y-activate.log | sed 's/^/        /'
+  fi
+  # --experimental-strip-types:行为门 import 的是 .ts 源,Node <23.6 不带这个 flag 会直接炸。
+  if "$NODE_BIN" --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs > /tmp/uni-a11y-behavior.log 2>&1; then
+    # 用 -o 只取计数片段:node --test 的行首是多字节的 ℹ,拿 `^.` 去锚会匹配不上 → PASS 又变空消息。
+    ok "a11y 键盘激活行为门 — $(grep -aoE '(pass|fail) [0-9]+' /tmp/uni-a11y-behavior.log | tr '\n' ' ')"
+  else
+    bad "a11y 键盘激活行为门失败 — node --test scripts/a11y-activate-behavior.test.mjs 看明细"
+    tail -14 /tmp/uni-a11y-behavior.log | sed 's/^/        /'
+  fi
+}
+a11y_activate_gate
+
 # Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
 if "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
   ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"

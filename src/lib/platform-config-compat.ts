@@ -6,9 +6,6 @@ import type { PlatformConfig, PlatformConfigSeed } from "@/store/config-types";
 const RUNTIME_PUBLIC_STATS_DEFAULT: PlatformConfig["publicStats"] = {
   // Deliberately invalid sentinel: H9 must stay unavailable until the server
   // projection is fetched and validated. Never replace it with plausible data.
-  // 🔴 全零还不够非法:publicStatsHealth 的 members/rank/jitter 合法域包含 0,
-  // 全零种子曾让首页把「Members 0 +0%/mo」当真数据渲染(z1 判决包 B7)。
-  // 三个 -1 保证六个健康位全部 false —— 改回 0 前先去看 publicStatsHealth 的域。
   fleetDevices: 0,
   onlineRatePct: 0,
   onlineJitter: -1,

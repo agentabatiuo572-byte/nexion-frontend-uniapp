@@ -1,5 +1,5 @@
 <template>
-  <view class="cs-layer">
+  <view class="cs-layer" role="dialog" aria-modal="true">
     <!-- 遮罩是**独立兄弟层**,不是卡片的父级:uni-app H5 把事件规范化成
          `{target:{id,dataset,...}}` 普通对象,`target`/`currentTarget` 是两个新对象,
          `@click.self` 的 `target === currentTarget` 恒不成立 → 点遮罩永远关不掉。
@@ -12,7 +12,7 @@
           <text class="cs-title">{{ t.authOtp.captchaTitle }}</text>
           <text class="cs-sub">{{ t.authOtp.captchaHint }}</text>
         </view>
-        <view class="cs-x" @click="onCancel">
+        <view class="cs-x" role="button" tabindex="0" :aria-label="t.ui.cancel" @click="onCancel">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
         </view>
       </view>
@@ -22,14 +22,14 @@
         <template v-if="challenge">
           <view class="cs-slot" :style="{ left: slotLeft }" />
           <view class="cs-piece" :style="{ left: pieceLeft }" />
-          <view class="cs-refresh" @click="reloadChallenge">
+          <view class="cs-refresh" role="button" tabindex="0" :aria-label="t.authOtp.captchaRetry" @click="reloadChallenge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
           </view>
         </template>
         <!-- ⑤ 报错/极限态:题面加载或校验网络失败 → 层内失败态 + 重试,不静默关闭 -->
         <view v-else-if="loadFailed" class="cs-fail">
           <text class="cs-fail__t">{{ t.authOtp.captchaLoadFailed }}</text>
-          <view class="cs-fail__btn" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
+          <view class="cs-fail__btn" role="button" tabindex="0" @click="onRetry"><text class="cs-fail__btn-t">{{ t.authOtp.captchaRetry }}</text></view>
         </view>
       </view>
 
@@ -37,14 +37,25 @@
       <view id="cs-track" class="cs-track" :class="trackCls">
         <view class="cs-fill" :style="{ width: curX + 24 + 'px' }" />
         <view v-if="showHint" class="cs-hintwrap"><text class="cs-hint">{{ t.authOtp.captchaTrackHint }}</text></view>
+        <!-- 🔴 滑柄此前只绑触摸与鼠标 —— 纯键盘用户拖不动它,而滑块是登录 / 注册 /
+             改提现地址三条路的必经关卡,等于这三件事键盘用户都做不了。
+             方向键移动 + Enter/Space 提交,走的是与拖拽**同一条**提交路径(onUp),
+             不另开一条分支,免得两条路的风控/失败态各走各的。 -->
         <view
           class="cs-handle"
+          role="slider"
+          tabindex="0"
+          :aria-label="t.authOtp.captchaTrackHint"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="handlePercent"
           :style="{ left: curX + 2 + 'px' }"
           @touchstart.prevent="onDown"
           @touchmove.prevent="onMove"
           @touchend="onUp"
           @touchcancel="onUp"
           @mousedown="onDown"
+          @keydown="onHandleKeydown"
         >
           <view v-if="busy" class="cs-spin" />
           <text v-else class="cs-handle__t">{{ verified ? "✓" : "→" }}</text>
@@ -65,6 +76,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { captchaChallenge, captchaVerify, MAX_CAPTCHA_FAILS, type CaptchaChallenge, type CaptchaVerifyResult } from "@/store/auth-otp";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ phone: string }>();
 const emit = defineEmits<{ (e: "success", ticket: string): void; (e: "close"): void }>();
@@ -204,6 +216,40 @@ async function onUp() {
     void loadChallenge(); // 重随机题面;网络失败同样落层内失败态
   }, 380);
 }
+/** 读屏要报"拖到百分之多少",给它一个 0-100 的整数。 */
+const handlePercent = computed(() => Math.round((curX.value / maxHandle.value) * 100));
+
+// 本组件由父级 v-if 挂载,自身没有开关 → 恒 open(composable 的 immediate 让它生效)。
+// Esc 取消,与点遮罩、点 × 同义。
+useDialogA11y(computed(() => true), ".cs-layer", onCancel);
+
+/**
+ * 滑柄的键盘操作。方向键移动、Home/End 到两端、Enter/Space 提交当前位置。
+ * 提交刻意复用 onUp:拖拽与键盘走同一条校验、失败态与风控路径,不另立分支。
+ */
+function onHandleKeydown(e: KeyboardEvent) {
+  if (busy.value || verified.value || !challenge.value) return;
+  const step = e.shiftKey ? 24 : 6;   // 按住 Shift 走大步,不然要按几十下
+  let next = curX.value;
+  switch (e.key) {
+    case "ArrowRight": next += step; break;
+    case "ArrowLeft": next -= step; break;
+    case "Home": next = 0; break;
+    case "End": next = maxHandle.value; break;
+    case "Enter":
+    case " ":
+      e.preventDefault();
+      if (curX.value <= 0) return;    // 没移动过就提交没有意义(与拖拽版同判据)
+      dragging.value = true;          // onUp 以 dragging 为门,键盘路径要显式置位
+      void onUp();
+      return;
+    default:
+      return;
+  }
+  e.preventDefault();                 // 方向键默认会滚动页面
+  curX.value = Math.min(maxHandle.value, Math.max(0, next));
+}
+
 function onCancel() {
   if (busy.value) return;
   emit("close");

@@ -118,18 +118,18 @@
       </view>
 
       <view class="intro-cta anim-cta">
-        <view class="cta-primary active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter="goRegister" @keydown.space.prevent="goRegister">
+        <view class="cta-primary active:scale-[0.98]" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
           <text class="cta-primary__t">{{ t.intro.getStarted }}</text>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
           </svg>
         </view>
-        <view class="cta-secondary active:scale-[0.98]" role="button" tabindex="0" @click="goLogin" @keydown.enter="goLogin" @keydown.space.prevent="goLogin">
+        <view class="cta-secondary active:scale-[0.98]" role="button" tabindex="0" @click="goLogin" @keydown.enter.prevent="goLogin" @keydown.space.prevent="goLogin">
           <text class="cta-secondary__t">{{ t.intro.signIn }}</text>
         </view>
         <view class="intro-terms">
           <text class="terms-left">{{ t.intro.termsLeft }} </text>
-          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter="goTerms" @keydown.space.prevent="goTerms">{{ t.intro.termsLink }}</text>
+          <text class="terms-link active:opacity-70" role="link" tabindex="0" @click="goTerms" @keydown.enter.prevent="goTerms" @keydown.space.prevent="goTerms">{{ t.intro.termsLink }}</text>
         </view>
       </view>
     </view>

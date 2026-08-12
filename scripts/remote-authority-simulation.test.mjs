@@ -212,12 +212,18 @@ test("订单履约:mock 推到 activated 并发设备,remote 一步不推", asyn
       const app = m.useApp();
       const orders = m.useOrders();
       const devicesBefore = app.devices.length;
-      const order = orders.createOrder({
-        productId: "stellarbox-pro",
-        productName: "NexGridBox Pro",
-        unitPrice: 100,
-        paymentMethod: "balance",
-      });
+      // 🔴 样本改成直接注入(与本文件 ③ 的 app.withdrawals = [seedWithdrawal()] 同款):
+      // 2026-08-12 起 createOrder 在远端档直接抛 REMOTE_ORDER_CREATE_REQUIRES_SERVER_API
+      // ——「建单归服务端」是更强的权威行为,不该由本门的样本构造方式把它判成回归。
+      // 断言一字未改:验的仍是「remote 一步不推、不凭空铸设备」。
+      const now = Date.now();
+      const order = {
+        id: "ORD-TEST-1", productId: "stellarbox-pro", productName: "NexGridBox Pro",
+        quantity: 1, unitPrice: 100, discount: 0, total: 100,
+        paymentMethod: "balance", status: "paid", placedAt: now - 60_000, paidAt: now - 30_000,
+        timeline: [{ status: "paid", at: now - 30_000 }], dataCenter: "Singapore DC",
+      };
+      orders.orders = [order];
       // 每步 0.45 概率:60 拍后仍停在 paid 的概率约 1e-15,不是随机性造成的假红。
       for (let i = 0; i < 60; i++) m.tickOrders(0);
       const status = orders.getById(order.id).status;

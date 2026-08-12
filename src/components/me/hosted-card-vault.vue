@@ -93,6 +93,7 @@ function tokenize(): HostedCardToken | null {
   if (props.mode !== "full" || !ready.value) return null;
   return {
     token: mintToken("tok"),
+    source: "mock",
     last4: panDigits(pan.value).slice(-4),
     brand: brand.value,
     expiry: expiry.value,

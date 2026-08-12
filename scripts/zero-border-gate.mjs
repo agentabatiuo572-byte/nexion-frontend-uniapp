@@ -148,6 +148,13 @@ export function judge({ fill, sides, chrome, dashed, isoRing, ring, outline }) {
 
 /* ── 浏览器内探针 ── */
 const PROBE = () => {
+  // 🔴 扫描前先卸掉焦点:浏览器给**当前聚焦元素**画的焦点环走的是 outline,而本门把
+  // outline 计入"描边"(见 judge:ring/outline 等同四面环)。于是「弹层打开后焦点自动
+  // 移入第一个控件」这种**无障碍必需**的正确行为(WCAG 2.4.7 焦点可见),会被判成设计违例。
+  // 2026-08-11 实测:领券弹层在首页自动弹出时,焦点落到 .vcs-close,本门就报一条新增违例
+  // —— 而那个类的样式里根本没有 border。两道门判据方向相反时,任何源码状态都不可能同时绿,
+  // 所以在这里划清边界:焦点态不属于本门要管的"设计描边"。
+  try { (document.activeElement instanceof HTMLElement) && document.activeElement.blur(); } catch { /* 无焦点可卸 */ }
   const out = [];
   document.querySelectorAll("uni-view,view,uni-text,text,uni-button,button").forEach((el) => {
     const r = el.getBoundingClientRect();

@@ -49,6 +49,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 type ErrorKey = "rateLimit" | "syncPending" | "bridge" | "verifyPending" | "cf";
 
@@ -189,6 +190,10 @@ const backBtnStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
 };
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => props.open), ".nx-os-overlay", emitClose);
 </script>
 
 <style scoped>

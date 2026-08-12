@@ -16,7 +16,7 @@
         <InviteEarnCard />
 
         <!-- V3+ royalty hero -->
-        <view v-if="myRank >= 3" class="rounded-2xl relative overflow-hidden active:opacity-95" :style="royaltyHeroStyle" @click="go('/pages/team/unilevel')">
+        <view v-if="!remoteApiEnabled && myRank >= 3" class="rounded-2xl relative overflow-hidden active:opacity-95" :style="royaltyHeroStyle" @click="go('/pages/team/unilevel')">
           <view class="flex items-center font-mono-tabular" :style="royaltyCapStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
             <text>{{ t.teamV3.royaltyHeroLabel }}</text>
@@ -56,7 +56,7 @@
         <!-- Unified quick nav -->
         <view class="nx-team-quick-panel rounded-2xl overflow-hidden" :style="quickPanelStyle">
           <!-- Leaderboard -->
-          <view class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
+          <view v-if="!remoteApiEnabled" class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
@@ -71,22 +71,22 @@
             </view>
           </view>
 
-          <view :style="quickDividerStyle" />
+          <view v-if="!remoteApiEnabled" :style="quickDividerStyle" />
 
           <!-- Royalty network -->
-          <view class="nx-team-royalty-network-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/unilevel')">
+          <view class="nx-team-royalty-network-link" :class="remoteApiEnabled ? '' : 'active:opacity-95'" :style="quickRowStyle" @click="openReferralNetwork">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-brand)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.sevenLayerNetwork }}</text>
-                <text class="block" :style="quickRowMetaStyle">{{ t.teamV3.directLabel }} · {{ directCount }}  /  {{ t.teamV3.extendedLabel }} · {{ totalMembersCount - directCount }}</text>
+                <text class="block" :style="quickRowMetaStyle">{{ t.teamV3.directLabel }} · {{ directCountText }}  /  {{ t.teamV3.extendedLabel }} · {{ extendedCountText }}</text>
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
-              <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ totalMembersCount }}</text>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ totalMembersCountText }}</text>
+              <svg v-if="!remoteApiEnabled" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
 
@@ -100,19 +100,19 @@
               </view>
               <view class="flex-1 min-w-0">
                 <text class="block" :style="quickRowTitleStyle">{{ t.teamV3.todayMatch }}</text>
-                <text class="block" :style="quickRowMetaStyle">A · ${{ leftVol.toFixed(0) }}  /  B · ${{ rightVol.toFixed(0) }}</text>
+                <text class="block" :style="quickRowMetaStyle">A · {{ leftVolText }}  /  B · {{ rightVolText }}</text>
               </view>
             </view>
             <view :style="quickRowValueWrapStyle">
-              <text class="font-display tabular-nums" :style="quickRowValueWarnStyle">+${{ binaryMatch.toFixed(2) }}</text>
+              <text class="font-display tabular-nums" :style="quickRowValueWarnStyle">{{ binaryMatchText }}</text>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
 
-          <view :style="quickDividerStyle" />
+          <view v-if="!remoteApiEnabled" :style="quickDividerStyle" />
 
           <!-- Leadership pool -->
-          <view class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
+          <view v-if="!remoteApiEnabled" class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-tech-cyan)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
@@ -132,8 +132,9 @@
 
         <!-- This month ledger -->
         <TeamLedgerCard
+          v-if="!remoteApiEnabled"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
-          :contributors="totalMembersCount"
+          :contributors="localTotalMembersCount"
           :direct-u-s-d-t="directUSDT"
           :extended-u-s-d-t="extendedUSDT"
           :month-u-s-d-t="monthUSDT"
@@ -143,7 +144,7 @@
         />
 
         <!-- Team tools -->
-        <view class="grid" :style="toolGridStyle">
+        <view v-if="!remoteApiEnabled" class="grid" :style="toolGridStyle">
           <view class="active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-warning-soft)')">
@@ -202,17 +203,19 @@ import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useReferralReward } from "@/store/referral-reward";
 
 const t = useT();
 const vrank = useVRank();
 const network = useNetwork();
 const commission = useCommission();
 const pool = useLeadershipPool();
+const referralRewards = useReferralReward();
 
 const myRank = computed(() => vrank.myRank);
 const myRankDisplay = computed(() => `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
 const members = computed(() => network.members);
-const totalMembersCount = computed(() => network.totalMembers);
+const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
 
 const rankInfo = computed(() =>
@@ -226,10 +229,18 @@ const rankInfo = computed(() =>
 );
 
 const byLayerBuckets = computed(() => network.byLayer());
-const directCount = computed(() => byLayerBuckets.value[1].length);
-const extendedCount = computed(() =>
-  ([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0),
-);
+const directCountText = computed(() => {
+  if (remoteApiEnabled) {
+    const count = referralRewards.snapshot?.invitedCount;
+    return count === undefined ? "—" : String(count);
+  }
+  return String(byLayerBuckets.value[1].length);
+});
+const extendedCountText = computed(() => {
+  if (remoteApiEnabled) return "—";
+  return String(([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0));
+});
+const totalMembersCountText = computed(() => remoteApiEnabled ? "—" : String(localTotalMembersCount.value));
 
 // Commission month aggregates (30d) + direct/extended split.
 const ledger = computed(() => {
@@ -260,6 +271,7 @@ const extendedUSDT = computed(() => ledger.value.extendedUSDT);
 const binary = computed(() => {
   if (remoteApiEnabled) {
     const snapshot = commission.binarySnapshot;
+    if (!snapshot) return null;
     return {
       binaryMatch: snapshot?.estimatedAmountUsdt ?? 0,
       leftVol: snapshot?.trackA ?? 0,
@@ -274,9 +286,9 @@ const binary = computed(() => {
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
 });
-const binaryMatch = computed(() => binary.value.binaryMatch);
-const leftVol = computed(() => binary.value.leftVol);
-const rightVol = computed(() => binary.value.rightVol);
+const binaryMatchText = computed(() => binary.value === null ? "—" : `+$${binary.value.binaryMatch.toFixed(2)}`);
+const leftVolText = computed(() => binary.value === null ? "—" : `$${binary.value.leftVol.toFixed(0)}`);
+const rightVolText = computed(() => binary.value === null ? "—" : `$${binary.value.rightVol.toFixed(0)}`);
 
 const myVotes = computed(() => pool.myVotes(vrank.myRank));
 const myShare = computed(() => pool.mySharePct(vrank.myRank));
@@ -295,6 +307,12 @@ const leadershipPoolLineB = computed(() =>
 
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
+}
+function openReferralNetwork() {
+  // Only the direct invite count is projected by H8 today. The drill-down is
+  // seeded demo data, so it is deliberately unavailable in a server session.
+  if (remoteApiEnabled) return;
+  go("/pages/team/unilevel");
 }
 
 // unlockMatured at mount + every 60s.

@@ -34,7 +34,9 @@ test("G2 remote mode never records a local wallet success", () => {
   assert.match(source, /import\s*\{[^}]*exchangeApi[^}]*remoteApiEnabled[^}]*\}\s*from\s*["']@\/api\/runtime["']/);
   assert.match(source, /async function syncRemoteState\(/);
   assert.match(source, /await exchangeApi\.fetchState\(\)/);
-  assert.match(source, /await exchangeApi\.swap\(/);
+  assert.match(source, /await executeExchangeSwap<ExchangeSnapshot>\(/);
+  assert.match(source, /swap:\s*\(idempotencyKey\)\s*=>\s*exchangeApi\.swap\(/);
+  assert.match(source, /fetchState:\s*\(\)\s*=>\s*exchangeApi\.fetchState\(\)/);
   assert.match(source, /remoteState\.value = null/);
   // 判据锚在 **i18n key** 上,不锚中文字面量:页面文案 2026-08-10 收进 src/i18n(硬编码中文
   // 哨兵 scripts/i18n-hardcoded-cjk-sentinel.mjs 要求 .vue 里不得出现中文),锚字面量会让

@@ -37,6 +37,9 @@
           <text class="cp-role-t">{{ headerRole }}</text>
         </view>
       </view>
+      <view v-if="!isAi && conv && !isClosedSession" class="cp-ticket active:opacity-70" role="button" tabindex="0" :aria-label="t.conversations.convertTicket" @click="onConvertToTicket">
+        <text>{{ t.conversations.convertTicket }}</text>
+      </view>
     </view>
 
     <!-- Thread body (messages + chips + input) -->
@@ -89,6 +92,7 @@ import { useNova } from "@/store/nova";
 import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
+import type { ConversationType } from "@/domain/support";
 
 const t = useT();
 const convStore = useConversations();
@@ -97,6 +101,7 @@ const app = useApp();
 
 const cid = ref("");
 const isAi = ref(false);
+const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
 // space itself. Match the chassis source (real device height, else the H5
@@ -123,7 +128,9 @@ onLoad((q) => {
   }
   if (typeof q?.cid === "string") {
     cid.value = q.cid;
+    return;
   }
+  if (q?.start === "advisor" || q?.start === "support") startType.value = q.start;
 });
 
 // onShow/onHide track the hidden-but-alive state that onUnload/onUnmounted miss.
@@ -136,62 +143,56 @@ onLoad((q) => {
 // coarse interval keeps calling the sweep. Store-side idempotence (idleWarnedAt /
 // sessionStatus guards) makes redundant ticks free. A real backend pushes these
 // events — the interval then becomes a harmless no-op.
-let idleTicker: ReturnType<typeof setInterval> | undefined;
-function startIdleTicker() {
-  if (idleTicker || isAi.value || !cid.value) return;
-  idleTicker = setInterval(() => convStore.sweepSupportTimeouts(), 10_000);
-}
-function stopIdleTicker() {
-  if (idleTicker) {
-    clearInterval(idleTicker);
-    idleTicker = undefined;
-  }
-}
-
-onShow(() => {
+onShow(async () => {
   revealTick.value += 1;
   if (isAi.value) nova.open(); // mark Nova as being viewed → clears + tracks unread
   else if (cid.value) {
-    // Sweep before open: entering a stale support thread lands the timeout closure
-    // (system notice + closed state) before unread is cleared.
-    convStore.sweepSupportTimeouts();
-    // Dangling cid — e.g. an H5 refresh re-seeded the non-persisted store while the
-    // URL still carries a runtime session id. Bail to the inbox instead of rendering
-    // a blank chat whose sends would be silently dropped.
-    if (!convStore.get(cid.value)) {
+    try { await convStore.open(cid.value); } catch {
       navBack("/pages/support/messages");
       return;
     }
-    convStore.open(cid.value);
-    startIdleTicker();
   }
 });
 onHide(() => {
   if (isAi.value) nova.close(); // no longer viewing Nova → later pushes accrue unread
-  stopIdleTicker();
 });
 
 const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
 const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>`;
 
 const conv = computed(() => (cid.value ? convStore.get(cid.value) : undefined));
+const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
+  conv.value?.type === "advisor" || conv.value?.type === "support" ? conv.value.type : startType.value,
+);
 
 // Timed-out support session → thread is read-only history with a restart CTA.
 const isClosedSession = computed(() => conv.value?.sessionStatus === "closed");
 
-const headerName = computed(() => (isAi.value ? t.value.nova.name : conv.value?.agentName ?? ""));
+const headerName = computed(() => {
+  if (isAi.value) return t.value.nova.name;
+  if (conv.value) return displayAgentName(conv.value.agentName);
+  return humanType.value === "advisor" ? t.value.conversations.typeAdvisor : humanType.value === "support" ? t.value.conversations.typeSupport : "";
+});
+
+function displayAgentName(name: string): string {
+  const normalized = name.trim();
+  return normalized && normalized.toLowerCase() !== "unassigned"
+    ? normalized
+    : t.value.conversations.unassignedAgent;
+}
 const agentTyping = computed(() =>
   isAi.value ? nova.typing : (cid.value ? convStore.typingIds[cid.value] === true : false),
 );
 const headerRole = computed(() => {
   if (agentTyping.value) return t.value.conversations.agentTyping;
   if (isAi.value) return t.value.conversations.roleAi;
+  if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
   if (isClosedSession.value) return t.value.conversations.sessionEnded;
   return t.value.conversations[conv.value.roleKey];
 });
 const headerTint = computed(() =>
-  isAi.value ? "var(--v5-brand-2)" : conv.value?.avatarTint ?? "var(--v5-tech-cyan)",
+  isAi.value ? "var(--v5-brand-2)" : conv.value?.avatarTint ?? (humanType.value === "advisor" ? "var(--v5-brand)" : "var(--v5-tech-cyan)"),
 );
 // Presence dot: closed session must not claim "online" — grey it and stop the pulse.
 const dotStyle = computed<CSSProperties>(() =>
@@ -199,7 +200,7 @@ const dotStyle = computed<CSSProperties>(() =>
     ? { background: "var(--v5-ink-4)", animation: "none" }
     : { background: headerTint.value },
 );
-const headerIcon = computed(() => (conv.value?.type === "advisor" ? ADVISOR_ICON : SUPPORT_ICON));
+const headerIcon = computed(() => (humanType.value === "advisor" ? ADVISOR_ICON : SUPPORT_ICON));
 const avaStyle = computed<CSSProperties>(() => ({
   color: headerTint.value,
   background: `color-mix(in srgb, ${headerTint.value} 14%, transparent)`,
@@ -208,7 +209,10 @@ const avaStyle = computed<CSSProperties>(() => ({
 const inputPlaceholder = computed(() =>
   isAi.value ? t.value.nova.inputPlaceholder : t.value.conversations.inputPlaceholder,
 );
-const emptyHint = computed(() => (isAi.value ? t.value.nova.emptyHint : ""));
+const emptyHint = computed(() => {
+  if (isAi.value) return t.value.nova.emptyHint;
+  return humanType.value === "advisor" ? t.value.conversations.listEmptyAdvisor : t.value.conversations.listEmptySupport;
+});
 
 const quickChips = computed<QuickChip[]>(() =>
   isAi.value
@@ -249,21 +253,15 @@ const threadMessages = computed<ThreadMsg[]>(() => {
     id: m.id,
     side: m.sender === "user" ? "right" : "left",
     tone: m.sender === "user" ? "user" : m.sender === "system" ? "system" : "agent",
-    text: m.textKey ? fmt(t.value.conversations.seed[m.textKey], { name: c.agentName, ...(m.textArgs ?? {}) }) : m.text ?? "",
+    text: m.text,
     receipt: receiptFor(m.status, i === lastUser),
-    ctaLabel: m.ctaKey ? t.value.conversations.cta[m.ctaKey] : undefined,
-    ctaHref: m.ctaHref,
   }));
 });
 
-// Restart a timed-out support session: a fresh agent is assigned (rotation — never
-// the same one) and THIS chat surface swaps to the new conversation in place. No
-// route hop → no H5 same-page hash-query staleness (P-044/P-049).
+// Restart returns to the same server-backed compose path. A durable conversation
+// is created only after the user submits the opening message.
 function onRestart() {
-  const id = convStore.startSupportSession();
-  cid.value = id;
-  convStore.open(id);
-  revealTick.value += 1; // re-pin the thread to the new greeting
+  navTo("/pages/support/chat?start=support");
 }
 
 function quickLabel(k: QuickPromptKey): string {
@@ -283,12 +281,10 @@ function schedule(fn: () => void, ms: number) {
   pendingTimers.push(setTimeout(fn, ms));
 }
 function cleanup() {
-  stopIdleTicker();
   pendingTimers.forEach(clearTimeout);
   pendingTimers.length = 0;
   // Cancelled timers would otherwise leave a ghost "typing…" flag on the store
   // (it bleeds into the list preview) — always drop it on the way out.
-  if (cid.value) convStore.setTyping(cid.value, false);
   nova.setTyping(false);
   // Reset Nova's open flag (the AI chat page acted as the "open" view). Without this
   // isOpen stays true forever and every future proactive push would silently zero
@@ -318,13 +314,10 @@ function acquireSendSlot(): boolean {
 }
 
 // Reply choreography (ms after send): agent reads → types → answers.
-const READ_MS = 500;
-const TYPING_ON_MS = 800;
-const REPLY_MS = 2000;
 const AI_TYPING_ON_MS = 300;
 const AI_REPLY_MS = 1100;
 
-function onSend(text: string, restore?: () => void) {
+async function onSend(text: string, restore?: () => void) {
   if (!acquireSendSlot()) {
     restore?.(); // rejected send must not swallow the typed message
     return;
@@ -340,14 +333,32 @@ function onSend(text: string, restore?: () => void) {
     return;
   }
   const id = cid.value;
-  if (!id) return;
-  convStore.sendUser(id, text);
-  schedule(() => convStore.markUserRead(id), READ_MS);
-  schedule(() => convStore.setTyping(id, true), TYPING_ON_MS);
-  schedule(() => {
-    convStore.setTyping(id, false);
-    convStore.pushAgentReply(id);
-  }, REPLY_MS);
+  if (!id) {
+    const type = startType.value;
+    if (!type) {
+      restore?.();
+      return;
+    }
+    try {
+      cid.value = await convStore.startConversation(type, text);
+      startType.value = null;
+      revealTick.value += 1;
+    } catch {
+      restore?.();
+      toast.error(t.value.conversations.convertTicketFailed, "");
+    }
+    return;
+  }
+  try { await convStore.sendUser(id, text); } catch { restore?.(); toast.error(t.value.conversations.convertTicketFailed, ""); }
+}
+
+async function onConvertToTicket() {
+  const current = conv.value;
+  if (!current) return;
+  try {
+    const ticketId = await convStore.convertToTicket(current.id, "technical", `Conversation ${current.id}`);
+    navTo(`/pages/me/support-tickets?ticket=${encodeURIComponent(ticketId)}`);
+  } catch { toast.error(t.value.conversations.convertTicketFailed, ""); }
 }
 
 function onChip(key: string) {
@@ -408,6 +419,15 @@ function goBack() {
 .cp-meta {
   flex: 1;
   min-width: 0;
+}
+.cp-ticket {
+  min-height: 44px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  color: var(--v5-brand);
+  font-size: 12px;
+  font-weight: 600;
 }
 .cp-name {
   display: block;

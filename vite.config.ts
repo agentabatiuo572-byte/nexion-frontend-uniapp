@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import uniPlugin from "@dcloudio/vite-plugin-uni";
 import UnoCSS from "unocss/vite";
 
@@ -8,9 +8,16 @@ import UnoCSS from "unocss/vite";
 // so uni() works regardless of interop mode.
 const uni = (uniPlugin as unknown as { default?: typeof uniPlugin }).default ?? uniPlugin;
 
-export default defineConfig({
-  plugins: [uni(), UnoCSS()],
-  server: {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+  // The dev server, rather than the browser bundle, owns the loopback target.
+  // This makes H5 -> /api same-origin and avoids localhost/127.0.0.1 identity
+  // splits. A production bundle must provide its own HTTPS gateway explicitly.
+  const apiPreviewTarget = env.VITE_NEXGRID_API_PREVIEW_TARGET?.trim() || "http://127.0.0.1:8110";
+
+  return {
+    plugins: [uni(), UnoCSS()],
+    server: {
     // 🔴 双栈监听(2026-08-05 结构性反思第 1 步)。此前默认只绑 [::1]:
     //   curl localhost=200 而 127.0.0.1=拒连 → verify 前段 curl 探活全绿、
     //   后段硬写 127.0.0.1 的 6 个 Playwright 齿轮 ERR_CONNECTION_REFUSED,
@@ -19,6 +26,20 @@ export default defineConfig({
     //   修在服务端一处,不追着改 N 个脚本里写死的地址(那是散弹枪,新脚本必复发)。
     host: true,
     port: 5173,
-    strictPort: true, // 5173 被占就明着炸,不许静默换端口把 verify 全家变假红
-  },
+      strictPort: true, // 5173 被占就明着炸,不许静默换端口把 verify 全家变假红
+      proxy: {
+        // The real H5 UI calls /auth/users/* from its same-origin base URL.
+        // The backend intentionally owns that same path, so proxy it without
+        // rewriting. Backend-native configuration routes continue under /api.
+        "/auth": {
+          target: apiPreviewTarget,
+          changeOrigin: true,
+        },
+        "/api": {
+          target: apiPreviewTarget,
+          changeOrigin: true,
+        },
+      },
+    },
+  };
 });

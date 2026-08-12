@@ -178,7 +178,7 @@ async function handleBind() {
     // The remote binder returns a server receipt; the local cards store only
     // projects the subsequent authoritative GET and never persists this card.
     try {
-      const bound = await paymentMethodApi.bind({ providerToken: card.token, brand: card.brand, last4: card.last4,
+      const bound = await paymentMethodApi.bind({ providerToken: card.token, source: card.source, brand: card.brand, last4: card.last4,
         holder: holder.value.trim().toUpperCase(), makeDefault: setAsDefault.value,
         idempotencyKey: `h3-card-bind:${card.token}` });
       if (!await cardsStore.refreshRemote()) throw new Error("CARD_BIND_READBACK_FAILED");

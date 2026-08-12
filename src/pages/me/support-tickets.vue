@@ -42,9 +42,10 @@
         </view>
         <text v-if="filterFeedback" class="block text-center" :style="filterFeedbackStyle">{{ filterFeedback }}</text>
 
-        <EmptyState v-if="filtered.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
+        <EmptyState v-if="ticketsStore.error" kind="recoverable-error" :title="t.empty.errorTitle" :desc="t.empty.errorDesc" :cta-label="t.empty.errorCta" @cta="reloadTickets" />
+        <EmptyState v-else-if="filtered.length === 0" :kind="tab === 'all' ? 'empty-list' : 'no-filter-results'" :title="tab === 'all' ? t.empty.listTitle : t.empty.filterTitle" :desc="tab === 'all' ? t.empty.listDesc : t.empty.filterDesc" />
         <view v-else style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
-          <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="mode = { kind: 'detail', id: tk.id }" />
+          <TicketRow v-for="(tk, i) in filtered" :key="tk.id" :tk="tk" :divider="i < filtered.length - 1" @open="openTicket(tk.id)" />
         </view>
 
         <text class="block text-center" :style="noteStyle">{{ t.tickets.note }}</text>
@@ -73,7 +74,7 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.cancel }}</text>
           </view>
-          <view class="flex items-center justify-center active:scale-[0.98]" :style="submitBtnStyle" role="button" tabindex="0" :aria-label="t.tickets.create.submit" @click="submitCreate">
+          <view class="flex items-center justify-center active:scale-[0.98]" :style="{ ...submitBtnStyle, opacity: ticketsStore.mutating ? 0.55 : 1 }" role="button" tabindex="0" :aria-disabled="ticketsStore.mutating" :aria-label="t.tickets.create.submit" @click="submitCreate">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" /><path d="m21.854 2.147-10.94 10.939" /></svg>
             <text style="margin-left: 6px">{{ t.tickets.create.submit }}</text>
           </view>
@@ -97,9 +98,9 @@
 
         <text class="block" :style="messagesLabelStyle">{{ t.tickets.detail.messagesLabel }}</text>
         <view style="display: flex; flex-direction: column; gap: 8px">
-          <view v-for="(m, i) in detailTicket.messages" :key="i" :style="msgBubbleStyle(m.author === 'user')">
+          <view v-for="m in detailTicket.messages" :key="m.id" :style="msgBubbleStyle(m.author === 'user')">
             <view class="flex items-center" :style="msgHeadStyle">
-              <text :style="msgAuthorStyle(m.author === 'user')">{{ m.author === "user" ? t.tickets.detail.youLabel : (m.agentName ?? "Agent") }}</text>
+              <text :style="msgAuthorStyle(m.author === 'user')">{{ messageAuthor(m) }}</text>
               <text :style="dotSepStyle" style="margin: 0 4px">·</text>
               <text :style="msgTimeStyle">{{ relWhen(m.ts) }}</text>
             </view>
@@ -126,7 +127,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
-import { onLoad } from "@dcloudio/uni-app";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -137,13 +138,12 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useTickets } from "@/store/tickets";
 import {
-  CATEGORY_LABEL,
-  STATUS_LABEL,
   STATUS_COLOR,
   type Ticket,
   type TicketCategory,
+  type TicketMessage,
   type TicketStatus,
-} from "@/mock/tickets";
+} from "@/domain/support";
 
 type Mode = { kind: "list" } | { kind: "create" } | { kind: "detail"; id: string };
 type Tab = "all" | "open" | "resolved" | "closed";
@@ -170,6 +170,30 @@ onLoad((query) => {
   }
   if (typeof query?.ticket === "string") mode.value = { kind: "detail", id: query.ticket };
 });
+
+onShow(async () => {
+  try {
+    await ticketsStore.refresh();
+    if (mode.value.kind === "detail") await ticketsStore.load(mode.value.id);
+  } catch {
+    toast.warn("Support unavailable", "Please retry when the connection is restored.");
+  }
+});
+
+async function reloadTickets() {
+  try { await ticketsStore.refresh(); }
+  catch { toast.warn("Support unavailable", "Please retry when the connection is restored."); }
+}
+
+async function openTicket(id: string) {
+  if (ticketsStore.mutating) return;
+  try {
+    await ticketsStore.load(id);
+    mode.value = { kind: "detail", id };
+  } catch {
+    toast.warn("Support unavailable", "Please retry when the connection is restored.");
+  }
+}
 
 const alertIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>`;
 const clockIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>`;
@@ -203,10 +227,10 @@ const createdLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.de
 const updatedLabel = computed(() => (detailTicket.value ? fmt(t.value.tickets.detail.lastUpdate, { when: relWhen(detailTicket.value.updatedAt) }) : ""));
 
 function catLabel(c: TicketCategory): string {
-  return CATEGORY_LABEL[c];
+  return t.value.tickets.category[c];
 }
 function statusLabel(s: TicketStatus): string {
-  return STATUS_LABEL[s];
+  return t.value.tickets.status[s];
 }
 function tabLabel(id: Tab): string {
   const key = id === "all" ? "tabAll" : id === "open" ? "tabOpen" : id === "resolved" ? "tabResolved" : "tabClosed";
@@ -225,10 +249,15 @@ function canClose(tk: Ticket): boolean {
 }
 function relWhen(ts: number): string {
   const ms = Date.now() - ts;
-  if (ms < 60_000) return "just now";
-  if (ms < 3600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
+  if (ms < 60_000) return t.value.tickets.timeJustNow;
+  if (ms < 3600_000) return fmt(t.value.tickets.timeMinutesAgo, { n: Math.floor(ms / 60_000) });
+  if (ms < 86_400_000) return fmt(t.value.tickets.timeHoursAgo, { n: Math.floor(ms / 3600_000) });
+  return fmt(t.value.tickets.timeDaysAgo, { n: Math.floor(ms / 86_400_000) });
+}
+
+function messageAuthor(message: TicketMessage): string {
+  if (message.author === "user") return t.value.tickets.detail.youLabel;
+  return message.agentName?.trim() || t.value.tickets.detail.agentFallback;
 }
 
 function detailVal(e: Event): string {
@@ -244,29 +273,39 @@ function onReply(e: Event) {
   reply.value = detailVal(e);
 }
 
-function submitCreate() {
+async function submitCreate() {
+  if (ticketsStore.mutating) return;
   if (!subject.value.trim() || !desc.value.trim()) {
     toast.info(t.value.tickets.create.missingFields, "");
     return;
   }
-  const id = ticketsStore.createTicket({ category: newCat.value, subject: subject.value, body: desc.value });
-  toast.success(t.value.tickets.create.submittedToast, "");
-  subject.value = "";
-  desc.value = "";
-  mode.value = { kind: "detail", id };
+  try {
+    const id = await ticketsStore.createTicket({ category: newCat.value, subject: subject.value, body: desc.value });
+    toast.success(t.value.tickets.create.submittedToast, "");
+    subject.value = "";
+    desc.value = "";
+    mode.value = { kind: "detail", id };
+  } catch { toast.error("Submit failed", "No local ticket was created."); }
 }
-function sendReply() {
+async function sendReply() {
+  if (ticketsStore.mutating) return;
   const current = detailTicket.value;
   if (!current || !reply.value.trim()) return;
-  ticketsStore.reply(current.id, reply.value);
-  reply.value = "";
-  toast.success(t.value.tickets.detail.sentToast, "");
+  try {
+    await ticketsStore.reply(current.id, reply.value);
+    reply.value = "";
+    toast.success(t.value.tickets.detail.sentToast, "");
+  } catch { toast.error("Reply failed", "Please refresh and try again."); }
 }
-function closeTicket() {
+async function closeTicket() {
+  if (ticketsStore.mutating) return;
   const current = detailTicket.value;
-  if (current) ticketsStore.close(current.id);
-  toast.success(t.value.tickets.detail.closedToast, "");
-  mode.value = { kind: "list" };
+  if (!current) return;
+  try {
+    await ticketsStore.close(current.id);
+    toast.success(t.value.tickets.detail.closedToast, "");
+    mode.value = { kind: "list" };
+  } catch { toast.error("Close failed", "Please refresh and try again."); }
 }
 
 const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };

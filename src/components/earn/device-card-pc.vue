@@ -102,6 +102,13 @@
         </view>
       </view>
 
+      <view v-if="!task && taskLockRemainingMinutes > 0" class="flex items-center justify-between"
+        style="margin: 0 20px 12px; padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb, var(--v5-warning) 10%, transparent)"
+        :data-task-lock-until="device.taskLockUntil">
+        <text style="font-size: 12px; color: var(--v5-warning-ink)">Task lock</text>
+        <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-2)">{{ taskLockRemainingMinutes }} min</text>
+      </view>
+
       <!-- FEAT-DEV01: task-capacity readout(补贴期内隐藏百分比只显 badge;tap → W-CAP1 说明弹层) -->
       <view v-if="degradable && !inSubsidy && lifecycle" class="nx-device-explainer flex items-center justify-between gap-2 active:opacity-70" style="padding: 0 20px 12px" role="button" tabindex="0" @click.stop="openExplainer" @keydown.enter.stop.prevent="openExplainer" @keydown.space.stop.prevent="openExplainer">
         <text class="min-w-0 truncate" :style="capacityRowStyle">{{ capacityRowText }}</text>
@@ -315,7 +322,8 @@ import type { Device, DeviceKind, TaskCategory } from "@/store/types";
 import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import { deviceName, deviceGpuLabel, deviceLocation } from "@/lib/device-copy";
 import { getLifecycleSummary, isDegradable, SUBSIDY_DAYS, CAPACITY_FLOOR } from "@/store/device-lifecycle";
-import { getLockedTeasers, avgEligibleReward, type LockedTeaser } from "@/mock/tasks";
+import type { LockedTeaser } from "@/mock/tasks";
+import { prepareEarnConfig, useEarnConfig } from "@/store/earn-config";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
 import { navTo } from "@/lib/route";
 import { interruptInfo, INTERRUPT_MAX_RETRIES } from "@/store/interrupt";
@@ -328,6 +336,8 @@ const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolea
 const emit = defineEmits<{ toggle: [] }>();
 const app = useApp();
 const t = useT();
+prepareEarnConfig();
+const earnConfig = useEarnConfig();
 
 // Model names are proper nouns (untranslated); the workload half is copy.
 // Resolved from `category` at render — the baked `task.type` string is English.
@@ -367,6 +377,10 @@ const KIND_ICON_PATHS: Record<DeviceKind, string> = {
 const kindIconPath = computed(() => KIND_ICON_PATHS[props.device.kind] ?? KIND_ICON_PATHS.phone);
 
 const task = computed(() => props.device.currentTask);
+const taskLockRemainingMinutes = computed(() => {
+  const lockUntil = props.device.taskLockUntil ?? 0;
+  return lockUntil > now.value ? Math.max(1, Math.ceil((lockUntil - now.value) / 60000)) : 0;
+});
 const reconnecting = computed(() => props.device.kind === "phone" && props.device.interruptedAt != null);
 const elapsedRatio = computed(() => {
   const tk = task.value;
@@ -571,7 +585,7 @@ const capacityFloored = computed(() => !!lifecycle.value && lifecycle.value.effi
 const tasksToday = computed(() => {
   const s = lifecycle.value;
   if (!s) return 0;
-  return Math.max(1, Math.min(999, Math.round(s.dailyRateNow / Math.max(avgEligibleReward(props.device.vramTotal), 1e-6))));
+  return Math.max(1, Math.min(999, Math.round(s.dailyRateNow / Math.max(earnConfig.averageEligibleReward(props.device.vramTotal), 1e-6))));
 });
 const capacityRowText = computed(() =>
   capacityFloored.value
@@ -585,7 +599,7 @@ const capacityRowStyle = computed<CSSProperties>(() => ({
 }));
 // 硬件版高阶任务 loss-ad:真派生(VRAM 门控),补贴期内不渲染(满产叙事自洽)。
 const hwTeasers = computed<LockedTeaser[]>(() =>
-  degradable.value && !inSubsidy.value ? getLockedTeasers(props.device.vramTotal, 3) : [],
+  degradable.value && !inSubsidy.value ? earnConfig.lockedTeasers(props.device.vramTotal, 3) : [],
 );
 const hwLockedDaily = computed(() => hwTeasers.value.reduce((s, x) => s + x.dailyPotentialUSD, 0));
 function goUnlockHw() {

@@ -30,26 +30,69 @@ import { ONE_MONTH_MS, mockServerNow } from "./server-time";
  *  throughMonth]; the `throughMonth: null` row is open-ended. monthlyDeltaPct
  *  compounds per whole month, with linear interpolation inside the current
  *  month so the UI renders a smooth curve. */
-export const TASK_CAPACITY_BANDS = [
+export let TASK_CAPACITY_BANDS: ReadonlyArray<{ throughMonth: number | null; monthlyDeltaPct: number }> = [
   { throughMonth: 3, monthlyDeltaPct: -4 },       // months 1-3
   { throughMonth: 8, monthlyDeltaPct: -6 },       // months 4-8
   { throughMonth: null, monthlyDeltaPct: -23.7 }, // months 9+ — calibrated so capacity(month 12) ≈ floor: 0.96³·0.94⁵·0.763⁴ ≈ 0.22
-] as const;
+];
 
 /** Capacity never drops below this share of the published daily rate. */
-export const CAPACITY_FLOOR = 0.22;
+export let CAPACITY_FLOOR = 0.22;
 
 /** New-device task-subsidy window, in days. DISPLAY-ONLY (FEAT-DEV01B): within
  *  the window the device card shows the subsidy badge instead of the capacity
  *  percentage. It must NEVER enter the accrual math below — the capacity curve
  *  is continuous from day 0 (等效换皮 P0). */
-export const SUBSIDY_DAYS = 30;
+export let SUBSIDY_DAYS = 30;
 
 /** Kinds exempt from the task-mix decline (constant 100% capacity): phone
  *  yield is engagement-tier, cloud-share is platform-refreshed rented compute,
  *  pc-gpu is the user's own shared computer. Admin exposes this as per-SKU
  *  「参与任务递减」switches. */
-export const CAPACITY_EXEMPT_KINDS: readonly DeviceKind[] = ["phone", "cloud-share", "pc-gpu"];
+export let CAPACITY_EXEMPT_KINDS: readonly DeviceKind[] = ["phone", "cloud-share", "pc-gpu"];
+
+const APPLY_KEY_BY_KIND: Record<DeviceKind, string> = {
+  phone: "capacityApplyToPhone",
+  "cloud-share": "capacityApplyToCloudShare",
+  "pc-gpu": "capacityApplyToPcGpu",
+  "stellarbox-s1": "capacityApplyToS1",
+  "stellarbox-pro": "capacityApplyToPro",
+  "stellarbox-pro-v2": "capacityApplyToProV2",
+  "stellarrack-p1": "capacityApplyToRackP1",
+  "stellarrack-p2": "capacityApplyToRackP2",
+};
+
+function requiredNumber(config: Record<string, string>, key: string): number {
+  const value = Number(config[key]);
+  if (!Number.isFinite(value)) throw new Error("E3_LIFECYCLE_CONFIG_INVALID");
+  return value;
+}
+
+/** Installs the exact server schedule returned with /api/devices/earnings. */
+export function installCanonicalLifecycleConfig(config: Record<string, string>): void {
+  const early = requiredNumber(config, "stageEarlyEnd");
+  const mid = requiredNumber(config, "stageMidEnd");
+  const floorPct = requiredNumber(config, "capacityFloorPct");
+  const subsidyDays = requiredNumber(config, "capacitySubsidyDays");
+  if (!Number.isSafeInteger(early) || !Number.isSafeInteger(mid) || early <= 0 || mid <= early
+      || floorPct < 0 || floorPct > 100 || !Number.isSafeInteger(subsidyDays) || subsidyDays < 0) {
+    throw new Error("E3_LIFECYCLE_CONFIG_INVALID");
+  }
+  const bands = [
+    { throughMonth: early, monthlyDeltaPct: requiredNumber(config, "capacityBand1DeltaPct") },
+    { throughMonth: mid, monthlyDeltaPct: requiredNumber(config, "capacityBand2DeltaPct") },
+    { throughMonth: null, monthlyDeltaPct: requiredNumber(config, "capacityBand3DeltaPct") },
+  ];
+  const exempt = (Object.keys(APPLY_KEY_BY_KIND) as DeviceKind[]).filter((kind) => {
+    const raw = config[APPLY_KEY_BY_KIND[kind]];
+    if (raw !== "true" && raw !== "false") throw new Error("E3_LIFECYCLE_CONFIG_INVALID");
+    return raw === "false";
+  });
+  TASK_CAPACITY_BANDS = bands;
+  CAPACITY_FLOOR = floorPct / 100;
+  SUBSIDY_DAYS = subsidyDays;
+  CAPACITY_EXEMPT_KINDS = exempt;
+}
 
 /** Frozen consumer API — true when the kind follows the capacity schedule. */
 export function isDegradable(kind: DeviceKind): boolean {
