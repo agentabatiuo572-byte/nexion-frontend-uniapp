@@ -87,22 +87,25 @@ check("未收口的提交尝试在请求发出前落盘,且落盘失败即拒发
 // policyVersion 变 → 重放的 body 跟着变 → 撞「同键异 body → 409 + 安全事件」。
 // 🔴 判据必须按大括号配对划界,不能按「另一个标识符出现在第几个字符」—— 后者能被
 // 「插在那个标识符前面」整个绕过(本门自己的变异测试抓到的洞)。
-const settledNeedle = "if (isSettledRejection(err)) {";
-let policyRefreshOnlyInSettled = false;
-if (catchTail.includes(settledNeedle)) {
-  const settledBlock = grabBlock(catchTail, settledNeedle);
-  const from = catchTail.indexOf(settledBlock);
-  const to = from + settledBlock.length;
-  policyRefreshOnlyInSettled = ![...catchTail.matchAll(/loadWithdrawalPolicy/g)]
-    .some((hit) => hit.index < from || hit.index >= to);
-}
+// ⚠️ 2026-08-12 重锚:上一版钉的是 `if (isSettledRejection(err)) {` 这行**出现在 catch 段里**,
+// 即「页面自己判定局」。判决现已抽成 `src/lib/withdraw-failure-triage.ts` 的纯函数,
+// 页面只消费它 —— 那一行按设计消失了。**不变量没丢,而且更强**:
+// 退役与刷费率各自只剩一处、且都由判决门控,值域层面的逐格断言由
+// `scripts/selfcheck-withdraw-replay-triage.mjs` 跑真函数全矩阵(48 格,含
+// 「重放路径上退役键的只有 409」「判成未知的一律留键」「重放一律不刷费率」三条不变量)。
+// 本门只钉**接线形状**:页面不许绕过判决自己动手。钉行为落点,不钉某个谓词名。
+const retireGated = /if \(verdict\.fate === "retire"\) forgetWithdrawAttempt\(/.test(catchTail)
+  && (catchTail.match(/forgetWithdrawAttempt\(/g) || []).length === 1;
+const refreshGated = /if \(verdict\.refreshPolicy\) await loadWithdrawalPolicy\(/.test(catchTail)
+  && (catchTail.match(/loadWithdrawalPolicy\(/g) || []).length === 1;
 
-check("失败按结果分层:定局才退役键,结果未知时留键、不刷费率、不喊重试",
-  catchTail.includes("isIdempotencyConflict(")
-  && catchTail.includes("isSettledRejection(")
+check("失败按结果分层:退役与刷费率都只有一处且由判决门控,页面不自行判定局",
+  catchTail.includes("triageWithdrawFailure(")
+  && !/isSettledRejection\(|isIdempotencyConflict\(/.test(catchTail)
   && catchTail.includes("withdrawOutcomeUnknown")
   && !catchTail.includes("withdrawFeeStale")
-  && policyRefreshOnlyInSettled);
+  && retireGated
+  && refreshGated);
 check("页面提交路径没有本地扣 USDT、烧 NEX 或伪造提现账单",
   !/app\.(?:debitBalance|debitNex)\(/.test(submit)
   && !/bills\.(?:add|addForAccount)\(/.test(submit));

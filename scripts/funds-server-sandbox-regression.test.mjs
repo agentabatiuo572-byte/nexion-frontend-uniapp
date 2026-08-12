@@ -123,15 +123,26 @@ assert.match(app, /const mutation: FundsMutationIdentity \| null = fundsSandboxE
 // 🔴 生产侧幂等键改由**调用方冻结后传入**,不在 store 内现造(2026-08-12 合并收口)。
 // 原判据要求 store 走 createProductionFundsRequestKey() —— 那个工厂每调一次就新造一把,
 // 于是「提交超时 → 用户重试」在服务端眼里是两个互不相干的请求 = **第二笔真出账**。
-// 现在的契约更强:页面按「账号|网络|金额|地址|抵扣」签名冻结一把键(wallet-withdraw.vue
-// currentIdempotencyKey),意图不变则重试沿用同一把,意图变了才换。sandbox 轨的持久
-// 注册表原样保留。两条断言分别守「沙箱走注册表」与「生产走入参、store 内不现造」。
+// 现在的契约更强:页面把键**连同整个请求体**冻结后落盘,重试原样重放。sandbox 轨的持久
+// 注册表原样保留。三条断言分别守「沙箱走注册表」「生产走入参、store 内不现造」「页面冻结落盘」。
+//
+// ⚠️ 2026-08-12 二次重锚:上一版这里钉的是 `submitIntentSig.value !== sig … submitIntentKey.value =`
+// —— 那是**内存签名轨**的内部实现,已随本轮收口删除(它与 lib/withdraw-attempt 的落盘轨
+// 是同一件事的两套实现,内存那条活不过刷新页面,而「请求在途时刷页面」正是要兜的那一刻)。
+// 不变量没变,变的是它落在哪儿,所以**重锚不删门**:改钉「键取自落盘的冻结件」+
+// 「落盘发生在请求发出之前」。钉行为落点,不钉某个变量名。
 assert.match(app, /if \(fundsSandboxEnabled\)[\s\S]{0,300}pendingFundsMutationKey\(mutation\)/,
   "the sandbox rail must still key its command off the durable pending registry");
 assert.doesNotMatch(app, /createProductionFundsRequestKey\(\)/,
   "production commands must not mint a fresh idempotency key inside the store (a retry would become a second payout)");
-assert.match(withdrawPage, /submitIntentSig\.value !== sig[\s\S]{0,200}submitIntentKey\.value = /,
-  "the production key must be frozen per submit intent so a retry reuses it");
+assert.match(withdrawPage, /idempotencyKey:\s*pending\?\.key\s*\?\?/,
+  "the production key must come from the persisted frozen attempt when one exists, so a retry reuses it");
+const rememberAt = withdrawPage.indexOf("rememberWithdrawAttempt(");
+const submitAt = withdrawPage.indexOf("app.submitWithdrawal(");
+assert.notEqual(rememberAt, -1, "找不到 rememberWithdrawAttempt 调用 —— 判据失效,判红");
+assert.notEqual(submitAt, -1, "找不到 app.submitWithdrawal 调用 —— 判据失效,判红");
+assert.ok(rememberAt < submitAt,
+  "the frozen key/body must be persisted BEFORE the request goes out (otherwise a crash mid-flight loses the only way to recognise that attempt)");
 assert.match(trackingPage, /<FundsSandboxBadge\b/,
   "terminal and non-terminal sandbox orders must remain visibly labelled");
 

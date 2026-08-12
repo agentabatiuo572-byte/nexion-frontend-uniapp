@@ -387,7 +387,8 @@ import { withdrawalApi } from "@/api/runtime";
 // 那行 import 曾经是**全文件唯一**的 isAmbiguousOutcome 出现处(零调用),却正好喂饱了
 // selfcheck-fastlane 的一格字符串针 —— 门以为页面在用它,实际一次没调过。
 // tsconfig 未开 noUnusedLocals,type-check 抓不到这种幻影针,只能靠删掉它。
-import { ApiError, isIdempotencyConflict, isSettledRejection } from "@/api/errors";
+import { ApiError } from "@/api/errors";
+import { triageWithdrawFailure } from "@/lib/withdraw-failure-triage";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 const ALL_NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
@@ -1275,70 +1276,46 @@ async function handleSubmit() {
     return;
   } catch (err) {
     clearSubmitFreeze();
-    // 🔴🔴 失败分诊:先问「要判的是哪一次」,再问「这一次定局了没有」。
+    // 🔴🔴 判决**不在这里做** —— 调 lib/withdraw-failure-triage 的 triageWithdrawFailure。
     //
-    // 2026-08-12 两路独立审计各自点名同一个根因:此前的四档只回答了后半句 ——
-    // `isSettledRejection` 说的是「**这一次**尝试在服务端定局了没有」。首次提交时这就是全部,
-    // 但**重放**时要回答的是另一个问题:「**上一次**那笔到底落库了没有」。
-    // 两者只在一个前提下等价:服务端的幂等表查询发生在所有拒绝路径之前。
-    // 而 401 鉴权、429 限流、地区策略这些**边缘层**拒绝,按任何常规栈都发生在幂等查询之前,
-    // 它们对「上一次」零信息量 —— 拿它们退役键,下一次就是新键、就是第二笔。
-    //
-    // 实测能走通的一条(会话过期是高频事件):
-    //   首提超时(服务端已建单)→ 键留盘 → 用户隔一阵回来点重发 → token 过期 →
-    //   `kind:"auth"` → 旧逻辑判「确定没建单」→ 退役键 → 用户重新登录再提 → **第二笔**。
-    //
-    // 🔴 重放路径上**只有两种结局是真定局**:
-    //   · 成功 —— 服务端把结果给了我们;
-    //   · 409  —— 服务端明确说「这个键我这儿已经有记录」。
-    // 其余一律**保留键**,只换话术。宁可让用户多看一次「仍在收口中」,也不多出一笔钱。
-    const isReplay = pending !== null;
-
-    // ① 日限:**只换话术,不动键**。
-    // 它的判据是 `err.message` 的子串匹配(`DAILY_LIMIT` / `DAILY_COUNT` / …),不看 kind
-    // 不看 status,而 api-client 对任何非 2xx 都把服务端 envelope 的 message 原样透传 ——
-    // 把「键的去留」交给一段**没有契约的、服务端可控的字符串**,等于把资金安全押在文案上。
-    // 键的去留一律走下面同一张表。(合并时我把这一档从旧机制的 clearSubmitIntent()
-    // 直译成了 forgetWithdrawAttempt(),同一个动作名在新旧两套架构下语义完全不同。)
-    if (isDailyLimitRejection(err)) {
-      if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(snap.account);
-      toast.error(isReplay ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
-      return;
-    }
-    // ② 409 —— 唯一一个在重放路径上也成立的「定局」。键已用掉,退役;绝不说「再试一次」。
-    if (isIdempotencyConflict(err)) {
-      forgetWithdrawAttempt(snap.account);
-      toast.error(t.value.walletV3.withdrawAlreadyOnFileTitle, t.value.walletV3.withdrawAlreadyOnFileBody);
-      return;
-    }
-    // ③ 服务端完整应答并拒绝 —— **仅在首次提交时**才等于「没建单」。
-    //    重放时它只说明「这一次被拒」,与上一次落没落库无关,所以不退役。
-    if (isSettledRejection(err)) {
-      if (!isReplay) forgetWithdrawAttempt(snap.account);
-      const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
-      if (geo) {
-        toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+    // 为什么(2026-08-12 第四轮独立审计实测出来的):上一版把规则写在这个 catch 里,
+    // 而机器门在它自己内部**重新推导了一遍**。两个真理源 ⇒ 门与实现分叉时门看不见。
+    // 实测三个必然出事的变异让门 32/32 全绿,其中一个是「结果未知也退役键」——
+    // 正是这整套机制存在的唯一理由所要防的那个 bug。
+    // 现在页面只做两件事:**给上下文**(这次是不是重放 / 认不认得出日限与地区),
+    // 和**按判决选文案**。键的去留一个字都不在这里决定。
+    const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
+    const verdict = triageWithdrawFailure(err, {
+      isReplay: pending !== null,
+      isDailyLimit: isDailyLimitRejection(err),
+      isGeo: geo !== null,
+    });
+    if (verdict.fate === "retire") forgetWithdrawAttempt(snap.account);
+    // 🔴 刷费率只跟着判决走:重放时刷了 policyVersion 就变,而重放的 body 冻着旧版本,
+    // 刷完再重放 = 同 key 异 body → 409 + 安全事件。
+    if (verdict.refreshPolicy) await loadWithdrawalPolicy();
+    switch (verdict.kind) {
+      case "daily-limit":
+        toast.error(verdict.fate === "keep" ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
         return;
-      }
-      if (isReplay) {
-        // 重放被拒:本次没过,但先前那笔的状态仍未知 —— 话术必须说清这两件事都成立。
-        toast.error(t.value.walletV3.withdrawResendDeclinedTitle, t.value.walletV3.withdrawResendDeclinedBody);
+      case "already-on-file":
+        toast.error(t.value.walletV3.withdrawAlreadyOnFileTitle, t.value.walletV3.withdrawAlreadyOnFileBody);
         return;
-      }
-      if (err instanceof ApiError && err.kind === "business") {
+      case "geo":
+        toast.error(geo ?? t.value.walletV3.withdrawDeclinedTitle, t.value.geoPolicy.fundsSafeNote);
+        return;
+      case "business":
         toast.error(t.value.walletV3.submitReasonReviewBlocked);
         return;
-      }
-      // 走到这里才是「计价参数确实可能是被拒的原因」,此时刷费率才对症。
-      // 🔴 只在**非重放**分支刷:刷了 policyVersion 就变,重放的 body 跟着变,正好撞 409。
-      await loadWithdrawalPolicy();
-      toast.error(t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
-      return;
+      case "resend-declined":
+        toast.error(t.value.walletV3.withdrawResendDeclinedTitle, t.value.walletV3.withdrawResendDeclinedBody);
+        return;
+      case "declined":
+        toast.error(t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
+        return;
+      default:
+        toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
     }
-    // ④ 结果未知(超时 / 断网 / 5xx / 应答读不懂):请求**可能已经落库**。
-    // 键与 body 原样留着,下次点提交按原样重放,服务端同 key 同 body 返回原结果。
-    // 🔴 这一支绝不能调 loadWithdrawalPolicy(理由同上)。
-    toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
     return;
   }
 
