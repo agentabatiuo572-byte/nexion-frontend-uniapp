@@ -59,10 +59,12 @@ import { useT } from "@/i18n/use-t";
 import { useOrders, type OrderStatus } from "@/store/orders";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
+import { onShow } from "@dcloudio/uni-app";
 
 const t = useT();
 const orders = useOrders();
 const orderList = computed(() => orders.orders);
+onShow(() => { void orders.refreshRemote().catch(() => undefined); });
 
 // Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted
 // colocation, nothing ships to the user, so the old "track your hardware

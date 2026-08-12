@@ -92,9 +92,8 @@ function nullableString(value: unknown): string | null {
 }
 
 function finiteNumber(value: unknown, minimum = 0): number {
-  const parsed = typeof value === "string" && value.trim() ? Number(value) : value;
-  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < minimum) return invalid();
-  return parsed;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) return invalid();
+  return value;
 }
 
 function integer(value: unknown, minimum = 0): number {
@@ -117,7 +116,7 @@ function canonicalOrder(value: unknown): CanonicalOrder {
   const source = record(value);
   const status = nonEmptyString(source.canonicalStatus);
   if (!STATUS_SET.has(status)) return invalid();
-  return {
+  const parsed: CanonicalOrder = {
     orderNo: nonEmptyString(source.orderNo),
     productId: integer(source.productId, 1),
     productNo: nonEmptyString(source.productNo),
@@ -141,6 +140,48 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     targetDeviceId: nullableInteger(source.targetDeviceId),
     targetDeviceInstanceNo: nullableString(source.targetDeviceInstanceNo),
   };
+  const paymentStatus = parsed.paymentStatus.toUpperCase();
+  const orderStatus = parsed.orderStatus.toUpperCase();
+  const activationStatus = parsed.activationStatus.toUpperCase();
+  const coherentStatus = (() => {
+    switch (parsed.canonicalStatus) {
+      case "placed":
+        return paymentStatus === "PENDING" && orderStatus === "PENDING_PAYMENT"
+          && activationStatus === "WAITING_PAYMENT" && parsed.paidAt === null
+          && parsed.activatedAt === null;
+      case "paid":
+        return paymentStatus === "PAID" && orderStatus === "PAID"
+          && activationStatus === "WAITING_PROVISIONING" && parsed.paidAt !== null
+          && parsed.activatedAt === null;
+      case "provisioning":
+        return paymentStatus === "PAID" && (orderStatus === "PROCESSING" || orderStatus === "PROVISIONING")
+          && activationStatus === "PROVISIONING" && parsed.paidAt !== null
+          && parsed.activatedAt === null;
+      case "activated":
+        return paymentStatus === "PAID" && orderStatus === "COMPLETED"
+          && activationStatus === "ACTIVATED" && parsed.paidAt !== null && parsed.activatedAt !== null;
+      case "payment_failed":
+        return paymentStatus === "FAILED" && orderStatus === "PAYMENT_FAILED"
+          && activationStatus === "WAITING_PAYMENT";
+      case "expired":
+        return paymentStatus === "EXPIRED" && orderStatus === "EXPIRED"
+          && activationStatus === "WAITING_PAYMENT";
+      case "provisioning_failed":
+        return paymentStatus === "PAID" && orderStatus === "PROVISIONING_FAILED"
+          && activationStatus === "PROVISIONING_FAILED";
+      case "refunded":
+        return paymentStatus === "REFUNDED" && orderStatus === "REFUNDED"
+          && activationStatus === "REFUNDED";
+      case "chargeback":
+        return paymentStatus === "CHARGEBACK" && orderStatus === "CHARGEBACK"
+          && activationStatus === "DEACTIVATED";
+      case "cancelled":
+        return paymentStatus === "CANCELLED" && orderStatus === "CANCELLED"
+          && activationStatus === "WAITING_PAYMENT";
+    }
+  })();
+  if (!coherentStatus) return invalid();
+  return parsed;
 }
 
 function createdOrder(value: unknown): CreatedOrder {
@@ -154,7 +195,7 @@ function createdOrder(value: unknown): CreatedOrder {
     status: redemption.status === "REDEEMED" ? "REDEEMED" as const : invalid(),
     discountUsdt: finiteNumber(redemption.discountUsdt),
   };
-  return {
+  const parsed: CreatedOrder = {
     orderNo: nonEmptyString(source.orderNo),
     subtotalUsdt: finiteNumber(source.subtotalUsdt),
     discountUsdt: finiteNumber(source.discountUsdt),
@@ -165,6 +206,11 @@ function createdOrder(value: unknown): CreatedOrder {
     orderStatus: nonEmptyString(source.orderStatus),
     idSource: "server",
   };
+  if (parsed.paymentStatus.toUpperCase() !== "PENDING"
+      || parsed.orderStatus.toUpperCase() !== "PENDING_PAYMENT") {
+    return invalid();
+  }
+  return parsed;
 }
 
 export function createOrderApi(client: ApiClient): OrderApi {

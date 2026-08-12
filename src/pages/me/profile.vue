@@ -131,7 +131,9 @@ const isSaving = ref(false);
 const nicknameSheetOpen = ref(false);
 
 const displayName = computed(() => profile.displayName);
-const email = computed(() => auth.email || app.user.email);
+// A remote session's user-id key is internal routing state, never profile copy.
+// Until the backend supplies a phone projection, show an honest blank field.
+const email = computed(() => remoteApiEnabled ? profile.phoneE164 : (auth.email || app.user.email));
 const initial = computed(
   () => (displayName.value || email.value || "S").trim()[0]?.toUpperCase() || "S",
 );

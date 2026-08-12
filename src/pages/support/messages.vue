@@ -36,21 +36,21 @@
 
         <!-- Right conversation list -->
         <view class="nx-conv-listcol">
-          <!-- Support entry: visible whenever no ACTIVE support session exists (none
-               yet, or every previous one timed out) — tapping assigns an agent. -->
+          <!-- A new turn opens a composer first. The authenticated user's text is the
+               first durable timeline entry; this surface never invents an opening. -->
           <view
-            v-if="selectedType === 'support' && !hasActiveSupport"
+            v-if="selectedType === 'support' && rows.length > 0 && !hasActiveSupport"
             class="nx-conv-contact active:opacity-80"
             role="button"
             tabindex="0"
             :aria-label="t.conversations.contactSupport"
-            @click="onContactSupport"
+            @click="onStartConversation('support')"
           >
             <view class="nx-conv-contact-ico" aria-hidden="true"><view v-html="SUPPORT_ICON" /></view>
             <text class="nx-conv-contact-t">{{ t.conversations.contactSupport }}</text>
           </view>
 
-          <EmptyState v-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="t.empty.messagesDesc" compact />
+          <EmptyState v-if="rows.length === 0" kind="empty-list" :title="t.empty.messagesTitle" :desc="emptyHint" :cta-label="startConversationLabel" emphasis compact @cta="onStartConversation" />
           <view
             v-for="r in rows"
             :key="r.id"
@@ -93,7 +93,7 @@ import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
-import type { ConversationType, ConvMessage } from "@/mock/conversations";
+import type { ConversationType, ConvMessage } from "@/domain/support";
 
 const t = useT();
 const convStore = useConversations();
@@ -104,8 +104,8 @@ const selectedType = ref<ConversationType>("advisor");
 // Entering the inbox is a lazy timeout checkpoint (chat entry and session start
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
-onShow(() => {
-  convStore.sweepSupportTimeouts();
+onShow(async () => {
+  try { await convStore.refresh(); } catch { /* honest empty state is rendered */ }
 });
 
 // Contact-support entry shows only when no live session exists.
@@ -113,9 +113,10 @@ const hasActiveSupport = computed(() =>
   convStore.byType("support").some((c) => c.sessionStatus === "active"),
 );
 
-function onContactSupport() {
-  const id = convStore.startSupportSession();
-  navTo("/pages/support/chat?cid=" + id);
+function onStartConversation(type?: Exclude<ConversationType, "ai">) {
+  const target = type ?? (selectedType.value === "advisor" || selectedType.value === "support" ? selectedType.value : null);
+  if (!target) return;
+  navTo("/pages/support/chat?start=" + target);
 }
 
 // Inline category icons (stroke=currentColor → tinted via container `color`).
@@ -156,9 +157,13 @@ function cleanPreview(s: string): string {
   return s.replace(/\*\*/g, "").replace(/\s*\n+\s*/g, " ").trim();
 }
 
-function msgText(m: ConvMessage, name: string): string {
-  const raw = m.textKey ? t.value.conversations.seed[m.textKey] : (m.text ?? "");
-  return fmt(raw, { name, ...(m.textArgs ?? {}) });
+function msgText(m: ConvMessage, _name: string): string { return m.text; }
+
+function displayAgentName(name: string): string {
+  const normalized = name.trim();
+  return normalized && normalized.toLowerCase() !== "unassigned"
+    ? normalized
+    : t.value.conversations.unassignedAgent;
 }
 
 function relTime(ts: number): string {
@@ -195,8 +200,8 @@ const rows = computed<Row[]>(() => {
     const typing = convStore.typingIds[c.id] === true;
     return {
       id: c.id,
-      name: c.agentName,
-      preview: typing ? t.value.conversations.agentTyping : last ? cleanPreview(msgText(last, c.agentName)) : t.value.conversations[c.roleKey],
+      name: displayAgentName(c.agentName),
+      preview: typing ? t.value.conversations.agentTyping : last ? cleanPreview(msgText(last, c.agentName)) : cleanPreview(c.lastMessage) || t.value.conversations[c.roleKey],
       time: relTime(c.lastTs),
       unread: c.unread,
       isAi: false,
@@ -212,6 +217,7 @@ const emptyHint = computed(() =>
     ? t.value.conversations.listEmptySupport
     : t.value.conversations.listEmptyAdvisor,
 );
+const startConversationLabel = computed(() => t.value.conversations.startConversation);
 
 function openRow(r: Row) {
   if (r.isAi) {

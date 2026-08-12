@@ -10,6 +10,7 @@ const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const pageRaw = readFileSync(path.join(root, "src", "pages", "me", "wallet-withdraw.vue"), "utf8");
 const appRaw = readFileSync(path.join(root, "src", "store", "app.ts"), "utf8");
 const apiRaw = readFileSync(path.join(root, "src", "api", "withdrawal-api.ts"), "utf8");
+const mutationRaw = readFileSync(path.join(root, "src", "lib", "funds-mutation-key.ts"), "utf8");
 const strip = (source) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
 
 function grabBlock(source, needle) {
@@ -39,6 +40,7 @@ console.log("selfcheck-withdraw-freeze — D5 server-authoritative submission bo
 const page = strip(pageRaw);
 const app = strip(appRaw);
 const api = strip(apiRaw);
+const mutation = strip(mutationRaw);
 const submit = grabBlock(page, "async function handleSubmit()");
 const appSubmit = grabBlock(app, "async function submitWithdrawal(");
 const snapAt = submit.indexOf("const snap = {");
@@ -47,12 +49,15 @@ const identityAt = submit.indexOf("app.accountKey !== snap.account");
 const realSubmitAt = submit.indexOf("await app.submitWithdrawal(");
 
 check("提交意图在首个 await 前冻结", snapAt >= 0 && firstAwaitAt > snapAt);
-check("快照包含账号、网络、地址、金额、抵扣意图、policyVersion 与幂等键",
-  ["account:", "network:", "address:", "amount:", "offset:", "policyVersion:", "idempotencyKey:"]
-    .every((key) => submit.slice(snapAt, snapAt + 900).includes(key)));
+check("快照包含账号、网络、地址、金额、抵扣意图与 policyVersion；幂等键由持久意图注册表生成",
+  ["account:", "network:", "address:", "amount:", "offset:", "policyVersion:"]
+    .every((key) => submit.slice(snapAt, snapAt + 900).includes(key))
+  && /pendingFundsMutationKey\(mutation\)/.test(appSubmit)
+  && /nexgrid-funds-pending-mutations-v1/.test(mutation)
+  && !/(?:Date\.now|Math\.random)/.test(appSubmit));
 check("确认后先复核账号/网络/地址，再调用真实提交", identityAt >= 0 && realSubmitAt > identityAt);
 check("页面按快照提交 policyVersion 与抵扣意图",
-  /submitWithdrawal\(\s*snap\.amount,\s*snap\.network,\s*snap\.address,\s*snap\.fee,\s*snap\.offset,\s*snap\.policyVersion,\s*snap\.idempotencyKey/.test(submit));
+  /submitWithdrawal\(\s*snap\.amount,\s*snap\.network,\s*snap\.address,\s*snap\.fee,\s*snap\.offset,\s*snap\.policyVersion/.test(submit));
 check("页面提交路径没有本地扣 USDT、烧 NEX 或伪造提现账单",
   !/app\.(?:debitBalance|debitNex)\(/.test(submit)
   && !/bills\.(?:add|addForAccount)\(/.test(submit));

@@ -117,11 +117,7 @@ const buckets = computed(() => ({
   bonusLockedUsdt: earningsReleaseSnapshot.value?.buckets.bonus_locked
     ?? app.user.earningBuckets.bonusLockedUsdt,
 }));
-// 🔴 账面总余额,标签「USDT 余额」——**不是**可提现额度(那个只有提现页算得准,且会
-// 在风控受限 / 无快照 / 无 policy 时 fail-closed 归 0)。原注释称三处同源=总余额,
-// 而提现页早已改成 (总余额−held两桶)×balanceMaxRatio,同名不同数。
-// 2026-08-11 主人拍板走"标签分离":这里保持总余额,只把标签的「可提现」摘掉。
-// 差额去向见下面 pendingLine(审核中 / 锁定)。详见 wallet.vue 同位置注释。
+// 2026-07-31:与 wallet.vue / wallet-withdraw 同源 —— 可提口径 = 总余额(held 两桶账外)。
 const usdt = computed(() => app.user.usdtBalance);
 const intPart = computed(() => Math.floor(usdt.value).toLocaleString());
 const fracPart = computed(() => (usdt.value - Math.floor(usdt.value)).toFixed(2).slice(2));

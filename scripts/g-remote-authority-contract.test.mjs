@@ -22,7 +22,9 @@ test("G2 remote mode never records a local wallet success", () => {
   assert.match(source, /import\s*\{[^}]*exchangeApi[^}]*remoteApiEnabled[^}]*\}\s*from\s*["']@\/api\/runtime["']/);
   assert.match(source, /async function syncRemoteState\(/);
   assert.match(source, /await exchangeApi\.fetchState\(\)/);
-  assert.match(source, /await exchangeApi\.swap\(/);
+  assert.match(source, /await executeExchangeSwap<ExchangeSnapshot>\(/);
+  assert.match(source, /swap:\s*\(idempotencyKey\)\s*=>\s*exchangeApi\.swap\(/);
+  assert.match(source, /fetchState:\s*\(\)\s*=>\s*exchangeApi\.fetchState\(\)/);
   assert.match(source, /remoteState\.value = null/);
   assert.match(source, /远端权威数据/);
   assert.match(source, /remoteState\.value\?\.orders/);

@@ -1,5 +1,8 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { readApiRuntimeConfig } from "@/api/runtime-config";
+import { parseTrialBooleanConfig } from "@/lib/trial-config-enum";
+import type { TrialConfigValue } from "@/api/trial-api";
 
 /**
  * Trial config — "后台可控" parameters surfaced as a store rather than
@@ -19,8 +22,8 @@ export interface TrialConfig {
   /** Trial-earnings offset cap, USD (offsets device price at purchase; remainder
    *  credited to balance AFTER purchase; before purchase only offsets). 后台可调。 */
   trialOffsetCapUSD: number;
-  /** Trial product id (currently only S1 supported) */
-  trialProductId: "stellarbox-s1";
+  /** Trial product id selected by the authoritative product policy. */
+  trialProductId: TrialProductId;
   /** Trial product price (conversion checkout subtotal) */
   trialPriceUSD: number;
   /** Shadow accrual rates (S1 baseline per spec §3.1) */
@@ -33,6 +36,25 @@ export interface TrialConfig {
   autoPushDelayMs: number;
   autoPushCooldownHours: number;
   autoPushMaxPerSession: number;
+}
+
+/**
+ * The API owns the selected product; the client only recognizes contractually
+ * supported product-to-display-device mappings.  An unrecognized remote id is
+ * deliberately rejected instead of being guessed or silently falling back.
+ */
+export const TRIAL_PRODUCT_DEVICE_NAMES = {
+  "stellarbox-s1": "NexGridBox S1",
+  "device-trial-standard": "NexGridBox S1",
+} as const;
+
+export type TrialProductId = keyof typeof TRIAL_PRODUCT_DEVICE_NAMES;
+
+export function resolveTrialDeviceName(productId: unknown): string | null {
+  if (typeof productId !== "string") return null;
+  return Object.prototype.hasOwnProperty.call(TRIAL_PRODUCT_DEVICE_NAMES, productId)
+    ? TRIAL_PRODUCT_DEVICE_NAMES[productId as TrialProductId]
+    : null;
 }
 
 export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
@@ -53,6 +75,7 @@ export const DEFAULT_TRIAL_CONFIG: TrialConfig = {
 };
 
 const STORAGE_KEY = "nexgrid-trial-config-v1";
+const remoteAuthority = readApiRuntimeConfig().mode !== "mock";
 
 function hydrate(): TrialConfig {
   try {
@@ -68,9 +91,10 @@ function hydrate(): TrialConfig {
 }
 
 export const useTrialConfig = defineStore("trialConfig", () => {
-  const config = ref<TrialConfig>(hydrate());
+  const config = ref<TrialConfig>(remoteAuthority ? { ...DEFAULT_TRIAL_CONFIG } : hydrate());
 
   function persist() {
+    if (remoteAuthority) return;
     try {
       uni.setStorageSync(STORAGE_KEY, { config: config.value });
     } catch {
@@ -78,15 +102,54 @@ export const useTrialConfig = defineStore("trialConfig", () => {
     }
   }
   function update(patch: Partial<TrialConfig>) {
+    if (remoteAuthority) return;
     config.value = { ...config.value, ...patch };
     persist();
   }
+  function applyAuthoritative(raw: Record<string, TrialConfigValue>) {
+    if (!remoteAuthority) return;
+    const number = (key: string, min = 0) => {
+      const value = Number(raw[key]);
+      if (!Number.isFinite(value) || value < min) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
+      return value;
+    };
+    const integer = (key: string, min = 0) => {
+      const value = number(key, min);
+      if (!Number.isInteger(value)) throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
+      return value;
+    };
+    const bool = (key: string) => {
+      return parseTrialBooleanConfig(raw[key]);
+    };
+    const discountRate = number("discountRate");
+    const trialProductId = raw.trialProductId as TrialProductId;
+    if (discountRate > 100 || !resolveTrialDeviceName(trialProductId)) {
+      throw new Error("TRIAL_CONFIG_RESPONSE_INVALID");
+    }
+    config.value = {
+      trialDays: integer("trialDays", 1),
+      graceDays: integer("graceDays"),
+      discountRate: discountRate > 1 ? discountRate / 100 : discountRate,
+      discountCapUSD: number("discountCapUSD"),
+      trialOffsetCapUSD: number("trialOffsetCapUSD"),
+      trialProductId,
+      trialPriceUSD: number("trialPriceUSD", Number.EPSILON),
+      shadowDailyUSD: number("shadowDailyUSD"),
+      shadowDailyNEX: number("shadowDailyNEX"),
+      phaseOpen: bool("phaseOpen"),
+      autoPushEnabled: bool("autoPushEnabled"),
+      autoPushDelayMs: integer("autoPushDelayMs"),
+      autoPushCooldownHours: integer("autoPushCooldownHours"),
+      autoPushMaxPerSession: integer("autoPushMaxPerSession"),
+    };
+  }
   function reset() {
+    if (remoteAuthority) return;
     config.value = { ...DEFAULT_TRIAL_CONFIG };
     persist();
   }
 
-  return { config, update, reset };
+  return { config, update, applyAuthoritative, reset };
 });
 
 /** Compute discounted price for a conversion purchase during trial/grace. */

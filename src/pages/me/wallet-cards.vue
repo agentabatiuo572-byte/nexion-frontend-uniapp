@@ -35,13 +35,13 @@
             </view>
           </view>
           <view v-if="!remoteApiEnabled" class="flex" :style="cardActionsStyle">
-            <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" role="button" tabindex="0" @click="setDefault(card.tokenId)">
+            <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="setDefault(card.tokenId)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
                 <text :style="actionDefaultTextStyle">{{ t.cards.setDefault }}</text>
               </view>
             </view>
-            <view class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" role="button" tabindex="0" @click="handleRemove(card)">
+            <view class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="handleRemove(card)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" /></svg>
                 <text :style="actionUnbindTextStyle">{{ t.cards.unbind }}</text>
@@ -51,7 +51,7 @@
         </view>
 
         <!-- Add new -->
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" role="button" tabindex="0" @click="goNew">
+        <view class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" @click="goNew">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text style="margin-left: 6px" :style="addBtnTextStyle">{{ t.cards.addNew }}</text>
         </view>

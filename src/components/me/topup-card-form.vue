@@ -16,6 +16,7 @@
        把状态放 vault 的原因。vault 渲染 <slot/> 零 DOM,space-y-3 的子元素间距不受影响。 -->
   <HostedCardVault ref="vaultRef" @change="onCardChange">
   <view class="mx-4 space-y-3">
+    <FundsSandboxBadge />
     <!-- Header row -->
     <view class="flex items-center justify-between" style="padding: 0 4px">
       <text class="font-mono-tabular" style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--v5-ink-3)">Visa / Mastercard</text>
@@ -23,7 +24,6 @@
            入口留着等于把「无取消出口」伪装成有,故只在可操作的两态显示。 -->
       <text v-if="phase === 'form' || phase === 'fail'" style="font-size: 12px; color: var(--v5-ink-3)" @click="emit('changeChannel')">{{ t.topupChrome.change }}</text>
     </view>
-
     <!-- Processing / 3DS -->
     <view v-if="phase === 'processing' || phase === '3ds'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="spinnerStyle" />
@@ -50,9 +50,9 @@
     <view v-else-if="phase === 'fail'" class="rounded-2xl text-center" :style="centerCardStyle">
       <view :style="failIconStyle"><text style="font-size: 32px">⚠️</text></view>
       <text class="block" :style="failTitleStyle">{{ t.topupChrome.payDeclined }}</text>
-      <text class="block font-mono-tabular" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ t.topupChrome.payDeclinedReason }}</text>
+      <text class="block font-mono-tabular break-all" style="margin-top: 8px; font-size: 12px; color: var(--v5-brand-2)">{{ failureReason || t.topupChrome.payDeclinedReason }}</text>
       <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.625; max-width: 280px; margin-left: auto; margin-right: auto">{{ t.topupChrome.contactIssuer }}</text>
-      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="phase = 'form'"><text>{{ t.ui.retry }}</text></view>
+      <view class="w-full grid place-items-center active:opacity-70" :style="tryAgainBtnStyle" @click="retry"><text>{{ t.ui.retry }}</text></view>
     </view>
 
     <!-- Form -->
@@ -134,9 +134,11 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDeposits } from "@/store/deposits";
+import { fundsSandboxEnabled } from "@/api/runtime";
 import {
   MAX_CARD_DEPOSIT_USDT,
   MIN_CARD_DEPOSIT_USDT,
@@ -148,6 +150,7 @@ import CardBrandBadge from "@/components/me/card-brand-badge.vue";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import type { CardBrand } from "@/store/cards-core";
+import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 
 const emit = defineEmits<{ changeChannel: [] }>();
 
@@ -186,6 +189,7 @@ const COUNTRY_LABELS = [
 ];
 const countryIdx = ref(0);
 const phase = ref<"form" | "processing" | "3ds" | "success" | "fail">("form");
+const failureReason = ref("");
 
 const usdtAmount = computed(() => Math.max(0, parseFloat(amount.value) || 0));
 // 费率/最低额单源在 deposits-core(真后台 = D1 通道配置下发),组件禁写死。
@@ -261,19 +265,35 @@ async function handleSubmit() {
   // 授权前捕获账号:这段 3.8s 等待活在组件里,期间会话可能被踢/登出(App.vue 会把
   // 各 store 重绑到 default),回来若不校验就会把钱记进别人账上。store 侧比对后作废。
   const acct = deposits.currentAccountKey();
+  failureReason.value = "";
   phase.value = "processing";
-  await new Promise((r) => setTimeout(r, 1400));
-  phase.value = "3ds";
-  await new Promise((r) => setTimeout(r, 2400));
-  // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
-  // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
-  const rec = deposits.submitCardPayment(usdtAmount.value, acct);
-  if (rec) {
-    authCode.value = rec.authCode ?? rec.depositId;
-    phase.value = "success";
-  } else {
-    phase.value = "fail";
-  }
+  await runRecoverableFundsOperation(async () => {
+      await new Promise((r) => setTimeout(r, 1400));
+      phase.value = "3ds";
+      await new Promise((r) => setTimeout(r, 2400));
+      // 授权 + 落入金单 + 记账 + 写账单全部由 deposits store 扮演的服务端完成;
+      // 组件只提交并按结果切展示态,不写任何资金状态(status server-canonical)。
+      const rec = fundsSandboxEnabled
+        ? await deposits.createSandboxTopup("CARD", usdtAmount.value, acct)
+        : deposits.submitCardPayment(usdtAmount.value, acct);
+      if (!rec) throw new Error(t.value.topupChrome.payDeclinedReason);
+      return rec;
+    }, {
+      success: (rec) => {
+        authCode.value = rec.authCode ?? rec.depositId;
+        phase.value = "success";
+      },
+      failure: (reason) => {
+        failureReason.value = reason;
+        phase.value = "fail";
+      },
+      settled: () => {},
+    }, t.value.topupChrome.payDeclinedReason);
+}
+
+function retry() {
+  failureReason.value = "";
+  phase.value = "form";
 }
 
 function goWallet() {

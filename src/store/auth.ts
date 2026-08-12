@@ -15,6 +15,48 @@ interface Persisted {
   onboardingComplete: boolean;
 }
 
+/**
+ * This deliberately recognizes only a non-secret routing hint from the
+ * existing auth record. It never restores authority: server mode still needs
+ * an in-memory sessionVault before protected UI may render.
+ */
+export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
+  try {
+    let record = uni.getStorageSync(STORAGE_KEY) as unknown;
+    // Uni H5 may expose its typed-storage envelope as an object or one/more
+    // serialized envelopes. Unwrap only the bounded, known `data` wrapper;
+    // malformed values remain a cold-start (false) rather than granting access.
+    for (let depth = 0; depth < 3; depth += 1) {
+      if (typeof record === "string") {
+        try {
+          record = JSON.parse(record) as unknown;
+        } catch {
+          return false;
+        }
+      }
+      if (record && typeof record === "object" && "data" in record) {
+        record = (record as { data?: unknown }).data;
+        continue;
+      }
+      break;
+    }
+    if (typeof record === "string") {
+      try {
+        record = JSON.parse(record) as unknown;
+      } catch {
+        return false;
+      }
+    }
+    return !!record
+      && typeof record === "object"
+      && (record as Partial<Persisted>).isAuthenticated === true
+      && typeof (record as Partial<Persisted>).accountId === "string"
+      && (record as Partial<Persisted>).accountId!.startsWith("user:");
+  } catch {
+    return false;
+  }
+}
+
 function hydrate(): Persisted {
   try {
     const s = uni.getStorageSync(STORAGE_KEY) as Persisted | "";

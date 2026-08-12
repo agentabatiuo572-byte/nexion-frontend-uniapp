@@ -41,7 +41,7 @@
               <NexSparkline :data="kline" :up="isUp" />
             </view>
 
-            <view class="inline-flex items-center active:opacity-80" :style="viewMarketStyle" role="button" tabindex="0" @click="goMarket">
+            <view class="inline-flex items-center active:opacity-80" :style="viewMarketStyle" @click="goMarket">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z" /></svg>
               <text style="margin: 0 4px">{{ t.nexWallet.viewMarket }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -51,7 +51,7 @@
 
         <!-- Quick actions 4-cell -->
         <view class="grid grid-cols-2" style="gap: 8px">
-          <view v-for="qc in quickCells" :key="qc.label" class="active:scale-[0.97]" :style="quickCellStyle" role="button" tabindex="0" @click="navTo(qc.href)">
+          <view v-for="qc in quickCells" :key="qc.label" class="active:scale-[0.97]" :style="quickCellStyle" @click="navTo(qc.href)">
             <view class="grid place-items-center" :style="quickIconStyle(qc.tint)">
               <view v-html="qc.icon" />
             </view>
@@ -94,7 +94,7 @@
         <view :style="cardStyle">
           <text class="block" :style="[cardLabelStyle, { marginBottom: '12px' }]">{{ t.nexWallet.useNex.label }}</text>
           <view class="grid grid-cols-2" style="gap: 8px">
-            <view v-for="tile in useTiles" :key="tile.label" class="active:scale-[0.98]" :style="useTileStyle" role="button" tabindex="0" @click="navTo(tile.href)">
+            <view v-for="tile in useTiles" :key="tile.label" class="active:scale-[0.98]" :style="useTileStyle" @click="navTo(tile.href)">
               <view class="flex items-center justify-between">
                 <view v-html="tile.icon" />
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -109,7 +109,7 @@
         <view :style="activityWrapStyle">
           <view class="flex items-center justify-between" :style="activityHeadStyle">
             <text :style="cardLabelStyle">{{ t.nexWallet.activity.label }}</text>
-            <view class="inline-flex items-center active:opacity-70" :style="viewAllStyle" role="button" tabindex="0" @click="goBills">
+            <view class="inline-flex items-center active:opacity-70" :style="viewAllStyle" @click="goBills">
               <text>{{ t.nexWallet.activity.viewAll }}</text>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>

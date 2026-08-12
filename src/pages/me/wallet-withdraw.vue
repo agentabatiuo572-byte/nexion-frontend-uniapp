@@ -23,10 +23,11 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" title="USDT" :subtitle="t.wallet.withdraw" />
+      <FundsSandboxBadge />
 
       <!-- dev-only tester reset(?dev=1):清空当前账号提现地址簿,复现空态引导 -->
       <view v-if="devMode" class="mx-4 mb-3 flex items-center justify-end">
-        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" role="button" tabindex="0" @click="handleResetAddresses">
+        <view class="shrink-0 inline-flex items-center active:opacity-80" :style="resetBtnStyle" @click="handleResetAddresses">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" /></svg>
           <text style="margin-left: 4px">{{ t.walletV3.resetAddrLabel }}</text>
         </view>
@@ -57,7 +58,7 @@
       <view class="mx-4" style="padding: 0 2px">
         <view class="flex items-center justify-between">
           <text class="font-mono-tabular" :style="metaLabelStyle">{{ t.wallet.amountLabel }}</text>
-          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" role="button" tabindex="0" @click="useMax">
+          <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; padding: 0 10px; margin: -12px -8px -12px 0" @click="useMax">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ t.wallet.useMax }}</text>
           </view>
         </view>
@@ -123,7 +124,7 @@
             :key="nw.id"
             :class="['flex-1 grid place-items-center active:opacity-85', `nx-withdraw-net-${nw.id.slice(5)}`]"
             :style="netChipStyle(nw.id)"
-            role="button" tabindex="0"
+            role="button"
             :aria-selected="network === nw.id"
             @click="pickNetwork(nw.id)"
           >
@@ -142,8 +143,8 @@
           </view>
           <view
             class="nx-withdraw-manage-entry grid place-items-center shrink-0 active:opacity-80"
-            role="button" tabindex="0"
             :style="manageEntryStyle"
+            role="button"
             @click="goManage"
           >
             <text :style="manageEntryTextStyle">{{ t.addrRebind.manageCta }}</text>
@@ -160,7 +161,7 @@
               <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.4">{{ t.addrRebind.emptyGuideBody }}</text>
             </view>
           </view>
-          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" tabindex="0" @click="goManage">
+          <view class="nx-withdraw-add-address-cta mt-3 w-full grid place-items-center active:opacity-85" :style="addrGuideCtaStyle" role="button" @click="goManage">
             <text style="font-family: var(--font-v5); font-size: 13px; font-weight: 600">{{ t.addrRebind.addCta }}</text>
           </view>
         </view>
@@ -253,7 +254,7 @@
       </view>
 
       <!-- Reverse-talk staking alternative -->
-      <StakeAlternativeCard v-if="amountNum > 0 && amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
+      <StakeAlternativeCard v-if="amountNum >= minWithdrawable && !quoteBlocked" :amount-num="amountNum" />
 
       <!-- NEX 抵扣开关(FEAT-WD02:用户自选,默认关;取代旧「强制自动抵扣 + 进度条」面板) -->
       <!-- 🔴 费率不可用时整块隐藏(历史漏网教训保留):
@@ -295,7 +296,7 @@
       <!-- 费用说明半屏(规格 ⑥ 新增):仅网络确认费含义 + NEX 抵扣规则,无按金额比例的旧费率段落。
            范式同 device-deactivate-sheet(scrim z79 + slide-up panel z80,safe-area padding)。 -->
       <view v-if="feeWhyOpen">
-        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" role="button" tabindex="0" @click="feeWhyOpen = false" />
+        <view class="nx-sheet-fade-in" :style="feeWhyScrimStyle" @click="feeWhyOpen = false" />
         <view class="nx-sheet-slide-up" :style="feeWhySheetStyle">
           <view class="flex items-start justify-between" style="gap: 12px">
             <text class="block" :style="feeWhyTitleStyle">{{ t.walletV3.feeWhyTitle }}</text>
@@ -313,7 +314,7 @@
       <!-- Sticky submit -->
       <view class="mx-4 mt-4" style="padding-bottom: 12px">
         <!-- 未设地址/金额不合法时按不动:显式 aria-disabled + 可提交时给按下反馈(《05》§6.1 + 《08》§2) -->
-        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :style="submitBtnStyle" @click="handleSubmit">
+        <view class="nx-withdraw-submit-cta w-full grid place-items-center" :class="{ 'active:opacity-90 transition-opacity': canSubmit }" role="button" :aria-disabled="canSubmit ? 'false' : 'true'" :style="submitBtnStyle" @click="handleSubmit">
           <view class="inline-flex items-center" style="gap: 8px">
             <template v-if="submitting">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
@@ -337,11 +338,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { platformDayIndex } from "@/store/withdrawal-eligibility-core";
 import { onLoad } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
@@ -353,7 +355,7 @@ import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
 import { useBills } from "@/store/bills";
 import { usePayoutAddress } from "@/store/payout-address";
-import { remoteApiEnabled } from "@/api/runtime";
+import { fundsSandboxEnabled, fundsServerEnabled, remoteApiEnabled } from "@/api/runtime";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
 import { mockServerNow } from "@/store/server-time";
 import {
@@ -370,8 +372,7 @@ import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
-// 提现网络收窄裁决:仅 USDT 三网络(可选;每网络各有独立当前地址,RM01a)。
-const NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
+const ALL_NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
   { id: "USDT-TRC20", label: "TRC20" },
   { id: "USDT-BEP20", label: "BEP20" },
   { id: "USDT-ERC20", label: "ERC20" },
@@ -385,32 +386,93 @@ const risk = useRiskDisclosure();
 const phase = useProductPhase();
 const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 const withdrawalPolicyLoading = ref(false);
+const withdrawalPolicyError = ref("");
+// The production withdrawal policy is deliberately irrelevant in an explicit
+// funds sandbox. Only the strict, authenticated wallet overview may project
+// this rail; a missing or contradictory policy leaves the page closed.
+const sandboxWithdrawalPolicy = computed(() => {
+  const evidence = app.fundsSandboxEvidence;
+  const policy = evidence?.withdrawalPolicy;
+  return fundsSandboxEnabled
+    && app.fundsSandboxStatus === "ready"
+    && evidence?.source === "mock"
+    && evidence.sourceEnvironment === "SANDBOX"
+    && evidence.mode === "LOCAL_SANDBOX"
+    && policy?.source === "mock"
+    && policy.sourceEnvironment === "SANDBOX"
+    && policy.mode === "LOCAL_SANDBOX"
+    && policy.withdrawalEnabled === true
+    && policy.network === "USDT-BEP20"
+    && policy.channel === "CREGIS_USDT_BEP20"
+    && policy.enabledNetworks.length === 1
+    && policy.enabledNetworks[0] === "USDT-BEP20"
+    ? policy
+    : null;
+});
+// The funds sandbox backend supports only its isolated Cregis BEP20 rail.  In
+// production server mode the policy response is the network allow-list; local
+// mock keeps its historical three-network fixture.
+const NETWORKS = computed<{ id: Withdrawal["network"]; label: string }[]>(() => fundsSandboxEnabled ? [{ id: "USDT-BEP20", label: "BEP20" }] :
+  fundsServerEnabled
+    ? ALL_NETWORKS.filter((item) => withdrawalPolicy.value?.enabledNetworks.includes(item.id))
+    : ALL_NETWORKS);
 
 async function loadWithdrawalPolicy(): Promise<void> {
   if (withdrawalPolicyLoading.value) return;
   withdrawalPolicyLoading.value = true;
+  withdrawalPolicyError.value = "";
   try {
+    if (fundsSandboxEnabled) {
+      const sandboxPolicy = sandboxWithdrawalPolicy.value;
+      if (!sandboxPolicy) throw new Error("FUNDS_SANDBOX_WITHDRAWAL_POLICY_REQUIRED");
+      withdrawalPolicy.value = {
+        minAmount: sandboxPolicy.minAmount,
+        dailyLimitCount: sandboxPolicy.dailyLimitCount,
+        balanceMaxRatio: sandboxPolicy.balanceMaxRatio,
+        smallAmountThresholdUsd: sandboxPolicy.smallAmountThresholdUsd,
+        payoutSlaHours: sandboxPolicy.payoutSlaHours,
+        networkConfirmFeeUsd: { ...sandboxPolicy.networkConfirmFeeUsd },
+        nexFeeOffsetRate: sandboxPolicy.nexFeeOffsetRate,
+        policyVersion: sandboxPolicy.policyVersion,
+        cooldownDays: sandboxPolicy.cooldownDays,
+        complianceHoldEnabled: sandboxPolicy.complianceHoldEnabled,
+        withdrawalEnabled: sandboxPolicy.withdrawalEnabled,
+        enabledNetworks: [...sandboxPolicy.enabledNetworks],
+        currentPhase: "LOCAL_SANDBOX",
+        currentMonth: 1,
+        gateSource: "FUNDS_SANDBOX",
+        source: "FUNDS_SANDBOX",
+      };
+      return;
+    }
     withdrawalPolicy.value = await withdrawalApi.policy();
-  } catch {
+    if (!NETWORKS.value.some((item) => item.id === network.value) && NETWORKS.value[0]) {
+      network.value = NETWORKS.value[0].id;
+    }
+  } catch (cause) {
     withdrawalPolicy.value = null;
+    withdrawalPolicyError.value = cause instanceof Error ? cause.message : "WITHDRAWAL_POLICY_UNAVAILABLE";
   } finally {
     withdrawalPolicyLoading.value = false;
   }
 }
 
-// 🔴 这才是**可提现额度的唯一权威**:它出禁用理由(disabledReasonFor)、并在提交前
-// 二次核验(handleSubmit 里 snap.amount > fresh.maxWithdrawableUsdt 即拒)。
-// 钱包页 / 钱包卡片显示的是**账面总余额**(标签「USDT 余额」),两者本就不是一个数,
-// 不要再像 2026-07-31 那版注释那样声称"三处同源" —— 那次分裂就是这么留下的。
-//
-// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提**基数** = 总余额;
-// 在此基数上再扣 held 两桶、乘 policy.balanceMaxRatio,并三态 fail-closed 归 0
-// (风控簇受限 / 无收益快照 / 无 policy)。后端缺席时本值恒 0,属预期的保守失败。
+watch(sandboxWithdrawalPolicy, () => {
+  if (fundsSandboxEnabled) void loadWithdrawalPolicy();
+});
+
+// 2026-07-31 规则变更:充值本金也可提(按标准费率收费),故可提上限 = 总余额。
 // pendingReviewUsdt / bonusLockedUsdt 本就账外(不计入 usdtBalance),风控扣留照旧生效。
-// 注意:这里读 usdtBalance 是本规则的正解。历史 P0(可提额度 > 总余额仍放行)的防线
-// 已随 c37e642 的本地扣款链一并移除 —— 客户端不再扣款,超额请求由本 computed 的
-// fail-closed 上限拦 + 服务端 reservation 拒;别再指望 app.ts 有总余额门。
+// 注意:这里读 usdtBalance 是本规则的正解,不是 verify.sh 反向哨兵防的那个历史 P0
+// ——那个 P0 是「可提额度 > 总余额仍放行」,防线在 app.ts 的总余额门,未拆。
 const maxWithdrawable = computed(() => {
+  const sandboxPolicy = sandboxWithdrawalPolicy.value;
+  if (fundsSandboxEnabled) {
+    // The wallet GET is the sandbox balance authority. Do not require the
+    // production earnings-release projection (which is intentionally absent
+    // from this isolated ledger) and do not show a local fallback on failure.
+    return sandboxPolicy ? Math.max(0, app.user.usdtBalance * sandboxPolicy.balanceMaxRatio) : 0;
+  }
   if (earningsReleaseSnapshot.value?.clusterRestricted) return 0;
   const buckets = earningsReleaseSnapshot.value?.buckets;
   if (!buckets) return 0;
@@ -435,14 +497,14 @@ const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: m
 const devMode = ref(false);
 onLoad((options) => {
   devMode.value = import.meta.env.DEV && options?.dev === "1";
-  // 默认选中已设地址的网络(第一个);都没有则维持 TRC20(空态引导卡)。
-  const withAddr = NETWORKS.find((n) => payout.currentFor(fromWithdrawNetwork(n.id)));
+  // 默认选中后端允许且已设地址的网络；sandbox 永远只会得到 BEP20。
+  const withAddr = NETWORKS.value.find((n) => payout.currentFor(fromWithdrawNetwork(n.id)));
   if (withAddr) network.value = withAddr.id;
 });
 
 const amount = ref("");
 // 提现网络可选;地址 = 该网络当前提现地址(payout-address store 单源,RM01a)。
-const network = ref<Withdrawal["network"]>("USDT-TRC20");
+const network = ref<Withdrawal["network"]>("USDT-BEP20");
 const chainNetwork = computed(() => fromWithdrawNetwork(network.value));
 const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.address ?? "");
 // 掩码中段:与地址管理页共用 core.maskAddressMid 同一实现,不各写一份。
@@ -518,7 +580,7 @@ const feeCalc = computed(() =>
  * 冻结报价对**当前**权威值是否仍成立 —— 与 app.ts 提交边界同一个纯函数、同一组入参
  * (5 参:含网络键与权威费率 map,fail-closed)。
  *
- * 🔴 这里读活值(nexFeeOffsetRate / policy.networkConfirmFeeUsd)是**故意**的:
+ * 🔴 这里读活值(nexFeeOffsetRate / currentNetworkConfirmFeeUsd)是**故意**的:
  * 它就是「确认后校验」那一步 —— 拿冻结件去问权威值还认不认。与「await 之后一律用快照」
  * 不冲突:快照供扣款,活值只供判「要不要拒单」。反过来用冻结费率复验冻结报价,
  * 等式恒成立、判据恒为真 = 这道门等于没有。
@@ -665,14 +727,6 @@ const heldLine = computed(() => {
  */
 // WD01 is HOLD: the backend does not yet execute the advertised review/address bypass.
 // Keep the fast-lane branch unreachable instead of treating a persisted/displayed value as effective.
-//
-// 🔴 2026-08-11(主人拍板"真停"):这个 0 此前**只关了页面这一层**。判定层
-// (withdrawal-eligibility.ts → decideWithdrawalRoute)读的是另一个源
-// config.withdrawRules.smallAmountThresholdUsd,那边当时是 50 —— 于是「注释说停用、
-// 引擎在跑」:≤$50 的首提照样被免掉「首提必审」与「新地址 hold」,上面那条
-// fastLaneOn 横幅还会真弹「这笔可立即处理 · 已免去:首次提现审核」。
-// 现已把判定层的默认值一并置 0(platform-config-compat.ts),两层同时关闭。
-// ⚠️ 恢复快车道时**必须两层一起改**,只改一层就会复现这次的口径分裂。
 const smallAmountLine = computed(() => 0);
 /**
  * 正向态:这笔**真的**免掉了闸,才值得说。
@@ -785,6 +839,7 @@ const riskNoticeBody = computed(() => {
  * 两个判据只要不是同一个源,迟早漂移。这里收成一个。
  */
 function disabledReasonFor(amount: number, decision: WithdrawalEligibility): string {
+  if (withdrawalPolicyError.value) return withdrawalPolicyError.value;
   // 费率可读与通道开放是两个独立事实。总开关关闭时仍展示服务端报价，
   // 但提交必须明确说明通道关闭，不能伪装成费率拉取失败。
   if (!feeConfigUsable.value) return t.value.walletV3.submitReasonFeeConfigUnavailable;
@@ -890,7 +945,6 @@ async function handleSubmit() {
     maxWithdrawable: maxWithdrawable.value,
     offset: offsetWithNex.value,
     policyVersion: withdrawalPolicy.value!.policyVersion,
-    idempotencyKey: `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     quote: q,
     // server 形状的费用快照(建单入参 + 复验入参同一份,不再各拼一次)
     fee: { networkConfirmUsd: q.networkConfirmUsd, nexBurned: q.nexBurned, actualFeeUsd: q.actualFee } as WithdrawalFeeSnapshot,
@@ -991,7 +1045,6 @@ async function handleSubmit() {
       snap.fee,
       snap.offset,
       snap.policyVersion,
-      snap.idempotencyKey,
       fresh.route,
       fresh.riskReasons,
       fresh.fastLaneApplied,
@@ -1004,10 +1057,10 @@ async function handleSubmit() {
     }
     uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
     return;
-  } catch {
+  } catch (cause) {
     clearSubmitFreeze();
     await loadWithdrawalPolicy();
-    toast.error(t.value.walletV3.withdrawFeeStale);
+    toast.error(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.walletV3.withdrawFeeStale);
     return;
   }
 

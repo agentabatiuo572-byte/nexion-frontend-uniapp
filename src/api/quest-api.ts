@@ -107,13 +107,15 @@ function parsePromo(value: unknown): CanonicalPromoBanner | null {
   };
 }
 
-function parseSnapshot(value: unknown): QuestSnapshot {
+export function parseQuestSnapshot(value: unknown): QuestSnapshot {
   const row = record(value);
   const multiplier = number(row?.questBonusMultiplier, 0.1);
   const rhythmMonth = number(row?.rhythmMonth, 1);
   const source = text(row?.source);
   if (!row || !Array.isArray(row.quests) || multiplier === null
-      || rhythmMonth === null || !Number.isInteger(rhythmMonth) || !source) {
+      || rhythmMonth === null || !Number.isInteger(rhythmMonth) || !source
+      || !source.includes("nx_mission") || !source.includes("nx_user_mission")
+      || source.toLowerCase().includes("mock")) {
     return invalid();
   }
   const quests = row.quests.map(parseQuest);
@@ -128,7 +130,7 @@ function parseSnapshot(value: unknown): QuestSnapshot {
   };
 }
 
-function parseClaim(value: unknown): QuestClaimResult {
+export function parseQuestClaim(value: unknown): QuestClaimResult {
   const row = record(value);
   const questId = text(row?.questId);
   const rewardNex = number(row?.rewardNex);
@@ -146,11 +148,11 @@ function required(value: string, error: string): string {
 
 export function createQuestApi(client: ApiClient): QuestApi {
   return {
-    state: async () => parseSnapshot(await client.request({
+    state: async () => parseQuestSnapshot(await client.request({
       method: "GET",
       path: "/api/quests/state",
     })),
-    claim: async (questCode, idempotencyKey) => parseClaim(await client.request({
+    claim: async (questCode, idempotencyKey) => parseQuestClaim(await client.request({
       method: "POST",
       path: `/api/quests/${encodeURIComponent(required(questCode, "QUEST_CODE_REQUIRED"))}/claim`,
       idempotencyKey: required(idempotencyKey, "QUEST_IDEMPOTENCY_KEY_REQUIRED"),

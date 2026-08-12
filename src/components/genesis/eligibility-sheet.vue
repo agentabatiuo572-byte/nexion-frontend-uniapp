@@ -11,7 +11,7 @@
 <template>
   <view v-if="open">
     <transition name="nx-elig-fade">
-      <view v-if="open" class="nx-elig-backdrop" role="dialog" aria-modal="true" @click="emitClose" />
+      <view v-if="open" class="nx-elig-backdrop" @click="emitClose" />
     </transition>
     <transition name="nx-elig-slide">
       <view v-if="open" class="nx-elig-panel" :style="panelStyle" @click.stop>
@@ -21,7 +21,7 @@
             <text class="block" :style="titleStyle">{{ t.genesisEligibility.title }}</text>
             <text class="block" :style="subtitleStyle">{{ subtitleText }}</text>
           </view>
-          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" role="button" tabindex="0" @click="emitClose">
+          <view class="inline-flex items-center justify-center active:opacity-60" :style="closeBtnStyle" @click="emitClose">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
           </view>
         </view>
@@ -50,7 +50,7 @@
                 v-else-if="fixNavLabel(c.key)"
                 class="active:opacity-70"
                 :style="fixLinkStyle"
-                role="button" tabindex="0" @click="goFix(c.key)"
+                @click="goFix(c.key)"
               >{{ fixNavLabel(c.key) }}</text>
             </view>
 
@@ -73,7 +73,7 @@
                   confirm-type="done"
                   @confirm="verifyInvite"
                 />
-                <view class="inline-flex items-center justify-center active:opacity-80" :style="verifyBtnStyle" role="button" tabindex="0" @click="verifyInvite">
+                <view class="inline-flex items-center justify-center active:opacity-80" :style="verifyBtnStyle" @click="verifyInvite">
                   <text>{{ t.genesisEligibility.inviteVerify }}</text>
                 </view>
               </view>
@@ -90,7 +90,7 @@
           v-if="gate.eligible && !gate.capReached"
           class="w-full inline-flex items-center justify-center active:opacity-85"
           :style="subscribeStyle"
-          role="button" tabindex="0" @click="emitSubscribe"
+          @click="emitSubscribe"
         >
           <text>{{ t.genesisEligibility.unlockedCta }}</text>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
@@ -109,7 +109,6 @@ import type { GenesisInviteRejectReason } from "@/store/genesis-invite";
 import { useApp } from "@/store/app";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { toast } from "@/store/ui";
-import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean]; subscribe: [] }>();
@@ -336,10 +335,6 @@ const subscribeStyle: CSSProperties = {
   fontSize: "15px",
   letterSpacing: "-0.005em",
 };
-
-// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
-// 且没有 Esc、关掉后焦点也回不到触发它的控件。
-useDialogA11y(computed(() => props.open), ".nx-elig-backdrop", emitClose);
 </script>
 
 <style scoped>
