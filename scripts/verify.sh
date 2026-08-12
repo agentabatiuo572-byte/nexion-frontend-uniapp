@@ -2913,6 +2913,21 @@ withdraw_replay_triage_gate() {
 }
 withdraw_replay_triage_gate
 
+# 提现分诊**数据流**门(2026-08-13 结构性反思的产物)。同型缺陷连两轮复发后换层:
+# 前两版都是静态判据(形状 / 字符串),守得住「代码长什么样」,守不住「运行时什么值流到哪」。
+# 本门把 catch 段真源码**跑起来**(注入桩),断言喂给判决的上下文与实际副作用次数。
+# 红测:页面谎报 isReplay/isDailyLimit/isGeo → 全红;拿掉日限线型守卫 → 红;
+#       结果未知也退役 → 红;409 档早退绕过退役 → 红。
+withdraw_triage_dataflow_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-triage-dataflow.mjs > /tmp/uniapp-triage-dataflow.log 2>&1; then
+    ok "提现分诊数据流门 — $(tail -1 /tmp/uniapp-triage-dataflow.log)"
+  else
+    bad "提现分诊数据流门失败 — node scripts/selfcheck-withdraw-triage-dataflow.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-triage-dataflow.log | head -8 | sed "s/^/        /"
+  fi
+}
+withdraw_triage_dataflow_gate
+
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
 # 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表
