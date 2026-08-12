@@ -41,6 +41,18 @@ export function currentShareReferralCode(): string {
 export function buildShareLink(referralCode = currentShareReferralCode()): string {
   const code = referralCode.trim();
   if (!code) return "";
+  // Remote H8 gives us the invite code, but the public platform projection does
+  // not own a share-channel/base-url policy.  Do not compose a link from the
+  // mock seed in that mode; the current H5 origin is the only non-business
+  // transport fallback and contains no reward or channel policy.
+  if (remoteApiEnabled) {
+    // #ifdef H5
+    if (typeof location !== "undefined") {
+      return `${location.origin}${location.pathname}#/pages/ref/code?code=${code}`;
+    }
+    // #endif
+    return "";
+  }
   const base = useConfig().config.share.baseUrl;
   if (base) return `${base}${code}`;
   // #ifdef H5
@@ -54,6 +66,7 @@ export function buildShareLink(referralCode = currentShareReferralCode()): strin
 
 // 邀请文案(渠道预填):礼包金额 config 派生,en/zh 镜像模板。
 export function buildShareText(): string {
+  if (remoteApiEnabled) return "";
   const t = useT();
   const gift = useConfig().config.rewards.welcomeGift;
   return fmt(t.value.share.shareText, { usd: gift.usdtAmount, nex: gift.nexAmount, link: buildShareLink() });
@@ -68,6 +81,10 @@ export function channelIntentUrl(def: ShareChannelDef, link: string, text: strin
 // 渠道可见性([FEAT-SHARE3] 平台矩阵):enabled 过滤;H5 上 system 需
 // navigator.share 支持(异常2),scheme 型保留(点击走复制降级,异常4)。
 export function visibleChannels(): ShareChannelDef[] {
+  // Channel enablement is an operator-owned policy that is not supplied by the
+  // current remote endpoint.  Hiding the sheet is safer than exposing mock
+  // outbound intents.
+  if (remoteApiEnabled) return [];
   const list = useConfig().config.share.channels.filter((c) => c.enabled);
   // #ifdef H5
   return list.filter(

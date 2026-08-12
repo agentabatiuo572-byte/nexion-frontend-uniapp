@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -193,7 +194,7 @@ const activatedOrder = {
 };
 
 test("E20 order readback accepts only a coherent paid and activated terminal", async () => {
-  const api = createOrderApi({ request: async () => ({ source: "server", orders: [activatedOrder] }) });
+  const api = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [activatedOrder] }) });
   const response = await api.list();
   assert.equal(response.orders[0].canonicalStatus, "activated");
 });
@@ -205,7 +206,7 @@ test("E20 order readback rejects contradictory or coerced HTTP 200 terminals", a
     { ...activatedOrder, paidAt: null },
     { ...activatedOrder, amountUsdt: "1000" },
   ]) {
-    const api = createOrderApi({ request: async () => ({ source: "server", orders: [malformed] }) });
+    const api = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [malformed] }) });
     await assert.rejects(api.list(), /ORDER_RESPONSE_INVALID/);
   }
 });
@@ -239,7 +240,7 @@ const createdOrder = {
 };
 
 test("E20 ordinary order accepts only the canonical placed state triplet", async () => {
-  const listApi = createOrderApi({ request: async () => ({ source: "server", orders: [placedOrder] }) });
+  const listApi = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [placedOrder] }) });
   assert.equal((await listApi.list()).orders[0].canonicalStatus, "placed");
 
   for (const malformed of [
@@ -248,7 +249,7 @@ test("E20 ordinary order accepts only the canonical placed state triplet", async
     { ...placedOrder, activationStatus: "ACTIVATED" },
     { ...placedOrder, paidAt: 2 },
   ]) {
-    const api = createOrderApi({ request: async () => ({ source: "server", orders: [malformed] }) });
+    const api = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [malformed] }) });
     await assert.rejects(api.list(), /ORDER_RESPONSE_INVALID/);
   }
 });
@@ -271,11 +272,23 @@ test("E20 order readback accepts every backend-authored canonical state matrix r
       orderStatus: "CHARGEBACK", activationStatus: "DEACTIVATED" },
     { ...placedOrder, canonicalStatus: "cancelled", paymentStatus: "CANCELLED", orderStatus: "CANCELLED" },
   ];
-  const api = createOrderApi({ request: async () => ({ source: "server", orders: validStates }) });
+  const api = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: validStates }) });
   assert.deepEqual((await api.list()).orders.map((order) => order.canonicalStatus), [
     "placed", "paid", "provisioning", "activated", "payment_failed", "expired",
     "provisioning_failed", "refunded", "chargeback", "cancelled",
   ]);
+});
+
+test("E20 remote order projection never collapses server failures into cancelled", () => {
+  const source = readFileSync(new URL("../src/store/orders.ts", import.meta.url), "utf8");
+  assert.match(source, /const status: OrderStatus = row\.canonicalStatus;/);
+  assert.doesNotMatch(source, /\["placed", "paid", "provisioning", "activated"\]\.includes\(row\.canonicalStatus\)/);
+});
+
+test("E20 remote order cancellation fails closed until a canonical cancellation command exists", () => {
+  const source = readFileSync("src/store/orders.ts", "utf8");
+  assert.match(source, /if \(remoteApiEnabled\) return false/);
+  assert.match(source, /function cancelOrder\(id: string\): boolean/);
 });
 
 test("E20 paid and provisioning rows require the backend payment timestamp and activation state", async () => {
@@ -287,7 +300,7 @@ test("E20 paid and provisioning rows require the backend payment timestamp and a
     { ...placedOrder, canonicalStatus: "provisioning", paymentStatus: "PAID", orderStatus: "PROVISIONING",
       activationStatus: "PROVISIONING", paidAt: null },
   ]) {
-    const api = createOrderApi({ request: async () => ({ source: "server", orders: [malformed] }) });
+    const api = createOrderApi({ request: async () => ({ source: "server", sourceEnvironment: "PRODUCTION", runId: null, orders: [malformed] }) });
     await assert.rejects(api.list(), /ORDER_RESPONSE_INVALID/);
   }
 });

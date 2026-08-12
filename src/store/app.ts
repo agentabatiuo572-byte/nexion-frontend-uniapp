@@ -51,6 +51,7 @@ import {
   taskAssignmentApi,
   withdrawalApi,
 } from "@/api/runtime";
+import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import {
   sandboxEvidenceFromOverview,
   type FundsSandboxEvidence,
@@ -60,7 +61,6 @@ import {
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments, TrustedTaskCompletionProof } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
-import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import {
   bindPendingFundsMutationOrder,
   finishPendingFundsMutationByOrder,

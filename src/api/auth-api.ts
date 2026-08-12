@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { isUserSession, type AuthSessionResponse, type UserSession } from "./contracts";
-import { ApiError } from "./errors";
+import { ApiError, asApiError } from "./errors";
 import type { SessionSnapshot, SessionVault } from "./session-vault";
 
 export interface PasswordLoginRequest {
@@ -34,7 +34,7 @@ export interface RegistrationRequest extends RegistrationOtpRequest {
 
 export type LoginResult =
   | { kind: "challenge"; user: UserSession; challengeNo: string; deliveryHint: string }
-  | { kind: "authenticated"; user: UserSession };
+  | { kind: "authenticated"; user: UserSession; vaultRevision: number };
 
 export interface AuthApi {
   login(request: PasswordLoginRequest): Promise<LoginResult>;
@@ -42,7 +42,23 @@ export interface AuthApi {
   sendRegistrationOtp(request: RegistrationOtpRequest): Promise<RegistrationOtpResult>;
   register(request: RegistrationRequest): Promise<LoginResult>;
   restore(): Promise<SessionSnapshot | null>;
+  /** Consume only the exact vault epoch issued by a failed sign-in completion. */
+  discardSessionIfCurrent(expectedRevision: number): void;
+  /** Fallback for legacy callers: never consume a session owned by another user. */
+  discardSessionForIdentity(identity: string): void;
   logout(): Promise<void>;
+}
+
+/**
+ * A registration POST can commit on the server while its response is lost.
+ * Only transport loss, an unparseable response, and 5xx have that ambiguity;
+ * authoritative 4xx responses remain actionable form errors.
+ */
+export function isRegistrationOutcomeUnknown(error: unknown): boolean {
+  const apiError = asApiError(error);
+  return apiError.kind === "network"
+    || apiError.kind === "protocol"
+    || (apiError.kind === "http" && (apiError.status ?? 0) >= 500);
 }
 
 function registrationOtpFromResponse(value: unknown): RegistrationOtpResult {
@@ -111,10 +127,38 @@ function consumeLoginResponse(
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
   }
-  return { kind: "authenticated", user: session.user };
+  // saveIfUnchanged advances the vault exactly once. Returning that epoch lets
+  // the UI discard this issuance without ever clearing a later account's vault.
+  return { kind: "authenticated", user: session.user, vaultRevision: expectedRevision + 1 };
 }
 
 export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
+  const revokeRefreshTokenBestEffort = (refreshToken: string) => {
+    void client.request({
+      path: "/auth/users/logout",
+      method: "POST",
+      body: { refreshToken },
+      authenticated: false,
+    }).catch(() => {
+      // The local vault was already consumed. Server revocation is best-effort.
+    });
+  };
+  const discardSessionIfCurrent = (expectedRevision: number): void => {
+    if (vault.revision() !== expectedRevision) return;
+    const snapshot = vault.read();
+    if (!snapshot) return;
+    // Clear synchronously before the network request so a rejected completion
+    // cannot leave a hidden Bearer token available to background requests.
+    if (!vault.clearIfUnchanged(expectedRevision)) return;
+    revokeRefreshTokenBestEffort(snapshot.refreshToken);
+  };
+  const discardSessionForIdentity = (identity: string): void => {
+    const expectedRevision = vault.revision();
+    const snapshot = vault.read();
+    if (!snapshot) return;
+    if (`user:${snapshot.user.userId}` !== identity) return;
+    discardSessionIfCurrent(expectedRevision);
+  };
   return {
     async login(request) {
       const revision = vault.revision();
@@ -167,6 +211,12 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
     async restore() {
       if (!vault.read()?.refreshToken) return null;
       return client.refreshSession();
+    },
+    discardSessionIfCurrent(expectedRevision) {
+      discardSessionIfCurrent(expectedRevision);
+    },
+    discardSessionForIdentity(identity) {
+      discardSessionForIdentity(identity);
     },
     async logout() {
       const revision = vault.revision();

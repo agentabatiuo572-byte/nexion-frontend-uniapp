@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
   // This makes H5 -> /api same-origin and avoids localhost/127.0.0.1 identity
   // splits. A production bundle must provide its own HTTPS gateway explicitly.
   const apiPreviewTarget = env.VITE_NEXGRID_API_PREVIEW_TARGET?.trim() || "http://127.0.0.1:8110";
+  const apiPreviewEdgeCountry = env.VITE_NEXGRID_API_PREVIEW_EDGE_COUNTRY?.trim().toUpperCase();
+  if (apiPreviewEdgeCountry && !/^[A-Z]{2}$/.test(apiPreviewEdgeCountry)) {
+    throw new Error("VITE_NEXGRID_API_PREVIEW_EDGE_COUNTRY must be a two-letter ISO country code");
+  }
+  const apiPreviewHeaders = apiPreviewEdgeCountry
+    ? { "X-Nexion-Edge-Country": apiPreviewEdgeCountry }
+    : undefined;
 
   return {
     plugins: [uni(), UnoCSS()],
@@ -34,10 +41,12 @@ export default defineConfig(({ mode }) => {
         "/auth": {
           target: apiPreviewTarget,
           changeOrigin: true,
+          headers: apiPreviewHeaders,
         },
         "/api": {
           target: apiPreviewTarget,
           changeOrigin: true,
+          headers: apiPreviewHeaders,
         },
       },
     },

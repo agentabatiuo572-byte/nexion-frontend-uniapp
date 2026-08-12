@@ -33,7 +33,9 @@ function hydrate(accountKey: string): Persisted {
 export const useProfile = defineStore("profile", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
-  const init = hydrate(boundKey);
+  // Remote profile fields are an auth-session projection.  Never render a
+  // browser seed before that projection arrives.
+  const init = remoteApiEnabled ? { displayName: "", avatarSeed: "" } : hydrate(boundKey);
   const displayName = ref(init.displayName);
   const avatarSeed = ref(init.avatarSeed);
   const phoneE164 = ref("");
@@ -71,8 +73,19 @@ export const useProfile = defineStore("profile", () => {
     phoneE164.value = `${identity.countryCode}${identity.phone}`;
   }
 
-  function setDisplayName(v: string) { displayName.value = v; persist(); }
-  function regenerateAvatar() { avatarSeed.value = defaultSeed(); persist(); }
+  /** No server profile-write endpoint exists yet: remote profile is read-only. */
+  function setDisplayName(v: string) {
+    if (remoteApiEnabled) return false;
+    displayName.value = v;
+    persist();
+    return true;
+  }
+  function regenerateAvatar() {
+    if (remoteApiEnabled) return false;
+    avatarSeed.value = defaultSeed();
+    persist();
+    return true;
+  }
 
   return { displayName, avatarSeed, phoneE164, setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity };
 });

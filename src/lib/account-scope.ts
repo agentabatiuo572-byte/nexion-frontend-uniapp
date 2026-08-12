@@ -34,6 +34,7 @@ import { useNova } from "@/store/nova";
 import { useRankSnapshot } from "@/store/rank-snapshot";
 import { bindEarningsReleaseAccount } from "@/store/earning-release";
 import { useReferralReward } from "@/store/referral-reward";
+import { useRepurchase } from "@/store/repurchase";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -74,6 +75,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useQuest().bindAccount(accountKey);
   useWeeklyQuest().bindAccount(accountKey);
   useReferralReward().bindAccount(accountKey);
+  useRepurchase().bindAccount();
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useEventQuest().bindAccount(accountKey);
   useMilestones().bindAccount(accountKey);
@@ -83,14 +85,14 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useDailyPowerUp().bindAccount(accountKey);
   useNotifications().bindAccount(accountKey);
   useReceipts().bindAccount(accountKey);
-  useTickets().bindAccount();
+  useTickets().bindAccount(accountKey);
   useCart().bindAccount(accountKey);
   useProfile().bindAccount(accountKey);
   useSecurity().bindAccount(accountKey);
   useSponsorship().bindAccount(accountKey);
   // 会话中心 + Nova 是非持久会话记录(无按账号存储),换号语义 = 清空重播种——
   // 防上一账号的客服对话/Nova 推送在 SPA 内切号(reLaunch 不重载文档)后被下一账号看到。
-  useConversations().reset();
+  useConversations().bindAccount(accountKey);
   useNova().reset();
   // rewards-seen 读 bills(已在上方先重绑)派生红点,故放最后。
   useRewardsSeen().bindAccount(accountKey);
