@@ -260,6 +260,35 @@ const gotBoth = sameStatus({ terminalReason: "risk-hit" }, { terminalReason: "da
 if (gotBoth?.terminalReason !== "data-mismatch") {
   throw new Error(`双方都有值时未取内存值(得到 ${gotBoth?.terminalReason})`);
 }
+// 🔴 字段合并必须**对所有可选字段成立**,不是对一份手写清单成立
+// (2026-08-12 并入主线时自查:上一版枚举了 6 个,而类型里有 7 个 —— 漏掉的 riskRoute
+//  会退回「整行择一」的老坏法)。判据从 **types.ts 的实际字段表**取,不在门里再抄一份。
+const optionalFields = (() => {
+  const src = fs.readFileSync("src/store/types.ts", "utf8");
+  const body = src.slice(src.indexOf("export interface Withdrawal {"));
+  return [...body.slice(0, body.indexOf("\n}")).matchAll(/^ {2}([a-zA-Z]+)\?:/gm)].map((m) => m[1]);
+})();
+if (optionalFields.length < 5) {
+  throw new Error(`Withdrawal 可选字段只解析出 ${optionalFields.length} 个 —— 判据失效,空集全过是假绿`);
+}
+for (const field of optionalFields) {
+  // 磁盘有值、内存这拍没带 → 必须保留磁盘的值(逐字段各测一次,不抽样)
+  const probe = { "wd-field": 1 };
+  void probe;
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-field", "frozen", 3400), [field]: "SENTINEL" }];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  // 🔴 靶必须是「内存**显式给了 undefined**」,不是「内存没这个键」——
+  // 对象展开 `{...disk, ...memory}` 本来就能处理「没这个键」,拿 delete 造靶等于测不到
+  // 被测分支(首版就是这么写的,红测不红才发现;同族:靶没进被测分支 = 恒绿)。
+  mem.withdrawals[0][field] = undefined;
+  const got = mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-field");
+  if (got?.[field] !== "SENTINEL") {
+    throw new Error(`同状态合并漏了可选字段 ${field}(得到 ${JSON.stringify(got?.[field])})—— 判据是手写清单就会这样静默漏`);
+  }
+}
+
 // 档位不等时仍按档位:主链单调,不因字段合并而退化
 const rankUp = (() => {
   const b = structuredClone(base);

@@ -336,19 +336,21 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
  * 同状态下两份快照本就相等,不参与合并 —— 真出现分歧属服务端串号,那是另一道闸的事。
  */
 function mergeSameStatusWithdrawal(disk: Withdrawal, memory: Withdrawal): Withdrawal {
-  const pick = <K extends keyof Withdrawal>(key: K): Withdrawal[K] =>
-    (memory[key] !== undefined ? memory[key] : disk[key]);
-  return {
-    ...disk,
-    ...memory,
-    // 双方都有值时以内存(本端刚写入的)为准;只有一方有值就取那一方。
-    terminalReason: pick("terminalReason"),
-    retriable: pick("retriable"),
-    confirmedAt: pick("confirmedAt"),
-    riskReasons: pick("riskReasons"),
-    waivedGates: pick("waivedGates"),
-    fastLaneApplied: pick("fastLaneApplied"),
-  };
+  // 🔴 判据**派生,不枚举**(2026-08-12 并入主线时自查抓到):上一版手写了一份
+  // 「要合并哪些字段」的清单,而 `Withdrawal` 的可选字段是**会长的** —— 当场就已经漏了
+  // `riskRoute`(7 个可选字段只列了 6 个)。手写清单必漏且静默失效,是本仓记过的族
+  // (docs/PORT-PITFALLS.md P-082 同族);清单一漏,漏掉的那个字段就回到「整行择一」的老坏法。
+  //
+  // 改成对**实际存在的键**做派生:内存这份没给值的位置,用磁盘那份补上。
+  // `{...disk, ...memory}` 本身已能处理「内存缺这个键」;补的是「内存**显式给了 undefined**」
+  // 那一种(展开时会把磁盘的值覆盖掉)。提现单没有任何「把字段清空」的合法路径,
+  // 所以「内存是 undefined」一律解释成「这一拍没带」,不解释成「要清掉」。
+  const merged = { ...disk, ...memory } as unknown as Record<string, unknown>;
+  const from = disk as unknown as Record<string, unknown>;
+  for (const key of Object.keys(from)) {
+    if (merged[key] === undefined && from[key] !== undefined) merged[key] = from[key];
+  }
+  return merged as unknown as Withdrawal;
 }
 
 function mergeWithdrawals(
