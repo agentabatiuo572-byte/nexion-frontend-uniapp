@@ -20,14 +20,10 @@ import type { DeviceKind } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { orderApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalOrder } from "@/api/order-api";
+import type { CanonicalOrder, CanonicalOrderStatus } from "@/api/order-api";
 
-export type OrderStatus =
-  | "placed"
-  | "paid"
-  | "provisioning"
-  | "activated"
-  | "cancelled";
+/** Server status is rendered verbatim in remote mode; no terminal outcome is collapsed into cancellation. */
+export type OrderStatus = CanonicalOrderStatus;
 
 export interface OrderTimelineEvent {
   status: OrderStatus;
@@ -127,6 +123,9 @@ export const useOrders = defineStore("orders", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
+  // Any in-flight server response is scoped to this binding generation. A logout
+  // or account switch must not project the prior account into the new session.
+  let boundEpoch = 0;
   const orders = ref<Order[]>(remoteApiEnabled ? [] : hydrate(boundKey));
 
   function persist() {
@@ -137,19 +136,21 @@ export const useOrders = defineStore("orders", () => {
   /** 账号切换重绑:装载该账号的订单行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    boundEpoch += 1;
     orders.value = remoteApiEnabled ? [] : hydrate(boundKey);
   }
 
   function fromCanonical(row: CanonicalOrder): Order {
-    const status: OrderStatus = ["placed", "paid", "provisioning", "activated"].includes(row.canonicalStatus)
-      ? row.canonicalStatus as OrderStatus : "cancelled";
+    const status: OrderStatus = row.canonicalStatus;
     const dataCenter = row.dataCenter?.toLowerCase().includes("frankfurt")
       ? "Frankfurt DC" as const : "Singapore DC" as const;
     const timeline: OrderTimelineEvent[] = [{ status: "placed", ts: row.placedAt }];
     if (row.paidAt != null) timeline.push({ status: "paid", ts: row.paidAt });
     if (status === "provisioning") timeline.push({ status, ts: row.paidAt ?? row.placedAt });
     if (row.activatedAt != null) timeline.push({ status: "activated", ts: row.activatedAt });
-    if (status === "cancelled") timeline.push({ status, ts: row.activatedAt ?? row.paidAt ?? row.placedAt });
+    if (!["placed", "paid", "provisioning", "activated"].includes(status)) {
+      timeline.push({ status, ts: row.activatedAt ?? row.paidAt ?? row.placedAt });
+    }
     return {
       id: row.orderNo,
       productId: row.productNo as Order["productId"],
@@ -172,7 +173,10 @@ export const useOrders = defineStore("orders", () => {
 
   async function refreshRemote(): Promise<void> {
     if (!remoteApiEnabled) return;
+    const requestBoundKey = boundKey;
+    const requestEpoch = boundEpoch;
     const canonical = await orderApi.list();
+    if (boundKey !== requestBoundKey || boundEpoch !== requestEpoch) return;
     orders.value = canonical.orders.map(fromCanonical);
   }
 
@@ -288,8 +292,12 @@ export const useOrders = defineStore("orders", () => {
   // Cancel is allowed ONLY pre-payment ("placed"). Once paid, DC provisioning
   // carries financial + capacity commitments → no self-cancel (server-canonical
   // refund/support flow). No-op on any non-"placed" status.
-  function cancelOrder(id: string) {
-    if (remoteApiEnabled) return;
+  function cancelOrder(id: string): boolean {
+    // There is no user-facing canonical cancellation command. Remote mode must
+    // remain HOLD/pending rather than pretending a local mutation succeeded.
+    if (remoteApiEnabled) return false;
+    const cancellable = orders.value.some((o) => o.id === id && o.status === "placed");
+    if (!cancellable) return false;
     orders.value = orders.value.map((o) =>
       o.id === id && o.status === "placed"
         ? {
@@ -307,13 +315,18 @@ export const useOrders = defineStore("orders", () => {
         : o,
     );
     persist();
+    return true;
+  }
+
+  function currentAccountKey(): string {
+    return boundKey;
   }
 
   function getById(id: string): Order | undefined {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, getById, bindAccount, refreshRemote };
+  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, getById, bindAccount, currentAccountKey, refreshRemote };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

@@ -155,11 +155,17 @@
 
         <!-- === awaiting === -->
         <view v-else-if="step === 'awaiting'" class="mx-4 rounded-2xl text-center nx-step-in" :style="centerCardStyle">
-          <view class="mx-auto grid place-items-center nx-spin" :style="spinnerWrapStyle">
+          <view v-if="!remoteOrderFailure" class="mx-auto grid place-items-center nx-spin" :style="spinnerWrapStyle">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           </view>
-          <text class="block" :style="centerTitleStyle">{{ t.store.coAwaiting }}</text>
-          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
+          <text class="block" :style="centerTitleStyle">{{ remoteOrderFailure ? t.tradein.errPurchaseFailed : t.store.coAwaiting }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.4; padding: 0 8px">{{ remoteOrderFailure ? `${t.store.coServerStatus}: ${remoteOrderFailure}` : remoteApiEnabled ? t.store.coAwaitingServer : isCard ? t.store.coAwaitingCard : t.store.coAwaitingChain }}</text>
+          <view v-if="remoteApiEnabled && remoteOrderPollError && !remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="restartRemoteOrderPolling">
+            <text>{{ t.store.coRetryStatus }}</text>
+          </view>
+          <view v-if="remoteOrderFailure" class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 14px" @click.stop="goTrack">
+            <text>{{ t.store.coTrackOrder }}</text>
+          </view>
         </view>
 
         <!-- === confirmed === -->
@@ -222,7 +228,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, type CSSProperties } from "vue";
-import { onLoad, onUnload } from "@dcloudio/uni-app";
+import { onHide, onLoad, onShow, onUnload } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CheckoutRow from "@/components/store/checkout-row.vue";
 import ChainPayment from "@/components/store/chain-payment.vue";
@@ -239,6 +245,8 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
+import { useAuth } from "@/store/auth";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 import { postMoneyBill, postReceiptOnly, reportStuckFunds } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
@@ -253,6 +261,7 @@ import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
 import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { asApiError } from "@/api/errors";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
@@ -277,6 +286,7 @@ interface PaymentMethod {
 
 const t = useT();
 const app = useApp();
+const auth = useAuth();
 const orders = useOrders();
 const voucher = useVoucher();
 
@@ -587,12 +597,16 @@ useSetPageHeader(() => ({
 const step = ref<Step>("select-payment");
 const payment = ref<string>("usdt-trc20");
 const orderId = ref<string | null>(null);
+const remoteOrderFailure = ref<string | null>(null);
+const remoteOrderPollError = ref(false);
 // Re-entry guard for the confirm→pay tap (mirrors source confirmingRef) —
 // prevents a double-tap from racing the step transition.
 let confirming = false;
 // Retries of one visible confirmation must resolve to the same server command;
 // navigating back to payment selection intentionally starts a new checkout.
 const remoteOrderCommandKey = new StableCommandKey();
+const REMOTE_CHECKOUT_COMMANDS_KEY = "nexgrid-remote-checkout-commands-v1";
+type RemoteCheckoutCommands = { commands?: Record<string, string> };
 // Freeze the canonical quote and endpoint after any remote mutation attempt;
 // an ambiguous-success retry must never switch from trade-in to /api/orders.
 const remoteTradeinRecoveryRequired = ref(false);
@@ -717,12 +731,37 @@ async function onConfirmPay() {
 }
 
 function remoteOrderKey(): string {
-  return remoteOrderCommandKey.get(() => {
+  const p = product.value;
+  const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
+    tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
+  const accountKey = orders.currentAccountKey();
+  const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey);
+  const durable = persisted?.commands?.[intent];
+  if (durable) return durable;
+  const key = remoteOrderCommandKey.get(() => {
     const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     return `h7-order:${suffix}`;
   });
+  writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, {
+    commands: { ...(persisted?.commands ?? {}), [intent]: key },
+  });
+  return key;
+}
+
+function retireRemoteOrderKey(): void {
+  const p = product.value;
+  const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
+    tradein.appliedTradein?.canonicalQuote?.sourceDeviceId ?? "ordinary"].join("|");
+  const accountKey = orders.currentAccountKey();
+  const persisted = readAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey);
+  if (persisted?.commands?.[intent]) {
+    const commands = { ...persisted.commands };
+    delete commands[intent];
+    writeAccountRow<RemoteCheckoutCommands>(REMOTE_CHECKOUT_COMMANDS_KEY, accountKey, { commands });
+  }
+  remoteOrderCommandKey.clear();
 }
 
 async function submitRemoteOrder(): Promise<void> {
@@ -775,7 +814,7 @@ async function submitRemoteOrder(): Promise<void> {
         commit(submitted) {
           orderId.value = submitted.orderNo;
           tradein.clearApplied();
-          remoteOrderCommandKey.clear();
+          retireRemoteOrderKey();
           remoteTradeinRecoveryRequired.value = false;
           step.value = "live";
         },
@@ -813,12 +852,29 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
     }
     orderId.value = created.orderNo;
+    remoteOrderFailure.value = null;
+    remoteOrderPollError.value = false;
     if (requestedVoucherId) await voucher.refreshRemote();
     await orders.refreshRemote();
-    await app.refreshRemoteFleet();
-    remoteOrderCommandKey.clear();
-    step.value = "live";
-  } catch {
+    // PENDING_PAYMENT has not created or activated a device yet. Fleet refresh
+    // is authoritative only after the ACTIVATED readback below; making it part
+    // of order creation turns an unrelated fleet outage into a false purchase
+    // failure after the server has already committed the order.
+    // Retire the durable key only after the server order readback above and
+    // account-scoped order refresh both succeeded; unknown outcomes reuse it.
+    retireRemoteOrderKey();
+    // A canonical PENDING_PAYMENT receipt proves only creation.  It is not
+    // provisioning or activation; wait for an authoritative callback/readback.
+    step.value = "awaiting";
+  } catch (error) {
+    // Keep only outcome-unknown errors: transport, malformed response, 5xx and
+    // the server's explicit unknown-result fence. Structured API facts—not text
+    // matching—decide whether a business rejection can mint a new attempt.
+    const apiError = asApiError(error);
+    const keepForReadback = apiError.kind === "network" || apiError.kind === "protocol"
+      || (apiError.kind === "http" && (apiError.status ?? 0) >= 500)
+      || apiError.message === "IDEMPOTENCY_RESULT_UNKNOWN";
+    if (!keepForReadback) retireRemoteOrderKey();
     // No local order, balance debit, or voucher redemption mirror in remote mode.
     step.value = "confirm";
     toast.warn(t.value.tradein.errPurchaseFailed);
@@ -826,6 +882,91 @@ async function submitRemoteOrder(): Promise<void> {
     confirming = false;
   }
 }
+
+// Remote checkout follows only the canonical server state. The recursive
+// timeout is single-flight for one page epoch; hide/account changes invalidate
+// late responses before they can mutate the visible checkout.
+let remoteOrderPollTimer: ReturnType<typeof setTimeout> | undefined;
+let remoteOrderPollEpoch = 0;
+let remoteOrderPageVisible = false;
+
+function stopRemoteOrderPolling() {
+  remoteOrderPollEpoch += 1;
+  if (remoteOrderPollTimer) {
+    clearTimeout(remoteOrderPollTimer);
+    remoteOrderPollTimer = undefined;
+  }
+}
+
+function scheduleRemoteOrderPoll(requestEpoch: number, delayMs: number) {
+  if (requestEpoch !== remoteOrderPollEpoch || !remoteOrderPageVisible) return;
+  remoteOrderPollTimer = setTimeout(() => { void pollRemoteOrder(requestEpoch); }, delayMs);
+}
+
+async function pollRemoteOrder(requestEpoch: number) {
+  const requestOrderNo = orderId.value;
+  const requestAccount = auth.accountId;
+  if (!remoteApiEnabled || !remoteOrderPageVisible || !requestOrderNo
+      || requestEpoch !== remoteOrderPollEpoch) return;
+  try {
+    const snapshot = await orderApi.list();
+    if (requestAccount !== auth.accountId || requestEpoch !== remoteOrderPollEpoch
+        || requestOrderNo !== orderId.value || !remoteOrderPageVisible) return;
+    const authoritative = snapshot.orders.find((row) => row.orderNo === requestOrderNo);
+    if (!authoritative) throw new Error("REMOTE_ORDER_READBACK_NOT_FOUND");
+    remoteOrderPollError.value = false;
+    switch (authoritative.canonicalStatus) {
+      case "placed":
+        scheduleRemoteOrderPoll(requestEpoch, 5000);
+        return;
+      case "paid":
+        step.value = "confirmed";
+        return;
+      case "provisioning":
+        step.value = "activating";
+        return;
+      case "activated":
+        stopRemoteOrderPolling();
+        step.value = "live";
+        void orders.refreshRemote();
+        void app.refreshRemoteFleet();
+        return;
+      case "payment_failed":
+      case "expired":
+      case "provisioning_failed":
+      case "refunded":
+      case "chargeback":
+      case "cancelled":
+        remoteOrderFailure.value = authoritative.canonicalStatus;
+        stopRemoteOrderPolling();
+        return;
+    }
+  } catch {
+    if (requestAccount !== auth.accountId || requestEpoch !== remoteOrderPollEpoch
+        || requestOrderNo !== orderId.value || !remoteOrderPageVisible) return;
+    remoteOrderPollError.value = true;
+    scheduleRemoteOrderPoll(requestEpoch, 5000);
+  }
+}
+
+function restartRemoteOrderPolling() {
+  stopRemoteOrderPolling();
+  remoteOrderPollError.value = false;
+  if (!remoteApiEnabled || !remoteOrderPageVisible || !orderId.value
+      || !["awaiting", "confirmed", "activating"].includes(step.value)
+      || remoteOrderFailure.value) return;
+  const requestEpoch = remoteOrderPollEpoch;
+  scheduleRemoteOrderPoll(requestEpoch, 0);
+}
+
+onShow(() => {
+  remoteOrderPageVisible = true;
+  restartRemoteOrderPolling();
+});
+onHide(() => {
+  remoteOrderPageVisible = false;
+  stopRemoteOrderPolling();
+});
 
 // ── state-machine timers (mirror source useEffect auto-advance chain) ──
 let advanceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -835,6 +976,13 @@ function clearAdvance() {
 
 watch(step, (s) => {
   clearAdvance();
+  // Remote checkout is a server-state machine. Never turn elapsed time into a
+  // payment, provisioning, or activation result; only authoritative readback
+  // may advance it. Local mock retains the guided timer demonstration.
+  if (remoteApiEnabled && (s === "awaiting" || s === "confirmed" || s === "activating")) {
+    restartRemoteOrderPolling();
+    return;
+  }
   if (s === "awaiting") {
     advanceTimer = setTimeout(() => { step.value = "confirmed"; }, 2400);
     return;
@@ -1063,6 +1211,8 @@ function goTrack() {
 // 离开结算页即放弃未使用的抵扣上下文(内存态,无半执行风险)。
 function cleanup() {
   clearAdvance();
+  remoteOrderPageVisible = false;
+  stopRemoteOrderPolling();
   tradein.clearApplied();
   if (trialTicker) { clearInterval(trialTicker); trialTicker = undefined; }
 }

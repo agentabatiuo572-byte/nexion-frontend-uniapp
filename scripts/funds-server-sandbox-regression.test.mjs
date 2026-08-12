@@ -101,8 +101,10 @@ assert.match(mutationKeys, /generations[\s\S]{0,2500}getOrCreate[\s\S]{0,1800}fi
   "pending mutation keys must survive retry and rotate only after a bound order reaches terminal authority");
 assert.match(app, /const mutation: FundsMutationIdentity \| null = fundsSandboxEnabled \?[\s\S]{0,900}: null/,
   "the durable pending registry must be limited to server sandbox commands");
-assert.match(app, /mutation\s*\? pendingFundsMutationKey\(mutation\)\s*:\s*createProductionFundsRequestKey\(\)/,
-  "production commands must not reuse the sandbox pending registry without a production terminal readback");
+assert.match(app, /if \(!fundsSandboxEnabled\) \{[\s\S]{0,240}FUNDS_PRODUCTION_WITHDRAWAL_HOLD/,
+  "production withdrawal must HOLD before POST until a durable terminal readback contract exists");
+assert.doesNotMatch(app, /createProductionFundsRequestKey\(\)/,
+  "a production retry must not mint a fresh key without terminal readback");
 assert.match(trackingPage, /<FundsSandboxBadge\b/,
   "terminal and non-terminal sandbox orders must remain visibly labelled");
 

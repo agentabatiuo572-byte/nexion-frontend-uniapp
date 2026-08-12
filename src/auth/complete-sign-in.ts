@@ -7,7 +7,7 @@ import { safeReturnTo } from "@/routing/safe-return-to";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { useProfile } from "@/store/profile";
-import { remoteApiEnabled } from "@/api/runtime";
+import { authApi, remoteApiEnabled } from "@/api/runtime";
 import type { UserSession } from "@/api/contracts";
 
 interface CompleteSignInOptions {
@@ -18,6 +18,10 @@ interface CompleteSignInOptions {
   onboardingComplete?: boolean;
   /** Required in server mode: this is the only identity projection authority. */
   serverProfile?: UserSession;
+  /** Exact vault epoch issued by authApi; protects a later account from cleanup. */
+  serverSessionRevision?: number;
+  /** Registration needs to show its success interstitial before onboarding routing. */
+  deferNavigation?: boolean;
 }
 
 interface CompletedSignIn {
@@ -28,7 +32,9 @@ interface CompletedSignIn {
 
 export type CompleteSignInResult =
   | { ok: true }
-  | { ok: false; error: "account_directory_unavailable" | "account_not_found" | "account_pending" | "sign_in_conflict" | "sign_in_storage_unavailable" | "SERVER_PROFILE_REQUIRED" };
+  | { ok: false; error: CompleteSignInResultError };
+
+type CompleteSignInResultError = "account_directory_unavailable" | "account_not_found" | "account_pending" | "sign_in_conflict" | "sign_in_storage_unavailable" | "SERVER_PROFILE_REQUIRED";
 
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
 const COMPLETED_SIGN_INS_KEY = "__nexgridAuthCompletedSignIns";
@@ -57,28 +63,52 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   const app = useApp();
   const session = useSession();
   const sponsorship = useSponsorship();
+  const failRemoteCompletion = (error: CompleteSignInResultError): CompleteSignInResult => {
+    if (remoteApiEnabled) {
+      if (typeof options.serverSessionRevision === "number") {
+        authApi.discardSessionIfCurrent(options.serverSessionRevision);
+      } else {
+        // Legacy/manual call sites have no issued epoch. Restrict cleanup to
+        // the requested user rather than risking a different active account.
+        authApi.discardSessionForIdentity(options.identity);
+      }
+    }
+    return { ok: false, error };
+  };
   const abortSignIn = (): CompleteSignInResult => {
     session.signOutSession();
     auth.signOut();
     app.bindAccount("default");
     rebindAccountScopedStores("default");
-    return { ok: false, error: "sign_in_storage_unavailable" };
+    return failRemoteCompletion("sign_in_storage_unavailable");
   };
 
   // Do not promote a server session into a browser-owned demo profile. A
   // missing authority projection remains an honest empty state and blocks
   // entry rather than reviving a local seed.
-  if (remoteApiEnabled && !options.serverProfile) return { ok: false, error: "SERVER_PROFILE_REQUIRED" };
+  if (remoteApiEnabled && !options.serverProfile) return failRemoteCompletion("SERVER_PROFILE_REQUIRED");
 
-  // 手机号账号必须先恢复目录里的 canonical 状态。pending 绝不能借普通
-  // 密码/OTP 登录拿到 auth/session；active 的 onboarding 事实也不能由调用方覆盖。
-  const accountLookup = resolveAuthAccountById(options.identity);
-  if (!accountLookup.ok) return { ok: false, error: accountLookup.error };
-  if (isPhoneAuthAccountId(options.identity) && accountLookup.account?.status !== "active") {
-    return { ok: false, error: accountLookup.account ? "account_pending" : "account_not_found" };
+  // Remote identities are issued by the server and deliberately do not exist
+  // in the mock-only phone directory.  Binding them to that browser table
+  // would reject every genuine login/registration and invite a local fallback.
+  // The server user must instead match the account identity exactly.
+  let onboardingComplete: boolean;
+  if (remoteApiEnabled) {
+    if (!options.serverProfile || options.identity !== `user:${options.serverProfile.userId}`) {
+      return failRemoteCompletion("SERVER_PROFILE_REQUIRED");
+    }
+    onboardingComplete = options.onboardingComplete ?? false;
+  } else {
+    // 手机号账号必须先恢复目录里的 canonical 状态。pending 绝不能借普通
+    // 密码/OTP 登录拿到 auth/session；active 的 onboarding 事实也不能由调用方覆盖。
+    const accountLookup = resolveAuthAccountById(options.identity);
+    if (!accountLookup.ok) return { ok: false, error: accountLookup.error };
+    if (isPhoneAuthAccountId(options.identity) && accountLookup.account?.status !== "active") {
+      return { ok: false, error: accountLookup.account ? "account_pending" : "account_not_found" };
+    }
+    if (accountLookup.account?.status === "pending") return { ok: false, error: "account_pending" };
+    onboardingComplete = accountLookup.account?.onboardingComplete ?? options.onboardingComplete ?? true;
   }
-  if (accountLookup.account?.status === "pending") return { ok: false, error: "account_pending" };
-  const onboardingComplete = accountLookup.account?.onboardingComplete ?? options.onboardingComplete ?? true;
 
   const now = Date.now();
   for (const [key, result] of completedSignIns) {
@@ -87,7 +117,9 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
 
   const idempotencyKey = options.idempotencyKey ?? null;
   const completed = idempotencyKey ? completedSignIns.get(idempotencyKey) : null;
-  if (completed && completed.identity !== options.identity) return { ok: false, error: "sign_in_conflict" };
+  if (completed && completed.identity !== options.identity) {
+    return remoteApiEnabled ? failRemoteCompletion("sign_in_conflict") : { ok: false, error: "sign_in_conflict" };
+  }
 
   let requiresRecalibration = completed?.requiresRecalibration ?? false;
   const completionStillApplied = !!completed
@@ -97,7 +129,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     && session.status === "active";
   if (!completionStillApplied) {
     if (!auth.signIn(options.identity, onboardingComplete)) {
-      return { ok: false, error: "sign_in_storage_unavailable" };
+      return remoteApiEnabled ? failRemoteCompletion("sign_in_storage_unavailable") : { ok: false, error: "sign_in_storage_unavailable" };
     }
     app.bindAccount(options.identity);
     rebindAccountScopedStores(options.identity);
@@ -118,7 +150,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     }
   } else if (auth.onboardingComplete !== onboardingComplete) {
     if (!auth.signIn(options.identity, onboardingComplete)) {
-      return { ok: false, error: "sign_in_storage_unavailable" };
+      return remoteApiEnabled ? failRemoteCompletion("sign_in_storage_unavailable") : { ok: false, error: "sign_in_storage_unavailable" };
     }
   }
   // Apply on every accepted server login, including a token-refresh/retry that
@@ -137,6 +169,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   // Fetch the new account's server buckets here; a failed request leaves the
   // snapshot unavailable and the withdrawal endpoint still fails closed.
   void refreshEarningsReleaseStatus(options.identity).catch(() => {});
+  if (options.deferNavigation) return { ok: true };
   if (!auth.onboardingComplete) {
     uni.reLaunch({
       url: "/pages/onboarding/estimator",

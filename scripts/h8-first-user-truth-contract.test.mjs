@@ -48,6 +48,7 @@ test("H8 invitation summary keeps an authoritative localized sandbox banner acro
   assert.match(card, /data-testid="h8-sandbox-banner"/);
   assert.match(card, /snapshot\?\.source === "mock"[\s\S]*snapshot\?\.sourceEnvironment === "SANDBOX"/);
   assert.match(card, /t\.team\.sandboxBanner/);
+  assert.match(card, /RunID \{\{ sandboxRunId \}\}/);
   assert.doesNotMatch(card, />Server-set reward per settled invitation</);
   assert.doesNotMatch(card, /`\$\{rewards\.snapshot\.settledCount\} settled/);
   assert.doesNotMatch(card, />Share &amp; earn/);
@@ -58,7 +59,8 @@ test("H8 invitation summary keeps an authoritative localized sandbox banner acro
     assert.match(messages, /settlementStatus:/);
     assert.match(messages, /settledToWallet:/);
   }
-  assert.match(api, /const SANDBOX_FACTS = \["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger", "nx_user_wallet"\]/);
+  assert.match(api, /const SANDBOX_FACTS = \["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"\]/);
+  assert.match(api, /sourceEnvironment === "SANDBOX"[\s\S]*runId/);
 });
 
 test("remote registration submits the captured referral code to the server", () => {

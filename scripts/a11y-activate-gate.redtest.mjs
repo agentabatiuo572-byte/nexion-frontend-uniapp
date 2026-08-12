@@ -153,7 +153,7 @@ const results = [
   redtestSource("D 平台层空壳化", "D", "src/lib/a11y-activate.ts",
     (s) => s.replace("target.click();", "/* target.click(); */")),
   redtestSource("D role 表被掏空(门与平台层同源)", "D", "src/lib/a11y-activate.ts",
-    (s) => s.replace(/ {2}button: \[[^\]]*\],\n/, "")),
+    (s) => s.replace(/ {2}button: \[[^\]]*\],\r?\n/, "")),
   redtestSource("D 行为门被清空", "D", "scripts/a11y-activate-behavior.test.mjs",
     (s) => s.replace(/^test\(/gm, "//test(")),
 

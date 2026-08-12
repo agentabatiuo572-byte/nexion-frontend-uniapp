@@ -5,7 +5,12 @@ import type { Conversation, ConvMessage, SupportFaq, Ticket, TicketCategory, Tic
 interface Page<T> { items: T[]; total: number }
 interface TicketInput { category: TicketCategory; subject: string; body: string }
 interface ConversationTicketResult { conversation: Conversation; ticket: Ticket }
+export type SupportCommandResult =
+  | { kind: "ticket"; ticket: Ticket }
+  | { kind: "conversation"; conversation: Conversation }
+  | { kind: "conversation-ticket"; conversation: Conversation; ticket: Ticket };
 export interface SupportApi {
+  acceptanceRunId(): Promise<string>;
   tickets(): Promise<Page<Ticket>>;
   ticket(id: string): Promise<Ticket>;
   createTicket(input: TicketInput, key: string): Promise<Ticket>;
@@ -17,6 +22,7 @@ export interface SupportApi {
   startConversation(type: Exclude<Conversation["type"], "ai">, openingText: string, key: string): Promise<Conversation>;
   replyConversation(conversation: Conversation, body: string, key: string): Promise<Conversation>;
   convertConversationToTicket(conversation: Conversation, category: TicketCategory, title: string, key: string): Promise<ConversationTicketResult>;
+  commandResult(key: string): Promise<SupportCommandResult | null>;
   faqs(language: string, category?: string): Promise<SupportFaq[]>;
 }
 
@@ -91,10 +97,42 @@ function parseFaq(value: unknown): SupportFaq {
 }
 
 export function createSupportApi(client: ApiClient): SupportApi {
+  let supportRoot: Promise<{ path: string; runId: string }> | undefined;
+  async function rootPath(): Promise<{ path: string; runId: string }> {
+    if (!supportRoot) supportRoot = client.request({ method: "GET", path: "/api/app/support/acceptance/projection" })
+      .then((proof) => {
+        const v = row(proof);
+        if (!v || v.source !== "mock" || v.sourceEnvironment !== "SANDBOX" || v.strictProfile !== true || typeof v.runId !== "string" || !v.runId.trim()) {
+          invalid("SUPPORT_ACCEPTANCE_PROOF_INVALID");
+        }
+        return { path: "/api/app/support/acceptance", runId: v.runId.trim() };
+      })
+      .catch((cause: unknown) => {
+        const error = cause instanceof ApiError ? cause : null;
+        // A missing acceptance-only controller is the sole production fallback.
+        if (error?.status === 404) return { path: "/api/app/support", runId: "production" };
+        supportRoot = undefined;
+        throw cause;
+      });
+    return supportRoot;
+  }
+  async function supportPath(path: string): Promise<string> { return `${(await rootPath()).path}${path}`; }
+  function parseCommandResult(value: unknown): SupportCommandResult | null {
+    if (value == null) return null;
+    const v = row(value); const type = text(v?.resultType)?.toLowerCase();
+    if (!v || !type) invalid("SUPPORT_COMMAND_RESULT_INVALID");
+    if (type === "ticket") return { kind: "ticket", ticket: parseTicketDetail(v.result) };
+    if (type === "conversation") return { kind: "conversation", conversation: parseConversationDetail(v.result) };
+    if (type === "conversation-ticket") {
+      const result = row(v.result); if (!result) invalid("SUPPORT_COMMAND_RESULT_INVALID");
+      return { kind: "conversation-ticket", conversation: parseConversationHeader(result.conversation), ticket: parseTicketDetail(result.ticket) };
+    }
+    invalid("SUPPORT_COMMAND_RESULT_INVALID");
+  }
   async function allTickets(): Promise<Page<Ticket>> {
     const items: Ticket[] = []; let pageNum = 1; let total = 0;
     do {
-      const page = parseTicketPage(await client.request({ method: "GET", path: `/api/app/support/tickets?pageNum=${pageNum}&pageSize=100` }));
+      const page = parseTicketPage(await client.request({ method: "GET", path: `${await supportPath("/tickets")}?pageNum=${pageNum}&pageSize=100` }));
       if (pageNum === 1) total = page.total;
       if (page.items.length === 0 && items.length < total) invalid("SUPPORT_TICKET_PAGE_INCOMPLETE");
       items.push(...page.items); pageNum += 1;
@@ -105,7 +143,7 @@ export function createSupportApi(client: ApiClient): SupportApi {
   async function allConversations(): Promise<Page<Conversation>> {
     const items: Conversation[] = []; let pageNum = 1; let total = 0;
     do {
-      const page = parseConversationPage(await client.request({ method: "GET", path: `/api/app/support/conversations?pageNum=${pageNum}&pageSize=100` }));
+      const page = parseConversationPage(await client.request({ method: "GET", path: `${await supportPath("/conversations")}?pageNum=${pageNum}&pageSize=100` }));
       if (pageNum === 1) total = page.total;
       if (page.items.length === 0 && items.length < total) invalid("SUPPORT_CONVERSATION_PAGE_INCOMPLETE");
       items.push(...page.items); pageNum += 1;
@@ -114,21 +152,31 @@ export function createSupportApi(client: ApiClient): SupportApi {
     return { items, total };
   }
   return {
+    acceptanceRunId: async () => (await rootPath()).runId,
     tickets: allTickets,
-    ticket: async id => parseTicketDetail(await client.request({ method: "GET", path: `/api/app/support/tickets/${pathId(id)}` })),
-    createTicket: async (input, key) => parseTicketDetail(await client.request({ method: "POST", path: "/api/app/support/tickets", idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim() } })),
-    replyTicket: async (ticket, body, key) => parseTicketDetail(await client.request({ method: "POST", path: `/api/app/support/tickets/${pathId(ticket.id)}/replies`, idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version } })),
-    closeTicket: async (ticket, key) => parseTicketDetail(await client.request({ method: "POST", path: `/api/app/support/tickets/${pathId(ticket.id)}/close`, idempotencyKey: requiredKey(key), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version } })),
+    ticket: async id => parseTicketDetail(await client.request({ method: "GET", path: await supportPath(`/tickets/${pathId(id)}`) })),
+    createTicket: async (input, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath("/tickets"), idempotencyKey: requiredKey(key), body: { category: input.category, title: input.subject.trim(), body: input.body.trim(), clientMessageId: key } })),
+    replyTicket: async (ticket, body, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
+    closeTicket: async (ticket, key) => parseTicketDetail(await client.request({ method: "POST", path: await supportPath(`/tickets/${pathId(ticket.id)}/close`), idempotencyKey: requiredKey(key), body: { expectedStatus: ticket.status.toUpperCase(), expectedVersion: ticket.version, clientMessageId: key } })),
     conversations: allConversations,
-    conversation: async id => parseConversationDetail(await client.request({ method: "GET", path: `/api/app/support/conversations/${pathId(id)}` })),
+    conversation: async id => parseConversationDetail(await client.request({ method: "GET", path: await supportPath(`/conversations/${pathId(id)}`) })),
     markConversationRead: async (conversation, lastSeenMessageId) => parseConversationDetail(await client.request({
-      method: "POST", path: `/api/app/support/conversations/${pathId(conversation.id)}/read`, body: { lastSeenMessageId },
+      method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/read`),
+      body: { lastSeenMessageId, expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version },
     })),
-    startConversation: async (conversationType, openingText, key) => parseConversationDetail(await client.request({ method: "POST", path: "/api/app/support/conversations", idempotencyKey: requiredKey(key), body: { conversationType: conversationType.toUpperCase(), openingText: openingText.trim() } })),
-    replyConversation: async (conversation, body, key) => parseConversationDetail(await client.request({ method: "POST", path: `/api/app/support/conversations/${pathId(conversation.id)}/replies`, idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version } })),
+    startConversation: async (conversationType, openingText, key) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath("/conversations"), idempotencyKey: requiredKey(key), body: { conversationType: conversationType.toUpperCase(), openingText: openingText.trim(), clientMessageId: key } })),
+    replyConversation: async (conversation, body, key) => parseConversationDetail(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/replies`), idempotencyKey: requiredKey(key), body: { body: body.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key } })),
     convertConversationToTicket: async (conversation, category, title, key) => {
-      const v = row(await client.request({ method: "POST", path: `/api/app/support/conversations/${pathId(conversation.id)}/ticket`, idempotencyKey: requiredKey(key), body: { category, title: title.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version } }));
+      const v = row(await client.request({ method: "POST", path: await supportPath(`/conversations/${pathId(conversation.id)}/ticket`), idempotencyKey: requiredKey(key), body: { category, title: title.trim(), expectedStatus: conversation.status.toUpperCase(), expectedVersion: conversation.version, clientMessageId: key } }));
       if (!v) invalid("SUPPORT_CONVERSATION_RESPONSE_INVALID"); return { conversation: parseConversationHeader(v.conversation), ticket: parseTicketDetail(v.ticket) };
+    },
+    commandResult: async key => {
+      try {
+        return parseCommandResult(await client.request({ method: "GET", path: await supportPath(`/commands/${pathId(requiredKey(key))}`) }));
+      } catch (cause) {
+        if (cause instanceof ApiError && cause.status === 404) return null;
+        throw cause;
+      }
     },
     faqs: async (language, category) => {
       const params = new URLSearchParams({ language: language.trim() || "en-US" }); if (category?.trim()) params.set("category", category.trim());

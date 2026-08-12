@@ -2,7 +2,7 @@
   <AppChassis active="me"><view class="px-4" style="padding-bottom:24px"><SubPageHeader back="/pages/me/me" />
     <view v-if="loading">正在加载教程中心…</view>
     <view v-else-if="error"><text>{{ error }}</text><text class="block" style="margin-top:12px;color:var(--v5-brand)" @click="load">重试</text></view>
-    <view v-else><text class="block" style="font-size:20px;font-weight:600">教程中心</text><text class="block" style="margin:8px 0;color:var(--v5-ink-3)">已完成 {{ overview?.completedCourses }}/{{ overview?.totalCourses }} · 已获 {{ overview?.earnedNex }} NEX</text>
+    <view v-else><text class="block" style="font-size:20px;font-weight:600">教程中心</text><text class="block" style="margin:8px 0;color:var(--v5-ink-3)">已完成 {{ overview?.completedCourses }}/{{ overview?.totalCourses }} · 已获 {{ overview?.earnedNex }} NEX</text><text v-if="overview?.courses[0]?.sourceEnvironment === 'SANDBOX'" class="block" style="margin:6px 0;color:#b45309">{{ overview.courses[0].permanentLabel }} · Run {{ overview.courses[0].runId }} · {{ overview.courses[0].source }}/{{ overview.courses[0].sourceEnvironment }}</text>
       <view v-for="course in overview?.courses" :key="course.id" style="margin-top:10px;padding:14px;border-radius:12px;background:var(--v5-surface)" @click="open(course.id)"><text class="block" style="font-weight:600">{{ course.title }}</text><text class="block" style="margin-top:5px;color:var(--v5-ink-3)">{{ course.duration }} · 奖励 {{ course.rewardNex }} NEX</text></view>
     </view>
   </view></AppChassis>

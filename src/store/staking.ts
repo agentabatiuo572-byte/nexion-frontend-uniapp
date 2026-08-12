@@ -105,7 +105,9 @@ export const useStaking = defineStore("staking", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const boot = hydrate(boundKey);
+  // Remote mode must not expose the prototype position while the authority
+  // request is pending. An empty snapshot is the only honest initial state.
+  const boot = remoteApiEnabled ? { positions: [], rev: 0 } : hydrate(boundKey);
   let boundRev = boot.rev;
   const positions = ref<StakingPosition[]>(boot.positions);
 
@@ -148,6 +150,12 @@ export const useStaking = defineStore("staking", () => {
   }
 
   async function openRemote(tierKey: string, amountUsdt: number, idempotencyKey: string) {
+    // A remote order may only be submitted against the exact, successfully
+    // parsed server product snapshot. Never reconstruct a tier or minimum from
+    // the mock table after a config/network failure.
+    if (!remoteReady.value) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
+    const pool = pools.value.find((row) => row.tierKey === tierKey && row.enabled);
+    if (!pool || amountUsdt < pool.minAmountUsdt) throw new Error("G1_REMOTE_AUTHORITY_UNAVAILABLE");
     try {
       const snapshot = await stakingApi.openStakingPosition(tierKey, amountUsdt, idempotencyKey);
       applyRemoteSnapshot(snapshot);
@@ -229,6 +237,11 @@ export const useStaking = defineStore("staking", () => {
   /** 账号切换重绑:装载该账号的持仓行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      clearRemoteState();
+      void syncRemote().catch(() => undefined);
+      return;
+    }
     const row = hydrate(boundKey);
     positions.value = row.positions;
     boundRev = row.rev;

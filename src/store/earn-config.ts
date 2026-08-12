@@ -16,6 +16,11 @@ const route = ref<EarnTaskRoute | null>(null);
 const routeError = ref("");
 let loadVersion = 0;
 
+// The mutable compatibility table is consumed by legacy presentation code.
+// Clear its prototype rows immediately in server mode; only a validated
+// /api/config/phone-tiers response is allowed to repopulate it.
+if (remoteApiEnabled) applyCanonicalPhoneTierYields([]);
+
 function unlockTierFor(minVRAM: number): string {
   if (minVRAM <= 24) return "RTX 4090 PC (24GB)";
   if (minVRAM <= 96) return "NexGridBox S1 (96GB)";
@@ -42,6 +47,7 @@ export async function refreshEarnConfig(): Promise<void> {
     if (version !== loadVersion) return;
     taskPricing.value = null;
     phoneTiers.value = null;
+    applyCanonicalPhoneTierYields([]);
     status.value = "error";
     error.value = cause instanceof Error ? cause.message : "E2_CONFIG_UNAVAILABLE";
   }
