@@ -27,6 +27,8 @@ type TrackerOptions = {
   deviceType: () => BehaviorDevice;
   locale: () => string;
   eventId: () => string;
+  /** In-memory authenticated subject scope; never emitted as telemetry. */
+  credentialScope?: string;
   enabled?: () => boolean;
 };
 
@@ -61,30 +63,34 @@ export function normalizeBehaviorTap(input: TapInput) {
 }
 
 export function createBehaviorTracker(options: TrackerOptions) {
-  let active: { route: string; clientEventId: string; startedAt: number } | null = null;
+  let active: { route: string; startedAt: number } | null = null;
   const pending = new Set<Promise<unknown>>();
+  let serial = Promise.resolve();
+  let epoch = 0;
 
   function enqueue(event: BehaviorEvent) {
     if (options.enabled && !options.enabled()) return;
-    const task = options.transport.ingest(event).catch(() => undefined).finally(() => pending.delete(task));
+    const queuedEpoch = epoch;
+    const task = serial = serial.catch(() => undefined).then(async () => {
+      // Logout, account rotation, hiding and remote disable cancel unsent work.
+      if (queuedEpoch !== epoch) return;
+      if (options.enabled && !options.enabled()) return;
+      const receipt = await options.transport.ingest(event).catch(() => undefined);
+      // A transport can resolve after sign-out or account rotation. Recheck
+      // this tracker epoch after await before it may project any credential.
+      if (queuedEpoch !== epoch) return;
+      if (options.enabled && !options.enabled()) return;
+      if (receipt) rememberAcceptanceObservationCredential(receipt, options.credentialScope || "");
+    });
     pending.add(task);
+    void task.finally(() => pending.delete(task));
   }
 
   function show(rawRoute: string) {
     const route = routeOnly(rawRoute);
     if (!route || active?.route === route) return;
     if (active) hide(active.route);
-    active = { route, clientEventId: options.eventId(), startedAt: options.now() };
-    enqueue({
-      clientEventId: active.clientEventId,
-      eventName: "app.page_viewed",
-      sessionId: options.sessionId,
-      route,
-      dwellMs: 0,
-      clientTs: active.startedAt,
-      deviceType: options.deviceType(),
-      locale: options.locale(),
-    });
+    active = { route, startedAt: options.now() };
   }
 
   function hide(rawRoute: string) {
@@ -92,13 +98,17 @@ export function createBehaviorTracker(options: TrackerOptions) {
     if (!active || active.route !== route) return;
     const ended = active;
     active = null;
+    const endedAt = options.now();
     enqueue({
-      clientEventId: ended.clientEventId,
+      clientEventId: options.eventId(),
       eventName: "app.page_viewed",
       sessionId: options.sessionId,
       route: ended.route,
-      dwellMs: Math.min(86_400_000, Math.max(0, Math.round(options.now() - ended.startedAt))),
-      clientTs: ended.startedAt,
+      // This is a completed dwell fact, so stamp the completion moment. It
+      // keeps the serialized transport chronology aligned with clientTs even
+      // when a click occurred while the page was visible.
+      dwellMs: Math.min(86_400_000, Math.max(0, Math.round(endedAt - ended.startedAt))),
+      clientTs: endedAt,
       deviceType: options.deviceType(),
       locale: options.locale(),
     });
@@ -122,7 +132,47 @@ export function createBehaviorTracker(options: TrackerOptions) {
     await Promise.allSettled([...pending]);
   }
 
-  return { show, hide, tap, flush };
+  function discard(): void {
+    epoch += 1;
+    active = null;
+  }
+
+  return { show, hide, tap, flush, discard };
+}
+
+let acceptanceObservationCredential = "";
+let acceptanceObservationCredentialScope = "";
+
+function rememberAcceptanceObservationCredential(receipt: Awaited<ReturnType<BehaviorTransport["ingest"]>>, scope: string): void {
+  if (!scope) return;
+  if (receipt.source !== "mock" || receipt.sourceEnvironment !== "SANDBOX"
+    || !receipt.runId || !receipt.observationToken) return;
+  const credential = `${receipt.runId}.${receipt.observationToken}`;
+  if (credential === acceptanceObservationCredential && scope === acceptanceObservationCredentialScope) return;
+  acceptanceObservationCredential = credential;
+  acceptanceObservationCredentialScope = scope;
+  try {
+    uni.setClipboardData({ data: credential, showToast: false });
+    uni.showModal({ title: "验收观察凭证", content: `${credential}\n已复制；可粘贴至 PC 的 L6 Sandbox 观察面。`, showCancel: false });
+  } catch {
+    // The receipt remains available through the explicit getter on hosts that
+    // cannot show a modal or reach the native clipboard.
+  }
+}
+
+function clearAcceptanceObservationCredential(): void {
+  acceptanceObservationCredential = "";
+  acceptanceObservationCredentialScope = "";
+}
+
+/** H5 acceptance can display or copy this opaque server-issued PC query credential. */
+export function getAcceptanceObservationCredential(): string {
+  return acceptanceObservationCredential;
+}
+
+export function copyAcceptanceObservationCredential(): void {
+  if (!acceptanceObservationCredential) return;
+  try { uni.setClipboardData({ data: acceptanceObservationCredential, showToast: true }); } catch { /* no-op */ }
 }
 
 type BehaviorTracker = ReturnType<typeof createBehaviorTracker>;
@@ -134,7 +184,7 @@ export type BehaviorAnalyticsContext = {
 
 type BehaviorAnalyticsManagerOptions = {
   context: () => BehaviorAnalyticsContext;
-  createTracker: (subject: string) => Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush">;
+  createTracker: (subject: string) => Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush" | "discard">;
   now: () => number;
 };
 
@@ -145,17 +195,21 @@ type BehaviorAnalyticsManagerOptions = {
  * prior tracker so a later account can never inherit its pseudonymous session.
  */
 export function createBehaviorAnalyticsManager(options: BehaviorAnalyticsManagerOptions) {
-  let tracker: Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush"> | null = null;
+  let tracker: Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush" | "discard"> | null = null;
   let subject = "";
   let activeRoute = "";
   let lastClickAt = Number.NEGATIVE_INFINITY;
   let lastClickRoute = "";
 
-  function dispose(): void {
+  function dispose(emitClose = false): void {
     if (!tracker) return;
-    if (activeRoute) tracker.hide(activeRoute);
+    if (emitClose && activeRoute) tracker.hide(activeRoute);
+    else tracker.discard();
     void tracker.flush();
     tracker = null;
+    // Clipboard history cannot be recalled by the platform, but this App's
+    // modal/getter projection must never carry a prior account's credential.
+    clearAcceptanceObservationCredential();
     subject = "";
     activeRoute = "";
     lastClickAt = Number.NEGATIVE_INFINITY;
@@ -172,10 +226,10 @@ export function createBehaviorAnalyticsManager(options: BehaviorAnalyticsManager
     }
     const nextSubject = String(context.subject || "").trim();
     if (!context.enabled || !nextSubject) {
-      dispose();
+      dispose(false);
       return null;
     }
-    if (tracker && subject !== nextSubject) dispose();
+    if (tracker && subject !== nextSubject) dispose(false);
     if (!tracker) {
       tracker = options.createTracker(nextSubject);
       subject = nextSubject;
@@ -218,11 +272,15 @@ export function createBehaviorAnalyticsManager(options: BehaviorAnalyticsManager
     await tracker?.flush();
   }
 
-  return { show, hide, tap, refresh, flush };
+  function discard(): void {
+    dispose(false);
+  }
+
+  return { show, hide, tap, refresh, flush, discard };
 }
 
 type BehaviorLifecycleOptions = {
-  tracker: Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush">;
+  tracker: Pick<BehaviorTracker, "show" | "hide" | "tap" | "flush" | "discard">;
   enabled: () => boolean;
   currentRoute: () => string;
   now: () => number;
@@ -250,9 +308,8 @@ export function createBehaviorAnalyticsLifecycle(options: BehaviorLifecycleOptio
   function syncRoute() {
     if (!visible) return;
     if (!options.enabled()) {
-      if (activeRoute) options.tracker.hide(activeRoute);
+      options.tracker.discard();
       activeRoute = "";
-      void options.tracker.flush();
       return;
     }
     const route = routeOnly(options.currentRoute());
@@ -291,9 +348,11 @@ export function createBehaviorAnalyticsLifecycle(options: BehaviorLifecycleOptio
   function pause() {
     if (!visible) return;
     visible = false;
-    if (activeRoute) options.tracker.hide(activeRoute);
+    // Hiding, sign-out and account rotation are privacy boundaries: discard the
+    // in-flight page state instead of sending a final request after visibility
+    // or identity has changed.
+    options.tracker.discard();
     activeRoute = "";
-    void options.tracker.flush();
   }
 
   return { start, pause, refresh: syncRoute, trackTap };
@@ -342,13 +401,14 @@ export function configureBehaviorAnalyticsContext(provider: () => BehaviorAnalyt
 export const behaviorTracker = createBehaviorAnalyticsManager({
   context: () => behaviorAnalyticsContext(),
   now: () => Date.now(),
-  createTracker: () => createBehaviorTracker({
+  createTracker: (subject) => createBehaviorTracker({
     transport: behaviorAnalyticsApi,
     now: () => Date.now(),
     sessionId: randomHex32(),
     deviceType: currentDevice,
     locale: currentLocale,
     eventId: randomHex32,
+    credentialScope: subject,
     enabled: () => remoteApiEnabled,
   }),
 });

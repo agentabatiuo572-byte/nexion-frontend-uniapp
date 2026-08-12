@@ -5,6 +5,8 @@ export interface ProductCatalogSnapshot {
   source: string;
   revision: string | null;
   products: Product[];
+  sourceEnvironment?: "SANDBOX";
+  runId?: string;
 }
 
 export class ProductCatalogContractError extends Error {
@@ -19,6 +21,7 @@ const PHASES = new Set<PhaseId>(["P1", "P2", "P3", "P4", "P5", "P6"]);
 const LIFECYCLES = new Set<NonNullable<Product["status"]>>(["active", "legacy"]);
 const GATE_MODES = new Set<PurchaseGate["mode"]>(["all", "either"]);
 const GATE_PERIODS = new Set<NonNullable<PurchaseGate["quotaPeriod"]>>(["month", "lifetime"]);
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
 
 function invalid(): never {
   throw new ProductCatalogContractError();
@@ -144,9 +147,15 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
   const catalogSource = nonEmptyString(source.source);
   if (source.revision !== null && typeof source.revision !== "string") return invalid();
   if (!Array.isArray(source.products)) return invalid();
+  const sourceEnvironment = source.sourceEnvironment;
+  const runId = source.runId;
+  const isSandbox = sourceEnvironment !== undefined || runId !== undefined;
+  if (isSandbox && (catalogSource !== "mock" || sourceEnvironment !== "SANDBOX"
+      || typeof runId !== "string" || !RUN_ID.test(runId))) return invalid();
   return {
     source: catalogSource,
     revision: source.revision as string | null,
     products: source.products.map(product),
+    ...(isSandbox ? { sourceEnvironment: "SANDBOX" as const, runId: runId as string } : {}),
   };
 }

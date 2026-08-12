@@ -212,6 +212,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   function withdraw(id: string): boolean {
+    if (remoteApiEnabled) return false;
     const e = events.value.find((x) => x.id === id);
     if (!e || e.status !== "unlocked") return false;
     events.value = events.value.map((x) => (x.id === id ? { ...x, status: "withdrawn" } : x));

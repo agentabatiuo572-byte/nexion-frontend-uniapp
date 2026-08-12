@@ -16,8 +16,99 @@ const IS_PRODUCTION = import.meta.env.PROD;
 // the seed with `GET /api/config/platform` on app boot; the client treats the
 // fetched response as READ-ONLY (no current admin push channel in this repo).
 export const useConfig = defineStore("config", () => {
-  // PROD: hydrate from GET /api/config/platform instead of the mock seed.
-  const config = ref<PlatformConfig>(completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG));
+  const mockConfig = completePlatformConfigSeed(DEFAULT_PLATFORM_CONFIG);
+  // Remote mode never exposes plausible server-owned seed values while the
+  // authority request is pending or failed. The full structural shape keeps
+  // rendering deterministic, but every server-owned value starts closed.
+  const unavailableServerConfig: PlatformConfig = {
+    ...mockConfig,
+    featureFlags: {
+      computeShareEnabled: false,
+      homeNewcomerTasksEnabled: false,
+      homeWeeklyPromoEnabled: false,
+    },
+    publicStats: {
+      // 🔴 三个 -1 是**故意的非法值**,不是随手写的 0(2026-08-12 合并收口;
+      // compat 的 RUNTIME_PUBLIC_STATS_DEFAULT 同款,那边有完整说明)。
+      // 原因:publicStatsHealth 的合法域里 **0 是合法值**(jitter 判 0-500、
+      // 增速判 0-50、虚拟人口判 0-10,000,000)。全 0 会让这三维判成「可用」,
+      // 于是服务端数据还没到,首页就把占位当真数据渲染出去(实测「Members 0 · +0%/mo」)。
+      // 判据:remote-config-merge-contract 的「load 前六维必须全 false」那格看住。
+      fleetDevices: 0,
+      onlineRatePct: 0,
+      onlineJitter: -1,
+      registeredUsersBase: 0,
+      registeredUsersMonthlyGrowthPct: -1,
+      registeredUsersAnchorAt: 0,
+      realUserCount: 0,
+      virtualUserCount: -1,
+      hashratePercentileTable: [],
+    },
+    onlineBonus: { h5BaseFactor: 0, continuityFullHours: 0 },
+    // These K/D5 policy branches are not part of the current public platform
+    // projection.  They must therefore never inherit their mock values in
+    // remote mode.  The values below are deliberately inert; real writes use
+    // their dedicated server endpoints (auth, payout-address, withdrawals).
+    riskCluster: {
+      freePhoneSlotsPerCluster: 0,
+      duplicateAccountPendingFrom: 0,
+      duplicateAccountFreezeFrom: 0,
+      pendingReleaseHours: 0,
+      appAttestationReleaseHours: 0,
+      maxSignupPerIp24h: 0,
+      maxAccountsPerDevice: 0,
+      maxAccountsPerPaymentInstrument: 0,
+      clusterFreezeSuggestThreshold: 0,
+      releaseMode: "manual_only",
+      freeSlotRequiresBinding: true,
+    },
+    withdrawRules: {
+      minWithdrawableUsdt: 0,
+      sameAddressRoute: "reject",
+      firstWithdrawalManual: true,
+      newAddressHoldHours: 0,
+      rebindCooldownDays: 0,
+      smallAmountThresholdUsd: 0,
+      payoutSlaHours: 0,
+      payoutReviewWindowDays: 0,
+      networkConfirmFeeUsd: { trc20: 0, bep20: 0, erc20: 0 },
+    },
+    rewards: {
+      welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
+      inviterReward: { nexAmount: 0 },
+    },
+    riskScore: {
+      dimensionWeights: {
+        serverDeviceId: 0,
+        ipBucket: 0,
+        withdrawAddress: 0,
+        paymentInstrument: 0,
+        sponsor: 0,
+        uaFingerprint: 0,
+        signupTiming: 0,
+      },
+      weakSignalClusterThreshold: 0,
+    },
+    otpGate: {
+      resendSeconds: 0,
+      captchaAfterSends: 0,
+      otpTtlSeconds: 0,
+      maxVerifyAttempts: 0,
+      captchaTicketTtlSeconds: 0,
+      captchaAlwaysScenes: [],
+    },
+    computeShare: {
+      downloadUrl: "",
+      content: { zhTitle: "", zhGuide: "", enTitle: "", enGuide: "" },
+      gpuTiers: [],
+    },
+    share: {
+      baseUrl: "",
+      channels: [],
+      appDownload: { officialUrl: "", iosUrl: "", androidUrl: "", apkUrl: "" },
+    },
+  };
+  const config = ref<PlatformConfig>(remoteApiEnabled ? unavailableServerConfig : mockConfig);
 
   // SPEC-7 FEAT-RISK02 异常3: 配置拉取失败态。true = 结算暂停、钱包显示
   // 「收益结算稍后同步」;禁止回退到前端写死默认值继续结算。
@@ -43,11 +134,11 @@ export const useConfig = defineStore("config", () => {
    * PROD:同一个判据用在 GET /api/config/platform 的响应上,不合法即置 syncFailed。
    */
   const feeConfigValid = computed(() =>
-    isNetworkFeeConfigUsable(config.value.withdrawRules.networkConfirmFeeUsd),
+    !syncFailed.value && isNetworkFeeConfigUsable(config.value.withdrawRules.networkConfirmFeeUsd),
   );
 
   function isEnabled(flag: FeatureFlagKey): boolean {
-    return config.value.featureFlags[flag] === true;
+    return !syncFailed.value && config.value.featureFlags[flag] === true;
   }
 
   /**
@@ -68,7 +159,14 @@ export const useConfig = defineStore("config", () => {
       }
       const remote = await platformConfigApi.platformConfig();
       config.value = {
+        // The server snapshot is authoritative for every field it provides.
+        // Keep only the client-only structural branches that are not part of
+        // this bounded context; no fetched field is allowed to fall back to a
+        // mock value by precedence.
         ...config.value,
+        // Platform's public endpoint owns only this subset. Keep unrelated
+        // client feature declarations structurally present, but never use a
+        // mock value for a server-supplied flag.
         featureFlags: { ...config.value.featureFlags, ...remote.featureFlags },
         // 🔴 publicStats 是 H9 的**唯一**来源:种子里没有它(819a6da 把它移出 mock 数据),
         //   compat 只补一个「故意非法」哨兵。这里漏写 = 服务端投影解析完就被丢掉,
@@ -90,7 +188,7 @@ export const useConfig = defineStore("config", () => {
 
   // ⚠️ DEV/DEMO-ONLY: 模拟配置拉取失败,演 FEAT-RISK02 异常3。
   function _devSetConfigSyncFailed(value: boolean) {
-    if (IS_PRODUCTION) return;
+    if (remoteApiEnabled || IS_PRODUCTION) return;
     syncFailed.value = value;
   }
 
@@ -99,7 +197,7 @@ export const useConfig = defineStore("config", () => {
   // prototype, DR-7). PROD: flags come from the server only; client never
   // mutates — remove this when wiring the real endpoint.
   function _devSetFlag(flag: FeatureFlagKey, value: boolean) {
-    if (IS_PRODUCTION) return;
+    if (remoteApiEnabled || IS_PRODUCTION) return;
     config.value = {
       ...config.value,
       featureFlags: { ...config.value.featureFlags, [flag]: value },
@@ -107,7 +205,7 @@ export const useConfig = defineStore("config", () => {
   }
 
   function _devSetComputeShareContent(content: Partial<ComputeShareContent>) {
-    if (IS_PRODUCTION) return;
+    if (remoteApiEnabled || IS_PRODUCTION) return;
     config.value = {
       ...config.value,
       computeShare: {

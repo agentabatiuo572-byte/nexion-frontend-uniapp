@@ -42,7 +42,9 @@ export interface CanonicalOrder {
 }
 
 export interface CanonicalOrderList {
-  source: string;
+  source: "server" | "mock";
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string | null;
   orders: CanonicalOrder[];
 }
 
@@ -55,7 +57,10 @@ export interface CreatedOrder {
   voucherRedemption: { voucherId: string; grantId: string; status: "REDEEMED"; discountUsdt: number } | null;
   paymentStatus: string;
   orderStatus: string;
-  idSource: "server";
+  idSource: "server" | "sandbox-server";
+  source?: "mock";
+  sourceEnvironment?: "SANDBOX";
+  runId?: string;
 }
 
 export interface CreateOrderRequest {
@@ -71,6 +76,13 @@ export interface OrderApi {
 }
 
 const STATUS_SET = new Set<string>(ORDER_STATUSES);
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/;
+let currentSandboxRunId: string | null = null;
+
+/** The catalogue is the current run-scoped commerce proof for checkout. */
+export function setCurrentCommerceSandboxRun(runId: string | null): void {
+  currentSandboxRunId = runId !== null && RUN_ID.test(runId) ? runId : null;
+}
 
 function invalid(): never {
   throw new ApiError({ kind: "protocol", message: "ORDER_RESPONSE_INVALID" });
@@ -186,7 +198,12 @@ function canonicalOrder(value: unknown): CanonicalOrder {
 
 function createdOrder(value: unknown): CreatedOrder {
   const source = record(value);
-  if (source.idSource !== "server") return invalid();
+  const sandboxRunId = typeof source.runId === "string" ? source.runId : "";
+  const sandboxResponse = source.idSource === "sandbox-server";
+  if (source.idSource !== "server" && !sandboxResponse) return invalid();
+  if (sandboxResponse && (source.source !== "mock" || source.sourceEnvironment !== "SANDBOX"
+      || !RUN_ID.test(sandboxRunId) || sandboxRunId !== currentSandboxRunId)) return invalid();
+  if (!sandboxResponse && (source.source !== undefined || source.sourceEnvironment !== undefined || source.runId !== undefined)) return invalid();
   const rawRedemption = source.voucherRedemption;
   const redemption = rawRedemption === null || rawRedemption === undefined ? null : record(rawRedemption);
   const voucherRedemption = redemption === null ? null : {
@@ -204,7 +221,8 @@ function createdOrder(value: unknown): CreatedOrder {
     voucherRedemption,
     paymentStatus: nonEmptyString(source.paymentStatus),
     orderStatus: nonEmptyString(source.orderStatus),
-    idSource: "server",
+    idSource: source.idSource as "server" | "sandbox-server",
+    ...(sandboxResponse ? { source: "mock" as const, sourceEnvironment: "SANDBOX" as const, runId: sandboxRunId } : {}),
   };
   if (parsed.paymentStatus.toUpperCase() !== "PENDING"
       || parsed.orderStatus.toUpperCase() !== "PENDING_PAYMENT") {
@@ -221,8 +239,17 @@ export function createOrderApi(client: ApiClient): OrderApi {
         path: "/api/orders",
       }));
       if (!Array.isArray(payload.orders)) return invalid();
+      const source = nonEmptyString(payload.source);
+      const sourceEnvironment = nonEmptyString(payload.sourceEnvironment);
+      const rawRunId = payload.runId;
+      const sandbox = source === "mock" && sourceEnvironment === "SANDBOX"
+        && typeof rawRunId === "string" && RUN_ID.test(rawRunId) && rawRunId === currentSandboxRunId;
+      const production = source === "server" && sourceEnvironment === "PRODUCTION" && (rawRunId === null || rawRunId === undefined);
+      if (!sandbox && !production) return invalid();
       return {
-        source: nonEmptyString(payload.source),
+        source: source as "server" | "mock",
+        sourceEnvironment: sourceEnvironment as "PRODUCTION" | "SANDBOX",
+        runId: sandbox ? rawRunId : null,
         orders: payload.orders.map(canonicalOrder),
       };
     },

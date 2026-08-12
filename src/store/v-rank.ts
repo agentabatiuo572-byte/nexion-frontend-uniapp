@@ -214,6 +214,12 @@ export const useVRank = defineStore("vRank", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
+      myRank.value = 0;
+      selfBuyUSD.value = 0;
+      directRefs.value = 0;
+      teamVolumeUSD.value = 0;
+      vDownlineCounts.value = {};
+      ladder.value = [];
       void refreshCanonicalVRank();
       return;
     }
@@ -239,10 +245,12 @@ export const useVRank = defineStore("vRank", () => {
   }
 
   function setMyRank(v: VRank) {
+    if (remoteApiEnabled) return;
     myRank.value = v;
     persist();
   }
   function setProgress(p: VRankProgressPatch) {
+    if (remoteApiEnabled) return;
     if (p.selfBuyUSD !== undefined) selfBuyUSD.value = p.selfBuyUSD;
     if (p.directRefs !== undefined) directRefs.value = p.directRefs;
     if (p.teamVolumeUSD !== undefined) teamVolumeUSD.value = p.teamVolumeUSD;

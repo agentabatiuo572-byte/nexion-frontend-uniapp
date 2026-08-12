@@ -43,7 +43,10 @@ const REGISTRY = {
   "funds-sandbox-ledger-behavior.test.mjs": { how: "chain" },
   "funds-sandbox-visible-label-contract.test.mjs": { how: "chain" },
   "funds-sandbox-withdrawal-contract.test.mjs": { how: "chain" },
-  "funds-server-sandbox-contract.test.mjs": { how: "chain" },
+  "funds-server-sandbox-contract.test.mjs": {
+    how: "excluded",
+    why: "断言读兄弟仓 ../backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境单跑;与 h-remote-authority / funds-run-scoped-isolation 同族。",
+  },
   "funds-server-sandbox-regression.test.mjs": { how: "chain" },
   "g2-swap-idempotency-behavior.test.mjs": { how: "chain" },
   "g2-swap-idempotency-contract.test.mjs": { how: "chain" },
@@ -66,6 +69,23 @@ const REGISTRY = {
   "behavior-analytics-active-route-catalog-contract.test.mjs": {
     how: "excluded",
     why: "断言读兄弟仓 ../nexion-backend 的迁移脚本(本机无该 checkout,ENOENT 必红)。在有后端仓的环境用 node --test 单跑;与 h-remote-authority 同族。",
+  },
+  // ── 2026-08-12 同事第二批新增(收口据实登记:4 进链 · 2 缺兄弟仓 · 1 与拍板相反)──
+  "behavior-analytics-auth-lifecycle-contract.test.mjs": { how: "chain" },
+  "commerce-acceptance-h5-launch-contract.test.mjs": { how: "chain" },
+  "remote-registration-unknown-result-contract.test.mjs": { how: "chain" },
+  "server-auth-config-authority-contract.test.mjs": { how: "chain" },
+  "funds-run-scoped-isolation-contract.test.mjs": {
+    how: "excluded",
+    why: "断言读兄弟仓 ../backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境单跑;与 h-remote-authority 同族。",
+  },
+  "h8-run-scoped-referral-projection-contract.test.mjs": {
+    how: "excluded",
+    why: "同上:依赖兄弟仓 ../backend。",
+  },
+  "funds-production-withdrawal-hold-contract.test.mjs": {
+    how: "excluded",
+    why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。若日后改回 HOLD,把本条移回 chain。",
   },
   // ── elsewhere:已有入口在跑 ──
   "kyc-removal-contract.test.mjs": { how: "elsewhere", by: "npm run test:kyc-removal" },

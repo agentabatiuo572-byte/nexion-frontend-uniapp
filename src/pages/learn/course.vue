@@ -30,7 +30,7 @@ const canSubmit = computed(() => !!course.value && !loading.value && !result.val
 const language = computed(() => ["zh", "vi", "en"].includes(locale.code) ? locale.code : "zh");
 const versionLine = computed(() => course.value ? fmt(t.value.learning.courseVersionMeta, { version: course.value.version, nex: course.value.rewardNex }) : "");
 const rewardGrantedLine = computed(() => result.value ? fmt(t.value.learning.rewardGranted, { nex: result.value.rewardNex }) : "");
-async function load() { loading.value = true; error.value = ""; course.value = null; result.value = null; if (!remoteApiEnabled || !courseId.value) { loading.value = false; error.value = "courseOffline"; return; } try { course.value = await learningApi.course(courseId.value, language.value); answers.value = Array(course.value.questions.length).fill(-1); await learningApi.start(course.value.id, language.value); } catch { error.value = "courseUnavailable"; } finally { loading.value = false; } }
+async function load() { loading.value = true; error.value = ""; course.value = null; result.value = null; if (!remoteApiEnabled || !courseId.value) { loading.value = false; error.value = "courseOffline"; return; } try { course.value = await learningApi.course(courseId.value, language.value); answers.value = Array(course.value.questions.length).fill(-1); await learningApi.start(course.value.id, language.value, course.value.version); } catch { error.value = "courseUnavailable"; } finally { loading.value = false; } }
 // 🔴 只回读、不伪造:判卷结果(score/passed/attempts)在当前契约下**没有任何接口能取回**
 // (LearningCourse 里根本没有这几个字段),原写法在「本次结果未知」这条分支上硬填
 // score:100 / passed:true / attempts:0,等于向用户断言「你通过了」——而且 attempts:0
@@ -42,11 +42,13 @@ async function recoverAuthoritative() { if (!course.value) return false; const f
 // 用户之后怎么答都拿不到成绩和奖励(独立审计判为 P0)。同仓写法见
 // wallet-exchange.vue:419 `G2-SWAP-…-${Date.now().toString(36)}`。
 // 键在**进入 try 之前**取一次,catch 里的那次重放才是「同一动作的重试」而非新单。
+// expectedVersion = 本次作答所依据的课程版本(course/start 回来的那份),服务端据它拒收过期卷。
+// ⚠️ complete 的第 2 参是**版本不是幂等键**(新契约里 complete 根本没有幂等键),别再塞 quizKey —— 两个都是 string,tsc 抓不到。
 async function finish() {
   if (!course.value || loading.value || !canSubmit.value) return;
   loading.value = true; error.value = "";
   quizKey.value = `learning-quiz:${course.value.id}:${course.value.version}:${Date.now().toString(36)}`;
-  try { result.value = course.value.questions.length ? await learningApi.submitQuiz(course.value.id, answers.value, quizKey.value) : await learningApi.complete(course.value.id, quizKey.value); } catch { try { if (course.value.questions.length) { result.value = await learningApi.submitQuiz(course.value.id, answers.value, quizKey.value); return; } if (await recoverAuthoritative()) return; } catch { try { if (await recoverAuthoritative()) return; } catch {} } error.value = "submitUnconfirmed"; } finally { loading.value = false; }
+  try { result.value = course.value.questions.length ? await learningApi.submitQuiz(course.value.id, course.value.version, answers.value, quizKey.value) : await learningApi.complete(course.value.id, course.value.version); } catch { try { if (course.value.questions.length) { result.value = await learningApi.submitQuiz(course.value.id, course.value.version, answers.value, quizKey.value); return; } if (await recoverAuthoritative()) return; } catch { try { if (await recoverAuthoritative()) return; } catch {} } error.value = "submitUnconfirmed"; } finally { loading.value = false; }
 }
 onLoad((options) => { courseId.value = typeof options?.id === "string" ? options.id : ""; void load(); });
 </script>

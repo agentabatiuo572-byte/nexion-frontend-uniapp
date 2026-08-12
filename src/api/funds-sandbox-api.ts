@@ -13,6 +13,7 @@ export interface FundsSandboxWallet {
 }
 
 export interface FundsSandboxOrder {
+  runId: string;
   orderNo: string;
   kind: "TOPUP" | "WITHDRAWAL";
   channel: FundsSandboxTopupChannel;
@@ -28,6 +29,7 @@ export interface FundsSandboxOrder {
 }
 
 export interface FundsSandboxLedgerEntry {
+  runId: string;
   ledgerNo: string;
   orderNo: string;
   entryRole: string;
@@ -67,6 +69,7 @@ export interface FundsSandboxWithdrawalPolicy {
 }
 
 export interface FundsSandboxOverview {
+  runId: string;
   wallet: FundsSandboxWallet;
   orders: FundsSandboxOrder[];
   ledger: FundsSandboxLedgerEntry[];
@@ -138,6 +141,7 @@ function order(value: unknown): FundsSandboxOrder {
   const row = object(value);
   assertSource(row);
   const orderNo = text(row.orderNo);
+  const runId = text(row.runId);
   const kind = row.kind;
   const channel = row.channel;
   const valueAmount = amount(row.amount);
@@ -146,7 +150,7 @@ function order(value: unknown): FundsSandboxOrder {
   const createdAt = text(row.createdAt);
   const settledAt = row.settledAt === null ? null : text(row.settledAt);
   const targetAddress = row.targetAddress === null ? null : text(row.targetAddress);
-  if (!orderNo || !["TOPUP", "WITHDRAWAL"].includes(String(kind))
+  if (!runId || !orderNo || !["TOPUP", "WITHDRAWAL"].includes(String(kind))
       || !["CREGIS_USDT_BEP20", "VIETQR", "CARD"].includes(String(channel))
       || valueAmount === null || valueAmount <= 0
       || !["PENDING", "SETTLED", "SUBMITTED", "CONFIRMED", "FAILED"].includes(String(status))
@@ -156,6 +160,7 @@ function order(value: unknown): FundsSandboxOrder {
     throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_ORDER_INVALID" });
   }
   return {
+    runId,
     orderNo,
     kind: kind as FundsSandboxOrder["kind"],
     channel: channel as FundsSandboxTopupChannel,
@@ -175,6 +180,7 @@ function ledger(value: unknown): FundsSandboxLedgerEntry {
   const row = object(value);
   assertSource(row);
   const ledgerNo = text(row.ledgerNo);
+  const runId = text(row.runId);
   const orderNo = text(row.orderNo);
   const entryRole = text(row.entryRole);
   const direction = row.direction;
@@ -182,12 +188,12 @@ function ledger(value: unknown): FundsSandboxLedgerEntry {
   const availableAfter = amount(row.availableAfter);
   const reservedAfter = amount(row.reservedAfter);
   const createdAt = text(row.createdAt);
-  if (!ledgerNo || !orderNo || !entryRole || !["IN", "OUT", "RESERVE", "RELEASE"].includes(String(direction))
+  if (!runId || !ledgerNo || !orderNo || !entryRole || !["IN", "OUT", "RESERVE", "RELEASE"].includes(String(direction))
       || valueAmount === null || availableAfter === null || reservedAfter === null
       || !createdAt || !Number.isFinite(Date.parse(createdAt))) {
     throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_LEDGER_INVALID" });
   }
-  return { ledgerNo, orderNo, entryRole, direction: direction as FundsSandboxLedgerEntry["direction"], amount: valueAmount,
+  return { runId, ledgerNo, orderNo, entryRole, direction: direction as FundsSandboxLedgerEntry["direction"], amount: valueAmount,
     availableAfter, reservedAfter, source: "mock", sourceEnvironment: "SANDBOX", createdAt };
 }
 
@@ -246,10 +252,16 @@ function withdrawalPolicy(value: unknown): FundsSandboxWithdrawalPolicy {
 function overview(value: unknown): FundsSandboxOverview {
   const row = object(value);
   assertSource(row);
-  if (row.mode !== "LOCAL_SANDBOX" || !Array.isArray(row.orders) || !Array.isArray(row.ledger)) {
+  const runId = text(row.runId);
+  if (!runId || row.mode !== "LOCAL_SANDBOX" || !Array.isArray(row.orders) || !Array.isArray(row.ledger)) {
     throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_OVERVIEW_INVALID" });
   }
-  return { wallet: wallet(row.wallet), orders: row.orders.map(order), ledger: row.ledger.map(ledger), withdrawalPolicy: withdrawalPolicy(row.withdrawalPolicy),
+  const orders = row.orders.map(order);
+  const entries = row.ledger.map(ledger);
+  if (orders.some((item) => item.runId !== runId) || entries.some((item) => item.runId !== runId)) {
+    throw new ApiError({ kind: "protocol", message: "FUNDS_SANDBOX_RUN_ID_MISMATCH" });
+  }
+  return { runId, wallet: wallet(row.wallet), orders, ledger: entries, withdrawalPolicy: withdrawalPolicy(row.withdrawalPolicy),
     source: "mock", sourceEnvironment: "SANDBOX", mode: "LOCAL_SANDBOX" };
 }
 

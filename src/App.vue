@@ -43,6 +43,8 @@ import { useDeposits } from "@/store/deposits";
 import { fundsSandboxEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
 import { prepareProductCatalog } from "@/store/product-catalog";
 import { installKeyboardActivation } from "@/lib/a11y-activate";
+import { refreshEarnConfig } from "@/store/earn-config";
+import { useMarket } from "@/store/market";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -957,6 +959,10 @@ onLaunch(() => {
   void useConfig().load();
   void useGenesisConfig().refresh();
   if (remoteApiEnabled) {
+    // Public server configuration is warmed at launch. Each store starts
+    // empty/fail-closed, so a failed request cannot expose prototype values.
+    void refreshEarnConfig().catch(() => undefined);
+    void useMarket().syncRemote().catch(() => undefined);
     // The server catalog is a USER-only resource. Clear any local compatibility
     // rows at startup, then let the authenticated Store entry fetch it; an
     // unauthenticated launch must not turn its expected 401 into a fake catalog

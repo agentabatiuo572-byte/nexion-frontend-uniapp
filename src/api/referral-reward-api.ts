@@ -23,12 +23,13 @@ export interface ReferralRewardSnapshot {
   limit: number;
   source: "ledger" | "mock";
   sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId: string | null;
   factSources: string[];
   refreshedAt: string;
 }
 
 const PRODUCTION_FACTS = ["nx_referral_reward_settlement", "nx_wallet_ledger", "nx_earnings_release_entry", "nx_user_wallet"];
-const SANDBOX_FACTS = ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger", "nx_user_wallet"];
+const SANDBOX_FACTS = ["nx_h8_sandbox_referral_settlement", "nx_h8_sandbox_referral_ledger"];
 
 function invalid(message = "REFERRAL_REWARD_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
@@ -60,6 +61,7 @@ export function parseReferralRewardSnapshot(value: unknown): ReferralRewardSnaps
   const limit = count(row?.limit, 20);
   const source = text(row?.source) as ReferralRewardSnapshot["source"];
   const sourceEnvironment = text(row?.sourceEnvironment)?.toUpperCase() as ReferralRewardSnapshot["sourceEnvironment"];
+  const runId = text(row?.runId);
   const refreshedAt = text(row?.refreshedAt);
   const factValues = row?.factSources;
   const rewardValues = row?.recentRewards;
@@ -71,6 +73,8 @@ export function parseReferralRewardSnapshot(value: unknown): ReferralRewardSnaps
       || facts.some((fact) => !fact)
       || !((source === "ledger" && sourceEnvironment === "PRODUCTION")
         || (source === "mock" && sourceEnvironment === "SANDBOX"))
+      || (sourceEnvironment === "SANDBOX" && (!runId || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(runId)))
+      || (sourceEnvironment === "PRODUCTION" && runId !== null)
       || !rawRecentRewards) return invalid();
   const requiredFacts = sourceEnvironment === "SANDBOX" ? SANDBOX_FACTS : PRODUCTION_FACTS;
   if (!requiredFacts.every((fact) => facts.includes(fact))) return invalid();
@@ -90,7 +94,7 @@ export function parseReferralRewardSnapshot(value: unknown): ReferralRewardSnaps
   });
   if (recentRewards.length > limit || settledCount > invitedCount || pendingCount + settledCount > invitedCount) return invalid();
   return { referralCode, inviterRewardNex, invitedCount, pendingCount, settledCount, lifetimeInviterNex,
-    walletNexAvailable, recentRewards, limit, source, sourceEnvironment, factSources: facts as string[], refreshedAt };
+    walletNexAvailable, recentRewards, limit, source, sourceEnvironment, runId, factSources: facts as string[], refreshedAt };
 }
 
 export function createReferralRewardApi(client: ApiClient) {

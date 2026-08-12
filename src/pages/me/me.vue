@@ -117,6 +117,7 @@ import { useVRank } from "@/store/v-rank";
 import { useTheme } from "@/store/theme";
 import { ACHIEVEMENTS } from "@/mock/achievements";
 import { confirm as uiConfirm } from "@/store/ui";
+import { authApi, remoteApiEnabled } from "@/api/runtime";
 
 const MIN_WITHDRAWAL_USD = 20;
 
@@ -435,6 +436,9 @@ async function handleSignOut() {
     confirmLabel: t.value.me.signOutConfirmLabel,
   });
   if (ok) {
+    // The server owns refresh-token revocation. authApi.logout always clears
+    // this device locally in its finally block, including an offline failure.
+    if (remoteApiEnabled) await authApi.logout();
     // Self sign-out: void in-flight tasks (rollback) + release the shared
     // session record (other tabs see "logged-out") before clearing auth.
     app.interruptAllTasks("logged-out");
