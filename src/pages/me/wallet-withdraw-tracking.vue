@@ -94,7 +94,7 @@
               role="button" tabindex="0"
               @click.stop="confirmSandboxCallback"
             >
-              <text>SANDBOX 服务端回调：确认到账</text>
+              <text>SANDBOX: confirm server callback</text>
             </view>
             <view
               class="flex items-center justify-center"
@@ -336,7 +336,7 @@ const etaSub = computed(() => {
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
   if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
   if (wd.value?.sourceEnvironment === "SANDBOX" && !isTerminalDone.value) {
-    return "source=mock · SANDBOX：等待服务端回调，不按客户端 ETA 自动完成";
+    return "source=mock · SANDBOX: awaiting server callback, no client-side ETA auto-complete";
   }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
   if (isTerminalDone.value && wd.value) {
@@ -396,9 +396,9 @@ async function confirmSandboxCallback() {
   const id = wd.value?.id;
   if (!id) return;
   try {
-    if (!await app.applyFundsSandboxCallback(id, "CONFIRMED")) toast.info("SANDBOX 订单状态已变化，请刷新");
+    if (!await app.applyFundsSandboxCallback(id, "CONFIRMED")) toast.info("SANDBOX: order status changed, refresh to see it");
   } catch (cause) {
-    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? "服务器暂时无法确认到账，请稍后刷新重试");
+    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.wallet.trackConfirmArrivalFailed);
   }
 }
 

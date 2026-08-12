@@ -61,7 +61,27 @@ const VALUE_EXEMPTIONS = [
     // 替换串传函数,不用 "$1" —— 字面量替换串会把 $& / $1 当引用吃掉(本仓踩过)。
     strip: (line) => line.replace(/(^|[\s{,])cnTitle:\s*(["'])[^"']*\2/g, (_m, lead) => `${lead}cnTitle:""`),
   },
+  {
+    id: "legacy-config-token",
+    why:
+      "后端 legacy 策略行的**取值**,不是展示文案:parseTrialBooleanConfig 把旧后台写的 '开'/'关' 这类值" +
+      "归一成 JSON boolean(H2 线上契约已是 boolean,这几个只在旧行归一化期间存在)。它们进的是 includes() " +
+      "的比较集,永远不会渲染给用户 —— 收进 i18n 反而是错的:词典是给人读的,这里要的是**跟后端字节对齐**。",
+    files: ["src/lib/trial-config-enum.ts"],
+    // 🔴 钉**具体授权的 4 个 token**,不是「这个文件的数组里都放行」:
+    //    ① 只有整串恰好等于授权值才剥(子串不逃逸:"开放试用" 照判);
+    //    ② 后端将来新增 "启用"/"停用" 必须显式加进这里 —— 每个新取值都过一次审,这正是要的;
+    //    ③ 文件作用域挡住「把文案塞成同名字面量就隐身」(消费面写 "开放" 照抓)。
+    strip: (line) =>
+      line.replace(/(["'])([^"']*)\1/g, (m, q, inner) =>
+        LEGACY_CONFIG_TOKENS.includes(inner) ? `${q}${q}` : m
+      ),
+  },
 ];
+
+// 与上面 legacy-config-token 配对的授权取值表。单独提出来是为了让「授权了哪几个值」
+// 一眼可数、可 diff —— 埋在正则里的白名单没人看得见增删。
+const LEGACY_CONFIG_TOKENS = ["开", "开放", "关", "关闭"];
 
 // ── 注释剥离 ────────────────────────────────────────────────────────────────
 // 按区域用不同的注释语法,不能一把梭:模板里的 `//` 是普通文本(URL / 分数 / 中文里的斜杠),
@@ -198,7 +218,14 @@ function run() {
   if (violations.length) {
     console.error(
       `i18n-cjk FAIL:${violations.length} 处硬编码中文(注释之外),扫描 ${files.length} 个 .vue/.ts。\n` +
-        "文案必须进 src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读:\n" +
+        "撞到本门有**三条**出路,按「这句话是给谁看的」选,别一律往词典搬:\n" +
+        "  ① 真·用户文案 → src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读;\n" +
+        "  ② 带 SANDBOX / source=mock / DEV 这类**工程话**的字符串 → 改成英文技术串,**不要进词典**。\n" +
+        "     verify.sh 那道 mock 门已经定过判据:工程话进词典就成了用户文案契约,而词典是普通对象、\n" +
+        "     打包摇不掉,会原样进生产包。给一个调试串做三语本地化是错的方向;本门只判中文,改英文即过。\n" +
+        "  ③ 压根不渲染给人看的**取值**(跟后端字节比对的码表等)→ 加 VALUE_EXEMPTIONS:\n" +
+        "     必须值级 + 带 files 作用域 + 写明理由,禁整文件放行(照抄 legacy-config-token 那条的形状)。\n" +
+        "违规明细:\n" +
         violations.map((v) => `  ${v.file}:${v.line}  ${v.text}`).join("\n")
     );
     return 1;
@@ -239,6 +266,13 @@ function selftest() {
     ["豁免:cnTitle 单引号写法同样放行(宽严不许取决于引号风格)", "src/store/v-rank.ts", "cnTitle: '学员',", 0],
     ["同文件里非 cnTitle 的中文照抓", "src/store/v-rank.ts", 'v: 0, title: "学员", cnTitle: "学员",', 1],
     ["🔴 cnTitle 豁免带文件作用域:消费面塞文案照抓", "src/pages/product/detail.vue", 'const o = { cnTitle: "立即购买" };', 1],
+    // legacy-config-token —— 阴阳两面各测一遍:只测 true 那行会让 "关"/"关闭" 半边判据无人验证。
+    ["豁免:legacy 配置取值放行(true 侧)", "src/lib/trial-config-enum.ts", 'if (["true", "1", "enabled", "on", "开", "开放"].includes(v)) return true;', 0],
+    ["豁免:legacy 配置取值放行(false 侧)", "src/lib/trial-config-enum.ts", 'if (["false", "0", "disabled", "off", "关", "关闭"].includes(v)) return false;', 0],
+    // 下面三格证明这条豁免**不是**整文件放行、也不是「含授权字就放行」:
+    ["🔴 同文件里非授权取值的中文照抓(不是整文件豁免)", "src/lib/trial-config-enum.ts", 'throw new Error("试用配置无效");', 1],
+    ["🔴 只认整串相等:授权 token 作子串不逃逸", "src/lib/trial-config-enum.ts", 'const a = "开放试用";', 1],
+    ["🔴 legacy 豁免带文件作用域:消费面写同样的字照抓", "src/pages/x/a.vue", "<template><view>开放</view></template>", 1],
     ["🔴 \\u 转义绕过被解码后照抓", "src/pages/x/a.ts", 'const a = "\\u6559\\u7a0b\\u4e2d\\u5fc3";', 1],
     ["🔴 纯 CJK 标点文案照抓(只判汉字块会整段免疫)", "src/pages/x/a.vue", "<template><view>「」、。</view></template>", 1],
     ["pages.json 的导航栏标题是用户可见文案面", "src/pages.json", '{"path":"pages/x/a","style":{"navigationBarTitleText":"教程中心"}}', 1],
