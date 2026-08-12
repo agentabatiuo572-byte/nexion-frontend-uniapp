@@ -80,14 +80,15 @@ const LEDGER = {
   // 🔴 本门的由来(2026-08-11 z4)。
   //   USDT- = 提现页按服务端回执写的主行 —— 用户「提了多少钱」的唯一凭据;
   //   NEX-  = 同单号的 NEX 抵扣费行(勾了抵扣才有,服务端已烧);
-  //   NEX+  = App.vue 对账在提现失败退还抵扣费时补的冲正行。
+  //   NEX+  = 提现失败退还抵扣费时补的冲正行(与另两条腿同住 withdrawal-bill-drafts)。
   // 三个都必须在。只剩 NEX+ 就是 2026-08-10~08-11 的实际状态:账单上只有一条
   // 平台白送 NEX 的孤行,而它要冲正的那条 NEX- 与主行 USDT- 从来没被写过。
-  // ⚠️ 已知边界(z4 R3 复核后的准确表述):NEX+ 那个生产者在 remote 模式下**运行期不可达** ——
-  // 它的判据是本地退款幂等键,而写那把键的 creditRewardBucketInternal 对 remote 直接早退;
-  // 服务端也还没有「失败提现退还已烧 NEX」的契约。**这是有意保留的缺口,不是漏改**:
-  // 我一度把判据放宽成「单据失败即写」,那等于账本凭空宣布一笔无证据的退款,已回滚。
-  // 「有生产者」≠「跑得到」,静态门守不了可达性,见头注与 withdraw-bill-runtime.mjs。
+  // ✅ 可达性缺口已于包 z6(2026-08-11)补上,此处的旧表述一并更新:
+  // NEX+ 原来判据是**本地**退款幂等键,而写那把键的 creditRewardBucketInternal 对 remote 直接早退、
+  // mock 下又建不出提现单 —— 两头落空,**任何真实配置下都不可达**(静态门当时全绿)。
+  // 现判据改锚服务端字段 `wd.nexRefunded`(契约 FEAT-WD01 §4.6),
+  // 可达性由行为门 `selfcheck-withdraw-nex-refund.mjs` 在 **remote 模式**下实证。
+  // 「有生产者」≠「跑得到」这条仍然成立:静态门守不了可达性,那一半归那道行为门。
   withdraw: ["NEX+", "NEX-", "USDT-"],
   purchase: ["USDT-×5"],
   // KYC 机制已于包 E 整体删除(pkg/e-kyc-rm),不再有任何生产者;
@@ -364,8 +365,14 @@ function selftest() {
   cases.push(["③ 抵扣费行符号被改反(NEX-)", { [DRAFTS_TS]: noNexLeg }, noNexLeg !== draftsSrc]);
 
   // ④ 冲正分录被删 → 失败提现退还的 NEX 在账单上无凭证(台账三条各守各的)。
-  const noRefund = appSrc.replace('type: "withdraw",', 'type: "bonus",');
-  cases.push(["④ 删掉 NEX 退还冲正行(NEX+)", { [appVue]: noRefund }, noRefund !== appSrc]);
+  // 🔴 注入点随实现搬家(包 z6,2026-08-11):冲正行原在 App.vue,现已并进
+  // `withdrawal-bill-drafts` 与另两条腿同住。**本门当场判红把这次搬家抓了出来** ——
+  // 旧注入锚 `type: "withdraw",` 在 App.vue 里已不存在,红测静默失效(改写没生效 = 红测已死)。
+  // 锚点改用 `amount: refunded,`:它在 drafts 文件里**唯一**,而 `type: "withdraw",`
+  // 在那里有 3 处(主行 / 抵扣费行 / 冲正行),整体替换会一次废掉三条腿 ——
+  // 那测的就不再是「冲正行没了」而是「整族没了」,①② 两格已经守着后者。
+  const noRefund = draftsSrc.replace("amount: refunded,", "amount: -refunded,");
+  cases.push(["④ 删掉 NEX 退还冲正行(NEX+)", { [DRAFTS_TS]: noRefund }, noRefund !== draftsSrc]);
 
   // ⑤ 新增类型未登记台账 → 必须红(不许悄悄多出一种没人管生产者的行)。
   const newType = billsSrc.replace('| "purchase" | "swap"', '| "purchase" | "swap" | "airdrop"');
