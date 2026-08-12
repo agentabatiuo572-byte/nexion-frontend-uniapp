@@ -78,7 +78,11 @@ const WITHDRAWAL_STATUS_RANK: Record<Withdrawal["status"], number> = {
   processing: 3,
   sent: 4,
   confirmed: 5,
-  // 异常态视为服务端最终结论,合并时胜过主链中间态(同一单不会两异常态互比)。
+  // 异常态视为服务端最终结论,合并时胜过主链中间态。
+  // ⚠️ 括号里原本写着「同一单不会两异常态互比」—— **那句话是错的**,而且正是三条 P0 的入口:
+  // frozen 与四个终态同档,而 frozen 是**在途**态(不在 TERMINAL_STATUSES 里),
+  // 「冻结 → 人工处置成拒绝/退款」是 D2 的正常流程,天天在两异常态之间互比。
+  // 同档位的胜负现在交给下面的 mirroredAt(谁问服务端问得更晚),不再靠这张表。
   "review-rejected": 6,
   frozen: 6,
   "address-invalid": 6,
@@ -335,8 +339,25 @@ function mergeWithdrawals(
       byId.set(w.id, w);
       continue;
     }
+    // 🔴 有真信号时,替身一律不参与裁决(2026-08-11 R2 审计:R1 只把 mirroredAt 当
+    // 档位制度内部的**平局**裁决,于是「档位说反了」的两条路径原样带病 —— 实测
+    // frozen→processing / sent / confirmed 三条边全被丢弃:后台核查通过、把冻结单
+    // **放行回主链**的每一次都进不来,坏结局(拒绝/退款)反而走得通。反向也坏:
+    // 一份陈旧的高档内存行能把磁盘上更新的 confirmed 顶回 frozen)。
+    //
+    // 判据主干换成「谁问服务端问得更晚」:任一侧被镜像过就纯按镜像时刻裁决,
+    // **完全不看档位** —— 档位排序对不对从此不再有后果。两侧都没被镜像过
+    // (mock 档 / 存量单)才回落到档位,与本字段引入前同行为,不造回归。
+    const at = prev.mirroredAt ?? 0;
+    const ct = w.mirroredAt ?? 0;
+    if (at || ct) {
+      byId.set(w.id, ct > at ? w : prev);
+      continue;
+    }
     const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
     const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
+    // 档位兜底(两侧都没被镜像过时才走到这里):遍历序 `[...latest, ...next]` 让磁盘行
+    // 先入 map,内存行是挑战方,严格大于才换人 —— 与 mirroredAt 引入前完全同行为。
     byId.set(w.id, c > a ? w : prev);
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单

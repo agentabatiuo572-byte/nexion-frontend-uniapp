@@ -1,4 +1,5 @@
 import type { Messages } from "@/i18n/messages/en";
+import type { WithdrawalTerminalReason } from "@/store/types";
 
 // 风控 reason code → 用户话术,单源码表(SPEC-7 K3/K4 基础码 + PAY04 换绑扩展码)。
 // 三处渲染源共用:wallet-withdraw 预览横幅 / wallet-withdraw-tracking 存单快照 /
@@ -11,6 +12,21 @@ export function riskReasonLines(t: Messages, codes: readonly string[] | undefine
     "rebind-freeze": t.addrRebind.submitFrozenReason,
   };
   return (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
+}
+
+/**
+ * 提现终态原因 code → 用户话术(服务端 GET /api/withdrawals/:id 的 terminalReason)。
+ *
+ * 🔴 返回 `null` 而不是空串:调用方据此回落到通用失败文案。上面两个函数用
+ * `.filter(Boolean)` 丢行是因为它们是**多行列表**,少一行不改变语义;终态原因只有一行,
+ * 悄悄丢掉 = 失败单又变回「只说失败、不说为什么」,正是本包要消灭的那个状态。
+ */
+export function terminalReasonLine(t: Messages, code: WithdrawalTerminalReason | undefined): string | null {
+  if (!code) return null;
+  // `?? {}`:整块被删时(三语同时删,tsc 因类型由 en.ts 派生而不报错)对 undefined
+  // 取下标会抛 TypeError 把追踪页整页算崩 —— 缺文案不该升级成白屏(同 waivedGateLines)。
+  const dict = (t.wallet.withdrawTerminalReasons ?? {}) as Record<string, string>;
+  return dict[code] ?? dict.other ?? null;
 }
 
 // 免审闸 code → 用户话术。与上面同一套路(散抄 dict 会被 filter 静默吞行),

@@ -1,6 +1,6 @@
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
-import type { Withdrawal, WithdrawalStatus } from "../store/types";
+import type { Withdrawal, WithdrawalStatus, WithdrawalTerminalReason } from "../store/types";
 import type { WithdrawalRiskRoute } from "../store/config-types";
 
 export type SupportedWithdrawalNetwork = "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC20";
@@ -50,6 +50,14 @@ export interface WithdrawalStatusSnapshot {
   status: WithdrawalStatus;
   /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
   confirmedAt: number | null;
+  /** 终态原因(仅终态有值)。null = 服务端没给 / 非终态 —— 页面据此决定要不要出原因行。 */
+  terminalReason: WithdrawalTerminalReason | null;
+  /**
+   * 服务端判定「用户能否就这笔重新发起」。null = 不适用 / 服务端没给。
+   * 🔴 **不在客户端由原因码推导**:能不能重来是风控与人工处置的结论(同一个
+   * `address-risk`,换个地址可以重提、命中黑名单则不能),客户端推一份等于第二个真理源。
+   */
+  retriable: boolean | null;
 }
 
 export interface WithdrawalApi {
@@ -223,10 +231,32 @@ function canonicalStatus(status: string): WithdrawalStatus {
       return "address-invalid";
     case "FAILED":
     case "TX_FAILED":
+    // 🔴 孤块 / 死亡信件(后台 D2 的 TX_ORPHANED·DEAD)。两个码此前**一个都不认**,
+    // 于是服务端一发这种终态,canonicalStatus 就抛 protocol → refreshRemoteWithdrawals
+    // 的 `.catch(() => null)` 静默吞掉 → 这一单**永久停在「处理中」**,
+    // 换绑入口与下一笔提现被连带永久拦死。立卡描述的症状正是以这个窄口径真实存活着。
+    //
+    // 归到既有 `tx-failed` 而不是新开一个客户端状态:对用户而言两者都是
+    // 「转账没走成」,归过来即刻接上既有的失败终态处理(账单结算成失败 + 客服出口);
+    // 新增状态要动 6 处枚举与三语文案,零用户可见收益。
+    // ⚠️ 两处别把话说满(R1 复核时自查出来的,原文说满了):
+    //   · **退款那条腿在远端档下当前是空转的** —— refundFailedWithdrawals 走
+    //     creditRewardBucketOnce,而它 `if (remoteApiEnabled) return false`。那是隔壁包
+    //     (z5 / z6)在修的面,本包不动;这里只说账单与客服出口,不声称退款会发生。
+    //   · **孤块与死亡信件坍缩后不可区分** —— terminalReason 的闭集里没有对应档位,
+    //     它承载的是「为什么终结」(风控/地址/资料/撤回/其他),不是「哪一种链上失败」。
+    //     用户侧两者本就同一句话;要区分得先在后台加码,那是新契约,不在本包。
+    case "TX_ORPHANED":
+    case "DEAD":
       return "tx-failed";
     case "REFUNDED":
       return "refunded";
     case "SUBMITTED":
+    // PENDING 是后台状态表里 SUBMITTED 的别名(D2 statusLabel 第一行就并列写着)。
+    // 漏它的后果和上面 TX_ORPHANED 那族一模一样,而且多一条更重的:建单响应回 PENDING 时,
+    // toCanonicalWithdrawal 会在单据入表**之前**抛 —— 服务端已经扣了钱,客户端连单号都没留下,
+    // 用户跳到追踪页看见「查无此单」。app.ts 为这个最坏态写的防御在抛点之后,够不着。
+    case "PENDING":
       return "submitted";
     default:
       throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_STATUS_INVALID" });
@@ -248,6 +278,32 @@ function canonicalRiskRoute(route: string): WithdrawalRiskRoute {
       return "freeze";
     default:
       throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+  }
+}
+
+/**
+ * 终态原因码归一。**故意与 canonicalStatus 不对称:未知码回落 `other`,不抛。**
+ *
+ * 🔴 判据是「这个值驱动什么」:status 驱动钱与状态机(退款、账单结算、单槽占用),
+ * 认不出就必须抛、绝不能猜;terminalReason 只驱动**显示哪一句话**。让它抛的话,
+ * 运营在后台加一个新原因码,全体客户端就会在解析这一步炸掉 → 整张单据镜像失败 →
+ * 单据永久停在「处理中」—— 那正是本包 §Why 第 2 条要消灭的缺陷,不能自己再造一个。
+ * 回落到 `other`(闭集里本来就有的兜底档)用户看到的是通用话术 + 客服出口,是诚实降级。
+ *
+ * 漂移的**预防**在机器门(withdraw-terminal-reason-parity),不在运行期抛异常。
+ */
+function canonicalTerminalReason(value: string): WithdrawalTerminalReason {
+  switch (value.trim().toUpperCase()) {
+    case "RISK_HIT":
+      return "risk-hit";
+    case "ADDRESS_RISK":
+      return "address-risk";
+    case "DATA_MISMATCH":
+      return "data-mismatch";
+    case "USER_CANCELLED":
+      return "user-cancelled";
+    default:
+      return "other";
   }
 }
 
@@ -286,24 +342,50 @@ export function toCanonicalWithdrawal(
  * 状态镜像解析。🔴 fail-closed:单号 / 状态任一不合法即抛,调用方保持原状再问一次 ——
  * 「问不到」绝不能降级成「自己判一个」,那正是本轮要消灭的东西。
  */
-function parseStatusSnapshot(value: unknown): WithdrawalStatusSnapshot {
+/**
+ * 🔴 抛不抛,判据是**这个字段驱动什么**(2026-08-11 R2 审计;上一版按「类型对不对」分,分错了)。
+ *
+ *   · 驱动钱与状态机的(`status`、单号身份)→ **fail-closed,认不出必抛**。猜一个 = 拿钱赌。
+ *   · 只驱动**显示哪一句话**的(`confirmedAt` / `terminalReason` / `retriable`)
+ *     → **坏值一律降级成「没给」,绝不抛**。
+ *
+ * 为什么显示字段不许抛:抛出去被调用方 `.catch(() => null)` 吞掉 → **整张单据镜像失败** →
+ * 这一单永久停在「处理中」,换绑入口与下一笔提现连带永久拦死。代价却只是一句话没显示。
+ * 上一版让 `retriable` 类型不对就抛,等于「为了不显示错一句话,把用户的单子锁死」——
+ * 而这正是本包 §Why 要消灭的那个缺陷,不能自己再造一个。
+ */
+function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): WithdrawalStatusSnapshot {
   const row = record(value);
   const withdrawalNo = text(row?.withdrawalNo);
   const status = text(row?.status);
   if (!row || !withdrawalNo || !status) {
     throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
   }
+  // 🔴 身份必须对上(R2 审计):响应里的单号此前解析出来就没人看过,而调用方是按**请求的**
+  // 单号落补丁的 —— 服务端一旦串号(反代缓存 / 并发 bug),另一张单的状态会被写到这张单上,
+  // 顺带触发按状态走的退款与账单结算。这是拿钱赌,归 fail-closed 那一档。
+  if (withdrawalNo !== expectedWithdrawalNo) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
+  }
+  // 到账时刻:毫秒数或 ISO 串。读不出来就当没给 —— 它只用来显示「几点到的」,
+  // 而调用方对 null 本来就有回落(取预计到账)。`0` 是服务端最常见的「未设置」哨兵值,
+  // 上一版把它判成协议错并抛,一个哨兵值就能把整张单据锁死(R2 审计)。
   const rawConfirmedAt = row.confirmedAt;
-  // 时刻可以是毫秒数或 ISO 串;给了但读不出来 = 协议不符,不静默当没给。
   let confirmedAt: number | null = null;
   if (rawConfirmedAt !== null && rawConfirmedAt !== undefined && rawConfirmedAt !== "") {
     const parsed = typeof rawConfirmedAt === "number" ? rawConfirmedAt : Date.parse(String(rawConfirmedAt));
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_RESPONSE_INVALID" });
-    }
-    confirmedAt = parsed;
+    confirmedAt = Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }
-  return { withdrawalNo, status: canonicalStatus(status), confirmedAt };
+  // 终态原因:只认字符串码;非字符串(对象 / 数组 / 数字)一律当没给,**不当成码吞掉**
+  // ——「不认识的码回落 other」说的是码,不是「任何垃圾都是码」。
+  // 认识不了的**字符串**码回落 `other`(闭集里本就有的兜底档):运营加新码不该打死老客户端。
+  const rawReason = row.terminalReason;
+  const terminalReason: WithdrawalTerminalReason | null =
+    typeof rawReason === "string" && rawReason.trim() ? canonicalTerminalReason(rawReason) : null;
+  // 可重试:只认布尔;其余一律当没给(页面对 null 的处理就是「不显示这句话」)。
+  const rawRetriable = row.retriable;
+  const retriable: boolean | null = typeof rawRetriable === "boolean" ? rawRetriable : null;
+  return { withdrawalNo, status: canonicalStatus(status), confirmedAt, terminalReason, retriable };
 }
 
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
@@ -315,7 +397,7 @@ export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
     get: async (withdrawalNo) => parseStatusSnapshot(await client.request({
       method: "GET",
       path: `/api/withdrawals/${encodeURIComponent(withdrawalNo)}`,
-    })),
+    }), withdrawalNo),
     submit: async (amount, chain, targetAddress, policyVersion, useNexFeeOffset, idempotencyKey) =>
       parseSubmission(await client.request({
         method: "POST",
