@@ -75,6 +75,33 @@ try {
     shell: false,
   });
   code = res.status ?? 1;
+  // 🔴 中止 ≠ 判红(2026-08-12 加,同型第二次之后)。
+  // 套件半路暴毙时退出码同样非零,而红门数会**变少** —— 两次都差点被读成好消息:
+  //   ① 跨仓测试 ENOENT 崩在第 2 步 → 红门 27 → 0;② unbound variable 崩在第 263 行 → 27 → 2。
+  // 靠人眼比 PASS 条数才看出来,那不是门。这里读哨兵第二行的基数,低于下限一律判「中止」。
+  // 下限取 400:当前满跑 435 pass + 27 fail = 462,留出正常增删门的余量;
+  // 真要大批删门,连同这个数一起改 —— 改它是显式动作,崩掉不是。
+  const FLOOR = 400;
+  let tally = null;
+  try {
+    const line = fs.readFileSync(path.join(root, ".verify-exit.code"), "utf8").split(/\r?\n/)[1] ?? "";
+    const m = line.match(/pass=(\d+) fail=(\d+) skip=(\d+)/);
+    if (m) tally = { pass: +m[1], fail: +m[2], skip: +m[3] };
+  } catch { /* 哨兵读不到,按下面的 null 分支处理 */ }
+  if (!tally) {
+    console.error("legacy-suite:FAIL —— 读不到退出码哨兵的基数行,无法区分「跑完判红」与「半路中止」");
+    code = code || 1;
+  } else {
+    const ran = tally.pass + tally.fail;
+    console.log(`legacy-suite:本次实跑 ${ran} 格(pass ${tally.pass} / fail ${tally.fail} / skip ${tally.skip})`);
+    if (ran < FLOOR) {
+      console.error(
+        `legacy-suite:FAIL —— 只跑了 ${ran} 格,低于下限 ${FLOOR} ⇒ **套件中途中止,不是判红**。` +
+        "红门数变少在这种情况下是假象;先看日志最后一行的报错(unbound variable / 语法错 / 某步崩溃),别拿本次红门数做对比。",
+      );
+      code = code || 1;
+    }
+  }
 } finally {
   stopTree(server);
 }

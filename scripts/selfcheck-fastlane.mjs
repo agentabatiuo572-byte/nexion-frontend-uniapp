@@ -16,7 +16,9 @@
 // 词法检查永远追不上控制流。改测行为后,上述四种**全部会被抓到** ——
 // 因为它们要成为漏洞就必须改变路由结果,而路由结果正是这里断言的东西。
 // 反过来:不改变行为的改法本来就不是漏洞,不该报红。
-import { readFileSync } from "node:fs";
+// readdirSync 同属 2026-08-12 合并落下的一批:调用点在,导入没跟过来。
+// 与 functionBody 同一个坏法 —— 运行到那一行才 ReferenceError,而**它后面的格子一格都不跑**。
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { transformSync } from "esbuild";
@@ -653,6 +655,23 @@ function balancedBody(src, from) {
     else if (c === ")" || c === "}") { depth--; if (started && depth === 0) return src.slice(from, k + 1); }
   }
   return null;
+}
+
+// 🔴 按**字面开头**定位一个函数并抠出它的平衡体。2026-08-12 补:三个调用点(858/881/886)
+// 一直在调它,而本文件从来没有过这个定义 —— 合并时把调用带过来了、把 helper 落下了。
+// 后果不是那三格判红,是 `ReferenceError` 让**整个脚本从第 890 行起一格都不跑**,
+// 而 verify.sh 只报「selfcheck-fastlane 有断言失败」,把「脚本根本崩了」盖住。
+//
+// 与 selfcheck-business-loop-liveness.mjs 里的同名函数**不是同一个契约**:那个收函数名、
+// 找不到就 assert.fail;这里收字面开头(调用点传的是 "async function submitWithdrawal("
+// 这种整串),找不到返回 null —— 调用点清一色 `if (!body) return false`,即
+// **定位不到目标 ⇒ 判红**,不静默放行。
+function functionBody(src, opener) {
+  const at = src.indexOf(opener);
+  if (at === -1) return null;
+  const brace = src.indexOf("{", at + opener.length);
+  if (brace === -1) return null;
+  return balancedBody(src, brace);
 }
 // ── 9. 🔴 接线门:判定守得再严,没接上也是零 ────────────────
 // 独立验收 F3 实证:把计数写入摘掉,三个哨兵 + type-check 全绿而限额完全失效。

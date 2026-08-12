@@ -35,9 +35,18 @@ pass=0; fail=0; skip=0
 # trap EXIT 覆盖所有退出路径,含 set -u 半路暴毙 —— 那条路径连 result 行都不会打,
 # 只有哨兵文件还能说出真话。.tmp$$ 带 PID:6 棵树挂着同一个 Stop hook,并发跑不许互相踩。
 VERIFY_EXIT_SENTINEL="${VERIFY_EXIT_SENTINEL:-$PROJECT_DIR/.verify-exit.code}"
+# 🔴 除退出码外**必须同时写跑了多少格**(2026-08-12 加,同型第二次之后)。
+# why:只记退出码分不出两件事 —— 「跑完了,有 N 道门判红」与「跑到一半暴毙」都是非零。
+# 实际两次都发生过、两次都差点被读成好消息:
+#   ① 跨仓测试 ENOENT 崩在第 2 步 → 后面 15 步一次没跑 → 红门数从 27 掉到 0,像是全修好了;
+#   ② 合并时留下一个 unbound variable → 套件崩在第 263 行 → 435 格只跑了 46 格 →
+#      红门数从 27 掉到 2,像是修好了 25 条。
+# 两次都是靠人眼对比 PASS 条数才看出来的,那不是门。基数写进哨兵,由 run-legacy-suite 设下限。
 _write_exit_sentinel() {
   local rc=$?
-  printf '%s\n' "$rc" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
+  # 🔴 第一行**保持纯退出码**不变(文档与既有习惯都是 `cat` 出来直接跟 0 比,加字段会打坏它);
+  # 基数另起第二行 `pass=N fail=N skip=N`,新判定读第二行,老读法一个字都不用改。
+  printf '%s\npass=%s fail=%s skip=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
     && mv -f "$VERIFY_EXIT_SENTINEL.tmp$$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
   return $rc
 }
@@ -247,8 +256,10 @@ if [ "$(_norm_tree_path 'D:\WORKS\x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
    && [ "$(_norm_tree_path '/mnt/d/WORKS/x')" = "$(_norm_tree_path 'D:/works/x/')" ] \
    && [ "$(_norm_tree_path '/d/WORKS/x')" != "$(_norm_tree_path '/d/WORKS/x/.claude/worktrees/w1')" ] \
    && [ "$(_norm_tree_path 'D:/WORKS/x')" != "$(_norm_tree_path '/c/WORKS/x')" ]; then
+  norm_root_selftest=ok
   ok "树身份判据自检(双向:D:\\ · D:\\\\ · /cygdrive/d/ · /mnt/d/ · D:/ · /d/ 六种写法判等 + 嵌套工作树/异盘符判不等)"
 else
+  norm_root_selftest=broken
   bad "树身份判据自检失败 —— _norm_tree_path 归一化坏了,下面的树身份判断不可信(动过它就看这条)"
 fi
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
@@ -262,8 +273,8 @@ elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
 elif [ "$norm_root_selftest" != "ok" ]; then
   bad "API-mode preflight: 树身份判据自检没过 —— 归一化不可信,这道门不发绿灯"
-elif [ "$(norm_root "$served_root")" != "$(norm_root "$expect_root")" ]; then
-  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(norm_root "$served_root") vs $(norm_root "$expect_root");并发多工作树时会给别人发绿灯)"
+elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$expect_root")" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(_norm_tree_path "$served_root") vs $(_norm_tree_path "$expect_root");并发多工作树时会给别人发绿灯)"
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
