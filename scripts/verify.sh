@@ -2883,6 +2883,22 @@ conflict_marker_gate() {
 }
 conflict_marker_gate
 
+# 提现失败分诊的**重放感知**门(2026-08-12 立,两路独立审计各自点名同一根因)。
+# 守:重放路径上只有「成功」与「409」算定局,其余一律保留幂等键 —— 401/429/地区策略
+# 都是边缘层拒绝,排在服务端幂等查询之前,对「上一次落没落库」零信息量;
+# 拿它们退役键 ⇒ 下次新键 ⇒ 服务端出第二笔。
+# 红测:A 去掉「确定拒绝」档的 !isReplay → 红;B 日限档改回无条件退役 → 红;
+#       C 给 409 档也加 !isReplay → 红;D 删掉抠段锚点 → 判据自失效判红。
+withdraw_replay_triage_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-replay-triage.mjs > /tmp/uniapp-replay-triage.log 2>&1; then
+    ok "提现分诊重放感知门 — $(tail -1 /tmp/uniapp-replay-triage.log)"
+  else
+    bad "提现分诊重放感知门失败 — node scripts/selfcheck-withdraw-replay-triage.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-replay-triage.log | head -8 | sed "s/^/        /"
+  fi
+}
+withdraw_replay_triage_gate
+
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
 # 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表

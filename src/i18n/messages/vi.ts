@@ -3551,6 +3551,11 @@ export const vi: Messages = {
     withdrawAlreadyOnFileTitle: "Yêu cầu này đã được ghi nhận",
     withdrawAlreadyOnFileBody:
       "Yêu cầu lần trước đã được ghi nhận nên không có khoản nào bị chi trả hai lần. Hãy mở trạng thái rút tiền để theo dõi.",
+    withdrawResendDeclinedTitle: "Lần gửi lại này đã bị từ chối",
+    withdrawResendDeclinedBody:
+      "Chúng tôi vẫn chưa xác nhận được yêu cầu trước đó có đang được xử lý hay không, nên vẫn giữ lại yêu cầu đó cho bạn. Hãy kiểm tra trạng thái rút tiền trước; nếu không thấy, hãy thử lại đúng yêu cầu đó sau — đừng tạo yêu cầu mới.",
+    withdrawDailyLimitWithPending:
+      "Bạn đã dùng hết số lần rút tiền hôm nay. Yêu cầu trước đó có thể đang được xử lý và đã dùng hạn mức hôm nay — hãy kiểm tra trạng thái rút tiền trước và đừng tạo yêu cầu mới.",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",

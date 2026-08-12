@@ -3685,6 +3685,11 @@ export const en = {
     withdrawAlreadyOnFileTitle: "This request is already on file",
     withdrawAlreadyOnFileBody:
       "Your earlier request was recorded, so nothing was paid out twice. Open withdrawal status to follow it.",
+    withdrawResendDeclinedTitle: "This resend was declined",
+    withdrawResendDeclinedBody:
+      "We still cannot confirm whether your earlier request is being processed, so we are keeping it for you. Check withdrawal status first; if it is not there, try the same request again later — do not start a new one.",
+    withdrawDailyLimitWithPending:
+      "You have used today's withdrawal count. Your earlier request may already be processing and may have used today's allowance — check withdrawal status first, and do not start a new request.",
     earnNexCta: "Mine more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
     feeConfirmRow: "Network confirmation fee",
