@@ -37,6 +37,7 @@
 //   余额 9999 →(失败终态退款)**10479.25** —— 退了一笔从没扣过的钱,凭空 +$480.25。
 //   即「只有退款腿、没有扣款腿」本身就是一条印钞路径,不是单纯的少扣。
 import { chromium } from "playwright";
+import { readFileSync } from "node:fs";
 import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
@@ -66,7 +67,17 @@ try {
     { timeout: 20_000 },
   );
 
-  const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT }) => {
+  // 🔴 从 i18n 源文件里抠出两个确认按钮文案(不写死字面串:文案一改门就该跟着走,
+// 而不是恒判 no-confirm-dialog)。抠不到即抛 —— 判据失效必须判红,不许静默放行。
+const enSrc = readFileSync(new URL("../src/i18n/messages/en.ts", import.meta.url), "utf8");
+const ctaOf = (key) => (enSrc.match(new RegExp(key + ': *"([^"]+)"')) || [])[1];
+const I18N_CONFIRM_CTA = ctaOf("withdrawConfirmCta");
+const I18N_RESEND_CTA = ctaOf("withdrawResendCta");
+if (!I18N_CONFIRM_CTA || !I18N_RESEND_CTA) {
+  throw new Error("抠不到确认按钮文案(withdrawConfirmCta / withdrawResendCta)—— 判据失效,判红");
+}
+
+const result = await page.evaluate(async ({ WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA }) => {
     const [rt, rel, payoutMod, riskMod, appMod, billsMod] = await Promise.all([
       import("/src/api/runtime.ts"), import("/src/store/earning-release.ts"),
       import("/src/store/payout-address.ts"), import("/src/store/risk-disclosure.ts"),
@@ -173,8 +184,15 @@ try {
       labels.push(b ? b.innerText.trim().slice(0, 80) : "NO BTN");
       b?.click();
       await new Promise((r) => setTimeout(r, 900));
+      // 🔴 确认框的按钮文案**有两种**:首次提交是 withdrawConfirmCta,而存在未收口尝试时
+      // 页面弹的是**重发确认框**,按钮换成 withdrawResendCta(2026-08-12 幂等键落盘那批引入)。
+      // 上一版这里写死了 "Confirm",于是**第二次**提交(重发)恒判 no-confirm-dialog,
+      // 19 格里 18 格连带全红 —— 而不变量(链路通、键复用)其实一直成立。判据过期,不是回归。
+      // 判据构造性:从 i18n 真值里取两个文案,不写死字面串;取不到就判红,不静默放行。
+      const CTA = [I18N_CONFIRM_CTA, I18N_RESEND_CTA].filter(Boolean);
+      if (CTA.length !== 2) return "cta-labels-missing";
       const confirm = [...document.querySelectorAll(".nx-btn--primary")]
-        .find((b) => (b.innerText || "").trim() === "Confirm");
+        .find((b) => CTA.includes((b.innerText || "").trim()));
       if (!confirm) return "no-confirm-dialog";
       confirm.click();
       await new Promise((r) => setTimeout(r, 2600)); // eligibility 600ms + submit + 写账单 + 跳转
@@ -262,7 +280,7 @@ try {
       parserAlive,
       labels,
     };
-  }, { WD_NO, SERVER_AMOUNT, PAGE_AMOUNT });
+  }, { WD_NO, SERVER_AMOUNT, PAGE_AMOUNT, I18N_CONFIRM_CTA, I18N_RESEND_CTA });
 
   console.log("withdraw-bill-runtime — 提现账单行真的会被写出来(不是「代码里有」)");
 
