@@ -31,7 +31,7 @@
           <view
             v-if="!completed"
             class="inline-flex items-center shrink-0 active:opacity-85"
-            role="button"
+            role="button" tabindex="0"
             :style="ctaStyle"
             @click="onCta"
           >
@@ -41,7 +41,7 @@
           <view
             v-else
             class="inline-flex items-center shrink-0 active:opacity-85"
-            role="button"
+            role="button" tabindex="0"
             :style="claimStyle"
             @click="onClaim"
           >

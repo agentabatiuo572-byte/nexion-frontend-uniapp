@@ -1,6 +1,6 @@
 <!-- Weekly Tier 2 is a server-authoritative list; pending rows only refresh status. -->
 <template>
-  <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" @click="retry">
+  <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
     <text :style="pendingLabelStyle">Weekly quests unavailable · tap to retry</text>
   </view>
   <view v-else-if="mounted && !wq.snapshot" class="mx-4 mt-3 px-4 py-3" :style="cardStyle">
@@ -26,7 +26,7 @@
         </view>
 
         <!-- completed: claimable button -->
-        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="completedRowStyle" @click="onClaimRow(q)">
+        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="completedRowStyle" @click="onClaimRow(q)">
           <view class="grid place-items-center shrink-0" :style="sparkBoxStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -35,7 +35,7 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="pendingRowStyle" @click="onRowCta(q)">
+        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="pendingRowStyle" @click="onRowCta(q)">
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>

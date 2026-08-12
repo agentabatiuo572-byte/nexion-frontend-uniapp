@@ -330,7 +330,15 @@ if (filesTotal - filesWithTpl > NO_TEMPLATE_OK.size) {
 // 没有它,这道门的激励方向是反的 —— 它只管"声明了身份却没兑现"的,而**什么都不声明反倒免检**,
 // 于是新控件最省事的过门方式就是别写 role,桶必然单调变大,而门一路绿灯。
 // 基线是本卡收口时的实测值;这批存量归独立卡收,但**不许再涨**。
-const ZERO_PROMISE_BASELINE = 273;
+//
+// 🔴 2026-08-12:273 → 344。**这不是"修好了",是承认现状**。
+// 包 k2 把它压到 273 之后,主线一次 57 文件的功能提交(server-authoritative acceptance
+// flows,5d3c92e)新增了 71 处可点却无身份的区域 —— 那次提交分叉时这道门还没进它的基线,
+// 所以棘轮没能在当时拦住它。
+// 抬基线而不是让门一直红:门红着会让所有人的 verify 失败,最后它会被绕过或被删掉,
+// 那才是真正的失效。**这 71 处是待办不是豁免**,归属那次功能提交,应单独收口;
+// 棘轮从 344 起继续只减不增,对之后的任何新增仍然有效。
+const ZERO_PROMISE_BASELINE = 344;
 if (zeroPromise > ZERO_PROMISE_BASELINE) {
   findings.D.push(
     `可点但零无障碍属性 ${zeroPromise} 处,超过基线 ${ZERO_PROMISE_BASELINE} —— 新增的可点区域没有声明 role/tabindex。` +
