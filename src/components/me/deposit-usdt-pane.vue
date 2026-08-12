@@ -76,7 +76,7 @@
             <text class="block" :style="warnTextStyle">Cregis USDT-BEP20</text>
           </view>
           <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
-            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "处理中" : "+25 USDT" }}</text>
+            <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "+25 USDT" }}</text>
           </view>
         </view>
       </view>
@@ -258,9 +258,9 @@ async function simulateSandboxTopup() {
   sandboxSubmitting.value = true;
   try {
     const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", 25, dep.currentAccountKey());
-    if (record) toast.success("SANDBOX 服务端已入账 25 USDT");
+    if (record) toast.success("SANDBOX: server credited 25 USDT");
   } catch (cause) {
-    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? "服务器暂时未完成入账，请稍后刷新重试");
+    toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);
   } finally {
     sandboxSubmitting.value = false;
   }

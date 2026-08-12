@@ -61,7 +61,27 @@ const VALUE_EXEMPTIONS = [
     // 替换串传函数,不用 "$1" —— 字面量替换串会把 $& / $1 当引用吃掉(本仓踩过)。
     strip: (line) => line.replace(/(^|[\s{,])cnTitle:\s*(["'])[^"']*\2/g, (_m, lead) => `${lead}cnTitle:""`),
   },
+  {
+    id: "legacy-config-token",
+    why:
+      "后端 legacy 策略行的**取值**,不是展示文案:parseTrialBooleanConfig 把旧后台写的 '开'/'关' 这类值" +
+      "归一成 JSON boolean(H2 线上契约已是 boolean,这几个只在旧行归一化期间存在)。它们进的是 includes() " +
+      "的比较集,永远不会渲染给用户 —— 收进 i18n 反而是错的:词典是给人读的,这里要的是**跟后端字节对齐**。",
+    files: ["src/lib/trial-config-enum.ts"],
+    // 🔴 钉**具体授权的 4 个 token**,不是「这个文件的数组里都放行」:
+    //    ① 只有整串恰好等于授权值才剥(子串不逃逸:"开放试用" 照判);
+    //    ② 后端将来新增 "启用"/"停用" 必须显式加进这里 —— 每个新取值都过一次审,这正是要的;
+    //    ③ 文件作用域挡住「把文案塞成同名字面量就隐身」(消费面写 "开放" 照抓)。
+    strip: (line) =>
+      line.replace(/(["'])([^"']*)\1/g, (m, q, inner) =>
+        LEGACY_CONFIG_TOKENS.includes(inner) ? `${q}${q}` : m
+      ),
+  },
 ];
+
+// 与上面 legacy-config-token 配对的授权取值表。单独提出来是为了让「授权了哪几个值」
+// 一眼可数、可 diff —— 埋在正则里的白名单没人看得见增删。
+const LEGACY_CONFIG_TOKENS = ["开", "开放", "关", "关闭"];
 
 // ── 注释剥离 ────────────────────────────────────────────────────────────────
 // 按区域用不同的注释语法,不能一把梭:模板里的 `//` 是普通文本(URL / 分数 / 中文里的斜杠),
@@ -239,6 +259,13 @@ function selftest() {
     ["豁免:cnTitle 单引号写法同样放行(宽严不许取决于引号风格)", "src/store/v-rank.ts", "cnTitle: '学员',", 0],
     ["同文件里非 cnTitle 的中文照抓", "src/store/v-rank.ts", 'v: 0, title: "学员", cnTitle: "学员",', 1],
     ["🔴 cnTitle 豁免带文件作用域:消费面塞文案照抓", "src/pages/product/detail.vue", 'const o = { cnTitle: "立即购买" };', 1],
+    // legacy-config-token —— 阴阳两面各测一遍:只测 true 那行会让 "关"/"关闭" 半边判据无人验证。
+    ["豁免:legacy 配置取值放行(true 侧)", "src/lib/trial-config-enum.ts", 'if (["true", "1", "enabled", "on", "开", "开放"].includes(v)) return true;', 0],
+    ["豁免:legacy 配置取值放行(false 侧)", "src/lib/trial-config-enum.ts", 'if (["false", "0", "disabled", "off", "关", "关闭"].includes(v)) return false;', 0],
+    // 下面三格证明这条豁免**不是**整文件放行、也不是「含授权字就放行」:
+    ["🔴 同文件里非授权取值的中文照抓(不是整文件豁免)", "src/lib/trial-config-enum.ts", 'throw new Error("试用配置无效");', 1],
+    ["🔴 只认整串相等:授权 token 作子串不逃逸", "src/lib/trial-config-enum.ts", 'const a = "开放试用";', 1],
+    ["🔴 legacy 豁免带文件作用域:消费面写同样的字照抓", "src/pages/x/a.vue", "<template><view>开放</view></template>", 1],
     ["🔴 \\u 转义绕过被解码后照抓", "src/pages/x/a.ts", 'const a = "\\u6559\\u7a0b\\u4e2d\\u5fc3";', 1],
     ["🔴 纯 CJK 标点文案照抓(只判汉字块会整段免疫)", "src/pages/x/a.vue", "<template><view>「」、。</view></template>", 1],
     ["pages.json 的导航栏标题是用户可见文案面", "src/pages.json", '{"path":"pages/x/a","style":{"navigationBarTitleText":"教程中心"}}', 1],
