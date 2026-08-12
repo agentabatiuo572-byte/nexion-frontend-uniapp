@@ -262,9 +262,18 @@ const refresh = () => { app.bindAccount(ACCT); };
   // 确定(可以换新键)—— 服务端明确拒绝或根本没处理
   check("🔴 业务拒单判为确定", isAmbiguousOutcome(mk("business", 200)) === false);
   check("🔴 鉴权失败判为确定", isAmbiguousOutcome(mk("auth", 401)) === false);
-  check("🔴 配置错判为确定", isAmbiguousOutcome(mk("configuration")) === false);
-  check("🔴 超额拒单 429 判为确定(它是被拒绝,不是被处理)",
-    isAmbiguousOutcome(mk("http", 429)) === false);
+  // ⚠️ 下面两格在 2026-08-12 的合并里**由「确定」改判为「歧义」**,理由写在 errors.ts 的
+  // configuration / UNSETTLED_4XX 两段注释里。不是放宽,是把「确定」的门槛提高到
+  // 「服务端明确应答过」—— 另一条支线独立得出同一结论并写了测试(withdraw-idempotency-contract)。
+  // 改测试而不是改实现的判据:两侧各自钉死了相反的结论,这里裁决取**保守**一侧,
+  // 因为两种判错的代价不对称(保守 = 多留一把没用的键;激进 = 真出第二笔)。
+  check("🔴 配置错判为歧义(kind 是开放分类,「都抛在请求发出前」这个前提没有门看得住)",
+    isAmbiguousOutcome(mk("configuration")) === true);
+  // 429 的**具体含义**若已知(日限拒单),由页面的 isDailyLimitRejection 在分诊第一档认掉,
+  // 比这条通用判定更准;通用判定只负责兜住「不知道这个 429 是谁发的」那一类
+  // —— 网关限流时上游可能已经转发过一次。
+  check("🔴 通用 429 判为歧义(网关限流时上游可能已转发)",
+    isAmbiguousOutcome(mk("http", 429)) === true);
   check("🔴 400 参数错判为确定", isAmbiguousOutcome(mk("http", 400)) === false);
   // 🔴 方向性自证:把「歧义」判反的代价是重复出账,判保守的代价只是多留一把键。
   //    所以任何**新增**的错误类别若判不准,必须落在歧义侧 —— 这条断言钉住那个默认。

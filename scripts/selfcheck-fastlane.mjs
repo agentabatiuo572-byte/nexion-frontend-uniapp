@@ -1212,8 +1212,11 @@ function balancedBody(src, from) {
       // 剥注释后找第一个真 await:金额快照必须在它之前,其后不许再出现裸 amountNum.value
       // (2026-08-04:金额快照并入统一提交快照 snap —— 账号/网络/地址/报价同刻冻结,
       //  全族判据在 selfcheck-withdraw-freeze;这里只守金额这一条,两边互为交叉验证)
+      // 2026-08-11 幂等 P0:金额的来源多了一个 —— 未收口的上一次尝试(重放要发的是那一笔的
+      // 金额,不是当前输入)。判据只放行这一个前缀,别的来源照红;「await 之后不许再读活值」
+      // 这半条一字不改。
       const code = body.split("\r\n").filter((l) => !l.trim().startsWith("//")).join("\r\n");
-      const s = code.indexOf("amount: amountNum.value,");
+      const s = code.search(/amount: (pending\?\.amount \?\? )?amountNum\.value,/);
       const a = code.indexOf("await ");
       if (s < 0 || a < 0 || s > a) return false;
       return !code.slice(a).includes("amountNum.value");
