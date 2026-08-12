@@ -102,6 +102,29 @@ sentinel_present() {
 echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE ━━${N}"
 
 # ── (1) type-check ──
+echo -e "${C}[0] 静态门(不依赖 dev server,必须排在任何 preflight 之前)${N}"
+# 🔴 前移理由(2026-08-12 独立审计 P1-3):这两道门原本排在 2800+ 行,而 [2.5] preflight
+# 曾因一个 unbound variable 在 245 行崩死 —— 于是「能抓这件事的门恰恰跑不到」。
+# 判据:不依赖 dev server 的纯静态门,一律排在任何可能中止的 preflight 之前。
+conflict_marker_gate() {
+  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
+    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
+  else
+    bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
+    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
+  fi
+}
+conflict_marker_gate
+runtime_flag_parity_gate() {
+  if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > /tmp/uniapp-flag-parity.log 2>&1; then
+    ok "运行时开关等价门 — $(tail -1 /tmp/uniapp-flag-parity.log)"
+  else
+    bad "运行时开关等价门失败 — node scripts/runtime-flag-parity-gate.mjs 看明细"
+    grep -E "^(FAIL|  )" /tmp/uniapp-flag-parity.log | head -8 | sed "s/^/        /"
+  fi
+}
+runtime_flag_parity_gate
+
 echo -e "${C}[1] vue-tsc type-check${N}"
 if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then
   ok "vue-tsc 0 errors"
@@ -2873,15 +2896,6 @@ withdrawal_merge_union_gate
 # 其中一个是门脚本本身(里面那根针钉的符号名已经不存在了 —— 假绿)。
 # tsc 看不到 .md/.mjs,契约登记门只扫 *.test.mjs,这一族此前天然无人看管。
 # 判据构造性:扫全部被 git 跟踪的文本文件,不维护类型清单;候选集塌了本门自己判红(已红测)。
-conflict_marker_gate() {
-  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
-    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
-  else
-    bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
-    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
-  fi
-}
-conflict_marker_gate
 
 # 提现失败分诊的**重放感知**门(2026-08-12 立,两路独立审计各自点名同一根因)。
 # 守:重放路径上只有「成功」与「409」算定局,其余一律保留幂等键 —— 401/429/地区策略
