@@ -2018,7 +2018,7 @@ export const vi: Messages = {
 
     withdrawBillWriteFailed: "Đã gửi lệnh rút, nhưng không lưu được dòng sao kê. Bạn vẫn có thể theo dõi ở trang trạng thái rút tiền.",
 
-    trackFailedBody: "Lệnh rút này chưa hoàn tất. Tiền vẫn còn trong tài khoản của bạn. Liên hệ hỗ trợ để biết chi tiết.",
+    trackFailedBody: "Lệnh rút này chưa hoàn tất. Hãy liên hệ hỗ trợ để biết tiền của bạn hiện ở đâu.",
     trackEtaPending: "Dự kiến trong {n} giờ",
     trackExpectedAt: "Thời gian xử lý dự kiến từ máy chủ: {time}",
 

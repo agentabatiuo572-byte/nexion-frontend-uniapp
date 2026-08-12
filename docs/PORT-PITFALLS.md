@@ -1161,3 +1161,35 @@ R2 探针实跑证明只修好 1/3 —— `frozen → processing / sent / confir
 抛的话后台加一个码就打死全体老客户端;漂移的**预防**放机器门(跨仓逐值 parity),不放运行期异常。
 但非字符串一律当没给,别用 `String(值)` 兜底 —— 那会把 `{}` 编成真实原因码、
 把 `["RISK_HIT"]` 当成合法码显示给用户。
+
+## P-084 门读「另一个工作树的文件」时,合并顺序会改变它的判定
+
+**现场(2026-08-12,包 z7 R3 审计)**:`selfcheck-withdraw-nex-refund.mjs`(z6/z8 的门)有两条分支 ——
+本仓没有状态回查面时,去读**隔壁 worktree** `../z7-withdraw-status/` 的文件打 INFO;
+本仓有回查面时,用 `/nexRefunded/.test(apiSrc.split(/interface WithdrawalStatusSnapshot|parseStatusSnapshot/)[1])` 判红。
+
+合并之后走的是第二条分支,而那个 `split()` 会把**整个文件下半截**(含 `parseSubmission` 里的
+`rawNexRefunded`)算进「回查面」→ 回查契约其实**不带**该字段,门照报 PASS。
+R3 用 `git merge-tree` 实跑合并产物证实:`gate11PASS=true`,而合并后的回查契约仍是 5 字段。
+
+🔴 **两条规则**:
+1. **门的判定不该随「哪个包先合」而变**。跨 worktree 读文件的分支只能打 INFO,
+   真判据必须只看**本仓最终状态**;否则同一份代码在合并前后得到相反结论,而没人会去复跑。
+2. **「字面量在不在某段文本里」不是判据**(同 P-082 家族)。这里要钉的因果是
+   「回查响应契约**带不带**这个字段」——判据应解析那个 interface 的成员,不是对整文件做 split。
+
+**排查同族**:`grep -rn '"\.\."' scripts/*.mjs` 找所有跨工作树取材的门,
+逐个问「合并后这条分支还走吗?换一条分支后判据还成立吗?」
+
+## P-085 shell 的工作目录会跨命令留存 —— 一个 `cd` 能让后面的写落进别人的分支
+
+**现场(2026-08-12,同一轮收尾)**:为核实隔壁包的门,我 `cd` 进了主 checkout;
+几步之后用相对路径 `cat >> docs/PORT-PITFALLS.md` 追加本条教训 ——
+**它落进了主 checkout**,而主 checkout 此刻停在**另一个会话的分支** `pkg/z8-refund-ts`
+且带着对方未提交的改动。等于把我的东西写进了别人正在改的工作树。
+(已当场 `git diff` 发现并逐字撤回,对方 WIP 未受影响。)
+
+🔴 **规则**:多工作副本并存时,**写操作一律用绝对路径**,不依赖当前工作目录;
+读操作可以 `cd`,但**任何一次写之前先确认 `pwd` 与分支**。
+判据:`git branch --show-current` 不是我这个包的分支 → 这次写就是错的。
+同族:[[feedback_commit_split_interleaved_worktree]](并发会话会切走 HEAD)。

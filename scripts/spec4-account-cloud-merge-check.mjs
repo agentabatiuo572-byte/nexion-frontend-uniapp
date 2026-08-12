@@ -230,73 +230,58 @@ if (wd1?.status !== "processing") {
   throw new Error(`withdrawal status regressed: ${wd1?.status}`);
 }
 
-// 🔴 平局侧(2026-08-11 独立审计三条 P0 的入口 —— 本门此前只测了「赢的一侧」)。
-// 状态档位是「谁更新」的替身,而替身在两种真实情形下失灵,且两种都让单据永久卡住:
-//   ① frozen 与四个终态同档:「冻结 → D2 处置成退款/拒绝」这条**正常流程**的每一次
-//      都被丢弃 → 单据不在失败清单里、退款永不触发、单槽永久占用;
-//   ② 状态没动只改字段(终态原因 / 可重试):平局,整拍丢失,5s 轮询永不收敛。
-// 判据换成 mirroredAt(谁问服务端问得更晚)。下面两格分别钉住这两条边。
-const tieCase = (fromStatus, toStatus, extra = {}) => {
+// 🔴 同档位 = 同一状态的两份快照,必须**按字段合并**,不是整行择一
+// (2026-08-11 R1 独立审计,包 z7 立案的直接原因;R3 又抓到反方向)。
+// 缺陷两个方向都真实发生过:
+//   ① 服务端这一拍只补了终态原因(状态没变)→ 整行择一时磁盘旧行赢 → 原因整拍丢失;
+//   ② 内存行赢时 → 把磁盘上已落盘的原因抹掉。终态单不再被回查 = 两个方向都是永久丢失。
+// ⚠️ 本门**不**覆盖「frozen 与四个终态同档 → 冻结单收不到最终结论」那条主线既有缺陷:
+//    它要真时序判据(独立仲裁重构,主人 2026-08-12 拍板独立立卡)。别在这里加假靶充数。
+const sameStatus = (over, memOver) => {
   const b = structuredClone(base);
-  b.withdrawals = [{ ...mkWd("wd-tie", fromStatus, 3000), mirroredAt: 100 }];
-  const disk = structuredClone(b); // latest = 磁盘上的旧行
-  const mem = structuredClone(b);  // next   = 内存里刚镜像回来的新结论
-  mem.withdrawals[0] = { ...mem.withdrawals[0], status: toStatus, mirroredAt: 200, ...extra };
-  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-tie");
+  b.withdrawals = [{ ...mkWd("wd-same", "frozen", 3000), ...over }];
+  const disk = structuredClone(b);            // latest = 磁盘行
+  const mem = structuredClone(b);             // next   = 内存行
+  mem.withdrawals[0] = { ...mem.withdrawals[0], ...memOver };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-same");
 };
-const frozenOut = tieCase("frozen", "refunded");
-if (frozenOut?.status !== "refunded") {
-  throw new Error(`同档位互转被丢弃(frozen→refunded 得到 ${frozenOut?.status})—— 冻结单的每一条出边都走不通`);
+// 方向 ①:磁盘没有原因,内存刚镜像到 → 必须留下
+const gotMem = sameStatus({}, { terminalReason: "address-risk", retriable: false });
+if (gotMem?.terminalReason !== "address-risk" || gotMem?.retriable !== false) {
+  throw new Error(`同状态下内存新补的字段被丢弃:${JSON.stringify({ r: gotMem?.terminalReason, t: gotMem?.retriable })}`);
 }
-const reasonOnly = tieCase("frozen", "frozen", { terminalReason: "address-risk", retriable: false });
-if (reasonOnly?.terminalReason !== "address-risk" || reasonOnly?.retriable !== false) {
-  throw new Error(`同状态改字段被丢弃(得到 ${JSON.stringify({ r: reasonOnly?.terminalReason, t: reasonOnly?.retriable })})`);
+// 方向 ②:磁盘已有原因,内存这拍没带 → **不许**被抹掉(赢家通吃会抹,R3 探针实测)
+const gotDisk = sameStatus({ terminalReason: "risk-hit", retriable: false, confirmedAt: 777 }, {});
+if (gotDisk?.terminalReason !== "risk-hit" || gotDisk?.retriable !== false || gotDisk?.confirmedAt !== 777) {
+  throw new Error(`同状态下磁盘已落盘的字段被抹掉:${JSON.stringify({ r: gotDisk?.terminalReason, t: gotDisk?.retriable, c: gotDisk?.confirmedAt })}`);
 }
-// 🔴 档位**不等**的两个方向(R2 审计:上一版四格全落在平局侧,`c > a` 与 `c < a`
-// 两条分支一次都没被执行过,而门的失败文案却写着「冻结单的每一条出边」——误报安全)。
-// 降档方向:frozen(档 6) → 主链 processing/sent/confirmed(档 3/4/5)。这是后台核查通过、
-// 把冻结单**放行回主链**的正常流程;判据若还看档位,这三条边永远走不通(坏结局反而走得通)。
-for (const to of ["processing", "sent", "confirmed"]) {
-  const got = tieCase("frozen", to);
-  if (got?.status !== to) {
-    throw new Error(`降档方向被丢弃(frozen→${to} 得到 ${got?.status})—— 放行回主链这条边走不通`);
-  }
+// 双方都有值 → 以内存(本端刚写入的)为准,且不得串成第三个值
+const gotBoth = sameStatus({ terminalReason: "risk-hit" }, { terminalReason: "data-mismatch" });
+if (gotBoth?.terminalReason !== "data-mismatch") {
+  throw new Error(`双方都有值时未取内存值(得到 ${gotBoth?.terminalReason})`);
 }
-// 升档方向 + 陈旧内存:磁盘上更新的 confirmed 不许被一份陈旧的高档内存行顶回去。
-for (const staleStatus of ["frozen", "tx-failed"]) {
+// 档位不等时仍按档位:主链单调,不因字段合并而退化
+const rankUp = (() => {
   const b = structuredClone(base);
-  b.withdrawals = [{ ...mkWd("wd-up", "confirmed", 3300), mirroredAt: 200 }];
+  b.withdrawals = [mkWd("wd-rank", "processing", 3100)];
   const disk = structuredClone(b);
   const mem = structuredClone(b);
-  mem.withdrawals[0] = { ...mem.withdrawals[0], status: staleStatus, mirroredAt: 100 };
-  const got = mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-up");
-  if (got?.status !== "confirmed") {
-    throw new Error(`陈旧高档内存行顶掉了磁盘上更新的 confirmed(得到 ${got?.status})—— 已到账的单被退回在途`);
-  }
-}
-// 反向:更旧的镜像**不许**顶掉更新的(否则平局判据就成了 last-write-wins)。
-const staleMirror = (() => {
-  const b = structuredClone(base);
-  b.withdrawals = [{ ...mkWd("wd-stale", "frozen", 3100), mirroredAt: 300 }];
-  const disk = structuredClone(b);
-  const mem = structuredClone(b);
-  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "refunded", mirroredAt: 100 };
-  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-stale");
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "confirmed" };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-rank");
 })();
-if (staleMirror?.status !== "frozen") {
-  throw new Error(`更旧的镜像顶掉了更新的(得到 ${staleMirror?.status})—— 平局判据退化成 last-write-wins`);
+if (rankUp?.status !== "confirmed") {
+  throw new Error(`升档被丢弃(processing→confirmed 得到 ${rankUp?.status})`);
 }
-// 存量单(两边都没有该时刻)仍按原行为:平局留磁盘值,不造回归。
-const legacyTie = (() => {
+const rankDown = (() => {
   const b = structuredClone(base);
-  b.withdrawals = [mkWd("wd-legacy", "frozen", 3200)];
+  b.withdrawals = [mkWd("wd-rank2", "confirmed", 3200)];
   const disk = structuredClone(b);
   const mem = structuredClone(b);
-  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "refunded" };
-  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-legacy");
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "processing" };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-rank2");
 })();
-if (legacyTie?.status !== "frozen") {
-  throw new Error(`存量单(无 mirroredAt)平局行为变了(得到 ${legacyTie?.status})—— 引入新判据不该改老数据的结论`);
+if (rankDown?.status !== "confirmed") {
+  throw new Error(`陈旧低档内存行顶掉了磁盘的 confirmed(得到 ${rankDown?.status})`);
 }
 
 // 🔴 列表化才有的不变量:两端**各自新建**的单都必须保留。

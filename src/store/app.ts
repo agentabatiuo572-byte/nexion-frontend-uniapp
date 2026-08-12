@@ -383,8 +383,6 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
-  /** 提现回读的在途闸:两拍叠加时,迟到的旧结论会带着更大的 mirroredAt 赢下合并裁决。 */
-  let mirrorInFlight = false;
   // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
   const slotDevices = computed(() =>
@@ -1374,22 +1372,13 @@ export const useApp = defineStore("app", () => {
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
     if (!remoteApiEnabled) return [];
-    // 🔴 在途守卫(2026-08-11 R2 审计):5s 轮询与 onShow 都 fire-and-forget 调本函数,
-    // 而单次请求可以跑到 12s(api-client 默认 timeout)。没有这道闸时两拍会真叠加,
-    // 后发的先回、先发的后回,而 mirroredAt 记的是**收到响应的时刻** ——
-    // 迟到的旧结论会带着更大的时间戳赢下合并裁决,把已到账的单退回冻结。
-    // 闸放在这里(而不是给 mirroredAt 找一个服务端时刻)是因为服务端契约里没有那个字段;
-    // 已写进后端交接书:若能下发服务端结论时刻,这里应改用它。
-    if (mirrorInFlight) return [];
-    mirrorInFlight = true;
-    try {
-      return await runRemoteWithdrawalMirror();
-    } finally {
-      mirrorInFlight = false;
-    }
-  }
-
-  async function runRemoteWithdrawalMirror(): Promise<string[]> {
+    // 注:本包一度加过一道「同一实例内只许一拍在途」的闸,已按主人 2026-08-12 的范围决定撤回。
+    // 撤回理由不是它没用,而是它**解决不了它声称的问题、却新引进一个**:闸是 store 实例级的,
+    // 跨标签页/跨 webview 原样敞开(那正是并发的真实来源);而它没有超时兜底,
+    // 一次不 settle 的请求就能让本会话的回读**永久停摆** —— 恰好复现本包要消灭的那个缺陷。
+    // 乱序响应的真正解法是服务端下发「结论时刻」并按它裁决,属独立的仲裁重构(已独立立卡)。
+    // 当前口径:乱序最坏是状态被旧结论覆盖一拍,下一拍(5s)自愈;而**信息字段不会丢** ——
+    // 同状态两份快照按字段合并(account-cloud.mergeSameStatusWithdrawal)。
     const targets = inFlightWithdrawals.value;
     if (!targets.length) return [];
     const mirrors = await Promise.all(targets.map((w) =>
@@ -1400,8 +1389,8 @@ export const useApp = defineStore("app", () => {
       if (!remote) return;
       // 🔴 基底取 **await 之后的当前行**,不是发请求那一刻捕获的那份(R2 审计):
       // `...w` 展开陈旧整行会把这段时间里别处(另一个 tab 合并回来、或上一拍)写入的
-      // confirmedAt / terminalReason / retriable 一并抹掉,而且抹掉的那一版还带着更大的
-      // mirroredAt,连磁盘一起覆盖。单据一进终态就不再被回查 —— 抹掉即永久。
+      // confirmedAt / terminalReason / retriable 一并抹掉。单据一进终态就不再被回查 ——
+      // 抹掉即永久。(合并层同状态按字段合并是第二道网,这里是第一道:别先把值弄丢。)
       const w = withdrawals.value.find((row) => row.id === target.id);
       if (!w) return; // 这段时间里单据没了(换账号 / 被合并掉)——本拍的结论不再适用
       // 🔴 判「变没变」要把**三个字段**都算上,不能只看 status:状态没动、只有终态原因
@@ -1419,7 +1408,6 @@ export const useApp = defineStore("app", () => {
         // 🔴 盖上「这份结论是什么时候从服务端问来的」。没有它,三路合并在平局时只能留磁盘旧行,
         // 上面那套判据就全是空转(独立审计实测:同状态改原因 100% 丢失)。
         // 用本机时钟即可:它只在**本机自己的两份快照之间**比大小,不与服务端时间对齐。
-        mirroredAt: Date.now(),
         // 服务端没给到账时刻就不编一个:仍按「到点即已到」记 estimatedCompletion,
         // 与 mock 推进同口径(见 advanceArrival 的 confirmedAt 注释)。
         ...(remote.status === "confirmed"

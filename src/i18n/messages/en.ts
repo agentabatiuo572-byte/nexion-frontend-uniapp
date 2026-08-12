@@ -2101,7 +2101,7 @@ export const en = {
 
     withdrawBillWriteFailed: "Withdrawal submitted, but the bill entry could not be saved. You can still track it on the withdrawal status page.",
 
-    trackFailedBody: "This withdrawal did not complete. Your funds have not left your account. Contact support for details.",
+    trackFailedBody: "This withdrawal did not complete. Contact support to check where your funds are.",
     trackEtaPending: "Expected within {n} hours",
     trackExpectedAt: "Server-estimated processing time: {time}",
 
