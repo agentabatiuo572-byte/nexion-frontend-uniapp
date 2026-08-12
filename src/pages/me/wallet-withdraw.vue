@@ -353,7 +353,6 @@ import StakeAlternativeCard from "@/components/me/stake-alternative-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { isIdempotencyConflict, isSettledRejection } from "@/api/errors";
 import {
   forgetWithdrawAttempt,
   newWithdrawKey,
@@ -384,7 +383,11 @@ import { useProductPhase } from "@/composables/use-product-phase";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import type { Withdrawal, WithdrawalFeeSnapshot } from "@/store/types";
 import { withdrawalApi } from "@/api/runtime";
-import { ApiError, isAmbiguousOutcome } from "@/api/errors";
+// 🔴 不再 import isAmbiguousOutcome:本页改用 isSettledRejection + isIdempotencyConflict 分诊。
+// 那行 import 曾经是**全文件唯一**的 isAmbiguousOutcome 出现处(零调用),却正好喂饱了
+// selfcheck-fastlane 的一格字符串针 —— 门以为页面在用它,实际一次没调过。
+// tsconfig 未开 noUnusedLocals,type-check 抓不到这种幻影针,只能靠删掉它。
+import { ApiError, isIdempotencyConflict, isSettledRejection } from "@/api/errors";
 import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 const ALL_NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
@@ -522,31 +525,27 @@ const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n
  *
  * 签名 = 账号 | 网络 | 金额 | **收款地址** | NEX 抵扣开关。
  *
- * 🔴 收款地址是后补的,漏掉它是资金流向级缺陷(R3 独立审计点名):
- * 歧义失败后用户改了收款地址再提交 → 沿用旧键 → 服务端幂等去重返回**打到旧地址**的那一单,
- * 而客户端用**本地传入的新地址**渲染(建单响应里根本没有 address 可核)——
- * 界面显示新地址、钱走旧地址,客户端永远发现不了。
+ * 🗑 **这条内存签名轨已于 2026-08-12 合并收口时删除**,只留下面这段判断。
+ * 它与 `lib/withdraw-attempt` 的落盘轨是同一件事的两套实现:内存轨活不过刷新页面,
+ * 而「请求在途时被杀进程 / 刷页面」正是这条链要兜住的那一刻。删除时
+ * `currentIdempotencyKey()` 已零调用,`clearSubmitIntent()` 只清一份没人读的 ref。
  *
- * 🔴 policyVersion **故意不进签名**:它是平台状态,不是「用户在要什么」。
- * 把它放进来会引出更坏的一条:歧义失败后本页 onShow 会重取策略,版本一变签名就变、
- * 键就换 —— 正好在最不该换键的那一刻换掉,直接制造重复出账。
- * 报价真变了由 quoteStillValid 那道闸拦,不靠幂等键表达。
+ * 🔴 两条判断必须接住,不许跟着代码一起消失:
+ *
+ * ① **policyVersion 不该改变「这是不是同一笔意图」**。旧轨把它排除在签名之外;
+ *    新轨更强 —— 连同整个请求体一起冻结落盘,重放逐字节相同。殊途同归,
+ *    都是为了不让后台的发布节奏在最不该换键的那一刻把键换掉。
+ *
+ * ② **换了收款地址,旧轨算「另一笔意图」,新轨不算** —— 这是一处**已知的口径变更**,
+ *    不是遗漏,两条路各有各的风险:
+ *      · 旧轨:改地址 → 换键 → 新单。风险是上一笔若已落库,**两笔都会出账**;
+ *        且客户端拿新地址渲染、服务端按旧键返回旧地址那一单,界面与钱流向对不上。
+ *      · 新轨:改地址 → 重放仍发**冻结的旧地址**。风险是钱打到用户已经放弃的地址。
+ *    取新轨:重复出账不可逆,而旧地址在换绑之前本来就是用户自己确认过的收款地址,
+ *    且重发弹窗会把那个冻结地址(掩码)原样展示出来再确认一次。
+ *    ⚠️ 残余缺口:用户若真想放弃这笔,**目前没有出口**(2026-08-12 独立审计 P1)。
+ *    已记进本轮收口文档的待办,需主人拍板取哪种出口,不在本次修法内。
  */
-const submitIntentKey = ref("");
-const submitIntentSig = ref("");
-function currentIdempotencyKey(): string {
-  const sig = `${app.accountKey}|${network.value}|${amountNum.value}|${boundAddress.value}|${offsetWithNex.value ? 1 : 0}`;
-  if (submitIntentSig.value !== sig || !submitIntentKey.value) {
-    submitIntentSig.value = sig;
-    submitIntentKey.value = `withdrawal:${app.accountKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-  }
-  return submitIntentKey.value;
-}
-/** 结局确定(成功 / 明确拒单)→ 下一次提交是新的一笔意图,换新键。 */
-function clearSubmitIntent(): void {
-  submitIntentKey.value = "";
-  submitIntentSig.value = "";
-}
 
 /**
  * 服务端「今日笔数已达上限」拒单的识别。
@@ -578,6 +577,10 @@ const dailyLimitReachedText = computed(() => {
   const stamp = `${p2(at.getMonth() + 1)}-${p2(at.getDate())} ${p2(at.getHours())}:${p2(at.getMinutes())}`;
   return fmt(t.value.walletV3.dailyLimitReached, { time: stamp });
 });
+// 重放时撞上日限,话术必须与首次提交不同:首次是「今天不能提了」,
+// 重放是「今天不能提了,**而且先前那笔可能已经占掉了额度**」——
+// 只说前半句会让用户以为先前那笔没成功,转头去开新的一笔,那正是要防的事。
+const dailyLimitReachedWithPendingText = computed(() => t.value.walletV3.withdrawDailyLimitWithPending);
 const minWithdrawNoteText = computed(() => fmt(t.value.wallet.minWithdrawNote, { n: minWithdrawable.value.toFixed(0) }));
 const minAmountLine = computed(() => fmt(t.value.wallet.minAmountDynamic, { n: minWithdrawable.value.toFixed(0) }));
 const devMode = ref(false);
@@ -1217,7 +1220,6 @@ async function handleSubmit() {
     );
     forgetWithdrawAttempt(snap.account);
     clearSubmitFreeze();
-    clearSubmitIntent(); // 结局确定:成功建单 → 下一次是新的一笔意图
     // (这里原本有一条 `if (!wd)` 的余额不足分支。submitWithdrawal 自 2026-08-10 起
     //  没有任何 return null 路径 —— 拒单全在服务端、一律抛 ApiError 走下面的 catch 分诊。
     //  留着那条死分支会让人以为余额闸还在客户端。z4 R2 P2-5。)
@@ -1273,38 +1275,54 @@ async function handleSubmit() {
     return;
   } catch (err) {
     clearSubmitFreeze();
-    // 🔴🔴 失败要按**结局是否确定**分诊,不能一律回落「费率已更新,请重新确认」
-    // (2026-08-11 两路独立审计各自点名)。此前三件事全错:原因错(会话过期 / 5xx / 超日限
-    // 都被说成费率变了)、下一步错(诱导重试,而重试会换新幂等键 → 服务端可能真出第二笔)、
-    // 什么时候能行不说。
+    // 🔴🔴 失败分诊:先问「要判的是哪一次」,再问「这一次定局了没有」。
     //
-    // 🔴 四档的顺序是**从具体到笼统**,不能调:后面每一档都比前一档笼统,先撞上笼统那档
-    // 就会用错话术、并且做错「键要不要退役」这个决定。
-    // (2026-08-12 合并收口:两条支线各自做了这套分诊,各有对方没有的档位,此处取并集。)
+    // 2026-08-12 两路独立审计各自点名同一个根因:此前的四档只回答了后半句 ——
+    // `isSettledRejection` 说的是「**这一次**尝试在服务端定局了没有」。首次提交时这就是全部,
+    // 但**重放**时要回答的是另一个问题:「**上一次**那笔到底落库了没有」。
+    // 两者只在一个前提下等价:服务端的幂等表查询发生在所有拒绝路径之前。
+    // 而 401 鉴权、429 限流、地区策略这些**边缘层**拒绝,按任何常规栈都发生在幂等查询之前,
+    // 它们对「上一次」零信息量 —— 拿它们退役键,下一次就是新键、就是第二笔。
     //
-    // ① 日限拒单:确定性结局(服务端明确拒了,没建单)。**必须排在歧义判定之前** ——
-    //    它走 429,kind 是 "http" 而不是 "business";而 429 在通用判定里被算作歧义
-    //    (网关限流时上游可能已转发过一次)。这里是「已知这个 429 的具体含义」,
-    //    比通用的保守判定更准,所以先认它。
+    // 实测能走通的一条(会话过期是高频事件):
+    //   首提超时(服务端已建单)→ 键留盘 → 用户隔一阵回来点重发 → token 过期 →
+    //   `kind:"auth"` → 旧逻辑判「确定没建单」→ 退役键 → 用户重新登录再提 → **第二笔**。
+    //
+    // 🔴 重放路径上**只有两种结局是真定局**:
+    //   · 成功 —— 服务端把结果给了我们;
+    //   · 409  —— 服务端明确说「这个键我这儿已经有记录」。
+    // 其余一律**保留键**,只换话术。宁可让用户多看一次「仍在收口中」,也不多出一笔钱。
+    const isReplay = pending !== null;
+
+    // ① 日限:**只换话术,不动键**。
+    // 它的判据是 `err.message` 的子串匹配(`DAILY_LIMIT` / `DAILY_COUNT` / …),不看 kind
+    // 不看 status,而 api-client 对任何非 2xx 都把服务端 envelope 的 message 原样透传 ——
+    // 把「键的去留」交给一段**没有契约的、服务端可控的字符串**,等于把资金安全押在文案上。
+    // 键的去留一律走下面同一张表。(合并时我把这一档从旧机制的 clearSubmitIntent()
+    // 直译成了 forgetWithdrawAttempt(),同一个动作名在新旧两套架构下语义完全不同。)
     if (isDailyLimitRejection(err)) {
-      forgetWithdrawAttempt(snap.account);
-      toast.error(dailyLimitReachedText.value);
+      if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(snap.account);
+      toast.error(isReplay ? dailyLimitReachedWithPendingText.value : dailyLimitReachedText.value);
       return;
     }
-    // ② 409 = 服务端这个键已有记录 ⇒ 上一次确实落库了。键已用掉,退役;但绝不能说「再试一次」。
+    // ② 409 —— 唯一一个在重放路径上也成立的「定局」。键已用掉,退役;绝不说「再试一次」。
     if (isIdempotencyConflict(err)) {
       forgetWithdrawAttempt(snap.account);
       toast.error(t.value.walletV3.withdrawAlreadyOnFileTitle, t.value.walletV3.withdrawAlreadyOnFileBody);
       return;
     }
-    // ③ 服务端完整应答并拒绝 ⇒ 没建单、余额没动。键作废,下一笔重新铸。
+    // ③ 服务端完整应答并拒绝 —— **仅在首次提交时**才等于「没建单」。
+    //    重放时它只说明「这一次被拒」,与上一次落没落库无关,所以不退役。
     if (isSettledRejection(err)) {
-      forgetWithdrawAttempt(snap.account);
-      // 地区限制也是确定性拒单,而且它有专属话术 —— 与上面 eligibility 那条 catch 同口径,
-      // 别让它落进「费率已更新」这个回落文案里。
+      if (!isReplay) forgetWithdrawAttempt(snap.account);
       const geo = geoPolicyUserMessage(err, t.value.geoPolicy);
       if (geo) {
         toast.error(geo, t.value.geoPolicy.fundsSafeNote);
+        return;
+      }
+      if (isReplay) {
+        // 重放被拒:本次没过,但先前那笔的状态仍未知 —— 话术必须说清这两件事都成立。
+        toast.error(t.value.walletV3.withdrawResendDeclinedTitle, t.value.walletV3.withdrawResendDeclinedBody);
         return;
       }
       if (err instanceof ApiError && err.kind === "business") {
@@ -1312,14 +1330,14 @@ async function handleSubmit() {
         return;
       }
       // 走到这里才是「计价参数确实可能是被拒的原因」,此时刷费率才对症。
+      // 🔴 只在**非重放**分支刷:刷了 policyVersion 就变,重放的 body 跟着变,正好撞 409。
       await loadWithdrawalPolicy();
       toast.error(t.value.walletV3.withdrawDeclinedTitle, t.value.walletV3.withdrawDeclinedBody);
       return;
     }
-    // ④ 结果未知(超时 / 断网 / 5xx / 应答解析不了):请求**可能已经落库**。
-    // 键与 body 原样留着 —— 下次点提交按原样重放,服务端同 key 同 body 返回原结果。
-    // 🔴 这一支绝不能调 loadWithdrawalPolicy:刷了 policyVersion 就变,重放的 body 跟着变,
-    // 正好撞上「同 key + 异 body → 409 + 安全事件」。
+    // ④ 结果未知(超时 / 断网 / 5xx / 应答读不懂):请求**可能已经落库**。
+    // 键与 body 原样留着,下次点提交按原样重放,服务端同 key 同 body 返回原结果。
+    // 🔴 这一支绝不能调 loadWithdrawalPolicy(理由同上)。
     toast.error(t.value.walletV3.withdrawOutcomeUnknownTitle, t.value.walletV3.withdrawOutcomeUnknownBody);
     return;
   }
