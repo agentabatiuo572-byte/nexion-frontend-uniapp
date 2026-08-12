@@ -124,8 +124,10 @@ check("🔴 报价引擎吃 offsetWithNex 开关(删判断 = 恒烧,回到旧强
   /computeWithdrawFee\( amountNum\.value, nexBalance\.value, offsetWithNex\.value,/.test(flat),
   "feeCalc 不再传开关 —— NEX 会被无意图自动烧掉");
 // 2026-08-04:开关快照并入统一提交快照 snap(三条 P1 同族收口,见 selfcheck-withdraw-freeze)。
+// 2026-08-11 幂等 P0:抵扣意图多了一个来源 —— 未收口的上一次尝试(重放要发的是那一笔的
+// 开关状态,不是当前开关)。判据只放行这一个前缀,换任何别的来源照红。
 check("🔴 提交链传开关快照(offset 入 snap 且 snap.offset 进 submitWithdrawal —— server 意图字段)",
-  /const snap = \{[\s\S]{0,600}?offset: offsetWithNex\.value,/.test(code) &&
+  /const snap = \{[\s\S]{0,600}?offset: (pending\?\.offset \?\? )?offsetWithNex\.value,/.test(code) &&
   /app\.submitWithdrawal\([\s\S]{0,400}?snap\.offset,/.test(code));
 check("🔴 开关在提交期间冻结(toggleOffset 走 inputsLocked = submitting || confirmingSubmit)",
   /function toggleOffset\(\)[\s\S]{0,200}?if \(inputsLocked\.value\) return;/.test(code)

@@ -32,6 +32,7 @@ const REGISTRY = {
   "g-remote-authority-behavior.test.mjs": { how: "chain" },
   "remote-authority-simulation.test.mjs": { how: "chain" },
   "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
+  "withdraw-idempotency-contract.test.mjs": { how: "chain" },
   "remote-config-merge-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
   "country-code-selector-contract.test.mjs": { how: "chain" },
