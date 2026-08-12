@@ -38,7 +38,12 @@ const REGISTRY = {
   "earnings-accrual-contract.test.mjs": { how: "elsewhere", by: "npm run test:earnings-accrual(需 --experimental-strip-types)" },
   "janus-stop-cancellation.test.mjs": { how: "elsewhere", by: "npm run test:janus-stop-cancellation + verify.sh" },
   "a11y-activate-behavior.test.mjs": { how: "elsewhere", by: "npm run test:a11y-activate + verify.sh 的 a11y_activate_gate(import .ts 源,需 type stripping)" },
+  "learning-submission.test.mjs": { how: "elsewhere", by: "npm run test:learning-contracts(import .ts 源,需 type stripping)" },
   // ── excluded:写清原因 ──
+  "learning-api-contract.test.mjs": {
+    how: "excluded",
+    why: "断言的两条契约(奖励金额格式非法必须 fail-closed、幂等键在请求体之外)都成立且有价值,但跑不起来:它 import 的 src/api/learning-api.ts 内部用无扩展名相对 import(`./errors`),Node 原生 ESM 不认;而本仓 TS 4.9 不支持 allowImportingTsExtensions,加 .ts 扩展名会让 type-check 报错。原为 src/api/*.test.ts + vitest,而本仓未装 vitest —— 既没有 runner 跑过它,又让 type-check 常红,故迁到 scripts/ 并登记在案。要真正跑起来需先统一 src/api 内部 import 的扩展名(或引入能解析 TS 路径的 runner),属独立议题。",
+  },
   "h-remote-authority-contract.test.mjs": {
     how: "excluded",
     why: "断言读兄弟仓 ../nexion-backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境用 node --test 单跑;已记 HANDOFF。",

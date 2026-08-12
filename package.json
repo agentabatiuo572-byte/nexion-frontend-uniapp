@@ -45,7 +45,9 @@
     "test:guard-liveness": "node scripts/selfcheck-guard-liveness.mjs",
     "test:session-reload-recovery": "node --test scripts/server-session-reload-recovery-contract.test.mjs && node scripts/verify-h5-runtime.mjs --server-session-reload-recovery",
     "test:h5-runtime": "node scripts/verify-h5-runtime.mjs",
-    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness && npm run build:h5 && npm run test:h5-runtime"
+    "verify": "npm run type-check && npm run test:kyc-removal && npm run test:probe-safety && npm run test:earnings-accrual && npm run test:business-loop-liveness && npm run test:janus-stop-cancellation && npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness && npm run test:a11y-activate && npm run test:learning-contracts && npm run build:h5 && npm run test:h5-runtime",
+    "test:learning-contracts": "node --experimental-strip-types --test scripts/learning-submission.test.mjs",
+    "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-4080420251103001",
