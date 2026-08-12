@@ -170,6 +170,7 @@ const { useConfig, platformConfigApi, publicStatsHealth } =
 const delivered = await platformConfigApi.platformConfig();
 const store = useConfig();
 const beforeLoad = structuredClone(store.config);
+const syncFailedBeforeLoad = store.syncFailed;
 await store.load();
 
 /** 覆盖等式的判据本体:解析结果里属于 PlatformConfig 的字段,哪些没落进 store。 */
@@ -182,12 +183,14 @@ function unlandedFields(snapshot, config) {
       : JSON.stringify(config[k]) !== JSON.stringify(snapshot[k])));
 }
 
-test("远端快照落库前:H9 是 compat 的故意非法哨兵(证明后面的 all-true 是 load 造成的)", () => {
+test("远端快照落库前:H9 不得暴露可用的生产事实", () => {
   const health = publicStatsHealth(beforeLoad.publicStats);
-  // 逐位断言,不用 every —— 任何一位提前为 true 都会让「load 使之可用」的结论失真
-  for (const [dim, ok] of Object.entries(health)) {
-    assert.equal(ok, false, `load 前 ${dim} 就已经是 true,哨兵失效`);
-  }
+  assert.equal(syncFailedBeforeLoad, true, "load 前必须由 authority 同步失败态关闭所有远端事实消费");
+  assert.equal(health.devicesOk, false, "load 前设备事实不得可用");
+  // 真实系统允许 0 个用户，因此 rankOk 只负责字段域校验，不能把合法 0 当成
+  // “尚未加载”哨兵；消费面由上面的 syncFailed 权威门关闭。
+  assert.equal(beforeLoad.publicStats.fleetDevices, 0);
+  assert.equal(beforeLoad.publicStats.realUserCount, 0);
 });
 
 test("服务端 publicStats 有路径进 store(z1 P0-3 的直接回归门)", () => {
