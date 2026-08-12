@@ -255,7 +255,7 @@ flowchart LR
 | `fund_allocation` | lot_id, purchase/refund/dispute/withdrawal id, amount, allocation_type | 消费、冻结、退款按 lot 分摊 |
 | `beneficiary` | context_id, id, account_id, asset, chain, address, type, verification_method, verification_level, evidence_hash/uri, challenge_id, verified_at, expires_at, version, kyt_state, cooling_until, hosted_vasp/account_ref | 地址+网络+证据版本绑定；敏感字段加密；变化即旧审批失效 |
 | `withdrawal` | id, beneficiary_id, source_vnd_minor, payout_usdt_minor, fee_vnd_minor, quote_id, state, risk_decision_id | VND 源负债与 USDT 到账额并存；状态 CAS；唯一幂等键 |
-| `payout_attempt` | context_id, withdrawal_id, attempt_no, custody_request_object_pk, provider_tx_object_pk, tx_hash, transaction_digest, state, terminal_at | signing 与 broadcast 各有 domain operation/link/route；同时受全局与链级证据守卫 |
+| `payout_attempt` | context_id, withdrawal_id, attempt_no, custody_request_object_pk, provider_tx_object_pk, tx_hash, transaction_digest, state, terminal_at | signing 与 broadcast 各有 domain operation/link/route；同时受全局与链级证据守卫。`withdrawal_id` 保留：这是 DB 列名（snake 命名域），对外 API 字段名为 `withdrawalNo` |
 | `chain_invalidation_evidence` | payout_attempt_id, chain_id, raw_tx_hash, signer, nonce_or_reference, expiry_or_blockhash, replacement_tx_hash, finality_height, provider_attestation_uri, independent_chain_evidence_uri, state | 已签交易不能上链的强证明；仅查不到 tx 不算证明 |
 | `payout_terminal_evidence` | payout_attempt_id, evidence_type, payout_confirmation_ref, never_signed_attestation_ref, chain_invalidation_evidence_id, external_operation_closure_hash, verified_by, verified_at | `UNIQUE(payout_attempt_id)`；trigger 只凭三类强证明填写 terminal_at |
 | `refund` | context_id, id, original_intent_id, origin_route_decision_id, fund_lot_id, amount, asset, provider_refund_object_pk, state, version | follow-on 强制回原 route service_existing；每次 partial refund 有独立 key |
@@ -312,7 +312,7 @@ flowchart LR
 - partial unique index `(context_id,subject_type,subject_id) WHERE funds_case.closed_at IS NULL`；`case_type` 只可 CAS 演进，不得靠换类型另开 active case
 - `(request_id, actor_id)`；同一 human 即使兼具多角色也只计一票
 - `(environment, provider_account_id, operation_id)`；只负责单 provider API 幂等，不能代替跨 provider 的 `economic_operation` 守卫；跨恢复 epoch 仍永久
-- `UNIQUE(withdrawal_id) WHERE payout_attempt.terminal_at IS NULL`；只有 payout confirmed、never-signed attestation 或链级失效且外部副作用闭环的强证明可填写 terminal_at
+- `UNIQUE(withdrawal_id) WHERE payout_attempt.terminal_at IS NULL`（`withdrawal_id` 保留：SQL 约束引用 DB 列名，非 API 字段名 `withdrawalNo`）；只有 payout confirmed、never-signed attestation 或链级失效且外部副作用闭环的强证明可填写 terminal_at
 
 provider/account/contract/environment、binding/role、capability scope、mapping/provider、adapter/provider、certification exact tuple 与 route pinned tuple 全部使用候选复合键+复合 FK；不能只存看似匹配的独立 UUID。`provider_operation_attempt.attempt_id` 是 PK。`activate_provider_route(...)` 是唯一新单 route 激活入口：锁 `provider_route_scope_guard(environment,scope_key)`，逐项验证 binding/account/contract/provider/environment、capability role/scope、mapping/adapter provider、production certification tuple、endpoint/credential versions完全一致且 `expires_at>now()`，再原子切旧 route 与新 route、插入下一条 append-only `provider_route_epoch` 并更新 guard current pointer。既有 epoch/decision 永不更新。
 
@@ -983,7 +983,7 @@ VND 使用 `amountMinor` 整数且 `amount` 不带小数。创建入金意图时
 
 | 字段 | 类型 | 必填 | 默认 | 规则 |
 |---|---|---|---|---|
-| withdrawalId | string | 是 | — | server mint `WD-...` |
+| withdrawalNo | string | 是 | — | server mint `WD-...`；提现单主键**线上真名 = `withdrawalNo`，不是 `withdrawalId`**（权威契约 `FEAT-WD01-trust-payout-rails.md` §4.2 响应表）；DB 层列名 `withdrawal_id`（`payout_attempt` 表）是另一命名域，不随此名改 |
 | sourceAmountVndMinor | bigint/string | 是 | — | VND 整数源负债 |
 | payoutAmountUsdtMinor | bigint/string | 条件 | — | quote_ready 后生成的 USDT 6 位整数 |
 | sourceBucket | enum | 是 | earnings_withdrawable_vnd | 只允许 VND 可提现收益 |
@@ -1108,11 +1108,11 @@ rejected/cancelled/vnd_returned → funds_released
 |---|---|---|
 | 添加/更换钱包 | 受益人验证流程 | 重新认证+MFA+KYT+冷静期 |
 | 提现 | 确认页 | 展示不可逆、地址、网络、到账额、费用 |
-| 创建提现申请 | 当前页 | 原子冻结 VND 后返回 withdrawalId，进入审核 |
+| 创建提现申请 | 当前页 | 原子冻结 VND 后返回 withdrawalNo，进入审核 |
 | 接受报价并确认 | 当前页 | step-up MFA；quote 一次消费，进入 pre_execution_recheck |
 | 查看进度 | 提现详情 | 读取服务端状态与 txHash |
 | 取消 | 当前页 | 仅 `fx_submitted` 前显示；之后只能走可证明的取消/冲销流程 |
-| 申诉/未到账 | 工单 | 自动带 withdrawalId/custodyId/txHash |
+| 申诉/未到账 | 工单 | 自动带 withdrawalNo/custodyId/txHash |
 
 **⑦ 跨文档一致性**
 
@@ -1308,7 +1308,7 @@ rejected/cancelled/vnd_returned → funds_released
 
 - intent、withdrawal、refund、beneficiary 全做服务端对象级授权；
 - 密码、邮箱、手机号、MFA、KYC 身份或账户恢复发生变化时撤销旧会话、发送多渠道通知并启动提现冷静期；
-- 新增/重置 MFA 或账户恢复默认触发 24h 提现冷静期（可由风险签字延长，不可由客服缩短）；最终认证 challenge 一次性绑定 withdrawalId、quoteId、beneficiaryId+version、transactionDigest、金额和 expiry；
+- 新增/重置 MFA 或账户恢复默认触发 24h 提现冷静期（可由风险签字延长，不可由客服缩短）；最终认证 challenge 一次性绑定 withdrawalNo、quoteId、beneficiaryId+version、transactionDigest、金额和 expiry；
 - 受益人签名挑战由服务端生成随机 nonce，绑定域名、account、beneficiary、address、chain、purpose、issuedAt/expiry，一次消费并防跨站/跨账户重放；
 - 不能签名的钱包只能标记为“经增强认证接受的受益人”，不得伪称已证明私钥控制权，并应用更长冷静期/人工规则。
 
