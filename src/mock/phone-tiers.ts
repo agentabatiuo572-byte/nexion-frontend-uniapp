@@ -51,10 +51,10 @@ export function getPhoneTierYields(): PhoneTierYield[] {
   return PHONE_TIER_YIELDS;
 }
 
-/** Resolve a tier's yield, falling back to the highest configured tier (then a
- *  safe Tier-3 default) if the tier is out of range — never throws. */
+/** Resolve a tier's yield, falling back to the highest configured tier. An
+ * empty table is an authority-unavailable state and therefore yields zero. */
 export function phoneTierYield(tier: number): { baseRateUsdt: number; baseRateNex: number } {
   const cfg = getPhoneTierYields();
-  const hit = cfg.find((c) => c.tier === tier) ?? cfg[cfg.length - 1] ?? { baseRateUsdt: 0.06, baseRateNex: 10 };
+  const hit = cfg.find((c) => c.tier === tier) ?? cfg[cfg.length - 1] ?? { baseRateUsdt: 0, baseRateNex: 0 };
   return { baseRateUsdt: hit.baseRateUsdt, baseRateNex: hit.baseRateNex };
 }

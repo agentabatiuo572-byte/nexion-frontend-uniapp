@@ -44,7 +44,6 @@ import {
   remoteApiEnabled,
   sessionVault,
   taskAssignmentApi,
-  withdrawalApi,
 } from "@/api/runtime";
 import {
   sandboxEvidenceFromOverview,
@@ -55,10 +54,8 @@ import {
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments, TrustedTaskCompletionProof } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
-import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import {
   bindPendingFundsMutationOrder,
-  createProductionFundsRequestKey,
   finishPendingFundsMutationByOrder,
   fundsAmountFingerprint,
   pendingFundsMutationKey,
@@ -1683,9 +1680,17 @@ export const useApp = defineStore("app", () => {
     waivedGates: string[] = [],
   ): Promise<string | null> {
     const expectedAccountKey = accountKey.value;
+    // Production has no durable terminal-order readback contract in this App.
+    // An uncertain POST could already have reserved wallet funds; minting a new
+    // request key on retry would convert that uncertainty into a duplicate
+    // reserve. Keep real-provider withdrawals HOLD until that server contract
+    // exists. The isolated sandbox flow below retains its durable replay key.
+    if (!fundsSandboxEnabled) {
+      throw new Error("FUNDS_PRODUCTION_WITHDRAWAL_HOLD");
+    }
+    void offsetWithNex;
+    void policyVersion;
     // Durable pending mutation keys belong only to the isolated server sandbox.
-    // Production has no terminal order readback in this client, so persisting a
-    // production key would replay the first completed withdrawal forever.
     const mutation: FundsMutationIdentity | null = fundsSandboxEnabled ? {
       accountKey: expectedAccountKey,
       environment: "SANDBOX",
@@ -1696,11 +1701,9 @@ export const useApp = defineStore("app", () => {
         targetAddress: address.trim(),
       }),
     } : null;
-    const idempotencyKey = mutation
-      ? pendingFundsMutationKey(mutation)
-      : createProductionFundsRequestKey();
-    if (fundsSandboxEnabled) {
-      if (!mutation) throw new Error("FUNDS_SANDBOX_MUTATION_IDENTITY_MISSING");
+    if (!mutation) throw new Error("FUNDS_SANDBOX_MUTATION_IDENTITY_MISSING");
+    const idempotencyKey = pendingFundsMutationKey(mutation);
+    {
       // A sandbox withdrawal is only possible after the *same* authenticated
       // wallet read supplied an explicit isolated policy. Never borrow a
       // production D5/J1 rule, a local seed, or a stale wallet value here.
@@ -1745,22 +1748,6 @@ export const useApp = defineStore("app", () => {
       withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
       return canonical.id;
     }
-    // D5 real boundary: the backend re-prices the request under policyVersion and
-    // commits wallet reservation, optional NEX burn, order and ledgers atomically.
-    // The local store only mirrors the returned order for rendering; it never
-    // debits balances or chooses a fee bucket.
-    const submission = await withdrawalApi.submit(
-      amount,
-      network,
-      address,
-      policyVersion,
-      offsetWithNex,
-      idempotencyKey,
-    );
-    if (expectedAccountKey !== accountKey.value) throw new Error("REMOTE_ACCOUNT_CHANGED");
-    const canonical = toCanonicalWithdrawal(submission, address);
-    withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
-    return canonical.id;
   }
 
   /**

@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
+import { remoteApiEnabled } from "@/api/runtime";
 
 // Ported from Nexion-prototype/lib/store/auth.ts (zustand → Pinia).
 // Gates main-app access: new sign-ups must finish onboarding
@@ -58,6 +59,13 @@ export function hasPersistedServerAuthenticatedAccountTrace(): boolean {
 }
 
 function hydrate(): Persisted {
+  // A browser-owned auth record is only a non-secret routing hint in server
+  // mode. It cannot recreate an in-memory Bearer session after an H5 reload.
+  // Keep the hint readable through hasPersistedServerAuthenticatedAccountTrace,
+  // but start closed until password/2FA completes again.
+  if (remoteApiEnabled) {
+    return { isAuthenticated: false, email: "", accountId: "default", onboardingComplete: false };
+  }
   try {
     const s = uni.getStorageSync(STORAGE_KEY) as Persisted | "";
     if (s && typeof s === "object") {

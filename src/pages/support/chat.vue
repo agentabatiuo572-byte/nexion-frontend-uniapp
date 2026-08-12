@@ -102,6 +102,46 @@ const app = useApp();
 const cid = ref("");
 const isAi = ref(false);
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
+const HUMAN_THREAD_POLL_MS = 5_000;
+let humanThreadPoll: ReturnType<typeof setTimeout> | undefined;
+let humanThreadEpoch = 0;
+let humanThreadVisible = false;
+let humanThreadPollInFlight = false;
+
+function stopHumanThreadPolling() {
+  humanThreadVisible = false;
+  humanThreadEpoch += 1;
+  if (humanThreadPoll !== undefined) clearTimeout(humanThreadPoll);
+  humanThreadPoll = undefined;
+  humanThreadPollInFlight = false;
+}
+
+async function pollHumanThread() {
+  const pollEpoch = humanThreadEpoch;
+  const activeId = cid.value;
+  if (!humanThreadVisible || isAi.value || !activeId || humanThreadPollInFlight) return;
+  humanThreadPollInFlight = true;
+  try {
+    await convStore.open(activeId, () => humanThreadVisible && pollEpoch === humanThreadEpoch && activeId === cid.value);
+    if (!humanThreadVisible || pollEpoch !== humanThreadEpoch || activeId !== cid.value) return;
+  } catch {
+    // Preserve the last authoritative snapshot while a transient poll fails.
+  } finally { humanThreadPollInFlight = false; }
+}
+
+function startHumanThreadPolling(openEpoch: number) {
+  if (humanThreadPoll !== undefined) clearTimeout(humanThreadPoll);
+  humanThreadPoll = undefined;
+  if (humanThreadVisible && openEpoch === humanThreadEpoch && !isAi.value && cid.value) {
+    const schedule = () => {
+      humanThreadPoll = setTimeout(async () => {
+        await pollHumanThread();
+        if (humanThreadVisible && openEpoch === humanThreadEpoch) schedule();
+      }, HUMAN_THREAD_POLL_MS);
+    };
+    schedule();
+  }
+}
 
 // Bare full-screen page (no AppChassis), so it must reserve the device status-bar
 // space itself. Match the chassis source (real device height, else the H5
@@ -147,14 +187,20 @@ onShow(async () => {
   revealTick.value += 1;
   if (isAi.value) nova.open(); // mark Nova as being viewed → clears + tracks unread
   else if (cid.value) {
-    try { await convStore.open(cid.value); } catch {
+    humanThreadVisible = true;
+    const openEpoch = humanThreadEpoch;
+    const openId = cid.value;
+    try { await convStore.open(cid.value, () => humanThreadVisible && openEpoch === humanThreadEpoch && openId === cid.value); } catch {
+      if (!humanThreadVisible || openEpoch !== humanThreadEpoch) return;
       navBack("/pages/support/messages");
       return;
     }
+    if (humanThreadVisible && openEpoch === humanThreadEpoch && openId === cid.value) startHumanThreadPolling(openEpoch);
   }
 });
 onHide(() => {
   if (isAi.value) nova.close(); // no longer viewing Nova → later pushes accrue unread
+  stopHumanThreadPolling();
 });
 
 const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4" /><path d="M6 21a6 6 0 0 1 12 0" /></svg>`;
@@ -281,6 +327,7 @@ function schedule(fn: () => void, ms: number) {
   pendingTimers.push(setTimeout(fn, ms));
 }
 function cleanup() {
+  stopHumanThreadPolling();
   pendingTimers.forEach(clearTimeout);
   pendingTimers.length = 0;
   // Cancelled timers would otherwise leave a ghost "typing…" flag on the store

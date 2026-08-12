@@ -22,7 +22,7 @@
       class="relative flex items-center"
       :style="sandboxBannerStyle"
     >
-      <text>{{ t.team.sandboxBanner }}</text>
+      <text>{{ t.team.sandboxBanner }} · RunID {{ sandboxRunId }}</text>
     </view>
 
     <!-- Top label row -->
@@ -131,6 +131,7 @@ const isAuthoritativeSandbox = computed(() =>
   rewards.snapshot?.source === "mock"
   && rewards.snapshot?.sourceEnvironment === "SANDBOX",
 );
+const sandboxRunId = computed(() => rewards.snapshot?.runId ?? "—");
 
 interface TickerItem {
   name: string;

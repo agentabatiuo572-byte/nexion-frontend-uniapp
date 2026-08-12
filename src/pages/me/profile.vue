@@ -24,7 +24,15 @@
             <view class="grid place-items-center" :style="avatarStyle">
               <text :style="avatarTextStyle">{{ initial }}</text>
             </view>
-            <view class="grid place-items-center active:opacity-80" :style="regenBtnStyle" @click="handleRegen">
+            <view
+              class="grid place-items-center"
+              :class="remoteProfileReadOnly ? '' : 'active:opacity-80'"
+              :style="{ ...regenBtnStyle, opacity: remoteProfileReadOnly ? 0.45 : 1 }"
+              role="button"
+              tabindex="0"
+              :aria-disabled="remoteProfileReadOnly ? 'true' : 'false'"
+              @click="handleRegen"
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M3 21v-5h5" /></svg>
             </view>
           </view>
@@ -47,11 +55,21 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
             <text :style="fieldLabelStyle">{{ t.profile.displayName }}</text>
           </view>
-          <view class="flex items-center active:opacity-80" :style="nameRowStyle" role="button" tabindex="0" :aria-label="t.profile.nicknameChange" @click="nicknameSheetOpen = true">
+          <view
+            class="flex items-center"
+            :class="remoteProfileReadOnly ? '' : 'active:opacity-80'"
+            :style="{ ...nameRowStyle, opacity: remoteProfileReadOnly ? 0.58 : 1 }"
+            role="button"
+            tabindex="0"
+            :aria-disabled="remoteProfileReadOnly ? 'true' : 'false'"
+            :aria-label="t.profile.nicknameChange"
+            @click="openNicknameSheet"
+          >
             <text class="flex-1 truncate" :style="nameValueStyle">{{ name }}</text>
             <text class="shrink-0" :style="nameChangeStyle">{{ t.profile.nicknameChange }}</text>
           </view>
           <text class="block" :style="fieldHintStyle">{{ t.profile.displayNameHint }}</text>
+          <text v-if="remoteProfileReadOnly" class="block" :style="readOnlyHoldStyle" data-proof="remote-profile-readonly-hold">{{ t.profile.serverReadOnlyHold }}</text>
         </view>
 
       </view>
@@ -129,6 +147,7 @@ const name = ref(profile.displayName);
 const saveFeedback = ref("");
 const isSaving = ref(false);
 const nicknameSheetOpen = ref(false);
+const remoteProfileReadOnly = computed(() => remoteApiEnabled);
 
 const displayName = computed(() => profile.displayName);
 // A remote session's user-id key is internal routing state, never profile copy.
@@ -163,15 +182,25 @@ const joinedDate = computed(() =>
   }),
 );
 
-const dirty = computed(() => name.value !== profile.displayName);
+const dirty = computed(() => !remoteProfileReadOnly.value && name.value !== profile.displayName);
+
+function openNicknameSheet() {
+  if (remoteProfileReadOnly.value) return;
+  nicknameSheetOpen.value = true;
+}
 
 function onNicknamePick(v: string) {
+  if (remoteProfileReadOnly.value) return;
   name.value = v;
   nicknameSheetOpen.value = false;
 }
 
 function handleSave() {
   if (isSaving.value) return;
+  if (remoteApiEnabled) {
+    toast.info(t.value.profile.serverReadOnlyHold);
+    return;
+  }
   if (!dirty.value) {
     saveFeedback.value = t.value.profile.noChangesToast;
     toast.info(t.value.profile.noChangesToast);
@@ -187,7 +216,11 @@ function handleSave() {
 }
 
 function handleRegen() {
-  profile.regenerateAvatar();
+  if (remoteApiEnabled) {
+    toast.info(t.value.profile.serverReadOnlyHold);
+    return;
+  }
+  if (!profile.regenerateAvatar()) return;
   toast.info(t.value.profile.avatar, t.value.profile.avatarHint);
 }
 
@@ -292,6 +325,13 @@ const fieldHintStyle: CSSProperties = {
   fontFamily: "var(--font-v5)",
   fontSize: "12px",
   color: "var(--v5-ink-4)",
+};
+const readOnlyHoldStyle: CSSProperties = {
+  marginTop: "6px",
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "var(--v5-warning)",
 };
 // De-carded tier: section-label header (title + tier badge) then the bar +
 // progress line on the floor.

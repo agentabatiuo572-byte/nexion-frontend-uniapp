@@ -14,3 +14,9 @@ test("H5 proxy preserves the /api prefix for backend-native app configuration ro
   assert.match(viteConfig, /"\/api"\s*:\s*\{[\s\S]*?target:\s*apiPreviewTarget/);
   assert.doesNotMatch(viteConfig, /"\/api"\s*:\s*\{[\s\S]*?rewrite:/);
 });
+
+test("local acceptance proxy supplies the server-owned geo edge country", () => {
+  assert.match(viteConfig, /VITE_NEXGRID_API_PREVIEW_EDGE_COUNTRY/);
+  assert.match(viteConfig, /"X-Nexion-Edge-Country"\s*:\s*apiPreviewEdgeCountry/);
+  assert.match(viteConfig, /headers:\s*apiPreviewHeaders/);
+});

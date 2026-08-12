@@ -1,5 +1,6 @@
 import { reactive } from "vue";
 import { productCatalogApi, remoteApiEnabled } from "@/api/runtime";
+import { setCurrentCommerceSandboxRun } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
 
 export type ProductCatalogStatus = "mock" | "loading" | "ready" | "error";
@@ -25,6 +26,7 @@ export function prepareProductCatalog(): void {
   productCatalogState.error = "";
   productCatalogState.source = "";
   productCatalogState.revision = null;
+  setCurrentCommerceSandboxRun(null);
 }
 
 export function refreshProductCatalog(force = false): Promise<boolean> {
@@ -40,6 +42,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.status = "ready";
       productCatalogState.source = snapshot.source;
       productCatalogState.revision = snapshot.revision;
+      setCurrentCommerceSandboxRun(snapshot.sourceEnvironment === "SANDBOX" ? snapshot.runId ?? null : null);
       return true;
     })
     .catch((error: unknown) => {
@@ -48,6 +51,7 @@ export function refreshProductCatalog(force = false): Promise<boolean> {
       productCatalogState.error = error instanceof Error ? error.message : "PRODUCT_CATALOG_UNAVAILABLE";
       productCatalogState.source = "";
       productCatalogState.revision = null;
+      setCurrentCommerceSandboxRun(null);
       return false;
     })
     .finally(() => {

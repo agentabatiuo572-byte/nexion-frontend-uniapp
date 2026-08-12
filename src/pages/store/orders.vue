@@ -94,6 +94,15 @@ function badge(status: OrderStatus): Badge {
       return { label: t.value.orders.statusActivated, color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M12 20v2", "M12 2v2", "M17 20v2", "M17 2v2", "M2 12h2", "M2 17h2", "M2 7h2", "M20 12h2", "M20 17h2", "M20 7h2", "M7 20v2", "M7 2v2", "M4 8h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2z", "M8 12h8"] };
     case "cancelled":
       return { label: t.value.orders.cancelStatus, color: "var(--v5-brand-2)", bg: "color-mix(in srgb, var(--v5-brand-2) 15%, transparent)", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
+    case "payment_failed":
+    case "provisioning_failed":
+      return { label: "处理失败", color: "var(--v5-danger)", bg: "color-mix(in srgb, var(--v5-danger) 15%, transparent)", icon: ["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z", "m15 9-6 6", "m9 9 6 6"] };
+    case "expired":
+      return { label: "支付已过期", color: "var(--v5-warning)", bg: "color-mix(in srgb, var(--v5-warning) 15%, transparent)", icon: ["M12 6v6l4 2", "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"] };
+    case "refunded":
+      return { label: "已退款", color: "var(--v5-brand)", bg: "color-mix(in srgb, var(--v5-brand) 15%, transparent)", icon: ["M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"] };
+    case "chargeback":
+      return { label: "付款争议", color: "var(--v5-danger)", bg: "color-mix(in srgb, var(--v5-danger) 15%, transparent)", icon: ["M12 2v12m0 4v4m-7-5 3 3m11-3-3 3"] };
   }
 }
 

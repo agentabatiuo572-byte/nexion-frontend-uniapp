@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { repurchaseApi } from "@/api/runtime";
+import { remoteApiEnabled, repurchaseApi } from "@/api/runtime";
 import type {
   RepurchaseConfig,
   RepurchaseOrder,
@@ -41,6 +41,16 @@ export const useRepurchase = defineStore("repurchase", () => {
   }
 
   async function refresh() {
+    // There is intentionally no browser-owned repurchase rail. If this store
+    // is reached outside server mode, leave its empty state in place instead
+    // of manufacturing a product, wallet balance, or order list.
+    if (!remoteApiEnabled) {
+      config.value = null;
+      orders.value = [];
+      walletBalanceUsdt.value = 0;
+      serverTime.value = 0;
+      return null;
+    }
     const account = accountGeneration;
     const refreshRequest = ++refreshGeneration;
     const configRequest = ++configGeneration;
@@ -126,6 +136,7 @@ export const useRepurchase = defineStore("repurchase", () => {
   }
 
   async function open(amountUsdt: number) {
+    if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
     const policy = config.value;
     if (!policy || !policy.enabled) throw new Error("REPURCHASE_PRODUCT_UNAVAILABLE");
     if (!Number.isFinite(amountUsdt) || amountUsdt < policy.minAmountUsdt) {
@@ -137,11 +148,13 @@ export const useRepurchase = defineStore("repurchase", () => {
   }
 
   async function claim(orderNo: string) {
+    if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
     return command(`claim:${orderNo}`, (idempotencyKey) =>
       repurchaseApi.claim(orderNo, idempotencyKey));
   }
 
   async function earlyWithdraw(orderNo: string) {
+    if (!remoteApiEnabled) throw new Error("REPURCHASE_REMOTE_AUTHORITY_REQUIRED");
     return command(`early:${orderNo}`, (idempotencyKey) =>
       repurchaseApi.earlyWithdraw(orderNo, idempotencyKey));
   }
@@ -160,6 +173,7 @@ export const useRepurchase = defineStore("repurchase", () => {
     loading.value = false;
     submitting.value = false;
     pendingKeys.clear();
+    if (remoteApiEnabled) void refresh().catch(() => undefined);
   }
 
   return {

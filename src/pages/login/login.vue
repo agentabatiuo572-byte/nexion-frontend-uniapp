@@ -139,7 +139,7 @@ import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
-import { authApi } from "@/api/runtime";
+import { authApi, remoteApiEnabled } from "@/api/runtime";
 import { ApiError } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
 
@@ -159,6 +159,18 @@ interface OtpFlowContext {
   phone: string;
   scene: OtpScene;
   requestId: string;
+}
+
+interface PasswordAttemptContext {
+  version: number;
+  phone: string;
+  password: string;
+}
+
+interface RemoteTwoFactorAttemptContext {
+  version: number;
+  phone: string;
+  challengeNo: string;
 }
 
 const mode = ref<LoginMode>("password");
@@ -292,6 +304,24 @@ function isCurrentOtpFlow(context: OtpFlowContext): boolean {
   );
 }
 
+function isCurrentPasswordAttempt(context: PasswordAttemptContext): boolean {
+  return mounted
+    && context.version === otpFlowVersion
+    && mode.value === "password"
+    && step.value === 1
+    && fullPhone.value === context.phone
+    && password.value === context.password;
+}
+
+function isCurrentRemoteTwoFactorAttempt(context: RemoteTwoFactorAttemptContext): boolean {
+  return mounted
+    && context.version === otpFlowVersion
+    && mode.value === "password"
+    && step.value === 2
+    && fullPhone.value === context.phone
+    && remoteTwoFactorChallenge.value === context.challengeNo;
+}
+
 // A region-policy refusal arrives as a code on the same result objects as every
 // other sign-in failure. Translate it first; `null` means it wasn't one, and the
 // caller must fall through to its existing mapping — otherwise an unrelated
@@ -304,7 +334,7 @@ function geoText(code: unknown): string | null {
 // snapshot, claims this carrier's session, and routes a changed physical device
 // through recalibration before the main app.
 function finishSignIn(
-  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession },
+  session: { accountId: string; signInIdempotencyKey?: string; onboardingComplete: boolean; serverProfile?: UserSession; serverSessionRevision?: number },
   context: OtpFlowContext | null = null,
 ) {
   signInTimer = undefined;
@@ -316,6 +346,7 @@ function finishSignIn(
     idempotencyKey: session.signInIdempotencyKey,
     onboardingComplete: session.onboardingComplete,
     serverProfile: session.serverProfile,
+    serverSessionRevision: session.serverSessionRevision,
   });
   if (!result.ok) {
     loading.value = false;
@@ -355,6 +386,13 @@ function startResend(sec: number) {
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
+  // The local OTP state machine is a mock-server implementation.  Remote mode
+  // has no passwordless/reset OTP contract, so never let it mint a browser
+  // verification token or establish a local identity in its place.
+  if (remoteApiEnabled) {
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
+  }
   const phoneAtRequest = fullPhone.value;
   const sceneAtRequest = otpScene.value;
   const stepAtRequest = step.value;
@@ -412,10 +450,18 @@ async function signInWithPassword() {
   if (!phoneOk.value || !pwdOk.value) { error.value = t.value.login.errorInvalidPassword; return; }
   const phoneAtSignIn = fullPhone.value;
   const flowVersion = ++otpFlowVersion;
+  const passwordAttempt: PasswordAttemptContext = {
+    version: flowVersion,
+    phone: phoneAtSignIn,
+    password: password.value,
+  };
   loading.value = true;
   try {
     const result = await authApi.login({ countryCode: country.value, phone: phoneClean.value, password: password.value });
-    if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtSignIn || step.value !== 1 || mode.value !== "password") return;
+    if (!isCurrentPasswordAttempt(passwordAttempt)) {
+      if (result.kind === "authenticated") authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
     if (result.kind === "challenge") {
       remoteTwoFactorChallenge.value = result.challengeNo;
       code.value = ["", "", "", "", "", ""];
@@ -424,9 +470,9 @@ async function signInWithPassword() {
       step.value = 2;
       return;
     }
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user });
+    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
-    if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtSignIn) return;
+    if (!isCurrentPasswordAttempt(passwordAttempt)) return;
     loading.value = false;
     error.value = remoteLoginError(loginError);
   }
@@ -435,6 +481,11 @@ async function signInWithPassword() {
 async function verifyRemoteTwoFactor() {
   const challengeNo = remoteTwoFactorChallenge.value;
   if (!challengeNo) return;
+  const twoFactorAttempt: RemoteTwoFactorAttemptContext = {
+    version: otpFlowVersion,
+    phone: fullPhone.value,
+    challengeNo,
+  };
   loading.value = true;
   try {
     const result = await authApi.completeTwoFactor({
@@ -445,8 +496,13 @@ async function verifyRemoteTwoFactor() {
       code: code.value.join(""),
     });
     if (result.kind !== "authenticated") throw new Error("TWO_FACTOR_SESSION_MISSING");
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user });
+    if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) {
+      authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
+    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
+    if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) return;
     loading.value = false;
     error.value = remoteLoginError(loginError);
   }
@@ -456,6 +512,10 @@ async function verifyCode() {
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
   if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
+  if (remoteApiEnabled) {
+    error.value = t.value.authOtp.errorServiceUnavailable;
+    return;
+  }
   const requestId = otpRequestId.value;
   if (!requestId) { loading.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
   const context: OtpFlowContext = {
