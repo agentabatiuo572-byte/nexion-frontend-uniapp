@@ -96,6 +96,7 @@ export const defineStore = (id, setup) => () => {
 const bundle = await build({
   stdin: {
     contents: `export { useApp } from "@/store/app";
+export { useBills } from "@/store/bills";
 export { countWithdrawalsOnPlatformDay } from "@/store/withdrawal-eligibility-core";`,
     resolveDir: root,
     loader: "ts",
@@ -113,10 +114,11 @@ export { countWithdrawalsOnPlatformDay } from "@/store/withdrawal-eligibility-co
     },
   }],
 });
-const { useApp, countWithdrawalsOnPlatformDay } =
+const { useApp, useBills, countWithdrawalsOnPlatformDay } =
   await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 const app = useApp();
+const bills = useBills();
 const ACCT = "failpath@nexgrid.test";
 const FEE = { networkConfirmUsd: 1, nexBurned: 0, actualFeeUsd: 1 };
 const submit = () => app.submitWithdrawal(50, "USDT-TRC20", "TXfailpath0000000000000000000000001", FEE, false, "failpath", `idem-${serverSeq + 1}`);
@@ -138,8 +140,15 @@ const refresh = () => { app.bindAccount(ACCT); };
 // ── ① 正常路径:建单后内存与磁盘都要有 ────────────────────────────
 {
   reset();
-  const id = await submit();
-  check("① 建单成功返回单号", typeof id === "string" && id.startsWith("WD-FAILPATH-"), String(id));
+  const wd = await submit();
+  // 🔴 返回的是**整张单**不是单号(z4 2026-08-11):调用方要按服务端回执记账 ——
+  // 提现页写账单行时的金额与实烧 NEX 都取自这里,回单号就只能拿本地报价编数。
+  // 顺带把 fee 一起 pin:少了它调用方拿不到实烧 NEX,账单行会退回本地报价。
+  const id = wd?.id;
+  check("① 建单成功返回整张单(单号 + 服务端费用回执)",
+    typeof id === "string" && id.startsWith("WD-FAILPATH-") && typeof wd?.fee?.actualFeeUsd === "number"
+      && typeof wd?.fee?.nexBurned === "number",
+    JSON.stringify(wd));
   check("① 建单后单据在内存里", app.withdrawals.some((w) => w.id === id));
   check("🔴 ① 建单后单据**落到磁盘**(此前只改内存,刷新即丢 —— 本包修的原始缺陷)",
     (diskWithdrawals() ?? []).some((w) => w.id === id),
@@ -149,7 +158,7 @@ const refresh = () => { app.bindAccount(ACCT); };
 // ── ② 刷新回归门:今日笔数必须跨刷新存活 ──────────────────────────
 {
   reset();
-  const id = await submit();
+  const id = (await submit())?.id;
   refresh();
   check("🔴 ② 刷新后单据还在(冷启动从磁盘水合)", app.withdrawals.some((w) => w.id === id),
     JSON.stringify(app.withdrawals.map((w) => w.id)));
@@ -164,7 +173,7 @@ const refresh = () => { app.bindAccount(ACCT); };
   await submit();                       // 先落一单成功,制造「磁盘上已有旧行」的前提
   const firstDisk = (diskWithdrawals() ?? []).length;
   failKey = (key) => key === CLOUD_KEY; // 从这一刻起账号快照写不进去
-  const id2 = await submit();
+  const id2 = (await submit())?.id;
   check("🔴🔴 ③ 落盘失败时,刚建的单**仍在内存**(不是被磁盘旧值 adopt 回去而静默丢单)",
     app.withdrawals.some((w) => w.id === id2),
     `内存: ${JSON.stringify(app.withdrawals.map((w) => w.id))}`);
@@ -185,7 +194,7 @@ const refresh = () => { app.bindAccount(ACCT); };
   reset();
   await submit();                        // 磁盘上先有一行
   failKey = (key) => key === CLOUD_KEY;  // 从此写不进去
-  const id2 = await submit();            // 落盘失败 → 放回内存
+  const id2 = (await submit())?.id;            // 落盘失败 → 放回内存
   const inMemAfterPutBack = app.withdrawals.some((w) => w.id === id2);
   // 兄弟资金原语:同样写不进去 → 它会走自己的失败回滚
   const credited = app.creditBalance(1);
@@ -196,16 +205,31 @@ const refresh = () => { app.bindAccount(ACCT); };
 }
 
 // ── ④ 诚实边界:落盘失败 + 刷新 = 这一单会丢。写下来,免得被当成已覆盖 ──
+//
+// 🔴 这句「不是错乱」的前提在 z4 变了(R2 completeness critic 点名):
+// 它成立于「当时**根本没有账单行**」——单据丢了,账上也没有对应的东西,两边都空,自洽。
+// z4 之后提现会写两条持久化的账单分录,于是同一场景可能变成:**账单在、单据没了** ——
+// 账单页两条「提现 · 处理中」永久挂着,点进去追踪页说「查无此单」,钱包页说没有在途提现。
+// 那是错乱,不是降级。所以这一格的断言必须**跨两张表**判,不能只看单据表。
+// 本门跑在 store 层、看不到页面写的账单行,故用 bills store 直接补一条同 ref 的行来代表它。
 {
   reset();
   await submit();
   failKey = (key) => key === CLOUD_KEY;
-  const id2 = await submit();
+  const id2 = (await submit())?.id;
   failKey = null;
+  // 模拟页面已经把这一单的账单行写下去了(z4 起这是真实行为)
+  bills.bindAccount(ACCT);
+  bills.add({ type: "withdraw", symbol: "USDT", amount: -50, status: "pending", memo: "x", ref: id2 });
   refresh();
-  check("④ [已知代价] 落盘失败后再刷新,那一单确实丢失 —— 降级到「磁盘没有」,不是错乱",
-    !app.withdrawals.some((w) => w.id === id2) && app.withdrawals.length === 1,
+  const orphanBill = bills.bills.some((b) => b.ref === id2 && b.type === "withdraw");
+  const orderGone = !app.withdrawals.some((w) => w.id === id2);
+  check("④ [已知代价] 落盘失败后再刷新,那一单确实丢失 —— 降级到「磁盘没有」",
+    orderGone && app.withdrawals.length === 1,
     JSON.stringify(app.withdrawals.map((w) => w.id)));
+  check("④b 🔴 诚实交底:此时账单行**仍在**,两张表对不上(账单在、单据没了)—— 这是本门已知的、尚未收口的错乱面",
+    orderGone && orphanBill,
+    `单据没了=${orderGone} 账单行还在=${orphanBill}`);
 }
 
 // ── ⑤ 🔴🔴 歧义结局判定:拿**真的 ApiError** 逐格验 ────────────────

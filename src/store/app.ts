@@ -932,9 +932,16 @@ export const useApp = defineStore("app", () => {
    * 两个缺口分开看都像「反正 mock 里走不到」,合起来就是「钱扣了、单子废了、没人还」。
    * 退款与置账单失败必须在**同一处**完成,否则接后端时必然只做一半(审计明确点名)。
    *
-   * 🔴 退的是两种币(2026-08-03 资金 P1):USDT 本金之外,用户勾选 NEX 抵扣时页面在提交前
-   * 已 debitNex 真扣了 NEX —— 单据废了 = 网络费从没真付过,只退 USDT 不退 NEX 就是白烧。
-   * 幂等键**必须拆两个**(USDT 用 refund:、NEX 用 refund-nex:):复用单键会让
+   * 🔴 退的是两种币(2026-08-03 资金 P1):USDT 本金之外,NEX 抵扣费也要退 ——
+   * 单据废了 = 网络费从没真付过,只退 USDT 不退 NEX 就是白烧。
+   * ⚠️ 两条腿此刻**不对称**,别照着 USDT 那条读 NEX 这条(2026-08-11 z5 回源核对):
+   *   · USDT 退的是**本客户端自己扣过**的那一笔(applyWithdrawalDebit ⇄ refundWithdrawalDebit,
+   *     判据是扣款幂等标记,自洽闭环);
+   *   · NEX 是**服务端烧**的,客户端从没 debitNex 过(全仓零调用点 —— 这行上一版写的
+   *     「页面在提交前已 debitNex 真扣了 NEX」是 2026-08-10 remote 对齐前的旧事实,已失效)。
+   *     于是这条腿仍走 creditRewardBucketOnce,在 remote 模式下恒 no-op;要接的是
+   *     「失败提现退还已烧 NEX」那条服务端契约(App.vue ②b 头注),独立成卡,本包不动。
+   * 幂等键**必须拆两个**(USDT 用 wd-refund:、NEX 用 refund-nex:):复用单键会让
    * 「USDT 退过 → NEX 因同键判已处理 → 永久跳过」。历史单 fee 是纯数字
    * (account-cloud 读盘会归一出 nexBurned:0,但内存态不保证都走过归一),
    * 故可选链取值且 >0 才退 —— undefined/0 = 本来无需退,绝不能被当成「退款失败」。
@@ -948,11 +955,7 @@ export const useApp = defineStore("app", () => {
     for (const wd of withdrawals.value) {
       if (!FAILED.includes(wd.status)) continue;
       if (!(wd.amount > 0)) continue;
-      // 🔴 复用 creditRewardBucketOnce,不要自己拼 user.value 的绝对值:
-      // account-cloud 把余额当**增量计数器**做三方合并,直接写绝对值会被合并算回去
-      // (实测:可提桶加上了、总余额纹丝不动 —— 一半生效比不生效更难查)。
-      // 这个 action 同时加总余额与可提桶,且自带 appliedRewardKeys 幂等,正是退款要的语义。
-      if (creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)) done.push(wd.id);
+      if (refundWithdrawalDebit(wd)) done.push(wd.id);
       // NEX 抵扣费退还:独立幂等键;usdt 参数位传 0、NEX 走第 4 参(方向搞反 = 把 NEX
       // 个数当美元退)。与 USDT 行互不阻塞:任一落盘失败,各自幂等键在下次调用重放补齐。
       const burnedNex = wd.fee?.nexBurned;
@@ -961,6 +964,149 @@ export const useApp = defineStore("app", () => {
       }
     }
     return done;
+  }
+
+  /**
+   * 提现落定 → 扣款。与账单主行(`-wd.amount`)是同一笔事实的两个面。
+   *
+   * 🔴 为什么是「本地扣减」而不是「回拉服务端余额」(2026-08-11 z5 回源结论):
+   * `usdtBalance` 在本仓**没有服务端源**可拉 —— account-api 没有余额端点,全仓唯一的
+   * 余额类端点 `GET /api/earnings/release-status` 只回**锁定桶**(pending_review / bonus_locked);
+   * 而提现页的可提额度反过来是 `usdtBalance − 这两个桶`(wallet-withdraw.vue maxWithdrawable),
+   * 锚仍是本地这个数。所以「提交成功后回拉服务端余额」在本仓是空转:没有可拉的数,
+   * 拉回来两个显示值一分不动,缺陷原样还在。余额的唯一持有者就是本 store ——
+   * 购买 / 组合 / 质押 / 兑换 / 复投全部在此本地扣款,提现是 2026-08-10 remote 对齐后
+   * **唯一漏掉资金面的那条**:单据搬去了服务端,钱没跟着走。
+   * PRD §9.3 同口径:「当日笔数门…即不建单不扣款」(建单⇔扣款)、「提交为原子操作」。
+   *
+   * 🔴 全有或全无,余额不够整笔不扣并报假,**绝不夹到 0**:夹了的话实扣 < `wd.amount`,
+   * 而退款按 `wd.amount` 退,差额就是凭空造出来的钱。报假由调用方交底,不静默。
+   *
+   * 🔴 金额取服务端回执的**全额** `wd.amount`(手续费含在其中),与账单主行同一个数、
+   * 同一个源(PRD:全额出金,费用为其中差额);不取本地报价 snap.*。
+   *
+   * 🔴 扣款与幂等标记**一次赋值、一次落盘**:分两次写会留下「钱扣了、标记没落盘」的中间态,
+   * 而退款正是按这个标记判「这笔到底扣没扣过」—— 判错就是退一笔从没扣过的钱。
+   *
+   * NEX 抵扣费**不在这里扣**:它是服务端烧的,而「失败提现退还已烧 NEX」至今没有服务端契约,
+   * 客户端单方面扣掉就造出一条只烧不退的路。那一项独立成卡(见 refundFailedWithdrawals 头注)。
+   *
+   * PRODUCTION:整个函数消失 —— 扣款由 `POST /api/withdrawals` 同事务完成,client 只读回执。
+   */
+  function applyWithdrawalDebit(wd: Withdrawal): boolean {
+    const amount = wd.amount;
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    const key = "wd-debit:" + wd.id;
+    // 🔴🔴 写前**复读磁盘**,与同文件 creditRewardBucketInternal 逐字同形(见其 readAccountSnapshot 段)。
+    // 只查内存是不够的,而且是我这版最初的错:内存里的 `appliedRewardKeys` 与 `usdtBalance`
+    // **必然陈旧** —— 全仓没有任何跨标签页 storage 监听(App.vue 只监听 session 键),
+    // 而 `usdtBalance` 在 account-cloud 的 ADDITIVE_NUMBER_KEYS 里按**增量累加**合并:
+    // 内存判重挡不住另一个标签页再加一笔 delta,两笔都会落到余额上。
+    // z5 三份独立审计各自实跑复现:重复退款 40→100→160、超卖被夹 100→40→0。
+    const stored = readAccountSnapshot(accountKey.value);
+    // 已扣过:重放(自愈补写 / 用户回退再进)不再动钱,如实回真 —— 调用方要的是
+    // 「这笔的扣款到位了没有」,不是「本次有没有写」。盘上有键就以盘为准并把内存拉齐。
+    if (stored?.user.appliedRewardKeys?.[key]) {
+      adoptAccountSnapshot(stored);
+      return true;
+    }
+    const currentUser = withDefaultEarningBuckets(user.value);
+    if (currentUser.appliedRewardKeys?.[key]) return true;
+    // 🔴 余额闸取**内存与磁盘的较小者**。只看内存会放行「另一标签页已经花掉这笔钱」的扣款,
+    // 合并后余额为负、被 clampAccountFundInvariants 静默夹到 0 —— 实扣 < amount,
+    // 而退款按 amount 全额退,差额就是凭空造出来的钱(红队实测:$100 余额买 $100 商品 + 提 $100,
+    // 失败退款后净得 $100 商品 + $100 余额)。取较小者后这条路被堵在扣款之前。
+    // 诚实边界:localStorage 没有锁,「读」与「写」终究两步,亚毫秒级双写窗口仍在 ——
+    // 那是本仓全部资金原语的同族既有暴露(debitBalance 同形),不是本函数独有,已登记成卡。
+    // 判据是**磁盘值**,不是 min(内存, 磁盘)。合并层的真值是 `disk + (next − base)`,
+    // 而 base ≡ 上次落盘时的内存态,所以本次扣款落盘后余额 = `disk − amount` —— 判 disk 才对。
+    // 上一版写 min() 是错的(独立复核实测):disk 比内存**多**时(另一标签页刚退款 / 刚入金,
+    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,而扣款**没有自愈** = 余额永久虚高,
+    // 正好退回本包要修的那个原状态。取不到盘(storage 不可用)才回落内存。
+    const authoritativeBalance = typeof stored?.user?.usdtBalance === "number"
+      ? stored.user.usdtBalance
+      : currentUser.usdtBalance;
+    if (authoritativeBalance < amount) return false;
+    const previousSnapshot = lastCloudSnapshot;
+    const nextUsdt = +(currentUser.usdtBalance - amount).toFixed(2);
+    const buckets = currentUser.earningBuckets;
+    user.value = {
+      ...currentUser,
+      usdtBalance: nextUsdt,
+      // 与 debitBalance 同一条不变量:withdrawableUsdt ≤ usdtBalance(先吃不可提部分)。
+      earningBuckets: { ...buckets, withdrawableUsdt: Math.min(buckets.withdrawableUsdt, nextUsdt) },
+      appliedRewardKeys: { ...currentUser.appliedRewardKeys, [key]: true },
+    };
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    // 🔴🔴 **刻意不进 moneyApplied**,与 recordDeposit 同一条禁令(见其头注)。
+    // moneyApplied 是 restoreMoney 的冲正基准 = 「本标签页动过、且**可以回滚**的钱」。
+    // 提现的钱由服务端在建单事务里落定,**不可回滚**;记进去的话,别处一次
+    // 「captureMoney → 失败 → restoreMoney」就会把这笔提现连同它的退款一起冲掉:
+    // 退款被吞而 `wd-refund:` 键已置位、永不重试 = 用户的钱静默消失(z5 独立审计)。
+    // 触发不需要同一条调用链 —— App.vue 的 5s 对账是定时器驱动的,能落进任何一个
+    // capture/restore 窗口(质押 / 复投 / 结算都有)。
+    // 下一个照着 debitBalance 给这里补 addMoneyApplied 的人,会造出一条很难查的丢钱路径。
+    return true;
+  }
+
+  /**
+   * 失败提现退款 —— **只退本客户端真的扣过的那一笔**(判据 = 扣款幂等标记),按单号幂等。
+   *
+   * 🔴 为什么不复用 creditRewardBucketOnce(USDT 腿原来走的那条):它内部第一行就是
+   * `if (remoteApiEnabled) return false`,而提现单**只在 remote 模式下建得出来**
+   * (mock 模式 apiClient 一律 reject,建不出单)。也就是说退款在「唯一会产生提现的那个模式」里
+   * 恒为 no-op。在没有扣款的原状态下这不造成损失(没人扣钱,退不退都一样);
+   * 一旦扣款接上,那条 no-op 就变成「服务端拒单 = 用户的钱凭空烧掉」。
+   * **扣款与退款必须在同一个模式下同时有效** —— 只修一半比不修更坏,所以这一对一起改。
+   *
+   * 退款额恒等于扣款额(两边同为 `wd.amount`,且扣款全有或全无),故不会退多。
+   *
+   * 🔴 只加回 `usdtBalance`,**不动 withdrawableUsdt**:扣款那步的 clamp 是有损的
+   * (`min(w, u−a)` 不可逆),盲加 `+amount` 会把可提额度抬到比提现前还高 = 凭空多出可提额度。
+   * 方向刻意取保守侧:可提桶宁可偏低(它随收益自然回升,且提现页的可提上限本就取
+   * `usdtBalance − 锁定桶`、不读这个桶),绝不能偏高。
+   *
+   * PRODUCTION:整个函数消失 —— 退款由服务端在拒单同事务里完成,client 只读回执。
+   */
+  function refundWithdrawalDebit(wd: Withdrawal): boolean {
+    const amount = wd.amount;
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+    const debitKey = "wd-debit:" + wd.id;
+    const refundKey = "wd-refund:" + wd.id;
+    // 🔴🔴 写前**复读磁盘**(同 applyWithdrawalDebit 头注,同 creditRewardBucketInternal 范式)。
+    // 退款是这条链上唯一「加钱」的动作,只查内存的后果最重:两个标签页的 5s 对账各退一次,
+    // 而 usdtBalance 按增量累加合并 —— 两笔 `+amount` 全部计入 = 退了两倍。
+    // 三份独立审计各自实跑复现(40 → 100 → **160**)。
+    const stored = readAccountSnapshot(accountKey.value);
+    const storedKeys = stored?.user.appliedRewardKeys;
+    // 条件直接写 `stored?.` 而不是 `storedKeys?.` —— tsc 只在前者上把 stored 收窄成非 null。
+    // 🔴 命中即**直接返回,不 adopt**。这条路被 App.vue 的 5s 对账每一拍都走一遍
+    // (失败单永不离开 withdrawals 列表),而 adoptAccountSnapshot 是**整体覆写**
+    // user/devices/earnings/withdrawals 并重置 tick 聚合 —— 等于 12 次/分钟的全量状态覆写;
+    // 且 stored 是未过 hydrateSnapshotEconomics 的原始行,会把 legacy 设备的派生字段写回 undefined。
+    // 这里只需要「别退第二次」,不需要同步任何东西(独立复核实测发现的新引入问题)。
+    if (stored?.user.appliedRewardKeys?.[refundKey]) return false;
+    const currentUser = withDefaultEarningBuckets(user.value);
+    // 没扣过就没得退(remote 对齐期建的存量单、或扣款那步失败的单)——
+    // 退一笔没扣过的钱就是凭空造钱,这一条比「漏退」严重得多。
+    // 内存与磁盘任一记着扣过即算扣过:扣款可能发生在**另一个标签页**。
+    if (!currentUser.appliedRewardKeys?.[debitKey] && !storedKeys?.[debitKey]) return false;
+    if (currentUser.appliedRewardKeys?.[refundKey]) return false;
+    const previousSnapshot = lastCloudSnapshot;
+    user.value = {
+      ...currentUser,
+      usdtBalance: +(currentUser.usdtBalance + amount).toFixed(2),
+      appliedRewardKeys: { ...currentUser.appliedRewardKeys, [refundKey]: true },
+    };
+    if (!persistAccountSnapshot()) {
+      adoptAccountSnapshot(previousSnapshot);
+      return false;
+    }
+    // 🔴🔴 与扣款同一条禁令:**不进 moneyApplied**(见 applyWithdrawalDebit 尾注)。
+    return true;
   }
 
   /**
@@ -1270,11 +1416,25 @@ export const useApp = defineStore("app", () => {
     // 「这单当时免了哪几道闸」,等于没做。与 riskReasons 同源同去处。
     fastLaneApplied = false,
     waivedGates: string[] = [],
-  ): Promise<string | null> {
+    // 🔴 返回**整张单**而不是单号:调用方要按服务端真实回执记账 —— 手续费实际烧了多少 NEX
+    // 由服务端定(submission.nexBurned),本地报价只是预览。回单号的话调用方只能拿本地
+    // 报价去写账单 = 账本上那个数字指不到单源(本仓禁令),或者回头去 app.withdrawals 里
+    // 按 id 反查 —— 而那个列表会被 bindAccount 整体换掉,换号那一刻正好查空。
+    // 🔴 不返回 null:拒单路径全在服务端,失败一律**抛** ApiError 冒泡给页面分诊。
+  ): Promise<Withdrawal> {
     // D5 real boundary: the backend re-prices the request under policyVersion and
     // commits wallet reservation, optional NEX burn, order and ledgers atomically.
     // The local store only mirrors the returned order for rendering; it never
     // debits balances or chooses a fee bucket.
+    //
+    // 🔴 入口冻结账号(z4 R1 独立审计 P0)。本函数跨一个最长 30s 的 await,期间跨标签页
+    // 登出 / 运营吊销 / 重新登录都会 `bindAccount`,把 `accountKey.value` 与
+    // `withdrawals.value` 整体换成**另一个账号**的。原来 await 之后仍读活值,于是:
+    // 服务端按**发起时**那个账号的会话扣了钱,单据却落到换后的账号头上 —— 新账号凭空多一张
+    // 别人的在途单(占它的日限、锁死它的换址闸、失败时把 NEX 退给它),而真正被扣的账号
+    // 有扣款无单据,追踪页深链「查无此单」。
+    // 页面侧的账单行早已钉死 `snap.account`,只钉一半反而更糟:账与单分家,对账永远配不上。
+    const acct = accountKey.value;
     const submission = await withdrawalApi.submit(
       amount,
       network,
@@ -1284,6 +1444,37 @@ export const useApp = defineStore("app", () => {
       idempotencyKey,
     );
     const canonical = toCanonicalWithdrawal(submission, address);
+    // 🔴 换号了:这一单属于 acct,当前绑定的是别人。直接写进**冻结账号**的那一行,
+    // 内存(现在装的是新账号的视图)一个字都不碰 —— 与 bills.addManyForAccountOnce 同一条纪律。
+    // 落盘成败都要把单交还调用方:服务端已经建单,吞掉它 = 旧账号有扣款无凭证。
+    if (accountKey.value !== acct) {
+      const stored = readAccountSnapshot(acct);
+      // 🔴 诚实边界:冻结账号在盘上**没有行**时(它从没落过盘)这一单写不进去,
+      // 而且不该硬写 —— 手上唯一能拿来拼快照的是**当前账号**的余额/设备/收益,
+      // 拿它冒充另一个账号的经济状态,比丢一条单据坏得多。
+      // 此时页面侧的账单行仍会落到 acct(bills 那条路自己会 hydrate 出基线),
+      // 单据以服务端为准;这是降级,不是静默成功。
+      // 落盘结果要接住:写不进去时这一单只活在服务端,客户端两边都没有(内存装的是新账号)。
+      // 这是**降级不是成功**,所以如实交给日志式注释而不是静默丢弃返回值(z4 R2 P2-6)。
+      //
+      // 🔴 已知限制,别把它写成「会自愈」(z4 R3-bis 指出我上一版在这里许了做不到的承诺):
+      // App.vue ⓪ 的自愈**以单据可见为前提** —— 它遍历的是 `app.withdrawals`,而那份列表由
+      // `bindAccount` 从**本地快照**水合。若这一单从没写进该账号的本地快照(`stored` 为 null,
+      // 或下面这次写盘失败),那么重新绑回该账号也读不出它,⓪ **无源可补**。
+      // 触发要「提交中换号」叠加「该账号本地无快照 / 写盘失败」,概率很低,但不是零 ——
+      // 真正的兜底在服务端(单据是它建的),客户端到此为止。
+      if (stored) {
+        const list = [canonical, ...(stored.withdrawals ?? []).filter((item) => item.id !== canonical.id)];
+        const written = mergeAndWriteAccountSnapshotResult(stored, { ...stored, withdrawals: list, updatedAt: Date.now() });
+        if (!written.persisted) {
+          // 与本函数主路径同口径:单据是服务端既成事实,不因为本地写不进去就吞掉它。
+          // 调用方拿到 canonical 照常写账单行(账单是另一张表,可能写得进去)。
+        }
+      }
+      // 风控台账同样记到冻结账号,不记当前绑定(首提标记 / 共用地址强信号都是按账号的)。
+      commitWithdrawal(acct, network, address);
+      return canonical;
+    }
     withdrawals.value = [canonical, ...withdrawals.value.filter((item) => item.id !== canonical.id)];
     // 🔴 建单成功**必须落盘**。此前这里只改内存:刷新一次单据就没了,而它同时是
     // 「今日提了几笔」的唯一凭据(日限预检)与「有没有在途单」的唯一凭据(换址闸)——
@@ -1315,8 +1506,10 @@ export const useApp = defineStore("app", () => {
     }
     // Client-side risk ledger (first-withdrawal mark + address use) feeds the local
     // pre-check engine; the server keeps its own authoritative copy.
-    commitWithdrawal(accountKey.value, network, address);
-    return canonical.id;
+    // 账号取入口冻结值(此分支下它与 accountKey.value 相等,写死 acct 是为了让「本函数只认一个
+    // 账号」这件事在两条分支上同形 —— 不留一个读活值的口子给下一次改动)。
+    commitWithdrawal(acct, network, address);
+    return canonical;
   }
 
   /**
@@ -1475,7 +1668,7 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, advanceWithdrawalArrival, refreshRemoteWithdrawals, refundFailedWithdrawals,
+    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
   };
