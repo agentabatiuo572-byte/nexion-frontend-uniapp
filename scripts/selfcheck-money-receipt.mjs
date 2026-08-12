@@ -615,9 +615,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 取基准 + restoreTo 还原。少了 restoreTo 的 `postMoneyBill(反向 draft)` 只是盲加一笔
     // credit —— 钱回来了、可提额度回不来($8000 → $1),而它照样能让「含 postMoneyBill(」
     // 这种粗判据全绿。
-<<<<<<< HEAD
-    ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptOnly"]],
-=======
     // b023674 起周任务路由奖励并入 claim 族统一出口 postMoneyBillsOnce(claim-idempotency
     // 门对它全绿);postMoneyBill(退款冲正)这一针照旧。
     // 🔴 包 z6(2026-08-11)把 `postReceiptOnly` 换成 `postReceiptForAccount`:NEX 退还的冲正
@@ -626,7 +623,6 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 补分录这件事没消失,只是换了出口。顺带把它入册:它一直是 App.vue 的动账出口之一,
     // 却从没上过这张表(⓪ 的提现主行走的就是它),漏针的话这条路改坏了本门也不红。
     ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptForAccount"]],
->>>>>>> pkg/z8-refund-ts
     // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
     // weekly-quest 两页的本地发奖已迁服务端(2026-08-12 批次),不再走收口点 —— 台账按事实移除。
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
