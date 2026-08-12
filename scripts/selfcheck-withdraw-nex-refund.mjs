@@ -35,6 +35,10 @@
 //   ⑩ **落盘合并层**:同状态更新 / 换失败终态 / 另一端回 0,都不许把退款事实丢掉
 //   ⑪ **跨包接线**:本仓一旦出现状态回查面,其响应契约必须带 nexRefunded(条件式,空过时打印样本量 0)
 //   ⑫ **mock 模式**:本地退款腿退完必须自己写下同一份证据(否则钱退了、账没记上)
+//   ⑬ **冲正行的日期**:跟退款时刻走、不跟提交时刻走(2026-08-12)。分五面:
+//      主格(服务端给了时刻 → ts 跟它,且与「烧掉」行落在不同月分组;同批其余行不被带跑;
+//      `atMs` 不落盘)· b 回落(没给 → 观测此刻,**不许**沿用提交时刻)· c 越界(早于提交 = 当没给)
+//      · f 换号后的直写盘路径同样按单条时刻落 · d 解析层 + 咽喉 · e 合并层金额与时刻成对
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -128,7 +132,7 @@ export { useBills } from "@/store/bills";
 export { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 export { postReceiptForAccount } from "@/lib/money-receipt";
 export { remoteApiEnabled } from "@/api/runtime";
-export { createWithdrawalApi } from "@/api/withdrawal-api";
+export { createWithdrawalApi, toCanonicalWithdrawal } from "@/api/withdrawal-api";
 export { mergeAccountSnapshots } from "@/store/account-cloud";`,
     resolveDir: root,
     loader: "ts",
@@ -147,7 +151,7 @@ export { mergeAccountSnapshots } from "@/store/account-cloud";`,
   }],
 });
 const { useApp, useBills, withdrawalBillDrafts, postReceiptForAccount, remoteApiEnabled,
-  createWithdrawalApi, mergeAccountSnapshots } =
+  createWithdrawalApi, toCanonicalWithdrawal, mergeAccountSnapshots } =
   await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 // 🔴 先证明「测的确实是 remote 模式」。这一条挂了,后面每一条的结论都不成立。
@@ -475,18 +479,234 @@ const reconcilePost = () => runReconcile(app, bills, withdrawalBillDrafts, postR
     submittedAt: Date.now() - 3600e3, estimatedCompletion: Date.now(),
   }];
   const nexBefore = mockApp.user.nexBalance;
+  const refundT0 = Date.now();
   mockApp.refundFailedWithdrawals();
+  const refundT1 = Date.now();
   const after = mockApp.withdrawals.find((w) => w.id === "WD-MOCK-1");
   check("🔴 ⑫ mock 下本地退款腿真的退了 NEX(前提成立,否则下一条无意义)",
     mockApp.user.nexBalance === nexBefore + 3, `${nexBefore} → ${mockApp.user.nexBalance}`);
   check("🔴 ⑫ 退完**同步写下退款证据** `nexRefunded`(否则钱包退了、账单没对手方)",
     after?.nexRefunded === 3, `nexRefunded=${after?.nexRefunded}`);
+  // 🔴 证据是**金额 + 时刻**一对:这条腿知道确切答案(退款就发生在此刻),只写金额等于
+  // 把日期让给下游去猜(回落到「哪一拍轮询先看到它」),而真值本来就在手上。
+  check("🔴 ⑫ 且**同时**写下 `nexRefundedAt`(就是此刻)—— 只写金额 = 日期交给下游去猜",
+    typeof after?.nexRefundedAt === "number"
+      && after.nexRefundedAt >= refundT0 && after.nexRefundedAt <= refundT1,
+    `nexRefundedAt=${after?.nexRefundedAt} 期望区间=[${refundT0}, ${refundT1}]`);
+}
+
+// ── ⑬ 🔴 冲正行的**日期**必须跟退款走,不跟提交走 ──────────────────────────────
+// 缺陷:⓪ 用 `postReceiptForAccount(..., wd.submittedAt)` 给**整组**分录盖一个时刻,而这一组里
+// 只有 USDT 主行与 NEX 抵扣费行真的发生在提交那一刻;失败退还的 `+N NEX` 是**事后**发生的。
+// 后果(账单页按 ts 分月分组):7 月提交、8 月退还的那笔,「退回 N NEX」落进 **7 月**那一组、
+// 贴在当初「烧掉 N NEX」那行旁边 —— 用户在 8 月的账单里找不到钱回来的记录,
+// 而钱包里的 NEX 确实是 8 月变的,两个口径对不上。
+const JULY = Date.parse("2026-07-03T09:00:00.000Z");
+const AUGUST = Date.parse("2026-08-05T11:30:00.000Z");
+
+/**
+ * 账单页的分月键 —— **从页面源码抠那一行出来跑**,不在门里重写一份口径。
+ * (时区、locale、粒度任一处漂移,门与页面就会各说各话 —— 本门 ⑧ 正是栽在「重写一份」上。)
+ */
+const monthKeyFn = (() => {
+  // 🔴 **先剥注释再判**(本仓硬规则,与本门 ⑪ 同款剥法):注释里出现同形文本会把判据引到
+  // 一段不是真在跑的代码上,而抠出来的东西照样能跑、照样全绿。
+  const page = readFileSync(path.join(SRC, "pages", "me", "wallet-bills.vue"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+  const m = page.match(/const key = d\.toLocaleDateString\(([\s\S]*?)\);/);
+  if (!m) throw new Error("harness: 抠不出 wallet-bills 的分月键 —— 判据失效必红,禁静默放行");
+  return new Function("ts", "localeTag", `const d = new Date(ts); return d.toLocaleDateString(${m[1]});`);
+})();
+const monthOf = (ts) => monthKeyFn(ts, { value: "en-US" });
+// 🔴 判据自证:分月键必须**恰好是月粒度**。抠错了表达式(比如抓到页面里那个精确到分的
+// `fmtTime`)的话,任意两个不同时刻都会得到不同的键 —— 下面那条「落在不同月分组」就变成
+// 一条恒真的自证,而冲正行哪怕只差一秒也算「换了月」。两头都钉:同月同键 + 跨月异键。
+check("🔴 ⑬ 判据自证:抠出来的分月键**恰好是月粒度**(同月同键、跨月异键)",
+  monthOf(AUGUST) === monthOf(AUGUST + 3 * 86400_000) && monthOf(JULY) !== monthOf(AUGUST),
+  JSON.stringify({ aug: monthOf(AUGUST), augPlus3d: monthOf(AUGUST + 3 * 86400_000), jul: monthOf(JULY) }));
+
+{
+  // 第一拍:7 月提交,服务端还没退 → 账上只有 USDT− 与 NEX−,都该盖提交时刻。
+  reset({ nexRefunded: 0 });
+  const wd = await submit();
+  app.withdrawals = app.withdrawals.map((w) => (w.id === wd.id ? { ...w, submittedAt: JULY } : w));
+  reconcilePost();
+  const usdtRow = () => bills.bills.find((b) => b.ref === wd.id && b.symbol === "USDT");
+  check("⑬ 前提:第一拍(7 月提交、还没退)写下的两行都盖**提交时刻**",
+    usdtRow()?.ts === JULY && minusNex(wd.id)[0]?.ts === JULY,
+    JSON.stringify({ usdt: usdtRow()?.ts, burn: minusNex(wd.id)[0]?.ts, submittedAt: JULY }));
+
+  // 第二拍:8 月判失败并退还,退款事实带着**自己的时刻**后到。
+  app.withdrawals = app.withdrawals.map((w) =>
+    (w.id === wd.id ? { ...w, nexRefunded: 3, nexRefundedAt: AUGUST } : w));
+  reconcilePost();
+  const plus = plusNex(wd.id)[0];
+  check("🔴 ⑬ 退款时刻晚于提交 → 冲正行的 ts **跟退款走**(本卡修的就是这一条)",
+    plus?.ts === AUGUST, `ts=${plus?.ts} 期望=${AUGUST}`);
+  check("🔴 ⑬ 且**不等于**提交时刻 —— 改回 `submittedAt` 这一条必红",
+    plus?.ts !== JULY, `ts=${plus?.ts} submittedAt=${JULY}`);
+  check("🔴 ⑬ 用户看得见的那一面:冲正行与被它冲正的「烧掉」行落在**不同的月分组**里",
+    plus && monthOf(plus.ts) !== monthOf(minusNex(wd.id)[0].ts),
+    `退回→${plus && monthOf(plus.ts)} ｜ 烧掉→${monthOf(minusNex(wd.id)[0].ts)}`);
+  check("⑬ 同批其余分录不被带跑:USDT 主行与烧掉行**仍**盖提交时刻(整批时刻照旧生效)",
+    usdtRow()?.ts === JULY && minusNex(wd.id)[0]?.ts === JULY,
+    JSON.stringify({ usdt: usdtRow()?.ts, burn: minusNex(wd.id)[0]?.ts }));
+  // 🔴 `atMs` 是**构造期**字段:它决定 ts,自己不该出现在落盘的 Bill 行上。
+  // 盘上多一个没人读的键 = 渲染/判重/合并全不认它,却随存量数据长期留存。
+  const onDisk = [...disk.values()].join("");
+  check("🔴 ⑬ `atMs` 是构造期字段 → **不许落进账单行**(内存与盘上都搜不到这个键)",
+    !("atMs" in (plus ?? {})) && !/"atMs"/.test(JSON.stringify(bills.bills)) && !/"atMs"/.test(onDisk),
+    JSON.stringify({ inRow: "atMs" in (plus ?? {}), inMemory: /"atMs"/.test(JSON.stringify(bills.bills)), onDisk: /"atMs"/.test(onDisk) }));
+}
+
+// ⑬b 回落:拿不到退款时刻(存量单 / 后端还没上该字段)→ 盖**观测此刻**,不许静默沿用提交时刻。
+{
+  reset({ nexRefunded: 0 });
+  const wd = await submit();
+  app.withdrawals = app.withdrawals.map((w) =>
+    (w.id === wd.id ? { ...w, submittedAt: JULY, nexRefunded: 3 } : w)); // 注意:没有 nexRefundedAt
+  const t0 = Date.now();
+  reconcilePost();
+  const t1 = Date.now();
+  const plus = plusNex(wd.id)[0];
+  check("🔴 ⑬b 没有 `nexRefundedAt` → 回落到**观测此刻**(区间内),而不是静默沿用提交时刻",
+    plus && plus.ts >= t0 && plus.ts <= t1, `ts=${plus?.ts} 期望区间=[${t0}, ${t1}]`);
+  check("⑬b 回落值明确 ≠ 提交时刻(沿用 = 本卡的缺陷原样保留)",
+    plus?.ts !== JULY, `ts=${plus?.ts} submittedAt=${JULY}`);
+}
+
+// ⑬c 服务端给了个**早于提交**的时刻(服务端 bug):当它没给。
+// 照单全收会把这一行扔进提交之前 —— 比缺一个准确日期错得更远(同 ④「已知是错的数不拿来写分录」)。
+{
+  reset({ nexRefunded: 0 });
+  const wd = await submit();
+  app.withdrawals = app.withdrawals.map((w) => (w.id === wd.id
+    ? { ...w, submittedAt: JULY, nexRefunded: 3, nexRefundedAt: JULY - 30 * 86400_000 } : w));
+  const t0 = Date.now();
+  reconcilePost();
+  const plus = plusNex(wd.id)[0];
+  check("🔴 ⑬c 退款时刻早于提交(服务端 bug)→ 当它没给,回落此刻;**不许**落在提交之前",
+    plus && plus.ts >= t0, `ts=${plus?.ts} submittedAt=${JULY}`);
+}
+
+// ⑬f 跨账号直写盘那条路 —— **提交期间被换号**时分录写回真正被扣款的那个账号,走的是
+// `addManyForAccountOnce` 里另一段代码(不经过 `addMany`)。两段各有一处 `ts` 赋值,
+// 只测当前账号那条 = 换号路径可以悄悄漂移回整批时刻,而这一族门全绿(修一处≠修全部)。
+{
+  reset({ nexRefunded: 0 });
+  const wd = await submit();
+  app.withdrawals = app.withdrawals.map((w) => (w.id === wd.id
+    ? { ...w, submittedAt: JULY, nexRefunded: 3, nexRefundedAt: AUGUST } : w));
+  bills.bindAccount("someone-else@nexgrid.test"); // 换号:账单 store 现在装的是别人的视图
+  reconcilePost();                                 // ⓪ 仍按 app.accountKey 写回原账号 → 直写盘
+  bills.bindAccount(ACCT);                         // 换回来,从**盘上**读这几行
+  const plus = plusNex(wd.id)[0];
+  check("🔴 ⑬f 换号后的直写盘路径**同样**按单条时刻落 ts(两段实现不许各走各的)",
+    plus?.ts === AUGUST, `ts=${plus?.ts} 期望=${AUGUST}(提交时刻=${JULY})`);
+  check("⑬f 且同批的烧掉行仍盖提交时刻、`atMs` 同样没落进盘上的行",
+    minusNex(wd.id)[0]?.ts === JULY && !/"atMs"/.test([...disk.values()].join("")),
+    JSON.stringify({ burn: minusNex(wd.id)[0]?.ts, onDisk: /"atMs"/.test([...disk.values()].join("")) }));
+}
+
+// ⑬d 解析层:线上是 ISO-8601 **字符串**,客户端存 epoch ms。喂真 parseSubmission。
+// 🔴 不能只靠 `Date.parse`:`Date.parse("3")` 在 V8 上是 **2003-01-01** —— 后端错发一个裸数字串
+// 就能把冲正行扔进 2003 年,而所有静态门全绿(与同批 `Number(true) === 1` 同型)。
+{
+  const realApi = createWithdrawalApi({ request: async () => globalThis.__probeRow });
+  const baseRow = globalThis.__nextSubmission();
+  const parseWith = async (v) => {
+    const row = { ...baseRow, withdrawalNo: "WD-PARSE-AT" };
+    if (v === undefined) delete row.nexRefundedAt; else row.nexRefundedAt = v;
+    globalThis.__probeRow = row;
+    try { return (await realApi.submit(50, "USDT-TRC20", "T", "p", true, "k")).nexRefundedAt; }
+    catch (e) { return `threw:${e?.message ?? e}`; }
+  };
+  const ISO = "2026-08-05T11:30:00.000Z";
+  const cases = [
+    [ISO, Date.parse(ISO)],
+    ["2026-08-05", Date.parse("2026-08-05")], // 只到日:仍能定位到正确的月分组,收
+    [undefined, undefined], [null, undefined], ["", undefined],
+    ["3", undefined],            // 🔴 Date.parse 会读成 2003-01-01
+    ["2026", undefined],         // 同上,读成 2026-01-01
+    [AUGUST, undefined],         // 裸 epoch 数字不是契约形状(线上是字符串)
+    [true, undefined], ["not-a-date", undefined],
+  ];
+  const got = [];
+  for (const [input] of cases) got.push(await parseWith(input));
+  check("🔴 ⑬d 真解析层:ISO-8601 → epoch ms;`\"3\"`/`\"2026\"`/裸数字/垃圾/缺失一律读作**没给**",
+    cases.every(([, want], i) => got[i] === want),
+    JSON.stringify(cases.map(([inp, want], i) => `${JSON.stringify(inp)}→${got[i]}(期望 ${want})`)));
+  check("⑬d 且以上没有任何一种输入会**抛协议错**(严格必填会造出「钱扣了却显示失败」)",
+    got.every((g) => g === undefined || typeof g === "number"), JSON.stringify(got));
+
+  // 🔴 咽喉:上面证的是**解析层**,而 ⑬ 那几格为了造「退款事实后到」的时序是手工 patch
+  // `app.withdrawals` 的 —— 两头都测到了,中间 `toCanonicalWithdrawal` 这一段却没有。
+  // 它漏带这个字段的话(z6 修 `nexRefunded` 时踩过同一个坑),线上永远拿不到时刻、
+  // 全站回落到观测此刻,而以上每一格照样全绿。这一条把中间那段接上:解析结果 → 单据对象。
+  globalThis.__probeRow = { ...baseRow, withdrawalNo: "WD-THROAT-1", nexRefundedAt: ISO };
+  const parsed = await realApi.submit(50, "USDT-TRC20", "T", "p", true, "k");
+  const canonical = toCanonicalWithdrawal(parsed, "TXthroat00000000000000000000000001");
+  check("🔴 ⑬d 咽喉:解析出来的时刻**真的进得了单据对象**(toCanonicalWithdrawal 漏带 = 全站回落)",
+    canonical?.nexRefundedAt === Date.parse(ISO),
+    `nexRefundedAt=${canonical?.nexRefundedAt} 期望=${Date.parse(ISO)}`);
+  check("⑬d 咽喉反向对照:服务端没发时,单据上就是「没有」(不是 0 —— 0 是 1970)",
+    (globalThis.__probeRow = { ...baseRow, withdrawalNo: "WD-THROAT-2" },
+      toCanonicalWithdrawal(await realApi.submit(50, "USDT-TRC20", "T", "p", true, "k"),
+        "TXthroat00000000000000000000000002").nexRefundedAt === undefined),
+    "缺失时应为 undefined");
+}
+
+// ⑬e 落盘合并层:金额与**发生时刻**是同一件事实的两个面,必须整对取自同一份快照。
+// 分开取会拼出一份两端都没有的事实(「退 3 · 无时刻」),冲正行的日期于是丢回观测此刻,
+// 而准确日期本来就在被丢弃的那一份里 —— 与 ⑩ 的金额面同一个丢失面。
+{
+  const mk = (over) => ({
+    schema: 1, accountKey: ACCT, entrySurface: "h5", updatedAt: Date.now(),
+    user: { email: ACCT, earningBuckets: {}, appliedRewardKeys: {} },
+    devices: [], earnings: {},
+    withdrawals: [{
+      id: "WD-MERGE-AT", amount: 50, network: "USDT-TRC20", address: "T",
+      fee: { networkConfirmUsd: 1, nexBurned: 3, actualFeeUsd: 0 },
+      riskRoute: "pass", riskReasons: [], submittedAt: JULY, estimatedCompletion: JULY + 1,
+      ...over,
+    }],
+  });
+  const at = (snap) => snap.withdrawals[0].nexRefundedAt;
+  const amt = (snap) => snap.withdrawals[0].nexRefunded ?? 0;
+  // 同 rank:一边有完整的退款事实,另一边什么都没有
+  const paired = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }),
+  );
+  check("🔴 ⑬e 合并:退款**金额与时刻成对**保留(只留金额 = 冲正行日期丢回观测此刻)",
+    amt(paired) === 3 && at(paired) === AUGUST, JSON.stringify({ nexRefunded: amt(paired), nexRefundedAt: at(paired) }));
+  // 胜出的那份(状态 rank 更靠后)自己没有退款事实 —— 时刻必须从证据那份带过来
+  const winnerBlank = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "refunded" }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }),
+  );
+  check("🔴 ⑬e 胜出方自己没有退款事实时,金额与时刻**都**从证据那份带过来",
+    amt(winnerBlank) === 3 && at(winnerBlank) === AUGUST,
+    JSON.stringify({ nexRefunded: amt(winnerBlank), nexRefundedAt: at(winnerBlank) }));
+  // 🔴 金额**相同**、只有一份带时刻(一端从服务端拿到完整事实、另一端是旧客户端/本地腿写的):
+  // 光比金额分不出胜负,得按「哪份更完整」挑 —— 挑错就把已知的准确日期换成了「不知道」,
+  // 冲正行回落到观测此刻。红测实测:不补这一条,合并层的取证规则退化成纯比金额也不判红。
+  const tieBreak = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed", nexRefunded: 3 }),                          // 有金额、无时刻
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }),   // 完整事实
+  );
+  check("🔴 ⑬e 金额打平时取**更完整**的那份(带时刻的)—— 否则准确日期被换成「不知道」",
+    amt(tieBreak) === 3 && at(tieBreak) === AUGUST,
+    JSON.stringify({ nexRefunded: amt(tieBreak), nexRefundedAt: at(tieBreak) }));
 }
 
 // 🔴 样本量当判据:PASS 数少于下限 = 有断言被删/跳过,按红处理(空集全过是哨兵最常见的假绿)。
-// 🔴 下限必须**等于**实际断言数(15),不能留富余:红测实测,写 14 时删掉任意一条断言
-// 会得到 pass=14 / fail=0 → 门照样绿。留一条的余量 = 允许悄悄删一条。
-const MIN_PASS = 25;
+// 🔴 下限必须**等于**实际断言数(45),不能留富余:红测实测,下限低一档时删掉任意一条断言
+// 会得到 pass=44 / fail=0 → 门照样绿。留一条的余量 = 允许悄悄删一条。
+const MIN_PASS = 45;
 console.log(`\nselfcheck-withdraw-nex-refund: ${pass} passed, ${fail} failed (min pass ${MIN_PASS})`);
 if (fail > 0 || pass < MIN_PASS) {
   console.log(`FAIL — fail=${fail} pass=${pass}(pass 低于 ${MIN_PASS} = 有断言被删或跳过,同样判红)`);

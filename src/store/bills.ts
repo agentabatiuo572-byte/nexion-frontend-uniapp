@@ -40,6 +40,26 @@ export interface Bill {
 }
 
 /**
+ * 账单入参 —— **落盘的是 `Bill`,不是它**:`id` / `ts` / `balanceAfter` 由 store 与服务端时钟负责,
+ * `atMs` 是**构造期字段**,只用来决定这一行的 `ts`,写盘前必须被解构掉(见 `addMany`)。
+ */
+export type BillDraft = Omit<Bill, "id" | "ts" | "balanceAfter"> & {
+  /**
+   * 🔴 这**一条**分录自己的事件时刻,覆盖整批的 `atMs`。不传 = 跟整批走(绝大多数分录本来就同时发生)。
+   *
+   * 为什么需要「单条」这一级(2026-08-12):一组分录**不必然是同一件事**。提现那一族里,
+   * USDT 主行与 NEX 抵扣费行发生在**提交**那一刻,而失败退还的 `+N NEX` 冲正行发生在
+   * **退款**那一刻 —— 两者可以差几个月。整批盖一个时刻的话,冲正行落进提交那个月的分组
+   * (账单页按 `ts` 分月),用户在退款当月的账单里找不到钱回来的记录,而钱包里的 NEX
+   * 确实是那个月变的:同一笔钱两个口径对不上。
+   *
+   * 🔴 它**不是**「随便挑个好看的日期」的口子:值必须指到一个真实事件的时刻,
+   * 拿不到真时刻的回落规则要写在构造处并说清(本仓禁令:显示的钱和时间必须指到单源)。
+   */
+  atMs?: number;
+};
+
+/**
  * Reward-type credits (activity bonus / referral commission / achievement;
  * CS compensation posts as `bonus`) — the "system rewards" family surfaced in
  * My Rewards (/me/rewards) AND its unread dot on the Me entry. Single source:
@@ -172,12 +192,15 @@ export const useBills = defineStore("bills", () => {
    */
   function addManyForAccountOnce(
     rawAccountKey: string,
-    drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[],
+    drafts: BillDraft[],
     /**
      * 🔴 **补记**这一笔时的事件时刻(不传 = 现在)。
      * 只给「把过去发生的事补进账本」用:自愈补写一笔三天前的提现时,若还盖当前时钟,
      * 那一行会落在账单页**今天**这一组的最上面 —— 账本给自己的历史标错日期。
      * 正常提交路径**不要**传:那一刻的「现在」就是事件时刻,由 mockServerNow 单时源给。
+     *
+     * 🔴 它是**整批**的时刻,而一组分录不必然同时发生 —— 组里某一条另有自己的事件时刻时,
+     * 由那一条自带 `atMs` 覆盖(见 `BillDraft.atMs`),不是把整批都改掉。
      */
     atMs?: number,
   ): Bill[] | null {
@@ -212,8 +235,11 @@ export const useBills = defineStore("bills", () => {
     const todo = missing(existing);
     if (!todo.length) return existing.filter((b) => drafts.some((d) => key(d) === key(b)));
     // 同一笔交易的分录共用一个 ts 并**一次落盘** —— 与 addMany 同一条纪律(半边账不存在)。
+    // 自带 `atMs` 的那条走自己的时刻(与 addMany 同一条规则,两条路径不许漂移)。
     const ts = atMs ?? mockServerNow();
-    const next: Bill[] = todo.map((b) => ({ ...b, id: mockServerId("BL"), ts }));
+    const next: Bill[] = todo.map(({ atMs: rowAtMs, ...b }) => ({
+      ...b, id: mockServerId("BL"), ts: rowAtMs ?? ts,
+    }));
     const merged = recomputeBalance([...next, ...existing]);
     if (!writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, target, { bills: merged })) return null;
     return next;
@@ -228,16 +254,23 @@ export const useBills = defineStore("bills", () => {
    * 那个中间态**根本不存在**:要么 N 条全在,要么一条不留。调用方因此不需要
    * 「删掉第一条」或「补一条冲正分录」这类补丁 —— 没有既成事实要冲正。
    *
-   * 同一笔交易的分录共用一个 ts(它们本来就发生在同一时刻)。
+   * 同一笔交易的分录**默认**共用一个 ts(它们通常本来就发生在同一时刻);
+   * 组里确有另一时刻的那一条自带 `atMs` 覆盖(见 `BillDraft.atMs` —— 提现失败退还的冲正行
+   * 与被它冲正的那两行可以差几个月)。「一次落盘」是原子性,不是「必须同一个时间戳」。
    * PROD:服务端在同一事务里写这 N 条分录,client 只消费。
    */
-  function addMany(drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[], atMs?: number): Bill[] | null {
+  function addMany(drafts: BillDraft[], atMs?: number): Bill[] | null {
     if (!drafts.length) return [];
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
     // `atMs` 只给**补记历史事件**用(见 addManyForAccountOnce 的同名参数);不传即「现在」。
     const ts = atMs ?? mockServerNow();
-    const next: Bill[] = drafts.map((b) => ({ ...b, id: mockServerId("BL"), ts }));
+    // 🔴 `atMs` 是**构造期字段,必须在这里被解构掉**:直接 `{ ...b }` 会把它一起写进落盘的
+    // Bill 行,而 `Bill` 上根本没有这个键 —— 渲染、判重、合并、balanceAfter 全不认它,
+    // 它只会随存量数据长期留在盘上,并让「Bill 的字段集」这件事从此说不清。
+    const next: Bill[] = drafts.map(({ atMs: rowAtMs, ...b }) => ({
+      ...b, id: mockServerId("BL"), ts: rowAtMs ?? ts,
+    }));
     const previous = bills.value;
     bills.value = recomputeBalance([...next, ...previous]);
     if (!persist()) {
@@ -248,12 +281,12 @@ export const useBills = defineStore("bills", () => {
   }
 
   /** 单条 = N=1 的退化情形。走同一条实现,两者的落盘/回滚语义不可能各自漂移。 */
-  function add(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+  function add(b: BillDraft): Bill | null {
     return addMany([b])?.[0] ?? null;
   }
 
   /** Stable ref + type + symbol is the mock server idempotency key. */
-  function addOnce(b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+  function addOnce(b: BillDraft): Bill | null {
     const existing = b.ref
       ? bills.value.find((bill) => bill.ref === b.ref && bill.type === b.type && bill.symbol === b.symbol)
       : null;

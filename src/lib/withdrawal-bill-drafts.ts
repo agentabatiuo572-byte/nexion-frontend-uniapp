@@ -15,10 +15,13 @@
  * 用户回到的正是本包要修的那个原状态,而所有门仍然全绿(门守的是「有没有生产者」,
  * 不是「那一行此刻在不在」)。把判据同样改成「从数据推出该有什么」,这一族才补齐。
  *
- * 纯函数、不碰 store、不依赖 i18n 运行时:memo 是英文兜底,渲染时以 memoKey 为准。
+ * 不碰 store、不依赖 i18n 运行时:memo 是英文兜底,渲染时以 memoKey 为准。
+ * ⚠️ 但它**不是引用透明的**:退还分录拿不到服务端时刻时会读一次共用时钟(见 `nexRefundAtMs`),
+ * 同一张单在不同时刻构造可能得到不同的 `atMs`。判重按「单号+币种+方向」,落盘后不再重取。
  * PRODUCTION:整个文件消失 —— 分录由服务端在建单同一事务里写,client 只消费 GET /api/bills。
  */
 import type { ReceiptDraft } from "@/lib/money-receipt";
+import { mockServerNow } from "@/store/server-time";
 import type { Withdrawal } from "@/store/types";
 
 /** NEX 数量展示:整数不带小数点,非整数保留一位(与提现页报价同口径)。 */
@@ -40,6 +43,34 @@ const WITHDRAW_MEMO_BY_ROUTE: Record<NonNullable<Withdrawal["riskRoute"]>, strin
   reject: "withdrawReview",
 };
 
+/**
+ * 冲正行的事件时刻 —— 🔴 **退款发生那一刻,不是提现提交那一刻**。
+ *
+ * 两者可以差几个月(7 月提交、8 月才判失败并退还),而账单页按分录的 `ts` 分月分组:
+ * 盖成提交时刻,「退回 N NEX」就落进 7 月那一组、贴在当初「烧掉 N NEX」那行旁边 ——
+ * 用户在 8 月的账单里找不到钱回来的记录,而钱包里的 NEX 确实是 8 月变的,两个口径对不上。
+ * 同一族的另外两行(USDT 主行 / NEX 抵扣费行)**确实**发生在提交那一刻,所以修法是
+ * 「这一条分录带自己的时刻」(`ReceiptDraft.atMs`),不是「整批换一个时刻」。
+ *
+ * 🔴 **回落规则(显式定,不许静默沿用提交时刻)**:拿不到 `nexRefundedAt` 时(存量单 /
+ * 后端还没上该字段)盖**本次构造的此刻**。理由:
+ *   · 真值一定落在 `[submittedAt, now]` 里,而客户端只知道这两个端点;
+ *   · 取 now = 「客户端**得知**退款的时刻」,最坏晚一个轮询周期;取 submittedAt 可以早几个月,
+ *     且会让冲正行与被它冲正的那行**同刻同组** —— 正是本函数要修掉的那个形态;
+ *   · 冲正行只在第一次落盘时定 `ts`(此后按「单号+币种+方向」判重跳过),不会每拍漂移。
+ *
+ * 🔴 服务端给的时刻**早于提交**时当它没给:退款不可能发生在下单之前,那是服务端 bug;
+ * 照单全收会把这一行扔进 1970 / 去年某月,比缺一个准确日期错得更远。
+ * (与 `refunded > nexBurned` 同一条纪律:已知是错的数不拿来写一条看着合理的分录。)
+ *
+ * 时钟不做成入参:那等于把「盖哪个时刻」的决定权交回调用方,而本卡的缺陷**正是**调用方
+ * (App.vue ⓪)用 `wd.submittedAt` 盖住了整批。决定留在这个唯一构造处。
+ */
+function nexRefundAtMs(wd: Withdrawal): number {
+  const at = wd.nexRefundedAt;
+  return typeof at === "number" && Number.isFinite(at) && at >= wd.submittedAt ? at : mockServerNow();
+}
+
 /** 单据终态 → 账单行状态。非终态一律在途,由 App.vue 的对账推进。 */
 const FAILED_STATUSES: readonly Withdrawal["status"][] = [
   "review-rejected", "address-invalid", "tx-failed", "refunded",
@@ -57,7 +88,8 @@ export function billStatusForWithdrawal(status: Withdrawal["status"]): "posted" 
  *   已经是终态了,写 pending 再等下一拍结算是多余的一步,也会让账单短暂说谎)。
  * - NEX 抵扣费行:只在服务端真烧了 NEX 时才有;恒 `posted` —— 烧是既成事实,
  *   提现失败时补一条 +N 的反向分录冲正(下一条),**不改写**这一条。
- * - NEX 退还行(冲正):只在服务端说「已经退了」时才有。判据是线上字段 `wd.nexRefunded`。
+ * - NEX 退还行(冲正):只在服务端说「已经退了」时才有。判据是线上字段 `wd.nexRefunded`,
+ *   而它的**日期**跟 `wd.nexRefundedAt` 走(这一族里唯一不发生在提交时刻的一行,见 `nexRefundAtMs`)。
  *
  * 🔴 每个数字都取自单据(服务端回执),不接受调用方另传 —— 本仓禁令:显示的钱必须指到单源。
  */
@@ -136,6 +168,8 @@ export function withdrawalBillDrafts(wd: Withdrawal): ReceiptDraft[] {
       memoKey: "withdrawNexRefund",
       memoParams: { nex: fmtNex(refunded) },
       ref: wd.id,
+      // 🔴 这一条**不跟整批的时刻**:它发生在退款那一刻,不是提交那一刻(见 nexRefundAtMs)。
+      atMs: nexRefundAtMs(wd),
     });
   }
   return drafts;
