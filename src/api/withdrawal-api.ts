@@ -22,8 +22,9 @@ export interface WithdrawalSubmission {
    * FEAT-WD01 §4.6:退款**发生**的时刻。**线上是 ISO-8601 字符串**,本字段是解析后的 epoch ms
    * (与 `Withdrawal.submittedAt` / `confirmedAt` 同口径,便于直接比较)。
    *
-   * 🔴 缺失 / 不可解析 = `undefined`,**不是 0**:0 是 1970-01-01,下游会把它当成一个真时刻,
-   * 冲正行落进 1970 年那一组 —— 比它要修的那个 bug 还远。「没有」必须长得不像「有」。
+   * 🔴 缺失 / 不可解析 = `undefined`,**不是 0**:0 是 1970-01-01,而消费点
+   * (`isUsableRefundInstant`)的合法域是 `[submittedAt, now]` —— 0 会被判越界、退回观测时刻。
+   * 「没有」必须长得不像「有」,否则它会在合并层被当成「带时刻的那份」而顶掉真正准确的一份。
    */
   nexRefundedAt?: number;
   feeWaived: number;
@@ -81,6 +82,45 @@ function number(value: unknown, min = 0): number | null {
   return Number.isFinite(parsed) && parsed >= min ? parsed : null;
 }
 
+/**
+ * 🔴 ISO-8601 **整串**文法(2026-08-12 独立审计后收紧)。带 `$` 收尾锚是本函数的要害:
+ * 上一版用 `/^\d{4}-\d{2}-\d{2}/`(只卡前缀),实测 `"2026-08-05junk"` 过卡口、
+ * `Date.parse` 给 **2026-06-07** —— 差两个月,正是本字段存在的理由要修掉的形态。
+ * 超出严格 ISO 的部分由各引擎的自定义分支接手,V8 与 iOS JSC 可给不同结果 =
+ * 同一份报文安卓/iOS 落不同月(双端不变量破了)。
+ *
+ * 收 `+07:00` 偏移(目标市场越南,后端多半发本地偏移)与 1-3 位毫秒。
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/;
+/** 只到日的那一支(降级兼容路径,见 parseRefundInstant)。 */
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * 退款发生时刻:ISO-8601 字符串 → epoch ms。缺失 / 形状不对 / 日历非法 → `undefined`(= 没给),
+ * **绝不抛协议错**(宽松档,理由同 §4.5:严格必填 = 后端没上该字段就整单被拒,而钱已经扣了)。
+ *
+ * 🔴 **只到日是「降级兼容路径」,不是契约**(规格 §4.6② 要求带时区偏移的完整 date-time)。
+ * 它按**本地正午**解析,不是 `Date.parse` 的 UTC 午夜:账单页按**本地时区**分月分组,
+ * 而 UTC 午夜在负时区会落进上一个月 —— 月初那天必错(实测 `2026-08-01` 在 UTC-5 渲染成 July)。
+ * 取正午而非本地午夜,是为了让「同一设备解析、同一设备渲染」这个前提下 UTC-12..+14 全部落回原日历日。
+ * 已知边界(不假装修了):**同一设备事后改时区 / 用户出境**时,已冻结的 epoch 会换个日历日渲染,量级一天。
+ *
+ * 🔴 回环校验**只对只到日那一支**做:`Date.parse("2026-02-29")` 会静默进位成 3 月 1 日(实测),
+ * 而带偏移的完整串没有进位风险,对它做回环反而会在负时区把合法值判成非法。
+ */
+function parseRefundInstant(raw: string | null): number | undefined {
+  if (!raw || !ISO_INSTANT.test(raw)) return undefined;
+  if (ISO_DATE_ONLY.test(raw)) {
+    const [y, m, d] = raw.split("-").map(Number);
+    const at = new Date(y, m - 1, d, 12, 0, 0, 0);
+    // 回环:本地取值,与上一行的本地构造同一套口径(用 getUTC* 会在负时区误杀)。
+    const ok = at.getFullYear() === y && at.getMonth() === m - 1 && at.getDate() === d;
+    return ok && at.getTime() > 0 ? at.getTime() : undefined;
+  }
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+}
+
 function parseSubmission(value: unknown): WithdrawalSubmission {
   const row = record(value);
   const chain = row?.chain;
@@ -113,24 +153,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
       && Number.isFinite(rawNexRefunded) && Number.isInteger(rawNexRefunded) && rawNexRefunded >= 0
     ? rawNexRefunded
     : 0;
-  // 🔴 §4.6 退款**发生时刻**(线上 ISO-8601 字符串 → 这里转 epoch ms)。宽松档同上一段:
-  // 缺失 / 坏值一律当「没给」,**绝不抛协议错** —— 严格必填 = 后端没上该字段就整单被拒,而钱已经扣了。
-  //
-  // 🔴 不能只靠 `Date.parse`:它对非 ISO 串出奇地宽容 —— `Date.parse("3")` 在 V8 上是
-  // **2003-01-01**、`Date.parse("2026")` 是 2026-01-01,后端错发一个裸数字串就能把这条冲正行
-  // 扔进 2003 年那一组,而门与 tsc 全绿。这与同批 `nexRefunded` 栽的那一下同型(`Number(true) === 1`)。
-  // 故先按契约声明的形状卡一道:必须以 ISO-8601 的**日历日** `YYYY-MM-DD` 起头才进 `Date.parse`。
-  //
-  // 🔴 门槛划在「到日」而不是「到分」:这个值的唯一用途是给冲正行定日期,而账单页按**月**分组 ——
-  // 后端只发到日(`2026-08-05`)时月份仍然是准的,拒掉它反而回落到观测时刻、可能落到别的月去。
-  // 宽松说的是「可以没有」,不是「什么都收」:形状不对 = 当没给,而不是硬解一个数出来。
-  const rawNexRefundedAt = text(row?.nexRefundedAt);
-  const parsedNexRefundedAt = rawNexRefundedAt && /^\d{4}-\d{2}-\d{2}/.test(rawNexRefundedAt)
-    ? Date.parse(rawNexRefundedAt)
-    : Number.NaN;
-  const nexRefundedAt = Number.isFinite(parsedNexRefundedAt) && parsedNexRefundedAt > 0
-    ? parsedNexRefundedAt
-    : undefined;
+  // §4.6 退款发生时刻(线上 ISO-8601 字符串 → epoch ms)。值域收口与降级路径见 parseRefundInstant。
+  const nexRefundedAt = parseRefundInstant(text(row?.nexRefundedAt));
   const feeWaived = number(row?.feeWaived);
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);

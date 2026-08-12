@@ -55,20 +55,49 @@ const WITHDRAW_MEMO_BY_ROUTE: Record<NonNullable<Withdrawal["riskRoute"]>, strin
  * 🔴 **回落规则(显式定,不许静默沿用提交时刻)**:拿不到 `nexRefundedAt` 时(存量单 /
  * 后端还没上该字段)盖**本次构造的此刻**。理由:
  *   · 真值一定落在 `[submittedAt, now]` 里,而客户端只知道这两个端点;
- *   · 取 now = 「客户端**得知**退款的时刻」,最坏晚一个轮询周期;取 submittedAt 可以早几个月,
+ *   · 取 now = 「客户端**得知**退款的时刻」——正常轮询下晚一拍,自愈/离线/存量单路径下可晚数月(如实说);取 submittedAt 可以早几个月,
  *     且会让冲正行与被它冲正的那行**同刻同组** —— 正是本函数要修掉的那个形态;
  *   · 冲正行只在第一次落盘时定 `ts`(此后按「单号+币种+方向」判重跳过),不会每拍漂移。
  *
- * 🔴 服务端给的时刻**早于提交**时当它没给:退款不可能发生在下单之前,那是服务端 bug;
- * 照单全收会把这一行扔进 1970 / 去年某月,比缺一个准确日期错得更远。
+ * 🔴 **双向越界都当它没给**(2026-08-12 独立审计:上一版只卡了下界,五份报告独立命中):
+ *   · 早于提交 —— 退款不可能发生在下单之前;
+ *   · **晚于此刻** —— 退款也不可能发生在未来。少了这一侧,后端错发 `"2099-01-01"` 会让这行按
+ *     `ts` 倒序**永久钉在账单首位**、落进一个还没到的月份组,且落盘后判重跳过、永不自愈 ——
+ *     比「早一个月」错得更远。同批的 `nexRefunded` 有 `<= nexBurned` 上界,它的时刻孪生兄弟
+ *     原本一个上界都没有,同一批里两个字段一有一无。
  * (与 `refunded > nexBurned` 同一条纪律:已知是错的数不拿来写一条看着合理的分录。)
+ *
+ * 🔴 回落值**不做 `Math.max(now, submittedAt)` 钳位**(2026-08-12 修法证伪结论):那正是
+ * 「把已知是错的数钳成看着合理的」——而钳完的结果恰好是**提交时刻**,即本函数存在的理由要修掉的形态。
+ * 时钟被拨回时 `submittedAt`(同为本机时钟)一样不可信;真要治,该在 `mockServerNow` 一处做单调钟,
+ * 不是在这一个调用点钳。**已知边界,不假装修了。**
+ *
+ * 🔴 **已知边界二(本次引入的,如实登记)**:回落走的是「构造此刻」,所以这一行**不是数据的纯函数** ——
+ * 账单表裸写无 CAS,跨标签页覆盖后由 5s 自愈重建时会取到一个新的「此刻」,日期随之推移。
+ * z8 之前这一行盖 `wd.submittedAt`,重写是幂等的。修法候选(观测值单独落一个字段、服务端值永远压过它)
+ * 尚未过证伪,不在本轮落盘 —— 宁可留一个写明白的缺口,也不塞一个没被证伪过的新存储字段。
+ * 咬人窗口:行丢失与自愈重建之间恰好跨月。
  *
  * 时钟不做成入参:那等于把「盖哪个时刻」的决定权交回调用方,而本卡的缺陷**正是**调用方
  * (App.vue ⓪)用 `wd.submittedAt` 盖住了整批。决定留在这个唯一构造处。
  */
+/**
+ * 「这个退款时刻消费方认不认」—— **单源谓词**,合并层与本文件共用(2026-08-12 修法证伪:
+ * 两处各写一份必然漂移,而漂移的后果是合法时刻在一层被留下、在另一层被丢弃,准确日期掉进缝里)。
+ *
+ * 🔴 合并层**只拿它排序**(优先选消费方会接受的那份),**不拿它置 undefined** ——
+ * 合并层写 undefined 是把值从盘上抹掉(不可恢复),而消费方的丢弃每次构造重算(可恢复)。
+ */
+export function isUsableRefundInstant(at: unknown, submittedAt: number, nowMs: number): boolean {
+  return typeof at === "number" && Number.isFinite(at) && at > 0
+    // submittedAt 在存量脏单上可能缺失 —— 缺失时不拿它当尺(否则 `at >= undefined` 恒假,合法值被全丢)。
+    && (!Number.isFinite(submittedAt) || at >= submittedAt)
+    && at <= nowMs;
+}
+
 function nexRefundAtMs(wd: Withdrawal): number {
-  const at = wd.nexRefundedAt;
-  return typeof at === "number" && Number.isFinite(at) && at >= wd.submittedAt ? at : mockServerNow();
+  const now = mockServerNow();
+  return isUsableRefundInstant(wd.nexRefundedAt, wd.submittedAt, now) ? wd.nexRefundedAt as number : now;
 }
 
 /** 单据终态 → 账单行状态。非终态一律在途,由 App.vue 的对账推进。 */

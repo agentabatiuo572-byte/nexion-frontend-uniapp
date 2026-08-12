@@ -51,6 +51,8 @@ const SRC = path.join(root, "src");
 
 let pass = 0;
 let fail = 0;
+/** 条件式判据本轮实际激活了几格(⑪ 的回查面一落地就 +1)。下限按它动,见文件末尾。 */
+let conditionalChecks = 0;
 function check(name, cond, detail) {
   if (cond) { pass++; console.log(`  PASS  ${name}`); }
   else { fail++; console.log(`  FAIL  ${name}${detail ? " — " + detail : ""}`); }
@@ -261,6 +263,16 @@ const reconcilePost = () => runReconcile(app, bills, withdrawalBillDrafts, postR
   check("🔴 ④ 退 5 > 烧 3 → **一条冲正也不写**(夹到 3 会拿已知是错的数写一条看着合理的分录)",
     plusNex(wd.id).length === 0, JSON.stringify(nexRows(wd.id).map((b) => b.amount)));
 }
+{
+  // 🔴 **邻界**靶(2026-08-12 独立审计实测:上一版只测 5 vs 3 这一个远点,
+  // 于是把上限放松成 `<= nexBurned + 1` 门照样 45/45 全绿 —— 而那意味着烧 3 退 4 会写一条 +4 NEX)。
+  // 判据边界只有紧挨着它的那个点测得出来。
+  reset({ nexRefunded: 4 });
+  const wd = await submit();
+  reconcilePost();
+  check("🔴 ④ **邻界**:退 4 = 烧 3 + 1 → 仍然一条都不写(只测远点的话上限松一格也全绿)",
+    plusNex(wd.id).length === 0, JSON.stringify(nexRows(wd.id).map((b) => b.amount)));
+}
 
 // ── ⑥ App.vue ⓪ 的存在性判据必须**含方向** ──────────────────────────
 // 抠真源码出来跑,不是 grep 字面量:判据若丢了方向,⓪ 会因为「这单已经有 NEX 行了」
@@ -431,6 +443,7 @@ const reconcilePost = () => runReconcile(app, bills, withdrawalBillDrafts, postR
         : "  INFO  🔴 ⑪ 并行包 z7 的回查契约**不带** nexRefunded —— 按现状合并后本包冲正不可达(HANDOFF U-9)。");
     } catch { /* 隔壁工作树不在本机:不影响本分支判定 */ }
   } else {
+    conditionalChecks += 1; // 这一格本轮真的跑了 → 下限同步 +1,不留白送的余量
     check("🔴 ⑪ 本仓已有状态回查面 → 它的响应契约**必须**带 `nexRefunded`(否则冲正永远拿不到证据)",
       /nexRefunded/.test(apiSrc.split(/interface WithdrawalStatusSnapshot|parseStatusSnapshot/)[1] ?? apiSrc),
       "回查响应里搜不到 nexRefunded —— 冲正判据拿不到证据,见 HANDOFF U-9");
@@ -493,6 +506,25 @@ const reconcilePost = () => runReconcile(app, bills, withdrawalBillDrafts, postR
     typeof after?.nexRefundedAt === "number"
       && after.nexRefundedAt >= refundT0 && after.nexRefundedAt <= refundT1,
     `nexRefundedAt=${after?.nexRefundedAt} 期望区间=[${refundT0}, ${refundT1}]`);
+
+  // ⑫b 🔴 **幂等重放分支**(独立审计 P0):幂等键已在盘时 `creditRewardBucketOnce` 走
+  // `adoptAccountSnapshot` + `return true` —— **不加钱**。返回 true 只保证「退过」,不保证「刚刚退的」。
+  // 此时若读闭包里那份**进循环之前**的 `wd` 快照,就会把「本次注意到」的时刻当成退款时刻写下,
+  // 冲正行落进错的月份且永不自愈 —— 本包要修的缺陷的镜像。
+  const OLD_REFUND_AT = Date.parse("2026-07-03T10:00:00.000Z");
+  mockApp.withdrawals = [{
+    id: "WD-MOCK-2", amount: 50, network: "USDT-TRC20", address: "T",
+    fee: { networkConfirmUsd: 1, nexBurned: 3, actualFeeUsd: 0 },
+    status: "tx-failed", riskRoute: "pass", riskReasons: [],
+    submittedAt: OLD_REFUND_AT - 3600e3, estimatedCompletion: OLD_REFUND_AT,
+    // 证据半写:金额那半没落上(模拟当初写盘失败),时刻那半在盘上。
+    nexRefunded: 0, nexRefundedAt: OLD_REFUND_AT,
+  }];
+  mockApp.refundFailedWithdrawals();
+  const replayed = mockApp.withdrawals.find((w) => w.id === "WD-MOCK-2");
+  check("🔴 ⑫b 重放分支上**已有的退款时刻不许被当前时钟覆盖**(读 stale 快照会把它盖成「本次注意到」)",
+    replayed?.nexRefundedAt === OLD_REFUND_AT,
+    `nexRefundedAt=${replayed?.nexRefundedAt} 期望=${OLD_REFUND_AT}(= 盘上已有的那个)`);
 }
 
 // ── ⑬ 🔴 冲正行的**日期**必须跟退款走,不跟提交走 ──────────────────────────────
@@ -589,6 +621,44 @@ check("🔴 ⑬ 判据自证:抠出来的分月键**恰好是月粒度**(同月�
     plus && plus.ts >= t0, `ts=${plus?.ts} submittedAt=${JULY}`);
 }
 
+// ⑬c2 🔴 **上界**:退款也不可能发生在未来。五份独立审计各自命中这一条(上一版只卡下界)。
+// 后端错发 `2099` 会让这行按 ts 倒序**永久钉在账单首位**、落进一个还没到的月份组,且落盘后永不自愈。
+{
+  reset({ nexRefunded: 0 });
+  const wd = await submit();
+  const FUTURE = Date.parse("2099-01-01T00:00:00.000Z");
+  app.withdrawals = app.withdrawals.map((w) => (w.id === wd.id
+    ? { ...w, submittedAt: JULY, nexRefunded: 3, nexRefundedAt: FUTURE } : w));
+  const t0 = Date.now();
+  reconcilePost();
+  const t1 = Date.now();
+  const plus = plusNex(wd.id)[0];
+  check("🔴 ⑬c2 退款时刻在**未来** → 当它没给,回落观测此刻(否则该行永久置顶在未来月份组)",
+    plus && plus.ts >= t0 && plus.ts <= t1, `ts=${plus?.ts} 服务端给的=${FUTURE}`);
+}
+
+// ⑬g 🔴 **共用资金原语**的纵深防御:非法 `atMs` 不许退回整批 ts。
+// 整批 ts 在唯一存量调用路径上**就是 `submittedAt`** —— 退回它 = 把本卡要修的缺陷原样放回去。
+{
+  reset();
+  bills.bindAccount(ACCT);
+  const t0 = Date.now();
+  // 直接喂原语:一条正常跟批、一条带非法 atMs。整批时刻取 JULY(模拟 ⓪ 传 submittedAt)。
+  const rows = bills.addMany([
+    { type: "withdraw", symbol: "USDT", amount: -1, status: "pending", memo: "x", ref: "WD-PRIM-1" },
+    { type: "withdraw", symbol: "NEX", amount: 1, status: "posted", memo: "y", ref: "WD-PRIM-1", atMs: Number.NaN },
+  ], JULY);
+  const t1 = Date.now();
+  check("⑬g 没带 atMs 的那条**跟整批走**(这是正常路径,不是降级)",
+    rows?.[0]?.ts === JULY, `ts=${rows?.[0]?.ts} 期望=${JULY}`);
+  check("🔴 ⑬g 带**非法** atMs 的那条盖观测此刻,**不退回整批 ts**(整批 ts 就是 submittedAt)",
+    rows?.[1] && rows[1].ts >= t0 && rows[1].ts <= t1 && rows[1].ts !== JULY,
+    `ts=${rows?.[1]?.ts} 整批=${JULY}`);
+  check("⑬g 且非法 atMs 不落进账单行",
+    !("atMs" in (rows?.[1] ?? {})) && !/"atMs"/.test(JSON.stringify(bills.bills)),
+    JSON.stringify(rows?.[1] ?? {}));
+}
+
 // ⑬f 跨账号直写盘那条路 —— **提交期间被换号**时分录写回真正被扣款的那个账号,走的是
 // `addManyForAccountOnce` 里另一段代码(不经过 `addMany`)。两段各有一处 `ts` 赋值,
 // 只测当前账号那条 = 换号路径可以悄悄漂移回整批时刻,而这一族门全绿(修一处≠修全部)。
@@ -609,8 +679,8 @@ check("🔴 ⑬ 判据自证:抠出来的分月键**恰好是月粒度**(同月�
 }
 
 // ⑬d 解析层:线上是 ISO-8601 **字符串**,客户端存 epoch ms。喂真 parseSubmission。
-// 🔴 不能只靠 `Date.parse`:`Date.parse("3")` 在 V8 上是 **2003-01-01** —— 后端错发一个裸数字串
-// 就能把冲正行扔进 2003 年,而所有静态门全绿(与同批 `Number(true) === 1` 同型)。
+// 🔴 不能只靠 `Date.parse`:`Date.parse("3")` 在 V8(node 24)上实测是 **2001-03-01**(本地)—— 后端错发一个裸数字串
+// 就能把冲正行扔进 2001 年,而所有静态门全绿(与同批 `Number(true) === 1` 同型)。
 {
   const realApi = createWithdrawalApi({ request: async () => globalThis.__probeRow });
   const baseRow = globalThis.__nextSubmission();
@@ -622,14 +692,25 @@ check("🔴 ⑬ 判据自证:抠出来的分月键**恰好是月粒度**(同月�
     catch (e) { return `threw:${e?.message ?? e}`; }
   };
   const ISO = "2026-08-05T11:30:00.000Z";
+  /** 只到日 = **降级兼容路径**,按**本地正午**解析(不是 Date.parse 的 UTC 午夜)。 */
+  const localNoon = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d, 12).getTime(); };
   const cases = [
     [ISO, Date.parse(ISO)],
-    ["2026-08-05", Date.parse("2026-08-05")], // 只到日:仍能定位到正确的月分组,收
+    ["2026-08-05T11:30:00+07:00", Date.parse("2026-08-05T11:30:00+07:00")], // 越南偏移必须收
+    ["2026-08-05", localNoon("2026-08-05")],
     [undefined, undefined], [null, undefined], ["", undefined],
-    ["3", undefined],            // 🔴 Date.parse 会读成 2003-01-01
+    ["3", undefined],            // 🔴 Date.parse 实测读成 2001-03-01
     ["2026", undefined],         // 同上,读成 2026-01-01
     [AUGUST, undefined],         // 裸 epoch 数字不是契约形状(线上是字符串)
     [true, undefined], ["not-a-date", undefined],
+    // 🔴 以下四族是 2026-08-12 独立审计打出来的、上一版**一条都没有**的真实坏值。
+    // 上一版用例集只覆盖「明显不像日期」的输入,于是 45/45 全绿而这四族全部放行。
+    ["2026-08-05junk", undefined],   // 尾部垃圾:前缀正则放行 → Date.parse 给 2026-06-07(差两个月)
+    ["2026-08-05//", undefined],     // 同族:实测给 2026-08-04(差一天,月末即跨月)
+    ["2026-08-05\\u0000", undefined],  // 同族:尾巴是转义序列字面量(整串锚定才拦得住)
+    ["2026-02-29", undefined],       // 日历进位:实测给 2026-03-01(换月)
+    ["2026-06-31", undefined],       // 同上:给 2026-07-01
+    ["2026-08-05 11:30:00", undefined], // 空格分隔不是 ISO-8601
   ];
   const got = [];
   for (const [input] of cases) got.push(await parseWith(input));
@@ -701,12 +782,55 @@ check("🔴 ⑬ 判据自证:抠出来的分月键**恰好是月粒度**(同月�
   check("🔴 ⑬e 金额打平时取**更完整**的那份(带时刻的)—— 否则准确日期被换成「不知道」",
     amt(tieBreak) === 3 && at(tieBreak) === AUGUST,
     JSON.stringify({ nexRefunded: amt(tieBreak), nexRefundedAt: at(tieBreak) }));
+
+  // 🔴 **镜像用例:证据放 `next` 侧**(2026-08-12 独立审计实测,上一版三条全是空转)。
+  // 合并循环是 `for (const w of [...latest, ...next])`,四个失败终态 rank 相同 ⇒ **latest 恒为 winner**。
+  // 上面三条把证据全放在 latest,于是 `{...winner}` **自带答案** —— 把被测的
+  // `nexRefundedAt: refundedAt` 整行删掉,三条照样全过。只有证据在**落败**那一侧才真正考验它。
+  const mirrorTie = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }), // next 侧带证据(落败侧)
+    mk({ status: "tx-failed", nexRefunded: 3 }),                        // latest 侧无时刻(胜出侧)
+  );
+  check("🔴 ⑬e 镜像:证据在**落败侧**时,时刻仍被取过来(上一版三条全在胜出侧 = 空转)",
+    amt(mirrorTie) === 3 && at(mirrorTie) === AUGUST,
+    JSON.stringify({ nexRefunded: amt(mirrorTie), nexRefundedAt: at(mirrorTie) }));
+  const mirrorAmount = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }), // next 侧金额更大
+    mk({ status: "tx-failed", nexRefunded: 0 }),
+  );
+  check("🔴 ⑬e 镜像:金额也在落败侧更大时,金额与时刻**成对**被取过来",
+    amt(mirrorAmount) === 3 && at(mirrorAmount) === AUGUST,
+    JSON.stringify({ nexRefunded: amt(mirrorAmount), nexRefundedAt: at(mirrorAmount) }));
+
+  // 🔴 `0` 必须被判成「没有时刻」而不是「有时刻」(独立审计实测:把 `> 0` 放宽成 `>= 0` 门全绿)。
+  // 放宽后 0 会在平局分支里冒充「更完整的那份」,顶掉真正带准确日期的一份 → 冲正行回落观测此刻。
+  const zeroInstant = mergeAccountSnapshots(
+    mk({ status: "tx-failed" }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: AUGUST }),
+    mk({ status: "tx-failed", nexRefunded: 3, nexRefundedAt: 0 }),
+  );
+  check("🔴 ⑬e `nexRefundedAt: 0` 判为**没有时刻**,不许顶掉真正准确的那一份",
+    amt(zeroInstant) === 3 && at(zeroInstant) === AUGUST,
+    JSON.stringify({ nexRefunded: amt(zeroInstant), nexRefundedAt: at(zeroInstant) }));
+  // 🔴 上面这条守的是「`numericRefundedAt` 里的 `> 0`」:放宽成 `>= 0` 后,0 会在平局分支里
+  // 冒充「带时刻的那份」并顶掉真正准确的一份 —— 红测实测该变异判红,靠的正是这条用例。
+  //
+  // 📝 过程留痕(免得下一个人重走):我一度给 `pickRefundEvidence` 加过一个「按消费方谓词排序」的
+  // 分支,那时这条变异确实变成良性的(0 在排序阶段就出局),我也据此写了「不该红」的结论。
+  // 随后那个分支因 `account-cloud` 必须 value-import-free(SPEC-4 哨兵)而回滚,
+  // 于是「不该红」的结论同步作废。**结论会随代码作废,别把某一轮的判断当成永久事实。**
 }
 
 // 🔴 样本量当判据:PASS 数少于下限 = 有断言被删/跳过,按红处理(空集全过是哨兵最常见的假绿)。
-// 🔴 下限必须**等于**实际断言数(45),不能留富余:红测实测,下限低一档时删掉任意一条断言
-// 会得到 pass=44 / fail=0 → 门照样绿。留一条的余量 = 允许悄悄删一条。
-const MIN_PASS = 45;
+//
+// 🔴 下限**不是手写常量**(2026-08-12 独立审计实测:上一版写死 45,而 ⑪ 是条件式空过 ——
+// z7 的回查面一合入,那一格改调 `check()`、总数变 46,于是**可以静默删掉任意一条断言**仍报 45 通过。
+// 门里自己写着「留余量 = 允许悄悄删一条」,而我亲手造了一个**会自己长出余量**的结构)。
+// 改成:无条件断言数写死,条件式那几格**各自登记**,下限 = 写死数 + 本轮真正激活的条件格数。
+const UNCONDITIONAL_MIN = 54;
+const MIN_PASS = UNCONDITIONAL_MIN + conditionalChecks;
 console.log(`\nselfcheck-withdraw-nex-refund: ${pass} passed, ${fail} failed (min pass ${MIN_PASS})`);
 if (fail > 0 || pass < MIN_PASS) {
   console.log(`FAIL — fail=${fail} pass=${pass}(pass 低于 ${MIN_PASS} = 有断言被删或跳过,同样判红)`);
