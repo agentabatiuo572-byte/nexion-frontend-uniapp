@@ -328,6 +328,70 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
  * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
  * last-write 会把已到账的单退回处理中。
  */
+/** 合并用的安全取值:存量单 / 脏盘上它可能是 undefined 或任何东西,非法一律当 0(= 没退)。 */
+function numericRefunded(w: Withdrawal): number {
+  const v = (w as { nexRefunded?: unknown }).nexRefunded;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+}
+
+/** 同上,时刻面。非法 / 缺失 = `undefined`,与消费方 `isUsableRefundInstant` 的值域对齐(0 会被它判越界)。 */
+function numericRefundedAt(w: Withdrawal): number | undefined {
+  const v = (w as { nexRefundedAt?: unknown }).nexRefundedAt;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+/**
+ * 🔴 退款事实 = **金额 + 发生时刻**,必须整对取自**同一份**快照。
+ *
+ * 为什么不能各取各的:两边各按自己的规则挑(金额取大、时刻取大/取胜者)会拼出一份
+ * **不存在于任何一端**的事实 —— 比如 A 份「退 3 · 8 月 2 日」、B 份「退 0 · 无时刻」,
+ * 分开取会得到「退 3 · 无时刻」,冲正行于是回落到观测时刻,而准确日期本来就在 A 份里。
+ * 金额面 z6 已经栽过一次(整对象按状态 rank 取胜,平局把退款事实整份丢弃);
+ * 时刻面是同一个丢失面的另一半,一并按事实整对取。
+ *
+ * 取法:金额大的那份胜(退款单调不减,大的是更新的证据);金额相同(含都为 0)时,
+ * 优先**消费方会接受**的那份,再退到「带时刻的那份更完整」。
+ *
+ * 🔴 **已知缺口,本轮不修,理由是架构约束不是遗漏**(2026-08-12):
+ * 独立审计报出「本层放行了消费方会拒绝的时刻(如早于提交的值),于是合法时刻可能被非法值顶掉、
+ * 再被消费方丢弃 —— 准确日期掉进两次判据的缝里」。证伪结论:方向对,应当**用消费方的谓词排序**
+ * (只排序,绝不拿它把值置 `undefined` —— 本层写 undefined 是把值从盘上抹掉,不可恢复)。
+ *
+ * 但本文件头注写明它**必须保持 value-import-free**:SPEC-4 的合并哨兵会把它转译进一个裸 node VM,
+ * Vite 别名在那里解析不了。实测:从 `lib/withdrawal-bill-drafts` import 那个谓词 →
+ * `Cannot find module '@/lib/withdrawal-bill-drafts'`,SPEC-4 门当场判红。
+ * 而在这里复制第二份谓词,又正是「同一概念两处各自推导」——本仓明令要配逐键 parity 哨兵才许做。
+ * 故本轮**不做**,登记为待办:要么给哨兵补别名解析,要么把谓词降到一个双方都能 import 的无依赖模块。
+ * 残余风险在解析层收紧(整串锚定 + 双向值域)之后已明显变窄,但没有归零。
+ */
+function pickRefundEvidence(a: Withdrawal, b: Withdrawal): Withdrawal {
+  const ra = numericRefunded(a);
+  const rb = numericRefunded(b);
+  if (ra !== rb) return ra > rb ? a : b;
+  return numericRefundedAt(a) !== undefined ? a : b;
+}
+
+/**
+ * 🔴 把退款事实盖回合并结果 —— **与「谁赢」这件事解耦**(2026-08-12 包 z8 并入主线时做的语义并集)。
+ *
+ * 两条支线在同一个缺陷上各修了一半,二选一都会丢东西,故合成一条:
+ *  · 主线修的是「同档位赢家通吃 → 输家独有的字段整拍丢失」,解法是同档位逐字段派生合并;
+ *  · 包 z8 修的是「退款事实随整对象一起被淘汰」,解法是金额取大 + 金额与时刻整对取。
+ *
+ * 为什么退款事实不能交给逐字段合并处理:那条规则是「内存这一拍为准」,而退款**单调不减** ——
+ * 内存的 0 只可能是这一端还没看到,不该把磁盘上已知的 3 抹回去。
+ * 为什么档位不同也要过这一道:输家可能是**唯一**带着退款证据的那份(状态先变、退款后补,
+ * 或反之),整行择一会把它连同证据一起丢掉;而冲正分录的唯一判据就是这个字段。
+ */
+function applyRefundEvidence(base: Withdrawal, a: Withdrawal, b: Withdrawal): Withdrawal {
+  const evidence = pickRefundEvidence(a, b);
+  const refunded = numericRefunded(evidence);
+  if (refunded <= 0) return base;
+  const refundedAt = numericRefundedAt(evidence);
+  if (numericRefunded(base) === refunded && numericRefundedAt(base) === refundedAt) return base;
+  return { ...base, nexRefunded: refunded, nexRefundedAt: refundedAt };
+}
+
 /**
  * 同一状态的两份提现单快照 → 逐字段合并(不是二选一)。
  *
@@ -345,6 +409,9 @@ function mergeSameStatusWithdrawal(disk: Withdrawal, memory: Withdrawal): Withdr
   // `{...disk, ...memory}` 本身已能处理「内存缺这个键」;补的是「内存**显式给了 undefined**」
   // 那一种(展开时会把磁盘的值覆盖掉)。提现单没有任何「把字段清空」的合法路径,
   // 所以「内存是 undefined」一律解释成「这一拍没带」,不解释成「要清掉」。
+  //
+  // ⚠️ 退款事实(nexRefunded / nexRefundedAt)是本规则的**唯一例外**,由调用方统一走
+  // applyRefundEvidence 盖回:那两个字段单调不减且必须整对同源,不适用「内存为准」。
   const merged = { ...disk, ...memory } as unknown as Record<string, unknown>;
   const from = disk as unknown as Record<string, unknown>;
   for (const key of Object.keys(from)) {
@@ -368,10 +435,7 @@ function mergeWithdrawals(
     const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
     const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
     // 状态档位决定胜负(遍历序 `[...latest, ...next]` 让磁盘行先入 map,内存行是挑战方)。
-    if (c !== a) {
-      byId.set(w.id, c > a ? w : prev);
-      continue;
-    }
+    //
     // 🔴 **同档位不是平局,是「同一状态的两份快照」** —— 必须按字段合并,不能整行择一。
     // 缺陷(2026-08-11 R1 审计,包 z7 立案的直接原因):服务端这一拍只补了终态原因
     // (状态没变),整行择一时磁盘旧行赢 → 那条原因整拍丢失,而终态单不再被回查 = 永久丢。
@@ -381,11 +445,17 @@ function mergeWithdrawals(
     // 判据:同档位时逐字段取「有值的那个」,双方都有值以内存(本端刚写入的)为准。
     // 只处理提现单的可选信息字段,不碰 status/金额/地址等身份与钱面(它们同档位下本就相等)。
     //
+    // 🔴 退款事实(金额 + 时刻)**两条支线都要过** applyRefundEvidence,与档位无关:
+    // 它单调不减且必须整对同源,档位不同的那一支里输家可能是唯一带着证据的那份
+    // (实测 `tx-failed→tx-failed`、`tx-failed→refunded`、重复投递三种情形合并后 nexRefunded 全变 0),
+    // 而冲正分录的唯一判据就是这个字段 —— 丢了就等于退款从没发生过,且所有静态门全绿。
+    //
     // ⚠️ 本包**刻意不引入**「谁更新」的时序字段来做仲裁:那需要可信时钟、
     // 跨端协调与字段级冲突规则,是一次独立的仲裁重构(主人 2026-08-12 拍板拆成独立卡),
     // 不该由一张契约卡附带。**因此「frozen 与四个终态同档 → 冻结单收不到最终结论」
     // 这条主线既有缺陷在本包内仍然存在**,已独立立卡,证据见该卡。
-    byId.set(w.id, mergeSameStatusWithdrawal(prev, w));
+    const decided = c !== a ? (c > a ? w : prev) : mergeSameStatusWithdrawal(prev, w);
+    byId.set(w.id, applyRefundEvidence(decided, prev, w));
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
   const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));

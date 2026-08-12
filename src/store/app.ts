@@ -1276,8 +1276,35 @@ export const useApp = defineStore("app", () => {
       // NEX 抵扣费退还:独立幂等键;usdt 参数位传 0、NEX 走第 4 参(方向搞反 = 把 NEX
       // 个数当美元退)。与 USDT 行互不阻塞:任一落盘失败,各自幂等键在下次调用重放补齐。
       const burnedNex = wd.fee?.nexBurned;
-      if (Number.isFinite(burnedNex) && burnedNex > 0) {
-        creditRewardBucketOnce("refund-nex:" + wd.id, "withdrawable", 0, burnedNex);
+      if (Number.isFinite(burnedNex) && burnedNex > 0
+        && creditRewardBucketOnce("refund-nex:" + wd.id, "withdrawable", 0, burnedNex)) {
+        // 🔴 钱退了就得留下**退款事实**,否则账本没有对手方(2026-08-11 独立审计 P1)。
+        //
+        // 冲正分录的唯一判据是单据上的 `nexRefunded`(FEAT-WD01 §4.6)。remote 模式下那个数
+        // 由服务端下发;而**本地这条退款腿只在 mock 模式下真会执行**(上一行的
+        // creditRewardBucketOnce 对 remote 直接早退返回 false)—— 若不在这里补写证据,
+        // mock 下就成了「钱包里 NEX 加回来了、账单上一条冲正也没有」:
+        // 正是本包要修的那个形态换到另一个模式复发。两条腿必须同生共死。
+        //
+        // 只在**真退了**(返回 true = 本次或此前已幂等落账)时写,且只增不减 ——
+        // 与 account-cloud 合并层的取大语义一致,不会把服务端已知的更大值抹小。
+        //
+        // 🔴 证据是**金额 + 发生时刻**一对,只写金额等于让下游回落到「构造时的此刻」。
+        //
+        // 🔴 **必须读 adopt 之后的当前行,不能读闭包里的 `wd`**(2026-08-12 独立审计 P0):
+        // `wd` 是**进循环之前**那份 `withdrawals.value` 的快照,而上一行的 `creditRewardBucketOnce`
+        // 在「幂等键已落盘」时会 `adoptAccountSnapshot(stored)` 把整份内存态换掉(见 creditRewardBucketInternal)。
+        // 读 stale 的 `wd` 会让「此前已退、本次只是重放」被当成「刚刚退的」,把**本次注意到的时刻**
+        // 写成退款时刻 —— 冲正行落进错的月份且永不自愈,正是本包要修的缺陷的镜像。
+        // 同理:返回 true 只保证「退过」,**不保证刚刚退的**,所以已有时刻时一律不覆盖。
+        const cur = withdrawals.value.find((w) => w.id === wd.id) ?? wd;
+        const already = typeof cur.nexRefunded === "number" ? cur.nexRefunded : 0;
+        if (already < burnedNex) {
+          const refundedAt = cur.nexRefundedAt ?? mockServerNow();
+          withdrawals.value = withdrawals.value.map((w) =>
+            (w.id === wd.id ? { ...w, nexRefunded: burnedNex, nexRefundedAt: refundedAt } : w));
+          persistAccountSnapshot();
+        }
       }
     }
     return done;
