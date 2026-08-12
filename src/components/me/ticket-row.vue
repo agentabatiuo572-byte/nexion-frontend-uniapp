@@ -20,7 +20,7 @@
           <text v-if="tk.unread > 0" :style="unreadChipStyle">{{ unreadLabel }}</text>
         </view>
         <text class="block" :style="subjectStyle">{{ tk.subject }}</text>
-        <text class="block" :style="timeStyle">{{ relWhen(tk.updatedAt) }} · {{ tk.messages.length }} messages</text>
+        <text class="block" :style="timeStyle">{{ relWhen(tk.updatedAt) }} · {{ messageCountLabel }}</text>
       </view>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 4px"><path d="m9 18 6-6-6-6" /></svg>
     </view>
@@ -31,24 +31,25 @@
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { CATEGORY_LABEL, STATUS_LABEL, STATUS_COLOR, type Ticket } from "@/mock/tickets";
+import { STATUS_COLOR, type Ticket } from "@/domain/support";
 
 const props = withDefaults(defineProps<{ tk: Ticket; divider?: boolean }>(), { divider: true });
 const emit = defineEmits<{ open: [] }>();
 const t = useT();
 
 const statusColor = computed(() => STATUS_COLOR[props.tk.status]);
-const statusLabel = computed(() => STATUS_LABEL[props.tk.status]);
-const categoryLabel = computed(() => CATEGORY_LABEL[props.tk.category]);
+const statusLabel = computed(() => t.value.tickets.status[props.tk.status]);
+const categoryLabel = computed(() => t.value.tickets.category[props.tk.category]);
 const unreadLabel = computed(() => fmt(t.value.tickets.unreadChip, { n: props.tk.unread }));
-const openLabel = computed(() => `Open ${props.tk.id} · ${props.tk.subject}`);
+const messageCountLabel = computed(() => fmt(t.value.tickets.messagesCount, { n: props.tk.messageCount }));
+const openLabel = computed(() => fmt(t.value.tickets.openAria, { id: props.tk.id, subject: props.tk.subject }));
 
 function relWhen(ts: number): string {
   const ms = Date.now() - ts;
-  if (ms < 60_000) return "just now";
-  if (ms < 3600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
+  if (ms < 60_000) return t.value.tickets.timeJustNow;
+  if (ms < 3600_000) return fmt(t.value.tickets.timeMinutesAgo, { n: Math.floor(ms / 60_000) });
+  if (ms < 86_400_000) return fmt(t.value.tickets.timeHoursAgo, { n: Math.floor(ms / 3600_000) });
+  return fmt(t.value.tickets.timeDaysAgo, { n: Math.floor(ms / 86_400_000) });
 }
 
 // Transparent hairline row (was one card per ticket) — parent opens the group

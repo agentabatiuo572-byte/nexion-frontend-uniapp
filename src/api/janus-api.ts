@@ -106,6 +106,11 @@ export interface JanusTakeoverProgress {
   failureClass?: "delivery" | "target" | "webview" | "handoff" | "lease" | "cleanup" | "contract";
   failureMessage?: string;
   reconciliationId?: string;
+  proofMode?: "SANDBOX" | "PRODUCTION";
+  executorId?: string;
+  proofNonce?: string;
+  proofTimestamp?: number;
+  proofSignature?: string;
 }
 
 export interface JanusAck {
@@ -114,6 +119,17 @@ export interface JanusAck {
   success: boolean;
   appliedStatus?: JanusStatus;
   message: string;
+  handoffReceipt?: string;
+  deviceAppliedVersion?: number;
+  deviceAppVersion?: string;
+  actualTargetId?: string;
+  actualTargetVersion?: number;
+  actualTargetCatalogVersion?: number;
+  proofMode?: "SANDBOX" | "PRODUCTION";
+  executorId?: string;
+  proofNonce?: string;
+  proofTimestamp?: number;
+  proofSignature?: string;
 }
 
 export interface JanusAckResult {

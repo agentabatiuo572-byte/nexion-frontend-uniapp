@@ -40,16 +40,25 @@ import { fmt } from "@/i18n/format";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { activateChannel, INVITER_REWARD_USDT_ESTIMATE, visibleChannels } from "@/lib/share";
 import type { ShareChannelDef, ShareChannelKey } from "@/store/config-types";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useReferralReward } from "@/store/referral-reward";
 
 defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void; (e: "openPoster"): void }>();
 
 const t = useT();
 const phase = useProductPhase();
+const rewards = useReferralReward();
 
 // §8.1.1 口径:估值 × 阶段倍率(与邀请卡同一单源常量,F4)。
 const dollarReward = computed(() => Math.round(INVITER_REWARD_USDT_ESTIMATE * phase.value.inviteBonusMultiplier));
 const rewardLineText = computed(() => {
+  if (remoteApiEnabled) {
+    const nex = rewards.snapshot?.inviterRewardNex;
+    return nex === undefined
+      ? "Server invitation reward unavailable"
+      : `Server-set reward: ${nex.toLocaleString()} NEX per settled invitation`;
+  }
   const base = fmt(t.value.share.rewardLine, { usd: dollarReward.value });
   const m = phase.value.inviteBonusMultiplier;
   if (m <= 1) return base;

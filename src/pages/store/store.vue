@@ -19,17 +19,48 @@
       <!-- Sprint 2 finale — phase + legacy-ownership trade-in window -->
       <TradeinWindowBanner />
 
-      <SectionHeader :title="t.store.secRecommended">
-        <template #right>
-          <text class="font-mono-tabular inline-flex items-center gap-1" :style="amberTagStyle">{{ t.store.secRecommendedTag }}</text>
-        </template>
-      </SectionHeader>
-      <ProductCard v-if="featured" :product="featured" featured />
+      <!-- Server mode has no seeded purchase inventory. Keep the live catalog
+           state visible so a malformed or empty response cannot hide every CTA. -->
+      <view v-if="catalogStatus === 'loading'" data-testid="store-catalog-loading" :style="catalogStateStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
+      </view>
+      <view v-else-if="catalogStatus === 'error'" data-testid="store-catalog-error" :style="catalogStateStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
+        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
+          <text>{{ t.store.catalogRetry }}</text>
+        </view>
+      </view>
+      <view v-else-if="!catalogHasProducts" data-testid="store-catalog-empty" :style="catalogStateStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogEmptyTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogEmptyBody }}</text>
+      </view>
+      <template v-else>
+        <SectionHeader :title="t.store.secRecommended">
+          <template #right>
+            <text class="font-mono-tabular inline-flex items-center gap-1" :style="amberTagStyle">{{ t.store.secRecommendedTag }}</text>
+          </template>
+        </SectionHeader>
+        <ProductCard v-if="featured" :product="featured" featured />
 
-      <PurchaseTicker />
+        <PurchaseTicker />
 
-      <SectionHeader :title="t.store.secMoreTiers" />
-      <ProductCard v-for="p in restProducts" :key="p.id" :product="p" />
+        <SectionHeader v-if="restProducts.length > 0" :title="t.store.secMoreTiers" />
+        <ProductCard v-for="p in restProducts" :key="p.id" :product="p" />
+
+        <!-- "Coming soon" — gen-2 phase-locked -->
+        <view v-if="lockedProducts.length > 0">
+          <SectionHeader :title="t.store.secComingSoon">
+            <template #right>
+              <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.comingSoonNote }}</text>
+            </template>
+          </SectionHeader>
+          <view class="space-y-2.5">
+            <LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" />
+          </view>
+        </view>
+      </template>
 
       <!-- 尊享席位 — Genesis 独立金融 SKU 入口(升级阶梯压轴;规格 FEAT-GEN07,
            非设备目录成员,经济模型在 store/genesis.ts,资格门 FEAT-GEN08)。
@@ -37,18 +68,6 @@
       <view v-if="genesisCfg.config.showcaseEnabled">
         <SectionHeader :title="t.store.secGenesis" />
         <GenesisShowcaseCard />
-      </view>
-
-      <!-- "Coming soon" — gen-2 phase-locked -->
-      <view v-if="lockedProducts.length > 0">
-        <SectionHeader :title="t.store.secComingSoon">
-          <template #right>
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ t.store.comingSoonNote }}</text>
-          </template>
-        </SectionHeader>
-        <view class="space-y-2.5">
-          <LockedProductCard v-for="p in lockedProducts" :key="p.id" :product="p" />
-        </view>
       </view>
 
       <!-- 《02》§7:Mono 仅限 <5 词短标签/数字;这是 8 词促销 callout 整句,改正文字体 -->
@@ -74,6 +93,7 @@ import { onShow } from "@dcloudio/uni-app";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { isPhaseReached } from "@/store/product-phase";
 
@@ -82,7 +102,10 @@ const genesisCfg = useGenesisConfig();
 // 🔴 商城页渲染创世尊享卡(受闸 CTA + 上架开关),必须跟着重读(独立验收 P1)。
 //   注意 `showcaseEnabled` 由 false→true 时卡片本身不挂载,composable 的 onMounted 够不着,
 //   只有页面级 onShow 能把它翻回来。
-onShow(() => genesisCfg.refresh());
+onShow(() => {
+  genesisCfg.refresh();
+  if (productCatalogState.status !== "ready") void refreshProductCatalog(true);
+});
 const phase = useProductPhase();
 
 // mounted guard: phase override persists in storage, rehydrates client-only —
@@ -92,8 +115,17 @@ onMounted(() => {
   mounted.value = true;
 });
 
+// `PRODUCTS` is deliberately a compatibility array for legacy consumers. Its
+// server replacement is not itself reactive, so make the catalog state an
+// explicit computed dependency. When the authoritative response reaches ready,
+// these computed listings run again against the new array.
+const catalogStatus = computed(() => productCatalogState.status);
+const catalogHasProducts = computed(() => {
+  const status = productCatalogState.status;
+  return status === "ready" && PRODUCTS.length > 0;
+});
 const unlockedProducts = computed(() =>
-  PRODUCTS.filter((p) => {
+  (productCatalogState.status === "ready" ? PRODUCTS : []).filter((p) => {
     if (!p.unlocksAtPhase) return true;
     if (!mounted.value) return false;
     return isPhaseReached(phase.value, p.unlocksAtPhase);
@@ -115,6 +147,10 @@ const restProducts = computed(() =>
   unlockedProducts.value.filter((p) => p.id !== featured.value?.id),
 );
 
+function retryCatalog() {
+  void refreshProductCatalog(true);
+}
+
 // "热门" tag — border line removed per request, soft bg kept (V5 inner-chip rule:
 // soft bg tint + content color, no border).
 const amberTagStyle: CSSProperties = {
@@ -126,5 +162,32 @@ const amberTagStyle: CSSProperties = {
   fontWeight: 500,
   letterSpacing: "0.04em",
   whiteSpace: "nowrap",
+};
+
+const catalogStateStyle: CSSProperties = {
+  padding: "18px 16px",
+  borderRadius: "16px",
+  background: "var(--v5-surface)",
+  border: "1px solid var(--v5-border)",
+};
+const catalogStateTitleStyle: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+};
+const catalogStateBodyStyle: CSSProperties = {
+  fontSize: "13px",
+  lineHeight: "19px",
+  color: "var(--v5-ink-3)",
+};
+const catalogRetryStyle: CSSProperties = {
+  minHeight: "36px",
+  alignItems: "center",
+  padding: "0 14px",
+  borderRadius: "9999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
 };
 </script>

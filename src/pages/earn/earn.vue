@@ -27,6 +27,11 @@
     </template>
 
     <CardStagger class="pt-6 pb-4 space-y-6" style="color: var(--v5-ink)">
+      <view v-if="app.remoteFleetStatus === 'error'" class="mx-4 rounded-xl" style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
+        <text class="block" style="font-size: 13px; font-weight: 600">{{ t.wallet.syncFailedTitle }}</text>
+        <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.syncFailedBody }}</text>
+        <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)" @click="retryFleet">{{ t.tradein.errPleaseRetry }}</view>
+      </view>
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">
         <!-- 轨道贴页面底:surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1 surface;选中 pill 已是 brand-soft,不撞色 -->
@@ -99,6 +104,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import CardStagger from "@/components/card-stagger.vue";
 import TrialHeroBanner from "@/components/trial-hero-banner.vue";
@@ -114,6 +120,8 @@ import { useApp } from "@/store/app";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useCapacityExplainer } from "@/composables/use-capacity-explainer";
+import { useFreeTrial } from "@/store/free-trial";
+import { remoteApiEnabled } from "@/api/runtime";
 
 type Range = "Today" | "Week" | "Month" | "All";
 const RANGES: Range[] = ["Today", "Week", "Month", "All"];
@@ -121,6 +129,15 @@ const RANGES: Range[] = ["Today", "Week", "Month", "All"];
 const app = useApp();
 const t = useT();
 const range = ref<Range>("Today");
+const freeTrial = useFreeTrial();
+
+// The banner is the first discoverable H2 entry. Do not make a new user wait
+// for the global poll before we know whether the server has made it eligible.
+onShow(() => {
+  if (remoteApiEnabled) void freeTrial.refreshRemote(true);
+});
+
+function retryFleet() { void app.refreshRemoteFleet().catch(() => undefined); }
 function rangeLabel(r: Range): string { return r === "Today" ? t.value.earn.rangeToday : r === "Week" ? t.value.earn.rangeWeek : r === "Month" ? t.value.earn.rangeMonth : t.value.earn.rangeAll; }
 
 // FEAT-DEV01: 任务池提示线展开态 + W-CAP1 弹层入口。

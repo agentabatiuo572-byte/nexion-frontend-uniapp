@@ -79,14 +79,40 @@ export interface CanonicalTradeinResult {
   walletBalanceAfterUsdt: number;
 }
 
+export type CapacityReplaceDecision = "CAPACITY_AVAILABLE" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
+
+export interface CanonicalCapacityReplaceQuote {
+  decision: CapacityReplaceDecision;
+  activeDevices: number;
+  maxActiveDevices: number;
+  sourceDeviceId: number | null;
+  sourceDeviceName: string | null;
+  targetProductId: number;
+  targetProductNo: string;
+  targetProductName: string;
+  targetPriceUsdt: number;
+  payableUsdt: number;
+  walletBalanceUsdt: number;
+  sufficientFunds: boolean;
+  decisionSource: "server";
+}
+
 export interface DeviceE3Api {
   fleet(): Promise<CanonicalE3Fleet>;
   tradeinConfig(): Promise<CanonicalTradeinConfig>;
   quote(sourceDeviceId: number, targetProductNo: string): Promise<CanonicalTradeinQuote>;
+  capacityQuote(targetProductNo: string): Promise<CanonicalCapacityReplaceQuote>;
+  capacityReplace(
+    sourceDeviceId: number,
+    targetProductNo: string,
+    idempotencyKey: string,
+    expectedQuote: CanonicalCapacityReplaceQuote,
+  ): Promise<CanonicalTradeinResult>;
   submit(
     sourceDeviceId: number,
     targetProductNo: string,
     idempotencyKey: string,
+    expectedQuote: CanonicalTradeinQuote,
   ): Promise<CanonicalTradeinResult>;
   activate(deviceId: number, clientMaxDevices: number, idempotencyKey: string): Promise<void>;
 }
@@ -108,9 +134,8 @@ function string(value: unknown, allowEmpty = false): string {
 }
 
 function number(value: unknown, minimum = 0): number {
-  const parsed = typeof value === "string" && value.trim() ? Number(value) : value;
-  if (typeof parsed !== "number" || !Number.isFinite(parsed) || parsed < minimum) return invalid();
-  return parsed;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) return invalid();
+  return value;
 }
 
 function integer(value: unknown, minimum = 0): number {
@@ -125,12 +150,8 @@ function boolean(value: unknown): boolean {
 }
 
 function timestamp(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined) return null;
   if (typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
-  if (typeof value === "string") {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
   return invalid();
 }
 
@@ -236,15 +257,18 @@ function quote(value: unknown): CanonicalTradeinQuote {
   };
   if (
     result.discountUsdt > result.targetPriceUsdt
+    || result.outputRatioPct > 100
+    || result.creditRatePct > 100
     || Math.abs((result.targetPriceUsdt - result.discountUsdt) - result.payableUsdt) > 0.00001
-    || result.sufficientFunds !== (result.walletShortfallUsdt === 0)
+    || Math.abs(result.walletShortfallUsdt - Math.max(0, result.payableUsdt - result.walletBalanceUsdt)) > 0.00001
+    || result.sufficientFunds !== (result.walletBalanceUsdt >= result.payableUsdt)
   ) return invalid();
   return result;
 }
 
 function result(value: unknown): CanonicalTradeinResult {
   const source = record(value);
-  return {
+  const parsed = {
     tradeinNo: string(source.tradeinNo),
     orderNo: string(source.orderNo),
     sourceDeviceId: integer(source.sourceDeviceId, 1),
@@ -255,6 +279,70 @@ function result(value: unknown): CanonicalTradeinResult {
     walletDebitUsdt: number(source.walletDebitUsdt),
     walletBalanceAfterUsdt: number(source.walletBalanceAfterUsdt),
   };
+  if (parsed.applicationStatus !== "COMPLETED" || parsed.orderStatus !== "COMPLETED") return invalid();
+  return parsed;
+}
+
+function sameMoney(actual: number, expected: number): boolean {
+  return Math.abs(actual - expected) <= 0.000001;
+}
+
+function assertResultMatchesQuote(
+  parsed: CanonicalTradeinResult,
+  expected: { sourceDeviceId: number; discountUsdt: number; payableUsdt: number; walletBalanceUsdt: number },
+): CanonicalTradeinResult {
+  if (parsed.sourceDeviceId !== expected.sourceDeviceId
+      || !sameMoney(parsed.discountUsdt, expected.discountUsdt)
+      || !sameMoney(parsed.walletDebitUsdt, expected.payableUsdt)
+      || !sameMoney(parsed.walletBalanceAfterUsdt, expected.walletBalanceUsdt - expected.payableUsdt)) {
+    return invalid("E3_TRADEIN_RESULT_QUOTE_MISMATCH");
+  }
+  return parsed;
+}
+
+function nullableInteger(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return integer(value, 1);
+}
+
+function nullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  return string(value);
+}
+
+function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
+  const source = record(value);
+  const decision = string(source.decision).toUpperCase() as CapacityReplaceDecision;
+  if (!["CAPACITY_AVAILABLE", "NO_ACTIVE_DEVICE", "REPLACE_REQUIRED"].includes(decision)) return invalid();
+  const parsed: CanonicalCapacityReplaceQuote = {
+    decision,
+    activeDevices: integer(source.activeDevices),
+    maxActiveDevices: integer(source.maxActiveDevices, 1),
+    sourceDeviceId: nullableInteger(source.sourceDeviceId),
+    sourceDeviceName: nullableString(source.sourceDeviceName),
+    targetProductId: integer(source.targetProductId, 1),
+    targetProductNo: string(source.targetProductNo),
+    targetProductName: string(source.targetProductName),
+    targetPriceUsdt: number(source.targetPriceUsdt),
+    payableUsdt: number(source.payableUsdt),
+    walletBalanceUsdt: number(source.walletBalanceUsdt),
+    sufficientFunds: boolean(source.sufficientFunds),
+    decisionSource: source.decisionSource === "server" ? "server" : invalid(),
+  };
+  if (parsed.payableUsdt !== parsed.targetPriceUsdt
+      || parsed.sufficientFunds !== (parsed.walletBalanceUsdt >= parsed.payableUsdt)
+      || (parsed.sourceDeviceId === null) !== (parsed.sourceDeviceName === null)) return invalid();
+  const belowCap = parsed.activeDevices < parsed.maxActiveDevices;
+  if (belowCap) {
+    if (decision !== "CAPACITY_AVAILABLE" || parsed.sourceDeviceId !== null) return invalid();
+  } else if (decision === "REPLACE_REQUIRED") {
+    if (parsed.sourceDeviceId === null || parsed.sourceDeviceName === null) return invalid();
+  } else if (decision === "NO_ACTIVE_DEVICE") {
+    if (parsed.sourceDeviceId !== null || parsed.sourceDeviceName !== null) return invalid();
+  } else {
+    return invalid();
+  }
+  return parsed;
 }
 
 function validTargetNo(value: string): string {
@@ -280,15 +368,56 @@ export function createDeviceE3Api(client: ApiClient): DeviceE3Api {
         body: { sourceDeviceId: integer(sourceDeviceId, 1), targetProductNo: validTargetNo(targetProductNo) },
       }));
     },
-    async submit(sourceDeviceId, targetProductNo, idempotencyKey) {
+    async capacityQuote(targetProductNo) {
+      return capacityQuote(await client.request<unknown>({
+        method: "POST",
+        path: "/api/app/trade-in/capacity-quote",
+        body: { targetProductNo: validTargetNo(targetProductNo) },
+      }));
+    },
+    async capacityReplace(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
       const key = idempotencyKey.trim();
       if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
-      return result(await client.request<unknown>({
+      if (expectedQuote.decision !== "REPLACE_REQUIRED"
+          || expectedQuote.sourceDeviceId !== sourceDeviceId
+          || expectedQuote.targetProductNo !== targetProductNo
+          || expectedQuote.decisionSource !== "server") {
+        throw new ApiError({ kind: "configuration", message: "CAPACITY_REPLACEMENT_QUOTE_CONTEXT_INVALID" });
+      }
+      return assertResultMatchesQuote(result(await client.request<unknown>({
+        method: "POST",
+        path: "/api/app/trade-in/capacity-replace",
+        body: {
+          sourceDeviceId: integer(sourceDeviceId, 1),
+          targetProductNo: validTargetNo(targetProductNo),
+          expectedPayableUsdt: number(expectedQuote.payableUsdt),
+        },
+        idempotencyKey: key,
+      })), {
+        sourceDeviceId,
+        discountUsdt: 0,
+        payableUsdt: expectedQuote.payableUsdt,
+        walletBalanceUsdt: expectedQuote.walletBalanceUsdt,
+      });
+    },
+    async submit(sourceDeviceId, targetProductNo, idempotencyKey, expectedQuote) {
+      const key = idempotencyKey.trim();
+      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+      if (expectedQuote.sourceDeviceId !== sourceDeviceId
+          || expectedQuote.targetProductNo !== targetProductNo) {
+        throw new ApiError({ kind: "configuration", message: "TRADEIN_QUOTE_CONTEXT_INVALID" });
+      }
+      return assertResultMatchesQuote(result(await client.request<unknown>({
         method: "POST",
         path: "/api/app/trade-in/submit",
-        body: { sourceDeviceId: integer(sourceDeviceId, 1), targetProductNo: validTargetNo(targetProductNo) },
+        body: {
+          sourceDeviceId: integer(sourceDeviceId, 1),
+          targetProductNo: validTargetNo(targetProductNo),
+          expectedPayableUsdt: number(expectedQuote.payableUsdt),
+          expectedDiscountUsdt: number(expectedQuote.discountUsdt),
+        },
         idempotencyKey: key,
-      }));
+      })), expectedQuote);
     },
     async activate(deviceId, clientMaxDevices, idempotencyKey) {
       const key = idempotencyKey.trim();

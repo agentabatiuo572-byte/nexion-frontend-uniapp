@@ -32,7 +32,7 @@
       <view v-if="!product" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
-          <text role="button" tabindex="0" @click.stop="goStore">{{ t.store.coBackToStore }}</text>
+          <text @click.stop="goStore">{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
@@ -79,10 +79,10 @@
             <view v-if="hasTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="m16 12-4-4-4 4" /><path d="M12 16V8" /></svg>
               <text class="flex-1" style="font-size: 12px; color: var(--v5-success)">{{ tradeinChipText }}</text>
-              <text style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" role="button" tabindex="0" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
+              <text v-if="!remoteTradeinRecoveryRequired" style="font-size: 12px; color: var(--v5-ink-3); text-decoration: underline; padding: 14px 4px 14px 14px" @click="removeTradein">{{ t.tradein.checkoutRemove }}</text>
             </view>
             <view v-else-if="removedTradein" class="flex items-center" style="gap: 5px; margin-top: 6px">
-              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" role="button" tabindex="0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
+              <text style="font-size: 12px; color: var(--v5-brand); text-decoration: underline; padding: 10px 4px 10px 0" @click="reAddTradein">{{ t.tradein.checkoutReAdd }}</text>
             </view>
           </view>
           <view style="padding: 12px">
@@ -112,7 +112,7 @@
               <text class="flex-1" style="margin-left: 6px">{{ slotsFullText }}</text>
             </view>
             <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="primaryBtnStyle" role="button" tabindex="0" :aria-label="t.store.coContinue" @click.stop="goConfirm">
-              <text role="button" tabindex="0" @click.stop="goConfirm">{{ t.store.coContinue }}</text>
+              <text @click.stop="goConfirm">{{ t.store.coContinue }}</text>
             </view>
           </view>
         </view>
@@ -140,10 +140,10 @@
             <text v-if="trialZeroDue" class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 6px; text-wrap: pretty">{{ t.store.coTrialZeroNote }}</text>
           </view>
           <view class="w-full grid place-items-center active:opacity-90 active:scale-[0.98]" :style="confirmCtaStyle" role="button" tabindex="0" :aria-label="isCard ? t.store.coContinueToPayment : t.store.coPayNow" @click.stop="onConfirmPay">
-            <text role="button" tabindex="0" @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
+            <text @click.stop="onConfirmPay">{{ isCard ? t.store.coContinueToPayment : t.store.coPayNow }}</text>
           </view>
           <view class="w-full grid place-items-center active:bg-[var(--v5-surface-3)]" :style="changePayBtnStyle" role="button" tabindex="0" :aria-label="t.store.coChangePayment" @click.stop="goSelectPayment">
-            <text role="button" tabindex="0" @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
+            <text @click.stop="goSelectPayment">{{ t.store.coChangePayment }}</text>
           </view>
         </view>
 
@@ -208,10 +208,10 @@
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3); line-height: 1.45; padding: 0 4px">{{ orderPlacedBody }}</text>
           <view class="flex" style="margin-top: 20px; gap: 8px">
             <view class="flex-1 grid place-items-center active:opacity-90" :style="trackBtnStyle" role="button" tabindex="0" :aria-label="t.store.coTrackOrder" @click.stop="goTrack">
-              <text role="button" tabindex="0" @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
+              <text @click.stop="goTrack">{{ t.store.coTrackOrder }}</text>
             </view>
             <view class="grid place-items-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" :aria-label="t.store.coDone" @click.stop="goStore">
-              <text role="button" tabindex="0" @click.stop="goStore">{{ t.store.coDone }}</text>
+              <text @click.stop="goStore">{{ t.store.coDone }}</text>
             </view>
           </view>
         </view>
@@ -252,7 +252,8 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
-import { orderApi, remoteApiEnabled } from "@/api/runtime";
+import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 const MAX_DEVICES = 6;
@@ -415,6 +416,9 @@ const promoRowLabel = computed(() => fmt(t.value.store.coRowTrialDiscount, { pct
 const voucherMatch = computed(() => {
   const p = product.value;
   if (!p) return null;
+  // Canonical E3 submit owns the complete quote and wallet debit. Client-side
+  // voucher stacking is not part of that command and therefore fails closed.
+  if (remoteApiEnabled && tradein.appliedTradein?.canonicalQuote) return null;
   return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
@@ -427,17 +431,20 @@ const voucherDiscountText = computed(() => voucherDiscount.value.toLocaleString(
 // 生效。抵扣只减应付,永不入余额;真值 server-authoritative(POST /api/orders
 // 服务端同事务复算+下架)。
 const appliedTradeinView = computed(() => {
-  if (!DEFAULT_TRADEIN_CONFIG.enabled) return null;
+  if (!remoteApiEnabled && !DEFAULT_TRADEIN_CONFIG.enabled) return null;
   const a = tradein.appliedTradein;
   const p = product.value;
   if (!a || !p || a.targetKind !== p.id) return null;
   const device = app.devices.find((d) => d.id === a.oldDeviceId);
   if (!device || isDeviceTaskBlocked(device)) return null;
-  const credit = computeTradeInCredit(
-    device.paidPriceUsdt ?? 0,
-    Math.max(0, device.cumulativeEarningsUsdt ?? 0),
-    p.price,
-  );
+  const quote = a.canonicalQuote;
+  if (remoteApiEnabled && (!quote || quote.sourceDeviceId !== Number(device.id)
+      || quote.targetProductNo !== p.id)) return null;
+  const credit = quote?.discountUsdt ?? computeTradeInCredit(
+      device.paidPriceUsdt ?? 0,
+      Math.max(0, device.cumulativeEarningsUsdt ?? 0),
+      p.price,
+    );
   return credit > 0 ? { device, credit } : null;
 });
 const tradeinCredit = computed(() => appliedTradeinView.value?.credit ?? 0);
@@ -454,19 +461,29 @@ const tradeinChipText = computed(() => {
 });
 const removedTradein = ref(false);
 function removeTradein() {
+  if (remoteApiEnabled && remoteTradeinRecoveryRequired.value) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
   tradein.clearApplied();
   removedTradein.value = true;
 }
 // 移除后的找回入口(PR-D 债 #2:intercept 一次性,移除后本页原无恢复路径)。
 function reAddTradein() {
+  if (remoteApiEnabled && remoteTradeinRecoveryRequired.value) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
   removedTradein.value = false;
   interceptFired = false;
   fireTradeinIntercept();
   if (tradein.state.kind === "none") toast.warn(t.value.tradein.errPleaseRetry);
 }
 
-const netPrice = computed(() =>
-  Math.max(
+const netPrice = computed(() => {
+  const canonical = remoteApiEnabled ? tradein.appliedTradein?.canonicalQuote : null;
+  if (canonical) return canonical.payableUsdt;
+  return Math.max(
     0,
     +(
       ((product.value?.price ?? 0) -
@@ -475,8 +492,8 @@ const netPrice = computed(() =>
         promoDiscount.value -
         trialOffsetView.value.offsetUSD)
     ).toFixed(2),
-  ),
-);
+  );
+});
 // 异常4: credit ≥ amount due → $0 payable, the explicit confirm step stays and
 // the page states the surplus is never refunded.
 const trialZeroDue = computed(() => trialConversionMode.value && netPrice.value === 0);
@@ -504,6 +521,7 @@ const KNOWN_KINDS: DeviceKind[] = [
   "cloud-share",
 ];
 let interceptFired = false;
+const remoteCapacityGate = new RemoteCapacityGate();
 function fireTradeinIntercept() {
   if (interceptFired) return;
   interceptFired = true;
@@ -518,8 +536,35 @@ function fireTradeinIntercept() {
   if (tradein.appliedTradein?.targetKind === kind) return;
   // Compose eligibility from the stores at the page layer (P-031/032).
   const { canTradeIn, tradeInSources, capped } = useDeviceEligibility(kind);
-  // Priority: trade-in (only with ≥1 active-tradein source) → slot-full
-  // replace → normal flow.
+  if (remoteApiEnabled) {
+    void remoteCapacityGate.resolve(() => deviceE3Api.capacityQuote(kind), async (quote) => {
+      if (quote.decision === "REPLACE_REQUIRED") {
+        if (canTradeIn.value && tradeInSources.value.length > 0) {
+          tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
+        } else {
+          tradein.showCanonicalReplace(kind, quote.payableUsdt, quote);
+        }
+        return;
+      }
+      if (quote.decision === "NO_ACTIVE_DEVICE") {
+        await handleNoActiveDeviceDecision({
+          notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
+          refreshFleet: () => app.refreshRemoteFleet(),
+        });
+        return;
+      }
+      // CAPACITY_AVAILABLE: server says the checkout is not capped; continue
+      // through the ordinary server order path without opening a local sheet.
+      if (canTradeIn.value && tradeInSources.value.length > 0) {
+        tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
+      }
+    }).catch(() => {
+      toast.warn(t.value.tradein.errPleaseRetry);
+    });
+    return;
+  }
+  // Local/demo mode retains its isolated composer. Remote mode above never
+  // reaches browser-owned replacement or order/device writes.
   if (canTradeIn.value && tradeInSources.value.length > 0) {
     tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
     return;
@@ -547,7 +592,10 @@ const orderId = ref<string | null>(null);
 let confirming = false;
 // Retries of one visible confirmation must resolve to the same server command;
 // navigating back to payment selection intentionally starts a new checkout.
-let remoteOrderIdempotencyKey: string | null = null;
+const remoteOrderCommandKey = new StableCommandKey();
+// Freeze the canonical quote and endpoint after any remote mutation attempt;
+// an ambiguous-success retry must never switch from trade-in to /api/orders.
+const remoteTradeinRecoveryRequired = ref(false);
 // Snapshot "was empty before this checkout" BEFORE createOrder increments it.
 const wasEmptyBefore = ref(orders.orders.length === 0);
 const firstOrderCelebrating = ref(false);
@@ -569,7 +617,8 @@ const priceText = computed(() => (product.value?.price ?? 0).toLocaleString());
 const netPriceText = computed(() => netPrice.value.toLocaleString());
 // 算法也单源:整数域(cent × bps)与入金同一套。浮点直乘再 toFixed 会在半分边界
 // 被 IEEE754 压低一分(实测 14 个金额少收 1 分),同一笔费率两种算法两个答案。
-const cardFee = computed(() => (isCard.value ? cardFeeUsd(netPrice.value) : 0));
+const cardFee = computed(() => (remoteApiEnabled && tradein.appliedTradein?.canonicalQuote
+  ? 0 : isCard.value ? cardFeeUsd(netPrice.value) : 0));
 const cardFeeText = computed(() => cardFee.value.toLocaleString());
 const confirmTotalText = computed(() => (netPrice.value + cardFee.value).toLocaleString());
 const paymentLabel = computed(() => PAYMENT_METHODS.value.find((m) => m.id === payment.value)?.label ?? "");
@@ -613,11 +662,19 @@ function goConfirm() {
     return;
   }
   if (step.value !== "select-payment") return;
+  const hasCanonicalTradein = Boolean(tradein.appliedTradein?.canonicalQuote);
+  if (remoteApiEnabled && !remoteCapacityGate.canConfirm(hasCanonicalTradein)) {
+    toast.warn(t.value.tradein.errPleaseRetry);
+    return;
+  }
   step.value = "confirm";
 }
 
 function goSelectPayment() {
-  remoteOrderIdempotencyKey = null;
+  // Remote retries keep the same server command key even if the user revisits
+  // payment selection after a transient readback failure. A new key is minted
+  // only after the previous command has been durably verified and committed.
+  if (!remoteApiEnabled) remoteOrderCommandKey.clear();
   step.value = "select-payment";
 }
 
@@ -660,12 +717,12 @@ async function onConfirmPay() {
 }
 
 function remoteOrderKey(): string {
-  if (remoteOrderIdempotencyKey) return remoteOrderIdempotencyKey;
-  const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  remoteOrderIdempotencyKey = `h7-order:${suffix}`;
-  return remoteOrderIdempotencyKey;
+  return remoteOrderCommandKey.get(() => {
+    const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `h7-order:${suffix}`;
+  });
 }
 
 async function submitRemoteOrder(): Promise<void> {
@@ -676,6 +733,55 @@ async function submitRemoteOrder(): Promise<void> {
     return;
   }
   try {
+    const tradeinContext = appliedTradeinView.value;
+    if (tradein.appliedTradein && !tradeinContext) {
+      throw new Error("E3_TRADEIN_QUOTE_REQUIRED");
+    }
+    if (tradeinContext) {
+      await completeVerifiedMutation({
+        submit: () => {
+          remoteTradeinRecoveryRequired.value = true;
+          return deviceE3Api.submit(
+            Number(tradeinContext.device.id),
+            p.id,
+            remoteOrderKey().replace("h7-order:", "e3-tradein:"),
+            tradein.appliedTradein!.canonicalQuote!,
+          );
+        },
+        readback: async (submitted) => (await orderApi.list()).orders
+          .find((order) => order.orderNo === submitted.orderNo),
+        verifyOrder(submitted, persisted) {
+          if (!persisted || persisted.tradeinNo !== submitted.tradeinNo
+              || persisted.sourceDeviceId !== submitted.sourceDeviceId
+              || persisted.targetDeviceId !== submitted.targetDeviceId
+              || persisted.canonicalStatus !== "activated"
+              || persisted.paymentStatus.toUpperCase() !== "PAID"
+              || persisted.orderStatus.toUpperCase() !== "COMPLETED"
+              || persisted.activationStatus.toUpperCase() !== "ACTIVATED"
+              || Math.abs(persisted.amountUsdt - submitted.walletDebitUsdt) > 0.000001
+              || Math.abs(persisted.discountUsdt - submitted.discountUsdt) > 0.000001) {
+            throw new Error("E3_TRADEIN_READBACK_MISMATCH");
+          }
+        },
+        refreshOrders: () => orders.refreshRemote(),
+        refreshFleet: () => app.refreshRemoteFleet(),
+        verifyFleet(submitted) {
+          const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
+          const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
+          if (!target || target.activatedAt == null || (source && source.activatedAt != null)) {
+            throw new Error("E3_TRADEIN_FLEET_READBACK_MISMATCH");
+          }
+        },
+        commit(submitted) {
+          orderId.value = submitted.orderNo;
+          tradein.clearApplied();
+          remoteOrderCommandKey.clear();
+          remoteTradeinRecoveryRequired.value = false;
+          step.value = "live";
+        },
+      });
+      return;
+    }
     const created = await orderApi.create({
       productNo: p.id,
       quantity: 1,
@@ -694,8 +800,23 @@ async function submitRemoteOrder(): Promise<void> {
       : receipt !== null) {
       throw new Error("H7_VOUCHER_REDEMPTION_RECEIPT_INVALID");
     }
+    const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
+    if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
+        || persisted.canonicalStatus !== "placed"
+        || persisted.paymentStatus.toUpperCase() !== "PENDING"
+        || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
+        || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
+        || created.paymentStatus.toUpperCase() !== "PENDING"
+        || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
+        || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
+        || Math.abs(persisted.discountUsdt - created.discountUsdt) > 0.000001) {
+      throw new Error("E20_CAPACITY_AVAILABLE_ORDER_READBACK_MISMATCH");
+    }
     orderId.value = created.orderNo;
     if (requestedVoucherId) await voucher.refreshRemote();
+    await orders.refreshRemote();
+    await app.refreshRemoteFleet();
+    remoteOrderCommandKey.clear();
     step.value = "live";
   } catch {
     // No local order, balance debit, or voucher redemption mirror in remote mode.

@@ -104,6 +104,8 @@ export interface Device {
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
   recentTasks: CompletedTask[]; // last 10
+  /** Server-authoritative post-completion task lock. Remote clients only display this value. */
+  taskLockUntil?: number | null;
   todayEarnings: number;
   todayEarningsNEX: number;
   // FEAT-DEV02 置换阶梯分子: lifetime USD output of THIS device. Accrued ONLY by
@@ -270,6 +272,10 @@ export interface Withdrawal {
   estimatedCompletion: number;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
   confirmedAt?: number;
+  /** Server CAS version. Present for the isolated acceptance funds sandbox. */
+  serverVersion?: number;
+  source?: "mock" | "provider" | "server";
+  sourceEnvironment?: "SANDBOX" | "PRODUCTION";
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────

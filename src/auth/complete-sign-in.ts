@@ -6,6 +6,9 @@ import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { safeReturnTo } from "@/routing/safe-return-to";
 import { isPhoneAuthAccountId, resolveAuthAccountById } from "@/store/auth-account";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
+import { useProfile } from "@/store/profile";
+import { remoteApiEnabled } from "@/api/runtime";
+import type { UserSession } from "@/api/contracts";
 
 interface CompleteSignInOptions {
   identity: string;
@@ -13,6 +16,8 @@ interface CompleteSignInOptions {
   sponsorCode?: string | null;
   idempotencyKey?: string | null;
   onboardingComplete?: boolean;
+  /** Required in server mode: this is the only identity projection authority. */
+  serverProfile?: UserSession;
 }
 
 interface CompletedSignIn {
@@ -23,7 +28,7 @@ interface CompletedSignIn {
 
 export type CompleteSignInResult =
   | { ok: true }
-  | { ok: false; error: "account_directory_unavailable" | "account_not_found" | "account_pending" | "sign_in_conflict" | "sign_in_storage_unavailable" };
+  | { ok: false; error: "account_directory_unavailable" | "account_not_found" | "account_pending" | "sign_in_conflict" | "sign_in_storage_unavailable" | "SERVER_PROFILE_REQUIRED" };
 
 const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
 const COMPLETED_SIGN_INS_KEY = "__nexgridAuthCompletedSignIns";
@@ -59,6 +64,11 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     rebindAccountScopedStores("default");
     return { ok: false, error: "sign_in_storage_unavailable" };
   };
+
+  // Do not promote a server session into a browser-owned demo profile. A
+  // missing authority projection remains an honest empty state and blocks
+  // entry rather than reviving a local seed.
+  if (remoteApiEnabled && !options.serverProfile) return { ok: false, error: "SERVER_PROFILE_REQUIRED" };
 
   // 手机号账号必须先恢复目录里的 canonical 状态。pending 绝不能借普通
   // 密码/OTP 登录拿到 auth/session；active 的 onboarding 事实也不能由调用方覆盖。
@@ -110,6 +120,18 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     if (!auth.signIn(options.identity, onboardingComplete)) {
       return { ok: false, error: "sign_in_storage_unavailable" };
     }
+  }
+  // Apply on every accepted server login, including a token-refresh/retry that
+  // reused the same completion key. This prevents an earlier browser profile
+  // from surviving a cross-account or refreshed server identity.
+  if (remoteApiEnabled && options.serverProfile) {
+    app.projectServerIdentity(options.serverProfile);
+    useProfile().projectServerIdentity(options.serverProfile);
+    // authApi persisted this matching Bearer session before completeSignIn.
+    // Reassert the wallet read here because an H5 reLaunch does not guarantee a
+    // fresh App lifecycle; the store rejects a missing/mismatched session and
+    // leaves all sandbox claims hidden instead of falling back to local facts.
+    void app.refreshFundsSandboxForAccount(options.identity);
   }
   // reLaunch does not reliably emit App.onShow in an existing H5 document.
   // Fetch the new account's server buckets here; a failed request leaves the
