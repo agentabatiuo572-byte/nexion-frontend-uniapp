@@ -108,8 +108,8 @@ function seedBills(): Bill[] {
  *  ① 账单是**部分**流水 —— 不是每笔余额变动都写账单(收益按 tick 累加就不写),
  *    从 0 累加永远补不齐差额。实测账单写「余额 $60.31」而钱包写「$24,826.56」,
  *    差 400 倍,用户看对账单第一反应是「我的两万四被吞了」。
- *  ② 提现在 submitWithdrawal 里**当场扣款**、账单却落 status:"pending",
- *    只数 posted 等于把已经扣掉的钱又算回来。
+ *  ② 提现在**提交那一刻**就把钱扣掉(2026-08-10 起扣款发生在服务端 `POST /api/withdrawals`,
+ *    不在本地),账单却落 status:"pending" —— 只数 posted 等于把已经扣掉的钱又算回来。
  *
  * balanceAfter 的正主是服务端复式账本(见文件头注释:server owns ids + balanceAfter)。
  * mock 期由 wallet-bills 页以**当前真实余额为锚往回倒推**,store 不编造。
@@ -147,22 +147,74 @@ export const useBills = defineStore("bills", () => {
   }
 
   /**
-   * 🔴 写到**指定账号**的账单行,不看当前绑定(R3 P1)。
+   * 🔴 按 `ref` 判重地把 N 条分录写到**指定账号**,不看当前绑定(R3 P1 + z4 R1)。
    *
-   * 为什么需要它:提现在 `await` 期间被换号时,钱已经扣在**旧账号**上,但 `add()` 只会写进
-   * 当前绑定的那本账 —— 写就是别人的流水,不写则旧账号有扣款无凭证。二选一都是错的;正解是
-   * 把这一笔写回**真正被扣的那个账号**。
+   * 为什么要「指定账号」:提现在 `await` 期间被换号时,钱已经扣在**旧账号**上,而 `add()`
+   * 只会写进当前绑定的那本账 —— 写就是别人的流水,不写则旧账号有扣款无凭证。二选一都是错的;
+   * 正解是把这一笔写回**真正被扣的那个账号**。
    *
-   * 目标账号即当前绑定时走 `add()`(要同步刷新内存态,页面才能立刻看到);不同才走直写。
+   * 🔴 为什么判重 —— **纵深防御,不是修一个够得着的缺陷**(z4 R1/R2 的诚实结论)。
+   * 三路独立审计都报「歧义重试会写出两条同单号的 −$X」,我一度也确认了;再往下追不成立:
+   * 提交**成功**那一刻页面会 `clearSubmitIntent()` 换掉幂等键,服务端下次必开新单;
+   * 而歧义失败那次根本没走到写账单。runtime 门在真页面上构造不出「两次都成功且返回同一张单」。
+   * 判重仍然留着,理由是这条链上**别处全是幂等的**(`app.withdrawals` 按 id 去重、
+   * 领奖按 ref 判重、入金按 txHash 判重),独缺账单这一环 = 一半幂等一半不幂等;
+   * 而且 App.vue 的自愈补写要反复调它。**别把它当成「已修的 P0」记账。**
+   *
+   * 判重键 = `ref + type + symbol`(与 `addOnce` 同一把键),**逐腿判**不是整组判:
+   * 全在 → 一条不写,返回既有行;全不在 → N 条一次落盘(原子,不存在半边账);
+   * 🔴 部分在 → 只补缺的那几条。上一版整组判,于是「主行被跨标签页覆盖掉、NEX 腿还在」时
+   * 同 ref 命中即整组跳过,自愈路径(App.vue ⓪)一辈子补不回那条主行 —— 而那一格正是它要救的
+   * (z4 R2 独立审计点名)。「分录同生共死」说的是**新写**那一刻的原子性,不是「缺了也不许补」。
+   *
+   * 目标账号即当前绑定时走 `addMany()`(要同步刷新内存态,页面才能立刻看到);不同才走直写。
    * 直写不碰 `bills.value` —— 那是当前账号的视图,把别人的流水塞进去正是本函数要避免的事。
    */
-  function addForAccount(rawAccountKey: string, b: Omit<Bill, "id" | "ts" | "balanceAfter">): Bill | null {
+  function addManyForAccountOnce(
+    rawAccountKey: string,
+    drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[],
+    /**
+     * 🔴 **补记**这一笔时的事件时刻(不传 = 现在)。
+     * 只给「把过去发生的事补进账本」用:自愈补写一笔三天前的提现时,若还盖当前时钟,
+     * 那一行会落在账单页**今天**这一组的最上面 —— 账本给自己的历史标错日期。
+     * 正常提交路径**不要**传:那一刻的「现在」就是事件时刻,由 mockServerNow 单时源给。
+     */
+    atMs?: number,
+  ): Bill[] | null {
+    if (!drafts.length) return [];
     const target = normalizeAccountKey(rawAccountKey);
-    if (target === boundKey) return add(b);
-    const row = readAccountRow<{ bills?: Bill[] }>(ACCOUNTS_KEY, target);
-    const existing = Array.isArray(row?.bills) ? (row!.bills as Bill[]) : [];
-    const next: Bill = { ...b, id: mockServerId("BL"), ts: mockServerNow() };
-    const merged = recomputeBalance([next, ...existing]);
+    // 🔴 同一组分录必须共用一个 ref —— 判重键含 ref,混 ref 的一组会各判各的,
+    // 「同生共死」当场失效。不静默降级,直接抛(与 postMoneyBillsOnce 空 ref 抛错同款)。
+    const refs = new Set(drafts.map((d) => d.ref ?? ""));
+    if (refs.size !== 1 || refs.has("")) throw new Error("BILLS_GROUP_REF_MUST_BE_SINGLE");
+    // 🔴 键必须含**方向**(z4 R3 独立审计 P0):同一单号下 NEX 有两条腿 ——
+    // 抵扣费的 `−N`(烧)与失败退还的 `+N`(冲正),两者 ref/type/symbol 全同。
+    // 不含方向时它们撞成一条:主行被跨标签页覆盖后走自愈,`+N` 会把 `−N` 的位置占住,
+    // 于是账上永远只剩「退还 +3 NEX」这条孤行 —— 正好是本包要修的那个形态换了个方向复发。
+    const key = (b: { ref?: string; type: BillType; symbol: Bill["symbol"]; amount: number }) =>
+      `${b.ref}|${b.type}|${b.symbol}|${b.amount < 0 ? "-" : "+"}`;
+    const missing = (existing: Bill[]) => {
+      const have = new Set(existing.map(key));
+      return drafts.filter((d) => !have.has(key(d)));
+    };
+    if (target === boundKey) {
+      const todo = missing(bills.value);
+      if (!todo.length) return bills.value.filter((b) => drafts.some((d) => key(d) === key(b)));
+      return addMany(todo, atMs);
+    }
+    // 🔴 基线走 `hydrate(target)`,不是「读盘,读不到就当空」(z4 R1 独立审计 + 本门 ⑧(e) 实测)。
+    //
+    // 目标账号如果还没**落过盘**(它的 30 天流水此刻只活在别的标签页内存里,或者压根还没被
+    // 打开过),按空数组合并就会把整本账替换成这两条 —— 而 `hydrate` 之后只认「行存在且非空」,
+    // 于是再也不会补种子:那个账号的账单页从此只剩这两条提现,历史凭空消失。
+    // 实测 39 条 → 2 条。`hydrate` 同时剥掉存量 balanceAfter,与读盘那条路同口径。
+    const existing = hydrate(target);
+    const todo = missing(existing);
+    if (!todo.length) return existing.filter((b) => drafts.some((d) => key(d) === key(b)));
+    // 同一笔交易的分录共用一个 ts 并**一次落盘** —— 与 addMany 同一条纪律(半边账不存在)。
+    const ts = atMs ?? mockServerNow();
+    const next: Bill[] = todo.map((b) => ({ ...b, id: mockServerId("BL"), ts }));
+    const merged = recomputeBalance([...next, ...existing]);
     if (!writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, target, { bills: merged })) return null;
     return next;
   }
@@ -179,11 +231,12 @@ export const useBills = defineStore("bills", () => {
    * 同一笔交易的分录共用一个 ts(它们本来就发生在同一时刻)。
    * PROD:服务端在同一事务里写这 N 条分录,client 只消费。
    */
-  function addMany(drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[]): Bill[] | null {
+  function addMany(drafts: Omit<Bill, "id" | "ts" | "balanceAfter">[], atMs?: number): Bill[] | null {
     if (!drafts.length) return [];
     // Server-clock domain — the rewards-seen watermark compares against ts,
     // so both must route through the same single time source.
-    const ts = mockServerNow();
+    // `atMs` 只给**补记历史事件**用(见 addManyForAccountOnce 的同名参数);不传即「现在」。
+    const ts = atMs ?? mockServerNow();
     const next: Bill[] = drafts.map((b) => ({ ...b, id: mockServerId("BL"), ts }));
     const previous = bills.value;
     bills.value = recomputeBalance([...next, ...previous]);
@@ -246,5 +299,5 @@ export const useBills = defineStore("bills", () => {
     return true;
   }
 
-  return { bills, add, addMany, addForAccount, addOnce, seed, settleByRef, bindAccount };
+  return { bills, add, addMany, addManyForAccountOnce, addOnce, seed, settleByRef, bindAccount };
 });

@@ -11,9 +11,11 @@
   fee = withdrawRules.networkConfirmFeeUsd[network] — fixed per withdrawal, admin D5
   configurable ([0,25], seed TRC20/BEP20 $1 · ERC20 $5). NEX offset is OPT-IN
   (offsetWithNex, default off): on → burn min(userNex, ceil(fee/offsetRate)), pay the
-  remainder; off → NEX is never burned. Submit freezes quote + toggle + amount,
-  burns NEX only when toggled on, app.submitWithdrawal re-verifies the fee snapshot
-  (server-shaped), bills.add; rolls burned NEX back if the USDT debit fails.
+  remainder; off → NEX is never burned. Submit freezes quote + toggle + amount, then goes
+  through POST /api/withdrawals — the server is sole authority for the debit, the NEX burn and
+  its own ledger, so this page never touches balances (D5). It only writes the local
+  bill rows (postReceiptForAccount, numbers taken from the server receipt), because the
+  bills store is still the app's only user-facing ledger.
   Then → withdraw-tracking. <AppChassis active="me">.
   Header is the shared sticky <SubPageHeader> (back=/pages/me/wallet, title="USDT",
   subtitle=t.wallet.withdraw — mirrors the prototype's
@@ -354,7 +356,8 @@ import { normalizeSlaHours } from "@/store/withdrawal-arrival-core";
 import { riskReasonLines, waivedGateLines } from "@/lib/risk-reason-text";
 import { useApp } from "@/store/app";
 import { earningsReleaseSnapshot } from "@/store/earning-release";
-import { useBills } from "@/store/bills";
+import { postReceiptForAccount } from "@/lib/money-receipt";
+import { withdrawalBillDrafts } from "@/lib/withdrawal-bill-drafts";
 import { usePayoutAddress } from "@/store/payout-address";
 import { remoteApiEnabled } from "@/api/runtime";
 import { formatClock, freezeRemainingMs, fromWithdrawNetwork, maskAddressMid } from "@/store/payout-address-core";
@@ -382,7 +385,6 @@ const NETWORKS: { id: Withdrawal["network"]; label: string }[] = [
 
 const t = useT();
 const app = useApp();
-const bills = useBills();
 const payout = usePayoutAddress();
 const risk = useRiskDisclosure();
 const phase = useProductPhase();
@@ -942,9 +944,9 @@ async function handleSubmit() {
   //  · 报价:feeCalc 依赖费率 / 网络确认费 / NEX 余额,而这些由后台配置同步、挖矿 tick、
   //    阶段换档在任意时刻改写 —— 遮罩只挡用户的手,挡不住后台数据流。用户确认的是 A 报价,
   //    实际扣的是 B 报价(R2 P1-B);
-  //  · 账号:确认期间换号 → debitNex 与账单全落到新账号,弹窗展示的却是旧账号的数字(R2 P1-C)。
+  //  · 账号:确认期间换号 → 账单会落到新账号,弹窗展示的却是旧账号的数字(R2 P1-C)。
   // 不变量:首个 await 之后一律读 snap,不再读任何活值;活值只在下面「确认后校验」里
-  // 用来判「快照过期了没有」,判完不符即拒,绝不静默按新值扣款。
+  // 用来判「快照过期了没有」,判完不符即拒,绝不静默按新值提交。
   const q = feeCalc.value;
   const snap = {
     account: app.accountKey,
@@ -1043,18 +1045,19 @@ async function handleSubmit() {
     toast.error(fresh.dailyLimitReached ? dailyLimitReachedText.value : t.value.walletV3.submitReasonReviewBlocked);
     return;
   }
-  // 🔴 **确认后校验** —— 快照纪律的另一半。冻结件与当前权威值不符即拒单,绝不静默按新值扣款。
-  //  ① 身份三元组(账号 / 网络 / 收款地址)。确认期间换号 → 下面的 debitNex 与账单会全落到
-  //     新账号,而弹窗展示的是旧账号的数字;地址 / 网络若变了,等于把钱打到用户没确认过的地方。
-  //     store 层 submitWithdrawal 也钉死账号,但它管不到本页的 debitNex 与建单入参 —— 两层各管一段。
+  // 🔴 **确认后校验** —— 快照纪律的另一半。冻结件与当前权威值不符即拒单,绝不静默按新值提交。
+  //  ① 身份三元组(账号 / 网络 / 收款地址)。确认期间换号 → 提交出去的就是新账号的会话,
+  //     而弹窗展示的是旧账号的数字;地址 / 网络若变了,等于把钱打到用户没确认过的地方。
+  //     这道闸挡的是「确认 → 提交」之间的漂移;提交**之后**(await 期间)的换号由
+  //     store 的入口冻结 + 本页账单钉 snap.account 两处共同兜底,两段各管一截。
   if (app.accountKey !== snap.account || network.value !== snap.network || boundAddress.value !== snap.address) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawContextStale);
     return;
   }
   //  ② 报价。用与 store 提交边界同一个纯函数复验冻结报价;不成立就走既有「费率已更新,请重试」
-  //     分支 —— 重试会按新费率重新报价,由用户重新确认。放在 debitNex **之前**:
-  //     让 store 拒单后再回滚 NEX 也能对上账,但那条路多烧一次余额写盘,能不进就不进。
+  //     分支 —— 重试会按新费率重新报价,由用户重新确认。放在 `POST /api/withdrawals` **之前**:
+  //     报价过期要在建单之前拦下,建完再拒就得走冲正,而单是服务端的既成事实。
   if (!quoteStillValid(snap.fee, snap.offset, snap.network)) {
     clearSubmitFreeze();
     toast.error(t.value.walletV3.withdrawFeeStale);
@@ -1062,9 +1065,9 @@ async function handleSubmit() {
   }
   // Real D5 submit. The server is the sole authority for wallet reservation,
   // fee calculation, optional NEX burn, release-bucket checks and ledger writes.
-  // No local balance/bill mutation is allowed before or after this call.
+  // 本地不动余额;**收据照记** —— 见下方 postReceiptForAccount 那一段。
   try {
-    const withdrawalId = await app.submitWithdrawal(
+    const wd = await app.submitWithdrawal(
       snap.amount,
       snap.network,
       snap.address,
@@ -1079,11 +1082,58 @@ async function handleSubmit() {
     );
     clearSubmitFreeze();
     clearSubmitIntent(); // 结局确定:成功建单 → 下一次是新的一笔意图
-    if (!withdrawalId) {
-      toast.error(t.value.wallet.withdrawInsufficient);
+    // (这里原本有一条 `if (!wd)` 的余额不足分支。submitWithdrawal 自 2026-08-10 起
+    //  没有任何 return null 路径 —— 拒单全在服务端、一律抛 ApiError 走下面的 catch 分诊。
+    //  留着那条死分支会让人以为余额闸还在客户端。z4 R2 P2-5。)
+    // 🔴 提现曾是唯一一笔「**本该**进账单却不进」的资金动作(2026-08-11 z4;缺陷全貌与
+    // 三处连带后果见 scripts/selfcheck-bill-producers.mjs 头注,那道门守着这里不再消失)。
+    // (收益按 tick 累加、佣金结算同样不写分录 —— 但那是 bills.ts 头注写明的有意设计:
+    //  账单是**部分**流水。提现不是,它一直有渲染面、有对账逻辑,只是没人生产。)
+    //
+    // 🔴 走 postReceiptForAccount 而不是 postMoneyBill:钱由服务端在 POST /api/withdrawals
+    // 里扣,本地余额一分不动 —— postMoneyBill 会照着 draft 的符号**再扣一次**(本地重复扣款)。
+    // 这一族的语义正是「资金已在别处落定且不可回滚,只补收据」。
+    //
+    // 🔴 账号取 snap.account(发起提交时冻结的那个),不是当前绑定:submit 的 await 窗口
+    // 最长 30s,期间跨标签页登出 / 吊销 / 重新登录都会 rebind,而服务端扣的是**发起时**
+    // 那个账号。写进当前账号 = 把别人的流水记到你头上,不写 = 被扣的账号有扣款无凭证。
+    //
+    // 🔴 分录形状由 `withdrawalBillDrafts(wd)` **单源**构造 —— 同一组分录还有第二个生产点
+    // (App.vue 对账的自愈补写),两处各拼一份必然漂移(z4 R2)。
+    // 每个数字都取自服务端回执 `wd.*`,不取本地报价 snap.quote / 本地预检 fresh.route:
+    // 服务端会按 policyVersion 重新定价、也会给出自己的风控裁决,与客户端预检可以不同。
+    // 写失败必须让用户知道:钱已经在服务端动了,台账却没这一笔 —— 静默吞掉等于让用户
+    // 在账单页查不到自己的钱去哪了。收口点**有意不弹**通用提示(见它的头注):这里给的是
+    // 带下一步的提现专属文案,两条一起弹正是 2026-08-04 修过的同型缺陷。不阻断跳转。
+    // (即便这里写失败,App.vue 的对账下一拍也会把它补回来 —— 但用户此刻该知道。)
+    if (!postReceiptForAccount(snap.account, withdrawalBillDrafts(wd))) {
+      toast.error(t.value.wallet.withdrawBillWriteFailed);
+    }
+    // 🔴 钱的那一面(2026-08-11 z5)。上一行只记账,余额是另一条线:remote 对齐把建单
+    // 搬去服务端时,本地扣款链被一并删掉,而**没有任何东西接手** —— 提交成功后钱包余额与
+    // 可提额度纹丝不动(可提额度是 `usdtBalance − 锁定桶` 派生的,同一个数不动就都不动)。
+    // 后果不止是数字难看:用户可以立刻按这个虚高值再提一笔,客户端预检照样判「余额够」,
+    // 一路放行到服务端才被拒。
+    // 「回拉服务端余额」这条路在本仓不成立 —— 全仓没有余额端点(见 applyWithdrawalDebit 头注),
+    // 余额的唯一持有者就是这个 store。
+    //
+    // 🔴 只在**没换号**时扣:换号后当前 store 装的是另一个账号的钱,扣它 = 扣错人。
+    // 与上一行账单写法的差别是有意的 —— 账单能按 accountKey 写进冻结账号的那一行,
+    // 而余额要动的是内存里的活值,换号后那份内存已经不是 snap.account 的了。
+    // 这一支是**降级不是成功**:钱在服务端已经动了,本地那份快照下次绑回来时不含这笔扣款。
+    // (与 store 侧「冻结账号无本地快照则不落单」同一条诚实边界:宁可少改一份显示,
+    //  也不拿当前账号的钱去冒充另一个账号的经济状态。)
+    if (app.accountKey === snap.account && !app.applyWithdrawalDebit(wd)) {
+      toast.error(t.value.wallet.withdrawDebitFailed);
+    }
+    // 换号后不跳追踪页:那笔单属于旧账号,当前账号的追踪页查不到它(深链会落空态)。
+    // 🔴 但必须给话:提交成功了、钱在旧账号动了,静默 return 会让新账号的用户以为什么都没发生
+    // (业务链必须有下一步 —— z4 R1 独立审计)。
+    if (app.accountKey !== snap.account) {
+      toast.info(t.value.wallet.withdrawSubmittedOtherAccountTitle, t.value.wallet.withdrawSubmittedOtherAccountBody);
       return;
     }
-    uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${withdrawalId}`, fail: () => {} });
+    uni.navigateTo({ url: `/pages/me/wallet-withdraw-tracking?id=${wd.id}`, fail: () => {} });
     return;
   } catch (err) {
     clearSubmitFreeze();

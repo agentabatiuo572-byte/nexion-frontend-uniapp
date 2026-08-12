@@ -57,7 +57,26 @@ function grabBlock(src, needle) {
   throw new Error(`selfcheck-money-receipt: \`${needle}\` 括号不闭合`);
 }
 
-const METHODS = "add|addMany|addOnce|addForAccount";
+// 🔴 METHODS 必须与 bills store 的**写入原语导出面**同步 —— 从 `bills.ts` 的 `return { … }`
+// 解析出 ground truth,不手写(z4 R1 两路独立审计 P0:手写清单对新增原语默认失明,
+// `addManyForAccountOnce` 就是活样本 —— 加进 store 那天,⑥ 裸调门与反向入册门同时对它全盲)。
+//
+// 🔴 顺序无关,别再写「长的排前面」那种注释:三处用法都带后缀锚(`\s*\(` / `^…$` / `\s*[;\r\n]`),
+// JS 交替会回溯,短名排头也命得中。实测(scratchpad 探针)短在前 / 长在前均 4/4,
+// 唯一命不中的是**名字压根不在集合里**那一档(3/4)。上一版把成因归给顺序,是错的。
+const BILL_WRITE_METHODS = (() => {
+  const src = strip(readFileSync(path.join(root, "src/store/bills.ts"), "utf8"));
+  // setup store 的导出面 = 那个同时含 `bills` 与 `bindAccount` 的 `return { … }`。
+  // 不能取「第一个 return {」—— 函数体里的 `return { ...b, id }` 会先命中(实测取到 0 个原语)。
+  const ret = [...src.matchAll(/return \{([^{}]*)\};/g)]
+    .map((m) => m[1])
+    .find((body) => /(?<![\w$])bills(?![\w$])/.test(body) && /bindAccount/.test(body));
+  if (!ret) throw new Error("selfcheck-money-receipt: 解析不到 bills store 的导出面(结构变了?)");
+  const writers = ret.split(",").map((s) => s.trim()).filter((n) => /^add/.test(n));
+  if (writers.length < 3) throw new Error(`selfcheck-money-receipt: 写入原语只解析到 ${writers.length} 个,判据已失效`);
+  return writers;
+})();
+const METHODS = BILL_WRITE_METHODS.join("|");
 //
 // 🔴 判据换口径(2026-08-04 对抗审计):原来判的是「**丢弃返回值**的裸调」,靠
 // 「调用处在语句位」的前缀字符串识别。实测那条判据有三族逃逸,而且每族都是零成本触发:
@@ -73,9 +92,9 @@ const METHODS = "add|addMany|addOnce|addForAccount";
 // 更简单、也严格更强 —— 合法的直调有且只有下面 ALLOW 里那几处,显式列出比逐处判语义可靠。
 // (台账已清零,「丢弃 vs 接住」的区分本来就没有存在价值了。)
 const ALLOW = {
-  // 收口点自己 —— 它就是唯一该调 bills 写入的地方。钉住条数:这里多出一处
-  // 丢弃式写入同样要被看见(原来整文件豁免 = 收口点内部零监控)。
-  "src/lib/money-receipt.ts": 3,
+  // 收口点自己 —— 它就是唯一该调 bills 写入的地方。额度是**等式**(多一处 / 少一处都红,
+  // 见下方 ⑥ 的两条判据),所以这里多出一处丢弃式写入、或者删掉一处都会被看见。
+  "src/lib/money-receipt.ts": 4,
   // 注册赠礼两条分录(addOnce ×2)。收口点目前没有「多腿 + 幂等」的出口(addMany 无 Once 变体),
   // 补齐前保留直调;两条分开写本身是半边账风险,已登记为 P2 欠账。
   "src/pages/register/register.vue": 2,
@@ -183,7 +202,7 @@ export const defineStore = (id, setup) => () => {
 };
 const bundle = await build({
   stdin: {
-    contents: `export { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce } from "@/lib/money-receipt";
+    contents: `export { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce, postReceiptForAccount } from "@/lib/money-receipt";
 export { useApp } from "@/store/app";
 export { useBills } from "@/store/bills";
 export { useUI } from "@/store/ui";`,
@@ -204,7 +223,7 @@ export { useUI } from "@/store/ui";`,
     },
   }],
 });
-const { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce, useApp, useBills, useUI } =
+const { postMoneyBill, postMoneyBills, postReceiptOnly, postReceiptOnce, postReceiptForAccount, useApp, useBills, useUI } =
   await import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 
 const app = useApp();
@@ -462,6 +481,112 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     overdrawn === "insufficient" && money().usdt === 150 && bills.bills.length === 0, `${overdrawn} / ${money().usdt}`);
 }
 
+// ── ⑧ 指定账号的收据补记(postReceiptForAccount)——「钱扣在 A、账记到 B」 ──────────
+// 提现的钱由服务端在 POST /api/withdrawals 里扣,而那个请求带的是**发起时**那个账号的
+// 会话;client 在这 30s 超时窗口里可能被换号(跨标签页登出 / 运营吊销 / 重新登录都会
+// rebind)。此时按「当前绑定」记账 = 把别人的钱记到你账上,不记 = 被扣的账号有扣款无凭证。
+// 判据跑真 store:换号后写回**目标账号**,当前账号一条不沾。
+{
+  samples.targets += 3;
+  const OTHER = "other-account@nexgrid.test";
+  const readBillsOf = (acct) => uni.getStorageSync(BILLS_KEY)?.[acct]?.bills ?? [];
+  const wdDrafts = (ref) => [
+    { type: "withdraw", symbol: "USDT", amount: -500, status: "pending", memo: "wd", ref },
+    { type: "withdraw", symbol: "NEX", amount: -3, status: "posted", memo: "fee", ref },
+  ];
+
+  // (a) 提交后换号:两条分录必须落到**被扣款的那个账号**,当前账号零沾染
+  reset();
+  bills.bindAccount(OTHER); // 模拟 await 期间被 rebind 走
+  const billWritesBefore = writesTo(BILLS_KEY);
+  const wrote = postReceiptForAccount(ACCT, wdDrafts("WD-X-1"));
+  check("⑧ 🔴 换号后写回被扣款的那个账号(不是当前绑定的)",
+    wrote === true && readBillsOf(ACCT).filter((b) => b.ref === "WD-X-1").length === 2,
+    `目标账号 ${readBillsOf(ACCT).length} 条`);
+  // 内存侧按 **ref** 判、不按条数判:bindAccount 到一个空账号会水合出 mock 的 30 天种子
+  // (实测 39 条),拿 length===0 当判据是把种子误当成污染 —— 判据要盯的是「这一笔有没有
+  // 串到别人账上」。磁盘侧仍按条数判:种子不落盘,真串账会把种子一起写进去(41 条)。
+  check("⑧ 🔴 当前绑定账号一条都不沾(否则就是把别人的流水记到你账上)",
+    readBillsOf(OTHER).length === 0 && !bills.bills.some((b) => b.ref === "WD-X-1"),
+    `盘 ${readBillsOf(OTHER).length} 条 / 内存命中 ${bills.bills.filter((b) => b.ref === "WD-X-1").length} 条`);
+  check("⑧ 🔴 两条分录**一次落盘**(与 addMany 同纪律:不存在只落一条的半边账)",
+    writesTo(BILLS_KEY) - billWritesBefore === 1, `写了 ${writesTo(BILLS_KEY) - billWritesBefore} 次`);
+
+  // (b) 没换号:退化成 add —— 内存态要同步刷新,页面才立刻看得见
+  reset();
+  const wroteSelf = postReceiptForAccount(ACCT, wdDrafts("WD-X-2"));
+  check("⑧ 目标即当前账号时内存立即可见(页面不用等下次水合)",
+    wroteSelf === true && bills.bills.filter((b) => b.ref === "WD-X-2").length === 2,
+    `内存 ${bills.bills.length} 条`);
+
+  // (c) 落盘失败 → 返回 false + 盘上零残留 + **不弹通用提示**(由调用方给带下一步的专属文案;
+  //     收口点一条 + 页面一条同屏正是 2026-08-04 修过的同型)
+  reset();
+  bills.bindAccount(OTHER);
+  ui.toasts = [];
+  failKey = (k) => k === BILLS_KEY;
+  const failedWrite = postReceiptForAccount(ACCT, wdDrafts("WD-X-3"));
+  failKey = null;
+  check("⑧ 🔴 落盘失败 → 返回 false、盘上零残留、且**不**抢着弹通用提示(交底权在调用方)",
+    failedWrite === false && readBillsOf(ACCT).length === 0 && ui.toasts.length === 0,
+    `${failedWrite} / 盘 ${readBillsOf(ACCT).length} 条 / toast ${ui.toasts.length}`);
+
+  // (d) 🔴 同 ref 重放只写一次 —— 歧义结局保留幂等键、服务端返回同一张单,这条链的现实形态。
+  //     三路独立审计各自命中(z4 R1):没有这一格,账单上会出现两条同单号的 −$X。
+  reset();
+  bills.bindAccount(OTHER);
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-4"));
+  const ofRef = () => readBillsOf(ACCT).filter((b) => b.ref === "WD-X-4").length;
+  const firstCount = ofRef();
+  const replayed = postReceiptForAccount(ACCT, wdDrafts("WD-X-4"));
+  check("⑧ 🔴 同 ref 重放不写第二遍(仍返回 true —— 收据已在账上就是成功)",
+    replayed === true && firstCount === 2 && ofRef() === 2,
+    `该单号首轮 ${firstCount} 条 → 重放后 ${ofRef()} 条`);
+
+  // (d2) 目标 == 当前绑定这条路也要判重(两条路不许各自漂移)
+  reset();
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-5"));
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-5"));
+  check("⑧ 🔴 绑定账号那条路同样按 ref 判重",
+    bills.bills.filter((b) => b.ref === "WD-X-5").length === 2,
+    `${bills.bills.filter((b) => b.ref === "WD-X-5").length} 条`);
+
+  // (d3) 🔴 补记历史事件必须盖**事件时刻**,不是「现在」。
+  //      自愈补写一笔三天前的提现时若盖当前时钟,那两行会落在账单页**今天**这一组的最上面 ——
+  //      账本给自己的历史标错日期(账单页按 ts 分月分组、倒序排)。
+  reset();
+  const OLD_TS = Date.now() - 3 * 24 * 3600 * 1000;
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-7"), OLD_TS);
+  const backfilled = bills.bills.filter((b) => b.ref === "WD-X-7");
+  check("⑧ 🔴 补记历史事件盖的是事件时刻(不是现在)",
+    backfilled.length === 2 && backfilled.every((b) => b.ts === OLD_TS),
+    `ts=${JSON.stringify(backfilled.map((b) => b.ts))} 期望 ${OLD_TS}`);
+  // 不传则仍取当前时钟 —— 正常提交路径不该被这个参数影响
+  reset();
+  const beforeNow = Date.now() - 1000;
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-8"));
+  check("⑧ 不传事件时刻时仍取当前时钟(正常提交路径不受影响)",
+    bills.bills.filter((b) => b.ref === "WD-X-8").every((b) => b.ts >= beforeNow),
+    JSON.stringify(bills.bills.filter((b) => b.ref === "WD-X-8").map((b) => b.ts)));
+
+  // (e) 目标账号**已有**分录时必须全部保留 —— 直写是「读盘 → 合并 → 整行写回」,
+  //     合并写错会静默吞掉该账号的历史(独立审计指出 ⑧ 原来只验了空账号那一格)。
+  reset();
+  bills.bindAccount(ACCT);
+  bills.add({ type: "bonus", symbol: "USDT", amount: 1, status: "posted", memo: "pre-existing", ref: "PRE-1" });
+  // 先落一次盘,目标账号才有**稳定 id** 的既有行可比(种子每次 hydrate 都重新发 id,
+  // 拿两次独立 hydrate 的 id 互比是比不出东西的 —— 这一条我第一版就写错了)。
+  const before6 = readBillsOf(ACCT);
+  const keptIds = before6.map((b) => b.id);
+  bills.bindAccount(OTHER);
+  postReceiptForAccount(ACCT, wdDrafts("WD-X-6"));
+  const after = readBillsOf(ACCT);
+  check("⑧ 🔴 直写不吞目标账号既有分录(原 N 条 id 全在 + 新增 2 条)",
+    keptIds.length > 30 && after.length === keptIds.length + 2 && keptIds.every((id) => after.some((b) => b.id === id)),
+    `原 ${keptIds.length} 条 → 现 ${after.length} 条,原 id 存活 ${keptIds.filter((id) => after.some((b) => b.id === id)).length}`);
+  reset();
+}
+
 // ── ⑤ 接线门:判定对不对 / 有没有被接上,是两道门 ─────────────────────────────────
 {
   const appSrc = strip(read("src", "store", "app.ts"));
@@ -503,6 +628,9 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     ["src/pages/me/wallet-cards-new.vue", ["postMoneyBillsOnce"]],
     ["src/pages/me/wallet-exchange.vue", ["postMoneyBills"]],
     ["src/pages/me/wallet-repurchase.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
+    // 提现:钱由服务端在 POST /api/withdrawals 里扣(本页零资金写),但收据必须落地 ——
+    // 走 postReceiptForAccount(账号取提交快照,不看当前绑定)。
+    ["src/pages/me/wallet-withdraw.vue", ["postReceiptForAccount"]],
     // wallet-topup.vue 已移出收口名单(2026-08-05 包 E):旧 $1 验证分录随机制删除,
     // 页面本身不再产生任何资金分录(常规充值记账在 deposits store / panes 收口)。
     // 下方零记账断言防它悄悄长回裸调。
@@ -619,16 +747,23 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   const total = Object.values(found).reduce((a, b) => a + b, 0);
   check(`⑥ 🔴 bills 写入原语只许在白名单内调用(扫 ${files.length} 个源文件,当前 ${total} 处 / ${Object.keys(found).length} 文件,白名单额度 ${Object.values(ALLOW).reduce((a, b) => a + b, 0)})`,
     grown.length === 0, grown.map(([f, n]) => `${f}: ${n} > ${ALLOW[f] ?? 0}`).join(" | "));
-  if (shrunk.length) {
-    console.log(`  INFO  白名单额度高于实测,建议下调:${shrunk.map(([f, q]) => `${f} ${found[f] ?? 0}/${q}`).join(" | ")}`);
-  }
+  // 🔴 额度**低于**实测同样判红(z4 R1 独立审计 P2-1):原来只打 INFO,于是这道门对
+  //「删除向」全盲 —— 钱路径上删掉一处登记过的写入,门照绿,而额度变成留给未来新调用点的
+  // 免检名额。门集体漏「删除」向是本仓踩过的族(见 memory feedback_gates_blind_to_deletion)。
+  check(`⑥ 🔴 白名单额度必须与实测**相等**(不止是上界:少了 = 有登记过的写入被删掉没人看见)`,
+    shrunk.length === 0, shrunk.map(([f, q]) => `${f} 实测 ${found[f] ?? 0} < 额度 ${q}`).join(" | "));
   // 🔴 反向入册门:WIRED 是**手工名单**,新页面自己调收口点(或直调 bills)时没人提醒入册,
   // 于是 ⑤ 不查(不在册)、⑥ 不响(在 ALLOW 里或走了收口点)—— 两道门同时失明。
   // 判据:全站「调了收口点导出符 或 调了 bills 写入原语」的文件集合,必须 ⊆ WIRED ∪ ALLOW。
   {
     // 🔴 postMoneyBillsOnce 必须在列(z1 2026-08-10):它是收口点真实导出面的一员
     // (lib/money-receipt.ts:227),漏了它,新页面只调它就整个绕过反向入册门。
-    const EXPORTS = ["postMoneyBill", "postMoneyBills", "postMoneyBillsOnce", "postReceiptOnly", "postReceiptOnce"];
+    // 🔴 从收口点的**真实导出面**解析,不手写(z4 R1 独立审计:手写版漏了 `reportStuckFunds`
+    // 与 `stuckFundsCases`,而前者会写 stuck 队列 + 弹终态提示,是资金路径的一员;
+    // z1 补 `postMoneyBillsOnce` 时踩的是同一个坑,手写清单必然复发第二次)。
+    const receiptSrc = strip(read("src", "lib", "money-receipt.ts"), true);
+    const EXPORTS = [...receiptSrc.matchAll(/export function (\w+)\s*\(/g)].map((m) => m[1]);
+    if (EXPORTS.length < 6) throw new Error(`selfcheck-money-receipt: 收口点导出面只解析到 ${EXPORTS.length} 个,反向入册门会失明`);
     if (!wiredFiles.length) throw new Error("selfcheck-money-receipt: ⑤ 的接线名单没传过来,反向入册门会空转");
     const enrolled = new Set([...wiredFiles, ...Object.keys(ALLOW)]);
     const outside = [];
@@ -663,9 +798,12 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
   const POS = [
     ['同行普通调用', '  bills.add({ type: "bonus" });'],
     ['useBills() 直调', '  useBills().addOnce({ type: "topup" });'],
-    ['另一个 receiver 名', '  if (x) { billsStore.addForAccount(k, { type: "withdraw" }); }'],
+    ['另一个 receiver 名', '  if (x) { billsStore.addManyForAccountOnce(k, [{ type: "withdraw" }]); }'],
     // addMany 是多腿写入原语,名单里加了一项却没有对应控制线 = 那一支从没被验证过
     ['多腿原语 addMany', '  bills.addMany([{ type: "bonus" }, { type: "fee" }]);'],
+    // 🔴 addManyForAccount(指定账号 × 多腿)—— 前缀与 add / addMany 重叠,交替顺序写反就
+    // 静默漏判(z4 实测)。常驻正控:METHODS 再排错序时当场红。
+    ["指定账号多腿判重 addManyForAccountOnce", '  bills.addManyForAccountOnce(k, [{ type: "withdraw" }, { type: "withdraw" }]);'],
     // 以下四条是对抗审计实测逃逸的形态,逐个立成常驻正控
     ['跨行(调用与实参不同行)', '  bills.add(\n    { type: "bonus" },\n  );'],
     ['局部别名 receiver', '  const s = useBills();\n  s.add({ type: "bonus" });'],

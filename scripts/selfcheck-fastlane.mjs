@@ -708,15 +708,64 @@ function functionBody(src, sig) {
         && appVueCode.includes("reconcileBills();")
         && !appVueCode.includes("pendingBillSettle"));
     // 🔴 提现在提交那一刻就扣了款,所以任何「最终没打出去」的终态都必须把钱退回去。
-    // 全仓此前没有任何退款实现,账单也不会被置 failed —— 两个缺口分开看都像「反正走不到」,
-    // 合起来就是「钱扣了、单子废了、没人还」。退款与置账单失败必须在**同一处**完成,
+    // 账单也要同步置 failed —— 两个缺口分开看都像「反正走不到」,合起来就是
+    // 「钱扣了、单子废了、没人还」。退款与置账单失败必须在**同一处**完成,
     // 否则接后端时必然只做一半(审计明确点名)。
+    // 🔴 z5 更新:USDT 腿改走 refundWithdrawalDebit(扣款 ⇄ 退款成对的那一半)。
+    // 原判据钉的是 creditRewardBucketOnce —— 那条路**内部第一行就是 `if (remoteApiEnabled) return false`**,
+    // 而提现单只在 remote 模式下建得出来,于是退款在「唯一会产生提现的模式」里恒为 no-op。
+    // 🔴 判据一律走**剥注释**的源(appCode,非 appSrc)。z5 独立审计实测:用原文时把
+    // `if (refundWithdrawalDebit(wd)) done.push(wd.id);` 整行注释掉(退款腿实际死掉),
+    // 三条判据仍全绿 —— 与本文件 700-706 行给 App.vue 焊过的同一种绕法,app.ts 侧当时没跟上。
+    const appCode = stripComments(appSrc);
     check("🔴 提现失败终态:退款与置账单失败成对完成,且幂等",
-      appSrc.includes("function refundFailedWithdrawals(): string[] {")
-        // 🔴 必须复用现成的幂等入账 action。自己拼 user.value 的绝对值会被 account-cloud 的
-        // **增量合并**算回去 —— 实测:可提桶加上了、总余额纹丝不动。一半生效比不生效更难查。
-        && appSrc.includes('creditRewardBucketOnce("refund:" + wd.id, "withdrawable", wd.amount)')
+      appCode.includes("function refundFailedWithdrawals(): string[] {")
+        && appCode.includes("if (refundWithdrawalDebit(wd)) done.push(wd.id);")
         && appVueCode.includes('for (const id of app.refundFailedWithdrawals()) bills.settleByRef(id, "failed");'));
+    // 🔴 下面两条单独列,不并进上面那个合取:它们是 runtime 门**覆盖不到**的那半边 ——
+    // withdraw-bill-runtime.mjs 只在 mock 模式跑(verify [2.5] 强制),而 mock 下
+    // creditRewardBucketOnce 照常工作,把腿改回去 runtime 门仍然全绿,红的是 remote 下真实用户的钱。
+    // 扣款腿同理:给它加一句 `if (remoteApiEnabled) return false;`,mock 下的 runtime 门也照绿,
+    // 而 remote(唯一建得出提现单的模式)下 z5 修的原缺陷原样复活。所以两条腿都要静态守。
+    // 🔴 能力上界(独立复核实跑证伪出来的,写下来免得下一个人高估这三条):
+    //   它们钉的是「字面量在不在」,不是「它的结果被消费」。仍能绕过的两种写法:
+    //   ① 把 `remoteApiEnabled` 换成别名函数(如 `apiIsRemote()`)—— 正则扫不到;
+    //   ② 把 `readAccountSnapshot(...)` 写成空转调用、判重仍只查内存;
+    //      或把回滚两行留在死分支里。
+    //   真正守「结果被消费」的是 runtime 门(withdraw-bill-runtime.mjs ⑥⑦,行为级),
+    //   但它只在 mock 模式跑 —— 两道门是分工:静态守 remote-only 的形状,runtime 守 mock 下的行为。
+    //   两边都不覆盖的那一格(remote 下的真实行为)本仓目前无门,已登记进
+    //   docs/changes/2026-08-11-z5-out-of-scope-findings.md 的 H 项。
+    for (const fn of ["applyWithdrawalDebit", "refundWithdrawalDebit"]) {
+      const signature = `function ${fn}(wd: Withdrawal): boolean {`;
+      const at = appCode.indexOf(signature);
+      const end = at < 0 ? -1 : appCode.indexOf("\n  }", at);
+      // 🔴 fail-closed:签名找不到、或切不出函数体(indexOf 回 -1)一律判红。
+      // 上一版写成 `slice(0, body.indexOf(...) + 4)`,-1 时切出 `"fun"` 三个字符 → 正则恒不命中
+      // → 判据恒真(独立审计实测:函数体单行化后含 remoteApiEnabled 仍判 true)。
+      const body = at >= 0 && end > at ? appCode.slice(at, end) : "";
+      // 🔴 连**调用方**一起扫。独立复核实跑证伪:把 `if (remoteApiEnabled) return false;`
+      // 从函数体挪进调用方 refundFailedWithdrawals,退款腿在 remote 下整体死掉,而只扫函数体的
+      // 判据照绿 —— 早退挪个位置就绕过去了,判据必须覆盖「这条腿实际会不会执行」的整段路径。
+      const callerAt = appCode.indexOf("function refundFailedWithdrawals(): string[] {");
+      const callerEnd = callerAt < 0 ? -1 : appCode.indexOf("\n  }", callerAt);
+      const callerBody = callerAt >= 0 && callerEnd > callerAt ? appCode.slice(callerAt, callerEnd) : "";
+      check(`🔴 ${fn} **不受 API 模式影响**(remote 是唯一建得出提现单的模式,这条腿不能在那里 no-op)`,
+        !!body && !!callerBody && !/remoteApiEnabled/.test(body) && !/remoteApiEnabled/.test(callerBody));
+      // 🔴 落盘失败必须回滚内存并报假。删掉这两行(退回「改了内存就当成功」),
+      // money-receipt / withdrawfee / runtime 门**全部照绿** —— 它们的原语名单里没有这两个新函数。
+      check(`🔴 ${fn} 落盘失败必须回滚内存并报假(否则刷新即回退,用户眼里钱凭空变化)`,
+        !!body && /adoptAccountSnapshot\(previousSnapshot\);\s*return false;/.test(body.replace(/\s+/g, " ")));
+      // 🔴 幂等判据必须**复读磁盘**,不能只查内存:内存必然陈旧(全仓无跨标签页 storage 监听),
+      // 而 usdtBalance 按增量累加合并 —— 只查内存时两个标签页的 5s 对账会各退一次(实测退两倍)。
+      check(`🔴 ${fn} 幂等要查**磁盘**快照(只查内存挡不住另一个标签页再动一次钱)`,
+        !!body && /readAccountSnapshot\(accountKey\.value\)/.test(body));
+    }
+    // 🔴 接线门:判定对 ≠ 接上了。把提现页那一行调用删掉,上面全部静态判据照样绿,
+    // 而 runtime 门在 mock 下也测不出 remote 的行为 —— 调用点必须自己被 pin 住。
+    check("🔴 接线:提现建单成功后**真的调**了扣款(删掉调用行,其余判据全绿也拦不住)",
+      stripComments(readSrc("src/pages/me/wallet-withdraw.vue"))
+        .includes("app.applyWithdrawalDebit(wd)"));
     // 赠金释放只动桶和余额、不写账单 → 那行「处理中」的赠金会永远停着。从数据推出它已落地。
     // 判据必须钉到**真正干活的那一句**(遍历 bills.bills 并 settleByRef),
     // 只查条件行的话,把循环源换成空数组照样绿(红测实证:改 `for (const row of [])` 不红)。
@@ -781,13 +830,31 @@ function functionBody(src, sig) {
   // (a) 调用在 submitWithdrawal 函数体内(functionBody 抠体再找,防命中别处);
   // (b) 调用在建单 await 之后(建单失败会 throw 冒泡,不得先记台账);
   // (c) commitWithdrawal 函数体内两笔台账(地址登记 + 首提标记)都落。
-  check("🔴 风控台账接线:submitWithdrawal 建单成功后同步 commitWithdrawal(首提标记 + 地址登记)",
+  // (d) 🔴 账号必须是**入口冻结值**(z4 R1):本函数跨一个最长 30s 的 await,期间跨标签页
+  //     登出 / 吊销 / 重登都会 bindAccount 改掉 accountKey.value。台账记到换后的账号 =
+  //     首提标记与共用地址强信号全落到别人头上,而钱是从冻结那个账号扣的。
+  //     判据用「一个都不许读活值」而不是「至少有一处读冻结值」—— 后者放得过「两条分支
+  //     一条对一条错」,而本包的原始缺陷正是这种半修状态(账单钉死、单据没钉)。
+  check("🔴 风控台账接线:submitWithdrawal 建单成功后同步 commitWithdrawal(首提标记 + 地址登记,账号取入口冻结值)",
     (() => {
       const body = functionBody(appSrc, "async function submitWithdrawal(");
       if (!body) return false;
-      const call = body.indexOf("commitWithdrawal(accountKey.value, network, address);");
+      if (!/const acct = accountKey\.value;/.test(body)) return false; // 入口没冻结 = 后面无从谈起
+      const calls = [...body.matchAll(/commitWithdrawal\(([^)]*)\)/g)];
+      if (!calls.length) return false;
+      if (calls.some((m) => /accountKey\.value/.test(m[1]))) return false; // 任一处读活值即判红
+      if (!calls.every((m) => /^\s*acct\s*,\s*network\s*,\s*address\s*$/.test(m[1]))) return false;
+      const call = body.indexOf("commitWithdrawal(");
       const submit = body.indexOf("await withdrawalApi.submit");
       if (call < 0 || submit < 0 || submit > call) return false;
+      // 🔴 (e) 页面侧对称门(z4 R2 P1-3):账单**真正落地的地方**在提现页,而它把账号钉在
+      //     提交快照 `snap.account` 上。store 侧钉死了、页面侧没门守着,下一次改动把它写回
+      //     `app.accountKey` 时四道门全绿 —— 那正是本包 R1 的原始缺陷(只钉了一半)。
+      const pageBody = functionBody(readFileSync(path.join(root, "src/pages/me/wallet-withdraw.vue"), "utf8"),
+        "async function handleSubmit(");
+      if (!pageBody) return false;
+      const receipt = /postReceiptForAccount\(\s*([A-Za-z_$][\w$.]*)\s*,/.exec(stripComments(pageBody));
+      if (!receipt || receipt[1] !== "snap.account") return false;
       const elgBody = functionBody(elgSrc, "function commitWithdrawal(");
       return !!elgBody
         && elgBody.includes("recordWithdrawAddressUse(accountKey, network, address);")
