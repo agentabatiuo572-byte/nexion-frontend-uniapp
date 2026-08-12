@@ -48,9 +48,11 @@
 零用户可见收益。
 
 ⚠️ 首版这里有两句话说满了，已在代码注释与本段一并改正（R1 复核自查）：
-- 「即刻接上既有的**退款**全套」——**退款那条腿在远端档下当前是空转的**
-  （`refundFailedWithdrawals` 走 `creditRewardBucketOnce`，而它 `if (remoteApiEnabled) return false`）。
-  那是 z5 / z6 在修的面，本包不动，因此这里只声称账单与客服出口。
+- 「即刻接上既有的**退款**全套」——退款有**两条腿，状态不同**（2026-08-12 并入 z5 后复核）：
+  USDT 本金腿已由 z5 改走 `refundWithdrawalDebit`（无远端早退），**remote 下会真退**；
+  NEX 抵扣费腿仍走 `creditRewardBucketOnce`（remote 下恒 false），**仍是空转**，归 z6。
+  因此本包只声称账单与客服出口，不替 NEX 那条腿打包票。
+  ⚠️ 本条首版写的是「整条退款腿都空转」—— 那是 fork 时的事实，并入 z5 后已过期，已改。
 - 「孤块与死亡信件的区别由 `terminalReason` 承载」——**闭集里没有对应档位**。
   `terminalReason` 承载的是「为什么终结」（风控 / 地址 / 资料 / 撤回 / 其他），
   不是「哪一种链上失败」。用户侧两者本就同一句话；要区分得先在后台加码，属新契约。
