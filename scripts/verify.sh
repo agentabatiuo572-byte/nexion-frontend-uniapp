@@ -340,8 +340,16 @@ if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad
 # copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
 # literal stars/backticks, and route-path literals violate the no-jargon rule.
 # (added 2026-07-09: owner caught **直接版税** + `/team/binary` in how-page copy.)
-i18n_md=$(grep -rEnI '\*\*[^*]+\*\*|`/[a-z]' src/i18n/messages 2>/dev/null | head -5)
-if [ -z "$i18n_md" ]; then ok "no markdown residue in i18n copy (0 hits)"; else bad "markdown residue in i18n copy (** or \`/path\`)"; echo "$i18n_md" | sed 's/^/        /'; fi
+# 🔴 2026-08-13 换成脚本门:原先是对**整个文件**做子串 grep,不剥注释 —— 在 i18n 文件里
+# 写一句带 markdown 强调的中文注释就会判红,而它要守的是「用户看得到的文案」里不许有 markdown。
+# 本仓记过这一族:子串哨兵必须先剥注释再匹配。新门只在**字符串字面量的值**里找,
+# 并对「一条文案都没抠到」判红(候选集为 0 = 判据失效)。红测:文案里塞 → 红;注释里塞 → 绿。
+if "$NODE_BIN" scripts/i18n-copy-residue-gate.mjs > /tmp/uniapp-i18n-residue.log 2>&1; then
+  ok "i18n 文案 markdown 残留门 — $(tail -1 /tmp/uniapp-i18n-residue.log)"
+else
+  bad "i18n 文案里有 markdown 残留 — node scripts/i18n-copy-residue-gate.mjs 看明细"
+  grep -E "^(FAIL| )" /tmp/uniapp-i18n-residue.log | head -8
+fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
