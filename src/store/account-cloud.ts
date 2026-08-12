@@ -78,7 +78,12 @@ const WITHDRAWAL_STATUS_RANK: Record<Withdrawal["status"], number> = {
   processing: 3,
   sent: 4,
   confirmed: 5,
-  // 异常态视为服务端最终结论,合并时胜过主链中间态(同一单不会两异常态互比)。
+  // 异常态视为服务端最终结论,合并时胜过主链中间态。
+  // ⚠️ 括号里原本写着「同一单不会两异常态互比」—— **那句话是错的**,而且正是三条 P0 的入口:
+  // frozen 与四个终态同档,而 frozen 是**在途**态(不在 TERMINAL_STATUSES 里),
+  // 「冻结 → 人工处置成拒绝/退款」是 D2 的正常流程,天天在两异常态之间互比。
+  // 同档位的两份快照现按**字段**合并(mergeSameStatusWithdrawal),不再整行择一;
+  // 但同档位互转(frozen→终态)这条边仍走不通 —— 那需要真时序判据,已独立立卡。
   "review-rejected": 6,
   frozen: 6,
   "address-invalid": 6,
@@ -323,6 +328,31 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
  * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
  * last-write 会把已到账的单退回处理中。
  */
+/**
+ * 同一状态的两份提现单快照 → 逐字段合并(不是二选一)。
+ *
+ * 只合并**可选信息字段**:它们是「服务端某一拍才补上」的东西,谁有值就该留下。
+ * 身份与钱面(id / amount / network / address / fee / submittedAt / estimatedCompletion)
+ * 同状态下两份快照本就相等,不参与合并 —— 真出现分歧属服务端串号,那是另一道闸的事。
+ */
+function mergeSameStatusWithdrawal(disk: Withdrawal, memory: Withdrawal): Withdrawal {
+  // 🔴 判据**派生,不枚举**(2026-08-12 并入主线时自查抓到):上一版手写了一份
+  // 「要合并哪些字段」的清单,而 `Withdrawal` 的可选字段是**会长的** —— 当场就已经漏了
+  // `riskRoute`(7 个可选字段只列了 6 个)。手写清单必漏且静默失效,是本仓记过的族
+  // (docs/PORT-PITFALLS.md P-082 同族);清单一漏,漏掉的那个字段就回到「整行择一」的老坏法。
+  //
+  // 改成对**实际存在的键**做派生:内存这份没给值的位置,用磁盘那份补上。
+  // `{...disk, ...memory}` 本身已能处理「内存缺这个键」;补的是「内存**显式给了 undefined**」
+  // 那一种(展开时会把磁盘的值覆盖掉)。提现单没有任何「把字段清空」的合法路径,
+  // 所以「内存是 undefined」一律解释成「这一拍没带」,不解释成「要清掉」。
+  const merged = { ...disk, ...memory } as unknown as Record<string, unknown>;
+  const from = disk as unknown as Record<string, unknown>;
+  for (const key of Object.keys(from)) {
+    if (merged[key] === undefined && from[key] !== undefined) merged[key] = from[key];
+  }
+  return merged as unknown as Withdrawal;
+}
+
 function mergeWithdrawals(
   base: Withdrawal[],
   next: Withdrawal[],
@@ -337,7 +367,25 @@ function mergeWithdrawals(
     }
     const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
     const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
-    byId.set(w.id, c > a ? w : prev);
+    // 状态档位决定胜负(遍历序 `[...latest, ...next]` 让磁盘行先入 map,内存行是挑战方)。
+    if (c !== a) {
+      byId.set(w.id, c > a ? w : prev);
+      continue;
+    }
+    // 🔴 **同档位不是平局,是「同一状态的两份快照」** —— 必须按字段合并,不能整行择一。
+    // 缺陷(2026-08-11 R1 审计,包 z7 立案的直接原因):服务端这一拍只补了终态原因
+    // (状态没变),整行择一时磁盘旧行赢 → 那条原因整拍丢失,而终态单不再被回查 = 永久丢。
+    // 反向也坏:内存行赢时会把磁盘上已落盘的原因抹掉(R3 审计探针实测)。
+    // 两种坏法同一个根:**赢家通吃会丢掉输家独有的字段**,而这些字段正是客服唯一的线索。
+    //
+    // 判据:同档位时逐字段取「有值的那个」,双方都有值以内存(本端刚写入的)为准。
+    // 只处理提现单的可选信息字段,不碰 status/金额/地址等身份与钱面(它们同档位下本就相等)。
+    //
+    // ⚠️ 本包**刻意不引入**「谁更新」的时序字段来做仲裁:那需要可信时钟、
+    // 跨端协调与字段级冲突规则,是一次独立的仲裁重构(主人 2026-08-12 拍板拆成独立卡),
+    // 不该由一张契约卡附带。**因此「frozen 与四个终态同档 → 冻结单收不到最终结论」
+    // 这条主线既有缺陷在本包内仍然存在**,已独立立卡,证据见该卡。
+    byId.set(w.id, mergeSameStatusWithdrawal(prev, w));
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
   const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));

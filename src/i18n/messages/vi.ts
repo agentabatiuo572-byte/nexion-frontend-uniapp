@@ -1956,6 +1956,16 @@ export const vi: Messages = {
       "new-address-hold": "Địa chỉ mới thêm đang trong thời gian bảo vệ",
       "first-withdrawal-review": "Kiểm tra an toàn cho lần rút đầu tiên",
     },
+    // 终态原因(服务端 terminalReason)。码表与后台 D2 拒绝原因下拉同源;
+    // 页面只出话术不出码。语气按「钱出事了」的场合来:平实、说清、给下一步,不口语挑逗。
+    withdrawTerminalReasons: {
+      "risk-hit": "Lệnh rút này không qua được kiểm tra an toàn.",
+      "address-risk": "Địa chỉ nhận không qua được kiểm tra an toàn.",
+      "data-mismatch": "Thông tin tài khoản không khớp với hồ sơ của chúng tôi.",
+      "user-cancelled": "Lệnh rút này đã được hủy theo yêu cầu của bạn.",
+      other: "Lệnh rút này chưa hoàn tất.",
+    },
+    trackRetryBlocked: "Không thể gửi lại lệnh rút này. Hãy liên hệ hỗ trợ để được xử lý.",
     topUpTitle: "Nạp tiền",
     chooseMethod: "Chọn phương thức",
     awaiting: "Đang chờ xác nhận",
@@ -2011,7 +2021,7 @@ export const vi: Messages = {
     withdrawSubmittedOtherAccountTitle: "Đã gửi lệnh rút",
     withdrawSubmittedOtherAccountBody: "Bạn đã đăng nhập tài khoản khác trong lúc gửi. Lệnh rút này thuộc tài khoản trước — đăng nhập lại tài khoản đó để theo dõi.",
 
-    trackFailedBody: "Lệnh rút này chưa hoàn tất. Tiền vẫn còn trong tài khoản của bạn. Liên hệ hỗ trợ để biết chi tiết.",
+    trackFailedBody: "Lệnh rút này chưa hoàn tất. Hãy liên hệ hỗ trợ để biết tiền của bạn hiện ở đâu.",
     trackEtaPending: "Dự kiến trong {n} giờ",
     trackExpectedAt: "Thời gian xử lý dự kiến từ máy chủ: {time}",
 

@@ -230,6 +230,89 @@ if (wd1?.status !== "processing") {
   throw new Error(`withdrawal status regressed: ${wd1?.status}`);
 }
 
+// 🔴 同档位 = 同一状态的两份快照,必须**按字段合并**,不是整行择一
+// (2026-08-11 R1 独立审计,包 z7 立案的直接原因;R3 又抓到反方向)。
+// 缺陷两个方向都真实发生过:
+//   ① 服务端这一拍只补了终态原因(状态没变)→ 整行择一时磁盘旧行赢 → 原因整拍丢失;
+//   ② 内存行赢时 → 把磁盘上已落盘的原因抹掉。终态单不再被回查 = 两个方向都是永久丢失。
+// ⚠️ 本门**不**覆盖「frozen 与四个终态同档 → 冻结单收不到最终结论」那条主线既有缺陷:
+//    它要真时序判据(独立仲裁重构,主人 2026-08-12 拍板独立立卡)。别在这里加假靶充数。
+const sameStatus = (over, memOver) => {
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-same", "frozen", 3000), ...over }];
+  const disk = structuredClone(b);            // latest = 磁盘行
+  const mem = structuredClone(b);             // next   = 内存行
+  mem.withdrawals[0] = { ...mem.withdrawals[0], ...memOver };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-same");
+};
+// 方向 ①:磁盘没有原因,内存刚镜像到 → 必须留下
+const gotMem = sameStatus({}, { terminalReason: "address-risk", retriable: false });
+if (gotMem?.terminalReason !== "address-risk" || gotMem?.retriable !== false) {
+  throw new Error(`同状态下内存新补的字段被丢弃:${JSON.stringify({ r: gotMem?.terminalReason, t: gotMem?.retriable })}`);
+}
+// 方向 ②:磁盘已有原因,内存这拍没带 → **不许**被抹掉(赢家通吃会抹,R3 探针实测)
+const gotDisk = sameStatus({ terminalReason: "risk-hit", retriable: false, confirmedAt: 777 }, {});
+if (gotDisk?.terminalReason !== "risk-hit" || gotDisk?.retriable !== false || gotDisk?.confirmedAt !== 777) {
+  throw new Error(`同状态下磁盘已落盘的字段被抹掉:${JSON.stringify({ r: gotDisk?.terminalReason, t: gotDisk?.retriable, c: gotDisk?.confirmedAt })}`);
+}
+// 双方都有值 → 以内存(本端刚写入的)为准,且不得串成第三个值
+const gotBoth = sameStatus({ terminalReason: "risk-hit" }, { terminalReason: "data-mismatch" });
+if (gotBoth?.terminalReason !== "data-mismatch") {
+  throw new Error(`双方都有值时未取内存值(得到 ${gotBoth?.terminalReason})`);
+}
+// 🔴 字段合并必须**对所有可选字段成立**,不是对一份手写清单成立
+// (2026-08-12 并入主线时自查:上一版枚举了 6 个,而类型里有 7 个 —— 漏掉的 riskRoute
+//  会退回「整行择一」的老坏法)。判据从 **types.ts 的实际字段表**取,不在门里再抄一份。
+const optionalFields = (() => {
+  const src = fs.readFileSync("src/store/types.ts", "utf8");
+  const body = src.slice(src.indexOf("export interface Withdrawal {"));
+  return [...body.slice(0, body.indexOf("\n}")).matchAll(/^ {2}([a-zA-Z]+)\?:/gm)].map((m) => m[1]);
+})();
+if (optionalFields.length < 5) {
+  throw new Error(`Withdrawal 可选字段只解析出 ${optionalFields.length} 个 —— 判据失效,空集全过是假绿`);
+}
+for (const field of optionalFields) {
+  // 磁盘有值、内存这拍没带 → 必须保留磁盘的值(逐字段各测一次,不抽样)
+  const probe = { "wd-field": 1 };
+  void probe;
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-field", "frozen", 3400), [field]: "SENTINEL" }];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  // 🔴 靶必须是「内存**显式给了 undefined**」,不是「内存没这个键」——
+  // 对象展开 `{...disk, ...memory}` 本来就能处理「没这个键」,拿 delete 造靶等于测不到
+  // 被测分支(首版就是这么写的,红测不红才发现;同族:靶没进被测分支 = 恒绿)。
+  mem.withdrawals[0][field] = undefined;
+  const got = mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-field");
+  if (got?.[field] !== "SENTINEL") {
+    throw new Error(`同状态合并漏了可选字段 ${field}(得到 ${JSON.stringify(got?.[field])})—— 判据是手写清单就会这样静默漏`);
+  }
+}
+
+// 档位不等时仍按档位:主链单调,不因字段合并而退化
+const rankUp = (() => {
+  const b = structuredClone(base);
+  b.withdrawals = [mkWd("wd-rank", "processing", 3100)];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "confirmed" };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-rank");
+})();
+if (rankUp?.status !== "confirmed") {
+  throw new Error(`升档被丢弃(processing→confirmed 得到 ${rankUp?.status})`);
+}
+const rankDown = (() => {
+  const b = structuredClone(base);
+  b.withdrawals = [mkWd("wd-rank2", "confirmed", 3200)];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "processing" };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-rank2");
+})();
+if (rankDown?.status !== "confirmed") {
+  throw new Error(`陈旧低档内存行顶掉了磁盘的 confirmed(得到 ${rankDown?.status})`);
+}
+
 // 🔴 列表化才有的不变量:两端**各自新建**的单都必须保留。
 // 单条版这里会互相顶掉 —— 钱已扣、单据不可达、到账推进永不再碰它(2026-07-31 audit P0)。
 const wdBothBase = structuredClone(base);

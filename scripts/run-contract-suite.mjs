@@ -31,6 +31,7 @@ const REGISTRY = {
   "g-remote-authority-contract.test.mjs": { how: "chain" },
   "g-remote-authority-behavior.test.mjs": { how: "chain" },
   "remote-authority-simulation.test.mjs": { how: "chain" },
+  "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
   // ── elsewhere:已有入口在跑 ──
   "kyc-removal-contract.test.mjs": { how: "elsewhere", by: "npm run test:kyc-removal" },
   "probe-safety-contract.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
