@@ -314,7 +314,7 @@ const choiceSources = computed(() => {
       id: d.id,
       label: fmt(t.value.tradein.choiceTradeInOption, {
         name: deviceName(t.value, d),
-        credit: remoteApiEnabled ? "服务端报价" : previewCredit(d, s.newPrice).toFixed(2),
+        credit: remoteApiEnabled ? t.value.tradein.remoteQuoteCreditLabel : previewCredit(d, s.newPrice).toFixed(2),
       }),
     }));
 });
@@ -451,7 +451,7 @@ const tradeinView = computed(() => {
     oldDeviceText: oldDevice.name,
     earned: earned.toFixed(2),
     bandText: remoteQuote
-      ? fmt(t.value.tradein.sheetBandText, { band: "服务端", pct: remoteQuote.creditRatePct })
+      ? fmt(t.value.tradein.sheetBandText, { band: t.value.tradein.remoteQuoteBandLabel, pct: remoteQuote.creditRatePct })
       : band
       ? fmt(t.value.tradein.sheetBandText, { band: band.band, pct: band.creditPct })
       : "—",
