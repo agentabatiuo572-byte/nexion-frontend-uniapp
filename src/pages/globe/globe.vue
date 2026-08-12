@@ -135,7 +135,7 @@
       </view>
 
       <!-- Drawer -->
-      <view v-if="selected" class="nx-globe-drawer">
+      <view v-if="selected" class="nx-globe-drawer" role="dialog" aria-modal="true">
         <view class="nx-globe-scrim" @click="selected = null" />
         <view class="relative border rounded-2xl" :style="drawerCardStyle">
           <view class="absolute grid place-items-center active:opacity-70" :style="drawerCloseStyle" @click="selected = null">
@@ -184,6 +184,7 @@ import { useConfig } from "@/store/config";
 import { publicStatsHealth } from "@/lib/platform-stats";
 import { REGIONS, type RegionData } from "@/mock/globe-regions";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const t = useT();
 const app = useApp();
@@ -394,6 +395,10 @@ const drawerStatLabelStyle: CSSProperties = {
   color: "var(--v5-ink-4)",
   marginTop: "2px",
 };
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => selected.value !== null), ".nx-globe-drawer", () => { selected.value = null; });
 </script>
 
 <style scoped>

@@ -24,7 +24,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
       </view>
       <view><text class="block text-center" style="margin-top: 10px; font-size: 12px; color: var(--v5-ink-3)">{{ t.topupChrome.addrLoadFailed }}</text></view>
-      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" @click="load">
+      <view class="nx-dep-retry-cta grid place-items-center active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" @click="load">
         <text style="font-size: 13px; font-weight: 500; color: var(--v5-ink)">{{ t.ui.retry }}</text>
       </view>
     </view>
@@ -37,7 +37,7 @@
           :key="nw.id"
           :class="['flex-1 flex flex-col items-center justify-center', isEnabled(nw.id) ? 'active:opacity-85' : '', `nx-dep-net-${nw.label.toLowerCase()}`]"
           :style="chipStyle(nw.id)"
-          role="button"
+          role="button" tabindex="0"
           :aria-disabled="!isEnabled(nw.id)"
           @click="pickNet(nw.id)"
         >
@@ -60,7 +60,7 @@
           <view class="flex-1 min-w-0">
             <text class="font-mono" style="font-size: 12px; color: color-mix(in srgb, var(--v5-ink) 90%, transparent); white-space: nowrap">{{ shortAddr }}</text>
           </view>
-          <view class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" @click="copyAddr">
+          <view class="nx-dep-copy-address-cta grid place-items-center shrink-0 active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="copyAddr">
             <svg v-if="copied" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
             <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
           </view>
@@ -75,7 +75,7 @@
           <view class="flex-1 min-w-0">
             <text class="block" :style="warnTextStyle">Cregis USDT-BEP20</text>
           </view>
-          <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" @click="simulateSandboxTopup">
+          <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
             <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "处理中" : "+25 USDT" }}</text>
           </view>
         </view>
@@ -97,11 +97,11 @@
 
       <!-- ── 指引 / 工单入口(透明 hairline 组)── -->
       <view style="margin-top: 16px">
-        <view class="nx-dep-usdt-guide-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" @click="goGuide">
+        <view class="nx-dep-usdt-guide-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goGuide">
           <text :style="linkTextStyle">{{ t.topupChrome.howToGetUsdt }}</text>
           <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
         </view>
-        <view class="nx-dep-support-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" @click="goSupport">
+        <view class="nx-dep-support-link flex items-center justify-between active:opacity-70" :style="linkRowStyle" role="button" tabindex="0" @click="goSupport">
           <text :style="linkTextStyle">{{ t.topupChrome.depositNotArrived }}</text>
           <text style="color: var(--v5-ink-4); font-size: 13px">›</text>
         </view>
@@ -126,6 +126,7 @@
             :class="recordClickable(r) ? 'active:opacity-90' : ''"
             :style="recordRowStyle"
             :role="recordClickable(r) ? 'button' : undefined"
+            :tabindex="recordClickable(r) ? 0 : undefined"
             v-on="recordRowOn(r)"
           >
             <view class="grid place-items-center shrink-0" :style="depIconStyle">

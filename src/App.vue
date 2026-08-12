@@ -40,6 +40,7 @@ import {
 import { useDeposits } from "@/store/deposits";
 import { fundsServerEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
 import { prepareProductCatalog } from "@/store/product-catalog";
+import { installKeyboardActivation } from "@/lib/a11y-activate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -860,6 +861,11 @@ function ensureBusinessLoopsRunning(): boolean {
 }
 
 onLaunch(() => {
+  // 🔴 必须在下面任何 early return 之前挂:退役路由 / 静态评审页同样有自造按钮,
+  // 晚一步挂 = 那些页面整页没有键盘可达性。
+  // ⚠️ 2026-08-12 这行被一次并发合并冲掉过一次(平台层文件还在、门也在,唯独没人调用它,
+  //    等于功能是死的)。门的 D 判据专门守这一行,别再删。
+  installKeyboardActivation();
   const auth = useAuth();
   if (remoteApiEnabled) {
     setRemoteUnauthorizedHandler(() => {

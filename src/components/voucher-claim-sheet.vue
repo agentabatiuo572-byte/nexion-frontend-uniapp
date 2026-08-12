@@ -7,7 +7,7 @@
   Zero card chrome on the protected tab pages — this is a chassis overlay.
 -->
 <template>
-  <view v-if="sheet.open" class="vcs-root">
+  <view v-if="sheet.open" class="vcs-root" role="dialog" aria-modal="true">
     <view class="vcs-backdrop" @click="hide" />
 
     <view class="vcs-panel" @click.stop>
@@ -73,6 +73,7 @@ import { useT } from "@/i18n/use-t";
 import { remoteApiEnabled } from "@/api/runtime";
 import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useVoucherClaimSheet();
 const voucher = useVoucher();
@@ -148,6 +149,9 @@ function onUse(v: VoucherDef) {
     navTo("/store");
   }
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮)。
+useDialogA11y(computed(() => sheet.open), ".vcs-root", hide);
 </script>
 
 <style scoped>
