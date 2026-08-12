@@ -69,14 +69,20 @@ export interface WithdrawalStatusSnapshot {
    * `address-risk`,换个地址可以重提、命中黑名单则不能),客户端推一份等于第二个真理源。
    */
   retriable: boolean | null;
-}
-
-/** 单据状态镜像 —— GET /api/withdrawals/:id (PRD §9.11f 的按 id 读单通式)。 */
-export interface WithdrawalStatusSnapshot {
-  withdrawalNo: string;
-  status: WithdrawalStatus;
-  /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
-  confirmedAt: number | null;
+  /**
+   * 🔴 FEAT-WD01 §4.6:服务端**已经退还**的已烧 NEX 枚数,以及退款**发生**的时刻。
+   *
+   * 为什么必须在回查响应里(2026-08-12 两包合并时补):提交即拒是零副作用、不烧 NEX,
+   * 所以退还只可能发生在**提交之后** —— 而提交之后客户端唯一的信息入口就是这个回查面。
+   * 这个面此前只回 5 个字段,于是「退款证据」永远到不了客户端,冲正分录一次都不会触发。
+   * 包 z8 预先把这条判据焊进 selfcheck-withdraw-nex-refund ⑪(本仓一旦出现状态回查面而
+   * 响应不带该字段即判红),合并当天如期报警 —— 本段就是补那一半。
+   *
+   * 两个字段是同一件事实的两个面,**成对**取:缺其一时冲正行的日期会掉回「客户端得知的此刻」。
+   * null = 服务端没给(不是「没退」);值域校验与「退得比烧的多」的拒绝收在消费点一处。
+   */
+  nexRefunded: number | null;
+  nexRefundedAt: number | null;
 }
 
 export interface WithdrawalApi {
@@ -490,7 +496,23 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
   // 可重试:只认布尔;其余一律当没给(页面对 null 的处理就是「不显示这句话」)。
   const rawRetriable = row.retriable;
   const retriable: boolean | null = typeof rawRetriable === "boolean" ? rawRetriable : null;
-  return { withdrawalNo, status: canonicalStatus(status), confirmedAt, terminalReason, retriable };
+  // 退款事实(金额 + 时刻),**成对**解析。归「显示 / 账本补记」那一档,坏值降级成没给、绝不抛:
+  // 抛出去会被调用方 .catch 吞掉,整张单据镜像失败 → 单子永久停在处理中(那正是本文件在修的坑)。
+  // 只认正数;`0` / 负数 / 非数一律当没给 —— 「退了 0 枚」与「没退」在账本上是同一件事,
+  // 而把 0 当成「有退款事实」会让合并层去覆盖一份真实的非 0 值。
+  // 时刻同样接受毫秒数或 ISO 串(线上发 ISO-8601 字符串)。
+  const positive = (v: unknown): number | null => {
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() ? Date.parse(v) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const nexRefunded = typeof row.nexRefunded === "number" && Number.isFinite(row.nexRefunded) && row.nexRefunded > 0
+    ? row.nexRefunded
+    : null;
+  const nexRefundedAt = positive(row.nexRefundedAt);
+  return {
+    withdrawalNo, status: canonicalStatus(status), confirmedAt, terminalReason, retriable,
+    nexRefunded, nexRefundedAt,
+  };
 }
 
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {

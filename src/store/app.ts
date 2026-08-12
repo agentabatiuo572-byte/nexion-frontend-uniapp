@@ -2172,6 +2172,12 @@ export const useApp = defineStore("app", () => {
         // 覆盖的话,一次「服务端这拍没带原因」就把客服唯一能查的那条线索抹了。
         ...(remote.terminalReason !== null ? { terminalReason: remote.terminalReason } : {}),
         ...(remote.retriable !== null ? { retriable: remote.retriable } : {}),
+        // 🔴 退款事实**成对**落单,与上面同一条规则:没给就保留旧值,不覆盖成空。
+        // 这一行是冲正分录的唯一进料口 —— 解析层认出来了但不落到单据上,等于没接
+        // (包 z8 焊的 ⑪ 判据防的就是这种半截:回查面在、字段不在,冲正永远不触发)。
+        ...(remote.nexRefunded !== null
+          ? { nexRefunded: remote.nexRefunded, nexRefundedAt: remote.nexRefundedAt ?? w.nexRefundedAt }
+          : {}),
       });
     });
     if (!patches.size) return [];
