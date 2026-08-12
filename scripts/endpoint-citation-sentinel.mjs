@@ -165,10 +165,8 @@ const LEDGER = {
   "GET /api/network/regions": "PRD §11.6",
   "GET /api/pool/state": "PRD §8.5.2",
   "GET /api/server-time": "PRD §9.11a.4",
-  // `/api/market/nex` 条目已删(z1 2026-08-10):c37e642 删掉了唯一引用注释,契约本身
-  // 也从 WebSocket 推送改为 marketApi.fetch() HTTP(真路径 GET /api/config/market/nex,
-  // 见 src/api/market-api.ts)。引用回归时按流程重新登记。
-  "GET /api/market": "TBD: 平台 NEX 牌价参考展示的旧候选名;真契约已定 GET /api/config/market/nex(market-api.ts,HTTP 拉取),注释收口时改指真契约并重登记",
+  "GET /api/market": "TBD: 与 §10.3 `/api/market/nex` 是同一个平台牌价,重复候选名;注释应改指 /api/market/nex",
+  "/api/market/nex": "PRD §10.3(WebSocket 推送)",
   "GET /api/market/tokens": "PRD §11.9.3",
   "GET /api/admin/platform/phase-config": "PRD §9.11d",
   "PUT /api/admin/tradein/config": "TBD: PRD 未定义置换配置写接口(admin 侧,候选名)",

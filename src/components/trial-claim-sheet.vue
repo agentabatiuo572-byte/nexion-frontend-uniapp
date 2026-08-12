@@ -6,7 +6,7 @@
   reason (异常2). Zero-friction copy, fully i18n-routed (t.trial.sheet*).
 -->
 <template>
-  <view v-if="sheet.open" class="tcs-root">
+  <view v-if="sheet.open" class="tcs-root" role="dialog" aria-modal="true">
     <view class="tcs-backdrop" @click="hide" />
 
     <view class="tcs-panel" @click.stop>
@@ -73,7 +73,7 @@
       <!-- Inline claim error + retry (spec ⑤ — never silent) -->
       <view v-if="claimError" class="tcs-error">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 1px"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-        <text class="tcs-error-t">{{ t.trial.claimErrorInline }}</text>
+        <text class="tcs-error-t">{{ claimErrorText }}</text>
       </view>
 
       <!-- CTAs -->
@@ -98,6 +98,7 @@ import { useFreeTrial, type TrialIneligibleReason } from "@/store/free-trial";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTrialClaimSheet();
 const trialConfig = useTrialConfig();
@@ -117,7 +118,11 @@ const prop3Sub = computed(() => fmt(t.value.trial.sheetProp3Sub, { pct: (cfg.val
 // error with retry (spec ⑤: failure is never silent).
 const claiming = ref(false);
 const claimError = ref(false);
+const claimErrorReason = ref<TrialIneligibleReason>();
 const claimCtaLabel = computed(() => (claimError.value ? t.value.trial.claimRetryCta : t.value.trial.sheetClaimCta));
+const claimErrorText = computed(() => claimErrorReason.value === "unknown"
+  ? t.value.trial.claimUnknownInline
+  : t.value.trial.claimErrorInline);
 
 function reasonText(reason: TrialIneligibleReason | undefined): string {
   const w = t.value.trial;
@@ -125,37 +130,41 @@ function reasonText(reason: TrialIneligibleReason | undefined): string {
   if (reason === "used") return w.eligReasonUsed;
   if (reason === "in-progress") return w.eligReasonInProgress;
   if (reason === "risk") return w.eligReasonRisk;
+  if (reason === "unknown") return w.eligReasonUnknown;
   return w.eligReasonClosed;
 }
 
 function hide() {
   claimError.value = false;
+  claimErrorReason.value = undefined;
   sheet.hide();
 }
-function onClaim() {
+async function onClaim() {
   if (claiming.value) return;
-  // Eligibility guard with the CONCRETE reason (异常2): auto-push surfaces can
-  // open this sheet in a race where the trial can't start — tell the user why,
-  // never a generic error.
-  const elig = freeTrial.eligibility();
-  if (!elig.ok) {
-    sheet.hide();
-    toast.info(reasonText(elig.reason));
-    return;
-  }
   claiming.value = true;
-  // PRODUCTION: await POST /api/trial/start — the claiming flag holds the CTA
-  // in its busy state for the round-trip. Mock resolves synchronously.
-  const r = freeTrial.start();
+  // Remote start first refreshes GET /api/trial/eligibility, then posts the
+  // idempotent command and performs an authoritative readback.
+  const r = await freeTrial.start();
   claiming.value = false;
   if (!r.ok) {
+    if (r.reason && r.reason !== "unknown") {
+      sheet.hide();
+      toast.info(reasonText(r.reason));
+      return;
+    }
+    claimErrorReason.value = r.reason;
     claimError.value = true; // inline error + retry CTA, stay in the sheet
     return;
   }
   claimError.value = false;
+  claimErrorReason.value = undefined;
   sheet.hide();
   toast.success(t.value.trial.toastActivated);
 }
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => sheet.open), ".tcs-root", hide);
 </script>
 
 <style scoped>
@@ -252,6 +261,7 @@ function onClaim() {
   position: relative;
   overflow: hidden;
   background: color-mix(in srgb, var(--v5-brand) 6%, var(--v5-surface-2));
+  border: 1px solid color-mix(in srgb, var(--v5-brand) 32%, transparent);
 }
 .tcs-hero-grid {
   position: absolute;

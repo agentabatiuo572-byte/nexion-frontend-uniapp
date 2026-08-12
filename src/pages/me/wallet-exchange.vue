@@ -97,7 +97,7 @@
       <view style="margin: 16px 16px 0">
         <!-- 金额无效 / 本次兑换在途时点了没用 → 显式 aria-disabled + 置灰(《05》§6.1
              disabled 派生:文字降 ink-4 + 填充降 surface 系),而不是靠「没有按下反馈」暗示 -->
-        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
+        <view class="grid place-items-center" :class="{ 'active:opacity-90': ctaEnabled }" role="button" tabindex="0" :aria-disabled="ctaEnabled ? 'false' : 'true'" :style="confirmStyle" @click="handleConfirm">
           <text :style="confirmTextStyle">{{ t.exchange.confirm }}</text>
         </view>
       </view>
@@ -187,8 +187,14 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { toast, confirm } from "@/store/ui";
 import { useApp } from "@/store/app";
 import { postMoneyBills } from "@/lib/money-receipt";
+import {
+  createExchangePendingMutationStore,
+  executeExchangeSwap,
+  ExchangeOutcomeUnknownError,
+  type ExchangeSwapIntent,
+} from "@/lib/exchange-pending-mutation";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
-import type { ExchangeSnapshot } from "@/api/exchange-api";
+import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
 import {
   useExchangeV3,
@@ -206,6 +212,7 @@ const exchange = useExchange();
 const v3 = useExchangeV3();
 const remoteState = ref<ExchangeSnapshot | null>(null);
 const remoteError = ref<string | null>(null);
+const pendingExchangeMutations = createExchangePendingMutationStore();
 
 async function syncRemoteState() {
   if (!remoteApiEnabled) return;
@@ -377,6 +384,27 @@ function goHowItWorks() {
   uni.navigateTo({ url: "/pages/me/wallet-exchange-how", fail: () => {} });
 }
 
+function notifyRemoteSwapResult(order: ExchangeOrder) {
+  if (order.status === "COMPLETED" || order.status === "SUCCESS") {
+    toast.success(t.value.exchange.swapped);
+    return;
+  }
+  if (order.status === "QUEUED") {
+    toast.info(
+      t.value.exchange.queuedToastTitle,
+      fmt(t.value.exchange.queuedToastBody, { amount: (order.fromAsset === "USDT" ? order.fromAmount : order.toAmount).toFixed(2) }),
+    );
+    return;
+  }
+  const reason = {
+    CANCELLED: "兑换单已取消，本次未成交",
+    USER_CAP: "已达到个人额度，本次未成交",
+    PLATFORM_CAP: "平台额度已用尽，本次未成交",
+    GEO_BLOCKED: "地区策略限制，本次未成交",
+  }[order.status];
+  toast.error(reason ?? `兑换未成交（${order.status}）`, order.exchangeNo);
+}
+
 async function handleConfirm() {
   // 🔴 重入守卫排在最前:无守卫时连点两次会排队两条完整兑换链,而第二条的额度门
   // 读到的还是第一条 v3.record 之前的计数 —— 两笔都放行,日限直接翻倍。
@@ -399,6 +427,7 @@ async function handleConfirm() {
     rate: rate.value,
     usd: swapUSDValue.value,
     account: app.accountKey,
+    remoteBaseline: remoteState.value,
   };
 
   submitting.value = true;
@@ -414,16 +443,33 @@ async function handleConfirm() {
         confirmLabel: t.value.exchange.confirm,
       });
       if (!ok) return;
+      if (app.accountKey !== snap.account || !snap.remoteBaseline) {
+        toast.error(t.value.exchange.quoteStaleTitle, t.value.exchange.quoteStaleContext);
+        return;
+      }
       const directionCode = snap.direction === "usdt2nex" ? "USDT_TO_NEX" : "NEX_TO_USDT";
-      remoteState.value = await exchangeApi.swap(
-        directionCode,
-        snap.fromAmount,
-        true,
-        `G2-SWAP-${directionCode}-${snap.fromAmount}-${Date.now().toString(36)}`,
-      );
+      const intent: ExchangeSwapIntent = {
+        direction: directionCode,
+        fromAmount: snap.fromAmount,
+        queueIfCapped: true,
+      };
+      const result = await executeExchangeSwap<ExchangeSnapshot>({
+        pending: pendingExchangeMutations,
+        accountKey: snap.account,
+        intent,
+        baseline: snap.remoteBaseline,
+        swap: (idempotencyKey) => exchangeApi.swap(directionCode, snap.fromAmount, true, idempotencyKey),
+        fetchState: () => exchangeApi.fetchState(),
+      });
+      if (app.accountKey !== snap.account) {
+        await syncRemoteState();
+        toast.info("账号已切换，已刷新当前账号权威状态");
+        return;
+      }
+      remoteState.value = result.snapshot;
       remoteError.value = null;
-      input.value = "";
-      toast.success(t.value.exchange.swapped);
+      if (["COMPLETED", "SUCCESS", "QUEUED"].includes(result.order.status)) input.value = "";
+      notifyRemoteSwapResult(result.order as ExchangeOrder);
       return;
     }
     // v3 gate: cap / queue —— 判的是**快照金额**,后面扣的也是它(同一个数)。
@@ -538,6 +584,16 @@ async function handleConfirm() {
     input.value = "";
   } catch (err) {
     if (remoteApiEnabled) {
+      if (err instanceof ExchangeOutcomeUnknownError) {
+        if (app.accountKey === snap.account && err.authoritativeState) {
+          remoteState.value = err.authoritativeState as ExchangeSnapshot;
+        } else if (app.accountKey !== snap.account) {
+          await syncRemoteState().catch(() => {});
+        }
+        remoteError.value = "G2_SWAP_OUTCOME_UNKNOWN";
+        toast.error("兑换结果尚未确认", "请保持同一方向和金额重试；系统将复用同一请求号安全回读。");
+        return;
+      }
       remoteState.value = null;
       remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
       // 这条路径失败的是用户刚提交的**兑换动作**,不是一次数据读取 —— 与 :268/:370 两处

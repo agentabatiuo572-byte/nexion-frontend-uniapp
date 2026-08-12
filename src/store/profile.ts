@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
+import { remoteApiEnabled } from "@/api/runtime";
+import type { UserSession } from "@/api/contracts";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
@@ -34,6 +36,7 @@ export const useProfile = defineStore("profile", () => {
   const init = hydrate(boundKey);
   const displayName = ref(init.displayName);
   const avatarSeed = ref(init.avatarSeed);
+  const phoneE164 = ref("");
 
   function persist() {
     writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
@@ -45,13 +48,31 @@ export const useProfile = defineStore("profile", () => {
   /** 账号切换重绑:装载该账号的资料(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    // A server session must never inherit a prior browser profile row. The
+    // authoritative auth response is projected immediately after this bind;
+    // until then leave an honest blank state rather than a demo identity.
+    if (remoteApiEnabled) {
+      displayName.value = "";
+      avatarSeed.value = "";
+      phoneE164.value = "";
+      return;
+    }
     const next = hydrate(boundKey);
     displayName.value = next.displayName;
     avatarSeed.value = next.avatarSeed;
+    phoneE164.value = "";
+  }
+
+  /** Ephemeral server projection: authentication, not local storage, owns it. */
+  function projectServerIdentity(identity: UserSession) {
+    if (!remoteApiEnabled) return;
+    displayName.value = identity.nickname;
+    avatarSeed.value = `user:${identity.userId}`;
+    phoneE164.value = `${identity.countryCode}${identity.phone}`;
   }
 
   function setDisplayName(v: string) { displayName.value = v; persist(); }
   function regenerateAvatar() { avatarSeed.value = defaultSeed(); persist(); }
 
-  return { displayName, avatarSeed, setDisplayName, regenerateAvatar, bindAccount };
+  return { displayName, avatarSeed, phoneE164, setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity };
 });

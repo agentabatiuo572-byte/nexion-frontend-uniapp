@@ -15,7 +15,7 @@
   Neutral, conversational copy; zero mock exposure. All i18n via t.luckySpin.*.
 -->
 <template>
-  <view v-if="spin.open" class="lss-root">
+  <view v-if="spin.open" class="lss-root" role="dialog" aria-modal="true">
     <view class="lss-backdrop nx-sheet-fade-in" @click="onBackdrop" />
 
     <view class="lss-panel nx-sheet-slide-up" @click.stop>
@@ -158,6 +158,7 @@ import { mockServerNow } from "@/store/server-time";
 import { toast, confirm, netError } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const R = 94; // wheel radius (viewBox 200)
 const CX = 100;
@@ -406,6 +407,10 @@ function goEarnTicket() {
 
 // 卸载时清兜底 timer,防 setState on unmounted(组件级 → onUnmounted,P-021)
 onUnmounted(() => clearSettleTimer());
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+useDialogA11y(computed(() => spin.open), ".lss-root", onBackdrop);
 </script>
 
 <style scoped>

@@ -12,6 +12,8 @@ export type { HostedCardKind };
 export interface HostedCardToken {
   /** 收单方 token(mock 生成;PROD = SDK createToken 返回的 id)。 */
   token: string;
+  /** 本地 vault 只会生成显式 sandbox token，服务端生产边界必须拒绝。 */
+  source: "mock";
   /** 卡号后四位,供 `•••• 1234` 展示。 */
   last4: string;
   brand: CardBrand;

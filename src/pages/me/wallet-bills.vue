@@ -15,6 +15,7 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.bills.title" />
+      <FundsSandboxBadge />
 
       <!-- Tabs -->
       <view class="flex" :style="segWrapStyle">
@@ -29,8 +30,12 @@
         </view>
       </view>
 
+      <view v-if="ledgerError" :style="ledgerErrorStyle">
+        <text class="break-all">{{ ledgerError }}</text>
+      </view>
+
       <!-- Empty -->
-      <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
+      <EmptyState v-else-if="filtered.length === 0" kind="empty-list" :title="t.empty.billsTitle" :desc="t.empty.billsDesc" />
 
       <!-- Grouped list -->
       <view v-else :style="listWrapStyle">
@@ -84,22 +89,37 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import { useLocaleStore } from "@/store/locale";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import BillTypeIcon from "@/components/me/bill-type-icon.vue";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bills";
 import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import { navTo } from "@/lib/route";
+import { fundsSandboxEnabled } from "@/api/runtime";
 
 const t = useT();
 const locale = useLocaleStore();
 const billsStore = useBills();
 const deposits = useDeposits();
+const refreshError = ref("");
+const ledgerError = computed(() => refreshError.value || billsStore.serverError);
+
+onShow(async () => {
+  if (!fundsSandboxEnabled) return;
+  refreshError.value = "";
+  try {
+    await billsStore.refreshFundsSandboxLedger();
+  } catch (cause) {
+    refreshError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+  }
+});
 
 type Tab = "all" | "in" | "out";
 const TABS: Tab[] = ["all", "in", "out"];
@@ -319,6 +339,14 @@ const emptyStyle: CSSProperties = {
 const emptyTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
 
 const listWrapStyle: CSSProperties = { margin: "0 16px 12px" };
+const ledgerErrorStyle: CSSProperties = {
+  margin: "0 16px 12px",
+  padding: "12px",
+  borderRadius: "12px",
+  background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)",
+  color: "var(--v5-danger)",
+  fontSize: "12px",
+};
 // Transparent hairline group per month: container border-top opens it, the mono
 // month header + rows carry their own dividers (first row = no top border).
 const sectionStyle: CSSProperties = {

@@ -1,9 +1,12 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { useTrialConfig, computeDiscountedPrice, computeTrialOffset } from "./trial-config";
+import { useTrialConfig, computeDiscountedPrice, computeTrialOffset, resolveTrialDeviceName } from "./trial-config";
 import { mockServerNow, ONE_DAY_MS } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { remoteApiEnabled, trialApi } from "@/api/runtime";
+import type { TrialAuthorityState } from "@/api/trial-api";
+import { asApiError } from "@/api/errors";
 import {
   resolveTrialAt,
   accruedShadow,
@@ -49,7 +52,7 @@ export type { TrialStatus } from "./trial-boundary";
 /** Why the trial can't start right now (spec 异常2 — concrete reasons, no generic error).
  *  "risk" = spec 异常2 第三具名原因(风控命中)。MOCK 无风控引擎,本地 eligibility()
  *  无触发路径;生产由后端 GET /api/trial/eligibility 下发该 reason。 */
-export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "risk";
+export type TrialIneligibleReason = "in-progress" | "converted" | "used" | "phase-closed" | "risk" | "unknown";
 
 /** Persisted row shape — single source lives in trial-boundary.ts (resolver 同型)。 */
 type FreeTrialState = TrialRowSnapshot;
@@ -148,7 +151,7 @@ function hydrate(accountKey: string, cfg: TrialBoundaryConfig): FreeTrialState {
 export const useFreeTrial = defineStore("freeTrial", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const init = hydrate(boundKey, useTrialConfig().config);
+  const init = remoteApiEnabled ? { ...INITIAL } : hydrate(boundKey, useTrialConfig().config);
   const status = ref<TrialStatus>(init.status);
   const startedAt = ref<number | null>(init.startedAt);
   const expiresAt = ref<number | null>(init.expiresAt);
@@ -157,6 +160,21 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   const shadowFrozenAtUSD = ref<number>(init.shadowFrozenAtUSD);
   const shadowFrozenAtNEX = ref<number>(init.shadowFrozenAtNEX);
   const legacyCardMigrated = ref<boolean>(init.legacyCardMigrated);
+  const authorityStatus = ref<"mock" | "loading" | "ready" | "unknown" | "error">(
+    remoteApiEnabled ? "unknown" : "mock",
+  );
+  const authorityError = ref<string | null>(null);
+  const authoritativeShadowUSD = ref(0);
+  const authoritativeShadowNEX = ref(0);
+  const remoteCanStart = ref(false);
+  const remoteEligibilityReason = ref<TrialIneligibleReason>("unknown");
+  const authorityClaimNo = ref<string | null>(null);
+  const authorityVersion = ref(0);
+  let refreshInFlight: Promise<boolean> | null = null;
+  let refreshInFlightAccount: string | null = null;
+  let pendingStartKey: string | null = null;
+  let authorityRequestSequence = 0;
+  let lastAppliedSequence = 0;
 
   /** Current row as a plain snapshot — resolver 的唯一输入形态(生产 = GET /api/trial/state 行)。 */
   function snapshot(): FreeTrialState {
@@ -173,11 +191,13 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   }
 
   function persist() {
+    if (remoteApiEnabled) return;
     writeAccountRow<FreeTrialState>(ACCOUNTS_KEY, boundKey, snapshot());
   }
 
   /** 边界推进唯一入口:resolve 后有变化才落盘(poll/convert 共用;渲染路径禁调)。 */
   function advanceTo(now: number): FreeTrialState {
+    if (remoteApiEnabled) return snapshot();
     const row = snapshot();
     const resolved = resolveTrialAt(row, now, useTrialConfig().config);
     if (resolved !== row) {
@@ -198,9 +218,104 @@ export const useFreeTrial = defineStore("freeTrial", () => {
     legacyCardMigrated.value = next.legacyCardMigrated;
   }
 
+  function clearRemoteFacts(nextStatus: "unknown" | "error" = "unknown", error: string | null = null) {
+    load({ ...INITIAL });
+    authoritativeShadowUSD.value = 0;
+    authoritativeShadowNEX.value = 0;
+    remoteCanStart.value = false;
+    remoteEligibilityReason.value = "unknown";
+    authorityClaimNo.value = null;
+    authorityVersion.value = 0;
+    authorityStatus.value = nextStatus;
+    authorityError.value = error;
+  }
+
+  function applyAuthority(next: TrialAuthorityState, sequence: number): boolean {
+    if (sequence < lastAppliedSequence) return false;
+    if (authorityStatus.value === "ready" && authorityClaimNo.value === next.claimNo
+        && next.version < authorityVersion.value) return false;
+    lastAppliedSequence = sequence;
+    load({
+      status: next.status,
+      startedAt: next.startedAt,
+      expiresAt: next.expiresAt,
+      graceEndsAt: next.graceEndsAt,
+      finishedAt: next.finishedAt,
+      // Remote shadow values are server projections, never locally accrued facts.
+      shadowFrozenAtUSD: next.shadowUSD,
+      shadowFrozenAtNEX: next.shadowNEX,
+      legacyCardMigrated: false,
+    });
+    authoritativeShadowUSD.value = next.shadowUSD;
+    authoritativeShadowNEX.value = next.shadowNEX;
+    remoteCanStart.value = next.canStart;
+    remoteEligibilityReason.value = next.eligibilityReason ?? "unknown";
+    authorityClaimNo.value = next.claimNo;
+    authorityVersion.value = next.version;
+    useTrialConfig().applyAuthoritative(next.config);
+    authorityStatus.value = "ready";
+    authorityError.value = null;
+    return true;
+  }
+
+  async function refreshRemote(force = false): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    if (!force && refreshInFlight && refreshInFlightAccount === boundKey) return refreshInFlight;
+    const requestedAccount = boundKey;
+    const sequence = ++authorityRequestSequence;
+    authorityStatus.value = "loading";
+    authorityError.value = null;
+    let request!: Promise<boolean>;
+    request = trialApi.state()
+      .then((next) => {
+        if (requestedAccount !== boundKey) return false;
+        return applyAuthority(next, sequence);
+      })
+      .catch((error: unknown) => {
+        if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
+          lastAppliedSequence = sequence;
+          clearRemoteFacts("error", asApiError(error).message);
+        }
+        return false;
+      })
+      .finally(() => {
+        if (refreshInFlight === request) {
+          refreshInFlight = null;
+          refreshInFlightAccount = null;
+        }
+      });
+    refreshInFlight = request;
+    refreshInFlightAccount = requestedAccount;
+    return request;
+  }
+
+  async function refreshEligibilityRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    const requestedAccount = boundKey;
+    const sequence = ++authorityRequestSequence;
+    authorityStatus.value = "loading";
+    authorityError.value = null;
+    try {
+      const next = await trialApi.eligibility();
+      return requestedAccount === boundKey && applyAuthority(next, sequence);
+    } catch (error) {
+      if (requestedAccount === boundKey && sequence >= lastAppliedSequence) {
+        lastAppliedSequence = sequence;
+        clearRemoteFacts("error", asApiError(error).message);
+      }
+      return false;
+    }
+  }
+
   /** 账号切换重绑:装载该账号的试用状态机(防跨账号继承试用资格/影子收益)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      lastAppliedSequence = ++authorityRequestSequence;
+      clearRemoteFacts();
+      void refreshRemote();
+      return;
+    }
     load(hydrate(boundKey, useTrialConfig().config));
   }
 
@@ -208,6 +323,12 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 判定基于 resolveTrialAt 解析后的状态(只读、不落盘):离线跨过边界的行在
   // 内存状态推进前就按真实时点判 —— 真 ended 的行拿 "used" 而不是 "in-progress"。
   function eligibility(): { ok: boolean; reason?: TrialIneligibleReason } {
+    if (remoteApiEnabled) {
+      if (authorityStatus.value !== "ready") return { ok: false, reason: "unknown" };
+      return remoteCanStart.value
+        ? { ok: true }
+        : { ok: false, reason: remoteEligibilityReason.value };
+    }
     const cfg = useTrialConfig().config;
     const resolved = resolveTrialAt(snapshot(), mockServerNow(), cfg);
     if (resolved.status === "active" || resolved.status === "grace") return { ok: false, reason: "in-progress" };
@@ -225,7 +346,42 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // PRODUCTION: POST /api/trial/start (no card token — cardless claim, spec ③).
   // Idempotent: a second call while ineligible is a no-op (spec 异常3 — one
   // trial per account, concurrent taps produce exactly one).
-  function start(): { ok: boolean; reason?: TrialIneligibleReason } {
+  async function start(): Promise<{ ok: boolean; reason?: TrialIneligibleReason }> {
+    if (remoteApiEnabled) {
+      if (!await refreshEligibilityRemote()) return { ok: false, reason: "unknown" };
+      const remoteEligibility = eligibility();
+      if (!remoteEligibility.ok) return { ok: false, reason: remoteEligibility.reason };
+      const deviceName = resolveTrialDeviceName(useTrialConfig().config.trialProductId);
+      if (!deviceName) {
+        clearRemoteFacts("error", "TRIAL_CONFIG_RESPONSE_INVALID");
+        return { ok: false, reason: "unknown" };
+      }
+      pendingStartKey ??= commandKey("start");
+      try {
+        const sequence = ++authorityRequestSequence;
+        const receipt = await trialApi.start(pendingStartKey, deviceName);
+        applyAuthority(receipt, sequence);
+        const expectedClaimNo = receipt.claimNo;
+        const confirmed = await refreshRemote(true);
+        if (!confirmed || !expectedClaimNo || authorityClaimNo.value !== expectedClaimNo
+            || (status.value !== "active" && status.value !== "grace")) {
+          clearRemoteFacts("unknown", "TRIAL_START_RESULT_UNKNOWN");
+          return { ok: false, reason: "unknown" };
+        }
+        pendingStartKey = null;
+        return { ok: true };
+      } catch (error) {
+        const reason = commandFailureReason(error);
+        authorityError.value = asApiError(error).message;
+        const reconciled = await refreshRemote();
+        if (reconciled && authorityClaimNo.value
+            && (status.value === "active" || status.value === "grace")) {
+          pendingStartKey = null;
+          return { ok: true };
+        }
+        return { ok: false, reason };
+      }
+    }
     const elig = eligibility();
     if (!elig.ok) return { ok: false, reason: elig.reason };
     const cfg = useTrialConfig().config;
@@ -250,6 +406,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 绝不信任调用方(结算页)缓存的 now 或内存里的旧 status —— 用户离线跨过宽限期
   // 后趁 poll 未跑下单,这里按真实时点判到 ended 即拒绝(边界推进结果已落盘)。
   function convert(): boolean {
+    if (remoteApiEnabled) return false;
     const now = mockServerNow();
     const resolved = advanceTo(now);
     if (resolved.status !== "active" && resolved.status !== "grace") return false;
@@ -261,25 +418,76 @@ export const useFreeTrial = defineStore("freeTrial", () => {
 
   // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`
   // — grace has nothing left to cancel (production already stopped).
-  function cancel() {
-    if (status.value !== "active") return;
+  async function cancel(): Promise<{ ok: boolean; reason?: TrialIneligibleReason }> {
+    if (remoteApiEnabled) {
+      if (authorityStatus.value !== "ready") await refreshRemote(true);
+      if (authorityStatus.value !== "ready" || !authorityClaimNo.value) {
+        return { ok: false, reason: "unknown" };
+      }
+      const expectedClaimNo = authorityClaimNo.value;
+      const key = `h2-cancel:${expectedClaimNo}`;
+      try {
+        const sequence = ++authorityRequestSequence;
+        const receipt = await trialApi.cancel("explicit", key);
+        applyAuthority(receipt, sequence);
+        const confirmed = await refreshRemote(true);
+        if (!confirmed || authorityClaimNo.value !== expectedClaimNo || status.value !== "ended") {
+          clearRemoteFacts("unknown", "TRIAL_CANCEL_RESULT_UNKNOWN");
+          return { ok: false, reason: "unknown" };
+        }
+        return { ok: true };
+      } catch (error) {
+        authorityError.value = asApiError(error).message;
+        const reconciled = await refreshRemote();
+        if (reconciled && authorityClaimNo.value === expectedClaimNo && status.value === "ended") {
+          return { ok: true };
+        }
+        return { ok: false, reason: commandFailureReason(error) };
+      }
+    }
+    if (status.value !== "active") return { ok: false, reason: eligibility().reason ?? "unknown" };
     status.value = "ended";
     finishedAt.value = mockServerNow();
     persist();
+    return { ok: true };
   }
 
   // PRODUCTION: client polls GET /api/trial/state; advancement runs server-side
   // by cron. Spec ④ 禁止动作:grace→ended flips STATE ONLY — zero debit, zero
   // order, zero device writes ever happen here. 边界判定/级联/补齐全在
   // resolveTrialAt(冻结窗口、finishedAt=真边界、null graceEndsAt 就地补齐)。
-  function poll(now: number) {
+  async function poll(now: number): Promise<boolean> {
+    if (remoteApiEnabled) return refreshRemote();
     advanceTo(now);
+    return true;
+  }
+
+  function commandKey(operation: string): string {
+    const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `h2-${operation}:${suffix}`;
+  }
+
+  function commandFailureReason(error: unknown): TrialIneligibleReason {
+    switch (asApiError(error).message) {
+      case "TRIAL_ALREADY_ACTIVE": return "in-progress";
+      case "TRIAL_ALREADY_REDEEMED": return "converted";
+      case "TRIAL_COOLDOWN_ACTIVE": return "used";
+      case "TRIAL_CYCLE_RISK_BLOCKED": return "risk";
+      case "TRIAL_PHASE_CLOSED":
+      case "TRIAL_KILL_SWITCH_DISABLED": return "phase-closed";
+      default: return "unknown";
+    }
   }
 
   return {
     status, startedAt, expiresAt, graceEndsAt, finishedAt,
     shadowFrozenAtUSD, shadowFrozenAtNEX, legacyCardMigrated,
+    authorityStatus, authorityError, authoritativeShadowUSD, authoritativeShadowNEX,
+    authorityClaimNo, authorityVersion,
     eligibility, canStart, start, convert, cancel, poll, bindAccount, snapshot,
+    refreshRemote, refreshEligibilityRemote,
   };
 });
 
@@ -290,6 +498,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
  *  落盘由 poll/convert 独占。 */
 export function liveShadowUSD(now: number): number {
   const s = useFreeTrial();
+  if (remoteApiEnabled) return s.authoritativeShadowUSD;
   const cfg = useTrialConfig().config;
   const r = resolveTrialAt(s.snapshot(), now, cfg);
   if (r.status === "active") return accruedShadow(r, now, cfg).usd;
@@ -299,6 +508,7 @@ export function liveShadowUSD(now: number): number {
 
 export function liveShadowNEX(now: number): number {
   const s = useFreeTrial();
+  if (remoteApiEnabled) return s.authoritativeShadowNEX;
   const cfg = useTrialConfig().config;
   const r = resolveTrialAt(s.snapshot(), now, cfg);
   if (r.status === "active") return accruedShadow(r, now, cfg).nex;

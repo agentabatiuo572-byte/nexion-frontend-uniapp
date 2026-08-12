@@ -34,7 +34,7 @@
 // 🔴 诚实边界:deposits 依赖 app / bills / fx 三个**跨 store 组合方**,它们不是被测对象
 // (双花的判据 = 假账本上余额动了几次),故只把这三个换成可观测的假账本;deposits 自身、
 // deposits-core、account-scoped-storage 全是真代码。其余五个 store 一个依赖都没 stub。
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build } from "esbuild";
@@ -648,6 +648,25 @@ group();
     "nex-faucet.ts": ["history", "lastSignedInAt", "signInStreak", "longestStreak", "streakSavers", "claimedMilestones"],
     "lucky-spin.ts": ["bonusTickets", "lastFreeSpinDate", "history", "realPrizeSoldOut", "coverageDegraded"],
   };
+  // 🔴 清单是手抄的 → 加一道覆盖门(z1 R2 对抗审计 P1-17c:c37e662 那批新接远端缝的
+  //    store 不在册,清单静默漏检)。判据从磁盘来:凡是走了 CAS 提交器
+  //    (createAccountRowCommit)的 store,都必须在册;在册但文件没了也红。
+  {
+    const storeDir = path.join(SRC, "store");
+    const casStores = readdirSync(STORE_DIR)
+      .filter((n) => n.endsWith(".ts"))
+      .filter((n) => {
+        const src = readFileSync(path.join(STORE_DIR, n), "utf8");
+        // 排除定义方本身:它 export 这个提交器,不是它的消费者
+        return /createAccountRowCommit\s*[<(]/.test(src) && !/export function createAccountRowCommit/.test(src);
+      });
+    check(`⑥ 覆盖门:CAS 提交器 store 扫描面非空(实扫 ${casStores.length} 个)`, casStores.length >= 3, `只扫到 ${casStores.length}`);
+    const missing = casStores.filter((n) => !PERSISTED_REFS[n]);
+    const stale = Object.keys(PERSISTED_REFS).filter((n) => !casStores.includes(n));
+    check(`⑥ 🔴 走 CAS 的 store 全部在册(漏 ${missing.length} 个 · 陈旧 ${stale.length} 个)`,
+      missing.length === 0 && stale.length === 0,
+      `漏:${missing.join(",") || "无"} | 陈旧:${stale.join(",") || "无"}`);
+  }
   /** 行号保持的剥注释:块注释以空格填充不吞行、整行 // 置空 —— 偏移→行号才对得上。 */
   const stripKeepLines = (s) => s
     .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\r\n]/g, " "))

@@ -1,15 +1,12 @@
-<!--
-  Weekly Quest Tier 2 list — ported from
-  Nexion-prototype/app/components/home/weekly-quest-list.tsx.
-
-  4 quests sampled deterministically by weekKey (dispatchTier2). Each row: link
-  (pending) → claim button (completed) → struck-through done (claimed). Once all
-  4 done+claimed AND tier 1 claimed → champion bonus row appears (+500 NEX ×
-  phase mult). Cross-store orchestration in click handlers (stores don't import
-  each other).
--->
+<!-- Weekly Tier 2 is a server-authoritative list; pending rows only refresh status. -->
 <template>
-  <view v-if="mounted" class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
+  <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
+    <text :style="pendingLabelStyle">Weekly quests unavailable · tap to retry</text>
+  </view>
+  <view v-else-if="mounted && !wq.snapshot" class="mx-4 mt-3 px-4 py-3" :style="cardStyle">
+    <text :style="pendingLabelStyle">Loading weekly quests…</text>
+  </view>
+  <view v-else-if="mounted" class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
     <!-- Header -->
     <view class="px-4 py-3 flex items-center justify-between" :style="headerStyle">
       <text :style="tier2LabelStyle">{{ w.tier2Label }}</text>
@@ -18,7 +15,7 @@
 
     <!-- Quest rows -->
     <view>
-      <view v-for="(q, i) in tier2Quests" :key="q.id" :style="{ borderBottom: i === tier2Quests.length - 1 ? 'none' : '1px solid var(--v5-border)' }">
+      <view v-for="(q, i) in tier2Quests" :key="q.questCode" :style="{ borderBottom: i === tier2Quests.length - 1 ? 'none' : '1px solid var(--v5-border)' }">
         <!-- claimed: struck-through done -->
         <view v-if="isClaimed(q)" class="flex items-center px-4 py-3" :style="claimedRowStyle">
           <view class="grid place-items-center shrink-0" :style="checkBoxStyle">
@@ -29,7 +26,7 @@
         </view>
 
         <!-- completed: claimable button -->
-        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="completedRowStyle" @click="onClaimRow(q)">
+        <view v-else-if="isCompleted(q)" class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="completedRowStyle" @click="onClaimRow(q)">
           <view class="grid place-items-center shrink-0" :style="sparkBoxStyle">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -38,147 +35,73 @@
         </view>
 
         <!-- pending: navigate to target route -->
-        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" :style="pendingRowStyle" @click="onRowCta(q)">
+        <view v-else class="flex items-center px-4 py-3 active:opacity-80" role="button" tabindex="0" :style="pendingRowStyle" @click="onRowCta(q)">
           <view class="grid place-items-center shrink-0" :style="numberBoxStyle">
             <text>{{ i + 1 }}</text>
           </view>
           <text class="flex-1" :style="pendingLabelStyle">{{ titleOf(q) }}</text>
           <view class="flex items-baseline" style="gap: 4px">
             <text :style="pendingRewardStyle">+{{ rewardOf(q) }} NEX</text>
-            <text v-if="q.rewardUsdt" :style="pendingUsdtStyle">+${{ q.rewardUsdt }}</text>
           </view>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 8px; flex-shrink: 0"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
         </view>
       </view>
-    </view>
-
-    <!-- Bonus row — all 5 done, claim championship bonus -->
-    <view v-if="allFiveDone && !bonusClaimed" class="px-3 py-3" :style="bonusRowStyle">
-      <view class="flex items-center justify-center active:opacity-85" role="button" :style="bonusBtnStyle" @click="onClaimBonus">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
-        <text>{{ bonusCtaText }}</text>
+      <view v-if="tier2Quests.length === 0" class="px-4 py-3" :style="pendingLabelStyle" @click="retry">
+        No weekly quests available
       </view>
     </view>
-    <view v-else-if="bonusClaimed" class="px-4 py-2 flex items-center" :style="bonusDoneStyle">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px; flex-shrink: 0"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
-      <text :style="bonusDoneTextStyle">🎉 {{ bonusClaimedText }}</text>
-    </view>
+
   </view>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
-import { useApp } from "@/store/app";
-import { postMoneyBillsOnce } from "@/lib/money-receipt";
+import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
-import { useProductPhase } from "@/composables/use-product-phase";
-import { useAchievements } from "@/store/achievements";
-import {
-  dispatchTier2,
-  getPhaseRewardMultiplier,
-  currentWeekKey,
-  WEEKLY_BONUS_NEX,
-  WEEKLY_CHAMPION_BADGE_ID,
-  type Tier2QuestDef,
-} from "@/mock/weekly-quests";
-import { isPurchasedHardwareKind } from "@/store/device-types";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { navTo } from "@/lib/route";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
-const app = useApp();
 const wq = useWeeklyQuest();
-const phase = useProductPhase();
-const ach = useAchievements();
 const mounted = ref(false);
 
-onMounted(() => {
-  wq.rollWeekIfStale();
+onMounted(async () => {
+  await wq.refresh();
   mounted.value = true;
 });
 
-const tier2Quests = computed<Tier2QuestDef[]>(() => {
-  if (!mounted.value) return [];
-  const hasHardware = app.visibleDevices.some((d) => isPurchasedHardwareKind(d.kind));
-  return dispatchTier2({
-    balanceUSDT: app.user.usdtBalance,
-    nexBalance: app.user.nexBalance,
-    hasHardware,
-    weekKey: currentWeekKey(),
-  });
-});
+const tier2Quests = computed<CanonicalQuest[]>(() => mounted.value ? wq.tier2Quests : []);
 
-const mult = computed(() => getPhaseRewardMultiplier(phase.value.id));
-const completedCount = computed(() => tier2Quests.value.filter((q) => wq.tier2Completed.includes(q.id)).length);
-const allTier2Done = computed(() => completedCount.value === tier2Quests.value.length && tier2Quests.value.length > 0);
-const allClaimed = computed(() => tier2Quests.value.every((q) => wq.tier2Claimed.includes(q.id)));
-const allFiveDone = computed(() => wq.tier1Claimed && allTier2Done.value && allClaimed.value);
-const bonusClaimed = computed(() => wq.bonusClaimed);
+const mult = computed(() => wq.multiplier);
+const completedCount = computed(() => tier2Quests.value.filter((q) => q.status === "CLAIMED").length);
 
-function isClaimed(q: Tier2QuestDef): boolean {
-  return wq.tier2Claimed.includes(q.id);
+function isClaimed(q: CanonicalQuest): boolean {
+  return q.status === "CLAIMED";
 }
-function isCompleted(q: Tier2QuestDef): boolean {
-  return wq.tier2Completed.includes(q.id) && !wq.tier2Claimed.includes(q.id);
+function isCompleted(q: CanonicalQuest): boolean {
+  return ["COMPLETED", "CLAIMABLE"].includes(q.status);
 }
-function rewardOf(q: Tier2QuestDef): number {
+function rewardOf(q: CanonicalQuest): number {
   return Math.round(q.rewardNex * mult.value);
 }
-function titleOf(q: Tier2QuestDef): string {
-  return w.value[`tier2_${q.i18nKey}_title` as keyof typeof w.value] as string;
+function titleOf(q: CanonicalQuest): string {
+  return q.name;
 }
-function claimTextFor(q: Tier2QuestDef): string {
+function claimTextFor(q: CanonicalQuest): string {
   return fmt(w.value.claim, { n: rewardOf(q).toLocaleString() });
 }
 
-const bonusCtaText = computed(() => fmt(w.value.bonusCta, { n: Math.round(WEEKLY_BONUS_NEX * mult.value).toLocaleString() }));
-const bonusClaimedText = computed(() => fmt(w.value.bonusClaimed, { n: Math.round(WEEKLY_BONUS_NEX * mult.value).toLocaleString() }));
-
-function onRowCta(q: Tier2QuestDef) {
-  // Completion trigger (see hero onCta): tap marks complete so the row flips to
-  // its claimable state on return. Backend-replaceable (server attribution).
-  wq.markTier2Complete(q.id);
-  navTo(q.href);
+function onRowCta(_q: CanonicalQuest) {
+  void wq.refresh();
 }
 
-function onClaimRow(q: Tier2QuestDef) {
-  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{tier2/:id}
-  // claims, credits, and bills in one idempotent transaction.
-  //
-  // 🔴 同 hero:先发钱(幂等)→ 后消费资格。原来是「先消费资格 → 发钱**返回值都没接**」,
-  // 这处比同文件的孪生函数 onClaimBonus 还少一层(那个在同一提交里接了)——
-  // 发钱失败时资格已没、奖归零,而且连个提示都没有。ref 用「周 + 任务 id」保持稳定。
-  if (!wq.tier2Completed.includes(q.id) || wq.tier2Claimed.includes(q.id)) return;
-  const amount = rewardOf(q);
-  if (postMoneyBillsOnce([{
-    type: "achievement",
-    symbol: "NEX",
-    amount,
-    status: "posted",
-    memo: `Weekly quest tier-2 · ${q.id}`,
-    ref: `WQT2-${wq.weekKey}-${q.id}`,
-  }]) !== "ok") return;
-  wq.claimTier2(q.id); // 消费失败也不再发第二次:重试命中同一 ref
+function retry() {
+  void wq.refresh();
 }
 
-function onClaimBonus() {
-  // MOCK-ONLY NON-ATOMIC: PROD POST /api/quests/weekly/{bonus}
-  // claims, credits, and bills in one idempotent transaction.
-  // 🔴 同 onClaimRow:先发钱(幂等)→ 后消费资格;ref 用周键保持稳定。
-  if (wq.bonusClaimed) return;
-  const amount = Math.round(WEEKLY_BONUS_NEX * mult.value);
-  if (postMoneyBillsOnce([{
-    type: "achievement",
-    symbol: "NEX",
-    amount,
-    status: "posted",
-    memo: "Weekly champion bonus",
-    ref: `WCHAMPION-${wq.weekKey}`,
-  }]) !== "ok") return;
-  if (!wq.claimBonus()) return;
-  ach.unlock(WEEKLY_CHAMPION_BADGE_ID);
+function onClaimRow(q: CanonicalQuest) {
+  void wq.claim(q);
 }
 
 // ── styles ──

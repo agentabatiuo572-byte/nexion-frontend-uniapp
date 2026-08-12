@@ -20,9 +20,15 @@
   </view>
 
   <!-- Confirm dialog (renders top of queue) -->
+  <!-- 🔴 这个确认框被约 15 处资金操作复用(提现 / 充值 / 兑换 / 注销账户 / 解绑卡…)。
+       此前两个按钮是裸 <view @click>:读屏不知道那是按钮、Tab 停不上去,于是键盘用户
+       既确认不了也取消不了,而 confirm() 返回的 Promise 会永久悬空 —— 钱的流程卡死在这里。 -->
   <view
     v-if="topConfirm"
-    class="nx-mask"
+    class="nx-mask nx-mask--confirm"
+    role="dialog"
+    aria-modal="true"
+    :aria-label="topConfirm.title"
     @click="ui.resolveConfirm(topConfirm.id, false)"
   >
     <view class="nx-modal" @click.stop>
@@ -32,6 +38,8 @@
         <view
           v-if="!topConfirm.hideCancel"
           class="nx-btn nx-btn--ghost active:opacity-70"
+          role="button"
+          tabindex="0"
           @click="ui.resolveConfirm(topConfirm.id, false)"
         >
           <text class="nx-btn__label nx-btn__label--ghost">{{ topConfirm.cancelLabel || t.ui.cancel }}</text>
@@ -39,6 +47,8 @@
         <view
           class="nx-btn active:opacity-85"
           :class="topConfirm.danger ? 'nx-btn--danger' : 'nx-btn--primary'"
+          role="button"
+          tabindex="0"
           @click="ui.resolveConfirm(topConfirm.id, true)"
         >
           <text class="nx-btn__label">{{ topConfirm.confirmLabel || t.ui.confirm }}</text>
@@ -48,12 +58,13 @@
   </view>
 
   <!-- Network-error overlay -->
-  <view v-if="ui.netError.visible" class="nx-mask">
+  <view v-if="ui.netError.visible" class="nx-mask nx-mask--neterr" role="dialog" aria-modal="true" :aria-label="ui.netError.title">
     <view class="nx-modal">
       <text class="nx-modal__title">{{ ui.netError.title }}</text>
       <text class="nx-modal__msg">{{ ui.netError.message }}</text>
       <view class="nx-modal__actions">
-        <view class="nx-btn nx-btn--primary active:opacity-85" @click="onRetry">
+        <!-- 断网遮罩没有关闭出口,「重试」是唯一的路;键盘按不到它就等于被锁死在这一屏。 -->
+        <view class="nx-btn nx-btn--primary active:opacity-85" role="button" tabindex="0" @click="onRetry">
           <text class="nx-btn__label">{{ t.ui.retry }}</text>
         </view>
       </view>
@@ -71,6 +82,7 @@ import { useUI } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import MilestoneCelebration from "@/components/milestone-celebration.vue";
 import { isStaticReviewRoute } from "@/lib/static-review-routes";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const ui = useUI();
 const t = useT();
@@ -115,6 +127,16 @@ function onRetry() {
   ui.hideNetError();
   cb?.();
 }
+
+// 确认框:Esc = 取消(与点遮罩同义),Tab 只在框内循环,关掉后焦点回到触发它的按钮。
+useDialogA11y(
+  computed(() => topConfirm.value !== null),
+  ".nx-mask--confirm",
+  () => { if (topConfirm.value) ui.resolveConfirm(topConfirm.value.id, false); },
+);
+// 断网遮罩:**不传 close** —— 它只有「重试」一条路,没有取消语义。
+// 给它接 Esc 会凭空造出一个"看起来关掉了、其实什么都没做"的出口。
+useDialogA11y(computed(() => ui.netError.visible), ".nx-mask--neterr");
 </script>
 
 <style scoped>

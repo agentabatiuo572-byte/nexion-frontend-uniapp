@@ -12,6 +12,11 @@ export interface JanusRuntimeState {
   commandVersion?: number;
   deviceAppVersion?: string;
   handoffReceipt?: string;
+  proofMode?: "SANDBOX" | "PRODUCTION";
+  executorId?: string;
+  proofNonce?: string;
+  proofTimestamp?: number;
+  proofSignature?: string;
 }
 
 export interface JanusApplyEvidence { handoffReceipt: string }

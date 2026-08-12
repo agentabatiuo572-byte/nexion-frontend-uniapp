@@ -7,7 +7,7 @@
        stay suspended on money-flow routes (checkout / withdraw / trial) and
        replay one-by-one afterwards; each shown one auto-dismisses after
        OVERLAY_DURATION_MS. -->
-  <view v-if="m.active" class="ms-overlay" @click="m.dismiss()">
+  <view v-if="m.active" class="ms-overlay" role="dialog" aria-modal="true" @click="m.dismiss()">
     <!-- Backdrop dim + blur — lowers chassis noise so the medal is the focus. -->
     <view class="ms-backdrop" />
 
@@ -64,6 +64,7 @@ import { computed, watch, onMounted, onUnmounted } from "vue";
 import { useMilestones } from "@/store/milestones";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const OVERLAY_DURATION_MS = 5_200;
 const PARTICLE_COUNT = 36;
@@ -196,6 +197,11 @@ onUnmounted(() => {
     advTimer = null;
   }
 });
+
+// 遮罩只拦指针不拦键盘:不接这一层,弹层打开后 Tab 会直接走到背景(那里有花钱的按钮),
+// 且没有 Esc、关掉后焦点也回不到触发它的控件。
+// m.active 是「当前正在庆祝的那一档」对象而不是布尔,判空才是"开着没开着"。
+useDialogA11y(computed(() => m.active !== null), ".ms-overlay", () => m.dismiss());
 </script>
 
 <style scoped>

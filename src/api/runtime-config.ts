@@ -1,7 +1,9 @@
-export type ApiMode = "mock" | "remote";
+export type ApiMode = "mock" | "sandbox" | "remote";
 
 export interface ApiRuntimeConfig {
   mode: ApiMode;
+  /** A sandbox rail is never inferred from a development fallback. */
+  modeExplicit: boolean;
   baseUrl: string;
 }
 
@@ -26,7 +28,18 @@ export function readApiRuntimeConfig(
   env: Record<string, unknown> = runtimeEnv,
   browserOrigin = currentBrowserOrigin(),
 ): ApiRuntimeConfig {
-  const mode = env.VITE_NEXGRID_API_MODE === "mock" ? "mock" : "remote";
+  const rawMode = env.VITE_NEXGRID_API_MODE;
+  const modeExplicit = rawMode === "mock" || rawMode === "sandbox" || rawMode === "remote";
+  // Keep a useful development default for generic remote API handling, but
+  // never infer a funds sandbox from it. Money surfaces require an explicit
+  // runtime declaration plus the strict server provenance response.
+  const mode: ApiMode = rawMode === "mock"
+    ? "mock"
+    : rawMode === "sandbox"
+      ? "sandbox"
+      : rawMode === "remote"
+        ? "remote"
+        : import.meta.env.DEV ? "sandbox" : "remote";
   const configured = typeof env.VITE_NEXGRID_API_BASE_URL === "string"
     ? env.VITE_NEXGRID_API_BASE_URL.trim()
     : "";
@@ -39,6 +52,7 @@ export function readApiRuntimeConfig(
     : "";
   return {
     mode,
+    modeExplicit,
     // A static H5 bundle is normally mounted behind the public API gateway.
     // Use that origin when a separate API origin is not supplied, so a valid
     // remote build never crashes during module initialization before the

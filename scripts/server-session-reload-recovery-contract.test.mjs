@@ -1,0 +1,39 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+
+const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+
+test("a refreshed server-mode account trace goes to login with a recoverable explanation", () => {
+  const app = read("src/App.vue");
+  const auth = read("src/store/auth.ts");
+  const login = read("src/pages/login/login.vue");
+  const zh = read("src/i18n/messages/zh.ts");
+  const packageJson = JSON.parse(read("package.json"));
+
+  assert.match(app, /function hasServerAuthenticatedAccountTrace\([\s\S]*?auth\.isAuthenticated[\s\S]*?auth\.accountId !== "default"/);
+  assert.match(app, /function readServerAuthenticatedAccountTrace\([\s\S]*?uni\.getStorageSync\("nexgrid-auth-v1"\)[\s\S]*?isAuthenticated === true[\s\S]*?startsWith\("user:"\)/);
+  assert.match(app, /hasPersistedServerAuthenticatedAccountTrace/);
+  assert.match(auth, /export function hasPersistedServerAuthenticatedAccountTrace\(\): boolean/);
+  assert.match(auth, /isAuthenticated === true[\s\S]*?startsWith\("user:"\)/);
+  assert.match(auth, /"data" in record/);
+  assert.match(app, /if \(remoteApiEnabled && \(!serverSession[\s\S]*?hasServerAuthenticatedAccountTrace\(auth\)[\s\S]*?\/pages\/login\/login\?notice=server-session-reload/);
+  assert.match(app, /setRemoteUnauthorizedHandler\([\s\S]*?!sessionVault\.read\(\)[\s\S]*?hasServerAuthenticatedAccountTrace\(auth\)[\s\S]*?\/pages\/login\/login\?notice=server-session-reload/);
+  assert.match(app, /let pendingServerSessionRecovery = false/);
+  assert.match(app, /pendingServerSessionRecovery = requiresServerSessionRecovery/);
+  assert.match(app, /if \(remoteApiEnabled && pendingServerSessionRecovery\)[\s\S]*?\/pages\/login\/login\?notice=server-session-reload/);
+  assert.match(app, /route\.startsWith\("pages\/login\/"\)\) pendingServerSessionRecovery = false/);
+  assert.match(app, /if \(isAuthWhitelisted\(route\)\)[\s\S]*?route\.startsWith\("pages\/login\/"\)[\s\S]*?if \(remoteApiEnabled && pendingServerSessionRecovery\)/,
+    "login must consume the recovery latch before any retrying redirect can run");
+  assert.doesNotMatch(app, /sessionVault\.read\(\)[\s\S]{0,500}localStorage/);
+  assert.match(login, /data-qa="server-session-reload-notice"/);
+  assert.match(login, /notice === "server-session-reload"/);
+  assert.match(login, /t\.login\.serverSessionReloadNotice/);
+  assert.match(zh, /数据在服务端安全保存，重新登录即可恢复/);
+  assert.match(packageJson.scripts["test:session-reload-recovery"] ?? "", /server-session-reload-recovery-contract\.test\.mjs/,
+    "the recovery contract must have a named formal verification gear");
+  assert.match(packageJson.scripts["test:session-reload-recovery"] ?? "", /verify-h5-runtime\.mjs --server-session-reload-recovery/,
+    "the formal gear must execute its browser runtime proof against an isolated H5 server");
+  assert.match(packageJson.scripts.verify, /npm run test:production-boundaries && npm run test:session-reload-recovery && npm run test:guard-liveness/,
+    "full verify must include recovery before the existing guard/build/runtime gates");
+});

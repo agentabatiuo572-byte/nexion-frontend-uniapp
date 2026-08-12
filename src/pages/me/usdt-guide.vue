@@ -39,7 +39,7 @@
         </view>
 
         <!-- back to top-up CTA -->
-        <view class="nx-usdt-guide-back-cta grid place-items-center active:opacity-85" :style="backCtaStyle" role="button" @click="goBack">
+        <view class="nx-usdt-guide-back-cta grid place-items-center active:opacity-85" :style="backCtaStyle" role="button" tabindex="0" @click="goBack">
           <text :style="backCtaTextStyle">{{ t.usdtGuide.backCta }}</text>
         </view>
       </view>

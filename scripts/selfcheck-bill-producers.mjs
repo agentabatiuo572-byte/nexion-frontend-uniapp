@@ -97,7 +97,8 @@ const LEDGER = {
   // `USDT?` = 金额写成加法表达式(`r.principal + r.interest`),方向静态判不出。
   // 如实记 `?` 而不是猜成 `+` —— 猜错就是借贷记反,而那正是本门唯一要守的东西。
   unstake: ["USDT+", "USDT?"],
-  achievement: ["NEX+×4", "USDT+×2", "seed:NEX+"],
+  // 2026-08-12:weekly-quest 两页的本地发奖迁服务端(同事批次),本地生产者各少一条。
+  achievement: ["NEX+×3", "USDT+×1", "seed:NEX+"],
 };
 
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");

@@ -45,6 +45,7 @@ Mock 驱动高保真原型，无真后端。但**每个 store/model 必须 100% 
 - **外壳**：`components/app-chassis.vue`（路由感知 header + tabbar pill + nova 浮标 + 下拉刷新 + 进场动画）；`global-ui.vue`（toast/confirm/netError）。
 - **独立全屏页系统壳**：登录 / 注册 / onboarding 等不套 `AppChassis` 的页面必须用 `components/device/standalone-page-shell.vue`，统一提供顶部状态栏、底部 Home Indicator 和 `env(safe-area-inset-bottom) + 38px` 安全区；禁止各页自行猜系统留白。
 - **设计 token**：`src/styles/tokens.css`（108 个双主题 CSS 变量 `--v5-*`）。颜色用 token 不写 hex；亮底文字用 `--v5-on-brand`。
+- **键盘可达性**：自造控件只需声明 `role` + `tabindex="0"`，Enter/Space 激活由平台层 `lib/a11y-activate.ts` 自动提供——**不要再手写 `@keydown`**（本仓禁原生 `button`，丢掉的键盘语义已由这层补回）。弹层接 `composables/use-dialog-a11y.ts`（焦点移入 / Tab 层内循环 / Esc / 焦点归还）。检查：`node scripts/a11y-activate-gate.mjs`
 - **行尾**：源文件 CRLF（Windows），verify/grep 正则用 `\r?`；`<text>` 必须裹在 `<view>` 内。
 
 ## 工作约定

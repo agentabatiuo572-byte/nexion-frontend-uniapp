@@ -44,3 +44,6 @@ scripts/.baseline/baseline-*/
 *.njsproj
 *.sln
 *.sw?
+# 探针每跑一次就重生成的临时对照图(chk.png / w.png 是有意跟踪的参考图,不在此列)
+scripts/.baseline/_check/h5-runtime-home.png
+scripts/.baseline/_check/sticky-frost.png

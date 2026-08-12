@@ -15,8 +15,9 @@ import type { Withdrawal } from "@/store/types";
 import { tickOrders } from "@/store/orders";
 import { useMilestones, nextUnfired } from "@/store/milestones";
 import { useQuest, type QuestTaskId } from "@/store/quest";
-import { useAuth } from "@/store/auth";
+import { hasPersistedServerAuthenticatedAccountTrace, useAuth } from "@/store/auth";
 import { useSession } from "@/store/session";
+import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
@@ -33,8 +34,15 @@ import { useConfig } from "@/store/config";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { refreshEarningsReleaseStatus } from "@/store/earning-release";
 import { startJanusC2Sync, stopJanusC2Sync } from "@/services/janus-c2";
+import {
+  configureBehaviorAnalyticsContext,
+  pauseBehaviorAnalytics,
+  startBehaviorAnalytics,
+} from "@/services/behavior-analytics";
 import { useDeposits } from "@/store/deposits";
-import { remoteApiEnabled } from "@/api/runtime";
+import { fundsSandboxEnabled, remoteApiEnabled, sessionVault, setRemoteUnauthorizedHandler } from "@/api/runtime";
+import { prepareProductCatalog } from "@/store/product-catalog";
+import { installKeyboardActivation } from "@/lib/a11y-activate";
 
 // Simulation tick driver (ports SimulationProvider). Runs the client-side
 // earnings/device simulation while the app is visible; pauses in background.
@@ -46,6 +54,10 @@ const businessTimeouts = new Set<ReturnType<typeof setTimeout>>();
 let devBusinessTimeoutRuns = 0;
 let pendingCanonicalRouteRepair = "";
 let pendingCanonicalRouteRepairAt = 0;
+let pendingServerSessionRecovery = false;
+// Capture the non-secret trace before any startup request can reject and clear
+// its persisted shell. It is consumed on the first recovery redirect.
+let serverAuthenticatedAccountTraceAtBoot = remoteApiEnabled && readServerAuthenticatedAccountTrace();
 const ROUTE_REPAIR_RETRY_MS = 750;
 const INVALID_H5_ROUTE_FALLBACK = "/pages/onboarding/intro";
 
@@ -101,6 +113,7 @@ let arrivalTimer: ReturnType<typeof setInterval> | undefined;
  * store 之间不互相 import(P-031),所以这个跨 store 编排放在 App 层。
  */
 function advanceArrivalAndSettleBill() {
+  if (fundsSandboxEnabled) return;
   const app = useApp();
   // 🔴 按**本次真正推进的那几笔**逐个结算,不能问「最新一笔是谁」——
   // 推进是全表扫,最新那笔未必是刚到账的那笔(独立验收实测:双向都会结算错单)。
@@ -138,6 +151,7 @@ function advanceArrivalAndSettleBill() {
  * 单据是终态、账单行还没跟上,就是待办。这样刷新、换设备、隔一周回来都能自愈,零额外存储。
  */
 function reconcileBills() {
+  if (fundsSandboxEnabled) return;
   const app = useApp();
   const bills = useBills();
   // ⓪ 🔴 单据在、账单缺 → **补写**(z4 R2,两路独立审计各自命中)。
@@ -234,6 +248,7 @@ function reconcileBills() {
 }
 
 function startArrivalPoll() {
+  if (fundsSandboxEnabled) return;
   stopArrivalPoll();
   arrivalTimer = setInterval(() => {
     if (!ensureBusinessLoopsAllowed()) return;
@@ -258,13 +273,19 @@ const URGENCY_1H_MS = 60 * 60_000;
 // Session-scoped fire flags so urgency toasts don't spam every poll.
 const urgencyFired = { active24h: false, grace24h: false, grace1h: false };
 let trialTimer: ReturnType<typeof setInterval> | undefined;
+let trialPollRunning = false;
 
-function pollTrial() {
-  if (!ensureBusinessLoopsAllowed()) return;
+async function pollTrial() {
+  if (!ensureBusinessLoopsAllowed() || trialPollRunning) return;
+  trialPollRunning = true;
   const freeTrial = useFreeTrial();
   const before = freeTrial.status;
   const nowMs = Date.now();
-  freeTrial.poll(nowMs);
+  try {
+    await freeTrial.poll(nowMs);
+  } finally {
+    trialPollRunning = false;
+  }
   const after = freeTrial.status;
   const t = useT().value;
 
@@ -313,7 +334,7 @@ function pollTrial() {
 
 function startTrialPoll() {
   stopTrialPoll();
-  trialTimer = setInterval(pollTrial, TRIAL_TICK_MS);
+  trialTimer = setInterval(() => { void pollTrial(); }, TRIAL_TICK_MS);
 }
 function stopTrialPoll() {
   if (trialTimer) {
@@ -436,6 +457,31 @@ function isAuthWhitelisted(route: string): boolean {
   const r = normalizeRoute(route);
   return isStaticReviewRoute(route) || AUTH_WHITELIST_PREFIXES.some((p) => r.startsWith(p));
 }
+
+/**
+ * A server-authenticated user has an account projection that is distinct from
+ * the prototype's default shell. It is only a routing hint after a reload:
+ * access still requires the in-memory server session to be recreated by login.
+ */
+function hasServerAuthenticatedAccountTrace(auth: ReturnType<typeof useAuth>): boolean {
+  return (auth.isAuthenticated && auth.accountId !== "default" && auth.accountId.startsWith("user:"))
+    || serverAuthenticatedAccountTraceAtBoot
+    || hasPersistedServerAuthenticatedAccountTrace();
+}
+
+function readServerAuthenticatedAccountTrace(): boolean {
+  try {
+    const record = uni.getStorageSync("nexgrid-auth-v1") as unknown;
+    return !!record
+      && typeof record === "object"
+      && (record as { isAuthenticated?: unknown }).isAuthenticated === true
+      && typeof (record as { accountId?: unknown }).accountId === "string"
+      && (record as { accountId: string }).accountId.startsWith("user:");
+  } catch {
+    return false;
+  }
+}
+
 // Returns true if it redirected (callers bail so they don't act on a route the
 // user is being kicked off of).
 function checkAuthGuard(): boolean {
@@ -446,8 +492,42 @@ function checkAuthGuard(): boolean {
   //       所以守卫轮询在 onShow 里**无条件启动**(见 onShow),每秒重查直到跳转真正落地。
   //    只修 ① 的状态在实景里与不修同果 —— verify 绿 ≠ 渲染 OK 的活例。
   const route = readCurrentRoute();
-  if (!route || isAuthWhitelisted(route)) return false; // no route yet / flow page
+  if (!route) return false; // no route yet
+  if (isAuthWhitelisted(route)) {
+    // Once login is visible, consume the recovery latch before any periodic
+    // guard retry. Re-launching the same login route resets in-progress input.
+    if (route.startsWith("pages/login/")) pendingServerSessionRecovery = false;
+    return false;
+  }
+  // An unauthorized callback can arrive before H5 exposes its first route.
+  // Carry only the non-secret recovery decision across that short window, then
+  // consume it exactly once once a route is available.
+  if (remoteApiEnabled && pendingServerSessionRecovery) {
+    uni.reLaunch({ url: "/pages/login/login?notice=server-session-reload" });
+    return true;
+  }
   const auth = useAuth();
+  // Server modes cannot accept a historical localStorage sign-in as authority.
+  // The runtime vault is deliberately in-memory, so refresh/restart means a
+  // clean sign-in instead of a stale local identity issuing sandbox commands.
+  const serverSession = remoteApiEnabled ? sessionVault.read() : null;
+  if (remoteApiEnabled && (!serverSession || auth.accountId !== `user:${serverSession.user.userId}`)) {
+    const requiresServerSessionRecovery = !serverSession && hasServerAuthenticatedAccountTrace(auth);
+    serverAuthenticatedAccountTraceAtBoot = false;
+    // Keep the intent until the next guard observes the login route. Several
+    // startup requests can reject together; a later callback must not replace
+    // this recovery redirect with first-time onboarding.
+    pendingServerSessionRecovery = requiresServerSessionRecovery;
+    sessionVault.clear();
+    useSession().signOutSession();
+    auth.signOut();
+    uni.reLaunch({
+      url: requiresServerSessionRecovery
+        ? "/pages/login/login?notice=server-session-reload"
+        : "/pages/onboarding/intro",
+    });
+    return true;
+  }
   if (!auth.isAuthenticated) {
     uni.reLaunch({ url: "/pages/onboarding/intro" });
     return true;
@@ -603,6 +683,15 @@ function bootstrapAccountSession() {
     const session = useSession();
     app.bindAccount(key);
     rebindAccountScopedStores(key);
+    // rebindAccountScopedStores clears profile state in server mode to prevent
+    // one browser account leaking into another. On a post-login reLaunch this
+    // bootstrap runs after completeSignIn, so restore only the in-memory,
+    // authenticated server response — never localStorage or a seed profile.
+    const serverSession = remoteApiEnabled ? sessionVault.read() : null;
+    if (serverSession && auth.accountId === `user:${serverSession.user.userId}`) {
+      app.projectServerIdentity(serverSession.user);
+      useProfile().projectServerIdentity(serverSession.user);
+    }
     const restored = session.resumeOrClaim(key);
     if (restored.status === "kicked" || restored.status === "logged-out") {
       const reason = restored.status === "kicked" ? "kicked" : "logged-out";
@@ -770,6 +859,7 @@ function stopBusinessLoops() {
   stopBusinessTimeouts();
   useDeposits().pauseMockEngine();
   stopJanusC2Sync();
+  pauseBehaviorAnalytics();
   stopTick();
   stopArrivalPoll();
   stopTrialPoll();
@@ -823,6 +913,7 @@ function ensureBusinessLoopsRunning(): boolean {
     startOrderPoll();
     startMilestonePoll();
     startJanusC2Sync();
+    startBehaviorAnalytics();
   } catch (error) {
     stopBusinessLoops();
     throw error;
@@ -831,9 +922,48 @@ function ensureBusinessLoopsRunning(): boolean {
 }
 
 onLaunch(() => {
+  // 🔴 必须在下面任何 early return 之前挂:退役路由 / 静态评审页同样有自造按钮,
+  // 晚一步挂 = 那些页面整页没有键盘可达性。
+  // ⚠️ 2026-08-12 这行被一次并发合并冲掉过一次(平台层文件还在、门也在,唯独没人调用它,
+  //    等于功能是死的)。门的 D 判据专门守这一行,别再删。
+  installKeyboardActivation();
+  const auth = useAuth();
+  if (remoteApiEnabled) {
+    setRemoteUnauthorizedHandler(() => {
+      // Preserve only the non-secret trace long enough to choose the login explanation.
+      const requiresServerSessionRecovery = pendingServerSessionRecovery
+        || (!sessionVault.read() && hasServerAuthenticatedAccountTrace(auth));
+      serverAuthenticatedAccountTraceAtBoot = false;
+      pendingServerSessionRecovery = requiresServerSessionRecovery;
+      sessionVault.clear();
+      useSession().signOutSession();
+      auth.signOut();
+      stopBusinessLoops();
+      const route = readCurrentRoute();
+      if (route && !isAuthWhitelisted(route)) {
+        uni.reLaunch({
+          url: requiresServerSessionRecovery
+            ? "/pages/login/login?notice=server-session-reload"
+            : "/pages/onboarding/intro",
+        });
+      }
+    });
+  }
+  configureBehaviorAnalyticsContext(() => ({
+    enabled: remoteApiEnabled && auth.isAuthenticated && auth.onboardingComplete,
+    subject: auth.accountId,
+  }));
   installBusinessLoopProbe();
   void useConfig().load();
   void useGenesisConfig().refresh();
+  if (remoteApiEnabled) {
+    // The server catalog is a USER-only resource. Clear any local compatibility
+    // rows at startup, then let the authenticated Store entry fetch it; an
+    // unauthenticated launch must not turn its expected 401 into a fake catalog
+    // failure before the user has even signed in.
+    prepareProductCatalog();
+    void useApp().refreshRemoteFleet().catch(() => undefined);
+  }
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
   // (system → OS scheme). Instantiating the store here also registers its live
@@ -862,6 +992,7 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
+  if (remoteApiEnabled) void useApp().refreshRemoteFleet().catch(() => undefined);
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });

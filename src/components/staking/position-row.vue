@@ -42,15 +42,15 @@
 
       <!-- Actions -->
       <view class="flex" style="margin-top: 12px; gap: 8px">
-        <view v-if="isMatured" class="flex-1 inline-flex items-center justify-center active:opacity-85" :style="claimBtnStyle" @click="emit('claim')">
+        <view v-if="isMatured" class="flex-1 inline-flex items-center justify-center active:opacity-85" :style="claimBtnStyle" role="button" tabindex="0" @click="emit('claim')">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 6 9 17l-5-5" /></svg>
           <text>{{ claimText }}</text>
         </view>
         <template v-else>
-          <view class="flex-1 active:opacity-80 inline-flex items-center justify-center" :style="earlyBtnStyle" @click="emit('earlyWithdraw')">
+          <view class="flex-1 active:opacity-80 inline-flex items-center justify-center" :style="earlyBtnStyle" role="button" tabindex="0" @click="emit('earlyWithdraw')">
             <text>{{ t.stakingV3.position.earlyWithdraw }}</text>
           </view>
-          <view class="flex-1 inline-flex items-center justify-center active:opacity-85" :style="trackBtnStyle" @click="onTrack">
+          <view class="flex-1 inline-flex items-center justify-center active:opacity-85" :style="trackBtnStyle" role="button" tabindex="0" @click="onTrack">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
             <text>{{ t.stakingV3.position.track }}</text>
           </view>

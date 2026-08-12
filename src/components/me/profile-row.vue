@@ -11,8 +11,8 @@
     </view>
     <view class="flex-1 min-w-0">
       <text class="block truncate" :style="nameStyle">{{ name }}</text>
-      <text class="block truncate" :style="metaStyle">{{ phoneMask }} · US</text>
-      <view class="flex items-center" style="gap: 6px; margin-top: 6px">
+      <text v-if="phoneMask" class="block truncate" :style="metaStyle">{{ phoneMask }}</text>
+      <view v-if="!remoteApiEnabled" class="flex items-center" style="gap: 6px; margin-top: 6px">
         <view class="inline-flex items-center" :style="joinedChipStyle">
           <text>{{ joinedLabel }}</text>
         </view>
@@ -27,6 +27,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useProfile } from "@/store/profile";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const ONE_DAY_MS = 86400 * 1000;
 
@@ -35,8 +36,18 @@ const app = useApp();
 const profile = useProfile();
 
 const name = computed(() => profile.displayName);
-const initial = computed(() => (name.value || app.user.email || "S").trim()[0]?.toUpperCase() || "S");
-const phoneMask = "+1 (415) ••• 4892";
+// Server mode deliberately never turns its internal user:<id> account key
+// into a visible identity. The auth response projects name/phone above; when
+// it is unavailable this remains a neutral empty-state avatar.
+const initial = computed(() => {
+  const source = name.value || (remoteApiEnabled ? profile.phoneE164.replace(/\D/g, "") : app.user.email);
+  return source.trim()[0]?.toUpperCase() || "S";
+});
+const phoneMask = computed(() => {
+  const phone = profile.phoneE164;
+  if (!phone) return "";
+  return phone.length > 8 ? `${phone.slice(0, 3)} ••••• ${phone.slice(-4)}` : phone;
+});
 const daysJoined = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / ONE_DAY_MS)));
 const joinedLabel = computed(() => fmt(t.value.me.profileJoinedDay, { n: daysJoined.value }));
 

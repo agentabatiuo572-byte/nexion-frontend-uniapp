@@ -36,6 +36,12 @@ export function runtimeStub(root) {
   const special = {
     remoteApiEnabled: "export const remoteApiEnabled = false;",
     apiRuntimeConfig: 'export const apiRuntimeConfig = { mode: "mock", baseUrl: "" };',
+    // 🔴 桩把 mode 钉成 mock,那么所有「非 mock 才为真」的布尔量必须显式 false。
+    // 不列在这里就会被下面的 unavailable Proxy 兜住 —— 而 **Proxy 对象恒为真**,
+    // 于是「if (fundsServerEnabled) return」这类闸在整个 selfcheck 家族里恒触发,
+    // 门测的就不再是 mock 语义(2026-08-12 合并收口实测:withdraw-failpaths 直接崩)。
+    fundsServerEnabled: 'export const fundsServerEnabled = false;',
+    fundsSandboxEnabled: 'export const fundsSandboxEnabled = false;',
   };
   const body = names.map((n) => special[n] ?? `export const ${n} = unavailable;`).join("\n");
   return `const unavailable = new Proxy({}, { get: () => async () => { throw new Error("runtime API is outside this self-check"); } });\n${body}`;

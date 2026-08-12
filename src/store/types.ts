@@ -104,6 +104,8 @@ export interface Device {
   vramUsed: number; // GB
   currentTask: CurrentTask | null;
   recentTasks: CompletedTask[]; // last 10
+  /** Server-authoritative post-completion task lock. Remote clients only display this value. */
+  taskLockUntil?: number | null;
   todayEarnings: number;
   todayEarningsNEX: number;
   // FEAT-DEV02 置换阶梯分子: lifetime USD output of THIS device. Accrued ONLY by
@@ -303,6 +305,10 @@ export interface Withdrawal {
   // 的范围决定撤回 —— 用设备墙钟做资金状态的裁决者需要可信时钟、跨端协调与字段级冲突
   // 规则,属独立的仲裁重构,不该由一张契约卡附带(独立审计实测:未校验的时钟偏前一小时
   // 即可把单据永久钉死)。同状态两份快照现按字段合并,见 account-cloud.mergeSameStatusWithdrawal。
+  /** Server CAS version. Present for the isolated acceptance funds sandbox. */
+  serverVersion?: number;
+  source?: "mock" | "provider" | "server";
+  sourceEnvironment?: "SANDBOX" | "PRODUCTION";
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────
