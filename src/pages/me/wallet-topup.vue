@@ -27,6 +27,20 @@
         :desc="t.topupChrome.railsClosedDesc"
       />
 
+      <!-- 🔴 远端模式:整页停摆,一个收款目标都不渲染。
+           两条轨是**链外真实付款**入口 —— 链上轨给的专属地址由 deriveDepositAddress
+           在本地用伪随机数派生(不是真地址),银行轨给的收款账号来自本地常量表,两者
+           都带一键复制。真后端未接线时展示它们 = 引导用户把真钱打进虚构的收款目标,
+           链上那笔不可找回。这与「不许伪造入账」是同一件事的两面:入账侧的四道闸挡住
+           「假装钱到了」,这道挡住「真把钱送出去」。
+           卡轨一并收进来:三条轨在远端模式下都没有服务端在对账,留一条能填的反而更费解。 -->
+      <EmptyState
+        v-if="remoteApiEnabled"
+        kind="locked-or-no-permission"
+        :title="t.topupChrome.railsClosedTitle"
+        :desc="t.topupChrome.railsClosedDesc"
+      />
+
       <!-- 通道 segmented(A4 在 SEGMENTS 中段插「银行转账」+ pane 分支) -->
       <view v-else class="flex" :style="segWrapStyle">
         <view

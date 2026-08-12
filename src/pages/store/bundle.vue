@@ -249,7 +249,12 @@ function onCheckout() {
   // 单用跨不了 N 笔单。逐 SKU 发单 = 页面显示 −12%、服务端按全价收,是付款环节的价格
   // 谎报。要诚实做只能由服务端整单定价,那个契约还不存在(PRD 3698 行只预告了折扣
   // 阶梯配置下发,不含组合下单),故此处不结算,由 CTA 置灰 + hint 给用户下一步。
-  if (remoteApiEnabled) return;
+  // 提示而不是静默 return:走到这里的是深链 / 程序化点击,页面上看不到置灰的 CTA,
+  // 什么都不发生等于让用户对着一个没反应的按钮重复点。
+  if (remoteApiEnabled) {
+    toast.warn(t.value.tradein.errPurchaseFailed);
+    return;
+  }
   // 购买资格门(等级门/锁额/售罄)——镜像单品 checkout 的门:suggestions 只挡上架节奏门
   // (unlocksAtPhase)、挡不住资格门,组合内任一 SKU 不达标即整单拒,防授权旁路(深链防线)。
   // 真后台仍以 POST /api/orders 服务端复检为准。

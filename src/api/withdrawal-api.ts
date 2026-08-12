@@ -71,6 +71,14 @@ export interface WithdrawalStatusSnapshot {
   retriable: boolean | null;
 }
 
+/** 单据状态镜像 —— GET /api/withdrawals/:id (PRD §9.11f 的按 id 读单通式)。 */
+export interface WithdrawalStatusSnapshot {
+  withdrawalNo: string;
+  status: WithdrawalStatus;
+  /** 服务端记的实际到账时刻(仅 confirmed 有值);缺省由调用方回落到单据预计到账。 */
+  confirmedAt: number | null;
+}
+
 export interface WithdrawalApi {
   policy(): Promise<WithdrawalPolicy>;
   get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;

@@ -2828,6 +2828,21 @@ withdrawal_merge_union_gate() {
 }
 withdrawal_merge_union_gate
 
+# 冲突标记哨兵(2026-08-12 立,同一会话内连犯两次后焊):`git add` 对 UU 文件的语义是
+# 「标记为已解决」,于是 <<<<<<< / >>>>>>> 会原样进提交。实际发生过 3 个文件带标记入库,
+# 其中一个是门脚本本身(里面那根针钉的符号名已经不存在了 —— 假绿)。
+# tsc 看不到 .md/.mjs,契约登记门只扫 *.test.mjs,这一族此前天然无人看管。
+# 判据构造性:扫全部被 git 跟踪的文本文件,不维护类型清单;候选集塌了本门自己判红(已红测)。
+conflict_marker_gate() {
+  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
+    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
+  else
+    bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
+    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
+  fi
+}
+conflict_marker_gate
+
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
 # 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表

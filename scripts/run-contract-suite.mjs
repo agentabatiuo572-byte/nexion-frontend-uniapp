@@ -13,7 +13,7 @@
 //     chain    — 由本执行器跑(接进 npm run verify)
 //     elsewhere— 已由别的入口跑(写明是哪个,便于回查)
 //     excluded — 明确不跑,必须写清原因(如依赖本机不存在的兄弟仓)
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -34,20 +34,8 @@ const REGISTRY = {
   "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
   "remote-config-merge-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
-  "acceptance-h5-sandbox-config.test.mjs": { how: "chain" },
   "country-code-selector-contract.test.mjs": { how: "chain" },
   "e18-e20-runtime-consumer-contract.test.mjs": { how: "chain" },
-  "e20-device-e3-api-behavior.test.mjs": { how: "chain" },
-  "funds-mutation-key-behavior.test.mjs": { how: "chain" },
-  "funds-recoverable-operation-behavior.test.mjs": { how: "chain" },
-  "funds-sandbox-ledger-behavior.test.mjs": { how: "chain" },
-  "funds-sandbox-visible-label-contract.test.mjs": { how: "chain" },
-  "funds-sandbox-withdrawal-contract.test.mjs": { how: "chain" },
-  "funds-server-sandbox-contract.test.mjs": {
-    how: "excluded",
-    why: "断言读兄弟仓 ../backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境单跑;与 h-remote-authority / funds-run-scoped-isolation 同族。",
-  },
-  "funds-server-sandbox-regression.test.mjs": { how: "chain" },
   "g2-swap-idempotency-behavior.test.mjs": { how: "chain" },
   "g2-swap-idempotency-contract.test.mjs": { how: "chain" },
   "h2-h3-m-runtime-acceptance-contract.test.mjs": { how: "chain" },
@@ -56,25 +44,13 @@ const REGISTRY = {
   "h3-h8-server-authority-contract.test.mjs": { how: "chain" },
   "h3-quest-race.test.mjs": { how: "chain" },
   "h5-api-proxy-contract.test.mjs": { how: "chain" },
-  "h8-first-user-truth-contract.test.mjs": { how: "chain" },
-  "h8-sandbox-referral-bill-contract.test.mjs": { how: "chain" },
   "i-nova-notification-runtime.test.mjs": { how: "chain" },
-  "janus-h5-executor-hold-contract.test.mjs": { how: "chain" },
-  "kl-sandbox-executor-contract.test.mjs": { how: "chain" },
-  "m-support-authority-contract.test.mjs": { how: "chain" },
   "product-catalog-visible-entry-contract.test.mjs": { how: "chain" },
   "server-login-identity-projection-contract.test.mjs": { how: "chain" },
-  "server-session-reload-recovery-contract.test.mjs": { how: "chain" },
   "weekly-quest-race.test.mjs": { how: "chain" },
-  "behavior-analytics-active-route-catalog-contract.test.mjs": {
-    how: "excluded",
-    why: "断言读兄弟仓 ../nexion-backend 的迁移脚本(本机无该 checkout,ENOENT 必红)。在有后端仓的环境用 node --test 单跑;与 h-remote-authority 同族。",
-  },
   // ── 2026-08-12 同事第二批新增(收口据实登记:4 进链 · 2 缺兄弟仓 · 1 与拍板相反)──
-  "behavior-analytics-auth-lifecycle-contract.test.mjs": { how: "chain" },
   "commerce-acceptance-h5-launch-contract.test.mjs": { how: "chain" },
   "remote-registration-unknown-result-contract.test.mjs": { how: "chain" },
-  "server-auth-config-authority-contract.test.mjs": { how: "chain" },
   "funds-run-scoped-isolation-contract.test.mjs": {
     how: "excluded",
     why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下同时有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘搜无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉它后面所有门。",
@@ -129,6 +105,29 @@ const REGISTRY = {
     why: "断言读兄弟仓 ../nexion-backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境用 node --test 单跑;已记 HANDOFF。",
   },
 };
+
+// 🔴 登记表自查:同名键写两遍时 JS **后写覆盖先写,不报错** —— 前面那份成了死声明。
+// 现场(2026-08-12 收口):两次合并各自把一批测试登进来,合出 74 行登记、去重只有 56,
+// 18 个键各有一份死声明躺在文件里;而本门用的是 Object.keys(REGISTRY),看到的是去重后的 56,
+// 于是「56/56 全登记」报得理直气壮,没人知道其中 18 条的分类根本没生效。
+// 判据只能扫**源文本**,不能扫解析后的对象 —— 对象里重复早就没了。
+function assertNoDuplicateRegistryKeys() {
+  const src = readFileSync(fileURLToPath(import.meta.url), "utf8");
+  const lines = [...src.matchAll(/^\s{2}"([\w.-]+\.test\.mjs)":/gm)].map((m) => m[1]);
+  if (lines.length < Object.keys(REGISTRY).length) {
+    console.log(`FAIL  登记表源文本只扫出 ${lines.length} 行,少于对象里的 ${Object.keys(REGISTRY).length} 个键 —— 判据失效,判红`);
+    process.exit(1);
+  }
+  const seen = new Set(); const dup = new Set();
+  for (const k of lines) { if (seen.has(k)) dup.add(k); seen.add(k); }
+  if (dup.size) {
+    console.log(`FAIL  登记表有 ${dup.size} 个重复键(后写静默覆盖先写,前面那份是死声明):`);
+    for (const k of dup) console.log(`        ${k}`);
+    process.exit(1);
+  }
+}
+assertNoDuplicateRegistryKeys();
+
 
 const found = readdirSync(SCRIPTS).filter((f) => f.endsWith(".test.mjs")).sort();
 if (found.length === 0) {
