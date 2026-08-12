@@ -272,6 +272,10 @@ export function toCanonicalWithdrawal(
       networkConfirmUsd: submission.networkFee,
       nexBurned: submission.nexBurned,
       actualFeeUsd: submission.actualFee,
+      // 🔴 feeWaived 必须带出来:账单行的「减免 $X」原本用「毛费 − 实付」重建,
+      // 漏 penaltyUsd 时会渲染成负数,而且那个数指的是三个源(z4 R2 P1-3)。
+      // 服务端这一个字段就是权威值,parseSubmission 已按 `grossFee − feeWaived == actualFee` 校过。
+      feeWaivedUsd: submission.feeWaived,
       ...(submission.penaltyFee > 0 ? { penaltyUsd: submission.penaltyFee } : {}),
     },
     status: canonicalStatus(submission.status),

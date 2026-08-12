@@ -189,6 +189,35 @@ export function postReceiptOnly(draft: ReceiptDraft): boolean {
 }
 
 /**
+ * 幂等版收据补记的**指定账号**变体 —— 语义同 postReceiptOnce(资金已在别处落定且不可回滚,
+ * 按 `ref` 判重),但把分录写回**真正被扣的那个账号**,不看当前绑定。
+ *
+ * 🔴 为什么要「指定账号」:提现的钱由服务端在 `POST /api/withdrawals` 里扣(本地不动余额),
+ * 而那个请求带的是**发起时**那个账号的会话;客户端在这 30s 超时窗口里可能被换号
+ * (跨标签页登出 / 运营吊销 / 重新登录都会 rebind)。此时 `bills.add` 写的是新账号的流水 ——
+ * 等于把别人的钱记到你账上,而真正被扣的那个账号有扣款、无凭证。二选一都是错的。
+ *
+ * 🔴 为什么要判重:① App.vue 的对账会**反复**拿同一笔提现来补写(自愈路径,每 5s 一拍),
+ * 没有判重就是每拍一条;② 纵深防御 —— 这条链上别处全是幂等的,独缺账单这一环。
+ * (注:「歧义重试写出两条」那个说法在 z4 R2 被证伪,见 bills.addManyForAccountOnce 头注,
+ *  别把本函数的判重当成修了那个缺陷。)判重与失败处置是同一件事的两面,放在收口点,
+ * 新调用点从此继承(与 postReceiptOnce 同理)。
+ *
+ * 落盘实现在 `bills.addManyForAccountOnce`:N 条分录一次落盘(多腿交易半边账不存在)。
+ * 失败时不留半条记录 —— 但**不弹通用提示**:提现页要给的是带下一步的专属文案,
+ * 两条一起弹正是 2026-08-04 修过的「收口点一条 + 页面一条」同型(见 silentFailure 头注)。
+ * PRODUCTION:整条消失 —— 分录由服务端在同一事务里写,client 只消费 GET /api/bills。
+ *
+ * @param atMs 补记**历史**事件时的事件时刻(自愈补写一笔旧提现时传它的 submittedAt)。
+ *             不传 = 现在。传错会让账本给自己的历史标错日期,不是小事:账单页按 ts 分月分组。
+ * @returns 收据是否已在账上(命中既有 ref、没写出新行也算 true);**false 时不弹提示,调用方必须自己交底**。
+ */
+export function postReceiptForAccount(accountKey: string, drafts: ReceiptDraft[], atMs?: number): boolean {
+  if (!drafts.length) return true;
+  return !!useBills().addManyForAccountOnce(accountKey, drafts, atMs);
+}
+
+/**
  * 幂等版收据补记 —— 语义同 postReceiptOnly(资金已落定、不可回滚),但按 `ref` 判重:
  * 同一笔入金被重放(mock 到账引擎重试 / 用户刷新 / 回调重投)时不会写出第二条分录。
  *
