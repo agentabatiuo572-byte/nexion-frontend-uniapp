@@ -20,7 +20,8 @@ test("all funds sandbox facts are RunID scoped from mapper through App parser", 
   assert.match(service, /mapper\.insertCallback\(runId,/);
   assert.match(service, /mapper\.findCallback\(runId,/);
   assert.match(service, /A racing request can read before the winning inbox insert commits/);
-  assert.match(service, /CallbackRow winner = mapper\.findCallback\(runId, normalizedEventId\)/);
+  assert.match(service, /CallbackRow winner = mapper\.lockCallback\(runId, normalizedEventId\)/,
+    "a duplicate-key race must use a current locking read instead of the stale transaction snapshot");
   assert.match(service, /winner\.requestHash\(\)\.equals\(requestHash\)/);
   assert.match(service, /catch \(DuplicateKeyException duplicate\)/,
     "a MySQL duplicate-key exception must enter the authoritative callback replay path");
