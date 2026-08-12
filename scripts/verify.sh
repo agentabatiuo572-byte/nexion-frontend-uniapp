@@ -26,7 +26,22 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0
+pass=0; fail=0; skip=0
+
+# 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
+# admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
+# 待复制同款」)。why:`verify.sh | tail -60` 这种顺手写法,管道退出码 = tail 的 0,两次都
+# 差点把「门断在半路」读成全绿。外部判定**读这个文件,不读管道**。
+# trap EXIT 覆盖所有退出路径,含 set -u 半路暴毙 —— 那条路径连 result 行都不会打,
+# 只有哨兵文件还能说出真话。.tmp$$ 带 PID:6 棵树挂着同一个 Stop hook,并发跑不许互相踩。
+VERIFY_EXIT_SENTINEL="${VERIFY_EXIT_SENTINEL:-$PROJECT_DIR/.verify-exit.code}"
+_write_exit_sentinel() {
+  local rc=$?
+  printf '%s\n' "$rc" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
+    && mv -f "$VERIFY_EXIT_SENTINEL.tmp$$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
+  return $rc
+}
+trap _write_exit_sentinel EXIT
 CURL_BIN="${CURL_BIN:-curl}"
 if [ -f /proc/version ] && grep -qi microsoft /proc/version && command -v curl.exe >/dev/null 2>&1; then
   CURL_BIN="curl.exe"
@@ -50,6 +65,9 @@ fi
 
 ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
 bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
+# 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
+# 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
+skipped() { printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
 
 check_http() {
   local label="$1" route="$2"
@@ -190,7 +208,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
   # Ported routes append here as Batch 1/2 land:
   # check_http "Earn" "/#/pages/earn/earn"
 else
-  printf "  ${Y}SKIP${N}  dev server not running at %s (run: npm run dev:h5)\n" "$BASE_URL"
+  skipped "dev server not running at $BASE_URL (run: npm run dev:h5)"
 fi
 
 # ── (3) source hygiene sentinels ──
@@ -203,17 +221,24 @@ echo -e "${C}[2.5] dev server API mode preflight${N}"
 #    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
 #    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
 #    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
+# 🔴 路径规范化必须两边都做,且要抹平**盘符写法**(2026-08-11 合并修正):
+#    这门原来的写法是 served 转斜杠、expect 只转反斜杠再各自小写。但 bash 里
+#    `PROJECT_DIR=$(pwd)` 在 Git Bash / MSYS 下给的是 `/d/WORKS/...`,而 uni 注入的
+#    VITE_ROOT_DIR 是 `D:\WORKS\...` → 转完是 `d:/works/...` vs `/d/works/...`,
+#    **永不相等 → 靶子完全正确也恒判红**(用主线原字节实测复现)。恒红的门 = 退出码恒 1,
+#    正是这轮要修的「新门翻红不可观测」本身。故统一归一:小写 + 反斜杠(含 JSON 转义的
+#    双反斜杠)转斜杠 + 去 /cygdrive 前缀 + 去首斜杠 + 去盘符冒号 + 折叠连续斜杠。
+_norm_tree_path() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's|\\\\|/|g; s|\\|/|g; s|^/cygdrive/||; s|^/||; s|^\([a-z]\):|\1|; s|//*|/|g; s|/$||'; }
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
-served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
-expect_root=$(echo "$PROJECT_DIR" | sed 's|\\|/|g')
+served_root=$(printf '%s' "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//')
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
 elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
   bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
 elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
-elif [ "$(echo "$served_root" | tr 'A-Z' 'a-z')" != "$(echo "$expect_root" | tr 'A-Z' 'a-z')" ]; then
-  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(并发多工作树时会给别人发绿灯)"
+elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$PROJECT_DIR")" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$PROJECT_DIR(并发多工作树时会给别人发绿灯)"
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
@@ -334,7 +359,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  bare login-entry system chrome runtime geometry (dev server not running at %s)\n" "$BASE_URL"
+  skipped "bare login-entry system chrome runtime geometry (dev server not running at $BASE_URL)"
 fi
 # ── SPEC-1 R7: factor reads device truth, never the viewing carrier ──
 sentinel_present "SPEC-1 R7 online seam exported" src/lib/hashpower.ts 'export function isDeviceOnline'
@@ -1129,7 +1154,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  SPEC-6 entry-surface runtime isolation (dev server not running at %s)\n" "$BASE_URL"
+  skipped "SPEC-6 entry-surface runtime isolation (dev server not running at $BASE_URL)"
 fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
@@ -1140,7 +1165,7 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
   fi
 else
-  printf "  ${Y}SKIP${N}  R7 + device detail runtime (dev server not running at %s)\n" "$BASE_URL"
+  skipped "R7 + device detail runtime (dev server not running at $BASE_URL)"
 fi
 # 注册成功页的平台边界是编译条件,UA 伪造无法证明 App 分支。锁住 H5
 # 提醒块、App 无提醒、底部继续入口和官网配置字段这四个不变量。
@@ -1498,8 +1523,8 @@ if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep
     bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
   fi
 else
-  printf "  ${Y}SKIP${N}  SPEC-4 account-cloud app sync (dev server not running at %s)\n" "$BASE_URL"
-  printf "  ${Y}SKIP${N}  SPEC-4 runtime session guard (dev server not running at %s)\n" "$BASE_URL"
+  skipped "SPEC-4 account-cloud app sync (dev server not running at $BASE_URL)"
+  skipped "SPEC-4 runtime session guard (dev server not running at $BASE_URL)"
 fi
 # SFC block closure (PITFALLS P-025): a `<script>` block missing its `</script>`
 # close tag compiles fine under vue-tsc/volar (lenient: script extends to EOF)
@@ -3094,5 +3119,5 @@ else
   tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
 fi
 
-echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ) ━━"
-[ $fail -eq 0 ]
+echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
+[ $fail -eq 0 ] && [ $skip -eq 0 ]
