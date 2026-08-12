@@ -397,12 +397,12 @@ function notifyRemoteSwapResult(order: ExchangeOrder) {
     return;
   }
   const reason = {
-    CANCELLED: "兑换单已取消，本次未成交",
-    USER_CAP: "已达到个人额度，本次未成交",
-    PLATFORM_CAP: "平台额度已用尽，本次未成交",
-    GEO_BLOCKED: "地区策略限制，本次未成交",
+    CANCELLED: t.value.exchange.swapCancelledReason,
+    USER_CAP: t.value.exchange.swapUserCapReason,
+    PLATFORM_CAP: t.value.exchange.swapPlatformCapReason,
+    GEO_BLOCKED: t.value.exchange.swapGeoBlockedReason,
   }[order.status];
-  toast.error(reason ?? `兑换未成交（${order.status}）`, order.exchangeNo);
+  toast.error(reason ?? fmt(t.value.exchange.swapNotFilled, { status: order.status }), order.exchangeNo);
 }
 
 async function handleConfirm() {
@@ -463,7 +463,7 @@ async function handleConfirm() {
       });
       if (app.accountKey !== snap.account) {
         await syncRemoteState();
-        toast.info("账号已切换，已刷新当前账号权威状态");
+        toast.info(t.value.exchange.accountSwitchedRefreshed);
         return;
       }
       remoteState.value = result.snapshot;
@@ -591,7 +591,7 @@ async function handleConfirm() {
           await syncRemoteState().catch(() => {});
         }
         remoteError.value = "G2_SWAP_OUTCOME_UNKNOWN";
-        toast.error("兑换结果尚未确认", "请保持同一方向和金额重试；系统将复用同一请求号安全回读。");
+        toast.error(t.value.exchange.outcomeUnknownTitle, t.value.exchange.outcomeUnknownBody);
         return;
       }
       remoteState.value = null;
