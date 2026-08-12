@@ -60,6 +60,28 @@ export type BillDraft = Omit<Bill, "id" | "ts" | "balanceAfter"> & {
 };
 
 /**
+ * 单条分录的事件时刻 → 落盘 `ts`。**纵深防御,不是主门**(主门在生产者,如
+ * `lib/withdrawal-bill-drafts` 的 `nexRefundAtMs`)。
+ *
+ * 🔴 为什么原语也要有一道:`?? ` 只挡 `null`/`undefined`,实测 `NaN` / `Infinity` / `0` / 负数 /
+ * 字符串全部穿过并落进 `Bill.ts` —— `NaN` 落盘 JSON 序列化成 **null**(该行永久损坏)、`0` 渲染成
+ * 1970 年 1 月。而本批把 `ReceiptDraft` 放宽成带 `atMs` 的类型后,全站 6 个 draft 构造点都够得着它:
+ * 校验只放在**调用方**等于把信任边界交给一个开放集合。
+ *
+ * 🔴 非法值回落到 **`mockServerNow()`,不是整批 `ts`**(2026-08-12 修法证伪):唯一的存量调用路径
+ * (App.vue ⓪)传的整批 `ts` **就是 `wd.submittedAt`** —— 回落到它等于把本包要修的缺陷原样放回去。
+ *
+ * 🔴 **不抛错**:`addMany` 跑在 `postMoneyBills` 的扣款**之后**且外层无 try,抛错会绕过
+ * `restoreMoney(undo)` 与失败提示 → 钱扣了、无分录、无回滚、无提示,正是 money-receipt 头注要根治的那一格。
+ */
+function rowTs(atMs: number | undefined, batchTs: number): number {
+  // 没传 = 这一条本来就跟整批走(绝大多数分录),用 batchTs —— 这是正常路径,不是降级。
+  if (atMs === undefined) return batchTs;
+  // 传了但非法 = 生产者有 bug。此时**不能**退回 batchTs(它就是 submittedAt),盖当前时刻。
+  return Number.isFinite(atMs) && atMs > 0 ? atMs : mockServerNow();
+}
+
+/**
  * Reward-type credits (activity bonus / referral commission / achievement;
  * CS compensation posts as `bonus`) — the "system rewards" family surfaced in
  * My Rewards (/me/rewards) AND its unread dot on the Me entry. Single source:
@@ -238,7 +260,7 @@ export const useBills = defineStore("bills", () => {
     // 自带 `atMs` 的那条走自己的时刻(与 addMany 同一条规则,两条路径不许漂移)。
     const ts = atMs ?? mockServerNow();
     const next: Bill[] = todo.map(({ atMs: rowAtMs, ...b }) => ({
-      ...b, id: mockServerId("BL"), ts: rowAtMs ?? ts,
+      ...b, id: mockServerId("BL"), ts: rowTs(rowAtMs, ts),
     }));
     const merged = recomputeBalance([...next, ...existing]);
     if (!writeAccountRow<{ bills: Bill[] }>(ACCOUNTS_KEY, target, { bills: merged })) return null;
@@ -269,7 +291,7 @@ export const useBills = defineStore("bills", () => {
     // Bill 行,而 `Bill` 上根本没有这个键 —— 渲染、判重、合并、balanceAfter 全不认它,
     // 它只会随存量数据长期留在盘上,并让「Bill 的字段集」这件事从此说不清。
     const next: Bill[] = drafts.map(({ atMs: rowAtMs, ...b }) => ({
-      ...b, id: mockServerId("BL"), ts: rowAtMs ?? ts,
+      ...b, id: mockServerId("BL"), ts: rowTs(rowAtMs, ts),
     }));
     const previous = bills.value;
     bills.value = recomputeBalance([...next, ...previous]);

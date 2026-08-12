@@ -329,7 +329,7 @@ function numericRefunded(w: Withdrawal): number {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
 }
 
-/** 同上,时刻面。非法 / 缺失 = `undefined`(不是 0 —— 0 是 1970,下游会当成一个真时刻)。 */
+/** 同上,时刻面。非法 / 缺失 = `undefined`,与消费方 `isUsableRefundInstant` 的值域对齐(0 会被它判越界)。 */
 function numericRefundedAt(w: Withdrawal): number | undefined {
   const v = (w as { nexRefundedAt?: unknown }).nexRefundedAt;
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
@@ -345,7 +345,19 @@ function numericRefundedAt(w: Withdrawal): number | undefined {
  * 时刻面是同一个丢失面的另一半,一并按事实整对取。
  *
  * 取法:金额大的那份胜(退款单调不减,大的是更新的证据);金额相同(含都为 0)时,
- * **带时刻的那份更完整**,取它。
+ * 优先**消费方会接受**的那份,再退到「带时刻的那份更完整」。
+ *
+ * 🔴 **已知缺口,本轮不修,理由是架构约束不是遗漏**(2026-08-12):
+ * 独立审计报出「本层放行了消费方会拒绝的时刻(如早于提交的值),于是合法时刻可能被非法值顶掉、
+ * 再被消费方丢弃 —— 准确日期掉进两次判据的缝里」。证伪结论:方向对,应当**用消费方的谓词排序**
+ * (只排序,绝不拿它把值置 `undefined` —— 本层写 undefined 是把值从盘上抹掉,不可恢复)。
+ *
+ * 但本文件头注写明它**必须保持 value-import-free**:SPEC-4 的合并哨兵会把它转译进一个裸 node VM,
+ * Vite 别名在那里解析不了。实测:从 `lib/withdrawal-bill-drafts` import 那个谓词 →
+ * `Cannot find module '@/lib/withdrawal-bill-drafts'`,SPEC-4 门当场判红。
+ * 而在这里复制第二份谓词,又正是「同一概念两处各自推导」——本仓明令要配逐键 parity 哨兵才许做。
+ * 故本轮**不做**,登记为待办:要么给哨兵补别名解析,要么把谓词降到一个双方都能 import 的无依赖模块。
+ * 残余风险在解析层收紧(整串锚定 + 双向值域)之后已明显变窄,但没有归零。
  */
 function pickRefundEvidence(a: Withdrawal, b: Withdrawal): Withdrawal {
   const ra = numericRefunded(a);
