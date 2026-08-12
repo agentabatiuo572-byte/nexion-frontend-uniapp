@@ -965,10 +965,15 @@ export const useApp = defineStore("app", () => {
         //
         // 只在**真退了**(返回 true = 本次或此前已幂等落账)时写,且只增不减 ——
         // 与 account-cloud 合并层的取大语义一致,不会把服务端已知的更大值抹小。
+        //
+        // 🔴 证据是**金额 + 发生时刻**一对,只写金额等于让下游回落到「构造时的此刻」——
+        // 而这条腿知道确切答案:退款就发生在**现在**(上一行刚把 NEX 加回钱包)。
+        // 少写这半边,冲正行的日期会随「哪一拍轮询先看到它」漂移,而真值本来就在手上。
         const already = typeof wd.nexRefunded === "number" ? wd.nexRefunded : 0;
         if (already < burnedNex) {
+          const refundedAt = mockServerNow();
           withdrawals.value = withdrawals.value.map((w) =>
-            (w.id === wd.id ? { ...w, nexRefunded: burnedNex } : w));
+            (w.id === wd.id ? { ...w, nexRefunded: burnedNex, nexRefundedAt: refundedAt } : w));
           persistAccountSnapshot();
         }
       }

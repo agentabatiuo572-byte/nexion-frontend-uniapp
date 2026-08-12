@@ -329,6 +329,31 @@ function numericRefunded(w: Withdrawal): number {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
 }
 
+/** 同上,时刻面。非法 / 缺失 = `undefined`(不是 0 —— 0 是 1970,下游会当成一个真时刻)。 */
+function numericRefundedAt(w: Withdrawal): number | undefined {
+  const v = (w as { nexRefundedAt?: unknown }).nexRefundedAt;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+/**
+ * 🔴 退款事实 = **金额 + 发生时刻**,必须整对取自**同一份**快照。
+ *
+ * 为什么不能各取各的:两边各按自己的规则挑(金额取大、时刻取大/取胜者)会拼出一份
+ * **不存在于任何一端**的事实 —— 比如 A 份「退 3 · 8 月 2 日」、B 份「退 0 · 无时刻」,
+ * 分开取会得到「退 3 · 无时刻」,冲正行于是回落到观测时刻,而准确日期本来就在 A 份里。
+ * 金额面 z6 已经栽过一次(整对象按状态 rank 取胜,平局把退款事实整份丢弃);
+ * 时刻面是同一个丢失面的另一半,一并按事实整对取。
+ *
+ * 取法:金额大的那份胜(退款单调不减,大的是更新的证据);金额相同(含都为 0)时,
+ * **带时刻的那份更完整**,取它。
+ */
+function pickRefundEvidence(a: Withdrawal, b: Withdrawal): Withdrawal {
+  const ra = numericRefunded(a);
+  const rb = numericRefunded(b);
+  if (ra !== rb) return ra > rb ? a : b;
+  return numericRefundedAt(a) !== undefined ? a : b;
+}
+
 function mergeWithdrawals(
   base: Withdrawal[],
   next: Withdrawal[],
@@ -354,10 +379,15 @@ function mergeWithdrawals(
     //
     // 取大而不是「取胜者的值」:退款是**既成事实且单调不减**(规格 §4.6②),
     // 0 → 3 是新证据,3 → 0 只可能是某一端还没看到,不该让它把已知事实抹回去。
-    const refunded = Math.max(numericRefunded(prev), numericRefunded(w));
-    byId.set(w.id, refunded > 0 && numericRefunded(winner) !== refunded
-      ? { ...winner, nexRefunded: refunded }
-      : winner);
+    // 🔴 金额与**发生时刻**整对取自同一份(见 pickRefundEvidence):时刻单独按自己的规则挑,
+    // 会拼出一份两端都没有的事实,冲正行的日期因此丢回观测时刻。
+    const evidence = pickRefundEvidence(prev, w);
+    const refunded = numericRefunded(evidence);
+    const refundedAt = numericRefundedAt(evidence);
+    byId.set(w.id,
+      refunded > 0 && (numericRefunded(winner) !== refunded || numericRefundedAt(winner) !== refundedAt)
+        ? { ...winner, nexRefunded: refunded, nexRefundedAt: refundedAt }
+        : winner);
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
   const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));

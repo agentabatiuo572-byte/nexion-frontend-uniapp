@@ -286,6 +286,17 @@ export interface Withdrawal {
    *  越界一律不认(退得比烧的多 = 账本凭空造 NEX);判定收在 withdrawal-bill-drafts 一处。
    *  顶层字段而不是塞进 `fee`:`fee` 是**报价快照**且请求/响应同构,退款是事后事件,不属于报价。 */
   nexRefunded?: number;
+  /** 🔴 FEAT-WD01 §4.6:退款**发生**的时刻(epoch ms;线上是 ISO-8601 字符串,解析层已转)。
+   *
+   *  为什么必须有这个字段:它与 `submittedAt` 可以差**几个月**(7 月提交、8 月才判失败退还),
+   *  而账单页按分录的 `ts` 分月分组 —— 没有它,冲正行只能盖提交时刻,落进 7 月那一组、
+   *  贴在当初「烧掉 N NEX」那行旁边;用户在 8 月的账单里找不到钱回来的记录,
+   *  而钱包里的 NEX 确实是 8 月变的,两个口径对不上。
+   *
+   *  与 `nexRefunded` 是同一件事实的两个面:合并 / 传递 / 落盘一律**成对**,拆开取会配错单
+   *  (合并规则见 account-cloud `pickRefundEvidence`)。缺失 = 不知道什么时候退的,
+   *  由消费点回落到「客户端得知的此刻」,**绝不回落到 `submittedAt`**(那正是本字段要修的形态)。 */
+  nexRefundedAt?: number;
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────

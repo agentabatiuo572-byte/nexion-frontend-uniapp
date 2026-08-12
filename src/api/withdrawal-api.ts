@@ -18,6 +18,14 @@ export interface WithdrawalSubmission {
   nexBurned: number;
   /** FEAT-WD01 §4.6:服务端已退还的已烧 NEX(既成事实)。后端未上该字段时解析为 0。 */
   nexRefunded: number;
+  /**
+   * FEAT-WD01 §4.6:退款**发生**的时刻。**线上是 ISO-8601 字符串**,本字段是解析后的 epoch ms
+   * (与 `Withdrawal.submittedAt` / `confirmedAt` 同口径,便于直接比较)。
+   *
+   * 🔴 缺失 / 不可解析 = `undefined`,**不是 0**:0 是 1970-01-01,下游会把它当成一个真时刻,
+   * 冲正行落进 1970 年那一组 —— 比它要修的那个 bug 还远。「没有」必须长得不像「有」。
+   */
+  nexRefundedAt?: number;
   feeWaived: number;
   actualFee: number;
   netReceive: number;
@@ -105,6 +113,24 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
       && Number.isFinite(rawNexRefunded) && Number.isInteger(rawNexRefunded) && rawNexRefunded >= 0
     ? rawNexRefunded
     : 0;
+  // 🔴 §4.6 退款**发生时刻**(线上 ISO-8601 字符串 → 这里转 epoch ms)。宽松档同上一段:
+  // 缺失 / 坏值一律当「没给」,**绝不抛协议错** —— 严格必填 = 后端没上该字段就整单被拒,而钱已经扣了。
+  //
+  // 🔴 不能只靠 `Date.parse`:它对非 ISO 串出奇地宽容 —— `Date.parse("3")` 在 V8 上是
+  // **2003-01-01**、`Date.parse("2026")` 是 2026-01-01,后端错发一个裸数字串就能把这条冲正行
+  // 扔进 2003 年那一组,而门与 tsc 全绿。这与同批 `nexRefunded` 栽的那一下同型(`Number(true) === 1`)。
+  // 故先按契约声明的形状卡一道:必须以 ISO-8601 的**日历日** `YYYY-MM-DD` 起头才进 `Date.parse`。
+  //
+  // 🔴 门槛划在「到日」而不是「到分」:这个值的唯一用途是给冲正行定日期,而账单页按**月**分组 ——
+  // 后端只发到日(`2026-08-05`)时月份仍然是准的,拒掉它反而回落到观测时刻、可能落到别的月去。
+  // 宽松说的是「可以没有」,不是「什么都收」:形状不对 = 当没给,而不是硬解一个数出来。
+  const rawNexRefundedAt = text(row?.nexRefundedAt);
+  const parsedNexRefundedAt = rawNexRefundedAt && /^\d{4}-\d{2}-\d{2}/.test(rawNexRefundedAt)
+    ? Date.parse(rawNexRefundedAt)
+    : Number.NaN;
+  const nexRefundedAt = Number.isFinite(parsedNexRefundedAt) && parsedNexRefundedAt > 0
+    ? parsedNexRefundedAt
+    : undefined;
   const feeWaived = number(row?.feeWaived);
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);
@@ -142,6 +168,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     grossFee,
     nexBurned,
     nexRefunded,
+    nexRefundedAt,
     feeWaived,
     actualFee,
     netReceive,
@@ -310,6 +337,10 @@ export function toCanonicalWithdrawal(
     // 现状与需要谁做什么,见 HANDOFF U-9;跨包判据由 `selfcheck-withdraw-nex-refund.mjs`
     // 的「回查响应字段 ⊇ 冲正判据字段」一格盯着。
     nexRefunded: submission.nexRefunded,
+    // 🔴 时刻与金额**必须一起带出**:账单页按 `ts` 分月分组,冲正行只有拿到退款发生的时刻
+    // 才落得进正确那个月。少带它,冲正行就只能盖提交时刻 —— 7 月提交、8 月退还会显示成 7 月的事
+    // (见 lib/withdrawal-bill-drafts 的 `nexRefundAtMs`)。二者是同一件事实的两个面,别拆开传。
+    nexRefundedAt: submission.nexRefundedAt,
   };
 }
 
