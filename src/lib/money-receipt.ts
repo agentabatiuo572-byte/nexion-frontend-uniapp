@@ -18,14 +18,14 @@
  * client 只消费返回值;本文件的三分支结果与那份 API 的语义一一对应。
  */
 import { useApp, type MoneySnapshot } from "@/store/app";
-import { useBills, type Bill } from "@/store/bills";
+import { useBills, type BillDraft } from "@/store/bills";
 import { getT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { mockServerId } from "@/store/mock-id";
 import { toast } from "@/store/ui";
 
-/** 账单入参(id / ts / balanceAfter 由 store 与服务端时钟负责)。 */
-export type ReceiptDraft = Omit<Bill, "id" | "ts" | "balanceAfter">;
+/** 账单入参(id / ts / balanceAfter 由 store 与服务端时钟负责;单条另有事件时刻时带 `atMs`,见 BillDraft)。 */
+export type ReceiptDraft = BillDraft;
 
 /**
  * - `ok`           两边都落盘。

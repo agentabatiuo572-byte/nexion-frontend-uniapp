@@ -10,15 +10,18 @@
  *
  * 🔴 为什么要有自愈那一路(R2 completeness critic 的 P0):
  * 账单表是**裸写整行、无 CAS**(2026-08-05 主人拍板不在前端修),跨标签页并发写会把
- * 刚落盘的分录整行覆盖掉。资金分录里只有这一族没有自愈路径 —— 冲正行(App.vue ②b)
+ * 刚落盘的分录整行覆盖掉。资金分录里只有这一族没有自愈路径 —— 冲正行(下方退还分录)
  * 的存在性判据取自账本自身,丢了下一拍就补回来;而提现主行一旦被抹掉就**永久消失**,
  * 用户回到的正是本包要修的那个原状态,而所有门仍然全绿(门守的是「有没有生产者」,
  * 不是「那一行此刻在不在」)。把判据同样改成「从数据推出该有什么」,这一族才补齐。
  *
- * 纯函数、不碰 store、不依赖 i18n 运行时:memo 是英文兜底,渲染时以 memoKey 为准。
+ * 不碰 store、不依赖 i18n 运行时:memo 是英文兜底,渲染时以 memoKey 为准。
+ * ⚠️ 但它**不是引用透明的**:退还分录拿不到服务端时刻时会读一次共用时钟(见 `nexRefundAtMs`),
+ * 同一张单在不同时刻构造可能得到不同的 `atMs`。判重按「单号+币种+方向」,落盘后不再重取。
  * PRODUCTION:整个文件消失 —— 分录由服务端在建单同一事务里写,client 只消费 GET /api/bills。
  */
 import type { ReceiptDraft } from "@/lib/money-receipt";
+import { mockServerNow } from "@/store/server-time";
 import type { Withdrawal } from "@/store/types";
 
 /** NEX 数量展示:整数不带小数点,非整数保留一位(与提现页报价同口径)。 */
@@ -40,6 +43,63 @@ const WITHDRAW_MEMO_BY_ROUTE: Record<NonNullable<Withdrawal["riskRoute"]>, strin
   reject: "withdrawReview",
 };
 
+/**
+ * 冲正行的事件时刻 —— 🔴 **退款发生那一刻,不是提现提交那一刻**。
+ *
+ * 两者可以差几个月(7 月提交、8 月才判失败并退还),而账单页按分录的 `ts` 分月分组:
+ * 盖成提交时刻,「退回 N NEX」就落进 7 月那一组、贴在当初「烧掉 N NEX」那行旁边 ——
+ * 用户在 8 月的账单里找不到钱回来的记录,而钱包里的 NEX 确实是 8 月变的,两个口径对不上。
+ * 同一族的另外两行(USDT 主行 / NEX 抵扣费行)**确实**发生在提交那一刻,所以修法是
+ * 「这一条分录带自己的时刻」(`ReceiptDraft.atMs`),不是「整批换一个时刻」。
+ *
+ * 🔴 **回落规则(显式定,不许静默沿用提交时刻)**:拿不到 `nexRefundedAt` 时(存量单 /
+ * 后端还没上该字段)盖**本次构造的此刻**。理由:
+ *   · 真值一定落在 `[submittedAt, now]` 里,而客户端只知道这两个端点;
+ *   · 取 now = 「客户端**得知**退款的时刻」——正常轮询下晚一拍,自愈/离线/存量单路径下可晚数月(如实说);取 submittedAt 可以早几个月,
+ *     且会让冲正行与被它冲正的那行**同刻同组** —— 正是本函数要修掉的那个形态;
+ *   · 冲正行只在第一次落盘时定 `ts`(此后按「单号+币种+方向」判重跳过),不会每拍漂移。
+ *
+ * 🔴 **双向越界都当它没给**(2026-08-12 独立审计:上一版只卡了下界,五份报告独立命中):
+ *   · 早于提交 —— 退款不可能发生在下单之前;
+ *   · **晚于此刻** —— 退款也不可能发生在未来。少了这一侧,后端错发 `"2099-01-01"` 会让这行按
+ *     `ts` 倒序**永久钉在账单首位**、落进一个还没到的月份组,且落盘后判重跳过、永不自愈 ——
+ *     比「早一个月」错得更远。同批的 `nexRefunded` 有 `<= nexBurned` 上界,它的时刻孪生兄弟
+ *     原本一个上界都没有,同一批里两个字段一有一无。
+ * (与 `refunded > nexBurned` 同一条纪律:已知是错的数不拿来写一条看着合理的分录。)
+ *
+ * 🔴 回落值**不做 `Math.max(now, submittedAt)` 钳位**(2026-08-12 修法证伪结论):那正是
+ * 「把已知是错的数钳成看着合理的」——而钳完的结果恰好是**提交时刻**,即本函数存在的理由要修掉的形态。
+ * 时钟被拨回时 `submittedAt`(同为本机时钟)一样不可信;真要治,该在 `mockServerNow` 一处做单调钟,
+ * 不是在这一个调用点钳。**已知边界,不假装修了。**
+ *
+ * 🔴 **已知边界二(本次引入的,如实登记)**:回落走的是「构造此刻」,所以这一行**不是数据的纯函数** ——
+ * 账单表裸写无 CAS,跨标签页覆盖后由 5s 自愈重建时会取到一个新的「此刻」,日期随之推移。
+ * z8 之前这一行盖 `wd.submittedAt`,重写是幂等的。修法候选(观测值单独落一个字段、服务端值永远压过它)
+ * 尚未过证伪,不在本轮落盘 —— 宁可留一个写明白的缺口,也不塞一个没被证伪过的新存储字段。
+ * 咬人窗口:行丢失与自愈重建之间恰好跨月。
+ *
+ * 时钟不做成入参:那等于把「盖哪个时刻」的决定权交回调用方,而本卡的缺陷**正是**调用方
+ * (App.vue ⓪)用 `wd.submittedAt` 盖住了整批。决定留在这个唯一构造处。
+ */
+/**
+ * 「这个退款时刻消费方认不认」—— **单源谓词**,合并层与本文件共用(2026-08-12 修法证伪:
+ * 两处各写一份必然漂移,而漂移的后果是合法时刻在一层被留下、在另一层被丢弃,准确日期掉进缝里)。
+ *
+ * 🔴 合并层**只拿它排序**(优先选消费方会接受的那份),**不拿它置 undefined** ——
+ * 合并层写 undefined 是把值从盘上抹掉(不可恢复),而消费方的丢弃每次构造重算(可恢复)。
+ */
+export function isUsableRefundInstant(at: unknown, submittedAt: number, nowMs: number): boolean {
+  return typeof at === "number" && Number.isFinite(at) && at > 0
+    // submittedAt 在存量脏单上可能缺失 —— 缺失时不拿它当尺(否则 `at >= undefined` 恒假,合法值被全丢)。
+    && (!Number.isFinite(submittedAt) || at >= submittedAt)
+    && at <= nowMs;
+}
+
+function nexRefundAtMs(wd: Withdrawal): number {
+  const now = mockServerNow();
+  return isUsableRefundInstant(wd.nexRefundedAt, wd.submittedAt, now) ? wd.nexRefundedAt as number : now;
+}
+
 /** 单据终态 → 账单行状态。非终态一律在途,由 App.vue 的对账推进。 */
 const FAILED_STATUSES: readonly Withdrawal["status"][] = [
   "review-rejected", "address-invalid", "tx-failed", "refunded",
@@ -56,7 +116,9 @@ export function billStatusForWithdrawal(status: Withdrawal["status"]): "posted" 
  * - USDT 主行:负额 = 用户「提了多少钱」的唯一凭据;状态跟单据当前态(自愈补写时可能
  *   已经是终态了,写 pending 再等下一拍结算是多余的一步,也会让账单短暂说谎)。
  * - NEX 抵扣费行:只在服务端真烧了 NEX 时才有;恒 `posted` —— 烧是既成事实,
- *   提现失败时由 App.vue ②b 补一条 +N 的反向分录冲正,不改写这一条。
+ *   提现失败时补一条 +N 的反向分录冲正(下一条),**不改写**这一条。
+ * - NEX 退还行(冲正):只在服务端说「已经退了」时才有。判据是线上字段 `wd.nexRefunded`,
+ *   而它的**日期**跟 `wd.nexRefundedAt` 走(这一族里唯一不发生在提交时刻的一行,见 `nexRefundAtMs`)。
  *
  * 🔴 每个数字都取自单据(服务端回执),不接受调用方另传 —— 本仓禁令:显示的钱必须指到单源。
  */
@@ -104,6 +166,39 @@ export function withdrawalBillDrafts(wd: Withdrawal): ReceiptDraft[] {
         ).toFixed(2),
       },
       ref: wd.id,
+    });
+  }
+  // 🔴 NEX 退还 → 冲正分录(原 App.vue ②b,2026-08-11 迁来本处)。
+  //
+  // 为什么冲正靠**反向分录**而不是改写上面那条 −N:烧确实发生过,改写 = 账本说没烧。
+  // 复式账本的规矩是同单号补一条 +N,两行相抵 = 钱包净变化。
+  //
+  // 🔴 判据是**服务端说退了**(`wd.nexRefunded`),不是「单据是失败终态所以大概退了」。
+  // z4 R2 按终态写过一版,R3 独立审计判定为「账本单方面宣布一笔没有任何证据的退款」并回滚:
+  // 少一条冲正是漏记(可自愈),凭空写一条是造假(不可逆)。原判据锚在一个**本地**幂等键上,
+  // 而写那个键的函数在 remote 模式下恒 no-op、mock 模式下压根建不出提现单 —— 两头落空,
+  // 这条冲正在任何真实配置下都不可达。现在锚到服务端事实,这是本次修复的全部要点。
+  //
+  // 🔴 金额取 `nexRefunded` 而不是 `nexBurned`:两者可以不等(将来若改成部分退还),
+  // 拿 burned 当退还额 = 显示的钱指到了另一个源(本仓禁令)。
+  //
+  // 🔴 `refunded > nexBurned` 一律不认:退得比烧的多 = 账本凭空造 NEX。此时**不夹到 nexBurned**
+  // 而是整条不写 —— 夹了会拿一个已知是错的数去写一条看着合理的分录,比缺一条坏。
+  // 这也是 `fee` 整个缺失(存量脏单)时的行为:不知道烧了多少,就无从验证退了多少。
+  const refunded = wd.nexRefunded;
+  if (typeof refunded === "number" && refunded > 0 && refunded <= fee.nexBurned) {
+    drafts.push({
+      type: "withdraw",
+      symbol: "NEX",
+      amount: refunded,
+      status: "posted",
+      // memoKey = 渲染时才翻译(切语言不留旧语);memo 只作兜底,与 bills.ts 的约定一致。
+      memo: `Fee offset refunded · ${fmtNex(refunded)} NEX returned`,
+      memoKey: "withdrawNexRefund",
+      memoParams: { nex: fmtNex(refunded) },
+      ref: wd.id,
+      // 🔴 这一条**不跟整批的时刻**:它发生在退款那一刻,不是提交那一刻(见 nexRefundAtMs)。
+      atMs: nexRefundAtMs(wd),
     });
   }
   return drafts;

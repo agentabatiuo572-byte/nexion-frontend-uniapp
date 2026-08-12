@@ -16,6 +16,17 @@ export interface WithdrawalSubmission {
   penaltyFee: number;
   grossFee: number;
   nexBurned: number;
+  /** FEAT-WD01 §4.6:服务端已退还的已烧 NEX(既成事实)。后端未上该字段时解析为 0。 */
+  nexRefunded: number;
+  /**
+   * FEAT-WD01 §4.6:退款**发生**的时刻。**线上是 ISO-8601 字符串**,本字段是解析后的 epoch ms
+   * (与 `Withdrawal.submittedAt` / `confirmedAt` 同口径,便于直接比较)。
+   *
+   * 🔴 缺失 / 不可解析 = `undefined`,**不是 0**:0 是 1970-01-01,而消费点
+   * (`isUsableRefundInstant`)的合法域是 `[submittedAt, now]` —— 0 会被判越界、退回观测时刻。
+   * 「没有」必须长得不像「有」,否则它会在合并层被当成「带时刻的那份」而顶掉真正准确的一份。
+   */
+  nexRefundedAt?: number;
   feeWaived: number;
   actualFee: number;
   netReceive: number;
@@ -88,6 +99,45 @@ function number(value: unknown, min = 0): number | null {
   return Number.isFinite(parsed) && parsed >= min ? parsed : null;
 }
 
+/**
+ * 🔴 ISO-8601 **整串**文法(2026-08-12 独立审计后收紧)。带 `$` 收尾锚是本函数的要害:
+ * 上一版用 `/^\d{4}-\d{2}-\d{2}/`(只卡前缀),实测 `"2026-08-05junk"` 过卡口、
+ * `Date.parse` 给 **2026-06-07** —— 差两个月,正是本字段存在的理由要修掉的形态。
+ * 超出严格 ISO 的部分由各引擎的自定义分支接手,V8 与 iOS JSC 可给不同结果 =
+ * 同一份报文安卓/iOS 落不同月(双端不变量破了)。
+ *
+ * 收 `+07:00` 偏移(目标市场越南,后端多半发本地偏移)与 1-3 位毫秒。
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/;
+/** 只到日的那一支(降级兼容路径,见 parseRefundInstant)。 */
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * 退款发生时刻:ISO-8601 字符串 → epoch ms。缺失 / 形状不对 / 日历非法 → `undefined`(= 没给),
+ * **绝不抛协议错**(宽松档,理由同 §4.5:严格必填 = 后端没上该字段就整单被拒,而钱已经扣了)。
+ *
+ * 🔴 **只到日是「降级兼容路径」,不是契约**(规格 §4.6② 要求带时区偏移的完整 date-time)。
+ * 它按**本地正午**解析,不是 `Date.parse` 的 UTC 午夜:账单页按**本地时区**分月分组,
+ * 而 UTC 午夜在负时区会落进上一个月 —— 月初那天必错(实测 `2026-08-01` 在 UTC-5 渲染成 July)。
+ * 取正午而非本地午夜,是为了让「同一设备解析、同一设备渲染」这个前提下 UTC-12..+14 全部落回原日历日。
+ * 已知边界(不假装修了):**同一设备事后改时区 / 用户出境**时,已冻结的 epoch 会换个日历日渲染,量级一天。
+ *
+ * 🔴 回环校验**只对只到日那一支**做:`Date.parse("2026-02-29")` 会静默进位成 3 月 1 日(实测),
+ * 而带偏移的完整串没有进位风险,对它做回环反而会在负时区把合法值判成非法。
+ */
+function parseRefundInstant(raw: string | null): number | undefined {
+  if (!raw || !ISO_INSTANT.test(raw)) return undefined;
+  if (ISO_DATE_ONLY.test(raw)) {
+    const [y, m, d] = raw.split("-").map(Number);
+    const at = new Date(y, m - 1, d, 12, 0, 0, 0);
+    // 回环:本地取值,与上一行的本地构造同一套口径(用 getUTC* 会在负时区误杀)。
+    const ok = at.getFullYear() === y && at.getMonth() === m - 1 && at.getDate() === d;
+    return ok && at.getTime() > 0 ? at.getTime() : undefined;
+  }
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+}
+
 function parseSubmission(value: unknown): WithdrawalSubmission {
   const row = record(value);
   const chain = row?.chain;
@@ -101,6 +151,27 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const penaltyFee = number(row?.penaltyFee);
   const grossFee = number(row?.grossFee);
   const nexBurned = number(row?.nexBurned);
+  // 🔴 FEAT-WD01 §4.6 已退还 NEX ——「宽松解析」是刻意的,理由与 §4.5 第二批字段同一条:
+  // 严格必填 = 后端还没上这个字段就整单被拒,**而钱已经扣了**(异常6,本规格最贵的失败模式)。
+  // 坏值一律读作 0 = 没退,这是安全侧:漏记一条冲正可自愈(下次取到就补),凭空写一条是造假。
+  //
+  // 🔴 **不能复用共用的 `number()`**(2026-08-11 独立审计实测):它内部是 `Number(value)`,于是
+  // `true → 1`、`"3" → 3`、`[3] → 3`、`2.5 → 2.5` 全部通过。后端若发规格 §4.6③ 明确否掉的
+  // boolean 形状,客户端会读成 **1**,在烧 3 退 3 的单上落一条「退回 1 NEX」——
+  // 账本上那个数指不到任何源,而钱包实收 3。宽松解析赖以成立的「坏值 = 安全侧」前提当场被破。
+  // 上一版注释写的正是「非数字一律读作 0」,与实际行为相反(本仓第四次栽在
+  // 「注释声称了没验证过的行为」上,这次栽在我自己手上)。
+  //
+  // 故这里**只认真正的 JSON number**,并按 §4.6② 的值域收口:非有限数 / 负数 / 非整数一律 0。
+  // 整数在解析层判(而不是留给消费方):它是**契约值域**,越界即协议不合,与「≤ nexBurned」
+  // 那条**跨字段**不变量不同 —— 后者依赖 fee 且存量单走不同来路,仍收在消费点一处。
+  const rawNexRefunded = row?.nexRefunded;
+  const nexRefunded = typeof rawNexRefunded === "number"
+      && Number.isFinite(rawNexRefunded) && Number.isInteger(rawNexRefunded) && rawNexRefunded >= 0
+    ? rawNexRefunded
+    : 0;
+  // §4.6 退款发生时刻(线上 ISO-8601 字符串 → epoch ms)。值域收口与降级路径见 parseRefundInstant。
+  const nexRefundedAt = parseRefundInstant(text(row?.nexRefundedAt));
   const feeWaived = number(row?.feeWaived);
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);
@@ -137,6 +208,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     penaltyFee,
     grossFee,
     nexBurned,
+    nexRefunded,
+    nexRefundedAt,
     feeWaived,
     actualFee,
     netReceive,
@@ -341,6 +414,24 @@ export function toCanonicalWithdrawal(
     riskReasons: [],
     submittedAt,
     estimatedCompletion,
+    // 🔴 顶层带出,不进 `fee`(fee 是报价快照,请求/响应同构;退款是事后事件)。
+    // 提交回执上它**几乎恒为 0** —— 提交那一刻就被拒的单按规格是「零副作用、不烧 NEX」,
+    // 没 NEX 可退。真正会带非 0 值的是**状态回查**端点。
+    //
+    // 🔴 **别指望那条端点会自动带上这个字段**(2026-08-11 独立审计当场证伪了我上一版的断言)。
+    // 上一版这里写的是「那条端点复用本函数,字段自然跟着走,届时无需再改这里」——
+    // 而回查端点已经在并行包 z7 里写完了:它有**自己的**响应类型与解析器
+    // (`WithdrawalStatusSnapshot` / `parseStatusSnapshot`),只回 withdrawalNo/status/
+    // confirmedAt/terminalReason/retriable 五个字段,**不经过本函数**,也就不带 `nexRefunded`。
+    // 两包各自合入主线后,这条冲正照样一次都不会触发 —— 与本包声称修好的缺陷完全同形。
+    // 我把「另一层会配合」当成了事实写进注释,这正是本包审计出的根因。
+    // 现状与需要谁做什么,见 HANDOFF U-9;跨包判据由 `selfcheck-withdraw-nex-refund.mjs`
+    // 的「回查响应字段 ⊇ 冲正判据字段」一格盯着。
+    nexRefunded: submission.nexRefunded,
+    // 🔴 时刻与金额**必须一起带出**:账单页按 `ts` 分月分组,冲正行只有拿到退款发生的时刻
+    // 才落得进正确那个月。少带它,冲正行就只能盖提交时刻 —— 7 月提交、8 月退还会显示成 7 月的事
+    // (见 lib/withdrawal-bill-drafts 的 `nexRefundAtMs`)。二者是同一件事实的两个面,别拆开传。
+    nexRefundedAt: submission.nexRefundedAt,
   };
 }
 

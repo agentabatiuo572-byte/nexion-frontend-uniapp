@@ -2769,6 +2769,40 @@ withdraw_failpaths_gate() {
 }
 withdraw_failpaths_gate
 
+# ── 失败提现「退还已烧 NEX」冲正分录门(包 z6,2026-08-11)──
+# 这一族的病形是**代码存在但链路走不到**:冲正分录一直躺在 App.vue 里,判据却锚在一个
+# remote 下恒不被写、mock 下压根没有提现单的本地幂等键上 —— 任何真实配置下都不可达,
+# 而「有没有这段代码」「有没有生产者」两种静态哨兵**全绿**。静态门对这一族天然瞎。
+# 判据:载真 app store + 真 bills store + 真 withdrawalBillDrafts,**把 remoteApiEnabled 翻成
+# true**(缺陷只在该模式下发作,共用桩默认 mock = 在本来就好使的模式里自证清白),
+# 从服务端回执喂进去,断言账本另一端真的多出那一行。含负向(没退 / 字段缺失 / 退多于烧)
+# 与幂等、方向判重、缺陷本体回归。红测实测 R1 删生产者 / R2 换错证据源 / R3 摘不变量 /
+# R4 判据丢方向 / R5 删断言,五种改法各自判红。
+withdraw_nex_refund_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-nex-refund.mjs > /tmp/uniapp-withdraw-nex-refund.log 2>&1; then
+    ok "失败提现退还 NEX 冲正门 — $(tail -1 /tmp/uniapp-withdraw-nex-refund.log)"
+  else
+    bad "失败提现退还 NEX 冲正门失败 — node scripts/selfcheck-withdraw-nex-refund.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-withdraw-nex-refund.log | head -8 | sed 's/^/        /'
+  fi
+}
+withdraw_nex_refund_gate
+
+# 提现单合并的两条修法并存门(2026-08-12 包 z8 并入主线时立)。主线修「同档位赢家通吃丢字段」,
+# 包 z8 修「退款事实随整对象被淘汰 + 金额与时刻须整对同源」—— 二者在同一个函数上,
+# 二选一都会丢一半。本门只证**两条同时生效**,不重复各自的单侧断言。
+# 红测实测三种拆法各自判红:A 调用点不过 applyRefundEvidence(5 红)/ B 同档位改回整行择一(1 红)/
+# C 金额与时刻拆开各取(1 红)。C 是第一版靶漏掉的覆盖洞,由红测本身抓出后补的。
+withdrawal_merge_union_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdrawal-merge-union.mjs > /tmp/uniapp-withdrawal-merge-union.log 2>&1; then
+    ok "提现单合并两修法并存门 — $(tail -1 /tmp/uniapp-withdrawal-merge-union.log)"
+  else
+    bad "提现单合并两修法并存门失败 — node scripts/selfcheck-withdrawal-merge-union.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|union-probe FAIL)" /tmp/uniapp-withdrawal-merge-union.log | head -8 | sed "s/^/        /"
+  fi
+}
+withdrawal_merge_union_gate
+
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
 # 第 4 条通道形同虚设。改为查平台码表 + 三态校验。判据(esbuild 载真 app store + 真码表
