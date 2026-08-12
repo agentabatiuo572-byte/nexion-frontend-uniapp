@@ -77,17 +77,41 @@ const REGISTRY = {
   "server-auth-config-authority-contract.test.mjs": { how: "chain" },
   "funds-run-scoped-isolation-contract.test.mjs": {
     how: "excluded",
-    why: "断言读兄弟仓 ../backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境单跑;与 h-remote-authority 同族。",
+    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下同时有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘搜无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉它后面所有门。",
   },
   "h8-run-scoped-referral-projection-contract.test.mjs": {
     how: "excluded",
-    why: "同上:依赖兄弟仓 ../backend。",
+    why: "同上,单体仓布局:读 backend 的 AppReferralRewardService.java / ReferralRewardMapper.java。npm run test:cross-repo。",
   },
   "funds-production-withdrawal-hold-contract.test.mjs": {
     how: "excluded",
     why: "该门断言「生产提现必须在发出请求前停住(HOLD)」,与主人 2026-08-12 拍板 B 相反 —— 拍板保留真实提现、用「同一笔意图冻结同一把幂等键」防重试变二次出账(其前提「本 App 没有可靠的订单终态回读契约」经回源核实不成立:GET /api/withdrawals/{单号} 存在,withdraw-status-mirror 门 25/0 端到端验证可用)。若日后改回 HOLD,把本条移回 chain。",
   },
   // ── elsewhere:已有入口在跑 ──
+  "acceptance-h5-sandbox-config.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "behavior-analytics-active-route-catalog-contract.test.mjs": {
+    how: "excluded",
+    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉后面所有门。",
+  },
+  "behavior-analytics-auth-lifecycle-contract.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
+  "e20-device-e3-api-behavior.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
+  "funds-mutation-key-behavior.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "funds-recoverable-operation-behavior.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "funds-sandbox-ledger-behavior.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "funds-sandbox-visible-label-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "funds-sandbox-withdrawal-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "funds-server-sandbox-contract.test.mjs": {
+    how: "excluded",
+    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉后面所有门。",
+  },
+  "funds-server-sandbox-regression.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "h8-first-user-truth-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "h8-sandbox-referral-bill-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "janus-h5-executor-hold-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "kl-sandbox-executor-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
+  "m-support-authority-contract.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
+  "server-auth-config-authority-contract.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
+  "server-session-reload-recovery-contract.test.mjs": { how: "elsewhere", by: "npm run test:session-reload-recovery" },
   "kyc-removal-contract.test.mjs": { how: "elsewhere", by: "npm run test:kyc-removal" },
   "probe-safety-contract.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
   "static-review-routes.test.mjs": { how: "elsewhere", by: "npm run test:probe-safety" },
@@ -98,7 +122,7 @@ const REGISTRY = {
   // ── excluded:写清原因 ──
   "learning-api-contract.test.mjs": {
     how: "excluded",
-    why: "断言的两条契约(奖励金额格式非法必须 fail-closed、幂等键在请求体之外)都成立且有价值,但跑不起来:它 import 的 src/api/learning-api.ts 内部用无扩展名相对 import(`./errors`),Node 原生 ESM 不认;而本仓 TS 4.9 不支持 allowImportingTsExtensions,加 .ts 扩展名会让 type-check 报错。原为 src/api/*.test.ts + vitest,而本仓未装 vitest —— 既没有 runner 跑过它,又让 type-check 常红,故迁到 scripts/ 并登记在案。要真正跑起来需先统一 src/api 内部 import 的扩展名(或引入能解析 TS 路径的 runner),属独立议题。",
+    why: "该旧 Node-ESM 副本无法解析 learning-api.ts 的无扩展名相对导入；等价且更新的 src/api/learning-api-contract.test.ts 已由 npm run test:real-backend-integration 通过 Vitest 执行。",
   },
   "h-remote-authority-contract.test.mjs": {
     how: "excluded",
