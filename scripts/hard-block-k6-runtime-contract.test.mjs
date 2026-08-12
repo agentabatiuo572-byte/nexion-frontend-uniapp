@@ -23,5 +23,7 @@ test("K6 success traverses every handoff phase with exact target evidence", () =
     assert.match(coordinator, new RegExp(field));
   }
   assert.match(coordinator, /if \(applied\.commandVersion !== command\.commandVersion[\s\S]*\) return;/);
-  assert.doesNotMatch(coordinator, /applied\.remoteUrlKey \|\| "none"/);
+  assert.doesNotMatch(coordinator,
+    /phase: "SUCCEEDED"[\s\S]{0,600}actualTargetId: applied\.remoteUrlKey \|\| "none"/,
+    "a verified handoff must not invent target evidence; the legacy non-handoff ACK may still encode RESET as none");
 });
