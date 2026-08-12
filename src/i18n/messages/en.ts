@@ -2039,6 +2039,16 @@ export const en = {
       "new-address-hold": "Newly added address is in a protection window",
       "first-withdrawal-review": "Safety check on your first withdrawal",
     },
+    // 终态原因(服务端 terminalReason)。码表与后台 D2 拒绝原因下拉同源;
+    // 页面只出话术不出码。语气按「钱出事了」的场合来:平实、说清、给下一步,不口语挑逗。
+    withdrawTerminalReasons: {
+      "risk-hit": "This withdrawal did not pass our security review.",
+      "address-risk": "The receiving address did not pass our security check.",
+      "data-mismatch": "Your account details did not match our records.",
+      "user-cancelled": "This withdrawal was cancelled at your request.",
+      other: "This withdrawal could not be completed.",
+    },
+    trackRetryBlocked: "This withdrawal cannot be resubmitted. Contact support to continue.",
     topUpTitle: "Top-up",
     chooseMethod: "Choose method",
     awaiting: "Awaiting confirmation",
@@ -2094,7 +2104,7 @@ export const en = {
     withdrawSubmittedOtherAccountTitle: "Withdrawal submitted",
     withdrawSubmittedOtherAccountBody: "You signed in to a different account while this was being sent. The withdrawal belongs to the previous account — sign back in to that account to follow it.",
 
-    trackFailedBody: "This withdrawal did not complete. Your funds have not left your account. Contact support for details.",
+    trackFailedBody: "This withdrawal did not complete. Contact support to check where your funds are.",
     trackEtaPending: "Expected within {n} hours",
     trackExpectedAt: "Server-estimated processing time: {time}",
 

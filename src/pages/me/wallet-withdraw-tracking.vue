@@ -73,8 +73,8 @@
             <view style="flex: 1">
               <text class="block" :style="etaTitleStyle">{{ etaTitle }}</text>
               <text class="block" :style="etaSubStyle">{{ etaSub }}</text>
-              <view v-if="heldReasonLines.length" style="margin-top: 6px">
-                <text v-for="line in heldReasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
+              <view v-if="reasonLines.length" style="margin-top: 6px">
+                <text v-for="line in reasonLines" :key="line" class="block" :style="reasonLineStyle">· {{ line }}</text>
               </view>
               <!-- 人工审核 / 冻结态给客服出口:告诉用户「不会自动放款」却不给人问,
                    等于把人钉在原地(业务链必须有下一步)。 -->
@@ -125,7 +125,7 @@ import { fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import type { WithdrawalStatus } from "@/store/types";
 import { navTo } from "@/lib/route";
-import { riskReasonLines } from "@/lib/risk-reason-text";
+import { riskReasonLines, terminalReasonLine } from "@/lib/risk-reason-text";
 import { dailyLimitStatus } from "@/store/withdrawal-eligibility";
 
 const STEP_DELAY_MS = 3500;
@@ -247,6 +247,20 @@ const dailyLimit = computed(() => {
     withdrawals: app.withdrawals,
   });
 });
+/**
+ * 服务端对**这一笔**的结论:它还能不能被重新发起。
+ *
+ * 🔴 **不拿它去置灰「再提一笔」**(2026-08-11 独立审计 P1,我上一版就是这么写的,错了):
+ * `retriable` 的作用域是**单据**,而「再提一笔」发起的是一笔**全新**提现 —— 作用域是账号。
+ * 拿单据级结论去禁账号级动作有两处错:① 禁用理由与被禁的动作不是同一件事;
+ * ② 失败单永久留在列表里、终态单又不再被回查,于是一张历史废单会把这个入口**永久**锁死,
+ * 哪怕换个地址换个金额本来完全提得出来。真正该拦的地方是提现页自己的闸(限额/风控/地址),
+ * 那里才拿得到账号级的当前结论。
+ * 这里只做一件事:**如实把服务端的结论说给用户**,不替它扩大适用范围。
+ * 缺省(服务端没给)不显示:没说过的话不替它说。
+ */
+const retryBlockedLine = computed(() =>
+  (isFailedEnd.value && wd.value?.retriable === false ? t.value.wallet.trackRetryBlocked : null));
 const againDisabled = computed(() => dailyLimit.value.reached);
 const againReasonText = computed(() => {
   const at = new Date(dailyLimit.value.resetAt);
@@ -263,6 +277,25 @@ const heldReasonLines = computed(() => {
   // 各页散抄 dict 会静默吞新增码(filter(Boolean) 无痕丢行)。
   return riskReasonLines(t.value, wd.value?.riskReasons);
 });
+/**
+ * 失败终态的原因行 —— 服务端 GET /api/withdrawals/:id 的 terminalReason 翻成业务话术。
+ * 在此之前失败单只有一句「审核未通过」,为什么被拒**页面上一个字都没有**,
+ * 用户与客服都只能猜。码不直出(工程枚举值禁上页面),翻译走 lib/risk-reason-text 单源。
+ */
+const failedReasonLine = computed(() =>
+  (isFailedEnd.value ? terminalReasonLine(t.value, wd.value?.terminalReason) : null));
+/**
+ * 两类原因合流到同一个渲染槽:一张 manual 路由的单被拒时,既有「当初为什么被拦下来」
+ * (riskReasons)也有「最后为什么没成」(terminalReason),两句都该给。
+ * 去重是因为 v-for 用文案本身作 key —— 两边恰好给出同一句时会撞 key。
+ */
+const reasonLines = computed(() => [...new Set([
+  ...heldReasonLines.value,
+  ...(failedReasonLine.value ? [failedReasonLine.value] : []),
+  // 「这笔不能再发起,请联系客服」和原因行同处一块 —— 那块下面就挂着客服入口
+  // (needsSupport 对失败终态恒真),叫用户联系客服的那句话与入口在同一屏,不是死胡同文案。
+  ...(retryBlockedLine.value ? [retryBlockedLine.value] : []),
+])]);
 // FEAT-WD02:fee 是结构化快照,展示只读 actualFeeUsd(旧单读盘时已归一,禁重算)。
 const viaLine = computed(() =>
   wd.value ? fmt(t.value.wallet.trackViaLine, { network: wd.value.network, fee: wd.value.fee.actualFeeUsd.toFixed(2) }) : "",

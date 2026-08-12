@@ -237,6 +237,23 @@ export type WithdrawalStatus =
   | "tx-failed"
   | "refunded";
 
+/**
+ * 提现终态原因码。**闭集与运营后台 D2「拒绝原因码」下拉同源**,不是本仓自造:
+ * `admin-ops/app/components/domain-views/d-tabs/d2-withdrawals.tsx` 的
+ * `options: ["RISK_HIT","ADDRESS_RISK","DATA_MISMATCH","USER_CANCELLED","OTHER"]`
+ * —— 运营在那个下拉里选什么,用户这边就该看到对应的业务话术。
+ * 逐值 parity 由 `scripts/withdraw-terminal-reason-parity.test.mjs` 焊死(两侧任一改动即红)。
+ *
+ * 🔴 线上名 ≠ 本地名:服务端发 SCREAMING_SNAKE,本地归一成 kebab-case
+ * (与 WithdrawalStatus 同套路,归一在 api/withdrawal-api.ts 的 canonicalTerminalReason)。
+ */
+export type WithdrawalTerminalReason =
+  | "risk-hit"
+  | "address-risk"
+  | "data-mismatch"
+  | "user-cancelled"
+  | "other";
+
 /** FEAT-WD02 提现费快照(server 形状,POST /api/withdrawals 请求/响应同构)。
  *  fee 从单数字换成结构化快照;penaltyUsd 仅历史单可能存在(旧双费模型),新单**不生成**。
  *  存量数字 fee 在 account-cloud 读盘升级时归一(actualFeeUsd = 旧数字,
@@ -276,6 +293,16 @@ export interface Withdrawal {
   estimatedCompletion: number;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
   confirmedAt?: number;
+  /** 终态原因(服务端 GET /api/withdrawals/:id 镜像回来,仅终态有值)。
+   *  🔴 必须随单落盘,不能只在内存:客服要查的正是这个,而用户刷新一次页面就该还在。
+   *  与 riskReasons / waivedGates 同源同去处(码不直出,渲染时经 lib/risk-reason-text 翻成话术)。 */
+  terminalReason?: WithdrawalTerminalReason;
+  /** 服务端判定「能否就这笔重新发起」。缺省 = 服务端没说,页面按不限制处理。 */
+  retriable?: boolean;
+  // 注:本包一度加过一个「最后镜像时刻」字段来给三路合并做仲裁,已按主人 2026-08-12
+  // 的范围决定撤回 —— 用设备墙钟做资金状态的裁决者需要可信时钟、跨端协调与字段级冲突
+  // 规则,属独立的仲裁重构,不该由一张契约卡附带(独立审计实测:未校验的时钟偏前一小时
+  // 即可把单据永久钉死)。同状态两份快照现按字段合并,见 account-cloud.mergeSameStatusWithdrawal。
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────
