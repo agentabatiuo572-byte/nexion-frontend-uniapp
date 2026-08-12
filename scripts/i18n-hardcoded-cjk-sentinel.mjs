@@ -218,7 +218,14 @@ function run() {
   if (violations.length) {
     console.error(
       `i18n-cjk FAIL:${violations.length} 处硬编码中文(注释之外),扫描 ${files.length} 个 .vue/.ts。\n` +
-        "文案必须进 src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读:\n" +
+        "撞到本门有**三条**出路,按「这句话是给谁看的」选,别一律往词典搬:\n" +
+        "  ① 真·用户文案 → src/i18n/messages/{en,zh,vi}.ts 三语同序,页面用 useT() 读;\n" +
+        "  ② 带 SANDBOX / source=mock / DEV 这类**工程话**的字符串 → 改成英文技术串,**不要进词典**。\n" +
+        "     verify.sh 那道 mock 门已经定过判据:工程话进词典就成了用户文案契约,而词典是普通对象、\n" +
+        "     打包摇不掉,会原样进生产包。给一个调试串做三语本地化是错的方向;本门只判中文,改英文即过。\n" +
+        "  ③ 压根不渲染给人看的**取值**(跟后端字节比对的码表等)→ 加 VALUE_EXEMPTIONS:\n" +
+        "     必须值级 + 带 files 作用域 + 写明理由,禁整文件放行(照抄 legacy-config-token 那条的形状)。\n" +
+        "违规明细:\n" +
         violations.map((v) => `  ${v.file}:${v.line}  ${v.text}`).join("\n")
     );
     return 1;
