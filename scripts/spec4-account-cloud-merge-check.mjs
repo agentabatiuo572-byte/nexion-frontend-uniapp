@@ -230,6 +230,75 @@ if (wd1?.status !== "processing") {
   throw new Error(`withdrawal status regressed: ${wd1?.status}`);
 }
 
+// 🔴 平局侧(2026-08-11 独立审计三条 P0 的入口 —— 本门此前只测了「赢的一侧」)。
+// 状态档位是「谁更新」的替身,而替身在两种真实情形下失灵,且两种都让单据永久卡住:
+//   ① frozen 与四个终态同档:「冻结 → D2 处置成退款/拒绝」这条**正常流程**的每一次
+//      都被丢弃 → 单据不在失败清单里、退款永不触发、单槽永久占用;
+//   ② 状态没动只改字段(终态原因 / 可重试):平局,整拍丢失,5s 轮询永不收敛。
+// 判据换成 mirroredAt(谁问服务端问得更晚)。下面两格分别钉住这两条边。
+const tieCase = (fromStatus, toStatus, extra = {}) => {
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-tie", fromStatus, 3000), mirroredAt: 100 }];
+  const disk = structuredClone(b); // latest = 磁盘上的旧行
+  const mem = structuredClone(b);  // next   = 内存里刚镜像回来的新结论
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: toStatus, mirroredAt: 200, ...extra };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-tie");
+};
+const frozenOut = tieCase("frozen", "refunded");
+if (frozenOut?.status !== "refunded") {
+  throw new Error(`同档位互转被丢弃(frozen→refunded 得到 ${frozenOut?.status})—— 冻结单的每一条出边都走不通`);
+}
+const reasonOnly = tieCase("frozen", "frozen", { terminalReason: "address-risk", retriable: false });
+if (reasonOnly?.terminalReason !== "address-risk" || reasonOnly?.retriable !== false) {
+  throw new Error(`同状态改字段被丢弃(得到 ${JSON.stringify({ r: reasonOnly?.terminalReason, t: reasonOnly?.retriable })})`);
+}
+// 🔴 档位**不等**的两个方向(R2 审计:上一版四格全落在平局侧,`c > a` 与 `c < a`
+// 两条分支一次都没被执行过,而门的失败文案却写着「冻结单的每一条出边」——误报安全)。
+// 降档方向:frozen(档 6) → 主链 processing/sent/confirmed(档 3/4/5)。这是后台核查通过、
+// 把冻结单**放行回主链**的正常流程;判据若还看档位,这三条边永远走不通(坏结局反而走得通)。
+for (const to of ["processing", "sent", "confirmed"]) {
+  const got = tieCase("frozen", to);
+  if (got?.status !== to) {
+    throw new Error(`降档方向被丢弃(frozen→${to} 得到 ${got?.status})—— 放行回主链这条边走不通`);
+  }
+}
+// 升档方向 + 陈旧内存:磁盘上更新的 confirmed 不许被一份陈旧的高档内存行顶回去。
+for (const staleStatus of ["frozen", "tx-failed"]) {
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-up", "confirmed", 3300), mirroredAt: 200 }];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: staleStatus, mirroredAt: 100 };
+  const got = mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-up");
+  if (got?.status !== "confirmed") {
+    throw new Error(`陈旧高档内存行顶掉了磁盘上更新的 confirmed(得到 ${got?.status})—— 已到账的单被退回在途`);
+  }
+}
+// 反向:更旧的镜像**不许**顶掉更新的(否则平局判据就成了 last-write-wins)。
+const staleMirror = (() => {
+  const b = structuredClone(base);
+  b.withdrawals = [{ ...mkWd("wd-stale", "frozen", 3100), mirroredAt: 300 }];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "refunded", mirroredAt: 100 };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-stale");
+})();
+if (staleMirror?.status !== "frozen") {
+  throw new Error(`更旧的镜像顶掉了更新的(得到 ${staleMirror?.status})—— 平局判据退化成 last-write-wins`);
+}
+// 存量单(两边都没有该时刻)仍按原行为:平局留磁盘值,不造回归。
+const legacyTie = (() => {
+  const b = structuredClone(base);
+  b.withdrawals = [mkWd("wd-legacy", "frozen", 3200)];
+  const disk = structuredClone(b);
+  const mem = structuredClone(b);
+  mem.withdrawals[0] = { ...mem.withdrawals[0], status: "refunded" };
+  return mergeAccountSnapshots(b, mem, disk).withdrawals.find((w) => w.id === "wd-legacy");
+})();
+if (legacyTie?.status !== "frozen") {
+  throw new Error(`存量单(无 mirroredAt)平局行为变了(得到 ${legacyTie?.status})—— 引入新判据不该改老数据的结论`);
+}
+
 // 🔴 列表化才有的不变量:两端**各自新建**的单都必须保留。
 // 单条版这里会互相顶掉 —— 钱已扣、单据不可达、到账推进永不再碰它(2026-07-31 audit P0)。
 const wdBothBase = structuredClone(base);

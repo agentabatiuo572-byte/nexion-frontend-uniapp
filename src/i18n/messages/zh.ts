@@ -1966,6 +1966,16 @@ export const zh: Messages = {
       "new-address-hold": "新绑定地址处于保护期",
       "first-withdrawal-review": "首笔提现安全确认",
     },
+    // 终态原因(服务端 terminalReason)。码表与后台 D2 拒绝原因下拉同源;
+    // 页面只出话术不出码。语气按「钱出事了」的场合来:平实、说清、给下一步,不口语挑逗。
+    withdrawTerminalReasons: {
+      "risk-hit": "这笔提现没有通过安全审核。",
+      "address-risk": "收款地址没有通过安全校验。",
+      "data-mismatch": "账户资料与平台记录不一致。",
+      "user-cancelled": "这笔提现已按你的申请取消。",
+      other: "这笔提现没有完成。",
+    },
+    trackRetryBlocked: "这笔提现不能再次发起,请联系客服处理。",
     topUpTitle: "充值",
     chooseMethod: "选择充值方式",
     awaiting: "等待链上确认",

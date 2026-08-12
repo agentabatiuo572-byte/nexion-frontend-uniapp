@@ -383,6 +383,8 @@ export const useApp = defineStore("app", () => {
       : null,
   );
   let lastCloudSnapshot: AccountCloudSnapshot = bootSnapshot;
+  /** 提现回读的在途闸:两拍叠加时,迟到的旧结论会带着更大的 mirroredAt 赢下合并裁决。 */
+  let mirrorInFlight = false;
   // cfg 声明已随「在线设备锚配置化」上移到 global 初始化之前(同一个实例,别再声明第二个)
   const computeShareEnabled = computed(() => cfg.isEnabled("computeShareEnabled"));
   const slotDevices = computed(() =>
@@ -1350,6 +1352,10 @@ export const useApp = defineStore("app", () => {
     // 后续轮询就恒返回 false 永不重试(只有整页重载才自愈)。失败即回滚内存,下个 tick 再试。
     if (!persistAccountSnapshot()) {
       withdrawals.value = prev;
+      // 🔴🔴 与 refreshRemoteWithdrawals / submitWithdrawal 同形:基准一起还原。
+      // 写失败时 persistAccountSnapshot 内部已把 lastCloudSnapshot 换成磁盘旧行,
+      // 只还原内存 = 下一次资金写失败回滚时按被污染的基准把单据抹掉(硬规则:修一处补全同形)。
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: withdrawals.value };
       return [];
     }
     return advancedIds;
@@ -1368,22 +1374,61 @@ export const useApp = defineStore("app", () => {
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
     if (!remoteApiEnabled) return [];
+    // 🔴 在途守卫(2026-08-11 R2 审计):5s 轮询与 onShow 都 fire-and-forget 调本函数,
+    // 而单次请求可以跑到 12s(api-client 默认 timeout)。没有这道闸时两拍会真叠加,
+    // 后发的先回、先发的后回,而 mirroredAt 记的是**收到响应的时刻** ——
+    // 迟到的旧结论会带着更大的时间戳赢下合并裁决,把已到账的单退回冻结。
+    // 闸放在这里(而不是给 mirroredAt 找一个服务端时刻)是因为服务端契约里没有那个字段;
+    // 已写进后端交接书:若能下发服务端结论时刻,这里应改用它。
+    if (mirrorInFlight) return [];
+    mirrorInFlight = true;
+    try {
+      return await runRemoteWithdrawalMirror();
+    } finally {
+      mirrorInFlight = false;
+    }
+  }
+
+  async function runRemoteWithdrawalMirror(): Promise<string[]> {
     const targets = inFlightWithdrawals.value;
     if (!targets.length) return [];
     const mirrors = await Promise.all(targets.map((w) =>
       withdrawalApi.get(w.id).catch(() => null)));
     const patches = new Map<string, Withdrawal>();
-    targets.forEach((w, i) => {
+    targets.forEach((target, i) => {
       const remote = mirrors[i];
-      if (!remote || remote.status === w.status) return;
+      if (!remote) return;
+      // 🔴 基底取 **await 之后的当前行**,不是发请求那一刻捕获的那份(R2 审计):
+      // `...w` 展开陈旧整行会把这段时间里别处(另一个 tab 合并回来、或上一拍)写入的
+      // confirmedAt / terminalReason / retriable 一并抹掉,而且抹掉的那一版还带着更大的
+      // mirroredAt,连磁盘一起覆盖。单据一进终态就不再被回查 —— 抹掉即永久。
+      const w = withdrawals.value.find((row) => row.id === target.id);
+      if (!w) return; // 这段时间里单据没了(换账号 / 被合并掉)——本拍的结论不再适用
+      // 🔴 判「变没变」要把**三个字段**都算上,不能只看 status:状态没动、只有终态原因
+      // 或可重试判定变了的那一拍,只比 status 会被整个丢掉。
+      // 这样写是为了**不依赖一个没写进契约的服务端假设**(「原因一定和终态状态同一个响应发」)。
+      // ⚠️ 但它救不了终态:单据一进终态就离开 inFlightWithdrawals,之后根本不会再被回查 ——
+      // 服务端晚发的原因确实补不回来。那一半的责任在服务端,已写进后端交接书 U-9 让后端同发。
+      // 本判据实际覆盖的是仍在途的单(如 frozen 被人工改写结论)。
+      const reasonChanged = remote.terminalReason !== null && remote.terminalReason !== w.terminalReason;
+      const retriableChanged = remote.retriable !== null && remote.retriable !== w.retriable;
+      if (remote.status === w.status && !reasonChanged && !retriableChanged) return;
       patches.set(w.id, {
         ...w,
         status: remote.status,
+        // 🔴 盖上「这份结论是什么时候从服务端问来的」。没有它,三路合并在平局时只能留磁盘旧行,
+        // 上面那套判据就全是空转(独立审计实测:同状态改原因 100% 丢失)。
+        // 用本机时钟即可:它只在**本机自己的两份快照之间**比大小,不与服务端时间对齐。
+        mirroredAt: Date.now(),
         // 服务端没给到账时刻就不编一个:仍按「到点即已到」记 estimatedCompletion,
         // 与 mock 推进同口径(见 advanceArrival 的 confirmedAt 注释)。
         ...(remote.status === "confirmed"
           ? { confirmedAt: remote.confirmedAt ?? w.estimatedCompletion }
           : {}),
+        // 🔴 `null`(没给)与 `false`/具体码是两回事:没给就**保留已存的旧值**,不覆盖成空。
+        // 覆盖的话,一次「服务端这拍没带原因」就把客服唯一能查的那条线索抹了。
+        ...(remote.terminalReason !== null ? { terminalReason: remote.terminalReason } : {}),
+        ...(remote.retriable !== null ? { retriable: remote.retriable } : {}),
       });
     });
     if (!patches.size) return [];
@@ -1392,6 +1437,12 @@ export const useApp = defineStore("app", () => {
     // 落盘失败即回滚内存 —— 与 advanceWithdrawalArrival 同一套「诚实返回落盘结果」。
     if (!persistAccountSnapshot()) {
       withdrawals.value = prev;
+      // 🔴🔴 基准也要一起还原(R2 审计;submitWithdrawal 早就为**同一个坑**补过这一行)。
+      // persistAccountSnapshot 无条件 adoptAccountSnapshot(result.snapshot),而写失败时
+      // 那份 snapshot 是**磁盘旧行** —— 于是 lastCloudSnapshot 已被改写。只还原
+      // withdrawals.value 的话,下一次任意资金原语写失败时会 adopt 这份被污染的基准,
+      // 把单据从内存里抹掉:追踪页「查无此单」,而服务端已经扣款持单。
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: withdrawals.value };
       return [];
     }
     return [...patches.keys()];
