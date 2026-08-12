@@ -276,6 +276,16 @@ export interface Withdrawal {
   estimatedCompletion: number;
   /** FEAT-WD01b:实际到账时刻(仅 confirmed 态有值)。推进逻辑见 withdrawal-arrival-core。 */
   confirmedAt?: number;
+  /** 🔴 FEAT-WD01d:服务端**已经退还**的已烧 NEX 枚数(见 FEAT-WD01 §4.6)。
+   *
+   *  语义是**既成事实**不是打算退:服务端只在给用户加完 NEX 的同一事务里写它。
+   *  客户端拿它当「退款真的发生过」的唯一证据,据此补冲正分录 —— 绝不由「单据是失败终态」
+   *  倒推(z4 R2 那么改过,R3 独立审计判定为「账本单方面宣布一笔没有证据的退款」并回滚)。
+   *
+   *  缺失 / 0 = **没退**(不是「不知道」)。值域 `0 < nexRefunded ≤ fee.nexBurned`,
+   *  越界一律不认(退得比烧的多 = 账本凭空造 NEX);判定收在 withdrawal-bill-drafts 一处。
+   *  顶层字段而不是塞进 `fee`:`fee` 是**报价快照**且请求/响应同构,退款是事后事件,不属于报价。 */
+  nexRefunded?: number;
 }
 
 // ── 入金(PAY-越南支付架构规格 v1.0 [FEAT-PAY01]③④ / [FEAT-PAY02]③)──────

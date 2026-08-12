@@ -16,6 +16,8 @@ export interface WithdrawalSubmission {
   penaltyFee: number;
   grossFee: number;
   nexBurned: number;
+  /** FEAT-WD01 §4.6:服务端已退还的已烧 NEX(既成事实)。后端未上该字段时解析为 0。 */
+  nexRefunded: number;
   feeWaived: number;
   actualFee: number;
   netReceive: number;
@@ -84,6 +86,25 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const penaltyFee = number(row?.penaltyFee);
   const grossFee = number(row?.grossFee);
   const nexBurned = number(row?.nexBurned);
+  // 🔴 FEAT-WD01 §4.6 已退还 NEX ——「宽松解析」是刻意的,理由与 §4.5 第二批字段同一条:
+  // 严格必填 = 后端还没上这个字段就整单被拒,**而钱已经扣了**(异常6,本规格最贵的失败模式)。
+  // 坏值一律读作 0 = 没退,这是安全侧:漏记一条冲正可自愈(下次取到就补),凭空写一条是造假。
+  //
+  // 🔴 **不能复用共用的 `number()`**(2026-08-11 独立审计实测):它内部是 `Number(value)`,于是
+  // `true → 1`、`"3" → 3`、`[3] → 3`、`2.5 → 2.5` 全部通过。后端若发规格 §4.6③ 明确否掉的
+  // boolean 形状,客户端会读成 **1**,在烧 3 退 3 的单上落一条「退回 1 NEX」——
+  // 账本上那个数指不到任何源,而钱包实收 3。宽松解析赖以成立的「坏值 = 安全侧」前提当场被破。
+  // 上一版注释写的正是「非数字一律读作 0」,与实际行为相反(本仓第四次栽在
+  // 「注释声称了没验证过的行为」上,这次栽在我自己手上)。
+  //
+  // 故这里**只认真正的 JSON number**,并按 §4.6② 的值域收口:非有限数 / 负数 / 非整数一律 0。
+  // 整数在解析层判(而不是留给消费方):它是**契约值域**,越界即协议不合,与「≤ nexBurned」
+  // 那条**跨字段**不变量不同 —— 后者依赖 fee 且存量单走不同来路,仍收在消费点一处。
+  const rawNexRefunded = row?.nexRefunded;
+  const nexRefunded = typeof rawNexRefunded === "number"
+      && Number.isFinite(rawNexRefunded) && Number.isInteger(rawNexRefunded) && rawNexRefunded >= 0
+    ? rawNexRefunded
+    : 0;
   const feeWaived = number(row?.feeWaived);
   const actualFee = number(row?.actualFee);
   const netReceive = number(row?.netReceive);
@@ -120,6 +141,7 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     penaltyFee,
     grossFee,
     nexBurned,
+    nexRefunded,
     feeWaived,
     actualFee,
     netReceive,
@@ -274,6 +296,20 @@ export function toCanonicalWithdrawal(
     riskReasons: [],
     submittedAt,
     estimatedCompletion,
+    // 🔴 顶层带出,不进 `fee`(fee 是报价快照,请求/响应同构;退款是事后事件)。
+    // 提交回执上它**几乎恒为 0** —— 提交那一刻就被拒的单按规格是「零副作用、不烧 NEX」,
+    // 没 NEX 可退。真正会带非 0 值的是**状态回查**端点。
+    //
+    // 🔴 **别指望那条端点会自动带上这个字段**(2026-08-11 独立审计当场证伪了我上一版的断言)。
+    // 上一版这里写的是「那条端点复用本函数,字段自然跟着走,届时无需再改这里」——
+    // 而回查端点已经在并行包 z7 里写完了:它有**自己的**响应类型与解析器
+    // (`WithdrawalStatusSnapshot` / `parseStatusSnapshot`),只回 withdrawalNo/status/
+    // confirmedAt/terminalReason/retriable 五个字段,**不经过本函数**,也就不带 `nexRefunded`。
+    // 两包各自合入主线后,这条冲正照样一次都不会触发 —— 与本包声称修好的缺陷完全同形。
+    // 我把「另一层会配合」当成了事实写进注释,这正是本包审计出的根因。
+    // 现状与需要谁做什么,见 HANDOFF U-9;跨包判据由 `selfcheck-withdraw-nex-refund.mjs`
+    // 的「回查响应字段 ⊇ 冲正判据字段」一格盯着。
+    nexRefunded: submission.nexRefunded,
   };
 }
 

@@ -323,6 +323,12 @@ function mergeDevicesByDiff(base: Device[], next: Device[], latest: Device[]): D
  * 状态用 rank 单调而不是 last-write —— 跨渲染进程「读最新」可能读到旧值,
  * last-write 会把已到账的单退回处理中。
  */
+/** 合并用的安全取值:存量单 / 脏盘上它可能是 undefined 或任何东西,非法一律当 0(= 没退)。 */
+function numericRefunded(w: Withdrawal): number {
+  const v = (w as { nexRefunded?: unknown }).nexRefunded;
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+}
+
 function mergeWithdrawals(
   base: Withdrawal[],
   next: Withdrawal[],
@@ -337,7 +343,21 @@ function mergeWithdrawals(
     }
     const a = WITHDRAWAL_STATUS_RANK[prev.status] ?? 0;
     const c = WITHDRAWAL_STATUS_RANK[w.status] ?? 0;
-    byId.set(w.id, c > a ? w : prev);
+    const winner = c > a ? w : prev;
+    // 🔴 `nexRefunded` 单独按**取大**合并,不随整对象一起被淘汰(2026-08-11 独立审计实测)。
+    //
+    // 本函数是**整对象**按状态 rank 取胜,平局(`c > a` 为假)保留先入的那份。而四个失败终态
+    // rank 相同 —— 于是「同一张单、状态没变、只是服务端补了退款事实」这种更新会被整份丢弃:
+    // 实测 `tx-failed→tx-failed`、`tx-failed→refunded`、重复投递三种情形,合并后 nexRefunded 全变 0。
+    // 而冲正分录的**唯一**判据就是这个字段(withdrawal-bill-drafts),丢了就等于退款从没发生过 ——
+    // 与本包要修的缺陷同形:证据在半路被吃掉,而所有静态门全绿。
+    //
+    // 取大而不是「取胜者的值」:退款是**既成事实且单调不减**(规格 §4.6②),
+    // 0 → 3 是新证据,3 → 0 只可能是某一端还没看到,不该让它把已知事实抹回去。
+    const refunded = Math.max(numericRefunded(prev), numericRefunded(w));
+    byId.set(w.id, refunded > 0 && numericRefunded(winner) !== refunded
+      ? { ...winner, nexRefunded: refunded }
+      : winner);
   }
   // base 里有、两边都没有的 = 被某一端显式删除;当前无删除路径,留此语义防将来复活死单
   const deleted = new Set(base.filter((w) => !byId.has(w.id)).map((w) => w.id));
