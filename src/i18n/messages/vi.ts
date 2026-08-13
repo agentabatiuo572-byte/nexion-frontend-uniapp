@@ -2070,7 +2070,7 @@ export const vi: Messages = {
     trackEtaDone: "Tiền đã chuyển tới địa chỉ của bạn",
 
     withdrawBillWriteFailed: "Đã gửi lệnh rút, nhưng không lưu được dòng sao kê. Bạn vẫn có thể theo dõi ở trang trạng thái rút tiền.",
-    withdrawDebitFailed: "Đã gửi lệnh rút. Số dư hiển thị trên thiết bị này tạm thời cao hơn thực tế vì vẫn bao gồm khoản vừa rút, và sẽ tự điều chỉnh sau giây lát. Hãy căn cứ trang trạng thái rút tiền, và đừng tạo lệnh rút mới dựa trên số dư đang hiển thị cho tới khi nó được điều chỉnh.",
+    withdrawDebitFailed: "Đã gửi lệnh rút. Số dư hiển thị trên thiết bị này đang cao hơn thực tế vì vẫn bao gồm khoản vừa rút, và mở lại ứng dụng cũng không tự sửa. Hãy căn cứ trang trạng thái rút tiền, và đừng tạo lệnh rút mới dựa trên số dư đang hiển thị.",
     withdrawSubmittedOtherAccountTitle: "Đã gửi lệnh rút",
     withdrawSubmittedOtherAccountBody: "Bạn đã đăng nhập tài khoản khác trong lúc gửi. Lệnh rút này thuộc tài khoản trước — đăng nhập lại tài khoản đó để theo dõi.",
 
