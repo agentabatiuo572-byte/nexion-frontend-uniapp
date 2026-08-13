@@ -953,7 +953,7 @@ onLaunch(() => {
     // unauthenticated launch must not turn its expected 401 into a fake catalog
     // failure before the user has even signed in.
     prepareProductCatalog();
-    void useApp().refreshRemoteFleet().catch(() => undefined);
+    void useApp().refreshRemoteFleet();
   }
   // NexGrid defaults dark, but the persisted user choice drives H5 after launch.
   // `resolved` collapses the light/dark/system choice to the concrete theme
@@ -983,7 +983,7 @@ onShow(() => {
   // 未登录/流程页上它短路在任何业务写入之前,常开无副作用。
   // 这里是守卫**唯一**的起点(停点唯一在 onHide),与 stopBusinessLoops 上方的不变量成对。
   startQuestWatch();
-  if (remoteApiEnabled) void useApp().refreshRemoteFleet().catch(() => undefined);
+  if (remoteApiEnabled) void useApp().refreshRemoteFleet();
   if (!ensureBusinessLoopsRunning()) return; // no business writes on auth/session flow pages
   void refreshEarningsReleaseStatus().catch(() => undefined);
 });

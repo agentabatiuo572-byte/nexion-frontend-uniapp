@@ -182,11 +182,7 @@ export const useDeposits = defineStore("deposits", () => {
       intents.value = [];
       serverStatus.value = fundsSandboxEnabled ? "idle" : "error";
       serverError.value = fundsSandboxEnabled ? "" : "FUNDS_DEPOSIT_PROVIDER_NOT_CONFIGURED";
-      if (fundsSandboxEnabled) void refreshFundsSandboxDeposits().catch((cause) => {
-        if (expectedAccountKey === serverAccountKey && !serverError.value) {
-          serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
-        }
-      });
+      if (fundsSandboxEnabled) void refreshFundsSandboxDeposits(); // 自吞降级;serverError 由缝内落好
       return;
     }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
@@ -892,7 +888,7 @@ export const useDeposits = defineStore("deposits", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
       }
-      throw cause;
+      // 权威不可达是常态输入,不 reject(resilience 门);serverError/serverStatus 即降级态。
     }
   }
 

@@ -115,7 +115,17 @@ async function loadEntry(contents) {
   const out = await build({
     stdin: { contents, resolveDir: root, loader: "ts" },
     bundle: true, write: false, format: "esm", platform: "neutral",
-    define: { "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"' },
+    // 🔴 z6:runtime-config.ts 在**模块加载期**读 import.meta.env.VITE_*(free-trial 的模块图
+    //    把它拉进来,实测载入即 TypeError)—— 那是 harness 缺陷不是缝缺陷:真栈里 Vite 会
+    //    define 全部 env 键。三个已知键给靶态值;再兜一个 "import.meta.env": "{}"
+    //    (esbuild 最长匹配优先),未来新增的 env 键读到 undefined 而不是崩。
+    define: {
+      "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"',
+      "import.meta.env.VITE_NEXGRID_API_MODE": '"remote"',
+      "import.meta.env.VITE_NEXGRID_API_BASE_URL": '"http://unreachable.invalid"',
+      "import.meta.env.VITE_NEXGRID_API_DEV_BASE_URL": '""',
+      "import.meta.env": "{}",
+    },
     plugins: [{
       name: "stubs",
       setup(b) {
@@ -177,7 +187,16 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
   exercised + notExercised.length === uniq.length);
 // 🔴 基数台账(z1 R2 对抗审计 P1-25):`>= N` 下限守不住删除向 —— 从 16 退化到 3 也判绿。
 // 缝数变化必须有人来改这个数,顺带逼他确认新增/删除的那条缝该不该有门。
-const EXPECTED_SEAMS = 16;
+// 2026-08-13 z6:16 → 27。新增 11 条系 z1 R2 扫描面三族扩收(带参 void / 成员调用 /
+// 箭头函数)后进来的**既有缝**;27 条逐一回源确认(app×2 / bills / cards / commission /
+// conversations / daily-powerup / deposits / earn-config / event-quest×3 / free-trial /
+// genesis / nex-faucet / notifications / payout-address / quest / referral-reward /
+// repurchase / risk-disclosure / staking / tickets / v-rank / voucher×2 / weekly-quest),
+// 全部是「remote 开 + void 触发」的远端读缝,不变量适用全体,无一例外。
+// ⚠️ 已知扫描盲区:**.vue 文件里的 void 裸发**不在扫描面(声明与调用跨文件,本门的
+// 同文件定位逻辑天然测不到)。z6 实锤 1 例:orders#refreshRemote 被 checkout 裸 void
+// (已在调用点补 .catch;orders 契约保持 reject,因其 await 消费方靠 reject 中断验证链)。
+const EXPECTED_SEAMS = 27;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来

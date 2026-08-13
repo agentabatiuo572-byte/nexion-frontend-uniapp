@@ -619,7 +619,7 @@ function goManage() {
 const nowTick = ref(mockServerNow());
 let freezeTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+  if (remoteApiEnabled) void payout.refreshRemote();
   void loadWithdrawalPolicy();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
