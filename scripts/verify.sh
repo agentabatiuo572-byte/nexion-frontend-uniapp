@@ -1522,7 +1522,6 @@ sentinel_present "P2-8 account-scope helper rebinds goals" src/lib/account-scope
 sentinel_present "P2-8 account-scope helper rebinds lucky-spin" src/lib/account-scope.ts 'useLuckySpin\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds daily-powerup" src/lib/account-scope.ts 'useDailyPowerUp\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeAccountRow'
-sentinel_present "P2-8 weekly-quest store is account-scoped" src/store/weekly-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
@@ -1534,19 +1533,30 @@ sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-po
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-scope.ts 'useTickets\(\)\.bindAccount\(accountKey\)'
+# 🔴 2026-08-13 三条钉函数名的哨兵已退役,换成 account-scope-gate.mjs:
+#   它们钉的是 `writeAccountRow` / `useConversations().reset()` 这类**具体写法**,
+#   而实现换了更严的机制之后全红 —— tickets 改按「账号+运行会话」双维拼键、
+#   weekly-quest 改服务端权威+版次围栏(本地不落盘)、conversations 从 reset 改 bindAccount。
+#   新门改钉**不变量本身**:收口面从 account-scope.ts 的真实调用派生(不手写清单),
+#   三个 store 必须在收口面里(bindAccount / reset 都算),收口面塌空即判红。
+#   红测:摘掉 tickets → 红;把 bindAccount 全改名(收口面塌空)→ 红。
+if "$NODE_BIN" scripts/account-scope-gate.mjs > /tmp/uniapp-account-scope.log 2>&1; then
+  ok "账号隔离门 — $(tail -1 /tmp/uniapp-account-scope.log)"
+else
+  bad "账号隔离门失败 — node scripts/account-scope-gate.mjs 看明细"
+  grep -E "^  FAIL|^FAIL" /tmp/uniapp-account-scope.log | head -6
+fi
 sentinel_present "P2-8 account-scope helper rebinds cart" src/lib/account-scope.ts 'useCart\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds profile" src/lib/account-scope.ts 'useProfile\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds security" src/lib/account-scope.ts 'useSecurity\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds rewards-seen" src/lib/account-scope.ts 'useRewardsSeen\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 notifications store is account-scoped" src/store/notifications.ts 'writeAccountRow'
 sentinel_present "P2-8 receipts store is account-scoped" src/store/receipts.ts 'writeAccountRow'
-sentinel_present "P2-8 tickets store is account-scoped" src/store/tickets.ts 'writeAccountRow'
 sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAccountRow'
 sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
 sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
 sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
 # P2-8 batch-5 会话记录:会话中心/Nova 非持久,换号收口点必须 reset 重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
-sentinel_present "P2-8 account-scope helper resets conversations" src/lib/account-scope.ts 'useConversations\(\)\.reset\(\)'
 sentinel_present "P2-8 account-scope helper resets nova" src/lib/account-scope.ts 'useNova\(\)\.reset\(\)'
 # 客服会话闲置策略双端 parity(本仓侧 tripwire;admin 侧 canon-sentinel 逐键比 canon-numbers.json):
 # 改这两个默认值必须三处同步(uniapp 常量 + admin m-tabs/data.ts + canon json),单独改本仓即红。
