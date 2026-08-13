@@ -174,11 +174,12 @@ test("an empty human conversation lane gives the user an authoritative start pat
 });
 
 test("ticket list and detail render refreshed server metadata through the active locale", async () => {
-  const [row, page, en, zh] = await Promise.all([
+  const [row, page, en, zh, vi] = await Promise.all([
     read("src/components/me/ticket-row.vue"),
     read("src/pages/me/support-tickets.vue"),
     read("src/i18n/messages/en.ts"),
     read("src/i18n/messages/zh.ts"),
+    read("src/i18n/messages/vi.ts"),
   ]);
   assert.match(row, /t\.value\.tickets\.status\[props\.tk\.status\]/);
   assert.match(row, /t\.value\.tickets\.category\[props\.tk\.category\]/);
@@ -198,6 +199,13 @@ test("ticket list and detail render refreshed server metadata through the active
   assert.match(zh, /status:[\s\S]*open:\s*"进行中"/);
   assert.match(zh, /category:[\s\S]*other:\s*"其他"/);
   assert.match(zh, /messagesCount:\s*"\{n\} 条消息"/);
+  // 🔴 语言面三语齐点(门的门 ① 判据):只点两种时,第三种可以随意漂移而本门全绿。
+  // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
+  // 英/中钉原文,越南文钉**键存在 + 占位符在位**(占位符丢了才是真会坏页面的那一种)。
+  for (const key of ["messagesCount", "unassignedAgent", "timeJustNow"]) {
+    assert.match(vi, new RegExp(`${key}:`), `vi.ts 缺 ${key}`);
+  }
+  assert.match(vi, /messagesCount:\s*"[^"]*\{n\}[^"]*"/, "vi.ts 的 messagesCount 丢了 {n} 占位符");
   assert.match(zh, /timeJustNow:\s*"刚刚"/);
 });
 

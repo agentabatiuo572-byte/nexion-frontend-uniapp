@@ -70,6 +70,19 @@ try {
   // 🔴 从 i18n 源文件里抠出两个确认按钮文案(不写死字面串:文案一改门就该跟着走,
 // 而不是恒判 no-confirm-dialog)。抠不到即抛 —— 判据失效必须判红,不许静默放行。
 const enSrc = readFileSync(new URL("../src/i18n/messages/en.ts", import.meta.url), "utf8");
+const zhSrc = readFileSync(new URL("../src/i18n/messages/zh.ts", import.meta.url), "utf8");
+const viSrc = readFileSync(new URL("../src/i18n/messages/vi.ts", import.meta.url), "utf8");
+// 🔴 语言面三语齐点(门的门 ① 判据)。本门驱动的浏览器跑在**英文档**,所以只有英文的
+// 按钮文案参与匹配 —— 但「只点一种语言」的真实风险在这儿是具体的:
+// 中文 / 越南文若缺了这两个键,本门照样全绿,而那两种语言的用户会看到一个**空按钮**、
+// 点不动重发,而这正是提现收口的唯一出口。故三语都断言键存在,英文另取值用于匹配。
+for (const [loc, src] of [["en", enSrc], ["zh", zhSrc], ["vi", viSrc]]) {
+  for (const key of ["withdrawConfirmCta", "withdrawResendCta"]) {
+    if (!new RegExp(key + ': *"[^"]+"').test(src)) {
+      throw new Error(`${loc}.ts 的 ${key} 缺失或为空 —— 该语言下确认框会出现空按钮,判据失效,判红`);
+    }
+  }
+}
 const ctaOf = (key) => (enSrc.match(new RegExp(key + ': *"([^"]+)"')) || [])[1];
 const I18N_CONFIRM_CTA = ctaOf("withdrawConfirmCta");
 const I18N_RESEND_CTA = ctaOf("withdrawResendCta");

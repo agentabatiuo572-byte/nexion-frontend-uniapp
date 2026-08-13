@@ -202,9 +202,13 @@ function reconcileBills() {
   //     🔴 **不排除失败终态**,靠顺序闭合:本格在 ② 退款腿之前,失败单补扣 −N 之后,
   //     退款腿当拍就看到 `wd-debit:` 键并退回 +N —— 净额为 0,不留跨拍中间态。
   //     要排除失败终态就得在这里抄第五份终态字面量清单(全仓已有 4 份),那是更差的交易。
+  //     🔴 try 必须**连粗筛一起**包住(墨菲前置抓到):只包扣款调用的话,粗筛自己抛异常
+  //     (脏 user 态)就会冲出循环打停 ①②③ —— 与本段注释承诺的爆炸半径不符。⓪ 的 try 同样在循环内。
   for (const wd of app.withdrawals) {
-    if (app.withdrawalDebitApplied(wd.id)) continue;
-    try { app.applyWithdrawalDebit(wd); } catch { /* 同 ⓪:一条脏单不拖垮整个对账循环 */ }
+    try {
+      if (app.withdrawalDebitApplied(wd.id)) continue;
+      app.applyWithdrawalDebit(wd);
+    } catch { /* 同 ⓪:一条脏单不拖垮整个对账循环 */ }
   }
   // ① 已到账 → 账单入账
   for (const wd of app.withdrawals) {
