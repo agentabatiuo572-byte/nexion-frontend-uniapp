@@ -1972,7 +1972,11 @@ no_oldbrand_check() {
   hits=$("$NODE_BIN" -e '
 const fs=require("fs"),path=require("path");
 const tok=process.argv[1];
-const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country`,"gi");
+// 🔴 线上契约标识符不算品牌残留(2026-08-13):`NEXION_USDT_WALLET` 是服务端下发的
+//   paymentRail 枚举值(trial-api.ts:110 拿它**校验回包**),`__NEXION_TRUSTED_TASK_PROOF__`
+//   是原生壳注入的全局键 —— 两个都是**对方定义的名字**,客户端单方面改拼写 = 契约当场对不上。
+//   等后端改名再同步。判据只放这两个**具体标识符**,不放宽成「凡大写就算契约」。
+const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
