@@ -1094,8 +1094,26 @@ spec2_guard_semantics() {
     if(!/addDevice\("pc-gpu", \{ gpuModel: normalizedModel, gpuTier \}\)/.test(app)) throw new Error("pc-gpu creation does not pass matched tier");
     if(!/device\.kind === "pc-gpu" && !computeShareEnabled\.value/.test(app)) throw new Error("pc-gpu activation is not feature-gated");
     if(!/const IS_PRODUCTION = import\.meta\.env\.PROD/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("dev config mutation lacks production guard constant");
-    if(!/function _devSetFlag[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetFlag is not production guarded");
-    if(!/function _devSetComputeShareContent[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetComputeShareContent is not production guarded");
+    // 🔴 2026-08-13 重锚:原判据钉的是字面写法 `if (IS_PRODUCTION) return`,而实现已加严成
+    //   `if (remoteApiEnabled || IS_PRODUCTION) return`(多拦一层远端档)—— 判据过期,不是回归。
+    //   改成**派生**:枚举 config.ts 里所有 `_dev*` 开发后门,逐个要求其函数体开头有
+    //   IS_PRODUCTION 早退。写法随便,但一个都不许漏 —— 新增一个没守的后门会自动判红,
+    //   而写死函数名的旧判据对「新增的后门」是瞎的。
+    const cfg = fs.readFileSync("src/store/config.ts","utf8");
+    const devFns = [...cfg.matchAll(/function (_dev[A-Za-z0-9_]*)\s*\(/g)].map((m)=>m[1]);
+    if(devFns.length < 3) throw new Error("config.ts 里只找到 "+devFns.length+" 个 _dev* 后门,不像完整实现 —— 判据失效");
+    // 🔴 函数体按**大括号配平**抠,不用 indexOf("\n}") —— 这些函数嵌套在 store 里,
+    //   结尾是缩进的 `  }`,按 "\n}" 找会一路截到很后面,把**邻居的**守卫也算进来,
+    //   于是「拆掉某个后门的守卫」和「新增一个没守的后门」两种变异都不会红(实测过)。
+    for(const fn of devFns){
+      const at = cfg.indexOf("function "+fn+"(");
+      const open = cfg.indexOf("{", at);
+      let d=0, close=-1;
+      for(let k=open;k<cfg.length;k++){ if(cfg[k]==="{")d++; else if(cfg[k]==="}"&&--d===0){close=k;break;} }
+      if(close<0) throw new Error(fn+" 函数体大括号不配平 —— 判据失效");
+      const body = cfg.slice(open, close);
+      if(!/IS_PRODUCTION/.test(body)) throw new Error(fn+" 是开发后门却没有 IS_PRODUCTION 早退 —— 生产构建里它是活的");
+    }
     if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(\(d\) => d\.activatedAt !== null\)\.length\)/.test(app)) throw new Error("slot cap must count hidden active pc-gpu devices");
     const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
     if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
