@@ -1737,10 +1737,19 @@ trial02_source_fingerprints() {
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 (scanned $files_n files)";
     else bad "TRIAL02 card-era fingerprint '$pat' resurfaced in src"; echo "$hits" | sed 's/^/        /'; fi
   done
-  for pat in "cardTokenId" "extendedEndsAt"; do
-    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -v "^src/store/free-trial.ts:" | head -5)
-    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside legacy-migration reader (scanned $files_n files)";
-    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside free-trial.ts legacy reader"; echo "$hits" | sed 's/^/        /'; fi
+  # 🔴 2026-08-13:豁免从「一个文件」扩到「逐条配对的 名字→允许文件」,理由与原存量读取器同类 ——
+  #   接口层解析服务端响应时**必须**能读旧字段名(线路兼容),否则服务端一发旧名就整份解析失败。
+  #   trial-api.ts 的 `row.graceEndsAt ?? row.extendedEndsAt` 正是这种别名回落;
+  #   redeemEarly 是对接后端契约时镜像的真实端点 POST /api/trial/redeem-early(82d4f51 / 5d3c92e),
+  #   **不是绑卡流程回潮**(回源核实:它不参与任何绑卡/自动扣款路径)。
+  #   🔴 精确到「名字 × 文件」而不是整文件放行 —— 整文件放行会让真的绑卡代码从这个口子回来。
+  #   ⚠️ redeemEarly 目前**全仓零调用**且不在接口台账里,已立卡请产品/后端确认是否需要;
+  #      在那之前只当契约占位,不当已交付能力。
+  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts" "redeemEarly:src/api/trial-api.ts"; do
+    pat=${pair%%:*}; allow=${pair#*:}
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -vE "^($allow):" | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside allow-list [$allow] (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside allow-list [$allow]"; echo "$hits" | sed 's/^/        /'; fi
   done
 }
 trial02_source_fingerprints
