@@ -2804,6 +2804,19 @@ withdraw_bill_runtime_gate() {
     bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
     grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
   fi
+
+# 提现扣款自愈门(2026-08-13 立)。守:扣款落盘失败后,5s 对账循环必须把那笔钱补扣回来。
+# 缺陷现场:提现页建单成功后只调一次扣款,报假只弹 toast 就再不重试;而报假时幂等键没置位,
+# 于是服务端已扣钱、本地余额一分没动且**永不再补** —— 可提余额永久虚高,还能照虚高值再提一笔。
+# 本门由当时的证伪探针**反极性**改成常设门:前 5 格【起点】/【活性】证明实验装置有效
+#(注入真生效 · 循环真在跑 · 对账真跑到了这个函数),没有它们最后一格无论红绿都不说明任何事。
+# 红测:把补扣格改成恒跳过 → 自愈那格判红。
+if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/selfcheck-withdraw-debit-selfheal.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
+  ok "提现扣款自愈门 — $(grep -oE "[0-9]+ pass / [0-9]+ fail" /tmp/uniapp-wd-debit-selfheal.log | tail -1)"
+else
+  bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/selfcheck-withdraw-debit-selfheal.mjs 看明细"
+  grep -E "^  FAIL" /tmp/uniapp-wd-debit-selfheal.log | head -6
+fi
 }
 withdraw_bill_runtime_gate
 

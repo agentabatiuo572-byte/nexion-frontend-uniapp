@@ -1250,6 +1250,29 @@ export const useApp = defineStore("app", () => {
    * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单每种币各退一次。
    * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
    */
+  /** 扣款幂等键的**唯一**拼法。三个消费点:applyWithdrawalDebit(写)、
+   *  refundWithdrawalDebit(读,判「这笔到底扣没扣过」)、以及 App.vue 对账补扣的粗筛(读)。
+   *  各拼各的必然漂移 —— 改一处就静默漏另两处,而漏的后果是「退一笔从没扣过的钱」。 */
+  function withdrawalDebitKey(id: string): string {
+    return "wd-debit:" + id;
+  }
+
+  /**
+   * 这笔提现的扣款在**本客户端内存态**里落地了没有 —— 只给 App.vue 的对账循环做粗筛。
+   *
+   * 🔴 为什么对账不直接每拍调 applyWithdrawalDebit:那个函数在幂等命中时会
+   * `adoptAccountSnapshot(stored)`(整体覆写 user/devices/earnings/withdrawals 并重置 tick 聚合),
+   * 5s 一拍 × 每张单 = 12 次/分钟的全量状态覆写,正是 refundWithdrawalDebit 头注
+   * 明确绕开的那个坑。内存命中就跳过,零成本。
+   *
+   * 判假**不代表没扣过**,只代表「值得再问一次」—— 权威判定仍在 applyWithdrawalDebit 内部
+   * 复读磁盘(内存必然陈旧:全仓无跨标签页 storage 监听)。磁盘有键而内存没有时,
+   * 那一次调用会 adopt 一次把内存拉齐,下一拍即跳过,收敛。
+   */
+  function withdrawalDebitApplied(id: string): boolean {
+    return !!withDefaultEarningBuckets(user.value).appliedRewardKeys?.[withdrawalDebitKey(id)];
+  }
+
   function refundFailedWithdrawals(): string[] {
     // 🔴🔴 合并裁决(资金安全级,这一条不改就是「扣了不退」)。
     // ⚠️ 本段刻意**不写出**远端线那道闸的代码原文 —— 写出来会让按串匹配的哨兵匹到注释而假绿
@@ -1345,7 +1368,7 @@ export const useApp = defineStore("app", () => {
     if (fundsSandboxEnabled) return true;
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
-    const key = "wd-debit:" + wd.id;
+    const key = withdrawalDebitKey(wd.id);
     // 🔴🔴 写前**复读磁盘**,与同文件 creditRewardBucketInternal 逐字同形(见其 readAccountSnapshot 段)。
     // 只查内存是不够的,而且是我这版最初的错:内存里的 `appliedRewardKeys` 与 `usdtBalance`
     // **必然陈旧** —— 全仓没有任何跨标签页 storage 监听(App.vue 只监听 session 键),
@@ -1423,7 +1446,7 @@ export const useApp = defineStore("app", () => {
   function refundWithdrawalDebit(wd: Withdrawal): boolean {
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
-    const debitKey = "wd-debit:" + wd.id;
+    const debitKey = withdrawalDebitKey(wd.id);
     const refundKey = "wd-refund:" + wd.id;
     // 🔴🔴 写前**复读磁盘**(同 applyWithdrawalDebit 头注,同 creditRewardBucketInternal 范式)。
     // 退款是这条链上唯一「加钱」的动作,只查内存的后果最重:两个标签页的 5s 对账各退一次,
@@ -2257,7 +2280,7 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals,
+    submitWithdrawal, applyWithdrawalDebit, withdrawalDebitApplied, advanceWithdrawalArrival, refreshRemoteWithdrawals,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,
