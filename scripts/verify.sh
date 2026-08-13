@@ -141,6 +141,19 @@ else
   bad "vue-tsc errors"; tail -15 /tmp/uni-tsc.log | sed 's/^/        /'
 fi
 
+# 🔴 紧跟类型检查:同一类(编译器能精确判定的)问题归在一处。守的是「store 里不许有
+# 不可达代码」—— 2026-08-13 创世五个动作的本地实现全成死代码,而它长得完全正常,
+# 还把 selfcheck-genesis-gate 的文本判据哄绿了(判据句就躺在死代码里)。
+store_unreachable_gate() {
+  if "$NODE_BIN" scripts/store-unreachable-code-gate.mjs > /tmp/uniapp-store-unreachable.log 2>&1; then
+    ok "store 不可达代码门 — $(tail -1 /tmp/uniapp-store-unreachable.log)"
+  else
+    bad "store 里出现不可达代码 — node scripts/store-unreachable-code-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-store-unreachable.log | head -6 | sed "s/^/        /"
+  fi
+}
+store_unreachable_gate
+
 echo -e "${C}[1.5] i18n mirror${N}"
 if "$NODE_BIN" scripts/i18n-key-mirror.mjs >/tmp/uni-i18n-mirror.log 2>&1; then
   ok "$(cat /tmp/uni-i18n-mirror.log)"

@@ -3518,6 +3518,8 @@ export const vi: Messages = {
     confirmCta: "Xác nhận",
     purchaseSuccess: "Đã giữ {n} suất Genesis",
     purchaseSubtitle: "Đã giữ suất OG · khóa ưu tiên niêm yết",
+    purchaseUnavailable: "Không kết nối được máy chủ",
+    purchaseUnavailableSub: "Số dư không thay đổi · kiểm tra kết nối rồi thử lại",
     purchaseError: "Không đủ USDT",
     purchaseErrorSubtitle: "Cần ${cost} · số dư ${balance}",
     onlyNLeft: "Chỉ còn {n}",

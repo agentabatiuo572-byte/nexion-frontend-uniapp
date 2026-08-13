@@ -3652,6 +3652,8 @@ export const en = {
     confirmCta: "Confirm",
     purchaseSuccess: "{n} Genesis seat{s} secured",
     purchaseSubtitle: "OG seat secured · listing priority locked",
+    purchaseUnavailable: "Couldn't reach the server",
+    purchaseUnavailableSub: "Your balance is untouched · check your connection and try again",
     purchaseError: "Insufficient USDT",
     purchaseErrorSubtitle: "Need ${cost} · balance ${balance}",
     onlyNLeft: "Only {n} left",

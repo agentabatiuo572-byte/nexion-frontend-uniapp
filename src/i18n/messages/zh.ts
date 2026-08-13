@@ -3523,6 +3523,8 @@ export const zh: Messages = {
     confirmCta: "确认认购",
     purchaseSuccess: "{n} 个创世席位认购成功",
     purchaseSubtitle: "创世席位已锁定 · 上所优先权",
+    purchaseUnavailable: "连不上服务器",
+    purchaseUnavailableSub: "余额分文未动 · 检查网络后重试",
     purchaseError: "USDT 不足",
     purchaseErrorSubtitle: "需 ${cost} · 余额 ${balance}",
     onlyNLeft: "仅剩 {n}",

@@ -11,6 +11,7 @@ import {
   type GenesisTier,
 } from "@/store/genesis-config";
 import { genesisApi, remoteApiEnabled } from "@/api/runtime";
+import { isSettledRejection } from "@/api/errors";
 import type { GenesisAccountState, GenesisPublicState } from "@/api/genesis-api";
 
 // 阶梯档位类型 + 默认值现定义在 genesis-config.ts(叶子,避免 TDZ 循环);
@@ -452,8 +453,14 @@ export const useGenesis = defineStore("genesis", () => {
   async function purchase(
     n: number,
     tokenIds?: number[],
-  ): Promise<{ ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" }> {
-    try {
+  ): Promise<{ ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" | "unavailable" }> {
+    // 🔴🔴 2026-08-13:这道 `if (remoteApiEnabled)` 曾经**漏写**,后果是下面整段本地实现
+    //   (mock 的 server 同构面)成了死代码 —— TypeScript 开 allowUnreachableCode:false
+    //   直接点名本文件 5 处不可达(purchase / listNode / cancelListing / acquireSecondary /
+    //   tickSales)。实测 mock 模式下点购买必然失败,还谎报「市场暂未开放」。
+    //   同批迁移的其它 store 都是「守卫 ≥ 远端调用」(app.ts 11/8 · cards 7/1),创世是唯一例外。
+    //   机器门:verify.sh 的 `store-unreachable-code` 哨兵钉死 src/store/** 不可达数 = 0。
+    if (remoteApiEnabled) try {
       const beforePrice = unitPriceUSDT.value;
       const state = await genesisApi.purchase(n, purchaseIdempotencyKey(n, tokenIds));
       applyAccountState(state);
@@ -463,8 +470,13 @@ export const useGenesis = defineStore("genesis", () => {
       //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
       clearPurchaseIntent();
       return { ok: true, cost: n * beforePrice };
-    } catch {
+    } catch (err) {
       await syncRemote().catch(() => undefined);
+      // 🔴 **够不着服务端 ≠ 服务端说不卖**。原来一律回落成 market-closed,于是任何一次网络
+      //   抖动都被讲成「活动已关闭」—— 用户以为错过了活动,而不是「重试一下」,直接劝退。
+      //   `isSettledRejection` 是全仓统一的那条判据(见 src/api/errors.ts):只有能证明
+      //   服务端确实处理并拒绝了,才允许把失败解释成业务结论。
+      if (!isSettledRejection(err)) return { ok: false, cost: 0, reason: "unavailable" };
       const block = genesisPurchaseBlock({
         configLoaded: cfg.loaded,
         marketOpenState: cfg.config.marketOpenState,
@@ -476,7 +488,7 @@ export const useGenesis = defineStore("genesis", () => {
       return { ok: false, cost: 0, reason: block === "soldOut" ? "sold-out" : "market-closed" };
     }
 
-    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
+    // ↓↓ mock 模式(remoteApiEnabled=false)走这里:本仓的 server 同构面,不是遗留死码。
     // 🔴 **服务端侧拒单**(规格 FEAT-GEN10 异常1/异常4)。前端置灰只挡住「正常点」,
     //   挡不住深链直达结算、也挡不住「用户已打开购买半屏、运营此刻切关闭」。
     //   这一层是 mock 的 server 同构面:**不管谁调、从哪调,关闭态一律拒**。
@@ -485,7 +497,9 @@ export const useGenesis = defineStore("genesis", () => {
     // 🔴 动钱前重读权威源(独立验收 P0→P1「hydrate-once」):不 refresh 的话,判定读的是
     //   store 构造时的内存快照 —— 运营切关闭后,已打开的会话照样买(实测 $23,998)。
     //   真后台此行即「下单前服务端校验」,mock 期读盘就是读 server。
-    cfgStore.refresh();
+    // 🔴 必须 await:不 await 的话这句只是发出一个 promise 就往下走,下面读到的仍是**旧**快照 ——
+    //    「动钱前重读权威源」这个 P0 修法整整一直是空转。三处同型(purchase/listNode/acquireSecondary)。
+    await cfgStore.refresh();
     const blocked = genesisPurchaseBlock({
       configLoaded: cfgStore.loaded,
       marketOpenState: cfgStore.config.marketOpenState,
@@ -517,6 +531,9 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   async function listNode(tokenId: number, askPriceUSDT: number): Promise<boolean> {
+    // 🔴 守卫必须在 holdingNo 之前:holdingNo 由服务端状态派生,mock 下恒空 ——
+    //   守卫放在 lookup 之后的话,本地路径照样被 `if (!holdingNo) return false` 挡死。
+    if (remoteApiEnabled) {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
@@ -525,8 +542,9 @@ export const useGenesis = defineStore("genesis", () => {
       await syncRemote();
       return true;
     } catch { return false; }
+    }
 
-    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
+    // ↓↓ mock 模式走这里(本仓的 server 同构面)。
     // 🔴 挂单出售与承接走**同一个**关闭闸(规格 FEAT-GEN10 ② 明写要锁的两个入口是
     //   「购买 / 二级市场挂单」;「挂单」在本产品词汇表里是卖方动作,买方叫「承接」)。
     //   不接闸的后果不是「少拦一次」,而是关闭态下产出一批**谁也接不了的死单**:
@@ -534,7 +552,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   用 genesisSecondaryBlock 而非 genesisPurchaseBlock:挂单是二级动作,
     //   主售售罄 / 未开售都不该妨碍转让,只有「市场关闭 / 熔断 / 配置未知」才拦。
     const cfgStore = useGenesisConfig();
-    cfgStore.refresh(); // 动状态前重读权威源,同 purchase(hydrate-once 修复)
+    await cfgStore.refresh(); // 动状态前重读权威源,同 purchase(hydrate-once 修复;必须 await)
     if (
       genesisSecondaryBlock({
         loaded: cfgStore.loaded,
@@ -558,6 +576,7 @@ export const useGenesis = defineStore("genesis", () => {
   //   —— 那是拿「停止交易」当借口没收用户的处置权,比漏拦一次严重得多。
   //   (同理由已登记进机器门 selfcheck-genesis-gate.mjs 的豁免台账,不是漏做。)
   async function cancelListing(tokenId: number): Promise<boolean> {
+    if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
@@ -566,8 +585,9 @@ export const useGenesis = defineStore("genesis", () => {
       await syncRemote();
       return true;
     } catch { return false; }
+    }
 
-    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
+    // ↓↓ mock 模式走这里(本仓的 server 同构面)。
     if (!myListings.value.some((l) => l.tokenId === tokenId)) return false;
     myListings.value = myListings.value.filter((l) => l.tokenId !== tokenId);
     persist();
@@ -584,6 +604,7 @@ export const useGenesis = defineStore("genesis", () => {
    * 真后台 = POST /api/genesis/secondary/fulfill（原子:校验挂单+资格→扣买家→贷卖家扣版税→转 token）。
    */
   async function acquireSecondary(tokenId: number): Promise<boolean> {
+    if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
@@ -598,8 +619,9 @@ export const useGenesis = defineStore("genesis", () => {
       // fail-closed responses and makes the user retry an action that cannot pass.
       throw error;
     }
+    }
 
-    /* istanbul ignore next -- legacy local registry is unreachable after the server call. */
+    // ↓↓ mock 模式走这里(本仓的 server 同构面)。
     // 🔴 二级市场与主售用**同一个**关闭闸(规格 FEAT-GEN10 ⑥)。只锁前端入口不锁这里,
     //   深链照样能承接。
     //   注意:这里**不**看 soldOut / preSale —— 二级卖的是别人手里的存量,
@@ -611,7 +633,7 @@ export const useGenesis = defineStore("genesis", () => {
     //   现改为喂给 genesisPurchaseBlock,再按「与二级相关的阻断原因」筛,
     //   这样将来往优先级链里加档,这里自动跟上。
     const cfgStore = useGenesisConfig();
-    cfgStore.refresh(); // 动钱前重读权威源,同 purchase(hydrate-once 修复)
+    await cfgStore.refresh(); // 动钱前重读权威源,同 purchase(hydrate-once 修复;必须 await)
     const blocked = genesisSecondaryBlock({
       loaded: cfgStore.loaded,
       marketOpenState: cfgStore.config.marketOpenState,
@@ -628,9 +650,8 @@ export const useGenesis = defineStore("genesis", () => {
   }
 
   function tickSales() {
-    void syncRemote();
-    return;
-    /* istanbul ignore next -- local sales simulation is disabled. */
+    // 接了服务端就以服务端的售出数为准,绝不本地瞎涨;mock 下才跑原型的售出模拟。
+    if (remoteApiEnabled) { void syncRemote(); return; }
     const t = Date.now();
     if (t - lastTickTs.value < 30_000) return;
     const inc = 1 + Math.floor(Math.random() * 3); // 1-3

@@ -120,7 +120,12 @@ for (const rel of apiFiles) {
 //    (把 `purchase: async (…)` 记成 `async`)后,创世那处又整片消失,而门照样全绿。
 //    所以这里钉的是**实测基数不许缩**;新增接口只会让它变大,缩了就是判据瞎了一片。
 //    数字变大时同步上调(它是覆盖面的账,不是魔法常数)。
-const SIG_FLOOR = 35, SITE_FLOOR = 82;
+// 2026-08-13 35 → 34:`trial-api.ts` 的卡时代早购方法(带 idempotencyKey 位)按裁决删除,
+//   覆盖面少一个是**方法没了**,不是判据瞎了 —— 同轮 ② 调用点底线 82 原样通过,正因为
+//   那个方法零调用点。裁决与证据链见 docs/changes/2026-08-13-trial-early-buy-adjudication.md。
+//   ⚠️ 下调底线只有在「能指名道姓说出少的是哪个方法、且它确实不存在了」时才允许;
+//      说不出名字就是解析器瞎了,那时要修解析器不是改这个数。
+const SIG_FLOOR = 34, SITE_FLOOR = 82;
 check(`① 从接口签名派生出幂等键参数位(实测 ${sigs.size} 个方法 / 底线 ${SIG_FLOOR})`, sigs.size >= SIG_FLOOR,
   `只派生出 ${sigs.size} 个,少于实测底线 ${SIG_FLOOR} —— 覆盖面缩了,判红`);
 
