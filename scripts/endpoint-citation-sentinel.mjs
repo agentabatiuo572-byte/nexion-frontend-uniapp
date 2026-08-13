@@ -180,6 +180,103 @@ const LEDGER = {
   "GET /api/market/tokens": "PRD §11.9.3",
   "GET /api/admin/platform/phase-config": "PRD §9.11d",
   "PUT /api/admin/tradein/config": "TBD: PRD 未定义置换配置写接口(admin 侧,候选名)",
+
+  // ══ 代码面收编(2026-08-13,卡 2)══════════════════════════════════════
+  // 本门原来只扫注释,于是 src/api/*.ts 里**真发出去的 77 个地址**一条都没进过台账。
+  // 下面按「逐条回根 PRD 搜、搜得到才写 §、搜不到一律 TBD 并写明为什么」补齐。
+  // 🔴 只有 7 条在前端 PRD 里找得到 —— 这不是登记工作没做完,这是**实情**:
+  //    绝大多数是后端对接批次引入的契约,前端 PRD 至今没同步。TBD 就是要让这件事一直可见。
+  // ⚠️ 路径参数段一律写 `:param`(与代码里的 `${…}` 判等,见 canonicalPath)。
+
+  // ── /api/app/* 契约族 ────────────────────────────────────────────────
+  // 后端对接批次引入的 app 作用域前缀,前端 PRD 成文早于它,整族都没有条目。
+  // 这一族**不要**逐条去 PRD 找 —— 找不到不是漏搜,是 PRD 还没写。
+  "/api/app/security": "TBD: /api/app/* 后端契约族(账号安全读),前端 PRD 未定义",
+  "/api/app/security/password": "TBD: 同上(改密)",
+  "/api/app/security/two-factor": "TBD: 同上(两步验证开关)",
+  "/api/app/security/sessions/:param/revoke": "TBD: 同上(踢单个会话);另见 PRD §4.7 的 /api/account/sessions/:id/revoke —— 两个候选名并存,接线时以后端为准",
+  "/api/app/security/sessions/revoke-others": "TBD: 同上(踢其余会话)",
+  "/api/app/analytics/events": "TBD: /api/app/* 族,行为埋点上报;PRD 未定义埋点接口",
+  "/api/app/trade-in/config": "TBD: /api/app/* 族;概念见 PRD §7.5.1(置换),但该路径 PRD 未定义",
+  "/api/app/trade-in/quote": "TBD: 同上(报价)",
+  "/api/app/trade-in/capacity-quote": "TBD: 同上(容量位报价)",
+  "/api/app/trade-in/capacity-replace": "TBD: 同上(容量位置换)",
+  "/api/app/trade-in/submit": "TBD: 同上(提交置换单)",
+  "/api/app/wallet/sandbox/topups": "TBD: /api/app/* 族,沙箱资金档专用;仅 fundsSandboxEnabled 档可达",
+  "/api/app/wallet/sandbox/withdrawals": "TBD: 同上",
+  "/api/app/wallet/sandbox/orders/:param/callbacks": "TBD: 同上(沙箱回调注入)",
+  "/api/app/janus/reports": "TBD: /api/app/* 族,Janus 双面 demo 专用,前端 PRD 不覆盖该工程",
+  "/api/app/janus/commands/pending": "TBD: 同上",
+  "/api/app/janus/commands/ack": "TBD: 同上",
+  "/api/app/janus/takeover/progress": "TBD: 同上",
+  "/api/app/payments/config": "TBD: /api/app/* 族,支付通道配置;PAY 规格未定义 API 层",
+  "/api/app/payments/fx-quote": "TBD: 同上(汇率报价)",
+  "/api/app/deposits/vietqr/intents": "TBD: /api/app/* 族,越南 VietQR 入金;概念见 PRD §9.2.8,该路径未定义",
+  "/api/app/deposits/vietqr/intents/:param": "TBD: 同上(单据回查)",
+  "/api/app/deposits/vietqr/intents/:param/cancel": "TBD: 同上(取消)",
+  "/api/app/support/acceptance/projection": "TBD: /api/app/* 族,客服受理投影",
+  "/api/app/support/acceptance": "TBD: 同上(受理)",
+  "/api/app/support": "TBD: 同上(工单读写)",
+  "/api/app/support/faqs": "TBD: 同上(FAQ)",
+  "/api/app/referral-rewards": "TBD: /api/app/* 族,推荐奖励发放面;另有 /api/config/referral-rewards 读配置",
+
+  // ── PRD 里找得到的(7 条,逐条核过原文不是正则假命中)──────────────
+  "/api/devices/activate": "PRD §9.11d.2(server enforce 活跃槽位上限,client 限制纯 UI)",
+  "/api/config/task-pricing": "PRD §9.11c.1(Task pricing 表 server 下发)",
+  "/api/genesis/state": "PRD §9.11c.1(供应 / 单价 / 排放比例)",
+  "/api/notifications": "PRD §11.2.4(分页拉取,支持按优先级过滤)",
+  "/api/notifications/:param/read": "PRD §11.2.4(原文写作 /api/notifications/:id/read)",
+  "/api/legal/risk-disclosure/current": "PRD §9.11d.1(按 jurisdiction 返 {version, body})",
+  "/api/points/sign-in": "APP规格 §4.6 积分域(每日签到,server roll lucky multiplier)",
+
+  // ── 其余:PRD 搜不到,逐条写明为什么 ─────────────────────────────────
+  "/api/team/binary": "TBD: 双轨团队读;PRD §8 有业务规则但未定义该端点",
+  "/api/team/rank": "TBD: 团队等级读;同上",
+  "/api/tasks/route": "TBD: 按显存派发任务路由;PRD §6.8 有容量概念,未定义该端点",
+  "/api/tasks/assignments": "TBD: 任务派单读;PRD 未定义",
+  "/api/tasks/assignments/claim": "TBD: 同上(领取)",
+  "/api/tasks/assignments/:param/complete": "TBD: 同上(完成)",
+  // 🔴 裸 /api/exchange ≠ PRD 的 /api/exchange/swap(§9.4.3)。回源核过:PRD 只定义了
+  //    带 /swap 的那条,裸路径全 PRD 零命中。**别把它当成 §9.4.3 登记** —— 那是假引用。
+  "/api/exchange": "TBD: 兑换单读/建;PRD §9.4.3 只定义了 POST /api/exchange/swap,裸路径未定义",
+  "/api/exchange/:param/cancel": "TBD: 撤销兑换单;PRD 未定义",
+  "/api/genesis/account": "TBD: 创世账户读;PRD 未定义",
+  "/api/genesis/purchase": "TBD: 创世购买;PRD 未定义该路径(§10.1 有业务规则)",
+  "/api/genesis/holdings/:param/listing": "TBD: 创世持仓挂单/撤单;概念见 PRD §10.2.4,路径未定义",
+  "/api/genesis/listings/:param/buy": "TBD: 创世二级买入;同上",
+  "/api/content/i18n": "TBD: 三语文案下发;PRD 未定义",
+  "/api/content/learning/courses": "TBD: 学习中心课程列表;PRD 未定义学习中心",
+  "/api/content/learning/courses/:param": "TBD: 同上(课程详情)",
+  "/api/content/learning/courses/:param/start": "TBD: 同上(开始)",
+  "/api/content/learning/courses/:param/quiz": "TBD: 同上(测验)",
+  "/api/content/learning/courses/:param/quiz/receipts/:param": "TBD: 同上(测验回执,按幂等键回查)",
+  "/api/content/learning/courses/:param/complete": "TBD: 同上(完成)",
+  "/api/content/trust/sections/current": "TBD: 信任板块内容下发;PRD 未定义",
+  "/api/content/trust/sections/:param/view": "TBD: 同上(曝光回报)",
+  "/api/config/market/nex": "TBD: NEX 牌价配置;与 §11.9.3 的 /api/market/tokens 是不同端点",
+  "/api/config/referral-rewards": "TBD: 推荐奖励配置读;PRD §9.11c.1 未列该条",
+  "/api/config/repurchase": "TBD: 复购配置读;PRD §9.11c.1 未列该条",
+  "/api/notifications/read-all": "TBD: 全部已读;PRD §11.2.4 只定义了单条已读",
+  "/api/notifications/read": "TBD: 批量已读;同上",
+  "/api/notifications/:param/actions": "TBD: 通知内联动作;PRD 未定义",
+  "/api/payment-methods": "TBD: 支付方式列表;PRD §9.10 是绑卡域,该路径未定义",
+  "/api/payment-methods/bind": "TBD: 同上(绑定)",
+  "/api/payout-addresses/otp/send": "TBD: 换绑收款地址的验证码;与已登记的 /api/payout-addresses 同族",
+  "/api/points/state": "TBD: 积分状态读;APP规格只列了 sign-in",
+  "/api/points/milestones/:param/claim": "TBD: 积分里程碑领奖;PRD §11.3a 是 /api/me/milestones/:id/claim,两个候选名并存",
+  "/api/points/streak-saver/use": "TBD: 连签补签卡;PRD 未定义",
+  "/api/points/power-ups/:param/activate": "TBD: 积分道具激活;PRD 未定义",
+  "/api/quests/:param/claim": "TBD: 周任务领奖(questApi.claim);与已登记的 /api/quests/state 同族,见交接书 U-16",
+  "/api/repurchase/orders": "TBD: 复购单读/建;PRD 未定义",
+  "/api/repurchase/orders/:param/claim": "TBD: 同上(领取)",
+  "/api/repurchase/orders/:param/early-withdraw": "TBD: 同上(提前赎回)",
+  "/api/legal/risk-disclosure/acknowledgment": "TBD: 风险披露确认回写;PRD §9.11d.1 只定义了读端点",
+  // 🔴 /api/stakes/* 与已登记的 /api/staking/* 是**同一批业务的两个路径名**,谁是真的没定论。
+  //    交接书 U-2 已就此问后端。在他们回话之前,两边都按代码真实引用登记 —— 台账反映实情,
+  //    不反映我们希望的样子。
+  "/api/stakes": "TBD: 与 PRD 的 /api/staking 路径名冲突,见交接书 U-2(客户端 4 处用 stakes)",
+  "/api/stakes/:param/claim": "TBD: 同上;PRD 写的是 POST /api/staking/:id/claim",
+  "/api/stakes/:param/early-withdraw": "TBD: 同上",
 };
 
 // ── 扫描 ────────────────────────────────────────────────────────────────
@@ -237,55 +334,140 @@ function normalizePath(raw) {
   return /^\/api\/[A-Za-z{]/.test(p) ? p : null;
 }
 
-const found = new Map(); // token → [{file, line}]
+/**
+ * 🔴 2026-08-13 起本门有**两个**扫描面。
+ *
+ * 只扫注释是原设计的盲区,而且是个大洞:`src/api/*.ts` 里真正发出去的地址全是
+ * **代码字符串**(`path: "/api/x"` / `` `/api/x/${id}` ``),一条都不在注释里。
+ * 实测该盲区下有 80 个端点从没进过台账 —— 其中一个是已被 PRD 改名的卡时代旧端点,
+ * 它零调用地躺在接口层近两周,本门一次都没响(见 docs/changes/
+ * 2026-08-13-trial-early-buy-adjudication.md 卡 2)。
+ *
+ * 注释面(`found`)判「写对没写对」;代码面(`wired`)判「真发出去的地址有没有据」。
+ * 两面**共用同一本台账** —— 分两本必然各自漂。
+ */
+const found = new Map(); // 注释面:token(含 method)→ [{file, line}]
+const wired = new Map(); // 代码面:canonical path → [{file, line}]
+
+/** 代码字符串里的地址:单/双引号 + 模板串(模板串必须扫,插值形态占了一大半)。 */
+const WIRE = /(["'`])(\/api\/(?:\\.|(?!\1)[^\\])*)\1/g;
+
+/**
+ * 归一到「路径骨架」:去 query、去尾斜杠,**任何参数段一律折成 `:param`** ——
+ * 代码侧写 `${encodeURIComponent(id)}`、台账侧写 `:id` / `:userId`,指的是同一个位置。
+ * 不折的话两边永远对不上,台账就得为每种写法各存一条,那是在给自己造漂移源。
+ */
+function canonicalPath(raw) {
+  const bare = raw.replace(/\?.*$/, "").replace(/\/+$/, "");
+  return bare
+    .split("/")
+    .map((seg) => (seg.includes("${") || seg.startsWith(":") ? ":param" : seg))
+    .join("/");
+}
+
+/**
+ * 代码面**跳过测试文件**:契约测试里会把路径参数写成固定夹具值
+ * (`…/courses/h3-live-20260722/quiz`),那是同一个端点的一个样本,不是新契约。
+ * 登记它们等于把夹具 id 焊进台账,夹具一改台账就过期。
+ * ⚠️ 注释面不跳过 —— 测试里的注释同样可能写错接口地址。
+ * ⚠️ 跳过数会打进 PASS 行,**不许静默增长**。
+ */
+const isTestFile = (rel) => /\.(test|spec)\.[cm]?[jt]sx?$/.test(rel);
+let wireSkippedFiles = 0;
+
 for (const f of files) {
+  const rel = relative(ROOT, f).replace(/\\/g, "/");
+  const skipWire = isTestFile(rel);
+  if (skipWire) wireSkippedFiles++;
   const lines = readFileSync(f, "utf8").split(/\r?\n/);
   const isComment = markCommentLines(lines);
   lines.forEach((line, i) => {
-    if (!isComment[i]) return;
-    for (const m of line.matchAll(CITE)) {
-      const p = normalizePath(m[2]);
-      if (!p) continue;
-      const token = (m[1] ? `${m[1]} ` : "") + p;
-      if (!found.has(token)) found.set(token, []);
-      found.get(token).push({ file: relative(ROOT, f).replace(/\\/g, "/"), line: i + 1 });
+    if (skipWire && !isComment[i]) return;
+    if (isComment[i]) {
+      for (const m of line.matchAll(CITE)) {
+        const p = normalizePath(m[2]);
+        if (!p) continue;
+        const token = (m[1] ? `${m[1]} ` : "") + p;
+        if (!found.has(token)) found.set(token, []);
+        found.get(token).push({ file: rel, line: i + 1 });
+      }
+      return;
+    }
+    for (const m of line.matchAll(WIRE)) {
+      const p = canonicalPath(m[2]);
+      if (!/^\/api\/[A-Za-z:]/.test(p)) continue;
+      if (!wired.has(p)) wired.set(p, []);
+      wired.get(p).push({ file: rel, line: i + 1 });
     }
   });
 }
 
+/** 台账 key(可能带 method)→ 路径骨架,供代码面比对。 */
+const ledgerSkeletons = new Set(
+  Object.keys(LEDGER).map((k) => canonicalPath(k.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+/, ""))),
+);
+
 if (process.argv.includes("--dump")) {
+  console.log("── 注释面 ──");
   for (const [t, locs] of [...found.entries()].sort()) {
     console.log(`${String(locs.length).padStart(3)}  ${t}${LEDGER[t] ? "" : "   <<< NOT IN LEDGER"}`);
     if (!LEDGER[t]) locs.forEach((l) => console.log(`       ${l.file}:${l.line}`));
+  }
+  console.log("── 代码面(真发出去的地址)──");
+  for (const [p, locs] of [...wired.entries()].sort()) {
+    console.log(`${String(locs.length).padStart(3)}  ${p}${ledgerSkeletons.has(p) ? "" : "   <<< NOT IN LEDGER"}`);
+    if (!ledgerSkeletons.has(p)) locs.forEach((l) => console.log(`       ${l.file}:${l.line}`));
   }
   process.exit(0);
 }
 
 const totalCitations = [...found.values()].reduce((s, v) => s + v.length, 0);
+const totalWired = [...wired.values()].reduce((s, v) => s + v.length, 0);
 const unregistered = [...found.entries()].filter(([t]) => !LEDGER[t]);
-const orphanLedger = Object.keys(LEDGER).filter((t) => !found.has(t));
+const unregisteredWired = [...wired.entries()].filter(([p]) => !ledgerSkeletons.has(p));
+// 台账条目「还活着」= 注释面按 token 命中,**或**代码面按路径骨架命中。
+// 只看注释面会把「只在代码里发、没写注释」的条目误判成过期条目。
+const orphanLedger = Object.keys(LEDGER).filter(
+  (t) => !found.has(t) && !wired.has(canonicalPath(t.replace(/^(GET|POST|PUT|PATCH|DELETE)\s+/, ""))),
+);
 
 const fail = [];
-// ③ 判据失效兜底:一条都没扫到 = 正则 / 路径写错了,空集全过是假绿
+// ③ 判据失效兜底:一条都没扫到 = 正则 / 路径写错了,空集全过是假绿。
+//    两个扫描面**各判各的** —— 合起来判的话,注释面还有命中就能把代码面整个瞎掉盖住。
 if (totalCitations === 0) {
   fail.push(
-    `扫描 0 命中 —— 判据失效(扫了 ${files.length} 个文件却一条 /api/ 注释引用都没找到)。` +
+    `注释面扫描 0 命中 —— 判据失效(扫了 ${files.length} 个文件却一条 /api/ 注释引用都没找到)。` +
       `先修扫描逻辑,别把空集当通过。`,
   );
 }
-// ① 代码里有、台账里没有
+if (totalWired === 0) {
+  fail.push(
+    `代码面扫描 0 命中 —— 判据失效(扫了 ${files.length} 个文件却一个 "/api/..." 字符串都没找到,` +
+      `而 src/api/ 下每个客户端都在发请求)。先修 WIRE 正则,别把空集当通过。`,
+  );
+}
+// ① 注释里有、台账里没有
 for (const [t, locs] of unregistered) {
   fail.push(
-    `未登记的接口引用 \`${t}\`(${locs.length} 处):\n` +
+    `未登记的接口引用 \`${t}\`(注释面 ${locs.length} 处):\n` +
       locs.map((l) => `      ${l.file}:${l.line}`).join("\n") +
       `\n      → 与前端 PRD 核对后加进 scripts/endpoint-citation-sentinel.mjs 的 LEDGER,` +
       `并注明 "PRD §X.Y" 或 "TBD: <原因>";PRD 没有的接口注释侧必须写明 TBD / 候选,不许当既定契约。`,
   );
 }
-// ② 台账里有、代码里没有
+// ①' 代码里真在发、台账里没有
+for (const [p, locs] of unregisteredWired) {
+  fail.push(
+    `未登记的接口调用 \`${p}\`(代码面 ${locs.length} 处):\n` +
+      locs.map((l) => `      ${l.file}:${l.line}`).join("\n") +
+      `\n      → 这是**真发出去的地址**,必须在 LEDGER 有据。与前端 PRD 核对后登记,` +
+      `注明 "PRD §X.Y" 或 "TBD: <原因>"。路径参数段在台账里写 \`:name\`(与代码里的 \`\${…}\` 判等)。`,
+  );
+}
+// ② 台账里有、两个面都没有
 for (const t of orphanLedger) {
   fail.push(
-    `台账条目 \`${t}\` 在代码注释里已不存在 —— 台账过期,请从 LEDGER 删除` +
+    `台账条目 \`${t}\` 在注释与代码里都已不存在 —— 台账过期,请从 LEDGER 删除` +
       `(出处记录:${LEDGER[t]})。`,
   );
 }
@@ -297,8 +479,8 @@ if (fail.length) {
 }
 
 console.log(
-  `✓ endpoint-citation-sentinel PASS — ${totalCitations} 处注释接口引用 / ` +
-    `${found.size} 个去重地址,全部在台账有据(扫描 ${files.length} 个源文件;` +
-    `台账 ${Object.keys(LEDGER).length} 条,其中 ` +
+  `✓ endpoint-citation-sentinel PASS — 注释面 ${totalCitations} 处 / ${found.size} 个去重地址,` +
+    `代码面 ${totalWired} 处 / ${wired.size} 个去重地址(另跳过 ${wireSkippedFiles} 个测试文件的代码面),` +
+    `全部在台账有据(扫描 ${files.length} 个源文件;台账 ${Object.keys(LEDGER).length} 条,其中 ` +
     `${Object.values(LEDGER).filter((v) => v.startsWith("TBD")).length} 条 PRD 未定义)`,
 );
