@@ -1250,27 +1250,13 @@ export const useApp = defineStore("app", () => {
    * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单每种币各退一次。
    * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
    */
-  /** 扣款幂等键的**唯一**拼法。三个消费点:applyWithdrawalDebit(写)、
-   *  refundWithdrawalDebit(读,判「这笔到底扣没扣过」)、以及 App.vue 对账补扣的粗筛(读)。
-   *  各拼各的必然漂移 —— 改一处就静默漏另两处,而漏的后果是「退一笔从没扣过的钱」。 */
+  /** 扣款幂等键的**唯一**拼法。两个消费点:applyWithdrawalDebit(写)、
+   *  refundWithdrawalDebit(读,判「这笔到底扣没扣过」)。
+   *  各拼各的必然漂移 —— 改一处就静默漏另一处,而漏的后果是「退一笔从没扣过的钱」。
+   *  ⚠️ 键**不带账号作用域**:它靠 appliedRewardKeys 本身住在账号快照里来隔离账号,
+   *  改成跨账号共享的存储前必须先给它加作用域。 */
   function withdrawalDebitKey(id: string): string {
     return "wd-debit:" + id;
-  }
-
-  /**
-   * 这笔提现的扣款在**本客户端内存态**里落地了没有 —— 只给 App.vue 的对账循环做粗筛。
-   *
-   * 🔴 为什么对账不直接每拍调 applyWithdrawalDebit:那个函数在幂等命中时会
-   * `adoptAccountSnapshot(stored)`(整体覆写 user/devices/earnings/withdrawals 并重置 tick 聚合),
-   * 5s 一拍 × 每张单 = 12 次/分钟的全量状态覆写,正是 refundWithdrawalDebit 头注
-   * 明确绕开的那个坑。内存命中就跳过,零成本。
-   *
-   * 判假**不代表没扣过**,只代表「值得再问一次」—— 权威判定仍在 applyWithdrawalDebit 内部
-   * 复读磁盘(内存必然陈旧:全仓无跨标签页 storage 监听)。磁盘有键而内存没有时,
-   * 那一次调用会 adopt 一次把内存拉齐,下一拍即跳过,收敛。
-   */
-  function withdrawalDebitApplied(id: string): boolean {
-    return !!withDefaultEarningBuckets(user.value).appliedRewardKeys?.[withdrawalDebitKey(id)];
   }
 
   function refundFailedWithdrawals(): string[] {
@@ -1395,11 +1381,10 @@ export const useApp = defineStore("app", () => {
     // 上一版写 min() 是错的(独立复核实测):disk 比内存**多**时(另一标签页刚退款 / 刚入金,
     // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,正好退回本包要修的那个原状态。
     // 取不到盘(storage 不可用)才回落内存。
-    // ⚠️ 这段原本还写着「而扣款**没有自愈** = 余额永久虚高」—— 那句话 2026-08-13 起**已失效**:
-    // 本函数返回 false 之后,App.vue 的 5s 对账(⓪b 补扣格)会从数据推出「该扣没扣」并重试,
-    // 由 scripts/withdraw-debit-selfheal-runtime.mjs 行为级守住。判假不再是终局。
-    // 但**这不表示可以放宽本闸**:自愈补的是「本该成功却没落地」的扣款,不是「余额真不够」——
-    // 判据取错(比如改回 min())仍会让一笔合法扣款被反复拒到余额涨上来为止。
+    // 🔴 本函数返回 false 之后**没有任何自愈**:幂等键不置位,而提现页只弹一条 toast 就再不重试。
+    // ⚠️ 2026-08-13 曾在 App.vue 对账里加过一格补扣来兜这个缺口,被 R1 独立审计整格否决并回退 ——
+    // 别再照着「反正有自愈」放宽本闸。否决理由与正确修法方向(提交时落一个本地待扣款标记,
+    // 只对带标记的单重试)见 docs/changes/2026-08-13-z6-audit-R1.md 与 2026-08-11-z5-out-of-scope-findings.md B 段。
     const authoritativeBalance = typeof stored?.user?.usdtBalance === "number"
       ? stored.user.usdtBalance
       : currentUser.usdtBalance;
@@ -2285,7 +2270,7 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, applyWithdrawalDebit, withdrawalDebitApplied, advanceWithdrawalArrival, refreshRemoteWithdrawals,
+    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,

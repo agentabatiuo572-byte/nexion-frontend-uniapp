@@ -2807,25 +2807,12 @@ withdraw_bill_runtime_gate() {
 }
 withdraw_bill_runtime_gate
 
-# 提现扣款自愈门(2026-08-13 立)。守:扣款报假之后,5s 对账循环必须把那笔钱补扣回来。
-# 缺陷现场:提现页建单成功后只调一次扣款,报假只弹 toast 就再不重试;而报假时幂等键没置位,
-# 于是服务端已扣钱、本地余额一分没动且**永不再补** —— 可提余额永久虚高,还能照虚高值再提一笔。
-# 本门由当时的证伪探针**反极性**改成常设门:前 8 格【起点】/【活性】证明实验装置有效
-#(夹具金额构造对 · 两个入口的注入真生效 · 循环真在跑 · 对账真跑到了那个函数),
-# 没有它们,最后几格无论红绿都不说明任何事。
-# 🔴 它守不到「补扣格排在退款腿之前」这条顺序不变量(13s 内跑 ≥2 拍会自己收敛,
-#    错误余额只存在一拍) —— 那条由 selfcheck-fastlane 的接线门② 守,两道互补。
-# 🔴 必须自成一个函数 + 自己的调用行:它一度被塞在 withdraw_bill_runtime_gate 函数体内,
-#    那样删掉账单行那道门会**静默带走**本门(新门搭旧门的车 = 迟早一起消失)。
-withdraw_debit_selfheal_gate() {
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-debit-selfheal-runtime.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
-    ok "提现扣款自愈门 — $(grep -oE "[0-9]+ pass / [0-9]+ fail" /tmp/uniapp-wd-debit-selfheal.log | tail -1)"
-  else
-    bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/withdraw-debit-selfheal-runtime.mjs 看明细"
-    grep -E "^  FAIL" /tmp/uniapp-wd-debit-selfheal.log | head -6 | sed 's/^/        /'
-  fi
-}
-withdraw_debit_selfheal_gate
+# 🗑 【2026-08-13 回退】这里曾挂过「提现扣款自愈门」(scripts/withdraw-debit-selfheal-runtime.mjs)。
+#    它守的实现 —— App.vue 对账里的扣款补扣格 —— 被 R1 独立审计整格否决并回退,门随之退役,
+#    脚本已移入 .trash。留着门守一段不存在的代码只会绿着骗人。
+#    重做时注意该门当时被审出的覆盖缺口:注入不跨拍(测不到「失败持续时补到成功为止」)、
+#    13 秒墙钟落在 2~3 拍之间(同一份代码两种结论)、状态覆盖 2/11、无跑满基数下限(截断即绿)、
+#    夹具继承 demo 种子而非构造。详见 docs/changes/2026-08-13-z6-audit-R1.md。
 
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST

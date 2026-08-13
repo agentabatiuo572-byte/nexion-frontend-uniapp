@@ -184,32 +184,22 @@ function reconcileBills() {
       postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);
     } catch { /* 这一单的数据不完整 —— 跳过它,别拖垮整个对账循环 */ }
   }
-  // ⓪b 🔴 单据在、**钱没真扣** → 补扣。与 ⓪ 是同一笔事实的两个面:⓪ 补的是账上那一行,
-  //     这一格补的是余额里那个数。
-  //     提现页在建单成功后调一次 app.applyWithdrawalDebit,报假只弹一条 toast 就再不重试;
-  //     而扣款报假时幂等键 `wd-debit:` 根本没置位 —— 于是服务端已经扣了钱、本地余额一分没动,
-  //     且**永远不会再补**(2026-08-13 运行时复现:活性探针证明对账确实跑到了本函数、⓪ 把删掉的
-  //     账单行补了回来,而 ≥2 拍之后那笔钱仍然没扣)。用户看到的可提余额永久虚高,
-  //     还能照这个虚高值再提一笔,一路放行到服务端才被拒。
-  //     app.ts applyWithdrawalDebit 余额闸那段注释里的「而扣款**没有自愈** = 余额永久虚高」
-  //     指的就是这一格 —— 当时只绕开了一个具体触发(别写 min()),没有补自愈本身。
-  //     判据同 ⓪ 从数据推出:单据在、扣款幂等键不在 = 该扣没扣。扣款函数按单号幂等、
-  //     写前复读磁盘、全有或全无,重入安全。
-  //     🔴 粗筛走 app.withdrawalDebitApplied(内存判据),**不**每拍直接调扣款函数:
-  //     后者在幂等命中时会 adoptAccountSnapshot 整体覆写 user/devices/earnings/withdrawals
-  //     (见 refundWithdrawalDebit 头注:12 次/分钟的全量覆写)。内存判假才值得再问一次,
-  //     权威判定仍在函数内部读盘。
-  //     🔴 **不排除失败终态**,靠顺序闭合:本格在 ② 退款腿之前,失败单补扣 −N 之后,
-  //     退款腿当拍就看到 `wd-debit:` 键并退回 +N —— 净额为 0,不留跨拍中间态。
-  //     要排除失败终态就得在这里抄第五份终态字面量清单(全仓已有 4 份),那是更差的交易。
-  //     🔴 try 必须**连粗筛一起**包住(墨菲前置抓到):只包扣款调用的话,粗筛自己抛异常
-  //     (脏 user 态)就会冲出循环打停 ①②③ —— 与本段注释承诺的爆炸半径不符。⓪ 的 try 同样在循环内。
-  for (const wd of app.withdrawals) {
-    try {
-      if (app.withdrawalDebitApplied(wd.id)) continue;
-      app.applyWithdrawalDebit(wd);
-    } catch { /* 同 ⓪:一条脏单不拖垮整个对账循环 */ }
-  }
+  // ⓪b —— 🔴 **这里曾加过「扣款没落地就补扣」的自愈格,2026-08-13 按 R1 独立审计整格回退。**
+  //     别再照 ⓪ 的样子在这里无条件遍历 app.withdrawals 补扣。两条独立证据(都已回源坐实):
+  //     ① 那一版的立论前提是错的 —— app.ts applyWithdrawalDebit 头注称「全仓没有余额端点、
+  //        余额的唯一持有者就是本 store」,而 refreshRemoteFleet 在
+  //        `remoteApiEnabled && !fundsSandboxEnabled` 时用服务端 `fleet.walletUsdt`
+  //        **整体覆写** usdtBalance 与 earningBuckets(app.ts:700-723);
+  //        按 api/runtime-config.ts,生产无 env→remote、开发无 env→sandbox 但非显式,
+  //        这两档 fundsSandboxEnabled 都是 false —— 正是补扣会跑且真扣本地余额的档。
+  //        ⇒ 服务端值已含这笔则**双扣**;不含则补扣的 −N 被下一拍重投影抹掉、而幂等键已置位
+  //        ⇒ **永不重试**。两种都比不修更坏。
+  //     ② docs/changes/2026-08-11-z5-out-of-scope-findings.md B 段早已明令:
+  //        **不可**无条件遍历补扣(remote 对齐期存量单全都没有 `wd-debit:` 键,会让余额无解释地掉一截),
+  //        范围必须用「提交时落一个本地待扣款标记」钉死,只对带标记的单重试。
+  //     另两条同轮结论:补扣不看 status 时 confirmed/sent 被扣后没有任何退款腿对手方;
+  //     「扣了又退净 0」只对 usdtBalance 成立 —— 扣款会 clamp 可提桶而退款腿明写不回补。
+  //     完整 findings 与逐条回源裁决:docs/changes/2026-08-13-z6-audit-R1.md
   // ① 已到账 → 账单入账
   for (const wd of app.withdrawals) {
     if (wd.status !== "confirmed") continue;
