@@ -1754,20 +1754,29 @@ trial02_source_fingerprints() {
   local files_n
   files_n=$(find src -type f \( -name "*.vue" -o -name "*.ts" \) | wc -l | tr -d ' ')
   local pat hits
-  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "markChargeFailed"; do
+  # 🔴 `redeem-early` 是 `redeemEarly` 的**路径拼法**,两条都要钉:2026-08-13 删掉那个方法时,
+  #   src 里只剩过一处命中,而它是 `path: "/api/trial/redeem-early"` 这种代码字符串 —— 换个
+  #   方法名重新引用同一条旧端点,只钉驼峰名的话一个字都抓不到(接口台账哨兵只扫注释行,
+  #   代码字符串它同样看不见,这里是那块盲区的唯一覆盖面)。
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "redeem-early" "markChargeFailed"; do
     hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | head -5)
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 (scanned $files_n files)";
     else bad "TRIAL02 card-era fingerprint '$pat' resurfaced in src"; echo "$hits" | sed 's/^/        /'; fi
   done
   # 🔴 2026-08-13:豁免从「一个文件」扩到「逐条配对的 名字→允许文件」,理由与原存量读取器同类 ——
   #   接口层解析服务端响应时**必须**能读旧字段名(线路兼容),否则服务端一发旧名就整份解析失败。
-  #   trial-api.ts 的 `row.graceEndsAt ?? row.extendedEndsAt` 正是这种别名回落;
-  #   redeemEarly 是对接后端契约时镜像的真实端点 POST /api/trial/redeem-early(82d4f51 / 5d3c92e),
-  #   **不是绑卡流程回潮**(回源核实:它不参与任何绑卡/自动扣款路径)。
+  #   trial-api.ts 的 `row.graceEndsAt ?? row.extendedEndsAt` 正是这种别名回落。
   #   🔴 精确到「名字 × 文件」而不是整文件放行 —— 整文件放行会让真的绑卡代码从这个口子回来。
-  #   ⚠️ redeemEarly 目前**全仓零调用**且不在接口台账里,已立卡请产品/后端确认是否需要;
-  #      在那之前只当契约占位,不当已交付能力。
-  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts" "redeemEarly:src/api/trial-api.ts"; do
+  #
+  # 🔴 2026-08-13(同日晚)撤销 redeemEarly 那条豁免 —— 方法已删,豁免随之作废。
+  #   ① 那条豁免从没生效过:名字被加进本轮配对时**没从上面的全禁名单删掉**,于是同一次跑
+  #      同时打出一条 FAIL(全禁名单)和一条 PASS(白名单),提交信息里「还原→全绿」读的是
+  #      后者。加豁免那笔的红测因此是假的 —— 它验的是「弄坏会红」,没验「还原会绿」。
+  #   ② 它也不该被豁免:`/api/trial/redeem-early` 是**卡时代**端点名,2026-08-02 无卡化
+  #      (FEAT-TRIAL02)时已随根 PRD §9.11a.2 改名为 `/api/trial/convert`(两行公式逐字相同),
+  #      签字规格里只有 convert、无 redeem 概念。全仓零调用、零消费点。
+  #   判定与证据链见 docs/changes/2026-08-13-trial-early-buy-adjudication.md。
+  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts"; do
     pat=${pair%%:*}; allow=${pair#*:}
     hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -vE "^($allow):" | head -5)
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside allow-list [$allow] (scanned $files_n files)";
