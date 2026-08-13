@@ -182,7 +182,7 @@ async function runRemoteMutation(kind: "claim" | "early", positionNo: string) {
     return true;
   } catch {
     // The request may have reached the service even when its response is unknown.
-    await staking.syncRemote().catch(() => {});
+    await staking.syncRemote();
     return false;
   } finally {
     const next = new Set(pendingRemoteMutations.value);
@@ -196,8 +196,9 @@ const nowTs = ref(Date.now());
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   if (!staking.isMockMode) {
-    void staking.syncRemote().catch(() => toast.error(t.value.stakingV3.toast.staleTitle));
-    timer = setInterval(() => { void staking.syncRemote().catch(() => {}); }, 4000);
+    // syncRemote 自吞不 reject(resilience 门);失败信号走返回值。
+    void staking.syncRemote().then((ok) => { if (!ok) toast.error(t.value.stakingV3.toast.staleTitle); });
+    timer = setInterval(() => { void staking.syncRemote(); }, 4000);
     return;
   }
   staking.markMatured();

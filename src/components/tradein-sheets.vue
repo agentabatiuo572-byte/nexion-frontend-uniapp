@@ -361,7 +361,7 @@ function onChooseFullPrice() {
       if (quote.decision === "NO_ACTIVE_DEVICE") {
         await handleNoActiveDeviceDecision({
           notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
-          refreshFleet: () => app.refreshRemoteFleet(),
+          refreshFleet: async () => { await app.refreshRemoteFleet(); }, // best-effort:失败自吞
         });
       }
     }).catch(() => toast.warn(t.value.tradein.errPleaseRetry));
@@ -559,7 +559,10 @@ async function submitCanonicalCapacityReplacement(
         }
       },
       refreshOrders: () => orders.refreshRemote(),
-      refreshFleet: () => app.refreshRemoteFleet(),
+      // refreshRemoteFleet 自吞不 reject(resilience 门);适配层升回 throw 保住验证链语义。
+      refreshFleet: async () => {
+        if (!(await app.refreshRemoteFleet())) throw new Error("E3_FLEET_REFRESH_UNAVAILABLE");
+      },
       verifyFleet(submitted) {
         const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
         const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
@@ -663,7 +666,7 @@ async function submitCanonicalKeepBuy(newKind: DeviceKind): Promise<void> {
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
     if (!persisted || persisted.productNo !== newKind) throw new Error("CAPACITY_KEEP_ORDER_READBACK_MISMATCH");
     await orders.refreshRemote();
-    await app.refreshRemoteFleet();
+    if (!(await app.refreshRemoteFleet())) throw new Error("E3_FLEET_REFRESH_UNAVAILABLE");
     capacityCommandKey.value = null;
     toast.success(fmt(t.value.tradein.keepBuySuccessToast, { newKind: kindLabel(newKind) }));
     hide();

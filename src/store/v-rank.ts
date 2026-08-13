@@ -233,15 +233,20 @@ export const useVRank = defineStore("vRank", () => {
 
   async function refreshCanonicalVRank() {
     if (!remoteApiEnabled) return;
-    const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
-    ladder.value = remoteLadder.ranks.map(canonicalRank);
-    myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
-    selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
-    directRefs.value = remoteCurrent.progress.directRefs;
-    teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
-    vDownlineCounts.value = Object.fromEntries(
-      Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
-    ) as Partial<Record<VRank, number>>;
+    try {
+      const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+      ladder.value = remoteLadder.ranks.map(canonicalRank);
+      myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
+      selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
+      directRefs.value = remoteCurrent.progress.directRefs;
+      teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
+      vDownlineCounts.value = Object.fromEntries(
+        Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
+      ) as Partial<Record<VRank, number>>;
+    } catch {
+      // 权威不可达是常态输入,不 reject(resilience 门):保留现值(bindAccount 后即空态),
+      // 页面 onShow 重试。
+    }
   }
 
   function setMyRank(v: VRank) {

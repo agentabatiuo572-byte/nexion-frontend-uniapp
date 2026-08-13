@@ -139,7 +139,7 @@ const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+  if (remoteApiEnabled) void payout.refreshRemote();
 });
 
 // Local edit buffer (committed on Save), mirroring the source useState.
