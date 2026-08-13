@@ -2811,10 +2811,10 @@ withdraw_bill_runtime_gate() {
 # 本门由当时的证伪探针**反极性**改成常设门:前 5 格【起点】/【活性】证明实验装置有效
 #(注入真生效 · 循环真在跑 · 对账真跑到了这个函数),没有它们最后一格无论红绿都不说明任何事。
 # 红测:把补扣格改成恒跳过 → 自愈那格判红。
-if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/selfcheck-withdraw-debit-selfheal.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
+if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-debit-selfheal-runtime.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
   ok "提现扣款自愈门 — $(grep -oE "[0-9]+ pass / [0-9]+ fail" /tmp/uniapp-wd-debit-selfheal.log | tail -1)"
 else
-  bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/selfcheck-withdraw-debit-selfheal.mjs 看明细"
+  bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/withdraw-debit-selfheal-runtime.mjs 看明细"
   grep -E "^  FAIL" /tmp/uniapp-wd-debit-selfheal.log | head -6
 fi
 }
