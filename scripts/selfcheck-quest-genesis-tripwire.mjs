@@ -23,7 +23,8 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { transform } from "esbuild";
+import { build } from "esbuild";
+import { atAliasResolver } from "./lib/at-alias.mjs";
 import { strip } from "./lib/strip-code.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -40,12 +41,41 @@ function check(name, cond, detail) {
 /**
  * 载入纯判定模块。传入 srcOverride 就载**改坏的那份**——红测必须把变异喂回真判据,
  * 而不是另写一个「看起来一样」的副本去自问自答(GEN10 v1 的红测就是那么假的)。
- * 模块只有 `import type`,esbuild 转译即擦除,不需要 bundle 也不会拉进整个 store。
+ *
+ * 🔴 必须 bundle,不能只 transform:本模块从 `@/store/genesis-config` 拿的是
+ *   `genesisBlockIsKnownUnavailable` 这个**值**(分档判定归本体所有,见该处注释),
+ *   不再是纯 `import type`。只 transform 的话 import 语句会原样留在 data: URL 里解析不了。
+ *   顺带的好处:红测跑的是**真的本体分类器**,本体改坏了这道门也会红。
  */
 async function loadPure(srcOverride) {
-  const source = srcOverride ?? readFileSync(path.join(root, PURE), "utf8");
-  const { code } = await transform(source, { loader: "ts", format: "esm" });
-  return import("data:text/javascript;base64," + Buffer.from(code, "utf8").toString("base64"));
+  const bundle = await build({
+    stdin: {
+      contents: `export { questLooksGenesisBound, unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";`,
+      resolveDir: root, loader: "ts",
+    },
+    bundle: true, write: false, format: "esm",
+    plugins: [
+      // 变异版从内存喂进去,不落盘 —— 红测绝不许改工作树
+      ...(srcOverride ? [{
+        name: "pure-override",
+        setup(b) {
+          b.onResolve({ filter: /quest-genesis-tripwire$/ }, () => ({ path: "pure", namespace: "override" }));
+          b.onLoad({ filter: /.*/, namespace: "override" }, () => ({ contents: srcOverride, loader: "ts", resolveDir: root }));
+        },
+      }] : []),
+      {
+        name: "runtime-stub",
+        setup(b) {
+          b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime", namespace: "stub" }));
+          b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
+            contents: "export const genesisApi = Object.freeze({});", loader: "js",
+          }));
+        },
+      },
+      { name: "alias", setup(b) { b.onResolve({ filter: /^@\// }, atAliasResolver(SRC, "selfcheck-quest-genesis-tripwire")); } },
+    ],
+  });
+  return import("data:text/javascript;base64," + Buffer.from(bundle.outputFiles[0].text, "utf8").toString("base64"));
 }
 
 /** 递归列出 src 下所有 .ts/.vue —— 任务面是开放集合,写死清单会漏掉新文件。 */
@@ -61,20 +91,28 @@ function allSources(dir = SRC, out = []) {
 console.log("selfcheck-quest-genesis-tripwire — 服务端派了不可能完成的创世任务时必须有人喊");
 
 const q = (questCode, name, status) => ({ questCode, name, layer: "WEEKLY_T1", rewardNex: 2500, status });
-const BLOCKS = ["configUnavailable", "marketClosed", "halted", "soldOut", "preSale"];
+/** 闸的全部档位;`configUnavailable` 单独列开 —— 它是「不知道」,不构成指控依据。 */
+const KNOWN_BLOCKED = ["marketClosed", "halted", "soldOut", "preSale"];
+const ALL_BLOCKS = ["configUnavailable", ...KNOWN_BLOCKED];
 
 // ══ ① 行为:纯函数固定靶 ═══════════════════════════════════════════════════════
 const pure = await loadPure();
 {
   const { unclaimableGenesisQuests: flag, questLooksGenesisBound: looks, genesisQuestContractViolation: msg } = pure;
 
-  // 五档阻断逐个隔离(别写「任一档命中即通过」——那样漏一档也绿)
-  for (const block of BLOCKS) {
+  // 四档**确定**阻断逐个隔离(别写「任一档命中即通过」——那样漏一档也绿)
+  for (const block of KNOWN_BLOCKED) {
     const hit = flag([q("WK_T1_GENESIS", "Acquire a Genesis Node", "PENDING")], block);
     check(`🔴 ① 阻断档「${block}」下派了待办创世任务 → 报警`, hit.length === 1, `实得 ${hit.length} 条`);
   }
   check(`① 可购买态(block=null)不报警`,
     flag([q("WK_T1_GENESIS", "Acquire a Genesis Node", "PENDING")], null).length === 0, "误报 = 正常态天天喊狼来了");
+  // 🔴 自审抓出的假警:configUnavailable = 「还不知道」,不是「已经关了」。
+  //   loaded 初值 false + cfg.refresh() 在 onMounted 之后 → 任务快照先到就会在启动窗口里
+  //   诬告服务端,并把一批断言 console error = 0 的运行时门连坐打红。
+  check(`🔴 ① 配置未知(configUnavailable)**不**报警(启动窗口的假警,不是违约)`,
+    flag([q("WK_T1_GENESIS", "Acquire a Genesis Node", "PENDING")], "configUnavailable").length === 0,
+    "报了 = 每次冷启动都可能诬告服务端一次");
 
   // 🔴 只算 PENDING —— 已挣到的奖励不许被指控,更不许顺着报警被藏掉
   for (const status of ["COMPLETED", "CLAIMABLE", "CLAIMED"]) {
@@ -92,6 +130,19 @@ const pure = await loadPure();
     && looks({ questCode: "", name: "GENESIS NODE" }), "大小写敏感 = 换个写法就静默");
   check(`① 无关任务不报警`,
     flag([q("WK_T1_STAKE", "Stake 500 NEX", "PENDING")], "marketClosed").length === 0, "误报");
+
+  // 🔴 档位台账不许漂:闸日后加第六档,必须有人明确判它算「确定关了」还是「还不知道」。
+  //   不焊这条,新档会默默落进 `!KNOWN_BLOCKED.has(block)` 的否定分支 = 静默不报警,
+  //   而「新增了一档阻断」恰恰是最该报警的时刻。判据锚在**类型声明本身**,不是我抄的副本。
+  // 🔴 必须先 strip 再匹配:类型声明每档后面跟着中文行注释,而 `halted` 那条注释里
+  //   写着「熔断(J 域既有闸;见下方注释」—— 里面那个**分号**会把非贪婪的 `[\s\S]*?;`
+  //   提前截断,只捞到前 3 档。本条首跑就是这么红的,红的是判据不是台账。
+  const declaredKinds = [...strip(readFileSync(path.join(root, "src/store/genesis-config.ts"), "utf8"), true)
+    .match(/export type GenesisPurchaseBlock =[\s\S]*?;/)?.[0]
+    .matchAll(/"([a-zA-Z]+)"/g) ?? []].map((m) => m[1]);
+  check(`🔴 ① 档位台账与 GenesisPurchaseBlock 类型声明一致(声明 ${declaredKinds.length} 档 / 台账 ${ALL_BLOCKS.length} 档)`,
+    declaredKinds.length === ALL_BLOCKS.length && declaredKinds.every((k) => ALL_BLOCKS.includes(k)),
+    `声明=${declaredKinds.join("/")} 台账=${ALL_BLOCKS.join("/")} —— 新档必须显式归类,不许默默落进「不报警」`);
 
   // 报警文案必须说清「谁 · 什么档 · 找谁修」,否则日志里没人知道该干嘛
   const line = msg([q("WK_T1_GENESIS", "Acquire a Genesis Node", "PENDING")], "marketClosed");
@@ -223,7 +274,8 @@ function unqatedGenesisEntries(files) {
 
   // ④a 报警判定被掏空 → ① 必须转红
   const gutted = mutate("报警恒返回空", pureSrc,
-    /if \(block === null\) return \[\];/, "if (block === null) return [];\n  return [];");
+    /if \(!genesisBlockIsKnownUnavailable\(block\)\) return \[\];/,
+    "if (!genesisBlockIsKnownUnavailable(block)) return [];\n  return [];");
   const gutMod = await loadPure(gutted);
   check(`🔴 红测:掏空报警判定后 ① 必须转红`,
     gutMod.unclaimableGenesisQuests([q("WK_GENESIS", "Genesis", "PENDING")], "marketClosed").length === 0
@@ -237,6 +289,19 @@ function unqatedGenesisEntries(files) {
   check(`🔴 红测:放宽 status 过滤后「CLAIMABLE 不报警」必须转红`,
     wideMod.unclaimableGenesisQuests([q("WK_GENESIS", "Genesis", "CLAIMABLE")], "marketClosed").length === 1,
     "放宽了还不红 = 那条断言恒真,拦不住「藏掉已得奖励」这个更坏的改法");
+
+  // ④b2 拿掉「只认确定阻断」的收窄 → 「configUnavailable 不报警」必须转红
+  //     (与 ④b 分开:那条测的是 status 收窄,这条测的是 block 收窄,合取项逐个隔离)
+  const anyBlock = mutate("阻断档收窄被拿掉(退回只判 null)", pureSrc,
+    /if \(!genesisBlockIsKnownUnavailable\(block\)\) return \[\];/, "if (block === null) return [];");
+  const anyMod = await loadPure(anyBlock);
+  check(`🔴 红测:拿掉「只认确定阻断」后「configUnavailable 不报警」必须转红`,
+    anyMod.unclaimableGenesisQuests([q("WK_GENESIS", "Genesis", "PENDING")], "configUnavailable").length === 1
+    && pure.unclaimableGenesisQuests([q("WK_GENESIS", "Genesis", "PENDING")], "configUnavailable").length === 0,
+    "拿掉了还绿 = 那条断言恒真,启动窗口的假警拦不住");
+  check(`🔴 红测:同一变异下四档确定阻断仍必须报警(不能靠「全都不报」来通过上一条)`,
+    KNOWN_BLOCKED.every((b) => anyMod.unclaimableGenesisQuests([q("WK_GENESIS", "Genesis", "PENDING")], b).length === 1),
+    "变异把报警整个关掉了 = 上一条的红是假红");
 
   // ④c 句柄只剩 questCode → 「name 命中」必须转红
   const codeOnly = mutate("句柄砍掉 name", pureSrc,
@@ -303,5 +368,5 @@ navTo("/genesis");
     "真源码脏了 = 红测把工作树改坏了");
 }
 
-console.log(`\n${pass} pass / ${fail} fail(样本:5 档阻断 × 4 种 status 固定靶 · 2 个句柄字段 · 接线数据流 · 全 src 派生任务面 · 13 条红测各自先证变异生效)`);
+console.log(`\n${pass} pass / ${fail} fail(样本:4 档确定阻断 + 1 档「不知道」 × 4 种 status 固定靶 · 档位台账锚类型声明 · 2 个句柄字段 · 接线数据流 · 全 src 派生任务面 · 15 条红测各自先证变异生效)`);
 process.exit(fail === 0 ? 0 : 1);

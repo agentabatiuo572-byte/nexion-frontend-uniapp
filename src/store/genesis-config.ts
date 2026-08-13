@@ -98,6 +98,19 @@ export function genesisShowsUrgency(block: GenesisPurchaseBlock): boolean {
 }
 
 /**
+ * 这个阻断档是不是「**确定**买不了」——`configUnavailable` 意为「还不知道」,不算。
+ *
+ * 🔴 为什么这条也必须住在本体里:调用方(周任务报警器)原本自己抄了一份四档白名单,
+ *   ④a 当场判红,判得对 —— 抄一份就等于**多一处会漂的档位副本**,本体改名它静默失效,
+ *   而它失效的表现是「报警从此不响」,没有任何编译期信号。放在这里,改名即编译错。
+ * 🔴 与 genesisShowsUrgency 的区别:那条管「能不能催」,这条管「能不能据此下结论」。
+ *   两者对 `preSale` 的取值恰好相反(未开售可以催、也确实买不了),别合并。
+ */
+export function genesisBlockIsKnownUnavailable(block: GenesisPurchaseBlock): boolean {
+  return block !== null && block !== "configUnavailable";
+}
+
+/**
  * **二级市场**(承接他人挂单)的阻断判定。
  *
  * 与主售只差两处输入:二级卖的是**别人手里的存量**,主售售罄或未开售都不妨碍转让,

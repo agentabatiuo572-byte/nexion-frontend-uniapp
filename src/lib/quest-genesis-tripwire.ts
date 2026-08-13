@@ -24,7 +24,7 @@
 //
 // 机器门:`scripts/selfcheck-quest-genesis-tripwire.mjs`(行为固定靶 + 接线 + 反向钉 + 红测)。
 import type { CanonicalQuest } from "@/api/quest-api";
-import type { GenesisPurchaseBlock } from "@/store/genesis-config";
+import { genesisBlockIsKnownUnavailable, type GenesisPurchaseBlock } from "@/store/genesis-config";
 
 /**
  * 这条任务是否指向创世购买。
@@ -38,18 +38,35 @@ export function questLooksGenesisBound(quest: Pick<CanonicalQuest, "questCode" |
   return /genesis/i.test(quest.questCode) || /genesis/i.test(quest.name);
 }
 
+// 🔴 已知会**多报**的一种(自审登记,不留成沉默的谎):形如「逛一逛创世二级市场」的任务
+//   在 `soldOut` 档会被判成不可完成,而二级市场**恰恰不受主售售罄影响**
+//   (`genesisSecondaryBlock` 明确把售罄与未开售喂成恒不命中——卖的是别人手里的存量)。
+//   为什么不修:句柄只有字符串,分不出「买创世」与「逛二级」;而这是**报警不是过滤**——
+//   多报的代价是一行日志,漏报的代价是回到今天,两边都受得住。真要分得清,得靠服务端
+//   在 CanonicalQuest 上给出它自己的可用性判定(见 U-16 末段的建议),不是客户端再猜一层。
+
 /**
  * 服务端派了、而本地闸判「现在买不了」的创世任务。
  *
  * 🔴 只算 PENDING。COMPLETED / CLAIMABLE 是用户**已经挣到**的奖励,创世关不关都得让他领;
  *   CLAIMED 已经结束。把这三档算进来,报警就会去指控一件正确的事,而顺着报警做过滤
  *   更会变成「关闭态吞掉已得奖励」——比它想防的那个问题更坏。
+ *
+ * 🔴 `configUnavailable` **不算阻断**(自审抓出的假警,首版把它算进去了)。它的语义是
+ *   「配置还不知道」,不是「已经关了」——而 `useGenesisConfig()` 的 `loaded` 初值就是 false,
+ *   `cfg.refresh()` 要等 onMounted 之后才落地。于是只要**任务快照先于创世配置到达**
+ *   (两条独立异步链,谁先到不由我们决定),报警就会在启动窗口里指控服务端违约。
+ *   这种假警比漏报坏两层:① 它诬告的是一件正确的事;② 运行时探针断言 console error = 0,
+ *   假警会把一批与创世毫无关系的门打红,而下一个人只会学到「这道报警不可信」。
+ *   闸对**购买**保守锁死是对的(不知道就别放行);对**指控**必须反过来:不知道就别喊。
  */
 export function unclaimableGenesisQuests(
   quests: readonly CanonicalQuest[],
   block: GenesisPurchaseBlock,
 ): CanonicalQuest[] {
-  if (block === null) return [];
+  // 🔴 分档判定走**本体**导出的 genesisBlockIsKnownUnavailable,不在这抄一份四档白名单。
+  //   抄的那一版被 GEN10 ④a 当场判红,判得对:副本会漂,而漂了的表现是「报警从此不响」。
+  if (!genesisBlockIsKnownUnavailable(block)) return [];
   return quests.filter((quest) => quest.status === "PENDING" && questLooksGenesisBound(quest));
 }
 
