@@ -215,11 +215,11 @@ function statusLabel(s: OrderStatus): string {
     case "provisioning": return t.value.orders.statusProvisioning;
     case "activated": return t.value.orders.statusActivated;
     case "cancelled": return t.value.orders.cancelStatus;
-    case "payment_failed": return "支付失败";
-    case "expired": return "支付已过期";
-    case "provisioning_failed": return "履约失败";
-    case "refunded": return "已退款";
-    case "chargeback": return "付款争议";
+    case "payment_failed": return t.value.orders.statusPaymentFailed;
+    case "expired": return t.value.orders.statusExpired;
+    case "provisioning_failed": return t.value.orders.statusProvisioningFailed;
+    case "refunded": return t.value.orders.statusRefunded;
+    case "chargeback": return t.value.orders.statusChargeback;
   }
 }
 
