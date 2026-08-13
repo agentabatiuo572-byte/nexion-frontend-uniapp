@@ -507,9 +507,12 @@ else
 fi
 sentinel_present "daily sign-in atomic seam names canonical endpoint" src/pages/daily/daily.vue 'POST /api/faucet/sign-in'
 sentinel_present "daily milestone atomic seam is honest TBD" src/pages/daily/daily.vue 'milestone-claim endpoint TBD'
-sentinel_present "weekly quest atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{tier2/:id\}'
-sentinel_present "weekly tier1 atomic seam names canonical endpoint" src/components/home/weekly-quest-hero.vue 'POST /api/quests/weekly/\{tier1\}'
-sentinel_present "weekly bonus atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{bonus\}'
+# 🔴 2026-08-13 三条重锚:原先钉的是**组件注释**里的 `POST /api/quests/weekly/{tier1|tier2|bonus}`。
+#   领奖已下沉到接口层(组件只调 `wq.claim(q)`),那三个路径全仓已无实现,注释也随之删掉 —— 判据过期。
+#   重锚到端点**真正被写出来的地方**,而且钉的是**真实代码不是注释**:注释会漂,代码不会。
+#   领奖端点现为 `/api/quests/{questCode}/claim`,状态端点为 `/api/quests/state`。
+sentinel_present "weekly quest claim seam names canonical endpoint" src/api/quest-api.ts '/api/quests/\$\{encodeURIComponent'
+sentinel_present "weekly quest state seam names canonical endpoint" src/api/quest-api.ts '"/api/quests/state"'
 sentinel_present "event claim atomic seam is honest TBD" src/pages/events/events.vue 'event-claim endpoint TBD'
 if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
   bad "SPEC-1 R7 hashpower must not read/import view carrier"
@@ -1034,7 +1037,12 @@ spec2_pc_gpu_kind_coverage() {
 }
 spec2_pc_gpu_kind_coverage
 sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/earn/compute-share-entry.vue 'isEnabled\("computeShareEnabled"\)'
-sentinel_present "SPEC-2 dev config mutation production guarded" src/store/config.ts 'if \(IS_PRODUCTION\) return'
+# 🗑 2026-08-13 退役:原哨兵钉 `if (IS_PRODUCTION) return` 这个**字面写法**,
+#   而实现已加严成 `if (remoteApiEnabled || IS_PRODUCTION) return`(多拦一层远端档)—— 判据过期。
+#   它守的不变量(开发后门在生产构建里必须失效)**已被 SPEC-2 guard semantics 里的派生判据完全覆盖**:
+#   那条枚举 config.ts 里所有 `_dev*` 后门,逐个要求函数体里有 IS_PRODUCTION 早退,
+#   写法随便但一个都不许漏 —— 比这条字面哨兵严格更强(它对**新增的后门**是瞎的)。
+#   红测证据:拆掉任一后门的守卫 / 新增一个没守的后门,派生判据都判红。
 sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
 sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
 sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-if="enabled" class="pb-8"'
