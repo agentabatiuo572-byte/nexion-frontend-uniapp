@@ -128,10 +128,18 @@ const LEDGER = {
   "GET /api/quest": "PRD §9.11c.2",
   "POST /api/quest/complete": "PRD §9.11c.2",
   "GET /api/quests/weekly": "PRD §9.11c.2",
-  "POST /api/quests/weekly/{tier1}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{tier2/:id}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{bonus}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{tier1|tier2/:id|bonus}": "PRD §11.13.5",
+  // 🔴 2026-08-13:周任务的**真实**端点是 `GET /api/quests/state`,不是 PRD 写的
+  //   `/api/quests/weekly` —— 后者全仓已无任何实现(只剩 mock 文件里一处注释)。
+  //   四条 `POST /api/quests/weekly/{...}` 已随领奖服务端化退役,本轮从台账删除。
+  //   领奖现在走 `questApi.claim(questCode, key)` + 回读确认,路径见下。
+  //   ⚠️ 已请后端在交接书 U-16 里确认以哪个为准;在那之前按代码实际路径登记,不按 PRD 登记 ——
+  //   台账要反映**代码真实引用**,PRD 与实现不一致时那本身就是要暴露的事。
+  "GET /api/quests/state": "PRD §9.11c.2(⚠️ PRD 写的是 /api/quests/weekly,实现用 state,已交底 U-16)",
+  // 2026-08-13 对齐轮补登(逐个回源核实过:5 个在 src/api 下都有真实现,不是笔误也不是虚构)
+  "/api/app/wallet/sandbox": "TBD: 沙箱资金档的钱包面,PRD 未定义;仅在 fundsSandboxEnabled 档可达",
+  "/api/orders": "PRD §9.11d(单品下单;组合购尚无整单定价契约,见 bundle.vue 注释)",
+  "/api/devices/earnings": "TBD: 设备收益投影,PRD 未单列章节",
+  "/api/config/phone-tiers": "TBD: 机型档位配置,PRD 未单列章节",
   "POST /api/faucet/sign-in": "PRD §11.12",
   "POST /api/nex/sign-in": "TBD: PRD 用 POST /api/faucet/sign-in;本处为旧候选名,接后台时以 faucet 为准",
   "POST /api/me/milestones/:id/claim": "PRD §11.3a",
@@ -166,7 +174,9 @@ const LEDGER = {
   "GET /api/pool/state": "PRD §8.5.2",
   "GET /api/server-time": "PRD §9.11a.4",
   "GET /api/market": "TBD: 与 §10.3 `/api/market/nex` 是同一个平台牌价,重复候选名;注释应改指 /api/market/nex",
-  "/api/market/nex": "PRD §10.3(WebSocket 推送)",
+  // 🗑 2026-08-13 删除 `/api/market/nex`(原出处 PRD §10.3 WebSocket 推送):
+  //   代码注释里已无该引用 —— 回源确认是 c37e642 / 82d4f51 两笔服务端权威化改造里去掉的,
+  //   不是笔误也不是被误删。台账只反映**代码真实引用**,留着过期条目会让本门变成只增不减的垃圾场。
   "GET /api/market/tokens": "PRD §11.9.3",
   "GET /api/admin/platform/phase-config": "PRD §9.11d",
   "PUT /api/admin/tradein/config": "TBD: PRD 未定义置换配置写接口(admin 侧,候选名)",
