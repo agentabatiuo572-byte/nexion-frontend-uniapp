@@ -167,8 +167,10 @@ const amberTagStyle: CSSProperties = {
 const catalogStateStyle: CSSProperties = {
   padding: "18px 16px",
   borderRadius: "16px",
+  // 《03》§3:带填充的卡片一律零 border,层级靠 surface 微差色。
+  // 删 border 不会让它隐形 —— surface 与页面底 bg 两个主题都是有差的
+  // (亮:#FFFFFF on #F4F1E9;暗:#141414 on #000000),不是「底色与父同色」那种坑。
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const catalogStateTitleStyle: CSSProperties = {
   fontSize: "15px",
