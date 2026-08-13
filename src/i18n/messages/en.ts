@@ -2153,7 +2153,7 @@ export const en = {
     trackEtaDone: "Funds delivered to your address",
 
     withdrawBillWriteFailed: "Withdrawal submitted, but the bill entry could not be saved. You can still track it on the withdrawal status page.",
-    withdrawDebitFailed: "Withdrawal submitted. The balance shown on this device is too high — it still includes this withdrawal, and reopening the app will not correct it. Go by the withdrawal status page, and do not start another withdrawal based on the balance shown here.",
+    withdrawDebitFailed: "Withdrawal submitted. The balance shown on this device is temporarily too high — it still includes this withdrawal and will correct itself shortly. Go by the withdrawal status page, and do not start another withdrawal based on the balance shown until it does.",
     withdrawSubmittedOtherAccountTitle: "Withdrawal submitted",
     withdrawSubmittedOtherAccountBody: "You signed in to a different account while this was being sent. The withdrawal belongs to the previous account — sign back in to that account to follow it.",
 

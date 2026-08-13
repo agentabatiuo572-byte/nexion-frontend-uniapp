@@ -1393,8 +1393,13 @@ export const useApp = defineStore("app", () => {
     // 判据是**磁盘值**,不是 min(内存, 磁盘)。合并层的真值是 `disk + (next − base)`,
     // 而 base ≡ 上次落盘时的内存态,所以本次扣款落盘后余额 = `disk − amount` —— 判 disk 才对。
     // 上一版写 min() 是错的(独立复核实测):disk 比内存**多**时(另一标签页刚退款 / 刚入金,
-    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,而扣款**没有自愈** = 余额永久虚高,
-    // 正好退回本包要修的那个原状态。取不到盘(storage 不可用)才回落内存。
+    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,正好退回本包要修的那个原状态。
+    // 取不到盘(storage 不可用)才回落内存。
+    // ⚠️ 这段原本还写着「而扣款**没有自愈** = 余额永久虚高」—— 那句话 2026-08-13 起**已失效**:
+    // 本函数返回 false 之后,App.vue 的 5s 对账(⓪b 补扣格)会从数据推出「该扣没扣」并重试,
+    // 由 scripts/withdraw-debit-selfheal-runtime.mjs 行为级守住。判假不再是终局。
+    // 但**这不表示可以放宽本闸**:自愈补的是「本该成功却没落地」的扣款,不是「余额真不够」——
+    // 判据取错(比如改回 min())仍会让一笔合法扣款被反复拒到余额涨上来为止。
     const authoritativeBalance = typeof stored?.user?.usdtBalance === "number"
       ? stored.user.usdtBalance
       : currentUser.usdtBalance;

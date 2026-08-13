@@ -2080,7 +2080,7 @@ export const zh: Messages = {
     trackEtaDone: "资金已送达你的地址",
 
     withdrawBillWriteFailed: "提现已提交,但账单记录写入失败。可在提现进度页查看这笔提现。",
-    withdrawDebitFailed: "提现已提交。本机显示的余额偏高,仍包含这笔提现的金额,重开也不会自动更正 —— 请以提现进度页的单据为准,不要按当前余额再提一笔。",
+    withdrawDebitFailed: "提现已提交。本机显示的余额暂时偏高,仍包含这笔提现的金额,稍后会自动更正 —— 请以提现进度页的单据为准,在更正前不要按当前余额再提一笔。",
     withdrawSubmittedOtherAccountTitle: "提现已提交",
     withdrawSubmittedOtherAccountBody: "发送期间你登录了另一个账号。这笔提现属于原来那个账号,登回该账号即可查看进度。",
 

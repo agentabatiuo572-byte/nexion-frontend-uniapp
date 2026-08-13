@@ -2804,21 +2804,28 @@ withdraw_bill_runtime_gate() {
     bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
     grep -E "^  FAIL" /tmp/uniapp-withdraw-bill-runtime.log | head -8 | sed 's/^/        /'
   fi
-
-# 提现扣款自愈门(2026-08-13 立)。守:扣款落盘失败后,5s 对账循环必须把那笔钱补扣回来。
-# 缺陷现场:提现页建单成功后只调一次扣款,报假只弹 toast 就再不重试;而报假时幂等键没置位,
-# 于是服务端已扣钱、本地余额一分没动且**永不再补** —— 可提余额永久虚高,还能照虚高值再提一笔。
-# 本门由当时的证伪探针**反极性**改成常设门:前 5 格【起点】/【活性】证明实验装置有效
-#(注入真生效 · 循环真在跑 · 对账真跑到了这个函数),没有它们最后一格无论红绿都不说明任何事。
-# 红测:把补扣格改成恒跳过 → 自愈那格判红。
-if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-debit-selfheal-runtime.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
-  ok "提现扣款自愈门 — $(grep -oE "[0-9]+ pass / [0-9]+ fail" /tmp/uniapp-wd-debit-selfheal.log | tail -1)"
-else
-  bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/withdraw-debit-selfheal-runtime.mjs 看明细"
-  grep -E "^  FAIL" /tmp/uniapp-wd-debit-selfheal.log | head -6
-fi
 }
 withdraw_bill_runtime_gate
+
+# 提现扣款自愈门(2026-08-13 立)。守:扣款报假之后,5s 对账循环必须把那笔钱补扣回来。
+# 缺陷现场:提现页建单成功后只调一次扣款,报假只弹 toast 就再不重试;而报假时幂等键没置位,
+# 于是服务端已扣钱、本地余额一分没动且**永不再补** —— 可提余额永久虚高,还能照虚高值再提一笔。
+# 本门由当时的证伪探针**反极性**改成常设门:前 8 格【起点】/【活性】证明实验装置有效
+#(夹具金额构造对 · 两个入口的注入真生效 · 循环真在跑 · 对账真跑到了那个函数),
+# 没有它们,最后几格无论红绿都不说明任何事。
+# 🔴 它守不到「补扣格排在退款腿之前」这条顺序不变量(13s 内跑 ≥2 拍会自己收敛,
+#    错误余额只存在一拍) —— 那条由 selfcheck-fastlane 的接线门② 守,两道互补。
+# 🔴 必须自成一个函数 + 自己的调用行:它一度被塞在 withdraw_bill_runtime_gate 函数体内,
+#    那样删掉账单行那道门会**静默带走**本门(新门搭旧门的车 = 迟早一起消失)。
+withdraw_debit_selfheal_gate() {
+  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-debit-selfheal-runtime.mjs > /tmp/uniapp-wd-debit-selfheal.log 2>&1; then
+    ok "提现扣款自愈门 — $(grep -oE "[0-9]+ pass / [0-9]+ fail" /tmp/uniapp-wd-debit-selfheal.log | tail -1)"
+  else
+    bad "提现扣款自愈门失败 — BASE_URL=$BASE_URL node scripts/withdraw-debit-selfheal-runtime.mjs 看明细"
+    grep -E "^  FAIL" /tmp/uniapp-wd-debit-selfheal.log | head -6 | sed 's/^/        /'
+  fi
+}
+withdraw_debit_selfheal_gate
 
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
