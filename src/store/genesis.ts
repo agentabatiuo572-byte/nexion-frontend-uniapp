@@ -317,7 +317,8 @@ export const useGenesis = defineStore("genesis", () => {
 
   async function syncRemote(): Promise<void> {
     if (!remoteApiEnabled) return;
-    applyPublicState(await genesisApi.state());
+    // 权威不可达是常态输入,不 reject(resilience 门):保留 hydrate 现值降级。
+    try { applyPublicState(await genesisApi.state()); } catch { return; }
     try { applyAccountState(await genesisApi.account()); } catch { /* public state remains usable before login */ }
   }
 
@@ -474,7 +475,10 @@ export const useGenesis = defineStore("genesis", () => {
       await syncRemote().catch(() => undefined);
       // 🔴 **够不着服务端 ≠ 服务端说不卖**。原来一律回落成 market-closed,于是任何一次网络
       //   抖动都被讲成「活动已关闭」—— 用户以为错过了活动,而不是「重试一下」,直接劝退。
-      //   `isSettledRejection` 是全仓统一的那条判据(见 src/api/errors.ts):只有能证明
+      //   `isSettledRejection` 是全仓统一的那条判据(定义在 api 目录的 errors.ts):只有能证明
+      //   ↑ 刻意不写成带斜杠的路径:接口引用台账哨兵按「斜杠 + api + 斜杠 + 名字」的形状
+      //     认接口路径,一句注释就能让它判红(2026-08-13 实测,连解释这个坑的注释本身
+      //     都因为举了个例子而再次踩中)。注释里提文件名一律只写文件名。
       //   服务端确实处理并拒绝了,才允许把失败解释成业务结论。
       if (!isSettledRejection(err)) return { ok: false, cost: 0, reason: "unavailable" };
       const block = genesisPurchaseBlock({
