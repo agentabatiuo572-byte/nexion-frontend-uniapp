@@ -947,7 +947,7 @@ onLaunch(() => {
     // Public server configuration is warmed at launch. Each store starts
     // empty/fail-closed, so a failed request cannot expose prototype values.
     void refreshEarnConfig().catch(() => undefined);
-    void useMarket().syncRemote().catch(() => undefined);
+    void useMarket().syncRemote();
     // The server catalog is a USER-only resource. Clear any local compatibility
     // rows at startup, then let the authenticated Store entry fetch it; an
     // unauthenticated launch must not turn its expected 401 into a fake catalog

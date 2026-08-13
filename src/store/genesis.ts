@@ -472,7 +472,7 @@ export const useGenesis = defineStore("genesis", () => {
       clearPurchaseIntent();
       return { ok: true, cost: n * beforePrice };
     } catch (err) {
-      await syncRemote().catch(() => undefined);
+      await syncRemote(); // 自吞不 reject(resilience 门;z6 审计清死 catch)
       // 🔴 **够不着服务端 ≠ 服务端说不卖**。原来一律回落成 market-closed,于是任何一次网络
       //   抖动都被讲成「活动已关闭」—— 用户以为错过了活动,而不是「重试一下」,直接劝退。
       //   `isSettledRejection` 是全仓统一的那条判据(定义在 api 目录的 errors.ts):只有能证明

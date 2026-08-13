@@ -56,9 +56,24 @@ free-trial 缝在 harness 里加载即崩、基数台账过期(16 vs 实扫 27)�
    `"import.meta.env": "{}"` 兜底(最长匹配优先),未来新增 env 键读 undefined 而不是崩。
 2. **EXPECTED_SEAMS 16 → 27**:27 条逐一回源确认全部是「remote 开 + void 触发」的远端读缝;
    新增 11 条系 z1 R2 扫描面三族扩收后进来的既有缝,非本轮新增行为。
-3. **已知盲区注释**:.vue 文件里的 void 裸发不在扫描面(声明与调用跨文件)。本轮实锤 1 例:
-   orders#refreshRemote 被 checkout:933 裸 void(已修调用点;orders 契约保持 reject,
-   因其 await 消费方靠 reject 中断验证链)。扩面待议。
+3. **已知盲区注释**(独立审计后修订):真正的盲区 = 跨文件声明/调用对(.vue 与 .ts 均算)
+   + 无 void 关键字的裸调用(定时器回调)+ 非 async 声明的 promise 包装函数。已核成员:
+   orders#refreshRemote(调用点全带 catch,契约保留 reject;checkout:933 补 .catch)、
+   order-canonical / use-remote-account-state(自吞,安全)、market#syncRemote(**审计 P0
+   实锤**:wallet-nex 的 setInterval 裸发 tickPrice,原 throw 每 3s 一个 unhandledRejection
+   ——已改自吞返 boolean,三处死 catch 同步清理)。扩面到跨文件扫描待议。
+
+## 审计轮(nexion-audit,两 skeptic 对抗证伪)
+
+- **P0×1 修复**:market#syncRemote 自吞化(见上)。
+- **P1×5 处置**:①payout saveRemoteAddress 回读改直读服务端(并发后台刷新抢 version 会让
+  superseded→true 假成功——回读在写之后单调最新,++version 作废在飞旧读后直接应用);
+  ②③盲区表述修订(见上);④esbuild define 解构盲区记入门注释(当前 0 使用,dormant);
+  ⑤门增第 6 断言:boolean 缝靶态下必须 false(反「谎报成功」),红测类 6 配套。
+- **P2×5 记录不修**:app.ts 双切号竞态残留 loading(新行为更正确,5s 自愈);wallet-bills
+  死 try/catch(serverError 双源已盖);checkout 合成错误 kind 恒 network(方向保守安全,
+  幂等键保留=防重复下单);genesis.ts:475 死 catch(已清,升级为修);earn.vue:150(已披露,
+  等 trial 线)。
 
 ## 红测(变异→门必红→还原,5/5)
 

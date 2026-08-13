@@ -157,19 +157,27 @@ for (const t of uniq) {
   const key = `${t.file}#${t.fn}`;
   const modName = t.file.replace(/^src\//, "@/").replace(/\.ts$/, "");
   const before = globalThis.__z1ApiCalls;
+  let resolved;
   try {
     const mod = await loadEntry(`export * from "${modName}";`);
     // 直调导出的刷新函数(若导出);否则触发 use store + bindAccount(常见 void 调用点)。
     if (typeof mod[t.fn] === "function") {
-      await mod[t.fn]();
+      resolved = await mod[t.fn]();
     } else {
       const useName = Object.keys(mod).find((k) => k.startsWith("use"));
       const store = useName ? mod[useName]() : null;
-      if (store && typeof store[t.fn] === "function") await store[t.fn]();
+      if (store && typeof store[t.fn] === "function") resolved = await store[t.fn]();
       else if (store && typeof store.bindAccount === "function") store.bindAccount("resilience-probe@nexgrid.test");
     }
   } catch (err) {
     check(`${key} await 后 resolve(权威不可达不许 reject 冒泡)`, false, String(err?.message ?? err).slice(0, 160));
+    continue;
+  }
+  // 🔴 z6 审计 F5:靶态=API 全抛,返回 boolean 的缝此时 resolve true = 谎报成功——
+  //    staking.vue 一类「.then(ok => !ok && toast)」的返回值消费者会被静默哄哑。
+  //    boolean 缝在靶态下必须 false;非 boolean(void)缝不在此断言内。
+  if (typeof resolved === "boolean" && resolved !== false) {
+    check(`${key} 靶态下 boolean 返回值必须 false(不许谎报成功)`, false, `resolved ${resolved}`);
     continue;
   }
   // 让 fire-and-forget 的调用有机会发出去
@@ -193,9 +201,16 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
 // genesis / nex-faucet / notifications / payout-address / quest / referral-reward /
 // repurchase / risk-disclosure / staking / tickets / v-rank / voucher×2 / weekly-quest),
 // 全部是「remote 开 + void 触发」的远端读缝,不变量适用全体,无一例外。
-// ⚠️ 已知扫描盲区:**.vue 文件里的 void 裸发**不在扫描面(声明与调用跨文件,本门的
-// 同文件定位逻辑天然测不到)。z6 实锤 1 例:orders#refreshRemote 被 checkout 裸 void
-// (已在调用点补 .catch;orders 契约保持 reject,因其 await 消费方靠 reject 中断验证链)。
+// ⚠️ 已知扫描盲区(z6 审计 F2/F3 修订):真正的盲区是**跨文件的声明/调用对**(.vue 或 .ts
+//    都算)+ **无 void 关键字的裸调用**(定时器/事件回调里 `() => x.f()`)+ **非 async 声明的
+//    promise 返回包装函数**——三者叠加让 market#syncRemote/tickPrice 曾三重不可见
+//    (P0:wallet-nex 的 setInterval 每 3s 一个 unhandledRejection,已改自吞)。
+//    z6 已核跨文件族成员:orders#refreshRemote(调用点全带 catch,契约保留 reject)、
+//    order-canonical#refreshCanonicalOrders(自吞)、use-remote-account-state(自吞、无调用方)、
+//    market(已修)。扩面到跨文件扫描待议——本门维持 store 内构造性判据 + 人工登记跨文件族。
+// ⚠️ harness env 提示(z6 审计 F4):esbuild define 只匹配**点式成员访问**;若未来有模块用
+//    解构 `const { K } = import.meta.env` 读键,拿到的是 undefined(静默错模式)。当前全仓 0 处
+//    解构读法;新增时必须改用点式或在此补 define。
 const EXPECTED_SEAMS = 27;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);

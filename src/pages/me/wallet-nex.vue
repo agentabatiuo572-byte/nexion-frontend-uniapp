@@ -158,7 +158,7 @@ const commission = useCommission();
 let priceTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
   if (!market.isMockMode) {
-    void market.syncRemote().catch(() => {});
+    void market.syncRemote();
   }
   priceTimer = setInterval(() => market.tickPrice(), 3000);
 });
