@@ -124,6 +124,15 @@ runtime_flag_parity_gate() {
   fi
 }
 runtime_flag_parity_gate
+api_idempotency_key_gate() {
+  if "$NODE_BIN" scripts/api-idempotency-key-gate.mjs > /tmp/uniapp-idem-key.log 2>&1; then
+    ok "接口幂等键稳定性门 — $(tail -1 /tmp/uniapp-idem-key.log)"
+  else
+    bad "接口幂等键不稳定 — node scripts/api-idempotency-key-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|        )" /tmp/uniapp-idem-key.log | head -10 | sed "s/^/        /"
+  fi
+}
+api_idempotency_key_gate
 
 echo -e "${C}[1] vue-tsc type-check${N}"
 if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then

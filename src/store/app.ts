@@ -666,6 +666,9 @@ export const useApp = defineStore("app", () => {
       proofNonce: task.proofNonce, proofExpiresAt: task.proofExpiresAt });
   }
 
+  // IDEMPOTENCY-FRESH-OK: 按分钟分桶:同一分钟内重试复用同一把。
+  // ⚠️ 已知上限:超过 60s 再重试就是新键。任务领取/完成走的是服务端权威状态机(claim 已被别人
+  //    领走会被拒),所以窗口内不会重复发奖;真要收紧应改成「按 taskNo 冻结」而不是按时间分桶。
   function taskMutationKey(scope: string): string {
     return `e18:${scope}:${Math.floor(Date.now() / 60000)}`;
   }
