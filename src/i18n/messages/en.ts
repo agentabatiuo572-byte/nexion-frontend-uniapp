@@ -2017,7 +2017,7 @@ export const en = {
   },
   wallet: {
     title: "Wallet",
-    usdtBalance: "Withdrawable USDT",
+    usdtBalance: "USDT balance",
     nexBalance: "NEX Balance",
     pending: "Pending",
     reviewingEarnings: "Under review",
@@ -2332,7 +2332,7 @@ export const en = {
     slotsOpen: "{n} device slot open",
     slotsOpenPlural: "{n} device slots open",
     addDeviceCta: "Add device →",
-    usdtBalance: "Withdrawable USDT",
+    usdtBalance: "USDT balance",
     pendingHint: "+${n} pending · auto-settles every 24h",
     walletBucketsHint: "${review} under review · ${locked} locked",
     nexTokens: "NEX tokens",
