@@ -55,6 +55,10 @@ const SITES = [
   "src/pages/me/wallet-cards-new.vue",
   // 包 E(2026-08-06):迁移期中途换绑单 $1 一律返还(主人拍板),稳定 ref=legacy-rebind-refund:<账号>
   "src/store/payout-address.ts",
+  // ⚠️ 2026-08-13 我一度把 src/store/genesis.ts 加进来 —— **加错门了**:
+  //   本门 ④ 扫的是「记账分录的 ref」,而创世购买用的是**接口幂等键**(函数实参),载体不同,
+  //   于是扫不到任何 ref、判据空转判红。同一条不变量、不同的载体,应该分门管。
+  //   接口幂等键那一族已另建 scripts/api-idempotency-key-gate.mjs。
 ];
 
 console.log("selfcheck-claim-idempotency — 领奖族:发钱可重放,资格只消费一次");

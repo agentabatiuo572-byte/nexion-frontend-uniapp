@@ -409,15 +409,59 @@ export const useGenesis = defineStore("genesis", () => {
   // 快照按账号走);genesis store 只保留全平台市场态(soldSlots/nexListed),
   // 设备级存 per-user 凭证会跨账号继承 → 资格门旁路(审计 P1)。
 
+  /**
+   * 🔴🔴 同一笔创世购买意图的幂等键 —— **跨重试复用,不是每次现造**。
+   *
+   * 缺陷现场(2026-08-13 对齐轮回源发现):原写法是
+   *   `genesis-purchase:${boundKey}:${Date.now()}:${Math.random()…}`
+   * —— 每调一次就是一把新键,**服务端的幂等去重永远命中不了**。
+   * 于是「购买超时 / 断网(而服务端其实已经成交)→ 用户再点一次」= 服务端当成新请求 = **真买两笔**。
+   * 这正是本仓幂等门 ④ 明令禁止的形态(「带时间戳判重永不命中,幂等出口退化成普通出口」),
+   * 只是本 store 当时不在那道门的名单里,所以一直没人管。
+   *
+   * 判据:**换了任何一样「用户在要什么」的东西,才是另一笔意图**。
+   * 签名 = 账号 | 数量 | 指定的 tokenId 集合。意图不变则重试沿用同一把键;
+   * 成交后作废(下一次点购买是新的一笔意图)。
+   *
+   * ⚠️ 故意不带时间 / 随机数 / 价格:
+   * · 时间与随机数会让重试变成新请求(就是上面那个缺陷);
+   * · 价格是**平台状态**不是「用户在要什么」—— 把它放进签名,行情一动键就换,
+   *   正好在最不该换键的那一刻换掉(与提现那条 policyVersion 的教训同型)。
+   */
+  // 🔴 键体只用**意图本身 + 一个单调序号**,不掺任何活值。
+  //   我第一版拿 myOwned / soldSlots 拼键 —— 那是**会变的市场态**,行情一动键就变,
+  //   等于没修(同一笔意图重试时又成了新键)。序号只在「换了一笔意图」时才 +1。
+  let purchaseIntentSig = "";
+  let purchaseIntentKey = "";
+  let purchaseIntentSeq = 0;
+  function purchaseIdempotencyKey(n: number, tokenIds?: number[]): string {
+    const sig = `${boundKey}|${n}|${(tokenIds ?? []).join(",")}`;
+    if (purchaseIntentSig !== sig || !purchaseIntentKey) {
+      purchaseIntentSig = sig;
+      purchaseIntentSeq += 1;
+      purchaseIntentKey = `genesis-purchase:${sig}:${purchaseIntentSeq}`;
+    }
+    return purchaseIntentKey;
+  }
+  /** 成交(或明确失败)后作废:下一次点购买是新的一笔意图。 */
+  function clearPurchaseIntent(): void {
+    purchaseIntentSig = "";
+    purchaseIntentKey = "";
+  }
+
   async function purchase(
     n: number,
     tokenIds?: number[],
   ): Promise<{ ok: boolean; cost: number; reason?: "sold-out" | "cap" | "market-closed" }> {
     try {
       const beforePrice = unitPriceUSDT.value;
-      const state = await genesisApi.purchase(n, `genesis-purchase:${boundKey}:${Date.now()}:${Math.random().toString(36).slice(2)}`);
+      const state = await genesisApi.purchase(n, purchaseIdempotencyKey(n, tokenIds));
       applyAccountState(state);
       await syncRemote();
+      // 成交 = 定局 → 键作废,下一次点购买是新的一笔意图。
+      // 🔴 失败路径**不作废**:失败可能是「服务端已成交但回执丢了」,此时保留键,
+      //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
+      clearPurchaseIntent();
       return { ok: true, cost: n * beforePrice };
     } catch {
       await syncRemote().catch(() => undefined);
@@ -476,6 +520,7 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
+      // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
       applyAccountState(await genesisApi.list(holdingNo, askPriceUSDT, `genesis-list:${holdingNo}:${Date.now()}`));
       await syncRemote();
       return true;
@@ -516,6 +561,7 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
+      // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
       applyAccountState(await genesisApi.cancel(holdingNo, `genesis-cancel:${holdingNo}:${Date.now()}`));
       await syncRemote();
       return true;
@@ -541,6 +587,8 @@ export const useGenesis = defineStore("genesis", () => {
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
     try {
+      // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
+      // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)
       applyAccountState(await genesisApi.buy(holdingNo, `genesis-buy:${holdingNo}:${Date.now()}`));
       await syncRemote();
       return true;

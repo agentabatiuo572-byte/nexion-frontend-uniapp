@@ -129,6 +129,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   async function checkInRemote(): Promise<{ ok: boolean; gained: number; streak: number; multiplier: number }> {
     try {
+      // IDEMPOTENCY-FRESH-OK: 键只取到「天」(toISOString().slice(0,10)),同一天内任意重试都是同一把 ——
+      // 签到的意图本来就是「今天这一次」,按天做键正是对的。
       const result = await pointsApi.checkIn(`h5-check-in:${new Date().toISOString().slice(0, 10)}`);
       await refreshRemote();
       return { ok: true, gained: result.rewardNex, streak: result.streakDays, multiplier: result.multiplier };
@@ -152,6 +154,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   async function useSaverRemote(): Promise<boolean> {
     try {
+      // IDEMPOTENCY-FRESH-OK: 同 checkIn —— 键只取到「天」,同一天内任意重试都是同一把;
+      // 「今天用掉一张补签卡」本来就是按天的意图。
       await pointsApi.useSaver(`h5-streak-saver:${new Date().toISOString().slice(0, 10)}`);
       return refreshRemote();
     } catch {

@@ -730,6 +730,8 @@ async function onConfirmPay() {
   setTimeout(() => { confirming = false; }, 0);
 }
 
+// IDEMPOTENCY-FRESH-OK: 下面 738-740 行先读**持久化**的 durable 键(readAccountRow),命中就直接返回 ——
+// 这把钥匙跨 App 重启都稳,是全仓最强的一处;现铸分支只在「这个 intent 头一次」时走到。
 function remoteOrderKey(): string {
   const p = product.value;
   const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
