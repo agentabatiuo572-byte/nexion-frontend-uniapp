@@ -502,6 +502,9 @@ export interface AppState {
    *  按单号幂等、全有或全无;false = 没扣成(余额不足 / 落盘失败),调用方必须交底。
    *  失败终态由 refundFailedWithdrawals 对称退回 —— 两者是一对,别只接其中一个。 */
   applyWithdrawalDebit: (wd: Withdrawal) => boolean;
+  /** 这笔提现的扣款在**本客户端内存态**里落地了没有 —— 对账循环补扣前的粗筛。
+   *  判假 ≠ 没扣过,只是「值得再问一次」;权威判定在 applyWithdrawalDebit 内部复读磁盘。 */
+  withdrawalDebitApplied: (id: string) => boolean;
   /** ⚠️ DEV/DEMO-ONLY: 仅 pass 路由可推进主链状态(SPEC-7: client 不推进风控队列)。 */
   _devAdvanceWithdrawal: () => void;
   /** ⚠️ DEV/DEMO-ONLY: 模拟 D2 人工放行全部待审收益(mock 双端不打通,DR-7)。 */

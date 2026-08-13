@@ -184,6 +184,28 @@ function reconcileBills() {
       postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);
     } catch { /* 这一单的数据不完整 —— 跳过它,别拖垮整个对账循环 */ }
   }
+  // ⓪b 🔴 单据在、**钱没真扣** → 补扣。与 ⓪ 是同一笔事实的两个面:⓪ 补的是账上那一行,
+  //     这一格补的是余额里那个数。
+  //     提现页在建单成功后调一次 app.applyWithdrawalDebit,报假只弹一条 toast 就再不重试;
+  //     而扣款报假时幂等键 `wd-debit:` 根本没置位 —— 于是服务端已经扣了钱、本地余额一分没动,
+  //     且**永远不会再补**(2026-08-13 运行时复现:活性探针证明对账确实跑到了本函数、⓪ 把删掉的
+  //     账单行补了回来,而 ≥2 拍之后那笔钱仍然没扣)。用户看到的可提余额永久虚高,
+  //     还能照这个虚高值再提一笔,一路放行到服务端才被拒。
+  //     app.ts applyWithdrawalDebit 余额闸那段注释里的「而扣款**没有自愈** = 余额永久虚高」
+  //     指的就是这一格 —— 当时只绕开了一个具体触发(别写 min()),没有补自愈本身。
+  //     判据同 ⓪ 从数据推出:单据在、扣款幂等键不在 = 该扣没扣。扣款函数按单号幂等、
+  //     写前复读磁盘、全有或全无,重入安全。
+  //     🔴 粗筛走 app.withdrawalDebitApplied(内存判据),**不**每拍直接调扣款函数:
+  //     后者在幂等命中时会 adoptAccountSnapshot 整体覆写 user/devices/earnings/withdrawals
+  //     (见 refundWithdrawalDebit 头注:12 次/分钟的全量覆写)。内存判假才值得再问一次,
+  //     权威判定仍在函数内部读盘。
+  //     🔴 **不排除失败终态**,靠顺序闭合:本格在 ② 退款腿之前,失败单补扣 −N 之后,
+  //     退款腿当拍就看到 `wd-debit:` 键并退回 +N —— 净额为 0,不留跨拍中间态。
+  //     要排除失败终态就得在这里抄第五份终态字面量清单(全仓已有 4 份),那是更差的交易。
+  for (const wd of app.withdrawals) {
+    if (app.withdrawalDebitApplied(wd.id)) continue;
+    try { app.applyWithdrawalDebit(wd); } catch { /* 同 ⓪:一条脏单不拖垮整个对账循环 */ }
+  }
   // ① 已到账 → 账单入账
   for (const wd of app.withdrawals) {
     if (wd.status !== "confirmed") continue;
