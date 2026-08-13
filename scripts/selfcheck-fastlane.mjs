@@ -682,48 +682,42 @@ function functionBody(src, opener) {
   const appSrc = readSrc("src/store/app.ts");
   const elgSrc = readSrc("src/store/withdrawal-eligibility.ts");
 
-  check("🔴 submitWithdrawal 建单前 await 占额度,占不到即 return null",
-    appSrc.includes("const claimToken = await claimWithdrawSlot(acct, rules.dailyWithdrawLimitCount, now);")
-      && appSrc.includes("if (!claimToken) return null;"));
-  check("🔴 占额度发生在建单**之前**(源码顺序:claim 早于 estimateArrivalAt)",
-    (() => {
-      const a = appSrc.indexOf("claimWithdrawSlot(acct");
-      const b = appSrc.indexOf("estimateArrivalAt(now, amount");
-      return a > 0 && b > 0 && a < b;
-    })());
-  check("🔴 占用等待期后余额被花掉 → 归还额度(被拒的提交不该白吃额度)",
-    appSrc.includes("releaseWithdrawSlot(acct, claimToken);"));
-  check("🔴 扣款基于 await **之后**重取的内存态(不拿旧快照回写,否则抹掉这期间的收益)",
-    appSrc.includes("const settledUser = withDefaultEarningBuckets(user.value);")
-      && appSrc.includes("const committedUser = applyDebit(settledUser);"));
-  check("🔴 扣款是**差分推导**不是绝对快照(合并层按 delta 累加,写绝对值会抹平并发方的余额变动)",
-    appSrc.includes("const applyDebit = (base: UserState): UserState => {")
-      && appSrc.includes("user.value = applyDebit(stored.user);")
-      // 重放循环里**不许**再出现回写绝对快照的写法(那正是抹平并发方余额的那一版)
-      && !/for \(let attempt[\s\S]{0,900}user\.value = committedUser;/.test(appSrc));
-  check("🔴 落盘失败要回滚内存 + 归还额度,不许返回成功单号",
-    (() => {
-      // 锚在提现那段(奖励入账也有同名的落盘失败回滚,indexOf 会锚错)
-      const i = appSrc.indexOf("const committedUser = applyDebit(settledUser);");
-      const seg = appSrc.slice(i, i + 900);
-      return i > 0
-        && seg.includes("if (!persistAccountSnapshot()) {")
-        && seg.includes("adoptAccountSnapshot(previousSnapshot);")
-        && seg.includes("releaseWithdrawSlot(acct, claimToken);")
-        && seg.includes("return null;");
-    })());
-  check("🔴 收敛重放的判据是**幂等键**不是提现单槽(单槽会被并发的另一笔占走,本单永远判不成立)",
-    appSrc.includes("if (stored?.user?.appliedRewardKeys?.[id]) break;")
-      && appSrc.includes("appliedRewardKeys: { ...u.appliedRewardKeys, [id]: true },"));
-  check("🔴 重放前先把落盘现状认作基线(否则差分为 0,合并会再写一遍旧值)",
-    (() => {
-      // 🔴 必须**锚在重放循环内**再找:adoptAccountSnapshot(stored) 在别的函数里也有,
-      // 直接 indexOf 会锚到第一处(奖励入账那段),判据就成了跨函数的假比较。
-      const loop = appSrc.indexOf("for (let attempt = 0; attempt < 3; attempt++)");
-      const a = appSrc.indexOf("adoptAccountSnapshot(stored);", loop);
-      const c = appSrc.indexOf("user.value = applyDebit(stored.user);", a);
-      return loop > 0 && a > loop && c > a && c - a < 200;
-    })());
+  // 🗑🗑 【C·判据已废弃】submitWithdrawal 的**本地占额度 + 本地扣款重放链** 8 格
+  //     (2026-08-13 判决;这 8 格自 c37e642「建单让渡服务端」起就已失效,只因本文件
+  //      当时崩在 ReferenceError 上、一格都没跑,没人看见它们是红的)。
+  //
+  // 它们钉的实现整段不存在了,而**每一条不变量都另有落点**,逐条交底:
+  //  ① claimWithdrawSlot / releaseWithdrawSlot:模块已删(全仓 0 处)。同族的
+  //     selfcheck-money-cas.mjs 早在 2026-08-11 就显式退役了同名两节(见其 ①② 段注释),
+  //     理由与这里一致:留着就是绿着守死代码。
+  //     「并发提交不许重复吃掉同一份日额度」现在是**两层**:客户端这一层的义务是
+  //     「不许再有第二份计数」—— 由本文件仍在跑的「今日笔数赋值点集合等式(全 src 恰 2 处)」
+  //     强制,再加一个本地 claim 反而**会把那道门弄红**;真正的原子占用在服务端
+  //     (POST /api/withdrawals 拒 DAILY_LIMIT,withdraw-idempotency-contract.test.mjs 建模,
+  //     页面 isDailyLimitRejection + replay-triage「首次撞日限必须退役」接住)。
+  //     残余窗口(本地预检通过 → 服务端应答之间)照 feedback_quota_claim_before_create 的
+  //     口径由服务端兜底,客户端无法也不该再占一次。
+  //  ② 本地扣款链(applyDebit / settledUser / committedUser / 3 次重放循环):
+  //     整体搬到 `applyWithdrawalDebit(wd)`,由提现页在建单成功后调用。
+  //     · 「不拿旧快照回写」:新签名**只收单据、不收 UserState**,结构上没有旧快照可回写,
+  //       函数体内读 user.value(app.ts:1362)。签名由本文件仍在跑的三格
+  //       `applyWithdrawalDebit / refundWithdrawalDebit` 门钉着。
+  //     · 「差分推导不是绝对快照」:差分下沉到持久层 —— account-cloud 的
+  //       ADDITIVE_NUMBER_KEYS 按 `disk + (next − base)` 合并 usdtBalance。
+  //       接手方是 scripts/selfcheck-money-rollback.mjs 的 ⑤「两笔扣款都落盘,磁盘余额
+  //       = 100 − 30 − 30 = 40(并发扣款各记各的)」—— **行为级**,两个 store 实例共享一份
+  //       序列化 storage 跑真扣款,比原来那条字面判据强。实测:把 "usdtBalance" 从
+  //       ADDITIVE_NUMBER_KEYS 里拿掉,该格立刻红(全 scripts 扫一遍只有它红)。
+  //       ⚠️ 别指望 spec4-account-cloud-merge-check.mjs —— 它测的是基线复用,
+  //       同一变异下**照绿**(本次判决时实跑证伪过,免得下一个人也按名字想当然)。
+  //     · 「落盘失败回滚内存」:本文件仍在跑的
+  //       `${fn} 落盘失败必须回滚内存并报假` 那格钉着 adoptAccountSnapshot(previousSnapshot)。
+  //     · 「收敛判据是幂等键不是单槽」:幂等键判据留在 applyWithdrawalDebit(`wd-debit:` + 读盘判重),
+  //       由 `${fn} 幂等要查**磁盘**快照` 那格守;单槽已删,由「单槽产品限制已删除」那格守。
+  //  ③ 🔴 「落盘失败…不许返回成功单号」这一条被**刻意反转**,不是丢失:
+  //     单据是服务端已经建好、已经扣过钱的既成事实,现在落盘失败要把它**放回内存**
+  //     并照常交还调用方(app.ts submitWithdrawal 的 `if (!persistAccountSnapshot())` 段,
+  //     理由与 R2/R3 独立审计复现记录都写在那里)。留着旧断言 = 用门反锁一个已推翻的修法。
   // 🔴 列表级问题不得读 latestWithdrawal —— 模型改成列表后,消费者若还用「只问最新一笔」
   //    的老问法去问列表级问题,在「一张在途 + 一张更新的已到账」组合下全部答错:
   //    账单结算结错单 / 钱包入口整行消失 / 换绑闸被静默架空(独立验收实测三条全中,
@@ -818,9 +812,13 @@ function functionBody(src, opener) {
     check("🔴 赠金释放后账单跟着入账(释放路径不写账单,只能靠对账推出来)",
       appVueCode.includes("b.pendingReviewUsdt <= 0 && b.bonusLockedUsdt <= 0")
         && /for \(const row of bills\.bills\)[\s\S]{0,220}row\.type === "bonus"[\s\S]{0,160}bills\.settleByRef\(row\.ref, "posted"\)/.test(appVueCode));
-    // 「今天」只许有一个口径:单号、每日笔数、可再提时刻全按平台日(越南 UTC+7)。
-    check("🔴 单号里的日期用平台日,与每日笔数 / 可再提时刻同一个「今天」",
-      appSrc.includes("new Date(now + PLATFORM_UTC_OFFSET_HOURS * 3600_000)"));
+    // 🗑 【C·判据已废弃】「单号里的日期用平台日」(2026-08-13 判决)。
+    //    它守的是**客户端铸造单号**那条路 —— c37e642 起单号一律由服务端签发:
+    //    两个建单分支写进列表的都是 canonical(toCanonicalWithdrawal / canonicalFundsSandboxWithdrawal),
+    //    而 withdrawal-api.ts 对 `row.idSource !== "server"` 直接拒收(selfcheck-withdraw-freeze 钉住)。
+    //    客户端已无从决定单号的日期口径,判据没有对象。
+    //    「今天」的平台日口径本身没丢:日限计数与可再提时刻仍由本文件 §7 的边界固定靶
+    //    (RESET-1 / RESET / RESET-DAY / RESET-DAY-1 四格 + platformDayIndex 非 UTC 日那格)守着。
 
     check("🔴 钱包入口与追踪页读**主单**(优先最早的在途单),不读最新一笔",
       walletSrc.includes("app.primaryWithdrawal") && trackSrc.includes("app.primaryWithdrawal")
@@ -855,12 +853,38 @@ function functionBody(src, opener) {
       appSrc.includes("const inFlightWithdrawals = computed(")
         && appSrc.includes("const primaryWithdrawal = computed<Withdrawal | null>("));
   }
-  check("🔴 提现单是**列表**不是单条(与真后端 GET /api/withdrawals 同构)",
-    appSrc.includes("const withdrawals = ref<Withdrawal[]>(bootSnapshot.withdrawals ?? []);")
-      && appSrc.includes("const latestWithdrawal = computed<Withdrawal | null>(")
-      && appSrc.includes("withdrawals.value = [wd, ...withdrawals.value];"));
-  check("🔴 建单是**追加**不是覆盖(覆盖会把在途单连同已扣的钱一起顶掉)",
-    !/latestWithdrawal\.value = wd;/.test(appSrc));
+  // 🔴 提现单是**列表**不是单条 —— 【A·判据过期,2026-08-13 重锚】。
+  //
+  // 原判据钉三串字面量:boot 表达式、latestWithdrawal 的定义行、一处 prepend 的写法。
+  // remote 对齐把三串**全部**改写(boot 在远端模式恒空、prepend 改成按 id 去重再前插),
+  // 而不变量一分没丢 —— 典型的「钉字面串,轨道一改门就红」。
+  // 重锚到**行为落点**,两条合取:
+  //   ① 状态本身是数组(改回 `Withdrawal | null` 即红,且会连带 tsc 全线报错);
+  //   ② 全 store 每一次 `withdrawals.value =` 都不许用「凭空造一张新表」顶掉旧表 ——
+  //      判的是**失败形状**(数组字面量 · 非空 · 里面一个展开都没有),不是枚举合法写法,
+  //      所以新增写法不必来改这里,而「一张新单顶掉整张表」这种写法一出现就红。
+  //   这一条同时吸收了原来那格「建单是追加不是覆盖」:它钉的 `latestWithdrawal.value = wd`
+  //   对一个 computed 是 tsc 错误,在能编译的代码里**恒不可能出现** = 空转的绿灯。
+  // 扫描面为空 / 骤降 = 判据失效(如状态被改名),必须红,不许「扫不到就当没违规」。
+  //
+  // 🔴 能力上界(写下来免得下一个人高估它):判的是「有没有展开」,不是「展开的是不是**这张**表」——
+  //    `[wd, ...someStaleAlias]` 这种「展开错了对象」它抓不到,那属于另一族(读陈旧快照),
+  //    由「到账推进全表扫」「换址闸问整张在途列表」那几格覆盖。故意放宽到这里为止:
+  //    收紧成必须写 `...withdrawals.value` 的话,`const prev = withdrawals.value` 这种
+  //    完全正当的重构会假红,而假红会把门推进逃生阀,比漏那一格更坏。
+  // 🔴 右值取到**分号**为止而不是行尾:多行数组字面量的行尾只有一个 `[`,按行截断会把
+  //    合法写法误判成「没有展开」(假红)。本仓这些右值内部无分号,已回源逐个核过。
+  {
+    const appCode = stripComments(appSrc).replace(/\s+/g, " ");
+    const writes = [...appCode.matchAll(/withdrawals\.value = ([^;]*);/g)].map((m) => m[1].trim());
+    const clobbers = writes.filter((rhs) =>
+      rhs.startsWith("[") && !rhs.startsWith("[]") && !rhs.includes("..."));
+    check(`🔴 提现单是**列表**不是单条:状态是数组,且 ${writes.length} 处赋值没有一处用新单顶掉旧表`,
+      /const withdrawals = ref<Withdrawal\[\]>\(/.test(appCode)
+        && writes.length >= 10
+        && clobbers.length === 0,
+      `writes=${writes.length} 顶掉旧表的写法=${JSON.stringify(clobbers)}`);
+  }
   // 2026-08-11:调用多了第三个必填参数「谁是权威」(远端模式 client 不自推),
   // 判据只钉「全表扫 + 每笔都过 advanceArrival」这层语义,不再钉死实参写法 ——
   // 权威闸本身由 selfcheck-arrival 第 0 节与 remote-authority-simulation 行为门守。
@@ -1041,60 +1065,28 @@ function functionBody(src, opener) {
         && /onShow\([\s\S]{0,300}?setInterval\(/.test(trackCode)
         && trackCode.includes("onUnmounted(stopDayTimer);"));
 
-    // ③f 🔴🔴 幂等键必须**跨重试复用**。现造一把新键 + 「请重新确认」的组合会在
-    //     超时(服务端已建单、响应没回来)时造出**第二笔真出账**(R2 资金安全级)。
-    //     判据钉三件:键来自复用函数、歧义结局不清键、确定性结局才清键。
-    check("🔴🔴 幂等键跨重试复用(超时重试不得换新键 —— 换键 = 服务端当新请求 = 重复出账)",
-      pgCode.includes("idempotencyKey: currentIdempotencyKey(),")
-        && pgCode.includes("function currentIdempotencyKey(): string")
-        && pgCode.includes("function clearSubmitIntent(): void")
-        // 现造键的老写法不许再出现在 snap 里
-        && !/idempotencyKey: `withdrawal:\$\{app\.accountKey\}:\$\{Date\.now\(\)\}/.test(pgCode));
-    // 🔴🔴 意图签名必须**含收款地址、不含 policyVersion**。这一条是数据成分的断言
-    //（不是语义判断),所以字面判据在这里是够的 —— 但两个方向都要钉:
-    //  · 少了 address:歧义失败后改地址再提交会沿用旧键 → 服务端返回**打到旧地址**的那一单,
-    //    而响应里没有 address 可核,界面显示新地址、钱走旧地址(资金流向级,R3 点名);
-    //  · 多了 policyVersion:本页 onShow 会重取策略,版本一变签名就变、键就换 ——
-    //    正好在最不该换键的那一刻换掉,直接制造重复出账。
-    check("🔴🔴 幂等意图签名含收款地址、且不含 policyVersion(前者漏 = 钱走错地址,后者加 = 重复出账)",
-      (() => {
-        const i = pgCode.indexOf("function currentIdempotencyKey(): string");
-        if (i < 0) return false;
-        // 🔴 从**函数体的 `{`** 开始配对,不能从函数名开始 —— balancedBody 从函数名起数,
-        //    第一个闭合的是空参数表 `()`,于是只取到函数名那几个字,判据落在空串上恒红。
-        const brace = pgCode.indexOf("{", i);
-        const body = (brace > 0 ? balancedBody(pgCode, brace) : null) ?? pgCode.slice(i, i + 500);
-        const sigLine = (body.match(/const sig = `[^`]*`/) || [])[0] || "";
-        return sigLine.includes("app.accountKey") && sigLine.includes("network.value")
-          && sigLine.includes("amountNum.value") && sigLine.includes("boundAddress.value")
-          && sigLine.includes("offsetWithNex.value")
-          && !sigLine.includes("policyVersion");
-      })());
-    // 🔴🔴 判定本身已搬到接口层(src/api/errors.ts 的 isAmbiguousOutcome),
-    //    并由 selfcheck-withdraw-failpaths.mjs 用**真的 ApiError** 逐格行为验(12 格)。
-    //    这里只守**接线**:页面必须用那个函数、歧义分支不许清键、确定分支才清。
-    //    分工的理由:判定留在页面里就只能用字符串门,而字符串门抓不到语义错 ——
-    //    上一版的边界漏掉 http/504,门全绿而实测会重复出账。
-    check("🔴🔴 失败分诊接线:用接口层的歧义判定,歧义分支保留幂等键、确定分支才作废",
-      (() => {
-        const submitAt = pgCode.indexOf("await app.submitWithdrawal(");
-        if (submitAt < 0) return false;
-        const i = pgCode.indexOf("} catch (err) {", submitAt);
-        if (i < 0) return false;
-        const seg = pgCode.slice(i, i + 2500);
-        // 用的是接口层那一个,不是页面自己再写一份
-        // 用 includes 精确串,不用正则 —— 这一行历史上被脚本改写吃掉反斜杠后变成非法正则
-        // (同「替换串静默损坏」那族坑,本文件顶部就写着别用正则写这类判据)。
-        if (!pgCode.includes("isAmbiguousOutcome") || !pgCode.includes('from "@/api/errors"')) return false;
-        if (/function isAmbiguousOutcome/.test(pgCode)) return false; // 页面里不许再有第二份实现
-        const aIdx = seg.indexOf("isAmbiguousOutcome(err)");
-        const aEnd = aIdx < 0 ? -1 : seg.indexOf("return;", aIdx);
-        const aBranch = aIdx >= 0 && aEnd > aIdx ? seg.slice(aIdx, aEnd) : "";
-        const ambiguousOk = aBranch.includes("submitUnknownTitle") && !aBranch.includes("clearSubmitIntent()");
-        // 确定性分支在歧义判定**之后**,且那里才清键
-        const definitiveOk = aEnd > 0 && seg.slice(aEnd).includes("clearSubmitIntent();");
-        return ambiguousOk && definitiveOk;
-      })());
+    // 🗑🗑 【C·判据已迁移】幂等键 / 意图签名 / 失败分诊接线 3 格(2026-08-13 判决)。
+    //
+    // 三条不变量一条没丢,**守它们的门换了地方而且更强**,原判据钉的是已被取代的那套实现:
+    //  ① 「幂等键跨重试复用」:内存轨(currentIdempotencyKey / clearSubmitIntent)已于
+    //     2026-08-12 合并收口时删除,换成**落盘轨** src/lib/withdraw-attempt.ts ——
+    //     键连同整个请求体在**发请求之前**落盘,重放逐字节原样重发。
+    //     内存轨活不过刷新页面,而「请求在途时被杀进程 / 刷页面」正是这条链要兜的那一刻。
+    //     现在由 selfcheck-withdraw-freeze.mjs 三格钉:「幂等键不在提交函数里现铸」
+    //     「快照优先取落盘的冻结件」「未收口的尝试在请求发出前落盘,且落盘失败即拒发」。
+    //  ② 「签名含地址、不含 policyVersion」:键不再由签名派生(newWithdrawKey 是随机 UUID),
+    //     policyVersion 与地址都在**冻结的 body 里**跟着一起重放 ——「后台发版把键换掉」
+    //     这条路结构上消失,不再需要一条「签名里不许有它」的负向断言。
+    //     ⚠️ 地址那一半是**有意的口径变更**(改地址不再算另一笔意图,重放仍发冻结的旧地址),
+    //     取舍与残余缺口写在 wallet-withdraw.vue 的 `currentIdempotencyKey` 墓志铭里。
+    //     契约面由 scripts/withdraw-idempotency-contract.test.mjs 守(run-contract-suite)。
+    //  ③ 「失败分诊接线」:判定已从 src/api/errors.ts 的 isAmbiguousOutcome 搬到
+    //     src/lib/withdraw-failure-triage.ts 的 triageWithdrawFailure。原判据其实**早已空转**——
+    //     页面里 `isAmbiguousOutcome` 只剩一行 import、零调用,那一行正好喂饱了这根字符串针
+    //     (wallet-withdraw.vue:386 的注释记着这件事)。现在三道门分工守:
+    //     selfcheck-withdraw-replay-triage.mjs(48 格:真函数全矩阵 + 4 格接线)、
+    //     selfcheck-withdraw-triage-dataflow.mjs(跑真 catch 段,验**输入域**对不对)、
+    //     selfcheck-withdraw-freeze.mjs(退役与刷费率各只有一处且由判决门控)。
 
     // ④ 外壳仍然只转发:今日笔数在 core 现算,页面/外壳不许自己 filter 出一个数来
     //    (外壳里留表达式 = 行为门覆盖不到那一层,这是本文件反复栽过的跟头)。
@@ -1178,10 +1170,20 @@ function functionBody(src, opener) {
   // 原来比较用原值、写入 toFixed(2)、显示 toFixed(0):线配成 49.999 时写进去的 50.00 反而超过原值,
   // 快车道不生效而 CTA 判据仍成立 → 一个点多少次都没反应、也永不消失的按钮;
   // 线配成 20.5 时按钮写「改为 $21」而实际填 20.50,照字面手输 21 反被送出免审区间。
-  check("🔴 小额线取后台配置,且比较 / 写入 / 显示三处同一个落地值(向下取到 2 位)",
-    pgSrc.includes("Math.floor(cfg.config.withdrawRules.smallAmountThresholdUsd * 100) / 100")
-      && pgSrc.includes("const smallAmountLineText = computed(")
-      && pgSrc.includes("fmt(t.value.wallet.fastLaneCta, { n: smallAmountLineText.value })"));
+  // 🗑 【C·判据已废弃,2026-08-13 判决】它守的是**快车道在跑**这个前提,而主人 2026-08-11
+  // 已拍板真停用:`const smallAmountLine = computed(() => 0)`(WD01 HOLD —— 后端没有执行面,
+  // 不许把一个持久化/显示出来的值当成生效)。判据前半句「取后台配置」正是被删掉的那件事;
+  // 后半句「三处同一落地值」在停用态下也没有对象 —— 比较 / 写入 / 显示三处现在都读同一个常量,
+  // 单源靠「一个 computed 喂三处」结构性成立,不再依赖「向下取 2 位」这条对齐规则。
+  //
+  // 现在谁守:
+  //  · 停用本身 —— scripts/hard-block-d5-runtime-contract.test.mjs 断言
+  //    `const smallAmountLine = computed(() => 0)`(接回配置即红,run-contract-suite 跑);
+  //  · 端到端不生效 —— scripts/selfcheck-config-compat.mjs ④ 拿出厂配置跑真判定,断言
+  //    fastLaneApplied=false / waivedGates 为空,并带一格阈值 50 的红测(接回来就该亮)。
+  // ⚠️ 重新启用时,「向下取到 2 位」的落地值必须一并恢复 —— 那条历史缺陷(配 49.999 写进
+  // 50.00 反而超线 → 点不动也不消失的按钮)的完整说明留在 wallet-withdraw.vue 里
+  // smallAmountLine 定义正上方,别只把那个 computed 改掉。
   check("🔴 首审提示按判定结果显示,不再常显(否则与免审横幅当场对打)",
     pgSrc.includes('const firstTimeReviewApplies = computed(() => eligibility.value.riskReasons.includes("first-withdrawal-review"))')
       && pgSrc.includes('v-if="firstTimeReviewApplies"'));
@@ -1265,7 +1267,9 @@ function functionBody(src, opener) {
 // 判据是**下限不是等式**:新增断言天天有,不该每次都来改这里;而删断言是罕见动作,
 // 必须撞线。下限按「当前条数 - 5」留一点重构余量,加断言时不必动它,
 // 真删掉一整节(几十条)必然击穿。
-const ASSERT_FLOOR = 100;
+// 2026-08-13:131 → 117(判决 14 格老红门:13 格 C 类显式删除 + 1 格 A 类重锚顺带吸收
+// 一格空转的绿灯)。按本行自己的规矩,删门时下限跟着走:117 − 5 = 112。
+const ASSERT_FLOOR = 112;
 if (pass + fail < ASSERT_FLOOR) {
   console.log(`  FAIL  🔴🔴 断言总数 ${pass + fail} 跌破下限 ${ASSERT_FLOOR} —— 有断言被整段删除?`
     + ` 删门是重大动作:确要删,连同本行下限一起改,并在 commit 里写明删了哪一节、为什么。`);
