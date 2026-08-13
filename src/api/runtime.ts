@@ -34,6 +34,8 @@ import { createTaskAssignmentApi } from "./task-assignment-api";
 import { createFundsSandboxApi } from "./funds-sandbox-api";
 import { createReferralRewardApi } from "./referral-reward-api";
 import { createSupportApi } from "./support-api";
+import { createProfileApi } from "./profile-api";
+import { createNovaAiApi } from "./nova-ai-api";
 import { readApiRuntimeConfig } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
@@ -94,6 +96,8 @@ export const taskAssignmentApi = createTaskAssignmentApi(apiClient);
 export const fundsSandboxApi = createFundsSandboxApi(apiClient);
 export const referralRewardApi = createReferralRewardApi(apiClient);
 export const supportApi = createSupportApi(apiClient);
+export const profileApi = createProfileApi(apiClient);
+export const novaAiApi = createNovaAiApi(apiClient);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

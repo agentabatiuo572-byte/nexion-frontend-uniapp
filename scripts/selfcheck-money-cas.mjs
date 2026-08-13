@@ -794,7 +794,7 @@ group();
     ["src/pages/daily/daily.vue", /const claim = faucet\.claimMilestone\([\s\S]{0,200}?if \(!claim\.ok\)[\s\S]{0,200}?return;/],
     ["src/pages/daily/daily.vue", /const r = faucet\.useSaver\(\);[\s\S]{0,80}?r\.ok/],
     ["src/components/lucky-spin-sheet.vue", /const r = spin\.spin\(\);[\s\S]{0,120}?if \(!r\.ok\)[\s\S]{0,140}?return;/],
-    ["src/components/me/deposit-bank-pane.vue", /const r = dep\.cancelBankIntent\([\s\S]{0,80}?r\.ok/],
+    ["src/components/me/deposit-bank-pane.vue", /const r = remoteApiEnabled[\s\S]{0,100}?cancelRemoteBankIntent\([\s\S]{0,100}?cancelBankIntent\([\s\S]{0,100}?r\.ok/],
   ];
   for (const [file, re] of SITES) {
     check(`⑥ ${file.split("/").pop()} 读到了 ok(返回对象后 \`if (action())\` 恒真,漏读 = 门白接)`,

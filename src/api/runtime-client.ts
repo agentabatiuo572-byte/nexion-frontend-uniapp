@@ -30,6 +30,7 @@ function createMockModeApiClient(): ApiClient {
   }));
   return {
     request: remoteDisabled,
+    upload: remoteDisabled,
     refreshSession: remoteDisabled,
   };
 }

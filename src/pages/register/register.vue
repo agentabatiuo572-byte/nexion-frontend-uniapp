@@ -156,7 +156,8 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { authApi, remoteApiEnabled } from "@/api/runtime";
-import { isRegistrationOutcomeUnknown } from "@/api/auth-api";
+import { registerAndLogin } from "@/auth/registration-auto-login";
+import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import {
   exchangeVerifiedSignIn,
   finalizeVerifiedRegistration,
@@ -296,7 +297,7 @@ function onPhone(e: Event) {
   otpRequestId.value = null;
   verifiedToken.value = null;
 }
-function onInvite(e: Event) { invite.value = inputVal(e); registrationRisk.value = null; }
+function onInvite(e: Event) { invite.value = inputVal(e); error.value = null; registrationRisk.value = null; }
 function onCode(i: number, e: Event) {
   const digits = inputVal(e).replace(/\D/g, "");
   const next = [...code.value];
@@ -350,7 +351,7 @@ async function requestCode(captchaTicket?: string) {
     } catch (cause) {
       if (!mounted || flowVersion !== otpFlowVersion) return;
       verifying.value = false;
-      error.value = geoText(cause) ?? t.value.authOtp.errorServiceUnavailable;
+      error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
     }
     return;
   }
@@ -392,7 +393,7 @@ function resend() {
 }
 function currentSponsorCode(): string | null {
   // 锁定码优先(?ref / pendingRefCode);仅无锁定时才取手输([FEAT-SHARE4] ③)。
-  return lockedRef.value || normalizeRefCode(invite.value);
+  return lockedRef.value || normalizeRegistrationSponsorCode(invite.value, remoteApiEnabled);
 }
 // A region-policy refusal reaches this page two ways: as a code on an OTP/
 // registration result, or as a thrown error out of the registration transaction.
@@ -413,9 +414,6 @@ function isCurrentRemoteRegistrationAttempt(context: RemoteRegistrationAttemptCo
 
 function registrationErrorText(cause: unknown): string {
   const code = cause instanceof Error ? cause.message : "";
-  if (code === "USER_REGISTRATION_SANDBOX_SPONSOR_REQUIRED") {
-    return t.value.register.sandboxSponsorRequired;
-  }
   if (code === "USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH") {
     return t.value.register.sandboxSponsorEnvironmentMismatch;
   }
@@ -542,50 +540,37 @@ async function finish() {
       challengeNo,
     };
     completing.value = true;
-    try {
-      const registration = await authApi.register({
-        countryCode: country.value,
-        phone: phoneClean.value,
-        challengeNo,
-        code: codeStr.value,
-        password: password.value,
-        sponsorCode: currentSponsorCode(),
-      });
-      if (registration.kind !== "authenticated") throw new Error("REGISTRATION_SESSION_INVALID");
-      if (!isCurrentRemoteRegistrationAttempt(registrationAttempt)) {
-        authApi.discardSessionIfCurrent(registration.vaultRevision);
-        return;
-      }
-      // authApi saves the issued session; completeSignIn binds its account scope
-      // and server identity projection before this UI is allowed to claim
-      // success.  A new server registration is conservatively onboarding-open.
-      const completed = completeSignIn({
-        identity: `user:${registration.user.userId}`,
-        onboardingComplete: false,
-        serverProfile: registration.user,
-        serverSessionRevision: registration.vaultRevision,
-        deferNavigation: true,
-      });
-      if (!completed.ok) {
-        error.value = geoText(completed.error) ?? t.value.authOtp.errorServiceUnavailable;
-        completing.value = false;
-        return;
-      }
-      launchRegistrationSuccess();
-    } catch (cause) {
-      if (!isCurrentRemoteRegistrationAttempt(registrationAttempt)) return;
+    const registration = await registerAndLogin(authApi, {
+      countryCode: country.value,
+      phone: phoneClean.value,
+      challengeNo,
+      code: codeStr.value,
+      password: password.value,
+      sponsorCode: currentSponsorCode(),
+    }, () => isCurrentRemoteRegistrationAttempt(registrationAttempt));
+    if (registration.kind === "stale") return;
+    if (registration.kind === "registration_error") {
       completing.value = false;
-      if (isRegistrationOutcomeUnknown(cause)) {
-        // The request may already have committed, but no session was accepted
-        // or persisted locally. Do not retry a non-idempotent registration;
-        // recover through the ordinary password-login authority instead.
-        error.value = t.value.register.registrationOutcomeUnknown;
-        toast.info(t.value.register.registrationOutcomeUnknown);
-        goLogin();
-        return;
-      }
-      error.value = registrationErrorText(cause);
+      error.value = registrationErrorText(registration.error);
+      return;
     }
+    if (registration.kind === "login_error") {
+      completing.value = false;
+      error.value = t.value.register.registrationOutcomeUnknown;
+      return;
+    }
+    const completed = completeSignIn({
+      identity: `user:${registration.user.userId}`,
+      onboardingComplete: true,
+      serverProfile: registration.user,
+      serverSessionRevision: registration.vaultRevision,
+    });
+    if (!completed.ok) {
+      error.value = geoText(completed.error) ?? t.value.authOtp.errorServiceUnavailable;
+      completing.value = false;
+      return;
+    }
+    toast.success(t.value.register.registrationSignedIn);
     return;
   }
   const identity = prospectiveIdentity();

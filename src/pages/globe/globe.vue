@@ -37,6 +37,18 @@
         </view>
       </view>
 
+      <view v-if="remoteApiEnabled" class="mx-4 mt-4">
+        <EmptyState
+          kind="empty-list"
+          :title="t.globe.regionProjectionHoldTitle"
+          :desc="t.globe.regionProjectionHoldDesc"
+          emphasis
+          compact
+        />
+        <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ GLOBE_REGION_PROJECTION_HOLD }}</text>
+      </view>
+
+      <template v-else>
       <!-- Map — de-carded (border dropped); relative + overflow-hidden retained
            to clip the region glow halos at the rounded panel edge (functional). -->
       <view class="mx-4 rounded-2xl relative overflow-hidden" :style="mapCardStyle">
@@ -68,8 +80,8 @@
           <line
             v-for="r in otherRegions"
             :key="`line-${r.id}`"
-            :x1="me.cx * W"
-            :y1="me.cy * H"
+            :x1="meX"
+            :y1="meY"
             :x2="r.cx * W"
             :y2="r.cy * H"
             stroke="var(--v5-brand)"
@@ -79,7 +91,7 @@
           />
 
           <!-- Region nodes -->
-          <g v-for="r in REGIONS" :key="r.id" class="cursor-pointer" @click="select(r)">
+          <g v-for="r in regions" :key="r.id" class="cursor-pointer" @click="select(r)">
             <circle :cx="r.cx * W" :cy="r.cy * H" r="18" :fill="`url(#${r.isYou ? 'you-glow' : 'globe-glow'})`" />
             <circle :cx="r.cx * W" :cy="r.cy * H" r="5" :fill="r.isYou ? 'var(--v5-tech-cyan)' : 'var(--v5-brand)'" />
             <!-- Pulse ring -->
@@ -114,10 +126,10 @@
            idiom), rows carry their own dividers (last row = no bottom border). -->
       <view class="mx-4 mt-4 mb-6" :style="regionListStyle">
         <view
-          v-for="(r, i) in REGIONS"
+          v-for="(r, i) in regions"
           :key="r.id"
           class="w-full flex items-center active:opacity-80"
-          :style="regionRowStyle(i === REGIONS.length - 1)"
+          :style="regionRowStyle(i === regions.length - 1)"
           @click="select(r)"
         >
           <view class="grid place-items-center shrink-0" :style="regionIconBox(r.isYou)">
@@ -170,6 +182,7 @@
           <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>
         </view>
       </view>
+      </template>
     </view>
   </AppChassis>
 </template>
@@ -178,6 +191,7 @@
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
@@ -185,6 +199,7 @@ import { publicStatsHealth } from "@/lib/platform-stats";
 import { REGIONS, type RegionData } from "@/mock/globe-regions";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -192,6 +207,7 @@ const cfg = useConfig();
 
 const W = 440;
 const H = 240;
+const GLOBE_REGION_PROJECTION_HOLD = "GLOBE_REGION_PROJECTION_HOLD";
 
 const selected = ref<RegionData | null>(null);
 const pulseTick = ref(0);
@@ -206,13 +222,17 @@ const activeNodesText = computed(() => {
 });
 const activeJobsText = computed(() => global.value.activeJobs.toLocaleString());
 
-const me = REGIONS.find((r) => r.isYou)!;
-const otherRegions = computed(() => REGIONS.filter((r) => !r.isYou));
+const regions = computed<RegionData[]>(() => remoteApiEnabled ? [] : REGIONS);
+const me = computed(() => regions.value.find((r) => r.isYou) ?? null);
+const meX = computed(() => (me.value?.cx ?? 0) * W);
+const meY = computed(() => (me.value?.cy ?? 0) * H);
+const otherRegions = computed(() => regions.value.filter((r) => !r.isYou));
 
 // Pick a random region to pulse each tick (client-only timer).
 const pulseRegionId = computed<string | null>(() => {
   if (pulseTick.value === 0) return null;
-  return REGIONS[Math.floor(Math.random() * REGIONS.length)].id;
+  if (regions.value.length === 0) return null;
+  return regions.value[Math.floor(Math.random() * regions.value.length)]?.id ?? null;
 });
 
 // Per-region uptime — stable per open (computed from a ref so it doesn't churn).
@@ -241,6 +261,7 @@ function regionJobsText(r: RegionData): string {
 }
 
 onMounted(() => {
+  if (remoteApiEnabled) return;
   pulseTimer = setInterval(() => {
     pulseTick.value += 1;
   }, 1800) as unknown as number;

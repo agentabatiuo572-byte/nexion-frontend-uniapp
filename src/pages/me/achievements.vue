@@ -30,8 +30,60 @@
         </view>
       </view>
 
-      <!-- Categories -->
-      <view style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
+      <!-- Real-backend milestones. Remote mode never derives rewards from mock stores. -->
+      <view v-if="remoteApiEnabled" style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
+        <view v-if="remoteLoading && !remoteSnapshot" class="mx-4" :style="listStyle">
+          <text class="block" style="padding: 18px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteLoading }}</text>
+        </view>
+        <view v-else-if="remoteError && !remoteSnapshot" class="mx-4" :style="listStyle">
+          <text class="block" style="padding: 18px 18px 6px; font-size: 13px; color: var(--v5-ink-3)">{{ w.remoteUnavailable }}</text>
+          <view class="active:opacity-80" :style="retryBtnStyle" role="button" tabindex="0" :aria-label="w.retry" @click="refreshRemote">
+            <text>{{ w.retry }}</text>
+          </view>
+        </view>
+        <template v-else>
+          <view v-for="grp in remoteGroups" :key="grp.key" class="mx-4">
+            <text class="block" :style="catHeadStyle">{{ grp.label }}</text>
+            <view :style="listStyle">
+              <view
+                v-for="(row, i) in grp.rows"
+                :key="row.key"
+                class="flex items-center"
+                :style="rowStyle(i !== 0)"
+              >
+                <view class="grid place-items-center shrink-0" :style="remoteIconBoxStyle(row.status)">
+                  <view v-html="iconSvg(row.iconId, row.status === 'LOCKED' ? 'var(--v5-ink-4)' : 'var(--v5-brand)')" />
+                </view>
+                <view class="min-w-0" style="flex: 1">
+                  <text class="block" :style="aLabelStyle(row.status !== 'LOCKED')">{{ row.label }}</text>
+                  <text class="block" :style="aDescStyle(row.status !== 'LOCKED')">{{ row.description }}</text>
+                </view>
+                <view class="text-right shrink-0">
+                  <text class="block" :style="rewardStyle(row.status !== 'LOCKED')">{{ row.reward }}</text>
+                  <view
+                    v-if="row.status === 'CLAIMABLE'"
+                    class="active:opacity-80"
+                    :style="claimBtnStyle(false)"
+                    role="button"
+                    tabindex="0"
+                    :aria-disabled="remoteBusy ? 'true' : 'false'"
+                    :aria-label="w.claim"
+                    @click="claimRemote(row)"
+                  >
+                    <text>{{ remoteBusy === row.key ? w.claiming : w.claim }}</text>
+                  </view>
+                  <text v-else class="block" style="margin-top: 6px; font-size: 12px; color: var(--v5-ink-4)">
+                    {{ row.status === 'LOCKED' ? w.lockedStatus : w.claimed }}
+                  </text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </template>
+      </view>
+
+      <!-- Local prototype achievements stay available only in mock mode. -->
+      <view v-else style="margin-top: 20px; display: flex; flex-direction: column; gap: 24px">
         <view v-for="grp in groups" :key="grp.cat" class="mx-4">
           <text class="block" :style="catHeadStyle">{{ catLabel(grp.cat) }}</text>
           <view :style="listStyle">
@@ -76,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -87,11 +139,29 @@ import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
 import { useAchievements } from "@/store/achievements";
 import { isPurchasedHardwareKind } from "@/store/device-types";
 import { ACHIEVEMENTS, type AchievementCategory, type AchievementDef } from "@/mock/achievements";
+import { pointsApi, remoteApiEnabled } from "@/api/runtime";
+import type { DailySnapshot, DailyMilestoneStatus, EarningMilestoneStatus } from "@/api/points-api";
 
 const t = useT();
 const w = computed(() => t.value.achievements);
 const app = useApp();
 const ach = useAchievements();
+const remoteSnapshot = ref<DailySnapshot | null>(null);
+const remoteLoading = ref(false);
+const remoteError = ref(false);
+const remoteBusy = ref("");
+
+type RemoteStatus = DailyMilestoneStatus | EarningMilestoneStatus;
+interface RemoteMilestoneRow {
+  key: string;
+  kind: "daily" | "earning";
+  id: number | string;
+  label: string;
+  description: string;
+  reward: string;
+  status: RemoteStatus;
+  iconId: string;
+}
 
 const CAT_COLOR: Record<AchievementCategory, string> = {
   firsts: "var(--v5-brand)",
@@ -123,7 +193,53 @@ function evaluate() {
   if (earningsTotal >= 1000) ach.unlock("diamond_miner");
   if (earningsTotal > 0) ach.unlock("first_contribution");
 }
-onShow(() => evaluate());
+async function refreshRemote() {
+  if (!remoteApiEnabled || remoteLoading.value) return;
+  remoteLoading.value = true;
+  remoteError.value = false;
+  try {
+    remoteSnapshot.value = await pointsApi.state();
+  } catch {
+    remoteError.value = true;
+    if (remoteSnapshot.value) toast.warn(w.value.remoteUnavailable);
+  } finally {
+    remoteLoading.value = false;
+  }
+}
+
+onShow(() => {
+  if (remoteApiEnabled) void refreshRemote();
+  else evaluate();
+});
+
+const remoteGroups = computed(() => {
+  const snapshot = remoteSnapshot.value;
+  if (!snapshot) return [];
+  const daily: RemoteMilestoneRow[] = snapshot.dailyMilestones.map((row) => ({
+    key: `daily:${row.milestoneId}`,
+    kind: "daily",
+    id: row.milestoneId,
+    label: `${w.value.dailyMilestone} ${row.milestoneDay}`,
+    description: `${w.value.streakProgress}: ${snapshot.streak.currentStreak}/${row.milestoneDay}`,
+    reward: `+${row.rewardAmount} ${row.rewardType}`,
+    status: row.status,
+    iconId: "power_user",
+  }));
+  const earnings: RemoteMilestoneRow[] = snapshot.earningMilestones.map((row) => ({
+    key: `earning:${row.milestoneId}`,
+    kind: "earning",
+    id: row.milestoneId,
+    label: `${w.value.earningMilestone} $${row.thresholdUsdt.toLocaleString()}`,
+    description: `${w.value.lifetimeEarnings}: $${row.lifetimeEarningsUsdt.toLocaleString()}`,
+    reward: `+${row.rewardNex} NEX`,
+    status: row.status,
+    iconId: "first_dollar",
+  }));
+  return [
+    { key: "daily", label: w.value.serverDailyMilestones, rows: daily },
+    { key: "earning", label: w.value.serverEarningMilestones, rows: earnings },
+  ].filter((group) => group.rows.length > 0);
+});
 
 const groups = computed(() => {
   const cats: AchievementCategory[] = ["firsts", "earnings", "social", "loyalty", "hardware"];
@@ -132,9 +248,31 @@ const groups = computed(() => {
     .filter((g) => g.list.length > 0);
 });
 
-const unlocked = computed(() => ach.records.length);
-const total = ACHIEVEMENTS.length;
-const percent = computed(() => Math.round((unlocked.value / total) * 100));
+const unlocked = computed(() => remoteApiEnabled
+  ? remoteGroups.value.flatMap((group) => group.rows).filter((row) => row.status === "CLAIMED" || row.status === "FIRED").length
+  : ach.records.length);
+const total = computed(() => remoteApiEnabled
+  ? remoteGroups.value.reduce((sum, group) => sum + group.rows.length, 0)
+  : ACHIEVEMENTS.length);
+const percent = computed(() => total.value > 0 ? Math.round((unlocked.value / total.value) * 100) : 0);
+
+async function claimRemote(row: RemoteMilestoneRow) {
+  if (!remoteApiEnabled || row.status !== "CLAIMABLE" || remoteBusy.value) return;
+  remoteBusy.value = row.key;
+  try {
+    if (row.kind === "daily") {
+      await pointsApi.claimMilestone(Number(row.id), `h5-achievement-daily:${row.id}`);
+    } else {
+      await pointsApi.evaluateEarningMilestones(`h5-achievement-earning:${row.id}`);
+    }
+    remoteSnapshot.value = await pointsApi.state();
+    toast.success(w.value.claimToast);
+  } catch {
+    toast.error(w.value.remoteUnavailable);
+  } finally {
+    remoteBusy.value = "";
+  }
+}
 
 function recOf(id: string) {
   return ach.records.find((r) => r.id === id) ?? null;
@@ -227,6 +365,24 @@ const catHeadStyle: CSSProperties = {
   letterSpacing: "-0.012em",
   color: "var(--v5-ink)",
 };
+const retryBtnStyle: CSSProperties = {
+  display: "inline-flex",
+  minHeight: "44px",
+  alignItems: "center",
+  margin: "4px 18px 14px",
+  color: "var(--v5-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
+};
+function remoteIconBoxStyle(status: RemoteStatus): CSSProperties {
+  return {
+    width: "40px",
+    height: "40px",
+    borderRadius: "12px",
+    background: status === "LOCKED" ? "var(--v5-surface-3)" : "color-mix(in srgb, var(--v5-brand) 10%, transparent)",
+    opacity: status === "LOCKED" ? 0.5 : 1,
+  };
+}
 // Badge list keeps a filled tile identity (achievement/badge semantic, de-card
 // white-list) — the single visual difference is the fill; outer border dropped.
 const listStyle: CSSProperties = {

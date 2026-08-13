@@ -138,8 +138,8 @@
       <DeviceHomeIndicator />
     </view>
 
-    <!-- Nova 浮标 — floating Nova advisor entry + its drawer + push triggers.
-         Tab routes only (chassis-gated); the button self-hides until unread>0. -->
+    <!-- Nova 浮标 — tab routes only. Remote mode keeps the real Gemma entry
+         resident; mock mode retains the prototype's unread-triggered behavior. -->
     <NovaBubble v-if="isTabRoute" />
 
     <!-- Chassis-level overlays (each self-gates on its own store's open state,

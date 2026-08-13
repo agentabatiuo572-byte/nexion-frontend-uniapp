@@ -42,6 +42,10 @@
       </view>
     </view>
 
+    <view v-if="isAi && remoteApiEnabled" class="cp-ai-safety" role="note">
+      <text class="cp-ai-safety-t">{{ t.nova.localSafetyNotice }}</text>
+    </view>
+
     <!-- Thread body (messages + chips + input) -->
     <ConversationThread
       :messages="threadMessages"
@@ -52,7 +56,7 @@
       :typing-label="t.conversations.agentTyping"
       :reveal-tick="revealTick"
       :closed="isClosedSession"
-      :restart-label="t.conversations.restartSession"
+      :restart-label="isAi && remoteApiEnabled ? t.nova.localRetry : t.conversations.restartSession"
       @send="onSend"
       @chip="onChip"
       @cta="onCta"
@@ -93,14 +97,24 @@ import { useApp } from "@/store/app";
 import { toast } from "@/store/ui";
 import { replyToQuickPrompt, type QuickPromptKey } from "@/mock/nova-templates";
 import type { ConversationType } from "@/domain/support";
+import { novaAiApi, remoteApiEnabled } from "@/api/runtime";
+import { asApiError } from "@/api/errors";
+import { useLocaleStore } from "@/store/locale";
 
 const t = useT();
 const convStore = useConversations();
 const nova = useNova();
 const app = useApp();
+const locale = useLocaleStore();
 
 const cid = ref("");
 const isAi = ref(false);
+// Nova availability belongs only to ?type=ai. Human advisor/support routes must
+// never inherit a provisional local-model state before their route is resolved.
+const novaProviderHold = ref(false);
+const novaStatusLoading = ref(false);
+const novaAiRequestInFlight = ref(false);
+let novaStatusEpoch = 0;
 const startType = ref<Exclude<ConversationType, "ai"> | null>(null);
 const HUMAN_THREAD_POLL_MS = 5_000;
 let humanThreadPoll: ReturnType<typeof setTimeout> | undefined;
@@ -185,7 +199,11 @@ onLoad((q) => {
 // events — the interval then becomes a harmless no-op.
 onShow(async () => {
   revealTick.value += 1;
-  if (isAi.value) nova.open(); // mark Nova as being viewed → clears + tracks unread
+  if (isAi.value) {
+    if (remoteApiEnabled) nova.bindRemoteAccount(app.accountKey);
+    nova.open(); // mark Nova as being viewed → clears + tracks unread
+    if (remoteApiEnabled) await refreshNovaAvailability();
+  }
   else if (cid.value) {
     humanThreadVisible = true;
     const openEpoch = humanThreadEpoch;
@@ -212,7 +230,9 @@ const humanType = computed<Exclude<ConversationType, "ai"> | null>(() =>
 );
 
 // Timed-out support session → thread is read-only history with a restart CTA.
-const isClosedSession = computed(() => conv.value?.sessionStatus === "closed");
+const isClosedSession = computed(() =>
+  isAi.value ? novaProviderHold.value : conv.value?.sessionStatus === "closed",
+);
 
 const headerName = computed(() => {
   if (isAi.value) return t.value.nova.name;
@@ -231,6 +251,9 @@ const agentTyping = computed(() =>
 );
 const headerRole = computed(() => {
   if (agentTyping.value) return t.value.conversations.agentTyping;
+  if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
+  if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
+  if (isAi.value && remoteApiEnabled) return t.value.nova.localRole;
   if (isAi.value) return t.value.conversations.roleAi;
   if (startType.value) return t.value.conversations.startConversation;
   if (!conv.value) return "";
@@ -253,20 +276,26 @@ const avaStyle = computed<CSSProperties>(() => ({
 }));
 
 const inputPlaceholder = computed(() =>
-  isAi.value ? t.value.nova.inputPlaceholder : t.value.conversations.inputPlaceholder,
+  isAi.value && novaProviderHold.value
+    ? t.value.nova.localUnavailable
+    : isAi.value
+      ? remoteApiEnabled ? t.value.nova.localInputPlaceholder : t.value.nova.inputPlaceholder
+      : t.value.conversations.inputPlaceholder,
 );
 const emptyHint = computed(() => {
-  if (isAi.value) return t.value.nova.emptyHint;
+  if (isAi.value && novaStatusLoading.value) return t.value.nova.localConnecting;
+  if (isAi.value && novaProviderHold.value) return t.value.nova.localUnavailable;
+  if (isAi.value) return remoteApiEnabled ? t.value.nova.localEmptyHint : t.value.nova.emptyHint;
   return humanType.value === "advisor" ? t.value.conversations.listEmptyAdvisor : t.value.conversations.listEmptySupport;
 });
 
 const quickChips = computed<QuickChip[]>(() =>
-  isAi.value
+  isAi.value && !novaProviderHold.value
     ? [
-        { key: "explain-today", emoji: "📈", label: t.value.nova.qExplainToday },
-        { key: "how-to-boost", emoji: "🎯", label: t.value.nova.qHowToBoost },
-        { key: "whats-hot", emoji: "🔥", label: t.value.nova.qWhatsHot },
-        { key: "show-top-jobs", emoji: "💎", label: t.value.nova.qShowTopJobs },
+        { key: "explain-today", emoji: "📦", label: quickLabel("explain-today") },
+        { key: "how-to-boost", emoji: "🎫", label: quickLabel("how-to-boost") },
+        { key: "whats-hot", emoji: "🔐", label: quickLabel("whats-hot") },
+        { key: "show-top-jobs", emoji: "💬", label: quickLabel("show-top-jobs") },
       ]
     : [],
 );
@@ -307,10 +336,39 @@ const threadMessages = computed<ThreadMsg[]>(() => {
 // Restart returns to the same server-backed compose path. A durable conversation
 // is created only after the user submits the opening message.
 function onRestart() {
+  if (isAi.value && remoteApiEnabled) {
+    void refreshNovaAvailability();
+    return;
+  }
   navTo("/pages/support/chat?start=support");
 }
 
+async function refreshNovaAvailability() {
+  if (!remoteApiEnabled || !isAi.value) return;
+  const epoch = ++novaStatusEpoch;
+  const accountKey = app.accountKey;
+  novaStatusLoading.value = true;
+  try {
+    const status = await novaAiApi.status();
+    if (epoch !== novaStatusEpoch || accountKey !== app.accountKey) return;
+    novaProviderHold.value = !status.available;
+  } catch {
+    if (epoch !== novaStatusEpoch || accountKey !== app.accountKey) return;
+    novaProviderHold.value = true;
+  } finally {
+    if (epoch === novaStatusEpoch && accountKey === app.accountKey) novaStatusLoading.value = false;
+  }
+}
+
 function quickLabel(k: QuickPromptKey): string {
+  if (remoteApiEnabled) {
+    switch (k) {
+      case "explain-today": return t.value.nova.localQOrder;
+      case "how-to-boost": return t.value.nova.localQTicket;
+      case "whats-hot": return t.value.nova.localQSecurity;
+      case "show-top-jobs": return t.value.nova.localQHuman;
+    }
+  }
   switch (k) {
     case "explain-today": return t.value.nova.qExplainToday;
     case "how-to-boost": return t.value.nova.qHowToBoost;
@@ -370,6 +428,42 @@ async function onSend(text: string, restore?: () => void) {
     return;
   }
   if (isAi.value) {
+    if (remoteApiEnabled) {
+      if (novaProviderHold.value || novaStatusLoading.value || novaAiRequestInFlight.value) {
+        restore?.();
+        toast.info(t.value.nova.localUnavailable, t.value.nova.localRetry);
+        return;
+      }
+      const accountKey = app.accountKey;
+      const history = nova.messages.slice(-10).map((message) => ({
+        role: message.sender === "user" ? "user" as const : "assistant" as const,
+        content: message.text,
+      }));
+      nova.sendUser(text);
+      nova.markUserRead();
+      nova.setTyping(true);
+      novaAiRequestInFlight.value = true;
+      try {
+        const result = await novaAiApi.chat({
+          message: text,
+          language: locale.code === "zh" || locale.code === "vi" ? locale.code : "en",
+          history,
+        });
+        if (accountKey !== app.accountKey) return;
+        nova.push({ kind: "nova-reply", text: result.reply });
+      } catch (error) {
+        if (accountKey !== app.accountKey) return;
+        const failure = asApiError(error);
+        if (["NOVA_AI_DISABLED", "NOVA_AI_UNAVAILABLE"].includes(failure.message)) novaProviderHold.value = true;
+        nova.push({ kind: "nova-reply", text: t.value.nova.localFailed });
+        toast.error(t.value.nova.localFailed, t.value.nova.localRetry);
+      } finally {
+        if (accountKey === app.accountKey) nova.setTyping(false);
+        else nova.bindRemoteAccount(app.accountKey);
+        novaAiRequestInFlight.value = false;
+      }
+      return;
+    }
     nova.sendUser(text);
     nova.markUserRead(); // Nova reads instantly
     schedule(() => nova.setTyping(true), AI_TYPING_ON_MS);
@@ -409,6 +503,10 @@ async function onConvertToTicket() {
 }
 
 function onChip(key: string) {
+  if (remoteApiEnabled) {
+    void onSend(quickLabel(key as QuickPromptKey));
+    return;
+  }
   if (!acquireSendSlot()) return;
   const k = key as QuickPromptKey;
   const onlineCount = app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length;
@@ -445,6 +543,17 @@ function goBack() {
   padding: 10px 14px 12px;
   /* top padding is bound inline to the device status-bar height (see cp-head :style) */
   border-bottom: 1px solid var(--v5-border);
+}
+.cp-ai-safety {
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--v5-tech-cyan) 8%, var(--v5-bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--v5-tech-cyan) 18%, var(--v5-border));
+}
+.cp-ai-safety-t {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--v5-ink-3);
 }
 .cp-back {
   /* 《07》tap≥44:原 36×36。负 margin 由 -6 调到 -10,图标视觉位置不动、只有热区变大 */

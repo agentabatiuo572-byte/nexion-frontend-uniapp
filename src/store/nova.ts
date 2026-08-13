@@ -3,8 +3,9 @@ import { ref } from "vue";
 
 /**
  * Ported from Nexion-prototype/lib/store/nova.ts (zustand → Pinia).
- * Nova · in-app AI compute advisor (design doc §6.8). All replies are
- * template-driven — no real LLM. The store holds the chat transcript, an unread
+ * Nova · in-app AI compute advisor (design doc §6.8). Remote replies come from the
+ * authenticated local-AI backend; explicit mock builds retain the deterministic templates.
+ * The store holds the chat transcript, an unread
  * counter, and the open flag. Auto-push triggers (driven from the app layer) call
  * `push()` to enqueue proactive Nova messages tied to mock simulator events.
  * Non-persisted (session transcript).
@@ -55,6 +56,14 @@ export const useNova = defineStore("nova", () => {
   const typing = ref(false);
   // throttle keys → last fire timestamp (prevents same auto-push firing too often).
   const cooldowns = ref<Record<string, number>>({});
+  let boundRemoteAccount = "";
+
+  function bindRemoteAccount(accountKey: string) {
+    const normalized = accountKey.trim();
+    if (boundRemoteAccount === normalized) return;
+    reset();
+    boundRemoteAccount = normalized;
+  }
 
   function open() {
     isOpen.value = true;
@@ -113,6 +122,6 @@ export const useNova = defineStore("nova", () => {
 
   return {
     messages, unread, isOpen, typing, cooldowns,
-    open, close, push, sendUser, markUserRead, setTyping, reset,
+    open, close, push, sendUser, markUserRead, setTyping, reset, bindRemoteAccount,
   };
 });
