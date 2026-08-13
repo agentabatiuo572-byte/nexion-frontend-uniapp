@@ -3145,6 +3145,21 @@ genesis_gate() {
 }
 genesis_gate
 
+# ── 周任务 × 创世闸的观测门(2026-08-13)────────────────────────────────────────
+# 接手 GEN10 门里那句交底:周任务改服务端下发后,「关闭态不派买创世」这条不变量
+# 在客户端**没有门守着**了。客户端不做过滤(questCode 是后台手输自由文本,猜错会藏掉
+# 用户已挣到的 CLAIMABLE 奖励,比它想防的问题更坏)—— 过滤归派发端(交接书 U-16),
+# 客户端只留报警,并焊住「任务面新增跳创世入口必须问闸」这条反向钉。
+quest_genesis_tripwire_gate() {
+  if "$NODE_BIN" scripts/selfcheck-quest-genesis-tripwire.mjs > /tmp/uniapp-quest-genesis-tripwire.log 2>&1; then
+    ok "周任务创世观测门 — $(tail -1 /tmp/uniapp-quest-genesis-tripwire.log)"
+  else
+    bad "周任务创世观测门失败 — node scripts/selfcheck-quest-genesis-tripwire.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-quest-genesis-tripwire.log | head -8 | sed 's/^/        /'
+  fi
+}
+quest_genesis_tripwire_gate
+
 # ── 守卫存活性门(2026-08-07 · 守卫存活性族第三次复发后的结构根治)──────────────
 # 不变量:周期性权限守卫是**安全装置不是业务循环**,只随前台/后台成对开关。
 # 前两轮只修「武装侧」(读取口归一 / onShow 无条件启动),没人动「解除武装侧」——
