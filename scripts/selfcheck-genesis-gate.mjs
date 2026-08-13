@@ -205,7 +205,15 @@ function producedKinds(src) {
   //   2026-08-05 9→10:weekly-quest-hero.vue 接闸(独立 critic Q1:周任务在关闭态仍派
   //   「买创世」,用户领到不可能完成的任务、点进去按钮是灰的 —— 紧迫感的入口从创世页
   //   挪到了任务页,规格只禁了倒计时/名额两种形态,没覆盖任务系统这一面)。
-  const EXPECTED_GATE_CONSUMERS = 10;
+  //   ⚠️ 2026-08-13 10→9:weekly-quest-hero.vue **不再接闸** —— 不是有人手滑摘的,
+  //   是周任务整体改成了**服务端下发**(`questApi.state()`),该组件现在零创世引用,
+  //   客户端已不再决定「派不派这个任务」。**但那条保护也随之失去了主人**:
+  //   服务端未必知道创世售罄/关闭,照样可能派「买创世」,用户领到不可能完成的任务。
+  //   🔴 处置不是把数字改小了事(那是掩盖)——已同步做两件:
+  //     ① 后端交接书写明「创世关闭态不得下发买创世任务」(U-16);
+  //     ② 立卡等产品定责任归属(客户端要不要保留一层兜底过滤,还是纯服务端负责)。
+  //   在卡关掉之前,这条不变量**在客户端确实没有门守着**,这句话就是它的交底。
+  const EXPECTED_GATE_CONSUMERS = 9;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
 }
@@ -410,7 +418,14 @@ function urgencySitesUngated(src) {
     } catch { /* git 不可用 / 非仓库 → 落回同级路径,下游读不到即红 */ }
     return direct;
   };
-  const ADMIN_OPS = siblingRepo("nexion-ops-console");
+  // 🔴 后台仓的目录名改过(`nexion-ops-console` → `admin-ops`),而这里写死了旧名 ——
+  // 于是 parity 的取材面读不到,本门恒红。**目录改名不会有任何编译期信号**,
+  // 只能靠「按候选名逐个试 + 取材面读不到就判红」这两条一起兜。
+  // 判据构造性:候选名都试完仍读不到,才是真缺仓;别只认一个名字。
+  const ADMIN_OPS = ["admin-ops", "nexion-ops-console"]
+    .map((n) => siblingRepo(n))
+    .find((p) => existsSync(path.join(p, "lib/admin/g4-client.ts")))
+    ?? siblingRepo("admin-ops");
   const adminClient = path.join(ADMIN_OPS, "lib/admin/g4-client.ts");
   const adminView = path.join(ADMIN_OPS, "app/components/domain-views/g-tabs/g4-genesis.tsx");
   let clientSrc = null, viewSrc = null;
