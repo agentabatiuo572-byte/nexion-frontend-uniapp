@@ -30,6 +30,12 @@ test("a refreshed server-mode account trace goes to login with a recoverable exp
   assert.match(login, /notice === "server-session-reload"/);
   assert.match(login, /t\.login\.serverSessionReloadNotice/);
   assert.match(zh, /数据在服务端安全保存，重新登录即可恢复/);
+  // 🔴 语言面三语齐点(门的门 ① 判据):只点一种语言时,另两种可以随意漂移而本门全绿。
+  // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
+  // 中文钉原文(话术是产品决定),英/越钉**键存在** —— 这条是掉线后唯一的恢复指引,缺哪种语言哪种语言的用户就无路可走。
+  for (const [loc, src] of [["en", read("src/i18n/messages/en.ts")], ["vi", read("src/i18n/messages/vi.ts")]]) {
+    assert.match(src, /serverSessionReloadNotice:/, `${loc}.ts 缺 serverSessionReloadNotice`);
+  }
   assert.match(packageJson.scripts["test:session-reload-recovery"] ?? "", /server-session-reload-recovery-contract\.test\.mjs/,
     "the recovery contract must have a named formal verification gear");
   assert.match(packageJson.scripts["test:session-reload-recovery"] ?? "", /verify-h5-runtime\.mjs --server-session-reload-recovery/,

@@ -187,6 +187,8 @@ function producedKinds(src) {
     ["src/pages/genesis/marketplace.vue", "useGenesisSaleGate"],
     ["src/components/genesis/purchase-sheet.vue", "useGenesisSaleGate"],
     ["src/store/genesis.ts", "genesisPurchaseBlock"],
+    // 观测消费者(非闸):周任务的报警器也必须从**本单源**取判定,不许自己读 config 再判一套。
+    ["src/components/home/weekly-quest-hero.vue", "useGenesisSaleGate"],
   ];
   for (const [f, sym] of CONSUMERS) {
     check(`⑤ ${f.split("/").pop()} 接线到单源`, strip(readFileSync(path.join(root, f), "utf8"), true).includes(sym), "没接线 = 它在自己判");
@@ -205,6 +207,23 @@ function producedKinds(src) {
   //   2026-08-05 9→10:weekly-quest-hero.vue 接闸(独立 critic Q1:周任务在关闭态仍派
   //   「买创世」,用户领到不可能完成的任务、点进去按钮是灰的 —— 紧迫感的入口从创世页
   //   挪到了任务页,规格只禁了倒计时/名额两种形态,没覆盖任务系统这一面)。
+  //   ⚠️ 2026-08-13 10→9:weekly-quest-hero.vue **一度不再接闸** —— 不是有人手滑摘的,
+  //   是周任务整体改成了**服务端下发**(`questApi.state()`),该组件零创世引用,
+  //   客户端不再决定「派不派这个任务」,那条保护随之失去主人。
+  //   ✅ 2026-08-13 9→10:同日定责并接回,但**接回的是报警不是闸**,别把它读成旧闸复活:
+  //     · 过滤(派不派)归**服务端**——交接书 U-16。客户端做不了:任务的唯一句柄
+  //       questCode 在后台 H3 是运营手输的自由文本(admin-ops h3-quest-events.tsx
+  //       mission-create:`String(bv.missionCode).trim()`,只要求「编号英文唯一」),
+  //       没有枚举也没有分类字段;而客户端猜错的代价**不对称** —— 藏掉一条 CLAIMABLE
+  //       的创世任务 = 扣掉用户已经挣到的奖励,比让他看见一条暂时做不了的任务更坏。
+  //     · 客户端留**观测**:hero 把本闸的 block 喂给 `lib/quest-genesis-tripwire.ts`,
+  //       服务端派了 PENDING 的创世任务而闸判阻断 → console.error;运行时探针统一断言
+  //       app console error = 0,所以报警一响那批门自动转红。
+  //   🔴 于是这个数字今天的含义**不再齐整**:10 个消费者里 9 个是真闸,第 10 个
+  //     (weekly-quest-hero.vue)只是报警器。数字对不代表保护回来了 —— U-16 落地前,
+  //     「关闭态不派买创世」这条不变量**仍然没有任何执行方**,客户端只能看见并喊。
+  //   机器门:`scripts/selfcheck-quest-genesis-tripwire.mjs`(报警判定 + 接线数据流 +
+  //     「任务面新增跳创世入口必须问闸」的反向钉,13 条红测)。
   const EXPECTED_GATE_CONSUMERS = 10;
   check(`🔴 ⑤ 闸消费者基数 = ${EXPECTED_GATE_CONSUMERS}(实测 ${actual})`, actual === EXPECTED_GATE_CONSUMERS,
     `数量变了就同步改这个数并说明:新增了消费者,还是有人把闸摘了`);
@@ -410,7 +429,14 @@ function urgencySitesUngated(src) {
     } catch { /* git 不可用 / 非仓库 → 落回同级路径,下游读不到即红 */ }
     return direct;
   };
-  const ADMIN_OPS = siblingRepo("nexion-ops-console");
+  // 🔴 后台仓的目录名改过(`nexion-ops-console` → `admin-ops`),而这里写死了旧名 ——
+  // 于是 parity 的取材面读不到,本门恒红。**目录改名不会有任何编译期信号**,
+  // 只能靠「按候选名逐个试 + 取材面读不到就判红」这两条一起兜。
+  // 判据构造性:候选名都试完仍读不到,才是真缺仓;别只认一个名字。
+  const ADMIN_OPS = ["admin-ops", "nexion-ops-console"]
+    .map((n) => siblingRepo(n))
+    .find((p) => existsSync(path.join(p, "lib/admin/g4-client.ts")))
+    ?? siblingRepo("admin-ops");
   const adminClient = path.join(ADMIN_OPS, "lib/admin/g4-client.ts");
   const adminView = path.join(ADMIN_OPS, "app/components/domain-views/g-tabs/g4-genesis.tsx");
   let clientSrc = null, viewSrc = null;

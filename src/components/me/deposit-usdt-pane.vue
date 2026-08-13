@@ -76,6 +76,10 @@
             <text class="block" :style="warnTextStyle">Cregis USDT-BEP20</text>
           </view>
           <view class="grid place-items-center active:opacity-80" :style="copyBtnStyle" role="button" tabindex="0" @click="simulateSandboxTopup">
+            <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):进词典就成了
+                 用户文案契约,词典打包摇不掉会原样进生产包。本门只判中文,这行英文不撞门 —— 别收进词典。
+                 另:这个按钮宽 44px 写死,换文案前先量宽度("处理中"36px→"Submitting…"70.6px 会溢出;
+                 "Wait…"34.8px 才放得下)。 -->
             <text style="font-size: 12px; color: var(--v5-brand)">{{ sandboxSubmitting ? "Wait…" : "+25 USDT" }}</text>
           </view>
         </view>
@@ -258,6 +262,7 @@ async function simulateSandboxTopup() {
   sandboxSubmitting.value = true;
   try {
     const record = await dep.createSandboxTopup("CREGIS_USDT_BEP20", 25, dep.currentAccountKey());
+    // 工程话,故意不进 i18n 词典(同 :79 的理由:出路②)。
     if (record) toast.success("SANDBOX: server credited 25 USDT");
   } catch (cause) {
     toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.topupChrome.topupNotCreditedYet);

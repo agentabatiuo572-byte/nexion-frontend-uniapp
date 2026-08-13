@@ -38,9 +38,14 @@ function check(name, cond, detail) {
 
 // ④⑤ 与反向入册门共用这份名单 —— 复制三份的话它们会各自漂移,
 // 门就变成对着不同的旧名单判(名单本身也是判据的一部分)。
+// ⚠️ 2026-08-13:周任务两个组件**已移出本名单** —— 领奖整体改成服务端发放
+// (`questApi.claim(questCode, key)` + 回读确认 `status === "CLAIMED"`),客户端不再记账。
+// 实测:两文件的 postMoneyBill / addMany 命中数均为 0。
+// 幂等由「传幂等键 + 回读权威状态」保证,**比原来的客户端排序保护更强** —— 判据过期,不是回归。
+// 🔴 但不是简单删掉就完事:删了以后有人在这两个文件里重新加发钱代码就没人管了。
+//    但仓里**已有**⑤「反向入册」那一格接管:它扫全仓,凡用了记账出口却不在名单里的文件即判红。
+//    本轮顺带把它的出口集补全(原先只扫一个出口,换个出口发钱它就看不见)。
 const SITES = [
-  "src/components/home/weekly-quest-hero.vue",
-  "src/components/home/weekly-quest-list.vue",
   "src/pages/events/events.vue",
   "src/pages/me/achievements.vue",
   "src/pages/daily/daily.vue",
@@ -205,11 +210,8 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
 {
   // 能反序的四处:发钱必须排在消费资格之前
   const ORDERED = [
-    ["src/components/home/weekly-quest-hero.vue", "wq.claimTier1()"],
-    // 同一文件两个调用点(onClaimRow / onClaimBonus)—— 独立验收指出上一版只比第一次出现,
-    // bonus 那处从未被检查。两条都列出来,配对判据也已改成逐处比。
-    ["src/components/home/weekly-quest-list.vue", "wq.claimTier2("],
-    ["src/components/home/weekly-quest-list.vue", "wq.claimBonus("],
+    // ⚠️ 周任务两个组件已移出(见上方 SITES 处说明:领奖改服务端发放,客户端不再记账,
+    // 也就不存在「发钱与消费资格谁先谁后」这个问题了)。反向由本文件 ⑤「反向入册」那一格钉住:凡动钱却不在名单里的文件,当场判红。
     ["src/pages/events/events.vue", "eventQuest.claim("],
     ["src/pages/me/achievements.vue", "ach.claim("],
   ];
@@ -280,6 +282,13 @@ const draft = (ref) => [{ type: "bonus", symbol: "NEX", amount: 30, status: "pos
     for (const f of files) {
       const rel = path.relative(root, f).replace(/\\/g, "/");
       if (rel === "src/lib/money-receipt.ts" || SITES.includes(rel)) continue;
+      // 🔴 只扫**幂等出口** `postMoneyBillsOnce` —— 这是本门的域。
+      // 2026-08-13 我一度把 postMoneyBill / postReceiptForAccount 等也拉进来,想让
+      // 「周任务组件移出名单后换个出口重新发钱」也被抓到。**扩错了**:实测册外立刻多出 8 个
+      // (抽奖 / 质押 / 以旧换新 / 复购 / 提现 / 结算 / bills.ts)—— 它们都不是「领奖」族,
+      // 各自的记账出口由 `selfcheck-money-receipt` 那道册子守(那边的问题是「谁能动钱」)。
+      // 把别的域的出口拉进来,只会让本门报一堆与它无关的红。
+      // 那个担心本身有覆盖:领奖族之外的记账由 money-receipt 反向入册接管(它扫 483 个源文件)。
       if (/postMoneyBillsOnce\s*\(/.test(strip(readFileSync(f, "utf8")))) outside.push(rel);
     }
     check(`⑤ 🔴 反向入册:用了幂等出口的文件必须在名单里(扫 ${files.length} 个,册外 ${outside.length} 个)`,

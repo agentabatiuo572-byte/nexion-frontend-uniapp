@@ -1250,6 +1250,15 @@ export const useApp = defineStore("app", () => {
    * 幂等靠 appliedRewardKeys(与赠金入账同一套):同一张单每种币各退一次。
    * 返回本次真正退了款的单号,供 App 层同步把账单行置 failed。
    */
+  /** 扣款幂等键的**唯一**拼法。两个消费点:applyWithdrawalDebit(写)、
+   *  refundWithdrawalDebit(读,判「这笔到底扣没扣过」)。
+   *  各拼各的必然漂移 —— 改一处就静默漏另一处,而漏的后果是「退一笔从没扣过的钱」。
+   *  ⚠️ 键**不带账号作用域**:它靠 appliedRewardKeys 本身住在账号快照里来隔离账号,
+   *  改成跨账号共享的存储前必须先给它加作用域。 */
+  function withdrawalDebitKey(id: string): string {
+    return "wd-debit:" + id;
+  }
+
   function refundFailedWithdrawals(): string[] {
     // 🔴🔴 合并裁决(资金安全级,这一条不改就是「扣了不退」)。
     // ⚠️ 本段刻意**不写出**远端线那道闸的代码原文 —— 写出来会让按串匹配的哨兵匹到注释而假绿
@@ -1345,7 +1354,7 @@ export const useApp = defineStore("app", () => {
     if (fundsSandboxEnabled) return true;
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
-    const key = "wd-debit:" + wd.id;
+    const key = withdrawalDebitKey(wd.id);
     // 🔴🔴 写前**复读磁盘**,与同文件 creditRewardBucketInternal 逐字同形(见其 readAccountSnapshot 段)。
     // 只查内存是不够的,而且是我这版最初的错:内存里的 `appliedRewardKeys` 与 `usdtBalance`
     // **必然陈旧** —— 全仓没有任何跨标签页 storage 监听(App.vue 只监听 session 键),
@@ -1370,8 +1379,12 @@ export const useApp = defineStore("app", () => {
     // 判据是**磁盘值**,不是 min(内存, 磁盘)。合并层的真值是 `disk + (next − base)`,
     // 而 base ≡ 上次落盘时的内存态,所以本次扣款落盘后余额 = `disk − amount` —— 判 disk 才对。
     // 上一版写 min() 是错的(独立复核实测):disk 比内存**多**时(另一标签页刚退款 / 刚入金,
-    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,而扣款**没有自愈** = 余额永久虚高,
-    // 正好退回本包要修的那个原状态。取不到盘(storage 不可用)才回落内存。
+    // 本页内存还没合并到)会把一笔本该成功的扣款拒掉,正好退回本包要修的那个原状态。
+    // 取不到盘(storage 不可用)才回落内存。
+    // 🔴 本函数返回 false 之后**没有任何自愈**:幂等键不置位,而提现页只弹一条 toast 就再不重试。
+    // ⚠️ 2026-08-13 曾在 App.vue 对账里加过一格补扣来兜这个缺口,被 R1 独立审计整格否决并回退 ——
+    // 别再照着「反正有自愈」放宽本闸。否决理由与正确修法方向(提交时落一个本地待扣款标记,
+    // 只对带标记的单重试)见 docs/changes/2026-08-13-z6-audit-R1.md 与 2026-08-11-z5-out-of-scope-findings.md B 段。
     const authoritativeBalance = typeof stored?.user?.usdtBalance === "number"
       ? stored.user.usdtBalance
       : currentUser.usdtBalance;
@@ -1423,7 +1436,7 @@ export const useApp = defineStore("app", () => {
   function refundWithdrawalDebit(wd: Withdrawal): boolean {
     const amount = wd.amount;
     if (!Number.isFinite(amount) || amount <= 0) return false;
-    const debitKey = "wd-debit:" + wd.id;
+    const debitKey = withdrawalDebitKey(wd.id);
     const refundKey = "wd-refund:" + wd.id;
     // 🔴🔴 写前**复读磁盘**(同 applyWithdrawalDebit 头注,同 creditRewardBucketInternal 范式)。
     // 退款是这条链上唯一「加钱」的动作,只查内存的后果最重:两个标签页的 5s 对账各退一次,

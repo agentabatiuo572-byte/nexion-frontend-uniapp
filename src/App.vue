@@ -184,6 +184,22 @@ function reconcileBills() {
       postReceiptForAccount(app.accountKey, drafts, wd.submittedAt);
     } catch { /* 这一单的数据不完整 —— 跳过它,别拖垮整个对账循环 */ }
   }
+  // ⓪b —— 🔴 **这里曾加过「扣款没落地就补扣」的自愈格,2026-08-13 按 R1 独立审计整格回退。**
+  //     别再照 ⓪ 的样子在这里无条件遍历 app.withdrawals 补扣。两条独立证据(都已回源坐实):
+  //     ① 那一版的立论前提是错的 —— app.ts applyWithdrawalDebit 头注称「全仓没有余额端点、
+  //        余额的唯一持有者就是本 store」,而 refreshRemoteFleet 在
+  //        `remoteApiEnabled && !fundsSandboxEnabled` 时用服务端 `fleet.walletUsdt`
+  //        **整体覆写** usdtBalance 与 earningBuckets(app.ts:700-723);
+  //        按 api/runtime-config.ts,生产无 env→remote、开发无 env→sandbox 但非显式,
+  //        这两档 fundsSandboxEnabled 都是 false —— 正是补扣会跑且真扣本地余额的档。
+  //        ⇒ 服务端值已含这笔则**双扣**;不含则补扣的 −N 被下一拍重投影抹掉、而幂等键已置位
+  //        ⇒ **永不重试**。两种都比不修更坏。
+  //     ② docs/changes/2026-08-11-z5-out-of-scope-findings.md B 段早已明令:
+  //        **不可**无条件遍历补扣(remote 对齐期存量单全都没有 `wd-debit:` 键,会让余额无解释地掉一截),
+  //        范围必须用「提交时落一个本地待扣款标记」钉死,只对带标记的单重试。
+  //     另两条同轮结论:补扣不看 status 时 confirmed/sent 被扣后没有任何退款腿对手方;
+  //     「扣了又退净 0」只对 usdtBalance 成立 —— 扣款会 clamp 可提桶而退款腿明写不回补。
+  //     完整 findings 与逐条回源裁决:docs/changes/2026-08-13-z6-audit-R1.md
   // ① 已到账 → 账单入账
   for (const wd of app.withdrawals) {
     if (wd.status !== "confirmed") continue;

@@ -17,6 +17,13 @@ test("unknown remote registration results attempt one password-login recovery", 
   assert.match(recovery, /if \(!isRegistrationOutcomeUnknown\(error\)\)[\s\S]*?kind: "registration_error"/);
   assert.match(recovery, /authApi\.login\(/);
   assert.match(zh, /registrationOutcomeUnknown:\s*"账号可能已创建，但自动登录结果未确认。请使用刚设置的手机号和密码登录"/);
+  // 🔴 语言面必须三语齐点(门的门 ① 判据):只点一种语言时,另两种可以随意漂移而本门全绿。
+  // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
+  // 中文钉**原文**(话术是产品决定),英/越只钉**键存在** —— 措辞由翻译定,但键不许缺。
+  for (const [loc, src] of [["en", read("src/i18n/messages/en.ts")], ["vi", read("src/i18n/messages/vi.ts")]]) {
+    assert.match(src, /registrationOutcomeUnknown:/,
+      `${loc}.ts 缺 registrationOutcomeUnknown —— 该语言下这条恢复指引不存在`);
+  }
 });
 
 test("authoritative remote 4xx registration errors stay on the form for correction", () => {
@@ -34,4 +41,8 @@ test("an optional sponsor is rejected only when it crosses environments", () => 
   assert.match(page, /USER_REGISTRATION_SPONSOR_ENVIRONMENT_MISMATCH/);
   assert.match(page, /error\.value = registrationErrorText\(registration\.error\)/);
   assert.match(zh, /sandboxSponsorEnvironmentMismatch:\s*"邀请码所属环境不匹配，请使用当前环境的有效邀请码后重试"/);
+  // 同上:三语齐点。中文钉原文,英/越钉键存在。
+  for (const [loc, src] of [["en", read("src/i18n/messages/en.ts")], ["vi", read("src/i18n/messages/vi.ts")]]) {
+    assert.match(src, /sandboxSponsorEnvironmentMismatch:/, `${loc}.ts 缺 sandboxSponsorEnvironmentMismatch`);
+  }
 });

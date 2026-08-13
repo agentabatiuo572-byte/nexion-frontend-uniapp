@@ -35,9 +35,18 @@ pass=0; fail=0; skip=0
 # trap EXIT 覆盖所有退出路径,含 set -u 半路暴毙 —— 那条路径连 result 行都不会打,
 # 只有哨兵文件还能说出真话。.tmp$$ 带 PID:6 棵树挂着同一个 Stop hook,并发跑不许互相踩。
 VERIFY_EXIT_SENTINEL="${VERIFY_EXIT_SENTINEL:-$PROJECT_DIR/.verify-exit.code}"
+# 🔴 除退出码外**必须同时写跑了多少格**(2026-08-12 加,同型第二次之后)。
+# why:只记退出码分不出两件事 —— 「跑完了,有 N 道门判红」与「跑到一半暴毙」都是非零。
+# 实际两次都发生过、两次都差点被读成好消息:
+#   ① 跨仓测试 ENOENT 崩在第 2 步 → 后面 15 步一次没跑 → 红门数从 27 掉到 0,像是全修好了;
+#   ② 合并时留下一个 unbound variable → 套件崩在第 263 行 → 435 格只跑了 46 格 →
+#      红门数从 27 掉到 2,像是修好了 25 条。
+# 两次都是靠人眼对比 PASS 条数才看出来的,那不是门。基数写进哨兵,由 run-legacy-suite 设下限。
 _write_exit_sentinel() {
   local rc=$?
-  printf '%s\n' "$rc" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
+  # 🔴 第一行**保持纯退出码**不变(文档与既有习惯都是 `cat` 出来直接跟 0 比,加字段会打坏它);
+  # 基数另起第二行 `pass=N fail=N skip=N`,新判定读第二行,老读法一个字都不用改。
+  printf '%s\npass=%s fail=%s skip=%s\n' "$rc" "${pass:-0}" "${fail:-0}" "${skip:-0}" > "$VERIFY_EXIT_SENTINEL.tmp$$" 2>/dev/null \
     && mv -f "$VERIFY_EXIT_SENTINEL.tmp$$" "$VERIFY_EXIT_SENTINEL" 2>/dev/null
   return $rc
 }
@@ -93,6 +102,29 @@ sentinel_present() {
 echo -e "${C}━━ NexGrid uni-app verify · module=$MODULE ━━${N}"
 
 # ── (1) type-check ──
+echo -e "${C}[0] 静态门(不依赖 dev server,必须排在任何 preflight 之前)${N}"
+# 🔴 前移理由(2026-08-12 独立审计 P1-3):这两道门原本排在 2800+ 行,而 [2.5] preflight
+# 曾因一个 unbound variable 在 245 行崩死 —— 于是「能抓这件事的门恰恰跑不到」。
+# 判据:不依赖 dev server 的纯静态门,一律排在任何可能中止的 preflight 之前。
+conflict_marker_gate() {
+  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
+    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
+  else
+    bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
+    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
+  fi
+}
+conflict_marker_gate
+runtime_flag_parity_gate() {
+  if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > /tmp/uniapp-flag-parity.log 2>&1; then
+    ok "运行时开关等价门 — $(tail -1 /tmp/uniapp-flag-parity.log)"
+  else
+    bad "运行时开关等价门失败 — node scripts/runtime-flag-parity-gate.mjs 看明细"
+    grep -E "^(FAIL|  )" /tmp/uniapp-flag-parity.log | head -8 | sed "s/^/        /"
+  fi
+}
+runtime_flag_parity_gate
+
 echo -e "${C}[1] vue-tsc type-check${N}"
 if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then
   ok "vue-tsc 0 errors"
@@ -221,24 +253,51 @@ echo -e "${C}[2.5] dev server API mode preflight${N}"
 #    没问**是哪棵树** —— 同一份 env JSON 里现成就有 VITE_ROOT_DIR。多工作树并发时
 #    (本仓实测同时开过 8 个),BASE_URL 指到别人的 checkout 会让下面所有运行时探针
 #    给别的工作树发绿灯(feedback_worktree_verify_environment 同族)。
-# 🔴 路径规范化必须两边都做,且要抹平**盘符写法**(2026-08-11 合并修正):
+# 🔴 路径规范化必须两边都做,且要抹平**盘符写法**(2026-08-11 合并修正,2026-08-12 再并一次):
 #    这门原来的写法是 served 转斜杠、expect 只转反斜杠再各自小写。但 bash 里
 #    `PROJECT_DIR=$(pwd)` 在 Git Bash / MSYS 下给的是 `/d/WORKS/...`,而 uni 注入的
 #    VITE_ROOT_DIR 是 `D:\WORKS\...` → 转完是 `d:/works/...` vs `/d/works/...`,
 #    **永不相等 → 靶子完全正确也恒判红**(用主线原字节实测复现)。恒红的门 = 退出码恒 1,
-#    正是这轮要修的「新门翻红不可观测」本身。故统一归一:小写 + 反斜杠(含 JSON 转义的
-#    双反斜杠)转斜杠 + 去 /cygdrive 前缀 + 去首斜杠 + 去盘符冒号 + 折叠连续斜杠。
-_norm_tree_path() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's|\\\\|/|g; s|\\|/|g; s|^/cygdrive/||; s|^/||; s|^\([a-z]\):|\1|; s|//*|/|g; s|/$||'; }
+#    正是这轮要修的「新门翻红不可观测」本身。
+#
+#    两条支线各自修过这只 bug,覆盖面互补,此处并成**一个**归一化函数(不留两份:
+#    同一个概念两处各自推导,正是本仓明令要配 parity 哨兵才许做的事):
+#      · 主线侧独有:JSON 里的双反斜杠 `\\`、`/cygdrive/` 前缀;
+#      · z3 侧独有:WSL 的 `/mnt/d/`、尾斜杠、以及**判据自己的双向自检**。
+#    归一后的正规形:去掉盘符冒号与前导斜杠,统一成 `d/works/x`。
+_norm_tree_path() {
+  printf '%s' "$1" | tr 'A-Z' 'a-z' \
+    | sed 's|\\\\|/|g; s|\\|/|g; s|^/cygdrive/||; s|^/mnt/\([a-z]\)/|\1/|; s|^/mnt/\([a-z]\)$|\1|; s|^/||; s|^\([a-z]\):|\1|; s|//*|/|g; s|/$||'
+}
+# 判据双向红测(常驻,由 z3 侧带入)。归一化有两种坏法,方向相反,只测一个方向不算数:
+#   ① 归不拢 → 同一目录的两种写法判不等,门恒红(2026-08-11 修的就是这只);
+#   ② 归过头 → 不同工作树被折成相等,门恒绿地替别人发绿灯(比恒红危险得多)。
+#   任一方向坏了,下面那道树身份判断就不许发绿灯。
+if [ "$(_norm_tree_path 'D:\WORKS\x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
+   && [ "$(_norm_tree_path 'D:\\WORKS\\x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
+   && [ "$(_norm_tree_path '/cygdrive/d/WORKS/x')" = "$(_norm_tree_path '/d/WORKS/x')" ] \
+   && [ "$(_norm_tree_path '/mnt/d/WORKS/x')" = "$(_norm_tree_path 'D:/works/x/')" ] \
+   && [ "$(_norm_tree_path '/d/WORKS/x')" != "$(_norm_tree_path '/d/WORKS/x/.claude/worktrees/w1')" ] \
+   && [ "$(_norm_tree_path 'D:/WORKS/x')" != "$(_norm_tree_path '/c/WORKS/x')" ]; then
+  norm_root_selftest=ok
+  ok "树身份判据自检(双向:D:\\ · D:\\\\ · /cygdrive/d/ · /mnt/d/ · D:/ · /d/ 六种写法判等 + 嵌套工作树/异盘符判不等)"
+else
+  norm_root_selftest=broken
+  bad "树身份判据自检失败 —— _norm_tree_path 归一化坏了,下面的树身份判断不可信(动过它就看这条)"
+fi
 served_env_head=$("$CURL_BIN" -s "$BASE_URL/src/api/runtime-config.ts" 2>/dev/null | head -2)
-served_root=$(printf '%s' "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//')
+served_root=$(echo "$served_env_head" | grep -oE '"VITE_ROOT_DIR": *"[^"]*"' | head -1 | sed 's/.*: *"//; s/"$//' | sed 's|\\\\|/|g')
+expect_root="$PROJECT_DIR"
 if [ -z "$served_env_head" ]; then
   bad "API-mode preflight: 拉不到 $BASE_URL/src/api/runtime-config.ts(server 没起或非 vite dev)"
 elif ! echo "$served_env_head" | grep -q '"VITE_NEXGRID_API_MODE": *"mock"'; then
   bad "API-mode preflight: server 非 mock 模式 —— 用 npm run test:legacy-suite(自启壳会以 mock 起本工作树),remote 默认值会让全部运行时探针验错对象"
 elif [ -z "$served_root" ]; then
   bad "API-mode preflight: env JSON 里读不到 VITE_ROOT_DIR —— 树身份判不了,判据失效必红"
-elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$PROJECT_DIR")" ]; then
-  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$PROJECT_DIR(并发多工作树时会给别人发绿灯)"
+elif [ "$norm_root_selftest" != "ok" ]; then
+  bad "API-mode preflight: 树身份判据自检没过 —— 归一化不可信,这道门不发绿灯"
+elif [ "$(_norm_tree_path "$served_root")" != "$(_norm_tree_path "$expect_root")" ]; then
+  bad "API-mode preflight: server 服的是**别的工作树** —— 它=$served_root,本套件在=$expect_root(归一后 $(_norm_tree_path "$served_root") vs $(_norm_tree_path "$expect_root");并发多工作树时会给别人发绿灯)"
 else
   ok "API-mode preflight: mock 模式 + 服的就是本工作树($served_root)"
 fi
@@ -281,8 +340,16 @@ if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad
 # copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
 # literal stars/backticks, and route-path literals violate the no-jargon rule.
 # (added 2026-07-09: owner caught **直接版税** + `/team/binary` in how-page copy.)
-i18n_md=$(grep -rEnI '\*\*[^*]+\*\*|`/[a-z]' src/i18n/messages 2>/dev/null | head -5)
-if [ -z "$i18n_md" ]; then ok "no markdown residue in i18n copy (0 hits)"; else bad "markdown residue in i18n copy (** or \`/path\`)"; echo "$i18n_md" | sed 's/^/        /'; fi
+# 🔴 2026-08-13 换成脚本门:原先是对**整个文件**做子串 grep,不剥注释 —— 在 i18n 文件里
+# 写一句带 markdown 强调的中文注释就会判红,而它要守的是「用户看得到的文案」里不许有 markdown。
+# 本仓记过这一族:子串哨兵必须先剥注释再匹配。新门只在**字符串字面量的值**里找,
+# 并对「一条文案都没抠到」判红(候选集为 0 = 判据失效)。红测:文案里塞 → 红;注释里塞 → 绿。
+if "$NODE_BIN" scripts/i18n-copy-residue-gate.mjs > /tmp/uniapp-i18n-residue.log 2>&1; then
+  ok "i18n 文案 markdown 残留门 — $(tail -1 /tmp/uniapp-i18n-residue.log)"
+else
+  bad "i18n 文案里有 markdown 残留 — node scripts/i18n-copy-residue-gate.mjs 看明细"
+  grep -E "^(FAIL| )" /tmp/uniapp-i18n-residue.log | head -8
+fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
@@ -783,7 +850,11 @@ sentinel_present "P0 neg-balance: amount input strips non-numeric" src/pages/me/
 # z1 判决 A:5 参交叉核对活在页面提交链(确认后、submit 前),第 5 参权威源从 config
 # 纯函数换成服务端 policy;store 侧不再报价。判据钉页面调用形态 + 权威源。
 sentinel_present "P1 fee snapshot cross-checks policy authority (page, 5-arg)" src/pages/me/wallet-withdraw.vue 'withdrawalPolicy\.value\?\.networkConfirmFeeUsd \?\? null'
-sentinel_present "P1 fee snapshot guard sits in submit chain" src/pages/me/wallet-withdraw.vue 'if \(!quoteStillValid\(snap\.fee, snap\.offset, snap\.network\)\)'
+# 2026-08-11 幂等 P0:唯一允许的豁免是**重放**(`!pending &&`)—— 重放送的是首次那份冻结
+# body,服务端按冻结的 policyVersion 定价 = 用户当初确认过的那个价;拿今天的费率复验上一次
+# 的报价,费率一变就恒不成立,只会让未收口的那笔永远收不了口。判据只放行这一个前缀,
+# 换任何别的条件(`!foo &&`)照红,防止「加个开关就把门关了」。
+sentinel_present "P1 fee snapshot guard sits in submit chain (replay-exempt only)" src/pages/me/wallet-withdraw.vue 'if \((!pending && )?!quoteStillValid\(snap\.fee, snap\.offset, snap\.network\)\)'
 sentinel_present "P1 failed-withdrawal refunds burned NEX via own idem key" src/store/app.ts 'creditRewardBucketOnce\("refund-nex:" \+ wd\.id, "withdrawable", 0, burnedNex\)'
 # 脏金额守卫覆盖门(补④):credit/debit × USDT/NEX 四个余额原语必须全带 NaN/负数守卫,
 # 否则 debitNex(-x) 会因 `bal < -x` 恒 false 反向增币、脏 amount 污染余额成 NaN。
@@ -1023,8 +1094,26 @@ spec2_guard_semantics() {
     if(!/addDevice\("pc-gpu", \{ gpuModel: normalizedModel, gpuTier \}\)/.test(app)) throw new Error("pc-gpu creation does not pass matched tier");
     if(!/device\.kind === "pc-gpu" && !computeShareEnabled\.value/.test(app)) throw new Error("pc-gpu activation is not feature-gated");
     if(!/const IS_PRODUCTION = import\.meta\.env\.PROD/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("dev config mutation lacks production guard constant");
-    if(!/function _devSetFlag[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetFlag is not production guarded");
-    if(!/function _devSetComputeShareContent[\s\S]*?if \(IS_PRODUCTION\) return/.test(fs.readFileSync("src/store/config.ts","utf8"))) throw new Error("_devSetComputeShareContent is not production guarded");
+    // 🔴 2026-08-13 重锚:原判据钉的是字面写法 `if (IS_PRODUCTION) return`,而实现已加严成
+    //   `if (remoteApiEnabled || IS_PRODUCTION) return`(多拦一层远端档)—— 判据过期,不是回归。
+    //   改成**派生**:枚举 config.ts 里所有 `_dev*` 开发后门,逐个要求其函数体开头有
+    //   IS_PRODUCTION 早退。写法随便,但一个都不许漏 —— 新增一个没守的后门会自动判红,
+    //   而写死函数名的旧判据对「新增的后门」是瞎的。
+    const cfg = fs.readFileSync("src/store/config.ts","utf8");
+    const devFns = [...cfg.matchAll(/function (_dev[A-Za-z0-9_]*)\s*\(/g)].map((m)=>m[1]);
+    if(devFns.length < 3) throw new Error("config.ts 里只找到 "+devFns.length+" 个 _dev* 后门,不像完整实现 —— 判据失效");
+    // 🔴 函数体按**大括号配平**抠,不用 indexOf("\n}") —— 这些函数嵌套在 store 里,
+    //   结尾是缩进的 `  }`,按 "\n}" 找会一路截到很后面,把**邻居的**守卫也算进来,
+    //   于是「拆掉某个后门的守卫」和「新增一个没守的后门」两种变异都不会红(实测过)。
+    for(const fn of devFns){
+      const at = cfg.indexOf("function "+fn+"(");
+      const open = cfg.indexOf("{", at);
+      let d=0, close=-1;
+      for(let k=open;k<cfg.length;k++){ if(cfg[k]==="{")d++; else if(cfg[k]==="}"&&--d===0){close=k;break;} }
+      if(close<0) throw new Error(fn+" 函数体大括号不配平 —— 判据失效");
+      const body = cfg.slice(open, close);
+      if(!/IS_PRODUCTION/.test(body)) throw new Error(fn+" 是开发后门却没有 IS_PRODUCTION 早退 —— 生产构建里它是活的");
+    }
     if(!/const activeSlotCount = computed\(\(\) => devices\.value\.filter\(\(d\) => d\.activatedAt !== null\)\.length\)/.test(app)) throw new Error("slot cap must count hidden active pc-gpu devices");
     const demoKindsMatch = deviceTypes.match(/const demoKinds:[\s\S]*?=\s*\[([^\]]*)\]/);
     if(!demoKindsMatch) throw new Error("default demoKinds seed missing");
@@ -1433,7 +1522,6 @@ sentinel_present "P2-8 account-scope helper rebinds goals" src/lib/account-scope
 sentinel_present "P2-8 account-scope helper rebinds lucky-spin" src/lib/account-scope.ts 'useLuckySpin\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds daily-powerup" src/lib/account-scope.ts 'useDailyPowerUp\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 quest store is account-scoped" src/store/quest.ts 'writeAccountRow'
-sentinel_present "P2-8 weekly-quest store is account-scoped" src/store/weekly-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 event-quest store is account-scoped" src/store/event-quest.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones store is account-scoped" src/store/milestones.ts 'writeAccountRow'
 sentinel_present "P2-8 milestones spec6 guard tracks new key" scripts/spec6-entry-surface-runtime.mjs 'nexgrid-milestones-accounts-v1'
@@ -1445,19 +1533,30 @@ sentinel_present "P2-8 daily-powerup store is account-scoped" src/store/daily-po
 sentinel_present "P2-8 account-scope helper rebinds notifications" src/lib/account-scope.ts 'useNotifications\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds receipts" src/lib/account-scope.ts 'useReceipts\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds tickets" src/lib/account-scope.ts 'useTickets\(\)\.bindAccount\(accountKey\)'
+# 🔴 2026-08-13 三条钉函数名的哨兵已退役,换成 account-scope-gate.mjs:
+#   它们钉的是 `writeAccountRow` / `useConversations().reset()` 这类**具体写法**,
+#   而实现换了更严的机制之后全红 —— tickets 改按「账号+运行会话」双维拼键、
+#   weekly-quest 改服务端权威+版次围栏(本地不落盘)、conversations 从 reset 改 bindAccount。
+#   新门改钉**不变量本身**:收口面从 account-scope.ts 的真实调用派生(不手写清单),
+#   三个 store 必须在收口面里(bindAccount / reset 都算),收口面塌空即判红。
+#   红测:摘掉 tickets → 红;把 bindAccount 全改名(收口面塌空)→ 红。
+if "$NODE_BIN" scripts/account-scope-gate.mjs > /tmp/uniapp-account-scope.log 2>&1; then
+  ok "账号隔离门 — $(tail -1 /tmp/uniapp-account-scope.log)"
+else
+  bad "账号隔离门失败 — node scripts/account-scope-gate.mjs 看明细"
+  grep -E "^  FAIL|^FAIL" /tmp/uniapp-account-scope.log | head -6
+fi
 sentinel_present "P2-8 account-scope helper rebinds cart" src/lib/account-scope.ts 'useCart\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds profile" src/lib/account-scope.ts 'useProfile\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds security" src/lib/account-scope.ts 'useSecurity\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 account-scope helper rebinds rewards-seen" src/lib/account-scope.ts 'useRewardsSeen\(\)\.bindAccount\(accountKey\)'
 sentinel_present "P2-8 notifications store is account-scoped" src/store/notifications.ts 'writeAccountRow'
 sentinel_present "P2-8 receipts store is account-scoped" src/store/receipts.ts 'writeAccountRow'
-sentinel_present "P2-8 tickets store is account-scoped" src/store/tickets.ts 'writeAccountRow'
 sentinel_present "P2-8 cart store is account-scoped" src/store/cart.ts 'writeAccountRow'
 sentinel_present "P2-8 profile store is account-scoped" src/store/profile.ts 'writeAccountRow'
 sentinel_present "P2-8 security store is account-scoped" src/store/security.ts 'writeAccountRow'
 sentinel_present "P2-8 rewards-seen store is account-scoped" src/store/rewards-seen.ts 'writeAccountRow'
 # P2-8 batch-5 会话记录:会话中心/Nova 非持久,换号收口点必须 reset 重播种(防上一账号的客服对话被下一账号看到;audit 2026-07-16)
-sentinel_present "P2-8 account-scope helper resets conversations" src/lib/account-scope.ts 'useConversations\(\)\.reset\(\)'
 sentinel_present "P2-8 account-scope helper resets nova" src/lib/account-scope.ts 'useNova\(\)\.reset\(\)'
 # 客服会话闲置策略双端 parity(本仓侧 tripwire;admin 侧 canon-sentinel 逐键比 canon-numbers.json):
 # 改这两个默认值必须三处同步(uniapp 常量 + admin m-tabs/data.ts + canon json),单独改本仓即红。
@@ -2736,6 +2835,13 @@ withdraw_bill_runtime_gate() {
 }
 withdraw_bill_runtime_gate
 
+# 🗑 【2026-08-13 回退】这里曾挂过「提现扣款自愈门」(scripts/withdraw-debit-selfheal-runtime.mjs)。
+#    它守的实现 —— App.vue 对账里的扣款补扣格 —— 被 R1 独立审计整格否决并回退,门随之退役,
+#    脚本已移入 .trash。留着门守一段不存在的代码只会绿着骗人。
+#    重做时注意该门当时被审出的覆盖缺口:注入不跨拍(测不到「失败持续时补到成功为止」)、
+#    13 秒墙钟落在 2~3 拍之间(同一份代码两种结论)、状态覆盖 2/11、无跑满基数下限(截断即绿)、
+#    夹具继承 demo 种子而非构造。详见 docs/changes/2026-08-13-z6-audit-R1.md。
+
 # ── 接口引用台账门(存量缺陷族,2026-08-04):注释里的接口地址与 PRD 对不上 / 纯属虚构 ──
 # 实测 5 处同型:`POST /api/stakes/:id/claim`(PRD 是 /api/staking/)、`POST
 # /api/genesis/purchase` 和 `POST /api/swap`(PRD 根本没这接口)、试用转化写成
@@ -2833,15 +2939,37 @@ withdrawal_merge_union_gate
 # 其中一个是门脚本本身(里面那根针钉的符号名已经不存在了 —— 假绿)。
 # tsc 看不到 .md/.mjs,契约登记门只扫 *.test.mjs,这一族此前天然无人看管。
 # 判据构造性:扫全部被 git 跟踪的文本文件,不维护类型清单;候选集塌了本门自己判红(已红测)。
-conflict_marker_gate() {
-  if "$NODE_BIN" scripts/conflict-marker-gate.mjs > /tmp/uniapp-conflict-marker.log 2>&1; then
-    ok "冲突标记哨兵 — $(tail -1 /tmp/uniapp-conflict-marker.log)"
+
+# 提现失败分诊的**重放感知**门(2026-08-12 立,两路独立审计各自点名同一根因)。
+# 守:重放路径上只有「成功」与「409」算定局,其余一律保留幂等键 —— 401/429/地区策略
+# 都是边缘层拒绝,排在服务端幂等查询之前,对「上一次落没落库」零信息量;
+# 拿它们退役键 ⇒ 下次新键 ⇒ 服务端出第二笔。
+# 红测:A 去掉「确定拒绝」档的 !isReplay → 红;B 日限档改回无条件退役 → 红;
+#       C 给 409 档也加 !isReplay → 红;D 删掉抠段锚点 → 判据自失效判红。
+withdraw_replay_triage_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-replay-triage.mjs > /tmp/uniapp-replay-triage.log 2>&1; then
+    ok "提现分诊重放感知门 — $(tail -1 /tmp/uniapp-replay-triage.log)"
   else
-    bad "残留冲突标记 — node scripts/conflict-marker-gate.mjs 看明细"
-    grep -E "^(FAIL|        )" /tmp/uniapp-conflict-marker.log | head -10 | sed "s/^/        /"
+    bad "提现分诊重放感知门失败 — node scripts/selfcheck-withdraw-replay-triage.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-replay-triage.log | head -8 | sed "s/^/        /"
   fi
 }
-conflict_marker_gate
+withdraw_replay_triage_gate
+
+# 提现分诊**数据流**门(2026-08-13 结构性反思的产物)。同型缺陷连两轮复发后换层:
+# 前两版都是静态判据(形状 / 字符串),守得住「代码长什么样」,守不住「运行时什么值流到哪」。
+# 本门把 catch 段真源码**跑起来**(注入桩),断言喂给判决的上下文与实际副作用次数。
+# 红测:页面谎报 isReplay/isDailyLimit/isGeo → 全红;拿掉日限线型守卫 → 红;
+#       结果未知也退役 → 红;409 档早退绕过退役 → 红。
+withdraw_triage_dataflow_gate() {
+  if "$NODE_BIN" scripts/selfcheck-withdraw-triage-dataflow.mjs > /tmp/uniapp-triage-dataflow.log 2>&1; then
+    ok "提现分诊数据流门 — $(tail -1 /tmp/uniapp-triage-dataflow.log)"
+  else
+    bad "提现分诊数据流门失败 — node scripts/selfcheck-withdraw-triage-dataflow.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|AssertionError)" /tmp/uniapp-triage-dataflow.log | head -8 | sed "s/^/        /"
+  fi
+}
+withdraw_triage_dataflow_gate
 
 # ── 创世邀请码码表核销门(规格 FEAT-GEN11,2026-08-04)──
 # 旧实现只跑一条正则:任何 NEXGRID-OG-XXXX 都通过、同一个码可被无限账号使用,创世资格门
@@ -3031,6 +3159,21 @@ genesis_gate() {
   fi
 }
 genesis_gate
+
+# ── 周任务 × 创世闸的观测门(2026-08-13)────────────────────────────────────────
+# 接手 GEN10 门里那句交底:周任务改服务端下发后,「关闭态不派买创世」这条不变量
+# 在客户端**没有门守着**了。客户端不做过滤(questCode 是后台手输自由文本,猜错会藏掉
+# 用户已挣到的 CLAIMABLE 奖励,比它想防的问题更坏)—— 过滤归派发端(交接书 U-16),
+# 客户端只留报警,并焊住「任务面新增跳创世入口必须问闸」这条反向钉。
+quest_genesis_tripwire_gate() {
+  if "$NODE_BIN" scripts/selfcheck-quest-genesis-tripwire.mjs > /tmp/uniapp-quest-genesis-tripwire.log 2>&1; then
+    ok "周任务创世观测门 — $(tail -1 /tmp/uniapp-quest-genesis-tripwire.log)"
+  else
+    bad "周任务创世观测门失败 — node scripts/selfcheck-quest-genesis-tripwire.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-quest-genesis-tripwire.log | head -8 | sed 's/^/        /'
+  fi
+}
+quest_genesis_tripwire_gate
 
 # ── 守卫存活性门(2026-08-07 · 守卫存活性族第三次复发后的结构根治)──────────────
 # 不变量:周期性权限守卫是**安全装置不是业务循环**,只随前台/后台成对开关。
