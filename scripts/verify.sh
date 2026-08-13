@@ -1783,6 +1783,49 @@ trial02_source_fingerprints() {
     else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside allow-list [$allow]"; echo "$hits" | sed 's/^/        /'; fi
   done
 }
+
+# ── 哨兵A':**文档面**的卡时代指纹(2026-08-14 补)────────────────────────
+# why:上面 A 只扫 src。`docs/业务流程说明.md` §1 整节把「绑卡 → 到期自动扣款」写成当前
+#   流程,足足 11 天没有任何门响 —— 因为它是文档。照那份文档实现,会实现出 FEAT-TRIAL02
+#   明令禁止的产品。文档不参与编译,tsc / verify 的源码哨兵都天然看不见它。
+#
+# 判据不能是「文档里出现即红」—— 那会把**正确的**文档判红:讲清「这些动作已删除」、
+#   列出门的禁用名单,都必须原样写出那些名字(本仓三份变更卡与重写后的 §1 都如此)。
+# 所以:
+#   · `docs/changes/**` 结构性豁免 —— 那里每份都是有日期的变更记录,按定义就是历史;
+#   · 其余文档必须**要么零命中,要么在文件里显式写一行 STALE-TERMS-OK 标记 + 理由**。
+#     标记是**有意为之且留了字**的动作,不会手滑加上;豁免文件数打进 PASS 行,不许静默增长。
+# ⚠️ 已知残余风险:带了标记的文件仍可能自己烂掉。这道门挡的是「无声地把死流程写成活的」,
+#   不是「所有文档永远正确」。别把它当成后者。
+DOC_STALE_MARKER='STALE-TERMS-OK'
+trial02_doc_fingerprints() {
+  local docs_n marked_n pat hits bad_hits=0
+  docs_n=$(find docs -name "*.md" -not -path "docs/changes/*" 2>/dev/null | wc -l | tr -d ' ')
+  marked_n=$(grep -rlF "$DOC_STALE_MARKER" docs --include="*.md" 2>/dev/null \
+    | grep -v "^docs/changes/" | wc -l | tr -d ' ')
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" \
+             "trialDisclose" "trialExtension" "redeemEarly" "redeem-early" "markChargeFailed"; do
+    # 命中文件 − changes/ − 自带标记的文件 = 真正该红的
+    hits=$(grep -rlF "$pat" docs --include="*.md" 2>/dev/null \
+      | grep -v "^docs/changes/" \
+      | while read -r f; do grep -qF "$DOC_STALE_MARKER" "$f" || echo "$f"; done | head -5)
+    if [ -n "$hits" ]; then
+      bad "TRIAL02 卡时代动作名 '$pat' 出现在**没有 $DOC_STALE_MARKER 标记**的文档里 —— 要么这份文档过期了,要么补标记+理由"
+      echo "$hits" | sed 's/^/        /'
+      bad_hits=1
+    fi
+  done
+  [ "$bad_hits" -eq 0 ] && ok "TRIAL02 doc fingerprints: 9 个动作名在无标记文档里 0 命中(扫 $docs_n 份非 changes 文档,其中 $marked_n 份带豁免标记)"
+  # 🔴 反向对照(正控):本门的 PASS 形态是「0 命中」—— 那正是假绿最爱的形状:
+  #   grep 机制一坏(路径写错 / 通配符失效 / docs 被挪走),同样是 0 命中,同样报绿。
+  #   所以要有一处**必须扫得到**的地方做对照:docs/changes/ 里的变更卡按定义会原样引用这些
+  #   旧动作名(裁决卡 / 红测记录都在讲它们)。那里扫不到 = 扫描机制本身坏了,不是「真干净了」。
+  local control
+  control=$(grep -rlF "redeemEarly" docs/changes --include="*.md" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$control" -ge 1 ]; then ok "TRIAL02 doc 扫描机制正控:docs/changes 里扫到 $control 份含旧动作名的变更卡(>0 = grep 确实在工作)";
+  else bad "TRIAL02 doc 扫描机制失效 —— 连 docs/changes 里的变更卡都扫不到旧动作名,上面那条「0 命中」是假绿,先修扫描逻辑"; fi
+}
+trial02_doc_fingerprints
 trial02_source_fingerprints
 
 # 哨兵B:i18n 三语自动扣款时代文案清零(en/zh/vi 同扫)。
