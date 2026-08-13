@@ -2884,6 +2884,13 @@ export const zh: Messages = {
     statusPaid: "已付款",
     statusProvisioning: "机位分配中",
     statusActivated: "已激活",
+    statusPaymentFailed: "支付失败",
+    statusExpired: "支付已过期",
+    statusProvisioningFailed: "履约失败",
+    statusRefunded: "已退款",
+    statusChargeback: "付款争议",
+    // 列表页把 payment_failed / provisioning_failed 两种失败合并显示;详情页仍分别用上面两条
+    statusFailedShort: "处理失败",
     provisioningHint: "正在 {dc} 分配机位…",
     activatedHint: "已在 {dc} 上线 · 收益已开始",
     dataCenter: "数据中心",
