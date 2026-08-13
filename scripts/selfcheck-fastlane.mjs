@@ -822,7 +822,12 @@ function functionBody(src, opener) {
     //    🔴 能力上界(先说清楚它守不到哪):三条钉的都是「字面量在不在、谁排在谁前面」,
     //    守不到「它真的把钱补上了」。行为级由 scripts/withdraw-debit-selfheal-runtime.mjs 守
     //    (注入落盘失败 / 余额闸判假 → 等真实的 5s 对账跑 ≥2 拍 → 看余额那个数变没变)。
-    //    两道门分工:静态守形状与顺序,runtime 守结果。别拿任何一道当另一道用。
+    //    🔴 反过来,(c) 那条顺序判据正是 runtime 门**测不到**的那一半 —— 三个变异实跑对照:
+    //      · 整格删除 / 粗筛写反:两道门都红;
+    //      · 把本格挪到 ② 退款腿之后:本门红,而 runtime 门 **13/13 全绿** ——
+    //        它等的 13s 里跑了 ≥2 拍,失败单下一拍就被退回、最终态照样收敛,
+    //        那一拍的错误余额它根本看不见。
+    //    所以两道门是**互补不是冗余**,谁都不许以「另一道守着呢」为由删掉。
     {
       const healAt = appVueCode.indexOf("app.applyWithdrawalDebit(wd)");
       const refundAt = appVueCode.indexOf("app.refundFailedWithdrawals()");
