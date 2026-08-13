@@ -55,15 +55,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, type CSSProperties } from "vue";
+import { computed, onMounted, watch, type CSSProperties } from "vue";
 import type { CanonicalQuest } from "@/api/quest-api";
 import { useWeeklyQuest } from "@/store/weekly-quest";
+import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { unclaimableGenesisQuests, genesisQuestContractViolation } from "@/lib/quest-genesis-tripwire";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 
 const t = useT();
 const w = computed(() => t.value.weeklyQuest);
 const wq = useWeeklyQuest();
+
+// 🔴 观测闸,**不是过滤器**——为什么客户端不过滤,见 lib/quest-genesis-tripwire.ts 顶部。
+//   判定走唯一消费入口 useGenesisSaleGate,本文件不自判(GEN10 ④「单一派生」)。
+//   代价交底:接这个 composable = 本页多持一个共享秒级时钟 + 15s 配置轮询(它自带,
+//   引用计数全局共享)。绕开它自己读 config 才是真问题,GEN10 ④b 会红,也该红。
+//   挂在 hero 而不是 list:hero 看得到整份 snapshot,一处接线覆盖 Tier1 + Tier2。
+const { block: genesisBlock } = useGenesisSaleGate();
+watch(
+  [() => wq.snapshot, genesisBlock],
+  ([snap, block]) => {
+    const offenders = unclaimableGenesisQuests(snap?.quests ?? [], block);
+    if (offenders.length > 0) console.error(genesisQuestContractViolation(offenders, block));
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   void wq.refresh();

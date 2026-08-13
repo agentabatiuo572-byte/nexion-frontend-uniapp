@@ -32,6 +32,7 @@ const REGISTRY = {
   "g-remote-authority-behavior.test.mjs": { how: "chain" },
   "remote-authority-simulation.test.mjs": { how: "chain" },
   "withdraw-terminal-reason-parity.test.mjs": { how: "chain" },
+  "withdraw-idempotency-contract.test.mjs": { how: "chain" },
   "remote-config-merge-contract.test.mjs": { how: "chain" },
   "remaining-feature-authority-contract.test.mjs": { how: "chain" },
   "nova-local-ai-contract.test.mjs": { how: "chain" },

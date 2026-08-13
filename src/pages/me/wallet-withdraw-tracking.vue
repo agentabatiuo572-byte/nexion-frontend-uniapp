@@ -94,6 +94,9 @@
               role="button" tabindex="0"
               @click.stop="confirmSandboxCallback"
             >
+              <!-- 🔴 工程话,**故意不进 i18n 词典**(硬编码中文门失败提示的出路②):
+                   进词典就成了用户文案契约,而词典是普通对象、打包摇不掉,会原样进生产包。
+                   本门只判中文,所以这行英文不会撞门 —— 别"好心"把它收进词典。 -->
               <text>SANDBOX: confirm server callback</text>
             </view>
             <view
@@ -336,6 +339,7 @@ const etaSub = computed(() => {
   if (isFrozenHold.value) return t.value.wallet.routeHeldFrozenBody;
   if (routeHeld.value) return t.value.wallet.withdrawRouteHeldSub;
   if (wd.value?.sourceEnvironment === "SANDBOX" && !isTerminalDone.value) {
+    // 工程话,故意不进 i18n 词典(同 :97 的理由:出路②)。
     return "source=mock · SANDBOX: awaiting server callback, no client-side ETA auto-complete";
   }
   // 终态给实际到账时刻；进行中只显示服务端订单快照中的预计时刻。
@@ -396,6 +400,7 @@ async function confirmSandboxCallback() {
   const id = wd.value?.id;
   if (!id) return;
   try {
+    // 工程话,故意不进 i18n 词典(同 :97 的理由:出路②)。
     if (!await app.applyFundsSandboxCallback(id, "CONFIRMED")) toast.info("SANDBOX: order status changed, refresh to see it");
   } catch (cause) {
     toast.info(geoPolicyUserMessage(cause, t.value.geoPolicy) ?? t.value.wallet.trackConfirmArrivalFailed);

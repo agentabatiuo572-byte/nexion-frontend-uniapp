@@ -2878,6 +2878,13 @@ export const vi: Messages = {
     statusPaid: "Đã thanh toán",
     statusProvisioning: "Đang cấp phát",
     statusActivated: "Đã kích hoạt",
+    statusPaymentFailed: "Thanh toán thất bại",
+    statusExpired: "Thanh toán đã hết hạn",
+    statusProvisioningFailed: "Cấp phát thất bại",
+    statusRefunded: "Đã hoàn tiền",
+    statusChargeback: "Tranh chấp thanh toán",
+    // Trang danh sách gộp payment_failed / provisioning_failed thành một nhãn; trang chi tiết vẫn tách
+    statusFailedShort: "Thất bại",
     provisioningHint: "Đang phân bổ vị trí rack tại {dc}…",
     activatedHint: "Đã chạy tại {dc} · thu nhập đã bắt đầu",
     dataCenter: "Trung tâm dữ liệu",
@@ -3564,6 +3571,27 @@ export const vi: Messages = {
     submitUnknownTitle: "Chưa xác nhận được kết quả gửi lệnh",
     submitUnknownBody: "Kết nối bị gián đoạn nên lệnh rút này có thể đã được gửi thành công. Đừng gửi lại — hãy kiểm tra Tiến độ rút tiền trước, chỉ thử lại nếu chưa thấy lệnh.",
     withdrawContextStale: "Tài khoản hoặc địa chỉ nhận đã thay đổi, vui lòng gửi lại",
+    withdrawResendTitle: "Gửi lại yêu cầu lần trước",
+    withdrawResendBody:
+      "Yêu cầu lần trước rút ${amount} về địa chỉ {network} {address} chưa nhận được xác nhận. Gửi lại sẽ không tạo lệnh rút thứ hai — nếu lần đầu đã thành công, bạn vẫn chỉ thấy lệnh đó.",
+    withdrawResendCta: "Gửi lại",
+    withdrawOutcomeUnknownTitle: "Chưa xác nhận được lệnh rút này",
+    withdrawOutcomeUnknownBody:
+      "Yêu cầu có thể đã đến hệ thống nên số dư vẫn có thể thay đổi. Đừng tạo lệnh rút khác — hãy bấm Rút tiền lần nữa, chúng tôi sẽ gửi lại đúng yêu cầu đó và không bao giờ chi trả hai lần.",
+    withdrawDeclinedTitle: "Không có lệnh rút nào được tạo",
+    withdrawDeclinedBody:
+      "Yêu cầu bị từ chối nên không có lệnh rút nào được tạo và số dư của bạn không thay đổi. Hãy kiểm tra số tiền và địa chỉ nhận rồi gửi lại.",
+    withdrawNotSentTitle: "Chúng tôi chưa gửi yêu cầu này",
+    withdrawNotSentBody:
+      "Thiết bị này không lưu được bản ghi giúp ngăn một lệnh rút bị chi trả hai lần, nên không có gì được gửi đi và số dư của bạn không thay đổi. Hãy giải phóng bớt dung lượng hoặc mở lại ứng dụng rồi thử lại.",
+    withdrawAlreadyOnFileTitle: "Yêu cầu này đã được ghi nhận",
+    withdrawAlreadyOnFileBody:
+      "Yêu cầu lần trước đã được ghi nhận nên không có khoản nào bị chi trả hai lần. Hãy mở trạng thái rút tiền để theo dõi.",
+    withdrawResendDeclinedTitle: "Lần gửi lại này đã bị từ chối",
+    withdrawResendDeclinedBody:
+      "Chúng tôi vẫn chưa xác nhận được yêu cầu trước đó có đang được xử lý hay không, nên vẫn giữ lại yêu cầu đó cho bạn. Hãy kiểm tra trạng thái rút tiền trước; nếu không thấy, hãy thử lại đúng yêu cầu đó sau — đừng tạo yêu cầu mới.",
+    withdrawDailyLimitWithPending:
+      "Bạn đã dùng hết số lần rút tiền hôm nay. Yêu cầu trước đó có thể đang được xử lý và đã dùng hạn mức hôm nay — hãy kiểm tra trạng thái rút tiền trước và đừng tạo yêu cầu mới.",
     earnNexCta: "Đào thêm NEX",
     // FEAT-WD02 — phí xác nhận mạng cố định theo mạng + bù NEX tùy chọn (mặc định tắt)
     feeConfirmRow: "Phí xác nhận mạng",

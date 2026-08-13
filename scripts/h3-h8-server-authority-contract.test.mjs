@@ -25,6 +25,9 @@ test("H8 card consumes isolated server ledger facts and has an honest empty stat
   assert.doesNotMatch(card, /No settled invitation rewards yet|暂无已结算的邀请奖励/);
   assert.match(en, /noSettledRewards:\s*"No settled invitation rewards yet"/);
   assert.match(zh, /noSettledRewards:\s*"暂无已结算的邀请奖励"/);
+  // 🔴 语言面三语齐点(门的门 ① 判据):只点两种时,第三种可以随意漂移而本门全绿。
+  // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
+  assert.match(read("src/i18n/messages/vi.ts"), /noSettledRewards:/, "vi.ts 缺 noSettledRewards");
   assert.match(api, /\/api\/app\/referral-rewards\?limit=/);
   assert.match(api, /source === "ledger" && sourceEnvironment === "PRODUCTION"/);
   assert.match(api, /source === "mock" && sourceEnvironment === "SANDBOX"/);

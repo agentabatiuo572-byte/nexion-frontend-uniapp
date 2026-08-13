@@ -86,6 +86,12 @@ test("OPS-E-20 both visible NO_ACTIVE_DEVICE entries preserve the authoritative 
   assert.match(checkout, /handleNoActiveDeviceDecision/);
   assert.match(sheets, /handleNoActiveDeviceDecision/);
   assert.match(zh, /errNoActiveDevice: "无可置换的活跃设备，请到设备\/仓库核对或联系客服"/);
+  // 🔴 语言面必须三语齐点(门的门 ① 判据):只点一种语言时,另两种可以随意漂移而本门全绿。
+  // 实测过的失败形态:语言豁免表不带语言维 → vi 真丢了占位符照样绿。
+  // 中文钉**原文**(话术是产品决定),英/越只钉**键存在** —— 措辞由翻译定,但键不许缺。
+  for (const [loc, src] of [["en", read("src/i18n/messages/en.ts")], ["vi", read("src/i18n/messages/vi.ts")]]) {
+    assert.match(src, /errNoActiveDevice:/, `${loc}.ts 缺 errNoActiveDevice`);
+  }
   assert.doesNotMatch(checkout, /NO_ACTIVE_DEVICE[\s\S]{0,220}errReplaceUnavailable/);
   assert.doesNotMatch(sheets, /NO_ACTIVE_DEVICE[\s\S]{0,220}errReplaceUnavailable/);
 });

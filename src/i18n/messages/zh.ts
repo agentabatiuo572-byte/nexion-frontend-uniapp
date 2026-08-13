@@ -2900,6 +2900,13 @@ export const zh: Messages = {
     statusPaid: "已付款",
     statusProvisioning: "机位分配中",
     statusActivated: "已激活",
+    statusPaymentFailed: "支付失败",
+    statusExpired: "支付已过期",
+    statusProvisioningFailed: "履约失败",
+    statusRefunded: "已退款",
+    statusChargeback: "付款争议",
+    // 列表页把 payment_failed / provisioning_failed 两种失败合并显示;详情页仍分别用上面两条
+    statusFailedShort: "处理失败",
     provisioningHint: "正在 {dc} 分配机位…",
     activatedHint: "已在 {dc} 上线 · 收益已开始",
     dataCenter: "数据中心",
@@ -3569,6 +3576,27 @@ export const zh: Messages = {
     submitUnknownTitle: "提交结果未确认",
     submitUnknownBody: "网络中断,这笔提现可能已经提交成功。请不要重复提交,到提现进度里确认;确实没提交成功再重试。",
     withdrawContextStale: "账户或收款地址已变化,请重新提交",
+    withdrawResendTitle: "重新发送刚才那一笔",
+    withdrawResendBody:
+      "刚才那笔 ${amount} 提到 {network} 地址 {address},没有拿到确认结果。再发一次不会生成第二笔提现 —— 如果上一次已经成功,你看到的还是那一笔。",
+    withdrawResendCta: "再发一次",
+    withdrawOutcomeUnknownTitle: "这笔提现还没确认结果",
+    withdrawOutcomeUnknownBody:
+      "请求可能已经送达,余额仍可能变动。先别另开一笔 —— 再点一次提现,我们会把同一笔原样重发,不会重复出款。",
+    withdrawDeclinedTitle: "没有生成提现单",
+    withdrawDeclinedBody: "本次请求被拒绝,没有生成提现单,余额没有变动。核对金额和收款地址后可以重新提交。",
+    withdrawNotSentTitle: "这笔没有发出去",
+    withdrawNotSentBody:
+      "这台设备存不下「防止同一笔被出款两次」的那条记录,所以没有发出去,余额没有变动。清一点设备空间或重开一次 App,再试。",
+    withdrawAlreadyOnFileTitle: "刚才那一笔已经在案",
+    withdrawAlreadyOnFileBody: "上一次提交已经记录在案,没有重复出款。到提现进度里就能跟进那一笔。",
+    // 重放被拒:本次没过,但先前那笔的状态**仍然未知** —— 两件事都要说,只说一件会让用户
+    // 以为「那就是没成功」,转头去开新的一笔。
+    withdrawResendDeclinedTitle: "这次重新发送被拒绝了",
+    withdrawResendDeclinedBody: "先前那一笔是否已经在处理,我们这边还确认不了,所以先替你保留着。请先到提现进度里看有没有那一笔;没有的话稍后再试同一笔,不要重新发起一笔新的。",
+    // 重放时撞上日限:与首次提交的日限话术不同 —— 首次是「今天不能提了」,
+    // 重放是「今天不能提了,而且先前那笔可能已经占掉了额度」。
+    withdrawDailyLimitWithPending: "今日提现次数已用完。先前那一笔可能已经在处理并占用了今天的额度 —— 请先到提现进度里确认,不要重新发起一笔新的。",
     earnNexCta: "去挖矿赚 NEX",
     // FEAT-WD02 — 按网络固定的网络确认费 + 自选 NEX 抵扣(默认关)
     feeConfirmRow: "网络确认费",

@@ -3005,6 +3005,13 @@ export const en = {
     statusPaid: "Paid",
     statusProvisioning: "Provisioning",
     statusActivated: "Activated",
+    statusPaymentFailed: "Payment failed",
+    statusExpired: "Payment expired",
+    statusProvisioningFailed: "Provisioning failed",
+    statusRefunded: "Refunded",
+    statusChargeback: "Chargeback",
+    // List view merges payment_failed / provisioning_failed into one label; the detail view keeps them apart
+    statusFailedShort: "Failed",
     provisioningHint: "Allocating a rack slot in {dc}…",
     activatedHint: "Live in {dc} · earnings have started",
     dataCenter: "Data center",
@@ -3698,6 +3705,27 @@ export const en = {
     submitUnknownTitle: "Submission result unconfirmed",
     submitUnknownBody: "The connection dropped, so this withdrawal may already have gone through. Don't submit it again — check Withdrawal progress first, and only retry if it isn't there.",
     withdrawContextStale: "Your account or payout address changed — please submit again",
+    withdrawResendTitle: "Send your earlier request again",
+    withdrawResendBody:
+      "Your earlier request for ${amount} to your {network} address {address} was never confirmed. Sending it again will not create a second withdrawal — if the first one went through, you will simply see that one.",
+    withdrawResendCta: "Send it again",
+    withdrawOutcomeUnknownTitle: "We could not confirm this withdrawal",
+    withdrawOutcomeUnknownBody:
+      "It may already have reached us, so your balance can still change. Do not start a different withdrawal — tap Withdraw again and we will send this same request, which never pays out twice.",
+    withdrawDeclinedTitle: "No withdrawal was created",
+    withdrawDeclinedBody:
+      "The request was declined, so no withdrawal exists and your balance is unchanged. Check the amount and the receiving address, then submit again.",
+    withdrawNotSentTitle: "We did not send this request",
+    withdrawNotSentBody:
+      "This device could not save the record that stops a withdrawal from being paid twice, so nothing was sent and your balance is unchanged. Free up space on your device or reopen the app, then try again.",
+    withdrawAlreadyOnFileTitle: "This request is already on file",
+    withdrawAlreadyOnFileBody:
+      "Your earlier request was recorded, so nothing was paid out twice. Open withdrawal status to follow it.",
+    withdrawResendDeclinedTitle: "This resend was declined",
+    withdrawResendDeclinedBody:
+      "We still cannot confirm whether your earlier request is being processed, so we are keeping it for you. Check withdrawal status first; if it is not there, try the same request again later — do not start a new one.",
+    withdrawDailyLimitWithPending:
+      "You have used today's withdrawal count. Your earlier request may already be processing and may have used today's allowance — check withdrawal status first, and do not start a new request.",
     earnNexCta: "Mine more NEX",
     // FEAT-WD02 — fixed per-network confirmation fee + opt-in NEX offset (default off)
     feeConfirmRow: "Network confirmation fee",
