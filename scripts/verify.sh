@@ -1917,7 +1917,11 @@ nav_routes_valid() {
     const fs=require("fs"), cp=require("child_process");
     const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
     const valid=new Set((pj.pages||[]).map(p=>"/"+p.path));
-    let out=""; try{out=cp.execSync("grep -rnE \"/pages/[A-Za-z0-9_/-]+\" src",{encoding:"utf8",maxBuffer:1e8});}catch(e){out=e.stdout||"";}
+    // 🔴 2026-08-13 收窄扫描面:测试文件里的路由是**夹具字符串**,不是导航目标 ——
+    //   behavior-analytics-race.test.ts 造了个 "/pages/home/index" 喂给 tap 采样器,
+    //   它永远不会被 navigateTo 消费,却让本门判红。门守的是「真导航指向不存在的页」,
+    //   夹具不在这个域里。只排 *.test.ts / *.spec.ts,不放宽到整目录。
+    let out=""; try{out=cp.execSync("grep -rnE \"/pages/[A-Za-z0-9_/-]+\" src --include=*.ts --include=*.vue --include=*.json --exclude=*.test.ts --exclude=*.spec.ts",{encoding:"utf8",maxBuffer:1e8});}catch(e){out=e.stdout||"";}
     const refs=new Set();
     out.split("\n").forEach(line=>{
       const ci=line.indexOf(":", line.indexOf(":")+1);
