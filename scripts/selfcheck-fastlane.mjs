@@ -806,6 +806,31 @@ function functionBody(src, opener) {
     check("🔴 接线:提现建单成功后**真的调**了扣款(删掉调用行,其余判据全绿也拦不住)",
       stripComments(readSrc("src/pages/me/wallet-withdraw.vue"))
         .includes("app.applyWithdrawalDebit(wd)"));
+    // 🔴 接线门②:扣款腿的**自愈**。上面那格守的是「提交那一刻调了扣款」——
+    //    而那一次调用报假之后就再没人管:幂等键 `wd-debit:` 没置位,服务端已经扣了钱、
+    //    本地余额一分没动,且**永远不会再补**(2026-08-13 运行时复现:同一个 reconcileBills 里
+    //    ⓪ 把删掉的账单行补了回来,≥2 拍后那笔钱仍然没扣)。用户看到的可提余额永久虚高,
+    //    还能照这个虚高值再提一笔,一路放行到服务端才被拒。
+    //    三条合取,逐条交代它各自挡住哪种写法(缺一条就有一种改法能绕过去):
+    //      (a) 对账里真的调了扣款 —— 挡「整格被删 / 被注释掉」(判据走剥注释的 appVueCode);
+    //      (b) 粗筛必须是 `if (applied) continue` 而**不是**反过来 —— 判据写反时 (a) 照绿,
+    //          实际效果却是「只对已经扣过的单反复调用」,该补的一张也补不上;
+    //      (c) 补扣格排在 ② 退款腿**之前** —— 顺序是修法的一部分:补扣**刻意不排除**失败终态
+    //          (排除就要在 App.vue 抄第五份终态字面量清单,全仓已有 4 份),靠「同拍内退款腿
+    //          看到 wd-debit: 键立刻退回 +N」闭合成净 0。挪到 ② 之后,失败单会留一整拍的
+    //          错误余额;退款腿若再被改坏,补扣就从「净 0」变成白扣用户的钱 —— 比原缺陷更坏。
+    //    🔴 能力上界(先说清楚它守不到哪):三条钉的都是「字面量在不在、谁排在谁前面」,
+    //    守不到「它真的把钱补上了」。行为级由 scripts/withdraw-debit-selfheal-runtime.mjs 守
+    //    (注入落盘失败 / 余额闸判假 → 等真实的 5s 对账跑 ≥2 拍 → 看余额那个数变没变)。
+    //    两道门分工:静态守形状与顺序,runtime 守结果。别拿任何一道当另一道用。
+    {
+      const healAt = appVueCode.indexOf("app.applyWithdrawalDebit(wd)");
+      const refundAt = appVueCode.indexOf("app.refundFailedWithdrawals()");
+      const skipOk = /if \(app\.withdrawalDebitApplied\(wd\.id\)\) continue;/.test(appVueCode);
+      check("🔴 接线:对账循环补扣「该扣没扣」的单,且排在退款腿之前(扣款报假后唯一的自愈路径)",
+        healAt > 0 && skipOk && refundAt > 0 && healAt < refundAt,
+        `补扣调用@${healAt} · 粗筛判据${skipOk ? "在" : "缺失/写反"} · 退款腿@${refundAt}`);
+    }
     // 赠金释放只动桶和余额、不写账单 → 那行「处理中」的赠金会永远停着。从数据推出它已落地。
     // 判据必须钉到**真正干活的那一句**(遍历 bills.bills 并 settleByRef),
     // 只查条件行的话,把循环源换成空数组照样绿(红测实证:改 `for (const row of [])` 不红)。
