@@ -100,6 +100,11 @@ import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+// ↓ mock 模式的资金落地面(远端模式一行都不走,见 handlePurchase 里的 `!remoteApiEnabled` 分支)
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
+import { postMoneyBill } from "@/lib/money-receipt";
+import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ "update:open": [boolean] }>();
@@ -135,6 +140,7 @@ const sheetBlocked = computed(() => {
 // 算出「暂未开放」,靠 sheetBlocked 碰巧挡住 —— 已删。
 const sheetBlockText = computed(() => blockText.value ?? t.value.genesis.marketClosed.default);
 
+const app = useApp();
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => genesis.totalSlots - genesis.soldSlots);
 
@@ -185,12 +191,72 @@ async function handlePurchase() {
   purchasing.value = true;
   let committed = false;
   try {
+    // 🔴🔴 mock 模式(无服务端)必须**在本页扣款记账**,和迁移前一样 ——
+    //   8-10 转服务端权威时把「扣款 ⊗ 记账 + 铸造失败冲正」整段从本页删掉了(服务端会做),
+    //   可 mock 侧没有服务端:实测创世节点**白送**(铸了席位、余额分文未动、账单零行)。
+    //   这一段是原实现原样恢复,只多套一层 `!remoteApiEnabled`;远端模式一行都不走。
+    //   顺序不可调:扣款⊗记账(一次提交)→ 铸席位 → 失败冲正。理由见 money-receipt.ts。
+    if (!remoteApiEnabled) {
+      const cost = qty.value * price.value;
+      const billRef = `GENESIS-PRIM-${Date.now().toString(36).toUpperCase()}`;
+      const before = app.captureMoney();
+      const paid = postMoneyBill({
+        type: "purchase",
+        symbol: "USDT",
+        amount: -cost,
+        status: "posted",
+        memo: `Genesis primary · ${qty.value} slot${qty.value > 1 ? "s" : ""} @ $${price.value}`,
+        ref: billRef,
+      });
+      const geo = geoPolicyUserMessage(paid, t.value.geoPolicy);
+      if (geo) { toast.error(geo, t.value.geoPolicy.fundsSafeNote); return; }
+      if (paid === "insufficient") {
+        toast.error(t.value.genesis.purchaseError, fmt(t.value.genesis.purchaseErrorSubtitle, {
+          cost: cost.toLocaleString(), balance: app.user.usdtBalance.toFixed(2),
+        }));
+        return;
+      }
+      if (paid !== "ok") return;   // 落盘失败:收口点已还原资金并提示,账上无残留
+      const r = await genesis.purchase(qty.value);
+      if (!r.ok) {
+        // 铸造失败 → 走**同一个**收口点冲正:restoreTo 精确还原可提额度(裸 credit 只加总余额,
+        // 一次「扣款→失败→退款」就把可提额永久压低),并补一条反向分录(退款也必须有账)。
+        postMoneyBill({
+          type: "purchase",
+          symbol: "USDT",
+          amount: cost,
+          status: "posted",
+          memo: `Genesis primary reversed · ${qty.value} slot${qty.value > 1 ? "s" : ""} refunded`,
+          memoKey: "genesisReversed",
+          memoParams: { n: qty.value },
+          ref: `${billRef}-REV`,   // 冲正分录的键必须与原分录分开,否则 addOnce 会误判重
+        }, { restoreTo: before });
+        if (r.reason === "market-closed") toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
+        else if (r.reason === "cap") {
+          toast.error(t.value.genesisEligibility.toastCapReached,
+            fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }));
+        } else toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
+        return;
+      }
+      toast.success(
+        fmt(t.value.genesis.purchaseSuccess, { n: qty.value, s: qty.value > 1 ? "s" : "" }),
+        t.value.genesis.purchaseSubtitle,
+      );
+      committed = true;
+      emitClose();
+      return;
+    }
     const result = await genesis.purchase(qty.value);
     if (!result.ok) {
-      toast.error(
-        result.reason === "market-closed" ? sheetBlockText.value : t.value.genesis.purchaseError,
-        result.reason === "market-closed" ? t.value.genesis.marketClosed.holdingsSafe : t.value.genesis.reduceQty,
-      );
+      // 🔴 「够不着服务端」必须和「服务端说不卖」分开讲:混在一起的话,一次网络抖动
+      //   会被讲成「活动已关闭」,用户以为错过了活动就走了,而不是重试一下。
+      //   store 侧用全仓统一的 isSettledRejection 判这件事,页面只负责选文案。
+      const copy = result.reason === "unavailable"
+        ? [t.value.genesis.purchaseUnavailable, t.value.genesis.purchaseUnavailableSub]
+        : result.reason === "market-closed"
+          ? [sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe]
+          : [t.value.genesis.purchaseError, t.value.genesis.reduceQty];
+      toast.error(copy[0], copy[1]);
       return;
     }
     toast.success(

@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { Listing } from "@/components/genesis/listing-card.vue";
 import type { ActivityEvent } from "@/components/genesis/activity-row.vue";
-import { genesisApi } from "@/api/runtime";
+import { genesisApi, remoteApiEnabled } from "@/api/runtime";
 
 /**
  * Genesis config — 创世节点的「后台可控」参数(阶梯定价 / 预售倒计时 / 权益文案 /
@@ -377,6 +377,17 @@ export const useGenesisConfig = defineStore("genesisConfig", () => {
    *      判定读的不再是构造时的内存快照,而是当下的权威源。
    */
   async function refresh() {
+    // 🔴🔴 mock 模式没有服务端可读,而下面的 catch 是 **fail-closed**(把市场钉成 closed、
+    //   loaded 置 false)。少了这个分支,mock 下 refresh 必然走进 catch ⇒
+    //   `genesisPurchaseBlock` 先判 `!configLoaded → configUnavailable`,创世**整条流程**
+    //   (购买 / 挂单 / 承接 / 展示)全被钉死在「市场暂未开放」。
+    //   mock 期的「服务端」就是内置默认配置:标记就绪 + 开市,其余字段沿用 DEFAULT_GENESIS_CONFIG。
+    //   fail-closed 只对**真的有服务端却读不到**的情形成立;没有服务端的构建不适用。
+    if (!remoteApiEnabled) {
+      config.value = { ...config.value, marketOpenState: "open" };
+      loaded.value = true;
+      return;
+    }
     try {
       const state = await genesisApi.state();
       config.value = {
