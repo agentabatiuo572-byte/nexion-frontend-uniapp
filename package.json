@@ -51,6 +51,7 @@
     "test:learning-contracts": "node --experimental-strip-types --test scripts/learning-submission.test.mjs",
     "test:a11y-activate": "node --experimental-strip-types --test scripts/a11y-activate-behavior.test.mjs && node scripts/a11y-activate-gate.mjs && node scripts/a11y-activate-gate.redtest.mjs",
     "test:cross-repo": "node --test scripts/funds-run-scoped-isolation-contract.test.mjs scripts/funds-server-sandbox-contract.test.mjs scripts/h8-run-scoped-referral-projection-contract.test.mjs scripts/behavior-analytics-active-route-catalog-contract.test.mjs",
+    "test:quest-tripwire": "node scripts/quest-genesis-tripwire-runtime.mjs",
     "test:withdraw-status-mirror": "node scripts/withdraw-status-mirror-runtime.mjs",
     "test:legacy-suite": "node scripts/run-legacy-suite.mjs"
   },
