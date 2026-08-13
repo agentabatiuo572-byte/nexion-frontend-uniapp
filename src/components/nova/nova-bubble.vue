@@ -21,7 +21,7 @@
     <view v-if="visible" class="nx-nova-bubble nova-float" @click="open">
       <view class="nx-nova-btn nova-pulse">
         <NovaAvatar :size="36" pulse />
-        <view class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
+        <view v-if="showUnreadBadge" class="nx-nova-badge"><text class="nx-nova-badge-t">{{ unreadLabel }}</text></view>
       </view>
     </view>
   </view>
@@ -52,12 +52,15 @@ const { showUrgency: genesisUrgencyOk } = useGenesisSaleGate();
 // Bubble badge reflects ALL unread — Nova pushes + human-category conversations
 // (the advisor's proactive seed shows immediately as a conversion hook). Tapping
 // opens the unified conversation center; unread clears per-thread on open there.
-const totalUnread = computed(() => nova.unread + conversations.totalUnread);
-const visible = computed(() => totalUnread.value > 0);
+const totalUnread = computed(() =>
+  remoteApiEnabled ? nova.unread : nova.unread + conversations.totalUnread,
+);
+const visible = computed(() => remoteApiEnabled || totalUnread.value > 0);
+const showUnreadBadge = computed(() => totalUnread.value > 0);
 const unreadLabel = computed(() => (totalUnread.value > 9 ? "9+" : String(totalUnread.value)));
 
 function open() {
-  navTo("/pages/support/messages");
+  navTo(remoteApiEnabled ? "/pages/support/chat?type=ai" : "/pages/support/messages");
 }
 
 // ── focused trigger port (nova-triggers welcome + nova-triggers-v3 channels)

@@ -80,7 +80,7 @@
       <NetworkPulseCard />
 
       <!-- ZONE 3: AI advisor bridge -->
-      <NovaCardSlot />
+      <NovaCardSlot v-if="!remoteApiEnabled" />
 
       <!-- ZONE 5: money & ROI -->
       <DoTheMathCard />
@@ -116,6 +116,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useConfig } from "@/store/config";
 import { useLocaleStore } from "@/store/locale";
+import { remoteApiEnabled } from "@/api/runtime";
 
 type TaskCardId = "newcomer" | "weekly";
 

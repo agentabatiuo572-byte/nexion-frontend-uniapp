@@ -47,27 +47,35 @@ test("App bootstrap reprojects the in-memory server user after account-store reb
   assert.match(app, /app\.projectServerIdentity\(serverSession\.user\)/);
 });
 
-test("remote profile mutations stay on HOLD until the server exposes a profile-write contract", () => {
+test("remote nickname and avatar mutations use server authority", () => {
   const profile = read("src/store/profile.ts");
   const page = read("src/pages/me/profile.vue");
+  const api = read("src/api/profile-api.ts");
 
   assert.match(profile, /const init = remoteApiEnabled \? \{ displayName: "", avatarSeed: "" \} : hydrate\(boundKey\);/);
-  assert.match(profile, /function setDisplayName\(v: string\) \{[\s\S]*?if \(remoteApiEnabled\) return false;[\s\S]*?persist\(\);[\s\S]*?return true;/);
+  assert.match(profile, /async function setDisplayName\(v: string\): Promise<boolean> \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?profileApi\.updateNickname\(expected, desired, commandKey\)[\s\S]*?return true;/);
+  assert.match(profile, /if \(!isAmbiguousOutcome\(error\)\) finishProfileCommand/);
+  assert.match(api, /method: "PUT"[\s\S]*?path: "\/api\/app\/profile"[\s\S]*?body: \{ expectedNickname, nickname \}/);
   assert.match(profile, /function regenerateAvatar\(\) \{[\s\S]*?if \(remoteApiEnabled\) return false;[\s\S]*?defaultSeed\(\)[\s\S]*?persist\(\);[\s\S]*?return true;/);
-  assert.match(page, /v-if="remoteProfileReadOnly"[^>]*data-proof="remote-profile-readonly-hold"/);
-  assert.match(page, /:aria-disabled="remoteProfileReadOnly \? 'true' : 'false'"/);
-  assert.match(page, /function handleSave\(\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?toast\.info\(t\.value\.profile\.serverReadOnlyHold\);[\s\S]*?return;/);
-  assert.match(page, /function handleRegen\(\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?toast\.info\(t\.value\.profile\.serverReadOnlyHold\);[\s\S]*?return;/);
+  assert.match(page, /:authoritative="remoteApiEnabled"/);
+  assert.match(page, /:server-candidates="profile\.nicknameCandidates"/);
+  assert.match(page, /const saved = await profile\.setDisplayName\(name\.value\);[\s\S]*?toast\.success\(t\.value\.profile\.savedToast\)/);
+  assert.match(api, /uploadAvatar:[\s\S]*?client\.upload\(\{[\s\S]*?path: "\/api\/app\/profile\/avatar"/);
+  assert.match(page, /async function handleRegen\(\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?uni\.chooseImage\([\s\S]*?profileApi\.uploadAvatar\(filePath, key\)[\s\S]*?profileApi\.profile\(\)\.catch/);
+  assert.doesNotMatch(page, /profile\.serverReadOnlyHold/);
 });
 
-test("remote registration consumes the issued session before showing success", () => {
+test("remote registration calls password login and enters the App with that authoritative session", () => {
   const register = read("src/pages/register/register.vue");
+  const autoLogin = read("src/auth/registration-auto-login.ts");
   const completion = read("src/auth/complete-sign-in.ts");
 
-  assert.match(register, /const registration = await authApi\.register\(\{[\s\S]*?sponsorCode: currentSponsorCode\(\),[\s\S]*?\}\);/);
-  assert.match(register, /if \(registration\.kind !== "authenticated"\) throw new Error\("REGISTRATION_SESSION_INVALID"\);/);
-  assert.match(register, /const completed = completeSignIn\(\{[\s\S]*?identity: `user:\$\{registration\.user\.userId\}`,[\s\S]*?onboardingComplete: false,[\s\S]*?serverProfile: registration\.user,[\s\S]*?deferNavigation: true,[\s\S]*?\}\);/);
-  assert.match(register, /if \(!completed\.ok\) \{[\s\S]*?error\.value = [\s\S]*?return;[\s\S]*?\}[\s\S]*?launchRegistrationSuccess\(\);/);
+  assert.match(register, /const registration = await registerAndLogin\(authApi, \{[\s\S]*?sponsorCode: currentSponsorCode\(\),[\s\S]*?\}, \(\) => isCurrentRemoteRegistrationAttempt\(registrationAttempt\)\);/);
+  assert.match(autoLogin, /authApi\.discardSessionIfCurrent\(registration\.vaultRevision\)/);
+  assert.match(autoLogin, /authApi\.login\(\{[\s\S]*?countryCode: request\.countryCode,[\s\S]*?phone: request\.phone,[\s\S]*?password: request\.password/);
+  assert.match(register, /const completed = completeSignIn\(\{[\s\S]*?identity: `user:\$\{registration\.user\.userId\}`,[\s\S]*?onboardingComplete: true,[\s\S]*?serverProfile: registration\.user,[\s\S]*?serverSessionRevision: registration\.vaultRevision,[\s\S]*?\}\);/);
+  assert.match(register, /onboardingComplete: true,[\s\S]*?serverProfile: registration\.user,[\s\S]*?serverSessionRevision: registration\.vaultRevision/);
+  assert.doesNotMatch(register, /registration\.kind !== "authenticated"/);
   assert.match(completion, /deferNavigation\?: boolean;/);
   assert.match(completion, /if \(remoteApiEnabled\) \{[\s\S]*?options\.serverProfile\.userId[\s\S]*?onboardingComplete = options\.onboardingComplete \?\? false;/);
   assert.match(completion, /if \(options\.deferNavigation\) return \{ ok: true \};[\s\S]*?if \(!auth\.onboardingComplete\)/);
@@ -97,10 +105,13 @@ test("a rejected server completion consumes only the issued vault epoch", () => 
 test("stale remote authentication responses discard only their issued vault epoch", () => {
   const login = read("src/pages/login/login.vue");
   const register = read("src/pages/register/register.vue");
+  const registrationAutoLogin = read("src/auth/registration-auto-login.ts");
   const authApi = read("src/api/auth-api.ts");
 
   assert.match(login, /if \(!isCurrentPasswordAttempt\(passwordAttempt\)\) \{[\s\S]*?authApi\.discardSessionIfCurrent\(result\.vaultRevision\);[\s\S]*?return;/);
   assert.match(login, /if \(!isCurrentRemoteTwoFactorAttempt\(twoFactorAttempt\)\) \{[\s\S]*?authApi\.discardSessionIfCurrent\(result\.vaultRevision\);[\s\S]*?return;/);
-  assert.match(register, /if \(!isCurrentRemoteRegistrationAttempt\(registrationAttempt\)\) \{[\s\S]*?authApi\.discardSessionIfCurrent\(registration\.vaultRevision\);[\s\S]*?return;/);
+  assert.match(register, /registerAndLogin\(authApi,[\s\S]*?\(\) => isCurrentRemoteRegistrationAttempt\(registrationAttempt\)\)/);
+  assert.match(registrationAutoLogin, /authApi\.discardSessionIfCurrent\(registration\.vaultRevision\);[\s\S]*?if \(!isCurrent\(\)\) return \{ kind: "stale" \}/);
+  assert.match(registrationAutoLogin, /if \(!isCurrent\(\)\) \{[\s\S]*?authApi\.discardSessionIfCurrent\(login\.vaultRevision\)/);
   assert.match(authApi, /if \(vault\.revision\(\) !== expectedRevision\) return;/);
 });

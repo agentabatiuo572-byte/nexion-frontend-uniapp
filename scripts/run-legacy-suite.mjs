@@ -36,6 +36,20 @@ function stopTree(child) {
   else child.kill("SIGTERM");
 }
 
+function findBash() {
+  if (process.platform !== "win32") return "bash";
+  const candidates = [process.env.BASH_EXE];
+  const locatedGit = spawnSync("where.exe", ["git"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  for (const gitExe of String(locatedGit.stdout || "").split(/\r?\n/).filter(Boolean)) {
+    candidates.push(path.resolve(path.dirname(gitExe), "..", "bin", "bash.exe"));
+  }
+  candidates.push(
+    path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "bin", "bash.exe"),
+    path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
+  );
+  return candidates.find((candidate) => candidate && fs.existsSync(candidate)) || null;
+}
+
 async function waitForServer(url, child, tailOutput, timeoutMs = 180_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -68,12 +82,15 @@ let code = 1;
 try {
   await waitForServer(`${baseUrl}/?nx_device=off`, server, () => out);
   console.log(`legacy-suite:已在 ${baseUrl} 起隔离 mock server(本工作树),开始跑 scripts/verify.sh`);
-  const res = spawnSync("bash", ["scripts/verify.sh"], {
+  const bash = findBash();
+  if (!bash) throw new Error("BASH_RUNTIME_NOT_FOUND:请安装 Git Bash 或设置 BASH_EXE");
+  const res = spawnSync(bash, ["scripts/verify.sh"], {
     cwd: root,
     env: { ...process.env, BASE_URL: baseUrl, VITE_NEXGRID_API_MODE: "mock" },
     stdio: "inherit",
     shell: false,
   });
+  if (res.error) throw res.error;
   code = res.status ?? 1;
 } finally {
   stopTree(server);
