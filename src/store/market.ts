@@ -47,8 +47,10 @@ export const useMarket = defineStore("market", () => {
     remoteReady.value = false;
   }
 
-  async function syncRemote() {
-    if (!remoteApiEnabled) return;
+  // 权威不可达是常态输入,不 reject(resilience 门同族;z6 审计 P0:
+  // wallet-nex 的 setInterval 裸发 tickPrice → 原 throw 每 3s 一个 unhandledRejection)。
+  async function syncRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
     try {
       const snapshot = await marketApi.fetch();
       const history = snapshot.history24h.map((point) => point.price);
@@ -65,10 +67,11 @@ export const useMarket = defineStore("market", () => {
       lastTickTs.value = Date.now();
       remoteError.value = null;
       remoteReady.value = true;
+      return true;
     } catch {
       clearRemoteState();
       remoteError.value = "G3_REMOTE_AUTHORITY_UNAVAILABLE";
-      throw new Error(remoteError.value);
+      return false;
     }
   }
 
