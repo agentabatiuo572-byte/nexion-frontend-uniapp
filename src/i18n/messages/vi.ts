@@ -2862,6 +2862,13 @@ export const vi: Messages = {
     statusPaid: "Đã thanh toán",
     statusProvisioning: "Đang cấp phát",
     statusActivated: "Đã kích hoạt",
+    statusPaymentFailed: "Thanh toán thất bại",
+    statusExpired: "Thanh toán đã hết hạn",
+    statusProvisioningFailed: "Cấp phát thất bại",
+    statusRefunded: "Đã hoàn tiền",
+    statusChargeback: "Tranh chấp thanh toán",
+    // Trang danh sách gộp payment_failed / provisioning_failed thành một nhãn; trang chi tiết vẫn tách
+    statusFailedShort: "Thất bại",
     provisioningHint: "Đang phân bổ vị trí rack tại {dc}…",
     activatedHint: "Đã chạy tại {dc} · thu nhập đã bắt đầu",
     dataCenter: "Trung tâm dữ liệu",

@@ -2989,6 +2989,13 @@ export const en = {
     statusPaid: "Paid",
     statusProvisioning: "Provisioning",
     statusActivated: "Activated",
+    statusPaymentFailed: "Payment failed",
+    statusExpired: "Payment expired",
+    statusProvisioningFailed: "Provisioning failed",
+    statusRefunded: "Refunded",
+    statusChargeback: "Chargeback",
+    // List view merges payment_failed / provisioning_failed into one label; the detail view keeps them apart
+    statusFailedShort: "Failed",
     provisioningHint: "Allocating a rack slot in {dc}…",
     activatedHint: "Live in {dc} · earnings have started",
     dataCenter: "Data center",

@@ -153,7 +153,10 @@ function rememberAcceptanceObservationCredential(receipt: Awaited<ReturnType<Beh
   acceptanceObservationCredentialScope = scope;
   try {
     uni.setClipboardData({ data: credential, showToast: false });
-    uni.showModal({ title: "验收观察凭证", content: `${credential}\n已复制；可粘贴至 PC 的 L6 Sandbox 观察面。`, showCancel: false });
+    // 只在 mock + SANDBOX 下弹(见上面的早退)。文案是验收工具的工程话,按硬编码中文门的
+    // 出路②处理:改英文技术串,**不进 i18n 词典** —— 工程话进词典就成了用户文案契约,
+    // 而词典是普通对象、打包摇不掉,会原样进生产包。
+    uni.showModal({ title: "Acceptance observation credential", content: `${credential}\nCopied — paste into the L6 Sandbox observation panel on PC.`, showCancel: false });
   } catch {
     // The receipt remains available through the explicit getter on hosts that
     // cannot show a modal or reach the native clipboard.
