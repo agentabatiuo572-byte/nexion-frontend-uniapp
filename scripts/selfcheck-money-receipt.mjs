@@ -623,7 +623,13 @@ const draft = (over = {}) => ({ type: "purchase", symbol: "USDT", amount: -100, 
     // 补分录这件事没消失,只是换了出口。顺带把它入册:它一直是 App.vue 的动账出口之一,
     // 却从没上过这张表(⓪ 的提现主行走的就是它),漏针的话这条路改坏了本门也不红。
     ["src/App.vue", ["postMoneyBill", "postMoneyBillsOnce", "postReceiptForAccount"]],
-    // Genesis 主售与二级交易已迁到真实后端原子资金链,页面不再本地扣款/冲正/记账。
+    // 🔴 2026-08-13 重新入册(此前按「已迁真实后端」移除):迁移把页面的本地扣款/冲正/记账
+    //   整段删了,可 mock 模式没有服务端 —— 实测创世节点**白送**(铸了席位、余额分文未动、
+    //   账单零行)。现按 `!remoteApiEnabled` 恢复,远端模式一行不走,但生产者确实回来了。
+    //   三针与另外三条冲正路径同形:captureMoney 取基准 + restoreTo 还原可提额度,
+    //   少了 restoreTo 就只是盲加一笔 credit(钱回来了、可提额度回不来)。
+    ["src/components/genesis/purchase-sheet.vue", ["postMoneyBill", "captureMoney", "restoreTo:"]],
+    // 二级交易(marketplace)仍在服务端原子资金链上,页面不本地动钱。
     // weekly-quest 两页的本地发奖已迁服务端(2026-08-12 批次),不再走收口点 —— 台账按事实移除。
     ["src/components/lucky-spin-sheet.vue", ["postMoneyBill"]],
     // R5 补登:与复投页同形的第二个建仓入口。三针 —— 它 `:166` 取基准、`:199` 冲正,
