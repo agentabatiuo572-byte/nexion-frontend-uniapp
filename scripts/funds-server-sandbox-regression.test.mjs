@@ -2,13 +2,24 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { strip } from "./lib/strip-code.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const app = read("src/store/app.ts");
 const shell = read("src/App.vue");
 const bills = read("src/store/bills.ts");
-const deposits = read("src/store/deposits.ts");
+// 🔴 窗口正则(`[\s\S]{0,N}`)必须跑在**剥注释 + 压空白**的文本上,两步缺一不可 ——
+//   两步各自的教训都在本文件实测过(2026-08-14):
+//   ① 只在原文上量:窗口正则要求「重绑账号 → 180 字符内清空 records」,一段合法的
+//      三行注释插在中间就把窗口撑爆 —— 不变量没坏,测试红了(deposits 那条真实发生);
+//   ② 只剥不压:共享 strip() 是**等长填空格**的(保行号偏移是它的设计),字符距离
+//      一个都没少,窗口照样爆 —— 修了等于没修(本文件第一版修法就栽在这)。
+//   keepStrings=true 是因为下面有断言的靶是字符串字面量(FUNDS_SANDBOX_ACCOUNT_CHANGED),
+//   默认模式会把字符串内容抹掉,修一格坏一格。压空白后窗口量的是**代码密度**距离,
+//   对注释与排版都免疫;正则里的字面空格仍匹配(压完还是单空格)。
+const squeeze = (s) => strip(s, true).replace(/\s+/g, " ");
+const deposits = squeeze(read("src/store/deposits.ts"));
 const withdraw = read("src/pages/me/wallet-withdraw.vue");
 const billPage = read("src/pages/me/wallet-bills.vue");
 const walletPage = read("src/pages/me/wallet.vue");
