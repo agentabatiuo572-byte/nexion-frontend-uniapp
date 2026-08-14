@@ -231,6 +231,15 @@ const LEDGER = {
 
   // ── 其余:PRD 搜不到,逐条写明为什么 ─────────────────────────────────
   "/api/team/binary": "TBD: 双轨团队读;PRD §8 有业务规则但未定义该端点",
+// ── 2026-08-14 并入远端主线(9db1d5d)带来的新端点 ────────────────────
+  // 同事那批(Nova AI 客服 / 用户自助资料 / 注销账号 / 里程碑评估)。逐条回根 PRD 核过。
+  "/api/app/profile": "PRD §11.0B(个人资料:整页无自由文本输入,昵称走预置候选)",
+  "/api/app/profile/nickname-candidates": "PRD §11.0B(昵称预置词库构造器,唯一改名路径 = 候选挑选)",
+  "/api/app/profile/avatar": "PRD §11.0B(头像)",
+  "/api/app/security/account-deletion": "TBD: 注销账号;PRD 全文无「注销/删除账号」章节 —— 这是**产品缺口**不只是端点缺登记,已在卡里登记",
+  "/api/app/support/ai/status": "TBD: AI 客服可用性;PRD §11.8 客服域无 AI 客服章节",
+  "/api/app/support/ai/chat": "TBD: 同上(会话)",
+  "/api/earnings/milestones/evaluate": "TBD: 里程碑达成评估;PRD §11.3a 定义了里程碑庆祝但未定义该评估端点",
   "/api/team/rank": "TBD: 团队等级读;同上",
   "/api/tasks/route": "TBD: 按显存派发任务路由;PRD §6.8 有容量概念,未定义该端点",
   "/api/tasks/assignments": "TBD: 任务派单读;PRD 未定义",
