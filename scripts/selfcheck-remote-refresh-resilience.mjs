@@ -149,7 +149,18 @@ async function loadEntry(contents) {
 // 目前全部 16 条都能从门外触发到(直调导出或经 bindAccount),故为空。
 // 将来确有触发不到的缝,在此登记 `"file#fn": "为什么门外触发不到"`;
 // 登记了却其实能触发的(陈旧登记)由下面的 stale 断言顶回来 —— 登记表本身也要被守。
-const UNREACHABLE = {};
+// 登记「本探针跑不到」的缝 + 原因。空表是常态;每加一条都是覆盖面的账,必须写清为什么。
+const UNREACHABLE = {
+  // 🔴 这条不是「缝够不到」,是**harness 自己的覆盖缺口**,别读成前者:
+  //   上面的 throwingRuntimeStub 只给 remoteApiEnabled / apiRuntimeConfig 特判,
+  //   其余导出**一律做成 Proxy** —— 而 Proxy 是 truthy。于是 `fundsSandboxEnabled`
+  //   在探针里恒为真,本缝首行 `if (fundsSandboxEnabled) return;` 永远早退。
+  //   真正的修法是探针把这类开关跑两遍(true / false 各一轮)再取并集,
+  //   而不是把某个开关钉死成 false —— 钉死只会把缺口挪到 refreshFundsSandboxDeposits 身上。
+  //   已单独立卡。在那之前如实登记,不假装覆盖到了。
+  "src/store/deposits.ts#refreshRemoteVietQrDeposits":
+    "harness 缺口:探针里 fundsSandboxEnabled 是 truthy 的 Proxy,本缝首行即早退。需探针按开关跑两遍才能覆盖。",
+};
 globalThis.__z1ApiCalls = 0;
 let exercised = 0;
 const notExercised = [];
@@ -211,7 +222,8 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
 // ⚠️ harness env 提示(z6 审计 F4):esbuild define 只匹配**点式成员访问**;若未来有模块用
 //    解构 `const { K } = import.meta.env` 读键,拿到的是 undefined(静默错模式)。当前全仓 0 处
 //    解构读法;新增时必须改用点式或在此补 define。
-const EXPECTED_SEAMS = 27;
+// 27 → 28(2026-08-14 合并远端):同事新增 refreshRemoteVietQrDeposits 作为非沙箱侧的入金 provider。
+const EXPECTED_SEAMS = 28;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来

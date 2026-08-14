@@ -39,12 +39,24 @@ export interface CanonicalTopStreaker {
   streak: number;
 }
 
+export type EarningMilestoneStatus = "LOCKED" | "CLAIMABLE" | "FIRED";
+
+export interface CanonicalEarningMilestone {
+  milestoneId: string;
+  thresholdUsdt: number;
+  rewardNex: number;
+  lifetimeEarningsUsdt: number;
+  status: EarningMilestoneStatus;
+  achievedAt: string | null;
+}
+
 export interface DailySnapshot {
   rewardAsset: "NEX";
   serverDate: string;
   nextResetAtUtc: string;
   streak: DailyStreakState;
   dailyMilestones: CanonicalDailyMilestone[];
+  earningMilestones: CanonicalEarningMilestone[];
   powerUps: CanonicalDailyPowerUp[];
   topStreakers: CanonicalTopStreaker[];
   source: string;
@@ -81,12 +93,18 @@ export interface DailyPowerUpActivationResult {
   status: "ACTIVATED";
 }
 
+export interface EarningMilestoneEvaluationResult {
+  fired: Array<{ milestoneId: string; thresholdUsd: number; rewardNex: number; lifetimeEarningsUsd: number }>;
+  count: number;
+}
+
 export interface PointsApi {
   state(): Promise<DailySnapshot>;
   checkIn(idempotencyKey: string): Promise<DailyCheckInResult>;
   claimMilestone(milestoneId: number, idempotencyKey: string): Promise<DailyMilestoneClaimResult>;
   useSaver(idempotencyKey: string): Promise<StreakSaverResult>;
   activatePowerUp(powerUpId: number, idempotencyKey: string): Promise<DailyPowerUpActivationResult>;
+  evaluateEarningMilestones(idempotencyKey: string): Promise<EarningMilestoneEvaluationResult>;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -190,6 +208,22 @@ function parseTopStreaker(value: unknown): CanonicalTopStreaker {
   return { name, countryCode, streak };
 }
 
+function parseEarningMilestone(value: unknown): CanonicalEarningMilestone {
+  const row = record(value);
+  const milestoneId = text(row?.milestoneId);
+  const thresholdUsdt = number(row?.thresholdUsdt);
+  const rewardNex = number(row?.rewardNex);
+  const lifetimeEarningsUsdt = number(row?.lifetimeEarningsUsdt);
+  const status = text(row?.status)?.toUpperCase() as EarningMilestoneStatus;
+  const achievedAt = optionalText(row?.achievedAt);
+  if (!row || !milestoneId || thresholdUsdt === null || rewardNex === null
+      || lifetimeEarningsUsdt === null || !["LOCKED", "CLAIMABLE", "FIRED"].includes(status)
+      || (achievedAt !== null && Number.isNaN(Date.parse(achievedAt)))) {
+    return invalid("EARNING_MILESTONE_RESPONSE_INVALID");
+  }
+  return { milestoneId, thresholdUsdt, rewardNex, lifetimeEarningsUsdt, status, achievedAt };
+}
+
 function parseSnapshot(value: unknown): DailySnapshot {
   const row = record(value);
   const streak = record(row?.streak);
@@ -204,7 +238,7 @@ function parseSnapshot(value: unknown): DailySnapshot {
       || longestStreak === null || streakSavers === null || checkedInToday === null
       || !serverDate || Number.isNaN(Date.parse(`${serverDate}T00:00:00Z`))
       || !nextResetAtUtc || Number.isNaN(Date.parse(nextResetAtUtc))
-      || !Array.isArray(row.dailyMilestones) || !Array.isArray(row.powerUps)
+      || !Array.isArray(row.dailyMilestones) || !Array.isArray(row.earningMilestones) || !Array.isArray(row.powerUps)
       || !Array.isArray(row.topStreakers) || !source) {
     return invalid();
   }
@@ -220,6 +254,10 @@ function parseSnapshot(value: unknown): DailySnapshot {
     return invalid("DAILY_POWER_UP_DUPLICATED");
   }
   const topStreakers = row.topStreakers.map(parseTopStreaker);
+  const earningMilestones = row.earningMilestones.map(parseEarningMilestone);
+  if (new Set(earningMilestones.map((item) => item.milestoneId)).size !== earningMilestones.length) {
+    return invalid("EARNING_MILESTONE_DUPLICATED");
+  }
   return {
     rewardAsset: "NEX",
     serverDate,
@@ -232,6 +270,7 @@ function parseSnapshot(value: unknown): DailySnapshot {
       checkedInToday,
     },
     dailyMilestones,
+    earningMilestones,
     powerUps,
     topStreakers,
     source,
@@ -300,6 +339,26 @@ function parsePowerUpActivation(value: unknown): DailyPowerUpActivationResult {
   };
 }
 
+function parseEarningEvaluation(value: unknown): EarningMilestoneEvaluationResult {
+  const row = record(value);
+  const count = whole(row?.count);
+  if (!row || count === null || !Array.isArray(row.fired) || count !== row.fired.length) {
+    return invalid("EARNING_MILESTONE_EVALUATION_RESPONSE_INVALID");
+  }
+  const fired = row.fired.map((value) => {
+    const item = record(value);
+    const milestoneId = text(item?.milestoneId);
+    const thresholdUsd = number(item?.thresholdUsd);
+    const rewardNex = number(item?.rewardNex);
+    const lifetimeEarningsUsd = number(item?.lifetimeEarningsUsd);
+    if (!item || !milestoneId || thresholdUsd === null || rewardNex === null || lifetimeEarningsUsd === null) {
+      return invalid("EARNING_MILESTONE_EVALUATION_RESPONSE_INVALID");
+    }
+    return { milestoneId, thresholdUsd, rewardNex, lifetimeEarningsUsd };
+  });
+  return { fired, count };
+}
+
 export function createPointsApi(client: ApiClient): PointsApi {
   return {
     state: async () => parseSnapshot(await client.request({ method: "GET", path: "/api/points/state" })),
@@ -333,5 +392,10 @@ export function createPointsApi(client: ApiClient): PointsApi {
         idempotencyKey: requiredKey(idempotencyKey),
       }));
     },
+    evaluateEarningMilestones: async (idempotencyKey) => parseEarningEvaluation(await client.request({
+      method: "POST",
+      path: "/api/earnings/milestones/evaluate",
+      idempotencyKey: requiredKey(idempotencyKey),
+    })),
   };
 }

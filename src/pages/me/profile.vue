@@ -21,16 +21,16 @@
       <view :style="avatarBlockStyle">
         <view class="flex items-center" style="gap: 16px">
           <view class="relative">
-            <view class="grid place-items-center" :style="avatarStyle">
-              <text :style="avatarTextStyle">{{ initial }}</text>
+            <view class="grid place-items-center overflow-hidden" :style="avatarStyle">
+              <image v-if="avatarUrl" :src="avatarUrl" mode="aspectFill" style="width: 64px; height: 64px" />
+              <text v-else :style="avatarTextStyle">{{ initial }}</text>
             </view>
             <view
-              class="grid place-items-center"
-              :class="remoteProfileReadOnly ? '' : 'active:opacity-80'"
-              :style="{ ...regenBtnStyle, opacity: remoteProfileReadOnly ? 0.45 : 1 }"
+              class="grid place-items-center active:opacity-80"
+              :style="regenBtnStyle"
               role="button"
               tabindex="0"
-              :aria-disabled="remoteProfileReadOnly ? 'true' : 'false'"
+              aria-disabled="false"
               @click="handleRegen"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M3 21v-5h5" /></svg>
@@ -56,12 +56,11 @@
             <text :style="fieldLabelStyle">{{ t.profile.displayName }}</text>
           </view>
           <view
-            class="flex items-center"
-            :class="remoteProfileReadOnly ? '' : 'active:opacity-80'"
-            :style="{ ...nameRowStyle, opacity: remoteProfileReadOnly ? 0.58 : 1 }"
+            class="flex items-center active:opacity-80"
+            :style="nameRowStyle"
             role="button"
             tabindex="0"
-            :aria-disabled="remoteProfileReadOnly ? 'true' : 'false'"
+            aria-disabled="false"
             :aria-label="t.profile.nicknameChange"
             @click="openNicknameSheet"
           >
@@ -69,7 +68,6 @@
             <text class="shrink-0" :style="nameChangeStyle">{{ t.profile.nicknameChange }}</text>
           </view>
           <text class="block" :style="fieldHintStyle">{{ t.profile.displayNameHint }}</text>
-          <text v-if="remoteProfileReadOnly" class="block" :style="readOnlyHoldStyle" data-proof="remote-profile-readonly-hold">{{ t.profile.serverReadOnlyHold }}</text>
         </view>
 
       </view>
@@ -111,14 +109,21 @@
         <text v-if="saveFeedback" class="block text-center" :style="saveFeedbackStyle">{{ saveFeedback }}</text>
       </view>
 
-      <NicknameSheet :open="nicknameSheetOpen" @close="nicknameSheetOpen = false" @pick="onNicknamePick" />
+      <NicknameSheet
+        :open="nicknameSheetOpen"
+        :authoritative="remoteApiEnabled"
+        :server-candidates="profile.nicknameCandidates"
+        @close="nicknameSheetOpen = false"
+        @pick="onNicknamePick"
+        @reroll="loadProfileCandidates"
+      />
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, type CSSProperties } from "vue";
-import { remoteApiEnabled } from "@/api/runtime";
+import { profileApi, remoteApiEnabled } from "@/api/runtime";
 import AppChassis from "@/components/app-chassis.vue";
 import NicknameSheet from "@/components/me/nickname-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -139,7 +144,13 @@ const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote();
+  // 合并裁决(2026-08-14):取远端那侧(保留 .catch + 收下新增的两个加载调用)。
+  //   本地这侧只是把 payout 那行的 .catch 去掉了 —— 理由是缝已自吞、这层是死代码。
+  //   但「死代码」和「有害」不是一回事:留着它,万一将来有人把缝的自吞改回抛,
+  //   这个调用点仍是安全的。少一行的收益抵不上那个风险,所以不坚持本地那侧。
+  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+  if (remoteApiEnabled) void loadProfileCandidates();
+  if (remoteApiEnabled) void loadRemoteProfile();
 });
 
 // Local edit buffer (committed on Save), mirroring the source useState.
@@ -147,7 +158,9 @@ const name = ref(profile.displayName);
 const saveFeedback = ref("");
 const isSaving = ref(false);
 const nicknameSheetOpen = ref(false);
-const remoteProfileReadOnly = computed(() => remoteApiEnabled);
+const avatarUrl = ref("");
+const avatarRevision = ref("");
+const avatarUploading = ref(false);
 
 const displayName = computed(() => profile.displayName);
 // A remote session's user-id key is internal routing state, never profile copy.
@@ -182,42 +195,89 @@ const joinedDate = computed(() =>
   }),
 );
 
-const dirty = computed(() => !remoteProfileReadOnly.value && name.value !== profile.displayName);
+const dirty = computed(() => name.value !== profile.displayName);
 
-function openNicknameSheet() {
-  if (remoteProfileReadOnly.value) return;
+async function loadProfileCandidates() {
+  const ok = await profile.refreshNicknameCandidates();
+  if (!ok) toast.error(t.value.profile.serverMutationFailed);
+}
+
+async function openNicknameSheet() {
+  if (remoteApiEnabled && profile.nicknameCandidates.length === 0) {
+    const ok = await profile.refreshNicknameCandidates();
+    if (!ok) {
+      toast.error(t.value.profile.serverMutationFailed);
+      return;
+    }
+  }
   nicknameSheetOpen.value = true;
 }
 
 function onNicknamePick(v: string) {
-  if (remoteProfileReadOnly.value) return;
   name.value = v;
   nicknameSheetOpen.value = false;
 }
 
-function handleSave() {
+async function handleSave() {
   if (isSaving.value) return;
-  if (remoteApiEnabled) {
-    toast.info(t.value.profile.serverReadOnlyHold);
-    return;
-  }
   if (!dirty.value) {
     saveFeedback.value = t.value.profile.noChangesToast;
     toast.info(t.value.profile.noChangesToast);
     return;
   }
   isSaving.value = true;
-  profile.setDisplayName(name.value);
-  saveFeedback.value = t.value.profile.savedToast;
-  toast.success(t.value.profile.savedToast);
-  setTimeout(() => {
+  try {
+    const saved = await profile.setDisplayName(name.value);
+    if (!saved) return;
+    name.value = profile.displayName;
+    saveFeedback.value = t.value.profile.savedToast;
+    toast.success(t.value.profile.savedToast);
+  } catch {
+    toast.error(t.value.profile.serverMutationFailed);
+  } finally {
     isSaving.value = false;
-  }, 0);
+  }
 }
 
-function handleRegen() {
+async function loadRemoteProfile() {
+  try {
+    const projection = await profileApi.profile();
+    avatarUrl.value = projection.avatarUrl;
+    avatarRevision.value = projection.avatarRevision;
+  } catch {
+    toast.error(t.value.profile.serverMutationFailed);
+  }
+}
+
+async function handleRegen() {
+  if (avatarUploading.value) return;
   if (remoteApiEnabled) {
-    toast.info(t.value.profile.serverReadOnlyHold);
+    try {
+      const chosen = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) => {
+        uni.chooseImage({ count: 1, sizeType: ["compressed"], sourceType: ["album", "camera"], success: resolve, fail: reject });
+      });
+      const filePath = chosen.tempFilePaths[0];
+      if (!filePath) return;
+      avatarUploading.value = true;
+      const key = `app-profile:avatar:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+      const before = avatarRevision.value;
+      try {
+        const result = await profileApi.uploadAvatar(filePath, key);
+        avatarUrl.value = result.avatarUrl;
+        avatarRevision.value = result.avatarRevision;
+      } catch (cause) {
+        const authoritative = await profileApi.profile().catch(() => null);
+        if (!authoritative || !authoritative.avatarRevision || authoritative.avatarRevision === before) throw cause;
+        avatarUrl.value = authoritative.avatarUrl;
+        avatarRevision.value = authoritative.avatarRevision;
+      }
+      toast.success(t.value.profile.avatar, t.value.profile.avatarHint);
+    } catch (cause) {
+      if (cause instanceof Error && /cancel/i.test(cause.message)) return;
+      toast.error(t.value.profile.serverMutationFailed);
+    } finally {
+      avatarUploading.value = false;
+    }
     return;
   }
   if (!profile.regenerateAvatar()) return;
