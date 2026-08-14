@@ -89,6 +89,8 @@ export const useRepurchase = defineStore("repurchase", () => {
       });
     const [configResult, ordersResult] = await Promise.all([configOutcome, ordersOutcome]);
     try {
+      // 权威不可达是常态输入,不 reject(resilience 门):error/config/orders 降级态
+      // 已在各分支落好;null = 本轮没有可用快照(同 mock 分支先例)。
       if (!configResult.ok || !ordersResult.ok) return null;
       return ordersResult.value;
     } finally {
@@ -172,7 +174,7 @@ export const useRepurchase = defineStore("repurchase", () => {
     loading.value = false;
     submitting.value = false;
     pendingKeys.clear();
-    if (remoteApiEnabled) void refresh().catch(() => undefined);
+    if (remoteApiEnabled) void refresh();
   }
 
   return {

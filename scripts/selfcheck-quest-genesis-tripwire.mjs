@@ -68,7 +68,10 @@ async function loadPure(srcOverride) {
         setup(b) {
           b.onResolve({ filter: /^@\/api\/runtime$/ }, () => ({ path: "runtime", namespace: "stub" }));
           b.onLoad({ filter: /.*/, namespace: "stub" }, () => ({
-            contents: "export const genesisApi = Object.freeze({});", loader: "js",
+            // 🔴 桩必须跟上真 runtime 的导出面:genesis-config.ts 2026-08-13 起也 import
+            // remoteApiEnabled(mock 模式不打服务端),桩少一个导出 esbuild 直接 build failed、
+            // 整道门崩掉——表现成「门失败」,但根本没跑到判据。
+            contents: "export const genesisApi = Object.freeze({}); export const remoteApiEnabled = false;", loader: "js",
           }));
         },
       },

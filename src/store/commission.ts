@@ -190,16 +190,24 @@ export const useCommission = defineStore("commission", () => {
 
   async function refreshCanonicalBinary(scope = requestScope()) {
     if (!remoteApiEnabled) return;
-    const snapshot = await commissionConfigApi.binary();
-    if (!isCurrentScope(scope)) return;
-    binarySnapshot.value = snapshot;
+    try {
+      const snapshot = await commissionConfigApi.binary();
+      if (!isCurrentScope(scope)) return;
+      binarySnapshot.value = snapshot;
+    } catch {
+      // 权威不可达时保留当前账号的空态或最近一次权威快照，等待下次 onShow 重试。
+    }
   }
 
   async function refreshCanonicalEvents(scope = requestScope()) {
     if (!remoteApiEnabled) return;
-    const snapshot = await teamInsightsApi.commissions();
-    if (!isCurrentScope(scope)) return;
-    events.value = snapshot.events;
+    try {
+      const snapshot = await teamInsightsApi.commissions();
+      if (!isCurrentScope(scope)) return;
+      events.value = snapshot.events;
+    } catch {
+      // 同上：bindAccount 已先清空跨账号数据，迟到结果也由 scope 丢弃。
+    }
   }
 
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {

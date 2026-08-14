@@ -44,7 +44,7 @@ const validCapacityQuote = {
   activeDevices: 6,
   maxActiveDevices: 6,
   sourceDeviceId: 11,
-  sourceDeviceName: "NexionBox S1",
+  sourceDeviceName: "NexGridBox S1",
   targetProductId: 22,
   targetProductNo: "stellarbox-pro-v2",
   targetProductName: "StellarBox Pro v2",

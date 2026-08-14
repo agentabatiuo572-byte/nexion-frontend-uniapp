@@ -167,6 +167,11 @@ const amberTagStyle: CSSProperties = {
 const catalogStateStyle: CSSProperties = {
   padding: "18px 16px",
   borderRadius: "16px",
+  // 《03》§3:带填充的卡片一律零 border,层级靠 surface 微差色。
+  // 删 border 不会让它隐形 —— 卡面 surface 与页面底 bg 两个主题都有真实色差
+  // (亮色是白卡压暖米底,暗色是深灰卡压纯黑底),不是「底色与父同色」那种坑。
+  // ↑ 刻意不在注释里写具体色号:hex 硬编码哨兵扫的是字面色号,一句注释就能让它判红
+  //   (2026-08-14 实测,与「注释里写接口路径把台账哨兵判红」同型)。
   background: "var(--v5-surface)",
 };
 const catalogStateTitleStyle: CSSProperties = {

@@ -115,6 +115,17 @@ conflict_marker_gate() {
   fi
 }
 conflict_marker_gate
+# 交接书指针门:docs/HANDOFF 只许一行式索引,正文住后台仓(2026-08-14,曾漂 12 条正文 + U-4 撞号重编 U-19)。
+# 后台仓缺席的环境(临时 worktree / 独立 checkout)里跨仓半边显式 SKIP,本地判据照跑 —— PASS 行会写明跑了哪半。
+handoff_pointer_gate() {
+  if "$NODE_BIN" scripts/handoff-pointer-gate.mjs > /tmp/uniapp-handoff-pointer.log 2>&1; then
+    ok "交接书指针门 — $(tail -1 /tmp/uniapp-handoff-pointer.log)"
+  else
+    bad "交接书指针漂移 — node scripts/handoff-pointer-gate.mjs 看明细"
+    grep -E "^(FAIL|  - )" /tmp/uniapp-handoff-pointer.log | head -10 | sed "s/^/        /"
+  fi
+}
+handoff_pointer_gate
 runtime_flag_parity_gate() {
   if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > /tmp/uniapp-flag-parity.log 2>&1; then
     ok "运行时开关等价门 — $(tail -1 /tmp/uniapp-flag-parity.log)"
@@ -124,6 +135,15 @@ runtime_flag_parity_gate() {
   fi
 }
 runtime_flag_parity_gate
+api_idempotency_key_gate() {
+  if "$NODE_BIN" scripts/api-idempotency-key-gate.mjs > /tmp/uniapp-idem-key.log 2>&1; then
+    ok "接口幂等键稳定性门 — $(tail -1 /tmp/uniapp-idem-key.log)"
+  else
+    bad "接口幂等键不稳定 — node scripts/api-idempotency-key-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL|        )" /tmp/uniapp-idem-key.log | head -10 | sed "s/^/        /"
+  fi
+}
+api_idempotency_key_gate
 
 echo -e "${C}[1] vue-tsc type-check${N}"
 if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then
@@ -131,6 +151,19 @@ if npx vue-tsc --noEmit >/tmp/uni-tsc.log 2>&1; then
 else
   bad "vue-tsc errors"; tail -15 /tmp/uni-tsc.log | sed 's/^/        /'
 fi
+
+# 🔴 紧跟类型检查:同一类(编译器能精确判定的)问题归在一处。守的是「store 里不许有
+# 不可达代码」—— 2026-08-13 创世五个动作的本地实现全成死代码,而它长得完全正常,
+# 还把 selfcheck-genesis-gate 的文本判据哄绿了(判据句就躺在死代码里)。
+store_unreachable_gate() {
+  if "$NODE_BIN" scripts/store-unreachable-code-gate.mjs > /tmp/uniapp-store-unreachable.log 2>&1; then
+    ok "store 不可达代码门 — $(tail -1 /tmp/uniapp-store-unreachable.log)"
+  else
+    bad "store 里出现不可达代码 — node scripts/store-unreachable-code-gate.mjs 看明细"
+    grep -E "^(FAIL|  FAIL)" /tmp/uniapp-store-unreachable.log | head -6 | sed "s/^/        /"
+  fi
+}
+store_unreachable_gate
 
 echo -e "${C}[1.5] i18n mirror${N}"
 if "$NODE_BIN" scripts/i18n-key-mirror.mjs >/tmp/uni-i18n-mirror.log 2>&1; then
@@ -507,9 +540,12 @@ else
 fi
 sentinel_present "daily sign-in atomic seam names canonical endpoint" src/pages/daily/daily.vue 'POST /api/faucet/sign-in'
 sentinel_present "daily milestone atomic seam is honest TBD" src/pages/daily/daily.vue 'milestone-claim endpoint TBD'
-sentinel_present "weekly quest atomic seam names canonical endpoint" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
-sentinel_present "weekly tier1 atomic seam uses canonical claim command" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
-sentinel_present "weekly bonus atomic seam uses canonical claim command" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
+# 🔴 2026-08-13 三条重锚:原先钉的是**组件注释**里的 `POST /api/quests/weekly/{tier1|tier2|bonus}`。
+#   领奖已下沉到接口层(组件只调 `wq.claim(q)`),那三个路径全仓已无实现,注释也随之删掉 —— 判据过期。
+#   重锚到端点**真正被写出来的地方**,而且钉的是**真实代码不是注释**:注释会漂,代码不会。
+#   领奖端点现为 `/api/quests/{questCode}/claim`,状态端点为 `/api/quests/state`。
+sentinel_present "weekly quest claim seam names canonical endpoint" src/api/quest-api.ts '/api/quests/\$\{encodeURIComponent'
+sentinel_present "weekly quest state seam names canonical endpoint" src/api/quest-api.ts '"/api/quests/state"'
 sentinel_present "event claim atomic seam is honest TBD" src/pages/events/events.vue 'event-claim endpoint TBD'
 if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
   bad "SPEC-1 R7 hashpower must not read/import view carrier"
@@ -1034,7 +1070,12 @@ spec2_pc_gpu_kind_coverage() {
 }
 spec2_pc_gpu_kind_coverage
 sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/earn/compute-share-entry.vue 'isEnabled\("computeShareEnabled"\)'
-sentinel_present "SPEC-2 dev config mutation production guarded" src/store/config.ts 'if \(remoteApiEnabled \|\| IS_PRODUCTION\) return'
+# 🗑 2026-08-13 退役:原哨兵钉 `if (IS_PRODUCTION) return` 这个**字面写法**,
+#   而实现已加严成 `if (remoteApiEnabled || IS_PRODUCTION) return`(多拦一层远端档)—— 判据过期。
+#   它守的不变量(开发后门在生产构建里必须失效)**已被 SPEC-2 guard semantics 里的派生判据完全覆盖**:
+#   那条枚举 config.ts 里所有 `_dev*` 后门,逐个要求函数体里有 IS_PRODUCTION 早退,
+#   写法随便但一个都不许漏 —— 比这条字面哨兵严格更强(它对**新增的后门**是瞎的)。
+#   红测证据:拆掉任一后门的守卫 / 新增一个没守的后门,派生判据都判红。
 sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
 sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
 sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-if="enabled" class="pb-8"'
@@ -1724,17 +1765,78 @@ trial02_source_fingerprints() {
   local files_n
   files_n=$(find src -type f \( -name "*.vue" -o -name "*.ts" \) | wc -l | tr -d ' ')
   local pat hits
-  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "markChargeFailed"; do
+  # 🔴 `redeem-early` 是 `redeemEarly` 的**路径拼法**,两条都要钉:2026-08-13 删掉那个方法时,
+  #   src 里只剩过一处命中,而它是 `path: "/api/trial/redeem-early"` 这种代码字符串 —— 换个
+  #   方法名重新引用同一条旧端点,只钉驼峰名的话一个字都抓不到(接口台账哨兵只扫注释行,
+  #   代码字符串它同样看不见,这里是那块盲区的唯一覆盖面)。
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" "trialDisclose" "trialExtension" "trial=1" "redeemEarly" "redeem-early" "markChargeFailed"; do
     hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | head -5)
     if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 (scanned $files_n files)";
     else bad "TRIAL02 card-era fingerprint '$pat' resurfaced in src"; echo "$hits" | sed 's/^/        /'; fi
   done
-  for pat in "cardTokenId" "extendedEndsAt"; do
-    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -v "^src/store/free-trial.ts:" | head -5)
-    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside legacy-migration reader (scanned $files_n files)";
-    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside free-trial.ts legacy reader"; echo "$hits" | sed 's/^/        /'; fi
+  # 🔴 2026-08-13:豁免从「一个文件」扩到「逐条配对的 名字→允许文件」,理由与原存量读取器同类 ——
+  #   接口层解析服务端响应时**必须**能读旧字段名(线路兼容),否则服务端一发旧名就整份解析失败。
+  #   trial-api.ts 的 `row.graceEndsAt ?? row.extendedEndsAt` 正是这种别名回落。
+  #   🔴 精确到「名字 × 文件」而不是整文件放行 —— 整文件放行会让真的绑卡代码从这个口子回来。
+  #
+  # 🔴 2026-08-13(同日晚)撤销 redeemEarly 那条豁免 —— 方法已删,豁免随之作废。
+  #   ① 那条豁免从没生效过:名字被加进本轮配对时**没从上面的全禁名单删掉**,于是同一次跑
+  #      同时打出一条 FAIL(全禁名单)和一条 PASS(白名单),提交信息里「还原→全绿」读的是
+  #      后者。加豁免那笔的红测因此是假的 —— 它验的是「弄坏会红」,没验「还原会绿」。
+  #   ② 它也不该被豁免:`/api/trial/redeem-early` 是**卡时代**端点名,2026-08-02 无卡化
+  #      (FEAT-TRIAL02)时已随根 PRD §9.11a.2 改名为 `/api/trial/convert`(两行公式逐字相同),
+  #      签字规格里只有 convert、无 redeem 概念。全仓零调用、零消费点。
+  #   判定与证据链见 docs/changes/2026-08-13-trial-early-buy-adjudication.md。
+  for pair in "cardTokenId:src/store/free-trial.ts" "extendedEndsAt:src/store/free-trial.ts|src/api/trial-api.ts"; do
+    pat=${pair%%:*}; allow=${pair#*:}
+    hits=$(grep -rnF "$pat" src --include="*.vue" --include="*.ts" 2>/dev/null | grep -vE "^($allow):" | head -5)
+    if [ -z "$hits" ]; then ok "TRIAL02 src fingerprint '$pat' = 0 outside allow-list [$allow] (scanned $files_n files)";
+    else bad "TRIAL02 card-era fingerprint '$pat' resurfaced outside allow-list [$allow]"; echo "$hits" | sed 's/^/        /'; fi
   done
 }
+
+# ── 哨兵A':**文档面**的卡时代指纹(2026-08-14 补)────────────────────────
+# why:上面 A 只扫 src。`docs/业务流程说明.md` §1 整节把「绑卡 → 到期自动扣款」写成当前
+#   流程,足足 11 天没有任何门响 —— 因为它是文档。照那份文档实现,会实现出 FEAT-TRIAL02
+#   明令禁止的产品。文档不参与编译,tsc / verify 的源码哨兵都天然看不见它。
+#
+# 判据不能是「文档里出现即红」—— 那会把**正确的**文档判红:讲清「这些动作已删除」、
+#   列出门的禁用名单,都必须原样写出那些名字(本仓三份变更卡与重写后的 §1 都如此)。
+# 所以:
+#   · `docs/changes/**` 结构性豁免 —— 那里每份都是有日期的变更记录,按定义就是历史;
+#   · 其余文档必须**要么零命中,要么在文件里显式写一行 STALE-TERMS-OK 标记 + 理由**。
+#     标记是**有意为之且留了字**的动作,不会手滑加上;豁免文件数打进 PASS 行,不许静默增长。
+# ⚠️ 已知残余风险:带了标记的文件仍可能自己烂掉。这道门挡的是「无声地把死流程写成活的」,
+#   不是「所有文档永远正确」。别把它当成后者。
+DOC_STALE_MARKER='STALE-TERMS-OK'
+trial02_doc_fingerprints() {
+  local docs_n marked_n pat hits bad_hits=0
+  docs_n=$(find docs -name "*.md" -not -path "docs/changes/*" 2>/dev/null | wc -l | tr -d ' ')
+  marked_n=$(grep -rlF "$DOC_STALE_MARKER" docs --include="*.md" 2>/dev/null \
+    | grep -v "^docs/changes/" | wc -l | tr -d ' ')
+  for pat in "startWithCard" "autoChargeAtEnd" "chargeFailRate" "scheduledChargeAt" \
+             "trialDisclose" "trialExtension" "redeemEarly" "redeem-early" "markChargeFailed"; do
+    # 命中文件 − changes/ − 自带标记的文件 = 真正该红的
+    hits=$(grep -rlF "$pat" docs --include="*.md" 2>/dev/null \
+      | grep -v "^docs/changes/" \
+      | while read -r f; do grep -qF "$DOC_STALE_MARKER" "$f" || echo "$f"; done | head -5)
+    if [ -n "$hits" ]; then
+      bad "TRIAL02 卡时代动作名 '$pat' 出现在**没有 $DOC_STALE_MARKER 标记**的文档里 —— 要么这份文档过期了,要么补标记+理由"
+      echo "$hits" | sed 's/^/        /'
+      bad_hits=1
+    fi
+  done
+  [ "$bad_hits" -eq 0 ] && ok "TRIAL02 doc fingerprints: 9 个动作名在无标记文档里 0 命中(扫 $docs_n 份非 changes 文档,其中 $marked_n 份带豁免标记)"
+  # 🔴 反向对照(正控):本门的 PASS 形态是「0 命中」—— 那正是假绿最爱的形状:
+  #   grep 机制一坏(路径写错 / 通配符失效 / docs 被挪走),同样是 0 命中,同样报绿。
+  #   所以要有一处**必须扫得到**的地方做对照:docs/changes/ 里的变更卡按定义会原样引用这些
+  #   旧动作名(裁决卡 / 红测记录都在讲它们)。那里扫不到 = 扫描机制本身坏了,不是「真干净了」。
+  local control
+  control=$(grep -rlF "redeemEarly" docs/changes --include="*.md" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$control" -ge 1 ]; then ok "TRIAL02 doc 扫描机制正控:docs/changes 里扫到 $control 份含旧动作名的变更卡(>0 = grep 确实在工作)";
+  else bad "TRIAL02 doc 扫描机制失效 —— 连 docs/changes 里的变更卡都扫不到旧动作名,上面那条「0 命中」是假绿,先修扫描逻辑"; fi
+}
+trial02_doc_fingerprints
 trial02_source_fingerprints
 
 # 哨兵B:i18n 三语自动扣款时代文案清零(en/zh/vi 同扫)。
@@ -1878,7 +1980,11 @@ nav_routes_valid() {
     const fs=require("fs"), cp=require("child_process");
     const pj=JSON.parse(fs.readFileSync("src/pages.json","utf8"));
     const valid=new Set((pj.pages||[]).map(p=>"/"+p.path));
-    let out=""; try{out=cp.execSync("grep -rnE \"/pages/[A-Za-z0-9_/-]+\" src",{encoding:"utf8",maxBuffer:1e8});}catch(e){out=e.stdout||"";}
+    // 🔴 2026-08-13 收窄扫描面:测试文件里的路由是**夹具字符串**,不是导航目标 ——
+    //   behavior-analytics-race.test.ts 造了个 "/pages/home/index" 喂给 tap 采样器,
+    //   它永远不会被 navigateTo 消费,却让本门判红。门守的是「真导航指向不存在的页」,
+    //   夹具不在这个域里。只排 *.test.ts / *.spec.ts,不放宽到整目录。
+    let out=""; try{out=cp.execSync("grep -rnE \"/pages/[A-Za-z0-9_/-]+\" src --include=*.ts --include=*.vue --include=*.json --exclude=*.test.ts --exclude=*.spec.ts",{encoding:"utf8",maxBuffer:1e8});}catch(e){out=e.stdout||"";}
     const refs=new Set();
     out.split("\n").forEach(line=>{
       const ci=line.indexOf(":", line.indexOf(":")+1);
@@ -1929,7 +2035,11 @@ no_oldbrand_check() {
   hits=$("$NODE_BIN" -e '
 const fs=require("fs"),path=require("path");
 const tok=process.argv[1];
-const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country`,"gi");
+// 🔴 线上契约标识符不算品牌残留(2026-08-13):`NEXION_USDT_WALLET` 是服务端下发的
+//   paymentRail 枚举值(trial-api.ts:110 拿它**校验回包**),`__NEXION_TRUSTED_TASK_PROOF__`
+//   是原生壳注入的全局键 —— 两个都是**对方定义的名字**,客户端单方面改拼写 = 契约当场对不上。
+//   等后端改名再同步。判据只放这两个**具体标识符**,不放宽成「凡大写就算契约」。
+const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);

@@ -22,10 +22,15 @@
 //
 // 方法:结构断言跑在**剥注释后的正主源码**上(注释里出现判定式文本不得哄绿);
 // 行为断言把正主代码块原文抠出来执行(不是抄一份判据副本)。
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { build, transformSync } from "esbuild";
+// 🔴 本文件自带的 `strip` 是朴素正则版,只够对付本地这两个 .vue 正主;拿它去剥别的文件会
+//    踩 strip-code.mjs 头注记的那个坑 —— 非贪婪块注释正则会把 `/*`…`*/` 之间的**真代码**
+//    一起删掉,实测把 store/genesis.ts 的 purchase 体抠成 2041 字的错块,取证判据随即恒假。
+//    跨文件一律走共享的状态机版,并传 keepStrings=true(本门有断言要读字符串字面量)。
+import { strip as stripCode } from "./lib/strip-code.mjs";
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const EXCHANGE = path.join(root, "src", "pages", "me", "wallet-exchange.vue");
@@ -49,8 +54,29 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/
 function grabBlock(src, needle) {
   const start = src.indexOf(needle);
   if (start < 0) throw new Error(`selfcheck-exchange-genesis-guard: 源码里找不到 \`${needle}\`(实现被改名或删除?)`);
+  // 🔴 函数体的开口不一定是 `needle` 之后的第一个 `{` —— 返回类型注解里也有大括号:
+  //    `function purchase(n): Promise<{ ok: boolean; … }> {` 里第一个 `{` 在 `Promise<…>` 内,
+  //    从它开始配平只会抠到 151 字的签名,判据随即在一段空文本上恒假。
+  //    判据:跳过参数表,再取**尖括号深度为 0** 的那个 `{`(`=>` 的 `>` 不计入)。
+  // 有的 needle 本身就落在参数表之后(如 `): MoneyReceiptOutcome`),那就没有参数表可吃 ——
+  // 判据:`(` 得出现在第一个 `{` 之前,才算「needle 在参数表之前」。
+  const iParen = src.indexOf("(", start);
+  const iBrace = src.indexOf("{", start);
+  let i = start;
+  if (iParen >= 0 && (iBrace < 0 || iParen < iBrace)) {
+    for (let d = 0, j = iParen; j < src.length; j++) {         // 先吃掉参数表
+      if (src[j] === "(") d++;
+      else if (src[j] === ")" && --d === 0) { i = j + 1; break; }
+    }
+  }
+  for (let ang = 0; i < src.length; i++) {                     // 再越过返回类型注解
+    const c = src[i];
+    if (c === "<") ang++;
+    else if (c === ">" && src[i - 1] !== "=") ang = Math.max(0, ang - 1);
+    else if (c === "{" && ang === 0) break;
+  }
   let depth = 0;
-  for (let i = src.indexOf("{", start); i < src.length; i++) {
+  for (; i < src.length; i++) {
     if (src[i] === "{") depth++;
     else if (src[i] === "}") { depth--; if (depth === 0) return src.slice(start, i + 1); }
   }
@@ -120,9 +146,14 @@ const iDebit = Math.min(
   // 整行因为还有个 `snap.direction` 就被整行豁免掉了,原缺陷形态从这道门底下走了过去。
   // 混着写的那一行恰恰是最危险的形态。改法:先把「确认后复验」那两个准许的表达式
   // 从行里抠掉,剩下的任何活值一律算违例。
+  // 🔴 2026-08-13:豁免原本写死 `app.accountKey !== snap.account`,而异常路径后来加了
+  //    正面分支 `app.accountKey === snap.account && err.authoritativeState`(账号没变就采信
+  //    服务端给的权威状态,变了就重拉)—— 同一个守卫的正反两面,判据只认其中一面就过期了。
+  //    改成钉**用途**:「把活账号和快照账号做比较」一律准许,不认运算符方向与操作数顺序。
+  //    仍然精确到表达式,不是整行放过 —— 整行放过的红测教训见上。
   const ALLOW = [
-    /app\.accountKey !== snap\.account/g,
-    /app\.accountKey === snap\.account/g,
+    /app\.accountKey\s*[!=]==\s*snap\.account/g,
+    /snap\.account\s*[!=]==\s*app\.accountKey/g,
     /quoteTo\(snap\.direction, snap\.fromAmount, rate\.value\)/g,
   ];
   const LIVE = ["direction.value", "fromSym.value", "toSym.value", "fromAmount.value",
@@ -146,10 +177,12 @@ const iDebit = Math.min(
     /function quoteTo\(/.test(strip(exRaw))
     && /const toAmount = computed\(\(\) => quoteTo\(/.test(strip(exRaw))
     && (strip(exRaw).match(/return money\(dir === "usdt2nex" \? from \/ r : from \* r\);/g) || []).length === 1);
+  // 同上:钉「活账号 vs 快照账号的比较」这件事,不钉某一个运算符方向(否则同一处漂移会再咬一次)。
+  const iAcctCmp = confirmBody.search(/app\.accountKey\s*[!=]==\s*snap\.account|snap\.account\s*[!=]==\s*app\.accountKey/);
   check("A② 账号 + 额度复验也排在扣款之前(拒单零资金动作)",
-    confirmBody.indexOf("app.accountKey !== snap.account") > iAwait
-    && confirmBody.indexOf("app.accountKey !== snap.account") < iDebit
-    && confirmBody.indexOf("!v3.canExchange(snap.usd).ok") < iDebit);
+    iAcctCmp > iAwait && iAcctCmp < iDebit
+    && confirmBody.indexOf("!v3.canExchange(snap.usd).ok") < iDebit,
+    `acctCmp@${iAcctCmp} await@${iAwait} debit@${iDebit}`);
   check("A③ 守卫复位在 finally(所有出口统一解锁,不会有分支漏掉 → 不会永久锁死)",
     /finally \{[\s\S]{0,200}submitting\.value = false;[\s\S]{0,40}\}/.test(confirmBody));
   check("A③ 结算延迟写成 await(setTimeout 回调版守卫在函数返回时就复位了 = 等于没守)",
@@ -219,23 +252,47 @@ const iDebit = Math.min(
 }
 
 // ══ B. 创世购买半屏 handlePurchase 的守卫纪律(结构) ═════════════════════════
-const purchaseBody = strip(grabBlock(strip(shRaw), "function handlePurchase()"));
+// 🔴 needle 必须带 `async`:购买转服务端权威后 handlePurchase 变成 async,
+//    而 `function handlePurchase()` 这个 needle 会从 `function` 起抠 —— 把 `async` 甩在块外,
+//    注入执行时 esbuild 直接报「await 只能用在 async 函数里」,门在这儿崩。
+const purchaseBody = strip(grabBlock(strip(shRaw), "async function handlePurchase()"));
 {
   const sh = strip(shRaw);
   check("B④ 守卫是实例级 ref(false),不是模块级 `let`(跨实例共享 = 忘复位就永久锁死)",
     /const purchasing = ref\(false\)/.test(sh) && !/^let (confirming|purchasing)\b/m.test(sh));
   check("B④ 重入守卫排在最前(先于资格门与任何资金动作)",
-    /function handlePurchase\(\) \{\s*if \(purchasing\.value\) return;/.test(purchaseBody));
+    /async function handlePurchase\(\) \{\s*if \(purchasing\.value\) return;/.test(purchaseBody));
   const iLockP = purchaseBody.indexOf("purchasing.value = true");
-  // 🔴 判据盯的是「第一次动钱」这件事,不是某一个函数名。原来写死 `app.debitBalance(cost)`,
-  // 收口到 postMoneyBill 之后它 indexOf 返回 -1 —— 而 -1 会让 `iLock < iDebit` 直接为假,
-  // 这次是红了;但同族的写法(找不到就当没有 → 恒真)正是哨兵假绿的经典形态。
-  // 改成扫**一组**资金原语取最早那个,并且**一个都扫不到就判失败**(不是默默放行)。
-  const MONEY_PRIMS = ["genesis.purchase(", "app.captureMoney()", "postMoneyBill(", "app.debitBalance(", "app.debitNex(", "app.creditBalance("];
-  const moneyHits = MONEY_PRIMS.map((p) => purchaseBody.indexOf(p)).filter((i) => i >= 0);
-  const iMoneyP = moneyHits.length ? Math.min(...moneyHits) : -1;
-  check(`B④ 上锁点在第一次动钱之前(扫 ${MONEY_PRIMS.length} 个资金原语,命中 ${moneyHits.length} 个)`,
-    iLockP >= 0 && iMoneyP >= 0 && iLockP < iMoneyP, `lock@${iLockP} firstMoney@${iMoneyP}`);
+  // 🔴🔴 判据换过两代,两代都是被「代码搬家」打漂的,记在这儿:
+  //  一代写死 `app.debitBalance(cost)` —— 收口到 postMoneyBill 后 indexOf 返回 -1。
+  //  二代改成扫**一组**资金原语取最早那个,并且一个都扫不到就判失败(不静默放行)。
+  //     2026-08-13 又漂了:创世购买改成**服务端权威**(`await genesis.purchase()` →
+  //     `genesisApi.purchase(…)` → `applyAccountState(…)`),本地那 5 个原语一个都不在
+  //     这个函数体里了,于是候选集为 0、门判红。不变量没坏,是判据还在盯搬走了的东西。
+  //  三代(本版)不认名字:**锁必须在第一个 `await` 之前**。任何挂起点都是重入窗口 ——
+  //     不需要知道哪一次 await 在动钱,而且这条比「在动钱之前」严格更强,
+  //     且对「钱搬到服务端 / 搬进 store / 再改名」完全免疫。
+  const iAwaitP = purchaseBody.search(/\bawait\b/);
+  check("B④ 上锁点在第一个 await 之前(挂起点即重入窗口;函数体内必须真有 await)",
+    iLockP >= 0 && iAwaitP >= 0 && iLockP < iAwaitP, `lock@${iLockP} firstAwait@${iAwaitP}`);
+  // 上一格严格更强,但**更强的判据守的可能是空房间** —— 若这条路径已经不动钱了,
+  // 它会一直绿着而毫无意义。所以再钉一格:顺着第一个被 await 的 store action 回源一跳,
+  // 证明它确实还在动钱(本地资金原语 或 带幂等键的服务端调用,两者取并)。
+  const callee = purchaseBody.slice(iAwaitP).match(/await\s+([A-Za-z_$][\w$]*)\.([A-Za-z_$][\w$]*)\s*\(/);
+  let moneyProof = "没解析出被 await 的 store action";
+  let movesMoney = false;
+  if (callee) {
+    const [, obj, action] = callee;
+    const imp = stripCode(shRaw, true).match(new RegExp(`import\\s*\\{[^}]*\\buse${obj[0].toUpperCase()}${obj.slice(1)}\\b[^}]*\\}\\s*from\\s*["']([^"']+)["']`));
+    const storeFile = imp && path.join(root, "src", imp[1].replace(/^@\//, "") + ".ts");
+    if (storeFile && existsSync(storeFile)) {
+      const body = grabBlock(stripCode(readFileSync(storeFile, "utf8"), true), `function ${action}(`);
+      movesMoney = /app\.captureMoney\(|postMoneyBill\(|\.debitBalance\(|\.debitNex\(|\.creditBalance\(|idempotencyKey|IdempotencyKey\(/.test(body);
+      moneyProof = `${obj}.${action}() @ src/${imp[1].replace(/^@\//, "")}.ts · 体内${movesMoney ? "有" : "无"}动钱动作`;
+    } else moneyProof = `解析不到 ${obj} 对应的 store 文件`;
+  }
+  check("B④ 被守的那条路径确实还在动钱(顺 store action 回源一跳取证,防止门守空房间)",
+    movesMoney, moneyProof);
   check("B④ 复位在 finally,且只有真成交才继续持锁(committed 标记)",
     /finally \{[\s\S]{0,400}if \(!committed\) purchasing\.value = false;[\s\S]{0,40}\}/.test(purchaseBody)
     && /committed = true;\s*emitClose\(\);/.test(purchaseBody));
@@ -369,7 +426,14 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     // This harness exercises the explicit mock branch. Remote calls have a
     // separate contract and must not be required by legacy local-CAS checks.
     remoteApiEnabled: false,
+    // 🔴 2026-08-13:这道门此前**跑到一半就崩**(ReferenceError: remoteState is not defined),
+    //    25 格 PASS 之后的全部格子从来没执行过 —— 而 verify.sh 只 grep FAIL,崩了反而看不见,
+    //    是「门自己中止 ≠ 判红」的原形。原因:兑换页后来接了远端,成交快照里多了一句
+    //    `remoteBaseline: remoteState.value` —— 它在 `if (remoteApiEnabled)` **之外**,
+    //    无条件求值,而 harness 没有这个桩。远端分支本身仍由另一套契约覆盖(见上一行注释),
+    //    这里只补上「无条件被读到」的那两个 ref,不把远端路径拉进本 harness。
     remoteState: { value: null },
+    remoteError: { value: null },
     exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
     geoPolicyUserMessage,
     submitting: { value: false },
@@ -584,18 +648,47 @@ function buildHandlePurchase(env) {
   // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
   return new Function(...names, src)(...names.map((n) => env[n]));
 }
-function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, sheetBlocked = false } = {}) {
+/**
+ * 资金收口点 postMoneyBill 也**跑真实现**(从 lib/money-receipt.ts 原文抠出来注入),
+ * 不写替身:handlePurchase 现在把扣款与记账都委托给它,替身一写,「只扣一次」就变成
+ * 在跟我自己写的假扣款对账 —— 页面真怎么动钱反而测不到。
+ */
+function buildPostMoneyBill(app, bills, toast) {
+  // 从**返回类型**处起抠函数体:直接从函数名起抠会撞上参数默认值 `opts = {}` 的那对花括号,
+  // 括号配平在那里就归零,抠出来的是半截签名(实测 esbuild 直接 transform 失败)。
+  // 签名本身是类型化糖(ts2js 后就是这一行),函数体一字不改地原文注入。
+  const grabbed = grabBlock(receiptRaw.slice(receiptRaw.indexOf("export function postMoneyBill(")), "): MoneyReceiptOutcome");
+  const body = grabbed.slice(grabbed.indexOf("{"));   // 去掉 needle 自带的返回类型前缀
+  const src = `function postMoneyBill(draft, opts = {}) ${ts2js(body)}\n; return postMoneyBill;`;
+  // 🔴 单数版现在只是复数版的壳(`return postMoneyBills([draft], opts)`),复数正主必须
+  // 一起进同一个闭包 —— 只注入单数体会在运行时炸 `postMoneyBills is not defined`。
+  // 复用已有的 buildPostMoneyBills,不另写第二份注入。
+  // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
+  return new Function("useApp", "useBills", "getT", "toast", "postMoneyBills", src)(
+    () => app, () => bills, () => t.value, toast, buildPostMoneyBills(app, bills, toast),
+  );
+}
+function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, billsFail = false, sheetBlocked = false } = {}) {
   const app = makeApp(usdt, 0);
   const minted = [];
-  const commandCalls = [];
   const billRows = [];
   const toasts = [];
   const closes = [];
   const purchasing = { value: false };
+  // 收口点走 addMany(N 条分录一次落盘);add 保留给仍在裸调的存量路径。
+  // billsFail 两个入口都要挡 —— 只挡一个的话「收据落盘失败」那条靶会从没挡的那边溜过去。
+  const bills = {
+    add: (r) => { if (billsFail) return null; billRows.push(r); return r; },
+    addMany: (ds) => { if (billsFail) return null; billRows.push(...ds); return ds; },
+  };
   const toast = { error: (a, b) => toasts.push(["error", a, b]), success: (a, b) => toasts.push(["success", a, b]) };
   const env = {
     // handlePurchase 的 geo 分支引用它;不喂 = 整道门 ReferenceError 崩溃(2026-08-07 实测)。
     geoPolicyUserMessage,
+    // 本 harness 验的是 **mock 路径**(页面自己扣款记账那条);远端路径另有契约覆盖。
+    // 不喂这个桩,注入执行会在 `if (!remoteApiEnabled)` 处抛 ReferenceError,
+    // 表现成「什么都没发生」(debits=0 minted=[] bills=0)—— 看着像缺陷,其实是 harness 缺桩。
+    remoteApiEnabled: false,
     purchasing,
     qty: { value: 1 },
     price: { value: 9999 },
@@ -606,31 +699,26 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, s
     sheetBlocked: { value: sheetBlocked },
     sheetBlockText: { value: "市场暂未开放" },
     app, t, fmt,
-    genesis: { purchase: async (n) => {
-      commandCalls.push(n);
-      await Promise.resolve();
-      if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason };
-      minted.push(n);
-      return { ok: true, cost: n * 9999 };
-    } },
+    genesis: { purchase: (n) => { if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason }; minted.push(n); return { ok: true, cost: n * 9999 }; } },
+    postMoneyBill: buildPostMoneyBill(app, bills, toast),
     toast,
     emitClose: () => closes.push(1),
     GENESIS_ELIGIBILITY: { perUserCap: 5 },
   };
-  return { env, app, minted, commandCalls, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
+  return { env, app, minted, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
 }
 {
   const f = genesisFixture();
-  const first = f.handlePurchase();
-  f.handlePurchase();   // 双击:面板还没卸载(emitClose 要等下一次渲染)
-  f.handlePurchase();
-  await first;
-  check("C④ 双击/三击只提交 1 个服务端购买命令 · 铸造 1 份 · 关闭 1 次",
-    f.commandCalls.length === 1 && f.minted.length === 1 && f.minted[0] === 1 && f.closes.length === 1,
-    `commands=${f.commandCalls.length} minted=${JSON.stringify(f.minted)} closes=${f.closes.length}`);
-  check("C④ 购买页不在浏览器本地扣款或写账单(资金只由服务端事务处理)",
-    f.app.calls.length === 0 && f.billRows.length === 0,
-    `localMoneyCalls=${f.app.calls.length} localBills=${f.billRows.length}`);
+  // 🔴 连点的语义 = **不等前一次结束就再点**,所以三次都不 await 地发出去,再统一 settle。
+  //   逐个 await 会变成串行,守卫永远不会被触发,这一格就成了空转。
+  const clicks = [f.handlePurchase(), f.handlePurchase(), f.handlePurchase()];
+  await Promise.allSettled(clicks);
+  check("C④ 双击/三击只买 1 台:1 次扣款 · 1 次铸造 · 1 行账单 · 1 次关闭",
+    f.app.calls.filter((c) => c[0] === "debitBalance").length === 1
+    && f.minted.length === 1 && f.minted[0] === 1 && f.billRows.length === 1 && f.closes.length === 1,
+    `debits=${f.app.calls.length} minted=${JSON.stringify(f.minted)} bills=${f.billRows.length}`);
+  check("C④ 只扣一台的钱($50000 − $9999 = $40001,不是扣两三台)",
+    f.app.user.usdtBalance === 40001, `usdt=${f.app.user.usdtBalance}`);
   check("C④ 成交后继续持锁(面板正在关闭,解锁就是给双击留窗口)", f.purchasing.value === true);
   check("C④ 成功 toast 只弹 1 次(1 次购买 = 1 条反馈)",
     f.toasts.filter((x) => x[0] === "success").length === 1, JSON.stringify(f.toasts.map((x) => x[0])));
@@ -641,45 +729,56 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, s
 // 连点 N 次就写 **2N 条**账单(扣款 + 冲正各一条)。这组靶子把它钉死。
 {
   const f = genesisFixture({ sheetBlocked: true });
-  await f.handlePurchase();
-  await f.handlePurchase();
-  await f.handlePurchase();
-  check("🔴 C⑦ 阻断态连点 3 次:0 个服务端购买命令",
-    f.commandCalls.length === 0, `实得 ${f.commandCalls.length} 个`);
-  check("🔴 C⑦ 阻断态不产生浏览器本地资金/账单副作用",
-    f.app.calls.length === 0 && f.billRows.length === 0,
-    `localMoneyCalls=${f.app.calls.length} localBills=${f.billRows.length}`);
+  await Promise.allSettled([f.handlePurchase(), f.handlePurchase(), f.handlePurchase()]);
+  check("🔴 C⑦ 阻断态连点 3 次:0 次扣款",
+    f.app.calls.filter((c) => c[0] === "debitBalance").length === 0,
+    `实得 ${f.app.calls.filter((c) => c[0] === "debitBalance").length} 次`);
+  check("🔴 C⑦ 阻断态连点 3 次:0 行账单(不是「扣了再冲正」的成对写入)",
+    f.billRows.length === 0, `实得 ${f.billRows.length} 行`);
   check("🔴 C⑦ 阻断态不铸造席位", f.minted.length === 0, `实得 ${JSON.stringify(f.minted)}`);
   check("C⑦ 阻断态给了说明(禁静默无反应)", f.toasts.length >= 1, `toasts=${f.toasts.length}`);
   check("C⑦ 阻断态不上重入锁(解除后能立刻重试,不用关面板)", f.purchasing.value === false);
   // 反向对照:同一 fixture 不阻断时必须**真能买**,证明上面 5 条不是因为 fixture 坏了才全 0
   const ok = genesisFixture({ sheetBlocked: false });
-  await ok.handlePurchase();
-  check("🔴 C⑦ 反向对照:不阻断时确实会提交服务端命令(否则上面的 0 是假绿)",
-    ok.commandCalls.length === 1 && ok.minted.length === 1,
-    `commands=${ok.commandCalls.length} minted=${ok.minted.length}`);
+  await ok.handlePurchase().catch(() => {});
+  check("🔴 C⑦ 反向对照:不阻断时确实会扣款(否则上面的 0 是假绿)",
+    ok.app.calls.filter((c) => c[0] === "debitBalance").length === 1 && ok.billRows.length === 1,
+    `debits=${ok.app.calls.filter((c) => c[0] === "debitBalance").length} bills=${ok.billRows.length}`);
 }
 {
-  // 🔴 反向不变量:服务端拒绝后必须立刻解锁,且浏览器不得自行补扣/冲正。
+  // 🔴 反向不变量:失败路径必须立刻解锁 —— 否则「提前 return 忘复位」= 后续购买永久锁死。
+  const poor = genesisFixture({ usdt: 100 });
+  await poor.handlePurchase().catch(() => {});
+  check("C④ 余额不足 → 零铸造、零账单,且守卫**已解锁**(可重试,不是永久锁死)",
+    poor.minted.length === 0 && poor.billRows.length === 0 && poor.purchasing.value === false
+    && poor.app.user.usdtBalance === 100);
   const soldOut = genesisFixture({ mint: { ok: false, reason: "sold-out" } });
-  await soldOut.handlePurchase();
-  check("C④ 服务端拒绝 → 零本地资金/账单、零铸造、守卫解锁、不关面板",
-    soldOut.commandCalls.length === 1 && soldOut.app.calls.length === 0 && soldOut.billRows.length === 0
-    && soldOut.minted.length === 0 && soldOut.purchasing.value === false && soldOut.closes.length === 0,
-    `commands=${soldOut.commandCalls.length} localMoney=${soldOut.app.calls.length} minted=${soldOut.minted.length}`);
-  soldOut.env.genesis.purchase = async (n) => {
-    soldOut.commandCalls.push(n);
-    soldOut.minted.push(n);
-    return { ok: true, cost: n * 9999 };
-  };
-  await soldOut.handlePurchase();
+  await soldOut.handlePurchase().catch(() => {});
+  // 收口到 postMoneyBill 之后,铸造失败的正确形态从「0 行账单」变成「1 扣 + 1 反向冲正,净和 0」:
+  // 已终态分录不改写,靠反向分录冲正(与提现 NEX 退还同规矩)。余额与**可提额度**都必须还原 ——
+  // 盲加 credit 只还总余额,一次失败退款就把可提额永久压低($8000 → $1)。
+  const soldOutNet = soldOut.billRows.reduce((a, b) => a + b.amount, 0);
+  check("C④ 铸造失败 → 账本 1 扣 + 1 反向冲正(净和 0)+ 余额与可提额度都还原 + 守卫解锁 + 不关面板",
+    soldOut.app.user.usdtBalance === 50000 && soldOut.app.user.earningBuckets.withdrawableUsdt === 50000
+    && soldOut.billRows.length === 2 && soldOutNet === 0
+    && soldOut.purchasing.value === false && soldOut.closes.length === 0,
+    `usdt=${soldOut.app.user.usdtBalance} withdrawable=${soldOut.app.user.earningBuckets.withdrawableUsdt} bills=${soldOut.billRows.length} net=${soldOutNet}`);
+  // 收据落不了盘 = 钱不许动、席位不许铸,且守卫必须解锁(否则一次落盘故障锁死后续所有购买)。
+  const noReceipt = genesisFixture({ billsFail: true });
+  await noReceipt.handlePurchase().catch(() => {});
+  check("C④ 收据落盘失败 → 资金精确还原 · 零铸造 · 零账单 · 不关面板 · 守卫解锁",
+    noReceipt.app.user.usdtBalance === 50000 && noReceipt.app.user.earningBuckets.withdrawableUsdt === 50000
+    && noReceipt.minted.length === 0 && noReceipt.billRows.length === 0
+    && noReceipt.closes.length === 0 && noReceipt.purchasing.value === false,
+    `usdt=${noReceipt.app.user.usdtBalance} minted=${noReceipt.minted.length}`);
+  soldOut.env.genesis.purchase = (n) => { soldOut.minted.push(n); return { ok: true, cost: n * 9999 }; };
+  await soldOut.handlePurchase().catch(() => {});
   check("C④ 失败后重试真的能成(解锁不是嘴上说说:第二次跑通并铸出 1 份)",
-    soldOut.commandCalls.length === 2 && soldOut.minted.length === 1 && soldOut.closes.length === 1);
+    soldOut.minted.length === 1 && soldOut.app.user.usdtBalance === 40001 && soldOut.closes.length === 1);
   const ineligible = genesisFixture({ capRemaining: 0 });
-  await ineligible.handlePurchase();
-  await ineligible.handlePurchase();
-  check("C④ 限购已满 → 零服务端命令且不上锁(资格门失败不该锁住入口)",
-    ineligible.commandCalls.length === 0 && ineligible.app.calls.length === 0 && ineligible.purchasing.value === false
+  await Promise.allSettled([ineligible.handlePurchase(), ineligible.handlePurchase()]);
+  check("C④ 限购已满 → 零资金动作且不上锁(资格门失败不该锁住入口)",
+    ineligible.app.calls.length === 0 && ineligible.purchasing.value === false
     && ineligible.toasts.filter((x) => x[0] === "error").length === 2);
 }
 
@@ -712,8 +811,8 @@ console.log(
   `\n${pass} pass / ${fail} fail(样本:兑换 handleConfirm + 创世 handlePurchase 两个正主函数原文注入执行` +
   ` · ${confirmBody.slice(iAwait).split(/\r?\n/).length} 行 await 后代码逐行扫 9 个活值 token` +
   ` · 8 项成交输入快照 + 5 个动钱/计数入口 · 5 组行为固定靶(汇率漂移/方向金额篡改/连点3次/创世同tick3击/正常路径)` +
-  ` · 5 条创世反向靶(双击重入·市场阻断·售罄·资格拒绝·失败后重试)` +
+  ` · 5 条创世反向靶(余额不足·铸造失败冲正·收据落盘失败·失败后重试·限购满不上锁)` +
   ` · 兑换两腿原子性 3 靶(收据落盘失败 → 双侧资金还原·账上零残留·明确失败;单次落盘归 money_receipt_gate ⑦)` +
-  ` · 创世购买只走服务端 genesis.purchase 命令且浏览器零资金副作用 · 3 key × 3 语 i18n)`,
+  ` · 资金收口点 postMoneyBill 跑真实现(lib/money-receipt.ts 原文注入) · 3 key × 3 语 i18n)`,
 );
 process.exit(fail ? 1 : 0);

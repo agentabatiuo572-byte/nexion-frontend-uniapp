@@ -534,7 +534,8 @@ function backToBase() {
 const nowTick = ref(mockServerNow());
 let tickTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote().catch(() => toast.error(t.value.addrRebind.startFailed));
+  // refreshRemote 自吞不 reject(resilience 门);失败信号走返回值。
+  if (remoteApiEnabled) void payout.refreshRemote().then((ok) => { if (!ok) toast.error(t.value.addrRebind.startFailed); });
   tickTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });
 onUnmounted(() => {

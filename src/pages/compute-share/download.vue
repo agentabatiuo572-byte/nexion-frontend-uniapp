@@ -218,6 +218,7 @@ function clearPending(accountKey: string) {
   try { localStorage.removeItem(storageScope(accountKey)); } catch { /* storage may be unavailable */ }
 }
 
+// IDEMPOTENCY-FRESH-OK: 仅在账号当前没有同型号 pending 意图时铸键，随后持久化并跨重试复用。
 function newEnrollmentKey(): string {
   const suffix = globalThis.crypto?.randomUUID?.()
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -271,7 +272,11 @@ async function createRemoteEnrollment(
   expectedGeneration = accountGeneration,
 ) {
   if (connecting.value) return;
-  const intent = pending ?? { requestedGpuModel: selectedModel.value, idempotencyKey: newEnrollmentKey() };
+  const requestedGpuModel = selectedModel.value.trim();
+  const retained = readPending(expectedAccount);
+  const intent = pending
+    ?? (retained?.requestedGpuModel === requestedGpuModel ? retained : null)
+    ?? { requestedGpuModel, idempotencyKey: newEnrollmentKey() };
   writePending(expectedAccount, intent);
   connecting.value = true;
   try {

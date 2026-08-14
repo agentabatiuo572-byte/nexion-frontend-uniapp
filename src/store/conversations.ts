@@ -287,12 +287,10 @@ export const useConversations = defineStore("conversations", () => {
     reset();
     accountKeyValue = accountKey;
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
-    const epoch = accountEpoch;
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch((cause) => {
-      if (epoch === accountEpoch) {
-        error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
-      }
-    });
+    // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
+    // "unverified",首次 refresh() 重走 preparePendingRun 并把失败落 error 态;
+    // preparePendingRun 本身保持 reject 契约(refresh/reconcile 的 await 消费方靠它报错)。
+    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
 
   return { conversations, typingIds, totalUnread, loading, mutating, error, refresh, byType, get, open, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };

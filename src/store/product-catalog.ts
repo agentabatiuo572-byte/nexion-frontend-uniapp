@@ -3,7 +3,9 @@ import { productCatalogApi, remoteApiEnabled } from "@/api/runtime";
 import { setCurrentCommerceSandboxRun } from "@/api/order-api";
 import { clearProductCatalog, replaceProductCatalog } from "@/mock/products";
 
-export type ProductCatalogStatus = "mock" | "loading" | "ready" | "error";
+// "mock" 变体已删:它曾是 mock 模式的初值,而全仓消费方只认 "ready" —— 留着这个变体
+// 等于给「下次有人再把 mock 设成它」留了门。删掉后 tsc 会证明没有第二处在用。
+export type ProductCatalogStatus = "loading" | "ready" | "error";
 
 export const productCatalogState = reactive<{
   status: ProductCatalogStatus;
@@ -11,7 +13,15 @@ export const productCatalogState = reactive<{
   source: string;
   revision: string | null;
 }>({
-  status: remoteApiEnabled ? "loading" : "mock",
+  // 🔴🔴 mock 模式下必须直接是 "ready",不能是一个只有这里用的 "mock" 状态值 ——
+  //   全仓**每一个**消费方判的都是 `status === "ready"`(store.vue 的 catalogHasProducts /
+  //   unlockedProducts、tradein-sheets 的守卫),而 refreshProductCatalog() 在
+  //   !remoteApiEnabled 时直接 resolve、根本不改 status。于是 mock 下 status 永远停在
+  //   "mock",商城主列表**永久不渲染**,页面钉死在「暂无可购设备」——
+  //   而 CLAUDE.md 明写 verify 的合法靶必须是 mock 模式,等于原型里商城是空的。
+  //   与创世那五处死代码同族:迁服务端权威时,mock 分支的取值没被下游认。
+  //   mock 期的目录就是本地 PRODUCTS 常量,它本来就是 ready 的;来源仍由 source 标注。
+  status: remoteApiEnabled ? "loading" : "ready",
   error: "",
   source: remoteApiEnabled ? "" : "mock/products",
   revision: null,

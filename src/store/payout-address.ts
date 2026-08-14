@@ -155,16 +155,18 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
-  /** Remote mode is fail-closed: only a validated server snapshot may populate the book. */
-  async function refreshRemote(): Promise<void> {
-    if (!remoteApiEnabled) return;
+  /** Remote mode is fail-closed: only a validated server snapshot may populate the book.
+   *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
+  async function refreshRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
     const version = ++remoteLoadVersion;
     try {
       const snapshot = await payoutAddressApi.list();
-      if (version !== remoteLoadVersion) return;
+      if (version !== remoteLoadVersion) return true;
       book.value = remoteBook(snapshot);
+      return true;
     } catch {
-      if (version === remoteLoadVersion) book.value = emptyBook();
+      return false;
     }
   }
 
@@ -189,7 +191,18 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
       code: input.code,
       idempotencyKey: input.idempotencyKey,
     });
-    await refreshRemote();
+    // save 是动作路径:服务端已收单但回读失败必须冒给调用方(rebind 页 catch 展示错误)。
+    // 🔴 readback 直读服务端,不复用 refreshRemote(z6 审计 P1:并发后台刷新抢 version 会让
+    //    superseded→true 造成假成功)。readback 在写之后、单调最新:++version 作废一切
+    //    在飞旧读后直接应用。
+    let snapshot: Awaited<ReturnType<typeof payoutAddressApi.list>>;
+    try {
+      snapshot = await payoutAddressApi.list();
+    } catch {
+      throw new Error("PAYOUT_ADDRESS_READBACK_UNAVAILABLE");
+    }
+    remoteLoadVersion += 1;
+    book.value = remoteBook(snapshot);
   }
 
   /** 账号切换重绑:装载该账号的地址簿(防跨账号继承地址与历史)。 */
@@ -198,7 +211,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     remoteLoadVersion += 1;
     if (remoteApiEnabled) {
       book.value = emptyBook();
-      void refreshRemote().catch(() => undefined);
+      void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
     }

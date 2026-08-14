@@ -144,6 +144,10 @@ const auth = useAuth();
 const profile = useProfile();
 const payout = usePayoutAddress();
 onMounted(() => {
+  // 合并裁决(2026-08-14):取远端那侧(保留 .catch + 收下新增的两个加载调用)。
+  //   本地这侧只是把 payout 那行的 .catch 去掉了 —— 理由是缝已自吞、这层是死代码。
+  //   但「死代码」和「有害」不是一回事:留着它,万一将来有人把缝的自吞改回抛,
+  //   这个调用点仍是安全的。少一行的收益抵不上那个风险,所以不坚持本地那侧。
   if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
   if (remoteApiEnabled) void loadProfileCandidates();
   if (remoteApiEnabled) void loadRemoteProfile();

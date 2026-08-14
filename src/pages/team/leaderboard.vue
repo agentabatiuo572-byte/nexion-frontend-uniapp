@@ -24,7 +24,7 @@
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
-          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '14px' }">{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
+          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '13px' }">{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
           <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" @click="loadRemote">
             <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.leaderboard.retry }}</text>
           </view>
