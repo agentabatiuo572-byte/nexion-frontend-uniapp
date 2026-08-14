@@ -13,11 +13,11 @@ function client(data: unknown): ApiClient {
 describe("profile API projection", () => {
   it("accepts an existing server nickname that predates the curated nickname editor", async () => {
     const api = createProfileApi(client({
-      nickname: "Nexion 5678",
+      nickname: "NexGrid 5678",
       avatarUrl: "",
       avatarRevision: "",
     }));
 
-    await expect(api.profile()).resolves.toMatchObject({ nickname: "Nexion 5678" });
+    await expect(api.profile()).resolves.toMatchObject({ nickname: "NexGrid 5678" });
   });
 });
