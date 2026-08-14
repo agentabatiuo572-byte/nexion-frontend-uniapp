@@ -24,6 +24,26 @@ const OUT = { isAuthenticated: false, email: "", accountId: "default", onboardin
 const BUSINESS = "pages/me/wallet-withdraw";
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/**
+ * 🔴 「必须被踢走」这类断言用**轮询等待**,不用「固定睡一觉再一次性读」。
+ *   2026-08-14 实测:冷启动的 dev server 上,业务页首次按需编译要好几秒,固定
+ *   SETTLE_MS 睡醒时守卫的下一拍还没来 —— 同一份代码冷靶首跑红、热靶连绿,
+ *   官方链(自起冷服)因此闪红 443/1。不变量是「必须被带离」,从没规定「多快」;
+ *   守卫本来就是周期轮询,判据的时序假设不该比被判物更紧。
+ *   踢走即刻通过;只有到宽限期还赖着才算真违例。「不许被误踢」(③)是相反方向 ——
+ *   证「不发生」只能固定观察窗,保持原样。
+ */
+async function waitEvictedFrom(p, business, deadlineMs) {
+  const t0 = Date.now();
+  let last = "";
+  while (Date.now() - t0 < deadlineMs) {
+    last = await readRoute(p);
+    if (last && last !== business) return { evicted: true, route: last };
+    await wait(500);
+  }
+  return { evicted: false, route: last };
+}
+const EVICT_DEADLINE_MS = 20000;
 const readRoute = (p) => p.evaluate(() => {
   try { const ps = getCurrentPages(); if (ps.length) return ps[ps.length - 1].route || ""; } catch {}
   return (location.hash || "").replace(/^#\/?/, "").split("?")[0];
@@ -66,12 +86,11 @@ try {
     if (!landed) fails.push("① 覆盖面:评审页没起来(路由读空)—— 判据失效,不是没违例");
     else if (!(await navInApp(p, BUSINESS))) fails.push("① 覆盖面:应用内导航原语不可用 —— 判据失效");
     else {
-      await wait(SETTLE_MS);
-      const end = await readRoute(p);
+      const r = await waitEvictedFrom(p, BUSINESS, EVICT_DEADLINE_MS);
       checks++;
-      if (!end) fails.push("① 覆盖面:导航后路由读空 —— 判据失效");
-      else if (end === BUSINESS) fails.push(`① 登出态经评审页进业务页后仍停在 ${end} —— 周期性权限守卫没在工作`);
-      else notes.push(`①经评审页→${end}`);
+      if (!r.route) fails.push("① 覆盖面:导航后路由读空 —— 判据失效");
+      else if (!r.evicted) fails.push(`① 登出态经评审页进业务页,${EVICT_DEADLINE_MS / 1000}s 内仍停在 ${r.route} —— 周期性权限守卫没在工作`);
+      else notes.push(`①经评审页→${r.route}`);
     }
     await ctx.close();
   }
@@ -80,12 +99,11 @@ try {
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const p = await open(ctx, BUSINESS, OUT);
-    await wait(SETTLE_MS);
-    const end = await readRoute(p);
+    const r = await waitEvictedFrom(p, BUSINESS, EVICT_DEADLINE_MS);
     checks++;
-    if (!end) fails.push("② 覆盖面:路由读空 —— 判据失效");
-    else if (end === BUSINESS) fails.push(`② 登出态直接落地业务页仍停在 ${end} —— 守卫整体失效`);
-    else notes.push(`②直接落地→${end}`);
+    if (!r.route) fails.push("② 覆盖面:路由读空 —— 判据失效");
+    else if (!r.evicted) fails.push(`② 登出态直接落地业务页,${EVICT_DEADLINE_MS / 1000}s 内仍停在 ${r.route} —— 守卫整体失效`);
+    else notes.push(`②直接落地→${r.route}`);
     await ctx.close();
   }
 
