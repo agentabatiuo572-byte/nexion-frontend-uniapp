@@ -70,6 +70,14 @@
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-ink)">{{ t.developer.requestAccess }}</text>
           </view>
           <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.developer.requestAccessHint }}</text>
+          <view v-if="remoteApiEnabled && latestRequest" class="rounded-xl" :style="requestStatusStyle">
+            <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-tech-cyan)">{{ latestRequest.requestNo }} · {{ latestRequest.status }}</text>
+            <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px">{{ new Date(latestRequest.submittedAt).toLocaleString() }}</text>
+          </view>
+          <view v-if="remoteApiEnabled && latestLoadFailed" class="rounded-xl" :style="requestStatusStyle">
+            <text class="block" style="font-size: 12px; color: var(--v5-warning)">{{ t.developer.latestLoadFailed }}</text>
+            <view role="button" tabindex="0" style="min-height: 44px; display: grid; place-items: center; margin-top: 6px" @click="loadLatestRequest"><text>{{ t.network.retry }}</text></view>
+          </view>
           <view class="space-y-2">
             <input v-model="company" :placeholder="t.developer.formCompany" :style="formInputStyle" placeholder-class="nx-dev-ph" />
             <input v-model="email" type="email" :placeholder="t.developer.formEmail" :style="formInputStyle" placeholder-class="nx-dev-ph" />
@@ -77,7 +85,7 @@
           </view>
           <view class="mt-3 rounded-xl flex items-center justify-center active:opacity-85" :style="submitBtnStyle" @click="submitRequest">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
-            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.formSubmit }}</text>
+            <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ submitting ? "…" : t.developer.formSubmit }}</text>
           </view>
         </view>
       </template>
@@ -103,7 +111,7 @@
         <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
           <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.keysEmpty }}</text>
-          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
+          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="tab = 'overview'">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" /><path d="m21 2-9.6 9.6" /><circle cx="7.5" cy="15.5" r="5.5" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.keysCreate }}</text>
           </view>
@@ -115,7 +123,7 @@
         <view class="rounded-2xl text-center" :style="emptyTabStyle">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           <text class="block" style="font-size: 13px; color: var(--v5-ink-2); margin-top: 12px">{{ t.developer.webhooksEmpty }}</text>
-          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="toast.info(t.developer.requestAccessHint)">
+          <view class="mt-4 inline-flex rounded-xl active:opacity-85" :style="smallBtnStyle" @click="tab = 'overview'">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M18 16.98h-5.99c-1.66 0-3.01-1.34-3.01-3s1.34-3 3.01-3H18" /><path d="m21 12-3-3 3-3" /><path d="M3 12a9 9 0 0 0 9 9" /></svg>
             <text style="font-size: 13px; font-weight: 600; color: var(--v5-on-brand)">{{ t.developer.webhooksAdd }}</text>
           </view>
@@ -126,19 +134,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { toast } from "@/store/ui";
+import { developerAccessApi, remoteApiEnabled } from "@/api/runtime";
+import type { DeveloperAccessReceipt } from "@/api/developer-access-api";
+import { useApp } from "@/store/app";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
 type Tab = "overview" | "docs" | "keys" | "webhooks";
 
 const t = useT();
+const app = useApp();
 const tab = ref<Tab>("overview");
 const company = ref("");
 const email = ref("");
 const useCase = ref("");
+const submitting = ref(false);
+const latestRequest = ref<DeveloperAccessReceipt | null>(null);
+const latestLoadFailed = ref(false);
+const REQUEST_KEY_STORAGE = "nexgrid-developer-access-command-v1";
+let requestKey: string | null = null;
+let requestGeneration = 0;
 
 const tabOptions = computed(() => [
   { value: "overview" as Tab, label: t.value.developer.apiOverviewTab },
@@ -221,9 +240,47 @@ const apiCards: ApiCardDef[] = [
   },
 ];
 
-function submitRequest() {
+function newRequestKey(): string { return globalThis.crypto?.randomUUID?.() ?? `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
+function restoreRequestKey(accountKey: string): string | null {
+  const row = readAccountRow<{ key?: string }>(REQUEST_KEY_STORAGE, accountKey);
+  return typeof row?.key === "string" && row.key.trim() ? row.key.trim() : null;
+}
+function persistRequestKey(accountKey: string, key: string | null): void {
+  writeAccountRow(REQUEST_KEY_STORAGE, accountKey, key ? { key } : {});
+}
+async function submitRequest() {
+  if (submitting.value) return;
   if (!company.value.trim() || !email.value.trim() || !useCase.value.trim()) {
-    toast.warn("Please complete all required fields");
+    toast.warn(t.value.developer.formRequiredToast);
+    return;
+  }
+  if (remoteApiEnabled) {
+    const accountKey = String(app.accountKey);
+    if (latestRequest.value?.status === "PENDING") {
+      toast.info(t.value.developer.pendingExists);
+      return;
+    }
+    const generation = ++requestGeneration;
+    submitting.value = true; requestKey ??= restoreRequestKey(accountKey) ?? newRequestKey();
+    persistRequestKey(accountKey, requestKey);
+    try {
+      const submitted = await developerAccessApi.submit({ company: company.value.trim(), email: email.value.trim(), useCase: useCase.value.trim() }, requestKey);
+      if (generation !== requestGeneration || accountKey !== String(app.accountKey)) return;
+      latestRequest.value = submitted;
+      requestKey = null; persistRequestKey(accountKey, null); toast.success(t.value.developer.formSubmittedToast);
+      company.value = ""; email.value = ""; useCase.value = "";
+    } catch {
+      try {
+        const latest = await developerAccessApi.latest();
+        if (generation !== requestGeneration || accountKey !== String(app.accountKey)) return;
+        if (latest && latest.idempotencyKey === requestKey) { latestRequest.value = latest; requestKey = null; persistRequestKey(accountKey, null); toast.success(t.value.developer.formSubmittedToast); }
+        else toast.warn(t.value.developer.requestAccessHint);
+      } catch {
+        if (generation === requestGeneration && accountKey === String(app.accountKey)) toast.warn(t.value.developer.requestAccessHint);
+      }
+    } finally {
+      if (generation === requestGeneration && accountKey === String(app.accountKey)) submitting.value = false;
+    }
     return;
   }
   toast.success(t.value.developer.formSubmittedToast);
@@ -231,6 +288,35 @@ function submitRequest() {
   email.value = "";
   useCase.value = "";
 }
+function loadLatestRequest() {
+  if (!remoteApiEnabled) return;
+  const accountKey = String(app.accountKey);
+  const generation = ++requestGeneration;
+  latestLoadFailed.value = false;
+  requestKey = restoreRequestKey(accountKey);
+  void developerAccessApi.latest().then((value) => {
+    if (generation === requestGeneration && accountKey === String(app.accountKey)) {
+      latestRequest.value = value;
+      latestLoadFailed.value = false;
+      if (requestKey && value?.idempotencyKey === requestKey) {
+        requestKey = null;
+        persistRequestKey(accountKey, null);
+      }
+    }
+  }).catch(() => {
+    if (generation === requestGeneration && accountKey === String(app.accountKey)) latestLoadFailed.value = true;
+  });
+}
+onMounted(loadLatestRequest);
+onUnmounted(() => { requestGeneration += 1; });
+watch(() => String(app.accountKey), () => {
+  requestGeneration += 1;
+  requestKey = null;
+  submitting.value = false;
+  latestRequest.value = null;
+  latestLoadFailed.value = false;
+  loadLatestRequest();
+});
 
 // ── styles ──
 const heroStyle: CSSProperties = {
@@ -357,6 +443,7 @@ const submitBtnStyle: CSSProperties = {
   height: "48px",
   background: "var(--v5-tech-cyan)",
 };
+const requestStatusStyle: CSSProperties = { padding: "10px 12px", marginBottom: "12px", background: "var(--v5-surface-2)" };
 const snippetWrapStyle: CSSProperties = {
   background: "var(--v5-surface-3)",
   borderRadius: "8px",

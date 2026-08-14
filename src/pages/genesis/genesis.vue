@@ -719,7 +719,7 @@ const dockBtnStyle = computed<CSSProperties>(() => ({
       // 暗主题合成底 rgb(18,13,7)(原 22,18,13)→ 9.28,肉眼无差。(2026-07-23 C1)
       ? "linear-gradient(180deg, rgba(50,38,20,0.88) 0%, rgba(20,14,8,0.92) 100%)"
       : "var(--v5-surface-2)",
-  border: dockActive.value ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "1px solid var(--v5-border)",
+  border: dockActive.value ? "1px solid color-mix(in srgb, var(--v5-genesis-gold-on-dark) 55%, transparent)" : "none",
   color: dockActive.value ? "var(--v5-genesis-gold-pale-on-dark)" : "var(--v5-ink-4)",
   fontFamily: "var(--font-v5)",
   fontWeight: 500,

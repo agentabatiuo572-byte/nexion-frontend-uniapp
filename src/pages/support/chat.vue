@@ -109,6 +109,7 @@ const locale = useLocaleStore();
 
 const cid = ref("");
 const isAi = ref(false);
+const initialPrompt = ref("");
 // Nova availability belongs only to ?type=ai. Human advisor/support routes must
 // never inherit a provisional local-model state before their route is resolved.
 const novaProviderHold = ref(false);
@@ -178,6 +179,7 @@ const revealTick = ref(0);
 onLoad((q) => {
   if (q?.type === "ai") {
     isAi.value = true;
+    if (typeof q?.prompt === "string") initialPrompt.value = q.prompt.trim().slice(0, 800);
     return;
   }
   if (typeof q?.cid === "string") {
@@ -292,6 +294,7 @@ const emptyHint = computed(() => {
 const quickChips = computed<QuickChip[]>(() =>
   isAi.value && !novaProviderHold.value
     ? [
+        ...(initialPrompt.value ? [{ key: "search-query", emoji: "🔎", label: initialPrompt.value }] : []),
         { key: "explain-today", emoji: "📦", label: quickLabel("explain-today") },
         { key: "how-to-boost", emoji: "🎫", label: quickLabel("how-to-boost") },
         { key: "whats-hot", emoji: "🔐", label: quickLabel("whats-hot") },
@@ -504,7 +507,9 @@ async function onConvertToTicket() {
 
 function onChip(key: string) {
   if (remoteApiEnabled) {
-    void onSend(quickLabel(key as QuickPromptKey));
+    const message = key === "search-query" ? initialPrompt.value : quickLabel(key as QuickPromptKey);
+    if (key === "search-query") initialPrompt.value = "";
+    void onSend(message);
     return;
   }
   if (!acquireSendSlot()) return;

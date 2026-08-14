@@ -37,15 +37,16 @@
         </view>
       </view>
 
-      <view v-if="remoteApiEnabled" class="mx-4 mt-4">
+      <view v-if="remoteApiEnabled && projectionStatus !== 'ready'" class="mx-4 mt-4">
         <EmptyState
-          kind="empty-list"
-          :title="t.globe.regionProjectionHoldTitle"
-          :desc="t.globe.regionProjectionHoldDesc"
+          :kind="projectionStatus === 'error' ? 'recoverable-error' : 'empty-list'"
+          :title="projectionStateTitle"
+          :desc="projectionStateDesc"
+          :cta-label="projectionStatus === 'error' ? t.ui.retry : undefined"
           emphasis
           compact
+          @cta="loadRegions"
         />
-        <text class="block text-center" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 8px">{{ GLOBE_REGION_PROJECTION_HOLD }}</text>
       </view>
 
       <template v-else>
@@ -175,11 +176,11 @@
             </view>
             <view class="rounded-xl text-center" :style="drawerStatStyle">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto"><path d="M12 20h.01" /><path d="M2 8.82a15 15 0 0 1 20 0" /><path d="M5 12.859a10 10 0 0 1 14 0" /><path d="M8.5 16.429a5 5 0 0 1 7 0" /></svg>
-              <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.avgLatencyMs }}ms</text>
+              <text class="block tabular-nums" :style="drawerStatValStyle">{{ selected.avgLatencyMs === null ? t.globe.metricUnavailable : `${selected.avgLatencyMs}ms` }}</text>
               <text class="block" :style="drawerStatLabelStyle">{{ t.uiChrome.latency }}</text>
             </view>
           </view>
-          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · uptime {{ uptimeText }}</text>
+          <text class="block" style="font-size: 12px; color: var(--v5-ink-4); margin-top: 12px; line-height: 1.625">{{ regionJobsText(selected) }} · {{ remoteApiEnabled ? fmt(t.globe.projectionUpdatedAt, { at: generatedAtText }) : `uptime ${uptimeText}` }}</text>
         </view>
       </view>
       </template>
@@ -188,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -199,7 +200,8 @@ import { publicStatsHealth } from "@/lib/platform-stats";
 import { REGIONS, type RegionData } from "@/mock/globe-regions";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
-import { remoteApiEnabled } from "@/api/runtime";
+import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
+import type { NetworkRegionProjection } from "@/api/network-regions-api";
 
 const t = useT();
 const app = useApp();
@@ -207,22 +209,51 @@ const cfg = useConfig();
 
 const W = 440;
 const H = 240;
-const GLOBE_REGION_PROJECTION_HOLD = "GLOBE_REGION_PROJECTION_HOLD";
+type GlobeRegion = {
+  id: string;
+  i18nKey?: RegionData["i18nKey"];
+  displayName?: string;
+  cx: number;
+  cy: number;
+  devices: number;
+  activeJobs: number;
+  jobsPerHour: number;
+  avgLatencyMs: number | null;
+  isYou?: boolean;
+};
 
-const selected = ref<RegionData | null>(null);
+const selected = ref<GlobeRegion | null>(null);
+const networkProjection = ref<NetworkRegionProjection | null>(null);
+const projectionStatus = ref<"loading" | "ready" | "empty" | "error">(remoteApiEnabled ? "loading" : "ready");
+let projectionRequest = 0;
 const pulseTick = ref(0);
 let pulseTimer = 0;
 
 const global = computed(() => app.global);
 const activeNodesText = computed(() => {
+  if (remoteApiEnabled) return (networkProjection.value?.activeNodes ?? 0).toLocaleString();
   const health = publicStatsHealth(cfg.config.publicStats);
   return cfg.syncFailed || !health.devicesOk
     ? t.value.home.networkStatUpdating
     : global.value.activeDevices.toLocaleString();
 });
-const activeJobsText = computed(() => global.value.activeJobs.toLocaleString());
+const activeJobsText = computed(() => (remoteApiEnabled
+  ? networkProjection.value?.activeJobs ?? 0
+  : global.value.activeJobs).toLocaleString());
 
-const regions = computed<RegionData[]>(() => remoteApiEnabled ? [] : REGIONS);
+const regions = computed<GlobeRegion[]>(() => remoteApiEnabled
+  ? (networkProjection.value?.regions ?? []).map((region, index, all) => ({
+      id: region.id,
+      displayName: region.displayName,
+      cx: region.longitude === null ? (index + 1) / (all.length + 1) : (region.longitude + 180) / 360,
+      cy: region.latitude === null ? 0.38 + (index % 3) * 0.14 : (90 - region.latitude) / 180,
+      devices: region.activeNodes,
+      activeJobs: region.activeJobs,
+      jobsPerHour: region.jobsPerHour,
+      avgLatencyMs: null,
+      isYou: region.isUserRegion,
+    }))
+  : REGIONS.map((region) => ({ ...region, activeJobs: 0 })));
 const me = computed(() => regions.value.find((r) => r.isYou) ?? null);
 const meX = computed(() => (me.value?.cx ?? 0) * W);
 const meY = computed(() => (me.value?.cy ?? 0) * H);
@@ -238,35 +269,75 @@ const pulseRegionId = computed<string | null>(() => {
 // Per-region uptime — stable per open (computed from a ref so it doesn't churn).
 const uptimeSeed = ref(0);
 const uptimeText = computed(() => (99 + uptimeSeed.value).toFixed(2) + "%");
+const generatedAtText = computed(() => networkProjection.value
+  ? new Date(networkProjection.value.generatedAt).toLocaleString()
+  : t.value.globe.metricUnavailable);
+const projectionStateTitle = computed(() => projectionStatus.value === "error"
+  ? t.value.globe.regionProjectionErrorTitle
+  : projectionStatus.value === "empty"
+    ? t.value.globe.regionProjectionEmptyTitle
+    : t.value.globe.regionProjectionLoadingTitle);
+const projectionStateDesc = computed(() => projectionStatus.value === "error"
+  ? t.value.globe.regionProjectionErrorDesc
+  : projectionStatus.value === "empty"
+    ? t.value.globe.regionProjectionEmptyDesc
+    : t.value.globe.regionProjectionLoadingDesc);
 
 const dots = computed(() => generateDotMap(W, H));
 
-function select(r: RegionData) {
+function select(r: GlobeRegion) {
   uptimeSeed.value = Math.random();
   selected.value = r;
 }
 
-function regionName(r: RegionData): string {
+function regionName(r: GlobeRegion): string {
+  if (r.displayName) return r.displayName;
   const g = t.value.globe as Record<string, string>;
-  return g[r.i18nKey] ?? r.id;
+  return r.i18nKey ? g[r.i18nKey] ?? r.id : r.id;
 }
-function regionDevicesText(r: RegionData): string {
+function regionDevicesText(r: GlobeRegion): string {
   return fmt(t.value.globe.regionDevices, { n: r.devices.toLocaleString() });
 }
-function regionLatencyText(r: RegionData): string {
+function regionLatencyText(r: GlobeRegion): string {
+  if (r.avgLatencyMs === null) return fmt(t.value.globe.regionLatencyUnavailable, { n: t.value.globe.metricUnavailable });
   return fmt(t.value.globe.regionLatency, { n: String(r.avgLatencyMs) });
 }
-function regionJobsText(r: RegionData): string {
+function regionJobsText(r: GlobeRegion): string {
   return fmt(t.value.globe.regionJobs, { n: r.jobsPerHour.toLocaleString() });
 }
 
+async function loadRegions() {
+  if (!remoteApiEnabled) return;
+  const request = ++projectionRequest;
+  const accountKey = String(app.accountKey);
+  projectionStatus.value = "loading";
+  try {
+    const next = await networkRegionsApi.list();
+    if (request !== projectionRequest || accountKey !== String(app.accountKey)) return;
+    networkProjection.value = next;
+    projectionStatus.value = next.regions.length > 0 ? "ready" : "empty";
+  } catch {
+    if (request !== projectionRequest || accountKey !== String(app.accountKey)) return;
+    networkProjection.value = null;
+    projectionStatus.value = "error";
+  }
+}
+
 onMounted(() => {
-  if (remoteApiEnabled) return;
+  void loadRegions();
   pulseTimer = setInterval(() => {
     pulseTick.value += 1;
   }, 1800) as unknown as number;
 });
+watch(() => String(app.accountKey), () => {
+  projectionRequest += 1;
+  selected.value = null;
+  networkProjection.value = null;
+  projectionStatus.value = remoteApiEnabled ? "loading" : "ready";
+  void loadRegions();
+});
 onUnmounted(() => {
+  projectionRequest += 1;
   if (pulseTimer) clearInterval(pulseTimer);
 });
 

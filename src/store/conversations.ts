@@ -287,7 +287,12 @@ export const useConversations = defineStore("conversations", () => {
     reset();
     accountKeyValue = accountKey;
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending);
+    const epoch = accountEpoch;
+    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch((cause) => {
+      if (epoch === accountEpoch) {
+        error.value = cause instanceof Error ? cause.message : "SUPPORT_CONVERSATIONS_LOAD_FAILED";
+      }
+    });
   }
 
   return { conversations, typingIds, totalUnread, loading, mutating, error, refresh, byType, get, open, startConversation, startSupportSession, sendUser, convertToTicket, reset, bindAccount };

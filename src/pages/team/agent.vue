@@ -145,7 +145,22 @@
         </view>
 
         <!-- approved cases — transparent hairline rows -->
-        <view :style="casesBlockStyle">
+        <view v-if="remoteApiEnabled && latestApplication.status !== 'NONE'" :style="casesBlockStyle">
+          <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.serverApplication }}</text>
+          <view :style="casesGroupStyle">
+            <view :style="caseRowStyle(true)">
+              <view class="flex items-start justify-between">
+                <view>
+                  <text class="block" :style="{ fontSize: '13px', fontWeight: 600, color: 'var(--v5-ink)' }">{{ latestApplication.city }} · {{ latestApplication.eventDate }}</text>
+                  <text class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ applicationProof }}</text>
+                </view>
+                <text class="font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ applicationStatusText }}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="!remoteApiEnabled" :style="casesBlockStyle">
           <text class="block font-mono-tabular" :style="approvedCapStyle">{{ t.agent.recentlyApproved }}</text>
           <view :style="casesGroupStyle">
             <view v-for="(c, i) in APPROVED_CASES" :key="i" :style="caseRowStyle(i === APPROVED_CASES.length - 1)">
@@ -166,6 +181,7 @@
 
 <script setup lang="ts">
 import { ref, computed, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -173,9 +189,15 @@ import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
+import { useApp } from "@/store/app";
+import { ambassadorApplicationApi, remoteApiEnabled } from "@/api/runtime";
+import type { AmbassadorApplication, AmbassadorApplicationInput } from "@/api/ambassador-application-api";
+import { isSettledRejection } from "@/api/errors";
+import { acquireAmbassadorCommandKey, finishAmbassadorCommand } from "@/lib/ambassador-command-key";
 
 const t = useT();
 const vrank = useVRank();
+const app = useApp();
 
 const myRank = computed(() => vrank.myRank);
 const unlocked = computed(() => vrank.myRank >= 5);
@@ -240,6 +262,15 @@ const city = ref("");
 const budget = ref(3000);
 const budgetText = ref("3000");
 const selectedBucketTitle = ref("");
+const selectedBucketId = ref<AmbassadorApplicationInput["bucket"] | "">("");
+const submitting = ref(false);
+const latestApplication = ref<AmbassadorApplication>({ applicationId: null, status: "NONE", city: null,
+  eventDate: null, budgetUsdt: null, bucket: null, submittedAt: null, source: "server",
+  sourceEnvironment: "PRODUCTION", runId: "" });
+
+const applicationStatusText = computed(() => t.value.agent.applicationStatuses[latestApplication.value.status]);
+const applicationProof = computed(() => latestApplication.value.sourceEnvironment === "SANDBOX"
+  ? `SANDBOX · Run ${latestApplication.value.runId}` : "PRODUCTION · server");
 
 function onBudgetInput() {
   const n = Math.max(0, parseInt(budgetText.value.replace(/\D/g, "")) || 0);
@@ -255,9 +286,25 @@ function hostedByText(c: ApprovedCase): string {
 
 function selectBucket(b: Bucket) {
   selectedBucketTitle.value = b.title;
+  selectedBucketId.value = b.id as AmbassadorApplicationInput["bucket"];
 }
 
-function submit() {
+function payloadIdentity(input: AmbassadorApplicationInput): string {
+  return JSON.stringify([input.eventDate, input.city.trim(), input.budgetUsdt, input.bucket]);
+}
+
+function matches(input: AmbassadorApplicationInput, value: AmbassadorApplication): boolean {
+  return value.status !== "NONE" && value.eventDate === input.eventDate && value.city === input.city.trim()
+    && value.budgetUsdt === input.budgetUsdt && value.bucket === input.bucket;
+}
+
+async function refreshLatest(): Promise<AmbassadorApplication> {
+  const value = await ambassadorApplicationApi.latest();
+  latestApplication.value = value;
+  return value;
+}
+
+async function submit() {
   if (!unlocked.value) {
     toast.error(t.value.agent.toastV5Required, t.value.agent.toastV5RequiredSub);
     return;
@@ -265,6 +312,44 @@ function submit() {
   if (!date.value || !city.value) {
     toast.error(t.value.agent.toastMissingFields, t.value.agent.toastMissingFieldsSub);
     return;
+  }
+  if (!selectedBucketId.value) {
+    toast.error(t.value.agent.toastMissingFields, t.value.agent.toastBucketRequired);
+    return;
+  }
+  if (remoteApiEnabled) {
+    if (submitting.value) return;
+    const input: AmbassadorApplicationInput = { eventDate: date.value, city: city.value.trim(),
+      budgetUsdt: budget.value, bucket: selectedBucketId.value };
+    const identity = payloadIdentity(input);
+    const expectedAccount = app.accountKey;
+    const key = acquireAmbassadorCommandKey(expectedAccount, identity);
+    submitting.value = true;
+    try {
+      const result = await ambassadorApplicationApi.submit(input, key);
+      if (app.accountKey !== expectedAccount) return;
+      latestApplication.value = result;
+      finishAmbassadorCommand(expectedAccount, identity);
+    } catch (error) {
+      if (app.accountKey !== expectedAccount) return;
+      try {
+        const authoritative = await refreshLatest();
+        if (matches(input, authoritative)) {
+          finishAmbassadorCommand(expectedAccount, identity);
+        } else if (isSettledRejection(error)) {
+          finishAmbassadorCommand(expectedAccount, identity);
+          throw error;
+        } else {
+          throw error;
+        }
+      } catch (readError) {
+        if (isSettledRejection(error)) finishAmbassadorCommand(expectedAccount, identity);
+        toast.error(t.value.agent.toastRemoteFailed, readError instanceof Error ? readError.message : String(readError));
+        return;
+      }
+    } finally {
+      submitting.value = false;
+    }
   }
   toast.success(
     t.value.agent.toastSubmitted,
@@ -274,7 +359,13 @@ function submit() {
   city.value = "";
   budget.value = 3000;
   budgetText.value = "3000";
+  selectedBucketId.value = "";
+  selectedBucketTitle.value = "";
 }
+
+onShow(() => {
+  if (remoteApiEnabled) void refreshLatest().catch(() => undefined);
+});
 
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });

@@ -168,7 +168,6 @@ const catalogStateStyle: CSSProperties = {
   padding: "18px 16px",
   borderRadius: "16px",
   background: "var(--v5-surface)",
-  border: "1px solid var(--v5-border)",
 };
 const catalogStateTitleStyle: CSSProperties = {
   fontSize: "15px",

@@ -11,7 +11,12 @@ import {
   type GenesisTier,
 } from "@/store/genesis-config";
 import { genesisApi, remoteApiEnabled } from "@/api/runtime";
-import type { GenesisAccountState, GenesisPublicState } from "@/api/genesis-api";
+import type {
+  GenesisAccountState,
+  GenesisEmission,
+  GenesisHolding,
+  GenesisPublicState,
+} from "@/api/genesis-api";
 
 // 阶梯档位类型 + 默认值现定义在 genesis-config.ts(叶子,避免 TDZ 循环);
 // re-export 兼容既有 import 方(canon-sentinel 改读 genesis-config,见 Step 5)。
@@ -274,6 +279,8 @@ export const useGenesis = defineStore("genesis", () => {
   const holdingNoByTokenId = ref<Record<number, string>>({});
   const listingNoByTokenId = ref<Record<number, string>>({});
   const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
+  const remoteHoldings = ref<GenesisHolding[]>([]);
+  const remoteEmissions = ref<GenesisEmission[]>([]);
   const hasGenesisInvite = ref(false);
 
   function tokenIdFor(value: string): number {
@@ -306,6 +313,8 @@ export const useGenesis = defineStore("genesis", () => {
       return tokenId;
     });
     holdingNoByTokenId.value = holdingMap;
+    remoteHoldings.value = [...state.holdings];
+    remoteEmissions.value = [...state.emissions];
     ownedTokenIds.value = ids;
     myOwned.value = ids.length;
     hasGenesisInvite.value = state.eligibility.hasGenesisInvite;
@@ -316,8 +325,20 @@ export const useGenesis = defineStore("genesis", () => {
 
   async function syncRemote(): Promise<void> {
     if (!remoteApiEnabled) return;
-    applyPublicState(await genesisApi.state());
-    try { applyAccountState(await genesisApi.account()); } catch { /* public state remains usable before login */ }
+    try {
+      applyPublicState(await genesisApi.state());
+      applyAccountState(await genesisApi.account());
+    } catch {
+      remoteListings.value = [];
+      listingNoByTokenId.value = {};
+      remoteHoldings.value = [];
+      remoteEmissions.value = [];
+      holdingNoByTokenId.value = {};
+      ownedTokenIds.value = [];
+      myListings.value = [];
+      myOwned.value = 0;
+      hasGenesisInvite.value = false;
+    }
   }
 
   function persist() {
@@ -341,6 +362,17 @@ export const useGenesis = defineStore("genesis", () => {
    *  业务变更处处即时 persist,旧账号无需先落盘。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    if (remoteApiEnabled) {
+      remoteHoldings.value = [];
+      remoteEmissions.value = [];
+      holdingNoByTokenId.value = {};
+      ownedTokenIds.value = [];
+      myListings.value = [];
+      myOwned.value = 0;
+      hasGenesisInvite.value = false;
+      void syncRemote();
+      return;
+    }
     const g = hydrateGlobal();
     soldSlots.value = g.soldSlots;
     nexListed.value = g.nexListed;
@@ -595,7 +627,7 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, hasGenesisInvite, syncRemote,
+    remoteListings, remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

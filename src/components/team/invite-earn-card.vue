@@ -93,7 +93,14 @@
         <text class="font-mono-tabular tabular-nums shrink-0" :style="tickerAmtStyle">{{ tickerItem.amount }}</text>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M7 7h10v10M7 17 17 7" /></svg>
       </view>
-      <view v-else class="flex items-center w-full min-w-0" style="gap: 6px; font-size: 12px" @click="rewards.refresh()">
+      <view
+        v-else
+        class="flex items-center w-full min-w-0 active:opacity-75"
+        style="gap: 6px; min-height: 44px; font-size: 12px"
+        role="button"
+        tabindex="0"
+        @click="rewards.refresh()"
+      >
         <text :style="{ color: 'var(--v5-ink-3)' }">{{ rewards.error ? t.team.rewardHistoryUnavailable : t.team.noSettledRewards }}</text>
       </view>
     </view>

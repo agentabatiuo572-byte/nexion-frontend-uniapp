@@ -14,11 +14,9 @@
   title headerTitles.storeBundle).
 
   结算分两档:
-  - mock:余额直付——复用单品 checkout 下单内核(扣款 + 逐件 createOrder + 账单 +
-    余额不足拦截)+ 同一道购买资格门,然后清空组合车、跳 /store/orders。
-  - 远端:**不结算**。组合的阶梯折扣没法由服务端整单定价(理由见 onCheckout 的注释),
-    逐件下单会变成显示价与实收价不符。CTA 置灰换文案 + 一句 hint 把用户导向商城单件
-    购买,组合车原样保留。
+  - mock:余额直付——保留原型体验。
+  - 远端:POST /api/orders/bundle，由服务端锁库存、计算阶梯折扣并创建一张 BUNDLE 订单；
+    客户端只展示预估，最终金额以服务器回执为准，结果未知时复用同一幂等键。
 -->
 <template>
   <AppChassis active="store">
@@ -147,7 +145,7 @@
             <svg v-if="!checkoutUnavailable" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
           </view>
           <!-- 禁用原因 + 下一步(项目不变量:业务链必须有下一步 / 禁用原因)。 -->
-          <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ t.bundle.checkoutUnavailableHint }}</text>
+          <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ checkoutHint }}</text>
         </view>
       </view>
     </view>
@@ -155,7 +153,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -166,13 +164,15 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { isPhaseReached } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { toast } from "@/store/ui";
-import { remoteApiEnabled } from "@/api/runtime";
+import { bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
+import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { postReceiptOnly } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
+import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
 
 const t = useT();
 const cart = useCart();
@@ -210,12 +210,14 @@ const tiersReversed = computed(() => BUNDLE_DISCOUNT_TIERS.slice().reverse());
 const totalText = computed(() => total.value.toLocaleString(undefined, { maximumFractionDigits: 0 }));
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
 const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
-// 远端模式下组合价没法由服务端整单定价(理由见 onCheckout 里的长注释)→ 结算不可用。
-// 模块级常量,取值在应用启动时就定死,不需要响应式。
-const checkoutUnavailable = remoteApiEnabled;
+const submitting = ref(false);
+const checkoutUnavailable = computed(() => submitting.value || products.value.length < 2 || remoteApiEnabled);
 const ctaText = computed(() => (
-  checkoutUnavailable ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
+  submitting.value ? "…" : remoteApiEnabled ? t.value.bundle.remoteCheckoutHoldCta : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
+const checkoutHint = computed(() => remoteApiEnabled
+  ? t.value.bundle.remoteCheckoutHoldHint
+  : products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -234,25 +236,60 @@ function onAddSuggestion(p: Product) {
   cart.add(p.id);
   toast.success(fmt(t.value.bundle.addedToBundle, { name: p.name }));
 }
-function onCheckout() {
+interface PendingBundleCommands { commands: Record<string, string> }
+const BUNDLE_COMMAND_KEY = "nexgrid-bundle-order-command-v1";
+function bundleFingerprint(list: Product[]): string {
+  return list.map((item) => item.id).sort().join("|");
+}
+function acquireBundleKey(list: Product[], accountKey: string): string {
+  const fingerprint = bundleFingerprint(list);
+  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
+  const existing = row?.commands?.[fingerprint];
+  if (existing) return existing;
+  const suffix = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const key = `bundle:${suffix}`;
+  writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, {
+    commands: { ...(row?.commands ?? {}), [fingerprint]: key },
+  });
+  return key;
+}
+function retireBundleKey(list: Product[], accountKey: string): void {
+  const row = readAccountRow<PendingBundleCommands>(BUNDLE_COMMAND_KEY, accountKey);
+  const commands = { ...(row?.commands ?? {}) };
+  delete commands[bundleFingerprint(list)];
+  writeAccountRow(BUNDLE_COMMAND_KEY, accountKey, { commands });
+}
+
+async function onCheckout() {
   const list = products.value;
-  if (list.length === 0) return;
-  // 🔴 远端模式不结算 —— 深链 / 程序化点击的第二道防线(正常路径上 CTA 已置灰)。
-  // 本页是全站唯一还在**本地建单 + 本地扣余额**的购买入口(单品 checkout 早已改走
-  // orderApi.create,见 checkout.vue 的 submitRemoteOrder);而履约推进
-  // (orders.advanceOrder)现已归服务端 —— 放行等于「钱扣了、单子永远停在已支付、
-  // 机器一台不来」。
-  //
-  // 为什么不改走单品接口:POST /api/orders 的请求体只有 productNo + quantity +
-  // voucherId,客户端不传价格、由服务端定价,阶梯折扣(cart.ts 的 BUNDLE_DISCOUNT_TIERS)
-  // 没有任何字段能带过去 —— quantity 是「同型号 N 台」而组合是 N 个不同型号,券是单笔
-  // 单用跨不了 N 笔单。逐 SKU 发单 = 页面显示 −12%、服务端按全价收,是付款环节的价格
-  // 谎报。要诚实做只能由服务端整单定价,那个契约还不存在(PRD 3698 行只预告了折扣
-  // 阶梯配置下发,不含组合下单),故此处不结算,由 CTA 置灰 + hint 给用户下一步。
-  // 提示而不是静默 return:走到这里的是深链 / 程序化点击,页面上看不到置灰的 CTA,
-  // 什么都不发生等于让用户对着一个没反应的按钮重复点。
   if (remoteApiEnabled) {
-    toast.warn(t.value.tradein.errPurchaseFailed);
+    toast.info(t.value.bundle.remoteCheckoutHoldHint);
+    return;
+  }
+  if (list.length < 2 || submitting.value) return;
+  if (remoteApiEnabled) {
+    const orders = useOrders();
+    const accountKey = orders.currentAccountKey();
+    submitting.value = true;
+    const key = acquireBundleKey(list, accountKey);
+    try {
+      const created = await bundleOrderApi.create(list.map((item) => item.id), key);
+      retireBundleKey(list, accountKey);
+      if (orders.currentAccountKey() !== accountKey) return;
+      cart.clear();
+      toast.success(t.value.bundle.checkoutSuccessTitle,
+        fmt(t.value.bundle.checkoutPendingBody, { count: created.itemCount }));
+      navTo("/pages/store/orders");
+    } catch (error) {
+      if (!isAmbiguousOutcome(error)) retireBundleKey(list, accountKey);
+      if (orders.currentAccountKey() !== accountKey) return;
+      toast.warn(isAmbiguousOutcome(error)
+        ? t.value.bundle.checkoutOutcomeUnknown
+        : t.value.tradein.errPurchaseFailed);
+    } finally {
+      submitting.value = false;
+    }
     return;
   }
   // 购买资格门(等级门/锁额/售罄)——镜像单品 checkout 的门:suggestions 只挡上架节奏门
@@ -458,24 +495,23 @@ function rowValueStyle(tint?: string, big = false): CSSProperties {
   };
 }
 
-// disabled 态按设计系统的状态派生公式:填充降 surface 系 + 文字/图标降 ink-4 + 去掉 glow,
-// 不新造灰色。checkoutUnavailable 是模块级常量,一次算好即可,不必上 computed。
-const ctaStyle: CSSProperties = {
+// disabled 态按设计系统的状态派生公式:填充降 surface 系 + 文字/图标降 ink-4 + 去掉 glow。
+const ctaStyle = computed<CSSProperties>(() => ({
   marginTop: "14px",
   gap: "6px",
   height: "50px",
   borderRadius: "999px",
-  background: checkoutUnavailable ? "var(--v5-surface-2)" : "var(--v5-brand)",
-  boxShadow: checkoutUnavailable ? "none" : "var(--v5-spotlight-brand)",
-  color: checkoutUnavailable ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-};
-const ctaLabelStyle: CSSProperties = {
+  background: checkoutUnavailable.value ? "var(--v5-surface-2)" : "var(--v5-brand)",
+  boxShadow: checkoutUnavailable.value ? "none" : "var(--v5-spotlight-brand)",
+  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+}));
+const ctaLabelStyle = computed<CSSProperties>(() => ({
   fontFamily: "var(--font-v5)",
   fontWeight: 500,
   fontSize: "15px",
   letterSpacing: "-0.005em",
-  color: checkoutUnavailable ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
-};
+  color: checkoutUnavailable.value ? "var(--v5-ink-4)" : "var(--v5-on-brand)",
+}));
 // 禁用原因 + 下一步那句。text-wrap: pretty 走排版铁律(禁末行孤字)。
 const ctaHintStyle: CSSProperties = {
   marginTop: "10px",

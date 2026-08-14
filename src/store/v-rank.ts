@@ -233,15 +233,24 @@ export const useVRank = defineStore("vRank", () => {
 
   async function refreshCanonicalVRank() {
     if (!remoteApiEnabled) return;
-    const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
-    ladder.value = remoteLadder.ranks.map(canonicalRank);
-    myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
-    selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
-    directRefs.value = remoteCurrent.progress.directRefs;
-    teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
-    vDownlineCounts.value = Object.fromEntries(
-      Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
-    ) as Partial<Record<VRank, number>>;
+    try {
+      const [remoteLadder, remoteCurrent] = await Promise.all([vRankApi.ladder(), vRankApi.current()]);
+      ladder.value = remoteLadder.ranks.map(canonicalRank);
+      myRank.value = Number(remoteCurrent.rankCode.slice(1)) as VRank;
+      selfBuyUSD.value = remoteCurrent.progress.selfBuyUSD;
+      directRefs.value = remoteCurrent.progress.directRefs;
+      teamVolumeUSD.value = remoteCurrent.progress.teamVolumeUSD;
+      vDownlineCounts.value = Object.fromEntries(
+        Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
+      ) as Partial<Record<VRank, number>>;
+    } catch {
+      ladder.value = [];
+      myRank.value = 0;
+      selfBuyUSD.value = 0;
+      directRefs.value = 0;
+      teamVolumeUSD.value = 0;
+      vDownlineCounts.value = {};
+    }
   }
 
   function setMyRank(v: VRank) {

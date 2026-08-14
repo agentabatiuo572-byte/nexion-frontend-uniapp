@@ -100,6 +100,10 @@ const LEDGER = {
   unstake: ["USDT+", "USDT?"],
   // 2026-08-12:weekly-quest 两页的本地发奖迁服务端(同事批次),本地生产者各少一条。
   achievement: ["NEX+×3", "USDT+×1", "seed:NEX+"],
+  // Unknown production biz types are projected as `other` until the client
+  // learns their semantic family. They are server-owned, so no local draft
+  // producer is expected in this repository.
+  other: [],
 };
 
 const read = (rel) => readFileSync(path.join(root, rel), "utf8");

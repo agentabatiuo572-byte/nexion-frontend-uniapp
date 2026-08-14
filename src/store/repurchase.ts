@@ -89,8 +89,7 @@ export const useRepurchase = defineStore("repurchase", () => {
       });
     const [configResult, ordersResult] = await Promise.all([configOutcome, ordersOutcome]);
     try {
-      if (!configResult.ok) throw configResult.cause;
-      if (!ordersResult.ok) throw ordersResult.cause;
+      if (!configResult.ok || !ordersResult.ok) return null;
       return ordersResult.value;
     } finally {
       if (account === accountGeneration && refreshRequest === refreshGeneration) {

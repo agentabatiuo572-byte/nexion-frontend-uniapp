@@ -16,19 +16,24 @@
       <SubPageHeader back="/pages/team/team" :title="t.network.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 16px">
+        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" :style="errorStateStyle">
+          <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
+          <view role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text></view>
+        </view>
         <!-- Top metrics — filled stat tiles, no border (single visual difference) -->
         <view class="grid grid-cols-3" style="gap: 8px">
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.members }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ members.length }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-ink)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : members.length }}</text>
           </view>
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.activeNow }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ activeCount }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-brand)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : activeCount }}</text>
           </view>
           <view class="rounded-2xl text-center" :style="metricCardStyle">
             <text class="block" :style="metricLabelStyle">{{ t.network.direct }}</text>
-            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ directCount }}</text>
+            <text class="block font-display tabular-nums" :style="metricValueStyle('var(--v5-tech-cyan)')">{{ remoteApiEnabled && network.remoteStatus !== 'ready' ? '—' : directCount }}</text>
           </view>
         </view>
 
@@ -142,7 +147,7 @@
             </view>
             <view>
               <text class="block" :style="sheetStatLabelStyle">{{ t.network.allTime }}</text>
-              <text class="block font-display tabular-nums" :style="sheetStatValStyle('var(--v5-ink)')">${{ selected.totalVolumeUSD }}</text>
+              <text class="block font-display tabular-nums" :style="sheetStatValStyle('var(--v5-ink)')">{{ selected.totalVolumeUSD === null ? '—' : `$${selected.totalVolumeUSD}` }}</text>
             </view>
             <view>
               <text class="block" :style="sheetStatLabelStyle">{{ t.network.joined }}</text>
@@ -171,6 +176,7 @@ import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
 import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const VIEW = 360;
 const CENTER = VIEW / 2;
@@ -199,6 +205,7 @@ let pulseTimer: ReturnType<typeof setInterval> | null = null;
 
 // page-level interval (P-034): random active-member pulse every 1.2s
 onMounted(() => {
+  if (remoteApiEnabled) void network.refreshCanonicalNetwork();
   pulseTimer = setInterval(() => {
     const pool = members.value.filter((m) => m.status === "active");
     if (pool.length === 0) return;
@@ -251,6 +258,8 @@ function statusColor(status: MemberStatus): string {
 // ─── styles ───
 // Filled stat tile, no border (single visual difference).
 const metricCardStyle: CSSProperties = { background: "var(--v5-surface)", borderRadius: "16px", padding: "12px" };
+const errorStateStyle: CSSProperties = { padding: "14px", borderRadius: "14px", background: "var(--v5-warning-soft)", color: "var(--v5-ink)" };
+const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "grid", placeItems: "center", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)" };
 const metricLabelStyle: CSSProperties = { fontSize: "12px", color: "var(--v5-ink-3)" };
 function metricValueStyle(color: string): CSSProperties {
   return { fontSize: "20px", fontWeight: 600, marginTop: "4px", color };

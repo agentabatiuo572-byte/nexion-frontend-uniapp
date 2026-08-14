@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { commissionConfigApi, remoteApiEnabled } from "@/api/runtime";
+import { commissionConfigApi, remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
 import type { CanonicalBinaryState } from "@/api/commission-config-api";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -160,8 +160,14 @@ export const useCommission = defineStore("commission", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 的
   // rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
+  let bindingEpoch = 0;
   const events = ref<CommissionEvent[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
+
+  type RequestScope = { accountKey: string; epoch: number };
+  const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch });
+  const isCurrentScope = (scope: RequestScope): boolean =>
+    scope.accountKey === boundKey && scope.epoch === bindingEpoch;
 
   function persist() {
     if (remoteApiEnabled) return;
@@ -171,20 +177,29 @@ export const useCommission = defineStore("commission", () => {
   /** 账号切换重绑:装载该账号的佣金事件行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    bindingEpoch += 1;
     if (remoteApiEnabled) {
       binarySnapshot.value = null;
       events.value = [];
-      void refreshCanonicalBinary();
+      const scope = requestScope();
+      void Promise.allSettled([refreshCanonicalBinary(scope), refreshCanonicalEvents(scope)]);
       return;
     }
     events.value = hydrate(boundKey);
   }
 
-  async function refreshCanonicalBinary() {
+  async function refreshCanonicalBinary(scope = requestScope()) {
     if (!remoteApiEnabled) return;
-    binarySnapshot.value = null;
-    events.value = [];
-    binarySnapshot.value = await commissionConfigApi.binary();
+    const snapshot = await commissionConfigApi.binary();
+    if (!isCurrentScope(scope)) return;
+    binarySnapshot.value = snapshot;
+  }
+
+  async function refreshCanonicalEvents(scope = requestScope()) {
+    if (!remoteApiEnabled) return;
+    const snapshot = await teamInsightsApi.commissions();
+    if (!isCurrentScope(scope)) return;
+    events.value = snapshot.events;
   }
 
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {
@@ -262,7 +277,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, binarySnapshot, bindAccount, refreshCanonicalBinary,
+    events, binarySnapshot, bindAccount, refreshCanonicalBinary, refreshCanonicalEvents,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

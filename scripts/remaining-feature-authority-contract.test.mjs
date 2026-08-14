@@ -77,12 +77,15 @@ test("remote achievements render and claim server milestone facts instead of loc
   assert.match(page, /Local prototype achievements stay available only in mock mode[\s\S]{0,120}v-else/);
 });
 
-test("remote-only unsupported surfaces cannot fall back to Nova or globe mock facts", () => {
+test("remote Nova and globe consume their authenticated server authorities", () => {
   const chat = read("src/pages/support/chat.vue");
   const globe = read("src/pages/globe/globe.vue");
   assert.match(chat, /novaAiApi\.status/);
   assert.match(chat, /novaAiApi\.chat/);
   assert.match(globe, /remoteApiEnabled/);
-  assert.match(globe, /GLOBE_REGION_PROJECTION_HOLD/);
+  assert.match(globe, /networkRegionsApi\.list\(\)/);
+  assert.match(globe, /networkProjection\.value\?\.regions/);
+  assert.match(globe, /projectionStatus\.value = next\.regions\.length > 0 \? "ready" : "empty"/);
+  assert.doesNotMatch(globe, /GLOBE_REGION_PROJECTION_HOLD/);
   assert.match(globe, /const regions = computed/);
 });

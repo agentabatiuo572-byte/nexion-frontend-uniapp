@@ -150,7 +150,7 @@ ${priceSlices}
 export function build(deps) {
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
-          voucherDiscount, tradeinCredit, nowTick, reportStuckFunds } = deps;
+          voucherDiscount, tradeinCredit, tradein, remoteApiEnabled, nowTick, reportStuckFunds } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
@@ -252,6 +252,8 @@ function bench(opts) {
     product: { value: PRODUCT },
     voucherDiscount: { value: voucher },
     tradeinCredit: { value: tradein },
+    tradein: { appliedTradein: null },
+    remoteApiEnabled: false,
     nowTick: { value: clockAt },
   };
   const api = mod.build(deps);

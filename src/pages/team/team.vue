@@ -237,10 +237,9 @@ const directCountText = computed(() => {
   return String(byLayerBuckets.value[1].length);
 });
 const extendedCountText = computed(() => {
-  if (remoteApiEnabled) return "—";
   return String(([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0));
 });
-const totalMembersCountText = computed(() => remoteApiEnabled ? "—" : String(localTotalMembersCount.value));
+const totalMembersCountText = computed(() => remoteApiEnabled && network.remoteStatus !== "ready" ? "—" : String(localTotalMembersCount.value));
 
 // Commission month aggregates (30d) + direct/extended split.
 const ledger = computed(() => {
@@ -281,7 +280,7 @@ const binary = computed(() => {
   let L = 0, R = 0;
   for (const m of members.value) {
     if (m.binary === "left") L += m.monthVolumeUSD;
-    else R += m.monthVolumeUSD;
+    else if (m.binary === "right") R += m.monthVolumeUSD;
   }
   const match = Math.min(Math.min(L / 30, R / 30) * 0.1, 5000);
   return { binaryMatch: match, leftVol: L, rightVol: R };
@@ -309,9 +308,6 @@ function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
 }
 function openReferralNetwork() {
-  // Only the direct invite count is projected by H8 today. The drill-down is
-  // seeded demo data, so it is deliberately unavailable in a server session.
-  if (remoteApiEnabled) return;
   go("/pages/team/unilevel");
 }
 
@@ -321,6 +317,7 @@ onMounted(() => {
   if (remoteApiEnabled) {
     void vrank.refreshCanonicalVRank();
     void commission.refreshCanonicalBinary();
+    void network.refreshCanonicalNetwork();
     return;
   }
   commission.unlockMatured();

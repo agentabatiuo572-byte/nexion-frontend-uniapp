@@ -102,7 +102,7 @@ import { useBills, type Bill, type BillType, type BillStatus } from "@/store/bil
 import { useDeposits, CHAIN_NET_SHORT } from "@/store/deposits";
 import { mockServerNow } from "@/store/server-time";
 import { navTo } from "@/lib/route";
-import { fundsSandboxEnabled } from "@/api/runtime";
+import { fundsServerEnabled } from "@/api/runtime";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -112,10 +112,10 @@ const refreshError = ref("");
 const ledgerError = computed(() => refreshError.value || billsStore.serverError);
 
 onShow(async () => {
-  if (!fundsSandboxEnabled) return;
+  if (!fundsServerEnabled) return;
   refreshError.value = "";
   try {
-    await billsStore.refreshFundsSandboxLedger();
+    await billsStore.refreshServerLedger();
   } catch (cause) {
     refreshError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
   }
@@ -139,6 +139,7 @@ const TYPE_COLOR: Record<BillType, string> = {
   stake: "var(--v5-warning)",
   unstake: "var(--v5-ink-3)",
   achievement: "var(--v5-warning)",
+  other: "var(--v5-ink-3)",
 };
 function typeColor(type: BillType): string {
   return TYPE_COLOR[type];

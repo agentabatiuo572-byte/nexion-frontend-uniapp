@@ -174,6 +174,12 @@
             <text class="block" :style="tipBodyStyle">{{ t.proof.posterHint }}</text>
           </view>
         </view>
+
+        <canvas
+          canvas-id="proofPosterCanvas"
+          id="proofPosterCanvas"
+          :style="posterCanvasStyle"
+        />
       </view>
     </view>
   </AppChassis>
@@ -181,6 +187,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -207,6 +214,7 @@ const network = useNetwork();
 const faucet = useNexFaucet();
 
 const variant = ref<Variant>("earnings");
+const exportingPoster = ref(false);
 
 const earningsTotal = computed(() => app.earnings.total);
 const onlineDevices = computed(
@@ -276,26 +284,169 @@ function copyLink() {
 function copyShareText(networkName: string) {
   copyText(shareText.value, t.value.proof.sharedToast, `Open ${networkName} and paste`);
 }
-function downloadPng() {
-  toast.success(t.value.proof.downloadToast, "");
+const POSTER_WIDTH = 1080;
+const POSTER_HEIGHT = 1350;
+
+async function downloadPng() {
+  if (exportingPoster.value) return;
+  exportingPoster.value = true;
+  try {
+    await drawProofPoster();
+    const tempFilePath = await exportProofCanvas();
+    if (typeof document !== "undefined") downloadProofOnH5(tempFilePath);
+    else await saveProofToAlbum(tempFilePath);
+    toast.success(t.value.proof.downloadToast, "");
+  } catch {
+    toast.error(t.value.proof.downloadErrorToast);
+  } finally {
+    exportingPoster.value = false;
+  }
 }
 function copyText(data: string, title: string, desc = "") {
   uni.setClipboardData({ data, showToast: false, fail: () => {} });
   toast.success(title, desc);
 }
 
-// ── QR pattern (deterministic 7×7, visual cue only — not a real QR) ──
-const qrCells = computed<boolean[]>(() => {
-  const code = refCode.value;
-  const arr: boolean[] = [];
-  for (let i = 0; i < 49; i++) {
-    const c = code.charCodeAt(i % code.length) + i * 7;
-    arr.push(c % 2 === 0);
-  }
-  [0, 6, 42].forEach((idx) => (arr[idx] = true));
-  [1, 7, 43, 5, 13, 35].forEach((idx) => (arr[idx] = true));
-  return arr;
+// ── QR payload is the exact referral URL shown beside it. ──
+const qrCode = computed(() => {
+  const code = qrcode(0, "M");
+  code.addData(referralLink.value, "Byte");
+  code.make();
+  return code;
 });
+const qrModuleCount = computed(() => qrCode.value.getModuleCount());
+const qrCells = computed<boolean[]>(() => {
+  const modules: boolean[] = [];
+  for (let row = 0; row < qrModuleCount.value; row += 1) {
+    for (let col = 0; col < qrModuleCount.value; col += 1) modules.push(qrCode.value.isDark(row, col));
+  }
+  return modules;
+});
+
+function drawProofPoster(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const ctx = uni.createCanvasContext("proofPosterCanvas");
+      ctx.setFillStyle("#07101f");
+      ctx.fillRect(0, 0, POSTER_WIDTH, POSTER_HEIGHT);
+      ctx.setFillStyle("#b7ff3c");
+      ctx.fillRect(72, 72, 18, 76);
+      ctx.setFillStyle("#f7fbff");
+      ctx.setFontSize(54);
+      ctx.fillText("NexGrid", 116, 128);
+      ctx.setFillStyle("#9cabbd");
+      ctx.setFontSize(24);
+      ctx.fillText("PROOF OF CONTRIBUTION", 72, 204);
+
+      ctx.setFillStyle("#111d30");
+      ctx.fillRect(72, 254, 936, 948);
+      ctx.setFillStyle("#f7fbff");
+      ctx.setFontSize(46);
+      ctx.fillText(profileName.value.slice(0, 24), 124, 342);
+      ctx.setFillStyle("#9cabbd");
+      ctx.setFontSize(25);
+      ctx.fillText(memberSinceText.value, 124, 388);
+
+      ctx.setFillStyle("#b7ff3c");
+      ctx.setFontSize(26);
+      ctx.fillText(posterMetricLabel(), 124, 490);
+      ctx.setFillStyle("#f7fbff");
+      ctx.setFontSize(72);
+      ctx.fillText(posterMetricValue(), 124, 580);
+
+      ctx.setFillStyle("#9cabbd");
+      ctx.setFontSize(24);
+      ctx.fillText(`${t.value.proof.activeDays}: ${activeDays.value}`, 124, 660);
+      ctx.fillText(`${t.value.proof.devices}: ${onlineDevices.value}`, 124, 706);
+      ctx.fillText(`${t.value.proof.teamMembers}: ${totalMembers.value}`, 124, 752);
+
+      drawPosterQr(ctx, 634, 438, 300);
+      ctx.setFillStyle("#b7ff3c");
+      ctx.setFontSize(24);
+      ctx.fillText(t.value.proof.refCodeLabel, 124, 874);
+      ctx.setFillStyle("#f7fbff");
+      ctx.setFontSize(44);
+      ctx.fillText(refCode.value.slice(0, 32), 124, 930);
+      ctx.setFillStyle("#9cabbd");
+      ctx.setFontSize(22);
+      ctx.fillText(referralLink.value.slice(0, 68), 124, 986);
+      ctx.setFillStyle("#d9e4f2");
+      ctx.setFontSize(24);
+      ctx.fillText(t.value.proof.qrHint, 124, 1106);
+      ctx.draw(false, () => resolve());
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function posterMetricLabel(): string {
+  if (variant.value === "streak") return t.value.proof.longestStreak;
+  if (variant.value === "network") return t.value.proof.teamReach;
+  return t.value.proof.totalEarned;
+}
+
+function posterMetricValue(): string {
+  if (variant.value === "streak") return `${longestOrCurrent.value} ${t.value.proof.daysShort}`;
+  if (variant.value === "network") return String(totalMembers.value);
+  return `$${earningsTotal.value.toFixed(2)}`;
+}
+
+function drawPosterQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number) {
+  const quietModules = 4;
+  const count = qrModuleCount.value;
+  const moduleSize = Math.floor(size / (count + quietModules * 2));
+  const renderedSize = moduleSize * (count + quietModules * 2);
+  ctx.setFillStyle("#ffffff");
+  ctx.fillRect(x, y, renderedSize, renderedSize);
+  ctx.setFillStyle("#07101f");
+  for (let row = 0; row < count; row += 1) {
+    for (let col = 0; col < count; col += 1) {
+      if (qrCode.value.isDark(row, col)) {
+        ctx.fillRect(x + (col + quietModules) * moduleSize, y + (row + quietModules) * moduleSize, moduleSize, moduleSize);
+      }
+    }
+  }
+}
+
+function exportProofCanvas(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    uni.canvasToTempFilePath({
+      canvasId: "proofPosterCanvas",
+      width: POSTER_WIDTH,
+      height: POSTER_HEIGHT,
+      destWidth: POSTER_WIDTH,
+      destHeight: POSTER_HEIGHT,
+      fileType: "png",
+      quality: 1,
+      success: (result) => resolve(result.tempFilePath),
+      fail: reject,
+    });
+  });
+}
+
+function downloadProofOnH5(tempFilePath: string) {
+  const anchor = document.createElement("a");
+  anchor.href = tempFilePath;
+  anchor.download = `nexgrid-proof-${refCode.value || "member"}.png`;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function saveProofToAlbum(tempFilePath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const save = (uni as typeof uni & {
+      saveImageToPhotosAlbum?: (options: { filePath: string; success: () => void; fail: (error: unknown) => void }) => void;
+    }).saveImageToPhotosAlbum;
+    if (!save) {
+      reject(new Error("PROOF_IMAGE_SAVE_UNAVAILABLE"));
+      return;
+    }
+    save({ filePath: tempFilePath, success: resolve, fail: reject });
+  });
+}
 
 // ── destination icon SVG strings (lucide replacements, stroke=currentColor) ──
 const ICON = {
@@ -428,10 +579,24 @@ const refLinkStyle: CSSProperties = {
   color: "var(--v5-ink-3)",
 };
 const qrBoxStyle: CSSProperties = { width: "56px", height: "56px", borderRadius: "8px", background: "#ffffff" };
-const qrGridStyle: CSSProperties = { gridTemplateColumns: "repeat(7, 1fr)", gap: "1px", padding: "4px" };
+const qrGridStyle = computed<CSSProperties>(() => ({
+  width: "48px",
+  height: "48px",
+  gridTemplateColumns: `repeat(${qrModuleCount.value}, 1fr)`,
+  gridTemplateRows: `repeat(${qrModuleCount.value}, 1fr)`,
+  padding: "4px",
+}));
 function qrCellStyle(on: boolean): CSSProperties {
-  return { width: "4px", height: "4px", background: on ? "var(--v5-on-brand)" : "transparent" };
+  return { width: "100%", height: "100%", background: on ? "var(--v5-on-brand)" : "transparent" };
 }
+const posterCanvasStyle: CSSProperties = {
+  position: "fixed",
+  left: "-12000px",
+  top: "0",
+  width: `${POSTER_WIDTH}px`,
+  height: `${POSTER_HEIGHT}px`,
+  pointerEvents: "none",
+};
 const nativeBtnStyle: CSSProperties = { height: "48px", borderRadius: "999px", background: "var(--v5-brand)" };
 const nativeBtnTextStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-on-brand)" };
 const nativeHintStyle: CSSProperties = { marginTop: "6px", textAlign: "center", fontSize: "12px", color: "var(--v5-ink-3)" };

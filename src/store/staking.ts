@@ -145,7 +145,6 @@ export const useStaking = defineStore("staking", () => {
     } catch {
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
-      throw new Error(remoteError.value);
     }
   }
 

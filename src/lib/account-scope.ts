@@ -35,6 +35,7 @@ import { useRankSnapshot } from "@/store/rank-snapshot";
 import { bindEarningsReleaseAccount } from "@/store/earning-release";
 import { useReferralReward } from "@/store/referral-reward";
 import { useRepurchase } from "@/store/repurchase";
+import { useNetwork } from "@/store/network";
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -75,6 +76,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useQuest().bindAccount(accountKey);
   useWeeklyQuest().bindAccount(accountKey);
   useReferralReward().bindAccount(accountKey);
+  useNetwork().bindAccount(accountKey);
   useRepurchase().bindAccount();
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
   useEventQuest().bindAccount(accountKey);

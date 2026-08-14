@@ -593,6 +593,7 @@ export const useApp = defineStore("app", () => {
     const active = ["ACTIVE", "ONLINE", "BUSY"].includes(device.status);
     return {
       id: String(device.id),
+      rowVersion: device.rowVersion,
       kind: canonicalKind(device),
       name: device.name,
       gpu: device.gpuModel,
@@ -748,7 +749,6 @@ export const useApp = defineStore("app", () => {
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
       }
-      throw cause;
     }
   }
 

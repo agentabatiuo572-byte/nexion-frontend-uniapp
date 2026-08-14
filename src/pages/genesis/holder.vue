@@ -52,7 +52,7 @@
 
             <view :style="allocLineStyle">
               <text>{{ t.genesisHolder.pre.allocLabel }} </text>
-              <text class="tabular-nums" style="font-weight: 600; color: var(--v5-brand)">{{ allocText }} NEX</text>
+              <text class="tabular-nums" style="font-weight: 600; color: var(--v5-brand)">{{ allocText }}</text>
             </view>
 
             <view class="grid grid-cols-2" :style="heroStatGridStyle">
@@ -73,14 +73,14 @@
             <text class="block" :style="cardTitleStyle">{{ t.genesisHolder.pre.progressLabel }}</text>
             <view :style="progTrackStyle"><view :style="progFillStyle" /></view>
             <view class="flex items-center justify-between" :style="progMetaStyle">
-              <text>{{ t.genesisHolder.pre.progressStage }}</text>
-              <text>{{ t.genesisHolder.pre.progressUnlock }}</text>
+              <text>{{ progressStageText }}</text>
+              <text>{{ progressUnlockText }}</text>
             </view>
             <text class="block active:opacity-70" :style="howLinkStyle" @click="goHowItWorks">{{ t.genesisHolder.pre.howLink }}</text>
           </view>
 
           <!-- Points leaderboard -->
-          <view :style="cardStyle">
+          <view v-if="!remoteApiEnabled" :style="cardStyle">
             <view class="flex items-center justify-between" style="margin-bottom: 6px">
               <text :style="cardTitleStyle">{{ t.genesisHolder.pre.pointsLabel }}</text>
               <text :style="poolChipStyle">{{ poolText }}</text>
@@ -91,6 +91,10 @@
               <text class="tabular-nums" :style="rankPtsStyle">{{ r.pts }}</text>
             </view>
             <text class="block" :style="pointsNoteStyle">{{ t.genesisHolder.pre.pointsNote }}</text>
+          </view>
+          <view v-else :style="cardStyle">
+            <text class="block" :style="cardTitleStyle">{{ t.genesisHolder.pre.pointsLabel }}</text>
+            <text class="block" :style="pointsNoteStyle">{{ t.genesisHolder.pre.serverPointsUnavailable }}</text>
           </view>
         </template>
 
@@ -109,12 +113,12 @@
               <view class="flex-1 min-w-0" style="display: flex; flex-direction: column; gap: 10px">
                 <view>
                   <text class="block" :style="cellLabelStyle">{{ t.genesisHolder.post.released }}</text>
-                  <text class="block tabular-nums" :style="emitValStyle">{{ emittedText }} NEX</text>
-                  <text class="block tabular-nums" :style="refStyle">≈ {{ refUsdText }}</text>
+                  <text class="block tabular-nums" :style="emitValStyle">{{ emittedText }} {{ emissionUnit }}</text>
+                  <text v-if="!remoteApiEnabled" class="block tabular-nums" :style="refStyle">≈ {{ refUsdText }}</text>
                 </view>
                 <view>
                   <text class="block" :style="cellLabelStyle">{{ t.genesisHolder.post.locked }}</text>
-                  <text class="block tabular-nums" :style="lockValStyle">{{ lockedText }} NEX</text>
+                  <text class="block tabular-nums" :style="lockValStyle">{{ lockedText }} {{ emissionUnit }}</text>
                 </view>
               </view>
             </view>
@@ -128,6 +132,10 @@
               <text :style="feedLabelStyle">{{ t.genesisHolder.post.feedLabel }}</text>
             </view>
             <view :style="feedListStyle">
+              <view v-if="emissionFeed.length === 0" class="flex items-center" :style="feedRowStyle(true)">
+                <text class="flex-1 min-w-0" style="color: var(--v5-ink-3); font-size: 12px">{{ t.genesisHolder.post.noEmissions }}</text>
+                <text class="tabular-nums" :style="feedAmtStyle">—</text>
+              </view>
               <view v-for="(f, i) in emissionFeed" :key="i" class="flex items-center" :style="feedRowStyle(i === emissionFeed.length - 1)">
                 <text class="flex-1 min-w-0 truncate" style="color: var(--v5-ink); font-size: 12px">{{ f.label }}</text>
                 <text class="tabular-nums" :style="feedAmtStyle">{{ f.amt }}</text>
@@ -149,7 +157,7 @@
                 <view class="flex-1 min-w-0">
                   <text class="block" :style="holdingIdStyle">{{ h.id }}</text>
                   <text class="block font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 2px">{{ mintedText(h.mintedAt) }}</text>
-                  <text class="block font-mono-tabular" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ t.genesisHolder.holdingCard.allocation }} {{ h.allocText }}</text>
+                  <text class="block font-mono-tabular" style="margin-top: 6px; font-size: 12px; color: var(--v5-brand)">{{ holdingAmountLabel }} {{ h.allocText }}</text>
                 </view>
                 <view class="grid place-items-center active:opacity-70" :style="holdingLinkStyle" @click="goMarketplace">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
@@ -215,6 +223,7 @@ import { fmt } from "@/i18n/format";
 import { useGenesis, GENESIS_EMISSION } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const DAY = 86400_000;
 // mock 参考价：真后台提供平台 NEX 结算价（GET /api/market），此处仅用于「≈$」参考展示（非保证）。
@@ -246,22 +255,53 @@ const notHolderBodyText = computed(() =>
 );
 
 // ── 上所前：额度 + 优先级（mock，backend-replaceable）──
-const allocText = computed(() => genesis.reservedAllocationNEX().toLocaleString());
-const priorityText = computed(() => (owned.value >= 5 ? "Top 1%" : owned.value >= 2 ? "Top 3%" : "Top 5%"));
+const allocText = computed(() => remoteApiEnabled
+  ? t.value.genesisHolder.pre.serverVerified
+  : `${genesis.reservedAllocationNEX().toLocaleString()} NEX`);
+const priorityText = computed(() => remoteApiEnabled
+  ? t.value.genesisHolder.pre.serverVerified
+  : (owned.value >= 5 ? "Top 1%" : owned.value >= 2 ? "Top 3%" : "Top 5%"));
 const poolText = computed(() => fmt(t.value.genesisHolder.pre.pointsPool, { amount: "$250K" }));
 const leaderboard = computed(() => [
-  { rank: 1, who: "0x7a…f2", pts: "48,210", me: false },
-  { rank: 2, who: "crypto_lion", pts: "41,880", me: false },
-  { rank: 7, who: t.value.genesisHolder.pre.pointsYou, pts: "22,540", me: true },
+  { rank: 1, who: t.value.genesisHolder.pre.pointsYou, pts: String(Math.max(1, owned.value) * 1000), me: true },
 ]);
+const progressStageText = computed(() => remoteApiEnabled
+  ? `${genesis.soldSlots.toLocaleString()} / ${genesis.totalSlots.toLocaleString()}`
+  : t.value.genesisHolder.pre.progressStage);
+const progressUnlockText = computed(() => remoteApiEnabled
+  ? `${remaining.value.toLocaleString()} ${t.value.genesisHolder.pre.remainingUnit}`
+  : t.value.genesisHolder.pre.progressUnlock);
 
 // ── 上所后：排放快照（server-canonical mock）──
 const snap = computed(() => genesis.emissionSnapshot());
-const pctText = computed(() => Math.round(snap.value.pctReleased * 100));
-const emittedText = computed(() => Math.round(snap.value.emittedNEX).toLocaleString());
-const lockedText = computed(() => Math.round(snap.value.lockedNEX).toLocaleString());
+const remotePaidUsdt = computed(() => genesis.remoteEmissions
+  .filter((entry) => entry.status === "PAID")
+  .reduce((sum, entry) => sum + entry.amountUsdt, 0));
+const remotePendingUsdt = computed(() => genesis.remoteEmissions
+  .filter((entry) => entry.status === "PENDING")
+  .reduce((sum, entry) => sum + entry.amountUsdt, 0));
+const pctText = computed(() => {
+  if (!remoteApiEnabled) return Math.round(snap.value.pctReleased * 100);
+  const total = remotePaidUsdt.value + remotePendingUsdt.value;
+  return total > 0 ? Math.round((remotePaidUsdt.value / total) * 100) : 0;
+});
+const emittedText = computed(() => remoteApiEnabled
+  ? remotePaidUsdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  : Math.round(snap.value.emittedNEX).toLocaleString());
+const lockedText = computed(() => remoteApiEnabled
+  ? remotePendingUsdt.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
+  : Math.round(snap.value.lockedNEX).toLocaleString());
+const emissionUnit = computed(() => remoteApiEnabled ? "USDT" : "NEX");
 const refUsdText = computed(() => `$${Math.round(snap.value.emittedNEX * NEX_REF_USDT).toLocaleString()}`);
 const emissionFeed = computed(() => {
+  if (remoteApiEnabled) {
+    return genesis.remoteEmissions.map((entry) => ({
+      label: entry.paidAt
+        ? `${entry.batchNo} · ${new Date(entry.paidAt).toLocaleDateString()}`
+        : `${entry.batchNo} · ${entry.status}`,
+      amt: `+${entry.amountUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`,
+    }));
+  }
   const daily = Math.max(1, Math.round((snap.value.emittedNEX * 0.008) || 142));
   return [
     { label: t.value.genesisHolder.post.feedToday, amt: `+${daily.toLocaleString()} NEX` },
@@ -271,11 +311,17 @@ const emissionFeed = computed(() => {
 });
 
 // Holdings list — 席位 + 铸造日 + 预留额度（无排放数字）。
-const holdings = computed(() => {
+const holdings = computed(() => remoteApiEnabled ? genesis.remoteHoldings.slice(0, 6).map((holding) => ({
+  id: holding.holdingNo,
+  mintedAt: holding.acquiredAt,
+  allocText: `$${holding.acquiredPriceUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })} USDT`,
+})) : mockHoldings());
+
+function mockHoldings(): Array<{ id: string; mintedAt: number; allocText: string }> {
   const list: Array<{ id: string; mintedAt: number; allocText: string }> = [];
   const count = Math.min(owned.value, 6);
   for (let i = 0; i < count; i++) {
-    const serial = 4192 - i * 137;
+    const serial = genesis.ownedTokenIds[i] ?? i + 1;
     list.push({
       id: `NEX-GEN-${serial.toString().padStart(4, "0")}`,
       mintedAt: Date.now() - (142 - i * 18) * DAY,
@@ -283,7 +329,10 @@ const holdings = computed(() => {
     });
   }
   return list;
-});
+}
+const holdingAmountLabel = computed(() => remoteApiEnabled
+  ? t.value.genesisHolder.holdingCard.acquiredPrice
+  : t.value.genesisHolder.holdingCard.allocation);
 
 function mintedText(ms: number): string {
   return fmt(t.value.genesisHolder.holdingCard.mintedOn, { date: new Date(ms).toLocaleDateString() });
@@ -389,12 +438,12 @@ const progTrackStyle: CSSProperties = {
   background: "color-mix(in srgb, var(--v5-surface-2) 70%, transparent)",
   overflow: "hidden",
 };
-const progFillStyle: CSSProperties = {
+const progFillStyle = computed<CSSProperties>(() => ({
   height: "100%",
-  width: "62%",
+  width: `${Math.max(0, Math.min(100, genesis.totalSlots > 0 ? (genesis.soldSlots / genesis.totalSlots) * 100 : 0))}%`,
   borderRadius: "99px",
   background: "linear-gradient(90deg, var(--v5-brand-2), var(--v5-brand))",
-};
+}));
 const progMetaStyle: CSSProperties = {
   marginTop: "8px",
   fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
