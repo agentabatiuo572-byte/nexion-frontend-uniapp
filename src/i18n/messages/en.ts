@@ -2691,6 +2691,10 @@ export const en = {
     deleteAccountPending: "The server has accepted this deletion request and it is under review. Do not submit it again.",
     deleteAccountConfirm:
       "Submit a NexGrid account deletion request?\n\nYou will be signed out; the server request remains the source of truth for completion.",
+    deleteAccountForfeitBalance: "Balance {balance} — will NOT be refunded",
+    deleteAccountForfeitPrincipal: "Staked principal {principal} — will NOT be refunded (including terms not yet matured)",
+    deleteAccountForfeitLead: "Submitting this request forfeits, permanently:",
+    deleteAccountBlockedByWithdrawal: "A withdrawal is still in progress. Wait until it completes or fails, then submit the deletion request.",
     deleteAccountToast: "Deletion request submitted — you've been signed out",
     deleteAccountUnavailable: "Account deletion is not available yet. We will not report success before the server confirms it.",
   },
