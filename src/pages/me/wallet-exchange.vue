@@ -230,6 +230,7 @@ async function syncRemoteState() {
 async function cancelRemoteOrder(exchangeNo: string) {
   if (!remoteApiEnabled) return;
   try {
+    // IDEMPOTENCY-FRESH-OK: 撤销的目标由 exchangeNo 唯一指定,重放 = 再撤一次同一笔 = 空操作,不会多撤别的。
     remoteState.value = await exchangeApi.cancel(exchangeNo, `G2-CANCEL-${exchangeNo}-${Date.now().toString(36)}`);
     remoteError.value = null;
   } catch {

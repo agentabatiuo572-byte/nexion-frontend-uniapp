@@ -90,7 +90,12 @@ const LEDGER = {
   // 可达性由行为门 `selfcheck-withdraw-nex-refund.mjs` 在 **remote 模式**下实证。
   // 「有生产者」≠「跑得到」这条仍然成立:静态门守不了可达性,那一半归那道行为门。
   withdraw: ["NEX+", "NEX-", "USDT-"],
-  purchase: ["USDT-×5"],
+  // 🔴 2026-08-13 从 5 → 6 + 一条 USDT+:创世购买半屏恢复了 mock 模式下的「扣款⊗记账 +
+  //   铸造失败冲正」(8-10 转服务端权威时整段被删,而 mock 没有服务端 ⇒ 节点白送)。
+  //   多出来的两个生产者就是那一对:主行 `amount: -cost`、冲正行 `amount: +cost`(同为
+  //   type=purchase,ref 加 `-REV` 后缀分开,否则 addOnce 会把冲正误判成重复)。
+  //   远端模式下这两条一行都不走 —— 但静态门数的是**生产者**不是执行次数,照数。
+  purchase: ["USDT-×6", "USDT+"],
   // KYC 机制已于包 E 整体删除(pkg/e-kyc-rm),不再有任何生产者;
   // 渲染分支 + `(legacy)` 文案保留,只为显示用户盘上的历史行。
   verification: [],

@@ -236,7 +236,7 @@ export const useBills = defineStore("bills", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
       }
-      throw cause;
+      // 权威不可达是常态输入,不 reject(resilience 门);页面横幅走 serverError 双源。
     }
   }
 
@@ -248,11 +248,7 @@ export const useBills = defineStore("bills", () => {
       bills.value = [];
       serverStatus.value = fundsSandboxEnabled ? "idle" : "error";
       serverError.value = fundsSandboxEnabled ? "" : "FUNDS_BILLS_PROVIDER_NOT_CONFIGURED";
-      if (fundsSandboxEnabled) void refreshFundsSandboxLedger().catch((cause) => {
-        if (expectedAccountKey === boundKey && !serverError.value) {
-          serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
-        }
-      });
+      if (fundsSandboxEnabled) void refreshFundsSandboxLedger(); // 自吞降级;serverError 由缝内落好
       return;
     }
     bills.value = hydrate(boundKey);

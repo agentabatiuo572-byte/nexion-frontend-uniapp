@@ -666,6 +666,9 @@ export const useApp = defineStore("app", () => {
       proofNonce: task.proofNonce, proofExpiresAt: task.proofExpiresAt });
   }
 
+  // IDEMPOTENCY-FRESH-OK: 按分钟分桶:同一分钟内重试复用同一把。
+  // ⚠️ 已知上限:超过 60s 再重试就是新键。任务领取/完成走的是服务端权威状态机(claim 已被别人
+  //    领走会被拒),所以窗口内不会重复发奖;真要收紧应改成「按 taskNo 冻结」而不是按时间分桶。
   function taskMutationKey(scope: string): string {
     return `e18:${scope}:${Math.floor(Date.now() / 60000)}`;
   }
@@ -698,8 +701,10 @@ export const useApp = defineStore("app", () => {
     }
   }
 
-  async function refreshRemoteFleet(): Promise<void> {
-    if (!remoteApiEnabled) return;
+  // 权威不可达是常态输入,不 reject(selfcheck-remote-refresh-resilience);
+  // 失败信号走返回值:false = 本轮没拿到权威快照(降级态已落好)。
+  async function refreshRemoteFleet(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
     const expectedAccountKey = accountKey.value;
     remoteFleetStatus.value = "loading";
     remoteFleetError.value = "";
@@ -730,6 +735,7 @@ export const useApp = defineStore("app", () => {
         history: [],
       };
       remoteFleetStatus.value = "ready";
+      return true;
     } catch (cause) {
       if (expectedAccountKey === accountKey.value) {
         devices.value = [];
@@ -748,7 +754,7 @@ export const useApp = defineStore("app", () => {
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
       }
-      throw cause;
+      return false;
     }
   }
 
@@ -767,11 +773,7 @@ export const useApp = defineStore("app", () => {
       fundsSandboxStatus.value = fundsSandboxEnabled ? "idle" : "ready";
       fundsSandboxError.value = "";
       fundsSandboxEvidence.value = null;
-      void refreshRemoteFleet().catch((cause) => {
-        if (key === accountKey.value && !remoteFleetError.value) {
-          remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
-        }
-      });
+      void refreshRemoteFleet(); // 自吞降级(resilience 门);error 态由缝内落好
       if (fundsSandboxEnabled) void refreshFundsSandboxForAccount(key);
       return;
     }

@@ -62,6 +62,9 @@
             <view :style="toggleThumbStyle" />
           </view>
         </view>
+        <view v-if="remoteApiEnabled" :style="pwdFormStyle">
+          <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
+        </view>
       </view>
       <text class="block mx-4" :style="footerStyle">{{ t.security.twoFactorHint }}</text>
 
@@ -80,7 +83,7 @@
           </view>
           <view class="flex-1 min-w-0">
             <text class="block truncate" :style="rowLabelStyle">{{ sessionDeviceLabel(s) }}</text>
-            <text class="block truncate" :style="rowSubStyle">{{ t.security.sessionLocation }} · {{ lastActiveLabel(s.lastActiveMs) }}</text>
+            <text class="block truncate" :style="rowSubStyle">{{ sessionSecondaryLabel(s) }}</text>
           </view>
           <text v-if="s.current" :style="currentBadgeStyle">{{ t.security.sessionCurrent }}</text>
           <view v-else class="grid place-items-center active:opacity-70" :style="revokeBtnStyle" @click="handleRevoke(s)">
@@ -95,7 +98,7 @@
 
       <!-- ───── Danger zone ───── -->
       <view class="mx-4" :style="[cardStyle, groupGap]">
-        <view class="flex items-center active:opacity-90" :style="rowStyle" @click="handleDeleteAccount">
+        <view class="flex items-center" :class="deletionPending ? '' : 'active:opacity-90'" :style="rowStyle" @click="handleDeleteAccount">
           <view class="grid place-items-center shrink-0" :style="iconBox('var(--v5-danger-soft)')">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--v5-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
           </view>
@@ -103,8 +106,11 @@
             <text class="block" :style="dangerLabelStyle">{{ t.security.deleteAccount }}</text>
           </view>
         </view>
+        <view v-if="remoteApiEnabled && !deletionPending" :style="pwdFormStyle">
+          <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
+        </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
   </AppChassis>
 </template>
@@ -123,6 +129,9 @@ import { useApp } from "@/store/app";
 import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
+import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
+import type { SecurityState } from "@/api/contracts";
+import type { AccountDeletionStatus } from "@/api/account-api";
 
 
 const t = useT();
@@ -135,14 +144,37 @@ onLoad((options) => {
     retiredFlow.value = true;
     toast.info(t.value.topupChrome.flowRetired);
   }
+  if (remoteApiEnabled) void loadRemoteSecurity();
 });
 const security = useSecurity();
 const auth = useAuth();
 const app = useApp();
 const session = useSession();
 
-const twoFactorEnabled = computed(() => security.twoFactorEnabled);
-const sessions = computed(() => session.activeSessions);
+const remoteSecurity = ref<SecurityState | null>(null);
+const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
+const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
+  && deletionStatus.value.status !== "CANCELLED"
+  && deletionStatus.value.status !== "COMPLETED");
+const securityBusy = ref(false);
+const twoFactorPassword = ref("");
+const deletionPassword = ref("");
+const deletionCommandKey = ref("");
+const twoFactorEnabled = computed(() => remoteApiEnabled
+  ? remoteSecurity.value?.twoFactorEnabled === true
+  : security.twoFactorEnabled);
+const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
+  ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
+      id: item.id,
+      deviceName: item.deviceName,
+      device: item.deviceName,
+      location: item.ipMasked,
+      ip: item.ipMasked,
+      lastActiveMs: Date.parse(item.lastActiveAt),
+      current: item.current,
+      entrySurface: "h5",
+    }))
+  : session.activeSessions);
 const hasOtherSessions = computed(() => sessions.value.some((s) => !s.current));
 
 const editingPwd = ref(false);
@@ -152,8 +184,25 @@ const confirmPwd = ref("");
 const err = ref("");
 
 const passwordHintLine = computed(() =>
-  t.value.security.passwordHint.replace("{when}", relativeWhen(security.passwordChangedAt)),
+  t.value.security.passwordHint.replace("{when}", relativeWhen(
+    remoteApiEnabled
+      ? Date.parse(remoteSecurity.value?.passwordChangedAt ?? "")
+      : security.passwordChangedAt,
+  )),
 );
+
+async function loadRemoteSecurity(): Promise<void> {
+  try {
+    const [securityState, accountDeletion] = await Promise.all([
+      accountApi.securityOverview(),
+      accountApi.accountDeletionStatus(),
+    ]);
+    remoteSecurity.value = securityState;
+    deletionStatus.value = accountDeletion;
+  } catch (cause) {
+    err.value = cause instanceof Error ? cause.message : "SECURITY_OVERVIEW_UNAVAILABLE";
+  }
+}
 
 function detailVal(e: Event): string {
   return (e as unknown as { detail: { value: string } }).detail.value;
@@ -166,6 +215,12 @@ function onNext(e: Event) {
 }
 function onConfirmPwd(e: Event) {
   confirmPwd.value = detailVal(e);
+}
+function onTwoFactorPassword(e: Event) {
+  twoFactorPassword.value = detailVal(e);
+}
+function onDeletionPassword(e: Event) {
+  deletionPassword.value = detailVal(e);
 }
 
 function deviceIconKind(label: string): "phone" | "tablet" | "monitor" {
@@ -181,7 +236,12 @@ function surfaceLabel(s: SessionListItem): string {
 }
 
 function sessionDeviceLabel(s: SessionListItem): string {
-  return `${s.deviceName} · ${surfaceLabel(s)}`;
+  return remoteApiEnabled ? s.deviceName : `${s.deviceName} · ${surfaceLabel(s)}`;
+}
+
+function sessionSecondaryLabel(s: SessionListItem): string {
+  const location = remoteApiEnabled ? s.ip : t.value.security.sessionLocation;
+  return `${location} · ${lastActiveLabel(s.lastActiveMs)}`;
 }
 
 function lastActiveLabel(ms: number): string {
@@ -193,6 +253,7 @@ function lastActiveLabel(ms: number): string {
 }
 
 function relativeWhen(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "—";
   const days = Math.floor((Date.now() - ms) / (24 * 3600 * 1000));
   if (days < 1) return t.value.security.timeToday;
   if (days < 30) return fmt(t.value.security.timeDaysAgo, { n: days });
@@ -208,8 +269,13 @@ function cancelPwd() {
   confirmPwd.value = "";
 }
 
-function submitPasswordChange() {
+async function submitPasswordChange() {
+  if (securityBusy.value) return;
   err.value = "";
+  if (!current.value) {
+    err.value = t.value.login.errorInvalidPassword;
+    return;
+  }
   if (!isPasswordOk(next.value)) {
     err.value = t.value.security.passwordShort;
     return;
@@ -218,7 +284,20 @@ function submitPasswordChange() {
     err.value = t.value.security.passwordMismatch;
     return;
   }
-  security.changePassword(next.value);
+  securityBusy.value = true;
+  try {
+    if (remoteApiEnabled) {
+      await accountApi.changePassword(current.value, next.value);
+      await loadRemoteSecurity();
+    } else {
+      security.changePassword(next.value);
+    }
+  } catch (cause) {
+    err.value = cause instanceof Error ? cause.message : "SECURITY_PASSWORD_UPDATE_FAILED";
+    securityBusy.value = false;
+    return;
+  }
+  securityBusy.value = false;
   current.value = "";
   next.value = "";
   confirmPwd.value = "";
@@ -227,6 +306,11 @@ function submitPasswordChange() {
 }
 
 async function toggleTwoFactor(value: boolean) {
+  if (securityBusy.value) return;
+  if (remoteApiEnabled && !twoFactorPassword.value) {
+    err.value = t.value.login.errorInvalidPassword;
+    return;
+  }
   if (!value && twoFactorEnabled.value) {
     const ok = await uiConfirm({
       title: t.value.security.twoFactorDisable,
@@ -235,12 +319,34 @@ async function toggleTwoFactor(value: boolean) {
       confirmLabel: t.value.security.twoFactorDisable,
     });
     if (ok) {
-      security.setTwoFactor(false);
-      toast.warn(t.value.security.twoFactorDisabledToast);
+      securityBusy.value = true;
+      try {
+        if (remoteApiEnabled) {
+          await accountApi.updateTwoFactor(false, twoFactorPassword.value);
+          await loadRemoteSecurity();
+          twoFactorPassword.value = "";
+        } else security.setTwoFactor(false);
+        toast.warn(t.value.security.twoFactorDisabledToast);
+      } catch (cause) {
+        err.value = cause instanceof Error ? cause.message : "SECURITY_TWO_FACTOR_UPDATE_FAILED";
+      } finally {
+        securityBusy.value = false;
+      }
     }
   } else if (value && !twoFactorEnabled.value) {
-    security.setTwoFactor(true);
-    toast.success(t.value.security.twoFactorEnabledToast);
+    securityBusy.value = true;
+    try {
+      if (remoteApiEnabled) {
+        await accountApi.updateTwoFactor(true, twoFactorPassword.value);
+        await loadRemoteSecurity();
+        twoFactorPassword.value = "";
+      } else security.setTwoFactor(true);
+      toast.success(t.value.security.twoFactorEnabledToast);
+    } catch (cause) {
+      err.value = cause instanceof Error ? cause.message : "SECURITY_TWO_FACTOR_UPDATE_FAILED";
+    } finally {
+      securityBusy.value = false;
+    }
   }
 }
 
@@ -251,8 +357,15 @@ async function handleRevoke(s: SessionListItem) {
     danger: true,
   });
   if (ok) {
-    session.revokeSession(s.id);
-    toast.success(t.value.security.sessionRevoked);
+    try {
+      if (remoteApiEnabled) {
+        await accountApi.revokeSession(s.id);
+        await loadRemoteSecurity();
+      } else session.revokeSession(s.id);
+      toast.success(t.value.security.sessionRevoked);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSION_REVOKE_FAILED");
+    }
   }
 }
 
@@ -264,12 +377,27 @@ async function handleRevokeAll() {
     danger: true,
   });
   if (ok) {
-    session.revokeAllOtherSessions();
-    toast.success(t.value.security.revokeAllDone);
+    try {
+      if (remoteApiEnabled) {
+        await accountApi.revokeOtherSessions();
+        await loadRemoteSecurity();
+      } else session.revokeAllOtherSessions();
+      toast.success(t.value.security.revokeAllDone);
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSIONS_REVOKE_FAILED");
+    }
   }
 }
 
 async function handleDeleteAccount() {
+  if (deletionPending.value) {
+    toast.info(t.value.security.deleteAccountPending);
+    return;
+  }
+  if (remoteApiEnabled && !deletionPassword.value) {
+    toast.error(t.value.login.errorInvalidPassword);
+    return;
+  }
   const ok = await uiConfirm({
     title: t.value.security.deleteAccount,
     message: t.value.security.deleteAccountConfirm,
@@ -277,7 +405,25 @@ async function handleDeleteAccount() {
     confirmLabel: t.value.security.deleteAccount,
   });
   if (ok) {
-    toast.success(t.value.security.deleteAccountToast);
+    if (remoteApiEnabled) {
+      securityBusy.value = true;
+      if (!deletionCommandKey.value) {
+        deletionCommandKey.value = `app-security:account-deletion:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+      }
+      try {
+        const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
+        toast.success(t.value.security.deleteAccountToast, request.requestNo);
+        deletionCommandKey.value = "";
+        await authApi.logout();
+      } catch (cause) {
+        toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_REQUEST_FAILED");
+        securityBusy.value = false;
+        return;
+      }
+      securityBusy.value = false;
+    } else {
+      toast.success(t.value.security.deleteAccountToast);
+    }
     app.interruptAllTasks("logged-out");
     session.signOutSession();
     auth.signOut();

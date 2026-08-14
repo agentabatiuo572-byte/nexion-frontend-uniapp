@@ -148,9 +148,16 @@ if (!paySlice.includes("freeTrial.convert()")) die("checkout.vue 结算切片里
 const assembled = `
 ${priceSlices}
 export function build(deps) {
+  // 2026-08-13 补两个桩:netPrice 切片里读了 remoteApiEnabled 与 tradein.appliedTradein,
+  //   少任何一个,注入执行直接 ReferenceError —— 整道门崩掉、一格判据都没跑到
+  //   (verify 里表现成「门失败」,极易被读成判据判红)。
+  //   注意 tradein 与既有的 tradeinCredit 不是一回事:前者是 tradein store(带服务端
+  //   权威报价),后者是本地折抵金额;同名近形,漏掉一个就静默少测一条分支。
+  //   本段活在**模板字符串里**,注释里别用反引号 —— 会把模板提前闭合(实测栽过一次)。
   const { computed, resolveTrialAt, accruedShadow, mockServerNow, cardFeeUsd,
           toast, t, fmt, app, freeTrial, trialCfg, productId, product,
-          voucherDiscount, tradeinCredit, nowTick, reportStuckFunds } = deps;
+          voucherDiscount, tradeinCredit, nowTick, reportStuckFunds,
+          remoteApiEnabled, tradein } = deps;
 ${ifaceSlice}
 ${noTrialSlice}
 ${quoteFnSlice}
@@ -247,6 +254,12 @@ function bench(opts) {
         return true;
       },
     },
+    // 本 harness 验的是**本地报价链**;服务端权威抵扣报价(canonicalQuote)另有契约覆盖。
+    // 钉成「没有服务端」让 netPrice 走本地那一支,与本门其余固定靶同一前提。
+    // ⚠️ 这里的 `tradein` 是 tradein **store**,与下面 `tradeinCredit: { value: tradein }`
+    //   里那个同名的**数字**折抵额不是一回事(后者是 bench 的 opts 参数)。
+    remoteApiEnabled: false,
+    tradein: { appliedTradein: null, state: { kind: "none" } },
     trialCfg: { value: CFG },
     productId: { value: productId },
     product: { value: PRODUCT },

@@ -248,7 +248,7 @@ import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
 import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT, qrDotMatrix } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
-import { fundsSandboxEnabled } from "@/api/runtime";
+import { fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
 
 const t = useT();
@@ -275,6 +275,15 @@ const paneView = computed<PaneView>(() => {
 
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
+  if (remoteApiEnabled && !fundsSandboxEnabled) {
+    // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
+    //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
+    //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
+    //   充值页的报错横幅会**静默变哑** —— 改缝必须连消费方一起改,这就是那一半。
+    void dep.refreshRemoteVietQrDeposits().then(() => {
+      if (dep.serverStatus === "error" && dep.serverError) createError.value = dep.serverError;
+    });
+  }
   const resume = dep.intents.find((i) => i.status === "awaiting_payment" || i.status === "mismatch_review");
   if (resume) viewIntentId.value = resume.intentId;
 });
@@ -331,7 +340,9 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
   await runRecoverableFundsOperation(async () => {
       const it = fundsSandboxEnabled
         ? await dep.createSandboxBankIntent(usdt, expectedAccountKey)
-        : dep.createBankIntent(usdt);
+        : remoteApiEnabled
+          ? await dep.createRemoteBankIntent(usdt, expectedAccountKey)
+          : dep.createBankIntent(usdt);
       if (!it) throw new Error(t.value.fx.updating);
       return it;
     }, {
@@ -426,7 +437,9 @@ async function askCancel() {
     icon: "warn",
   });
   if (!ok) return;
-  const r = dep.cancelBankIntent(it.intentId);
+  const r = remoteApiEnabled
+    ? await dep.cancelRemoteBankIntent(it.intentId)
+    : dep.cancelBankIntent(it.intentId);
   if (r.ok) {
     toast.success(t.value.bankPane.cancelledToast);
     viewIntentId.value = null;

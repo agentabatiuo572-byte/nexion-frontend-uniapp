@@ -133,8 +133,9 @@ export const useStaking = defineStore("staking", () => {
     remoteReady.value = true;
   }
 
-  async function syncRemote() {
-    if (!remoteApiEnabled) return;
+  // 权威不可达是常态输入,不 reject(resilience 门);失败信号走返回值/remoteError。
+  async function syncRemote(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
     try {
       const [nextPools, snapshot] = await Promise.all([
         stakingApi.fetchStakingPools(),
@@ -142,10 +143,11 @@ export const useStaking = defineStore("staking", () => {
       ]);
       pools.value = nextPools;
       applyRemoteSnapshot(snapshot);
+      return true;
     } catch {
       clearRemoteState();
       remoteError.value = "G1_REMOTE_AUTHORITY_UNAVAILABLE";
-      throw new Error(remoteError.value);
+      return false;
     }
   }
 
@@ -239,7 +241,7 @@ export const useStaking = defineStore("staking", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       clearRemoteState();
-      void syncRemote().catch(() => undefined);
+      void syncRemote();
       return;
     }
     const row = hydrate(boundKey);

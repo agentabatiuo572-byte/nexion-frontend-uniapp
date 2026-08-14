@@ -82,6 +82,21 @@ export function isPasswordOk(
   return validatePassword(password, context).ok;
 }
 
+// Password recovery is a higher-risk unauthenticated mutation. Keep its
+// client-side gate aligned with the server reset policy; the server remains
+// authoritative and also rejects the current password and blocked accounts.
+export function isResetPasswordOk(
+  password: string,
+  context: { phone?: string } = {},
+): boolean {
+  if (password.length < 12 || password.length > PASSWORD_MAX_LENGTH) return false;
+  if (!/[a-z]/.test(password) || !/[A-Z]/.test(password)
+      || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) return false;
+  if (WEAK_DICTIONARY.has(password.toLowerCase())) return false;
+  const phone = context.phone?.replace(/\s+/g, "");
+  return !(phone && phone.length >= 6 && password.includes(phone));
+}
+
 // Strength scoring for the UI hint bar — purely advisory, never gates submit.
 // The validatePassword() result determines whether submission is allowed.
 export function passwordStrength(password: string): PasswordStrength {

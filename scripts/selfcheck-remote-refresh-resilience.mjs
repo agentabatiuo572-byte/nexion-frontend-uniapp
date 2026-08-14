@@ -115,7 +115,17 @@ async function loadEntry(contents) {
   const out = await build({
     stdin: { contents, resolveDir: root, loader: "ts" },
     bundle: true, write: false, format: "esm", platform: "neutral",
-    define: { "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"' },
+    // 🔴 z6:runtime-config.ts 在**模块加载期**读 import.meta.env.VITE_*(free-trial 的模块图
+    //    把它拉进来,实测载入即 TypeError)—— 那是 harness 缺陷不是缝缺陷:真栈里 Vite 会
+    //    define 全部 env 键。三个已知键给靶态值;再兜一个 "import.meta.env": "{}"
+    //    (esbuild 最长匹配优先),未来新增的 env 键读到 undefined 而不是崩。
+    define: {
+      "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"',
+      "import.meta.env.VITE_NEXGRID_API_MODE": '"remote"',
+      "import.meta.env.VITE_NEXGRID_API_BASE_URL": '"http://unreachable.invalid"',
+      "import.meta.env.VITE_NEXGRID_API_DEV_BASE_URL": '""',
+      "import.meta.env": "{}",
+    },
     plugins: [{
       name: "stubs",
       setup(b) {
@@ -139,7 +149,18 @@ async function loadEntry(contents) {
 // 目前全部 16 条都能从门外触发到(直调导出或经 bindAccount),故为空。
 // 将来确有触发不到的缝,在此登记 `"file#fn": "为什么门外触发不到"`;
 // 登记了却其实能触发的(陈旧登记)由下面的 stale 断言顶回来 —— 登记表本身也要被守。
-const UNREACHABLE = {};
+// 登记「本探针跑不到」的缝 + 原因。空表是常态;每加一条都是覆盖面的账,必须写清为什么。
+const UNREACHABLE = {
+  // 🔴 这条不是「缝够不到」,是**harness 自己的覆盖缺口**,别读成前者:
+  //   上面的 throwingRuntimeStub 只给 remoteApiEnabled / apiRuntimeConfig 特判,
+  //   其余导出**一律做成 Proxy** —— 而 Proxy 是 truthy。于是 `fundsSandboxEnabled`
+  //   在探针里恒为真,本缝首行 `if (fundsSandboxEnabled) return;` 永远早退。
+  //   真正的修法是探针把这类开关跑两遍(true / false 各一轮)再取并集,
+  //   而不是把某个开关钉死成 false —— 钉死只会把缺口挪到 refreshFundsSandboxDeposits 身上。
+  //   已单独立卡。在那之前如实登记,不假装覆盖到了。
+  "src/store/deposits.ts#refreshRemoteVietQrDeposits":
+    "harness 缺口:探针里 fundsSandboxEnabled 是 truthy 的 Proxy,本缝首行即早退。需探针按开关跑两遍才能覆盖。",
+};
 globalThis.__z1ApiCalls = 0;
 let exercised = 0;
 const notExercised = [];
@@ -147,19 +168,27 @@ for (const t of uniq) {
   const key = `${t.file}#${t.fn}`;
   const modName = t.file.replace(/^src\//, "@/").replace(/\.ts$/, "");
   const before = globalThis.__z1ApiCalls;
+  let resolved;
   try {
     const mod = await loadEntry(`export * from "${modName}";`);
     // 直调导出的刷新函数(若导出);否则触发 use store + bindAccount(常见 void 调用点)。
     if (typeof mod[t.fn] === "function") {
-      await mod[t.fn]();
+      resolved = await mod[t.fn]();
     } else {
       const useName = Object.keys(mod).find((k) => k.startsWith("use"));
       const store = useName ? mod[useName]() : null;
-      if (store && typeof store[t.fn] === "function") await store[t.fn]();
+      if (store && typeof store[t.fn] === "function") resolved = await store[t.fn]();
       else if (store && typeof store.bindAccount === "function") store.bindAccount("resilience-probe@nexgrid.test");
     }
   } catch (err) {
     check(`${key} await 后 resolve(权威不可达不许 reject 冒泡)`, false, String(err?.message ?? err).slice(0, 160));
+    continue;
+  }
+  // 🔴 z6 审计 F5:靶态=API 全抛,返回 boolean 的缝此时 resolve true = 谎报成功——
+  //    staking.vue 一类「.then(ok => !ok && toast)」的返回值消费者会被静默哄哑。
+  //    boolean 缝在靶态下必须 false;非 boolean(void)缝不在此断言内。
+  if (typeof resolved === "boolean" && resolved !== false) {
+    check(`${key} 靶态下 boolean 返回值必须 false(不许谎报成功)`, false, `resolved ${resolved}`);
     continue;
   }
   // 让 fire-and-forget 的调用有机会发出去
@@ -177,7 +206,24 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
   exercised + notExercised.length === uniq.length);
 // 🔴 基数台账(z1 R2 对抗审计 P1-25):`>= N` 下限守不住删除向 —— 从 16 退化到 3 也判绿。
 // 缝数变化必须有人来改这个数,顺带逼他确认新增/删除的那条缝该不该有门。
-const EXPECTED_SEAMS = 16;
+// 2026-08-13 z6:16 → 27。新增 11 条系 z1 R2 扫描面三族扩收(带参 void / 成员调用 /
+// 箭头函数)后进来的**既有缝**;27 条逐一回源确认(app×2 / bills / cards / commission /
+// conversations / daily-powerup / deposits / earn-config / event-quest×3 / free-trial /
+// genesis / nex-faucet / notifications / payout-address / quest / referral-reward /
+// repurchase / risk-disclosure / staking / tickets / v-rank / voucher×2 / weekly-quest),
+// 全部是「remote 开 + void 触发」的远端读缝,不变量适用全体,无一例外。
+// ⚠️ 已知扫描盲区(z6 审计 F2/F3 修订):真正的盲区是**跨文件的声明/调用对**(.vue 或 .ts
+//    都算)+ **无 void 关键字的裸调用**(定时器/事件回调里 `() => x.f()`)+ **非 async 声明的
+//    promise 返回包装函数**——三者叠加让 market#syncRemote/tickPrice 曾三重不可见
+//    (P0:wallet-nex 的 setInterval 每 3s 一个 unhandledRejection,已改自吞)。
+//    z6 已核跨文件族成员:orders#refreshRemote(调用点全带 catch,契约保留 reject)、
+//    order-canonical#refreshCanonicalOrders(自吞)、use-remote-account-state(自吞、无调用方)、
+//    market(已修)。扩面到跨文件扫描待议——本门维持 store 内构造性判据 + 人工登记跨文件族。
+// ⚠️ harness env 提示(z6 审计 F4):esbuild define 只匹配**点式成员访问**;若未来有模块用
+//    解构 `const { K } = import.meta.env` 读键,拿到的是 undefined(静默错模式)。当前全仓 0 处
+//    解构读法;新增时必须改用点式或在此补 define。
+// 27 → 28(2026-08-14 合并远端):同事新增 refreshRemoteVietQrDeposits 作为非沙箱侧的入金 provider。
+const EXPECTED_SEAMS = 28;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来

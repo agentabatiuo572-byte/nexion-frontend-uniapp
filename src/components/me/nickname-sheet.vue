@@ -21,7 +21,7 @@
 
         <!-- Candidates (single-select) -->
         <view
-          v-for="c in candidates"
+          v-for="c in displayedCandidates"
           :key="c"
           class="flex items-center active:opacity-80"
           :style="candidateStyle(c)"
@@ -53,12 +53,16 @@ import { computed, ref, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { generateNicknameCandidates } from "@/lib/nickname";
 
-const props = defineProps<{ open: boolean }>();
-const emit = defineEmits<{ (e: "close"): void; (e: "pick", name: string): void }>();
+const props = withDefaults(defineProps<{ open: boolean; serverCandidates?: string[]; authoritative?: boolean }>(), {
+  serverCandidates: () => [],
+  authoritative: false,
+});
+const emit = defineEmits<{ (e: "close"): void; (e: "pick", name: string): void; (e: "reroll"): void }>();
 
 const t = useT();
 const candidates = ref<string[]>(generateNicknameCandidates());
 const picked = ref("");
+const displayedCandidates = computed(() => props.authoritative ? props.serverCandidates : candidates.value);
 
 // 每次打开出新一批候选并清空选中。
 watch(
@@ -69,6 +73,11 @@ watch(
 );
 
 function reroll() {
+  if (props.authoritative) {
+    picked.value = "";
+    emit("reroll");
+    return;
+  }
   candidates.value = generateNicknameCandidates();
   picked.value = "";
 }
