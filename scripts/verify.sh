@@ -115,6 +115,17 @@ conflict_marker_gate() {
   fi
 }
 conflict_marker_gate
+# 交接书指针门:docs/HANDOFF 只许一行式索引,正文住后台仓(2026-08-14,曾漂 12 条正文 + U-4 撞号重编 U-19)。
+# 后台仓缺席的环境(临时 worktree / 独立 checkout)里跨仓半边显式 SKIP,本地判据照跑 —— PASS 行会写明跑了哪半。
+handoff_pointer_gate() {
+  if "$NODE_BIN" scripts/handoff-pointer-gate.mjs > /tmp/uniapp-handoff-pointer.log 2>&1; then
+    ok "交接书指针门 — $(tail -1 /tmp/uniapp-handoff-pointer.log)"
+  else
+    bad "交接书指针漂移 — node scripts/handoff-pointer-gate.mjs 看明细"
+    grep -E "^(FAIL|  - )" /tmp/uniapp-handoff-pointer.log | head -10 | sed "s/^/        /"
+  fi
+}
+handoff_pointer_gate
 runtime_flag_parity_gate() {
   if "$NODE_BIN" scripts/runtime-flag-parity-gate.mjs > /tmp/uniapp-flag-parity.log 2>&1; then
     ok "运行时开关等价门 — $(tail -1 /tmp/uniapp-flag-parity.log)"
