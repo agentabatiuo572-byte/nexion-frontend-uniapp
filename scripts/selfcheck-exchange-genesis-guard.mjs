@@ -122,6 +122,7 @@ const iDebit = Math.min(
   // 从行里抠掉,剩下的任何活值一律算违例。
   const ALLOW = [
     /app\.accountKey !== snap\.account/g,
+    /app\.accountKey === snap\.account/g,
     /quoteTo\(snap\.direction, snap\.fromAmount, rate\.value\)/g,
   ];
   const LIVE = ["direction.value", "fromSym.value", "toSym.value", "fromAmount.value",
@@ -230,7 +231,7 @@ const purchaseBody = strip(grabBlock(strip(shRaw), "function handlePurchase()"))
   // 收口到 postMoneyBill 之后它 indexOf 返回 -1 —— 而 -1 会让 `iLock < iDebit` 直接为假,
   // 这次是红了;但同族的写法(找不到就当没有 → 恒真)正是哨兵假绿的经典形态。
   // 改成扫**一组**资金原语取最早那个,并且**一个都扫不到就判失败**(不是默默放行)。
-  const MONEY_PRIMS = ["app.captureMoney()", "postMoneyBill(", "app.debitBalance(", "app.debitNex(", "app.creditBalance("];
+  const MONEY_PRIMS = ["genesis.purchase(", "app.captureMoney()", "postMoneyBill(", "app.debitBalance(", "app.debitNex(", "app.creditBalance("];
   const moneyHits = MONEY_PRIMS.map((p) => purchaseBody.indexOf(p)).filter((i) => i >= 0);
   const iMoneyP = moneyHits.length ? Math.min(...moneyHits) : -1;
   check(`B④ 上锁点在第一次动钱之前(扫 ${MONEY_PRIMS.length} 个资金原语,命中 ${moneyHits.length} 个)`,
@@ -368,6 +369,7 @@ function exchangeFixture({ onConfirm, direction: dir = "nex2usdt", from = 100, r
     // This harness exercises the explicit mock branch. Remote calls have a
     // separate contract and must not be required by legacy local-CAS checks.
     remoteApiEnabled: false,
+    remoteState: { value: null },
     exchangeApi: { fetchState: async () => { throw new Error("REMOTE_STUB_UNUSED"); }, swap: async () => { throw new Error("REMOTE_STUB_UNUSED"); } },
     geoPolicyUserMessage,
     submitting: { value: false },
@@ -577,44 +579,19 @@ const firstNum = (s) => {
 
 // ── ④ 创世双击 → 只扣一次款只铸一份 ──────────────────────────────────────
 function buildHandlePurchase(env) {
-  const src = `${ts2js(grabBlock(shRaw, "function handlePurchase()"))}\n; return handlePurchase;`;
+  const src = `${ts2js(grabBlock(shRaw, "async function handlePurchase()"))}\n; return handlePurchase;`;
   const names = Object.keys(env);
   // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
   return new Function(...names, src)(...names.map((n) => env[n]));
 }
-/**
- * 资金收口点 postMoneyBill 也**跑真实现**(从 lib/money-receipt.ts 原文抠出来注入),
- * 不写替身:handlePurchase 现在把扣款与记账都委托给它,替身一写,「只扣一次」就变成
- * 在跟我自己写的假扣款对账 —— 页面真怎么动钱反而测不到。
- */
-function buildPostMoneyBill(app, bills, toast) {
-  // 从**返回类型**处起抠函数体:直接从函数名起抠会撞上参数默认值 `opts = {}` 的那对花括号,
-  // 括号配平在那里就归零,抠出来的是半截签名(实测 esbuild 直接 transform 失败)。
-  // 签名本身是类型化糖(ts2js 后就是这一行),函数体一字不改地原文注入。
-  const grabbed = grabBlock(receiptRaw.slice(receiptRaw.indexOf("export function postMoneyBill(")), "): MoneyReceiptOutcome");
-  const body = grabbed.slice(grabbed.indexOf("{"));   // 去掉 needle 自带的返回类型前缀
-  const src = `function postMoneyBill(draft, opts = {}) ${ts2js(body)}\n; return postMoneyBill;`;
-  // 🔴 单数版现在只是复数版的壳(`return postMoneyBills([draft], opts)`),复数正主必须
-  // 一起进同一个闭包 —— 只注入单数体会在运行时炸 `postMoneyBills is not defined`。
-  // 复用已有的 buildPostMoneyBills,不另写第二份注入。
-  // eslint-disable-next-line no-new-func — 正主代码块原文注入执行
-  return new Function("useApp", "useBills", "getT", "toast", "postMoneyBills", src)(
-    () => app, () => bills, () => t.value, toast, buildPostMoneyBills(app, bills, toast),
-  );
-}
-function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, billsFail = false, sheetBlocked = false } = {}) {
+function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, sheetBlocked = false } = {}) {
   const app = makeApp(usdt, 0);
   const minted = [];
+  const commandCalls = [];
   const billRows = [];
   const toasts = [];
   const closes = [];
   const purchasing = { value: false };
-  // 收口点走 addMany(N 条分录一次落盘);add 保留给仍在裸调的存量路径。
-  // billsFail 两个入口都要挡 —— 只挡一个的话「收据落盘失败」那条靶会从没挡的那边溜过去。
-  const bills = {
-    add: (r) => { if (billsFail) return null; billRows.push(r); return r; },
-    addMany: (ds) => { if (billsFail) return null; billRows.push(...ds); return ds; },
-  };
   const toast = { error: (a, b) => toasts.push(["error", a, b]), success: (a, b) => toasts.push(["success", a, b]) };
   const env = {
     // handlePurchase 的 geo 分支引用它;不喂 = 整道门 ReferenceError 崩溃(2026-08-07 实测)。
@@ -629,25 +606,31 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
     sheetBlocked: { value: sheetBlocked },
     sheetBlockText: { value: "市场暂未开放" },
     app, t, fmt,
-    genesis: { purchase: (n) => { if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason }; minted.push(n); return { ok: true, cost: n * 9999 }; } },
-    postMoneyBill: buildPostMoneyBill(app, bills, toast),
+    genesis: { purchase: async (n) => {
+      commandCalls.push(n);
+      await Promise.resolve();
+      if (!mint.ok) return { ok: false, cost: 0, reason: mint.reason };
+      minted.push(n);
+      return { ok: true, cost: n * 9999 };
+    } },
     toast,
     emitClose: () => closes.push(1),
     GENESIS_ELIGIBILITY: { perUserCap: 5 },
   };
-  return { env, app, minted, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
+  return { env, app, minted, commandCalls, billRows, toasts, closes, purchasing, handlePurchase: buildHandlePurchase(env) };
 }
 {
   const f = genesisFixture();
-  f.handlePurchase();
+  const first = f.handlePurchase();
   f.handlePurchase();   // 双击:面板还没卸载(emitClose 要等下一次渲染)
   f.handlePurchase();
-  check("C④ 双击/三击只买 1 台:1 次扣款 · 1 次铸造 · 1 行账单 · 1 次关闭",
-    f.app.calls.filter((c) => c[0] === "debitBalance").length === 1
-    && f.minted.length === 1 && f.minted[0] === 1 && f.billRows.length === 1 && f.closes.length === 1,
-    `debits=${f.app.calls.length} minted=${JSON.stringify(f.minted)} bills=${f.billRows.length}`);
-  check("C④ 只扣一台的钱($50000 − $9999 = $40001,不是扣两三台)",
-    f.app.user.usdtBalance === 40001, `usdt=${f.app.user.usdtBalance}`);
+  await first;
+  check("C④ 双击/三击只提交 1 个服务端购买命令 · 铸造 1 份 · 关闭 1 次",
+    f.commandCalls.length === 1 && f.minted.length === 1 && f.minted[0] === 1 && f.closes.length === 1,
+    `commands=${f.commandCalls.length} minted=${JSON.stringify(f.minted)} closes=${f.closes.length}`);
+  check("C④ 购买页不在浏览器本地扣款或写账单(资金只由服务端事务处理)",
+    f.app.calls.length === 0 && f.billRows.length === 0,
+    `localMoneyCalls=${f.app.calls.length} localBills=${f.billRows.length}`);
   check("C④ 成交后继续持锁(面板正在关闭,解锁就是给双击留窗口)", f.purchasing.value === true);
   check("C④ 成功 toast 只弹 1 次(1 次购买 = 1 条反馈)",
     f.toasts.filter((x) => x[0] === "success").length === 1, JSON.stringify(f.toasts.map((x) => x[0])));
@@ -658,59 +641,45 @@ function genesisFixture({ usdt = 50000, capRemaining = 5, mint = { ok: true }, b
 // 连点 N 次就写 **2N 条**账单(扣款 + 冲正各一条)。这组靶子把它钉死。
 {
   const f = genesisFixture({ sheetBlocked: true });
-  f.handlePurchase();
-  f.handlePurchase();
-  f.handlePurchase();
-  check("🔴 C⑦ 阻断态连点 3 次:0 次扣款",
-    f.app.calls.filter((c) => c[0] === "debitBalance").length === 0,
-    `实得 ${f.app.calls.filter((c) => c[0] === "debitBalance").length} 次`);
-  check("🔴 C⑦ 阻断态连点 3 次:0 行账单(不是「扣了再冲正」的成对写入)",
-    f.billRows.length === 0, `实得 ${f.billRows.length} 行`);
+  await f.handlePurchase();
+  await f.handlePurchase();
+  await f.handlePurchase();
+  check("🔴 C⑦ 阻断态连点 3 次:0 个服务端购买命令",
+    f.commandCalls.length === 0, `实得 ${f.commandCalls.length} 个`);
+  check("🔴 C⑦ 阻断态不产生浏览器本地资金/账单副作用",
+    f.app.calls.length === 0 && f.billRows.length === 0,
+    `localMoneyCalls=${f.app.calls.length} localBills=${f.billRows.length}`);
   check("🔴 C⑦ 阻断态不铸造席位", f.minted.length === 0, `实得 ${JSON.stringify(f.minted)}`);
   check("C⑦ 阻断态给了说明(禁静默无反应)", f.toasts.length >= 1, `toasts=${f.toasts.length}`);
   check("C⑦ 阻断态不上重入锁(解除后能立刻重试,不用关面板)", f.purchasing.value === false);
   // 反向对照:同一 fixture 不阻断时必须**真能买**,证明上面 5 条不是因为 fixture 坏了才全 0
   const ok = genesisFixture({ sheetBlocked: false });
-  ok.handlePurchase();
-  check("🔴 C⑦ 反向对照:不阻断时确实会扣款(否则上面的 0 是假绿)",
-    ok.app.calls.filter((c) => c[0] === "debitBalance").length === 1 && ok.billRows.length === 1,
-    `debits=${ok.app.calls.filter((c) => c[0] === "debitBalance").length} bills=${ok.billRows.length}`);
+  await ok.handlePurchase();
+  check("🔴 C⑦ 反向对照:不阻断时确实会提交服务端命令(否则上面的 0 是假绿)",
+    ok.commandCalls.length === 1 && ok.minted.length === 1,
+    `commands=${ok.commandCalls.length} minted=${ok.minted.length}`);
 }
 {
-  // 🔴 反向不变量:失败路径必须立刻解锁 —— 否则「提前 return 忘复位」= 后续购买永久锁死。
-  const poor = genesisFixture({ usdt: 100 });
-  poor.handlePurchase();
-  check("C④ 余额不足 → 零铸造、零账单,且守卫**已解锁**(可重试,不是永久锁死)",
-    poor.minted.length === 0 && poor.billRows.length === 0 && poor.purchasing.value === false
-    && poor.app.user.usdtBalance === 100);
+  // 🔴 反向不变量:服务端拒绝后必须立刻解锁,且浏览器不得自行补扣/冲正。
   const soldOut = genesisFixture({ mint: { ok: false, reason: "sold-out" } });
-  soldOut.handlePurchase();
-  // 收口到 postMoneyBill 之后,铸造失败的正确形态从「0 行账单」变成「1 扣 + 1 反向冲正,净和 0」:
-  // 已终态分录不改写,靠反向分录冲正(与提现 NEX 退还同规矩)。余额与**可提额度**都必须还原 ——
-  // 盲加 credit 只还总余额,一次失败退款就把可提额永久压低($8000 → $1)。
-  const soldOutNet = soldOut.billRows.reduce((a, b) => a + b.amount, 0);
-  check("C④ 铸造失败 → 账本 1 扣 + 1 反向冲正(净和 0)+ 余额与可提额度都还原 + 守卫解锁 + 不关面板",
-    soldOut.app.user.usdtBalance === 50000 && soldOut.app.user.earningBuckets.withdrawableUsdt === 50000
-    && soldOut.billRows.length === 2 && soldOutNet === 0
-    && soldOut.purchasing.value === false && soldOut.closes.length === 0,
-    `usdt=${soldOut.app.user.usdtBalance} withdrawable=${soldOut.app.user.earningBuckets.withdrawableUsdt} bills=${soldOut.billRows.length} net=${soldOutNet}`);
-  // 收据落不了盘 = 钱不许动、席位不许铸,且守卫必须解锁(否则一次落盘故障锁死后续所有购买)。
-  const noReceipt = genesisFixture({ billsFail: true });
-  noReceipt.handlePurchase();
-  check("C④ 收据落盘失败 → 资金精确还原 · 零铸造 · 零账单 · 不关面板 · 守卫解锁",
-    noReceipt.app.user.usdtBalance === 50000 && noReceipt.app.user.earningBuckets.withdrawableUsdt === 50000
-    && noReceipt.minted.length === 0 && noReceipt.billRows.length === 0
-    && noReceipt.closes.length === 0 && noReceipt.purchasing.value === false,
-    `usdt=${noReceipt.app.user.usdtBalance} minted=${noReceipt.minted.length}`);
-  soldOut.env.genesis.purchase = (n) => { soldOut.minted.push(n); return { ok: true, cost: n * 9999 }; };
-  soldOut.handlePurchase();
+  await soldOut.handlePurchase();
+  check("C④ 服务端拒绝 → 零本地资金/账单、零铸造、守卫解锁、不关面板",
+    soldOut.commandCalls.length === 1 && soldOut.app.calls.length === 0 && soldOut.billRows.length === 0
+    && soldOut.minted.length === 0 && soldOut.purchasing.value === false && soldOut.closes.length === 0,
+    `commands=${soldOut.commandCalls.length} localMoney=${soldOut.app.calls.length} minted=${soldOut.minted.length}`);
+  soldOut.env.genesis.purchase = async (n) => {
+    soldOut.commandCalls.push(n);
+    soldOut.minted.push(n);
+    return { ok: true, cost: n * 9999 };
+  };
+  await soldOut.handlePurchase();
   check("C④ 失败后重试真的能成(解锁不是嘴上说说:第二次跑通并铸出 1 份)",
-    soldOut.minted.length === 1 && soldOut.app.user.usdtBalance === 40001 && soldOut.closes.length === 1);
+    soldOut.commandCalls.length === 2 && soldOut.minted.length === 1 && soldOut.closes.length === 1);
   const ineligible = genesisFixture({ capRemaining: 0 });
-  ineligible.handlePurchase();
-  ineligible.handlePurchase();
-  check("C④ 限购已满 → 零资金动作且不上锁(资格门失败不该锁住入口)",
-    ineligible.app.calls.length === 0 && ineligible.purchasing.value === false
+  await ineligible.handlePurchase();
+  await ineligible.handlePurchase();
+  check("C④ 限购已满 → 零服务端命令且不上锁(资格门失败不该锁住入口)",
+    ineligible.commandCalls.length === 0 && ineligible.app.calls.length === 0 && ineligible.purchasing.value === false
     && ineligible.toasts.filter((x) => x[0] === "error").length === 2);
 }
 
@@ -743,8 +712,8 @@ console.log(
   `\n${pass} pass / ${fail} fail(样本:兑换 handleConfirm + 创世 handlePurchase 两个正主函数原文注入执行` +
   ` · ${confirmBody.slice(iAwait).split(/\r?\n/).length} 行 await 后代码逐行扫 9 个活值 token` +
   ` · 8 项成交输入快照 + 5 个动钱/计数入口 · 5 组行为固定靶(汇率漂移/方向金额篡改/连点3次/创世同tick3击/正常路径)` +
-  ` · 5 条创世反向靶(余额不足·铸造失败冲正·收据落盘失败·失败后重试·限购满不上锁)` +
+  ` · 5 条创世反向靶(双击重入·市场阻断·售罄·资格拒绝·失败后重试)` +
   ` · 兑换两腿原子性 3 靶(收据落盘失败 → 双侧资金还原·账上零残留·明确失败;单次落盘归 money_receipt_gate ⑦)` +
-  ` · 资金收口点 postMoneyBill 跑真实现(lib/money-receipt.ts 原文注入) · 3 key × 3 语 i18n)`,
+  ` · 创世购买只走服务端 genesis.purchase 命令且浏览器零资金副作用 · 3 key × 3 语 i18n)`,
 );
 process.exit(fail ? 1 : 0);

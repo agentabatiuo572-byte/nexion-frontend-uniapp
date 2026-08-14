@@ -16,6 +16,13 @@
       <SubPageHeader back="/pages/team/team" :title="t.pool.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+        <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
+          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '14px' }">{{ remoteState === 'loading' ? t.pool.loading : t.pool.loadError }}</text>
+          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" @click="loadRemotePool">
+            <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.pool.retry }}</text>
+          </view>
+        </view>
+        <template v-else>
         <!-- Week pool hero — de-carded: big number sits directly on the page
              floor (card gradient/radial would be a floor aura → deleted per
              owner call 2026-07-08, accent border dropped with it). Rules-intro
@@ -32,7 +39,7 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </view>
           </view>
-          <text class="block font-display tabular-nums" :style="heroBigStyle">${{ (pool.currentWeekPoolUSDT / 1000).toFixed(1) }}K</text>
+          <text class="block font-display tabular-nums" :style="heroBigStyle">${{ (currentWeekPoolUSDT / 1000).toFixed(1) }}K</text>
           <text class="block" :style="heroDescStyle">{{ weeklyDescText }}</text>
         </view>
 
@@ -109,10 +116,10 @@
         </view>
 
         <!-- Past pools — transparent hairline group (form a, ledger idiom). -->
-        <view v-if="pool.history.length > 0" :style="pastGroupStyle">
+        <view v-if="poolHistory.length > 0" :style="pastGroupStyle">
           <text class="block font-mono-tabular" :style="pastHeadStyle">{{ t.pool.pastPools }}</text>
           <view
-            v-for="(h, i) in pool.history"
+            v-for="(h, i) in poolHistory"
             :key="h.weekId"
             class="flex items-center justify-between"
             :style="historyRowStyle(i === pool.history.length - 1)"
@@ -124,13 +131,15 @@
             <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: h.payoutUSDT > 0 ? 'var(--v5-brand)' : 'var(--v5-ink-3)' }">{{ h.payoutUSDT > 0 ? `+$${h.payoutUSDT.toFixed(2)}` : "—" }}</text>
           </view>
         </view>
+        </template>
       </view>
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import VBadge from "@/components/team/v-badge.vue";
@@ -139,19 +148,38 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLeadershipPool, V_VOTES, POOL_TOP_N, type LeadershipPayout } from "@/store/leadership-pool";
 import { useVRank, V_RANKS, type VRank } from "@/store/v-rank";
+import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
+import { useApp } from "@/store/app";
 
 const t = useT();
+const app = useApp();
 const vState = useVRank();
 const pool = useLeadershipPool();
+const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
+const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+let remoteRequest = 0;
 
-const myRank = computed(() => vState.myRank);
-const unlocked = computed(() => vState.myRank >= 3);
-const dist = computed(() => pool.globalVDistribution);
-const totalVotes = computed(() => pool.totalVotes());
-const myVotes = computed(() => pool.myVotes(vState.myRank));
-const myShare = computed(() => pool.mySharePct(vState.myRank));
-const projectedPayout = computed(() => pool.myProjectedPayout(vState.myRank));
-const nextPayoutTs = computed(() => pool.nextPayoutTs());
+const myRank = computed(() => (remoteApiEnabled ? remotePool.value?.myRank ?? 0 : vState.myRank) as VRank);
+const unlocked = computed(() => myRank.value >= 3);
+const dist = computed(() => {
+  if (!remoteApiEnabled) return pool.globalVDistribution;
+  const result = {} as Record<VRank, number>;
+  for (let rank = 0; rank <= 12; rank += 1) result[rank as VRank] = 0;
+  for (const row of remotePool.value?.distribution ?? []) result[row.vRank as VRank] = row.people;
+  return result;
+});
+const currentWeekPoolUSDT = computed(() => remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT);
+const totalVotes = computed(() => remoteApiEnabled ? remotePool.value?.totalVotes ?? 0 : pool.totalVotes());
+const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vState.myRank));
+const myShare = computed(() => remoteApiEnabled ? remotePool.value?.mySharePct ?? 0 : pool.mySharePct(vState.myRank));
+const projectedPayout = computed(() => remoteApiEnabled ? remotePool.value?.projectedPayoutUSDT ?? 0 : pool.myProjectedPayout(vState.myRank));
+const nextPayoutTs = computed(() => remoteApiEnabled ? Date.parse(remotePool.value?.nextPayoutAt ?? "") || Date.now() : pool.nextPayoutTs());
+const poolHistory = computed<LeadershipPayout[]>(() => remoteApiEnabled
+  ? (remotePool.value?.history ?? []).map((item) => ({ weekId: item.weekId, weekStartTs: 0,
+      poolUSDT: 0, myVotes: myVotes.value, totalVotes: totalVotes.value,
+      mySharePct: myShare.value, payoutUSDT: item.payoutUSDT }))
+  : pool.history);
 const daysToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - Date.now()) / 86400000)));
 const hoursToPayout = computed(() => Math.max(0, Math.ceil((nextPayoutTs.value - Date.now()) / 3600000)));
 
@@ -163,12 +191,21 @@ const requiresV3Parts = computed(() => {
   const parts = t.value.pool.requiresV3.split("V3 Captain");
   return [parts[0] ?? "", parts[1] ?? ""];
 });
-const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: vState.myRank, title: V_RANKS[vState.myRank].title }));
+const currentlyVText = computed(() => fmt(t.value.pool.currentlyV, { n: myRank.value, title: V_RANKS[myRank.value].title }));
 const totalPeopleText = computed(() =>
   fmt(t.value.pool.totalPeople, { n: Object.values(dist.value).reduce((a, b) => a + b, 0).toLocaleString() }),
 );
 // 头部集中度:派生真值(顶部 N 名领袖占池比),随 seed/票权变,非硬编码。
-const topPct = computed(() => Math.round(pool.topConcentrationPct() * 100));
+const topPct = computed(() => {
+  if (!remoteApiEnabled) return Math.round(pool.topConcentrationPct() * 100);
+  if (totalVotes.value <= 0) return 0;
+  let remaining = POOL_TOP_N; let votes = 0;
+  for (let rank = 12; rank >= 3 && remaining > 0; rank -= 1) {
+    const count = dist.value[rank as VRank] ?? 0; const take = Math.min(count, remaining);
+    votes += take * V_VOTES[rank as VRank]; remaining -= take;
+  }
+  return Math.round((votes / totalVotes.value) * 100);
+});
 const concentrationText = computed(() => fmt(t.value.pool.concentrationHint, { n: POOL_TOP_N, pct: topPct.value }));
 
 const voteRows = computed(() => {
@@ -185,7 +222,7 @@ const voteRows = computed(() => {
       isMine: v === vState.myRank,
       peopleVotes: fmt(t.value.pool.peopleVotesEa, { count: count.toLocaleString(), votes }),
       shareOfPool,
-      perPerson: ((pool.currentWeekPoolUSDT * shareOfPool) / Math.max(count, 1)).toFixed(0),
+      perPerson: ((currentWeekPoolUSDT.value * shareOfPool) / Math.max(count, 1)).toFixed(0),
     };
   });
 });
@@ -197,6 +234,30 @@ function poolTotalText(h: LeadershipPayout): string {
 function go(url: string) {
   uni.navigateTo({ url, fail: () => {} });
 }
+
+async function loadRemotePool() {
+  if (!remoteApiEnabled) return;
+  const request = ++remoteRequest;
+  const accountKey = app.accountKey;
+  remoteState.value = "loading";
+  try {
+    const snapshot = await teamInsightsApi.leadershipPool();
+    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    remotePool.value = snapshot;
+    remoteState.value = "ready";
+  } catch {
+    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    remotePool.value = null;
+    remoteState.value = "error";
+  }
+}
+
+watch(() => app.accountKey, () => {
+  if (!remoteApiEnabled) return;
+  remotePool.value = null;
+  void loadRemotePool();
+});
+onShow(() => { if (remoteApiEnabled) void loadRemotePool(); });
 
 // ─── styles ───
 // Soft tint only — pills carry no border (chip/pill whitelist rule).

@@ -30,7 +30,6 @@ export interface TrialApi {
   eligibility(): Promise<TrialAuthorityState>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
   cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
-  redeemEarly(idempotencyKey: string): Promise<TrialAuthorityState>;
 }
 
 const SERVER_STATES = new Set([
@@ -110,8 +109,7 @@ export function parseTrialAuthorityState(value: unknown): TrialAuthorityState {
 
   const startedAt = timestamp(row.claimedAtEpochMs ?? row.claimedAt);
   const expiresAt = timestamp(row.expiresAtEpochMs ?? row.expiresAt);
-  const graceEndsAt = timestamp(row.graceEndsAtEpochMs ?? row.extendedEndsAtEpochMs
-    ?? row.graceEndsAt ?? row.extendedEndsAt);
+  const graceEndsAt = timestamp(row.graceEndsAtEpochMs ?? row.graceEndsAt);
   const finishedAt = timestamp(row.finishedAtEpochMs ?? row.finishedAt);
   const cooldownUntil = timestamp(row.cooldownUntilEpochMs ?? row.cooldownUntil);
   if (["ACTIVE", "GRACE", "EXTENDED", "REDEEMED"].includes(serverState)
@@ -155,11 +153,6 @@ export function createTrialApi(client: ApiClient): TrialApi {
       method: "POST",
       path: "/api/trial/cancel",
       body: { reason },
-      idempotencyKey,
-    }),
-    redeemEarly: (idempotencyKey) => parse({
-      method: "POST",
-      path: "/api/trial/redeem-early",
       idempotencyKey,
     }),
   };

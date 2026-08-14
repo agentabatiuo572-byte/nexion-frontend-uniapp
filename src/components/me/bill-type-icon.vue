@@ -44,9 +44,11 @@
       <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
     </template>
     <!-- unstake: Wrench -->
-    <template v-else>
+    <template v-else-if="type === 'unstake'">
       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
     </template>
+    <!-- other: canonical ledger row without a narrower product category -->
+    <template v-else><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h10" /></template>
   </svg>
 </template>
 

@@ -4,8 +4,9 @@ import { mockServerId } from "./mock-id";
 import { mockServerNow } from "./server-time";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
-import { fundsSandboxApi, fundsSandboxEnabled, fundsServerEnabled, referralRewardApi } from "@/api/runtime";
+import { fundsSandboxApi, fundsSandboxEnabled, fundsServerEnabled, referralRewardApi, walletBillsApi } from "@/api/runtime";
 import type { FundsSandboxLedgerEntry } from "@/api/funds-sandbox-api";
+import type { WalletBillRow } from "@/api/wallet-bills-api";
 import { projectFundsSandboxLedger } from "./funds-sandbox-ledger";
 import { projectReferralRewardBills } from "./referral-reward-bills";
 
@@ -14,7 +15,7 @@ import { projectReferralRewardBills } from "./referral-reward-bills";
 // with GET /api/bills and lets the server own ids + balanceAfter.
 export type BillType =
   | "earn" | "refer" | "bonus" | "topup" | "withdraw"
-  | "purchase" | "swap" | "verification" | "stake" | "unstake" | "achievement";
+  | "purchase" | "swap" | "verification" | "stake" | "unstake" | "achievement" | "other";
 export type BillStatus = "posted" | "pending" | "failed";
 
 export interface Bill {
@@ -210,12 +211,7 @@ export const useBills = defineStore("bills", () => {
 
   async function refreshFundsSandboxLedger(): Promise<void> {
     if (!fundsSandboxEnabled) {
-      if (fundsServerEnabled) {
-        bills.value = [];
-        serverStatus.value = "error";
-        serverError.value = "FUNDS_BILLS_PROVIDER_NOT_CONFIGURED";
-        throw new Error(serverError.value);
-      }
+      if (fundsServerEnabled) return refreshProductionLedger();
       return;
     }
     const expectedAccountKey = boundKey;
@@ -240,17 +236,69 @@ export const useBills = defineStore("bills", () => {
     }
   }
 
+  function productionBill(row: WalletBillRow): Bill {
+    const amount = row.direction === "IN" ? row.amount : -row.amount;
+    return {
+      id: row.id,
+      type: productionBillType(row.bizType, row.direction),
+      amount,
+      symbol: row.asset,
+      status: row.status === "SUCCESS" ? "posted" : row.status === "PENDING" ? "pending" : "failed",
+      ts: row.createdAt,
+      memo: row.remark || row.bizType,
+      ref: row.bizNo,
+      balanceAfter: row.balanceAfter,
+    };
+  }
+
+  function productionBillType(bizType: string, direction: WalletBillRow["direction"]): BillType {
+    const value = bizType.toUpperCase();
+    if (/(DEPOSIT|TOPUP|RECHARGE)/.test(value)) return "topup";
+    if (/(WITHDRAW|PAYOUT)/.test(value)) return "withdraw";
+    if (/(REFERRAL|COMMISSION|UNILEVEL|BINARY|LEADERSHIP)/.test(value)) return "refer";
+    if (/(STAKE|STAKING)/.test(value)) return direction === "IN" ? "unstake" : "stake";
+    if (/(EXCHANGE|SWAP)/.test(value)) return "swap";
+    if (/(PURCHASE|ORDER|REPURCHASE|GENESIS|TRADE_IN)/.test(value)) return direction === "IN" ? "earn" : "purchase";
+    if (/(ACHIEVEMENT|MILESTONE|QUEST)/.test(value)) return "achievement";
+    if (/(EARN|REWARD|RELEASE|TASK|TRIAL)/.test(value)) return "earn";
+    return "other";
+  }
+
+  async function refreshProductionLedger(): Promise<void> {
+    const expectedAccountKey = boundKey;
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const snapshot = await walletBillsApi.list();
+      if (expectedAccountKey !== boundKey) throw new Error("WALLET_BILLS_ACCOUNT_CHANGED");
+      bills.value = recomputeBalance(snapshot.bills.map(productionBill));
+      serverStatus.value = "ready";
+    } catch (cause) {
+      if (expectedAccountKey === boundKey) {
+        bills.value = [];
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
+      }
+      throw cause;
+    }
+  }
+
+  async function refreshServerLedger(): Promise<void> {
+    if (!fundsServerEnabled) return;
+    return fundsSandboxEnabled ? refreshFundsSandboxLedger() : refreshProductionLedger();
+  }
+
   /** 账号切换重绑:装载该账号的账单行(变更处处即时 persist,旧账号无需先落盘)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (fundsServerEnabled) {
       const expectedAccountKey = boundKey;
       bills.value = [];
-      serverStatus.value = fundsSandboxEnabled ? "idle" : "error";
-      serverError.value = fundsSandboxEnabled ? "" : "FUNDS_BILLS_PROVIDER_NOT_CONFIGURED";
-      if (fundsSandboxEnabled) void refreshFundsSandboxLedger().catch((cause) => {
+      serverStatus.value = "idle";
+      serverError.value = "";
+      void refreshServerLedger().catch((cause) => {
         if (expectedAccountKey === boundKey && !serverError.value) {
-          serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+          serverError.value = cause instanceof Error ? cause.message : "WALLET_BILLS_REFRESH_FAILED";
         }
       });
       return;
@@ -439,6 +487,6 @@ export const useBills = defineStore("bills", () => {
   return {
     bills, serverStatus, serverError,
     add, addMany, addManyForAccountOnce, addOnce, seed, settleByRef, bindAccount,
-    adoptFundsSandboxLedger, refreshFundsSandboxLedger,
+    adoptFundsSandboxLedger, refreshFundsSandboxLedger, refreshServerLedger,
   };
 });

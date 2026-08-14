@@ -53,6 +53,9 @@ export const useWeeklyQuest = defineStore("weeklyQuest", () => {
     }
   }
 
+  // Tier 1, Tier 2 and bonus rows share one canonical server command:
+  // POST /api/quests/{questCode}/claim. The quest code selects the row; the
+  // idempotency key and authoritative state readback make the claim atomic.
   async function claim(quest: CanonicalQuest): Promise<boolean> {
     if (!remoteApiEnabled || !["COMPLETED", "CLAIMABLE"].includes(quest.status) || claiming.value) return false;
     const key = claimKeys.get(quest.questCode) ?? idempotencyKey(quest.questCode);

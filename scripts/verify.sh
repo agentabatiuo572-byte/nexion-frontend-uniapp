@@ -60,15 +60,15 @@ if ! command -v "$NODE_BIN" >/dev/null 2>&1 && command -v node.exe >/dev/null 2>
   NODE_BIN="node.exe"
 fi
 
-# admin 仓根解析:主树 `../Nexion-admin-prototype` 相对路径优先;linked worktree
+# admin 仓根解析:当前真实 PC 仓 `../nexion-ops-console` 相对路径优先;linked worktree
 # (.claude/worktrees/*)下该相对路径落空 → 用 git common-dir 反推主仓根再取同级
 # admin 仓(pkg-i 审查:worktree 内 SPEC-7 因路径假阴恒红)。git 不可用 / 独立打包 /
 # admin 仓真缺失时 ADMIN_ROOT 保持原相对值 → 下游各消费点维持原 bad/skip 行为。
-ADMIN_ROOT="$PROJECT_DIR/../Nexion-admin-prototype"
+ADMIN_ROOT="$PROJECT_DIR/../nexion-ops-console"
 if [ ! -d "$ADMIN_ROOT" ]; then
   main_git_dir=$(git -C "$PROJECT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)
-  if [ -n "$main_git_dir" ] && [ -d "$(dirname "$main_git_dir")/../Nexion-admin-prototype" ]; then
-    ADMIN_ROOT="$(dirname "$main_git_dir")/../Nexion-admin-prototype"
+  if [ -n "$main_git_dir" ] && [ -d "$(dirname "$main_git_dir")/../nexion-ops-console" ]; then
+    ADMIN_ROOT="$(dirname "$main_git_dir")/../nexion-ops-console"
   fi
 fi
 
@@ -507,9 +507,9 @@ else
 fi
 sentinel_present "daily sign-in atomic seam names canonical endpoint" src/pages/daily/daily.vue 'POST /api/faucet/sign-in'
 sentinel_present "daily milestone atomic seam is honest TBD" src/pages/daily/daily.vue 'milestone-claim endpoint TBD'
-sentinel_present "weekly quest atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{tier2/:id\}'
-sentinel_present "weekly tier1 atomic seam names canonical endpoint" src/components/home/weekly-quest-hero.vue 'POST /api/quests/weekly/\{tier1\}'
-sentinel_present "weekly bonus atomic seam names canonical endpoint" src/components/home/weekly-quest-list.vue 'POST /api/quests/weekly/\{bonus\}'
+sentinel_present "weekly quest atomic seam names canonical endpoint" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
+sentinel_present "weekly tier1 atomic seam uses canonical claim command" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
+sentinel_present "weekly bonus atomic seam uses canonical claim command" src/store/weekly-quest.ts 'POST /api/quests/\{questCode\}/claim'
 sentinel_present "event claim atomic seam is honest TBD" src/pages/events/events.vue 'event-claim endpoint TBD'
 if grep -qE 'input\.carrier|carrier ===|getCarrier|from "@/lib/carrier"' src/lib/hashpower.ts 2>/dev/null; then
   bad "SPEC-1 R7 hashpower must not read/import view carrier"
@@ -1034,7 +1034,7 @@ spec2_pc_gpu_kind_coverage() {
 }
 spec2_pc_gpu_kind_coverage
 sentinel_present "SPEC-2 compute entry gated by feature flag" src/components/earn/compute-share-entry.vue 'isEnabled\("computeShareEnabled"\)'
-sentinel_present "SPEC-2 dev config mutation production guarded" src/store/config.ts 'if \(IS_PRODUCTION\) return'
+sentinel_present "SPEC-2 dev config mutation production guarded" src/store/config.ts 'if \(remoteApiEnabled \|\| IS_PRODUCTION\) return'
 sentinel_present "SPEC-2 compute entry render guarded" src/components/earn/compute-share-entry.vue 'v-if="enabled"'
 sentinel_present "SPEC-2 download page guard uses feature flag" src/pages/compute-share/download.vue 'isEnabled\("computeShareEnabled"\)'
 sentinel_present "SPEC-2 download body does not render while disabled" src/pages/compute-share/download.vue 'v-if="enabled" class="pb-8"'

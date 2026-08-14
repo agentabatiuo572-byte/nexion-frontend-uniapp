@@ -47,13 +47,13 @@ beforeEach(() => {
 test("an A receipt resolving after logout and B login cannot overwrite B's credential", async () => {
   let resolveA: ((value: ReturnType<typeof receipt>) => void) | undefined;
   const a = tracker("account-A", () => new Promise((resolve) => { resolveA = resolve; }));
-  a.tap({ route: "/pages/home/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
+  a.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
   await Promise.resolve();
 
   // A logout/rotation cancels A's queue before B begins a fresh authenticated scope.
   a.discard();
   const b = tracker("account-B", async () => receipt("h5.20260812", tokenB));
-  b.tap({ route: "/pages/home/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
+  b.tap({ route: "/pages/index/index", clientX: 1, clientY: 1, viewportWidth: 10, viewportHeight: 10 });
   await b.flush();
   expect(getAcceptanceObservationCredential()).toBe(`h5.20260812.${tokenB}`);
 

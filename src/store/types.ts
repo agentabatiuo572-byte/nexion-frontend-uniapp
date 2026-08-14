@@ -61,6 +61,8 @@ export interface CompletedTask extends CurrentTask {
 
 export interface Device {
   id: string;
+  /** Server CAS version. Remote mutations must send this exact value. */
+  rowVersion?: number;
   kind: DeviceKind;
   name: string;
   gpu: string;

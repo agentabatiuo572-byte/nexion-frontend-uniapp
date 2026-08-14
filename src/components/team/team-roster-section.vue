@@ -45,7 +45,7 @@
             </view>
           </view>
           <view class="text-right shrink-0">
-            <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
+            <text v-if="showContribution" class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: accentText }">+${{ contribution(m).toFixed(2) }}</text>
             <text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">${{ m.monthVolumeUSD }} vol</text>
           </view>
         </view>
@@ -71,8 +71,10 @@ const props = defineProps<{
   isOpen: boolean;
   emptyLabel: string;
   kind: "direct" | "extended";
+  showContribution?: boolean;
 }>();
 const emit = defineEmits<{ toggle: [] }>();
+const showContribution = computed(() => props.showContribution !== false);
 
 const sortedMembers = computed(() => [...props.members].sort((a, b) => b.monthVolumeUSD - a.monthVolumeUSD));
 

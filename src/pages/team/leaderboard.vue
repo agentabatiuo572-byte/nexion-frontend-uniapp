@@ -23,6 +23,13 @@
       <SubPageHeader back="/pages/team/team" :title="t.leaderboard.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+        <view v-if="remoteApiEnabled && remoteState !== 'ready'" class="text-center" style="padding: 48px 20px">
+          <text class="block" :style="{ color: 'var(--v5-ink-2)', fontSize: '14px' }">{{ remoteState === 'loading' ? t.leaderboard.loading : t.leaderboard.loadError }}</text>
+          <view v-if="remoteState === 'error'" class="inline-flex items-center justify-center active:opacity-70" style="margin-top: 14px; min-height: 44px; padding: 0 18px; border-radius: 999px; background: var(--v5-brand)" @click="loadRemote">
+            <text :style="{ color: 'var(--v5-on-brand)', fontSize: '13px', fontWeight: 600 }">{{ t.leaderboard.retry }}</text>
+          </view>
+        </view>
+        <template v-else>
         <!-- Prize pool hero — de-carded: big number sits directly on the page
              floor. No floor glow (owner call 2026-07-08: page-floor auras get
              deleted, not tuned — clip-edge class of bugs removed at the root). -->
@@ -57,7 +64,7 @@
             <view>
               <text class="block font-mono-tabular" :style="heroCapStyle('var(--v5-brand-2)')">{{ t.leaderboard.myRank.label }}</text>
               <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
-                <text class="font-display tabular-nums" :style="myRankBigStyle">#{{ me.rank }}</text>
+                <text class="font-display tabular-nums" :style="myRankBigStyle">#{{ myRankDisplay }}</text>
                 <text :style="{ fontSize: '12px', color: 'var(--v5-ink-3)' }">/ {{ rows.length.toLocaleString() }}+</text>
               </view>
               <view class="flex items-center" style="margin-top: 8px; gap: 6px">
@@ -157,6 +164,7 @@
 
         <!-- footer note -->
         <text class="block text-center" :style="footerNoteStyle">{{ t.leaderboard.note }}</text>
+        </template>
       </view>
     </view>
   </AppChassis>
@@ -164,23 +172,39 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { LEADERBOARD, PERIOD_PRIZE, PODIUM_PRIZE, MY_RANK, type LeaderPeriod } from "@/mock/leaderboard";
+import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import type { TeamLeaderboardSnapshot } from "@/api/team-insights-api";
+import { useApp } from "@/store/app";
 
 const t = useT();
+const app = useApp();
 const PERIODS: LeaderPeriod[] = ["today", "week", "month", "all"];
 const period = ref<LeaderPeriod>("week");
+const remoteSnapshot = ref<TeamLeaderboardSnapshot | null>(null);
+const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+let remoteRequest = 0;
 // One screen's worth per load — reduces initial render + (future) server load.
 const PAGE_SIZE = 20;
 const visibleCount = ref(PAGE_SIZE);
-watch(period, () => { visibleCount.value = PAGE_SIZE; });
+watch(period, () => { visibleCount.value = PAGE_SIZE; if (remoteApiEnabled) void loadRemote(); });
+watch(() => app.accountKey, () => {
+  if (!remoteApiEnabled) return;
+  remoteSnapshot.value = null;
+  void loadRemote();
+});
 
-const rows = computed(() => LEADERBOARD[period.value]);
-const prize = computed(() => PERIOD_PRIZE[period.value]);
-const me = computed(() => MY_RANK[period.value]);
+const rows = computed(() => remoteApiEnabled ? (remoteSnapshot.value?.period === period.value ? remoteSnapshot.value.rows : []) : LEADERBOARD[period.value]);
+const prize = computed(() => remoteApiEnabled ? { poolUSD: remoteSnapshot.value?.poolUsd ?? 0,
+  topN: remoteSnapshot.value?.topN ?? 0, resetsIn: "—", label: period.value } : PERIOD_PRIZE[period.value]);
+const me = computed(() => remoteApiEnabled ? { rank: remoteSnapshot.value?.myRank ?? null,
+  gapToNext: remoteSnapshot.value?.gapToNext ?? 0 } : MY_RANK[period.value]);
+const myRankDisplay = computed(() => me.value.rank === null ? "—" : String(me.value.rank));
 const top3 = computed(() => rows.value.slice(0, 3));
 const rest = computed(() => rows.value.slice(3));
 const visibleRest = computed(() => rest.value.slice(0, visibleCount.value));
@@ -189,6 +213,25 @@ const hasMore = computed(() => visibleCount.value < rest.value.length);
 function loadMore() {
   visibleCount.value = Math.min(rest.value.length, visibleCount.value + PAGE_SIZE);
 }
+
+async function loadRemote() {
+  const request = ++remoteRequest;
+  const accountKey = app.accountKey;
+  const requestedPeriod = period.value;
+  remoteState.value = "loading";
+  try {
+    const snapshot = await teamInsightsApi.leaderboard(requestedPeriod);
+    if (request !== remoteRequest || accountKey !== app.accountKey || requestedPeriod !== period.value) return;
+    remoteSnapshot.value = snapshot;
+    remoteState.value = "ready";
+  } catch {
+    if (request !== remoteRequest || accountKey !== app.accountKey || requestedPeriod !== period.value) return;
+    remoteSnapshot.value = null;
+    remoteState.value = "error";
+  }
+}
+
+onShow(() => { if (remoteApiEnabled) void loadRemote(); });
 
 // Podium display order: #2 (left) / #1 (center, raised) / #3 (right)
 const podiumDisplay = computed(() => {
@@ -203,7 +246,9 @@ const podiumDisplay = computed(() => {
 });
 
 const payoutToText = computed(() => fmt(t.value.leaderboard.pool.payoutTo, { n: prize.value.topN }));
-const gapText = computed(() => fmt(t.value.leaderboard.myRank.gap, { amount: me.value.gapToNext.toLocaleString() }));
+const gapText = computed(() => me.value.rank === null
+  ? t.value.leaderboard.myRank.notRanked
+  : fmt(t.value.leaderboard.myRank.gap, { amount: me.value.gapToNext.toLocaleString() }));
 
 function fmtCompactUSD(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;

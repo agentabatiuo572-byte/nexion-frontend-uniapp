@@ -120,6 +120,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -130,6 +131,7 @@ import {
   type CommissionEvent,
   type CommissionKind,
 } from "@/store/commission";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const commission = useCommission();
@@ -155,6 +157,7 @@ const KIND: Record<CommissionKind, KindSpec> = {
 onMounted(() => {
   commission.unlockMatured();
 });
+onShow(() => { if (remoteApiEnabled) void commission.refreshCanonicalEvents(); });
 
 const events = computed(() => commission.events);
 const byKind = computed(() => commission.byKind());

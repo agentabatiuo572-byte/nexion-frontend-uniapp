@@ -262,7 +262,12 @@ export const useTickets = defineStore("tickets", () => {
     accountKeyValue = accountKey;
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
     pendingKeys = new Map();
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending);
+    const epoch = accountEpoch;
+    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch((cause) => {
+      if (epoch === accountEpoch) {
+        error.value = cause instanceof Error ? cause.message : "SUPPORT_TICKETS_LOAD_FAILED";
+      }
+    });
   }
   function reset() { clearAccount(); pendingKeys = new Map(); }
 

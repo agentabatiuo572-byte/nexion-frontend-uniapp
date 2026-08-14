@@ -30,10 +30,14 @@
       </view>
 
       <!-- Empty state -->
-      <view v-if="!q.trim()" class="mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
+      <view v-if="!q.trim()" class="nx-empty mx-4 mt-4 rounded-2xl text-center" :style="emptyCardStyle">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 8px"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
         <text class="block" style="font-size: 13px; color: var(--v5-ink)">{{ t.search.emptyTitle }}</text>
         <text class="block" style="font-size: 12px; color: var(--v5-ink-3); margin-top: 4px; line-height: 1.625">{{ t.search.emptyBody }}</text>
+        <view class="nx-search-nova active:opacity-75" role="button" tabindex="0"
+          @click="openNova('')" @keydown.enter.prevent="openNova('')" @keydown.space.prevent="openNova('')">
+          <text>{{ t.search.askNova }}</text>
+        </view>
       </view>
 
       <!-- 无搜索结果 —— 《06》no-search-results:插画 + 引导 + 清除搜索 -->
@@ -42,8 +46,8 @@
         kind="no-search-results"
         :title="t.empty.searchTitle"
         :desc="t.empty.searchDesc"
-        :cta-label="t.empty.searchCta"
-        @cta="q = ''"
+        :cta-label="t.search.askNova"
+        @cta="openNova(q)"
       />
 
       <!-- Results -->
@@ -72,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type CSSProperties } from "vue";
+import { ref, computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -83,8 +87,10 @@ import { useNetwork } from "@/store/network";
 import { PRODUCTS } from "@/mock/products";
 import { productCopy } from "@/lib/product-copy";
 import { deviceName, deviceGpuLabel } from "@/lib/device-copy";
+import { remoteApiEnabled } from "@/api/runtime";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 
-type Group = "route" | "device" | "product" | "member" | "faq";
+type Group = "route" | "device" | "product" | "member" | "faq" | "help";
 interface Hit {
   group: Group;
   label: string;
@@ -98,8 +104,15 @@ const network = useNetwork();
 
 const q = ref("");
 
+onMounted(() => {
+  if (!remoteApiEnabled) return;
+  void refreshProductCatalog();
+  void network.refreshCanonicalNetwork();
+});
+
 const devices = computed(() => app.visibleDevices);
 const members = computed(() => network.members);
+const searchableProducts = computed(() => !remoteApiEnabled || productCatalogState.status === "ready" ? PRODUCTS : []);
 
 // Static route/FAQ catalog. Copy lives in i18n (search.routes / search.faqEntries);
 // only the key→href binding stays here. href = uni page path when the page is
@@ -148,7 +161,7 @@ const results = computed<Hit[]>(() => {
       out.push({ group: "route", label: c.label, sublabel: c.sub, href: r.href });
     }
   }
-  for (const p of PRODUCTS) {
+  for (const p of searchableProducts.value) {
     // Match on the copy the user can actually see, so a Vietnamese query hits a
     // Vietnamese tagline. `name` is a brand mark — untranslated on both sides.
     const tagline = productCopy(t.value, p).tagline;
@@ -186,7 +199,13 @@ const results = computed<Hit[]>(() => {
       out.push({ group: "faq", label: c.label, sublabel: c.sub, href: f.href });
     }
   }
-  return out.slice(0, 30);
+  const help: Hit = {
+    group: "help",
+    label: t.value.search.askNova,
+    sublabel: t.value.search.askNovaWithQuery.replace("{query}", q.value.trim()),
+    href: `/pages/support/chat?type=ai&prompt=${encodeURIComponent(q.value.trim())}`,
+  };
+  return out.length ? [...out.slice(0, 29), help] : [];
 });
 
 // Grouped as an ordered list of { group, hits } (preserves insertion order,
@@ -211,6 +230,11 @@ function groupLabel(g: Group): string {
 
 function openHit(h: Hit) {
   uni.navigateTo({ url: h.href, fail: () => {} });
+}
+
+function openNova(query: string) {
+  const suffix = query.trim() ? `&prompt=${encodeURIComponent(query.trim())}` : "";
+  uni.navigateTo({ url: `/pages/support/chat?type=ai${suffix}`, fail: () => {} });
 }
 
 // ── styles ──
@@ -269,5 +293,15 @@ function rowStyle(isLast: boolean): CSSProperties {
 /* 原版 active:bg-[var(--v5-surface-2)] — row press feedback via bg, not opacity */
 .nx-search-row:active {
   background: var(--v5-surface-2);
+}
+.nx-search-nova {
+  width: max-content;
+  margin: 14px auto 0;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--v5-brand-soft);
+  color: var(--v5-brand);
+  font-size: 13px;
+  font-weight: 600;
 }
 </style>

@@ -54,6 +54,7 @@ const LEDGER = {
   "GET /api/config/leadership-pool": "PRD §9.11c.1",
   "GET /api/config/milestones": "PRD §9.11c.1",
   "GET /api/config/phone-tiers": "PRD §9.11c.1",
+  "/api/config/phone-tiers": "PRD §9.11c.1",
   "GET /api/config/staking/pools": "PRD §9.11c.1",
   "GET /api/config/task-capacity": "PRD §6.8 / §9.11c.1(PRD 原文标 TBD)",
   "GET /api/config/tradein": "PRD §7.5.1 / §9.11c.1",
@@ -89,6 +90,8 @@ const LEDGER = {
 
   // ── orders / store ────────────────────────────────────────────────────
   "POST /api/orders": "PRD §7.5 / §9.10 / §9.11e",
+  "/api/orders": "PRD §7.4 / §7.5 / §9.10",
+  "POST /api/orders/bundle": "TBD: 2026-08-13 服务端权威组合定价与原子建单契约;PRD §7.5 / §9.10 待同步 bundle 资源",
   "GET /api/orders": "TBD: PRD §7.4 只定义了按 id 读单;列表读回路已由 order-api.ts 的 list() 实现(store/order-canonical.ts 在用),PRD 同步时补条目",
   "GET /api/orders/:id": "PRD §7.4(SSE)",
   "GET /api/store/catalog": "PRD §7.1",
@@ -116,6 +119,8 @@ const LEDGER = {
   "PATCH /api/me/rewards/seen": "PRD §11.5a",
   "GET /api/earnings/release-status": "TBD: PRD 未定名 —— 收益放行桶(可提现 / 待审 / 赠金锁定)的读取端点,概念见 PRD §9.3「提现只认可提现桶」;实现在 src/api/earnings-release-api.ts。🔴 它**只回锁定桶,不回总余额**:全仓没有任何余额端点,所以「提现后回拉服务端余额」这条路不成立(见 app.ts applyWithdrawalDebit 头注)。PRD 同步时定名",
   "GET /api/me/earnings": "PRD §9.11c.1",
+  "/api/devices/earnings": "TBD: 设备收益推送候选资源;当前仅为迁移说明,以实际 earnings authority 为准",
+  "/api/app/wallet/sandbox": "TBD: 受控验收 Funds sandbox 投影族;仅用于永久 Sandbox 标签说明",
   "/api/me/earnings/stream": "PRD §9.11c.1(SSE)",
 
   // ── vouchers ──────────────────────────────────────────────────────────
@@ -128,10 +133,8 @@ const LEDGER = {
   "GET /api/quest": "PRD §9.11c.2",
   "POST /api/quest/complete": "PRD §9.11c.2",
   "GET /api/quests/weekly": "PRD §9.11c.2",
-  "POST /api/quests/weekly/{tier1}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{tier2/:id}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{bonus}": "PRD §11.13.5",
-  "POST /api/quests/weekly/{tier1|tier2/:id|bonus}": "PRD §11.13.5",
+  "GET /api/quests/state": "TBD: 创世任务状态候选读面;当前仅用于 tripwire 说明,以后端契约为准",
+  "POST /api/quests/{questCode}/claim": "TBD: 周任务按 questCode 原子领取的服务端权威命令;后端已实现,PRD §9.11c.2 待同步资源形状",
   "POST /api/faucet/sign-in": "PRD §11.12",
   "POST /api/nex/sign-in": "TBD: PRD 用 POST /api/faucet/sign-in;本处为旧候选名,接后台时以 faucet 为准",
   "POST /api/me/milestones/:id/claim": "PRD §11.3a",
@@ -166,7 +169,6 @@ const LEDGER = {
   "GET /api/pool/state": "PRD §8.5.2",
   "GET /api/server-time": "PRD §9.11a.4",
   "GET /api/market": "TBD: 与 §10.3 `/api/market/nex` 是同一个平台牌价,重复候选名;注释应改指 /api/market/nex",
-  "/api/market/nex": "PRD §10.3(WebSocket 推送)",
   "GET /api/market/tokens": "PRD §11.9.3",
   "GET /api/admin/platform/phase-config": "PRD §9.11d",
   "PUT /api/admin/tradein/config": "TBD: PRD 未定义置换配置写接口(admin 侧,候选名)",

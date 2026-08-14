@@ -109,13 +109,23 @@ export const defineStore = (id, setup) => () => {
 };
 
 const rejections = [];
-process.on("unhandledRejection", (err) => { rejections.push(String(err?.message ?? err)); });
+let activeProbeKey = "bootstrap";
+process.on("unhandledRejection", (err) => {
+  rejections.push(`${activeProbeKey}: ${String(err?.message ?? err)}`);
+});
 
 async function loadEntry(contents) {
   const out = await build({
     stdin: { contents, resolveDir: root, loader: "ts" },
     bundle: true, write: false, format: "esm", platform: "neutral",
-    define: { "import.meta.env.PROD": "false", "import.meta.env.DEV": "true", "import.meta.env.MODE": '"test"' },
+    define: {
+      "import.meta.env.PROD": "false",
+      "import.meta.env.DEV": "true",
+      "import.meta.env.MODE": '"test"',
+      "import.meta.env.VITE_NEXGRID_API_MODE": '"remote"',
+      "import.meta.env.VITE_NEXGRID_API_BASE_URL": '"http://unreachable.invalid"',
+      "import.meta.env.VITE_NEXGRID_API_DEV_BASE_URL": '"http://unreachable.invalid"',
+    },
     plugins: [{
       name: "stubs",
       setup(b) {
@@ -145,6 +155,7 @@ let exercised = 0;
 const notExercised = [];
 for (const t of uniq) {
   const key = `${t.file}#${t.fn}`;
+  activeProbeKey = key;
   const modName = t.file.replace(/^src\//, "@/").replace(/\.ts$/, "");
   const before = globalThis.__z1ApiCalls;
   try {
@@ -177,7 +188,7 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
   exercised + notExercised.length === uniq.length);
 // 🔴 基数台账(z1 R2 对抗审计 P1-25):`>= N` 下限守不住删除向 —— 从 16 退化到 3 也判绿。
 // 缝数变化必须有人来改这个数,顺带逼他确认新增/删除的那条缝该不该有门。
-const EXPECTED_SEAMS = 16;
+const EXPECTED_SEAMS = 25;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来

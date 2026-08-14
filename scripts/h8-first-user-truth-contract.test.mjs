@@ -15,14 +15,15 @@ test("remote H8 share surfaces use only the current server projection", () => {
   assert.doesNotMatch(card, /canonical === app\.user\.referralCode/);
 });
 
-test("remote H8 team metrics fail closed instead of rendering the network and pool demos", () => {
+test("remote H8 team metrics use server projections while demo-only pools stay hidden", () => {
   const team = read("src/pages/team/team.vue");
 
   assert.match(team, /useReferralReward/);
   assert.match(team, /referralRewards\.snapshot\?\.invitedCount/);
   assert.match(team, /v-if="!remoteApiEnabled"[\s\S]*nx-team-leadership-pool-link/);
   assert.match(team, /<TeamLedgerCard[\s\S]*v-if="!remoteApiEnabled"/);
-  assert.match(team, /function openReferralNetwork\(\) \{[\s\S]*if \(remoteApiEnabled\) return;/);
+  assert.match(team, /function openReferralNetwork\(\) \{[\s\S]*go\("\/pages\/team\/unilevel"\)/);
+  assert.match(team, /network\.refreshCanonicalNetwork\(\)/);
   assert.match(team, /nx-team-leaderboard-link[\s\S]*v-if="!remoteApiEnabled"/);
   assert.match(team, /<!-- Team tools -->[\s\S]*v-if="!remoteApiEnabled"/);
 });

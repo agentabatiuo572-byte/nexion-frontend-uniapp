@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { VRank } from "./v-rank";
+import { remoteApiEnabled, teamNetworkApi } from "@/api/runtime";
 
 /**
  * Ported from Nexion-prototype/lib/v3/network.ts + network-seed.ts
@@ -22,11 +23,11 @@ export interface NetworkMember {
   avatar: string; // emoji or single char
   vRank: VRank;
   layer: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-  binary: "left" | "right";
+  binary: "left" | "right" | "unassigned";
   isSpillover: boolean;
   joinedAt: number; // epoch ms
   monthVolumeUSD: number;
-  totalVolumeUSD: number;
+  totalVolumeUSD: number | null;
   status: MemberStatus;
   sponsorId?: string;
   city: string;
@@ -127,10 +128,55 @@ const NETWORK_SEED: NetworkMember[] = [
 type ByLayer = Record<1 | 2 | 3 | 4 | 5 | 6 | 7, NetworkMember[]>;
 
 export const useNetwork = defineStore("network", () => {
-  const members = ref<NetworkMember[]>([...NETWORK_SEED]);
-  const totalMembers = ref(NETWORK_SEED.length);
-  const totalMonthVolumeUSD = ref(NETWORK_SEED.reduce((s, m) => s + m.monthVolumeUSD, 0));
-  const totalAllTimeVolumeUSD = ref(NETWORK_SEED.reduce((s, m) => s + m.totalVolumeUSD, 0));
+  const initial = remoteApiEnabled ? [] : NETWORK_SEED;
+  const members = ref<NetworkMember[]>([...initial]);
+  const totalMembers = ref(initial.length);
+  const totalMonthVolumeUSD = ref(initial.reduce((s, m) => s + m.monthVolumeUSD, 0));
+  const totalAllTimeVolumeUSD = ref<number | null>(initial.reduce((s, m) => s + (m.totalVolumeUSD ?? 0), 0));
+  const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  let accountEpoch = 0;
+  let refreshSequence = 0;
+
+  async function refreshCanonicalNetwork(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    const epoch = accountEpoch;
+    const request = ++refreshSequence;
+    remoteStatus.value = "loading";
+    try {
+      const snapshot = await teamNetworkApi.snapshot();
+      if (epoch !== accountEpoch || request !== refreshSequence) return false;
+      members.value = snapshot.members.map((member) => ({
+        id: member.id, name: member.name, avatar: member.avatarUrl ?? member.name.slice(0, 1).toUpperCase(),
+        vRank: member.vRank as VRank, layer: member.layer,
+        binary: member.leg === "A" ? "left" : member.leg === "B" ? "right" : "unassigned",
+        isSpillover: false, joinedAt: Date.parse(member.joinedAt), monthVolumeUSD: member.monthVolumeUsdt,
+        totalVolumeUSD: member.lifetimeVolumeUsdt,
+        status: member.status === "ACTIVE" ? "active" : member.status === "IDLE" ? "idle" : "offline",
+        sponsorId: member.sponsorId ?? undefined, city: member.region ?? "—",
+      }));
+      totalMembers.value = snapshot.totalMembers;
+      totalMonthVolumeUSD.value = snapshot.monthVolumeUsdt;
+      totalAllTimeVolumeUSD.value = snapshot.lifetimeVolumeUsdt;
+      remoteStatus.value = "ready";
+      return true;
+    } catch {
+      if (epoch !== accountEpoch || request !== refreshSequence) return false;
+      remoteStatus.value = "error";
+      return false;
+    }
+  }
+
+  function bindAccount(_accountKey: string): void {
+    accountEpoch += 1;
+    refreshSequence += 1;
+    const next = remoteApiEnabled ? [] : NETWORK_SEED;
+    members.value = [...next];
+    totalMembers.value = next.length;
+    totalMonthVolumeUSD.value = next.reduce((sum, member) => sum + member.monthVolumeUSD, 0);
+    totalAllTimeVolumeUSD.value = remoteApiEnabled ? null : next.reduce((sum, member) => sum + (member.totalVolumeUSD ?? 0), 0);
+    remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
+    if (remoteApiEnabled) void refreshCanonicalNetwork();
+  }
 
   function byLayer(): ByLayer {
     const buckets: Record<number, NetworkMember[]> = {
@@ -145,7 +191,7 @@ export const useNetwork = defineStore("network", () => {
     const right: NetworkMember[] = [];
     for (const m of members.value) {
       if (m.binary === "left") left.push(m);
-      else right.push(m);
+      else if (m.binary === "right") right.push(m);
     }
     return { left, right };
   }
@@ -199,6 +245,6 @@ export const useNetwork = defineStore("network", () => {
   return {
     members, totalMembers, totalMonthVolumeUSD, totalAllTimeVolumeUSD,
     byLayer, byBinary, leftVolumeMonth, rightVolumeMonth,
-    binaryMatchToday, vDownlineCounts, addSpillover,
+    binaryMatchToday, vDownlineCounts, addSpillover, remoteStatus, refreshCanonicalNetwork, bindAccount,
   };
 });

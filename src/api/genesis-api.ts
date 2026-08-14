@@ -46,6 +46,14 @@ export interface GenesisHolding {
   listedAt: number | null;
 }
 
+export interface GenesisEmission {
+  batchNo: string;
+  holdingNo: string;
+  amountUsdt: number;
+  status: "PENDING" | "PAID" | "FAILED";
+  paidAt: number | null;
+}
+
 export interface GenesisListing {
   holdingNo: string;
   seriesCode: string;
@@ -94,6 +102,7 @@ export interface GenesisAccountState {
   marketEnabled: boolean;
   emissionOpen: boolean;
   holdings: GenesisHolding[];
+  emissions: GenesisEmission[];
   eligibility: GenesisEligibility;
   walletBalanceUsdt: number;
   billNo?: string;
@@ -215,6 +224,23 @@ function parseHolding(value: unknown): GenesisHolding {
   };
 }
 
+function parseEmission(value: unknown): GenesisEmission {
+  const row = record(value);
+  const batchNo = text(row?.batchNo);
+  const holdingNo = text(row?.holdingNo);
+  const amountUsdt = number(row?.amountUsdt, 0.000001);
+  const status = text(row?.status);
+  if (!row || !batchNo || !holdingNo || amountUsdt === null
+      || (status !== "PENDING" && status !== "PAID" && status !== "FAILED")) return invalid();
+  return {
+    batchNo,
+    holdingNo,
+    amountUsdt,
+    status,
+    paidAt: timestamp(row.paidAt, true),
+  };
+}
+
 function parseListing(value: unknown): GenesisListing {
   const row = record(value);
   const holdingNo = text(row?.holdingNo);
@@ -300,13 +326,14 @@ export function parseGenesisAccountState(value: unknown): GenesisAccountState {
   const walletBalanceUsdt = number(row?.walletBalanceUsdt);
   if (!row || row.serverCanonical !== true || typeof row.marketEnabled !== "boolean"
       || typeof row.emissionOpen !== "boolean" || !Array.isArray(row.holdings)
-      || walletBalanceUsdt === null) return invalid();
+      || !Array.isArray(row.emissions) || walletBalanceUsdt === null) return invalid();
   return {
     series,
     sale,
     marketEnabled: row.marketEnabled,
     emissionOpen: row.emissionOpen,
     holdings: row.holdings.map(parseHolding),
+    emissions: row.emissions.map(parseEmission),
     eligibility: parseEligibility(row.eligibility),
     walletBalanceUsdt,
     billNo: text(row.billNo) ?? undefined,

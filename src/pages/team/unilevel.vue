@@ -18,6 +18,11 @@
       <SubPageHeader back="/pages/team/team" :title="t.unilevel.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
+        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" :style="errorStateStyle">
+          <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
+          <view role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text></view>
+        </view>
         <!-- Hero — de-carded: royalty total sits directly on the page floor
              (bordered card + page-floor radial glow deleted outright, owner
              call 2026-07-08). Rules-intro pill sits on the section-title row
@@ -31,16 +36,16 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </view>
           </view>
-          <text class="block font-display tabular-nums" :style="heroBigStyle">${{ totalRoyalty.toFixed(2) }}</text>
+          <text class="block font-display tabular-nums" :style="heroBigStyle">{{ remoteApiEnabled ? '—' : `$${totalRoyalty.toFixed(2)}` }}</text>
           <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
-            <text>{{ heroRateLineText }}</text>
+            <text>{{ remoteApiEnabled ? t.unilevel.serverRewardHold : heroRateLineText }}</text>
           </view>
         </view>
 
         <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
              card each (owner 2026-07-09; chassis glass-tile tokens); colored
              badge chips + values carry the semantic identity. -->
-        <view class="flex items-start" style="gap: 12px" :style="glassCardStyle">
+        <view v-if="!remoteApiEnabled" class="flex items-start" style="gap: 12px" :style="glassCardStyle">
           <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
           <view class="flex-1 min-w-0">
             <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
@@ -52,7 +57,7 @@
             <text class="block" :style="{ fontSize: '12px', color: 'var(--v5-ink-3)', marginTop: '2px' }">{{ directMembersText }}</text>
           </view>
         </view>
-        <view :style="glassCardStyle">
+        <view v-if="!remoteApiEnabled" :style="glassCardStyle">
           <view class="flex items-start" style="gap: 12px">
             <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
             <view class="flex-1 min-w-0">
@@ -83,7 +88,7 @@
              2026-07-09); the four tier cells keep their fills, borders
              dropped (selection/comparison whitelist, podium idiom: current
              cell tinted, rest dimmed surface-2). -->
-        <view :style="glassCardStyle">
+        <view v-if="!remoteApiEnabled" :style="glassCardStyle">
           <text class="block font-mono-tabular" :style="{ fontSize: '12px', letterSpacing: '0.16em', color: 'var(--v5-ink-3)' }">{{ t.unilevel.rateTierLabel }}</text>
           <text class="block" :style="{ marginTop: '8px', fontSize: '12px', color: 'var(--v5-ink-3)', lineHeight: 1.6 }">{{ t.unilevel.rateTierNote }}</text>
 
@@ -159,7 +164,7 @@
                 </view>
               </view>
               <view class="text-right">
-                <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ memberCommission(m).toFixed(2) }}</text>
+                <text class="font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">{{ remoteApiEnabled ? `$${m.monthVolumeUSD} vol` : `+$${memberCommission(m).toFixed(2)}` }}</text>
               </view>
             </view>
             <!-- View more — explicit user click (leaderboard idiom), 44px ghost. -->
@@ -175,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties } from "vue";
+import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -183,6 +188,7 @@ import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
+import { remoteApiEnabled } from "@/api/runtime";
 import { UNILEVEL_USDT } from "@/store/commission";
 
 type RateTierId = "standard" | "verified" | "elite" | "diamond";
@@ -214,6 +220,7 @@ type PlottedMember = NetworkMember & { kind: "direct" | "extended" };
 
 const t = useT();
 const network = useNetwork();
+onMounted(() => { if (remoteApiEnabled) void network.refreshCanonicalNetwork(); });
 const filter = ref<FilterId>("all");
 
 const byLayer = computed(() => network.byLayer());
@@ -312,6 +319,8 @@ const howEntryStyle: CSSProperties = {
 // De-carded hero: no surface/border/glow — content sits directly on the page
 // floor (page-floor auras are deleted outright per owner call, not re-tuned).
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
+const errorStateStyle: CSSProperties = { padding: "14px", borderRadius: "14px", background: "var(--v5-warning-soft)", color: "var(--v5-ink)" };
+const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "grid", placeItems: "center", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)" };
 const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroTierChipStyle = computed<CSSProperties>(() => ({

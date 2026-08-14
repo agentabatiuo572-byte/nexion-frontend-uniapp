@@ -30,7 +30,7 @@
       <view v-if="app.remoteFleetStatus === 'error'" class="mx-4 rounded-xl" style="padding: 12px; background: var(--v5-danger-soft); color: var(--v5-danger)">
         <text class="block" style="font-size: 13px; font-weight: 600">{{ t.wallet.syncFailedTitle }}</text>
         <text class="block" style="font-size: 12px; margin-top: 4px">{{ t.wallet.syncFailedBody }}</text>
-        <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)" @click="retryFleet">{{ t.tradein.errPleaseRetry }}</view>
+        <view class="inline-flex items-center active:opacity-70" style="min-height: 44px; margin-top: 4px; color: var(--v5-brand)" @click="retryFleet"><text>{{ t.tradein.errPleaseRetry }}</text></view>
       </view>
       <!-- ===== HERO: pill tabs ===== -->
       <view class="mx-4">

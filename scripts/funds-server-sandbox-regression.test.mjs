@@ -76,8 +76,8 @@ assert.match(bills, /expectedAccountKey[\s\S]{0,800}FUNDS_SANDBOX_ACCOUNT_CHANGE
   "ledger refresh must reject a response after account switching");
 assert.match(ledgerProjection, /source: "mock"[\s\S]{0,120}sourceEnvironment: "SANDBOX"/,
   "sandbox ledger rows must remain visibly labelled");
-assert.match(billPage, /onShow\(async \(\) =>[\s\S]{0,300}refreshFundsSandboxLedger/,
-  "the ledger page must re-read the server authority after refresh or re-entry");
+assert.match(billPage, /onShow\(async \(\) =>[\s\S]{0,300}refreshServerLedger/,
+  "the ledger page must re-read the current server authority after refresh or re-entry");
 assert.match(billPage, /b\.balanceAfter !== undefined[\s\S]{0,200}runningBalanceLabel\(b\.balanceAfter!/,
   "ledger UI must render the authoritative availableAfter projection");
 assert.match(billPage, /<FundsSandboxBadge\b/,

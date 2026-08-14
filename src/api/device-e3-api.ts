@@ -3,6 +3,7 @@ import { ApiError } from "./errors";
 
 export interface CanonicalE3Device {
   id: number;
+  rowVersion: number;
   instanceNo: string;
   name: string;
   deviceType: string;
@@ -32,6 +33,7 @@ export interface CanonicalE3Fleet {
   walletNex: number;
   userJoinedAt: number;
   serverNow: number;
+  slotCap: number;
   devices: CanonicalE3Device[];
   capacitySchedule: Record<string, string>;
   source: string;
@@ -79,6 +81,14 @@ export interface CanonicalTradeinResult {
   walletBalanceAfterUsdt: number;
 }
 
+export interface CanonicalDeviceCommandResult {
+  deviceId: number;
+  instanceNo: string;
+  status: "ACTIVE" | "DEACTIVATED";
+  rowVersion: number;
+  alreadyApplied: boolean;
+}
+
 export type CapacityReplaceDecision = "CAPACITY_AVAILABLE" | "NO_ACTIVE_DEVICE" | "REPLACE_REQUIRED";
 
 export interface CanonicalCapacityReplaceQuote {
@@ -114,7 +124,8 @@ export interface DeviceE3Api {
     idempotencyKey: string,
     expectedQuote: CanonicalTradeinQuote,
   ): Promise<CanonicalTradeinResult>;
-  activate(deviceId: number, clientMaxDevices: number, idempotencyKey: string): Promise<void>;
+  activate(deviceId: number, expectedVersion: number, clientMaxDevices: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
+  deactivate(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
 }
 
 function invalid(message = "E3_CANONICAL_RESPONSE_INVALID"): never {
@@ -174,6 +185,7 @@ function device(value: unknown): CanonicalE3Device {
   const source = record(value);
   return {
     id: integer(source.id, 1),
+    rowVersion: integer(source.rowVersion),
     instanceNo: string(source.instanceNo),
     name: string(source.name),
     deviceType: string(source.deviceType),
@@ -209,6 +221,7 @@ function fleet(value: unknown): CanonicalE3Fleet {
     walletNex: number(source.walletNex),
     userJoinedAt: integer(source.userJoinedAt),
     serverNow: integer(source.serverNow),
+    slotCap: integer(source.slotCap, 1),
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
     source: string(source.source),
@@ -281,6 +294,21 @@ function result(value: unknown): CanonicalTradeinResult {
   };
   if (parsed.applicationStatus !== "COMPLETED" || parsed.orderStatus !== "COMPLETED") return invalid();
   return parsed;
+}
+
+function deviceCommand(value: unknown, expectedStatus: CanonicalDeviceCommandResult["status"]): CanonicalDeviceCommandResult {
+  const source = record(value);
+  const status = string(source.status).toUpperCase();
+  if (status !== expectedStatus) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
+  return {
+    deviceId: integer(source.deviceId, 1),
+    instanceNo: string(source.instanceNo),
+    status,
+    rowVersion: integer(source.rowVersion),
+    alreadyApplied: expectedStatus === "ACTIVE"
+      ? boolean(source.alreadyActive)
+      : boolean(source.alreadyDeactivated),
+  };
 }
 
 function sameMoney(actual: number, expected: number): boolean {
@@ -419,15 +447,31 @@ export function createDeviceE3Api(client: ApiClient): DeviceE3Api {
         idempotencyKey: key,
       })), expectedQuote);
     },
-    async activate(deviceId, clientMaxDevices, idempotencyKey) {
+    async activate(deviceId, expectedVersion, clientMaxDevices, idempotencyKey) {
       const key = idempotencyKey.trim();
       if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
-      await client.request<unknown>({
+      const id = integer(deviceId, 1);
+      const result = deviceCommand(await client.request<unknown>({
         method: "POST",
         path: "/api/devices/activate",
-        body: { deviceId: integer(deviceId, 1), clientMaxDevices: integer(clientMaxDevices, 1) },
+        body: { deviceId: id, expectedVersion: integer(expectedVersion), clientMaxDevices: integer(clientMaxDevices, 1) },
         idempotencyKey: key,
-      });
+      }), "ACTIVE");
+      if (result.deviceId !== id || result.rowVersion < expectedVersion) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
+      return result;
+    },
+    async deactivate(deviceId, expectedVersion, idempotencyKey) {
+      const key = idempotencyKey.trim();
+      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+      const id = integer(deviceId, 1);
+      const result = deviceCommand(await client.request<unknown>({
+        method: "POST",
+        path: `/api/device/${deviceId}/deactivate`,
+        body: { expectedVersion: integer(expectedVersion) },
+        idempotencyKey: key,
+      }), "DEACTIVATED");
+      if (result.deviceId !== id || result.rowVersion < expectedVersion) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
+      return result;
     },
   };
 }

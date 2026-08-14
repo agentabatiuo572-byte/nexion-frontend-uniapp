@@ -172,6 +172,9 @@ import { getMonthsSince, isTradeInTargetAvailable } from "@/store/product-phase"
 import { useProductPhase } from "@/composables/use-product-phase";
 import type { Device } from "@/store/types";
 import { confirm as uiConfirm, toast } from "@/store/ui";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import { isSettledRejection } from "@/api/errors";
+import { acquireDeviceCommandKey, finishDeviceCommand } from "@/lib/device-command-key";
 
 const t = useT();
 const app = useApp();
@@ -247,8 +250,11 @@ async function handleActivate(d: Device) {
     toast.warn(fmt(t.value.myDevices.inventoryToastSlotsFull, { max: MAX_DEVICES }));
     return;
   }
-  // Pass the trial-reserved slot count so the store's MAX_DEVICES guard stays
-  // authoritative without app.ts importing the trial store.
+  if (remoteApiEnabled) {
+    await runRemoteDeviceCommand(d, "activate");
+    return;
+  }
+  // Mock-only projection keeps the prototype slot simulation.
   const ok = app.activateDevice(d.id, trialReserved.value);
   if (ok) {
     toast.success(fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) }));
@@ -269,7 +275,8 @@ async function handleDeactivate(d: Device) {
     confirmLabel: t.value.myDevices.inventoryConfirmDeactivateOk,
     cancelLabel: t.value.myDevices.inventoryConfirmDeactivateCancel,
   });
-  if (ok) {
+  if (ok && remoteApiEnabled) await runRemoteDeviceCommand(d, "deactivate");
+  else if (ok) {
     app.deactivateDevice(d.id);
     toast.success(fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) }));
   }
@@ -278,16 +285,22 @@ async function handleDeactivate(d: Device) {
 function onSheetWait() {
   const d = sheetDevice.value;
   if (!d) return;
-  app.scheduleDeactivation(d.id);
-  toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
+  if (remoteApiEnabled) toast.warn(t.value.myDevices.inventoryRemoteWaitUnavailable);
+  else {
+    app.scheduleDeactivation(d.id);
+    toast.success(fmt(t.value.deactivateSheet.toastScheduled, { name: deviceName(t.value, d) }));
+  }
   sheetDevice.value = null;
 }
 
-function onSheetForce() {
+async function onSheetForce() {
   const d = sheetDevice.value;
   if (!d) return;
-  app.deactivateDevice(d.id);
-  toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
+  if (remoteApiEnabled) await runRemoteDeviceCommand(d, "deactivate");
+  else {
+    app.deactivateDevice(d.id);
+    toast.warn(fmt(t.value.deactivateSheet.toastForced, { name: deviceName(t.value, d) }));
+  }
   sheetDevice.value = null;
 }
 
@@ -302,6 +315,56 @@ async function handleCancelTrial() {
     const result = await trial.cancel();
     if (result?.ok) toast.info(t.value.trial.toastCancelled);
     else toast.warn(t.value.trial.cancelError);
+  }
+}
+
+async function runRemoteDeviceCommand(d: Device, operation: "activate" | "deactivate"): Promise<boolean> {
+  if (!Number.isSafeInteger(d.rowVersion) || Number(d.rowVersion) < 0) {
+    toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+    return false;
+  }
+  const accountKey = app.accountKey;
+  const version = Number(d.rowVersion);
+  const key = acquireDeviceCommandKey(accountKey, operation, d.id, version);
+  const expectedActive = operation === "activate";
+  const confirmed = () => {
+    if (accountKey !== app.accountKey) return false;
+    const current = app.devices.find((entry) => entry.id === d.id);
+    return Boolean(current) && (current!.activatedAt !== null) === expectedActive;
+  };
+  try {
+    if (operation === "activate") {
+      await deviceE3Api.activate(Number(d.id), version, MAX_DEVICES, key);
+    } else {
+      await deviceE3Api.deactivate(Number(d.id), version, key);
+    }
+    await app.refreshRemoteFleet();
+    if (!confirmed()) throw new Error(operation === "activate"
+      ? "DEVICE_ACTIVATION_NOT_CONFIRMED"
+      : "DEVICE_DEACTIVATION_NOT_CONFIRMED");
+    finishDeviceCommand(accountKey, operation, d.id, version);
+    const message = operation === "activate"
+      ? fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) })
+      : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) });
+    toast.success(message);
+    return true;
+  } catch (cause) {
+    try {
+      await app.refreshRemoteFleet();
+      if (confirmed()) {
+        finishDeviceCommand(accountKey, operation, d.id, version);
+        const message = operation === "activate"
+          ? fmt(t.value.myDevices.inventoryToastActivated, { deviceName: deviceName(t.value, d) })
+          : fmt(t.value.myDevices.inventoryToastDeactivated, { deviceName: deviceName(t.value, d) });
+        toast.success(message);
+        return true;
+      }
+    } catch {
+      // Preserve the original command key while both command and readback remain uncertain.
+    }
+    if (isSettledRejection(cause)) finishDeviceCommand(accountKey, operation, d.id, version);
+    toast.error(t.value.myDevices.inventoryRemoteMutationFailed);
+    return false;
   }
 }
 
