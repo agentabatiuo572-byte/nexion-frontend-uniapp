@@ -185,7 +185,9 @@ export const useDeposits = defineStore("deposits", () => {
     timers.clear();
     if (fundsServerEnabled) {
       serverAccountKey = normalizeAccountKey(rawAccountKey);
-      const expectedAccountKey = serverAccountKey;
+      // (这里原有一行 `const expectedAccountKey = serverAccountKey;` —— 它只服务于调用点侧
+      //  那个已删的 .catch 闭包,闭包没了就成了死变量。账号一致性判断落在两条刷新缝**内部**,
+      //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
       // 🔴 合并裁决(2026-08-14):取远端那侧。
