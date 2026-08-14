@@ -76,8 +76,19 @@ function sliceDecl(src, marker) {
         // 对象型返回值注解(如 eligibility 的 `: { ok; reason? }`)会先于函数体
         // 闭合 —— 若紧随其后的非空白字符仍是 `{`,说明真正的函数体在后面,继续吃。
         let k = j + 1;
-        while (k < src.length && (src[k] === " " || src[k] === "\t" || src[k] === "\n")) k++;
+        while (k < src.length && (src[k] === " " || src[k] === "\t" || src[k] === "\n" || src[k] === "\r")) k++;
         if (src[k] === "{") continue;
+        // 🔴 2026-08-14:还有第二种形状 —— `Promise<{ … }>`。这时对象大括号闭合后
+        //   跟的是 `>`(可能还有 `[]`/空白)而不是 `{`,上面那条认不出来,于是切片
+        //   在**函数签名处就停了**。实测 `async function cancel(): Promise<{ ok; reason? }>`
+        //   被切成 74 字的签名,而真身 1495 字 —— 判据全在一段空文本上跑:
+        //   `indexOf(x) >= 0` 恒假(判红,这次就是它),而 `indexOf(x) < 0` **恒真(假绿)**。
+        //   后者更危险:同一格里两个方向的合取项,红的那半掩盖了绿的那半没在守东西。
+        //   这里继续往后吃到真正的函数体大括号。
+        let m = k;
+        while (m < src.length && (src[m] === ">" || src[m] === "[" || src[m] === "]"
+          || src[m] === " " || src[m] === "\t" || src[m] === "\n" || src[m] === "\r")) m++;
+        if (src[m] === "{") { j = m - 1; depth = 0; continue; }
         break;
       }
     }
