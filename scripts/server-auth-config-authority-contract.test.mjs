@@ -3,6 +3,31 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const read = (file) => readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+// 🔴 fnBlock:按大括号配平抠出**这一个函数的块**,断言只在块内量。
+//   为什么必须有它(2026-08-14 红测实测):`function bindAccount\([\s\S]*?clearRemoteState` 这种
+//   全文懒惰通配,把 bindAccount 里的 clearRemoteState 删掉之后**照样绿** —— 通配滑出函数
+//   边界,命中了别的函数里的同名调用。断言看着在守「重绑必清态」,实际全文出现过就算。
+//   跳参数表再找 `{`(免得被类型注解骗;本仓有 `Promise<{…}>` 撑爆同类抠取器的先例)。
+const fnBlock = (src, name) => {
+  const start = src.indexOf(`function ${name}(`);
+  assert.notEqual(start, -1, `source is missing function ${name}`);
+  let i = src.indexOf("(", start);
+  for (let d = 0; i < src.length; i += 1) {
+    if (src[i] === "(") d += 1;
+    else if (src[i] === ")" && (d -= 1) === 0) { i += 1; break; }
+  }
+  for (let ang = 0; i < src.length; i += 1) {
+    const c = src[i];
+    if (c === "<") ang += 1;
+    else if (c === ">" && src[i - 1] !== "=") ang = Math.max(0, ang - 1);
+    else if (c === "{" && ang === 0) break;
+  }
+  for (let d = 0, s = i; i < src.length; i += 1) {
+    if (src[i] === "{") d += 1;
+    else if (src[i] === "}" && (d -= 1) === 0) return src.slice(s, i + 1);
+  }
+  assert.fail(`unbalanced braces in function ${name}`);
+};
 
 test("server mode starts unauthenticated and only retains a non-secret recovery trace", () => {
   const auth = read("src/store/auth.ts");
@@ -60,16 +85,32 @@ test("remote configuration loads are authoritative and remote writes do not revi
   assert.match(commission, /function withdraw\(id: string\): boolean \{[\s\S]*?if \(remoteApiEnabled\) return false;/);
   assert.match(staking, /async function openRemote\([\s\S]*?if \(!remoteReady\.value\) throw new Error\("G1_REMOTE_AUTHORITY_UNAVAILABLE"\);/);
   assert.match(staking, /const boot = remoteApiEnabled \? \{ positions: \[\], rev: 0 \} : hydrate\(boundKey\)/);
-  assert.match(staking, /function bindAccount\([\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?clearRemoteState\(\);[\s\S]*?void syncRemote\(\)\.catch/);
+    // 🔴 2026-08-14:下面三处不再钉调用点的 `.catch` —— 韧性包(c2c572e/c244c86)把自吞
+  // 挪进了刷新缝内部,「不 reject」由 selfcheck-remote-refresh-resilience 对全部 28 条缝
+  // 行为级看守;调用点的 .catch 成了死代码,有的已删有的还挂着。这里只钉真不变量:
+  // 远端重绑必须清本地态 + 触发一次重拉。带不带 .catch 都接受(它无害,只是没必要)。
+  {
+    const block = fnBlock(staking, "bindAccount");
+    const iClear = block.indexOf("clearRemoteState();");
+    const iSync = block.indexOf("void syncRemote()");
+    assert.ok(iClear >= 0, "remote rebind must clear local staking state (in bindAccount itself)");
+    assert.ok(iSync > iClear, "remote rebind must trigger a resync after clearing (in bindAccount itself)");
+  }
   assert.match(staking, /const pool = pools\.value\.find\(\(row\) => row\.tierKey === tierKey && row\.enabled\);[\s\S]*?if \(!pool \|\| amountUsdt < pool\.minAmountUsdt\) throw new Error\("G1_REMOTE_AUTHORITY_UNAVAILABLE"\);/);
   assert.match(earnConfig, /if \(remoteApiEnabled\) applyCanonicalPhoneTierYields\(\[\]\);/);
   assert.match(earnConfig, /catch \(cause\) \{[\s\S]*?phoneTiers\.value = null;[\s\S]*?applyCanonicalPhoneTierYields\(\[\]\);/);
   assert.match(phoneTiers, /\?\? \{ baseRateUsdt: 0, baseRateNex: 0 \}/);
-  assert.match(app, /if \(remoteApiEnabled\) \{[\s\S]*?void refreshEarnConfig\(\)\.catch[\s\S]*?void useMarket\(\)\.syncRemote\(\)\.catch/);
+  assert.match(app, /if \(remoteApiEnabled\) \{[\s\S]*?void refreshEarnConfig\(\)[\s\S]*?void useMarket\(\)\.syncRemote\(\)/);
   assert.match(accountScope, /useRepurchase\(\)\.bindAccount\(\);/);
   assert.match(repurchase, /async function refresh\(\) \{[\s\S]*?if \(!remoteApiEnabled\) \{[\s\S]*?config\.value = null[\s\S]*?orders\.value = \[\][\s\S]*?return null;/);
   assert.match(repurchase, /async function open\(amountUsdt: number\) \{[\s\S]*?if \(!remoteApiEnabled\) throw new Error\("REPURCHASE_REMOTE_AUTHORITY_REQUIRED"\);/);
-  assert.match(repurchase, /function bindAccount\(\) \{[\s\S]*?pendingKeys\.clear\(\);[\s\S]*?if \(remoteApiEnabled\) void refresh\(\)\.catch/);
+  {
+    const block = fnBlock(repurchase, "bindAccount");
+    const iClear = block.indexOf("pendingKeys.clear();");
+    const iRefresh = block.search(/if \(remoteApiEnabled\) void refresh\(\)/);
+    assert.ok(iClear >= 0, "repurchase rebind must clear pending keys (in bindAccount itself)");
+    assert.ok(iRefresh > iClear, "repurchase rebind must re-pull after clearing (in bindAccount itself)");
+  }
 });
 
 test("remote-only policy branches stay inert until a dedicated server contract exists", () => {
