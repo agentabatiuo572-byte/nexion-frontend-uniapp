@@ -2694,6 +2694,8 @@ export const en = {
     deleteAccountForfeitBalance: "Balance {balance} — will NOT be refunded",
     deleteAccountForfeitPrincipal: "Staked principal {principal} — will NOT be refunded (including terms not yet matured)",
     deleteAccountForfeitLead: "Submitting this request forfeits, permanently:",
+    deleteAccountVerifyFailed: "Couldn't verify your balance and staked principal. Check your connection and try again.",
+    deleteAccountViewWithdrawals: "View withdrawals",
     deleteAccountBlockedByWithdrawal: "A withdrawal is still in progress. Wait until it completes or fails, then submit the deletion request.",
     deleteAccountToast: "Deletion request submitted — you've been signed out",
     deleteAccountUnavailable: "Account deletion is not available yet. We will not report success before the server confirms it.",
