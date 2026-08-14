@@ -192,7 +192,7 @@ async function submit() {
       emitClose();
     } catch {
       // Unknown timeout/result: read the authority before allowing a retry with the same key.
-      await staking.syncRemote().catch(() => {});
+      await staking.syncRemote();
       toast.error(t.value.stakingV3.toast.openFailedTitle);
     } finally {
       remotePending.value = false;

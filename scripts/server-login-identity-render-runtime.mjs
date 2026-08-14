@@ -9,7 +9,7 @@ const serverUser = {
   userId: 60723152644,
   countryCode: "+86",
   phone: "1990811152754",
-  nickname: "Nexion 2754",
+  nickname: "NexGrid 2754",
 };
 
 async function waitUntil(check, message, timeoutMs = 15_000) {
@@ -81,7 +81,7 @@ try {
     return { result, initialProjection: { name: useProfile().displayName, phone: useProfile().phoneE164 } };
   }, serverUser);
   assert.equal(projection.result.ok, true);
-  assert.deepEqual(projection.initialProjection, { name: "Nexion 2754", phone: "+861990811152754" });
+  assert.deepEqual(projection.initialProjection, { name: "NexGrid 2754", phone: "+861990811152754" });
 
   await loginFrame.evaluate(() => {
     uni.reLaunch({ url: "/pages/me/me", fail: () => {} });
@@ -95,7 +95,7 @@ try {
         if (!candidate.url().includes("nx_device_inner")) continue;
         const text = await candidate.locator("body").innerText().catch(() => "");
         observed = { frameUrl: candidate.url(), text: text.slice(0, 240) };
-        if (text.includes("Nexion 2754") && text.includes("+86 ••••• 2754")) {
+        if (text.includes("NexGrid 2754") && text.includes("+86 ••••• 2754")) {
           liveFrame = candidate;
           return true;
         }
@@ -117,7 +117,7 @@ try {
 
   const liveText = await liveFrame.locator("body").innerText();
   const liveVisibility = await liveFrame.evaluate(() => {
-    const node = [...document.querySelectorAll("*")].find((candidate) => candidate.textContent?.trim() === "Nexion 2754");
+    const node = [...document.querySelectorAll("*")].find((candidate) => candidate.textContent?.trim() === "NexGrid 2754");
     if (!node) return { present: false };
     const rect = node.getBoundingClientRect();
     const style = getComputedStyle(node);
@@ -131,7 +131,7 @@ try {
       route: location.hash,
     };
   });
-  assert.match(liveText, /Nexion 2754/);
+  assert.match(liveText, /NexGrid 2754/);
   assert.match(liveText, /\+86 ••••• 2754/);
   assert.doesNotMatch(liveText, /Hyper Summit|\+1 \(415\)|· US/);
   assert.deepEqual(liveVisibility, {
@@ -142,7 +142,7 @@ try {
   });
   await liveFrame.locator("body").screenshot({ path: "scripts/.baseline/_check/live-5173-server-profile.png" });
   process.stdout.write(`live 5173 My DOM identity: ${JSON.stringify({
-    name: /Nexion 2754/.test(liveText),
+    name: /NexGrid 2754/.test(liveText),
     maskedPhone: /\+86 ••••• 2754/.test(liveText),
     seedIdentity: /Hyper Summit|\+1 \(415\)|· US/.test(liveText),
     visible: liveVisibility,

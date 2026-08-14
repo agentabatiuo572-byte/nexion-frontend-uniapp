@@ -8,10 +8,24 @@ export interface AccountApi {
   updateTwoFactor(enabled: boolean, currentPassword: string): Promise<SecurityMutation>;
   revokeSession(sessionId: string): Promise<SecurityMutation>;
   revokeOtherSessions(): Promise<SecurityMutation>;
+  accountDeletionStatus(): Promise<AccountDeletionStatus>;
+  requestAccountDeletion(currentPassword: string, idempotencyKey: string): Promise<AccountDeletionRequest>;
 }
+
+export interface AccountDeletionRequest {
+  requestNo: string;
+  status: "REQUESTED" | "IN_REVIEW" | "BLOCKED" | "COMPLETED" | "CANCELLED";
+  requestedAt: string;
+}
+
+export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
 
 let idempotencySequence = 0;
 
+// IDEMPOTENCY-FRESH-OK: 这四个操作(改密 / 开关 2FA / 踢单个会话 / 踢其它会话)都是「把状态设成某个值」,
+// 不是「新建一笔单据」—— 重放一次结果完全相同,不会多出东西。返回的 SecurityMutation 是状态
+// 快照(twoFactorEnabled / passwordChangedAt / revokedSessionCount),没有新铸的标识符可重复。
+// 与之相对:购买 / 提现那类每调一次就多一笔的,键必须冻结(见 genesis.ts purchaseIdempotencyKey)。
 function mutationKey(operation: string): string {
   idempotencySequence += 1;
   const randomId = globalThis.crypto?.randomUUID?.()
@@ -83,6 +97,23 @@ function parseMutation(value: unknown): SecurityMutation {
   return source as SecurityMutation;
 }
 
+function parseAccountDeletion(value: unknown): AccountDeletionRequest {
+  const source = record(value);
+  const allowed = ["REQUESTED", "IN_REVIEW", "BLOCKED", "COMPLETED", "CANCELLED"];
+  if (!source || typeof source.requestNo !== "string" || !/^ADR-[a-f0-9]{32}$/i.test(source.requestNo)
+      || typeof source.status !== "string" || !allowed.includes(source.status)
+      || !validDate(source.requestedAt)) {
+    throw new ApiError({ kind: "protocol", message: "ACCOUNT_DELETION_RESPONSE_INVALID" });
+  }
+  return source as unknown as AccountDeletionRequest;
+}
+
+function parseAccountDeletionStatus(value: unknown): AccountDeletionStatus {
+  const source = record(value);
+  if (source?.status === "NONE") return { status: "NONE" };
+  return parseAccountDeletion(value);
+}
+
 export function createAccountApi(client: ApiClient): AccountApi {
   return {
     securityOverview: async () => parseSecurityState(await client.request({
@@ -110,6 +141,16 @@ export function createAccountApi(client: ApiClient): AccountApi {
       method: "POST",
       path: "/api/app/security/sessions/revoke-others",
       idempotencyKey: mutationKey("revoke-other-sessions"),
+    })),
+    accountDeletionStatus: async () => parseAccountDeletionStatus(await client.request({
+      method: "GET",
+      path: "/api/app/security/account-deletion",
+    })),
+    requestAccountDeletion: async (currentPassword, idempotencyKey) => parseAccountDeletion(await client.request({
+      method: "POST",
+      path: "/api/app/security/account-deletion",
+      body: { currentPassword, confirmation: "DELETE" },
+      idempotencyKey,
     })),
   };
 }

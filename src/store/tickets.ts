@@ -262,7 +262,10 @@ export const useTickets = defineStore("tickets", () => {
     accountKeyValue = accountKey;
     pendingRunId = remoteApiEnabled ? "unverified" : "mock";
     pendingKeys = new Map();
-    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending);
+    // 启动预热是 fire-and-forget:权威不可达自吞(resilience 门)。pendingRunId 留
+    // "unverified",首次 refresh()/load() 重走 preparePendingRun 并按各自路径报错;
+    // preparePendingRun 本身保持 reject 契约(refresh/load/reconcile 靠它报错)。
+    if (remoteApiEnabled) void preparePendingRun().then(reconcilePending).catch(() => undefined);
   }
   function reset() { clearAccount(); pendingKeys = new Map(); }
 

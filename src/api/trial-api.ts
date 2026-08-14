@@ -25,12 +25,19 @@ export interface TrialAuthorityState {
   config: Record<string, TrialConfigValue>;
 }
 
+/**
+ * 🔴 转化(用抵扣金购机)故意**不在**本接口层。当前 PRD §9.11a.2 的转化端点是
+ * `POST /api/trial/convert`,而 free-trial.ts 的 `convert()` 在 remoteApiEnabled
+ * 档直接 return false —— 服务端转化整条链尚未接线(卡:见 docs/changes/
+ * 2026-08-13-trial-early-buy-adjudication.md)。接线时按 convert 建方法,别照卡时代
+ * 的旧端点名建 —— 那个名字在 2026-08-02 无卡化时已随 §9.11a.2 一起改名,
+ * 且它的响应是价格拆解、不是本文件解析的 authority 信封。
+ */
 export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
   eligibility(): Promise<TrialAuthorityState>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
   cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
-  redeemEarly(idempotencyKey: string): Promise<TrialAuthorityState>;
 }
 
 const SERVER_STATES = new Set([
@@ -155,11 +162,6 @@ export function createTrialApi(client: ApiClient): TrialApi {
       method: "POST",
       path: "/api/trial/cancel",
       body: { reason },
-      idempotencyKey,
-    }),
-    redeemEarly: (idempotencyKey) => parse({
-      method: "POST",
-      path: "/api/trial/redeem-early",
       idempotencyKey,
     }),
   };

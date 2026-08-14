@@ -184,7 +184,12 @@ export const useCommission = defineStore("commission", () => {
     if (!remoteApiEnabled) return;
     binarySnapshot.value = null;
     events.value = [];
-    binarySnapshot.value = await commissionConfigApi.binary();
+    try {
+      binarySnapshot.value = await commissionConfigApi.binary();
+    } catch {
+      // 权威不可达是常态输入,不 reject(resilience 门):保持清空态,
+      // 团队页按空快照降级渲染;下次 onShow 重试。
+    }
   }
 
   function addEvent(e: Omit<CommissionEvent, "id" | "ts" | "unlockAt" | "status">) {

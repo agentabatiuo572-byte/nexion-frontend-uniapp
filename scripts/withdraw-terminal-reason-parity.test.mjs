@@ -22,14 +22,16 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /**
- * 找兄弟仓 admin-ops。worktree 里 `../admin-ops` 会落到 `.claude/worktrees/` 下,
- * 所以逐级上溯找,而不是写死一个相对层级(worktree 环境实测踩过)。
+ * 找真实运营后台仓。历史 checkout 名称是 admin-ops,当前正式仓名是
+ * nexion-ops-console；worktree 里相对层级会变化,所以逐级上溯找两者。
  */
 function findAdminOps() {
   let dir = ROOT;
   for (let i = 0; i < 6; i++) {
-    const candidate = join(dir, "admin-ops");
-    if (existsSync(join(candidate, "package.json"))) return candidate;
+    for (const name of ["nexion-ops-console", "admin-ops"]) {
+      const candidate = join(dir, name);
+      if (existsSync(join(candidate, "package.json"))) return candidate;
+    }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -43,9 +45,7 @@ const D2_RELATIVE = "app/components/domain-views/d-tabs/d2-withdrawals.tsx";
 function assertAdminOps() {
   assert.ok(
     adminOps,
-    "找不到兄弟仓 admin-ops —— 本门的 ground truth 在那边,缺件不许静默跳过。"
-    + " worktree 环境请在 PLAN 根同级补 junction:"
-    + ' cmd //c mklink //J admin-ops "D:\\WORKS\\PLAN\\admin-ops"',
+    "找不到真实运营后台仓 nexion-ops-console/admin-ops —— 本门的 ground truth 在那边,缺件不许静默跳过。",
   );
   assert.ok(
     existsSync(join(adminOps, D2_RELATIVE)),

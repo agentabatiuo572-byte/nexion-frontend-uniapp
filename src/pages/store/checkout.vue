@@ -559,7 +559,7 @@ function fireTradeinIntercept() {
       if (quote.decision === "NO_ACTIVE_DEVICE") {
         await handleNoActiveDeviceDecision({
           notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
-          refreshFleet: () => app.refreshRemoteFleet(),
+          refreshFleet: async () => { await app.refreshRemoteFleet(); }, // best-effort:失败自吞
         });
         return;
       }
@@ -730,6 +730,8 @@ async function onConfirmPay() {
   setTimeout(() => { confirming = false; }, 0);
 }
 
+// IDEMPOTENCY-FRESH-OK: 下面 738-740 行先读**持久化**的 durable 键(readAccountRow),命中就直接返回 ——
+// 这把钥匙跨 App 重启都稳,是全仓最强的一处;现铸分支只在「这个 intent 头一次」时走到。
 function remoteOrderKey(): string {
   const p = product.value;
   const intent = [p?.id ?? "unknown", voucherQuote.id ?? "", payment.value,
@@ -803,7 +805,11 @@ async function submitRemoteOrder(): Promise<void> {
           }
         },
         refreshOrders: () => orders.refreshRemote(),
-        refreshFleet: () => app.refreshRemoteFleet(),
+        // refreshRemoteFleet 自吞不 reject(resilience 门);verified mutation 靠 reject
+        // 中断验证链,适配层把 false 升回 throw,保住「fleet 刷新失败 ≠ READBACK_MISMATCH」的语义。
+        refreshFleet: async () => {
+          if (!(await app.refreshRemoteFleet())) throw new Error("E3_FLEET_REFRESH_UNAVAILABLE");
+        },
         verifyFleet(submitted) {
           const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
           const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
@@ -928,7 +934,7 @@ async function pollRemoteOrder(requestEpoch: number) {
       case "activated":
         stopRemoteOrderPolling();
         step.value = "live";
-        void orders.refreshRemote();
+        void orders.refreshRemote().catch(() => undefined); // orders 契约保持 reject;此处纯展示刷新
         void app.refreshRemoteFleet();
         return;
       case "payment_failed":
