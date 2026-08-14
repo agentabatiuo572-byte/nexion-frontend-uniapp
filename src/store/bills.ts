@@ -232,7 +232,7 @@ export const useBills = defineStore("bills", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
       }
-      throw cause;
+      // 权威不可达是常态输入,不 reject(resilience 门);页面横幅走 serverError 双源。
     }
   }
 

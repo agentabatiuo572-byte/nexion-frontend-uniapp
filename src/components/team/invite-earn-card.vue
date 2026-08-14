@@ -93,15 +93,22 @@
         <text class="font-mono-tabular tabular-nums shrink-0" :style="tickerAmtStyle">{{ tickerItem.amount }}</text>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0"><path d="M7 7h10v10M7 17 17 7" /></svg>
       </view>
+      <!-- 🔴 两种状态拆开:原来共用一个 @click 容器,于是「暂无已结算奖励」这种**没什么可重试**
+           的状态也长成可点的样子(文案却只在出错时才写「点击重试」),而且整条只有 16px 高、
+           按下去零反馈 —— tap 门两条违例都出在这一个元素上。
+           出错态:44px 热区 + 按下反馈 + role/tabindex(键盘激活由 lib/a11y-activate.ts 平台层给)。
+           空态:纯展示,不给可点暗示。 -->
       <view
-        v-else
-        class="flex items-center w-full min-w-0 active:opacity-75"
-        style="gap: 6px; min-height: 44px; font-size: 12px"
-        role="button"
-        tabindex="0"
+        v-else-if="rewards.error"
+        class="flex items-center w-full min-w-0 active:opacity-70"
+        style="gap: 6px; font-size: 12px; min-height: 44px"
+        role="button" tabindex="0"
         @click="rewards.refresh()"
       >
-        <text :style="{ color: 'var(--v5-ink-3)' }">{{ rewards.error ? t.team.rewardHistoryUnavailable : t.team.noSettledRewards }}</text>
+        <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.team.rewardHistoryUnavailable }}</text>
+      </view>
+      <view v-else class="flex items-center w-full min-w-0" style="gap: 6px; font-size: 12px">
+        <text :style="{ color: 'var(--v5-ink-3)' }">{{ t.team.noSettledRewards }}</text>
       </view>
     </view>
   </view>

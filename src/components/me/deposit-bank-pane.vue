@@ -276,8 +276,12 @@ const paneView = computed<PaneView>(() => {
 // 进段即接管在途单 / 人工核对单(刷新不丢单;credited/expired 旧单不复活)
 onMounted(() => {
   if (remoteApiEnabled && !fundsSandboxEnabled) {
-    void dep.refreshRemoteVietQrDeposits().catch((cause) => {
-      createError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
+    // 🔴 失败信号改读 store 状态,不再靠 reject:那条缝已按 ADR 改成自吞降级
+    //   (docs/changes/2026-08-13-remote-refresh-resilience.md「需要失败信号的消费方
+    //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
+    //   充值页的报错横幅会**静默变哑** —— 改缝必须连消费方一起改,这就是那一半。
+    void dep.refreshRemoteVietQrDeposits().then(() => {
+      if (dep.serverStatus === "error" && dep.serverError) createError.value = dep.serverError;
     });
   }
   const resume = dep.intents.find((i) => i.status === "awaiting_payment" || i.status === "mismatch_review");

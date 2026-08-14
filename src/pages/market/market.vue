@@ -165,7 +165,7 @@ const nex = computed(() => market.isMockMode ? NEX : ({
   spark24h: market.klineHourly,
   spark30d: market.klineDaily,
 }));
-onMounted(() => { if (!market.isMockMode) void market.syncRemote().catch(() => {}); });
+onMounted(() => { if (!market.isMockMode) void market.syncRemote(); });
 
 type CatFilter = TokenCategory | "all" | "watchlist";
 const activeCat = ref<CatFilter>("all");

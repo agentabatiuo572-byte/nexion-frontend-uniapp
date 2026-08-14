@@ -244,12 +244,8 @@ export const useVRank = defineStore("vRank", () => {
         Object.entries(remoteCurrent.progress.vDownlineCounts).map(([rank, count]) => [Number(rank) as VRank, count]),
       ) as Partial<Record<VRank, number>>;
     } catch {
-      ladder.value = [];
-      myRank.value = 0;
-      selfBuyUSD.value = 0;
-      directRefs.value = 0;
-      teamVolumeUSD.value = 0;
-      vDownlineCounts.value = {};
+      // 权威不可达是常态输入,不 reject(resilience 门):保留现值(bindAccount 后即空态),
+      // 页面 onShow 重试。
     }
   }
 

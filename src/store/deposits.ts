@@ -185,17 +185,28 @@ export const useDeposits = defineStore("deposits", () => {
     timers.clear();
     if (fundsServerEnabled) {
       serverAccountKey = normalizeAccountKey(rawAccountKey);
-      const expectedAccountKey = serverAccountKey;
+      // (这里原有一行 `const expectedAccountKey = serverAccountKey;` —— 它只服务于调用点侧
+      //  那个已删的 .catch 闭包,闭包没了就成了死变量。账号一致性判断落在两条刷新缝**内部**,
+      //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
+      // 🔴 合并裁决(2026-08-14):取远端那侧。
+      //   本地这侧写的是「fundsSandboxEnabled 为假 ⇒ 状态 error + FUNDS_DEPOSIT_PROVIDER_NOT_CONFIGURED」,
+      //   前提是「非沙箱就没有入金 provider」。远端这笔正好把这个前提推翻了 ——
+      //   新增 refreshRemoteVietQrDeposits 作为非沙箱侧的真 provider。前提没了,那条报错就是错的。
       serverStatus.value = "idle";
       serverError.value = "";
-      const refresh = fundsSandboxEnabled ? refreshFundsSandboxDeposits : refreshRemoteVietQrDeposits;
-      void refresh().catch((cause) => {
-        if (expectedAccountKey === serverAccountKey && !serverError.value) {
-          serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
-        }
-      });
+      // 🔴 两支**各自显式调用**,不要经局部变量转发。
+      //   韧性门是靠「void <函数名>(」这种裸发调用点来发现刷新缝的;写成
+      //   `const refresh = 条件 ? A : B; void refresh()` 之后,A 和 B **一起从门的视野里消失**,
+      //   缝数当场从 27 掉到 26(台账抓住了)。功能一模一样,但覆盖面少了两条。
+      //   多两行换回可见性,顺带让新增的 VietQR 缝也进覆盖。
+      // 🔴 这里**不再挂 .catch**:两条缝现在都按 ADR 自吞降级,失败态落在
+      //   serverStatus / serverError 上。挂了也永远打不到,是死代码 ——
+      //   (合并时我一度把远端那半 .catch 原样粘了回来,而它在本地这侧前一天刚被删掉,
+      //    理由正是「缝内已自吞」;独立审计逐行比对两个父提交后指出来的。)
+      if (fundsSandboxEnabled) void refreshFundsSandboxDeposits();
+      else void refreshRemoteVietQrDeposits();
       return;
     }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
@@ -902,7 +913,7 @@ export const useDeposits = defineStore("deposits", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_DEPOSIT_REFRESH_FAILED";
       }
-      throw cause;
+      // 权威不可达是常态输入,不 reject(resilience 门);serverError/serverStatus 即降级态。
     }
   }
 
@@ -1011,7 +1022,11 @@ export const useDeposits = defineStore("deposits", () => {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
       }
-      throw cause;
+      // 🔴 与上面 refreshFundsSandboxDeposits 同规矩:权威不可达是常态输入,**不 reject**。
+      //   原来这里 `throw cause`,靠每个调用点各写一个 .catch 撑着 —— 而那正是
+      //   docs/changes/2026-08-13-remote-refresh-resilience.md 明确否决的做法:
+      //   每新增一个裸 void 调用点就漏一个,漏了就是生产环境的 unhandled rejection。
+      //   需要失败信号的消费方改读 serverStatus / serverError(deposit-bank-pane.vue 已改)。
     }
   }
 

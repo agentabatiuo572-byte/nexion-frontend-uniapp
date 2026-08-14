@@ -554,13 +554,13 @@ const dailyLimitNoteText = computed(() => fmt(t.value.wallet.dailyLimitNote, { n
  * 🔴 实测更正(假后端 `dailyLimit` 档):超额拒单走 **HTTP 429**,而 429 不是 2xx,
  * 所以客户端拿到的是 `kind:"http"` 而**不是** `business` —— `business` 只在 2xx 且
  * 业务码非 0 时才产生。也就是说「按 kind 认」认不出它,真正认得出的是 message 这一路。
- * 契约定名前保持串匹配;定名后收敛,见 HANDOFF U-4。
+ * 契约定名前保持串匹配;定名后收敛,见 HANDOFF U-19(原 U-4,2026-08-14 撞号重编)。
  *
  * 🔴 为什么按 message 认而不按 code:本仓的 `ApiError` 带 kind/code/message 三样,
  * 但 code 是 HTTP 状态码(超日限多半统一 4xx,认不出是哪条规则),真正区分规则的是
  * 服务端 envelope 的 message。契约里还没钉死这个串 —— 所以这里按**一组候选**宽松匹配,
  * 并且**只用于换一句更准的话**,认不出就回落原文案,认错也不会放行或拦截任何东西。
- * 待后端定名后收敛成单串:见 HANDOFF U-4。
+ * 待后端定名后收敛成单串:见 HANDOFF U-19(原 U-4,2026-08-14 撞号重编)。
  */
 function isDailyLimitRejection(err: unknown): boolean {
   const msg = err instanceof ApiError ? err.message : "";
@@ -619,7 +619,7 @@ function goManage() {
 const nowTick = ref(mockServerNow());
 let freezeTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
-  if (remoteApiEnabled) void payout.refreshRemote().catch(() => undefined);
+  if (remoteApiEnabled) void payout.refreshRemote();
   void loadWithdrawalPolicy();
   freezeTimer = setInterval(() => (nowTick.value = mockServerNow()), 1000);
 });

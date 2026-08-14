@@ -22,6 +22,10 @@ export type AccountDeletionStatus = AccountDeletionRequest | { status: "NONE" };
 
 let idempotencySequence = 0;
 
+// IDEMPOTENCY-FRESH-OK: 这四个操作(改密 / 开关 2FA / 踢单个会话 / 踢其它会话)都是「把状态设成某个值」,
+// 不是「新建一笔单据」—— 重放一次结果完全相同,不会多出东西。返回的 SecurityMutation 是状态
+// 快照(twoFactorEnabled / passwordChangedAt / revokedSessionCount),没有新铸的标识符可重复。
+// 与之相对:购买 / 提现那类每调一次就多一笔的,键必须冻结(见 genesis.ts purchaseIdempotencyKey)。
 function mutationKey(operation: string): string {
   idempotencySequence += 1;
   const randomId = globalThis.crypto?.randomUUID?.()

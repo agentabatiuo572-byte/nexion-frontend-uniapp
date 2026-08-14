@@ -1,5 +1,7 @@
 # PORT-PITFALLS — Next.js/React → uni-app 迁移踩坑登记
 
+<!-- STALE-TERMS-OK: 踩坑登记 = 事故叙事,按定义记录的是当时的代码形态;删掉旧动作名等于删掉事故本身(见全局铁律:降噪不删事故叙事)。 -->
+
 > 「反思 → 进化」台账。每批迁移收尾把新踩的坑追加于此，并尽量转化为
 > `scripts/verify.sh` 哨兵或 `nexion-uniapp-port` SKILL 硬规则，让机制随每轮变强。
 > 对标后台 `NEXION_DEFECT_REGISTER` / `PORT-LEDGER`。
