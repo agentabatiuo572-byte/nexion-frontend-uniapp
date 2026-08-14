@@ -126,6 +126,8 @@ import { useSecurity } from "@/store/security";
 import { rebindAccountScopedStores } from "@/lib/account-scope";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
+// ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
+import { useStaking } from "@/store/staking";
 import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -149,6 +151,7 @@ onLoad((options) => {
 const security = useSecurity();
 const auth = useAuth();
 const app = useApp();
+const staking = useStaking();
 const session = useSession();
 
 const remoteSecurity = ref<SecurityState | null>(null);
@@ -398,9 +401,36 @@ async function handleDeleteAccount() {
     toast.error(t.value.login.errorInvalidPassword);
     return;
   }
+  // ── PRD §4.5a.1:提交前逐条明示 + 在途提现拦截 ──────────────────────────────
+  // 金额必须取**提交时刻**的真实数值 —— 远端模式先把三个权威面刷一遍(余额 / 提现单 / 锁仓),
+  // 三条缝都已按韧性不变量自吞降级,刷不动就用现值,不阻断也不抛。
+  if (remoteApiEnabled) {
+    securityBusy.value = true;
+    await Promise.allSettled([app.refreshRemoteFleet(), app.refreshRemoteWithdrawals(), staking.syncRemote()]);
+    securityBusy.value = false;
+  }
+  // 🔴 存在任一在途提现单 ⇒ 禁止提交(不是「提交了再被服务端打回」——规格要的是入口拦截)。
+  //   判据复用 app 的 inFlightWithdrawals(按占槽状态过滤),不在页面自造第二套「在途」定义。
+  if (app.inFlightWithdrawals.length > 0) {
+    toast.error(t.value.security.deleteAccountBlockedByWithdrawal);
+    return;
+  }
+  // 🔴 「不退」必须是提交前的显式告知,不是事后条款:逐条列出具体金额,用户看着数字确认。
+  //   锁仓口径 = 本金还没回到余额的每一笔(pending-lock / active / matured 未领取)——
+  //   store 的 totalLocked() 只数 active,那是收益展示口径;放弃披露少报即漏报,这里不用它。
+  const forfeitPrincipal = staking.positions
+    .filter((p) => p.status === "pending-lock" || p.status === "active" || p.status === "matured")
+    .reduce((s, p) => s + p.amountUSDT, 0);
+  const forfeitLines = [
+    t.value.security.deleteAccountForfeitLead,
+    fmt(t.value.security.deleteAccountForfeitBalance, { balance: `$${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+    ...(forfeitPrincipal > 0
+      ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `$${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
+      : []),
+  ];
   const ok = await uiConfirm({
     title: t.value.security.deleteAccount,
-    message: t.value.security.deleteAccountConfirm,
+    message: `${forfeitLines.join("\n")}\n\n${t.value.security.deleteAccountConfirm}`,
     danger: true,
     confirmLabel: t.value.security.deleteAccount,
   });
