@@ -2598,6 +2598,8 @@ export const zh: Messages = {
     deleteAccountForfeitBalance: "账户余额 {balance} —— 不退还",
     deleteAccountForfeitPrincipal: "锁仓本金 {principal} —— 不退还(含未到期部分)",
     deleteAccountForfeitLead: "提交申请即永久放弃:",
+    deleteAccountVerifyFailed: "无法核实当前余额与锁仓本金,请检查网络后重试。",
+    deleteAccountViewWithdrawals: "查看提现记录",
     deleteAccountBlockedByWithdrawal: "有提现正在处理中。等它完成或失败后,再提交注销申请。",
     deleteAccountToast: "注销申请已提交 — 已退出登录",
     deleteAccountUnavailable: "账号注销暂不可用；我们不会在服务端未确认前显示注销成功。",

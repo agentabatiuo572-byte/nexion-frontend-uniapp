@@ -2577,6 +2577,8 @@ export const vi: Messages = {
     deleteAccountForfeitBalance: "Số dư {balance} — KHÔNG được hoàn lại",
     deleteAccountForfeitPrincipal: "Vốn gốc đang khóa {principal} — KHÔNG được hoàn lại (kể cả kỳ hạn chưa đáo hạn)",
     deleteAccountForfeitLead: "Gửi yêu cầu là từ bỏ vĩnh viễn:",
+    deleteAccountVerifyFailed: "Không thể xác nhận số dư và vốn gốc đang khóa. Kiểm tra kết nối rồi thử lại.",
+    deleteAccountViewWithdrawals: "Xem lệnh rút tiền",
     deleteAccountBlockedByWithdrawal: "Có lệnh rút tiền đang xử lý. Hãy đợi nó hoàn tất hoặc thất bại rồi mới gửi yêu cầu xóa tài khoản.",
     deleteAccountToast: "Đã gửi yêu cầu xóa — bạn đã đăng xuất",
     deleteAccountUnavailable: "Tính năng xóa tài khoản hiện chưa khả dụng. Ứng dụng sẽ không báo thành công trước khi máy chủ xác nhận.",

@@ -128,6 +128,7 @@ import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 // ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
 import { useStaking } from "@/store/staking";
+import { navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -393,6 +394,10 @@ async function handleRevokeAll() {
 }
 
 async function handleDeleteAccount() {
+  // 🔴 重入闸(审计 P2):本函数在「刷新权威面」处有一次真网络往返 —— 没有这道闸,
+  //   双击会各推一个确认弹窗进队列(confirm 是队列不是单例),确认完第一个立刻露出
+  //   第二个一模一样的,极易连着点两次。同文件另外两个操作(改密 / 2FA)都有同款闸。
+  if (securityBusy.value) return;
   if (deletionPending.value) {
     toast.info(t.value.security.deleteAccountPending);
     return;
@@ -401,66 +406,89 @@ async function handleDeleteAccount() {
     toast.error(t.value.login.errorInvalidPassword);
     return;
   }
-  // ── PRD §4.5a.1:提交前逐条明示 + 在途提现拦截 ──────────────────────────────
-  // 金额必须取**提交时刻**的真实数值 —— 远端模式先把三个权威面刷一遍(余额 / 提现单 / 锁仓),
-  // 三条缝都已按韧性不变量自吞降级,刷不动就用现值,不阻断也不抛。
-  if (remoteApiEnabled) {
-    securityBusy.value = true;
-    await Promise.allSettled([app.refreshRemoteFleet(), app.refreshRemoteWithdrawals(), staking.syncRemote()]);
-    securityBusy.value = false;
-  }
-  // 🔴 存在任一在途提现单 ⇒ 禁止提交(不是「提交了再被服务端打回」——规格要的是入口拦截)。
-  //   判据复用 app 的 inFlightWithdrawals(按占槽状态过滤),不在页面自造第二套「在途」定义。
-  if (app.inFlightWithdrawals.length > 0) {
-    toast.error(t.value.security.deleteAccountBlockedByWithdrawal);
-    return;
-  }
-  // 🔴 「不退」必须是提交前的显式告知,不是事后条款:逐条列出具体金额,用户看着数字确认。
-  //   锁仓口径 = 本金还没回到余额的每一笔(pending-lock / active / matured 未领取)——
-  //   store 的 totalLocked() 只数 active,那是收益展示口径;放弃披露少报即漏报,这里不用它。
-  const forfeitPrincipal = staking.positions
-    .filter((p) => p.status === "pending-lock" || p.status === "active" || p.status === "matured")
-    .reduce((s, p) => s + p.amountUSDT, 0);
-  const forfeitLines = [
-    t.value.security.deleteAccountForfeitLead,
-    fmt(t.value.security.deleteAccountForfeitBalance, { balance: `$${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
-    ...(forfeitPrincipal > 0
-      ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `$${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
-      : []),
-  ];
-  const ok = await uiConfirm({
-    title: t.value.security.deleteAccount,
-    message: `${forfeitLines.join("\n")}\n\n${t.value.security.deleteAccountConfirm}`,
-    danger: true,
-    confirmLabel: t.value.security.deleteAccount,
-  });
-  if (ok) {
+  // 🔴 重入闸的另一半:入口挡掉的是「busy 期间再点」,这里保证 busy 覆盖**整个**流程
+  //   (含刷新等待与确认弹窗停留),所有出口统一由 finally 放闸 —— 不靠每条 return 记得复位。
+  securityBusy.value = true;
+  try {
+    // ── PRD §4.5a.1:提交前逐条明示 + 在途提现拦截 ──────────────────────────────
+    // 🔴 独立审计(BLOCK,2×P0)后的修法,教训记在这儿:
+    //   第一版「刷一遍然后直接读」在远端刷新**失败**时会拿到清零态 —— refreshRemoteFleet
+    //   的 catch 把 usdtBalance 置 0、staking.syncRemote 的 catch 把 positions 清空,
+    //   于是弹窗会写「Balance $0.00 — 不退」而真实余额分文未动,锁仓那行则整行消失。
+    //   披露页显示一个具体、格式规整、**错误**的数字,比不显示更糟。
+    //   修:两个驱动金额的刷新按返回值判成败,**核不动就阻断提交**(fail-closed:
+    //   宁可让用户稍后重试,不让他对着错误披露确认永久放弃)。提现列表刷新失败不阻断 ——
+    //   它失败时保留旧值(回源核过),且服务端状态机另有「已阻断」兜底。
     if (remoteApiEnabled) {
-      securityBusy.value = true;
-      if (!deletionCommandKey.value) {
-        deletionCommandKey.value = `app-security:account-deletion:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-      }
-      try {
-        const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
-        toast.success(t.value.security.deleteAccountToast, request.requestNo);
-        deletionCommandKey.value = "";
-        await authApi.logout();
-      } catch (cause) {
-        toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_REQUEST_FAILED");
-        securityBusy.value = false;
+      const [fleet, , stake] = await Promise.allSettled([
+        app.refreshRemoteFleet(), app.refreshRemoteWithdrawals(), staking.syncRemote(),
+      ]);
+      const fleetOk = fleet.status === "fulfilled" && fleet.value === true;
+      const stakeOk = stake.status === "fulfilled" && stake.value === true;
+      if (!fleetOk || !stakeOk) {
+        toast.error(t.value.security.deleteAccountVerifyFailed);
         return;
       }
-      securityBusy.value = false;
-    } else {
-      toast.success(t.value.security.deleteAccountToast);
     }
-    app.interruptAllTasks("logged-out");
-    session.signOutSession();
-    auth.signOut();
-    // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
-    app.bindAccount("default");
-    rebindAccountScopedStores("default");
-    uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+    // 🔴 存在任一在途提现单 ⇒ 禁止提交(不是「提交了再被服务端打回」——规格要的是入口拦截)。
+    //   判据复用 app 的 inFlightWithdrawals(按占槽状态过滤),不在页面自造第二套「在途」定义。
+    //   PRD §4.5a.1 明文要求「并给出去提现记录的入口」—— 所以是带跳转的确认框,不是一条会
+    //   自动消失的 toast(审计 P1:只提示不给路径,用户被拦下后只能自己翻)。
+    if (app.inFlightWithdrawals.length > 0) {
+      const view = await uiConfirm({
+        title: t.value.security.deleteAccount,
+        message: t.value.security.deleteAccountBlockedByWithdrawal,
+        confirmLabel: t.value.security.deleteAccountViewWithdrawals,
+      });
+      if (view) navTo("/pages/me/wallet-withdraw-tracking");
+      return;
+    }
+    // 🔴 「不退」必须是提交前的显式告知,不是事后条款:逐条列出具体金额,用户看着数字确认。
+    //   锁仓口径 = 本金还没回到余额的每一笔(pending-lock / active / matured 未领取)——
+    //   store 的 totalLocked() 只数 active,那是收益展示口径;放弃披露少报即漏报,这里不用它。
+    const forfeitPrincipal = staking.positions
+      .filter((p) => p.status === "pending-lock" || p.status === "active" || p.status === "matured")
+      .reduce((s, p) => s + p.amountUSDT, 0);
+    const forfeitLines = [
+      t.value.security.deleteAccountForfeitLead,
+      fmt(t.value.security.deleteAccountForfeitBalance, { balance: `$${app.user.usdtBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` }),
+      ...(forfeitPrincipal > 0
+        ? [fmt(t.value.security.deleteAccountForfeitPrincipal, { principal: `$${forfeitPrincipal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` })]
+        : []),
+    ];
+    const ok = await uiConfirm({
+      title: t.value.security.deleteAccount,
+      message: `${forfeitLines.join("\n")}\n\n${t.value.security.deleteAccountConfirm}`,
+      danger: true,
+      confirmLabel: t.value.security.deleteAccount,
+    });
+    if (ok) {
+      if (remoteApiEnabled) {
+        if (!deletionCommandKey.value) {
+          deletionCommandKey.value = `app-security:account-deletion:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+        }
+        try {
+          const request = await accountApi.requestAccountDeletion(deletionPassword.value, deletionCommandKey.value);
+          toast.success(t.value.security.deleteAccountToast, request.requestNo);
+          deletionCommandKey.value = "";
+          await authApi.logout();
+        } catch (cause) {
+          toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_REQUEST_FAILED");
+          return;
+        }
+      } else {
+        toast.success(t.value.security.deleteAccountToast);
+      }
+      app.interruptAllTasks("logged-out");
+      session.signOutSession();
+      auth.signOut();
+      // 删除账号即登出兜底:清全部账号级数据内存残留(P2-8 纵深防御)。app + 28 store 归 default。
+      app.bindAccount("default");
+      rebindAccountScopedStores("default");
+      uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
+    }
+  } finally {
+    securityBusy.value = false;
   }
 }
 
