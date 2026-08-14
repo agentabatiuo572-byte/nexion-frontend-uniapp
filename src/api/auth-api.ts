@@ -25,6 +25,18 @@ export interface RegistrationOtpResult {
   deliveryHint: string;
 }
 
+export interface LoginOtpResult {
+  challengeNo: string;
+  resendAfterSec: number;
+  deliveryHint: string;
+}
+
+export interface PasswordResetOtpResult {
+  challengeNo: string;
+  resendAfterSec: number;
+  deliveryHint: string;
+}
+
 export interface RegistrationRequest extends RegistrationOtpRequest {
   challengeNo: string;
   code: string;
@@ -38,6 +50,14 @@ export type LoginResult =
 
 export interface AuthApi {
   login(request: PasswordLoginRequest): Promise<LoginResult>;
+  sendLoginOtp(request: RegistrationOtpRequest): Promise<LoginOtpResult>;
+  completeOtpLogin(request: RegistrationOtpRequest & { challengeNo: string; code: string }): Promise<LoginResult>;
+  sendPasswordResetOtp(request: RegistrationOtpRequest): Promise<PasswordResetOtpResult>;
+  completePasswordReset(request: RegistrationOtpRequest & {
+    challengeNo: string;
+    code: string;
+    newPassword: string;
+  }): Promise<{ status: "PASSWORD_RESET"; revokedSessionCount: number }>;
   completeTwoFactor(request: TwoFactorLoginRequest): Promise<LoginResult>;
   sendRegistrationOtp(request: RegistrationOtpRequest): Promise<RegistrationOtpResult>;
   register(request: RegistrationRequest): Promise<LoginResult>;
@@ -47,6 +67,37 @@ export interface AuthApi {
   /** Fallback for legacy callers: never consume a session owned by another user. */
   discardSessionForIdentity(identity: string): void;
   logout(): Promise<void>;
+}
+
+function loginOtpFromResponse(value: unknown): LoginOtpResult {
+  if (!value || typeof value !== "object") {
+    throw new ApiError({ kind: "protocol", message: "LOGIN_OTP_RESPONSE_INVALID" });
+  }
+  const data = value as Partial<LoginOtpResult>;
+  if (
+    typeof data.challengeNo !== "string"
+    || !/^LOGIN-[a-f0-9]{32}$/i.test(data.challengeNo)
+    || !Number.isSafeInteger(data.resendAfterSec)
+    || Number(data.resendAfterSec) < 1
+    || Number(data.resendAfterSec) > 600
+    || typeof data.deliveryHint !== "string"
+  ) {
+    throw new ApiError({ kind: "protocol", message: "LOGIN_OTP_RESPONSE_INVALID" });
+  }
+  return data as LoginOtpResult;
+}
+
+function passwordResetOtpFromResponse(value: unknown): PasswordResetOtpResult {
+  if (!value || typeof value !== "object") {
+    throw new ApiError({ kind: "protocol", message: "PASSWORD_RESET_OTP_RESPONSE_INVALID" });
+  }
+  const data = value as Partial<PasswordResetOtpResult>;
+  if (typeof data.challengeNo !== "string" || !/^RESET-[a-f0-9]{32}$/i.test(data.challengeNo)
+      || !Number.isSafeInteger(data.resendAfterSec) || Number(data.resendAfterSec) < 1
+      || Number(data.resendAfterSec) > 600 || typeof data.deliveryHint !== "string") {
+    throw new ApiError({ kind: "protocol", message: "PASSWORD_RESET_OTP_RESPONSE_INVALID" });
+  }
+  return data as PasswordResetOtpResult;
 }
 
 /**
@@ -174,6 +225,53 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         }],
       });
       return consumeLoginResponse(data, vault, revision);
+    },
+    async sendLoginOtp(request) {
+      return loginOtpFromResponse(await client.request<unknown>({
+        path: "/auth/users/login/otp/send",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      }));
+    },
+    async completeOtpLogin(request) {
+      const revision = vault.revision();
+      const data = await client.request<AuthSessionResponse>({
+        path: "/auth/users/login/otp/verify",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      });
+      const result = consumeLoginResponse(data, vault, revision);
+      if (result.kind !== "authenticated") {
+        throw new ApiError({ kind: "protocol", message: "LOGIN_OTP_SESSION_INVALID" });
+      }
+      return result;
+    },
+    async sendPasswordResetOtp(request) {
+      return passwordResetOtpFromResponse(await client.request<unknown>({
+        path: "/auth/users/password-reset/otp/send",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      }));
+    },
+    async completePasswordReset(request) {
+      const data = await client.request<unknown>({
+        path: "/auth/users/password-reset/otp/complete",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      });
+      if (!data || typeof data !== "object") {
+        throw new ApiError({ kind: "protocol", message: "PASSWORD_RESET_RESPONSE_INVALID" });
+      }
+      const row = data as Record<string, unknown>;
+      if (row.status !== "PASSWORD_RESET" || !Number.isSafeInteger(row.revokedSessionCount)
+          || Number(row.revokedSessionCount) < 0) {
+        throw new ApiError({ kind: "protocol", message: "PASSWORD_RESET_RESPONSE_INVALID" });
+      }
+      return { status: "PASSWORD_RESET", revokedSessionCount: Number(row.revokedSessionCount) };
     },
     async completeTwoFactor(request) {
       const revision = vault.revision();

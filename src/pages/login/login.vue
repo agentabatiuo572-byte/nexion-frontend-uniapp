@@ -136,7 +136,7 @@ import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
 import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
-import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
+import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
 import { authApi, remoteApiEnabled } from "@/api/runtime";
@@ -219,7 +219,7 @@ const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
 const pwdOk = computed(() => password.value.length > 0);
 // Reset mode's new password must pass the full strength check.
-const newPwdOk = computed(() => isPasswordOk(newPassword.value, { phone: phoneClean.value }));
+const newPwdOk = computed(() => isResetPasswordOk(newPassword.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => newPassword.value === confirmPwd.value && newPwdOk.value);
 
 const titleText = computed(() => {
@@ -386,18 +386,31 @@ function startResend(sec: number) {
 // resendAfterSec 为准,client 不再持有 60s 业务常量。
 async function requestCode(captchaTicket?: string) {
   if (loading.value) return;
-  // The local OTP state machine is a mock-server implementation.  Remote mode
-  // has no passwordless/reset OTP contract, so never let it mint a browser
-  // verification token or establish a local identity in its place.
-  if (remoteApiEnabled) {
-    error.value = t.value.authOtp.errorServiceUnavailable;
-    return;
-  }
   const phoneAtRequest = fullPhone.value;
   const sceneAtRequest = otpScene.value;
   const stepAtRequest = step.value;
   const flowVersion = ++otpFlowVersion;
   loading.value = true;
+  if (remoteApiEnabled) {
+    try {
+      const res = sceneAtRequest === "reset"
+        ? await authApi.sendPasswordResetOtp({ countryCode: country.value, phone: phoneClean.value })
+        : await authApi.sendLoginOtp({ countryCode: country.value, phone: phoneClean.value });
+      if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest || step.value !== stepAtRequest) return;
+      loading.value = false;
+      otpRequestId.value = res.challengeNo;
+      otpVerifyToken.value = null;
+      code.value = ["", "", "", "", "", ""];
+      focusIdx.value = 0;
+      step.value = 2;
+      startResend(res.resendAfterSec);
+    } catch (cause) {
+      if (!mounted || flowVersion !== otpFlowVersion || fullPhone.value !== phoneAtRequest) return;
+      loading.value = false;
+      error.value = remoteLoginError(cause);
+    }
+    return;
+  }
   const res = await otpSend(phoneAtRequest, sceneAtRequest, captchaTicket);
   if (
     !mounted
@@ -512,10 +525,6 @@ async function verifyCode() {
   error.value = null;
   if (!codeOk.value) { error.value = t.value.login.errorInvalidCode; return; }
   if (remoteTwoFactorChallenge.value) { await verifyRemoteTwoFactor(); return; }
-  if (remoteApiEnabled) {
-    error.value = t.value.authOtp.errorServiceUnavailable;
-    return;
-  }
   const requestId = otpRequestId.value;
   if (!requestId) { loading.value = false; error.value = t.value.authOtp.errorOtpNotFound; return; }
   const context: OtpFlowContext = {
@@ -525,6 +534,37 @@ async function verifyCode() {
     requestId,
   };
   loading.value = true;
+  if (remoteApiEnabled) {
+    if (mode.value === "reset") {
+      loading.value = false;
+      step.value = 3;
+      return;
+    }
+    try {
+      const result = await authApi.completeOtpLogin({
+        countryCode: country.value,
+        phone: phoneClean.value,
+        challengeNo: requestId,
+        code: code.value.join(""),
+      });
+      if (result.kind !== "authenticated") throw new Error("LOGIN_OTP_SESSION_MISSING");
+      if (!isCurrentOtpFlow(context)) {
+        authApi.discardSessionIfCurrent(result.vaultRevision);
+        return;
+      }
+      finishSignIn({
+        accountId: `user:${result.user.userId}`,
+        onboardingComplete: true,
+        serverProfile: result.user,
+        serverSessionRevision: result.vaultRevision,
+      }, context);
+    } catch (cause) {
+      if (!isCurrentOtpFlow(context)) return;
+      loading.value = false;
+      error.value = remoteLoginError(cause);
+    }
+    return;
+  }
   if (mode.value !== "reset" && otpVerifyToken.value) {
     finishVerifiedOtpSignIn(otpVerifyToken.value, context);
     return;
@@ -556,11 +596,43 @@ async function verifyCode() {
   otpVerifyToken.value = res.verifyToken;
   finishVerifiedOtpSignIn(res.verifyToken, context);
 }
-function finishReset() {
+async function finishReset() {
   if (loading.value || signInTimer) return;
   error.value = null;
   if (!newPwdOk.value) { error.value = t.value.login.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
+  if (remoteApiEnabled) {
+    const challengeNo = otpRequestId.value;
+    if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+    loading.value = true;
+    try {
+      await authApi.completePasswordReset({
+        countryCode: country.value,
+        phone: phoneClean.value,
+        challengeNo,
+        code: code.value.join(""),
+        newPassword: newPassword.value,
+      });
+    } catch (cause) {
+      loading.value = false;
+      const message = cause instanceof ApiError ? cause.message : "";
+      error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID"
+        ? t.value.login.errorInvalidCode
+        : message === "USER_NEW_PASSWORD_MUST_DIFFER"
+          ? t.value.login.errorWeakPassword
+          : t.value.authOtp.errorServiceUnavailable;
+      return;
+    }
+    loading.value = false;
+    toast.success(t.value.login.resetSuccess, "");
+    invalidateOtpFlow();
+    mode.value = "password";
+    step.value = 1;
+    password.value = "";
+    newPassword.value = "";
+    confirmPwd.value = "";
+    return;
+  }
   // MOCK: no real password persistence; treat as success → back to password login.
   toast.success(t.value.login.resetSuccess, "");
   invalidateOtpFlow();

@@ -21,6 +21,16 @@ export interface HttpResponse {
 
 export interface HttpTransport {
   request(request: HttpRequest): Promise<HttpResponse>;
+  upload?(request: HttpUploadRequest): Promise<HttpResponse>;
+}
+
+export interface HttpUploadRequest {
+  url: string;
+  filePath: string;
+  name: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  signal?: AbortSignal;
 }
 
 export interface ApiRequest {
@@ -40,7 +50,18 @@ export interface ApiRequest {
 
 export interface ApiClient {
   request<T>(request: ApiRequest): Promise<T>;
+  upload<T>(request: ApiUploadRequest): Promise<T>;
   refreshSession(): Promise<SessionSnapshot>;
+}
+
+export interface ApiUploadRequest {
+  path: string;
+  filePath: string;
+  name?: string;
+  authenticated?: boolean;
+  idempotencyKey?: string;
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 interface ApiClientOptions {
@@ -72,6 +93,15 @@ function isEnvelope(value: unknown): value is ApiResult<unknown> {
   if (!value || typeof value !== "object") return false;
   const envelope = value as Partial<ApiResult<unknown>>;
   return typeof envelope.code === "number" && typeof envelope.message === "string" && "data" in envelope;
+}
+
+function decodeTransportData(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return value;
+  }
 }
 
 function authFailure(status: number, code?: number, message = ""): boolean {
@@ -111,7 +141,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw asApiError(error);
     }
 
-    const envelope = isEnvelope(response.data) ? response.data : null;
+    const responseData = decodeTransportData(response.data);
+    const envelope = isEnvelope(responseData) ? responseData : null;
     const explicitlyAccepted = !!envelope && acceptedResponses.some(
       (accepted) => accepted.status === response.status
         && accepted.code === envelope.code
@@ -251,7 +282,67 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
   }
 
-  return { request, refreshSession };
+  async function upload<T>(apiRequest: ApiUploadRequest): Promise<T> {
+    if (!options.transport.upload) {
+      throw new ApiError({ kind: "configuration", message: "FILE_UPLOAD_TRANSPORT_UNAVAILABLE" });
+    }
+    const authenticated = apiRequest.authenticated !== false;
+    let session = options.vault.read();
+    if (authenticated && !session?.accessToken) session = await refreshSession();
+    const headers: Record<string, string> = {};
+    if (authenticated && session?.accessToken) {
+      headers.Authorization = `${session.tokenType || "Bearer"} ${session.accessToken}`;
+    }
+    if (apiRequest.idempotencyKey) headers["Idempotency-Key"] = apiRequest.idempotencyKey;
+    const uploadRequest: HttpUploadRequest = {
+      url: `${baseUrl}/${apiRequest.path.replace(/^\/+/, "")}`,
+      filePath: apiRequest.filePath,
+      name: apiRequest.name ?? "file",
+      headers,
+      timeoutMs: apiRequest.timeoutMs ?? 30_000,
+      signal: apiRequest.signal,
+    };
+    const executeUpload = () => options.transport.upload!(uploadRequest)
+      .then((response) => executeResponse<T>(response));
+    try {
+      return await executeUpload();
+    } catch (error) {
+      const apiError = asApiError(error);
+      if (!authenticated || apiError.kind !== "auth") throw apiError;
+      const latest = options.vault.read();
+      if (!session || !latest || latest.user.userId !== session.user.userId) {
+        throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_REQUEST" });
+      }
+      const refreshed = latest.accessToken && latest.accessToken !== session.accessToken
+        ? latest : await refreshSession();
+      uploadRequest.headers.Authorization = `${refreshed.tokenType || "Bearer"} ${refreshed.accessToken}`;
+      return executeUpload();
+    }
+  }
+
+  async function executeResponse<T>(response: HttpResponse): Promise<T> {
+    const responseData = decodeTransportData(response.data);
+    const envelope = isEnvelope(responseData) ? responseData : null;
+    if (authFailure(response.status, envelope?.code, envelope?.message)) {
+      throw new ApiError({ kind: "auth", message: envelope?.message || "AUTH_REQUIRED", status: response.status, code: envelope?.code });
+    }
+    if (response.status < 200 || response.status >= 300) {
+      throw new ApiError({
+        kind: "http",
+        message: envelope?.message || `HTTP_${response.status}`,
+        status: response.status,
+        code: envelope?.code,
+        retryable: response.status >= 500,
+      });
+    }
+    if (!envelope) throw new ApiError({ kind: "protocol", message: "API_ENVELOPE_INVALID", status: response.status });
+    if (envelope.code !== 0) {
+      throw new ApiError({ kind: "business", message: envelope.message || "BUSINESS_ERROR", status: response.status, code: envelope.code });
+    }
+    return envelope.data as T;
+  }
+
+  return { request, upload, refreshSession };
 }
 
 export function createUniHttpTransport(): HttpTransport {
@@ -300,6 +391,43 @@ export function createUniHttpTransport(): HttpTransport {
           fail: () => rejectOnce(request.signal?.aborted
             ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
             : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true })),
+        });
+      });
+    },
+    upload(request) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        let task: { abort?: () => void } | undefined;
+        const cleanup = () => request.signal?.removeEventListener("abort", onAbort);
+        const finish = (action: () => void) => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          action();
+        };
+        const onAbort = () => {
+          task?.abort?.();
+          finish(() => reject(new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })));
+        };
+        if (request.signal?.aborted) {
+          onAbort();
+          return;
+        }
+        request.signal?.addEventListener("abort", onAbort, { once: true });
+        task = uni.uploadFile({
+          url: request.url,
+          filePath: request.filePath,
+          name: request.name,
+          header: request.headers,
+          timeout: request.timeoutMs,
+          success: (response) => finish(() => resolve({
+            status: response.statusCode,
+            data: response.data,
+            headers: {},
+          })),
+          fail: () => finish(() => reject(request.signal?.aborted
+            ? new ApiError({ kind: "network", message: "REQUEST_ABORTED", retryable: false })
+            : new ApiError({ kind: "network", message: "NETWORK_UNAVAILABLE", retryable: true }))),
         });
       });
     },

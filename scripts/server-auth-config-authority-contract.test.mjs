@@ -23,6 +23,20 @@ test("explicit logout revokes the remote refresh session before local state is c
   assert.match(me, /async function handleSignOut\(\)[\s\S]*?if \(remoteApiEnabled\) await authApi\.logout\(\);[\s\S]*?session\.signOutSession\(\);[\s\S]*?auth\.signOut\(\);/);
 });
 
+test("registration OTP send uses the public auth route and a delivery-specific fallback", () => {
+  const api = read("src/api/auth-api.ts");
+  const register = read("src/pages/register/register.vue");
+  const zh = read("src/i18n/messages/zh.ts");
+  const en = read("src/i18n/messages/en.ts");
+  const vi = read("src/i18n/messages/vi.ts");
+
+  assert.match(api, /sendRegistrationOtp[\s\S]*?path: "\/auth\/users\/register\/otp\/send"/);
+  assert.match(register, /authApi\.sendRegistrationOtp[\s\S]*?errorOtpSendUnavailable/);
+  assert.match(zh, /errorOtpSendUnavailable: "暂时无法发送验证码,请重试。"/);
+  assert.match(en, /errorOtpSendUnavailable: "We couldn't send the verification code right now\. Please try again\."/);
+  assert.match(vi, /errorOtpSendUnavailable: "Hiện chưa thể gửi mã xác minh\. Vui lòng thử lại\."/);
+});
+
 test("remote configuration loads are authoritative and remote writes do not revive local tables", () => {
   const config = read("src/store/config.ts");
   const rank = read("src/store/v-rank.ts");
@@ -71,8 +85,9 @@ test("remote-only policy branches stay inert until a dedicated server contract e
   // 锚点改用同样「关死」的 smallAmountThresholdUsd: 0(小额免审真停用),强度不变。
   assert.match(config, /const unavailableServerConfig: PlatformConfig = \{[\s\S]*?riskCluster: \{[\s\S]*?releaseMode: "manual_only"[\s\S]*?withdrawRules: \{[\s\S]*?sameAddressRoute: "reject"[\s\S]*?smallAmountThresholdUsd: 0[\s\S]*?riskScore: \{[\s\S]*?weakSignalClusterThreshold: 0[\s\S]*?otpGate: \{[\s\S]*?maxVerifyAttempts: 0[\s\S]*?share: \{[\s\S]*?channels: \[\]/);
   assert.match(login, /import \{ authApi, remoteApiEnabled \} from "@\/api\/runtime"/);
-  assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?error\.value = t\.value\.authOtp\.errorServiceUnavailable;[\s\S]*?return;/);
-  assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?error\.value = t\.value\.authOtp\.errorServiceUnavailable;/);
+  assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.sendPasswordResetOtp[\s\S]*?authApi\.sendLoginOtp/);
+  assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.completeOtpLogin/);
+  assert.match(login, /async function finishReset\(\) \{[\s\S]*?authApi\.completePasswordReset/);
   assert.match(share, /export function buildShareLink[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?location\.origin[\s\S]*?return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
   assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?if \(remoteApiEnabled\) return \[\];/);

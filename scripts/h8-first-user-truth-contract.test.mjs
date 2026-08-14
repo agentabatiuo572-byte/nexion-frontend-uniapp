@@ -65,6 +65,8 @@ test("H8 invitation summary keeps an authoritative localized sandbox banner acro
 
 test("remote registration submits the captured referral code to the server", () => {
   const register = read("src/pages/register/register.vue");
+  const recovery = read("src/auth/registration-auto-login.ts");
 
-  assert.match(register, /authApi\.register\([\s\S]*sponsorCode:\s*currentSponsorCode\(\)/);
+  assert.match(register, /registerAndLogin\(authApi,[\s\S]*sponsorCode:\s*currentSponsorCode\(\)/);
+  assert.match(recovery, /authApi\.register\(request\)/);
 });

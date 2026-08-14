@@ -94,10 +94,13 @@ import { navTo } from "@/lib/route";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import type { ConversationType, ConvMessage } from "@/domain/support";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
 
 const t = useT();
 const convStore = useConversations();
 const nova = useNova();
+const app = useApp();
 
 const selectedType = ref<ConversationType>("advisor");
 
@@ -105,6 +108,7 @@ const selectedType = ref<ConversationType>("advisor");
 // sweep too): stale-active support sessions flip to closed here (real backend
 // closes server-side and pushes the status).
 onShow(async () => {
+  if (remoteApiEnabled) nova.bindRemoteAccount(app.accountKey);
   try { await convStore.refresh(); } catch { /* honest empty state is rendered */ }
 });
 
@@ -124,11 +128,14 @@ const ADVISOR_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none
 const SUPPORT_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2" /><path d="M21 16a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 16a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" /></svg>`;
 const AI_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9.8 3.2 11 7l3.8 1.2L11 9.4 9.8 13 8.6 9.4 4.8 8.2 8.6 7z" /><path d="M17.5 13.5l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6z" /></svg>`;
 
-const TYPES: { key: ConversationType; tint: string; icon: string }[] = [
-  { key: "advisor", tint: "var(--v5-brand)", icon: ADVISOR_ICON },
-  { key: "support", tint: "var(--v5-tech-cyan)", icon: SUPPORT_ICON },
-  { key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON },
-];
+const TYPES = computed<{ key: ConversationType; tint: string; icon: string }[]>(() => {
+  const available: { key: ConversationType; tint: string; icon: string }[] = [
+    { key: "advisor", tint: "var(--v5-brand)", icon: ADVISOR_ICON },
+    { key: "support", tint: "var(--v5-tech-cyan)", icon: SUPPORT_ICON },
+  ];
+  available.push({ key: "ai", tint: "var(--v5-brand-2)", icon: AI_ICON });
+  return available;
+});
 
 interface Row {
   id: string;

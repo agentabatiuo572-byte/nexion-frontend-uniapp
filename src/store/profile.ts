@@ -4,7 +4,10 @@ import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
 import { defaultNickname } from "@/lib/nickname";
 import { remoteApiEnabled } from "@/api/runtime";
+import { profileApi } from "@/api/runtime";
+import { isAmbiguousOutcome } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
+import { acquireProfileCommandKey, finishProfileCommand } from "@/lib/profile-command-key";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
@@ -39,6 +42,7 @@ export const useProfile = defineStore("profile", () => {
   const displayName = ref(init.displayName);
   const avatarSeed = ref(init.avatarSeed);
   const phoneE164 = ref("");
+  const nicknameCandidates = ref<string[]>([]);
 
   function persist() {
     writeAccountRow<Persisted>(ACCOUNTS_KEY, boundKey, {
@@ -57,6 +61,7 @@ export const useProfile = defineStore("profile", () => {
       displayName.value = "";
       avatarSeed.value = "";
       phoneE164.value = "";
+      nicknameCandidates.value = [];
       return;
     }
     const next = hydrate(boundKey);
@@ -73,9 +78,32 @@ export const useProfile = defineStore("profile", () => {
     phoneE164.value = `${identity.countryCode}${identity.phone}`;
   }
 
-  /** No server profile-write endpoint exists yet: remote profile is read-only. */
-  function setDisplayName(v: string) {
-    if (remoteApiEnabled) return false;
+  async function refreshNicknameCandidates(): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
+    try {
+      nicknameCandidates.value = await profileApi.nicknameCandidates();
+      return true;
+    } catch {
+      nicknameCandidates.value = [];
+      return false;
+    }
+  }
+
+  async function setDisplayName(v: string): Promise<boolean> {
+    if (remoteApiEnabled) {
+      const expected = displayName.value;
+      const desired = v.trim();
+      if (!expected || !desired || desired === expected) return false;
+      const commandKey = acquireProfileCommandKey(boundKey, expected, desired);
+      try {
+        displayName.value = await profileApi.updateNickname(expected, desired, commandKey);
+        finishProfileCommand(boundKey, expected, desired);
+        return true;
+      } catch (error) {
+        if (!isAmbiguousOutcome(error)) finishProfileCommand(boundKey, expected, desired);
+        throw error;
+      }
+    }
     displayName.value = v;
     persist();
     return true;
@@ -87,5 +115,8 @@ export const useProfile = defineStore("profile", () => {
     return true;
   }
 
-  return { displayName, avatarSeed, phoneE164, setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity };
+  return {
+    displayName, avatarSeed, phoneE164, nicknameCandidates,
+    setDisplayName, regenerateAvatar, bindAccount, projectServerIdentity, refreshNicknameCandidates,
+  };
 });
