@@ -60,5 +60,3 @@
 | 需用户处理的轻反馈（Undo/Retry） | `Snackbar` | 遮 TabBar |
 | 区域空数据 | `Card/EmptyState`（插画+引导+CTA） | 白屏/裸转圈 |
 | 整页断网/接口挂 | `NetErrorOverlay` | 表单校验错也整页盖（应 inline error） |
-
-<!-- redtest-real: startWithCard -->
