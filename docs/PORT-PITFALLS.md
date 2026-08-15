@@ -1573,3 +1573,10 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:① selftest 与生产共用同一信号通道(登记簿/计数器),演习流量与真流量不可分;② 计数判据数「文本出现次数」而非「可执行调用点」,注释也是文本。
 - **对策**:① selftest 期间**换草稿通道**(临时改指 scratch 文件,演习完还原并删除),生产通道零污染,并断言真通道 0 字节;② 计数判据**锚定行首**(`^\s*if <函数名> `)——注释行以 # 开头天然不匹配;红测必须含「仅诱饵→仍绿」+「诱饵+真解包→红」组合靶,单测解包不够。
 - **同族提醒**:任何「gate 自测时真跑一遍失败路径」的哨兵都要过一遍「演习弹落在哪个通道」;任何 grep 计数门都要问「注释里写同形文本会怎样」。出处:pkg/zj 独立证伪轮(P1-1/P2-3),2026-08-15。
+
+## P-094 「连接服务器超时」= dev 依赖重打包窗口,不是网络/后端问题
+
+- **症状**:mock 模式下打开某页(实测 earn)黑屏转圈 60s 后弹「连接服务器超时」;console 一串模块请求 500 + `Async component timed out after 60000ms`。该文案是 uni-h5 运行时内置的,src 里 grep 不到。
+- **根因**:uni 按需编译下,vite 冷启动的依赖扫描抓不到**只被懒编译页面引用**的依赖(qrcode-generator 仅 proof.vue / share-poster-sheet.vue 引用)。冷启动后第一次有人访问引它的页面 → 运行时「new dependencies optimized」全量重打包 → 窗口内在途模块请求 500 → uni 异步页面组件等满 60s 报超时。自愈型:窗口过后刷新即好,极易误判成后端/网络问题。
+- **对策**:此类依赖显式写进 `vite.config.ts` → `optimizeDeps.include`(已加 qrcode-generator);**新增「仅页面级引用」的 npm 依赖时同步补 include**。诊断口径:见到该文案先看 dev server 日志有无 `new dependencies optimized` / `restarting server`,再谈网络。
+- **判据来源**:server 日志时间线(20:44:50 重打包 = 报障时刻)+ 修复后重启同路径访问日志零重打包行、二维码页直接渲染。2026-08-15。
