@@ -21,7 +21,7 @@
         <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.displayName[0] }}</text></view>
         <view class="rg-sponsor__body">
           <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.displayName }}</text> {{ t.ref.invitedYou }}</text>
-          <text class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
+          <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
         </view>
         <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
@@ -34,20 +34,27 @@
       <!-- Title -->
       <text class="rg-title">{{ step === 1 ? t.register.title : step === 2 ? t.register.codeStepTitle : t.register.setPasswordTitle }}</text>
       <text class="rg-subtitle">
-        <template v-if="step === 1"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { usd: giftUsdt }) }}</text>{{ t.register.subtitleRest }}</template>
+        <!-- 奖励金额护栏(包 zm T1):配置未到位/被中毒清零时金额句整体让位,$0 永不上转化首屏 -->
+        <template v-if="step === 1"><template v-if="giftUsdt > 0"><text class="rg-subtitle__hl">{{ fmt(t.register.subtitleHighlight, { usd: giftUsdt }) }}</text>{{ t.register.subtitleRest }}</template><template v-else>{{ t.register.subtitleNoBonus }}</template></template>
         <template v-else-if="step === 2">{{ t.register.codeSentTo }} <text class="rg-subtitle__ph">{{ country }} {{ phone }}</text></template>
         <template v-else>{{ t.register.setPasswordHint }}</template>
       </text>
 
       <!-- Body -->
       <view class="rg-body">
-        <!-- Step 1: phone -->
-        <view v-if="step === 1" class="rg-phone">
-          <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
-            <text class="rg-phone__cc-t">{{ country }}</text>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
+        <!-- Step 1: phone。🔴 hint/横幅必须在本容器**内**:插在 v-if 与 v-else-if 之间会断步骤链,
+             密码块曾因此在第 1 步恒渲染(独立验收 F1 抓获)。 -->
+        <view v-if="step === 1">
+          <view class="rg-phone">
+            <view class="rg-phone__cc" role="button" tabindex="0" :aria-label="t.countryCodes.title" :aria-expanded="showCountries" @click="showCountries = true" @keydown.enter.prevent="showCountries = true" @keydown.space.prevent="showCountries = true">
+              <text class="rg-phone__cc-t">{{ country }}</text>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: showCountries ? 'rotate(180deg)' : '' }"><path d="m6 9 6 6 6-6" /></svg>
+            </view>
+            <input class="rg-phone__in" type="number" :placeholder="t.register.phonePlaceholder" :value="phone" @input="onPhone" />
           </view>
-          <input class="rg-phone__in" type="number" :placeholder="t.register.phonePlaceholder" :value="phone" @input="onPhone" />
+          <text v-if="phoneLenHint" class="rg-phone-hint">{{ phoneLenHint }}</text>
+          <!-- 包 zm T3:仅开发构建,sandbox 后端网络级失联时亮工程横幅(生产构建整段剔除) -->
+          <view v-if="devBackendDown" class="rg-devbanner"><text class="rg-devbanner__t">Dev build · sandbox API unreachable — start the 8110 backend or run mock mode</text></view>
         </view>
 
         <!-- Step 2: OTP + invite -->
@@ -154,10 +161,12 @@ import GlobalUi from "@/components/global-ui.vue";
 import CaptchaSlider from "@/components/captcha-slider.vue";
 import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
+import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
 import type { OAuthProvider } from "@/api/auth-api";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
+import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin } from "@/auth/registration-auto-login";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import {
@@ -211,7 +220,11 @@ interface RemoteRegistrationAttemptContext {
   challengeNo: string;
 }
 const step = ref<Step>(1);
-const country = ref("+1");
+// 包 zm T4:初始国家码随 App 语言(仅初始默认;用户手选后以 pickCountry 为准)。
+const LOCALE_DIAL: Record<string, string> = {
+  vi: "+84", zh: "+86", ja: "+81", ko: "+82", ru: "+7", pt: "+55", de: "+49", fr: "+33", ar: "+966",
+};
+const country = ref(LOCALE_DIAL[useLocaleStore().code] ?? "+1");
 const showCountries = ref(false);
 const phone = ref("");
 const code = ref<string[]>(["", "", "", "", "", ""]);
@@ -221,6 +234,7 @@ const password = ref("");
 const confirmPwd = ref("");
 const showPwd = ref(false);
 const error = ref<string | null>(null);
+const devBackendDown = ref(false);
 const showCaptcha = ref(false);
 const registrationRisk = ref<RegistrationAssessment | null>(null);
 // OTP + K1 评估进行中(⑤ 加载态): CTA 显示「校验中」,拦重复提交。
@@ -266,7 +280,21 @@ onLoad(async (options) => {
 });
 
 const phoneClean = computed(() => phone.value.replace(/\s+/g, ""));
-const phoneOk = computed(() => /^\d{6,15}$/.test(phoneClean.value));
+// 包 zm T5:主市场国别位数即时校验(不合法禁发送并就地提示);未列国别退回通用 6-15。
+const DIAL_LEN: Record<string, [number, number]> = {
+  "+86": [11, 11], "+84": [9, 10], "+1": [10, 10], "+81": [10, 11], "+82": [9, 11],
+  "+7": [10, 10], "+55": [10, 11], "+49": [10, 11], "+33": [9, 9], "+966": [9, 9],
+};
+const dialLen = computed(() => DIAL_LEN[country.value] ?? [6, 15]);
+const phoneOk = computed(() => {
+  const [min, max] = dialLen.value;
+  return new RegExp(`^\\d{${min},${max}}$`).test(phoneClean.value);
+});
+const phoneLenHint = computed(() => {
+  if (!phoneClean.value || phoneOk.value) return "";
+  const [min, max] = dialLen.value;
+  return fmt(t.value.register.phoneLenHint, { range: min === max ? String(min) : `${min}-${max}` });
+});
 const fullPhone = computed(() => `${country.value}${phoneClean.value}`);
 const codeStr = computed(() => code.value.join(""));
 const codeOk = computed(() => /^\d{6}$/.test(codeStr.value));
@@ -437,6 +465,8 @@ async function requestCode(captchaTicket?: string) {
       if (!mounted || flowVersion !== otpFlowVersion) return;
       verifying.value = false;
       error.value = geoText(cause) ?? t.value.authOtp.errorOtpSendUnavailable;
+      // 包 zm T3:开发构建里区分「产品坏了」与「本地后端没起」——网络级失败且在 sandbox 档时亮工程横幅。
+      if (import.meta.env.DEV) devBackendDown.value = apiRuntimeConfig.mode === "sandbox";
     }
     return;
   }
@@ -701,6 +731,9 @@ async function finish() {
     completing.value = false;
     return;
   }
+  // 包 zm F2:legacy 目录不存密码 —— 把本次设置的密码登记进 mock authApi 注册表,
+  // 否则 mock 档密码登录永远「查无此人」。两个成功分支(已提交/新建)都要走到,故放在这里。
+  registerMockAuthCredential(country.value, phoneClean.value, password.value);
   const previousAccountKey = app.accountKey || "default";
   const restorePreviousAccountScope = () => {
     app.bindAccount(previousAccountKey);
@@ -875,9 +908,10 @@ onUnmounted(() => cleanup());
 .rg-locked__code { flex: 1; font-size: 15px; color: var(--text-muted); font-family: var(--font-jet-mono), ui-monospace, monospace; letter-spacing: 0.04em; }
 .rg-locked__tag { display: block; margin-top: 8px; padding: 0 4px; font-size: 12px; color: var(--v5-brand); }
 .rg-step3 { display: flex; flex-direction: column; gap: 12px; }
-.rg-field { background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
-.rg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border: 1px solid var(--v5-surface-2); border-radius: 16px; height: 56px; padding: 0 16px; }
-.rg-field-wrap--err { border-color: color-mix(in srgb, var(--v5-brand-2) 45%, transparent); }
+/* 《03》§3 零 border:填充容器不描边(2026-08-15 zero-border 门抓获存量);错误态改 soft tint 表达。 */
+.rg-field { background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; font-size: 15px; color: var(--v5-ink); }
+.rg-field-wrap { display: flex; align-items: center; background: var(--v5-surface); border-radius: 16px; height: 56px; padding: 0 16px; }
+.rg-field-wrap--err { background: color-mix(in srgb, var(--v5-brand-2) 12%, var(--v5-surface)); }
 .rg-field--flex { flex: 1; background: transparent; border: none; height: 100%; padding: 0; }
 .rg-eye { padding: 4px; }
 .rg-check { display: flex; }
@@ -885,6 +919,9 @@ onUnmounted(() => cleanup());
 .rg-review__title { display: block; font-size: 13px; font-weight: 600; color: var(--v5-warning); }
 .rg-review__body { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--v5-ink-3); }
 .rg-error { margin-top: 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--v5-brand-2); background: color-mix(in srgb, var(--v5-brand-2) 10%, transparent); border-radius: 8px; padding: 8px 12px; }
+.rg-phone-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--v5-ink-3); }
+.rg-devbanner { margin-top: 10px; border-radius: 8px; padding: 8px 12px; background: color-mix(in srgb, var(--v5-warning) 12%, transparent); }
+.rg-devbanner__t { font-size: 12px; color: var(--v5-warning); }
 .rg-error__t { flex: 1; }
 .rg-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .rg-cta { margin-top: 20px; height: 56px; border-radius: 9999px; background: var(--v5-surface); display: flex; align-items: center; justify-content: center; }
