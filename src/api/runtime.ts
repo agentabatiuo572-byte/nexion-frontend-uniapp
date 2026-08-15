@@ -1,6 +1,7 @@
 import { createAccountApi } from "./account-api";
 import { createUniHttpTransport } from "./api-client";
 import { createAuthApi } from "./auth-api";
+import { createMockAuthApi } from "./mock-auth-api";
 import { createPaymentApi } from "./payment-api";
 import { createProductCatalogApi } from "./product-catalog-api";
 import { createWithdrawalApi } from "./withdrawal-api";
@@ -69,7 +70,12 @@ export const apiClient = createRuntimeApiClient({
   localPreview: isLoopbackSameOriginPreview(apiRuntimeConfig.baseUrl),
   onUnauthorized: () => unauthorizedHandler?.(),
 });
-export const authApi = createAuthApi(apiClient, sessionVault);
+// mock 档装本地 AuthApi(包 zm T0):服务端权威化后 auth 全链 server-backed,mock 客户端
+// 对一切调用抛 REMOTE_API_DISABLED_IN_MOCK_MODE → 演示档注册/登录死路。本地实现与真实现
+// 逐方法同契约同 vault 语义,sandbox/remote 档零变化。
+export const authApi = apiRuntimeConfig.mode === "mock"
+  ? createMockAuthApi(sessionVault)
+  : createAuthApi(apiClient, sessionVault);
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient);
 export const productCatalogApi = createProductCatalogApi(apiClient);
