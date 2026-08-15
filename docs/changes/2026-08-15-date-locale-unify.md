@@ -56,6 +56,6 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
   另:cross-repo sampling 门红 = admin 仓审计脚本指向已改名的 `NX1.0-UniApp`(现 `NX1.0-UniApp-UI`),与本包无关,已挂修复芯片。
   🔴 **未清账**:静机(其它会话服务器停掉后)复跑 `BASE_URL=… bash scripts/verify.sh` 全绿才许合并主线——runbook:
   `VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5223` 起新服务器 → `node <scratch>/warm-all-routes.cjs` 预热 → 全量 verify。
-- [ ] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图
-- [ ] 独立 tester 黑盒验收(报告落同目录 `2026-08-15-date-locale-unify-t1-test.md`)
-- [ ] 合并回 UniApp 主线(主线只收合并)
+- [x] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图(main DOM 断言 + tester 截图双份,`evidence-date-locale/`)
+- [x] 独立 tester 黑盒验收 **AC 5/5 pass**(报告 `2026-08-15-date-locale-unify-t1-test.md`;5 条 AC 外发现已裁决:#2 裸值 default 与 #1/#3/#4 均为既有问题,#2 已挂修复芯片)
+- [ ] 🔴 静机复跑 `bash scripts/verify.sh` 全绿(P-097 环境红清账)→ 才合并回 UniApp 主线(主线只收合并)
