@@ -5,12 +5,10 @@ export interface RecoverableFundsHandlers<T> {
 }
 
 function failureReason(cause: unknown, fallback: string): string {
-  const message = cause && typeof cause === "object" && "message" in cause
-    ? String((cause as { message?: unknown }).message ?? "").trim()
-    : "";
-  if (message) return message;
-  const text = String(cause ?? "").trim();
-  return text || fallback;
+  // 焦虑文案收口(2026-08-15):原始 message/错误码是给工程师的,只进日志;
+  // 用户面渲染 fallback(调用方传人话文案,不再传 SCREAMING_CODE)。
+  console.warn("[funds-operation] failed:", cause);
+  return fallback;
 }
 
 /**

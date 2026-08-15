@@ -281,7 +281,10 @@ onMounted(() => {
     //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
     //   充值页的报错横幅会**静默变哑** —— 改缝必须连消费方一起改,这就是那一半。
     void dep.refreshRemoteVietQrDeposits().then(() => {
-      if (dep.serverStatus === "error" && dep.serverError) createError.value = dep.serverError;
+      if (dep.serverStatus === "error" && dep.serverError) {
+        console.warn("[deposit] refresh failed:", dep.serverError);
+        createError.value = t.value.topupChrome.depositOpFailedNote;
+      }
     });
   }
   const resume = dep.intents.find((i) => i.status === "awaiting_payment" || i.status === "mismatch_review");
@@ -351,7 +354,7 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         paidPressed.value = false;
       },
       failure: (reason) => {
-        createError.value = reason;
+        createError.value = t.value.topupChrome.depositOpFailedNote;
         toast.error(reason);
       },
       settled: () => { creating.value = false; },
