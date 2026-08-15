@@ -25,6 +25,15 @@ export BASE_URL="${BASE_URL:-http://localhost:5173}"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
+# 🔴 判定 locale 钉死(2026-08-15 A/B 实锤,2/2 复现):login shell 的 profile 会带进
+#   LANG=zh_CN.UTF-8,同一个 GNU sed 4.9 在多字节模式下对含 emoji 的注释行做
+#   `s|…//.*$|…|` 剥除会**静默失败** —— platform-anchor 禁令因此把 platform-stats.ts
+#   族B 说明注释误判成代码面(447/1 假红);反向更险:剥注释失败会让「消费计数 ≥2」
+#   类门被注释行虚增计数(死代码假绿)。LANG unset(C locale)则剥除干净。
+#   门的判定不许随启动者 shell 环境漂移;全部文本门按字节语义跑
+#   (脚本内 UTF-8 模式串按字节比对,中文/emoji 字面匹配不受影响)。
+export LC_ALL=C
+
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
 pass=0; fail=0; skip=0; retried=0
 
@@ -433,7 +442,9 @@ sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|
 # scans the message files directly for unambiguous funnel compounds + a bare
 # "转化" value (currency reads 兑换/exchange in copy) → zero false positives.
 # (added 2026-06-22: 转化→推荐 task surfaced 3 user-facing leaks past the gate.)
-i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate' src/i18n/messages 2>/dev/null | head -5)
+# 2026-08-15 追加「观察者视角」族(真实用户/Real users/Người dùng thật):proof.posterHint 曾以
+# 「真实用户会把这种卡片发到…」解说套路 —— 产品要对用户直说,不许旁白解说用户行为。
+i18n_meta=$(grep -rEnI '转化路径|转化门槛|转化率|转化漏斗|"转化"|conversion path|conversion gate|conversion funnel|conversion rate|真实用户|[Rr]eal users|Người dùng thật' src/i18n/messages 2>/dev/null | head -5)
 if [ -z "$i18n_meta" ]; then ok "no funnel-meta in i18n copy (0 hits)"; else bad "funnel-meta leaked into i18n copy"; echo "$i18n_meta" | sed 's/^/        /'; fi
 # copy hygiene: <text> renders raw — markdown tokens (**bold**, `code`) show as
 # literal stars/backticks, and route-path literals violate the no-jargon rule.

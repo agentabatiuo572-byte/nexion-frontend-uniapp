@@ -3253,7 +3253,7 @@ export const en = {
     copiedToast: "Card link copied",
     posterHintTitle: "Tip",
     posterHint:
-      "Real users post these cards in crypto Telegram groups — every referral earns you 5% of their lifetime revenue.",
+      "Share this card in your Telegram groups — every referral earns you 5% of their lifetime revenue.",
     // Enhanced share hub
     variantLabel: "CARD STYLE",
     variants: {

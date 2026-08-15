@@ -3125,7 +3125,7 @@ export const vi: Messages = {
     copiedToast: "Đã sao chép link thẻ",
     posterHintTitle: "Mẹo",
     posterHint:
-      "Người dùng thật đăng những tấm thẻ này trong các nhóm Telegram crypto — mỗi người bạn giới thiệu mang về cho bạn 5% doanh thu trọn đời của họ.",
+      "Đăng thẻ này vào nhóm Telegram của bạn — mỗi người bạn giới thiệu mang về cho bạn 5% doanh thu trọn đời.",
     variantLabel: "KIỂU THẺ",
     variants: {
       earnings: "Thu nhập",
