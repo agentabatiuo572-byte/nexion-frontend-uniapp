@@ -32,6 +32,11 @@
 - [ ] D3 selftest 断言:runtime 族清点数 = 实际被包调用点数,人为解包 1 个调用点 → selftest 红(接线完整性)
 - [ ] D4 同机连跑 3 轮 legacy-suite:除 SPEC-7(或其已修态)外 0 条未解释红;如出现 after-retry 标记,逐条留痕可查
 
+## 修订(T4 独立 tester 证伪后,2026-08-15)
+- tester 报 P1=1/P2=10(P0=0),合并修:selftest 演习换草稿登记簿(P1-1 常噪)· ⚠ 色码走格式串(P2-1)· 重定向收进函数+首败存档 `.attempt1`(P2-2)· 接线判据锚定行首+绝对路径+弃 `|| echo 0`(P2-3/4/10)· skipped() 也消费标志(P2-9)。
+- **偏离原稿一处**:dom-qa/tap-feedback 的 `--selftest` 行经 tester 实锤「顶层真起 chromium」,由不包改**入族**(launch 抖动面真实);theme/zero-border 的 selftest 纯函数先退,维持不包。族=14 脚本/16 调用点。
+- 记录不处置:`test:h5-runtime` 第二入口无包装(P2-8);计数门天然不守新增探针(census 有账)。
+
 ## 实施拆解(M 级内联)
 - [ ] **T1 清点探针族**:grep verify.sh 全部 runtime 探针调用点(读 BASE_URL / Playwright 类),产出清单(文件:行号),区分「包」与「不包」并写入 selftest 的期望数 — AC:清单覆盖三轮日志里出现过的全部抖动成员;测试:清单 vs 16-fail 假红名单交叉核对
 - [ ] **T2 实现包装函数 + 换装**:`run_probe_with_retry` 落 verify.sh;T1 清单逐点换装,失败明细日志双份保留(首败 + 终判) — AC:全量 suite 跑通,绿门行为与改前一致;测试:`npm run test:legacy-suite`
