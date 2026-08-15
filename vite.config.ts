@@ -41,6 +41,15 @@ export default defineConfig(({ mode }) => {
     host: true,
     port: 5173,
       strictPort: true, // 5173 被占就明着炸,不许静默换端口把 verify 全家变假红
+      // 🔴 .claude/worktrees 与 admin 仓互挂 junction(跨仓门取材面),构成双向环:
+      //   uniapp/.claude/worktrees/nexion-ops-console → admin-ops/.claude/worktrees/Nexion-uniapp → 回本仓。
+      //   chokidar 跟随 junction 在环里无限递归,监视路径每圈翻倍,4GB 堆 ~2.5h 吃穿
+      //   (FATAL: heap out of memory,exit 134;2026-08-15/16 主 5173 连崩,GC 日志实锤)。
+      //   dist/ 是构建产物:verify 链的 build:h5 每次落盘都触发整页 reload,打断正在浏览的人。
+      //   .trash/ 是删除暂存,监视它只有噪声。三者都不是源码,监视器一律拉黑。
+      watch: {
+        ignored: ["**/.claude/**", "**/dist/**", "**/.trash/**"],
+      },
       proxy: {
         // The real H5 UI calls /auth/users/* from its same-origin base URL.
         // The backend intentionally owns that same path, so proxy it without
