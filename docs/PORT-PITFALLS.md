@@ -1587,3 +1587,10 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:login shell 的 profile 注入 `LANG=zh_CN.UTF-8`,GNU sed(4.9)转入多字节模式后,对含 emoji(🔴)的注释行执行 `s|(^\|[^:])//.*$|\1|` **静默失败**(不报错、原样放行)。A/B 各 2 次全复现:LANG unset(C locale)剥净→绿,zh_CN.UTF-8 存活→红。**反向更险**:剥注释失败会让「符号消费计数 ≥2」类门把注释行计进去 —— 死代码假绿。
 - **对策**(已焊,b0c9e14):verify.sh 头部 `export LC_ALL=C`,全部文本门按字节语义跑,判定与启动者 shell 环境解耦;脚本内 UTF-8 模式串按字节比对,中文/emoji 字面匹配不受影响。修后用敌意方式(-lc)复跑 448/0 作红转绿证明。
 - **同族提醒**:① 任何会话里临时写的 grep/sed 判定管道,若跑在 `-lc`/交互 shell 下,同样带着 zh locale —— 判定类管道自带 `LC_ALL=C` 前缀;② 「单跑绿、全跑红」或反之,先比对两次调用的 env(locale/PATH),再怀疑树被并发改;③ 与 P-059(演习弹污染共享通道)互补:本次三轮排查顺序 = 先疑并发注入、再疑树漂移、最后 env 对比才定罪 —— env 差异应提早进入证伪矩阵。2026-08-15。
+
+## P-096 跨仓 junction 成环:vite 监视器无限递归,dev server ~2.5h 必 OOM 崩
+
+- **症状**:主 5173 长跑约 2.5 小时后 exit 134 连崩(加 4GB 堆照崩,更快见底)。崩前日志出现**无限自我嵌套路径**:`[vite] page reload .claude/worktrees/nexion-ops-console/.claude/worktrees/Nexion-uniapp/.claude/worktrees/nexion-ops-console/…`,末尾 GC 日志 `FATAL: JavaScript heap out of memory`。
+- **根因**:跨仓门取材面在两个仓各挂了一条 junction —— uniapp 侧 `.claude/worktrees/nexion-ops-console → admin-ops`,admin 侧 `.claude/worktrees/Nexion-uniapp → Nexion-uniapp`,构成**双向环**;vite 的文件监视器(chokidar)跟随 junction 在环里无限递归,监视条目路径每圈翻倍直至堆爆。触发即崩的不是流量而是**时间**,与页面操作无关。只有主检出中招(worktree 检出里没有那些 junction),所以 5399 从不崩、5173 必崩,极易误判成「偶发内存不足」。
+- **对策**(已焊):`vite.config.ts` → `server.watch.ignored: ["**/.claude/**", "**/dist/**", "**/.trash/**"]`——`.claude`(worktrees/junction 基础设施)、`dist`(构建产物;verify 链每跑 build:h5 都会触发整页 reload 打断浏览者)、`.trash`(删除暂存)都不是源码,监视器一律拉黑。加内存(`start-services.ps1` 5173 行已带 4GB)只是缓冲,不是修复。
+- **同族提醒**:① 新挂任何跨仓 junction 前,想一句「对面仓会不会也挂回来」——环一旦成立,**两边所有跟随符号链接的递归工具**(watcher / find / 备份 / 打包)都会中招;② dev server「定时炸弹式」崩溃(固定 uptime 后崩、与负载无关)优先查监视面无限增长,GC 日志和崩前 watch 路径是第一现场;③ 与 env_windows_shell「junction 递归删除穿透」同族:junction 的风险面 = 一切递归遍历,不止删除。2026-08-16。
