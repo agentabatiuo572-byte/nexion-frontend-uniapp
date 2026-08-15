@@ -88,7 +88,7 @@ function onRowKeydown(e: KeyboardEvent, code: string, index: number) {
 
 const COUNTRIES = computed(() => [
   { code: "+1", name: t.value.countryCodes.usCanada }, { code: "+44", name: t.value.countryCodes.unitedKingdom }, { code: "+49", name: t.value.countryCodes.germany },
-  { code: "+33", name: t.value.countryCodes.france }, { code: "+34", name: t.value.countryCodes.spain }, { code: "+86", name: t.value.countryCodes.china }, { code: "+81", name: t.value.countryCodes.japan },
+  { code: "+33", name: t.value.countryCodes.france }, { code: "+34", name: t.value.countryCodes.spain }, { code: "+84", name: t.value.countryCodes.vietnam }, { code: "+86", name: t.value.countryCodes.china }, { code: "+81", name: t.value.countryCodes.japan },
   { code: "+82", name: t.value.countryCodes.southKorea }, { code: "+55", name: t.value.countryCodes.brazil }, { code: "+62", name: t.value.countryCodes.indonesia },
   { code: "+63", name: t.value.countryCodes.philippines }, { code: "+66", name: t.value.countryCodes.thailand }, { code: "+971", name: t.value.countryCodes.uae }, { code: "+7", name: t.value.countryCodes.russia },
 ]);
