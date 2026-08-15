@@ -47,7 +47,15 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
 - [x] verify.sh 哨兵 + PORT-PITFALLS P-096
 - [x] skeptic 证伪轮 → 3 条 P1 修复(hour12 / 类型锁+DICTS 派生 / 哨兵扩容+红测 11/11)
 - [x] vue-tsc 0 err
-- [ ] verify.sh 全量绿(哨兵新行 PASS 出现在输出里 = 门已接线)
+- [~] verify.sh 全量:R3 = **435 PASS / 15 FAIL(exit 1)**——15 条全为运行时探针「加载超时/覆盖为空」族,零断言失败。
+  定性为环境红,证据链:① 同套门当日晨间基线 445/0/0;② 三轮 FAIL 集与本包 diff 零交集(auth/register/entry-surfaces 无日期格式化);
+  ③ 实测 dev server 喂满一轮探针流量后进程膨胀至 4.8GB、**空载 shell 31s**;④ 最小复现:同一秒内裸 `/` goto 超时 30s、
+  紧接的 hash 路由 goto **528ms 成功** = 服务器侧请求队列拥塞(被杀探针客户端的残留转译积压),非页面问题;
+  ⑤ 「单浏览器串行耐心」模式当晚 176 次 goto 全成(预热 91/91 + 88/91),一门一浏览器的探针模式则集体超时;
+  ⑥ 我的浏览器在「失败」页(index/proof/me)全部秒级实景渲染,console 无应用错误;⑦ 当晚机器同时挂 3 个 uni dev server(两个属其它会话)。
+  另:cross-repo sampling 门红 = admin 仓审计脚本指向已改名的 `NX1.0-UniApp`(现 `NX1.0-UniApp-UI`),与本包无关,已挂修复芯片。
+  🔴 **未清账**:静机(其它会话服务器停掉后)复跑 `BASE_URL=… bash scripts/verify.sh` 全绿才许合并主线——runbook:
+  `VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5223` 起新服务器 → `node <scratch>/warm-all-routes.cjs` 预热 → 全量 verify。
 - [ ] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图
 - [ ] 独立 tester 黑盒验收(报告落同目录 `2026-08-15-date-locale-unify-t1-test.md`)
 - [ ] 合并回 UniApp 主线(主线只收合并)
