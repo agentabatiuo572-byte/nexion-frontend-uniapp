@@ -11,7 +11,10 @@ export function riskReasonLines(t: Messages, codes: readonly string[] | undefine
     "new-address-large-amount": t.addrRebind.reasonNewAddressAge,
     "rebind-freeze": t.addrRebind.submitFrozenReason,
   };
-  return (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
+  const lines = (codes ?? []).map((code) => dict[code]).filter((line): line is string => Boolean(line));
+  // 2026-08-15 焦虑文案收敛:多个侦测码共用同一句「行为异常」话术 —— 必须去重,
+  // 否则横幅 join(" · ") 会拼出「行为异常 · 行为异常」。
+  return [...new Set(lines)];
 }
 
 /**
