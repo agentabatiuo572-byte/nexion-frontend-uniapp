@@ -3,13 +3,13 @@ import { collectAppConsoleErrors } from "./lib/console-origin-filter.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:5173";
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+// argv 优先于环境变量：WSL 调用 node.exe 时临时环境变量可能不会跨进 Windows
+// 进程，而 argv 能稳定保留 EN/ZH 两轮运行时回归的目标语言。
+const locale = process.argv[2] === "zh" || (process.argv[2] !== "en" && process.env.AUTH02_LOCALE === "zh") ? "zh" : "en";
 const phoneDigits = `650${String(Date.now()).slice(-7)}`;
 const fullPhone = `+1${phoneDigits}`;
 const accountId = `${fullPhone}@demo.nexgrid.ai`;
 const referralCode = "NEXGRID-AB12";
-// argv 优先于环境变量：WSL 调用 node.exe 时临时环境变量可能不会跨进 Windows
-// 进程，而 argv 能稳定保留 EN/ZH 两轮运行时回归的目标语言。
-const locale = process.argv[2] === "zh" || (process.argv[2] !== "en" && process.env.AUTH02_LOCALE === "zh") ? "zh" : "en";
 const registeredTitle = locale === "zh" ? "该手机号已注册" : "This number is already registered";
 const registeredBody = locale === "zh" ? "验证通过,正在登录…" : "Verification complete. Signing you in…";
 const successDownloadHint = locale === "zh"
@@ -135,6 +135,15 @@ async function solveCaptchaSlider(frame, phone) {
 }
 
 async function enterPhoneAndSend(frame, digits = phoneDigits) {
+  // 包 zm T4/T5 配套:区号随语言预置(zh 默认 +86)且按国别位数校验 —— 本门夹具全是 +1 十位号,
+  // 输号前显式选回 +1,否则 zh 轮 CTA 被位数闸禁用、门恒红。选区号本身也是真实用户步骤。
+  if ((await frame.locator(".rg-phone__cc-t").innerText()).trim() !== "+1") {
+    await frame.locator(".rg-phone__cc").click();
+    const row = frame.locator(".cc-row", { hasText: "+1" }).first();
+    await row.waitFor({ state: "visible", timeout: 10_000 });
+    await row.click();
+    await waitUntil(async () => (await frame.locator(".rg-phone__cc-t").innerText()).trim() === "+1", "country code did not switch to +1");
+  }
   await frame.locator(".rg-phone__in input").fill(digits);
   await frame.locator(".rg-cta").click();
   // FEAT-AUTH03 容忍式:滑块层弹出则真拖解层,未弹则直过(.rg-step2 与 .cs-card 均为
