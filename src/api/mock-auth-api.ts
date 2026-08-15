@@ -95,6 +95,17 @@ function sessionUser(countryCode: string, phone: string, rec: MockUserRecord): U
 
 let challengeSeq = 0;
 
+/**
+ * 注册页 mock 分支(legacy 本地链)完成时同步写入本注册表 —— 否则密码登录结构性死路:
+ * legacy 账号目录(nexgrid-auth-accounts-v1)不存密码,login() 永远查无此人(独立验收 F2)。
+ */
+export function registerMockAuthCredential(countryCode: string, phone: string, password: string): void {
+  const reg = loadRegistry();
+  const rec = ensureUser(reg, countryCode, phone);
+  rec.password = password;
+  saveRegistry(reg);
+}
+
 export function createMockAuthApi(vault: SessionVault): AuthApi {
   const issueChallenge = () => ({
     challengeNo: `MOCK-CH-${++challengeSeq}`,
@@ -118,7 +129,9 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
       const reg = loadRegistry();
       const rec = reg.users[identityOf(request.countryCode, request.phone)];
       if (!rec || rec.password === null || rec.password !== request.password) {
-        throw new ApiError({ kind: "business", message: "INVALID_CREDENTIALS" });
+        // 错误码钉页面契约名(login.vue 映射 USER_INVALID_CREDENTIALS;独立验收 F3:
+        // 自造码会落兜底「服务不可用」,连「手机号或密码不正确」都显不出来)。
+        throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
       }
       return persistLogin(sessionUser(request.countryCode, request.phone, rec), vault.revision());
     },

@@ -37,9 +37,13 @@
 ## 实施拆解
 - [x] T0 mock-auth-api + runtime 装配（`src/api/mock-auth-api.ts` 全 11 方法契约对齐 + vault 乐观并发/丢弃语义镜像；`runtime.ts` mode==="mock" 分支装配；tsc 0；5399 实测发码通过并弹出既定滑块验证。⚠️ 滑块抗合成事件——E2E 由 tester 用 playwright 受信鼠标输入完成；login 页接线核留 T6 一并）
   - 补充事实：5173 的「$0 奖励」= 浏览器**持久化的中毒配置快照**（sandbox 时期 compat 清零写入 uni storage；5399 新存储即显示 $5）。T1 因此聚焦「金额 ≤0 不渲染」的消费方护栏，mock 配置本身已带真值无需喂。
-- [ ] T1 奖励 gate + mock 配置喂真值
-- [ ] T2 失败指路文案三语（register+login）
-- [ ] T3 DEV sandbox 横幅
-- [ ] T4 国家码默认随语言
-- [ ] T5 位数校验 + 禁用态
-- [ ] T6 门全量 + 实景 + 独立 tester + 合并推送 + 日志/PRD 问询
+- [x] T1 奖励 gate（金额句/邀请卡礼物行 gate `giftUsdt > 0`，else `subtitleNoBonus` 三语；mock 配置本身已带 $5 无需喂——中毒态才是靶）
+- [x] T2 失败指路文案（改共用 key `authOtp.errorOtpSendUnavailable` 三语为指路型，register/login 同吃）
+- [x] T3 DEV sandbox 横幅（仅 DEV 构建 + sandbox 档发码失败时亮，生产剔除；warning soft 底零 border）
+- [x] T4 国家码默认随语言（LOCALE_DIAL 9 语映射，仅初始默认）
+- [x] T5 位数校验（DIAL_LEN 10 国别 + 6-15 兜底；hint 就地提示；CTA 既有 phoneOk 闸自动禁用。实测：+86 3 位/10 位提示在、11 位消失）
+- [x] T6 门全量 + 实景 + 独立 tester（首轮 5 pass/1 fail + 5 发现 → 修复 F1 步进链回归/F2 mock 密码登录死路/F3 错误码契约 USER_INVALID_CREDENTIALS/F4 区号表补 +84 三语 → 回归复测 R1-R4 全 PASS,含真拖滑块注册→密码登录闭环、错误密码文案精准;console 0）
+
+**独立验收遗留台账（P2,非阻断）**：① N1 同一手机号「注册/OTP 登录」绑目录身份(@demo 账号、走 onboarding)而「密码登录」绑派生身份(user:<id>、直进首页)——mock 档两套账号作用域不互通,收口方向=密码登录成功后按手机号回查目录优先绑定目录身份；② F5 mock authApi 的 OTP/注册方法在 mock 档暂无调用方(register/login 走 legacy 本地链,mock-auth 当前实际可达面=密码登录/改密/restore)——属防御性契约实现,待 legacy 链退役时全面接管；③ F6 发码 60s 冷却按手机号跨场景共享(演示脚本需知)。
+
+**根因终判记录**（诊断三易其稿，最终版）：5173 症状 =「sandbox 默认模式裸奔期写入浏览器的中毒持久状态」（配置清零快照 → $0；发码闸失败态 → 无法发送），清站点存储 + `.env.local` 定死 mock 后 5173 实测复通（$5 + 滑块正常弹出）。register 的 OTP 在 mock 下走 legacy 本地链（`remoteApiEnabled` 分支）,mock-auth-api 主要价值在 login/OTP 登录/改密等无本地分支的 auth 面。
