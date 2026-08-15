@@ -3140,7 +3140,7 @@ export const zh: Messages = {
     sharedToast: "分享文案已准备好",
     copiedToast: "卡片链接已复制",
     posterHintTitle: "提示",
-    posterHint: "真实用户会把这种卡片发到加密 Telegram 群 — 每次邀请你都能终身获 5% 分成。",
+    posterHint: "把这张卡片发到你的 Telegram 群 — 每邀请一位好友，你终身获 5% 分成。",
     variantLabel: "卡片风格",
     variants: {
       earnings: "收益",

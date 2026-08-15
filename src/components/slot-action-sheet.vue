@@ -83,12 +83,13 @@ const sheet = useSlotActionSheet();
 const app = useApp();
 const t = useT();
 
-// Secondary "activate existing" list is collapsed by default; reset on each open.
-const expanded = ref(false);
+// openForSlot 只在有未激活库存时放行本层,层的身份即「选择要激活的设备」——
+// 列表打开即展开,不再折叠一层把选择藏起来;购买新设备仍是顶部主 CTA。
+const expanded = ref(true);
 watch(
   () => sheet.open,
   (open) => {
-    if (open) expanded.value = false;
+    if (open) expanded.value = true;
   },
 );
 
