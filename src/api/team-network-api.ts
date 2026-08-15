@@ -3,7 +3,7 @@ import { ApiError } from "./errors";
 
 export interface TeamNetworkMember {
   id: string; name: string; avatarUrl: string | null; vRank: number; layer: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-  leg: "A" | "B" | null; sponsorId: string | null; joinedAt: string;
+  leg: "A" | "B" | null; joinedAt: string;
   monthVolumeUsdt: number; lifetimeVolumeUsdt: number | null; status: "ACTIVE" | "IDLE" | "OFFLINE"; region: string | null;
 }
 export interface TeamNetworkSnapshot {
@@ -22,13 +22,14 @@ function optionalAmount(value: unknown): number | null { return value === null ?
 
 function member(value: unknown): TeamNetworkMember {
   const source = row(value); const layer = count(source.layer); const vRank = count(source.vRank);
+  if (Object.prototype.hasOwnProperty.call(source, "sponsorId")) return invalid();
   const leg = source.leg === null ? null : source.leg === "A" || source.leg === "B" ? source.leg : invalid();
   const status = source.status === "ACTIVE" || source.status === "IDLE" || source.status === "OFFLINE" ? source.status : invalid();
   const joinedAt = text(source.joinedAt) as string;
   if (layer < 1 || layer > 7 || vRank > 12 || !Number.isFinite(Date.parse(joinedAt))) return invalid();
   return { id: text(source.id) as string, name: text(source.name) as string,
     avatarUrl: text(source.avatarUrl, true), vRank, layer: layer as TeamNetworkMember["layer"], leg,
-    sponsorId: text(source.sponsorId, true), joinedAt, monthVolumeUsdt: amount(source.monthVolumeUsdt),
+    joinedAt, monthVolumeUsdt: amount(source.monthVolumeUsdt),
     lifetimeVolumeUsdt: optionalAmount(source.lifetimeVolumeUsdt), status, region: text(source.region, true) };
 }
 

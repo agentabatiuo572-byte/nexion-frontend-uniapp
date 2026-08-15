@@ -91,6 +91,8 @@ import { createRemoteIntentGate } from "@/lib/g-remote-intent";
 import { useStaking, STAKING_APY, STAKING_PENALTY, STAKING_MIN, type StakingTerm } from "@/store/staking";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { useRiskDisclosure } from "@/store/risk-disclosure";
+import { ApiError } from "@/api/errors";
 
 const PRESETS = [100, 500, 1000, 5000];
 const ONE_DAY_MS = 86400 * 1000;
@@ -101,6 +103,7 @@ const emit = defineEmits<{ "update:open": [boolean] }>();
 const t = useT();
 const app = useApp();
 const staking = useStaking();
+const risk = useRiskDisclosure();
 
 const amount = ref(0);
 const remotePending = ref(false);
@@ -185,14 +188,19 @@ async function submit() {
     remotePending.value = true;
     try {
       const key = intentKey(pool.tierKey, amount.value);
+      await risk.checkGate("staking", key);
       await staking.openRemote(pool.tierKey, amount.value, key);
       remoteIntent.value = null;
       remoteGate.complete(`${"open"}:${JSON.stringify({ tierKey: pool.tierKey, amountUsdt: amount.value.toFixed(2) })}`, true);
       toast.success(t.value.stakingV3.toast.stakeSuccess);
       emitClose();
-    } catch {
+    } catch (cause) {
       // Unknown timeout/result: read the authority before allowing a retry with the same key.
       await staking.syncRemote();
+      if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
+        uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/staking/staking", fail: () => {} });
+        return;
+      }
       toast.error(t.value.stakingV3.toast.openFailedTitle);
     } finally {
       remotePending.value = false;

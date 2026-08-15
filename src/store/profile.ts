@@ -8,6 +8,7 @@ import { profileApi } from "@/api/runtime";
 import { isAmbiguousOutcome } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
 import { acquireProfileCommandKey, finishProfileCommand } from "@/lib/profile-command-key";
+import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 
 // Ported from Nexion-prototype/lib/store/profile.ts (zustand → Pinia).
 // 旧设备级单键 "nexgrid-profile-v1" 废弃(存量无账号归属,mock 可重建);资料按账号分行。
@@ -36,6 +37,7 @@ function hydrate(accountKey: string): Persisted {
 export const useProfile = defineStore("profile", () => {
   // 账号维度:boot 期落 "default",账号确定后由 lib/account-scope 统一重绑。
   let boundKey = "default";
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
   // Remote profile fields are an auth-session projection.  Never render a
   // browser seed before that projection arrives.
   const init = remoteApiEnabled ? { displayName: "", avatarSeed: "" } : hydrate(boundKey);
@@ -54,6 +56,7 @@ export const useProfile = defineStore("profile", () => {
   /** 账号切换重绑:装载该账号的资料(P2-8 设备级泄漏修复)。 */
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
+    remoteAccountEpoch.bind(boundKey);
     // A server session must never inherit a prior browser profile row. The
     // authoritative auth response is projected immediately after this bind;
     // until then leave an honest blank state rather than a demo identity.
@@ -80,10 +83,14 @@ export const useProfile = defineStore("profile", () => {
 
   async function refreshNicknameCandidates(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
+    const request = remoteAccountEpoch.snapshot();
     try {
-      nicknameCandidates.value = await profileApi.nicknameCandidates();
+      const candidates = await profileApi.nicknameCandidates();
+      if (!remoteAccountEpoch.isCurrent(request)) return true;
+      nicknameCandidates.value = candidates;
       return true;
     } catch {
+      if (!remoteAccountEpoch.isCurrent(request)) return true;
       nicknameCandidates.value = [];
       return false;
     }
@@ -95,8 +102,11 @@ export const useProfile = defineStore("profile", () => {
       const desired = v.trim();
       if (!expected || !desired || desired === expected) return false;
       const commandKey = acquireProfileCommandKey(boundKey, expected, desired);
+      const request = remoteAccountEpoch.snapshot();
       try {
-        displayName.value = await profileApi.updateNickname(expected, desired, commandKey);
+        const updated = await profileApi.updateNickname(expected, desired, commandKey);
+        if (!remoteAccountEpoch.isCurrent(request)) return false;
+        displayName.value = updated;
         finishProfileCommand(boundKey, expected, desired);
         return true;
       } catch (error) {

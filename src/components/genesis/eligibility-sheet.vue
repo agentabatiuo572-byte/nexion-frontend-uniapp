@@ -108,6 +108,7 @@ import { GENESIS_ELIGIBILITY, useGenesis, type GenesisGateCondition } from "@/st
 import type { GenesisInviteRejectReason } from "@/store/genesis-invite";
 import { useApp } from "@/store/app";
 import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
+import { remoteApiEnabled } from "@/api/runtime";
 import { toast } from "@/store/ui";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
@@ -146,15 +147,19 @@ const inviteErrorText = computed(() => {
 });
 
 const subtitleText = computed(() =>
-  GENESIS_ELIGIBILITY.mode === "all-of" ? t.value.genesisEligibility.subtitleAll : t.value.genesisEligibility.subtitleAny,
+  (remoteApiEnabled ? genesis.remoteEligibility?.mode : GENESIS_ELIGIBILITY.mode) === "all-of"
+    ? t.value.genesisEligibility.subtitleAll : t.value.genesisEligibility.subtitleAny,
 );
-const capNoteText = computed(() => fmt(t.value.genesisEligibility.capReachedNote, { n: GENESIS_ELIGIBILITY.perUserCap }));
+const capNoteText = computed(() => fmt(t.value.genesisEligibility.capReachedNote, {
+  n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap,
+}));
 
 function condLabel(c: GenesisGateCondition): string {
   const el = t.value.genesisEligibility;
   if (c.key === "deposit") return fmt(el.condDeposit, { n: GENESIS_ELIGIBILITY.minDepositUsdt.toLocaleString() });
   if (c.key === "flagship") return fmt(el.condFlagship, { n: GENESIS_ELIGIBILITY.flagshipMin });
   if (c.key === "vrank") return fmt(el.condVrank, { n: GENESIS_ELIGIBILITY.vRankMin });
+  if (c.key === "server") return el.condInvite;
   return el.condInvite;
 }
 

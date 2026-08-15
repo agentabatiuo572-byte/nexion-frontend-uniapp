@@ -41,9 +41,8 @@ import { useNetwork } from "@/store/network";
 import { prepareProductCatalog } from "@/store/product-catalog";
 import { prepareServerProductPhase } from "@/store/server-product-phase";
 import { useTradeinSheet } from "@/store/tradein-sheet";
-import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
-
-const remoteAccountScope = createRemoteAccountEpoch();
+import { useContentCopy } from "@/store/content-copy";
+import { remoteAccountScope, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 /** Snapshot the account generation before starting an account-sensitive request. */
 export function captureAccountScope(): RemoteAccountRequest {
@@ -80,6 +79,7 @@ export function rebindAccountScopedStores(accountKey: string): void {
   prepareServerProductPhase();
   useTradeinSheet().clearApplied();
   useTradeinSheet().hide();
+  useContentCopy().clear();
   bindEarningsReleaseAccount(accountKey);
   useRiskDisclosure().bindAccount();
   useGenesis().bindAccount(accountKey);

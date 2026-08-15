@@ -44,8 +44,8 @@
         </view>
       </view>
 
-      <!-- Gift hero -->
-      <view class="text-center relative overflow-hidden" :style="giftCardStyle">
+      <!-- Gift hero: remote promotion is rendered only after the server preview succeeds. -->
+      <view v-if="!remoteApiEnabled || remotePreview" class="text-center relative overflow-hidden" :style="giftCardStyle">
         <text class="block" :style="giftLabelStyle">{{ t.ref.welcomeGift }}</text>
         <view class="flex items-baseline justify-center" style="gap: 6px; margin-top: 8px">
           <text :style="giftAmountStyle">${{ giftUsdt }}</text>
@@ -55,7 +55,7 @@
       </view>
 
       <!-- What you get -->
-      <view :style="perksCardStyle">
+      <view v-if="!remoteApiEnabled || remotePreview" :style="perksCardStyle">
         <view v-for="(p, i) in perks" :key="p.key" class="flex items-center" :style="perkRowStyle(i !== perks.length - 1)">
           <view class="grid place-items-center shrink-0" :style="perkIconBoxStyle(p.tint)">
             <view v-html="p.icon" />
@@ -66,12 +66,15 @@
       </view>
 
       <!-- CTA(已登录 → 进入 NexGrid,隐藏注册入口;异常2) -->
-      <view v-if="!authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
+      <view v-if="!authed && (!remoteApiEnabled || remotePreview)" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="goRegister" @keydown.enter.prevent="goRegister" @keydown.space.prevent="goRegister">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>
         <text style="margin: 0 8px">{{ fmt(t.ref.claimCta, { usd: giftUsdt, nex: giftNex }) }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
-      <view v-else class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp" @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
+      <view v-if="remoteApiEnabled && !remotePreview" class="text-center" style="padding: 28px 12px">
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.ref.previewUnavailable }}</text>
+      </view>
+      <view v-if="authed" class="ref-cta w-full flex items-center justify-center active:scale-[0.98]" :style="ctaStyle" role="button" tabindex="0" data-system-chrome-primary @click="enterApp" @keydown.enter.prevent="enterApp" @keydown.space.prevent="enterApp">
         <text style="margin: 0 8px">{{ t.ref.enterApp }}</text>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
       </view>
@@ -89,13 +92,13 @@
         </view>
         <view class="grid grid-cols-3 text-center" style="gap: 8px">
           <Stat :label="t.ref.newJoiners" :value="joinersText" tint="var(--v5-brand)" />
-          <Stat :label="t.ref.countries" value="47" />
+          <Stat :label="t.ref.countries" :value="countryCountText" />
           <Stat :label="t.ref.paidOut" :value="paidOutText" tint="var(--v5-warning)" />
         </view>
       </view>
 
       <!-- Partner wall -->
-      <view :style="partnerCardStyle">
+      <view v-if="!remoteApiEnabled" :style="partnerCardStyle">
         <view class="flex items-center" :style="partnerHeadStyle">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>
           <text>{{ t.ref.backedAudited }}</text>
@@ -132,7 +135,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
-import { apiClient, remoteApiEnabled } from "@/api/runtime";
+import { apiClient, networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
 import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
@@ -146,6 +149,8 @@ const code = ref("");
 const cfg = useConfig();
 const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 const remotePreview = ref<PublicSponsorPreview | null>(null);
+const countryCount = ref<number | null>(null);
+const countryCountText = computed(() => remoteApiEnabled && countryCount.value !== null ? String(countryCount.value) : "—");
 const paidOutText = computed(() => {
   const ps = cfg.config.publicStats;
   return !cfg.syncFailed && publicStatsHealth(ps).fleetOk
@@ -170,6 +175,7 @@ const giftNex = computed(() => remoteApiEnabled
 // [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
 onLoad(async (options) => {
   if (remoteApiEnabled) {
+    void networkRegionsApi.list().then((value) => { countryCount.value = value.countryCount; }).catch(() => { countryCount.value = null; });
     const norm = normalizeRegistrationSponsorCode(options?.code ?? "", true);
     code.value = norm ?? "";
     if (!norm) return;

@@ -16,7 +16,7 @@
       <text class="block tabular-nums" :style="priceStyle">${{ priceText }}</text>
       <view class="flex items-center justify-between" style="margin-top: 6px">
         <text :style="lastSaleStyle">{{ lastSaleText }}</text>
-        <text class="tabular-nums" :style="deltaStyle">{{ isUp ? "+" : "" }}{{ deltaPct }}%</text>
+        <text class="tabular-nums" :style="deltaStyle">{{ deltaPct === null ? "—" : `${isUp ? "+" : ""}${deltaPct}%` }}</text>
       </view>
       <view class="flex justify-end" style="margin-top: 10px">
         <view class="inline-flex items-center" :class="{ 'active:scale-[0.95]': !disabled }" :style="buyBtnStyleComputed" role="button" tabindex="0" :aria-disabled="disabled ? 'true' : 'false'" :aria-label="t.marketplace.buyCta" @click="!disabled && emit('buy')">
@@ -37,7 +37,7 @@ export interface Listing {
   tokenId: number;
   holdingNo?: string;
   priceUSDT: number;
-  lastSaleUSDT: number;
+  lastSaleUSDT: number | null;
   seller: string;
   listedAt: number;
   traits: { tier: string; boost: string; mintYear: number };
@@ -48,13 +48,16 @@ const emit = defineEmits<{ buy: [] }>();
 
 const t = useT();
 
-const delta = computed(() => props.l.priceUSDT - props.l.lastSaleUSDT);
-const deltaPct = computed(() =>
-  (props.l.lastSaleUSDT > 0 ? (delta.value / props.l.lastSaleUSDT) * 100 : 0).toFixed(0),
+const delta = computed(() => props.l.lastSaleUSDT === null ? 0 : props.l.priceUSDT - props.l.lastSaleUSDT);
+const deltaPct = computed<string | null>(() =>
+  props.l.lastSaleUSDT && props.l.lastSaleUSDT > 0
+    ? ((delta.value / props.l.lastSaleUSDT) * 100).toFixed(0)
+    : null,
 );
 const isUp = computed(() => delta.value > 0);
 const priceText = computed(() => props.l.priceUSDT.toLocaleString());
-const lastSaleText = computed(() => fmt(t.value.marketplace.lastSale, { k: (props.l.lastSaleUSDT / 1000).toFixed(1) }));
+const lastSaleText = computed(() => props.l.lastSaleUSDT === null
+  ? "—" : fmt(t.value.marketplace.lastSale, { k: (props.l.lastSaleUSDT / 1000).toFixed(1) }));
 
 // Collectible tile — filled surface, no border (single visual difference).
 const cardStyle: CSSProperties = {

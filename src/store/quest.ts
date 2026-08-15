@@ -100,10 +100,12 @@ export const useQuest = defineStore("quest", () => {
   let refreshSequence = 0;
   let claimSequence = 0;
   const completedMap = reactive<Record<string, boolean>>({});
+  const rewardMap = reactive<Record<string, number>>({});
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   function clearRemoteFacts() {
     for (const key of Object.keys(completedMap)) delete completedMap[key];
+    for (const key of Object.keys(rewardMap)) delete rewardMap[key];
   }
 
   async function refreshRemote(): Promise<boolean> {
@@ -117,6 +119,7 @@ export const useQuest = defineStore("quest", () => {
       if (!isCurrentRequest()) return false;
       clearRemoteFacts();
       for (const quest of snapshot.quests) {
+        rewardMap[quest.questCode] = quest.rewardNex;
         if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
       }
       return true;
@@ -168,6 +171,10 @@ export const useQuest = defineStore("quest", () => {
     return completedMap[id] === true;
   }
 
+  function rewardFor(id: QuestTaskId): number | null {
+    return typeof rewardMap[id] === "number" ? rewardMap[id] : null;
+  }
+
   /**
    * Mark a task complete. Idempotent — re-calling for an already-completed id
    * returns { firstTime: false, rewardNex: 0, rewardUsdt: 0 } so the caller
@@ -207,5 +214,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, QUEST_TASKS, isComplete, markComplete, reset, bindAccount, refreshRemote, claimRemote };
+  return { completedMap, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote };
 });

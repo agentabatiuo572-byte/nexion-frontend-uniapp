@@ -26,6 +26,31 @@
       <!-- Back + "Bundle" title now live in the sticky chassis nav header
            (useSetPageHeader below), mirroring the prototype's <SetPageHeader>. -->
 
+      <!-- Remote and explicit sandbox catalogs start empty. Do not render the
+           compatibility PRODUCTS array until the authoritative snapshot is
+           ready; a cold first frame must never look like a real quote. -->
+      <view v-if="catalogStatus === 'loading'" data-testid="bundle-catalog-loading" class="mx-4" :style="catalogStateStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogLoadingTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogLoadingBody }}</text>
+      </view>
+      <view v-else-if="catalogStatus === 'error'" data-testid="bundle-catalog-error" class="mx-4" :style="catalogStateStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.store.catalogErrorTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.store.catalogErrorBody }}</text>
+        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" @click="retryCatalog">
+          <text>{{ t.store.catalogRetry }}</text>
+        </view>
+      </view>
+      <template v-else>
+
+      <view v-if="receiptWriteFailure" class="mx-4 rounded-2xl text-center" :style="receiptFailureCardStyle">
+        <text class="block" :style="catalogStateTitleStyle">{{ t.errors.billMissingTitle }}</text>
+        <text class="block mt-1" :style="catalogStateBodyStyle">{{ t.errors.billMissingMsg }}</text>
+        <view class="inline-flex mt-3 active:opacity-70" role="button" tabindex="0" :style="catalogRetryStyle" :aria-disabled="receiptRetrying" @click="retryReceiptWrite">
+          <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+        </view>
+      </view>
+      <template v-else>
+
       <!-- Hero — filled commercial spotlight (border dropped; aurora stays clipped
            inside the surface + overflow-hidden, so it's not a page-floor glow). -->
       <view class="mx-4 relative overflow-hidden" :style="heroStyle">
@@ -148,6 +173,8 @@
           <text v-if="checkoutUnavailable" class="block" :style="ctaHintStyle">{{ checkoutHint }}</text>
         </view>
       </view>
+      </template>
+      </template>
     </view>
   </AppChassis>
 </template>
@@ -164,14 +191,15 @@ import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { isProductAvailable } from "@/store/product-availability";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { refreshProductCatalog } from "@/store/product-catalog";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { toast } from "@/store/ui";
-import { bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
+import { bundleOrderApi, commercePaymentApi, fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
-import { postReceiptOnly } from "@/lib/money-receipt";
+import { postReceiptOnly, type ReceiptDraft } from "@/lib/money-receipt";
 import { navTo } from "@/lib/route";
 import { useVRank } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
@@ -180,6 +208,9 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 const t = useT();
 const cart = useCart();
 const phase = useProductPhase();
+
+const catalogStatus = computed(() => productCatalogState.status);
+const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
 
 onLoad(async () => {
   await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
@@ -199,10 +230,12 @@ useSetPageHeader(() => ({
 }));
 
 const products = computed<Product[]>(() =>
-  cart.items
-    .map((id) => getProduct(id))
-    .filter((p): p is Product => !!p)
-    .filter((p) => isProductAvailable(p, phase.value)),
+  catalogReady.value
+    ? cart.items
+      .map((id) => getProduct(id))
+      .filter((p): p is Product => !!p)
+      .filter((p) => isProductAvailable(p, phase.value))
+    : [],
 );
 const subtotal = computed(() => products.value.reduce((s, p) => s + p.price, 0));
 const discountPct = computed(() => bundleDiscountForCount(products.value.length));
@@ -212,13 +245,37 @@ const cumulativeDailyEarn = computed(() => products.value.reduce((s, p) => s + p
 
 // 未正式上架的 SKU 不进组合建议(bundle 是可购组合面,走商城正门口径;审查 F12)。
 const suggestions = computed(() =>
-  PRODUCTS.filter(
-    (p) =>
-      !cart.items.includes(p.id) &&
-      p.tier !== "Share" &&
-      isProductAvailable(p, phase.value),
-  ).slice(0, 3),
+  catalogReady.value
+    ? PRODUCTS.filter(
+      (p) =>
+        !cart.items.includes(p.id) &&
+        p.tier !== "Share" &&
+        isProductAvailable(p, phase.value),
+    ).slice(0, 3)
+    : [],
 );
+
+function retryCatalog() {
+  void refreshProductCatalog(true);
+}
+
+function retryReceiptWrite() {
+  const failure = receiptWriteFailure.value;
+  if (!failure || receiptRetrying.value) return;
+  receiptRetrying.value = true;
+  try {
+    if (!postReceiptOnly(failure.draft)) return;
+    receiptWriteFailure.value = null;
+    cart.clear();
+    toast.success(
+      t.value.bundle.checkoutSuccessTitle,
+      fmt(t.value.bundle.checkoutSuccessBody, { count: failure.orderIds.length }),
+    );
+    navTo("/pages/store/orders");
+  } finally {
+    receiptRetrying.value = false;
+  }
+}
 
 const tiersReversed = computed(() => BUNDLE_DISCOUNT_TIERS.slice().reverse());
 
@@ -231,6 +288,8 @@ const ctaText = computed(() => (
   submitting.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
 const checkoutHint = computed(() => products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
+const receiptWriteFailure = ref<{ draft: ReceiptDraft; orderIds: string[] } | null>(null);
+const receiptRetrying = ref(false);
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -284,11 +343,20 @@ async function onCheckout() {
     const key = acquireBundleKey(list, accountKey);
     try {
       const created = await bundleOrderApi.create(list.map((item) => item.id), key);
+      if (fundsSandboxEnabled) {
+        const payment = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
+        if (payment.orderNo !== created.orderNo || payment.sourceEnvironment !== "SANDBOX") {
+          throw new Error("COMMERCE_PAYMENT_READBACK_INVALID");
+        }
+      }
       retireBundleKey(list, accountKey);
       if (orders.currentAccountKey() !== accountKey) return;
       cart.clear();
+      const successBody = fundsSandboxEnabled
+        ? t.value.bundle.checkoutSuccessBody
+        : t.value.bundle.checkoutPendingBody;
       toast.success(t.value.bundle.checkoutSuccessTitle,
-        fmt(t.value.bundle.checkoutPendingBody, { count: created.itemCount }));
+        fmt(successBody, { count: created.itemCount }));
       navTo("/pages/store/orders");
     } catch (error) {
       if (!isAmbiguousOutcome(error)) retireBundleKey(list, accountKey);
@@ -341,14 +409,18 @@ async function onCheckout() {
   // 🔴 走 postReceiptOnly 而不是 postMoneyBill(与 checkout.vue 主账单同口径):扣款必须
   // 发生在建单之前,而单子已经建好并进入履约 —— 收据写失败时回滚资金只还钱、还不回那几台设备。
   // 既定处置是让用户明确看见收据没记上,而不是像原来那样丢弃返回值静默吞掉。
-  postReceiptOnly({
+  const receiptDraft: ReceiptDraft = {
     type: "purchase",
     symbol: "USDT",
     amount: -charge,
     status: "posted",
     memo: fmt(t.value.bundle.checkoutBillMemo, { count: list.length }),
     ref: created[0]?.id ?? "BUNDLE",
-  });
+  };
+  if (!postReceiptOnly(receiptDraft)) {
+    receiptWriteFailure.value = { draft: receiptDraft, orderIds: created.map((order) => order.id) };
+    return;
+  }
   cart.clear();
   toast.success(
     t.value.bundle.checkoutSuccessTitle,
@@ -358,6 +430,35 @@ async function onCheckout() {
 }
 
 // ───── style objects ─────
+const catalogStateStyle: CSSProperties = {
+  padding: "18px 16px",
+  borderRadius: "16px",
+  background: "var(--v5-surface)",
+};
+const catalogStateTitleStyle: CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 600,
+  color: "var(--v5-ink)",
+};
+const catalogStateBodyStyle: CSSProperties = {
+  fontSize: "13px",
+  lineHeight: "19px",
+  color: "var(--v5-ink-3)",
+};
+const catalogRetryStyle: CSSProperties = {
+  minHeight: "36px",
+  alignItems: "center",
+  padding: "0 14px",
+  borderRadius: "9999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
+};
+const receiptFailureCardStyle: CSSProperties = {
+  padding: "24px 20px",
+  background: "var(--v5-surface)",
+};
 const heroStyle: CSSProperties = {
   padding: "18px",
   borderRadius: "16px",

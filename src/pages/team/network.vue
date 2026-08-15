@@ -202,14 +202,17 @@ const myRank = computed(() => vRank.myRank);
 const selected = ref<NetworkMember | null>(null);
 const pulseId = ref<string | null>(null);
 let pulseTimer: ReturnType<typeof setInterval> | null = null;
+let pulseCursor = 0;
 
-// page-level interval (P-034): random active-member pulse every 1.2s
+// page-level interval (P-034): deterministic decorative pulse every 1.2s.
+// It never fabricates a member or metric and does not use client randomness.
 onMounted(() => {
   if (remoteApiEnabled) void network.refreshCanonicalNetwork();
   pulseTimer = setInterval(() => {
     const pool = members.value.filter((m) => m.status === "active");
     if (pool.length === 0) return;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const pick = pool[pulseCursor % pool.length];
+    pulseCursor += 1;
     pulseId.value = pick.id;
   }, 1200);
 });

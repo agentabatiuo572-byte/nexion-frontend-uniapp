@@ -604,6 +604,22 @@ const boundAddress = computed(() => payout.currentFor(chainNetwork.value)?.addre
 const boundAddressShort = computed(() => (boundAddress.value ? maskAddressMid(boundAddress.value) : "—"));
 
 const amountNum = computed(() => parseFloat(amount.value) || 0);
+const remoteEligibility = ref<WithdrawalEligibility | null>(null);
+let remoteEligibilityEpoch = 0;
+watch([amountNum, network, boundAddress, () => app.accountKey], async () => {
+  if (!remoteApiEnabled || fundsSandboxEnabled || amountNum.value <= 0 || boundAddress.value.length <= 10) {
+    remoteEligibility.value = null;
+    return;
+  }
+  const epoch = ++remoteEligibilityEpoch;
+  try {
+    const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
+      maxWithdrawable.value, dailyFacts.value, amountNum.value);
+    if (epoch === remoteEligibilityEpoch && app.accountKey) remoteEligibility.value = snapshot;
+  } catch {
+    if (epoch === remoteEligibilityEpoch) remoteEligibility.value = null;
+  }
+}, { immediate: true });
 
 // 网络也是报价/地址的输入 —— 提交在途一律冻结,与 useMax/useSmallAmountLine/toggleOffset
 // 同一纪律(审计 P2:评估窗口内切网络会让本可成功的提交被确认后校验无谓拒绑)。
@@ -773,6 +789,15 @@ const eligibilityClock = computed(() => {
 });
 const eligibility = computed(() => {
   void eligibilityClock.value; // 建立对「时间边界」的依赖,不参与计算
+  if (remoteApiEnabled && !fundsSandboxEnabled) {
+    return remoteEligibility.value ?? {
+      canSubmit: true,
+      maxWithdrawableUsdt: maxWithdrawable.value,
+      route: "pass" as const,
+      riskReasons: [], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
+      dailyCountResetAt: Date.now(), configVersion: "remote-pending",
+    };
+  }
   return evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, amountNum.value);
 });
 // 冻结期不重复挂风控横幅(专属冻结横幅已在顶部,避免双横幅噪声)。
@@ -824,9 +849,25 @@ const heldLine = computed(() => {
  * 快车道不生效而 CTA 判据仍成立 → 一个点多少次都没反应、也永不消失的按钮。
  * 向下取整(不是四舍五入)才不会越线。
  */
-// WD01 is HOLD: the backend does not yet execute the advertised review/address bypass.
-// Keep the fast-lane branch unreachable instead of treating a persisted/displayed value as effective.
-const smallAmountLine = computed(() => 0);
+// WD01 is a server-owned policy value in remote mode (and the isolated sandbox
+// snapshot in sandbox mode). Never fall back to the old client rule/config.
+const smallAmountLine = computed(() => withdrawalPolicy.value?.smallAmountThresholdUsd ?? 0);
+const remoteSmallLineEligibility = ref<WithdrawalEligibility | null>(null);
+let remoteSmallLineEpoch = 0;
+watch([smallAmountLine, network, boundAddress, () => app.accountKey], async () => {
+  if (!remoteApiEnabled || fundsSandboxEnabled || smallAmountLine.value <= 0 || boundAddress.value.length <= 10) {
+    remoteSmallLineEligibility.value = null;
+    return;
+  }
+  const epoch = ++remoteSmallLineEpoch;
+  try {
+    const snapshot = await requestWithdrawalEligibility(app.accountKey, network.value, boundAddress.value,
+      maxWithdrawable.value, dailyFacts.value, smallAmountLine.value);
+    if (epoch === remoteSmallLineEpoch && app.accountKey) remoteSmallLineEligibility.value = snapshot;
+  } catch {
+    if (epoch === remoteSmallLineEpoch) remoteSmallLineEligibility.value = null;
+  }
+}, { immediate: true });
 /**
  * 正向态:这笔**真的**免掉了闸,才值得说。
  * 🔴 判据用 waivedGates 而不是 fastLaneApplied —— 后者只表示「金额在小额线内」,
@@ -855,7 +896,15 @@ const fastLaneOn = computed(
  * 直接把小额线代进同一个判定函数问一次,答案是什么就说什么。
  */
 const smallLineDecision = computed(() =>
-  evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value),
+  remoteApiEnabled && !fundsSandboxEnabled
+    ? remoteSmallLineEligibility.value ?? {
+      canSubmit: false,
+      maxWithdrawableUsdt: maxWithdrawable.value,
+      route: "manual" as const,
+      riskReasons: [], fastLaneApplied: false, waivedGates: [], dailyLimitReached: false,
+      dailyCountResetAt: Date.now(), configVersion: "remote-pending",
+    }
+    : evaluateWithdrawal(app.accountKey, network.value, boundAddress.value, maxWithdrawable.value, dailyFacts.value, smallAmountLine.value),
 );
 const fastLaneOverLine = computed(
   () =>
@@ -1124,9 +1173,24 @@ async function handleSubmit() {
     clearSubmitFreeze();
     return;
   }
+  // The page gate is a visible product boundary, while the withdrawal service
+  // keeps the final server-side gate as defense in depth. Reuse the frozen
+  // withdrawal idempotency key as operationId so retries remain one audited
+  // business flow and an account rebind cannot authorize the old attempt.
+  submitting.value = true;
+  try {
+    await risk.checkGate("withdraw", snap.idempotencyKey);
+  } catch (cause) {
+    clearSubmitFreeze();
+    if (cause instanceof ApiError && cause.message === "RISK_DISCLOSURE_ACK_REQUIRED") {
+      uni.navigateTo({ url: "/pages/me/risk-disclosure?return=/pages/me/wallet-withdraw", fail: () => {} });
+    } else {
+      toast.error(t.value.riskDisclosure.gateUnavailable);
+    }
+    return;
+  }
   // SPEC-7 ⑤ 加载态: 提交先走服务端形态的前置评估;拿到路由前不扣款不跳页。
   // R5: 提交时点重新评估(显示层 computed 只是预览)。异常3: 超时不乐观扣款。
-  submitting.value = true;
   // 🔴 重放**不进**前置评估:它是给「新的一笔」用的前置过滤(判当前额度/风控放不放行),
   // 而重放要送的那笔可能**已经在服务端落库了** —— 拿今天的额度去否掉它,并不能把它撤回来,
   // 只会让未收口的那笔永远收不了口(实景实测:可提额跌到冻结金额以下,重放每次都被这里挡住)。
@@ -1251,23 +1315,9 @@ async function handleSubmit() {
     if (!postReceiptForAccount(snap.account, withdrawalBillDrafts(wd))) {
       toast.error(t.value.wallet.withdrawBillWriteFailed);
     }
-    // 🔴 钱的那一面(2026-08-11 z5)。上一行只记账,余额是另一条线:remote 对齐把建单
-    // 搬去服务端时,本地扣款链被一并删掉,而**没有任何东西接手** —— 提交成功后钱包余额与
-    // 可提额度纹丝不动(可提额度是 `usdtBalance − 锁定桶` 派生的,同一个数不动就都不动)。
-    // 后果不止是数字难看:用户可以立刻按这个虚高值再提一笔,客户端预检照样判「余额够」,
-    // 一路放行到服务端才被拒。
-    // 「回拉服务端余额」这条路在本仓不成立 —— 全仓没有余额端点(见 applyWithdrawalDebit 头注),
-    // 余额的唯一持有者就是这个 store。
-    //
-    // 🔴 只在**没换号**时扣:换号后当前 store 装的是另一个账号的钱,扣它 = 扣错人。
-    // 与上一行账单写法的差别是有意的 —— 账单能按 accountKey 写进冻结账号的那一行,
-    // 而余额要动的是内存里的活值,换号后那份内存已经不是 snap.account 的了。
-    // 这一支是**降级不是成功**:钱在服务端已经动了,本地那份快照下次绑回来时不含这笔扣款。
-    // (与 store 侧「冻结账号无本地快照则不落单」同一条诚实边界:宁可少改一份显示,
-    //  也不拿当前账号的钱去冒充另一个账号的经济状态。)
-    if (app.accountKey === snap.account && !app.applyWithdrawalDebit(wd)) {
-      toast.error(t.value.wallet.withdrawDebitFailed);
-    }
+    // Remote wallet balance is server-owned. Re-read the E3 fleet snapshot
+    // after the server transaction; never apply a local shadow debit.
+    if (app.accountKey === snap.account) await app.refreshRemoteFleet();
     // 换号后不跳追踪页:那笔单属于旧账号,当前账号的追踪页查不到它(深链会落空态)。
     // 🔴 但必须给话:提交成功了、钱在旧账号动了,静默 return 会让新账号的用户以为什么都没发生
     // (业务链必须有下一步 —— z4 R1 独立审计)。

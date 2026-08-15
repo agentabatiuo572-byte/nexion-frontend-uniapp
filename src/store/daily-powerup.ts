@@ -56,10 +56,13 @@ export const useDailyPowerUp = defineStore("dailyPowerUp", () => {
     clearRemoteFacts();
     try {
       const snapshot = await pointsApi.state();
-      remotePowerUpIds.value = Object.fromEntries(snapshot.powerUps.map((powerUp) => [powerUp.powerUpCode, powerUp.powerUpId]));
+      remotePowerUpIds.value = Object.fromEntries(snapshot.powerUps.flatMap((powerUp) => [
+        [powerUp.powerUpCode, powerUp.powerUpId],
+        [powerUp.powerUpCode.toLowerCase(), powerUp.powerUpId],
+      ]));
       claimed.value = snapshot.powerUps
         .filter((powerUp) => powerUp.status === "ACTIVATED")
-        .map((powerUp) => powerUp.powerUpCode as StreakPowerUpId);
+        .map((powerUp) => powerUp.powerUpCode.toLowerCase() as StreakPowerUpId);
       return true;
     } catch {
       clearRemoteFacts();

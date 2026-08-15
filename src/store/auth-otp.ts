@@ -122,6 +122,24 @@ function readMap<T>(key: string): Record<string, T> {
 function writeMap<T>(key: string, map: Record<string, T>) {
   uni.setStorageSync(key, JSON.stringify(map));
 }
+
+/** Mock account deletion cleanup; production OTP state is server-owned. */
+export function clearAuthOtpStateForPhone(phone: string): void {
+  try {
+    for (const key of [SEND_LOG_KEY, ACTIVE_KEY, CAPTCHA_KEY]) {
+      const map = readMap<unknown>(key);
+      delete map[phone];
+      writeMap(key, map);
+    }
+  } catch {
+    // Account deletion remains best-effort when local storage is unavailable;
+    // the auth registry and in-memory verifier are still consumed below.
+  }
+  for (const [token, record] of verifyTokens) {
+    if (record.phone === phone) verifyTokens.delete(token);
+  }
+}
+
 function mint(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.toUpperCase();
 }

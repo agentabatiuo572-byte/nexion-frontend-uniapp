@@ -33,11 +33,11 @@
           <view class="grid grid-cols-4" :style="statGridStyle">
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.floor }}</text>
-              <text class="tabular-nums" :style="statValStyle('var(--v5-success)')">${{ (stats.floor / 1000).toFixed(1) }}K</text>
+              <text class="tabular-nums" :style="statValStyle('var(--v5-success)')">{{ stats.floor === null ? "—" : `$${(stats.floor / 1000).toFixed(1)}K` }}</text>
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.vol24h }}</text>
-              <text class="tabular-nums" :style="statValStyle()">${{ (stats.vol24h / 1000).toFixed(0) }}K</text>
+              <text class="tabular-nums" :style="statValStyle()">{{ stats.vol24h === null ? "—" : `$${(stats.vol24h / 1000).toFixed(0)}K` }}</text>
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.listed }}</text>
@@ -45,7 +45,7 @@
             </view>
             <view class="flex flex-col">
               <text :style="statLabelStyle">{{ t.marketplace.owners }}</text>
-              <text class="tabular-nums" :style="statValStyle()">{{ stats.owners }}</text>
+              <text class="tabular-nums" :style="statValStyle()">{{ stats.owners === null ? "—" : stats.owners }}</text>
             </view>
           </view>
 
@@ -54,7 +54,7 @@
             <text class="flex items-center" style="gap: 6px; font-family: var(--font-v5); font-size: 12px; color: var(--v5-ink-3)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6" /><path d="m22 7-8.5 8.5-5-5L2 17" /></svg>
               <text>{{ t.marketplace.floorUp }} </text>
-              <text class="tabular-nums" style="color: var(--v5-success); font-weight: 600">+{{ stats.floorDeltaPct }}%</text>
+              <text class="tabular-nums" style="color: var(--v5-success); font-weight: 600">{{ stats.floorDeltaPct === null ? "—" : `${stats.floorDeltaPct >= 0 ? "+" : ""}${stats.floorDeltaPct}%` }}</text>
               <text> {{ t.marketplace.past7d }}</text>
             </text>
             <view class="inline-flex items-center active:opacity-80" :style="viewOpenSeaStyle" @click.stop="openSeaOpen = true">
@@ -148,6 +148,7 @@ import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const genesis = useGenesis();
@@ -172,9 +173,14 @@ const secondaryBlockSub = computed(() =>
 
 // 盘面展示统计（运营可配 admin G4，FEAT-GEN09；替换原硬编码 FLOOR/VOL_24H/... ）。
 const stats = computed(() => {
-  const rows = genesis.remoteListings;
-  const floor = rows.length ? Math.min(...rows.map((row) => row.priceUSDT)) : 0;
-  return { floor, vol24h: 0, listed: rows.length, owners: 0, floorDeltaPct: 0 };
+  const remote = genesis.remoteMarketStats;
+  return {
+    floor: remote.floorUsdt,
+    vol24h: remote.volume24hUsdt,
+    listed: genesis.remoteListings.length,
+    owners: remote.owners,
+    floorDeltaPct: remote.floorDeltaPct,
+  };
 });
 
 const eligSheetOpen = ref(false);
@@ -196,7 +202,7 @@ const soldTokenIds = ref<Set<number>>(new Set());
 const mergedListings = computed<Listing[]>(() => {
   return genesis.remoteListings.map((row) => ({
     ...row,
-    lastSaleUSDT: row.priceUSDT,
+    lastSaleUSDT: genesis.remoteMarketStats.lastSaleUsdt,
     traits: { tier: `Founder #${row.tokenId}`, boost: "—", mintYear: 2026 },
   }));
 });
@@ -205,7 +211,7 @@ const sortedListings = computed(() => {
   const arr = [...mergedListings.value];
   if (sortKey.value === "floor") arr.sort((a, b) => a.priceUSDT - b.priceUSDT);
   if (sortKey.value === "recent") arr.sort((a, b) => b.listedAt - a.listedAt);
-  if (sortKey.value === "lastSale") arr.sort((a, b) => b.lastSaleUSDT - a.lastSaleUSDT);
+  if (sortKey.value === "lastSale") arr.sort((a, b) => (b.lastSaleUSDT ?? -1) - (a.lastSaleUSDT ?? -1));
   return arr;
 });
 
@@ -243,7 +249,7 @@ async function handleBuy(listing: Listing) {
   if (gate.value.capRemaining < 1) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
     );
     return;
   }

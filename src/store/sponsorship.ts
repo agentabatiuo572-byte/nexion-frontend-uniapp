@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { pickSponsor, type SponsorMeta } from "@/mock/sponsors";
 import { normalizeAccountKey } from "@/store/account-cloud";
 import { useConfig } from "@/store/config";
+import { remoteApiEnabled } from "@/api/runtime";
 
 // ⚠️ MOCK-ONLY: 本地保存推荐展示态与礼包领取标记。PROD 由既有
 // `POST /api/sponsorship/bind` 及其服务端账本回执原子裁决，客户端不能把此表
@@ -92,7 +93,9 @@ function hydrate(): State {
 }
 
 export const useSponsorship = defineStore("sponsorship", () => {
-  const init = hydrate();
+  // Remote mode has server-owned sponsorship/referral state. Do not hydrate
+  // the mock sponsor table or let a stale device snapshot enter that flow.
+  const init = remoteApiEnabled ? { bindingsByAccount: {}, pendingCode: null, pendingAt: null } : hydrate();
   let boundAccountKey = "default";
   const bindingsByAccount = ref<Record<string, AccountBinding>>(init.bindingsByAccount);
   const sponsorCode = ref<string | null>(null);
@@ -127,6 +130,7 @@ export const useSponsorship = defineStore("sponsorship", () => {
   }
 
   function persist(): boolean {
+    if (remoteApiEnabled) return false;
     try {
       const binding = bindingsByAccount.value[boundAccountKey] ?? null;
       // 旧版本和运行时诊断仍读取这一只读镜像；真实归因与领取状态只以

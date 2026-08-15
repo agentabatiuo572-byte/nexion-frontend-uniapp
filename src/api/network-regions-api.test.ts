@@ -7,6 +7,7 @@ describe("network regions API", () => {
     const request = vi.fn().mockResolvedValue({
       activeNodes: 2,
       activeJobs: 1,
+      countryCount: 1,
       regions: [{
         id: "ap-southeast-1", displayName: "Singapore", location: "Singapore",
         activeNodes: 2, activeJobs: 1, jobsPerHour: 8,
@@ -35,6 +36,7 @@ describe("network regions API", () => {
     const request = vi.fn().mockResolvedValue({
       activeNodes: 2,
       activeJobs: 0,
+      countryCount: 2,
       regions: [
         { id: "sg", displayName: "Singapore", location: "Singapore", activeNodes: 1, activeJobs: 0,
           jobsPerHour: 1, latitude: 1.35, longitude: 103.82, isUserRegion: true },

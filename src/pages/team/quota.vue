@@ -22,8 +22,8 @@
             <view>
               <text class="block font-mono-tabular" :style="heroCapStyle">{{ t.quota.yourInvites }}</text>
               <view class="flex items-baseline" style="margin-top: 8px; gap: 6px">
-                <text class="font-display tabular-nums" :style="heroBigStyle">{{ activeDirect }}</text>
-                <text class="font-mono-tabular" :style="heroSuffixStyle">{{ fmt(t.quota.totalSuffix, { n: directInvites }) }}</text>
+                <text class="font-display tabular-nums" :style="heroBigStyle">{{ activeDirectText }}</text>
+                <text class="font-mono-tabular" :style="heroSuffixStyle">{{ remoteApiEnabled && !remoteSnapshot ? "—" : fmt(t.quota.totalSuffix, { n: directInvites }) }}</text>
               </view>
             </view>
             <view class="rounded-2xl grid place-items-center" :style="heroIconStyle">
@@ -32,6 +32,15 @@
           </view>
           <view :style="heroFooterStyle">
             <text class="block" :style="heroBodyStyle">{{ t.quota.heroBody }}</text>
+          </view>
+        </view>
+
+        <view v-if="remoteApiEnabled && remoteError" class="rounded-2xl" :style="remoteErrorStyle">
+          <view class="flex items-center justify-between" style="gap: 12px">
+            <text :style="{ color: 'var(--v5-warning)', fontSize: '12px' }">{{ remoteError }}</text>
+            <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshRemoteQuota">
+              <text>{{ t.store.catalogRetry }}</text>
+            </view>
           </view>
         </view>
 
@@ -57,13 +66,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import QuotaTierCard, { type QuotaTier, type QuotaCondition } from "@/components/team/quota-tier-card.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { getProduct, annualRoiPct } from "@/mock/products";
+import { remoteApiEnabled, teamQuotaApi } from "@/api/runtime";
+import type { TeamQuotaSnapshot } from "@/api/team-quota-api";
+import { getProduct as getMockProduct, annualRoiPct as mockAnnualRoiPct } from "@/mock/products";
 import { useNetwork } from "@/store/network";
 import { useVRank } from "@/store/v-rank";
 import { useConfig } from "@/store/config";
@@ -72,12 +84,32 @@ const t = useT();
 const network = useNetwork();
 const vRank = useVRank();
 const cfg = useConfig();
+const remoteSnapshot = ref<TeamQuotaSnapshot | null>(null);
+const remoteError = ref<string | null>(null);
+const remoteRefreshing = ref(false);
+let remoteRequest = 0;
+async function refreshRemoteQuota() {
+  if (remoteRefreshing.value) return;
+  const request = ++remoteRequest;
+  remoteRefreshing.value = true;
+  remoteError.value = null;
+  try {
+    const value = await teamQuotaApi.snapshot();
+    if (request === remoteRequest) remoteSnapshot.value = value;
+  } catch {
+    if (request === remoteRequest) { remoteSnapshot.value = null; remoteError.value = t.value.authOtp.errorServiceUnavailable; }
+  } finally {
+    if (request === remoteRequest) remoteRefreshing.value = false;
+  }
+}
+onShow(() => { if (remoteApiEnabled) void refreshRemoteQuota(); });
 // 礼包 NEX 数量单源派生自 platform config。
-const inviteHint = computed(() => fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
+const inviteHint = computed(() => remoteApiEnabled ? "—" : fmt(t.value.quota.inviteFriendsHint, { inviterNex: cfg.config.rewards.inviterReward.nexAmount, nex: cfg.config.rewards.welcomeGift.nexAmount }));
 
 const members = computed(() => network.members);
-const directInvites = computed(() => members.value.filter((m) => m.layer === 1).length);
-const activeDirect = computed(() => members.value.filter((m) => m.layer === 1 && m.status === "active").length);
+const directInvites = computed(() => remoteApiEnabled ? remoteSnapshot.value?.facts.directRefs ?? 0 : members.value.filter((m) => m.layer === 1).length);
+const activeDirect = computed(() => remoteApiEnabled ? remoteSnapshot.value?.facts.activeDirect ?? 0 : members.value.filter((m) => m.layer === 1 && m.status === "active").length);
+const activeDirectText = computed(() => remoteApiEnabled && !remoteSnapshot.value ? "—" : String(activeDirect.value));
 
 // Single source: tiers derive from the catalog products that carry a
 // purchaseGate (name/price/锁额/解锁条件/perks all from getProduct + gate config,
@@ -85,7 +117,7 @@ const activeDirect = computed(() => members.value.filter((m) => m.layer === 1 &&
 // the page mirrors §4 PurchaseGate + the store catalog (fixes stale $899/$3,499/
 // "800-1,100 NEX/day" that drifted out of sync with the recalibrated catalog).
 function buildTier(productId: string, tint: string): QuotaTier | null {
-  const p = getProduct(productId);
+  const p = getMockProduct(productId);
   const g = p?.purchaseGate;
   if (!p || !g) return null;
   const conditions: QuotaCondition[] = [];
@@ -106,16 +138,29 @@ function buildTier(productId: string, tint: string): QuotaTier | null {
     perks: [
       fmt(t.value.quota.perkGen, { n: p.dailyEarnNEX }),
       `${p.gpu} · ${p.vram}`,
-      fmt(t.value.quota.perkRoi, { roi: annualRoiPct(p) }),
+      fmt(t.value.quota.perkRoi, { roi: mockAnnualRoiPct(p) }),
     ],
     tint,
   };
 }
 
 const tiers = computed<QuotaTier[]>(() =>
-  [buildTier("stellarbox-pro", "var(--v5-brand)"), buildTier("stellarrack-p1", "var(--v5-warning)")].filter(
-    (x): x is QuotaTier => x !== null,
-  ),
+  remoteApiEnabled
+    ? (remoteSnapshot.value?.tiers ?? []).map((tier, index) => ({
+      productId: tier.productId, name: tier.name, price: tier.price,
+      monthlyStock: tier.monthlyStock, soldThisMonth: tier.soldThisMonth,
+      unlockKind: tier.unlockKind === "EITHER" ? "either" : "all",
+      conditions: tier.conditions.map((condition) => ({
+        label: condition.kind === "teamVolume" ? t.value.quota.condTeamVol
+          : condition.kind === "rank" ? fmt(t.value.quota.condRank, { v: condition.required })
+          : t.value.quota.condActivatedDirect,
+        current: condition.current, required: condition.required,
+        kind: condition.kind === "teamVolume" ? "volume" : "invites",
+      })), perks: tier.perks, tint: index % 2 ? "var(--v5-warning)" : "var(--v5-brand)",
+    }))
+    : [buildTier("stellarbox-pro", "var(--v5-brand)"), buildTier("stellarrack-p1", "var(--v5-warning)")].filter(
+      (x): x is QuotaTier => x !== null,
+    ),
 );
 
 function go(url: string) {
@@ -148,4 +193,6 @@ const inviteCtaStyle: CSSProperties = {
 const inviteIconStyle: CSSProperties = { width: "40px", height: "40px", background: "color-mix(in srgb, var(--v5-brand) 20%, transparent)" };
 const inviteTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
 const inviteHintStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-3)" };
+const remoteErrorStyle: CSSProperties = { padding: "10px 12px", background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)" };
+const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
 </script>

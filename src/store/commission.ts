@@ -28,7 +28,7 @@ export type CommissionStatus = "cooling" | "unlocked" | "withdrawn";
 export interface CommissionEvent {
   id: string;
   kind: CommissionKind;
-  sourceUserId: string;
+  sourceUserId?: string;
   sourceUserName: string;
   layer?: number;             // 仅 unilevel
   orderId?: string;

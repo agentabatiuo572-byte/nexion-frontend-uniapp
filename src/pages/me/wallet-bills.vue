@@ -31,7 +31,12 @@
       </view>
 
       <view v-if="ledgerError" :style="ledgerErrorStyle">
-        <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+        <view class="flex items-center justify-between" style="gap: 12px">
+          <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="ledgerRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshLedger">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
       </view>
 
       <!-- Empty -->
@@ -109,17 +114,23 @@ const locale = useLocaleStore();
 const billsStore = useBills();
 const deposits = useDeposits();
 const refreshError = ref("");
+const ledgerRefreshing = ref(false);
 const ledgerError = computed(() => refreshError.value || billsStore.serverError);
 
-onShow(async () => {
+async function refreshLedger() {
   if (!fundsServerEnabled) return;
+  if (ledgerRefreshing.value) return;
+  ledgerRefreshing.value = true;
   refreshError.value = "";
   try {
     await billsStore.refreshServerLedger();
   } catch (cause) {
     refreshError.value = cause instanceof Error ? cause.message : "FUNDS_SANDBOX_LEDGER_REFRESH_FAILED";
+  } finally {
+    ledgerRefreshing.value = false;
   }
-});
+}
+onShow(() => { void refreshLedger(); });
 
 type Tab = "all" | "in" | "out";
 const TABS: Tab[] = ["all", "in", "out"];
@@ -346,6 +357,14 @@ const ledgerErrorStyle: CSSProperties = {
   borderRadius: "12px",
   background: "color-mix(in srgb, var(--v5-danger) 10%, transparent)",
   color: "var(--v5-danger)",
+  fontSize: "12px",
+};
+const retryBtnStyle: CSSProperties = {
+  minHeight: "32px",
+  padding: "0 10px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink)",
   fontSize: "12px",
 };
 // Transparent hairline group per month: container border-top opens it, the mono

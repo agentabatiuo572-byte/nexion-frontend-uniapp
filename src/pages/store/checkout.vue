@@ -60,8 +60,19 @@
           <text v-for="(s, i) in stepLabels" :key="s.key" :style="{ color: i <= stepDisplay ? 'var(--v5-brand)' : 'var(--v5-ink-3)', fontSize: '12px' }">{{ s.label }}</text>
         </view>
 
+        <!-- A receipt-only write is a recoverable post-order failure. Keep the
+             checkout on this explicit state; the timer chain must not announce
+             activation while the bill is still missing. -->
+        <view v-if="receiptWriteFailure" class="mx-4 rounded-2xl text-center nx-step-in" :style="receiptFailureCardStyle">
+          <text class="block" :style="centerTitleStyle">{{ t.errors.billMissingTitle }}</text>
+          <text class="block" style="margin-top: 6px; font-size: 12px; line-height: 1.5; color: var(--v5-ink-3)">{{ t.errors.billMissingMsg }}</text>
+          <view class="inline-flex items-center justify-center active:opacity-80" :style="doneBtnStyle" role="button" tabindex="0" style="margin-top: 16px" :aria-disabled="receiptRetrying" @click.stop="retryReceiptWrite">
+            <text>{{ receiptRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+          </view>
+        </view>
+
         <!-- === select-payment === -->
-        <view v-if="step === 'select-payment'" class="mx-4 rounded-2xl overflow-hidden nx-step-in" :style="surfaceCardStyle">
+        <view v-else-if="step === 'select-payment'" class="mx-4 rounded-2xl overflow-hidden nx-step-in" :style="surfaceCardStyle">
           <view class="border-b" :style="payHeadStyle">
             <view class="flex items-center justify-between">
               <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coTotal }}</text>
@@ -258,7 +269,7 @@ import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
 import { useAuth } from "@/store/auth";
 import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage";
-import { postMoneyBill, postReceiptOnly, reportStuckFunds } from "@/lib/money-receipt";
+import { postMoneyBill, postReceiptOnly, reportStuckFunds, type ReceiptDraft } from "@/lib/money-receipt";
 import { useVoucher } from "@/store/voucher";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { trialReservesSlotNow, useFreeTrial } from "@/store/free-trial";
@@ -271,7 +282,7 @@ import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
-import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -309,13 +320,24 @@ const voucher = useVoucher();
 // 平台支付收窄裁决:USDT 三网络 + 卡。
 const WALLET_PATH = "M21 12V7H5a2 2 0 0 1 0-4h14v4";
 const WALLET_PATH2 = "M3 5v14a2 2 0 0 0 2 2h16v-5";
-const PAYMENT_METHODS = computed<PaymentMethod[]>(() => [
-  { id: "usdt-trc20", label: "USDT (TRC20)", hint: t.value.store.coHintTrc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "usdt-bep20", label: "USDT (BEP20)", hint: t.value.store.coHintBep20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  { id: "usdt-erc20", label: "USDT (ERC20)", hint: t.value.store.coHintErc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
-  // 费率单源:文案走 i18n 模板,{rate} 仍由 cardFeeRateLabel() 从 CARD_FEE_RATE 派生。
-  { id: "card", label: "Card", hint: fmt(t.value.store.coCardHint, { rate: cardFeeRateLabel() }), iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" },
-]);
+const PAYMENT_METHODS = computed<PaymentMethod[]>(() => {
+  if (fundsSandboxEnabled) {
+    return [{ id: "sandbox-wallet", label: t.value.store.coSandboxWallet,
+      hint: t.value.store.coHintSandboxWallet, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 }];
+  }
+  const methods: PaymentMethod[] = [
+    { id: "usdt-trc20", label: "USDT (TRC20)", hint: t.value.store.coHintTrc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+    { id: "usdt-bep20", label: "USDT (BEP20)", hint: t.value.store.coHintBep20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+    { id: "usdt-erc20", label: "USDT (ERC20)", hint: t.value.store.coHintErc20, iconPath: WALLET_PATH, iconPath2: WALLET_PATH2 },
+  ];
+  // The current hosted card vault emits mock tokens. Keep Card strictly inside
+  // the isolated frontend mock; production cannot advertise a route the server
+  // intentionally rejects.
+  if (!remoteApiEnabled) methods.push({ id: "card", label: "Card",
+    hint: fmt(t.value.store.coCardHint, { rate: cardFeeRateLabel() }),
+    iconPath: "M2 5h20a0 0 0 0 1 0 0v14a0 0 0 0 1 0 0H2a0 0 0 0 1 0 0V5a0 0 0 0 1 0 0z M2 10h20" });
+  return methods;
+});
 
 const tradein = useTradeinSheet();
 // 上架节奏门判定与商城正门同源(含 demo pin)。
@@ -336,6 +358,11 @@ onLoad(async (options) => {
   // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
   // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
   const pp = getProduct(productId.value);
+  if (pp?.purchaseBlocked) {
+    uni.showToast({ title: t.value.store.specUnavailable, icon: "none" });
+    navTo("/store");
+    return;
+  }
   if (pp && !isProductAvailable(pp, phase.value)) {
     const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
     const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
@@ -367,6 +394,7 @@ onLoad(async (options) => {
 
 const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => getProduct(productId.value));
+const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
 
@@ -452,7 +480,7 @@ const voucherMatch = computed(() => {
   if (!p) return null;
   // Canonical E3 submit owns the complete quote and wallet debit. Client-side
   // voucher stacking is not part of that command and therefore fails closed.
-  if (remoteApiEnabled && tradein.appliedTradein?.canonicalQuote) return null;
+  if (remoteApiEnabled && (tradein.appliedTradein?.canonicalQuote || fundsSandboxEnabled)) return null;
   return voucher.bestVoucherFor(p.id, p.price, trialConversionMode.value ? { stackWithTrial: true } : undefined);
 });
 const voucherDiscount = computed(() => voucherMatch.value?.discountUSD ?? 0);
@@ -559,6 +587,19 @@ const remoteCapacityGate = new RemoteCapacityGate();
 watch(() => app.accountKey, () => {
   interceptFired = false;
   remoteCapacityGate.reset();
+  // Checkout progress is money state owned by one account. Clear every
+  // projection immediately so a late response cannot expose account A's order
+  // after the session has switched to account B.
+  stopRemoteOrderPolling();
+  confirming = false;
+  orderId.value = null;
+  remoteOrderFailure.value = null;
+  receiptWriteFailure.value = null;
+  receiptRetrying.value = false;
+  remoteOrderPollError.value = false;
+  remoteTradeinRecoveryRequired.value = false;
+  remoteOrderCommandKey.clear();
+  step.value = "select-payment";
 });
 function fireTradeinIntercept() {
   if (interceptFired) return;
@@ -641,10 +682,12 @@ useSetPageHeader(() => ({
 }));
 
 const step = ref<Step>("select-payment");
-const payment = ref<string>("usdt-trc20");
+const payment = ref<string>(fundsSandboxEnabled ? "sandbox-wallet" : "usdt-trc20");
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
+const receiptWriteFailure = ref<{ draft: ReceiptDraft; orderId: string } | null>(null);
+const receiptRetrying = ref(false);
 // Re-entry guard for the confirm→pay tap (mirrors source confirmingRef) —
 // prevents a double-tap from racing the step transition.
 let confirming = false;
@@ -659,6 +702,20 @@ const remoteTradeinRecoveryRequired = ref(false);
 // Snapshot "was empty before this checkout" BEFORE createOrder increments it.
 const wasEmptyBefore = ref(orders.orders.length === 0);
 const firstOrderCelebrating = ref(false);
+
+function retryReceiptWrite() {
+  const failure = receiptWriteFailure.value;
+  if (!failure || receiptRetrying.value) return;
+  receiptRetrying.value = true;
+  try {
+    if (!postReceiptOnly(failure.draft)) return;
+    receiptWriteFailure.value = null;
+    orderId.value = failure.orderId;
+    step.value = "activating";
+  } finally {
+    receiptRetrying.value = false;
+  }
+}
 
 const isCard = computed(() => payment.value === "card");
 const reservedSlots = computed(() => (trialReservesSlotNow() ? 1 : 0));
@@ -717,6 +774,11 @@ function selectPayment(id: string) {
 }
 
 function goConfirm() {
+  if (purchaseUnavailable.value) {
+    toast.warn(t.value.store.specUnavailable);
+    navTo("/store");
+    return;
+  }
   if (step.value === "pay-instructions" || step.value === "confirm") {
     step.value = "confirm";
     return;
@@ -738,8 +800,31 @@ function goSelectPayment() {
   step.value = "select-payment";
 }
 
-function goAwaiting() {
+async function goAwaiting() {
   if (step.value !== "pay-instructions") return;
+  // Explicit local-sandbox payment is a server command: only the backend may
+  // debit the run-scoped sandbox wallet and issue the durable payment number.
+  // Remote/production deliberately remains provider-backed and never falls
+  // back to this mock rail.
+  if (fundsSandboxEnabled) {
+    const orderNo = orderId.value;
+    if (!orderNo) {
+      step.value = "confirm";
+      toast.warn(t.value.tradein.errPurchaseFailed);
+      return;
+    }
+    try {
+      const account = auth.accountId;
+      const receipt = await commercePaymentApi.confirm(orderNo, `payment:${orderNo}`);
+      if (account !== auth.accountId || receipt.orderNo !== orderNo) return;
+      step.value = "awaiting";
+      restartRemoteOrderPolling();
+    } catch {
+      step.value = "confirm";
+      toast.warn(t.value.tradein.errPurchaseFailed);
+    }
+    return;
+  }
   step.value = "awaiting";
 }
 
@@ -763,6 +848,40 @@ async function onConfirmPay() {
   quotedTotal = +(netPrice.value + cardFee.value).toFixed(2);
   voucherQuote = { id: voucherMatch.value?.def.id ?? null, discount: voucherDiscount.value };
   if (remoteApiEnabled) {
+    // Trial conversion is already a backend transaction (trial lock + wallet
+    // debit + order creation). It must run before the ordinary order path;
+    // otherwise an explicit local-sandbox session would create a second,
+    // permanently pending order and never close the trial.
+    if (trialQuote.applied) {
+      const confirmationScope = captureAccountScope();
+      const p = product.value;
+      const payQuote = trialQuoteAt(mockServerNow());
+      if (!p || !payQuote.applied) {
+        confirming = false;
+        toast.warn(t.value.store.coTrialQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      if (!Number.isFinite(quotedTotal) || quotedTotal < 0) {
+        confirming = false;
+        toast.warn(t.value.store.coTotalQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      const conversion = await freeTrial.convert(p.id, quotedTotal);
+      if (!isCurrentAccountScope(confirmationScope)) return;
+      confirming = false;
+      if (!conversion.ok || !conversion.orderNo) {
+        toast.warn(t.value.store.coTrialQuoteChanged);
+        step.value = "select-payment";
+        return;
+      }
+      orderId.value = conversion.orderNo;
+      // Replace checkout with the canonical order URL. A browser refresh now
+      // reloads the paid server order instead of reopening a fresh purchase.
+      uni.redirectTo({ url: `/pages/store/order-detail?id=${encodeURIComponent(conversion.orderNo)}` });
+      return;
+    }
     await submitRemoteOrder();
     return;
   }
@@ -813,9 +932,11 @@ function retireRemoteOrderKey(): void {
 }
 
 async function submitRemoteOrder(): Promise<void> {
+  const submissionScope = captureAccountScope();
+  const scopeIsCurrent = () => isCurrentAccountScope(submissionScope);
   const p = product.value;
   const requestedVoucherId = voucherQuote.id;
-  if (!p) {
+  if (!p || purchaseUnavailable.value) {
     confirming = false;
     return;
   }
@@ -827,6 +948,7 @@ async function submitRemoteOrder(): Promise<void> {
     if (tradeinContext) {
       await completeVerifiedMutation({
         submit: () => {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           remoteTradeinRecoveryRequired.value = true;
           return deviceE3Api.submit(
             Number(tradeinContext.device.id),
@@ -835,9 +957,14 @@ async function submitRemoteOrder(): Promise<void> {
             tradein.appliedTradein!.canonicalQuote!,
           );
         },
-        readback: async (submitted) => (await orderApi.list()).orders
-          .find((order) => order.orderNo === submitted.orderNo),
+        readback: async (submitted) => {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
+          const rows = (await orderApi.list()).orders;
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
+          return rows.find((order) => order.orderNo === submitted.orderNo);
+        },
         verifyOrder(submitted, persisted) {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           if (!persisted || persisted.tradeinNo !== submitted.tradeinNo
               || persisted.sourceDeviceId !== submitted.sourceDeviceId
               || persisted.targetDeviceId !== submitted.targetDeviceId
@@ -850,13 +977,20 @@ async function submitRemoteOrder(): Promise<void> {
             throw new Error("E3_TRADEIN_READBACK_MISMATCH");
           }
         },
-        refreshOrders: () => orders.refreshRemote(),
+        refreshOrders: async () => {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
+          await orders.refreshRemote();
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
+        },
         // refreshRemoteFleet 自吞不 reject(resilience 门);verified mutation 靠 reject
         // 中断验证链,适配层把 false 升回 throw,保住「fleet 刷新失败 ≠ READBACK_MISMATCH」的语义。
         refreshFleet: async () => {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           if (!(await app.refreshRemoteFleet())) throw new Error("E3_FLEET_REFRESH_UNAVAILABLE");
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
         },
         verifyFleet(submitted) {
+          if (!scopeIsCurrent()) throw new Error("CHECKOUT_ACCOUNT_CHANGED");
           const target = app.devices.find((device) => device.id === String(submitted.targetDeviceId));
           const source = app.devices.find((device) => device.id === String(submitted.sourceDeviceId));
           if (!target || target.activatedAt == null || (source && source.activatedAt != null)) {
@@ -864,6 +998,7 @@ async function submitRemoteOrder(): Promise<void> {
           }
         },
         commit(submitted) {
+          if (!scopeIsCurrent()) return;
           orderId.value = submitted.orderNo;
           tradein.clearApplied();
           retireRemoteOrderKey();
@@ -879,6 +1014,7 @@ async function submitRemoteOrder(): Promise<void> {
       voucherId: requestedVoucherId,
       idempotencyKey: remoteOrderKey(),
     });
+    if (!scopeIsCurrent()) return;
     const receipt = created.voucherRedemption;
     // A claimed voucher changes its UI state only after the order's explicit,
     // server-issued redemption receipt. Missing/mismatched receipts fail closed.
@@ -892,11 +1028,15 @@ async function submitRemoteOrder(): Promise<void> {
       throw new Error("H7_VOUCHER_REDEMPTION_RECEIPT_INVALID");
     }
     const persisted = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
+    if (!scopeIsCurrent()) return;
+    const sandboxPaidReplay = fundsSandboxEnabled && persisted?.canonicalStatus === "paid"
+      && persisted.paymentStatus.toUpperCase() === "PAID"
+      && persisted.orderStatus.toUpperCase() === "PAID";
     if (!persisted || persisted.productNo !== p.id || persisted.quantity !== 1
-        || persisted.canonicalStatus !== "placed"
-        || persisted.paymentStatus.toUpperCase() !== "PENDING"
-        || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
-        || persisted.activationStatus.toUpperCase() !== "WAITING_PAYMENT"
+        || (!sandboxPaidReplay && (persisted.canonicalStatus !== "placed"
+          || persisted.paymentStatus.toUpperCase() !== "PENDING"
+          || persisted.orderStatus.toUpperCase() !== "PENDING_PAYMENT"))
+        || persisted.activationStatus.toUpperCase() !== (sandboxPaidReplay ? "WAITING_PROVISIONING" : "WAITING_PAYMENT")
         || created.paymentStatus.toUpperCase() !== "PENDING"
         || created.orderStatus.toUpperCase() !== "PENDING_PAYMENT"
         || Math.abs(persisted.amountUsdt - created.amountUsdt) > 0.000001
@@ -907,18 +1047,43 @@ async function submitRemoteOrder(): Promise<void> {
     remoteOrderFailure.value = null;
     remoteOrderPollError.value = false;
     if (requestedVoucherId) await voucher.refreshRemote();
+    if (!scopeIsCurrent()) return;
     await orders.refreshRemote();
+    if (!scopeIsCurrent()) return;
     // PENDING_PAYMENT has not created or activated a device yet. Fleet refresh
     // is authoritative only after the ACTIVATED readback below; making it part
     // of order creation turns an unrelated fleet outage into a false purchase
     // failure after the server has already committed the order.
     // Retire the durable key only after the server order readback above and
     // account-scoped order refresh both succeeded; unknown outcomes reuse it.
-    retireRemoteOrderKey();
-    // A canonical PENDING_PAYMENT receipt proves only creation.  It is not
-    // provisioning or activation; wait for an authoritative callback/readback.
-    step.value = "awaiting";
+    if (fundsSandboxEnabled) {
+      // The user's confirm click is the explicit payment action in
+      // local-sandbox. Settlement remains entirely server-side and is accepted
+      // only after both the mock provenance receipt and canonical order readback
+      // agree. Production never enters this branch.
+      const paymentReceipt = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
+      if (!scopeIsCurrent()) return;
+      if (paymentReceipt.orderNo !== created.orderNo) throw new Error("COMMERCE_PAYMENT_ORDER_MISMATCH");
+      const paidSnapshot = await orderApi.list();
+      if (!scopeIsCurrent()) return;
+      const paidOrder = paidSnapshot.orders.find((order) => order.orderNo === created.orderNo);
+      if (!paidOrder || paidOrder.canonicalStatus !== "paid"
+          || paidOrder.paymentStatus.toUpperCase() !== "PAID"
+          || paidOrder.orderStatus.toUpperCase() !== "PAID") {
+        throw new Error("COMMERCE_PAYMENT_READBACK_MISMATCH");
+      }
+      await orders.refreshRemote();
+      if (!scopeIsCurrent()) return;
+      retireRemoteOrderKey();
+      uni.redirectTo({ url: `/pages/store/order-detail?id=${encodeURIComponent(created.orderNo)}` });
+    } else {
+      // A canonical PENDING_PAYMENT receipt proves only creation. It is not
+      // provisioning or activation; wait for a real provider callback/readback.
+      retireRemoteOrderKey();
+      step.value = "awaiting";
+    }
   } catch (error) {
+    if (!scopeIsCurrent()) return;
     // Keep only outcome-unknown errors: transport, malformed response, 5xx and
     // the server's explicit unknown-result fence. Structured API facts—not text
     // matching—decide whether a business rejection can mint a new attempt.
@@ -1239,7 +1404,7 @@ watch(step, async (s) => {
       // undo。收据写失败时回滚资金 = 只还钱、还不回已经进入履约管线的设备,等于白送一台;
       // 所以这里的既定处置是**让用户明确看见收据没记上**(与提现页同口径),而不是像原来那样
       // 丢弃 bills.add 的返回值、静默吞掉。
-      postReceiptOnly({
+      const receiptDraft: ReceiptDraft = {
         type: "purchase",
         symbol: "USDT",
         amount: -chargeTotal,
@@ -1248,7 +1413,11 @@ watch(step, async (s) => {
           ? fmt(t.value.store.coBillMemoWithParts, { name: p.name, parts: memoParts.join(" · ") })
           : fmt(t.value.store.coBillMemoBase, { name: p.name }),
         ref: ord.id,
-      });
+      };
+      if (!postReceiptOnly(receiptDraft)) {
+        receiptWriteFailure.value = { draft: receiptDraft, orderId: ord.id };
+        return;
+      }
       if (wasEmptyBefore.value) firstOrderCelebrating.value = true;
     }
     // Timer lives OUTSIDE the !orderId guard, else the re-render from setting
@@ -1441,6 +1610,10 @@ const doneBtnStyle: CSSProperties = {
   background: "var(--v5-surface-2)",
   color: "var(--v5-ink-2)",
   fontSize: "13px",
+};
+const receiptFailureCardStyle: CSSProperties = {
+  padding: "24px 20px",
+  background: "var(--v5-surface)",
 };
 </script>
 

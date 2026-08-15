@@ -103,6 +103,7 @@ import { fmt } from "@/i18n/format";
 import { useNow } from "@/composables/use-now";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
 import { useQuest, type QuestTaskId } from "@/store/quest";
+import { remoteApiEnabled } from "@/api/runtime";
 
 interface QuestTask {
   id: QuestTaskId;
@@ -137,12 +138,12 @@ const quest = useQuest();
 const reward = 500;
 
 const tasks = computed<QuestTask[]>(() => [
-  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
-  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
-  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
-  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
-  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
-  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: 200, usdt: 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "bind_bank_card", order: 1, label: t.value.home.dayOneTaskBindCard, nex: remoteApiEnabled ? quest.rewardFor("bind_bank_card") ?? 0 : 50, href: "/pages/me/wallet-cards-new", cat: t.value.home.dayOneCatWallet, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
+  { id: "visit_earn", order: 2, label: t.value.home.dayOneTaskVisitEarn, nex: remoteApiEnabled ? quest.rewardFor("visit_earn") ?? 0 : 30, href: "/pages/earn/earn", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "visit_store", order: 3, label: t.value.home.dayOneTaskVisitStore, nex: remoteApiEnabled ? quest.rewardFor("visit_store") ?? 0 : 50, href: "/pages/store/store", cat: t.value.home.dayOneCatExplore, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
+  { id: "view_product_roi", order: 4, label: t.value.home.dayOneTaskSeeRoi, nex: remoteApiEnabled ? quest.rewardFor("view_product_roi") ?? 0 : 100, href: "/pages/store/detail?id=stellarbox-s1", cat: t.value.home.dayOneCatRecommend, color: "var(--v5-brand)", onColor: "var(--v5-on-brand)" },
+  { id: "setup_profile", order: 5, label: t.value.home.dayOneTaskSetupProfile, nex: remoteApiEnabled ? quest.rewardFor("setup_profile") ?? 0 : 80, href: "/pages/me/profile", cat: t.value.home.dayOneCatIdentity, color: "var(--v5-quest-violet)", onColor: "var(--v5-on-quest)" },
+  { id: "invite_friend", order: 6, label: t.value.home.dayOneTaskInviteFriend, nex: remoteApiEnabled ? quest.rewardFor("invite_friend") ?? 0 : 200, usdt: remoteApiEnabled ? undefined : 1, href: "/pages/team/team", cat: t.value.home.dayOneCatSocial, color: "var(--v5-quest-ember)", onColor: "var(--v5-on-quest)" },
 ]);
 
 const total = computed(() => tasks.value.length);

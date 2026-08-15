@@ -42,7 +42,15 @@
         </view>
 
         <!-- Event list -->
-        <EmptyState v-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
+        <EmptyState
+          v-if="remoteEventsError"
+          kind="recoverable-error"
+          :title="t.events.loadErrorTitle"
+          :desc="t.events.loadErrorBody"
+          :cta-label="t.events.retry"
+          @cta="retryRemoteEvents"
+        />
+        <EmptyState v-else-if="filtered.length === 0 && emptyKey" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" />
         <view v-else class="space-y-2.5">
           <EventsCard
             v-for="ev in filtered"
@@ -94,6 +102,7 @@ const app = useApp();
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);
+const remoteEventsError = ref(false);
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
 
 function remoteEventView(event: CanonicalEvent): NexEvent {
@@ -126,20 +135,29 @@ async function loadRemoteEvents(request: RemoteAccountRequest = remoteAccountEpo
     const snapshot = await eventsApi.state();
     if (!remoteAccountEpoch.isCurrent(request)) return;
     remoteEvents.value = snapshot.events;
+    remoteEventsError.value = false;
   } catch {
-    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = [];
+    if (remoteAccountEpoch.isCurrent(request)) {
+      remoteEvents.value = [];
+      remoteEventsError.value = true;
+    }
   }
+}
+function retryRemoteEvents() {
+  void loadRemoteEvents();
 }
 onMounted(() => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
   remoteEvents.value = [];
+  remoteEventsError.value = false;
   void loadRemoteEvents();
 });
 watch(() => app.accountKey, (accountKey) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
   remoteEvents.value = [];
+  remoteEventsError.value = false;
   void loadRemoteEvents();
 });
 

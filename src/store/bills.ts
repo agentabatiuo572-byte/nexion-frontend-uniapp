@@ -269,9 +269,17 @@ export const useBills = defineStore("bills", () => {
     serverStatus.value = "loading";
     serverError.value = "";
     try {
-      const snapshot = await walletBillsApi.list();
+      const pages: WalletBillRow[] = [];
+      let page = 1;
+      let nextPage: number | null = 1;
+      while (nextPage !== null && pages.length < 1000) {
+        const snapshot = await walletBillsApi.list(page, 50);
+        pages.push(...snapshot.bills);
+        nextPage = snapshot.nextPage;
+        page = nextPage ?? page;
+      }
       if (expectedAccountKey !== boundKey) throw new Error("WALLET_BILLS_ACCOUNT_CHANGED");
-      bills.value = recomputeBalance(snapshot.bills.map(productionBill));
+      bills.value = recomputeBalance(pages.map(productionBill));
       serverStatus.value = "ready";
     } catch (cause) {
       if (expectedAccountKey === boundKey) {
