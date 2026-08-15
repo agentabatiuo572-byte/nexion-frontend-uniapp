@@ -35,9 +35,10 @@ export interface ComputeShareContent {
   enGuide: string;
 }
 
-// SPEC-1 在线加成系数 — admin E6「算力与设备配置」is the authoring surface; this
-// shape is mirrored 1:1 in admin lib/mock/admin/compute-config.ts (COMPUTE_COEFFICIENTS).
-// DR-7: each side mocks its own; structure/keys must match so PROD wires server→client.
+// SPEC-1 在线加成系数 — admin E6「算力与设备配置」is the authoring surface; keys are
+// mirrored 1:1 in admin lib/admin/e6-client.ts (e6CoeffKey: h5BaseFactor/continuityFullHours;
+// 原 mock 寄存器 lib/mock/admin/compute-config.ts 已死,admin 已 server-canonical)。
+// PROD wires server→client; value authority lives in the real backend.
 export interface OnlineBonus {
   // 无新鲜设备心跳时的基础托管系数(沿用 h5BaseFactor 配置键)∈(0,1]:
   // effectiveTops = baseline × h5BaseFactor × network × jitter.
