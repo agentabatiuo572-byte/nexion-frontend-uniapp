@@ -26,7 +26,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0; skip=0
+pass=0; fail=0; skip=0; retried=0
 
 # 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
 # admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
@@ -72,11 +72,63 @@ if [ ! -d "$ADMIN_ROOT" ]; then
   fi
 fi
 
-ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
-bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
+ok()   { local m="$1"; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then m="$m ${Y}⚠ after-retry${N}"; PROBE_RETRIED_LAST=0; retried=$((retried+1)); fi; printf "  ${G}PASS${N}  %s\n" "$m"; pass=$((pass+1)); }
+bad()  { local m="$1"; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then m="$m ${Y}(重试后仍失败)${N}"; PROBE_RETRIED_LAST=0; fi; printf "  ${R}FAIL${N}  %s\n" "$m"; fail=$((fail+1)); }
 # 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
 # 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
 skipped() { printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
+
+# ── runtime 探针重试(pkg/zj)────────────────────────────────────────────────
+# 族=真起浏览器的 14 个探针(census:docs/changes/2026-08-15-runtime-probe-retry.census.md)。
+# 同机三轮实测每轮恰好 1 个随机 runtime 探针抖(Frame detached / 20s 超时),轮轮不同、复跑自愈
+# —— 时序余量在本机负载下不够,族层统一「失败自动重跑 1 次,以第二次为准」。
+# 🔴 重试必须大声:首败明细留在探针日志(分隔行),事件登记 $PROBE_RETRY_LOG,ok/bad 行尾带
+# ⚠ 标记,总结行报 after-retry 计数 —— 静默重试会把真实的偶发产品 bug 一起吞掉,禁止。
+# 🔴 只包 runtime 真跑调用点;--selftest / 静态哨兵 / 逻辑门一律不包(确定性门失败重跑无意义,
+# 反而掩盖不该存在的非确定性)。稳定红两跑仍红,不被洗绿(probe_retry_selftest 变异①钉死)。
+# ponytail: 重试 1 次是当前抖动率(~1/轮)下的够用值;若单探针 1 次重试仍频繁穿透,升级路径=
+# 该探针内部等待硬化单独立项,不是加大重试次数。
+PROBE_RETRY_LOG="${TMPDIR:-/tmp}/uniapp-probe-retries.$$.log"
+PROBE_RETRIED_LAST=0
+probe_retry() {
+  PROBE_RETRIED_LAST=0
+  "$@" && return 0
+  local rc=$?
+  PROBE_RETRIED_LAST=1
+  printf '%s\n' "--- probe retry: first attempt exit $rc, rerunning once ---"
+  printf '%s | first-exit=%s | %s\n' "$(date +%H:%M:%S)" "$rc" "$*" >> "$PROBE_RETRY_LOG"
+  "$@"
+}
+
+# 红测三变异:①恒败不洗绿 ②首败后成=绿+标记+留痕 ③接线完整性(解包即红)。
+# 每个变异先证注入生效(rc/标志文件)再看判定 —— 红测铁律:先证起点。
+probe_retry_selftest() {
+  local bad_bits="" tmpflag="${TMPDIR:-/tmp}/uniapp-probe-retry-selftest.$$"
+  # ① 恒败探针经包装:终判必须仍红(稳定红不被洗绿)
+  if probe_retry bash -c 'exit 7' >/dev/null 2>&1; then bad_bits="$bad_bits ①洗绿"; fi
+  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ①未重试"
+  PROBE_RETRIED_LAST=0
+  # ② 首败后成:终判绿 + 标记置位 + 登记文件长了一行(重试大声)
+  rm -f "$tmpflag"
+  local before after
+  before=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null || echo 0)
+  if probe_retry bash -c "[ -f '$tmpflag' ] || { : > '$tmpflag'; exit 1; }" >/dev/null 2>&1; then :; else bad_bits="$bad_bits ②未转绿"; fi
+  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ②标记未置位"
+  after=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null || echo 0)
+  [ "$after" -gt "$before" ] || bad_bits="$bad_bits ②未留痕"
+  rm -f "$tmpflag"
+  PROBE_RETRIED_LAST=0
+  # ③ 接线完整性:verify.sh 里被包的真跑调用点数必须 = census 期望(解包/漏包即红)
+  local expected_sites=14 actual_sites
+  actual_sites=$(grep -c 'if probe_retry \(env \)\?.*"\$NODE_BIN" scripts/' "$0" 2>/dev/null || echo 0)
+  [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
+  if [ -z "$bad_bits" ]; then
+    ok "probe-retry selftest(恒败不洗绿 · 首败后成大声转绿 · 接线 $actual_sites/$expected_sites)"
+  else
+    bad "probe-retry selftest 失效:$bad_bits —— 重试包装不可信,本轮所有 runtime 探针结论按未包装解读"
+  fi
+}
+probe_retry_selftest
 
 check_http() {
   local label="$1" route="$2"
@@ -453,7 +505,7 @@ else
   bad "bare login-entry system chrome contract"; sed 's/^/        /' /tmp/uni-auth-system-chrome.log
 fi
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs >/tmp/uni-auth-system-chrome-runtime.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs >/tmp/uni-auth-system-chrome-runtime.log 2>&1; then
     ok "bare login-entry system chrome runtime geometry (P-069)"
   else
     bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
@@ -1275,7 +1327,7 @@ spec6_entry_surface_homes_present() {
 }
 spec6_entry_surface_homes_present
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs >/tmp/uni-spec6-entry-runtime.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs >/tmp/uni-spec6-entry-runtime.log 2>&1; then
     ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
   else
     bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
@@ -1286,7 +1338,7 @@ fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs >/tmp/uni-r7-device-detail-runtime.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs >/tmp/uni-r7-device-detail-runtime.log 2>&1; then
     ok "$(cat /tmp/uni-r7-device-detail-runtime.log)"
   else
     bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
@@ -1493,13 +1545,13 @@ fi
 # FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
 # “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs >/tmp/uni-spec7-risk-gate-runtime.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs >/tmp/uni-spec7-risk-gate-runtime.log 2>&1; then
     ok "$(cat /tmp/uni-spec7-risk-gate-runtime.log)"
   else
     bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' /tmp/uni-spec7-risk-gate-runtime.log
   fi
   for AUTH02_LOCALE in en zh; do
-    if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE" >/tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log 2>&1; then
+    if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE" >/tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log 2>&1; then
       ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
     else
       bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
@@ -1649,12 +1701,12 @@ else
   bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
 fi
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs >/tmp/uni-spec4-app-sync.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs >/tmp/uni-spec4-app-sync.log 2>&1; then
     ok "$(cat /tmp/uni-spec4-app-sync.log)"
   else
     bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' /tmp/uni-spec4-app-sync.log
   fi
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs >/tmp/uni-spec4-runtime-guard.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs >/tmp/uni-spec4-runtime-guard.log 2>&1; then
     ok "$(cat /tmp/uni-spec4-runtime-guard.log)"
   else
     bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
@@ -2618,7 +2670,7 @@ theme_constant_gate() {
     tail -6 /tmp/uniapp-theme-const-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/theme-constant-gate.mjs > /tmp/uniapp-theme-const.log 2>&1; then
+  if probe_retry "$NODE_BIN" scripts/theme-constant-gate.mjs > /tmp/uniapp-theme-const.log 2>&1; then
     ok "$(tail -1 /tmp/uniapp-theme-const.log)"
   else
     bad "新增「双主题恒定」着色元素 — 该元素亮/暗渲染出来一个色 = 没跟主题"
@@ -2639,7 +2691,7 @@ zero_border_gate() {
     tail -6 /tmp/uniapp-zero-border-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/zero-border-gate.mjs > /tmp/uniapp-zero-border.log 2>&1; then
+  if probe_retry "$NODE_BIN" scripts/zero-border-gate.mjs > /tmp/uniapp-zero-border.log 2>&1; then
     ok "$(tail -1 /tmp/uniapp-zero-border.log)"
   else
     bad "新增「有填充 + 四边描边」容器 — 《03》§3 层级靠 surface 微差色,不靠描边"
@@ -2660,7 +2712,7 @@ dom_qa_gate() {
     tail -5 /tmp/uniapp-dom-qa-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/dom-qa.mjs --sweep core > /tmp/uniapp-dom-qa.log 2>&1; then
+  if probe_retry "$NODE_BIN" scripts/dom-qa.mjs --sweep core > /tmp/uniapp-dom-qa.log 2>&1; then
     ok "dom-qa core(5 tab)无新 DOM 违例(存量黄灯见 docs/DOM-QA-LEDGER.json)"
   else
     bad "dom-qa 新 DOM 违例 — node scripts/dom-qa.mjs --sweep core 看明细;确属合法例外 → --update-ledger 收编并写 qaOk 理由"
@@ -2683,7 +2735,7 @@ tap_feedback_gate() {
     tail -6 /tmp/uniapp-tap-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/tap-feedback-probe.mjs > /tmp/uniapp-tap.log 2>&1; then
+  if probe_retry "$NODE_BIN" scripts/tap-feedback-probe.mjs > /tmp/uniapp-tap.log 2>&1; then
     ok "$(tail -1 /tmp/uniapp-tap.log)"
   else
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
@@ -2736,7 +2788,7 @@ card_data_boundary_gate
 # 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空
 # + 不溢出 + 无 console error。「接上了组件」和「空态真能显示」是两回事。
 empty_state_gate() {
-  if "$NODE_BIN" scripts/empty-state-probe.mjs > /tmp/uniapp-empty-state.log 2>&1; then
+  if probe_retry "$NODE_BIN" scripts/empty-state-probe.mjs > /tmp/uniapp-empty-state.log 2>&1; then
     ok "$(tail -1 /tmp/uniapp-empty-state.log)"
   else
     bad "空状态渲染失败 — node scripts/empty-state-probe.mjs 看明细(插画路径 / 标题 key / 布局溢出)"
@@ -2933,7 +2985,7 @@ bill_producer_gate
 # (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
 # 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
 withdraw_bill_runtime_gate() {
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs > /tmp/uniapp-withdraw-bill-runtime.log 2>&1; then
+  if probe_retry env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs > /tmp/uniapp-withdraw-bill-runtime.log 2>&1; then
     ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
   else
     bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
@@ -3377,12 +3429,17 @@ a11y_activate_gate() {
 a11y_activate_gate
 
 # Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
-if "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
+if probe_retry "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
   ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
 else
   bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
   tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
 fi
 
-echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
+# 重试留痕回显:哪个探针、几点、首败退出码 —— 反复出现同一探针 = 可能是真偶发 bug,要追
+if [ -s "$PROBE_RETRY_LOG" ]; then
+  echo -e "${Y}⚠ probe retries this run:${N}"
+  sed 's/^/    /' "$PROBE_RETRY_LOG"
+fi
+echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
 [ $fail -eq 0 ] && [ $skip -eq 0 ]
