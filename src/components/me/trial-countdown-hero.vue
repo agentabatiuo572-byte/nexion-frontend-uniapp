@@ -43,7 +43,7 @@
 import { computed, type CSSProperties } from "vue";
 import Cell from "@/components/me/trial-time-cell.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useTrialConfig } from "@/store/trial-config";
 import type { TrialStatus } from "@/store/free-trial";
 
@@ -89,12 +89,12 @@ const cta = computed(() => {
 
 const startDateLine = computed(() =>
   fmt(w.value.countdownStart, {
-    date: props.startedAt ? new Date(props.startedAt).toLocaleDateString() : w.value.countdownDateEmpty,
+    date: props.startedAt ? new Date(props.startedAt).toLocaleDateString(dateLocale()) : w.value.countdownDateEmpty,
   }),
 );
 const endDateLine = computed(() =>
   fmt(w.value.countdownEnd, {
-    date: props.graceEndsAt ? new Date(props.graceEndsAt).toLocaleDateString() : w.value.countdownDateEmpty,
+    date: props.graceEndsAt ? new Date(props.graceEndsAt).toLocaleDateString(dateLocale()) : w.value.countdownDateEmpty,
   }),
 );
 

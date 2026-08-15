@@ -68,7 +68,7 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import type { StakingPosition } from "@/store/staking";
 import { toast } from "@/store/ui";
 
@@ -93,7 +93,7 @@ const apyPct = computed(() => (props.p.apy * 100).toFixed(0));
 const daysIn = computed(() => Math.floor(elapsed.value / ONE_DAY_MS));
 const accruedText = computed(() => accrued.value.toFixed(2));
 const claimText = computed(() => fmt(t.value.stakingV3.position.claim, { amount: (props.p.amountUSDT + accrued.value).toFixed(2) }));
-const startedDate = computed(() => new Date(props.p.startTs).toLocaleDateString());
+const startedDate = computed(() => new Date(props.p.startTs).toLocaleDateString(dateLocale()));
 
 function onTrack() {
   toast.info(t.value.stakingV3.position.autoClaimToast, fmt(t.value.stakingV3.position.autoClaimSubtitle, { n: remainingDays.value }));

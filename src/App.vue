@@ -20,7 +20,7 @@ import { useProfile } from "@/store/profile";
 import { useTheme } from "@/store/theme";
 import { toast } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import {
   canonicalH5RouteUrl,
   isStaticReviewRoute,
@@ -280,7 +280,7 @@ async function pollTrial() {
     if (after === "grace") {
       // Production stopped; the credit stays usable until graceEndsAt — always
       // hand the user the exact time + next step (spec ④).
-      const until = freeTrial.graceEndsAt !== null ? new Date(freeTrial.graceEndsAt).toLocaleString() : "";
+      const until = freeTrial.graceEndsAt !== null ? new Date(freeTrial.graceEndsAt).toLocaleString(dateLocale()) : "";
       toast.info(fmt(t.trial.graceStartToast, { time: until }));
       urgencyFired.grace24h = false;
       urgencyFired.grace1h = false;

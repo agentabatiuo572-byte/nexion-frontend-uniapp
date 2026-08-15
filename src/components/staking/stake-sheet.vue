@@ -83,7 +83,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
@@ -142,7 +142,7 @@ const interestText = computed(() =>
   props.term !== null ? (amount.value * (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365)).toFixed(2) : "0.00",
 );
 const unlockDateText = computed(() =>
-  props.term !== null ? new Date(Date.now() + props.term * ONE_DAY_MS).toLocaleDateString() : "",
+  props.term !== null ? new Date(Date.now() + props.term * ONE_DAY_MS).toLocaleDateString(dateLocale()) : "",
 );
 const totalText = computed(() =>
   props.term !== null ? (amount.value * (1 + (selectedPool.value?.apy ?? STAKING_APY[props.term]) * (props.term / 365))).toFixed(2) : "0.00",
