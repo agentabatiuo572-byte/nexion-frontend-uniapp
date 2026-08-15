@@ -606,7 +606,7 @@ sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode
 # z1 判决 A:克隆逻辑 819a6da 起搬进 lib/platform-config-compat.ts(config store 经
 # completePlatformConfigSeed 初始化)。字面 pin 换行为门:克隆隔离 / captchaAlwaysScenes
 # 有效值 / WD02 网络费逐键 parity 全走「合成后的有效配置」,种子文件形态属实现细节。
-if "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
+if ADMIN_ROOT="$ADMIN_ROOT" "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
   ok "platform-config compat 行为门 — $(tail -1 /tmp/uni-config-compat.log)"
 else
   bad "platform-config compat 行为门失败 — node scripts/selfcheck-config-compat.mjs 看明细"
@@ -978,49 +978,46 @@ if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/a
 else
   ok "SPEC-7 settle NEX route goes through buckets"
 fi
-# 双端参数 key parity: uniapp 配置契约 ↔ admin 参数寄存器(DR-7 结构一致)
-ADMIN_CFG="$ADMIN_ROOT/lib/mock/admin/compute-config.ts"
-if [ ! -f "$ADMIN_CFG" ]; then
-  bad "SPEC-7 parity: admin compute-config.ts not found at $ADMIN_CFG"
+# 双端参数 key parity: uniapp 配置契约 ↔ admin main 活源(2026-08-15 改锚,单独立项)。
+# 原锚 lib/mock/admin/compute-config.ts 已死(admin main 2c477b4 进 .trash;含全键 defaultVal
+# 的寄存器只活在 admin 非 main 分支,与 wd02 契约锚无交集分支 → 原门在 main 族恒红)。
+# 现锚 main 活源:riskCluster 11 键 → k-client.ts;lockMode → h-client.ts;K3 提现前置 /
+# K4 聚簇权重 12 键 main 前端尚未落地(只在 PRD),admin 侧断言降为域锚脚本里的升级哨兵
+# (落地即红,提醒接进比对),uniapp 侧契约照旧 24 键全量必含。
+# 键清单三处消费(key 循环 / 域锚脚本 argv / 覆盖度门)同源于下面两个变量,勿另抄。
+SPEC7_RISKCLUSTER_KEYS="freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding"
+SPEC7_OTPGATE_KEYS="resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds"
+SPEC7_ADMIN_PENDING_KEYS="minWithdrawableUsdt sameAddressRoute firstWithdrawalManual newAddressHoldHours serverDeviceId ipBucket withdrawAddress paymentInstrument sponsor uaFingerprint signupTiming weakSignalClusterThreshold"
+ADMIN_K_CLIENT="$ADMIN_ROOT/lib/admin/k-client.ts"
+ADMIN_H_CLIENT="$ADMIN_ROOT/lib/admin/h-client.ts"
+if [ ! -f "$ADMIN_K_CLIENT" ] || [ ! -f "$ADMIN_H_CLIENT" ]; then
+  bad "SPEC-7 parity: admin main 活源缺失(k-client:$([ -f "$ADMIN_K_CLIENT" ] && echo ok || echo MISS) h-client:$([ -f "$ADMIN_H_CLIENT" ] && echo ok || echo MISS))at $ADMIN_ROOT/lib/admin"
 else
   parity_miss=""
-  for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
-           pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
-           maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding \
-           minWithdrawableUsdt sameAddressRoute firstWithdrawalManual newAddressHoldHours lockMode \
-           serverDeviceId ipBucket withdrawAddress paymentInstrument sponsor uaFingerprint signupTiming \
-           weakSignalClusterThreshold; do
+  for k in $SPEC7_RISKCLUSTER_KEYS lockMode $SPEC7_ADMIN_PENDING_KEYS; do
     grep -q "$k" src/store/config-types.ts || parity_miss="${parity_miss}uniapp:$k "
-    grep -q "$k" "$ADMIN_CFG" || parity_miss="${parity_miss}admin:$k "
   done
+  for k in $SPEC7_RISKCLUSTER_KEYS; do
+    grep -q "$k" "$ADMIN_K_CLIENT" || parity_miss="${parity_miss}admin:$k "
+  done
+  grep -q "lockMode" "$ADMIN_H_CLIENT" || parity_miss="${parity_miss}admin:lockMode "
   if [ -z "$parity_miss" ]; then
-    ok "SPEC-7 param key parity (uniapp config-types ↔ admin compute-config)"
+    ok "SPEC-7 param key parity (uniapp config-types 24 键 ↔ admin k-client/h-client 活源;K3/K4 12 键升级哨兵在域锚脚本)"
   else
     bad "SPEC-7 param key parity missing: $parity_miss"
   fi
-  # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
-  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 数值 5 键逐一比对字面值;
-  # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
-  # z1 判决 A(2026-08-10):captchaAlwaysScenes 已出种子进 compat 运行时默认,由
-  # selfcheck-config-compat 对合成配置行为断言;键清单收成下面两个变量 —— 值循环与
-  # 覆盖度门共用同一份(单源)。admin 侧数组参数登记义务已记 HANDOFF。
-  SPEC7_RISKCLUSTER_KEYS="freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding"
-  SPEC7_OTPGATE_KEYS="resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds"
-  value_mismatch=""
-  for k in $SPEC7_RISKCLUSTER_KEYS $SPEC7_OTPGATE_KEYS; do
-    uni_v=$(grep -oE "\b$k: [^,]+" src/mock/platform-config.ts | head -1 | sed "s/^$k: //" | tr -d '\r')
-    # 尾逗号锚定对象字面量条目;类型声明的 union 行(key: "X" | ...)无逗号,天然排除(红测抓过 resendSeconds 撞 union 首键)
-    adm_v=$(grep -A6 "key: \"$k\"," "$ADMIN_CFG" | grep -m1 -oE "defaultVal: [^,]+" | sed "s/^defaultVal: //" | tr -d '\r')
-    if [ -z "$uni_v" ] || [ -z "$adm_v" ]; then
-      value_mismatch="${value_mismatch}${k}(extract-fail:uni=${uni_v:-none} admin=${adm_v:-none}) "
-    elif [ "$uni_v" != "$adm_v" ]; then
-      value_mismatch="${value_mismatch}${k}(uni=$uni_v!=admin=$adm_v) "
-    fi
-  done
-  if [ -z "$value_mismatch" ]; then
-    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;captchaAlwaysScenes 由 config-compat 行为门看住)"
+  # 双端参数「值」parity → 域锚版:uniapp seed ∈ admin 允许值域/枚举白名单。
+  # admin main 已 server-canonical(前端无 defaultVal,字面权威在真后端 DB,本机无仓),
+  # 字面级比对的 admin 侧对象消亡 —— 降级语义 / 抓漂范围 / 恢复字面级的条件,见
+  # scripts/spec7-admin-domain-parity.mjs 头注释。红测已验:越域 / 假键 / 锚缺失均红。
+  # 历史沿革仍有效的部分:z1 判决 A(2026-08-10)captchaAlwaysScenes 出种子进 compat
+  # 运行时默认,由 selfcheck-config-compat 行为门看住,不在本键清单。
+  if "$NODE_BIN" scripts/spec7-admin-domain-parity.mjs "$ADMIN_ROOT" "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" \
+       > /tmp/uni-spec7-admin-domain.log 2>&1; then
+    ok "SPEC-7 param value parity·域锚(seed ∈ admin 域/白名单;$(tail -1 /tmp/uni-spec7-admin-domain.log | tr -d '\r'))"
   else
-    bad "SPEC-7 param value parity drift: $value_mismatch"
+    bad "SPEC-7 param value parity·域锚失败 — node scripts/spec7-admin-domain-parity.mjs 看明细"
+    grep "^FAIL" /tmp/uni-spec7-admin-domain.log | head -8 | sed 's/^/        /'
   fi
   # 值 parity 覆盖度自守(z1 判决 A:硬计数改集合等式,与循环键清单同源):种子块键集
   # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
@@ -2499,8 +2496,8 @@ NODE
 home_task_carousel_contract
 
 # ── 跨仓采样证据门:pages.json 每个页面必须在 admin 仓有 runtime 采样证据 ──
-# 单源 = ../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs(直接调用,
-# 不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
+# 单源 = $ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs(../nexion-ops-console → admin-ops
+# main;直接调用,不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
 # 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
 cross_repo_sampling_gate() {
   local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
@@ -2517,7 +2514,7 @@ cross_repo_sampling_gate() {
   if "$NODE_BIN" "$audit_arg" > /tmp/uniapp-port-coverage-audit.log 2>&1; then
     ok "cross-repo sampling evidence (admin uniapp-port-coverage-audit findings=0)"
   else
-    bad "page(s) lack admin-side sampling evidence — 去 ../Nexion-admin-prototype 把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
+    bad "page(s) lack admin-side sampling evidence — 去 ../nexion-ops-console(admin-ops main)把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
     tail -25 /tmp/uniapp-port-coverage-audit.log | sed 's/^/        /'
   fi
 }
