@@ -2073,7 +2073,7 @@ export const zh: Messages = {
     timeMinutesAgo: "{n} 分钟前",
     timeHoursAgo: "{n} 小时前",
     timeDaysAgo: "{n} 天前",
-    firstTimeReview: "第一笔提现我们会多做一道安全确认,到账比平时慢一些。",
+    firstTimeReview: "第一笔提现会多一道安全确认,到账稍慢",
 
     fastLaneOnTitle: "这笔可立即处理",
     fastLaneOnBody: "已免去:{g}。提交后按标准时效到账。",
@@ -5210,7 +5210,7 @@ export const zh: Messages = {
     addCta: "添加提现地址",
     changeCta: "更换地址",
     emptyGuideTitle: "设置提现地址",
-    emptyGuideBody: "提现将转入你自己的钱包地址,一次设置长期使用。",
+    emptyGuideBody: "提现转入你自己的钱包地址,设置一次长期用",
     currentLabel: "当前地址",
     addedAtLabel: "生效时间",
     sourceMigrated: "早期地址 · 自动沿用",

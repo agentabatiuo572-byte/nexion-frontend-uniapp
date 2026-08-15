@@ -2763,6 +2763,21 @@ tap_feedback_gate() {
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
     tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
   fi
+  # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
+  # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
+  if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
+    ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
+  else
+    bad "orphan-line selftest 失败(探针失效即门失效;node scripts/orphan-line-probe.mjs --selftest 看明细)"
+    tail -4 /tmp/uniapp-orphan-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if probe_retry /tmp/uniapp-orphan.log "$NODE_BIN" scripts/orphan-line-probe.mjs; then
+    ok "$(tail -1 /tmp/uniapp-orphan.log)"
+  else
+    bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
+    tail -8 /tmp/uniapp-orphan.log | sed 's/^/        /'
+  fi
 }
 tap_feedback_gate
 

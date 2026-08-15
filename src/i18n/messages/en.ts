@@ -2146,7 +2146,7 @@ export const en = {
     timeMinutesAgo: "{n}m ago",
     timeHoursAgo: "{n}h ago",
     timeDaysAgo: "{n}d ago",
-    firstTimeReview: "We run one extra safety check on your first withdrawal, so it lands a little slower than usual.",
+    firstTimeReview: "Your first withdrawal gets one extra safety check, so it lands a little slower.",
 
     fastLaneOnTitle: "This one processes right away",
     fastLaneOnBody: "Waived: {g}. It goes out on the standard timeline.",

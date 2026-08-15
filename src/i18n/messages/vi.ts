@@ -2063,7 +2063,7 @@ export const vi: Messages = {
     timeMinutesAgo: "{n} phút trước",
     timeHoursAgo: "{n} giờ trước",
     timeDaysAgo: "{n} ngày trước",
-    firstTimeReview: "Với lần rút đầu tiên, chúng tôi kiểm tra an toàn thêm một bước nên tiền về chậm hơn bình thường một chút.",
+    firstTimeReview: "Lần rút đầu tiên có thêm một bước xác nhận an toàn nên về chậm hơn chút",
 
     fastLaneOnTitle: "Lệnh này xử lý ngay",
     fastLaneOnBody: "Đã miễn: {g}. Vẫn về theo thời gian tiêu chuẩn.",
