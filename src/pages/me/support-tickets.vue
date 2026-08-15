@@ -176,13 +176,13 @@ onShow(async () => {
     await ticketsStore.refresh();
     if (mode.value.kind === "detail") await ticketsStore.load(mode.value.id);
   } catch {
-    toast.warn("Support unavailable", "Please retry when the connection is restored.");
+    toast.warn(t.value.security.opFailed);
   }
 });
 
 async function reloadTickets() {
   try { await ticketsStore.refresh(); }
-  catch { toast.warn("Support unavailable", "Please retry when the connection is restored."); }
+  catch { toast.warn(t.value.security.opFailed); }
 }
 
 async function openTicket(id: string) {
@@ -191,7 +191,7 @@ async function openTicket(id: string) {
     await ticketsStore.load(id);
     mode.value = { kind: "detail", id };
   } catch {
-    toast.warn("Support unavailable", "Please retry when the connection is restored.");
+    toast.warn(t.value.security.opFailed);
   }
 }
 
@@ -285,7 +285,7 @@ async function submitCreate() {
     subject.value = "";
     desc.value = "";
     mode.value = { kind: "detail", id };
-  } catch { toast.error("Submit failed", "No local ticket was created."); }
+  } catch { toast.error(t.value.security.opFailed); }
 }
 async function sendReply() {
   if (ticketsStore.mutating) return;
@@ -295,7 +295,7 @@ async function sendReply() {
     await ticketsStore.reply(current.id, reply.value);
     reply.value = "";
     toast.success(t.value.tickets.detail.sentToast, "");
-  } catch { toast.error("Reply failed", "Please refresh and try again."); }
+  } catch { toast.error(t.value.security.opFailed); }
 }
 async function closeTicket() {
   if (ticketsStore.mutating) return;
@@ -305,7 +305,7 @@ async function closeTicket() {
     await ticketsStore.close(current.id);
     toast.success(t.value.tickets.detail.closedToast, "");
     mode.value = { kind: "list" };
-  } catch { toast.error("Close failed", "Please refresh and try again."); }
+  } catch { toast.error(t.value.security.opFailed); }
 }
 
 const backRowStyle: CSSProperties = { minHeight: "44px", marginLeft: "-8px", padding: "0 8px", fontSize: "13px", color: "var(--v5-brand)" };

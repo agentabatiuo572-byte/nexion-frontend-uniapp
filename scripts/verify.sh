@@ -448,6 +448,15 @@ else
   bad "i18n 文案里有 markdown 残留 — node scripts/i18n-copy-residue-gate.mjs 看明细"
   grep -E "^(FAIL| )" /tmp/uniapp-i18n-residue.log | head -8
 fi
+# 焦虑词哨兵(2026-08-15 pkg/zk):用户可见字符串禁内部运营/审查术语(人工审核/风控/审查/
+# manual review/xét duyệt…)。同 residue 门惯例:剥注释只扫字符串值、候选下限判红;
+# 确需保留的行(注销等破坏性流程)用 `anxiety-exempt: <理由>` 行内豁免,豁免清单随 PASS 输出供 review。
+if "$NODE_BIN" scripts/anxiety-copy-gate.mjs > /tmp/uniapp-anxiety-copy.log 2>&1; then
+  ok "焦虑词哨兵 — $(head -1 /tmp/uniapp-anxiety-copy.log)"
+else
+  bad "用户可见文案命中焦虑/内部术语禁词 — node scripts/anxiety-copy-gate.mjs --list 看全量"
+  grep -E "^(FAIL| )" /tmp/uniapp-anxiety-copy.log | head -8
+fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
@@ -2753,6 +2762,21 @@ tap_feedback_gate() {
   else
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
     tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
+  fi
+  # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
+  # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
+  if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
+    ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
+  else
+    bad "orphan-line selftest 失败(探针失效即门失效;node scripts/orphan-line-probe.mjs --selftest 看明细)"
+    tail -4 /tmp/uniapp-orphan-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if probe_retry /tmp/uniapp-orphan.log "$NODE_BIN" scripts/orphan-line-probe.mjs; then
+    ok "$(tail -1 /tmp/uniapp-orphan.log)"
+  else
+    bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
+    tail -8 /tmp/uniapp-orphan.log | sed 's/^/        /'
   fi
 }
 tap_feedback_gate
