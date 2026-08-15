@@ -34,12 +34,11 @@
           </view>
           <view class="min-w-0" style="flex: 1">
             <view>
-              <text :style="sponsorNameStyle">{{ sponsor.name }} </text>
+              <text :style="sponsorNameStyle">{{ sponsor?.name }} </text>
               <text :style="sponsorTagStyle">· {{ t.ref.invitedYou }}</text>
             </view>
             <view class="flex items-center" style="gap: 6px; margin-top: 4px; flex-wrap: wrap">
-              <text :style="vRankChipStyle">V{{ sponsor.vRank }} {{ sponsor.title }}</text>
-              <text :style="cityLineStyle">{{ cityLine }}</text>
+              <text :style="vRankChipStyle">V{{ sponsor?.vRank }}</text>
             </view>
           </view>
         </view>
@@ -133,6 +132,9 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import Stat from "@/components/trust/trust-stat.vue";
 import { pickSponsor } from "@/mock/sponsors";
+import { apiClient, remoteApiEnabled } from "@/api/runtime";
+import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
+import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
 import { useConfig } from "@/store/config";
 import { useAuth } from "@/store/auth";
 import { normalizeRefCode, useSponsorship } from "@/store/sponsorship";
@@ -142,6 +144,8 @@ const PARTNER_LOGOS = ["NVIDIA", "Intel", "AMD", "OpenRouter", "OPPO", "TechCrun
 const t = useT();
 const code = ref("");
 const cfg = useConfig();
+const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
+const remotePreview = ref<PublicSponsorPreview | null>(null);
 const paidOutText = computed(() => {
   const ps = cfg.config.publicStats;
   return !cfg.syncFailed && publicStatsHealth(ps).fleetOk
@@ -155,23 +159,45 @@ const joinersText = computed(() => {
     : "—";
 });
 const auth = useAuth();
-const sponsorship = useSponsorship();
+const sponsorship = remoteApiEnabled ? null : useSponsorship();
 // 礼包金额单源派生自 platform config(禁写死镜像)。
-const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
-const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
+const giftUsdt = computed(() => remoteApiEnabled
+  ? remotePreview.value?.gift.usdtAmount ?? 0
+  : cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => remoteApiEnabled
+  ? remotePreview.value?.gift.nexAmount ?? 0
+  : cfg.config.rewards.welcomeGift.nexAmount);
 // [FEAT-SHARE4] 码过 client 预检才展示 sponsor / 写归因;非法 = 通用落地(异常1)。
-onLoad((options) => {
+onLoad(async (options) => {
+  if (remoteApiEnabled) {
+    const norm = normalizeRegistrationSponsorCode(options?.code ?? "", true);
+    code.value = norm ?? "";
+    if (!norm) return;
+    try {
+      remotePreview.value = await publicSponsorPreviewApi.preview(norm);
+      code.value = remotePreview.value.code;
+    } catch {
+      code.value = "";
+      remotePreview.value = null;
+    }
+    return;
+  }
   const norm = normalizeRefCode(options?.code ?? "");
   code.value = norm ?? "";
-  if (norm) sponsorship.capturePending(norm);
+  if (norm) sponsorship?.capturePending(norm);
 });
-const hasCode = computed(() => !!code.value);
+const hasCode = computed(() => remoteApiEnabled ? !!remotePreview.value : !!code.value);
 const authed = computed(() => auth.isAuthenticated);
 
 const codeUpper = computed(() => code.value.toUpperCase());
-const sponsor = computed(() => pickSponsor(code.value));
-const initial = computed(() => sponsor.value.name[0]);
-const cityLine = computed(() => fmt(t.value.ref.sponsorCityLine, { city: sponsor.value.city, n: sponsor.value.downlines }));
+const sponsor = computed(() => {
+  if (remoteApiEnabled) {
+    const value = remotePreview.value?.sponsor;
+    return value ? { name: value.displayName, vRank: value.vRank.replace(/^V/i, "") } : null;
+  }
+  return code.value ? pickSponsor(code.value) : null;
+});
+const initial = computed(() => sponsor.value?.name[0] ?? "N");
 
 const GIFT_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="4" rx="1" /><path d="M12 8v13" /><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5" /></svg>`;
 const SPARK_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" /></svg>`;
@@ -264,7 +290,6 @@ const vRankChipStyle: CSSProperties = {
   color: "var(--v5-brand)",
   fontWeight: 600,
 };
-const cityLineStyle: CSSProperties = { fontFamily: "var(--font-jet-mono), ui-monospace, monospace", fontSize: "12px", color: "var(--v5-ink-3)" };
 const giftCardStyle: CSSProperties = {
   borderRadius: "16px",
   padding: "20px",

@@ -32,10 +32,28 @@ import { useSponsorship } from "@/store/sponsorship";
 import { useConversations } from "@/store/conversations";
 import { useNova } from "@/store/nova";
 import { useRankSnapshot } from "@/store/rank-snapshot";
+import { useGenesisPoints } from "@/store/genesis-points";
+import { useNetworkRank } from "@/store/network-rank";
 import { bindEarningsReleaseAccount } from "@/store/earning-release";
 import { useReferralReward } from "@/store/referral-reward";
 import { useRepurchase } from "@/store/repurchase";
 import { useNetwork } from "@/store/network";
+import { prepareProductCatalog } from "@/store/product-catalog";
+import { prepareServerProductPhase } from "@/store/server-product-phase";
+import { useTradeinSheet } from "@/store/tradein-sheet";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
+
+const remoteAccountScope = createRemoteAccountEpoch();
+
+/** Snapshot the account generation before starting an account-sensitive request. */
+export function captureAccountScope(): RemoteAccountRequest {
+  return remoteAccountScope.snapshot();
+}
+
+/** Reject a response after a rebind, including a same-account rebind. */
+export function isCurrentAccountScope(request: RemoteAccountRequest): boolean {
+  return remoteAccountScope.isCurrent(request);
+}
 
 /**
  * 账号切换收口:所有 per-account store 在此统一重绑,账号切换互不继承(P2-8 存储
@@ -55,8 +73,13 @@ import { useNetwork } from "@/store/network";
  * sponsorship 的推荐归因也按账号重绑，避免同设备不同账号串展示/串礼。
  */
 export function rebindAccountScopedStores(accountKey: string): void {
+  remoteAccountScope.bind(accountKey);
   // Server-authoritative financial buckets are never shared across accounts;
   // the successful sign-in flow refreshes this cleared slot immediately.
+  prepareProductCatalog();
+  prepareServerProductPhase();
+  useTradeinSheet().clearApplied();
+  useTradeinSheet().hide();
   bindEarningsReleaseAccount(accountKey);
   useRiskDisclosure().bindAccount();
   useGenesis().bindAccount(accountKey);
@@ -79,6 +102,8 @@ export function rebindAccountScopedStores(accountKey: string): void {
   useNetwork().bindAccount(accountKey);
   useRepurchase().bindAccount();
   useRankSnapshot().bindAccount(accountKey); // 首页排名 24h 快照:换号必换行,否则看到别人的昨日名次
+  useGenesisPoints().bindAccount(accountKey);
+  useNetworkRank().bindAccount(accountKey);
   useEventQuest().bindAccount(accountKey);
   useMilestones().bindAccount(accountKey);
   useAchievements().bindAccount(accountKey);

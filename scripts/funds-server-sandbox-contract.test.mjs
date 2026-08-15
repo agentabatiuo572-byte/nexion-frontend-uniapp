@@ -5,13 +5,17 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
+const backendRoot = process.env.NEXGRID_BACKEND_ROOT?.trim()
+  ? path.resolve(process.env.NEXGRID_BACKEND_ROOT.trim())
+  : path.resolve(root, "..", "nexion-backend");
+const readBackend = (relative) => fs.readFileSync(path.join(backendRoot, relative), "utf8");
 
 const runtimeConfig = read("src/api/runtime-config.ts");
 const runtime = read("src/api/runtime.ts");
 const appStore = read("src/store/app.ts");
 const api = read("src/api/funds-sandbox-api.ts");
-const withdrawalService = read("../backend/src/main/java/ffdd/opsconsole/finance/application/AppWithdrawalService.java");
-const withdrawalMapper = read("../backend/src/main/java/ffdd/opsconsole/finance/mapper/AppWithdrawalMapper.java");
+const withdrawalService = readBackend("src/main/java/ffdd/opsconsole/finance/application/AppWithdrawalService.java");
+const withdrawalMapper = readBackend("src/main/java/ffdd/opsconsole/finance/mapper/AppWithdrawalMapper.java");
 
 assert.match(runtimeConfig, /"mock"\s*\|\s*"sandbox"\s*\|\s*"remote"/);
 assert.match(runtime, /fundsSandboxEnabled\s*=\s*apiRuntimeConfig\.mode\s*===\s*["']sandbox["']\s*&&\s*apiRuntimeConfig\.modeExplicit/);

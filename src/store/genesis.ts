@@ -11,6 +11,7 @@ import {
   type GenesisTier,
 } from "@/store/genesis-config";
 import { genesisApi, remoteApiEnabled } from "@/api/runtime";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { isSettledRejection } from "@/api/errors";
 import type {
   GenesisAccountState,
@@ -264,11 +265,11 @@ function hydrateUser(accountKey: string, soldSlots: number): GenesisUserData {
 
 export const useGenesis = defineStore("genesis", () => {
   const cfg = useGenesisConfig(); // 单向读配置(档位定价);同 free-trial→trial-config 先例
-  const initGlobal = hydrateGlobal();
+  const initGlobal = remoteApiEnabled ? globalDefaults() : hydrateGlobal();
   // 账号维度。boot 期与 app store 同款落 "default";账号确定后由
   // lib/account-scope 的 rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
-  const initUser = hydrateUser(boundKey, initGlobal.soldSlots);
+  const initUser = remoteApiEnabled ? userDefaults() : hydrateUser(boundKey, initGlobal.soldSlots);
   const totalSlots = ref(TOTAL_SLOTS);
   const soldSlots = ref(initGlobal.soldSlots);
   const myOwned = ref(initUser.myOwned);
@@ -280,9 +281,11 @@ export const useGenesis = defineStore("genesis", () => {
   const holdingNoByTokenId = ref<Record<number, string>>({});
   const listingNoByTokenId = ref<Record<number, string>>({});
   const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
+  const remoteTransactions = ref<GenesisPublicState["transactions"]>([]);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const remoteEmissions = ref<GenesisEmission[]>([]);
   const hasGenesisInvite = ref(false);
+  const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
   function tokenIdFor(value: string): number {
     let hash = 0;
@@ -294,6 +297,7 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots.value = state.series.totalSupply;
     soldSlots.value = state.series.soldSupply;
     nexListed.value = state.emissionOpen;
+    remoteTransactions.value = [...state.transactions];
     const listingMap: Record<number, string> = {};
     remoteListings.value = state.listings.map((listing) => {
       const tokenId = tokenIdFor(listing.holdingNo);
@@ -324,11 +328,42 @@ export const useGenesis = defineStore("genesis", () => {
       .map((holding) => ({ tokenId: tokenIdFor(holding.holdingNo), askPriceUSDT: holding.listingPriceUsdt!, listedAt: holding.listedAt ?? Date.now() }));
   }
 
-  async function syncRemote(): Promise<void> {
-    if (!remoteApiEnabled) return;
+  function clearRemoteFacts(): void {
+    totalSlots.value = TOTAL_SLOTS;
+    soldSlots.value = 0;
+    nexListed.value = false;
+    nexListedAt.value = null;
+    remoteListings.value = [];
+    remoteTransactions.value = [];
+    remoteHoldings.value = [];
+    remoteEmissions.value = [];
+    holdingNoByTokenId.value = {};
+    listingNoByTokenId.value = {};
+    ownedTokenIds.value = [];
+    myListings.value = [];
+    myOwned.value = 0;
+    hasGenesisInvite.value = false;
+  }
+
+  async function syncRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
+    if (!remoteApiEnabled) return true;
     // 权威不可达是常态输入,不 reject(resilience 门):保留 hydrate 现值降级。
-    try { applyPublicState(await genesisApi.state()); } catch { return; }
-    try { applyAccountState(await genesisApi.account()); } catch { /* public state remains usable before login */ }
+    let publicState: GenesisPublicState;
+    try { publicState = await genesisApi.state(); } catch {
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
+      return false;
+    }
+    if (!remoteAccountEpoch.isCurrent(request)) return false;
+    applyPublicState(publicState);
+    try {
+      const accountState = await genesisApi.account();
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      applyAccountState(accountState);
+    } catch {
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
+      return false;
+    }
+    return true;
   }
 
   function persist() {
@@ -353,14 +388,9 @@ export const useGenesis = defineStore("genesis", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
-      remoteHoldings.value = [];
-      remoteEmissions.value = [];
-      holdingNoByTokenId.value = {};
-      ownedTokenIds.value = [];
-      myListings.value = [];
-      myOwned.value = 0;
-      hasGenesisInvite.value = false;
-      void syncRemote();
+      remoteAccountEpoch.bind(boundKey);
+      clearRemoteFacts();
+      void syncRemote(remoteAccountEpoch.snapshot());
       return;
     }
     const g = hydrateGlobal();
@@ -482,10 +512,12 @@ export const useGenesis = defineStore("genesis", () => {
     //   同批迁移的其它 store 都是「守卫 ≥ 远端调用」(app.ts 11/8 · cards 7/1),创世是唯一例外。
     //   机器门:verify.sh 的 `store-unreachable-code` 哨兵钉死 src/store/** 不可达数 = 0。
     if (remoteApiEnabled) try {
+      const request = remoteAccountEpoch.snapshot();
       const beforePrice = unitPriceUSDT.value;
       const state = await genesisApi.purchase(n, purchaseIdempotencyKey(n, tokenIds));
+      if (!remoteAccountEpoch.isCurrent(request)) return { ok: false, cost: 0, reason: "unavailable" };
       applyAccountState(state);
-      await syncRemote();
+      if (!await syncRemote(request)) return { ok: false, cost: 0, reason: "unavailable" };
       // 成交 = 定局 → 键作废,下一次点购买是新的一笔意图。
       // 🔴 失败路径**不作废**:失败可能是「服务端已成交但回执丢了」,此时保留键,
       //    用户再点一次就是原样重放、命中服务端去重;换新键才是造出第二笔的那条路。
@@ -560,11 +592,13 @@ export const useGenesis = defineStore("genesis", () => {
     if (remoteApiEnabled) {
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
+    const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
-      applyAccountState(await genesisApi.list(holdingNo, askPriceUSDT, `genesis-list:${holdingNo}:${Date.now()}`));
-      await syncRemote();
-      return true;
+      const state = await genesisApi.list(holdingNo, askPriceUSDT, `genesis-list:${holdingNo}:${Date.now()}`);
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      applyAccountState(state);
+      return syncRemote(request);
     } catch { return false; }
     }
 
@@ -603,11 +637,13 @@ export const useGenesis = defineStore("genesis", () => {
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = holdingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
+    const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
-      applyAccountState(await genesisApi.cancel(holdingNo, `genesis-cancel:${holdingNo}:${Date.now()}`));
-      await syncRemote();
-      return true;
+      const state = await genesisApi.cancel(holdingNo, `genesis-cancel:${holdingNo}:${Date.now()}`);
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      applyAccountState(state);
+      return syncRemote(request);
     } catch { return false; }
     }
 
@@ -631,12 +667,14 @@ export const useGenesis = defineStore("genesis", () => {
     if (remoteApiEnabled) {                                   // 同 listNode:守卫必须在 holdingNo 之前
     const holdingNo = listingNoByTokenId.value[tokenId];
     if (!holdingNo) return false;
+    const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
       // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)
-      applyAccountState(await genesisApi.buy(holdingNo, `genesis-buy:${holdingNo}:${Date.now()}`));
-      await syncRemote();
-      return true;
+      const state = await genesisApi.buy(holdingNo, `genesis-buy:${holdingNo}:${Date.now()}`);
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      applyAccountState(state);
+      return syncRemote(request);
     } catch (error) {
       // Preserve the backend policy/error token for the visible purchase surface.
       // Treating every rejection as "insufficient funds" hides geo-policy and
@@ -688,7 +726,7 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
+    remoteListings, remoteTransactions, remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

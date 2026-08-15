@@ -12,6 +12,8 @@ export interface RiskDisclosureChapter {
 }
 
 export interface RiskDisclosureCurrent {
+  source: "server" | "mock";
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
   jurisdiction: string;
   jurisdictionName: string;
   version: string;
@@ -72,6 +74,12 @@ function chapter(value: unknown, requireEnglish: boolean): RiskDisclosureChapter
 
 function current(value: unknown): RiskDisclosureCurrent {
   const row = record(value);
+  const source = row?.source;
+  const sourceEnvironment = row?.sourceEnvironment;
+  if ((source !== "server" && source !== "mock")
+      || (sourceEnvironment !== "PRODUCTION" && sourceEnvironment !== "SANDBOX")
+      || (source === "mock" && sourceEnvironment !== "SANDBOX")
+      || (source === "server" && sourceEnvironment !== "PRODUCTION")) return invalid();
   const minimumReadingSeconds = Number(row?.minimumReadingSeconds);
   if (!row || typeof row.acknowledged !== "boolean"
       || !Array.isArray(row.chapters) || row.chapters.length !== 7
@@ -84,6 +92,8 @@ function current(value: unknown): RiskDisclosureCurrent {
   const chapters = row.chapters.map((entry) => chapter(entry, languageScope.includes("en")));
   if (chapters.map((entry) => entry.no).sort().join(",") !== "01,02,03,04,05,06,07") return invalid();
   const parsed: RiskDisclosureCurrent = {
+    source,
+    sourceEnvironment,
     jurisdiction: requiredText(row.jurisdiction),
     jurisdictionName: requiredText(row.jurisdictionName),
     version: requiredText(row.version),

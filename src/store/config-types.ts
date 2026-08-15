@@ -181,6 +181,9 @@ export interface ShareChannelDef {
   intentType: ShareIntentType;
   // web 型必填:intent 模板,{link}/{text} 占位(URL-encode 后代入)。
   urlTemplate?: string;
+  // Optional message template. New server responses provide this for enabled
+  // channels; absence remains compatible with legacy local fixtures.
+  textTemplate?: string;
   // App 壳已装检测参数(H5 忽略;v1 仅承载结构,检测在组件层接入)。
   androidPackage?: string;
   iosScheme?: string;
@@ -199,6 +202,9 @@ export interface ShareConfig {
     iosUrl: string;
     androidUrl: string;
     apkUrl: string;
+    version: string;
+    releaseNotes: { zh: string; en: string };
+    source: "official" | "mock" | "unavailable";
   };
 }
 

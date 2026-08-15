@@ -6,7 +6,14 @@
   only the avatar accent colors are decorative.
 -->
 <template>
-  <view class="flex items-center gap-2.5" :style="rootStyle">
+  <view v-if="remoteApiEnabled && remoteCurrent" class="flex items-center gap-2.5" :style="rootStyle">
+    <view class="flex-1 min-w-0 overflow-hidden" style="font-size: 13px">
+      <text style="color: var(--v5-ink-3)">{{ t.store.tickerBought }} </text>
+      <text style="color: var(--v5-brand); font-weight: 500">{{ remoteCurrent.productName }}</text>
+    </view>
+    <text class="font-mono-tabular whitespace-nowrap" style="font-size: 12px; color: var(--v5-ink-4)">{{ verifiedHour }}</text>
+  </view>
+  <view v-else-if="!remoteApiEnabled" class="flex items-center gap-2.5" :style="rootStyle">
     <view class="grid place-items-center" :style="avatarStyle">
       <text>{{ initial }}</text>
     </view>
@@ -20,10 +27,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled, storefrontActivityApi } from "@/api/runtime";
+import type { StorefrontActivityItem } from "@/api/storefront-activity-api";
+import { useApp } from "@/store/app";
+import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
 
 const t = useT();
+const app = useApp();
+const remoteItems = ref<StorefrontActivityItem[]>([]);
+const remoteIndex = ref(0);
+const remoteCurrent = computed(() => remoteItems.value[remoteIndex.value] ?? null);
+const verifiedHour = computed(() => remoteCurrent.value?.occurredAt.replace("T", " ") ?? "");
+const remoteEpoch = createRemoteAccountEpoch(app.accountKey);
 
 interface Purchase { who: string; co: string; prod: string; t: string; color: string }
 
@@ -42,10 +59,46 @@ const purchases: Purchase[] = [
 const i = ref(0);
 let timer: ReturnType<typeof setInterval> | undefined;
 
+function clearRemoteActivity(): void {
+  remoteItems.value = [];
+  remoteIndex.value = 0;
+  if (timer) {
+    clearInterval(timer);
+    timer = undefined;
+  }
+}
+
+function loadRemoteActivity(request = remoteEpoch.snapshot()): void {
+  void storefrontActivityApi.activity(8).then((snapshot) => {
+    if (!remoteEpoch.isCurrent(request)) return;
+    remoteItems.value = snapshot.items;
+    if (snapshot.items.length > 1) {
+      timer = setInterval(() => {
+        if (!remoteEpoch.isCurrent(request)) return;
+        remoteIndex.value = (remoteIndex.value + 1) % remoteItems.value.length;
+      }, 3400);
+    }
+  }).catch(() => {
+    if (remoteEpoch.isCurrent(request)) clearRemoteActivity();
+  });
+}
+
 onMounted(() => {
+  if (remoteApiEnabled) {
+    remoteEpoch.bind(app.accountKey);
+    clearRemoteActivity();
+    loadRemoteActivity();
+    return;
+  }
   timer = setInterval(() => {
     i.value = (i.value + 1) % purchases.length;
   }, 3400);
+});
+watch(() => app.accountKey, (accountKey) => {
+  if (!remoteApiEnabled) return;
+  remoteEpoch.bind(accountKey);
+  clearRemoteActivity();
+  loadRemoteActivity();
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);

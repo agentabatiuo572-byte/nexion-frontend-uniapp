@@ -45,7 +45,6 @@ const LEDGER = {
   "GET /api/account/sessions": "PRD §4.7",
   "POST /api/account/sessions/:id/revoke": "PRD §4.7",
   "POST /api/me/password": "TBD-NAME: PRD §4.6.5 用 POST /api/auth/password/change;本处为旧候选名,接后台时以 auth 为准",
-  "GET /api/pulse/rank-snapshot": "TBD-NAME: PRD 未定义 —— 包 G 排名 24h 快照的候选名(rank-snapshot.ts 注释已标 TBD),PRD 同步时定名",
   "/api/me/*": "PRD §12.2(自身档案读写族,非单一 endpoint)",
 
   // ── config(server-canonical 业务参数)──────────────────────────────
@@ -83,7 +82,8 @@ const LEDGER = {
 
   // ── trial ─────────────────────────────────────────────────────────────
   "GET /api/trial/eligibility": "PRD §9.11a.2",
-  "GET /api/trial/state": "PRD §9.11a.2",
+  "GET /api/trial/state": "HOLD: backend 当前仅公开 /api/trial/eligibility;保留为前端候选读取,未接线前不得当作服务端事实",
+  "/api/trial/state": "HOLD: 同上;注释未带 method 的候选引用",
   "POST /api/trial/start": "PRD §9.11a.2",
   "POST /api/trial/convert": "PRD §9.11a.2 / §9.11e",
   "POST /api/trial/cancel": "PRD §9.11a.2",
@@ -144,6 +144,19 @@ const LEDGER = {
   "/api/app/wallet/sandbox": "NOT-PRD: 沙箱资金档的钱包面,PRD 未定义;仅在 fundsSandboxEnabled 档可达",
   "/api/orders": "PRD §9.11d(单品下单;组合购尚无整单定价契约,见 bundle.vue 注释)",
   "/api/devices/earnings": "TBD-NAME: 设备收益投影,PRD 未单列章节",
+  "/api/product/phase": "BACKEND: AppCanonicalBoundaryController#getProductPhase 已实现;前端 PRD 待同步",
+  "GET /api/product/phase": "BACKEND: AppCanonicalBoundaryController#getProductPhase 已实现;前端 PRD 待同步",
+  "/api/app/network/rank": "BACKEND: AppNetworkRankController 已实现;当前账号排名投影,前端 PRD 待同步",
+  "/api/app/security/account-deletion/cancel": "BACKEND: AppUserSecurityController 已实现;账号注销取消命令,前端 PRD 待同步",
+  "/api/app/trade-in/eligibility": "BACKEND: AppTradeinController 已实现;置换资格权威检查,前端 PRD 待同步",
+  "/api/device/:param/deactivate-after-task": "BACKEND: AppCanonicalBoundaryController 已实现;设备任务后停用命令,前端 PRD 待同步",
+  "/api/events/:param/spin/state": "BACKEND: AppGrowthEngagementController 已实现;活动转盘状态读取,前端 PRD 待同步",
+  "/api/genesis/points": "BACKEND: AppGenesisPointsController 已实现;创世积分投影,前端 PRD 待同步",
+  "/api/orders/:param/cancel": "BACKEND: AppOrderCommandController 已实现;订单取消命令,前端 PRD 待同步",
+  "/api/app/deposits/vietqr/receipts": "BACKEND: AppVietQrIntentController 已实现;VietQR 回执读取,前端 PRD 待同步",
+  "/api/public/referrals/:param/preview": "BACKEND: PublicSponsorPreviewController 已实现;公开推荐预览,前端 PRD 待同步",
+  "/api/storefront/activity": "BACKEND: AppStorefrontActivityController 已实现;商城活动流,前端 PRD 待同步",
+  "/api/storefront/products/:param/social-proof": "BACKEND: AppStorefrontActivityController 已实现;商品社会证明快照,前端 PRD 待同步",
   "/api/config/phone-tiers": "TBD-NAME: 机型档位配置,PRD 未单列章节",
   "POST /api/faucet/sign-in": "PRD §11.12",
   "POST /api/nex/sign-in": "TBD-NAME: PRD 用 POST /api/faucet/sign-in;本处为旧候选名,接后台时以 faucet 为准",

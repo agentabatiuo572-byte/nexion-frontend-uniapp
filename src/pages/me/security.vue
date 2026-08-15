@@ -109,8 +109,13 @@
         <view v-if="remoteApiEnabled && !deletionPending" :style="pwdFormStyle">
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </view>
+        <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
+          :style="revokeAllRowStyle" role="button" tabindex="0" aria-label="Cancel deletion request"
+          @click="handleCancelAccountDeletion">
+          <text :style="revokeAllLabelStyle">Cancel deletion request</text>
+        </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ deletionStatus.status === 'BLOCKED' ? `Deletion blocked: ${deletionStatus.blockReason ?? deletionStatus.reason ?? 'pending financial or order settlement'}` : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
   </AppChassis>
 </template>
@@ -158,8 +163,9 @@ const session = useSession();
 const remoteSecurity = ref<SecurityState | null>(null);
 const deletionStatus = ref<AccountDeletionStatus>({ status: "NONE" });
 const deletionPending = computed(() => deletionStatus.value.status !== "NONE"
-  && deletionStatus.value.status !== "CANCELLED"
-  && deletionStatus.value.status !== "COMPLETED");
+  && (deletionStatus.value.status === "REQUESTED" || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED"));
+const deletionCanCancel = computed(() => deletionStatus.value.status === "REQUESTED"
+  || deletionStatus.value.status === "IN_REVIEW" || deletionStatus.value.status === "BLOCKED");
 const securityBusy = ref(false);
 const twoFactorPassword = ref("");
 const deletionPassword = ref("");
@@ -487,6 +493,30 @@ async function handleDeleteAccount() {
       rebindAccountScopedStores("default");
       uni.reLaunch({ url: "/pages/login/login", fail: () => {} });
     }
+  } finally {
+    securityBusy.value = false;
+  }
+}
+
+async function handleCancelAccountDeletion() {
+  if (!remoteApiEnabled || !deletionCanCancel.value || securityBusy.value) return;
+  const ok = await uiConfirm({
+    title: "Cancel deletion request",
+    message: "This cancels the current request only. You can submit a new request later.",
+    danger: true,
+    confirmLabel: "Cancel request",
+  });
+  if (!ok) return;
+  securityBusy.value = true;
+  try {
+    const current = deletionStatus.value;
+    if (current.status === "NONE") return;
+    const key = `app-security:account-deletion-cancel:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+    deletionStatus.value = await accountApi.cancelAccountDeletion(current.version, key);
+    toast.success("Deletion request cancelled");
+  } catch (cause) {
+    toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_CANCEL_FAILED");
+    await loadRemoteSecurity();
   } finally {
     securityBusy.value = false;
   }

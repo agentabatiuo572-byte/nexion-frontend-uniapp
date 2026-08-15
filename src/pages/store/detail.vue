@@ -22,8 +22,16 @@
            (useSetPageHeader below) so they pin on scroll + frost content,
            mirroring the prototype's SetPageHeader. -->
 
+      <view v-if="catalogStatus === 'loading'" class="text-center" style="padding: 40px 16px">
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.catalogLoadingTitle }}</text>
+      </view>
+
+      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 40px 16px">
+        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.catalogErrorTitle }}</text>
+      </view>
+
       <!-- Product not found — plain floor text (matches checkout / order-detail). -->
-      <view v-if="!product" class="text-center" style="padding: 40px 16px">
+      <view v-else-if="!product" class="text-center" style="padding: 40px 16px">
         <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.coProductNotFound }}</text>
       </view>
 
@@ -188,7 +196,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted, type CSSProperties } from "vue";
-import { onLoad, onHide } from "@dcloudio/uni-app";
+import { onLoad, onHide, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SectionHeader from "@/components/store/section-header.vue";
 import ProductRender from "@/components/store/product-render.vue";
@@ -199,21 +207,30 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { getProduct, type Product } from "@/mock/products";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isPhaseReached } from "@/store/product-phase";
+import { isProductAvailable } from "@/store/product-availability";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { useStickyCTA } from "@/store/sticky-cta-bar";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { refreshServerProductPhase } from "@/store/server-product-phase";
 
 const t = useT();
 const phase = useProductPhase();
 
 const id = ref("");
-onLoad((options) => {
+onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
 });
 
+onShow(() => {
+  void refreshServerProductPhase(true);
+  void refreshProductCatalog(true);
+});
+
+const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
 const isShare = computed(() => product.value?.tier === "Share");
 // Localized SKU copy (tagline / ribbon badge). Empty strings until `id` resolves —
@@ -227,8 +244,8 @@ const copy = computed(() =>
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
   const p = product.value;
-  if (!p || !p.unlocksAtPhase) return false;
-  return !isPhaseReached(phase.value, p.unlocksAtPhase);
+  if (!p) return false;
+  return !isProductAvailable(p, phase.value);
 });
 
 // Per-user purchase gate (等级门 + 锁额) — drives the sticky Buy CTA below.

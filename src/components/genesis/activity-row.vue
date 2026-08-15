@@ -13,10 +13,10 @@
     </view>
     <view class="flex-1 min-w-0">
       <view class="flex items-center" style="gap: 6px">
-        <text :style="tokenStyle">#{{ e.tokenId }}</text>
+        <text v-if="e.tokenId !== undefined" :style="tokenStyle">#{{ e.tokenId }}</text>
         <text :style="kindBadgeStyle">{{ kindLabel }}</text>
       </view>
-      <text class="block truncate" :style="addrStyle">{{ fromLabel }} → {{ toLabel }}</text>
+      <text class="block truncate" :style="addrStyle">{{ e.description ?? `${fromLabel} → ${toLabel}` }}</text>
     </view>
     <view class="text-right shrink-0">
       <text v-if="e.priceUSDT !== undefined" class="block tabular-nums" :style="priceStyle">${{ priceText }}</text>
@@ -36,11 +36,12 @@ import { fmt } from "@/i18n/format";
 export interface ActivityEvent {
   id: string;
   kind: "sale" | "list" | "transfer" | "mint";
-  tokenId: number;
+  tokenId?: number;
   priceUSDT?: number;
   from: string;
   to: string;
   ts: number;
+  description?: string;
 }
 
 const props = defineProps<{ e: ActivityEvent; isLast: boolean }>();

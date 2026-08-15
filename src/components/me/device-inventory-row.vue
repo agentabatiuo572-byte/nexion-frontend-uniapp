@@ -35,7 +35,7 @@
         <text :style="tradeinCtaStyle">{{ tradeinCtaLabel }}</text>
       </view>
     </view>
-    <view class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !disabled }" :style="actionStyle" @click="onAction">
+    <view class="w-full flex items-center justify-center transition" :class="{ 'active:bg-[var(--v5-surface-2)]': !actionDisabled }" :style="actionStyle" @click="onAction">
       <svg v-if="active" width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15" /><path d="M6.16 6.16a9 9 0 1 0 12.68 12.68" /><path d="M12 2v4" /><line x1="2" x2="22" y1="2" y2="22" /></svg>
       <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" :stroke="actionColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></svg>
       <text :style="actionLabelStyle">{{ actionLabel }}</text>
@@ -56,6 +56,7 @@ const props = withDefaults(
     device: Device;
     active: boolean;
     disabled?: boolean;
+    actionDisabled?: boolean;
     activateLabel: string;
     deactivateLabel: string;
     slotsFullLabel: string;
@@ -65,22 +66,23 @@ const props = withDefaults(
     tradeinCtaLabel?: string;
     tradeinDisabledText?: string;
   }>(),
-  { disabled: false },
+  { disabled: false, actionDisabled: false },
 );
 
 const emit = defineEmits<{ (e: "toggle"): void; (e: "tradein"): void; (e: "ladder"): void }>();
 
 const isPhone = computed(() => props.device.kind === "phone");
+const actionDisabled = computed(() => props.disabled || props.actionDisabled);
 const iconColor = computed(() => (props.active ? "var(--v5-brand)" : "var(--v5-ink-3)"));
 const actionColor = computed(() =>
-  props.disabled ? "var(--v5-ink-4)" : props.active ? "var(--v5-brand-2)" : "var(--v5-brand)",
+  actionDisabled.value ? "var(--v5-ink-4)" : props.active ? "var(--v5-brand-2)" : "var(--v5-brand)",
 );
 const actionLabel = computed(() =>
   props.active ? props.deactivateLabel : props.disabled ? props.slotsFullLabel : props.activateLabel,
 );
 
 function onAction() {
-  if (props.disabled) return;
+  if (actionDisabled.value) return;
   emit("toggle");
 }
 

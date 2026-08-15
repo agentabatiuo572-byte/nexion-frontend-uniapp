@@ -62,7 +62,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
   const auth = useAuth();
   const app = useApp();
   const session = useSession();
-  const sponsorship = useSponsorship();
+  const sponsorship = remoteApiEnabled ? null : useSponsorship();
   const failRemoteCompletion = (error: CompleteSignInResultError): CompleteSignInResult => {
     if (remoteApiEnabled) {
       if (typeof options.serverSessionRevision === "number") {
@@ -142,7 +142,7 @@ export function completeSignIn(options: CompleteSignInOptions): CompleteSignInRe
     if (!readAccountSessionRecords(options.identity).some((record) => record.sessionId === session.sessionId)) {
       return abortSignIn();
     }
-    if (options.sponsorCode && !sponsorship.bind(options.sponsorCode)) {
+    if (!remoteApiEnabled && options.sponsorCode && !sponsorship?.bind(options.sponsorCode)) {
       return abortSignIn();
     }
     if (idempotencyKey) {

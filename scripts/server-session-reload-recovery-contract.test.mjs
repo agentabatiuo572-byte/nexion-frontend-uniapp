@@ -22,6 +22,8 @@ test("a refreshed server-mode account trace goes to login with a recoverable exp
   assert.match(app, /let pendingServerSessionRecovery = false/);
   assert.match(app, /pendingServerSessionRecovery = requiresServerSessionRecovery/);
   assert.match(app, /if \(remoteApiEnabled && pendingServerSessionRecovery\)[\s\S]*?\/pages\/login\/login\?notice=server-session-reload/);
+  assert.match(app, /if \(remoteApiEnabled && pendingServerSessionRecovery\)[\s\S]*?serverSession[\s\S]*?auth\.isAuthenticated[\s\S]*?auth\.accountId === `user:\$\{serverSession\.user\.userId\}`[\s\S]*?pendingServerSessionRecovery = false/,
+    "a successful re-login must consume a stale recovery latch before its next guard tick");
   assert.match(app, /route\.startsWith\("pages\/login\/"\)\) pendingServerSessionRecovery = false/);
   assert.match(app, /if \(isAuthWhitelisted\(route\)\)[\s\S]*?route\.startsWith\("pages\/login\/"\)[\s\S]*?if \(remoteApiEnabled && pendingServerSessionRecovery\)/,
     "login must consume the recovery latch before any retrying redirect can run");

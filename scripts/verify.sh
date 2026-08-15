@@ -978,80 +978,23 @@ if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/a
 else
   ok "SPEC-7 settle NEX route goes through buckets"
 fi
-# 双端参数 key parity: uniapp 配置契约 ↔ admin 参数寄存器(DR-7 结构一致)
-ADMIN_CFG="$ADMIN_ROOT/lib/mock/admin/compute-config.ts"
-if [ ! -f "$ADMIN_CFG" ]; then
-  bad "SPEC-7 parity: admin compute-config.ts not found at $ADMIN_CFG"
+# 双端配置契约 parity:当前真实 App platform-config/API ↔ PC server-canonical clients。
+# 旧 admin mock compute-config.ts 已从真实 PC 删除,禁止以不存在的 mock 或默认值伪造 parity。
+PLATFORM_CONFIG_PARITY="$ADMIN_ROOT/scripts/platform-config-contract-parity.mjs"
+if [ ! -f "$PLATFORM_CONFIG_PARITY" ]; then
+  bad "SPEC-7 platform-config/API parity script not found at $PLATFORM_CONFIG_PARITY"
 else
-  parity_miss=""
-  for k in freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom \
-           pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice \
-           maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding \
-           minWithdrawableUsdt sameAddressRoute firstWithdrawalManual newAddressHoldHours lockMode \
-           serverDeviceId ipBucket withdrawAddress paymentInstrument sponsor uaFingerprint signupTiming \
-           weakSignalClusterThreshold; do
-    grep -q "$k" src/store/config-types.ts || parity_miss="${parity_miss}uniapp:$k "
-    grep -q "$k" "$ADMIN_CFG" || parity_miss="${parity_miss}admin:$k "
-  done
-  if [ -z "$parity_miss" ]; then
-    ok "SPEC-7 param key parity (uniapp config-types ↔ admin compute-config)"
-  else
-    bad "SPEC-7 param key parity missing: $parity_miss"
+  parity_arg="$PLATFORM_CONFIG_PARITY"
+  app_root_arg="$PROJECT_DIR"
+  if [ "$($NODE_BIN -p 'process.platform' 2>/dev/null)" = "win32" ] && command -v wslpath >/dev/null 2>&1; then
+    parity_arg=$(wslpath -w "$PLATFORM_CONFIG_PARITY")
+    app_root_arg=$(wslpath -w "$PROJECT_DIR")
   fi
-  # 双端参数「值」parity: uniapp seed ↔ admin defaultVal(2026-07-14 加焊:K1 双渲染源值漂移
-  # 1/0.82≠2/0.7 的同类回归——键在但值抄错。riskCluster 11 键 + otpGate 数值 5 键逐一比对字面值;
-  # 红测已验能抓真漂移。07-15 因整树 reset 丢失后重放(feedback_cross_repo_value_parity)。
-  # z1 判决 A(2026-08-10):captchaAlwaysScenes 已出种子进 compat 运行时默认,由
-  # selfcheck-config-compat 对合成配置行为断言;键清单收成下面两个变量 —— 值循环与
-  # 覆盖度门共用同一份(单源)。admin 侧数组参数登记义务已记 HANDOFF。
-  SPEC7_RISKCLUSTER_KEYS="freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding"
-  SPEC7_OTPGATE_KEYS="resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds"
-  value_mismatch=""
-  for k in $SPEC7_RISKCLUSTER_KEYS $SPEC7_OTPGATE_KEYS; do
-    uni_v=$(grep -oE "\b$k: [^,]+" src/mock/platform-config.ts | head -1 | sed "s/^$k: //" | tr -d '\r')
-    # 尾逗号锚定对象字面量条目;类型声明的 union 行(key: "X" | ...)无逗号,天然排除(红测抓过 resendSeconds 撞 union 首键)
-    adm_v=$(grep -A6 "key: \"$k\"," "$ADMIN_CFG" | grep -m1 -oE "defaultVal: [^,]+" | sed "s/^defaultVal: //" | tr -d '\r')
-    if [ -z "$uni_v" ] || [ -z "$adm_v" ]; then
-      value_mismatch="${value_mismatch}${k}(extract-fail:uni=${uni_v:-none} admin=${adm_v:-none}) "
-    elif [ "$uni_v" != "$adm_v" ]; then
-      value_mismatch="${value_mismatch}${k}(uni=$uni_v!=admin=$adm_v) "
-    fi
-  done
-  if [ -z "$value_mismatch" ]; then
-    ok "SPEC-7 param value parity (uniapp seed ↔ admin defaultVal, 16 keys: riskCluster 11 + otpGate 数值 5;captchaAlwaysScenes 由 config-compat 行为门看住)"
+  if NEXION_UNIAPP_ROOT="$app_root_arg" "$NODE_BIN" "$parity_arg" > /tmp/spec7-platform-config-parity.log 2>&1; then
+    ok "SPEC-7 platform-config/API parity (real App platform config + PC E6/K1/K2 contracts)"
   else
-    bad "SPEC-7 param value parity drift: $value_mismatch"
-  fi
-  # 值 parity 覆盖度自守(z1 判决 A:硬计数改集合等式,与循环键清单同源):种子块键集
-  # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
-  # 都在这里红(2026-07-14 对抗审查 D 项缺口的构造性版本)。
-  # 值起始 [^{] 过滤:块首行「riskCluster: {」自己也长得像键,不滤会多出幽灵键(红测实锤)。
-  # 🔴 但它同时把**对象值的键**一起滤掉了(z1 R2 对抗审计 P1-13):新增
-  #    `deviceFingerprint: { salt, ttlDays }` 这类参数在两侧键集里都看不见 → 静默不进
-  #    值 parity 循环,正是 captchaAlwaysScenes 那次的同型。故再加一道:块内**所有**
-  #    顶层键(含对象值)必须 = 循环键集 ∪ 显式登记的对象值键(下面登记表当前为空)。
-  SPEC7_OBJECT_VALUE_KEYS=""   # 形如 "deviceFingerprint tierWeights";登记即须写明谁在守它的值
-  seed_rc_keys=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
-  seed_og_keys=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
-  seed_all_keys=$(sed -n '/riskCluster: {/,/},/p;/otpGate: {/,/},/p' src/mock/platform-config.ts \
-    | grep -E '^\s+\w+:' | grep -oE '^\s+\w+:' | tr -d ' :\r' | grep -vE '^(riskCluster|otpGate)$' | sort -u)
-  loop_all_keys=$(printf '%s\n%s\n%s\n' "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" "$SPEC7_OBJECT_VALUE_KEYS" | tr ' ' '\n' | grep -v '^$' | sort -u)
-  unwatched=$(comm -23 <(echo "$seed_all_keys") <(echo "$loop_all_keys"))
-  # 🔴 空集必红:抽不到键(文件读不到 / 块形状变了)时上面的差集恒空 → 会假绿。
-  #    这条守卫是自己红测时发现的:cwd 漂了一次,判据就静默全过。
-  if [ "$(echo "$seed_all_keys" | grep -c .)" -lt 10 ]; then
-    bad "SPEC-7 参数键集抽取失败(只抽到 $(echo "$seed_all_keys" | grep -c .) 个,应 ≥10)—— 判据失效必红,禁空集全过"; fails=1
-  elif [ -z "$unwatched" ]; then
-    ok "SPEC-7 无脱管参数(含对象值键:种子顶层键集 ⊆ 循环键集 ∪ 对象值登记表)"
-  else
-    bad "SPEC-7 有参数脱离值 parity 看管(多半是对象/数组值的新键,判据的历史盲区):$(echo $unwatched)——补进循环或登记进 SPEC7_OBJECT_VALUE_KEYS 并写明谁守它的值"
-  fi
-  loop_rc_keys=$(echo "$SPEC7_RISKCLUSTER_KEYS" | tr ' ' '\n' | sort)
-  loop_og_keys=$(echo "$SPEC7_OTPGATE_KEYS" | tr ' ' '\n' | sort)
-  if [ -n "$seed_rc_keys" ] && [ -n "$seed_og_keys" ] && [ "$seed_rc_keys" = "$loop_rc_keys" ] && [ "$seed_og_keys" = "$loop_og_keys" ]; then
-    ok "SPEC-7 value parity coverage(种子键集==循环键集:riskCluster $(echo "$seed_rc_keys" | grep -c .) + otpGate $(echo "$seed_og_keys" | grep -c .))"
-  else
-    bad "SPEC-7 value parity coverage 键集不等 —— seed(rc)=[$(echo $seed_rc_keys)] loop(rc)=[$(echo $loop_rc_keys)] seed(og)=[$(echo $seed_og_keys)] loop(og)=[$(echo $loop_og_keys)]"
+    bad "SPEC-7 platform-config/API parity failed — current App $PROJECT_DIR and PC $ADMIN_ROOT must expose the same server-owned contract"
+    tail -25 /tmp/spec7-platform-config-parity.log | sed 's/^/        /'
   fi
 fi
 # ── FEAT-WD02 网络确认费逐键 parity ──
@@ -1856,7 +1799,7 @@ trial02_i18n_legacy_copy
 # API(spec ④:poll 的 grace→ended 只翻状态;转化侧效应只住 checkout,P-031 同向)。
 trial02_machine_invariants() {
   local f="src/store/free-trial.ts"
-  if grep -qE 'function convert\(\)' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares convert() (1 hit)";
+  if grep -qE 'async[[:space:]]+function[[:space:]]+convert[[:space:]]*\(' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares async convert() (1 hit)";
   else bad "TRIAL02 free-trial.ts lost convert() — conversion cannot close the machine"; fi
   local money
   money=$(grep -nE "debitBalance|addDevice|bills\.add|creditBalance|creditNex" "$f" 2>/dev/null | head -5)
@@ -2039,7 +1982,11 @@ const tok=process.argv[1];
 //   paymentRail 枚举值(trial-api.ts:110 拿它**校验回包**),`__NEXION_TRUSTED_TASK_PROOF__`
 //   是原生壳注入的全局键 —— 两个都是**对方定义的名字**,客户端单方面改拼写 = 契约当场对不上。
 //   等后端改名再同步。判据只放这两个**具体标识符**,不放宽成「凡大写就算契约」。
-const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
+// Product names are the one user-visible exception: NexionBox S1 and NexionBox
+// Pro v2 are load-bearing catalog fixture names for the server product contract.
+// Keep this exact (whole product name) rather than allowing the bare Nexion token;
+// a normal brand string must still fail the rebrand gate.
+const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
@@ -2192,15 +2139,21 @@ platform_stats_anchor() {
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
-  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。**代码面**出现即红。
-  #   计数剥注释 —— 族B 注释自己就点名这个符号解释为什么禁,不剥的话哨兵抓自己的说明书
-  #   (首跑实锤:这条禁令与上面 pin 同分钟写就,上面剥了、这里没剥,P2-10 同型在相邻行重犯)。
+  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。
+  #   这里不能再把字段名本身当成违规:服务端 publicStats 新投影可以合法携带
+  #   `paidCumulativeNowOf`,而客户端只读该投影并不产生历史回退。只拦两种真正的
+  #   本地派生:platform-stats.ts 自己定义同名计算器,或任意调用把 cfg/config/
+  #   publicStats 当作该计算器输入。这样 server projection 过门,本地配置公式仍红。
+  if grep -qE '(^|[[:space:]])(function|const)[[:space:]]+paidCumulativeNowOf[[:space:]]*[=(]' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: platform-stats.ts 不得定义 paidCumulativeNowOf —— 累计支付只能由服务端投影"; fails=1
+  fi
+  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^|[^:])//.*$|\1|' {} + 2>/dev/null \
+      | grep -qE 'paidCumulativeNowOf[[:space:]]*\([^)]*(cfg|config|publicStats)'; then
+    bad "platform-anchor: paidCumulativeNowOf 不得从本地 cfg/config/publicStats 派生"; fails=1
+  fi
   # R3 P2:fail-open 补 witness —— 管道故障/空扫描时禁令会静默绿;扫描数必须够量才算判过
   _pcno_scanned=$(find src -type f \( -name '*.ts' -o -name '*.vue' \) 2>/dev/null | wc -l)
   if [ "${_pcno_scanned:-0}" -lt 50 ]; then bad "platform-anchor: 禁令哨兵扫描面异常($_pcno_scanned 文件)——判据失效不许静默过"; fails=1; fi
-  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^\|[^:])//.*$|\1|' {} + 2>/dev/null | grep -q "paidCumulativeNowOf"; then
-    bad "platform-anchor: paidCumulativeNowOf 出现在代码面 —— 积分类禁跟配置,见 platform-stats 族B 注"; fails=1
-  fi
   # (4b) z1 判决 A · 判据反转(2026-08-10):819a6da 把 publicStats 种子移出 mock,
   #      c37e642 把 compat 默认清零并声明「Deliberately invalid sentinel …
   #      Never replace it with plausible data」—— H9 在服务端投影到达前必须保持不可用。
@@ -2498,9 +2451,9 @@ NODE
 }
 home_task_carousel_contract
 
-# ── 跨仓采样证据门:pages.json 每个页面必须在 admin 仓有 runtime 采样证据 ──
-# 单源 = ../Nexion-admin-prototype/scripts/uniapp-port-coverage-audit.mjs(直接调用,
-# 不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
+# ── 跨仓采样证据门:pages.json 每个页面必须在真实 PC 仓有 runtime 采样证据 ──
+# 单源 = ../nexion-ops-console/scripts/uniapp-port-coverage-audit.mjs(直接调用,
+# 不镜像豁免清单/逻辑,防跨仓 parity 漂移);PC 仓不存在(独立打包/CI)则跳过。
 # 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
 cross_repo_sampling_gate() {
   local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
@@ -2517,7 +2470,7 @@ cross_repo_sampling_gate() {
   if "$NODE_BIN" "$audit_arg" > /tmp/uniapp-port-coverage-audit.log 2>&1; then
     ok "cross-repo sampling evidence (admin uniapp-port-coverage-audit findings=0)"
   else
-    bad "page(s) lack admin-side sampling evidence — 去 ../Nexion-admin-prototype 把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
+    bad "page(s) lack PC-side sampling evidence — 去 ../nexion-ops-console 把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
     tail -25 /tmp/uniapp-port-coverage-audit.log | sed 's/^/        /'
   fi
 }

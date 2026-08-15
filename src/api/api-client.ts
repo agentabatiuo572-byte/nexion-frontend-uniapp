@@ -239,7 +239,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     const authenticated = apiRequest.authenticated !== false;
     let session = options.vault.read();
     if (authenticated && !session?.accessToken) {
-      session = await refreshSession();
+      // A protected prefetch started from Login has no authority to mutate the
+      // global auth lifecycle. Treat the missing vault as a local caller-state
+      // error; onUnauthorized is reserved for a session that existed and was
+      // rejected/expired by the server. This also prevents a stale pre-login
+      // promise from clearing a newer successful login.
+      throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
     }
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -288,7 +293,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     }
     const authenticated = apiRequest.authenticated !== false;
     let session = options.vault.read();
-    if (authenticated && !session?.accessToken) session = await refreshSession();
+    if (authenticated && !session?.accessToken) {
+      throw new ApiError({ kind: "auth", message: "AUTH_SESSION_REQUIRED" });
+    }
     const headers: Record<string, string> = {};
     if (authenticated && session?.accessToken) {
       headers.Authorization = `${session.tokenType || "Bearer"} ${session.accessToken}`;

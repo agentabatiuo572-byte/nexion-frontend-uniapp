@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -76,6 +76,8 @@ import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
 import { postMoneyBillsOnce } from "@/lib/money-receipt";
 import { useEventQuest } from "@/store/event-quest";
+import { useApp } from "@/store/app";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import { useLuckySpin } from "@/store/lucky-spin";
 import { toast } from "@/store/ui";
 import { EVENTS, type EventStatus, type NexEvent } from "@/mock/events";
@@ -88,9 +90,11 @@ const TABS: TabId[] = ["all", "ongoing", "upcoming", "joined", "ended"];
 const t = useT();
 const eventQuest = useEventQuest();
 const luckySpin = useLuckySpin();
+const app = useApp();
 
 const tab = ref<TabId>("ongoing");
 const remoteEvents = ref<CanonicalEvent[]>([]);
+const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
 
 function remoteEventView(event: CanonicalEvent): NexEvent {
   const tintByKind: Record<CanonicalEvent["kind"], string> = {
@@ -116,15 +120,28 @@ function remoteEventView(event: CanonicalEvent): NexEvent {
   };
 }
 
-async function loadRemoteEvents() {
+async function loadRemoteEvents(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()) {
   if (!remoteApiEnabled) return;
   try {
-    remoteEvents.value = (await eventsApi.state()).events;
+    const snapshot = await eventsApi.state();
+    if (!remoteAccountEpoch.isCurrent(request)) return;
+    remoteEvents.value = snapshot.events;
   } catch {
-    remoteEvents.value = [];
+    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = [];
   }
 }
-onMounted(() => { void loadRemoteEvents(); });
+onMounted(() => {
+  if (!remoteApiEnabled) return;
+  remoteAccountEpoch.bind(app.accountKey);
+  remoteEvents.value = [];
+  void loadRemoteEvents();
+});
+watch(() => app.accountKey, (accountKey) => {
+  if (!remoteApiEnabled) return;
+  remoteAccountEpoch.bind(accountKey);
+  remoteEvents.value = [];
+  void loadRemoteEvents();
+});
 
 // Enrich each event with live join/claim state from the store.
 const enrichedEvents = computed<EnrichedEvent[]>(() =>

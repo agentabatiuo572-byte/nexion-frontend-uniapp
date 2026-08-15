@@ -15,7 +15,9 @@ function write(value: PendingTable): void {
   uni.setStorageSync(STORAGE_KEY, value);
 }
 
-function slot(accountKey: string, operation: "activate" | "deactivate", deviceId: string, rowVersion: number): string {
+type DeviceCommandOperation = "activate" | "deactivate" | "deactivate-after-task";
+
+function slot(accountKey: string, operation: DeviceCommandOperation, deviceId: string, rowVersion: number): string {
   const account = accountKey.trim().toLowerCase();
   if (!account || !deviceId || !Number.isSafeInteger(rowVersion) || rowVersion < 0) {
     throw new Error("DEVICE_COMMAND_SCOPE_INVALID");
@@ -23,7 +25,7 @@ function slot(accountKey: string, operation: "activate" | "deactivate", deviceId
   return JSON.stringify([account, operation, deviceId, rowVersion]);
 }
 
-function nextKey(operation: "activate" | "deactivate"): string {
+function nextKey(operation: DeviceCommandOperation): string {
   const id = globalThis.crypto?.randomUUID?.()
     ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   return `app-device:${operation}:${id}`;
@@ -31,7 +33,7 @@ function nextKey(operation: "activate" | "deactivate"): string {
 
 export function acquireDeviceCommandKey(
   accountKey: string,
-  operation: "activate" | "deactivate",
+  operation: DeviceCommandOperation,
   deviceId: string,
   rowVersion: number,
 ): string {
@@ -45,7 +47,7 @@ export function acquireDeviceCommandKey(
 
 export function finishDeviceCommand(
   accountKey: string,
-  operation: "activate" | "deactivate",
+  operation: DeviceCommandOperation,
   deviceId: string,
   rowVersion: number,
 ): void {

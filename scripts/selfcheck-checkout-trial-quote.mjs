@@ -142,7 +142,7 @@ const netPriceSlice = sliceStatement(coSrc, "const netPrice = computed(", "check
 const PAY_END = "if (ti) {";
 const paySlice = sliceRange(coSrc, "const payNow = mockServerNow();", PAY_END, "checkout.vue")
   .slice(0, -PAY_END.length);
-if (!paySlice.includes("freeTrial.convert()")) die("checkout.vue 结算切片里没有 convert() —— 切片区间与实现已经对不上");
+if (!/freeTrial\.convert\(\s*p\.id\s*\)/.test(paySlice)) die("checkout.vue 结算切片里没有 convert(p.id) —— 切片区间与实现已经对不上");
 
 // ── 装配可执行模块 ──
 const assembled = `
@@ -163,7 +163,7 @@ ${noTrialSlice}
 ${quoteFnSlice}
 ${viewSlice}
 ${netPriceSlice}
-  function settle(ctx) {
+  async function settle(ctx) {
     const { trialQuote, quotedTotal, p, discount, ti, isCard, step } = ctx;
 ${paySlice}
     return { charged: true, chargeTotal, net, fee, applyTrial, promo,
@@ -207,7 +207,7 @@ const T = {
  * 展示侧数字 + 结算结果。clockAt = 展示时刻,payClockAt = 支付时刻(模拟
  * 「确认页看到 → 几秒后落单」),两者可分别越界。
  */
-function bench(opts) {
+async function bench(opts) {
   const {
     row, clockAt, payClockAt = clockAt, balance = 100_000, voucher = 0, tradein = 0,
     isCard = false, convertReturns = null, productId = "stellarbox-s1",
@@ -246,12 +246,12 @@ function bench(opts) {
       // 看守:自取 server now → advanceTo → 非 active/grace 即 false)。这里复刻同一
       // 判据,并允许固定靶强制返回 false 以测「状态机拒绝」这条路径。
       convert: () => {
-        if (convertReturns !== null) return convertReturns;
+        if (convertReturns !== null) return { ok: convertReturns };
         const r = resolveTrialAt(store.row, payClock, CFG);
-        if (r.status !== "active" && r.status !== "grace") return false;
+        if (r.status !== "active" && r.status !== "grace") return { ok: false, reason: "used" };
         store.row = { ...r, status: "converted", finishedAt: payClock };
         store.converted = true;
-        return true;
+        return { ok: true };
       },
     },
     // 本 harness 验的是**本地报价链**;服务端权威抵扣报价(canonicalQuote)另有契约覆盖。
@@ -280,7 +280,7 @@ function bench(opts) {
   //    所以展示侧读数必须在此之前取完 —— computed shim 无缓存,读一次算一次)──
   payClock = payClockAt;
   const step = { value: "confirmed" };
-  const out = api.settle({
+  const out = await api.settle({
     trialQuote: snapshot,
     quotedTotal: shownTotal,
     p: productPrice === null ? PRODUCT : { ...PRODUCT, price: productPrice },
@@ -295,7 +295,7 @@ function bench(opts) {
 
 // ── ② 正常 grace 内 → 按展示净额扣款(基线:守卫不能误伤正常单)──
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 5 * D });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 5 * D });
   // grace 冻结影子 21 → offset 21(未触 50 上限);促销 min(649*0.15, 20) = 20
   check("quote", "②grace 内:模式生效,促销 20 / 抵扣 21 全部出自单次解析",
     b.mode === true && b.snapshot.promo === 20 && b.snapshot.offsetUSD === 21 && b.snapshot.remainderUSD === 0);
@@ -310,7 +310,7 @@ function bench(opts) {
 // ── ① 宽限期刚过、poll 未到 → 拒单,零扣款(本轮 P0 固定靶)──
 {
   // 展示时刻还在 grace 内(报价含抵扣),支付时刻已越过 graceEndsAt。
-  const b = bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000 });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000 });
   check("quote", "①展示时刻仍在 grace:报价含促销 + 抵扣", b.snapshot.applied === true && b.shownNet === 608);
   check("settle", "①支付时刻已越界 → 拒单(未返回成交)", b.out === undefined);
   check("settle", "①拒单时零扣款(debitBalance 一次都没调)", b.debits.length === 0);
@@ -319,7 +319,7 @@ function bench(opts) {
   check("settle", "①拒单时试用未被转化(状态机没被烧掉)", b.converted === false);
   // 同一行、同一支付时刻,展示侧也已收回抵扣(≤1s ticker)——不再出现
   // 「模式说还能转化、影子说已结束」的互斥答案。
-  const after = bench({ row: rowGrace, clockAt: T0 + 10 * D + 1000 });
+  const after = await bench({ row: rowGrace, clockAt: T0 + 10 * D + 1000 });
   check("quote", "①越界后展示侧同步收回:模式 false、促销/抵扣归零、净额回全价 649",
     after.mode === false && after.snapshot.promo === 0 && after.snapshot.offsetUSD === 0 && after.shownNet === 649);
 }
@@ -327,14 +327,14 @@ function bench(opts) {
 // ── ①c 隔离越界守卫本身:强制状态机误放行(convert 返回 true),守卫若被摘掉
 //    就会按报价把钱扣走 —— 这条靶专盯那道守卫,不靠 convert 兜底 ──
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000, convertReturns: true });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000, convertReturns: true });
   check("settle", "①c 状态机误放行时,越界解析仍独立拒单零扣款",
     b.out === undefined && b.debits.length === 0 && b.step === "select-payment");
 }
 
 // ── ①b 离线跨很久(级联):resolver 一次到 ended,同样拒单 ──
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 90 * D });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 9 * D, payClockAt: T0 + 90 * D });
   check("settle", "①b 离线跨 80 天:级联到 ended 仍拒单零扣款",
     b.out === undefined && b.debits.length === 0 && b.step === "select-payment");
 }
@@ -343,10 +343,10 @@ function bench(opts) {
 {
   // 649 − 券 400 − 旧机 208 − 促销 20 − 抵扣 21 = 0
   const zeroOpts = { row: rowGrace, voucher: 400, tradein: 208 };
-  const okZero = bench({ ...zeroOpts, clockAt: T0 + 5 * D });
+  const okZero = await bench({ ...zeroOpts, clockAt: T0 + 5 * D });
   check("quote", "③$0 路径:展示净额确为 0(直跳完成的判据来源)", okZero.shownNet === 0 && okZero.shownTotal === 0);
   check("settle", "③$0 路径正常时成交且扣款额为 0", okZero.out && okZero.out.chargeTotal === 0);
-  const badZero = bench({ ...zeroOpts, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000 });
+  const badZero = await bench({ ...zeroOpts, clockAt: T0 + 9 * D, payClockAt: T0 + 10 * D + 1000 });
   check("settle", "③$0 路径越界 → 同样拒单,绝不出现「展示 $0 却扣钱」",
     badZero.out === undefined && badZero.debits.length === 0 && badZero.step === "select-payment");
   // 缺陷复现基线:旧实现在此窗口会算出 net = 649−400−208−20−0 = 21 并扣走。
@@ -358,25 +358,25 @@ function bench(opts) {
 //    落盘失败路径,先 convert 就会「试用烧了、单没下」且不可恢复)。于是这条路径的正确处置
 //    从「零扣款」变成「扣了必须精确退回」,退不回去则走响亮终态。
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false });
   check("settle", "⑤convert 拒绝 → 不成交", b.out === undefined);
   check("settle", "⑤convert 拒绝 → 刚扣的钱被精确退回(退到扣款前那份快照)",
     b.debits.length === 1 && b.restores.length === 1 && b.restores[0].usdtBalance === 100_000);
   check("settle", "⑤convert 拒绝 → 回报价步 + 提示", b.step === "select-payment" && b.toasts.includes("TRIAL_QUOTE_CHANGED"));
   check("settle", "⑤convert 拒绝 → 未走响亮终态(退款成功时不该惊动客服)", b.stuck.length === 0);
   // R5 固定靶:退款自己也失败 —— 钱真扣着,不许再弹「报价已变」了事。
-  const s = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false, restoreFails: true });
+  const s = await bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: false, restoreFails: true });
   check("settle", "⑤🔴 退款也失败 → 走响亮终态(交易号 + 待对账),而不是通用「报价已变」",
     s.stuck.length === 1 && !s.toasts.includes("TRIAL_QUOTE_CHANGED"));
   check("settle", "⑤退款失败时仍然不建单、仍退回报价步", s.out === undefined && s.step === "select-payment");
-  const okc = bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: true });
+  const okc = await bench({ row: rowGrace, clockAt: T0 + 5 * D, convertReturns: true });
   check("settle", "⑤convert 通过 → 正常扣款且不退款(守卫不误伤)",
     okc.out && okc.debits.length === 1 && okc.restores.length === 0);
 }
 
 // ── ④b 族级兜底闸:确认页之后总额变贵(旧机抵扣跌档)→ 拒单不静默补扣 ──
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 5 * D, tradein: 100 });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 5 * D, tradein: 100 });
   check("settle", "④b 基线:带旧机抵扣正常成交(649−20−21−100=508)", b.out && b.out.chargeTotal === 508);
   // 直接把「支付时刻的抵扣」调低,模拟累计收益跌档:quotedTotal 仍是确认页的 508
   const api = mod.build({
@@ -384,12 +384,12 @@ function bench(opts) {
     cardFeeUsd: (n) => +(n * 0.029).toFixed(2),
     toast: { warn: () => {}, success: () => {}, info: () => {} }, t: T, fmt: fmtShim,
     app: { user: { usdtBalance: 100_000 }, debitBalance: () => true },
-    freeTrial: { snapshot: () => ({ ...rowGrace }), convert: () => true },
+    freeTrial: { snapshot: () => ({ ...rowGrace }), convert: () => ({ ok: true }) },
     trialCfg: { value: CFG }, productId: { value: "stellarbox-s1" }, product: { value: PRODUCT },
     voucherDiscount: { value: 0 }, tradeinCredit: { value: 100 }, nowTick: { value: T0 + 5 * D },
   });
   const step = { value: "confirmed" };
-  const drift = api.settle({
+  const drift = await api.settle({
     trialQuote: api.trialView.value, quotedTotal: 508, p: PRODUCT, discount: 0,
     ti: { credit: 40, device: { id: "dev-old", name: "Old" } }, isCard: { value: false }, step,
   });
@@ -399,11 +399,11 @@ function bench(opts) {
 
 // ── ④c 非试用 SKU / 非试用用户:守卫不改变原有普通购买 ──
 {
-  const other = bench({ row: rowGrace, clockAt: T0 + 5 * D, productId: "stellarbox-pro" });
+  const other = await bench({ row: rowGrace, clockAt: T0 + 5 * D, productId: "stellarbox-pro" });
   check("quote", "④c 非试用 SKU:模式 false,净额 = 全价", other.mode === false && other.shownNet === 649);
   check("settle", "④c 非试用 SKU:照常成交,不调 convert", other.out && other.converted === false && other.debits.length === 1);
   const noneRow = { ...rowGrace, status: "none", startedAt: null, expiresAt: null, graceEndsAt: null, shadowFrozenAtUSD: 0, shadowFrozenAtNEX: 0 };
-  const plain = bench({ row: noneRow, clockAt: T0 + 5 * D, isCard: true });
+  const plain = await bench({ row: noneRow, clockAt: T0 + 5 * D, isCard: true });
   check("settle", "④c 无试用 + 卡支付:展示总额 == 扣款总额(含卡费)",
     plain.out && plain.out.chargeTotal === plain.shownTotal && plain.out.chargeTotal === +(649 + 649 * 0.029).toFixed(2));
 }
@@ -412,7 +412,7 @@ function bench(opts) {
 {
   const rowActive = { ...rowGrace, status: "active", shadowFrozenAtUSD: 0, shadowFrozenAtNEX: 0 };
   // 展示时刻 T0+2d → 累计 14;支付时刻 T0+2.5d → 累计 17.5(更多)。
-  const b = bench({ row: rowActive, clockAt: T0 + 2 * D, payClockAt: T0 + 2.5 * D });
+  const b = await bench({ row: rowActive, clockAt: T0 + 2 * D, payClockAt: T0 + 2.5 * D });
   check("quote", "④d active:展示时刻抵扣 = 累计 14(冻结窗口内)", b.snapshot.offsetUSD === 14);
   check("settle", "④d 扣款仍按快照 649−20−14=615(所见即所付,不因期间累计而变)",
     b.out && b.out.chargeTotal === 615 && b.out.chargeTotal === b.shownTotal);
@@ -438,9 +438,11 @@ function bench(opts) {
     /trialQuote\.remainderUSD/.test(payBare) && /trialQuote\.shadowNEX/.test(payBare) &&
     !/promoDiscount\.value/.test(payBare) && !/trialOffsetView\.value/.test(payBare) &&
     !/trialConversionMode\.value/.test(payBare));
-  check("wiring", "W7 convert() 返回值被判定(不许丢弃)", /if\s*\(applyTrial && !freeTrial\.convert\(\)\)/.test(payBare));
-  const idxConvert = bare.indexOf("freeTrial.convert()");
   const idxDebit = bare.indexOf("app.debitBalance(chargeTotal)");
+  const convertCalls = [...bare.matchAll(/freeTrial\.convert\(\s*p\.id\s*\)/g)];
+  const localConvert = convertCalls.find((match) => match.index > idxDebit);
+  const idxConvert = localConvert?.index ?? -1;
+  check("wiring", "W7 convert(p.id) 返回值被判定(不许丢弃)", /if\s*\(applyTrial\s*&&\s*!\(\s*await\s+freeTrial\.convert\(\s*p\.id\s*\)\)\.ok\s*\)/.test(payBare));
   const idxOrder = bare.indexOf("orders.createOrder(");
   // 🔴 R5 反转:convert() 是不可逆终态,必须排在扣款**之后** —— 扣款的落盘失败路径是
   // 只读预检堵不住的,先 convert 就会「试用烧了、钱没扣、单没下」,且用户无从恢复。
@@ -466,7 +468,7 @@ function bench(opts) {
 //    convert() 会把试用打成不可逆终态,而 debitBalance(NaN) 被 store 守卫拒掉 ——
 //    净结果「单没下、钱没扣、试用永久没了」。守卫必须排在任何终态副作用之前。
 {
-  const b = bench({ row: rowGrace, clockAt: T0 + 5 * D, productPrice: Number.NaN });
+  const b = await bench({ row: rowGrace, clockAt: T0 + 5 * D, productPrice: Number.NaN });
   check("settle", "⑥金额非数值 → 拒单(不成交)", b.out === undefined);
   check("settle", "⑥金额非数值 → 零扣款", b.debits.length === 0);
   check("settle", "⑥金额非数值 → 试用**未被烧成终态**(守卫排在 convert 之前)", b.converted === false);

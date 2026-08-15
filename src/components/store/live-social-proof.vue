@@ -14,7 +14,16 @@
   softens entering/exiting rows.
 -->
 <template>
-  <view class="absolute" :style="rootStyle" :aria-label="w.label">
+  <view v-if="remoteApiEnabled && remoteProof" class="absolute" :style="rootStyle" :aria-label="remoteProof.productName">
+    <view>
+      <view v-for="(r, i) in remoteRows" :key="i" class="flex items-baseline" :style="rowStyle">
+        <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
+        <text class="shrink-0 tabular-nums" :style="numStyle(r.color)">{{ r.n.toLocaleString() }}</text>
+        <text class="truncate" :style="labelStyle">{{ r.label }}</text>
+      </view>
+    </view>
+  </view>
+  <view v-else-if="!remoteApiEnabled" class="absolute" :style="rootStyle" :aria-label="`${w.label} · ${MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID}`">
     <view :style="listStyle">
       <view v-for="(r, i) in doubled" :key="i" class="flex items-baseline" :style="rowStyle">
         <view aria-hidden class="shrink-0" :style="dotStyle(r.color)" />
@@ -27,13 +36,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, type CSSProperties } from "vue";
 import type { Product } from "@/mock/products";
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled, storefrontActivityApi } from "@/api/runtime";
+import type { StorefrontSocialProof } from "@/api/storefront-activity-api";
+import { useApp } from "@/store/app";
+import { createRemoteAccountEpoch } from "@/lib/remote-account-epoch";
+import { MOCK_STOREFRONT_SOCIAL_PROOF_FIXTURE_ID, fixtureSocialProofValue } from "@/mock/storefront-social-proof";
 
 const props = defineProps<{ product: Product }>();
 const t = useT();
+const app = useApp();
 const w = computed(() => t.value.store.liveProof);
+const remoteProof = ref<StorefrontSocialProof | null>(null);
+const remoteEpoch = createRemoteAccountEpoch(app.accountKey);
 
 function hashId(id: string): number {
   let h = 0x811c9dc5;
@@ -61,22 +78,67 @@ const baseSold30m = Math.max(1, Math.floor(baseSold24h * 0.022));
 const viewing = ref(baseViewing);
 const sold24h = ref(baseSold24h);
 const sold30m = ref(baseSold30m);
+const fixtureTick = ref(0);
 const mounted = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
+function clearRemoteProof(): void {
+  remoteProof.value = null;
+}
+
+function loadRemoteProof(request = remoteEpoch.snapshot()): void {
+  void storefrontActivityApi.socialProof(props.product.id, 30).then((snapshot) => {
+    if (remoteEpoch.isCurrent(request)) remoteProof.value = snapshot;
+  }).catch(() => {
+    if (remoteEpoch.isCurrent(request)) clearRemoteProof();
+  });
+}
+
 onMounted(() => {
+  if (remoteApiEnabled) {
+    remoteEpoch.bind(app.accountKey);
+    clearRemoteProof();
+    loadRemoteProof();
+    return;
+  }
   mounted.value = true;
   timer = setInterval(() => {
-    viewing.value = baseViewing + Math.floor(Math.random() * 12) - 5;
-    if (Math.random() < 0.3) sold24h.value += 1;
-    if (Math.random() < 0.06) sold30m.value += 1;
+    fixtureTick.value += 1;
+    viewing.value = fixtureSocialProofValue(baseViewing, fixtureTick.value, 9, 1);
+    sold24h.value = baseSold24h + Math.floor(fixtureTick.value / 3);
+    sold30m.value = baseSold30m + Math.floor(fixtureTick.value / 17);
   }, 12_000);
+});
+watch(() => app.accountKey, (accountKey) => {
+  if (!remoteApiEnabled) return;
+  remoteEpoch.bind(accountKey);
+  clearRemoteProof();
+  loadRemoteProof();
+});
+watch(() => props.product.id, () => {
+  if (!remoteApiEnabled) return;
+  remoteEpoch.bind(app.accountKey);
+  clearRemoteProof();
+  loadRemoteProof();
 });
 onUnmounted(() => {
   if (timer) clearInterval(timer);
 });
 
 type FlatRow = { n: number; label: string; color: string; hot?: boolean };
+const remoteRows = computed<FlatRow[]>(() => {
+  const proof = remoteProof.value;
+  if (!proof) return [];
+  const rows: FlatRow[] = [
+    { n: proof.windowSales, label: `${t.value.store.soldLabel} · ${proof.windowDays}d`, color: "var(--v5-brand)" },
+    { n: proof.cumulativeSales, label: t.value.store.soldLabel, color: "var(--v5-success-ink)" },
+  ];
+  const stock = props.product.stock;
+  if (stock !== undefined && stock < 50) {
+    rows.push({ n: stock, label: w.value.stockShortLabel, color: "var(--v5-brand-2)" });
+  }
+  return rows;
+});
 const flat = computed<FlatRow[]>(() => {
   const rows: FlatRow[] = [
     { n: viewing.value, label: w.value.viewingLabel, color: "var(--v5-tech-cyan)" },

@@ -4,12 +4,18 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const root = resolve(import.meta.dirname, "..");
-const backend = resolve(root, "..", "backend");
+const workspaceRoot = resolve(root, "..");
+const backend = process.env.NEXGRID_BACKEND_ROOT?.trim()
+  ? resolve(process.env.NEXGRID_BACKEND_ROOT.trim())
+  : resolve(workspaceRoot, "nexion-backend");
+const pcRoot = process.env.NEXGRID_PC_ROOT?.trim()
+  ? resolve(process.env.NEXGRID_PC_ROOT.trim())
+  : resolve(workspaceRoot, "nexion-ops-console");
 const appApi = readFileSync(resolve(root, "src/api/referral-reward-api.ts"), "utf8");
 const card = readFileSync(resolve(root, "src/components/team/invite-earn-card.vue"), "utf8");
 const service = readFileSync(resolve(backend, "src/main/java/ffdd/opsconsole/growth/application/AppReferralRewardService.java"), "utf8");
 const mapper = readFileSync(resolve(backend, "src/main/java/ffdd/opsconsole/growth/mapper/ReferralRewardMapper.java"), "utf8");
-const pc = readFileSync(resolve(root, "..", "pc/lib/admin/h-client.ts"), "utf8");
+const pc = readFileSync(resolve(pcRoot, "lib/admin/h-client.ts"), "utf8");
 
 test("H8 sandbox referral snapshot is a current-RunID ledger projection, never a cumulative wallet projection", () => {
   assert.match(service, /NEXION_ACCEPTANCE_RUN_ID/);

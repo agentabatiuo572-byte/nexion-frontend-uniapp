@@ -1,5 +1,5 @@
 import type { ApiClient } from "./api-client";
-import { isUserSession, type AuthSessionResponse, type UserSession } from "./contracts";
+import { isRegistrationReceipt, isUserSession, type AuthSessionResponse, type RegistrationReceipt, type UserSession } from "./contracts";
 import { ApiError, asApiError } from "./errors";
 import type { SessionSnapshot, SessionVault } from "./session-vault";
 
@@ -44,9 +44,24 @@ export interface RegistrationRequest extends RegistrationOtpRequest {
   sponsorCode: string | null;
 }
 
+export type OAuthProvider = "GOOGLE" | "APPLE";
+export type OAuthExchangeMode = "SANDBOX_MOCK" | "PROVIDER";
+export interface OAuthExchangeRequest {
+  provider: OAuthProvider;
+  mode: OAuthExchangeMode;
+  externalSubject: string;
+  displayName?: string;
+}
+export interface OAuthExchangeResult {
+  user: UserSession;
+  vaultRevision: number;
+  source: "mock";
+  sandbox: true;
+}
+
 export type LoginResult =
   | { kind: "challenge"; user: UserSession; challengeNo: string; deliveryHint: string }
-  | { kind: "authenticated"; user: UserSession; vaultRevision: number };
+  | { kind: "authenticated"; user: UserSession; vaultRevision: number; registrationReceipt?: RegistrationReceipt | null };
 
 export interface AuthApi {
   login(request: PasswordLoginRequest): Promise<LoginResult>;
@@ -61,6 +76,7 @@ export interface AuthApi {
   completeTwoFactor(request: TwoFactorLoginRequest): Promise<LoginResult>;
   sendRegistrationOtp(request: RegistrationOtpRequest): Promise<RegistrationOtpResult>;
   register(request: RegistrationRequest): Promise<LoginResult>;
+  oauthExchange(request: OAuthExchangeRequest): Promise<OAuthExchangeResult>;
   restore(): Promise<SessionSnapshot | null>;
   /** Consume only the exact vault epoch issued by a failed sign-in completion. */
   discardSessionIfCurrent(expectedRevision: number): void;
@@ -175,12 +191,39 @@ function consumeLoginResponse(
   }
   const session = sessionFromResponse(data);
   if (!session) throw new ApiError({ kind: "protocol", message: "AUTH_RESPONSE_INVALID" });
+  const registrationReceipt = data.registrationReceipt ?? null;
+  if (registrationReceipt !== null && !isRegistrationReceipt(registrationReceipt)) {
+    throw new ApiError({ kind: "protocol", message: "AUTH_REGISTRATION_RECEIPT_INVALID" });
+  }
   if (!vault.saveIfUnchanged(session, expectedRevision)) {
     throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
   }
   // saveIfUnchanged advances the vault exactly once. Returning that epoch lets
   // the UI discard this issuance without ever clearing a later account's vault.
-  return { kind: "authenticated", user: session.user, vaultRevision: expectedRevision + 1 };
+  return { kind: "authenticated", user: session.user, vaultRevision: expectedRevision + 1, registrationReceipt };
+}
+
+function oauthExchangeFromResponse(value: unknown, vault: SessionVault, expectedRevision: number): OAuthExchangeResult {
+  if (!value || typeof value !== "object") {
+    throw new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
+  }
+  const data = value as Record<string, unknown>;
+  if (typeof data.accessToken !== "string" || data.accessToken.length === 0
+      || typeof data.refreshToken !== "string" || data.refreshToken.length === 0
+      || data.tokenType !== "Bearer" || !isUserSession(data.user)
+      || data.source !== "mock" || data.sandbox !== true) {
+    throw new ApiError({ kind: "protocol", message: "OAUTH_RESPONSE_INVALID" });
+  }
+  const session: SessionSnapshot = {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    tokenType: data.tokenType,
+    user: data.user,
+  };
+  if (!vault.saveIfUnchanged(session, expectedRevision)) {
+    throw new ApiError({ kind: "auth", message: "SESSION_CHANGED_DURING_AUTH" });
+  }
+  return { user: data.user, vaultRevision: expectedRevision + 1, source: "mock", sandbox: true };
 }
 
 export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
@@ -305,6 +348,16 @@ export function createAuthApi(client: ApiClient, vault: SessionVault): AuthApi {
         throw new ApiError({ kind: "protocol", message: "REGISTRATION_SESSION_INVALID" });
       }
       return result;
+    },
+    async oauthExchange(request) {
+      const revision = vault.revision();
+      const data = await client.request<unknown>({
+        path: "/auth/users/oauth/exchange",
+        method: "POST",
+        body: request,
+        authenticated: false,
+      });
+      return oauthExchangeFromResponse(data, vault, revision);
     },
     async restore() {
       if (!vault.read()?.refreshToken) return null;

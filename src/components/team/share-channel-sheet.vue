@@ -73,7 +73,7 @@ const FALLBACK: ShareChannelDef[] = [
 ];
 const channels = computed<ShareChannelDef[]>(() => {
   const list = visibleChannels();
-  return list.length ? list : FALLBACK;
+  return list.length || remoteApiEnabled ? list : FALLBACK;
 });
 
 interface ChannelMeta {

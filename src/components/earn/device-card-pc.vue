@@ -331,6 +331,7 @@ import { computeLiveHashpower, isDeviceOnline } from "@/lib/hashpower";
 import { fallbackCapability } from "@/lib/device-capability";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const props = defineProps<{ device: Device; expanded?: boolean; divider?: boolean }>();
 const emit = defineEmits<{ toggle: [] }>();
@@ -462,9 +463,9 @@ const phoneRunning = computed(
 // Phones always carry capability fields (createDevice seeds them); fall back to
 // the lib's single-source default rather than duplicating the literal here.
 const FALLBACK_CAP = fallbackCapability();
-const baselineTops = computed(() => props.device.capabilityTops ?? FALLBACK_CAP.tops);
+const baselineTops = computed(() => props.device.capabilityTops ?? (remoteApiEnabled ? 0 : FALLBACK_CAP.tops));
 const cfg = useConfig();
-const capTier = computed(() => props.device.capabilityTier ?? FALLBACK_CAP.tier);
+const capTier = computed(() => props.device.capabilityTier ?? (remoteApiEnabled ? "—" : FALLBACK_CAP.tier));
 const deviceOnline = computed(() => isDeviceOnline(props.device, now.value));
 const live = computed(() =>
   computeLiveHashpower({

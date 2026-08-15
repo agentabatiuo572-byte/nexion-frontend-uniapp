@@ -10,9 +10,8 @@
   carry over (P-013). Source dot hex (#1F2D1A bright olive / #101418 dim) →
   var(--v5-brand) low-opacity (matches "brighter green = denser cluster"
   legend) / var(--v5-ink-4). Drawer is position:fixed so it overlays the
-  whole chassis. Mock Math.random pulse/uptime kept (no SSR in uni, no
-  hydration concern → the source's mulberry32 seeding is unnecessary here,
-  but retained for identical dot positions).
+  whole chassis. Sandbox decorative values come from the named deterministic
+  fixture; production never promotes fixture values to telemetry.
 -->
 <template>
   <AppChassis active="me">
@@ -197,7 +196,7 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { publicStatsHealth } from "@/lib/platform-stats";
-import { REGIONS, type RegionData } from "@/mock/globe-regions";
+import { MOCK_GLOBE_FIXTURE_ID, REGIONS, type RegionData } from "@/mock/globe-regions";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { networkRegionsApi, remoteApiEnabled } from "@/api/runtime";
@@ -259,16 +258,17 @@ const meX = computed(() => (me.value?.cx ?? 0) * W);
 const meY = computed(() => (me.value?.cy ?? 0) * H);
 const otherRegions = computed(() => regions.value.filter((r) => !r.isYou));
 
-// Pick a random region to pulse each tick (client-only timer).
+// Deterministic pulse selection is decorative only; it must never become a metric source.
 const pulseRegionId = computed<string | null>(() => {
   if (pulseTick.value === 0) return null;
   if (regions.value.length === 0) return null;
-  return regions.value[Math.floor(Math.random() * regions.value.length)]?.id ?? null;
+  return regions.value[(pulseTick.value - 1) % regions.value.length]?.id ?? null;
 });
 
-// Per-region uptime — stable per open (computed from a ref so it doesn't churn).
-const uptimeSeed = ref(0);
-const uptimeText = computed(() => (99 + uptimeSeed.value).toFixed(2) + "%");
+// Mock-only fixture value. Remote mode renders unavailable telemetry instead.
+const uptimeText = computed(() => remoteApiEnabled
+  ? t.value.globe.metricUnavailable
+  : `${MOCK_GLOBE_FIXTURE_ID} · 99.20%`);
 const generatedAtText = computed(() => networkProjection.value
   ? new Date(networkProjection.value.generatedAt).toLocaleString()
   : t.value.globe.metricUnavailable);
@@ -286,7 +286,6 @@ const projectionStateDesc = computed(() => projectionStatus.value === "error"
 const dots = computed(() => generateDotMap(W, H));
 
 function select(r: GlobeRegion) {
-  uptimeSeed.value = Math.random();
   selected.value = r;
 }
 

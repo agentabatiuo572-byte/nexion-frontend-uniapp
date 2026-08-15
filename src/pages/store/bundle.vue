@@ -154,6 +154,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -161,8 +162,10 @@ import { fmt } from "@/i18n/format";
 import { useCart, bundleDiscountForCount, BUNDLE_DISCOUNT_TIERS, type BundleDiscountTier } from "@/store/cart";
 import { PRODUCTS, getProduct, evaluatePurchaseGate, type Product } from "@/mock/products";
 import { useSetPageHeader } from "@/composables/use-page-header";
-import { isPhaseReached } from "@/store/product-phase";
+import { isProductAvailable } from "@/store/product-availability";
 import { useProductPhase } from "@/composables/use-product-phase";
+import { refreshProductCatalog } from "@/store/product-catalog";
+import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { toast } from "@/store/ui";
 import { bundleOrderApi, remoteApiEnabled } from "@/api/runtime";
 import { isAmbiguousOutcome } from "@/api/errors";
@@ -178,6 +181,15 @@ const t = useT();
 const cart = useCart();
 const phase = useProductPhase();
 
+onLoad(async () => {
+  await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
+});
+
+onShow(() => {
+  void refreshProductCatalog(true);
+  void refreshServerProductPhase(true);
+});
+
 // Sticky chassis nav header — back + "Bundle" title (mirrors the prototype's
 // <SetPageHeader backHref="/store"/>, whose chassis Header resolves the route
 // title headerTitles.storeBundle).
@@ -187,7 +199,10 @@ useSetPageHeader(() => ({
 }));
 
 const products = computed<Product[]>(() =>
-  cart.items.map((id) => getProduct(id)).filter((p): p is Product => !!p),
+  cart.items
+    .map((id) => getProduct(id))
+    .filter((p): p is Product => !!p)
+    .filter((p) => isProductAvailable(p, phase.value)),
 );
 const subtotal = computed(() => products.value.reduce((s, p) => s + p.price, 0));
 const discountPct = computed(() => bundleDiscountForCount(products.value.length));
@@ -201,7 +216,7 @@ const suggestions = computed(() =>
     (p) =>
       !cart.items.includes(p.id) &&
       p.tier !== "Share" &&
-      (!p.unlocksAtPhase || isPhaseReached(phase.value, p.unlocksAtPhase)),
+      isProductAvailable(p, phase.value),
   ).slice(0, 3),
 );
 
@@ -211,13 +226,11 @@ const totalText = computed(() => total.value.toLocaleString(undefined, { maximum
 const discountLabel = computed(() => fmt(t.value.bundle.bundleDiscount, { pct: (discountPct.value * 100).toFixed(0) }));
 const checkoutCtaText = computed(() => fmt(t.value.bundle.checkoutCta, { total: totalText.value }));
 const submitting = ref(false);
-const checkoutUnavailable = computed(() => submitting.value || products.value.length < 2 || remoteApiEnabled);
+const checkoutUnavailable = computed(() => submitting.value || products.value.length < 2);
 const ctaText = computed(() => (
-  submitting.value ? "…" : remoteApiEnabled ? t.value.bundle.remoteCheckoutHoldCta : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
+  submitting.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
-const checkoutHint = computed(() => remoteApiEnabled
-  ? t.value.bundle.remoteCheckoutHoldHint
-  : products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
+const checkoutHint = computed(() => products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -263,10 +276,6 @@ function retireBundleKey(list: Product[], accountKey: string): void {
 
 async function onCheckout() {
   const list = products.value;
-  if (remoteApiEnabled) {
-    toast.info(t.value.bundle.remoteCheckoutHoldHint);
-    return;
-  }
   if (list.length < 2 || submitting.value) return;
   if (remoteApiEnabled) {
     const orders = useOrders();

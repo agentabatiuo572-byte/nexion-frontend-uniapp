@@ -1,10 +1,21 @@
-import type { GpuTier, OnlineBonus, PublicStatsConfig, RewardsConfig } from "@/store/config-types";
+import type {
+  GpuTier,
+  OnlineBonus,
+  PublicStatsConfig,
+  RewardsConfig,
+  ShareChannelDef,
+  ShareChannelKey,
+  ShareConfig,
+  ShareIntentType,
+} from "@/store/config-types";
 import type { ApiClient } from "./api-client";
 import { ApiError } from "./errors";
 
 export interface PlatformComputeConfigSnapshot {
   featureFlags: {
     computeShareEnabled: boolean;
+    homeNewcomerTasksEnabled: boolean;
+    homeWeeklyPromoEnabled: boolean;
   };
   publicStats: PublicStatsConfig;
   onlineBonus: OnlineBonus;
@@ -19,6 +30,7 @@ export interface PlatformComputeConfigSnapshot {
     gpuTiers: GpuTier[];
   };
   rewards: RewardsConfig;
+  share: ShareConfig;
   updatedAt: string;
   sources: string[];
 }
@@ -32,6 +44,11 @@ const COEFFICIENT_KEYS = new Set(["h5BaseFactor", "continuityFullHours"]);
 const FLAG_KEYS = new Set(["computeShareEnabled"]);
 const YIELD_KEYS = new Set(["topsBaseline", "dailyUsdtPerBaseline", "nexPerUsdt"]);
 const KEYWORD_SLOTS = new Set(["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"]);
+const SHARE_CHANNEL_KEYS = new Set<ShareChannelKey>([
+  "zalo", "telegram", "whatsapp", "messenger", "sms", "x", "copy", "poster", "system",
+]);
+const SHARE_INTENTS = new Set<ShareIntentType>(["web", "scheme", "copy", "poster", "system"]);
+const DOWNLOAD_SOURCES = new Set(["official", "mock", "unavailable"]);
 
 function invalid(message = "E6_PLATFORM_CONFIG_RESPONSE_INVALID"): never {
   throw new ApiError({ kind: "protocol", message });
@@ -49,6 +66,106 @@ function string(value: unknown): string {
 function nonEmptyString(value: unknown): string {
   const normalized = string(value).trim();
   return normalized ? normalized : invalid();
+}
+
+function optionalString(value: unknown): string {
+  return value === undefined || value === null ? "" : string(value).trim();
+}
+
+function safeUrl(value: unknown, required: boolean, allowHttp: boolean): string {
+  const url = optionalString(value);
+  if (!url && !required) return "";
+  if (!url || /[\s#@]/.test(url)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  try {
+    const parsed = new URL(url);
+    if ((!allowHttp && parsed.protocol !== "https:") || (allowHttp && !["https:", "http:"].includes(parsed.protocol))) {
+      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+    if (!parsed.hostname || parsed.username || parsed.password) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  } catch {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  return url;
+}
+
+function parsePlatformShareConfig(value: unknown): ShareConfig {
+  const root = record(value);
+  const baseUrl = safeUrl(root.baseUrl, false, false);
+  const channelsRaw = root.channels;
+  if (!Array.isArray(channelsRaw)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  const keys = new Set<string>();
+  const channels: ShareChannelDef[] = channelsRaw.map((raw) => {
+    const row = record(raw);
+    const key = nonEmptyString(row.key);
+    const intentType = nonEmptyString(row.intentType);
+    if (!SHARE_CHANNEL_KEYS.has(key as ShareChannelKey) || !SHARE_INTENTS.has(intentType as ShareIntentType) || keys.has(key)) {
+      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+    keys.add(key);
+    const enabled = row.enabled;
+    if (typeof enabled !== "boolean") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    const urlTemplate = optionalString(row.urlTemplate);
+    const textTemplate = optionalString(row.textTemplate);
+    if (urlTemplate && !urlTemplate.includes("{link}") && !urlTemplate.includes("{text}")) {
+      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+    if (intentType === "web" && !urlTemplate) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    if (enabled && intentType !== "copy" && intentType !== "poster" && intentType !== "system" && !textTemplate) {
+      return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+    }
+    return {
+      key: key as ShareChannelKey,
+      intentType: intentType as ShareIntentType,
+      ...(urlTemplate ? { urlTemplate } : {}),
+      ...(textTemplate ? { textTemplate } : {}),
+      ...(row.androidPackage ? { androidPackage: nonEmptyString(row.androidPackage) } : {}),
+      ...(row.iosScheme ? { iosScheme: nonEmptyString(row.iosScheme) } : {}),
+      enabled,
+    };
+  });
+  const appDownload = record(root.appDownload);
+  const source = nonEmptyString(appDownload.source);
+  if (!DOWNLOAD_SOURCES.has(source)) return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  const officialUrl = safeUrl(appDownload.officialUrl, source !== "unavailable", source === "mock");
+  const version = optionalString(appDownload.version);
+  const notes = record(appDownload.releaseNotes);
+  const releaseNotes = { zh: optionalString(notes.zh), en: optionalString(notes.en) };
+  if (source !== "unavailable" && (!version || !releaseNotes.zh || !releaseNotes.en)) {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  return {
+    baseUrl,
+    channels,
+    appDownload: {
+      officialUrl,
+      iosUrl: safeUrl(appDownload.iosUrl, false, source === "mock"),
+      androidUrl: safeUrl(appDownload.androidUrl, false, source === "mock"),
+      apkUrl: safeUrl(appDownload.apkUrl, false, source === "mock"),
+      version,
+      releaseNotes,
+      source: source as ShareConfig["appDownload"]["source"],
+    },
+  };
+}
+
+export function parsePlatformExperienceConfig(value: unknown): {
+  featureFlags: PlatformComputeConfigSnapshot["featureFlags"];
+  share: ShareConfig;
+} {
+  const root = record(value);
+  const featureFlags = record(root.featureFlags);
+  if (typeof featureFlags.homeNewcomerTasksEnabled !== "boolean"
+      || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean") {
+    return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  }
+  return {
+    featureFlags: {
+      computeShareEnabled: typeof featureFlags.computeShareEnabled === "boolean" ? featureFlags.computeShareEnabled : false,
+      homeNewcomerTasksEnabled: featureFlags.homeNewcomerTasksEnabled,
+      homeWeeklyPromoEnabled: featureFlags.homeWeeklyPromoEnabled,
+    },
+    share: parsePlatformShareConfig(root.share),
+  };
 }
 
 function isoInstant(value: unknown): string {
@@ -183,7 +300,11 @@ export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfi
   const compute = record(root.computerCompute);
   const download = record(compute.download);
 
-  if (typeof featureFlags.computeShareEnabled !== "boolean" || compute.domain !== "E6") return invalid();
+  if (typeof featureFlags.computeShareEnabled !== "boolean"
+      || typeof featureFlags.homeNewcomerTasksEnabled !== "boolean"
+      || typeof featureFlags.homeWeeklyPromoEnabled !== "boolean"
+      || compute.domain !== "E6") return invalid("PLATFORM_EXPERIENCE_RESPONSE_INVALID");
+  const experience = parsePlatformExperienceConfig(value);
   const h5BaseFactor = positiveNumber(onlineBonus.h5BaseFactor);
   const continuityFullHours = positiveNumber(onlineBonus.continuityFullHours);
   if (h5BaseFactor > 1) return invalid();
@@ -216,7 +337,7 @@ export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfi
   const sources = Array.isArray(compute.sources) ? compute.sources.map(nonEmptyString) : invalid();
 
   return {
-    featureFlags: { computeShareEnabled: featureFlags.computeShareEnabled },
+    featureFlags: experience.featureFlags,
     publicStats,
     onlineBonus: { h5BaseFactor, continuityFullHours },
     computeShare: {
@@ -234,6 +355,7 @@ export function parsePlatformComputeConfig(value: unknown): PlatformComputeConfi
       welcomeGift: { lockMode: "risk_bucket", usdtAmount: 0, nexAmount: 0 },
       inviterReward: { nexAmount: 0 },
     },
+    share: experience.share,
     updatedAt: nonEmptyString(root.updatedAt),
     sources,
   };

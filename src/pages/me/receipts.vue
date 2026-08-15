@@ -13,8 +13,34 @@
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.receipt.title" />
 
+      <view v-if="remoteReceiptsMode" style="margin: 0 16px">
+        <EmptyState v-if="remoteReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+        <view v-else :style="listStyle">
+          <view v-for="r in remoteReceiptItems" :key="r.receiptNo" class="flex items-center" :style="rowStyle(0)">
+            <view class="flex-1 min-w-0">
+              <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
+              <text class="block truncate" :style="rowSubStyle">{{ r.intentNo }} · {{ r.viewType }}</text>
+            </view>
+            <view class="text-right shrink-0" style="margin-left: 8px">
+              <text class="block tabular-nums" :style="remoteAmountStyle">+${{ r.creditedUsdt.toFixed(2) }}</text>
+              <text class="block" :style="rowDateStyle">{{ shortDate(Date.parse(r.createdAt)) }}</text>
+            </view>
+          </view>
+        </view>
+        <view
+          v-if="depositsStore.remoteReceiptNextOffset !== null"
+          class="grid place-items-center active:opacity-70"
+          style="min-height: 44px; margin: 8px 0 16px"
+          role="button"
+          tabindex="0"
+          @click="loadMoreRemoteReceipts"
+        >
+          <text :style="rowSubStyle">{{ t.receipt.loadMore }}</text>
+        </view>
+      </view>
+
       <!-- Tabs + clear-all -->
-      <view class="flex items-center" :style="tabsRowStyle">
+      <view v-if="!remoteReceiptsMode" class="flex items-center" :style="tabsRowStyle">
         <scroll-view scroll-x class="flex-1 min-w-0" :show-scrollbar="false" style="white-space: nowrap">
           <view class="inline-flex" style="gap: 6px; padding: 0 1px 4px">
             <view
@@ -35,10 +61,10 @@
       </view>
 
       <!-- Empty -->
-      <EmptyState v-if="filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+      <EmptyState v-if="!remoteReceiptsMode && filtered.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
 
       <!-- List -->
-      <view v-else :style="listStyle">
+      <view v-else-if="!remoteReceiptsMode" :style="listStyle">
         <view
           v-for="(r, i) in visibleReceipts"
           :key="`${r.signature}-${i}`"
@@ -71,17 +97,17 @@
 
       <!-- Always mounted (even while empty) so the observer below attaches at
            first mount rather than missing it if this tab starts with 0 items. -->
-      <view ref="loadMoreSentinel" style="height: 1px" />
+      <view v-if="!remoteReceiptsMode" ref="loadMoreSentinel" style="height: 1px" />
 
-      <text class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
+      <text v-if="!remoteReceiptsMode" class="block" :style="footerStyle">{{ t.receipt.footerNote }}</text>
 
-      <ReceiptModal :receipt="open" @close="open = null" />
+      <ReceiptModal v-if="!remoteReceiptsMode" :receipt="open" @close="open = null" />
     </view>
   </AppChassis>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect, watch, type CSSProperties } from "vue";
+import { computed, ref, watchEffect, watch, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -94,6 +120,9 @@ import { useReceipts, filterByCategory } from "@/store/receipts";
 import type { Receipt, ReceiptCategory } from "@/mock/receipt";
 import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
+import { remoteApiEnabled, fundsSandboxEnabled } from "@/api/runtime";
+import { useDeposits } from "@/store/deposits";
+import type { VietQrReceiptSnapshot } from "@/api/payment-api";
 
 type Tab = "ALL" | ReceiptCategory;
 const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
@@ -101,16 +130,27 @@ const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
 const PAGE_SIZE = 10;
 
 const t = useT();
-const receiptsStore = useReceipts();
+const depositsStore = useDeposits();
+const remoteReceiptsMode = remoteApiEnabled && !fundsSandboxEnabled;
+const remoteReceiptItems = computed<VietQrReceiptSnapshot[]>(() => depositsStore.remoteReceipts);
+const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | null>(null);
 const visibleCount = ref(PAGE_SIZE);
 watch(tab, () => { visibleCount.value = PAGE_SIZE; });
 
-const receipts = computed(() => receiptsStore.receipts);
+const receipts = computed(() => receiptsStore?.receipts ?? []);
 const filtered = computed(() => filterByCategory(receipts.value, tab.value));
 const visibleReceipts = computed(() => filtered.value.slice(0, visibleCount.value));
 const hasMore = computed(() => visibleCount.value < filtered.value.length);
+
+onMounted(() => {
+  if (remoteReceiptsMode) void depositsStore.refreshRemoteVietQrDeposits();
+});
+
+function loadMoreRemoteReceipts() {
+  void depositsStore.loadMoreRemoteVietQrReceipts();
+}
 
 // Sentinel row (always mounted so the observer attaches from the start —
 // hasMore can flip true later as receipts arrive) sits at the list end;
@@ -167,7 +207,7 @@ async function handleClearAll() {
   });
   if (ok) {
     const n = receipts.value.length;
-    receiptsStore.clear();
+    receiptsStore?.clear();
     toast.success(t.value.receipt.clearAll, fmt(t.value.receipt.clearedToast, { n }));
   }
 }
@@ -270,6 +310,12 @@ function rowAmountStyle(r: Receipt): CSSProperties {
   };
 }
 const rowDateStyle: CSSProperties = { marginTop: "2px", fontSize: "12px", color: "var(--v5-ink-4)" };
+const remoteAmountStyle: CSSProperties = {
+  fontFamily: "var(--font-jet-mono), ui-monospace, monospace",
+  fontSize: "13px",
+  fontWeight: 600,
+  color: "var(--v5-brand-2)",
+};
 const footerStyle: CSSProperties = {
   margin: "16px 24px 24px",
   textAlign: "center",

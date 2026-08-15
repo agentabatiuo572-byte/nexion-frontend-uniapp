@@ -8,6 +8,8 @@ export interface VietQrPaymentConfig {
   toleranceVnd: number;
   graceMinutes: number;
   version: number;
+  feeVnd: number;
+  feeUsdt: number;
 }
 
 export interface PaymentConfig {
@@ -48,10 +50,32 @@ export interface VietQrIntentSnapshot {
   status: VietQrIntentStatus;
   expiresAt: string;
   creditedUsdt: number;
+  feeVnd: number;
+  feeUsdt: number;
+  qrPayload?: string;
   version: number;
   receivedVnd?: number;
   matchedAt?: string;
   createdAt?: string;
+}
+
+export interface VietQrReceiptSnapshot {
+  receiptNo: string;
+  intentNo: string;
+  viewType: string;
+  status: string;
+  payableVnd?: number;
+  receivedVnd?: number;
+  lockedFxRate: number;
+  creditedUsdt: number;
+  expiresAt?: string;
+  receivedAt?: string;
+  createdAt: string;
+}
+
+export interface VietQrReceiptPage {
+  items: VietQrReceiptSnapshot[];
+  nextOffset: number | null;
 }
 
 export interface PaymentApi {
@@ -65,6 +89,7 @@ export interface PaymentApi {
     expectedVersion: number,
     idempotencyKey: string,
   ): Promise<VietQrIntentSnapshot>;
+  listVietQrReceipts(limit?: number, offset?: number): Promise<VietQrReceiptPage>;
 }
 
 const INTENT_STATUSES = new Set<VietQrIntentStatus>([
@@ -106,6 +131,8 @@ function parseConfig(value: unknown): PaymentConfig {
   const toleranceVnd = number(vietQr?.toleranceVnd, { min: 0 });
   const graceMinutes = number(vietQr?.graceMinutes, { min: 0, integer: true });
   const version = number(vietQr?.version, { min: 0, integer: true });
+  const feeVnd = number(vietQr?.feeVnd, { min: 0 });
+  const feeUsdt = number(vietQr?.feeUsdt, { min: 0 });
   if (
     !vietQr
     || typeof vietQr.enabled !== "boolean"
@@ -115,6 +142,8 @@ function parseConfig(value: unknown): PaymentConfig {
     || toleranceVnd === null
     || graceMinutes === null
     || version === null
+    || feeVnd === null
+    || feeUsdt === null
   ) {
     throw new ApiError({ kind: "protocol", message: "PAYMENT_CONFIG_RESPONSE_INVALID" });
   }
@@ -126,6 +155,8 @@ function parseConfig(value: unknown): PaymentConfig {
       toleranceVnd,
       graceMinutes,
       version,
+      feeVnd,
+      feeUsdt,
     },
   };
 }
@@ -187,6 +218,9 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     : null;
   const expiresAt = date(source?.expiresAt);
   const creditedUsdt = number(source?.creditedUsdt, { min: 0 });
+  const feeVnd = number(source?.feeVnd, { min: 0 });
+  const feeUsdt = number(source?.feeUsdt, { min: 0 });
+  const qrPayload = source?.qrPayload === undefined ? undefined : text(source.qrPayload);
   const version = number(source?.version, { min: 0, integer: true });
   const receivedVnd = source?.receivedVnd === undefined
     ? undefined
@@ -207,6 +241,9 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     || !status
     || !expiresAt
     || creditedUsdt === null
+    || feeVnd === null
+    || feeUsdt === null
+    || (source.qrPayload !== undefined && qrPayload === null)
     || version === null
     || receivedVnd === null
     || (source.matchedAt !== undefined && !matchedAt)
@@ -224,11 +261,52 @@ function parseIntent(value: unknown): VietQrIntentSnapshot {
     status,
     expiresAt,
     creditedUsdt,
+    feeVnd,
+    feeUsdt,
+    ...(qrPayload ? { qrPayload } : {}),
     version,
     ...(receivedVnd === undefined ? {} : { receivedVnd }),
     ...(matchedAt ? { matchedAt } : {}),
     ...(createdAt ? { createdAt } : {}),
   };
+}
+
+function parseReceipt(value: unknown): VietQrReceiptSnapshot {
+  const source = record(value);
+  const receiptNo = text(source?.receiptNo);
+  const intentNo = text(source?.intentNo);
+  const viewType = text(source?.viewType);
+  const status = text(source?.status);
+  const payableVnd = source?.payableVnd === null || source?.payableVnd === undefined
+    ? undefined : number(source.payableVnd, { min: 0 });
+  const receivedVnd = source?.receivedVnd === null || source?.receivedVnd === undefined
+    ? undefined : number(source.receivedVnd, { min: 0 });
+  const lockedFxRate = number(source?.lockedFxRate, { min: 1 });
+  const creditedUsdt = number(source?.creditedUsdt, { min: 0 });
+  const expiresAt = source?.expiresAt === null || source?.expiresAt === undefined
+    ? undefined : date(source.expiresAt);
+  const receivedAt = source?.receivedAt === undefined ? undefined : date(source.receivedAt);
+  const createdAt = date(source?.createdAt);
+  if (!source || !receiptNo || !intentNo || !viewType || !status || payableVnd === null
+    || receivedVnd === null || lockedFxRate === null || creditedUsdt === null
+    || (source.expiresAt !== null && source.expiresAt !== undefined && !expiresAt)
+    || !createdAt || (source.receivedAt !== undefined && !receivedAt)) {
+    throw new ApiError({ kind: "protocol", message: "VIETQR_RECEIPT_RESPONSE_INVALID" });
+  }
+  return { receiptNo, intentNo, viewType, status,
+    ...(payableVnd === undefined ? {} : { payableVnd }),
+    ...(receivedVnd === undefined ? {} : { receivedVnd }),
+    lockedFxRate, creditedUsdt,
+    ...(expiresAt ? { expiresAt } : {}), ...(receivedAt ? { receivedAt } : {}), createdAt };
+}
+
+function parseReceiptPage(value: unknown): VietQrReceiptPage {
+  const source = record(value);
+  const nextOffset = source?.nextOffset === null ? null : number(source?.nextOffset, { min: 0, integer: true });
+  if (!source || !Array.isArray(source.items) || (source.nextOffset !== null && nextOffset === null)) {
+    throw new ApiError({ kind: "protocol", message: "VIETQR_RECEIPT_RESPONSE_INVALID" });
+  }
+  return { items: source.items.map(parseReceipt), nextOffset: nextOffset as number | null };
 }
 
 function parseIntentList(value: unknown): VietQrIntentSnapshot[] {
@@ -271,5 +349,9 @@ export function createPaymentApi(client: ApiClient): PaymentApi {
         body: { expectedVersion },
         idempotencyKey,
       })),
+    listVietQrReceipts: async (limit = 20, offset = 0) => parseReceiptPage(await client.request({
+      method: "GET",
+      path: `/api/app/deposits/vietqr/receipts?limit=${Math.max(1, Math.min(50, Math.trunc(limit)))}&offset=${Math.max(0, Math.trunc(offset))}`,
+    })),
   };
 }
