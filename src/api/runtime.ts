@@ -43,12 +43,16 @@ import { createNetworkRegionsApi } from "./network-regions-api";
 import { createTeamNetworkApi } from "./team-network-api";
 import { createDeveloperAccessApi } from "./developer-access-api";
 import { createBundleOrderApi } from "./bundle-order-api";
+import { createCommercePaymentApi } from "./commerce-payment-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
 import { createTeamInsightsApi } from "./team-insights-api";
 import { createWalletBillsApi } from "./wallet-bills-api";
 import { createStorefrontActivityApi } from "./storefront-activity-api";
 import { createGenesisPointsApi } from "./genesis-points-api";
 import { createNetworkRankApi } from "./network-rank-api";
+import { createTeamQuotaApi } from "./team-quota-api";
+import { createProofApi } from "./proof-api";
+import { createAppHomeApi } from "./app-home-api";
 import { readApiRuntimeConfig } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
@@ -56,6 +60,10 @@ import { createRuntimeSessionVault } from "./session-vault";
 export const apiRuntimeConfig = readApiRuntimeConfig();
 export const remoteApiEnabled = apiRuntimeConfig.mode !== "mock";
 export const fundsSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
+// Card tokenization/binding is a mock or explicit local-sandbox capability until
+// a real PSP provider is configured. Remote/production must fail closed rather
+// than presenting a form that only creates a mock token.
+export const paymentSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
 export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";
 // Payout addresses are real provider/production data. The isolated App
 // sandbox deliberately uses the account-scoped local implementation instead
@@ -127,12 +135,16 @@ export const networkRegionsApi = createNetworkRegionsApi(apiClient);
 export const teamNetworkApi = createTeamNetworkApi(apiClient);
 export const developerAccessApi = createDeveloperAccessApi(apiClient);
 export const bundleOrderApi = createBundleOrderApi(apiClient);
+export const commercePaymentApi = createCommercePaymentApi(apiClient);
 export const ambassadorApplicationApi = createAmbassadorApplicationApi(apiClient);
 export const teamInsightsApi = createTeamInsightsApi(apiClient);
 export const walletBillsApi = createWalletBillsApi(apiClient);
 export const storefrontActivityApi = createStorefrontActivityApi(apiClient);
 export const genesisPointsApi = createGenesisPointsApi(apiClient);
 export const networkRankApi = createNetworkRankApi(apiClient);
+export const teamQuotaApi = createTeamQuotaApi(apiClient);
+export const proofApi = createProofApi(apiClient);
+export const appHomeApi = createAppHomeApi(apiClient);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

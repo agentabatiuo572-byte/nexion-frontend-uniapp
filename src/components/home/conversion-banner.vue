@@ -33,7 +33,7 @@
             </svg>
           </view>
           <text class="weekly-quest__title">{{ t.home.weeklyQuestEyebrow }}</text>
-          <text class="weekly-quest__multiplier">{{ promoMult }}×</text>
+          <text class="weekly-quest__multiplier">{{ promoMult === null ? "—" : `${promoMult}×` }}</text>
         </view>
         <view class="weekly-quest__countdown">
           <text class="weekly-quest__countdown-label">{{ t.home.weeklyQuestEndsIn }}</text>
@@ -72,6 +72,8 @@ import { useNow } from "@/composables/use-now";
 import { useContentCopy } from "@/store/content-copy";
 import { useLocaleStore } from "@/store/locale";
 import { refreshCanonicalOrders } from "@/store/order-canonical";
+import { useWeeklyQuest } from "@/store/weekly-quest";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const MANAGED_POSITION = "home.conversion-banner";
 
@@ -83,19 +85,32 @@ const app = useApp();
 const nowTick = useNow();
 const managedCopy = useContentCopy();
 const locale = useLocaleStore();
+const wq = useWeeklyQuest();
 
 onMounted(() => {
+  if (remoteApiEnabled) void wq.refresh();
   void managedCopy.refresh(MANAGED_POSITION).then(() => {
     if (managedCopy.deliveries[MANAGED_POSITION]?.experimentId) void refreshCanonicalOrders(true);
   });
 });
 
-const promoMult = 1.5;
+const serverPromo = computed(() => app.homeTruth?.weeklyPromo ?? null);
+const promoMult = computed<number | null>(() => remoteApiEnabled ? serverPromo.value?.multiplier ?? null : 1.5);
 const baseReward = 800;
-const finalReward = Math.round(baseReward * promoMult);
-const finalRewardText = computed(() => finalReward.toLocaleString());
+const finalRewardText = computed(() => {
+    const reward = remoteApiEnabled ? serverPromo.value?.rewardNex == null ? null : Math.round(serverPromo.value.rewardNex) : Math.round(baseReward * (promoMult.value ?? 1));
+  return reward === null ? "—" : reward.toLocaleString();
+});
 
 const remainingLabel = computed(() => {
+  if (remoteApiEnabled) {
+    const endAt = serverPromo.value?.endAt;
+    if (!endAt) return "—";
+    const remainingMs = Math.max(0, Date.parse(endAt) - Date.now());
+    const days = Math.floor(remainingMs / 86400_000);
+    const hours = Math.floor((remainingMs % 86400_000) / 3600_000);
+    return `${days}d ${String(hours).padStart(2, "0")}h`;
+  }
   const remainingMs = (4 * 86400 + 12 * 3600) * 1000 - ((nowTick.value * 1000) % 60_000);
   const days = Math.floor(remainingMs / 86400_000);
   const hours = Math.floor((remainingMs % 86400_000) / 3600_000);
@@ -103,10 +118,16 @@ const remainingLabel = computed(() => {
 });
 
 const promo = computed(() => derivePromoUpgrade(app.visibleDevices));
-const targetDailyText = computed(() => promo.value.targetDaily.toFixed(2));
+const targetDailyText = computed(() => {
+  if (remoteApiEnabled) {
+    const value = serverPromo.value?.product.dailyUsdt;
+    return value == null ? "—" : value.toFixed(2);
+  }
+  return promo.value.targetDaily.toFixed(2);
+});
 const managedCopyText = computed(() => managedCopy.localized(MANAGED_POSITION, locale.code));
 const subtitleText = computed(() =>
-  managedCopyText.value || (promo.value.multiplier > 0
+  managedCopyText.value || (remoteApiEnabled ? (serverPromo.value?.product.name || "—") : promo.value.multiplier > 0
     ? fmt(t.value.home.weeklyQuestActivateToClaim, {
         device: deviceNameByKind(t.value, promo.value.targetKind, promo.value.targetName),
       })
@@ -141,7 +162,9 @@ const productStyle: CSSProperties = {
 };
 
 function goStore() {
-  uni.navigateTo({ url: `/pages/store/detail?id=${promo.value.targetKind}`, fail: () => {} });
+  const kind = remoteApiEnabled ? serverPromo.value?.product.kind : promo.value.targetKind;
+  if (!kind) return;
+  uni.navigateTo({ url: `/pages/store/detail?id=${kind}`, fail: () => {} });
 }
 </script>
 

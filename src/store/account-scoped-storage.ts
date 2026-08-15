@@ -32,6 +32,86 @@ export function writeAccountRow<T>(tableKey: string, accountKey: string, row: T)
   }
 }
 
+/**
+ * Remove every local row owned by one mock account.  This is deliberately a
+ * best-effort, key-scoped cleanup: remote mode never calls it, and unrelated
+ * accounts/ device preferences remain intact.  Keeping the sweep here makes
+ * account deletion resilient when a new account-row store is added without
+ * having to remember a second deletion call site.
+ */
+export function removeAccountScopedPersistentState(rawAccountKey: string): boolean {
+  const accountKey = normalizeAccountKey(rawAccountKey);
+  let ok = true;
+  try {
+    const keys = typeof uni.getStorageInfoSync === "function"
+      ? (uni.getStorageInfoSync().keys ?? [])
+      : [];
+    for (const tableKey of keys) {
+      const raw = uni.getStorageSync(tableKey) as unknown;
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+      const value = raw as Record<string, unknown>;
+
+      if (tableKey === "nexgrid-auth-v1" && value.accountId === accountKey) {
+        uni.removeStorageSync(tableKey);
+        continue;
+      }
+
+      // All account-row stores and the account-cloud table use the account key
+      // as a direct map key.  Do not remove the complete table when another
+      // account still has a row.
+      if (tableKey.endsWith("-accounts-v1") || tableKey === "nexgrid-account-cloud-v1") {
+        if (!(accountKey in value)) continue;
+        const next = { ...value };
+        delete next[accountKey];
+        uni.setStorageSync(tableKey, next);
+        continue;
+      }
+
+      if (tableKey === "nexgrid-account-sessions-v1" && value.schema === 1 && value.sessions && typeof value.sessions === "object") {
+        const sessions = Object.fromEntries(
+          Object.entries(value.sessions as Record<string, unknown>)
+            .filter(([, session]) => !session || typeof session !== "object" || (session as { accountKey?: unknown }).accountKey !== accountKey),
+        );
+        uni.setStorageSync(tableKey, { ...value, sessions });
+        continue;
+      }
+
+      if (tableKey === "nexgrid-calibrated-device-v1" && accountKey in value) {
+        const next = { ...value };
+        delete next[accountKey];
+        uni.setStorageSync(tableKey, next);
+        continue;
+      }
+
+      if (tableKey === "nexgrid-risk-registry-v1" && value.accounts && typeof value.accounts === "object") {
+        const accounts = { ...(value.accounts as Record<string, unknown>) };
+        if (!(accountKey in accounts)) continue;
+        delete accounts[accountKey];
+        uni.setStorageSync(tableKey, { ...value, accounts });
+        continue;
+      }
+
+      if (tableKey === "nexgrid-cluster-override-v1" && value.byAccount && typeof value.byAccount === "object") {
+        const byAccount = { ...(value.byAccount as Record<string, unknown>) };
+        if (!(accountKey in byAccount)) continue;
+        delete byAccount[accountKey];
+        uni.setStorageSync(tableKey, { ...value, byAccount });
+        continue;
+      }
+
+      if (tableKey === "nexgrid-sponsorship-v1" && value.bindingsByAccount && typeof value.bindingsByAccount === "object") {
+        const bindingsByAccount = { ...(value.bindingsByAccount as Record<string, unknown>) };
+        if (!(accountKey in bindingsByAccount)) continue;
+        delete bindingsByAccount[accountKey];
+        uni.setStorageSync(tableKey, { ...value, bindingsByAccount });
+      }
+    }
+  } catch {
+    ok = false;
+  }
+  return ok;
+}
+
 /** CAS 写结果。conflict 区分「版本被别处推进了」与「storage 根本写不进去」——调用方对这两种
  *  失败的处置不同(前者要重读/提示,后者是环境故障)。 */
 export interface AccountRowCasResult {

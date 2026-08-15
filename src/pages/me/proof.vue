@@ -12,8 +12,14 @@
 -->
 <template>
   <AppChassis active="me">
-    <view style="color: var(--v5-ink)">
-      <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
+      <view style="color: var(--v5-ink)">
+        <SubPageHeader back="/pages/me/me" :title="t.proof.title" />
+
+        <view v-if="remoteApiEnabled && remoteError" :style="remoteErrorStyle">
+          <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
+          <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
+          <view role="button" tabindex="0" :style="remoteRetryStyle" @click="refreshRemoteProof"><text>{{ t.network.retry }}</text></view>
+        </view>
 
       <view :style="bodyStyle">
         <!-- Variant tabs -->
@@ -36,7 +42,7 @@
         </view>
 
         <!-- Share card -->
-        <view class="relative overflow-hidden" :style="shareCardStyle">
+        <view v-if="!remoteApiEnabled || remoteSnapshot" class="relative overflow-hidden" :style="shareCardStyle">
           <!-- brand -->
           <view class="flex items-center" style="gap: 8px">
             <view class="grid place-items-center" :style="brandMarkStyle">
@@ -53,14 +59,15 @@
               <text class="block" :style="memberSinceStyle">{{ memberSinceText }}</text>
             </view>
             <view class="shrink-0">
-              <VBadge :v="myRank" size="md" />
+              <VBadge v-if="myRank !== null" :v="myRank" size="md" />
+              <text v-else class="font-mono-tabular" :style="miniValueStyle">V—</text>
             </view>
           </view>
 
           <!-- variant hero stat -->
           <view v-if="variant === 'earnings'" style="margin-top: 16px">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand)')">{{ t.proof.totalEarned }}</text>
-            <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotal.toFixed(2) }}</text>
+            <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotalText }}</text>
             <ProofSparkline />
           </view>
           <view v-else-if="variant === 'streak'" style="margin-top: 16px">
@@ -75,7 +82,7 @@
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand-2)')">{{ t.proof.teamReach }}</text>
             <view class="flex items-baseline" style="margin-top: 4px; gap: 6px">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
-              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ totalMembers }}</text>
+              <text class="font-display tabular-nums" :style="heroBigInlineStyle">{{ totalMembers === null ? "—" : totalMembers }}</text>
             </view>
           </view>
 
@@ -83,15 +90,15 @@
           <view class="grid grid-cols-3" style="margin-top: 16px; gap: 8px">
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ t.proof.activeDays }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueStyle">{{ activeDays }}</text>
+              <text class="block font-display tabular-nums" :style="miniValueStyle">{{ activeDays === null ? "—" : activeDays }}</text>
             </view>
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ t.proof.devices }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueStyle">{{ onlineDevices }}</text>
+              <text class="block font-display tabular-nums" :style="miniValueStyle">{{ onlineDevices === null ? "—" : onlineDevices }}</text>
             </view>
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ topPctLabel }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">Top {{ topPct }}%</text>
+              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">{{ topPctText }}</text>
             </view>
           </view>
 
@@ -100,8 +107,8 @@
             <text class="block font-mono-tabular" :style="chipsLabelStyle">{{ t.proof.achievementsRow }}</text>
             <view class="flex" style="gap: 6px; flex-wrap: wrap">
               <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand)')">{{ vRankChip }}</text>
-              <text v-if="longestOrCurrent > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand-2)')">{{ streakChip }}</text>
-              <text v-if="onlineDevices > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-tech-cyan)')">{{ devicesChip }}</text>
+              <text v-if="longestOrCurrent !== null && longestOrCurrent > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-brand-2)')">{{ streakChip }}</text>
+              <text v-if="onlineDevices !== null && onlineDevices > 0" class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-tech-cyan)')">{{ devicesChip }}</text>
               <text class="inline-block font-mono-tabular" :style="chipStyle('var(--v5-warning)')">{{ daysActiveChip }}</text>
             </view>
           </view>
@@ -187,6 +194,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -202,6 +210,8 @@ import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
+import { proofApi, remoteApiEnabled } from "@/api/runtime";
+import type { ProofSnapshot } from "@/api/proof-api";
 
 type Variant = "earnings" | "streak" | "network";
 const VARIANTS: Variant[] = ["earnings", "streak", "network"];
@@ -215,51 +225,71 @@ const faucet = useNexFaucet();
 
 const variant = ref<Variant>("earnings");
 const exportingPoster = ref(false);
+const remoteSnapshot = ref<ProofSnapshot | null>(null);
+const remoteError = ref(false);
+let remoteRequest = 0;
+async function refreshRemoteProof() {
+  const request = ++remoteRequest;
+  remoteError.value = false;
+  const expectedAccount = app.accountKey;
+  try {
+    const value = await proofApi.snapshot();
+    if (request === remoteRequest && expectedAccount === app.accountKey) remoteSnapshot.value = value;
+  } catch {
+    if (request === remoteRequest && expectedAccount === app.accountKey) { remoteSnapshot.value = null; remoteError.value = true; }
+  }
+}
+onShow(() => {
+  if (remoteApiEnabled) {
+    void refreshRemoteProof();
+    void vRank.refreshCanonicalVRank();
+  }
+});
 
-const earningsTotal = computed(() => app.earnings.total);
+const earningsTotal = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.earningsTotalUsdt ?? null : app.earnings.total);
+const earningsTotalText = computed(() => earningsTotal.value === null ? "—" : earningsTotal.value.toFixed(2));
 const onlineDevices = computed(
-  () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
+  () => remoteApiEnabled ? remoteSnapshot.value?.onlineDevices ?? null
+    : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
 const profileName = computed(() => profile.displayName);
-const myRank = computed(() => vRank.myRank);
-const totalMembers = computed(() => network.totalMembers);
-const streak = computed(() => faucet.signInStreak);
-const longestStreak = computed(() => faucet.longestStreak);
-const longestOrCurrent = computed(() => longestStreak.value || streak.value || 0);
+const myRank = computed(() => remoteApiEnabled && vRank.ladder.length === 0 ? null : vRank.myRank);
+const totalMembers = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? null : network.totalMembers);
+const streak = computed<number | null>(() => remoteApiEnabled ? null : faucet.signInStreak);
+const longestStreak = computed<number | null>(() => remoteApiEnabled ? null : faucet.longestStreak);
+const longestOrCurrent = computed<number | null>(() => longestStreak.value ?? streak.value ?? null);
 
-const joined = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(undefined, { month: "short", year: "numeric" }),
-);
-const activeDays = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
+const joined = computed(() => {
+  const raw = remoteApiEnabled ? remoteSnapshot.value?.joinedAt : app.user.joinedAt;
+  if (!raw) return "—";
+  const ts = typeof raw === "string" ? Date.parse(raw) : raw;
+  return Number.isFinite(ts) ? new Date(ts).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "—";
+});
+const activeDays = computed<number | null>(() => remoteApiEnabled ? remoteSnapshot.value?.activeDays ?? null
+  : Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
 
 // [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexgrid.ai/ref/)。
-const referralLink = computed(() => buildShareLink());
-const refCode = computed(() => app.user.referralCode);
+const refCode = computed(() => remoteApiEnabled ? remoteSnapshot.value?.referralCode ?? "—" : app.user.referralCode);
+const referralLink = computed(() => refCode.value === "—" ? "" : buildShareLink(refCode.value));
 
-const topPct = computed(() => {
-  const total = earningsTotal.value;
-  if (total > 1000) return 1;
-  if (total > 500) return 3;
-  if (total > 100) return 8;
-  if (total > 30) return 18;
-  return 35;
-});
+const topPct = computed(() => remoteApiEnabled ? remoteSnapshot.value?.topPercentile ?? null : null);
+const topPctText = computed(() => topPct.value === null ? "Top —" : `Top ${topPct.value}%`);
 
 const shareText = computed(() => {
   if (variant.value === "streak")
-    return `🔥 ${longestOrCurrent.value}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
+    return `🔥 ${longestOrCurrent.value ?? "—"}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
-    return `🌐 My NexGrid network is ${totalMembers.value} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotal.value.toFixed(2)} on NexGrid in ${activeDays.value} days. Join my network: ${referralLink.value}`;
+    return `🌐 My NexGrid network is ${totalMembers.value ?? "—"} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
+  return `💸 Earned $${earningsTotalText.value} on NexGrid in ${activeDays.value ?? "—"} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
 const memberSinceText = computed(() => fmt(t.value.proof.memberSince, { m: joined.value }));
-const topPctLabel = computed(() => t.value.proof.topPct.replace("{n}", String(topPct.value)));
-const vRankChip = computed(() => fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: V_RANKS[myRank.value].title }));
-const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value) }));
-const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value) }));
-const daysActiveChip = computed(() => fmt(t.value.proof.badges.daysActive, { n: String(activeDays.value) }));
+const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPct.replace("{n}", "—") : t.value.proof.topPct.replace("{n}", String(topPct.value)));
+const vRankChip = computed(() => myRank.value === null ? "V—" : fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: V_RANKS[myRank.value].title }));
+const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value ?? "—") }));
+const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value ?? "—") }));
+const daysActiveChip = computed(() => fmt(t.value.proof.badges.daysActive, { n: String(activeDays.value ?? "—") }));
 
 // ── share actions (P-028: uni.share? + setClipboardData fallback) ──
 function nativeShare() {
@@ -389,7 +419,7 @@ function posterMetricLabel(): string {
 function posterMetricValue(): string {
   if (variant.value === "streak") return `${longestOrCurrent.value} ${t.value.proof.daysShort}`;
   if (variant.value === "network") return String(totalMembers.value);
-  return `$${earningsTotal.value.toFixed(2)}`;
+  return `$${earningsTotalText.value}`;
 }
 
 function drawPosterQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number) {
@@ -470,6 +500,8 @@ function tint(svg: string, color: string): string {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px 32px" };
+const remoteErrorStyle: CSSProperties = { margin: "0 16px 12px", padding: "12px", borderRadius: "12px", background: "color-mix(in srgb, var(--v5-warning) 10%, transparent)" };
+const remoteRetryStyle: CSSProperties = { minHeight: "44px", display: "grid", placeItems: "center", marginTop: "6px", color: "var(--v5-warning)" };
 const variantLabelStyle: CSSProperties = {
   marginBottom: "6px",
   fontSize: "12px",

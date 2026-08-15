@@ -12,10 +12,17 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet" :title="t.cards.listTitle" :subtitle="t.cards.listSubtitle" />
+      <FundsSandboxBadge />
 
       <view :style="bodyStyle">
+        <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
+          <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
+          <view class="inline-flex items-center justify-center active:opacity-80" :style="refreshRetryStyle" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
+            <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+          </view>
+        </view>
         <!-- Empty -->
-        <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="t.empty.cardsCta" @cta="goNew" />
+        <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="cardBindingAvailable ? t.empty.cardsCta : undefined" @cta="goNew" />
 
         <!-- Card rows -->
         <view v-for="card in cards" :key="card.tokenId" :style="cardRowStyle">
@@ -34,7 +41,7 @@
               <text class="block font-mono-tabular" :style="cardMetaStyle">{{ rowMeta(card) }}</text>
             </view>
           </view>
-          <view v-if="!remoteApiEnabled" class="flex" :style="cardActionsStyle">
+          <view class="flex" :style="cardActionsStyle">
             <view v-if="card.tokenId !== defaultTokenId" class="flex-1 grid place-items-center active:bg-[var(--v5-surface-2)]" :style="actionBtnStyle" @click="setDefault(card.tokenId)">
               <view class="inline-flex items-center" style="gap: 6px">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
@@ -51,7 +58,7 @@
         </view>
 
         <!-- Add new -->
-        <view class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" @click="goNew">
+        <view v-if="cardBindingAvailable" class="flex items-center justify-center active:scale-[0.98]" :style="addBtnStyle" @click="goNew">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>
           <text style="margin-left: 6px" :style="addBtnTextStyle">{{ t.cards.addNew }}</text>
         </view>
@@ -63,7 +70,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -73,21 +81,38 @@ import { confirm, toast } from "@/store/ui";
 import { useCards, brandLabel, type SavedCard } from "@/store/cards";
 import { useNotifications } from "@/store/notifications";
 import { cardUnboundNotification } from "@/mock/card-notifications";
-import { remoteApiEnabled } from "@/api/runtime";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
+import { remoteApiEnabled, paymentSandboxEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();
 const notifs = useNotifications();
+const cardBindingAvailable = computed(() => !remoteApiEnabled || paymentSandboxEnabled);
 
 const cards = computed(() => cardsStore.cards);
 const defaultTokenId = computed(() => cardsStore.defaultTokenId);
+const remoteCardsError = ref(false);
+const remoteCardsRefreshing = ref(false);
+
+async function refreshCards() {
+  if (!remoteApiEnabled || remoteCardsRefreshing.value) return;
+  remoteCardsRefreshing.value = true;
+  try {
+    remoteCardsError.value = !(await cardsStore.refreshRemote());
+  } finally {
+    remoteCardsRefreshing.value = false;
+  }
+}
+
+onShow(() => { void refreshCards(); });
 
 function rowMeta(card: SavedCard): string {
   return fmt(t.value.cards.rowMeta, { expiry: card.expiry, holder: card.holder });
 }
 
-function setDefault(tokenId: string) {
-  cardsStore.setDefault(tokenId);
+async function setDefault(tokenId: string) {
+  try { await cardsStore.setDefault(tokenId); remoteCardsError.value = false; toast.success(t.value.cards.setDefault); }
+  catch { remoteCardsError.value = remoteApiEnabled; toast.error(t.value.security.opFailed); }
 }
 
 async function handleRemove(card: SavedCard) {
@@ -100,7 +125,8 @@ async function handleRemove(card: SavedCard) {
     cancelLabel: t.value.cards.unbindCancelLabel,
   });
   if (ok) {
-    cardsStore.remove(card.tokenId);
+    try { await cardsStore.remove(card.tokenId); }
+    catch { remoteCardsError.value = remoteApiEnabled; toast.error(t.value.security.opFailed); return; }
     // card.unbound → 通知中心(FEAT-CARDS02 模板;PRODUCTION 由后端事件触发推送,mock 在事件源同步入 feed)
     notifs.push(cardUnboundNotification(t.value.notifs, card));
     toast.success(t.value.cards.unbindToast);
@@ -108,6 +134,7 @@ async function handleRemove(card: SavedCard) {
 }
 
 function goNew() {
+  if (!cardBindingAvailable.value) return;
   uni.navigateTo({ url: "/pages/me/wallet-cards-new", fail: () => {} });
 }
 
@@ -168,5 +195,20 @@ const disclaimerStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
+};
+const refreshErrorStyle: CSSProperties = {
+  padding: "12px 14px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface))",
+  borderRadius: "16px",
+};
+const refreshErrorTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const refreshRetryStyle: CSSProperties = {
+  minHeight: "34px",
+  marginTop: "8px",
+  padding: "0 12px",
+  borderRadius: "999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "12px",
 };
 </script>

@@ -13,17 +13,17 @@
 
     <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
       <view
-        v-for="(c, i) in GRID_CLIENTS"
+        v-for="(c, i) in gridClients"
         :key="c.id"
         class="grid items-center gap-3 px-4 py-2.5"
-        :style="{ gridTemplateColumns: '32px 1fr auto', borderBottom: i < GRID_CLIENTS.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
+        :style="{ gridTemplateColumns: '32px 1fr auto', borderBottom: i < gridClients.length - 1 ? '1px solid var(--v5-border)' : 'none' }"
       >
         <view class="grid place-items-center" style="width: 30px; height: 30px; border-radius: 8px; background: var(--v5-brand-soft)">
           <text :style="{ color: c.color, fontFamily: 'var(--font-v5)', fontWeight: 600, fontSize: '12px' }">{{ c.id }}</text>
         </view>
         <view class="min-w-0">
-          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.model }}</text>
-          <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.name }} <text style="color: var(--v5-ink-4)">· {{ c.city }}</text></text>
+          <text class="block truncate" style="font-family: var(--font-v5); font-weight: 500; font-size: 13px; color: var(--v5-ink); letter-spacing: -0.008em">{{ c.model ?? "—" }}</text>
+          <text class="block font-mono-tabular mt-0.5 truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ c.name ?? "—" }} <text style="color: var(--v5-ink-4)">· {{ c.city ?? "—" }}</text></text>
         </view>
         <text class="font-mono-tabular tabular-nums text-right whitespace-nowrap" style="font-size: 12px; color: var(--v5-success-ink); font-weight: 500">{{ gpusText(i) }}</text>
       </view>
@@ -41,7 +41,7 @@
       </view>
       <view v-else class="px-4 py-2 flex items-center justify-between font-mono-tabular" style="border-top: 1px solid var(--v5-border); background: var(--v5-surface-2); font-size: 12px; color: var(--v5-ink-3)">
         <text v-if="devicesBad">{{ t.home.networkStatUpdating }}</text>
-        <text v-else><text style="color: var(--v5-ink); font-weight: 500">{{ app.global.activeDevices.toLocaleString() }}</text> {{ t.home.onGridOnline }}</text>
+        <text v-else><text style="color: var(--v5-ink); font-weight: 500">{{ activeDevicesText }}</text> {{ t.home.onGridOnline }}</text>
         <text v-if="fleetBad">{{ t.home.networkStatUpdating }}</text>
         <text v-else style="color: var(--v5-success-ink); font-weight: 500">{{ perSecText }}</text>
       </view>
@@ -56,6 +56,7 @@ import { useApp } from "@/store/app";
 import { useConfig } from "@/store/config";
 import { computed } from "vue";
 import { payoutPerSecUsdOf, publicStatsHealth } from "@/lib/platform-stats";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -68,15 +69,20 @@ const psHealth = computed(() => {
   const ps = cfg.config.publicStats;
   return ps ? publicStatsHealth(ps) : null;
 });
-const devicesBad = computed(() => cfg.syncFailed || !psHealth.value?.devicesOk);
-const fleetBad = computed(() => cfg.syncFailed || !psHealth.value?.fleetOk);
+const devicesBad = computed(() => remoteApiEnabled ? app.homeTruth?.onGrid.activeDevices == null : cfg.syncFailed || !psHealth.value?.devicesOk);
+const fleetBad = computed(() => remoteApiEnabled ? app.homeTruth?.onGrid.perSecUsdt == null : cfg.syncFailed || !psHealth.value?.fleetOk);
 const perSecText = computed(() => {
+  if (remoteApiEnabled) {
+    const value = app.homeTruth?.onGrid.perSecUsdt;
+    return value == null ? "" : `+$${value.toFixed(1)}/sec`;
+  }
   const ps = cfg.config.publicStats;
   if (!ps || fleetBad.value) return "";
   return `+$${payoutPerSecUsdOf(ps).toFixed(1)}/sec`;
 });
 function retryConfig() {
-  void cfg.load();
+  if (remoteApiEnabled) void app.refreshRemoteFleet();
+  else void cfg.load();
 }
 
 const GRID_CLIENTS = [
@@ -85,8 +91,18 @@ const GRID_CLIENTS = [
   { id: "E", name: "Echo Earbuds", model: "Whisper tiny", color: "var(--v5-tech-cyan-ink)", city: "Tokyo" },
 ];
 
+const gridClients = computed(() => remoteApiEnabled
+  ? (app.homeTruth?.onGrid.clients ?? []).map((client) => ({ ...client, color: "var(--v5-brand)" }))
+  : GRID_CLIENTS.map((client, index) => ({ ...client, gpus: 30 + index * 27 })));
+const activeDevicesText = computed(() => {
+  if (!remoteApiEnabled) return app.global.activeDevices.toLocaleString();
+  const value = app.homeTruth?.onGrid.activeDevices;
+  return value === null || value === undefined ? "—" : value.toLocaleString();
+});
+
 function gpusText(i: number) {
-  return fmt(t.value.home.onGridGpus, { n: 30 + i * 27 });
+  const value = remoteApiEnabled ? gridClients.value[i]?.gpus ?? null : 30 + i * 27;
+  return value === null ? "—" : fmt(t.value.home.onGridGpus, { n: value });
 }
 function goGlobe() {
   uni.navigateTo({ url: "/pages/globe/globe", fail: () => {} });

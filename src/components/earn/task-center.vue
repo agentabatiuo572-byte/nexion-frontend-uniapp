@@ -16,7 +16,7 @@
       <text style="font-family: var(--font-v5); font-size: 15px; font-weight: 600; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.earn.taskCenter }}</text>
       <view class="flex items-center gap-1" style="font-size: 12px; color: var(--v5-ink-3)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>
-        <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ app.global.activeJobs.toLocaleString() }}</text>
+        <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-brand)">{{ activeJobsText }}</text>
         <text>{{ t.earn.jobsLive }}</text>
       </view>
     </view>
@@ -75,7 +75,10 @@
         <text class="flex-1 truncate min-w-0" style="color: var(--v5-ink-2)">{{ task.model }}<text style="color: var(--v5-ink-4); margin: 0 4px">·</text><text style="color: var(--v5-ink-3)">{{ workloadLabel(task.category) }}</text></text>
         <text class="tabular-nums shrink-0" style="font-family: var(--font-v5); color: var(--v5-warning-ink)">+${{ task.reward.toFixed(3) }}</text>
         <text class="text-right shrink-0" style="font-size: 12px; color: var(--v5-ink-3); width: 48px">{{ shortTime(task.completedAt) }}</text>
-        <view v-if="receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
+        <view v-if="remoteApiEnabled && task.receiptNo" class="shrink-0 grid place-items-center" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-brand)" :title="task.receiptNo">
+          <text style="font-size: 9px; font-weight: 700">R</text>
+        </view>
+        <view v-else-if="!remoteApiEnabled && receiptFor(task.id)" class="shrink-0 grid place-items-center active:opacity-60" style="width: 22px; height: 22px; border-radius: 6px; color: var(--v5-ink-4)" @click="openReceipt = receiptFor(task.id) ?? null">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" /><path d="M14 8H8" /><path d="M16 12H8" /><path d="M13 16H8" /></svg>
         </view>
         <view v-else class="shrink-0" style="width: 22px; height: 22px" />
@@ -95,15 +98,20 @@ import { workloadLabel as resolveWorkloadLabel } from "@/lib/workload-label";
 import ReceiptModal from "@/components/me/receipt-modal.vue";
 import { useReceipts } from "@/store/receipts";
 import type { Receipt } from "@/mock/receipt";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const app = useApp();
 const t = useT();
-const receipts = useReceipts();
+const receipts = remoteApiEnabled ? null : useReceipts();
 const openReceipt = ref<Receipt | null>(null);
 prepareEarnConfig();
 const earnConfig = useEarnConfig();
+const activeJobsText = computed(() => {
+  const value = remoteApiEnabled ? app.homeTruth?.onGrid.activeJobs ?? null : app.global.activeJobs;
+  return value === null ? "—" : value.toLocaleString();
+});
 function receiptFor(id: string): Receipt | undefined {
-  return receipts.byId(id);
+  return receipts?.byId(id);
 }
 
 // Model names are proper nouns (untranslated); the workload half is copy.

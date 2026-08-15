@@ -17,6 +17,8 @@ import type {
   GenesisAccountState,
   GenesisEmission,
   GenesisHolding,
+  GenesisEligibility,
+  GenesisMarketStats,
   GenesisPublicState,
 } from "@/api/genesis-api";
 
@@ -116,7 +118,7 @@ export interface GenesisEligibilityCtx {
 }
 
 export interface GenesisGateCondition {
-  key: "deposit" | "flagship" | "vrank" | "invite";
+  key: "deposit" | "flagship" | "vrank" | "invite" | "server";
   met: boolean;
   current: number;
   target: number;
@@ -210,6 +212,7 @@ interface GenesisUserData {
   myOwned: number;
   ownedTokenIds: number[];
   myListings: MyListing[];
+  idempotencyKeys?: Record<string, string>;
 }
 
 const STORAGE_KEY = "nexgrid-genesis"; // 仅全平台片
@@ -224,7 +227,7 @@ function globalDefaults(): GenesisGlobalData {
 }
 
 function userDefaults(): GenesisUserData {
-  return { myOwned: 0, ownedTokenIds: [], myListings: [] };
+  return { myOwned: 0, ownedTokenIds: [], myListings: [], idempotencyKeys: {} };
 }
 
 // 旧全局键里的存量 myOwned/ownedTokenIds/myListings 不迁移:设备级数据无账号
@@ -260,12 +263,19 @@ function hydrateUser(accountKey: string, soldSlots: number): GenesisUserData {
     myOwned: owned,
     ownedTokenIds: ids,
     myListings: Array.isArray(row.myListings) ? row.myListings : [],
+    idempotencyKeys: row.idempotencyKeys && typeof row.idempotencyKeys === "object"
+      ? { ...row.idempotencyKeys } : {},
   };
+}
+
+function remoteDefaults(): GenesisGlobalData {
+  // Remote mode starts unknown, never with the mock's seeded 847 slots.
+  return { soldSlots: 0, nexListed: false, nexListedAt: null };
 }
 
 export const useGenesis = defineStore("genesis", () => {
   const cfg = useGenesisConfig(); // 单向读配置(档位定价);同 free-trial→trial-config 先例
-  const initGlobal = remoteApiEnabled ? globalDefaults() : hydrateGlobal();
+  const initGlobal = remoteApiEnabled ? remoteDefaults() : hydrateGlobal();
   // 账号维度。boot 期与 app store 同款落 "default";账号确定后由
   // lib/account-scope 的 rebindAccountScopedStores 统一重绑(P-031 store 不互 import)。
   let boundKey = "default";
@@ -282,9 +292,15 @@ export const useGenesis = defineStore("genesis", () => {
   const listingNoByTokenId = ref<Record<number, string>>({});
   const remoteListings = ref<Array<{ tokenId: number; holdingNo: string; priceUSDT: number; seller: string; listedAt: number }>>([]);
   const remoteTransactions = ref<GenesisPublicState["transactions"]>([]);
+  const remoteMarketStats = ref<GenesisMarketStats>({
+    floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null,
+  });
+  const remoteEligibility = ref<GenesisEligibility | null>(null);
+  const remoteHalted = ref(false);
   const remoteHoldings = ref<GenesisHolding[]>([]);
   const remoteEmissions = ref<GenesisEmission[]>([]);
   const hasGenesisInvite = ref(false);
+  const intentKeys = ref<Record<string, string>>(initUser.idempotencyKeys ?? {});
   const remoteAccountEpoch = createRemoteAccountEpoch(boundKey);
 
   function tokenIdFor(value: string): number {
@@ -298,6 +314,8 @@ export const useGenesis = defineStore("genesis", () => {
     soldSlots.value = state.series.soldSupply;
     nexListed.value = state.emissionOpen;
     remoteTransactions.value = [...state.transactions];
+    remoteMarketStats.value = state.marketStats;
+    remoteHalted.value = state.marketEnabled !== true;
     const listingMap: Record<number, string> = {};
     remoteListings.value = state.listings.map((listing) => {
       const tokenId = tokenIdFor(listing.holdingNo);
@@ -323,6 +341,8 @@ export const useGenesis = defineStore("genesis", () => {
     ownedTokenIds.value = ids;
     myOwned.value = ids.length;
     hasGenesisInvite.value = state.eligibility.hasGenesisInvite;
+    remoteEligibility.value = state.eligibility;
+    remoteHalted.value = state.marketEnabled !== true || state.eligibility.halted === true;
     myListings.value = state.holdings
       .filter((holding) => holding.status === "LISTED" && holding.listingPriceUsdt !== null)
       .map((holding) => ({ tokenId: tokenIdFor(holding.holdingNo), askPriceUSDT: holding.listingPriceUsdt!, listedAt: holding.listedAt ?? Date.now() }));
@@ -343,6 +363,9 @@ export const useGenesis = defineStore("genesis", () => {
     myListings.value = [];
     myOwned.value = 0;
     hasGenesisInvite.value = false;
+    remoteEligibility.value = null;
+    remoteHalted.value = true;
+    remoteMarketStats.value = { floorUsdt: null, volume24hUsdt: null, owners: null, floorDeltaPct: null, lastSaleUsdt: null };
   }
 
   async function syncRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
@@ -356,9 +379,11 @@ export const useGenesis = defineStore("genesis", () => {
     if (!remoteAccountEpoch.isCurrent(request)) return false;
     applyPublicState(publicState);
     try {
-      const accountState = await genesisApi.account();
+      const [accountState, eligibility] = await Promise.all([genesisApi.account(), genesisApi.eligibility()]);
       if (!remoteAccountEpoch.isCurrent(request)) return false;
       applyAccountState(accountState);
+      remoteEligibility.value = eligibility;
+      remoteHalted.value = remoteHalted.value || eligibility.halted === true;
     } catch {
       if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
@@ -380,6 +405,7 @@ export const useGenesis = defineStore("genesis", () => {
       myOwned: myOwned.value,
       ownedTokenIds: ownedTokenIds.value,
       myListings: myListings.value,
+      idempotencyKeys: intentKeys.value,
     });
   }
 
@@ -389,6 +415,7 @@ export const useGenesis = defineStore("genesis", () => {
     boundKey = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
       remoteAccountEpoch.bind(boundKey);
+      intentKeys.value = {};
       clearRemoteFacts();
       void syncRemote(remoteAccountEpoch.snapshot());
       return;
@@ -401,6 +428,7 @@ export const useGenesis = defineStore("genesis", () => {
     myOwned.value = u.myOwned;
     ownedTokenIds.value = u.ownedTokenIds;
     myListings.value = u.myListings;
+    intentKeys.value = u.idempotencyKeys ?? {};
     void syncRemote();
   }
 
@@ -501,6 +529,31 @@ export const useGenesis = defineStore("genesis", () => {
     purchaseIntentKey = "";
   }
 
+  /** Account-scoped stable command key. It survives reloads and is reused when
+   * the network result is unknown; changing the requested intent creates a new
+   * slot without incorporating time or random state. */
+  function stableIntent(operation: string, target: string): string {
+    const scope = `${boundKey}|${operation}|${target}`;
+    const existing = intentKeys.value[scope];
+    if (existing) return existing;
+    const key = `genesis:${boundKey}:${operation}:${target}`;
+    intentKeys.value = { ...intentKeys.value, [scope]: key };
+    persist();
+    return key;
+  }
+
+  /** Retire a command key only after the mutation response was received.
+   * A timeout keeps the key for read-back/replay; a confirmed success must not
+   * poison a later, distinct list/cancel intent for the same holding. */
+  function retireIntent(operation: string, target: string): void {
+    const scope = `${boundKey}|${operation}|${target}`;
+    if (!(scope in intentKeys.value)) return;
+    const next = { ...intentKeys.value };
+    delete next[scope];
+    intentKeys.value = next;
+    persist();
+  }
+
   async function purchase(
     n: number,
     tokenIds?: number[],
@@ -595,11 +648,13 @@ export const useGenesis = defineStore("genesis", () => {
     const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 同一个持仓挂不出第二个单,重放是空操作。
-      const state = await genesisApi.list(holdingNo, askPriceUSDT, `genesis-list:${holdingNo}:${Date.now()}`);
+      const target = `${holdingNo}:${askPriceUSDT.toFixed(6)}`;
+      const state = await genesisApi.list(holdingNo, askPriceUSDT, stableIntent("list", target));
       if (!remoteAccountEpoch.isCurrent(request)) return false;
       applyAccountState(state);
+      retireIntent("list", target);
       return syncRemote(request);
-    } catch { return false; }
+    } catch { await syncRemote(request); return false; }
     }
 
     // ↓↓ mock 模式走这里(本仓的 server 同构面)。
@@ -640,11 +695,12 @@ export const useGenesis = defineStore("genesis", () => {
     const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 撤单目标由 holdingNo 唯一指定,重放 = 再撤同一笔 = 空操作。
-      const state = await genesisApi.cancel(holdingNo, `genesis-cancel:${holdingNo}:${Date.now()}`);
+      const state = await genesisApi.cancel(holdingNo, stableIntent("cancel", holdingNo));
       if (!remoteAccountEpoch.isCurrent(request)) return false;
       applyAccountState(state);
+      retireIntent("cancel", holdingNo);
       return syncRemote(request);
-    } catch { return false; }
+    } catch { await syncRemote(request); return false; }
     }
 
     // ↓↓ mock 模式走这里(本仓的 server 同构面)。
@@ -671,11 +727,13 @@ export const useGenesis = defineStore("genesis", () => {
     try {
       // IDEMPOTENCY-FRESH-OK: 目标由 holdingNo 唯一指定 —— 挂单成交后就没了,重放只会失败,钱只扣一次。
       // (对照:purchase(n) 要的是「n 个新节点」,没有目标身份,所以那条必须冻结钥匙。)
-      const state = await genesisApi.buy(holdingNo, `genesis-buy:${holdingNo}:${Date.now()}`);
+      const state = await genesisApi.buy(holdingNo, stableIntent("buy", holdingNo));
       if (!remoteAccountEpoch.isCurrent(request)) return false;
       applyAccountState(state);
+      retireIntent("buy", holdingNo);
       return syncRemote(request);
     } catch (error) {
+      await syncRemote(request);
       // Preserve the backend policy/error token for the visible purchase surface.
       // Treating every rejection as "insufficient funds" hides geo-policy and
       // fail-closed responses and makes the user retry an action that cannot pass.
@@ -726,7 +784,8 @@ export const useGenesis = defineStore("genesis", () => {
     totalSlots, soldSlots, myOwned, ownedTokenIds, myListings, unitPriceUSDT, lastTickTs,
     nexListed, nexListedAt, dividendsOpen, currentTier,
     remaining, soldPct, tierRemaining, setNexListed, emissionSnapshot, reservedAllocationNEX,
-    remoteListings, remoteTransactions, remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
+    remoteListings, remoteTransactions, remoteMarketStats, remoteEligibility, remoteHalted,
+    remoteHoldings, remoteEmissions, hasGenesisInvite, syncRemote,
     purchase, listNode, cancelListing, acquireSecondary, tickSales, bindAccount,
   };
 });

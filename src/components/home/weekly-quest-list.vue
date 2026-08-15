@@ -1,10 +1,10 @@
 <!-- Weekly Tier 2 is a server-authoritative list; pending rows only refresh status. -->
 <template>
   <view v-if="mounted && wq.error" class="mx-4 mt-3 px-4 py-3 active:opacity-70" :style="cardStyle" role="button" tabindex="0" @click="retry">
-    <text :style="pendingLabelStyle">Weekly quests unavailable · tap to retry</text>
+    <text :style="pendingLabelStyle">{{ w.loadError }}</text>
   </view>
   <view v-else-if="mounted && !wq.snapshot" class="mx-4 mt-3 px-4 py-3" :style="cardStyle">
-    <text :style="pendingLabelStyle">Loading weekly quests…</text>
+    <text :style="pendingLabelStyle">{{ w.loading }}</text>
   </view>
   <view v-else-if="mounted" class="mx-4 mt-3 overflow-hidden" :style="cardStyle">
     <!-- Header -->
@@ -47,7 +47,7 @@
         </view>
       </view>
       <view v-if="tier2Quests.length === 0" class="px-4 py-3" :style="pendingLabelStyle" @click="retry">
-        No weekly quests available
+        {{ w.empty }}
       </view>
     </view>
 

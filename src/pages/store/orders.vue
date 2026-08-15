@@ -12,12 +12,21 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
+      <view v-if="remoteOrdersError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+        <view class="flex items-center justify-between" style="gap: 12px">
+          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrdersRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrders">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- Empty state -->
-      <EmptyState v-if="orderList.length === 0" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
+      <EmptyState v-if="!remoteOrdersError && orderList.length === 0" kind="empty-list" :title="t.empty.ordersTitle" :desc="t.empty.ordersDesc" :cta-label="t.empty.ordersCta" @cta="goStore" />
 
       <!-- Order list — transparent hairline group (row cards flattened; the
            container border-top opens the group, each row keeps a divider). -->
-      <view v-else class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
+      <view v-else-if="!remoteOrdersError" class="mx-4" style="padding: 0 2px; border-top: 1px solid var(--v5-border)">
         <view
           v-for="(o, i) in orderList"
           :key="o.id"
@@ -52,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import { useT } from "@/i18n/use-t";
@@ -60,11 +69,26 @@ import { useOrders, type OrderStatus } from "@/store/orders";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
 import { onShow } from "@dcloudio/uni-app";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
 const orderList = computed(() => orders.orders);
-onShow(() => { void orders.refreshRemote().catch(() => undefined); });
+const remoteOrdersError = ref(false);
+const remoteOrdersRefreshing = ref(false);
+async function refreshOrders() {
+  if (!remoteApiEnabled || remoteOrdersRefreshing.value) return;
+  remoteOrdersRefreshing.value = true;
+  remoteOrdersError.value = false;
+  try {
+    await orders.refreshRemote();
+  } catch {
+    remoteOrdersError.value = true;
+  } finally {
+    remoteOrdersRefreshing.value = false;
+  }
+}
+onShow(() => { void refreshOrders(); });
 
 // Sticky chassis nav header — back + "Orders" title, no subtitle (IDC-hosted
 // colocation, nothing ships to the user, so the old "track your hardware
@@ -116,6 +140,20 @@ function goStore() {
 function goDetail(id: string) {
   navTo(`/pages/store/order-detail?id=${id}`);
 }
+
+const remoteErrorStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "10px 12px",
+  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+};
+const retryBtnStyle: CSSProperties = {
+  minHeight: "32px",
+  padding: "0 10px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink)",
+  fontSize: "12px",
+};
 
 // ─── styles ───
 // Empty state — dashed outline on the page floor, no fill (whitelist idiom).

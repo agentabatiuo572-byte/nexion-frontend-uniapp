@@ -230,15 +230,16 @@ let pulseTimer = 0;
 
 const global = computed(() => app.global);
 const activeNodesText = computed(() => {
-  if (remoteApiEnabled) return (networkProjection.value?.activeNodes ?? 0).toLocaleString();
+  if (remoteApiEnabled) return networkProjection.value?.activeNodes === undefined ? "—" : networkProjection.value.activeNodes.toLocaleString();
   const health = publicStatsHealth(cfg.config.publicStats);
   return cfg.syncFailed || !health.devicesOk
     ? t.value.home.networkStatUpdating
     : global.value.activeDevices.toLocaleString();
 });
-const activeJobsText = computed(() => (remoteApiEnabled
-  ? networkProjection.value?.activeJobs ?? 0
-  : global.value.activeJobs).toLocaleString());
+const activeJobsText = computed(() => {
+  if (remoteApiEnabled) return networkProjection.value?.activeJobs === undefined ? "—" : networkProjection.value.activeJobs.toLocaleString();
+  return global.value.activeJobs.toLocaleString();
+});
 
 const regions = computed<GlobeRegion[]>(() => remoteApiEnabled
   ? (networkProjection.value?.regions ?? []).map((region, index, all) => ({

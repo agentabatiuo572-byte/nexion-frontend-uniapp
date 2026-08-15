@@ -14,6 +14,9 @@
   <AppChassis active="me">
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/me" :title="t.security.title" />
+      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="mx-4" :style="mockModeBannerStyle" data-testid="mock-security-label">
+        <text :style="mockModeBannerTextStyle">{{ modeLabel }}</text>
+      </view>
 
       <view
         v-if="retiredFlow"
@@ -62,7 +65,7 @@
             <view :style="toggleThumbStyle" />
           </view>
         </view>
-        <view v-if="remoteApiEnabled" :style="pwdFormStyle">
+        <view :style="pwdFormStyle">
           <input class="w-full" :style="pwdInputStyle" password :value="twoFactorPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onTwoFactorPassword" />
         </view>
       </view>
@@ -110,12 +113,12 @@
           <input class="w-full" :style="pwdInputStyle" password :value="deletionPassword" :placeholder="t.security.currentPassword" :maxlength="PASSWORD_MAX_LENGTH" @input="onDeletionPassword" />
         </view>
         <view v-if="remoteApiEnabled && deletionCanCancel" class="flex items-center justify-center active:opacity-70"
-          :style="revokeAllRowStyle" role="button" tabindex="0" aria-label="Cancel deletion request"
+          :style="revokeAllRowStyle" role="button" tabindex="0" :aria-label="t.security.cancelDeletionRequest"
           @click="handleCancelAccountDeletion">
-          <text :style="revokeAllLabelStyle">Cancel deletion request</text>
+          <text :style="revokeAllLabelStyle">{{ t.security.cancelDeletionRequest }}</text>
         </view>
       </view>
-      <text class="block mx-4" :style="footerStyle">{{ deletionStatus.status === 'BLOCKED' ? `Deletion blocked: ${deletionStatus.blockReason ?? deletionStatus.reason ?? 'pending financial or order settlement'}` : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
+      <text class="block mx-4" :style="footerStyle">{{ deletionStatus.status === 'BLOCKED' ? fmt(t.security.deleteAccountBlocked, { reason: deletionStatus.blockReason ?? deletionStatus.reason ?? t.security.deleteAccountPendingReason }) : deletionPending ? t.security.deleteAccountPending : t.security.deleteAccountHint }}</text>
     </view>
   </AppChassis>
 </template>
@@ -128,7 +131,7 @@ import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useSecurity } from "@/store/security";
-import { rebindAccountScopedStores } from "@/lib/account-scope";
+import { captureAccountScope, isCurrentAccountScope, rebindAccountScopedStores } from "@/lib/account-scope";
 import { useAuth } from "@/store/auth";
 import { useApp } from "@/store/app";
 // ↓ 注销的提交前明示要用锁仓本金(PRD §4.5a.1:提交前逐条明示,金额取提交时刻真实数值)
@@ -137,7 +140,8 @@ import { navTo } from "@/lib/route";
 import { useSession, type SessionListItem } from "@/store/session";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
-import { accountApi, authApi, remoteApiEnabled } from "@/api/runtime";
+import { accountApi, authApi, apiRuntimeConfig, remoteApiEnabled } from "@/api/runtime";
+import { deleteMockAuthAccount } from "@/api/mock-auth-api";
 import type { SecurityState } from "@/api/contracts";
 import type { AccountDeletionStatus } from "@/api/account-api";
 
@@ -173,6 +177,7 @@ const deletionCommandKey = ref("");
 const twoFactorEnabled = computed(() => remoteApiEnabled
   ? remoteSecurity.value?.twoFactorEnabled === true
   : security.twoFactorEnabled);
+const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
 const sessions = computed<SessionListItem[]>(() => remoteApiEnabled
   ? (remoteSecurity.value?.sessions ?? []).map((item) => ({
       id: item.id,
@@ -201,17 +206,23 @@ const passwordHintLine = computed(() =>
   )),
 );
 
-async function loadRemoteSecurity(): Promise<void> {
+async function loadRemoteSecurity(): Promise<boolean> {
+  const scope = captureAccountScope();
+  const accountKey = auth.accountId;
   try {
     const [securityState, accountDeletion] = await Promise.all([
       accountApi.securityOverview(),
       accountApi.accountDeletionStatus(),
     ]);
+    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return false;
     remoteSecurity.value = securityState;
     deletionStatus.value = accountDeletion;
+    return true;
   } catch (cause) {
+    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return false;
     console.warn("[security] overview load failed:", cause);
     err.value = t.value.security.opFailed;
+    return false;
   }
 }
 
@@ -297,15 +308,17 @@ async function submitPasswordChange() {
   }
   securityBusy.value = true;
   try {
-    if (remoteApiEnabled) {
-      await accountApi.changePassword(current.value, next.value);
-      await loadRemoteSecurity();
+      if (remoteApiEnabled) {
+        await accountApi.changePassword(current.value, next.value);
+        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
     } else {
-      security.changePassword(next.value);
+      security.changePassword(current.value, next.value);
     }
   } catch (cause) {
     console.warn("[security] password update failed:", cause);
-    err.value = t.value.security.opFailed;
+    err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
+      ? t.value.login.errorInvalidCredentials
+      : t.value.security.opFailed;
     securityBusy.value = false;
     return;
   }
@@ -319,7 +332,7 @@ async function submitPasswordChange() {
 
 async function toggleTwoFactor(value: boolean) {
   if (securityBusy.value) return;
-  if (remoteApiEnabled && !twoFactorPassword.value) {
+  if (!twoFactorPassword.value) {
     err.value = t.value.login.errorInvalidPassword;
     return;
   }
@@ -335,13 +348,16 @@ async function toggleTwoFactor(value: boolean) {
       try {
         if (remoteApiEnabled) {
           await accountApi.updateTwoFactor(false, twoFactorPassword.value);
-          await loadRemoteSecurity();
+          if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
           twoFactorPassword.value = "";
-        } else security.setTwoFactor(false);
+        } else security.setTwoFactor(false, twoFactorPassword.value);
+        twoFactorPassword.value = "";
         toast.warn(t.value.security.twoFactorDisabledToast);
       } catch (cause) {
         console.warn("[security] 2FA update failed:", cause);
-        err.value = t.value.security.opFailed;
+        err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
+          ? t.value.login.errorInvalidCredentials
+          : t.value.security.opFailed;
       } finally {
         securityBusy.value = false;
       }
@@ -351,13 +367,16 @@ async function toggleTwoFactor(value: boolean) {
     try {
       if (remoteApiEnabled) {
         await accountApi.updateTwoFactor(true, twoFactorPassword.value);
-        await loadRemoteSecurity();
+        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
         twoFactorPassword.value = "";
-      } else security.setTwoFactor(true);
+      } else security.setTwoFactor(true, twoFactorPassword.value);
+      twoFactorPassword.value = "";
       toast.success(t.value.security.twoFactorEnabledToast);
     } catch (cause) {
       console.warn("[security] 2FA update failed:", cause);
-      err.value = t.value.security.opFailed;
+      err.value = cause instanceof Error && cause.message === "USER_INVALID_CREDENTIALS"
+        ? t.value.login.errorInvalidCredentials
+        : t.value.security.opFailed;
     } finally {
       securityBusy.value = false;
     }
@@ -374,11 +393,13 @@ async function handleRevoke(s: SessionListItem) {
     try {
       if (remoteApiEnabled) {
         await accountApi.revokeSession(s.id);
-        await loadRemoteSecurity();
+        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
       } else session.revokeSession(s.id);
       toast.success(t.value.security.sessionRevoked);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSION_REVOKE_FAILED");
+      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
+        ? t.value.security.opFailed
+        : cause instanceof Error ? cause.message : t.value.security.opFailed);
     }
   }
 }
@@ -394,11 +415,13 @@ async function handleRevokeAll() {
     try {
       if (remoteApiEnabled) {
         await accountApi.revokeOtherSessions();
-        await loadRemoteSecurity();
+        if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
       } else session.revokeAllOtherSessions();
       toast.success(t.value.security.revokeAllDone);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSIONS_REVOKE_FAILED");
+      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
+        ? t.value.security.opFailed
+        : cause instanceof Error ? cause.message : t.value.security.opFailed);
     }
   }
 }
@@ -487,6 +510,10 @@ async function handleDeleteAccount() {
           return;
         }
       } else {
+        if (!deleteMockAuthAccount(auth.accountId)) {
+          toast.error(t.value.security.opFailed);
+          return;
+        }
         toast.success(t.value.security.deleteAccountToast);
       }
       app.interruptAllTasks("logged-out");
@@ -505,10 +532,10 @@ async function handleDeleteAccount() {
 async function handleCancelAccountDeletion() {
   if (!remoteApiEnabled || !deletionCanCancel.value || securityBusy.value) return;
   const ok = await uiConfirm({
-    title: "Cancel deletion request",
-    message: "This cancels the current request only. You can submit a new request later.",
+    title: t.value.security.cancelDeletionRequest,
+    message: t.value.security.cancelDeletionMessage,
     danger: true,
-    confirmLabel: "Cancel request",
+    confirmLabel: t.value.security.cancelDeletionRequest,
   });
   if (!ok) return;
   securityBusy.value = true;
@@ -516,8 +543,9 @@ async function handleCancelAccountDeletion() {
     const current = deletionStatus.value;
     if (current.status === "NONE") return;
     const key = `app-security:account-deletion-cancel:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
-    deletionStatus.value = await accountApi.cancelAccountDeletion(current.version, key);
-    toast.success("Deletion request cancelled");
+    await accountApi.cancelAccountDeletion(current.version, key);
+    if (!(await loadRemoteSecurity())) throw new Error("SECURITY_READBACK_FAILED");
+    toast.success(t.value.security.cancelDeletionSuccess);
   } catch (cause) {
     toast.error(cause instanceof Error ? cause.message : "ACCOUNT_DELETION_CANCEL_FAILED");
     await loadRemoteSecurity();
@@ -573,6 +601,18 @@ const footerStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-3)",
   lineHeight: 1.625,
+};
+const mockModeBannerStyle: CSSProperties = {
+  marginTop: "10px",
+  padding: "8px 10px",
+  borderRadius: "8px",
+  background: "var(--v5-warning-soft)",
+};
+const mockModeBannerTextStyle: CSSProperties = {
+  fontFamily: "var(--font-v5)",
+  fontSize: "12px",
+  fontWeight: 600,
+  color: "var(--v5-warning)",
 };
 // Section label (de-card spec): 15/600/ink.
 const sectionHeadStyle: CSSProperties = {

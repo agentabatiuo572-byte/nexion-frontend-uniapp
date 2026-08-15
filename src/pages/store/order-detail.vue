@@ -18,6 +18,15 @@
     <!-- Chassis-nav pages (useSetPageHeader) don't get sub-page-header.vue's global
          24px .spv gap, so the nav→content breathing is supplied here once. -->
     <view style="color: var(--v5-ink); padding-top: 24px">
+      <view v-if="remoteOrderError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+        <view class="flex items-center justify-between" style="gap: 12px">
+          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.orders.refreshFailed }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteOrderRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshOrder">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+      </view>
+
       <!-- Order not found -->
       <view v-if="!order" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.orders.notFound }}</text>
@@ -68,7 +77,7 @@
         <view class="mx-4 rounded-2xl" :style="summaryCardStyle" style="margin-top: 12px">
           <text class="block" :style="sectionLabelStyle">{{ t.orders.orderSummary }}</text>
           <DetailRow :label="t.orders.orderIdLabel" :value="order.id" mono />
-          <DetailRow :label="t.orders.quantity" :value="`${order.quantity}`" />
+          <DetailRow :label="t.orders.quantity" :value="`${order.itemCount ?? order.quantity}`" />
           <DetailRow :label="t.orders.unitPrice" :value="`$${order.unitPrice.toLocaleString()}`" />
           <DetailRow v-if="order.discount > 0" :label="t.orders.discount" :value="`-$${order.discount.toLocaleString()}`" brand />
           <!-- FEAT-TRIAL02 conversion order: promo + trial credit as their own
@@ -89,6 +98,18 @@
             <view v-if="order.activatedAt">
               <text class="block" style="font-size: 12px; color: var(--v5-ink-4)">{{ t.orders.activatedAt }}</text>
               <text class="block" style="font-size: 12px; color: var(--v5-ink-2); margin-top: 2px">{{ dt(order.activatedAt) }}</text>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="sandboxPaymentAvailable" class="mx-4 rounded-2xl" :style="sandboxPayCardStyle">
+          <view class="flex items-center justify-between" style="gap: 12px">
+            <view class="flex-1 min-w-0">
+              <text class="block" :style="sandboxPayTitleStyle">{{ t.orders.sandboxPayCta }}</text>
+              <text class="block" :style="sandboxPayHintStyle">{{ t.orders.sandboxPayHint }}</text>
+            </view>
+            <view class="shrink-0 active:opacity-80" :style="sandboxPayBtnStyle" :aria-disabled="sandboxPaying ? 'true' : 'false'" role="button" tabindex="0" @click.stop="handleSandboxPay">
+              <text>{{ sandboxPaying ? t.orders.sandboxPayBusy : t.orders.sandboxPayCta }}</text>
             </view>
           </view>
         </view>
@@ -131,7 +152,7 @@ import { trialReservesSlotNow } from "@/store/free-trial";
 import { confirm as uiConfirm, toast } from "@/store/ui";
 import { useSetPageHeader } from "@/composables/use-page-header";
 import { navTo } from "@/lib/route";
-import { remoteApiEnabled } from "@/api/runtime";
+import { commercePaymentApi, fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const orders = useOrders();
@@ -141,7 +162,21 @@ onLoad((options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
 });
-onShow(() => { void orders.refreshRemote().catch(() => undefined); });
+const remoteOrderError = ref(false);
+const remoteOrderRefreshing = ref(false);
+async function refreshOrder() {
+  if (!remoteApiEnabled || remoteOrderRefreshing.value) return;
+  remoteOrderRefreshing.value = true;
+  remoteOrderError.value = false;
+  try {
+    await orders.refreshRemote();
+  } catch {
+    remoteOrderError.value = true;
+  } finally {
+    remoteOrderRefreshing.value = false;
+  }
+}
+onShow(() => { void refreshOrder(); });
 
 const order = computed(() => orders.orders.find((o) => o.id === id.value));
 
@@ -174,6 +209,27 @@ const currentIdx = computed(() => (order.value ? stages.value.indexOf(order.valu
 // "paid", so in practice no order rests at "placed" — kept faithful to source.
 const cancellable = computed(() => order.value?.status === "placed");
 const isProvisioning = computed(() => order.value?.status === "provisioning");
+const sandboxPaymentAvailable = computed(() => fundsSandboxEnabled && !remoteOrderError.value && order.value?.status === "placed");
+const sandboxPaying = ref(false);
+
+async function handleSandboxPay() {
+  const current = order.value;
+  if (!fundsSandboxEnabled || !current || current.status !== "placed" || sandboxPaying.value) return;
+  sandboxPaying.value = true;
+  try {
+    await commercePaymentApi.confirm(current.id, `h5-order-pay:${current.id}`);
+    await orders.refreshRemote();
+    const readBack = orders.orders.find((item) => item.id === current.id);
+    if (readBack?.status !== "paid" && readBack?.status !== "provisioning" && readBack?.status !== "activated") {
+      throw new Error("ORDER_PAYMENT_READBACK_MISMATCH");
+    }
+    toast.success(t.value.orders.statusPaid);
+  } catch {
+    toast.error(t.value.authOtp.errorServiceUnavailable);
+  } finally {
+    sandboxPaying.value = false;
+  }
+}
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
   placed: "var(--v5-ink-3)",
@@ -374,6 +430,16 @@ const cancelBtnStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 500,
 };
+const remoteErrorStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "10px 12px",
+  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+};
+const retryBtnStyle: CSSProperties = { minHeight: "32px", padding: "0 10px", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink)", fontSize: "12px" };
+const sandboxPayCardStyle: CSSProperties = { marginTop: "12px", padding: "14px 16px", background: "color-mix(in srgb, var(--v5-warning) 9%, transparent)" };
+const sandboxPayTitleStyle: CSSProperties = { fontSize: "13px", fontWeight: 600, color: "var(--v5-ink)" };
+const sandboxPayHintStyle: CSSProperties = { marginTop: "4px", fontSize: "12px", lineHeight: 1.4, color: "var(--v5-ink-3)" };
+const sandboxPayBtnStyle: CSSProperties = { minHeight: "40px", padding: "0 12px", borderRadius: "999px", background: "var(--v5-warning)", color: "var(--v5-on-warning, #11131A)", fontSize: "12px", fontWeight: 600 };
 </script>
 
 <style scoped>

@@ -48,20 +48,12 @@ assert.match(walletPage, /<FundsSandboxBadge\b/,
   "the successful sandbox wallet balance must stay visibly labelled");
 assert.match(sandboxBadge, /Acceptance Sandbox · source=mock · SANDBOX[\s\S]{0,900}fundsSandboxEvidence/,
   "the label must be derived from the validated server provenance");
-// 🔴 判据改成「扣与退必须同档」(2026-08-12 双向分叉合并收口):
-// 原判据钉的是 refundFailedWithdrawals 整个函数在 fundsServerEnabled 下早退。但本仓
-// **扣款侧** applyWithdrawalDebit 只在 fundsSandboxEnabled 下让位服务端(普通 remote
-// 轨全仓没有余额端点,余额的唯一持有者就是这个 store,页面提交成功后照样本地扣)。
-// 两边不同档 = 服务端每拒一单,用户的钱被扣走且永不退回 —— 门锁住的是这个自相矛盾态。
-// 真正要守的不变量仍在,拆成两条更强的:
-//   ① 扣与退同档(任一侧改档,这条就红);
-//   ② 本金退款走与扣款同轨的 refundWithdrawalDebit;NEX 那条腿走奖励桶,
-//      而奖励桶入口 creditRewardBucketOnce 自己的 fundsServerEnabled 闸原样保留
-//      (下一条断言即守它)—— 所以「服务端模式不许用本地奖励桶退款」依然成立。
-assert.match(app, /function applyWithdrawalDebit\([\s\S]{0,400}if \(fundsSandboxEnabled\) return true/,
-  "local debit must yield to the server only on the sandbox rail");
-assert.match(app, /function refundFailedWithdrawals\(\)[\s\S]{0,900}if \(fundsSandboxEnabled\) return \[\]/,
-  "refund must yield on exactly the same rail as the debit (otherwise the server burns user funds on every rejection)");
+// Remote and explicit sandbox balances are both server-owned. The client may
+// mirror their readbacks, but it must never apply a second local debit/refund.
+assert.match(app, /function applyWithdrawalDebit\([\s\S]{0,400}if \(remoteApiEnabled\) return false/,
+  "every remote rail must reject the legacy local shadow debit");
+assert.match(app, /function refundFailedWithdrawals\(\)[\s\S]{0,900}if \(fundsServerEnabled\) return \[\]/,
+  "every server rail must reject the legacy local shadow refund");
 assert.match(app, /function refundFailedWithdrawals\(\)[\s\S]{0,1400}refundWithdrawalDebit\(wd\)/,
   "the principal refund leg must reuse the debit's own reversal path");
 assert.match(app, /function creditRewardBucketOnce[\s\S]{0,220}if \(fundsServerEnabled\) return false/,
@@ -87,7 +79,7 @@ assert.match(bills, /expectedAccountKey[\s\S]{0,800}FUNDS_SANDBOX_ACCOUNT_CHANGE
   "ledger refresh must reject a response after account switching");
 assert.match(ledgerProjection, /source: "mock"[\s\S]{0,120}sourceEnvironment: "SANDBOX"/,
   "sandbox ledger rows must remain visibly labelled");
-assert.match(billPage, /onShow\(async \(\) =>[\s\S]{0,300}refreshServerLedger/,
+assert.match(billPage, /async function refreshLedger\(\)[\s\S]{0,500}refreshServerLedger\(\)[\s\S]{0,500}onShow\(\(\) => \{ void refreshLedger\(\); \}\)/,
   "the ledger page must re-read the current server authority after refresh or re-entry");
 assert.match(billPage, /b\.balanceAfter !== undefined[\s\S]{0,200}runningBalanceLabel\(b\.balanceAfter!/,
   "ledger UI must render the authoritative availableAfter projection");

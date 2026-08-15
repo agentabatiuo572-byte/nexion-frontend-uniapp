@@ -134,6 +134,7 @@ import { useProfile } from "@/store/profile";
 import { usePayoutAddress } from "@/store/payout-address";
 import { maskAddressMid, PAYOUT_NETWORKS } from "@/store/payout-address-core";
 import { toast } from "@/store/ui";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 
 const TIERS = ["L0", "L1", "L2", "L3", "L4", "L5"] as const;
 type Tier = (typeof TIERS)[number];
@@ -240,11 +241,15 @@ async function handleSave() {
 }
 
 async function loadRemoteProfile() {
+  const scope = captureAccountScope();
+  const accountKey = auth.accountId;
   try {
     const projection = await profileApi.profile();
+    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
     avatarUrl.value = projection.avatarUrl;
     avatarRevision.value = projection.avatarRevision;
   } catch {
+    if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
     toast.error(t.value.profile.serverMutationFailed);
   }
 }
@@ -259,14 +264,18 @@ async function handleRegen() {
       const filePath = chosen.tempFilePaths[0];
       if (!filePath) return;
       avatarUploading.value = true;
+      const scope = captureAccountScope();
+      const accountKey = auth.accountId;
       const key = `app-profile:avatar:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
       const before = avatarRevision.value;
       try {
         const result = await profileApi.uploadAvatar(filePath, key);
+        if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
         avatarUrl.value = result.avatarUrl;
         avatarRevision.value = result.avatarRevision;
       } catch (cause) {
         const authoritative = await profileApi.profile().catch(() => null);
+        if (!isCurrentAccountScope(scope) || auth.accountId !== accountKey) return;
         if (!authoritative || !authoritative.avatarRevision || authoritative.avatarRevision === before) throw cause;
         avatarUrl.value = authoritative.avatarUrl;
         avatarRevision.value = authoritative.avatarRevision;

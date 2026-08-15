@@ -22,6 +22,10 @@ export interface WalletBillsSnapshot {
   source: "server";
   sourceEnvironment: "PRODUCTION";
   bills: WalletBillRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  nextPage: number | null;
 }
 
 function invalid(): never {
@@ -76,14 +80,19 @@ export function parseWalletBillsSnapshot(value: unknown): WalletBillsSnapshot {
   if (!row || row.source !== "server" || row.sourceEnvironment !== "PRODUCTION" || !Array.isArray(row.bills)) {
     return invalid();
   }
-  return { source: "server", sourceEnvironment: "PRODUCTION", bills: row.bills.map(bill) };
+  const page = typeof row.page === "number" && Number.isSafeInteger(row.page) && row.page > 0 ? row.page : 1;
+  const pageSize = typeof row.pageSize === "number" && Number.isSafeInteger(row.pageSize) && row.pageSize > 0 ? row.pageSize : row.bills.length;
+  const total = typeof row.total === "number" && Number.isSafeInteger(row.total) && row.total >= 0 ? row.total : row.bills.length;
+  const nextPage = row.nextPage === null || row.nextPage === undefined ? null
+    : typeof row.nextPage === "number" && Number.isSafeInteger(row.nextPage) && row.nextPage > page ? row.nextPage : null;
+  return { source: "server", sourceEnvironment: "PRODUCTION", bills: row.bills.map(bill), page, pageSize, total, nextPage };
 }
 
 export function createWalletBillsApi(client: ApiClient) {
   return {
-    list: async (): Promise<WalletBillsSnapshot> => parseWalletBillsSnapshot(await client.request({
+    list: async (page = 1, pageSize = 50): Promise<WalletBillsSnapshot> => parseWalletBillsSnapshot(await client.request({
       method: "GET",
-      path: "/api/app/wallet/bills",
+      path: `/api/app/wallet/bills?page=${Math.max(1, Math.trunc(page))}&pageSize=${Math.max(1, Math.min(100, Math.trunc(pageSize)))}`,
     })),
   };
 }

@@ -13,7 +13,17 @@
     <view class="pb-6" style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamBinary" :subtitle="t.headerSubtitles.teamBinary" />
 
-      <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
+        <view class="px-4" style="display: flex; flex-direction: column; gap: 12px; padding-top: 10px">
+          <EmptyState
+            v-if="remoteApiEnabled && commission.binaryStatus !== 'ready'"
+            :kind="commission.binaryStatus === 'error' ? 'recoverable-error' : 'empty-list'"
+            :title="commission.binaryStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
+            :desc="commission.binaryStatus === 'error' ? t.network.projectionErrorDesc : undefined"
+            :cta-label="commission.binaryStatus === 'error' ? t.network.retry : undefined"
+            compact
+            @cta="commission.refreshCanonicalBinary()"
+          />
+          <template v-if="!remoteApiEnabled || commission.binaryStatus === 'ready'">
         <!-- match hero — de-carded: the number sits on the page floor. Rules-intro
              pill rides the cap row (owner 2026-07-09: kill the empty gap above the hero). -->
         <view :style="heroStyle">
@@ -123,8 +133,9 @@
           </view>
           </view>
         </view>
+          </template>
+        </view>
       </view>
-    </view>
   </AppChassis>
 </template>
 
@@ -132,6 +143,7 @@
 import { computed, onMounted, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
+import EmptyState from "@/components/empty-state.vue";
 import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";

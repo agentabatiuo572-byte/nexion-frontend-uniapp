@@ -65,7 +65,16 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           <text :style="sectionTitleStyle">{{ t.missions.eventsHeading }}</text>
         </view>
-        <view class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/events/events')">
+        <EmptyState
+          v-if="remoteEventsError"
+          class="mx-4"
+          kind="recoverable-error"
+          :title="t.missions.eventsUnavailableTitle"
+          :desc="t.missions.eventsUnavailableBody"
+          :cta-label="t.missions.retry"
+          @cta="retryRemoteEvents"
+        />
+        <view v-else class="mx-4 flex items-center active:opacity-80" :style="rowStyle" @click="go('/pages/events/events')">
           <view class="grid place-items-center shrink-0" :style="rowIconBox('var(--v5-warning)')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" /></svg>
           </view>
@@ -106,6 +115,7 @@ import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
+import EmptyState from "@/components/empty-state.vue";
 import WeeklyQuestHero from "@/components/home/weekly-quest-hero.vue";
 import WeeklyQuestList from "@/components/home/weekly-quest-list.vue";
 import { useT } from "@/i18n/use-t";
@@ -121,26 +131,38 @@ const t = useT();
 const eventQuest = useEventQuest();
 const app = useApp();
 const remoteEvents = ref<CanonicalEvent[]>([]);
+const remoteEventsError = ref(false);
 const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
 async function refreshRemoteEvents(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<void> {
   if (!remoteApiEnabled) return;
   try {
     const snapshot = await eventsApi.state();
-    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = snapshot.events;
+    if (remoteAccountEpoch.isCurrent(request)) {
+      remoteEvents.value = snapshot.events;
+      remoteEventsError.value = false;
+    }
   } catch {
-    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = [];
+    if (remoteAccountEpoch.isCurrent(request)) {
+      remoteEvents.value = [];
+      remoteEventsError.value = true;
+    }
   }
+}
+function retryRemoteEvents() {
+  void refreshRemoteEvents();
 }
 onMounted(() => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(app.accountKey);
   remoteEvents.value = [];
+  remoteEventsError.value = false;
   void refreshRemoteEvents();
 });
 watch(() => app.accountKey, (accountKey) => {
   if (!remoteApiEnabled) return;
   remoteAccountEpoch.bind(accountKey);
   remoteEvents.value = [];
+  remoteEventsError.value = false;
   void refreshRemoteEvents();
 });
 

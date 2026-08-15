@@ -14,8 +14,18 @@
       <SubPageHeader back="/pages/me/me" :title="t.receipt.title" />
 
       <view v-if="remoteReceiptsMode" style="margin: 0 16px">
-        <EmptyState v-if="remoteReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
+        <EmptyState v-if="remoteReceiptItems.length === 0 && remoteComputeReceiptItems.length === 0" kind="empty-list" :title="t.empty.listTitle" :desc="t.empty.listDesc" />
         <view v-else :style="listStyle">
+          <view v-for="r in remoteComputeReceiptItems" :key="`compute:${r.receiptNo}`" class="flex items-center" :style="rowStyle(0)">
+            <view class="flex-1 min-w-0">
+              <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
+              <text class="block truncate" :style="rowSubStyle">{{ t.receipt.title }} · {{ r.model }}</text>
+            </view>
+            <view class="text-right shrink-0" style="margin-left: 8px">
+              <text class="block tabular-nums" :style="remoteAmountStyle">+${{ r.reward.toFixed(3) }}</text>
+              <text class="block" :style="rowDateStyle">{{ shortDate(r.completedAt) }}</text>
+            </view>
+          </view>
           <view v-for="r in remoteReceiptItems" :key="r.receiptNo" class="flex items-center" :style="rowStyle(0)">
             <view class="flex-1 min-w-0">
               <text class="block truncate" :style="rowTitleStyle">{{ r.receiptNo }}</text>
@@ -122,7 +132,9 @@ import { confirm, toast } from "@/store/ui";
 import { useScrollGrowProgress } from "@/composables/use-scroll-grow-progress";
 import { remoteApiEnabled, fundsSandboxEnabled } from "@/api/runtime";
 import { useDeposits } from "@/store/deposits";
+import { useApp } from "@/store/app";
 import type { VietQrReceiptSnapshot } from "@/api/payment-api";
+import type { CompletedTask } from "@/store/types";
 
 type Tab = "ALL" | ReceiptCategory;
 const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
@@ -130,9 +142,15 @@ const TAB_ORDER: Tab[] = ["ALL", "IG", "VG", "LL", "FT", "EM", "SP", "KY"];
 const PAGE_SIZE = 10;
 
 const t = useT();
+const app = useApp();
 const depositsStore = useDeposits();
 const remoteReceiptsMode = remoteApiEnabled && !fundsSandboxEnabled;
 const remoteReceiptItems = computed<VietQrReceiptSnapshot[]>(() => depositsStore.remoteReceipts);
+const remoteComputeReceiptItems = computed<CompletedTask[]>(() => remoteApiEnabled
+  ? app.visibleDevices.flatMap((device) => device.recentTasks)
+    .filter((task) => !!task.receiptNo)
+    .sort((a, b) => b.completedAt - a.completedAt)
+  : []);
 const receiptsStore = remoteReceiptsMode ? null : useReceipts();
 const tab = ref<Tab>("ALL");
 const open = ref<Receipt | null>(null);

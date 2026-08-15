@@ -23,6 +23,9 @@
 
       <!-- Title -->
       <text class="lg-title">{{ titleText }}</text>
+      <view v-if="apiRuntimeConfig.mode !== 'remote'" class="lg-mode-badge" data-testid="auth-runtime-label">
+        <text class="lg-mode-badge__t">{{ modeLabel }}</text>
+      </view>
       <view v-if="serverSessionReloadNotice" class="lg-recovery-notice" role="status" data-qa="server-session-reload-notice">
         <text class="lg-recovery-notice__t">{{ t.login.serverSessionReloadNotice }}</text>
       </view>
@@ -237,6 +240,7 @@ const titleText = computed(() => {
   if (mode.value === "reset") return t.value.login.resetTitle;
   return t.value.login.title;
 });
+const modeLabel = computed(() => apiRuntimeConfig.mode === "mock" ? t.value.security.mockModeLabel : t.value.security.sandboxModeLabel);
 const primaryText = computed(() => {
   if (step.value === 1) return mode.value === "password" ? t.value.login.signIn : t.value.login.sendCode;
   if (step.value === 2) return t.value.login.verify;
@@ -522,7 +526,10 @@ function goSendCode() {
 function remoteLoginError(error: unknown): string {
   const code = error instanceof ApiError ? error.message : "";
   return geoText(code)
-    ?? (code === "USER_INVALID_CREDENTIALS" ? t.value.login.errorInvalidCredentials : t.value.authOtp.errorServiceUnavailable);
+    ?? (code === "USER_INVALID_CREDENTIALS" ? t.value.login.errorInvalidCredentials
+      : code === "USER_TWO_FACTOR_CHALLENGE_INVALID" || code === "OTP_CODE_INVALID"
+        ? t.value.security.twoFactorCodeInvalid
+        : t.value.authOtp.errorServiceUnavailable);
 }
 
 async function signInWithPassword() {
@@ -779,6 +786,8 @@ onUnmounted(() => cleanup());
 .lg-dot--active { width: 32px; background: var(--v5-brand); }
 .lg-dot--done { width: 16px; background: color-mix(in srgb, var(--v5-brand) 40%, transparent); }
 .lg-title { display: block; font-family: var(--font-v5); margin-top: 12px; font-size: 34px; font-weight: 600; line-height: 1.15; letter-spacing: -0.025em; color: var(--v5-ink); }
+.lg-mode-badge { display: inline-flex; margin-top: 8px; padding: 5px 8px; border-radius: 999px; background: var(--v5-warning-soft); }
+.lg-mode-badge__t { font-size: 11px; font-weight: 700; color: var(--v5-warning); }
 .lg-recovery-notice { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--v5-brand) 12%, transparent); border: 1px solid color-mix(in srgb, var(--v5-brand) 34%, transparent); }
 .lg-recovery-notice__t { display: block; font-size: 13px; line-height: 1.5; color: var(--v5-ink-2); }
 .lg-sub { display: block; margin-top: 8px; font-size: 13px; color: var(--v5-ink-3); }

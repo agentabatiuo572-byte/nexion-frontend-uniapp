@@ -8,6 +8,7 @@ import {
   evaluateGenesisEligibility,
   type GenesisGateResult,
 } from "@/store/genesis";
+import { remoteApiEnabled } from "@/api/runtime";
 
 /**
  * useGenesisEligibility — 创世节点认购资格门（规格 FEAT-GEN08）。
@@ -38,8 +39,7 @@ export function useGenesisEligibility(): UseGenesisEligibilityResult {
   const vRank = useVRank();
   const genesis = useGenesis();
 
-  const gate = computed<GenesisGateResult>(() =>
-    evaluateGenesisEligibility(GENESIS_ELIGIBILITY, {
+  const localGate = computed<GenesisGateResult>(() => evaluateGenesisEligibility(GENESIS_ELIGIBILITY, {
       cumulativeDepositUsdt: app.user.cumulativeDepositUsdt,
       vRank: vRank.myRank,
       // active + inventory 都计（countOwned 语义）。
@@ -52,11 +52,31 @@ export function useGenesisEligibility(): UseGenesisEligibilityResult {
       // rendering. Eligibility itself is always re-evaluated by Genesis APIs.
       hasInvite: genesis.hasGenesisInvite,
       myOwned: genesis.myOwned,
-    }),
-  );
+    }));
+  const gate = computed<GenesisGateResult>(() => {
+    if (!remoteApiEnabled) return localGate.value;
+    const remote = genesis.remoteEligibility;
+    const capRemaining = remote?.remainingCap ?? 0;
+    const eligible = remote?.eligible === true && genesis.remoteHalted !== true;
+    return {
+      eligible,
+      conditions: [{
+        key: "server",
+        met: eligible,
+        current: eligible ? 1 : 0,
+        target: 1,
+        progressPct: eligible ? 100 : 0,
+      }],
+      unmetCount: eligible ? 0 : 1,
+      capReached: capRemaining <= 0,
+      capRemaining,
+    };
+  });
 
   const eligible = computed(() => gate.value.eligible);
-  const gatesSecondary = computed(() => GENESIS_ELIGIBILITY.appliesTo === "both");
+  const gatesSecondary = computed(() => remoteApiEnabled
+    ? genesis.remoteEligibility?.appliesTo === "both"
+    : GENESIS_ELIGIBILITY.appliesTo === "both");
 
   return { gate, eligible, gatesSecondary };
 }

@@ -202,9 +202,9 @@ const genesis = useGenesis();
 const cfg = useGenesisConfig();
 // 🔴 页面每次露出都重读配置(hydrate-once 修复):navigateBack 回到本页不触发
 //   onMounted,只有 onShow 能接住「去了一趟别处、运营已切状态」的情形。
-onShow(() => {
-  void cfg.refresh();
-  void genesis.syncRemote();
+onShow(async () => {
+  await cfg.refresh();
+  await genesis.syncRemote();
 });
 const locale = useLocaleStore();
 const { eligible, gate } = useGenesisEligibility();
@@ -327,7 +327,7 @@ function toastBlocked() {
   else toast.info(dockCtaText.value, blockHintSub.value);
 }
 
-function openSheet() {
+async function openSheet() {
   // 🔴 阻断判定**只问 `block` 一处**(FEAT-GEN10 ④)。改造前这里与 dockCtaText 各写一套
   //   if 链,两处顺序一致纯属巧合 —— 任一处加条件而另一处忘改就会「按钮与行为对不上」。
   if (block.value === "soldOut") {
@@ -340,7 +340,7 @@ function openSheet() {
     //   重读配置源,成功即当场解锁;仍失败则给「可重试」说明。
     //   结果判定问派生 `block`,不摸原料 `.loaded`(④b 门):refresh 写共享 store,
     //   computed 同步失效,下一行读到的已是重读后的判定。
-    cfg.refresh();
+    await cfg.refresh();
     if (block.value !== "configUnavailable") {
       toast.success(t.value.genesis.marketClosed.retryOk);
     } else {
@@ -363,7 +363,7 @@ function openSheet() {
   if (gate.value.capReached) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
     );
     return;
   }

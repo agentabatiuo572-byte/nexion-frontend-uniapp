@@ -16,6 +16,7 @@ export interface NetworkRegion {
 export interface NetworkRegionProjection {
   activeNodes: number;
   activeJobs: number;
+  countryCount: number;
   regions: NetworkRegion[];
   source: "server";
   generatedAt: string;
@@ -71,11 +72,12 @@ function projection(value: unknown): NetworkRegionProjection {
   if (new Set(regions.map((entry) => entry.id)).size !== regions.length) return invalid();
   const activeNodes = integer(row.activeNodes);
   const activeJobs = integer(row.activeJobs);
+  const countryCount = integer(row.countryCount);
   if (activeNodes !== regions.reduce((sum, entry) => sum + entry.activeNodes, 0)
       || activeJobs !== regions.reduce((sum, entry) => sum + entry.activeJobs, 0)) return invalid();
   const generatedAt = string(row.generatedAt);
   if (!Number.isFinite(Date.parse(generatedAt))) return invalid();
-  return { activeNodes, activeJobs, regions, source: "server", generatedAt };
+  return { activeNodes, activeJobs, countryCount, regions, source: "server", generatedAt };
 }
 
 export function createNetworkRegionsApi(client: ApiClient): NetworkRegionsApi {

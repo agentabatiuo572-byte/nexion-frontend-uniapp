@@ -36,6 +36,8 @@ export interface Order {
   productId: Exclude<DeviceKind, "phone">;
   productName: string;
   quantity: number;
+  /** Number of products represented by a canonical bundle order. */
+  itemCount?: number;
   unitPrice: number;        // USDT
   discount: number;         // USDT (voucher)
   /** FEAT-DEV02 旧机抵扣(USDT)——仅结算抵减,永不入余额;服务端同事务复算。 */
@@ -156,6 +158,7 @@ export const useOrders = defineStore("orders", () => {
       productId: row.productNo as Order["productId"],
       productName: row.productName,
       quantity: row.quantity,
+      ...(row.itemCount != null && { itemCount: row.itemCount }),
       unitPrice: row.unitPriceUsdt,
       discount: row.tradeinNo ? 0 : row.discountUsdt,
       ...(row.tradeinNo && { tradeInCredit: row.discountUsdt, tradeInDeviceId: String(row.sourceDeviceId) }),

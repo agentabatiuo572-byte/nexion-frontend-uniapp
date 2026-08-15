@@ -298,9 +298,9 @@ function matches(input: AmbassadorApplicationInput, value: AmbassadorApplication
     && value.budgetUsdt === input.budgetUsdt && value.bucket === input.bucket;
 }
 
-async function refreshLatest(): Promise<AmbassadorApplication> {
+async function refreshLatest(expectedAccount = app.accountKey): Promise<AmbassadorApplication> {
   const value = await ambassadorApplicationApi.latest();
-  latestApplication.value = value;
+  if (app.accountKey === expectedAccount) latestApplication.value = value;
   return value;
 }
 
@@ -333,7 +333,7 @@ async function submit() {
     } catch (error) {
       if (app.accountKey !== expectedAccount) return;
       try {
-        const authoritative = await refreshLatest();
+        const authoritative = await refreshLatest(expectedAccount);
         if (matches(input, authoritative)) {
           finishAmbassadorCommand(expectedAccount, identity);
         } else if (isSettledRejection(error)) {
@@ -364,7 +364,13 @@ async function submit() {
 }
 
 onShow(() => {
-  if (remoteApiEnabled) void refreshLatest().catch(() => undefined);
+  if (remoteApiEnabled) {
+    const expectedAccount = app.accountKey;
+    void Promise.all([
+      refreshLatest(expectedAccount).catch(() => undefined),
+      vrank.refreshCanonicalVRank(),
+    ]);
+  }
 });
 
 function go(url: string) {
