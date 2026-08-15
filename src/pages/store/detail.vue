@@ -27,7 +27,10 @@
       </view>
 
       <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 40px 16px">
-        <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.catalogErrorTitle }}</text>
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogErrorTitle }}</text>
+        <view data-testid="detail-catalog-retry" class="inline-flex items-center justify-center active:opacity-90" :style="catalogRetryStyle" role="button" tabindex="0" :aria-disabled="catalogRetrying" @click.stop="retryCatalog">
+          <text>{{ catalogRetrying ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+        </view>
       </view>
 
       <!-- Product not found — plain floor text (matches checkout / order-detail). -->
@@ -38,6 +41,16 @@
       <!-- Phase-gated → coming-soon lock card -->
       <template v-else-if="isLocked">
         <LockedProductCard :product="product" />
+        <view aria-hidden style="height: 32px" />
+      </template>
+
+      <!-- The server has not certified the managed-service specification. Keep
+           the detail readable, but never expose a purchase CTA for it. -->
+      <template v-else-if="purchaseUnavailable">
+        <view class="mx-4 rounded-2xl border" style="padding: 24px; border-color: var(--v5-border); background: var(--v5-surface)">
+          <text class="block" style="font-size: 16px; font-weight: 600; color: var(--v5-ink)">{{ product.name }}</text>
+          <text class="block" style="margin-top: 8px; font-size: 13px; line-height: 1.6; color: var(--v5-ink-3)">{{ t.store.specUnavailable }}</text>
+        </view>
         <view aria-hidden style="height: 32px" />
       </template>
 
@@ -92,14 +105,14 @@
           <view class="flex items-center min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-ink-3)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><rect width="14" height="20" x="5" y="2" rx="2" ry="2" /><path d="M12 18h.01" /></svg>
             <text class="truncate">{{ t.store.detYourPhone }}</text>
-            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">$0.06/d</text>
+            <text class="tabular-nums" style="font-family: var(--font-v5); color: var(--v5-warning)">{{ phoneDailyEarnText }}</text>
           </view>
           <text class="shrink-0" style="font-size: 12px; color: var(--v5-ink-4)">↔</text>
           <view class="flex-1 flex items-center justify-end min-w-0" style="gap: 6px; font-size: 12px; color: var(--v5-warning)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" /><path d="m3.3 7 8.7 5 8.7-5" /><path d="M12 22V12" /></svg>
             <text class="tabular-nums" style="font-family: var(--font-v5); font-weight: 600">${{ dailyEarnText }}/d</text>
           </view>
-          <text class="shrink-0" :style="vsMultChipStyle">{{ speedup }}×</text>
+          <text v-if="speedup > 0" class="shrink-0" :style="vsMultChipStyle">{{ speedup }}×</text>
         </view>
 
         <!-- === Section 4: ROI calc — qty stepper + 4-cell grid === -->
@@ -156,21 +169,23 @@
           <SpecTable :rows="aiPerfRows" brand-value />
         </template>
 
-        <!-- === Section 7: Trust badges === -->
-        <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
-        <view class="mx-4 rounded-2xl" :style="trustCardStyle">
-          <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detFeaturedIn }}</text>
-          <view class="flex flex-wrap" style="margin-top: 12px; gap: 18px">
-            <text v-for="m in featuredMedia" :key="m" :style="mediaStyle">{{ m }}</text>
-          </view>
+        <!-- === Section 7: Trust badges (mock-only until backed by a server projection) === -->
+        <template v-if="!remoteApiEnabled">
+          <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detTrustedBy" /></view>
+          <view class="mx-4 rounded-2xl" :style="trustCardStyle">
+            <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detFeaturedIn }}</text>
+            <view class="flex flex-wrap" style="margin-top: 12px; gap: 18px">
+              <text v-for="m in featuredMedia" :key="m" :style="mediaStyle">{{ m }}</text>
+            </view>
 
-          <view style="height: 1px; background: var(--v5-border); margin: 16px 0" />
+            <view style="height: 1px; background: var(--v5-border); margin: 16px 0" />
 
-          <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detCompliance }}</text>
-          <view class="flex flex-wrap" style="margin-top: 10px; gap: 8px">
-            <text v-for="c in compliance" :key="c" :style="complianceChipStyle">{{ c }}</text>
+            <text class="block" style="font-size: 13px; color: var(--v5-ink-3)">{{ t.store.detCompliance }}</text>
+            <view class="flex flex-wrap" style="margin-top: 10px; gap: 8px">
+              <text v-for="c in compliance" :key="c" :style="complianceChipStyle">{{ c }}</text>
+            </view>
           </view>
-        </view>
+        </template>
 
         <!-- === Section 8: FAQ accordion === -->
         <view style="padding: 22px 16px 4px"><SectionHeader :title="t.store.detFaq" /></view>
@@ -214,11 +229,13 @@ import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const phase = useProductPhase();
 
 const id = ref("");
+const catalogRetrying = ref(false);
 onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   if (o.id) id.value = o.id;
@@ -230,6 +247,16 @@ onShow(() => {
   void refreshProductCatalog(true);
 });
 
+async function retryCatalog() {
+  if (catalogRetrying.value) return;
+  catalogRetrying.value = true;
+  try {
+    await Promise.all([refreshProductCatalog(true), refreshServerProductPhase(true)]);
+  } finally {
+    catalogRetrying.value = false;
+  }
+}
+
 const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => (id.value ? getProduct(id.value) : undefined));
 const isShare = computed(() => product.value?.tier === "Share");
@@ -237,14 +264,18 @@ const isShare = computed(() => product.value?.tier === "Share");
 // both consumers are inside `v-if="product"`, so the blanks never render.
 const copy = computed(() =>
   product.value
-    ? productCopy(t.value, product.value)
+    ? remoteApiEnabled
+      ? { tagline: product.value.tagline, badge: product.value.badge ?? "", unlocks: product.value.ai?.unlocks ?? "" }
+      : productCopy(t.value, product.value)
     : { tagline: "", badge: "", unlocks: "" },
 );
+
+const purchaseUnavailable = computed(() => product.value?.purchaseBlocked === true);
 
 // Phase gate: a product with unlocksAtPhase not yet reached shows the lock card.
 const isLocked = computed(() => {
   const p = product.value;
-  if (!p) return false;
+  if (!p || purchaseUnavailable.value) return false;
   return !isProductAvailable(p, phase.value);
 });
 
@@ -264,10 +295,16 @@ useSetPageHeader(() => ({
 const qty = ref(1);
 const openFaq = ref(0);
 
-const PHONE_RATE = 0.06;
+const phoneDailyEarnValue = computed(() => {
+  const raw = product.value?.phoneDailyEarn;
+  if (!raw || raw === "unavailable") return 0;
+  const match = raw.match(/[0-9]+(?:\.[0-9]+)?/);
+  return match ? Number(match[0]) : 0;
+});
 const speedup = computed(() =>
   product.value && !isShare.value
-    ? Math.round(product.value.dailyEarn / PHONE_RATE)
+    && phoneDailyEarnValue.value > 0
+    ? Math.round(product.value.dailyEarn / phoneDailyEarnValue.value)
     : 0,
 );
 const dailyYield = computed(() => (product.value?.dailyEarn ?? 0) * qty.value);
@@ -296,10 +333,10 @@ const hardwareSpecs = computed<{ k: string; v: string }[]>(() => {
   return [
     { k: s.specGpu, v: p.gpu },
     { k: s.specVram, v: p.vram },
-    { k: s.specPower, v: p.power ?? "—" },
-    { k: s.specDatacenter, v: s.specDatacenterValue },
-    { k: s.specUptime, v: "99.9%" },
-    { k: s.specWarranty, v: s.specWarrantyValue },
+    { k: s.specPower, v: p.power ?? "unavailable" },
+    { k: s.specDatacenter, v: p.datacenter ?? "unavailable" },
+    { k: s.specUptime, v: p.uptime ?? "unavailable" },
+    { k: s.specWarranty, v: p.warranty ?? "unavailable" },
   ];
 });
 
@@ -332,6 +369,7 @@ const stockLow = computed(
   () => !isShare.value && product.value?.stock != null && product.value.stock < 50,
 );
 const soldText = computed(() => (product.value?.sold ?? 0).toLocaleString());
+const phoneDailyEarnText = computed(() => product.value?.phoneDailyEarn ?? "unavailable");
 const dailyEarnText = computed(() => (product.value?.dailyEarn ?? 0).toFixed(2));
 const dailyYieldText = computed(() => dailyYield.value.toFixed(2));
 const monthlyYieldText = computed(() => monthlyYield.value.toFixed(0));
@@ -359,9 +397,9 @@ function toggleFaq(i: number) {
 // product/qty resolve; cleared on hide/unmount so it never bleeds to the next page.
 const sticky = useStickyCTA();
 watch(
-  [product, isShare, isLocked, priceText, dailyEarnText, paybackLabel, purchaseGate],
+  [product, isShare, isLocked, purchaseUnavailable, priceText, dailyEarnText, paybackLabel, purchaseGate],
   () => {
-    if (!product.value || isLocked.value) {
+    if (!product.value || isLocked.value || purchaseUnavailable.value) {
       sticky.hide();
       return;
     }
@@ -396,6 +434,15 @@ onHide(() => sticky.hide());
 onUnmounted(() => sticky.hide());
 
 // ─── styles ───
+const catalogRetryStyle: CSSProperties = {
+  minHeight: "36px",
+  padding: "0 14px",
+  borderRadius: "9999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "13px",
+  fontWeight: 600,
+};
 const heroCardStyle: CSSProperties = {
   background: "var(--v5-surface)",
   borderColor: "var(--v5-border)",

@@ -405,7 +405,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 🔴 P0 防线:convert 内部自己取 mockServerNow() 并先 resolveTrialAt 推进边界,
   // 绝不信任调用方(结算页)缓存的 now 或内存里的旧 status —— 用户离线跨过宽限期
   // 后趁 poll 未跑下单,这里按真实时点判到 ended 即拒绝(边界推进结果已落盘)。
-  async function convert(productNo?: string): Promise<{
+  async function convert(productNo?: string, expectedAmountUsdt?: number): Promise<{
     ok: boolean; reason?: TrialIneligibleReason; orderNo?: string;
   }> {
     const requestedProductNo = productNo ?? useTrialConfig().config.trialProductId;
@@ -417,7 +417,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
       const key = `h2-convert:${expectedClaimNo}:${requestedProductNo}`;
       try {
         const sequence = ++authorityRequestSequence;
-        const receipt = await trialApi.convert(requestedProductNo, key);
+        const receipt = await trialApi.convert(requestedProductNo, expectedAmountUsdt ?? null, key);
         if (requestedAccount !== boundKey) return { ok: false, reason: "unknown" };
         const confirmed = await refreshRemote(true);
         if (!confirmed || authorityClaimNo.value !== expectedClaimNo || status.value !== "converted") {
@@ -432,7 +432,7 @@ export const useFreeTrial = defineStore("freeTrial", () => {
         // idempotency record can replay the original order receipt without a
         // second stock reservation; only then do we fall back to state readback.
         try {
-          const replay = await trialApi.convert(requestedProductNo, key);
+          const replay = await trialApi.convert(requestedProductNo, expectedAmountUsdt ?? null, key);
           const reconciled = await refreshRemote(true);
           if (requestedAccount === boundKey && reconciled && authorityClaimNo.value === expectedClaimNo
               && status.value === "converted") return { ok: true, orderNo: replay.orderNo };

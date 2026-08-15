@@ -31,6 +31,8 @@ export interface SavedCard {
   boundAt: number;
   /** Server lifecycle state. Present only in the remote projection. */
   status?: "BOUND";
+  /** Optimistic-concurrency version supplied by the server. */
+  version?: number;
 }
 
 // 旧设备级单键 "nexgrid-cards-v1" 废弃(存量无账号归属,mock 可重建);绑卡按账号分行。
@@ -74,7 +76,7 @@ export const useCards = defineStore("cards", () => {
     clearRemoteFacts();
     try {
       const remote = await paymentMethodApi.list();
-      cards.value = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status }));
+      cards.value = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status, version: card.version }));
       defaultTokenId.value = remote.find((card) => card.isDefault)?.tokenId ?? null;
       return true;
     } catch { clearRemoteFacts(); return false; }
@@ -113,8 +115,14 @@ export const useCards = defineStore("cards", () => {
     return tokenId;
   }
 
-  function remove(tokenId: string) {
-    if (remoteApiEnabled) { void refreshRemote(); return; }
+  async function remove(tokenId: string): Promise<void> {
+    if (remoteApiEnabled) {
+      const card = cards.value.find((item) => item.tokenId === tokenId);
+      if (!card || card.version === undefined) throw new Error("PAYMENT_METHOD_VERSION_REQUIRED");
+      await paymentMethodApi.unbind({ tokenId, expectedVersion: card.version, idempotencyKey: `app-card-unbind-${tokenId}-${card.version}` });
+      if (!(await refreshRemote())) throw new Error("PAYMENT_METHOD_READBACK_FAILED");
+      return;
+    }
     const next = cards.value.filter((c) => c.tokenId !== tokenId);
     if (defaultTokenId.value === tokenId) {
       defaultTokenId.value = next[0]?.tokenId ?? null;
@@ -123,8 +131,14 @@ export const useCards = defineStore("cards", () => {
     persist();
   }
 
-  function setDefault(tokenId: string) {
-    if (remoteApiEnabled) { void refreshRemote(); return; }
+  async function setDefault(tokenId: string): Promise<void> {
+    if (remoteApiEnabled) {
+      const card = cards.value.find((item) => item.tokenId === tokenId);
+      if (!card || card.version === undefined) throw new Error("PAYMENT_METHOD_VERSION_REQUIRED");
+      await paymentMethodApi.setDefault({ tokenId, expectedVersion: card.version, idempotencyKey: `app-card-default-${tokenId}-${card.version}` });
+      if (!(await refreshRemote())) throw new Error("PAYMENT_METHOD_READBACK_FAILED");
+      return;
+    }
     if (cards.value.some((c) => c.tokenId === tokenId)) {
       defaultTokenId.value = tokenId;
       persist();

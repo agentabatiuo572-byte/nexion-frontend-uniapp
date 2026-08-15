@@ -36,3 +36,10 @@ export function createRemoteAccountEpoch(initialAccountKey = "default"): RemoteA
     },
   };
 }
+
+/**
+ * Process-wide fence used by account-scoped remote stores. Keep this in the
+ * leaf module so stores can share the fence without importing account-scope
+ * (which itself orchestrates all stores and would create a cycle).
+ */
+export const remoteAccountScope = createRemoteAccountEpoch();

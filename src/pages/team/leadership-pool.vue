@@ -169,6 +169,11 @@ const dist = computed(() => {
   for (const row of remotePool.value?.distribution ?? []) result[row.vRank as VRank] = row.people;
   return result;
 });
+const remoteVotesByRank = computed(() => {
+  const result: Record<number, number> = {};
+  for (const row of remotePool.value?.distribution ?? []) result[row.vRank] = row.votes;
+  return result;
+});
 const currentWeekPoolUSDT = computed(() => remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT);
 const totalVotes = computed(() => remoteApiEnabled ? remotePool.value?.totalVotes ?? 0 : pool.totalVotes());
 const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vState.myRank));
@@ -202,7 +207,7 @@ const topPct = computed(() => {
   let remaining = POOL_TOP_N; let votes = 0;
   for (let rank = 12; rank >= 3 && remaining > 0; rank -= 1) {
     const count = dist.value[rank as VRank] ?? 0; const take = Math.min(count, remaining);
-    votes += take * V_VOTES[rank as VRank]; remaining -= take;
+    votes += take * (remoteVotesByRank.value[rank] ?? 0); remaining -= take;
   }
   return Math.round((votes / totalVotes.value) * 100);
 });
@@ -213,7 +218,7 @@ const voteRows = computed(() => {
   return ranks.map((v) => {
     const def = V_RANKS[v];
     const count = dist.value[v] ?? 0;
-    const votes = V_VOTES[v];
+    const votes = remoteApiEnabled ? remoteVotesByRank.value[v] ?? 0 : V_VOTES[v];
     const vTotalVotes = count * votes;
     const shareOfPool = totalVotes.value > 0 ? vTotalVotes / totalVotes.value : 0;
     return {

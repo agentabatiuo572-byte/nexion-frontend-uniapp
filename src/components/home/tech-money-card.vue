@@ -39,7 +39,8 @@
         style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)"
       >
         <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-        <text class="tabular-nums" style="font-size: 56px">{{ intPart }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
+        <text v-if="remoteApiEnabled && remoteToday === null" class="tabular-nums" style="font-size: 56px">—</text>
+        <text v-else class="tabular-nums" style="font-size: 56px">{{ intPart }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ cents }}</text></text>
       </view>
 
       <!-- 《02》§7:混合内容整句禁 Mono;保留 tabular-nums 让数字仍等宽对齐 -->
@@ -55,6 +56,7 @@ import { useApp } from "@/store/app";
 import { useCommission } from "@/store/commission";
 import { useStaking } from "@/store/staking";
 import { useTicker } from "@/composables/use-ticker";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
@@ -67,11 +69,16 @@ const computeToday = computed(() => app.earnings.today);
 const teamToday = computed(() => commission.todayUSDT());
 const stakingToday = computed(() => staking.todayAccruedUSDT());
 const todayTotal = computed(() => computeToday.value + teamToday.value + stakingToday.value);
+const remoteToday = computed<number | null>(() => remoteApiEnabled
+  ? app.homeTruth?.earnings.today.usdt ?? null
+  : null);
 
-// Streaming number — ticks up; resyncs on a material jump (new commission / day rollover).
-const display = useTicker(() => Math.max(todayTotal.value, 0.06), 0.0009, 1100);
-const intPart = computed(() => Math.floor(display.value));
-const cents = computed(() => String(Math.floor(display.value * 100) % 100).padStart(2, "0"));
+// Mock-only streaming number. Remote mode renders the exact server snapshot or
+// an unavailable placeholder; it never advances a client-side money counter.
+const display = useTicker(() => remoteToday.value ?? Math.max(todayTotal.value, 0.06), 0.0009, 1100, !remoteApiEnabled);
+const displayAmount = computed(() => remoteToday.value ?? display.value);
+const intPart = computed(() => Math.floor(displayAmount.value));
+const cents = computed(() => String(Math.floor(displayAmount.value * 100) % 100).padStart(2, "0"));
 
 interface Dot {
   left: string;

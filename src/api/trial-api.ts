@@ -1,5 +1,6 @@
 import type { ApiClient } from "./api-client";
 import type { TrialStatus } from "../store/trial-boundary";
+import { isCurrentCommerceSandboxRun } from "./order-api";
 
 export type TrialEligibilityReason = "in-progress" | "converted" | "used" | "phase-closed" | "risk" | "unknown";
 export type TrialConfigValue = string | boolean;
@@ -27,12 +28,15 @@ export interface TrialAuthorityState {
 
 export interface TrialConvertReceipt {
   orderNo: string;
+  paymentNo?: string;
   productNo: string;
   amountUsdt: number;
   discountUsdt: number;
-  paymentStatus: "PENDING";
-  orderStatus: "PENDING_PAYMENT";
-  sourceEnvironment: "PRODUCTION";
+  paymentStatus: "PENDING" | "PAID";
+  orderStatus: "PENDING_PAYMENT" | "PAID";
+  source: "mock" | "provider";
+  sourceEnvironment: "PRODUCTION" | "SANDBOX";
+  runId?: string;
 }
 
 /**
@@ -44,7 +48,7 @@ export interface TrialApi {
   state(): Promise<TrialAuthorityState>;
   eligibility(): Promise<TrialAuthorityState>;
   start(idempotencyKey: string, deviceName: string): Promise<TrialAuthorityState>;
-  convert(productNo: string, idempotencyKey: string): Promise<TrialConvertReceipt>;
+  convert(productNo: string, expectedAmountUsdt: number | null, idempotencyKey: string): Promise<TrialConvertReceipt>;
   cancel(reason: "explicit" | "unbind", idempotencyKey: string): Promise<TrialAuthorityState>;
 }
 
@@ -76,17 +80,28 @@ function timestamp(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : invalid();
 }
 
-function convertReceipt(value: unknown): TrialConvertReceipt {
+export function parseTrialConvertReceipt(value: unknown): TrialConvertReceipt {
   const row = record(value);
   const orderNo = typeof row?.orderNo === "string" ? row.orderNo.trim() : "";
   const productNo = typeof row?.productNo === "string" ? row.productNo.trim() : "";
   const amountUsdt = finiteNumber(row?.amountUsdt);
   const discountUsdt = finiteNumber(row?.discountUsdt);
-  if (!/^TRC-[A-Z0-9]+$/.test(orderNo) || !productNo || amountUsdt === null || discountUsdt === null
-      || row?.paymentStatus !== "PENDING" || row?.orderStatus !== "PENDING_PAYMENT"
-      || row?.sourceEnvironment !== "PRODUCTION") return invalid();
-  return { orderNo, productNo, amountUsdt, discountUsdt, paymentStatus: "PENDING",
-    orderStatus: "PENDING_PAYMENT", sourceEnvironment: "PRODUCTION" };
+  const paymentStatus = row?.paymentStatus === "PAID" ? "PAID" : row?.paymentStatus === "PENDING" ? "PENDING" : null;
+  const orderStatus = row?.orderStatus === "PAID" ? "PAID" : row?.orderStatus === "PENDING_PAYMENT" ? "PENDING_PAYMENT" : null;
+  const environment = row?.sourceEnvironment === "SANDBOX" ? "SANDBOX"
+    : row?.sourceEnvironment === "PRODUCTION" ? "PRODUCTION" : null;
+  const source = row?.source === "mock" ? "mock" : row?.source === "provider"
+    ? "provider" : environment === "PRODUCTION" && row?.source == null ? "provider" : null;
+  const paymentNo = row?.paymentNo == null ? undefined : String(row.paymentNo).trim();
+  const runId = row?.runId == null ? undefined : String(row.runId).trim();
+  if (!/^(TRC|TRC-SBX)-[A-Z0-9]+$/.test(orderNo) || !productNo || amountUsdt === null || discountUsdt === null
+      || !paymentStatus || !orderStatus || !environment || !source
+      || environment === "SANDBOX" && (source !== "mock" || paymentStatus !== "PAID" || orderStatus !== "PAID"
+        || !/^PAY-SBX-[A-Z0-9]+$/.test(paymentNo ?? "")
+        || !runId || !/^[A-Za-z0-9][A-Za-z0-9._-]{7,95}$/.test(runId)
+        || !isCurrentCommerceSandboxRun(runId))) return invalid();
+  return { orderNo, ...(paymentNo ? { paymentNo } : {}), productNo, amountUsdt, discountUsdt,
+    paymentStatus, orderStatus, source, sourceEnvironment: environment, ...(runId ? { runId } : {}) };
 }
 
 function clientStatus(serverState: TrialAuthorityState["serverState"]): TrialStatus {
@@ -178,10 +193,10 @@ export function createTrialApi(client: ApiClient): TrialApi {
       body: { deviceName },
       idempotencyKey,
     }),
-    convert: async (productNo, idempotencyKey) => convertReceipt(await client.request({
+    convert: async (productNo, expectedAmountUsdt, idempotencyKey) => parseTrialConvertReceipt(await client.request({
       method: "POST",
       path: "/api/trial/convert",
-      body: { productNo },
+      body: { productNo, expectedAmountUsdt },
       idempotencyKey,
     })),
     cancel: (reason, idempotencyKey) => parse({

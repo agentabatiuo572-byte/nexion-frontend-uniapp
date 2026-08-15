@@ -39,6 +39,9 @@ export interface CanonicalOrder {
   sourceDeviceId: number | null;
   targetDeviceId: number | null;
   targetDeviceInstanceNo: string | null;
+  paymentNo?: string | null;
+  /** Bundle composition count; a bundle order's quantity is still one order. */
+  itemCount: number | null;
 }
 
 export interface CanonicalOrderList {
@@ -91,6 +94,10 @@ let currentSandboxRunId: string | null = null;
 /** The catalogue is the current run-scoped commerce proof for checkout. */
 export function setCurrentCommerceSandboxRun(runId: string | null): void {
   currentSandboxRunId = runId !== null && RUN_ID.test(runId) ? runId : null;
+}
+
+export function isCurrentCommerceSandboxRun(runId: unknown): runId is string {
+  return typeof runId === "string" && RUN_ID.test(runId) && runId === currentSandboxRunId;
 }
 
 function invalid(): never {
@@ -160,6 +167,9 @@ function canonicalOrder(value: unknown): CanonicalOrder {
     sourceDeviceId: nullableInteger(source.sourceDeviceId),
     targetDeviceId: nullableInteger(source.targetDeviceId),
     targetDeviceInstanceNo: nullableString(source.targetDeviceInstanceNo),
+    itemCount: nullableInteger(source.itemCount),
+    ...(source.paymentNo === null || source.paymentNo === undefined
+      ? {} : { paymentNo: nonEmptyString(source.paymentNo) }),
   };
   const paymentStatus = parsed.paymentStatus.toUpperCase();
   const orderStatus = parsed.orderStatus.toUpperCase();

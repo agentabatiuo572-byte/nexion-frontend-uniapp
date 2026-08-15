@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { pointsApi, remoteApiEnabled } from "@/api/runtime";
-import type { CanonicalTopStreaker } from "@/api/points-api";
+import type { CanonicalTopStreaker, CanonicalDailyMilestone, CanonicalDailyPowerUp } from "@/api/points-api";
 import { createAccountRowCommit } from "./account-scoped-storage";
 import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
@@ -96,6 +96,9 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const streakSavers = ref(0);
   const claimedMilestones = ref<number[]>([]);
   const remoteMilestoneIds = ref<Record<number, number>>({});
+  const remoteMilestones = ref<CanonicalDailyMilestone[]>([]);
+  const remotePowerUps = ref<CanonicalDailyPowerUp[]>([]);
+  const remoteRules = ref<Array<{ key: string; value: string }>>([]);
   const topStreakers = ref<CanonicalTopStreaker[]>([]);
   const remoteAccountEpoch = createRemoteAccountEpoch();
 
@@ -107,6 +110,9 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
     streakSavers.value = 0;
     claimedMilestones.value = [];
     remoteMilestoneIds.value = {};
+    remoteMilestones.value = [];
+    remotePowerUps.value = [];
+    remoteRules.value = [];
     topStreakers.value = [];
   }
 
@@ -117,6 +123,9 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
       const snapshot = await pointsApi.state();
       if (!remoteAccountEpoch.isCurrent(request)) return false;
       topStreakers.value = snapshot.topStreakers;
+      remoteMilestones.value = snapshot.dailyMilestones;
+      remotePowerUps.value = snapshot.powerUps;
+      remoteRules.value = snapshot.rules;
       const last = snapshot.streak.lastCheckInDate ? Date.parse(`${snapshot.streak.lastCheckInDate}T00:00:00Z`) : 0;
       lastSignedInAt.value = Number.isFinite(last) ? last : 0;
       signInStreak.value = snapshot.streak.currentStreak;
@@ -315,7 +324,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
-    topStreakers,
+    topStreakers, remoteMilestones, remotePowerUps, remoteRules,
     signIn, useSaver, claimMilestone, bindAccount, refreshRemote,
     checkInRemote, claimMilestoneRemote, useSaverRemote,
   };

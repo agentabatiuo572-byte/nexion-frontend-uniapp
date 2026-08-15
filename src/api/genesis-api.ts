@@ -23,6 +23,9 @@ export interface GenesisEligibility {
   minAccountAgeDays: number;
   accountAgeDays: number;
   hasGenesisInvite: boolean;
+  mode?: "any-of" | "all-of";
+  appliesTo?: "primary" | "both";
+  halted?: boolean;
 }
 
 export interface GenesisSeries {
@@ -94,6 +97,15 @@ export interface GenesisPublicState {
   catalogAvailable: boolean;
   tradeAvailable: boolean;
   tradeBlockedReason: string;
+  marketStats: GenesisMarketStats;
+}
+
+export interface GenesisMarketStats {
+  floorUsdt: number | null;
+  volume24hUsdt: number | null;
+  owners: number | null;
+  floorDeltaPct: number | null;
+  lastSaleUsdt: number | null;
 }
 
 export interface GenesisAccountState {
@@ -202,6 +214,25 @@ function parseEligibility(value: unknown): GenesisEligibility {
     minAccountAgeDays,
     accountAgeDays,
     hasGenesisInvite: row.hasGenesisInvite,
+    mode: row.mode === "all-of" || row.mode === "any-of" ? row.mode : undefined,
+    appliesTo: row.appliesTo === "primary" || row.appliesTo === "both" ? row.appliesTo : undefined,
+    halted: typeof row.halted === "boolean" ? row.halted : undefined,
+  };
+}
+
+function parseMarketStats(value: unknown): GenesisMarketStats {
+  const row = record(value);
+  if (!row) return invalid();
+  const nullable = (item: unknown, min = 0): number | null => {
+    if (item === null || item === undefined || item === "") return null;
+    return number(item, min) ?? invalid();
+  };
+  return {
+    floorUsdt: nullable(row.floorUsdt),
+    volume24hUsdt: nullable(row.volume24hUsdt),
+    owners: nullable(row.owners),
+    floorDeltaPct: nullable(row.floorDeltaPct, Number.NEGATIVE_INFINITY),
+    lastSaleUsdt: nullable(row.lastSaleUsdt),
   };
 }
 
@@ -316,6 +347,7 @@ export function parseGenesisPublicState(value: unknown): GenesisPublicState {
     catalogAvailable: row.catalogAvailable,
     tradeAvailable: row.tradeAvailable,
     tradeBlockedReason,
+    marketStats: parseMarketStats(row.marketStats),
   };
 }
 
@@ -348,6 +380,9 @@ export function createGenesisApi(client: ApiClient) {
     })),
     account: async () => parseGenesisAccountState(await client.request({
       method: "GET", path: "/api/genesis/account",
+    })),
+    eligibility: async () => parseEligibility(await client.request({
+      method: "GET", path: "/api/genesis/eligibility",
     })),
     purchase: async (quantity: number, idempotencyKey: string) => parseGenesisAccountState(await client.request({
       method: "POST", path: "/api/genesis/purchase", idempotencyKey, body: { quantity },

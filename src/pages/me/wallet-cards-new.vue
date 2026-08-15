@@ -15,10 +15,11 @@
   <AppChassis active="me">
     <view style="color: var(--v5-ink)">
       <SubPageHeader back="/pages/me/wallet-cards" :title="t.cards.newTitle" />
+      <FundsSandboxBadge />
 
       <view :style="bodyStyle">
         <!-- Form card -->
-        <view :style="formCardStyle">
+        <view v-if="cardBindingAvailable" :style="formCardStyle">
           <view class="flex items-center" :style="formHeadStyle">
             <view class="grid place-items-center shrink-0" :style="formHeadIconStyle">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2" /><path d="M2 10h20" /></svg>
@@ -74,9 +75,14 @@
           </HostedCardVault>
         </view>
 
+        <view v-else :style="formCardStyle">
+          <text class="block" :style="providerHoldTitleStyle">{{ t.authOtp.errorServiceUnavailable }}</text>
+          <text class="block" :style="providerHoldBodyStyle">{{ t.walletV3.submitReasonServiceUnavailable }}</text>
+        </view>
+
         <!-- Submit -->
         <!-- 字段没填全时点了没用 → 显式 aria-disabled(《05》§6.1),别只靠「没有按下反馈」暗示 -->
-        <view class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind">
+        <view v-if="cardBindingAvailable" class="grid place-items-center" :class="{ 'active:scale-[0.98]': canSubmit }" :style="submitStyle" role="button" tabindex="0" :aria-disabled="canSubmit ? 'false' : 'true'" :aria-label="canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled" @click.stop="handleBind">
           <text :style="submitTextStyle">{{ canSubmit ? t.cards.formSubmit : t.cards.formSubmitDisabled }}</text>
         </view>
 
@@ -96,15 +102,17 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useCards, brandLabel } from "@/store/cards";
+import FundsSandboxBadge from "@/components/me/funds-sandbox-badge.vue";
 import type { CardBrand } from "@/store/cards-core";
 import HostedCardVault from "@/components/me/hosted-card-vault.vue";
 import HostedCardField from "@/components/me/hosted-card-field.vue";
 import { useQuest } from "@/store/quest";
 import { postMoneyBillsOnce, type ReceiptDraft } from "@/lib/money-receipt";
-import { paymentMethodApi, remoteApiEnabled } from "@/api/runtime";
+import { paymentMethodApi, remoteApiEnabled, paymentSandboxEnabled } from "@/api/runtime";
 
 const t = useT();
 const cardsStore = useCards();
+const cardBindingAvailable = computed(() => !remoteApiEnabled || paymentSandboxEnabled);
 
 // Query (onLoad — page-level): ?returnTo=<relative path> for post-bind
 // navigation (open-redirect guarded). Initialize from the H5 URL hash query
@@ -163,11 +171,11 @@ function onDefaultGroupChange(e: Event) {
 
 const validHolder = computed(() => holder.value.trim().length >= 2);
 const valid = computed(() => cardReady.value && validHolder.value);
-const canSubmit = computed(() => valid.value && !isBinding.value);
+const canSubmit = computed(() => cardBindingAvailable.value && valid.value && !isBinding.value);
 const defaultStateLabel = computed(() => (setAsDefault.value ? t.value.cards.formDefaultOn : t.value.cards.formDefaultOff));
 
 async function handleBind() {
-  if (!canSubmit.value) return;
+  if (!cardBindingAvailable.value || !canSubmit.value) return;
   // 明文由 <HostedCardVault> 交给收单方换 token(真实现 = SDK createToken)。
   // 本页拿到的是 token / 后四位 / 卡组织 / 有效期四样,连同本页自己收的持卡人姓名
   // 共五个字段落库 —— 卡号与 CVV 不在其中,明文无从写入(SavedCard 根本没这两个字段)。
@@ -234,6 +242,8 @@ async function handleBind() {
 
 // ── styles ──
 const bodyStyle: CSSProperties = { padding: "0 16px" };
+const providerHoldTitleStyle: CSSProperties = { fontSize: "15px", fontWeight: 600, color: "var(--v5-ink)" };
+const providerHoldBodyStyle: CSSProperties = { marginTop: "8px", fontSize: "12px", lineHeight: 1.5, color: "var(--v5-ink-3)" };
 
 // De-carded form wrapper — the head + recessed input fields sit on the page
 // floor. Input controls (PAN/expiry/CVV/holder) are untouched; only the

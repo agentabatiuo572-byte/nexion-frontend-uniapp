@@ -34,7 +34,7 @@
             <view>
               <text class="block font-mono-tabular" :style="overviewCapStyle">Cooling</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-warning)')">${{ commission.coolingUSDT().toFixed(2) }}</text>
-              <text class="block font-mono-tabular" :style="overviewSmallStyle">Unlocks in 30d</text>
+              <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ coolingOverviewText }}</text>
             </view>
           </view>
           <view class="grid grid-cols-2" :style="heroFooterStyle">
@@ -164,6 +164,15 @@ const byKind = computed(() => commission.byKind());
 const filtered = computed(() =>
   filter.value === "all" ? events.value : events.value.filter((e) => e.kind === filter.value),
 );
+
+const coolingOverviewText = computed(() => {
+  const next = events.value
+    .filter((event) => event.status === "cooling" && Number.isFinite(event.unlockAt))
+    .sort((a, b) => a.unlockAt - b.unlockAt)[0];
+  if (!next) return remoteApiEnabled ? "—" : t.value.commissions.unlocksIn30d;
+  const days = Math.max(0, Math.ceil((next.unlockAt - Date.now()) / 86400000));
+  return fmt(t.value.commissions.coolingTag, { n: days });
+});
 
 const noKindText = computed(() =>
   fmt(t.value.commissions.noKindEvents, { kind: t.value.commissions.kind[filter.value as CommissionKind] }),

@@ -60,7 +60,7 @@
           <!-- variant hero stat -->
           <view v-if="variant === 'earnings'" style="margin-top: 16px">
             <text class="block font-mono-tabular" :style="heroKickerStyle('var(--v5-brand)')">{{ t.proof.totalEarned }}</text>
-            <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotal.toFixed(2) }}</text>
+            <text class="block font-display tabular-nums" :style="heroBigStyle">${{ earningsTotalText }}</text>
             <ProofSparkline />
           </view>
           <view v-else-if="variant === 'streak'" style="margin-top: 16px">
@@ -91,7 +91,7 @@
             </view>
             <view :style="miniStatStyle">
               <text class="block truncate" :style="miniLabelStyle">{{ topPctLabel }}</text>
-              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">Top {{ topPct }}%</text>
+              <text class="block font-display tabular-nums" :style="miniValueSmallStyle">{{ topPctText }}</text>
             </view>
           </view>
 
@@ -187,6 +187,7 @@
 
 <script setup lang="ts">
 import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import qrcode from "qrcode-generator";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -202,6 +203,8 @@ import { isDeviceOnline } from "@/lib/hashpower";
 import { useVRank, V_RANKS } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useNexFaucet } from "@/store/nex-faucet";
+import { proofApi, remoteApiEnabled } from "@/api/runtime";
+import type { ProofSnapshot } from "@/api/proof-api";
 
 type Variant = "earnings" | "streak" | "network";
 const VARIANTS: Variant[] = ["earnings", "streak", "network"];
@@ -215,47 +218,63 @@ const faucet = useNexFaucet();
 
 const variant = ref<Variant>("earnings");
 const exportingPoster = ref(false);
+const remoteSnapshot = ref<ProofSnapshot | null>(null);
+const remoteError = ref(false);
+let remoteRequest = 0;
+async function refreshRemoteProof() {
+  const request = ++remoteRequest;
+  remoteError.value = false;
+  const expectedAccount = app.accountKey;
+  try {
+    const value = await proofApi.snapshot();
+    if (request === remoteRequest && expectedAccount === app.accountKey) remoteSnapshot.value = value;
+  } catch {
+    if (request === remoteRequest && expectedAccount === app.accountKey) { remoteSnapshot.value = null; remoteError.value = true; }
+  }
+}
+onShow(() => {
+  if (remoteApiEnabled) {
+    void refreshRemoteProof();
+    void vRank.refreshCanonicalVRank();
+  }
+});
 
-const earningsTotal = computed(() => app.earnings.total);
+const earningsTotal = computed(() => remoteApiEnabled ? remoteSnapshot.value?.earningsTotalUsdt ?? 0 : app.earnings.total);
+const earningsTotalText = computed(() => remoteApiEnabled && !remoteSnapshot.value ? "—" : earningsTotal.value.toFixed(2));
 const onlineDevices = computed(
-  () => app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
+  () => remoteApiEnabled ? remoteSnapshot.value?.onlineDevices ?? 0
+    : app.visibleDevices.filter((d) => d.activatedAt !== null && isDeviceOnline(d, Date.now())).length,
 );
 const profileName = computed(() => profile.displayName);
 const myRank = computed(() => vRank.myRank);
-const totalMembers = computed(() => network.totalMembers);
+const totalMembers = computed(() => remoteApiEnabled ? remoteSnapshot.value?.team.totalMembers ?? 0 : network.totalMembers);
 const streak = computed(() => faucet.signInStreak);
 const longestStreak = computed(() => faucet.longestStreak);
 const longestOrCurrent = computed(() => longestStreak.value || streak.value || 0);
 
-const joined = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(undefined, { month: "short", year: "numeric" }),
-);
-const activeDays = computed(() => Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
+const joined = computed(() => new Date(remoteApiEnabled ? remoteSnapshot.value?.joinedAt ?? 0 : app.user.joinedAt)
+  .toLocaleDateString(undefined, { month: "short", year: "numeric" }));
+const activeDays = computed(() => remoteApiEnabled ? remoteSnapshot.value?.activeDays ?? 0
+  : Math.max(1, Math.floor((Date.now() - app.user.joinedAt) / (24 * 3600 * 1000))));
 
 // [FEAT-SHARE1] 链接单源收编:构造走 lib/share(禁自拼 nexgrid.ai/ref/)。
-const referralLink = computed(() => buildShareLink());
-const refCode = computed(() => app.user.referralCode);
+const refCode = computed(() => remoteApiEnabled ? remoteSnapshot.value?.referralCode ?? "—" : app.user.referralCode);
+const referralLink = computed(() => refCode.value === "—" ? "" : buildShareLink(refCode.value));
 
-const topPct = computed(() => {
-  const total = earningsTotal.value;
-  if (total > 1000) return 1;
-  if (total > 500) return 3;
-  if (total > 100) return 8;
-  if (total > 30) return 18;
-  return 35;
-});
+const topPct = computed(() => remoteApiEnabled ? remoteSnapshot.value?.topPercentile ?? null : null);
+const topPctText = computed(() => topPct.value === null ? "Top —" : `Top ${topPct.value}%`);
 
 const shareText = computed(() => {
   if (variant.value === "streak")
     return `🔥 ${longestOrCurrent.value}-day streak on NexGrid. Daily check-ins = passive NEX. Join me: ${referralLink.value}`;
   if (variant.value === "network")
     return `🌐 My NexGrid network is ${totalMembers.value} strong across 7 layers. Compound earnings from each. Join: ${referralLink.value}`;
-  return `💸 Earned $${earningsTotal.value.toFixed(2)} on NexGrid in ${activeDays.value} days. Join my network: ${referralLink.value}`;
+  return `💸 Earned $${earningsTotalText.value} on NexGrid in ${activeDays.value} days. Join my network: ${referralLink.value}`;
 });
 
 // ── derived labels ──
 const memberSinceText = computed(() => fmt(t.value.proof.memberSince, { m: joined.value }));
-const topPctLabel = computed(() => t.value.proof.topPct.replace("{n}", String(topPct.value)));
+const topPctLabel = computed(() => topPct.value === null ? t.value.proof.topPct.replace("{n}", "—") : t.value.proof.topPct.replace("{n}", String(topPct.value)));
 const vRankChip = computed(() => fmt(t.value.proof.badges.vRank, { n: String(myRank.value), title: V_RANKS[myRank.value].title }));
 const streakChip = computed(() => fmt(t.value.proof.badges.streak, { n: String(longestOrCurrent.value) }));
 const devicesChip = computed(() => fmt(t.value.proof.badges.devices, { n: String(onlineDevices.value) }));
@@ -389,7 +408,7 @@ function posterMetricLabel(): string {
 function posterMetricValue(): string {
   if (variant.value === "streak") return `${longestOrCurrent.value} ${t.value.proof.daysShort}`;
   if (variant.value === "network") return String(totalMembers.value);
-  return `$${earningsTotal.value.toFixed(2)}`;
+  return `$${earningsTotalText.value}`;
 }
 
 function drawPosterQr(ctx: UniApp.CanvasContext, x: number, y: number, size: number) {

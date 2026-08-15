@@ -57,6 +57,8 @@ export interface CurrentTask {
 
 export interface CompletedTask extends CurrentTask {
   completedAt: number;
+  /** Server-issued Proof-of-Compute receipt number (remote mode only). */
+  receiptNo?: string | null;
 }
 
 export interface Device {

@@ -126,7 +126,7 @@
               <text class="block" :style="activityTimeStyle">{{ new Date(a.ts).toLocaleString() }}</text>
             </view>
             <view class="text-right">
-              <text class="block tabular-nums" :style="activityNexStyle">+{{ fmtNum(a.nex, 2) }} NEX</text>
+              <text class="block tabular-nums" :style="activityNexStyle">{{ a.nex >= 0 ? "+" : "" }}{{ fmtNum(a.nex, 2) }} NEX</text>
               <text class="block" :style="activityUsdStyle">≈ {{ fmtUSD(a.nex * nexPrice) }}</text>
             </view>
           </view>
@@ -141,6 +141,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -149,11 +150,14 @@ import { useT } from "@/i18n/use-t";
 import { useApp } from "@/store/app";
 import { useMarket } from "@/store/market";
 import { useCommission } from "@/store/commission";
+import { useBills } from "@/store/bills";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const app = useApp();
 const market = useMarket();
 const commission = useCommission();
+const bills = useBills();
 
 let priceTimer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {
@@ -164,6 +168,9 @@ onMounted(() => {
 });
 onUnmounted(() => {
   if (priceTimer) clearInterval(priceTimer);
+});
+onShow(() => {
+  if (remoteApiEnabled) void bills.refreshServerLedger().catch(() => undefined);
 });
 
 const nexBalance = computed(() => app.user.nexBalance);
@@ -182,8 +189,30 @@ const totalSpent = computed(() => nexBalance.value * market.costBasis);
 const pnl = computed(() => usdValue.value - totalSpent.value);
 const pnlPct = computed(() => (totalSpent.value > 0 ? (pnl.value / totalSpent.value) * 100 : 0));
 
-// NEX activity — mining (synthetic) + NEX-denominated commissions.
+const nexLedger = computed(() => {
+  if (!remoteApiEnabled || bills.serverStatus !== "ready") return [];
+  return bills.bills
+    .filter((bill) => bill.symbol === "NEX" && bill.status !== "failed")
+    .map((bill) => ({
+      id: bill.id,
+      ts: bill.ts,
+      kind: "ledger",
+      nex: bill.amount,
+      label: bill.memo || bill.type,
+    }));
+});
+const pendingNex = computed<number | null>(() => {
+  if (!remoteApiEnabled) return 0;
+  if (bills.serverStatus !== "ready") return null;
+  return bills.bills
+    .filter((bill) => bill.symbol === "NEX" && bill.status === "pending")
+    .reduce((sum, bill) => sum + Math.abs(bill.amount), 0);
+});
+
+// NEX activity — mock uses the prototype fixture; remote uses the production
+// wallet ledger only and stays empty while that authority is unavailable.
 const activity = computed(() => {
+  if (remoteApiEnabled) return nexLedger.value.slice().sort((a, b) => b.ts - a.ts).slice(0, 10);
   const items: Array<{ id: string; ts: number; kind: string; nex: number; label: string }> = [];
   for (const e of commission.events) {
     if (e.amountNEX > 0) {
@@ -242,7 +271,7 @@ const quickCells = computed(() => [
 const breakdownRows = computed(() => [
   { label: t.value.nexWallet.breakdown.liquid, value: `${fmtNum(nexBalance.value, 2)} NEX`, hint: fmtUSD(usdValue.value), tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
   { label: t.value.nexWallet.breakdown.mining, value: `+${fmtNum(todayNEX.value, 2)} NEX`, hint: t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
-  { label: t.value.nexWallet.breakdown.pending, value: "0 NEX", hint: t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
+  { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} NEX`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 
 const pnlSummary = computed(() => `${pnl.value >= 0 ? "+" : ""}${fmtUSD(pnl.value)} (${pnl.value >= 0 ? "+" : ""}${pnlPct.value.toFixed(1)}%)`);

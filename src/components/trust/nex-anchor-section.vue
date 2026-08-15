@@ -4,7 +4,7 @@
   from the inline NexAnchorSection in Nexion-prototype trust/page.tsx.
 -->
 <template>
-  <view :style="cardStyle">
+  <view v-if="!remoteApiEnabled" :style="cardStyle">
     <text class="block" :style="heroStyle">{{ t.trust.nexAnchorHero }}</text>
     <text class="block" :style="subStyle">{{ t.trust.nexAnchorSubhero }}</text>
 
@@ -45,6 +45,7 @@ import Stat from "@/components/trust/trust-stat.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useMarket } from "@/store/market";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const NEX_CLIENTS = [
   { name: "Helix Labs", city: "San Francisco", monthlyNex: 1_240_000 },

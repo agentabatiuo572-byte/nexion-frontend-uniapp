@@ -41,6 +41,12 @@ export interface Product {
   vram: string;
   hashRate?: string;
   power?: string;
+  /** Server-owned managed-service specification; explicit "unavailable" is valid. */
+  datacenter?: string;
+  uptime?: string;
+  warranty?: string;
+  phoneDailyEarn?: string;
+  phoneDailyEarnNEX?: string;
   dailyEarn: number;        // USDT/day
   dailyEarnNEX: number;     // NEX/day (spec §3.1)
   // Q9: annual ROI is DERIVED, not stored — see annualRoiPct() below. A stored
@@ -74,6 +80,9 @@ export interface Product {
   // Per-user purchase gate (等级门 + 锁额). Operator-configured at 上架,
   // server-canonical. undefined = 无门,自由购买. See evaluatePurchaseGate().
   purchaseGate?: PurchaseGate;
+  /** True when the server refused to certify enough specs for a purchase. */
+  purchaseBlocked?: boolean;
+  purchaseBlockedReason?: string;
 }
 
 export const PRODUCTS: Product[] = [

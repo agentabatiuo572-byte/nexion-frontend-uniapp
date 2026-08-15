@@ -68,7 +68,7 @@
 
             <view class="mt-2.5 flex items-baseline gap-1" style="font-family: var(--font-v5); font-weight: 600; letter-spacing: -0.024em; line-height: 1; color: var(--v5-ink)">
               <text style="font-size: 20px; color: var(--v5-ink-3); font-weight: 500">$</text>
-              <text class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
+              <text class="tabular-nums" style="font-size: 56px">{{ totalInt }}<text v-if="totalKnown" style="font-size: 36px; color: var(--v5-ink-3); font-weight: 600">.{{ totalCents }}</text></text>
             </view>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 15px; color: var(--v5-nex); font-weight: 600">+{{ nexFmt }} <text style="font-size: 12px; font-weight: 500; letter-spacing: 0.06em">NEX</text></text>
             <text class="block mt-2 font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink-3)">{{ jobsText }}</text>
@@ -168,24 +168,23 @@ const devices = computed(() => app.visibleDevices.filter((d) => d.activatedAt !=
 const fleetCountText = computed(() => fmt(t.value.home.fleetOfMax, { n: devices.value.length }));
 
 // ── HERO total earned ──
-const total = computed(() => {
-  const e = app.earnings;
-  return range.value === "Today" ? e.today
-    : range.value === "Week" ? e.thisWeek
-      : range.value === "Month" ? e.thisMonth
-        : e.total;
+const serverPeriod = computed(() => {
+  const e = app.homeTruth?.earnings;
+  if (!e) return null;
+  return range.value === "Today" ? e.today : range.value === "Week" ? e.week : range.value === "Month" ? e.month : e.all;
 });
-const totalInt = computed(() => Math.floor(total.value).toLocaleString());
-const totalCents = computed(() => String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
-// NEX earned for the range — backend gives per-range NEX; mock scales today's NEX by the USDT ratio.
-const nexTotal = computed(() => {
+const mockTotal = computed(() => {
   const e = app.earnings;
-  const ratio = e.today > 0 ? e.todayNEX / e.today : 0;
-  return total.value * ratio;
+  return range.value === "Today" ? e.today : range.value === "Week" ? e.thisWeek : range.value === "Month" ? e.thisMonth : e.total;
 });
-const nexFmt = computed(() => nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
-const jobsCount = computed(() => (range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247));
-const jobsText = computed(() => fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
+const total = computed(() => remoteApiEnabled ? serverPeriod.value?.usdt ?? null : mockTotal.value);
+const totalKnown = computed(() => total.value !== null);
+const totalInt = computed(() => total.value === null ? "—" : Math.floor(total.value).toLocaleString());
+const totalCents = computed(() => total.value === null ? "" : String(Math.floor(total.value * 100) % 100).padStart(2, "0"));
+const nexTotal = computed(() => remoteApiEnabled ? serverPeriod.value?.nex ?? null : (() => { const e = app.earnings; const ratio = e.today > 0 ? e.todayNEX / e.today : 0; return mockTotal.value * ratio; })());
+const nexFmt = computed(() => nexTotal.value === null ? "—" : nexTotal.value.toLocaleString(undefined, { maximumFractionDigits: 1 }));
+const jobsCount = computed(() => remoteApiEnabled ? serverPeriod.value?.jobCount ?? null : (range.value === "Today" ? 14 : range.value === "Week" ? 98 : range.value === "Month" ? 412 : 1247));
+const jobsText = computed(() => jobsCount.value === null ? "—" : fmt(t.value.earn.jobsCount, { n: jobsCount.value.toLocaleString() }));
 
 // drifting hero dots
 const HERO_DOTS = [
