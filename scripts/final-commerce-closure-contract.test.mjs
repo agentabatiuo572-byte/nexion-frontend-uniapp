@@ -14,6 +14,9 @@ test("mock checkout receipts stop in a recoverable error state", async () => {
     assert.match(page, /if \(!postReceiptOnly\(/);
     assert.match(page, /receiptWriteFailure/);
     assert.match(page, /retryReceiptWrite/);
+    assert.match(page, /accountKey/);
+    assert.match(page, /readAccountRow<[^>]*ReceiptRecovery/);
+    assert.match(page, /writeAccountRow<[^>]*ReceiptRecovery/);
   }
 });
 
@@ -21,7 +24,10 @@ test("remote card mutations require authoritative readback before UI success", a
   const cards = await source("src/store/cards.ts");
   const page = await source("src/pages/me/wallet-cards.vue");
   assert.match(cards, /if \(!\(await refreshRemote\(\)\)\) throw new Error\("PAYMENT_METHOD_READBACK_FAILED"\)/g);
-  assert.match(page, /catch \{ toast\.error\(t\.value\.security\.opFailed\); \}/g);
+  assert.match(cards, /const nextCards = remote\.map/);
+  assert.match(cards, /catch \{ return false; \}/);
+  assert.match(page, /data-testid="wallet-cards-retry"/);
+  assert.match(page, /cardsStore\.refreshRemote\(\)/);
   assert.match(page, /await cardsStore\.setDefault\(tokenId\);[\s\S]*toast\.success/);
   assert.match(page, /notifs\.push[\s\S]*toast\.success/);
 });
@@ -30,6 +36,7 @@ test("security mutations fail closed when overview readback fails", async () => 
   const security = await source("src/pages/me/security.vue");
   assert.match(security, /async function loadRemoteSecurity\(\): Promise<boolean>/);
   assert.match(security, /if \(!\(await loadRemoteSecurity\(\)\)\) throw new Error\("SECURITY_READBACK_FAILED"\)/g);
+  assert.match(security, /cause\.message === "SECURITY_READBACK_FAILED"[\s\S]*t\.value\.security\.opFailed/);
 });
 
 test("catalog detail retry and bundle order item count remain visible", async () => {
@@ -44,4 +51,8 @@ test("catalog detail retry and bundle order item count remain visible", async ()
   assert.match(orders, /itemCount: row\.itemCount/);
   assert.match(orderDetail, /order\.itemCount \?\? order\.quantity/);
   assert.match(bundle, /fundsSandboxEnabled\s*\?\s*t\.value\.bundle\.checkoutSuccessBody/);
+  assert.match(bundle, /await orderApi\.list\(\)/);
+  assert.match(bundle, /isCanonicalPaidOrder\(readback, created\.orderNo, created\.itemCount\)/);
+  const checkout = await source("src/pages/store/checkout.vue");
+  assert.match(checkout, /isCanonicalPaidOrder\(readback, conversion\.orderNo\)/);
 });

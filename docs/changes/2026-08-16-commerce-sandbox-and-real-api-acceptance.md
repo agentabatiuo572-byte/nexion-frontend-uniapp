@@ -10,7 +10,7 @@
 2. 确认至少一件后端裁决为可购的商品；未达 E1 发布阶段的商品仍保留锁定。
 3. 余额不足时通过 `POST /api/app/wallet/sandbox/topups` 建立隔离入金，回读 `SETTLED`；未修改生产钱包。
 4. 通过 `POST /api/orders` 建单，回读 `PENDING / PENDING_PAYMENT`。
-5. 通过 `POST /api/orders/{orderNo}/pay` 支付，回读 `PAID / PAID / paid`和服务端 `paymentNo`。
+5. 通过 `POST /api/orders/{orderNo}/pay` 支付，回读 `PAID / PAID / paid` 和服务端 `paymentNo`。
 6. 以同一幂等键重放支付，`paymentNo` 保持不变，不重复扣款。
 7. 再次读取 `GET /api/orders`，订单状态稳定为 `PAID / WAITING_PROVISIONING / paid`，支付编号与首次回执一致。
 
@@ -25,17 +25,19 @@
 - D7 模拟出金补齐 Sandbox 用户和 RunID 维度；管理端支付方式增加 profile/user 环境一致性；Home 的事实表没有 RunID 时直接返回不可用，不跨验收运行复用事实。
 - Mock 单品/组合的收据写入失败原会继续提示成功，改为保留可重试错误态；远端银行卡与安全命令改为只有权威读回成功后才确认。
 - 商品详情增加目录重试，组合订单回读保留 `itemCount`；remote 收益、NEX 历史、合作/合规背书、随机成员动画与固定解锁倒计时全部改为服务端真值或不可用。
+- 收据失败恢复按账号隔离；组合购与试用转购必须回读同一 canonical 订单并确认已支付，组合购还需确认 `itemCount` 一致后才清空购物车。
+- Trade-in 对所有 Sandbox 用户统一失败关闭，不因运行 profile 旁路生产钱包、库存或订单；Day-one、Proof、团队财务、钱包 NEX 与网络统计缺少权威数据时统一显示不可用。
 
 ## 自动化证据
 
-- Backend：3819 tests，0 failure，0 error，12 skipped。
-- UniApp：TypeScript 检查通过；49 test files / 126 tests 通过。
+- Backend：3822 tests，0 failure，0 error，12 skipped。
+- UniApp：TypeScript 检查通过；50 test files / 129 tests 通过。
 - Production boundaries：23/23 通过。
 - Remote logic journey：3/3 通过。
 - Cross-repo contracts：8/8 通过。
 - H5 production build：通过。
 - PC：A3 契约 4/4、RBAC 21/21，Next.js production build 通过。
-- Final commerce / remote truth contracts：12/12 通过。
+- Final commerce / funds / remote truth contracts：17/17 通过。
 
 ## 不在本轮签发的生产能力
 

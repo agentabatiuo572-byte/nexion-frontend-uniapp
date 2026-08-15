@@ -397,7 +397,9 @@ async function handleRevoke(s: SessionListItem) {
       } else session.revokeSession(s.id);
       toast.success(t.value.security.sessionRevoked);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSION_REVOKE_FAILED");
+      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
+        ? t.value.security.opFailed
+        : cause instanceof Error ? cause.message : t.value.security.opFailed);
     }
   }
 }
@@ -417,7 +419,9 @@ async function handleRevokeAll() {
       } else session.revokeAllOtherSessions();
       toast.success(t.value.security.revokeAllDone);
     } catch (cause) {
-      toast.error(cause instanceof Error ? cause.message : "SECURITY_SESSIONS_REVOKE_FAILED");
+      toast.error(cause instanceof Error && cause.message === "SECURITY_READBACK_FAILED"
+        ? t.value.security.opFailed
+        : cause instanceof Error ? cause.message : t.value.security.opFailed);
     }
   }
 }

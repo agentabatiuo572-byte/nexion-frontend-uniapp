@@ -46,3 +46,40 @@ test("remote network and commission surfaces use server timing without random or
   assert.doesNotMatch(commissions, /Unlocks in 30d/);
   assert.match(commissions, /unlockAt/);
 });
+
+test("remote onboarding and trial surfaces fail closed on local business constants", () => {
+  const quest = read("src/components/home/day-one-quest-card.vue");
+  const trial = read("src/components/trial-hero-banner.vue");
+  assert.match(quest, /quest\.remoteStatus/);
+  assert.match(quest, /rewardText/);
+  assert.doesNotMatch(quest, /18 \* 3600_000/);
+  assert.match(trial, /v-if="!remoteApiEnabled"/);
+  assert.doesNotMatch(trial, /const trialsLeft = 47/);
+});
+
+test("remote proof and team finance pages expose unavailable instead of zero defaults", () => {
+  const proof = read("src/pages/me/proof.vue");
+  const commissions = read("src/pages/team/commissions.vue");
+  const binary = read("src/pages/team/binary.vue");
+  const unilevel = read("src/pages/team/unilevel.vue");
+  assert.match(proof, /remoteError/);
+  assert.match(proof, /remoteApiEnabled && remoteError/);
+  assert.match(proof, /=== null \? "—"/);
+  assert.match(commissions, /commission\.eventsStatus/);
+  assert.match(binary, /commission\.binaryStatus/);
+  assert.match(unilevel, /remoteState === 'ready'/);
+});
+
+test("remote static partner wall and telemetry/mining/rank defaults are gated", () => {
+  const developer = read("src/pages/developer/developer.vue");
+  const globe = read("src/pages/globe/globe.vue");
+  const wallet = read("src/pages/me/wallet-nex.vue");
+  const network = read("src/pages/team/network.vue");
+  const team = read("src/pages/team/team.vue");
+  assert.match(developer, /v-if="!remoteApiEnabled"/);
+  assert.match(globe, /activeNodesText.*—/s);
+  assert.match(globe, /activeJobsText.*—/s);
+  assert.match(wallet, /todayNEX.*number \| null/);
+  assert.match(network, /myRankText/);
+  assert.match(team, /const extendedCountText[\s\S]*if \(remoteApiEnabled/);
+});

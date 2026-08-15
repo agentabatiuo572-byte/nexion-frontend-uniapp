@@ -30,7 +30,7 @@
              (bordered card + page-floor radial glow deleted outright, owner
              call 2026-07-08). Rules-intro pill sits on the section-title row
              (owner 2026-07-09: kill the empty gap above 本月版税). -->
-        <view :style="heroStyle">
+        <view v-if="!remoteApiEnabled || remoteState === 'ready'" :style="heroStyle">
           <view class="flex items-center justify-between" style="gap: 8px">
             <text class="font-mono-tabular" :style="heroCapStyle">{{ t.unilevel.heroLabel }}</text>
             <view class="nx-unilevel-how-link inline-flex items-center shrink-0 active:scale-[0.98]" :style="howEntryStyle" @click="go('/pages/team/unilevel-how')">

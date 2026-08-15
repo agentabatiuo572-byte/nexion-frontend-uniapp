@@ -283,6 +283,7 @@ import { navTo } from "@/lib/route";
 import type { DeviceKind } from "@/store/types";
 import { toast } from "@/store/ui";
 import { commercePaymentApi, deviceE3Api, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { asApiError } from "@/api/errors";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
 import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
@@ -596,6 +597,7 @@ watch(() => app.accountKey, () => {
   remoteOrderFailure.value = null;
   receiptWriteFailure.value = null;
   receiptRetrying.value = false;
+  restoreReceiptRecovery();
   remoteOrderPollError.value = false;
   remoteTradeinRecoveryRequired.value = false;
   remoteOrderCommandKey.clear();
@@ -686,7 +688,9 @@ const payment = ref<string>(fundsSandboxEnabled ? "sandbox-wallet" : "usdt-trc20
 const orderId = ref<string | null>(null);
 const remoteOrderFailure = ref<string | null>(null);
 const remoteOrderPollError = ref(false);
-const receiptWriteFailure = ref<{ draft: ReceiptDraft; orderId: string } | null>(null);
+const CHECKOUT_RECEIPT_RECOVERY_KEY = "nexgrid-checkout-receipt-recovery-v1";
+type CheckoutReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderId: string };
+const receiptWriteFailure = ref<CheckoutReceiptRecovery | null>(null);
 const receiptRetrying = ref(false);
 // Re-entry guard for the confirm→pay tap (mirrors source confirmingRef) —
 // prevents a double-tap from racing the step transition.
@@ -703,13 +707,35 @@ const remoteTradeinRecoveryRequired = ref(false);
 const wasEmptyBefore = ref(orders.orders.length === 0);
 const firstOrderCelebrating = ref(false);
 
+function restoreReceiptRecovery() {
+  const accountKey = orders.currentAccountKey();
+  const row = readAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, accountKey);
+  receiptWriteFailure.value = row?.accountKey === accountKey && row.orderId === row.draft?.ref
+    ? row
+    : null;
+}
+
+function persistReceiptRecovery(failure: CheckoutReceiptRecovery) {
+  receiptWriteFailure.value = failure;
+  writeAccountRow<CheckoutReceiptRecovery>(CHECKOUT_RECEIPT_RECOVERY_KEY, failure.accountKey, failure);
+}
+
+function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
+  writeAccountRow<CheckoutReceiptRecovery | null>(CHECKOUT_RECEIPT_RECOVERY_KEY, accountKey, null);
+}
+
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;
   if (!failure || receiptRetrying.value) return;
+  if (failure.accountKey !== orders.currentAccountKey()) {
+    restoreReceiptRecovery();
+    return;
+  }
   receiptRetrying.value = true;
   try {
     if (!postReceiptOnly(failure.draft)) return;
     receiptWriteFailure.value = null;
+    clearReceiptRecovery(failure.accountKey);
     orderId.value = failure.orderId;
     step.value = "activating";
   } finally {
@@ -875,6 +901,26 @@ async function onConfirmPay() {
         toast.warn(t.value.store.coTrialQuoteChanged);
         step.value = "select-payment";
         return;
+      }
+      if (fundsSandboxEnabled) {
+        try {
+          const readback = (await orderApi.list()).orders.find((order) => order.orderNo === conversion.orderNo);
+          if (!isCurrentAccountScope(confirmationScope)) {
+            confirming = false;
+            return;
+          }
+          if (!isCanonicalPaidOrder(readback, conversion.orderNo)) {
+            confirming = false;
+            toast.warn(t.value.tradein.errPleaseRetry);
+            step.value = "select-payment";
+            return;
+          }
+        } catch {
+          confirming = false;
+          toast.warn(t.value.tradein.errPleaseRetry);
+          step.value = "select-payment";
+          return;
+        }
       }
       orderId.value = conversion.orderNo;
       // Replace checkout with the canonical order URL. A browser refresh now
@@ -1180,6 +1226,7 @@ onShow(() => {
   remoteOrderPageVisible = true;
   void refreshServerProductPhase(true);
   void refreshProductCatalog(true);
+  restoreReceiptRecovery();
   restartRemoteOrderPolling();
 });
 onHide(() => {
@@ -1415,7 +1462,11 @@ watch(step, async (s) => {
         ref: ord.id,
       };
       if (!postReceiptOnly(receiptDraft)) {
-        receiptWriteFailure.value = { draft: receiptDraft, orderId: ord.id };
+        persistReceiptRecovery({
+          accountKey: orders.currentAccountKey(),
+          draft: receiptDraft,
+          orderId: ord.id,
+        });
         return;
       }
       if (wasEmptyBefore.value) firstOrderCelebrating.value = true;

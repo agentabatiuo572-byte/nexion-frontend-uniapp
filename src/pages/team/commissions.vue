@@ -12,6 +12,16 @@
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamCommissions" :subtitle="t.headerSubtitles.teamCommissions" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+        <EmptyState
+          v-if="remoteApiEnabled && commission.eventsStatus !== 'ready'"
+          :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
+          :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
+          :desc="commission.eventsStatus === 'error' ? t.network.projectionErrorDesc : undefined"
+          :cta-label="commission.eventsStatus === 'error' ? t.network.retry : undefined"
+          compact
+          @cta="commission.refreshCanonicalEvents()"
+        />
+        <template v-if="!remoteApiEnabled || commission.eventsStatus === 'ready'">
         <!-- overview — de-carded: the two headline numbers sit on the page floor.
              Dual-number hero (Withdrawable/Cooling grid) has no single cap to host
              the rules-intro pill, so the pill rides a tight top-right row hugging
@@ -113,6 +123,7 @@
               </view>
             </view>
         </view>
+        </template>
       </view>
     </view>
   </AppChassis>

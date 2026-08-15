@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { reactive } from "vue";
+import { reactive, ref } from "vue";
 import { questApi, remoteApiEnabled } from "@/api/runtime";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
@@ -101,6 +101,7 @@ export const useQuest = defineStore("quest", () => {
   let claimSequence = 0;
   const completedMap = reactive<Record<string, boolean>>({});
   const rewardMap = reactive<Record<string, number>>({});
+  const remoteStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   if (!remoteApiEnabled) for (const id of hydrate(boundKey)) completedMap[id] = true;
 
   function clearRemoteFacts() {
@@ -113,6 +114,7 @@ export const useQuest = defineStore("quest", () => {
     const epoch = accountEpoch;
     const requestSequence = ++refreshSequence;
     const isCurrentRequest = () => epoch === accountEpoch && requestSequence === refreshSequence;
+    remoteStatus.value = "loading";
     clearRemoteFacts();
     try {
       const snapshot = await questApi.state();
@@ -122,11 +124,12 @@ export const useQuest = defineStore("quest", () => {
         rewardMap[quest.questCode] = quest.rewardNex;
         if (quest.status === "CLAIMED") completedMap[quest.questCode] = true;
       }
+      remoteStatus.value = "ready";
       return true;
     } catch {
       // Do not leave a previous account's progress visible after an authority
       // failure. A retry may refill this map only from the server snapshot.
-      if (isCurrentRequest()) clearRemoteFacts();
+      if (isCurrentRequest()) { clearRemoteFacts(); remoteStatus.value = "error"; }
       return false;
     }
   }
@@ -160,6 +163,7 @@ export const useQuest = defineStore("quest", () => {
     claimSequence += 1;
     boundKey = normalizeAccountKey(rawAccountKey);
     clearRemoteFacts();
+    remoteStatus.value = remoteApiEnabled ? "idle" : "ready";
     if (remoteApiEnabled) {
       void refreshRemote();
       return;
@@ -214,5 +218,5 @@ export const useQuest = defineStore("quest", () => {
     persist();
   }
 
-  return { completedMap, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote };
+  return { completedMap, QUEST_TASKS, isComplete, rewardFor, markComplete, reset, bindAccount, refreshRemote, claimRemote, remoteStatus };
 });
