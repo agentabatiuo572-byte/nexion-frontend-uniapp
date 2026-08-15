@@ -1580,3 +1580,10 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:uni 按需编译下,vite 冷启动的依赖扫描抓不到**只被懒编译页面引用**的依赖(qrcode-generator 仅 proof.vue / share-poster-sheet.vue 引用)。冷启动后第一次有人访问引它的页面 → 运行时「new dependencies optimized」全量重打包 → 窗口内在途模块请求 500 → uni 异步页面组件等满 60s 报超时。自愈型:窗口过后刷新即好,极易误判成后端/网络问题。
 - **对策**:此类依赖显式写进 `vite.config.ts` → `optimizeDeps.include`(已加 qrcode-generator);**新增「仅页面级引用」的 npm 依赖时同步补 include**。诊断口径:见到该文案先看 dev server 日志有无 `new dependencies optimized` / `restarting server`,再谈网络。
 - **判据来源**:server 日志时间线(20:44:50 重打包 = 报障时刻)+ 修复后重启同路径访问日志零重打包行、二维码页直接渲染。2026-08-15。
+
+## P-095 shell locale 会改写文本门语义:中文 LANG 下 sed 剥注释静默失败
+
+- **症状**:同一提交、同一 verify.sh,`bash.exe <script>` 跑 448/0,`bash.exe -lc`(login shell)跑 447/1 —— platform-anchor 禁令报「paidCumulativeNowOf 出现在代码面」,而该符号全 src 唯一出现处是一行 `//` 注释(本应被剥掉)。
+- **根因**:login shell 的 profile 注入 `LANG=zh_CN.UTF-8`,GNU sed(4.9)转入多字节模式后,对含 emoji(🔴)的注释行执行 `s|(^\|[^:])//.*$|\1|` **静默失败**(不报错、原样放行)。A/B 各 2 次全复现:LANG unset(C locale)剥净→绿,zh_CN.UTF-8 存活→红。**反向更险**:剥注释失败会让「符号消费计数 ≥2」类门把注释行计进去 —— 死代码假绿。
+- **对策**(已焊,b0c9e14):verify.sh 头部 `export LC_ALL=C`,全部文本门按字节语义跑,判定与启动者 shell 环境解耦;脚本内 UTF-8 模式串按字节比对,中文/emoji 字面匹配不受影响。修后用敌意方式(-lc)复跑 448/0 作红转绿证明。
+- **同族提醒**:① 任何会话里临时写的 grep/sed 判定管道,若跑在 `-lc`/交互 shell 下,同样带着 zh locale —— 判定类管道自带 `LC_ALL=C` 前缀;② 「单跑绿、全跑红」或反之,先比对两次调用的 env(locale/PATH),再怀疑树被并发改;③ 与 P-059(演习弹污染共享通道)互补:本次三轮排查顺序 = 先疑并发注入、再疑树漂移、最后 env 对比才定罪 —— env 差异应提早进入证伪矩阵。2026-08-15。
