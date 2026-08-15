@@ -30,10 +30,19 @@
           </template>
 
           <template v-else>
-            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
+            <!-- 空槽可点:与底部 CTA 同一入口(openForSlot 里做库存分支)。铺满整格拿满 tap 面积。 -->
+            <view
+              class="absolute inset-0 grid place-items-center active:opacity-70"
+              role="button"
+              tabindex="0"
+              :aria-label="t.earn.fillSlots"
+              @click="openAddDevice"
+            >
+              <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="color-mix(in srgb, var(--v5-tech-cyan) 70%, transparent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14" />
+                <path d="M12 5v14" />
+              </svg>
+            </view>
           </template>
         </view>
       </view>
@@ -103,7 +112,7 @@ function deviceIconPath(kind: DeviceKind): string {
 }
 
 function openAddDevice() {
-  useSlotActionSheet().show();
+  useSlotActionSheet().openForSlot();
 }
 
 function liveDotStyle(color: string): CSSProperties {
