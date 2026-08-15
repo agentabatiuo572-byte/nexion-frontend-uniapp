@@ -15,6 +15,12 @@
       <FundsSandboxBadge />
 
       <view :style="bodyStyle">
+        <view v-if="remoteCardsError" data-testid="wallet-cards-refresh-error" class="mb-3 rounded-2xl" :style="refreshErrorStyle">
+          <text class="block" :style="refreshErrorTextStyle">{{ t.security.opFailed }}</text>
+          <view class="inline-flex items-center justify-center active:opacity-80" :style="refreshRetryStyle" role="button" tabindex="0" :aria-disabled="remoteCardsRefreshing" data-testid="wallet-cards-retry" @click="refreshCards">
+            <text>{{ remoteCardsRefreshing ? t.store.catalogLoadingTitle : t.store.catalogRetry }}</text>
+          </view>
+        </view>
         <!-- Empty -->
         <EmptyState v-if="cards.length === 0" kind="empty-list" :title="t.empty.cardsTitle" :desc="t.empty.cardsDesc" :cta-label="cardBindingAvailable ? t.empty.cardsCta : undefined" @cta="goNew" />
 
@@ -64,7 +70,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -84,14 +91,28 @@ const cardBindingAvailable = computed(() => !remoteApiEnabled || paymentSandboxE
 
 const cards = computed(() => cardsStore.cards);
 const defaultTokenId = computed(() => cardsStore.defaultTokenId);
+const remoteCardsError = ref(false);
+const remoteCardsRefreshing = ref(false);
+
+async function refreshCards() {
+  if (!remoteApiEnabled || remoteCardsRefreshing.value) return;
+  remoteCardsRefreshing.value = true;
+  try {
+    remoteCardsError.value = !(await cardsStore.refreshRemote());
+  } finally {
+    remoteCardsRefreshing.value = false;
+  }
+}
+
+onShow(() => { void refreshCards(); });
 
 function rowMeta(card: SavedCard): string {
   return fmt(t.value.cards.rowMeta, { expiry: card.expiry, holder: card.holder });
 }
 
 async function setDefault(tokenId: string) {
-  try { await cardsStore.setDefault(tokenId); toast.success(t.value.cards.setDefault); }
-  catch { toast.error(t.value.security.opFailed); }
+  try { await cardsStore.setDefault(tokenId); remoteCardsError.value = false; toast.success(t.value.cards.setDefault); }
+  catch { remoteCardsError.value = remoteApiEnabled; toast.error(t.value.security.opFailed); }
 }
 
 async function handleRemove(card: SavedCard) {
@@ -105,7 +126,7 @@ async function handleRemove(card: SavedCard) {
   });
   if (ok) {
     try { await cardsStore.remove(card.tokenId); }
-    catch { toast.error(t.value.security.opFailed); return; }
+    catch { remoteCardsError.value = remoteApiEnabled; toast.error(t.value.security.opFailed); return; }
     // card.unbound → 通知中心(FEAT-CARDS02 模板;PRODUCTION 由后端事件触发推送,mock 在事件源同步入 feed)
     notifs.push(cardUnboundNotification(t.value.notifs, card));
     toast.success(t.value.cards.unbindToast);
@@ -174,5 +195,20 @@ const disclaimerStyle: CSSProperties = {
   fontSize: "12px",
   color: "var(--v5-ink-4)",
   lineHeight: 1.625,
+};
+const refreshErrorStyle: CSSProperties = {
+  padding: "12px 14px",
+  background: "color-mix(in srgb, var(--v5-warning) 10%, var(--v5-surface))",
+  borderRadius: "16px",
+};
+const refreshErrorTextStyle: CSSProperties = { fontSize: "13px", color: "var(--v5-ink-2)" };
+const refreshRetryStyle: CSSProperties = {
+  minHeight: "34px",
+  marginTop: "8px",
+  padding: "0 12px",
+  borderRadius: "999px",
+  background: "var(--v5-brand)",
+  color: "var(--v5-on-brand)",
+  fontSize: "12px",
 };
 </script>

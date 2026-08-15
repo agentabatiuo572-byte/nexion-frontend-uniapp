@@ -180,7 +180,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import { onLoad, onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
@@ -195,7 +195,8 @@ import { productCatalogState, refreshProductCatalog } from "@/store/product-cata
 import { bundleCatalogReady } from "@/store/bundle-catalog-guard";
 import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { toast } from "@/store/ui";
-import { bundleOrderApi, commercePaymentApi, fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
+import { bundleOrderApi, commercePaymentApi, fundsSandboxEnabled, orderApi, remoteApiEnabled } from "@/api/runtime";
+import { isCanonicalPaidOrder } from "@/api/order-readback";
 import { isAmbiguousOutcome } from "@/api/errors";
 import { useApp } from "@/store/app";
 import { useOrders, type Order } from "@/store/orders";
@@ -208,6 +209,8 @@ import { readAccountRow, writeAccountRow } from "@/store/account-scoped-storage"
 const t = useT();
 const cart = useCart();
 const phase = useProductPhase();
+const app = useApp();
+const orders = useOrders();
 
 const catalogStatus = computed(() => productCatalogState.status);
 const catalogReady = computed(() => bundleCatalogReady(remoteApiEnabled, catalogStatus.value));
@@ -219,6 +222,7 @@ onLoad(async () => {
 onShow(() => {
   void refreshProductCatalog(true);
   void refreshServerProductPhase(true);
+  restoreReceiptRecovery();
 });
 
 // Sticky chassis nav header — back + "Bundle" title (mirrors the prototype's
@@ -262,10 +266,15 @@ function retryCatalog() {
 function retryReceiptWrite() {
   const failure = receiptWriteFailure.value;
   if (!failure || receiptRetrying.value) return;
+  if (failure.accountKey !== orders.currentAccountKey()) {
+    restoreReceiptRecovery();
+    return;
+  }
   receiptRetrying.value = true;
   try {
     if (!postReceiptOnly(failure.draft)) return;
     receiptWriteFailure.value = null;
+    clearReceiptRecovery(failure.accountKey);
     cart.clear();
     toast.success(
       t.value.bundle.checkoutSuccessTitle,
@@ -288,8 +297,27 @@ const ctaText = computed(() => (
   submitting.value ? "…" : products.value.length < 2 ? t.value.bundle.checkoutUnavailableCta : checkoutCtaText.value
 ));
 const checkoutHint = computed(() => products.value.length < 2 ? t.value.bundle.checkoutUnavailableHint : "");
-const receiptWriteFailure = ref<{ draft: ReceiptDraft; orderIds: string[] } | null>(null);
+const BUNDLE_RECEIPT_RECOVERY_KEY = "nexgrid-bundle-receipt-recovery-v1";
+type BundleReceiptRecovery = { accountKey: string; draft: ReceiptDraft; orderIds: string[] };
+const receiptWriteFailure = ref<BundleReceiptRecovery | null>(null);
 const receiptRetrying = ref(false);
+
+function restoreReceiptRecovery() {
+  const accountKey = orders.currentAccountKey();
+  const row = readAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey);
+  receiptWriteFailure.value = row?.accountKey === accountKey ? row : null;
+}
+
+function persistReceiptRecovery(failure: BundleReceiptRecovery) {
+  receiptWriteFailure.value = failure;
+  writeAccountRow<BundleReceiptRecovery>(BUNDLE_RECEIPT_RECOVERY_KEY, failure.accountKey, failure);
+}
+
+function clearReceiptRecovery(accountKey = orders.currentAccountKey()) {
+  writeAccountRow<BundleReceiptRecovery | null>(BUNDLE_RECEIPT_RECOVERY_KEY, accountKey, null);
+}
+
+watch(() => app.accountKey, restoreReceiptRecovery);
 
 function tierIsActive(tier: BundleDiscountTier): boolean {
   return products.value.length >= tier.minItems;
@@ -337,7 +365,6 @@ async function onCheckout() {
   const list = products.value;
   if (list.length < 2 || submitting.value) return;
   if (remoteApiEnabled) {
-    const orders = useOrders();
     const accountKey = orders.currentAccountKey();
     submitting.value = true;
     const key = acquireBundleKey(list, accountKey);
@@ -346,6 +373,10 @@ async function onCheckout() {
       if (fundsSandboxEnabled) {
         const payment = await commercePaymentApi.confirm(created.orderNo, `payment:${created.orderNo}`);
         if (payment.orderNo !== created.orderNo || payment.sourceEnvironment !== "SANDBOX") {
+          throw new Error("COMMERCE_PAYMENT_READBACK_INVALID");
+        }
+        const readback = (await orderApi.list()).orders.find((order) => order.orderNo === created.orderNo);
+        if (!isCanonicalPaidOrder(readback, created.orderNo, created.itemCount)) {
           throw new Error("COMMERCE_PAYMENT_READBACK_INVALID");
         }
       }
@@ -386,14 +417,12 @@ async function onCheckout() {
     navTo("/pages/team/quota");
     return;
   }
-  const app = useApp();
   // 组合折扣已含在 total;一次扣平台余额(复用单品 checkout 的余额门),不足则拦截。
   const charge = total.value;
   if (!app.debitBalance(charge)) {
     toast.warn(fmt(t.value.errors.insufficientBalanceMsg, { amt: charge.toFixed(2) }));
     return;
   }
-  const orders = useOrders();
   const pct = discountPct.value;
   // 逐商品建单;组合折扣按单价比例分摊到各单(展示净额)。
   // ponytail: 账本单源 = debitBalance(total)+bills;各单 net 之和的四舍五入分差不入账。
@@ -418,7 +447,11 @@ async function onCheckout() {
     ref: created[0]?.id ?? "BUNDLE",
   };
   if (!postReceiptOnly(receiptDraft)) {
-    receiptWriteFailure.value = { draft: receiptDraft, orderIds: created.map((order) => order.id) };
+    persistReceiptRecovery({
+      accountKey: orders.currentAccountKey(),
+      draft: receiptDraft,
+      orderIds: created.map((order) => order.id),
+    });
     return;
   }
   cart.clear();

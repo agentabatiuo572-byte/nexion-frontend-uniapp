@@ -181,8 +181,14 @@ const usdValue = computed(() => nexBalance.value * nexPrice.value);
 const isUp = computed(() => change24h.value >= 0);
 
 // Only active devices contribute today's NEX.
-const todayNEX = computed(() =>
-  app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
+const todayNEX = computed<number | null>(() =>
+  remoteApiEnabled
+    ? bills.serverStatus !== "ready"
+      ? null
+      : bills.bills
+        .filter((bill) => bill.symbol === "NEX" && bill.type === "earn" && bill.status !== "failed" && bill.ts >= new Date().setHours(0, 0, 0, 0))
+        .reduce((sum, bill) => sum + bill.amount, 0)
+    : app.visibleDevices.filter((d) => d.activatedAt !== null).reduce((s, d) => s + (d.todayEarningsNEX ?? 0), 0),
 );
 
 const totalSpent = computed(() => nexBalance.value * market.costBasis);
@@ -225,7 +231,7 @@ const activity = computed(() => {
       id: `mine-${i}`,
       ts: Date.now() - i * 86400_000,
       kind: "mining",
-      nex: todayNEX.value * (0.6 + i * 0.1),
+      nex: (todayNEX.value ?? 0) * (0.6 + i * 0.1),
       label: t.value.nexWallet.activity.miningLabel,
     });
   }
@@ -270,7 +276,7 @@ const quickCells = computed(() => [
 
 const breakdownRows = computed(() => [
   { label: t.value.nexWallet.breakdown.liquid, value: `${fmtNum(nexBalance.value, 2)} NEX`, hint: fmtUSD(usdValue.value), tint: "var(--v5-success)", icon: tintIcon(ICON.up, "var(--v5-success)") },
-  { label: t.value.nexWallet.breakdown.mining, value: `+${fmtNum(todayNEX.value, 2)} NEX`, hint: t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
+  { label: t.value.nexWallet.breakdown.mining, value: todayNEX.value === null ? "—" : `+${fmtNum(todayNEX.value, 2)} NEX`, hint: todayNEX.value === null ? "—" : t.value.nexWallet.breakdown.miningHint, tint: "var(--v5-brand)", icon: tintIcon(ICON.cpu, "var(--v5-brand)") },
   { label: t.value.nexWallet.breakdown.pending, value: pendingNex.value === null ? "—" : `${fmtNum(pendingNex.value, 2)} NEX`, hint: pendingNex.value === null ? "—" : t.value.nexWallet.breakdown.pendingHint, tint: "var(--v5-warning)", icon: tintIcon(ICON.hourglass, "var(--v5-warning)") },
 ]);
 

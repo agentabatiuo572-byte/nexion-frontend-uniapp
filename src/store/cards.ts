@@ -73,13 +73,14 @@ export const useCards = defineStore("cards", () => {
   function clearRemoteFacts() { cards.value = []; defaultTokenId.value = null; }
   async function refreshRemote(): Promise<boolean> {
     if (!remoteApiEnabled) return true;
-    clearRemoteFacts();
     try {
       const remote = await paymentMethodApi.list();
-      cards.value = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status, version: card.version }));
-      defaultTokenId.value = remote.find((card) => card.isDefault)?.tokenId ?? null;
+      const nextCards = remote.map((card) => ({ tokenId: card.tokenId, brand: card.brand, last4: card.last4, expiry: "--/--", holder: card.holder, boundAt: Date.parse(card.boundAt), status: card.status, version: card.version }));
+      const nextDefaultTokenId = remote.find((card) => card.isDefault)?.tokenId ?? null;
+      cards.value = nextCards;
+      defaultTokenId.value = nextDefaultTokenId;
       return true;
-    } catch { clearRemoteFacts(); return false; }
+    } catch { return false; }
   }
 
   /** 账号切换重绑:装载该账号绑定的银行卡(P2-8 设备级泄漏修复;绑卡=金融凭证,必按账号)。 */
