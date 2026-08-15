@@ -134,6 +134,7 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
+import { authAccountKeyForPhone } from "@/store/auth-account";
 import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
@@ -219,6 +220,13 @@ const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
 // Login mode accepts any non-empty password (existing users may have shorter
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
 const pwdOk = computed(() => password.value.length > 0);
+
+function authenticatedAccountId(user: UserSession): string {
+  if (remoteApiEnabled) return `user:${user.userId}`;
+  // Mock password auth shares the same account scope as the legacy OTP and
+  // registration directory, so one phone never opens two local wallets.
+  return authAccountKeyForPhone(`${user.countryCode}${user.phone}`) ?? `user:${user.userId}`;
+}
 // Reset mode's new password must pass the full strength check.
 const newPwdOk = computed(() => isResetPasswordOk(newPassword.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => newPassword.value === confirmPwd.value && newPwdOk.value);
@@ -296,7 +304,7 @@ async function startOauth(label: string) {
       return;
     }
     const completed = completeSignIn({
-      identity: `user:${result.user.userId}`,
+      identity: authenticatedAccountId(result.user),
       returnTo: returnParam.value,
       onboardingComplete: true,
       serverProfile: result.user,
@@ -543,7 +551,7 @@ async function signInWithPassword() {
       step.value = 2;
       return;
     }
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentPasswordAttempt(passwordAttempt)) return;
     loading.value = false;
@@ -573,7 +581,7 @@ async function verifyRemoteTwoFactor() {
       authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) return;
     loading.value = false;
@@ -613,7 +621,7 @@ async function verifyCode() {
         return;
       }
       finishSignIn({
-        accountId: `user:${result.user.userId}`,
+        accountId: authenticatedAccountId(result.user),
         onboardingComplete: true,
         serverProfile: result.user,
         serverSessionRevision: result.vaultRevision,
@@ -661,43 +669,33 @@ async function finishReset() {
   error.value = null;
   if (!newPwdOk.value) { error.value = t.value.login.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
-  if (remoteApiEnabled) {
-    const challengeNo = otpRequestId.value;
-    if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
-    loading.value = true;
-    try {
-      await authApi.completePasswordReset({
-        countryCode: country.value,
-        phone: phoneClean.value,
-        challengeNo,
-        code: code.value.join(""),
-        newPassword: newPassword.value,
-      });
-    } catch (cause) {
-      loading.value = false;
-      const message = cause instanceof ApiError ? cause.message : "";
-      error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID"
-        ? t.value.login.errorInvalidCode
-        : message === "USER_NEW_PASSWORD_MUST_DIFFER"
-          ? t.value.login.errorWeakPassword
-          : t.value.authOtp.errorServiceUnavailable;
-      return;
-    }
+  const challengeNo = otpRequestId.value;
+  if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+  loading.value = true;
+  try {
+    await authApi.completePasswordReset({
+      countryCode: country.value,
+      phone: phoneClean.value,
+      challengeNo,
+      code: code.value.join(""),
+      newPassword: newPassword.value,
+    });
+  } catch (cause) {
     loading.value = false;
-    toast.success(t.value.login.resetSuccess, "");
-    invalidateOtpFlow();
-    mode.value = "password";
-    step.value = 1;
-    password.value = "";
-    newPassword.value = "";
-    confirmPwd.value = "";
+    const message = cause instanceof ApiError ? cause.message : "";
+    error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+      ? t.value.login.errorInvalidCode
+      : message === "USER_NEW_PASSWORD_MUST_DIFFER"
+        ? t.value.login.errorWeakPassword
+        : t.value.authOtp.errorServiceUnavailable;
     return;
   }
-  // MOCK: no real password persistence; treat as success → back to password login.
+  loading.value = false;
   toast.success(t.value.login.resetSuccess, "");
   invalidateOtpFlow();
   mode.value = "password";
   step.value = 1;
+  password.value = "";
   newPassword.value = "";
   confirmPwd.value = "";
 }

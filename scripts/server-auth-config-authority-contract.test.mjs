@@ -62,6 +62,20 @@ test("registration OTP send uses the public auth route and a delivery-specific f
   assert.match(vi, /errorOtpSendUnavailable: "Mã xác minh chưa gửi được — bạn có thể đăng nhập bằng Google \/ Apple \/ Telegram bên dưới, hoặc thử lại sau ít phút\."/);
 });
 
+test("mock password reset persists through AuthApi and reuses the phone account scope", () => {
+  const login = read("src/pages/login/login.vue");
+  const reset = fnBlock(login, "finishReset");
+  const accountId = fnBlock(login, "authenticatedAccountId");
+
+  assert.match(reset, /await authApi\.completePasswordReset\(/);
+  assert.doesNotMatch(reset, /if \(remoteApiEnabled\)/,
+    "mock reset must not bypass the AuthApi persistence call");
+  assert.match(accountId, /if \(remoteApiEnabled\) return `user:\$\{user\.userId\}`/);
+  assert.match(accountId, /authAccountKeyForPhone\(`\$\{user\.countryCode\}\$\{user\.phone\}`\)/);
+  assert.equal((login.match(/accountId: authenticatedAccountId\(result\.user\)/g) || []).length, 3);
+  assert.match(login, /identity: authenticatedAccountId\(result\.user\)/);
+});
+
 test("remote configuration loads are authoritative and remote writes do not revive local tables", () => {
   const config = read("src/store/config.ts");
   const rank = read("src/store/v-rank.ts");
