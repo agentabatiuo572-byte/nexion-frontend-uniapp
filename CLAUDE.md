@@ -41,7 +41,7 @@ verify 是 tripwire，不是 typecheck：tsc 过 ≠ verify 过。退出码另�
 2. `bash scripts/verify.sh` → 全绿。含 15+ 源码哨兵：React 残留（`className=`/`useState`/JSX 自闭）、反向词（庞氏/杀猪盘/ponzi）、hex 硬码（禁用色号）、SFC 闭合、native `<button>` 禁用、chassis 完整性、CSS 基础、路由有效性。
 3. Browser self-check（Playwright）：每个改动路由 navigate + console error=0 + 截图。**verify 绿 ≠ 渲染 OK**（只有浏览器抓 hydration / 遮挡 / 字色回归）。
 4. 清理 `.playwright-mcp/` 和临时 `*.png`。
-5. PRD sync：报一句 diff，问主人，确认后走 `nexion-prd-sync`（标准 PRD 风格，不加 changelog）。
+5. PRD sync：按 `nexion-prd-sync` Step 2 判据**自行判定**并执行（主人 2026-08-15 拍板：不再询问），收尾汇报写明「已同步 §X / 未同步+理由」（标准 PRD 风格，不加 changelog）。
 6. 产品更新日志：每个功能任务收尾追一条 `docs/前端产品更新日志.md`（🆕/✏️/🗑️ 分类）。
 
 ## 架构 big-picture

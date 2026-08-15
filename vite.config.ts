@@ -24,6 +24,13 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [uni(), UnoCSS()],
+    // 只被懒编译页面引用的依赖必须在这里显式预打包:uni 的按需编译让启动扫描
+    // 抓不到它们,首个访客触发运行时依赖重打包 → 在途模块请求 500 + 整页 reload,
+    // uni 异步页面组件等满 60s 直接弹「连接服务器超时」。入口链上的依赖
+    // (vue/pinia/vue-i18n)启动即扫到,无需列出。
+    optimizeDeps: {
+      include: ["qrcode-generator"], // 仅 proof.vue / share-poster-sheet.vue 引用
+    },
     server: {
     // 🔴 双栈监听(2026-08-05 结构性反思第 1 步)。此前默认只绑 [::1]:
     //   curl localhost=200 而 127.0.0.1=拒连 → verify 前段 curl 探活全绿、
