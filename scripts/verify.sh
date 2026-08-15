@@ -1072,7 +1072,7 @@ else
   fi
 fi
 # 双端参数 key parity: uniapp 配置契约 ↔ admin main 活源(2026-08-15 改锚,单独立项)。
-# 原锚 lib/mock/admin/compute-config.ts 已死(admin main 2c477b4 进 .trash;含全键 defaultVal
+# 原 mock 参数寄存器已死(admin main 2c477b4 进 .trash;含全键 defaultVal
 # 的寄存器只活在 admin 非 main 分支,与 wd02 契约锚无交集分支 → 原门在 main 族恒红)。
 # 现锚 main 活源:riskCluster 11 键 → k-client.ts;lockMode → h-client.ts;K3 提现前置 /
 # K4 聚簇权重 12 键 main 前端尚未落地(只在 PRD),admin 侧断言降为域锚脚本里的升级哨兵
