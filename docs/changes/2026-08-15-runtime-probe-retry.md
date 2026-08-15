@@ -2,7 +2,7 @@
 
 - **工作线**:④ uniapp(scripts/ 门体系 harness 层,非业务代码)
 - **日期**:2026-08-15
-- **状态**:Aligned(主人 2026-08-15)
+- **状态**:Shipped(2026-08-15 合并 `3b26371` 并推远端;纯 harness 免 PRD 同步,验收档见同目录 t4-test)
 - **来源**:任务卡 task_38c9417f;三轮实测证据见 memory `project_uniapp_crossrepo_gate_pairing`
 
 ## Why
