@@ -54,7 +54,13 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
   ⑤ 「单浏览器串行耐心」模式当晚 176 次 goto 全成(预热 91/91 + 88/91),一门一浏览器的探针模式则集体超时;
   ⑥ 我的浏览器在「失败」页(index/proof/me)全部秒级实景渲染,console 无应用错误;⑦ 当晚机器同时挂 3 个 uni dev server(两个属其它会话)。
   另:cross-repo sampling 门红 = admin 仓审计脚本指向已改名的 `NX1.0-UniApp`(现 `NX1.0-UniApp-UI`),与本包无关,已挂修复芯片。
-  🔴 **未清账**:静机(其它会话服务器停掉后)复跑 `BASE_URL=… bash scripts/verify.sh` 全绿才许合并主线——runbook:
+  R4(03:46,凌晨静机+全预热)= 436/14,四轮包络 433-436 / 14-17 稳定同族 → 熔断停跑。
+  **终极判别(03:50)**:`build:h5`(0 err)产物起零转译静态服务器(:5599),全新上下文裸启动实测——
+  bare-boot / entry-surfaces/h5 / onboarding/intro / register / proof 全部 **1-2s 挂载 OK**(正是残差门的目标页);
+  且 proof 以「新存储 + zh-CN 浏览器」直出 `Member since Jul 2026` = 在**生产构建**上复现原始缺陷环境并证明已修。
+  结论:代码全健康;残差 = dev server 转译管线在整文档冷载「启动图」请求形态下的病理(P-097),
+  与 SPA 增量导航(我/tester 走的路径,全部通过)分野一致。
+  🔴 **未清账**:环境恢复正常后(其它会话 dev server 停掉/白天常规状态)复跑 `bash scripts/verify.sh` 全绿才许合并主线——runbook:
   `VITE_NEXGRID_API_MODE=mock npm run dev:h5 -- --port 5223` 起新服务器 → `node <scratch>/warm-all-routes.cjs` 预热 → 全量 verify。
 - [x] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图(main DOM 断言 + tester 截图双份,`evidence-date-locale/`)
 - [x] 独立 tester 黑盒验收 **AC 5/5 pass**(报告 `2026-08-15-date-locale-unify-t1-test.md`;5 条 AC 外发现已裁决:#2 裸值 default 与 #1/#3/#4 均为既有问题,#2 已挂修复芯片)
