@@ -23,6 +23,11 @@ const ROUTES = [
   "pages/me/wallet-withdraw",
   "pages/me/wallet",
   "pages/me/wallet-topup",
+  "pages/me/wallet-bills",
+  "pages/me/security",
+  "pages/me/support-tickets",
+  "pages/store/order-detail",
+  "pages/register/success",
   "pages/index/index",
   "pages/me/me",
 ];

@@ -5255,7 +5255,7 @@ export const en = {
     cardDeposit: "Card deposit",
     confirmingProgress: "Confirming {n}/{total}",
     depositCredited: "Credited",
-    dustHoldNote: "Below the minimum deposit — moved to manual handling",
+    dustHoldNote: "Below the minimum deposit — see Bills for the outcome",
     depositReturned: "Returned · see Bills",
     confirmDelayed: "Network congested — confirmation is taking longer",
     channelPaused: "Paused — please choose another network",
@@ -5412,7 +5412,7 @@ export const en = {
       "The old address stops receiving immediately. Withdrawals freeze for 24 hours after the change, and no further change is possible for {days} days.",
     changeConfirmYes: "Confirm change",
     addSuccessTitle: "Withdrawal address saved",
-    addSuccessBody: "Withdrawals will use this address after the security freeze ends.",
+    addSuccessBody: "Withdrawals will use this address once the protection window ends.",
     successTitle: "New address in effect",
     successBody:
       "The previous address has been deactivated. For security, withdrawals pause for 24 hours before resuming.",
