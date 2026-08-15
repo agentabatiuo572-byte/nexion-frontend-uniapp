@@ -41,6 +41,7 @@ export interface WithdrawalPolicy {
   dailyLimitCount: number;
   balanceMaxRatio: number;
   smallAmountThresholdUsd: number;
+  strongReviewThresholdUsdt: number;
   payoutSlaHours: number;
   networkConfirmFeeUsd: Record<"trc20" | "bep20" | "erc20", number>;
   nexFeeOffsetRate: number;
@@ -240,6 +241,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   const dailyLimitCount = number(row?.dailyLimitCount, 1);
   const balanceMaxRatio = number(row?.balanceMaxRatio, Number.EPSILON);
   const smallAmountThresholdUsd = number(row?.smallAmountThresholdUsd);
+  const strongReviewThresholdUsdt = number(row?.strongReviewThresholdUsdt, Number.EPSILON);
   const payoutSlaHours = number(row?.payoutSlaHours, 1);
   const networkFees = record(row?.networkConfirmFeeUsd);
   const trc20 = number(networkFees?.trc20);
@@ -258,6 +260,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
   if (!row || minAmount === null || dailyLimitCount === null || !Number.isInteger(dailyLimitCount)
       || balanceMaxRatio === null || balanceMaxRatio > 1
       || smallAmountThresholdUsd === null || smallAmountThresholdUsd > 500
+      || strongReviewThresholdUsdt === null || strongReviewThresholdUsdt > 10000000
       || payoutSlaHours === null || payoutSlaHours > 168 || !Number.isInteger(payoutSlaHours)
       || trc20 === null || bep20 === null || erc20 === null
       || trc20 > 25 || bep20 > 25 || erc20 > 25
@@ -276,6 +279,7 @@ function parsePolicy(value: unknown): WithdrawalPolicy {
     dailyLimitCount,
     balanceMaxRatio,
     smallAmountThresholdUsd,
+    strongReviewThresholdUsdt,
     payoutSlaHours,
     networkConfirmFeeUsd: { trc20, bep20, erc20 },
     nexFeeOffsetRate,
@@ -362,6 +366,7 @@ function canonicalRiskRoute(route: string): WithdrawalRiskRoute {
     case "manual":
     case "high-manual":
     case "escalated-manual":
+    case "strong-review":
       return "manual";
     case "freeze":
       return "freeze";

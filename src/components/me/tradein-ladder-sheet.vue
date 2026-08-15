@@ -33,16 +33,46 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type CSSProperties } from "vue";
+import { computed, ref, watch, type CSSProperties } from "vue";
 import type { Device } from "@/store/types";
 import { TRADEIN_CREDIT_LADDER } from "@/mock/tradein-config";
 import { useT } from "@/i18n/use-t";
 import { deviceName } from "@/lib/device-copy";
 import { fmt } from "@/i18n/format";
+import { deviceE3Api, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalTradeinConfig } from "@/api/device-e3-api";
+import { useApp } from "@/store/app";
 
 const props = defineProps<{ device: Device | null }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 const t = useT();
+const app = useApp();
+const canonicalConfig = ref<CanonicalTradeinConfig | null>(null);
+
+async function refreshCanonicalConfig(): Promise<void> {
+  if (!remoteApiEnabled) return;
+  const accountKey = app.accountKey;
+  canonicalConfig.value = null;
+  try {
+    const snapshot = await deviceE3Api.tradeinConfig();
+    if (accountKey === app.accountKey) canonicalConfig.value = snapshot;
+  } catch {
+    if (accountKey === app.accountKey) canonicalConfig.value = null;
+  }
+}
+
+watch(() => app.accountKey, () => { void refreshCanonicalConfig(); }, { immediate: true });
+
+const ladderModel = computed(() => {
+  if (!remoteApiEnabled) return TRADEIN_CREDIT_LADDER;
+  const config = canonicalConfig.value;
+  if (!config?.enabled) return [];
+  return config.creditRatesPct.map((creditPct, index) => ({
+    minRatioPct: index === 0 ? 0 : config.outputRatioCutsPct[index - 1],
+    maxRatioPct: index < config.outputRatioCutsPct.length ? config.outputRatioCutsPct[index] : null,
+    creditPct,
+  }));
+});
 
 const ratioPct = computed(() => {
   const d = props.device;
@@ -51,12 +81,12 @@ const ratioPct = computed(() => {
   return (Math.max(0, d.cumulativeEarningsUsdt ?? 0) / paid) * 100;
 });
 const currentBand = computed(() =>
-  TRADEIN_CREDIT_LADDER.findIndex(
+  ladderModel.value.findIndex(
     (r) => ratioPct.value >= r.minRatioPct && (r.maxRatioPct === null || ratioPct.value < r.maxRatioPct),
   ),
 );
 const ladderRows = computed(() =>
-  TRADEIN_CREDIT_LADDER.map((r) => ({
+  ladderModel.value.map((r) => ({
     rangeText:
       r.maxRatioPct === null
         ? fmt(t.value.tradein.ladderRangeTop, { min: r.minRatioPct })

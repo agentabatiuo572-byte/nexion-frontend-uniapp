@@ -59,6 +59,14 @@ export interface Product {
   ai?: AIPerformance;
   // Sprint 2 second phase: catalog lifecycle status
   status?: "active" | "legacy"; // legacy = older catalog listing (still owned & serviced)
+  // Remote catalog authority: E1 ids are database identities rather than H1
+  // P-codes, so the server computes this release result. Undefined is mock-only.
+  available?: boolean;
+  // Server-owned explanation for `available`. E1 phase ids are opaque database
+  // identities and must only be displayed; the App never derives availability
+  // from them or compares them with the H1 P1-P6 lifecycle.
+  releaseState?: string;
+  releasePhaseId?: string;
   // Sprint 2 final phase: platform-lifecycle release gate. Pro v2 ships when the
   // platform reaches P3 (~month 5); Rack P2 ships at P5 (~month 10). Listings
   // and direct-URL hits before that surface a "coming soon" lock card.

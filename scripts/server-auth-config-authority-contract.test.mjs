@@ -57,9 +57,23 @@ test("registration OTP send uses the public auth route and a delivery-specific f
 
   assert.match(api, /sendRegistrationOtp[\s\S]*?path: "\/auth\/users\/register\/otp\/send"/);
   assert.match(register, /authApi\.sendRegistrationOtp[\s\S]*?errorOtpSendUnavailable/);
-  assert.match(zh, /errorOtpSendUnavailable: "暂时无法发送验证码,请重试。"/);
-  assert.match(en, /errorOtpSendUnavailable: "We couldn't send the verification code right now\. Please try again\."/);
-  assert.match(vi, /errorOtpSendUnavailable: "Hiện chưa thể gửi mã xác minh\. Vui lòng thử lại\."/);
+  assert.match(zh, /errorOtpSendUnavailable: "验证码暂时没发出去 —— 可先用下方 Google \/ Apple \/ Telegram 直接登录,或稍等片刻再试。"/);
+  assert.match(en, /errorOtpSendUnavailable: "The code didn't go out just now — sign in with Google \/ Apple \/ Telegram below, or retry in a moment\."/);
+  assert.match(vi, /errorOtpSendUnavailable: "Mã xác minh chưa gửi được — bạn có thể đăng nhập bằng Google \/ Apple \/ Telegram bên dưới, hoặc thử lại sau ít phút\."/);
+});
+
+test("mock password reset persists through AuthApi and reuses the phone account scope", () => {
+  const login = read("src/pages/login/login.vue");
+  const reset = fnBlock(login, "finishReset");
+  const accountId = fnBlock(login, "authenticatedAccountId");
+
+  assert.match(reset, /await authApi\.completePasswordReset\(/);
+  assert.doesNotMatch(reset, /if \(remoteApiEnabled\)/,
+    "mock reset must not bypass the AuthApi persistence call");
+  assert.match(accountId, /if \(remoteApiEnabled\) return `user:\$\{user\.userId\}`/);
+  assert.match(accountId, /authAccountKeyForPhone\(`\$\{user\.countryCode\}\$\{user\.phone\}`\)/);
+  assert.equal((login.match(/accountId: authenticatedAccountId\(result\.user\)/g) || []).length, 3);
+  assert.match(login, /identity: authenticatedAccountId\(result\.user\)/);
 });
 
 test("remote configuration loads are authoritative and remote writes do not revive local tables", () => {
@@ -80,7 +94,13 @@ test("remote configuration loads are authoritative and remote writes do not revi
   assert.match(config, /const remote = await platformConfigApi\.platformConfig\(\);[\s\S]*?config\.value = \{[\s\S]*?featureFlags: \{ \.\.\.config\.value\.featureFlags, \.\.\.remote\.featureFlags \}[\s\S]*?publicStats: remote\.publicStats[\s\S]*?onlineBonus: remote\.onlineBonus[\s\S]*?rewards: remote\.rewards[\s\S]*?computeShare: remote\.computeShare/);
   assert.match(config, /catch \{[\s\S]*?syncFailed\.value = true/);
   assert.match(rank, /function setMyRank\(v: VRank\) \{[\s\S]*?if \(remoteApiEnabled\) return;/);
-  assert.match(rank, /function bindAccount\([\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?myRank\.value = 0;[\s\S]*?ladder\.value = \[\];[\s\S]*?void refreshCanonicalVRank\(\)/);
+  {
+    const block = fnBlock(rank, "bindAccount");
+    const iClear = block.indexOf("clearRemoteFacts();");
+    const iRefresh = block.indexOf("void refreshCanonicalVRank(");
+    assert.ok(iClear >= 0, "remote V-rank rebind must clear the previous account facts");
+    assert.ok(iRefresh > iClear, "remote V-rank rebind must refresh only after clearing old facts");
+  }
   assert.match(rank, /function setProgress\(p: VRankProgressPatch\) \{[\s\S]*?if \(remoteApiEnabled\) return;/);
   assert.match(commission, /function withdraw\(id: string\): boolean \{[\s\S]*?if \(remoteApiEnabled\) return false;/);
   assert.match(staking, /async function openRemote\([\s\S]*?if \(!remoteReady\.value\) throw new Error\("G1_REMOTE_AUTHORITY_UNAVAILABLE"\);/);
@@ -113,7 +133,7 @@ test("remote configuration loads are authoritative and remote writes do not revi
   }
 });
 
-test("remote-only policy branches stay inert until a dedicated server contract exists", () => {
+test("remote policy branches use dedicated server contracts or stay fail-closed", () => {
   const config = read("src/store/config.ts");
   const login = read("src/pages/login/login.vue");
   const share = read("src/lib/share.ts");
@@ -125,11 +145,14 @@ test("remote-only policy branches stay inert until a dedicated server contract e
   // WithdrawRulesConfig 删除(每日笔数上限唯一来源 = GET /api/withdrawals/policy),
   // 锚点改用同样「关死」的 smallAmountThresholdUsd: 0(小额免审真停用),强度不变。
   assert.match(config, /const unavailableServerConfig: PlatformConfig = \{[\s\S]*?riskCluster: \{[\s\S]*?releaseMode: "manual_only"[\s\S]*?withdrawRules: \{[\s\S]*?sameAddressRoute: "reject"[\s\S]*?smallAmountThresholdUsd: 0[\s\S]*?riskScore: \{[\s\S]*?weakSignalClusterThreshold: 0[\s\S]*?otpGate: \{[\s\S]*?maxVerifyAttempts: 0[\s\S]*?share: \{[\s\S]*?channels: \[\]/);
-  assert.match(login, /import \{ authApi, remoteApiEnabled \} from "@\/api\/runtime"/);
+  assert.match(login, /import \{[^}]*authApi[^}]*remoteApiEnabled[^}]*\} from "@\/api\/runtime"/);
+  assert.match(login, /async function startOauth\([\s\S]*?authApi\.oauthExchange/);
+  assert.match(login, /apiRuntimeConfig\.mode === "sandbox" && apiRuntimeConfig\.modeExplicit \? "SANDBOX_MOCK" : "PROVIDER"/);
   assert.match(login, /async function requestCode\(captchaTicket\?: string\) \{[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.sendPasswordResetOtp[\s\S]*?authApi\.sendLoginOtp/);
   assert.match(login, /async function verifyCode\(\) \{[\s\S]*?if \(remoteTwoFactorChallenge\.value\) \{ await verifyRemoteTwoFactor\(\); return; \}[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?authApi\.completeOtpLogin/);
   assert.match(login, /async function finishReset\(\) \{[\s\S]*?authApi\.completePasswordReset/);
   assert.match(share, /export function buildShareLink[\s\S]*?if \(remoteApiEnabled\) \{[\s\S]*?location\.origin[\s\S]*?return "";/);
   assert.match(share, /export function buildShareText\(\): string \{[\s\S]*?if \(remoteApiEnabled\) return "";/);
-  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?if \(remoteApiEnabled\) return \[\];/);
+  assert.match(share, /export function visibleChannels\(\): ShareChannelDef\[\] \{[\s\S]*?useConfig\(\)\.config\.share\.channels\.filter\(\(c\) => c\.enabled\)/);
+  assert.match(share, /const text = remoteApiEnabled[\s\S]*?def\.textTemplate\?\.replace\("\{link\}", link\)/);
 });

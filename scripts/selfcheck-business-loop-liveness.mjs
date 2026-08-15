@@ -200,7 +200,7 @@ evaluate(source);
 assertNoRawTimeoutsInBusinessModules(businessModuleSources);
 evaluateDeposits(depositsSource);
 evaluateConfig(configSource);
-assert.match(functionBody(genesisSource, "syncRemote"), /^\s*if \(!remoteApiEnabled\) return;/,
+assert.match(functionBody(genesisSource, "syncRemote"), /^\s*if \(!remoteApiEnabled\) return true;/,
   "account bootstrap must not leak a rejected Genesis remote sync in local-mock mode");
 
 const mutations = [

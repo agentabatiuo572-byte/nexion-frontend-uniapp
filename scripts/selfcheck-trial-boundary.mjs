@@ -221,7 +221,7 @@ const rowActive = {
 {
   const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
   const body = (marker) => stripComments(sliceDecl(ftSrc, marker));
-  const convertBody = body("function convert()");
+  const convertBody = body("async function convert(");
   const advanceBody = body("function advanceTo(");
   const pollBody = body("function poll(");
   const eligBody = body("function eligibility(");
@@ -233,9 +233,11 @@ const rowActive = {
   const shadowNEXBody = body("export function liveShadowNEX(");
   const migBody = stripComments(migrateSlice);
 
-  check("wiring", "W-convert 签名冻结:无参返回 boolean(并发协作契约)", /function convert\(\): boolean/.test(ftSrc));
+  check("wiring", "W-convert 签名冻结:async 返回结果对象(并发协作契约)", /async function convert\([^)]*\): Promise<\{/.test(ftSrc));
   check("wiring", "W-convert 内部自取 mockServerNow(不吃调用方缓存 now)", convertBody.indexOf("mockServerNow()") >= 0 && convertBody.indexOf("Date.now") < 0);
   check("wiring", "W-convert 先走 advanceTo 推进边界再判可转化", convertBody.indexOf("advanceTo(") >= 0);
+  check("wiring", "W-convert 远程分支调用权威 convert 并读回 converted", convertBody.indexOf("trialApi.convert(") >= 0
+    && convertBody.indexOf("refreshRemote(true)") >= 0 && convertBody.indexOf('status.value !== "converted"') >= 0);
   check("wiring", "W-advanceTo 路由到 resolveTrialAt 且变更才落盘", advanceBody.indexOf("resolveTrialAt(") >= 0 && advanceBody.indexOf("persist()") >= 0);
   check("wiring", "W-poll 整体委托 advanceTo(无手写边界比对)", pollBody.indexOf("advanceTo(") >= 0 && pollBody.indexOf(">=") < 0);
   check("wiring", "W-eligibility 按解析后状态判(resolveTrialAt 接上)", eligBody.indexOf("resolveTrialAt(") >= 0);

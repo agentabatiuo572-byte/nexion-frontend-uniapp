@@ -26,20 +26,27 @@ export class RemoteCapacityGate {
   async resolve<T extends { decision: CapacityDecision }>(
     load: () => Promise<T>,
     consume: (quote: T) => Promise<void> | void,
+    isCurrent: () => boolean = () => true,
   ): Promise<T> {
     this.pending = true;
     this.blocked = true;
     try {
       const quote = await load();
+      if (!isCurrent()) return quote;
       this.blocked = quote.decision !== "CAPACITY_AVAILABLE";
       await consume(quote);
       return quote;
     } catch (error) {
-      this.blocked = true;
+      if (isCurrent()) this.blocked = true;
       throw error;
     } finally {
-      this.pending = false;
+      if (isCurrent()) this.pending = false;
     }
+  }
+
+  reset(): void {
+    this.pending = false;
+    this.blocked = false;
   }
 
   canConfirm(hasCanonicalReplacement: boolean): boolean {

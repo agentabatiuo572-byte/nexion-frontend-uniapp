@@ -6,7 +6,20 @@
   (untranslated, like the source). Chrome labels keyed for bilingual parity.
 -->
 <template>
-  <view>
+  <view v-if="remoteApiEnabled">
+    <view class="px-0.5 pt-1 pb-2.5">
+      <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink)">Task assignments</text>
+    </view>
+    <view v-if="remoteTaskRows.length" class="font-mono-tabular" style="padding: 0 2px 6px; font-size: 12px">
+      <view v-for="(r, i) in remoteTaskRows" :key="r.id" class="grid items-center gap-2.5 py-2" :style="{ gridTemplateColumns: '44px 1fr auto', borderBottom: i < remoteTaskRows.length - 1 ? '1px solid var(--v5-border)' : 'none' }">
+        <text class="tabular-nums" style="font-size: 12px; color: var(--v5-ink-4)">{{ r.time }}</text>
+        <text class="truncate" style="font-family: var(--font-v5); color: var(--v5-ink-2)">{{ r.client }} · {{ r.model }}</text>
+        <text class="tabular-nums" style="color: var(--v5-success); font-weight: 500">+${{ r.reward.toFixed(5) }}</text>
+      </view>
+    </view>
+    <text v-else class="block px-1 py-3" style="font-size: 12px; color: var(--v5-ink-3)">No task activity available.</text>
+  </view>
+  <view v-else>
     <!-- Tab switcher + see-all shortcut -->
     <view class="px-0.5 pt-1 pb-2.5 flex items-center justify-between gap-2">
       <!-- 轨道贴页面底:原 surface-2 与页面底同色不可辨(亮色 ΔE 2.2),改 L1。
@@ -74,6 +87,8 @@ import { computed, ref, onMounted, onUnmounted, type CSSProperties } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useLocaleStore } from "@/store/locale";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
 
 interface FeedRow {
   k: number;
@@ -102,7 +117,18 @@ const FEED_POOL: Omit<FeedRow, "k" | "ts">[] = [
 ];
 
 const t = useT();
+const app = useApp();
 const tab = ref<"activity" | "earnings">("activity");
+
+const remoteTaskRows = computed(() => app.visibleDevices
+  .flatMap((device) => [
+    ...(device.currentTask ? [{ ...device.currentTask, eventAt: device.currentTask.startedAt }] : []),
+    ...device.recentTasks.map((task) => ({ ...task, eventAt: task.completedAt })),
+  ])
+  .filter((task) => Number.isFinite(task.eventAt))
+  .sort((a, b) => b.eventAt - a.eventAt)
+  .slice(0, 6)
+  .map((task) => ({ id: task.id, client: task.client, model: task.model, reward: task.reward, time: new Date(task.eventAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })));
 
 const tabs = computed(() => [
   { id: "activity" as const, label: t.value.home.liveFeedTabActivity },
@@ -129,6 +155,7 @@ let actTimer: ReturnType<typeof setInterval> | null = null;
 let earnTimer: ReturnType<typeof setInterval> | null = null;
 
 onMounted(() => {
+  if (remoteApiEnabled) return;
   actTimer = setInterval(() => {
     const next = FEED_POOL[Math.floor(Math.random() * FEED_POOL.length)];
     activityCounter += 1;

@@ -2,9 +2,11 @@
  * Ported from Nexion-prototype/lib/store/product-phase.ts
  * (zustand persist → Pinia + uni storage).
  *
- * ⚠️ MOCK-ONLY PHASES table (12-month platform tightening dials).
- * Production: GET /api/admin/platform/phase-config — server is sole source
- * of truth for withdrawal cooldown, binary cap, NEX burn thresholds, etc.
+ * ⚠️ MOCK-ONLY H1 PHASES table (12-month platform tightening dials).
+ * Production H1 business parameters are mirrored from
+ * GET /api/admin/platform/phase-config. Storefront release is a separate E1
+ * concern computed by backend StorefrontProductReleasePolicy; these P1-P6
+ * values never decide whether a remote catalog item is available.
  * getMonthsSince uses mockServerNow() → server time in production.
  *
  * Computes the current operational phase from `user.joinedAt` and exposes a
@@ -15,6 +17,7 @@
 
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { remoteApiEnabled } from "@/api/runtime";
 import { ONE_MONTH_MS, mockServerNow } from "./server-time";
 
 export type PhaseId = "P1" | "P2" | "P3" | "P4" | "P5" | "P6";
@@ -121,6 +124,10 @@ export function getPhaseForMonth(month: number): PhaseParams {
   return PHASES[PHASES.length - 1];
 }
 
+export function getPhaseParams(id: PhaseId): PhaseParams {
+  return PHASES.find((phase) => phase.id === id) ?? PHASES[0];
+}
+
 /**
  * True when `current` has advanced to or past `target` on the P1 → P6 scale.
  * Used by gen-2 product gating: Pro v2 unlocks at P3, Rack P2 at P5.
@@ -134,16 +141,16 @@ export function isPhaseReached(current: PhaseParams, target: PhaseId): boolean {
 // PM-facing phase override (dev/PM tooling). Persisted so the pinned state survives
 // reload. When `pinned` is null the engine falls back to time-based phase.
 //
-// ⚠️ PRODUCTION GUARD: in production any user could call setPinned to skip
+// ⚠️ PRODUCTION/REMOTE GUARD: in production or any remote runtime any user could call setPinned to skip
 // months of ramp and unlock a higher invite multiplier / shorter cooldown.
-// The setter no-ops in production. Real phase decision is server canonical;
+// The setter no-ops in production and remote development. Real phase decision is server canonical;
 // client only mirrors server-issued phase.
 const OVERRIDE_STORAGE_KEY = "nexgrid-product-phase-override-v1";
 
 function hydratePinned(): PhaseId | null {
-  // 产线读守卫:setPinned 在 production no-op 只拦「写」,不拦手写 localStorage 的
+  // 产线/远程读守卫:setPinned 在 production/remote no-op 只拦「写」,不拦手写 localStorage 的
   // 「读」——否则用户手工塞 {pinned:"P5"} 即可绕开上架门/phase 派发(审查 F8)。
-  if (IS_PRODUCTION) return null;
+  if (IS_PRODUCTION || remoteApiEnabled) return null;
   try {
     const s = uni.getStorageSync(OVERRIDE_STORAGE_KEY) as { pinned?: PhaseId } | "";
     if (s && typeof s === "object" && typeof s.pinned === "string") return s.pinned;
@@ -162,7 +169,7 @@ export const useProductPhaseOverride = defineStore("productPhaseOverride", () =>
   const pinned = ref<PhaseId | null>(hydratePinned());
 
   function setPinned(id: PhaseId | null) {
-    if (IS_PRODUCTION) return;
+    if (IS_PRODUCTION || remoteApiEnabled) return;
     pinned.value = id;
     try {
       uni.setStorageSync(OVERRIDE_STORAGE_KEY, { pinned: id });

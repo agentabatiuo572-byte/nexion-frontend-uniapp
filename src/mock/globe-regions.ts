@@ -22,6 +22,8 @@ export interface RegionData {
   isYou?: boolean;
 }
 
+export const MOCK_GLOBE_FIXTURE_ID = "globe-regions-fixture-v1";
+
 export const REGIONS: RegionData[] = [
   {
     id: "ap",

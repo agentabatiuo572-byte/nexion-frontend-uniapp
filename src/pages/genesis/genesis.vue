@@ -14,8 +14,7 @@
   (route+cls+size 精确匹配,只覆盖这两个元素);金色本体已于 C2 收敛为
   `--v5-genesis-gold-on-dark` token,不再是散落 hex。**本页其它容器不享此例外**;shared
   gen-* keyframes live in tokens.css (P-023). Holder perks + live-market cards
-  are faithful English data arrays (matching the source's inline PERKS /
-  LIVE_MARKET), not i18n.
+  are faithful English data arrays (matching the source's inline PERKS), not i18n.
 -->
 <template>
   <AppChassis active="me">
@@ -79,16 +78,6 @@
         </view>
 
         <!-- ════ Live social proof ════ -->
-        <view v-if="latest" :key="latest.ago" class="rounded-xl flex items-center mc-ledger-in" :style="socialStyle">
-          <view class="mc-pulse shrink-0" :style="socialDotStyle" />
-          <text style="color: var(--v5-ink-2); flex: 1">
-            <text style="font-weight: 600">{{ latest.buyer }}</text>
-            <text style="color: var(--v5-ink-3)"> {{ t.genesis.socialBought }} </text>
-            <text style="font-weight: 600; color: var(--v5-warning)">{{ latest.qty }} Genesis Node{{ latest.qty > 1 ? "s" : "" }}</text>
-          </text>
-          <text class="shrink-0" :style="socialTimeStyle">{{ t.genesis.justNow }}</text>
-        </view>
-
         <!-- ════ Tier ladder — 售罄跳价 ════ -->
         <view class="flex items-center justify-between" :style="secHeaderStyle">
           <text :style="secTitleStyle">{{ t.genesis.tier.title }}</text>
@@ -127,7 +116,7 @@
           <text :style="secLinkStyle" style="pointer-events: none">{{ t.genesis.viewMarketplace }}</text>
         </view>
         <view class="grid grid-cols-2" style="gap: 10px">
-          <NftCard v-for="n in LIVE_MARKET" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
+          <NftCard v-for="n in liveMarket" :key="n.id" :id="n.id" :price="n.price" :ago="n.ago" />
         </view>
 
         <!-- ════ FAQ snippet — de-carded: floor hairline group ════ -->
@@ -188,7 +177,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { ref, computed, type CSSProperties } from "vue";
 import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -206,6 +195,7 @@ import { useGenesisEligibility } from "@/composables/use-genesis-eligibility";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { toast } from "@/store/ui";
 import { useScrollGrowProgress, PROGRESS_GROW_TRANSITION } from "@/composables/use-scroll-grow-progress";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const genesis = useGenesis();
@@ -245,16 +235,6 @@ const PERKS = computed(() => {
 });
 
 // Secondary-market recent fills（价格随尾盘档溢价，非旧 $25K 地板叙事）。
-const LIVE_MARKET = [
-  { id: 247, price: 13.4, ago: "12m" },
-  { id: 481, price: 14.2, ago: "34m" },
-];
-
-const BUYER_NAMES = [
-  "Alex from SF", "Marina from Berlin", "Tom from Tokyo", "Sara from Singapore",
-  "Carlos from Madrid", "Yuki from Seoul", "Diego from São Paulo", "Lena from Frankfurt",
-];
-
 const faqKeys = ["q1", "q2", "q3"] as const;
 function answerKey(k: "q1" | "q2" | "q3"): "a1" | "a2" | "a3" {
   return k === "q1" ? "a1" : k === "q2" ? "a2" : "a3";
@@ -265,6 +245,17 @@ const total = computed(() => genesis.totalSlots);
 const price = computed(() => genesis.unitPriceUSDT);
 const remaining = computed(() => total.value - sold.value);
 const soldPct = computed(() => (sold.value / total.value) * 100);
+const liveMarket = computed(() => remoteApiEnabled
+  ? genesis.remoteListings.slice(0, 2).map((listing) => ({
+      id: listing.tokenId,
+      price: listing.priceUSDT / 1000,
+      ago: ageText(listing.listedAt),
+    }))
+  : []);
+function ageText(ts: number): string {
+  const mins = Math.max(1, Math.floor((Date.now() - ts) / 60_000));
+  return mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;
+}
 
 // Dock 文案:**阻断原因来自唯一派生 `block`**(composable),本页不再自排优先级。
 // 顺序由 genesisPurchaseBlock 定:配置未知 > 市场关闭 > 熔断 > 售罄 > 预售;
@@ -323,26 +314,6 @@ const tiers = computed(() =>
 );
 
 const { elRef: salesBarRef, inView: salesBarInView } = useScrollGrowProgress();
-
-// Rolling social proof + sales ticker.
-const latest = ref<{ buyer: string; qty: number; ago: number } | null>(null);
-let socialId: ReturnType<typeof setTimeout> | null = null;
-let tickId: ReturnType<typeof setInterval> | null = null;
-
-function emitSocial() {
-  // 🔴 关闭态不播「某某刚买了 N 个」(独立验收 P1-3)。它既是紧迫感元素,
-  //   又与「市场未开放」当面互相拆台 —— 页面一边说买不了,一边播别人正在买。
-  //   注意是**不播新的、也清掉旧的**:只停止定时器会让最后一条留在屏上。
-  if (!showUrgency.value) {
-    latest.value = null;
-    socialId = setTimeout(emitSocial, 8_000); // 继续轮询,恢复开放后自动接上
-    return;
-  }
-  const buyer = BUYER_NAMES[Math.floor(Math.random() * BUYER_NAMES.length)];
-  const qty = 1 + Math.floor(Math.random() * 3);
-  latest.value = { buyer, qty, ago: Date.now() };
-  socialId = setTimeout(emitSocial, 8_000 + Math.random() * 6_000);
-}
 
 /**
  * 阻断态的统一提示口。认购是动钱入口,被拦住时先把「钱怎么样了」说清楚 ——
@@ -412,22 +383,6 @@ function goHowItWorks() {
 function goMarketplace() {
   uni.navigateTo({ url: "/pages/genesis/marketplace", fail: () => {} });
 }
-
-onMounted(() => {
-  emitSocial();
-  // 🔴 关闭态不推进已售数(独立验收 P1-2):实测 65 秒内进度条从 847 跳到 850,
-  //   而同屏按钮写着「市场暂未开放」。关闭期够长会自己跑到售罄,恢复开放即无货。
-  //   闸放在**调用处**而非 tickSales 内部 —— tickSales 是 store 的通用推进器,
-  //   把页面态的判定塞进 store 会让它对其它调用方也生效,那是另一种耦合。
-  tickId = setInterval(() => {
-    if (!showUrgency.value) return;
-    genesis.tickSales();
-  }, 30_000);
-});
-onUnmounted(() => {
-  if (socialId) clearTimeout(socialId);
-  if (tickId) clearInterval(tickId);
-});
 
 // ── styles ──
 // Gold-toned pill (matches the obsidian-gold hero's crown chip — a green

@@ -18,10 +18,13 @@
       <SubPageHeader back="/pages/team/team" :title="t.unilevel.pageTitle" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 16px">
-        <view v-if="remoteApiEnabled && network.remoteStatus === 'error'" :style="errorStateStyle">
+        <view v-if="remoteApiEnabled && (network.remoteStatus === 'error' || remoteState === 'error')" :style="errorStateStyle">
           <text class="block" style="font-weight: 600">{{ t.network.projectionErrorTitle }}</text>
           <text class="block" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
-          <view role="button" tabindex="0" :style="retryStyle" @click="network.refreshCanonicalNetwork()"><text>{{ t.network.retry }}</text></view>
+          <view role="button" tabindex="0" :style="retryStyle" @click="retryRemote"><text>{{ t.network.retry }}</text></view>
+        </view>
+        <view v-if="remoteApiEnabled && remoteState !== 'ready' && remoteState !== 'error'" class="text-center" style="padding: 24px 20px">
+          <text style="font-size: 13px; color: var(--v5-ink-3)">{{ t.network.projectionErrorDesc }}</text>
         </view>
         <!-- Hero — de-carded: royalty total sits directly on the page floor
              (bordered card + page-floor radial glow deleted outright, owner
@@ -36,10 +39,30 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
             </view>
           </view>
-          <text class="block font-display tabular-nums" :style="heroBigStyle">{{ remoteApiEnabled ? '—' : `$${totalRoyalty.toFixed(2)}` }}</text>
+          <text class="block font-display tabular-nums" :style="heroBigStyle">{{ remoteApiEnabled ? `$${remoteTotalUSDT.toFixed(2)}` : `$${totalRoyalty.toFixed(2)}` }}</text>
           <view class="inline-flex items-center font-mono-tabular" :style="heroTierChipStyle">
             <text>{{ remoteApiEnabled ? t.unilevel.serverRewardHold : heroRateLineText }}</text>
           </view>
+        </view>
+
+        <view v-if="remoteApiEnabled && remoteState === 'ready'" :style="remoteBreakdownStyle">
+          <view class="flex items-start" style="gap: 12px">
+            <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand)')">D</text>
+            <view class="flex-1 min-w-0">
+              <text class="block" :style="compTitleStyle">{{ t.unilevel.directLabel }}</text>
+              <text class="block" :style="compSubStyle">{{ remoteDirect.count }} {{ t.commissions.events }}</text>
+            </view>
+            <text class="font-display tabular-nums" :style="remoteAmountStyle">${{ remoteDirect.amountUSDT.toFixed(2) }}</text>
+          </view>
+          <view class="flex items-start" style="gap: 12px; margin-top: 14px">
+            <text class="rounded-xl grid place-items-center shrink-0" :style="compBadgeStyle('var(--v5-brand-2)')">N</text>
+            <view class="flex-1 min-w-0">
+              <text class="block" :style="compTitleStyle">{{ t.unilevel.networkLabel }}</text>
+              <text class="block" :style="compSubStyle">{{ remoteExtended.count }} {{ t.commissions.events }}</text>
+            </view>
+            <text class="font-display tabular-nums" :style="remoteAmountStyle">${{ remoteExtended.amountUSDT.toFixed(2) }}</text>
+          </view>
+          <text class="block font-mono-tabular" :style="remoteSplitNoteStyle">+{{ remoteTotalNEX.toLocaleString() }} NEX · {{ remoteSnapshot?.period }}</text>
         </view>
 
         <!-- Royalty breakdown — Direct (D) + Network (N): one frosted-glass
@@ -139,7 +162,18 @@
         <!-- Member list — de-carded: transparent hairline group (leaderboard
              rest-list idiom); the surface + border shell was redundant
              boundary weight around already hairline-separated rows. -->
-        <view :style="memberGroupStyle">
+        <view v-if="remoteApiEnabled && remoteState === 'ready'" :style="memberGroupStyle">
+          <view v-for="(event, i) in (remoteSnapshot?.events ?? [])" :key="event.id" class="flex items-center" :style="memberRowStyle(i === (remoteSnapshot?.events.length ?? 0) - 1)">
+            <view class="rounded-full grid place-items-center shrink-0" :style="memberAvatarStyle"><text style="font-size: 15px">↗</text></view>
+            <view class="flex-1 min-w-0">
+              <text class="block truncate" :style="{ fontSize: '13px', fontWeight: 500, color: 'var(--v5-ink)' }">{{ event.sourceUserName }}</text>
+              <text class="block font-mono-tabular" :style="{ marginTop: '2px', fontSize: '12px', color: 'var(--v5-ink-3)' }">{{ event.cycle }} · L{{ event.layer }} · {{ event.currency }}</text>
+            </view>
+            <view class="text-right"><text class="block font-mono-tabular tabular-nums" :style="{ fontSize: '12px', color: 'var(--v5-brand)' }">+${{ event.amountUSDT.toFixed(2) }}</text><text v-if="event.amountNEX > 0" class="block font-mono-tabular" :style="{ fontSize: '12px', color: 'var(--v5-brand-2)' }">+{{ event.amountNEX.toLocaleString() }} NEX</text></view>
+          </view>
+          <EmptyState v-if="(remoteSnapshot?.events.length ?? 0) === 0" kind="empty-list" :title="t.empty.commissionsTitle" :desc="t.empty.commissionsDesc" />
+        </view>
+        <view v-else :style="memberGroupStyle">
           <EmptyState v-if="filteredMembers.length === 0" kind="no-filter-results" :title="t.empty.filterTitle" :desc="t.empty.filterDesc" compact />
           <template v-else>
             <view
@@ -181,6 +215,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
@@ -188,7 +223,9 @@ import VBadge from "@/components/team/v-badge.vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useNetwork, type NetworkMember, type MemberStatus } from "@/store/network";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import type { TeamUnilevelSnapshot } from "@/api/team-insights-api";
+import { useApp } from "@/store/app";
 import { UNILEVEL_USDT } from "@/store/commission";
 
 type RateTierId = "standard" | "verified" | "elite" | "diamond";
@@ -219,8 +256,35 @@ type FilterId = "all" | "direct" | "extended";
 type PlottedMember = NetworkMember & { kind: "direct" | "extended" };
 
 const t = useT();
+const app = useApp();
 const network = useNetwork();
-onMounted(() => { if (remoteApiEnabled) void network.refreshCanonicalNetwork(); });
+const remoteSnapshot = ref<TeamUnilevelSnapshot | null>(null);
+const remoteState = ref<"loading" | "ready" | "error">(remoteApiEnabled ? "loading" : "ready");
+let remoteRequest = 0;
+onMounted(() => { if (remoteApiEnabled) { void network.refreshCanonicalNetwork(); void loadRemote(); } });
+onShow(() => { if (remoteApiEnabled) void loadRemote(); });
+watch(() => app.accountKey, () => {
+  if (!remoteApiEnabled) return;
+  remoteSnapshot.value = null;
+  void loadRemote();
+});
+async function loadRemote() {
+  if (!remoteApiEnabled) return;
+  const request = ++remoteRequest;
+  const accountKey = app.accountKey;
+  remoteState.value = "loading";
+  try {
+    const snapshot = await teamInsightsApi.unilevel("month");
+    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    remoteSnapshot.value = snapshot;
+    remoteState.value = "ready";
+  } catch {
+    if (request !== remoteRequest || accountKey !== app.accountKey) return;
+    remoteSnapshot.value = null;
+    remoteState.value = "error";
+  }
+}
+function retryRemote() { void Promise.all([network.refreshCanonicalNetwork(), loadRemote()]); }
 const filter = ref<FilterId>("all");
 
 const byLayer = computed(() => network.byLayer());
@@ -248,6 +312,10 @@ const influenceScore = computed(() => {
   return Math.min(5.0, 1 + Math.log10(monthlyNetworkVolume.value / 100));
 });
 const totalRoyalty = computed(() => directRoyalty.value + networkBonus.value);
+const remoteDirect = computed(() => remoteSnapshot.value?.split.direct ?? { amountUSDT: 0, amountNEX: 0, count: 0 });
+const remoteExtended = computed(() => remoteSnapshot.value?.split.extended ?? { amountUSDT: 0, amountNEX: 0, count: 0 });
+const remoteTotalUSDT = computed(() => remoteDirect.value.amountUSDT + remoteExtended.value.amountUSDT);
+const remoteTotalNEX = computed(() => remoteDirect.value.amountNEX + remoteExtended.value.amountNEX);
 
 const filteredMembers = computed<PlottedMember[]>(() => {
   if (filter.value === "all") {
@@ -321,6 +389,9 @@ const howEntryStyle: CSSProperties = {
 const heroStyle: CSSProperties = { padding: "6px 2px 0" };
 const errorStateStyle: CSSProperties = { padding: "14px", borderRadius: "14px", background: "var(--v5-warning-soft)", color: "var(--v5-ink)" };
 const retryStyle: CSSProperties = { marginTop: "10px", minHeight: "44px", display: "grid", placeItems: "center", borderRadius: "999px", background: "var(--v5-surface-2)", color: "var(--v5-ink-2)" };
+const remoteBreakdownStyle: CSSProperties = { padding: "16px", borderRadius: "16px", background: "var(--v5-glass-bg)", backdropFilter: "blur(18px) saturate(180%)" };
+const remoteAmountStyle: CSSProperties = { fontSize: "20px", fontWeight: 600, color: "var(--v5-brand)" };
+const remoteSplitNoteStyle: CSSProperties = { marginTop: "14px", fontSize: "12px", color: "var(--v5-ink-3)" };
 const heroCapStyle: CSSProperties = { fontSize: "12px", fontWeight: 500, color: "var(--v5-brand)", letterSpacing: "0.06em" };
 const heroBigStyle: CSSProperties = { marginTop: "8px", fontSize: "34px", fontWeight: 600, lineHeight: 1, letterSpacing: "-0.022em", color: "var(--v5-ink)" };
 const heroTierChipStyle = computed<CSSProperties>(() => ({

@@ -4,6 +4,7 @@ import { createAuthApi } from "./auth-api";
 import { createMockAuthApi } from "./mock-auth-api";
 import { createPaymentApi } from "./payment-api";
 import { createProductCatalogApi } from "./product-catalog-api";
+import { createProductPhaseApi } from "./product-phase-api";
 import { createWithdrawalApi } from "./withdrawal-api";
 import { createEarnConfigApi } from "./earn-config-api";
 import { createDeviceE3Api } from "./device-e3-api";
@@ -45,6 +46,9 @@ import { createBundleOrderApi } from "./bundle-order-api";
 import { createAmbassadorApplicationApi } from "./ambassador-application-api";
 import { createTeamInsightsApi } from "./team-insights-api";
 import { createWalletBillsApi } from "./wallet-bills-api";
+import { createStorefrontActivityApi } from "./storefront-activity-api";
+import { createGenesisPointsApi } from "./genesis-points-api";
+import { createNetworkRankApi } from "./network-rank-api";
 import { readApiRuntimeConfig } from "./runtime-config";
 import { createRuntimeApiClient } from "./runtime-client";
 import { createRuntimeSessionVault } from "./session-vault";
@@ -53,6 +57,11 @@ export const apiRuntimeConfig = readApiRuntimeConfig();
 export const remoteApiEnabled = apiRuntimeConfig.mode !== "mock";
 export const fundsSandboxEnabled = apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit;
 export const fundsServerEnabled = apiRuntimeConfig.mode !== "mock";
+// Payout addresses are real provider/production data. The isolated App
+// sandbox deliberately uses the account-scoped local implementation instead
+// of calling the production-only resource with a sandbox identity.
+export const payoutAddressServerEnabled = apiRuntimeConfig.mode === "remote";
+export const payoutAddressMockEnabled = apiRuntimeConfig.mode !== "remote";
 export const sessionVault = createRuntimeSessionVault();
 let unauthorizedHandler: (() => void | Promise<void>) | undefined;
 
@@ -79,6 +88,7 @@ export const authApi = apiRuntimeConfig.mode === "mock"
 export const accountApi = createAccountApi(apiClient);
 export const paymentApi = createPaymentApi(apiClient);
 export const productCatalogApi = createProductCatalogApi(apiClient);
+export const productPhaseApi = createProductPhaseApi(apiClient);
 export const withdrawalApi = createWithdrawalApi(apiClient);
 export const earnConfigApi = createEarnConfigApi(apiClient);
 export const deviceE3Api = createDeviceE3Api(apiClient);
@@ -120,6 +130,9 @@ export const bundleOrderApi = createBundleOrderApi(apiClient);
 export const ambassadorApplicationApi = createAmbassadorApplicationApi(apiClient);
 export const teamInsightsApi = createTeamInsightsApi(apiClient);
 export const walletBillsApi = createWalletBillsApi(apiClient);
+export const storefrontActivityApi = createStorefrontActivityApi(apiClient);
+export const genesisPointsApi = createGenesisPointsApi(apiClient);
+export const networkRankApi = createNetworkRankApi(apiClient);
 
 export function setRemoteUnauthorizedHandler(handler: (() => void | Promise<void>) | undefined): void {
   unauthorizedHandler = handler;

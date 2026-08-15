@@ -94,8 +94,9 @@ import { useGenesisConfig } from "@/store/genesis-config";
 import { useT } from "@/i18n/use-t";
 import { PRODUCTS } from "@/mock/products";
 import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { refreshServerProductPhase } from "@/store/server-product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
-import { isPhaseReached } from "@/store/product-phase";
+import { isProductAvailable } from "@/store/product-availability";
 
 const t = useT();
 const genesisCfg = useGenesisConfig();
@@ -104,7 +105,8 @@ const genesisCfg = useGenesisConfig();
 //   只有页面级 onShow 能把它翻回来。
 onShow(() => {
   genesisCfg.refresh();
-  if (productCatalogState.status !== "ready") void refreshProductCatalog(true);
+  void refreshServerProductPhase(true);
+  void refreshProductCatalog(true);
 });
 const phase = useProductPhase();
 
@@ -126,16 +128,14 @@ const catalogHasProducts = computed(() => {
 });
 const unlockedProducts = computed(() =>
   (productCatalogState.status === "ready" ? PRODUCTS : []).filter((p) => {
-    if (!p.unlocksAtPhase) return true;
     if (!mounted.value) return false;
-    return isPhaseReached(phase.value, p.unlocksAtPhase);
+    return isProductAvailable(p, phase.value);
   }),
 );
 const lockedProducts = computed(() =>
   PRODUCTS.filter((p) => {
-    if (!p.unlocksAtPhase) return false;
     if (!mounted.value) return true;
-    return !isPhaseReached(phase.value, p.unlocksAtPhase);
+    return !isProductAvailable(p, phase.value);
   }),
 );
 

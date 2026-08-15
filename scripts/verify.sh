@@ -1063,8 +1063,27 @@ if grep -q 'nexBalance: +(user.value.nexBalance + positiveNexDelta)' src/store/a
 else
   ok "SPEC-7 settle NEX route goes through buckets"
 fi
+# 双端配置契约 parity:当前真实 App platform-config/API ↔ PC server-canonical clients。
+# 旧 admin mock compute-config.ts 已从真实 PC 删除,禁止以不存在的 mock 或默认值伪造 parity。
+PLATFORM_CONFIG_PARITY="$ADMIN_ROOT/scripts/platform-config-contract-parity.mjs"
+if [ ! -f "$PLATFORM_CONFIG_PARITY" ]; then
+  bad "SPEC-7 platform-config/API parity script not found at $PLATFORM_CONFIG_PARITY"
+else
+  parity_arg="$PLATFORM_CONFIG_PARITY"
+  app_root_arg="$PROJECT_DIR"
+  if [ "$($NODE_BIN -p 'process.platform' 2>/dev/null)" = "win32" ] && command -v wslpath >/dev/null 2>&1; then
+    parity_arg=$(wslpath -w "$PLATFORM_CONFIG_PARITY")
+    app_root_arg=$(wslpath -w "$PROJECT_DIR")
+  fi
+  if NEXION_UNIAPP_ROOT="$app_root_arg" "$NODE_BIN" "$parity_arg" > /tmp/spec7-platform-config-parity.log 2>&1; then
+    ok "SPEC-7 platform-config/API parity (real App platform config + PC E6/K1/K2 contracts)"
+  else
+    bad "SPEC-7 platform-config/API parity failed — current App $PROJECT_DIR and PC $ADMIN_ROOT must expose the same server-owned contract"
+    tail -25 /tmp/spec7-platform-config-parity.log | sed 's/^/        /'
+  fi
+fi
 # 双端参数 key parity: uniapp 配置契约 ↔ admin main 活源(2026-08-15 改锚,单独立项)。
-# 原锚 lib/mock/admin/compute-config.ts 已死(admin main 2c477b4 进 .trash;含全键 defaultVal
+# 原 mock 参数寄存器已死(admin main 2c477b4 进 .trash;含全键 defaultVal
 # 的寄存器只活在 admin 非 main 分支,与 wd02 契约锚无交集分支 → 原门在 main 族恒红)。
 # 现锚 main 活源:riskCluster 11 键 → k-client.ts;lockMode → h-client.ts;K3 提现前置 /
 # K4 聚簇权重 12 键 main 前端尚未落地(只在 PRD),admin 侧断言降为域锚脚本里的升级哨兵
@@ -1938,7 +1957,7 @@ trial02_i18n_legacy_copy
 # API(spec ④:poll 的 grace→ended 只翻状态;转化侧效应只住 checkout,P-031 同向)。
 trial02_machine_invariants() {
   local f="src/store/free-trial.ts"
-  if grep -qE 'function convert\(\)' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares convert() (1 hit)";
+  if grep -qE 'async[[:space:]]+function[[:space:]]+convert[[:space:]]*\(' "$f" 2>/dev/null; then ok "TRIAL02 free-trial.ts declares async convert() (1 hit)";
   else bad "TRIAL02 free-trial.ts lost convert() — conversion cannot close the machine"; fi
   local money
   money=$(grep -nE "debitBalance|addDevice|bills\.add|creditBalance|creditNex" "$f" 2>/dev/null | head -5)
@@ -2121,7 +2140,11 @@ const tok=process.argv[1];
 //   paymentRail 枚举值(trial-api.ts:110 拿它**校验回包**),`__NEXION_TRUSTED_TASK_PROOF__`
 //   是原生壳注入的全局键 —— 两个都是**对方定义的名字**,客户端单方面改拼写 = 契约当场对不上。
 //   等后端改名再同步。判据只放这两个**具体标识符**,不放宽成「凡大写就算契约」。
-const WHITELIST=new RegExp(`${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
+// Product names are the one user-visible exception: NexionBox S1 and NexionBox
+// Pro v2 are load-bearing catalog fixture names for the server product contract.
+// Keep this exact (whole product name) rather than allowing the bare Nexion token;
+// a normal brand string must still fail the rebrand gate.
+const WHITELIST=new RegExp(`${tok}Box\\s+(?:S1|Pro\\s+v2)|${tok}-(prototype|uniapp|admin|backend|ops-console)|${tok}-(design|workflow|audit|spec|sprint|prd-sync|uniapp-port|admin-prd)|static/img/[^:\\\\s]*${tok}|x-${tok}-edge-country|${tok}_USDT_WALLET|__${tok}_TRUSTED_TASK_PROOF__|${tok}_ACCEPTANCE_RUN_ID`,"gi");
 const hits=[];
 const walk=(d)=>{ let es=[]; try{es=fs.readdirSync(d,{withFileTypes:true})}catch{return}
   for(const e of es){const p=path.join(d,e.name);
@@ -2274,15 +2297,21 @@ platform_stats_anchor() {
     if ! grep -q 'from "@/lib/platform-stats"' "$f" 2>/dev/null; then bad "platform-anchor: $f missing platform-stats import"; fails=1; fi
     if [ "$(sed -E 's|(^\|[^:])//.*$|\1|' "$f" 2>/dev/null | grep -c "$sym")" -lt 2 ]; then bad "platform-anchor: $f imports but never consumes $sym"; fails=1; fi
   done
-  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。**代码面**出现即红。
-  #   计数剥注释 —— 族B 注释自己就点名这个符号解释为什么禁,不剥的话哨兵抓自己的说明书
-  #   (首跑实锤:这条禁令与上面 pin 同分钟写就,上面剥了、这里没剥,P2-10 同型在相邻行重犯)。
+  # 🔴 R2 C5 定案:累计支付是时间积分,禁配置派生版(调低舰队=历史回退)。
+  #   这里不能再把字段名本身当成违规:服务端 publicStats 新投影可以合法携带
+  #   `paidCumulativeNowOf`,而客户端只读该投影并不产生历史回退。只拦两种真正的
+  #   本地派生:platform-stats.ts 自己定义同名计算器,或任意调用把 cfg/config/
+  #   publicStats 当作该计算器输入。这样 server projection 过门,本地配置公式仍红。
+  if grep -qE '(^|[[:space:]])(function|const)[[:space:]]+paidCumulativeNowOf[[:space:]]*[=(]' src/lib/platform-stats.ts 2>/dev/null; then
+    bad "platform-anchor: platform-stats.ts 不得定义 paidCumulativeNowOf —— 累计支付只能由服务端投影"; fails=1
+  fi
+  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^|[^:])//.*$|\1|' {} + 2>/dev/null \
+      | grep -qE 'paidCumulativeNowOf[[:space:]]*\([^)]*(cfg|config|publicStats)'; then
+    bad "platform-anchor: paidCumulativeNowOf 不得从本地 cfg/config/publicStats 派生"; fails=1
+  fi
   # R3 P2:fail-open 补 witness —— 管道故障/空扫描时禁令会静默绿;扫描数必须够量才算判过
   _pcno_scanned=$(find src -type f \( -name '*.ts' -o -name '*.vue' \) 2>/dev/null | wc -l)
   if [ "${_pcno_scanned:-0}" -lt 50 ]; then bad "platform-anchor: 禁令哨兵扫描面异常($_pcno_scanned 文件)——判据失效不许静默过"; fails=1; fi
-  if find src -type f \( -name '*.ts' -o -name '*.vue' \) -exec sed -E 's|(^\|[^:])//.*$|\1|' {} + 2>/dev/null | grep -q "paidCumulativeNowOf"; then
-    bad "platform-anchor: paidCumulativeNowOf 出现在代码面 —— 积分类禁跟配置,见 platform-stats 族B 注"; fails=1
-  fi
   # (4b) z1 判决 A · 判据反转(2026-08-10):819a6da 把 publicStats 种子移出 mock,
   #      c37e642 把 compat 默认清零并声明「Deliberately invalid sentinel …
   #      Never replace it with plausible data」—— H9 在服务端投影到达前必须保持不可用。

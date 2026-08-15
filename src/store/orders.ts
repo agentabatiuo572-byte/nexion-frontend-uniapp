@@ -180,6 +180,23 @@ export const useOrders = defineStore("orders", () => {
     orders.value = canonical.orders.map(fromCanonical);
   }
 
+  async function cancelOrderRemote(id: string): Promise<boolean> {
+    if (!remoteApiEnabled) return cancelOrder(id);
+    const requestBoundKey = boundKey;
+    const requestEpoch = boundEpoch;
+    try {
+      await orderApi.cancel(id, `order-cancel:${id}`);
+      if (boundKey !== requestBoundKey || boundEpoch !== requestEpoch) return false;
+      await refreshRemote();
+      return orders.value.some((item) => item.id === id && item.status === "cancelled");
+    } catch {
+      // The command may have committed before the response was lost. Read-back is
+      // the only safe result for the UI; never project a local cancellation.
+      try { await refreshRemote(); } catch { return false; }
+      return orders.value.some((item) => item.id === id && item.status === "cancelled");
+    }
+  }
+
   function createOrder(input: CreateOrderInput): Order {
     if (remoteApiEnabled) throw new Error("REMOTE_ORDER_CREATE_REQUIRES_SERVER_API");
     const {
@@ -331,7 +348,7 @@ export const useOrders = defineStore("orders", () => {
     return orders.value.find((o) => o.id === id);
   }
 
-  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, getById, bindAccount, currentAccountKey, refreshRemote };
+  return { orders, createOrder, advanceOrder, markActivated, cancelOrder, cancelOrderRemote, getById, bindAccount, currentAccountKey, refreshRemote };
 });
 
 // ⚠️ MOCK-ONLY: client unilaterally progresses orders through provisioning with

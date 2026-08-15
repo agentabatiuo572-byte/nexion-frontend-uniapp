@@ -18,7 +18,7 @@
     <!-- ── 下单前:金额输入 + 生成付款单 ── -->
     <template v-if="paneView === 'form'">
       <!-- 收款账户池无可用账户 → 通道维护空状态([FEAT-PAY02] ⑤;segment 侧同步置灰) -->
-      <view v-if="!dep.bankRailAvailable" class="flex flex-col items-center" style="padding: 36px 0 28px">
+      <view v-if="!bankRailAvailable" class="flex flex-col items-center" style="padding: 36px 0 28px">
         <view class="grid place-items-center" :style="pausedIconStyle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M10 15V9" /><path d="M14 15V9" /></svg>
         </view>
@@ -48,7 +48,7 @@
         </view>
 
         <view class="flex items-center justify-between" style="margin-top: 10px; padding: 0 4px; gap: 8px">
-          <view class="min-w-0"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ t.bankPane.feeNote }}</text></view>
+          <view class="min-w-0"><text style="font-size: 12px; color: var(--v5-ink-3)">{{ feeNote }}</text></view>
           <view class="shrink-0"><text style="font-size: 12px; color: var(--v5-ink-3); white-space: nowrap">{{ limitLine }}</text></view>
         </view>
 
@@ -74,13 +74,11 @@
         <view><text class="block text-center tabular-nums" style="margin-top: 8px; font-family: var(--font-v5); font-size: 26px; font-weight: 600; color: var(--v5-ink); white-space: nowrap">{{ fmtVnd(intent.vndAmount) }}</text></view>
         <view><text class="block text-center" style="margin-top: 4px; font-size: 12px; color: var(--v5-ink-3)">{{ creditLineText }}</text></view>
 
-        <!-- VietQR 点阵(确定性 seed = 附言码,带三角定位块;QR 物理黑白固定色同 usdt 段先例) -->
-        <view :style="qrBoxStyle">
-          <view :style="qrGridStyle" aria-hidden>
-            <view v-for="(d, i) in qrCells" :key="i" :style="d ? qrDarkCellStyle : undefined" />
-          </view>
+        <!-- 远程没有服务端签发的二维码载荷时，禁止展示本地点阵与扫码文案。 -->
+        <view v-if="intent.qrPayload" :style="qrBoxStyle">
+          <image :src="intent.qrPayload" mode="aspectFit" style="width: 100%; height: 100%" />
         </view>
-        <view><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.bankPane.scanHint }}</text></view>
+        <view v-if="intent.qrPayload"><text class="block text-center" style="margin-top: 8px; font-size: 12px; color: var(--v5-ink-3)">{{ t.bankPane.scanHint }}</text></view>
 
         <!-- 收款账户(完整账号,转账要用,不脱敏;规格 ③) -->
         <view style="margin-top: 14px">
@@ -246,10 +244,11 @@ import { useDeposits } from "@/store/deposits";
 import { useFx } from "@/store/fx";
 import { fmtVnd, vndForUsdt } from "@/store/fx-core";
 import { mockServerNow } from "@/store/server-time";
-import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT, qrDotMatrix } from "@/store/deposits-core";
+import { BANK_MAX_DEPOSIT_USDT, MIN_DEPOSIT_USDT } from "@/store/deposits-core";
 import type { DepositIntent } from "@/store/types";
 import { fundsSandboxEnabled, remoteApiEnabled } from "@/api/runtime";
 import { runRecoverableFundsOperation } from "@/lib/recoverable-funds-operation";
+import { buildVietQrTransferSteps } from "@/lib/vietqr-remote-safety";
 
 const t = useT();
 const fx = useFx();
@@ -286,6 +285,7 @@ onMounted(() => {
         createError.value = t.value.topupChrome.depositOpFailedNote;
       }
     });
+    dep.startRemoteVietQrPolling();
   }
   const resume = dep.intents.find((i) => i.status === "awaiting_payment" || i.status === "mismatch_review");
   if (resume) viewIntentId.value = resume.intentId;
@@ -310,14 +310,25 @@ const amountNum = computed(() => {
   const n = parseFloat(amount.value);
   return Number.isFinite(n) ? n : 0;
 });
-const inRange = computed(() => amountNum.value >= MIN_DEPOSIT_USDT && amountNum.value <= BANK_MAX_DEPOSIT_USDT);
-const fxUsable = computed(() => fx.fxAvailable);
+const minDeposit = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.minDepositUsdt : MIN_DEPOSIT_USDT);
+const maxDeposit = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.maxDepositUsdt : BANK_MAX_DEPOSIT_USDT);
+const bankRailAvailable = computed(() => remoteApiEnabled && !fundsSandboxEnabled ? fx.vietQrEnabled : dep.bankRailAvailable);
+const inRange = computed(() => amountNum.value >= minDeposit.value && amountNum.value <= maxDeposit.value);
+const fxUsable = computed(() => fx.fxAvailable && fx.configReady && bankRailAvailable.value);
 
-const minLabel = `$${MIN_DEPOSIT_USDT}`;
-const maxLabel = `$${BANK_MAX_DEPOSIT_USDT.toLocaleString("en-US")}`;
-const limitLine = computed(() => fmt(t.value.bankPane.limitNote, { min: minLabel, max: maxLabel }));
+const minLabel = computed(() => `$${minDeposit.value}`);
+const maxLabel = computed(() => `$${maxDeposit.value.toLocaleString("en-US")}`);
+const limitLine = computed(() => fmt(t.value.bankPane.limitNote, { min: minLabel.value, max: maxLabel.value }));
+const feeNote = computed(() => {
+  if (!fx.configReady) return "—";
+  if (fx.feeUsdt <= 0 && fx.feeVnd <= 0) return t.value.bankPane.feeNote;
+  const usdt = fx.feeUsdt.toFixed(2);
+  return fx.feeVnd > 0
+    ? fmt(t.value.bankPane.feeConfiguredVnd, { usdt, vnd: fmtVnd(fx.feeVnd) })
+    : fmt(t.value.bankPane.feeConfigured, { usdt });
+});
 const amountError = computed(() =>
-  amount.value !== "" && !inRange.value ? fmt(t.value.bankPane.limitError, { min: minLabel, max: maxLabel }) : "",
+  amount.value !== "" && !inRange.value ? fmt(t.value.bankPane.limitError, { min: minLabel.value, max: maxLabel.value }) : "",
 );
 // 牌价未返回/不可用 → 占位「—」不显示 0([FEAT-PAY03] ⑤ 空状态)
 const vndPreview = computed(() =>
@@ -384,6 +395,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
   if (createTimer) clearTimeout(createTimer);
+  if (remoteApiEnabled && !fundsSandboxEnabled) dep.stopRemoteVietQrPolling();
 });
 const countdownText = computed(() => {
   const it = intent.value;
@@ -408,8 +420,20 @@ const creditLineText = computed(() =>
 );
 // 过期文案的锁价分钟数:配置未返回用「—」占位,不显示 0(同 fx-rate-line 口径)
 const lockMinText = computed(() => (fx.lockWindowMin > 0 ? String(fx.lockWindowMin) : "—"));
-const steps = computed(() => [t.value.bankPane.step1, t.value.bankPane.step2, t.value.bankPane.step3]);
-const qrCells = computed<boolean[]>(() => qrDotMatrix(intent.value?.memoCode ?? "nexgrid"));
+const steps = computed(() => {
+  const it = intent.value;
+  return buildVietQrTransferSteps(
+    it?.qrPayload,
+    it?.bankAccount.accountNumber ?? "",
+    it ? fmtVnd(it.vndAmount) : "",
+    {
+      scan: t.value.bankPane.step1,
+      manual: (account, amount) => fmt(t.value.bankPane.manualStep1, { account, amount }),
+      amount: t.value.bankPane.step2,
+      complete: t.value.bankPane.step3,
+    },
+  );
+});
 
 // ── 动作 ──
 function copyText(data: string, okText: string) {

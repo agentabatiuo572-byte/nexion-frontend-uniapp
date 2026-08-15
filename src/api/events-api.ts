@@ -64,8 +64,44 @@ export interface EventSpinResult {
   downgradeReason: string;
 }
 
+export interface EventSpinSegment {
+  tierId: string;
+  rewardType: string;
+  rewardAmount: number;
+  rewardName: string;
+  realOutflow: boolean;
+  displayOrder: number;
+}
+
+export interface EventSpinHistory {
+  spinId: string;
+  spinDate: string;
+  sourceType: "DAILY" | "BONUS";
+  tierId: string;
+  rewardType: string;
+  rewardAmount: number;
+  rewardName: string;
+  downgraded: boolean;
+  downgradeReason: string;
+  awardedAt: string;
+}
+
+export interface EventSpinState {
+  eventCode: string;
+  eventId: string;
+  serverDate: string;
+  nextResetAtUtc: string;
+  freeAvailable: boolean;
+  bonusTickets: number;
+  availableSpins: number;
+  segments: EventSpinSegment[];
+  history: EventSpinHistory[];
+  source: string;
+}
+
 export interface EventsApi {
   state(): Promise<EventSnapshot>;
+  spinState(eventCode: string): Promise<EventSpinState>;
   join(eventCode: string, idempotencyKey: string): Promise<EventJoinResult>;
   claim(eventCode: string, idempotencyKey: string): Promise<EventClaimResult>;
   spin(eventCode: string, idempotencyKey: string): Promise<EventSpinResult>;
@@ -225,11 +261,72 @@ function parseSpin(value: unknown): EventSpinResult {
   };
 }
 
+function parseSpinState(value: unknown): EventSpinState {
+  const row = record(value);
+  const eventCode = text(row?.eventCode);
+  const eventId = text(row?.eventId);
+  const serverDate = text(row?.serverDate);
+  const nextResetAtUtc = text(row?.nextResetAtUtc);
+  const freeAvailable = bool(row?.freeAvailable);
+  const bonusTickets = number(row?.bonusTickets);
+  const availableSpins = number(row?.availableSpins);
+  const source = text(row?.source);
+  if (!row || !eventCode || !eventId || !serverDate || !nextResetAtUtc
+      || freeAvailable === null || bonusTickets === null || availableSpins === null
+      || !source || !Array.isArray(row.segments) || !Array.isArray(row.history)) {
+    return invalid("EVENT_SPIN_STATE_RESPONSE_INVALID");
+  }
+  const segments = row.segments.map((value) => {
+    const segment = record(value);
+    const tierId = text(segment?.tierId);
+    const rewardType = text(segment?.rewardType)?.toUpperCase();
+    const rewardAmount = number(segment?.rewardAmount);
+    const rewardName = text(segment?.rewardName);
+    const realOutflow = bool(segment?.realOutflow);
+    const displayOrder = number(segment?.displayOrder);
+    if (!segment || !tierId || !rewardType || rewardAmount === null || !rewardName
+        || realOutflow === null || displayOrder === null) {
+      return invalid("EVENT_SPIN_SEGMENT_INVALID");
+    }
+    return { tierId, rewardType, rewardAmount, rewardName, realOutflow, displayOrder };
+  });
+  const history = row.history.map((value) => {
+    const item = record(value);
+    const spinId = text(item?.spinId);
+    const spinDate = text(item?.spinDate);
+    const sourceType = text(item?.sourceType)?.toUpperCase() as "DAILY" | "BONUS";
+    const tierId = text(item?.tierId);
+    const rewardType = text(item?.rewardType)?.toUpperCase();
+    const rewardAmount = number(item?.rewardAmount);
+    const rewardName = text(item?.rewardName);
+    const downgraded = bool(item?.downgraded);
+    const downgradeReason = text(item?.downgradeReason);
+    const awardedAt = text(item?.awardedAt);
+    if (!item || !spinId || !spinDate || !["DAILY", "BONUS"].includes(sourceType)
+        || !tierId || !rewardType || rewardAmount === null || !rewardName
+        || downgraded === null || !downgradeReason || !awardedAt) {
+      return invalid("EVENT_SPIN_HISTORY_INVALID");
+    }
+    return {
+      spinId, spinDate, sourceType, tierId, rewardType, rewardAmount,
+      rewardName, downgraded, downgradeReason, awardedAt,
+    };
+  });
+  return {
+    eventCode, eventId, serverDate, nextResetAtUtc, freeAvailable,
+    bonusTickets, availableSpins, segments, history, source,
+  };
+}
+
 export function createEventsApi(client: ApiClient): EventsApi {
   const code = (value: string) => encodeURIComponent(required(value, "EVENT_CODE_REQUIRED"));
   const key = (value: string) => required(value, "EVENT_IDEMPOTENCY_KEY_REQUIRED");
   return {
     state: async () => parseSnapshot(await client.request({ method: "GET", path: "/api/events" })),
+    spinState: async (eventCode) => parseSpinState(await client.request({
+      method: "GET",
+      path: `/api/events/${code(eventCode)}/spin/state`,
+    })),
     join: async (eventCode, idempotencyKey) => parseJoin(await client.request({
       method: "POST",
       path: `/api/events/${code(eventCode)}/join`,

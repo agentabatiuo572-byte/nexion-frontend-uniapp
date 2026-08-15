@@ -1,7 +1,9 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { pointsApi, remoteApiEnabled } from "@/api/runtime";
+import type { CanonicalTopStreaker } from "@/api/points-api";
 import { createAccountRowCommit } from "./account-scoped-storage";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 /**
  * NEX 水龙头 + 提现闸 — 由旧 points.ts 演化(积分系统下线,NEX 接管)。
@@ -94,6 +96,8 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   const streakSavers = ref(0);
   const claimedMilestones = ref<number[]>([]);
   const remoteMilestoneIds = ref<Record<number, number>>({});
+  const topStreakers = ref<CanonicalTopStreaker[]>([]);
+  const remoteAccountEpoch = createRemoteAccountEpoch();
 
   function clearRemoteFacts() {
     history.value = [];
@@ -103,13 +107,16 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
     streakSavers.value = 0;
     claimedMilestones.value = [];
     remoteMilestoneIds.value = {};
+    topStreakers.value = [];
   }
 
-  async function refreshRemote(): Promise<boolean> {
+  async function refreshRemote(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return true;
     clearRemoteFacts();
     try {
       const snapshot = await pointsApi.state();
+      if (!remoteAccountEpoch.isCurrent(request)) return false;
+      topStreakers.value = snapshot.topStreakers;
       const last = snapshot.streak.lastCheckInDate ? Date.parse(`${snapshot.streak.lastCheckInDate}T00:00:00Z`) : 0;
       lastSignedInAt.value = Number.isFinite(last) ? last : 0;
       signInStreak.value = snapshot.streak.currentStreak;
@@ -122,44 +129,48 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
         .map((milestone) => [milestone.milestoneDay, milestone.milestoneId]));
       return true;
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
 
   async function checkInRemote(): Promise<{ ok: boolean; gained: number; streak: number; multiplier: number }> {
+    const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 键只取到「天」(toISOString().slice(0,10)),同一天内任意重试都是同一把 ——
       // 签到的意图本来就是「今天这一次」,按天做键正是对的。
       const result = await pointsApi.checkIn(`h5-check-in:${new Date().toISOString().slice(0, 10)}`);
-      await refreshRemote();
+      if (!remoteAccountEpoch.isCurrent(request)) return { ok: false, gained: 0, streak: 0, multiplier: 1 };
+      if (!await refreshRemote(request)) return { ok: false, gained: 0, streak: 0, multiplier: 1 };
       return { ok: true, gained: result.rewardNex, streak: result.streakDays, multiplier: result.multiplier };
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return { ok: false, gained: 0, streak: 0, multiplier: 1 };
     }
   }
 
   async function claimMilestoneRemote(day: number): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
     const milestoneId = remoteMilestoneIds.value[day];
     if (!milestoneId) return false;
     try {
       await pointsApi.claimMilestone(milestoneId, `h5-milestone:${milestoneId}`);
-      return refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && refreshRemote(request);
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
 
   async function useSaverRemote(): Promise<boolean> {
+    const request = remoteAccountEpoch.snapshot();
     try {
       // IDEMPOTENCY-FRESH-OK: 同 checkIn —— 键只取到「天」,同一天内任意重试都是同一把;
       // 「今天用掉一张补签卡」本来就是按天的意图。
       await pointsApi.useSaver(`h5-streak-saver:${new Date().toISOString().slice(0, 10)}`);
-      return refreshRemote();
+      return remoteAccountEpoch.isCurrent(request) && refreshRemote(request);
     } catch {
-      clearRemoteFacts();
+      if (remoteAccountEpoch.isCurrent(request)) clearRemoteFacts();
       return false;
     }
   }
@@ -190,8 +201,9 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
   /** 账号切换重绑:装载该账号的签到状态机(防跨账号继承连胜/里程碑/saver)。 */
   function bindAccount(rawAccountKey: string) {
     if (remoteApiEnabled) {
+      remoteAccountEpoch.bind(rawAccountKey);
       clearRemoteFacts();
-      void refreshRemote();
+      void refreshRemote(remoteAccountEpoch.snapshot());
       return;
     }
     const next = rows.bind(rawAccountKey) ?? defaults();
@@ -303,6 +315,7 @@ export const useNexFaucet = defineStore("nexFaucet", () => {
 
   return {
     history, lastSignedInAt, signInStreak, longestStreak, streakSavers, claimedMilestones,
+    topStreakers,
     signIn, useSaver, claimMilestone, bindAccount, refreshRemote,
     checkInRemote, claimMilestoneRemote, useSaverRemote,
   };

@@ -61,6 +61,7 @@ import {
 import type { CanonicalE3Device } from "@/api/device-e3-api";
 import type { CanonicalTaskAssignment, CanonicalTaskAssignments, TrustedTaskCompletionProof } from "@/api/task-assignment-api";
 import type { UserSession } from "@/api/contracts";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 import {
   bindPendingFundsMutationOrder,
   finishPendingFundsMutationByOrder,
@@ -373,6 +374,7 @@ export const useApp = defineStore("app", () => {
     ? createServerEmptySnapshot("default", "", bootSurface)
     : hydrateSnapshotEconomics(readAccountSnapshot("default")) ?? createSeedSnapshot("default", "alex@nexgrid.ai", bootSurface);
   const accountKey = ref(bootSnapshot.accountKey);
+  const remoteAccountEpoch = createRemoteAccountEpoch(accountKey.value);
   const entrySurface = ref<EntrySurface>(bootSnapshot.entrySurface);
   const accountCloudUpdatedAt = ref(bootSnapshot.updatedAt);
   const user = ref<UserState>(remoteApiEnabled ? {
@@ -604,6 +606,7 @@ export const useApp = defineStore("app", () => {
       baseRateNEX: fullDailyNex,
       purchasedAt: device.purchasedAt ?? serverNow,
       activatedAt: active ? (device.activatedAt ?? serverNow) : null,
+      pendingDeactivate: device.pendingDeactivate,
       lastSettledAt: null,
       onlineHeartbeatAt: null,
       status: active ? "online" : "offline",
@@ -614,8 +617,8 @@ export const useApp = defineStore("app", () => {
       currentTask: null,
       recentTasks: [],
       taskLockUntil: null,
-      todayEarnings: 0,
-      todayEarningsNEX: 0,
+      todayEarnings: device.todayEarningsUsdt,
+      todayEarningsNEX: device.todayEarningsNex,
       cumulativeEarningsUsdt: device.cumulativeOutputUsdt,
       paidPriceUsdt: device.actualPaidUsdt,
       location: device.location,
@@ -677,26 +680,35 @@ export const useApp = defineStore("app", () => {
   async function syncRemoteTaskAssignments(): Promise<void> {
     const calledAt = Date.now();
     if (!remoteApiEnabled || miningPaused.value || remoteTaskSyncInFlight || calledAt < remoteTaskSyncAfter) return;
+    const request = remoteAccountEpoch.snapshot();
     remoteTaskSyncInFlight = true;
     remoteTaskSyncAfter = calledAt + REMOTE_TASK_SYNC_MS;
     try {
       let state = await taskAssignmentApi.state();
+      // before applying remote task assignments, reject any response from a prior account bind.
+      if (!remoteAccountEpoch.isCurrent(request)) return;
       devices.value = applyRemoteAssignments(devices.value, state);
       for (const device of devices.value) {
+        if (!remoteAccountEpoch.isCurrent(request)) return;
         const authority = state.devices.find((entry) => String(entry.deviceId) === device.id);
         if (!authority || device.status !== "online" || device.activatedAt == null) continue;
         if (authority.currentTask && authority.currentTask.completableAt <= state.serverNow) {
           const proof = await trustedTaskProof(authority.currentTask);
+          if (!remoteAccountEpoch.isCurrent(request)) return;
           await taskAssignmentApi.complete(authority.currentTask.taskNo, proof,
             taskMutationKey(`complete:${authority.currentTask.taskNo}`));
         } else if (!authority.currentTask && (authority.lockUntil == null || authority.lockUntil <= state.serverNow)) {
+          if (!remoteAccountEpoch.isCurrent(request)) return;
           await taskAssignmentApi.claim(authority.deviceId, taskMutationKey(`claim:${authority.deviceId}`));
         }
       }
-      await refreshRemoteFleet();
+      if (!remoteAccountEpoch.isCurrent(request)) return;
+      await refreshRemoteFleet(request);
     } catch (cause) {
-      remoteFleetStatus.value = "error";
-      remoteFleetError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
+      if (remoteAccountEpoch.isCurrent(request)) {
+        remoteFleetStatus.value = "error";
+        remoteFleetError.value = cause instanceof Error ? cause.message : "TASK_ASSIGNMENT_SYNC_FAILED";
+      }
     } finally {
       remoteTaskSyncInFlight = false;
     }
@@ -704,14 +716,20 @@ export const useApp = defineStore("app", () => {
 
   // 权威不可达是常态输入,不 reject(selfcheck-remote-refresh-resilience);
   // 失败信号走返回值:false = 本轮没拿到权威快照(降级态已落好)。
-  async function refreshRemoteFleet(): Promise<boolean> {
+  async function refreshRemoteFleet(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<boolean> {
     if (!remoteApiEnabled) return true;
-    const expectedAccountKey = accountKey.value;
-    remoteFleetStatus.value = "loading";
-    remoteFleetError.value = "";
+    const expectedAccountKey = request.accountKey;
+    // Remote H5 deliberately drops credentials on reload. Never turn a Login
+    // page lifecycle hook or a default-account rebind into an authenticated
+    // request: its late unauthorized callback could otherwise clear a newer
+    // session created while that stale request was still settling.
     try {
+      const activeSession = sessionVault.read();
+      if (!activeSession || expectedAccountKey !== `user:${activeSession.user.userId}`) return false;
+      remoteFleetStatus.value = "loading";
+      remoteFleetError.value = "";
       const [fleet, assignmentState] = await Promise.all([deviceE3Api.fleet(), taskAssignmentApi.state()]);
-      if (expectedAccountKey !== accountKey.value) throw new Error("REMOTE_ACCOUNT_CHANGED");
+      if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
       installCanonicalLifecycleConfig(fleet.capacitySchedule);
       const nextDevices = applyRemoteAssignments(
         fleet.devices.map((device) => canonicalDevice(device, fleet.serverNow)), assignmentState);
@@ -728,8 +746,8 @@ export const useApp = defineStore("app", () => {
         }),
       };
       earnings.value = {
-        today: 0,
-        todayNEX: 0,
+        today: fleet.realizedTodayUsdt,
+        todayNEX: fleet.realizedTodayNex,
         thisWeek: 0,
         thisMonth: 0,
         total: 0,
@@ -738,7 +756,7 @@ export const useApp = defineStore("app", () => {
       remoteFleetStatus.value = "ready";
       return true;
     } catch (cause) {
-      if (expectedAccountKey === accountKey.value) {
+      if (remoteAccountEpoch.isCurrent(request)) {
         devices.value = [];
         syncDeviceRuntime([], true);
         user.value = {
@@ -762,6 +780,7 @@ export const useApp = defineStore("app", () => {
   function bindAccount(rawAccountKey: string, surface: EntrySurface = getEntrySurface()) {
     const key = normalizeAccountKey(rawAccountKey);
     if (remoteApiEnabled) {
+      remoteAccountEpoch.bind(key);
       const emptySnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       accountKey.value = emptySnapshot.accountKey;
       entrySurface.value = emptySnapshot.entrySurface;
@@ -2142,7 +2161,8 @@ export const useApp = defineStore("app", () => {
    * advanceWithdrawalArrival 同形状,供 App 层按单号结算对应账单行。
    */
   async function refreshRemoteWithdrawals(): Promise<string[]> {
-    if (!remoteApiEnabled) return [];
+    if (!remoteApiEnabled || fundsSandboxEnabled) return [];
+    const expectedAccountKey = accountKey.value;
     // 注:本包一度加过一道「同一实例内只许一拍在途」的闸,已按主人 2026-08-12 的范围决定撤回。
     // 撤回理由不是它没用,而是它**解决不了它声称的问题、却新引进一个**:闸是 store 实例级的,
     // 跨标签页/跨 webview 原样敞开(那正是并发的真实来源);而它没有超时兜底,
@@ -2154,6 +2174,7 @@ export const useApp = defineStore("app", () => {
     if (!targets.length) return [];
     const mirrors = await Promise.all(targets.map((w) =>
       withdrawalApi.get(w.id).catch(() => null)));
+    if (expectedAccountKey !== accountKey.value) return [];
     const patches = new Map<string, Withdrawal>();
     targets.forEach((target, i) => {
       const remote = mirrors[i];
@@ -2172,7 +2193,10 @@ export const useApp = defineStore("app", () => {
       // 本判据实际覆盖的是仍在途的单(如 frozen 被人工改写结论)。
       const reasonChanged = remote.terminalReason !== null && remote.terminalReason !== w.terminalReason;
       const retriableChanged = remote.retriable !== null && remote.retriable !== w.retriable;
-      if (remote.status === w.status && !reasonChanged && !retriableChanged) return;
+      const nexRefundedChanged = remote.nexRefunded !== null && remote.nexRefunded !== w.nexRefunded;
+      const nexRefundedAtChanged = remote.nexRefundedAt !== null && remote.nexRefundedAt !== w.nexRefundedAt;
+      if (remote.status === w.status && !reasonChanged && !retriableChanged
+          && !nexRefundedChanged && !nexRefundedAtChanged) return;
       patches.set(w.id, {
         ...w,
         status: remote.status,

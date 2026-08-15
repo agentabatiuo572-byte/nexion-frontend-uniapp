@@ -133,27 +133,6 @@ export function pickBankAccount(
   return { accountName, accountNumber, bankName };
 }
 
-/** 确定性 QR 装饰点阵(n×n 伪随机 + 三角定位块;银行轨 seed = 附言码)。
- *  ponytail: 拟真非真编码,与 deposit-usdt-pane 内联实现同构;PROD 接真 QR 库后删除。 */
-export function qrDotMatrix(seed: string, n = 21): boolean[] {
-  // 标准定位块:7×7 外环暗 + 中环亮 + 3×3 内心暗
-  const finderDark = (dx: number, dy: number): boolean => {
-    const ring = Math.max(Math.abs(dx - 3), Math.abs(dy - 3));
-    return ring === 3 || ring <= 1;
-  };
-  const rnd = mulberry32(fnv1a(seed || "nexgrid"));
-  const cells: boolean[] = [];
-  for (let cy = 0; cy < n; cy++) {
-    for (let cx = 0; cx < n; cx++) {
-      if (cx < 7 && cy < 7) cells.push(finderDark(cx, cy));
-      else if (cx >= n - 7 && cy < 7) cells.push(finderDark(cx - (n - 7), cy));
-      else if (cx < 7 && cy >= n - 7) cells.push(finderDark(cx, cy - (n - 7)));
-      else cells.push(rnd() > 0.52);
-    }
-  }
-  return cells;
-}
-
 // ── 卡通道(国际卡辅助轨 mock 种子)──────────────────────────────────
 // 真后台 = D1 通道配置(费率/最低额/单笔上限)下发,client 拉取,拉取失败禁回退写死值。
 // 🔴 计费方向与链上相反:链上「从到账额里扣」(credited = gross − fee),

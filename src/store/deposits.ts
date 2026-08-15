@@ -33,8 +33,12 @@ import {
 } from "./deposits-core";
 import type { ChainDepositChannel, DepositChannel, DepositIntent, DepositRecord } from "./types";
 import type { FundsSandboxOrder, FundsSandboxTopupChannel } from "@/api/funds-sandbox-api";
-import type { VietQrIntentSnapshot, VietQrIntentStatus } from "@/api/payment-api";
+import type { VietQrIntentSnapshot, VietQrIntentStatus, VietQrReceiptSnapshot } from "@/api/payment-api";
 import { isAmbiguousOutcome } from "@/api/errors";
+import {
+  appendVietQrReceipts,
+  remoteGenerationMatches,
+} from "@/lib/vietqr-remote-safety";
 import {
   bindPendingFundsMutationOrder,
   finishPendingFundsMutation,
@@ -117,6 +121,12 @@ export const useDeposits = defineStore("deposits", () => {
   const intents = ref<DepositIntent[]>([]);
   const serverStatus = ref<"idle" | "loading" | "ready" | "error">(fundsSandboxEnabled ? "idle" : "ready");
   const serverError = ref("");
+  const remoteReceipts = ref<VietQrReceiptSnapshot[]>([]);
+  const remoteReceiptNextOffset = ref<number | null>(null);
+  let remotePollTimer: ReturnType<typeof setInterval> | undefined;
+  let remoteGeneration = 0;
+  let remotePollingActive = false;
+  let remoteRefreshInFlight = false;
 
   // mock 到账引擎的在途定时器(depositId → timer)。账号切换即停:引擎跑在
   // client,跨账号继续推进会把钱记进新绑账号;PROD 服务端持续推进,
@@ -184,12 +194,17 @@ export const useDeposits = defineStore("deposits", () => {
     timers.forEach((t) => clearTimeout(t));
     timers.clear();
     if (fundsServerEnabled) {
+      remoteGeneration += 1;
+      if (remotePollTimer) clearInterval(remotePollTimer);
+      remotePollTimer = undefined;
       serverAccountKey = normalizeAccountKey(rawAccountKey);
       // (这里原有一行 `const expectedAccountKey = serverAccountKey;` —— 它只服务于调用点侧
       //  那个已删的 .catch 闭包,闭包没了就成了死变量。账号一致性判断落在两条刷新缝**内部**,
       //  不依赖这行。tsconfig 没开 noUnusedLocals,机器门抓不到,是独立审计逐行读出来的。)
       records.value = [];
       intents.value = [];
+      remoteReceipts.value = [];
+      remoteReceiptNextOffset.value = null;
       // 🔴 合并裁决(2026-08-14):取远端那侧。
       //   本地这侧写的是「fundsSandboxEnabled 为假 ⇒ 状态 error + FUNDS_DEPOSIT_PROVIDER_NOT_CONFIGURED」,
       //   前提是「非沙箱就没有入金 provider」。远端这笔正好把这个前提推翻了 ——
@@ -207,6 +222,7 @@ export const useDeposits = defineStore("deposits", () => {
       //    理由正是「缝内已自吞」;独立审计逐行比对两个父提交后指出来的。)
       if (fundsSandboxEnabled) void refreshFundsSandboxDeposits();
       else void refreshRemoteVietQrDeposits();
+      if (remotePollingActive) startRemoteVietQrPolling();
       return;
     }
     const row = rows.bind(rawAccountKey) ?? { records: [], intents: [] };
@@ -977,6 +993,7 @@ export const useDeposits = defineStore("deposits", () => {
       vndAmount: snapshot.vndAmount,
       memoCode: snapshot.memoCode,
       bankAccount: snapshot.bankAccount,
+      ...(snapshot.qrPayload ? { qrPayload: snapshot.qrPayload } : {}),
       status: remoteIntentStatus(snapshot.status),
       createdAt,
       expireAt: Date.parse(snapshot.expiresAt),
@@ -992,7 +1009,7 @@ export const useDeposits = defineStore("deposits", () => {
       depositId: snapshot.intentNo,
       channel: "bank-vietqr",
       grossAmountUsdt: snapshot.usdtAmount,
-      feeUsdt: Math.max(0, snapshot.usdtAmount - snapshot.creditedUsdt),
+      feeUsdt: snapshot.feeUsdt,
       creditedUsdt: snapshot.creditedUsdt,
       status: "credited",
       createdAt,
@@ -1003,14 +1020,25 @@ export const useDeposits = defineStore("deposits", () => {
   async function refreshRemoteVietQrDeposits(): Promise<void> {
     if (!remoteApiEnabled) return;
     if (fundsSandboxEnabled) return;
+    if (remoteRefreshInFlight) return;
+    remoteRefreshInFlight = true;
     const expectedAccountKey = serverAccountKey;
+    const expectedGeneration = remoteGeneration;
     serverStatus.value = "loading";
     serverError.value = "";
     try {
       const snapshots = await paymentApi.listVietQrIntents(50);
-      if (expectedAccountKey !== serverAccountKey) throw new Error("VIETQR_ACCOUNT_CHANGED");
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        throw new Error("VIETQR_ACCOUNT_CHANGED");
+      }
       intents.value = snapshots.map(remoteVietQrIntent);
       records.value = snapshots.map(remoteVietQrRecord).filter((item): item is DepositRecord => item !== null);
+      const receiptPage = await paymentApi.listVietQrReceipts(50, 0);
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        throw new Error("VIETQR_ACCOUNT_CHANGED");
+      }
+      remoteReceipts.value = receiptPage.items;
+      remoteReceiptNextOffset.value = receiptPage.nextOffset;
       snapshots.forEach((snapshot) => {
         if (snapshot.status !== "awaiting_payment" && snapshot.status !== "receipt_review") {
           finishVietQrCommandByIntent(expectedAccountKey, snapshot.intentNo);
@@ -1018,7 +1046,7 @@ export const useDeposits = defineStore("deposits", () => {
       });
       serverStatus.value = "ready";
     } catch (cause) {
-      if (expectedAccountKey === serverAccountKey) {
+      if (remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
         serverStatus.value = "error";
         serverError.value = cause instanceof Error ? cause.message : "VIETQR_DEPOSIT_REFRESH_FAILED";
       }
@@ -1027,7 +1055,54 @@ export const useDeposits = defineStore("deposits", () => {
       //   docs/changes/2026-08-13-remote-refresh-resilience.md 明确否决的做法:
       //   每新增一个裸 void 调用点就漏一个,漏了就是生产环境的 unhandled rejection。
       //   需要失败信号的消费方改读 serverStatus / serverError(deposit-bank-pane.vue 已改)。
+    } finally {
+      remoteRefreshInFlight = false;
     }
+  }
+
+  async function loadMoreRemoteVietQrReceipts(): Promise<void> {
+    if (!remoteApiEnabled || fundsSandboxEnabled || remoteRefreshInFlight) return;
+    const offset = remoteReceiptNextOffset.value;
+    if (offset === null) return;
+    remoteRefreshInFlight = true;
+    const expectedAccountKey = serverAccountKey;
+    const expectedGeneration = remoteGeneration;
+    serverStatus.value = "loading";
+    serverError.value = "";
+    try {
+      const page = await paymentApi.listVietQrReceipts(50, offset);
+      if (!remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        throw new Error("VIETQR_ACCOUNT_CHANGED");
+      }
+      remoteReceipts.value = appendVietQrReceipts(remoteReceipts.value, page.items);
+      remoteReceiptNextOffset.value = page.nextOffset;
+      serverStatus.value = "ready";
+    } catch (cause) {
+      if (remoteGenerationMatches(expectedAccountKey, expectedGeneration, serverAccountKey, remoteGeneration)) {
+        serverStatus.value = "error";
+        serverError.value = cause instanceof Error ? cause.message : "VIETQR_RECEIPT_REFRESH_FAILED";
+      }
+    } finally {
+      remoteRefreshInFlight = false;
+    }
+  }
+
+  function startRemoteVietQrPolling(): void {
+    if (!remoteApiEnabled || fundsSandboxEnabled) return;
+    remotePollingActive = true;
+    if (remotePollTimer) return;
+    const generation = remoteGeneration;
+    const accountKey = serverAccountKey;
+    remotePollTimer = setInterval(() => {
+      if (!remoteGenerationMatches(accountKey, generation, serverAccountKey, remoteGeneration)) return;
+      void refreshRemoteVietQrDeposits();
+    }, 3000);
+  }
+
+  function stopRemoteVietQrPolling(): void {
+    remotePollingActive = false;
+    if (remotePollTimer) clearInterval(remotePollTimer);
+    remotePollTimer = undefined;
   }
 
   async function createRemoteBankIntent(amount: number, rawExpectedAccountKey: string): Promise<DepositIntent | null> {
@@ -1116,6 +1191,8 @@ export const useDeposits = defineStore("deposits", () => {
     intents,
     serverStatus,
     serverError,
+    remoteReceipts,
+    remoteReceiptNextOffset,
     chainChannelEnabled,
     bankAccounts,
     bankRailAvailable,
@@ -1129,6 +1206,9 @@ export const useDeposits = defineStore("deposits", () => {
     submitCardPayment,
     refreshFundsSandboxDeposits,
     refreshRemoteVietQrDeposits,
+    loadMoreRemoteVietQrReceipts,
+    startRemoteVietQrPolling,
+    stopRemoteVietQrPolling,
     createSandboxTopup,
     createSandboxBankIntent,
     createRemoteBankIntent,

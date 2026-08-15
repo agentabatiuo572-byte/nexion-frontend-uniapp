@@ -15,17 +15,18 @@ test("remote H8 share surfaces use only the current server projection", () => {
   assert.doesNotMatch(card, /canonical === app\.user\.referralCode/);
 });
 
-test("remote H8 team metrics use server projections while demo-only pools stay hidden", () => {
+test("remote H8 team metrics keep server-backed team entries visible", () => {
   const team = read("src/pages/team/team.vue");
 
   assert.match(team, /useReferralReward/);
   assert.match(team, /referralRewards\.snapshot\?\.invitedCount/);
-  assert.match(team, /v-if="!remoteApiEnabled"[\s\S]*nx-team-leadership-pool-link/);
-  assert.match(team, /<TeamLedgerCard[\s\S]*v-if="!remoteApiEnabled"/);
+  assert.doesNotMatch(team, /v-if="!remoteApiEnabled"[\s\S]*nx-team-leadership-pool-link/);
+  assert.match(team, /<TeamLedgerCard[\s\S]*:total-u-s-d-t-lifetime/);
   assert.match(team, /function openReferralNetwork\(\) \{[\s\S]*go\("\/pages\/team\/unilevel"\)/);
   assert.match(team, /network\.refreshCanonicalNetwork\(\)/);
-  assert.match(team, /nx-team-leaderboard-link[\s\S]*v-if="!remoteApiEnabled"/);
-  assert.match(team, /<!-- Team tools -->[\s\S]*v-if="!remoteApiEnabled"/);
+  assert.doesNotMatch(team, /nx-team-leaderboard-link[\s\S]*v-if="!remoteApiEnabled"/);
+  assert.doesNotMatch(team, /<!-- Team tools -->[\s\S]*v-if="!remoteApiEnabled"/);
+  assert.match(team, /go\('\/pages\/team\/quota'\)[\s\S]*go\('\/pages\/team\/agent'\)[\s\S]*go\('\/pages\/team\/network'\)[\s\S]*go\('\/pages\/team\/tree'\)/);
 });
 
 test("H8 drops malformed or stale-account projections instead of retaining another account's data", () => {

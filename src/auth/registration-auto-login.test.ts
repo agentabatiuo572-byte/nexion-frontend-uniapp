@@ -22,6 +22,7 @@ function api(overrides: Partial<AuthApi>): AuthApi {
     completePasswordReset: vi.fn(),
     completeTwoFactor: vi.fn(),
     sendRegistrationOtp: vi.fn(),
+    oauthExchange: vi.fn(),
     restore: vi.fn(),
     discardSessionIfCurrent: vi.fn(),
     discardSessionForIdentity: vi.fn(),
@@ -31,11 +32,20 @@ function api(overrides: Partial<AuthApi>): AuthApi {
 }
 
 test("successful registration revokes its bootstrap session then calls password login", async () => {
+  const receipt = {
+    sponsorCode: "NXAB12CD34EF",
+    sponsorDisplayName: "A•••",
+    sourceEnvironment: "PRODUCTION" as const,
+    giftStatus: "PENDING_REVIEW" as const,
+    giftUsdt: 1.25,
+    giftNex: 20,
+  };
   const authApi = api({
     register: vi.fn().mockResolvedValue({
       kind: "authenticated",
       user: { userId: 7101, countryCode: "+81", phone: "81987654321", nickname: "New" },
       vaultRevision: 4,
+      registrationReceipt: receipt,
     }),
     login: vi.fn().mockResolvedValue({
       kind: "authenticated",
@@ -52,7 +62,7 @@ test("successful registration revokes its bootstrap session then calls password 
     phone: "81987654321",
     password: "NexPass9a",
   });
-  expect(result).toMatchObject({ kind: "authenticated", vaultRevision: 6 });
+  expect(result).toMatchObject({ kind: "authenticated", vaultRevision: 6, registrationReceipt: receipt });
 });
 
 test("unknown registration outcome performs one authoritative password-login recovery", async () => {

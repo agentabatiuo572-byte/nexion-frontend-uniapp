@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { payoutAddressApi, remoteApiEnabled } from "@/api/runtime";
+import { payoutAddressApi, payoutAddressServerEnabled } from "@/api/runtime";
 import type { PayoutAddressNetwork, PayoutAddressSnapshot } from "@/api/payout-address-api";
 import type { ChainDepositChannel } from "./types";
 import { normalizeAccountKey } from "./account-cloud";
@@ -147,23 +147,27 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   // 账号维度。boot 期落 "default";账号确定后由 lib/account-scope 统一重绑。
   // 🔴 地址簿必按账号:设备级存储会让换号继承他人提现地址(资格旁路,规格 ② 异常5)。
   let boundKey = "default";
-  const book = ref<PayoutAddressBook>(remoteApiEnabled ? emptyBook() : hydrate(boundKey));
+  const book = ref<PayoutAddressBook>(payoutAddressServerEnabled ? emptyBook() : hydrate(boundKey));
+  const remoteChangeCooldownDays = ref<number | null>(payoutAddressServerEnabled ? null : cooldownDaysNow());
+  const remoteEffectiveDelayHours = ref<number | null>(payoutAddressServerEnabled ? null : 24);
   let remoteLoadVersion = 0;
 
   function persist(): boolean {
-    if (remoteApiEnabled) return false;
+    if (payoutAddressServerEnabled) return false;
     return writeAccountRow<PayoutAddressBook>(ACCOUNTS_KEY, boundKey, book.value);
   }
 
   /** Remote mode is fail-closed: only a validated server snapshot may populate the book.
    *  权威不可达自吞返 false(resilience 门);被更新调用顶替(superseded)不是失败事实,返 true。 */
   async function refreshRemote(): Promise<boolean> {
-    if (!remoteApiEnabled) return true;
+    if (!payoutAddressServerEnabled) return true;
     const version = ++remoteLoadVersion;
     try {
       const snapshot = await payoutAddressApi.list();
       if (version !== remoteLoadVersion) return true;
       book.value = remoteBook(snapshot);
+      remoteChangeCooldownDays.value = snapshot.changeCooldownDays;
+      remoteEffectiveDelayHours.value = snapshot.effectiveDelayHours;
       return true;
     } catch {
       return false;
@@ -171,7 +175,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   }
 
   async function sendRemoteOtp() {
-    if (!remoteApiEnabled) throw new Error("REMOTE_API_DISABLED_IN_MOCK_MODE");
+    if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
     return payoutAddressApi.sendOtp();
   }
 
@@ -182,7 +186,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     code: string;
     idempotencyKey: string;
   }): Promise<void> {
-    if (!remoteApiEnabled) throw new Error("REMOTE_API_DISABLED_IN_MOCK_MODE");
+    if (!payoutAddressServerEnabled) throw new Error("PAYOUT_ADDRESS_SERVER_DISABLED_IN_SANDBOX");
     if (!isChainAddressValid(input.network, input.address)) throw new Error("PAYOUT_ADDRESS_FORMAT_INVALID");
     await payoutAddressApi.save({
       network: TO_SERVER_NETWORK[input.network],
@@ -209,11 +213,15 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   function bindAccount(rawAccountKey: string) {
     boundKey = normalizeAccountKey(rawAccountKey);
     remoteLoadVersion += 1;
-    if (remoteApiEnabled) {
+    if (payoutAddressServerEnabled) {
       book.value = emptyBook();
+      remoteChangeCooldownDays.value = null;
+      remoteEffectiveDelayHours.value = null;
       void refreshRemote();
     } else {
       book.value = hydrate(boundKey);
+      remoteChangeCooldownDays.value = cooldownDaysNow();
+      remoteEffectiveDelayHours.value = 24;
     }
   }
 
@@ -262,7 +270,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
     network: ChainDepositChannel,
     address: string,
   ): { ok: true } | { ok: false; reason: "invalid-address" | "already-set" | "persist-failed" } {
-    if (remoteApiEnabled) return { ok: false, reason: "persist-failed" };
+    if (payoutAddressServerEnabled) return { ok: false, reason: "persist-failed" };
     if (!isChainAddressValid(network, address)) return { ok: false, reason: "invalid-address" };
     const now = mockServerNow();
     const next = applyAddAddress(stateFor(network), address, now, cooldownDaysNow());
@@ -288,7 +296,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
   ):
     | { ok: true }
     | { ok: false; reason: PayoutChangeBlockReason | "invalid-address" | "no-current" | "same-address" | "persist-failed" } {
-    if (remoteApiEnabled) return { ok: false, reason: "persist-failed" };
+    if (payoutAddressServerEnabled) return { ok: false, reason: "persist-failed" };
     const blocked = changeBlockReason(network);
     if (blocked) return { ok: false, reason: blocked };
     if (!isChainAddressValid(network, address)) return { ok: false, reason: "invalid-address" };
@@ -310,7 +318,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** ⚠️ DEV/DEMO-ONLY:tester 复位 —— 清除全部网络的冻结与频控(不动地址本身)。 */
   function _devClearRestrictions(): boolean {
-    if (import.meta.env.PROD || remoteApiEnabled) return false; // dev-only local reset, store-layer second guard
+    if (import.meta.env.PROD || payoutAddressServerEnabled) return false; // dev-only local reset, store-layer second guard
     const next = { ...book.value };
     for (const network of PAYOUT_NETWORKS) {
       next[network] = { ...next[network], freezeUntil: null, nextChangeAt: null };
@@ -322,7 +330,7 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   /** ⚠️ DEV/DEMO-ONLY:tester 复位 —— 清空当前账号地址簿(回到未设置空态)。 */
   function _devResetAddresses(): boolean {
-    if (import.meta.env.PROD || remoteApiEnabled) return false;
+    if (import.meta.env.PROD || payoutAddressServerEnabled) return false;
     book.value = emptyBook();
     persist();
     return true;
@@ -340,6 +348,8 @@ export const usePayoutAddress = defineStore("payoutAddress", () => {
 
   return {
     book,
+    changeCooldownDays: computed(() => remoteChangeCooldownDays.value),
+    effectiveDelayHours: computed(() => remoteEffectiveDelayHours.value),
     hasAnyAddress,
     stateFor,
     currentFor,

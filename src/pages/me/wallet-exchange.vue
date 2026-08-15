@@ -150,8 +150,21 @@
             <text style="margin-left: 6px">{{ queuedLabel }}</text>
           </view>
           <view v-for="q in displayQueue.slice(0, 3)" :key="q.id" class="flex items-center justify-between" style="padding: 4px 0">
-            <text class="font-mono-tabular" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
-            <text class="font-mono-tabular tabular-nums" style="font-size: 12px; color: var(--v5-ink)">${{ q.amountUSD.toFixed(2) }}</text>
+            <view class="flex items-center min-w-0" style="gap: 8px">
+              <text class="font-mono-tabular truncate" style="font-size: 12px; color: var(--v5-ink-3)">{{ q.id }} · {{ q.direction === "nex2usdt" ? "NEX → USDT" : "USDT → NEX" }}</text>
+              <view
+                v-if="remoteApiEnabled"
+                class="shrink-0"
+                role="button"
+                tabindex="0"
+                :aria-disabled="cancellingOrderNo === q.id ? 'true' : 'false'"
+                :style="cancelQueueButtonStyle(cancellingOrderNo === q.id)"
+                @click.stop="handleCancelQueued(q.id)"
+              >
+                <text>{{ cancellingOrderNo === q.id ? t.exchange.cancelling : t.exchange.cancelQueued }}</text>
+              </view>
+            </view>
+            <text class="font-mono-tabular tabular-nums shrink-0" style="font-size: 12px; color: var(--v5-ink)">${{ q.amountUSD.toFixed(2) }}</text>
           </view>
         </view>
       </view>
@@ -193,6 +206,15 @@ import {
   ExchangeOutcomeUnknownError,
   type ExchangeSwapIntent,
 } from "@/lib/exchange-pending-mutation";
+import {
+  acquireExchangeCancelCommand,
+  createExchangeCancelStorage,
+  exchangeOrderCanCancel,
+  finishExchangeCancelCommand,
+  isCurrentExchangeCancelScope,
+  visibleQueuedExchangeOrders,
+} from "@/lib/exchange-cancel";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { exchangeApi, remoteApiEnabled } from "@/api/runtime";
 import type { ExchangeOrder, ExchangeSnapshot } from "@/api/exchange-api";
 import { useExchange, type SwapEvent } from "@/store/exchange";
@@ -213,13 +235,19 @@ const v3 = useExchangeV3();
 const remoteState = ref<ExchangeSnapshot | null>(null);
 const remoteError = ref<string | null>(null);
 const pendingExchangeMutations = createExchangePendingMutationStore();
+const exchangeCancelStorage = createExchangeCancelStorage();
+const cancellingOrderNo = ref<string | null>(null);
 
 async function syncRemoteState() {
   if (!remoteApiEnabled) return;
+  const scope = captureAccountScope();
   try {
-    remoteState.value = await exchangeApi.fetchState();
+    const snapshot = await exchangeApi.fetchState();
+    if (!isCurrentAccountScope(scope) || app.accountKey !== scope.accountKey) return;
+    remoteState.value = snapshot;
     remoteError.value = null;
   } catch {
+    if (!isCurrentAccountScope(scope) || app.accountKey !== scope.accountKey) return;
     // Failure-close: local balances, rates, queues and history are not a remote fallback.
     remoteState.value = null;
     remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
@@ -227,17 +255,74 @@ async function syncRemoteState() {
   }
 }
 
-async function cancelRemoteOrder(exchangeNo: string) {
-  if (!remoteApiEnabled) return;
-  try {
-    // IDEMPOTENCY-FRESH-OK: 撤销的目标由 exchangeNo 唯一指定,重放 = 再撤一次同一笔 = 空操作,不会多撤别的。
-    remoteState.value = await exchangeApi.cancel(exchangeNo, `G2-CANCEL-${exchangeNo}-${Date.now().toString(36)}`);
-    remoteError.value = null;
-  } catch {
-    remoteState.value = null;
-    remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
-    throw new Error(remoteError.value);
+async function cancelRemoteOrder(exchangeNo: string): Promise<"cancelled" | "unknown" | "stale" | "not-cancellable"> {
+  if (!remoteApiEnabled) return "unknown";
+  const current = remoteState.value?.orders.find((order) => order.exchangeNo === exchangeNo);
+  if (!exchangeOrderCanCancel(current)) {
+    toast.info(t.value.exchange.cancelNotAllowed);
+    return "not-cancellable";
   }
+  const scope = captureAccountScope();
+  const key = acquireExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo);
+  cancellingOrderNo.value = exchangeNo;
+  try {
+    const snapshot = await exchangeApi.cancel(exchangeNo, key);
+    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+    remoteState.value = snapshot;
+    remoteError.value = null;
+    const updated = snapshot.orders.find((order) => order.exchangeNo === exchangeNo);
+    if (updated?.status !== "CANCELLED") return "unknown";
+    finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
+    toast.success(t.value.exchange.cancelDone, t.value.exchange.cancelDoneBody);
+    return "cancelled";
+  } catch {
+    if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+    // A timeout may happen after the server committed. Re-read the current
+    // account's authority before telling the user whether retry is needed.
+    try {
+      const snapshot = await exchangeApi.fetchState();
+      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+      remoteState.value = snapshot;
+      remoteError.value = null;
+      const updated = snapshot.orders.find((order) => order.exchangeNo === exchangeNo);
+      if (updated?.status === "CANCELLED") {
+        finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
+        toast.success(t.value.exchange.cancelDone, t.value.exchange.cancelDoneBody);
+        return "cancelled";
+      }
+      if (updated && !exchangeOrderCanCancel(updated)) {
+        finishExchangeCancelCommand(exchangeCancelStorage, scope.accountKey, exchangeNo, key);
+        toast.info(t.value.exchange.cancelNotAllowed);
+        return "not-cancellable";
+      }
+    } catch {
+      // Keep the command key so a later retry is the same idempotent request.
+      if (!isCurrentExchangeCancelScope(scope, captureAccountScope()) || app.accountKey !== scope.accountKey) return "stale";
+      remoteState.value = null;
+      remoteError.value = "G2_REMOTE_AUTHORITY_UNAVAILABLE";
+    }
+    toast.error(t.value.exchange.cancelUnknownTitle, t.value.exchange.cancelUnknownBody);
+    return "unknown";
+  } finally {
+    if (cancellingOrderNo.value === exchangeNo) cancellingOrderNo.value = null;
+  }
+}
+
+function handleCancelQueued(exchangeNo: string) {
+  if (cancellingOrderNo.value) return;
+  void cancelRemoteOrder(exchangeNo);
+}
+
+function cancelQueueButtonStyle(disabled: boolean): CSSProperties {
+  return {
+    minHeight: "24px",
+    padding: "0 8px",
+    borderRadius: "999px",
+    background: disabled ? "var(--v5-surface-3)" : "color-mix(in srgb, var(--v5-danger) 10%, transparent)",
+    color: disabled ? "var(--v5-ink-4)" : "var(--v5-danger)",
+    fontSize: "12px",
+    pointerEvents: disabled ? "none" : "auto",
+  };
 }
 
 const history = computed<SwapEvent[]>(() => {
@@ -258,7 +343,7 @@ const displayPlatformUsed = computed(() => remoteApiEnabled ? (remoteState.value
 const displayUserCap = computed(() => remoteApiEnabled ? (remoteState.value?.caps.userDailyCapUsdt ?? 0) : USER_DAILY_CAP_USD);
 const displayPlatformCap = computed(() => remoteApiEnabled ? (remoteState.value?.caps.platformDailyCapUsdt ?? 0) : PLATFORM_DAILY_CAP_USD);
 const displayQueue = computed(() => remoteApiEnabled
-  ? (remoteState.value?.orders ?? []).filter((order) => order.status === "QUEUED").map((order) => ({
+  ? visibleQueuedExchangeOrders(remoteState.value?.orders ?? []).map((order) => ({
     id: order.exchangeNo,
     amountUSD: order.fromAsset === "USDT" ? order.fromAmount : order.toAmount,
     direction: order.fromAsset === "NEX" ? "nex2usdt" as const : "usdt2nex" as const,
