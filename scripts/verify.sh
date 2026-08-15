@@ -434,6 +434,12 @@ sentinel_absent "no bare {{ }} directly in <view>"  '<view[^>]*>\{\{[^}]+\}\}</v
 # with Ref unwrapping (state typed as a plain value ≠ the returned Ref<T>) →
 # TS2740. Setup stores must let Pinia infer the return (cf. market/profile).
 sentinel_absent "no defineStore setup return annotation" 'defineStore\(.*\(\): *[A-Za-z_]'
+# 日期格式化必须跟**应用**语言,不跟设备/浏览器语言(P-096):toLocale* 不传 locale
+# (无参 / undefined / [])= 跟浏览器走,应用 en + 浏览器 zh 时渲染 "Member since 2026年7月",
+# 同字符串还会画进 proof 分享海报 canvas。Date 格式化一律传 src/i18n/format.ts 的 dateLocale()。
+# ceiling:变量持有的 Date 调裸 .toLocaleString() 与数字千分位同形,grep 区分不了,只兜
+# 内联 `new Date(…).toLocaleString(` 惯用形;数字 Number#toLocaleString()(千分位)有意不在此门内。
+sentinel_absent "date toLocale* pins app locale (dateLocale())" 'toLocale(Date|Time)String\(\s*(\)|undefined|\[\])|new Date\([^)]*\)\.toLocaleString\(\s*(\)|undefined|\[\])'
 # reverse-ed / meta language must never leak into the product
 sentinel_absent "no meta/ponzi words"               '庞氏|割韭菜|杀猪盘|跑路|ponzi|scam|反向教育|揭穿|conversion quest|funnel'
 # Funnel-meta vocabulary must not leak into user-facing i18n copy. The sentinel

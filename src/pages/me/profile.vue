@@ -128,6 +128,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import NicknameSheet from "@/components/me/nickname-sheet.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { useApp } from "@/store/app";
 import { useAuth } from "@/store/auth";
 import { useProfile } from "@/store/profile";
@@ -188,7 +189,7 @@ const tierProgressLine = computed(() => {
 });
 
 const joinedDate = computed(() =>
-  new Date(app.user.joinedAt).toLocaleDateString(undefined, {
+  new Date(app.user.joinedAt).toLocaleDateString(dateLocale(), {
     year: "numeric",
     month: "short",
     day: "numeric",

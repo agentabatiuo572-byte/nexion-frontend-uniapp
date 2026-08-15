@@ -125,7 +125,7 @@ import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import { useT } from "@/i18n/use-t";
-import { fmt } from "@/i18n/format";
+import { dateLocale, fmt } from "@/i18n/format";
 import {
   useCommission,
   type CommissionEvent,
@@ -172,7 +172,7 @@ const noKindText = computed(() =>
 function eventMeta(e: CommissionEvent): string {
   const kindLabel = t.value.commissions.kind[e.kind];
   const order = e.orderAmountUSD ? ` · ${t.value.commissions.orderPrefix}${e.orderAmountUSD}` : "";
-  const date = new Date(e.ts).toLocaleDateString();
+  const date = new Date(e.ts).toLocaleDateString(dateLocale());
   return `${kindLabel}${order} · ${date}`;
 }
 function coolingTag(e: CommissionEvent): string {

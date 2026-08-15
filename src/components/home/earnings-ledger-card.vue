@@ -32,6 +32,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useT } from "@/i18n/use-t";
+import { dateLocale } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useApp } from "@/store/app";
 
@@ -56,7 +57,7 @@ const remoteRows = computed(() => app.visibleDevices
     who: task.client,
     model: task.model,
     amt: `+$${task.reward.toFixed(5)}`,
-    t: new Date(task.completedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    t: new Date(task.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit" }),
   })));
 const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 

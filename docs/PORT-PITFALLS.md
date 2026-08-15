@@ -1587,3 +1587,10 @@ if (!isReplay && isSettledRejection(err)) forgetWithdrawAttempt(...)
 - **根因**:login shell 的 profile 注入 `LANG=zh_CN.UTF-8`,GNU sed(4.9)转入多字节模式后,对含 emoji(🔴)的注释行执行 `s|(^\|[^:])//.*$|\1|` **静默失败**(不报错、原样放行)。A/B 各 2 次全复现:LANG unset(C locale)剥净→绿,zh_CN.UTF-8 存活→红。**反向更险**:剥注释失败会让「符号消费计数 ≥2」类门把注释行计进去 —— 死代码假绿。
 - **对策**(已焊,b0c9e14):verify.sh 头部 `export LC_ALL=C`,全部文本门按字节语义跑,判定与启动者 shell 环境解耦;脚本内 UTF-8 模式串按字节比对,中文/emoji 字面匹配不受影响。修后用敌意方式(-lc)复跑 448/0 作红转绿证明。
 - **同族提醒**:① 任何会话里临时写的 grep/sed 判定管道,若跑在 `-lc`/交互 shell 下,同样带着 zh locale —— 判定类管道自带 `LC_ALL=C` 前缀;② 「单跑绿、全跑红」或反之,先比对两次调用的 env(locale/PATH),再怀疑树被并发改;③ 与 P-059(演习弹污染共享通道)互补:本次三轮排查顺序 = 先疑并发注入、再疑树漂移、最后 env 对比才定罪 —— env 差异应提早进入证伪矩阵。2026-08-15。
+
+## P-096 toLocale* 不传 locale = 跟浏览器语言,应用语言≠设备语言时全站混语日期
+
+- **症状**:独立 tester 验收 proof 页发现:应用 en + 浏览器 zh 时 "Member since 2026年7月"、vi 页 "Thành viên từ 2026年7月";同字符串还画进分享海报 canvas。全站同型 22 处(无参 / `undefined` / `[]` 三种形态),散在 17 个文件。
+- **根因**:`Date#toLocaleDateString/toLocaleTimeString/toLocaleString` 的 locale 参数缺省 = 宿主环境语言(浏览器/OS),与应用自选语言(locale store)是两个独立轴。wallet-bills 曾单点修过(本地 `localeTag` computed + 注释写明理由),但没有全站扫同型、没有焊门 → 其余 21 处照旧(修一处 ≠ 修全部)。
+- **对策**(pkg/zp):① `src/i18n/format.ts` 单源 `dateLocale()`——应用语言→BCP-47(en-US/vi-VN/zh-CN),词典未落地的语言随 UI 文案一起回退 en-US(避免反向混语);读 locale store,computed 内调用随切换语言重算。② 全站 22 处全部改传 `dateLocale()`,wallet-bills 本地实现收编进单源。③ verify.sh 焊 `date toLocale* pins app locale` 哨兵(修前基线 22 命中 = 哨兵四个分支的天然红证)。**ceiling**:变量持有的 Date 调裸 `.toLocaleString()` 与数字千分位同形,grep 兜不住,靠 review;数字 `Number#toLocaleString()` 千分位分组是另一族(约 150 处,部分定点 en-US),有意不动。
+- **同族提醒**:任何「宿主环境缺省」参数(locale / timezone / 首日周起点)都要问一句「这该跟设备还是跟应用?」——跟应用的必须显式传值并锁单源。2026-08-15。
