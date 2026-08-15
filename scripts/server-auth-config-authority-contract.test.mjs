@@ -57,9 +57,9 @@ test("registration OTP send uses the public auth route and a delivery-specific f
 
   assert.match(api, /sendRegistrationOtp[\s\S]*?path: "\/auth\/users\/register\/otp\/send"/);
   assert.match(register, /authApi\.sendRegistrationOtp[\s\S]*?errorOtpSendUnavailable/);
-  assert.match(zh, /errorOtpSendUnavailable: "暂时无法发送验证码,请重试。"/);
-  assert.match(en, /errorOtpSendUnavailable: "We couldn't send the verification code right now\. Please try again\."/);
-  assert.match(vi, /errorOtpSendUnavailable: "Hiện chưa thể gửi mã xác minh\. Vui lòng thử lại\."/);
+  assert.match(zh, /errorOtpSendUnavailable: "验证码暂时没发出去 —— 可先用下方 Google \/ Apple \/ Telegram 直接登录,或稍等片刻再试。"/);
+  assert.match(en, /errorOtpSendUnavailable: "The code didn't go out just now — sign in with Google \/ Apple \/ Telegram below, or retry in a moment\."/);
+  assert.match(vi, /errorOtpSendUnavailable: "Mã xác minh chưa gửi được — bạn có thể đăng nhập bằng Google \/ Apple \/ Telegram bên dưới, hoặc thử lại sau ít phút\."/);
 });
 
 test("remote configuration loads are authoritative and remote writes do not revive local tables", () => {
