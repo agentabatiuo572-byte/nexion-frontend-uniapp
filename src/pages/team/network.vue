@@ -90,7 +90,7 @@
             <g>
               <circle cx="180" cy="180" r="14" fill="var(--v5-brand)" />
               <text x="180" y="181" text-anchor="middle" dominant-baseline="middle" font-family="var(--font-v5)" font-weight="600" font-size="11" fill="var(--v5-on-brand)">YOU</text>
-              <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">V{{ myRank }}</text>
+              <text x="180" y="158" text-anchor="middle" font-family="var(--font-v5)" font-weight="600" font-size="9" fill="rgba(198,255,58,0.85)" letter-spacing="1.5">{{ myRankText }}</text>
             </g>
 
             <!-- orbit labels -->
@@ -199,17 +199,21 @@ const vRank = useVRank();
 
 const members = computed(() => network.members);
 const myRank = computed(() => vRank.myRank);
+const myRankText = computed(() => remoteApiEnabled && vRank.ladder.length === 0 ? "—" : `V${myRank.value}`);
 const selected = ref<NetworkMember | null>(null);
 const pulseId = ref<string | null>(null);
 let pulseTimer: ReturnType<typeof setInterval> | null = null;
+let pulseCursor = 0;
 
-// page-level interval (P-034): random active-member pulse every 1.2s
+// page-level interval (P-034): deterministic decorative pulse every 1.2s.
+// It never fabricates a member or metric and does not use client randomness.
 onMounted(() => {
   if (remoteApiEnabled) void network.refreshCanonicalNetwork();
   pulseTimer = setInterval(() => {
     const pool = members.value.filter((m) => m.status === "active");
     if (pool.length === 0) return;
-    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const pick = pool[pulseCursor % pool.length];
+    pulseCursor += 1;
     pulseId.value = pick.id;
   }, 1200);
 });

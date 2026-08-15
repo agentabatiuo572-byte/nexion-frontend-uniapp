@@ -170,6 +170,8 @@ import { useLocaleStore } from "@/store/locale";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
+import { useApp } from "@/store/app";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const locale = useLocaleStore();
@@ -187,6 +189,7 @@ useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
 //   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
 //   rationale 见 docs/changes/2026-07-24-intro-stats-cumulative.md。
 const cfg = useConfig();
+const app = useApp();
 const fleetOk = () => {
   const ps = cfg.config.publicStats;
   return !!ps && publicStatsHealth(ps).fleetOk;
@@ -196,9 +199,9 @@ const fleetNow = () => (fleetOk() && !cfg.syncFailed ? fleetDevicesOf(cfg.config
 //   拿「当前参数 × 全段 elapsed」派生,运营调低舰队它就整段回退,而「不回退」是本数字的
 //   硬承诺。mock 无参数变更时点存储,沉淀段以编译期锚斜率计;PROD 由服务端累计。
 //   速率类($/sec、日产、月付)跟配置走是对的 —— 它们是「现在」,不背历史。
-const paidNow = () => paidCumulativeNow();
+const paidNow = () => remoteApiEnabled ? app.homeTruth?.onboarding.cumulativePaidUsdt ?? null : paidCumulativeNow();
 const paid = ref(paidNow());
-const devices = ref(fleetNow());
+const devices = ref(remoteApiEnabled ? app.homeTruth?.onboarding.activeDevices ?? null : fleetNow());
 
 function fmtNum(n: number | null): string {
   return n === null ? "—" : n.toLocaleString("en-US");
@@ -239,10 +242,14 @@ onMounted(() => {
     // Recompute from the time anchor (~$14/1.8s) instead of accumulating random
     // steps, so a reload can never show a smaller total than a longer session.
     paid.value = paidNow();
+    if (remoteApiEnabled) {
+      devices.value = app.homeTruth?.onboarding.activeDevices ?? null;
+      return;
+    }
     const drift = Math.random();
     // ±24 band, same rationale as the store tick (bounded symmetric wobble),
     // 带心随配置派生的舰队数走(审计 P1 的「其它页面舰队数字」半场)。
-    const base = fleetNow();
+    const base = remoteApiEnabled ? app.homeTruth?.onboarding.activeDevices ?? null : fleetNow();
     if (base === null) { devices.value = null; return; }
     const current = devices.value ?? base;
     if (drift > 0.75) devices.value = Math.min(base + 24, current + 1);

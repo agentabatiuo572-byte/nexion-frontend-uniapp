@@ -43,6 +43,7 @@ import {
 } from "./account-cloud";
 import {
   deviceE3Api,
+  appHomeApi,
   fundsSandboxApi,
   fundsSandboxEnabled,
   fundsServerEnabled,
@@ -51,6 +52,7 @@ import {
   taskAssignmentApi,
   withdrawalApi,
 } from "@/api/runtime";
+import type { AppHomeOverview } from "@/api/app-home-api";
 import { toCanonicalWithdrawal } from "@/api/withdrawal-api";
 import {
   sandboxEvidenceFromOverview,
@@ -389,6 +391,11 @@ export const useApp = defineStore("app", () => {
   const earnings = ref<EarningsState>(remoteApiEnabled
     ? { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] }
     : bootSnapshot.earnings);
+  // Authenticated Home/Earn commercial facts are a server projection. Remote
+  // mode intentionally starts empty: missing authority is rendered as —.
+  const homeTruth = ref<AppHomeOverview | null>(null);
+  const homeTruthStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const homeTruthError = ref<string | null>(null);
   const remoteFleetStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
   const remoteFleetError = ref("");
   // 🔴 在线设备锚改由展示配置驱动(规格 FEAT-HOME02 ③:「既有硬编码常量改为由此配置驱动」)。
@@ -652,6 +659,7 @@ export const useApp = defineStore("app", () => {
         recentTasks: authority.recentTasks.map((entry) => ({
           ...remoteTask(entry, device.location ?? ""),
           completedAt: entry.completedAt ?? entry.completableAt,
+          receiptNo: entry.receiptNo,
         })),
       };
     });
@@ -753,6 +761,29 @@ export const useApp = defineStore("app", () => {
         total: 0,
         history: [],
       };
+      homeTruthStatus.value = "loading";
+      try {
+        const projection = await appHomeApi.fetch();
+        if (!remoteAccountEpoch.isCurrent(request)) throw new Error("REMOTE_ACCOUNT_CHANGED");
+        homeTruth.value = projection;
+        const range = projection.earnings;
+        earnings.value = {
+          ...earnings.value,
+          today: range.today.usdt ?? 0,
+          todayNEX: range.today.nex ?? 0,
+          thisWeek: range.week.usdt ?? 0,
+          thisMonth: range.month.usdt ?? 0,
+          total: range.all.usdt ?? 0,
+        };
+        homeTruthStatus.value = "ready";
+        homeTruthError.value = null;
+      } catch (cause) {
+        if (remoteAccountEpoch.isCurrent(request)) {
+          homeTruth.value = null;
+          homeTruthStatus.value = "error";
+          homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
+        }
+      }
       remoteFleetStatus.value = "ready";
       return true;
     } catch (cause) {
@@ -770,6 +801,9 @@ export const useApp = defineStore("app", () => {
           }),
         };
         earnings.value = { today: 0, todayNEX: 0, thisWeek: 0, thisMonth: 0, total: 0, history: [] };
+        homeTruth.value = null;
+        homeTruthStatus.value = "error";
+        homeTruthError.value = cause instanceof Error ? cause.message : "APP_HOME_OVERVIEW_UNAVAILABLE";
         remoteFleetStatus.value = "error";
         remoteFleetError.value = cause instanceof Error ? cause.message : "E3_FLEET_UNAVAILABLE";
       }
@@ -790,10 +824,14 @@ export const useApp = defineStore("app", () => {
       lastCloudSnapshot = createServerEmptySnapshot(key, rawAccountKey, surface);
       remoteFleetStatus.value = "idle";
       remoteFleetError.value = "";
+      homeTruth.value = null;
+      homeTruthStatus.value = "idle";
+      homeTruthError.value = null;
       fundsSandboxStatus.value = fundsSandboxEnabled ? "idle" : "ready";
       fundsSandboxError.value = "";
       fundsSandboxEvidence.value = null;
       void refreshRemoteFleet(); // 自吞降级(resilience 门);error 态由缝内落好
+      void refreshRemoteWithdrawalList(key);
       if (fundsSandboxEnabled) void refreshFundsSandboxForAccount(key);
       return;
     }
@@ -808,6 +846,22 @@ export const useApp = defineStore("app", () => {
     miningPaused.value = false;
     adoptAccountSnapshot(boundSnapshot, true);
     persistAccountSnapshot();
+  }
+
+  /** Rehydrates every historical production withdrawal after login/reload. */
+  async function refreshRemoteWithdrawalList(expectedAccountKey = accountKey.value): Promise<boolean> {
+    if (!remoteApiEnabled || fundsSandboxEnabled || expectedAccountKey !== accountKey.value) return false;
+    const request = remoteAccountEpoch.snapshot();
+    try {
+      const rows = await withdrawalApi.list();
+      if (!remoteAccountEpoch.isCurrent(request) || expectedAccountKey !== accountKey.value) return false;
+      const canonical = rows.map((row) => toCanonicalWithdrawal(row, row.targetAddress ?? "", row.createdAt));
+      withdrawals.value = canonical;
+      lastCloudSnapshot = { ...lastCloudSnapshot, withdrawals: canonical };
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function tick(deltaMs: number) {
@@ -1282,22 +1336,10 @@ export const useApp = defineStore("app", () => {
   }
 
   function refundFailedWithdrawals(): string[] {
-    // 🔴🔴 合并裁决(资金安全级,这一条不改就是「扣了不退」)。
-    // ⚠️ 本段刻意**不写出**远端线那道闸的代码原文 —— 写出来会让按串匹配的哨兵匹到注释而假绿
-    //    (本仓家法:资金路径上的判据必须剥注释再判)。
-    // 远端线在这里早退的判据是 fundsServerEnabled,而它 ≡ remoteApiEnabled
-    // (两者都是 mode !== "mock",见 api/runtime.ts)—— 提现单**只在**远端模式下建得出来,
-    // 于是那道闸让退款在唯一会产生提现的模式里恒为 no-op。
-    // 它在远端线自己的世界里是对的:那边客户端一分钱都不扣。但本地线把扣款接了回来
-    // (applyWithdrawalDebit),两条腿必须同模式同时有效 —— 只留扣款不留退款 =
-    // 服务端每拒一单,用户的钱就凭空烧掉一笔。
-    // 保留的是它真正想守的那一半:**服务端持有余额的那条轨不许客户端本地退**。
-    // 那条轨是 sandbox(refreshFundsSandbox / adoptFundsSandboxWallet 会把钱包整体
-    // 按服务端值重投影,本地再退一次就是双计);普通 remote 轨全仓没有余额端点,
-    // 余额的唯一持有者就是本 store,退款必须留在这里。
-    // 另:远端线那句「不许用本地奖励桶退款」原样有效 —— NEX 那条腿走
-    // creditRewardBucketOnce,它自身的 fundsServerEnabled / remoteApiEnabled 双闸未动。
-    if (fundsSandboxEnabled) return [];
+    // Production and explicit sandbox withdrawals are both server-owned. Their
+    // debit/refund facts arrive through authoritative readback; applying a local
+    // reversal would mint a second refund in the client projection.
+    if (fundsServerEnabled) return [];
     const FAILED: Withdrawal["status"][] = ["review-rejected", "address-invalid", "tx-failed", "refunded"];
     const done: string[] = [];
     for (const wd of withdrawals.value) {
@@ -1369,6 +1411,9 @@ export const useApp = defineStore("app", () => {
    * PRODUCTION:整个函数消失 —— 扣款由 `POST /api/withdrawals` 同事务完成,client 只读回执。
    */
   function applyWithdrawalDebit(wd: Withdrawal): boolean {
+    // Production withdrawals are already debited atomically by the server;
+    // this local projection is sandbox/mock-only defense in depth.
+    if (remoteApiEnabled) return false;
     // 🔴 sandbox 轨的钱包由服务端持有:建单响应里的 `order.wallet` 已经是**扣完之后**的余额,
     // 且 adoptFundsSandboxWallet 已经把它整体投影进来。这里再扣一次就是双计。
     // 回 true 而不是 false:钱确实动了(在服务端),调用方不该弹「扣款失败」。
@@ -2163,6 +2208,9 @@ export const useApp = defineStore("app", () => {
   async function refreshRemoteWithdrawals(): Promise<string[]> {
     if (!remoteApiEnabled || fundsSandboxEnabled) return [];
     const expectedAccountKey = accountKey.value;
+    // List is the durable source of truth; a fresh session may have no local rows
+    // at all, so hydrate it before polling in-flight snapshots.
+    await refreshRemoteWithdrawalList(expectedAccountKey);
     // 注:本包一度加过一道「同一实例内只许一拍在途」的闸,已按主人 2026-08-12 的范围决定撤回。
     // 撤回理由不是它没用,而是它**解决不了它声称的问题、却新引进一个**:闸是 store 实例级的,
     // 跨标签页/跨 webview 原样敞开(那正是并发的真实来源);而它没有超时兜底,
@@ -2290,6 +2338,7 @@ export const useApp = defineStore("app", () => {
   return {
     accountKey, entrySurface, accountCloudUpdatedAt,
     user, devices, visibleDevices, slotDevices, activeSlotCount, myTotalHashrateAt, earnings, global,
+    homeTruth, homeTruthStatus, homeTruthError,
     remoteFleetStatus, remoteFleetError,
     withdrawals, latestWithdrawal, inFlightWithdrawals, primaryWithdrawal, miningPaused,
     bindAccount, projectServerIdentity, persistAccountSnapshot, refreshRemoteFleet, syncRemoteTaskAssignments, refreshFundsSandbox, refreshFundsSandboxForAccount,
@@ -2297,7 +2346,7 @@ export const useApp = defineStore("app", () => {
     tick, settle, setPhoneRuntime, applyPhoneCalibration, interruptAllTasks, resumeMining,
     creditBalance, debitBalance, creditNex, debitNex, captureMoney, restoreMoney,
     recordDeposit, setGenesisInviteCode, creditRewardBucket, creditRewardBucketOnce,
-    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals,
+    submitWithdrawal, applyWithdrawalDebit, advanceWithdrawalArrival, refreshRemoteWithdrawals, refreshRemoteWithdrawalList,
     applyFundsSandboxCallback, refundFailedWithdrawals,
     _devAdvanceWithdrawal, _devGrantManualRelease,
     addDevice, activateDevice, deactivateDevice, scheduleDeactivation, connectComputeShareDevice,

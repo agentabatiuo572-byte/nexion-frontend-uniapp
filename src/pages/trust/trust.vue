@@ -152,11 +152,13 @@
           <text class="block" :style="q3FootStyle">{{ tr.q3Footnote }}</text>
         </view>
 
-        <!-- NEX anchor -->
+        <!-- NEX anchor (mock-only until the server publishes this projection) -->
+        <template v-if="!remoteApiEnabled">
         <SectionHeader :label="tr.nexAnchorLabel" :suffix="tr.nexAnchorSuffix">
           <template #icon><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-9" /><path d="M4 12V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4" /><rect width="20" height="8" x="2" y="12" rx="2" /></svg></template>
         </SectionHeader>
         <NexAnchorSection />
+        </template>
 
         <!-- Listings -->
         <SectionHeader :label="tr.listingsLabel">

@@ -30,6 +30,7 @@ export interface RiskDisclosureCurrent {
 export interface RiskDisclosureApi {
   current(): Promise<RiskDisclosureCurrent>;
   acknowledge(current: RiskDisclosureCurrent): Promise<RiskDisclosureCurrent>;
+  checkGate(actionKey: string, operationId?: string): Promise<void>;
 }
 
 function invalid(): never {
@@ -154,6 +155,21 @@ export function createRiskDisclosureApi(client: ApiClient): RiskDisclosureApi {
         }
         throw error;
       }
+    },
+    checkGate: async (actionKey, operationId) => {
+      const normalizedActionKey = actionKey.trim();
+      if (!normalizedActionKey || normalizedActionKey.length > 96) {
+        throw new ApiError({ kind: "protocol", message: "RISK_DISCLOSURE_GATE_ACTION_INVALID" });
+      }
+      const normalizedOperationId = operationId?.trim();
+      if (normalizedOperationId && normalizedOperationId.length > 128) {
+        throw new ApiError({ kind: "protocol", message: "RISK_DISCLOSURE_GATE_OPERATION_INVALID" });
+      }
+      await client.request({
+        method: "POST",
+        path: `/api/legal/risk-disclosure/gates/${encodeURIComponent(normalizedActionKey)}/check`,
+        body: normalizedOperationId ? { operationId: normalizedOperationId } : undefined,
+      });
     },
   };
 }

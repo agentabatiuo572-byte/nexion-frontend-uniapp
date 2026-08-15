@@ -7,6 +7,8 @@ export type SupportedWithdrawalNetwork = "USDT-TRC20" | "USDT-BEP20" | "USDT-ERC
 
 export interface WithdrawalSubmission {
   withdrawalNo: string;
+  targetAddress?: string;
+  createdAt?: number;
   amount: number;
   chain: SupportedWithdrawalNetwork;
   status: string;
@@ -87,7 +89,14 @@ export interface WithdrawalStatusSnapshot {
 }
 
 export interface WithdrawalApi {
+  list(): Promise<WithdrawalSubmission[]>;
   policy(): Promise<WithdrawalPolicy>;
+  eligibility(input: {
+    amount: number;
+    chain: SupportedWithdrawalNetwork;
+    address: string;
+    policyVersion?: string;
+  }): Promise<WithdrawalEligibilitySnapshot>;
   get(withdrawalNo: string): Promise<WithdrawalStatusSnapshot>;
   submit(
     amount: number,
@@ -97,6 +106,18 @@ export interface WithdrawalApi {
     useNexFeeOffset: boolean,
     idempotencyKey: string,
   ): Promise<WithdrawalSubmission>;
+}
+
+export interface WithdrawalEligibilitySnapshot {
+  canSubmit: boolean;
+  maxWithdrawableUsdt: number;
+  route: "pass" | "delay" | "manual" | "freeze" | "reject";
+  riskReasons: string[];
+  fastLaneApplied: boolean;
+  waivedGates: string[];
+  dailyLimitReached: boolean;
+  dailyCountResetAt: number;
+  configVersion: string;
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -158,6 +179,9 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   const chain = row?.chain;
   const withdrawalNo = text(row?.withdrawalNo);
   const status = text(row?.status);
+  const targetAddress = text(row?.targetAddress) ?? undefined;
+  const createdAtRaw = text(row?.createdAt);
+  const createdAt = createdAtRaw ? Date.parse(createdAtRaw) : undefined;
   const holdUntil = text(row?.holdUntil);
   const riskRoute = text(row?.riskRoute);
   const amount = number(row?.amount, Number.EPSILON);
@@ -214,6 +238,8 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
   }
   return {
     withdrawalNo,
+    ...(targetAddress ? { targetAddress } : {}),
+    ...(createdAt !== undefined && Number.isFinite(createdAt) ? { createdAt } : {}),
     amount,
     chain: chain as SupportedWithdrawalNetwork,
     status,
@@ -232,6 +258,39 @@ function parseSubmission(value: unknown): WithdrawalSubmission {
     useNexFeeOffset: row.useNexFeeOffset,
     riskRoute,
     idSource: "server",
+  };
+}
+
+function parseSubmissionList(value: unknown): WithdrawalSubmission[] {
+  const row = record(value);
+  if (!row || row.source !== "nx_withdrawal_order" || row.sourceEnvironment !== "PRODUCTION"
+      || !Array.isArray(row.withdrawals)) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_LIST_RESPONSE_INVALID" });
+  }
+  return row.withdrawals.map(parseSubmission);
+}
+
+function parseEligibility(value: unknown): WithdrawalEligibilitySnapshot {
+  const row = record(value);
+  const route = text(row?.route)?.toLowerCase();
+  const reasons = row?.riskReasons;
+  const waived = row?.waivedGates;
+  const max = number(row?.maxWithdrawableUsdt);
+  const reset = number(row?.dailyCountResetAt, 1);
+  const configVersion = text(row?.configVersion);
+  if (!row || typeof row.canSubmit !== "boolean" || max === null
+      || !route || !["pass", "delay", "manual", "freeze", "reject"].includes(route)
+      || !Array.isArray(reasons) || reasons.some((item) => typeof item !== "string")
+      || !Array.isArray(waived) || waived.some((item) => typeof item !== "string")
+      || typeof row.fastLaneApplied !== "boolean" || typeof row.dailyLimitReached !== "boolean"
+      || reset === null || !configVersion) {
+    throw new ApiError({ kind: "protocol", message: "WITHDRAWAL_ELIGIBILITY_RESPONSE_INVALID" });
+  }
+  return {
+    canSubmit: row.canSubmit, maxWithdrawableUsdt: max, route: route as WithdrawalEligibilitySnapshot["route"],
+    riskReasons: reasons as string[], fastLaneApplied: row.fastLaneApplied,
+    waivedGates: waived as string[], dailyLimitReached: row.dailyLimitReached,
+    dailyCountResetAt: reset, configVersion,
   };
 }
 
@@ -404,7 +463,7 @@ function canonicalTerminalReason(value: string): WithdrawalTerminalReason {
 export function toCanonicalWithdrawal(
   submission: WithdrawalSubmission,
   address: string,
-  submittedAt = Date.now(),
+  submittedAt = submission.createdAt ?? Date.now(),
 ): Withdrawal {
   const estimatedCompletion = Date.parse(submission.holdUntil);
   if (!address.trim() || !Number.isFinite(estimatedCompletion)) {
@@ -522,9 +581,17 @@ function parseStatusSnapshot(value: unknown, expectedWithdrawalNo: string): With
 
 export function createWithdrawalApi(client: ApiClient): WithdrawalApi {
   return {
+    list: async () => parseSubmissionList(await client.request({
+      method: "GET", path: "/api/withdrawals",
+    })),
     policy: async () => parsePolicy(await client.request({
       method: "GET",
       path: "/api/withdrawals/policy",
+    })),
+    eligibility: async (input) => parseEligibility(await client.request({
+      method: "POST", path: "/api/withdrawals/eligibility",
+      body: input,
+      timeoutMs: 30_000,
     })),
     get: async (withdrawalNo) => parseStatusSnapshot(await client.request({
       method: "GET",

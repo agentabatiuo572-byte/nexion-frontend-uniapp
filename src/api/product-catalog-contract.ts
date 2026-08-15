@@ -65,6 +65,11 @@ function integer(value: unknown, minimum = 0): number {
   return parsed;
 }
 
+function displayString(value: unknown): string {
+  // "unavailable" is a deliberate server truth, never a client fallback.
+  return nonEmptyString(value);
+}
+
 function booleanValue(value: unknown): boolean {
   if (typeof value !== "boolean") return invalid();
   return value;
@@ -123,6 +128,9 @@ function product(value: unknown): Product {
   if (lifecycle && !LIFECYCLES.has(lifecycle as NonNullable<Product["status"]>)) return invalid();
   const unlocksAtPhase = phase(source.unlocksAtPhase);
   if (!Array.isArray(source.features) || !source.features.every((entry) => typeof entry === "string")) return invalid();
+  const purchaseBlocked = source.purchaseBlocked === undefined ? false : booleanValue(source.purchaseBlocked);
+  const purchaseBlockedReason = optionalString(source.purchaseBlockedReason);
+  if (purchaseBlocked && !purchaseBlockedReason) return invalid();
 
   return {
     id: nonEmptyString(source.id),
@@ -130,10 +138,15 @@ function product(value: unknown): Product {
     tier: tier as Product["tier"],
     tagline: requiredString(source.tagline),
     badge: optionalString(source.badge),
-    gpu: requiredString(source.gpu),
-    vram: requiredString(source.vram),
+    gpu: displayString(source.gpu),
+    vram: displayString(source.vram),
     hashRate: optionalString(source.hashRate),
-    power: optionalString(source.power),
+    power: displayString(source.power),
+    datacenter: displayString(source.datacenter),
+    uptime: displayString(source.uptime),
+    warranty: displayString(source.warranty),
+    phoneDailyEarn: displayString(source.phoneDailyEarn),
+    phoneDailyEarnNEX: displayString(source.phoneDailyEarnNEX),
     dailyEarn: finiteNumber(source.dailyEarn),
     dailyEarnNEX: finiteNumber(source.dailyEarnNEX),
     price: finiteNumber(source.price, Number.EPSILON),
@@ -147,6 +160,8 @@ function product(value: unknown): Product {
     releasePhaseId: optionalString(source.releasePhaseId),
     unlocksAtPhase,
     purchaseGate: purchaseGate(source.purchaseGate),
+    purchaseBlocked,
+    purchaseBlockedReason,
   };
 }
 
@@ -158,6 +173,8 @@ export function parseProductCatalogPayload(payload: unknown): ProductCatalogSnap
   const sourceEnvironment = source.sourceEnvironment;
   const runId = source.runId;
   const isSandbox = sourceEnvironment !== undefined || runId !== undefined;
+  // Mock data is valid only when the caller explicitly identifies a sandbox run.
+  if (catalogSource === "mock" && !isSandbox) return invalid();
   if (isSandbox && (catalogSource !== "mock" || sourceEnvironment !== "SANDBOX"
       || typeof runId !== "string" || !RUN_ID.test(runId))) return invalid();
   return {

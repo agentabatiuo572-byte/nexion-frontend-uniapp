@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import type { LocaleCode } from "@/i18n";
 import type { ManagedCopyDelivery } from "@/api/content-copy-api";
 import { contentCopyApi, remoteApiEnabled } from "@/api/runtime";
+import { remoteAccountScope } from "@/lib/remote-account-epoch";
 
 export type ManagedCopyLoadStatus = "fallback" | "loading" | "ready" | "error";
 
@@ -20,14 +21,17 @@ export const useContentCopy = defineStore("content-copy", () => {
     if (!force && status.value[positionKey] === "ready") return;
     const inFlight = refreshes.get(positionKey);
     if (inFlight) return inFlight;
+    const scopeRequest = remoteAccountScope.snapshot();
     status.value = { ...status.value, [positionKey]: "loading" };
-    const request = contentCopyApi.byPosition(positionKey)
+    const promise = contentCopyApi.byPosition(positionKey)
       .then((copy) => {
+        if (!remoteAccountScope.isCurrent(scopeRequest)) return;
         deliveries.value = { ...deliveries.value, [positionKey]: copy };
         errors.value = { ...errors.value, [positionKey]: "" };
         status.value = { ...status.value, [positionKey]: "ready" };
       })
       .catch((error: unknown) => {
+        if (!remoteAccountScope.isCurrent(scopeRequest)) return;
         const next = { ...deliveries.value };
         delete next[positionKey];
         deliveries.value = next;
@@ -38,10 +42,10 @@ export const useContentCopy = defineStore("content-copy", () => {
         status.value = { ...status.value, [positionKey]: "error" };
       })
       .finally(() => {
-        if (refreshes.get(positionKey) === request) refreshes.delete(positionKey);
+        if (refreshes.get(positionKey) === promise) refreshes.delete(positionKey);
       });
-    refreshes.set(positionKey, request);
-    return request;
+    refreshes.set(positionKey, promise);
+    return promise;
   }
 
   function localized(positionKey: string, locale: LocaleCode): string | null {
@@ -60,7 +64,9 @@ export const useContentCopy = defineStore("content-copy", () => {
 
   async function reportOrderConversions(orderNos: string[]): Promise<void> {
     if (!remoteApiEnabled || assignedExperimentIds.value.length === 0) return;
+    const scopeRequest = remoteAccountScope.snapshot();
     const uniqueOrders = Array.from(new Set(orderNos.map((value) => value.trim()).filter(Boolean)));
+    if (!remoteAccountScope.isCurrent(scopeRequest)) return;
     await Promise.allSettled(
       assignedExperimentIds.value.flatMap((experimentId) =>
         uniqueOrders.map((orderNo) => contentCopyApi.convert(experimentId, orderNo))),

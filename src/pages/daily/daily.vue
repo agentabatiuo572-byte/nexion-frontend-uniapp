@@ -15,6 +15,15 @@
     <CardStagger style="padding-bottom: 24px">
       <SubPageHeader back="/pages/me/wallet" />
 
+      <view v-if="remoteApiEnabled && remoteRefreshError" class="mx-4 rounded-2xl" :style="remoteErrorStyle">
+        <view class="flex items-center justify-between" style="gap: 12px">
+          <text :style="{ color: 'var(--v5-warning)', fontSize: '12px', lineHeight: '1.5' }">{{ t.authOtp.errorServiceUnavailable }}</text>
+          <view class="shrink-0 active:opacity-70" :style="retryBtnStyle" :aria-disabled="remoteRefreshing ? 'true' : 'false'" role="button" tabindex="0" @click="refreshDaily">
+            <text>{{ t.store.catalogRetry }}</text>
+          </view>
+        </view>
+      </view>
+
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
         <!-- Streak hero -->
         <view class="relative overflow-hidden text-center" :style="heroStyle">
@@ -53,10 +62,10 @@
             </text>
           </view>
           <view style="display: flex; flex-direction: column; gap: 8px">
-            <view v-for="m in MILESTONES" :key="m.day" class="flex items-center" :style="milestoneRowStyle(m)">
+            <view v-for="m in milestones" :key="m.day" class="flex items-center" :style="milestoneRowStyle(m)">
               <view class="grid place-items-center shrink-0" :style="milestoneIconStyle(m)">
-                <svg v-if="claimedSet.has(m.day)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-                <svg v-else-if="streak >= m.day" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg v-if="isMilestoneClaimed(m)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+                <svg v-else-if="isMilestoneUnlocked(m)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path :d="m.iconPath" />
                   <path v-if="m.iconPath2" :d="m.iconPath2" />
                 </svg>
@@ -64,13 +73,13 @@
               </view>
               <view class="flex-1 min-w-0">
                 <view class="flex items-center" style="gap: 8px">
-                  <text class="tabular-nums" :style="milestoneDayStyle">{{ t.daily.milestones[m.labelKey] }}</text>
-                  <text :style="milestoneRewardStyle">{{ t.daily.milestones[m.rewardKey] }}</text>
+                  <text class="tabular-nums" :style="milestoneDayStyle">{{ m.labelText ?? t.daily.milestones[m.labelKey] }}</text>
+                  <text :style="milestoneRewardStyle">{{ m.rewardText ?? t.daily.milestones[m.rewardKey] }}</text>
                 </view>
-                <text class="block" v-if="streak < m.day" :style="milestoneLeftStyle">{{ daysLeftText(m.day) }}</text>
+                <text class="block" v-if="!isMilestoneUnlocked(m)" :style="milestoneLeftStyle">{{ daysLeftText(m.day) }}</text>
               </view>
               <view class="active:opacity-80 transition-opacity" :style="milestoneBtnStyle(m)" @click="handleClaimMilestone(m)">
-                <text>{{ claimedSet.has(m.day) ? t.daily.milestones.claimed : t.daily.milestones.claim }}</text>
+                <text>{{ isMilestoneClaimed(m) ? t.daily.milestones.claimed : t.daily.milestones.claim }}</text>
               </view>
             </view>
           </view>
@@ -175,6 +184,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { onShow } from "@dcloudio/uni-app";
 import AppChassis from "@/components/app-chassis.vue";
 import EmptyState from "@/components/empty-state.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -200,6 +210,9 @@ interface Milestone {
   tint: string;
   iconPath: string;
   iconPath2?: string;
+  labelText?: string;
+  rewardText?: string;
+  status?: "LOCKED" | "CLAIMABLE" | "CLAIMED";
 }
 
 // Icon paths (lucide): Sparkles / Gift / TrendingUp / Star / Trophy / ShieldCheck.
@@ -226,6 +239,37 @@ const faucet = useNexFaucet();
 const app = useApp();
 const luckySpin = useLuckySpin();
 const leaderRows = computed(() => remoteApiEnabled ? faucet.topStreakers : MOCK_TOP_STREAKERS);
+const milestones = computed<Milestone[]>(() => remoteApiEnabled
+  ? faucet.remoteMilestones.map((m) => ({
+      day: m.milestoneDay,
+      rewardKey: "reward3",
+      labelKey: "day3",
+      labelText: `Day-${m.milestoneDay}`,
+      rewardText: `${m.rewardType} ${m.rewardAmount}`,
+      status: m.status,
+      reward: { type: (m.rewardType.toLowerCase() === "usdt" ? "usdt" : m.rewardType.toLowerCase() === "spin" ? "spin" : m.rewardType.toLowerCase() === "badge" ? "badge" : "nex") as Milestone["reward"]["type"], amount: m.rewardAmount },
+      tint: "var(--v5-nex)", iconPath: "m12 3v18M3 12h18",
+    }))
+  : MILESTONES);
+
+const remoteRefreshError = ref(false);
+const remoteRefreshing = ref(false);
+let dailyRefreshRequest = 0;
+async function refreshDaily() {
+  if (!remoteApiEnabled || remoteRefreshing.value) return;
+  const request = ++dailyRefreshRequest;
+  remoteRefreshing.value = true;
+  remoteRefreshError.value = false;
+  try {
+    const ok = await faucet.refreshRemote();
+    if (request === dailyRefreshRequest && !ok) remoteRefreshError.value = true;
+  } catch {
+    if (request === dailyRefreshRequest) remoteRefreshError.value = true;
+  } finally {
+    if (request === dailyRefreshRequest) remoteRefreshing.value = false;
+  }
+}
+onShow(() => { void refreshDaily(); });
 
 // Per-second tick for the countdown.
 const tick = ref(0);
@@ -270,8 +314,18 @@ const streak = computed(() => faucet.signInStreak);
 const lastSignedToday = computed(() => faucet.lastSignedInAt > 0 && isSameDay(faucet.lastSignedInAt, Date.now()));
 const claimedSet = computed(() => new Set(faucet.claimedMilestones));
 
+function isMilestoneClaimed(m: Milestone): boolean {
+  return remoteApiEnabled ? m.status === "CLAIMED" : claimedSet.value.has(m.day);
+}
+
+function isMilestoneUnlocked(m: Milestone): boolean {
+  return remoteApiEnabled
+    ? m.status === "CLAIMABLE" || m.status === "CLAIMED"
+    : streak.value >= m.day;
+}
+
 const nextMilestone = computed(() =>
-  streak.value === 0 ? 3 : MILESTONES.find((m) => m.day > streak.value)?.day ?? 100,
+  streak.value === 0 ? milestones.value[0]?.day ?? 0 : milestones.value.find((m) => m.day > streak.value)?.day ?? milestones.value.at(-1)?.day ?? 0,
 );
 const daysToMilestone = computed(() => Math.max(1, nextMilestone.value - streak.value));
 
@@ -380,11 +434,11 @@ async function handleCheckIn() {
 }
 
 async function handleClaimMilestone(m: Milestone) {
-  if (claimedSet.value.has(m.day)) {
+  if (isMilestoneClaimed(m)) {
     toast.info(t.value.daily.milestones.claimedToast, "");
     return;
   }
-  if (streak.value < m.day) {
+  if (!isMilestoneUnlocked(m)) {
     toast.info(t.value.daily.milestones.lockedToast, "");
     return;
   }
@@ -393,7 +447,7 @@ async function handleClaimMilestone(m: Milestone) {
       toast.error(t.value.authOtp.errorServiceUnavailable);
       return;
     }
-    toast.success(t.value.daily.milestones[m.rewardKey], `Day-${m.day} milestone claimed`);
+    toast.success(m.rewardText ?? `${m.reward.type} ${m.reward.amount}`, `Day-${m.day} milestone claimed`);
     return;
   }
   const gainedNex = m.reward.type === "nex" ? m.reward.amount : 0;
@@ -531,8 +585,8 @@ const milestoneLabelStyle: CSSProperties = {
   letterSpacing: "0.06em",
 };
 function milestoneRowStyle(m: Milestone): CSSProperties {
-  const claimed = claimedSet.value.has(m.day);
-  const canClaim = streak.value >= m.day && !claimed;
+  const claimed = isMilestoneClaimed(m);
+  const canClaim = isMilestoneUnlocked(m) && !claimed;
   return {
     gap: "12px",
     padding: "10px 12px",
@@ -541,8 +595,8 @@ function milestoneRowStyle(m: Milestone): CSSProperties {
   };
 }
 function milestoneIconStyle(m: Milestone): CSSProperties {
-  const claimed = claimedSet.value.has(m.day);
-  const reached = streak.value >= m.day;
+  const claimed = isMilestoneClaimed(m);
+  const reached = isMilestoneUnlocked(m);
   return {
     width: "36px",
     height: "36px",
@@ -565,8 +619,8 @@ const milestoneRewardStyle: CSSProperties = {
 };
 const milestoneLeftStyle: CSSProperties = { marginTop: "3px", fontSize: "12px", color: "var(--v5-ink-3)" };
 function milestoneBtnStyle(m: Milestone): CSSProperties {
-  const claimed = claimedSet.value.has(m.day);
-  const canClaim = streak.value >= m.day && !claimed;
+  const claimed = isMilestoneClaimed(m);
+  const canClaim = isMilestoneUnlocked(m) && !claimed;
   return {
     minHeight: "44px",  // 《07》tap≥44(原 36)
     padding: "0 14px",
@@ -740,4 +794,17 @@ function historyDeltaStyle(delta: number): CSSProperties {
     color: delta > 0 ? "var(--v5-success)" : delta < 0 ? "var(--v5-brand-2)" : "var(--v5-ink-3)",
   };
 }
+const remoteErrorStyle: CSSProperties = {
+  marginBottom: "12px",
+  padding: "10px 12px",
+  background: "color-mix(in srgb, var(--v5-warning) 8%, transparent)",
+};
+const retryBtnStyle: CSSProperties = {
+  minHeight: "32px",
+  padding: "0 10px",
+  borderRadius: "999px",
+  background: "var(--v5-surface-2)",
+  color: "var(--v5-ink)",
+  fontSize: "12px",
+};
 </script>

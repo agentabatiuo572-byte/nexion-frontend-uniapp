@@ -29,7 +29,6 @@ export interface NetworkMember {
   monthVolumeUSD: number;
   totalVolumeUSD: number | null;
   status: MemberStatus;
-  sponsorId?: string;
   city: string;
 }
 
@@ -76,7 +75,6 @@ function mk(
     monthVolumeUSD: monthVol,
     totalVolumeUSD: totalVol,
     status: opts.status ?? (i % 5 === 0 ? "idle" : i % 11 === 0 ? "offline" : "active"),
-    sponsorId: opts.sponsorId,
     city: CITIES[i % CITIES.length],
   };
 }
@@ -152,7 +150,7 @@ export const useNetwork = defineStore("network", () => {
         isSpillover: false, joinedAt: Date.parse(member.joinedAt), monthVolumeUSD: member.monthVolumeUsdt,
         totalVolumeUSD: member.lifetimeVolumeUsdt,
         status: member.status === "ACTIVE" ? "active" : member.status === "IDLE" ? "idle" : "offline",
-        sponsorId: member.sponsorId ?? undefined, city: member.region ?? "—",
+        city: member.region ?? "—",
       }));
       totalMembers.value = snapshot.totalMembers;
       totalMonthVolumeUSD.value = snapshot.monthVolumeUsdt;

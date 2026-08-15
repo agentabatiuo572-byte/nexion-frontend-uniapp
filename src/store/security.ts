@@ -2,6 +2,9 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { normalizeAccountKey } from "./account-cloud";
 import { readAccountRow, writeAccountRow } from "./account-scoped-storage";
+import { changeMockAuthPassword, mockAuthSecurityState, setMockAuthTwoFactor } from "@/api/mock-auth-api";
+import { ApiError } from "@/api/errors";
+import { remoteApiEnabled } from "@/api/runtime";
 
 // Ported from Nexion-prototype/lib/store/security.ts (zustand+persist → Pinia).
 // MOCK-ONLY: password hash never lives client-side; 2FA is local mock state.
@@ -19,10 +22,11 @@ interface Persisted {
 
 function hydrate(accountKey: string): Persisted {
   const row = readAccountRow<Persisted>(ACCOUNTS_KEY, accountKey);
+  const mockState = remoteApiEnabled ? null : mockAuthSecurityState(accountKey);
   if (row && typeof row.twoFactorEnabled === "boolean") {
     return {
       passwordChangedAt: row.passwordChangedAt,
-      twoFactorEnabled: row.twoFactorEnabled,
+      twoFactorEnabled: mockState?.twoFactorEnabled ?? row.twoFactorEnabled,
     };
   }
   return {
@@ -56,13 +60,21 @@ export const useSecurity = defineStore("security", () => {
   // ⚠️ MOCK-ONLY: production POST /api/me/password { oldPassword, newPassword }
   // — server validates old, hashes new, invalidates other sessions. Client
   // never stores the hash; the param keeps the signature stable for cutover.
-  function changePassword(newHash: string) {
-    void newHash; // server is sole authority for hash storage
+  function changePassword(currentPassword: string, newPassword?: string) {
+    const desired = newPassword ?? "";
+    if (remoteApiEnabled) {
+      // Remote pages call accountApi directly; retain a no-op-compatible
+      // branch for legacy callers without pretending local state is authority.
+      if (!desired) throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
+    } else {
+      changeMockAuthPassword(boundKey, currentPassword, desired);
+    }
     passwordChangedAt.value = Date.now();
     persist();
   }
 
-  function setTwoFactor(on: boolean) {
+  function setTwoFactor(on: boolean, currentPassword = "") {
+    if (!remoteApiEnabled) setMockAuthTwoFactor(boundKey, on, currentPassword);
     twoFactorEnabled.value = on;
     persist();
   }

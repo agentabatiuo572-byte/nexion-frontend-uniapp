@@ -58,6 +58,7 @@ export interface DailySnapshot {
   dailyMilestones: CanonicalDailyMilestone[];
   earningMilestones: CanonicalEarningMilestone[];
   powerUps: CanonicalDailyPowerUp[];
+  rules: Array<{ key: string; value: string }>;
   topStreakers: CanonicalTopStreaker[];
   source: string;
 }
@@ -249,6 +250,13 @@ function parseSnapshot(value: unknown): DailySnapshot {
     return invalid("DAILY_MILESTONE_DUPLICATED");
   }
   const powerUps = row.powerUps.map(parsePowerUp);
+  const rules = Array.isArray(row.rules) ? row.rules.map((item) => {
+    const rule = record(item);
+    const key = text(rule?.key);
+    const value = typeof rule?.value === "string" ? rule.value : rule?.value == null ? null : String(rule.value);
+    if (!key || value === null) return invalid("DAILY_RULE_RESPONSE_INVALID");
+    return { key, value };
+  }) : invalid("DAILY_RULE_RESPONSE_INVALID");
   if (new Set(powerUps.map((item) => item.powerUpId)).size !== powerUps.length
       || new Set(powerUps.map((item) => item.powerUpCode)).size !== powerUps.length) {
     return invalid("DAILY_POWER_UP_DUPLICATED");
@@ -272,6 +280,7 @@ function parseSnapshot(value: unknown): DailySnapshot {
     dailyMilestones,
     earningMilestones,
     powerUps,
+    rules,
     topStreakers,
     source,
   };

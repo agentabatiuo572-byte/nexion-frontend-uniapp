@@ -94,8 +94,8 @@ const completed = computed(() => !!quest.value && ["COMPLETED", "CLAIMABLE"].inc
 const visible = computed(() => !!quest.value && quest.value.status !== "CLAIMED");
 
 const titleText = computed(() => quest.value?.name ?? "");
-const bodyText = computed(() => quest.value?.status === "PENDING" ? "Progress is verified by the server." : "Reward is ready to claim.");
-const ctaText = computed(() => wq.loading ? "Refreshing…" : "Refresh status");
+const bodyText = computed(() => quest.value?.status === "PENDING" ? w.value.progressVerified : w.value.rewardReady);
+const ctaText = computed(() => wq.loading ? w.value.refreshing : w.value.refreshStatus);
 const promoChipText = computed(() => fmt(w.value.promoChip, { mult: mult.value.toFixed(1) }));
 const claimText = computed(() => fmt(w.value.claim, { n: rewardDisplay.value }));
 

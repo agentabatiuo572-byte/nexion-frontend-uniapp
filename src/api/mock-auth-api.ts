@@ -2,6 +2,10 @@ import type { AuthApi } from "./auth-api";
 import type { SessionSnapshot, SessionVault } from "./session-vault";
 import type { UserSession } from "./contracts";
 import { ApiError } from "./errors";
+import { normalizeAccountKey } from "@/store/account-cloud";
+import { deleteAuthAccount } from "@/store/auth-account";
+import { clearAuthOtpStateForPhone } from "@/store/auth-otp";
+import { removeAccountScopedPersistentState } from "@/store/account-scoped-storage";
 
 /**
  * mock 档的本地 AuthApi 实现(主人 2026-08-15 拍板包 zm T0)。
@@ -21,6 +25,7 @@ interface MockUserRecord {
   userId: number;
   password: string | null;
   nickname: string;
+  twoFactorEnabled?: boolean;
 }
 
 interface MockUserRegistry {
@@ -93,7 +98,70 @@ function sessionUser(countryCode: string, phone: string, rec: MockUserRecord): U
   return { userId: rec.userId, countryCode, phone, nickname: rec.nickname };
 }
 
+function accountIdForIdentity(identity: string): string {
+  const compact = identity.replace(/\s+/g, "");
+  return normalizeAccountKey(`${compact}@demo.nexgrid.ai`);
+}
+
+function findUser(reg: MockUserRegistry, accountId: string): { identity: string; record: MockUserRecord } | null {
+  const normalized = normalizeAccountKey(accountId);
+  const entry = Object.entries(reg.users).find(([identity, record]) =>
+    accountIdForIdentity(identity) === normalized || `user:${record.userId}` === normalized,
+  );
+  return entry ? { identity: entry[0], record: entry[1] } : null;
+}
+
+function requireMockUser(accountId: string): { registry: MockUserRegistry; identity: string; record: MockUserRecord } {
+  const registry = loadRegistry();
+  const found = findUser(registry, accountId);
+  if (!found) throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
+  return { registry, ...found };
+}
+
+export function mockAuthSecurityState(accountId: string): { twoFactorEnabled: boolean } | null {
+  const found = findUser(loadRegistry(), accountId);
+  return found ? { twoFactorEnabled: found.record.twoFactorEnabled === true } : null;
+}
+
+export function changeMockAuthPassword(accountId: string, currentPassword: string, newPassword: string): void {
+  const found = requireMockUser(accountId);
+  if (!found.record.password || found.record.password !== currentPassword) {
+    throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
+  }
+  found.record.password = newPassword;
+  saveRegistry(found.registry);
+}
+
+export function setMockAuthTwoFactor(accountId: string, enabled: boolean, currentPassword: string): void {
+  const found = requireMockUser(accountId);
+  if (!found.record.password || found.record.password !== currentPassword) {
+    throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
+  }
+  found.record.twoFactorEnabled = enabled;
+  saveRegistry(found.registry);
+}
+
+/** Delete the mock auth account plus every account-keyed local projection. */
+export function deleteMockAuthAccount(accountId: string): boolean {
+  const found = findUser(loadRegistry(), accountId);
+  if (!found) return false;
+  deleteAuthAccount(accountId);
+  const registry = loadRegistry();
+  delete registry.users[found.identity];
+  saveRegistry(registry);
+  // OTP uses compact E.164. Keep the spaced legacy form as well for older
+  // records that were written before the identity normalizer was introduced.
+  clearAuthOtpStateForPhone(found.identity.replace(/\s+/g, ""));
+  clearAuthOtpStateForPhone(found.identity);
+  removeAccountScopedPersistentState(accountId);
+  // The mock auth registry is the primary login authority; a missing legacy
+  // phone-directory row is harmless for accounts created through the newer
+  // password path, so deletion succeeds after the user row is removed.
+  return true;
+}
+
 let challengeSeq = 0;
+const twoFactorChallenges = new Map<string, { identity: string; expiresAt: number }>();
 
 /**
  * 注册页 mock 分支(legacy 本地链)完成时同步写入本注册表 —— 否则密码登录结构性死路:
@@ -103,6 +171,7 @@ export function registerMockAuthCredential(countryCode: string, phone: string, p
   const reg = loadRegistry();
   const rec = ensureUser(reg, countryCode, phone);
   rec.password = password;
+  rec.twoFactorEnabled = rec.twoFactorEnabled === true;
   saveRegistry(reg);
 }
 
@@ -133,6 +202,16 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
         // 自造码会落兜底「服务不可用」,连「手机号或密码不正确」都显不出来)。
         throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
       }
+      if (rec.twoFactorEnabled === true) {
+        const challengeNo = `MOCK-2FA-${++challengeSeq}`;
+        twoFactorChallenges.set(challengeNo, { identity: identityOf(request.countryCode, request.phone), expiresAt: Date.now() + 5 * 60 * 1000 });
+        return {
+          kind: "challenge",
+          user: sessionUser(request.countryCode, request.phone, rec),
+          challengeNo,
+          deliveryHint: maskedHint(request.phone),
+        };
+      }
       return persistLogin(sessionUser(request.countryCode, request.phone, rec), vault.revision());
     },
     async sendLoginOtp(request) {
@@ -155,9 +234,21 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
       saveRegistry(reg);
       return { status: "PASSWORD_RESET", revokedSessionCount: 0 };
     },
-    async completeTwoFactor() {
-      // mock 档不签发 2FA 挑战,走到这里 = 调用面出了岔子,如实报协议错而不是伪造放行。
-      throw new ApiError({ kind: "protocol", message: "TWO_FACTOR_NOT_ISSUED_IN_MOCK" });
+    async completeTwoFactor(request) {
+      assertSixDigit(request.code);
+      const challenge = twoFactorChallenges.get(request.challengeNo);
+      const identity = identityOf(request.countryCode, request.phone);
+      if (!challenge || challenge.identity !== identity || challenge.expiresAt <= Date.now()) {
+        twoFactorChallenges.delete(request.challengeNo);
+        throw new ApiError({ kind: "business", message: "USER_TWO_FACTOR_CHALLENGE_INVALID" });
+      }
+      const reg = loadRegistry();
+      const rec = reg.users[identity];
+      if (!rec || rec.password !== request.password || rec.twoFactorEnabled !== true) {
+        throw new ApiError({ kind: "business", message: "USER_INVALID_CREDENTIALS" });
+      }
+      twoFactorChallenges.delete(request.challengeNo);
+      return persistLogin(sessionUser(request.countryCode, request.phone, rec), vault.revision());
     },
     async sendRegistrationOtp(request) {
       return { ...issueChallenge(), deliveryHint: maskedHint(request.phone) };
@@ -195,6 +286,7 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
       discardSessionIfCurrent(expectedRevision);
     },
     async logout() {
+      twoFactorChallenges.clear();
       vault.clear();
     },
   };

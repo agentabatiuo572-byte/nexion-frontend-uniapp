@@ -12,6 +12,16 @@
       <SubPageHeader back="/pages/team/team" :title="t.headerTitles.teamCommissions" :subtitle="t.headerSubtitles.teamCommissions" />
 
       <view class="px-4" style="display: flex; flex-direction: column; gap: 12px">
+        <EmptyState
+          v-if="remoteApiEnabled && commission.eventsStatus !== 'ready'"
+          :kind="commission.eventsStatus === 'error' ? 'recoverable-error' : 'empty-list'"
+          :title="commission.eventsStatus === 'error' ? t.network.projectionErrorTitle : t.network.projectionErrorDesc"
+          :desc="commission.eventsStatus === 'error' ? t.network.projectionErrorDesc : undefined"
+          :cta-label="commission.eventsStatus === 'error' ? t.network.retry : undefined"
+          compact
+          @cta="commission.refreshCanonicalEvents()"
+        />
+        <template v-if="!remoteApiEnabled || commission.eventsStatus === 'ready'">
         <!-- overview — de-carded: the two headline numbers sit on the page floor.
              Dual-number hero (Withdrawable/Cooling grid) has no single cap to host
              the rules-intro pill, so the pill rides a tight top-right row hugging
@@ -34,7 +44,7 @@
             <view>
               <text class="block font-mono-tabular" :style="overviewCapStyle">Cooling</text>
               <text class="block tabular-nums" :style="overviewBigStyle('var(--v5-warning)')">${{ commission.coolingUSDT().toFixed(2) }}</text>
-              <text class="block font-mono-tabular" :style="overviewSmallStyle">Unlocks in 30d</text>
+              <text class="block font-mono-tabular" :style="overviewSmallStyle">{{ coolingOverviewText }}</text>
             </view>
           </view>
           <view class="grid grid-cols-2" :style="heroFooterStyle">
@@ -113,6 +123,7 @@
               </view>
             </view>
         </view>
+        </template>
       </view>
     </view>
   </AppChassis>
@@ -164,6 +175,15 @@ const byKind = computed(() => commission.byKind());
 const filtered = computed(() =>
   filter.value === "all" ? events.value : events.value.filter((e) => e.kind === filter.value),
 );
+
+const coolingOverviewText = computed(() => {
+  const next = events.value
+    .filter((event) => event.status === "cooling" && Number.isFinite(event.unlockAt))
+    .sort((a, b) => a.unlockAt - b.unlockAt)[0];
+  if (!next) return remoteApiEnabled ? "—" : t.value.commissions.unlocksIn30d;
+  const days = Math.max(0, Math.ceil((next.unlockAt - Date.now()) / 86400000));
+  return fmt(t.value.commissions.coolingTag, { n: days });
+});
 
 const noKindText = computed(() =>
   fmt(t.value.commissions.noKindEvents, { kind: t.value.commissions.kind[filter.value as CommissionKind] }),

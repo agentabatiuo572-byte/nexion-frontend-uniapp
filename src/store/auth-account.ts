@@ -343,3 +343,17 @@ export function inspectAuthAccounts(): AuthAccountRecord[] {
   const registry = readRegistry();
   return registry ? Object.values(registry.byPhone).filter((account) => account.status === "active") : [];
 }
+
+/** Mock-only account deletion: remove the canonical phone-directory row. */
+export function deleteAuthAccount(rawAccountId: string): { ok: true; phoneE164: string } | { ok: false } {
+  const accountId = normalizeAccountKey(rawAccountId);
+  const registry = readRegistry();
+  if (!registry) return { ok: false };
+  const entry = Object.entries(registry.byPhone).find(([, account]) => account.accountId === accountId);
+  if (!entry) return { ok: false };
+  const [phoneE164] = entry;
+  const byPhone = { ...registry.byPhone };
+  delete byPhone[phoneE164];
+  if (!writeRegistry({ ...registry, byPhone })) return { ok: false };
+  return { ok: true, phoneE164 };
+}

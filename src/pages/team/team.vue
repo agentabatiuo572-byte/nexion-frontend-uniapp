@@ -132,6 +132,7 @@
 
         <!-- This month ledger -->
         <TeamLedgerCard
+          v-if="!remoteApiEnabled || (network.remoteStatus === 'ready' && commission.eventsStatus === 'ready')"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
           :contributors="localTotalMembersCount"
           :direct-u-s-d-t="directUSDT"
@@ -141,6 +142,10 @@
           :unlocked-u-s-d-t="unlockedUSDT"
           :cooling-u-s-d-t="coolingUSDT"
         />
+        <view v-else :style="toolCellStyle(0)">
+          <text class="block" :style="toolTitleStyle">{{ t.network.projectionErrorDesc }}</text>
+          <text class="block" :style="toolSubStyle">{{ t.network.retry }}</text>
+        </view>
 
         <!-- Team tools -->
         <view class="grid" :style="toolGridStyle">
@@ -218,7 +223,7 @@ const remotePoolState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEna
 let remotePoolRequest = 0;
 
 const myRank = computed(() => vrank.myRank);
-const myRankDisplay = computed(() => `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
+const myRankDisplay = computed(() => remoteApiEnabled && vrank.ladder.length === 0 ? "V—" : `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
 const members = computed(() => network.members);
 const localTotalMembersCount = computed(() => network.totalMembers);
 const events = computed(() => commission.events);
@@ -242,6 +247,7 @@ const directCountText = computed(() => {
   return String(byLayerBuckets.value[1].length);
 });
 const extendedCountText = computed(() => {
+  if (remoteApiEnabled && network.remoteStatus !== "ready") return "—";
   return String(([2, 3, 4, 5, 6, 7] as const).reduce((s, L) => s + byLayerBuckets.value[L].length, 0));
 });
 const totalMembersCountText = computed(() => remoteApiEnabled && network.remoteStatus !== "ready" ? "—" : String(localTotalMembersCount.value));
@@ -322,6 +328,7 @@ onMounted(() => {
   if (remoteApiEnabled) {
     void vrank.refreshCanonicalVRank();
     void commission.refreshCanonicalBinary();
+    void commission.refreshCanonicalEvents();
     void network.refreshCanonicalNetwork();
     void refreshRemotePool();
     return;

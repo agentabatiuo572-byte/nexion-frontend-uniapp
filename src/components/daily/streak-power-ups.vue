@@ -21,12 +21,12 @@
     </view>
 
     <view class="px-2" style="padding-bottom: 8px">
-      <view v-for="(p, i) in POWERUPS" :key="p.id" :style="liStyle(i === POWERUPS.length - 1)">
+      <view v-for="(p, i) in powerUps" :key="p.id" :style="liStyle(i === powerUps.length - 1)">
         <view class="flex items-center" style="gap: 12px; padding: 12px 8px; min-height: 56px">
           <view class="grid place-items-center shrink-0" :style="iconBoxStyle(p)">
             <!-- claimed = check / locked = lock / unlocked = per-perk icon -->
             <svg v-if="isClaimed(p.id)" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
-            <svg v-else-if="streak < p.threshold" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+            <svg v-else-if="!isUnlocked(p)" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
             <!-- royalty_boost (Zap) -->
             <svg v-else-if="p.id === 'royalty_boost'" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" /></svg>
             <!-- nex_boost (Crown) -->
@@ -39,13 +39,13 @@
           <view class="flex-1 min-w-0">
             <view class="flex items-center" style="gap: 8px">
               <text class="tabular-nums" :style="thresholdChipStyle(p)">{{ thresholdText(p.threshold) }}</text>
-              <text :style="labelStyle(p)">{{ w[`${p.key}_label`] }}</text>
+              <text :style="labelStyle(p)">{{ p.labelText ?? w[`${p.key}_label`] }}</text>
             </view>
-            <text class="block" :style="descStyle">{{ streak >= p.threshold ? w[`${p.key}_desc`] : daysToUnlockText(p.threshold) }}</text>
+            <text class="block" :style="descStyle">{{ isUnlocked(p) ? (p.descText ?? w[`${p.key}_desc`]) : daysToUnlockText(p.threshold) }}</text>
           </view>
           <!-- activated badge / activate CTA / locked label -->
           <text v-if="isClaimed(p.id)" :style="activatedBadgeStyle">{{ w.activated }}</text>
-          <view v-else-if="streak >= p.threshold" class="inline-flex items-center active:opacity-85" :style="activateBtnStyle(p)" @click="handleClaim(p)">
+          <view v-else-if="isUnlocked(p)" class="inline-flex items-center active:opacity-85" :style="activateBtnStyle(p)" @click="handleClaim(p)">
             <text>{{ w.activate }}</text>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 3px"><path d="m9 18 6-6-6-6" /></svg>
           </view>
@@ -87,6 +87,9 @@ interface PowerUp {
   tint: string;
   key: "royalty_boost" | "nex_boost" | "staking_boost" | "genesis_whitelist";
   href: string;
+  labelText?: string;
+  descText?: string;
+  status?: "LOCKED" | "AVAILABLE" | "ACTIVATED";
 }
 
 const t = useT();
@@ -102,17 +105,34 @@ const POWERUPS: PowerUp[] = [
   { id: "genesis_whitelist", threshold: 60, tint: "var(--v5-ink)", key: "genesis_whitelist", href: "/pages/genesis/genesis" },
 ];
 
+const powerUps = computed<PowerUp[]>(() => remoteApiEnabled
+  ? faucet.remotePowerUps.map((item) => ({
+      id: item.powerUpCode.toLowerCase() as StreakPowerUpId,
+      threshold: item.unlockStreakDays,
+      tint: "var(--v5-success)", key: item.powerUpCode.toLowerCase() as PowerUp["key"], href: item.targetPath,
+      labelText: item.name, descText: `${item.effectType}: ${item.effectValue}`,
+      status: item.status,
+    }))
+  : POWERUPS);
+
 const streak = computed(() => faucet.signInStreak);
 
+function isUnlocked(p: PowerUp): boolean {
+  return remoteApiEnabled
+    ? p.status === "AVAILABLE" || p.status === "ACTIVATED"
+    : streak.value >= p.threshold;
+}
+
 function isClaimed(id: StreakPowerUpId): boolean {
+  if (remoteApiEnabled) return powerUps.value.find((p) => p.id === id)?.status === "ACTIVATED";
   return powerUp.hasClaimed(id);
 }
 
 const nextUnclaimedUnlocked = computed(() =>
-  POWERUPS.find((p) => streak.value >= p.threshold && !powerUp.hasClaimed(p.id)),
+  powerUps.value.find((p) => isUnlocked(p) && !isClaimed(p.id)),
 );
-const nextLocked = computed(() => POWERUPS.find((p) => streak.value < p.threshold));
-const activatedCount = computed(() => POWERUPS.filter((p) => powerUp.hasClaimed(p.id)).length);
+const nextLocked = computed(() => powerUps.value.find((p) => !isUnlocked(p)));
+const activatedCount = computed(() => powerUps.value.filter((p) => isClaimed(p.id)).length);
 
 const streakStatText = computed(() => fmt(w.value.streakStat, { n: streak.value }));
 function thresholdText(n: number): string {
@@ -122,13 +142,13 @@ function daysToUnlockText(threshold: number): string {
   return fmt(w.value.daysToUnlock, { n: Math.max(0, threshold - streak.value) });
 }
 const footerReadyText = computed(() =>
-  nextUnclaimedUnlocked.value ? fmt(w.value.footerReady, { name: w.value[`${nextUnclaimedUnlocked.value.key}_label`] }) : "",
+  nextUnclaimedUnlocked.value ? fmt(w.value.footerReady, { name: nextUnclaimedUnlocked.value.labelText ?? w.value[`${nextUnclaimedUnlocked.value.key}_label`] }) : "",
 );
 const footerNextText = computed(() =>
   nextLocked.value
     ? fmt(w.value.footerNext, {
         days: nextLocked.value.threshold - streak.value,
-        name: w.value[`${nextLocked.value.key}_label`],
+        name: nextLocked.value.labelText ?? w.value[`${nextLocked.value.key}_label`],
       })
     : "",
 );
@@ -137,7 +157,7 @@ const footerAllText = computed(() => fmt(w.value.footerAll, { n: activatedCount.
 async function handleClaim(p: PowerUp) {
   if (remoteApiEnabled) {
     if (await powerUp.claimRemote(p.id)) {
-      toast.success(fmt(w.value.toastTitle, { name: w.value[`${p.key}_label`] }), w.value.toastBody);
+      toast.success(fmt(w.value.toastTitle, { name: p.labelText ?? w.value[`${p.key}_label`] }), p.descText ?? w.value.toastBody);
     } else {
       toast.error(t.value.authOtp.errorServiceUnavailable);
     }

@@ -798,9 +798,9 @@ function checkQuestRoute() {
   const id = questIdForRoute(route);
   if (!id) return;
   if (remoteApiEnabled) {
-    // Visiting a screen is not a completion event. Only an authoritative H3
-    // claim can update this state; refresh merely removes stale local facts.
-    void useQuest().refreshRemote();
+    // Visiting a tracked screen is the H3 completion event. The server claim
+    // decides eligibility and reward; the client never credits locally.
+    if (!useQuest().isComplete(id)) void useQuest().claimRemote(id);
     return;
   }
   // 🔴 与领奖族同一套顺序:先发钱(幂等)→ 后消费资格(2026-08-04 独立验收指出 quest 族

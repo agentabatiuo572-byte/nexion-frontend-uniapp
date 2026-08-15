@@ -4,7 +4,7 @@
   proof footer. Chip labels are proper nouns (vendor/cert names, untranslated).
 -->
 <template>
-  <view class="block" style="padding: 8px 2px 2px" @click="goTrust">
+  <view v-if="!remoteApiEnabled" class="block" style="padding: 8px 2px 2px" @click="goTrust">
     <view class="flex items-center gap-1.5 font-mono-tabular mb-2.5" style="font-size: 12px; color: var(--v5-ink-3)">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
@@ -28,6 +28,7 @@
 
 <script setup lang="ts">
 import { useT } from "@/i18n/use-t";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const t = useT();
 const CHIPS = ["NVIDIA", "Intel", "AMD", "CertiK ✓", "SOC 2", "GDPR", "ISO 27001"];

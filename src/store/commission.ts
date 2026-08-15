@@ -28,7 +28,7 @@ export type CommissionStatus = "cooling" | "unlocked" | "withdrawn";
 export interface CommissionEvent {
   id: string;
   kind: CommissionKind;
-  sourceUserId: string;
+  sourceUserId?: string;
   sourceUserName: string;
   layer?: number;             // 仅 unilevel
   orderId?: string;
@@ -163,6 +163,8 @@ export const useCommission = defineStore("commission", () => {
   let bindingEpoch = 0;
   const events = ref<CommissionEvent[]>(remoteApiEnabled ? [] : hydrate(boundKey));
   const binarySnapshot = ref<CanonicalBinaryState | null>(null);
+  const eventsStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+  const binaryStatus = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
 
   type RequestScope = { accountKey: string; epoch: number };
   const requestScope = (): RequestScope => ({ accountKey: boundKey, epoch: bindingEpoch });
@@ -181,6 +183,8 @@ export const useCommission = defineStore("commission", () => {
     if (remoteApiEnabled) {
       binarySnapshot.value = null;
       events.value = [];
+      eventsStatus.value = "idle";
+      binaryStatus.value = "idle";
       const scope = requestScope();
       void Promise.allSettled([refreshCanonicalBinary(scope), refreshCanonicalEvents(scope)]);
       return;
@@ -190,23 +194,27 @@ export const useCommission = defineStore("commission", () => {
 
   async function refreshCanonicalBinary(scope = requestScope()) {
     if (!remoteApiEnabled) return;
+    binaryStatus.value = "loading";
     try {
       const snapshot = await commissionConfigApi.binary();
       if (!isCurrentScope(scope)) return;
       binarySnapshot.value = snapshot;
+      binaryStatus.value = "ready";
     } catch {
-      // 权威不可达时保留当前账号的空态或最近一次权威快照，等待下次 onShow 重试。
+      if (isCurrentScope(scope)) binaryStatus.value = "error";
     }
   }
 
   async function refreshCanonicalEvents(scope = requestScope()) {
     if (!remoteApiEnabled) return;
+    eventsStatus.value = "loading";
     try {
       const snapshot = await teamInsightsApi.commissions();
       if (!isCurrentScope(scope)) return;
       events.value = snapshot.events;
+      eventsStatus.value = "ready";
     } catch {
-      // 同上：bindAccount 已先清空跨账号数据，迟到结果也由 scope 丢弃。
+      if (isCurrentScope(scope)) eventsStatus.value = "error";
     }
   }
 
@@ -285,7 +293,7 @@ export const useCommission = defineStore("commission", () => {
   }
 
   return {
-    events, binarySnapshot, bindAccount, refreshCanonicalBinary, refreshCanonicalEvents,
+    events, binarySnapshot, eventsStatus, binaryStatus, bindAccount, refreshCanonicalBinary, refreshCanonicalEvents,
     addEvent, unlockMatured, withdraw,
     totalUSDTLifetime, totalNEXLifetime, unlockedUSDT, unlockedNEX, coolingUSDT,
     todayUSDT, monthUSDT, monthNEX, byKind,

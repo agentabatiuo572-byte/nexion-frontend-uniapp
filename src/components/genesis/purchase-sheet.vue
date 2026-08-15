@@ -184,7 +184,7 @@ async function handlePurchase() {
   if (qty.value > gate.value.capRemaining) {
     toast.error(
       t.value.genesisEligibility.toastCapReached,
-      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }),
+      fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }),
     );
     return;
   }
@@ -234,7 +234,7 @@ async function handlePurchase() {
         if (r.reason === "market-closed") toast.error(sheetBlockText.value, t.value.genesis.marketClosed.holdingsSafe);
         else if (r.reason === "cap") {
           toast.error(t.value.genesisEligibility.toastCapReached,
-            fmt(t.value.genesisEligibility.toastCapReachedSub, { n: GENESIS_ELIGIBILITY.perUserCap }));
+            fmt(t.value.genesisEligibility.toastCapReachedSub, { n: remoteApiEnabled ? genesis.remoteEligibility?.maxPerUser ?? 0 : GENESIS_ELIGIBILITY.perUserCap }));
         } else toast.error(fmt(t.value.genesis.onlyNLeft, { n: remaining.value }), t.value.genesis.reduceQty);
         return;
       }

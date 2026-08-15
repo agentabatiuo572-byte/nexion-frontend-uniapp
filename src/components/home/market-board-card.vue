@@ -43,23 +43,22 @@
       </view>
     </view>
     <view v-else class="rounded-xl" style="background: var(--v5-surface); padding: 14px">
-      <view class="flex items-center justify-between">
-        <text style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink)">NEX</text>
-        <text v-if="market.remoteReady && market.nexPriceUSDT > 0" class="font-mono-tabular" style="color: var(--v5-ink)">${{ market.nexPriceUSDT.toFixed(6) }}</text>
-        <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">Unavailable</text>
+      <view v-if="homeMarketRows.length" v-for="row in homeMarketRows" :key="row.code" class="flex items-center justify-between py-1.5">
+        <text class="truncate" style="font-size: 12px; color: var(--v5-ink-2)">{{ row.name ?? row.code }}</text>
+        <text class="font-mono-tabular" style="color: var(--v5-ink)">{{ row.price === null ? "—" : `$${row.price}` }} <text style="color: var(--v5-ink-3)">{{ row.deltaPct === null ? "" : `${row.deltaPct >= 0 ? '+' : ''}${row.deltaPct.toFixed(1)}%` }}</text></text>
       </view>
-      <text v-if="market.remoteReady" class="block font-mono-tabular mt-1" :style="{ color: market.change24hPct >= 0 ? 'var(--v5-success)' : 'var(--v5-danger)' }">{{ market.change24hPct >= 0 ? '+' : '' }}{{ market.change24hPct.toFixed(2) }}%</text>
-      <text v-else class="block mt-1" style="font-size: 12px; color: var(--v5-ink-3)">Market quote unavailable.</text>
+      <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">Unavailable</text>
     </view>
   </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { remoteApiEnabled } from "@/api/runtime";
 import { useMarket } from "@/store/market";
+import { useApp } from "@/store/app";
 import HomeSparkline from "./home-sparkline.vue";
 
 interface MbRow {
@@ -74,6 +73,8 @@ interface MbRow {
 
 const t = useT();
 const market = useMarket();
+const app = useApp();
+const homeMarketRows = computed(() => app.homeTruth?.marketBoard.workloads ?? []);
 const tick = ref(0);
 let timer: ReturnType<typeof setInterval> | null = null;
 onMounted(() => {

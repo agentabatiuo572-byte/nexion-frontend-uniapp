@@ -23,7 +23,7 @@
         </view>
         <text class="block" style="font-size: 12px; letter-spacing: 0.18em; color: var(--v5-tech-cyan)">{{ t.developer.headline }}</text>
         <text class="block" :style="heroTaglineStyle">{{ t.developer.tagline }}</text>
-        <view class="mt-4 flex flex-wrap" style="gap: 6px">
+        <view v-if="!remoteApiEnabled" class="mt-4 flex flex-wrap" style="gap: 6px">
           <text class="block" :style="badgeStyle">{{ t.developer.badgeEnterprise }}</text>
           <text class="block" :style="badgeStyle">{{ t.developer.badgeUptime }}</text>
           <text class="block" :style="badgeStyle">{{ t.developer.badgeAuth }}</text>
@@ -54,7 +54,7 @@
         </view>
 
         <!-- Partners -->
-        <view class="mx-4 mt-4">
+        <view v-if="!remoteApiEnabled" class="mx-4 mt-4">
           <text class="block" :style="partnerTitleStyle">{{ t.developer.partners }}</text>
           <view class="rounded-2xl grid" :style="partnerGridStyle">
             <view v-for="p in PARTNERS" :key="p.id" class="grid place-items-center" :style="partnerCellStyle">

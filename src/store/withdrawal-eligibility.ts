@@ -13,6 +13,7 @@ import type { Withdrawal } from "@/store/types";
 import type { WithdrawalRiskRoute } from "@/store/config-types";
 import { decideFromStores, isDailyLimitReached, nextDayResetAt } from "@/store/withdrawal-eligibility-core";
 import { usePayoutAddress } from "@/store/payout-address";
+import { remoteApiEnabled, withdrawalApi } from "@/api/runtime";
 import {
   fromWithdrawNetwork,
   NEW_ADDRESS_AGE_DAYS,
@@ -173,6 +174,23 @@ export function requestWithdrawalEligibility(
   daily: WithdrawalDailyFacts,
   requestedUsdt?: number,
 ): Promise<WithdrawalEligibility> {
+  if (remoteApiEnabled) {
+    return withdrawalApi.eligibility({
+      amount: requestedUsdt ?? 0,
+      chain: network,
+      address,
+    }).then((snapshot) => ({
+      canSubmit: snapshot.canSubmit,
+      maxWithdrawableUsdt: snapshot.maxWithdrawableUsdt,
+      route: snapshot.route,
+      riskReasons: snapshot.riskReasons,
+      fastLaneApplied: snapshot.fastLaneApplied,
+      waivedGates: snapshot.waivedGates,
+      dailyLimitReached: snapshot.dailyLimitReached,
+      dailyCountResetAt: snapshot.dailyCountResetAt,
+      configVersion: snapshot.configVersion,
+    }));
+  }
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (devEligibilityTimeout) {
