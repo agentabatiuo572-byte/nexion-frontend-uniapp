@@ -18,6 +18,9 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
 - 22 处 Date 格式化(`toLocaleDateString` / `toLocaleTimeString` / Date 的 `toLocaleString`)全部改传 `dateLocale()`;
   wallet-bills 本地 `localeTag` computed + `useLocaleStore` 引用收编删除。
 - `scripts/verify.sh` 焊哨兵 `date toLocale* pins app locale (dateLocale())`;`docs/PORT-PITFALLS.md` 登记 P-096。
+- **skeptic 对抗轮**(3 条 P1 全采纳):feed 两处 `toLocaleTimeString` 钉 `hour12: false`(防 en 应用 12h 撑破固定栅格列);
+  tag 表补全 11 语 + `Record<LocaleCode, string>` 类型锁,启用与否由 `code in DICTS` 派生(消灭第二张手抄开关表);
+  哨兵扩容 4 分支(navigator.* / 字符串字面量 / Intl.DateTimeFormat / `[ ]` 变体),合成探针 11/11 红、真实 src 0 误伤。
 
 **Out of scope**:数字千分位 `Number#toLocaleString()`(~150 处,部分已定点 "en-US")不属于「混语日期」族——
 数字分组无月名等语言词,视觉混感极低,且全站统一属产品口径决策(vi 会变 `1.234,56`),不在本包动。
@@ -42,7 +45,8 @@ wallet-bills 早已单点修过(本地 `localeTag`)但未扫全站——本包�
 - [x] format.ts 落 `dateLocale()` 单源
 - [x] 22 处调用点接线(含 wallet-bills 收编)
 - [x] verify.sh 哨兵 + PORT-PITFALLS P-096
-- [ ] vue-tsc 0 err
+- [x] skeptic 证伪轮 → 3 条 P1 修复(hour12 / 类型锁+DICTS 派生 / 哨兵扩容+红测 11/11)
+- [x] vue-tsc 0 err
 - [ ] verify.sh 全量绿(哨兵新行 PASS 出现在输出里 = 门已接线)
 - [ ] 浏览器三语实测(proof 页,浏览器语言与应用语言错开)+ 截图
 - [ ] 独立 tester 黑盒验收(报告落同目录 `2026-08-15-date-locale-unify-t1-test.md`)
