@@ -9,7 +9,7 @@ import { useI18nRuntime } from "@/store/i18n-runtime";
 // Ported from Nexion-prototype/lib/i18n/use-t.ts (zustand → Pinia).
 // Only locales with real dictionaries are listed; everything else falls back
 // to English (the source-of-truth).
-const DICTS: Partial<Record<LocaleCode, Messages>> = {
+export const DICTS: Partial<Record<LocaleCode, Messages>> = {
   en,
   vi,
   zh,

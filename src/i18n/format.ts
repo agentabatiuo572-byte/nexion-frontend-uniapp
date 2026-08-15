@@ -1,4 +1,6 @@
 import { useLocaleStore } from "@/store/locale";
+import { DICTS } from "./use-t";
+import type { LocaleCode } from "./index";
 
 /**
  * Tiny string interpolator for i18n keys with placeholders.
@@ -22,12 +24,28 @@ export function fmt(
  * BCP-47 tag for Date#toLocale{Date,Time}String / toLocaleString — must follow
  * the language the UI actually renders, never the device locale (`undefined`
  * showed "Member since 2026年7月" on an English page under a zh browser).
- * Real dictionaries exist for en/vi/zh; every other pick falls back to English
- * copy in use-t, so dates fall back to en-US with it. Reads the locale store,
- * so calls inside a computed re-run on language switch.
+ * Whether a tag is ACTIVE is derived from DICTS — the same membership useT uses
+ * for copy fallback — so shipping a new dictionary flips dates to that language
+ * automatically; there is no second hand-maintained on/off list to forget
+ * (wallet-bills' local localeTag already diverged once that way). The table is
+ * typed against LocaleCode: adding a 12th locale fails to compile until it gets
+ * a tag. Reads the locale store, so calls inside a computed re-run on switch.
  */
-const DATE_LOCALE_TAGS: Record<string, string> = { en: "en-US", vi: "vi-VN", zh: "zh-CN" };
+const DATE_LOCALE_TAGS: Record<LocaleCode, string> = {
+  en: "en-US",
+  vi: "vi-VN",
+  zh: "zh-CN",
+  ja: "ja-JP",
+  ko: "ko-KR",
+  ru: "ru-RU",
+  es: "es-419",
+  pt: "pt-BR",
+  ar: "ar-SA",
+  de: "de-DE",
+  fr: "fr-FR",
+};
 
 export function dateLocale(): string {
-  return DATE_LOCALE_TAGS[useLocaleStore().code] ?? "en-US";
+  const code = useLocaleStore().code;
+  return code in DICTS ? DATE_LOCALE_TAGS[code] : DATE_LOCALE_TAGS.en;
 }

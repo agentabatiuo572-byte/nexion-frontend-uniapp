@@ -57,7 +57,7 @@ const remoteRows = computed(() => app.visibleDevices
     who: task.client,
     model: task.model,
     amt: `+$${task.reward.toFixed(5)}`,
-    t: new Date(task.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit" }),
+    t: new Date(task.completedAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false }),
   })));
 const rows = computed(() => remoteApiEnabled ? remoteRows.value : ROWS);
 

@@ -128,7 +128,7 @@ const remoteTaskRows = computed(() => app.visibleDevices
   .filter((task) => Number.isFinite(task.eventAt))
   .sort((a, b) => b.eventAt - a.eventAt)
   .slice(0, 6)
-  .map((task) => ({ id: task.id, client: task.client, model: task.model, reward: task.reward, time: new Date(task.eventAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit" }) })));
+  .map((task) => ({ id: task.id, client: task.client, model: task.model, reward: task.reward, time: new Date(task.eventAt).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", hour12: false }) })));
 
 const tabs = computed(() => [
   { id: "activity" as const, label: t.value.home.liveFeedTabActivity },
