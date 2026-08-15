@@ -8,6 +8,12 @@ import {
 } from "./lib/probe-coverage.mjs";
 
 const baseUrl = process.env.BASE_URL || "http://localhost:5173";
+// The legacy verification lane shares one Vite server with hundreds of
+// preceding checks. On Windows a cold route transform can exceed Playwright's
+// 30s default even though the isolated runtime gate is healthy. Keep this
+// probe fail-closed, but give the document response the same 60s budget as the
+// surrounding legacy runtime checks.
+const navigationTimeoutMs = 60_000;
 const routes = [
   "/#/pages/entry-surfaces/index",
   "/#/pages/entry-surfaces/signed",
@@ -69,7 +75,10 @@ async function main() {
     await page.addInitScript((keys) => {
       for (const key of keys) localStorage.removeItem(key);
     }, businessStorageKeys);
-    await page.goto(directAppUrl(baseUrl, route), { waitUntil: "domcontentloaded" });
+    await page.goto(directAppUrl(baseUrl, route), {
+      waitUntil: "domcontentloaded",
+      timeout: navigationTimeoutMs,
+    });
     await page.locator("body").waitFor({ state: "visible", timeout: 10000 });
     await page.waitForTimeout(4700);
     const text = await page.locator("body").innerText({ timeout: 5000 });

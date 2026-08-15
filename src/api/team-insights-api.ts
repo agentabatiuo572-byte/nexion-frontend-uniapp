@@ -9,6 +9,16 @@ export interface TeamLeaderboardSnapshot extends TeamProvenance {
   poolUsd: number; topN: number; generatedAt: string;
 }
 export interface TeamCommissionSnapshot extends TeamProvenance { events: CommissionEvent[]; generatedAt: string }
+export interface TeamUnilevelEvent {
+  id: string; source: string; sourceUserId: string; sourceUserName: string; cycle: string; layer: number;
+  orderId: string | null; orderAmountUSD: number; amountUSDT: number; amountNEX: number;
+  currency: string; status: CommissionEvent["status"]; ts: number; unlockAt: number;
+}
+export interface TeamUnilevelSplit { amountUSDT: number; amountNEX: number; count: number }
+export interface TeamUnilevelSnapshot extends TeamProvenance {
+  period: LeaderPeriod; events: TeamUnilevelEvent[];
+  split: { direct: TeamUnilevelSplit; extended: TeamUnilevelSplit }; generatedAt: string;
+}
 export interface TeamPoolDistribution { vRank: number; people: number; votes: number }
 export interface TeamLeadershipHistory { weekId: string; payoutUSDT: number }
 export interface TeamLeadershipPoolSnapshot extends TeamProvenance {
@@ -19,6 +29,7 @@ export interface TeamLeadershipPoolSnapshot extends TeamProvenance {
 export interface TeamInsightsApi {
   leaderboard(period: LeaderPeriod): Promise<TeamLeaderboardSnapshot>;
   commissions(): Promise<TeamCommissionSnapshot>;
+  unilevel(period: LeaderPeriod): Promise<TeamUnilevelSnapshot>;
   leadershipPool(): Promise<TeamLeadershipPoolSnapshot>;
 }
 
@@ -40,6 +51,9 @@ const KINDS=new Set(["unilevel","binary","peer","cultivation","leadership","gene
 const STATUSES=new Set(["cooling","unlocked","withdrawn"]);
 function commissions(value: unknown): TeamCommissionSnapshot { const source=row(value);const proof=provenance(source);if(!Array.isArray(source.events)) return invalid();const events=source.events.map((item):CommissionEvent=>{const v=row(item);if(!KINDS.has(String(v.kind))||!STATUSES.has(String(v.status))) return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);return {id:text(v.id),kind:v.kind as CommissionEvent["kind"],sourceUserId:text(v.sourceUserId),sourceUserName:text(v.sourceUserName),layer:v.layer===null||v.layer===undefined?undefined:num(v.layer,true),orderId:v.orderId===null||v.orderId===undefined?undefined:text(v.orderId),orderAmountUSD:v.orderAmountUSD===null||v.orderAmountUSD===undefined?undefined:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),ts,unlockAt,status:v.status as CommissionEvent["status"]};});const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();return {...proof,events,generatedAt}; }
 
+function split(value: unknown): TeamUnilevelSplit { const source=row(value); return { amountUSDT:num(source.amountUSDT), amountNEX:num(source.amountNEX), count:num(source.count,true) }; }
+function unilevel(value: unknown): TeamUnilevelSnapshot { const source=row(value);const proof=provenance(source);const period=source.period;if(period!=="today"&&period!=="week"&&period!=="month"&&period!=="all")return invalid();if(!Array.isArray(source.events))return invalid();const events=source.events.map((item):TeamUnilevelEvent=>{const v=row(item);const layer=num(v.layer,true);if(layer<1||layer>7)return invalid();const status=String(v.status);if(!STATUSES.has(status))return invalid();const ts=num(v.ts,true),unlockAt=num(v.unlockAt,true);return {id:text(v.id),source:text(v.source),sourceUserId:text(v.sourceUserId),sourceUserName:text(v.sourceUserName),cycle:text(v.cycle),layer,orderId:v.orderId===null||v.orderId===undefined?null:text(v.orderId),orderAmountUSD:num(v.orderAmountUSD),amountUSDT:num(v.amountUSDT),amountNEX:num(v.amountNEX),currency:text(v.currency),status:status as CommissionEvent["status"],ts,unlockAt};});const rawSplit=row(source.split);const generatedAt=text(source.generatedAt);if(!Number.isFinite(Date.parse(generatedAt)))return invalid();return {...proof,period,events,split:{direct:split(rawSplit.direct),extended:split(rawSplit.extended)},generatedAt}; }
+
 function pool(value: unknown): TeamLeadershipPoolSnapshot {const source=row(value);const proof=provenance(source);if(!Array.isArray(source.distribution)||!Array.isArray(source.history))return invalid();const distribution=source.distribution.map(item=>{const v=row(item);const vRank=num(v.vRank,true);if(vRank>12)return invalid();return {vRank,people:num(v.people,true),votes:num(v.votes,true)};});const history=source.history.map(item=>{const v=row(item);return {weekId:text(v.weekId),payoutUSDT:num(v.payoutUSDT)};});const nextPayoutAt=text(source.nextPayoutAt);if(!Number.isFinite(Date.parse(nextPayoutAt)))return invalid();return {...proof,currentWeekPoolUSDT:num(source.currentWeekPoolUSDT),myRank:num(source.myRank,true),myVotes:num(source.myVotes,true),totalVotes:num(source.totalVotes,true),mySharePct:num(source.mySharePct),projectedPayoutUSDT:num(source.projectedPayoutUSDT),distribution,history,nextPayoutAt};}
 
-export function createTeamInsightsApi(client: ApiClient): TeamInsightsApi {const root="/api/app/team/insights";return {leaderboard:async period=>leaderboard(await client.request<unknown>({path:`${root}/leaderboard?period=${encodeURIComponent(period)}`})),commissions:async()=>commissions(await client.request<unknown>({path:`${root}/commissions`})),leadershipPool:async()=>pool(await client.request<unknown>({path:`${root}/leadership-pool`}))};}
+export function createTeamInsightsApi(client: ApiClient): TeamInsightsApi {const root="/api/app/team/insights";return {leaderboard:async period=>leaderboard(await client.request<unknown>({path:`${root}/leaderboard?period=${encodeURIComponent(period)}`})),commissions:async()=>commissions(await client.request<unknown>({path:`${root}/commissions`})),unilevel:async period=>unilevel(await client.request<unknown>({path:`${root}/unilevel?period=${encodeURIComponent(period)}`})),leadershipPool:async()=>pool(await client.request<unknown>({path:`${root}/leadership-pool`}))};}

@@ -53,7 +53,7 @@
             <text class="lss-chip-t lss-chip-t-bonus">{{ bonusChip }}</text>
           </view>
         </view>
-        <text class="lss-social">{{ socialProofText }}</text>
+        <text v-if="!remoteApiEnabled" class="lss-social">{{ socialProofText }}</text>
       </view>
 
       <!-- ───────── 转盘 ───────── -->
@@ -121,14 +121,14 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lss-pool-chev" :class="{ 'lss-pool-chev-open': poolOpen }"><path d="m9 18 6-6-6-6" /></svg>
       </view>
       <view v-if="poolOpen" class="lss-pool-grid">
-        <view v-for="sp in SPIN_PRIZES" :key="sp.id" class="lss-pool-item" :style="{ opacity: sp.isReal && !realActive ? 0.45 : 1 }">
+        <view v-for="sp in prizes" :key="sp.id" class="lss-pool-item" :style="{ opacity: sp.isReal && !realActive ? 0.45 : 1 }">
           <view class="lss-pool-dot" :style="{ background: sp.tint }" />
           <text class="lss-pool-name">{{ ls(sp) }}</text>
         </view>
       </view>
 
       <!-- 我的中奖 -->
-      <view v-if="spin.history.length > 0" class="lss-hist">
+      <view v-if="historyRows.length > 0" class="lss-hist">
         <view class="lss-hist-head">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" /><path d="M12 7v5l4 2" /></svg>
           <text class="lss-hist-head-t">{{ t.luckySpin.historyTitle }}</text>
@@ -145,12 +145,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from "vue";
+import { computed, ref, onUnmounted, watch } from "vue";
 import type { CSSProperties } from "vue";
 import {
   useLuckySpin,
   SPIN_PRIZES,
-  SEGMENT_COUNT,
   type SpinPrize,
 } from "@/store/lucky-spin";
 import { postMoneyBill } from "@/lib/money-receipt";
@@ -159,17 +158,20 @@ import { toast, confirm, netError } from "@/store/ui";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useApp } from "@/store/app";
 
 const R = 94; // wheel radius (viewBox 200)
 const CX = 100;
 const CY = 100;
-const SEG = 360 / SEGMENT_COUNT;
 const MOCK_NET_FAIL_RATE = 0.08; // mock: 区块链拥堵演示(server 侧真实裁决)
 
 const spin = useLuckySpin();
+const app = useApp();
 const t = useT();
 
 const poolOpen = ref(false);
+let accountGeneration = 0;
 
 // social proof — mock 实时数(不必准确,营造真平台氛围)
 const winnersToday = 247;
@@ -184,9 +186,13 @@ function polar(angleDeg: number, radius: number): { x: number; y: number } {
 
 /** mock UTC 次日 0 点倒计时文案 hh:mm */
 function untilUtcResetLabel(): string {
-  const now = mockServerNow();
+  const now = remoteApiEnabled ? Date.now() : mockServerNow();
+  const serverReset = remoteApiEnabled ? spin.nextResetAtUtc() : null;
+  if (remoteApiEnabled && !serverReset) return "—";
   const d = new Date(now);
-  const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0);
+  const next = serverReset ? Date.parse(serverReset)
+    : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1, 0, 0, 0);
+  if (!Number.isFinite(next)) return "—";
   const ms = next - now;
   const h = Math.floor(ms / 3_600_000);
   const m = Math.floor((ms % 3_600_000) / 60_000);
@@ -199,21 +205,26 @@ const available = computed(() => spin.availableSpins());
 const realActive = computed(() => spin.realPrizeActive());
 const realPrizeSoldOut = computed(() => spin.realPrizeSoldOut);
 
-const ls = (sp: SpinPrize) => t.value.luckySpin.prizes[sp.labelKey as keyof typeof t.value.luckySpin.prizes];
-const lsShort = (sp: SpinPrize) => t.value.luckySpin.prizesShort[sp.labelKey as keyof typeof t.value.luckySpin.prizesShort];
+const ls = (sp: SpinPrize) => t.value.luckySpin.prizes[sp.labelKey as keyof typeof t.value.luckySpin.prizes]
+  || sp.rewardName || sp.id;
+const lsShort = (sp: SpinPrize) => t.value.luckySpin.prizesShort[sp.labelKey as keyof typeof t.value.luckySpin.prizesShort]
+  || sp.rewardName || sp.id;
 
 const bonusChip = computed(() => fmt(t.value.luckySpin.bonusTicketChip, { n: spin.bonusTickets }));
 const socialProofText = computed(() => fmt(t.value.luckySpin.socialProof, { n: winnersToday }));
 const noSpinHintText = computed(() => fmt(t.value.luckySpin.noSpinHint, { time: untilUtcResetLabel() }));
 
-// wheel slices (drawn clockwise from 12 o'clock; segment i = SPIN_PRIZES[i])
+const prizes = computed(() => remoteApiEnabled ? spin.remoteSegments : SPIN_PRIZES);
+
+// wheel slices (drawn clockwise from 12 o'clock; segment i = server segment i in remote mode)
 const slices = computed(() =>
-  SPIN_PRIZES.map((sp, i) => {
-    const a0 = -90 + i * SEG;
-    const a1 = -90 + (i + 1) * SEG;
+  prizes.value.map((sp, i) => {
+    const segmentDeg = 360 / prizes.value.length;
+    const a0 = -90 + i * segmentDeg;
+    const a1 = -90 + (i + 1) * segmentDeg;
     const p0 = polar(a0, R);
     const p1 = polar(a1, R);
-    const mid = polar(a0 + SEG / 2, 60);
+    const mid = polar(a0 + segmentDeg / 2, 60);
     const dim = sp.isReal && !realActive.value; // 降级/售罄 → 真实奖档置灰
     const fill = `color-mix(in srgb, ${sp.tint} ${i % 2 === 0 ? 46 : 30}%, var(--v5-surface-2))`;
     return { sp, i, path: `M${CX},${CY} L${p0.x},${p0.y} A${R},${R} 0 0 1 ${p1.x},${p1.y} Z`, mid, dim, fill };
@@ -238,7 +249,7 @@ const slicesSvg = computed(() =>
 );
 
 const wonPrize = computed(() =>
-  spin.lastWonPrizeId ? SPIN_PRIZES.find((p) => p.id === spin.lastWonPrizeId) ?? null : null,
+  spin.lastWonPrizeId ? prizes.value.find((p) => p.id === spin.lastWonPrizeId) ?? null : null,
 );
 const isJackpot = computed(() =>
   wonPrize.value
@@ -246,13 +257,20 @@ const isJackpot = computed(() =>
     : false,
 );
 
-const historyRows = computed(() =>
-  spin.history.slice(0, 5).flatMap((h) => {
+const historyRows = computed(() => {
+  if (remoteApiEnabled) {
+    return spin.remoteHistory.slice(0, 5).map((h) => ({
+      ts: Date.parse(h.awardedAt),
+      label: h.rewardName,
+      time: h.awardedAt.slice(5, 16).replace("T", " "),
+    }));
+  }
+  return spin.history.slice(0, 5).flatMap((h) => {
     const sp = SPIN_PRIZES.find((p) => p.id === h.prizeId);
     if (!sp) return [];
     return [{ ts: h.ts, label: ls(sp), time: new Date(h.ts).toISOString().slice(5, 16).replace("T", " ") }];
-  }),
-);
+  });
+});
 
 // ── inline styles (token-driven; CSSProperties) ──
 const wheelStyle = computed<CSSProperties>(() => ({
@@ -303,14 +321,19 @@ function clearSettleTimer() {
 // 结算一次抽奖(派奖 + 历史 + toast)。幂等:phase!=="spinning" 直接早退 —
 // 由 transitionend / 兜底 timer / 关闭中途 三处任一触发,只生效一次,
 // 杜绝"消费了票但奖没派"(切后台 / 导航 / transitionend 不触发时的兜底)。
-function settleSpin() {
+function settleSpin(expectedGeneration = accountGeneration) {
+  if (expectedGeneration !== accountGeneration) return;
   if (spin.phase !== "spinning") return;
-  const sp = SPIN_PRIZES.find((p) => p.id === spin.lastWonPrizeId);
+  const sp = prizes.value.find((p) => p.id === spin.lastWonPrizeId);
   if (!sp) {
     spin.backToIdle();
     return;
   }
   spin.reveal();
+  if (remoteApiEnabled) {
+    toast.success(fmt(t.value.luckySpin.wonToast, { prize: ls(sp) }), t.value.luckySpin.wonToastSub);
+    return;
+  }
   // 🔴 顺序不可换、返回值不可丢:奖没到账就不许写历史、不许弹「你赢了」。
   // 收口点在失败时已经弹过「交易未保存」,这里再补一句成功文案就是当面撒谎;
   // 而 pushHistory 是**持久化**的,写下去等于给用户留一张查无此账的中奖凭证。
@@ -328,6 +351,7 @@ function onWheelTransitionEnd(e: Event) {
 
 async function doSpin(skipConfirm = false) {
   if (spin.availableSpins() <= 0) return;
+  const generation = accountGeneration;
   const usingBonus = !spin.hasFreeSpinToday();
 
   // bonus 票为稀缺资源 → 二次确认;免费次数零门槛不弹(转化优先)。
@@ -341,10 +365,11 @@ async function doSpin(skipConfirm = false) {
       icon: "info",
     });
     if (!ok) return;
+    if (generation !== accountGeneration) return;
   }
 
-  // mock 网络:区块链拥堵演示(抽奖券不扣除)。server 侧真实裁决:POST /api/events/:id/spin
-  if (Math.random() < MOCK_NET_FAIL_RATE) {
+  // mock 网络:区块链拥堵演示(抽奖券不扣除)。remote 失败由 API 错误路径处理。
+  if (!remoteApiEnabled && Math.random() < MOCK_NET_FAIL_RATE) {
     netError.show({
       title: t.value.luckySpin.netErrorTitle,
       message: t.value.luckySpin.netErrorMsg,
@@ -357,7 +382,34 @@ async function doSpin(skipConfirm = false) {
     return;
   }
 
-  // 消费票 + mock server roll(server-canonical RNG 占位)+ 置 spinning + 目标角。
+  if (remoteApiEnabled) {
+    const key = pendingSpinKey ?? createSpinIdempotencyKey();
+    pendingSpinKey = key;
+    const result = await spin.spinRemote("evt-spring-spin", key);
+    if (generation !== accountGeneration) return;
+    if (result.stale) return;
+    if (!result.ok) {
+      netError.show({
+        title: t.value.luckySpin.netErrorTitle,
+        message: t.value.luckySpin.netErrorMsg,
+        retryAfterMs: null,
+        onRetry: () => {
+          netError.hide();
+          void doSpin(true);
+        },
+      });
+      return;
+    }
+    pendingSpinKey = null;
+    clearSettleTimer();
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      settleSpin(generation);
+    }, 3650);
+    return;
+  }
+
+  // mock:本地消费票 + 本地演示 RNG + 置 spinning + 目标角。
   // 🔴 票没扣成就不能转轮子:上面的 availableSpins() 预判读的是本页内存态,而票是
   // 每日配额 + 稀缺资源;别的标签页刚花掉时 store 按磁盘最新态拒掉,此时还往下走
   // 就是两个标签页花同一张票各中一次奖。
@@ -373,6 +425,20 @@ async function doSpin(skipConfirm = false) {
     settleTimer = null;
     settleSpin();
   }, 3650);
+}
+
+let pendingSpinKey: string | null = null;
+watch(() => app.accountKey, () => {
+  accountGeneration += 1;
+  pendingSpinKey = null;
+  clearSettleTimer();
+});
+let spinKeySequence = 0;
+function createSpinIdempotencyKey(): string {
+  const randomUuid = globalThis.crypto?.randomUUID;
+  if (typeof randomUuid === "function") return `lucky-spin-${randomUuid()}`;
+  spinKeySequence += 1;
+  return `lucky-spin-${Date.now().toString(36)}-${spinKeySequence}`;
 }
 
 function onSpinClick() {

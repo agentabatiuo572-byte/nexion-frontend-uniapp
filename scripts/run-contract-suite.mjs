@@ -38,6 +38,17 @@ const REGISTRY = {
   "nova-local-ai-contract.test.mjs": { how: "chain" },
   "compute-share-server-enrollment-contract.test.mjs": { how: "chain" },
   "remaining-feature-closure-contract.test.mjs": { how: "chain" },
+  "phase-isolation-contract.test.mjs": { how: "chain" },
+  "server-product-phase-catalog-contract.test.mjs": { how: "chain" },
+  "social-facts-authority-contract.test.mjs": { how: "chain" },
+  "store-catalog-deeplink-contract.test.mjs": { how: "chain" },
+  "tradein-account-switch-contract.test.mjs": { how: "chain" },
+  "tradein-remote-authority-contract.test.mjs": { how: "chain" },
+  "oauth-sandbox-contract.test.mjs": { how: "chain" },
+  "risk-disclosure-sandbox-contract.test.mjs": { how: "chain" },
+  "remote-external-data-hold-contract.test.mjs": { how: "chain" },
+  "withdraw-p0-contract.test.mjs": { how: "chain" },
+  "legacy-suite-path-contract.test.mjs": { how: "chain" },
   // ── 同事 2026-08-12 批次新增(收口会话据实登记:29 进链 · 1 缺兄弟仓)──
   "country-code-selector-contract.test.mjs": { how: "chain" },
   "e18-e20-runtime-consumer-contract.test.mjs": { how: "chain" },
@@ -57,12 +68,12 @@ const REGISTRY = {
   "commerce-acceptance-h5-launch-contract.test.mjs": { how: "chain" },
   "remote-registration-unknown-result-contract.test.mjs": { how: "chain" },
   "funds-run-scoped-isolation-contract.test.mjs": {
-    how: "excluded",
-    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下同时有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘搜无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉它后面所有门。",
+    how: "elsewhere",
+    by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend)",
   },
   "h8-run-scoped-referral-projection-contract.test.mjs": {
-    how: "excluded",
-    why: "同上,单体仓布局:读 backend 的 AppReferralRewardService.java / ReferralRewardMapper.java。npm run test:cross-repo。",
+    how: "elsewhere",
+    by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT/NEXGRID_PC_ROOT 或标准兄弟仓)",
   },
   "funds-production-withdrawal-hold-contract.test.mjs": {
     how: "excluded",
@@ -71,8 +82,8 @@ const REGISTRY = {
   // ── elsewhere:已有入口在跑 ──
   "acceptance-h5-sandbox-config.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "behavior-analytics-active-route-catalog-contract.test.mjs": {
-    how: "excluded",
-    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉后面所有门。",
+    how: "elsewhere",
+    by: "npm run test:cross-repo",
   },
   "behavior-analytics-auth-lifecycle-contract.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
   "e20-device-e3-api-behavior.test.mjs": { how: "elsewhere", by: "npm run test:real-backend-integration" },
@@ -82,8 +93,8 @@ const REGISTRY = {
   "funds-sandbox-visible-label-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "funds-sandbox-withdrawal-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "funds-server-sandbox-contract.test.mjs": {
-    how: "excluded",
-    why: "仓布局差异,非缺依赖:该测试按**单体仓**定位源(root=../.. 下有 backend/ 与 app/),而本仓是独立 checkout,断言的 Java 源在本机不存在(全盘无 AppWithdrawalService.java)。在单体仓环境用 npm run test:cross-repo 单跑;不进本仓门链,以免一步 ENOENT 崩掉后面所有门。",
+    how: "elsewhere",
+    by: "npm run test:cross-repo(支持 NEXGRID_BACKEND_ROOT 或兄弟仓 nexion-backend)",
   },
   "funds-server-sandbox-regression.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
   "h8-first-user-truth-contract.test.mjs": { how: "elsewhere", by: "npm run test:production-boundaries" },
@@ -107,7 +118,7 @@ const REGISTRY = {
   },
   "h-remote-authority-contract.test.mjs": {
     how: "excluded",
-    why: "断言读兄弟仓 ../nexion-backend 的 Java 源(本机无该 checkout,ENOENT 必红)。在有后端仓的环境用 node --test 单跑;已记 HANDOFF。",
+    why: "旧 H8 断言要求注册页直接调用 authApi.register；当前注册已收口到 completeRemoteRegistration 编排并由更新的 registration 合约覆盖。其余 H3-H7 判据已有 chain/production-boundaries 等价覆盖，待拆除过期 H8 断言后再入链。",
   },
 };
 

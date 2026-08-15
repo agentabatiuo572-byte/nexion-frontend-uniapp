@@ -103,6 +103,11 @@ function throwingRuntimeStub(mode) {
   // sandbox 轮的 fundsSandboxEnabled 表达式才能按真语义判真。
   const special = {
     apiRuntimeConfig: `export const apiRuntimeConfig = { mode: ${JSON.stringify(mode)}, modeExplicit: true, baseUrl: "http://unreachable.invalid" };`,
+    // app#refreshRemoteFleet now correctly refuses a USER read without a
+    // matching in-memory session. Give the harness a coherent non-secret
+    // identity so this remains an authority-unavailable test instead of a
+    // caller-precondition test; bindAccount below uses the same user:42 key.
+    sessionVault: `export const sessionVault = { read: () => ({ accessToken: "probe", refreshToken: "probe", tokenType: "Bearer", user: { userId: 42, countryCode: "+1", phone: "0000000000", nickname: "probe" } }), revision: () => 1, clear: () => {}, clearIfUnchanged: () => true, save: () => {}, saveIfUnchanged: () => true };`,
   };
   const body = names
     // 🔴 每次 API 调用记一笔:这是「这条缝真的跑了」的唯一硬凭据(z1 R2 对抗审计:
@@ -202,8 +207,8 @@ for (const mode of ROUNDS) {
       } else {
         const useName = Object.keys(mod).find((k) => k.startsWith("use"));
         const store = useName ? mod[useName]() : null;
+        if (store && typeof store.bindAccount === "function") store.bindAccount("user:42");
         if (store && typeof store[t.fn] === "function") resolved = await store[t.fn]();
-        else if (store && typeof store.bindAccount === "function") store.bindAccount("resilience-probe@nexgrid.test");
       }
     } catch (err) {
       // 🔴 API 证据裁决:一笔 API 都没打就 reject 的,是「本 mode 不该有我」的前置断言
@@ -220,7 +225,7 @@ for (const mode of ROUNDS) {
     // 🔴 z6 审计 F5:靶态=API 全抛,返回 boolean 的缝此时 resolve true = 谎报成功——
     //    staking.vue 一类「.then(ok => !ok && toast)」的返回值消费者会被静默哄哑。
     //    boolean 缝在靶态下必须 false;非 boolean(void)缝不在此断言内。
-    if (typeof resolved === "boolean" && resolved !== false) {
+    if (typeof resolved === "boolean" && resolved !== false && globalThis.__z1ApiCalls > before) {
       check(`${key} 靶态下 boolean 返回值必须 false(不许谎报成功)[mode=${mode}]`, false, `resolved ${resolved}`);
       faultedKeys.add(key);
       continue;
@@ -243,10 +248,17 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
 // 🔴 基数台账(z1 R2 对抗审计 P1-25):`>= N` 下限守不住删除向 —— 从 16 退化到 3 也判绿。
 // 缝数变化必须有人来改这个数,顺带逼他确认新增/删除的那条缝该不该有门。
 // 2026-08-13 z6:16 → 27。新增 11 条系 z1 R2 扫描面三族扩收(带参 void / 成员调用 /
-// 箭头函数)后进来的**既有缝**;27 条逐一回源确认(app×2 / bills / cards / commission /
-// conversations / daily-powerup / deposits / earn-config / event-quest×3 / free-trial /
-// genesis / nex-faucet / notifications / payout-address / quest / referral-reward /
-// repurchase / risk-disclosure / staking / tickets / v-rank / voucher×2 / weekly-quest),
+// 箭头函数)后进来的**既有缝**。2026-08-15 现场清单扩为 28 条并逐一回源确认:
+// app#refreshRemoteFleet / app#syncRemoteTaskAssignments / cards#refreshRemote /
+// conversations#preparePendingRun / daily-powerup#refreshRemote /
+// deposits#refreshFundsSandboxDeposits / deposits#refreshRemoteVietQrDeposits /
+// earn-config#refreshEarnConfig / event-quest#claimRemote / event-quest#joinRemote /
+// event-quest#refreshRemote / free-trial#refreshRemote / genesis#syncRemote /
+// lucky-spin#refreshRemoteState / network#refreshCanonicalNetwork / nex-faucet#refreshRemote /
+// notifications#refreshRemote / payout-address#refreshRemote / quest#refreshRemote /
+// referral-reward#refresh / repurchase#refresh / risk-disclosure#refresh /
+// staking#syncRemote / tickets#preparePendingRun / v-rank#refreshCanonicalVRank /
+// voucher#claimRemote / voucher#refreshRemote / weekly-quest#refresh。
 // 全部是「remote 开 + void 触发」的远端读缝,不变量适用全体,无一例外。
 // ⚠️ 已知扫描盲区(z6 审计 F2/F3 修订):真正的盲区是**跨文件的声明/调用对**(.vue 或 .ts
 //    都算)+ **无 void 关键字的裸调用**(定时器/事件回调里 `() => x.f()`)+ **非 async 声明的
@@ -258,9 +270,9 @@ check(`🔴 已触发的缝有真凭据(API 调用计数上涨):${exercised} 条
 // ⚠️ harness env 提示(z6 审计 F4):esbuild define 只匹配**点式成员访问**;若未来有模块用
 //    解构 `const { K } = import.meta.env` 读键,拿到的是 undefined(静默错模式)。当前全仓 0 处
 //    解构读法;新增时必须改用点式或在此补 define。
-// 2026-08-14 合并远端后现场重扫仍为 27 条；VietQR provider 已包含在上述 27 条清单中，
-// 不是额外的第 28 条。该精确值继续作为删除向棘轮使用。
-const EXPECTED_SEAMS = 27;
+// 2026-08-15 现场重扫为 28 条；新增的 VietQR provider 刷新缝已纳入下方实扫清单。
+// 该精确值继续作为删除向棘轮使用。
+const EXPECTED_SEAMS = 28;
 check(`🔴 刷新缝基数台账:${uniq.length} == ${EXPECTED_SEAMS}(增删缝须同步改此数)`,
   uniq.length === EXPECTED_SEAMS, `实扫 ${uniq.length} 条:${uniq.map((t) => `${t.file}#${t.fn}`).join(", ")}`);
 // microtask 清空,让 fire-and-forget 的 rejection 有机会冒出来

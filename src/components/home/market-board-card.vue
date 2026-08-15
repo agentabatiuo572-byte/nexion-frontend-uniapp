@@ -6,12 +6,12 @@
 -->
 <template>
   <view>
-    <view class="flex items-center justify-between" style="margin: 8px 2px 10px">
+    <view v-if="!remoteApiEnabled" class="flex items-center justify-between" style="margin: 8px 2px 10px">
       <text style="font-family: var(--font-v5); font-weight: 600; font-size: 15px; color: var(--v5-ink); letter-spacing: -0.012em">{{ t.home.marketBoardTitle }} <text class="font-mono-tabular" style="font-size: 12px; font-weight: 400; color: var(--v5-ink-3)">{{ t.home.marketBoardPrices }}</text></text>
       <text class="font-mono-tabular inline-flex items-center active:opacity-70" style="min-height: 44px; padding-left: 12px; font-size: 13px; color: var(--v5-brand); font-weight: 500" @click="goMarket">{{ t.home.marketBoardOpen }} →</text>
     </view>
 
-    <view style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
+    <view v-if="!remoteApiEnabled" style="background: var(--v5-surface); border-radius: 16px; overflow: hidden">
       <view class="grid gap-2 font-mono-tabular" style="grid-template-columns: 36px 1fr 60px 76px 58px; padding: 9px 14px; background: var(--v5-surface-2); border-bottom: 1px solid var(--v5-border); font-size: 12px; color: var(--v5-ink-4)">
         <text>{{ t.home.mbColTag }}</text>
         <text>{{ t.home.mbColModel }}</text>
@@ -42,13 +42,24 @@
         <text class="text-right tabular-nums font-mono-tabular" :style="{ fontSize: '13px', color: r.d >= 0 ? 'var(--v5-success)' : 'var(--v5-danger)', fontWeight: 500 }">{{ changeText(r) }}</text>
       </view>
     </view>
+    <view v-else class="rounded-xl" style="background: var(--v5-surface); padding: 14px">
+      <view class="flex items-center justify-between">
+        <text style="font-family: var(--font-v5); font-weight: 600; color: var(--v5-ink)">NEX</text>
+        <text v-if="market.remoteReady && market.nexPriceUSDT > 0" class="font-mono-tabular" style="color: var(--v5-ink)">${{ market.nexPriceUSDT.toFixed(6) }}</text>
+        <text v-else class="font-mono-tabular" style="color: var(--v5-ink-3)">Unavailable</text>
+      </view>
+      <text v-if="market.remoteReady" class="block font-mono-tabular mt-1" :style="{ color: market.change24hPct >= 0 ? 'var(--v5-success)' : 'var(--v5-danger)' }">{{ market.change24hPct >= 0 ? '+' : '' }}{{ market.change24hPct.toFixed(2) }}%</text>
+      <text v-else class="block mt-1" style="font-size: 12px; color: var(--v5-ink-3)">Market quote unavailable.</text>
+    </view>
   </view>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue";
 import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
-import { useTicker } from "@/composables/use-ticker";
+import { remoteApiEnabled } from "@/api/runtime";
+import { useMarket } from "@/store/market";
 import HomeSparkline from "./home-sparkline.vue";
 
 interface MbRow {
@@ -62,7 +73,19 @@ interface MbRow {
 }
 
 const t = useT();
-const tick = useTicker(0, 1, 1600);
+const market = useMarket();
+const tick = ref(0);
+let timer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  if (remoteApiEnabled) {
+    void market.syncRemote();
+    return;
+  }
+  timer = setInterval(() => { tick.value += 1; }, 1600);
+});
+onUnmounted(() => {
+  if (timer) clearInterval(timer);
+});
 
 const ROWS: MbRow[] = [
   { tag: "IMG", name: "SDXL Turbo", unit: "image", base: 0.00032, d: 3.2, vol: "142k", spark: [3.0, 3.1, 3.0, 3.15, 3.2, 3.18, 3.22, 3.2] },

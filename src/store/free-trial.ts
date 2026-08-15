@@ -405,15 +405,59 @@ export const useFreeTrial = defineStore("freeTrial", () => {
   // 🔴 P0 防线:convert 内部自己取 mockServerNow() 并先 resolveTrialAt 推进边界,
   // 绝不信任调用方(结算页)缓存的 now 或内存里的旧 status —— 用户离线跨过宽限期
   // 后趁 poll 未跑下单,这里按真实时点判到 ended 即拒绝(边界推进结果已落盘)。
-  function convert(): boolean {
-    if (remoteApiEnabled) return false;
+  async function convert(productNo?: string): Promise<{
+    ok: boolean; reason?: TrialIneligibleReason; orderNo?: string;
+  }> {
+    const requestedProductNo = productNo ?? useTrialConfig().config.trialProductId;
+    if (remoteApiEnabled) {
+      if (authorityStatus.value !== "ready") await refreshRemote(true);
+      if (authorityStatus.value !== "ready" || !authorityClaimNo.value) return { ok: false, reason: "unknown" };
+      const requestedAccount = boundKey;
+      const expectedClaimNo = authorityClaimNo.value;
+      const key = `h2-convert:${expectedClaimNo}:${requestedProductNo}`;
+      try {
+        const sequence = ++authorityRequestSequence;
+        const receipt = await trialApi.convert(requestedProductNo, key);
+        if (requestedAccount !== boundKey) return { ok: false, reason: "unknown" };
+        const confirmed = await refreshRemote(true);
+        if (!confirmed || authorityClaimNo.value !== expectedClaimNo || status.value !== "converted") {
+          clearRemoteFacts("unknown", "TRIAL_CONVERT_RESULT_UNKNOWN");
+          return { ok: false, reason: "unknown" };
+        }
+        lastAppliedSequence = Math.max(lastAppliedSequence, sequence);
+        return { ok: true, orderNo: receipt.orderNo };
+      } catch (error) {
+        authorityError.value = asApiError(error).message;
+        // A lost HTTP response is reconciled with the same key first. The
+        // idempotency record can replay the original order receipt without a
+        // second stock reservation; only then do we fall back to state readback.
+        try {
+          const replay = await trialApi.convert(requestedProductNo, key);
+          const reconciled = await refreshRemote(true);
+          if (requestedAccount === boundKey && reconciled && authorityClaimNo.value === expectedClaimNo
+              && status.value === "converted") return { ok: true, orderNo: replay.orderNo };
+        } catch {
+          // Continue to the authoritative state readback below.
+        }
+        const reconciled = await refreshRemote(true);
+        if (requestedAccount === boundKey && reconciled && authorityClaimNo.value === expectedClaimNo
+            && status.value === "converted") {
+          // State readback proves the trial is terminal, but without the
+          // receipt/order number the checkout cannot safely present or poll
+          // the created order. Keep this unknown and retain the same key so a
+          // later retry can replay the idempotent receipt.
+          return { ok: false, reason: "unknown" };
+        }
+        return { ok: false, reason: "unknown" };
+      }
+    }
     const now = mockServerNow();
     const resolved = advanceTo(now);
-    if (resolved.status !== "active" && resolved.status !== "grace") return false;
+    if (resolved.status !== "active" && resolved.status !== "grace") return { ok: false, reason: "used" };
     status.value = "converted";
     finishedAt.value = now;
     persist();
-    return true;
+    return { ok: true };
   }
 
   // PRODUCTION: POST /api/trial/cancel. Spec ④: only `active →(用户主动取消)ended`

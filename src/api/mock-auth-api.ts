@@ -171,6 +171,11 @@ export function createMockAuthApi(vault: SessionVault): AuthApi {
       saveRegistry(reg);
       return persistLogin(sessionUser(request.countryCode, request.phone, rec), vault.revision());
     },
+    async oauthExchange() {
+      // Mock mode has no external identity provider. Keep the full AuthApi
+      // contract while failing closed if a caller bypasses the page-level gate.
+      throw new ApiError({ kind: "business", message: "OAUTH_PROVIDER_UNAVAILABLE" });
+    },
     async restore() {
       // 真实现走 refreshSession 换新 access token;mock 无服务端,本地重签同语义。
       const snapshot = vault.read();

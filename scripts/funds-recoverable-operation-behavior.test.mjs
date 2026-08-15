@@ -24,9 +24,10 @@ for (const reason of [
   "HTTP_401",
   "NETWORK_UNAVAILABLE",
 ]) {
-  test(`rejected funds request becomes retryable UI state: ${reason}`, async () => {
+  test(`rejected funds request becomes a safe retryable UI state: ${reason}`, async () => {
     let visibleError = "";
     let loading = true;
+    const safeMessage = "操作暂时没有完成，请稍后重试。";
     const result = await runRecoverableFundsOperation(
       async () => { throw new Error(reason); },
       {
@@ -34,9 +35,11 @@ for (const reason of [
         failure: (message) => { visibleError = message; },
         settled: () => { loading = false; },
       },
+      safeMessage,
     );
     assert.equal(result, null);
-    assert.equal(visibleError, reason);
+    assert.equal(visibleError, safeMessage);
+    assert.notEqual(visibleError, reason);
     assert.equal(loading, false);
   });
 }

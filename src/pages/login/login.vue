@@ -104,7 +104,7 @@
       <view v-if="step === 1 && mode !== 'reset'" class="lg-oauth">
         <view class="lg-divider"><view class="lg-divider__line" /><text class="lg-divider__t">{{ t.login.orContinueWith }}</text><view class="lg-divider__line" /></view>
         <view class="lg-social">
-          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter.prevent="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
+          <view v-for="o in oauth" :key="o.label" class="lg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="startOauth(o.label)" @keydown.enter.prevent="startOauth(o.label)" @keydown.space.prevent="startOauth(o.label)">
             <view class="lg-social__ic" v-html="o.svg" />
             <text class="lg-social__lbl">{{ o.label }}</text>
           </view>
@@ -134,12 +134,14 @@ import { useT } from "@/i18n/use-t";
 import { fmt } from "@/i18n/format";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
 import { otpSend, otpVerify, type OtpScene } from "@/store/auth-otp";
+import { authAccountKeyForPhone } from "@/store/auth-account";
 import { normalizeRefCode } from "@/store/sponsorship";
 import { toast } from "@/store/ui";
 import { isResetPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { exchangeVerifiedLogin } from "@/store/auth-otp";
-import { authApi, remoteApiEnabled } from "@/api/runtime";
+import { apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
+import type { OAuthProvider } from "@/api/auth-api";
 import { ApiError } from "@/api/errors";
 import type { UserSession } from "@/api/contracts";
 
@@ -218,6 +220,13 @@ const codeOk = computed(() => /^\d{6}$/.test(code.value.join("")));
 // Login mode accepts any non-empty password (existing users may have shorter
 // passwords from before the strength rule) — mirrors prototype `pwdOk`.
 const pwdOk = computed(() => password.value.length > 0);
+
+function authenticatedAccountId(user: UserSession): string {
+  if (remoteApiEnabled) return `user:${user.userId}`;
+  // Mock password auth shares the same account scope as the legacy OTP and
+  // registration directory, so one phone never opens two local wallets.
+  return authAccountKeyForPhone(`${user.countryCode}${user.phone}`) ?? `user:${user.userId}`;
+}
 // Reset mode's new password must pass the full strength check.
 const newPwdOk = computed(() => isResetPasswordOk(newPassword.value, { phone: phoneClean.value }));
 const pwdMatch = computed(() => newPassword.value === confirmPwd.value && newPwdOk.value);
@@ -251,6 +260,65 @@ const primaryDisabledReason = computed(() => {
 const resendInText = computed(() => (t.value.login.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
   toast.info(fmt(t.value.login.oauthUnavailableTitle, { provider }), t.value.login.oauthUnavailableBody);
+}
+
+function oauthProvider(label: string): OAuthProvider | null {
+  return label === "Google" ? "GOOGLE" : label === "Apple" ? "APPLE" : null;
+}
+
+function oauthSubject(provider: OAuthProvider): string {
+  // Explicit non-secret sandbox identity: it survives a page refresh/re-login
+  // without reading browser storage, while provider + server environment keep
+  // Google and Apple accounts isolated on the server.
+  return `app-${provider.toLowerCase()}-sandbox`;
+}
+
+function oauthError(cause: unknown, provider: OAuthProvider): string {
+  const code = cause instanceof ApiError ? cause.message : "";
+  if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
+      || code === "OAUTH_SANDBOX_ONLY") {
+    return `${fmt(t.value.login.oauthUnavailableTitle, { provider })}: ${t.value.login.oauthUnavailableBody}`;
+  }
+  return remoteLoginError(cause);
+}
+
+async function startOauth(label: string) {
+  const provider = oauthProvider(label);
+  if (!provider || !remoteApiEnabled) {
+    showOauthUnavailable(label);
+    return;
+  }
+  if (loading.value) return;
+  const flowVersion = ++otpFlowVersion;
+  loading.value = true;
+  error.value = null;
+  try {
+    const result = await authApi.oauthExchange({
+      provider,
+      mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
+      externalSubject: oauthSubject(provider),
+      displayName: `${provider} Sandbox`,
+    });
+    if (!mounted || flowVersion !== otpFlowVersion) {
+      authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
+    const completed = completeSignIn({
+      identity: authenticatedAccountId(result.user),
+      returnTo: returnParam.value,
+      onboardingComplete: true,
+      serverProfile: result.user,
+      serverSessionRevision: result.vaultRevision,
+    });
+    if (!completed.ok) {
+      loading.value = false;
+      error.value = t.value.authOtp.errorServiceUnavailable;
+    }
+  } catch (cause) {
+    if (!mounted || flowVersion !== otpFlowVersion) return;
+    loading.value = false;
+    error.value = oauthError(cause, provider);
+  }
 }
 
 function inputVal(e: Event): string {
@@ -483,7 +551,7 @@ async function signInWithPassword() {
       step.value = 2;
       return;
     }
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentPasswordAttempt(passwordAttempt)) return;
     loading.value = false;
@@ -513,7 +581,7 @@ async function verifyRemoteTwoFactor() {
       authApi.discardSessionIfCurrent(result.vaultRevision);
       return;
     }
-    finishSignIn({ accountId: `user:${result.user.userId}`, onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
+    finishSignIn({ accountId: authenticatedAccountId(result.user), onboardingComplete: true, serverProfile: result.user, serverSessionRevision: result.vaultRevision });
   } catch (loginError) {
     if (!isCurrentRemoteTwoFactorAttempt(twoFactorAttempt)) return;
     loading.value = false;
@@ -553,7 +621,7 @@ async function verifyCode() {
         return;
       }
       finishSignIn({
-        accountId: `user:${result.user.userId}`,
+        accountId: authenticatedAccountId(result.user),
         onboardingComplete: true,
         serverProfile: result.user,
         serverSessionRevision: result.vaultRevision,
@@ -601,43 +669,33 @@ async function finishReset() {
   error.value = null;
   if (!newPwdOk.value) { error.value = t.value.login.errorWeakPassword; return; }
   if (!pwdMatch.value) { error.value = t.value.login.passwordMismatch; return; }
-  if (remoteApiEnabled) {
-    const challengeNo = otpRequestId.value;
-    if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
-    loading.value = true;
-    try {
-      await authApi.completePasswordReset({
-        countryCode: country.value,
-        phone: phoneClean.value,
-        challengeNo,
-        code: code.value.join(""),
-        newPassword: newPassword.value,
-      });
-    } catch (cause) {
-      loading.value = false;
-      const message = cause instanceof ApiError ? cause.message : "";
-      error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID"
-        ? t.value.login.errorInvalidCode
-        : message === "USER_NEW_PASSWORD_MUST_DIFFER"
-          ? t.value.login.errorWeakPassword
-          : t.value.authOtp.errorServiceUnavailable;
-      return;
-    }
+  const challengeNo = otpRequestId.value;
+  if (!challengeNo) { error.value = t.value.authOtp.errorOtpNotFound; return; }
+  loading.value = true;
+  try {
+    await authApi.completePasswordReset({
+      countryCode: country.value,
+      phone: phoneClean.value,
+      challengeNo,
+      code: code.value.join(""),
+      newPassword: newPassword.value,
+    });
+  } catch (cause) {
     loading.value = false;
-    toast.success(t.value.login.resetSuccess, "");
-    invalidateOtpFlow();
-    mode.value = "password";
-    step.value = 1;
-    password.value = "";
-    newPassword.value = "";
-    confirmPwd.value = "";
+    const message = cause instanceof ApiError ? cause.message : "";
+    error.value = message === "USER_PASSWORD_RESET_CHALLENGE_INVALID" || message === "OTP_CODE_INVALID"
+      ? t.value.login.errorInvalidCode
+      : message === "USER_NEW_PASSWORD_MUST_DIFFER"
+        ? t.value.login.errorWeakPassword
+        : t.value.authOtp.errorServiceUnavailable;
     return;
   }
-  // MOCK: no real password persistence; treat as success → back to password login.
+  loading.value = false;
   toast.success(t.value.login.resetSuccess, "");
   invalidateOtpFlow();
   mode.value = "password";
   step.value = 1;
+  password.value = "";
   newPassword.value = "";
   confirmPwd.value = "";
 }

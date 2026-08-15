@@ -56,7 +56,7 @@
         <!-- Unified quick nav -->
         <view class="nx-team-quick-panel rounded-2xl overflow-hidden" :style="quickPanelStyle">
           <!-- Leaderboard -->
-          <view v-if="!remoteApiEnabled" class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
+          <view class="nx-team-leaderboard-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leaderboard')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-warning)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-warning-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0z" /></svg>
@@ -71,7 +71,7 @@
             </view>
           </view>
 
-          <view v-if="!remoteApiEnabled" :style="quickDividerStyle" />
+          <view :style="quickDividerStyle" />
 
           <!-- Royalty network -->
           <view class="nx-team-royalty-network-link" :class="remoteApiEnabled ? '' : 'active:opacity-95'" :style="quickRowStyle" @click="openReferralNetwork">
@@ -86,7 +86,7 @@
             </view>
             <view :style="quickRowValueWrapStyle">
               <text class="font-display tabular-nums" :style="quickRowValueStyle">{{ totalMembersCountText }}</text>
-              <svg v-if="!remoteApiEnabled" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6" /></svg>
             </view>
           </view>
 
@@ -109,10 +109,10 @@
             </view>
           </view>
 
-          <view v-if="!remoteApiEnabled" :style="quickDividerStyle" />
+          <view :style="quickDividerStyle" />
 
           <!-- Leadership pool -->
-          <view v-if="!remoteApiEnabled" class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
+          <view class="nx-team-leadership-pool-link active:opacity-95" :style="quickRowStyle" @click="go('/pages/team/leadership-pool')">
             <view :style="quickRowMainStyle">
               <view :style="quickIconStyle('var(--v5-tech-cyan)')">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--v5-tech-cyan-ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14" /></svg>
@@ -132,7 +132,6 @@
 
         <!-- This month ledger -->
         <TeamLedgerCard
-          v-if="!remoteApiEnabled"
           :total-u-s-d-t-lifetime="totalUSDTLifetime"
           :contributors="localTotalMembersCount"
           :direct-u-s-d-t="directUSDT"
@@ -144,7 +143,7 @@
         />
 
         <!-- Team tools -->
-        <view v-if="!remoteApiEnabled" class="grid" :style="toolGridStyle">
+        <view class="grid" :style="toolGridStyle">
           <view class="active:opacity-95" :style="toolCellStyle(0)" @click="go('/pages/team/quota')">
             <view class="flex items-start justify-between">
               <view :style="toolIconStyle('var(--v5-warning-soft)')">
@@ -192,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, type CSSProperties } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import InviteEarnCard from "@/components/team/invite-earn-card.vue";
 import TeamLedgerCard from "@/components/team/team-ledger-card.vue";
@@ -202,15 +201,21 @@ import { useVRank, nextRankProgress } from "@/store/v-rank";
 import { useNetwork } from "@/store/network";
 import { useCommission } from "@/store/commission";
 import { useLeadershipPool } from "@/store/leadership-pool";
-import { remoteApiEnabled } from "@/api/runtime";
+import { remoteApiEnabled, teamInsightsApi } from "@/api/runtime";
+import type { TeamLeadershipPoolSnapshot } from "@/api/team-insights-api";
 import { useReferralReward } from "@/store/referral-reward";
+import { useApp } from "@/store/app";
 
 const t = useT();
+const app = useApp();
 const vrank = useVRank();
 const network = useNetwork();
 const commission = useCommission();
 const pool = useLeadershipPool();
 const referralRewards = useReferralReward();
+const remotePool = ref<TeamLeadershipPoolSnapshot | null>(null);
+const remotePoolState = ref<"idle" | "loading" | "ready" | "error">(remoteApiEnabled ? "idle" : "ready");
+let remotePoolRequest = 0;
 
 const myRank = computed(() => vrank.myRank);
 const myRankDisplay = computed(() => `V${vrank.myRank} ${vrank.ladder[vrank.myRank]?.title ?? ""}`);
@@ -289,19 +294,19 @@ const binaryMatchText = computed(() => binary.value === null ? "—" : `+$${bina
 const leftVolText = computed(() => binary.value === null ? "—" : `$${binary.value.leftVol.toFixed(0)}`);
 const rightVolText = computed(() => binary.value === null ? "—" : `$${binary.value.rightVol.toFixed(0)}`);
 
-const myVotes = computed(() => pool.myVotes(vrank.myRank));
-const myShare = computed(() => pool.mySharePct(vrank.myRank));
-const projectedPayout = computed(() => pool.myProjectedPayout(vrank.myRank));
+const myVotes = computed(() => remoteApiEnabled ? remotePool.value?.myVotes ?? 0 : pool.myVotes(vrank.myRank));
+const myShare = computed(() => remoteApiEnabled ? remotePool.value?.mySharePct ?? 0 : pool.mySharePct(vrank.myRank));
+const projectedPayout = computed(() => remoteApiEnabled ? remotePool.value?.projectedPayoutUSDT ?? 0 : pool.myProjectedPayout(vrank.myRank));
 const leadershipPoolUnlocked = computed(() => myVotes.value > 0);
-const leadershipPoolKText = computed(() => (pool.currentWeekPoolUSDT / 1000).toFixed(1));
+const leadershipPoolKText = computed(() => (remoteApiEnabled ? remotePool.value?.currentWeekPoolUSDT ?? 0 : pool.currentWeekPoolUSDT) / 1000);
 const leadershipPoolPrimary = computed(() =>
-  leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value}K`,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? "—" : leadershipPoolUnlocked.value ? `+$${projectedPayout.value.toFixed(2)}` : `$${leadershipPoolKText.value.toFixed(1)}K`,
 );
 const leadershipPoolLineA = computed(() =>
-  leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : t.value.home.poolV3Unlock,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.projectionErrorDesc : leadershipPoolUnlocked.value ? `${myVotes.value} ${t.value.teamV3.votes}` : t.value.home.poolV3Unlock,
 );
 const leadershipPoolLineB = computed(() =>
-  leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
+  remoteApiEnabled && remotePoolState.value !== "ready" ? t.value.network.retry : leadershipPoolUnlocked.value ? `${(myShare.value * 100).toFixed(2)}%` : t.value.home.poolThisWeek,
 );
 
 function go(url: string) {
@@ -318,11 +323,29 @@ onMounted(() => {
     void vrank.refreshCanonicalVRank();
     void commission.refreshCanonicalBinary();
     void network.refreshCanonicalNetwork();
+    void refreshRemotePool();
     return;
   }
   commission.unlockMatured();
   unlockTimer = setInterval(() => commission.unlockMatured(), 60_000);
 });
+async function refreshRemotePool() {
+  if (!remoteApiEnabled) return;
+  const request = ++remotePoolRequest;
+  const accountKey = app.accountKey;
+  remotePoolState.value = "loading";
+  try {
+    const snapshot = await teamInsightsApi.leadershipPool();
+    if (request !== remotePoolRequest || accountKey !== app.accountKey) return;
+    remotePool.value = snapshot;
+    remotePoolState.value = "ready";
+  } catch {
+    if (request !== remotePoolRequest || accountKey !== app.accountKey) return;
+    remotePool.value = null;
+    remotePoolState.value = "error";
+  }
+}
+watch(() => app.accountKey, () => { if (remoteApiEnabled) { remotePool.value = null; void refreshRemotePool(); } });
 onUnmounted(() => {
   if (unlockTimer) clearInterval(unlockTimer);
 });

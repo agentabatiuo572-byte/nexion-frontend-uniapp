@@ -9,10 +9,13 @@ export interface CanonicalE3Device {
   deviceType: string;
   productCode: string;
   status: string;
+  pendingDeactivate: boolean;
   activatedAt: number | null;
   purchasedAt: number | null;
   dailyUsdt: number;
   dailyNex: number;
+  todayEarningsUsdt: number;
+  todayEarningsNex: number;
   gpuModel: string;
   vramTotalGb: number;
   basePowerW: number;
@@ -29,10 +32,13 @@ export interface CanonicalE3Device {
 export interface CanonicalE3Fleet {
   dailyUsdt: number;
   dailyNex: number;
+  realizedTodayUsdt: number;
+  realizedTodayNex: number;
   walletUsdt: number;
   walletNex: number;
   userJoinedAt: number;
   serverNow: number;
+  timezone: string;
   slotCap: number;
   devices: CanonicalE3Device[];
   capacitySchedule: Record<string, string>;
@@ -47,6 +53,27 @@ export interface CanonicalTradeinConfig {
   requireHigherPrice: boolean;
   maxDevicesPerOrder: number;
   source: string;
+}
+
+export interface CanonicalTradeinEligibilitySource {
+  sourceDeviceId: number;
+  sourceProductName: string | null;
+  eligible: boolean;
+  reasonCode: string;
+}
+
+export interface CanonicalTradeinEligibility {
+  enabled: boolean;
+  eligible: boolean;
+  decisionCode: string;
+  targetProductId: number | null;
+  targetProductNo: string;
+  targetProductName: string | null;
+  targetPriceUsdt: number | null;
+  requireHigherPrice: boolean;
+  maxDevicesPerOrder: number;
+  sources: CanonicalTradeinEligibilitySource[];
+  decisionSource: "server";
 }
 
 export interface CanonicalTradeinQuote {
@@ -84,7 +111,7 @@ export interface CanonicalTradeinResult {
 export interface CanonicalDeviceCommandResult {
   deviceId: number;
   instanceNo: string;
-  status: "ACTIVE" | "DEACTIVATED";
+  status: "ACTIVE" | "DEACTIVATED" | "PENDING_DEACTIVATE";
   rowVersion: number;
   alreadyApplied: boolean;
 }
@@ -110,6 +137,7 @@ export interface CanonicalCapacityReplaceQuote {
 export interface DeviceE3Api {
   fleet(): Promise<CanonicalE3Fleet>;
   tradeinConfig(): Promise<CanonicalTradeinConfig>;
+  eligibility(targetProductNo: string): Promise<CanonicalTradeinEligibility>;
   quote(sourceDeviceId: number, targetProductNo: string): Promise<CanonicalTradeinQuote>;
   capacityQuote(targetProductNo: string): Promise<CanonicalCapacityReplaceQuote>;
   capacityReplace(
@@ -126,6 +154,7 @@ export interface DeviceE3Api {
   ): Promise<CanonicalTradeinResult>;
   activate(deviceId: number, expectedVersion: number, clientMaxDevices: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
   deactivate(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
+  deactivateAfterTask(deviceId: number, expectedVersion: number, idempotencyKey: string): Promise<CanonicalDeviceCommandResult>;
 }
 
 function invalid(message = "E3_CANONICAL_RESPONSE_INVALID"): never {
@@ -191,14 +220,17 @@ function device(value: unknown): CanonicalE3Device {
     deviceType: string(source.deviceType),
     productCode: string(source.productCode),
     status: string(source.status).toUpperCase(),
+    pendingDeactivate: boolean(source.pendingDeactivate),
     activatedAt: timestamp(source.activatedAt),
     purchasedAt: timestamp(source.purchasedAt),
     dailyUsdt: number(source.dailyUsdt),
     dailyNex: number(source.dailyNex),
-    gpuModel: string(source.gpuModel ?? "", true),
-    vramTotalGb: integer(source.vramTotalGb ?? 0),
-    basePowerW: number(source.basePowerW ?? 0),
-    location: string(source.location ?? "", true),
+    todayEarningsUsdt: number(source.todayEarningsUsdt),
+    todayEarningsNex: number(source.todayEarningsNex),
+    gpuModel: string(source.gpuModel),
+    vramTotalGb: integer(source.vramTotalGb),
+    basePowerW: number(source.basePowerW),
+    location: string(source.location),
     capacityPct: number(source.capacityPct),
     capacityAgeMonths: integer(source.capacityAgeMonths),
     capacityConfigKey: string(source.capacityConfigKey),
@@ -217,10 +249,13 @@ function fleet(value: unknown): CanonicalE3Fleet {
   return {
     dailyUsdt: number(source.dailyUsdt),
     dailyNex: number(source.dailyNex),
+    realizedTodayUsdt: number(source.realizedTodayUsdt),
+    realizedTodayNex: number(source.realizedTodayNex),
     walletUsdt: number(source.walletUsdt),
     walletNex: number(source.walletNex),
     userJoinedAt: integer(source.userJoinedAt),
     serverNow: integer(source.serverNow),
+    timezone: string(source.timezone),
     slotCap: integer(source.slotCap, 1),
     devices,
     capacitySchedule: stringMap(source.capacitySchedule),
@@ -296,18 +331,80 @@ function result(value: unknown): CanonicalTradeinResult {
   return parsed;
 }
 
-function deviceCommand(value: unknown, expectedStatus: CanonicalDeviceCommandResult["status"]): CanonicalDeviceCommandResult {
+function eligibility(value: unknown): CanonicalTradeinEligibility {
+  const source = record(value);
+  const decisionCodes = new Set([
+    "ELIGIBLE", "NO_ELIGIBLE_SOURCE", "TRADEIN_DISABLED", "TRADEIN_ELIGIBILITY_NOT_MET",
+    "TARGET_NOT_ACTIVE", "TARGET_OUT_OF_STOCK", "TARGET_NOT_RELEASED",
+  ]);
+  const sourceReasonCodes = new Set([
+    "OK", "SOURCE_PAID_PRICE_UNAVAILABLE", "TARGET_MUST_DIFFER", "HIGHER_PRICE_REQUIRED",
+  ]);
+  const decisionCode = string(source.decisionCode);
+  if (!decisionCodes.has(decisionCode)) return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");
+  if (!Array.isArray(source.sources)) return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");
+  const sources = source.sources.map((value) => {
+    const row = record(value);
+    const eligible = boolean(row.eligible);
+    const reasonCode = string(row.reasonCode);
+    if (!sourceReasonCodes.has(reasonCode)
+        || eligible !== (reasonCode === "OK")) return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");
+    const sourceProductName = nullableString(row.sourceProductName);
+    if (eligible && sourceProductName === null) return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");
+    return {
+      sourceDeviceId: integer(row.sourceDeviceId, 1),
+      sourceProductName,
+      eligible,
+      reasonCode,
+    };
+  });
+  const targetProductId = nullableInteger(source.targetProductId);
+  const targetProductName = nullableString(source.targetProductName);
+  const targetPriceUsdt = nullableNumber(source.targetPriceUsdt);
+  const parsed: CanonicalTradeinEligibility = {
+    enabled: boolean(source.enabled),
+    eligible: boolean(source.eligible),
+    decisionCode,
+    targetProductId,
+    targetProductNo: string(source.targetProductNo),
+    targetProductName,
+    targetPriceUsdt,
+    requireHigherPrice: boolean(source.requireHigherPrice),
+    maxDevicesPerOrder: integer(source.maxDevicesPerOrder, 1),
+    sources,
+    decisionSource: source.decisionSource === "server" ? "server" : invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID"),
+  };
+  const hasTarget = parsed.targetProductId !== null;
+  const hasEligibleSource = parsed.sources.some((row) => row.eligible);
+  if ((hasTarget !== (parsed.targetProductName !== null && parsed.targetPriceUsdt !== null))
+      || parsed.eligible !== (parsed.decisionCode === "ELIGIBLE" && hasEligibleSource)
+      || (parsed.decisionCode === "ELIGIBLE" && !hasTarget)
+      || (parsed.decisionCode === "TRADEIN_DISABLED" && parsed.enabled)
+      || (!parsed.enabled && parsed.decisionCode !== "TRADEIN_DISABLED")
+      || (parsed.decisionCode === "TRADEIN_DISABLED" && sources.length > 0)) {
+    return invalid("TRADEIN_ELIGIBILITY_RESPONSE_INVALID");
+  }
+  return parsed;
+}
+
+function deviceCommand(
+  value: unknown,
+  expectedStatus: CanonicalDeviceCommandResult["status"] | ReadonlyArray<CanonicalDeviceCommandResult["status"]>,
+): CanonicalDeviceCommandResult {
   const source = record(value);
   const status = string(source.status).toUpperCase();
-  if (status !== expectedStatus) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
+  const expected = Array.isArray(expectedStatus) ? expectedStatus : [expectedStatus];
+  if (!expected.includes(status as CanonicalDeviceCommandResult["status"])) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
   return {
     deviceId: integer(source.deviceId, 1),
     instanceNo: string(source.instanceNo),
-    status,
+    status: status as CanonicalDeviceCommandResult["status"],
     rowVersion: integer(source.rowVersion),
-    alreadyApplied: expectedStatus === "ACTIVE"
+    alreadyApplied: status === "ACTIVE"
       ? boolean(source.alreadyActive)
-      : boolean(source.alreadyDeactivated),
+      : status === "PENDING_DEACTIVATE"
+        ? boolean(source.alreadyPending)
+        : boolean(source.alreadyDeactivated),
   };
 }
 
@@ -336,6 +433,11 @@ function nullableInteger(value: unknown): number | null {
 function nullableString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   return string(value);
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  return number(value);
 }
 
 function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
@@ -374,6 +476,9 @@ function capacityQuote(value: unknown): CanonicalCapacityReplaceQuote {
 }
 
 function validTargetNo(value: string): string {
+  if (typeof value !== "string") {
+    throw new ApiError({ kind: "configuration", message: "TRADEIN_TARGET_PRODUCT_INVALID" });
+  }
   const normalized = value.trim();
   if (!/^[A-Za-z0-9._:-]{1,64}$/.test(normalized)) {
     throw new ApiError({ kind: "configuration", message: "TRADEIN_TARGET_PRODUCT_INVALID" });
@@ -388,6 +493,13 @@ export function createDeviceE3Api(client: ApiClient): DeviceE3Api {
     },
     async tradeinConfig() {
       return config(await client.request<unknown>({ path: "/api/app/trade-in/config" }));
+    },
+    async eligibility(targetProductNo) {
+      return eligibility(await client.request<unknown>({
+        method: "POST",
+        path: "/api/app/trade-in/eligibility",
+        body: { targetProductNo: validTargetNo(targetProductNo) },
+      }));
     },
     async quote(sourceDeviceId, targetProductNo) {
       return quote(await client.request<unknown>({
@@ -470,6 +582,19 @@ export function createDeviceE3Api(client: ApiClient): DeviceE3Api {
         body: { expectedVersion: integer(expectedVersion) },
         idempotencyKey: key,
       }), "DEACTIVATED");
+      if (result.deviceId !== id || result.rowVersion < expectedVersion) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
+      return result;
+    },
+    async deactivateAfterTask(deviceId, expectedVersion, idempotencyKey) {
+      const key = idempotencyKey.trim();
+      if (!key) throw new ApiError({ kind: "configuration", message: "IDEMPOTENCY_KEY_REQUIRED" });
+      const id = integer(deviceId, 1);
+      const result = deviceCommand(await client.request<unknown>({
+        method: "POST",
+        path: `/api/device/${deviceId}/deactivate-after-task`,
+        body: { expectedVersion: integer(expectedVersion) },
+        idempotencyKey: key,
+      }), ["PENDING_DEACTIVATE", "DEACTIVATED"]);
       if (result.deviceId !== id || result.rowVersion < expectedVersion) return invalid("DEVICE_COMMAND_RESPONSE_INVALID");
       return result;
     },

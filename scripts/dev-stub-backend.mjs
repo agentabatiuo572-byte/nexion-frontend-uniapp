@@ -48,6 +48,7 @@ function policy() {
     dailyLimitCount: state.dailyLimitCount,
     balanceMaxRatio: 1,
     smallAmountThresholdUsd: 50,
+    strongReviewThresholdUsdt: 1000,
     payoutSlaHours: 24,
     networkConfirmFeeUsd: { trc20: 1, bep20: 1, erc20: 5 },
     nexFeeOffsetRate: 0.5,
@@ -152,6 +153,21 @@ const server = createServer(async (req, res) => {
     }));
   }
 
+  const withdrawalDetail = /^\/api\/withdrawals\/([^/]+)$/.exec(path);
+  if (withdrawalDetail && req.method === "GET") {
+    const order = state.orders.find((item) => item.withdrawalNo === decodeURIComponent(withdrawalDetail[1]));
+    if (!order) return send(res, 404, envelope(null, 40400, "WITHDRAWAL_NOT_FOUND"));
+    return send(res, 200, envelope({
+      withdrawalNo: order.withdrawalNo,
+      status: order.status,
+      confirmedAt: null,
+      terminalReason: null,
+      retriable: null,
+      nexRefunded: 0,
+      nexRefundedAt: null,
+    }));
+  }
+
   if (path === "/api/payout-addresses" && req.method === "GET") {
     const iso = new Date(Date.now() - 30 * 86400000).toISOString();
     return send(res, 200, envelope({
@@ -159,6 +175,9 @@ const server = createServer(async (req, res) => {
         status: "ACTIVE", effectiveAt: iso, createdAt: iso,
         nextChangeAllowedAt: new Date(Date.now() - 86400000).toISOString(), changePending: false }],
       serverCanonical: true,
+      changeCooldownDays: 7,
+      effectiveDelayHours: 24,
+      inFlightWithdrawalBlocked: true,
     }));
   }
 

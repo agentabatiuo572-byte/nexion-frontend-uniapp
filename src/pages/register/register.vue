@@ -18,12 +18,12 @@
 
       <!-- Sponsor card (arrived via ?ref) -->
       <view v-if="sponsorPreview" class="rg-sponsor">
-        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.name[0] }}</text></view>
+        <view class="rg-sponsor__av"><text class="rg-sponsor__av-t">{{ sponsorPreview.displayName[0] }}</text></view>
         <view class="rg-sponsor__body">
-          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.name }}</text> {{ t.ref.invitedYou }}</text>
+          <text class="rg-sponsor__name"><text class="rg-sponsor__name-b">{{ sponsorPreview.displayName }}</text> {{ t.ref.invitedYou }}</text>
           <text v-if="giftUsdt > 0" class="rg-sponsor__gift">+${{ giftUsdt }} + {{ giftNex }} NEX</text>
         </view>
-        <text class="rg-sponsor__v">V{{ sponsorPreview.vRank }}</text>
+        <text class="rg-sponsor__v">{{ sponsorPreview.vRank }}</text>
       </view>
 
       <!-- Step dots -->
@@ -133,7 +133,7 @@
       <view v-if="step === 1" class="rg-oauth">
         <view class="rg-divider"><view class="rg-divider__line" /><text class="rg-divider__t">{{ t.register.orContinueWith }}</text><view class="rg-divider__line" /></view>
         <view class="rg-social">
-          <view v-for="o in oauth" :key="o.label" class="rg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="showOauthUnavailable(o.label)" @keydown.enter.prevent="showOauthUnavailable(o.label)" @keydown.space.prevent="showOauthUnavailable(o.label)">
+          <view v-for="o in oauth" :key="o.label" class="rg-social__btn" role="button" tabindex="0" :aria-label="o.label" @click="startOauth(o.label)" @keydown.enter.prevent="startOauth(o.label)" @keydown.space.prevent="startOauth(o.label)">
             <view class="rg-social__ic" v-html="o.svg" />
             <text class="rg-social__lbl">{{ o.label }}</text>
           </view>
@@ -163,7 +163,9 @@ import CountryCodeSheet from "@/components/country-code-sheet.vue";
 import { useT } from "@/i18n/use-t";
 import { useLocaleStore } from "@/store/locale";
 import { geoPolicyUserMessage } from "@/api/geo-policy-error";
-import { authApi, remoteApiEnabled, apiRuntimeConfig } from "@/api/runtime";
+import { apiClient, apiRuntimeConfig, authApi, remoteApiEnabled } from "@/api/runtime";
+import type { OAuthProvider } from "@/api/auth-api";
+import { createPublicSponsorPreviewApi, type PublicSponsorPreview } from "@/api/public-sponsor-preview-api";
 import { registerMockAuthCredential } from "@/api/mock-auth-api";
 import { registerAndLogin } from "@/auth/registration-auto-login";
 import { normalizeRegistrationSponsorCode } from "@/auth/registration-sponsor";
@@ -186,15 +188,22 @@ import { toast } from "@/store/ui";
 import { isPasswordOk, PASSWORD_MAX_LENGTH } from "@/auth/password-rules";
 import { completeSignIn } from "@/auth/complete-sign-in";
 import { restoreActivatedRegistrationSession } from "@/auth/complete-registration";
+import { stageRemoteRegistrationReceipt, clearRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
 
 const t = useT();
 const app = useApp();
 const bills = useBills();
-const sponsorship = useSponsorship();
+const sponsorship = remoteApiEnabled ? null : useSponsorship();
 const cfg = useConfig();
+const publicSponsorPreviewApi = createPublicSponsorPreviewApi(apiClient);
 // 礼包金额单源派生自 platform config(禁本地常量镜像)。
-const giftUsdt = computed(() => cfg.config.rewards.welcomeGift.usdtAmount);
-const giftNex = computed(() => cfg.config.rewards.welcomeGift.nexAmount);
+const remotePreview = ref<PublicSponsorPreview | null>(null);
+const giftUsdt = computed(() => remoteApiEnabled
+  ? remotePreview.value?.gift.usdtAmount ?? 0
+  : cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => remoteApiEnabled
+  ? remotePreview.value?.gift.nexAmount ?? 0
+  : cfg.config.rewards.welcomeGift.nexAmount);
 
 const oauth = [
   { label: "Passkey", svg: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="10" r="5"/><path d="m13 10 7 0M17 10v4M20 10v3"/></svg>' },
@@ -241,14 +250,32 @@ let mounted = true;
 // [FEAT-SHARE4] 链接来源码(?ref > pendingRefCode)合法即锁定;非法/缺失视同
 // 无码,回到可手输。锁定后无任何解锁入口(防截断归因/换码自荐)。
 const lockedRef = ref<string | null>(null);
-const sponsorPreview = ref<SponsorMeta | null>(null);
+type SponsorPreview = { displayName: string; vRank: string };
+const sponsorPreview = ref<SponsorPreview | null>(null);
 
-onLoad((options) => {
+onLoad(async (options) => {
   const raw = options && (options as Record<string, string>).ref;
-  const norm = normalizeRefCode(raw) ?? sponsorship.pendingCode;
+  if (remoteApiEnabled) {
+    const norm = normalizeRegistrationSponsorCode(raw, true);
+    if (!norm) return;
+    try {
+      const preview = await publicSponsorPreviewApi.preview(norm);
+      if (!mounted) return;
+      remotePreview.value = preview;
+      lockedRef.value = preview.code;
+      sponsorPreview.value = preview.sponsor;
+    } catch {
+      remotePreview.value = null;
+      lockedRef.value = null;
+      sponsorPreview.value = null;
+    }
+    return;
+  }
+  const norm = normalizeRefCode(raw) ?? sponsorship?.pendingCode;
   if (norm) {
     lockedRef.value = norm;
-    sponsorPreview.value = pickSponsor(norm);
+    const mock = pickSponsor(norm);
+    sponsorPreview.value = { displayName: mock.name, vRank: `V${mock.vRank}` };
   }
 });
 
@@ -296,6 +323,64 @@ const ctaDisabledReason = computed(() => {
 const resendInText = computed(() => (t.value.register.resendIn || "{s}s").replace("{s}", String(resendLeft.value)));
 function showOauthUnavailable(provider: string) {
   toast.info(fmt(t.value.register.oauthUnavailableTitle, { provider }), t.value.register.oauthUnavailableBody);
+}
+
+function oauthProvider(label: string): OAuthProvider | null {
+  return label === "Google" ? "GOOGLE" : label === "Apple" ? "APPLE" : null;
+}
+
+function oauthSubject(provider: OAuthProvider): string {
+  // Explicit non-secret sandbox identity: it survives a page refresh/re-login
+  // without reading browser storage, while provider + server environment keep
+  // Google and Apple accounts isolated on the server.
+  return `app-${provider.toLowerCase()}-sandbox`;
+}
+
+function oauthError(cause: unknown, provider: OAuthProvider): string {
+  const code = cause instanceof Error ? cause.message : "";
+  if (code === "OAUTH_PROVIDER_NOT_CONFIGURED" || code === "OAUTH_PROVIDER_UNAVAILABLE"
+      || code === "OAUTH_SANDBOX_ONLY") {
+    return `${fmt(t.value.register.oauthUnavailableTitle, { provider })}: ${t.value.register.oauthUnavailableBody}`;
+  }
+  return t.value.authOtp.errorServiceUnavailable;
+}
+
+async function startOauth(label: string) {
+  const provider = oauthProvider(label);
+  if (!provider || !remoteApiEnabled) {
+    showOauthUnavailable(label);
+    return;
+  }
+  if (busy.value) return;
+  const flowVersion = ++otpFlowVersion;
+  completing.value = true;
+  error.value = null;
+  try {
+    const result = await authApi.oauthExchange({
+      provider,
+      mode: apiRuntimeConfig.mode === "sandbox" && apiRuntimeConfig.modeExplicit ? "SANDBOX_MOCK" : "PROVIDER",
+      externalSubject: oauthSubject(provider),
+      displayName: `${provider} Sandbox`,
+    });
+    if (!mounted || flowVersion !== otpFlowVersion) {
+      authApi.discardSessionIfCurrent(result.vaultRevision);
+      return;
+    }
+    const completed = completeSignIn({
+      identity: `user:${result.user.userId}`,
+      onboardingComplete: true,
+      serverProfile: result.user,
+      serverSessionRevision: result.vaultRevision,
+    });
+    if (!completed.ok) {
+      completing.value = false;
+      error.value = t.value.authOtp.errorServiceUnavailable;
+    }
+  } catch (cause) {
+    if (!mounted || flowVersion !== otpFlowVersion) return;
+    completing.value = false;
+    error.value = oauthError(cause, provider);
+  }
 }
 const reviewNotice = computed(() => registrationRisk.value !== null && registrationRisk.value.cluster.status !== "clear");
 // 分因提示: 同簇重复账号用「设备已有账号活动」口径;裸号/未绑定用「先审核,绑定后释放」口径。
@@ -594,13 +679,17 @@ async function finish() {
       onboardingComplete: true,
       serverProfile: registration.user,
       serverSessionRevision: registration.vaultRevision,
+      deferNavigation: true,
     });
     if (!completed.ok) {
       error.value = geoText(completed.error) ?? t.value.authOtp.errorServiceUnavailable;
       completing.value = false;
+      clearRemoteRegistrationReceipt();
       return;
     }
+    stageRemoteRegistrationReceipt(registration.registrationReceipt ?? null, `user:${registration.user.userId}`);
     toast.success(t.value.register.registrationSignedIn);
+    launchRegistrationSuccess();
     return;
   }
   const identity = prospectiveIdentity();
@@ -673,7 +762,7 @@ async function finish() {
       throw new Error("risk_registration_unavailable");
     }
     if (registration.sponsorCode) {
-      if (!sponsorship.bind(registration.sponsorCode)) throw new Error("sponsor_bind_unavailable");
+      if (!sponsorship?.bind(registration.sponsorCode)) throw new Error("sponsor_bind_unavailable");
       const gift = sponsorship.ensureGiftClaim(createdIdentity, {
         usdt: registration.giftUsdt,
         nex: registration.giftNex,
@@ -692,7 +781,7 @@ async function finish() {
           toast.success(
             `+$${gift.usdt} + ${gift.nex} NEX`,
             sponsorPreview.value
-              ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: sponsorPreview.value.name })
+              ? fmt(t.value.register.giftCreditedToastSubSponsor, { name: sponsorPreview.value.displayName })
               : t.value.register.giftCreditedToastSub,
           );
         } else {

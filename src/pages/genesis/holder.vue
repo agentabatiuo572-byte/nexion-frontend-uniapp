@@ -94,7 +94,20 @@
           </view>
           <view v-else :style="cardStyle">
             <text class="block" :style="cardTitleStyle">{{ t.genesisHolder.pre.pointsLabel }}</text>
-            <text class="block" :style="pointsNoteStyle">{{ t.genesisHolder.pre.serverPointsUnavailable }}</text>
+            <template v-if="genesisPoints.status === 'ready'">
+              <view v-for="r in remoteLeaderboard" :key="r.rank" class="flex items-center" :style="rankRowStyle(r.me)">
+                <text class="tabular-nums" :style="rankNumStyle">{{ r.rank }}</text>
+                <text class="flex-1 min-w-0 truncate" :style="rankWhoStyle">{{ r.who }}</text>
+                <text class="tabular-nums" :style="rankPtsStyle">{{ r.pts }}</text>
+              </view>
+              <view v-if="remoteCurrentUserRow" class="flex items-center" :style="rankRowStyle(true)">
+                <text class="tabular-nums" :style="rankNumStyle">{{ remoteCurrentUserRow.rank }}</text>
+                <text class="flex-1 min-w-0 truncate" :style="rankWhoStyle">{{ remoteCurrentUserRow.who }}</text>
+                <text class="tabular-nums" :style="rankPtsStyle">{{ remoteCurrentUserRow.pts }}</text>
+              </view>
+              <text class="block" :style="pointsNoteStyle">{{ t.genesisHolder.pre.pointsNote }}</text>
+            </template>
+            <text v-else class="block" :style="pointsNoteStyle">{{ t.genesisHolder.pre.serverPointsUnavailable }}</text>
           </view>
         </template>
 
@@ -224,6 +237,7 @@ import { useGenesis, GENESIS_EMISSION } from "@/store/genesis";
 import { useGenesisConfig } from "@/store/genesis-config";
 import { useGenesisSaleGate } from "@/composables/use-genesis-sale-gate";
 import { remoteApiEnabled } from "@/api/runtime";
+import { useGenesisPoints } from "@/store/genesis-points";
 
 const DAY = 86400_000;
 // mock 参考价：真后台提供平台 NEX 结算价（GET /api/market），此处仅用于「≈$」参考展示（非保证）。
@@ -231,6 +245,7 @@ const NEX_REF_USDT = 0.189;
 
 const t = useT();
 const genesis = useGenesis();
+const genesisPoints = useGenesisPoints();
 
 const perkKeys = ["a", "b", "c", "d", "e", "f"] as const;
 
@@ -247,6 +262,7 @@ const { showUrgency, blockText } = useGenesisSaleGate();
 onShow(() => {
   void useGenesisConfig().refresh();
   void genesis.syncRemote();
+  void genesisPoints.refresh();
 });
 const notHolderBodyText = computed(() =>
   showUrgency.value
@@ -265,6 +281,18 @@ const poolText = computed(() => fmt(t.value.genesisHolder.pre.pointsPool, { amou
 const leaderboard = computed(() => [
   { rank: 1, who: t.value.genesisHolder.pre.pointsYou, pts: String(Math.max(1, owned.value) * 1000), me: true },
 ]);
+const remoteLeaderboard = computed(() => {
+  const rows = genesisPoints.projection?.leaderboard ?? [];
+  const currentRank = genesisPoints.projection?.currentUser.rank;
+  return rows.map((row) => ({ rank: row.rank, who: row.handle, pts: row.points.toLocaleString(), me: row.rank === currentRank }));
+});
+const remoteCurrentUserRow = computed(() => {
+  const projection = genesisPoints.projection;
+  const rank = projection?.currentUser.rank;
+  if (!projection || (rank !== null && rank !== undefined && remoteLeaderboard.value.some((row) => row.rank === rank))) return null;
+  if (projection.currentUser.points <= 0 && projection.currentUser.holdings <= 0) return null;
+  return { rank: rank ?? "—", who: t.value.genesisHolder.pre.pointsYou, pts: projection.currentUser.points.toLocaleString() };
+});
 const progressStageText = computed(() => remoteApiEnabled
   ? `${genesis.soldSlots.toLocaleString()} / ${genesis.totalSlots.toLocaleString()}`
   : t.value.genesisHolder.pre.progressStage);

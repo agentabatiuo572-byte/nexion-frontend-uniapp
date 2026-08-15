@@ -97,6 +97,9 @@ import { fmt } from "@/i18n/format";
 import { toast } from "@/store/ui";
 import { useRiskDisclosure } from "@/store/risk-disclosure";
 import { safeReturnTo } from "@/routing/safe-return-to";
+import { withdrawalApi } from "@/api/runtime";
+import { remoteApiEnabled } from "@/api/runtime";
+import type { WithdrawalPolicy } from "@/api/withdrawal-api";
 
 const cfg = useConfig();
 const t = useT();
@@ -106,6 +109,7 @@ const risk = useRiskDisclosure();
 const accepted = computed(() => risk.accepted);
 const disclosure = computed(() => risk.current);
 const loadError = computed(() => risk.error ? w.value.loadErrorRegion : "");
+const withdrawalPolicy = ref<WithdrawalPolicy | null>(null);
 
 const returnTo = ref("/pages/me/me");
 onLoad((options) => {
@@ -117,6 +121,13 @@ const checked = ref(false);
 const selectedBlock = ref<number | null>(null);
 onMounted(async () => {
   await risk.refresh();
+  if (remoteApiEnabled) {
+    try {
+      withdrawalPolicy.value = await withdrawalApi.policy();
+    } catch {
+      withdrawalPolicy.value = null;
+    }
+  }
 });
 function onScrollToLower() { scrolledToBottom.value = true; }
 
@@ -130,8 +141,13 @@ function onScrollToLower() { scrolledToBottom.value = true; }
 /** FEAT-WD02:按金额比例的旧费率已删除 —— 费用是按网络固定的网络确认费,s4Body 不再插费率;
  *  时限阈值 {h} 仍从配置插值(合规文本阈值必插值铁律)。 */
 const withdrawWindowBody = computed(() => {
+  if (remoteApiEnabled && !withdrawalPolicy.value) return w.value.s4Body;
+  const payoutSlaHours = remoteApiEnabled && withdrawalPolicy.value
+    ? withdrawalPolicy.value.payoutSlaHours
+    : cfg.config.withdrawRules.payoutSlaHours;
+  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(payoutSlaHours) });
+  if (remoteApiEnabled) return base;
   const rules = cfg.config.withdrawRules;
-  const base = fmt(w.value.s4Body, { h: normalizeSlaHours(rules.payoutSlaHours) });
   if (normalizeReviewWindowDays(rules.payoutReviewWindowDays) <= 0) return base;
   return `${base} ${fmt(w.value.s4BodyLargeAmount, {
     large: NEW_ADDRESS_LARGE_AMOUNT_USDT.toFixed(0),
@@ -141,7 +157,8 @@ const withdrawWindowBody = computed(() => {
 const blocks = computed(() => disclosure.value?.chapters.map((chapter) => ({
   n: Number(chapter.no),
   title: locale.code === "vi" ? chapter.vi : locale.code === "en" ? chapter.en : chapter.zh,
-  body: locale.code === "vi" ? chapter.viBody : locale.code === "en" ? chapter.enBody : chapter.zhBody,
+  body: Number(chapter.no) === 4 ? withdrawWindowBody.value
+    : locale.code === "vi" ? chapter.viBody : locale.code === "en" ? chapter.enBody : chapter.zhBody,
 })) ?? []);
 
 function sectionSelectedLabel(n: number): string {

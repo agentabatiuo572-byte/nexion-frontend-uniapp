@@ -266,8 +266,21 @@ function urgencySitesUngated(src) {
     check(`🔴 ⑥ ${f.split("/").pop()} 的每个「余席」渲染点都在同一表达式内受闸`, bad.length === 0, bad.join(" | "));
   }
   const g = strip(readFileSync(path.join(root, "src/pages/genesis/genesis.vue"), "utf8"), true);
-  check(`🔴 ⑥ 社会证明播报受闸`, /function emitSocial\(\)[\s\S]{0,400}showUrgency/.test(g), "关闭态仍播成交");
-  check(`🔴 ⑥ 已售数推进受闸`, /tickSales[\s\S]{0,200}showUrgency|showUrgency[\s\S]{0,200}tickSales/.test(g), "关闭态已售数仍自增");
+  // Genesis remote no longer synthesizes a social-proof stream.  The page is
+  // deliberately empty until server transactions/listings arrive; accepting
+  // the old emitSocial/tickSales shape here would bless fake FOMO in a closed
+  // market.  Keep this harness aligned to the authority contract instead of
+  // requiring a dead local timer to mention the sale gate.
+  check(`🔴 ⑥ 社会证明播报只读服务端事实`,
+    !/emitSocial|BUYER_NAMES|LIVE_MARKET|scheduleFomo|genFomoSale/.test(g),
+    "Genesis page still contains a local social-proof generator");
+  const genesisStore = strip(readFileSync(path.join(root, "src/store/genesis.ts"), "utf8"), true);
+  const tickBody = genesisStore.match(/function tickSales\(\)[\s\S]{0,520}/)?.[0] ?? "";
+  const remoteTickBranch = tickBody.match(/if \(remoteApiEnabled\)\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+  check(`🔴 ⑥ 已售数推进只接受服务端快照`,
+    /if \(remoteApiEnabled\)[\s\S]{0,120}syncRemote\(\)[\s\S]{0,40}return;/.test(tickBody)
+      && !/Math\.random/.test(remoteTickBranch),
+    "关闭态/远端仍由客户端自增已售数");
   check(`🔴 ⑥ dock 取色不再按 remaining 判`, !g.includes("remaining.value > 0"), "还有取色点按老条件走");
 }
 

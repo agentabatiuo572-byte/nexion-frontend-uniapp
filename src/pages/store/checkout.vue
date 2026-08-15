@@ -28,11 +28,22 @@
            (useSetPageHeader below) so they pin on scroll, mirroring the
            prototype's <SetPageHeader>. -->
 
+      <view v-if="catalogStatus === 'loading'" class="text-center" style="padding: 20px">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogLoadingTitle }}</text>
+      </view>
+
+      <view v-else-if="catalogStatus === 'error'" class="text-center" style="padding: 20px">
+        <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.catalogErrorTitle }}</text>
+        <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
+          <text>{{ t.store.coBackToStore }}</text>
+        </view>
+      </view>
+
       <!-- Product not found -->
-      <view v-if="!product" class="text-center" style="padding: 20px">
+      <view v-else-if="!product" class="text-center" style="padding: 20px">
         <text class="block" style="font-size: 13px; color: var(--v5-ink-3); margin-bottom: 12px">{{ t.store.coProductNotFound }}</text>
         <view class="inline-flex items-center justify-center active:opacity-90" :style="notFoundBtnStyle" role="button" tabindex="0" @click.stop="goStore">
-          <text @click.stop="goStore">{{ t.store.coBackToStore }}</text>
+          <text>{{ t.store.coBackToStore }}</text>
         </view>
       </view>
 
@@ -240,7 +251,7 @@ import { cardFeeRateLabel, cardFeeUsd } from "@/store/deposits-core";
 import { getProduct, annualRoiPct, type Product } from "@/mock/products";
 import { computeTradeInCredit, DEFAULT_TRADEIN_CONFIG } from "@/mock/tradein-config";
 import { isDeviceTaskBlocked } from "@/mock/eligibility";
-import { getMonthsSince, isPhaseReached, tradeInEarlyWindowOk } from "@/store/product-phase";
+import { getMonthsSince, tradeInEarlyWindowOk } from "@/store/product-phase";
 import { useProductPhase } from "@/composables/use-product-phase";
 import { voucherAppliesToSku } from "@/mock/vouchers";
 import { useApp } from "@/store/app";
@@ -263,6 +274,10 @@ import { toast } from "@/store/ui";
 import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
 import { asApiError } from "@/api/errors";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision, RemoteCapacityGate, StableCommandKey } from "@/domain/e20-capacity-coordinator";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
+import { productCatalogState, refreshProductCatalog } from "@/store/product-catalog";
+import { refreshServerProductPhase } from "@/store/server-product-phase";
+import { isProductAvailable } from "@/store/product-availability";
 
 // cap applies to ACTIVE slots, not inventory (source Sprint #146-1).
 const MAX_DEVICES = 6;
@@ -307,17 +322,25 @@ const tradein = useTradeinSheet();
 const phase = useProductPhase();
 
 const productId = ref("stellarbox-s1");
-onLoad((options) => {
+onLoad(async (options) => {
   const o = (options || {}) as Record<string, string>;
   // accept ?product= (canonical) or ?id= (per task spec)
   if (o.product) productId.value = o.product;
   else if (o.id) productId.value = o.id;
+  const [catalogReady] = await Promise.all([
+    refreshProductCatalog(true),
+    refreshServerProductPhase(true),
+  ]);
+  // Remote 商品授权只取 catalog.available；H1 节奏镜像失败不能跳过商城发布门。
+  if (!catalogReady) return;
   // 上架节奏门(FEAT-DEV02b,深链防线,先于购买门):未正式上架 SKU 仅当
   // 「携置换上下文 + 抢先购窗口(开关默认关)」才放行;商城正门不受抢先购影响。
   const pp = getProduct(productId.value);
-  if (pp?.unlocksAtPhase && !isPhaseReached(phase.value, pp.unlocksAtPhase)) {
+  if (pp && !isProductAvailable(pp, phase.value)) {
     const viaTradeIn = tradein.appliedTradein?.targetKind === pp.id;
-    if (!(viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt)))) {
+    const mockEarlyWindow = pp.available === undefined && pp.unlocksAtPhase
+      && viaTradeIn && tradeInEarlyWindowOk(pp.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
+    if (!mockEarlyWindow) {
       uni.showToast({ title: t.value.store.releaseComingToast, icon: "none" });
       navTo("/store");
       return;
@@ -342,6 +365,7 @@ onLoad((options) => {
   fireTradeinIntercept();
 });
 
+const catalogStatus = computed(() => productCatalogState.status);
 const product = computed<Product | undefined>(() => getProduct(productId.value));
 // Hard purchase gate (等级门 + 锁额) — single source via usePurchaseGate.
 const { gate: purchaseGate } = usePurchaseGate(product);
@@ -532,6 +556,10 @@ const KNOWN_KINDS: DeviceKind[] = [
 ];
 let interceptFired = false;
 const remoteCapacityGate = new RemoteCapacityGate();
+watch(() => app.accountKey, () => {
+  interceptFired = false;
+  remoteCapacityGate.reset();
+});
 function fireTradeinIntercept() {
   if (interceptFired) return;
   interceptFired = true;
@@ -544,13 +572,22 @@ function fireTradeinIntercept() {
   if (!p || !KNOWN_KINDS.includes(p.id as DeviceKind)) return;
   const kind = p.id as DeviceKind;
   if (tradein.appliedTradein?.targetKind === kind) return;
-  // Compose eligibility from the stores at the page layer (P-031/032).
-  const { canTradeIn, tradeInSources, capped } = useDeviceEligibility(kind);
   if (remoteApiEnabled) {
-    void remoteCapacityGate.resolve(() => deviceE3Api.capacityQuote(kind), async (quote) => {
+    const requestScope = captureAccountScope();
+    void Promise.all([
+      deviceE3Api.eligibility(kind),
+      remoteCapacityGate.resolve(
+        () => deviceE3Api.capacityQuote(kind),
+        () => {},
+        () => isCurrentAccountScope(requestScope),
+      ),
+    ]).then(async ([eligibility, quote]) => {
+      if (!isCurrentAccountScope(requestScope)) return;
+      const sourceIds = eligibility.sources.filter((source) => source.eligible)
+        .map((source) => String(source.sourceDeviceId));
       if (quote.decision === "REPLACE_REQUIRED") {
-        if (canTradeIn.value && tradeInSources.value.length > 0) {
-          tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
+        if (eligibility.eligible && sourceIds.length > 0) {
+          tradein.showChoice(kind, p.price, sourceIds);
         } else {
           tradein.showCanonicalReplace(kind, quote.payableUsdt, quote);
         }
@@ -558,21 +595,30 @@ function fireTradeinIntercept() {
       }
       if (quote.decision === "NO_ACTIVE_DEVICE") {
         await handleNoActiveDeviceDecision({
-          notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
-          refreshFleet: async () => { await app.refreshRemoteFleet(); }, // best-effort:失败自吞
+          notify: () => {
+            if (isCurrentAccountScope(requestScope)) toast.warn(t.value.tradein.errNoActiveDevice);
+          },
+          refreshFleet: async () => {
+            if (!isCurrentAccountScope(requestScope)) return;
+            await app.refreshRemoteFleet();
+          }, // best-effort:失败自吞
         });
         return;
       }
       // CAPACITY_AVAILABLE: server says the checkout is not capped; continue
       // through the ordinary server order path without opening a local sheet.
-      if (canTradeIn.value && tradeInSources.value.length > 0) {
-        tradein.showChoice(kind, p.price, tradeInSources.value.map((d) => d.id));
+      if (eligibility.eligible && sourceIds.length > 0) {
+        if (!isCurrentAccountScope(requestScope)) return;
+        tradein.showChoice(kind, p.price, sourceIds);
       }
     }).catch(() => {
+      if (!isCurrentAccountScope(requestScope)) return;
       toast.warn(t.value.tradein.errPleaseRetry);
     });
     return;
   }
+  // Mock/demo keeps the isolated local eligibility composer.
+  const { canTradeIn, tradeInSources, capped } = useDeviceEligibility(kind);
   // Local/demo mode retains its isolated composer. Remote mode above never
   // reaches browser-owned replacement or order/device writes.
   if (canTradeIn.value && tradeInSources.value.length > 0) {
@@ -967,6 +1013,8 @@ function restartRemoteOrderPolling() {
 
 onShow(() => {
   remoteOrderPageVisible = true;
+  void refreshServerProductPhase(true);
+  void refreshProductCatalog(true);
   restartRemoteOrderPolling();
 });
 onHide(() => {
@@ -980,7 +1028,7 @@ function clearAdvance() {
   if (advanceTimer) { clearTimeout(advanceTimer); advanceTimer = undefined; }
 }
 
-watch(step, (s) => {
+watch(step, async (s) => {
   clearAdvance();
   // Remote checkout is a server-state machine. Never turn elapsed time into a
   // payment, provisioning, or activation result; only authoritative readback
@@ -1024,8 +1072,10 @@ watch(step, (s) => {
       // 上架节奏门支付时复验(与 onLoad 同谓词):未正式上架 SKU 必须在支付
       // 瞬间仍「携有效抵扣上下文 ∧ 抢先购窗口」——堵住「过门后移除抵扣 →
       // 全价买未上架机」的旁路(对抗审查 F1)。
-      if (p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase)) {
-        if (!(ti && tradeInEarlyWindowOk(p.unlocksAtPhase, getMonthsSince(app.user.joinedAt)))) {
+      if (!isProductAvailable(p, phase.value)) {
+        const mockEarlyWindow = p.available === undefined && p.unlocksAtPhase
+          && ti && tradeInEarlyWindowOk(p.unlocksAtPhase, getMonthsSince(app.user.joinedAt));
+        if (!mockEarlyWindow) {
           toast.warn(t.value.store.releaseComingToast);
           step.value = "select-payment";
           return;
@@ -1083,6 +1133,20 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
+      // Production conversion is one server transaction: the server locks the
+      // trial and catalogue row, creates the order, and closes the trial. Do
+      // not debit local mock money or mint a second local order in this branch.
+      if (applyTrial && remoteApiEnabled) {
+        const conversion = await freeTrial.convert(p.id);
+        if (!conversion.ok) {
+          toast.warn(t.value.store.coTrialQuoteChanged);
+          step.value = "select-payment";
+          return;
+        }
+        orderId.value = conversion.orderNo ?? null;
+        step.value = "awaiting";
+        return;
+      }
       // 🔴 扣款排在 convert() **之前**(2026-08-04 R5 改序)。原顺序是「只读预检 → convert
       // → 扣款」,理由是"预检使 convert 成功后扣款必成功" —— 但预检堵不住 debitBalance 的
       // 另一条失败路径:**落盘失败**。那时试用已被打成 converted(不可逆终态且已持久化)、
@@ -1099,7 +1163,7 @@ watch(step, (s) => {
         step.value = "select-payment";
         return;
       }
-      if (applyTrial && !freeTrial.convert()) {
+      if (applyTrial && !(await freeTrial.convert(p.id)).ok) {
         // 扣款与 convert 之间跨过宽限终点的极窄窗口:把刚扣的钱按增量精确退回
         // (含 withdrawableUsdt);退不回去 = 钱真扣着,走响亮终态(交易号 + 待对账队列),
         // 绝不再弹一句"报价已变"了事。

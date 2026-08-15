@@ -104,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { onBackPress } from "@dcloudio/uni-app";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import GlobalUi from "@/components/global-ui.vue";
@@ -114,30 +114,51 @@ import { useConfig } from "@/store/config";
 import { pickSponsor } from "@/mock/sponsors";
 import { useAuth } from "@/store/auth";
 import { resolveAuthAccountById } from "@/store/auth-account";
+import { remoteApiEnabled } from "@/api/runtime";
+import { consumeRemoteRegistrationReceipt } from "@/auth/remote-registration-receipt";
+import type { RegistrationReceipt } from "@/api/contracts";
 
 type GiftState = "posted" | "pending" | "none";
 
 const t = useT();
 const cfg = useConfig();
 const auth = useAuth();
+const remoteReceipt = ref<RegistrationReceipt | null>(consumeRemoteRegistrationReceipt(auth.accountId));
 
 // ⚠️ MOCK-ONLY: 成功页只读 active 账号目录中冻结的注册回执，绝不信任 URL。
 // 无回执时 giftState 为 none、礼包卡不渲染；live config 仅保留给旧页降级的
 // 非可见 fallback。PROD 注册 endpoint/回执契约 TBD，由服务端回执提供业务事实。
 const registration = computed(() => {
+  if (remoteApiEnabled) return null;
   const resolved = resolveAuthAccountById(auth.accountId);
   return resolved.ok && resolved.account?.status === "active" ? resolved.account.registration : null;
 });
 const giftState = computed<GiftState>(() => {
+  if (remoteApiEnabled) {
+    const status = remoteReceipt.value?.giftStatus;
+    if (!remoteReceipt.value || status === "UNAVAILABLE"
+        || typeof remoteReceipt.value.giftUsdt !== "number"
+        || typeof remoteReceipt.value.giftNex !== "number") return "none";
+    return status === "POSTED" ? "posted" : "pending";
+  }
   const receipt = registration.value;
   if (!receipt?.sponsorCode) return "none";
   return receipt.giftRoute === "withdrawable" ? "posted" : "pending";
 });
 
 // active 注册回执的金额是本次业务事实；无回执时仅为旧页降级保留 live config。
-const giftUsdt = computed(() => registration.value?.giftUsdt ?? cfg.config.rewards.welcomeGift.usdtAmount);
-const giftNex = computed(() => registration.value?.giftNex ?? cfg.config.rewards.welcomeGift.nexAmount);
-const sponsor = computed(() => registration.value?.sponsorCode ? pickSponsor(registration.value.sponsorCode) : null);
+const giftUsdt = computed(() => remoteApiEnabled
+  ? remoteReceipt.value?.giftUsdt ?? 0
+  : registration.value?.giftUsdt ?? cfg.config.rewards.welcomeGift.usdtAmount);
+const giftNex = computed(() => remoteApiEnabled
+  ? remoteReceipt.value?.giftNex ?? 0
+  : registration.value?.giftNex ?? cfg.config.rewards.welcomeGift.nexAmount);
+const sponsor = computed(() => {
+  if (remoteApiEnabled) return remoteReceipt.value?.sponsorDisplayName
+    ? { name: remoteReceipt.value.sponsorDisplayName }
+    : null;
+  return registration.value?.sponsorCode ? pickSponsor(registration.value.sponsorCode) : null;
+});
 const subLine = computed(() =>
   sponsor.value ? fmt(t.value.register.doneSubTeam, { name: sponsor.value.name }) : t.value.register.doneSubSolo,
 );

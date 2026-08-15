@@ -101,6 +101,19 @@ test("trial commands carry idempotency keys and parse authoritative receipts", a
   assert.deepEqual(client.requests[1].body, { reason: "explicit" });
 });
 
+test("trial conversion posts the product and stable idempotency key and validates the server order receipt", async () => {
+  const client = clientReturning({
+    orderNo: "TRC-ABC123", productNo: "stellarbox-s1", amountUsdt: 1200,
+    discountUsdt: 99, paymentStatus: "PENDING", orderStatus: "PENDING_PAYMENT",
+    sourceEnvironment: "PRODUCTION",
+  });
+  await createTrialApi(client).convert("stellarbox-s1", "h2-convert-TRIAL-1");
+  assert.deepEqual(client.requests[0], {
+    method: "POST", path: "/api/trial/convert", body: { productNo: "stellarbox-s1" },
+    idempotencyKey: "h2-convert-TRIAL-1",
+  });
+});
+
 test("trial start sends the device mapped from the authoritative product config", async () => {
   const client = clientReturning({
     ...activeState,

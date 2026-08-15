@@ -132,6 +132,7 @@ import { fmt } from "@/i18n/format";
 import { navTo } from "@/lib/route";
 import { usePurchaseGate } from "@/composables/use-purchase-gate";
 import { productCopy } from "@/lib/product-copy";
+import { remoteApiEnabled } from "@/api/runtime";
 
 const props = withDefaults(defineProps<{ product: Product; featured?: boolean }>(), {
   featured: false,
@@ -161,7 +162,7 @@ const bestTradeinCredit = computed(() => {
   if (!d) return 0;
   return computeTradeInCredit(d.paidPriceUsdt ?? 0, d.cumulativeEarningsUsdt ?? 0, props.product.price);
 });
-const showTradein = computed(() => bestTradeinCredit.value > 0);
+const showTradein = computed(() => !remoteApiEnabled && bestTradeinCredit.value > 0);
 
 // ── Purchase gate (等级门 + 锁额) — locked state + Buy redirect ──
 const { gate } = usePurchaseGate(() => props.product);

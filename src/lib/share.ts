@@ -45,7 +45,11 @@ export function buildShareLink(referralCode = currentShareReferralCode()): strin
   // not own a share-channel/base-url policy.  Do not compose a link from the
   // mock seed in that mode; the current H5 origin is the only non-business
   // transport fallback and contains no reward or channel policy.
+  const base = useConfig().config.share.baseUrl;
+  if (base) return `${base}${code}`;
   if (remoteApiEnabled) {
+    // A missing server base URL has no business fallback; the current origin
+    // is transport-only and is never composed from a mock domain.
     // #ifdef H5
     if (typeof location !== "undefined") {
       return `${location.origin}${location.pathname}#/pages/ref/code?code=${code}`;
@@ -53,8 +57,6 @@ export function buildShareLink(referralCode = currentShareReferralCode()): strin
     // #endif
     return "";
   }
-  const base = useConfig().config.share.baseUrl;
-  if (base) return `${base}${code}`;
   // #ifdef H5
   if (typeof location !== "undefined") {
     return `${location.origin}${location.pathname}#/pages/ref/code?code=${code}`;
@@ -75,16 +77,15 @@ export function buildShareText(): string {
 // web 型渠道 intent URL({link}/{text} URL-encode 后代入);非 web 型返回 null。
 export function channelIntentUrl(def: ShareChannelDef, link: string, text: string): string | null {
   if (!def.urlTemplate) return null;
-  return def.urlTemplate.replace("{link}", encodeURIComponent(link)).replace("{text}", encodeURIComponent(text));
+  const configuredText = def.textTemplate
+    ? def.textTemplate.replace("{link}", link)
+    : text;
+  return def.urlTemplate.replace("{link}", encodeURIComponent(link)).replace("{text}", encodeURIComponent(configuredText));
 }
 
 // 渠道可见性([FEAT-SHARE3] 平台矩阵):enabled 过滤;H5 上 system 需
 // navigator.share 支持(异常2),scheme 型保留(点击走复制降级,异常4)。
 export function visibleChannels(): ShareChannelDef[] {
-  // Channel enablement is an operator-owned policy that is not supplied by the
-  // current remote endpoint.  Hiding the sheet is safer than exposing mock
-  // outbound intents.
-  if (remoteApiEnabled) return [];
   const list = useConfig().config.share.channels.filter((c) => c.enabled);
   // #ifdef H5
   return list.filter(
@@ -116,7 +117,9 @@ export async function activateChannel(def: ShareChannelDef, surface: ShareSurfac
     toast.info(t.value.share.noCodeYet);
     return;
   }
-  const text = buildShareText();
+  const text = remoteApiEnabled
+    ? (def.textTemplate?.replace("{link}", link) ?? "")
+    : buildShareText();
   switch (def.intentType) {
     case "web": {
       const url = channelIntentUrl(def, link, text);

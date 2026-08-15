@@ -3,13 +3,18 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-const root = path.resolve(import.meta.dirname, "../..");
-const read = (relative) => readFileSync(path.join(root, relative), "utf8");
+const appRoot = path.resolve(import.meta.dirname, "..");
+const workspaceRoot = path.resolve(appRoot, "..");
+const backendRoot = process.env.NEXGRID_BACKEND_ROOT?.trim()
+  ? path.resolve(process.env.NEXGRID_BACKEND_ROOT.trim())
+  : path.join(workspaceRoot, "nexion-backend");
+const readBackend = (relative) => readFileSync(path.join(backendRoot, relative), "utf8");
+const readApp = (relative) => readFileSync(path.join(appRoot, relative), "utf8");
 
 test("all funds sandbox facts are RunID scoped from mapper through App parser", () => {
-  const mapper = read("backend/src/main/java/ffdd/opsconsole/finance/mapper/FundsSandboxMapper.java");
-  const service = read("backend/src/main/java/ffdd/opsconsole/finance/application/FundsSandboxService.java");
-  const api = read("app/src/api/funds-sandbox-api.ts");
+  const mapper = readBackend("src/main/java/ffdd/opsconsole/finance/mapper/FundsSandboxMapper.java");
+  const service = readBackend("src/main/java/ffdd/opsconsole/finance/application/FundsSandboxService.java");
+  const api = readApp("src/api/funds-sandbox-api.ts");
   for (const table of ["wallet", "order", "ledger", "callback_inbox"]) {
     assert.match(mapper, new RegExp(`nx_funds_sandbox_${table}[\\s\\S]{0,400}run_id`));
   }
@@ -30,9 +35,9 @@ test("all funds sandbox facts are RunID scoped from mapper through App parser", 
 });
 
 test("baseline, forward migration and guarded runner preserve RunID uniqueness", () => {
-  const baseline = read("backend/scripts/migrations/20260811_funds_persistent_sandbox.sql");
-  const forward = read("backend/scripts/migrations/20260812_funds_sandbox_run_scope.sql");
-  const runner = read("backend/scripts/apply_startup_schema_migrations.ps1");
+  const baseline = readBackend("scripts/migrations/20260811_funds_persistent_sandbox.sql");
+  const forward = readBackend("scripts/migrations/20260812_funds_sandbox_run_scope.sql");
+  const runner = readBackend("scripts/apply_startup_schema_migrations.ps1");
   for (const unique of [
     "(run_id,user_id)", "(run_id,order_no)", "(run_id,user_id,idempotency_key)",
     "(run_id,ledger_no)", "(run_id,order_no,entry_role)", "(run_id,event_id)",

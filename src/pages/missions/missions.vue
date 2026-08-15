@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, type CSSProperties } from "vue";
+import { computed, onMounted, ref, watch, type CSSProperties } from "vue";
 import AppChassis from "@/components/app-chassis.vue";
 import SubPageHeader from "@/components/sub-page-header.vue";
 import CardStagger from "@/components/card-stagger.vue";
@@ -114,16 +114,35 @@ import { useEventQuest } from "@/store/event-quest";
 import { EVENTS } from "@/mock/events";
 import { eventsApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalEvent } from "@/api/events-api";
+import { useApp } from "@/store/app";
+import { createRemoteAccountEpoch, type RemoteAccountRequest } from "@/lib/remote-account-epoch";
 
 const t = useT();
 const eventQuest = useEventQuest();
+const app = useApp();
 const remoteEvents = ref<CanonicalEvent[]>([]);
-async function refreshRemoteEvents(): Promise<void> {
+const remoteAccountEpoch = createRemoteAccountEpoch(app.accountKey);
+async function refreshRemoteEvents(request: RemoteAccountRequest = remoteAccountEpoch.snapshot()): Promise<void> {
   if (!remoteApiEnabled) return;
-  try { remoteEvents.value = (await eventsApi.state()).events; }
-  catch { remoteEvents.value = []; }
+  try {
+    const snapshot = await eventsApi.state();
+    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = snapshot.events;
+  } catch {
+    if (remoteAccountEpoch.isCurrent(request)) remoteEvents.value = [];
+  }
 }
-onMounted(() => { void refreshRemoteEvents(); });
+onMounted(() => {
+  if (!remoteApiEnabled) return;
+  remoteAccountEpoch.bind(app.accountKey);
+  remoteEvents.value = [];
+  void refreshRemoteEvents();
+});
+watch(() => app.accountKey, (accountKey) => {
+  if (!remoteApiEnabled) return;
+  remoteAccountEpoch.bind(accountKey);
+  remoteEvents.value = [];
+  void refreshRemoteEvents();
+});
 
 // Live Events row stat — ongoing / joined / claimable from the ported mock +
 // store (claimable = trackable + done + not yet claimed).

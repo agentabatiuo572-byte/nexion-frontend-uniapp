@@ -404,6 +404,8 @@ export interface DepositIntent {
   memoCode: string;
   /** 收款账户池按轮换策略分配;server 派发(用户需完整账号转账,不脱敏)。 */
   bankAccount: { accountName: string; accountNumber: string; bankName: string };
+  /** Optional server/provider-signed QR payload. Never synthesized by the client. */
+  qrPayload?: string;
   status: DepositIntentStatus;
   /** 下单时刻(ms epoch,server 时钟)。入账时透传给 DepositRecord.createdAt ——
    *  否则单据的「创建 → 到账」耗时恒为 0,后台对账看不出真实等待时长。 */

@@ -212,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useTradeinSheet } from "@/store/tradein-sheet";
 import { useApp } from "@/store/app";
 import { postMoneyBill } from "@/lib/money-receipt";
@@ -236,8 +236,10 @@ import { fmt } from "@/i18n/format";
 import { deviceE3Api, orderApi, remoteApiEnabled } from "@/api/runtime";
 import type { CanonicalCapacityReplaceQuote, CanonicalTradeinConfig, CanonicalTradeinQuote } from "@/api/device-e3-api";
 import { productCatalogState } from "@/store/product-catalog";
+import { isProductAvailable } from "@/store/product-availability";
 import { useOrders } from "@/store/orders";
 import { completeVerifiedMutation, handleNoActiveDeviceDecision } from "@/domain/e20-capacity-coordinator";
+import { captureAccountScope, isCurrentAccountScope } from "@/lib/account-scope";
 import { useDialogA11y } from "@/composables/use-dialog-a11y";
 
 const sheet = useTradeinSheet();
@@ -259,10 +261,18 @@ const confirming = ref(false);
 const canonicalQuote = ref<CanonicalTradeinQuote | null>(null);
 const canonicalTradeinConfig = ref<CanonicalTradeinConfig | null>(null);
 const capacityCommandKey = ref<string | null>(null);
+watch(() => app.accountKey, () => {
+  canonicalQuote.value = null;
+  canonicalTradeinConfig.value = null;
+  capacityCommandKey.value = null;
+});
 onMounted(() => {
   if (!remoteApiEnabled) return;
-  void deviceE3Api.tradeinConfig().then((value) => { canonicalTradeinConfig.value = value; }).catch(() => {
-    canonicalTradeinConfig.value = null;
+  const requestScope = captureAccountScope();
+  void deviceE3Api.tradeinConfig().then((value) => {
+    if (isCurrentAccountScope(requestScope)) canonicalTradeinConfig.value = value;
+  }).catch(() => {
+    if (isCurrentAccountScope(requestScope)) canonicalTradeinConfig.value = null;
   });
 });
 
@@ -325,10 +335,19 @@ async function openTradeinQuote(oldDevice: Device, targetKind: DeviceKind, newPr
     sheet.showTradein(oldDevice.id, targetKind, newPrice);
     return;
   }
+  const requestScope = captureAccountScope();
   try {
-    canonicalQuote.value = await deviceE3Api.quote(Number(oldDevice.id), targetKind);
+    const eligibility = await deviceE3Api.eligibility(targetKind);
+    if (!isCurrentAccountScope(requestScope)) return;
+    const sourceAllowed = eligibility.sources.some((source) => source.eligible
+      && source.sourceDeviceId === Number(oldDevice.id));
+    if (!eligibility.eligible || !sourceAllowed) throw new Error("TRADEIN_SOURCE_NOT_ELIGIBLE");
+    const quote = await deviceE3Api.quote(Number(oldDevice.id), targetKind);
+    if (!isCurrentAccountScope(requestScope)) return;
+    canonicalQuote.value = quote;
     sheet.showTradein(oldDevice.id, targetKind, newPrice);
   } catch {
+    if (!isCurrentAccountScope(requestScope)) return;
     canonicalQuote.value = null;
     toast.warn(t.value.tradein.errPleaseRetry);
   }
@@ -352,7 +371,9 @@ function onChooseFullPrice() {
   const s = state.value;
   if (s.kind !== "choice") return;
   if (remoteApiEnabled) {
+    const requestScope = captureAccountScope();
     void deviceE3Api.capacityQuote(s.targetKind).then(async (quote) => {
+      if (!isCurrentAccountScope(requestScope)) return;
       if (quote.decision === "REPLACE_REQUIRED") {
         sheet.showCanonicalReplace(s.targetKind, quote.payableUsdt, quote);
         return;
@@ -360,11 +381,18 @@ function onChooseFullPrice() {
       hide();
       if (quote.decision === "NO_ACTIVE_DEVICE") {
         await handleNoActiveDeviceDecision({
-          notify: () => toast.warn(t.value.tradein.errNoActiveDevice),
-          refreshFleet: async () => { await app.refreshRemoteFleet(); }, // best-effort:失败自吞
+          notify: () => {
+            if (isCurrentAccountScope(requestScope)) toast.warn(t.value.tradein.errNoActiveDevice);
+          },
+          refreshFleet: async () => {
+            if (!isCurrentAccountScope(requestScope)) return;
+            await app.refreshRemoteFleet();
+          }, // best-effort:失败自吞
         });
       }
-    }).catch(() => toast.warn(t.value.tradein.errPleaseRetry));
+    }).catch(() => {
+      if (isCurrentAccountScope(requestScope)) toast.warn(t.value.tradein.errPleaseRetry);
+    });
     return;
   }
   // If slot full, hand off to the replace sheet; else just dismiss (caller's
@@ -397,14 +425,17 @@ const retireView = computed(() => {
   const targets = PRODUCTS.filter(
     (p) =>
       (!(remoteApiEnabled ? canonicalTradeinConfig.value?.requireHigherPrice !== false : TRADEIN_LADDER_RULES.requireHigherPrice) || p.price > paid) &&
-      isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value),
+      (remoteApiEnabled
+        ? isProductAvailable(p, phase.value)
+        : isTradeInTargetAvailable(p.unlocksAtPhase, phase.value, monthsSinceJoin.value)),
   ).map((p) => {
     // 抢先购窗口内的未正式上架目标,行尾加「抢先升级」标(默认关闭时零渲染)。
     const early = !!p.unlocksAtPhase && !isPhaseReached(phase.value, p.unlocksAtPhase);
+    const net = remoteApiEnabled ? "—" : Math.max(0, +(p.price - previewCredit(device, p.price)).toFixed(2)).toLocaleString();
     const base = fmt(t.value.tradein.retireTargetOption, {
       name: p.name,
       price: p.price.toLocaleString(),
-      net: Math.max(0, +(p.price - previewCredit(device, p.price)).toFixed(2)).toLocaleString(),
+      net,
     });
     return { id: p.id, label: early ? `${base} · ${t.value.tradein.retireEarlyTag}` : base };
   });
