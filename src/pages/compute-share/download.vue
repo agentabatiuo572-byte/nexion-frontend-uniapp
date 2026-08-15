@@ -284,7 +284,8 @@ async function createRemoteEnrollment(
   } catch (cause) {
     if (expectedAccount !== String(app.accountKey) || expectedGeneration !== accountGeneration) return;
     if (!isAmbiguousOutcome(cause)) clearPending(expectedAccount);
-    toast.warn(cause instanceof Error ? cause.message : t.value.computeShare.pairingFailed);
+    console.warn("[compute-share] pairing failed:", cause);
+    toast.warn(t.value.computeShare.pairingFailed);
   } finally {
     if (expectedAccount === String(app.accountKey) && expectedGeneration === accountGeneration) connecting.value = false;
   }

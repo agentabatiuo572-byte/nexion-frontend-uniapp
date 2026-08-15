@@ -280,7 +280,10 @@ onMounted(() => {
     //   改走返回值 / store 状态字段」)。若继续 .catch,缝不抛了这里就永远拿不到错,
     //   充值页的报错横幅会**静默变哑** —— 改缝必须连消费方一起改,这就是那一半。
     void dep.refreshRemoteVietQrDeposits().then(() => {
-      if (dep.serverStatus === "error" && dep.serverError) createError.value = dep.serverError;
+      if (dep.serverStatus === "error" && dep.serverError) {
+        console.warn("[deposit] refresh failed:", dep.serverError);
+        createError.value = t.value.topupChrome.depositOpFailedNote;
+      }
     });
     dep.startRemoteVietQrPolling();
   }
@@ -366,7 +369,9 @@ async function completeCreateOrder(usdt: number, expectedAccountKey: string) {
         toast.error(reason);
       },
       settled: () => { creating.value = false; },
-    }, "VIETQR_CREATE_FAILED");
+      // lib 新契约:fallback = 用户面人话(原始 cause 由 lib 进日志)。审计 R3 抓获:此处
+      // 曾仍传 "VIETQR_CREATE_FAILED",lib 改版后它从「极端边界才漏出」变成「每次失败必弹」。
+    }, t.value.topupChrome.depositOpFailedNote);
 }
 /** 过期态「重新生成」= 新单新锁价(沿用原单金额,当前牌价重新锁定)。 */
 function regen() {

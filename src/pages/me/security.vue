@@ -210,7 +210,8 @@ async function loadRemoteSecurity(): Promise<void> {
     remoteSecurity.value = securityState;
     deletionStatus.value = accountDeletion;
   } catch (cause) {
-    err.value = cause instanceof Error ? cause.message : "SECURITY_OVERVIEW_UNAVAILABLE";
+    console.warn("[security] overview load failed:", cause);
+    err.value = t.value.security.opFailed;
   }
 }
 
@@ -303,7 +304,8 @@ async function submitPasswordChange() {
       security.changePassword(next.value);
     }
   } catch (cause) {
-    err.value = cause instanceof Error ? cause.message : "SECURITY_PASSWORD_UPDATE_FAILED";
+    console.warn("[security] password update failed:", cause);
+    err.value = t.value.security.opFailed;
     securityBusy.value = false;
     return;
   }
@@ -338,7 +340,8 @@ async function toggleTwoFactor(value: boolean) {
         } else security.setTwoFactor(false);
         toast.warn(t.value.security.twoFactorDisabledToast);
       } catch (cause) {
-        err.value = cause instanceof Error ? cause.message : "SECURITY_TWO_FACTOR_UPDATE_FAILED";
+        console.warn("[security] 2FA update failed:", cause);
+        err.value = t.value.security.opFailed;
       } finally {
         securityBusy.value = false;
       }
@@ -353,7 +356,8 @@ async function toggleTwoFactor(value: boolean) {
       } else security.setTwoFactor(true);
       toast.success(t.value.security.twoFactorEnabledToast);
     } catch (cause) {
-      err.value = cause instanceof Error ? cause.message : "SECURITY_TWO_FACTOR_UPDATE_FAILED";
+      console.warn("[security] 2FA update failed:", cause);
+      err.value = t.value.security.opFailed;
     } finally {
       securityBusy.value = false;
     }

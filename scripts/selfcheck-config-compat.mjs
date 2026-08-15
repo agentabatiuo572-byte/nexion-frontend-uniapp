@@ -83,7 +83,11 @@ check(`② 二次合成不受一次合成的突变影响(weights[${wKeys[0]}]=${
 // ── ③ WD02 parity(合成有效值 ↔ admin-ops 契约锚)────────────────────────────
 // 锚点身份沿袭原门:比对对象是 admin-ops wd02 契约测试里的声明锚(server-canonical,
 // 后端字段同步是人肉义务)。锚点位于当前真实 PC 仓 nexion-ops-console。
+// 路径解析:linked worktree(.claude/worktrees/*)下 `root/../nexion-ops-console` 落空
+// (verify.sh ADMIN_ROOT 同款坑,2026-08-15 在 worktree 里实红抓到)——verify.sh 已用
+// git common-dir 反推出正确 ADMIN_ROOT,经 env 传入放候选首位;裸跑(无 env)仍走相对候选。
 const anchorCands = [
+  ...(process.env.ADMIN_ROOT ? [path.join(process.env.ADMIN_ROOT, "tests", "wd02-network-confirm-fee-contract.test.mjs")] : []),
   path.join(root, "..", "nexion-ops-console", "tests", "wd02-network-confirm-fee-contract.test.mjs"),
 ];
 const anchorPath = anchorCands.find((p) => existsSync(p));
