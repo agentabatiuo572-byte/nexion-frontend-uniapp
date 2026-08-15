@@ -17,23 +17,30 @@
 
     <!-- Centerpiece -->
     <view class="intro-content">
+      <!-- Language entry (top-right; opens in-place sheet — onboarding 不离开漏斗,不进 App 壳) -->
+      <view
+        class="intro-lang active:scale-[0.96] active:opacity-80"
+        role="button"
+        tabindex="0"
+        :aria-label="t.language.pageTitle"
+        @click="langOpen = true"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--v5-ink-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+        <text class="intro-lang__code">{{ locale.code.toUpperCase() }}</text>
+      </view>
       <view class="intro-orb-area">
         <view class="intro-orb anim-orb">
           <view class="orb-glow" />
           <svg viewBox="0 0 240 240" class="orb-svg" aria-hidden="true">
             <defs>
-              <radialGradient id="orb-chip" cx="50%" cy="40%" r="60%">
-                <stop offset="0%" stop-color="var(--v5-surface-2)" />
-                <stop offset="100%" stop-color="#070707" />
-              </radialGradient>
               <radialGradient id="orb-core" cx="50%" cy="50%" r="50%">
                 <stop offset="0%" stop-color="var(--v5-brand)" stop-opacity="0.55" />
                 <stop offset="55%" stop-color="var(--v5-brand)" stop-opacity="0.12" />
                 <stop offset="100%" stop-color="var(--v5-brand)" stop-opacity="0" />
-              </radialGradient>
-              <radialGradient id="orb-die" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="var(--v5-on-brand)" />
-                <stop offset="100%" stop-color="#000000" />
               </radialGradient>
               <filter id="orb-soft" x="-50%" y="-50%" width="200%" height="200%">
                 <feGaussianBlur stdDeviation="1.2" />
@@ -76,26 +83,14 @@
             <!-- Center radial glow -->
             <circle cx="120" cy="120" r="56" fill="url(#orb-core)" />
 
-            <!-- Chip badge -->
-            <rect x="90" y="90" width="60" height="60" rx="14" fill="url(#orb-chip)" stroke="var(--v5-brand)" stroke-opacity="0.45" stroke-width="1" />
-
-            <!-- PCB pins -->
-            <g v-for="(p, i) in pinPos" :key="`pin-${i}`" stroke="var(--v5-brand)" stroke-opacity="0.45" stroke-width="1.3">
-              <line :x1="p" y1="90" :x2="p" y2="86" />
-              <line :x1="p" y1="150" :x2="p" y2="154" />
-              <line x1="90" :y1="p" x2="86" :y2="p" />
-              <line x1="150" :y1="p" x2="154" :y2="p" />
-            </g>
-
-            <!-- Inner die -->
-            <rect x="106" y="106" width="28" height="28" rx="4" fill="url(#orb-die)" stroke="var(--v5-brand)" stroke-opacity="0.55" stroke-width="1" />
-            <!-- Brand N -->
-            <text x="120" y="124.2" text-anchor="middle" font-size="13" font-weight="600" fill="var(--v5-brand)" fill-opacity="0.85">N</text>
-            <!-- LED -->
-            <circle cx="120" cy="98" r="1.6" fill="var(--v5-brand)">
-              <animate attributeName="opacity" values="1;0.25;1" dur="1.4s" repeatCount="indefinite" />
-            </circle>
           </svg>
+          <!-- App icon badge(官方品牌资产,双主题成对切换 —— 与 app-chassis 的 header logo 同机制)。
+               🔴 不能放进上面的 SVG:uni 编译器会把 <image> 劫持成 uni-image 组件,落在 SVG 命名空间里
+               完全不渲染(实测 0×0)。改为容器内绝对定位叠加,60/240 = 25% 居中。 -->
+          <view class="orb-appicon-wrap">
+            <image class="orb-appicon orb-appicon--light" src="/static/img/brand/app-icon-light.png" mode="aspectFit" />
+            <image class="orb-appicon orb-appicon--dark" src="/static/img/brand/app-icon-dark.png" mode="aspectFit" />
+          </view>
         </view>
       </view>
 
@@ -133,17 +128,60 @@
         </view>
       </view>
     </view>
+
+    <!-- Language sheet(vcs-root 同型:dialog 角色在包裹层,遮罩是其子元素) -->
+    <view v-if="langOpen" class="intro-lang-root" role="dialog" aria-modal="true" :aria-label="t.language.pageTitle">
+      <view class="intro-lang-mask" role="presentation" aria-hidden="true" @click="closeLang" />
+      <view class="intro-lang-sheet">
+      <view class="intro-lang-sheet__grab" />
+      <text class="intro-lang-sheet__title">{{ t.language.pageTitle }}</text>
+      <scroll-view scroll-y :show-scrollbar="false" class="intro-lang-list">
+        <view
+          v-for="l in LOCALES"
+          :key="l.code"
+          class="intro-lang-row active:opacity-80"
+          role="button"
+          tabindex="0"
+          :aria-label="l.nativeName"
+          @click="pick(l.code)"
+        >
+          <text class="intro-lang-row__flag">{{ l.flag }}</text>
+          <view class="intro-lang-row__names">
+            <text class="intro-lang-row__native" :style="l.code === locale.code ? 'color: var(--v5-brand)' : ''">{{ l.nativeName }}</text>
+            <text class="intro-lang-row__en">{{ l.englishName }}</text>
+          </view>
+          <view v-if="l.code === locale.code" class="intro-lang-row__check">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--v5-on-brand)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+          </view>
+          <text v-else class="intro-lang-row__code">{{ l.code }}</text>
+        </view>
+      </scroll-view>
+      </view>
+    </view>
   </StandalonePageShell>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import StandalonePageShell from "@/components/device/standalone-page-shell.vue";
 import { useT } from "@/i18n/use-t";
+import { LOCALES, type LocaleCode } from "@/i18n";
+import { useLocaleStore } from "@/store/locale";
+import { useDialogA11y } from "@/composables/use-dialog-a11y";
 import { fleetDevicesOf, paidCumulativeNow, publicStatsHealth } from "@/lib/platform-stats";
 import { useConfig } from "@/store/config";
 
 const t = useT();
+const locale = useLocaleStore();
+const langOpen = ref(false);
+function closeLang() {
+  langOpen.value = false;
+}
+function pick(code: LocaleCode) {
+  locale.setLocale(code);
+  langOpen.value = false;
+}
+useDialogA11y(computed(() => langOpen.value), ".intro-lang-root", closeLang);
 // 🔴 累计支付与舰队数走**配置派生**(2026-08-06 审计 P1:规格 ③「其它页面舰队数字
 //   继续从它派生」)。配置坏回种子锚(本页不在异常3 占位管辖面)。
 //   cumulative 仍是 time-anchored derive-not-accumulate,不随访问回退;
@@ -193,7 +231,6 @@ const satellites = [
   { x: 120, y: 228 },
   { x: 12, y: 120 },
 ];
-const pinPos = [0, 1, 2, 3].map((i) => 98 + i * 14.6);
 const orbitPath = "M 120 12 A 108 108 0 1 1 119.999 12 Z";
 
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -260,6 +297,130 @@ function goTerms() {
   height: 4px;
   border-radius: 9999px;
   background: var(--v5-brand);
+}
+
+/* 中心 App 图标:双主题成对切换(html[data-theme] 由主题层维护,与 app-chassis header logo 同机制) */
+.orb-appicon-wrap {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 25%;
+  height: 25%;
+  pointer-events: none;
+}
+.orb-appicon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.orb-appicon--dark {
+  display: none;
+}
+html[data-theme="dark"] .orb-appicon--light {
+  display: none;
+}
+html[data-theme="dark"] .orb-appicon--dark {
+  display: block;
+}
+
+/* Language entry + in-place sheet(bg 填充零 border;字号取 9 档;tap ≥44) */
+.intro-lang {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  background: var(--v5-surface-2);
+}
+.intro-lang__code {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--v5-ink-2);
+}
+.intro-lang-root {
+  position: fixed;
+  inset: 0;
+  z-index: 790;
+}
+.intro-lang-mask {
+  position: absolute;
+  inset: 0;
+  background: var(--v5-bg-color-mask);
+}
+.intro-lang-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 800;
+  background: var(--v5-surface);
+  border-radius: 24px 24px 0 0;
+  padding: 10px 16px calc(env(safe-area-inset-bottom, 0px) + 38px);
+  display: flex;
+  flex-direction: column;
+}
+.intro-lang-sheet__grab {
+  width: 36px;
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--v5-surface-3);
+  margin: 2px auto 10px;
+}
+.intro-lang-sheet__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--v5-ink);
+  padding: 0 4px 10px;
+}
+.intro-lang-list {
+  max-height: 56vh;
+}
+.intro-lang-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 4px;
+}
+.intro-lang-row__flag {
+  font-size: 20px;
+}
+.intro-lang-row__names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.intro-lang-row__native {
+  font-size: 15px;
+  font-weight: 550;
+  color: var(--v5-ink);
+}
+.intro-lang-row__en {
+  font-size: 12px;
+  color: var(--v5-ink-3);
+}
+.intro-lang-row__code {
+  font-size: 12px;
+  color: var(--v5-ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.intro-lang-row__check {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: var(--v5-brand);
+  display: grid;
+  place-items: center;
 }
 
 .intro-content {
