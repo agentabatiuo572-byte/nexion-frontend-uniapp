@@ -26,7 +26,7 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[0;36m'; N='\033[0m'
-pass=0; fail=0; skip=0
+pass=0; fail=0; skip=0; retried=0
 
 # 🔴 退出码哨兵文件 —— WF-7(2026-07-09)/ WF-10(2026-08-06)两次同型踩坑的挂账修法,
 # admin-ops 的 verify.mjs 早焊了,本仓一直欠着(EVOLUTION-LEDGER:「其余工程 verify.sh
@@ -72,11 +72,76 @@ if [ ! -d "$ADMIN_ROOT" ]; then
   fi
 fi
 
-ok()   { printf "  ${G}PASS${N}  %s\n" "$1"; pass=$((pass+1)); }
-bad()  { printf "  ${R}FAIL${N}  %s\n" "$1"; fail=$((fail+1)); }
+# ⚠ 标记放格式串不放 %s 参数位:POSIX printf 只在格式串里解释 \033 色码(P2-1);消息位禁 %(无用户输入)
+ok()   { local mark=""; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}⚠ after-retry${N}"; PROBE_RETRIED_LAST=0; retried=$((retried+1)); fi; printf "  ${G}PASS${N}  %s$mark\n" "$1"; pass=$((pass+1)); }
+bad()  { local mark=""; if [ "${PROBE_RETRIED_LAST:-0}" = "1" ]; then mark=" ${Y}(重试后仍失败,首败明细在 *.attempt1)${N}"; PROBE_RETRIED_LAST=0; fi; printf "  ${R}FAIL${N}  %s$mark\n" "$1"; fail=$((fail+1)); }
 # 🔴 SKIP 必须进账。以前 6 处 SKIP 是裸 printf,两个计数器都不碰 —— 于是「0 fail」既可能是
 # 「418 道全跑过了」,也可能是「412 道跑了、6 道压根没跑」,退出码分不出这两件事。
-skipped() { printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
+skipped() { PROBE_RETRIED_LAST=0; printf "  ${Y}SKIP${N}  %s\n" "$1"; skip=$((skip+1)); }
+
+# ── runtime 探针重试(pkg/zj)────────────────────────────────────────────────
+# 族=真起浏览器的 14 个探针(census:docs/changes/2026-08-15-runtime-probe-retry.census.md)。
+# 同机三轮实测每轮恰好 1 个随机 runtime 探针抖(Frame detached / 20s 超时),轮轮不同、复跑自愈
+# —— 时序余量在本机负载下不够,族层统一「失败自动重跑 1 次,以第二次为准」。
+# 🔴 重试必须大声:首败明细留在探针日志(分隔行),事件登记 $PROBE_RETRY_LOG,ok/bad 行尾带
+# ⚠ 标记,总结行报 after-retry 计数 —— 静默重试会把真实的偶发产品 bug 一起吞掉,禁止。
+# 🔴 只包 runtime 真跑调用点;--selftest / 静态哨兵 / 逻辑门一律不包(确定性门失败重跑无意义,
+# 反而掩盖不该存在的非确定性)。稳定红两跑仍红,不被洗绿(probe_retry_selftest 变异①钉死)。
+# ponytail: 重试 1 次是当前抖动率(~1/轮)下的够用值;若单探针 1 次重试仍频繁穿透,升级路径=
+# 该探针内部等待硬化单独立项,不是加大重试次数。
+PROBE_RETRY_LOG="${TMPDIR:-/tmp}/uniapp-probe-retries.$$.log"
+: > "$PROBE_RETRY_LOG"   # 开跑清空:防 Windows PID 复用把上一轮残留条目混进本轮回显
+PROBE_RETRIED_LAST=0
+# 用法:probe_retry <探针日志路径> <命令...>(重定向收进函数:首败整份存档 *.attempt1 后
+# 截断重写,主日志永远只有权威的第二次 —— 下游 cat/tail/grep 消费点不吃首败污染)
+probe_retry() {
+  local plog="$1"; shift
+  PROBE_RETRIED_LAST=0
+  "$@" > "$plog" 2>&1 && return 0
+  local rc=$?
+  PROBE_RETRIED_LAST=1
+  cp -f "$plog" "$plog.attempt1" 2>/dev/null
+  printf '%s | first-exit=%s | attempt1=%s | %s\n' "$(date '+%F %T')" "$rc" "$plog.attempt1" "$*" >> "$PROBE_RETRY_LOG"
+  "$@" > "$plog" 2>&1
+}
+
+# 红测三变异:①恒败不洗绿 ②首败后成=绿+标记+留痕 ③接线完整性(解包即红)。
+# 每个变异先证注入生效(rc/标志文件)再看判定 —— 红测铁律:先证起点。
+probe_retry_selftest() {
+  local bad_bits="" sroot="${TMPDIR:-/tmp}"
+  local tmpflag="$sroot/uniapp-probe-retry-selftest.$$" slog="$sroot/uniapp-probe-retry-selftest-plog.$$"
+  # 演习期间换草稿登记簿:selftest 自己注入的失败靶不许污染真登记簿(P1-1 狼来了)
+  local real_log="$PROBE_RETRY_LOG"
+  PROBE_RETRY_LOG="$sroot/uniapp-probe-retry-selftest-reg.$$"; : > "$PROBE_RETRY_LOG"
+  # ① 恒败探针经包装:终判必须仍红(稳定红不被洗绿)
+  if probe_retry "$slog" bash -c 'exit 7'; then bad_bits="$bad_bits ①洗绿"; fi
+  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ①未重试"
+  PROBE_RETRIED_LAST=0
+  # ② 首败后成:终判绿 + 标记置位 + 草稿登记簿长了一行 + 首败明细存档(重试大声)
+  rm -f "$tmpflag"
+  local before after
+  before=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null); before=${before:-0}
+  if probe_retry "$slog" bash -c "[ -f '$tmpflag' ] || { : > '$tmpflag'; exit 1; }"; then :; else bad_bits="$bad_bits ②未转绿"; fi
+  [ "$PROBE_RETRIED_LAST" = "1" ] || bad_bits="$bad_bits ②标记未置位"
+  after=$(wc -l < "$PROBE_RETRY_LOG" 2>/dev/null); after=${after:-0}
+  [ "$after" -gt "$before" ] || bad_bits="$bad_bits ②未留痕"
+  [ -f "$slog.attempt1" ] || bad_bits="$bad_bits ②首败明细未存档"
+  rm -f "$tmpflag" "$slog" "$slog.attempt1" "$PROBE_RETRY_LOG"
+  PROBE_RETRIED_LAST=0
+  PROBE_RETRY_LOG="$real_log"
+  # ③ 接线完整性:被包真跑调用点数 = census 期望(解包/漏包即红)。锚定行首 if(注释诱饵免疫,
+  # tester M5)+ 绝对路径(cwd≠仓根时 $0 相对路径假红,P2-4)+ 不用 `|| echo 0`(grep -c 零命中
+  # 时打印 0 且退出码 1,会产出 "0\n0" 两行值,P2-10)
+  local expected_sites=18 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live)
+  actual_sites=$(grep -cE '^[[:space:]]*if probe_retry .*"\$NODE_BIN" scripts/' "$vfile" 2>/dev/null); actual_sites=${actual_sites:-0}
+  [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
+  if [ -z "$bad_bits" ]; then
+    ok "probe-retry selftest(恒败不洗绿 · 首败后成大声转绿 · 接线 $actual_sites/$expected_sites)"
+  else
+    bad "probe-retry selftest 失效:$bad_bits —— 重试包装不可信,本轮所有 runtime 探针结论按未包装解读"
+  fi
+}
+probe_retry_selftest
 
 check_http() {
   local label="$1" route="$2"
@@ -383,6 +448,15 @@ else
   bad "i18n 文案里有 markdown 残留 — node scripts/i18n-copy-residue-gate.mjs 看明细"
   grep -E "^(FAIL| )" /tmp/uniapp-i18n-residue.log | head -8
 fi
+# 焦虑词哨兵(2026-08-15 pkg/zk):用户可见字符串禁内部运营/审查术语(人工审核/风控/审查/
+# manual review/xét duyệt…)。同 residue 门惯例:剥注释只扫字符串值、候选下限判红;
+# 确需保留的行(注销等破坏性流程)用 `anxiety-exempt: <理由>` 行内豁免,豁免清单随 PASS 输出供 review。
+if "$NODE_BIN" scripts/anxiety-copy-gate.mjs > /tmp/uniapp-anxiety-copy.log 2>&1; then
+  ok "焦虑词哨兵 — $(head -1 /tmp/uniapp-anxiety-copy.log)"
+else
+  bad "用户可见文案命中焦虑/内部术语禁词 — node scripts/anxiety-copy-gate.mjs --list 看全量"
+  grep -E "^(FAIL| )" /tmp/uniapp-anxiety-copy.log | head -8
+fi
 # token discipline: no hardcoded v5 light hex in components (use var(--v5-*))
 # 保留为「无豁免硬地板」:这 4 个是最核心的 token 值,任何形式都不许出现,连 allowlist 也不给。
 # 全量覆盖(45 个 token × hex/rgb/rgba 三种写法 + 变 alpha 副本)由下面的 token_copy_gate 承担。
@@ -453,7 +527,7 @@ else
   bad "bare login-entry system chrome contract"; sed 's/^/        /' /tmp/uni-auth-system-chrome.log
 fi
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs >/tmp/uni-auth-system-chrome-runtime.log 2>&1; then
+  if probe_retry /tmp/uni-auth-system-chrome-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-system-chrome-runtime.mjs; then
     ok "bare login-entry system chrome runtime geometry (P-069)"
   else
     bad "bare login-entry system chrome runtime geometry"; sed 's/^/        /' /tmp/uni-auth-system-chrome-runtime.log
@@ -606,7 +680,7 @@ sentinel_present "SPEC-7 gift lock seeded" src/mock/platform-config.ts 'lockMode
 # z1 判决 A:克隆逻辑 819a6da 起搬进 lib/platform-config-compat.ts(config store 经
 # completePlatformConfigSeed 初始化)。字面 pin 换行为门:克隆隔离 / captchaAlwaysScenes
 # 有效值 / WD02 网络费逐键 parity 全走「合成后的有效配置」,种子文件形态属实现细节。
-if "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
+if ADMIN_ROOT="$ADMIN_ROOT" "$NODE_BIN" scripts/selfcheck-config-compat.mjs > /tmp/uni-config-compat.log 2>&1; then
   ok "platform-config compat 行为门 — $(tail -1 /tmp/uni-config-compat.log)"
 else
   bad "platform-config compat 行为门失败 — node scripts/selfcheck-config-compat.mjs 看明细"
@@ -997,6 +1071,79 @@ else
     tail -25 /tmp/spec7-platform-config-parity.log | sed 's/^/        /'
   fi
 fi
+# 双端参数 key parity: uniapp 配置契约 ↔ admin main 活源(2026-08-15 改锚,单独立项)。
+# 原锚 lib/mock/admin/compute-config.ts 已死(admin main 2c477b4 进 .trash;含全键 defaultVal
+# 的寄存器只活在 admin 非 main 分支,与 wd02 契约锚无交集分支 → 原门在 main 族恒红)。
+# 现锚 main 活源:riskCluster 11 键 → k-client.ts;lockMode → h-client.ts;K3 提现前置 /
+# K4 聚簇权重 12 键 main 前端尚未落地(只在 PRD),admin 侧断言降为域锚脚本里的升级哨兵
+# (落地即红,提醒接进比对),uniapp 侧契约照旧 24 键全量必含。
+# 键清单三处消费(key 循环 / 域锚脚本 argv / 覆盖度门)同源于下面两个变量,勿另抄。
+SPEC7_RISKCLUSTER_KEYS="freePhoneSlotsPerCluster duplicateAccountPendingFrom duplicateAccountFreezeFrom pendingReleaseHours appAttestationReleaseHours maxSignupPerIp24h maxAccountsPerDevice maxAccountsPerPaymentInstrument clusterFreezeSuggestThreshold releaseMode freeSlotRequiresBinding"
+SPEC7_OTPGATE_KEYS="resendSeconds captchaAfterSends otpTtlSeconds maxVerifyAttempts captchaTicketTtlSeconds"
+SPEC7_ADMIN_PENDING_KEYS="minWithdrawableUsdt sameAddressRoute firstWithdrawalManual newAddressHoldHours serverDeviceId ipBucket withdrawAddress paymentInstrument sponsor uaFingerprint signupTiming weakSignalClusterThreshold"
+ADMIN_K_CLIENT="$ADMIN_ROOT/lib/admin/k-client.ts"
+ADMIN_H_CLIENT="$ADMIN_ROOT/lib/admin/h-client.ts"
+if [ ! -f "$ADMIN_K_CLIENT" ] || [ ! -f "$ADMIN_H_CLIENT" ]; then
+  bad "SPEC-7 parity: admin main 活源缺失(k-client:$([ -f "$ADMIN_K_CLIENT" ] && echo ok || echo MISS) h-client:$([ -f "$ADMIN_H_CLIENT" ] && echo ok || echo MISS))at $ADMIN_ROOT/lib/admin"
+else
+  parity_miss=""
+  for k in $SPEC7_RISKCLUSTER_KEYS lockMode $SPEC7_ADMIN_PENDING_KEYS; do
+    grep -q "$k" src/store/config-types.ts || parity_miss="${parity_miss}uniapp:$k "
+  done
+  for k in $SPEC7_RISKCLUSTER_KEYS; do
+    grep -q "$k" "$ADMIN_K_CLIENT" || parity_miss="${parity_miss}admin:$k "
+  done
+  grep -q "lockMode" "$ADMIN_H_CLIENT" || parity_miss="${parity_miss}admin:lockMode "
+  if [ -z "$parity_miss" ]; then
+    ok "SPEC-7 param key parity (uniapp config-types 24 键 ↔ admin k-client/h-client 活源;K3/K4 12 键升级哨兵在域锚脚本)"
+  else
+    bad "SPEC-7 param key parity missing: $parity_miss"
+  fi
+  # 双端参数「值」parity → 域锚版:uniapp seed ∈ admin 允许值域/枚举白名单。
+  # admin main 已 server-canonical(前端无 defaultVal,字面权威在真后端 DB,本机无仓),
+  # 字面级比对的 admin 侧对象消亡 —— 降级语义 / 抓漂范围 / 恢复字面级的条件,见
+  # scripts/spec7-admin-domain-parity.mjs 头注释。红测已验:越域 / 假键 / 锚缺失均红。
+  # 历史沿革仍有效的部分:z1 判决 A(2026-08-10)captchaAlwaysScenes 出种子进 compat
+  # 运行时默认,由 selfcheck-config-compat 行为门看住,不在本键清单。
+  if "$NODE_BIN" scripts/spec7-admin-domain-parity.mjs "$ADMIN_ROOT" "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" \
+       > /tmp/uni-spec7-admin-domain.log 2>&1; then
+    ok "SPEC-7 param value parity·域锚(seed ∈ admin 域/白名单;$(tail -1 /tmp/uni-spec7-admin-domain.log | tr -d '\r'))"
+  else
+    bad "SPEC-7 param value parity·域锚失败 — node scripts/spec7-admin-domain-parity.mjs 看明细"
+    grep "^FAIL" /tmp/uni-spec7-admin-domain.log | head -8 | sed 's/^/        /'
+  fi
+  # 值 parity 覆盖度自守(z1 判决 A:硬计数改集合等式,与循环键清单同源):种子块键集
+  # 必须与循环键清单完全相等 —— 种子加键没进循环、循环钉着种子已删的键、任一侧提取为空,
+  # 都在这里红(2026-07-14 对抗审查 D 项缺口的构造性版本)。
+  # 值起始 [^{] 过滤:块首行「riskCluster: {」自己也长得像键,不滤会多出幽灵键(红测实锤)。
+  # 🔴 但它同时把**对象值的键**一起滤掉了(z1 R2 对抗审计 P1-13):新增
+  #    `deviceFingerprint: { salt, ttlDays }` 这类参数在两侧键集里都看不见 → 静默不进
+  #    值 parity 循环,正是 captchaAlwaysScenes 那次的同型。故再加一道:块内**所有**
+  #    顶层键(含对象值)必须 = 循环键集 ∪ 显式登记的对象值键(下面登记表当前为空)。
+  SPEC7_OBJECT_VALUE_KEYS=""   # 形如 "deviceFingerprint tierWeights";登记即须写明谁在守它的值
+  seed_rc_keys=$(sed -n '/riskCluster: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  seed_og_keys=$(sed -n '/otpGate: {/,/},/p' src/mock/platform-config.ts | grep -E '^\s+\w+: [^{]' | grep -oE '^\s+\w+:' | tr -d ' :\r' | sort)
+  seed_all_keys=$(sed -n '/riskCluster: {/,/},/p;/otpGate: {/,/},/p' src/mock/platform-config.ts \
+    | grep -E '^\s+\w+:' | grep -oE '^\s+\w+:' | tr -d ' :\r' | grep -vE '^(riskCluster|otpGate)$' | sort -u)
+  loop_all_keys=$(printf '%s\n%s\n%s\n' "$SPEC7_RISKCLUSTER_KEYS" "$SPEC7_OTPGATE_KEYS" "$SPEC7_OBJECT_VALUE_KEYS" | tr ' ' '\n' | grep -v '^$' | sort -u)
+  unwatched=$(comm -23 <(echo "$seed_all_keys") <(echo "$loop_all_keys"))
+  # 🔴 空集必红:抽不到键(文件读不到 / 块形状变了)时上面的差集恒空 → 会假绿。
+  #    这条守卫是自己红测时发现的:cwd 漂了一次,判据就静默全过。
+  if [ "$(echo "$seed_all_keys" | grep -c .)" -lt 10 ]; then
+    bad "SPEC-7 参数键集抽取失败(只抽到 $(echo "$seed_all_keys" | grep -c .) 个,应 ≥10)—— 判据失效必红,禁空集全过"; fails=1
+  elif [ -z "$unwatched" ]; then
+    ok "SPEC-7 无脱管参数(含对象值键:种子顶层键集 ⊆ 循环键集 ∪ 对象值登记表)"
+  else
+    bad "SPEC-7 有参数脱离值 parity 看管(多半是对象/数组值的新键,判据的历史盲区):$(echo $unwatched)——补进循环或登记进 SPEC7_OBJECT_VALUE_KEYS 并写明谁守它的值"
+  fi
+  loop_rc_keys=$(echo "$SPEC7_RISKCLUSTER_KEYS" | tr ' ' '\n' | sort)
+  loop_og_keys=$(echo "$SPEC7_OTPGATE_KEYS" | tr ' ' '\n' | sort)
+  if [ -n "$seed_rc_keys" ] && [ -n "$seed_og_keys" ] && [ "$seed_rc_keys" = "$loop_rc_keys" ] && [ "$seed_og_keys" = "$loop_og_keys" ]; then
+    ok "SPEC-7 value parity coverage(种子键集==循环键集:riskCluster $(echo "$seed_rc_keys" | grep -c .) + otpGate $(echo "$seed_og_keys" | grep -c .))"
+  else
+    bad "SPEC-7 value parity coverage 键集不等 —— seed(rc)=[$(echo $seed_rc_keys)] loop(rc)=[$(echo $loop_rc_keys)] seed(og)=[$(echo $seed_og_keys)] loop(og)=[$(echo $loop_og_keys)]"
+  fi
+fi
 # ── FEAT-WD02 网络确认费逐键 parity ──
 # z1 判决 A(2026-08-10):networkConfirmFeeUsd 已出种子进 compat 运行时默认(819a6da),
 # 文本提取器按设计红(判据失效必红,没白跑)。比对迁入 selfcheck-config-compat 行为门:
@@ -1221,7 +1368,7 @@ spec6_entry_surface_homes_present() {
 }
 spec6_entry_surface_homes_present
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs >/tmp/uni-spec6-entry-runtime.log 2>&1; then
+  if probe_retry /tmp/uni-spec6-entry-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec6-entry-surface-runtime.mjs; then
     ok "$(cat /tmp/uni-spec6-entry-runtime.log)"
   else
     bad "SPEC-6 entry-surface runtime isolation"; sed 's/^/        /' /tmp/uni-spec6-entry-runtime.log
@@ -1232,7 +1379,7 @@ fi
 # R7 pricing order and the device-detail route are runtime contracts: static
 # sentinels cannot prove a stale App reopen stays baseline or that taps really navigate.
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs >/tmp/uni-r7-device-detail-runtime.log 2>&1; then
+  if probe_retry /tmp/uni-r7-device-detail-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/r7-device-detail-runtime.mjs; then
     ok "$(cat /tmp/uni-r7-device-detail-runtime.log)"
   else
     bad "R7 + device detail runtime"; sed 's/^/        /' /tmp/uni-r7-device-detail-runtime.log
@@ -1439,13 +1586,13 @@ fi
 # FEAT-AUTH02 必须用真实 H5 iframe 回归：页面源码和 vue-tsc 都无法证明
 # “老号提示 → 自动登录 → 无重复副作用”这条跨 store/路由链实际可用。
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs >/tmp/uni-spec7-risk-gate-runtime.log 2>&1; then
+  if probe_retry /tmp/uni-spec7-risk-gate-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec7-risk-gate-runtime.mjs; then
     ok "$(cat /tmp/uni-spec7-risk-gate-runtime.log)"
   else
     bad "SPEC-7 K1 device/payment registration gates"; sed 's/^/        /' /tmp/uni-spec7-risk-gate-runtime.log
   fi
   for AUTH02_LOCALE in en zh; do
-    if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE" >/tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log 2>&1; then
+    if probe_retry /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/auth-register-existing-runtime.mjs "$AUTH02_LOCALE"; then
       ok "$(cat /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log)"
     else
       bad "AUTH02 registered-number runtime handoff (${AUTH02_LOCALE})"; sed 's/^/        /' /tmp/uni-auth02-runtime-${AUTH02_LOCALE}.log
@@ -1595,12 +1742,12 @@ else
   bad "SPEC-4 account-cloud merge semantics"; sed 's/^/        /' /tmp/uni-spec4-merge.log
 fi
 if "$CURL_BIN" -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q 200; then
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs >/tmp/uni-spec4-app-sync.log 2>&1; then
+  if probe_retry /tmp/uni-spec4-app-sync.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-account-cloud-app-sync.mjs; then
     ok "$(cat /tmp/uni-spec4-app-sync.log)"
   else
     bad "SPEC-4 account-cloud app sync"; sed 's/^/        /' /tmp/uni-spec4-app-sync.log
   fi
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs >/tmp/uni-spec4-runtime-guard.log 2>&1; then
+  if probe_retry /tmp/uni-spec4-runtime-guard.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/spec4-runtime-session-guard.mjs; then
     ok "$(cat /tmp/uni-spec4-runtime-guard.log)"
   else
     bad "SPEC-4 runtime session guard"; sed 's/^/        /' /tmp/uni-spec4-runtime-guard.log
@@ -2451,9 +2598,9 @@ NODE
 }
 home_task_carousel_contract
 
-# ── 跨仓采样证据门:pages.json 每个页面必须在真实 PC 仓有 runtime 采样证据 ──
-# 单源 = ../nexion-ops-console/scripts/uniapp-port-coverage-audit.mjs(直接调用,
-# 不镜像豁免清单/逻辑,防跨仓 parity 漂移);PC 仓不存在(独立打包/CI)则跳过。
+# ── 跨仓采样证据门:pages.json 每个页面必须在 admin 仓有 runtime 采样证据 ──
+# 单源 = $ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs(../nexion-ops-console → admin-ops
+# main;直接调用,不镜像豁免清单/逻辑,防跨仓 parity 漂移);admin 仓不存在(独立打包/CI)则跳过。
 # 出处:2026-07-15 device-detail 增页未补采样证据,admin 跨仓齿轮红了一天才被发现。
 cross_repo_sampling_gate() {
   local audit_js="$ADMIN_ROOT/scripts/uniapp-port-coverage-audit.mjs"
@@ -2470,7 +2617,7 @@ cross_repo_sampling_gate() {
   if "$NODE_BIN" "$audit_arg" > /tmp/uniapp-port-coverage-audit.log 2>&1; then
     ok "cross-repo sampling evidence (admin uniapp-port-coverage-audit findings=0)"
   else
-    bad "page(s) lack PC-side sampling evidence — 去 ../nexion-ops-console 把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
+    bad "page(s) lack admin-side sampling evidence — 去 ../nexion-ops-console(admin-ops main)把新页面加进 docs/audit/l1-shards.json 对应 UNI-FR-* shard,再跑 node scripts/remediation-runtime-front-shard.mjs <SHARD> && node scripts/remediation-runtime-front-action-sample.mjs <SHARD>"
     tail -25 /tmp/uniapp-port-coverage-audit.log | sed 's/^/        /'
   fi
 }
@@ -2574,7 +2721,7 @@ theme_constant_gate() {
     tail -6 /tmp/uniapp-theme-const-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/theme-constant-gate.mjs > /tmp/uniapp-theme-const.log 2>&1; then
+  if probe_retry /tmp/uniapp-theme-const.log "$NODE_BIN" scripts/theme-constant-gate.mjs; then
     ok "$(tail -1 /tmp/uniapp-theme-const.log)"
   else
     bad "新增「双主题恒定」着色元素 — 该元素亮/暗渲染出来一个色 = 没跟主题"
@@ -2595,7 +2742,7 @@ zero_border_gate() {
     tail -6 /tmp/uniapp-zero-border-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/zero-border-gate.mjs > /tmp/uniapp-zero-border.log 2>&1; then
+  if probe_retry /tmp/uniapp-zero-border.log "$NODE_BIN" scripts/zero-border-gate.mjs; then
     ok "$(tail -1 /tmp/uniapp-zero-border.log)"
   else
     bad "新增「有填充 + 四边描边」容器 — 《03》§3 层级靠 surface 微差色,不靠描边"
@@ -2609,14 +2756,14 @@ zero_border_gate
 # 存量黄灯 = docs/DOM-QA-LEDGER.json;gate 只拦 ledger 外新指纹(新页/改动页硬门)。
 # 豁免 = 人工审阅后 --update-ledger 收编 + entry 写 qaOk 理由。selftest = 哨兵自身双向红测。
 dom_qa_gate() {
-  if "$NODE_BIN" scripts/dom-qa.mjs --selftest > /tmp/uniapp-dom-qa-selftest.log 2>&1; then
+  if probe_retry /tmp/uniapp-dom-qa-selftest.log "$NODE_BIN" scripts/dom-qa.mjs --selftest; then
     ok "dom-qa selftest(双向红测:5 类阳性全中 + 干净 fixture 0)"
   else
     bad "dom-qa selftest 失败(探针失效即门失效;node scripts/dom-qa.mjs --selftest 看明细)"
     tail -5 /tmp/uniapp-dom-qa-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/dom-qa.mjs --sweep core > /tmp/uniapp-dom-qa.log 2>&1; then
+  if probe_retry /tmp/uniapp-dom-qa.log "$NODE_BIN" scripts/dom-qa.mjs --sweep core; then
     ok "dom-qa core(5 tab)无新 DOM 违例(存量黄灯见 docs/DOM-QA-LEDGER.json)"
   else
     bad "dom-qa 新 DOM 违例 — node scripts/dom-qa.mjs --sweep core 看明细;确属合法例外 → --update-ledger 收编并写 qaOk 理由"
@@ -2632,18 +2779,33 @@ dom_qa_gate
 # 反馈判定走 CDP CSS.forcePseudoState 实测(不是 grep class,声明了但被 inline style 压掉的会被抓出来)。
 # 存量黄灯 = docs/TAP-FEEDBACK-LEDGER.json;豁免 = --update-ledger 收编 + entry 写 tapOk 理由。
 tap_feedback_gate() {
-  if "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest > /tmp/uniapp-tap-selftest.log 2>&1; then
+  if probe_retry /tmp/uniapp-tap-selftest.log "$NODE_BIN" scripts/tap-feedback-probe.mjs --selftest; then
     ok "tap-feedback selftest(双向红测:尺寸/反馈阳性全中 + 过渡·祖先链·不可点三类假阳 0)"
   else
     bad "tap-feedback selftest 失败(探针失效即门失效;node scripts/tap-feedback-probe.mjs --selftest 看明细)"
     tail -6 /tmp/uniapp-tap-selftest.log | sed 's/^/        /'
     return
   fi
-  if "$NODE_BIN" scripts/tap-feedback-probe.mjs > /tmp/uniapp-tap.log 2>&1; then
+  if probe_retry /tmp/uniapp-tap.log "$NODE_BIN" scripts/tap-feedback-probe.mjs; then
     ok "$(tail -1 /tmp/uniapp-tap.log)"
   else
     bad "tap 目标新违例 — node scripts/tap-feedback-probe.mjs 看明细;热区补到 44 或按《08》§2 加 active 反馈,确属豁免 → --update-ledger 收编并写 tapOk 理由"
     tail -12 /tmp/uniapp-tap.log | sed 's/^/        /'
+  fi
+  # 孤字断行探针(包 zk 2026-08-15):三语 × 钱链路 5 路由 @375px,CJK 正文末行不得只剩一两个字。
+  # 静态门测不出排版结果(同句 390px 不断、375px 断出「些。」),必须真渲染;先跑双向 selftest。
+  if probe_retry /tmp/uniapp-orphan-selftest.log "$NODE_BIN" scripts/orphan-line-probe.mjs --selftest; then
+    ok "orphan-line selftest(双向红测:CJK 孤字必中 · en 单词尾行不误报 · 干净 0)"
+  else
+    bad "orphan-line selftest 失败(探针失效即门失效;node scripts/orphan-line-probe.mjs --selftest 看明细)"
+    tail -4 /tmp/uniapp-orphan-selftest.log | sed 's/^/        /'
+    return
+  fi
+  if probe_retry /tmp/uniapp-orphan.log "$NODE_BIN" scripts/orphan-line-probe.mjs; then
+    ok "$(tail -1 /tmp/uniapp-orphan.log)"
+  else
+    bad "孤字断行新违例 — node scripts/orphan-line-probe.mjs 看明细;改短文案或给数字+单位原子加 nowrap"
+    tail -8 /tmp/uniapp-orphan.log | sed 's/^/        /'
   fi
 }
 tap_feedback_gate
@@ -2692,7 +2854,7 @@ card_data_boundary_gate
 # 强制清空所有 store 的数组字段让空态显形,逐页断言:插画真加载(naturalWidth>0)+ 标题非空
 # + 不溢出 + 无 console error。「接上了组件」和「空态真能显示」是两回事。
 empty_state_gate() {
-  if "$NODE_BIN" scripts/empty-state-probe.mjs > /tmp/uniapp-empty-state.log 2>&1; then
+  if probe_retry /tmp/uniapp-empty-state.log "$NODE_BIN" scripts/empty-state-probe.mjs; then
     ok "$(tail -1 /tmp/uniapp-empty-state.log)"
   else
     bad "空状态渲染失败 — node scripts/empty-state-probe.mjs 看明细(插画路径 / 标题 key / 布局溢出)"
@@ -2889,7 +3051,7 @@ bill_producer_gate
 # (故意让回执 ≠ 页面输入)+ memoKey 走 i18n 码位 ④歧义失败零写入、原地重试沿用同一把幂等键
 # 并自愈成一对 ⑤账单页渲染成可点行 ⑥零 console error。
 withdraw_bill_runtime_gate() {
-  if BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs > /tmp/uniapp-withdraw-bill-runtime.log 2>&1; then
+  if probe_retry /tmp/uniapp-withdraw-bill-runtime.log env BASE_URL="$BASE_URL" "$NODE_BIN" scripts/withdraw-bill-runtime.mjs; then
     ok "提现账单行 runtime 门 — $(tail -1 /tmp/uniapp-withdraw-bill-runtime.log)"
   else
     bad "提现账单行 runtime 门失败 — BASE_URL=$BASE_URL node scripts/withdraw-bill-runtime.mjs 看明细"
@@ -3333,12 +3495,17 @@ a11y_activate_gate() {
 a11y_activate_gate
 
 # Always boot the current worktree on an isolated port; never reuse a stale BASE_URL server.
-if "$NODE_BIN" scripts/verify-h5-runtime.mjs >/tmp/uni-h5-runtime-gates.log 2>&1; then
+if probe_retry /tmp/uni-h5-runtime-gates.log "$NODE_BIN" scripts/verify-h5-runtime.mjs; then
   ok "H5 运行时门隔离起服 — $(tail -1 /tmp/uni-h5-runtime-gates.log)"
 else
   bad "H5 运行时门隔离起服失败 — node scripts/verify-h5-runtime.mjs 看明细"
   tail -12 /tmp/uni-h5-runtime-gates.log | sed 's/^/        /'
 fi
 
-echo -e "${C}━━ result: ${G}$pass pass${N}, $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
+# 重试留痕回显:哪个探针、几点、首败退出码 —— 反复出现同一探针 = 可能是真偶发 bug,要追
+if [ -s "$PROBE_RETRY_LOG" ]; then
+  echo -e "${Y}⚠ probe retries this run:${N}"
+  sed 's/^/    /' "$PROBE_RETRY_LOG"
+fi
+echo -e "${C}━━ result: ${G}$pass pass${N}$( [ $retried -gt 0 ] && echo -e " ${Y}($retried after-retry ⚠)${N}" ), $( [ $fail -gt 0 ] && echo -e "${R}$fail fail${N}" || echo -e "${G}0 fail${N}" ), $( [ $skip -gt 0 ] && echo -e "${Y}$skip skip${N}" || echo "0 skip" ) ━━"
 [ $fail -eq 0 ] && [ $skip -eq 0 ]

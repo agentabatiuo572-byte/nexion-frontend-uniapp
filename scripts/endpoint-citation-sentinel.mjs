@@ -131,7 +131,8 @@ const LEDGER = {
   // ── quests / faucet / milestones ──────────────────────────────────────
   "GET /api/quest": "PRD §9.11c.2",
   "POST /api/quest/complete": "PRD §9.11c.2",
-  "GET /api/quests/weekly": "PRD §9.11c.2",
+  // 2026-08-15 包 zk:`GET /api/quests/weekly` 从台账删除 —— 最后一处文本引用在死文件
+  // mock/weekly-quests.ts(0 运行时引用,已 Move .trash),实现自 U-16 起走 /api/quests/state。
   // 🔴 2026-08-13:周任务的**真实**端点是 `GET /api/quests/state`,不是 PRD 写的
   //   `/api/quests/weekly` —— 后者全仓已无任何实现(只剩 mock 文件里一处注释)。
   //   四条 `POST /api/quests/weekly/{...}` 已随领奖服务端化退役,本轮从台账删除。

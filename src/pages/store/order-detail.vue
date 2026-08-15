@@ -261,7 +261,7 @@ async function handleCancel() {
     if (cancelled) {
       toast.warn(t.value.orders.cancelDoneToast);
     } else {
-      toast.warn("Cancellation is awaiting server confirmation; this order remains pending.");
+      toast.warn(t.value.orders.cancelPendingServer);
     }
   }
 }

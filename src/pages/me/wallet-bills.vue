@@ -31,7 +31,7 @@
       </view>
 
       <view v-if="ledgerError" :style="ledgerErrorStyle">
-        <text class="break-all">{{ ledgerError }}</text>
+        <text>{{ t.walletV3.submitReasonServiceUnavailable }}</text>
       </view>
 
       <!-- Empty -->
