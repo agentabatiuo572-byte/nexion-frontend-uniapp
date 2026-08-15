@@ -132,7 +132,7 @@ probe_retry_selftest() {
   # ③ 接线完整性:被包真跑调用点数 = census 期望(解包/漏包即红)。锚定行首 if(注释诱饵免疫,
   # tester M5)+ 绝对路径(cwd≠仓根时 $0 相对路径假红,P2-4)+ 不用 `|| echo 0`(grep -c 零命中
   # 时打印 0 且退出码 1,会产出 "0\n0" 两行值,P2-10)
-  local expected_sites=16 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"
+  local expected_sites=18 actual_sites vfile="$PROJECT_DIR/scripts/verify.sh"  # 2026-08-15 包 zl:+2 = orphan-line 探针(selftest+live)
   actual_sites=$(grep -cE '^[[:space:]]*if probe_retry .*"\$NODE_BIN" scripts/' "$vfile" 2>/dev/null); actual_sites=${actual_sites:-0}
   [ "$actual_sites" = "$expected_sites" ] || bad_bits="$bad_bits ③接线数=$actual_sites≠$expected_sites"
   if [ -z "$bad_bits" ]; then
